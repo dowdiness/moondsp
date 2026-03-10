@@ -36,6 +36,47 @@ test "process fills a block with bounded samples" {
 }
 
 ///|
+test "saw waveform ramps upward from negative values" {
+  let osc = Oscillator::new()
+
+  let first = osc.tick_waveform(Waveform::Saw, 440.0, 48000.0)
+  let second = osc.tick_waveform(Waveform::Saw, 440.0, 48000.0)
+  let third = osc.tick_waveform(Waveform::Saw, 440.0, 48000.0)
+
+  assert_true(first < second)
+  assert_true(second < third)
+  assert_true(first >= -1.0 && third <= 1.0)
+}
+
+///|
+test "square waveform toggles only between bipolar levels" {
+  let osc = Oscillator::new()
+  let context = DspContext::new(48000.0, 8)
+  let buffer = AudioBuffer::filled(8)
+
+  osc.process_waveform(context, buffer, Waveform::Square, 440.0)
+
+  assert_true(
+    buffer.as_fixed_array().every(sample => sample == 1.0 || sample == -1.0),
+  )
+}
+
+///|
+test "triangle waveform stays bounded and changes smoothly" {
+  let osc = Oscillator::new()
+  let context = DspContext::new(48000.0, 8)
+  let buffer = AudioBuffer::filled(8)
+
+  osc.process_waveform(context, buffer, Waveform::Triangle, 440.0)
+
+  assert_true(
+    buffer.as_fixed_array().every(sample => sample >= -1.0 && sample <= 1.0),
+  )
+  assert_true((buffer.get(1) - buffer.get(0)).abs() < 0.1)
+  assert_true((buffer.get(2) - buffer.get(1)).abs() < 0.1)
+}
+
+///|
 test "audio buffer initializes and mutates samples" {
   let buffer = AudioBuffer::filled(4, init=0.25)
 

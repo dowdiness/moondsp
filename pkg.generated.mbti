@@ -122,8 +122,10 @@ pub struct Oscillator {
 pub fn Oscillator::new() -> Self
 pub fn Oscillator::phase(Self) -> Double
 pub fn Oscillator::process(Self, DspContext, AudioBuffer, Double) -> Unit
+pub fn Oscillator::process_waveform(Self, DspContext, AudioBuffer, Waveform, Double) -> Unit
 pub fn Oscillator::reset(Self) -> Unit
 pub fn Oscillator::tick(Self, Double, Double) -> Double
+pub fn Oscillator::tick_waveform(Self, Waveform, Double, Double) -> Double
 
 pub struct ParamSmoother {
   mut current : Double
@@ -139,6 +141,13 @@ pub fn ParamSmoother::set_smoothing_time_from_context(Self, Double, DspContext) 
 pub fn ParamSmoother::set_target(Self, Double) -> Unit
 pub fn ParamSmoother::target(Self) -> Double
 pub fn ParamSmoother::tick(Self) -> Double
+
+pub(all) enum Waveform {
+  Sine
+  Saw
+  Square
+  Triangle
+}
 
 // Type aliases
 

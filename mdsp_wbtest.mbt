@@ -25,6 +25,32 @@ test "process with invalid sample rate writes silence" {
 }
 
 ///|
+test "process_waveform respects context block size" {
+  let osc = Oscillator::new()
+  let context = DspContext::new(48000.0, 2)
+  let buffer = AudioBuffer::filled(4, init=1.0)
+
+  osc.process_waveform(context, buffer, Waveform::Saw, 440.0)
+
+  assert_true(buffer.get(0) != 1.0)
+  assert_true(buffer.get(1) != 1.0)
+  assert_eq(buffer.get(2), 0.0)
+  assert_eq(buffer.get(3), 0.0)
+}
+
+///|
+test "waveform selection preserves shared phase progression" {
+  let osc = Oscillator::new()
+
+  ignore(osc.tick_waveform(Waveform::Saw, 440.0, 48000.0))
+  let phase_after_saw = osc.phase()
+  ignore(osc.tick_waveform(Waveform::Triangle, 440.0, 48000.0))
+
+  assert_true(phase_after_saw > 0.0)
+  assert_eq(osc.phase(), 880.0 / 48000.0)
+}
+
+///|
 test "process respects context block size" {
   let osc = Oscillator::new()
   let context = DspContext::new(48000.0, 2)

@@ -1,5 +1,14 @@
 ///|
-/// Stateful sine oscillator for the first reusable Phase 1 DSP primitive.
+/// Supported oscillator waveforms for the Phase 1 source primitive.
+pub(all) enum Waveform {
+  Sine
+  Saw
+  Square
+  Triangle
+}
+
+///|
+/// Stateful oscillator for the first reusable Phase 1 DSP primitive.
 pub struct Oscillator {
   mut phase : Double
 }
@@ -23,27 +32,39 @@ pub fn Oscillator::phase(self : Oscillator) -> Double {
 }
 
 ///|
-/// Generate one sine sample and advance the oscillator state.
-pub fn Oscillator::tick(
+/// Generate one sample for the selected waveform and advance the oscillator
+/// state.
+pub fn Oscillator::tick_waveform(
   self : Oscillator,
+  waveform : Waveform,
   freq : Double,
   sample_rate : Double,
 ) -> Double {
   if sample_rate <= 0.0 {
     return 0.0
   }
-  let two_pi = 6.283185307179586
-  let out = @math.sin(self.phase * two_pi)
+  let out = sample_for_phase(waveform, self.phase)
   self.phase = wrap_phase(self.phase + freq / sample_rate)
   out
 }
 
 ///|
-/// Fill an output buffer with oscillator samples.
-pub fn Oscillator::process(
+/// Generate one sine sample and advance the oscillator state.
+pub fn Oscillator::tick(
+  self : Oscillator,
+  freq : Double,
+  sample_rate : Double,
+) -> Double {
+  self.tick_waveform(Waveform::Sine, freq, sample_rate)
+}
+
+///|
+/// Fill an output buffer with samples for the selected waveform.
+pub fn Oscillator::process_waveform(
   self : Oscillator,
   context : DspContext,
   output : AudioBuffer,
+  waveform : Waveform,
   freq : Double,
 ) -> Unit {
   let sample_rate = context.sample_rate()
@@ -59,11 +80,32 @@ pub fn Oscillator::process(
   }
 
   for index = 0; index < sample_count; index = index + 1 {
-    output.set(index, self.tick(freq, sample_rate))
+    output.set(index, self.tick_waveform(waveform, freq, sample_rate))
   }
 
   for index = sample_count; index < output.length(); index = index + 1 {
     output.set(index, 0.0)
+  }
+}
+
+///|
+/// Fill an output buffer with oscillator samples.
+pub fn Oscillator::process(
+  self : Oscillator,
+  context : DspContext,
+  output : AudioBuffer,
+  freq : Double,
+) -> Unit {
+  self.process_waveform(context, output, Waveform::Sine, freq)
+}
+
+///|
+fn sample_for_phase(waveform : Waveform, phase : Double) -> Double {
+  match waveform {
+    Sine => @math.sin(phase * 6.283185307179586)
+    Saw => 2.0 * phase - 1.0
+    Square => if phase < 0.5 { 1.0 } else { -1.0 }
+    Triangle => if phase < 0.5 { 4.0 * phase - 1.0 } else { 3.0 - 4.0 * phase }
   }
 }
 
