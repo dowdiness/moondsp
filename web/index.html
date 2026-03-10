@@ -61,6 +61,64 @@
       margin: 28px 0;
     }
 
+    .meter-card {
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 20px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(247, 238, 223, 0.88));
+    }
+
+    .meter-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: baseline;
+      margin-bottom: 14px;
+    }
+
+    .meter-sub {
+      font-size: 0.92rem;
+      color: rgba(29, 27, 24, 0.74);
+    }
+
+    .meter-rail {
+      position: relative;
+      overflow: hidden;
+      height: 18px;
+      border-radius: 999px;
+      background: rgba(29, 27, 24, 0.08);
+      border: 1px solid rgba(29, 27, 24, 0.08);
+    }
+
+    .meter-fill {
+      width: 0%;
+      height: 100%;
+      border-radius: inherit;
+      background:
+        linear-gradient(90deg, #577d21 0%, #d8a227 68%, #c35a2b 100%);
+      box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.22);
+      transition: width 80ms linear;
+    }
+
+    .meter-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+      font-size: 0.88rem;
+      color: rgba(29, 27, 24, 0.68);
+    }
+
+    .scope {
+      display: block;
+      width: 100%;
+      height: 88px;
+      margin-top: 16px;
+      border-radius: 16px;
+      background: rgba(29, 27, 24, 0.92);
+      border: 1px solid rgba(29, 27, 24, 0.2);
+    }
+
     .buttons {
       display: flex;
       gap: 12px;
@@ -156,6 +214,25 @@
     </div>
 
     <section class="controls">
+      <div class="meter-card">
+        <div class="meter-head">
+          <div>
+            <strong>Signal Meter</strong>
+            <div class="meter-sub">Confirms that samples are moving even if speaker output is muted.</div>
+          </div>
+          <span id="meterValue">-∞ dB</span>
+        </div>
+        <div class="meter-rail" aria-hidden="true">
+          <div id="meterFill" class="meter-fill"></div>
+        </div>
+        <div class="meter-labels">
+          <span>silent</span>
+          <span>healthy</span>
+          <span>hot</span>
+        </div>
+        <canvas id="scope" class="scope" width="640" height="88"></canvas>
+      </div>
+
       <div class="slider-card">
         <div class="slider-row">
           <strong>Frequency</strong>
@@ -183,11 +260,18 @@
     const gainSlider = document.getElementById("gainSlider");
     const freqValue = document.getElementById("freqValue");
     const gainValue = document.getElementById("gainValue");
+    const meterFill = document.getElementById("meterFill");
+    const meterValue = document.getElementById("meterValue");
+    const scope = document.getElementById("scope");
     const statusBox = document.getElementById("status");
+    const scopeCtx = scope.getContext("2d");
 
     let audioContext = null;
     let node = null;
     let gainNode = null;
+    let analyserNode = null;
+    let analyserData = null;
+    let meterFrame = 0;
 
     function setStatus(message, state = "idle") {
       statusBox.textContent = message;
@@ -197,6 +281,71 @@
     function syncLabels() {
       freqValue.textContent = freqSlider.value;
       gainValue.textContent = gainSlider.value;
+    }
+
+    function resetMeter() {
+      meterFill.style.width = "0%";
+      meterValue.textContent = "-\u221e dB";
+      scopeCtx.clearRect(0, 0, scope.width, scope.height);
+      scopeCtx.fillStyle = "rgba(18, 17, 15, 0.96)";
+      scopeCtx.fillRect(0, 0, scope.width, scope.height);
+      scopeCtx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+      scopeCtx.beginPath();
+      scopeCtx.moveTo(0, scope.height / 2);
+      scopeCtx.lineTo(scope.width, scope.height / 2);
+      scopeCtx.stroke();
+    }
+
+    function stopMeterLoop() {
+      if (meterFrame) {
+        cancelAnimationFrame(meterFrame);
+        meterFrame = 0;
+      }
+    }
+
+    function startMeterLoop() {
+      if (!analyserNode || !analyserData) {
+        resetMeter();
+        return;
+      }
+
+      const draw = () => {
+        if (!analyserNode || !analyserData) {
+          return;
+        }
+
+        analyserNode.getFloatTimeDomainData(analyserData);
+        let peak = 0;
+        for (let index = 0; index < analyserData.length; index += 1) {
+          peak = Math.max(peak, Math.abs(analyserData[index]));
+        }
+
+        const db = peak > 0 ? (20 * Math.log10(peak)) : -Infinity;
+        const normalized = peak >= 1 ? 1 : peak;
+        meterFill.style.width = `${(normalized * 100).toFixed(1)}%`;
+        meterValue.textContent = Number.isFinite(db) ? `${db.toFixed(1)} dB` : "-\u221e dB";
+
+        scopeCtx.fillStyle = "rgba(18, 17, 15, 0.28)";
+        scopeCtx.fillRect(0, 0, scope.width, scope.height);
+        scopeCtx.lineWidth = 2;
+        scopeCtx.strokeStyle = "#f4d39c";
+        scopeCtx.beginPath();
+        for (let index = 0; index < analyserData.length; index += 1) {
+          const x = (index / (analyserData.length - 1)) * scope.width;
+          const y = ((1 - analyserData[index]) * 0.5) * scope.height;
+          if (index === 0) {
+            scopeCtx.moveTo(x, y);
+          } else {
+            scopeCtx.lineTo(x, y);
+          }
+        }
+        scopeCtx.stroke();
+
+        meterFrame = requestAnimationFrame(draw);
+      };
+
+      stopMeterLoop();
+      draw();
     }
 
     async function start() {
@@ -236,14 +385,23 @@
 
         gainNode = audioContext.createGain();
         gainNode.gain.value = 1.0;
-        node.connect(gainNode).connect(audioContext.destination);
+        analyserNode = audioContext.createAnalyser();
+        analyserNode.fftSize = 2048;
+        analyserNode.smoothingTimeConstant = 0.85;
+        analyserData = new Float32Array(analyserNode.fftSize);
+        node.connect(gainNode);
+        gainNode.connect(analyserNode);
+        gainNode.connect(audioContext.destination);
 
         node.port.postMessage({ type: "set-freq", value: Number(freqSlider.value) });
         node.port.postMessage({ type: "set-gain", value: Number(gainSlider.value) / 100 });
 
+        startMeterLoop();
         startBtn.disabled = true;
         stopBtn.disabled = false;
       } catch (error) {
+        stopMeterLoop();
+        resetMeter();
         setStatus(error instanceof Error ? error.message : String(error), "error");
         if (audioContext) {
           await audioContext.close();
@@ -251,18 +409,24 @@
         audioContext = null;
         node = null;
         gainNode = null;
+        analyserNode = null;
+        analyserData = null;
       }
     }
 
     async function stop() {
+      stopMeterLoop();
       if (audioContext) {
         await audioContext.close();
       }
       audioContext = null;
       node = null;
       gainNode = null;
+      analyserNode = null;
+      analyserData = null;
       startBtn.disabled = false;
       stopBtn.disabled = true;
+      resetMeter();
       setStatus("Stopped.");
     }
 
@@ -291,6 +455,7 @@
     });
 
     syncLabels();
+    resetMeter();
   </script>
 </body>
 </html>
