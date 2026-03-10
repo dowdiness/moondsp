@@ -2,3 +2,4 @@
 _build/
 .mooncakes/
 .moonagent/
+web/moonbit_dsp.wasm

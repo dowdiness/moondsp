@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mdsp Step 0</title>
+  <style>
+    :root {
+      --bg: #f3efe5;
+      --ink: #1d1b18;
+      --panel: rgba(255, 252, 245, 0.9);
+      --accent: #b44f2c;
+      --accent-soft: #e8c2a2;
+      --border: rgba(29, 27, 24, 0.14);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Georgia, "Times New Roman", serif;
+      background:
+        radial-gradient(circle at top left, #fff9ef 0%, transparent 35%),
+        linear-gradient(135deg, #efe0cb 0%, #f8f4eb 48%, #dfc7b1 100%);
+      color: var(--ink);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    main {
+      width: min(720px, 100%);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      padding: 32px;
+      box-shadow: 0 24px 80px rgba(60, 34, 10, 0.12);
+      backdrop-filter: blur(10px);
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(2.2rem, 6vw, 4.5rem);
+      line-height: 0.95;
+      letter-spacing: -0.04em;
+    }
+
+    p {
+      margin: 0 0 20px;
+      font-size: 1.05rem;
+      line-height: 1.5;
+      max-width: 52ch;
+    }
+
+    .controls {
+      display: grid;
+      gap: 18px;
+      margin: 28px 0;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      padding: 14px 24px;
+      font: inherit;
+      font-size: 1rem;
+      cursor: pointer;
+      background: var(--ink);
+      color: white;
+      transition: transform 120ms ease, opacity 120ms ease;
+    }
+
+    button.secondary {
+      background: white;
+      color: var(--ink);
+      border: 1px solid var(--border);
+    }
+
+    button:disabled {
+      opacity: 0.4;
+      cursor: default;
+      transform: none;
+    }
+
+    button:not(:disabled):hover {
+      transform: translateY(-1px);
+    }
+
+    .slider-card {
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px;
+      background: rgba(255, 255, 255, 0.62);
+    }
+
+    .slider-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+      font-size: 0.98rem;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    #status {
+      margin-top: 18px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: #fff7ea;
+      border: 1px solid rgba(180, 79, 44, 0.22);
+      min-height: 54px;
+    }
+
+    #status[data-state="error"] {
+      background: #fff0ec;
+      border-color: rgba(180, 32, 32, 0.28);
+    }
+
+    #status[data-state="ok"] {
+      background: #f4faee;
+      border-color: rgba(71, 125, 33, 0.25);
+    }
+
+    code {
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.92em;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>MoonBit DSP<br>Step 0</h1>
+    <p>
+      This page is the Phase 0 platform check for <code>mdsp</code>:
+      a sine oscillator computed in MoonBit and called from an
+      <code>AudioWorkletProcessor</code>.
+    </p>
+
+    <div class="buttons">
+      <button id="startBtn">Start Audio</button>
+      <button id="stopBtn" class="secondary" disabled>Stop</button>
+    </div>
+
+    <section class="controls">
+      <div class="slider-card">
+        <div class="slider-row">
+          <strong>Frequency</strong>
+          <span><span id="freqValue">440</span> Hz</span>
+        </div>
+        <input id="freqSlider" type="range" min="20" max="2000" value="440" step="1">
+      </div>
+
+      <div class="slider-card">
+        <div class="slider-row">
+          <strong>Gain</strong>
+          <span><span id="gainValue">30</span>%</span>
+        </div>
+        <input id="gainSlider" type="range" min="0" max="100" value="30" step="1">
+      </div>
+    </section>
+
+    <div id="status" data-state="idle">Ready. Build the wasm file, serve <code>web/</code>, then click Start Audio.</div>
+  </main>
+
+  <script>
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const freqSlider = document.getElementById("freqSlider");
+    const gainSlider = document.getElementById("gainSlider");
+    const freqValue = document.getElementById("freqValue");
+    const gainValue = document.getElementById("gainValue");
+    const statusBox = document.getElementById("status");
+
+    let audioContext = null;
+    let node = null;
+    let gainNode = null;
+
+    function setStatus(message, state = "idle") {
+      statusBox.textContent = message;
+      statusBox.dataset.state = state;
+    }
+
+    function syncLabels() {
+      freqValue.textContent = freqSlider.value;
+      gainValue.textContent = gainSlider.value;
+    }
+
+    async function start() {
+      setStatus("Creating AudioContext...");
+      audioContext = new AudioContext({ sampleRate: 48000 });
+
+      try {
+        setStatus("Unlocking audio...");
+        await audioContext.resume();
+
+        await audioContext.audioWorklet.addModule("processor.js");
+        setStatus("Fetching and compiling MoonBit wasm module...");
+        const response = await fetch("moonbit_dsp.wasm");
+        if (!response.ok) {
+          throw new Error(`Failed to fetch moonbit_dsp.wasm: ${response.status}`);
+        }
+
+        const bytes = await response.arrayBuffer();
+        const wasmModule = await WebAssembly.compile(bytes);
+        const exports = WebAssembly.Module.exports(wasmModule).map((entry) => entry.name);
+        console.log("wasm exports:", exports);
+
+        node = new AudioWorkletNode(audioContext, "moonbit-dsp", {
+          processorOptions: { wasmModule },
+          numberOfInputs: 0,
+          numberOfOutputs: 1,
+          outputChannelCount: [2],
+        });
+
+        node.port.onmessage = (event) => {
+          if (event.data?.type === "ready") {
+            setStatus(`Audio running. Exports: ${event.data.exports.join(", ")}`, "ok");
+          } else if (event.data?.type === "error") {
+            setStatus(`Processor init failed: ${event.data.message}`, "error");
+          }
+        };
+
+        gainNode = audioContext.createGain();
+        gainNode.gain.value = 1.0;
+        node.connect(gainNode).connect(audioContext.destination);
+
+        node.port.postMessage({ type: "set-freq", value: Number(freqSlider.value) });
+        node.port.postMessage({ type: "set-gain", value: Number(gainSlider.value) / 100 });
+
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : String(error), "error");
+        if (audioContext) {
+          await audioContext.close();
+        }
+        audioContext = null;
+        node = null;
+        gainNode = null;
+      }
+    }
+
+    async function stop() {
+      if (audioContext) {
+        await audioContext.close();
+      }
+      audioContext = null;
+      node = null;
+      gainNode = null;
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      setStatus("Stopped.");
+    }
+
+    startBtn.addEventListener("click", () => {
+      if (!audioContext) {
+        start();
+      }
+    });
+
+    stopBtn.addEventListener("click", () => {
+      stop();
+    });
+
+    freqSlider.addEventListener("input", () => {
+      syncLabels();
+      if (node) {
+        node.port.postMessage({ type: "set-freq", value: Number(freqSlider.value) });
+      }
+    });
+
+    gainSlider.addEventListener("input", () => {
+      syncLabels();
+      if (node) {
+        node.port.postMessage({ type: "set-gain", value: Number(gainSlider.value) / 100 });
+      }
+    });
+
+    syncLabels();
+  </script>
+</body>
+</html>

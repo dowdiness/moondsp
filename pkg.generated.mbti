@@ -1,0 +1,16 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/mdsp"
+
+// Values
+pub fn reset_phase() -> Unit
+
+pub fn tick(Double, Double) -> Double
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+

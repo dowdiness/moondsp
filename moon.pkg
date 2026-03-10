@@ -1,0 +1,12 @@
+import {
+  "moonbitlang/core/math" @math,
+  "moonbitlang/core/ref" @ref,
+}
+
+options(
+  "is-main": true,
+  link: {
+    "js": { "exports": [ "tick", "reset_phase" ] },
+    "wasm-gc": { "exports": [ "tick", "reset_phase" ] },
+  },
+)
