@@ -9,6 +9,14 @@ pub fn tick(Double, Double) -> Double
 // Errors
 
 // Types and methods
+pub struct Oscillator {
+  mut phase : Double
+}
+pub fn Oscillator::new() -> Self
+pub fn Oscillator::phase(Self) -> Double
+pub fn Oscillator::process(Self, FixedArray[Double], Double, Double) -> Unit
+pub fn Oscillator::reset(Self) -> Unit
+pub fn Oscillator::tick(Self, Double, Double) -> Double
 
 // Type aliases
 
