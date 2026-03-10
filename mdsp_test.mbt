@@ -411,3 +411,79 @@ test "delay line wraps around its circular buffer" {
   assert_eq(delay.tick(4.0), 1.0)
   assert_eq(delay.tick(5.0), 2.0)
 }
+
+///|
+test "pan sends mono input fully left at -1 position" {
+  let pan = Pan::new()
+  let context = DspContext::new(48000.0, 4)
+  let input = AudioBuffer::new(make_pan_test_samples())
+  let left = AudioBuffer::filled(4)
+  let right = AudioBuffer::filled(4)
+
+  pan.process(context, input, left, right, -1.0)
+
+  assert_eq(left.get(0), 1.0)
+  assert_eq(left.get(1), 0.5)
+  assert_eq(left.get(2), -0.5)
+  assert_eq(left.get(3), -1.0)
+  assert_true(right.as_fixed_array().every(sample => sample == 0.0))
+}
+
+///|
+test "pan uses equal-power gains at center" {
+  let pan = Pan::new()
+  let context = DspContext::new(48000.0, 4)
+  let input = AudioBuffer::new(make_pan_test_samples())
+  let left = AudioBuffer::filled(4)
+  let right = AudioBuffer::filled(4)
+
+  pan.process(context, input, left, right, 0.0)
+
+  let center_gain = 0.5.sqrt()
+  assert_true((left.get(0) - center_gain).abs() < 0.000000001)
+  assert_true((right.get(0) - center_gain).abs() < 0.000000001)
+  assert_true((left.get(3) + center_gain).abs() < 0.000000001)
+  assert_true((right.get(3) + center_gain).abs() < 0.000000001)
+}
+
+///|
+test "pan sends mono input fully right at +1 position" {
+  let pan = Pan::new()
+  let context = DspContext::new(48000.0, 4)
+  let input = AudioBuffer::new(make_pan_test_samples())
+  let left = AudioBuffer::filled(4)
+  let right = AudioBuffer::filled(4)
+
+  pan.process(context, input, left, right, 1.0)
+
+  assert_true(left.as_fixed_array().every(sample => sample == 0.0))
+  assert_eq(right.get(0), 1.0)
+  assert_eq(right.get(1), 0.5)
+  assert_eq(right.get(2), -0.5)
+  assert_eq(right.get(3), -1.0)
+}
+
+///|
+test "pan clamps finite positions outside the supported range" {
+  let pan = Pan::new()
+  let context = DspContext::new(48000.0, 2)
+  let input = AudioBuffer::new(make_pan_test_samples())
+  let left = AudioBuffer::filled(2)
+  let right = AudioBuffer::filled(2)
+
+  pan.process(context, input, left, right, 2.0)
+
+  assert_true(left.as_fixed_array().every(sample => sample == 0.0))
+  assert_eq(right.get(0), 1.0)
+  assert_eq(right.get(1), 0.5)
+}
+
+///|
+fn make_pan_test_samples() -> FixedArray[Double] {
+  let samples = FixedArray::make(4, 0.0)
+  samples[0] = 1.0
+  samples[1] = 0.5
+  samples[2] = -0.5
+  samples[3] = -1.0
+  samples
+}

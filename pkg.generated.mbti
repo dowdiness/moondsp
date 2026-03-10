@@ -136,6 +136,14 @@ pub fn Oscillator::reset(Self) -> Unit
 pub fn Oscillator::tick(Self, Double, Double) -> Double
 pub fn Oscillator::tick_waveform(Self, Waveform, Double, Double) -> Double
 
+pub struct Pan {
+  unit : Unit
+
+  fn new() -> Pan
+}
+pub fn Pan::new() -> Self
+pub fn Pan::process(Self, DspContext, AudioBuffer, AudioBuffer, AudioBuffer, Double) -> Unit
+
 pub struct ParamSmoother {
   mut current : Double
   mut target : Double

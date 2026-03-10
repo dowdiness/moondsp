@@ -440,3 +440,58 @@ fn make_delay_followup_samples() -> FixedArray[Double] {
   samples[3] = 8.0
   samples
 }
+
+///|
+test "pan invalid context writes silence to both outputs" {
+  let pan = Pan::new()
+  let context = DspContext::new(0.0, 4)
+  let input = AudioBuffer::new(make_pan_test_samples_wb())
+  let left = AudioBuffer::filled(4, init=1.0)
+  let right = AudioBuffer::filled(4, init=1.0)
+
+  pan.process(context, input, left, right, 0.0)
+
+  assert_true(left.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(right.as_fixed_array().every(sample => sample == 0.0))
+}
+
+///|
+test "pan invalid position writes silence to both outputs" {
+  let pan = Pan::new()
+  let context = DspContext::new(48000.0, 4)
+  let input = AudioBuffer::new(make_pan_test_samples_wb())
+  let left = AudioBuffer::filled(4, init=1.0)
+  let right = AudioBuffer::filled(4, init=1.0)
+
+  pan.process(context, input, left, right, 0.0 / 0.0)
+
+  assert_true(left.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(right.as_fixed_array().every(sample => sample == 0.0))
+}
+
+///|
+test "pan respects context block size and zeros both tails" {
+  let pan = Pan::new()
+  let context = DspContext::new(48000.0, 2)
+  let input = AudioBuffer::new(make_pan_test_samples_wb())
+  let left = AudioBuffer::filled(4, init=1.0)
+  let right = AudioBuffer::filled(4, init=1.0)
+
+  pan.process(context, input, left, right, -1.0)
+
+  assert_eq(left.get(0), 1.0)
+  assert_eq(left.get(1), 0.5)
+  assert_eq(left.get(2), 0.0)
+  assert_eq(left.get(3), 0.0)
+  assert_true(right.as_fixed_array().every(sample => sample == 0.0))
+}
+
+///|
+fn make_pan_test_samples_wb() -> FixedArray[Double] {
+  let samples = FixedArray::make(4, 0.0)
+  samples[0] = 1.0
+  samples[1] = 0.5
+  samples[2] = -0.5
+  samples[3] = -1.0
+  samples
+}
