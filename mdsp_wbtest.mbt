@@ -51,6 +51,28 @@ test "waveform selection preserves shared phase progression" {
 }
 
 ///|
+test "tick_waveform rejects non-finite parameters without poisoning phase" {
+  let osc = Oscillator::new()
+
+  assert_eq(osc.tick_waveform(Waveform::Saw, 0.0 / 0.0, 48000.0), 0.0)
+  assert_eq(osc.tick_waveform(Waveform::Square, 440.0, 1.0 / 0.0), 0.0)
+  assert_eq(osc.phase(), 0.0)
+  assert_eq(osc.tick_waveform(Waveform::Triangle, 440.0, 48000.0), -1.0)
+}
+
+///|
+test "process_waveform rejects non-finite frequency without advancing phase" {
+  let osc = Oscillator::new()
+  let context = DspContext::new(48000.0, 4)
+  let buffer = AudioBuffer::filled(4, init=1.0)
+
+  osc.process_waveform(context, buffer, Waveform::Saw, 0.0 / 0.0)
+
+  assert_true(buffer.as_fixed_array().every(sample => sample == 0.0))
+  assert_eq(osc.phase(), 0.0)
+}
+
+///|
 test "process respects context block size" {
   let osc = Oscillator::new()
   let context = DspContext::new(48000.0, 2)

@@ -40,7 +40,9 @@ pub fn Oscillator::tick_waveform(
   freq : Double,
   sample_rate : Double,
 ) -> Double {
-  if sample_rate <= 0.0 {
+  if !is_valid_osc_param(freq) ||
+    !is_valid_osc_param(sample_rate) ||
+    sample_rate <= 0.0 {
     return 0.0
   }
   let out = sample_for_phase(waveform, self.phase)
@@ -74,7 +76,10 @@ pub fn Oscillator::process_waveform(
     context.block_size()
   }
 
-  if sample_rate <= 0.0 || sample_count <= 0 {
+  if !is_valid_osc_param(freq) ||
+    !is_valid_osc_param(sample_rate) ||
+    sample_rate <= 0.0 ||
+    sample_count <= 0 {
     output.fill(0.0)
     return
   }
@@ -118,4 +123,9 @@ fn wrap_phase(phase : Double) -> Double {
   } else {
     phase
   }
+}
+
+///|
+fn is_valid_osc_param(value : Double) -> Bool {
+  !value.is_nan() && !value.is_inf()
 }
