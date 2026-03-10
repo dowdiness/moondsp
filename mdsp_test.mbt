@@ -234,6 +234,43 @@ fn make_mix_hot_input_samples() -> FixedArray[Double] {
 }
 
 ///|
+test "noise is deterministic from a seed" {
+  let first = Noise::new(12345U)
+  let second = Noise::new(12345U)
+
+  assert_eq(first.tick(), second.tick())
+  assert_eq(first.tick(), second.tick())
+  assert_eq(first.tick(), second.tick())
+}
+
+///|
+test "noise reset reproduces the same sequence" {
+  let noise = Noise::new(99U)
+  let first = noise.tick()
+  let second = noise.tick()
+
+  noise.reset(99U)
+
+  assert_eq(noise.tick(), first)
+  assert_eq(noise.tick(), second)
+}
+
+///|
+test "noise process fills a block with bounded samples" {
+  let noise = Noise::new(7U)
+  let context = DspContext::new(48000.0, 128)
+  let buffer = AudioBuffer::filled(128)
+
+  noise.process(context, buffer)
+
+  assert_eq(buffer.length(), 128)
+  assert_true(buffer.as_fixed_array().any(sample => sample != 0.0))
+  assert_true(
+    buffer.as_fixed_array().every(sample => sample >= -1.0 && sample <= 1.0),
+  )
+}
+
+///|
 test "clip limits positive and negative peaks symmetrically" {
   let clip = Clip::new()
   let context = DspContext::new(48000.0, 4)

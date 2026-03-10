@@ -116,6 +116,15 @@ pub struct Mix {
 pub fn Mix::new() -> Self
 pub fn Mix::process(Self, DspContext, AudioBuffer, AudioBuffer) -> Unit
 
+pub struct Noise {
+  mut state : UInt
+}
+pub fn Noise::new(UInt) -> Self
+pub fn Noise::process(Self, DspContext, AudioBuffer) -> Unit
+pub fn Noise::reset(Self, UInt) -> Unit
+pub fn Noise::seed(Self) -> UInt
+pub fn Noise::tick(Self) -> Double
+
 pub struct Oscillator {
   mut phase : Double
 }
@@ -152,3 +161,4 @@ pub(all) enum Waveform {
 // Type aliases
 
 // Traits
+

@@ -213,6 +213,41 @@ fn make_short_mix_input_samples_wb() -> FixedArray[Double] {
 }
 
 ///|
+test "noise normalizes zero seed to a usable internal state" {
+  let noise = Noise::new(0U)
+
+  assert_true(noise.seed() != 0U)
+  assert_true(noise.tick() >= -1.0)
+}
+
+///|
+test "noise with invalid context writes silence without advancing state" {
+  let noise = Noise::new(42U)
+  let state_before = noise.seed()
+  let context = DspContext::new(0.0, 4)
+  let buffer = AudioBuffer::filled(4, init=1.0)
+
+  noise.process(context, buffer)
+
+  assert_true(buffer.as_fixed_array().every(sample => sample == 0.0))
+  assert_eq(noise.seed(), state_before)
+}
+
+///|
+test "noise respects context block size and zeros the tail" {
+  let noise = Noise::new(17U)
+  let context = DspContext::new(48000.0, 2)
+  let buffer = AudioBuffer::filled(4, init=1.0)
+
+  noise.process(context, buffer)
+
+  assert_true(buffer.get(0) != 0.0)
+  assert_true(buffer.get(1) != 0.0)
+  assert_eq(buffer.get(2), 0.0)
+  assert_eq(buffer.get(3), 0.0)
+}
+
+///|
 test "clip with invalid context writes silence" {
   let clip = Clip::new()
   let context = DspContext::new(0.0, 4)
