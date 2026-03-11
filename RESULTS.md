@@ -61,14 +61,14 @@ graph compilation work.
 Confirmed on 2026-03-11:
 
 - A compiled mono graph exists via `DspNode` -> `CompiledDsp`.
-- A first terminal-stereo graph slice also exists via `CompiledStereoDsp` for
-  `Mono -> Pan -> StereoOutput`.
+- A first narrow stereo graph slice also exists via `CompiledStereoDsp` for
+  `Mono -> Pan -> StereoGain? -> StereoClip? -> StereoOutput`.
 - Phase 2 graph compilation and runtime control are working in the current
   graph implementation.
 - Integration coverage exists for compiled graph voice paths and runtime
   retuning.
-- Terminal-stereo coverage now includes a compiled stereo voice-path
-  integration test with runtime `Pan` updates.
+- Stereo graph coverage now includes compiled stereo voice-path integration plus
+  runtime and batched updates for `Pan`, `StereoGain`, and `StereoClip`.
 
 Authoritative detailed Phase 2 graph status now lives in
 `docs/salat-engine-technical-reference.md`, including:

@@ -146,6 +146,8 @@ pub fn DspNode::noise(UInt) -> Self
 pub fn DspNode::oscillator(Waveform, Double) -> Self
 pub fn DspNode::output(Int) -> Self
 pub fn DspNode::pan(Int, Double) -> Self
+pub fn DspNode::stereo_clip(Int, Double) -> Self
+pub fn DspNode::stereo_gain(Int, Double) -> Self
 pub fn DspNode::stereo_output(Int) -> Self
 
 pub(all) enum DspNodeKind {
@@ -161,6 +163,8 @@ pub(all) enum DspNodeKind {
   Clip
   Output
   Pan
+  StereoGain
+  StereoClip
   StereoOutput
 }
 

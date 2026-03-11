@@ -13,6 +13,8 @@ pub(all) enum DspNodeKind {
   Clip
   Output
   Pan
+  StereoGain
+  StereoClip
   StereoOutput
 }
 
@@ -409,6 +411,44 @@ pub fn DspNode::pan(input : Int, position : Double) -> DspNode {
 }
 
 ///|
+/// Create a stereo gain node from one stereo upstream node.
+pub fn DspNode::stereo_gain(input : Int, amount : Double) -> DspNode {
+  DspNode(
+    DspNodeKind::StereoGain,
+    input,
+    -1,
+    amount,
+    0.0,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    BiquadMode::LowPass,
+    0,
+    0,
+    0U,
+  )
+}
+
+///|
+/// Create a stereo clip node from one stereo upstream node.
+pub fn DspNode::stereo_clip(input : Int, threshold : Double) -> DspNode {
+  DspNode(
+    DspNodeKind::StereoClip,
+    input,
+    -1,
+    threshold,
+    0.0,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    BiquadMode::LowPass,
+    0,
+    0,
+    0U,
+  )
+}
+
+///|
 /// Mark the final stereo output node.
 pub fn DspNode::stereo_output(input : Int) -> DspNode {
   DspNode(
@@ -592,6 +632,8 @@ pub fn CompiledDsp::process(
       }
       Output => copy_buffer(self.buffers[node.input0], buffer, sample_count)
       Pan => buffer.fill(0.0)
+      StereoGain => buffer.fill(0.0)
+      StereoClip => buffer.fill(0.0)
       StereoOutput => buffer.fill(0.0)
     }
   }
@@ -755,6 +797,28 @@ pub fn CompiledStereoDsp::process(
           self.right_buffers[index],
           node.value0,
         )
+      StereoGain => {
+        copy_stereo_buffers(
+          self.left_buffers[node.input0],
+          self.right_buffers[node.input0],
+          self.left_buffers[index],
+          self.right_buffers[index],
+          sample_count,
+        )
+        apply_gain_buffer(self.left_buffers[index], sample_count, node.value0)
+        apply_gain_buffer(self.right_buffers[index], sample_count, node.value0)
+      }
+      StereoClip => {
+        copy_stereo_buffers(
+          self.left_buffers[node.input0],
+          self.right_buffers[node.input0],
+          self.left_buffers[index],
+          self.right_buffers[index],
+          sample_count,
+        )
+        clip_buffer(self.left_buffers[index], sample_count, node.value0)
+        clip_buffer(self.right_buffers[index], sample_count, node.value0)
+      }
       StereoOutput =>
         copy_stereo_buffers(
           self.left_buffers[node.input0],
@@ -1211,6 +1275,8 @@ fn valid_node_inputs(
       node.value0 > 0.0
     Output => valid_reference(node.input0, node_count)
     Pan => false
+    StereoGain => false
+    StereoClip => false
     StereoOutput => false
   }
 }
@@ -1251,6 +1317,13 @@ fn valid_stereo_node_inputs(
     Pan =>
       valid_reference(node.input0, node_count) &&
       valid_finite_value(node.value0)
+    StereoGain =>
+      valid_reference(node.input0, node_count) &&
+      valid_finite_value(node.value0)
+    StereoClip =>
+      valid_reference(node.input0, node_count) &&
+      valid_finite_value(node.value0) &&
+      node.value0 > 0.0
     StereoOutput => valid_reference(node.input0, node_count)
   }
 }
@@ -1368,6 +1441,18 @@ fn updated_node_param(
           Some(node_with_value0(node, value))
         _ => None
       }
+    StereoGain =>
+      match slot {
+        Value0 if valid_finite_value(value) =>
+          Some(node_with_value0(node, value))
+        _ => None
+      }
+    StereoClip =>
+      match slot {
+        Value0 if valid_finite_value(value) && value > 0.0 =>
+          Some(node_with_value0(node, value))
+        _ => None
+      }
     StereoOutput => None
   }
 }
@@ -1398,6 +1483,8 @@ fn apply_runtime_param_side_effect(
     Gain => true
     Clip => true
     Pan => true
+    StereoGain => false
+    StereoClip => false
     _ => false
   }
 }
@@ -1428,6 +1515,8 @@ fn apply_runtime_param_side_effect_stereo(
     Gain => true
     Clip => true
     Pan => true
+    StereoGain => true
+    StereoClip => true
     _ => false
   }
 }
@@ -1602,6 +1691,8 @@ fn visit_graph_dependencies(
     Clip => visit_graph_node(node.input0, nodes, marks, order)
     Output => visit_graph_node(node.input0, nodes, marks, order)
     Pan => visit_graph_node(node.input0, nodes, marks, order)
+    StereoGain => visit_graph_node(node.input0, nodes, marks, order)
+    StereoClip => visit_graph_node(node.input0, nodes, marks, order)
     StereoOutput => visit_graph_node(node.input0, nodes, marks, order)
   }
 }
@@ -1976,6 +2067,8 @@ fn node_kind_matches(left : DspNodeKind, right : DspNodeKind) -> Bool {
     Clip => right is Clip
     Output => right is Output
     Pan => right is Pan
+    StereoGain => right is StereoGain
+    StereoClip => right is StereoClip
     StereoOutput => right is StereoOutput
   }
 }
@@ -2036,6 +2129,16 @@ fn valid_terminal_stereo_shapes(nodes : FixedArray[DspNode]) -> Bool {
       Pan =>
         match input_shape(node.input0, shapes) {
           Some(MONO_SIGNAL_SHAPE) => STEREO_SIGNAL_SHAPE
+          _ => return false
+        }
+      StereoGain =>
+        match input_shape(node.input0, shapes) {
+          Some(STEREO_SIGNAL_SHAPE) => STEREO_SIGNAL_SHAPE
+          _ => return false
+        }
+      StereoClip =>
+        match input_shape(node.input0, shapes) {
+          Some(STEREO_SIGNAL_SHAPE) => STEREO_SIGNAL_SHAPE
           _ => return false
         }
       StereoOutput =>

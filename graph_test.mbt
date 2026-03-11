@@ -83,6 +83,9 @@ const PAN_HARD_RIGHT : Double = 1.0
 const PAN_CENTER_GAIN : Double = 0.7071067811865476
 
 ///|
+const STEREO_CLIP_THRESHOLD : Double = 0.25
+
+///|
 test "compiled dsp renders a constant graph" {
   let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
   let nodes = [DspNode::constant(QUARTER_SAMPLE), DspNode::output(0)]
@@ -354,6 +357,71 @@ test "compiled stereo dsp rejects stereo post processing after pan" {
 }
 
 ///|
+test "compiled stereo dsp applies stereo gain after pan" {
+  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::pan(0, PAN_CENTER),
+    DspNode::stereo_gain(1, HALF_GAIN),
+    DspNode::stereo_output(2),
+  ]
+  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+  let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+
+  compiled.process(context, left_output, right_output)
+
+  for index = 0; index < SMALL_BLOCK_SIZE; index = index + 1 {
+    assert_true(
+      (left_output.get(index) - HALF_GAIN * PAN_CENTER_GAIN).abs() < 0.000000001,
+    )
+    assert_true(
+      (right_output.get(index) - HALF_GAIN * PAN_CENTER_GAIN).abs() <
+      0.000000001,
+    )
+  }
+}
+
+///|
+test "compiled stereo dsp applies stereo clip after pan" {
+  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::pan(0, PAN_CENTER),
+    DspNode::stereo_clip(1, STEREO_CLIP_THRESHOLD),
+    DspNode::stereo_output(2),
+  ]
+  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+  let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+
+  compiled.process(context, left_output, right_output)
+
+  for index = 0; index < SMALL_BLOCK_SIZE; index = index + 1 {
+    assert_eq(left_output.get(index), STEREO_CLIP_THRESHOLD)
+    assert_eq(right_output.get(index), STEREO_CLIP_THRESHOLD)
+  }
+}
+
+///|
+test "compiled dsp rejects stereo-only nodes" {
+  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let stereo_gain_nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::stereo_gain(0, HALF_GAIN),
+    DspNode::output(1),
+  ]
+  let stereo_clip_nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::stereo_clip(0, STEREO_CLIP_THRESHOLD),
+    DspNode::output(1),
+  ]
+
+  assert_true(CompiledDsp::compile(stereo_gain_nodes, context) is None)
+  assert_true(CompiledDsp::compile(stereo_clip_nodes, context) is None)
+}
+
+///|
 test "compiled stereo dsp apply_control updates pan position" {
   let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
   let nodes = [
@@ -375,6 +443,38 @@ test "compiled stereo dsp apply_control updates pan position" {
   for index = 0; index < SMALL_BLOCK_SIZE; index = index + 1 {
     assert_eq(left_output.get(index), ZERO_SAMPLE)
     assert_eq(right_output.get(index), UNIT_SAMPLE)
+  }
+}
+
+///|
+test "compiled stereo dsp runtime params update stereo gain and clip" {
+  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::pan(0, PAN_CENTER),
+    DspNode::stereo_gain(1, UNIT_SAMPLE),
+    DspNode::stereo_clip(2, UNIT_SAMPLE),
+    DspNode::stereo_output(3),
+  ]
+  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+  let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+
+  assert_true(
+    compiled.apply_control(
+      GraphControl::set_param(2, GraphParamSlot::Value0, HALF_GAIN),
+    ),
+  )
+  assert_true(
+    compiled.apply_control(
+      GraphControl::set_param(3, GraphParamSlot::Value0, STEREO_CLIP_THRESHOLD),
+    ),
+  )
+  compiled.process(context, left_output, right_output)
+
+  for index = 0; index < SMALL_BLOCK_SIZE; index = index + 1 {
+    assert_eq(left_output.get(index), STEREO_CLIP_THRESHOLD)
+    assert_eq(right_output.get(index), STEREO_CLIP_THRESHOLD)
   }
 }
 
