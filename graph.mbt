@@ -5,6 +5,7 @@ pub(all) enum DspNodeKind {
   Oscillator
   Noise
   Adsr
+  Biquad
   Gain
   Mul
   Mix
@@ -23,6 +24,7 @@ pub struct DspNode {
   value2 : Double
   value3 : Double
   waveform : Waveform
+  filter_mode : BiquadMode
   seed : UInt
 
   fn new(
@@ -34,6 +36,7 @@ pub struct DspNode {
     value2 : Double,
     value3 : Double,
     waveform : Waveform,
+    filter_mode : BiquadMode,
     seed : UInt,
   ) -> DspNode
 }
@@ -48,9 +51,21 @@ fn DspNode::new(
   value2 : Double,
   value3 : Double,
   waveform : Waveform,
+  filter_mode : BiquadMode,
   seed : UInt,
 ) -> DspNode {
-  { kind, input0, input1, value0, value1, value2, value3, waveform, seed }
+  {
+    kind,
+    input0,
+    input1,
+    value0,
+    value1,
+    value2,
+    value3,
+    waveform,
+    filter_mode,
+    seed,
+  }
 }
 
 ///|
@@ -62,6 +77,7 @@ struct CompiledDsp {
   osc_states : FixedArray[Oscillator?]
   noise_states : FixedArray[Noise?]
   env_states : FixedArray[Adsr?]
+  biquad_states : FixedArray[Biquad?]
 }
 
 ///|
@@ -76,6 +92,7 @@ pub fn DspNode::constant(value : Double) -> DspNode {
     0.0,
     0.0,
     Waveform::Sine,
+    BiquadMode::LowPass,
     0U,
   )
 }
@@ -83,13 +100,35 @@ pub fn DspNode::constant(value : Double) -> DspNode {
 ///|
 /// Create an oscillator node with a fixed frequency.
 pub fn DspNode::oscillator(waveform : Waveform, freq : Double) -> DspNode {
-  DspNode(DspNodeKind::Oscillator, -1, -1, freq, 0.0, 0.0, 0.0, waveform, 0U)
+  DspNode(
+    DspNodeKind::Oscillator,
+    -1,
+    -1,
+    freq,
+    0.0,
+    0.0,
+    0.0,
+    waveform,
+    BiquadMode::LowPass,
+    0U,
+  )
 }
 
 ///|
 /// Create a white-noise source node.
 pub fn DspNode::noise(seed : UInt) -> DspNode {
-  DspNode(DspNodeKind::Noise, -1, -1, 0.0, 0.0, 0.0, 0.0, Waveform::Sine, seed)
+  DspNode(
+    DspNodeKind::Noise,
+    -1,
+    -1,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    BiquadMode::LowPass,
+    seed,
+  )
 }
 
 ///|
@@ -112,6 +151,29 @@ pub fn DspNode::adsr(
     sustain,
     release_ms,
     Waveform::Sine,
+    BiquadMode::LowPass,
+    0U,
+  )
+}
+
+///|
+/// Create a fixed-parameter biquad node from one upstream node.
+pub fn DspNode::biquad(
+  input : Int,
+  mode : BiquadMode,
+  cutoff : Double,
+  q : Double,
+) -> DspNode {
+  DspNode(
+    DspNodeKind::Biquad,
+    input,
+    -1,
+    cutoff,
+    q,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    mode,
     0U,
   )
 }
@@ -128,6 +190,7 @@ pub fn DspNode::gain(input : Int, amount : Double) -> DspNode {
     0.0,
     0.0,
     Waveform::Sine,
+    BiquadMode::LowPass,
     0U,
   )
 }
@@ -135,13 +198,35 @@ pub fn DspNode::gain(input : Int, amount : Double) -> DspNode {
 ///|
 /// Create a sample-wise multiply node from two upstream nodes.
 pub fn DspNode::mul(left : Int, right : Int) -> DspNode {
-  DspNode(DspNodeKind::Mul, left, right, 0.0, 0.0, 0.0, 0.0, Waveform::Sine, 0U)
+  DspNode(
+    DspNodeKind::Mul,
+    left,
+    right,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    BiquadMode::LowPass,
+    0U,
+  )
 }
 
 ///|
 /// Create a mix node from two upstream nodes.
 pub fn DspNode::mix(left : Int, right : Int) -> DspNode {
-  DspNode(DspNodeKind::Mix, left, right, 0.0, 0.0, 0.0, 0.0, Waveform::Sine, 0U)
+  DspNode(
+    DspNodeKind::Mix,
+    left,
+    right,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    BiquadMode::LowPass,
+    0U,
+  )
 }
 
 ///|
@@ -156,6 +241,7 @@ pub fn DspNode::clip(input : Int, threshold : Double) -> DspNode {
     0.0,
     0.0,
     Waveform::Sine,
+    BiquadMode::LowPass,
     0U,
   )
 }
@@ -172,6 +258,7 @@ pub fn DspNode::output(input : Int) -> DspNode {
     0.0,
     0.0,
     Waveform::Sine,
+    BiquadMode::LowPass,
     0U,
   )
 }
@@ -191,7 +278,7 @@ pub fn CompiledDsp::compile(
   nodes : Array[DspNode],
   context : DspContext,
 ) -> CompiledDsp? {
-  let order = match topo_sorted_node_order(nodes) {
+  let order = match topo_sorted_node_order(nodes, context) {
     Some(order) => order
     None => return None
   }
@@ -217,6 +304,9 @@ pub fn CompiledDsp::compile(
   let env_states = FixedArray::makei(node_count, index => {
     make_graph_env_state(fixed_nodes[index])
   })
+  let biquad_states = FixedArray::makei(node_count, index => {
+    make_graph_biquad_state(fixed_nodes[index])
+  })
   Some({
     nodes: fixed_nodes,
     index_map,
@@ -224,6 +314,7 @@ pub fn CompiledDsp::compile(
     osc_states,
     noise_states,
     env_states,
+    biquad_states,
   })
 }
 
@@ -260,6 +351,17 @@ pub fn CompiledDsp::process(
         .process_waveform(context, buffer, node.waveform, node.value0)
       Noise => self.noise_states[index].unwrap().process(context, buffer)
       Adsr => self.env_states[index].unwrap().process(context, buffer)
+      Biquad => {
+        copy_buffer(self.buffers[node.input0], buffer, sample_count)
+        process_graph_biquad(
+          self.biquad_states[index].unwrap(),
+          context,
+          buffer,
+          node.filter_mode,
+          node.value0,
+          node.value1,
+        )
+      }
       Gain => {
         copy_buffer(self.buffers[node.input0], buffer, sample_count)
         apply_gain_buffer(buffer, sample_count, node.value0)
@@ -322,7 +424,8 @@ pub fn CompiledDsp::gate_off(self : CompiledDsp, node_index : Int) -> Bool {
 }
 
 ///|
-fn valid_compiled_graph(nodes : Array[DspNode]) -> Bool {
+fn valid_compiled_graph(nodes : Array[DspNode], context : DspContext) -> Bool {
+  let sample_rate = context.sample_rate()
   let output_index = match find_single_output_index(nodes) {
     Some(output_index) => output_index
     None => return false
@@ -333,7 +436,7 @@ fn valid_compiled_graph(nodes : Array[DspNode]) -> Bool {
 
   for index = 0; index < nodes.length(); index = index + 1 {
     let node = nodes[index]
-    if !valid_node_inputs(node, nodes.length()) {
+    if !valid_node_inputs(node, nodes.length(), sample_rate) {
       return false
     }
   }
@@ -342,7 +445,11 @@ fn valid_compiled_graph(nodes : Array[DspNode]) -> Bool {
 }
 
 ///|
-fn valid_node_inputs(node : DspNode, node_count : Int) -> Bool {
+fn valid_node_inputs(
+  node : DspNode,
+  node_count : Int,
+  sample_rate : Double,
+) -> Bool {
   match node.kind {
     Constant => valid_finite_value(node.value0)
     Oscillator => valid_finite_value(node.value0)
@@ -352,6 +459,9 @@ fn valid_node_inputs(node : DspNode, node_count : Int) -> Bool {
       valid_finite_value(node.value1) &&
       valid_finite_value(node.value2) &&
       valid_finite_value(node.value3)
+    Biquad =>
+      valid_reference(node.input0, node_count) &&
+      valid_biquad_graph_params(sample_rate, node.value0, node.value1)
     Gain =>
       valid_reference(node.input0, node_count) &&
       valid_finite_value(node.value0)
@@ -401,8 +511,27 @@ fn valid_finite_value(value : Double) -> Bool {
 }
 
 ///|
-fn topo_sorted_node_order(nodes : Array[DspNode]) -> Array[Int]? {
-  if !valid_compiled_graph(nodes) {
+fn valid_biquad_graph_params(
+  sample_rate : Double,
+  cutoff : Double,
+  q : Double,
+) -> Bool {
+  let nyquist = sample_rate * 0.5
+  valid_finite_value(sample_rate) &&
+  sample_rate > 0.0 &&
+  valid_finite_value(cutoff) &&
+  cutoff > 0.0 &&
+  cutoff < nyquist &&
+  valid_finite_value(q) &&
+  q > 0.0
+}
+
+///|
+fn topo_sorted_node_order(
+  nodes : Array[DspNode],
+  context : DspContext,
+) -> Array[Int]? {
+  if !valid_compiled_graph(nodes, context) {
     return None
   }
 
@@ -484,6 +613,7 @@ fn visit_graph_dependencies(
     Oscillator => true
     Noise => true
     Adsr => true
+    Biquad => visit_graph_node(node.input0, nodes, marks, order)
     Gain => visit_graph_node(node.input0, nodes, marks, order)
     Mul =>
       visit_graph_node(node.input0, nodes, marks, order) &&
@@ -507,6 +637,7 @@ fn remap_node_inputs(node : DspNode, remap : FixedArray[Int]) -> DspNode {
     node.value2,
     node.value3,
     node.waveform,
+    node.filter_mode,
     node.seed,
   )
 }
@@ -710,6 +841,30 @@ fn make_graph_env_state(node : DspNode) -> Adsr? {
     Adsr => Some(Adsr::new(node.value0, node.value1, node.value2, node.value3))
     _ => None
   }
+}
+
+///|
+fn make_graph_biquad_state(node : DspNode) -> Biquad? {
+  match node.kind {
+    Biquad => Some(Biquad::new())
+    _ => None
+  }
+}
+
+///|
+fn process_graph_biquad(
+  biquad : Biquad,
+  context : DspContext,
+  buffer : AudioBuffer,
+  mode : BiquadMode,
+  cutoff : Double,
+  q : Double,
+) -> Unit {
+  if !biquad.update(context, mode, cutoff, q) {
+    buffer.fill(0.0)
+    return
+  }
+  biquad.process(context, buffer)
 }
 
 ///|

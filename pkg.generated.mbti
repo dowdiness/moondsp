@@ -115,11 +115,13 @@ pub struct DspNode {
   value2 : Double
   value3 : Double
   waveform : Waveform
+  filter_mode : BiquadMode
   seed : UInt
 
-  fn new(DspNodeKind, Int, Int, Double, Double, Double, Double, Waveform, UInt) -> DspNode
+  fn new(DspNodeKind, Int, Int, Double, Double, Double, Double, Waveform, BiquadMode, UInt) -> DspNode
 }
 pub fn DspNode::adsr(Double, Double, Double, Double) -> Self
+pub fn DspNode::biquad(Int, BiquadMode, Double, Double) -> Self
 pub fn DspNode::clip(Int, Double) -> Self
 pub fn DspNode::constant(Double) -> Self
 pub fn DspNode::gain(Int, Double) -> Self
@@ -134,6 +136,7 @@ pub(all) enum DspNodeKind {
   Oscillator
   Noise
   Adsr
+  Biquad
   Gain
   Mul
   Mix

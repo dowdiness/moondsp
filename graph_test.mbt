@@ -120,6 +120,56 @@ test "compiled dsp resets adsr state on invalid context" {
 }
 
 ///|
+test "compiled dsp applies low-pass biquad in graph" {
+  let context = DspContext::new(48000.0, 8)
+  let nodes = [
+    DspNode::constant(1.0),
+    DspNode::biquad(0, BiquadMode::LowPass, 1000.0, 0.707),
+    DspNode::output(1),
+  ]
+  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let output = AudioBuffer::filled(8)
+
+  compiled.process(context, output)
+
+  assert_true(output.get(0) > 0.0)
+  assert_true(output.get(0) < 1.0)
+  assert_true(output.get(1) > output.get(0))
+  assert_true(output.get(2) > output.get(1))
+  assert_true(output.get(7) < 1.0)
+}
+
+///|
+test "compiled dsp rejects invalid biquad parameters" {
+  let context = DspContext::new(48000.0, 4)
+  let nodes = [
+    DspNode::constant(1.0),
+    DspNode::biquad(0, BiquadMode::LowPass, 24000.0, 0.707),
+    DspNode::output(1),
+  ]
+
+  assert_true(CompiledDsp::compile(nodes, context) is None)
+}
+
+///|
+test "compiled dsp topologically sorts declarative filter graph" {
+  let context = DspContext::new(48000.0, 8)
+  let nodes = [
+    DspNode::output(1),
+    DspNode::biquad(2, BiquadMode::LowPass, 1000.0, 0.707),
+    DspNode::constant(1.0),
+  ]
+  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let output = AudioBuffer::filled(8)
+
+  compiled.process(context, output)
+
+  assert_true(output.get(0) > 0.0)
+  assert_true(output.get(0) < 1.0)
+  assert_true(output.get(7) < 1.0)
+}
+
+///|
 test "compiled dsp rejects non-finite adsr parameters" {
   let context = DspContext::new(48000.0, 4)
   let nodes = [DspNode::adsr(0.0 / 0.0, 1.0, 0.5, 10.0), DspNode::output(0)]
