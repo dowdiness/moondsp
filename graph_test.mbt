@@ -71,6 +71,18 @@ const DELAY_SAMPLES : Int = 2
 const DELAY_SAMPLES_DOUBLE : Double = 2.0
 
 ///|
+const PAN_HARD_LEFT : Double = -1.0
+
+///|
+const PAN_CENTER : Double = 0.0
+
+///|
+const PAN_HARD_RIGHT : Double = 1.0
+
+///|
+const PAN_CENTER_GAIN : Double = 0.7071067811865476
+
+///|
 test "compiled dsp renders a constant graph" {
   let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
   let nodes = [DspNode::constant(QUARTER_SAMPLE), DspNode::output(0)]
@@ -298,6 +310,103 @@ test "compiled dsp delay node keeps zero-capacity default as passthrough" {
   assert_eq(output.get(1), QUARTER_SAMPLE)
   assert_eq(output.get(2), QUARTER_SAMPLE)
   assert_eq(output.get(3), QUARTER_SAMPLE)
+}
+
+///|
+test "compiled stereo dsp pans mono input to stereo output" {
+  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::pan(0, PAN_CENTER),
+    DspNode::stereo_output(1),
+  ]
+  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+  let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+
+  compiled.process(context, left_output, right_output)
+
+  for index = 0; index < SMALL_BLOCK_SIZE; index = index + 1 {
+    assert_true((left_output.get(index) - PAN_CENTER_GAIN).abs() < 0.000000001)
+    assert_true((right_output.get(index) - PAN_CENTER_GAIN).abs() < 0.000000001)
+  }
+}
+
+///|
+test "compiled stereo dsp rejects mono direct to stereo output" {
+  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let nodes = [DspNode::constant(UNIT_SAMPLE), DspNode::stereo_output(0)]
+
+  assert_true(CompiledStereoDsp::compile(nodes, context) is None)
+}
+
+///|
+test "compiled stereo dsp rejects stereo post processing after pan" {
+  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::pan(0, PAN_HARD_LEFT),
+    DspNode::gain(1, HALF_GAIN),
+    DspNode::stereo_output(2),
+  ]
+
+  assert_true(CompiledStereoDsp::compile(nodes, context) is None)
+}
+
+///|
+test "compiled stereo dsp apply_control updates pan position" {
+  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::pan(0, PAN_CENTER),
+    DspNode::stereo_output(1),
+  ]
+  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+  let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+
+  assert_true(
+    compiled.apply_control(
+      GraphControl::set_param(1, GraphParamSlot::Value0, PAN_HARD_RIGHT),
+    ),
+  )
+  compiled.process(context, left_output, right_output)
+
+  for index = 0; index < SMALL_BLOCK_SIZE; index = index + 1 {
+    assert_eq(left_output.get(index), ZERO_SAMPLE)
+    assert_eq(right_output.get(index), UNIT_SAMPLE)
+  }
+}
+
+///|
+test "compiled stereo dsp apply_controls updates pan and source together" {
+  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::pan(0, PAN_HARD_LEFT),
+    DspNode::stereo_output(1),
+  ]
+  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+  let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+
+  assert_true(
+    compiled.apply_controls([
+      GraphControl::set_param(0, GraphParamSlot::Value0, HALF_GAIN),
+      GraphControl::set_param(1, GraphParamSlot::Value0, PAN_CENTER),
+    ]),
+  )
+  compiled.process(context, left_output, right_output)
+
+  for index = 0; index < SMALL_BLOCK_SIZE; index = index + 1 {
+    assert_true(
+      (left_output.get(index) - HALF_GAIN * PAN_CENTER_GAIN).abs() < 0.000000001,
+    )
+    assert_true(
+      (right_output.get(index) - HALF_GAIN * PAN_CENTER_GAIN).abs() <
+      0.000000001,
+    )
+  }
 }
 
 ///|

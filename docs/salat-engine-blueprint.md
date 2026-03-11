@@ -195,8 +195,10 @@ DspNode enum  ──(flatten)──▶  Array[FlatNode]
 
 Current implemented surface:
 - Declarative mono `DspNode` graph compiled into opaque `CompiledDsp`
+- First terminal-stereo graph slice via `CompiledStereoDsp` for
+  `Mono -> Pan -> StereoOutput`
 - Topological sorting, graph validation, and runtime control for the current
-  mono graph
+  graph paths
 - Integration coverage for compiled mono voice paths and runtime retuning
 - See `docs/salat-engine-technical-reference.md` for the current node set,
   `set_param(...)` slot matrix, and exact runtime-control surface
@@ -204,11 +206,13 @@ Current implemented surface:
 Still planned in Phase 2:
 - Single-sample feedback handling (cycles → insert z⁻¹ delay)
 - Constant folding and dead node elimination
-- Multichannel/stereo graph semantics
+- Stereo post-processing after `Pan`
+- Full multichannel graph semantics
 - Graph hot-swap and crossfade on the audio thread
 
-**Current deliverable**: compiled mono graph execution with runtime control and
-integration coverage.
+**Current deliverable**: compiled mono graph execution plus the first
+terminal-stereo graph slice, both with runtime control and integration
+coverage.
 
 **Phase 2 exit deliverable**: `sine(2).range(200,400).sine().lpf(800,1).out()`
 produces sound with graph hot-swap and feedback handling.

@@ -84,6 +84,15 @@ pub fn CompiledDsp::gate_on(Self, Int) -> Bool
 pub fn CompiledDsp::process(Self, DspContext, AudioBuffer) -> Unit
 pub fn CompiledDsp::set_param(Self, Int, GraphParamSlot, Double) -> Bool
 
+type CompiledStereoDsp
+pub fn CompiledStereoDsp::apply_control(Self, GraphControl) -> Bool
+pub fn CompiledStereoDsp::apply_controls(Self, Array[GraphControl]) -> Bool
+pub fn CompiledStereoDsp::compile(Array[DspNode], DspContext) -> Self?
+pub fn CompiledStereoDsp::gate_off(Self, Int) -> Bool
+pub fn CompiledStereoDsp::gate_on(Self, Int) -> Bool
+pub fn CompiledStereoDsp::process(Self, DspContext, AudioBuffer, AudioBuffer) -> Unit
+pub fn CompiledStereoDsp::set_param(Self, Int, GraphParamSlot, Double) -> Bool
+
 pub struct DelayLine {
   buffer : FixedArray[Double]
   mut write_pos : Int
@@ -136,6 +145,8 @@ pub fn DspNode::mul(Int, Int) -> Self
 pub fn DspNode::noise(UInt) -> Self
 pub fn DspNode::oscillator(Waveform, Double) -> Self
 pub fn DspNode::output(Int) -> Self
+pub fn DspNode::pan(Int, Double) -> Self
+pub fn DspNode::stereo_output(Int) -> Self
 
 pub(all) enum DspNodeKind {
   Constant
@@ -149,6 +160,8 @@ pub(all) enum DspNodeKind {
   Mix
   Clip
   Output
+  Pan
+  StereoOutput
 }
 
 pub(all) enum EnvStage {

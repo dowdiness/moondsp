@@ -632,11 +632,14 @@ runtime-control surface. Update it first when Phase 2 runtime behavior changes;
 keep `RESULTS.md` and `docs/salat-engine-blueprint.md` as summary-level
 pointers back to this section.
 
-The current repository already implements the first compiled mono graph slice:
+The current repository already implements:
 
-- `DspNode` authoring graphs compile into an opaque `CompiledDsp`
+- a compiled mono graph path: `DspNode` authoring graphs compile into an opaque
+  `CompiledDsp`
+- a first terminal-stereo graph path: the same `DspNode` authoring language can
+  compile into `CompiledStereoDsp` for `Mono -> Pan -> StereoOutput`
 - input nodes may be declared in authoring order; the compiler topologically
-  sorts reachable nodes from a single `Output`
+  sorts reachable nodes from a single terminal output node
 - compile rejects:
   - cycles
   - multiple outputs
@@ -660,7 +663,9 @@ Current graph node support:
 - `Mul`
 - `Mix`
 - `Clip`
+- `Pan`
 - `Output`
+- `StereoOutput`
 
 Current runtime control support:
 
@@ -690,14 +695,16 @@ Current `set_param(node_index, slot, value)` support matrix:
 | `Mul` | none | No runtime params |
 | `Mix` | none | No runtime params |
 | `Clip` | `Value0` | Positive finite threshold only |
+| `Pan` | `Value0` | Finite pan position only |
 | `Output` | none | No runtime params |
+| `StereoOutput` | none | No runtime params |
 
 Current limits:
 
-- mono only
+- stereo graph support is terminal only: `Pan -> StereoOutput`
+- no stereo post-processing after `Pan` yet
 - no feedback-edge insertion yet
 - no graph hot-swap yet
-- no `Pan` or stereo graph semantics in `CompiledDsp`
 - runtime parameter updates are partial, not universal across node kinds
 
 ### 3.5.2 Control Frames
@@ -726,8 +733,9 @@ Current semantics:
     `process(...)` call
 - `apply_control(...)` remains the single-message form of the same runtime API
 
-This is enough for the current mono graph to support per-block parameter and
-gate updates from a host, UI, or future pattern engine.
+This is enough for the current compiled mono and terminal-stereo graph paths to
+support per-block parameter and gate updates from a host, UI, or future pattern
+engine.
 
 Current limits of the control-frame model:
 
