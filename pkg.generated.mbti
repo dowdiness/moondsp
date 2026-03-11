@@ -75,6 +75,14 @@ pub struct Clip {
 pub fn Clip::new() -> Self
 pub fn Clip::process(Self, DspContext, AudioBuffer, Double) -> Unit
 
+pub struct CompiledDsp {
+  nodes : FixedArray[DspNode]
+  buffers : FixedArray[AudioBuffer]
+  states : FixedArray[GraphNodeState]
+}
+pub fn CompiledDsp::compile(Array[DspNode], DspContext) -> Self?
+pub fn CompiledDsp::process(Self, DspContext, AudioBuffer) -> Unit
+
 pub struct DelayLine {
   buffer : FixedArray[Double]
   mut write_pos : Int
@@ -100,6 +108,34 @@ pub fn DspContext::block_size(Self) -> Int
 pub fn DspContext::new(Double, Int) -> Self
 pub fn DspContext::sample_rate(Self) -> Double
 
+pub struct DspNode {
+  kind : DspNodeKind
+  input0 : Int
+  input1 : Int
+  value0 : Double
+  waveform : Waveform
+  seed : UInt
+
+  fn new(DspNodeKind, Int, Int, Double, Waveform, UInt) -> DspNode
+}
+pub fn DspNode::clip(Int, Double) -> Self
+pub fn DspNode::constant(Double) -> Self
+pub fn DspNode::gain(Int, Double) -> Self
+pub fn DspNode::mix(Int, Int) -> Self
+pub fn DspNode::noise(UInt) -> Self
+pub fn DspNode::oscillator(Waveform, Double) -> Self
+pub fn DspNode::output(Int) -> Self
+
+pub(all) enum DspNodeKind {
+  Constant
+  Oscillator
+  Noise
+  Gain
+  Mix
+  Clip
+  Output
+}
+
 pub(all) enum EnvStage {
   Idle
   Attack
@@ -115,6 +151,8 @@ pub struct Gain {
 }
 pub fn Gain::new() -> Self
 pub fn Gain::process(Self, DspContext, AudioBuffer, Double) -> Unit
+
+type GraphNodeState
 
 pub struct Mix {
   unit : Unit
