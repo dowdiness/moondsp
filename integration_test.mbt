@@ -264,7 +264,7 @@ test "compiled graph voice path stays coherent across gates and runtime updates"
   let compiled = CompiledDsp::compile(nodes, context).unwrap()
   let output = AudioBuffer::filled(GRAPH_VOICE_BLOCK_SIZE)
 
-  assert_true(compiled.gate_on(6))
+  assert_true(compiled.apply_control(GraphControl::gate_on(6)))
   compiled.process(context, output)
 
   assert_true(
@@ -272,7 +272,11 @@ test "compiled graph voice path stays coherent across gates and runtime updates"
   )
   assert_true(integration_any_non_zero(output))
 
-  assert_true(compiled.set_param(3, GraphParamSlot::Value0, 0.0))
+  assert_true(
+    compiled.apply_control(
+      GraphControl::set_param(3, GraphParamSlot::Value0, 0.0),
+    ),
+  )
   compiled.process(context, output)
 
   assert_true(
@@ -281,12 +285,18 @@ test "compiled graph voice path stays coherent across gates and runtime updates"
   assert_true(integration_any_non_zero(output))
   assert_true(integration_all_zero_from(output, GRAPH_VOICE_DELAY_SAMPLES))
 
-  assert_true(compiled.set_param(3, GraphParamSlot::Value0, GRAPH_VOICE_GAIN))
   assert_true(
-    compiled.set_param(
-      2,
-      GraphParamSlot::DelaySamples,
-      GRAPH_VOICE_DELAY_SAMPLES_DOUBLE,
+    compiled.apply_control(
+      GraphControl::set_param(3, GraphParamSlot::Value0, GRAPH_VOICE_GAIN),
+    ),
+  )
+  assert_true(
+    compiled.apply_control(
+      GraphControl::set_param(
+        2,
+        GraphParamSlot::DelaySamples,
+        GRAPH_VOICE_DELAY_SAMPLES_DOUBLE,
+      ),
     ),
   )
   compiled.process(context, output)
@@ -296,7 +306,7 @@ test "compiled graph voice path stays coherent across gates and runtime updates"
   )
   assert_true(integration_any_non_zero(output))
 
-  assert_true(compiled.gate_off(6))
+  assert_true(compiled.apply_control(GraphControl::gate_off(6)))
   compiled.process(context, output)
 
   assert_true(
@@ -367,10 +377,12 @@ test "compiled graph multi-source path responds to runtime biquad retune" {
   )
 
   assert_true(
-    retuned.set_param(
-      4,
-      GraphParamSlot::Value0,
-      GRAPH_MULTI_SOURCE_RETUNED_CUTOFF,
+    retuned.apply_control(
+      GraphControl::set_param(
+        4,
+        GraphParamSlot::Value0,
+        GRAPH_MULTI_SOURCE_RETUNED_CUTOFF,
+      ),
     ),
   )
 
@@ -426,7 +438,13 @@ test "compiled graph runtime high-pass retune changes output directionally" {
   retuned.process(context, retuned_output)
 
   assert_true(
-    retuned.set_param(1, GraphParamSlot::Value0, GRAPH_HIGHPASS_RETUNED_CUTOFF),
+    retuned.apply_control(
+      GraphControl::set_param(
+        1,
+        GraphParamSlot::Value0,
+        GRAPH_HIGHPASS_RETUNED_CUTOFF,
+      ),
+    ),
   )
 
   baseline.process(context, baseline_output)
@@ -484,7 +502,13 @@ test "compiled graph runtime band-pass retune changes output" {
   retuned.process(context, retuned_output)
 
   assert_true(
-    retuned.set_param(1, GraphParamSlot::Value0, GRAPH_BANDPASS_RETUNED_CUTOFF),
+    retuned.apply_control(
+      GraphControl::set_param(
+        1,
+        GraphParamSlot::Value0,
+        GRAPH_BANDPASS_RETUNED_CUTOFF,
+      ),
+    ),
   )
 
   baseline.process(context, baseline_output)

@@ -25,7 +25,41 @@ pub(all) enum GraphParamSlot {
 }
 
 ///|
+/// Unified runtime control kinds for compiled graphs.
+pub(all) enum GraphControlKind {
+  GateOn
+  GateOff
+  SetParam
+}
+
+///|
 const NYQUIST_RATIO : Double = 0.5
+
+///|
+/// Runtime control message for a compiled graph.
+pub struct GraphControl {
+  kind : GraphControlKind
+  node_index : Int
+  slot : GraphParamSlot
+  value : Double
+
+  fn new(
+    kind : GraphControlKind,
+    node_index : Int,
+    slot : GraphParamSlot,
+    value : Double,
+  ) -> GraphControl
+}
+
+///|
+fn GraphControl::new(
+  kind : GraphControlKind,
+  node_index : Int,
+  slot : GraphParamSlot,
+  value : Double,
+) -> GraphControl {
+  { kind, node_index, slot, value }
+}
 
 ///|
 /// Declarative DSP graph node in authoring order.
@@ -164,8 +198,9 @@ pub fn DspNode::noise(seed : UInt) -> DspNode {
 ///|
 /// Create an ADSR envelope source node.
 ///
-/// Use `CompiledDsp::gate_on(...)` and `CompiledDsp::gate_off(...)` to drive
-/// the envelope after compilation.
+/// Use `CompiledDsp::apply_control(GraphControl::gate_on(...))` and
+/// `CompiledDsp::apply_control(GraphControl::gate_off(...))` to drive the
+/// envelope after compilation.
 pub fn DspNode::adsr(
   attack_ms : Double,
   decay_ms : Double,
@@ -331,15 +366,48 @@ pub fn DspNode::output(input : Int) -> DspNode {
 }
 
 ///|
+/// Create a runtime gate-on control targeting an original authoring index.
+pub fn GraphControl::gate_on(node_index : Int) -> GraphControl {
+  GraphControl(
+    GraphControlKind::GateOn,
+    node_index,
+    GraphParamSlot::Value0,
+    0.0,
+  )
+}
+
+///|
+/// Create a runtime gate-off control targeting an original authoring index.
+pub fn GraphControl::gate_off(node_index : Int) -> GraphControl {
+  GraphControl(
+    GraphControlKind::GateOff,
+    node_index,
+    GraphParamSlot::Value0,
+    0.0,
+  )
+}
+
+///|
+/// Create a runtime numeric parameter update targeting an original authoring
+/// index.
+pub fn GraphControl::set_param(
+  node_index : Int,
+  slot : GraphParamSlot,
+  value : Double,
+) -> GraphControl {
+  GraphControl(GraphControlKind::SetParam, node_index, slot, value)
+}
+
+///|
 /// Compile a declarative mono graph into an executable buffer graph.
 ///
 /// This first Phase 2 slice accepts nodes in authoring order, requires exactly
 /// one reachable `Output` node, rejects cycles, and rejects graphs containing
 /// unreachable nodes.
 ///
-/// Current limitation: runtime graph control is still partial. `gate_on(...)` /
-/// `gate_off(...)` are ADSR-specific, and `set_param(...)` only supports the
-/// node/slot combinations implemented in this slice.
+/// Current limitation: runtime graph control is still partial.
+/// `CompiledDsp::apply_control(...)` provides a unified entrypoint, but only the
+/// node/slot combinations implemented in this slice are supported.
 pub fn CompiledDsp::compile(
   nodes : Array[DspNode],
   context : DspContext,
@@ -468,35 +536,42 @@ pub fn CompiledDsp::process(
 }
 
 ///|
-/// Trigger `gate_on()` on an ADSR node using its original authoring index.
-pub fn CompiledDsp::gate_on(self : CompiledDsp, node_index : Int) -> Bool {
-  match self.compiled_index_for(node_index) {
-    Some(compiled_index) =>
-      match self.env_states[compiled_index] {
-        Some(env) => {
-          env.gate_on()
-          true
-        }
-        None => false
-      }
-    None => false
+/// Apply a runtime control message to a compiled graph.
+///
+/// This is the preferred Phase 2 runtime-control entrypoint. The older
+/// `gate_on(...)`, `gate_off(...)`, and `set_param(...)` methods are retained as
+/// compatibility helpers and delegate here.
+pub fn CompiledDsp::apply_control(
+  self : CompiledDsp,
+  control : GraphControl,
+) -> Bool {
+  match control.kind {
+    GateOn => apply_graph_gate_control(self, control.node_index, true)
+    GateOff => apply_graph_gate_control(self, control.node_index, false)
+    SetParam =>
+      apply_graph_param_control(
+        self,
+        control.node_index,
+        control.slot,
+        control.value,
+      )
   }
 }
 
 ///|
+/// Trigger `gate_on()` on an ADSR node using its original authoring index.
+///
+/// Compatibility helper; prefer `apply_control(GraphControl::gate_on(...))`.
+pub fn CompiledDsp::gate_on(self : CompiledDsp, node_index : Int) -> Bool {
+  self.apply_control(GraphControl::gate_on(node_index))
+}
+
+///|
 /// Trigger `gate_off()` on an ADSR node using its original authoring index.
+///
+/// Compatibility helper; prefer `apply_control(GraphControl::gate_off(...))`.
 pub fn CompiledDsp::gate_off(self : CompiledDsp, node_index : Int) -> Bool {
-  match self.compiled_index_for(node_index) {
-    Some(compiled_index) =>
-      match self.env_states[compiled_index] {
-        Some(env) => {
-          env.gate_off()
-          true
-        }
-        None => false
-      }
-    None => false
-  }
+  self.apply_control(GraphControl::gate_off(node_index))
 }
 
 ///|
@@ -505,24 +580,60 @@ pub fn CompiledDsp::gate_off(self : CompiledDsp, node_index : Int) -> Bool {
 ///
 /// Returns `false` when the node index is invalid, the slot is unsupported for
 /// that node kind, or the new value is invalid for that slot.
+///
+/// Compatibility helper; prefer
+/// `apply_control(GraphControl::set_param(...))`.
 pub fn CompiledDsp::set_param(
   self : CompiledDsp,
   node_index : Int,
   slot : GraphParamSlot,
   value : Double,
 ) -> Bool {
-  let compiled_index = match self.compiled_index_for(node_index) {
+  self.apply_control(GraphControl::set_param(node_index, slot, value))
+}
+
+///|
+fn apply_graph_gate_control(
+  compiled : CompiledDsp,
+  node_index : Int,
+  gate_on : Bool,
+) -> Bool {
+  match compiled.compiled_index_for(node_index) {
+    Some(compiled_index) =>
+      match compiled.env_states[compiled_index] {
+        Some(env) => {
+          if gate_on {
+            env.gate_on()
+          } else {
+            env.gate_off()
+          }
+          true
+        }
+        None => false
+      }
+    None => false
+  }
+}
+
+///|
+fn apply_graph_param_control(
+  compiled : CompiledDsp,
+  node_index : Int,
+  slot : GraphParamSlot,
+  value : Double,
+) -> Bool {
+  let compiled_index = match compiled.compiled_index_for(node_index) {
     Some(compiled_index) => compiled_index
     None => return false
   }
-  let node = self.nodes[compiled_index]
+  let node = compiled.nodes[compiled_index]
   let updated = match
-    updated_node_param(node, slot, value, self.compile_sample_rate) {
+    updated_node_param(node, slot, value, compiled.compile_sample_rate) {
     Some(updated) => updated
     None => return false
   }
-  self.nodes[compiled_index] = updated
-  apply_runtime_param_side_effect(self, compiled_index, updated, slot)
+  compiled.nodes[compiled_index] = updated
+  apply_runtime_param_side_effect(compiled, compiled_index, updated, slot)
 }
 
 ///|

@@ -162,7 +162,7 @@ test "compiled dsp applies adsr envelope through multiply" {
   let compiled = CompiledDsp::compile(nodes, context).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
-  assert_true(compiled.gate_on(2))
+  assert_true(compiled.apply_control(GraphControl::gate_on(2)))
   compiled.process(context, output)
 
   assert_eq(output.get(0), UNIT_SAMPLE)
@@ -170,7 +170,7 @@ test "compiled dsp applies adsr envelope through multiply" {
   assert_eq(output.get(2), ADSR_SUSTAIN_LEVEL)
   assert_eq(output.get(3), ADSR_SUSTAIN_LEVEL)
 
-  assert_true(compiled.gate_off(2))
+  assert_true(compiled.apply_control(GraphControl::gate_off(2)))
   compiled.process(context, output)
 
   assert_eq(output.get(0), 0.125)
@@ -197,7 +197,7 @@ test "compiled dsp resets adsr state on invalid context" {
   let compiled = CompiledDsp::compile(nodes, valid_context).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
-  assert_true(compiled.gate_on(2))
+  assert_true(compiled.apply_control(GraphControl::gate_on(2)))
   compiled.process(valid_context, output)
   compiled.process(invalid_context, output)
   compiled.process(valid_context, output)
@@ -314,7 +314,11 @@ test "compiled dsp runtime param update changes gain output" {
   compiled.process(context, output)
   assert_eq(output.get(0), QUARTER_SAMPLE)
 
-  assert_true(compiled.set_param(1, GraphParamSlot::Value0, HALF_GAIN))
+  assert_true(
+    compiled.apply_control(
+      GraphControl::set_param(1, GraphParamSlot::Value0, HALF_GAIN),
+    ),
+  )
   compiled.process(context, output)
 
   assert_eq(output.get(0), HALF_GAIN)
@@ -338,9 +342,19 @@ test "compiled dsp runtime param update changes delay length" {
   assert_eq(output.get(0), ZERO_SAMPLE)
   assert_eq(output.get(3), ZERO_SAMPLE)
 
-  assert_true(compiled.set_param(0, GraphParamSlot::Value0, UNIT_SAMPLE))
   assert_true(
-    compiled.set_param(1, GraphParamSlot::DelaySamples, DELAY_SAMPLES_DOUBLE),
+    compiled.apply_control(
+      GraphControl::set_param(0, GraphParamSlot::Value0, UNIT_SAMPLE),
+    ),
+  )
+  assert_true(
+    compiled.apply_control(
+      GraphControl::set_param(
+        1,
+        GraphParamSlot::DelaySamples,
+        DELAY_SAMPLES_DOUBLE,
+      ),
+    ),
   )
   compiled.process(context, output)
 
@@ -362,10 +376,24 @@ test "compiled dsp runtime param update rejects unsupported or invalid values" {
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   assert_false(
-    compiled.set_param(0, GraphParamSlot::DelaySamples, DELAY_SAMPLES_DOUBLE),
+    compiled.apply_control(
+      GraphControl::set_param(
+        0,
+        GraphParamSlot::DelaySamples,
+        DELAY_SAMPLES_DOUBLE,
+      ),
+    ),
   )
-  assert_false(compiled.set_param(1, GraphParamSlot::DelaySamples, 1.5))
-  assert_false(compiled.set_param(1, GraphParamSlot::DelaySamples, 0.0 / 0.0))
+  assert_false(
+    compiled.apply_control(
+      GraphControl::set_param(1, GraphParamSlot::DelaySamples, 1.5),
+    ),
+  )
+  assert_false(
+    compiled.apply_control(
+      GraphControl::set_param(1, GraphParamSlot::DelaySamples, 0.0 / 0.0),
+    ),
+  )
 
   compiled.process(context, output)
 
@@ -388,14 +416,60 @@ test "compiled dsp runtime param update rejects invalid biquad values" {
 
   compiled.process(context, output)
   assert_false(
-    compiled.set_param(1, GraphParamSlot::Value0, INVALID_NYQUIST_CUTOFF),
+    compiled.apply_control(
+      GraphControl::set_param(1, GraphParamSlot::Value0, INVALID_NYQUIST_CUTOFF),
+    ),
   )
-  assert_false(compiled.set_param(1, GraphParamSlot::Value1, ZERO_SAMPLE))
+  assert_false(
+    compiled.apply_control(
+      GraphControl::set_param(1, GraphParamSlot::Value1, ZERO_SAMPLE),
+    ),
+  )
   compiled.process(context, output)
 
   assert_true(output.get(0) > ZERO_SAMPLE)
   assert_true(output.get(0) < UNIT_SAMPLE)
   assert_true(output.as_fixed_array().any(sample => sample != ZERO_SAMPLE))
+}
+
+///|
+test "compiled dsp legacy wrappers match apply_control" {
+  let context = DspContext::new(ADSR_TEST_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let nodes = [
+    DspNode::output(1),
+    DspNode::mul(3, 2),
+    DspNode::adsr(
+      ADSR_ATTACK_MS,
+      ADSR_DECAY_MS,
+      ADSR_SUSTAIN_LEVEL,
+      ADSR_RELEASE_MS,
+    ),
+    DspNode::constant(UNIT_SAMPLE),
+  ]
+  let wrapper_compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let unified_compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let wrapper_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+  let unified_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+
+  assert_true(wrapper_compiled.gate_on(2))
+  assert_true(unified_compiled.apply_control(GraphControl::gate_on(2)))
+
+  wrapper_compiled.process(context, wrapper_output)
+  unified_compiled.process(context, unified_output)
+
+  for index = 0; index < SMALL_BLOCK_SIZE; index = index + 1 {
+    assert_eq(wrapper_output.get(index), unified_output.get(index))
+  }
+
+  assert_true(wrapper_compiled.gate_off(2))
+  assert_true(unified_compiled.apply_control(GraphControl::gate_off(2)))
+
+  wrapper_compiled.process(context, wrapper_output)
+  unified_compiled.process(context, unified_output)
+
+  for index = 0; index < SMALL_BLOCK_SIZE; index = index + 1 {
+    assert_eq(wrapper_output.get(index), unified_output.get(index))
+  }
 }
 
 ///|

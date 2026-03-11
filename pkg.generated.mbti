@@ -76,6 +76,7 @@ pub fn Clip::new() -> Self
 pub fn Clip::process(Self, DspContext, AudioBuffer, Double) -> Unit
 
 type CompiledDsp
+pub fn CompiledDsp::apply_control(Self, GraphControl) -> Bool
 pub fn CompiledDsp::compile(Array[DspNode], DspContext) -> Self?
 pub fn CompiledDsp::gate_off(Self, Int) -> Bool
 pub fn CompiledDsp::gate_on(Self, Int) -> Bool
@@ -164,6 +165,24 @@ pub struct Gain {
 }
 pub fn Gain::new() -> Self
 pub fn Gain::process(Self, DspContext, AudioBuffer, Double) -> Unit
+
+pub struct GraphControl {
+  kind : GraphControlKind
+  node_index : Int
+  slot : GraphParamSlot
+  value : Double
+
+  fn new(GraphControlKind, Int, GraphParamSlot, Double) -> GraphControl
+}
+pub fn GraphControl::gate_off(Int) -> Self
+pub fn GraphControl::gate_on(Int) -> Self
+pub fn GraphControl::set_param(Int, GraphParamSlot, Double) -> Self
+
+pub(all) enum GraphControlKind {
+  GateOn
+  GateOff
+  SetParam
+}
 
 pub(all) enum GraphParamSlot {
   Value0
