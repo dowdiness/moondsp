@@ -170,6 +170,51 @@ test "compiled dsp topologically sorts declarative filter graph" {
 }
 
 ///|
+test "compiled dsp applies delay line in graph across blocks" {
+  let context = DspContext::new(48000.0, 4)
+  let nodes = [
+    DspNode::constant(1.0),
+    DspNode::delay(0, 4, delay_samples=2),
+    DspNode::output(1),
+  ]
+  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let output = AudioBuffer::filled(4)
+
+  compiled.process(context, output)
+
+  assert_eq(output.get(0), 0.0)
+  assert_eq(output.get(1), 0.0)
+  assert_eq(output.get(2), 1.0)
+  assert_eq(output.get(3), 1.0)
+
+  compiled.process(context, output)
+
+  assert_eq(output.get(0), 1.0)
+  assert_eq(output.get(1), 1.0)
+  assert_eq(output.get(2), 1.0)
+  assert_eq(output.get(3), 1.0)
+}
+
+///|
+test "compiled dsp delay node keeps zero-capacity default as passthrough" {
+  let context = DspContext::new(48000.0, 4)
+  let nodes = [
+    DspNode::constant(0.25),
+    DspNode::delay(0, 0),
+    DspNode::output(1),
+  ]
+  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let output = AudioBuffer::filled(4)
+
+  compiled.process(context, output)
+
+  assert_eq(output.get(0), 0.25)
+  assert_eq(output.get(1), 0.25)
+  assert_eq(output.get(2), 0.25)
+  assert_eq(output.get(3), 0.25)
+}
+
+///|
 test "compiled dsp rejects non-finite adsr parameters" {
   let context = DspContext::new(48000.0, 4)
   let nodes = [DspNode::adsr(0.0 / 0.0, 1.0, 0.5, 10.0), DspNode::output(0)]

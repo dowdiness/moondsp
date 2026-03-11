@@ -6,6 +6,7 @@ pub(all) enum DspNodeKind {
   Noise
   Adsr
   Biquad
+  Delay
   Gain
   Mul
   Mix
@@ -25,6 +26,8 @@ pub struct DspNode {
   value3 : Double
   waveform : Waveform
   filter_mode : BiquadMode
+  delay_max_samples : Int
+  delay_samples : Int
   seed : UInt
 
   fn new(
@@ -37,6 +40,8 @@ pub struct DspNode {
     value3 : Double,
     waveform : Waveform,
     filter_mode : BiquadMode,
+    delay_max_samples : Int,
+    delay_samples : Int,
     seed : UInt,
   ) -> DspNode
 }
@@ -52,6 +57,8 @@ fn DspNode::new(
   value3 : Double,
   waveform : Waveform,
   filter_mode : BiquadMode,
+  delay_max_samples : Int,
+  delay_samples : Int,
   seed : UInt,
 ) -> DspNode {
   {
@@ -64,6 +71,8 @@ fn DspNode::new(
     value3,
     waveform,
     filter_mode,
+    delay_max_samples,
+    delay_samples,
     seed,
   }
 }
@@ -78,6 +87,7 @@ struct CompiledDsp {
   noise_states : FixedArray[Noise?]
   env_states : FixedArray[Adsr?]
   biquad_states : FixedArray[Biquad?]
+  delay_states : FixedArray[DelayLine?]
 }
 
 ///|
@@ -93,6 +103,8 @@ pub fn DspNode::constant(value : Double) -> DspNode {
     0.0,
     Waveform::Sine,
     BiquadMode::LowPass,
+    0,
+    0,
     0U,
   )
 }
@@ -110,6 +122,8 @@ pub fn DspNode::oscillator(waveform : Waveform, freq : Double) -> DspNode {
     0.0,
     waveform,
     BiquadMode::LowPass,
+    0,
+    0,
     0U,
   )
 }
@@ -127,6 +141,8 @@ pub fn DspNode::noise(seed : UInt) -> DspNode {
     0.0,
     Waveform::Sine,
     BiquadMode::LowPass,
+    0,
+    0,
     seed,
   )
 }
@@ -152,6 +168,8 @@ pub fn DspNode::adsr(
     release_ms,
     Waveform::Sine,
     BiquadMode::LowPass,
+    0,
+    0,
     0U,
   )
 }
@@ -174,6 +192,31 @@ pub fn DspNode::biquad(
     0.0,
     Waveform::Sine,
     mode,
+    0,
+    0,
+    0U,
+  )
+}
+
+///|
+/// Create a fixed-delay node from one upstream node.
+pub fn DspNode::delay(
+  input : Int,
+  max_delay_samples : Int,
+  delay_samples? : Int = graph_default_delay_samples(max_delay_samples),
+) -> DspNode {
+  DspNode(
+    DspNodeKind::Delay,
+    input,
+    -1,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    BiquadMode::LowPass,
+    max_delay_samples,
+    delay_samples,
     0U,
   )
 }
@@ -191,6 +234,8 @@ pub fn DspNode::gain(input : Int, amount : Double) -> DspNode {
     0.0,
     Waveform::Sine,
     BiquadMode::LowPass,
+    0,
+    0,
     0U,
   )
 }
@@ -208,6 +253,8 @@ pub fn DspNode::mul(left : Int, right : Int) -> DspNode {
     0.0,
     Waveform::Sine,
     BiquadMode::LowPass,
+    0,
+    0,
     0U,
   )
 }
@@ -225,6 +272,8 @@ pub fn DspNode::mix(left : Int, right : Int) -> DspNode {
     0.0,
     Waveform::Sine,
     BiquadMode::LowPass,
+    0,
+    0,
     0U,
   )
 }
@@ -242,6 +291,8 @@ pub fn DspNode::clip(input : Int, threshold : Double) -> DspNode {
     0.0,
     Waveform::Sine,
     BiquadMode::LowPass,
+    0,
+    0,
     0U,
   )
 }
@@ -259,6 +310,8 @@ pub fn DspNode::output(input : Int) -> DspNode {
     0.0,
     Waveform::Sine,
     BiquadMode::LowPass,
+    0,
+    0,
     0U,
   )
 }
@@ -307,6 +360,9 @@ pub fn CompiledDsp::compile(
   let biquad_states = FixedArray::makei(node_count, index => {
     make_graph_biquad_state(fixed_nodes[index])
   })
+  let delay_states = FixedArray::makei(node_count, index => {
+    make_graph_delay_state(fixed_nodes[index])
+  })
   Some({
     nodes: fixed_nodes,
     index_map,
@@ -315,6 +371,7 @@ pub fn CompiledDsp::compile(
     noise_states,
     env_states,
     biquad_states,
+    delay_states,
   })
 }
 
@@ -361,6 +418,10 @@ pub fn CompiledDsp::process(
           node.value0,
           node.value1,
         )
+      }
+      Delay => {
+        copy_buffer(self.buffers[node.input0], buffer, sample_count)
+        self.delay_states[index].unwrap().process(context, buffer)
       }
       Gain => {
         copy_buffer(self.buffers[node.input0], buffer, sample_count)
@@ -462,6 +523,7 @@ fn valid_node_inputs(
     Biquad =>
       valid_reference(node.input0, node_count) &&
       valid_biquad_graph_params(sample_rate, node.value0, node.value1)
+    Delay => valid_reference(node.input0, node_count)
     Gain =>
       valid_reference(node.input0, node_count) &&
       valid_finite_value(node.value0)
@@ -524,6 +586,15 @@ fn valid_biquad_graph_params(
   cutoff < nyquist &&
   valid_finite_value(q) &&
   q > 0.0
+}
+
+///|
+fn graph_default_delay_samples(value : Int) -> Int {
+  if value > 0 {
+    value
+  } else {
+    0
+  }
 }
 
 ///|
@@ -614,6 +685,7 @@ fn visit_graph_dependencies(
     Noise => true
     Adsr => true
     Biquad => visit_graph_node(node.input0, nodes, marks, order)
+    Delay => visit_graph_node(node.input0, nodes, marks, order)
     Gain => visit_graph_node(node.input0, nodes, marks, order)
     Mul =>
       visit_graph_node(node.input0, nodes, marks, order) &&
@@ -638,6 +710,8 @@ fn remap_node_inputs(node : DspNode, remap : FixedArray[Int]) -> DspNode {
     node.value3,
     node.waveform,
     node.filter_mode,
+    node.delay_max_samples,
+    node.delay_samples,
     node.seed,
   )
 }
@@ -847,6 +921,17 @@ fn make_graph_env_state(node : DspNode) -> Adsr? {
 fn make_graph_biquad_state(node : DspNode) -> Biquad? {
   match node.kind {
     Biquad => Some(Biquad::new())
+    _ => None
+  }
+}
+
+///|
+fn make_graph_delay_state(node : DspNode) -> DelayLine? {
+  match node.kind {
+    Delay =>
+      Some(
+        DelayLine::new(node.delay_max_samples, delay_samples=node.delay_samples),
+      )
     _ => None
   }
 }

@@ -116,14 +116,17 @@ pub struct DspNode {
   value3 : Double
   waveform : Waveform
   filter_mode : BiquadMode
+  delay_max_samples : Int
+  delay_samples : Int
   seed : UInt
 
-  fn new(DspNodeKind, Int, Int, Double, Double, Double, Double, Waveform, BiquadMode, UInt) -> DspNode
+  fn new(DspNodeKind, Int, Int, Double, Double, Double, Double, Waveform, BiquadMode, Int, Int, UInt) -> DspNode
 }
 pub fn DspNode::adsr(Double, Double, Double, Double) -> Self
 pub fn DspNode::biquad(Int, BiquadMode, Double, Double) -> Self
 pub fn DspNode::clip(Int, Double) -> Self
 pub fn DspNode::constant(Double) -> Self
+pub fn DspNode::delay(Int, Int, delay_samples? : Int) -> Self
 pub fn DspNode::gain(Int, Double) -> Self
 pub fn DspNode::mix(Int, Int) -> Self
 pub fn DspNode::mul(Int, Int) -> Self
@@ -137,6 +140,7 @@ pub(all) enum DspNodeKind {
   Noise
   Adsr
   Biquad
+  Delay
   Gain
   Mul
   Mix
