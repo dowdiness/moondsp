@@ -4,7 +4,9 @@ pub(all) enum DspNodeKind {
   Constant
   Oscillator
   Noise
+  Adsr
   Gain
+  Mul
   Mix
   Clip
   Output
@@ -17,6 +19,9 @@ pub struct DspNode {
   input0 : Int
   input1 : Int
   value0 : Double
+  value1 : Double
+  value2 : Double
+  value3 : Double
   waveform : Waveform
   seed : UInt
 
@@ -25,6 +30,9 @@ pub struct DspNode {
     input0 : Int,
     input1 : Int,
     value0 : Double,
+    value1 : Double,
+    value2 : Double,
+    value3 : Double,
     waveform : Waveform,
     seed : UInt,
   ) -> DspNode
@@ -36,61 +44,136 @@ fn DspNode::new(
   input0 : Int,
   input1 : Int,
   value0 : Double,
+  value1 : Double,
+  value2 : Double,
+  value3 : Double,
   waveform : Waveform,
   seed : UInt,
 ) -> DspNode {
-  { kind, input0, input1, value0, waveform, seed }
+  { kind, input0, input1, value0, value1, value2, value3, waveform, seed }
 }
 
 ///|
 /// Executable buffer-based DSP graph compiled from `DspNode`s.
 struct CompiledDsp {
   nodes : FixedArray[DspNode]
+  index_map : FixedArray[Int]
   buffers : FixedArray[AudioBuffer]
   osc_states : FixedArray[Oscillator?]
   noise_states : FixedArray[Noise?]
+  env_states : FixedArray[Adsr?]
 }
 
 ///|
 /// Create a constant-value node.
 pub fn DspNode::constant(value : Double) -> DspNode {
-  DspNode(DspNodeKind::Constant, -1, -1, value, Waveform::Sine, 0U)
+  DspNode(
+    DspNodeKind::Constant,
+    -1,
+    -1,
+    value,
+    0.0,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    0U,
+  )
 }
 
 ///|
 /// Create an oscillator node with a fixed frequency.
 pub fn DspNode::oscillator(waveform : Waveform, freq : Double) -> DspNode {
-  DspNode(DspNodeKind::Oscillator, -1, -1, freq, waveform, 0U)
+  DspNode(DspNodeKind::Oscillator, -1, -1, freq, 0.0, 0.0, 0.0, waveform, 0U)
 }
 
 ///|
 /// Create a white-noise source node.
 pub fn DspNode::noise(seed : UInt) -> DspNode {
-  DspNode(DspNodeKind::Noise, -1, -1, 0.0, Waveform::Sine, seed)
+  DspNode(DspNodeKind::Noise, -1, -1, 0.0, 0.0, 0.0, 0.0, Waveform::Sine, seed)
+}
+
+///|
+/// Create an ADSR envelope source node.
+///
+/// Use `CompiledDsp::gate_on(...)` and `CompiledDsp::gate_off(...)` to drive
+/// the envelope after compilation.
+pub fn DspNode::adsr(
+  attack_ms : Double,
+  decay_ms : Double,
+  sustain : Double,
+  release_ms : Double,
+) -> DspNode {
+  DspNode(
+    DspNodeKind::Adsr,
+    -1,
+    -1,
+    attack_ms,
+    decay_ms,
+    sustain,
+    release_ms,
+    Waveform::Sine,
+    0U,
+  )
 }
 
 ///|
 /// Create an in-place gain node from one upstream node.
 pub fn DspNode::gain(input : Int, amount : Double) -> DspNode {
-  DspNode(DspNodeKind::Gain, input, -1, amount, Waveform::Sine, 0U)
+  DspNode(
+    DspNodeKind::Gain,
+    input,
+    -1,
+    amount,
+    0.0,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    0U,
+  )
+}
+
+///|
+/// Create a sample-wise multiply node from two upstream nodes.
+pub fn DspNode::mul(left : Int, right : Int) -> DspNode {
+  DspNode(DspNodeKind::Mul, left, right, 0.0, 0.0, 0.0, 0.0, Waveform::Sine, 0U)
 }
 
 ///|
 /// Create a mix node from two upstream nodes.
 pub fn DspNode::mix(left : Int, right : Int) -> DspNode {
-  DspNode(DspNodeKind::Mix, left, right, 0.0, Waveform::Sine, 0U)
+  DspNode(DspNodeKind::Mix, left, right, 0.0, 0.0, 0.0, 0.0, Waveform::Sine, 0U)
 }
 
 ///|
 /// Create a clip node from one upstream node.
 pub fn DspNode::clip(input : Int, threshold : Double) -> DspNode {
-  DspNode(DspNodeKind::Clip, input, -1, threshold, Waveform::Sine, 0U)
+  DspNode(
+    DspNodeKind::Clip,
+    input,
+    -1,
+    threshold,
+    0.0,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    0U,
+  )
 }
 
 ///|
 /// Mark the final output node.
 pub fn DspNode::output(input : Int) -> DspNode {
-  DspNode(DspNodeKind::Output, input, -1, 0.0, Waveform::Sine, 0U)
+  DspNode(
+    DspNodeKind::Output,
+    input,
+    -1,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    0U,
+  )
 }
 
 ///|
@@ -99,27 +182,49 @@ pub fn DspNode::output(input : Int) -> DspNode {
 /// This first Phase 2 slice accepts nodes in authoring order, requires exactly
 /// one reachable `Output` node, rejects cycles, and rejects graphs containing
 /// unreachable nodes.
+///
+/// Current limitation: runtime graph events are specialized for ADSR via
+/// `gate_on(...)` / `gate_off(...)`. If more stateful nodes need runtime
+/// control, this should be generalized into a broader graph event/update API
+/// instead of growing one-off methods per node kind.
 pub fn CompiledDsp::compile(
   nodes : Array[DspNode],
   context : DspContext,
 ) -> CompiledDsp? {
-  let sorted_nodes = match topo_sorted_nodes(nodes) {
-    Some(sorted_nodes) => sorted_nodes
+  let order = match topo_sorted_node_order(nodes) {
+    Some(order) => order
     None => return None
   }
   let node_count = nodes.length()
   let block_size = compiled_block_size(context)
-  let fixed_nodes = FixedArray::makei(node_count, index => sorted_nodes[index])
+  let index_map = FixedArray::make(node_count, -1)
+  for new_index = 0; new_index < order.length(); new_index = new_index + 1 {
+    index_map[order[new_index]] = new_index
+  }
+
+  let fixed_nodes = FixedArray::makei(node_count, index => {
+    remap_node_inputs(nodes[order[index]], index_map)
+  })
   let buffers = FixedArray::makei(node_count, _ => {
     AudioBuffer::filled(block_size)
   })
   let osc_states = FixedArray::makei(node_count, index => {
-    make_graph_osc_state(sorted_nodes[index])
+    make_graph_osc_state(fixed_nodes[index])
   })
   let noise_states = FixedArray::makei(node_count, index => {
-    make_graph_noise_state(sorted_nodes[index])
+    make_graph_noise_state(fixed_nodes[index])
   })
-  Some({ nodes: fixed_nodes, buffers, osc_states, noise_states })
+  let env_states = FixedArray::makei(node_count, index => {
+    make_graph_env_state(fixed_nodes[index])
+  })
+  Some({
+    nodes: fixed_nodes,
+    index_map,
+    buffers,
+    osc_states,
+    noise_states,
+    env_states,
+  })
 }
 
 ///|
@@ -132,9 +237,13 @@ pub fn CompiledDsp::process(
 ) -> Unit {
   let sample_rate = context.sample_rate()
   let sample_count = compiled_sample_count(context, output)
-  if !valid_compiled_context(sample_rate) ||
-    sample_count <= 0 ||
-    sample_count > self.compiled_buffer_capacity() {
+  if !valid_compiled_context(sample_rate) {
+    clear_compiled_buffers(self.buffers)
+    reset_graph_env_states(self.env_states)
+    output.fill(0.0)
+    return
+  }
+  if sample_count <= 0 || sample_count > self.compiled_buffer_capacity() {
     clear_compiled_buffers(self.buffers)
     output.fill(0.0)
     return
@@ -150,10 +259,18 @@ pub fn CompiledDsp::process(
         .unwrap()
         .process_waveform(context, buffer, node.waveform, node.value0)
       Noise => self.noise_states[index].unwrap().process(context, buffer)
+      Adsr => self.env_states[index].unwrap().process(context, buffer)
       Gain => {
         copy_buffer(self.buffers[node.input0], buffer, sample_count)
         apply_gain_buffer(buffer, sample_count, node.value0)
       }
+      Mul =>
+        multiply_buffers(
+          self.buffers[node.input0],
+          self.buffers[node.input1],
+          buffer,
+          sample_count,
+        )
       Mix =>
         mix_buffers(
           self.buffers[node.input0],
@@ -170,6 +287,38 @@ pub fn CompiledDsp::process(
   }
 
   copy_buffer(self.buffers[self.buffers.length() - 1], output, sample_count)
+}
+
+///|
+/// Trigger `gate_on()` on an ADSR node using its original authoring index.
+pub fn CompiledDsp::gate_on(self : CompiledDsp, node_index : Int) -> Bool {
+  match self.compiled_index_for(node_index) {
+    Some(compiled_index) =>
+      match self.env_states[compiled_index] {
+        Some(env) => {
+          env.gate_on()
+          true
+        }
+        None => false
+      }
+    None => false
+  }
+}
+
+///|
+/// Trigger `gate_off()` on an ADSR node using its original authoring index.
+pub fn CompiledDsp::gate_off(self : CompiledDsp, node_index : Int) -> Bool {
+  match self.compiled_index_for(node_index) {
+    Some(compiled_index) =>
+      match self.env_states[compiled_index] {
+        Some(env) => {
+          env.gate_off()
+          true
+        }
+        None => false
+      }
+    None => false
+  }
 }
 
 ///|
@@ -198,9 +347,17 @@ fn valid_node_inputs(node : DspNode, node_count : Int) -> Bool {
     Constant => valid_finite_value(node.value0)
     Oscillator => valid_finite_value(node.value0)
     Noise => true
+    Adsr =>
+      valid_finite_value(node.value0) &&
+      valid_finite_value(node.value1) &&
+      valid_finite_value(node.value2) &&
+      valid_finite_value(node.value3)
     Gain =>
       valid_reference(node.input0, node_count) &&
       valid_finite_value(node.value0)
+    Mul =>
+      valid_reference(node.input0, node_count) &&
+      valid_reference(node.input1, node_count)
     Mix =>
       valid_reference(node.input0, node_count) &&
       valid_reference(node.input1, node_count)
@@ -227,12 +384,24 @@ fn CompiledDsp::compiled_buffer_capacity(self : CompiledDsp) -> Int {
 }
 
 ///|
+fn CompiledDsp::compiled_index_for(
+  self : CompiledDsp,
+  node_index : Int,
+) -> Int? {
+  if node_index < 0 || node_index >= self.index_map.length() {
+    None
+  } else {
+    Some(self.index_map[node_index])
+  }
+}
+
+///|
 fn valid_finite_value(value : Double) -> Bool {
   !value.is_nan() && !value.is_inf()
 }
 
 ///|
-fn topo_sorted_nodes(nodes : Array[DspNode]) -> Array[DspNode]? {
+fn topo_sorted_node_order(nodes : Array[DspNode]) -> Array[Int]? {
   if !valid_compiled_graph(nodes) {
     return None
   }
@@ -247,16 +416,7 @@ fn topo_sorted_nodes(nodes : Array[DspNode]) -> Array[DspNode]? {
     return None
   }
 
-  let remap = FixedArray::make(nodes.length(), -1)
-  for new_index = 0; new_index < order.length(); new_index = new_index + 1 {
-    remap[order[new_index]] = new_index
-  }
-
-  let sorted = Array::new()
-  for new_index = 0; new_index < order.length(); new_index = new_index + 1 {
-    sorted.push(remap_node_inputs(nodes[order[new_index]], remap))
-  }
-  Some(sorted)
+  Some(order)
 }
 
 ///|
@@ -323,7 +483,11 @@ fn visit_graph_dependencies(
     Constant => true
     Oscillator => true
     Noise => true
+    Adsr => true
     Gain => visit_graph_node(node.input0, nodes, marks, order)
+    Mul =>
+      visit_graph_node(node.input0, nodes, marks, order) &&
+      visit_graph_node(node.input1, nodes, marks, order)
     Mix =>
       visit_graph_node(node.input0, nodes, marks, order) &&
       visit_graph_node(node.input1, nodes, marks, order)
@@ -339,6 +503,9 @@ fn remap_node_inputs(node : DspNode, remap : FixedArray[Int]) -> DspNode {
     remapped_input(node.input0, remap),
     remapped_input(node.input1, remap),
     node.value0,
+    node.value1,
+    node.value2,
+    node.value3,
     node.waveform,
     node.seed,
   )
@@ -463,6 +630,27 @@ fn mix_buffers(
 }
 
 ///|
+fn multiply_buffers(
+  left : AudioBuffer,
+  right : AudioBuffer,
+  output : AudioBuffer,
+  sample_count : Int,
+) -> Unit {
+  let bounded = min_buffer_length(
+    sample_count,
+    left.length(),
+    right.length(),
+    output.length(),
+  )
+  for index = 0; index < bounded; index = index + 1 {
+    output.set(index, left.get(index) * right.get(index))
+  }
+  for index = bounded; index < output.length(); index = index + 1 {
+    output.set(index, 0.0)
+  }
+}
+
+///|
 fn clip_buffer(
   buffer : AudioBuffer,
   sample_count : Int,
@@ -513,6 +701,24 @@ fn make_graph_noise_state(node : DspNode) -> Noise? {
   match node.kind {
     Noise => Some(Noise::new(node.seed))
     _ => None
+  }
+}
+
+///|
+fn make_graph_env_state(node : DspNode) -> Adsr? {
+  match node.kind {
+    Adsr => Some(Adsr::new(node.value0, node.value1, node.value2, node.value3))
+    _ => None
+  }
+}
+
+///|
+fn reset_graph_env_states(env_states : FixedArray[Adsr?]) -> Unit {
+  for index = 0; index < env_states.length(); index = index + 1 {
+    match env_states[index] {
+      Some(env) => env.reset()
+      None => ()
+    }
   }
 }
 

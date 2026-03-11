@@ -77,6 +77,8 @@ pub fn Clip::process(Self, DspContext, AudioBuffer, Double) -> Unit
 
 type CompiledDsp
 pub fn CompiledDsp::compile(Array[DspNode], DspContext) -> Self?
+pub fn CompiledDsp::gate_off(Self, Int) -> Bool
+pub fn CompiledDsp::gate_on(Self, Int) -> Bool
 pub fn CompiledDsp::process(Self, DspContext, AudioBuffer) -> Unit
 
 pub struct DelayLine {
@@ -109,15 +111,20 @@ pub struct DspNode {
   input0 : Int
   input1 : Int
   value0 : Double
+  value1 : Double
+  value2 : Double
+  value3 : Double
   waveform : Waveform
   seed : UInt
 
-  fn new(DspNodeKind, Int, Int, Double, Waveform, UInt) -> DspNode
+  fn new(DspNodeKind, Int, Int, Double, Double, Double, Double, Waveform, UInt) -> DspNode
 }
+pub fn DspNode::adsr(Double, Double, Double, Double) -> Self
 pub fn DspNode::clip(Int, Double) -> Self
 pub fn DspNode::constant(Double) -> Self
 pub fn DspNode::gain(Int, Double) -> Self
 pub fn DspNode::mix(Int, Int) -> Self
+pub fn DspNode::mul(Int, Int) -> Self
 pub fn DspNode::noise(UInt) -> Self
 pub fn DspNode::oscillator(Waveform, Double) -> Self
 pub fn DspNode::output(Int) -> Self
@@ -126,7 +133,9 @@ pub(all) enum DspNodeKind {
   Constant
   Oscillator
   Noise
+  Adsr
   Gain
+  Mul
   Mix
   Clip
   Output

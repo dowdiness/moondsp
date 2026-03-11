@@ -70,6 +70,64 @@ test "compiled dsp noise graph stays bounded and non-zero" {
 }
 
 ///|
+test "compiled dsp applies adsr envelope through multiply" {
+  let context = DspContext::new(1000.0, 4)
+  let nodes = [
+    DspNode::output(1),
+    DspNode::mul(3, 2),
+    DspNode::adsr(1.0, 1.0, 0.25, 2.0),
+    DspNode::constant(1.0),
+  ]
+  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let output = AudioBuffer::filled(4)
+
+  assert_true(compiled.gate_on(2))
+  compiled.process(context, output)
+
+  assert_eq(output.get(0), 1.0)
+  assert_eq(output.get(1), 0.25)
+  assert_eq(output.get(2), 0.25)
+  assert_eq(output.get(3), 0.25)
+
+  assert_true(compiled.gate_off(2))
+  compiled.process(context, output)
+
+  assert_eq(output.get(0), 0.125)
+  assert_eq(output.get(1), 0.0)
+  assert_eq(output.get(2), 0.0)
+  assert_eq(output.get(3), 0.0)
+}
+
+///|
+test "compiled dsp resets adsr state on invalid context" {
+  let valid_context = DspContext::new(1000.0, 4)
+  let invalid_context = DspContext::new(0.0, 4)
+  let nodes = [
+    DspNode::output(1),
+    DspNode::mul(3, 2),
+    DspNode::adsr(1.0, 1.0, 0.25, 2.0),
+    DspNode::constant(1.0),
+  ]
+  let compiled = CompiledDsp::compile(nodes, valid_context).unwrap()
+  let output = AudioBuffer::filled(4)
+
+  assert_true(compiled.gate_on(2))
+  compiled.process(valid_context, output)
+  compiled.process(invalid_context, output)
+  compiled.process(valid_context, output)
+
+  assert_true(output.as_fixed_array().every(sample => sample == 0.0))
+}
+
+///|
+test "compiled dsp rejects non-finite adsr parameters" {
+  let context = DspContext::new(48000.0, 4)
+  let nodes = [DspNode::adsr(0.0 / 0.0, 1.0, 0.5, 10.0), DspNode::output(0)]
+
+  assert_true(CompiledDsp::compile(nodes, context) is None)
+}
+
+///|
 test "compiled dsp rejects non-finite constants" {
   let context = DspContext::new(48000.0, 4)
   let nan_nodes = [DspNode::constant(0.0 / 0.0), DspNode::output(0)]
