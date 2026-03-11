@@ -204,7 +204,8 @@ Current implemented surface:
   - `gate_on(node_index)` / `gate_off(node_index)` on `Adsr`
   - partial `set_param(node_index, slot, value)` for selected numeric params
 - Integration coverage for a compiled mono voice path using gates and runtime
-  parameter updates together
+  parameter updates together, plus mixed-source and successful runtime
+  `Biquad` retune coverage
 
 Still planned in Phase 2:
 - Single-sample feedback handling (cycles → insert z⁻¹ delay)

@@ -662,6 +662,10 @@ Current runtime control support:
 - `gate_on(node_index)` / `gate_off(node_index)` for `Adsr`
 - partial `set_param(node_index, slot, value)` for selected numeric params
   (`Gain`, `Clip`, `Biquad`, `Delay`, `Constant`, `Oscillator`)
+- integration coverage now includes successful runtime `Biquad` retunes in
+  compiled mono graphs for `LowPass`, `HighPass`, and `BandPass`
+- the current graph tests also include directional runtime-retune assertions for
+  `HighPass` and `BandPass`, not just output-difference checks
 
 Current `set_param(node_index, slot, value)` support matrix:
 

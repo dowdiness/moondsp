@@ -63,7 +63,8 @@ Confirmed on 2026-03-11:
 - A compiled mono graph exists via `DspNode` -> `CompiledDsp`.
 - Topological sorting, graph validation, and runtime control are implemented.
 - Integration coverage exists for compiled graph voice paths that use both gate
-  events and runtime parameter updates.
+  events and runtime parameter updates, including successful runtime `Biquad`
+  retunes in compiled mono graphs.
 
 Authoritative detailed Phase 2 graph status now lives in
 `docs/salat-engine-technical-reference.md`, including:
