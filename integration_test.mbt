@@ -38,6 +38,81 @@ const GRAPH_VOICE_DELAY_SAMPLES_DOUBLE : Double = 2.0
 const GRAPH_VOICE_RELEASE_TAIL_LIMIT : Double = 0.001
 
 ///|
+const GRAPH_MULTI_SOURCE_SAMPLE_RATE : Double = 48000.0
+
+///|
+const GRAPH_MULTI_SOURCE_BLOCK_SIZE : Int = 16
+
+///|
+const GRAPH_MULTI_SOURCE_OSC_FREQ : Double = 220.0
+
+///|
+const GRAPH_MULTI_SOURCE_NOISE_SEED : UInt = 456U
+
+///|
+const GRAPH_MULTI_SOURCE_NOISE_GAIN : Double = 0.2
+
+///|
+const GRAPH_MULTI_SOURCE_CUTOFF : Double = 500.0
+
+///|
+const GRAPH_MULTI_SOURCE_RETUNED_CUTOFF : Double = 4000.0
+
+///|
+const GRAPH_MULTI_SOURCE_Q : Double = 0.707
+
+///|
+const GRAPH_MULTI_SOURCE_OUTPUT_GAIN : Double = 0.6
+
+///|
+const GRAPH_MULTI_SOURCE_CLIP : Double = 0.5
+
+///|
+const INTEGRATION_BUFFER_EPSILON : Double = 0.000000000001
+
+///|
+const GRAPH_HIGHPASS_SAMPLE_RATE : Double = 48000.0
+
+///|
+const GRAPH_HIGHPASS_BLOCK_SIZE : Int = 32
+
+///|
+const GRAPH_HIGHPASS_FREQ : Double = 220.0
+
+///|
+const GRAPH_HIGHPASS_INITIAL_CUTOFF : Double = 2000.0
+
+///|
+const GRAPH_HIGHPASS_RETUNED_CUTOFF : Double = 100.0
+
+///|
+const GRAPH_HIGHPASS_Q : Double = 0.707
+
+///|
+const GRAPH_HIGHPASS_CLIP : Double = 0.9
+
+///|
+const GRAPH_BANDPASS_SAMPLE_RATE : Double = 48000.0
+
+///|
+const GRAPH_BANDPASS_BLOCK_SIZE : Int = 32
+
+///|
+const GRAPH_BANDPASS_FREQ : Double = 440.0
+
+///|
+const GRAPH_BANDPASS_INITIAL_CUTOFF : Double = 2000.0
+
+///|
+const GRAPH_BANDPASS_RETUNED_CUTOFF : Double = 440.0
+
+///|
+const GRAPH_BANDPASS_Q : Double = 1.2
+
+///|
+const GRAPH_BANDPASS_CLIP : Double = 0.9
+
+///|
 test "voice chain stays bounded across note on and release" {
   let context = DspContext::new(48000.0, 16)
   let osc = Oscillator::new()
@@ -241,6 +316,207 @@ test "compiled graph voice path stays coherent across gates and runtime updates"
 }
 
 ///|
+test "compiled graph multi-source path responds to runtime biquad retune" {
+  let context = DspContext::new(
+    GRAPH_MULTI_SOURCE_SAMPLE_RATE,
+    GRAPH_MULTI_SOURCE_BLOCK_SIZE,
+  )
+  let nodes = [
+    DspNode::oscillator(Waveform::Triangle, GRAPH_MULTI_SOURCE_OSC_FREQ),
+    DspNode::noise(GRAPH_MULTI_SOURCE_NOISE_SEED),
+    DspNode::gain(1, GRAPH_MULTI_SOURCE_NOISE_GAIN),
+    DspNode::mix(0, 2),
+    DspNode::biquad(
+      3,
+      BiquadMode::LowPass,
+      GRAPH_MULTI_SOURCE_CUTOFF,
+      GRAPH_MULTI_SOURCE_Q,
+    ),
+    DspNode::gain(4, GRAPH_MULTI_SOURCE_OUTPUT_GAIN),
+    DspNode::clip(5, GRAPH_MULTI_SOURCE_CLIP),
+    DspNode::output(6),
+  ]
+  let baseline = CompiledDsp::compile(nodes, context).unwrap()
+  let retuned = CompiledDsp::compile(nodes, context).unwrap()
+  let baseline_output = AudioBuffer::filled(GRAPH_MULTI_SOURCE_BLOCK_SIZE)
+  let retuned_output = AudioBuffer::filled(GRAPH_MULTI_SOURCE_BLOCK_SIZE)
+
+  baseline.process(context, baseline_output)
+  retuned.process(context, retuned_output)
+
+  assert_true(
+    integration_buffer_is_finite_and_bounded(
+      baseline_output,
+      GRAPH_MULTI_SOURCE_CLIP,
+    ),
+  )
+  assert_true(
+    integration_buffer_is_finite_and_bounded(
+      retuned_output,
+      GRAPH_MULTI_SOURCE_CLIP,
+    ),
+  )
+  assert_true(integration_any_non_zero(baseline_output))
+  assert_true(integration_any_non_zero(retuned_output))
+  assert_true(
+    integration_buffers_close(
+      baseline_output,
+      retuned_output,
+      INTEGRATION_BUFFER_EPSILON,
+    ),
+  )
+
+  assert_true(
+    retuned.set_param(
+      4,
+      GraphParamSlot::Value0,
+      GRAPH_MULTI_SOURCE_RETUNED_CUTOFF,
+    ),
+  )
+
+  baseline.process(context, baseline_output)
+  retuned.process(context, retuned_output)
+
+  assert_true(
+    integration_buffer_is_finite_and_bounded(
+      baseline_output,
+      GRAPH_MULTI_SOURCE_CLIP,
+    ),
+  )
+  assert_true(
+    integration_buffer_is_finite_and_bounded(
+      retuned_output,
+      GRAPH_MULTI_SOURCE_CLIP,
+    ),
+  )
+  assert_true(integration_any_non_zero(baseline_output))
+  assert_true(integration_any_non_zero(retuned_output))
+  assert_false(
+    integration_buffers_close(
+      baseline_output,
+      retuned_output,
+      INTEGRATION_BUFFER_EPSILON,
+    ),
+  )
+}
+
+///|
+test "compiled graph runtime high-pass retune changes output directionally" {
+  let context = DspContext::new(
+    GRAPH_HIGHPASS_SAMPLE_RATE,
+    GRAPH_HIGHPASS_BLOCK_SIZE,
+  )
+  let nodes = [
+    DspNode::oscillator(Waveform::Sine, GRAPH_HIGHPASS_FREQ),
+    DspNode::biquad(
+      0,
+      BiquadMode::HighPass,
+      GRAPH_HIGHPASS_INITIAL_CUTOFF,
+      GRAPH_HIGHPASS_Q,
+    ),
+    DspNode::clip(1, GRAPH_HIGHPASS_CLIP),
+    DspNode::output(2),
+  ]
+  let baseline = CompiledDsp::compile(nodes, context).unwrap()
+  let retuned = CompiledDsp::compile(nodes, context).unwrap()
+  let baseline_output = AudioBuffer::filled(GRAPH_HIGHPASS_BLOCK_SIZE)
+  let retuned_output = AudioBuffer::filled(GRAPH_HIGHPASS_BLOCK_SIZE)
+
+  baseline.process(context, baseline_output)
+  retuned.process(context, retuned_output)
+
+  assert_true(
+    retuned.set_param(1, GraphParamSlot::Value0, GRAPH_HIGHPASS_RETUNED_CUTOFF),
+  )
+
+  baseline.process(context, baseline_output)
+  retuned.process(context, retuned_output)
+
+  assert_true(
+    integration_buffer_is_finite_and_bounded(
+      baseline_output,
+      GRAPH_HIGHPASS_CLIP,
+    ),
+  )
+  assert_true(
+    integration_buffer_is_finite_and_bounded(
+      retuned_output,
+      GRAPH_HIGHPASS_CLIP,
+    ),
+  )
+  assert_true(integration_any_non_zero(baseline_output))
+  assert_true(integration_any_non_zero(retuned_output))
+  assert_false(
+    integration_buffers_close(
+      baseline_output,
+      retuned_output,
+      INTEGRATION_BUFFER_EPSILON,
+    ),
+  )
+  assert_true(
+    integration_abs_sum(retuned_output) > integration_abs_sum(baseline_output),
+  )
+}
+
+///|
+test "compiled graph runtime band-pass retune changes output" {
+  let context = DspContext::new(
+    GRAPH_BANDPASS_SAMPLE_RATE,
+    GRAPH_BANDPASS_BLOCK_SIZE,
+  )
+  let nodes = [
+    DspNode::oscillator(Waveform::Sine, GRAPH_BANDPASS_FREQ),
+    DspNode::biquad(
+      0,
+      BiquadMode::BandPass,
+      GRAPH_BANDPASS_INITIAL_CUTOFF,
+      GRAPH_BANDPASS_Q,
+    ),
+    DspNode::clip(1, GRAPH_BANDPASS_CLIP),
+    DspNode::output(2),
+  ]
+  let baseline = CompiledDsp::compile(nodes, context).unwrap()
+  let retuned = CompiledDsp::compile(nodes, context).unwrap()
+  let baseline_output = AudioBuffer::filled(GRAPH_BANDPASS_BLOCK_SIZE)
+  let retuned_output = AudioBuffer::filled(GRAPH_BANDPASS_BLOCK_SIZE)
+
+  baseline.process(context, baseline_output)
+  retuned.process(context, retuned_output)
+
+  assert_true(
+    retuned.set_param(1, GraphParamSlot::Value0, GRAPH_BANDPASS_RETUNED_CUTOFF),
+  )
+
+  baseline.process(context, baseline_output)
+  retuned.process(context, retuned_output)
+
+  assert_true(
+    integration_buffer_is_finite_and_bounded(
+      baseline_output,
+      GRAPH_BANDPASS_CLIP,
+    ),
+  )
+  assert_true(
+    integration_buffer_is_finite_and_bounded(
+      retuned_output,
+      GRAPH_BANDPASS_CLIP,
+    ),
+  )
+  assert_true(integration_any_non_zero(baseline_output))
+  assert_true(integration_any_non_zero(retuned_output))
+  assert_false(
+    integration_buffers_close(
+      baseline_output,
+      retuned_output,
+      INTEGRATION_BUFFER_EPSILON,
+    ),
+  )
+  assert_true(
+    integration_abs_sum(retuned_output) > integration_abs_sum(baseline_output),
+  )
+}
+
+///|
 fn integration_apply_modulation(
   signal : AudioBuffer,
   modulation : AudioBuffer,
@@ -350,4 +626,15 @@ fn integration_buffer_is_finite_and_bounded(
   .every(sample => {
     !sample.is_nan() && !sample.is_inf() && sample >= -limit && sample <= limit
   })
+}
+
+///|
+fn integration_abs_sum(buffer : AudioBuffer) -> Double {
+  let mut total = 0.0
+
+  for index = 0; index < buffer.length(); index = index + 1 {
+    total = total + buffer.get(index).abs()
+  }
+
+  total
 }
