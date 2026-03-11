@@ -215,6 +215,98 @@ test "compiled dsp delay node keeps zero-capacity default as passthrough" {
 }
 
 ///|
+test "compiled dsp runtime param update changes gain output" {
+  let context = DspContext::new(48000.0, 4)
+  let nodes = [
+    DspNode::constant(1.0),
+    DspNode::gain(0, 0.25),
+    DspNode::output(1),
+  ]
+  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let output = AudioBuffer::filled(4)
+
+  compiled.process(context, output)
+  assert_eq(output.get(0), 0.25)
+
+  assert_true(compiled.set_param(1, GraphParamSlot::Value0, 0.5))
+  compiled.process(context, output)
+
+  assert_eq(output.get(0), 0.5)
+  assert_eq(output.get(1), 0.5)
+  assert_eq(output.get(2), 0.5)
+  assert_eq(output.get(3), 0.5)
+}
+
+///|
+test "compiled dsp runtime param update changes delay length" {
+  let context = DspContext::new(48000.0, 4)
+  let nodes = [
+    DspNode::constant(0.0),
+    DspNode::delay(0, 4, delay_samples=0),
+    DspNode::output(1),
+  ]
+  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let output = AudioBuffer::filled(4)
+
+  compiled.process(context, output)
+  assert_eq(output.get(0), 0.0)
+  assert_eq(output.get(3), 0.0)
+
+  assert_true(compiled.set_param(0, GraphParamSlot::Value0, 1.0))
+  assert_true(compiled.set_param(1, GraphParamSlot::DelaySamples, 2.0))
+  compiled.process(context, output)
+
+  assert_eq(output.get(0), 0.0)
+  assert_eq(output.get(1), 0.0)
+  assert_eq(output.get(2), 1.0)
+  assert_eq(output.get(3), 1.0)
+}
+
+///|
+test "compiled dsp runtime param update rejects unsupported or invalid values" {
+  let context = DspContext::new(48000.0, 4)
+  let nodes = [
+    DspNode::constant(1.0),
+    DspNode::delay(0, 4, delay_samples=0),
+    DspNode::output(1),
+  ]
+  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let output = AudioBuffer::filled(4)
+
+  assert_false(compiled.set_param(0, GraphParamSlot::DelaySamples, 2.0))
+  assert_false(compiled.set_param(1, GraphParamSlot::DelaySamples, 1.5))
+  assert_false(compiled.set_param(1, GraphParamSlot::DelaySamples, 0.0 / 0.0))
+
+  compiled.process(context, output)
+
+  assert_eq(output.get(0), 1.0)
+  assert_eq(output.get(1), 1.0)
+  assert_eq(output.get(2), 1.0)
+  assert_eq(output.get(3), 1.0)
+}
+
+///|
+test "compiled dsp runtime param update rejects invalid biquad values" {
+  let context = DspContext::new(48000.0, 8)
+  let nodes = [
+    DspNode::constant(1.0),
+    DspNode::biquad(0, BiquadMode::LowPass, 1000.0, 0.707),
+    DspNode::output(1),
+  ]
+  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let output = AudioBuffer::filled(8)
+
+  compiled.process(context, output)
+  assert_false(compiled.set_param(1, GraphParamSlot::Value0, 24000.0))
+  assert_false(compiled.set_param(1, GraphParamSlot::Value1, 0.0))
+  compiled.process(context, output)
+
+  assert_true(output.get(0) > 0.0)
+  assert_true(output.get(0) < 1.0)
+  assert_true(output.as_fixed_array().any(sample => sample != 0.0))
+}
+
+///|
 test "compiled dsp rejects non-finite adsr parameters" {
   let context = DspContext::new(48000.0, 4)
   let nodes = [DspNode::adsr(0.0 / 0.0, 1.0, 0.5, 10.0), DspNode::output(0)]

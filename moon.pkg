@@ -7,6 +7,8 @@ options(
   "is-main": true,
   link: {
     "js": { "exports": [ "demo_tick", "demo_tick_source", "demo_reset_phase" ] },
-    "wasm-gc": { "exports": [ "demo_tick", "demo_tick_source", "demo_reset_phase" ] },
+    "wasm-gc": {
+      "exports": [ "demo_tick", "demo_tick_source", "demo_reset_phase" ],
+    },
   },
 )

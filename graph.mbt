@@ -15,6 +15,16 @@ pub(all) enum DspNodeKind {
 }
 
 ///|
+/// Runtime-updatable numeric graph parameter slots.
+pub(all) enum GraphParamSlot {
+  Value0
+  Value1
+  Value2
+  Value3
+  DelaySamples
+}
+
+///|
 /// Declarative DSP graph node in authoring order.
 pub struct DspNode {
   kind : DspNodeKind
@@ -80,6 +90,7 @@ fn DspNode::new(
 ///|
 /// Executable buffer-based DSP graph compiled from `DspNode`s.
 struct CompiledDsp {
+  compile_sample_rate : Double
   nodes : FixedArray[DspNode]
   index_map : FixedArray[Int]
   buffers : FixedArray[AudioBuffer]
@@ -323,10 +334,9 @@ pub fn DspNode::output(input : Int) -> DspNode {
 /// one reachable `Output` node, rejects cycles, and rejects graphs containing
 /// unreachable nodes.
 ///
-/// Current limitation: runtime graph events are specialized for ADSR via
-/// `gate_on(...)` / `gate_off(...)`. If more stateful nodes need runtime
-/// control, this should be generalized into a broader graph event/update API
-/// instead of growing one-off methods per node kind.
+/// Current limitation: runtime graph control is still partial. `gate_on(...)` /
+/// `gate_off(...)` are ADSR-specific, and `set_param(...)` only supports the
+/// node/slot combinations implemented in this slice.
 pub fn CompiledDsp::compile(
   nodes : Array[DspNode],
   context : DspContext,
@@ -337,6 +347,7 @@ pub fn CompiledDsp::compile(
   }
   let node_count = nodes.length()
   let block_size = compiled_block_size(context)
+  let compile_sample_rate = context.sample_rate()
   let index_map = FixedArray::make(node_count, -1)
   for new_index = 0; new_index < order.length(); new_index = new_index + 1 {
     index_map[order[new_index]] = new_index
@@ -364,6 +375,7 @@ pub fn CompiledDsp::compile(
     make_graph_delay_state(fixed_nodes[index])
   })
   Some({
+    compile_sample_rate,
     nodes: fixed_nodes,
     index_map,
     buffers,
@@ -485,6 +497,32 @@ pub fn CompiledDsp::gate_off(self : CompiledDsp, node_index : Int) -> Bool {
 }
 
 ///|
+/// Update a runtime parameter on a compiled node using its original authoring
+/// index.
+///
+/// Returns `false` when the node index is invalid, the slot is unsupported for
+/// that node kind, or the new value is invalid for that slot.
+pub fn CompiledDsp::set_param(
+  self : CompiledDsp,
+  node_index : Int,
+  slot : GraphParamSlot,
+  value : Double,
+) -> Bool {
+  let compiled_index = match self.compiled_index_for(node_index) {
+    Some(compiled_index) => compiled_index
+    None => return false
+  }
+  let node = self.nodes[compiled_index]
+  let updated = match
+    updated_node_param(node, slot, value, self.compile_sample_rate) {
+    Some(updated) => updated
+    None => return false
+  }
+  self.nodes[compiled_index] = updated
+  apply_runtime_param_side_effect(self, compiled_index, updated, slot)
+}
+
+///|
 fn valid_compiled_graph(nodes : Array[DspNode], context : DspContext) -> Bool {
   let sample_rate = context.sample_rate()
   let output_index = match find_single_output_index(nodes) {
@@ -570,6 +608,106 @@ fn CompiledDsp::compiled_index_for(
 ///|
 fn valid_finite_value(value : Double) -> Bool {
   !value.is_nan() && !value.is_inf()
+}
+
+///|
+fn updated_node_param(
+  node : DspNode,
+  slot : GraphParamSlot,
+  value : Double,
+  sample_rate : Double,
+) -> DspNode? {
+  match node.kind {
+    Constant =>
+      match slot {
+        Value0 if valid_finite_value(value) =>
+          Some(node_with_value0(node, value))
+        _ => None
+      }
+    Oscillator =>
+      match slot {
+        Value0 if valid_finite_value(value) =>
+          Some(node_with_value0(node, value))
+        _ => None
+      }
+    Adsr => None
+    Noise => None
+    Biquad =>
+      match slot {
+        Value0 if valid_biquad_graph_params(sample_rate, value, node.value1) =>
+          Some(node_with_value0(node, value))
+        Value1 if valid_biquad_graph_params(sample_rate, node.value0, value) =>
+          Some(node_with_value1(node, value))
+        _ => None
+      }
+    Delay =>
+      match slot {
+        DelaySamples =>
+          match exact_int_value(value) {
+            Some(delay_samples) =>
+              Some(node_with_delay_samples(node, delay_samples))
+            None => None
+          }
+        _ => None
+      }
+    Gain =>
+      match slot {
+        Value0 if valid_finite_value(value) =>
+          Some(node_with_value0(node, value))
+        _ => None
+      }
+    Mul => None
+    Mix => None
+    Clip =>
+      match slot {
+        Value0 if valid_finite_value(value) && value > 0.0 =>
+          Some(node_with_value0(node, value))
+        _ => None
+      }
+    Output => None
+  }
+}
+
+///|
+fn apply_runtime_param_side_effect(
+  compiled : CompiledDsp,
+  compiled_index : Int,
+  node : DspNode,
+  slot : GraphParamSlot,
+) -> Bool {
+  match node.kind {
+    Delay =>
+      match slot {
+        DelaySamples =>
+          match compiled.delay_states[compiled_index] {
+            Some(delay) => {
+              delay.set_delay_samples(node.delay_samples)
+              true
+            }
+            None => false
+          }
+        _ => false
+      }
+    Constant => true
+    Oscillator => true
+    Biquad => true
+    Gain => true
+    Clip => true
+    _ => false
+  }
+}
+
+///|
+fn exact_int_value(value : Double) -> Int? {
+  if !valid_finite_value(value) || value.trunc() != value {
+    return None
+  }
+  let int_value = value.to_int()
+  if Double::from_int(int_value) == value {
+    Some(int_value)
+  } else {
+    None
+  }
 }
 
 ///|
@@ -712,6 +850,60 @@ fn remap_node_inputs(node : DspNode, remap : FixedArray[Int]) -> DspNode {
     node.filter_mode,
     node.delay_max_samples,
     node.delay_samples,
+    node.seed,
+  )
+}
+
+///|
+fn node_with_value0(node : DspNode, value0 : Double) -> DspNode {
+  DspNode(
+    node.kind,
+    node.input0,
+    node.input1,
+    value0,
+    node.value1,
+    node.value2,
+    node.value3,
+    node.waveform,
+    node.filter_mode,
+    node.delay_max_samples,
+    node.delay_samples,
+    node.seed,
+  )
+}
+
+///|
+fn node_with_value1(node : DspNode, value1 : Double) -> DspNode {
+  DspNode(
+    node.kind,
+    node.input0,
+    node.input1,
+    node.value0,
+    value1,
+    node.value2,
+    node.value3,
+    node.waveform,
+    node.filter_mode,
+    node.delay_max_samples,
+    node.delay_samples,
+    node.seed,
+  )
+}
+
+///|
+fn node_with_delay_samples(node : DspNode, delay_samples : Int) -> DspNode {
+  DspNode(
+    node.kind,
+    node.input0,
+    node.input1,
+    node.value0,
+    node.value1,
+    node.value2,
+    node.value3,
+    node.waveform,
+    node.filter_mode,
+    node.delay_max_samples,
+    delay_samples,
     node.seed,
   )
 }

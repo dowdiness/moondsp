@@ -49,7 +49,8 @@ pub fn tick_source(
   match source_id {
     1 => demo_oscillator.val.tick_waveform(Waveform::Saw, freq, sample_rate)
     2 => demo_oscillator.val.tick_waveform(Waveform::Square, freq, sample_rate)
-    3 => demo_oscillator.val.tick_waveform(Waveform::Triangle, freq, sample_rate)
+    3 =>
+      demo_oscillator.val.tick_waveform(Waveform::Triangle, freq, sample_rate)
     4 =>
       if !is_valid_osc_param(sample_rate) || sample_rate <= 0.0 {
         0.0

@@ -80,6 +80,7 @@ pub fn CompiledDsp::compile(Array[DspNode], DspContext) -> Self?
 pub fn CompiledDsp::gate_off(Self, Int) -> Bool
 pub fn CompiledDsp::gate_on(Self, Int) -> Bool
 pub fn CompiledDsp::process(Self, DspContext, AudioBuffer) -> Unit
+pub fn CompiledDsp::set_param(Self, Int, GraphParamSlot, Double) -> Bool
 
 pub struct DelayLine {
   buffer : FixedArray[Double]
@@ -163,6 +164,14 @@ pub struct Gain {
 }
 pub fn Gain::new() -> Self
 pub fn Gain::process(Self, DspContext, AudioBuffer, Double) -> Unit
+
+pub(all) enum GraphParamSlot {
+  Value0
+  Value1
+  Value2
+  Value3
+  DelaySamples
+}
 
 pub struct Mix {
   unit : Unit
