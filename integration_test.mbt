@@ -326,6 +326,72 @@ test "compiled graph voice path stays coherent across gates and runtime updates"
 }
 
 ///|
+test "compiled graph control frames apply batched runtime changes per block" {
+  let context = DspContext::new(GRAPH_VOICE_SAMPLE_RATE, GRAPH_VOICE_BLOCK_SIZE)
+  let nodes = [
+    DspNode::output(1),
+    DspNode::clip(2, GRAPH_VOICE_CLIP),
+    DspNode::delay(
+      3,
+      GRAPH_VOICE_DELAY_CAPACITY,
+      delay_samples=GRAPH_VOICE_DELAY_SAMPLES,
+    ),
+    DspNode::gain(4, GRAPH_VOICE_GAIN),
+    DspNode::biquad(5, BiquadMode::LowPass, GRAPH_VOICE_CUTOFF, GRAPH_VOICE_Q),
+    DspNode::mul(7, 6),
+    DspNode::adsr(0.0, 0.0, GRAPH_VOICE_SUSTAIN, GRAPH_VOICE_RELEASE_MS),
+    DspNode::oscillator(Waveform::Square, GRAPH_VOICE_FREQ),
+  ]
+  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let output = AudioBuffer::filled(GRAPH_VOICE_BLOCK_SIZE)
+
+  assert_true(
+    compiled.apply_controls([
+      GraphControl::gate_on(6),
+      GraphControl::set_param(3, GraphParamSlot::Value0, 0.0),
+    ]),
+  )
+  compiled.process(context, output)
+
+  assert_true(
+    integration_buffer_is_finite_and_bounded(output, GRAPH_VOICE_CLIP),
+  )
+  assert_true(output.as_fixed_array().every(sample => sample == 0.0))
+
+  assert_true(
+    compiled.apply_controls([
+      GraphControl::set_param(3, GraphParamSlot::Value0, GRAPH_VOICE_GAIN),
+      GraphControl::set_param(2, GraphParamSlot::DelaySamples, 0.0),
+    ]),
+  )
+  compiled.process(context, output)
+
+  assert_true(
+    integration_buffer_is_finite_and_bounded(output, GRAPH_VOICE_CLIP),
+  )
+  assert_true(integration_any_non_zero(output))
+
+  assert_true(compiled.apply_controls([GraphControl::gate_off(6)]))
+  compiled.process(context, output)
+
+  assert_true(
+    integration_buffer_is_finite_and_bounded(output, GRAPH_VOICE_CLIP),
+  )
+  assert_true(integration_any_non_zero(output))
+
+  for repeat = 0; repeat < 6; repeat = repeat + 1 {
+    compiled.process(context, output)
+  }
+
+  assert_true(
+    integration_buffer_is_finite_and_bounded(
+      output,
+      GRAPH_VOICE_RELEASE_TAIL_LIMIT,
+    ),
+  )
+}
+
+///|
 test "compiled graph multi-source path responds to runtime biquad retune" {
   let context = DspContext::new(
     GRAPH_MULTI_SOURCE_SAMPLE_RATE,
