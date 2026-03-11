@@ -28,6 +28,13 @@ You can browse and install extra skills here:
   `docs/salat-engine-blueprint.md` for the full architecture vision and
   `docs/step0-instruction.md` for the current phase spec.
 
+- For Phase 2 graph runtime-control behavior, treat
+  `docs/salat-engine-technical-reference.md` as the authoritative source of
+  truth. Update it first whenever `CompiledDsp`, `GraphControl`,
+  `apply_control(...)`, `apply_controls(...)`, or the runtime-control support
+  matrix changes; only then adjust summary docs like `RESULTS.md` or
+  `docs/salat-engine-blueprint.md` if needed.
+
 ## Package Map
 
 - `/` (root package): core DSP library
