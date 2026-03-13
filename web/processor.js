@@ -4,6 +4,9 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
     this.freq = 440.0;
     this.gain = 0.3;
     this.pan = 0.0;
+    this.forceStereoInitFailure = Boolean(
+      options?.processorOptions?.forceStereoInitFailure,
+    );
     this.ready = false;
     this.initError = null;
     this.wasm = null;
@@ -69,7 +72,10 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
       this.usesCompiledGraph = false;
 
       if (supportsCompiledStereoGraph) {
-        const initialized = this.wasm.init_compiled_stereo_graph(sampleRate, 128);
+        let initialized = this.wasm.init_compiled_stereo_graph(sampleRate, 128);
+        if (this.forceStereoInitFailure) {
+          initialized = false;
+        }
         if (initialized) {
           this.usesCompiledStereoGraph = true;
         }

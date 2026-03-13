@@ -22,9 +22,13 @@ async function stereoWidths(page) {
   return { left, right };
 }
 
-test('browser demo reports CompiledStereoDsp mode and reacts to pan', async ({ page }) => {
-  await page.goto('/');
+async function startAudio(page, path) {
+  await page.goto(path);
   await page.click('#startBtn');
+}
+
+test('browser demo reports CompiledStereoDsp mode and reacts to pan', async ({ page }) => {
+  await startAudio(page, '/');
   await expect(page.locator('#status')).toContainText('CompiledStereoDsp block runtime');
 
   await expect.poll(() => meterWidth(page, '#meterFill'), { timeout: 10_000 }).toBeGreaterThan(0.5);
@@ -60,4 +64,17 @@ test('browser demo reports CompiledStereoDsp mode and reacts to pan', async ({ p
       return right - left;
     }, { timeout: 10_000 })
     .toBeGreaterThan(15);
+});
+
+test('browser demo falls back to CompiledDsp when stereo init fails', async ({ page }) => {
+  await startAudio(page, '/?forceStereoInitFailure=1');
+  await expect(page.locator('#status')).toContainText('CompiledDsp block runtime');
+  await expect(page.locator('#status')).not.toContainText('Processor init failed');
+  await expect.poll(() => meterWidth(page, '#meterFill'), { timeout: 10_000 }).toBeGreaterThan(0.5);
+
+  await setRangeValue(page, '#gainSlider', 40);
+  await setRangeValue(page, '#freqSlider', 550);
+  await expect(page.locator('#gainValue')).toHaveText('40');
+  await expect(page.locator('#freqValue')).toHaveText('550');
+  await expect.poll(() => meterWidth(page, '#meterFill'), { timeout: 10_000 }).toBeGreaterThan(0.5);
 });

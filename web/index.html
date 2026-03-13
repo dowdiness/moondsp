@@ -453,10 +453,15 @@
         const bytes = await response.arrayBuffer();
         const wasmModule = await WebAssembly.compile(bytes);
         const exports = WebAssembly.Module.exports(wasmModule).map((entry) => entry.name);
+        const forceStereoInitFailure =
+          new URLSearchParams(window.location.search).get("forceStereoInitFailure") === "1";
         console.log("wasm exports:", exports);
 
         node = new AudioWorkletNode(audioContext, "moonbit-dsp", {
-          processorOptions: { wasmModule },
+          processorOptions: {
+            wasmModule,
+            forceStereoInitFailure,
+          },
           numberOfInputs: 0,
           numberOfOutputs: 1,
           outputChannelCount: [2],
