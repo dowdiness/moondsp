@@ -98,6 +98,15 @@ const GRAPH_STEREO_HARD_LEFT : Double = -1.0
 const GRAPH_STEREO_HARD_RIGHT : Double = 1.0
 
 ///|
+const GRAPH_STEREO_FILTER_INITIAL_CUTOFF : Double = 180.0
+
+///|
+const GRAPH_STEREO_FILTER_RETUNED_CUTOFF : Double = 4000.0
+
+///|
+const GRAPH_STEREO_FILTER_Q : Double = 0.707
+
+///|
 const INTEGRATION_BUFFER_EPSILON : Double = 0.000000000001
 
 ///|
@@ -392,6 +401,81 @@ test "compiled stereo graph applies batched control frames" {
   assert_true(integration_any_non_zero(right_output))
   assert_true(
     integration_abs_sum(right_output) > integration_abs_sum(left_output),
+  )
+}
+
+///|
+test "compiled stereo graph stereo biquad retune changes output" {
+  let context = DspContext::new(
+    GRAPH_STEREO_SAMPLE_RATE,
+    GRAPH_STEREO_BLOCK_SIZE,
+  )
+  let baseline_nodes = [
+    DspNode::oscillator(Waveform::Triangle, GRAPH_STEREO_FREQ),
+    DspNode::pan(0, GRAPH_STEREO_CENTER),
+    DspNode::stereo_biquad(
+      1,
+      BiquadMode::LowPass,
+      GRAPH_STEREO_FILTER_INITIAL_CUTOFF,
+      GRAPH_STEREO_FILTER_Q,
+    ),
+    DspNode::stereo_gain(2, GRAPH_STEREO_POST_GAIN),
+    DspNode::stereo_clip(3, GRAPH_STEREO_CLIP),
+    DspNode::stereo_output(4),
+  ]
+  let baseline = CompiledStereoDsp::compile(baseline_nodes, context).unwrap()
+  let retuned = CompiledStereoDsp::compile(baseline_nodes, context).unwrap()
+  let baseline_left = AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
+  let baseline_right = AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
+  let retuned_left = AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
+  let retuned_right = AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
+
+  baseline.process(context, baseline_left, baseline_right)
+  retuned.process(context, retuned_left, retuned_right)
+
+  assert_true(integration_any_non_zero(baseline_left))
+  assert_true(integration_any_non_zero(retuned_left))
+  assert_true(
+    integration_buffers_close(
+      baseline_left,
+      baseline_right,
+      INTEGRATION_BUFFER_EPSILON,
+    ),
+  )
+  assert_true(
+    integration_buffers_close(
+      retuned_left,
+      retuned_right,
+      INTEGRATION_BUFFER_EPSILON,
+    ),
+  )
+
+  assert_true(
+    retuned.apply_control(
+      GraphControl::set_param(
+        2,
+        GraphParamSlot::Value0,
+        GRAPH_STEREO_FILTER_RETUNED_CUTOFF,
+      ),
+    ),
+  )
+  retuned.process(context, retuned_left, retuned_right)
+
+  assert_true(
+    integration_buffer_is_finite_and_bounded(baseline_left, GRAPH_STEREO_CLIP),
+  )
+  assert_true(
+    integration_buffer_is_finite_and_bounded(retuned_left, GRAPH_STEREO_CLIP),
+  )
+  assert_false(
+    integration_buffers_close(
+      baseline_left,
+      retuned_left,
+      INTEGRATION_BUFFER_EPSILON,
+    ),
+  )
+  assert_true(
+    integration_abs_sum(retuned_left) > integration_abs_sum(baseline_left),
   )
 }
 

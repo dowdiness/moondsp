@@ -638,8 +638,9 @@ The current repository already implements:
   `CompiledDsp`, including explicit `Mono -> Stereo -> Mono` subgraphs through
   `Pan` and `StereoMixDown`
 - a first stereo graph path: the same `DspNode` authoring language can compile
-  into `CompiledStereoDsp` for `Mono -> Pan -> StereoGain? -> StereoClip? ->
-  StereoOutput`
+  into `CompiledStereoDsp` for `Mono -> Pan -> Stereo post-processing ->
+  StereoOutput`, where the current stereo post-processing node set is
+  `StereoGain`, `StereoClip`, and `StereoBiquad`
 - input nodes may be declared in authoring order; the compiler topologically
   sorts reachable nodes from a single terminal output node
 - compile rejects:
@@ -668,6 +669,7 @@ Current graph node support:
 - `Pan`
 - `StereoGain`
 - `StereoClip`
+- `StereoBiquad`
 - `StereoMixDown`
 - `Output`
 - `StereoOutput`
@@ -681,18 +683,20 @@ Current runtime control support:
   - `gate_on(node_index)` / `gate_off(node_index)` for `Adsr`
 - partial `set_param(node_index, slot, value)` for selected numeric params
   (`Gain`, `Clip`, `Biquad`, `Delay`, `Constant`, `Oscillator`, `Pan`,
-  `StereoGain`, `StereoClip`)
+  `StereoGain`, `StereoClip`, `StereoBiquad`)
 - integration coverage now includes successful runtime `Biquad` retunes in
   compiled mono graphs for `LowPass`, `HighPass`, and `BandPass`
 - the current graph tests also include directional runtime-retune assertions for
   `HighPass` and `BandPass`, not just output-difference checks
 - stereo graph coverage now includes:
   - graph-unit checks for `Pan -> StereoOutput` shape enforcement
-  - stereo post-processing through `StereoGain` and `StereoClip`
-  - direct runtime updates for `Pan`, `StereoGain`, and `StereoClip`
+  - stereo post-processing through `StereoGain`, `StereoClip`, and
+    `StereoBiquad`
+  - direct runtime updates for `Pan`, `StereoGain`, `StereoClip`, and
+    `StereoBiquad`
   - end-to-end compiled stereo voice-path and batched-control integration tests
 - mono graph coverage now includes explicit stereo fold-down through
-  `StereoMixDown`
+  `StereoMixDown`, including a stereo-filtered path through `StereoBiquad`
 
 Current `set_param(node_index, slot, value)` support matrix:
 
@@ -711,6 +715,7 @@ Current `set_param(node_index, slot, value)` support matrix:
 | `Pan` | `Value0` | Finite pan position only |
 | `StereoGain` | `Value0` | Finite gain only |
 | `StereoClip` | `Value0` | Positive finite threshold only |
+| `StereoBiquad` | `Value0`, `Value1` | `Value0 = cutoff`, `Value1 = q`; validated against the compile-time sample rate |
 | `StereoMixDown` | none | Fixed equal-weight fold-down: `0.5 * (left + right)` |
 | `Output` | none | No runtime params |
 | `StereoOutput` | none | No runtime params |
@@ -718,9 +723,10 @@ Current `set_param(node_index, slot, value)` support matrix:
 Current limits:
 
 - stereo graph support is still narrow: terminal stereo remains
-  `Pan -> StereoGain? -> StereoClip? -> StereoOutput`, while mono graphs may
-  now fold stereo back through `StereoMixDown`
-- no stereo filters or stereo delay nodes yet
+  `Pan -> stereo post-processing -> StereoOutput`, while mono graphs may now
+  fold stereo back through `StereoMixDown`
+- only one stereo filter node exists so far: `StereoBiquad`; no stereo delay
+  nodes yet
 - no feedback-edge insertion yet
 - no graph hot-swap yet
 - runtime parameter updates are partial, not universal across node kinds

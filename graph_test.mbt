@@ -389,6 +389,40 @@ test "compiled dsp runtime params update stereo nodes before mixdown" {
 }
 
 ///|
+test "compiled dsp runtime params update stereo biquad before mixdown" {
+  let context = DspContext::new(STANDARD_SAMPLE_RATE, LARGE_BLOCK_SIZE)
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::pan(0, PAN_CENTER),
+    DspNode::stereo_biquad(1, BiquadMode::LowPass, LOWPASS_CUTOFF, LOWPASS_Q),
+    DspNode::stereo_mixdown(2),
+    DspNode::output(3),
+  ]
+  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let output = AudioBuffer::filled(LARGE_BLOCK_SIZE)
+
+  assert_true(
+    compiled.apply_control(
+      GraphControl::set_param(
+        2,
+        GraphParamSlot::Value0,
+        HALF_GAIN * LOWPASS_CUTOFF,
+      ),
+    ),
+  )
+  assert_true(
+    compiled.apply_control(
+      GraphControl::set_param(2, GraphParamSlot::Value1, 1.2),
+    ),
+  )
+  compiled.process(context, output)
+
+  assert_true(output.get(0) > ZERO_SAMPLE)
+  assert_true(output.get(0) < PAN_CENTER_GAIN)
+  assert_true(output.get(1) > output.get(0))
+}
+
+///|
 test "compiled stereo dsp pans mono input to stereo output" {
   let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
   let nodes = [
@@ -505,6 +539,29 @@ test "compiled stereo dsp applies stereo clip after pan" {
 }
 
 ///|
+test "compiled stereo dsp applies stereo biquad after pan" {
+  let context = DspContext::new(STANDARD_SAMPLE_RATE, LARGE_BLOCK_SIZE)
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::pan(0, PAN_CENTER),
+    DspNode::stereo_biquad(1, BiquadMode::LowPass, LOWPASS_CUTOFF, LOWPASS_Q),
+    DspNode::stereo_output(2),
+  ]
+  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let left_output = AudioBuffer::filled(LARGE_BLOCK_SIZE)
+  let right_output = AudioBuffer::filled(LARGE_BLOCK_SIZE)
+
+  compiled.process(context, left_output, right_output)
+
+  assert_true(left_output.get(0) > ZERO_SAMPLE)
+  assert_true(left_output.get(0) < PAN_CENTER_GAIN)
+  assert_true(left_output.get(1) > left_output.get(0))
+  assert_true(right_output.get(0) > ZERO_SAMPLE)
+  assert_true((left_output.get(0) - right_output.get(0)).abs() < 0.000000001)
+  assert_true((left_output.get(1) - right_output.get(1)).abs() < 0.000000001)
+}
+
+///|
 test "compiled dsp rejects stereo-only nodes" {
   let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
   let stereo_gain_nodes = [
@@ -517,9 +574,15 @@ test "compiled dsp rejects stereo-only nodes" {
     DspNode::stereo_clip(0, STEREO_CLIP_THRESHOLD),
     DspNode::output(1),
   ]
+  let stereo_biquad_nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::stereo_biquad(0, BiquadMode::LowPass, LOWPASS_CUTOFF, LOWPASS_Q),
+    DspNode::output(1),
+  ]
 
   assert_true(CompiledDsp::compile(stereo_gain_nodes, context) is None)
   assert_true(CompiledDsp::compile(stereo_clip_nodes, context) is None)
+  assert_true(CompiledDsp::compile(stereo_biquad_nodes, context) is None)
 }
 
 ///|
@@ -577,6 +640,42 @@ test "compiled stereo dsp runtime params update stereo gain and clip" {
     assert_eq(left_output.get(index), STEREO_CLIP_THRESHOLD)
     assert_eq(right_output.get(index), STEREO_CLIP_THRESHOLD)
   }
+}
+
+///|
+test "compiled stereo dsp runtime params update stereo biquad" {
+  let context = DspContext::new(STANDARD_SAMPLE_RATE, LARGE_BLOCK_SIZE)
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::pan(0, PAN_CENTER),
+    DspNode::stereo_biquad(1, BiquadMode::LowPass, LOWPASS_CUTOFF, LOWPASS_Q),
+    DspNode::stereo_output(2),
+  ]
+  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let baseline_left = AudioBuffer::filled(LARGE_BLOCK_SIZE)
+  let baseline_right = AudioBuffer::filled(LARGE_BLOCK_SIZE)
+  let retuned_left = AudioBuffer::filled(LARGE_BLOCK_SIZE)
+  let retuned_right = AudioBuffer::filled(LARGE_BLOCK_SIZE)
+
+  compiled.process(context, baseline_left, baseline_right)
+  assert_true(
+    compiled.apply_control(
+      GraphControl::set_param(
+        2,
+        GraphParamSlot::Value0,
+        HALF_GAIN * LOWPASS_CUTOFF,
+      ),
+    ),
+  )
+  assert_true(
+    compiled.apply_control(
+      GraphControl::set_param(2, GraphParamSlot::Value1, 1.2),
+    ),
+  )
+  compiled.process(context, retuned_left, retuned_right)
+
+  assert_true(retuned_left.get(0) != baseline_left.get(0))
+  assert_true(retuned_right.get(0) != baseline_right.get(0))
 }
 
 ///|

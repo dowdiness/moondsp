@@ -15,6 +15,7 @@ pub(all) enum DspNodeKind {
   Pan
   StereoGain
   StereoClip
+  StereoBiquad
   StereoMixDown
   StereoOutput
 }
@@ -148,6 +149,8 @@ struct CompiledDsp {
   noise_states : FixedArray[Noise?]
   env_states : FixedArray[Adsr?]
   biquad_states : FixedArray[Biquad?]
+  stereo_biquad_left_states : FixedArray[Biquad?]
+  stereo_biquad_right_states : FixedArray[Biquad?]
   delay_states : FixedArray[DelayLine?]
 }
 
@@ -164,6 +167,8 @@ struct CompiledStereoDsp {
   noise_states : FixedArray[Noise?]
   env_states : FixedArray[Adsr?]
   biquad_states : FixedArray[Biquad?]
+  stereo_biquad_left_states : FixedArray[Biquad?]
+  stereo_biquad_right_states : FixedArray[Biquad?]
   delay_states : FixedArray[DelayLine?]
 }
 
@@ -452,6 +457,30 @@ pub fn DspNode::stereo_clip(input : Int, threshold : Double) -> DspNode {
 }
 
 ///|
+/// Create a stereo biquad node from one stereo upstream node.
+pub fn DspNode::stereo_biquad(
+  input : Int,
+  mode : BiquadMode,
+  cutoff : Double,
+  q : Double,
+) -> DspNode {
+  DspNode(
+    DspNodeKind::StereoBiquad,
+    input,
+    -1,
+    cutoff,
+    q,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    mode,
+    0,
+    0,
+    0U,
+  )
+}
+
+///|
 /// Create a fixed-policy stereo-to-mono fold-down node.
 pub fn DspNode::stereo_mixdown(input : Int) -> DspNode {
   DspNode(
@@ -575,6 +604,12 @@ pub fn CompiledDsp::compile(
   let biquad_states = FixedArray::makei(node_count, index => {
     make_graph_biquad_state(fixed_nodes[index])
   })
+  let stereo_biquad_left_states = FixedArray::makei(node_count, index => {
+    make_graph_stereo_biquad_state(fixed_nodes[index])
+  })
+  let stereo_biquad_right_states = FixedArray::makei(node_count, index => {
+    make_graph_stereo_biquad_state(fixed_nodes[index])
+  })
   let delay_states = FixedArray::makei(node_count, index => {
     make_graph_delay_state(fixed_nodes[index])
   })
@@ -589,6 +624,8 @@ pub fn CompiledDsp::compile(
     noise_states,
     env_states,
     biquad_states,
+    stereo_biquad_left_states,
+    stereo_biquad_right_states,
     delay_states,
   })
 }
@@ -699,6 +736,31 @@ pub fn CompiledDsp::process(
         clip_buffer(self.left_buffers[index], sample_count, node.value0)
         clip_buffer(self.right_buffers[index], sample_count, node.value0)
       }
+      StereoBiquad => {
+        copy_stereo_buffers(
+          self.left_buffers[node.input0],
+          self.right_buffers[node.input0],
+          self.left_buffers[index],
+          self.right_buffers[index],
+          sample_count,
+        )
+        process_graph_biquad(
+          self.stereo_biquad_left_states[index].unwrap(),
+          context,
+          self.left_buffers[index],
+          node.filter_mode,
+          node.value0,
+          node.value1,
+        )
+        process_graph_biquad(
+          self.stereo_biquad_right_states[index].unwrap(),
+          context,
+          self.right_buffers[index],
+          node.filter_mode,
+          node.value0,
+          node.value1,
+        )
+      }
       StereoMixDown =>
         mixdown_stereo_buffers(
           self.left_buffers[node.input0],
@@ -762,6 +824,12 @@ pub fn CompiledStereoDsp::compile(
   let biquad_states = FixedArray::makei(node_count, index => {
     make_graph_biquad_state(fixed_nodes[index])
   })
+  let stereo_biquad_left_states = FixedArray::makei(node_count, index => {
+    make_graph_stereo_biquad_state(fixed_nodes[index])
+  })
+  let stereo_biquad_right_states = FixedArray::makei(node_count, index => {
+    make_graph_stereo_biquad_state(fixed_nodes[index])
+  })
   let delay_states = FixedArray::makei(node_count, index => {
     make_graph_delay_state(fixed_nodes[index])
   })
@@ -776,6 +844,8 @@ pub fn CompiledStereoDsp::compile(
     noise_states,
     env_states,
     biquad_states,
+    stereo_biquad_left_states,
+    stereo_biquad_right_states,
     delay_states,
   })
 }
@@ -889,6 +959,31 @@ pub fn CompiledStereoDsp::process(
         )
         clip_buffer(self.left_buffers[index], sample_count, node.value0)
         clip_buffer(self.right_buffers[index], sample_count, node.value0)
+      }
+      StereoBiquad => {
+        copy_stereo_buffers(
+          self.left_buffers[node.input0],
+          self.right_buffers[node.input0],
+          self.left_buffers[index],
+          self.right_buffers[index],
+          sample_count,
+        )
+        process_graph_biquad(
+          self.stereo_biquad_left_states[index].unwrap(),
+          context,
+          self.left_buffers[index],
+          node.filter_mode,
+          node.value0,
+          node.value1,
+        )
+        process_graph_biquad(
+          self.stereo_biquad_right_states[index].unwrap(),
+          context,
+          self.right_buffers[index],
+          node.filter_mode,
+          node.value0,
+          node.value1,
+        )
       }
       StereoMixDown =>
         mixdown_stereo_buffers(
@@ -1362,6 +1457,9 @@ fn valid_node_inputs(
       valid_reference(node.input0, node_count) &&
       valid_finite_value(node.value0) &&
       node.value0 > 0.0
+    StereoBiquad =>
+      valid_reference(node.input0, node_count) &&
+      valid_biquad_graph_params(sample_rate, node.value0, node.value1)
     StereoMixDown => valid_reference(node.input0, node_count)
     StereoOutput => false
   }
@@ -1410,6 +1508,9 @@ fn valid_stereo_node_inputs(
       valid_reference(node.input0, node_count) &&
       valid_finite_value(node.value0) &&
       node.value0 > 0.0
+    StereoBiquad =>
+      valid_reference(node.input0, node_count) &&
+      valid_biquad_graph_params(sample_rate, node.value0, node.value1)
     StereoMixDown => false
     StereoOutput => valid_reference(node.input0, node_count)
   }
@@ -1540,6 +1641,14 @@ fn updated_node_param(
           Some(node_with_value0(node, value))
         _ => None
       }
+    StereoBiquad =>
+      match slot {
+        Value0 if valid_biquad_graph_params(sample_rate, value, node.value1) =>
+          Some(node_with_value0(node, value))
+        Value1 if valid_biquad_graph_params(sample_rate, node.value0, value) =>
+          Some(node_with_value1(node, value))
+        _ => None
+      }
     StereoMixDown => None
     StereoOutput => None
   }
@@ -1573,6 +1682,7 @@ fn apply_runtime_param_side_effect(
     Pan => true
     StereoGain => true
     StereoClip => true
+    StereoBiquad => true
     StereoMixDown => false
     _ => false
   }
@@ -1606,6 +1716,7 @@ fn apply_runtime_param_side_effect_stereo(
     Pan => true
     StereoGain => true
     StereoClip => true
+    StereoBiquad => true
     StereoMixDown => false
     _ => false
   }
@@ -1783,6 +1894,7 @@ fn visit_graph_dependencies(
     Pan => visit_graph_node(node.input0, nodes, marks, order)
     StereoGain => visit_graph_node(node.input0, nodes, marks, order)
     StereoClip => visit_graph_node(node.input0, nodes, marks, order)
+    StereoBiquad => visit_graph_node(node.input0, nodes, marks, order)
     StereoMixDown => visit_graph_node(node.input0, nodes, marks, order)
     StereoOutput => visit_graph_node(node.input0, nodes, marks, order)
   }
@@ -2121,6 +2233,14 @@ fn make_graph_biquad_state(node : DspNode) -> Biquad? {
 }
 
 ///|
+fn make_graph_stereo_biquad_state(node : DspNode) -> Biquad? {
+  match node.kind {
+    StereoBiquad => Some(Biquad::new())
+    _ => None
+  }
+}
+
+///|
 fn make_graph_delay_state(node : DspNode) -> DelayLine? {
   match node.kind {
     Delay =>
@@ -2181,6 +2301,7 @@ fn node_kind_matches(left : DspNodeKind, right : DspNodeKind) -> Bool {
     Pan => right is Pan
     StereoGain => right is StereoGain
     StereoClip => right is StereoClip
+    StereoBiquad => right is StereoBiquad
     StereoMixDown => right is StereoMixDown
     StereoOutput => right is StereoOutput
   }
@@ -2258,6 +2379,11 @@ fn valid_terminal_mono_shapes(nodes : FixedArray[DspNode]) -> Bool {
           Some(STEREO_SIGNAL_SHAPE) => STEREO_SIGNAL_SHAPE
           _ => return false
         }
+      StereoBiquad =>
+        match input_shape(node.input0, shapes) {
+          Some(STEREO_SIGNAL_SHAPE) => STEREO_SIGNAL_SHAPE
+          _ => return false
+        }
       StereoMixDown =>
         match input_shape(node.input0, shapes) {
           Some(STEREO_SIGNAL_SHAPE) => MONO_SIGNAL_SHAPE
@@ -2328,6 +2454,11 @@ fn valid_terminal_stereo_shapes(nodes : FixedArray[DspNode]) -> Bool {
           _ => return false
         }
       StereoClip =>
+        match input_shape(node.input0, shapes) {
+          Some(STEREO_SIGNAL_SHAPE) => STEREO_SIGNAL_SHAPE
+          _ => return false
+        }
+      StereoBiquad =>
         match input_shape(node.input0, shapes) {
           Some(STEREO_SIGNAL_SHAPE) => STEREO_SIGNAL_SHAPE
           _ => return false

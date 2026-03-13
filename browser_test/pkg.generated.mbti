@@ -14,7 +14,7 @@ pub fn init_compiled_stereo_graph(Double, Int) -> Bool
 
 pub fn process_compiled_block(Double, Double, Double, Int) -> Bool
 
-pub fn process_compiled_stereo_block(Double, Double, Double, Double, Int) -> Bool
+pub fn process_compiled_stereo_block(Double, Double, Double, Double, Double, Int) -> Bool
 
 pub fn reset_phase() -> Unit
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>mdsp Phase 2 Stereo Browser Proof</title>
+  <title>mdsp Phase 2 Stereo Filter Browser Proof</title>
   <style>
     :root {
       --bg: #f3efe5;
@@ -107,6 +107,15 @@
       margin-top: 10px;
       font-size: 0.88rem;
       color: rgba(29, 27, 24, 0.68);
+    }
+
+    .telemetry-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 12px;
+      font-size: 0.86rem;
+      color: rgba(29, 27, 24, 0.72);
     }
 
     .channel-grid {
@@ -223,13 +232,14 @@
 </head>
 <body>
   <main>
-    <h1>MoonBit DSP<br>Phase 2 Stereo</h1>
+    <h1>MoonBit DSP<br>Phase 2 Stereo Filter</h1>
     <p>
       This page proves the browser pipeline now runs the compiled graph runtime
       itself. The AudioWorklet calls a fixed MoonBit
-      <code>CompiledStereoDsp</code> graph once per render quantum and reads the
+      <code>CompiledStereoDsp</code> graph with a live
+      <code>StereoBiquad</code> node once per render quantum and reads the
       generated left and right blocks back sample by sample for output,
-      metering, and pan verification.
+      metering, filter retuning, and pan verification.
     </p>
 
     <div class="buttons">
@@ -253,6 +263,11 @@
           <span>silent</span>
           <span>healthy</span>
           <span>hot</span>
+        </div>
+        <div class="telemetry-row">
+          <span>render peak <strong id="renderPeakValue">0.000</strong></span>
+          <span>left <strong id="renderLeftPeakValue">0.000</strong></span>
+          <span>right <strong id="renderRightPeakValue">0.000</strong></span>
         </div>
         <div class="channel-grid">
           <div class="channel-meter">
@@ -287,6 +302,14 @@
 
       <div class="slider-card">
         <div class="slider-row">
+          <strong>Cutoff</strong>
+          <span><span id="cutoffValue">1800</span> Hz</span>
+        </div>
+        <input id="cutoffSlider" type="range" min="80" max="6000" value="1800" step="1">
+      </div>
+
+      <div class="slider-card">
+        <div class="slider-row">
           <strong>Gain</strong>
           <span><span id="gainValue">30</span>%</span>
         </div>
@@ -309,13 +332,18 @@
     const startBtn = document.getElementById("startBtn");
     const stopBtn = document.getElementById("stopBtn");
     const freqSlider = document.getElementById("freqSlider");
+    const cutoffSlider = document.getElementById("cutoffSlider");
     const gainSlider = document.getElementById("gainSlider");
     const panSlider = document.getElementById("panSlider");
     const freqValue = document.getElementById("freqValue");
+    const cutoffValue = document.getElementById("cutoffValue");
     const gainValue = document.getElementById("gainValue");
     const panValue = document.getElementById("panValue");
     const meterFill = document.getElementById("meterFill");
     const meterValue = document.getElementById("meterValue");
+    const renderPeakValue = document.getElementById("renderPeakValue");
+    const renderLeftPeakValue = document.getElementById("renderLeftPeakValue");
+    const renderRightPeakValue = document.getElementById("renderRightPeakValue");
     const leftMeterFill = document.getElementById("leftMeterFill");
     const leftMeterValue = document.getElementById("leftMeterValue");
     const rightMeterFill = document.getElementById("rightMeterFill");
@@ -343,6 +371,7 @@
 
     function syncLabels() {
       freqValue.textContent = freqSlider.value;
+      cutoffValue.textContent = cutoffSlider.value;
       gainValue.textContent = gainSlider.value;
       panValue.textContent = panSlider.value;
     }
@@ -373,6 +402,9 @@
     function resetMeter() {
       meterFill.style.width = "0%";
       meterValue.textContent = "-\u221e dB";
+      renderPeakValue.textContent = "0.000";
+      renderLeftPeakValue.textContent = "0.000";
+      renderRightPeakValue.textContent = "0.000";
       leftMeterFill.style.width = "0%";
       leftMeterValue.textContent = "-\u221e dB";
       rightMeterFill.style.width = "0%";
@@ -476,6 +508,10 @@
             setStatus(`Audio running via ${modeLabel}. Exports: ${event.data.exports.join(", ")}`, "ok");
           } else if (event.data?.type === "error") {
             setStatus(`Processor init failed: ${event.data.message}`, "error");
+          } else if (event.data?.type === "telemetry") {
+            renderPeakValue.textContent = Number(event.data.overallPeak).toFixed(3);
+            renderLeftPeakValue.textContent = Number(event.data.leftPeak).toFixed(3);
+            renderRightPeakValue.textContent = Number(event.data.rightPeak).toFixed(3);
           }
         };
 
@@ -502,6 +538,7 @@
         gainNode.connect(audioContext.destination);
 
         node.port.postMessage({ type: "set-freq", value: Number(freqSlider.value) });
+        node.port.postMessage({ type: "set-cutoff", value: Number(cutoffSlider.value) });
         node.port.postMessage({ type: "set-gain", value: Number(gainSlider.value) / 100 });
         node.port.postMessage({ type: "set-pan", value: Number(panSlider.value) / 100 });
 
@@ -570,6 +607,13 @@
       syncLabels();
       if (node) {
         node.port.postMessage({ type: "set-gain", value: Number(gainSlider.value) / 100 });
+      }
+    });
+
+    cutoffSlider.addEventListener("input", () => {
+      syncLabels();
+      if (node) {
+        node.port.postMessage({ type: "set-cutoff", value: Number(cutoffSlider.value) });
       }
     });
 

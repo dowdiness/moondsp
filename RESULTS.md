@@ -15,7 +15,7 @@ current Phase 2 graph-compiler checkpoint.
 - `web/index.html` and `web/processor.js` now provide the current Phase 2
   browser proof: the AudioWorklet runs a fixed MoonBit `CompiledStereoDsp`
   graph once per render quantum and reads its left/right output blocks back for
-  playback, metering, and pan verification.
+  playback, metering, filter retuning, and pan verification.
 - `serve.sh` copies the browser wrapper `.wasm` into `web/` and starts a local
   server.
 - Browser validation is complete for the current prototype.
@@ -52,8 +52,10 @@ Confirmed on 2026-03-13:
 - `processor.js` now prefers the `CompiledStereoDsp` path once per render
   quantum instead of calling `tick(...)` for each individual sample.
 - Browser automation confirms the live page enters the compiled-stereo mode and
-  that the left/right meters respond to `pan` changes in the expected
-  direction.
+  that the `StereoBiquad` cutoff control measurably changes output level before
+  pan changes are applied.
+- Browser automation also confirms the left/right meters respond to `pan`
+  changes in the expected direction.
 
 This means the browser prototype now exercises the actual Phase 2 compiled
 stereo graph runtime, not just the earlier per-sample wrapper ABI.
@@ -85,14 +87,15 @@ Confirmed on 2026-03-11:
 - Compiled mono graphs now support explicit `Mono -> Stereo -> Mono` round-trips
   through `Pan` and `StereoMixDown`.
 - A first narrow terminal-stereo graph slice also exists via
-  `CompiledStereoDsp` for `Mono -> Pan -> StereoGain? -> StereoClip? ->
-  StereoOutput`.
+  `CompiledStereoDsp` for `Mono -> Pan -> Stereo post-processing ->
+  StereoOutput`, including `StereoGain`, `StereoClip`, and `StereoBiquad`.
 - Phase 2 graph compilation and runtime control are working in the current
   graph implementation.
 - Integration coverage exists for compiled graph voice paths and runtime
   retuning.
 - Stereo graph coverage now includes compiled stereo voice-path integration plus
-  runtime and batched updates for `Pan`, `StereoGain`, and `StereoClip`.
+  runtime and batched updates for `Pan`, `StereoGain`, `StereoClip`, and
+  `StereoBiquad`.
 
 Authoritative detailed Phase 2 graph status now lives in
 `docs/salat-engine-technical-reference.md`, including:
@@ -107,7 +110,7 @@ Authoritative detailed Phase 2 graph status now lives in
 3. Open the URL printed by `serve.sh` (for example `http://127.0.0.1:8080` or
    the next free port if `8080` is occupied)
 4. Click `Start Audio`
-5. Move the frequency, gain, and pan controls
+5. Move the frequency, cutoff, gain, and pan controls
 6. Watch the signal meter if you need visual confirmation that samples are
    flowing
 
@@ -124,8 +127,9 @@ Authoritative detailed Phase 2 graph status now lives in
   the browser wrapper wasm exports
 - The page reports `CompiledStereoDsp block runtime`
 - Audible output is confirmed manually
-- The frequency, gain, and pan controls update the running demo
+- The frequency, cutoff, gain, and pan controls update the running demo
 - The signal meter shows non-zero output while running
+- The cutoff control changes the running stereo-filtered output
 - The left/right meters shift in the expected direction when pan changes
 
 ## Remaining Checks

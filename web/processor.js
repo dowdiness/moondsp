@@ -4,12 +4,14 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
     this.freq = 440.0;
     this.gain = 0.3;
     this.pan = 0.0;
+    this.cutoff = 1800.0;
     this.ready = false;
     this.initError = null;
     this.wasm = null;
     this.usesCompiledStereoGraph = false;
     this.usesCompiledGraph = false;
     this.reportedRuntimeError = false;
+    this.telemetryCountdown = 0;
 
     this.port.onmessage = (event) => {
       const data = event.data;
@@ -22,6 +24,8 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
         this.gain = Number(data.value);
       } else if (data.type === "set-pan") {
         this.pan = Number(data.value);
+      } else if (data.type === "set-cutoff") {
+        this.cutoff = Number(data.value);
       }
     };
 
@@ -131,6 +135,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
       if (right) {
         right.fill(0);
       }
+      this.reportBlockTelemetry(left, right);
       return true;
     }
 
@@ -139,6 +144,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
         this.freq,
         this.gain,
         this.pan,
+        this.cutoff,
         sampleRate,
         left.length,
       );
@@ -161,6 +167,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
         }
       }
 
+      this.reportBlockTelemetry(left, right);
       return true;
     }
 
@@ -191,6 +198,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
         }
       }
 
+      this.reportBlockTelemetry(left, right);
       return true;
     }
 
@@ -209,6 +217,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
       }
     }
 
+    this.reportBlockTelemetry(left, right);
     return true;
   }
 
@@ -217,6 +226,33 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
     if (right) {
       right.fill(0);
     }
+  }
+
+  reportBlockTelemetry(left, right) {
+    if (this.telemetryCountdown > 0) {
+      this.telemetryCountdown -= 1;
+      return;
+    }
+    this.telemetryCountdown = 7;
+
+    let leftPeak = 0;
+    let rightPeak = 0;
+    for (let index = 0; index < left.length; index += 1) {
+      leftPeak = Math.max(leftPeak, Math.abs(left[index]));
+      if (right) {
+        rightPeak = Math.max(rightPeak, Math.abs(right[index]));
+      }
+    }
+    if (!right) {
+      rightPeak = leftPeak;
+    }
+
+    this.port.postMessage({
+      type: "telemetry",
+      overallPeak: Math.max(leftPeak, rightPeak),
+      leftPeak,
+      rightPeak,
+    });
   }
 }
 

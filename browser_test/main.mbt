@@ -57,6 +57,7 @@ pub fn process_compiled_stereo_block(
   _freq : Double,
   _gain : Double,
   _pan : Double,
+  _cutoff : Double,
   _sample_rate : Double,
   _block_size : Int,
 ) -> Bool {
