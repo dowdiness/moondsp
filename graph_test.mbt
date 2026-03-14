@@ -1317,6 +1317,114 @@ test "compiled dsp runtime gain update retunes accepted feedback cycle" {
 }
 
 ///|
+test "compiled dsp resolves multiple mono feedback edges from one source" {
+  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::gain(4, HALF_GAIN),
+    DspNode::gain(4, QUARTER_SAMPLE),
+    DspNode::mix(0, 1),
+    DspNode::mix(3, 2),
+    DspNode::output(4),
+  ]
+  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+
+  compiled.process(context, output)
+
+  assert_true((output.get(0) - UNIT_SAMPLE).abs() < 0.000000001)
+  assert_true((output.get(1) - 1.75).abs() < 0.000000001)
+  assert_true((output.get(2) - 2.3125).abs() < 0.000000001)
+  assert_true((output.get(3) - 2.734375).abs() < 0.000000001)
+}
+
+///|
+test "compiled dsp runtime delay update matches fixed feedback loop compile" {
+  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let runtime_nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::mix(0, 3),
+    DspNode::delay(1, DELAY_CAPACITY, delay_samples=0),
+    DspNode::gain(2, HALF_GAIN),
+    DspNode::output(3),
+  ]
+  let fixed_nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::mix(0, 3),
+    DspNode::delay(1, DELAY_CAPACITY, delay_samples=DELAY_SAMPLES),
+    DspNode::gain(2, HALF_GAIN),
+    DspNode::output(3),
+  ]
+  let runtime_compiled = CompiledDsp::compile(runtime_nodes, context).unwrap()
+  let fixed_compiled = CompiledDsp::compile(fixed_nodes, context).unwrap()
+  let runtime_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+  let fixed_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+
+  assert_true(
+    runtime_compiled.apply_control(
+      GraphControl::set_param(
+        2,
+        GraphParamSlot::DelaySamples,
+        DELAY_SAMPLES_DOUBLE,
+      ),
+    ),
+  )
+  runtime_compiled.process(context, runtime_output)
+  fixed_compiled.process(context, fixed_output)
+
+  assert_eq(runtime_output.get(0), ZERO_SAMPLE)
+  assert_eq(runtime_output.get(1), ZERO_SAMPLE)
+  assert_eq(runtime_output.get(2), HALF_GAIN)
+  assert_eq(runtime_output.get(3), HALF_GAIN)
+  for index = 0; index < runtime_output.length(); index = index + 1 {
+    assert_true(
+      (runtime_output.get(index) - fixed_output.get(index)).abs() < 0.000000001,
+    )
+  }
+}
+
+///|
+test "compiled dsp runtime biquad update matches fixed feedback loop compile" {
+  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let retuned_cutoff = 4000.0
+  let runtime_nodes = [
+    DspNode::oscillator(Waveform::Sine, OSCILLATOR_FREQ),
+    DspNode::mix(0, 3),
+    DspNode::biquad(1, BiquadMode::LowPass, LOWPASS_CUTOFF, LOWPASS_Q),
+    DspNode::gain(2, HALF_GAIN),
+    DspNode::output(3),
+  ]
+  let fixed_nodes = [
+    DspNode::oscillator(Waveform::Sine, OSCILLATOR_FREQ),
+    DspNode::mix(0, 3),
+    DspNode::biquad(1, BiquadMode::LowPass, retuned_cutoff, LOWPASS_Q),
+    DspNode::gain(2, HALF_GAIN),
+    DspNode::output(3),
+  ]
+  let runtime_compiled = CompiledDsp::compile(runtime_nodes, context).unwrap()
+  let fixed_compiled = CompiledDsp::compile(fixed_nodes, context).unwrap()
+  let runtime_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+  let fixed_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+
+  assert_true(
+    runtime_compiled.apply_control(
+      GraphControl::set_param(2, GraphParamSlot::Value0, retuned_cutoff),
+    ),
+  )
+  runtime_compiled.process(context, runtime_output)
+  fixed_compiled.process(context, fixed_output)
+
+  assert_true(
+    runtime_output.as_fixed_array().any(sample => sample != ZERO_SAMPLE),
+  )
+  for index = 0; index < runtime_output.length(); index = index + 1 {
+    assert_true(
+      (runtime_output.get(index) - fixed_output.get(index)).abs() < 0.000000001,
+    )
+  }
+}
+
+///|
 test "compiled dsp accepts direct self-feedback with zero-initialized z^-1 state" {
   let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
   let nodes = [DspNode::gain(0, HALF_GAIN), DspNode::output(0)]

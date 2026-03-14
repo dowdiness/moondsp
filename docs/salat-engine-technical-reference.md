@@ -702,7 +702,9 @@ Current runtime control support:
   `HighPass` and `BandPass`, not just output-difference checks
 - accepted mono feedback graphs keep the existing supported runtime-control
   surface; coverage now includes direct `Gain` retunes and transactional
-  `apply_controls(...)` batches inside a compiled `z^-1` loop
+  `apply_controls(...)` batches inside a compiled `z^-1` loop, plus direct
+  `Delay` and `Biquad` runtime-update equivalence checks against fixed feedback
+  graph compiles
 - stereo graph coverage now includes:
   - graph-unit checks for `Pan -> StereoOutput` shape enforcement
   - stereo post-processing through `StereoGain`, `StereoClip`, and
@@ -715,7 +717,8 @@ Current runtime control support:
   `StereoBiquad` and `StereoDelay`
 - mono graph coverage now also includes a bounded `z^-1` feedback recurrence in
   `CompiledDsp`, direct self-feedback acceptance with zero-initialized state,
-  runtime gain/control-batch retunes on an accepted loop, and rejection
+  a direct multi-back-edge fanout regression, runtime
+  gain/delay/biquad/control-batch retunes on accepted loops, and rejection
   coverage for unsupported output/stereo cycles
 
 Current `set_param(node_index, slot, value)` support matrix:
