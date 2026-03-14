@@ -103,7 +103,8 @@ Confirmed on 2026-03-11:
   through `Pan` and `StereoMixDown`.
 - A first narrow terminal-stereo graph slice also exists via
   `CompiledStereoDsp` for `Mono -> Pan -> Stereo post-processing ->
-  StereoOutput`, including `StereoGain`, `StereoClip`, and `StereoBiquad`.
+  StereoOutput`, including `StereoGain`, `StereoClip`, `StereoBiquad`, and
+  `StereoDelay`.
 - Phase 2 graph compilation and runtime control are working in the current
   graph implementation.
 - Integration coverage exists for compiled graph voice paths and runtime
@@ -126,6 +127,15 @@ Confirmed on 2026-03-14:
 - Coverage now includes a bounded mono feedback recurrence, direct
   self-feedback acceptance, runtime control retunes inside an accepted loop,
   and rejection of unsupported output/stereo feedback cycles.
+
+Confirmed on 2026-03-15:
+
+- `CompiledStereoDsp` now accepts the same narrow mono `z^-1` feedback slice
+  before `Pan`, so terminal-stereo graphs can carry supported mono feedback
+  loops into the stereo post-processing path.
+- Coverage now also includes bounded terminal-stereo feedback persistence plus
+  graph/integration runtime retunes on accepted mono feedback loops before the
+  stereo lift.
 
 Authoritative detailed Phase 2 graph status now lives in
 `docs/salat-engine-technical-reference.md`, including:

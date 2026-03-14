@@ -531,12 +531,15 @@ kabelsalat's approach: detect back-edges during topological sort. For each back-
 // 5. FeedbackWrite stores current sample's value to that register
 ```
 
-Current status note: the implementation now supports a narrow feedback slice in
-compiled mono graphs. `CompiledDsp` can detect supported mono back-edges and
+Current status note: the implementation now supports a narrow mono-valued
+feedback slice in both compiled mono graphs and terminal-stereo graphs.
+`CompiledDsp` and `CompiledStereoDsp` can detect supported mono back-edges and
 resolve them as zero-initialized implicit `z^-1` reads during runtime.
 Supported shapes currently include direct self-feedback and multiple mono
-back-edges, while stereo or mixed-shape cycles are still rejected. Node-local
-recirculation on `Delay` and `StereoDelay` remains a separate feature.
+back-edges, including mono loops that later lift through `Pan` into a terminal
+stereo suffix. Stereo-valued or mixed-shape cycles are still rejected.
+Node-local recirculation on `Delay` and `StereoDelay` remains a separate
+feature.
 
 ### 3.5 Compilation Approaches
 
@@ -648,7 +651,9 @@ The current repository already implements:
 - a first stereo graph path: the same `DspNode` authoring language can compile
   into `CompiledStereoDsp` for `Mono -> Pan -> Stereo post-processing ->
   StereoOutput`, where the current stereo post-processing node set is
-  `StereoGain`, `StereoClip`, `StereoBiquad`, and `StereoDelay`
+  `StereoGain`, `StereoClip`, `StereoBiquad`, and `StereoDelay`, and where the
+  current feedback slice also allows supported mono `z^-1` loops before the
+  stereo lift through `Pan`
 - input nodes may be declared in authoring order; the compiler topologically
   sorts reachable nodes from a single terminal output node
 - compile rejects:
@@ -711,6 +716,9 @@ Current runtime control support:
     `StereoBiquad`, plus `StereoDelay`
   - direct runtime updates for `Pan`, `StereoGain`, `StereoClip`, and
     `StereoBiquad`, plus `StereoDelay`
+  - accepted mono `z^-1` feedback loops before `Pan`, including graph-unit
+    gain-retune coverage and bounded block-persistence plus batched
+    gain/pan-retune integration checks
   - end-to-end compiled stereo voice-path and batched-control integration tests
 - mono graph coverage now includes explicit stereo fold-down through
   `StereoMixDown`, including stereo-filtered and stereo-delayed paths through
@@ -757,14 +765,15 @@ Current limits:
   is `StereoBiquad` plus `StereoDelay`, with no broader stereo mix/effect set
   yet
 - feedback-edge insertion is still narrow: only `CompiledDsp` supports
-  automatic `z^-1` back-edges today, only for mono-only node graphs, and
-  stereo or output-involved cycles are still rejected
+  automatic `z^-1` back-edges today, with `CompiledStereoDsp` only accepting
+  the same mono-valued feedback slice before `Pan`; stereo-valued,
+  mixed-shape, or output-involved cycles are still rejected
 - supported feedback shapes are still constrained to the current mono node set:
   direct self-feedback and multiple simultaneous back-edges are allowed, but
-  any cycle involving `Output`, `Pan`, `Stereo*`, or a mono/stereo shape change
-  is rejected
+  any cycle involving a stereo-valued back-edge, `Output`, `StereoOutput`, or a
+  mono/stereo shape change is rejected
 - feedback graphs currently use a sample-by-sample fallback inside
-  `CompiledDsp`; `CompiledStereoDsp` remains block-only and acyclic
+  `CompiledDsp` and `CompiledStereoDsp` whenever feedback edges are present
 - no graph hot-swap yet
 - runtime parameter updates are partial, not universal across node kinds
 

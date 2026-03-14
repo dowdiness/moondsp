@@ -1425,6 +1425,83 @@ test "compiled dsp runtime biquad update matches fixed feedback loop compile" {
 }
 
 ///|
+test "compiled stereo dsp resolves mono feedback cycle before pan via z^-1 insertion" {
+  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::mix(0, 2),
+    DspNode::gain(1, HALF_GAIN),
+    DspNode::pan(2, PAN_CENTER),
+    DspNode::stereo_output(3),
+  ]
+  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+  let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+
+  compiled.process(context, left_output, right_output)
+
+  assert_true(
+    (left_output.get(0) - HALF_GAIN * PAN_CENTER_GAIN).abs() < 0.000000001,
+  )
+  assert_true((left_output.get(1) - 0.75 * PAN_CENTER_GAIN).abs() < 0.000000001)
+  assert_true(
+    (left_output.get(2) - 0.875 * PAN_CENTER_GAIN).abs() < 0.000000001,
+  )
+  assert_true(
+    (left_output.get(3) - 0.9375 * PAN_CENTER_GAIN).abs() < 0.000000001,
+  )
+  for index = 0; index < SMALL_BLOCK_SIZE; index = index + 1 {
+    assert_true(
+      (left_output.get(index) - right_output.get(index)).abs() < 0.000000001,
+    )
+  }
+}
+
+///|
+test "compiled stereo dsp runtime gain update retunes accepted mono feedback cycle" {
+  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::mix(0, 2),
+    DspNode::gain(1, HALF_GAIN),
+    DspNode::pan(2, PAN_CENTER),
+    DspNode::stereo_output(3),
+  ]
+  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let baseline_left = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+  let baseline_right = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+  let retuned_left = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+  let retuned_right = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+
+  compiled.process(context, baseline_left, baseline_right)
+  assert_true(
+    compiled.apply_control(
+      GraphControl::set_param(2, GraphParamSlot::Value0, QUARTER_SAMPLE),
+    ),
+  )
+  compiled.process(context, retuned_left, retuned_right)
+
+  assert_true(
+    (retuned_left.get(0) - 0.484375 * PAN_CENTER_GAIN).abs() < 0.000000001,
+  )
+  assert_true(
+    (retuned_left.get(1) - 0.37109375 * PAN_CENTER_GAIN).abs() < 0.000000001,
+  )
+  assert_true(
+    (retuned_left.get(2) - 0.3427734375 * PAN_CENTER_GAIN).abs() < 0.000000001,
+  )
+  assert_true(
+    (retuned_left.get(3) - 0.335693359375 * PAN_CENTER_GAIN).abs() < 0.000000001,
+  )
+  assert_true(retuned_left.get(0) < baseline_left.get(3))
+  for index = 0; index < SMALL_BLOCK_SIZE; index = index + 1 {
+    assert_true(
+      (retuned_left.get(index) - retuned_right.get(index)).abs() < 0.000000001,
+    )
+  }
+}
+
+///|
 test "compiled dsp accepts direct self-feedback with zero-initialized z^-1 state" {
   let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
   let nodes = [DspNode::gain(0, HALF_GAIN), DspNode::output(0)]
@@ -1458,6 +1535,21 @@ test "compiled dsp rejects stereo-involved feedback cycles" {
   ]
 
   assert_true(CompiledDsp::compile(nodes, context) is None)
+}
+
+///|
+test "compiled stereo dsp rejects stereo-shaped feedback edges" {
+  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::mix(0, 4),
+    DspNode::gain(1, HALF_GAIN),
+    DspNode::pan(2, PAN_CENTER),
+    DspNode::stereo_gain(3, HALF_GAIN),
+    DspNode::stereo_output(4),
+  ]
+
+  assert_true(CompiledStereoDsp::compile(nodes, context) is None)
 }
 
 ///|

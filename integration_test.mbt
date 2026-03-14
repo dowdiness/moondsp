@@ -808,6 +808,110 @@ test "compiled graph z^-1 feedback cycle applies batched runtime changes" {
 }
 
 ///|
+test "compiled stereo graph mono z^-1 feedback cycle persists across blocks" {
+  let context = DspContext::new(
+    GRAPH_FEEDBACK_SAMPLE_RATE,
+    GRAPH_FEEDBACK_BLOCK_SIZE,
+  )
+  let nodes = [
+    DspNode::constant(1.0),
+    DspNode::mix(0, 2),
+    DspNode::gain(1, GRAPH_FEEDBACK_GAIN),
+    DspNode::pan(2, GRAPH_STEREO_CENTER),
+    DspNode::stereo_output(3),
+  ]
+  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let first_left = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let first_right = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let second_left = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let second_right = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+
+  compiled.process(context, first_left, first_right)
+  compiled.process(context, second_left, second_right)
+
+  assert_true(
+    integration_buffer_is_finite_and_bounded(
+      first_left,
+      GRAPH_STEREO_CENTER_GAIN,
+    ),
+  )
+  assert_true(
+    integration_buffer_is_finite_and_bounded(
+      second_left,
+      GRAPH_STEREO_CENTER_GAIN,
+    ),
+  )
+  assert_true(
+    integration_buffers_close(
+      first_left,
+      first_right,
+      INTEGRATION_BUFFER_EPSILON,
+    ),
+  )
+  assert_true(
+    integration_buffers_close(
+      second_left,
+      second_right,
+      INTEGRATION_BUFFER_EPSILON,
+    ),
+  )
+  assert_true(
+    (first_left.get(0) - GRAPH_FEEDBACK_GAIN * GRAPH_STEREO_CENTER_GAIN).abs() <
+    INTEGRATION_BUFFER_EPSILON,
+  )
+  assert_true(
+    (second_left.get(0) - 0.998046875 * GRAPH_STEREO_CENTER_GAIN).abs() <
+    INTEGRATION_BUFFER_EPSILON,
+  )
+  assert_true(second_left.get(0) > first_left.get(first_left.length() - 1))
+}
+
+///|
+test "compiled stereo graph mono z^-1 feedback cycle applies batched runtime changes" {
+  let context = DspContext::new(
+    GRAPH_FEEDBACK_SAMPLE_RATE,
+    GRAPH_FEEDBACK_BLOCK_SIZE,
+  )
+  let nodes = [
+    DspNode::constant(1.0),
+    DspNode::mix(0, 2),
+    DspNode::gain(1, GRAPH_FEEDBACK_GAIN),
+    DspNode::pan(2, GRAPH_STEREO_CENTER),
+    DspNode::stereo_output(3),
+  ]
+  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let first_left = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let first_right = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let second_left = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let second_right = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+
+  compiled.process(context, first_left, first_right)
+  assert_true(
+    compiled.apply_controls([
+      GraphControl::set_param(
+        2,
+        GraphParamSlot::Value0,
+        GRAPH_FEEDBACK_RETUNED_GAIN,
+      ),
+      GraphControl::set_param(3, GraphParamSlot::Value0, GRAPH_STEREO_HARD_LEFT),
+    ]),
+  )
+  compiled.process(context, second_left, second_right)
+
+  assert_true(integration_buffer_is_finite_and_bounded(second_left, 1.0))
+  assert_true(integration_buffer_is_finite_and_bounded(second_right, 0.0))
+  assert_true(
+    (second_left.get(0) - 0.4990234375).abs() < INTEGRATION_BUFFER_EPSILON,
+  )
+  assert_true(
+    second_right
+    .as_fixed_array()
+    .all(sample => sample.abs() < INTEGRATION_BUFFER_EPSILON),
+  )
+  assert_true(second_left.get(second_left.length() - 1) < second_left.get(0))
+}
+
+///|
 test "compiled graph voice path stays coherent across gates and runtime updates" {
   let context = DspContext::new(GRAPH_VOICE_SAMPLE_RATE, GRAPH_VOICE_BLOCK_SIZE)
   let nodes = [

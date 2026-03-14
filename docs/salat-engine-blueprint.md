@@ -205,6 +205,9 @@ Current implemented surface:
 - `CompiledDsp` now supports a first narrow automatic graph-feedback slice for
   mono-only back-edges via implicit `z^-1`, including direct self-feedback and
   runtime retunes on accepted loops
+- `CompiledStereoDsp` now carries that same mono-valued `z^-1` slice into
+  terminal-stereo graphs before `Pan`, while stereo-valued back-edges remain
+  out of scope
 - Topological sorting, graph validation, and runtime control for the current
   graph paths
 - Integration coverage for compiled mono voice paths, runtime retuning, and the
@@ -213,8 +216,8 @@ Current implemented surface:
   `set_param(...)` slot matrix, and exact runtime-control surface
 
 Still planned in Phase 2:
-- Broader graph-cycle feedback handling beyond the current mono-only `z^-1`
-  slice
+- Broader graph-cycle feedback handling beyond the current mono-valued `z^-1`
+  slice in `CompiledDsp` / `CompiledStereoDsp`
 - Constant folding and dead node elimination
 - Broader stereo node coverage beyond the current filter/delay slice
 - Full multichannel graph semantics
