@@ -155,6 +155,13 @@ struct CompiledDsp {
   delay_states : FixedArray[DelayLine?]
   stereo_delay_left_states : FixedArray[DelayLine?]
   stereo_delay_right_states : FixedArray[DelayLine?]
+  feedback_edges : FixedArray[(Int, Int, Int)]
+  feedback_input0_edges : FixedArray[Int]
+  feedback_input1_edges : FixedArray[Int]
+  feedback_source_heads : FixedArray[Int]
+  feedback_next_by_source : FixedArray[Int]
+  feedback_values : FixedArray[Double]
+  sample_values : FixedArray[Double]
 }
 
 ///|
@@ -585,8 +592,9 @@ pub fn GraphControl::set_param(
 /// Compile a declarative mono graph into an executable buffer graph.
 ///
 /// This first Phase 2 slice accepts nodes in authoring order, requires exactly
-/// one reachable `Output` node, rejects cycles, and rejects graphs containing
-/// unreachable nodes.
+/// one reachable `Output` node, rejects unreachable nodes, and supports a
+/// narrow mono-only feedback slice by resolving detected back-edges as
+/// implicit `z^-1` inputs.
 ///
 /// Current limitation: runtime graph control is still partial.
 /// `CompiledDsp::apply_control(...)` provides a unified entrypoint, but only the
@@ -595,10 +603,11 @@ pub fn CompiledDsp::compile(
   nodes : Array[DspNode],
   context : DspContext,
 ) -> CompiledDsp? {
-  let order = match topo_sorted_node_order(nodes, context) {
-    Some(order) => order
+  let plan = match mono_compile_plan(nodes, context) {
+    Some(plan) => plan
     None => return None
   }
+  let order = plan.0
   let node_count = nodes.length()
   let block_size = compiled_block_size(context)
   let compile_sample_rate = context.sample_rate()
@@ -610,9 +619,22 @@ pub fn CompiledDsp::compile(
   let fixed_nodes = FixedArray::makei(node_count, index => {
     remap_node_inputs(nodes[order[index]], index_map)
   })
-  if !valid_terminal_mono_shapes(fixed_nodes) {
+  let feedback_edges = remapped_feedback_edges(plan.1, index_map)
+  if feedback_edges.length() == 0 {
+    if !valid_terminal_mono_shapes(fixed_nodes) {
+      return None
+    }
+  } else if !valid_feedback_terminal_mono_graph(fixed_nodes, feedback_edges) {
     return None
   }
+  let feedback_input0_edges = FixedArray::make(node_count, -1)
+  let feedback_input1_edges = FixedArray::make(node_count, -1)
+  let feedback_source_heads = FixedArray::make(node_count, -1)
+  let feedback_next_by_source = FixedArray::make(feedback_edges.length(), -1)
+  build_feedback_edge_index(
+    feedback_edges, feedback_input0_edges, feedback_input1_edges, feedback_source_heads,
+    feedback_next_by_source,
+  )
   let buffers = FixedArray::makei(node_count, _ => {
     AudioBuffer::filled(block_size)
   })
@@ -649,6 +671,8 @@ pub fn CompiledDsp::compile(
   let stereo_delay_right_states = FixedArray::makei(node_count, index => {
     make_graph_stereo_delay_state(fixed_nodes[index])
   })
+  let feedback_values = FixedArray::make(feedback_edges.length(), 0.0)
+  let sample_values = FixedArray::make(node_count, 0.0)
   Some({
     compile_sample_rate,
     nodes: fixed_nodes,
@@ -665,6 +689,13 @@ pub fn CompiledDsp::compile(
     delay_states,
     stereo_delay_left_states,
     stereo_delay_right_states,
+    feedback_edges,
+    feedback_input0_edges,
+    feedback_input1_edges,
+    feedback_source_heads,
+    feedback_next_by_source,
+    feedback_values,
+    sample_values,
   })
 }
 
@@ -691,6 +722,10 @@ pub fn CompiledDsp::process(
     clear_compiled_buffers(self.left_buffers)
     clear_compiled_buffers(self.right_buffers)
     output.fill(0.0)
+    return
+  }
+  if self.feedback_edges.length() > 0 {
+    self.process_feedback_graph(context, output, sample_count)
     return
   }
 
@@ -826,6 +861,66 @@ pub fn CompiledDsp::process(
   }
 
   copy_buffer(self.buffers[self.buffers.length() - 1], output, sample_count)
+}
+
+///|
+fn CompiledDsp::process_feedback_graph(
+  self : CompiledDsp,
+  context : DspContext,
+  output : AudioBuffer,
+  sample_count : Int,
+) -> Unit {
+  clear_compiled_buffers(self.buffers)
+  prepare_feedback_graph_biquads(self, context)
+
+  for sample_index = 0
+      sample_index < sample_count
+      sample_index = sample_index + 1 {
+    for node_index = 0
+        node_index < self.nodes.length()
+        node_index = node_index + 1 {
+      let node = self.nodes[node_index]
+      let input0 = feedback_graph_input_sample(
+        self.sample_values,
+        self.feedback_values,
+        node.input0,
+        self.feedback_input0_edges[node_index],
+      )
+      let input1 = feedback_graph_input_sample(
+        self.sample_values,
+        self.feedback_values,
+        node.input1,
+        self.feedback_input1_edges[node_index],
+      )
+      let value = process_feedback_graph_node_sample(
+        self,
+        context,
+        context.sample_rate(),
+        node_index,
+        node,
+        input0,
+        input1,
+      )
+      self.sample_values[node_index] = value
+      self.buffers[node_index].set(sample_index, value)
+      self.update_feedback_sources(node_index, value)
+    }
+  }
+
+  copy_buffer(self.buffers[self.buffers.length() - 1], output, sample_count)
+}
+
+///|
+fn CompiledDsp::update_feedback_sources(
+  self : CompiledDsp,
+  node_index : Int,
+  value : Double,
+) -> Unit {
+  let mut edge_index = self.feedback_source_heads[node_index]
+  while edge_index >= 0 {
+    self.feedback_values[edge_index] = value
+    edge_index = self.feedback_next_by_source[edge_index]
+  }
 }
 
 ///|
@@ -1445,27 +1540,6 @@ fn valid_graph_param_control_stereo(
 }
 
 ///|
-fn valid_compiled_graph(nodes : Array[DspNode], context : DspContext) -> Bool {
-  let sample_rate = context.sample_rate()
-  let output_index = match find_single_output_index(nodes) {
-    Some(output_index) => output_index
-    None => return false
-  }
-  if nodes.is_empty() {
-    return false
-  }
-
-  for index = 0; index < nodes.length(); index = index + 1 {
-    let node = nodes[index]
-    if !valid_node_inputs(node, nodes.length(), sample_rate) {
-      return false
-    }
-  }
-
-  has_reachable_acyclic_graph(nodes, output_index)
-}
-
-///|
 fn valid_compiled_stereo_graph(
   nodes : Array[DspNode],
   context : DspContext,
@@ -1928,25 +2002,249 @@ fn valid_delay_feedback(value : Double) -> Bool {
 }
 
 ///|
-fn topo_sorted_node_order(
+fn mono_compile_plan(
   nodes : Array[DspNode],
   context : DspContext,
-) -> Array[Int]? {
-  if !valid_compiled_graph(nodes, context) {
+) -> (Array[Int], Array[(Int, Int, Int)])? {
+  let sample_rate = context.sample_rate()
+  if !valid_compiled_context(sample_rate) {
     return None
+  }
+  let output_index = match find_single_output_index(nodes) {
+    Some(output_index) => output_index
+    None => return None
+  }
+  for index = 0; index < nodes.length(); index = index + 1 {
+    if !valid_node_inputs(nodes[index], nodes.length(), sample_rate) {
+      return None
+    }
   }
 
-  let output_index = find_single_output_index(nodes).unwrap()
   let marks = FixedArray::make(nodes.length(), 0)
   let order = Array::new()
-  if !visit_graph_node(output_index, nodes, marks, order) {
-    return None
-  }
+  let feedback_edges = Array::new()
+  visit_graph_node_with_feedback(
+    output_index, nodes, marks, order, feedback_edges,
+  )
   if order.length() != nodes.length() {
     return None
   }
 
-  Some(order)
+  Some((order, feedback_edges))
+}
+
+///|
+fn visit_graph_node_with_feedback(
+  index : Int,
+  nodes : Array[DspNode],
+  marks : FixedArray[Int],
+  order : Array[Int],
+  feedback_edges : Array[(Int, Int, Int)],
+) -> Unit {
+  if marks[index] != 0 {
+    return
+  }
+  marks[index] = 1
+  visit_graph_dependencies_with_feedback(
+    index, nodes, marks, order, feedback_edges,
+  )
+  marks[index] = 2
+  order.push(index)
+}
+
+///|
+fn visit_graph_dependencies_with_feedback(
+  index : Int,
+  nodes : Array[DspNode],
+  marks : FixedArray[Int],
+  order : Array[Int],
+  feedback_edges : Array[(Int, Int, Int)],
+) -> Unit {
+  let node = nodes[index]
+  match node.kind {
+    Constant => ()
+    Oscillator => ()
+    Noise => ()
+    Adsr => ()
+    Biquad =>
+      visit_graph_input_with_feedback(
+        node.input0,
+        index,
+        0,
+        nodes,
+        marks,
+        order,
+        feedback_edges,
+      )
+    Delay =>
+      visit_graph_input_with_feedback(
+        node.input0,
+        index,
+        0,
+        nodes,
+        marks,
+        order,
+        feedback_edges,
+      )
+    Gain =>
+      visit_graph_input_with_feedback(
+        node.input0,
+        index,
+        0,
+        nodes,
+        marks,
+        order,
+        feedback_edges,
+      )
+    Mul => {
+      visit_graph_input_with_feedback(
+        node.input0,
+        index,
+        0,
+        nodes,
+        marks,
+        order,
+        feedback_edges,
+      )
+      visit_graph_input_with_feedback(
+        node.input1,
+        index,
+        1,
+        nodes,
+        marks,
+        order,
+        feedback_edges,
+      )
+    }
+    Mix => {
+      visit_graph_input_with_feedback(
+        node.input0,
+        index,
+        0,
+        nodes,
+        marks,
+        order,
+        feedback_edges,
+      )
+      visit_graph_input_with_feedback(
+        node.input1,
+        index,
+        1,
+        nodes,
+        marks,
+        order,
+        feedback_edges,
+      )
+    }
+    Clip =>
+      visit_graph_input_with_feedback(
+        node.input0,
+        index,
+        0,
+        nodes,
+        marks,
+        order,
+        feedback_edges,
+      )
+    Output =>
+      visit_graph_input_with_feedback(
+        node.input0,
+        index,
+        0,
+        nodes,
+        marks,
+        order,
+        feedback_edges,
+      )
+    Pan =>
+      visit_graph_input_with_feedback(
+        node.input0,
+        index,
+        0,
+        nodes,
+        marks,
+        order,
+        feedback_edges,
+      )
+    StereoGain =>
+      visit_graph_input_with_feedback(
+        node.input0,
+        index,
+        0,
+        nodes,
+        marks,
+        order,
+        feedback_edges,
+      )
+    StereoClip =>
+      visit_graph_input_with_feedback(
+        node.input0,
+        index,
+        0,
+        nodes,
+        marks,
+        order,
+        feedback_edges,
+      )
+    StereoBiquad =>
+      visit_graph_input_with_feedback(
+        node.input0,
+        index,
+        0,
+        nodes,
+        marks,
+        order,
+        feedback_edges,
+      )
+    StereoDelay =>
+      visit_graph_input_with_feedback(
+        node.input0,
+        index,
+        0,
+        nodes,
+        marks,
+        order,
+        feedback_edges,
+      )
+    StereoMixDown =>
+      visit_graph_input_with_feedback(
+        node.input0,
+        index,
+        0,
+        nodes,
+        marks,
+        order,
+        feedback_edges,
+      )
+    StereoOutput =>
+      visit_graph_input_with_feedback(
+        node.input0,
+        index,
+        0,
+        nodes,
+        marks,
+        order,
+        feedback_edges,
+      )
+  }
+}
+
+///|
+fn visit_graph_input_with_feedback(
+  input : Int,
+  target_index : Int,
+  target_slot : Int,
+  nodes : Array[DspNode],
+  marks : FixedArray[Int],
+  order : Array[Int],
+  feedback_edges : Array[(Int, Int, Int)],
+) -> Unit {
+  match marks[input] {
+    0 =>
+      visit_graph_node_with_feedback(input, nodes, marks, order, feedback_edges)
+    1 => feedback_edges.push((input, target_index, target_slot))
+    _ => ()
+  }
 }
 
 ///|
@@ -2146,6 +2444,36 @@ fn remapped_input(input : Int, remap : FixedArray[Int]) -> Int {
     remap[input]
   } else {
     -1
+  }
+}
+
+///|
+fn remapped_feedback_edges(
+  edges : Array[(Int, Int, Int)],
+  remap : FixedArray[Int],
+) -> FixedArray[(Int, Int, Int)] {
+  FixedArray::makei(edges.length(), index => {
+    let edge = edges[index]
+    (remap[edge.0], remap[edge.1], edge.2)
+  })
+}
+
+///|
+fn build_feedback_edge_index(
+  edges : FixedArray[(Int, Int, Int)],
+  input0_edges : FixedArray[Int],
+  input1_edges : FixedArray[Int],
+  source_heads : FixedArray[Int],
+  next_by_source : FixedArray[Int],
+) -> Unit {
+  for index = 0; index < edges.length(); index = index + 1 {
+    let edge = edges[index]
+    match edge.2 {
+      0 => input0_edges[edge.1] = index
+      _ => input1_edges[edge.1] = index
+    }
+    next_by_source[index] = source_heads[edge.0]
+    source_heads[edge.0] = index
   }
 }
 
@@ -2479,6 +2807,81 @@ fn process_graph_biquad(
 }
 
 ///|
+fn prepare_feedback_graph_biquads(
+  compiled : CompiledDsp,
+  context : DspContext,
+) -> Unit {
+  for index = 0; index < compiled.nodes.length(); index = index + 1 {
+    let node = compiled.nodes[index]
+    match node.kind {
+      Biquad =>
+        ignore(
+          compiled.biquad_states[index]
+          .unwrap()
+          .update(context, node.filter_mode, node.value0, node.value1),
+        )
+      _ => ()
+    }
+  }
+}
+
+///|
+fn feedback_graph_input_sample(
+  sample_values : FixedArray[Double],
+  feedback_values : FixedArray[Double],
+  input_index : Int,
+  feedback_edge_index : Int,
+) -> Double {
+  if feedback_edge_index >= 0 {
+    feedback_values[feedback_edge_index]
+  } else if input_index >= 0 {
+    sample_values[input_index]
+  } else {
+    0.0
+  }
+}
+
+///|
+fn process_feedback_graph_node_sample(
+  compiled : CompiledDsp,
+  context : DspContext,
+  sample_rate : Double,
+  node_index : Int,
+  node : DspNode,
+  input0 : Double,
+  input1 : Double,
+) -> Double {
+  match node.kind {
+    Constant => node.value0
+    Oscillator =>
+      compiled.osc_states[node_index]
+      .unwrap()
+      .tick_waveform(node.waveform, node.value0, sample_rate)
+    Noise => compiled.noise_states[node_index].unwrap().tick()
+    Adsr => compiled.env_states[node_index].unwrap().tick(context)
+    Biquad => compiled.biquad_states[node_index].unwrap().tick(input0)
+    Delay => compiled.delay_states[node_index].unwrap().tick(input0)
+    Gain => input0 * node.value0
+    Mul => input0 * input1
+    Mix => input0 + input1
+    Clip => clip_feedback_sample(input0, node.value0)
+    Output => input0
+    _ => 0.0
+  }
+}
+
+///|
+fn clip_feedback_sample(value : Double, threshold : Double) -> Double {
+  if value > threshold {
+    threshold
+  } else if value < -threshold {
+    -threshold
+  } else {
+    value
+  }
+}
+
+///|
 fn reset_graph_env_states(env_states : FixedArray[Adsr?]) -> Unit {
   for index = 0; index < env_states.length(); index = index + 1 {
     match env_states[index] {
@@ -2523,6 +2926,43 @@ fn node_kind_matches(left : DspNodeKind, right : DspNodeKind) -> Bool {
 fn is_mono_shape(shape : Int?) -> Bool {
   match shape {
     Some(MONO_SIGNAL_SHAPE) => true
+    _ => false
+  }
+}
+
+///|
+fn valid_feedback_terminal_mono_graph(
+  nodes : FixedArray[DspNode],
+  feedback_edges : FixedArray[(Int, Int, Int)],
+) -> Bool {
+  for index = 0; index < nodes.length(); index = index + 1 {
+    if !valid_feedback_mono_node_kind(nodes[index].kind) {
+      return false
+    }
+  }
+  for index = 0; index < feedback_edges.length(); index = index + 1 {
+    let edge = feedback_edges[index]
+    if nodes[edge.0].kind is Output || nodes[edge.1].kind is Output {
+      return false
+    }
+  }
+  true
+}
+
+///|
+fn valid_feedback_mono_node_kind(kind : DspNodeKind) -> Bool {
+  match kind {
+    Constant => true
+    Oscillator => true
+    Noise => true
+    Adsr => true
+    Biquad => true
+    Delay => true
+    Gain => true
+    Mul => true
+    Mix => true
+    Clip => true
+    Output => true
     _ => false
   }
 }

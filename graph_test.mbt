@@ -1269,9 +1269,85 @@ test "compiled dsp topologically sorts declarative node order" {
 }
 
 ///|
-test "compiled dsp rejects cycles" {
+test "compiled dsp resolves simple mono feedback cycle via z^-1 insertion" {
+  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::mix(0, 2),
+    DspNode::gain(1, HALF_GAIN),
+    DspNode::output(2),
+  ]
+  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+
+  compiled.process(context, output)
+
+  assert_true((output.get(0) - HALF_GAIN).abs() < 0.000000001)
+  assert_true((output.get(1) - 0.75).abs() < 0.000000001)
+  assert_true((output.get(2) - 0.875).abs() < 0.000000001)
+  assert_true((output.get(3) - 0.9375).abs() < 0.000000001)
+}
+
+///|
+test "compiled dsp runtime gain update retunes accepted feedback cycle" {
+  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::mix(0, 2),
+    DspNode::gain(1, HALF_GAIN),
+    DspNode::output(2),
+  ]
+  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let baseline_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+  let retuned_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+
+  compiled.process(context, baseline_output)
+  assert_true(
+    compiled.apply_control(
+      GraphControl::set_param(2, GraphParamSlot::Value0, QUARTER_SAMPLE),
+    ),
+  )
+  compiled.process(context, retuned_output)
+
+  assert_true((baseline_output.get(3) - 0.9375).abs() < 0.000000001)
+  assert_true((retuned_output.get(0) - 0.484375).abs() < 0.000000001)
+  assert_true((retuned_output.get(1) - 0.37109375).abs() < 0.000000001)
+  assert_true((retuned_output.get(2) - 0.3427734375).abs() < 0.000000001)
+  assert_true((retuned_output.get(3) - 0.335693359375).abs() < 0.000000001)
+}
+
+///|
+test "compiled dsp accepts direct self-feedback with zero-initialized z^-1 state" {
+  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let nodes = [DspNode::gain(0, HALF_GAIN), DspNode::output(0)]
+  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+
+  compiled.process(context, output)
+
+  assert_eq(output.get(0), ZERO_SAMPLE)
+  assert_eq(output.get(1), ZERO_SAMPLE)
+  assert_eq(output.get(2), ZERO_SAMPLE)
+  assert_eq(output.get(3), ZERO_SAMPLE)
+}
+
+///|
+test "compiled dsp rejects feedback cycles through output nodes" {
   let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
   let nodes = [DspNode::output(1), DspNode::gain(0, HALF_GAIN)]
+
+  assert_true(CompiledDsp::compile(nodes, context) is None)
+}
+
+///|
+test "compiled dsp rejects stereo-involved feedback cycles" {
+  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::pan(2, PAN_CENTER),
+    DspNode::stereo_mixdown(1),
+    DspNode::output(2),
+  ]
 
   assert_true(CompiledDsp::compile(nodes, context) is None)
 }

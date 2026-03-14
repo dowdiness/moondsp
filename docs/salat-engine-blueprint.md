@@ -202,6 +202,9 @@ Current implemented surface:
   `StereoGain`, `StereoClip`, `StereoBiquad`, and `StereoDelay`
 - `Delay` and `StereoDelay` now support internal recirculating feedback
   coefficients
+- `CompiledDsp` now supports a first narrow automatic graph-feedback slice for
+  mono-only back-edges via implicit `z^-1`, including direct self-feedback and
+  runtime retunes on accepted loops
 - Topological sorting, graph validation, and runtime control for the current
   graph paths
 - Integration coverage for compiled mono voice paths, runtime retuning, and the
@@ -210,7 +213,8 @@ Current implemented surface:
   `set_param(...)` slot matrix, and exact runtime-control surface
 
 Still planned in Phase 2:
-- General graph-cycle feedback handling (cycles → insert z⁻¹ delay)
+- Broader graph-cycle feedback handling beyond the current mono-only `z^-1`
+  slice
 - Constant folding and dead node elimination
 - Broader stereo node coverage beyond the current filter/delay slice
 - Full multichannel graph semantics

@@ -531,9 +531,12 @@ kabelsalat's approach: detect back-edges during topological sort. For each back-
 // 5. FeedbackWrite stores current sample's value to that register
 ```
 
-Current status note: the implementation still rejects graph cycles during
-compile. The only supported feedback today is node-local recirculation on
-`Delay` and `StereoDelay` via their internal feedback coefficient.
+Current status note: the implementation now supports a narrow feedback slice in
+compiled mono graphs. `CompiledDsp` can detect supported mono back-edges and
+resolve them as zero-initialized implicit `z^-1` reads during runtime.
+Supported shapes currently include direct self-feedback and multiple mono
+back-edges, while stereo or mixed-shape cycles are still rejected. Node-local
+recirculation on `Delay` and `StereoDelay` remains a separate feature.
 
 ### 3.5 Compilation Approaches
 
@@ -640,7 +643,8 @@ The current repository already implements:
 
 - a compiled mono graph path: `DspNode` authoring graphs compile into an opaque
   `CompiledDsp`, including explicit `Mono -> Stereo -> Mono` subgraphs through
-  `Pan` and `StereoMixDown`
+  `Pan` and `StereoMixDown`, plus supported mono feedback cycles through
+  automatic `z^-1` back-edge insertion
 - a first stereo graph path: the same `DspNode` authoring language can compile
   into `CompiledStereoDsp` for `Mono -> Pan -> Stereo post-processing ->
   StereoOutput`, where the current stereo post-processing node set is
@@ -648,7 +652,7 @@ The current repository already implements:
 - input nodes may be declared in authoring order; the compiler topologically
   sorts reachable nodes from a single terminal output node
 - compile rejects:
-  - cycles
+  - unsupported feedback cycles
   - multiple outputs
   - missing outputs
   - unreachable nodes
@@ -696,6 +700,9 @@ Current runtime control support:
   compiled mono graphs for `LowPass`, `HighPass`, and `BandPass`
 - the current graph tests also include directional runtime-retune assertions for
   `HighPass` and `BandPass`, not just output-difference checks
+- accepted mono feedback graphs keep the existing supported runtime-control
+  surface; coverage now includes direct `Gain` retunes and transactional
+  `apply_controls(...)` batches inside a compiled `z^-1` loop
 - stereo graph coverage now includes:
   - graph-unit checks for `Pan -> StereoOutput` shape enforcement
   - stereo post-processing through `StereoGain`, `StereoClip`, and
@@ -706,6 +713,10 @@ Current runtime control support:
 - mono graph coverage now includes explicit stereo fold-down through
   `StereoMixDown`, including stereo-filtered and stereo-delayed paths through
   `StereoBiquad` and `StereoDelay`
+- mono graph coverage now also includes a bounded `z^-1` feedback recurrence in
+  `CompiledDsp`, direct self-feedback acceptance with zero-initialized state,
+  runtime gain/control-batch retunes on an accepted loop, and rejection
+  coverage for unsupported output/stereo cycles
 
 Current `set_param(node_index, slot, value)` support matrix:
 
@@ -738,9 +749,15 @@ Current limits:
 - stereo post-processing remains intentionally small: the current effect slice
   is `StereoBiquad` plus `StereoDelay`, with no broader stereo mix/effect set
   yet
-- feedback support is currently node-local only: `Delay` and `StereoDelay`
-  recirculate internally, but arbitrary graph cycles are still rejected
-- no feedback-edge insertion yet
+- feedback-edge insertion is still narrow: only `CompiledDsp` supports
+  automatic `z^-1` back-edges today, only for mono-only node graphs, and
+  stereo or output-involved cycles are still rejected
+- supported feedback shapes are still constrained to the current mono node set:
+  direct self-feedback and multiple simultaneous back-edges are allowed, but
+  any cycle involving `Output`, `Pan`, `Stereo*`, or a mono/stereo shape change
+  is rejected
+- feedback graphs currently use a sample-by-sample fallback inside
+  `CompiledDsp`; `CompiledStereoDsp` remains block-only and acyclic
 - no graph hot-swap yet
 - runtime parameter updates are partial, not universal across node kinds
 

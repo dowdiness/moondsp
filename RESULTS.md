@@ -115,6 +115,11 @@ Confirmed on 2026-03-14:
 - `Delay` and `StereoDelay` now support internal recirculating feedback
   coefficients. This is node-local delay feedback only; general graph-cycle
   feedback insertion is still pending.
+- `CompiledDsp` now supports a first real graph-cycle slice for mono-only
+  back-edges by inserting implicit `z^-1` feedback reads during compile.
+- Coverage now includes a bounded mono feedback recurrence, direct
+  self-feedback acceptance, runtime control retunes inside an accepted loop,
+  and rejection of unsupported output/stereo feedback cycles.
 
 Authoritative detailed Phase 2 graph status now lives in
 `docs/salat-engine-technical-reference.md`, including:

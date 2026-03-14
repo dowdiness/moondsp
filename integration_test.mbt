@@ -38,6 +38,21 @@ const GRAPH_VOICE_DELAY_SAMPLES_DOUBLE : Double = 2.0
 const GRAPH_VOICE_RELEASE_TAIL_LIMIT : Double = 0.001
 
 ///|
+const GRAPH_FEEDBACK_SAMPLE_RATE : Double = 1000.0
+
+///|
+const GRAPH_FEEDBACK_BLOCK_SIZE : Int = 8
+
+///|
+const GRAPH_FEEDBACK_GAIN : Double = 0.5
+
+///|
+const GRAPH_FEEDBACK_RETUNED_GAIN : Double = 0.25
+
+///|
+const GRAPH_FEEDBACK_RETUNED_CONSTANT : Double = 2.0
+
+///|
 const GRAPH_MULTI_SOURCE_SAMPLE_RATE : Double = 48000.0
 
 ///|
@@ -715,6 +730,81 @@ test "compiled graph stereo mixdown matches equivalent mono gain path" {
       INTEGRATION_BUFFER_EPSILON,
     ),
   )
+}
+
+///|
+test "compiled graph z^-1 feedback cycle persists across blocks and stays bounded" {
+  let context = DspContext::new(
+    GRAPH_FEEDBACK_SAMPLE_RATE,
+    GRAPH_FEEDBACK_BLOCK_SIZE,
+  )
+  let nodes = [
+    DspNode::constant(1.0),
+    DspNode::mix(0, 2),
+    DspNode::gain(1, GRAPH_FEEDBACK_GAIN),
+    DspNode::output(2),
+  ]
+  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let first_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let second_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+
+  compiled.process(context, first_block)
+  compiled.process(context, second_block)
+
+  assert_true(integration_buffer_is_finite_and_bounded(first_block, 1.0))
+  assert_true(integration_buffer_is_finite_and_bounded(second_block, 1.0))
+  assert_true(
+    (first_block.get(0) - GRAPH_FEEDBACK_GAIN).abs() <
+    INTEGRATION_BUFFER_EPSILON,
+  )
+  assert_true((first_block.get(1) - 0.75).abs() < INTEGRATION_BUFFER_EPSILON)
+  assert_true(
+    (second_block.get(0) - 0.998046875).abs() < INTEGRATION_BUFFER_EPSILON,
+  )
+  assert_true(second_block.get(0) > first_block.get(first_block.length() - 1))
+}
+
+///|
+test "compiled graph z^-1 feedback cycle applies batched runtime changes" {
+  let context = DspContext::new(
+    GRAPH_FEEDBACK_SAMPLE_RATE,
+    GRAPH_FEEDBACK_BLOCK_SIZE,
+  )
+  let nodes = [
+    DspNode::constant(1.0),
+    DspNode::mix(0, 2),
+    DspNode::gain(1, GRAPH_FEEDBACK_GAIN),
+    DspNode::output(2),
+  ]
+  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let first_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let second_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+
+  compiled.process(context, first_block)
+  assert_true(
+    compiled.apply_controls([
+      GraphControl::set_param(
+        0,
+        GraphParamSlot::Value0,
+        GRAPH_FEEDBACK_RETUNED_CONSTANT,
+      ),
+      GraphControl::set_param(
+        2,
+        GraphParamSlot::Value0,
+        GRAPH_FEEDBACK_RETUNED_GAIN,
+      ),
+    ]),
+  )
+  compiled.process(context, second_block)
+
+  assert_true(integration_buffer_is_finite_and_bounded(second_block, 0.75))
+  assert_true(
+    (second_block.get(0) - 0.7490234375).abs() < INTEGRATION_BUFFER_EPSILON,
+  )
+  assert_true(
+    (second_block.get(1) - 0.687255859375).abs() < INTEGRATION_BUFFER_EPSILON,
+  )
+  assert_true(second_block.get(second_block.length() - 1) < second_block.get(0))
 }
 
 ///|
