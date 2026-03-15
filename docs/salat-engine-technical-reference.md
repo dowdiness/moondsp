@@ -819,13 +819,15 @@ Current limits of the control-frame model:
 
 - controls are still block-boundary updates, not sample-accurate events
 - runtime-updatable slots are still limited to the support matrix above
-- `GraphControl` does not yet cover topology changes, hot-swap, or stereo graph
-  routing changes; hot-swap is a separate wrapper API in this slice
+- `GraphControl` still does not cover topology changes or stereo graph routing
+  changes directly; hot-swap and the first topology-edit slice remain separate
+  wrapper APIs in this phase
 
 ### 3.6 Graph Hot-Swap
 
 The current implementation provides narrow mono and terminal-stereo hot-swap
-wrappers:
+wrappers, plus a first mono topology-edit wrapper layered on top of mono
+hot-swap:
 
 ```moonbit
 let active = CompiledDsp::compile(old_nodes, context).unwrap()
@@ -848,12 +850,35 @@ assert(hot_swap_stereo.queue_swap(replacement_stereo))
 hot_swap_stereo.process(context, left_output, right_output)
 ```
 
+```moonbit
+let topology = CompiledDspTopologyController::from_nodes(
+  old_nodes,
+  context,
+  crossfade_samples=128,
+).unwrap()
+
+assert(
+  topology.queue_topology_edit(
+    GraphTopologyEdit::replace_node(gain_node, DspNode::gain(input_node, 0.75)),
+  ),
+)
+topology.process(context, output)
+```
+
 Current semantics:
 
 - `CompiledDspHotSwap` owns one active mono `CompiledDsp`
 - `CompiledStereoDspHotSwap` owns one active terminal-stereo `CompiledStereoDsp`
+- `CompiledDspTopologyController` owns authoring-order mono nodes plus an inner
+  `CompiledDspHotSwap`
 - `queue_swap(...)` stages one replacement graph for the next `process(...)`
   call
+- `queue_topology_edit(...)` / `queue_topology_edits(...)` apply an ordered
+  `GraphTopologyEdit` batch to the stored mono authoring nodes, recompile a new
+  `CompiledDsp`, and stage that replacement through the inner hot-swap wrapper
+- topology-edit batches are transactional:
+  - if any edit has an invalid authoring index, nothing is changed
+  - if the edited node array fails recompilation, nothing is staged
 - replacement graphs must match the active graph's compile-time sample rate and
   block capacity
 - `process(...)` runs only the active graph when no swap is pending
@@ -875,8 +900,12 @@ Current limits:
   from its own freshly compiled internal state
 - in-flight control mirroring requires both graphs to accept the same
   node-index / slot updates during the crossfade window
-- queued replacement is a whole compiled graph, not a `GraphControl`
-  topology-edit frame
+- topology edits are still mono-only and narrow:
+  - only `GraphTopologyEdit::replace_node(...)` exists
+  - the graph length stays fixed; there is no node insert/delete frame yet
+  - only one topology replacement may be staged at a time
+- stereo topology edits still require explicit whole-graph recompilation outside
+  this wrapper
 - browser/AudioWorklet hot-swap proof is now narrow but present for both paths:
   the `browser/` wrapper exports dedicated mono `CompiledDspHotSwap` and
   terminal-stereo `CompiledStereoDspHotSwap` proof paths, and Playwright checks

@@ -31,6 +31,9 @@ current Phase 2 graph-compiler checkpoint.
 - `CompiledStereoDspHotSwap` now brings the same hot-swap model to
   terminal-stereo graphs, and the browser wrapper exports a dedicated stereo
   hot-swap proof path as well.
+- `CompiledDspTopologyController` now adds a first narrow topology-edit layer
+  above mono `CompiledDspHotSwap`, with ordered transactional `ReplaceNode`
+  frames that recompile and stage a replacement graph.
 
 ## Confirmed Outcome
 
@@ -170,6 +173,13 @@ Confirmed on 2026-03-15:
 - `CompiledStereoDspHotSwap` now adds stereo hot-swap parity for
   `CompiledStereoDsp`, including mirrored runtime controls during crossfade and
   browser proof of the mixed and settled stereo swap blocks.
+- `CompiledDspTopologyController` now adds the first topology-edit wrapper
+  beyond whole-graph swap for mono graphs, with transactional
+  `GraphTopologyEdit::replace_node(...)` batches compiled and staged through the
+  mono hot-swap path.
+- Coverage now includes exact crossfade expectations for a rebuilt mono graph,
+  transactional rejection of invalid edit batches, and runtime-control mirroring
+  into a queued topology-edited replacement.
 
 Authoritative detailed Phase 2 graph status now lives in
 `docs/salat-engine-technical-reference.md`, including:

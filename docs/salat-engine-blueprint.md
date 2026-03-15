@@ -215,6 +215,8 @@ Current implemented surface:
   AudioWorklet via a dedicated wrapper mode
 - `CompiledStereoDspHotSwap` now brings the same whole-graph swap model to the
   current terminal-stereo slice, including browser proof in the AudioWorklet
+- `CompiledDspTopologyController` now adds a first narrow mono topology-edit
+  layer above hot-swap with transactional node replacement
 - Topological sorting, graph validation, and runtime control for the current
   graph paths
 - Integration coverage for compiled mono voice paths, runtime retuning, and the
@@ -228,7 +230,7 @@ Still planned in Phase 2:
 - Constant folding and dead node elimination
 - Broader stereo node coverage beyond the current filter/delay slice
 - Full multichannel graph semantics
-- Broader topology-edit semantics beyond whole-graph hot-swap / crossfade
+- Broader topology-edit semantics beyond mono `ReplaceNode` recompilation
 
 **Current deliverable**: compiled mono graph execution including explicit
 stereo fold-down, the first terminal-stereo graph slice, and a first mono-only

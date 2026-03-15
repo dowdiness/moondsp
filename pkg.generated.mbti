@@ -91,6 +91,14 @@ pub fn CompiledDspHotSwap::from_graph(CompiledDsp, crossfade_samples? : Int) -> 
 pub fn CompiledDspHotSwap::process(Self, DspContext, AudioBuffer) -> Unit
 pub fn CompiledDspHotSwap::queue_swap(Self, CompiledDsp) -> Bool
 
+type CompiledDspTopologyController
+pub fn CompiledDspTopologyController::apply_control(Self, GraphControl) -> Bool
+pub fn CompiledDspTopologyController::apply_controls(Self, Array[GraphControl]) -> Bool
+pub fn CompiledDspTopologyController::from_nodes(Array[DspNode], DspContext, crossfade_samples? : Int) -> Self?
+pub fn CompiledDspTopologyController::process(Self, DspContext, AudioBuffer) -> Unit
+pub fn CompiledDspTopologyController::queue_topology_edit(Self, GraphTopologyEdit) -> Bool
+pub fn CompiledDspTopologyController::queue_topology_edits(Self, Array[GraphTopologyEdit]) -> Bool
+
 type CompiledStereoDsp
 pub fn CompiledStereoDsp::apply_control(Self, GraphControl) -> Bool
 pub fn CompiledStereoDsp::apply_controls(Self, Array[GraphControl]) -> Bool
@@ -231,6 +239,19 @@ pub(all) enum GraphParamSlot {
   Value2
   Value3
   DelaySamples
+}
+
+pub struct GraphTopologyEdit {
+  kind : GraphTopologyEditKind
+  node_index : Int
+  replacement : DspNode
+
+  fn new(GraphTopologyEditKind, Int, DspNode) -> GraphTopologyEdit
+}
+pub fn GraphTopologyEdit::replace_node(Int, DspNode) -> Self
+
+pub(all) enum GraphTopologyEditKind {
+  ReplaceNode
 }
 
 pub struct Mix {
