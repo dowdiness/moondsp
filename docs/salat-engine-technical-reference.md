@@ -950,6 +950,10 @@ Current limits:
     `CompiledStereoDspTopologyController` browser proof path, with Playwright
     checking the mixed and settled channel-shape transition from a queued
     stereo topology edit
+  - the stereo browser proof also applies a live runtime level control while
+    the queued pan-replacement crossfade is already in flight, and Playwright
+    checks that the mixed left/right block reflects the mirrored control on
+    both the active and pending stereo graphs
 
 ### 3.7 Multichannel Expansion (SuperCollider-Style)
 

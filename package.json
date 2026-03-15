@@ -3,8 +3,8 @@
   "private": true,
   "scripts": {
     "build:browser": "moon build browser --target wasm-gc --release",
-    "test:browser": "playwright test",
-    "test:browser:headed": "playwright test --headed"
+    "test:browser": "moon build --target wasm-gc --release && ./playwright-sync-wasm.sh && playwright test",
+    "test:browser:headed": "moon build --target wasm-gc --release && ./playwright-sync-wasm.sh && playwright test --headed"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2"

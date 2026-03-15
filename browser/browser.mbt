@@ -191,6 +191,9 @@ let compiled_stereo_topology_edit_sample_rate : @ref.Ref[Double] = @ref.new(0.0)
 let compiled_stereo_topology_edit_block_size : @ref.Ref[Int] = @ref.new(0)
 
 ///|
+let compiled_stereo_topology_edit_level : @ref.Ref[Double] = @ref.new(1.0)
+
+///|
 /// Reset browser demo state.
 pub fn reset_phase() -> Unit {
   @lib.reset_phase()
@@ -588,6 +591,16 @@ pub fn queue_compiled_stereo_topology_edit() -> Bool {
 }
 
 ///|
+/// Update the fixed browser stereo topology-edit level control.
+pub fn set_compiled_stereo_topology_edit_level(level : Double) -> Bool {
+  if compiled_stereo_topology_edit.val is None {
+    return false
+  }
+  compiled_stereo_topology_edit_level.val = level
+  true
+}
+
+///|
 /// Run one render quantum through the browser proof
 /// `CompiledStereoDspTopologyController` graph.
 pub fn process_compiled_stereo_topology_edit_block(
@@ -598,6 +611,15 @@ pub fn process_compiled_stereo_topology_edit_block(
     return false
   }
   let topology = compiled_stereo_topology_edit.val.unwrap()
+  if !topology.apply_control(
+      @lib.GraphControl::set_param(
+        0,
+        @lib.GraphParamSlot::Value0,
+        compiled_stereo_topology_edit_level.val,
+      ),
+    ) {
+    return false
+  }
   topology.process(
     compiled_stereo_topology_edit_context.val.unwrap(),
     compiled_stereo_topology_edit_left.val.unwrap(),
@@ -882,6 +904,7 @@ fn ensure_compiled_stereo_topology_edit_graph(
   compiled_stereo_topology_edit_right.val = Some(right)
   compiled_stereo_topology_edit_sample_rate.val = sample_rate
   compiled_stereo_topology_edit_block_size.val = block_size
+  compiled_stereo_topology_edit_level.val = 1.0
   true
 }
 
@@ -968,4 +991,5 @@ fn reset_compiled_stereo_topology_edit_graph() -> Unit {
   compiled_stereo_topology_edit_right.val = None
   compiled_stereo_topology_edit_sample_rate.val = 0.0
   compiled_stereo_topology_edit_block_size.val = 0
+  compiled_stereo_topology_edit_level.val = 1.0
 }
