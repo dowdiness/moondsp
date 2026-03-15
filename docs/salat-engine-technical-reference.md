@@ -778,7 +778,9 @@ Current limits:
   mono/stereo shape change is rejected
 - feedback graphs currently use a sample-by-sample fallback inside
   `CompiledDsp` and `CompiledStereoDsp` whenever feedback edges are present
-- no graph hot-swap yet
+- graph hot-swap is now narrow: `CompiledDspHotSwap` supports mono
+  `CompiledDsp` replacement only, with block-boundary `queue_swap(...)` and an
+  optional equal-power crossfade
 - runtime parameter updates are partial, not universal across node kinds
 
 ### 3.5.2 Control Frames
@@ -816,23 +818,51 @@ Current limits of the control-frame model:
 - controls are still block-boundary updates, not sample-accurate events
 - runtime-updatable slots are still limited to the support matrix above
 - `GraphControl` does not yet cover topology changes, hot-swap, or stereo graph
-  routing changes
+  routing changes; hot-swap is a separate wrapper API in this slice
 
 ### 3.6 Graph Hot-Swap
 
-When the user changes the DSP graph:
+The current implementation provides a narrow mono-only hot-swap wrapper:
 
-```
-1. Main thread: compile new graph → new CompiledDsp object
-2. Main thread: serialize or transfer to audio thread via postMessage
-3. Audio thread: receive new graph
-4. Audio thread: crossfade from old to new over ~25ms (≈10 buffers)
-   - During crossfade: run BOTH old and new, mix with complementary gains
-   - old_gain = cos(t * π/2), new_gain = sin(t * π/2)  (equal-power crossfade)
-5. Audio thread: discard old graph
+```moonbit
+let active = CompiledDsp::compile(old_nodes, context).unwrap()
+let replacement = CompiledDsp::compile(new_nodes, context).unwrap()
+let hot_swap = CompiledDspHotSwap::from_graph(active, crossfade_samples=128)
+
+assert(hot_swap.queue_swap(replacement))
+hot_swap.process(context, output)
 ```
 
-Simple version (no crossfade): just swap instantly. May cause a small click, but acceptable for prototyping.
+Current semantics:
+
+- `CompiledDspHotSwap` owns one active mono `CompiledDsp`
+- `queue_swap(...)` stages one replacement graph for the next `process(...)`
+  call
+- replacement graphs must match the active graph's compile-time sample rate and
+  block capacity
+- `process(...)` runs only the active graph when no swap is pending
+- when a swap is pending and `crossfade_samples > 0`, `process(...)` runs both
+  graphs and mixes them with equal-power gains:
+  - `old_gain = cos(t * π/2)`
+  - `new_gain = sin(t * π/2)`
+- when `crossfade_samples <= 0`, the swap is instantaneous on the next
+  `process(...)` call
+- runtime `apply_control(...)` / `apply_controls(...)` target the active graph
+  when no swap is pending
+- during an in-flight crossfade, runtime controls are validated against both
+  active and pending graphs and applied to both graphs transactionally
+  - if either graph rejects the control batch, nothing is applied
+
+Current limits:
+
+- mono `CompiledDsp` only; there is no `CompiledStereoDsp` hot-swap yet
+- no state migration between old and new graphs; the replacement graph starts
+  from its own freshly compiled internal state
+- in-flight control mirroring requires both graphs to accept the same
+  node-index / slot updates during the crossfade window
+- queued replacement is a whole compiled graph, not a `GraphControl`
+  topology-edit frame
+- browser/AudioWorklet hot-swap proof is not implemented yet
 
 ### 3.7 Multichannel Expansion (SuperCollider-Style)
 

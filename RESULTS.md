@@ -22,6 +22,9 @@ current Phase 2 graph-compiler checkpoint.
 - `serve.sh` copies the browser wrapper `.wasm` into `web/` and starts a local
   server.
 - Browser validation is complete for the current prototype.
+- `CompiledDspHotSwap` now provides a first mono-only graph replacement path
+  for already-compiled graphs, with block-boundary `queue_swap(...)` and an
+  optional equal-power crossfade.
 
 ## Confirmed Outcome
 
@@ -149,6 +152,11 @@ Confirmed on 2026-03-15:
 - Coverage now also includes bounded terminal-stereo feedback persistence plus
   graph/integration runtime retunes on accepted mono feedback loops before the
   stereo lift.
+- `CompiledDspHotSwap` now adds a first graph replacement layer above mono
+  `CompiledDsp`, supporting either instantaneous swap or fixed equal-power
+  crossfade between compatible compiled graphs.
+- Coverage now pins exact equal-power crossfade samples plus bounded
+  block-to-block hot-swap behavior for that wrapper.
 
 Authoritative detailed Phase 2 graph status now lives in
 `docs/salat-engine-technical-reference.md`, including:

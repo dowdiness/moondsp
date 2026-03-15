@@ -84,6 +84,13 @@ pub fn CompiledDsp::gate_on(Self, Int) -> Bool
 pub fn CompiledDsp::process(Self, DspContext, AudioBuffer) -> Unit
 pub fn CompiledDsp::set_param(Self, Int, GraphParamSlot, Double) -> Bool
 
+type CompiledDspHotSwap
+pub fn CompiledDspHotSwap::apply_control(Self, GraphControl) -> Bool
+pub fn CompiledDspHotSwap::apply_controls(Self, Array[GraphControl]) -> Bool
+pub fn CompiledDspHotSwap::from_graph(CompiledDsp, crossfade_samples? : Int) -> Self
+pub fn CompiledDspHotSwap::process(Self, DspContext, AudioBuffer) -> Unit
+pub fn CompiledDspHotSwap::queue_swap(Self, CompiledDsp) -> Bool
+
 type CompiledStereoDsp
 pub fn CompiledStereoDsp::apply_control(Self, GraphControl) -> Bool
 pub fn CompiledStereoDsp::apply_controls(Self, Array[GraphControl]) -> Bool

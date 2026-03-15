@@ -208,6 +208,9 @@ Current implemented surface:
 - `CompiledStereoDsp` now carries that same mono-valued `z^-1` slice into
   terminal-stereo graphs before `Pan`, while stereo-valued back-edges remain
   out of scope
+- `CompiledDspHotSwap` now provides a first mono-only graph replacement layer
+  for already-compiled graphs, with queued swap plus optional equal-power
+  crossfade
 - Topological sorting, graph validation, and runtime control for the current
   graph paths
 - Integration coverage for compiled mono voice paths, runtime retuning, and the
@@ -221,11 +224,12 @@ Still planned in Phase 2:
 - Constant folding and dead node elimination
 - Broader stereo node coverage beyond the current filter/delay slice
 - Full multichannel graph semantics
-- Graph hot-swap and crossfade on the audio thread
+- Stereo parity and browser proof for graph hot-swap / crossfade
 
 **Current deliverable**: compiled mono graph execution including explicit
-stereo fold-down, plus the first terminal-stereo graph slice, both with runtime
-control and integration coverage.
+stereo fold-down, the first terminal-stereo graph slice, and a first mono-only
+compiled-graph hot-swap wrapper, all with runtime control and integration
+coverage.
 
 **Phase 2 exit deliverable**: `sine(2).range(200,400).sine().lpf(800,1).out()`
 produces sound with graph hot-swap and feedback handling.

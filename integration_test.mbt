@@ -912,6 +912,41 @@ test "compiled stereo graph mono z^-1 feedback cycle applies batched runtime cha
 }
 
 ///|
+test "compiled graph hot swap crossfades between bounded mono graphs" {
+  let context = DspContext::new(
+    GRAPH_FEEDBACK_SAMPLE_RATE,
+    GRAPH_FEEDBACK_BLOCK_SIZE,
+  )
+  let active = CompiledDsp::compile(
+    [DspNode::constant(0.25), DspNode::output(0)],
+    context,
+  ).unwrap()
+  let replacement = CompiledDsp::compile(
+    [DspNode::constant(0.75), DspNode::output(0)],
+    context,
+  ).unwrap()
+  let hot_swap = CompiledDspHotSwap::from_graph(active, crossfade_samples=8)
+  let first_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let second_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let settled_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+
+  assert_true(hot_swap.queue_swap(replacement))
+  hot_swap.process(context, first_block)
+  hot_swap.process(context, second_block)
+  hot_swap.process(context, settled_block)
+
+  assert_true(integration_buffer_is_finite_and_bounded(first_block, 0.8))
+  assert_true(integration_buffer_is_finite_and_bounded(second_block, 0.8))
+  assert_true(integration_buffer_is_finite_and_bounded(settled_block, 0.75))
+  assert_true(first_block.get(0) == 0.25)
+  assert_true(first_block.get(1) > first_block.get(0))
+  assert_true(first_block.get(2) > first_block.get(1))
+  assert_true(first_block.get(3) > first_block.get(2))
+  assert_true(second_block.as_fixed_array().every(sample => sample == 0.75))
+  assert_true(settled_block.as_fixed_array().every(sample => sample == 0.75))
+}
+
+///|
 test "compiled graph voice path stays coherent across gates and runtime updates" {
   let context = DspContext::new(GRAPH_VOICE_SAMPLE_RATE, GRAPH_VOICE_BLOCK_SIZE)
   let nodes = [
