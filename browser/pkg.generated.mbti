@@ -56,6 +56,8 @@ pub fn queue_compiled_topology_edit() -> Bool
 
 pub fn reset_phase() -> Unit
 
+pub fn set_compiled_topology_edit_gain(Double) -> Bool
+
 pub fn tick(Double, Double) -> Double
 
 pub fn tick_source(Int, Double, Double) -> Double

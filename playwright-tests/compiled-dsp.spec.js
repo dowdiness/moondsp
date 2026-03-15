@@ -2,6 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 const PAN_CENTER_GAIN = 0.7071067811865476;
 const HOT_SWAP_CROSSFADE_SAMPLES = 128;
+const TOPOLOGY_EDIT_CROSSFADE_SAMPLES = 1024;
 
 async function setRangeValue(page, selector, value) {
   await page.locator(selector).evaluate((element, nextValue) => {
@@ -70,18 +71,18 @@ function hotSwapExpectedSample(index) {
   return (0.25 * oldGain) + (0.75 * newGain);
 }
 
-function topologyInsertExpectedSample(index) {
-  const progress = index / HOT_SWAP_CROSSFADE_SAMPLES;
+function topologyInsertExpectedSample(index, oldValue, newValue) {
+  const progress = index / TOPOLOGY_EDIT_CROSSFADE_SAMPLES;
   const oldGain = Math.cos(progress * Math.PI * 0.5);
   const newGain = Math.sin(progress * Math.PI * 0.5);
-  return oldGain + (0.5 * newGain);
+  return (oldValue * oldGain) + (newValue * newGain);
 }
 
-function topologyDeleteExpectedSample(index) {
-  const progress = index / HOT_SWAP_CROSSFADE_SAMPLES;
+function topologyDeleteExpectedSample(index, oldValue, newValue) {
+  const progress = index / TOPOLOGY_EDIT_CROSSFADE_SAMPLES;
   const oldGain = Math.cos(progress * Math.PI * 0.5);
   const newGain = Math.sin(progress * Math.PI * 0.5);
-  return (0.5 * oldGain) + newGain;
+  return (oldValue * oldGain) + (newValue * newGain);
 }
 
 function stereoHotSwapExpectedSample(index) {
@@ -369,10 +370,18 @@ test('browser demo proves CompiledDspHotSwap crossfade in the worklet', async ({
 test('browser demo proves CompiledDspTopologyController insert delete roundtrip in the worklet', async ({ page }) => {
   await startAudio(page, '/?topologyEditMono=1');
   await expect(page.locator('#status')).toContainText('CompiledDspTopologyController block runtime');
+  await setRangeValue(page, '#gainSlider', 100);
+  await expect(page.locator('#gainValue')).toHaveText('100');
   await expect
-    .poll(async () => (await firstTelemetry(page))?.sequence || 0, { timeout: 10_000 })
+    .poll(async () => {
+      const telemetry = await currentTelemetry(page);
+      if (!telemetry) {
+        return 0;
+      }
+      return Math.abs(telemetry.gain - 1.0) < 0.000001 ? telemetry.sequence : 0;
+    }, { timeout: 10_000 })
     .toBeGreaterThan(0);
-  const initialTelemetry = await firstTelemetry(page);
+  const initialTelemetry = await currentTelemetry(page);
 
   expect(initialTelemetry.leftPreview.every(sample => Math.abs(sample - 1.0) < 0.000001)).toBeTruthy();
   expect(initialTelemetry.rightPreview.every(sample => Math.abs(sample - 1.0) < 0.000001)).toBeTruthy();
@@ -380,6 +389,8 @@ test('browser demo proves CompiledDspTopologyController insert delete roundtrip 
   await page.evaluate(() => {
     window.__mdspNode.port.postMessage({ type: 'queue-topology-edit' });
   });
+  await setRangeValue(page, '#gainSlider', 50);
+  await expect(page.locator('#gainValue')).toHaveText('50');
   await expect
     .poll(async () => (await topologyEditQueued(page))?.telemetrySequence ?? -1, { timeout: 10_000 })
     .toBeGreaterThanOrEqual(initialTelemetry.sequence);
@@ -390,37 +401,43 @@ test('browser demo proves CompiledDspTopologyController insert delete roundtrip 
       const history = await telemetryHistory(page);
       const match = history.find((telemetry) =>
         telemetry.sequence > queueAck.telemetrySequence &&
-        Math.abs(telemetry.leftPreview[0] - 1.0) < 0.000001 &&
-        telemetry.leftPreview.some(sample => sample > 1.001));
+        Math.abs(telemetry.gain - 0.5) < 0.000001 &&
+        Math.abs(telemetry.leftPreview[0] - 0.5) < 0.000001 &&
+        telemetry.leftPreview.some(sample => sample > 0.5001));
       return match?.sequence || 0;
     }, { timeout: 10_000 })
     .toBeGreaterThan(queueAck.telemetrySequence);
   const crossfadeTelemetry = (await telemetryHistory(page)).find((telemetry) =>
     telemetry.sequence > queueAck.telemetrySequence &&
-    Math.abs(telemetry.leftPreview[0] - 1.0) < 0.000001 &&
-    telemetry.leftPreview.some(sample => sample > 1.001));
+    Math.abs(telemetry.gain - 0.5) < 0.000001 &&
+    Math.abs(telemetry.leftPreview[0] - 0.5) < 0.000001 &&
+    telemetry.leftPreview.some(sample => sample > 0.5001));
 
   for (let index = 0; index < crossfadeTelemetry.leftPreview.length; index += 1) {
-    expect(crossfadeTelemetry.leftPreview[index]).toBeCloseTo(topologyInsertExpectedSample(index), 6);
-    expect(crossfadeTelemetry.rightPreview[index]).toBeCloseTo(topologyInsertExpectedSample(index), 6);
+    expect(crossfadeTelemetry.leftPreview[index]).toBeCloseTo(topologyInsertExpectedSample(index, 0.5, 0.25), 6);
+    expect(crossfadeTelemetry.rightPreview[index]).toBeCloseTo(topologyInsertExpectedSample(index, 0.5, 0.25), 6);
   }
+  expect(crossfadeTelemetry.leftPreview[1]).toBeGreaterThan(crossfadeTelemetry.leftPreview[0]);
+  expect(crossfadeTelemetry.leftPreview[7]).toBeLessThan(0.51);
 
   await expect
     .poll(async () => {
       const history = await telemetryHistory(page);
       const match = history.find((telemetry) =>
         telemetry.sequence > crossfadeTelemetry.sequence &&
-        telemetry.leftPreview.every(sample => Math.abs(sample - 0.5) < 0.000001));
+        Math.abs(telemetry.gain - 0.5) < 0.000001 &&
+        telemetry.leftPreview.every(sample => Math.abs(sample - 0.25) < 0.000001));
       return match?.sequence || 0;
     }, { timeout: 10_000 })
     .toBeGreaterThan(crossfadeTelemetry.sequence);
   const insertedTelemetry = (await telemetryHistory(page)).find((telemetry) =>
     telemetry.sequence > crossfadeTelemetry.sequence &&
-    telemetry.leftPreview.every(sample => Math.abs(sample - 0.5) < 0.000001));
+    Math.abs(telemetry.gain - 0.5) < 0.000001 &&
+    telemetry.leftPreview.every(sample => Math.abs(sample - 0.25) < 0.000001));
 
-  expect(insertedTelemetry.leftPreview.every(sample => Math.abs(sample - 0.5) < 0.000001)).toBeTruthy();
-  expect(insertedTelemetry.rightPreview.every(sample => Math.abs(sample - 0.5) < 0.000001)).toBeTruthy();
-  expect(insertedTelemetry.overallPeak).toBeCloseTo(0.5, 6);
+  expect(insertedTelemetry.leftPreview.every(sample => Math.abs(sample - 0.25) < 0.000001)).toBeTruthy();
+  expect(insertedTelemetry.rightPreview.every(sample => Math.abs(sample - 0.25) < 0.000001)).toBeTruthy();
+  expect(insertedTelemetry.overallPeak).toBeCloseTo(0.25, 6);
 
   await page.evaluate(() => {
     window.__mdspNode.port.postMessage({ type: 'queue-topology-delete-edit' });
@@ -435,19 +452,19 @@ test('browser demo proves CompiledDspTopologyController insert delete roundtrip 
       const history = await telemetryHistory(page);
       const match = history.find((telemetry) =>
         telemetry.sequence > deleteQueueAck.telemetrySequence &&
-        Math.abs(telemetry.leftPreview[0] - 0.5) < 0.000001 &&
-        telemetry.leftPreview.some(sample => sample > 0.501));
+        Math.abs(telemetry.leftPreview[0] - 0.25) < 0.000001 &&
+        telemetry.leftPreview.some(sample => sample > 0.251));
       return match?.sequence || 0;
     }, { timeout: 10_000 })
     .toBeGreaterThan(deleteQueueAck.telemetrySequence);
   const deleteCrossfadeTelemetry = (await telemetryHistory(page)).find((telemetry) =>
     telemetry.sequence > deleteQueueAck.telemetrySequence &&
-    Math.abs(telemetry.leftPreview[0] - 0.5) < 0.000001 &&
-    telemetry.leftPreview.some(sample => sample > 0.501));
+    Math.abs(telemetry.leftPreview[0] - 0.25) < 0.000001 &&
+    telemetry.leftPreview.some(sample => sample > 0.251));
 
   for (let index = 0; index < deleteCrossfadeTelemetry.leftPreview.length; index += 1) {
-    expect(deleteCrossfadeTelemetry.leftPreview[index]).toBeCloseTo(topologyDeleteExpectedSample(index), 6);
-    expect(deleteCrossfadeTelemetry.rightPreview[index]).toBeCloseTo(topologyDeleteExpectedSample(index), 6);
+    expect(deleteCrossfadeTelemetry.leftPreview[index]).toBeCloseTo(topologyDeleteExpectedSample(index, 0.25, 0.5), 6);
+    expect(deleteCrossfadeTelemetry.rightPreview[index]).toBeCloseTo(topologyDeleteExpectedSample(index, 0.25, 0.5), 6);
   }
 
   await expect
@@ -455,17 +472,19 @@ test('browser demo proves CompiledDspTopologyController insert delete roundtrip 
       const history = await telemetryHistory(page);
       const match = history.find((telemetry) =>
         telemetry.sequence > deleteCrossfadeTelemetry.sequence &&
-        telemetry.leftPreview.every(sample => Math.abs(sample - 1.0) < 0.000001));
+        Math.abs(telemetry.gain - 0.5) < 0.000001 &&
+        telemetry.leftPreview.every(sample => Math.abs(sample - 0.5) < 0.000001));
       return match?.sequence || 0;
     }, { timeout: 10_000 })
     .toBeGreaterThan(deleteCrossfadeTelemetry.sequence);
   const settledTelemetry = (await telemetryHistory(page)).find((telemetry) =>
     telemetry.sequence > deleteCrossfadeTelemetry.sequence &&
-    telemetry.leftPreview.every(sample => Math.abs(sample - 1.0) < 0.000001));
+    Math.abs(telemetry.gain - 0.5) < 0.000001 &&
+    telemetry.leftPreview.every(sample => Math.abs(sample - 0.5) < 0.000001));
 
-  expect(settledTelemetry.leftPreview.every(sample => Math.abs(sample - 1.0) < 0.000001)).toBeTruthy();
-  expect(settledTelemetry.rightPreview.every(sample => Math.abs(sample - 1.0) < 0.000001)).toBeTruthy();
-  expect(settledTelemetry.overallPeak).toBeCloseTo(1.0, 6);
+  expect(settledTelemetry.leftPreview.every(sample => Math.abs(sample - 0.5) < 0.000001)).toBeTruthy();
+  expect(settledTelemetry.rightPreview.every(sample => Math.abs(sample - 0.5) < 0.000001)).toBeTruthy();
+  expect(settledTelemetry.overallPeak).toBeCloseTo(0.5, 6);
 });
 
 test('browser demo proves CompiledStereoDspTopologyController crossfade in the worklet', async ({ page }) => {

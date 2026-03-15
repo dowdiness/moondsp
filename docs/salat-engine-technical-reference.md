@@ -943,6 +943,9 @@ Current limits:
   - the first queued edit inserts one unary node with the expected mixed and
     settled rebuilt blocks, and the second queued edit deletes that node and
     returns the browser output to the original baseline shape
+  - the browser proof also applies a live runtime gain control while the insert
+    crossfade is already in flight, and Playwright checks that the mixed block
+    reflects the mirrored control on both the active and pending rebuilt graphs
   - terminal-stereo parity now exists through a dedicated
     `CompiledStereoDspTopologyController` browser proof path, with Playwright
     checking the mixed and settled channel-shape transition from a queued

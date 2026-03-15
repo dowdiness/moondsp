@@ -353,6 +353,20 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
     }
 
     if (this.usesCompiledTopologyEdit) {
+      if (typeof this.wasm.set_compiled_topology_edit_gain === "function") {
+        const updated = this.wasm.set_compiled_topology_edit_gain(this.gain);
+        if (!updated) {
+          this.fillSilence(left, right);
+          if (!this.reportedRuntimeError) {
+            this.reportedRuntimeError = true;
+            this.port.postMessage({
+              type: "error",
+              message: "CompiledDspTopologyController browser control update failed",
+            });
+          }
+          return true;
+        }
+      }
       const processed = this.wasm.process_compiled_topology_edit_block(
         sampleRate,
         left.length,

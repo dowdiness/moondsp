@@ -44,13 +44,10 @@ const BROWSER_HOT_SWAP_NEW_CONSTANT : Double = 0.75
 const BROWSER_HOT_SWAP_CROSSFADE_SAMPLES : Int = 128
 
 ///|
-const BROWSER_TOPOLOGY_EDIT_OLD_CONSTANT : Double = 1.0
-
-///|
 const BROWSER_TOPOLOGY_EDIT_INSERTED_GAIN : Double = 0.5
 
 ///|
-const BROWSER_TOPOLOGY_EDIT_CROSSFADE_SAMPLES : Int = 128
+const BROWSER_TOPOLOGY_EDIT_CROSSFADE_SAMPLES : Int = 1024
 
 ///|
 const BROWSER_STEREO_HOT_SWAP_OLD_CONSTANT : Double = 0.25
@@ -116,6 +113,11 @@ let compiled_topology_edit_sample_rate : @ref.Ref[Double] = @ref.new(0.0)
 
 ///|
 let compiled_topology_edit_block_size : @ref.Ref[Int] = @ref.new(0)
+
+///|
+let compiled_topology_edit_gain : @ref.Ref[Double] = @ref.new(
+  BROWSER_COMPILED_DEFAULT_GAIN,
+)
 
 ///|
 let compiled_topology_edit_inserted : @ref.Ref[Bool] = @ref.new(false)
@@ -383,6 +385,16 @@ pub fn queue_compiled_topology_delete_edit() -> Bool {
 }
 
 ///|
+/// Update the fixed browser topology-edit gain control.
+pub fn set_compiled_topology_edit_gain(gain : Double) -> Bool {
+  if compiled_topology_edit.val is None {
+    return false
+  }
+  compiled_topology_edit_gain.val = gain
+  true
+}
+
+///|
 /// Run one render quantum through the browser proof `CompiledDspTopologyController`
 /// graph.
 pub fn process_compiled_topology_edit_block(
@@ -393,6 +405,15 @@ pub fn process_compiled_topology_edit_block(
     return false
   }
   let topology = compiled_topology_edit.val.unwrap()
+  if !topology.apply_control(
+      @lib.GraphControl::set_param(
+        0,
+        @lib.GraphParamSlot::Value0,
+        compiled_topology_edit_gain.val,
+      ),
+    ) {
+    return false
+  }
   topology.process(
     compiled_topology_edit_context.val.unwrap(),
     compiled_topology_edit_output.val.unwrap(),
@@ -699,7 +720,7 @@ fn ensure_compiled_topology_edit_graph(
   let topology = match
     @lib.CompiledDspTopologyController::from_nodes(
       [
-        @lib.DspNode::constant(BROWSER_TOPOLOGY_EDIT_OLD_CONSTANT),
+        @lib.DspNode::constant(BROWSER_COMPILED_DEFAULT_GAIN),
         @lib.DspNode::output(0),
       ],
       context,
@@ -716,6 +737,7 @@ fn ensure_compiled_topology_edit_graph(
   compiled_topology_edit_output.val = Some(output)
   compiled_topology_edit_sample_rate.val = sample_rate
   compiled_topology_edit_block_size.val = block_size
+  compiled_topology_edit_gain.val = BROWSER_COMPILED_DEFAULT_GAIN
   compiled_topology_edit_inserted.val = false
   true
 }
@@ -914,6 +936,7 @@ fn reset_compiled_topology_edit_graph() -> Unit {
   compiled_topology_edit_output.val = None
   compiled_topology_edit_sample_rate.val = 0.0
   compiled_topology_edit_block_size.val = 0
+  compiled_topology_edit_gain.val = BROWSER_COMPILED_DEFAULT_GAIN
   compiled_topology_edit_inserted.val = false
 }
 
