@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 
 const PAN_CENTER_GAIN = 0.7071067811865476;
+const HOT_SWAP_CROSSFADE_SAMPLES = 128;
 
 async function setRangeValue(page, selector, value) {
   await page.locator(selector).evaluate((element, nextValue) => {
@@ -30,6 +31,14 @@ async function currentTelemetry(page) {
   return page.evaluate(() => window.__mdspTelemetry);
 }
 
+async function hotSwapQueued(page) {
+  return page.evaluate(() => window.__mdspHotSwapQueued);
+}
+
+async function telemetryHistory(page) {
+  return page.evaluate(() => window.__mdspTelemetryHistory);
+}
+
 function previewEnergy(samples) {
   return samples.reduce((sum, sample) => sum + Math.abs(sample), 0);
 }
@@ -40,6 +49,13 @@ function previewVariation(samples) {
     total += Math.abs(samples[index] - samples[index - 1]);
   }
   return total;
+}
+
+function hotSwapExpectedSample(index) {
+  const progress = index / HOT_SWAP_CROSSFADE_SAMPLES;
+  const oldGain = Math.cos(progress * Math.PI * 0.5);
+  const newGain = Math.sin(progress * Math.PI * 0.5);
+  return (0.25 * oldGain) + (0.75 * newGain);
 }
 
 async function startAudio(page, path) {
@@ -248,4 +264,61 @@ test('browser demo falls back to CompiledDsp when stereo init fails', async ({ p
   expect(retunedTelemetry.leftPreview.every(Number.isFinite)).toBeTruthy();
   expect(retunedTelemetry.overallPeak).toBeGreaterThan(0.95);
   expect(retunedTelemetry.overallPeak).toBeLessThan(1.01);
+});
+
+test('browser demo proves CompiledDspHotSwap crossfade in the worklet', async ({ page }) => {
+  await startAudio(page, '/?hotSwapMono=1');
+  await expect(page.locator('#status')).toContainText('CompiledDspHotSwap block runtime');
+  await expect
+    .poll(async () => (await firstTelemetry(page))?.sequence || 0, { timeout: 10_000 })
+    .toBeGreaterThan(0);
+  const initialTelemetry = await firstTelemetry(page);
+
+  expect(initialTelemetry.leftPreview.every(sample => Math.abs(sample - 0.25) < 0.000001)).toBeTruthy();
+  expect(initialTelemetry.rightPreview.every(sample => Math.abs(sample - 0.25) < 0.000001)).toBeTruthy();
+
+  await page.evaluate(() => {
+    window.__mdspNode.port.postMessage({ type: 'queue-hot-swap' });
+  });
+  await expect
+    .poll(async () => (await hotSwapQueued(page))?.telemetrySequence ?? -1, { timeout: 10_000 })
+    .toBeGreaterThanOrEqual(initialTelemetry.sequence);
+  const queueAck = await hotSwapQueued(page);
+
+  await expect
+    .poll(async () => {
+      const history = await telemetryHistory(page);
+      const match = history.find((telemetry) =>
+        telemetry.sequence > queueAck.telemetrySequence &&
+        telemetry.leftPreview.some(sample => sample > 0.250001 && sample < 0.75));
+      return match?.sequence || 0;
+    }, { timeout: 10_000 })
+    .toBeGreaterThan(queueAck.telemetrySequence);
+  const crossfadeTelemetry = (await telemetryHistory(page)).find((telemetry) =>
+    telemetry.sequence > queueAck.telemetrySequence &&
+    telemetry.leftPreview.some(sample => sample > 0.250001 && sample < 0.75));
+
+  for (let index = 0; index < crossfadeTelemetry.leftPreview.length; index += 1) {
+    expect(crossfadeTelemetry.leftPreview[index]).toBeCloseTo(hotSwapExpectedSample(index), 6);
+    expect(crossfadeTelemetry.rightPreview[index]).toBeCloseTo(hotSwapExpectedSample(index), 6);
+  }
+  expect(crossfadeTelemetry.leftPreview[1]).toBeGreaterThan(crossfadeTelemetry.leftPreview[0]);
+  expect(crossfadeTelemetry.leftPreview[7]).toBeLessThan(0.4);
+
+  await expect
+    .poll(async () => {
+      const history = await telemetryHistory(page);
+      const match = history.find((telemetry) =>
+        telemetry.sequence > crossfadeTelemetry.sequence &&
+        telemetry.leftPreview.every(sample => Math.abs(sample - 0.75) < 0.000001));
+      return match?.sequence || 0;
+    }, { timeout: 10_000 })
+    .toBeGreaterThan(crossfadeTelemetry.sequence);
+  const settledTelemetry = (await telemetryHistory(page)).find((telemetry) =>
+    telemetry.sequence > crossfadeTelemetry.sequence &&
+    telemetry.leftPreview.every(sample => Math.abs(sample - 0.75) < 0.000001));
+
+  expect(settledTelemetry.leftPreview.every(sample => Math.abs(sample - 0.75) < 0.000001)).toBeTruthy();
+  expect(settledTelemetry.rightPreview.every(sample => Math.abs(sample - 0.75) < 0.000001)).toBeTruthy();
+  expect(settledTelemetry.overallPeak).toBeCloseTo(0.75, 6);
 });

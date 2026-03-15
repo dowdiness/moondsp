@@ -862,7 +862,10 @@ Current limits:
   node-index / slot updates during the crossfade window
 - queued replacement is a whole compiled graph, not a `GraphControl`
   topology-edit frame
-- browser/AudioWorklet hot-swap proof is not implemented yet
+- browser/AudioWorklet hot-swap proof is now narrow: the `browser/` wrapper
+  exports a dedicated mono `CompiledDspHotSwap` proof path and Playwright
+  checks both the mixed crossfade block and the settled replacement block in
+  the AudioWorklet pipeline
 
 ### 3.7 Multichannel Expansion (SuperCollider-Style)
 

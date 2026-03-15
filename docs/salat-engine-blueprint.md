@@ -211,6 +211,8 @@ Current implemented surface:
 - `CompiledDspHotSwap` now provides a first mono-only graph replacement layer
   for already-compiled graphs, with queued swap plus optional equal-power
   crossfade
+- The browser prototype now also proves that mono hot-swap path in the
+  AudioWorklet via a dedicated wrapper mode
 - Topological sorting, graph validation, and runtime control for the current
   graph paths
 - Integration coverage for compiled mono voice paths, runtime retuning, and the
@@ -224,7 +226,7 @@ Still planned in Phase 2:
 - Constant folding and dead node elimination
 - Broader stereo node coverage beyond the current filter/delay slice
 - Full multichannel graph semantics
-- Stereo parity and browser proof for graph hot-swap / crossfade
+- Stereo parity for graph hot-swap / crossfade
 
 **Current deliverable**: compiled mono graph execution including explicit
 stereo fold-down, the first terminal-stereo graph slice, and a first mono-only

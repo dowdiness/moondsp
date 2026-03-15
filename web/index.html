@@ -240,7 +240,8 @@
       <code>z^-1</code> feedback loop before <code>Pan</code>. The worklet
       reads the generated left and right blocks back sample by sample for
       output, metering, exact recurrence checks, live loop-gain retuning, and
-      stereo pan verification.
+      stereo pan verification. A query-param browser proof also exercises the
+      mono <code>CompiledDspHotSwap</code> path in the same AudioWorklet.
     </p>
 
     <div class="buttons">
@@ -365,6 +366,7 @@
     const urlParams = new URLSearchParams(window.location.search);
     const initialFreq = Number(urlParams.get("freq"));
     const initialDelaySamples = Number(urlParams.get("delaySamples"));
+    const useCompiledHotSwap = urlParams.get("hotSwapMono") === "1";
 
     let audioContext = null;
     let node = null;
@@ -395,6 +397,8 @@
       rightPreview: [],
     };
     window.__mdspFirstTelemetry = null;
+    window.__mdspTelemetryHistory = [];
+    window.__mdspHotSwapQueued = null;
 
     function setStatus(message, state = "idle") {
       statusBox.textContent = message;
@@ -510,6 +514,8 @@
         rightPreview: [],
       };
       window.__mdspFirstTelemetry = null;
+      window.__mdspTelemetryHistory = [];
+      window.__mdspHotSwapQueued = null;
       setStatus("Creating AudioContext...");
       audioContext = new AudioContext({ sampleRate: 48000 });
 
@@ -537,15 +543,19 @@
           processorOptions: {
             wasmModule,
             initialDelaySamples: Number(delaySlider.value),
+            useCompiledHotSwap,
           },
           numberOfInputs: 0,
           numberOfOutputs: 1,
           outputChannelCount: [2],
         });
+        window.__mdspNode = node;
 
         node.port.onmessage = (event) => {
           if (event.data?.type === "ready") {
-            const modeLabel = event.data.mode === "compiled-stereo-dsp"
+            const modeLabel = event.data.mode === "compiled-hot-swap-dsp"
+              ? "CompiledDspHotSwap block runtime"
+              : event.data.mode === "compiled-stereo-dsp"
               ? "CompiledStereoDsp block runtime"
               : event.data.mode === "compiled-dsp"
                 ? "CompiledDsp block runtime"
@@ -558,9 +568,15 @@
             if (!window.__mdspFirstTelemetry) {
               window.__mdspFirstTelemetry = event.data;
             }
+            window.__mdspTelemetryHistory.push(event.data);
+            if (window.__mdspTelemetryHistory.length > 64) {
+              window.__mdspTelemetryHistory.shift();
+            }
             renderPeakValue.textContent = Number(event.data.overallPeak).toFixed(3);
             renderLeftPeakValue.textContent = Number(event.data.leftPeak).toFixed(3);
             renderRightPeakValue.textContent = Number(event.data.rightPeak).toFixed(3);
+          } else if (event.data?.type === "hot-swap-queued") {
+            window.__mdspHotSwapQueued = event.data;
           }
         };
 
@@ -604,6 +620,7 @@
         }
         audioContext = null;
         node = null;
+        window.__mdspNode = null;
         gainNode = null;
         analyserNode = null;
         analyserData = null;
@@ -622,6 +639,7 @@
       }
       audioContext = null;
       node = null;
+      window.__mdspNode = null;
       gainNode = null;
       analyserNode = null;
       analyserData = null;
@@ -642,6 +660,8 @@
         rightPreview: [],
       };
       window.__mdspFirstTelemetry = null;
+      window.__mdspTelemetryHistory = [];
+      window.__mdspHotSwapQueued = null;
       setStatus("Stopped.");
     }
 

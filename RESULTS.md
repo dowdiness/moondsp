@@ -25,6 +25,9 @@ current Phase 2 graph-compiler checkpoint.
 - `CompiledDspHotSwap` now provides a first mono-only graph replacement path
   for already-compiled graphs, with block-boundary `queue_swap(...)` and an
   optional equal-power crossfade.
+- The browser wrapper now also exports a dedicated mono hot-swap proof path,
+  and browser automation confirms the AudioWorklet runs both the mixed
+  crossfade block and the settled replacement block.
 
 ## Confirmed Outcome
 
@@ -157,6 +160,10 @@ Confirmed on 2026-03-15:
   crossfade between compatible compiled graphs.
 - Coverage now pins exact equal-power crossfade samples plus bounded
   block-to-block hot-swap behavior for that wrapper.
+- The browser wrapper now also exports a dedicated `CompiledDspHotSwap` proof
+  path, and browser automation confirms a queued swap yields one mixed
+  crossfade block followed by the settled replacement block in the
+  AudioWorklet.
 
 Authoritative detailed Phase 2 graph status now lives in
 `docs/salat-engine-technical-reference.md`, including:

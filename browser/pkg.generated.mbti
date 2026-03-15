@@ -2,6 +2,8 @@
 package "dowdiness/mdsp/browser"
 
 // Values
+pub fn compiled_hot_swap_output_sample(Int) -> Double
+
 pub fn compiled_output_sample(Int) -> Double
 
 pub fn compiled_stereo_left_sample(Int) -> Double
@@ -10,11 +12,17 @@ pub fn compiled_stereo_right_sample(Int) -> Double
 
 pub fn init_compiled_graph(Double, Int) -> Bool
 
+pub fn init_compiled_hot_swap_graph(Double, Int) -> Bool
+
 pub fn init_compiled_stereo_graph(Double, Int) -> Bool
 
 pub fn process_compiled_block(Double, Double, Double, Int) -> Bool
 
+pub fn process_compiled_hot_swap_block(Double, Int) -> Bool
+
 pub fn process_compiled_stereo_block(Double, Double, Double, Double, Double, Double, Int) -> Bool
+
+pub fn queue_compiled_hot_swap() -> Bool
 
 pub fn reset_phase() -> Unit
 
