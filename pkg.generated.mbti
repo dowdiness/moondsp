@@ -253,13 +253,22 @@ pub struct GraphTopologyEdit {
   kind : GraphTopologyEditKind
   node_index : Int
   replacement : DspNode
+  input_slot : GraphTopologyInputSlot
+  source_index : Int
 
-  fn new(GraphTopologyEditKind, Int, DspNode) -> GraphTopologyEdit
+  fn new(GraphTopologyEditKind, Int, DspNode, GraphTopologyInputSlot, Int) -> GraphTopologyEdit
 }
 pub fn GraphTopologyEdit::replace_node(Int, DspNode) -> Self
+pub fn GraphTopologyEdit::rewire_input(Int, GraphTopologyInputSlot, Int) -> Self
 
 pub(all) enum GraphTopologyEditKind {
   ReplaceNode
+  RewireInput
+}
+
+pub(all) enum GraphTopologyInputSlot {
+  Input0
+  Input1
 }
 
 pub struct Mix {

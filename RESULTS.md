@@ -32,11 +32,12 @@ current Phase 2 graph-compiler checkpoint.
   terminal-stereo graphs, and the browser wrapper exports a dedicated stereo
   hot-swap proof path as well.
 - `CompiledDspTopologyController` now adds a first narrow topology-edit layer
-  above mono `CompiledDspHotSwap`, with ordered transactional `ReplaceNode`
-  frames that recompile and stage a replacement graph.
+  above mono `CompiledDspHotSwap`, with ordered transactional
+  `ReplaceNode` / `RewireInput` frames that recompile and stage a replacement
+  graph.
 - The browser wrapper now also exports a dedicated mono topology-edit proof
-  path, and browser automation confirms one queued `ReplaceNode` edit yields the
-  expected mixed crossfade block and settled rebuilt block.
+  path, and browser automation confirms one queued `RewireInput` edit yields
+  the expected mixed crossfade block and settled rebuilt block.
 - `CompiledStereoDspTopologyController` now brings the same narrow
   topology-edit model to terminal-stereo graphs, and the browser wrapper
   exports a dedicated stereo topology-edit proof path as well.
@@ -181,18 +182,19 @@ Confirmed on 2026-03-15:
   browser proof of the mixed and settled stereo swap blocks.
 - `CompiledDspTopologyController` now adds the first topology-edit wrapper
   beyond whole-graph swap for mono graphs, with transactional
-  `GraphTopologyEdit::replace_node(...)` batches compiled and staged through the
-  mono hot-swap path.
+  `GraphTopologyEdit::replace_node(...)` and `GraphTopologyEdit::rewire_input(...)`
+  batches compiled and staged through the mono hot-swap path.
 - Coverage now includes exact crossfade expectations for a rebuilt mono graph,
   transactional rejection of invalid edit batches, and runtime-control mirroring
   into a queued topology-edited replacement.
 - The browser wrapper now also exports a dedicated
   `CompiledDspTopologyController` proof path, and browser automation confirms
   the queued topology edit runs through the AudioWorklet with the expected
-  mixed crossfade block and settled rebuilt block.
+  mixed crossfade block and settled rebuilt block, now including a structural
+  `RewireInput` proof on the mono path.
 - `CompiledStereoDspTopologyController` now adds stereo topology-edit parity for
-  terminal-stereo graphs, with queued `ReplaceNode` recompilation staged
-  through `CompiledStereoDspHotSwap`.
+  terminal-stereo graphs, with queued `ReplaceNode` / `RewireInput`
+  recompilation staged through `CompiledStereoDspHotSwap`.
 - The browser wrapper now also exports a dedicated
   `CompiledStereoDspTopologyController` proof path, and browser automation
   confirms the queued stereo topology edit yields the expected mixed and

@@ -992,6 +992,46 @@ test "compiled graph topology edit crossfades rebuilt mono graphs" {
 }
 
 ///|
+test "compiled graph topology edit rewires rebuilt mono graphs" {
+  let context = DspContext::new(
+    GRAPH_FEEDBACK_SAMPLE_RATE,
+    GRAPH_FEEDBACK_BLOCK_SIZE,
+  )
+  let topology = CompiledDspTopologyController::from_nodes(
+    [
+      DspNode::constant(2.0),
+      DspNode::constant(1.0),
+      DspNode::gain(0, HALF_GAIN),
+      DspNode::gain(1, HALF_GAIN),
+      DspNode::mix(2, 3),
+      DspNode::mix(4, 3),
+      DspNode::output(5),
+    ],
+    context,
+    crossfade_samples=8,
+  ).unwrap()
+  let first_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let second_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let settled_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+
+  assert_true(
+    topology.queue_topology_edit(
+      GraphTopologyEdit::rewire_input(4, GraphTopologyInputSlot::Input1, 0),
+    ),
+  )
+  topology.process(context, first_block)
+  topology.process(context, second_block)
+  topology.process(context, settled_block)
+
+  assert_true(integration_buffer_is_finite_and_bounded(first_block, 4.1))
+  assert_true(integration_buffer_is_finite_and_bounded(second_block, 4.1))
+  assert_true(integration_buffer_is_finite_and_bounded(settled_block, 3.5))
+  assert_true(first_block.get(0) == 2.0)
+  assert_true(second_block.get(0) >= 2.0)
+  assert_true(settled_block.as_fixed_array().every(sample => sample == 3.5))
+}
+
+///|
 test "compiled stereo graph hot swap preserves bounded stereo output" {
   let context = DspContext::new(
     GRAPH_FEEDBACK_SAMPLE_RATE,

@@ -2,6 +2,14 @@
 /// Narrow topology-edit kinds for compiled mono graphs.
 pub(all) enum GraphTopologyEditKind {
   ReplaceNode
+  RewireInput
+}
+
+///|
+/// Input slot selector for fixed-length topology rewiring.
+pub(all) enum GraphTopologyInputSlot {
+  Input0
+  Input1
 }
 
 ///|
@@ -10,11 +18,15 @@ pub struct GraphTopologyEdit {
   kind : GraphTopologyEditKind
   node_index : Int
   replacement : DspNode
+  input_slot : GraphTopologyInputSlot
+  source_index : Int
 
   fn new(
     kind : GraphTopologyEditKind,
     node_index : Int,
     replacement : DspNode,
+    input_slot : GraphTopologyInputSlot,
+    source_index : Int,
   ) -> GraphTopologyEdit
 }
 
@@ -23,8 +35,10 @@ fn GraphTopologyEdit::new(
   kind : GraphTopologyEditKind,
   node_index : Int,
   replacement : DspNode,
+  input_slot : GraphTopologyInputSlot,
+  source_index : Int,
 ) -> GraphTopologyEdit {
-  { kind, node_index, replacement }
+  { kind, node_index, replacement, input_slot, source_index }
 }
 
 ///|
@@ -33,7 +47,29 @@ pub fn GraphTopologyEdit::replace_node(
   node_index : Int,
   replacement : DspNode,
 ) -> GraphTopologyEdit {
-  GraphTopologyEdit(GraphTopologyEditKind::ReplaceNode, node_index, replacement)
+  GraphTopologyEdit(
+    GraphTopologyEditKind::ReplaceNode,
+    node_index,
+    replacement,
+    GraphTopologyInputSlot::Input0,
+    -1,
+  )
+}
+
+///|
+/// Rewire one authoring-order node input to a different upstream source.
+pub fn GraphTopologyEdit::rewire_input(
+  node_index : Int,
+  input_slot : GraphTopologyInputSlot,
+  source_index : Int,
+) -> GraphTopologyEdit {
+  GraphTopologyEdit(
+    GraphTopologyEditKind::RewireInput,
+    node_index,
+    DspNode::constant(0.0),
+    input_slot,
+    source_index,
+  )
 }
 
 ///|
@@ -41,8 +77,8 @@ pub fn GraphTopologyEdit::replace_node(
 /// replacement through `CompiledDspHotSwap`.
 ///
 /// This first slice keeps edits narrow and deterministic: only `ReplaceNode`
-/// frames are supported, the graph length stays fixed, and only one staged
-/// topology replacement may be pending at a time.
+/// and `RewireInput` frames are supported, the graph length stays fixed, and
+/// only one staged topology replacement may be pending at a time.
 struct CompiledDspTopologyController {
   mut authoring_nodes : Array[DspNode]
   compile_sample_rate : Double
@@ -192,6 +228,100 @@ fn apply_topology_edit(
         nodes[edit.node_index] = edit.replacement
         true
       }
+    GraphTopologyEditKind::RewireInput =>
+      if edit.node_index < 0 ||
+        edit.node_index >= nodes.length() ||
+        edit.source_index < 0 ||
+        edit.source_index >= nodes.length() {
+        false
+      } else {
+        apply_topology_rewire_input(
+          nodes,
+          edit.node_index,
+          edit.input_slot,
+          edit.source_index,
+        )
+      }
+  }
+}
+
+///|
+fn apply_topology_rewire_input(
+  nodes : Array[DspNode],
+  node_index : Int,
+  input_slot : GraphTopologyInputSlot,
+  source_index : Int,
+) -> Bool {
+  let node = nodes[node_index]
+  let rewired = match (node.kind, input_slot) {
+    (DspNodeKind::Gain, GraphTopologyInputSlot::Input0) =>
+      Some(DspNode::gain(source_index, node.value0))
+    (DspNodeKind::Mul, GraphTopologyInputSlot::Input0) =>
+      Some(DspNode::mul(source_index, node.input1))
+    (DspNodeKind::Mul, GraphTopologyInputSlot::Input1) =>
+      Some(DspNode::mul(node.input0, source_index))
+    (DspNodeKind::Mix, GraphTopologyInputSlot::Input0) =>
+      Some(DspNode::mix(source_index, node.input1))
+    (DspNodeKind::Mix, GraphTopologyInputSlot::Input1) =>
+      Some(DspNode::mix(node.input0, source_index))
+    (DspNodeKind::Clip, GraphTopologyInputSlot::Input0) =>
+      Some(DspNode::clip(source_index, node.value0))
+    (DspNodeKind::Output, GraphTopologyInputSlot::Input0) =>
+      Some(DspNode::output(source_index))
+    (DspNodeKind::Pan, GraphTopologyInputSlot::Input0) =>
+      Some(DspNode::pan(source_index, node.value0))
+    (DspNodeKind::StereoGain, GraphTopologyInputSlot::Input0) =>
+      Some(DspNode::stereo_gain(source_index, node.value0))
+    (DspNodeKind::StereoClip, GraphTopologyInputSlot::Input0) =>
+      Some(DspNode::stereo_clip(source_index, node.value0))
+    (DspNodeKind::StereoMixDown, GraphTopologyInputSlot::Input0) =>
+      Some(DspNode::stereo_mixdown(source_index))
+    (DspNodeKind::StereoOutput, GraphTopologyInputSlot::Input0) =>
+      Some(DspNode::stereo_output(source_index))
+    (DspNodeKind::Biquad, GraphTopologyInputSlot::Input0) =>
+      Some(
+        DspNode::biquad(
+          source_index,
+          node.filter_mode,
+          node.value0,
+          node.value1,
+        ),
+      )
+    (DspNodeKind::Delay, GraphTopologyInputSlot::Input0) =>
+      Some(
+        DspNode::delay(
+          source_index,
+          node.delay_max_samples,
+          delay_samples=node.delay_samples,
+          feedback=node.value0,
+        ),
+      )
+    (DspNodeKind::StereoBiquad, GraphTopologyInputSlot::Input0) =>
+      Some(
+        DspNode::stereo_biquad(
+          source_index,
+          node.filter_mode,
+          node.value0,
+          node.value1,
+        ),
+      )
+    (DspNodeKind::StereoDelay, GraphTopologyInputSlot::Input0) =>
+      Some(
+        DspNode::stereo_delay(
+          source_index,
+          node.delay_max_samples,
+          delay_samples=node.delay_samples,
+          feedback=node.value0,
+        ),
+      )
+    _ => None
+  }
+  match rewired {
+    Some(rewired) => {
+      nodes[node_index] = rewired
+      true
+    }
+    None => false
   }
 }
 
@@ -210,8 +340,9 @@ fn make_compiled_dsp_topology_controller(
 /// stages the replacement through `CompiledStereoDspHotSwap`.
 ///
 /// This stereo parity slice keeps the same narrow semantics as the mono
-/// controller: only `ReplaceNode` frames are supported, graph length stays
-/// fixed, and only one staged topology replacement may be pending at a time.
+/// controller: only `ReplaceNode` and `RewireInput` frames are supported,
+/// graph length stays fixed, and only one staged topology replacement may be
+/// pending at a time.
 struct CompiledStereoDspTopologyController {
   mut authoring_nodes : Array[DspNode]
   compile_sample_rate : Double

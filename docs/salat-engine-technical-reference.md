@@ -859,7 +859,11 @@ let topology = CompiledDspTopologyController::from_nodes(
 
 assert(
   topology.queue_topology_edit(
-    GraphTopologyEdit::replace_node(gain_node, DspNode::gain(input_node, 0.75)),
+    GraphTopologyEdit::rewire_input(
+      gain_node,
+      GraphTopologyInputSlot::Input0,
+      alternate_source,
+    ),
   ),
 )
 topology.process(context, output)
@@ -879,6 +883,7 @@ Current semantics:
 - topology-edit batches are transactional:
   - if any edit has an invalid authoring index, nothing is changed
   - if the edited node array fails recompilation, nothing is staged
+  - `RewireInput` also rejects unsupported input slots for the targeted node
 - replacement graphs must match the active graph's compile-time sample rate and
   block capacity
 - `process(...)` runs only the active graph when no swap is pending
@@ -904,8 +909,9 @@ Current limits:
   from its own freshly compiled internal state
 - in-flight control mirroring requires both graphs to accept the same
   node-index / slot updates during the crossfade window
-- topology edits are still mono-only and narrow:
-  - only `GraphTopologyEdit::replace_node(...)` exists
+- topology edits are still narrow:
+  - `GraphTopologyEdit::replace_node(...)` swaps one authoring-order node
+  - `GraphTopologyEdit::rewire_input(...)` retargets one existing input edge
   - the graph length stays fixed; there is no node insert/delete frame yet
   - only one topology replacement may be staged at a time
   - stereo parity exists only for terminal-stereo graphs through
@@ -917,12 +923,12 @@ Current limits:
   AudioWorklet pipeline
 - browser/AudioWorklet topology-edit proof is now present for the mono slice:
   the `browser/` wrapper exports a dedicated `CompiledDspTopologyController`
-  proof path, and Playwright checks that one queued `ReplaceNode` edit yields
+  proof path, and Playwright checks that one queued `RewireInput` edit yields
   the expected mixed crossfade block and settled rebuilt block
   - terminal-stereo parity now exists through a dedicated
     `CompiledStereoDspTopologyController` browser proof path, with Playwright
     checking the mixed and settled channel-shape transition from a queued
-    stereo `ReplaceNode` edit
+    stereo topology edit
 
 ### 3.7 Multichannel Expansion (SuperCollider-Style)
 
