@@ -423,7 +423,7 @@ test('browser demo proves CompiledDspTopologyController insert delete roundtrip 
   expect(insertedTelemetry.overallPeak).toBeCloseTo(0.5, 6);
 
   await page.evaluate(() => {
-    window.__mdspNode.port.postMessage({ type: 'queue-topology-edit' });
+    window.__mdspNode.port.postMessage({ type: 'queue-topology-delete-edit' });
   });
   await expect
     .poll(async () => (await topologyEditQueued(page))?.telemetrySequence ?? -1, { timeout: 10_000 })

@@ -252,12 +252,11 @@ pub(all) enum GraphParamSlot {
 pub struct GraphTopologyEdit {
   kind : GraphTopologyEditKind
   node_index : Int
-  aux_index : Int
   replacement : DspNode
   input_slot : GraphTopologyInputSlot
   source_index : Int
 
-  fn new(GraphTopologyEditKind, Int, Int, DspNode, GraphTopologyInputSlot, Int) -> GraphTopologyEdit
+  fn new(GraphTopologyEditKind, Int, DspNode, GraphTopologyInputSlot, Int) -> GraphTopologyEdit
 }
 pub fn GraphTopologyEdit::delete_node(Int, Int, GraphTopologyInputSlot, Int) -> Self
 pub fn GraphTopologyEdit::insert_node(Int, GraphTopologyInputSlot, DspNode) -> Self

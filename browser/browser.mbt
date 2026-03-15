@@ -334,33 +334,50 @@ pub fn init_compiled_topology_edit_graph(
 }
 
 ///|
-/// Queue the fixed browser topology edit round-trip: insert one gain node on
-/// the first request, then delete that same node on the next request.
+/// Queue the fixed browser topology edit insertion that appends one gain node
+/// before the output.
 pub fn queue_compiled_topology_edit() -> Bool {
   let topology = match compiled_topology_edit.val {
     Some(topology) => topology
     None => return false
   }
-  let queued = if compiled_topology_edit_inserted.val {
-    topology.queue_topology_edit(
-      @lib.GraphTopologyEdit::delete_node(
-        2,
-        1,
-        @lib.GraphTopologyInputSlot::Input0,
-        2,
-      ),
-    )
-  } else {
-    topology.queue_topology_edit(
-      @lib.GraphTopologyEdit::insert_node(
-        1,
-        @lib.GraphTopologyInputSlot::Input0,
-        @lib.DspNode::gain(0, BROWSER_TOPOLOGY_EDIT_INSERTED_GAIN),
-      ),
-    )
+  if compiled_topology_edit_inserted.val {
+    return false
   }
+  let queued = topology.queue_topology_edit(
+    @lib.GraphTopologyEdit::insert_node(
+      1,
+      @lib.GraphTopologyInputSlot::Input0,
+      @lib.DspNode::gain(0, BROWSER_TOPOLOGY_EDIT_INSERTED_GAIN),
+    ),
+  )
   if queued {
-    compiled_topology_edit_inserted.val = !compiled_topology_edit_inserted.val
+    compiled_topology_edit_inserted.val = true
+  }
+  queued
+}
+
+///|
+/// Queue the fixed browser topology edit deletion that removes the inserted
+/// gain node and returns to the baseline graph.
+pub fn queue_compiled_topology_delete_edit() -> Bool {
+  let topology = match compiled_topology_edit.val {
+    Some(topology) => topology
+    None => return false
+  }
+  if !compiled_topology_edit_inserted.val {
+    return false
+  }
+  let queued = topology.queue_topology_edit(
+    @lib.GraphTopologyEdit::delete_node(
+      2,
+      1,
+      @lib.GraphTopologyInputSlot::Input0,
+      2,
+    ),
+  )
+  if queued {
+    compiled_topology_edit_inserted.val = false
   }
   queued
 }

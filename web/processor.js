@@ -93,6 +93,19 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
             this.port.postMessage({ type: "error", message: "CompiledDspTopologyController queue_topology_edit failed" });
           }
         }
+      } else if (data.type === "queue-topology-delete-edit") {
+        if (this.usesCompiledTopologyEdit && this.wasm && typeof this.wasm.queue_compiled_topology_delete_edit === "function") {
+          const queued = this.wasm.queue_compiled_topology_delete_edit();
+          if (queued) {
+            this.forceTelemetryBlocks = 2;
+            this.port.postMessage({
+              type: "topology-edit-queued",
+              telemetrySequence: this.telemetrySequence,
+            });
+          } else {
+            this.port.postMessage({ type: "error", message: "CompiledDspTopologyController queue_topology_delete_edit failed" });
+          }
+        }
       }
     };
 
@@ -154,6 +167,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
       const supportsCompiledTopologyEdit =
         typeof this.wasm.init_compiled_topology_edit_graph === "function" &&
         typeof this.wasm.queue_compiled_topology_edit === "function" &&
+        typeof this.wasm.queue_compiled_topology_delete_edit === "function" &&
         typeof this.wasm.process_compiled_topology_edit_block === "function" &&
         typeof this.wasm.compiled_topology_edit_output_sample === "function";
 

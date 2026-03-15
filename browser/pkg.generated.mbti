@@ -50,6 +50,8 @@ pub fn queue_compiled_stereo_hot_swap() -> Bool
 
 pub fn queue_compiled_stereo_topology_edit() -> Bool
 
+pub fn queue_compiled_topology_delete_edit() -> Bool
+
 pub fn queue_compiled_topology_edit() -> Bool
 
 pub fn reset_phase() -> Unit

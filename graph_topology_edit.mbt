@@ -19,7 +19,6 @@ pub(all) enum GraphTopologyInputSlot {
 pub struct GraphTopologyEdit {
   kind : GraphTopologyEditKind
   node_index : Int
-  aux_index : Int
   replacement : DspNode
   input_slot : GraphTopologyInputSlot
   source_index : Int
@@ -27,7 +26,6 @@ pub struct GraphTopologyEdit {
   fn new(
     kind : GraphTopologyEditKind,
     node_index : Int,
-    aux_index : Int,
     replacement : DspNode,
     input_slot : GraphTopologyInputSlot,
     source_index : Int,
@@ -38,12 +36,11 @@ pub struct GraphTopologyEdit {
 fn GraphTopologyEdit::new(
   kind : GraphTopologyEditKind,
   node_index : Int,
-  aux_index : Int,
   replacement : DspNode,
   input_slot : GraphTopologyInputSlot,
   source_index : Int,
 ) -> GraphTopologyEdit {
-  { kind, node_index, aux_index, replacement, input_slot, source_index }
+  { kind, node_index, replacement, input_slot, source_index }
 }
 
 ///|
@@ -55,7 +52,6 @@ pub fn GraphTopologyEdit::replace_node(
   GraphTopologyEdit(
     GraphTopologyEditKind::ReplaceNode,
     node_index,
-    -1,
     replacement,
     GraphTopologyInputSlot::Input0,
     -1,
@@ -72,7 +68,6 @@ pub fn GraphTopologyEdit::rewire_input(
   GraphTopologyEdit(
     GraphTopologyEditKind::RewireInput,
     node_index,
-    -1,
     DspNode::constant(0.0),
     input_slot,
     source_index,
@@ -96,7 +91,6 @@ pub fn GraphTopologyEdit::insert_node(
   GraphTopologyEdit(
     GraphTopologyEditKind::InsertNode,
     retarget_node_index,
-    -1,
     inserted_node,
     retarget_input_slot,
     -1,
@@ -119,8 +113,7 @@ pub fn GraphTopologyEdit::delete_node(
   GraphTopologyEdit(
     GraphTopologyEditKind::DeleteNode,
     delete_node_index,
-    retarget_node_index,
-    DspNode::constant(0.0),
+    topology_delete_marker(retarget_node_index),
     retarget_input_slot,
     replacement_source_index,
   )
@@ -314,7 +307,7 @@ fn apply_topology_edit(
         apply_topology_delete_node(
           nodes,
           edit.node_index,
-          edit.aux_index,
+          topology_delete_retarget_node_index(edit),
           edit.input_slot,
           edit.source_index,
         )
@@ -403,6 +396,16 @@ fn apply_topology_delete_node(
     nodes.push(compacted[index])
   }
   true
+}
+
+///|
+fn topology_delete_marker(retarget_node_index : Int) -> DspNode {
+  DspNode::output(retarget_node_index)
+}
+
+///|
+fn topology_delete_retarget_node_index(edit : GraphTopologyEdit) -> Int {
+  edit.replacement.input0
 }
 
 ///|
