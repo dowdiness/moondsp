@@ -8,7 +8,7 @@ current Phase 2 graph-compiler checkpoint.
 
 - Phase 0 is complete.
 - Phase 1 is complete.
-- Phase 2 is in progress.
+- Phase 2 is complete.
 - The browser demo now serves the dedicated `browser/` wrapper package wasm so
   the external browser ABI stays stable as `tick`, `tick_source`, and
   `reset_phase`.
@@ -209,6 +209,31 @@ Confirmed on 2026-03-15:
   `CompiledStereoDspTopologyController` proof path, and browser automation
   confirms the queued stereo topology edit yields the expected mixed and
   settled channel-shape transition in the AudioWorklet.
+
+Confirmed on 2026-03-19:
+
+- Two-layer Finally Tagless architecture implemented: `ArithSym`, `DspSym`,
+  `FilterSym`, `DelaySym`, `StereoSym`, `StereoFilterSym`, `StereoDelaySym`
+  trait hierarchy with diamond super-trait bounds resolved by MoonBit
+- `GraphBuilder` interpretation type bridges tagless traits to `DspNode` graph
+  construction with array merging for source nodes
+- `replay()` function enables tagless round-trip through any interpretation
+- Composed operations `range()` and `lin_map()` as generic `ArithSym` functions
+  — no new enum variants needed
+- Oscillator FM mode: `DspNode::oscillator_from()` reads frequency per-sample
+  from input buffer
+- `NodeSpanning`, `NodeFoldable`, `NodeStateful`, `NodeEditable` capability
+  traits for compiler passes
+- `optimize_graph()`: constant folding + dead-node elimination, integrated into
+  `CompiledDsp::compile()` and `CompiledStereoDsp::compile()`
+- Self-register feedback model replaces linked-list infrastructure: stereo and
+  mixed-shape feedback now accepted
+- `InsertChain` / `DeleteChain` topology edit variants for multi-node subgraph
+  operations with stereo parity
+- State preservation across topology edit recompilation
+- `ChannelSpec` trait with `Mono` / `Stereo` types
+- Exit deliverable `sine(2).range(200,400).sine().lpf(800,1).out()` compiles
+  and produces audible FM synthesis output
 
 Authoritative detailed Phase 2 graph status now lives in
 `docs/salat-engine-technical-reference.md`, including:

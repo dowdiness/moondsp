@@ -137,7 +137,7 @@ MoonBit's ecosystem is young. Avoid large foundation libraries. Each library (`i
 | `loom` | Parser framework | Active (6 defects identified) |
 | `seam` | Language-agnostic CST / green-red tree | Active |
 | `ecs` | Entity-Component-System | Phase 1 ready |
-| **`salat-dsp`** | **DSP engine (this project)** | **Phase 1 complete, Phase 2 in progress** |
+| **`salat-dsp`** | **DSP engine (this project)** | **Phase 1 complete, Phase 2 complete** |
 | **`salat-pattern`** | **Pattern engine** | **Design phase** |
 
 ---
@@ -231,23 +231,29 @@ Current implemented surface:
 - See `docs/salat-engine-technical-reference.md` for the current node set,
   `set_param(...)` slot matrix, and exact runtime-control surface
 
-Still planned in Phase 2:
-- Broader graph-cycle feedback handling beyond the current mono-valued `z^-1`
-  slice in `CompiledDsp` / `CompiledStereoDsp`
-- Constant folding and dead node elimination
+Completed in Phase 2:
+- Self-register feedback model: stereo and mixed-shape feedback accepted
+- Constant folding and dead-node elimination via `optimize_graph()`
+- `InsertChain` / `DeleteChain` multi-node topology edits with stereo parity
+- State preservation across topology edit recompilation
+- `ChannelSpec` trait with `Mono` / `Stereo` types
+- Two-layer Finally Tagless trait hierarchy (`ArithSym`, `DspSym`, `FilterSym`,
+  `DelaySym`, `StereoSym`, `StereoFilterSym`, `StereoDelaySym`)
+- `GraphBuilder` interpretation and `replay()` tagless round-trip
+- Composed `range()` / `lin_map()` operations as generic `ArithSym` functions
+- Oscillator FM mode via `DspNode::oscillator_from()`
+- `NodeSpanning`, `NodeFoldable`, `NodeStateful`, `NodeEditable` capability traits
+
+Deferred to later phases:
 - Broader stereo node coverage beyond the current filter/delay slice
 - Full multichannel graph semantics
-- Broader topology-edit semantics beyond `ReplaceNode` / `RewireInput` /
-  unary `InsertNode` / `DeleteNode` recompilation
 
-**Current deliverable**: compiled mono graph execution including explicit
-stereo fold-down, the first terminal-stereo graph slice, mono/stereo compiled
-graph hot-swap, and mono/stereo topology-edit control with browser proof for
-mono length-changing insert/delete round-trips, all with runtime control and
-integration coverage.
-
-**Phase 2 exit deliverable**: `sine(2).range(200,400).sine().lpf(800,1).out()`
-produces sound with graph hot-swap and feedback handling.
+**Phase 2 deliverable**: `sine(2).range(200,400).sine().lpf(800,1).out()`
+compiles and produces audible FM synthesis output, with graph hot-swap,
+self-register feedback, constant-folding optimization, multi-node topology
+edits, state preservation across recompilation, and the full two-layer Finally
+Tagless trait hierarchy — all with runtime control, integration coverage, and
+browser proof.
 
 ### Phase 3 — Voice Management (1-2 weeks)
 
