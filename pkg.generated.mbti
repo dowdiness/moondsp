@@ -8,6 +8,10 @@ pub fn demo_tick(Double, Double) -> Double
 
 pub fn demo_tick_source(Int, Double, Double) -> Double
 
+pub fn[T : ArithSym] lin_map(T, Double, Double, Double, Double) -> T
+
+pub fn[T : ArithSym] range(T, Double, Double) -> T
+
 pub fn reset_phase() -> Unit
 
 pub fn tick(Double, Double) -> Double

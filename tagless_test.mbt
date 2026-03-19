@@ -146,3 +146,46 @@ test "DspSym gain" {
   let result = @mdsp.DspSym::gain(input, 0.5)
   assert_eq(result.value, 5.0)
 }
+
+///|
+test "range maps -1 to lo" {
+  let input : Eval = @mdsp.ArithSym::constant(-1.0)
+  let result = @mdsp.range(input, 200.0, 400.0)
+  assert_eq(result.value, 200.0)
+}
+
+///|
+test "range maps 1 to hi" {
+  let input : Eval = @mdsp.ArithSym::constant(1.0)
+  let result = @mdsp.range(input, 200.0, 400.0)
+  assert_eq(result.value, 400.0)
+}
+
+///|
+test "range maps 0 to midpoint" {
+  let input : Eval = @mdsp.ArithSym::constant(0.0)
+  let result = @mdsp.range(input, 200.0, 400.0)
+  assert_eq(result.value, 300.0)
+}
+
+///|
+test "lin_map maps in_lo to out_lo" {
+  let input : Eval = @mdsp.ArithSym::constant(0.0)
+  let result = @mdsp.lin_map(input, 0.0, 10.0, 100.0, 200.0)
+  assert_eq(result.value, 100.0)
+}
+
+///|
+test "lin_map maps in_hi to out_hi" {
+  let input : Eval = @mdsp.ArithSym::constant(10.0)
+  let result = @mdsp.lin_map(input, 0.0, 10.0, 100.0, 200.0)
+  assert_eq(result.value, 200.0)
+}
+
+///|
+test "lin_map with in_lo == in_hi produces non-finite result" {
+  let input : Eval = @mdsp.ArithSym::constant(5.0)
+  let result = @mdsp.lin_map(input, 3.0, 3.0, 0.0, 100.0)
+  // division by zero: scale = inf or NaN
+  assert_true(result.value.is_nan() || result.value.is_inf())
+}
