@@ -190,6 +190,10 @@ pub fn DspNode::stereo_delay(Int, Int, delay_samples? : Int, feedback? : Double)
 pub fn DspNode::stereo_gain(Int, Double) -> Self
 pub fn DspNode::stereo_mixdown(Int) -> Self
 pub fn DspNode::stereo_output(Int) -> Self
+pub impl NodeEditable for DspNode
+pub impl NodeFoldable for DspNode
+pub impl NodeSpanning for DspNode
+pub impl NodeStateful for DspNode
 
 pub(all) enum DspNodeKind {
   Constant
@@ -376,6 +380,24 @@ pub(open) trait DspSym : ArithSym {
 
 pub(open) trait FilterSym : DspSym {
   biquad(Self, BiquadMode, Double, Double) -> Self
+}
+
+pub(open) trait NodeEditable : NodeSpanning + NodeFoldable {
+  can_insert_after(Self) -> Bool
+  can_delete(Self) -> Bool
+}
+
+pub(open) trait NodeFoldable : NodeSpanning {
+  is_foldable(Self) -> Bool
+  fold_value(Self, Double, Double) -> Double
+}
+
+pub(open) trait NodeSpanning {
+  signal_shape(Self) -> Int
+}
+
+pub(open) trait NodeStateful : NodeSpanning {
+  is_stateful(Self) -> Bool
 }
 
 pub(open) trait StereoDelaySym : StereoSym + DelaySym {
