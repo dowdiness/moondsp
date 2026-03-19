@@ -14,6 +14,8 @@ pub fn optimize_graph(Array[DspNode]) -> (Array[DspNode], FixedArray[Int])
 
 pub fn[T : ArithSym] range(T, Double, Double) -> T
 
+pub fn[T : ArithSym + DspSym + FilterSym + DelaySym + StereoSym + StereoFilterSym + StereoDelaySym] replay(Array[DspNode]) -> T
+
 pub fn reset_phase() -> Unit
 
 pub fn tick(Double, Double) -> Double

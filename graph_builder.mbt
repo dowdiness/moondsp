@@ -291,3 +291,83 @@ pub impl StereoDelaySym for GraphBuilder with stereo_delay(
   )
   { nodes_: self.nodes_, index: idx }
 }
+
+// ---------------------------------------------------------------------------
+// Replay bridge
+// ---------------------------------------------------------------------------
+
+///|
+/// Walk a `DspNode` array and reconstruct the DSP graph through the tagless
+/// API, enabling round-trip testing (GraphBuilder -> nodes -> replay -> Eval).
+pub fn[
+  T : ArithSym + DspSym + FilterSym + DelaySym + StereoSym + StereoFilterSym + StereoDelaySym,
+] replay(
+  nodes : Array[DspNode],
+) -> T {
+  let len = nodes.length()
+  let results : FixedArray[T?] = FixedArray::make(len, None)
+  for i = 0; i < len; i = i + 1 {
+    let node = nodes[i]
+    let value : T = match node.kind {
+      Constant => T::constant(node.value0)
+      Oscillator =>
+        if node.input0 >= 0 {
+          T::oscillator(results[node.input0].unwrap(), node.waveform)
+        } else {
+          T::oscillator(T::constant(node.value0), node.waveform)
+        }
+      Noise => T::noise(node.seed)
+      Adsr => T::adsr(node.value0, node.value1, node.value2, node.value3)
+      Biquad =>
+        T::biquad(
+          results[node.input0].unwrap(),
+          node.filter_mode,
+          node.value0,
+          node.value1,
+        )
+      Delay =>
+        T::delay(
+          results[node.input0].unwrap(),
+          node.delay_max_samples,
+          node.delay_samples,
+          node.value0,
+        )
+      Gain => T::gain(results[node.input0].unwrap(), node.value0)
+      Mul =>
+        T::mul(results[node.input0].unwrap(), results[node.input1].unwrap())
+      Mix =>
+        T::mix(results[node.input0].unwrap(), results[node.input1].unwrap())
+      Clip => T::clip(results[node.input0].unwrap(), node.value0)
+      Output => T::output(results[node.input0].unwrap())
+      Pan => T::pan(results[node.input0].unwrap(), node.value0)
+      StereoGain => T::stereo_gain(results[node.input0].unwrap(), node.value0)
+      StereoClip => T::stereo_clip(results[node.input0].unwrap(), node.value0)
+      StereoBiquad =>
+        T::stereo_biquad(
+          results[node.input0].unwrap(),
+          node.filter_mode,
+          node.value0,
+          node.value1,
+        )
+      StereoDelay =>
+        T::stereo_delay(
+          results[node.input0].unwrap(),
+          node.delay_max_samples,
+          node.delay_samples,
+          node.value0,
+        )
+      StereoMixDown =>
+        T::stereo_mixdown(
+          results[node.input0].unwrap(),
+          results[node.input1].unwrap(),
+        )
+      StereoOutput =>
+        T::stereo_output(
+          results[node.input0].unwrap(),
+          results[node.input1].unwrap(),
+        )
+    }
+    results[i] = Some(value)
+  }
+  results[len - 1].unwrap()
+}
