@@ -232,8 +232,8 @@
 </head>
 <body>
   <main>
-    <h1>MoonBit DSP<br>Phase 2 Stereo Feedback</h1>
-    <p>
+    <h1 id="pageTitle">MoonBit DSP<br>Phase 2 Stereo Feedback</h1>
+    <p id="pageDesc">
       This page proves the browser pipeline now runs the compiled graph runtime
       itself. The AudioWorklet calls a fixed MoonBit
       <code>CompiledStereoDsp</code> graph that contains a mono
@@ -352,7 +352,7 @@
     const delaySlider = document.getElementById("delaySlider");
     const gainSlider = document.getElementById("gainSlider");
     const panSlider = document.getElementById("panSlider");
-    const freqValue = document.getElementById("freqValue");
+    let freqValue = document.getElementById("freqValue");
     const cutoffValue = document.getElementById("cutoffValue");
     const delayValue = document.getElementById("delayValue");
     const gainValue = document.getElementById("gainValue");
@@ -376,6 +376,34 @@
     const useCompiledTopologyEdit = urlParams.get("topologyEditMono") === "1";
     const useCompiledStereoHotSwap = urlParams.get("hotSwapStereo") === "1";
     const useCompiledStereoTopologyEdit = urlParams.get("topologyEditStereo") === "1";
+    const useExitDeliverable = urlParams.get("exitDeliverable") === "1";
+
+    if (useExitDeliverable) {
+      document.getElementById("pageTitle").innerHTML = "MoonBit DSP<br>FM Synthesis";
+      document.getElementById("pageDesc").textContent =
+        "Phase 2 exit deliverable: sine(2).range(200,400).sine().lpf(800,1).out() — " +
+        "a 2 Hz LFO modulates a carrier oscillator between 200–400 Hz through a low-pass filter. " +
+        "Use the sliders to control LFO rate, filter cutoff, and master gain.";
+      // Relabel the freq slider and update companion readout
+      const freqLabel = freqSlider.closest(".slider-card").querySelector("strong");
+      if (freqLabel) freqLabel.textContent = "LFO Rate";
+      const freqSuffix = freqSlider.closest(".slider-card").querySelector(".slider-row span:last-child");
+      if (freqSuffix) freqSuffix.innerHTML = '<span id="freqValue">2</span> Hz';
+      // Re-acquire freqValue reference after innerHTML replacement
+      freqValue = document.getElementById("freqValue");
+      freqSlider.min = "0";
+      freqSlider.max = "20";
+      freqSlider.value = "2";
+      freqSlider.step = "0.1";
+      // Set gain slider to 30%
+      gainSlider.value = "30";
+      // Relabel gain slider
+      const gainLabel = gainSlider.closest(".slider-card").querySelector("strong");
+      if (gainLabel) gainLabel.textContent = "Master Gain";
+      // Hide delay and pan sliders (not used in exit deliverable)
+      delaySlider.closest(".slider-card").style.display = "none";
+      panSlider.closest(".slider-card").style.display = "none";
+    }
 
     let audioContext = null;
     let node = null;
@@ -562,6 +590,7 @@
             useCompiledTopologyEdit,
             useCompiledStereoHotSwap,
             useCompiledStereoTopologyEdit,
+            useExitDeliverable,
           },
           numberOfInputs: 0,
           numberOfOutputs: 1,
@@ -579,6 +608,8 @@
               ? "CompiledStereoDspTopologyController block runtime"
               : event.data.mode === "compiled-stereo-hot-swap-dsp"
               ? "CompiledStereoDspHotSwap block runtime"
+              : event.data.mode === "exit-deliverable-dsp"
+              ? "Exit Deliverable FM Synthesis (Phase 2)"
               : event.data.mode === "compiled-stereo-dsp"
               ? "CompiledStereoDsp block runtime"
               : event.data.mode === "compiled-dsp"

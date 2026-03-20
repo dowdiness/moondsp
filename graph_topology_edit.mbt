@@ -5,6 +5,8 @@ pub(all) enum GraphTopologyEditKind {
   RewireInput
   InsertNode
   DeleteNode
+  InsertChain
+  DeleteChain
 }
 
 ///|
@@ -22,6 +24,9 @@ pub struct GraphTopologyEdit {
   replacement : DspNode
   input_slot : GraphTopologyInputSlot
   source_index : Int
+  chain_nodes : Array[DspNode]
+  end_node_index : Int
+  replacement_source_index : Int
 
   fn new(
     kind : GraphTopologyEditKind,
@@ -29,6 +34,9 @@ pub struct GraphTopologyEdit {
     replacement : DspNode,
     input_slot : GraphTopologyInputSlot,
     source_index : Int,
+    chain_nodes : Array[DspNode],
+    end_node_index : Int,
+    replacement_source_index : Int,
   ) -> GraphTopologyEdit
 }
 
@@ -39,8 +47,20 @@ fn GraphTopologyEdit::new(
   replacement : DspNode,
   input_slot : GraphTopologyInputSlot,
   source_index : Int,
+  chain_nodes : Array[DspNode],
+  end_node_index : Int,
+  replacement_source_index : Int,
 ) -> GraphTopologyEdit {
-  { kind, node_index, replacement, input_slot, source_index }
+  {
+    kind,
+    node_index,
+    replacement,
+    input_slot,
+    source_index,
+    chain_nodes,
+    end_node_index,
+    replacement_source_index,
+  }
 }
 
 ///|
@@ -54,6 +74,9 @@ pub fn GraphTopologyEdit::replace_node(
     node_index,
     replacement,
     GraphTopologyInputSlot::Input0,
+    -1,
+    [],
+    -1,
     -1,
   )
 }
@@ -71,6 +94,9 @@ pub fn GraphTopologyEdit::rewire_input(
     DspNode::constant(0.0),
     input_slot,
     source_index,
+    [],
+    -1,
+    -1,
   )
 }
 
@@ -94,6 +120,9 @@ pub fn GraphTopologyEdit::insert_node(
     inserted_node,
     retarget_input_slot,
     -1,
+    [],
+    -1,
+    -1,
   )
 }
 
@@ -116,6 +145,61 @@ pub fn GraphTopologyEdit::delete_node(
     topology_delete_marker(retarget_node_index),
     retarget_input_slot,
     replacement_source_index,
+    [],
+    -1,
+    -1,
+  )
+}
+
+///|
+/// Insert a chain of unary authoring-order nodes and retarget one downstream
+/// input to the last node in the chain.
+///
+/// Each node in the chain is appended at the end of the authoring array. The
+/// first chain node inherits the previous upstream source of the retarget
+/// input; each subsequent chain node reads from the preceding chain node. The
+/// retarget input is then rerouted to the last chain node.
+pub fn GraphTopologyEdit::insert_chain(
+  retarget_node : Int,
+  input_slot : GraphTopologyInputSlot,
+  chain_nodes : Array[DspNode],
+) -> GraphTopologyEdit {
+  GraphTopologyEdit(
+    GraphTopologyEditKind::InsertChain,
+    retarget_node,
+    DspNode::constant(0.0),
+    input_slot,
+    -1,
+    chain_nodes,
+    -1,
+    -1,
+  )
+}
+
+///|
+/// Delete a contiguous chain of unary authoring-order nodes and retarget one
+/// downstream input to a replacement upstream source.
+///
+/// All nodes from `start_node` through `end_node` (inclusive) must be unary
+/// and each must feed exactly one downstream consumer. The retarget input of
+/// `retarget_node` is rerouted to `replacement_source`, and every node in the
+/// chain is removed with index compaction.
+pub fn GraphTopologyEdit::delete_chain(
+  start_node : Int,
+  end_node : Int,
+  retarget_node : Int,
+  input_slot : GraphTopologyInputSlot,
+  replacement_source : Int,
+) -> GraphTopologyEdit {
+  GraphTopologyEdit(
+    GraphTopologyEditKind::DeleteChain,
+    start_node,
+    topology_delete_marker(retarget_node),
+    input_slot,
+    replacement_source,
+    [],
+    end_node,
+    replacement_source,
   )
 }
 
@@ -141,7 +225,7 @@ pub fn CompiledDspTopologyController::from_nodes(
   context : DspContext,
   crossfade_samples? : Int = 0,
 ) -> CompiledDspTopologyController? {
-  let compiled = match CompiledDsp::compile(nodes, context) {
+  let compiled = match CompiledDsp::compile_raw(nodes, context) {
     Some(compiled) => compiled
     None => return None
   }
@@ -229,9 +313,22 @@ pub fn CompiledDspTopologyController::queue_topology_edits(
     self.compile_sample_rate,
     self.compile_block_size,
   )
-  let replacement = match CompiledDsp::compile(edited_nodes, compile_context) {
+  let replacement = match
+    CompiledDsp::compile_raw(edited_nodes, compile_context) {
     Some(replacement) => replacement
     None => return false
+  }
+  // Skip state copy after delete operations — authoring indices shift,
+  // so position-based matching may copy state from the wrong node.
+  // The crossfade smooths the transition with fresh state.
+  let has_delete = edits
+    .iter()
+    .any(fn(e) {
+      e.kind is GraphTopologyEditKind::DeleteNode ||
+      e.kind is GraphTopologyEditKind::DeleteChain
+    })
+  if !has_delete {
+    copy_compiled_dsp_state(self.hot_swap.active, replacement)
   }
   if !self.hot_swap.queue_swap(replacement) {
     return false
@@ -312,6 +409,22 @@ fn apply_topology_edit(
           edit.source_index,
         )
       }
+    GraphTopologyEditKind::InsertChain =>
+      apply_topology_insert_chain(
+        nodes,
+        edit.node_index,
+        edit.input_slot,
+        edit.chain_nodes,
+      )
+    GraphTopologyEditKind::DeleteChain =>
+      apply_topology_delete_chain(
+        nodes,
+        edit.node_index,
+        edit.end_node_index,
+        topology_delete_retarget_node_index(edit),
+        edit.input_slot,
+        edit.replacement_source_index,
+      )
   }
 }
 
@@ -396,6 +509,184 @@ fn apply_topology_delete_node(
     nodes.push(compacted[index])
   }
   true
+}
+
+///|
+fn apply_topology_insert_chain(
+  nodes : Array[DspNode],
+  retarget_node_index : Int,
+  retarget_input_slot : GraphTopologyInputSlot,
+  chain_nodes : Array[DspNode],
+) -> Bool {
+  if chain_nodes.length() == 0 {
+    return false
+  }
+  if retarget_node_index < 0 || retarget_node_index >= nodes.length() {
+    return false
+  }
+  // Validate all chain nodes are unary (no input1)
+  for index = 0; index < chain_nodes.length(); index = index + 1 {
+    if chain_nodes[index].input1 >= 0 {
+      return false
+    }
+  }
+  // Get original source of the retarget node's input
+  let old_source = match
+    topology_node_input(nodes[retarget_node_index], retarget_input_slot) {
+    Some(old_source) => old_source
+    None => return false
+  }
+  // For each node in the chain: append to authoring array
+  let mut prev_source = old_source
+  let mut last_index = -1
+  let first_chain_index = nodes.length()
+  for index = 0; index < chain_nodes.length(); index = index + 1 {
+    let inserted = match
+      topology_inserted_node(chain_nodes[index], prev_source) {
+      Some(inserted) => inserted
+      None => {
+        // Roll back: remove all chain nodes appended so far
+        while nodes.length() > first_chain_index {
+          ignore(nodes.pop())
+        }
+        return false
+      }
+    }
+    last_index = nodes.length()
+    nodes.push(inserted)
+    prev_source = last_index
+  }
+  // Retarget the downstream node's input to the last chain node
+  if apply_topology_rewire_input(
+      nodes, retarget_node_index, retarget_input_slot, last_index,
+    ) {
+    true
+  } else {
+    // Roll back
+    while nodes.length() > first_chain_index {
+      ignore(nodes.pop())
+    }
+    false
+  }
+}
+
+///|
+fn apply_topology_delete_chain(
+  nodes : Array[DspNode],
+  start_node_index : Int,
+  end_node_index : Int,
+  retarget_node_index : Int,
+  retarget_input_slot : GraphTopologyInputSlot,
+  replacement_source_index : Int,
+) -> Bool {
+  // Basic bounds check
+  if start_node_index < 0 ||
+    start_node_index >= nodes.length() ||
+    end_node_index < 0 ||
+    end_node_index >= nodes.length() ||
+    start_node_index > end_node_index ||
+    retarget_node_index < 0 ||
+    retarget_node_index >= nodes.length() ||
+    replacement_source_index < 0 ||
+    replacement_source_index >= nodes.length() {
+    return false
+  }
+  // Reject if replacement_source is inside the deleted span
+  if replacement_source_index >= start_node_index &&
+    replacement_source_index <= end_node_index {
+    return false
+  }
+  // Validate: each node in the chain must be unary (input1 < 0) and not
+  // Output/StereoOutput, and each must feed exactly one downstream consumer
+  for index = start_node_index; index <= end_node_index; index = index + 1 {
+    let node = nodes[index]
+    if node.input1 >= 0 {
+      return false
+    }
+    if node.kind is Output || node.kind is StereoOutput {
+      return false
+    }
+    let consumer = match topology_single_consumer_for_input(nodes, index) {
+      Some(consumer) => consumer
+      None => return false
+    }
+    // Each chain node except the last must feed the next node in the chain
+    if index < end_node_index {
+      if consumer != index + 1 {
+        return false
+      }
+      // Last chain node must feed the retarget node
+    } else if consumer != retarget_node_index {
+      return false
+    }
+  }
+  // Retarget the downstream node's input to the replacement source
+  if !apply_topology_rewire_input(
+      nodes, retarget_node_index, retarget_input_slot, replacement_source_index,
+    ) {
+    return false
+  }
+  // Build compacted array excluding all chain nodes, adjusting indices
+  // We need to delete nodes from start_node_index to end_node_index inclusive
+  let chain_count = end_node_index - start_node_index + 1
+  let compacted = Array::new(capacity=nodes.length() - chain_count)
+  for index = 0; index < nodes.length(); index = index + 1 {
+    if index < start_node_index || index > end_node_index {
+      let mut node = nodes[index]
+      // Compact inputs: shift down by the number of deleted nodes before each
+      // reference
+      node = topology_chain_compacted_node_inputs(
+        node, start_node_index, end_node_index,
+      )
+      compacted.push(node)
+    }
+  }
+  nodes.clear()
+  for index = 0; index < compacted.length(); index = index + 1 {
+    nodes.push(compacted[index])
+  }
+  true
+}
+
+///|
+fn topology_chain_compacted_node_inputs(
+  node : DspNode,
+  start_deleted : Int,
+  end_deleted : Int,
+) -> DspNode {
+  DspNode(
+    node.kind,
+    topology_chain_compacted_input(node.input0, start_deleted, end_deleted),
+    topology_chain_compacted_input(node.input1, start_deleted, end_deleted),
+    node.value0,
+    node.value1,
+    node.value2,
+    node.value3,
+    node.waveform,
+    node.filter_mode,
+    node.delay_max_samples,
+    node.delay_samples,
+    node.seed,
+  )
+}
+
+///|
+fn topology_chain_compacted_input(
+  input : Int,
+  start_deleted : Int,
+  end_deleted : Int,
+) -> Int {
+  if input < 0 {
+    input
+  } else if input > end_deleted {
+    input - (end_deleted - start_deleted + 1)
+  } else if input >= start_deleted {
+    // This should not happen for valid graphs (we already rewired away from
+    // deleted nodes), but return -1 as a safety measure
+    -1
+  } else {
+    input
+  }
 }
 
 ///|
@@ -657,7 +948,7 @@ pub fn CompiledStereoDspTopologyController::from_nodes(
   context : DspContext,
   crossfade_samples? : Int = 0,
 ) -> CompiledStereoDspTopologyController? {
-  let compiled = match CompiledStereoDsp::compile(nodes, context) {
+  let compiled = match CompiledStereoDsp::compile_raw(nodes, context) {
     Some(compiled) => compiled
     None => return None
   }
@@ -749,9 +1040,21 @@ pub fn CompiledStereoDspTopologyController::queue_topology_edits(
     self.compile_block_size,
   )
   let replacement = match
-    CompiledStereoDsp::compile(edited_nodes, compile_context) {
+    CompiledStereoDsp::compile_raw(edited_nodes, compile_context) {
     Some(replacement) => replacement
     None => return false
+  }
+  // Skip state copy after delete operations — authoring indices shift,
+  // so position-based matching may copy state from the wrong node.
+  // The crossfade smooths the transition with fresh state.
+  let has_delete = edits
+    .iter()
+    .any(fn(e) {
+      e.kind is GraphTopologyEditKind::DeleteNode ||
+      e.kind is GraphTopologyEditKind::DeleteChain
+    })
+  if !has_delete {
+    copy_compiled_stereo_dsp_state(self.hot_swap.active, replacement)
   }
   if !self.hot_swap.queue_swap(replacement) {
     return false
@@ -761,12 +1064,11 @@ pub fn CompiledStereoDspTopologyController::queue_topology_edits(
 }
 
 ///|
-fn valid_stereo_topology_edits(edits : Array[GraphTopologyEdit]) -> Bool {
-  for index = 0; index < edits.length(); index = index + 1 {
-    if edits[index].kind is InsertNode || edits[index].kind is DeleteNode {
-      return false
-    }
-  }
+/// Stereo topology edit validation is intentionally permissive: compilation
+/// itself is the gatekeeper for invalid stereo graphs. Edits that produce
+/// invalid shapes will fail at recompilation time rather than at the
+/// validation step.
+fn valid_stereo_topology_edits(_edits : Array[GraphTopologyEdit]) -> Bool {
   true
 }
 
@@ -835,5 +1137,151 @@ fn apply_topology_runtime_control(
       true
     }
     _ => true
+  }
+}
+
+///|
+/// Copy runtime state from an old compiled mono graph to a new one for nodes
+/// that share the same authoring index and node kind.
+fn copy_compiled_dsp_state(
+  old_graph : CompiledDsp,
+  new_graph : CompiledDsp,
+) -> Unit {
+  let old_map = old_graph.index_map
+  let new_map = new_graph.index_map
+  let shared_count = if old_map.length() < new_map.length() {
+    old_map.length()
+  } else {
+    new_map.length()
+  }
+  for authoring_idx = 0
+      authoring_idx < shared_count
+      authoring_idx = authoring_idx + 1 {
+    let old_compiled = old_map[authoring_idx]
+    let new_compiled = new_map[authoring_idx]
+    if old_compiled >= 0 &&
+      new_compiled >= 0 &&
+      old_compiled < old_graph.nodes.length() &&
+      new_compiled < new_graph.nodes.length() &&
+      node_kind_matches(
+        old_graph.nodes[old_compiled].kind,
+        new_graph.nodes[new_compiled].kind,
+      ) {
+      new_graph.osc_states[new_compiled] = old_graph.osc_states[old_compiled]
+      new_graph.noise_states[new_compiled] = old_graph.noise_states[old_compiled]
+      new_graph.env_states[new_compiled] = old_graph.env_states[old_compiled]
+      new_graph.biquad_states[new_compiled] = old_graph.biquad_states[old_compiled]
+      new_graph.stereo_biquad_left_states[new_compiled] = old_graph.stereo_biquad_left_states[old_compiled]
+      new_graph.stereo_biquad_right_states[new_compiled] = old_graph.stereo_biquad_right_states[old_compiled]
+      // Only copy delay state if buffer capacity matches
+      match
+        (
+          old_graph.delay_states[old_compiled],
+          new_graph.delay_states[new_compiled],
+        ) {
+        (Some(old_delay), Some(new_delay)) =>
+          if old_delay.max_delay_samples() == new_delay.max_delay_samples() {
+            new_graph.delay_states[new_compiled] = old_graph.delay_states[old_compiled]
+          }
+        _ => ()
+      }
+      match
+        (
+          old_graph.stereo_delay_left_states[old_compiled],
+          new_graph.stereo_delay_left_states[new_compiled],
+        ) {
+        (Some(old_delay), Some(new_delay)) =>
+          if old_delay.max_delay_samples() == new_delay.max_delay_samples() {
+            new_graph.stereo_delay_left_states[new_compiled] = old_graph.stereo_delay_left_states[old_compiled]
+          }
+        _ => ()
+      }
+      match
+        (
+          old_graph.stereo_delay_right_states[old_compiled],
+          new_graph.stereo_delay_right_states[new_compiled],
+        ) {
+        (Some(old_delay), Some(new_delay)) =>
+          if old_delay.max_delay_samples() == new_delay.max_delay_samples() {
+            new_graph.stereo_delay_right_states[new_compiled] = old_graph.stereo_delay_right_states[old_compiled]
+          }
+        _ => ()
+      }
+      new_graph.self_values[new_compiled] = old_graph.self_values[old_compiled]
+    }
+  }
+}
+
+///|
+/// Copy runtime state from an old compiled stereo graph to a new one for nodes
+/// that share the same authoring index and node kind.
+fn copy_compiled_stereo_dsp_state(
+  old_graph : CompiledStereoDsp,
+  new_graph : CompiledStereoDsp,
+) -> Unit {
+  let old_map = old_graph.index_map
+  let new_map = new_graph.index_map
+  let shared_count = if old_map.length() < new_map.length() {
+    old_map.length()
+  } else {
+    new_map.length()
+  }
+  for authoring_idx = 0
+      authoring_idx < shared_count
+      authoring_idx = authoring_idx + 1 {
+    let old_compiled = old_map[authoring_idx]
+    let new_compiled = new_map[authoring_idx]
+    if old_compiled >= 0 &&
+      new_compiled >= 0 &&
+      old_compiled < old_graph.nodes.length() &&
+      new_compiled < new_graph.nodes.length() &&
+      node_kind_matches(
+        old_graph.nodes[old_compiled].kind,
+        new_graph.nodes[new_compiled].kind,
+      ) {
+      new_graph.osc_states[new_compiled] = old_graph.osc_states[old_compiled]
+      new_graph.noise_states[new_compiled] = old_graph.noise_states[old_compiled]
+      new_graph.env_states[new_compiled] = old_graph.env_states[old_compiled]
+      new_graph.biquad_states[new_compiled] = old_graph.biquad_states[old_compiled]
+      new_graph.stereo_biquad_left_states[new_compiled] = old_graph.stereo_biquad_left_states[old_compiled]
+      new_graph.stereo_biquad_right_states[new_compiled] = old_graph.stereo_biquad_right_states[old_compiled]
+      // Only copy delay state if buffer capacity matches
+      match
+        (
+          old_graph.delay_states[old_compiled],
+          new_graph.delay_states[new_compiled],
+        ) {
+        (Some(old_delay), Some(new_delay)) =>
+          if old_delay.max_delay_samples() == new_delay.max_delay_samples() {
+            new_graph.delay_states[new_compiled] = old_graph.delay_states[old_compiled]
+          }
+        _ => ()
+      }
+      match
+        (
+          old_graph.stereo_delay_left_states[old_compiled],
+          new_graph.stereo_delay_left_states[new_compiled],
+        ) {
+        (Some(old_delay), Some(new_delay)) =>
+          if old_delay.max_delay_samples() == new_delay.max_delay_samples() {
+            new_graph.stereo_delay_left_states[new_compiled] = old_graph.stereo_delay_left_states[old_compiled]
+          }
+        _ => ()
+      }
+      match
+        (
+          old_graph.stereo_delay_right_states[old_compiled],
+          new_graph.stereo_delay_right_states[new_compiled],
+        ) {
+        (Some(old_delay), Some(new_delay)) =>
+          if old_delay.max_delay_samples() == new_delay.max_delay_samples() {
+            new_graph.stereo_delay_right_states[new_compiled] = old_graph.stereo_delay_right_states[old_compiled]
+          }
+        _ => ()
+      }
+      new_graph.self_values[new_compiled] = old_graph.self_values[old_compiled]
+      new_graph.self_left_values[new_compiled] = old_graph.self_left_values[old_compiled]
+      new_graph.self_right_values[new_compiled] = old_graph.self_right_values[old_compiled]
+    }
   }
 }

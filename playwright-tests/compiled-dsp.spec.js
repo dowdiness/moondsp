@@ -387,11 +387,21 @@ test('browser demo proves CompiledDspTopologyController insert delete roundtrip 
   expect(initialTelemetry.leftPreview.every(sample => Math.abs(sample - 1.0) < 0.000001)).toBeTruthy();
   expect(initialTelemetry.rightPreview.every(sample => Math.abs(sample - 1.0) < 0.000001)).toBeTruthy();
 
+  // Set gain BEFORE queueing the topology edit to avoid a race where the
+  // crossfade completes before the gain message reaches the AudioWorklet.
+  await setRangeValue(page, '#gainSlider', 50);
+  await expect(page.locator('#gainValue')).toHaveText('50');
+  await expect
+    .poll(async () => {
+      const telemetry = await currentTelemetry(page);
+      if (!telemetry) return 0;
+      return Math.abs(telemetry.gain - 0.5) < 0.000001 ? telemetry.sequence : 0;
+    }, { timeout: 10_000 })
+    .toBeGreaterThan(0);
+
   await page.evaluate(() => {
     window.__mdspNode.port.postMessage({ type: 'queue-topology-edit' });
   });
-  await setRangeValue(page, '#gainSlider', 50);
-  await expect(page.locator('#gainValue')).toHaveText('50');
   await expect
     .poll(async () => (await topologyEditQueued(page))?.telemetrySequence ?? -1, { timeout: 10_000 })
     .toBeGreaterThanOrEqual(initialTelemetry.sequence);
@@ -515,11 +525,21 @@ test('browser demo proves CompiledStereoDspTopologyController crossfade in the w
     ),
   ).toBeTruthy();
 
+  // Set gain BEFORE queueing the topology edit to avoid a race where the
+  // crossfade completes before the gain message reaches the AudioWorklet.
+  await setRangeValue(page, '#gainSlider', 50);
+  await expect(page.locator('#gainValue')).toHaveText('50');
+  await expect
+    .poll(async () => {
+      const telemetry = await currentTelemetry(page);
+      if (!telemetry) return 0;
+      return Math.abs(telemetry.gain - 0.5) < 0.000001 ? telemetry.sequence : 0;
+    }, { timeout: 10_000 })
+    .toBeGreaterThan(0);
+
   await page.evaluate(() => {
     window.__mdspNode.port.postMessage({ type: 'queue-stereo-topology-edit' });
   });
-  await setRangeValue(page, '#gainSlider', 50);
-  await expect(page.locator('#gainValue')).toHaveText('50');
   await expect
     .poll(async () => (await stereoTopologyEditQueued(page))?.telemetrySequence ?? -1, { timeout: 10_000 })
     .toBeGreaterThanOrEqual(initialTelemetry.sequence);
@@ -575,6 +595,72 @@ test('browser demo proves CompiledStereoDspTopologyController crossfade in the w
   expect(settledTelemetry.leftPeak).toBeCloseTo(0.0, 6);
   expect(settledTelemetry.rightPeak).toBeCloseTo(0.5, 6);
   expect(settledTelemetry.overallPeak).toBeCloseTo(0.5, 6);
+});
+
+test('browser demo proves exit deliverable FM synthesis in the worklet', async ({ page }) => {
+  await startAudio(page, '/?exitDeliverable=1');
+  await expect(page.locator('#status')).toContainText('Exit Deliverable FM Synthesis');
+  await expect
+    .poll(async () => (await firstTelemetry(page))?.sequence || 0, { timeout: 10_000 })
+    .toBeGreaterThan(0);
+  const initialTelemetry = await firstTelemetry(page);
+
+  // Exit deliverable should produce non-zero output (FM synthesis)
+  expect(previewEnergy(initialTelemetry.leftPreview)).toBeGreaterThan(0.001);
+  // Mono graph duplicates to both channels
+  expect(initialTelemetry.rightPreview[0]).toBeCloseTo(initialTelemetry.leftPreview[0], 9);
+  expect(initialTelemetry.rightPreview[3]).toBeCloseTo(initialTelemetry.leftPreview[3], 9);
+  expect(initialTelemetry.leftPreview.every(Number.isFinite)).toBeTruthy();
+
+  // Verify LFO rate control reaches the processor
+  await setRangeValue(page, '#freqSlider', 10);
+  await expect(page.locator('#freqValue')).toHaveText('10');
+  await expect
+    .poll(async () => {
+      const telemetry = await currentTelemetry(page);
+      if (!telemetry) {
+        return 0;
+      }
+      return Math.abs(telemetry.freq - 10) < 0.000001 ? telemetry.sequence : 0;
+    }, { timeout: 10_000 })
+    .toBeGreaterThan(0);
+  const lfoTelemetry = await currentTelemetry(page);
+  expect(lfoTelemetry.freq).toBeCloseTo(10, 6);
+  expect(previewEnergy(lfoTelemetry.leftPreview)).toBeGreaterThan(0.001);
+
+  // Verify gain control reaches the processor
+  await setRangeValue(page, '#gainSlider', 10);
+  await expect(page.locator('#gainValue')).toHaveText('10');
+  await expect
+    .poll(async () => {
+      const telemetry = await currentTelemetry(page);
+      if (!telemetry) {
+        return 0;
+      }
+      return Math.abs(telemetry.gain - 0.1) < 0.000001 &&
+        telemetry.sequence > lfoTelemetry.sequence
+        ? telemetry.overallPeak
+        : 0;
+    }, { timeout: 10_000 })
+    .toBeGreaterThan(0.001);
+  const lowGainTelemetry = await currentTelemetry(page);
+  expect(lowGainTelemetry.overallPeak).toBeLessThan(initialTelemetry.overallPeak);
+
+  // Verify cutoff control reaches the processor
+  await setRangeValue(page, '#cutoffSlider', 200);
+  await expect(page.locator('#cutoffValue')).toHaveText('200');
+  await expect
+    .poll(async () => {
+      const telemetry = await currentTelemetry(page);
+      if (!telemetry) {
+        return 0;
+      }
+      return Math.abs(telemetry.cutoff - 200) < 0.000001 &&
+        telemetry.sequence > lowGainTelemetry.sequence
+        ? previewVariation(telemetry.leftPreview)
+        : 0;
+    }, { timeout: 10_000 })
+    .toBeGreaterThan(0.0001);
 });
 
 test('browser demo proves CompiledStereoDspHotSwap crossfade in the worklet', async ({ page }) => {

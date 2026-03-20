@@ -553,16 +553,21 @@ test "compiled stereo dsp topology controller rejects invalid edit batches trans
 }
 
 ///|
-test "compiled stereo dsp topology controller rejects insert nodes transactionally" {
+test "compiled stereo dsp topology controller accepts insert nodes" {
   let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
   let topology = CompiledStereoDspTopologyController::from_nodes(
     [DspNode::constant(1.0), DspNode::pan(0, 0.0), DspNode::stereo_output(1)],
     context,
+    crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
   ).unwrap()
-  let left = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
-  let right = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+  let first_left = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+  let first_right = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+  let second_left = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+  let second_right = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+  let settled_left = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+  let settled_right = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
 
-  assert_false(
+  assert_true(
     topology.queue_topology_edit(
       GraphTopologyEdit::insert_node(
         2,
@@ -571,44 +576,66 @@ test "compiled stereo dsp topology controller rejects insert nodes transactional
       ),
     ),
   )
-  topology.process(context, left, right)
+  topology.process(context, first_left, first_right)
+  topology.process(context, second_left, second_right)
+  topology.process(context, settled_left, settled_right)
 
+  // After insert: constant(1.0) -> pan(0,0.0) -> stereo_gain(0,0.5) ->
+  // stereo_output. Center pan = ~0.707, then * 0.5 = ~0.354
+  let expected = HOT_SWAP_CENTER_GAIN * 0.5
   assert_true(
-    left
+    settled_left
     .as_fixed_array()
-    .every(sample => (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON),
+    .every(sample => (sample - expected).abs() < HOT_SWAP_EPSILON),
   )
   assert_true(
-    right
+    settled_right
     .as_fixed_array()
-    .every(sample => (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON),
+    .every(sample => (sample - expected).abs() < HOT_SWAP_EPSILON),
   )
 }
 
 ///|
-test "compiled stereo dsp topology controller rejects delete nodes transactionally" {
+test "compiled stereo dsp topology controller accepts delete nodes" {
   let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  // Graph: constant -> pan -> stereo_gain -> stereo_output
   let topology = CompiledStereoDspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::pan(0, 0.0), DspNode::stereo_output(1)],
+    [
+      DspNode::constant(1.0),
+      DspNode::pan(0, 0.0),
+      DspNode::stereo_gain(1, 0.5),
+      DspNode::stereo_output(2),
+    ],
     context,
+    crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
   ).unwrap()
-  let left = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
-  let right = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+  let first_left = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+  let first_right = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+  let second_left = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+  let second_right = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+  let settled_left = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+  let settled_right = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
 
-  assert_false(
+  // Delete the stereo_gain node (index 2), retarget stereo_output (index 3)
+  // to read from pan (replacement_source = 2 means self-resolve to its input)
+  assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::delete_node(1, 2, GraphTopologyInputSlot::Input0, 1),
+      GraphTopologyEdit::delete_node(2, 3, GraphTopologyInputSlot::Input0, 2),
     ),
   )
-  topology.process(context, left, right)
+  topology.process(context, first_left, first_right)
+  topology.process(context, second_left, second_right)
+  topology.process(context, settled_left, settled_right)
 
+  // After delete: constant(1.0) -> pan(0, 0.0) -> stereo_output
+  // Center pan with gain 1.0 = ~0.707 on each channel
   assert_true(
-    left
+    settled_left
     .as_fixed_array()
     .every(sample => (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON),
   )
   assert_true(
-    right
+    settled_right
     .as_fixed_array()
     .every(sample => (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON),
   )
@@ -811,6 +838,233 @@ test "compiled stereo dsp topology controller preserves runtime params across la
     .as_fixed_array()
     .every(sample => sample.abs() < HOT_SWAP_EPSILON),
   )
+}
+
+///|
+test "topology edit: insert chain of two gain nodes" {
+  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  // Graph: constant(1.0) -> output(0)
+  let topology = CompiledDspTopologyController::from_nodes(
+    [DspNode::constant(1.0), DspNode::output(0)],
+    context,
+    crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
+  ).unwrap()
+  let first_block = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+  let second_block = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+  let settled_block = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+
+  // Insert chain [Gain(0.5), Gain(0.8)] between constant and output
+  assert_true(
+    topology.queue_topology_edit(
+      GraphTopologyEdit::insert_chain(1, GraphTopologyInputSlot::Input0, [
+        DspNode::gain(0, 0.5),
+        DspNode::gain(0, 0.8),
+      ]),
+    ),
+  )
+  topology.process(context, first_block)
+  topology.process(context, second_block)
+  topology.process(context, settled_block)
+
+  // After insert: constant(1.0) -> gain(0.5) -> gain(0.8) -> output
+  // Output = 1.0 * 0.5 * 0.8 = 0.4
+  assert_true(settled_block.as_fixed_array().every(sample => sample == 0.4))
+}
+
+///|
+test "topology edit: delete chain reverses insert chain" {
+  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  // Graph: constant(1.0) -> output(0)
+  let topology = CompiledDspTopologyController::from_nodes(
+    [DspNode::constant(1.0), DspNode::output(0)],
+    context,
+    crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
+  ).unwrap()
+  let insert_first = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+  let insert_second = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+  let inserted_block = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+
+  // Insert chain [Gain(0.5), Gain(0.8)] between constant and output
+  assert_true(
+    topology.queue_topology_edit(
+      GraphTopologyEdit::insert_chain(1, GraphTopologyInputSlot::Input0, [
+        DspNode::gain(0, 0.5),
+        DspNode::gain(0, 0.8),
+      ]),
+    ),
+  )
+  topology.process(context, insert_first)
+  topology.process(context, insert_second)
+  topology.process(context, inserted_block)
+  assert_true(inserted_block.as_fixed_array().every(sample => sample == 0.4))
+
+  // After insert: [constant(1.0), output(3), gain(0,0.5), gain(2,0.8)]
+  // Indices: 0=constant, 1=output, 2=gain(0.5), 3=gain(0.8)
+  // Delete chain from 2 to 3, retarget output (node 1) to constant (node 0)
+  let delete_first = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+  let delete_second = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+  let restored_block = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+
+  assert_true(
+    topology.queue_topology_edit(
+      GraphTopologyEdit::delete_chain(
+        2,
+        3,
+        1,
+        GraphTopologyInputSlot::Input0,
+        0,
+      ),
+    ),
+  )
+  topology.process(context, delete_first)
+  topology.process(context, delete_second)
+  topology.process(context, restored_block)
+  assert_true(restored_block.as_fixed_array().every(sample => sample == 1.0))
+}
+
+///|
+test "topology edit: insert_chain rejects empty chain" {
+  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let topology = CompiledDspTopologyController::from_nodes(
+    [DspNode::constant(1.0), DspNode::output(0)],
+    context,
+  ).unwrap()
+  let output = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+
+  assert_false(
+    topology.queue_topology_edit(
+      GraphTopologyEdit::insert_chain(1, GraphTopologyInputSlot::Input0, []),
+    ),
+  )
+  topology.process(context, output)
+  assert_true(output.as_fixed_array().every(sample => sample == 1.0))
+}
+
+///|
+test "topology edit: insert_chain rejects chain with binary node" {
+  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let topology = CompiledDspTopologyController::from_nodes(
+    [DspNode::constant(1.0), DspNode::output(0)],
+    context,
+  ).unwrap()
+  let output = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+
+  // Mix is binary (has input1), should be rejected
+  assert_false(
+    topology.queue_topology_edit(
+      GraphTopologyEdit::insert_chain(1, GraphTopologyInputSlot::Input0, [
+        DspNode::gain(0, 0.5),
+        DspNode::mix(0, 0),
+      ]),
+    ),
+  )
+  topology.process(context, output)
+  assert_true(output.as_fixed_array().every(sample => sample == 1.0))
+}
+
+///|
+test "topology edit: delete_chain rejects chain with binary node" {
+  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  // Build a graph with a binary node (mix) in the potential delete range
+  let topology = CompiledDspTopologyController::from_nodes(
+    [
+      DspNode::constant(1.0),
+      DspNode::constant(0.5),
+      DspNode::mix(0, 1),
+      DspNode::output(2),
+    ],
+    context,
+  ).unwrap()
+  let output = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+
+  // Try to delete chain containing mix node (binary, has input1 >= 0)
+  assert_false(
+    topology.queue_topology_edit(
+      GraphTopologyEdit::delete_chain(
+        2,
+        2,
+        3,
+        GraphTopologyInputSlot::Input0,
+        0,
+      ),
+    ),
+  )
+  topology.process(context, output)
+  assert_true(output.as_fixed_array().every(sample => sample == 1.5))
+}
+
+///|
+test "topology edit preserves oscillator phase across recompilation" {
+  let nodes = [
+    DspNode::constant(440.0),
+    DspNode::oscillator_from(0, Waveform::Sine),
+    DspNode::output(1),
+  ]
+  let ctx = DspContext::new(48000.0, 128)
+  let controller = CompiledDspTopologyController::from_nodes(
+    nodes,
+    ctx,
+    crossfade_samples=0,
+  ).unwrap()
+
+  // Process one block to advance oscillator phase
+  let buf = AudioBuffer::filled(128)
+  controller.process(ctx, buf)
+
+  // Insert a gain(1.0) identity node — should not change output
+  let edit = GraphTopologyEdit::insert_node(
+    2,
+    GraphTopologyInputSlot::Input0,
+    DspNode::gain(-1, 1.0),
+  )
+  assert_true(controller.queue_topology_edit(edit))
+  controller.process(ctx, buf) // applies the swap
+
+  // Process another block — phase should be continuous (not reset)
+  controller.process(ctx, buf)
+  let sample_after_first = buf.get(0)
+
+  // If phase was preserved, the output continues naturally
+  // If phase reset to 0, the first sample would be 0.0
+  assert_true(sample_after_first != 0.0)
+}
+
+///|
+test "topology edit preserves stereo oscillator phase across recompilation" {
+  let nodes = [
+    DspNode::constant(440.0),
+    DspNode::oscillator_from(0, Waveform::Sine),
+    DspNode::pan(1, 0.0),
+    DspNode::stereo_output(2),
+  ]
+  let ctx = DspContext::new(48000.0, 128)
+  let controller = CompiledStereoDspTopologyController::from_nodes(
+    nodes,
+    ctx,
+    crossfade_samples=0,
+  ).unwrap()
+
+  // Process one block to advance oscillator phase
+  let left = AudioBuffer::filled(128)
+  let right = AudioBuffer::filled(128)
+  controller.process(ctx, left, right)
+
+  // Insert a stereo_gain(1.0) identity node — should not change output
+  let edit = GraphTopologyEdit::insert_node(
+    3,
+    GraphTopologyInputSlot::Input0,
+    DspNode::stereo_gain(-1, 1.0),
+  )
+  assert_true(controller.queue_topology_edit(edit))
+  controller.process(ctx, left, right) // applies the swap
+
+  // Process another block — phase should be continuous (not reset)
+  controller.process(ctx, left, right)
+  let left_after_first = left.get(0)
+
+  // If phase was preserved, the output continues naturally
+  // If phase reset to 0, the first sample would be 0.0
+  assert_true(left_after_first != 0.0)
 }
 
 ///|

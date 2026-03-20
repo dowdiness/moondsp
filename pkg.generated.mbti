@@ -8,7 +8,21 @@ pub fn demo_tick(Double, Double) -> Double
 
 pub fn demo_tick_source(Int, Double, Double) -> Double
 
+pub fn[T : FilterSym] exit_deliverable() -> T
+
+pub fn[T : ArithSym] lin_map(T, Double, Double, Double, Double) -> T
+
+pub fn mono_shape() -> Int
+
+pub fn optimize_graph(Array[DspNode]) -> (Array[DspNode], FixedArray[Int])
+
+pub fn[T : ArithSym] range(T, Double, Double) -> T
+
+pub fn[T : ArithSym + DspSym + FilterSym + DelaySym + StereoSym + StereoFilterSym + StereoDelaySym] replay(Array[DspNode]) -> T?
+
 pub fn reset_phase() -> Unit
+
+pub fn stereo_shape() -> Int
 
 pub fn tick(Double, Double) -> Double
 
@@ -177,6 +191,7 @@ pub fn DspNode::mix(Int, Int) -> Self
 pub fn DspNode::mul(Int, Int) -> Self
 pub fn DspNode::noise(UInt) -> Self
 pub fn DspNode::oscillator(Waveform, Double) -> Self
+pub fn DspNode::oscillator_from(Int, Waveform) -> Self
 pub fn DspNode::output(Int) -> Self
 pub fn DspNode::pan(Int, Double) -> Self
 pub fn DspNode::stereo_biquad(Int, BiquadMode, Double, Double) -> Self
@@ -185,6 +200,10 @@ pub fn DspNode::stereo_delay(Int, Int, delay_samples? : Int, feedback? : Double)
 pub fn DspNode::stereo_gain(Int, Double) -> Self
 pub fn DspNode::stereo_mixdown(Int) -> Self
 pub fn DspNode::stereo_output(Int) -> Self
+pub impl NodeEditable for DspNode
+pub impl NodeFoldable for DspNode
+pub impl NodeSpanning for DspNode
+pub impl NodeStateful for DspNode
 
 pub(all) enum DspNodeKind {
   Constant
@@ -223,6 +242,19 @@ pub struct Gain {
 pub fn Gain::new() -> Self
 pub fn Gain::process(Self, DspContext, AudioBuffer, Double) -> Unit
 
+pub struct GraphBuilder {
+  nodes_ : Array[DspNode]
+  index : Int
+}
+pub fn GraphBuilder::nodes(Self) -> Array[DspNode]
+pub impl ArithSym for GraphBuilder
+pub impl DelaySym for GraphBuilder
+pub impl DspSym for GraphBuilder
+pub impl FilterSym for GraphBuilder
+pub impl StereoDelaySym for GraphBuilder
+pub impl StereoFilterSym for GraphBuilder
+pub impl StereoSym for GraphBuilder
+
 pub struct GraphControl {
   kind : GraphControlKind
   node_index : Int
@@ -255,10 +287,15 @@ pub struct GraphTopologyEdit {
   replacement : DspNode
   input_slot : GraphTopologyInputSlot
   source_index : Int
+  chain_nodes : Array[DspNode]
+  end_node_index : Int
+  replacement_source_index : Int
 
-  fn new(GraphTopologyEditKind, Int, DspNode, GraphTopologyInputSlot, Int) -> GraphTopologyEdit
+  fn new(GraphTopologyEditKind, Int, DspNode, GraphTopologyInputSlot, Int, Array[DspNode], Int, Int) -> GraphTopologyEdit
 }
+pub fn GraphTopologyEdit::delete_chain(Int, Int, Int, GraphTopologyInputSlot, Int) -> Self
 pub fn GraphTopologyEdit::delete_node(Int, Int, GraphTopologyInputSlot, Int) -> Self
+pub fn GraphTopologyEdit::insert_chain(Int, GraphTopologyInputSlot, Array[DspNode]) -> Self
 pub fn GraphTopologyEdit::insert_node(Int, GraphTopologyInputSlot, DspNode) -> Self
 pub fn GraphTopologyEdit::replace_node(Int, DspNode) -> Self
 pub fn GraphTopologyEdit::rewire_input(Int, GraphTopologyInputSlot, Int) -> Self
@@ -268,6 +305,8 @@ pub(all) enum GraphTopologyEditKind {
   RewireInput
   InsertNode
   DeleteNode
+  InsertChain
+  DeleteChain
 }
 
 pub(all) enum GraphTopologyInputSlot {
@@ -282,6 +321,11 @@ pub struct Mix {
 }
 pub fn Mix::new() -> Self
 pub fn Mix::process(Self, DspContext, AudioBuffer, AudioBuffer) -> Unit
+
+pub struct Mono {
+}
+pub fn Mono::new() -> Self
+pub impl ChannelSpec for Mono
 
 pub struct Noise {
   mut state : UInt
@@ -326,6 +370,11 @@ pub fn ParamSmoother::set_target(Self, Double) -> Unit
 pub fn ParamSmoother::target(Self) -> Double
 pub fn ParamSmoother::tick(Self) -> Double
 
+pub struct Stereo {
+}
+pub fn Stereo::new() -> Self
+pub impl ChannelSpec for Stereo
+
 pub(all) enum Waveform {
   Sine
   Saw
@@ -336,4 +385,64 @@ pub(all) enum Waveform {
 // Type aliases
 
 // Traits
+pub(open) trait ArithSym {
+  constant(Double) -> Self
+  mul(Self, Self) -> Self
+  mix(Self, Self) -> Self
+  clip(Self, Double) -> Self
+}
+
+pub(open) trait ChannelSpec {
+  channel_count(Self) -> Int
+}
+
+pub(open) trait DelaySym : DspSym {
+  delay(Self, Int, Int, Double) -> Self
+}
+
+pub(open) trait DspSym : ArithSym {
+  oscillator(Self, Waveform) -> Self
+  noise(UInt) -> Self
+  adsr(Double, Double, Double, Double) -> Self
+  gain(Self, Double) -> Self
+  output(Self) -> Self
+}
+
+pub(open) trait FilterSym : DspSym {
+  biquad(Self, BiquadMode, Double, Double) -> Self
+}
+
+pub(open) trait NodeEditable : NodeSpanning + NodeFoldable {
+  can_insert_after(Self) -> Bool
+  can_delete(Self) -> Bool
+}
+
+pub(open) trait NodeFoldable : NodeSpanning {
+  is_foldable(Self) -> Bool
+  fold_value(Self, Double, Double) -> Double
+}
+
+pub(open) trait NodeSpanning {
+  signal_shape(Self) -> Int
+}
+
+pub(open) trait NodeStateful : NodeSpanning {
+  is_stateful(Self) -> Bool
+}
+
+pub(open) trait StereoDelaySym : StereoSym + DelaySym {
+  stereo_delay(Self, Int, Int, Double) -> Self
+}
+
+pub(open) trait StereoFilterSym : StereoSym + FilterSym {
+  stereo_biquad(Self, BiquadMode, Double, Double) -> Self
+}
+
+pub(open) trait StereoSym : DspSym {
+  pan(Self, Double) -> Self
+  stereo_gain(Self, Double) -> Self
+  stereo_clip(Self, Double) -> Self
+  stereo_mixdown(Self) -> Self
+  stereo_output(Self) -> Self
+}
 

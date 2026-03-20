@@ -531,13 +531,13 @@ kabelsalat's approach: detect back-edges during topological sort. For each back-
 // 5. FeedbackWrite stores current sample's value to that register
 ```
 
-Current status note: the implementation now supports a narrow mono-valued
-feedback slice in both compiled mono graphs and terminal-stereo graphs.
-`CompiledDsp` and `CompiledStereoDsp` can detect supported mono back-edges and
-resolve them as zero-initialized implicit `z^-1` reads during runtime.
-Supported shapes currently include direct self-feedback and multiple mono
-back-edges, including mono loops that later lift through `Pan` into a terminal
-stereo suffix. Stereo-valued or mixed-shape cycles are still rejected.
+Current status note: the implementation now uses a self-register feedback model
+in both compiled mono graphs and terminal-stereo graphs. `CompiledDsp` and
+`CompiledStereoDsp` detect back-edges and resolve them as zero-initialized
+implicit `z^-1` reads during runtime using self-registers rather than
+linked-list infrastructure. Stereo and mixed-shape feedback are now accepted.
+Supported shapes include direct self-feedback, multiple simultaneous
+back-edges, and loops that lift through `Pan` into a terminal stereo suffix.
 Node-local recirculation on `Delay` and `StereoDelay` remains a separate
 feature.
 
@@ -652,8 +652,9 @@ The current repository already implements:
   into `CompiledStereoDsp` for `Mono -> Pan -> Stereo post-processing ->
   StereoOutput`, where the current stereo post-processing node set is
   `StereoGain`, `StereoClip`, `StereoBiquad`, and `StereoDelay`, and where the
-  current feedback slice also allows supported mono `z^-1` loops before the
-  stereo lift through `Pan`
+  feedback uses a self-register model: stereo, mixed-shape, and mono `z^-1`
+  feedback loops are accepted through `Pan` and in the stereo post-processing
+  path
 - input nodes may be declared in authoring order; the compiler topologically
   sorts reachable nodes from a single terminal output node
 - compile rejects:
@@ -672,6 +673,7 @@ Current graph node support:
 
 - `Constant`
 - `Oscillator`
+- `Oscillator` in FM mode (`input0 >= 0`): reads frequency per-sample from input buffer
 - `Noise`
 - `Adsr`
 - `Biquad`
@@ -743,6 +745,7 @@ Current `set_param(node_index, slot, value)` support matrix:
 |-----------|-----------------|-------|
 | `Constant` | `Value0` | Finite values only |
 | `Oscillator` | `Value0` | Finite frequency values only |
+| `Oscillator` (FM mode) | none | FM mode: frequency comes from input buffer, no runtime freq param |
 | `Noise` | none | No runtime seed update yet |
 | `Adsr` | none | Runtime control is `gate_on` / `gate_off` only |
 | `Biquad` | `Value0`, `Value1` | `Value0 = cutoff`, `Value1 = q`; validated against the compile-time sample rate |
@@ -768,16 +771,16 @@ Current limits:
 - stereo post-processing remains intentionally small: the current effect slice
   is `StereoBiquad` plus `StereoDelay`, with no broader stereo mix/effect set
   yet
-- feedback-edge insertion is still narrow: only `CompiledDsp` supports
-  automatic `z^-1` back-edges today, with `CompiledStereoDsp` only accepting
-  the same mono-valued feedback slice before `Pan`; stereo-valued,
-  mixed-shape, or output-involved cycles are still rejected
-- supported feedback shapes are still constrained to the current mono node set:
-  direct self-feedback and multiple simultaneous back-edges are allowed, but
-  any cycle involving a stereo-valued back-edge, `Output`, `StereoOutput`, or a
-  mono/stereo shape change is rejected
-- feedback graphs currently use a sample-by-sample fallback inside
-  `CompiledDsp` and `CompiledStereoDsp` whenever feedback edges are present
+- feedback-edge insertion now uses a self-register model: stereo and
+  mixed-shape feedback are accepted, and both `CompiledDsp` and
+  `CompiledStereoDsp` process feedback through a unified per-sample loop
+  with self-registers rather than a separate linked-list infrastructure
+- constant folding and dead-node elimination are integrated into
+  `CompiledDsp::compile()` and `CompiledStereoDsp::compile()` via
+  `optimize_graph()`
+- `InsertChain` / `DeleteChain` topology edit variants support multi-node
+  subgraph operations with stereo parity
+- state preservation across topology edit recompilation is supported
 - graph hot-swap is now narrow but no longer mono-only:
   `CompiledDspHotSwap` supports mono `CompiledDsp` replacement and
   `CompiledStereoDspHotSwap` supports terminal-stereo `CompiledStereoDsp`
@@ -913,22 +916,23 @@ Current limits:
   from its own freshly compiled internal state
 - in-flight control mirroring requires both graphs to accept the same
   node-index / slot updates during the crossfade window
-- topology edits are still narrow:
+- topology edits support both single-node and multi-node operations:
   - `GraphTopologyEdit::replace_node(...)` swaps one authoring-order node
   - `GraphTopologyEdit::rewire_input(...)` retargets one existing input edge
   - `GraphTopologyEdit::insert_node(...)` appends one unary node and retargets
     one existing downstream input to it
   - `GraphTopologyEdit::delete_node(...)` removes one unary node and retargets
     one downstream input to a replacement upstream source
-  - append-only `InsertNode` keeps existing authoring indices stable during the
-    staged swap; the inserted node becomes the new final authoring index
-  - `DeleteNode` compacts authoring indices after removal and is currently
-    mono-only, matching the append-only insert slice rather than stereo parity
-  - on the mono path, `InsertNode` followed by `DeleteNode` can round-trip a
-    unary append-only edit back to the original shorter graph shape
+  - `GraphTopologyEdit::insert_chain(...)` inserts a chain of unary nodes
+    between a source and a downstream input
+  - `GraphTopologyEdit::delete_chain(...)` removes a contiguous chain of unary
+    nodes and retargets the downstream input to a replacement source
+  - all edit variants work for both mono and stereo topology controllers
+  - state preservation across topology-edit recompilation is supported:
+    unchanged nodes (matched by authoring index and kind) inherit runtime state
+    (oscillator phase, filter coefficients, delay buffers, self-register values)
+    from the previous compiled graph
   - only one topology replacement may be staged at a time
-  - stereo parity exists only for terminal-stereo graphs through
-    `CompiledStereoDspTopologyController`
 - browser/AudioWorklet hot-swap proof is now narrow but present for both paths:
   the `browser/` wrapper exports dedicated mono `CompiledDspHotSwap` and
   terminal-stereo `CompiledStereoDspHotSwap` proof paths, and Playwright checks
@@ -1176,6 +1180,8 @@ Minimum set needed for a useful synthesizer (Phase 1-2):
 | `FeedbackRead` | Read from feedback register |
 | `FeedbackWrite` | Write to feedback register |
 | `Range` | Map [-1,1] to [min,max]: `(input + 1) / 2 * (max - min) + min` |
+| `range()` | Composed `ArithSym` function — maps [-1,1] to [min,max] using arithmetic; no new enum variant |
+| `lin_map()` | Composed `ArithSym` function — linear map from [in_min,in_max] to [out_min,out_max]; no new enum variant |
 
 ---
 
