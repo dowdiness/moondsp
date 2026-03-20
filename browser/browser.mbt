@@ -731,24 +731,35 @@ pub fn process_exit_deliverable_block(
     return false
   }
   let graph = exit_deliverable_graph.val.unwrap()
-  let controls = [
-    @lib.GraphControl::set_param(
-      EXIT_LFO_RATE_NODE,
-      @lib.GraphParamSlot::Value0,
-      exit_lfo_rate.val,
+  // Apply controls individually — batch is transactional and one failure
+  // rejects all. Individual controls are independent.
+  ignore(
+    graph.apply_control(
+      @lib.GraphControl::set_param(
+        EXIT_LFO_RATE_NODE,
+        @lib.GraphParamSlot::Value0,
+        exit_lfo_rate.val,
+      ),
     ),
-    @lib.GraphControl::set_param(
-      EXIT_BIQUAD_NODE,
-      @lib.GraphParamSlot::Value0,
-      exit_cutoff.val,
+  )
+  ignore(
+    graph.apply_control(
+      @lib.GraphControl::set_param(
+        EXIT_BIQUAD_NODE,
+        @lib.GraphParamSlot::Value0,
+        exit_cutoff.val,
+      ),
     ),
-    @lib.GraphControl::set_param(
-      EXIT_GAIN_NODE,
-      @lib.GraphParamSlot::Value0,
-      exit_gain.val,
+  )
+  ignore(
+    graph.apply_control(
+      @lib.GraphControl::set_param(
+        EXIT_GAIN_NODE,
+        @lib.GraphParamSlot::Value0,
+        exit_gain.val,
+      ),
     ),
-  ]
-  ignore(graph.apply_controls(controls))
+  )
   graph.process(
     exit_deliverable_context.val.unwrap(),
     exit_deliverable_output.val.unwrap(),

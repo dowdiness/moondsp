@@ -394,6 +394,9 @@
       freqSlider.step = "0.1";
       // Set gain slider to 30%
       gainSlider.value = "30";
+      // Relabel gain slider
+      const gainLabel = gainSlider.closest(".slider-card").querySelector("strong");
+      if (gainLabel) gainLabel.textContent = "Master Gain";
       // Hide delay and pan sliders (not used in exit deliverable)
       delaySlider.closest(".slider-card").style.display = "none";
       panSlider.closest(".slider-card").style.display = "none";
