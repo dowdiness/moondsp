@@ -387,11 +387,21 @@ test('browser demo proves CompiledDspTopologyController insert delete roundtrip 
   expect(initialTelemetry.leftPreview.every(sample => Math.abs(sample - 1.0) < 0.000001)).toBeTruthy();
   expect(initialTelemetry.rightPreview.every(sample => Math.abs(sample - 1.0) < 0.000001)).toBeTruthy();
 
+  // Set gain BEFORE queueing the topology edit to avoid a race where the
+  // crossfade completes before the gain message reaches the AudioWorklet.
+  await setRangeValue(page, '#gainSlider', 50);
+  await expect(page.locator('#gainValue')).toHaveText('50');
+  await expect
+    .poll(async () => {
+      const telemetry = await currentTelemetry(page);
+      if (!telemetry) return 0;
+      return Math.abs(telemetry.gain - 0.5) < 0.000001 ? telemetry.sequence : 0;
+    }, { timeout: 10_000 })
+    .toBeGreaterThan(0);
+
   await page.evaluate(() => {
     window.__mdspNode.port.postMessage({ type: 'queue-topology-edit' });
   });
-  await setRangeValue(page, '#gainSlider', 50);
-  await expect(page.locator('#gainValue')).toHaveText('50');
   await expect
     .poll(async () => (await topologyEditQueued(page))?.telemetrySequence ?? -1, { timeout: 10_000 })
     .toBeGreaterThanOrEqual(initialTelemetry.sequence);
@@ -515,11 +525,21 @@ test('browser demo proves CompiledStereoDspTopologyController crossfade in the w
     ),
   ).toBeTruthy();
 
+  // Set gain BEFORE queueing the topology edit to avoid a race where the
+  // crossfade completes before the gain message reaches the AudioWorklet.
+  await setRangeValue(page, '#gainSlider', 50);
+  await expect(page.locator('#gainValue')).toHaveText('50');
+  await expect
+    .poll(async () => {
+      const telemetry = await currentTelemetry(page);
+      if (!telemetry) return 0;
+      return Math.abs(telemetry.gain - 0.5) < 0.000001 ? telemetry.sequence : 0;
+    }, { timeout: 10_000 })
+    .toBeGreaterThan(0);
+
   await page.evaluate(() => {
     window.__mdspNode.port.postMessage({ type: 'queue-stereo-topology-edit' });
   });
-  await setRangeValue(page, '#gainSlider', 50);
-  await expect(page.locator('#gainValue')).toHaveText('50');
   await expect
     .poll(async () => (await stereoTopologyEditQueued(page))?.telemetrySequence ?? -1, { timeout: 10_000 })
     .toBeGreaterThanOrEqual(initialTelemetry.sequence);
