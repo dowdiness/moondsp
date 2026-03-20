@@ -55,6 +55,13 @@ test "ArithSym Eval: clip" {
 }
 
 ///|
+test "ArithSym Eval: clip negative" {
+  let a : Eval = @mdsp.ArithSym::constant(-5.0)
+  let result = @mdsp.ArithSym::clip(a, 3.0)
+  assert_eq(result.value, -3.0)
+}
+
+///|
 impl @mdsp.DspSym for Eval with oscillator(self, _waveform) {
   { value: self.value }
 }

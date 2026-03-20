@@ -916,22 +916,23 @@ Current limits:
   from its own freshly compiled internal state
 - in-flight control mirroring requires both graphs to accept the same
   node-index / slot updates during the crossfade window
-- topology edits are still narrow:
+- topology edits support both single-node and multi-node operations:
   - `GraphTopologyEdit::replace_node(...)` swaps one authoring-order node
   - `GraphTopologyEdit::rewire_input(...)` retargets one existing input edge
   - `GraphTopologyEdit::insert_node(...)` appends one unary node and retargets
     one existing downstream input to it
   - `GraphTopologyEdit::delete_node(...)` removes one unary node and retargets
     one downstream input to a replacement upstream source
-  - append-only `InsertNode` keeps existing authoring indices stable during the
-    staged swap; the inserted node becomes the new final authoring index
-  - `DeleteNode` compacts authoring indices after removal and is currently
-    mono-only, matching the append-only insert slice rather than stereo parity
-  - on the mono path, `InsertNode` followed by `DeleteNode` can round-trip a
-    unary append-only edit back to the original shorter graph shape
+  - `GraphTopologyEdit::insert_chain(...)` inserts a chain of unary nodes
+    between a source and a downstream input
+  - `GraphTopologyEdit::delete_chain(...)` removes a contiguous chain of unary
+    nodes and retargets the downstream input to a replacement source
+  - all edit variants work for both mono and stereo topology controllers
+  - state preservation across topology-edit recompilation is supported:
+    unchanged nodes (matched by authoring index and kind) inherit runtime state
+    (oscillator phase, filter coefficients, delay buffers, self-register values)
+    from the previous compiled graph
   - only one topology replacement may be staged at a time
-  - stereo parity exists only for terminal-stereo graphs through
-    `CompiledStereoDspTopologyController`
 - browser/AudioWorklet hot-swap proof is now narrow but present for both paths:
   the `browser/` wrapper exports dedicated mono `CompiledDspHotSwap` and
   terminal-stereo `CompiledStereoDspHotSwap` proof paths, and Playwright checks

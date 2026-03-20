@@ -49,11 +49,16 @@ fn fold_constants(
           0.0
         }
         let result = node.fold_value(v0, v1)
-        let new_index = folded.length()
-        folded.push(DspNode::constant(result))
-        index_map[i] = new_index
-        changed = true
-        continue
+        // Skip folding if result is non-finite
+        if result.is_nan() || result.is_inf() {
+          // Fall through to keep node as-is
+        } else {
+          let new_index = folded.length()
+          folded.push(DspNode::constant(result))
+          index_map[i] = new_index
+          changed = true
+          continue
+        }
       }
     }
     // Keep node as-is, remapping inputs
@@ -156,22 +161,26 @@ fn eliminate_dead(
 }
 
 ///|
-/// Recursively mark a node and its inputs as reachable.
+/// Iteratively mark a node and its inputs as reachable using a worklist.
 fn mark_reachable(
   nodes : Array[DspNode],
   reachable : FixedArray[Bool],
-  index : Int,
+  start : Int,
 ) -> Unit {
-  if index < 0 || index >= nodes.length() || reachable[index] {
-    return
-  }
-  reachable[index] = true
-  let node = nodes[index]
-  if node.input0 >= 0 {
-    mark_reachable(nodes, reachable, node.input0)
-  }
-  if node.input1 >= 0 {
-    mark_reachable(nodes, reachable, node.input1)
+  let stack : Array[Int] = [start]
+  while stack.length() > 0 {
+    let index = stack.pop().unwrap()
+    if index < 0 || index >= nodes.length() || reachable[index] {
+      continue
+    }
+    reachable[index] = true
+    let node = nodes[index]
+    if node.input0 >= 0 {
+      stack.push(node.input0)
+    }
+    if node.input1 >= 0 {
+      stack.push(node.input1)
+    }
   }
 }
 

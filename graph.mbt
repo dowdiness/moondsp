@@ -1223,6 +1223,8 @@ fn CompiledDsp::process_feedback_graph(
       // Update self-register for feedback sources
       if self.self_enabled[node_index] {
         self.self_values[node_index] = sample_values[node_index]
+        self.self_left_values[node_index] = left_sv[node_index]
+        self.self_right_values[node_index] = right_sv[node_index]
       }
     }
   }
@@ -4320,7 +4322,6 @@ fn valid_feedback_terminal_stereo_graph(
       None => return false
     }
   }
-  ignore(shapes)
   true
 }
 

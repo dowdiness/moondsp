@@ -1042,6 +1042,10 @@ pub fn CompiledStereoDspTopologyController::queue_topology_edits(
 }
 
 ///|
+/// Stereo topology edit validation is intentionally permissive: compilation
+/// itself is the gatekeeper for invalid stereo graphs. Edits that produce
+/// invalid shapes will fail at recompilation time rather than at the
+/// validation step.
 fn valid_stereo_topology_edits(_edits : Array[GraphTopologyEdit]) -> Bool {
   true
 }
