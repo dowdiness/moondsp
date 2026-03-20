@@ -13,10 +13,12 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
     this.prefersCompiledTopologyEdit = Boolean(options?.processorOptions?.useCompiledTopologyEdit);
     this.prefersCompiledStereoHotSwap = Boolean(options?.processorOptions?.useCompiledStereoHotSwap);
     this.prefersCompiledStereoTopologyEdit = Boolean(options?.processorOptions?.useCompiledStereoTopologyEdit);
+    this.prefersExitDeliverable = Boolean(options?.processorOptions?.useExitDeliverable);
     this.usesCompiledHotSwap = false;
     this.usesCompiledTopologyEdit = false;
     this.usesCompiledStereoHotSwap = false;
     this.usesCompiledStereoTopologyEdit = false;
+    this.usesExitDeliverable = false;
     this.usesCompiledStereoGraph = false;
     this.usesCompiledGraph = false;
     this.reportedRuntimeError = false;
@@ -226,7 +228,26 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
         }
       }
 
-      if (!this.usesCompiledHotSwap && !this.usesCompiledTopologyEdit && !this.usesCompiledStereoTopologyEdit && !this.usesCompiledStereoHotSwap && supportsCompiledStereoGraph) {
+      const supportsExitDeliverable =
+        typeof this.wasm.init_exit_deliverable_graph === "function" &&
+        typeof this.wasm.process_exit_deliverable_block === "function" &&
+        typeof this.wasm.exit_deliverable_output_sample === "function";
+
+      if (
+        !this.usesCompiledHotSwap &&
+        !this.usesCompiledTopologyEdit &&
+        !this.usesCompiledStereoTopologyEdit &&
+        !this.usesCompiledStereoHotSwap &&
+        this.prefersExitDeliverable &&
+        supportsExitDeliverable
+      ) {
+        const initialized = this.wasm.init_exit_deliverable_graph(sampleRate, 128);
+        if (initialized) {
+          this.usesExitDeliverable = true;
+        }
+      }
+
+      if (!this.usesCompiledHotSwap && !this.usesCompiledTopologyEdit && !this.usesCompiledStereoTopologyEdit && !this.usesCompiledStereoHotSwap && !this.usesExitDeliverable && supportsCompiledStereoGraph) {
         const initialized = this.wasm.init_compiled_stereo_graph(sampleRate, 128);
         if (initialized) {
           this.usesCompiledStereoGraph = true;
@@ -238,6 +259,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
         !this.usesCompiledTopologyEdit &&
         !this.usesCompiledStereoTopologyEdit &&
         !this.usesCompiledStereoHotSwap &&
+        !this.usesExitDeliverable &&
         !this.usesCompiledStereoGraph &&
         supportsCompiledGraph
       ) {
@@ -252,6 +274,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
         !this.usesCompiledTopologyEdit &&
         !this.usesCompiledStereoTopologyEdit &&
         !this.usesCompiledStereoHotSwap &&
+        !this.usesExitDeliverable &&
         !this.usesCompiledStereoGraph &&
         !this.usesCompiledGraph &&
         (
@@ -259,6 +282,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
           supportsCompiledTopologyEdit ||
           supportsCompiledStereoTopologyEdit ||
           supportsCompiledStereoHotSwap ||
+          supportsExitDeliverable ||
           supportsCompiledStereoGraph ||
           supportsCompiledGraph
         )
@@ -293,6 +317,8 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
             ? "compiled-stereo-topology-edit-dsp"
           : this.usesCompiledStereoHotSwap
             ? "compiled-stereo-hot-swap-dsp"
+          : this.usesExitDeliverable
+            ? "exit-deliverable-dsp"
           : this.usesCompiledStereoGraph
           ? "compiled-stereo-dsp"
           : this.usesCompiledGraph
@@ -430,6 +456,35 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
         left[index] = this.wasm.compiled_stereo_topology_edit_left_sample(index);
         if (right) {
           right[index] = this.wasm.compiled_stereo_topology_edit_right_sample(index);
+        }
+      }
+
+      this.reportBlockTelemetry(left, right);
+      return true;
+    }
+
+    if (this.usesExitDeliverable) {
+      const processed = this.wasm.process_exit_deliverable_block(
+        sampleRate,
+        left.length,
+      );
+      if (!processed) {
+        this.fillSilence(left, right);
+        if (!this.reportedRuntimeError) {
+          this.reportedRuntimeError = true;
+          this.port.postMessage({
+            type: "error",
+            message: "Exit deliverable browser block processing failed",
+          });
+        }
+        return true;
+      }
+
+      for (let index = 0; index < left.length; index += 1) {
+        const sample = this.wasm.exit_deliverable_output_sample(index);
+        left[index] = sample;
+        if (right) {
+          right[index] = sample;
         }
       }
 

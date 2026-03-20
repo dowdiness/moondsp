@@ -376,6 +376,7 @@
     const useCompiledTopologyEdit = urlParams.get("topologyEditMono") === "1";
     const useCompiledStereoHotSwap = urlParams.get("hotSwapStereo") === "1";
     const useCompiledStereoTopologyEdit = urlParams.get("topologyEditStereo") === "1";
+    const useExitDeliverable = urlParams.get("exitDeliverable") === "1";
 
     let audioContext = null;
     let node = null;
@@ -562,6 +563,7 @@
             useCompiledTopologyEdit,
             useCompiledStereoHotSwap,
             useCompiledStereoTopologyEdit,
+            useExitDeliverable,
           },
           numberOfInputs: 0,
           numberOfOutputs: 1,
@@ -579,6 +581,8 @@
               ? "CompiledStereoDspTopologyController block runtime"
               : event.data.mode === "compiled-stereo-hot-swap-dsp"
               ? "CompiledStereoDspHotSwap block runtime"
+              : event.data.mode === "exit-deliverable-dsp"
+              ? "Exit Deliverable FM Synthesis (Phase 2)"
               : event.data.mode === "compiled-stereo-dsp"
               ? "CompiledStereoDsp block runtime"
               : event.data.mode === "compiled-dsp"
