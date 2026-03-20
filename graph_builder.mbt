@@ -12,11 +12,6 @@ pub struct GraphBuilder {
 }
 
 ///|
-pub fn GraphBuilder::new() -> GraphBuilder {
-  { nodes_: [], index: 0 }
-}
-
-///|
 /// Return the accumulated node array.
 pub fn GraphBuilder::nodes(self : GraphBuilder) -> Array[DspNode] {
   self.nodes_
@@ -284,75 +279,154 @@ pub impl StereoDelaySym for GraphBuilder with stereo_delay(
 ///|
 /// Walk a `DspNode` array and reconstruct the DSP graph through the tagless
 /// API, enabling round-trip testing (GraphBuilder -> nodes -> replay -> Eval).
+/// Returns `None` for empty arrays or invalid node references.
 pub fn[
   T : ArithSym + DspSym + FilterSym + DelaySym + StereoSym + StereoFilterSym + StereoDelaySym,
 ] replay(
   nodes : Array[DspNode],
-) -> T {
+) -> T? {
   let len = nodes.length()
+  if len == 0 {
+    return None
+  }
   let results : FixedArray[T?] = FixedArray::make(len, None)
   for i = 0; i < len; i = i + 1 {
     let node = nodes[i]
-    let value : T = match node.kind {
-      Constant => T::constant(node.value0)
+    let value : T? = match node.kind {
+      Constant => Some(T::constant(node.value0))
       Oscillator =>
         if node.input0 >= 0 {
-          T::oscillator(results[node.input0].unwrap(), node.waveform)
+          match replay_get_result(results, node.input0) {
+            Some(v) => Some(T::oscillator(v, node.waveform))
+            None => None
+          }
         } else {
-          T::oscillator(T::constant(node.value0), node.waveform)
+          Some(T::oscillator(T::constant(node.value0), node.waveform))
         }
-      Noise => T::noise(node.seed)
-      Adsr => T::adsr(node.value0, node.value1, node.value2, node.value3)
+      Noise => Some(T::noise(node.seed))
+      Adsr => Some(T::adsr(node.value0, node.value1, node.value2, node.value3))
       Biquad =>
-        T::biquad(
-          results[node.input0].unwrap(),
-          node.filter_mode,
-          node.value0,
-          node.value1,
-        )
+        match replay_get_result(results, node.input0) {
+          Some(v) =>
+            Some(T::biquad(v, node.filter_mode, node.value0, node.value1))
+          None => None
+        }
       Delay =>
-        T::delay(
-          results[node.input0].unwrap(),
-          node.delay_max_samples,
-          node.delay_samples,
-          node.value0,
-        )
-      Gain => T::gain(results[node.input0].unwrap(), node.value0)
+        match replay_get_result(results, node.input0) {
+          Some(v) =>
+            Some(
+              T::delay(
+                v,
+                node.delay_max_samples,
+                node.delay_samples,
+                node.value0,
+              ),
+            )
+          None => None
+        }
+      Gain =>
+        match replay_get_result(results, node.input0) {
+          Some(v) => Some(T::gain(v, node.value0))
+          None => None
+        }
       Mul =>
-        T::mul(results[node.input0].unwrap(), results[node.input1].unwrap())
+        match
+          (
+            replay_get_result(results, node.input0),
+            replay_get_result(results, node.input1),
+          ) {
+          (Some(a), Some(b)) => Some(T::mul(a, b))
+          _ => None
+        }
       Mix =>
-        T::mix(results[node.input0].unwrap(), results[node.input1].unwrap())
-      Clip => T::clip(results[node.input0].unwrap(), node.value0)
-      Output => T::output(results[node.input0].unwrap())
-      Pan => T::pan(results[node.input0].unwrap(), node.value0)
-      StereoGain => T::stereo_gain(results[node.input0].unwrap(), node.value0)
-      StereoClip => T::stereo_clip(results[node.input0].unwrap(), node.value0)
+        match
+          (
+            replay_get_result(results, node.input0),
+            replay_get_result(results, node.input1),
+          ) {
+          (Some(a), Some(b)) => Some(T::mix(a, b))
+          _ => None
+        }
+      Clip =>
+        match replay_get_result(results, node.input0) {
+          Some(v) => Some(T::clip(v, node.value0))
+          None => None
+        }
+      Output =>
+        match replay_get_result(results, node.input0) {
+          Some(v) => Some(T::output(v))
+          None => None
+        }
+      Pan =>
+        match replay_get_result(results, node.input0) {
+          Some(v) => Some(T::pan(v, node.value0))
+          None => None
+        }
+      StereoGain =>
+        match replay_get_result(results, node.input0) {
+          Some(v) => Some(T::stereo_gain(v, node.value0))
+          None => None
+        }
+      StereoClip =>
+        match replay_get_result(results, node.input0) {
+          Some(v) => Some(T::stereo_clip(v, node.value0))
+          None => None
+        }
       StereoBiquad =>
-        T::stereo_biquad(
-          results[node.input0].unwrap(),
-          node.filter_mode,
-          node.value0,
-          node.value1,
-        )
+        match replay_get_result(results, node.input0) {
+          Some(v) =>
+            Some(
+              T::stereo_biquad(v, node.filter_mode, node.value0, node.value1),
+            )
+          None => None
+        }
       StereoDelay =>
-        T::stereo_delay(
-          results[node.input0].unwrap(),
-          node.delay_max_samples,
-          node.delay_samples,
-          node.value0,
-        )
+        match replay_get_result(results, node.input0) {
+          Some(v) =>
+            Some(
+              T::stereo_delay(
+                v,
+                node.delay_max_samples,
+                node.delay_samples,
+                node.value0,
+              ),
+            )
+          None => None
+        }
       StereoMixDown =>
-        T::stereo_mixdown(
-          results[node.input0].unwrap(),
-          results[node.input1].unwrap(),
-        )
+        match
+          (
+            replay_get_result(results, node.input0),
+            replay_get_result(results, node.input1),
+          ) {
+          (Some(a), Some(b)) => Some(T::stereo_mixdown(a, b))
+          _ => None
+        }
       StereoOutput =>
-        T::stereo_output(
-          results[node.input0].unwrap(),
-          results[node.input1].unwrap(),
-        )
+        match
+          (
+            replay_get_result(results, node.input0),
+            replay_get_result(results, node.input1),
+          ) {
+          (Some(a), Some(b)) => Some(T::stereo_output(a, b))
+          _ => None
+        }
     }
-    results[i] = Some(value)
+    match value {
+      Some(v) => results[i] = Some(v)
+      None => return None
+    }
   }
-  results[len - 1].unwrap()
+  results[len - 1]
+}
+
+///|
+/// Safely access a replay result by index, returning None for out-of-bounds
+/// or missing results.
+fn[T] replay_get_result(results : FixedArray[T?], index : Int) -> T? {
+  if index >= 0 && index < results.length() {
+    results[index]
+  } else {
+    None
+  }
 }

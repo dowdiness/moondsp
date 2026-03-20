@@ -316,7 +316,7 @@ test "replay: Constant+Mul through Eval" {
     @mdsp.DspNode::constant(4.0),
     @mdsp.DspNode::mul(0, 1),
   ]
-  let result : Eval = @mdsp.replay(nodes)
+  let result : Eval = @mdsp.replay(nodes).unwrap()
   assert_eq(result.value, 12.0)
 }
 
@@ -328,7 +328,7 @@ test "replay: Gain+Clip+Output through Eval" {
     @mdsp.DspNode::clip(1, 2.0),
     @mdsp.DspNode::output(2),
   ]
-  let result : Eval = @mdsp.replay(nodes)
+  let result : Eval = @mdsp.replay(nodes).unwrap()
   // 5.0 * 0.5 = 2.5, clipped to 2.0
   assert_eq(result.value, 2.0)
 }
@@ -338,6 +338,6 @@ test "replay: tagless -> GraphBuilder -> replay roundtrip" {
   let a : @mdsp.GraphBuilder = @mdsp.ArithSym::constant(3.0)
   let b : @mdsp.GraphBuilder = @mdsp.ArithSym::constant(4.0)
   let product : @mdsp.GraphBuilder = @mdsp.ArithSym::mul(a, b)
-  let result : Eval = @mdsp.replay(product.nodes())
+  let result : Eval = @mdsp.replay(product.nodes()).unwrap()
   assert_eq(result.value, 12.0)
 }

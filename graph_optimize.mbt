@@ -9,8 +9,8 @@ fn fold_constants(
   // Bail out if nodes are not in topological order (forward references present)
   for i = 0; i < n; i = i + 1 {
     let node = nodes[i]
-    if (node.input0 >= 0 && node.input0 > i) ||
-      (node.input1 >= 0 && node.input1 > i) {
+    if (node.input0 >= 0 && node.input0 >= i) ||
+      (node.input1 >= 0 && node.input1 >= i) {
       return (nodes, FixedArray::makei(n, fn(i) { i }), false)
     }
   }
@@ -125,8 +125,16 @@ fn eliminate_dead(
   let result : Array[DspNode] = []
   for i = 0; i < live.length(); i = i + 1 {
     let node = live[i]
-    let new_input0 = if node.input0 >= 0 { remap[node.input0] } else { -1 }
-    let new_input1 = if node.input1 >= 0 { remap[node.input1] } else { -1 }
+    let new_input0 = if node.input0 >= 0 && node.input0 < remap.length() {
+      remap[node.input0]
+    } else {
+      -1
+    }
+    let new_input1 = if node.input1 >= 0 && node.input1 < remap.length() {
+      remap[node.input1]
+    } else {
+      -1
+    }
     result.push(
       DspNode(
         node.kind,

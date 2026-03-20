@@ -580,6 +580,11 @@ fn apply_topology_delete_chain(
     replacement_source_index >= nodes.length() {
     return false
   }
+  // Reject if replacement_source is inside the deleted span
+  if replacement_source_index >= start_node_index &&
+    replacement_source_index <= end_node_index {
+    return false
+  }
   // Validate: each node in the chain must be unary (input1 < 0) and not
   // Output/StereoOutput, and each must feed exactly one downstream consumer
   for index = start_node_index; index <= end_node_index; index = index + 1 {
@@ -1142,9 +1147,40 @@ fn copy_compiled_dsp_state(
       new_graph.biquad_states[new_compiled] = old_graph.biquad_states[old_compiled]
       new_graph.stereo_biquad_left_states[new_compiled] = old_graph.stereo_biquad_left_states[old_compiled]
       new_graph.stereo_biquad_right_states[new_compiled] = old_graph.stereo_biquad_right_states[old_compiled]
-      new_graph.delay_states[new_compiled] = old_graph.delay_states[old_compiled]
-      new_graph.stereo_delay_left_states[new_compiled] = old_graph.stereo_delay_left_states[old_compiled]
-      new_graph.stereo_delay_right_states[new_compiled] = old_graph.stereo_delay_right_states[old_compiled]
+      // Only copy delay state if buffer capacity matches
+      match
+        (
+          old_graph.delay_states[old_compiled],
+          new_graph.delay_states[new_compiled],
+        ) {
+        (Some(old_delay), Some(new_delay)) =>
+          if old_delay.max_delay_samples() == new_delay.max_delay_samples() {
+            new_graph.delay_states[new_compiled] = old_graph.delay_states[old_compiled]
+          }
+        _ => ()
+      }
+      match
+        (
+          old_graph.stereo_delay_left_states[old_compiled],
+          new_graph.stereo_delay_left_states[new_compiled],
+        ) {
+        (Some(old_delay), Some(new_delay)) =>
+          if old_delay.max_delay_samples() == new_delay.max_delay_samples() {
+            new_graph.stereo_delay_left_states[new_compiled] = old_graph.stereo_delay_left_states[old_compiled]
+          }
+        _ => ()
+      }
+      match
+        (
+          old_graph.stereo_delay_right_states[old_compiled],
+          new_graph.stereo_delay_right_states[new_compiled],
+        ) {
+        (Some(old_delay), Some(new_delay)) =>
+          if old_delay.max_delay_samples() == new_delay.max_delay_samples() {
+            new_graph.stereo_delay_right_states[new_compiled] = old_graph.stereo_delay_right_states[old_compiled]
+          }
+        _ => ()
+      }
       new_graph.self_values[new_compiled] = old_graph.self_values[old_compiled]
       new_graph.self_enabled[new_compiled] = old_graph.self_enabled[old_compiled]
     }
@@ -1184,9 +1220,40 @@ fn copy_compiled_stereo_dsp_state(
       new_graph.biquad_states[new_compiled] = old_graph.biquad_states[old_compiled]
       new_graph.stereo_biquad_left_states[new_compiled] = old_graph.stereo_biquad_left_states[old_compiled]
       new_graph.stereo_biquad_right_states[new_compiled] = old_graph.stereo_biquad_right_states[old_compiled]
-      new_graph.delay_states[new_compiled] = old_graph.delay_states[old_compiled]
-      new_graph.stereo_delay_left_states[new_compiled] = old_graph.stereo_delay_left_states[old_compiled]
-      new_graph.stereo_delay_right_states[new_compiled] = old_graph.stereo_delay_right_states[old_compiled]
+      // Only copy delay state if buffer capacity matches
+      match
+        (
+          old_graph.delay_states[old_compiled],
+          new_graph.delay_states[new_compiled],
+        ) {
+        (Some(old_delay), Some(new_delay)) =>
+          if old_delay.max_delay_samples() == new_delay.max_delay_samples() {
+            new_graph.delay_states[new_compiled] = old_graph.delay_states[old_compiled]
+          }
+        _ => ()
+      }
+      match
+        (
+          old_graph.stereo_delay_left_states[old_compiled],
+          new_graph.stereo_delay_left_states[new_compiled],
+        ) {
+        (Some(old_delay), Some(new_delay)) =>
+          if old_delay.max_delay_samples() == new_delay.max_delay_samples() {
+            new_graph.stereo_delay_left_states[new_compiled] = old_graph.stereo_delay_left_states[old_compiled]
+          }
+        _ => ()
+      }
+      match
+        (
+          old_graph.stereo_delay_right_states[old_compiled],
+          new_graph.stereo_delay_right_states[new_compiled],
+        ) {
+        (Some(old_delay), Some(new_delay)) =>
+          if old_delay.max_delay_samples() == new_delay.max_delay_samples() {
+            new_graph.stereo_delay_right_states[new_compiled] = old_graph.stereo_delay_right_states[old_compiled]
+          }
+        _ => ()
+      }
       new_graph.self_values[new_compiled] = old_graph.self_values[old_compiled]
       new_graph.self_left_values[new_compiled] = old_graph.self_left_values[old_compiled]
       new_graph.self_right_values[new_compiled] = old_graph.self_right_values[old_compiled]

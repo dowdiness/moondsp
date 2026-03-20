@@ -652,8 +652,9 @@ The current repository already implements:
   into `CompiledStereoDsp` for `Mono -> Pan -> Stereo post-processing ->
   StereoOutput`, where the current stereo post-processing node set is
   `StereoGain`, `StereoClip`, `StereoBiquad`, and `StereoDelay`, and where the
-  current feedback slice also allows supported mono `z^-1` loops before the
-  stereo lift through `Pan`
+  feedback uses a self-register model: stereo, mixed-shape, and mono `z^-1`
+  feedback loops are accepted through `Pan` and in the stereo post-processing
+  path
 - input nodes may be declared in authoring order; the compiler topologically
   sorts reachable nodes from a single terminal output node
 - compile rejects:
@@ -672,7 +673,7 @@ Current graph node support:
 
 - `Constant`
 - `Oscillator`
-- `OscillatorFrom` (FM mode: reads frequency per-sample from input buffer)
+- `Oscillator` in FM mode (`input0 >= 0`): reads frequency per-sample from input buffer
 - `Noise`
 - `Adsr`
 - `Biquad`
@@ -744,7 +745,7 @@ Current `set_param(node_index, slot, value)` support matrix:
 |-----------|-----------------|-------|
 | `Constant` | `Value0` | Finite values only |
 | `Oscillator` | `Value0` | Finite frequency values only |
-| `OscillatorFrom` | none | FM mode: frequency comes from input buffer, no runtime freq param |
+| `Oscillator` (FM mode) | none | FM mode: frequency comes from input buffer, no runtime freq param |
 | `Noise` | none | No runtime seed update yet |
 | `Adsr` | none | Runtime control is `gate_on` / `gate_off` only |
 | `Biquad` | `Value0`, `Value1` | `Value0 = cutoff`, `Value1 = q`; validated against the compile-time sample rate |

@@ -29,6 +29,9 @@ pub fn[T : ArithSym] lin_map(
   out_lo : Double,
   out_hi : Double,
 ) -> T {
+  if in_hi == in_lo {
+    return T::constant(out_lo)
+  }
   let scale = (out_hi - out_lo) / (in_hi - in_lo)
   T::mix(
     T::mul(T::mix(input, T::constant(-in_lo)), T::constant(scale)),

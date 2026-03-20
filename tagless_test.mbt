@@ -183,9 +183,8 @@ test "lin_map maps in_hi to out_hi" {
 }
 
 ///|
-test "lin_map with in_lo == in_hi produces non-finite result" {
+test "lin_map with in_lo == in_hi returns out_lo fallback" {
   let input : Eval = @mdsp.ArithSym::constant(5.0)
   let result = @mdsp.lin_map(input, 3.0, 3.0, 0.0, 100.0)
-  // division by zero: scale = inf or NaN
-  assert_true(result.value.is_nan() || result.value.is_inf())
+  assert_eq(result.value, 0.0) // out_lo = 0.0
 }
