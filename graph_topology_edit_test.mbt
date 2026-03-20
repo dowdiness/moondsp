@@ -997,7 +997,7 @@ test "topology edit: delete_chain rejects chain with binary node" {
 test "topology edit preserves oscillator phase across recompilation" {
   let nodes = [
     DspNode::constant(440.0),
-    DspNode::oscillator(Waveform::Sine, 440.0),
+    DspNode::oscillator_from(0, Waveform::Sine),
     DspNode::output(1),
   ]
   let ctx = DspContext::new(48000.0, 128)
@@ -1033,7 +1033,7 @@ test "topology edit preserves oscillator phase across recompilation" {
 test "topology edit preserves stereo oscillator phase across recompilation" {
   let nodes = [
     DspNode::constant(440.0),
-    DspNode::oscillator(Waveform::Sine, 440.0),
+    DspNode::oscillator_from(0, Waveform::Sine),
     DspNode::pan(1, 0.0),
     DspNode::stereo_output(2),
   ]

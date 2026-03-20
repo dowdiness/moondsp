@@ -639,6 +639,28 @@ pub fn CompiledDsp::compile(
 ) -> CompiledDsp? {
   let original_count = nodes.length()
   let (nodes, opt_map) = optimize_graph(nodes)
+  CompiledDsp::compile_internal(nodes, context, original_count, opt_map)
+}
+
+///|
+/// Compile without optimization — used by topology controllers where authoring
+/// indices must be preserved for runtime controls.
+fn CompiledDsp::compile_raw(
+  nodes : Array[DspNode],
+  context : DspContext,
+) -> CompiledDsp? {
+  let count = nodes.length()
+  let identity_map = FixedArray::makei(count, fn(i) { i })
+  CompiledDsp::compile_internal(nodes, context, count, identity_map)
+}
+
+///|
+fn CompiledDsp::compile_internal(
+  nodes : Array[DspNode],
+  context : DspContext,
+  original_count : Int,
+  opt_map : FixedArray[Int],
+) -> CompiledDsp? {
   let plan = match mono_compile_plan(nodes, context) {
     Some(plan) => plan
     None => return None
@@ -1219,6 +1241,26 @@ pub fn CompiledStereoDsp::compile(
 ) -> CompiledStereoDsp? {
   let original_count = nodes.length()
   let (nodes, opt_map) = optimize_graph(nodes)
+  CompiledStereoDsp::compile_internal(nodes, context, original_count, opt_map)
+}
+
+///|
+fn CompiledStereoDsp::compile_raw(
+  nodes : Array[DspNode],
+  context : DspContext,
+) -> CompiledStereoDsp? {
+  let count = nodes.length()
+  let identity_map = FixedArray::makei(count, fn(i) { i })
+  CompiledStereoDsp::compile_internal(nodes, context, count, identity_map)
+}
+
+///|
+fn CompiledStereoDsp::compile_internal(
+  nodes : Array[DspNode],
+  context : DspContext,
+  original_count : Int,
+  opt_map : FixedArray[Int],
+) -> CompiledStereoDsp? {
   let plan = match stereo_compile_plan(nodes, context) {
     Some(plan) => plan
     None => return None

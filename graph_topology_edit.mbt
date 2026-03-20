@@ -225,7 +225,7 @@ pub fn CompiledDspTopologyController::from_nodes(
   context : DspContext,
   crossfade_samples? : Int = 0,
 ) -> CompiledDspTopologyController? {
-  let compiled = match CompiledDsp::compile(nodes, context) {
+  let compiled = match CompiledDsp::compile_raw(nodes, context) {
     Some(compiled) => compiled
     None => return None
   }
@@ -313,7 +313,8 @@ pub fn CompiledDspTopologyController::queue_topology_edits(
     self.compile_sample_rate,
     self.compile_block_size,
   )
-  let replacement = match CompiledDsp::compile(edited_nodes, compile_context) {
+  let replacement = match
+    CompiledDsp::compile_raw(edited_nodes, compile_context) {
     Some(replacement) => replacement
     None => return false
   }
@@ -931,7 +932,7 @@ pub fn CompiledStereoDspTopologyController::from_nodes(
   context : DspContext,
   crossfade_samples? : Int = 0,
 ) -> CompiledStereoDspTopologyController? {
-  let compiled = match CompiledStereoDsp::compile(nodes, context) {
+  let compiled = match CompiledStereoDsp::compile_raw(nodes, context) {
     Some(compiled) => compiled
     None => return None
   }
@@ -1023,7 +1024,7 @@ pub fn CompiledStereoDspTopologyController::queue_topology_edits(
     self.compile_block_size,
   )
   let replacement = match
-    CompiledStereoDsp::compile(edited_nodes, compile_context) {
+    CompiledStereoDsp::compile_raw(edited_nodes, compile_context) {
     Some(replacement) => replacement
     None => return false
   }
