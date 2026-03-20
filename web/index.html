@@ -384,10 +384,11 @@
         "Phase 2 exit deliverable: sine(2).range(200,400).sine().lpf(800,1).out() — " +
         "a 2 Hz LFO modulates a carrier oscillator between 200–400 Hz through a low-pass filter. " +
         "Use the sliders to control LFO rate, filter cutoff, and master gain.";
-      document.querySelector('[for="freqSlider"], .slider-card:nth-of-type(1) strong')
-      // Relabel the freq slider
+      // Relabel the freq slider and update companion readout
       const freqLabel = freqSlider.closest(".slider-card").querySelector("strong");
       if (freqLabel) freqLabel.textContent = "LFO Rate";
+      const freqSuffix = freqSlider.closest(".slider-card").querySelector(".slider-row span:last-child");
+      if (freqSuffix) freqSuffix.innerHTML = '<span id="freqValue">2</span> Hz';
       freqSlider.min = "0";
       freqSlider.max = "20";
       freqSlider.value = "2";

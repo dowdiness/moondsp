@@ -822,6 +822,9 @@ fn reset_exit_deliverable_graph() -> Unit {
   exit_deliverable_output.val = None
   exit_deliverable_sample_rate.val = 0.0
   exit_deliverable_block_size.val = 0
+  exit_lfo_rate.val = 2.0
+  exit_cutoff.val = 800.0
+  exit_gain.val = 0.3
 }
 
 ///|

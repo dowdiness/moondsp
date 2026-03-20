@@ -295,6 +295,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
         !this.usesCompiledTopologyEdit &&
         !this.usesCompiledStereoTopologyEdit &&
         !this.usesCompiledStereoHotSwap &&
+        !this.usesExitDeliverable &&
         !this.usesCompiledStereoGraph &&
         !this.usesCompiledGraph &&
         typeof this.wasm.tick !== "function" &&

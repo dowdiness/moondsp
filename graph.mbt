@@ -2464,10 +2464,16 @@ fn updated_node_param(
         _ => None
       }
     Oscillator =>
-      match slot {
-        Value0 if valid_finite_value(value) =>
-          Some(node_with_value0(node, value))
-        _ => None
+      // FM oscillators (input0 >= 0) read frequency from input buffer;
+      // reject Value0 updates for them since the value is unused.
+      if node.input0 >= 0 {
+        None
+      } else {
+        match slot {
+          Value0 if valid_finite_value(value) =>
+            Some(node_with_value0(node, value))
+          _ => None
+        }
       }
     Adsr => None
     Noise => None
