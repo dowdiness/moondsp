@@ -16,7 +16,8 @@ pub fn[T : FilterSym] exit_deliverable() -> T {
   let freq = range(lfo, 200.0, 400.0)
   let carrier = T::oscillator(freq, Waveform::Sine)
   let filtered = T::biquad(carrier, BiquadMode::LowPass, 800.0, 1.0)
-  T::output(filtered)
+  let gained = T::gain(filtered, 0.3)
+  T::output(gained)
 }
 
 ///|

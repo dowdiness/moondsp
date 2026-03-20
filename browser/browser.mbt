@@ -672,7 +672,7 @@ let exit_deliverable_block_size : @ref.Ref[Int] = @ref.new(0)
 // [7] Mix(5,6)            — modulated freq
 // [8] Oscillator(Sine)    — carrier
 // [9] Biquad(LowPass)     — filter
-// [10] Gain               — master gain (added by browser wrapper)
+// [10] Gain(0.3)          — master gain
 // [11] Output
 const EXIT_LFO_RATE_NODE : Int = 0
 
@@ -798,27 +798,8 @@ fn ensure_exit_deliverable_graph(
 
   let context = @lib.DspContext::new(sample_rate, block_size)
   let output = @lib.AudioBuffer::filled(block_size)
-  // Build exit deliverable via tagless, then append a Gain node for master volume
   let builder : @lib.GraphBuilder = @lib.exit_deliverable()
-  let nodes = builder.nodes()
-  // The last node is Output(biquad). Insert Gain before Output.
-  // Output is at nodes.length()-1, its input is biquad at builder.index
-  let output_node = nodes[nodes.length() - 1]
-  let biquad_index = output_node.input0
-  // Replace Output's input with a new Gain node
-  let gain_index = nodes.length()
-  nodes.push(@lib.DspNode::gain(biquad_index, exit_gain.val))
-  nodes[nodes.length() - 2] = @lib.DspNode::output(gain_index)
-  // Wait — Output was the last node. After push, Gain is last. Fix: swap.
-  // Actually: nodes = [..., Output(biquad), Gain(biquad, 0.3)]
-  // Output needs to reference Gain, and Output should be last for compile.
-  // Let's just rebuild: remove the Output, add Gain, add new Output.
-  let len = nodes.length()
-  // nodes[len-2] was Output(biquad_index), nodes[len-1] is the new Gain
-  // Rewrite: nodes[len-2] = Gain(biquad_index, gain), nodes[len-1] = Output(len-2)
-  nodes[len - 2] = @lib.DspNode::gain(biquad_index, exit_gain.val)
-  nodes[len - 1] = @lib.DspNode::output(len - 2)
-  match @lib.CompiledDsp::compile(nodes, context) {
+  match @lib.CompiledDsp::compile(builder.nodes(), context) {
     Some(graph) => {
       exit_deliverable_graph.val = Some(graph)
       exit_deliverable_context.val = Some(context)

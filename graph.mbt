@@ -1105,9 +1105,8 @@ fn CompiledDsp::process_feedback_graph(
             node.input0,
             self.back_edge_input0_source[node_index],
           )
-          let pan_gains = feedback_graph_pan_gain(node.value0)
-          let pan_left = input0 * pan_gains.0
-          let pan_right = input0 * pan_gains.1
+          let pan_left = input0 * feedback_pan_left_gain(node.value0)
+          let pan_right = input0 * feedback_pan_right_gain(node.value0)
           left_sv[node_index] = pan_left
           right_sv[node_index] = pan_right
           self.left_buffers[node_index].set(sample_index, pan_left)
@@ -1723,9 +1722,8 @@ fn CompiledStereoDsp::process_feedback_graph(
             node.input0,
             self.back_edge_input0_source[node_index],
           )
-          let pan_gains = feedback_graph_pan_gain(node.value0)
-          let pan_left = input0 * pan_gains.0
-          let pan_right = input0 * pan_gains.1
+          let pan_left = input0 * feedback_pan_left_gain(node.value0)
+          let pan_right = input0 * feedback_pan_right_gain(node.value0)
           left_sv[node_index] = pan_left
           right_sv[node_index] = pan_right
           self.left_buffers[node_index].set(sample_index, pan_left)
@@ -3539,12 +3537,12 @@ fn self_register_stereo_input_right(
 }
 
 ///|
-fn feedback_graph_pan_gain(position : Double) -> (Double, Double) {
+fn feedback_pan_left_gain(position : Double) -> Double {
   if !valid_finite_value(position) {
-    (0.0, 0.0)
+    0.0
   } else {
     let clamped = position.clamp(min=-1.0, max=1.0)
-    let left_gain = if clamped <= -1.0 {
+    if clamped <= -1.0 {
       1.0
     } else if clamped >= 1.0 {
       0.0
@@ -3552,7 +3550,16 @@ fn feedback_graph_pan_gain(position : Double) -> (Double, Double) {
       let angle = (clamped + 1.0) * @math.PI * 0.25
       @math.cos(angle)
     }
-    let right_gain = if clamped <= -1.0 {
+  }
+}
+
+///|
+fn feedback_pan_right_gain(position : Double) -> Double {
+  if !valid_finite_value(position) {
+    0.0
+  } else {
+    let clamped = position.clamp(min=-1.0, max=1.0)
+    if clamped <= -1.0 {
       0.0
     } else if clamped >= 1.0 {
       1.0
@@ -3560,7 +3567,6 @@ fn feedback_graph_pan_gain(position : Double) -> (Double, Double) {
       let angle = (clamped + 1.0) * @math.PI * 0.25
       @math.sin(angle)
     }
-    (left_gain, right_gain)
   }
 }
 
