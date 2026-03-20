@@ -1182,7 +1182,6 @@ fn copy_compiled_dsp_state(
         _ => ()
       }
       new_graph.self_values[new_compiled] = old_graph.self_values[old_compiled]
-      new_graph.self_enabled[new_compiled] = old_graph.self_enabled[old_compiled]
     }
   }
 }
@@ -1257,7 +1256,6 @@ fn copy_compiled_stereo_dsp_state(
       new_graph.self_values[new_compiled] = old_graph.self_values[old_compiled]
       new_graph.self_left_values[new_compiled] = old_graph.self_left_values[old_compiled]
       new_graph.self_right_values[new_compiled] = old_graph.self_right_values[old_compiled]
-      new_graph.self_enabled[new_compiled] = old_graph.self_enabled[old_compiled]
     }
   }
 }

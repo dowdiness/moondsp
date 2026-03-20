@@ -191,50 +191,16 @@ pub impl StereoSym for GraphBuilder with stereo_clip(self, threshold) -> GraphBu
 }
 
 ///|
-pub impl StereoSym for GraphBuilder with stereo_mixdown(a, b) -> GraphBuilder {
-  let b_offset = merge_into(a.nodes_, b.nodes_)
-  let b_index = b.index + b_offset
+pub impl StereoSym for GraphBuilder with stereo_mixdown(a) -> GraphBuilder {
   let idx = a.nodes_.length()
-  a.nodes_.push(
-    DspNode(
-      DspNodeKind::StereoMixDown,
-      a.index,
-      b_index,
-      0.0,
-      0.0,
-      0.0,
-      0.0,
-      Waveform::Sine,
-      BiquadMode::LowPass,
-      0,
-      0,
-      0U,
-    ),
-  )
+  a.nodes_.push(DspNode::stereo_mixdown(a.index))
   { nodes_: a.nodes_, index: idx }
 }
 
 ///|
-pub impl StereoSym for GraphBuilder with stereo_output(a, b) -> GraphBuilder {
-  let b_offset = merge_into(a.nodes_, b.nodes_)
-  let b_index = b.index + b_offset
+pub impl StereoSym for GraphBuilder with stereo_output(a) -> GraphBuilder {
   let idx = a.nodes_.length()
-  a.nodes_.push(
-    DspNode(
-      DspNodeKind::StereoOutput,
-      a.index,
-      b_index,
-      0.0,
-      0.0,
-      0.0,
-      0.0,
-      Waveform::Sine,
-      BiquadMode::LowPass,
-      0,
-      0,
-      0U,
-    ),
-  )
+  a.nodes_.push(DspNode::stereo_output(a.index))
   { nodes_: a.nodes_, index: idx }
 }
 
@@ -394,22 +360,14 @@ pub fn[
           None => None
         }
       StereoMixDown =>
-        match
-          (
-            replay_get_result(results, node.input0),
-            replay_get_result(results, node.input1),
-          ) {
-          (Some(a), Some(b)) => Some(T::stereo_mixdown(a, b))
-          _ => None
+        match replay_get_result(results, node.input0) {
+          Some(v) => Some(T::stereo_mixdown(v))
+          None => None
         }
       StereoOutput =>
-        match
-          (
-            replay_get_result(results, node.input0),
-            replay_get_result(results, node.input1),
-          ) {
-          (Some(a), Some(b)) => Some(T::stereo_output(a, b))
-          _ => None
+        match replay_get_result(results, node.input0) {
+          Some(v) => Some(T::stereo_output(v))
+          None => None
         }
     }
     match value {

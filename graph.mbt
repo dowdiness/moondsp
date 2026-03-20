@@ -2409,7 +2409,12 @@ fn CompiledDsp::compiled_index_for(
   if node_index < 0 || node_index >= self.index_map.length() {
     None
   } else {
-    Some(self.index_map[node_index])
+    let compiled = self.index_map[node_index]
+    if compiled < 0 {
+      None
+    } else {
+      Some(compiled)
+    }
   }
 }
 
@@ -2430,7 +2435,12 @@ fn CompiledStereoDsp::compiled_index_for(
   if node_index < 0 || node_index >= self.index_map.length() {
     None
   } else {
-    Some(self.index_map[node_index])
+    let compiled = self.index_map[node_index]
+    if compiled < 0 {
+      None
+    } else {
+      Some(compiled)
+    }
   }
 }
 

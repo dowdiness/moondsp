@@ -188,33 +188,28 @@ test "GraphBuilder: stereo_delay" {
 }
 
 ///|
-test "GraphBuilder: stereo_mixdown binary merge" {
-  let a : @mdsp.GraphBuilder = @mdsp.ArithSym::constant(1.0)
-  let pa : @mdsp.GraphBuilder = @mdsp.StereoSym::pan(a, -1.0)
-  let b : @mdsp.GraphBuilder = @mdsp.ArithSym::constant(2.0)
-  let pb : @mdsp.GraphBuilder = @mdsp.StereoSym::pan(b, 1.0)
-  let mixed : @mdsp.GraphBuilder = @mdsp.StereoSym::stereo_mixdown(pa, pb)
+test "GraphBuilder: stereo_mixdown unary" {
+  let c : @mdsp.GraphBuilder = @mdsp.ArithSym::constant(1.0)
+  let p : @mdsp.GraphBuilder = @mdsp.StereoSym::pan(c, -1.0)
+  let mixed : @mdsp.GraphBuilder = @mdsp.StereoSym::stereo_mixdown(p)
   let nodes = mixed.nodes()
-  // a: const(1.0)=0, pan=1 | b: const(2.0)=0, pan=1 -> merged at offset 2
-  // result: const(1.0)=0, pan(0)=1, const(2.0)=2, pan(2)=3, stereo_mixdown(1,3)=4
-  assert_eq(nodes.length(), 5)
-  assert_true(nodes[4].kind is @mdsp.DspNodeKind::StereoMixDown)
-  assert_eq(nodes[4].input0, 1)
-  assert_eq(nodes[4].input1, 3)
+  // const(1.0)=0, pan(0)=1, stereo_mixdown(1)=2
+  assert_eq(nodes.length(), 3)
+  assert_true(nodes[2].kind is @mdsp.DspNodeKind::StereoMixDown)
+  assert_eq(nodes[2].input0, 1)
+  assert_eq(nodes[2].input1, -1)
 }
 
 ///|
-test "GraphBuilder: stereo_output binary merge" {
-  let a : @mdsp.GraphBuilder = @mdsp.ArithSym::constant(1.0)
-  let pa : @mdsp.GraphBuilder = @mdsp.StereoSym::pan(a, -1.0)
-  let b : @mdsp.GraphBuilder = @mdsp.ArithSym::constant(2.0)
-  let pb : @mdsp.GraphBuilder = @mdsp.StereoSym::pan(b, 1.0)
-  let out : @mdsp.GraphBuilder = @mdsp.StereoSym::stereo_output(pa, pb)
+test "GraphBuilder: stereo_output unary" {
+  let c : @mdsp.GraphBuilder = @mdsp.ArithSym::constant(1.0)
+  let p : @mdsp.GraphBuilder = @mdsp.StereoSym::pan(c, -1.0)
+  let out : @mdsp.GraphBuilder = @mdsp.StereoSym::stereo_output(p)
   let nodes = out.nodes()
-  assert_eq(nodes.length(), 5)
-  assert_true(nodes[4].kind is @mdsp.DspNodeKind::StereoOutput)
-  assert_eq(nodes[4].input0, 1)
-  assert_eq(nodes[4].input1, 3)
+  assert_eq(nodes.length(), 3)
+  assert_true(nodes[2].kind is @mdsp.DspNodeKind::StereoOutput)
+  assert_eq(nodes[2].input0, 1)
+  assert_eq(nodes[2].input1, -1)
 }
 
 ///|

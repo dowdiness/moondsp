@@ -105,12 +105,12 @@ impl @mdsp.StereoSym for Eval with stereo_clip(self, _threshold) {
 }
 
 ///|
-impl @mdsp.StereoSym for Eval with stereo_mixdown(a, _b) {
+impl @mdsp.StereoSym for Eval with stereo_mixdown(a) {
   a
 }
 
 ///|
-impl @mdsp.StereoSym for Eval with stereo_output(a, _b) {
+impl @mdsp.StereoSym for Eval with stereo_output(a) {
   a
 }
 

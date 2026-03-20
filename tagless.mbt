@@ -33,8 +33,8 @@ pub(open) trait StereoSym: DspSym {
   pan(Self, Double) -> Self
   stereo_gain(Self, Double) -> Self
   stereo_clip(Self, Double) -> Self
-  stereo_mixdown(Self, Self) -> Self
-  stereo_output(Self, Self) -> Self
+  stereo_mixdown(Self) -> Self
+  stereo_output(Self) -> Self
 }
 
 ///|
