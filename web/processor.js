@@ -27,6 +27,8 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
     this.telemetrySequence = 0;
     this.firstBlockTelemetryReported = false;
     this.forceTelemetryBlocks = 0;
+    this._leftPreview = new Float64Array(8);
+    this._rightPreview = new Float64Array(8);
 
     this.port.onmessage = (event) => {
       const data = event.data;
@@ -634,11 +636,9 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
     }
 
     const previewCount = Math.min(8, left.length);
-    const leftPreview = [];
-    const rightPreview = [];
     for (let index = 0; index < previewCount; index += 1) {
-      leftPreview.push(left[index]);
-      rightPreview.push(right ? right[index] : left[index]);
+      this._leftPreview[index] = left[index];
+      this._rightPreview[index] = right ? right[index] : left[index];
     }
 
     if (!this.firstBlockTelemetryReported) {
@@ -655,8 +655,8 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
         overallPeak: Math.max(leftPeak, rightPeak),
         leftPeak,
         rightPeak,
-        leftPreview,
-        rightPreview,
+        leftPreview: Array.from(this._leftPreview),
+        rightPreview: Array.from(this._rightPreview),
       });
       return;
     }
@@ -686,8 +686,8 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
       overallPeak: Math.max(leftPeak, rightPeak),
       leftPeak,
       rightPeak,
-      leftPreview,
-      rightPreview,
+      leftPreview: Array.from(this._leftPreview),
+      rightPreview: Array.from(this._rightPreview),
     });
   }
 }

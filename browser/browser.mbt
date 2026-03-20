@@ -703,6 +703,9 @@ pub fn init_exit_deliverable_graph(
 ///|
 /// Set the LFO rate (Hz) for the exit deliverable.
 pub fn set_exit_deliverable_lfo_rate(rate : Double) -> Bool {
+  if rate.is_nan() || rate.is_inf() {
+    return false
+  }
   exit_lfo_rate.val = rate
   true
 }
@@ -710,6 +713,9 @@ pub fn set_exit_deliverable_lfo_rate(rate : Double) -> Bool {
 ///|
 /// Set the filter cutoff (Hz) for the exit deliverable.
 pub fn set_exit_deliverable_cutoff(cutoff : Double) -> Bool {
+  if cutoff.is_nan() || cutoff.is_inf() || cutoff < 0.0 {
+    return false
+  }
   exit_cutoff.val = cutoff
   true
 }
@@ -717,6 +723,9 @@ pub fn set_exit_deliverable_cutoff(cutoff : Double) -> Bool {
 ///|
 /// Set the master gain for the exit deliverable.
 pub fn set_exit_deliverable_gain(gain : Double) -> Bool {
+  if gain.is_nan() || gain.is_inf() || gain < 0.0 {
+    return false
+  }
   exit_gain.val = gain
   true
 }

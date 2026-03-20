@@ -166,6 +166,9 @@ struct CompiledDsp {
   sample_values : FixedArray[Double]
   left_sample_values : FixedArray[Double]
   right_sample_values : FixedArray[Double]
+  // Pre-computed pan gains (avoid per-sample trig in feedback loop)
+  pan_left_gains : FixedArray[Double]
+  pan_right_gains : FixedArray[Double]
 }
 
 ///|
@@ -197,6 +200,9 @@ struct CompiledStereoDsp {
   sample_values : FixedArray[Double]
   left_sample_values : FixedArray[Double]
   right_sample_values : FixedArray[Double]
+  // Pre-computed pan gains (avoid per-sample trig in feedback loop)
+  pan_left_gains : FixedArray[Double]
+  pan_right_gains : FixedArray[Double]
 }
 
 ///|
@@ -741,8 +747,14 @@ fn CompiledDsp::compile_internal(
     let slot = edge.2
     self_enabled[source_idx] = true
     if slot == 0 {
+      if back_edge_input0_source[target_idx] >= 0 {
+        return None
+      }
       back_edge_input0_source[target_idx] = source_idx
     } else {
+      if back_edge_input1_source[target_idx] >= 0 {
+        return None
+      }
       back_edge_input1_source[target_idx] = source_idx
     }
   }
@@ -772,6 +784,8 @@ fn CompiledDsp::compile_internal(
     sample_values: FixedArray::make(node_count, 0.0),
     left_sample_values: FixedArray::make(node_count, 0.0),
     right_sample_values: FixedArray::make(node_count, 0.0),
+    pan_left_gains: FixedArray::make(node_count, 0.0),
+    pan_right_gains: FixedArray::make(node_count, 0.0),
   })
 }
 
@@ -969,6 +983,13 @@ fn CompiledDsp::process_feedback_graph(
     right_sv[i] = 0.0
   }
   let sample_rate = context.sample_rate()
+  // Pre-compute pan trig gains once per block (position is constant within block)
+  for i = 0; i < self.nodes.length(); i = i + 1 {
+    if self.nodes[i].kind is Pan {
+      self.pan_left_gains[i] = feedback_pan_left_gain(self.nodes[i].value0)
+      self.pan_right_gains[i] = feedback_pan_right_gain(self.nodes[i].value0)
+    }
+  }
 
   for sample_index = 0
       sample_index < sample_count
@@ -1105,8 +1126,8 @@ fn CompiledDsp::process_feedback_graph(
             node.input0,
             self.back_edge_input0_source[node_index],
           )
-          let pan_left = input0 * feedback_pan_left_gain(node.value0)
-          let pan_right = input0 * feedback_pan_right_gain(node.value0)
+          let pan_left = input0 * self.pan_left_gains[node_index]
+          let pan_right = input0 * self.pan_right_gains[node_index]
           left_sv[node_index] = pan_left
           right_sv[node_index] = pan_right
           self.left_buffers[node_index].set(sample_index, pan_left)
@@ -1347,8 +1368,14 @@ fn CompiledStereoDsp::compile_internal(
     let slot = edge.2
     self_enabled[source_idx] = true
     if slot == 0 {
+      if back_edge_input0_source[target_idx] >= 0 {
+        return None
+      }
       back_edge_input0_source[target_idx] = source_idx
     } else {
+      if back_edge_input1_source[target_idx] >= 0 {
+        return None
+      }
       back_edge_input1_source[target_idx] = source_idx
     }
   }
@@ -1378,6 +1405,8 @@ fn CompiledStereoDsp::compile_internal(
     sample_values: FixedArray::make(node_count, 0.0),
     left_sample_values: FixedArray::make(node_count, 0.0),
     right_sample_values: FixedArray::make(node_count, 0.0),
+    pan_left_gains: FixedArray::make(node_count, 0.0),
+    pan_right_gains: FixedArray::make(node_count, 0.0),
   })
 }
 
@@ -1596,6 +1625,13 @@ fn CompiledStereoDsp::process_feedback_graph(
     right_sv[i] = 0.0
   }
   let sample_rate = context.sample_rate()
+  // Pre-compute pan trig gains once per block (position is constant within block)
+  for i = 0; i < self.nodes.length(); i = i + 1 {
+    if self.nodes[i].kind is Pan {
+      self.pan_left_gains[i] = feedback_pan_left_gain(self.nodes[i].value0)
+      self.pan_right_gains[i] = feedback_pan_right_gain(self.nodes[i].value0)
+    }
+  }
 
   for sample_index = 0
       sample_index < sample_count
@@ -1722,8 +1758,8 @@ fn CompiledStereoDsp::process_feedback_graph(
             node.input0,
             self.back_edge_input0_source[node_index],
           )
-          let pan_left = input0 * feedback_pan_left_gain(node.value0)
-          let pan_right = input0 * feedback_pan_right_gain(node.value0)
+          let pan_left = input0 * self.pan_left_gains[node_index]
+          let pan_right = input0 * self.pan_right_gains[node_index]
           left_sv[node_index] = pan_left
           right_sv[node_index] = pan_right
           self.left_buffers[node_index].set(sample_index, pan_left)
