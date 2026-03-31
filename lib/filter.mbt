@@ -159,7 +159,6 @@ fn valid_biquad_params(
   is_finite(q)
 }
 
-
 ///|
 fn Biquad::invalidate(self : Biquad) -> Unit {
   self.b0 = 0.0
@@ -180,4 +179,3 @@ fn Biquad::finite_coefficients(self : Biquad) -> Bool {
   is_finite(self.a1) &&
   is_finite(self.a2)
 }
-

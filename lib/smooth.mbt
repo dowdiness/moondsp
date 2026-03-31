@@ -112,4 +112,3 @@ fn normalize_param_value(value : Double) -> Double {
     0.0
   }
 }
-

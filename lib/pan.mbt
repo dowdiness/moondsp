@@ -70,7 +70,6 @@ pub fn Pan::process(
   }
 }
 
-
 ///|
 fn pan_sample_count(
   context : DspContext,

@@ -188,4 +188,3 @@ fn normalize_sustain(value : Double) -> Double {
     value.clamp(min=0.0, max=1.0)
   }
 }
-

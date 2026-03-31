@@ -2340,9 +2340,7 @@ fn valid_node_inputs(
     Delay =>
       valid_reference(node.input0, node_count) &&
       valid_delay_feedback(node.value0)
-    Gain =>
-      valid_reference(node.input0, node_count) &&
-      is_finite(node.value0)
+    Gain => valid_reference(node.input0, node_count) && is_finite(node.value0)
     Mul =>
       valid_reference(node.input0, node_count) &&
       valid_reference(node.input1, node_count)
@@ -2354,12 +2352,9 @@ fn valid_node_inputs(
       is_finite(node.value0) &&
       node.value0 > 0.0
     Output => valid_reference(node.input0, node_count)
-    Pan =>
-      valid_reference(node.input0, node_count) &&
-      is_finite(node.value0)
+    Pan => valid_reference(node.input0, node_count) && is_finite(node.value0)
     StereoGain =>
-      valid_reference(node.input0, node_count) &&
-      is_finite(node.value0)
+      valid_reference(node.input0, node_count) && is_finite(node.value0)
     StereoClip =>
       valid_reference(node.input0, node_count) &&
       is_finite(node.value0) &&
@@ -2401,9 +2396,7 @@ fn valid_stereo_node_inputs(
     Delay =>
       valid_reference(node.input0, node_count) &&
       valid_delay_feedback(node.value0)
-    Gain =>
-      valid_reference(node.input0, node_count) &&
-      is_finite(node.value0)
+    Gain => valid_reference(node.input0, node_count) && is_finite(node.value0)
     Mul =>
       valid_reference(node.input0, node_count) &&
       valid_reference(node.input1, node_count)
@@ -2415,12 +2408,9 @@ fn valid_stereo_node_inputs(
       is_finite(node.value0) &&
       node.value0 > 0.0
     Output => false
-    Pan =>
-      valid_reference(node.input0, node_count) &&
-      is_finite(node.value0)
+    Pan => valid_reference(node.input0, node_count) && is_finite(node.value0)
     StereoGain =>
-      valid_reference(node.input0, node_count) &&
-      is_finite(node.value0)
+      valid_reference(node.input0, node_count) && is_finite(node.value0)
     StereoClip =>
       valid_reference(node.input0, node_count) &&
       is_finite(node.value0) &&
@@ -2493,7 +2483,6 @@ fn CompiledStereoDsp::compiled_index_for(
   }
 }
 
-
 ///|
 fn updated_node_param(
   node : DspNode,
@@ -2504,8 +2493,7 @@ fn updated_node_param(
   match node.kind {
     Constant =>
       match slot {
-        Value0 if is_finite(value) =>
-          Some(node_with_value0(node, value))
+        Value0 if is_finite(value) => Some(node_with_value0(node, value))
         _ => None
       }
     Oscillator =>
@@ -2515,8 +2503,7 @@ fn updated_node_param(
         None
       } else {
         match slot {
-          Value0 if is_finite(value) =>
-            Some(node_with_value0(node, value))
+          Value0 if is_finite(value) => Some(node_with_value0(node, value))
           _ => None
         }
       }
@@ -2544,8 +2531,7 @@ fn updated_node_param(
       }
     Gain =>
       match slot {
-        Value0 if is_finite(value) =>
-          Some(node_with_value0(node, value))
+        Value0 if is_finite(value) => Some(node_with_value0(node, value))
         _ => None
       }
     Mul => None
@@ -2559,14 +2545,12 @@ fn updated_node_param(
     Output => None
     Pan =>
       match slot {
-        Value0 if is_finite(value) =>
-          Some(node_with_value0(node, value))
+        Value0 if is_finite(value) => Some(node_with_value0(node, value))
         _ => None
       }
     StereoGain =>
       match slot {
-        Value0 if is_finite(value) =>
-          Some(node_with_value0(node, value))
+        Value0 if is_finite(value) => Some(node_with_value0(node, value))
         _ => None
       }
     StereoClip =>
@@ -3174,7 +3158,6 @@ fn compiled_stereo_sample_count(
     context.block_size()
   }
 }
-
 
 ///|
 fn copy_buffer(

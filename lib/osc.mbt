@@ -40,9 +40,7 @@ pub fn Oscillator::tick_waveform(
   freq : Double,
   sample_rate : Double,
 ) -> Double {
-  if !is_finite(freq) ||
-    !is_finite(sample_rate) ||
-    sample_rate <= 0.0 {
+  if !is_finite(freq) || !is_finite(sample_rate) || sample_rate <= 0.0 {
     return 0.0
   }
   let out = sample_for_phase(waveform, self.phase)
@@ -120,4 +118,3 @@ fn wrap_phase(phase : Double) -> Double {
     phase
   }
 }
-

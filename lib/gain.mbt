@@ -39,4 +39,3 @@ pub fn Gain::process(
     buffer.set(index, 0.0)
   }
 }
-

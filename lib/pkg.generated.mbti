@@ -2,7 +2,13 @@
 package "dowdiness/mdsp/lib"
 
 // Values
+pub fn effective_sample_count(DspContext, AudioBuffer) -> Int
+
 pub fn[T : FilterSym] exit_deliverable() -> T
+
+pub fn is_finite(Double) -> Bool
+
+pub fn is_finite_positive(Double) -> Bool
 
 pub fn[T : ArithSym] lin_map(T, Double, Double, Double, Double) -> T
 
@@ -73,7 +79,7 @@ pub(all) enum BiquadMode {
   LowPass
   HighPass
   BandPass
-}
+} derive(Eq)
 
 pub struct Clip {
   unit : Unit
@@ -218,7 +224,7 @@ pub(all) enum DspNodeKind {
   StereoDelay
   StereoMixDown
   StereoOutput
-}
+} derive(Eq)
 
 pub(all) enum EnvStage {
   Idle
@@ -226,7 +232,7 @@ pub(all) enum EnvStage {
   Decay
   Sustain
   Release
-}
+} derive(Eq)
 
 pub struct Gain {
   unit : Unit
@@ -265,7 +271,7 @@ pub(all) enum GraphControlKind {
   GateOn
   GateOff
   SetParam
-}
+} derive(Eq)
 
 pub(all) enum GraphParamSlot {
   Value0
@@ -273,7 +279,7 @@ pub(all) enum GraphParamSlot {
   Value2
   Value3
   DelaySamples
-}
+} derive(Eq)
 
 pub struct GraphTopologyEdit {
   kind : GraphTopologyEditKind
@@ -301,12 +307,12 @@ pub(all) enum GraphTopologyEditKind {
   DeleteNode
   InsertChain
   DeleteChain
-}
+} derive(Eq)
 
 pub(all) enum GraphTopologyInputSlot {
   Input0
   Input1
-}
+} derive(Eq)
 
 pub struct Mix {
   unit : Unit
@@ -374,7 +380,7 @@ pub(all) enum Waveform {
   Saw
   Square
   Triangle
-}
+} derive(Eq)
 
 // Type aliases
 

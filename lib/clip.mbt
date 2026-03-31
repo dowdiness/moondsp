@@ -52,4 +52,3 @@ fn clip_sample(sample : Double, threshold : Double) -> Double {
     sample
   }
 }
-
