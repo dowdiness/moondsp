@@ -75,7 +75,20 @@ fn GraphControl::new(
 }
 
 ///|
-/// Declarative DSP graph node in authoring order.
+/// Flat graph node representation for compiled DSP graphs.
+///
+/// Design decision: DspNode uses a flat struct with generic fields (value0-value3)
+/// rather than per-kind structs or a tagged union with payloads. This is deliberate:
+///
+/// 1. **Flat memory layout** — all nodes are the same size, enabling fixed-array
+///    storage without boxing. Critical for zero-allocation audio processing.
+/// 2. **Copy-on-update** — node_with_value0/value1/delay_samples create updated
+///    copies without knowing the node kind, supporting runtime parameter changes.
+/// 3. **Serialization** — uniform layout simplifies graph serialization for
+///    hot-swap and topology editing.
+///
+/// The cost is that field semantics depend on `kind` — see each constructor
+/// (e.g. `DspNode::oscillator`, `DspNode::biquad`) for the field mapping.
 pub struct DspNode {
   kind : DspNodeKind
   input0 : Int
