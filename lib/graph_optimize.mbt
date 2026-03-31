@@ -54,7 +54,7 @@ fn fold_constants(
           }
           let result = node.fold_value(v0, v1)
           // Skip folding if result is non-finite
-          if result.is_nan() || result.is_inf() {
+          if !is_finite(result) {
             // Fall through to keep node as-is
           } else {
             let new_index = folded.length()

@@ -182,7 +182,7 @@ fn normalize_time_ms(value : Double) -> Double {
 
 ///|
 fn normalize_sustain(value : Double) -> Double {
-  if value.is_nan() || value.is_inf() {
+  if !is_finite(value) {
     0.0
   } else {
     value.clamp(min=0.0, max=1.0)

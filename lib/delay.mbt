@@ -173,7 +173,7 @@ fn normalize_delay_samples(value : Int, capacity : Int) -> Int {
 
 ///|
 fn normalize_feedback(value : Double) -> Double {
-  if value.is_nan() || value.is_inf() {
+  if !is_finite(value) {
     0.0
   } else if value < -max_feedback_amount() {
     -max_feedback_amount()

@@ -26,8 +26,7 @@ pub fn Clip::process(
   if sample_rate <= 0.0 ||
     sample_count <= 0 ||
     threshold <= 0.0 ||
-    threshold.is_nan() ||
-    threshold.is_inf() {
+    !is_finite(threshold) {
     buffer.fill(0.0)
     return
   }
