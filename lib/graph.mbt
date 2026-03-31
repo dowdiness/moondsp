@@ -1920,17 +1920,7 @@ pub fn CompiledDsp::apply_control(
   self : CompiledDsp,
   control : GraphControl,
 ) -> Bool {
-  match control.kind {
-    GateOn => apply_graph_gate_control(self, control.node_index, true)
-    GateOff => apply_graph_gate_control(self, control.node_index, false)
-    SetParam =>
-      apply_graph_param_control(
-        self,
-        control.node_index,
-        control.slot,
-        control.value,
-      )
-  }
+  self.0.apply_control_impl(control)
 }
 
 ///|
@@ -1943,19 +1933,7 @@ pub fn CompiledDsp::apply_controls(
   self : CompiledDsp,
   controls : Array[GraphControl],
 ) -> Bool {
-  let simulated_nodes = FixedArray::makei(self.0.nodes.length(), index => {
-    self.0.nodes[index]
-  })
-  for index = 0; index < controls.length(); index = index + 1 {
-    if !valid_graph_control(self, simulated_nodes, controls[index]) {
-      return false
-    }
-  }
-
-  for index = 0; index < controls.length(); index = index + 1 {
-    ignore(self.apply_control(controls[index]))
-  }
-  true
+  self.0.apply_controls_impl(controls)
 }
 
 ///|
@@ -1964,17 +1942,7 @@ pub fn CompiledStereoDsp::apply_control(
   self : CompiledStereoDsp,
   control : GraphControl,
 ) -> Bool {
-  match control.kind {
-    GateOn => apply_graph_gate_control_stereo(self, control.node_index, true)
-    GateOff => apply_graph_gate_control_stereo(self, control.node_index, false)
-    SetParam =>
-      apply_graph_param_control_stereo(
-        self,
-        control.node_index,
-        control.slot,
-        control.value,
-      )
-  }
+  self.0.apply_control_impl(control)
 }
 
 ///|
@@ -1983,19 +1951,7 @@ pub fn CompiledStereoDsp::apply_controls(
   self : CompiledStereoDsp,
   controls : Array[GraphControl],
 ) -> Bool {
-  let simulated_nodes = FixedArray::makei(self.0.nodes.length(), index => {
-    self.0.nodes[index]
-  })
-  for index = 0; index < controls.length(); index = index + 1 {
-    if !valid_graph_control_stereo(self, simulated_nodes, controls[index]) {
-      return false
-    }
-  }
-
-  for index = 0; index < controls.length(); index = index + 1 {
-    ignore(self.apply_control(controls[index]))
-  }
-  true
+  self.0.apply_controls_impl(controls)
 }
 
 ///|
@@ -2065,37 +2021,52 @@ pub fn CompiledStereoDsp::set_param(
 }
 
 ///|
-fn apply_graph_gate_control(
-  compiled : CompiledDsp,
-  node_index : Int,
-  gate_on : Bool,
+fn CompiledGraph::apply_control_impl(
+  self : CompiledGraph,
+  control : GraphControl,
 ) -> Bool {
-  match compiled.compiled_index_for(node_index) {
-    Some(compiled_index) =>
-      match compiled.0.env_states[compiled_index] {
-        Some(env) => {
-          if gate_on {
-            env.gate_on()
-          } else {
-            env.gate_off()
-          }
-          true
-        }
-        None => false
-      }
-    None => false
+  match control.kind {
+    GateOn => apply_graph_gate_control(self, control.node_index, true)
+    GateOff => apply_graph_gate_control(self, control.node_index, false)
+    SetParam =>
+      apply_graph_param_control(
+        self,
+        control.node_index,
+        control.slot,
+        control.value,
+      )
   }
 }
 
 ///|
-fn apply_graph_gate_control_stereo(
-  compiled : CompiledStereoDsp,
+fn CompiledGraph::apply_controls_impl(
+  self : CompiledGraph,
+  controls : Array[GraphControl],
+) -> Bool {
+  let simulated_nodes = FixedArray::makei(self.nodes.length(), index => {
+    self.nodes[index]
+  })
+  for index = 0; index < controls.length(); index = index + 1 {
+    if !valid_graph_control(self, simulated_nodes, controls[index]) {
+      return false
+    }
+  }
+
+  for index = 0; index < controls.length(); index = index + 1 {
+    ignore(self.apply_control_impl(controls[index]))
+  }
+  true
+}
+
+///|
+fn apply_graph_gate_control(
+  graph : CompiledGraph,
   node_index : Int,
   gate_on : Bool,
 ) -> Bool {
-  match compiled.compiled_index_for(node_index) {
+  match graph.compiled_index_for(node_index) {
     Some(compiled_index) =>
-      match compiled.0.env_states[compiled_index] {
+      match graph.env_states[compiled_index] {
         Some(env) => {
           if gate_on {
             env.gate_on()
@@ -2112,60 +2083,37 @@ fn apply_graph_gate_control_stereo(
 
 ///|
 fn apply_graph_param_control(
-  compiled : CompiledDsp,
+  graph : CompiledGraph,
   node_index : Int,
   slot : GraphParamSlot,
   value : Double,
 ) -> Bool {
-  let compiled_index = match compiled.compiled_index_for(node_index) {
+  let compiled_index = match graph.compiled_index_for(node_index) {
     Some(compiled_index) => compiled_index
     None => return false
   }
-  let node = compiled.0.nodes[compiled_index]
+  let node = graph.nodes[compiled_index]
   let updated = match
-    updated_node_param(node, slot, value, compiled.0.compile_sample_rate) {
+    updated_node_param(node, slot, value, graph.compile_sample_rate) {
     Some(updated) => updated
     None => return false
   }
-  compiled.0.nodes[compiled_index] = updated
-  apply_runtime_param_side_effect(compiled, compiled_index, updated, slot)
-}
-
-///|
-fn apply_graph_param_control_stereo(
-  compiled : CompiledStereoDsp,
-  node_index : Int,
-  slot : GraphParamSlot,
-  value : Double,
-) -> Bool {
-  let compiled_index = match compiled.compiled_index_for(node_index) {
-    Some(compiled_index) => compiled_index
-    None => return false
-  }
-  let node = compiled.0.nodes[compiled_index]
-  let updated = match
-    updated_node_param(node, slot, value, compiled.0.compile_sample_rate) {
-    Some(updated) => updated
-    None => return false
-  }
-  compiled.0.nodes[compiled_index] = updated
-  apply_runtime_param_side_effect_stereo(
-    compiled, compiled_index, updated, slot,
-  )
+  graph.nodes[compiled_index] = updated
+  apply_runtime_param_side_effect(graph, compiled_index, updated, slot)
 }
 
 ///|
 fn valid_graph_control(
-  compiled : CompiledDsp,
+  graph : CompiledGraph,
   simulated_nodes : FixedArray[DspNode],
   control : GraphControl,
 ) -> Bool {
   match control.kind {
-    GateOn => valid_graph_gate_control(compiled, control.node_index)
-    GateOff => valid_graph_gate_control(compiled, control.node_index)
+    GateOn => valid_graph_gate_control(graph, control.node_index)
+    GateOff => valid_graph_gate_control(graph, control.node_index)
     SetParam =>
       valid_graph_param_control(
-        compiled,
+        graph,
         simulated_nodes,
         control.node_index,
         control.slot,
@@ -2175,53 +2123,22 @@ fn valid_graph_control(
 }
 
 ///|
-fn valid_graph_control_stereo(
-  compiled : CompiledStereoDsp,
-  simulated_nodes : FixedArray[DspNode],
-  control : GraphControl,
-) -> Bool {
-  match control.kind {
-    GateOn => valid_graph_gate_control_stereo(compiled, control.node_index)
-    GateOff => valid_graph_gate_control_stereo(compiled, control.node_index)
-    SetParam =>
-      valid_graph_param_control_stereo(
-        compiled,
-        simulated_nodes,
-        control.node_index,
-        control.slot,
-        control.value,
-      )
-  }
-}
-
-///|
-fn valid_graph_gate_control(compiled : CompiledDsp, node_index : Int) -> Bool {
-  match compiled.compiled_index_for(node_index) {
-    Some(compiled_index) => compiled.0.env_states[compiled_index] is Some(_)
-    None => false
-  }
-}
-
-///|
-fn valid_graph_gate_control_stereo(
-  compiled : CompiledStereoDsp,
-  node_index : Int,
-) -> Bool {
-  match compiled.compiled_index_for(node_index) {
-    Some(compiled_index) => compiled.0.env_states[compiled_index] is Some(_)
+fn valid_graph_gate_control(graph : CompiledGraph, node_index : Int) -> Bool {
+  match graph.compiled_index_for(node_index) {
+    Some(compiled_index) => graph.env_states[compiled_index] is Some(_)
     None => false
   }
 }
 
 ///|
 fn valid_graph_param_control(
-  compiled : CompiledDsp,
+  graph : CompiledGraph,
   simulated_nodes : FixedArray[DspNode],
   node_index : Int,
   slot : GraphParamSlot,
   value : Double,
 ) -> Bool {
-  let compiled_index = match compiled.compiled_index_for(node_index) {
+  let compiled_index = match graph.compiled_index_for(node_index) {
     Some(compiled_index) => compiled_index
     None => return false
   }
@@ -2230,33 +2147,7 @@ fn valid_graph_param_control(
       simulated_nodes[compiled_index],
       slot,
       value,
-      compiled.0.compile_sample_rate,
-    ) {
-    Some(updated) => updated
-    None => return false
-  }
-  simulated_nodes[compiled_index] = updated
-  true
-}
-
-///|
-fn valid_graph_param_control_stereo(
-  compiled : CompiledStereoDsp,
-  simulated_nodes : FixedArray[DspNode],
-  node_index : Int,
-  slot : GraphParamSlot,
-  value : Double,
-) -> Bool {
-  let compiled_index = match compiled.compiled_index_for(node_index) {
-    Some(compiled_index) => compiled_index
-    None => return false
-  }
-  let updated = match
-    updated_node_param(
-      simulated_nodes[compiled_index],
-      slot,
-      value,
-      compiled.0.compile_sample_rate,
+      graph.compile_sample_rate,
     ) {
     Some(updated) => updated
     None => return false
@@ -2421,55 +2312,39 @@ fn valid_reference(input : Int, node_count : Int) -> Bool {
 }
 
 ///|
-fn CompiledDsp::compiled_buffer_capacity(self : CompiledDsp) -> Int {
-  if self.0.buffers.length() == 0 {
+fn CompiledGraph::compiled_buffer_capacity(self : CompiledGraph) -> Int {
+  if self.buffers.length() == 0 {
     0
   } else {
-    self.0.buffers[0].length()
+    self.buffers[0].length()
   }
 }
 
 ///|
-fn CompiledDsp::compiled_index_for(
-  self : CompiledDsp,
+fn CompiledGraph::compiled_index_for(
+  self : CompiledGraph,
   node_index : Int,
 ) -> Int? {
-  if node_index < 0 || node_index >= self.0.index_map.length() {
+  if node_index < 0 || node_index >= self.index_map.length() {
     None
   } else {
-    let compiled = self.0.index_map[node_index]
+    let compiled = self.index_map[node_index]
     if compiled < 0 {
       None
     } else {
       Some(compiled)
     }
   }
+}
+
+///|
+fn CompiledDsp::compiled_buffer_capacity(self : CompiledDsp) -> Int {
+  self.0.compiled_buffer_capacity()
 }
 
 ///|
 fn CompiledStereoDsp::compiled_buffer_capacity(self : CompiledStereoDsp) -> Int {
-  if self.0.buffers.length() == 0 {
-    0
-  } else {
-    self.0.buffers[0].length()
-  }
-}
-
-///|
-fn CompiledStereoDsp::compiled_index_for(
-  self : CompiledStereoDsp,
-  node_index : Int,
-) -> Int? {
-  if node_index < 0 || node_index >= self.0.index_map.length() {
-    None
-  } else {
-    let compiled = self.0.index_map[node_index]
-    if compiled < 0 {
-      None
-    } else {
-      Some(compiled)
-    }
-  }
+  self.0.compiled_buffer_capacity()
 }
 
 ///|
@@ -2575,7 +2450,7 @@ fn updated_node_param(
 
 ///|
 fn apply_runtime_param_side_effect(
-  compiled : CompiledDsp,
+  graph : CompiledGraph,
   compiled_index : Int,
   node : DspNode,
   slot : GraphParamSlot,
@@ -2584,7 +2459,7 @@ fn apply_runtime_param_side_effect(
     Delay =>
       match slot {
         Value0 =>
-          match compiled.0.delay_states[compiled_index] {
+          match graph.delay_states[compiled_index] {
             Some(delay) => {
               delay.set_feedback(node.value0)
               delay.set_delay_samples(node.delay_samples)
@@ -2593,7 +2468,7 @@ fn apply_runtime_param_side_effect(
             None => false
           }
         DelaySamples =>
-          match compiled.0.delay_states[compiled_index] {
+          match graph.delay_states[compiled_index] {
             Some(delay) => {
               delay.set_feedback(node.value0)
               delay.set_delay_samples(node.delay_samples)
@@ -2616,80 +2491,16 @@ fn apply_runtime_param_side_effect(
       match slot {
         Value0 =>
           apply_stereo_delay_param_side_effect(
-            compiled.0.stereo_delay_left_states,
-            compiled.0.stereo_delay_right_states,
+            graph.stereo_delay_left_states,
+            graph.stereo_delay_right_states,
             compiled_index,
             node.delay_samples,
             node.value0,
           )
         DelaySamples =>
           apply_stereo_delay_param_side_effect(
-            compiled.0.stereo_delay_left_states,
-            compiled.0.stereo_delay_right_states,
-            compiled_index,
-            node.delay_samples,
-            node.value0,
-          )
-        _ => false
-      }
-    StereoMixDown => false
-    _ => false
-  }
-}
-
-///|
-fn apply_runtime_param_side_effect_stereo(
-  compiled : CompiledStereoDsp,
-  compiled_index : Int,
-  node : DspNode,
-  slot : GraphParamSlot,
-) -> Bool {
-  match node.kind {
-    Delay =>
-      match slot {
-        Value0 =>
-          match compiled.0.delay_states[compiled_index] {
-            Some(delay) => {
-              delay.set_feedback(node.value0)
-              delay.set_delay_samples(node.delay_samples)
-              true
-            }
-            None => false
-          }
-        DelaySamples =>
-          match compiled.0.delay_states[compiled_index] {
-            Some(delay) => {
-              delay.set_feedback(node.value0)
-              delay.set_delay_samples(node.delay_samples)
-              true
-            }
-            None => false
-          }
-        _ => false
-      }
-    Constant => true
-    Oscillator => true
-    Biquad => true
-    Gain => true
-    Clip => true
-    Pan => true
-    StereoGain => true
-    StereoClip => true
-    StereoBiquad => true
-    StereoDelay =>
-      match slot {
-        Value0 =>
-          apply_stereo_delay_param_side_effect(
-            compiled.0.stereo_delay_left_states,
-            compiled.0.stereo_delay_right_states,
-            compiled_index,
-            node.delay_samples,
-            node.value0,
-          )
-        DelaySamples =>
-          apply_stereo_delay_param_side_effect(
-            compiled.0.stereo_delay_left_states,
-            compiled.0.stereo_delay_right_states,
+            graph.stereo_delay_left_states,
+            graph.stereo_delay_right_states,
             compiled_index,
             node.delay_samples,
             node.value0,

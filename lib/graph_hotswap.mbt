@@ -213,7 +213,7 @@ fn valid_hot_swap_control(
   let simulated_nodes = FixedArray::makei(compiled.0.nodes.length(), index => {
     compiled.0.nodes[index]
   })
-  valid_graph_control(compiled, simulated_nodes, control)
+  valid_graph_control(compiled.0, simulated_nodes, control)
 }
 
 ///|
@@ -225,7 +225,7 @@ fn valid_hot_swap_controls(
     compiled.0.nodes[index]
   })
   for index = 0; index < controls.length(); index = index + 1 {
-    if !valid_graph_control(compiled, simulated_nodes, controls[index]) {
+    if !valid_graph_control(compiled.0, simulated_nodes, controls[index]) {
       return false
     }
   }
@@ -468,7 +468,7 @@ fn valid_hot_swap_control_stereo(
   let simulated_nodes = FixedArray::makei(compiled.0.nodes.length(), index => {
     compiled.0.nodes[index]
   })
-  valid_graph_control_stereo(compiled, simulated_nodes, control)
+  valid_graph_control(compiled.0, simulated_nodes, control)
 }
 
 ///|
@@ -480,7 +480,7 @@ fn valid_hot_swap_controls_stereo(
     compiled.0.nodes[index]
   })
   for index = 0; index < controls.length(); index = index + 1 {
-    if !valid_graph_control_stereo(compiled, simulated_nodes, controls[index]) {
+    if !valid_graph_control(compiled.0, simulated_nodes, controls[index]) {
       return false
     }
   }
