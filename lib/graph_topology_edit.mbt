@@ -204,19 +204,26 @@ pub fn GraphTopologyEdit::delete_chain(
 }
 
 ///|
+/// Shared topology-edit state for both mono and stereo compiled graphs.
+///
+/// Holds the authoring-order nodes, compile-time parameters, and the
+/// hot-swap graph used for block-boundary graph replacement.
+priv struct TopologyGraph {
+  mut authoring_nodes : Array[DspNode]
+  compile_sample_rate : Double
+  compile_block_size : Int
+  hot_swap : HotSwapGraph
+}
+
+///|
 /// Mono topology-edit wrapper that recompiles authoring nodes and stages the
-/// replacement through `CompiledDspHotSwap`.
+/// replacement through `HotSwapGraph`.
 ///
 /// This first slice keeps edits narrow and deterministic: only `ReplaceNode`
 /// and `RewireInput` frames are supported, plus narrow unary `InsertNode` and
 /// `DeleteNode` frames on the mono path. Only one staged topology replacement
 /// may be pending at a time.
-struct CompiledDspTopologyController {
-  mut authoring_nodes : Array[DspNode]
-  compile_sample_rate : Double
-  compile_block_size : Int
-  hot_swap : CompiledDspHotSwap
-}
+struct CompiledDspTopologyController(TopologyGraph)
 
 ///|
 /// Build a topology-edit wrapper from authoring-order mono nodes.
@@ -229,20 +236,21 @@ pub fn CompiledDspTopologyController::from_nodes(
     Some(compiled) => compiled
     None => return None
   }
+  let hot_swap = CompiledDspHotSwap::from_graph(compiled, crossfade_samples~)
   Some(
-    make_compiled_dsp_topology_controller(
-      nodes.copy(),
-      context.sample_rate(),
-      context.block_size(),
-      CompiledDspHotSwap::from_graph(compiled, crossfade_samples~),
-    ),
+    CompiledDspTopologyController({
+      authoring_nodes: nodes.copy(),
+      compile_sample_rate: context.sample_rate(),
+      compile_block_size: context.block_size(),
+      hot_swap: hot_swap.0,
+    }),
   )
 }
 
 ///|
-/// Apply one runtime control message to the active or in-flight mono graph.
-pub fn CompiledDspTopologyController::apply_control(
-  self : CompiledDspTopologyController,
+/// Apply one runtime control message to the active or in-flight graph.
+fn TopologyGraph::apply_control_impl(
+  self : TopologyGraph,
   control : GraphControl,
 ) -> Bool {
   let updated_authoring_nodes = match
@@ -254,7 +262,7 @@ pub fn CompiledDspTopologyController::apply_control(
     Some(updated_authoring_nodes) => updated_authoring_nodes
     None => return false
   }
-  if !self.hot_swap.apply_control(control) {
+  if !self.hot_swap.apply_control_impl(control) {
     return false
   }
   self.authoring_nodes = updated_authoring_nodes
@@ -262,10 +270,9 @@ pub fn CompiledDspTopologyController::apply_control(
 }
 
 ///|
-/// Apply a batch of runtime control messages to the active or in-flight mono
-/// graph.
-pub fn CompiledDspTopologyController::apply_controls(
-  self : CompiledDspTopologyController,
+/// Apply a batch of runtime control messages to the active or in-flight graph.
+fn TopologyGraph::apply_controls_impl(
+  self : TopologyGraph,
   controls : Array[GraphControl],
 ) -> Bool {
   let updated_authoring_nodes = match
@@ -277,7 +284,7 @@ pub fn CompiledDspTopologyController::apply_controls(
     Some(updated_authoring_nodes) => updated_authoring_nodes
     None => return false
   }
-  if !self.hot_swap.apply_controls(controls) {
+  if !self.hot_swap.apply_controls_impl(controls) {
     return false
   }
   self.authoring_nodes = updated_authoring_nodes
@@ -286,11 +293,12 @@ pub fn CompiledDspTopologyController::apply_controls(
 
 ///|
 /// Queue one topology edit for the next hot-swap recompilation.
-pub fn CompiledDspTopologyController::queue_topology_edit(
-  self : CompiledDspTopologyController,
+fn TopologyGraph::queue_topology_edit_impl(
+  self : TopologyGraph,
   edit : GraphTopologyEdit,
+  compile_fn : (Array[DspNode], DspContext) -> CompiledGraph?,
 ) -> Bool {
-  self.queue_topology_edits([edit])
+  self.queue_topology_edits_impl([edit], compile_fn)
 }
 
 ///|
@@ -298,9 +306,10 @@ pub fn CompiledDspTopologyController::queue_topology_edit(
 ///
 /// The batch is transactional: invalid node indices or a recompilation failure
 /// reject the whole edit set and leave the current graph unchanged.
-pub fn CompiledDspTopologyController::queue_topology_edits(
-  self : CompiledDspTopologyController,
+fn TopologyGraph::queue_topology_edits_impl(
+  self : TopologyGraph,
   edits : Array[GraphTopologyEdit],
+  compile_fn : (Array[DspNode], DspContext) -> CompiledGraph?,
 ) -> Bool {
   if self.hot_swap.pending is Some(_) {
     return false
@@ -313,8 +322,7 @@ pub fn CompiledDspTopologyController::queue_topology_edits(
     self.compile_sample_rate,
     self.compile_block_size,
   )
-  let replacement = match
-    CompiledDsp::compile_raw(edited_nodes, compile_context) {
+  let replacement = match compile_fn(edited_nodes, compile_context) {
     Some(replacement) => replacement
     None => return false
   }
@@ -328,13 +336,53 @@ pub fn CompiledDspTopologyController::queue_topology_edits(
       e.kind is GraphTopologyEditKind::DeleteChain
     })
   if !has_delete {
-    copy_compiled_dsp_state(self.hot_swap.active, replacement)
+    copy_compiled_graph_state(self.hot_swap.active, replacement)
   }
-  if !self.hot_swap.queue_swap(replacement) {
+  if !self.hot_swap.queue_swap_impl(replacement) {
     return false
   }
   self.authoring_nodes = edited_nodes
   true
+}
+
+///|
+/// Apply one runtime control message to the active or in-flight mono graph.
+pub fn CompiledDspTopologyController::apply_control(
+  self : CompiledDspTopologyController,
+  control : GraphControl,
+) -> Bool {
+  self.0.apply_control_impl(control)
+}
+
+///|
+/// Apply a batch of runtime control messages to the active or in-flight mono
+/// graph.
+pub fn CompiledDspTopologyController::apply_controls(
+  self : CompiledDspTopologyController,
+  controls : Array[GraphControl],
+) -> Bool {
+  self.0.apply_controls_impl(controls)
+}
+
+///|
+/// Queue one topology edit for the next hot-swap recompilation.
+pub fn CompiledDspTopologyController::queue_topology_edit(
+  self : CompiledDspTopologyController,
+  edit : GraphTopologyEdit,
+) -> Bool {
+  self.0.queue_topology_edit_impl(edit, compile_mono_graph)
+}
+
+///|
+/// Queue an ordered topology-edit batch.
+///
+/// The batch is transactional: invalid node indices or a recompilation failure
+/// reject the whole edit set and leave the current graph unchanged.
+pub fn CompiledDspTopologyController::queue_topology_edits(
+  self : CompiledDspTopologyController,
+  edits : Array[GraphTopologyEdit],
+) -> Bool {
+  self.0.queue_topology_edits_impl(edits, compile_mono_graph)
 }
 
 ///|
@@ -344,7 +392,7 @@ pub fn CompiledDspTopologyController::process(
   context : DspContext,
   output : AudioBuffer,
 ) -> Unit {
-  self.hot_swap.process(context, output)
+  CompiledDspHotSwap(self.0.hot_swap).process(context, output)
 }
 
 ///|
@@ -486,6 +534,8 @@ fn apply_topology_delete_node(
   if consumer_index != retarget_node_index {
     return false
   }
+  // If the caller specified the deleted node itself as the replacement source,
+  // substitute its upstream input instead — the deleted node won't exist.
   let expected_replacement = if replacement_source_index == delete_node_index {
     unary_input
   } else {
@@ -690,11 +740,15 @@ fn topology_chain_compacted_input(
 }
 
 ///|
+/// Encode the retarget node index inside a DspNode for delete operations.
+/// Uses DspNode::output because its input0 field stores a node index,
+/// which we recover via topology_delete_retarget_node_index.
 fn topology_delete_marker(retarget_node_index : Int) -> DspNode {
   DspNode::output(retarget_node_index)
 }
 
 ///|
+/// Decode the retarget node index from a delete edit's replacement marker.
 fn topology_delete_retarget_node_index(edit : GraphTopologyEdit) -> Int {
   edit.replacement.input0
 }
@@ -917,29 +971,14 @@ fn apply_topology_rewire_input(
 }
 
 ///|
-fn make_compiled_dsp_topology_controller(
-  authoring_nodes : Array[DspNode],
-  compile_sample_rate : Double,
-  compile_block_size : Int,
-  hot_swap : CompiledDspHotSwap,
-) -> CompiledDspTopologyController {
-  { authoring_nodes, compile_sample_rate, compile_block_size, hot_swap }
-}
-
-///|
 /// Terminal-stereo topology-edit wrapper that recompiles authoring nodes and
-/// stages the replacement through `CompiledStereoDspHotSwap`.
+/// stages the replacement through `HotSwapGraph`.
 ///
 /// This stereo parity slice keeps the same narrow semantics as the mono
 /// controller: only `ReplaceNode` and `RewireInput` frames are supported,
 /// graph length stays fixed, and only one staged topology replacement may be
 /// pending at a time.
-struct CompiledStereoDspTopologyController {
-  mut authoring_nodes : Array[DspNode]
-  compile_sample_rate : Double
-  compile_block_size : Int
-  hot_swap : CompiledStereoDspHotSwap
-}
+struct CompiledStereoDspTopologyController(TopologyGraph)
 
 ///|
 /// Build a topology-edit wrapper from authoring-order terminal-stereo nodes.
@@ -952,13 +991,17 @@ pub fn CompiledStereoDspTopologyController::from_nodes(
     Some(compiled) => compiled
     None => return None
   }
+  let hot_swap = CompiledStereoDspHotSwap::from_graph(
+    compiled,
+    crossfade_samples~,
+  )
   Some(
-    make_compiled_stereo_dsp_topology_controller(
-      nodes.copy(),
-      context.sample_rate(),
-      context.block_size(),
-      CompiledStereoDspHotSwap::from_graph(compiled, crossfade_samples~),
-    ),
+    CompiledStereoDspTopologyController({
+      authoring_nodes: nodes.copy(),
+      compile_sample_rate: context.sample_rate(),
+      compile_block_size: context.block_size(),
+      hot_swap: hot_swap.0,
+    }),
   )
 }
 
@@ -968,20 +1011,7 @@ pub fn CompiledStereoDspTopologyController::apply_control(
   self : CompiledStereoDspTopologyController,
   control : GraphControl,
 ) -> Bool {
-  let updated_authoring_nodes = match
-    topology_control_updated_nodes(
-      self.authoring_nodes,
-      self.compile_sample_rate,
-      [control],
-    ) {
-    Some(updated_authoring_nodes) => updated_authoring_nodes
-    None => return false
-  }
-  if !self.hot_swap.apply_control(control) {
-    return false
-  }
-  self.authoring_nodes = updated_authoring_nodes
-  true
+  self.0.apply_control_impl(control)
 }
 
 ///|
@@ -991,20 +1021,7 @@ pub fn CompiledStereoDspTopologyController::apply_controls(
   self : CompiledStereoDspTopologyController,
   controls : Array[GraphControl],
 ) -> Bool {
-  let updated_authoring_nodes = match
-    topology_control_updated_nodes(
-      self.authoring_nodes,
-      self.compile_sample_rate,
-      controls,
-    ) {
-    Some(updated_authoring_nodes) => updated_authoring_nodes
-    None => return false
-  }
-  if !self.hot_swap.apply_controls(controls) {
-    return false
-  }
-  self.authoring_nodes = updated_authoring_nodes
-  true
+  self.0.apply_controls_impl(controls)
 }
 
 ///|
@@ -1013,7 +1030,7 @@ pub fn CompiledStereoDspTopologyController::queue_topology_edit(
   self : CompiledStereoDspTopologyController,
   edit : GraphTopologyEdit,
 ) -> Bool {
-  self.queue_topology_edits([edit])
+  self.0.queue_topology_edit_impl(edit, compile_stereo_graph)
 }
 
 ///|
@@ -1025,51 +1042,7 @@ pub fn CompiledStereoDspTopologyController::queue_topology_edits(
   self : CompiledStereoDspTopologyController,
   edits : Array[GraphTopologyEdit],
 ) -> Bool {
-  if self.hot_swap.pending is Some(_) {
-    return false
-  }
-  if !valid_stereo_topology_edits(edits) {
-    return false
-  }
-  let edited_nodes = self.authoring_nodes.copy()
-  if !apply_topology_edits(edited_nodes, edits) {
-    return false
-  }
-  let compile_context = DspContext::new(
-    self.compile_sample_rate,
-    self.compile_block_size,
-  )
-  let replacement = match
-    CompiledStereoDsp::compile_raw(edited_nodes, compile_context) {
-    Some(replacement) => replacement
-    None => return false
-  }
-  // Skip state copy after delete operations — authoring indices shift,
-  // so position-based matching may copy state from the wrong node.
-  // The crossfade smooths the transition with fresh state.
-  let has_delete = edits
-    .iter()
-    .any(fn(e) {
-      e.kind is GraphTopologyEditKind::DeleteNode ||
-      e.kind is GraphTopologyEditKind::DeleteChain
-    })
-  if !has_delete {
-    copy_compiled_stereo_dsp_state(self.hot_swap.active, replacement)
-  }
-  if !self.hot_swap.queue_swap(replacement) {
-    return false
-  }
-  self.authoring_nodes = edited_nodes
-  true
-}
-
-///|
-/// Stereo topology edit validation is intentionally permissive: compilation
-/// itself is the gatekeeper for invalid stereo graphs. Edits that produce
-/// invalid shapes will fail at recompilation time rather than at the
-/// validation step.
-fn valid_stereo_topology_edits(_edits : Array[GraphTopologyEdit]) -> Bool {
-  true
+  self.0.queue_topology_edits_impl(edits, compile_stereo_graph)
 }
 
 ///|
@@ -1080,17 +1053,9 @@ pub fn CompiledStereoDspTopologyController::process(
   left_output : AudioBuffer,
   right_output : AudioBuffer,
 ) -> Unit {
-  self.hot_swap.process(context, left_output, right_output)
-}
-
-///|
-fn make_compiled_stereo_dsp_topology_controller(
-  authoring_nodes : Array[DspNode],
-  compile_sample_rate : Double,
-  compile_block_size : Int,
-  hot_swap : CompiledStereoDspHotSwap,
-) -> CompiledStereoDspTopologyController {
-  { authoring_nodes, compile_sample_rate, compile_block_size, hot_swap }
+  CompiledStereoDspHotSwap(self.0.hot_swap).process(
+    context, left_output, right_output,
+  )
 }
 
 ///|
@@ -1141,80 +1106,35 @@ fn apply_topology_runtime_control(
 }
 
 ///|
-/// Copy runtime state from an old compiled mono graph to a new one for nodes
-/// that share the same authoring index and node kind.
-fn copy_compiled_dsp_state(
-  old_graph : CompiledDsp,
-  new_graph : CompiledDsp,
-) -> Unit {
-  let old_map = old_graph.index_map
-  let new_map = new_graph.index_map
-  let shared_count = if old_map.length() < new_map.length() {
-    old_map.length()
-  } else {
-    new_map.length()
-  }
-  for authoring_idx = 0
-      authoring_idx < shared_count
-      authoring_idx = authoring_idx + 1 {
-    let old_compiled = old_map[authoring_idx]
-    let new_compiled = new_map[authoring_idx]
-    if old_compiled >= 0 &&
-      new_compiled >= 0 &&
-      old_compiled < old_graph.nodes.length() &&
-      new_compiled < new_graph.nodes.length() &&
-      old_graph.nodes[old_compiled].kind == new_graph.nodes[new_compiled].kind {
-      new_graph.osc_states[new_compiled] = old_graph.osc_states[old_compiled]
-      new_graph.noise_states[new_compiled] = old_graph.noise_states[old_compiled]
-      new_graph.env_states[new_compiled] = old_graph.env_states[old_compiled]
-      new_graph.biquad_states[new_compiled] = old_graph.biquad_states[old_compiled]
-      new_graph.stereo_biquad_left_states[new_compiled] = old_graph.stereo_biquad_left_states[old_compiled]
-      new_graph.stereo_biquad_right_states[new_compiled] = old_graph.stereo_biquad_right_states[old_compiled]
-      // Only copy delay state if buffer capacity matches
-      match
-        (
-          old_graph.delay_states[old_compiled],
-          new_graph.delay_states[new_compiled],
-        ) {
-        (Some(old_delay), Some(new_delay)) =>
-          if old_delay.max_delay_samples() == new_delay.max_delay_samples() {
-            new_graph.delay_states[new_compiled] = old_graph.delay_states[old_compiled]
-          }
-        _ => ()
-      }
-      match
-        (
-          old_graph.stereo_delay_left_states[old_compiled],
-          new_graph.stereo_delay_left_states[new_compiled],
-        ) {
-        (Some(old_delay), Some(new_delay)) =>
-          if old_delay.max_delay_samples() == new_delay.max_delay_samples() {
-            new_graph.stereo_delay_left_states[new_compiled] = old_graph.stereo_delay_left_states[old_compiled]
-          }
-        _ => ()
-      }
-      match
-        (
-          old_graph.stereo_delay_right_states[old_compiled],
-          new_graph.stereo_delay_right_states[new_compiled],
-        ) {
-        (Some(old_delay), Some(new_delay)) =>
-          if old_delay.max_delay_samples() == new_delay.max_delay_samples() {
-            new_graph.stereo_delay_right_states[new_compiled] = old_graph.stereo_delay_right_states[old_compiled]
-          }
-        _ => ()
-      }
-      new_graph.self_values[new_compiled] = old_graph.self_values[old_compiled]
-    }
+/// Compile helper for mono graphs, returning `CompiledGraph` directly.
+fn compile_mono_graph(
+  nodes : Array[DspNode],
+  context : DspContext,
+) -> CompiledGraph? {
+  match CompiledDsp::compile_raw(nodes, context) {
+    Some(compiled) => Some(compiled.0)
+    None => None
   }
 }
 
 ///|
-/// Copy runtime state from an old compiled stereo graph to a new one for nodes
+/// Compile helper for stereo graphs, returning `CompiledGraph` directly.
+fn compile_stereo_graph(
+  nodes : Array[DspNode],
+  context : DspContext,
+) -> CompiledGraph? {
+  match CompiledStereoDsp::compile_raw(nodes, context) {
+    Some(compiled) => Some(compiled.0)
+    None => None
+  }
+}
+
+///|
+/// Copy runtime state from an old compiled graph to a new one for nodes
 /// that share the same authoring index and node kind.
-fn copy_compiled_stereo_dsp_state(
-  old_graph : CompiledStereoDsp,
-  new_graph : CompiledStereoDsp,
+fn copy_compiled_graph_state(
+  old_graph : CompiledGraph,
+  new_graph : CompiledGraph,
 ) -> Unit {
   let old_map = old_graph.index_map
   let new_map = new_graph.index_map

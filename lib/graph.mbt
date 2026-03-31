@@ -151,12 +151,20 @@ fn DspNode::new(
 }
 
 ///|
-/// Executable buffer-based DSP graph compiled from `DspNode`s.
-struct CompiledDsp {
+/// Shared internal graph state for both mono and stereo compiled DSP graphs.
+/// Both CompiledDsp and CompiledStereoDsp wrap this struct as newtypes.
+///
+/// All three buffer families (buffers, left_buffers, right_buffers) are allocated
+/// for every node regardless of mono/stereo variant. Mono nodes write only to
+/// `buffers`; stereo nodes write only to `left_buffers`/`right_buffers`. This
+/// uniform layout enables hot-swap state copy without knowing the variant.
+priv struct CompiledGraph {
   compile_sample_rate : Double
   nodes : FixedArray[DspNode]
   index_map : FixedArray[Int]
+  // Mono signal path buffers — one per node
   buffers : FixedArray[AudioBuffer]
+  // Stereo signal path buffers — one pair per node (populated only for stereo-aware nodes)
   left_buffers : FixedArray[AudioBuffer]
   right_buffers : FixedArray[AudioBuffer]
   osc_states : FixedArray[Oscillator?]
@@ -169,6 +177,7 @@ struct CompiledDsp {
   stereo_delay_left_states : FixedArray[DelayLine?]
   stereo_delay_right_states : FixedArray[DelayLine?]
   feedback_edges : FixedArray[(Int, Int, Int)]
+  // Feedback graph per-sample self-registers — one value per node, updated each sample
   self_values : FixedArray[Double]
   self_left_values : FixedArray[Double]
   self_right_values : FixedArray[Double]
@@ -179,44 +188,18 @@ struct CompiledDsp {
   sample_values : FixedArray[Double]
   left_sample_values : FixedArray[Double]
   right_sample_values : FixedArray[Double]
-  // Pre-computed pan gains (avoid per-sample trig in feedback loop)
+  // Pre-computed pan gains — trig is done once per block, not per sample
   pan_left_gains : FixedArray[Double]
   pan_right_gains : FixedArray[Double]
 }
 
 ///|
+/// Executable buffer-based DSP graph compiled from `DspNode`s.
+struct CompiledDsp(CompiledGraph)
+
+///|
 /// Executable terminal-stereo graph compiled from `DspNode`s.
-struct CompiledStereoDsp {
-  compile_sample_rate : Double
-  nodes : FixedArray[DspNode]
-  index_map : FixedArray[Int]
-  buffers : FixedArray[AudioBuffer]
-  left_buffers : FixedArray[AudioBuffer]
-  right_buffers : FixedArray[AudioBuffer]
-  osc_states : FixedArray[Oscillator?]
-  noise_states : FixedArray[Noise?]
-  env_states : FixedArray[Adsr?]
-  biquad_states : FixedArray[Biquad?]
-  stereo_biquad_left_states : FixedArray[Biquad?]
-  stereo_biquad_right_states : FixedArray[Biquad?]
-  delay_states : FixedArray[DelayLine?]
-  stereo_delay_left_states : FixedArray[DelayLine?]
-  stereo_delay_right_states : FixedArray[DelayLine?]
-  feedback_edges : FixedArray[(Int, Int, Int)]
-  self_values : FixedArray[Double]
-  self_left_values : FixedArray[Double]
-  self_right_values : FixedArray[Double]
-  self_enabled : FixedArray[Bool]
-  back_edge_input0_source : FixedArray[Int]
-  back_edge_input1_source : FixedArray[Int]
-  // Pre-allocated scratch arrays for feedback processing (avoid hot-path alloc)
-  sample_values : FixedArray[Double]
-  left_sample_values : FixedArray[Double]
-  right_sample_values : FixedArray[Double]
-  // Pre-computed pan gains (avoid per-sample trig in feedback loop)
-  pan_left_gains : FixedArray[Double]
-  pan_right_gains : FixedArray[Double]
-}
+struct CompiledStereoDsp(CompiledGraph)
 
 ///|
 /// Create a constant-value node.
@@ -771,35 +754,37 @@ fn CompiledDsp::compile_internal(
       back_edge_input1_source[target_idx] = source_idx
     }
   }
-  Some({
-    compile_sample_rate,
-    nodes: fixed_nodes,
-    index_map,
-    buffers,
-    left_buffers,
-    right_buffers,
-    osc_states,
-    noise_states,
-    env_states,
-    biquad_states,
-    stereo_biquad_left_states,
-    stereo_biquad_right_states,
-    delay_states,
-    stereo_delay_left_states,
-    stereo_delay_right_states,
-    feedback_edges,
-    self_values,
-    self_left_values: FixedArray::make(node_count, 0.0),
-    self_right_values: FixedArray::make(node_count, 0.0),
-    self_enabled,
-    back_edge_input0_source,
-    back_edge_input1_source,
-    sample_values: FixedArray::make(node_count, 0.0),
-    left_sample_values: FixedArray::make(node_count, 0.0),
-    right_sample_values: FixedArray::make(node_count, 0.0),
-    pan_left_gains: FixedArray::make(node_count, 0.0),
-    pan_right_gains: FixedArray::make(node_count, 0.0),
-  })
+  Some(
+    CompiledDsp({
+      compile_sample_rate,
+      nodes: fixed_nodes,
+      index_map,
+      buffers,
+      left_buffers,
+      right_buffers,
+      osc_states,
+      noise_states,
+      env_states,
+      biquad_states,
+      stereo_biquad_left_states,
+      stereo_biquad_right_states,
+      delay_states,
+      stereo_delay_left_states,
+      stereo_delay_right_states,
+      feedback_edges,
+      self_values,
+      self_left_values: FixedArray::make(node_count, 0.0),
+      self_right_values: FixedArray::make(node_count, 0.0),
+      self_enabled,
+      back_edge_input0_source,
+      back_edge_input1_source,
+      sample_values: FixedArray::make(node_count, 0.0),
+      left_sample_values: FixedArray::make(node_count, 0.0),
+      right_sample_values: FixedArray::make(node_count, 0.0),
+      pan_left_gains: FixedArray::make(node_count, 0.0),
+      pan_right_gains: FixedArray::make(node_count, 0.0),
+    }),
+  )
 }
 
 ///|
@@ -813,50 +798,50 @@ pub fn CompiledDsp::process(
   let sample_rate = context.sample_rate()
   let sample_count = effective_sample_count(context, output)
   if !is_finite_positive(sample_rate) {
-    clear_compiled_buffers(self.buffers)
-    clear_compiled_buffers(self.left_buffers)
-    clear_compiled_buffers(self.right_buffers)
-    reset_graph_env_states(self.env_states)
+    clear_compiled_buffers(self.0.buffers)
+    clear_compiled_buffers(self.0.left_buffers)
+    clear_compiled_buffers(self.0.right_buffers)
+    reset_graph_env_states(self.0.env_states)
     output.fill(0.0)
     return
   }
   if sample_count <= 0 || sample_count > self.compiled_buffer_capacity() {
-    clear_compiled_buffers(self.buffers)
-    clear_compiled_buffers(self.left_buffers)
-    clear_compiled_buffers(self.right_buffers)
+    clear_compiled_buffers(self.0.buffers)
+    clear_compiled_buffers(self.0.left_buffers)
+    clear_compiled_buffers(self.0.right_buffers)
     output.fill(0.0)
     return
   }
-  if self.feedback_edges.length() > 0 {
+  if self.0.feedback_edges.length() > 0 {
     self.process_feedback_graph(context, output, sample_count)
     return
   }
 
   let pan = Pan::new()
-  for index = 0; index < self.nodes.length(); index = index + 1 {
-    let node = self.nodes[index]
-    let buffer = self.buffers[index]
+  for index = 0; index < self.0.nodes.length(); index = index + 1 {
+    let node = self.0.nodes[index]
+    let buffer = self.0.buffers[index]
     match node.kind {
       Constant => fill_constant_buffer(buffer, sample_count, node.value0)
       Oscillator =>
         if node.input0 >= 0 {
-          let osc = self.osc_states[index].unwrap()
-          let freq_buf = self.buffers[node.input0]
+          let osc = self.0.osc_states[index].unwrap()
+          let freq_buf = self.0.buffers[node.input0]
           let sr = context.sample_rate()
           for i = 0; i < sample_count; i = i + 1 {
             buffer.set(i, osc.tick_waveform(node.waveform, freq_buf.get(i), sr))
           }
         } else {
-          self.osc_states[index]
+          self.0.osc_states[index]
           .unwrap()
           .process_waveform(context, buffer, node.waveform, node.value0)
         }
-      Noise => self.noise_states[index].unwrap().process(context, buffer)
-      Adsr => self.env_states[index].unwrap().process(context, buffer)
+      Noise => self.0.noise_states[index].unwrap().process(context, buffer)
+      Adsr => self.0.env_states[index].unwrap().process(context, buffer)
       Biquad => {
-        copy_buffer(self.buffers[node.input0], buffer, sample_count)
+        copy_buffer(self.0.buffers[node.input0], buffer, sample_count)
         process_graph_biquad(
-          self.biquad_states[index].unwrap(),
+          self.0.biquad_states[index].unwrap(),
           context,
           buffer,
           node.filter_mode,
@@ -865,82 +850,86 @@ pub fn CompiledDsp::process(
         )
       }
       Delay => {
-        copy_buffer(self.buffers[node.input0], buffer, sample_count)
-        self.delay_states[index].unwrap().process(context, buffer)
+        copy_buffer(self.0.buffers[node.input0], buffer, sample_count)
+        self.0.delay_states[index].unwrap().process(context, buffer)
       }
       Gain => {
-        copy_buffer(self.buffers[node.input0], buffer, sample_count)
+        copy_buffer(self.0.buffers[node.input0], buffer, sample_count)
         apply_gain_buffer(buffer, sample_count, node.value0)
       }
       Mul =>
         multiply_buffers(
-          self.buffers[node.input0],
-          self.buffers[node.input1],
+          self.0.buffers[node.input0],
+          self.0.buffers[node.input1],
           buffer,
           sample_count,
         )
       Mix =>
         mix_buffers(
-          self.buffers[node.input0],
-          self.buffers[node.input1],
+          self.0.buffers[node.input0],
+          self.0.buffers[node.input1],
           buffer,
           sample_count,
         )
       Clip => {
-        copy_buffer(self.buffers[node.input0], buffer, sample_count)
+        copy_buffer(self.0.buffers[node.input0], buffer, sample_count)
         clip_buffer(buffer, sample_count, node.value0)
       }
-      Output => copy_buffer(self.buffers[node.input0], buffer, sample_count)
+      Output => copy_buffer(self.0.buffers[node.input0], buffer, sample_count)
       Pan =>
         pan.process(
           context,
-          self.buffers[node.input0],
-          self.left_buffers[index],
-          self.right_buffers[index],
+          self.0.buffers[node.input0],
+          self.0.left_buffers[index],
+          self.0.right_buffers[index],
           node.value0,
         )
       StereoGain => {
         copy_stereo_buffers(
-          self.left_buffers[node.input0],
-          self.right_buffers[node.input0],
-          self.left_buffers[index],
-          self.right_buffers[index],
+          self.0.left_buffers[node.input0],
+          self.0.right_buffers[node.input0],
+          self.0.left_buffers[index],
+          self.0.right_buffers[index],
           sample_count,
         )
-        apply_gain_buffer(self.left_buffers[index], sample_count, node.value0)
-        apply_gain_buffer(self.right_buffers[index], sample_count, node.value0)
+        apply_gain_buffer(self.0.left_buffers[index], sample_count, node.value0)
+        apply_gain_buffer(
+          self.0.right_buffers[index],
+          sample_count,
+          node.value0,
+        )
       }
       StereoClip => {
         copy_stereo_buffers(
-          self.left_buffers[node.input0],
-          self.right_buffers[node.input0],
-          self.left_buffers[index],
-          self.right_buffers[index],
+          self.0.left_buffers[node.input0],
+          self.0.right_buffers[node.input0],
+          self.0.left_buffers[index],
+          self.0.right_buffers[index],
           sample_count,
         )
-        clip_buffer(self.left_buffers[index], sample_count, node.value0)
-        clip_buffer(self.right_buffers[index], sample_count, node.value0)
+        clip_buffer(self.0.left_buffers[index], sample_count, node.value0)
+        clip_buffer(self.0.right_buffers[index], sample_count, node.value0)
       }
       StereoBiquad => {
         copy_stereo_buffers(
-          self.left_buffers[node.input0],
-          self.right_buffers[node.input0],
-          self.left_buffers[index],
-          self.right_buffers[index],
+          self.0.left_buffers[node.input0],
+          self.0.right_buffers[node.input0],
+          self.0.left_buffers[index],
+          self.0.right_buffers[index],
           sample_count,
         )
         process_graph_biquad(
-          self.stereo_biquad_left_states[index].unwrap(),
+          self.0.stereo_biquad_left_states[index].unwrap(),
           context,
-          self.left_buffers[index],
+          self.0.left_buffers[index],
           node.filter_mode,
           node.value0,
           node.value1,
         )
         process_graph_biquad(
-          self.stereo_biquad_right_states[index].unwrap(),
+          self.0.stereo_biquad_right_states[index].unwrap(),
           context,
-          self.right_buffers[index],
+          self.0.right_buffers[index],
           node.filter_mode,
           node.value0,
           node.value1,
@@ -948,23 +937,23 @@ pub fn CompiledDsp::process(
       }
       StereoDelay => {
         copy_stereo_buffers(
-          self.left_buffers[node.input0],
-          self.right_buffers[node.input0],
-          self.left_buffers[index],
-          self.right_buffers[index],
+          self.0.left_buffers[node.input0],
+          self.0.right_buffers[node.input0],
+          self.0.left_buffers[index],
+          self.0.right_buffers[index],
           sample_count,
         )
-        self.stereo_delay_left_states[index]
+        self.0.stereo_delay_left_states[index]
         .unwrap()
-        .process(context, self.left_buffers[index])
-        self.stereo_delay_right_states[index]
+        .process(context, self.0.left_buffers[index])
+        self.0.stereo_delay_right_states[index]
         .unwrap()
-        .process(context, self.right_buffers[index])
+        .process(context, self.0.right_buffers[index])
       }
       StereoMixDown =>
         mixdown_stereo_buffers(
-          self.left_buffers[node.input0],
-          self.right_buffers[node.input0],
+          self.0.left_buffers[node.input0],
+          self.0.right_buffers[node.input0],
           buffer,
           sample_count,
         )
@@ -972,7 +961,7 @@ pub fn CompiledDsp::process(
     }
   }
 
-  copy_buffer(self.buffers[self.buffers.length() - 1], output, sample_count)
+  copy_buffer(self.0.buffers[self.0.buffers.length() - 1], output, sample_count)
 }
 
 ///|
@@ -982,14 +971,14 @@ fn CompiledDsp::process_feedback_graph(
   output : AudioBuffer,
   sample_count : Int,
 ) -> Unit {
-  clear_compiled_buffers(self.buffers)
-  clear_compiled_buffers(self.left_buffers)
-  clear_compiled_buffers(self.right_buffers)
-  prepare_feedback_graph_biquads(self, context)
+  clear_compiled_buffers(self.0.buffers)
+  clear_compiled_buffers(self.0.left_buffers)
+  clear_compiled_buffers(self.0.right_buffers)
+  self.0.prepare_feedback_biquads(context)
   // Use pre-allocated scratch arrays instead of allocating per call
-  let sample_values = self.sample_values
-  let left_sv = self.left_sample_values
-  let right_sv = self.right_sample_values
+  let sample_values = self.0.sample_values
+  let left_sv = self.0.left_sample_values
+  let right_sv = self.0.right_sample_values
   for i = 0; i < sample_values.length(); i = i + 1 {
     sample_values[i] = 0.0
     left_sv[i] = 0.0
@@ -997,10 +986,12 @@ fn CompiledDsp::process_feedback_graph(
   }
   let sample_rate = context.sample_rate()
   // Pre-compute pan trig gains once per block (position is constant within block)
-  for i = 0; i < self.nodes.length(); i = i + 1 {
-    if self.nodes[i].kind is Pan {
-      self.pan_left_gains[i] = feedback_pan_left_gain(self.nodes[i].value0)
-      self.pan_right_gains[i] = feedback_pan_right_gain(self.nodes[i].value0)
+  for i = 0; i < self.0.nodes.length(); i = i + 1 {
+    if self.0.nodes[i].kind is Pan {
+      self.0.pan_left_gains[i] = feedback_pan_left_gain(self.0.nodes[i].value0)
+      self.0.pan_right_gains[i] = feedback_pan_right_gain(
+        self.0.nodes[i].value0,
+      )
     }
   }
 
@@ -1008,261 +999,261 @@ fn CompiledDsp::process_feedback_graph(
       sample_index < sample_count
       sample_index = sample_index + 1 {
     for node_index = 0
-        node_index < self.nodes.length()
+        node_index < self.0.nodes.length()
         node_index = node_index + 1 {
-      let node = self.nodes[node_index]
+      let node = self.0.nodes[node_index]
       match node.kind {
         Constant => {
           let value = node.value0
           sample_values[node_index] = value
-          self.buffers[node_index].set(sample_index, value)
+          self.0.buffers[node_index].set(sample_index, value)
         }
         Oscillator => {
           let freq = if node.input0 >= 0 {
             self_register_input_sample(
               sample_values,
-              self.self_values,
+              self.0.self_values,
               node.input0,
-              self.back_edge_input0_source[node_index],
+              self.0.back_edge_input0_source[node_index],
             )
           } else {
             node.value0
           }
-          let value = self.osc_states[node_index]
+          let value = self.0.osc_states[node_index]
             .unwrap()
             .tick_waveform(node.waveform, freq, sample_rate)
           sample_values[node_index] = value
-          self.buffers[node_index].set(sample_index, value)
+          self.0.buffers[node_index].set(sample_index, value)
         }
         Noise => {
-          let value = self.noise_states[node_index].unwrap().tick()
+          let value = self.0.noise_states[node_index].unwrap().tick()
           sample_values[node_index] = value
-          self.buffers[node_index].set(sample_index, value)
+          self.0.buffers[node_index].set(sample_index, value)
         }
         Adsr => {
-          let value = self.env_states[node_index].unwrap().tick(context)
+          let value = self.0.env_states[node_index].unwrap().tick(context)
           sample_values[node_index] = value
-          self.buffers[node_index].set(sample_index, value)
+          self.0.buffers[node_index].set(sample_index, value)
         }
         Biquad => {
           let input0 = self_register_input_sample(
             sample_values,
-            self.self_values,
+            self.0.self_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
-          let value = self.biquad_states[node_index].unwrap().tick(input0)
+          let value = self.0.biquad_states[node_index].unwrap().tick(input0)
           sample_values[node_index] = value
-          self.buffers[node_index].set(sample_index, value)
+          self.0.buffers[node_index].set(sample_index, value)
         }
         Delay => {
           let input0 = self_register_input_sample(
             sample_values,
-            self.self_values,
+            self.0.self_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
-          let value = self.delay_states[node_index].unwrap().tick(input0)
+          let value = self.0.delay_states[node_index].unwrap().tick(input0)
           sample_values[node_index] = value
-          self.buffers[node_index].set(sample_index, value)
+          self.0.buffers[node_index].set(sample_index, value)
         }
         Gain => {
           let input0 = self_register_input_sample(
             sample_values,
-            self.self_values,
+            self.0.self_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
           let value = input0 * node.value0
           sample_values[node_index] = value
-          self.buffers[node_index].set(sample_index, value)
+          self.0.buffers[node_index].set(sample_index, value)
         }
         Mul => {
           let input0 = self_register_input_sample(
             sample_values,
-            self.self_values,
+            self.0.self_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
           let input1 = self_register_input_sample(
             sample_values,
-            self.self_values,
+            self.0.self_values,
             node.input1,
-            self.back_edge_input1_source[node_index],
+            self.0.back_edge_input1_source[node_index],
           )
           let value = input0 * input1
           sample_values[node_index] = value
-          self.buffers[node_index].set(sample_index, value)
+          self.0.buffers[node_index].set(sample_index, value)
         }
         Mix => {
           let input0 = self_register_input_sample(
             sample_values,
-            self.self_values,
+            self.0.self_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
           let input1 = self_register_input_sample(
             sample_values,
-            self.self_values,
+            self.0.self_values,
             node.input1,
-            self.back_edge_input1_source[node_index],
+            self.0.back_edge_input1_source[node_index],
           )
           let value = input0 + input1
           sample_values[node_index] = value
-          self.buffers[node_index].set(sample_index, value)
+          self.0.buffers[node_index].set(sample_index, value)
         }
         Clip => {
           let input0 = self_register_input_sample(
             sample_values,
-            self.self_values,
+            self.0.self_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
           let value = clip_feedback_sample(input0, node.value0)
           sample_values[node_index] = value
-          self.buffers[node_index].set(sample_index, value)
+          self.0.buffers[node_index].set(sample_index, value)
         }
         Output => {
           let input0 = self_register_input_sample(
             sample_values,
-            self.self_values,
+            self.0.self_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
           sample_values[node_index] = input0
-          self.buffers[node_index].set(sample_index, input0)
+          self.0.buffers[node_index].set(sample_index, input0)
         }
         Pan => {
           let input0 = self_register_input_sample(
             sample_values,
-            self.self_values,
+            self.0.self_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
-          let pan_left = input0 * self.pan_left_gains[node_index]
-          let pan_right = input0 * self.pan_right_gains[node_index]
+          let pan_left = input0 * self.0.pan_left_gains[node_index]
+          let pan_right = input0 * self.0.pan_right_gains[node_index]
           left_sv[node_index] = pan_left
           right_sv[node_index] = pan_right
-          self.left_buffers[node_index].set(sample_index, pan_left)
-          self.right_buffers[node_index].set(sample_index, pan_right)
+          self.0.left_buffers[node_index].set(sample_index, pan_left)
+          self.0.right_buffers[node_index].set(sample_index, pan_right)
         }
         StereoGain => {
           let input_left = self_register_stereo_input_left(
             left_sv,
-            self.self_left_values,
+            self.0.self_left_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
           let input_right = self_register_stereo_input_right(
             right_sv,
-            self.self_right_values,
+            self.0.self_right_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
           let left = input_left * node.value0
           let right = input_right * node.value0
           left_sv[node_index] = left
           right_sv[node_index] = right
-          self.left_buffers[node_index].set(sample_index, left)
-          self.right_buffers[node_index].set(sample_index, right)
+          self.0.left_buffers[node_index].set(sample_index, left)
+          self.0.right_buffers[node_index].set(sample_index, right)
         }
         StereoClip => {
           let input_left = self_register_stereo_input_left(
             left_sv,
-            self.self_left_values,
+            self.0.self_left_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
           let input_right = self_register_stereo_input_right(
             right_sv,
-            self.self_right_values,
+            self.0.self_right_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
           let left = clip_feedback_sample(input_left, node.value0)
           let right = clip_feedback_sample(input_right, node.value0)
           left_sv[node_index] = left
           right_sv[node_index] = right
-          self.left_buffers[node_index].set(sample_index, left)
-          self.right_buffers[node_index].set(sample_index, right)
+          self.0.left_buffers[node_index].set(sample_index, left)
+          self.0.right_buffers[node_index].set(sample_index, right)
         }
         StereoBiquad => {
           let input_left = self_register_stereo_input_left(
             left_sv,
-            self.self_left_values,
+            self.0.self_left_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
           let input_right = self_register_stereo_input_right(
             right_sv,
-            self.self_right_values,
+            self.0.self_right_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
-          let left = self.stereo_biquad_left_states[node_index]
+          let left = self.0.stereo_biquad_left_states[node_index]
             .unwrap()
             .tick(input_left)
-          let right = self.stereo_biquad_right_states[node_index]
+          let right = self.0.stereo_biquad_right_states[node_index]
             .unwrap()
             .tick(input_right)
           left_sv[node_index] = left
           right_sv[node_index] = right
-          self.left_buffers[node_index].set(sample_index, left)
-          self.right_buffers[node_index].set(sample_index, right)
+          self.0.left_buffers[node_index].set(sample_index, left)
+          self.0.right_buffers[node_index].set(sample_index, right)
         }
         StereoDelay => {
           let input_left = self_register_stereo_input_left(
             left_sv,
-            self.self_left_values,
+            self.0.self_left_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
           let input_right = self_register_stereo_input_right(
             right_sv,
-            self.self_right_values,
+            self.0.self_right_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
-          let left = self.stereo_delay_left_states[node_index]
+          let left = self.0.stereo_delay_left_states[node_index]
             .unwrap()
             .tick(input_left)
-          let right = self.stereo_delay_right_states[node_index]
+          let right = self.0.stereo_delay_right_states[node_index]
             .unwrap()
             .tick(input_right)
           left_sv[node_index] = left
           right_sv[node_index] = right
-          self.left_buffers[node_index].set(sample_index, left)
-          self.right_buffers[node_index].set(sample_index, right)
+          self.0.left_buffers[node_index].set(sample_index, left)
+          self.0.right_buffers[node_index].set(sample_index, right)
         }
         StereoMixDown => {
           let input_left = self_register_stereo_input_left(
             left_sv,
-            self.self_left_values,
+            self.0.self_left_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
           let input_right = self_register_stereo_input_right(
             right_sv,
-            self.self_right_values,
+            self.0.self_right_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
           let value = (input_left + input_right) * 0.5
           sample_values[node_index] = value
-          self.buffers[node_index].set(sample_index, value)
+          self.0.buffers[node_index].set(sample_index, value)
         }
         StereoOutput => ()
       }
       // Update self-register for feedback sources
-      if self.self_enabled[node_index] {
-        self.self_values[node_index] = sample_values[node_index]
-        self.self_left_values[node_index] = left_sv[node_index]
-        self.self_right_values[node_index] = right_sv[node_index]
+      if self.0.self_enabled[node_index] {
+        self.0.self_values[node_index] = sample_values[node_index]
+        self.0.self_left_values[node_index] = left_sv[node_index]
+        self.0.self_right_values[node_index] = right_sv[node_index]
       }
     }
   }
 
-  copy_buffer(self.buffers[self.buffers.length() - 1], output, sample_count)
+  copy_buffer(self.0.buffers[self.0.buffers.length() - 1], output, sample_count)
 }
 
 ///|
@@ -1392,35 +1383,37 @@ fn CompiledStereoDsp::compile_internal(
       back_edge_input1_source[target_idx] = source_idx
     }
   }
-  Some({
-    compile_sample_rate,
-    nodes: fixed_nodes,
-    index_map,
-    buffers,
-    left_buffers,
-    right_buffers,
-    osc_states,
-    noise_states,
-    env_states,
-    biquad_states,
-    stereo_biquad_left_states,
-    stereo_biquad_right_states,
-    delay_states,
-    stereo_delay_left_states,
-    stereo_delay_right_states,
-    feedback_edges: remapped_feedback,
-    self_values,
-    self_left_values,
-    self_right_values,
-    self_enabled,
-    back_edge_input0_source,
-    back_edge_input1_source,
-    sample_values: FixedArray::make(node_count, 0.0),
-    left_sample_values: FixedArray::make(node_count, 0.0),
-    right_sample_values: FixedArray::make(node_count, 0.0),
-    pan_left_gains: FixedArray::make(node_count, 0.0),
-    pan_right_gains: FixedArray::make(node_count, 0.0),
-  })
+  Some(
+    CompiledStereoDsp({
+      compile_sample_rate,
+      nodes: fixed_nodes,
+      index_map,
+      buffers,
+      left_buffers,
+      right_buffers,
+      osc_states,
+      noise_states,
+      env_states,
+      biquad_states,
+      stereo_biquad_left_states,
+      stereo_biquad_right_states,
+      delay_states,
+      stereo_delay_left_states,
+      stereo_delay_right_states,
+      feedback_edges: remapped_feedback,
+      self_values,
+      self_left_values,
+      self_right_values,
+      self_enabled,
+      back_edge_input0_source,
+      back_edge_input1_source,
+      sample_values: FixedArray::make(node_count, 0.0),
+      left_sample_values: FixedArray::make(node_count, 0.0),
+      right_sample_values: FixedArray::make(node_count, 0.0),
+      pan_left_gains: FixedArray::make(node_count, 0.0),
+      pan_right_gains: FixedArray::make(node_count, 0.0),
+    }),
+  )
 }
 
 ///|
@@ -1437,23 +1430,23 @@ pub fn CompiledStereoDsp::process(
     context, left_output, right_output,
   )
   if !is_finite_positive(sample_rate) {
-    clear_compiled_buffers(self.buffers)
-    clear_compiled_buffers(self.left_buffers)
-    clear_compiled_buffers(self.right_buffers)
-    reset_graph_env_states(self.env_states)
+    clear_compiled_buffers(self.0.buffers)
+    clear_compiled_buffers(self.0.left_buffers)
+    clear_compiled_buffers(self.0.right_buffers)
+    reset_graph_env_states(self.0.env_states)
     left_output.fill(0.0)
     right_output.fill(0.0)
     return
   }
   if sample_count <= 0 || sample_count > self.compiled_buffer_capacity() {
-    clear_compiled_buffers(self.buffers)
-    clear_compiled_buffers(self.left_buffers)
-    clear_compiled_buffers(self.right_buffers)
+    clear_compiled_buffers(self.0.buffers)
+    clear_compiled_buffers(self.0.left_buffers)
+    clear_compiled_buffers(self.0.right_buffers)
     left_output.fill(0.0)
     right_output.fill(0.0)
     return
   }
-  if self.feedback_edges.length() > 0 {
+  if self.0.feedback_edges.length() > 0 {
     self.process_feedback_graph(
       context, left_output, right_output, sample_count,
     )
@@ -1461,30 +1454,30 @@ pub fn CompiledStereoDsp::process(
   }
 
   let pan = Pan::new()
-  for index = 0; index < self.nodes.length(); index = index + 1 {
-    let node = self.nodes[index]
-    let buffer = self.buffers[index]
+  for index = 0; index < self.0.nodes.length(); index = index + 1 {
+    let node = self.0.nodes[index]
+    let buffer = self.0.buffers[index]
     match node.kind {
       Constant => fill_constant_buffer(buffer, sample_count, node.value0)
       Oscillator =>
         if node.input0 >= 0 {
-          let osc = self.osc_states[index].unwrap()
-          let freq_buf = self.buffers[node.input0]
+          let osc = self.0.osc_states[index].unwrap()
+          let freq_buf = self.0.buffers[node.input0]
           let sr = context.sample_rate()
           for i = 0; i < sample_count; i = i + 1 {
             buffer.set(i, osc.tick_waveform(node.waveform, freq_buf.get(i), sr))
           }
         } else {
-          self.osc_states[index]
+          self.0.osc_states[index]
           .unwrap()
           .process_waveform(context, buffer, node.waveform, node.value0)
         }
-      Noise => self.noise_states[index].unwrap().process(context, buffer)
-      Adsr => self.env_states[index].unwrap().process(context, buffer)
+      Noise => self.0.noise_states[index].unwrap().process(context, buffer)
+      Adsr => self.0.env_states[index].unwrap().process(context, buffer)
       Biquad => {
-        copy_buffer(self.buffers[node.input0], buffer, sample_count)
+        copy_buffer(self.0.buffers[node.input0], buffer, sample_count)
         process_graph_biquad(
-          self.biquad_states[index].unwrap(),
+          self.0.biquad_states[index].unwrap(),
           context,
           buffer,
           node.filter_mode,
@@ -1493,81 +1486,85 @@ pub fn CompiledStereoDsp::process(
         )
       }
       Delay => {
-        copy_buffer(self.buffers[node.input0], buffer, sample_count)
-        self.delay_states[index].unwrap().process(context, buffer)
+        copy_buffer(self.0.buffers[node.input0], buffer, sample_count)
+        self.0.delay_states[index].unwrap().process(context, buffer)
       }
       Gain => {
-        copy_buffer(self.buffers[node.input0], buffer, sample_count)
+        copy_buffer(self.0.buffers[node.input0], buffer, sample_count)
         apply_gain_buffer(buffer, sample_count, node.value0)
       }
       Mul =>
         multiply_buffers(
-          self.buffers[node.input0],
-          self.buffers[node.input1],
+          self.0.buffers[node.input0],
+          self.0.buffers[node.input1],
           buffer,
           sample_count,
         )
       Mix =>
         mix_buffers(
-          self.buffers[node.input0],
-          self.buffers[node.input1],
+          self.0.buffers[node.input0],
+          self.0.buffers[node.input1],
           buffer,
           sample_count,
         )
       Clip => {
-        copy_buffer(self.buffers[node.input0], buffer, sample_count)
+        copy_buffer(self.0.buffers[node.input0], buffer, sample_count)
         clip_buffer(buffer, sample_count, node.value0)
       }
       Pan =>
         pan.process(
           context,
-          self.buffers[node.input0],
-          self.left_buffers[index],
-          self.right_buffers[index],
+          self.0.buffers[node.input0],
+          self.0.left_buffers[index],
+          self.0.right_buffers[index],
           node.value0,
         )
       StereoGain => {
         copy_stereo_buffers(
-          self.left_buffers[node.input0],
-          self.right_buffers[node.input0],
-          self.left_buffers[index],
-          self.right_buffers[index],
+          self.0.left_buffers[node.input0],
+          self.0.right_buffers[node.input0],
+          self.0.left_buffers[index],
+          self.0.right_buffers[index],
           sample_count,
         )
-        apply_gain_buffer(self.left_buffers[index], sample_count, node.value0)
-        apply_gain_buffer(self.right_buffers[index], sample_count, node.value0)
+        apply_gain_buffer(self.0.left_buffers[index], sample_count, node.value0)
+        apply_gain_buffer(
+          self.0.right_buffers[index],
+          sample_count,
+          node.value0,
+        )
       }
       StereoClip => {
         copy_stereo_buffers(
-          self.left_buffers[node.input0],
-          self.right_buffers[node.input0],
-          self.left_buffers[index],
-          self.right_buffers[index],
+          self.0.left_buffers[node.input0],
+          self.0.right_buffers[node.input0],
+          self.0.left_buffers[index],
+          self.0.right_buffers[index],
           sample_count,
         )
-        clip_buffer(self.left_buffers[index], sample_count, node.value0)
-        clip_buffer(self.right_buffers[index], sample_count, node.value0)
+        clip_buffer(self.0.left_buffers[index], sample_count, node.value0)
+        clip_buffer(self.0.right_buffers[index], sample_count, node.value0)
       }
       StereoBiquad => {
         copy_stereo_buffers(
-          self.left_buffers[node.input0],
-          self.right_buffers[node.input0],
-          self.left_buffers[index],
-          self.right_buffers[index],
+          self.0.left_buffers[node.input0],
+          self.0.right_buffers[node.input0],
+          self.0.left_buffers[index],
+          self.0.right_buffers[index],
           sample_count,
         )
         process_graph_biquad(
-          self.stereo_biquad_left_states[index].unwrap(),
+          self.0.stereo_biquad_left_states[index].unwrap(),
           context,
-          self.left_buffers[index],
+          self.0.left_buffers[index],
           node.filter_mode,
           node.value0,
           node.value1,
         )
         process_graph_biquad(
-          self.stereo_biquad_right_states[index].unwrap(),
+          self.0.stereo_biquad_right_states[index].unwrap(),
           context,
-          self.right_buffers[index],
+          self.0.right_buffers[index],
           node.filter_mode,
           node.value0,
           node.value1,
@@ -1575,32 +1572,32 @@ pub fn CompiledStereoDsp::process(
       }
       StereoDelay => {
         copy_stereo_buffers(
-          self.left_buffers[node.input0],
-          self.right_buffers[node.input0],
-          self.left_buffers[index],
-          self.right_buffers[index],
+          self.0.left_buffers[node.input0],
+          self.0.right_buffers[node.input0],
+          self.0.left_buffers[index],
+          self.0.right_buffers[index],
           sample_count,
         )
-        self.stereo_delay_left_states[index]
+        self.0.stereo_delay_left_states[index]
         .unwrap()
-        .process(context, self.left_buffers[index])
-        self.stereo_delay_right_states[index]
+        .process(context, self.0.left_buffers[index])
+        self.0.stereo_delay_right_states[index]
         .unwrap()
-        .process(context, self.right_buffers[index])
+        .process(context, self.0.right_buffers[index])
       }
       StereoMixDown =>
         mixdown_stereo_buffers(
-          self.left_buffers[node.input0],
-          self.right_buffers[node.input0],
+          self.0.left_buffers[node.input0],
+          self.0.right_buffers[node.input0],
           buffer,
           sample_count,
         )
       StereoOutput =>
         copy_stereo_buffers(
-          self.left_buffers[node.input0],
-          self.right_buffers[node.input0],
-          self.left_buffers[index],
-          self.right_buffers[index],
+          self.0.left_buffers[node.input0],
+          self.0.right_buffers[node.input0],
+          self.0.left_buffers[index],
+          self.0.right_buffers[index],
           sample_count,
         )
       Output => ()
@@ -1608,8 +1605,8 @@ pub fn CompiledStereoDsp::process(
   }
 
   copy_stereo_buffers(
-    self.left_buffers[self.left_buffers.length() - 1],
-    self.right_buffers[self.right_buffers.length() - 1],
+    self.0.left_buffers[self.0.left_buffers.length() - 1],
+    self.0.right_buffers[self.0.right_buffers.length() - 1],
     left_output,
     right_output,
     sample_count,
@@ -1624,14 +1621,14 @@ fn CompiledStereoDsp::process_feedback_graph(
   right_output : AudioBuffer,
   sample_count : Int,
 ) -> Unit {
-  clear_compiled_buffers(self.buffers)
-  clear_compiled_buffers(self.left_buffers)
-  clear_compiled_buffers(self.right_buffers)
-  prepare_feedback_stereo_graph_biquads(self, context)
+  clear_compiled_buffers(self.0.buffers)
+  clear_compiled_buffers(self.0.left_buffers)
+  clear_compiled_buffers(self.0.right_buffers)
+  self.0.prepare_feedback_biquads(context)
   // Use pre-allocated scratch arrays instead of allocating per call
-  let sample_values = self.sample_values
-  let left_sv = self.left_sample_values
-  let right_sv = self.right_sample_values
+  let sample_values = self.0.sample_values
+  let left_sv = self.0.left_sample_values
+  let right_sv = self.0.right_sample_values
   for i = 0; i < sample_values.length(); i = i + 1 {
     sample_values[i] = 0.0
     left_sv[i] = 0.0
@@ -1639,10 +1636,12 @@ fn CompiledStereoDsp::process_feedback_graph(
   }
   let sample_rate = context.sample_rate()
   // Pre-compute pan trig gains once per block (position is constant within block)
-  for i = 0; i < self.nodes.length(); i = i + 1 {
-    if self.nodes[i].kind is Pan {
-      self.pan_left_gains[i] = feedback_pan_left_gain(self.nodes[i].value0)
-      self.pan_right_gains[i] = feedback_pan_right_gain(self.nodes[i].value0)
+  for i = 0; i < self.0.nodes.length(); i = i + 1 {
+    if self.0.nodes[i].kind is Pan {
+      self.0.pan_left_gains[i] = feedback_pan_left_gain(self.0.nodes[i].value0)
+      self.0.pan_right_gains[i] = feedback_pan_right_gain(
+        self.0.nodes[i].value0,
+      )
     }
   }
 
@@ -1650,271 +1649,271 @@ fn CompiledStereoDsp::process_feedback_graph(
       sample_index < sample_count
       sample_index = sample_index + 1 {
     for node_index = 0
-        node_index < self.nodes.length()
+        node_index < self.0.nodes.length()
         node_index = node_index + 1 {
-      let node = self.nodes[node_index]
+      let node = self.0.nodes[node_index]
       match node.kind {
         Constant => {
           let value = node.value0
           sample_values[node_index] = value
-          self.buffers[node_index].set(sample_index, value)
+          self.0.buffers[node_index].set(sample_index, value)
         }
         Oscillator => {
           let freq = if node.input0 >= 0 {
             self_register_input_sample(
               sample_values,
-              self.self_values,
+              self.0.self_values,
               node.input0,
-              self.back_edge_input0_source[node_index],
+              self.0.back_edge_input0_source[node_index],
             )
           } else {
             node.value0
           }
-          let value = self.osc_states[node_index]
+          let value = self.0.osc_states[node_index]
             .unwrap()
             .tick_waveform(node.waveform, freq, sample_rate)
           sample_values[node_index] = value
-          self.buffers[node_index].set(sample_index, value)
+          self.0.buffers[node_index].set(sample_index, value)
         }
         Noise => {
-          let value = self.noise_states[node_index].unwrap().tick()
+          let value = self.0.noise_states[node_index].unwrap().tick()
           sample_values[node_index] = value
-          self.buffers[node_index].set(sample_index, value)
+          self.0.buffers[node_index].set(sample_index, value)
         }
         Adsr => {
-          let value = self.env_states[node_index].unwrap().tick(context)
+          let value = self.0.env_states[node_index].unwrap().tick(context)
           sample_values[node_index] = value
-          self.buffers[node_index].set(sample_index, value)
+          self.0.buffers[node_index].set(sample_index, value)
         }
         Biquad => {
           let input0 = self_register_input_sample(
             sample_values,
-            self.self_values,
+            self.0.self_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
-          let value = self.biquad_states[node_index].unwrap().tick(input0)
+          let value = self.0.biquad_states[node_index].unwrap().tick(input0)
           sample_values[node_index] = value
-          self.buffers[node_index].set(sample_index, value)
+          self.0.buffers[node_index].set(sample_index, value)
         }
         Delay => {
           let input0 = self_register_input_sample(
             sample_values,
-            self.self_values,
+            self.0.self_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
-          let value = self.delay_states[node_index].unwrap().tick(input0)
+          let value = self.0.delay_states[node_index].unwrap().tick(input0)
           sample_values[node_index] = value
-          self.buffers[node_index].set(sample_index, value)
+          self.0.buffers[node_index].set(sample_index, value)
         }
         Gain => {
           let input0 = self_register_input_sample(
             sample_values,
-            self.self_values,
+            self.0.self_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
           let value = input0 * node.value0
           sample_values[node_index] = value
-          self.buffers[node_index].set(sample_index, value)
+          self.0.buffers[node_index].set(sample_index, value)
         }
         Mul => {
           let input0 = self_register_input_sample(
             sample_values,
-            self.self_values,
+            self.0.self_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
           let input1 = self_register_input_sample(
             sample_values,
-            self.self_values,
+            self.0.self_values,
             node.input1,
-            self.back_edge_input1_source[node_index],
+            self.0.back_edge_input1_source[node_index],
           )
           let value = input0 * input1
           sample_values[node_index] = value
-          self.buffers[node_index].set(sample_index, value)
+          self.0.buffers[node_index].set(sample_index, value)
         }
         Mix => {
           let input0 = self_register_input_sample(
             sample_values,
-            self.self_values,
+            self.0.self_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
           let input1 = self_register_input_sample(
             sample_values,
-            self.self_values,
+            self.0.self_values,
             node.input1,
-            self.back_edge_input1_source[node_index],
+            self.0.back_edge_input1_source[node_index],
           )
           let value = input0 + input1
           sample_values[node_index] = value
-          self.buffers[node_index].set(sample_index, value)
+          self.0.buffers[node_index].set(sample_index, value)
         }
         Clip => {
           let input0 = self_register_input_sample(
             sample_values,
-            self.self_values,
+            self.0.self_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
           let value = clip_feedback_sample(input0, node.value0)
           sample_values[node_index] = value
-          self.buffers[node_index].set(sample_index, value)
+          self.0.buffers[node_index].set(sample_index, value)
         }
         Pan => {
           let input0 = self_register_input_sample(
             sample_values,
-            self.self_values,
+            self.0.self_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
-          let pan_left = input0 * self.pan_left_gains[node_index]
-          let pan_right = input0 * self.pan_right_gains[node_index]
+          let pan_left = input0 * self.0.pan_left_gains[node_index]
+          let pan_right = input0 * self.0.pan_right_gains[node_index]
           left_sv[node_index] = pan_left
           right_sv[node_index] = pan_right
-          self.left_buffers[node_index].set(sample_index, pan_left)
-          self.right_buffers[node_index].set(sample_index, pan_right)
+          self.0.left_buffers[node_index].set(sample_index, pan_left)
+          self.0.right_buffers[node_index].set(sample_index, pan_right)
         }
         StereoGain => {
           let input_left = self_register_stereo_input_left(
             left_sv,
-            self.self_left_values,
+            self.0.self_left_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
           let input_right = self_register_stereo_input_right(
             right_sv,
-            self.self_right_values,
+            self.0.self_right_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
           let left = input_left * node.value0
           let right = input_right * node.value0
           left_sv[node_index] = left
           right_sv[node_index] = right
-          self.left_buffers[node_index].set(sample_index, left)
-          self.right_buffers[node_index].set(sample_index, right)
+          self.0.left_buffers[node_index].set(sample_index, left)
+          self.0.right_buffers[node_index].set(sample_index, right)
         }
         StereoClip => {
           let input_left = self_register_stereo_input_left(
             left_sv,
-            self.self_left_values,
+            self.0.self_left_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
           let input_right = self_register_stereo_input_right(
             right_sv,
-            self.self_right_values,
+            self.0.self_right_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
           let left = clip_feedback_sample(input_left, node.value0)
           let right = clip_feedback_sample(input_right, node.value0)
           left_sv[node_index] = left
           right_sv[node_index] = right
-          self.left_buffers[node_index].set(sample_index, left)
-          self.right_buffers[node_index].set(sample_index, right)
+          self.0.left_buffers[node_index].set(sample_index, left)
+          self.0.right_buffers[node_index].set(sample_index, right)
         }
         StereoBiquad => {
           let input_left = self_register_stereo_input_left(
             left_sv,
-            self.self_left_values,
+            self.0.self_left_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
           let input_right = self_register_stereo_input_right(
             right_sv,
-            self.self_right_values,
+            self.0.self_right_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
-          let left = self.stereo_biquad_left_states[node_index]
+          let left = self.0.stereo_biquad_left_states[node_index]
             .unwrap()
             .tick(input_left)
-          let right = self.stereo_biquad_right_states[node_index]
+          let right = self.0.stereo_biquad_right_states[node_index]
             .unwrap()
             .tick(input_right)
           left_sv[node_index] = left
           right_sv[node_index] = right
-          self.left_buffers[node_index].set(sample_index, left)
-          self.right_buffers[node_index].set(sample_index, right)
+          self.0.left_buffers[node_index].set(sample_index, left)
+          self.0.right_buffers[node_index].set(sample_index, right)
         }
         StereoDelay => {
           let input_left = self_register_stereo_input_left(
             left_sv,
-            self.self_left_values,
+            self.0.self_left_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
           let input_right = self_register_stereo_input_right(
             right_sv,
-            self.self_right_values,
+            self.0.self_right_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
-          let left = self.stereo_delay_left_states[node_index]
+          let left = self.0.stereo_delay_left_states[node_index]
             .unwrap()
             .tick(input_left)
-          let right = self.stereo_delay_right_states[node_index]
+          let right = self.0.stereo_delay_right_states[node_index]
             .unwrap()
             .tick(input_right)
           left_sv[node_index] = left
           right_sv[node_index] = right
-          self.left_buffers[node_index].set(sample_index, left)
-          self.right_buffers[node_index].set(sample_index, right)
+          self.0.left_buffers[node_index].set(sample_index, left)
+          self.0.right_buffers[node_index].set(sample_index, right)
         }
         StereoMixDown => {
           let input_left = self_register_stereo_input_left(
             left_sv,
-            self.self_left_values,
+            self.0.self_left_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
           let input_right = self_register_stereo_input_right(
             right_sv,
-            self.self_right_values,
+            self.0.self_right_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
           let value = (input_left + input_right) * 0.5
           sample_values[node_index] = value
-          self.buffers[node_index].set(sample_index, value)
+          self.0.buffers[node_index].set(sample_index, value)
         }
         StereoOutput => {
           let input_left = self_register_stereo_input_left(
             left_sv,
-            self.self_left_values,
+            self.0.self_left_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
           let input_right = self_register_stereo_input_right(
             right_sv,
-            self.self_right_values,
+            self.0.self_right_values,
             node.input0,
-            self.back_edge_input0_source[node_index],
+            self.0.back_edge_input0_source[node_index],
           )
           left_sv[node_index] = input_left
           right_sv[node_index] = input_right
-          self.left_buffers[node_index].set(sample_index, input_left)
-          self.right_buffers[node_index].set(sample_index, input_right)
+          self.0.left_buffers[node_index].set(sample_index, input_left)
+          self.0.right_buffers[node_index].set(sample_index, input_right)
         }
         Output => ()
       }
       // Update self-register for feedback sources
-      if self.self_enabled[node_index] {
-        self.self_values[node_index] = sample_values[node_index]
-        self.self_left_values[node_index] = left_sv[node_index]
-        self.self_right_values[node_index] = right_sv[node_index]
+      if self.0.self_enabled[node_index] {
+        self.0.self_values[node_index] = sample_values[node_index]
+        self.0.self_left_values[node_index] = left_sv[node_index]
+        self.0.self_right_values[node_index] = right_sv[node_index]
       }
     }
   }
 
   copy_stereo_buffers(
-    self.left_buffers[self.left_buffers.length() - 1],
-    self.right_buffers[self.right_buffers.length() - 1],
+    self.0.left_buffers[self.0.left_buffers.length() - 1],
+    self.0.right_buffers[self.0.right_buffers.length() - 1],
     left_output,
     right_output,
     sample_count,
@@ -1931,17 +1930,7 @@ pub fn CompiledDsp::apply_control(
   self : CompiledDsp,
   control : GraphControl,
 ) -> Bool {
-  match control.kind {
-    GateOn => apply_graph_gate_control(self, control.node_index, true)
-    GateOff => apply_graph_gate_control(self, control.node_index, false)
-    SetParam =>
-      apply_graph_param_control(
-        self,
-        control.node_index,
-        control.slot,
-        control.value,
-      )
-  }
+  self.0.apply_control_impl(control)
 }
 
 ///|
@@ -1954,19 +1943,7 @@ pub fn CompiledDsp::apply_controls(
   self : CompiledDsp,
   controls : Array[GraphControl],
 ) -> Bool {
-  let simulated_nodes = FixedArray::makei(self.nodes.length(), index => {
-    self.nodes[index]
-  })
-  for index = 0; index < controls.length(); index = index + 1 {
-    if !valid_graph_control(self, simulated_nodes, controls[index]) {
-      return false
-    }
-  }
-
-  for index = 0; index < controls.length(); index = index + 1 {
-    ignore(self.apply_control(controls[index]))
-  }
-  true
+  self.0.apply_controls_impl(controls)
 }
 
 ///|
@@ -1975,17 +1952,7 @@ pub fn CompiledStereoDsp::apply_control(
   self : CompiledStereoDsp,
   control : GraphControl,
 ) -> Bool {
-  match control.kind {
-    GateOn => apply_graph_gate_control_stereo(self, control.node_index, true)
-    GateOff => apply_graph_gate_control_stereo(self, control.node_index, false)
-    SetParam =>
-      apply_graph_param_control_stereo(
-        self,
-        control.node_index,
-        control.slot,
-        control.value,
-      )
-  }
+  self.0.apply_control_impl(control)
 }
 
 ///|
@@ -1994,19 +1961,7 @@ pub fn CompiledStereoDsp::apply_controls(
   self : CompiledStereoDsp,
   controls : Array[GraphControl],
 ) -> Bool {
-  let simulated_nodes = FixedArray::makei(self.nodes.length(), index => {
-    self.nodes[index]
-  })
-  for index = 0; index < controls.length(); index = index + 1 {
-    if !valid_graph_control_stereo(self, simulated_nodes, controls[index]) {
-      return false
-    }
-  }
-
-  for index = 0; index < controls.length(); index = index + 1 {
-    ignore(self.apply_control(controls[index]))
-  }
-  true
+  self.0.apply_controls_impl(controls)
 }
 
 ///|
@@ -2076,37 +2031,52 @@ pub fn CompiledStereoDsp::set_param(
 }
 
 ///|
-fn apply_graph_gate_control(
-  compiled : CompiledDsp,
-  node_index : Int,
-  gate_on : Bool,
+fn CompiledGraph::apply_control_impl(
+  self : CompiledGraph,
+  control : GraphControl,
 ) -> Bool {
-  match compiled.compiled_index_for(node_index) {
-    Some(compiled_index) =>
-      match compiled.env_states[compiled_index] {
-        Some(env) => {
-          if gate_on {
-            env.gate_on()
-          } else {
-            env.gate_off()
-          }
-          true
-        }
-        None => false
-      }
-    None => false
+  match control.kind {
+    GateOn => apply_graph_gate_control(self, control.node_index, true)
+    GateOff => apply_graph_gate_control(self, control.node_index, false)
+    SetParam =>
+      apply_graph_param_control(
+        self,
+        control.node_index,
+        control.slot,
+        control.value,
+      )
   }
 }
 
 ///|
-fn apply_graph_gate_control_stereo(
-  compiled : CompiledStereoDsp,
+fn CompiledGraph::apply_controls_impl(
+  self : CompiledGraph,
+  controls : Array[GraphControl],
+) -> Bool {
+  let simulated_nodes = FixedArray::makei(self.nodes.length(), index => {
+    self.nodes[index]
+  })
+  for index = 0; index < controls.length(); index = index + 1 {
+    if !valid_graph_control(self, simulated_nodes, controls[index]) {
+      return false
+    }
+  }
+
+  for index = 0; index < controls.length(); index = index + 1 {
+    ignore(self.apply_control_impl(controls[index]))
+  }
+  true
+}
+
+///|
+fn apply_graph_gate_control(
+  graph : CompiledGraph,
   node_index : Int,
   gate_on : Bool,
 ) -> Bool {
-  match compiled.compiled_index_for(node_index) {
+  match graph.compiled_index_for(node_index) {
     Some(compiled_index) =>
-      match compiled.env_states[compiled_index] {
+      match graph.env_states[compiled_index] {
         Some(env) => {
           if gate_on {
             env.gate_on()
@@ -2123,60 +2093,37 @@ fn apply_graph_gate_control_stereo(
 
 ///|
 fn apply_graph_param_control(
-  compiled : CompiledDsp,
+  graph : CompiledGraph,
   node_index : Int,
   slot : GraphParamSlot,
   value : Double,
 ) -> Bool {
-  let compiled_index = match compiled.compiled_index_for(node_index) {
+  let compiled_index = match graph.compiled_index_for(node_index) {
     Some(compiled_index) => compiled_index
     None => return false
   }
-  let node = compiled.nodes[compiled_index]
+  let node = graph.nodes[compiled_index]
   let updated = match
-    updated_node_param(node, slot, value, compiled.compile_sample_rate) {
+    updated_node_param(node, slot, value, graph.compile_sample_rate) {
     Some(updated) => updated
     None => return false
   }
-  compiled.nodes[compiled_index] = updated
-  apply_runtime_param_side_effect(compiled, compiled_index, updated, slot)
-}
-
-///|
-fn apply_graph_param_control_stereo(
-  compiled : CompiledStereoDsp,
-  node_index : Int,
-  slot : GraphParamSlot,
-  value : Double,
-) -> Bool {
-  let compiled_index = match compiled.compiled_index_for(node_index) {
-    Some(compiled_index) => compiled_index
-    None => return false
-  }
-  let node = compiled.nodes[compiled_index]
-  let updated = match
-    updated_node_param(node, slot, value, compiled.compile_sample_rate) {
-    Some(updated) => updated
-    None => return false
-  }
-  compiled.nodes[compiled_index] = updated
-  apply_runtime_param_side_effect_stereo(
-    compiled, compiled_index, updated, slot,
-  )
+  graph.nodes[compiled_index] = updated
+  apply_runtime_param_side_effect(graph, compiled_index, updated, slot)
 }
 
 ///|
 fn valid_graph_control(
-  compiled : CompiledDsp,
+  graph : CompiledGraph,
   simulated_nodes : FixedArray[DspNode],
   control : GraphControl,
 ) -> Bool {
   match control.kind {
-    GateOn => valid_graph_gate_control(compiled, control.node_index)
-    GateOff => valid_graph_gate_control(compiled, control.node_index)
+    GateOn => valid_graph_gate_control(graph, control.node_index)
+    GateOff => valid_graph_gate_control(graph, control.node_index)
     SetParam =>
       valid_graph_param_control(
-        compiled,
+        graph,
         simulated_nodes,
         control.node_index,
         control.slot,
@@ -2186,53 +2133,22 @@ fn valid_graph_control(
 }
 
 ///|
-fn valid_graph_control_stereo(
-  compiled : CompiledStereoDsp,
-  simulated_nodes : FixedArray[DspNode],
-  control : GraphControl,
-) -> Bool {
-  match control.kind {
-    GateOn => valid_graph_gate_control_stereo(compiled, control.node_index)
-    GateOff => valid_graph_gate_control_stereo(compiled, control.node_index)
-    SetParam =>
-      valid_graph_param_control_stereo(
-        compiled,
-        simulated_nodes,
-        control.node_index,
-        control.slot,
-        control.value,
-      )
-  }
-}
-
-///|
-fn valid_graph_gate_control(compiled : CompiledDsp, node_index : Int) -> Bool {
-  match compiled.compiled_index_for(node_index) {
-    Some(compiled_index) => compiled.env_states[compiled_index] is Some(_)
-    None => false
-  }
-}
-
-///|
-fn valid_graph_gate_control_stereo(
-  compiled : CompiledStereoDsp,
-  node_index : Int,
-) -> Bool {
-  match compiled.compiled_index_for(node_index) {
-    Some(compiled_index) => compiled.env_states[compiled_index] is Some(_)
+fn valid_graph_gate_control(graph : CompiledGraph, node_index : Int) -> Bool {
+  match graph.compiled_index_for(node_index) {
+    Some(compiled_index) => graph.env_states[compiled_index] is Some(_)
     None => false
   }
 }
 
 ///|
 fn valid_graph_param_control(
-  compiled : CompiledDsp,
+  graph : CompiledGraph,
   simulated_nodes : FixedArray[DspNode],
   node_index : Int,
   slot : GraphParamSlot,
   value : Double,
 ) -> Bool {
-  let compiled_index = match compiled.compiled_index_for(node_index) {
+  let compiled_index = match graph.compiled_index_for(node_index) {
     Some(compiled_index) => compiled_index
     None => return false
   }
@@ -2241,33 +2157,7 @@ fn valid_graph_param_control(
       simulated_nodes[compiled_index],
       slot,
       value,
-      compiled.compile_sample_rate,
-    ) {
-    Some(updated) => updated
-    None => return false
-  }
-  simulated_nodes[compiled_index] = updated
-  true
-}
-
-///|
-fn valid_graph_param_control_stereo(
-  compiled : CompiledStereoDsp,
-  simulated_nodes : FixedArray[DspNode],
-  node_index : Int,
-  slot : GraphParamSlot,
-  value : Double,
-) -> Bool {
-  let compiled_index = match compiled.compiled_index_for(node_index) {
-    Some(compiled_index) => compiled_index
-    None => return false
-  }
-  let updated = match
-    updated_node_param(
-      simulated_nodes[compiled_index],
-      slot,
-      value,
-      compiled.compile_sample_rate,
+      graph.compile_sample_rate,
     ) {
     Some(updated) => updated
     None => return false
@@ -2432,7 +2322,7 @@ fn valid_reference(input : Int, node_count : Int) -> Bool {
 }
 
 ///|
-fn CompiledDsp::compiled_buffer_capacity(self : CompiledDsp) -> Int {
+fn CompiledGraph::compiled_buffer_capacity(self : CompiledGraph) -> Int {
   if self.buffers.length() == 0 {
     0
   } else {
@@ -2441,8 +2331,8 @@ fn CompiledDsp::compiled_buffer_capacity(self : CompiledDsp) -> Int {
 }
 
 ///|
-fn CompiledDsp::compiled_index_for(
-  self : CompiledDsp,
+fn CompiledGraph::compiled_index_for(
+  self : CompiledGraph,
   node_index : Int,
 ) -> Int? {
   if node_index < 0 || node_index >= self.index_map.length() {
@@ -2455,32 +2345,16 @@ fn CompiledDsp::compiled_index_for(
       Some(compiled)
     }
   }
+}
+
+///|
+fn CompiledDsp::compiled_buffer_capacity(self : CompiledDsp) -> Int {
+  self.0.compiled_buffer_capacity()
 }
 
 ///|
 fn CompiledStereoDsp::compiled_buffer_capacity(self : CompiledStereoDsp) -> Int {
-  if self.buffers.length() == 0 {
-    0
-  } else {
-    self.buffers[0].length()
-  }
-}
-
-///|
-fn CompiledStereoDsp::compiled_index_for(
-  self : CompiledStereoDsp,
-  node_index : Int,
-) -> Int? {
-  if node_index < 0 || node_index >= self.index_map.length() {
-    None
-  } else {
-    let compiled = self.index_map[node_index]
-    if compiled < 0 {
-      None
-    } else {
-      Some(compiled)
-    }
-  }
+  self.0.compiled_buffer_capacity()
 }
 
 ///|
@@ -2586,7 +2460,7 @@ fn updated_node_param(
 
 ///|
 fn apply_runtime_param_side_effect(
-  compiled : CompiledDsp,
+  graph : CompiledGraph,
   compiled_index : Int,
   node : DspNode,
   slot : GraphParamSlot,
@@ -2595,7 +2469,7 @@ fn apply_runtime_param_side_effect(
     Delay =>
       match slot {
         Value0 =>
-          match compiled.delay_states[compiled_index] {
+          match graph.delay_states[compiled_index] {
             Some(delay) => {
               delay.set_feedback(node.value0)
               delay.set_delay_samples(node.delay_samples)
@@ -2604,7 +2478,7 @@ fn apply_runtime_param_side_effect(
             None => false
           }
         DelaySamples =>
-          match compiled.delay_states[compiled_index] {
+          match graph.delay_states[compiled_index] {
             Some(delay) => {
               delay.set_feedback(node.value0)
               delay.set_delay_samples(node.delay_samples)
@@ -2627,80 +2501,16 @@ fn apply_runtime_param_side_effect(
       match slot {
         Value0 =>
           apply_stereo_delay_param_side_effect(
-            compiled.stereo_delay_left_states,
-            compiled.stereo_delay_right_states,
+            graph.stereo_delay_left_states,
+            graph.stereo_delay_right_states,
             compiled_index,
             node.delay_samples,
             node.value0,
           )
         DelaySamples =>
           apply_stereo_delay_param_side_effect(
-            compiled.stereo_delay_left_states,
-            compiled.stereo_delay_right_states,
-            compiled_index,
-            node.delay_samples,
-            node.value0,
-          )
-        _ => false
-      }
-    StereoMixDown => false
-    _ => false
-  }
-}
-
-///|
-fn apply_runtime_param_side_effect_stereo(
-  compiled : CompiledStereoDsp,
-  compiled_index : Int,
-  node : DspNode,
-  slot : GraphParamSlot,
-) -> Bool {
-  match node.kind {
-    Delay =>
-      match slot {
-        Value0 =>
-          match compiled.delay_states[compiled_index] {
-            Some(delay) => {
-              delay.set_feedback(node.value0)
-              delay.set_delay_samples(node.delay_samples)
-              true
-            }
-            None => false
-          }
-        DelaySamples =>
-          match compiled.delay_states[compiled_index] {
-            Some(delay) => {
-              delay.set_feedback(node.value0)
-              delay.set_delay_samples(node.delay_samples)
-              true
-            }
-            None => false
-          }
-        _ => false
-      }
-    Constant => true
-    Oscillator => true
-    Biquad => true
-    Gain => true
-    Clip => true
-    Pan => true
-    StereoGain => true
-    StereoClip => true
-    StereoBiquad => true
-    StereoDelay =>
-      match slot {
-        Value0 =>
-          apply_stereo_delay_param_side_effect(
-            compiled.stereo_delay_left_states,
-            compiled.stereo_delay_right_states,
-            compiled_index,
-            node.delay_samples,
-            node.value0,
-          )
-        DelaySamples =>
-          apply_stereo_delay_param_side_effect(
-            compiled.stereo_delay_left_states,
-            compiled.stereo_delay_right_states,
+            graph.stereo_delay_left_states,
+            graph.stereo_delay_right_states,
             compiled_index,
             node.delay_samples,
             node.value0,
@@ -3448,58 +3258,30 @@ fn process_graph_biquad(
 }
 
 ///|
-fn prepare_feedback_graph_biquads(
-  compiled : CompiledDsp,
+/// Re-derive biquad coefficients for all filter nodes before feedback processing.
+/// Called once per block — coefficients depend on sample rate and cutoff/Q which
+/// may have changed via runtime parameter control.
+fn CompiledGraph::prepare_feedback_biquads(
+  self : CompiledGraph,
   context : DspContext,
 ) -> Unit {
-  for index = 0; index < compiled.nodes.length(); index = index + 1 {
-    let node = compiled.nodes[index]
+  for index = 0; index < self.nodes.length(); index = index + 1 {
+    let node = self.nodes[index]
     match node.kind {
       Biquad =>
         ignore(
-          compiled.biquad_states[index]
+          self.biquad_states[index]
           .unwrap()
           .update(context, node.filter_mode, node.value0, node.value1),
         )
       StereoBiquad => {
         ignore(
-          compiled.stereo_biquad_left_states[index]
+          self.stereo_biquad_left_states[index]
           .unwrap()
           .update(context, node.filter_mode, node.value0, node.value1),
         )
         ignore(
-          compiled.stereo_biquad_right_states[index]
-          .unwrap()
-          .update(context, node.filter_mode, node.value0, node.value1),
-        )
-      }
-      _ => ()
-    }
-  }
-}
-
-///|
-fn prepare_feedback_stereo_graph_biquads(
-  compiled : CompiledStereoDsp,
-  context : DspContext,
-) -> Unit {
-  for index = 0; index < compiled.nodes.length(); index = index + 1 {
-    let node = compiled.nodes[index]
-    match node.kind {
-      Biquad =>
-        ignore(
-          compiled.biquad_states[index]
-          .unwrap()
-          .update(context, node.filter_mode, node.value0, node.value1),
-        )
-      StereoBiquad => {
-        ignore(
-          compiled.stereo_biquad_left_states[index]
-          .unwrap()
-          .update(context, node.filter_mode, node.value0, node.value1),
-        )
-        ignore(
-          compiled.stereo_biquad_right_states[index]
+          self.stereo_biquad_right_states[index]
           .unwrap()
           .update(context, node.filter_mode, node.value0, node.value1),
         )

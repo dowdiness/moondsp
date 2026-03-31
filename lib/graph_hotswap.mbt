@@ -1,16 +1,97 @@
 ///|
+/// Shared hot-swap state for both mono and stereo compiled graphs.
+///
+/// Mono uses `old_output`/`new_output` (stereo buffers are zero-length).
+/// Stereo uses `old_left`/`old_right`/`new_left`/`new_right` (mono buffers
+/// are zero-length). Zero-length rather than Option so crossfade code can
+/// call buffer methods unconditionally without branching per sample.
+priv struct HotSwapGraph {
+  mut active : CompiledGraph
+  mut pending : CompiledGraph?
+  crossfade_samples : Int
+  mut crossfade_position : Int
+  old_output : AudioBuffer
+  new_output : AudioBuffer
+  old_left : AudioBuffer
+  old_right : AudioBuffer
+  new_left : AudioBuffer
+  new_right : AudioBuffer
+}
+
+///|
 /// Block-boundary mono graph hot-swap wrapper for `CompiledDsp`.
 ///
 /// This first Phase 2 slice supports swapping between already-compiled mono
 /// graphs with an optional equal-power crossfade. It does not migrate internal
 /// node state between graphs.
-struct CompiledDspHotSwap {
-  mut active : CompiledDsp
-  mut pending : CompiledDsp?
-  crossfade_samples : Int
-  mut crossfade_position : Int
-  old_output : AudioBuffer
-  new_output : AudioBuffer
+struct CompiledDspHotSwap(HotSwapGraph)
+
+///|
+/// Block-boundary stereo graph hot-swap wrapper for `CompiledStereoDsp`.
+///
+/// This first stereo parity slice supports swapping between already-compiled
+/// terminal-stereo graphs with an optional equal-power crossfade. It does not
+/// migrate internal node state between graphs.
+struct CompiledStereoDspHotSwap(HotSwapGraph)
+
+///|
+/// Queue a new compiled graph, resetting the crossfade position.
+///
+/// Returns `false` when the replacement graph is incompatible with the active
+/// graph's compile-time sample rate or block capacity.
+fn HotSwapGraph::queue_swap_impl(
+  self : HotSwapGraph,
+  next : CompiledGraph,
+) -> Bool {
+  if self.active.compile_sample_rate != next.compile_sample_rate {
+    return false
+  }
+  if self.active.compiled_buffer_capacity() != next.compiled_buffer_capacity() {
+    return false
+  }
+  self.pending = Some(next)
+  self.crossfade_position = 0
+  true
+}
+
+///|
+/// Apply one runtime control message to the active (and pending) graph.
+fn HotSwapGraph::apply_control_impl(
+  self : HotSwapGraph,
+  control : GraphControl,
+) -> Bool {
+  match self.pending {
+    None => self.active.apply_control_impl(control)
+    Some(next) => {
+      if !valid_hot_swap_control_graph(self.active, control) ||
+        !valid_hot_swap_control_graph(next, control) {
+        return false
+      }
+      ignore(self.active.apply_control_impl(control))
+      ignore(next.apply_control_impl(control))
+      true
+    }
+  }
+}
+
+///|
+/// Apply a batch of runtime control messages to the active (and pending) graph.
+fn HotSwapGraph::apply_controls_impl(
+  self : HotSwapGraph,
+  controls : Array[GraphControl],
+) -> Bool {
+  match self.pending {
+    None => self.active.apply_controls_impl(controls)
+    Some(next) => {
+      if !valid_hot_swap_controls_graph(self.active, controls) ||
+        !valid_hot_swap_controls_graph(next, controls) {
+        return false
+      }
+      ignore(self.active.apply_controls_impl(controls))
+      ignore(next.apply_controls_impl(controls))
+      true
+    }
+  }
 }
 
 ///|
@@ -25,14 +106,18 @@ pub fn CompiledDspHotSwap::from_graph(
     0
   }
   let capacity = active.compiled_buffer_capacity()
-  make_compiled_dsp_hot_swap(
-    active,
-    None,
-    clamped_crossfade,
-    0,
-    AudioBuffer::filled(capacity),
-    AudioBuffer::filled(capacity),
-  )
+  CompiledDspHotSwap({
+    active: active.0,
+    pending: None,
+    crossfade_samples: clamped_crossfade,
+    crossfade_position: 0,
+    old_output: AudioBuffer::filled(capacity),
+    new_output: AudioBuffer::filled(capacity),
+    old_left: AudioBuffer::filled(0),
+    old_right: AudioBuffer::filled(0),
+    new_left: AudioBuffer::filled(0),
+    new_right: AudioBuffer::filled(0),
+  })
 }
 
 ///|
@@ -44,15 +129,7 @@ pub fn CompiledDspHotSwap::queue_swap(
   self : CompiledDspHotSwap,
   next : CompiledDsp,
 ) -> Bool {
-  if self.active.compile_sample_rate != next.compile_sample_rate {
-    return false
-  }
-  if self.active.compiled_buffer_capacity() != next.compiled_buffer_capacity() {
-    return false
-  }
-  self.pending = Some(next)
-  self.crossfade_position = 0
-  true
+  self.0.queue_swap_impl(next.0)
 }
 
 ///|
@@ -61,18 +138,7 @@ pub fn CompiledDspHotSwap::apply_control(
   self : CompiledDspHotSwap,
   control : GraphControl,
 ) -> Bool {
-  match self.pending {
-    None => self.active.apply_control(control)
-    Some(next) => {
-      if !valid_hot_swap_control(self.active, control) ||
-        !valid_hot_swap_control(next, control) {
-        return false
-      }
-      ignore(self.active.apply_control(control))
-      ignore(next.apply_control(control))
-      true
-    }
-  }
+  self.0.apply_control_impl(control)
 }
 
 ///|
@@ -81,18 +147,7 @@ pub fn CompiledDspHotSwap::apply_controls(
   self : CompiledDspHotSwap,
   controls : Array[GraphControl],
 ) -> Bool {
-  match self.pending {
-    None => self.active.apply_controls(controls)
-    Some(next) => {
-      if !valid_hot_swap_controls(self.active, controls) ||
-        !valid_hot_swap_controls(next, controls) {
-        return false
-      }
-      ignore(self.active.apply_controls(controls))
-      ignore(next.apply_controls(controls))
-      true
-    }
-  }
+  self.0.apply_controls_impl(controls)
 }
 
 ///|
@@ -103,22 +158,22 @@ pub fn CompiledDspHotSwap::process(
   context : DspContext,
   output : AudioBuffer,
 ) -> Unit {
-  match self.pending {
-    None => self.active.process(context, output)
+  match self.0.pending {
+    None => CompiledDsp(self.0.active).process(context, output)
     Some(next) =>
-      if self.crossfade_samples <= 0 {
-        self.active = next
-        self.pending = None
-        self.crossfade_position = 0
-        self.active.process(context, output)
+      if self.0.crossfade_samples <= 0 {
+        self.0.active = next
+        self.0.pending = None
+        self.0.crossfade_position = 0
+        CompiledDsp(self.0.active).process(context, output)
       } else {
-        self.active.process(context, self.old_output)
-        next.process(context, self.new_output)
+        CompiledDsp(self.0.active).process(context, self.0.old_output)
+        CompiledDsp(next).process(context, self.0.new_output)
         self.mix_hot_swap_outputs(context, output)
-        if self.crossfade_position >= self.crossfade_samples {
-          self.active = next
-          self.pending = None
-          self.crossfade_position = 0
+        if self.0.crossfade_position >= self.0.crossfade_samples {
+          self.0.active = next
+          self.0.pending = None
+          self.0.crossfade_position = 0
         }
       }
   }
@@ -133,8 +188,8 @@ fn CompiledDspHotSwap::mix_hot_swap_outputs(
   let sample_count = compiled_hot_swap_sample_count(
     context,
     output,
-    self.old_output,
-    self.new_output,
+    self.0.old_output,
+    self.0.new_output,
   )
   if sample_count <= 0 {
     output.fill(0.0)
@@ -143,21 +198,170 @@ fn CompiledDspHotSwap::mix_hot_swap_outputs(
 
   for index = 0; index < sample_count; index = index + 1 {
     let progress = hot_swap_progress(
-      self.crossfade_position,
-      self.crossfade_samples,
+      self.0.crossfade_position,
+      self.0.crossfade_samples,
     )
     let old_gain = equal_power_old_gain(progress)
     let new_gain = equal_power_new_gain(progress)
     output.set(
       index,
-      self.old_output.get(index) * old_gain +
-      self.new_output.get(index) * new_gain,
+      self.0.old_output.get(index) * old_gain +
+      self.0.new_output.get(index) * new_gain,
     )
-    self.crossfade_position = self.crossfade_position + 1
+    self.0.crossfade_position = self.0.crossfade_position + 1
   }
 
   for index = sample_count; index < output.length(); index = index + 1 {
     output.set(index, 0.0)
+  }
+}
+
+///|
+/// Create a hot-swap wrapper around an active stereo compiled graph.
+pub fn CompiledStereoDspHotSwap::from_graph(
+  active : CompiledStereoDsp,
+  crossfade_samples? : Int = 0,
+) -> CompiledStereoDspHotSwap {
+  let clamped_crossfade = if crossfade_samples > 0 {
+    crossfade_samples
+  } else {
+    0
+  }
+  let capacity = active.compiled_buffer_capacity()
+  CompiledStereoDspHotSwap({
+    active: active.0,
+    pending: None,
+    crossfade_samples: clamped_crossfade,
+    crossfade_position: 0,
+    old_output: AudioBuffer::filled(0),
+    new_output: AudioBuffer::filled(0),
+    old_left: AudioBuffer::filled(capacity),
+    old_right: AudioBuffer::filled(capacity),
+    new_left: AudioBuffer::filled(capacity),
+    new_right: AudioBuffer::filled(capacity),
+  })
+}
+
+///|
+/// Queue a replacement stereo graph for the next `process(...)` call.
+///
+/// Returns `false` when the replacement graph is incompatible with the active
+/// graph's compile-time sample rate or block capacity.
+pub fn CompiledStereoDspHotSwap::queue_swap(
+  self : CompiledStereoDspHotSwap,
+  next : CompiledStereoDsp,
+) -> Bool {
+  self.0.queue_swap_impl(next.0)
+}
+
+///|
+/// Apply one runtime control message to the active stereo graph.
+pub fn CompiledStereoDspHotSwap::apply_control(
+  self : CompiledStereoDspHotSwap,
+  control : GraphControl,
+) -> Bool {
+  self.0.apply_control_impl(control)
+}
+
+///|
+/// Apply a batch of runtime control messages to the active stereo graph.
+pub fn CompiledStereoDspHotSwap::apply_controls(
+  self : CompiledStereoDspHotSwap,
+  controls : Array[GraphControl],
+) -> Bool {
+  self.0.apply_controls_impl(controls)
+}
+
+///|
+/// Process one block, crossfading between the active and pending stereo graphs
+/// when a swap is in flight.
+pub fn CompiledStereoDspHotSwap::process(
+  self : CompiledStereoDspHotSwap,
+  context : DspContext,
+  left_output : AudioBuffer,
+  right_output : AudioBuffer,
+) -> Unit {
+  match self.0.pending {
+    None =>
+      CompiledStereoDsp(self.0.active).process(
+        context, left_output, right_output,
+      )
+    Some(next) =>
+      if self.0.crossfade_samples <= 0 {
+        self.0.active = next
+        self.0.pending = None
+        self.0.crossfade_position = 0
+        CompiledStereoDsp(self.0.active).process(
+          context, left_output, right_output,
+        )
+      } else {
+        CompiledStereoDsp(self.0.active).process(
+          context,
+          self.0.old_left,
+          self.0.old_right,
+        )
+        CompiledStereoDsp(next).process(
+          context,
+          self.0.new_left,
+          self.0.new_right,
+        )
+        self.mix_hot_swap_outputs(context, left_output, right_output)
+        if self.0.crossfade_position >= self.0.crossfade_samples {
+          self.0.active = next
+          self.0.pending = None
+          self.0.crossfade_position = 0
+        }
+      }
+  }
+}
+
+///|
+fn CompiledStereoDspHotSwap::mix_hot_swap_outputs(
+  self : CompiledStereoDspHotSwap,
+  context : DspContext,
+  left_output : AudioBuffer,
+  right_output : AudioBuffer,
+) -> Unit {
+  let sample_count = compiled_stereo_hot_swap_sample_count(
+    context,
+    left_output,
+    right_output,
+    self.0.old_left,
+    self.0.old_right,
+    self.0.new_left,
+    self.0.new_right,
+  )
+  if sample_count <= 0 {
+    left_output.fill(0.0)
+    right_output.fill(0.0)
+    return
+  }
+
+  for index = 0; index < sample_count; index = index + 1 {
+    let progress = hot_swap_progress(
+      self.0.crossfade_position,
+      self.0.crossfade_samples,
+    )
+    let old_gain = equal_power_old_gain(progress)
+    let new_gain = equal_power_new_gain(progress)
+    left_output.set(
+      index,
+      self.0.old_left.get(index) * old_gain +
+      self.0.new_left.get(index) * new_gain,
+    )
+    right_output.set(
+      index,
+      self.0.old_right.get(index) * old_gain +
+      self.0.new_right.get(index) * new_gain,
+    )
+    self.0.crossfade_position = self.0.crossfade_position + 1
+  }
+
+  for index = sample_count; index < left_output.length(); index = index + 1 {
+    left_output.set(index, 0.0)
+  }
+  for index = sample_count; index < right_output.length(); index = index + 1 {
+    right_output.set(index, 0.0)
   }
 }
 
@@ -206,8 +410,8 @@ fn equal_power_new_gain(progress : Double) -> Double {
 }
 
 ///|
-fn valid_hot_swap_control(
-  compiled : CompiledDsp,
+fn valid_hot_swap_control_graph(
+  compiled : CompiledGraph,
   control : GraphControl,
 ) -> Bool {
   let simulated_nodes = FixedArray::makei(compiled.nodes.length(), index => {
@@ -217,8 +421,8 @@ fn valid_hot_swap_control(
 }
 
 ///|
-fn valid_hot_swap_controls(
-  compiled : CompiledDsp,
+fn valid_hot_swap_controls_graph(
+  compiled : CompiledGraph,
   controls : Array[GraphControl],
 ) -> Bool {
   let simulated_nodes = FixedArray::makei(compiled.nodes.length(), index => {
@@ -230,205 +434,6 @@ fn valid_hot_swap_controls(
     }
   }
   true
-}
-
-///|
-fn make_compiled_dsp_hot_swap(
-  active : CompiledDsp,
-  pending : CompiledDsp?,
-  crossfade_samples : Int,
-  crossfade_position : Int,
-  old_output : AudioBuffer,
-  new_output : AudioBuffer,
-) -> CompiledDspHotSwap {
-  {
-    active,
-    pending,
-    crossfade_samples,
-    crossfade_position,
-    old_output,
-    new_output,
-  }
-}
-
-///|
-/// Block-boundary stereo graph hot-swap wrapper for `CompiledStereoDsp`.
-///
-/// This first stereo parity slice supports swapping between already-compiled
-/// terminal-stereo graphs with an optional equal-power crossfade. It does not
-/// migrate internal node state between graphs.
-struct CompiledStereoDspHotSwap {
-  mut active : CompiledStereoDsp
-  mut pending : CompiledStereoDsp?
-  crossfade_samples : Int
-  mut crossfade_position : Int
-  old_left : AudioBuffer
-  old_right : AudioBuffer
-  new_left : AudioBuffer
-  new_right : AudioBuffer
-}
-
-///|
-/// Create a hot-swap wrapper around an active stereo compiled graph.
-pub fn CompiledStereoDspHotSwap::from_graph(
-  active : CompiledStereoDsp,
-  crossfade_samples? : Int = 0,
-) -> CompiledStereoDspHotSwap {
-  let clamped_crossfade = if crossfade_samples > 0 {
-    crossfade_samples
-  } else {
-    0
-  }
-  let capacity = active.compiled_buffer_capacity()
-  make_compiled_stereo_dsp_hot_swap(
-    active,
-    None,
-    clamped_crossfade,
-    0,
-    AudioBuffer::filled(capacity),
-    AudioBuffer::filled(capacity),
-    AudioBuffer::filled(capacity),
-    AudioBuffer::filled(capacity),
-  )
-}
-
-///|
-/// Queue a replacement stereo graph for the next `process(...)` call.
-///
-/// Returns `false` when the replacement graph is incompatible with the active
-/// graph's compile-time sample rate or block capacity.
-pub fn CompiledStereoDspHotSwap::queue_swap(
-  self : CompiledStereoDspHotSwap,
-  next : CompiledStereoDsp,
-) -> Bool {
-  if self.active.compile_sample_rate != next.compile_sample_rate {
-    return false
-  }
-  if self.active.compiled_buffer_capacity() != next.compiled_buffer_capacity() {
-    return false
-  }
-  self.pending = Some(next)
-  self.crossfade_position = 0
-  true
-}
-
-///|
-/// Apply one runtime control message to the active stereo graph.
-pub fn CompiledStereoDspHotSwap::apply_control(
-  self : CompiledStereoDspHotSwap,
-  control : GraphControl,
-) -> Bool {
-  match self.pending {
-    None => self.active.apply_control(control)
-    Some(next) => {
-      if !valid_hot_swap_control_stereo(self.active, control) ||
-        !valid_hot_swap_control_stereo(next, control) {
-        return false
-      }
-      ignore(self.active.apply_control(control))
-      ignore(next.apply_control(control))
-      true
-    }
-  }
-}
-
-///|
-/// Apply a batch of runtime control messages to the active stereo graph.
-pub fn CompiledStereoDspHotSwap::apply_controls(
-  self : CompiledStereoDspHotSwap,
-  controls : Array[GraphControl],
-) -> Bool {
-  match self.pending {
-    None => self.active.apply_controls(controls)
-    Some(next) => {
-      if !valid_hot_swap_controls_stereo(self.active, controls) ||
-        !valid_hot_swap_controls_stereo(next, controls) {
-        return false
-      }
-      ignore(self.active.apply_controls(controls))
-      ignore(next.apply_controls(controls))
-      true
-    }
-  }
-}
-
-///|
-/// Process one block, crossfading between the active and pending stereo graphs
-/// when a swap is in flight.
-pub fn CompiledStereoDspHotSwap::process(
-  self : CompiledStereoDspHotSwap,
-  context : DspContext,
-  left_output : AudioBuffer,
-  right_output : AudioBuffer,
-) -> Unit {
-  match self.pending {
-    None => self.active.process(context, left_output, right_output)
-    Some(next) =>
-      if self.crossfade_samples <= 0 {
-        self.active = next
-        self.pending = None
-        self.crossfade_position = 0
-        self.active.process(context, left_output, right_output)
-      } else {
-        self.active.process(context, self.old_left, self.old_right)
-        next.process(context, self.new_left, self.new_right)
-        self.mix_hot_swap_outputs(context, left_output, right_output)
-        if self.crossfade_position >= self.crossfade_samples {
-          self.active = next
-          self.pending = None
-          self.crossfade_position = 0
-        }
-      }
-  }
-}
-
-///|
-fn CompiledStereoDspHotSwap::mix_hot_swap_outputs(
-  self : CompiledStereoDspHotSwap,
-  context : DspContext,
-  left_output : AudioBuffer,
-  right_output : AudioBuffer,
-) -> Unit {
-  let sample_count = compiled_stereo_hot_swap_sample_count(
-    context,
-    left_output,
-    right_output,
-    self.old_left,
-    self.old_right,
-    self.new_left,
-    self.new_right,
-  )
-  if sample_count <= 0 {
-    left_output.fill(0.0)
-    right_output.fill(0.0)
-    return
-  }
-
-  for index = 0; index < sample_count; index = index + 1 {
-    let progress = hot_swap_progress(
-      self.crossfade_position,
-      self.crossfade_samples,
-    )
-    let old_gain = equal_power_old_gain(progress)
-    let new_gain = equal_power_new_gain(progress)
-    left_output.set(
-      index,
-      self.old_left.get(index) * old_gain + self.new_left.get(index) * new_gain,
-    )
-    right_output.set(
-      index,
-      self.old_right.get(index) * old_gain +
-      self.new_right.get(index) * new_gain,
-    )
-    self.crossfade_position = self.crossfade_position + 1
-  }
-
-  for index = sample_count; index < left_output.length(); index = index + 1 {
-    left_output.set(index, 0.0)
-  }
-  for index = sample_count; index < right_output.length(); index = index + 1 {
-    right_output.set(index, 0.0)
-  }
 }
 
 ///|
@@ -457,55 +462,5 @@ fn compiled_stereo_hot_swap_sample_count(
     bounded_old
   } else {
     new_length
-  }
-}
-
-///|
-fn valid_hot_swap_control_stereo(
-  compiled : CompiledStereoDsp,
-  control : GraphControl,
-) -> Bool {
-  let simulated_nodes = FixedArray::makei(compiled.nodes.length(), index => {
-    compiled.nodes[index]
-  })
-  valid_graph_control_stereo(compiled, simulated_nodes, control)
-}
-
-///|
-fn valid_hot_swap_controls_stereo(
-  compiled : CompiledStereoDsp,
-  controls : Array[GraphControl],
-) -> Bool {
-  let simulated_nodes = FixedArray::makei(compiled.nodes.length(), index => {
-    compiled.nodes[index]
-  })
-  for index = 0; index < controls.length(); index = index + 1 {
-    if !valid_graph_control_stereo(compiled, simulated_nodes, controls[index]) {
-      return false
-    }
-  }
-  true
-}
-
-///|
-fn make_compiled_stereo_dsp_hot_swap(
-  active : CompiledStereoDsp,
-  pending : CompiledStereoDsp?,
-  crossfade_samples : Int,
-  crossfade_position : Int,
-  old_left : AudioBuffer,
-  old_right : AudioBuffer,
-  new_left : AudioBuffer,
-  new_right : AudioBuffer,
-) -> CompiledStereoDspHotSwap {
-  {
-    active,
-    pending,
-    crossfade_samples,
-    crossfade_position,
-    old_left,
-    old_right,
-    new_left,
-    new_right,
   }
 }
