@@ -210,8 +210,8 @@ fn valid_hot_swap_control(
   compiled : CompiledDsp,
   control : GraphControl,
 ) -> Bool {
-  let simulated_nodes = FixedArray::makei(compiled.nodes.length(), index => {
-    compiled.nodes[index]
+  let simulated_nodes = FixedArray::makei(compiled.0.nodes.length(), index => {
+    compiled.0.nodes[index]
   })
   valid_graph_control(compiled, simulated_nodes, control)
 }
@@ -221,8 +221,8 @@ fn valid_hot_swap_controls(
   compiled : CompiledDsp,
   controls : Array[GraphControl],
 ) -> Bool {
-  let simulated_nodes = FixedArray::makei(compiled.nodes.length(), index => {
-    compiled.nodes[index]
+  let simulated_nodes = FixedArray::makei(compiled.0.nodes.length(), index => {
+    compiled.0.nodes[index]
   })
   for index = 0; index < controls.length(); index = index + 1 {
     if !valid_graph_control(compiled, simulated_nodes, controls[index]) {

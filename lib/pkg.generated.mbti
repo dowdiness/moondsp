@@ -113,6 +113,8 @@ pub fn CompiledDspTopologyController::process(Self, DspContext, AudioBuffer) -> 
 pub fn CompiledDspTopologyController::queue_topology_edit(Self, GraphTopologyEdit) -> Bool
 pub fn CompiledDspTopologyController::queue_topology_edits(Self, Array[GraphTopologyEdit]) -> Bool
 
+type CompiledGraph
+
 type CompiledStereoDsp
 pub fn CompiledStereoDsp::apply_control(Self, GraphControl) -> Bool
 pub fn CompiledStereoDsp::apply_controls(Self, Array[GraphControl]) -> Bool

@@ -1147,8 +1147,8 @@ fn copy_compiled_dsp_state(
   old_graph : CompiledDsp,
   new_graph : CompiledDsp,
 ) -> Unit {
-  let old_map = old_graph.index_map
-  let new_map = new_graph.index_map
+  let old_map = old_graph.0.index_map
+  let new_map = new_graph.0.index_map
   let shared_count = if old_map.length() < new_map.length() {
     old_map.length()
   } else {
@@ -1161,50 +1161,51 @@ fn copy_compiled_dsp_state(
     let new_compiled = new_map[authoring_idx]
     if old_compiled >= 0 &&
       new_compiled >= 0 &&
-      old_compiled < old_graph.nodes.length() &&
-      new_compiled < new_graph.nodes.length() &&
-      old_graph.nodes[old_compiled].kind == new_graph.nodes[new_compiled].kind {
-      new_graph.osc_states[new_compiled] = old_graph.osc_states[old_compiled]
-      new_graph.noise_states[new_compiled] = old_graph.noise_states[old_compiled]
-      new_graph.env_states[new_compiled] = old_graph.env_states[old_compiled]
-      new_graph.biquad_states[new_compiled] = old_graph.biquad_states[old_compiled]
-      new_graph.stereo_biquad_left_states[new_compiled] = old_graph.stereo_biquad_left_states[old_compiled]
-      new_graph.stereo_biquad_right_states[new_compiled] = old_graph.stereo_biquad_right_states[old_compiled]
+      old_compiled < old_graph.0.nodes.length() &&
+      new_compiled < new_graph.0.nodes.length() &&
+      old_graph.0.nodes[old_compiled].kind ==
+      new_graph.0.nodes[new_compiled].kind {
+      new_graph.0.osc_states[new_compiled] = old_graph.0.osc_states[old_compiled]
+      new_graph.0.noise_states[new_compiled] = old_graph.0.noise_states[old_compiled]
+      new_graph.0.env_states[new_compiled] = old_graph.0.env_states[old_compiled]
+      new_graph.0.biquad_states[new_compiled] = old_graph.0.biquad_states[old_compiled]
+      new_graph.0.stereo_biquad_left_states[new_compiled] = old_graph.0.stereo_biquad_left_states[old_compiled]
+      new_graph.0.stereo_biquad_right_states[new_compiled] = old_graph.0.stereo_biquad_right_states[old_compiled]
       // Only copy delay state if buffer capacity matches
       match
         (
-          old_graph.delay_states[old_compiled],
-          new_graph.delay_states[new_compiled],
+          old_graph.0.delay_states[old_compiled],
+          new_graph.0.delay_states[new_compiled],
         ) {
         (Some(old_delay), Some(new_delay)) =>
           if old_delay.max_delay_samples() == new_delay.max_delay_samples() {
-            new_graph.delay_states[new_compiled] = old_graph.delay_states[old_compiled]
+            new_graph.0.delay_states[new_compiled] = old_graph.0.delay_states[old_compiled]
           }
         _ => ()
       }
       match
         (
-          old_graph.stereo_delay_left_states[old_compiled],
-          new_graph.stereo_delay_left_states[new_compiled],
+          old_graph.0.stereo_delay_left_states[old_compiled],
+          new_graph.0.stereo_delay_left_states[new_compiled],
         ) {
         (Some(old_delay), Some(new_delay)) =>
           if old_delay.max_delay_samples() == new_delay.max_delay_samples() {
-            new_graph.stereo_delay_left_states[new_compiled] = old_graph.stereo_delay_left_states[old_compiled]
+            new_graph.0.stereo_delay_left_states[new_compiled] = old_graph.0.stereo_delay_left_states[old_compiled]
           }
         _ => ()
       }
       match
         (
-          old_graph.stereo_delay_right_states[old_compiled],
-          new_graph.stereo_delay_right_states[new_compiled],
+          old_graph.0.stereo_delay_right_states[old_compiled],
+          new_graph.0.stereo_delay_right_states[new_compiled],
         ) {
         (Some(old_delay), Some(new_delay)) =>
           if old_delay.max_delay_samples() == new_delay.max_delay_samples() {
-            new_graph.stereo_delay_right_states[new_compiled] = old_graph.stereo_delay_right_states[old_compiled]
+            new_graph.0.stereo_delay_right_states[new_compiled] = old_graph.0.stereo_delay_right_states[old_compiled]
           }
         _ => ()
       }
-      new_graph.self_values[new_compiled] = old_graph.self_values[old_compiled]
+      new_graph.0.self_values[new_compiled] = old_graph.0.self_values[old_compiled]
     }
   }
 }
