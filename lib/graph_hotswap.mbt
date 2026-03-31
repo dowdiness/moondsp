@@ -301,7 +301,7 @@ pub fn CompiledStereoDspHotSwap::queue_swap(
   self : CompiledStereoDspHotSwap,
   next : CompiledStereoDsp,
 ) -> Bool {
-  if self.active.compile_sample_rate != next.compile_sample_rate {
+  if self.active.0.compile_sample_rate != next.0.compile_sample_rate {
     return false
   }
   if self.active.compiled_buffer_capacity() != next.compiled_buffer_capacity() {
@@ -465,8 +465,8 @@ fn valid_hot_swap_control_stereo(
   compiled : CompiledStereoDsp,
   control : GraphControl,
 ) -> Bool {
-  let simulated_nodes = FixedArray::makei(compiled.nodes.length(), index => {
-    compiled.nodes[index]
+  let simulated_nodes = FixedArray::makei(compiled.0.nodes.length(), index => {
+    compiled.0.nodes[index]
   })
   valid_graph_control_stereo(compiled, simulated_nodes, control)
 }
@@ -476,8 +476,8 @@ fn valid_hot_swap_controls_stereo(
   compiled : CompiledStereoDsp,
   controls : Array[GraphControl],
 ) -> Bool {
-  let simulated_nodes = FixedArray::makei(compiled.nodes.length(), index => {
-    compiled.nodes[index]
+  let simulated_nodes = FixedArray::makei(compiled.0.nodes.length(), index => {
+    compiled.0.nodes[index]
   })
   for index = 0; index < controls.length(); index = index + 1 {
     if !valid_graph_control_stereo(compiled, simulated_nodes, controls[index]) {
