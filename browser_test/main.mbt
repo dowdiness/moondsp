@@ -37,13 +37,13 @@ let compiled_block_size : @ref.Ref[Int] = @ref.new(0)
 
 ///|
 pub fn reset_phase() -> Unit {
-  @browser.reset_phase()
+  @lib.reset_phase()
   reset_compiled_graph()
 }
 
 ///|
 pub fn tick(freq : Double, sample_rate : Double) -> Double {
-  @browser.tick(freq, sample_rate)
+  @lib.tick(freq, sample_rate)
 }
 
 ///|
@@ -52,7 +52,7 @@ pub fn tick_source(
   freq : Double,
   sample_rate : Double,
 ) -> Double {
-  @browser.tick_source(source_id, freq, sample_rate)
+  @lib.tick_source(source_id, freq, sample_rate)
 }
 
 ///|
