@@ -153,7 +153,7 @@ fn DspNode::new(
 ///|
 /// Shared internal graph state for both mono and stereo compiled DSP graphs.
 /// Both CompiledDsp and CompiledStereoDsp wrap this struct as newtypes.
-struct CompiledGraph {
+priv struct CompiledGraph {
   compile_sample_rate : Double
   nodes : FixedArray[DspNode]
   index_map : FixedArray[Int]

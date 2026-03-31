@@ -208,7 +208,7 @@ pub fn GraphTopologyEdit::delete_chain(
 ///
 /// Holds the authoring-order nodes, compile-time parameters, and the
 /// hot-swap graph used for block-boundary graph replacement.
-struct TopologyGraph {
+priv struct TopologyGraph {
   mut authoring_nodes : Array[DspNode]
   compile_sample_rate : Double
   compile_block_size : Int
