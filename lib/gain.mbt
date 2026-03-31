@@ -23,9 +23,7 @@ pub fn Gain::process(
   ignore(self)
   let sample_rate = context.sample_rate()
   let sample_count = effective_sample_count(context, buffer)
-  if sample_rate <= 0.0 ||
-    sample_count <= 0 ||
-    !is_finite(amount) {
+  if sample_rate <= 0.0 || sample_count <= 0 || !is_finite(amount) {
     buffer.fill(0.0)
     return
   }
