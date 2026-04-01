@@ -6,6 +6,19 @@ package "dowdiness/mdsp/pattern"
 // Errors
 
 // Types and methods
+pub struct Event[A] {
+  whole : TimeSpan?
+  part : TimeSpan
+  value : A
+} derive(Show)
+
+pub struct Pat[A] {
+  query : (TimeSpan) -> Array[Event[A]]
+}
+pub fn[A] Pat::pure(A) -> Self[A]
+pub fn[A] Pat::query(Self[A], TimeSpan) -> Array[Event[A]]
+pub fn[A] Pat::silence() -> Self[A]
+
 pub struct Rational {
   num : Int64
   den : Int64
