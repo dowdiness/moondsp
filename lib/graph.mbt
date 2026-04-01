@@ -1885,10 +1885,11 @@ fn stereo_compile_plan(
 }
 
 ///|
-fn valid_node_inputs(
+fn valid_any_node_inputs(
   node : DspNode,
   node_count : Int,
   sample_rate : Double,
+  output_kind : DspNodeKind,
 ) -> Bool {
   match node.kind {
     Constant => is_finite(node.value0)
@@ -1921,7 +1922,8 @@ fn valid_node_inputs(
       valid_reference(node.input0, node_count) &&
       is_finite(node.value0) &&
       node.value0 > 0.0
-    Output => valid_reference(node.input0, node_count)
+    Output =>
+      node.kind == output_kind && valid_reference(node.input0, node_count)
     Pan => valid_reference(node.input0, node_count) && is_finite(node.value0)
     StereoGain =>
       valid_reference(node.input0, node_count) && is_finite(node.value0)
@@ -1936,8 +1938,18 @@ fn valid_node_inputs(
       valid_reference(node.input0, node_count) &&
       valid_delay_feedback(node.value0)
     StereoMixDown => valid_reference(node.input0, node_count)
-    StereoOutput => false
+    StereoOutput =>
+      node.kind == output_kind && valid_reference(node.input0, node_count)
   }
+}
+
+///|
+fn valid_node_inputs(
+  node : DspNode,
+  node_count : Int,
+  sample_rate : Double,
+) -> Bool {
+  valid_any_node_inputs(node, node_count, sample_rate, Output)
 }
 
 ///|
@@ -1946,54 +1958,7 @@ fn valid_stereo_node_inputs(
   node_count : Int,
   sample_rate : Double,
 ) -> Bool {
-  match node.kind {
-    Constant => is_finite(node.value0)
-    Oscillator =>
-      if node.input0 >= 0 {
-        valid_reference(node.input0, node_count)
-      } else {
-        is_finite(node.value0)
-      }
-    Noise => true
-    Adsr =>
-      is_finite(node.value0) &&
-      is_finite(node.value1) &&
-      is_finite(node.value2) &&
-      is_finite(node.value3)
-    Biquad =>
-      valid_reference(node.input0, node_count) &&
-      valid_biquad_graph_params(sample_rate, node.value0, node.value1)
-    Delay =>
-      valid_reference(node.input0, node_count) &&
-      valid_delay_feedback(node.value0)
-    Gain => valid_reference(node.input0, node_count) && is_finite(node.value0)
-    Mul =>
-      valid_reference(node.input0, node_count) &&
-      valid_reference(node.input1, node_count)
-    Mix =>
-      valid_reference(node.input0, node_count) &&
-      valid_reference(node.input1, node_count)
-    Clip =>
-      valid_reference(node.input0, node_count) &&
-      is_finite(node.value0) &&
-      node.value0 > 0.0
-    Output => false
-    Pan => valid_reference(node.input0, node_count) && is_finite(node.value0)
-    StereoGain =>
-      valid_reference(node.input0, node_count) && is_finite(node.value0)
-    StereoClip =>
-      valid_reference(node.input0, node_count) &&
-      is_finite(node.value0) &&
-      node.value0 > 0.0
-    StereoBiquad =>
-      valid_reference(node.input0, node_count) &&
-      valid_biquad_graph_params(sample_rate, node.value0, node.value1)
-    StereoDelay =>
-      valid_reference(node.input0, node_count) &&
-      valid_delay_feedback(node.value0)
-    StereoMixDown => valid_reference(node.input0, node_count)
-    StereoOutput => valid_reference(node.input0, node_count)
-  }
+  valid_any_node_inputs(node, node_count, sample_rate, StereoOutput)
 }
 
 ///|
