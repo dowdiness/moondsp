@@ -376,6 +376,29 @@ pub struct Stereo {
 pub fn Stereo::new() -> Self
 pub impl ChannelSpec for Stereo
 
+pub struct VoiceHandle {
+  slot : Int
+  generation : Int
+} derive(Eq, Show)
+
+pub struct VoicePool {
+  // private fields
+}
+pub fn VoicePool::active_voice_count(Self) -> Int
+pub fn VoicePool::new(Array[DspNode], DspContext, max_voices? : Int) -> Self?
+pub fn VoicePool::note_off(Self, VoiceHandle) -> Bool
+pub fn VoicePool::note_off_all(Self) -> Unit
+pub fn VoicePool::note_on(Self, Array[GraphControl]) -> VoiceHandle?
+pub fn VoicePool::set_template(Self, Array[DspNode]) -> Bool
+pub fn VoicePool::set_voice_pan(Self, VoiceHandle, Double) -> Bool
+pub fn VoicePool::voice_state(Self, VoiceHandle) -> VoiceState
+
+pub enum VoiceState {
+  Idle
+  Active
+  Releasing
+} derive(Eq, Show)
+
 pub(all) enum Waveform {
   Sine
   Saw
