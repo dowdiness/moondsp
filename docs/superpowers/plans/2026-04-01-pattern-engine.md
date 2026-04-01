@@ -552,7 +552,11 @@ Append to `pattern/pattern.mbt`:
 ```moonbit
 ///|
 /// Speed up by factor. Both whole and part are scaled.
+/// Returns silence for zero or negative factors (prevents division by zero).
 pub fn[A] Pat::fast(self : Pat[A], factor : Rational) -> Pat[A] {
+  if factor.num <= 0L {
+    return Pat::silence()
+  }
   let inv = Rational::from_int(1) / factor
   {
     query: fn(arc) {
@@ -577,7 +581,11 @@ pub fn[A] Pat::fast(self : Pat[A], factor : Rational) -> Pat[A] {
 
 ///|
 /// Slow down by factor. Sugar for fast(1/factor).
+/// Returns silence for zero or negative factors.
 pub fn[A] Pat::slow(self : Pat[A], factor : Rational) -> Pat[A] {
+  if factor.num <= 0L {
+    return Pat::silence()
+  }
   self.fast(Rational::from_int(1) / factor)
 }
 
@@ -781,11 +789,15 @@ pub fn[A] stack(pats : Array[Pat[A]]) -> Pat[A] {
 
 ///|
 /// Apply transformation f every nth cycle.
+/// Returns the unmodified pattern if n <= 0.
 pub fn[A] every(
   n : Int,
   f : (Pat[A]) -> Pat[A],
   pat : Pat[A],
 ) -> Pat[A] {
+  if n <= 0 {
+    return pat
+  }
   let n64 = Int64::from_int(n)
   {
     query: fn(arc) {
@@ -794,13 +806,12 @@ pub fn[A] every(
       for c = 0; c < cycles.length(); c = c + 1 {
         let cycle_arc = cycles[c]
         let cycle_num = cycle_arc.begin.floor()
-        let adjusted_cycle = if cycle_num >= 0L {
-          cycle_num
-        } else {
-          // Handle negative cycle numbers
-          cycle_num
-        }
-        let source = if adjusted_cycle % n64 == 0L {
+        // WHY ((cycle_num % n64) + n64) % n64: MoonBit's % can return
+        // negative values for negative dividends. This double-mod ensures
+        // a non-negative remainder for correct cycle counting with negative
+        // cycle numbers (e.g., querying arcs before time 0).
+        let remainder = ((cycle_num % n64) + n64) % n64
+        let source = if remainder == 0L {
           f(pat)
         } else {
           pat
@@ -906,7 +917,9 @@ Create `pattern/control.mbt`:
 /// Numeric control map — the contract between Pattern and DSP engines.
 /// WHY Map[String, Double]: sufficient for numeric synth parameters.
 /// Richer types (sample names, arrays) deferred to a future ControlValue enum.
-pub type ControlMap Map[String, Double]
+/// WHY newtype struct not type alias: enables ControlMap(m) construction and
+/// .0 field access for the inner Map. A bare `type` alias would not support this.
+pub struct ControlMap(Map[String, Double]) derive(Show)
 
 ///|
 fn single_control(key : String, value : Double) -> ControlMap {
@@ -1011,9 +1024,10 @@ fn merge_maps(a : ControlMap, b : ControlMap) -> ControlMap {
 }
 
 ///|
-/// Onset-aligned merge: for each onset in pattern a, sample active controls
-/// from pattern b and merge. Produces one merged event per a-onset.
-/// WHY onset-aligned: Phase 5 needs one complete control frame per note_on call.
+/// Merge controls: for each event in pattern a, merge all overlapping b events.
+/// WHY overlap-based (not strict onset-point): Phase 4 controls are all pure()
+/// (full-cycle), so overlap == onset for all practical cases. Phase 5 may
+/// refine to strict onset-point sampling if fast-changing b patterns are needed.
 pub fn merge_control(
   a : Pat[ControlMap],
   b : Pat[ControlMap],
