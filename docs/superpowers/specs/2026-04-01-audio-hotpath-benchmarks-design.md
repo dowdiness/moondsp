@@ -22,16 +22,16 @@ These benchmarks enable regression detection and informed optimization decisions
 
 Five realistic graph configurations built via the public tagless `GraphBuilder` API, plus one minimal baseline (6 total).
 
-| Name | ~Nodes | Description | Feedback? | Stereo? |
-|------|--------|-------------|-----------|---------|
+| Name | Nodes | Description | Feedback? | Stereo? |
+|------|-------|-------------|-----------|---------|
 | **Passthrough** | 2 | constant → output (baseline for graph traversal overhead) | No | No |
-| **Minimal voice** | ~6 | osc → gain → output | No | No |
-| **FM voice** | ~12 | LFO → range → carrier → LPF → gain → output (`exit_deliverable`) | No | No |
-| **Full voice** | TBD | osc → ADSR → filter → gain → delay → clip → output, noise bus mixed in | No | No |
-| **Feedback voice** | TBD | osc → filter → delay(feedback) → gain → output, with `z^-1` back-edge | Yes | No |
-| **Stereo chain** | TBD | Full voice → pan → stereo filter → stereo delay → stereo gain → stereo clip → stereo output | No | Yes |
+| **Minimal voice** | 4 | osc → gain → output | No | No |
+| **FM voice** | 11 | LFO → range → carrier → LPF → gain → output (`exit_deliverable`) | No | No |
+| **Full voice** | 12 | osc → ADSR → filter → gain → delay → clip → output, noise bus mixed in | No | No |
+| **Feedback voice** | 7 | osc → filter → delay(feedback) → gain → output, with `z^-1` back-edge | Yes | No |
+| **Stereo chain** | 15 | Full voice → pan → stereo filter → stereo delay → stereo gain → stereo clip → stereo output | No | Yes |
 
-Node counts marked TBD will be filled in during implementation by counting `GraphBuilder::nodes().length()` on the constructed graph.
+Node counts measured from implemented graph builders.
 
 Each graph is constructed by a `fn build_bench_*() -> GraphBuilder` function using the same tagless API that real users would use. Graph parameters (frequencies, cutoffs, gains) use production-realistic values.
 
