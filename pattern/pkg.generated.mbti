@@ -1,0 +1,73 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/mdsp/pattern"
+
+// Values
+pub fn[A] every(Int, (Pat[A]) -> Pat[A], Pat[A]) -> Pat[A]
+
+pub fn merge_control(Pat[ControlMap], Pat[ControlMap]) -> Pat[ControlMap]
+
+pub fn note(Double) -> Pat[ControlMap]
+
+pub fn note_name(String) -> Pat[ControlMap]
+
+pub fn s_cutoff(Double) -> Pat[ControlMap]
+
+pub fn s_gain(Double) -> Pat[ControlMap]
+
+pub fn s_pan(Double) -> Pat[ControlMap]
+
+pub fn[A] sequence(Array[Pat[A]]) -> Pat[A]
+
+pub fn[A] stack(Array[Pat[A]]) -> Pat[A]
+
+// Errors
+
+// Types and methods
+pub struct ControlMap(Map[String, Double]) derive(Show)
+#deprecated
+pub fn ControlMap::inner(Self) -> Map[String, Double]
+
+pub struct Event[A] {
+  whole : TimeSpan?
+  part : TimeSpan
+  value : A
+} derive(Show)
+
+pub struct Pat[A] {
+  query : (TimeSpan) -> Array[Event[A]]
+}
+pub fn[A] Pat::fast(Self[A], Rational) -> Self[A]
+pub fn[A] Pat::pure(A) -> Self[A]
+pub fn[A] Pat::query(Self[A], TimeSpan) -> Array[Event[A]]
+pub fn[A] Pat::rev(Self[A]) -> Self[A]
+pub fn[A] Pat::silence() -> Self[A]
+pub fn[A] Pat::slow(Self[A], Rational) -> Self[A]
+
+pub struct Rational {
+  num : Int64
+  den : Int64
+} derive(Eq, Show)
+pub fn Rational::floor(Self) -> Int64
+pub fn Rational::from_int(Int) -> Self
+pub fn Rational::new(Int64, Int64) -> Self
+pub fn Rational::to_double(Self) -> Double
+pub impl Add for Rational
+pub impl Compare for Rational
+pub impl Div for Rational
+pub impl Mul for Rational
+pub impl Sub for Rational
+
+pub struct TimeSpan {
+  begin : Rational
+  end_ : Rational
+} derive(Eq, Show)
+pub fn TimeSpan::contains(Self, Rational) -> Bool
+pub fn TimeSpan::duration(Self) -> Rational
+pub fn TimeSpan::intersect(Self, Self) -> Self?
+pub fn TimeSpan::new(Rational, Rational) -> Self
+pub fn TimeSpan::whole_cycles(Self) -> Array[Self]
+
+// Type aliases
+
+// Traits
+
