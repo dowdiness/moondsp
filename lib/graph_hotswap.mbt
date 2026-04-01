@@ -100,11 +100,7 @@ pub fn CompiledDspHotSwap::from_graph(
   active : CompiledDsp,
   crossfade_samples? : Int = 0,
 ) -> CompiledDspHotSwap {
-  let clamped_crossfade = if crossfade_samples > 0 {
-    crossfade_samples
-  } else {
-    0
-  }
+  let clamped_crossfade = clamp_crossfade_samples(crossfade_samples)
   let capacity = active.compiled_buffer_capacity()
   CompiledDspHotSwap({
     active: active.0,
@@ -226,11 +222,7 @@ pub fn CompiledStereoDspHotSwap::from_graph(
   active : CompiledStereoDsp,
   crossfade_samples? : Int = 0,
 ) -> CompiledStereoDspHotSwap {
-  let clamped_crossfade = if crossfade_samples > 0 {
-    crossfade_samples
-  } else {
-    0
-  }
+  let clamped_crossfade = clamp_crossfade_samples(crossfade_samples)
   let capacity = active.compiled_buffer_capacity()
   CompiledStereoDspHotSwap({
     active: active.0,
@@ -374,6 +366,15 @@ fn CompiledStereoDspHotSwap::mix_hot_swap_outputs(
   }
   for index = sample_count; index < right_output.length(); index = index + 1 {
     right_output.set(index, 0.0)
+  }
+}
+
+///|
+fn clamp_crossfade_samples(crossfade_samples : Int) -> Int {
+  if crossfade_samples > 0 {
+    crossfade_samples
+  } else {
+    0
   }
 }
 
