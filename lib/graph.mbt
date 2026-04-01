@@ -657,13 +657,23 @@ fn CompiledDsp::compile_raw(
 }
 
 ///|
-fn CompiledDsp::compile_internal(
+/// Shared compilation logic for both mono and stereo graphs.
+///
+/// Takes two callbacks to handle the variant-specific parts:
+/// - `compile_plan`: runs the mono or stereo topological sort + feedback detection
+/// - `validate`: checks terminal-node shapes (simple or feedback variant)
+fn compile_graph_impl(
   nodes : Array[DspNode],
   context : DspContext,
   original_count : Int,
   opt_map : FixedArray[Int],
-) -> CompiledDsp? {
-  let plan = match mono_compile_plan(nodes, context) {
+  compile_plan : (Array[DspNode], DspContext) -> (
+    Array[Int],
+    Array[(Int, Int, Int)],
+  )?,
+  validate : (FixedArray[DspNode], FixedArray[(Int, Int, Int)]) -> Bool,
+) -> CompiledGraph? {
+  let plan = match compile_plan(nodes, context) {
     Some(plan) => plan
     None => return None
   }
@@ -689,11 +699,7 @@ fn CompiledDsp::compile_internal(
     remap_node_inputs(nodes[order[index]], topo_map)
   })
   let feedback_edges = remapped_feedback_edges(plan.1, topo_map)
-  if feedback_edges.length() == 0 {
-    if !valid_terminal_mono_shapes(fixed_nodes) {
-      return None
-    }
-  } else if !valid_feedback_terminal_mono_graph(fixed_nodes, feedback_edges) {
+  if !validate(fixed_nodes, feedback_edges) {
     return None
   }
   let buffers = FixedArray::makei(node_count, _ => {
@@ -733,6 +739,8 @@ fn CompiledDsp::compile_internal(
     make_graph_stereo_delay_state(fixed_nodes[index])
   })
   let self_values = FixedArray::make(node_count, 0.0)
+  let self_left_values = FixedArray::make(node_count, 0.0)
+  let self_right_values = FixedArray::make(node_count, 0.0)
   let self_enabled = FixedArray::make(node_count, false)
   let back_edge_input0_source = FixedArray::make(node_count, -1)
   let back_edge_input1_source = FixedArray::make(node_count, -1)
@@ -754,37 +762,58 @@ fn CompiledDsp::compile_internal(
       back_edge_input1_source[target_idx] = source_idx
     }
   }
-  Some(
-    CompiledDsp({
-      compile_sample_rate,
-      nodes: fixed_nodes,
-      index_map,
-      buffers,
-      left_buffers,
-      right_buffers,
-      osc_states,
-      noise_states,
-      env_states,
-      biquad_states,
-      stereo_biquad_left_states,
-      stereo_biquad_right_states,
-      delay_states,
-      stereo_delay_left_states,
-      stereo_delay_right_states,
-      feedback_edges,
-      self_values,
-      self_left_values: FixedArray::make(node_count, 0.0),
-      self_right_values: FixedArray::make(node_count, 0.0),
-      self_enabled,
-      back_edge_input0_source,
-      back_edge_input1_source,
-      sample_values: FixedArray::make(node_count, 0.0),
-      left_sample_values: FixedArray::make(node_count, 0.0),
-      right_sample_values: FixedArray::make(node_count, 0.0),
-      pan_left_gains: FixedArray::make(node_count, 0.0),
-      pan_right_gains: FixedArray::make(node_count, 0.0),
-    }),
-  )
+  Some({
+    compile_sample_rate,
+    nodes: fixed_nodes,
+    index_map,
+    buffers,
+    left_buffers,
+    right_buffers,
+    osc_states,
+    noise_states,
+    env_states,
+    biquad_states,
+    stereo_biquad_left_states,
+    stereo_biquad_right_states,
+    delay_states,
+    stereo_delay_left_states,
+    stereo_delay_right_states,
+    feedback_edges,
+    self_values,
+    self_left_values,
+    self_right_values,
+    self_enabled,
+    back_edge_input0_source,
+    back_edge_input1_source,
+    sample_values: FixedArray::make(node_count, 0.0),
+    left_sample_values: FixedArray::make(node_count, 0.0),
+    right_sample_values: FixedArray::make(node_count, 0.0),
+    pan_left_gains: FixedArray::make(node_count, 0.0),
+    pan_right_gains: FixedArray::make(node_count, 0.0),
+  })
+}
+
+///|
+fn CompiledDsp::compile_internal(
+  nodes : Array[DspNode],
+  context : DspContext,
+  original_count : Int,
+  opt_map : FixedArray[Int],
+) -> CompiledDsp? {
+  compile_graph_impl(
+    nodes,
+    context,
+    original_count,
+    opt_map,
+    mono_compile_plan,
+    fn(fixed_nodes, feedback_edges) {
+      if feedback_edges.length() == 0 {
+        valid_terminal_mono_shapes(fixed_nodes)
+      } else {
+        valid_feedback_terminal_mono_graph(fixed_nodes, feedback_edges)
+      }
+    },
+  ).map(fn(graph) { CompiledDsp(graph) })
 }
 
 ///|
@@ -1287,133 +1316,20 @@ fn CompiledStereoDsp::compile_internal(
   original_count : Int,
   opt_map : FixedArray[Int],
 ) -> CompiledStereoDsp? {
-  let plan = match stereo_compile_plan(nodes, context) {
-    Some(plan) => plan
-    None => return None
-  }
-  let order = plan.0
-  let feedback_edges = plan.1
-  let node_count = nodes.length()
-  let block_size = compiled_block_size(context)
-  let compile_sample_rate = context.sample_rate()
-  let topo_map = FixedArray::make(node_count, -1)
-  for new_index = 0; new_index < order.length(); new_index = new_index + 1 {
-    topo_map[order[new_index]] = new_index
-  }
-  // Compose: original index -> optimized index -> compiled index
-  let index_map = FixedArray::makei(original_count, fn(i) {
-    let opt_i = opt_map[i]
-    if opt_i < 0 {
-      -1
-    } else {
-      topo_map[opt_i]
-    }
-  })
-
-  let fixed_nodes = FixedArray::makei(node_count, index => {
-    remap_node_inputs(nodes[order[index]], topo_map)
-  })
-  let remapped_feedback = remapped_feedback_edges(feedback_edges, topo_map)
-  if remapped_feedback.length() == 0 {
-    if !valid_terminal_stereo_shapes(fixed_nodes) {
-      return None
-    }
-  } else if !valid_feedback_terminal_stereo_graph(
-      fixed_nodes, remapped_feedback,
-    ) {
-    return None
-  }
-  let buffers = FixedArray::makei(node_count, _ => {
-    AudioBuffer::filled(block_size)
-  })
-  let left_buffers = FixedArray::makei(node_count, _ => {
-    AudioBuffer::filled(block_size)
-  })
-  let right_buffers = FixedArray::makei(node_count, _ => {
-    AudioBuffer::filled(block_size)
-  })
-  let osc_states = FixedArray::makei(node_count, index => {
-    make_graph_osc_state(fixed_nodes[index])
-  })
-  let noise_states = FixedArray::makei(node_count, index => {
-    make_graph_noise_state(fixed_nodes[index])
-  })
-  let env_states = FixedArray::makei(node_count, index => {
-    make_graph_env_state(fixed_nodes[index])
-  })
-  let biquad_states = FixedArray::makei(node_count, index => {
-    make_graph_biquad_state(fixed_nodes[index])
-  })
-  let stereo_biquad_left_states = FixedArray::makei(node_count, index => {
-    make_graph_stereo_biquad_state(fixed_nodes[index])
-  })
-  let stereo_biquad_right_states = FixedArray::makei(node_count, index => {
-    make_graph_stereo_biquad_state(fixed_nodes[index])
-  })
-  let delay_states = FixedArray::makei(node_count, index => {
-    make_graph_delay_state(fixed_nodes[index])
-  })
-  let stereo_delay_left_states = FixedArray::makei(node_count, index => {
-    make_graph_stereo_delay_state(fixed_nodes[index])
-  })
-  let stereo_delay_right_states = FixedArray::makei(node_count, index => {
-    make_graph_stereo_delay_state(fixed_nodes[index])
-  })
-  let self_values = FixedArray::make(node_count, 0.0)
-  let self_left_values = FixedArray::make(node_count, 0.0)
-  let self_right_values = FixedArray::make(node_count, 0.0)
-  let self_enabled = FixedArray::make(node_count, false)
-  let back_edge_input0_source = FixedArray::make(node_count, -1)
-  let back_edge_input1_source = FixedArray::make(node_count, -1)
-  for i = 0; i < remapped_feedback.length(); i = i + 1 {
-    let edge = remapped_feedback[i]
-    let source_idx = edge.0
-    let target_idx = edge.1
-    let slot = edge.2
-    self_enabled[source_idx] = true
-    if slot == 0 {
-      if back_edge_input0_source[target_idx] >= 0 {
-        return None
+  compile_graph_impl(
+    nodes,
+    context,
+    original_count,
+    opt_map,
+    stereo_compile_plan,
+    fn(fixed_nodes, feedback_edges) {
+      if feedback_edges.length() == 0 {
+        valid_terminal_stereo_shapes(fixed_nodes)
+      } else {
+        valid_feedback_terminal_stereo_graph(fixed_nodes, feedback_edges)
       }
-      back_edge_input0_source[target_idx] = source_idx
-    } else {
-      if back_edge_input1_source[target_idx] >= 0 {
-        return None
-      }
-      back_edge_input1_source[target_idx] = source_idx
-    }
-  }
-  Some(
-    CompiledStereoDsp({
-      compile_sample_rate,
-      nodes: fixed_nodes,
-      index_map,
-      buffers,
-      left_buffers,
-      right_buffers,
-      osc_states,
-      noise_states,
-      env_states,
-      biquad_states,
-      stereo_biquad_left_states,
-      stereo_biquad_right_states,
-      delay_states,
-      stereo_delay_left_states,
-      stereo_delay_right_states,
-      feedback_edges: remapped_feedback,
-      self_values,
-      self_left_values,
-      self_right_values,
-      self_enabled,
-      back_edge_input0_source,
-      back_edge_input1_source,
-      sample_values: FixedArray::make(node_count, 0.0),
-      left_sample_values: FixedArray::make(node_count, 0.0),
-      right_sample_values: FixedArray::make(node_count, 0.0),
-      pan_left_gains: FixedArray::make(node_count, 0.0),
-      pan_right_gains: FixedArray::make(node_count, 0.0),
-    }),
-  )
+    },
+  ).map(fn(graph) { CompiledStereoDsp(graph) })
 }
 
 ///|
