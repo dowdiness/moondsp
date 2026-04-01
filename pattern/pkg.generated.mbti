@@ -15,9 +15,12 @@ pub struct Event[A] {
 pub struct Pat[A] {
   query : (TimeSpan) -> Array[Event[A]]
 }
+pub fn[A] Pat::fast(Self[A], Rational) -> Self[A]
 pub fn[A] Pat::pure(A) -> Self[A]
 pub fn[A] Pat::query(Self[A], TimeSpan) -> Array[Event[A]]
+pub fn[A] Pat::rev(Self[A]) -> Self[A]
 pub fn[A] Pat::silence() -> Self[A]
+pub fn[A] Pat::slow(Self[A], Rational) -> Self[A]
 
 pub struct Rational {
   num : Int64
