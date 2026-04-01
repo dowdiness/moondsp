@@ -1,0 +1,26 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/mdsp/pattern"
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct Rational {
+  num : Int64
+  den : Int64
+} derive(Eq, Show)
+pub fn Rational::floor(Self) -> Int64
+pub fn Rational::from_int(Int) -> Self
+pub fn Rational::new(Int64, Int64) -> Self
+pub fn Rational::to_double(Self) -> Double
+pub impl Add for Rational
+pub impl Compare for Rational
+pub impl Div for Rational
+pub impl Mul for Rational
+pub impl Sub for Rational
+
+// Type aliases
+
+// Traits
+
