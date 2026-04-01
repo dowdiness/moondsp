@@ -1,4 +1,13 @@
 ///|
+/// Exact fraction for musical time. Int64 numerator and denominator.
+///
+/// WHY Int64: MoonBit Int is 32-bit. Cross-multiplication for comparison
+/// and nested fast/slow transforms overflow 32-bit quickly in live sessions.
+///
+/// Invariants (enforced by Rational::new):
+/// - den is always positive (sign lives in num)
+/// - num/den is always in lowest terms (GCD-reduced)
+/// These are required for correct cross-multiply comparison.
 pub struct Rational {
   num : Int64
   den : Int64

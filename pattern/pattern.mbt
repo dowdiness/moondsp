@@ -1,4 +1,13 @@
 ///|
+/// A pattern is a query function from time arcs to events.
+///
+/// WHY function, not data: Strudel's core insight. Patterns are infinite
+/// repeating streams — representing them as data would require materializing
+/// infinity. As functions, they are lazy: only the queried arc is computed.
+/// Combinators compose functions naturally (no interpreter needed).
+///
+/// WHY concrete struct, not trait: Phase 4 uses concrete composition.
+/// A PatternSym trait layer can wrap this in Phase 6 for incr memoization.
 pub struct Pat[A] {
   query : (TimeSpan) -> Array[Event[A]]
 }
@@ -37,6 +46,10 @@ pub fn[A] Pat::query(self : Pat[A], arc : TimeSpan) -> Array[Event[A]] {
 }
 
 ///|
+/// WHY two-step time scaling: query the inner pattern in compressed time
+/// (arc * factor), then scale returned events back (timestamps / factor).
+/// The inner pattern "sees" time passing faster, but events are reported
+/// in the caller's real-time frame. Both whole and part are scaled.
 pub fn[A] Pat::fast(self : Pat[A], factor : Rational) -> Pat[A] {
   if factor.num <= 0L {
     return Pat::silence()

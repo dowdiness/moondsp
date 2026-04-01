@@ -1,4 +1,11 @@
 ///|
+/// Half-open time interval [begin, end) with rational boundaries.
+///
+/// WHY half-open: adjacent cycle arcs must not overlap. [0,1) and [1,2) are
+/// disjoint — the boundary point 1 belongs to the second arc only. This
+/// prevents double-counting events at cycle boundaries.
+///
+/// WHY `end_` not `end`: avoids potential keyword collision in MoonBit.
 pub struct TimeSpan {
   begin : Rational
   end_ : Rational
