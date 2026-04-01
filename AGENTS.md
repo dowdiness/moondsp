@@ -3,10 +3,12 @@
 This is a [MoonBit](https://docs.moonbitlang.com) project.
 
 `mdsp` is a MoonBit DSP audio engine library in the Salat Engine project.
-Phases 0–2 are complete: wasm-gc AudioWorklet proof (Phase 0), DSP primitives
-(Phase 1), and compiled graph runtime with hot-swap, topology editing, and
-stereo support (Phase 2). The path remains open for native targets such as
-CLAP plugins.
+Phases 0–4 are complete: wasm-gc AudioWorklet proof (Phase 0), DSP primitives
+(Phase 1), compiled graph runtime with hot-swap, topology editing, and
+stereo support (Phase 2), polyphonic voice pool with priority stealing and
+per-voice pan mixdown (Phase 3), and Strudel-inspired pattern engine with
+rational time and combinators (Phase 4). The path remains open for native
+targets such as CLAP plugins.
 
 You can browse and install extra skills here:
 <https://github.com/moonbitlang/skills>
@@ -21,8 +23,10 @@ You can browse and install extra skills here:
 - In the toplevel directory, there is a `moon.mod.json` file listing module
   metadata.
 
-- The `lib/` package contains the core DSP library. The root package is a thin
-  demo entrypoint (`mdsp.mbt`) that delegates to `lib/`.
+- The `lib/` package contains the core DSP library (oscillators, filters, graph
+  compiler, voice pool). The `pattern/` package is a standalone pattern engine
+  (rational time, combinators, control maps) with zero dependency on `lib/`.
+  The root package is a thin demo entrypoint (`mdsp.mbt`) that delegates to `lib/`.
 
 - `cmd/main/` contains the executable entry point and its package manifest.
 

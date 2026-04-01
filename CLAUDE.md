@@ -12,7 +12,8 @@ Single module `dowdiness/mdsp` with packages:
 
 | Package | Purpose |
 |---------|---------|
-| `lib/` | Core DSP library — oscillators, filters, graph, tagless algebra |
+| `lib/` | Core DSP library — oscillators, filters, graph, tagless algebra, voice pool |
+| `pattern/` | Pattern engine — rational time, arcs, events, combinators, control maps |
 | `/` (root) | Demo entrypoint — wasm/js exports for browser prototype |
 | `cmd/main` | Executable entry point |
 | `browser/` | Browser/AudioWorklet integration |
@@ -21,7 +22,7 @@ Single module `dowdiness/mdsp` with packages:
 ## Commands
 
 ```bash
-moon check && moon test        # 264 tests
+moon check && moon test        # 405 tests
 moon build --target wasm-gc    # Browser WASM build
 moon run cmd/main              # CLI entry point
 ```
@@ -42,8 +43,10 @@ moon info && moon fmt
 
 ## Key Facts
 
-- Phases 0–2 complete: AudioWorklet proof, DSP primitives, compiled graph runtime
+- Phases 0–4 complete: AudioWorklet proof, DSP primitives, compiled graph runtime, voice management, pattern engine
 - Finally Tagless two-layer architecture (traits + concrete AST)
 - Compiled graph with hot-swap, topology editing, and stereo support
+- Voice pool: 32+ polyphonic voices with priority stealing and per-voice pan mixdown
+- Pattern engine: Strudel-inspired algebra with rational time, 8 combinators, ControlMap output
 - Audio constants: 48000 Hz sample rate, 128 samples per buffer
 - No allocation in the audio thread; pre-allocated buffers

@@ -137,8 +137,8 @@ MoonBit's ecosystem is young. Avoid large foundation libraries. Each library (`i
 | `loom` | Parser framework | Active (6 defects identified) |
 | `seam` | Language-agnostic CST / green-red tree | Active |
 | `ecs` | Entity-Component-System | Phase 1 ready |
-| **`salat-dsp`** | **DSP engine (this project)** | **Phase 1 complete, Phase 2 complete** |
-| **`salat-pattern`** | **Pattern engine** | **Design phase** |
+| **`salat-dsp`** | **DSP engine (this project)** | **Phases 1–3 complete** |
+| **`salat-pattern`** | **Pattern engine** | **Phase 4 complete** |
 
 ---
 
@@ -255,32 +255,43 @@ edits, state preservation across recompilation, and the full two-layer Finally
 Tagless trait hierarchy — all with runtime control, integration coverage, and
 browser proof.
 
-### Phase 3 — Voice Management (1-2 weeks)
+### Phase 3 — Voice Management (1-2 weeks) ✓ COMPLETE
 
 **Question**: How do we handle polyphonic events where each voice has independent parameters?
 
-This is the hardest unsolved problem (kabelsalat also struggled here).
-Two candidate approaches:
+**Decision**: Voice pool (approach A). ECS deferred to Phase 5+ if the Pattern Engine's
+arbitrary control maps need open extensibility.
 
-- **A) Voice pool**: Pre-allocate N voice slots, each a compiled DSP graph instance. Events are assigned to free slots. ADSR release frees the slot.
-- **B) ECS-based**: Each voice is an Entity. Components hold DSP state. Systems run the graph per-entity. Integrates naturally with the `ecs` library.
-
-Evaluate both; choose based on prototype results.
+Implemented:
+- `VoicePool` managing 32+ mono `CompiledDsp` instances with stereo mixdown
+- Priority-based stealing: idle → oldest releasing → oldest active
+- Generation-tagged `VoiceHandle` preventing stale-handle bugs
+- Two-stage silence detection: ADSR idle AND output buffer silent (catches delay tails)
+- Transactional `note_on` with param validation via `apply_controls`
+- Per-voice equal-power pan cached at control rate (no trig in audio thread)
+- Recompile-on-steal template changes (no N-voice recompile spike)
+- 21 tests in `lib/voice.mbt` / `lib/voice_test.mbt`
 
 **Deliverable**: Polyphonic synth — multiple overlapping notes with independent filter/envelope per voice.
 
-### Phase 4 — Pattern Engine (2-3 weeks)
+### Phase 4 — Pattern Engine (2-3 weeks) ✓ COMPLETE
 
 **Question**: Can we implement Strudel's pattern algebra in MoonBit?
 
+**Decision**: Concrete function composition (approach C from brainstorming). No traits/AST
+until Phase 6 when `incr` needs it for memoization.
+
+Implemented in standalone `pattern/` package (zero dependency on `lib/`):
+
 ```
-salat-pattern/
-├── time.mbt         Rational time (fraction-based, exact arithmetic)
-├── arc.mbt          Time span [begin, end)
-├── event.mbt        Event[A] = { arc, value }
-├── pattern.mbt      Pat[A] = (Arc) -> Array[Event[A]] (query function)
-├── combinators.mbt  sequence, stack, fast, slow, every, rev, ...
-└── control_map.mbt  Map[String, Double] — the contract with DSP
+pattern/
+├── rational.mbt     Rational time (Int64 num/den, exact arithmetic)
+├── time.mbt         TimeSpan [begin, end) with intersect, whole_cycles
+├── event.mbt        Event[A] = { whole?, part, value }
+├── pattern.mbt      Pat[A] = (TimeSpan) -> Array[Event[A]], silence, pure, fast, slow, rev
+├── combinators.mbt  sequence, stack, every
+├── control.mbt      ControlMap (Map[String, Double]), note helpers, merge_control
+└── *_test.mbt       65 tests including 13 property-based algebraic law tests
 ```
 
 The core insight from Strudel: `Pattern a = State → [Event a]`. A pattern *is* a function. Combinators wrap functions in functions. This is Church encoding / Finally Tagless.
