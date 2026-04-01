@@ -250,3 +250,43 @@ test "process mixes multiple voices" {
     )
   }
 }
+
+///|
+test "new voices use updated template after set_template" {
+  let ctx = DspContext::new(48000.0, 4)
+  let nodes_a = [DspNode::constant(1.0), DspNode::output(0)]
+  let nodes_b = [DspNode::constant(2.0), DspNode::output(0)]
+  let pool = VoicePool::new(nodes_a, ctx, max_voices=4).unwrap()
+  let _h1 = pool.note_on([]).unwrap()
+  let left1 = AudioBuffer::filled(4)
+  let right1 = AudioBuffer::filled(4)
+  pool.process(ctx, left1, right1)
+  let first_output = left1.get(0)
+  assert_true(pool.set_template(nodes_b))
+  let _h2 = pool.note_on([]).unwrap()
+  let left2 = AudioBuffer::filled(4)
+  let right2 = AudioBuffer::filled(4)
+  pool.process(ctx, left2, right2)
+  assert_true(left2.get(0) > first_output * 1.5)
+}
+
+///|
+test "stealing prefers releasing over active" {
+  let ctx = DspContext::new(48000.0, 16)
+  let nodes = [
+    DspNode::constant(440.0),
+    DspNode::adsr(5.0, 5.0, 0.5, 100.0),
+    DspNode::output(1),
+  ]
+  let pool = VoicePool::new(nodes, ctx, max_voices=2).unwrap()
+  let h1 = pool.note_on([]).unwrap()
+  let h2 = pool.note_on([]).unwrap()
+  let left = AudioBuffer::filled(16)
+  let right = AudioBuffer::filled(16)
+  pool.process(ctx, left, right)
+  assert_true(pool.note_off(h1))
+  assert_true(pool.voice_state(h1) is VoiceState::Releasing)
+  assert_true(pool.voice_state(h2) is VoiceState::Active)
+  let h3 = pool.note_on([]).unwrap()
+  assert_true(h3.slot == h1.slot)
+}
