@@ -151,3 +151,24 @@ test "resolve: empty binding map produces empty controls" {
   let result = map.resolve_controls(controls)
   assert_eq(result.length(), 0)
 }
+
+///|
+test "integration: resolved controls accepted by VoicePool::note_on" {
+  let ctx = DspContext::new(48000.0, 16)
+  let template = [
+    DspNode::oscillator(Waveform::Sine, 440.0),
+    DspNode::gain(0, 0.3),
+    DspNode::output(1),
+  ]
+  let pool = VoicePool::new(template, ctx, max_voices=4).unwrap()
+  let bindings = ControlBindingBuilder::new()
+    .bind(key="note", node_index=0, slot=GraphParamSlot::Value0)
+    .bind(key="gain", node_index=1, slot=GraphParamSlot::Value0)
+    .build(template)
+    .unwrap()
+  let controls : Map[String, Double] = { "note": 880.0, "gain": 0.5 }
+  let resolved = bindings.resolve_controls(controls)
+  let handle = pool.note_on(resolved)
+  assert_true(handle is Some(_))
+  assert_true(pool.voice_state(handle.unwrap()) is VoiceState::Active)
+}
