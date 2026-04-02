@@ -192,6 +192,8 @@ priv struct CompiledGraph {
   pan_left_gains : FixedArray[Double]
   pan_right_gains : FixedArray[Double]
   mut last_sanitized_count : Int
+  mut debug_validate : Bool
+  mut last_validation_errors : Array[GraphValidationError]
 }
 
 ///|
@@ -806,6 +808,8 @@ fn compile_graph_impl(
     pan_left_gains: FixedArray::make(node_count, 0.0),
     pan_right_gains: FixedArray::make(node_count, 0.0),
     last_sanitized_count: 0,
+    debug_validate: false,
+    last_validation_errors: [],
   })
 }
 
@@ -857,6 +861,10 @@ pub fn CompiledDsp::process(
     clear_compiled_buffers(self.0.right_buffers)
     output.fill(0.0)
     self.0.last_sanitized_count = 0
+    return
+  }
+  if self.0.debug_validate {
+    self.process_mono_debug(context, output, sample_count)
     return
   }
   if self.0.feedback_edges.length() > 0 {
@@ -1441,6 +1449,10 @@ pub fn CompiledStereoDsp::process(
     left_output.fill(0.0)
     right_output.fill(0.0)
     self.0.last_sanitized_count = 0
+    return
+  }
+  if self.0.debug_validate {
+    self.process_stereo_debug(context, left_output, right_output, sample_count)
     return
   }
   if self.0.feedback_edges.length() > 0 {
