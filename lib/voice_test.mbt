@@ -288,3 +288,21 @@ test "stealing prefers releasing over active" {
   let h3 = pool.note_on([]).unwrap()
   assert_true(h3.slot == h1.slot)
 }
+
+///|
+test "VoicePool process sanitizes final mixdown output" {
+  let ctx = DspContext::new(48000.0, 4)
+  let nodes = [
+    DspNode::constant(1.0),
+    DspNode::output(0),
+  ]
+  let pool = VoicePool::new(nodes, ctx, max_voices=2).unwrap()
+  ignore(pool.note_on([]))
+  let left = AudioBuffer::filled(4)
+  let right = AudioBuffer::filled(4)
+  pool.process(ctx, left, right)
+  // Clean constant output should have zero sanitized count
+  assert_eq(pool.last_sanitized_count(), 0)
+  // Verify output is non-zero (voice was active)
+  assert_true(left.get(0) > 0.0)
+}

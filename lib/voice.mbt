@@ -114,6 +114,7 @@ pub struct VoicePool {
   priv compile_context : DspContext
   priv mut next_allocation_order : Int
   priv max_voices : Int
+  priv mut last_sanitized_count : Int
 }
 
 ///|
@@ -143,6 +144,7 @@ pub fn VoicePool::new(
     compile_context: context,
     next_allocation_order: 0,
     max_voices,
+    last_sanitized_count: 0,
   })
 }
 
@@ -168,6 +170,11 @@ pub fn VoicePool::active_voice_count(self : VoicePool) -> Int {
     }
   }
   count
+}
+
+///|
+pub fn VoicePool::last_sanitized_count(self : VoicePool) -> Int {
+  self.last_sanitized_count
 }
 
 ///|
@@ -378,4 +385,11 @@ pub fn VoicePool::process(
       }
     }
   }
+  let sample_count = if context.block_size() < left_output.length() {
+    context.block_size()
+  } else {
+    left_output.length()
+  }
+  self.last_sanitized_count = sanitize_buffer(left_output, sample_count) +
+    sanitize_buffer(right_output, sample_count)
 }
