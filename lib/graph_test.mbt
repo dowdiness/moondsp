@@ -1992,7 +1992,7 @@ test "process: clean graph has zero sanitized count" {
 ///|
 test "process: NaN constant is rejected at compile time" {
   let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
-  let nodes = [DspNode::constant(Double::nan()), DspNode::output(0)]
+  let nodes = [DspNode::constant(@double.not_a_number), DspNode::output(0)]
   // NaN constants are caught by validation — compile returns None
   assert_true(CompiledDsp::compile(nodes, context) is None)
 }

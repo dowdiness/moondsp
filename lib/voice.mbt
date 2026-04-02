@@ -173,6 +173,8 @@ pub fn VoicePool::active_voice_count(self : VoicePool) -> Int {
 }
 
 ///|
+/// Number of non-finite samples replaced with 0.0 during the most recent
+/// process() call, across both L and R output channels after mixdown.
 pub fn VoicePool::last_sanitized_count(self : VoicePool) -> Int {
   self.last_sanitized_count
 }
@@ -351,6 +353,11 @@ pub fn VoicePool::process(
   left_output : AudioBuffer,
   right_output : AudioBuffer,
 ) -> Unit {
+  let sample_count = if context.block_size() < left_output.length() {
+    context.block_size()
+  } else {
+    left_output.length()
+  }
   for i = 0; i < self.max_voices; i = i + 1 {
     let slot = self.slots[i]
     if slot.state is VoiceState::Idle {
@@ -368,11 +375,6 @@ pub fn VoicePool::process(
         // This avoids 2 trig calls per voice per block.
         let left_gain = slot.pan_left_gain
         let right_gain = slot.pan_right_gain
-        let sample_count = if context.block_size() < left_output.length() {
-          context.block_size()
-        } else {
-          left_output.length()
-        }
         for s = 0; s < sample_count; s = s + 1 {
           let mono = slot.mono_buffer.get(s)
           left_output.set(s, left_output.get(s) + mono * left_gain)
@@ -384,11 +386,6 @@ pub fn VoicePool::process(
         }
       }
     }
-  }
-  let sample_count = if context.block_size() < left_output.length() {
-    context.block_size()
-  } else {
-    left_output.length()
   }
   self.last_sanitized_count = sanitize_buffer(left_output, sample_count) +
     sanitize_buffer(right_output, sample_count)
