@@ -149,6 +149,17 @@ fn validate_node_state(
 /// Shared debug process loop for both mono and stereo graphs.
 /// Validates each node's inputs and state before processing.
 /// On violation, fills output with silence and skips to next node.
+///
+/// WHY duplicated from the production loops: validation checks run per-node
+/// inside the tight loop. Keeping them in a separate function preserves the
+/// production fast path's code shape unchanged (no debug branches to optimize
+/// away). If new node kinds are added, update this loop alongside the
+/// production loops in graph.mbt.
+///
+/// WHY shared between mono and stereo: compile-time validation guarantees
+/// mono graphs have Output (never StereoOutput) and stereo graphs have
+/// StereoOutput (never Output). Both arms are present but only the
+/// appropriate one fires for each graph type.
 fn process_debug_loop(
   graph : CompiledGraph,
   context : DspContext,
@@ -167,7 +178,13 @@ fn process_debug_loop(
         graph.last_validation_errors,
       ) ||
       !validate_node_state(graph, node, index, graph.last_validation_errors) {
+      // WHY zero all three buffers: stereo nodes (Pan, StereoGain, etc.) write
+      // to left_buffers/right_buffers, not the mono buffer. Without zeroing all
+      // three, downstream stereo consumers would see stale data from the
+      // previous block instead of silence.
       buffer.fill(0.0)
+      graph.left_buffers[index].fill(0.0)
+      graph.right_buffers[index].fill(0.0)
       continue index + 1
     }
     match node.kind {
