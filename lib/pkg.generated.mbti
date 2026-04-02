@@ -140,6 +140,27 @@ pub fn CompiledStereoDspTopologyController::process(Self, DspContext, AudioBuffe
 pub fn CompiledStereoDspTopologyController::queue_topology_edit(Self, GraphTopologyEdit) -> Bool
 pub fn CompiledStereoDspTopologyController::queue_topology_edits(Self, Array[GraphTopologyEdit]) -> Bool
 
+pub struct ControlBinding {
+  key : String
+  node_index : Int
+  slot : GraphParamSlot
+
+  fn new(key~ : String, node_index~ : Int, slot~ : GraphParamSlot) -> ControlBinding
+} derive(Eq, Show)
+
+pub struct ControlBindingBuilder {
+  bindings : Array[ControlBinding]
+
+  fn new() -> ControlBindingBuilder
+} derive(Show)
+pub fn ControlBindingBuilder::bind(Self, key~ : String, node_index~ : Int, slot~ : GraphParamSlot) -> Self
+
+pub(all) enum ControlBindingError {
+  InvalidNodeIndex(Int)
+  InvalidSlotForNode(Int, GraphParamSlot)
+  DuplicateKey(String)
+} derive(Eq, Show)
+
 pub struct DelayLine {
   buffer : FixedArray[Double]
   mut write_pos : Int
@@ -282,7 +303,7 @@ pub(all) enum GraphParamSlot {
   Value2
   Value3
   DelaySamples
-} derive(Eq)
+} derive(Eq, Show)
 
 pub struct GraphTopologyEdit {
   kind : GraphTopologyEditKind

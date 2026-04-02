@@ -29,7 +29,7 @@ pub(all) enum GraphParamSlot {
   Value2
   Value3
   DelaySamples
-} derive(Eq)
+} derive(Eq, Show)
 
 ///|
 /// Unified runtime control kinds for compiled graphs.
