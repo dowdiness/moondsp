@@ -292,10 +292,7 @@ test "stealing prefers releasing over active" {
 ///|
 test "VoicePool process sanitizes final mixdown output" {
   let ctx = DspContext::new(48000.0, 4)
-  let nodes = [
-    DspNode::constant(1.0),
-    DspNode::output(0),
-  ]
+  let nodes = [DspNode::constant(1.0), DspNode::output(0)]
   let pool = VoicePool::new(nodes, ctx, max_voices=2).unwrap()
   ignore(pool.note_on([]))
   let left = AudioBuffer::filled(4)

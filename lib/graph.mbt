@@ -210,9 +210,7 @@ pub fn CompiledDsp::last_sanitized_count(self : CompiledDsp) -> Int {
 }
 
 ///|
-pub fn CompiledStereoDsp::last_sanitized_count(
-  self : CompiledStereoDsp,
-) -> Int {
+pub fn CompiledStereoDsp::last_sanitized_count(self : CompiledStereoDsp) -> Int {
   self.0.last_sanitized_count
 }
 

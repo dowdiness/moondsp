@@ -24,6 +24,8 @@ pub fn[T : ArithSym + DspSym + FilterSym + DelaySym + StereoSym + StereoFilterSy
 
 pub fn reset_phase() -> Unit
 
+pub fn sanitize_buffer(AudioBuffer, Int) -> Int
+
 pub fn stereo_shape() -> Int
 
 pub fn tick(Double, Double) -> Double
@@ -98,6 +100,7 @@ pub fn CompiledDsp::compile(Array[DspNode], DspContext) -> Self?
 pub fn CompiledDsp::gate_off(Self, Int) -> Bool
 pub fn CompiledDsp::gate_on(Self, Int) -> Bool
 pub fn CompiledDsp::is_voice_finished(Self) -> Bool
+pub fn CompiledDsp::last_sanitized_count(Self) -> Int
 pub fn CompiledDsp::process(Self, DspContext, AudioBuffer) -> Unit
 pub fn CompiledDsp::set_param(Self, Int, GraphParamSlot, Double) -> Bool
 
@@ -122,6 +125,7 @@ pub fn CompiledStereoDsp::apply_controls(Self, Array[GraphControl]) -> Bool
 pub fn CompiledStereoDsp::compile(Array[DspNode], DspContext) -> Self?
 pub fn CompiledStereoDsp::gate_off(Self, Int) -> Bool
 pub fn CompiledStereoDsp::gate_on(Self, Int) -> Bool
+pub fn CompiledStereoDsp::last_sanitized_count(Self) -> Int
 pub fn CompiledStereoDsp::process(Self, DspContext, AudioBuffer, AudioBuffer) -> Unit
 pub fn CompiledStereoDsp::set_param(Self, Int, GraphParamSlot, Double) -> Bool
 
@@ -416,6 +420,7 @@ pub struct VoicePool {
   // private fields
 }
 pub fn VoicePool::active_voice_count(Self) -> Int
+pub fn VoicePool::last_sanitized_count(Self) -> Int
 pub fn VoicePool::new(Array[DspNode], DspContext, max_voices? : Int) -> Self?
 pub fn VoicePool::note_off(Self, VoiceHandle) -> Bool
 pub fn VoicePool::note_off_all(Self) -> Unit

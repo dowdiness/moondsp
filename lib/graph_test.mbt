@@ -1992,10 +1992,7 @@ test "process: clean graph has zero sanitized count" {
 ///|
 test "process: NaN constant is rejected at compile time" {
   let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
-  let nodes = [
-    DspNode::constant(Double::nan()),
-    DspNode::output(0),
-  ]
+  let nodes = [DspNode::constant(Double::nan()), DspNode::output(0)]
   // NaN constants are caught by validation — compile returns None
   assert_true(CompiledDsp::compile(nodes, context) is None)
 }
@@ -2003,10 +2000,7 @@ test "process: NaN constant is rejected at compile time" {
 ///|
 test "process: last_sanitized_count resets each call" {
   let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
-  let nodes = [
-    DspNode::constant(1.0),
-    DspNode::output(0),
-  ]
+  let nodes = [DspNode::constant(1.0), DspNode::output(0)]
   let compiled = CompiledDsp::compile(nodes, context).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   compiled.process(context, output)
