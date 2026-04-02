@@ -1782,7 +1782,9 @@ fn CompiledGraph::apply_controls_impl(
   }
 
   for index = 0; index < controls.length(); index = index + 1 {
-    ignore(self.apply_control_impl(controls[index]))
+    if !self.apply_control_impl(controls[index]) {
+      return false
+    }
   }
   true
 }
@@ -1949,7 +1951,8 @@ fn valid_any_node_inputs(
       valid_biquad_graph_params(sample_rate, node.value0, node.value1)
     Delay =>
       valid_reference(node.input0, node_count) &&
-      valid_delay_feedback(node.value0)
+      valid_delay_feedback(node.value0) &&
+      valid_delay_samples(node.delay_samples, node.delay_max_samples)
     Gain => valid_reference(node.input0, node_count) && is_finite(node.value0)
     Mul =>
       valid_reference(node.input0, node_count) &&
@@ -1975,7 +1978,8 @@ fn valid_any_node_inputs(
       valid_biquad_graph_params(sample_rate, node.value0, node.value1)
     StereoDelay =>
       valid_reference(node.input0, node_count) &&
-      valid_delay_feedback(node.value0)
+      valid_delay_feedback(node.value0) &&
+      valid_delay_samples(node.delay_samples, node.delay_max_samples)
     StereoMixDown => valid_reference(node.input0, node_count)
     StereoOutput =>
       node.kind == output_kind && valid_reference(node.input0, node_count)
@@ -2081,9 +2085,9 @@ fn updated_node_param(
           Some(node_with_value0(node, value))
         DelaySamples =>
           match exact_int_value(value) {
-            Some(delay_samples) =>
-              Some(node_with_delay_samples(node, delay_samples))
-            None => None
+            Some(ds) if valid_delay_samples(ds, node.delay_max_samples) =>
+              Some(node_with_delay_samples(node, ds))
+            _ => None
           }
         _ => None
       }
@@ -2131,9 +2135,9 @@ fn updated_node_param(
           Some(node_with_value0(node, value))
         DelaySamples =>
           match exact_int_value(value) {
-            Some(delay_samples) =>
-              Some(node_with_delay_samples(node, delay_samples))
-            None => None
+            Some(ds) if valid_delay_samples(ds, node.delay_max_samples) =>
+              Some(node_with_delay_samples(node, ds))
+            _ => None
           }
         _ => None
       }
@@ -2249,6 +2253,13 @@ fn valid_delay_feedback(value : Double) -> Bool {
   is_finite(value) &&
   value >= -max_feedback_amount() &&
   value <= max_feedback_amount()
+}
+
+///|
+/// Shared validation for delay_samples used by both compile-time
+/// (`valid_any_node_inputs`) and runtime (`updated_node_param`) paths.
+fn valid_delay_samples(delay_samples : Int, delay_max_samples : Int) -> Bool {
+  delay_samples >= 0 && delay_samples <= delay_max_samples
 }
 
 ///|

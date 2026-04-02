@@ -1820,3 +1820,112 @@ test "self-register: mixed-shape feedback across mono/stereo boundary" {
   assert_true(output.get(0) > 0.0)
   assert_true(output.get(1) > output.get(0))
 }
+
+///|
+test "compiled dsp rejects negative delay_samples via set_param" {
+  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::delay(0, DELAY_CAPACITY, delay_samples=DELAY_SAMPLES),
+    DspNode::output(1),
+  ]
+  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+
+  // Negative delay_samples must be rejected
+  assert_false(
+    compiled.apply_control(
+      GraphControl::set_param(1, GraphParamSlot::DelaySamples, -1.0),
+    ),
+  )
+  // Verify the node still works with the original valid delay_samples
+  let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+  compiled.process(context, output)
+  assert_eq(output.get(0), ZERO_SAMPLE)
+}
+
+///|
+test "compiled dsp rejects delay_samples exceeding delay_max_samples via set_param" {
+  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::delay(0, DELAY_CAPACITY, delay_samples=DELAY_SAMPLES),
+    DspNode::output(1),
+  ]
+  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+
+  // delay_samples > delay_max_samples (DELAY_CAPACITY=4) must be rejected
+  assert_false(
+    compiled.apply_control(
+      GraphControl::set_param(
+        1,
+        GraphParamSlot::DelaySamples,
+        5.0, // exceeds DELAY_CAPACITY of 4
+      ),
+    ),
+  )
+}
+
+///|
+test "compiled dsp accepts valid delay_samples within bounds via set_param" {
+  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::delay(0, DELAY_CAPACITY, delay_samples=DELAY_SAMPLES),
+    DspNode::output(1),
+  ]
+  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+
+  // delay_samples == 0 (lower bound) is valid
+  assert_true(
+    compiled.apply_control(
+      GraphControl::set_param(1, GraphParamSlot::DelaySamples, 0.0),
+    ),
+  )
+  // delay_samples == delay_max_samples (upper bound) is valid
+  assert_true(
+    compiled.apply_control(
+      GraphControl::set_param(
+        1,
+        GraphParamSlot::DelaySamples,
+        4.0, // equals DELAY_CAPACITY
+      ),
+    ),
+  )
+  // delay_samples == 3 (mid-range) is valid
+  assert_true(
+    compiled.apply_control(
+      GraphControl::set_param(1, GraphParamSlot::DelaySamples, 3.0),
+    ),
+  )
+}
+
+///|
+test "compiled stereo dsp rejects out-of-bounds delay_samples via set_param" {
+  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::pan(0, ZERO_SAMPLE),
+    DspNode::stereo_delay(1, DELAY_CAPACITY, delay_samples=DELAY_SAMPLES),
+    DspNode::stereo_output(2),
+  ]
+  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+
+  // Negative delay_samples must be rejected
+  assert_false(
+    compiled.apply_control(
+      GraphControl::set_param(2, GraphParamSlot::DelaySamples, -1.0),
+    ),
+  )
+  // Exceeding max must be rejected
+  assert_false(
+    compiled.apply_control(
+      GraphControl::set_param(2, GraphParamSlot::DelaySamples, 5.0),
+    ),
+  )
+  // Valid value must be accepted
+  assert_true(
+    compiled.apply_control(
+      GraphControl::set_param(2, GraphParamSlot::DelaySamples, 3.0),
+    ),
+  )
+}

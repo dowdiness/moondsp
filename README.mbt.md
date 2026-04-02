@@ -22,8 +22,9 @@ To hear it in the browser, open `web/index.html` after building. The AudioWorkle
 
 **Finally Tagless DSP algebra** — the same graph definition works as both a concrete AST for optimization and a trait-driven interpretation for extensibility:
 
-```moonbit
-fn exit_deliverable[T : FilterSym]() -> T {
+```moonbit nocheck
+///|
+fn[T : FilterSym] exit_deliverable() -> T {
   let lfo = T::oscillator(T::constant(2.0), Waveform::Sine)
   let freq = range(lfo, 200.0, 400.0)
   let carrier = T::oscillator(freq, Waveform::Sine)
@@ -38,7 +39,7 @@ This compiles into an FM synthesis patch: a 2 Hz LFO sweeps a carrier between 20
 
 **Pattern engine** — a standalone `pattern/` package implementing Strudel's core model: patterns are query functions over rational-time arcs, producing events with control maps. Eight combinators (`silence`, `pure`, `fast`, `slow`, `rev`, `sequence`, `stack`, `every`) compose into expressive rhythmic structures:
 
-```moonbit
+```moonbit nocheck
 // C major triad played twice per cycle
 sequence([note_name("c3"), note_name("e3"), note_name("g3")]).fast(Rational::from_int(2))
 ```

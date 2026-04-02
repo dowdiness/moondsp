@@ -47,6 +47,23 @@ test "adsr reset returns to idle" {
 }
 
 ///|
+test "adsr zero-time attack/decay/release skips via loop not recursion" {
+  let env = Adsr::new(0.0, 0.0, 0.5, 0.0)
+  let ctx = DspContext::new(48000.0, 1)
+  let buf = AudioBuffer::filled(1)
+  // After gate_on + tick: should skip attack and decay, land on sustain
+  env.gate_on()
+  env.process(ctx, buf)
+  assert_true(env.stage() is EnvStage::Sustain)
+  assert_true(buf.get(0) == 0.5)
+  // After gate_off + tick: should skip release, land on idle
+  env.gate_off()
+  env.process(ctx, buf)
+  assert_true(env.stage() is EnvStage::Idle)
+  assert_true(buf.get(0) == 0.0)
+}
+
+///|
 test "prop: adsr output in [0, 1]" {
   @qc.quick_check_fn(
     fn(params : (Double, Double, Double, Double)) {

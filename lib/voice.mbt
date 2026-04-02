@@ -185,7 +185,7 @@ fn VoicePool::find_slot(self : VoicePool) -> Int {
   }
   // Priority 2: oldest releasing voice (least audible pop)
   let mut best_releasing = -1
-  let mut best_releasing_order = 2147483647
+  let mut best_releasing_order = @int.MAX_VALUE
   for i = 0; i < self.max_voices; i = i + 1 {
     if self.slots[i].state is VoiceState::Releasing &&
       self.slots[i].allocation_order < best_releasing_order {
@@ -198,7 +198,7 @@ fn VoicePool::find_slot(self : VoicePool) -> Int {
   }
   // Priority 3: oldest active voice (audible cut, last resort)
   let mut best_active = 0
-  let mut best_active_order = 2147483647
+  let mut best_active_order = @int.MAX_VALUE
   for i = 0; i < self.max_voices; i = i + 1 {
     if self.slots[i].allocation_order < best_active_order {
       best_active = i
@@ -206,6 +206,28 @@ fn VoicePool::find_slot(self : VoicePool) -> Int {
     }
   }
   best_active
+}
+
+///|
+/// Reassign allocation_order values to a dense sequential range (0, 1, 2, ...)
+/// preserving relative ordering. Called when next_allocation_order is about to
+/// overflow. This keeps the oldest-first voice-stealing heuristic correct.
+fn VoicePool::compact_allocation_orders(self : VoicePool) -> Unit {
+  // Collect (slot_index, allocation_order) pairs for non-idle slots
+  let pairs : Array[(Int, Int)] = []
+  for i = 0; i < self.max_voices; i = i + 1 {
+    if !(self.slots[i].state is VoiceState::Idle) {
+      pairs.push((i, self.slots[i].allocation_order))
+    }
+  }
+  // Sort by allocation_order ascending to preserve relative age
+  pairs.sort_by(fn(a, b) { a.1.compare(b.1) })
+  // Reassign sequential orders starting from 0
+  for j = 0; j < pairs.length(); j = j + 1 {
+    self.slots[pairs[j].0].allocation_order = j
+  }
+  // Set pool counter to next available value
+  self.next_allocation_order = pairs.length()
 }
 
 ///|
@@ -233,9 +255,23 @@ pub fn VoicePool::note_on(
   // See VoiceSlot.template_snapshot doc comment for the full rationale.
   slot.template_snapshot = self.template
   slot.state = VoiceState::Active
-  slot.generation = slot.generation + 1
+  // WHY overflow guard on generation: after 2^31 increments the counter
+  // wraps negative, which could revalidate stale VoiceHandles. Resetting
+  // to 0 safely invalidates all outstanding handles for this slot.
+  slot.generation = if slot.generation >= @int.MAX_VALUE - 1 {
+    0
+  } else {
+    slot.generation + 1
+  }
   slot.allocation_order = self.next_allocation_order
-  self.next_allocation_order = self.next_allocation_order + 1
+  // WHY overflow guard on allocation_order: if the pool-wide counter wraps
+  // negative, the oldest-first stealing heuristic breaks. Compact all slot
+  // orders into a dense sequential range preserving relative order.
+  if self.next_allocation_order >= @int.MAX_VALUE - 1 {
+    self.compact_allocation_orders()
+  } else {
+    self.next_allocation_order = self.next_allocation_order + 1
+  }
   Some({ slot: slot_index, generation: slot.generation })
 }
 

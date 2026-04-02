@@ -98,48 +98,63 @@ fn Adsr::tick_with_sample_rate(self : Adsr, sample_rate : Double) -> Double {
     return 0.0
   }
 
-  match self.stage {
-    Idle => self.level = 0.0
-    Attack =>
-      if self.attack_ms <= 0.0 {
-        self.level = 1.0
-        self.stage = EnvStage::Decay
-        return self.tick_with_sample_rate(sample_rate)
-      } else {
-        self.level += 1000.0 / (self.attack_ms * sample_rate)
-        if self.level >= 1.0 {
+  // WHY bounded loop: zero-time stages (e.g. attack_ms=0) advance to the next
+  // stage without producing a sample. The loop re-evaluates until a non-zero
+  // stage is reached. Bound of 4 = number of ADSR stages, guaranteeing termination.
+  for transitions = 0; transitions < 4; transitions = transitions + 1 {
+    match self.stage {
+      Idle => {
+        self.level = 0.0
+        break
+      }
+      Attack =>
+        if self.attack_ms <= 0.0 {
           self.level = 1.0
           self.stage = EnvStage::Decay
+          continue
+        } else {
+          self.level += 1000.0 / (self.attack_ms * sample_rate)
+          if self.level >= 1.0 {
+            self.level = 1.0
+            self.stage = EnvStage::Decay
+          }
+          break
         }
-      }
-    Decay =>
-      if self.decay_ms <= 0.0 {
-        self.level = self.sustain
-        self.stage = EnvStage::Sustain
-        return self.tick_with_sample_rate(sample_rate)
-      } else {
-        self.level -= (1.0 - self.sustain) *
-          1000.0 /
-          (self.decay_ms * sample_rate)
-        if self.level <= self.sustain {
+      Decay =>
+        if self.decay_ms <= 0.0 {
           self.level = self.sustain
           self.stage = EnvStage::Sustain
+          continue
+        } else {
+          self.level -= (1.0 - self.sustain) *
+            1000.0 /
+            (self.decay_ms * sample_rate)
+          if self.level <= self.sustain {
+            self.level = self.sustain
+            self.stage = EnvStage::Sustain
+          }
+          break
         }
+      Sustain => {
+        self.level = self.sustain
+        break
       }
-    Sustain => self.level = self.sustain
-    Release =>
-      if self.release_ms <= 0.0 || self.level_at_release <= 0.0 {
-        self.level = 0.0
-        self.stage = EnvStage::Idle
-      } else {
-        self.level -= self.level_at_release *
-          1000.0 /
-          (self.release_ms * sample_rate)
-        if self.level <= 0.0 {
+      Release => {
+        if self.release_ms <= 0.0 || self.level_at_release <= 0.0 {
           self.level = 0.0
           self.stage = EnvStage::Idle
+        } else {
+          self.level -= self.level_at_release *
+            1000.0 /
+            (self.release_ms * sample_rate)
+          if self.level <= 0.0 {
+            self.level = 0.0
+            self.stage = EnvStage::Idle
+          }
         }
+        break
       }
+    }
   }
   self.level
 }

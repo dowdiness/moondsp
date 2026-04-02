@@ -1,3 +1,35 @@
+/// # Threading Contract for Browser WASM Exports
+///
+/// All exported functions assume **single-threaded access** per graph variant.
+/// The `@ref.Ref` globals below carry mutable graph state across JavaScript
+/// calls and provide no synchronization primitives.
+///
+/// ## Expected call pattern
+///
+/// 1. **`init_*_graph(sample_rate, block_size)`** -- call once from the main
+///    thread before audio starts. This allocates the graph, context, and
+///    output buffers.
+/// 2. **`process_*_block(...)`** -- call from the AudioWorklet `process()`
+///    callback (audio thread). Must not overlap with any other call on the
+///    same graph variant.
+/// 3. **`queue_*` / `set_*`** -- call from the main thread only between
+///    process calls. Use AudioWorklet `port.postMessage` to synchronize.
+/// 4. **`*_sample(index)`** -- call only after `process_*_block` returns
+///    `true` and before the next process call, to read output samples.
+///
+/// ## No concurrent access guarantee
+///
+/// If `init_*` is called while `process_*` is executing, behavior is
+/// undefined (potential use-after-free of graph state). The same applies to
+/// any pair of exported functions that touch the same `@ref.Ref` globals
+/// concurrently.
+///
+/// ## Re-initialization
+///
+/// Calling `init_*` with different `sample_rate`/`block_size` rebuilds the
+/// graph from scratch; the old graph is discarded. This must never happen
+/// during a `process_*` call.
+
 ///|
 /// Browser-export wrapper package that preserves the original Phase 0/1 wasm ABI.
 fn main {
