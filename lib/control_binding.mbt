@@ -87,7 +87,10 @@ pub fn ControlBindingBuilder::build(
     }
     seen_keys[binding.key] = true
   }
-  Ok({ bindings: self.bindings })
+  // WHY copy: self.bindings is a mutable Array shared with the builder.
+  // Without copying, post-build bind() calls would mutate the validated map,
+  // breaking the proven-valid invariant.
+  Ok({ bindings: self.bindings.copy() })
 }
 
 ///|

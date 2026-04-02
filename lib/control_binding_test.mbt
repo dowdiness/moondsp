@@ -172,3 +172,17 @@ test "integration: resolved controls accepted by VoicePool::note_on" {
   assert_true(handle is Some(_))
   assert_true(pool.voice_state(handle.unwrap()) is VoiceState::Active)
 }
+
+///|
+test "build: post-build bind does not mutate validated map" {
+  let template = [DspNode::constant(1.0), DspNode::output(0)]
+  let builder = ControlBindingBuilder::new().bind(
+    key="freq",
+    node_index=0,
+    slot=GraphParamSlot::Value0,
+  )
+  let map = builder.build(template).unwrap()
+  // Mutate the builder after build — must not affect the validated map
+  ignore(builder.bind(key="extra", node_index=0, slot=GraphParamSlot::Value0))
+  assert_eq(map.bindings.length(), 1)
+}
