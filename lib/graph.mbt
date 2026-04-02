@@ -1433,6 +1433,7 @@ pub fn CompiledStereoDsp::process(
     reset_graph_env_states(self.0.env_states)
     left_output.fill(0.0)
     right_output.fill(0.0)
+    self.0.last_sanitized_count = 0
     return
   }
   if sample_count <= 0 || sample_count > self.compiled_buffer_capacity() {
@@ -1441,12 +1442,15 @@ pub fn CompiledStereoDsp::process(
     clear_compiled_buffers(self.0.right_buffers)
     left_output.fill(0.0)
     right_output.fill(0.0)
+    self.0.last_sanitized_count = 0
     return
   }
   if self.0.feedback_edges.length() > 0 {
     self.process_feedback_graph(
       context, left_output, right_output, sample_count,
     )
+    self.0.last_sanitized_count = sanitize_buffer(left_output, sample_count) +
+      sanitize_buffer(right_output, sample_count)
     return
   }
 
@@ -1608,6 +1612,8 @@ pub fn CompiledStereoDsp::process(
     right_output,
     sample_count,
   )
+  self.0.last_sanitized_count = sanitize_buffer(left_output, sample_count) +
+    sanitize_buffer(right_output, sample_count)
 }
 
 ///|

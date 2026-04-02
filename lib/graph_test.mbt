@@ -2015,3 +2015,18 @@ test "process: last_sanitized_count resets each call" {
   compiled.process(context, output)
   assert_eq(compiled.last_sanitized_count(), 0)
 }
+
+///|
+test "stereo process: clean graph has zero sanitized count" {
+  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let nodes = [
+    DspNode::constant(1.0),
+    DspNode::pan(0, 0.0),
+    DspNode::stereo_output(1),
+  ]
+  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let left = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+  let right = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+  compiled.process(context, left, right)
+  assert_eq(compiled.last_sanitized_count(), 0)
+}
