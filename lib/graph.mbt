@@ -29,7 +29,7 @@ pub(all) enum GraphParamSlot {
   Value2
   Value3
   DelaySamples
-} derive(Eq)
+} derive(Eq, Show)
 
 ///|
 /// Unified runtime control kinds for compiled graphs.
@@ -2260,6 +2260,33 @@ fn valid_delay_feedback(value : Double) -> Bool {
 /// (`valid_any_node_inputs`) and runtime (`updated_node_param`) paths.
 fn valid_delay_samples(delay_samples : Int, delay_max_samples : Int) -> Bool {
   delay_samples >= 0 && delay_samples <= delay_max_samples
+}
+
+///|
+/// Structural check: does this node kind accept SetParam on the given slot?
+/// Used by ControlBindingBuilder::build() to validate bindings at graph
+/// construction time. Does not check value-domain constraints.
+pub fn node_accepts_slot(node : DspNode, slot : GraphParamSlot) -> Bool {
+  match node.kind {
+    Constant => slot is Value0
+    Oscillator => node.input0 < 0 && slot is Value0
+    Noise => false
+    Adsr => false
+    Biquad => slot is Value0 || slot is Value1
+    Delay => slot is Value0 || slot is DelaySamples
+    Gain => slot is Value0
+    Mul => false
+    Mix => false
+    Clip => slot is Value0
+    Output => false
+    Pan => slot is Value0
+    StereoGain => slot is Value0
+    StereoClip => slot is Value0
+    StereoBiquad => slot is Value0 || slot is Value1
+    StereoDelay => slot is Value0 || slot is DelaySamples
+    StereoMixDown => false
+    StereoOutput => false
+  }
 }
 
 ///|

@@ -14,6 +14,8 @@ pub fn[T : ArithSym] lin_map(T, Double, Double, Double, Double) -> T
 
 pub fn mono_shape() -> Int
 
+pub fn node_accepts_slot(DspNode, GraphParamSlot) -> Bool
+
 pub fn optimize_graph(Array[DspNode]) -> (Array[DspNode], FixedArray[Int])
 
 pub fn[T : ArithSym] range(T, Double, Double) -> T
@@ -137,6 +139,35 @@ pub fn CompiledStereoDspTopologyController::from_nodes(Array[DspNode], DspContex
 pub fn CompiledStereoDspTopologyController::process(Self, DspContext, AudioBuffer, AudioBuffer) -> Unit
 pub fn CompiledStereoDspTopologyController::queue_topology_edit(Self, GraphTopologyEdit) -> Bool
 pub fn CompiledStereoDspTopologyController::queue_topology_edits(Self, Array[GraphTopologyEdit]) -> Bool
+
+pub struct ControlBinding {
+  key : String
+  node_index : Int
+  slot : GraphParamSlot
+
+  fn new(key~ : String, node_index~ : Int, slot~ : GraphParamSlot) -> ControlBinding
+} derive(Eq, Show)
+
+pub struct ControlBindingBuilder {
+  bindings : Array[ControlBinding]
+
+  fn new() -> ControlBindingBuilder
+} derive(Show)
+pub fn ControlBindingBuilder::bind(Self, key~ : String, node_index~ : Int, slot~ : GraphParamSlot) -> Self
+pub fn ControlBindingBuilder::build(Self, Array[DspNode]) -> Result[ControlBindingMap, ControlBindingError]
+pub fn ControlBindingBuilder::new() -> Self
+
+pub(all) enum ControlBindingError {
+  InvalidNodeIndex(Int)
+  InvalidSlotForNode(Int, GraphParamSlot)
+  DuplicateKey(String)
+} derive(Eq, Show)
+
+pub struct ControlBindingMap {
+  // private fields
+} derive(Eq, Show)
+pub fn ControlBindingMap::length(Self) -> Int
+pub fn ControlBindingMap::resolve_controls(Self, Map[String, Double]) -> Array[GraphControl]
 
 pub struct DelayLine {
   buffer : FixedArray[Double]
@@ -280,7 +311,7 @@ pub(all) enum GraphParamSlot {
   Value2
   Value3
   DelaySamples
-} derive(Eq)
+} derive(Eq, Show)
 
 pub struct GraphTopologyEdit {
   kind : GraphTopologyEditKind
