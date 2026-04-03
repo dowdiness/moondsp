@@ -11,7 +11,7 @@ struct ActiveNote {
 
 ///|
 pub struct PatternScheduler {
-  bpm : Double
+  mut bpm : Double
   mut sample_counter : Int64
   ctx : @lib.DspContext
   active_notes : Array[ActiveNote]
@@ -44,6 +44,13 @@ pub fn PatternScheduler::sample_counter(self : PatternScheduler) -> Int64 {
 ///|
 pub fn PatternScheduler::active_note_count(self : PatternScheduler) -> Int {
   self.active_notes.length()
+}
+
+///|
+/// Update tempo in-place. Active notes continue with existing gate-off times —
+/// those cycle positions simply arrive faster/slower with the new BPM.
+pub fn PatternScheduler::set_bpm(self : PatternScheduler, bpm : Double) -> Unit {
+  self.bpm = if bpm < 1.0 { 1.0 } else { bpm }
 }
 
 ///|
