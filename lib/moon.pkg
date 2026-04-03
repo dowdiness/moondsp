@@ -1,8 +1,11 @@
 import {
   "moonbitlang/core/bench" @bench,
-  "moonbitlang/core/double" @double,
   "moonbitlang/core/int" @int,
   "moonbitlang/core/math" @math,
   "moonbitlang/core/ref" @ref,
-  "moonbitlang/quickcheck" @qc,
 }
+
+import {
+  "moonbitlang/core/double" @double,
+  "moonbitlang/quickcheck" @qc,
+} for "test"
