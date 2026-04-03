@@ -23,7 +23,7 @@ Single module `dowdiness/mdsp` with packages:
 ## Commands
 
 ```bash
-moon check && moon test        # 469 tests
+moon check && moon test        # 470 tests
 moon build --target wasm-gc    # Browser WASM build
 moon run cmd/main              # CLI entry point
 ```
