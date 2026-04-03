@@ -11,7 +11,7 @@ struct ActiveNote {
 
 ///|
 pub struct PatternScheduler {
-  bpm : Double
+  mut bpm : Double
   mut sample_counter : Int64
   ctx : @lib.DspContext
   active_notes : Array[ActiveNote]
@@ -25,15 +25,28 @@ pub struct PatternScheduler {
 }
 
 ///|
+/// Reject NaN/Inf and clamp to minimum 1.0 BPM.
+fn sanitize_bpm(bpm : Double) -> Double {
+  if bpm.is_nan() || bpm.is_inf() || bpm < 1.0 {
+    1.0
+  } else {
+    bpm
+  }
+}
+
+///|
 pub fn PatternScheduler::new(
   bpm~ : Double,
   bindings~ : @lib.ControlBindingMap,
   ctx~ : @lib.DspContext,
 ) -> PatternScheduler {
-  // WHY clamp: BPM <= 0 produces degenerate arcs (empty or reversed).
-  // Clamp to 1.0 minimum to guarantee forward progress.
-  let safe_bpm = if bpm < 1.0 { 1.0 } else { bpm }
-  { bpm: safe_bpm, sample_counter: 0L, ctx, active_notes: [], bindings }
+  {
+    bpm: sanitize_bpm(bpm),
+    sample_counter: 0L,
+    ctx,
+    active_notes: [],
+    bindings,
+  }
 }
 
 ///|
@@ -44,6 +57,13 @@ pub fn PatternScheduler::sample_counter(self : PatternScheduler) -> Int64 {
 ///|
 pub fn PatternScheduler::active_note_count(self : PatternScheduler) -> Int {
   self.active_notes.length()
+}
+
+///|
+/// Update tempo in-place. Active notes continue with existing gate-off times —
+/// those cycle positions simply arrive faster/slower with the new BPM.
+pub fn PatternScheduler::set_bpm(self : PatternScheduler, bpm : Double) -> Unit {
+  self.bpm = sanitize_bpm(bpm)
 }
 
 ///|

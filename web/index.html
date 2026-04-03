@@ -252,7 +252,28 @@
 
     <div class="buttons">
       <button id="startBtn">Start Audio</button>
+      <button id="btnScheduler" onclick="startScheduler()">Scheduler</button>
       <button id="stopBtn" class="secondary" disabled>Stop</button>
+    </div>
+
+    <div id="schedulerControls" style="display: none; margin-top: 10px;">
+      <div style="margin-bottom: 8px;">
+        <label>Pattern: </label>
+        <button onclick="setSchedulerPattern(0)">Single Note</button>
+        <button onclick="setSchedulerPattern(1)">Arpeggio</button>
+        <button onclick="setSchedulerPattern(2)">Chord</button>
+        <button onclick="setSchedulerPattern(3)">Fast</button>
+      </div>
+      <div style="margin-bottom: 8px;">
+        <label>BPM: <span id="bpmValue">120</span></label>
+        <input type="range" id="bpmSlider" min="60" max="240" value="120"
+               oninput="setSchedulerBpm(this.value)">
+      </div>
+      <div style="margin-bottom: 8px;">
+        <label>Gain: <span id="schedulerGainValue">0.30</span></label>
+        <input type="range" id="schedulerGainSlider" min="0" max="100" value="30"
+               oninput="setSchedulerGain(this.value / 100)">
+      </div>
     </div>
 
     <section class="controls">
@@ -544,7 +565,7 @@
       draw();
     }
 
-    async function start() {
+    async function start(extraOptions = {}) {
       window.__mdspTelemetry = {
         sequence: 0,
         overallPeak: 0,
@@ -582,15 +603,19 @@
         const exports = WebAssembly.Module.exports(wasmModule).map((entry) => entry.name);
         console.log("wasm exports:", exports);
 
+        // When scheduler is requested, disable all other variant flags
+        // to ensure mutual exclusivity.
+        const isScheduler = Boolean(extraOptions.useScheduler);
         node = new AudioWorkletNode(audioContext, "moonbit-dsp", {
           processorOptions: {
             wasmModule,
             initialDelaySamples: Number(delaySlider.value),
-            useCompiledHotSwap,
-            useCompiledTopologyEdit,
-            useCompiledStereoHotSwap,
-            useCompiledStereoTopologyEdit,
-            useExitDeliverable,
+            useCompiledHotSwap: isScheduler ? false : useCompiledHotSwap,
+            useCompiledTopologyEdit: isScheduler ? false : useCompiledTopologyEdit,
+            useCompiledStereoHotSwap: isScheduler ? false : useCompiledStereoHotSwap,
+            useCompiledStereoTopologyEdit: isScheduler ? false : useCompiledStereoTopologyEdit,
+            useExitDeliverable: isScheduler ? false : useExitDeliverable,
+            ...extraOptions,
           },
           numberOfInputs: 0,
           numberOfOutputs: 1,
@@ -610,6 +635,8 @@
               ? "CompiledStereoDspHotSwap block runtime"
               : event.data.mode === "exit-deliverable-dsp"
               ? "Exit Deliverable FM Synthesis (Phase 2)"
+              : event.data.mode === "scheduler-dsp"
+              ? "Pattern Scheduler (Phase 5)"
               : event.data.mode === "compiled-stereo-dsp"
               ? "CompiledStereoDsp block runtime"
               : event.data.mode === "compiled-dsp"
@@ -711,6 +738,8 @@
       rightAnalyserData = null;
       startBtn.disabled = false;
       stopBtn.disabled = true;
+      document.getElementById('schedulerControls').style.display = 'none';
+      document.querySelector('.controls').style.display = '';
       resetMeter();
       window.__mdspTelemetry = {
         sequence: 0,
@@ -727,6 +756,34 @@
       window.__mdspStereoHotSwapQueued = null;
       window.__mdspStereoTopologyEditQueued = null;
       setStatus("Stopped.");
+    }
+
+    function startScheduler() {
+      if (!audioContext) {
+        document.getElementById('schedulerControls').style.display = 'block';
+        document.querySelector('.controls').style.display = 'none';
+        start({ useScheduler: true });
+      }
+    }
+
+    function setSchedulerPattern(index) {
+      if (node) {
+        node.port.postMessage({ type: 'set-scheduler-pattern', index: index });
+      }
+    }
+
+    function setSchedulerBpm(bpm) {
+      document.getElementById('bpmValue').textContent = bpm;
+      if (node) {
+        node.port.postMessage({ type: 'set-scheduler-bpm', bpm: Number(bpm) });
+      }
+    }
+
+    function setSchedulerGain(gain) {
+      document.getElementById('schedulerGainValue').textContent = gain.toFixed(2);
+      if (node) {
+        node.port.postMessage({ type: 'set-scheduler-gain', gain: gain });
+      }
     }
 
     startBtn.addEventListener("click", () => {

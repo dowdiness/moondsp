@@ -36,6 +36,8 @@ pub fn init_compiled_topology_edit_graph(Double, Int) -> Bool
 
 pub fn init_exit_deliverable_graph(Double, Int) -> Bool
 
+pub fn init_scheduler_graph(Double, Int) -> Bool
+
 pub fn process_compiled_block(Double, Double, Double, Int) -> Bool
 
 pub fn process_compiled_hot_swap_block(Double, Int) -> Bool
@@ -50,6 +52,8 @@ pub fn process_compiled_topology_edit_block(Double, Int) -> Bool
 
 pub fn process_exit_deliverable_block(Double, Int) -> Bool
 
+pub fn process_scheduler_block() -> Bool
+
 pub fn queue_compiled_hot_swap() -> Bool
 
 pub fn queue_compiled_stereo_hot_swap() -> Bool
@@ -62,6 +66,10 @@ pub fn queue_compiled_topology_edit() -> Bool
 
 pub fn reset_phase() -> Unit
 
+pub fn scheduler_left_sample(Int) -> Double
+
+pub fn scheduler_right_sample(Int) -> Double
+
 pub fn set_compiled_stereo_topology_edit_level(Double) -> Bool
 
 pub fn set_compiled_topology_edit_gain(Double) -> Bool
@@ -71,6 +79,12 @@ pub fn set_exit_deliverable_cutoff(Double) -> Bool
 pub fn set_exit_deliverable_gain(Double) -> Bool
 
 pub fn set_exit_deliverable_lfo_rate(Double) -> Bool
+
+pub fn set_scheduler_bpm(Double) -> Unit
+
+pub fn set_scheduler_gain(Double) -> Unit
+
+pub fn set_scheduler_pattern(Int) -> Unit
 
 pub fn tick(Double, Double) -> Double
 

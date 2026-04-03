@@ -17,7 +17,7 @@ pub fn midi_to_hz(Double) -> Double
 type ActiveNote
 
 pub struct PatternScheduler {
-  bpm : Double
+  mut bpm : Double
   mut sample_counter : Int64
   ctx : @lib.DspContext
   active_notes : Array[ActiveNote]
@@ -32,6 +32,7 @@ pub fn PatternScheduler::process_block(Self, @pattern.Pat[@pattern.ControlMap], 
 pub fn PatternScheduler::process_events(Self, Array[@pattern.Event[@pattern.ControlMap]], @pattern.TimeSpan, @lib.VoicePool) -> Unit
 pub fn PatternScheduler::push_active_note(Self, @lib.VoiceHandle, @pattern.Rational) -> Unit
 pub fn PatternScheduler::sample_counter(Self) -> Int64
+pub fn PatternScheduler::set_bpm(Self, Double) -> Unit
 
 // Type aliases
 

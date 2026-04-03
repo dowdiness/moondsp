@@ -118,6 +118,7 @@ pub fn reset_phase() -> Unit {
   reset_compiled_stereo_hot_swap_graph()
   reset_compiled_stereo_topology_edit_graph()
   reset_exit_deliverable_graph()
+  reset_scheduler_graph()
 }
 
 ///|
