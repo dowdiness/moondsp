@@ -18,7 +18,7 @@ type ActiveNote
 
 pub struct PatternScheduler {
   bpm : Double
-  sample_counter : Int64
+  mut sample_counter : Int64
   sample_rate : Int
   block_size : Int
   active_notes : Array[ActiveNote]
@@ -29,6 +29,7 @@ pub struct PatternScheduler {
 pub fn PatternScheduler::active_note_count(Self) -> Int
 pub fn PatternScheduler::expire_notes(Self, @lib.VoicePool, @pattern.TimeSpan) -> Unit
 pub fn PatternScheduler::new(bpm~ : Double, bindings~ : @lib.ControlBindingMap, ctx~ : @lib.DspContext) -> Self
+pub fn PatternScheduler::process_block(Self, @pattern.Pat[@pattern.ControlMap], @lib.VoicePool, @lib.DspContext, @lib.AudioBuffer, @lib.AudioBuffer) -> Unit
 pub fn PatternScheduler::process_events(Self, Array[@pattern.Event[@pattern.ControlMap]], @pattern.TimeSpan, @lib.VoicePool) -> Unit
 pub fn PatternScheduler::push_active_note(Self, @lib.VoiceHandle, @pattern.Rational) -> Unit
 pub fn PatternScheduler::sample_counter(Self) -> Int64

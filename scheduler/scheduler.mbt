@@ -8,7 +8,7 @@ struct ActiveNote {
 ///|
 pub struct PatternScheduler {
   bpm : Double
-  sample_counter : Int64
+  mut sample_counter : Int64
   sample_rate : Int
   block_size : Int
   active_notes : Array[ActiveNote]
@@ -137,6 +137,43 @@ pub fn PatternScheduler::process_events(
       }
     }
   }
+}
+
+///|
+/// Main entry point: called once per audio block.
+/// 1. Compute block arc from sample counter
+/// 2. Gate-off expired notes
+/// 3. Query pattern
+/// 4. Process note-ons (sorted, with pan and MIDI→Hz)
+/// 5. Advance sample counter
+/// 6. Zero buffers and render audio
+pub fn PatternScheduler::process_block(
+  self : PatternScheduler,
+  pat : @pattern.Pat[@pattern.ControlMap],
+  pool : @lib.VoicePool,
+  ctx : @lib.DspContext,
+  left : @lib.AudioBuffer,
+  right : @lib.AudioBuffer,
+) -> Unit {
+  // Step 1: compute block arc
+  let arc = compute_arc(
+    self.sample_counter,
+    self.bpm,
+    self.sample_rate,
+    self.block_size,
+  )
+  // Step 2: gate-off expired notes
+  self.expire_notes(pool, arc)
+  // Step 3: query pattern
+  let events = pat.query(arc)
+  // Step 4: process note-ons
+  self.process_events(events, arc, pool)
+  // Step 5: advance sample counter
+  self.sample_counter = self.sample_counter + self.block_size.to_int64()
+  // Step 6: zero buffers and render
+  left.fill(0.0)
+  right.fill(0.0)
+  pool.process(ctx, left, right)
 }
 
 ///|
