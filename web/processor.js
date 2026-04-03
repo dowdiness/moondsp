@@ -14,6 +14,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
     this.prefersCompiledStereoHotSwap = Boolean(options?.processorOptions?.useCompiledStereoHotSwap);
     this.prefersCompiledStereoTopologyEdit = Boolean(options?.processorOptions?.useCompiledStereoTopologyEdit);
     this.prefersExitDeliverable = Boolean(options?.processorOptions?.useExitDeliverable);
+    this.prefersScheduler = Boolean(options?.processorOptions?.useScheduler);
     this.usesCompiledHotSwap = false;
     this.usesCompiledTopologyEdit = false;
     this.usesCompiledStereoHotSwap = false;
@@ -21,6 +22,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
     this.usesExitDeliverable = false;
     this.usesCompiledStereoGraph = false;
     this.usesCompiledGraph = false;
+    this.usesScheduler = false;
     this.reportedRuntimeError = false;
     this.telemetryCountdown = 0;
     this.telemetryWarmupBlocks = 16;
@@ -45,6 +47,18 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
         this.delaySamples = Number(data.value);
       } else if (data.type === "set-cutoff") {
         this.cutoff = Number(data.value);
+      } else if (data.type === "set-scheduler-pattern") {
+        if (this.usesScheduler && this.wasm && typeof this.wasm.set_scheduler_pattern === "function") {
+          this.wasm.set_scheduler_pattern(Number(data.index));
+        }
+      } else if (data.type === "set-scheduler-bpm") {
+        if (this.usesScheduler && this.wasm && typeof this.wasm.set_scheduler_bpm === "function") {
+          this.wasm.set_scheduler_bpm(Number(data.bpm));
+        }
+      } else if (data.type === "set-scheduler-gain") {
+        if (this.usesScheduler && this.wasm && typeof this.wasm.set_scheduler_gain === "function") {
+          this.wasm.set_scheduler_gain(Number(data.gain));
+        }
       } else if (data.type === "queue-hot-swap") {
         if (this.usesCompiledHotSwap && this.wasm && typeof this.wasm.queue_compiled_hot_swap === "function") {
           const queued = this.wasm.queue_compiled_hot_swap();
@@ -235,6 +249,12 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
         typeof this.wasm.process_exit_deliverable_block === "function" &&
         typeof this.wasm.exit_deliverable_output_sample === "function";
 
+      const supportsScheduler =
+        typeof this.wasm.init_scheduler_graph === "function" &&
+        typeof this.wasm.process_scheduler_block === "function" &&
+        typeof this.wasm.scheduler_left_sample === "function" &&
+        typeof this.wasm.scheduler_right_sample === "function";
+
       if (
         !this.usesCompiledHotSwap &&
         !this.usesCompiledTopologyEdit &&
@@ -249,7 +269,22 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
         }
       }
 
-      if (!this.usesCompiledHotSwap && !this.usesCompiledTopologyEdit && !this.usesCompiledStereoTopologyEdit && !this.usesCompiledStereoHotSwap && !this.usesExitDeliverable && supportsCompiledStereoGraph) {
+      if (
+        !this.usesCompiledHotSwap &&
+        !this.usesCompiledTopologyEdit &&
+        !this.usesCompiledStereoTopologyEdit &&
+        !this.usesCompiledStereoHotSwap &&
+        !this.usesExitDeliverable &&
+        this.prefersScheduler &&
+        supportsScheduler
+      ) {
+        const initialized = this.wasm.init_scheduler_graph(sampleRate, 128);
+        if (initialized) {
+          this.usesScheduler = true;
+        }
+      }
+
+      if (!this.usesCompiledHotSwap && !this.usesCompiledTopologyEdit && !this.usesCompiledStereoTopologyEdit && !this.usesCompiledStereoHotSwap && !this.usesExitDeliverable && !this.usesScheduler && supportsCompiledStereoGraph) {
         const initialized = this.wasm.init_compiled_stereo_graph(sampleRate, 128);
         if (initialized) {
           this.usesCompiledStereoGraph = true;
@@ -262,6 +297,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
         !this.usesCompiledStereoTopologyEdit &&
         !this.usesCompiledStereoHotSwap &&
         !this.usesExitDeliverable &&
+        !this.usesScheduler &&
         !this.usesCompiledStereoGraph &&
         supportsCompiledGraph
       ) {
@@ -277,6 +313,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
         !this.usesCompiledStereoTopologyEdit &&
         !this.usesCompiledStereoHotSwap &&
         !this.usesExitDeliverable &&
+        !this.usesScheduler &&
         !this.usesCompiledStereoGraph &&
         !this.usesCompiledGraph &&
         (
@@ -285,6 +322,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
           supportsCompiledStereoTopologyEdit ||
           supportsCompiledStereoHotSwap ||
           supportsExitDeliverable ||
+          supportsScheduler ||
           supportsCompiledStereoGraph ||
           supportsCompiledGraph
         )
@@ -298,6 +336,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
         !this.usesCompiledStereoTopologyEdit &&
         !this.usesCompiledStereoHotSwap &&
         !this.usesExitDeliverable &&
+        !this.usesScheduler &&
         !this.usesCompiledStereoGraph &&
         !this.usesCompiledGraph &&
         typeof this.wasm.tick !== "function" &&
@@ -322,6 +361,8 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
             ? "compiled-stereo-hot-swap-dsp"
           : this.usesExitDeliverable
             ? "exit-deliverable-dsp"
+          : this.usesScheduler
+            ? "scheduler-dsp"
           : this.usesCompiledStereoGraph
           ? "compiled-stereo-dsp"
           : this.usesCompiledGraph
@@ -525,6 +566,31 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
         left[index] = this.wasm.compiled_stereo_hot_swap_left_sample(index);
         if (right) {
           right[index] = this.wasm.compiled_stereo_hot_swap_right_sample(index);
+        }
+      }
+
+      this.reportBlockTelemetry(left, right);
+      return true;
+    }
+
+    if (this.usesScheduler) {
+      const processed = this.wasm.process_scheduler_block();
+      if (!processed) {
+        this.fillSilence(left, right);
+        if (!this.reportedRuntimeError) {
+          this.reportedRuntimeError = true;
+          this.port.postMessage({
+            type: "error",
+            message: "Scheduler block processing failed",
+          });
+        }
+        return true;
+      }
+
+      for (let index = 0; index < left.length; index += 1) {
+        left[index] = this.wasm.scheduler_left_sample(index);
+        if (right) {
+          right[index] = this.wasm.scheduler_right_sample(index);
         }
       }
 
