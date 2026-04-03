@@ -1,5 +1,7 @@
 import {
   "dowdiness/mdsp/lib" @lib,
+  "dowdiness/mdsp/scheduler" @scheduler,
+  "dowdiness/mdsp/pattern" @pattern,
   "moonbitlang/core/ref" @ref,
 }
 
@@ -45,6 +47,13 @@ options(
         "set_exit_deliverable_lfo_rate",
         "set_exit_deliverable_cutoff",
         "set_exit_deliverable_gain",
+        "init_scheduler_graph",
+        "process_scheduler_block",
+        "scheduler_left_sample",
+        "scheduler_right_sample",
+        "set_scheduler_pattern",
+        "set_scheduler_bpm",
+        "set_scheduler_gain",
       ],
     },
     "wasm-gc": {
@@ -86,6 +95,13 @@ options(
         "set_exit_deliverable_lfo_rate",
         "set_exit_deliverable_cutoff",
         "set_exit_deliverable_gain",
+        "init_scheduler_graph",
+        "process_scheduler_block",
+        "scheduler_left_sample",
+        "scheduler_right_sample",
+        "set_scheduler_pattern",
+        "set_scheduler_bpm",
+        "set_scheduler_gain",
       ],
     },
   },
