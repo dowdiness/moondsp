@@ -603,15 +603,18 @@
         const exports = WebAssembly.Module.exports(wasmModule).map((entry) => entry.name);
         console.log("wasm exports:", exports);
 
+        // When scheduler is requested, disable all other variant flags
+        // to ensure mutual exclusivity.
+        const isScheduler = Boolean(extraOptions.useScheduler);
         node = new AudioWorkletNode(audioContext, "moonbit-dsp", {
           processorOptions: {
             wasmModule,
             initialDelaySamples: Number(delaySlider.value),
-            useCompiledHotSwap,
-            useCompiledTopologyEdit,
-            useCompiledStereoHotSwap,
-            useCompiledStereoTopologyEdit,
-            useExitDeliverable,
+            useCompiledHotSwap: isScheduler ? false : useCompiledHotSwap,
+            useCompiledTopologyEdit: isScheduler ? false : useCompiledTopologyEdit,
+            useCompiledStereoHotSwap: isScheduler ? false : useCompiledStereoHotSwap,
+            useCompiledStereoTopologyEdit: isScheduler ? false : useCompiledStereoTopologyEdit,
+            useExitDeliverable: isScheduler ? false : useExitDeliverable,
             ...extraOptions,
           },
           numberOfInputs: 0,
@@ -632,6 +635,8 @@
               ? "CompiledStereoDspHotSwap block runtime"
               : event.data.mode === "exit-deliverable-dsp"
               ? "Exit Deliverable FM Synthesis (Phase 2)"
+              : event.data.mode === "scheduler-dsp"
+              ? "Pattern Scheduler (Phase 5)"
               : event.data.mode === "compiled-stereo-dsp"
               ? "CompiledStereoDsp block runtime"
               : event.data.mode === "compiled-dsp"
@@ -733,6 +738,8 @@
       rightAnalyserData = null;
       startBtn.disabled = false;
       stopBtn.disabled = true;
+      document.getElementById('schedulerControls').style.display = 'none';
+      document.querySelector('.controls').style.display = '';
       resetMeter();
       window.__mdspTelemetry = {
         sequence: 0,
@@ -754,6 +761,7 @@
     function startScheduler() {
       if (!audioContext) {
         document.getElementById('schedulerControls').style.display = 'block';
+        document.querySelector('.controls').style.display = 'none';
         start({ useScheduler: true });
       }
     }

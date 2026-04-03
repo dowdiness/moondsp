@@ -74,6 +74,8 @@ fn reset_scheduler_graph() -> Unit {
   sched_scheduler.val = None
   sched_left.val = None
   sched_right.val = None
+  sched_pattern_index.val = 0
+  sched_gain.val = 0.3
 }
 
 ///|

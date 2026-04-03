@@ -67,7 +67,7 @@ Default BPM: 120.0. Default pattern index: 0.
 Main thread (JS)                    AudioWorklet (WASM)
 ─────────────────                   ───────────────────
 set_scheduler_pattern(2) ──msg──→   pattern_index = 2
-set_scheduler_bpm(140)   ──msg──→   recreate scheduler with new BPM
+set_scheduler_bpm(140)   ──msg──→   scheduler.set_bpm(140) in-place
 set_scheduler_gain(0.5)  ──msg──→   gain = 0.5
 
                                     process_scheduler_block():
@@ -83,7 +83,7 @@ Pattern objects live entirely in WASM. JS sends only an integer index. The sched
 
 ### BPM Changes
 
-`set_scheduler_bpm(bpm)` recreates the `PatternScheduler` with the new BPM. The sample counter resets to 0. Active notes in the voice pool continue sounding (they belong to the pool, not the scheduler). This is acceptable for a demo — seamless BPM transitions are out of scope.
+`set_scheduler_bpm(bpm)` calls `PatternScheduler::set_bpm(bpm)` to update the tempo in-place. The sample counter is preserved — no timeline reset, no voice interruption. Active notes continue with their existing gate-off cycle positions, which simply arrive faster or slower with the new BPM. This produces seamless, click-free tempo transitions.
 
 ### Gain
 
@@ -146,5 +146,5 @@ Exports gain 7 new functions (listed above).
 - Pattern serialization / parsing from JS
 - Dynamic voice template changes from JS
 - Per-voice parameter control from JS
-- Seamless BPM transitions (sample counter resets)
+- Fractional-sample-accurate BPM transitions (current in-place update is block-quantized)
 - New Playwright test scenarios (extend existing smoke test only)
