@@ -14,7 +14,7 @@
 
 ## File Structure
 
-```
+```text
 scheduler/
   moon.pkg              — package config with imports
   scheduler.mbt         — ActiveNote, PatternScheduler, midi_to_hz, process_block
@@ -69,7 +69,7 @@ test "midi_to_hz: MIDI 127" {
 
 Create `scheduler/moon.pkg`:
 
-```
+```text
 import {
   "dowdiness/mdsp/lib",
   "dowdiness/mdsp/pattern",

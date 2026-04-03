@@ -192,17 +192,17 @@ pub fn compute_arc(
   bpm : Double,
   ctx : @lib.DspContext,
 ) -> @pattern.TimeSpan {
-  // WHY truncate: BPM is stored as Double for API convenience, but
-  // converted to Int64 for exact rational arithmetic. Fractional BPM
-  // (e.g. 120.5) is truncated — acceptable for Phase 5, revisit if
-  // fractional BPM support is needed.
-  let bpm_int = bpm.to_int().to_int64()
-  let sr60 = ctx.sample_rate().to_int().to_int64() * 60L
+  // WHY scale by 10: BPM is a Double but Rational needs Int64. Multiplying
+  // by 10 preserves one decimal place (120.5 → 1205) which covers all
+  // standard tempos. The denominator becomes sample_rate * 600 instead of
+  // sample_rate * 60 — still well within Int64 range.
+  let bpm_scaled = (bpm * 10.0).to_int64()
+  let sr600 = ctx.sample_rate().to_int().to_int64() * 600L
   let block_size = ctx.block_size().to_int64()
-  let arc_start = @pattern.Rational::new(sample_counter * bpm_int, sr60)
+  let arc_start = @pattern.Rational::new(sample_counter * bpm_scaled, sr600)
   let arc_end = @pattern.Rational::new(
-    (sample_counter + block_size) * bpm_int,
-    sr60,
+    (sample_counter + block_size) * bpm_scaled,
+    sr600,
   )
   @pattern.TimeSpan::new(arc_start, arc_end)
 }

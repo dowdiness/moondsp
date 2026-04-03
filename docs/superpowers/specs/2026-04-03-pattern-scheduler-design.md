@@ -36,8 +36,7 @@ struct ActiveNote {
 pub struct PatternScheduler {
   bpm : Double
   sample_counter : Int64         // total samples elapsed — monotonic, drift-free
-  sample_rate : Int              // integer Hz (e.g. 48000)
-  block_size : Int
+  ctx : DspContext               // pinned at construction — sample rate and block size
   active_notes : Array[ActiveNote]
   bindings : ControlBindingMap
 }
@@ -45,14 +44,15 @@ pub struct PatternScheduler {
 
 Constructor: `PatternScheduler::new(bpm~ : Double, bindings~ : ControlBindingMap, ctx~ : DspContext) -> PatternScheduler`
 
-Takes `sample_rate` and `block_size` from the `DspContext`. BPM stays as `Double` — it is only used to compute the cycle-time arc each block, not accumulated.
+Stores the `DspContext` to pin `sample_rate` and `block_size` for the scheduler's lifetime — prevents silent retiming if a different context were passed per block. BPM is clamped to a minimum of 1.0 to prevent degenerate arcs.
 
 **Timing model:** Position is derived each block from an integer `sample_counter`, not accumulated as `Rational`. The arc is computed as:
 ```
-arc_start = Rational::new(sample_counter * bpm_int, sample_rate * 60)
-arc_end   = Rational::new((sample_counter + block_size) * bpm_int, sample_rate * 60)
+bpm_scaled = bpm * 10  // scaled to preserve one decimal place
+arc_start = Rational::new(sample_counter * bpm_scaled, sample_rate * 600)
+arc_end   = Rational::new((sample_counter + block_size) * bpm_scaled, sample_rate * 600)
 ```
-where `bpm_int` is BPM truncated to integer (e.g. 120). This avoids cumulative drift and keeps `Rational` denominators bounded. The sample counter is `Int64`, supporting ~6 million hours at 48kHz before overflow.
+BPM is scaled by 10 to preserve one decimal place of precision (e.g. 120.5 → 1205). This avoids cumulative drift and keeps `Rational` denominators bounded. The sample counter is `Int64`, supporting ~6 million hours at 48kHz before overflow.
 
 ### midi_to_hz
 
@@ -62,7 +62,7 @@ Formula: `440.0 * 2^((midi - 69) / 12)`
 
 ## process_block Flow
 
-`PatternScheduler::process_block(self, pat : Pat[ControlMap], pool : VoicePool, ctx : DspContext, left : AudioBuffer, right : AudioBuffer) -> Unit`
+`PatternScheduler::process_block(self, pat : Pat[ControlMap], pool : VoicePool, left : AudioBuffer, right : AudioBuffer) -> Unit`
 
 Called once per audio block (128 samples at 48kHz). Six steps:
 
@@ -71,13 +71,13 @@ Called once per audio block (128 samples at 48kHz). Six steps:
 Derive the cycle-time arc `[start, end)` from the integer sample counter each block.
 
 ```
-bpm_int = bpm.to_int()  // truncated integer BPM
-arc_start = Rational::new(sample_counter * bpm_int, sample_rate * 60)
-arc_end   = Rational::new((sample_counter + block_size) * bpm_int, sample_rate * 60)
+bpm_scaled = bpm * 10  // scaled to preserve one decimal place
+arc_start = Rational::new(sample_counter * bpm_scaled, sample_rate * 600)
+arc_end   = Rational::new((sample_counter + block_size) * bpm_scaled, sample_rate * 600)
 arc = TimeSpan::new(arc_start, arc_end)
 ```
 
-Position is derived, not accumulated — no floating-point drift. `Rational` denominators are bounded by `sample_rate * 60` (e.g. 2,880,000 for 48kHz).
+Position is derived, not accumulated — no floating-point drift. BPM is scaled by 10 to preserve one decimal place (120.5 → 1205). `Rational` denominators are bounded by `sample_rate * 600` (e.g. 28,800,000 for 48kHz). Uses pinned `ctx` for `sample_rate` and `block_size`.
 
 ### Step 2: Gate-off expired notes
 
@@ -124,7 +124,7 @@ Integer counter — no drift, no overflow concern for practical session lengths.
 
 ### Step 6: Render audio
 
-Zero `left` and `right` output buffers, then call `pool.process(ctx, left, right)`.
+Zero `left` and `right` output buffers, then call `pool.process(self.ctx, left, right)`.
 
 `VoicePool::process` mixes (adds) into output buffers — it does not zero them. The scheduler is responsible for clearing buffers each block before mixdown.
 
@@ -170,9 +170,9 @@ All tests use real `VoicePool` with a minimal template (single oscillator + ADSR
 
 ## File Layout
 
-```
+```text
 scheduler/
-  moon.pkg.json          — imports: ["dowdiness/mdsp/lib", "dowdiness/mdsp/pattern"]
+  moon.pkg               — imports: dowdiness/mdsp/lib, dowdiness/mdsp/pattern, moonbitlang/core/math
   scheduler.mbt          — PatternScheduler, ActiveNote, midi_to_hz, process_block
   scheduler_test.mbt     — unit, integration, and edge case tests
 ```

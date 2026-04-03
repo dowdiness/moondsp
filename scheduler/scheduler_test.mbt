@@ -37,8 +37,8 @@ test "PatternScheduler::new initializes with zero position" {
   match bindings {
     Ok(b) => {
       let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b, ctx~)
-      inspect(sched.sample_counter(), content="0")
-      inspect(sched.active_note_count(), content="0")
+      assert_eq(sched.sample_counter(), 0L)
+      assert_eq(sched.active_note_count(), 0)
     }
     Err(_) => assert_true(false)
   }
@@ -62,6 +62,19 @@ test "compute_arc: second block at 120 BPM" {
   let expected_end = @pattern.Rational::new(30720L, 2880000L)
   assert_true(arc.begin == expected_start)
   assert_true(arc.end_ == expected_end)
+}
+
+///|
+test "compute_arc: fractional BPM 120.5 preserves precision" {
+  let ctx = @lib.DspContext::new(48000.0, 128)
+  // 120.5 BPM → bpm_scaled = 1205, denominator = 48000 * 600 = 28800000
+  // arc_end = 128 * 1205 / 28800000 = 154240 / 28800000
+  let arc = @scheduler.compute_arc(0L, 120.5, ctx)
+  let expected_end = @pattern.Rational::new(154240L, 28800000L)
+  assert_true(arc.end_ == expected_end)
+  // Verify 120.5 and 120.0 produce different arcs
+  let arc_120 = @scheduler.compute_arc(0L, 120.0, ctx)
+  assert_true(arc.end_ != arc_120.end_)
 }
 
 ///|
@@ -120,13 +133,13 @@ test "expire_notes: removes notes past their end_time" {
         None => assert_true(false)
         Some(h) => {
           sched.push_active_note(h, @pattern.Rational::from_int(0))
-          inspect(sched.active_note_count(), content="1")
+          assert_eq(sched.active_note_count(), 1)
           let arc = @pattern.TimeSpan::new(
             @pattern.Rational::from_int(1),
             @pattern.Rational::from_int(2),
           )
           sched.expire_notes(pool, arc)
-          inspect(sched.active_note_count(), content="0")
+          assert_eq(sched.active_note_count(), 0)
         }
       }
     }
@@ -142,8 +155,8 @@ test "process_events: single note-on creates active voice" {
   )
   let events = @pattern.note(60.0).query(arc)
   sched.process_events(events, arc, pool)
-  inspect(sched.active_note_count(), content="1")
-  inspect(pool.active_voice_count(), content="1")
+  assert_eq(sched.active_note_count(), 1)
+  assert_eq(pool.active_voice_count(), 1)
 }
 
 ///|
@@ -151,9 +164,9 @@ test "process_block: note(60) triggers one voice" {
   let (pool, sched, left, right) = make_test_sched()
   let pat = @pattern.note(60.0)
   sched.process_block(pat, pool, left, right)
-  inspect(pool.active_voice_count(), content="1")
-  inspect(sched.active_note_count(), content="1")
-  inspect(sched.sample_counter(), content="128")
+  assert_eq(pool.active_voice_count(), 1)
+  assert_eq(sched.active_note_count(), 1)
+  assert_eq(sched.sample_counter(), 128L)
 }
 
 ///|
@@ -161,8 +174,8 @@ test "process_block: empty pattern triggers no voices" {
   let (pool, sched, left, right) = make_test_sched()
   let pat : @pattern.Pat[@pattern.ControlMap] = @pattern.Pat::silence()
   sched.process_block(pat, pool, left, right)
-  inspect(pool.active_voice_count(), content="0")
-  inspect(sched.active_note_count(), content="0")
+  assert_eq(pool.active_voice_count(), 0)
+  assert_eq(sched.active_note_count(), 0)
 }
 
 ///|
@@ -186,12 +199,12 @@ test "process_block: gate-off fires after note ends" {
   let (pool, sched, left, right) = make_test_sched()
   let pat = @pattern.note(60.0)
   sched.process_block(pat, pool, left, right)
-  inspect(sched.active_note_count(), content="1")
+  assert_eq(sched.active_note_count(), 1)
   for _i = 1; _i < 190; _i = _i + 1 {
     sched.process_block(pat, pool, left, right)
   }
   // After crossing cycle boundary, old note expired, new one triggered
-  inspect(sched.active_note_count(), content="1")
+  assert_eq(sched.active_note_count(), 1)
 }
 
 ///|
@@ -199,8 +212,8 @@ test "process_block: pan key applies per-voice pan" {
   let (pool, sched, left, right) = make_test_sched()
   let pat = @pattern.merge_control(@pattern.note(60.0), @pattern.s_pan(-1.0))
   sched.process_block(pat, pool, left, right)
-  inspect(pool.active_voice_count(), content="1")
-  inspect(sched.active_note_count(), content="1")
+  assert_eq(pool.active_voice_count(), 1)
+  assert_eq(sched.active_note_count(), 1)
 }
 
 ///|
