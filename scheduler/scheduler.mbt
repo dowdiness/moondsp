@@ -13,18 +13,27 @@ struct ActiveNote {
 pub struct PatternScheduler {
   bpm : Double
   mut sample_counter : Int64
+  ctx : @lib.DspContext
   active_notes : Array[ActiveNote]
   bindings : @lib.ControlBindingMap
 
-  fn new(bpm~ : Double, bindings~ : @lib.ControlBindingMap) -> PatternScheduler
+  fn new(
+    bpm~ : Double,
+    bindings~ : @lib.ControlBindingMap,
+    ctx~ : @lib.DspContext,
+  ) -> PatternScheduler
 }
 
 ///|
 pub fn PatternScheduler::new(
   bpm~ : Double,
   bindings~ : @lib.ControlBindingMap,
+  ctx~ : @lib.DspContext,
 ) -> PatternScheduler {
-  { bpm, sample_counter: 0L, active_notes: [], bindings }
+  // WHY clamp: BPM <= 0 produces degenerate arcs (empty or reversed).
+  // Clamp to 1.0 minimum to guarantee forward progress.
+  let safe_bpm = if bpm < 1.0 { 1.0 } else { bpm }
+  { bpm: safe_bpm, sample_counter: 0L, ctx, active_notes: [], bindings }
 }
 
 ///|
@@ -157,18 +166,17 @@ pub fn PatternScheduler::process_block(
   self : PatternScheduler,
   pat : @pattern.Pat[@pattern.ControlMap],
   pool : @lib.VoicePool,
-  ctx : @lib.DspContext,
   left : @lib.AudioBuffer,
   right : @lib.AudioBuffer,
 ) -> Unit {
-  let arc = compute_arc(self.sample_counter, self.bpm, ctx)
+  let arc = compute_arc(self.sample_counter, self.bpm, self.ctx)
   self.expire_notes(pool, arc)
   let events = pat.query(arc)
   self.process_events(events, arc, pool)
-  self.sample_counter = self.sample_counter + ctx.block_size().to_int64()
+  self.sample_counter = self.sample_counter + self.ctx.block_size().to_int64()
   left.fill(0.0)
   right.fill(0.0)
-  pool.process(ctx, left, right)
+  pool.process(self.ctx, left, right)
 }
 
 ///|

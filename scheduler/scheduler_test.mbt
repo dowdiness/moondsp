@@ -30,12 +30,13 @@ test "PatternScheduler::new initializes with zero position" {
     @lib.DspNode::adsr(0.01, 0.1, 0.7, 0.3),
     @lib.DspNode::output(1),
   ]
+  let ctx = @lib.DspContext::new(48000.0, 128)
   let bindings = @lib.ControlBindingBuilder::new()
     .bind(key="note", node_index=0, slot=@lib.GraphParamSlot::Value0)
     .build(template)
   match bindings {
     Ok(b) => {
-      let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b)
+      let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b, ctx~)
       inspect(sched.sample_counter(), content="0")
       inspect(sched.active_note_count(), content="0")
     }
@@ -85,7 +86,6 @@ fn make_test_pool() -> (@lib.VoicePool, Array[@lib.DspNode], @lib.DspContext) {
 fn make_test_sched() -> (
   @lib.VoicePool,
   @scheduler.PatternScheduler,
-  @lib.DspContext,
   @lib.AudioBuffer,
   @lib.AudioBuffer,
 ) {
@@ -95,10 +95,10 @@ fn make_test_sched() -> (
     .build(template)
   match bindings {
     Ok(b) => {
-      let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b)
+      let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b, ctx~)
       let left = @lib.AudioBuffer::filled(128)
       let right = @lib.AudioBuffer::filled(128)
-      (pool, sched, ctx, left, right)
+      (pool, sched, left, right)
     }
     Err(_) => abort("test bindings creation failed")
   }
@@ -113,7 +113,7 @@ test "expire_notes: removes notes past their end_time" {
   match bindings {
     Err(_) => assert_true(false)
     Ok(b) => {
-      let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b)
+      let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b, ctx~)
       let controls = b.resolve_controls({ "note": 440.0 })
       let handle = pool.note_on(controls)
       match handle {
@@ -135,7 +135,7 @@ test "expire_notes: removes notes past their end_time" {
 
 ///|
 test "process_events: single note-on creates active voice" {
-  let (pool, sched, ctx, _, _) = make_test_sched()
+  let (pool, sched, _, _) = make_test_sched()
   let arc = @pattern.TimeSpan::new(
     @pattern.Rational::from_int(0),
     @pattern.Rational::new(1L, 100L),
@@ -148,9 +148,9 @@ test "process_events: single note-on creates active voice" {
 
 ///|
 test "process_block: note(60) triggers one voice" {
-  let (pool, sched, ctx, left, right) = make_test_sched()
+  let (pool, sched, left, right) = make_test_sched()
   let pat = @pattern.note(60.0)
-  sched.process_block(pat, pool, ctx, left, right)
+  sched.process_block(pat, pool, left, right)
   inspect(pool.active_voice_count(), content="1")
   inspect(sched.active_note_count(), content="1")
   inspect(sched.sample_counter(), content="128")
@@ -158,22 +158,22 @@ test "process_block: note(60) triggers one voice" {
 
 ///|
 test "process_block: empty pattern triggers no voices" {
-  let (pool, sched, ctx, left, right) = make_test_sched()
+  let (pool, sched, left, right) = make_test_sched()
   let pat : @pattern.Pat[@pattern.ControlMap] = @pattern.Pat::silence()
-  sched.process_block(pat, pool, ctx, left, right)
+  sched.process_block(pat, pool, left, right)
   inspect(pool.active_voice_count(), content="0")
   inspect(sched.active_note_count(), content="0")
 }
 
 ///|
 test "process_block: fast(2) triggers two voices per cycle" {
-  let (pool, sched, ctx, left, right) = make_test_sched()
+  let (pool, sched, left, right) = make_test_sched()
   let pat = @pattern.note(60.0).fast(@pattern.Rational::from_int(2))
-  sched.process_block(pat, pool, ctx, left, right)
+  sched.process_block(pat, pool, left, right)
   assert_true(pool.active_voice_count() >= 1)
   let mut voices_seen = pool.active_voice_count()
   for _i = 1; _i < 94; _i = _i + 1 {
-    sched.process_block(pat, pool, ctx, left, right)
+    sched.process_block(pat, pool, left, right)
     if pool.active_voice_count() > voices_seen {
       voices_seen = pool.active_voice_count()
     }
@@ -183,12 +183,12 @@ test "process_block: fast(2) triggers two voices per cycle" {
 
 ///|
 test "process_block: gate-off fires after note ends" {
-  let (pool, sched, ctx, left, right) = make_test_sched()
+  let (pool, sched, left, right) = make_test_sched()
   let pat = @pattern.note(60.0)
-  sched.process_block(pat, pool, ctx, left, right)
+  sched.process_block(pat, pool, left, right)
   inspect(sched.active_note_count(), content="1")
   for _i = 1; _i < 190; _i = _i + 1 {
-    sched.process_block(pat, pool, ctx, left, right)
+    sched.process_block(pat, pool, left, right)
   }
   // After crossing cycle boundary, old note expired, new one triggered
   inspect(sched.active_note_count(), content="1")
@@ -196,18 +196,18 @@ test "process_block: gate-off fires after note ends" {
 
 ///|
 test "process_block: pan key applies per-voice pan" {
-  let (pool, sched, ctx, left, right) = make_test_sched()
+  let (pool, sched, left, right) = make_test_sched()
   let pat = @pattern.merge_control(@pattern.note(60.0), @pattern.s_pan(-1.0))
-  sched.process_block(pat, pool, ctx, left, right)
+  sched.process_block(pat, pool, left, right)
   inspect(pool.active_voice_count(), content="1")
   inspect(sched.active_note_count(), content="1")
 }
 
 ///|
 test "process_block: dense pattern fires multiple note-ons per block" {
-  let (pool, sched, ctx, left, right) = make_test_sched()
+  let (pool, sched, left, right) = make_test_sched()
   let pat = @pattern.note(60.0).fast(@pattern.Rational::from_int(1000))
-  sched.process_block(pat, pool, ctx, left, right)
+  sched.process_block(pat, pool, left, right)
   assert_true(pool.active_voice_count() >= 1)
 }
 
@@ -230,12 +230,16 @@ test "process_block: stolen voice gate-off is harmless" {
       match bindings {
         Err(_) => assert_true(false)
         Ok(b) => {
-          let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b)
+          let sched = @scheduler.PatternScheduler::new(
+            bpm=120.0,
+            bindings=b,
+            ctx~,
+          )
           let pat = @pattern.note(60.0).fast(@pattern.Rational::from_int(2))
           let left = @lib.AudioBuffer::filled(128)
           let right = @lib.AudioBuffer::filled(128)
           for _i = 0; _i < 200; _i = _i + 1 {
-            sched.process_block(pat, pool, ctx, left, right)
+            sched.process_block(pat, pool, left, right)
           }
           assert_true(true)
         }
