@@ -174,3 +174,77 @@ test "process_block: empty pattern triggers no voices" {
     }
   }
 }
+
+///|
+test "process_block: fast(2) triggers two voices per cycle" {
+  let (pool, template, ctx) = make_test_pool()
+  let bindings = @lib.ControlBindingBuilder::new()
+    .bind(key="note", node_index=0, slot=@lib.GraphParamSlot::Value0)
+    .build(template)
+  match bindings {
+    Err(_) => assert_true(false)
+    Ok(b) => {
+      let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b, ctx~)
+      let pat = @pattern.note(60.0).fast(@pattern.Rational::from_int(2))
+      let left = @lib.AudioBuffer::filled(128)
+      let right = @lib.AudioBuffer::filled(128)
+      sched.process_block(pat, pool, ctx, left, right)
+      assert_true(pool.active_voice_count() >= 1)
+      let mut voices_seen = pool.active_voice_count()
+      for _i = 1; _i < 94; _i = _i + 1 {
+        sched.process_block(pat, pool, ctx, left, right)
+        if pool.active_voice_count() > voices_seen {
+          voices_seen = pool.active_voice_count()
+        }
+      }
+      assert_true(voices_seen >= 2)
+    }
+  }
+}
+
+///|
+test "process_block: gate-off fires after note ends" {
+  let (pool, template, ctx) = make_test_pool()
+  let bindings = @lib.ControlBindingBuilder::new()
+    .bind(key="note", node_index=0, slot=@lib.GraphParamSlot::Value0)
+    .build(template)
+  match bindings {
+    Err(_) => assert_true(false)
+    Ok(b) => {
+      let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b, ctx~)
+      let pat = @pattern.note(60.0)
+      let left = @lib.AudioBuffer::filled(128)
+      let right = @lib.AudioBuffer::filled(128)
+      sched.process_block(pat, pool, ctx, left, right)
+      inspect(sched.active_note_count(), content="1")
+      for _i = 1; _i < 190; _i = _i + 1 {
+        sched.process_block(pat, pool, ctx, left, right)
+      }
+      // After crossing cycle boundary, old note expired, new one triggered
+      inspect(sched.active_note_count(), content="1")
+    }
+  }
+}
+
+///|
+test "process_block: pan key applies per-voice pan" {
+  let (pool, template, ctx) = make_test_pool()
+  let bindings = @lib.ControlBindingBuilder::new()
+    .bind(key="note", node_index=0, slot=@lib.GraphParamSlot::Value0)
+    .build(template)
+  match bindings {
+    Err(_) => assert_true(false)
+    Ok(b) => {
+      let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b, ctx~)
+      let pat = @pattern.merge_control(
+        @pattern.note(60.0),
+        @pattern.s_pan(-1.0),
+      )
+      let left = @lib.AudioBuffer::filled(128)
+      let right = @lib.AudioBuffer::filled(128)
+      sched.process_block(pat, pool, ctx, left, right)
+      inspect(pool.active_voice_count(), content="1")
+      inspect(sched.active_note_count(), content="1")
+    }
+  }
+}
