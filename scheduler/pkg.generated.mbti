@@ -1,12 +1,31 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "dowdiness/mdsp/scheduler"
 
+import {
+  "dowdiness/mdsp/lib",
+}
+
 // Values
 pub fn midi_to_hz(Double) -> Double
 
 // Errors
 
 // Types and methods
+type ActiveNote
+
+pub struct PatternScheduler {
+  bpm : Double
+  sample_counter : Int64
+  sample_rate : Int
+  block_size : Int
+  active_notes : Array[ActiveNote]
+  bindings : @lib.ControlBindingMap
+
+  fn new(bpm~ : Double, bindings~ : @lib.ControlBindingMap, ctx~ : @lib.DspContext) -> PatternScheduler
+}
+pub fn PatternScheduler::active_note_count(Self) -> Int
+pub fn PatternScheduler::new(bpm~ : Double, bindings~ : @lib.ControlBindingMap, ctx~ : @lib.DspContext) -> Self
+pub fn PatternScheduler::sample_counter(Self) -> Int64
 
 // Type aliases
 
