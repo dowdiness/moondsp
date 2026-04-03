@@ -30,13 +30,12 @@ test "PatternScheduler::new initializes with zero position" {
     @lib.DspNode::adsr(0.01, 0.1, 0.7, 0.3),
     @lib.DspNode::output(1),
   ]
-  let ctx = @lib.DspContext::new(48000.0, 128)
   let bindings = @lib.ControlBindingBuilder::new()
     .bind(key="note", node_index=0, slot=@lib.GraphParamSlot::Value0)
     .build(template)
   match bindings {
     Ok(b) => {
-      let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b, ctx~)
+      let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b)
       inspect(sched.sample_counter(), content="0")
       inspect(sched.active_note_count(), content="0")
     }
@@ -46,7 +45,8 @@ test "PatternScheduler::new initializes with zero position" {
 
 ///|
 test "compute_arc: first block at 120 BPM" {
-  let arc = @scheduler.compute_arc(0L, 120.0, 48000, 128)
+  let ctx = @lib.DspContext::new(48000.0, 128)
+  let arc = @scheduler.compute_arc(0L, 120.0, ctx)
   let zero = @pattern.Rational::from_int(0)
   assert_true(arc.begin == zero)
   let expected_end = @pattern.Rational::new(15360L, 2880000L)
@@ -55,7 +55,8 @@ test "compute_arc: first block at 120 BPM" {
 
 ///|
 test "compute_arc: second block at 120 BPM" {
-  let arc = @scheduler.compute_arc(128L, 120.0, 48000, 128)
+  let ctx = @lib.DspContext::new(48000.0, 128)
+  let arc = @scheduler.compute_arc(128L, 120.0, ctx)
   let expected_start = @pattern.Rational::new(15360L, 2880000L)
   let expected_end = @pattern.Rational::new(30720L, 2880000L)
   assert_true(arc.begin == expected_start)
@@ -63,7 +64,7 @@ test "compute_arc: second block at 120 BPM" {
 }
 
 ///|
-/// Helper: build a VoicePool with a minimal osc+adsr+output template.
+/// Helper: build a VoicePool with a minimal osc→adsr→gain→output template.
 fn make_test_pool() -> (@lib.VoicePool, Array[@lib.DspNode], @lib.DspContext) {
   let template : Array[@lib.DspNode] = [
     @lib.DspNode::oscillator(@lib.Waveform::Sine, 440.0),
@@ -80,6 +81,30 @@ fn make_test_pool() -> (@lib.VoicePool, Array[@lib.DspNode], @lib.DspContext) {
 }
 
 ///|
+/// Helper: build pool + scheduler + audio buffers for standard test setup.
+fn make_test_sched() -> (
+  @lib.VoicePool,
+  @scheduler.PatternScheduler,
+  @lib.DspContext,
+  @lib.AudioBuffer,
+  @lib.AudioBuffer,
+) {
+  let (pool, template, ctx) = make_test_pool()
+  let bindings = @lib.ControlBindingBuilder::new()
+    .bind(key="note", node_index=0, slot=@lib.GraphParamSlot::Value0)
+    .build(template)
+  match bindings {
+    Ok(b) => {
+      let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b)
+      let left = @lib.AudioBuffer::filled(128)
+      let right = @lib.AudioBuffer::filled(128)
+      (pool, sched, ctx, left, right)
+    }
+    Err(_) => abort("test bindings creation failed")
+  }
+}
+
+///|
 test "expire_notes: removes notes past their end_time" {
   let (pool, template, ctx) = make_test_pool()
   let bindings = @lib.ControlBindingBuilder::new()
@@ -88,17 +113,14 @@ test "expire_notes: removes notes past their end_time" {
   match bindings {
     Err(_) => assert_true(false)
     Ok(b) => {
-      let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b, ctx~)
-      // Trigger a voice manually
+      let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b)
       let controls = b.resolve_controls({ "note": 440.0 })
       let handle = pool.note_on(controls)
       match handle {
         None => assert_true(false)
         Some(h) => {
-          // Inject an ActiveNote that expires at cycle 0 (already past)
           sched.push_active_note(h, @pattern.Rational::from_int(0))
           inspect(sched.active_note_count(), content="1")
-          // Expire with arc starting at cycle 1
           let arc = @pattern.TimeSpan::new(
             @pattern.Rational::from_int(1),
             @pattern.Rational::from_int(2),
@@ -113,159 +135,80 @@ test "expire_notes: removes notes past their end_time" {
 
 ///|
 test "process_events: single note-on creates active voice" {
-  let (pool, template, ctx) = make_test_pool()
-  let bindings = @lib.ControlBindingBuilder::new()
-    .bind(key="note", node_index=0, slot=@lib.GraphParamSlot::Value0)
-    .build(template)
-  match bindings {
-    Err(_) => assert_true(false)
-    Ok(b) => {
-      let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b, ctx~)
-      // Use the pattern API to generate events — Event is not directly constructible
-      let arc = @pattern.TimeSpan::new(
-        @pattern.Rational::from_int(0),
-        @pattern.Rational::new(1L, 100L),
-      )
-      let events = @pattern.note(60.0).query(arc)
-      sched.process_events(events, arc, pool)
-      inspect(sched.active_note_count(), content="1")
-      inspect(pool.active_voice_count(), content="1")
-    }
-  }
+  let (pool, sched, ctx, _, _) = make_test_sched()
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::new(1L, 100L),
+  )
+  let events = @pattern.note(60.0).query(arc)
+  sched.process_events(events, arc, pool)
+  inspect(sched.active_note_count(), content="1")
+  inspect(pool.active_voice_count(), content="1")
 }
 
 ///|
 test "process_block: note(60) triggers one voice" {
-  let (pool, template, ctx) = make_test_pool()
-  let bindings = @lib.ControlBindingBuilder::new()
-    .bind(key="note", node_index=0, slot=@lib.GraphParamSlot::Value0)
-    .build(template)
-  match bindings {
-    Err(_) => assert_true(false)
-    Ok(b) => {
-      let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b, ctx~)
-      let pat = @pattern.note(60.0)
-      let left = @lib.AudioBuffer::filled(128)
-      let right = @lib.AudioBuffer::filled(128)
-      sched.process_block(pat, pool, ctx, left, right)
-      inspect(pool.active_voice_count(), content="1")
-      inspect(sched.active_note_count(), content="1")
-      inspect(sched.sample_counter(), content="128")
-    }
-  }
+  let (pool, sched, ctx, left, right) = make_test_sched()
+  let pat = @pattern.note(60.0)
+  sched.process_block(pat, pool, ctx, left, right)
+  inspect(pool.active_voice_count(), content="1")
+  inspect(sched.active_note_count(), content="1")
+  inspect(sched.sample_counter(), content="128")
 }
 
 ///|
 test "process_block: empty pattern triggers no voices" {
-  let (pool, template, ctx) = make_test_pool()
-  let bindings = @lib.ControlBindingBuilder::new()
-    .bind(key="note", node_index=0, slot=@lib.GraphParamSlot::Value0)
-    .build(template)
-  match bindings {
-    Err(_) => assert_true(false)
-    Ok(b) => {
-      let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b, ctx~)
-      let pat : @pattern.Pat[@pattern.ControlMap] = @pattern.Pat::silence()
-      let left = @lib.AudioBuffer::filled(128)
-      let right = @lib.AudioBuffer::filled(128)
-      sched.process_block(pat, pool, ctx, left, right)
-      inspect(pool.active_voice_count(), content="0")
-      inspect(sched.active_note_count(), content="0")
-    }
-  }
+  let (pool, sched, ctx, left, right) = make_test_sched()
+  let pat : @pattern.Pat[@pattern.ControlMap] = @pattern.Pat::silence()
+  sched.process_block(pat, pool, ctx, left, right)
+  inspect(pool.active_voice_count(), content="0")
+  inspect(sched.active_note_count(), content="0")
 }
 
 ///|
 test "process_block: fast(2) triggers two voices per cycle" {
-  let (pool, template, ctx) = make_test_pool()
-  let bindings = @lib.ControlBindingBuilder::new()
-    .bind(key="note", node_index=0, slot=@lib.GraphParamSlot::Value0)
-    .build(template)
-  match bindings {
-    Err(_) => assert_true(false)
-    Ok(b) => {
-      let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b, ctx~)
-      let pat = @pattern.note(60.0).fast(@pattern.Rational::from_int(2))
-      let left = @lib.AudioBuffer::filled(128)
-      let right = @lib.AudioBuffer::filled(128)
-      sched.process_block(pat, pool, ctx, left, right)
-      assert_true(pool.active_voice_count() >= 1)
-      let mut voices_seen = pool.active_voice_count()
-      for _i = 1; _i < 94; _i = _i + 1 {
-        sched.process_block(pat, pool, ctx, left, right)
-        if pool.active_voice_count() > voices_seen {
-          voices_seen = pool.active_voice_count()
-        }
-      }
-      assert_true(voices_seen >= 2)
+  let (pool, sched, ctx, left, right) = make_test_sched()
+  let pat = @pattern.note(60.0).fast(@pattern.Rational::from_int(2))
+  sched.process_block(pat, pool, ctx, left, right)
+  assert_true(pool.active_voice_count() >= 1)
+  let mut voices_seen = pool.active_voice_count()
+  for _i = 1; _i < 94; _i = _i + 1 {
+    sched.process_block(pat, pool, ctx, left, right)
+    if pool.active_voice_count() > voices_seen {
+      voices_seen = pool.active_voice_count()
     }
   }
+  assert_true(voices_seen >= 2)
 }
 
 ///|
 test "process_block: gate-off fires after note ends" {
-  let (pool, template, ctx) = make_test_pool()
-  let bindings = @lib.ControlBindingBuilder::new()
-    .bind(key="note", node_index=0, slot=@lib.GraphParamSlot::Value0)
-    .build(template)
-  match bindings {
-    Err(_) => assert_true(false)
-    Ok(b) => {
-      let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b, ctx~)
-      let pat = @pattern.note(60.0)
-      let left = @lib.AudioBuffer::filled(128)
-      let right = @lib.AudioBuffer::filled(128)
-      sched.process_block(pat, pool, ctx, left, right)
-      inspect(sched.active_note_count(), content="1")
-      for _i = 1; _i < 190; _i = _i + 1 {
-        sched.process_block(pat, pool, ctx, left, right)
-      }
-      // After crossing cycle boundary, old note expired, new one triggered
-      inspect(sched.active_note_count(), content="1")
-    }
+  let (pool, sched, ctx, left, right) = make_test_sched()
+  let pat = @pattern.note(60.0)
+  sched.process_block(pat, pool, ctx, left, right)
+  inspect(sched.active_note_count(), content="1")
+  for _i = 1; _i < 190; _i = _i + 1 {
+    sched.process_block(pat, pool, ctx, left, right)
   }
+  // After crossing cycle boundary, old note expired, new one triggered
+  inspect(sched.active_note_count(), content="1")
 }
 
 ///|
 test "process_block: pan key applies per-voice pan" {
-  let (pool, template, ctx) = make_test_pool()
-  let bindings = @lib.ControlBindingBuilder::new()
-    .bind(key="note", node_index=0, slot=@lib.GraphParamSlot::Value0)
-    .build(template)
-  match bindings {
-    Err(_) => assert_true(false)
-    Ok(b) => {
-      let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b, ctx~)
-      let pat = @pattern.merge_control(
-        @pattern.note(60.0),
-        @pattern.s_pan(-1.0),
-      )
-      let left = @lib.AudioBuffer::filled(128)
-      let right = @lib.AudioBuffer::filled(128)
-      sched.process_block(pat, pool, ctx, left, right)
-      inspect(pool.active_voice_count(), content="1")
-      inspect(sched.active_note_count(), content="1")
-    }
-  }
+  let (pool, sched, ctx, left, right) = make_test_sched()
+  let pat = @pattern.merge_control(@pattern.note(60.0), @pattern.s_pan(-1.0))
+  sched.process_block(pat, pool, ctx, left, right)
+  inspect(pool.active_voice_count(), content="1")
+  inspect(sched.active_note_count(), content="1")
 }
 
 ///|
 test "process_block: dense pattern fires multiple note-ons per block" {
-  let (pool, template, ctx) = make_test_pool()
-  let bindings = @lib.ControlBindingBuilder::new()
-    .bind(key="note", node_index=0, slot=@lib.GraphParamSlot::Value0)
-    .build(template)
-  match bindings {
-    Err(_) => assert_true(false)
-    Ok(b) => {
-      let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b, ctx~)
-      let pat = @pattern.note(60.0).fast(@pattern.Rational::from_int(1000))
-      let left = @lib.AudioBuffer::filled(128)
-      let right = @lib.AudioBuffer::filled(128)
-      sched.process_block(pat, pool, ctx, left, right)
-      assert_true(pool.active_voice_count() >= 1)
-    }
-  }
+  let (pool, sched, ctx, left, right) = make_test_sched()
+  let pat = @pattern.note(60.0).fast(@pattern.Rational::from_int(1000))
+  sched.process_block(pat, pool, ctx, left, right)
+  assert_true(pool.active_voice_count() >= 1)
 }
 
 ///|
@@ -287,11 +230,7 @@ test "process_block: stolen voice gate-off is harmless" {
       match bindings {
         Err(_) => assert_true(false)
         Ok(b) => {
-          let sched = @scheduler.PatternScheduler::new(
-            bpm=120.0,
-            bindings=b,
-            ctx~,
-          )
+          let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b)
           let pat = @pattern.note(60.0).fast(@pattern.Rational::from_int(2))
           let left = @lib.AudioBuffer::filled(128)
           let right = @lib.AudioBuffer::filled(128)
