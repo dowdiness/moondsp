@@ -198,11 +198,16 @@ fn compile_graph_impl(
   let self_enabled = FixedArray::make(node_count, false)
   let back_edge_input0_source = FixedArray::make(node_count, -1)
   let back_edge_input1_source = FixedArray::make(node_count, -1)
-  for i = 0; i < feedback_edges.length(); i = i + 1 {
-    let edge = feedback_edges[i]
+  for edge in feedback_edges {
     let source_idx = edge.0
     let target_idx = edge.1
     let slot = edge.2
+    guard source_idx >= 0 &&
+      source_idx < node_count &&
+      target_idx >= 0 &&
+      target_idx < node_count else {
+      return None
+    }
     self_enabled[source_idx] = true
     if slot == 0 {
       if back_edge_input0_source[target_idx] >= 0 {

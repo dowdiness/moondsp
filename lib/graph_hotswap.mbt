@@ -129,6 +129,82 @@ pub fn CompiledDspHotSwap::queue_swap(
 }
 
 ///|
+/// Shared crossfade loop for both mono and stereo hot-swap.
+///
+/// Applies equal-power crossfade sample-by-sample between old and new graphs'
+/// scratch buffers, writing into the output buffers. The `is_stereo` flag
+/// selects which scratch buffer set to read from (mono: old_output/new_output;
+/// stereo: old_left/old_right/new_left/new_right).
+fn HotSwapGraph::crossfade_block(
+  self : HotSwapGraph,
+  output : AudioBuffer,
+  left_output : AudioBuffer,
+  right_output : AudioBuffer,
+  is_stereo : Bool,
+  sample_count : Int,
+) -> Unit {
+  if sample_count <= 0 {
+    output.fill(0.0)
+    if is_stereo {
+      left_output.fill(0.0)
+      right_output.fill(0.0)
+    }
+    return
+  }
+  for index in 0..<sample_count {
+    let progress = hot_swap_progress(
+      self.crossfade_position,
+      self.crossfade_samples,
+    )
+    let old_gain = equal_power_old_gain(progress)
+    let new_gain = equal_power_new_gain(progress)
+    if is_stereo {
+      left_output.set(
+        index,
+        apply_crossfade_sample(
+          self.old_left.get(index),
+          self.new_left.get(index),
+          old_gain,
+          new_gain,
+        ),
+      )
+      right_output.set(
+        index,
+        apply_crossfade_sample(
+          self.old_right.get(index),
+          self.new_right.get(index),
+          old_gain,
+          new_gain,
+        ),
+      )
+    } else {
+      output.set(
+        index,
+        apply_crossfade_sample(
+          self.old_output.get(index),
+          self.new_output.get(index),
+          old_gain,
+          new_gain,
+        ),
+      )
+    }
+    self.crossfade_position = self.crossfade_position + 1
+  }
+  if is_stereo {
+    for index in sample_count..<left_output.length() {
+      left_output.set(index, 0.0)
+    }
+    for index in sample_count..<right_output.length() {
+      right_output.set(index, 0.0)
+    }
+  } else {
+    for index in sample_count..<output.length() {
+      output.set(index, 0.0)
+    }
+  }
+}
+
+///|
 /// Process one block, crossfading between the active and pending graphs when a
 /// swap is in flight.
 pub fn CompiledDspHotSwap::process(
@@ -147,54 +223,19 @@ pub fn CompiledDspHotSwap::process(
       } else {
         CompiledDsp(self.0.active).process(context, self.0.old_output)
         CompiledDsp(next).process(context, self.0.new_output)
-        self.mix_hot_swap_outputs(context, output)
+        let sample_count = compiled_hot_swap_sample_count(
+          context,
+          output,
+          self.0.old_output,
+          self.0.new_output,
+        )
+        self.0.crossfade_block(output, output, output, false, sample_count)
         if self.0.crossfade_position >= self.0.crossfade_samples {
           self.0.active = next
           self.0.pending = None
           self.0.crossfade_position = 0
         }
       }
-  }
-}
-
-///|
-fn CompiledDspHotSwap::mix_hot_swap_outputs(
-  self : CompiledDspHotSwap,
-  context : DspContext,
-  output : AudioBuffer,
-) -> Unit {
-  let sample_count = compiled_hot_swap_sample_count(
-    context,
-    output,
-    self.0.old_output,
-    self.0.new_output,
-  )
-  if sample_count <= 0 {
-    output.fill(0.0)
-    return
-  }
-
-  for index = 0; index < sample_count; index = index + 1 {
-    let progress = hot_swap_progress(
-      self.0.crossfade_position,
-      self.0.crossfade_samples,
-    )
-    let old_gain = equal_power_old_gain(progress)
-    let new_gain = equal_power_new_gain(progress)
-    output.set(
-      index,
-      apply_crossfade_sample(
-        self.0.old_output.get(index),
-        self.0.new_output.get(index),
-        old_gain,
-        new_gain,
-      ),
-    )
-    self.0.crossfade_position = self.0.crossfade_position + 1
-  }
-
-  for index = sample_count; index < output.length(); index = index + 1 {
-    output.set(index, 0.0)
   }
 }
 
@@ -265,71 +306,24 @@ pub fn CompiledStereoDspHotSwap::process(
           self.0.new_left,
           self.0.new_right,
         )
-        self.mix_hot_swap_outputs(context, left_output, right_output)
+        let sample_count = compiled_stereo_hot_swap_sample_count(
+          context,
+          left_output,
+          right_output,
+          self.0.old_left,
+          self.0.old_right,
+          self.0.new_left,
+          self.0.new_right,
+        )
+        self.0.crossfade_block(
+          left_output, left_output, right_output, true, sample_count,
+        )
         if self.0.crossfade_position >= self.0.crossfade_samples {
           self.0.active = next
           self.0.pending = None
           self.0.crossfade_position = 0
         }
       }
-  }
-}
-
-///|
-fn CompiledStereoDspHotSwap::mix_hot_swap_outputs(
-  self : CompiledStereoDspHotSwap,
-  context : DspContext,
-  left_output : AudioBuffer,
-  right_output : AudioBuffer,
-) -> Unit {
-  let sample_count = compiled_stereo_hot_swap_sample_count(
-    context,
-    left_output,
-    right_output,
-    self.0.old_left,
-    self.0.old_right,
-    self.0.new_left,
-    self.0.new_right,
-  )
-  if sample_count <= 0 {
-    left_output.fill(0.0)
-    right_output.fill(0.0)
-    return
-  }
-
-  for index = 0; index < sample_count; index = index + 1 {
-    let progress = hot_swap_progress(
-      self.0.crossfade_position,
-      self.0.crossfade_samples,
-    )
-    let old_gain = equal_power_old_gain(progress)
-    let new_gain = equal_power_new_gain(progress)
-    left_output.set(
-      index,
-      apply_crossfade_sample(
-        self.0.old_left.get(index),
-        self.0.new_left.get(index),
-        old_gain,
-        new_gain,
-      ),
-    )
-    right_output.set(
-      index,
-      apply_crossfade_sample(
-        self.0.old_right.get(index),
-        self.0.new_right.get(index),
-        old_gain,
-        new_gain,
-      ),
-    )
-    self.0.crossfade_position = self.0.crossfade_position + 1
-  }
-
-  for index = sample_count; index < left_output.length(); index = index + 1 {
-    left_output.set(index, 0.0)
-  }
-  for index = sample_count; index < right_output.length(); index = index + 1 {
-    right_output.set(index, 0.0)
   }
 }
 

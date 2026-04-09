@@ -8,6 +8,14 @@
 ///
 /// The `process` method is intentionally excluded because mono and stereo
 /// graphs have different output arity (one buffer vs. two).
+///
+/// WHY 12 identical impl blocks below: MoonBit has no blanket impls or
+/// default trait methods. Each of the 6 wrapper types (CompiledDsp,
+/// CompiledStereoDsp, CompiledDspHotSwap, CompiledStereoDspHotSwap,
+/// CompiledDspTopologyController, CompiledStereoDspTopologyController)
+/// must declare both methods individually, all delegating to
+/// `.0.apply_control_impl()` / `.0.apply_controls_impl()`. This is
+/// irreducible boilerplate under the current type system.
 pub(open) trait GraphControllable {
   apply_control(Self, GraphControl) -> Bool
   apply_controls(Self, Array[GraphControl]) -> Bool

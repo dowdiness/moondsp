@@ -260,3 +260,51 @@ test "process_block: stolen voice gate-off is harmless" {
     }
   }
 }
+
+///|
+test "process_block silence produces zero output" {
+  let (pool, sched, left, right) = make_test_sched()
+  let pat : @pattern.Pat[@pattern.ControlMap] = @pattern.Pat::silence()
+  sched.process_block(pat, pool, left, right)
+  let mut all_zero = true
+  for i = 0; i < left.length(); i = i + 1 {
+    if left.get(i) != 0.0 || right.get(i) != 0.0 {
+      all_zero = false
+    }
+  }
+  inspect(all_zero, content="true")
+}
+
+///|
+test "process_block note pattern produces non-zero output" {
+  let (pool, sched, left, right) = make_test_sched()
+  let pat = @pattern.note(60.0)
+  // Process several blocks so the oscillator has time to produce output
+  for _i = 0; _i < 4; _i = _i + 1 {
+    sched.process_block(pat, pool, left, right)
+  }
+  let mut has_nonzero = false
+  for i = 0; i < left.length(); i = i + 1 {
+    if left.get(i) != 0.0 || right.get(i) != 0.0 {
+      has_nonzero = true
+    }
+  }
+  inspect(has_nonzero, content="true")
+}
+
+///|
+test "process_block multi-block note expiry" {
+  let (pool, sched, left, right) = make_test_sched()
+  let note_pat = @pattern.note(60.0)
+  let silence_pat : @pattern.Pat[@pattern.ControlMap] = @pattern.Pat::silence()
+  // First block triggers the note
+  sched.process_block(note_pat, pool, left, right)
+  inspect(sched.active_note_count() > 0, content="true")
+  // Now feed silence so no new notes are triggered.
+  // Process enough blocks to cross the cycle boundary (~188 blocks at 120 BPM)
+  // so the original note expires via gate-off.
+  for _i = 1; _i < 200; _i = _i + 1 {
+    sched.process_block(silence_pat, pool, left, right)
+  }
+  inspect(sched.active_note_count(), content="0")
+}
