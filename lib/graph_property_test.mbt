@@ -64,10 +64,9 @@ fn gen_mono_graph(seed : Int) -> Array[DspNode] {
       let freq = 110.0 + (s % 880).to_double()
       nodes.push(DspNode::oscillator(prop_waveform(s / 4), freq))
     }
-    1 => {
+    1 =>
       // Noise
       nodes.push(DspNode::noise(s.reinterpret_as_uint()))
-    }
     2 => {
       // Constant
       let val = (s % 200).to_double() / 200.0 - 0.5
@@ -82,7 +81,7 @@ fn gen_mono_graph(seed : Int) -> Array[DspNode] {
     }
   }
   // Processing chain — add 0 to 4 processors based on seed bits
-  let chain_bits = (s / 5) % 16 // 4 bits → up to 4 processors
+  let chain_bits = s / 5 % 16 // 4 bits → up to 4 processors
   let mut last = nodes.length() - 1
   if chain_bits % 2 >= 1 {
     // Gain
@@ -90,27 +89,25 @@ fn gen_mono_graph(seed : Int) -> Array[DspNode] {
     nodes.push(DspNode::gain(last, gain_val))
     last = nodes.length() - 1
   }
-  if (chain_bits / 2) % 2 >= 1 {
+  if chain_bits / 2 % 2 >= 1 {
     // Clip
     let threshold = 0.1 + (s % 9).to_double() * 0.1
     nodes.push(DspNode::clip(last, threshold))
     last = nodes.length() - 1
   }
-  if (chain_bits / 4) % 2 >= 1 {
+  if chain_bits / 4 % 2 >= 1 {
     // Biquad
     let cutoff = 200.0 + (s % 4000).to_double()
     let q = 0.5 + (s % 10).to_double() * 0.1
     nodes.push(DspNode::biquad(last, prop_biquad_mode(s / 3), cutoff, q))
     last = nodes.length() - 1
   }
-  if (chain_bits / 8) % 2 >= 1 {
+  if chain_bits / 8 % 2 >= 1 {
     // Delay
-    let max_samples = 4 + (s % 60)
-    let delay_samples = 1 + (s % max_samples)
+    let max_samples = 4 + s % 60
+    let delay_samples = 1 + s % max_samples
     let feedback = (s % 8).to_double() * 0.1
-    nodes.push(
-      DspNode::delay(last, max_samples, delay_samples~, feedback~),
-    )
+    nodes.push(DspNode::delay(last, max_samples, delay_samples~, feedback~))
     last = nodes.length() - 1
   }
   // Terminal
@@ -141,7 +138,7 @@ fn gen_stereo_graph(seed : Int) -> Array[DspNode] {
   }
   let mut last = nodes.length() - 1
   // Optional mono gain before pan
-  if (s / 3) % 2 == 0 {
+  if s / 3 % 2 == 0 {
     let gain_val = 0.1 + (s % 9).to_double() * 0.1
     nodes.push(DspNode::gain(last, gain_val))
     last = nodes.length() - 1
@@ -151,23 +148,21 @@ fn gen_stereo_graph(seed : Int) -> Array[DspNode] {
   nodes.push(DspNode::pan(last, pan_pos))
   last = nodes.length() - 1
   // Optional stereo processors
-  let stereo_bits = (s / 7) % 8
+  let stereo_bits = s / 7 % 8
   if stereo_bits % 2 >= 1 {
     let gain_val = 0.1 + (s % 9).to_double() * 0.1
     nodes.push(DspNode::stereo_gain(last, gain_val))
     last = nodes.length() - 1
   }
-  if (stereo_bits / 2) % 2 >= 1 {
+  if stereo_bits / 2 % 2 >= 1 {
     let threshold = 0.1 + (s % 9).to_double() * 0.1
     nodes.push(DspNode::stereo_clip(last, threshold))
     last = nodes.length() - 1
   }
-  if (stereo_bits / 4) % 2 >= 1 {
+  if stereo_bits / 4 % 2 >= 1 {
     let cutoff = 200.0 + (s % 4000).to_double()
     let q = 0.5 + (s % 10).to_double() * 0.1
-    nodes.push(
-      DspNode::stereo_biquad(last, prop_biquad_mode(s / 3), cutoff, q),
-    )
+    nodes.push(DspNode::stereo_biquad(last, prop_biquad_mode(s / 3), cutoff, q))
     last = nodes.length() - 1
   }
   // StereoOutput
@@ -184,7 +179,7 @@ fn gen_binary_graph(seed : Int) -> Array[DspNode] {
   let freq_a = 110.0 + (s % 440).to_double()
   nodes.push(DspNode::oscillator(prop_waveform(s), freq_a))
   // Source B
-  let source_b = (s / 3) % 3
+  let source_b = s / 3 % 3
   match source_b {
     0 => {
       let freq_b = 220.0 + (s % 660).to_double()
@@ -204,7 +199,7 @@ fn gen_binary_graph(seed : Int) -> Array[DspNode] {
   }
   // Optional gain
   let mut last = 2
-  if (s / 11) % 2 == 0 {
+  if s / 11 % 2 == 0 {
     let gain_val = 0.1 + (s % 9).to_double() * 0.1
     nodes.push(DspNode::gain(last, gain_val))
     last = nodes.length() - 1
@@ -218,9 +213,9 @@ fn gen_binary_graph(seed : Int) -> Array[DspNode] {
 fn gen_adsr_graph(seed : Int) -> Array[DspNode] {
   let s = seed.abs()
   let attack_ms = 0.5 + (s % 10).to_double() * 0.5
-  let decay_ms = 0.5 + ((s / 3) % 10).to_double() * 0.5
-  let sustain = 0.1 + ((s / 7) % 9).to_double() * 0.1
-  let release_ms = 0.5 + ((s / 11) % 20).to_double() * 0.5
+  let decay_ms = 0.5 + (s / 3 % 10).to_double() * 0.5
+  let sustain = 0.1 + (s / 7 % 9).to_double() * 0.1
+  let release_ms = 0.5 + (s / 11 % 20).to_double() * 0.5
   let freq = 220.0 + (s % 440).to_double()
   [
     DspNode::adsr(attack_ms, decay_ms, sustain, release_ms),
@@ -243,7 +238,7 @@ fn gen_mono_feedback_graph(seed : Int) -> Array[DspNode] {
   let feedback_gain = 0.05 + (s % 18).to_double() * 0.05
   let variant = s % 3
   match variant {
-    0 => {
+    0 =>
       // Simple: Constant → Mix(0, 2) → Gain → Output
       // Back-edge: node 2 (Gain output) → node 1 (Mix input1)
       [
@@ -252,7 +247,6 @@ fn gen_mono_feedback_graph(seed : Int) -> Array[DspNode] {
         DspNode::gain(1, feedback_gain),
         DspNode::output(2),
       ]
-    }
     1 => {
       // With biquad in feedback path:
       // Constant → Mix(0, 3) → Biquad → Gain → Output
@@ -269,8 +263,8 @@ fn gen_mono_feedback_graph(seed : Int) -> Array[DspNode] {
     _ => {
       // With delay in feedback path:
       // Constant → Mix(0, 3) → Delay → Gain → Output
-      let max_samples = 4 + (s % 60)
-      let delay_samples = 1 + (s % max_samples)
+      let max_samples = 4 + s % 60
+      let delay_samples = 1 + s % max_samples
       [
         DspNode::constant(constant_val),
         DspNode::mix(0, 3),
@@ -292,7 +286,7 @@ fn gen_stereo_feedback_graph(seed : Int) -> Array[DspNode] {
   let s = seed.abs()
   let constant_val = 0.1 + (s % 9).to_double() * 0.1
   let feedback_gain = 0.05 + (s % 18).to_double() * 0.05
-  let stereo_gain_val = 0.1 + ((s / 3) % 9).to_double() * 0.1
+  let stereo_gain_val = 0.1 + (s / 3 % 9).to_double() * 0.1
   let pan_pos = ((s % 20).to_double() - 10.0) / 10.0
   // Constant → Mix(0, 5) → Gain → Pan → StereoGain → StereoMixDown → StereoOutput(4)
   // Back-edge: StereoMixDown(5) → Mix(1) input1
@@ -310,11 +304,7 @@ fn gen_stereo_feedback_graph(seed : Int) -> Array[DspNode] {
 ///|
 /// Compare two AudioBuffers sample-by-sample up to `count` samples.
 /// Returns true if all samples are identical (bitwise equal).
-fn buffers_identical(
-  a : AudioBuffer,
-  b : AudioBuffer,
-  count : Int,
-) -> Bool {
+fn buffers_identical(a : AudioBuffer, b : AudioBuffer, count : Int) -> Bool {
   for i = 0; i < count; i = i + 1 {
     if a.get(i) != b.get(i) {
       return false
@@ -503,7 +493,7 @@ test "prop: mono feedback cycle — runtime retune is deterministic" {
       let compiled_b = CompiledDsp::compile(nodes, context).unwrap()
       // The gain node is always the last before Output in our feedback graphs
       let gain_index = nodes.length() - 2
-      let new_gain = 0.05 + ((s / 13) % 18).to_double() * 0.05
+      let new_gain = 0.05 + (s / 13 % 18).to_double() * 0.05
       let out_a = AudioBuffer::filled(PROP_BLOCK_SIZE)
       let out_b = AudioBuffer::filled(PROP_BLOCK_SIZE)
       // Process one block, then retune, then process again
@@ -602,7 +592,7 @@ test "prop: runtime param update is deterministic across compilations" {
       let s = seed.abs()
       let freq = 200.0 + (s % 600).to_double()
       let gain_val = 0.1 + (s % 9).to_double() * 0.1
-      let new_gain = 0.05 + ((s / 7) % 9).to_double() * 0.1
+      let new_gain = 0.05 + (s / 7 % 9).to_double() * 0.1
       let nodes = [
         DspNode::oscillator(Waveform::Sine, freq),
         DspNode::gain(0, gain_val),
