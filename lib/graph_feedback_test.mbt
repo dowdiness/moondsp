@@ -474,3 +474,45 @@ test "self-register: mixed-shape feedback across mono/stereo boundary" {
   assert_true(output.get(0) > 0.0)
   assert_true(output.get(1) > output.get(0))
 }
+
+///|
+test "feedback clip and mul exercise inline feedback computations" {
+  // Exercises Clip and Mul within a feedback loop — both use inline
+  // computation in the feedback dispatch (clip_feedback_sample, input0*input1)
+  // rather than delegating to .tick(). This test catches semantic drift
+  // between the block and feedback dispatch for these node kinds.
+  //
+  // Graph:
+  //   0: Constant(1.0)
+  //   1: Mix(0, 4)       -- feedback entry: input0=Constant, input1=Clip
+  //   2: Constant(0.5)
+  //   3: Mul(1, 2)       -- multiply by 0.5 (same as Gain but via Mul)
+  //   4: Clip(3, 0.8)    -- clamp to [-0.8, 0.8]
+  //   5: Output(4)
+  //
+  // Back-edge: Clip(4) -> Mix(1) on slot 1.
+  //
+  // Analytical per-sample recurrence:
+  //   s[0]: Mix(1.0, 0.0) = 1.0, Mul(1.0*0.5) = 0.5, Clip(0.5, 0.8) = 0.5
+  //   s[1]: Mix(1.0, 0.5) = 1.5, Mul(1.5*0.5) = 0.75, Clip(0.75, 0.8) = 0.75
+  //   s[2]: Mix(1.0, 0.75)= 1.75, Mul(1.75*0.5)= 0.875, Clip(0.875, 0.8) = 0.8
+  //   s[3]: Mix(1.0, 0.8) = 1.8, Mul(1.8*0.5) = 0.9, Clip(0.9, 0.8) = 0.8
+  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::mix(0, 4),
+    DspNode::constant(HALF_GAIN),
+    DspNode::mul(1, 2),
+    DspNode::clip(3, 0.8),
+    DspNode::output(4),
+  ]
+  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+
+  compiled.process(context, output)
+
+  assert_true((output.get(0) - 0.5).abs() < 0.000000001)
+  assert_true((output.get(1) - 0.75).abs() < 0.000000001)
+  assert_true((output.get(2) - 0.8).abs() < 0.000000001)
+  assert_true((output.get(3) - 0.8).abs() < 0.000000001)
+}

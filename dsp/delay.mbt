@@ -185,6 +185,6 @@ fn normalize_feedback(value : Double) -> Double {
 }
 
 ///|
-fn max_feedback_amount() -> Double {
+pub fn max_feedback_amount() -> Double {
   0.99
 }

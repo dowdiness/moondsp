@@ -2,12 +2,13 @@
 package "dowdiness/mdsp/scheduler"
 
 import {
+  "dowdiness/mdsp/dsp",
   "dowdiness/mdsp/lib",
   "dowdiness/mdsp/pattern",
 }
 
 // Values
-pub fn compute_arc(Int64, Double, @lib.DspContext) -> @pattern.TimeSpan
+pub fn compute_arc(Int64, Double, @dsp.DspContext) -> @pattern.TimeSpan
 
 pub fn default_control_mapper() -> ControlMapper
 
@@ -29,17 +30,17 @@ pub fn ControlMapper::new(transform~ : (String, Double) -> (String, Double)?, vo
 pub struct PatternScheduler {
   mut bpm : Double
   mut sample_counter : Int64
-  ctx : @lib.DspContext
+  ctx : @dsp.DspContext
   active_notes : Array[ActiveNote]
   bindings : @lib.ControlBindingMap
   mapper : ControlMapper
 
-  fn new(bpm~ : Double, bindings~ : @lib.ControlBindingMap, ctx~ : @lib.DspContext, mapper? : ControlMapper) -> PatternScheduler
+  fn new(bpm~ : Double, bindings~ : @lib.ControlBindingMap, ctx~ : @dsp.DspContext, mapper? : ControlMapper) -> PatternScheduler
 }
 pub fn PatternScheduler::active_note_count(Self) -> Int
 pub fn PatternScheduler::expire_notes(Self, @lib.VoicePool, @pattern.TimeSpan) -> Unit
-pub fn PatternScheduler::new(bpm~ : Double, bindings~ : @lib.ControlBindingMap, ctx~ : @lib.DspContext, mapper? : ControlMapper) -> Self
-pub fn PatternScheduler::process_block(Self, @pattern.Pat[@pattern.ControlMap], @lib.VoicePool, @lib.AudioBuffer, @lib.AudioBuffer) -> Unit
+pub fn PatternScheduler::new(bpm~ : Double, bindings~ : @lib.ControlBindingMap, ctx~ : @dsp.DspContext, mapper? : ControlMapper) -> Self
+pub fn PatternScheduler::process_block(Self, @pattern.Pat[@pattern.ControlMap], @lib.VoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::process_events(Self, Array[@pattern.Event[@pattern.ControlMap]], @pattern.TimeSpan, @lib.VoicePool) -> Unit
 pub fn PatternScheduler::push_active_note(Self, @lib.VoiceHandle, @pattern.Rational) -> Unit
 pub fn PatternScheduler::sample_counter(Self) -> Int64

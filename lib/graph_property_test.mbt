@@ -729,10 +729,15 @@ test "prop: runtime control variants are deterministic" {
           // Delay samples update
           let max_samples = 8 + s % 56
           let initial_delay = 1 + s % (max_samples / 2)
-          let new_delay = 1 + (s / 3) % max_samples
+          let new_delay = 1 + s / 3 % max_samples
           let nodes = [
             DspNode::oscillator(Waveform::Sine, 220.0),
-            DspNode::delay(0, max_samples, delay_samples=initial_delay, feedback=0.3),
+            DspNode::delay(
+              0,
+              max_samples,
+              delay_samples=initial_delay,
+              feedback=0.3,
+            ),
             DspNode::output(1),
           ]
           let ca = CompiledDsp::compile(nodes, context).unwrap()
@@ -742,14 +747,18 @@ test "prop: runtime control variants are deterministic" {
           ignore(
             ca.apply_control(
               GraphControl::set_param(
-                1, GraphParamSlot::DelaySamples, new_delay.to_double(),
+                1,
+                GraphParamSlot::DelaySamples,
+                new_delay.to_double(),
               ),
             ),
           )
           ignore(
             cb.apply_control(
               GraphControl::set_param(
-                1, GraphParamSlot::DelaySamples, new_delay.to_double(),
+                1,
+                GraphParamSlot::DelaySamples,
+                new_delay.to_double(),
               ),
             ),
           )

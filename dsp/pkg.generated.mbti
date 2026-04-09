@@ -1,0 +1,243 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/mdsp/dsp"
+
+// Values
+pub fn effective_sample_count(DspContext, AudioBuffer) -> Int
+
+pub fn[T : FilterSym] exit_deliverable() -> T
+
+pub fn is_finite(Double) -> Bool
+
+pub fn is_finite_positive(Double) -> Bool
+
+pub fn[T : ArithSym] lin_map(T, Double, Double, Double, Double) -> T
+
+pub fn max_feedback_amount() -> Double
+
+pub fn mono_shape() -> Int
+
+pub fn[T : ArithSym] range(T, Double, Double) -> T
+
+pub fn sanitize_buffer(AudioBuffer, Int) -> Int
+
+pub fn stereo_shape() -> Int
+
+// Errors
+
+// Types and methods
+pub struct Adsr {
+  attack_ms : Double
+  decay_ms : Double
+  sustain : Double
+  release_ms : Double
+  mut stage : EnvStage
+  mut level : Double
+  mut level_at_release : Double
+
+  fn new(Double, Double, Double, Double) -> Adsr
+}
+pub fn Adsr::gate_off(Self) -> Unit
+pub fn Adsr::gate_on(Self) -> Unit
+pub fn Adsr::level(Self) -> Double
+pub fn Adsr::new(Double, Double, Double, Double) -> Self
+pub fn Adsr::process(Self, DspContext, AudioBuffer) -> Unit
+pub fn Adsr::reset(Self) -> Unit
+pub fn Adsr::stage(Self) -> EnvStage
+pub fn Adsr::tick(Self, DspContext) -> Double
+
+pub struct AudioBuffer {
+  data : FixedArray[Double]
+
+  fn new(FixedArray[Double]) -> AudioBuffer
+}
+pub fn AudioBuffer::as_fixed_array(Self) -> FixedArray[Double]
+pub fn AudioBuffer::fill(Self, Double) -> Unit
+pub fn AudioBuffer::filled(Int, init? : Double) -> Self
+pub fn AudioBuffer::get(Self, Int) -> Double
+pub fn AudioBuffer::length(Self) -> Int
+pub fn AudioBuffer::new(FixedArray[Double]) -> Self
+pub fn AudioBuffer::set(Self, Int, Double) -> Unit
+
+pub struct Biquad {
+  // private fields
+
+  fn new() -> Biquad
+}
+pub fn Biquad::new() -> Self
+pub fn Biquad::process(Self, DspContext, AudioBuffer) -> Unit
+pub fn Biquad::reset(Self) -> Unit
+pub fn Biquad::tick(Self, Double) -> Double
+pub fn Biquad::update(Self, DspContext, BiquadMode, Double, Double) -> Bool
+
+pub(all) enum BiquadMode {
+  LowPass
+  HighPass
+  BandPass
+} derive(Eq)
+
+pub struct Clip {
+  unit : Unit
+
+  fn new() -> Clip
+}
+pub fn Clip::new() -> Self
+pub fn Clip::process(Self, DspContext, AudioBuffer, Double) -> Unit
+
+pub struct DelayLine {
+  buffer : FixedArray[Double]
+  mut write_pos : Int
+  mut delay_samples : Int
+  mut feedback : Double
+
+  fn new(Int, delay_samples? : Int, feedback? : Double) -> DelayLine
+}
+pub fn DelayLine::delay_samples(Self) -> Int
+pub fn DelayLine::feedback(Self) -> Double
+pub fn DelayLine::max_delay_samples(Self) -> Int
+pub fn DelayLine::new(Int, delay_samples? : Int, feedback? : Double) -> Self
+pub fn DelayLine::process(Self, DspContext, AudioBuffer) -> Unit
+pub fn DelayLine::reset(Self) -> Unit
+pub fn DelayLine::set_delay_samples(Self, Int) -> Unit
+pub fn DelayLine::set_feedback(Self, Double) -> Unit
+pub fn DelayLine::tick(Self, Double) -> Double
+
+pub struct DspContext {
+  sample_rate : Double
+  block_size : Int
+
+  fn new(Double, Int) -> DspContext
+}
+pub fn DspContext::block_size(Self) -> Int
+pub fn DspContext::new(Double, Int) -> Self
+pub fn DspContext::sample_rate(Self) -> Double
+
+pub(all) enum EnvStage {
+  Idle
+  Attack
+  Decay
+  Sustain
+  Release
+} derive(Eq)
+
+pub struct Gain {
+  unit : Unit
+
+  fn new() -> Gain
+}
+pub fn Gain::new() -> Self
+pub fn Gain::process(Self, DspContext, AudioBuffer, Double) -> Unit
+
+pub struct Mix {
+  unit : Unit
+
+  fn new() -> Mix
+}
+pub fn Mix::new() -> Self
+pub fn Mix::process(Self, DspContext, AudioBuffer, AudioBuffer) -> Unit
+
+pub struct Mono {
+}
+pub fn Mono::new() -> Self
+pub impl ChannelSpec for Mono
+
+pub struct Noise {
+  mut state : UInt
+}
+pub fn Noise::new(UInt) -> Self
+pub fn Noise::process(Self, DspContext, AudioBuffer) -> Unit
+pub fn Noise::reset(Self, UInt) -> Unit
+pub fn Noise::seed(Self) -> UInt
+pub fn Noise::tick(Self) -> Double
+
+pub struct Oscillator {
+  mut phase : Double
+}
+pub fn Oscillator::new() -> Self
+pub fn Oscillator::phase(Self) -> Double
+pub fn Oscillator::process(Self, DspContext, AudioBuffer, Double) -> Unit
+pub fn Oscillator::process_waveform(Self, DspContext, AudioBuffer, Waveform, Double) -> Unit
+pub fn Oscillator::reset(Self) -> Unit
+pub fn Oscillator::tick(Self, Double, Double) -> Double
+pub fn Oscillator::tick_waveform(Self, Waveform, Double, Double) -> Double
+
+pub struct Pan {
+  unit : Unit
+
+  fn new() -> Pan
+}
+pub fn Pan::new() -> Self
+pub fn Pan::process(Self, DspContext, AudioBuffer, AudioBuffer, AudioBuffer, Double) -> Unit
+
+pub struct ParamSmoother {
+  mut current : Double
+  mut target : Double
+  mut coeff : Double
+}
+pub fn ParamSmoother::current(Self) -> Double
+pub fn ParamSmoother::from_context(Double, Double, DspContext) -> Self
+pub fn ParamSmoother::new(Double, Double, Double) -> Self
+pub fn ParamSmoother::reset(Self, Double) -> Unit
+pub fn ParamSmoother::set_smoothing_time(Self, Double, Double) -> Unit
+pub fn ParamSmoother::set_smoothing_time_from_context(Self, Double, DspContext) -> Unit
+pub fn ParamSmoother::set_target(Self, Double) -> Unit
+pub fn ParamSmoother::target(Self) -> Double
+pub fn ParamSmoother::tick(Self) -> Double
+
+pub struct Stereo {
+}
+pub fn Stereo::new() -> Self
+pub impl ChannelSpec for Stereo
+
+pub(all) enum Waveform {
+  Sine
+  Saw
+  Square
+  Triangle
+} derive(Eq)
+
+// Type aliases
+
+// Traits
+pub(open) trait ArithSym {
+  constant(Double) -> Self
+  mul(Self, Self) -> Self
+  mix(Self, Self) -> Self
+  clip(Self, Double) -> Self
+}
+
+pub(open) trait ChannelSpec {
+  channel_count(Self) -> Int
+}
+
+pub(open) trait DelaySym : DspSym {
+  delay(Self, Int, Int, Double) -> Self
+}
+
+pub(open) trait DspSym : ArithSym {
+  oscillator(Self, Waveform) -> Self
+  noise(UInt) -> Self
+  adsr(Double, Double, Double, Double) -> Self
+  gain(Self, Double) -> Self
+  output(Self) -> Self
+}
+
+pub(open) trait FilterSym : DspSym {
+  biquad(Self, BiquadMode, Double, Double) -> Self
+}
+
+pub(open) trait StereoDelaySym : StereoSym + DelaySym {
+  stereo_delay(Self, Int, Int, Double) -> Self
+}
+
+pub(open) trait StereoFilterSym : StereoSym + FilterSym {
+  stereo_biquad(Self, BiquadMode, Double, Double) -> Self
+}
+
+pub(open) trait StereoSym : DspSym {
+  pan(Self, Double) -> Self
+  stereo_gain(Self, Double) -> Self
+  stereo_clip(Self, Double) -> Self
+  stereo_mixdown(Self) -> Self
+  stereo_output(Self) -> Self
+}
+
