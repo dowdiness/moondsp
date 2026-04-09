@@ -33,6 +33,12 @@
             "type": "command",
             "command": "moon update",
             "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "bash scripts/package-overview.sh",
+            "timeout": 30,
+            "statusMessage": "Discovering package structure..."
           }
         ]
       }

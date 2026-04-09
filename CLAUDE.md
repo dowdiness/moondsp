@@ -35,23 +35,13 @@ moon info && moon fmt
 
 ## Documentation
 
-**Main docs:** [docs/](docs/)
+Browse `docs/` for architecture, decisions, development guides, and performance snapshots. Key rules:
 
-- **Blueprint:** `docs/salat-engine-blueprint.md` — full architecture vision
-- **Phase 0 spec:** `docs/step0-instruction.md` — original proof-of-concept spec
-- **Technical reference:** `docs/salat-engine-technical-reference.md` — authoritative for graph runtime-control
-- **Structural editor:** `docs/dsp-structural-editor-*.md` — vision and architecture
+- Architecture docs = principles only, never reference specific types/fields/lines
+- Code is the source of truth — if a doc and the code disagree, the doc is wrong
+- `docs/salat-engine-technical-reference.md` is authoritative for graph runtime-control
+- `docs/archive/` = completed work. Do not search here unless asked for historical context.
 
-## Key Facts
+## Package Map
 
-- Phases 0–5 complete: AudioWorklet proof, DSP primitives, compiled graph runtime, voice management, pattern engine, pattern scheduler
-- Finally Tagless two-layer architecture (traits + concrete AST)
-- Compiled graph with hot-swap, topology editing, and stereo support
-- Voice pool: 32+ polyphonic voices with priority stealing and per-voice pan mixdown
-- Pattern engine: Strudel-inspired algebra with rational time, 8 combinators, ControlMap output
-- Pattern scheduler: bridges pattern events to voice pool with MIDI→Hz, per-voice pan, block-quantized gate-off
-- Typed control binding: `ControlBindingMap` bridges pattern string keys to graph control targets with compile-time safety
-- NaN firewall: output sanitization at graph rendering boundary
-- Debug validation mode: runtime bounds checking for graph buffer indexing (dev-only)
-- Audio constants: 48000 Hz sample rate, 128 samples per buffer
-- No allocation in the audio thread; pre-allocated buffers
+The SessionStart hook runs `scripts/package-overview.sh` which provides a live package map at the start of every session. Use `moon ide outline <path>` to explore any package's public API before modifying it. Read `moon.mod.json` for module dependencies.
