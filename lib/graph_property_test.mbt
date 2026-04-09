@@ -147,8 +147,8 @@ fn gen_stereo_graph(seed : Int) -> Array[DspNode] {
   let pan_pos = ((s % 20).to_double() - 10.0) / 10.0 // [-1.0, 1.0]
   nodes.push(DspNode::pan(last, pan_pos))
   last = nodes.length() - 1
-  // Optional stereo processors
-  let stereo_bits = s / 7 % 8
+  // Optional stereo processors — 4 bits select gain, clip, biquad, delay
+  let stereo_bits = s / 7 % 16
   if stereo_bits % 2 >= 1 {
     let gain_val = 0.1 + (s % 9).to_double() * 0.1
     nodes.push(DspNode::stereo_gain(last, gain_val))
@@ -163,6 +163,15 @@ fn gen_stereo_graph(seed : Int) -> Array[DspNode] {
     let cutoff = 200.0 + (s % 4000).to_double()
     let q = 0.5 + (s % 10).to_double() * 0.1
     nodes.push(DspNode::stereo_biquad(last, prop_biquad_mode(s / 3), cutoff, q))
+    last = nodes.length() - 1
+  }
+  if stereo_bits / 8 % 2 >= 1 {
+    let max_samples = 4 + s % 60
+    let delay_samples = 1 + s % max_samples
+    let feedback = (s % 8).to_double() * 0.1
+    nodes.push(
+      DspNode::stereo_delay(last, max_samples, delay_samples~, feedback~),
+    )
     last = nodes.length() - 1
   }
   // StereoOutput
@@ -581,6 +590,50 @@ test "prop: mono hot-swap — same swap sequence produces identical output" {
   )
 }
 
+///|
+test "prop: stereo hot-swap — same swap sequence produces identical output" {
+  @qc.quick_check_fn(
+    fn(seed : Int) {
+      let s = seed.abs()
+      let nodes_initial = gen_stereo_graph(s)
+      let nodes_replacement = gen_stereo_graph(s + 1000)
+      let context = DspContext::new(PROP_SAMPLE_RATE, PROP_BLOCK_SIZE)
+      let crossfade = 64 + s % 128
+      let hs_a = CompiledStereoDspHotSwap::from_graph(
+        compile_stereo(nodes_initial),
+        crossfade_samples=crossfade,
+      )
+      let hs_b = CompiledStereoDspHotSwap::from_graph(
+        compile_stereo(nodes_initial),
+        crossfade_samples=crossfade,
+      )
+      let la = AudioBuffer::filled(PROP_BLOCK_SIZE)
+      let ra = AudioBuffer::filled(PROP_BLOCK_SIZE)
+      let lb = AudioBuffer::filled(PROP_BLOCK_SIZE)
+      let rb = AudioBuffer::filled(PROP_BLOCK_SIZE)
+      hs_a.process(context, la, ra)
+      hs_b.process(context, lb, rb)
+      if !buffers_identical(la, lb, PROP_BLOCK_SIZE) ||
+        !buffers_identical(ra, rb, PROP_BLOCK_SIZE) {
+        return false
+      }
+      ignore(hs_a.queue_swap(compile_stereo(nodes_replacement)))
+      ignore(hs_b.queue_swap(compile_stereo(nodes_replacement)))
+      let mut identical = true
+      for _block in 0..<4 {
+        hs_a.process(context, la, ra)
+        hs_b.process(context, lb, rb)
+        if !buffers_identical(la, lb, PROP_BLOCK_SIZE) ||
+          !buffers_identical(ra, rb, PROP_BLOCK_SIZE) {
+          identical = false
+        }
+      }
+      identical
+    },
+    max_success=100,
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Property: runtime controls produce deterministic results
 // ---------------------------------------------------------------------------
@@ -616,6 +669,122 @@ test "prop: runtime param update is deterministic across compilations" {
       compiled_a.process(context, out_a)
       compiled_b.process(context, out_b)
       buffers_identical(out_a, out_b, PROP_BLOCK_SIZE)
+    },
+    max_success=200,
+  )
+}
+
+///|
+/// Broader runtime control: biquad cutoff/Q, delay_samples, and gate
+/// transitions all produce deterministic output across two compilations.
+test "prop: runtime control variants are deterministic" {
+  @qc.quick_check_fn(
+    fn(seed : Int) {
+      let s = seed.abs()
+      let variant = s % 3
+      let context = DspContext::new(PROP_SAMPLE_RATE, PROP_BLOCK_SIZE)
+      let out_a = AudioBuffer::filled(PROP_BLOCK_SIZE)
+      let out_b = AudioBuffer::filled(PROP_BLOCK_SIZE)
+      match variant {
+        0 => {
+          // Biquad cutoff + Q update
+          let cutoff = 500.0 + (s % 3000).to_double()
+          let q = 0.5 + (s % 10).to_double() * 0.1
+          let new_cutoff = 200.0 + (s / 3 % 4000).to_double()
+          let new_q = 0.5 + (s / 7 % 10).to_double() * 0.1
+          let nodes = [
+            DspNode::oscillator(Waveform::Saw, 440.0),
+            DspNode::biquad(0, BiquadMode::LowPass, cutoff, q),
+            DspNode::output(1),
+          ]
+          let ca = CompiledDsp::compile(nodes, context).unwrap()
+          let cb = CompiledDsp::compile(nodes, context).unwrap()
+          ca.process(context, out_a)
+          cb.process(context, out_b)
+          ignore(
+            ca.apply_control(
+              GraphControl::set_param(1, GraphParamSlot::Value0, new_cutoff),
+            ),
+          )
+          ignore(
+            cb.apply_control(
+              GraphControl::set_param(1, GraphParamSlot::Value0, new_cutoff),
+            ),
+          )
+          ignore(
+            ca.apply_control(
+              GraphControl::set_param(1, GraphParamSlot::Value1, new_q),
+            ),
+          )
+          ignore(
+            cb.apply_control(
+              GraphControl::set_param(1, GraphParamSlot::Value1, new_q),
+            ),
+          )
+          ca.process(context, out_a)
+          cb.process(context, out_b)
+          buffers_identical(out_a, out_b, PROP_BLOCK_SIZE)
+        }
+        1 => {
+          // Delay samples update
+          let max_samples = 8 + s % 56
+          let initial_delay = 1 + s % (max_samples / 2)
+          let new_delay = 1 + (s / 3) % max_samples
+          let nodes = [
+            DspNode::oscillator(Waveform::Sine, 220.0),
+            DspNode::delay(0, max_samples, delay_samples=initial_delay, feedback=0.3),
+            DspNode::output(1),
+          ]
+          let ca = CompiledDsp::compile(nodes, context).unwrap()
+          let cb = CompiledDsp::compile(nodes, context).unwrap()
+          ca.process(context, out_a)
+          cb.process(context, out_b)
+          ignore(
+            ca.apply_control(
+              GraphControl::set_param(
+                1, GraphParamSlot::DelaySamples, new_delay.to_double(),
+              ),
+            ),
+          )
+          ignore(
+            cb.apply_control(
+              GraphControl::set_param(
+                1, GraphParamSlot::DelaySamples, new_delay.to_double(),
+              ),
+            ),
+          )
+          ca.process(context, out_a)
+          cb.process(context, out_b)
+          buffers_identical(out_a, out_b, PROP_BLOCK_SIZE)
+        }
+        _ => {
+          // Gate on/off transitions
+          let attack_ms = 1.0 + (s % 5).to_double()
+          let decay_ms = 1.0 + (s / 3 % 5).to_double()
+          let sustain = 0.2 + (s / 7 % 8).to_double() * 0.1
+          let release_ms = 2.0 + (s / 11 % 10).to_double()
+          let nodes = [
+            DspNode::adsr(attack_ms, decay_ms, sustain, release_ms),
+            DspNode::oscillator(Waveform::Sine, 440.0),
+            DspNode::mul(0, 1),
+            DspNode::output(2),
+          ]
+          let ca = CompiledDsp::compile(nodes, context).unwrap()
+          let cb = CompiledDsp::compile(nodes, context).unwrap()
+          ignore(ca.gate_on(0))
+          ignore(cb.gate_on(0))
+          ca.process(context, out_a)
+          cb.process(context, out_b)
+          if !buffers_identical(out_a, out_b, PROP_BLOCK_SIZE) {
+            return false
+          }
+          ignore(ca.gate_off(0))
+          ignore(cb.gate_off(0))
+          ca.process(context, out_a)
+          cb.process(context, out_b)
+          buffers_identical(out_a, out_b, PROP_BLOCK_SIZE)
+        }
+      }
     },
     max_success=200,
   )
