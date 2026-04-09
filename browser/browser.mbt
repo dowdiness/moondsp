@@ -110,7 +110,7 @@ const BROWSER_STEREO_TOPOLOGY_EDIT_CROSSFADE_SAMPLES : Int = 128
 ///|
 /// Reset browser demo state.
 pub fn reset_phase() -> Unit {
-  @lib.reset_phase()
+  reset_demo_phase()
   reset_compiled_graph()
   reset_compiled_hot_swap_graph()
   reset_compiled_topology_edit_graph()
@@ -124,7 +124,7 @@ pub fn reset_phase() -> Unit {
 ///|
 /// Generate one sine sample for the browser demo.
 pub fn tick(freq : Double, sample_rate : Double) -> Double {
-  @lib.tick(freq, sample_rate)
+  demo_tick_source(0, freq, sample_rate)
 }
 
 ///|
@@ -134,7 +134,7 @@ pub fn tick_source(
   freq : Double,
   sample_rate : Double,
 ) -> Double {
-  @lib.tick_source(source_id, freq, sample_rate)
+  demo_tick_source(source_id, freq, sample_rate)
 }
 
 // ---------------------------------------------------------------------------

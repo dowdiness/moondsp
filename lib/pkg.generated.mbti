@@ -22,15 +22,9 @@ pub fn[T : ArithSym] range(T, Double, Double) -> T
 
 pub fn[T : ArithSym + DspSym + FilterSym + DelaySym + StereoSym + StereoFilterSym + StereoDelaySym] replay(Array[DspNode]) -> T?
 
-pub fn reset_phase() -> Unit
-
 pub fn sanitize_buffer(AudioBuffer, Int) -> Int
 
 pub fn stereo_shape() -> Int
-
-pub fn tick(Double, Double) -> Double
-
-pub fn tick_source(Int, Double, Double) -> Double
 
 // Errors
 

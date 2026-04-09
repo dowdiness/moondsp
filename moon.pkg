@@ -1,5 +1,6 @@
 import {
   "dowdiness/mdsp/lib" @lib,
+  "moonbitlang/core/ref" @ref,
 }
 
 options(
