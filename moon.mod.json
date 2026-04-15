@@ -2,7 +2,10 @@
   "name": "dowdiness/mdsp",
   "version": "0.1.0",
   "deps": {
-    "moonbitlang/quickcheck": "0.11.2"
+    "moonbitlang/quickcheck": "0.11.2",
+    "dowdiness/loom": { "path": "../../../canopy/loom/loom" },
+    "dowdiness/seam": { "path": "../../../canopy/loom/seam" },
+    "dowdiness/text_change": { "path": "../../../canopy/lib/text-change" }
   },
   "readme": "README.mbt.md",
   "repository": "",
