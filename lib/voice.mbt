@@ -47,8 +47,8 @@ fn VoiceSlot::new(block_size : Int) -> VoiceSlot {
     generation: 0,
     allocation_order: 0,
     // Center pan: cos(π/4) = sin(π/4) ≈ 0.7071
-    pan_left_gain: feedback_pan_left_gain(0.0),
-    pan_right_gain: feedback_pan_right_gain(0.0),
+    pan_left_gain: pan_left_gain(0.0),
+    pan_right_gain: pan_right_gain(0.0),
     mono_buffer: AudioBuffer::filled(block_size),
   }
 }
@@ -59,14 +59,10 @@ fn VoiceSlot::is_handle_valid(self : VoiceSlot, handle : VoiceHandle) -> Bool {
 }
 
 ///|
-/// WHY feedback_pan_*: these are the engine's existing equal-power pan
-/// functions (cos/sin law with clamping and NaN safety). The "feedback"
-/// prefix is a historical artifact — they implement standard constant-power
-/// panning reused here for voice-level mixdown.
 fn VoiceSlot::update_pan(self : VoiceSlot, pan : Double) -> Unit {
   let clamped = pan.clamp(min=-1.0, max=1.0)
-  self.pan_left_gain = feedback_pan_left_gain(clamped)
-  self.pan_right_gain = feedback_pan_right_gain(clamped)
+  self.pan_left_gain = pan_left_gain(clamped)
+  self.pan_right_gain = pan_right_gain(clamped)
 }
 
 ///|

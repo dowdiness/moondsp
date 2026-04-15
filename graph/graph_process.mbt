@@ -179,8 +179,8 @@ pub fn CompiledDsp::process(
   output : AudioBuffer,
 ) -> Unit {
   let sample_rate = context.sample_rate()
-  let sample_count = effective_sample_count(context, output)
-  if !is_finite_positive(sample_rate) {
+  let sample_count = @dsp.effective_sample_count(context, output)
+  if !@dsp.is_finite_positive(sample_rate) {
     clear_compiled_buffers(self.0.buffers)
     clear_compiled_buffers(self.0.left_buffers)
     clear_compiled_buffers(self.0.right_buffers)
@@ -203,12 +203,12 @@ pub fn CompiledDsp::process(
   }
   if self.0.feedback_edges.length() > 0 {
     self.process_feedback_graph(context, output, sample_count)
-    self.0.last_sanitized_count = sanitize_buffer(output, sample_count)
+    self.0.last_sanitized_count = @dsp.sanitize_buffer(output, sample_count)
     return
   }
   self.0.run_node_loop(context, sample_count)
   copy_buffer(self.0.buffers[self.0.buffers.length() - 1], output, sample_count)
-  self.0.last_sanitized_count = sanitize_buffer(output, sample_count)
+  self.0.last_sanitized_count = @dsp.sanitize_buffer(output, sample_count)
 }
 
 ///|
@@ -224,7 +224,7 @@ pub fn CompiledStereoDsp::process(
   let sample_count = compiled_stereo_sample_count(
     context, left_output, right_output,
   )
-  if !is_finite_positive(sample_rate) {
+  if !@dsp.is_finite_positive(sample_rate) {
     clear_compiled_buffers(self.0.buffers)
     clear_compiled_buffers(self.0.left_buffers)
     clear_compiled_buffers(self.0.right_buffers)
@@ -251,8 +251,10 @@ pub fn CompiledStereoDsp::process(
     self.process_feedback_graph(
       context, left_output, right_output, sample_count,
     )
-    self.0.last_sanitized_count = sanitize_buffer(left_output, sample_count) +
-      sanitize_buffer(right_output, sample_count)
+    self.0.last_sanitized_count = @dsp.sanitize_buffer(
+        left_output, sample_count,
+      ) +
+      @dsp.sanitize_buffer(right_output, sample_count)
     return
   }
   self.0.run_node_loop(context, sample_count)
@@ -263,8 +265,8 @@ pub fn CompiledStereoDsp::process(
     right_output,
     sample_count,
   )
-  self.0.last_sanitized_count = sanitize_buffer(left_output, sample_count) +
-    sanitize_buffer(right_output, sample_count)
+  self.0.last_sanitized_count = @dsp.sanitize_buffer(left_output, sample_count) +
+    @dsp.sanitize_buffer(right_output, sample_count)
 }
 
 ///|

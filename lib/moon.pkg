@@ -1,12 +1,5 @@
 import {
   "dowdiness/mdsp/dsp" @dsp,
-  "moonbitlang/core/bench" @bench,
+  "dowdiness/mdsp/graph" @graph,
   "moonbitlang/core/int" @int,
-  "moonbitlang/core/math" @math,
-  "moonbitlang/core/ref" @ref,
 }
-
-import {
-  "moonbitlang/core/double" @double,
-  "moonbitlang/quickcheck" @qc,
-} for "test"

@@ -248,7 +248,7 @@ fn updated_node_param(
   match node.kind {
     Constant =>
       match slot {
-        Value0 if is_finite(value) => Some(node_with_value0(node, value))
+        Value0 if @dsp.is_finite(value) => Some(node_with_value0(node, value))
         _ => None
       }
     Oscillator =>
@@ -258,7 +258,7 @@ fn updated_node_param(
         None
       } else {
         match slot {
-          Value0 if is_finite(value) => Some(node_with_value0(node, value))
+          Value0 if @dsp.is_finite(value) => Some(node_with_value0(node, value))
           _ => None
         }
       }
@@ -286,31 +286,31 @@ fn updated_node_param(
       }
     Gain =>
       match slot {
-        Value0 if is_finite(value) => Some(node_with_value0(node, value))
+        Value0 if @dsp.is_finite(value) => Some(node_with_value0(node, value))
         _ => None
       }
     Mul => None
     Mix => None
     Clip =>
       match slot {
-        Value0 if is_finite(value) && value > 0.0 =>
+        Value0 if @dsp.is_finite(value) && value > 0.0 =>
           Some(node_with_value0(node, value))
         _ => None
       }
     Output => None
     Pan =>
       match slot {
-        Value0 if is_finite(value) => Some(node_with_value0(node, value))
+        Value0 if @dsp.is_finite(value) => Some(node_with_value0(node, value))
         _ => None
       }
     StereoGain =>
       match slot {
-        Value0 if is_finite(value) => Some(node_with_value0(node, value))
+        Value0 if @dsp.is_finite(value) => Some(node_with_value0(node, value))
         _ => None
       }
     StereoClip =>
       match slot {
-        Value0 if is_finite(value) && value > 0.0 =>
+        Value0 if @dsp.is_finite(value) && value > 0.0 =>
           Some(node_with_value0(node, value))
         _ => None
       }
@@ -405,7 +405,7 @@ fn apply_runtime_param_side_effect(
 
 ///|
 fn exact_int_value(value : Double) -> Int? {
-  if !is_finite(value) || value.trunc() != value {
+  if !@dsp.is_finite(value) || value.trunc() != value {
     return None
   }
   let int_value = value.to_int()
@@ -423,12 +423,12 @@ fn valid_biquad_graph_params(
   q : Double,
 ) -> Bool {
   let nyquist = sample_rate * NYQUIST_RATIO
-  is_finite(sample_rate) &&
+  @dsp.is_finite(sample_rate) &&
   sample_rate > 0.0 &&
-  is_finite(cutoff) &&
+  @dsp.is_finite(cutoff) &&
   cutoff > 0.0 &&
   cutoff < nyquist &&
-  is_finite(q) &&
+  @dsp.is_finite(q) &&
   q > 0.0
 }
 
@@ -443,9 +443,9 @@ fn graph_default_delay_samples(value : Int) -> Int {
 
 ///|
 fn valid_delay_feedback(value : Double) -> Bool {
-  is_finite(value) &&
-  value >= -max_feedback_amount() &&
-  value <= max_feedback_amount()
+  @dsp.is_finite(value) &&
+  value >= -@dsp.max_feedback_amount() &&
+  value <= @dsp.max_feedback_amount()
 }
 
 ///|

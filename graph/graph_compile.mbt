@@ -331,7 +331,7 @@ fn stereo_compile_plan(
   context : DspContext,
 ) -> (Array[Int], Array[(Int, Int, Int)])? {
   let sample_rate = context.sample_rate()
-  if !is_finite_positive(sample_rate) {
+  if !@dsp.is_finite_positive(sample_rate) {
     return None
   }
   let output_index = match
@@ -405,7 +405,7 @@ fn mono_compile_plan(
   context : DspContext,
 ) -> (Array[Int], Array[(Int, Int, Int)])? {
   let sample_rate = context.sample_rate()
-  if !is_finite_positive(sample_rate) {
+  if !@dsp.is_finite_positive(sample_rate) {
     return None
   }
   let output_index = match find_single_output_index(nodes) {

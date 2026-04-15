@@ -464,12 +464,12 @@ fn self_register_stereo_input_right(
 
 ///|
 fn feedback_pan_left_gain(position : Double) -> Double {
-  pan_left_gain(position)
+  @dsp.pan_left_gain(position)
 }
 
 ///|
 fn feedback_pan_right_gain(position : Double) -> Double {
-  pan_right_gain(position)
+  @dsp.pan_right_gain(position)
 }
 
 ///|

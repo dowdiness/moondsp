@@ -182,12 +182,12 @@ fn CompiledDsp::process_mono_debug(
     } else {
       output.fill(0.0)
     }
-    self.0.last_sanitized_count = sanitize_buffer(output, sample_count)
+    self.0.last_sanitized_count = @dsp.sanitize_buffer(output, sample_count)
     return
   }
   process_debug_loop(self.0, context, sample_count)
   copy_buffer(self.0.buffers[self.0.buffers.length() - 1], output, sample_count)
-  self.0.last_sanitized_count = sanitize_buffer(output, sample_count)
+  self.0.last_sanitized_count = @dsp.sanitize_buffer(output, sample_count)
 }
 
 ///|
@@ -210,8 +210,10 @@ fn CompiledStereoDsp::process_stereo_debug(
       left_output.fill(0.0)
       right_output.fill(0.0)
     }
-    self.0.last_sanitized_count = sanitize_buffer(left_output, sample_count) +
-      sanitize_buffer(right_output, sample_count)
+    self.0.last_sanitized_count = @dsp.sanitize_buffer(
+        left_output, sample_count,
+      ) +
+      @dsp.sanitize_buffer(right_output, sample_count)
     return
   }
   process_debug_loop(self.0, context, sample_count)
@@ -222,6 +224,6 @@ fn CompiledStereoDsp::process_stereo_debug(
     right_output,
     sample_count,
   )
-  self.0.last_sanitized_count = sanitize_buffer(left_output, sample_count) +
-    sanitize_buffer(right_output, sample_count)
+  self.0.last_sanitized_count = @dsp.sanitize_buffer(left_output, sample_count) +
+    @dsp.sanitize_buffer(right_output, sample_count)
 }

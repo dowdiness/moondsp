@@ -1,0 +1,11 @@
+import {
+  "dowdiness/mdsp/dsp" @dsp,
+  "moonbitlang/core/math" @math,
+}
+
+import {
+  "moonbitlang/core/bench" @bench,
+  "moonbitlang/core/double" @double,
+  "moonbitlang/core/ref" @ref,
+  "moonbitlang/quickcheck" @qc,
+} for "test"
