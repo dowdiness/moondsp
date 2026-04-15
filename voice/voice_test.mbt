@@ -1,4 +1,10 @@
 ///|
+using @dsp {type AudioBuffer, type DspContext, type Waveform}
+
+///|
+using @graph {type CompiledDsp, type DspNode}
+
+///|
 test "is_voice_finished returns false during active envelope" {
   let ctx = DspContext::new(48000.0, 16)
   let nodes = [

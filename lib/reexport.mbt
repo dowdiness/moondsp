@@ -102,3 +102,7 @@ pub using @graph {
   optimize_graph,
   replay,
 }
+
+///|
+// Re-export voice/ package — polyphonic voice pool with priority stealing.
+pub using @voice {type VoiceHandle, type VoicePool, type VoiceState}

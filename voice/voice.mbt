@@ -1,4 +1,10 @@
 ///|
+using @dsp {type AudioBuffer, type DspContext}
+
+///|
+using @graph {type CompiledDsp, type DspNode, type GraphControl}
+
+///|
 pub enum VoiceState {
   Idle
   Active
@@ -47,8 +53,8 @@ fn VoiceSlot::new(block_size : Int) -> VoiceSlot {
     generation: 0,
     allocation_order: 0,
     // Center pan: cos(π/4) = sin(π/4) ≈ 0.7071
-    pan_left_gain: pan_left_gain(0.0),
-    pan_right_gain: pan_right_gain(0.0),
+    pan_left_gain: @dsp.pan_left_gain(0.0),
+    pan_right_gain: @dsp.pan_right_gain(0.0),
     mono_buffer: AudioBuffer::filled(block_size),
   }
 }
@@ -61,8 +67,8 @@ fn VoiceSlot::is_handle_valid(self : VoiceSlot, handle : VoiceHandle) -> Bool {
 ///|
 fn VoiceSlot::update_pan(self : VoiceSlot, pan : Double) -> Unit {
   let clamped = pan.clamp(min=-1.0, max=1.0)
-  self.pan_left_gain = pan_left_gain(clamped)
-  self.pan_right_gain = pan_right_gain(clamped)
+  self.pan_left_gain = @dsp.pan_left_gain(clamped)
+  self.pan_right_gain = @dsp.pan_right_gain(clamped)
 }
 
 ///|
@@ -383,6 +389,6 @@ pub fn VoicePool::process(
       }
     }
   }
-  self.last_sanitized_count = sanitize_buffer(left_output, sample_count) +
-    sanitize_buffer(right_output, sample_count)
+  self.last_sanitized_count = @dsp.sanitize_buffer(left_output, sample_count) +
+    @dsp.sanitize_buffer(right_output, sample_count)
 }
