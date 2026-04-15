@@ -89,6 +89,27 @@ pub fn[A] stack(pats : Array[Pat[A]]) -> Pat[A] {
 }
 
 ///|
+/// Keep events where `f(value)` returns `Some(new_value)`, discard the rest.
+/// Preserves event timing (whole and part spans unchanged).
+pub fn[A] Pat::filter_map(self : Pat[A], f : (A) -> A?) -> Pat[A] {
+  let inner = self
+  {
+    query: fn(arc) {
+      let events = inner.query(arc)
+      let result : Array[Event[A]] = []
+      for ev in events {
+        match f(ev.value) {
+          Some(new_value) =>
+            result.push({ whole: ev.whole, part: ev.part, value: new_value })
+          None => ()
+        }
+      }
+      result
+    },
+  }
+}
+
+///|
 pub fn[A] every(n : Int, f : (Pat[A]) -> Pat[A], pat : Pat[A]) -> Pat[A] {
   if n <= 0 {
     return pat
