@@ -15,6 +15,12 @@ pub fn note(n : Double) -> Pat[ControlMap] {
 }
 
 ///|
+/// Create a sound control pattern from a MIDI drum number.
+pub fn sound(midi : Double) -> Pat[ControlMap] {
+  Pat::pure(single_control("sound", midi))
+}
+
+///|
 pub fn note_name(name : String) -> Pat[ControlMap] {
   note(parse_note_name(name))
 }

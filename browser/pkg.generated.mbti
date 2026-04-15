@@ -2,6 +2,8 @@
 package "dowdiness/mdsp/browser"
 
 // Values
+pub fn clear_pattern_input() -> Unit
+
 pub fn compiled_hot_swap_output_sample(Int) -> Double
 
 pub fn compiled_output_sample(Int) -> Double
@@ -20,7 +22,11 @@ pub fn compiled_stereo_topology_edit_right_sample(Int) -> Double
 
 pub fn compiled_topology_edit_output_sample(Int) -> Double
 
+pub fn eval_pattern_input() -> Int
+
 pub fn exit_deliverable_output_sample(Int) -> Double
+
+pub fn get_scheduler_parse_error() -> String
 
 pub fn init_compiled_graph(Double, Int) -> Bool
 
@@ -38,6 +44,8 @@ pub fn init_exit_deliverable_graph(Double, Int) -> Bool
 
 pub fn init_scheduler_graph(Double, Int) -> Bool
 
+pub fn parse_and_set_pattern(String) -> Int
+
 pub fn process_compiled_block(Double, Double, Double, Int) -> Bool
 
 pub fn process_compiled_hot_swap_block(Double, Int) -> Bool
@@ -53,6 +61,8 @@ pub fn process_compiled_topology_edit_block(Double, Int) -> Bool
 pub fn process_exit_deliverable_block(Double, Int) -> Bool
 
 pub fn process_scheduler_block() -> Bool
+
+pub fn push_pattern_char(Int) -> Unit
 
 pub fn queue_compiled_hot_swap() -> Bool
 
@@ -84,8 +94,6 @@ pub fn set_scheduler_bpm(Double) -> Unit
 
 pub fn set_scheduler_gain(Double) -> Unit
 
-pub fn set_scheduler_pattern(Int) -> Unit
-
 pub fn tick(Double, Double) -> Double
 
 pub fn tick_source(Int, Double, Double) -> Double
@@ -93,6 +101,7 @@ pub fn tick_source(Int, Double, Double) -> Double
 // Errors
 
 // Types and methods
+type SoundPool
 
 // Type aliases
 

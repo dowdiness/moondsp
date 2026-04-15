@@ -47,9 +47,22 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
         this.delaySamples = Number(data.value);
       } else if (data.type === "set-cutoff") {
         this.cutoff = Number(data.value);
-      } else if (data.type === "set-scheduler-pattern") {
-        if (this.usesScheduler && this.wasm && typeof this.wasm.set_scheduler_pattern === "function") {
-          this.wasm.set_scheduler_pattern(Number(data.index));
+      } else if (data.type === "set-pattern-text") {
+        if (this.usesScheduler && this.wasm &&
+            typeof this.wasm.clear_pattern_input === "function" &&
+            typeof this.wasm.push_pattern_char === "function" &&
+            typeof this.wasm.eval_pattern_input === "function") {
+          this.wasm.clear_pattern_input();
+          const text = data.text || "";
+          for (let i = 0; i < text.length; i++) {
+            this.wasm.push_pattern_char(text.charCodeAt(i));
+          }
+          const result = this.wasm.eval_pattern_input();
+          if (result === 0) {
+            this.port.postMessage({ type: "pattern-updated" });
+          } else {
+            this.port.postMessage({ type: "pattern-error", message: "parse error" });
+          }
         }
       } else if (data.type === "set-scheduler-bpm") {
         if (this.usesScheduler && this.wasm && typeof this.wasm.set_scheduler_bpm === "function") {

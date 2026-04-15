@@ -119,3 +119,56 @@ test "every: n<=0 returns pattern unchanged" {
   let events_neg = p_neg.query(span(0, 1, 1, 1))
   inspect(events_neg.length(), content="1")
 }
+
+///|
+test "filter_map: keeps matching events with transformed value" {
+  // sequence of 3 values, filter_map keeps only even numbers doubled
+  let p = sequence([Pat::pure(2), Pat::pure(3), Pat::pure(4)])
+  let filtered = p.filter_map(fn(x) {
+    if x % 2 == 0 {
+      Some(x * 2)
+    } else {
+      None
+    }
+  })
+  let events = filtered.query(span(0, 1, 1, 1))
+  // Only 2 and 4 pass the filter → 2 events
+  inspect(events.length(), content="2")
+  inspect(events[0].value, content="4")
+  inspect(events[1].value, content="8")
+}
+
+///|
+test "filter_map: removes all non-matching events" {
+  let p = Pat::pure(1)
+  let filtered = p.filter_map(fn(_x) { None })
+  let events = filtered.query(span(0, 1, 1, 1))
+  inspect(events.length(), content="0")
+}
+
+///|
+test "filter_map: on silence returns empty" {
+  let p : Pat[Int] = Pat::silence()
+  let filtered = p.filter_map(fn(x) { Some(x + 1) })
+  let events = filtered.query(span(0, 1, 1, 1))
+  inspect(events.length(), content="0")
+}
+
+///|
+test "filter_map: preserves event timing (whole and part spans unchanged)" {
+  let p = Pat::pure(42)
+  let filtered = p.filter_map(fn(x) { Some(x + 1) })
+  let events = filtered.query(span(0, 1, 1, 1))
+  inspect(events.length(), content="1")
+  inspect(events[0].value, content="43")
+  // whole should be [0, 1)
+  inspect(
+    events[0].whole,
+    content="Some({begin: {num: 0, den: 1}, end_: {num: 1, den: 1}})",
+  )
+  // part should be [0, 1)
+  inspect(
+    events[0].part,
+    content="{begin: {num: 0, den: 1}, end_: {num: 1, den: 1}}",
+  )
+}

@@ -18,6 +18,8 @@ pub fn s_pan(Double) -> Pat[ControlMap]
 
 pub fn[A] sequence(Array[Pat[A]]) -> Pat[A]
 
+pub fn sound(Double) -> Pat[ControlMap]
+
 pub fn[A] stack(Array[Pat[A]]) -> Pat[A]
 
 // Errors
@@ -37,6 +39,7 @@ pub struct Pat[A] {
   query : (TimeSpan) -> Array[Event[A]]
 }
 pub fn[A] Pat::fast(Self[A], Rational) -> Self[A]
+pub fn[A] Pat::filter_map(Self[A], (A) -> A?) -> Self[A]
 pub fn[A] Pat::pure(A) -> Self[A]
 pub fn[A] Pat::query(Self[A], TimeSpan) -> Array[Event[A]]
 pub fn[A] Pat::rev(Self[A]) -> Self[A]
