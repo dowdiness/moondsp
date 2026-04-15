@@ -257,13 +257,15 @@
     </div>
 
     <div id="schedulerControls" style="display: none; margin-top: 10px;">
-      <div style="margin-bottom: 8px;">
-        <label>Pattern: </label>
-        <button onclick="setSchedulerPattern(0)">Single Note</button>
-        <button onclick="setSchedulerPattern(1)">Arpeggio</button>
-        <button onclick="setSchedulerPattern(2)">Chord</button>
-        <button onclick="setSchedulerPattern(3)">Fast</button>
+      <div style="margin-bottom: 8px; display: flex; gap: 8px; align-items: center;">
+        <input type="text" id="patternInput" value='s("bd sd hh sd").fast(2)'
+               style="flex: 1; padding: 10px 14px; font-family: 'SFMono-Regular', Consolas, monospace;
+                      font-size: 1rem; border: 1px solid var(--border); border-radius: 12px;
+                      background: white; color: var(--ink);"
+               placeholder='s("bd sd hh sd").fast(2)'>
+        <button onclick="evalPattern()" style="padding: 10px 18px;">Eval</button>
       </div>
+      <div id="patternStatus" style="margin-bottom: 8px; font-size: 0.88rem; color: rgba(29,27,24,0.7);"></div>
       <div style="margin-bottom: 8px;">
         <label>BPM: <span id="bpmValue">120</span></label>
         <input type="range" id="bpmSlider" min="60" max="240" value="120"
@@ -665,6 +667,18 @@
             window.__mdspStereoHotSwapQueued = event.data;
           } else if (event.data?.type === "stereo-topology-edit-queued") {
             window.__mdspStereoTopologyEditQueued = event.data;
+          } else if (event.data?.type === "pattern-updated") {
+            const statusEl = document.getElementById('patternStatus');
+            if (statusEl) {
+              statusEl.textContent = "Pattern updated";
+              statusEl.style.color = "#577d21";
+            }
+          } else if (event.data?.type === "pattern-error") {
+            const statusEl = document.getElementById('patternStatus');
+            if (statusEl) {
+              statusEl.textContent = event.data.message;
+              statusEl.style.color = "#c35a2b";
+            }
           }
         };
 
@@ -762,13 +776,19 @@
       if (!audioContext) {
         document.getElementById('schedulerControls').style.display = 'block';
         document.querySelector('.controls').style.display = 'none';
+        document.getElementById('pageTitle').innerHTML = 'MoonBit DSP<br>Pattern Sequencer';
+        document.getElementById('pageDesc').textContent =
+          'Phase 5: type a pattern and hear it play. Try s("bd sd hh sd").fast(2), ' +
+          'note("60 64 67"), or s("bd [sd hh], hh hh hh").';
         start({ useScheduler: true });
+        setTimeout(() => evalPattern(), 200);
       }
     }
 
-    function setSchedulerPattern(index) {
+    function evalPattern() {
+      const text = document.getElementById('patternInput').value;
       if (node) {
-        node.port.postMessage({ type: 'set-scheduler-pattern', index: index });
+        node.port.postMessage({ type: 'set-pattern-text', text: text });
       }
     }
 
@@ -833,6 +853,12 @@
 
     syncLabels();
     resetMeter();
+
+    document.getElementById('patternInput')?.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        evalPattern();
+      }
+    });
   </script>
 </body>
 </html>
