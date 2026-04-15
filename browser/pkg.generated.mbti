@@ -38,6 +38,8 @@ pub fn init_exit_deliverable_graph(Double, Int) -> Bool
 
 pub fn init_scheduler_graph(Double, Int) -> Bool
 
+pub fn parse_and_set_pattern(String) -> String
+
 pub fn process_compiled_block(Double, Double, Double, Int) -> Bool
 
 pub fn process_compiled_hot_swap_block(Double, Int) -> Bool
@@ -84,8 +86,6 @@ pub fn set_scheduler_bpm(Double) -> Unit
 
 pub fn set_scheduler_gain(Double) -> Unit
 
-pub fn set_scheduler_pattern(Int) -> Unit
-
 pub fn tick(Double, Double) -> Double
 
 pub fn tick_source(Int, Double, Double) -> Double
@@ -93,6 +93,7 @@ pub fn tick_source(Int, Double, Double) -> Double
 // Errors
 
 // Types and methods
+type SoundPool
 
 // Type aliases
 
