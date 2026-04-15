@@ -15,7 +15,10 @@ remains open for native targets such as CLAP plugins.
 | Package | Path | Purpose |
 |---------|------|---------|
 | `dowdiness/mdsp` | `./` | Demo entrypoint (`mdsp.mbt`), delegates to `lib/` |
-| `dowdiness/mdsp/lib` | `lib/` | Core DSP library (oscillators, filters, graph compiler, voice pool) |
+| `dowdiness/mdsp/dsp` | `dsp/` | DSP primitives (oscillators, filters, tagless algebra, pan math) |
+| `dowdiness/mdsp/graph` | `graph/` | Compiled graph runtime (compile, optimize, topology edit, hot-swap, control binding) |
+| `dowdiness/mdsp/voice` | `voice/` | Polyphonic voice pool with priority stealing |
+| `dowdiness/mdsp/lib` | `lib/` | Re-export facade (dsp/ + graph/ + voice/) |
 | `dowdiness/mdsp/pattern` | `pattern/` | Standalone pattern engine (rational time, combinators, control maps) — zero dep on `lib/` |
 | `dowdiness/mdsp/scheduler` | `scheduler/` | Pattern scheduler — bridges pattern engine to DSP voice pool |
 | `dowdiness/mdsp/browser` | `browser/` | AudioWorklet export wrapper |
