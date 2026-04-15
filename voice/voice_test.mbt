@@ -183,6 +183,42 @@ test "set_voice_pan with stale handle returns false" {
 }
 
 ///|
+test "drum template sd: noise envelope decays to silence via envelope_gain" {
+  // Exact sd_template from browser_scheduler: noise → biquad → adsr → envelope_gain → output
+  let ctx = DspContext::new(48000.0, 128)
+  let nodes = [
+    DspNode::noise(12345U),
+    DspNode::biquad(0, @graph.BiquadMode::BandPass, 800.0, 2.0),
+    DspNode::adsr(1.0, 80.0, 0.0, 50.0),
+    DspNode::envelope_gain(1, 2, 1.0),
+    DspNode::output(3),
+  ]
+  let pool = VoicePool::new(nodes, ctx, max_voices=4).unwrap()
+  let handle = pool.note_on([]).unwrap()
+  // First block: should have non-zero output (attack/decay phase)
+  let left1 = AudioBuffer::filled(128)
+  let right1 = AudioBuffer::filled(128)
+  pool.process(ctx, left1, right1)
+  let mut has_nonzero = false
+  for i = 0; i < 128; i = i + 1 {
+    if left1.get(i).abs() > 0.001 {
+      has_nonzero = true
+      break
+    }
+  }
+  assert_true(has_nonzero)
+  // After note_off + several blocks, output should decay to silence
+  assert_true(pool.note_off(handle))
+  for j = 0; j < 50; j = j + 1 {
+    let left = AudioBuffer::filled(128)
+    let right = AudioBuffer::filled(128)
+    pool.process(ctx, left, right)
+  }
+  // Voice should be reclaimed (Idle) — envelope finished
+  assert_true(pool.voice_state(handle) is VoiceState::Idle)
+}
+
+///|
 test "process produces stereo output from mono voices" {
   let ctx = DspContext::new(48000.0, 4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]

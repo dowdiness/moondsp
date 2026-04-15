@@ -120,6 +120,7 @@ pub fn DspNode::biquad(Int, @dsp.BiquadMode, Double, Double) -> Self
 pub fn DspNode::clip(Int, Double) -> Self
 pub fn DspNode::constant(Double) -> Self
 pub fn DspNode::delay(Int, Int, delay_samples? : Int, feedback? : Double) -> Self
+pub fn DspNode::envelope_gain(Int, Int, Double) -> Self
 pub fn DspNode::gain(Int, Double) -> Self
 pub fn DspNode::mix(Int, Int) -> Self
 pub fn DspNode::mul(Int, Int) -> Self

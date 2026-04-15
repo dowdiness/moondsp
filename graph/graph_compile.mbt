@@ -495,7 +495,7 @@ fn visit_graph_dependencies_with_feedback(
         order,
         feedback_edges,
       )
-    Gain =>
+    Gain => {
       visit_graph_input_with_feedback(
         node.input0,
         index,
@@ -505,6 +505,18 @@ fn visit_graph_dependencies_with_feedback(
         order,
         feedback_edges,
       )
+      if node.input1 >= 0 {
+        visit_graph_input_with_feedback(
+          node.input1,
+          index,
+          1,
+          nodes,
+          marks,
+          order,
+          feedback_edges,
+        )
+      }
+    }
     Mul => {
       visit_graph_input_with_feedback(
         node.input0,

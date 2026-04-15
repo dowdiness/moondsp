@@ -36,33 +36,61 @@ let sched_gain : @ref.Ref[Double] = @ref.new(0.3)
 
 ///|
 fn bd_template() -> Array[@lib.DspNode] {
-  // ADSR gating handled by compiled graph — no explicit Mul needed
+  // Kick drum: pitch sweep 240→60 Hz + amplitude envelope
+  // [0] pitch ADSR: fast decay creates frequency sweep
+  // [1] scale pitch envelope by 180 Hz range
+  // [2] base frequency 60 Hz
+  // [3] mix = 60 + env*180 → frequency sweeps 240→60
+  // [4] FM sine oscillator reading frequency from mix
+  // [5] amplitude ADSR
+  // [6] envelope_gain: signal * amp envelope
+  // [7] output
   [
-    @lib.DspNode::oscillator(@lib.Waveform::Sine, 60.0),
-    @lib.DspNode::adsr(0.001, 0.15, 0.0, 0.1),
-    @lib.DspNode::gain(0, 1.0),
-    @lib.DspNode::output(2),
+    @lib.DspNode::adsr(0.5, 40.0, 0.0, 40.0),
+    @lib.DspNode::gain(0, 180.0),
+    @lib.DspNode::constant(60.0),
+    @lib.DspNode::mix(1, 2),
+    @lib.DspNode::oscillator_from(3, @lib.Waveform::Sine),
+    @lib.DspNode::adsr(0.5, 120.0, 0.0, 80.0),
+    @lib.DspNode::envelope_gain(4, 5, 1.0),
+    @lib.DspNode::output(6),
   ]
 }
 
 ///|
 fn sd_template() -> Array[@lib.DspNode] {
+  // Snare: bandpass noise + sine body, amplitude envelope
+  // [0] noise source
+  // [1] bandpass filter at 1.5 kHz (snare body)
+  // [2] sine at 180 Hz (tonal body)
+  // [3] mix noise + sine layers
+  // [4] amplitude ADSR
+  // [5] envelope_gain: signal * envelope
+  // [6] output
   [
     @lib.DspNode::noise(12345U),
-    @lib.DspNode::biquad(0, @lib.BiquadMode::BandPass, 800.0, 2.0),
-    @lib.DspNode::adsr(0.001, 0.08, 0.0, 0.05),
-    @lib.DspNode::gain(1, 1.0),
-    @lib.DspNode::output(3),
+    @lib.DspNode::biquad(0, @lib.BiquadMode::BandPass, 1500.0, 1.5),
+    @lib.DspNode::oscillator(@lib.Waveform::Sine, 180.0),
+    @lib.DspNode::mix(1, 2),
+    @lib.DspNode::adsr(0.5, 60.0, 0.0, 40.0),
+    @lib.DspNode::envelope_gain(3, 4, 1.0),
+    @lib.DspNode::output(5),
   ]
 }
 
 ///|
 fn hh_template() -> Array[@lib.DspNode] {
+  // Hi-hat: high-pass filtered noise, short envelope
+  // [0] noise source
+  // [1] high-pass filter at 7 kHz
+  // [2] amplitude ADSR (very short)
+  // [3] envelope_gain: signal * envelope
+  // [4] output
   [
     @lib.DspNode::noise(67890U),
-    @lib.DspNode::biquad(0, @lib.BiquadMode::HighPass, 8000.0, 1.0),
-    @lib.DspNode::adsr(0.001, 0.03, 0.0, 0.02),
-    @lib.DspNode::gain(1, 1.0),
+    @lib.DspNode::biquad(0, @lib.BiquadMode::HighPass, 7000.0, 1.5),
+    @lib.DspNode::adsr(0.5, 25.0, 0.0, 15.0),
+    @lib.DspNode::envelope_gain(1, 2, 0.6),
     @lib.DspNode::output(3),
   ]
 }
@@ -71,8 +99,8 @@ fn hh_template() -> Array[@lib.DspNode] {
 fn synth_template() -> Array[@lib.DspNode] {
   [
     @lib.DspNode::oscillator(@lib.Waveform::Sine, 440.0),
-    @lib.DspNode::adsr(0.01, 0.1, 0.7, 0.3),
-    @lib.DspNode::gain(0, 1.0),
+    @lib.DspNode::adsr(10.0, 100.0, 0.7, 300.0),
+    @lib.DspNode::envelope_gain(0, 1, 1.0),
     @lib.DspNode::output(2),
   ]
 }

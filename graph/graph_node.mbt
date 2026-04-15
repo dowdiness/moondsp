@@ -322,6 +322,30 @@ pub fn DspNode::gain(input : Int, amount : Double) -> DspNode {
 }
 
 ///|
+/// Create a gain node with envelope modulation from two upstream nodes.
+/// The output is: input_signal * envelope_buffer * amount.
+pub fn DspNode::envelope_gain(
+  input : Int,
+  envelope : Int,
+  amount : Double,
+) -> DspNode {
+  DspNode(
+    DspNodeKind::Gain,
+    input,
+    envelope,
+    amount,
+    0.0,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    BiquadMode::LowPass,
+    0,
+    0,
+    0U,
+  )
+}
+
+///|
 /// Create a sample-wise multiply node from two upstream nodes.
 pub fn DspNode::mul(left : Int, right : Int) -> DspNode {
   DspNode(

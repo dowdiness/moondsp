@@ -78,6 +78,27 @@ fn fill_constant_buffer(
 }
 
 ///|
+fn apply_envelope_gain_buffer(
+  buffer : AudioBuffer,
+  envelope : AudioBuffer,
+  sample_count : Int,
+  amount : Double,
+) -> Unit {
+  let bounded = min_buffer_length(
+    sample_count,
+    buffer.length(),
+    envelope.length(),
+    buffer.length(),
+  )
+  for index = 0; index < bounded; index = index + 1 {
+    buffer.set(index, buffer.get(index) * envelope.get(index) * amount)
+  }
+  for index = bounded; index < buffer.length(); index = index + 1 {
+    buffer.set(index, 0.0)
+  }
+}
+
+///|
 fn apply_gain_buffer(
   buffer : AudioBuffer,
   sample_count : Int,

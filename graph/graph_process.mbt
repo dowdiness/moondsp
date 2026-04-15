@@ -45,7 +45,17 @@ fn process_node_block(
     }
     Gain => {
       copy_buffer(graph.buffers[node.input0], buffer, sample_count)
-      apply_gain_buffer(buffer, sample_count, node.value0)
+      if node.input1 >= 0 {
+        // Envelope modulation: multiply by input1 buffer (e.g. ADSR), then scale
+        apply_envelope_gain_buffer(
+          buffer,
+          graph.buffers[node.input1],
+          sample_count,
+          node.value0,
+        )
+      } else {
+        apply_gain_buffer(buffer, sample_count, node.value0)
+      }
     }
     Mul =>
       multiply_buffers(
