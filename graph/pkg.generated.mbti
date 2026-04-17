@@ -76,6 +76,7 @@ pub struct CompiledTemplate {
   // private fields
 }
 pub fn CompiledTemplate::analyze(Array[DspNode]) -> Self
+pub fn CompiledTemplate::orphan_adsr_count(Self) -> Int
 
 pub struct ControlBinding {
   key : String

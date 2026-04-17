@@ -46,3 +46,23 @@ fn CompiledTemplate::length(self : CompiledTemplate) -> Int {
 fn CompiledTemplate::node_at(self : CompiledTemplate, index : Int) -> DspNode {
   self.template[index]
 }
+
+///|
+/// Count Adsr nodes in the template snapshot whose compiled index is < 0
+/// (eliminated by optimize_graph as dead code). An orphan ADSR silently
+/// no-ops its gate_on, producing voices that never envelope — VoicePool::new
+/// and set_template reject templates where this count is > 0.
+///
+/// Parameterless because the template snapshot is owned by self; callers
+/// do not need to remember which template was compiled.
+pub fn CompiledTemplate::orphan_adsr_count(self : CompiledTemplate) -> Int {
+  let mut count = 0
+  for i = 0
+      i < self.template.length() && i < self.index_map.length()
+      i = i + 1 {
+    if self.template[i].kind is Adsr && self.index_map[i] < 0 {
+      count = count + 1
+    }
+  }
+  count
+}
