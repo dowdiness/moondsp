@@ -75,7 +75,7 @@ pub fn ControlBindingBuilder::build(
   compiled_template : CompiledTemplate,
 ) -> Result[ControlBindingMap, ControlBindingError] {
   let seen_keys : Map[String, Bool] = {}
-  for i = 0; i < self.bindings.length(); i = i + 1 {
+  for i in 0..<self.bindings.length() {
     let binding = self.bindings[i]
     if binding.node_index < 0 ||
       binding.node_index >= compiled_template.length() {
@@ -92,8 +92,14 @@ pub fn ControlBindingBuilder::build(
         ),
       )
     }
-    // NB: orphan check is added in Task 7 — this commit keeps build
-    // behavior identical apart from the signature.
+    // Orphan check — binding targets a node that optimize_graph eliminated.
+    // Without this, resolve_controls would emit set_param messages that
+    // CompiledDsp silently drops via index_map[i] = -1.
+    if !compiled_template.is_node_live(binding.node_index) {
+      return Err(
+        ControlBindingError::OrphanBinding(binding.key, binding.node_index),
+      )
+    }
     if seen_keys.contains(binding.key) {
       return Err(ControlBindingError::DuplicateKey(binding.key))
     }
@@ -115,7 +121,7 @@ pub fn ControlBindingMap::resolve_controls(
   controls : Map[String, Double],
 ) -> Array[GraphControl] {
   let result = Array::new(capacity=self.bindings.length())
-  for i = 0; i < self.bindings.length(); i = i + 1 {
+  for i in 0..<self.bindings.length() {
     let binding = self.bindings[i]
     match controls.get(binding.key) {
       Some(value) =>
