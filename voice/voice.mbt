@@ -145,8 +145,11 @@ pub struct VoicePool {
 /// index to -1 and silently no-ops, and voices play with a 0 envelope —
 /// a frustrating footgun. Reject at pool-construction time with a clear
 /// failure rather than at note-trigger time with silent audio.
-/// WHY template.copy(): the pool must own a stable snapshot. compile()
-/// internally calls optimize_graph which may consume or mutate the array.
+/// WHY template.copy(): the pool's long-lived snapshot (used by note_on
+/// compiles and by set_template transitions) must be independent of the
+/// caller's array, which can be mutated after VoicePool::new returns.
+/// CompiledDsp::compile runs optimize_graph on its own local copy and
+/// does not affect the caller's array.
 pub fn VoicePool::new(
   template : Array[DspNode],
   context : DspContext,

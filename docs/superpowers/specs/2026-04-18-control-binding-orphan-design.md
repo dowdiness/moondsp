@@ -171,7 +171,7 @@ All new tests mirror the PR #8 shape in `graph/graph_optimize_test.mbt` and `voi
 ### Orphan-binding rejection tests
 
 8. **Live binding passes** — binding on surviving `Oscillator`.value0 → `Ok`.
-9. **Orphan binding rejected** — binding on dead ADSR (would-be-live before optimize) → `Err(OrphanBinding(key, i))`.
+9. **Orphan binding rejected** — binding on a dead node (an unwired `Oscillator`; `Value0` must be a slot the node kind accepts, so we cannot use an ADSR here — `node_accepts_slot(Adsr, *)` is always false, making the slot check preempt the orphan check) → `Err(OrphanBinding(key, i))`.
 10. **Error reports correct key** — two orphan bindings on the same node but different keys; assert the error carries the specific offending key.
 11. **Slot error preempts orphan** — binding at index `i` with both a wrong slot AND where `template[i]` gets eliminated by optimize → reports `InvalidSlotForNode`, not `OrphanBinding` (slot check runs first per the ordering above).
 12. **Bounds error preempts everything** — binding with out-of-range `node_index` still reports `InvalidNodeIndex` regardless of optimization state.
