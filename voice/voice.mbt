@@ -134,6 +134,12 @@ pub struct VoicePool {
 /// node, no invalid cycles, valid node indices) before accepting it. This
 /// is a correctness gate so that per-voice note_on compiles can assume the
 /// template is well-formed. The compiled result is discarded.
+/// WHY orphan-ADSR reject: `VoicePool::note_on` calls `gate_on` for every
+/// ADSR index in the template. If an ADSR is authored into the template but
+/// not wired to Output, optimize_graph eliminates it, `gate_on` maps the
+/// index to -1 and silently no-ops, and voices play with a 0 envelope —
+/// a frustrating footgun. Reject at pool-construction time with a clear
+/// failure rather than at note-trigger time with silent audio.
 /// WHY template.copy(): the pool must own a stable snapshot. compile()
 /// internally calls optimize_graph which may consume or mutate the array.
 pub fn VoicePool::new(
@@ -144,8 +150,11 @@ pub fn VoicePool::new(
   if max_voices <= 0 {
     return None
   }
-  let test_compile = CompiledDsp::compile(template, context)
-  if test_compile is None {
+  let test_compile = match CompiledDsp::compile(template, context) {
+    Some(c) => c
+    None => return None
+  }
+  if test_compile.orphan_adsr_count(template) > 0 {
     return None
   }
   let block_size = context.block_size()
@@ -165,8 +174,12 @@ pub fn VoicePool::set_template(
   self : VoicePool,
   template : Array[DspNode],
 ) -> Bool {
-  let test_compile = CompiledDsp::compile(template, self.compile_context)
-  if test_compile is None {
+  let test_compile = match
+    CompiledDsp::compile(template, self.compile_context) {
+    Some(c) => c
+    None => return false
+  }
+  if test_compile.orphan_adsr_count(template) > 0 {
     return false
   }
   self.template = template.copy()

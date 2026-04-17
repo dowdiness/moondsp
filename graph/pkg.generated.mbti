@@ -29,6 +29,7 @@ pub fn CompiledDsp::gate_on(Self, Int) -> Bool
 pub fn CompiledDsp::has_feedback_edges(Self) -> Bool
 pub fn CompiledDsp::is_voice_finished(Self) -> Bool
 pub fn CompiledDsp::last_sanitized_count(Self) -> Int
+pub fn CompiledDsp::orphan_adsr_count(Self, Array[DspNode]) -> Int
 pub fn CompiledDsp::process(Self, @dsp.DspContext, @dsp.AudioBuffer) -> Unit
 pub fn CompiledDsp::set_param(Self, Int, GraphParamSlot, Double) -> Bool
 pub impl GraphControllable for CompiledDsp

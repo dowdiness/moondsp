@@ -78,12 +78,15 @@ test "compute_arc: fractional BPM 120.5 preserves precision" {
 }
 
 ///|
-/// Helper: build a VoicePool with a minimal osc→adsr→gain→output template.
+/// Helper: build a VoicePool with a minimal osc→adsr→envelope_gain→output
+/// template. Envelope_gain wires the ADSR at index 1 into the signal path so
+/// `VoicePool::new`'s orphan-ADSR gate accepts it; swapping to bare `gain(0)`
+/// would orphan the ADSR and be rejected.
 fn make_test_pool() -> (@lib.VoicePool, Array[@lib.DspNode], @lib.DspContext) {
   let template : Array[@lib.DspNode] = [
     @lib.DspNode::oscillator(@lib.Waveform::Sine, 440.0),
     @lib.DspNode::adsr(0.01, 0.1, 0.7, 0.3),
-    @lib.DspNode::gain(0, 1.0),
+    @lib.DspNode::envelope_gain(0, 1, 1.0),
     @lib.DspNode::output(2),
   ]
   let ctx = @lib.DspContext::new(48000.0, 128)
@@ -229,7 +232,7 @@ test "process_block: stolen voice gate-off is harmless" {
   let template : Array[@lib.DspNode] = [
     @lib.DspNode::oscillator(@lib.Waveform::Sine, 440.0),
     @lib.DspNode::adsr(0.01, 0.1, 0.7, 0.3),
-    @lib.DspNode::gain(0, 1.0),
+    @lib.DspNode::envelope_gain(0, 1, 1.0),
     @lib.DspNode::output(2),
   ]
   let ctx = @lib.DspContext::new(48000.0, 128)

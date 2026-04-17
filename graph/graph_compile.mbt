@@ -77,6 +77,27 @@ pub fn CompiledStereoDsp::has_feedback_edges(self : CompiledStereoDsp) -> Bool {
 }
 
 ///|
+/// Count ADSR nodes in `template` that were eliminated as dead code during
+/// optimization. An orphan ADSR — one with no path to the Output — silently
+/// no-ops its `gate_on`, producing voices that never envelope. Templates
+/// authored as `[osc, adsr, gain(osc), output(gain)]` (ADSR present but
+/// unwired) hit this. Returns 0 when every `Adsr` node in `template` maps
+/// to a live compiled node.
+pub fn CompiledDsp::orphan_adsr_count(
+  self : CompiledDsp,
+  template : Array[DspNode],
+) -> Int {
+  let mut count = 0
+  let map = self.0.index_map
+  for i = 0; i < template.length() && i < map.length(); i = i + 1 {
+    if template[i].kind is Adsr && map[i] < 0 {
+      count = count + 1
+    }
+  }
+  count
+}
+
+///|
 /// Compile a declarative mono graph into an executable buffer graph.
 ///
 /// This first Phase 2 slice accepts nodes in authoring order, requires exactly

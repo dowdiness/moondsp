@@ -87,6 +87,79 @@ test "voice pool constructor rejects invalid template" {
 }
 
 ///|
+test "voice pool constructor rejects template with orphan ADSR" {
+  let ctx = DspContext::new(48000.0, 128)
+  // ADSR at index 1 is unwired — gain reads from osc (0), not adsr (1).
+  // Without the orphan-ADSR guard, VoicePool::note_on would silently no-op
+  // `gate_on(1)` and voices would play with a flat envelope.
+  let template = [
+    DspNode::oscillator(Waveform::Sine, 440.0),
+    DspNode::adsr(5.0, 5.0, 0.5, 50.0),
+    DspNode::gain(0, 1.0),
+    DspNode::output(2),
+  ]
+  let pool = VoicePool::new(template, ctx)
+  assert_true(pool is None)
+}
+
+///|
+test "voice pool constructor accepts wired-ADSR template via envelope_gain" {
+  let ctx = DspContext::new(48000.0, 128)
+  let template = [
+    DspNode::oscillator(Waveform::Sine, 440.0),
+    DspNode::adsr(5.0, 5.0, 0.5, 50.0),
+    DspNode::envelope_gain(0, 1, 1.0),
+    DspNode::output(2),
+  ]
+  let pool = VoicePool::new(template, ctx)
+  assert_true(pool is Some(_))
+}
+
+///|
+test "set_template rejects template with orphan ADSR" {
+  let ctx = DspContext::new(48000.0, 128)
+  let wired_template = [
+    DspNode::oscillator(Waveform::Sine, 440.0),
+    DspNode::adsr(5.0, 5.0, 0.5, 50.0),
+    DspNode::envelope_gain(0, 1, 1.0),
+    DspNode::output(2),
+  ]
+  let pool = VoicePool::new(wired_template, ctx).unwrap()
+  let orphan_template = [
+    DspNode::oscillator(Waveform::Sine, 440.0),
+    DspNode::adsr(5.0, 5.0, 0.5, 50.0),
+    DspNode::gain(0, 1.0),
+    DspNode::output(2),
+  ]
+  assert_true(!pool.set_template(orphan_template))
+}
+
+///|
+test "set_template rejection leaves previous template intact" {
+  // Regression guard: a failed set_template must not partially mutate state.
+  // note_on must still work against the original (wired) template after the
+  // rejected attempt.
+  let ctx = DspContext::new(48000.0, 128)
+  let wired_template = [
+    DspNode::oscillator(Waveform::Sine, 440.0),
+    DspNode::adsr(5.0, 5.0, 0.5, 50.0),
+    DspNode::envelope_gain(0, 1, 1.0),
+    DspNode::output(2),
+  ]
+  let pool = VoicePool::new(wired_template, ctx).unwrap()
+  let orphan_template = [
+    DspNode::oscillator(Waveform::Sine, 440.0),
+    DspNode::adsr(5.0, 5.0, 0.5, 50.0),
+    DspNode::gain(0, 1.0),
+    DspNode::output(2),
+  ]
+  assert_true(!pool.set_template(orphan_template))
+  // Pool should still be usable with the original template.
+  assert_true(pool.note_on([]) is Some(_))
+  assert_true(pool.active_voice_count() == 1)
+}
+
+///|
 test "set_template accepts valid template" {
   let ctx = DspContext::new(48000.0, 128)
   let nodes = [DspNode::constant(440.0), DspNode::output(0)]
