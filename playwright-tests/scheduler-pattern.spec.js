@@ -152,15 +152,16 @@ test.describe('BPM and Gain Controls', () => {
     // Set gain to 0
     await setRangeValue(page, '#schedulerGainSlider', 0);
 
-    // Wait for gain change to take effect
-    await page.waitForTimeout(500);
-
-    // Verify output is silent or near-silent
+    // No fixed sleep: expect.poll already retries until peaks drop, and the
+    // prior 500ms waitForTimeout was belt-and-suspenders that only served to
+    // mask CI-side jitter (the retry-masked flake this replaces). A longer
+    // poll timeout is the deterministic equivalent — the gain ramp takes
+    // roughly one telemetry interval (~21ms) to propagate.
     await expect
       .poll(async () => {
         const peaks = await renderPeaks(page);
         return peaks.overall;
-      }, { timeout: 5_000 })
+      }, { timeout: 10_000 })
       .toBeLessThan(0.001);
   });
 });
@@ -170,10 +171,16 @@ test.describe('Stop and Restart', () => {
     await startScheduler(page);
     await expect(page.locator('#patternStatus')).toContainText('Pattern updated', { timeout: 5_000 });
 
-    // Wait for audio
-    await page.waitForTimeout(300);
+    // Wait for audio to actually start producing signal, rather than a fixed
+    // 300ms timeout that can miss the signal on slow workers (the retry-masked
+    // flake this replaces). Stop is only meaningful once audio is live.
+    await expect
+      .poll(async () => {
+        const peaks = await renderPeaks(page);
+        return peaks.overall;
+      }, { timeout: 10_000 })
+      .toBeGreaterThan(0);
 
-    // Stop
     await page.click('#stopBtn');
     await expect(page.locator('#status')).toContainText('Stopped.');
   });

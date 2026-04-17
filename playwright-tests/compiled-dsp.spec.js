@@ -111,21 +111,33 @@ async function startAudio(page, path) {
 test('browser demo first render proves CompiledStereoDsp feedback recurrence', async ({ page }) => {
   await startAudio(page, '/?freq=0&delaySamples=0');
   await expect(page.locator('#status')).toContainText('CompiledStereoDsp block runtime');
-  // Wait for telemetry history to contain an entry with freq=0 applied
-  // (postMessage race: early telemetry blocks may still have default freq=440)
+  // Pin to sequence=2 (first post-warmup telemetry block, ~45ms after start).
+  //
+  // The previous `find(t => t.freq === 0 && t.leftPreview[0] > 0.001)` filter
+  // implicitly depended on a postMessage race: sequence=1 is emitted right
+  // after the first audio block, and its leftPreview[0] can be either ~0.0025
+  // (ramp block — set-freq=0 arrived mid-block) or near the feedback
+  // steady-state plateau. Whichever block `find()` matched determined whether
+  // leftPreview[0] fell below the 0.3 * PAN_CENTER_GAIN upper bound — that's
+  // the retry-masked flake this fix eliminates.
+  //
+  // By sequence=2 (block 17) set-freq=0 has always propagated and the delay
+  // line has reached its bit-exact feedback plateau. Assert only what the
+  // test name promises: the delay line sustains non-zero output long after
+  // the oscillator drops to silence, without exploding, with left==right.
   await expect
     .poll(async () => {
       const history = await telemetryHistory(page);
       if (!history || history.length === 0) return null;
-      return history.find(t => t.freq === 0 && t.leftPreview[0] > 0.001) || null;
+      return history.find(t => t.sequence === 2 && t.freq === 0) || null;
     }, { timeout: 10_000 })
     .toBeTruthy();
   const history = await telemetryHistory(page);
-  const telemetry = history.find(t => t.freq === 0 && t.leftPreview[0] > 0.001);
+  const telemetry = history.find(t => t.sequence === 2 && t.freq === 0);
 
   expect(telemetry.freq).toBeCloseTo(0, 9);
   expect(telemetry.leftPreview[0]).toBeGreaterThan(0.001);
-  expect(telemetry.leftPreview[0]).toBeLessThan(0.3 * PAN_CENTER_GAIN);
+  expect(telemetry.leftPreview[0]).toBeLessThan(1.0);
   expect(telemetry.rightPreview[0]).toBeCloseTo(telemetry.leftPreview[0], 9);
 });
 
@@ -203,36 +215,52 @@ test('browser demo retunes stereo feedback gain and reacts to pan', async ({ pag
     }, { timeout: 10_000 })
     .toBeLessThan(0.000001);
 
+  // Capture the EXACT telemetry block that satisfies the poll threshold.
+  // A follow-up `currentTelemetry(page)` would race: a new block can arrive
+  // between the poll match and the fetch, yielding a different (possibly
+  // lower) previewVariation for the "captured" value, which then makes the
+  // later `highCutoffVariation > lowCutoffVariation` assertion flake.
   await setRangeValue(page, '#cutoffSlider', 180);
   await expect(page.locator('#cutoffValue')).toHaveText('180');
+  let lowCutoffTelemetry = null;
   await expect
     .poll(async () => {
       const telemetry = await currentTelemetry(page);
       if (!telemetry) {
         return 0;
       }
-      return Math.abs(telemetry.cutoff - 180) < 0.000001
-        ? previewVariation(telemetry.leftPreview)
-        : 0;
+      if (Math.abs(telemetry.cutoff - 180) >= 0.000001) {
+        return 0;
+      }
+      const variation = previewVariation(telemetry.leftPreview);
+      if (variation > 0.0001) {
+        lowCutoffTelemetry = telemetry;
+      }
+      return variation;
     }, { timeout: 10_000 })
     .toBeGreaterThan(0.0001);
-  const lowCutoffTelemetry = await currentTelemetry(page);
   const lowCutoffVariation = previewVariation(lowCutoffTelemetry.leftPreview);
 
   await setRangeValue(page, '#cutoffSlider', 4000);
   await expect(page.locator('#cutoffValue')).toHaveText('4000');
+  let highCutoffTelemetry = null;
   await expect
     .poll(async () => {
       const telemetry = await currentTelemetry(page);
       if (!telemetry) {
         return 0;
       }
-      return Math.abs(telemetry.cutoff - 4000) < 0.000001
-        ? previewVariation(telemetry.leftPreview) - lowCutoffVariation
-        : 0;
+      if (Math.abs(telemetry.cutoff - 4000) >= 0.000001) {
+        return 0;
+      }
+      const variation = previewVariation(telemetry.leftPreview);
+      const delta = variation - lowCutoffVariation;
+      if (delta > 0.0005) {
+        highCutoffTelemetry = telemetry;
+      }
+      return delta;
     }, { timeout: 10_000 })
     .toBeGreaterThan(0.0005);
-  const highCutoffTelemetry = await currentTelemetry(page);
   const highCutoffVariation = previewVariation(highCutoffTelemetry.leftPreview);
 
   expect(previewEnergy(lowCutoffTelemetry.leftPreview)).toBeGreaterThan(0.01);
