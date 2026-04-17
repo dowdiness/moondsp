@@ -61,3 +61,38 @@ test "orphan_adsr_count: multiple dead ADSRs returns correct count" {
   let ct = CompiledTemplate::analyze(template)
   assert_eq(ct.orphan_adsr_count(), 3)
 }
+
+///|
+test "is_node_live: surviving node returns true" {
+  let template = [
+    DspNode::oscillator(Waveform::Sine, 440.0),
+    DspNode::output(0),
+  ]
+  let ct = CompiledTemplate::analyze(template)
+  assert_true(ct.is_node_live(0)) // Oscillator survives (feeds Output)
+  assert_true(ct.is_node_live(1)) // Output survives
+}
+
+///|
+test "is_node_live: eliminated node returns false" {
+  let template = [
+    DspNode::oscillator(Waveform::Sine, 440.0),
+    DspNode::adsr(10.0, 100.0, 0.7, 300.0), // orphan — eliminated
+    DspNode::gain(0, 0.3),
+    DspNode::output(2),
+  ]
+  let ct = CompiledTemplate::analyze(template)
+  assert_false(ct.is_node_live(1)) // ADSR dead
+  assert_true(ct.is_node_live(0)) // Osc survives
+  assert_true(ct.is_node_live(2)) // Gain survives
+  assert_true(ct.is_node_live(3)) // Output survives
+}
+
+///|
+test "is_node_live: out-of-bounds index returns false (does not abort)" {
+  let template = [DspNode::constant(1.0), DspNode::output(0)]
+  let ct = CompiledTemplate::analyze(template)
+  assert_false(ct.is_node_live(-1))
+  assert_false(ct.is_node_live(100))
+  assert_false(ct.is_node_live(2)) // exactly one past end
+}

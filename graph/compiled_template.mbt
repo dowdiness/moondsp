@@ -48,6 +48,18 @@ fn CompiledTemplate::node_at(self : CompiledTemplate, index : Int) -> DspNode {
 }
 
 ///|
+/// Does authoring index `i` survive the optimizer? Returns false for
+/// out-of-range indices (no abort).
+///
+/// Package-private: binding validation in control_binding.mbt uses this;
+/// external callers should not need raw liveness queries — orphan counts
+/// (for diagnostics) or the build rejection flow (for enforcement) are
+/// sufficient.
+fn CompiledTemplate::is_node_live(self : CompiledTemplate, index : Int) -> Bool {
+  index >= 0 && index < self.index_map.length() && self.index_map[index] >= 0
+}
+
+///|
 /// Count Adsr nodes in the template snapshot whose compiled index is < 0
 /// (eliminated by optimize_graph as dead code). An orphan ADSR silently
 /// no-ops its gate_on, producing voices that never envelope — VoicePool::new
