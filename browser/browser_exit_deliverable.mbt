@@ -1,19 +1,4 @@
 ///|
-let exit_deliverable_graph : @ref.Ref[@lib.CompiledDsp?] = @ref.new(None)
-
-///|
-let exit_deliverable_context : @ref.Ref[@lib.DspContext?] = @ref.new(None)
-
-///|
-let exit_deliverable_output : @ref.Ref[@lib.AudioBuffer?] = @ref.new(None)
-
-///|
-let exit_deliverable_sample_rate : @ref.Ref[Double] = @ref.new(0.0)
-
-///|
-let exit_deliverable_block_size : @ref.Ref[Int] = @ref.new(0)
-
-///|
 // WHY this map: node indices are positional after GraphBuilder flattening.
 // apply_control targets nodes by index, so this map is needed to aim correctly.
 // [0] Constant(2.0)       — LFO rate
@@ -46,12 +31,21 @@ let exit_cutoff : @ref.Ref[Double] = @ref.new(800.0)
 let exit_gain : @ref.Ref[Double] = @ref.new(0.3)
 
 ///|
+let exit_deliverable : GraphSlot[@lib.CompiledDsp, MonoOut] = GraphSlot::new(
+  output=MonoOut::new(),
+  compile=fn(ctx) {
+    let builder : @lib.GraphBuilder = @lib.exit_deliverable()
+    @lib.CompiledDsp::compile(builder.nodes(), ctx)
+  },
+)
+
+///|
 /// Initialize the exit deliverable graph: FM synthesis via tagless composition.
 pub fn init_exit_deliverable_graph(
   sample_rate : Double,
   block_size : Int,
 ) -> Bool {
-  ensure_exit_deliverable_graph(sample_rate, block_size)
+  exit_deliverable.ensure(sample_rate, block_size)
 }
 
 ///|
@@ -90,10 +84,10 @@ pub fn process_exit_deliverable_block(
   sample_rate : Double,
   block_size : Int,
 ) -> Bool {
-  if !ensure_exit_deliverable_graph(sample_rate, block_size) {
+  if !exit_deliverable.ensure(sample_rate, block_size) {
     return false
   }
-  let graph = exit_deliverable_graph.val.unwrap()
+  let graph = exit_deliverable.graph_val()
   // Apply controls individually — batch is transactional and one failure
   // rejects all. Individual controls are independent.
   ignore(
@@ -123,60 +117,19 @@ pub fn process_exit_deliverable_block(
       ),
     ),
   )
-  graph.process(
-    exit_deliverable_context.val.unwrap(),
-    exit_deliverable_output.val.unwrap(),
-  )
+  graph.process(exit_deliverable.ctx_val(), exit_deliverable.output.get())
   true
 }
 
 ///|
 /// Read one sample from the most recent exit deliverable output block.
 pub fn exit_deliverable_output_sample(index : Int) -> Double {
-  checked_sample(index, exit_deliverable_output.val)
-}
-
-///|
-fn ensure_exit_deliverable_graph(
-  sample_rate : Double,
-  block_size : Int,
-) -> Bool {
-  if sample_rate <= 0.0 || block_size <= 0 {
-    reset_exit_deliverable_graph()
-    return false
-  }
-  if exit_deliverable_graph.val is Some(_) &&
-    exit_deliverable_sample_rate.val == sample_rate &&
-    exit_deliverable_block_size.val == block_size {
-    return true
-  }
-
-  let context = @lib.DspContext::new(sample_rate, block_size)
-  let output = @lib.AudioBuffer::filled(block_size)
-  let builder : @lib.GraphBuilder = @lib.exit_deliverable()
-  match @lib.CompiledDsp::compile(builder.nodes(), context) {
-    Some(graph) => {
-      exit_deliverable_graph.val = Some(graph)
-      exit_deliverable_context.val = Some(context)
-      exit_deliverable_output.val = Some(output)
-      exit_deliverable_sample_rate.val = sample_rate
-      exit_deliverable_block_size.val = block_size
-      true
-    }
-    None => {
-      reset_exit_deliverable_graph()
-      false
-    }
-  }
+  exit_deliverable.output.sample(index)
 }
 
 ///|
 fn reset_exit_deliverable_graph() -> Unit {
-  exit_deliverable_graph.val = None
-  exit_deliverable_context.val = None
-  exit_deliverable_output.val = None
-  exit_deliverable_sample_rate.val = 0.0
-  exit_deliverable_block_size.val = 0
+  exit_deliverable.reset()
   exit_lfo_rate.val = 2.0
   exit_cutoff.val = 800.0
   exit_gain.val = 0.3

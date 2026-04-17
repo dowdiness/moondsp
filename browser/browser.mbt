@@ -145,22 +145,6 @@ pub fn tick_source(
 // ---------------------------------------------------------------------------
 
 ///|
-/// Bounds-checked sample read from an optional buffer.
-/// Shared by all mono and stereo output_sample functions.
-/// Returns 0.0 for out-of-bounds indices or uninitialized buffers.
-fn checked_sample(index : Int, output : @lib.AudioBuffer?) -> Double {
-  match output {
-    Some(buffer) =>
-      if index >= 0 && index < buffer.length() {
-        buffer.get(index)
-      } else {
-        0.0
-      }
-    None => 0.0
-  }
-}
-
-///|
 /// Clamp gain to safe feedback range, replacing NaN/Inf with default.
 fn bounded_feedback_gain(gain : Double) -> Double {
   if gain.is_nan() || gain.is_inf() {

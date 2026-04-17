@@ -68,10 +68,14 @@ test.describe('Pattern Text Input', () => {
     // Verify pattern was accepted
     await expect(page.locator('#patternStatus')).toContainText('Pattern updated');
 
-    // Wait for audio and verify signal
-    await page.waitForTimeout(300);
-    const peaks = await renderPeaks(page);
-    expect(peaks.overall).toBeGreaterThan(0);
+    // Poll for audio signal — peaks reflect the most recent audio block, so
+    // a 300ms hardcoded wait can miss the signal on slow workers.
+    await expect
+      .poll(async () => {
+        const peaks = await renderPeaks(page);
+        return peaks.overall;
+      }, { timeout: 10_000 })
+      .toBeGreaterThan(0);
   });
 
   test('Eval a note pattern via Enter key', async ({ page }) => {
@@ -85,10 +89,13 @@ test.describe('Pattern Text Input', () => {
     // Verify pattern was accepted
     await expect(page.locator('#patternStatus')).toContainText('Pattern updated');
 
-    // Verify signal
-    await page.waitForTimeout(300);
-    const peaks = await renderPeaks(page);
-    expect(peaks.overall).toBeGreaterThan(0);
+    // Poll for audio signal — same reason as drum pattern test above.
+    await expect
+      .poll(async () => {
+        const peaks = await renderPeaks(page);
+        return peaks.overall;
+      }, { timeout: 10_000 })
+      .toBeGreaterThan(0);
   });
 
   test('Parse error shows message', async ({ page }) => {
