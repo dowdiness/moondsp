@@ -79,9 +79,11 @@ pub fn ControlBindingMap::length(self : ControlBindingMap) -> Int {
 }
 
 ///|
-/// Validate all bindings against the graph template and transition to
-/// the proven-valid ControlBindingMap. Checks node index bounds, slot
-/// compatibility, and key uniqueness. Returns the first error found.
+/// Validate all bindings against the compiled template and transition
+/// to the proven-valid ControlBindingMap. Per-binding checks in order:
+/// node index bounds, slot compatibility with the authoring node kind,
+/// post-optimization liveness (rejects bindings on nodes eliminated by
+/// optimize_graph), and key uniqueness. Returns the first error found.
 pub fn ControlBindingBuilder::build(
   self : ControlBindingBuilder,
   compiled_template : CompiledTemplate,

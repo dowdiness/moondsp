@@ -315,3 +315,21 @@ test "build: empty builder still succeeds on any template" {
   )
   assert_true(result is Ok(_))
 }
+
+///|
+test "build: orphan via constant-folding rejected" {
+  // Coverage for the optimizer path that eliminates nodes via fold_constants
+  // rather than dead-branch elimination. Gain is foldable; when its inputs
+  // are constants, optimize_graph replaces the Gain with a Constant and the
+  // upstream Constant becomes unreachable. A binding at the upstream
+  // Constant's authoring index must be rejected as OrphanBinding.
+  let template = [
+    DspNode::constant(1.0), // index 0 — eliminated by fold_constants
+    DspNode::gain(0, 0.3), // index 1 — foldable; folds to a new Constant
+    DspNode::output(1), // index 2 — wires to the folded node
+  ]
+  let result = ControlBindingBuilder::new()
+    .bind(key="base", node_index=0, slot=GraphParamSlot::Value0)
+    .build(CompiledTemplate::analyze(template))
+  assert_eq(result, Err(ControlBindingError::OrphanBinding("base", 0)))
+}
