@@ -57,9 +57,7 @@ fn CompiledTemplate::node_at(self : CompiledTemplate, index : Int) -> DspNode {
 /// do not need to remember which template was compiled.
 pub fn CompiledTemplate::orphan_adsr_count(self : CompiledTemplate) -> Int {
   let mut count = 0
-  for i = 0
-      i < self.template.length() && i < self.index_map.length()
-      i = i + 1 {
+  for i in 0..<self.template.length() {
     if self.template[i].kind is Adsr && self.index_map[i] < 0 {
       count = count + 1
     }
