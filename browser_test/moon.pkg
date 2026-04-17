@@ -18,6 +18,7 @@ options(
         "process_compiled_stereo_block",
         "compiled_stereo_left_sample",
         "compiled_stereo_right_sample",
+        "mul_adsr_peak",
       ],
     },
     "wasm-gc": {
@@ -32,6 +33,7 @@ options(
         "process_compiled_stereo_block",
         "compiled_stereo_left_sample",
         "compiled_stereo_right_sample",
+        "mul_adsr_peak",
       ],
     },
   },

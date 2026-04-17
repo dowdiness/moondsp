@@ -210,3 +210,34 @@ fn reset_compiled_graph() -> Unit {
   compiled_sample_rate.val = 0.0
   compiled_block_size.val = 0
 }
+
+///|
+/// Peak magnitude of one block from `[osc(Sine, 440Hz), adsr(5,5,0.5,50) ms,
+/// mul(0,1), output(2)]` with gate_on fired. Proves that `DspNode::mul` in a
+/// wasm-gc release build produces non-trivial audio — counter-evidence to the
+/// former "Mul wasm-gc bug" memory. Returns -1.0 if compile fails.
+pub fn mul_adsr_peak(sample_rate : Double, block_size : Int) -> Double {
+  let ctx = @lib.DspContext::new(sample_rate, block_size)
+  let nodes = [
+    @lib.DspNode::oscillator(@lib.Waveform::Sine, 440.0),
+    @lib.DspNode::adsr(5.0, 5.0, 0.5, 50.0),
+    @lib.DspNode::mul(0, 1),
+    @lib.DspNode::output(2),
+  ]
+  match @lib.CompiledDsp::compile(nodes, ctx) {
+    Some(graph) => {
+      ignore(graph.gate_on(1))
+      let buf = @lib.AudioBuffer::filled(block_size)
+      graph.process(ctx, buf)
+      let mut peak = 0.0
+      for i = 0; i < block_size; i = i + 1 {
+        let s = buf.get(i).abs()
+        if s > peak {
+          peak = s
+        }
+      }
+      peak
+    }
+    None => -1.0
+  }
+}
