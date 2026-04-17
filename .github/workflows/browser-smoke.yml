@@ -37,3 +37,39 @@ jobs:
 
       - name: Run browser smoke test
         run: npm run test:browser
+
+  deploy:
+    needs: browser-smoke
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: deploy-main
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - name: Fetch MoonBit dependencies
+        run: moon update
+
+      - name: Build wasm-gc release
+        run: |
+          moon clean
+          moon build --target wasm-gc --release
+
+      - name: Sync wasm artifacts to web/
+        run: ./playwright-sync-wasm.sh
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy web/ --project-name=mdsp --branch=main
