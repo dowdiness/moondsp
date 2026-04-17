@@ -3,6 +3,7 @@ package "dowdiness/mdsp/graph"
 
 import {
   "dowdiness/mdsp/dsp",
+  "moonbitlang/core/debug",
 }
 
 // Values
@@ -76,28 +77,32 @@ pub struct ControlBinding {
   slot : GraphParamSlot
 
   fn new(key~ : String, node_index~ : Int, slot~ : GraphParamSlot) -> ControlBinding
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub impl Show for ControlBinding
 
 pub struct ControlBindingBuilder {
   bindings : Array[ControlBinding]
 
   fn new() -> ControlBindingBuilder
-} derive(Show)
+} derive(@debug.Debug)
 pub fn ControlBindingBuilder::bind(Self, key~ : String, node_index~ : Int, slot~ : GraphParamSlot) -> Self
 pub fn ControlBindingBuilder::build(Self, Array[DspNode]) -> Result[ControlBindingMap, ControlBindingError]
 pub fn ControlBindingBuilder::new() -> Self
+pub impl Show for ControlBindingBuilder
 
 pub(all) enum ControlBindingError {
   InvalidNodeIndex(Int)
   InvalidSlotForNode(Int, GraphParamSlot)
   DuplicateKey(String)
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub impl Show for ControlBindingError
 
 pub struct ControlBindingMap {
   // private fields
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 pub fn ControlBindingMap::length(Self) -> Int
 pub fn ControlBindingMap::resolve_controls(Self, Map[String, Double]) -> Array[GraphControl]
+pub impl Show for ControlBindingMap
 
 pub struct DspNode {
   kind : DspNodeKind
@@ -198,7 +203,8 @@ pub(all) enum GraphParamSlot {
   Value2
   Value3
   DelaySamples
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub impl Show for GraphParamSlot
 
 pub(all) enum GraphTopologyEdit {
   ReplaceNode(Int, DspNode)
@@ -224,7 +230,8 @@ pub(all) enum GraphValidationError {
   InvalidInput0(Int, Int, Int)
   InvalidInput1(Int, Int, Int)
   InvalidStateIndex(Int, String)
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub impl Show for GraphValidationError
 
 // Type aliases
 pub using @dsp {type Adsr}

@@ -29,7 +29,12 @@ pub(all) enum GraphParamSlot {
   Value2
   Value3
   DelaySamples
-} derive(Eq, Show)
+} derive(Eq, Debug)
+
+///|
+pub impl Show for GraphParamSlot with output(self, logger) {
+  logger.write_string(@debug.to_string(self))
+}
 
 ///|
 /// Unified runtime control kinds for compiled graphs.

@@ -9,7 +9,12 @@ pub enum VoiceState {
   Idle
   Active
   Releasing
-} derive(Eq, Show)
+} derive(Eq, Debug)
+
+///|
+pub impl Show for VoiceState with output(self, logger) {
+  logger.write_string(@debug.to_string(self))
+}
 
 ///|
 /// Generation-tagged voice handle.
@@ -21,7 +26,12 @@ pub enum VoiceState {
 pub struct VoiceHandle {
   slot : Int
   generation : Int
-} derive(Eq, Show)
+} derive(Eq, Debug)
+
+///|
+pub impl Show for VoiceHandle with output(self, logger) {
+  logger.write_string(@debug.to_string(self))
+}
 
 ///|
 priv struct VoiceSlot {

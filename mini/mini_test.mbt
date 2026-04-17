@@ -43,7 +43,7 @@ test "parse single drum sound" {
   inspect(
     events[0].value,
     content=(
-      #|ControlMap({"sound": 36})
+      #|ControlMap({ "sound": 36 })
     ),
   )
 }
@@ -63,19 +63,19 @@ test "parse note sequence" {
   inspect(
     events[0].value,
     content=(
-      #|ControlMap({"note": 60})
+      #|ControlMap({ "note": 60 })
     ),
   )
   inspect(
     events[1].value,
     content=(
-      #|ControlMap({"note": 64})
+      #|ControlMap({ "note": 64 })
     ),
   )
   inspect(
     events[2].value,
     content=(
-      #|ControlMap({"note": 67})
+      #|ControlMap({ "note": 67 })
     ),
   )
 }
@@ -161,19 +161,19 @@ test "parse with rev method" {
   inspect(
     events[0].value,
     content=(
-      #|ControlMap({"sound": 36})
+      #|ControlMap({ "sound": 36 })
     ),
   )
   inspect(
     events[1].value,
     content=(
-      #|ControlMap({"sound": 38})
+      #|ControlMap({ "sound": 38 })
     ),
   )
   inspect(
     events[2].value,
     content=(
-      #|ControlMap({"sound": 42})
+      #|ControlMap({ "sound": 42 })
     ),
   )
 }

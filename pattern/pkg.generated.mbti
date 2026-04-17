@@ -1,6 +1,10 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "dowdiness/mdsp/pattern"
 
+import {
+  "moonbitlang/core/debug",
+}
+
 // Values
 pub fn[A] every(Int, (Pat[A]) -> Pat[A], Pat[A]) -> Pat[A]
 
@@ -25,15 +29,17 @@ pub fn[A] stack(Array[Pat[A]]) -> Pat[A]
 // Errors
 
 // Types and methods
-pub struct ControlMap(Map[String, Double]) derive(Show)
+pub struct ControlMap(Map[String, Double]) derive(@debug.Debug)
 #deprecated
 pub fn ControlMap::inner(Self) -> Map[String, Double]
+pub impl Show for ControlMap
 
 pub struct Event[A] {
   whole : TimeSpan?
   part : TimeSpan
   value : A
-} derive(Show)
+} derive(@debug.Debug)
+pub impl[A : @debug.Debug] Show for Event[A]
 
 pub struct Pat[A] {
   query : (TimeSpan) -> Array[Event[A]]
@@ -49,7 +55,7 @@ pub fn[A] Pat::slow(Self[A], Rational) -> Self[A]
 pub struct Rational {
   num : Int64
   den : Int64
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 pub fn Rational::floor(Self) -> Int64
 pub fn Rational::from_int(Int) -> Self
 pub fn Rational::new(Int64, Int64) -> Self
@@ -58,17 +64,19 @@ pub impl Add for Rational
 pub impl Compare for Rational
 pub impl Div for Rational
 pub impl Mul for Rational
+pub impl Show for Rational
 pub impl Sub for Rational
 
 pub struct TimeSpan {
   begin : Rational
   end_ : Rational
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 pub fn TimeSpan::contains(Self, Rational) -> Bool
 pub fn TimeSpan::duration(Self) -> Rational
 pub fn TimeSpan::intersect(Self, Self) -> Self?
 pub fn TimeSpan::new(Rational, Rational) -> Self
 pub fn TimeSpan::whole_cycles(Self) -> Array[Self]
+pub impl Show for TimeSpan
 
 // Type aliases
 

@@ -11,7 +11,12 @@
 pub struct Rational {
   num : Int64
   den : Int64
-} derive(Eq, Show)
+} derive(Eq, Debug)
+
+///|
+pub impl Show for Rational with output(self, logger) {
+  logger.write_string(@debug.to_string(self))
+}
 
 ///|
 fn gcd(a : Int64, b : Int64) -> Int64 {

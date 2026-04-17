@@ -9,7 +9,7 @@ test "simplification: 6/4 -> 3/2" {
   inspect(
     rat,
     content=(
-      #|{num: 3, den: 2}
+      #|{ num: 3, den: 2 }
     ),
   )
 }
@@ -20,7 +20,7 @@ test "simplification: 2/4 -> 1/2" {
   inspect(
     rat,
     content=(
-      #|{num: 1, den: 2}
+      #|{ num: 1, den: 2 }
     ),
   )
 }
@@ -31,7 +31,7 @@ test "negative denominator normalization" {
   inspect(
     rat,
     content=(
-      #|{num: -3, den: 4}
+      #|{ num: -3, den: 4 }
     ),
   )
 }
@@ -42,7 +42,7 @@ test "negative denominator normalization: -3/-4 -> 3/4" {
   inspect(
     rat,
     content=(
-      #|{num: 3, den: 4}
+      #|{ num: 3, den: 4 }
     ),
   )
 }
@@ -53,7 +53,7 @@ test "add: 1/2 + 1/3 = 5/6" {
   inspect(
     result,
     content=(
-      #|{num: 5, den: 6}
+      #|{ num: 5, den: 6 }
     ),
   )
 }
@@ -64,7 +64,7 @@ test "sub: 3/4 - 1/4 = 1/2" {
   inspect(
     result,
     content=(
-      #|{num: 1, den: 2}
+      #|{ num: 1, den: 2 }
     ),
   )
 }
@@ -75,7 +75,7 @@ test "mul: 2/3 * 3/4 = 1/2" {
   inspect(
     result,
     content=(
-      #|{num: 1, den: 2}
+      #|{ num: 1, den: 2 }
     ),
   )
 }
@@ -86,7 +86,7 @@ test "div: 3/4 / 3/2 = 1/2" {
   inspect(
     result,
     content=(
-      #|{num: 1, den: 2}
+      #|{ num: 1, den: 2 }
     ),
   )
 }
@@ -137,7 +137,7 @@ test "from_int: 5 -> 5/1" {
   inspect(
     rat,
     content=(
-      #|{num: 5, den: 1}
+      #|{ num: 5, den: 1 }
     ),
   )
 }

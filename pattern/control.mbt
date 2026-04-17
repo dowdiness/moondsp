@@ -1,6 +1,11 @@
 ///|
 /// Numeric control map — the contract between Pattern and DSP engines.
-pub struct ControlMap(Map[String, Double]) derive(Show)
+pub struct ControlMap(Map[String, Double]) derive(Debug)
+
+///|
+pub impl Show for ControlMap with output(self, logger) {
+  logger.write_string(@debug.to_string(self))
+}
 
 ///|
 fn single_control(key : String, value : Double) -> ControlMap {

@@ -9,7 +9,7 @@ pub struct ControlBinding {
     node_index~ : Int,
     slot~ : GraphParamSlot,
   ) -> ControlBinding
-} derive(Show, Eq)
+} derive(Debug, Eq)
 
 ///|
 fn ControlBinding::new(
@@ -25,14 +25,14 @@ pub(all) enum ControlBindingError {
   InvalidNodeIndex(Int)
   InvalidSlotForNode(Int, GraphParamSlot)
   DuplicateKey(String)
-} derive(Show, Eq)
+} derive(Debug, Eq)
 
 ///|
 pub struct ControlBindingBuilder {
   bindings : Array[ControlBinding]
 
   fn new() -> ControlBindingBuilder
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub fn ControlBindingBuilder::new() -> ControlBindingBuilder {
@@ -55,7 +55,7 @@ pub fn ControlBindingBuilder::bind(
 /// No public constructor — only reachable through ControlBindingBuilder::build().
 pub struct ControlBindingMap {
   priv bindings : Array[ControlBinding]
-} derive(Show, Eq)
+} derive(Debug, Eq)
 
 ///|
 /// Number of validated bindings in this map.
@@ -117,4 +117,24 @@ pub fn ControlBindingMap::resolve_controls(
     }
   }
   result
+}
+
+///|
+pub impl Show for ControlBinding with output(self, logger) {
+  logger.write_string(@debug.to_string(self))
+}
+
+///|
+pub impl Show for ControlBindingError with output(self, logger) {
+  logger.write_string(@debug.to_string(self))
+}
+
+///|
+pub impl Show for ControlBindingBuilder with output(self, logger) {
+  logger.write_string(@debug.to_string(self))
+}
+
+///|
+pub impl Show for ControlBindingMap with output(self, logger) {
+  logger.write_string(@debug.to_string(self))
 }

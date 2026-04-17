@@ -6,7 +6,12 @@ pub(all) enum GraphValidationError {
   InvalidInput0(Int, Int, Int)
   InvalidInput1(Int, Int, Int)
   InvalidStateIndex(Int, String)
-} derive(Show, Eq)
+} derive(Debug, Eq)
+
+///|
+pub impl Show for GraphValidationError with output(self, logger) {
+  logger.write_string(@debug.to_string(self))
+}
 
 ///|
 /// Check that node's input0 and input1 are within buffer bounds.

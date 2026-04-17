@@ -9,7 +9,7 @@ test "duration: [0, 1) = 1" {
   inspect(
     ts.duration(),
     content=(
-      #|{num: 1, den: 1}
+      #|{ num: 1, den: 1 }
     ),
   )
 }
@@ -20,7 +20,7 @@ test "duration: [1/4, 3/4) = 1/2" {
   inspect(
     ts.duration(),
     content=(
-      #|{num: 1, den: 2}
+      #|{ num: 1, den: 2 }
     ),
   )
 }
@@ -58,7 +58,7 @@ test "intersect: overlapping [0,1) and [1/2,2) = [1/2, 1)" {
       inspect(
         ts,
         content=(
-          #|{begin: {num: 1, den: 2}, end_: {num: 1, den: 1}}
+          #|{ begin: { num: 1, den: 2 }, end_: { num: 1, den: 1 } }
         ),
       )
     None => abort("expected intersection")
@@ -87,7 +87,7 @@ test "intersect: same arc = same arc" {
       inspect(
         ts,
         content=(
-          #|{begin: {num: 0, den: 1}, end_: {num: 1, den: 1}}
+          #|{ begin: { num: 0, den: 1 }, end_: { num: 1, den: 1 } }
         ),
       )
     None => abort("expected intersection")
@@ -102,7 +102,7 @@ test "whole_cycles: single cycle [0,1) = [[0,1)]" {
   inspect(
     cycles[0],
     content=(
-      #|{begin: {num: 0, den: 1}, end_: {num: 1, den: 1}}
+      #|{ begin: { num: 0, den: 1 }, end_: { num: 1, den: 1 } }
     ),
   )
 }
@@ -123,14 +123,14 @@ test "whole_cycles: partial [1/4, 7/4) spans 2 cycles" {
   inspect(
     cycles[0],
     content=(
-      #|{begin: {num: 1, den: 4}, end_: {num: 1, den: 1}}
+      #|{ begin: { num: 1, den: 4 }, end_: { num: 1, den: 1 } }
     ),
   )
   // second partial: [1, 7/4)
   inspect(
     cycles[1],
     content=(
-      #|{begin: {num: 1, den: 1}, end_: {num: 7, den: 4}}
+      #|{ begin: { num: 1, den: 1 }, end_: { num: 7, den: 4 } }
     ),
   )
 }
@@ -143,7 +143,7 @@ test "whole_cycles: sub-cycle [1/4, 3/4) = 1 arc" {
   inspect(
     cycles[0],
     content=(
-      #|{begin: {num: 1, den: 4}, end_: {num: 3, den: 4}}
+      #|{ begin: { num: 1, den: 4 }, end_: { num: 3, den: 4 } }
     ),
   )
 }

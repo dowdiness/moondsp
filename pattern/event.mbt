@@ -13,4 +13,9 @@ pub struct Event[A] {
   whole : TimeSpan?
   part : TimeSpan
   value : A
-} derive(Show)
+} derive(Debug)
+
+///|
+pub impl[A : Debug] Show for Event[A] with output(self, logger) {
+  logger.write_string(@debug.to_string(self))
+}

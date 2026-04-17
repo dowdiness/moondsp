@@ -29,7 +29,7 @@ test "pure: event whole spans full cycle [0,1)" {
       inspect(
         whole,
         content=(
-          #|{begin: {num: 0, den: 1}, end_: {num: 1, den: 1}}
+          #|{ begin: { num: 0, den: 1 }, end_: { num: 1, den: 1 } }
         ),
       )
     None => abort("expected whole")
@@ -43,7 +43,7 @@ test "pure: event part equals query arc when arc is within cycle" {
   inspect(
     events[0].part,
     content=(
-      #|{begin: {num: 0, den: 1}, end_: {num: 1, den: 1}}
+      #|{ begin: { num: 0, den: 1 }, end_: { num: 1, den: 1 } }
     ),
   )
 }
@@ -64,7 +64,7 @@ test "pure slices part to query arc: query [1/4, 3/4)" {
   inspect(
     events[0].part,
     content=(
-      #|{begin: {num: 1, den: 4}, end_: {num: 3, den: 4}}
+      #|{ begin: { num: 1, den: 4 }, end_: { num: 3, den: 4 } }
     ),
   )
   // whole is still full cycle [0, 1)
@@ -73,7 +73,7 @@ test "pure slices part to query arc: query [1/4, 3/4)" {
       inspect(
         whole,
         content=(
-          #|{begin: {num: 0, den: 1}, end_: {num: 1, den: 1}}
+          #|{ begin: { num: 0, den: 1 }, end_: { num: 1, den: 1 } }
         ),
       )
     None => abort("expected whole")
@@ -89,14 +89,14 @@ test "pure slices part across cycle boundary: query [3/4, 5/4)" {
   inspect(
     events[0].part,
     content=(
-      #|{begin: {num: 3, den: 4}, end_: {num: 1, den: 1}}
+      #|{ begin: { num: 3, den: 4 }, end_: { num: 1, den: 1 } }
     ),
   )
   // second event: part = [1, 5/4), whole = [1, 2)
   inspect(
     events[1].part,
     content=(
-      #|{begin: {num: 1, den: 1}, end_: {num: 5, den: 4}}
+      #|{ begin: { num: 1, den: 1 }, end_: { num: 5, den: 4 } }
     ),
   )
 }
@@ -110,14 +110,14 @@ test "fast(2) produces 2 events per cycle with correct part spans" {
   inspect(
     events[0].part,
     content=(
-      #|{begin: {num: 0, den: 1}, end_: {num: 1, den: 2}}
+      #|{ begin: { num: 0, den: 1 }, end_: { num: 1, den: 2 } }
     ),
   )
   // second event part: [1/2, 1)
   inspect(
     events[1].part,
     content=(
-      #|{begin: {num: 1, den: 2}, end_: {num: 1, den: 1}}
+      #|{ begin: { num: 1, den: 2 }, end_: { num: 1, den: 1 } }
     ),
   )
 }
@@ -132,7 +132,7 @@ test "fast(2) transforms whole correctly (half-cycle each)" {
       inspect(
         w,
         content=(
-          #|{begin: {num: 0, den: 1}, end_: {num: 1, den: 2}}
+          #|{ begin: { num: 0, den: 1 }, end_: { num: 1, den: 2 } }
         ),
       )
     None => abort("expected whole for event 0")
@@ -142,7 +142,7 @@ test "fast(2) transforms whole correctly (half-cycle each)" {
       inspect(
         w,
         content=(
-          #|{begin: {num: 1, den: 2}, end_: {num: 1, den: 1}}
+          #|{ begin: { num: 1, den: 2 }, end_: { num: 1, den: 1 } }
         ),
       )
     None => abort("expected whole for event 1")
@@ -160,7 +160,7 @@ test "slow(2) halves events: 1 event per cycle, whole spans 2 cycles" {
       inspect(
         w,
         content=(
-          #|{begin: {num: 0, den: 1}, end_: {num: 2, den: 1}}
+          #|{ begin: { num: 0, den: 1 }, end_: { num: 2, den: 1 } }
         ),
       )
     None => abort("expected whole")
@@ -176,13 +176,13 @@ test "rev of fast(2) mirrors the two events" {
   inspect(
     events[0].part,
     content=(
-      #|{begin: {num: 1, den: 2}, end_: {num: 1, den: 1}}
+      #|{ begin: { num: 1, den: 2 }, end_: { num: 1, den: 1 } }
     ),
   )
   inspect(
     events[1].part,
     content=(
-      #|{begin: {num: 0, den: 1}, end_: {num: 1, den: 2}}
+      #|{ begin: { num: 0, den: 1 }, end_: { num: 1, den: 2 } }
     ),
   )
 }
@@ -204,7 +204,7 @@ test "sequence([pure(1), pure(2), pure(3)]) produces 3 events at thirds" {
   inspect(
     events[0].part,
     content=(
-      #|{begin: {num: 0, den: 1}, end_: {num: 1, den: 3}}
+      #|{ begin: { num: 0, den: 1 }, end_: { num: 1, den: 3 } }
     ),
   )
   // Event 1: value=2, part=[1/3, 2/3)
@@ -212,7 +212,7 @@ test "sequence([pure(1), pure(2), pure(3)]) produces 3 events at thirds" {
   inspect(
     events[1].part,
     content=(
-      #|{begin: {num: 1, den: 3}, end_: {num: 2, den: 3}}
+      #|{ begin: { num: 1, den: 3 }, end_: { num: 2, den: 3 } }
     ),
   )
   // Event 2: value=3, part=[2/3, 1)
@@ -220,7 +220,7 @@ test "sequence([pure(1), pure(2), pure(3)]) produces 3 events at thirds" {
   inspect(
     events[2].part,
     content=(
-      #|{begin: {num: 2, den: 3}, end_: {num: 1, den: 1}}
+      #|{ begin: { num: 2, den: 3 }, end_: { num: 1, den: 1 } }
     ),
   )
 }

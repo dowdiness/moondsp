@@ -9,7 +9,12 @@
 pub struct TimeSpan {
   begin : Rational
   end_ : Rational
-} derive(Eq, Show)
+} derive(Eq, Debug)
+
+///|
+pub impl Show for TimeSpan with output(self, logger) {
+  logger.write_string(@debug.to_string(self))
+}
 
 ///|
 pub fn TimeSpan::new(begin : Rational, end_ : Rational) -> TimeSpan {

@@ -14,7 +14,9 @@ test "sequence: single pattern produces 1 event compressed to full cycle" {
   // whole should span [0, 1) — the single slot is the entire cycle
   inspect(
     events[0].part,
-    content="{begin: {num: 0, den: 1}, end_: {num: 1, den: 1}}",
+    content=(
+      #|{ begin: { num: 0, den: 1 }, end_: { num: 1, den: 1 } }
+    ),
   )
 }
 
@@ -29,15 +31,21 @@ test "sequence: 3 patterns produce 3 events with correct values and thirds" {
   // part spans: [0, 1/3), [1/3, 2/3), [2/3, 1)
   inspect(
     events[0].part,
-    content="{begin: {num: 0, den: 1}, end_: {num: 1, den: 3}}",
+    content=(
+      #|{ begin: { num: 0, den: 1 }, end_: { num: 1, den: 3 } }
+    ),
   )
   inspect(
     events[1].part,
-    content="{begin: {num: 1, den: 3}, end_: {num: 2, den: 3}}",
+    content=(
+      #|{ begin: { num: 1, den: 3 }, end_: { num: 2, den: 3 } }
+    ),
   )
   inspect(
     events[2].part,
-    content="{begin: {num: 2, den: 3}, end_: {num: 1, den: 1}}",
+    content=(
+      #|{ begin: { num: 2, den: 3 }, end_: { num: 1, den: 1 } }
+    ),
   )
 }
 
@@ -164,11 +172,15 @@ test "filter_map: preserves event timing (whole and part spans unchanged)" {
   // whole should be [0, 1)
   inspect(
     events[0].whole,
-    content="Some({begin: {num: 0, den: 1}, end_: {num: 1, den: 1}})",
+    content=(
+      #|Some({ begin: { num: 0, den: 1 }, end_: { num: 1, den: 1 } })
+    ),
   )
   // part should be [0, 1)
   inspect(
     events[0].part,
-    content="{begin: {num: 0, den: 1}, end_: {num: 1, den: 1}}",
+    content=(
+      #|{ begin: { num: 0, den: 1 }, end_: { num: 1, den: 1 } }
+    ),
   )
 }
