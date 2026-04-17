@@ -8,8 +8,7 @@ test "analyze: returns CompiledTemplate with snapshot that survives caller mutat
   // Mutate the caller's array post-analyze.
   template[0] = DspNode::constant(1.0)
   // Snapshot inside CompiledTemplate is independent.
-  let node = ct.node_at(0)
-  assert_true(node.kind == DspNodeKind::Oscillator)
+  assert_true(ct.node_at(0).kind is DspNodeKind::Oscillator)
 }
 
 ///|
