@@ -35,19 +35,19 @@ test "normalize_block_size clamps negative to 0" {
 
 ///|
 test "DspContext::new with valid values" {
-  let ctx = DspContext::new(48000.0, 128)
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
   inspect(ctx.sample_rate(), content="48000")
   inspect(ctx.block_size(), content="128")
 }
 
 ///|
 test "DspContext::new normalizes negative sample_rate" {
-  let ctx = DspContext::new(-44100.0, 128)
+  let ctx = DspContext::new(sample_rate=-44100.0, block_size=128)
   inspect(ctx.sample_rate(), content="0")
 }
 
 ///|
 test "DspContext::new normalizes negative block_size" {
-  let ctx = DspContext::new(48000.0, -64)
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=-64)
   inspect(ctx.block_size(), content="0")
 }

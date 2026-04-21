@@ -1,7 +1,7 @@
 ///|
 test "pan center splits signal equally" {
   let pan = Pan::new()
-  let ctx = DspContext::new(48000.0, 4)
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
   let input = AudioBuffer::filled(4, init=1.0)
   let left = AudioBuffer::filled(4)
   let right = AudioBuffer::filled(4)
@@ -15,7 +15,7 @@ test "pan center splits signal equally" {
 ///|
 test "pan hard left sends signal only to left" {
   let pan = Pan::new()
-  let ctx = DspContext::new(48000.0, 4)
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
   let input = AudioBuffer::filled(4, init=1.0)
   let left = AudioBuffer::filled(4)
   let right = AudioBuffer::filled(4)
@@ -29,7 +29,7 @@ test "pan hard left sends signal only to left" {
 ///|
 test "pan hard right sends signal only to right" {
   let pan = Pan::new()
-  let ctx = DspContext::new(48000.0, 4)
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
   let input = AudioBuffer::filled(4, init=1.0)
   let left = AudioBuffer::filled(4)
   let right = AudioBuffer::filled(4)
@@ -43,7 +43,7 @@ test "pan hard right sends signal only to right" {
 ///|
 test "pan zero input produces zero output regardless of position" {
   let pan = Pan::new()
-  let ctx = DspContext::new(48000.0, 4)
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
   let input = AudioBuffer::filled(4)
   let left = AudioBuffer::filled(4)
   let right = AudioBuffer::filled(4)
@@ -63,7 +63,7 @@ test "prop: pan preserves energy (equal-power law)" {
         return true
       }
       let pan = Pan::new()
-      let ctx = DspContext::new(48000.0, 1)
+      let ctx = DspContext::new(sample_rate=48000.0, block_size=1)
       let input = AudioBuffer::filled(1, init=1.0)
       let left = AudioBuffer::filled(1)
       let right = AudioBuffer::filled(1)

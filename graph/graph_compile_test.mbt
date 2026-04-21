@@ -1,6 +1,9 @@
 ///|
 test "compiled dsp rejects implicit stereo to mono output" {
-  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::pan(0, PAN_CENTER),
@@ -12,7 +15,10 @@ test "compiled dsp rejects implicit stereo to mono output" {
 
 ///|
 test "compiled dsp rejects stereo-only nodes" {
-  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
   let stereo_gain_nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::stereo_gain(0, HALF_GAIN),
@@ -42,9 +48,17 @@ test "compiled dsp rejects stereo-only nodes" {
 
 ///|
 test "compiled dsp rejects non-finite adsr parameters" {
-  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
   let nodes = [
-    DspNode::adsr(0.0 / 0.0, ADSR_DECAY_MS, HALF_GAIN, 10.0),
+    DspNode::adsr(
+      attack_ms=0.0 / 0.0,
+      decay_ms=ADSR_DECAY_MS,
+      sustain=HALF_GAIN,
+      release_ms=10.0,
+    ),
     DspNode::output(0),
   ]
 
@@ -53,7 +67,10 @@ test "compiled dsp rejects non-finite adsr parameters" {
 
 ///|
 test "compiled dsp rejects non-finite constants" {
-  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
   let nan_nodes = [DspNode::constant(0.0 / 0.0), DspNode::output(0)]
   let inf_nodes = [DspNode::constant(1.0 / 0.0), DspNode::output(0)]
 
@@ -63,7 +80,10 @@ test "compiled dsp rejects non-finite constants" {
 
 ///|
 test "compiled dsp rejects graphs without a final output node" {
-  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
   let nodes = [DspNode::constant(QUARTER_SAMPLE)]
 
   assert_true(CompiledDsp::compile(nodes, context) is None)
@@ -71,7 +91,10 @@ test "compiled dsp rejects graphs without a final output node" {
 
 ///|
 test "compiled dsp rejects multiple output nodes" {
-  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
   let nodes = [
     DspNode::constant(QUARTER_SAMPLE),
     DspNode::output(0),
@@ -83,10 +106,18 @@ test "compiled dsp rejects multiple output nodes" {
 
 ///|
 test "compiled dsp rejects invalid biquad parameters" {
-  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
-    DspNode::biquad(0, BiquadMode::LowPass, INVALID_NYQUIST_CUTOFF, LOWPASS_Q),
+    DspNode::biquad(
+      input=0,
+      mode=BiquadMode::LowPass,
+      cutoff_hz=INVALID_NYQUIST_CUTOFF,
+      q=LOWPASS_Q,
+    ),
     DspNode::output(1),
   ]
 
@@ -95,10 +126,18 @@ test "compiled dsp rejects invalid biquad parameters" {
 
 ///|
 test "compiled dsp topologically sorts declarative filter graph" {
-  let context = DspContext::new(STANDARD_SAMPLE_RATE, LARGE_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=LARGE_BLOCK_SIZE,
+  )
   let nodes = [
     DspNode::output(1),
-    DspNode::biquad(2, BiquadMode::LowPass, LOWPASS_CUTOFF, LOWPASS_Q),
+    DspNode::biquad(
+      input=2,
+      mode=BiquadMode::LowPass,
+      cutoff_hz=LOWPASS_CUTOFF,
+      q=LOWPASS_Q,
+    ),
     DspNode::constant(UNIT_SAMPLE),
   ]
   let compiled = CompiledDsp::compile(nodes, context).unwrap()
@@ -113,7 +152,10 @@ test "compiled dsp topologically sorts declarative filter graph" {
 
 ///|
 test "compiled dsp topologically sorts declarative node order" {
-  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
   let nodes = [
     DspNode::output(1),
     DspNode::gain(2, HALF_GAIN),
@@ -143,7 +185,7 @@ test "compiled dsp optimizes constant subgraph during compilation" {
     DspNode::mul(0, 1),
     DspNode::output(2),
   ]
-  let ctx = DspContext::new(48000.0, 128)
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
   let compiled = CompiledDsp::compile(nodes, ctx)
   assert_true(compiled is Some(_))
   // Process and verify output = 12.0 (constant)
@@ -155,7 +197,10 @@ test "compiled dsp optimizes constant subgraph during compilation" {
 
 ///|
 test "compiled dsp delay node keeps zero-capacity default as passthrough" {
-  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
   let nodes = [
     DspNode::constant(QUARTER_SAMPLE),
     DspNode::delay(0, 0),
@@ -174,7 +219,10 @@ test "compiled dsp delay node keeps zero-capacity default as passthrough" {
 
 ///|
 test "compiled graphs reject delay feedback outside live supported range" {
-  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
   let mono_nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::delay(
@@ -203,7 +251,10 @@ test "compiled graphs reject delay feedback outside live supported range" {
 
 ///|
 test "compiled stereo dsp rejects mono direct to stereo output" {
-  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
   let nodes = [DspNode::constant(UNIT_SAMPLE), DspNode::stereo_output(0)]
 
   assert_true(CompiledStereoDsp::compile(nodes, context) is None)
@@ -211,7 +262,10 @@ test "compiled stereo dsp rejects mono direct to stereo output" {
 
 ///|
 test "compiled stereo dsp rejects stereo post processing after pan" {
-  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::pan(0, PAN_HARD_LEFT),
@@ -224,7 +278,10 @@ test "compiled stereo dsp rejects stereo post processing after pan" {
 
 ///|
 test "compiled stereo dsp rejects stereo mixdown before stereo output" {
-  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::pan(0, PAN_CENTER),
@@ -237,7 +294,10 @@ test "compiled stereo dsp rejects stereo mixdown before stereo output" {
 
 ///|
 test "compiled stereo dsp rejects internal stereo mixdown roundtrip" {
-  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::pan(0, PAN_CENTER),

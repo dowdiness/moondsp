@@ -22,7 +22,14 @@ to `archive/` rather than edited in place.
   above still mentions `lib` as that was the state at the time of the
   review; the current code no longer has a `lib/` package.
 - **(2) Abstract state-bearing DSP structs — open.**
-- **(3) Label the footgun constructors — open.**
+- **(3) Label the footgun constructors — ✅ shipped 2026-04-21.**
+  `DspContext::new`, `Adsr::new`, `DspNode::adsr`, `DspNode::biquad`, and
+  `Oscillator::process` now use labelled-required arguments, so call
+  sites are unit-self-documenting (`attack_ms`, `release_ms`,
+  `sample_rate`, `block_size`, `cutoff_hz`, `freq_hz`, etc.). Trait-level
+  variants (`DspSym::adsr`, `FilterSym::biquad`) remain positional; a
+  separate pass would be needed to extend labelling through the tagless
+  symantic traits.
 
 ## Step 1 — Facts / Assumptions / Unknowns
 

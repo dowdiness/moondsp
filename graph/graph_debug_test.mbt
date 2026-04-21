@@ -1,6 +1,6 @@
 ///|
 test "debug: off by default" {
-  let context = DspContext::new(48000.0, 4)
+  let context = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]
   let compiled = CompiledDsp::compile(nodes, context).unwrap()
   assert_eq(compiled.last_validation_errors().length(), 0)
@@ -8,7 +8,7 @@ test "debug: off by default" {
 
 ///|
 test "debug: enable and disable toggle" {
-  let context = DspContext::new(48000.0, 4)
+  let context = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]
   let compiled = CompiledDsp::compile(nodes, context).unwrap()
   compiled.enable_debug_validation()
@@ -22,7 +22,7 @@ test "debug: enable and disable toggle" {
 
 ///|
 test "debug: valid graph produces no errors" {
-  let context = DspContext::new(48000.0, 4)
+  let context = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [
     DspNode::oscillator(Waveform::Sine, 440.0),
     DspNode::gain(0, 0.3),
@@ -39,7 +39,7 @@ test "debug: valid graph produces no errors" {
 
 ///|
 test "debug: errors reset each process call" {
-  let context = DspContext::new(48000.0, 4)
+  let context = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]
   let compiled = CompiledDsp::compile(nodes, context).unwrap()
   compiled.enable_debug_validation()
@@ -52,7 +52,7 @@ test "debug: errors reset each process call" {
 
 ///|
 test "debug stereo: valid graph produces no errors" {
-  let context = DspContext::new(48000.0, 4)
+  let context = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [
     DspNode::constant(1.0),
     DspNode::pan(0, 0.0),

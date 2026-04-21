@@ -20,20 +20,20 @@ pub struct Adsr {
   mut level_at_release : Double
 
   fn new(
-    attack_ms : Double,
-    decay_ms : Double,
-    sustain : Double,
-    release_ms : Double,
+    attack_ms~ : Double,
+    decay_ms~ : Double,
+    sustain~ : Double,
+    release_ms~ : Double,
   ) -> Adsr
 }
 
 ///|
 /// Create a new ADSR envelope with normalized parameters.
 pub fn Adsr::new(
-  attack_ms : Double,
-  decay_ms : Double,
-  sustain : Double,
-  release_ms : Double,
+  attack_ms~ : Double,
+  decay_ms~ : Double,
+  sustain~ : Double,
+  release_ms~ : Double,
 ) -> Adsr {
   {
     attack_ms: normalize_time_ms(attack_ms),

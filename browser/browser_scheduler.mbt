@@ -46,12 +46,22 @@ fn bd_template() -> Array[@moondsp.DspNode] {
   // [6] envelope_gain: signal * amp envelope
   // [7] output
   [
-    @moondsp.DspNode::adsr(0.5, 40.0, 0.0, 40.0),
+    @moondsp.DspNode::adsr(
+      attack_ms=0.5,
+      decay_ms=40.0,
+      sustain=0.0,
+      release_ms=40.0,
+    ),
     @moondsp.DspNode::gain(0, 180.0),
     @moondsp.DspNode::constant(60.0),
     @moondsp.DspNode::mix(1, 2),
     @moondsp.DspNode::oscillator_from(3, @moondsp.Waveform::Sine),
-    @moondsp.DspNode::adsr(0.5, 120.0, 0.0, 80.0),
+    @moondsp.DspNode::adsr(
+      attack_ms=0.5,
+      decay_ms=120.0,
+      sustain=0.0,
+      release_ms=80.0,
+    ),
     @moondsp.DspNode::envelope_gain(4, 5, 1.0),
     @moondsp.DspNode::output(6),
   ]
@@ -69,10 +79,20 @@ fn sd_template() -> Array[@moondsp.DspNode] {
   // [6] output
   [
     @moondsp.DspNode::noise(12345U),
-    @moondsp.DspNode::biquad(0, @moondsp.BiquadMode::BandPass, 1500.0, 1.5),
+    @moondsp.DspNode::biquad(
+      input=0,
+      mode=@moondsp.BiquadMode::BandPass,
+      cutoff_hz=1500.0,
+      q=1.5,
+    ),
     @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 180.0),
     @moondsp.DspNode::mix(1, 2),
-    @moondsp.DspNode::adsr(0.5, 60.0, 0.0, 40.0),
+    @moondsp.DspNode::adsr(
+      attack_ms=0.5,
+      decay_ms=60.0,
+      sustain=0.0,
+      release_ms=40.0,
+    ),
     @moondsp.DspNode::envelope_gain(3, 4, 1.0),
     @moondsp.DspNode::output(5),
   ]
@@ -88,8 +108,18 @@ fn hh_template() -> Array[@moondsp.DspNode] {
   // [4] output
   [
     @moondsp.DspNode::noise(67890U),
-    @moondsp.DspNode::biquad(0, @moondsp.BiquadMode::HighPass, 7000.0, 1.5),
-    @moondsp.DspNode::adsr(0.5, 25.0, 0.0, 15.0),
+    @moondsp.DspNode::biquad(
+      input=0,
+      mode=@moondsp.BiquadMode::HighPass,
+      cutoff_hz=7000.0,
+      q=1.5,
+    ),
+    @moondsp.DspNode::adsr(
+      attack_ms=0.5,
+      decay_ms=25.0,
+      sustain=0.0,
+      release_ms=15.0,
+    ),
     @moondsp.DspNode::envelope_gain(1, 2, 0.6),
     @moondsp.DspNode::output(3),
   ]
@@ -99,7 +129,12 @@ fn hh_template() -> Array[@moondsp.DspNode] {
 fn synth_template() -> Array[@moondsp.DspNode] {
   [
     @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 440.0),
-    @moondsp.DspNode::adsr(10.0, 100.0, 0.7, 300.0),
+    @moondsp.DspNode::adsr(
+      attack_ms=10.0,
+      decay_ms=100.0,
+      sustain=0.7,
+      release_ms=300.0,
+    ),
     @moondsp.DspNode::envelope_gain(0, 1, 1.0),
     @moondsp.DspNode::output(2),
   ]
@@ -174,7 +209,7 @@ pub fn init_scheduler_graph(sample_rate : Double, block_size : Int) -> Bool {
     reset_scheduler_graph()
     return false
   }
-  let ctx = @moondsp.DspContext::new(sample_rate, block_size)
+  let ctx = @moondsp.DspContext::new(sample_rate~, block_size~)
   let bd = make_drum_pool(bd_template(), ctx, block_size)
   let sd = make_drum_pool(sd_template(), ctx, block_size)
   let hh = make_drum_pool(hh_template(), ctx, block_size)

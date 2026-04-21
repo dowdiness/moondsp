@@ -4,12 +4,12 @@ pub struct DspContext {
   sample_rate : Double
   block_size : Int
 
-  fn new(sample_rate : Double, block_size : Int) -> DspContext
+  fn new(sample_rate~ : Double, block_size~ : Int) -> DspContext
 }
 
 ///|
 /// Create a DSP context with normalized runtime parameters.
-pub fn DspContext::new(sample_rate : Double, block_size : Int) -> DspContext {
+pub fn DspContext::new(sample_rate~ : Double, block_size~ : Int) -> DspContext {
   {
     sample_rate: normalize_sample_rate(sample_rate),
     block_size: normalize_block_size(block_size),

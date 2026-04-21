@@ -40,7 +40,7 @@ test "shorter smoothing times move faster than longer ones" {
 
 ///|
 test "context-based setup matches explicit sample rate setup" {
-  let context = DspContext::new(48000.0, 128)
+  let context = DspContext::new(sample_rate=48000.0, block_size=128)
   let from_rate = ParamSmoother::new(0.0, 5.0, 48000.0)
   let from_context = ParamSmoother::from_context(0.0, 5.0, context)
 
@@ -68,7 +68,7 @@ test "invalid smoothing parameters snap immediately" {
   smoother.set_target(0.5)
   assert_eq(smoother.tick(), 0.5)
 
-  let context = DspContext::new(0.0, 128)
+  let context = DspContext::new(sample_rate=0.0, block_size=128)
   smoother.reset(0.0)
   smoother.set_smoothing_time_from_context(5.0, context)
   smoother.set_target(-0.25)

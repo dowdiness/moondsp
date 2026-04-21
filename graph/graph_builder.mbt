@@ -118,7 +118,7 @@ pub impl DspSym for GraphBuilder with noise(seed) -> GraphBuilder {
 ///|
 pub impl DspSym for GraphBuilder with adsr(a, d, s, r) -> GraphBuilder {
   let nodes : Array[DspNode] = []
-  nodes.push(DspNode::adsr(a, d, s, r))
+  nodes.push(DspNode::adsr(attack_ms=a, decay_ms=d, sustain=s, release_ms=r))
   { nodes_: nodes, index: 0 }
 }
 
@@ -143,7 +143,9 @@ pub impl DspSym for GraphBuilder with output(self) -> GraphBuilder {
 ///|
 pub impl FilterSym for GraphBuilder with biquad(self, mode, cutoff, q) -> GraphBuilder {
   let idx = self.nodes_.length()
-  self.nodes_.push(DspNode::biquad(self.index, mode, cutoff, q))
+  self.nodes_.push(
+    DspNode::biquad(input=self.index, mode~, cutoff_hz=cutoff, q~),
+  )
   { nodes_: self.nodes_, index: idx }
 }
 

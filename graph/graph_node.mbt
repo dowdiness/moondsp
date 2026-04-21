@@ -238,10 +238,10 @@ pub fn DspNode::noise(seed : UInt) -> DspNode {
 /// `CompiledDsp::apply_control(GraphControl::gate_off(...))` to drive the
 /// envelope after compilation.
 pub fn DspNode::adsr(
-  attack_ms : Double,
-  decay_ms : Double,
-  sustain : Double,
-  release_ms : Double,
+  attack_ms~ : Double,
+  decay_ms~ : Double,
+  sustain~ : Double,
+  release_ms~ : Double,
 ) -> DspNode {
   DspNode(
     DspNodeKind::Adsr,
@@ -262,16 +262,16 @@ pub fn DspNode::adsr(
 ///|
 /// Create a fixed-parameter biquad node from one upstream node.
 pub fn DspNode::biquad(
-  input : Int,
-  mode : BiquadMode,
-  cutoff : Double,
-  q : Double,
+  input~ : Int,
+  mode~ : BiquadMode,
+  cutoff_hz~ : Double,
+  q~ : Double,
 ) -> DspNode {
   DspNode(
     DspNodeKind::Biquad,
     input,
     -1,
-    cutoff,
+    cutoff_hz,
     q,
     0.0,
     0.0,

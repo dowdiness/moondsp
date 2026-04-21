@@ -127,8 +127,8 @@ pub struct DspNode {
 
   fn new(DspNodeKind, Int, Int, Double, Double, Double, Double, @dsp.Waveform, @dsp.BiquadMode, Int, Int, UInt) -> DspNode
 }
-pub fn DspNode::adsr(Double, Double, Double, Double) -> Self
-pub fn DspNode::biquad(Int, @dsp.BiquadMode, Double, Double) -> Self
+pub fn DspNode::adsr(attack_ms~ : Double, decay_ms~ : Double, sustain~ : Double, release_ms~ : Double) -> Self
+pub fn DspNode::biquad(input~ : Int, mode~ : @dsp.BiquadMode, cutoff_hz~ : Double, q~ : Double) -> Self
 pub fn DspNode::clip(Int, Double) -> Self
 pub fn DspNode::constant(Double) -> Self
 pub fn DspNode::delay(Int, Int, delay_samples? : Int, feedback? : Double) -> Self

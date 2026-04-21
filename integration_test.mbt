@@ -180,9 +180,9 @@ const GRAPH_BANDPASS_CLIP : Double = 0.9
 
 ///|
 test "voice chain stays bounded across note on and release" {
-  let context = DspContext::new(48000.0, 16)
+  let context = DspContext::new(sample_rate=48000.0, block_size=16)
   let osc = Oscillator::new()
-  let env = Adsr::new(0.0, 0.0, 0.5, 5.0)
+  let env = Adsr::new(attack_ms=0.0, decay_ms=0.0, sustain=0.5, release_ms=5.0)
   let filter = Biquad::new()
   let gain = Gain::new()
   let delay = DelayLine::new(4, delay_samples=2)
@@ -232,7 +232,7 @@ test "voice chain stays bounded across note on and release" {
 
 ///|
 test "mixed oscillator and noise buses remain finite and bounded" {
-  let context = DspContext::new(48000.0, 16)
+  let context = DspContext::new(sample_rate=48000.0, block_size=16)
   let osc = Oscillator::new()
   let noise = Noise::new(123U)
   let smoother = ParamSmoother::from_context(0.0, 1.0, context)
@@ -270,9 +270,9 @@ test "mixed oscillator and noise buses remain finite and bounded" {
 
 ///|
 test "stereo voice path with pan stays balanced and bounded" {
-  let context = DspContext::new(48000.0, 16)
+  let context = DspContext::new(sample_rate=48000.0, block_size=16)
   let osc = Oscillator::new()
-  let env = Adsr::new(0.0, 0.0, 0.6, 10.0)
+  let env = Adsr::new(attack_ms=0.0, decay_ms=0.0, sustain=0.6, release_ms=10.0)
   let filter = Biquad::new()
   let gain = Gain::new()
   let pan = Pan::new()
@@ -313,8 +313,8 @@ test "stereo voice path with pan stays balanced and bounded" {
 ///|
 test "compiled stereo graph voice path responds to runtime pan updates" {
   let context = DspContext::new(
-    GRAPH_STEREO_SAMPLE_RATE,
-    GRAPH_STEREO_BLOCK_SIZE,
+    sample_rate=GRAPH_STEREO_SAMPLE_RATE,
+    block_size=GRAPH_STEREO_BLOCK_SIZE,
   )
   let nodes = [
     DspNode::oscillator(Waveform::Triangle, GRAPH_STEREO_FREQ),
@@ -369,8 +369,8 @@ test "compiled stereo graph voice path responds to runtime pan updates" {
 ///|
 test "compiled stereo graph applies batched control frames" {
   let context = DspContext::new(
-    GRAPH_STEREO_SAMPLE_RATE,
-    GRAPH_STEREO_BLOCK_SIZE,
+    sample_rate=GRAPH_STEREO_SAMPLE_RATE,
+    block_size=GRAPH_STEREO_BLOCK_SIZE,
   )
   let nodes = [
     DspNode::oscillator(Waveform::Triangle, GRAPH_STEREO_FREQ),
@@ -434,8 +434,8 @@ test "compiled stereo graph applies batched control frames" {
 ///|
 test "compiled stereo graph stereo biquad retune changes output" {
   let context = DspContext::new(
-    GRAPH_STEREO_SAMPLE_RATE,
-    GRAPH_STEREO_BLOCK_SIZE,
+    sample_rate=GRAPH_STEREO_SAMPLE_RATE,
+    block_size=GRAPH_STEREO_BLOCK_SIZE,
   )
   let baseline_nodes = [
     DspNode::oscillator(Waveform::Triangle, GRAPH_STEREO_FREQ),
@@ -509,8 +509,8 @@ test "compiled stereo graph stereo biquad retune changes output" {
 ///|
 test "compiled stereo graph stereo delay retune changes output" {
   let context = DspContext::new(
-    GRAPH_STEREO_SAMPLE_RATE,
-    GRAPH_STEREO_BLOCK_SIZE,
+    sample_rate=GRAPH_STEREO_SAMPLE_RATE,
+    block_size=GRAPH_STEREO_BLOCK_SIZE,
   )
   let nodes = [
     DspNode::constant(1.0),
@@ -578,8 +578,8 @@ test "compiled stereo graph stereo delay retune changes output" {
 ///|
 test "compiled stereo graph stereo delay feedback increases tail energy" {
   let context = DspContext::new(
-    GRAPH_STEREO_SAMPLE_RATE,
-    GRAPH_STEREO_BLOCK_SIZE,
+    sample_rate=GRAPH_STEREO_SAMPLE_RATE,
+    block_size=GRAPH_STEREO_BLOCK_SIZE,
   )
   let nodes = [
     DspNode::constant(1.0),
@@ -641,8 +641,8 @@ test "compiled stereo graph stereo delay feedback increases tail energy" {
 ///|
 test "compiled graph stereo delay mixdown matches equivalent mono delay path" {
   let context = DspContext::new(
-    GRAPH_STEREO_SAMPLE_RATE,
-    GRAPH_STEREO_BLOCK_SIZE,
+    sample_rate=GRAPH_STEREO_SAMPLE_RATE,
+    block_size=GRAPH_STEREO_BLOCK_SIZE,
   )
   let stereo_nodes = [
     DspNode::constant(1.0),
@@ -690,8 +690,8 @@ test "compiled graph stereo delay mixdown matches equivalent mono delay path" {
 ///|
 test "compiled graph stereo mixdown matches equivalent mono gain path" {
   let context = DspContext::new(
-    GRAPH_STEREO_SAMPLE_RATE,
-    GRAPH_STEREO_BLOCK_SIZE,
+    sample_rate=GRAPH_STEREO_SAMPLE_RATE,
+    block_size=GRAPH_STEREO_BLOCK_SIZE,
   )
   let mono_gain = GRAPH_STEREO_GAIN *
     GRAPH_STEREO_POST_GAIN *
@@ -735,8 +735,8 @@ test "compiled graph stereo mixdown matches equivalent mono gain path" {
 ///|
 test "compiled graph z^-1 feedback cycle persists across blocks and stays bounded" {
   let context = DspContext::new(
-    GRAPH_FEEDBACK_SAMPLE_RATE,
-    GRAPH_FEEDBACK_BLOCK_SIZE,
+    sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
+    block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
   let nodes = [
     DspNode::constant(1.0),
@@ -767,8 +767,8 @@ test "compiled graph z^-1 feedback cycle persists across blocks and stays bounde
 ///|
 test "compiled graph z^-1 feedback cycle applies batched runtime changes" {
   let context = DspContext::new(
-    GRAPH_FEEDBACK_SAMPLE_RATE,
-    GRAPH_FEEDBACK_BLOCK_SIZE,
+    sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
+    block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
   let nodes = [
     DspNode::constant(1.0),
@@ -810,8 +810,8 @@ test "compiled graph z^-1 feedback cycle applies batched runtime changes" {
 ///|
 test "compiled stereo graph mono z^-1 feedback cycle persists across blocks" {
   let context = DspContext::new(
-    GRAPH_FEEDBACK_SAMPLE_RATE,
-    GRAPH_FEEDBACK_BLOCK_SIZE,
+    sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
+    block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
   let nodes = [
     DspNode::constant(1.0),
@@ -869,8 +869,8 @@ test "compiled stereo graph mono z^-1 feedback cycle persists across blocks" {
 ///|
 test "compiled stereo graph mono z^-1 feedback cycle applies batched runtime changes" {
   let context = DspContext::new(
-    GRAPH_FEEDBACK_SAMPLE_RATE,
-    GRAPH_FEEDBACK_BLOCK_SIZE,
+    sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
+    block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
   let nodes = [
     DspNode::constant(1.0),
@@ -914,8 +914,8 @@ test "compiled stereo graph mono z^-1 feedback cycle applies batched runtime cha
 ///|
 test "compiled graph hot swap crossfades between bounded mono graphs" {
   let context = DspContext::new(
-    GRAPH_FEEDBACK_SAMPLE_RATE,
-    GRAPH_FEEDBACK_BLOCK_SIZE,
+    sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
+    block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
   let active = CompiledDsp::compile(
     [DspNode::constant(0.25), DspNode::output(0)],
@@ -949,8 +949,8 @@ test "compiled graph hot swap crossfades between bounded mono graphs" {
 ///|
 test "compiled graph topology edit crossfades rebuilt mono graphs" {
   let context = DspContext::new(
-    GRAPH_FEEDBACK_SAMPLE_RATE,
-    GRAPH_FEEDBACK_BLOCK_SIZE,
+    sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
+    block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
   let topology = CompiledDspTopologyController::from_nodes(
     [DspNode::constant(1.0), DspNode::gain(0, 0.25), DspNode::output(1)],
@@ -994,8 +994,8 @@ test "compiled graph topology edit crossfades rebuilt mono graphs" {
 ///|
 test "compiled graph topology edit rewires rebuilt mono graphs" {
   let context = DspContext::new(
-    GRAPH_FEEDBACK_SAMPLE_RATE,
-    GRAPH_FEEDBACK_BLOCK_SIZE,
+    sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
+    block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
   let topology = CompiledDspTopologyController::from_nodes(
     [
@@ -1034,8 +1034,8 @@ test "compiled graph topology edit rewires rebuilt mono graphs" {
 ///|
 test "compiled graph topology edit inserts rebuilt mono graphs" {
   let context = DspContext::new(
-    GRAPH_FEEDBACK_SAMPLE_RATE,
-    GRAPH_FEEDBACK_BLOCK_SIZE,
+    sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
+    block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
   let topology = CompiledDspTopologyController::from_nodes(
     [DspNode::constant(1.0), DspNode::output(0)],
@@ -1074,8 +1074,8 @@ test "compiled graph topology edit inserts rebuilt mono graphs" {
 ///|
 test "compiled graph topology edit deletes rebuilt mono graphs" {
   let context = DspContext::new(
-    GRAPH_FEEDBACK_SAMPLE_RATE,
-    GRAPH_FEEDBACK_BLOCK_SIZE,
+    sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
+    block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
   let topology = CompiledDspTopologyController::from_nodes(
     [DspNode::constant(1.0), DspNode::gain(0, HALF_GAIN), DspNode::output(1)],
@@ -1106,8 +1106,8 @@ test "compiled graph topology edit deletes rebuilt mono graphs" {
 ///|
 test "compiled graph topology edit insert delete roundtrip restores rebuilt mono graphs" {
   let context = DspContext::new(
-    GRAPH_FEEDBACK_SAMPLE_RATE,
-    GRAPH_FEEDBACK_BLOCK_SIZE,
+    sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
+    block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
   let topology = CompiledDspTopologyController::from_nodes(
     [DspNode::constant(1.0), DspNode::output(0)],
@@ -1166,8 +1166,8 @@ test "compiled graph topology edit insert delete roundtrip restores rebuilt mono
 ///|
 test "compiled stereo graph hot swap preserves bounded stereo output" {
   let context = DspContext::new(
-    GRAPH_FEEDBACK_SAMPLE_RATE,
-    GRAPH_FEEDBACK_BLOCK_SIZE,
+    sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
+    block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
   let active = CompiledStereoDsp::compile(
     [
@@ -1262,8 +1262,8 @@ test "compiled stereo graph hot swap preserves bounded stereo output" {
 ///|
 test "compiled stereo graph topology edit crossfades rebuilt stereo graphs" {
   let context = DspContext::new(
-    GRAPH_FEEDBACK_SAMPLE_RATE,
-    GRAPH_FEEDBACK_BLOCK_SIZE,
+    sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
+    block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
   let topology = CompiledStereoDspTopologyController::from_nodes(
     [
@@ -1326,7 +1326,10 @@ test "compiled stereo graph topology edit crossfades rebuilt stereo graphs" {
 
 ///|
 test "compiled graph voice path stays coherent across gates and runtime updates" {
-  let context = DspContext::new(GRAPH_VOICE_SAMPLE_RATE, GRAPH_VOICE_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=GRAPH_VOICE_SAMPLE_RATE,
+    block_size=GRAPH_VOICE_BLOCK_SIZE,
+  )
   let nodes = [
     DspNode::output(1),
     DspNode::clip(2, GRAPH_VOICE_CLIP),
@@ -1336,9 +1339,19 @@ test "compiled graph voice path stays coherent across gates and runtime updates"
       delay_samples=GRAPH_VOICE_DELAY_SAMPLES,
     ),
     DspNode::gain(4, GRAPH_VOICE_GAIN),
-    DspNode::biquad(5, BiquadMode::LowPass, GRAPH_VOICE_CUTOFF, GRAPH_VOICE_Q),
+    DspNode::biquad(
+      input=5,
+      mode=BiquadMode::LowPass,
+      cutoff_hz=GRAPH_VOICE_CUTOFF,
+      q=GRAPH_VOICE_Q,
+    ),
     DspNode::mul(7, 6),
-    DspNode::adsr(0.0, 0.0, GRAPH_VOICE_SUSTAIN, GRAPH_VOICE_RELEASE_MS),
+    DspNode::adsr(
+      attack_ms=0.0,
+      decay_ms=0.0,
+      sustain=GRAPH_VOICE_SUSTAIN,
+      release_ms=GRAPH_VOICE_RELEASE_MS,
+    ),
     DspNode::oscillator(Waveform::Square, GRAPH_VOICE_FREQ),
   ]
   let compiled = CompiledDsp::compile(nodes, context).unwrap()
@@ -1407,7 +1420,10 @@ test "compiled graph voice path stays coherent across gates and runtime updates"
 
 ///|
 test "compiled graph control frames apply batched runtime changes per block" {
-  let context = DspContext::new(GRAPH_VOICE_SAMPLE_RATE, GRAPH_VOICE_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=GRAPH_VOICE_SAMPLE_RATE,
+    block_size=GRAPH_VOICE_BLOCK_SIZE,
+  )
   let nodes = [
     DspNode::output(1),
     DspNode::clip(2, GRAPH_VOICE_CLIP),
@@ -1417,9 +1433,19 @@ test "compiled graph control frames apply batched runtime changes per block" {
       delay_samples=GRAPH_VOICE_DELAY_SAMPLES,
     ),
     DspNode::gain(4, GRAPH_VOICE_GAIN),
-    DspNode::biquad(5, BiquadMode::LowPass, GRAPH_VOICE_CUTOFF, GRAPH_VOICE_Q),
+    DspNode::biquad(
+      input=5,
+      mode=BiquadMode::LowPass,
+      cutoff_hz=GRAPH_VOICE_CUTOFF,
+      q=GRAPH_VOICE_Q,
+    ),
     DspNode::mul(7, 6),
-    DspNode::adsr(0.0, 0.0, GRAPH_VOICE_SUSTAIN, GRAPH_VOICE_RELEASE_MS),
+    DspNode::adsr(
+      attack_ms=0.0,
+      decay_ms=0.0,
+      sustain=GRAPH_VOICE_SUSTAIN,
+      release_ms=GRAPH_VOICE_RELEASE_MS,
+    ),
     DspNode::oscillator(Waveform::Square, GRAPH_VOICE_FREQ),
   ]
   let compiled = CompiledDsp::compile(nodes, context).unwrap()
@@ -1474,8 +1500,8 @@ test "compiled graph control frames apply batched runtime changes per block" {
 ///|
 test "compiled graph multi-source path responds to runtime biquad retune" {
   let context = DspContext::new(
-    GRAPH_MULTI_SOURCE_SAMPLE_RATE,
-    GRAPH_MULTI_SOURCE_BLOCK_SIZE,
+    sample_rate=GRAPH_MULTI_SOURCE_SAMPLE_RATE,
+    block_size=GRAPH_MULTI_SOURCE_BLOCK_SIZE,
   )
   let nodes = [
     DspNode::oscillator(Waveform::Triangle, GRAPH_MULTI_SOURCE_OSC_FREQ),
@@ -1483,10 +1509,10 @@ test "compiled graph multi-source path responds to runtime biquad retune" {
     DspNode::gain(1, GRAPH_MULTI_SOURCE_NOISE_GAIN),
     DspNode::mix(0, 2),
     DspNode::biquad(
-      3,
-      BiquadMode::LowPass,
-      GRAPH_MULTI_SOURCE_CUTOFF,
-      GRAPH_MULTI_SOURCE_Q,
+      input=3,
+      mode=BiquadMode::LowPass,
+      cutoff_hz=GRAPH_MULTI_SOURCE_CUTOFF,
+      q=GRAPH_MULTI_SOURCE_Q,
     ),
     DspNode::gain(4, GRAPH_MULTI_SOURCE_OUTPUT_GAIN),
     DspNode::clip(5, GRAPH_MULTI_SOURCE_CLIP),
@@ -1561,16 +1587,16 @@ test "compiled graph multi-source path responds to runtime biquad retune" {
 ///|
 test "compiled graph runtime high-pass retune changes output directionally" {
   let context = DspContext::new(
-    GRAPH_HIGHPASS_SAMPLE_RATE,
-    GRAPH_HIGHPASS_BLOCK_SIZE,
+    sample_rate=GRAPH_HIGHPASS_SAMPLE_RATE,
+    block_size=GRAPH_HIGHPASS_BLOCK_SIZE,
   )
   let nodes = [
     DspNode::oscillator(Waveform::Sine, GRAPH_HIGHPASS_FREQ),
     DspNode::biquad(
-      0,
-      BiquadMode::HighPass,
-      GRAPH_HIGHPASS_INITIAL_CUTOFF,
-      GRAPH_HIGHPASS_Q,
+      input=0,
+      mode=BiquadMode::HighPass,
+      cutoff_hz=GRAPH_HIGHPASS_INITIAL_CUTOFF,
+      q=GRAPH_HIGHPASS_Q,
     ),
     DspNode::clip(1, GRAPH_HIGHPASS_CLIP),
     DspNode::output(2),
@@ -1625,16 +1651,16 @@ test "compiled graph runtime high-pass retune changes output directionally" {
 ///|
 test "compiled graph runtime band-pass retune changes output" {
   let context = DspContext::new(
-    GRAPH_BANDPASS_SAMPLE_RATE,
-    GRAPH_BANDPASS_BLOCK_SIZE,
+    sample_rate=GRAPH_BANDPASS_SAMPLE_RATE,
+    block_size=GRAPH_BANDPASS_BLOCK_SIZE,
   )
   let nodes = [
     DspNode::oscillator(Waveform::Sine, GRAPH_BANDPASS_FREQ),
     DspNode::biquad(
-      0,
-      BiquadMode::BandPass,
-      GRAPH_BANDPASS_INITIAL_CUTOFF,
-      GRAPH_BANDPASS_Q,
+      input=0,
+      mode=BiquadMode::BandPass,
+      cutoff_hz=GRAPH_BANDPASS_INITIAL_CUTOFF,
+      q=GRAPH_BANDPASS_Q,
     ),
     DspNode::clip(1, GRAPH_BANDPASS_CLIP),
     DspNode::output(2),
@@ -1689,7 +1715,7 @@ test "compiled graph runtime band-pass retune changes output" {
 ///|
 test "exit deliverable compiles and produces non-zero output" {
   let graph : GraphBuilder = exit_deliverable()
-  let ctx = DspContext::new(48000.0, 128)
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
   let compiled = CompiledDsp::compile(graph.nodes(), ctx)
   assert_true(compiled is Some(_))
   let compiled = compiled.unwrap()

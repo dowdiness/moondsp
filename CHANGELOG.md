@@ -15,6 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   one facade were missed in the other (notably `CompiledTemplate`, now
   exposed at the root). Internal sub-packages that previously imported
   `dowdiness/moondsp/lib @lib` now import `dowdiness/moondsp @moondsp`.
+- **Labelled constructor arguments**: five footgun-prone positional
+  signatures now require labels at the call site, eliminating whole
+  classes of unit / ordering bugs (ms vs. s on ADSR times, sample-rate
+  vs. block-size swap on `DspContext`, cutoff-vs-Q swap on biquad):
+  `DspContext::new(sample_rate~, block_size~)`,
+  `Adsr::new(attack_ms~, decay_ms~, sustain~, release_ms~)`,
+  `DspNode::adsr(attack_ms~, decay_ms~, sustain~, release_ms~)`,
+  `DspNode::biquad(input~, mode~, cutoff_hz~, q~)`,
+  `Oscillator::process(..., freq_hz~)`. The corresponding trait methods
+  (`DspSym::adsr`, `FilterSym::biquad`) remain positional for now.
 
 ## [0.1.0] - 2026-04-21
 

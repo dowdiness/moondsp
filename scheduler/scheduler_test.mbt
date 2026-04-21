@@ -27,10 +27,15 @@ test "PatternScheduler::new initializes with zero position" {
   let template : Array[@moondsp.DspNode] = [
     @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 440.0),
     @moondsp.DspNode::gain(0, 1.0),
-    @moondsp.DspNode::adsr(0.01, 0.1, 0.7, 0.3),
+    @moondsp.DspNode::adsr(
+      attack_ms=0.01,
+      decay_ms=0.1,
+      sustain=0.7,
+      release_ms=0.3,
+    ),
     @moondsp.DspNode::output(1),
   ]
-  let ctx = @moondsp.DspContext::new(48000.0, 128)
+  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
   let bindings = @moondsp.ControlBindingBuilder::new()
     .bind(key="note", node_index=0, slot=@moondsp.GraphParamSlot::Value0)
     .build(@moondsp.CompiledTemplate::analyze(template))
@@ -46,7 +51,7 @@ test "PatternScheduler::new initializes with zero position" {
 
 ///|
 test "compute_arc: first block at 120 BPM" {
-  let ctx = @moondsp.DspContext::new(48000.0, 128)
+  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
   let arc = @scheduler.compute_arc(0L, 120.0, ctx)
   let zero = @pattern.Rational::from_int(0)
   assert_true(arc.begin == zero)
@@ -56,7 +61,7 @@ test "compute_arc: first block at 120 BPM" {
 
 ///|
 test "compute_arc: second block at 120 BPM" {
-  let ctx = @moondsp.DspContext::new(48000.0, 128)
+  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
   let arc = @scheduler.compute_arc(128L, 120.0, ctx)
   let expected_start = @pattern.Rational::new(15360L, 2880000L)
   let expected_end = @pattern.Rational::new(30720L, 2880000L)
@@ -66,7 +71,7 @@ test "compute_arc: second block at 120 BPM" {
 
 ///|
 test "compute_arc: fractional BPM 120.5 preserves precision" {
-  let ctx = @moondsp.DspContext::new(48000.0, 128)
+  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
   // 120.5 BPM → bpm_scaled = 1205, denominator = 48000 * 600 = 28800000
   // arc_end = 128 * 1205 / 28800000 = 154240 / 28800000
   let arc = @scheduler.compute_arc(0L, 120.5, ctx)
@@ -89,11 +94,16 @@ fn make_test_pool() -> (
 ) {
   let template : Array[@moondsp.DspNode] = [
     @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 440.0),
-    @moondsp.DspNode::adsr(0.01, 0.1, 0.7, 0.3),
+    @moondsp.DspNode::adsr(
+      attack_ms=0.01,
+      decay_ms=0.1,
+      sustain=0.7,
+      release_ms=0.3,
+    ),
     @moondsp.DspNode::envelope_gain(0, 1, 1.0),
     @moondsp.DspNode::output(2),
   ]
-  let ctx = @moondsp.DspContext::new(48000.0, 128)
+  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
   let pool = @moondsp.VoicePool::new(template, ctx, max_voices=4)
   match pool {
     Some(p) => (p, template, ctx)
@@ -235,11 +245,16 @@ test "process_block: dense pattern fires multiple note-ons per block" {
 test "process_block: stolen voice gate-off is harmless" {
   let template : Array[@moondsp.DspNode] = [
     @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 440.0),
-    @moondsp.DspNode::adsr(0.01, 0.1, 0.7, 0.3),
+    @moondsp.DspNode::adsr(
+      attack_ms=0.01,
+      decay_ms=0.1,
+      sustain=0.7,
+      release_ms=0.3,
+    ),
     @moondsp.DspNode::envelope_gain(0, 1, 1.0),
     @moondsp.DspNode::output(2),
   ]
-  let ctx = @moondsp.DspContext::new(48000.0, 128)
+  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
   let pool = @moondsp.VoicePool::new(template, ctx, max_voices=1)
   match pool {
     None => assert_true(false)

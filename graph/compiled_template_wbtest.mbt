@@ -25,7 +25,7 @@ test "orphan_adsr_count: live ADSR returns 0" {
   // ADSR wired through envelope_gain to Output — survives optimization.
   let template = [
     DspNode::oscillator(Waveform::Sine, 440.0),
-    DspNode::adsr(10.0, 100.0, 0.7, 300.0),
+    DspNode::adsr(attack_ms=10.0, decay_ms=100.0, sustain=0.7, release_ms=300.0),
     DspNode::envelope_gain(0, 1, 1.0),
     DspNode::output(2),
   ]
@@ -38,7 +38,7 @@ test "orphan_adsr_count: dead ADSR returns 1" {
   // ADSR present but not consumed by Output path — orphan.
   let template = [
     DspNode::oscillator(Waveform::Sine, 440.0),
-    DspNode::adsr(10.0, 100.0, 0.7, 300.0),
+    DspNode::adsr(attack_ms=10.0, decay_ms=100.0, sustain=0.7, release_ms=300.0),
     DspNode::gain(0, 0.3),
     DspNode::output(2),
   ]
@@ -50,9 +50,9 @@ test "orphan_adsr_count: dead ADSR returns 1" {
 test "orphan_adsr_count: multiple dead ADSRs returns correct count" {
   let template = [
     DspNode::oscillator(Waveform::Sine, 440.0),
-    DspNode::adsr(10.0, 100.0, 0.7, 300.0), // orphan
-    DspNode::adsr(5.0, 50.0, 0.5, 100.0), // orphan
-    DspNode::adsr(1.0, 10.0, 0.9, 20.0), // orphan
+    DspNode::adsr(attack_ms=10.0, decay_ms=100.0, sustain=0.7, release_ms=300.0), // orphan
+    DspNode::adsr(attack_ms=5.0, decay_ms=50.0, sustain=0.5, release_ms=100.0), // orphan
+    DspNode::adsr(attack_ms=1.0, decay_ms=10.0, sustain=0.9, release_ms=20.0), // orphan
     DspNode::gain(0, 0.3),
     DspNode::output(4),
   ]
@@ -75,7 +75,7 @@ test "is_node_live: surviving node returns true" {
 test "is_node_live: eliminated node returns false" {
   let template = [
     DspNode::oscillator(Waveform::Sine, 440.0),
-    DspNode::adsr(10.0, 100.0, 0.7, 300.0), // orphan — eliminated
+    DspNode::adsr(attack_ms=10.0, decay_ms=100.0, sustain=0.7, release_ms=300.0), // orphan — eliminated
     DspNode::gain(0, 0.3),
     DspNode::output(2),
   ]

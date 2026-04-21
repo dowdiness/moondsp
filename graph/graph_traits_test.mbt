@@ -12,7 +12,12 @@ test "NodeFoldable: Oscillator is not foldable" {
 
 ///|
 test "NodeStateful: Biquad is stateful" {
-  let node = DspNode::biquad(0, BiquadMode::LowPass, 1000.0, 0.707)
+  let node = DspNode::biquad(
+    input=0,
+    mode=BiquadMode::LowPass,
+    cutoff_hz=1000.0,
+    q=0.707,
+  )
   assert_true(node.is_stateful())
 }
 

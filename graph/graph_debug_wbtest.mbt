@@ -26,7 +26,7 @@ fn corrupt_input0(
 
 ///|
 test "debug: invalid input0 produces InvalidInput0 error" {
-  let context = DspContext::new(48000.0, 4)
+  let context = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [
     DspNode::constant(1.0),
     DspNode::gain(0, 0.3),
@@ -46,7 +46,7 @@ test "debug: invalid input0 produces InvalidInput0 error" {
 
 ///|
 test "debug: skipped node outputs silence, downstream processes normally" {
-  let context = DspContext::new(48000.0, 4)
+  let context = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [
     DspNode::constant(1.0),
     DspNode::gain(0, 0.5),
@@ -66,7 +66,7 @@ test "debug: skipped node outputs silence, downstream processes normally" {
 
 ///|
 test "debug: errors reset on next process call" {
-  let context = DspContext::new(48000.0, 4)
+  let context = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [
     DspNode::constant(1.0),
     DspNode::gain(0, 0.3),
@@ -87,7 +87,7 @@ test "debug: errors reset on next process call" {
 
 ///|
 test "debug: feedback graph validation failure yields silence and records errors" {
-  let context = DspContext::new(48000.0, 4)
+  let context = DspContext::new(sample_rate=48000.0, block_size=4)
   // Minimal feedback graph: Constant → Mix(0,2) → Gain → Output
   // Back-edge: node 2 feeds back to node 1
   let nodes = [
@@ -115,7 +115,7 @@ test "debug: feedback graph validation failure yields silence and records errors
 
 ///|
 test "debug: multiple errors in one block" {
-  let context = DspContext::new(48000.0, 4)
+  let context = DspContext::new(sample_rate=48000.0, block_size=4)
   // Use oscillators (stateful, not foldable) to prevent optimization
   let nodes = [
     DspNode::oscillator(Waveform::Sine, 440.0),

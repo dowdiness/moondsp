@@ -733,7 +733,15 @@ fn make_graph_noise_state(node : DspNode) -> Noise? {
 ///|
 fn make_graph_env_state(node : DspNode) -> Adsr? {
   match node.kind {
-    Adsr => Some(Adsr::new(node.value0, node.value1, node.value2, node.value3))
+    Adsr =>
+      Some(
+        Adsr::new(
+          attack_ms=node.value0,
+          decay_ms=node.value1,
+          sustain=node.value2,
+          release_ms=node.value3,
+        ),
+      )
     _ => None
   }
 }

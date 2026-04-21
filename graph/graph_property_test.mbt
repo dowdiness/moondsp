@@ -99,7 +99,14 @@ fn gen_mono_graph(seed : Int) -> Array[DspNode] {
     // Biquad
     let cutoff = 200.0 + (s % 4000).to_double()
     let q = 0.5 + (s % 10).to_double() * 0.1
-    nodes.push(DspNode::biquad(last, prop_biquad_mode(s / 3), cutoff, q))
+    nodes.push(
+      DspNode::biquad(
+        input=last,
+        mode=prop_biquad_mode(s / 3),
+        cutoff_hz=cutoff,
+        q~,
+      ),
+    )
     last = nodes.length() - 1
   }
   if chain_bits / 8 % 2 >= 1 {
@@ -227,7 +234,7 @@ fn gen_adsr_graph(seed : Int) -> Array[DspNode] {
   let release_ms = 0.5 + (s / 11 % 20).to_double() * 0.5
   let freq = 220.0 + (s % 440).to_double()
   [
-    DspNode::adsr(attack_ms, decay_ms, sustain, release_ms),
+    DspNode::adsr(attack_ms~, decay_ms~, sustain~, release_ms~),
     DspNode::oscillator(prop_waveform(s), freq),
     DspNode::mul(0, 1),
     DspNode::output(2),
@@ -264,7 +271,12 @@ fn gen_mono_feedback_graph(seed : Int) -> Array[DspNode] {
       [
         DspNode::constant(constant_val),
         DspNode::mix(0, 3),
-        DspNode::biquad(1, prop_biquad_mode(s / 3), cutoff, q),
+        DspNode::biquad(
+          input=1,
+          mode=prop_biquad_mode(s / 3),
+          cutoff_hz=cutoff,
+          q~,
+        ),
         DspNode::gain(2, feedback_gain),
         DspNode::output(3),
       ]
@@ -339,21 +351,30 @@ fn samples_identical(a : Array[Double], b : Array[Double]) -> Bool {
 /// Compile a mono graph, abort on failure. Generators produce valid graphs,
 /// so compilation failure indicates a generator bug, not expected rejection.
 fn compile_mono(nodes : Array[DspNode]) -> CompiledDsp {
-  let context = DspContext::new(PROP_SAMPLE_RATE, PROP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=PROP_SAMPLE_RATE,
+    block_size=PROP_BLOCK_SIZE,
+  )
   CompiledDsp::compile(nodes, context).unwrap()
 }
 
 ///|
 /// Compile a stereo graph, abort on failure.
 fn compile_stereo(nodes : Array[DspNode]) -> CompiledStereoDsp {
-  let context = DspContext::new(PROP_SAMPLE_RATE, PROP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=PROP_SAMPLE_RATE,
+    block_size=PROP_BLOCK_SIZE,
+  )
   CompiledStereoDsp::compile(nodes, context).unwrap()
 }
 
 ///|
 /// Process a mono compiled graph for N blocks, return all samples.
 fn run_mono(compiled : CompiledDsp, num_blocks : Int) -> Array[Double] {
-  let context = DspContext::new(PROP_SAMPLE_RATE, PROP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=PROP_SAMPLE_RATE,
+    block_size=PROP_BLOCK_SIZE,
+  )
   let output = AudioBuffer::filled(PROP_BLOCK_SIZE)
   let samples : Array[Double] = Array::new(
     capacity=num_blocks * PROP_BLOCK_SIZE,
@@ -373,7 +394,10 @@ fn run_stereo(
   compiled : CompiledStereoDsp,
   num_blocks : Int,
 ) -> (Array[Double], Array[Double]) {
-  let context = DspContext::new(PROP_SAMPLE_RATE, PROP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=PROP_SAMPLE_RATE,
+    block_size=PROP_BLOCK_SIZE,
+  )
   let left = AudioBuffer::filled(PROP_BLOCK_SIZE)
   let right = AudioBuffer::filled(PROP_BLOCK_SIZE)
   let left_samples : Array[Double] = Array::new(
@@ -427,7 +451,10 @@ test "prop: mono ADSR graph — compile twice, process identically" {
   @qc.quick_check_fn(
     fn(seed : Int) {
       let nodes = gen_adsr_graph(seed)
-      let context = DspContext::new(PROP_SAMPLE_RATE, PROP_BLOCK_SIZE)
+      let context = DspContext::new(
+        sample_rate=PROP_SAMPLE_RATE,
+        block_size=PROP_BLOCK_SIZE,
+      )
       let compiled_a = CompiledDsp::compile(nodes, context).unwrap()
       let compiled_b = CompiledDsp::compile(nodes, context).unwrap()
       ignore(compiled_a.gate_on(0))
@@ -497,7 +524,10 @@ test "prop: mono feedback cycle — runtime retune is deterministic" {
     fn(seed : Int) {
       let s = seed.abs()
       let nodes = gen_mono_feedback_graph(s)
-      let context = DspContext::new(PROP_SAMPLE_RATE, PROP_BLOCK_SIZE)
+      let context = DspContext::new(
+        sample_rate=PROP_SAMPLE_RATE,
+        block_size=PROP_BLOCK_SIZE,
+      )
       let compiled_a = CompiledDsp::compile(nodes, context).unwrap()
       let compiled_b = CompiledDsp::compile(nodes, context).unwrap()
       // The gain node is always the last before Output in our feedback graphs
@@ -557,7 +587,10 @@ test "prop: mono hot-swap — same swap sequence produces identical output" {
       let s = seed.abs()
       let nodes_initial = gen_mono_graph(s)
       let nodes_replacement = gen_mono_graph(s + 1000)
-      let context = DspContext::new(PROP_SAMPLE_RATE, PROP_BLOCK_SIZE)
+      let context = DspContext::new(
+        sample_rate=PROP_SAMPLE_RATE,
+        block_size=PROP_BLOCK_SIZE,
+      )
       let crossfade = 64 + s % 128
       let hs_a = CompiledDspHotSwap::from_graph(
         compile_mono(nodes_initial),
@@ -597,7 +630,10 @@ test "prop: stereo hot-swap — same swap sequence produces identical output" {
       let s = seed.abs()
       let nodes_initial = gen_stereo_graph(s)
       let nodes_replacement = gen_stereo_graph(s + 1000)
-      let context = DspContext::new(PROP_SAMPLE_RATE, PROP_BLOCK_SIZE)
+      let context = DspContext::new(
+        sample_rate=PROP_SAMPLE_RATE,
+        block_size=PROP_BLOCK_SIZE,
+      )
       let crossfade = 64 + s % 128
       let hs_a = CompiledStereoDspHotSwap::from_graph(
         compile_stereo(nodes_initial),
@@ -651,7 +687,10 @@ test "prop: runtime param update is deterministic across compilations" {
         DspNode::gain(0, gain_val),
         DspNode::output(1),
       ]
-      let context = DspContext::new(PROP_SAMPLE_RATE, PROP_BLOCK_SIZE)
+      let context = DspContext::new(
+        sample_rate=PROP_SAMPLE_RATE,
+        block_size=PROP_BLOCK_SIZE,
+      )
       let compiled_a = CompiledDsp::compile(nodes, context).unwrap()
       let compiled_b = CompiledDsp::compile(nodes, context).unwrap()
       ignore(
@@ -682,7 +721,10 @@ test "prop: runtime control variants are deterministic" {
     fn(seed : Int) {
       let s = seed.abs()
       let variant = s % 3
-      let context = DspContext::new(PROP_SAMPLE_RATE, PROP_BLOCK_SIZE)
+      let context = DspContext::new(
+        sample_rate=PROP_SAMPLE_RATE,
+        block_size=PROP_BLOCK_SIZE,
+      )
       let out_a = AudioBuffer::filled(PROP_BLOCK_SIZE)
       let out_b = AudioBuffer::filled(PROP_BLOCK_SIZE)
       match variant {
@@ -694,7 +736,12 @@ test "prop: runtime control variants are deterministic" {
           let new_q = 0.5 + (s / 7 % 10).to_double() * 0.1
           let nodes = [
             DspNode::oscillator(Waveform::Saw, 440.0),
-            DspNode::biquad(0, BiquadMode::LowPass, cutoff, q),
+            DspNode::biquad(
+              input=0,
+              mode=BiquadMode::LowPass,
+              cutoff_hz=cutoff,
+              q~,
+            ),
             DspNode::output(1),
           ]
           let ca = CompiledDsp::compile(nodes, context).unwrap()
@@ -773,7 +820,7 @@ test "prop: runtime control variants are deterministic" {
           let sustain = 0.2 + (s / 7 % 8).to_double() * 0.1
           let release_ms = 2.0 + (s / 11 % 10).to_double()
           let nodes = [
-            DspNode::adsr(attack_ms, decay_ms, sustain, release_ms),
+            DspNode::adsr(attack_ms~, decay_ms~, sustain~, release_ms~),
             DspNode::oscillator(Waveform::Sine, 440.0),
             DspNode::mul(0, 1),
             DspNode::output(2),
@@ -811,7 +858,10 @@ test "prop: mono graphs produce finite output" {
       let compiled = compile_mono(nodes)
       let output = AudioBuffer::filled(PROP_BLOCK_SIZE)
       compiled.process(
-        DspContext::new(PROP_SAMPLE_RATE, PROP_BLOCK_SIZE),
+        DspContext::new(
+          sample_rate=PROP_SAMPLE_RATE,
+          block_size=PROP_BLOCK_SIZE,
+        ),
         output,
       )
       let mut all_finite = true
@@ -835,7 +885,10 @@ test "prop: stereo graphs produce finite output" {
       let left = AudioBuffer::filled(PROP_BLOCK_SIZE)
       let right = AudioBuffer::filled(PROP_BLOCK_SIZE)
       compiled.process(
-        DspContext::new(PROP_SAMPLE_RATE, PROP_BLOCK_SIZE),
+        DspContext::new(
+          sample_rate=PROP_SAMPLE_RATE,
+          block_size=PROP_BLOCK_SIZE,
+        ),
         left,
         right,
       )
@@ -857,7 +910,10 @@ test "prop: mono feedback graphs produce finite output" {
     fn(seed : Int) {
       let nodes = gen_mono_feedback_graph(seed)
       let compiled = compile_mono(nodes)
-      let context = DspContext::new(PROP_SAMPLE_RATE, PROP_BLOCK_SIZE)
+      let context = DspContext::new(
+        sample_rate=PROP_SAMPLE_RATE,
+        block_size=PROP_BLOCK_SIZE,
+      )
       let output = AudioBuffer::filled(PROP_BLOCK_SIZE)
       // Process multiple blocks — feedback can diverge over time
       let mut all_finite = true
@@ -881,7 +937,10 @@ test "prop: stereo feedback graphs produce finite output" {
     fn(seed : Int) {
       let nodes = gen_stereo_feedback_graph(seed)
       let compiled = compile_stereo(nodes)
-      let context = DspContext::new(PROP_SAMPLE_RATE, PROP_BLOCK_SIZE)
+      let context = DspContext::new(
+        sample_rate=PROP_SAMPLE_RATE,
+        block_size=PROP_BLOCK_SIZE,
+      )
       let left = AudioBuffer::filled(PROP_BLOCK_SIZE)
       let right = AudioBuffer::filled(PROP_BLOCK_SIZE)
       let mut all_finite = true
@@ -913,7 +972,10 @@ test "prop: debug mode produces same output as normal mode (acyclic)" {
       compiled_debug.enable_debug_validation()
       let out_normal = AudioBuffer::filled(PROP_BLOCK_SIZE)
       let out_debug = AudioBuffer::filled(PROP_BLOCK_SIZE)
-      let context = DspContext::new(PROP_SAMPLE_RATE, PROP_BLOCK_SIZE)
+      let context = DspContext::new(
+        sample_rate=PROP_SAMPLE_RATE,
+        block_size=PROP_BLOCK_SIZE,
+      )
       let mut identical = true
       for _block = 0; _block < PROP_NUM_BLOCKS; _block = _block + 1 {
         compiled_normal.process(context, out_normal)
@@ -940,7 +1002,10 @@ test "prop: stereo debug mode produces same output as normal mode (acyclic)" {
       let right_normal = AudioBuffer::filled(PROP_BLOCK_SIZE)
       let left_debug = AudioBuffer::filled(PROP_BLOCK_SIZE)
       let right_debug = AudioBuffer::filled(PROP_BLOCK_SIZE)
-      let context = DspContext::new(PROP_SAMPLE_RATE, PROP_BLOCK_SIZE)
+      let context = DspContext::new(
+        sample_rate=PROP_SAMPLE_RATE,
+        block_size=PROP_BLOCK_SIZE,
+      )
       let mut identical = true
       for _block = 0; _block < PROP_NUM_BLOCKS; _block = _block + 1 {
         compiled_normal.process(context, left_normal, right_normal)
@@ -970,7 +1035,10 @@ test "prop: debug mode equals production for mono feedback graphs" {
       compiled_debug.enable_debug_validation()
       let out_debug = AudioBuffer::filled(PROP_BLOCK_SIZE)
       let out_prod = AudioBuffer::filled(PROP_BLOCK_SIZE)
-      let context = DspContext::new(PROP_SAMPLE_RATE, PROP_BLOCK_SIZE)
+      let context = DspContext::new(
+        sample_rate=PROP_SAMPLE_RATE,
+        block_size=PROP_BLOCK_SIZE,
+      )
       let mut identical = true
       for _block = 0; _block < PROP_NUM_BLOCKS; _block = _block + 1 {
         compiled_debug.process(context, out_debug)
@@ -1001,7 +1069,10 @@ test "prop: debug mode equals production for stereo feedback graphs" {
       let right_debug = AudioBuffer::filled(PROP_BLOCK_SIZE)
       let left_prod = AudioBuffer::filled(PROP_BLOCK_SIZE)
       let right_prod = AudioBuffer::filled(PROP_BLOCK_SIZE)
-      let context = DspContext::new(PROP_SAMPLE_RATE, PROP_BLOCK_SIZE)
+      let context = DspContext::new(
+        sample_rate=PROP_SAMPLE_RATE,
+        block_size=PROP_BLOCK_SIZE,
+      )
       let mut identical = true
       for _block = 0; _block < PROP_NUM_BLOCKS; _block = _block + 1 {
         compiled_debug.process(context, left_debug, right_debug)

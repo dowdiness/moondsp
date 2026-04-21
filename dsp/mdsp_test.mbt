@@ -22,10 +22,10 @@ test "tick advances phase continuously" {
 ///|
 test "process fills a block with bounded samples" {
   let osc = Oscillator::new()
-  let context = DspContext::new(48000.0, 128)
+  let context = DspContext::new(sample_rate=48000.0, block_size=128)
   let buffer = AudioBuffer::filled(128)
 
-  osc.process(context, buffer, 440.0)
+  osc.process(context, buffer, freq_hz=440.0)
 
   assert_eq(buffer.length(), 128)
   assert_eq(buffer.get(0), 0.0)
@@ -51,7 +51,7 @@ test "saw waveform ramps upward from negative values" {
 ///|
 test "square waveform toggles only between bipolar levels" {
   let osc = Oscillator::new()
-  let context = DspContext::new(48000.0, 8)
+  let context = DspContext::new(sample_rate=48000.0, block_size=8)
   let buffer = AudioBuffer::filled(8)
 
   osc.process_waveform(context, buffer, Waveform::Square, 440.0)
@@ -64,7 +64,7 @@ test "square waveform toggles only between bipolar levels" {
 ///|
 test "triangle waveform stays bounded and changes smoothly" {
   let osc = Oscillator::new()
-  let context = DspContext::new(48000.0, 8)
+  let context = DspContext::new(sample_rate=48000.0, block_size=8)
   let buffer = AudioBuffer::filled(8)
 
   osc.process_waveform(context, buffer, Waveform::Triangle, 440.0)
@@ -106,7 +106,7 @@ test "audio buffer can wrap an existing fixed array without copying" {
 
 ///|
 test "dsp context stores normalized runtime values" {
-  let context = DspContext::new(48000.0, 128)
+  let context = DspContext::new(sample_rate=48000.0, block_size=128)
 
   assert_eq(context.sample_rate(), 48000.0)
   assert_eq(context.block_size(), 128)
@@ -114,7 +114,7 @@ test "dsp context stores normalized runtime values" {
 
 ///|
 test "dsp context normalizes invalid runtime values" {
-  let context = DspContext::new(-1.0, -64)
+  let context = DspContext::new(sample_rate=-1.0, block_size=-64)
 
   assert_eq(context.sample_rate(), 0.0)
   assert_eq(context.block_size(), 0)
@@ -123,7 +123,7 @@ test "dsp context normalizes invalid runtime values" {
 ///|
 test "gain with unity amount preserves samples" {
   let gain = Gain::new()
-  let context = DspContext::new(48000.0, 4)
+  let context = DspContext::new(sample_rate=48000.0, block_size=4)
   let buffer = AudioBuffer::new(make_gain_test_samples())
 
   gain.process(context, buffer, 1.0)
@@ -137,7 +137,7 @@ test "gain with unity amount preserves samples" {
 ///|
 test "gain with zero amount silences samples" {
   let gain = Gain::new()
-  let context = DspContext::new(48000.0, 4)
+  let context = DspContext::new(sample_rate=48000.0, block_size=4)
   let buffer = AudioBuffer::new(make_gain_test_samples())
 
   gain.process(context, buffer, 0.0)
@@ -148,7 +148,7 @@ test "gain with zero amount silences samples" {
 ///|
 test "gain with negative amount inverts polarity" {
   let gain = Gain::new()
-  let context = DspContext::new(48000.0, 4)
+  let context = DspContext::new(sample_rate=48000.0, block_size=4)
   let buffer = AudioBuffer::new(make_gain_test_samples())
 
   gain.process(context, buffer, -2.0)
@@ -172,7 +172,7 @@ fn make_gain_test_samples() -> FixedArray[Double] {
 ///|
 test "mix sums two buffers in place" {
   let mix = Mix::new()
-  let context = DspContext::new(48000.0, 4)
+  let context = DspContext::new(sample_rate=48000.0, block_size=4)
   let output = AudioBuffer::new(make_mix_output_samples())
   let input = AudioBuffer::new(make_mix_input_samples())
 
@@ -187,7 +187,7 @@ test "mix sums two buffers in place" {
 ///|
 test "mix does not implicitly clip summed output" {
   let mix = Mix::new()
-  let context = DspContext::new(48000.0, 2)
+  let context = DspContext::new(sample_rate=48000.0, block_size=2)
   let output = AudioBuffer::new(make_mix_hot_output_samples())
   let input = AudioBuffer::new(make_mix_hot_input_samples())
 
@@ -258,7 +258,7 @@ test "noise reset reproduces the same sequence" {
 ///|
 test "noise process fills a block with bounded samples" {
   let noise = Noise::new(7U)
-  let context = DspContext::new(48000.0, 128)
+  let context = DspContext::new(sample_rate=48000.0, block_size=128)
   let buffer = AudioBuffer::filled(128)
 
   noise.process(context, buffer)
@@ -273,7 +273,7 @@ test "noise process fills a block with bounded samples" {
 ///|
 test "clip limits positive and negative peaks symmetrically" {
   let clip = Clip::new()
-  let context = DspContext::new(48000.0, 4)
+  let context = DspContext::new(sample_rate=48000.0, block_size=4)
   let buffer = AudioBuffer::new(make_clip_test_samples())
 
   clip.process(context, buffer, 0.5)
@@ -287,7 +287,7 @@ test "clip limits positive and negative peaks symmetrically" {
 ///|
 test "clip leaves in-range samples unchanged" {
   let clip = Clip::new()
-  let context = DspContext::new(48000.0, 4)
+  let context = DspContext::new(sample_rate=48000.0, block_size=4)
   let buffer = AudioBuffer::new(make_clip_in_range_samples())
 
   clip.process(context, buffer, 0.5)
@@ -320,8 +320,13 @@ fn make_clip_in_range_samples() -> FixedArray[Double] {
 
 ///|
 test "adsr attack reaches full scale then enters decay" {
-  let env = Adsr::new(1.0, 10.0, 0.5, 10.0)
-  let context = DspContext::new(1000.0, 8)
+  let env = Adsr::new(
+    attack_ms=1.0,
+    decay_ms=10.0,
+    sustain=0.5,
+    release_ms=10.0,
+  )
+  let context = DspContext::new(sample_rate=1000.0, block_size=8)
 
   env.gate_on()
 
@@ -331,8 +336,13 @@ test "adsr attack reaches full scale then enters decay" {
 
 ///|
 test "adsr decay settles at sustain level" {
-  let env = Adsr::new(0.0, 2.0, 0.25, 10.0)
-  let context = DspContext::new(1000.0, 8)
+  let env = Adsr::new(
+    attack_ms=0.0,
+    decay_ms=2.0,
+    sustain=0.25,
+    release_ms=10.0,
+  )
+  let context = DspContext::new(sample_rate=1000.0, block_size=8)
 
   env.gate_on()
   ignore(env.tick(context))
@@ -347,8 +357,8 @@ test "adsr decay settles at sustain level" {
 
 ///|
 test "adsr release falls from the current level to idle" {
-  let env = Adsr::new(0.0, 0.0, 0.5, 2.0)
-  let context = DspContext::new(1000.0, 8)
+  let env = Adsr::new(attack_ms=0.0, decay_ms=0.0, sustain=0.5, release_ms=2.0)
+  let context = DspContext::new(sample_rate=1000.0, block_size=8)
 
   env.gate_on()
   assert_eq(env.tick(context), 0.5)
@@ -361,8 +371,13 @@ test "adsr release falls from the current level to idle" {
 
 ///|
 test "adsr process fills a block of envelope values" {
-  let env = Adsr::new(0.0, 0.0, 0.75, 10.0)
-  let context = DspContext::new(1000.0, 4)
+  let env = Adsr::new(
+    attack_ms=0.0,
+    decay_ms=0.0,
+    sustain=0.75,
+    release_ms=10.0,
+  )
+  let context = DspContext::new(sample_rate=1000.0, block_size=4)
   let buffer = AudioBuffer::filled(4)
 
   env.gate_on()
@@ -427,7 +442,7 @@ test "delay line recirculates echoes when feedback is enabled" {
 ///|
 test "pan sends mono input fully left at -1 position" {
   let pan = Pan::new()
-  let context = DspContext::new(48000.0, 4)
+  let context = DspContext::new(sample_rate=48000.0, block_size=4)
   let input = AudioBuffer::new(make_pan_test_samples())
   let left = AudioBuffer::filled(4)
   let right = AudioBuffer::filled(4)
@@ -444,7 +459,7 @@ test "pan sends mono input fully left at -1 position" {
 ///|
 test "pan uses equal-power gains at center" {
   let pan = Pan::new()
-  let context = DspContext::new(48000.0, 4)
+  let context = DspContext::new(sample_rate=48000.0, block_size=4)
   let input = AudioBuffer::new(make_pan_test_samples())
   let left = AudioBuffer::filled(4)
   let right = AudioBuffer::filled(4)
@@ -461,7 +476,7 @@ test "pan uses equal-power gains at center" {
 ///|
 test "pan sends mono input fully right at +1 position" {
   let pan = Pan::new()
-  let context = DspContext::new(48000.0, 4)
+  let context = DspContext::new(sample_rate=48000.0, block_size=4)
   let input = AudioBuffer::new(make_pan_test_samples())
   let left = AudioBuffer::filled(4)
   let right = AudioBuffer::filled(4)
@@ -478,7 +493,7 @@ test "pan sends mono input fully right at +1 position" {
 ///|
 test "pan clamps finite positions outside the supported range" {
   let pan = Pan::new()
-  let context = DspContext::new(48000.0, 2)
+  let context = DspContext::new(sample_rate=48000.0, block_size=2)
   let input = AudioBuffer::new(make_pan_test_samples())
   let left = AudioBuffer::filled(2)
   let right = AudioBuffer::filled(2)

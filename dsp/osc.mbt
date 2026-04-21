@@ -93,9 +93,9 @@ pub fn Oscillator::process(
   self : Oscillator,
   context : DspContext,
   output : AudioBuffer,
-  freq : Double,
+  freq_hz~ : Double,
 ) -> Unit {
-  self.process_waveform(context, output, Waveform::Sine, freq)
+  self.process_waveform(context, output, Waveform::Sine, freq_hz)
 }
 
 ///|

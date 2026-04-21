@@ -135,8 +135,8 @@ fn TopologyGraph::queue_topology_edits_impl(
     return false
   }
   let compile_context = DspContext::new(
-    self.compile_sample_rate,
-    self.compile_block_size,
+    sample_rate=self.compile_sample_rate,
+    block_size=self.compile_block_size,
   )
   let replacement = match compile_fn(edited_nodes, compile_context) {
     Some(replacement) => replacement

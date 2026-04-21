@@ -172,7 +172,7 @@ test "resolve: empty binding map produces empty controls" {
 
 ///|
 test "integration: resolved controls accepted by VoicePool::note_on" {
-  let ctx = DspContext::new(48000.0, 16)
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
   let template = [
     DspNode::oscillator(Waveform::Sine, 440.0),
     DspNode::gain(0, 0.3),

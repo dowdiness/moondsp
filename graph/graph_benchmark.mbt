@@ -61,7 +61,12 @@ fn build_bench_feedback_voice_nodes() -> Array[DspNode] {
   [
     DspNode::constant(440.0), // 0: freq
     DspNode::oscillator(Waveform::Saw, 440.0), // 1: osc (fixed freq)
-    DspNode::biquad(1, BiquadMode::LowPass, 1000.0, 0.707), // 2: filter
+    DspNode::biquad(
+      input=1,
+      mode=BiquadMode::LowPass,
+      cutoff_hz=1000.0,
+      q=0.707,
+    ), // 2: filter
     DspNode::mix(2, 5), // 3: mix (filter + feedback from gain) — back-edge
     DspNode::delay(3, 4800, delay_samples=2400, feedback=0.0), // 4: delay
     DspNode::gain(4, 0.5), // 5: gain (feedback source)
@@ -97,42 +102,42 @@ fn build_bench_stereo_chain() -> GraphBuilder {
 
 ///|
 test "bench graph: passthrough compiles" {
-  let ctx = DspContext::new(BENCH_SAMPLE_RATE, 128)
+  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   let compiled = CompiledDsp::compile(build_bench_passthrough().nodes(), ctx)
   assert_true(compiled is Some(_))
 }
 
 ///|
 test "bench graph: minimal voice compiles" {
-  let ctx = DspContext::new(BENCH_SAMPLE_RATE, 128)
+  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   let compiled = CompiledDsp::compile(build_bench_minimal_voice().nodes(), ctx)
   assert_true(compiled is Some(_))
 }
 
 ///|
 test "bench graph: fm voice compiles" {
-  let ctx = DspContext::new(BENCH_SAMPLE_RATE, 128)
+  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   let compiled = CompiledDsp::compile(build_bench_fm_voice().nodes(), ctx)
   assert_true(compiled is Some(_))
 }
 
 ///|
 test "bench graph: full voice compiles" {
-  let ctx = DspContext::new(BENCH_SAMPLE_RATE, 128)
+  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   let compiled = CompiledDsp::compile(build_bench_full_voice().nodes(), ctx)
   assert_true(compiled is Some(_))
 }
 
 ///|
 test "bench graph: feedback voice compiles" {
-  let ctx = DspContext::new(BENCH_SAMPLE_RATE, 128)
+  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   let compiled = CompiledDsp::compile(build_bench_feedback_voice_nodes(), ctx)
   assert_true(compiled is Some(_))
 }
 
 ///|
 test "bench graph: stereo chain compiles" {
-  let ctx = DspContext::new(BENCH_SAMPLE_RATE, 128)
+  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   let compiled = CompiledStereoDsp::compile(
     build_bench_stereo_chain().nodes(),
     ctx,
@@ -142,7 +147,7 @@ test "bench graph: stereo chain compiles" {
 
 ///|
 test "bench graph: stereo chain hotswap compiles" {
-  let ctx = DspContext::new(BENCH_SAMPLE_RATE, 128)
+  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   let compiled = CompiledStereoDsp::compile(
     build_bench_stereo_chain().nodes(),
     ctx,
@@ -167,7 +172,7 @@ test "bench graph: stereo chain hotswap compiles" {
 test "bench/process/passthrough" (b : @bench.T) {
   let nodes = build_bench_passthrough().nodes()
   for block_size in bench_block_sizes {
-    let ctx = DspContext::new(BENCH_SAMPLE_RATE, block_size)
+    let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size~)
     let compiled = CompiledDsp::compile(nodes, ctx).unwrap()
     let output = AudioBuffer::filled(block_size)
     b.bench(name="passthrough/\{block_size}", fn() {
@@ -181,7 +186,7 @@ test "bench/process/passthrough" (b : @bench.T) {
 test "bench/process/minimal_voice" (b : @bench.T) {
   let nodes = build_bench_minimal_voice().nodes()
   for block_size in bench_block_sizes {
-    let ctx = DspContext::new(BENCH_SAMPLE_RATE, block_size)
+    let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size~)
     let compiled = CompiledDsp::compile(nodes, ctx).unwrap()
     let output = AudioBuffer::filled(block_size)
     b.bench(name="minimal_voice/\{block_size}", fn() {
@@ -195,7 +200,7 @@ test "bench/process/minimal_voice" (b : @bench.T) {
 test "bench/process/fm_voice" (b : @bench.T) {
   let nodes = build_bench_fm_voice().nodes()
   for block_size in bench_block_sizes {
-    let ctx = DspContext::new(BENCH_SAMPLE_RATE, block_size)
+    let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size~)
     let compiled = CompiledDsp::compile(nodes, ctx).unwrap()
     let output = AudioBuffer::filled(block_size)
     b.bench(name="fm_voice/\{block_size}", fn() {
@@ -209,7 +214,7 @@ test "bench/process/fm_voice" (b : @bench.T) {
 test "bench/process/full_voice" (b : @bench.T) {
   let nodes = build_bench_full_voice().nodes()
   for block_size in bench_block_sizes {
-    let ctx = DspContext::new(BENCH_SAMPLE_RATE, block_size)
+    let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size~)
     let compiled = CompiledDsp::compile(nodes, ctx).unwrap()
     let output = AudioBuffer::filled(block_size)
     b.bench(name="full_voice/\{block_size}", fn() {
@@ -223,7 +228,7 @@ test "bench/process/full_voice" (b : @bench.T) {
 test "bench/process/feedback_voice" (b : @bench.T) {
   let nodes = build_bench_feedback_voice_nodes()
   for block_size in bench_block_sizes {
-    let ctx = DspContext::new(BENCH_SAMPLE_RATE, block_size)
+    let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size~)
     let compiled = CompiledDsp::compile(nodes, ctx).unwrap()
     let output = AudioBuffer::filled(block_size)
     b.bench(name="feedback_voice/\{block_size}", fn() {
@@ -237,7 +242,7 @@ test "bench/process/feedback_voice" (b : @bench.T) {
 test "bench/process/stereo_chain" (b : @bench.T) {
   let nodes = build_bench_stereo_chain().nodes()
   for block_size in bench_block_sizes {
-    let ctx = DspContext::new(BENCH_SAMPLE_RATE, block_size)
+    let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size~)
     let compiled = CompiledStereoDsp::compile(nodes, ctx).unwrap()
     let left = AudioBuffer::filled(block_size)
     let right = AudioBuffer::filled(block_size)
@@ -252,7 +257,7 @@ test "bench/process/stereo_chain" (b : @bench.T) {
 ///|
 test "bench/compile/passthrough" (b : @bench.T) {
   let nodes = build_bench_passthrough().nodes()
-  let ctx = DspContext::new(BENCH_SAMPLE_RATE, 128)
+  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   b.bench(name="passthrough", fn() {
     let compiled = CompiledDsp::compile(nodes, ctx)
     b.keep(compiled)
@@ -262,7 +267,7 @@ test "bench/compile/passthrough" (b : @bench.T) {
 ///|
 test "bench/compile/minimal_voice" (b : @bench.T) {
   let nodes = build_bench_minimal_voice().nodes()
-  let ctx = DspContext::new(BENCH_SAMPLE_RATE, 128)
+  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   b.bench(name="minimal_voice", fn() {
     let compiled = CompiledDsp::compile(nodes, ctx)
     b.keep(compiled)
@@ -272,7 +277,7 @@ test "bench/compile/minimal_voice" (b : @bench.T) {
 ///|
 test "bench/compile/fm_voice" (b : @bench.T) {
   let nodes = build_bench_fm_voice().nodes()
-  let ctx = DspContext::new(BENCH_SAMPLE_RATE, 128)
+  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   b.bench(name="fm_voice", fn() {
     let compiled = CompiledDsp::compile(nodes, ctx)
     b.keep(compiled)
@@ -282,7 +287,7 @@ test "bench/compile/fm_voice" (b : @bench.T) {
 ///|
 test "bench/compile/full_voice" (b : @bench.T) {
   let nodes = build_bench_full_voice().nodes()
-  let ctx = DspContext::new(BENCH_SAMPLE_RATE, 128)
+  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   b.bench(name="full_voice", fn() {
     let compiled = CompiledDsp::compile(nodes, ctx)
     b.keep(compiled)
@@ -292,7 +297,7 @@ test "bench/compile/full_voice" (b : @bench.T) {
 ///|
 test "bench/compile/feedback_voice" (b : @bench.T) {
   let nodes = build_bench_feedback_voice_nodes()
-  let ctx = DspContext::new(BENCH_SAMPLE_RATE, 128)
+  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   b.bench(name="feedback_voice", fn() {
     let compiled = CompiledDsp::compile(nodes, ctx)
     b.keep(compiled)
@@ -302,7 +307,7 @@ test "bench/compile/feedback_voice" (b : @bench.T) {
 ///|
 test "bench/compile/stereo_chain" (b : @bench.T) {
   let nodes = build_bench_stereo_chain().nodes()
-  let ctx = DspContext::new(BENCH_SAMPLE_RATE, 128)
+  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   b.bench(name="stereo_chain", fn() {
     let compiled = CompiledStereoDsp::compile(nodes, ctx)
     b.keep(compiled)
@@ -346,7 +351,7 @@ test "bench/hotswap/minimal_voice" (b : @bench.T) {
   let nodes_a = build_bench_minimal_voice().nodes()
   let nodes_b = build_bench_minimal_voice_alt().nodes()
   for block_size in bench_block_sizes {
-    let ctx = DspContext::new(BENCH_SAMPLE_RATE, block_size)
+    let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size~)
     let compiled_a = CompiledDsp::compile(nodes_a, ctx).unwrap()
     let compiled_b = CompiledDsp::compile(nodes_b, ctx).unwrap()
     let hs = CompiledDspHotSwap::from_graph(
@@ -370,7 +375,7 @@ test "bench/hotswap/fm_voice" (b : @bench.T) {
   let nodes_a = build_bench_fm_voice().nodes()
   let nodes_b = build_bench_minimal_voice().nodes()
   for block_size in bench_block_sizes {
-    let ctx = DspContext::new(BENCH_SAMPLE_RATE, block_size)
+    let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size~)
     let compiled_a = CompiledDsp::compile(nodes_a, ctx).unwrap()
     let compiled_b = CompiledDsp::compile(nodes_b, ctx).unwrap()
     let hs = CompiledDspHotSwap::from_graph(
@@ -394,7 +399,7 @@ test "bench/hotswap/full_voice" (b : @bench.T) {
   let nodes_a = build_bench_full_voice().nodes()
   let nodes_b = build_bench_fm_voice().nodes()
   for block_size in bench_block_sizes {
-    let ctx = DspContext::new(BENCH_SAMPLE_RATE, block_size)
+    let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size~)
     let compiled_a = CompiledDsp::compile(nodes_a, ctx).unwrap()
     let compiled_b = CompiledDsp::compile(nodes_b, ctx).unwrap()
     let hs = CompiledDspHotSwap::from_graph(
@@ -418,7 +423,7 @@ test "bench/hotswap/stereo_chain" (b : @bench.T) {
   let nodes_a = build_bench_stereo_chain().nodes()
   let nodes_b = build_bench_stereo_chain_alt().nodes()
   for block_size in bench_block_sizes {
-    let ctx = DspContext::new(BENCH_SAMPLE_RATE, block_size)
+    let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size~)
     let compiled_a = CompiledStereoDsp::compile(nodes_a, ctx).unwrap()
     let compiled_b = CompiledStereoDsp::compile(nodes_b, ctx).unwrap()
     let hs = CompiledStereoDspHotSwap::from_graph(
@@ -453,7 +458,7 @@ test "bench/hotswap/stereo_chain" (b : @bench.T) {
 test "bench/topology/replace_node" (b : @bench.T) {
   let nodes = build_bench_fm_voice().nodes()
   for block_size in bench_block_sizes {
-    let ctx = DspContext::new(BENCH_SAMPLE_RATE, block_size)
+    let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size~)
     let tc = CompiledDspTopologyController::from_nodes(
       nodes,
       ctx,
@@ -479,7 +484,7 @@ test "bench/topology/replace_node" (b : @bench.T) {
 test "bench/topology/insert_delete_roundtrip" (b : @bench.T) {
   let nodes = build_bench_fm_voice().nodes()
   for block_size in bench_block_sizes {
-    let ctx = DspContext::new(BENCH_SAMPLE_RATE, block_size)
+    let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size~)
     let tc = CompiledDspTopologyController::from_nodes(
       nodes,
       ctx,

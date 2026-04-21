@@ -2,7 +2,7 @@
 test "noise is deterministic given same seed" {
   let noise1 = Noise::new(42U)
   let noise2 = Noise::new(42U)
-  let ctx = DspContext::new(48000.0, 8)
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=8)
   let buf1 = AudioBuffer::filled(8)
   let buf2 = AudioBuffer::filled(8)
   noise1.process(ctx, buf1)

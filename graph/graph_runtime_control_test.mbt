@@ -1,6 +1,9 @@
 ///|
 test "compiled dsp runtime param update changes gain output" {
-  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::gain(0, QUARTER_SAMPLE),
@@ -27,7 +30,10 @@ test "compiled dsp runtime param update changes gain output" {
 
 ///|
 test "compiled dsp runtime param update changes delay length" {
-  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
   let nodes = [
     DspNode::constant(ZERO_SAMPLE),
     DspNode::delay(0, DELAY_CAPACITY, delay_samples=0),
@@ -64,15 +70,18 @@ test "compiled dsp runtime param update changes delay length" {
 
 ///|
 test "compiled dsp applies mixed control batches in order" {
-  let context = DspContext::new(ADSR_TEST_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=ADSR_TEST_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
   let nodes = [
     DspNode::output(1),
     DspNode::mul(3, 2),
     DspNode::adsr(
-      ADSR_ATTACK_MS,
-      ADSR_DECAY_MS,
-      ADSR_SUSTAIN_LEVEL,
-      ADSR_RELEASE_MS,
+      attack_ms=ADSR_ATTACK_MS,
+      decay_ms=ADSR_DECAY_MS,
+      sustain=ADSR_SUSTAIN_LEVEL,
+      release_ms=ADSR_RELEASE_MS,
     ),
     DspNode::constant(UNIT_SAMPLE),
   ]
@@ -95,7 +104,10 @@ test "compiled dsp applies mixed control batches in order" {
 
 ///|
 test "compiled dsp rejects invalid control batches without partial updates" {
-  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::gain(0, QUARTER_SAMPLE),
@@ -125,7 +137,10 @@ test "compiled dsp rejects invalid control batches without partial updates" {
 
 ///|
 test "compiled dsp runtime param update rejects unsupported or invalid values" {
-  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::delay(0, DELAY_CAPACITY, delay_samples=0),
@@ -178,10 +193,18 @@ test "compiled dsp runtime param update rejects unsupported or invalid values" {
 
 ///|
 test "compiled dsp runtime param update rejects invalid biquad values" {
-  let context = DspContext::new(STANDARD_SAMPLE_RATE, LARGE_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=LARGE_BLOCK_SIZE,
+  )
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
-    DspNode::biquad(0, BiquadMode::LowPass, LOWPASS_CUTOFF, LOWPASS_Q),
+    DspNode::biquad(
+      input=0,
+      mode=BiquadMode::LowPass,
+      cutoff_hz=LOWPASS_CUTOFF,
+      q=LOWPASS_Q,
+    ),
     DspNode::output(1),
   ]
   let compiled = CompiledDsp::compile(nodes, context).unwrap()
@@ -207,15 +230,18 @@ test "compiled dsp runtime param update rejects invalid biquad values" {
 
 ///|
 test "compiled dsp legacy wrappers match apply_control" {
-  let context = DspContext::new(ADSR_TEST_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=ADSR_TEST_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
   let nodes = [
     DspNode::output(1),
     DspNode::mul(3, 2),
     DspNode::adsr(
-      ADSR_ATTACK_MS,
-      ADSR_DECAY_MS,
-      ADSR_SUSTAIN_LEVEL,
-      ADSR_RELEASE_MS,
+      attack_ms=ADSR_ATTACK_MS,
+      decay_ms=ADSR_DECAY_MS,
+      sustain=ADSR_SUSTAIN_LEVEL,
+      release_ms=ADSR_RELEASE_MS,
     ),
     DspNode::constant(UNIT_SAMPLE),
   ]
@@ -247,7 +273,10 @@ test "compiled dsp legacy wrappers match apply_control" {
 
 ///|
 test "compiled dsp set_param wrapper matches apply_control" {
-  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::gain(0, QUARTER_SAMPLE),
@@ -275,7 +304,10 @@ test "compiled dsp set_param wrapper matches apply_control" {
 
 ///|
 test "compiled dsp rejects negative delay_samples via set_param" {
-  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::delay(0, DELAY_CAPACITY, delay_samples=DELAY_SAMPLES),
@@ -297,7 +329,10 @@ test "compiled dsp rejects negative delay_samples via set_param" {
 
 ///|
 test "compiled dsp rejects delay_samples exceeding delay_max_samples via set_param" {
-  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::delay(0, DELAY_CAPACITY, delay_samples=DELAY_SAMPLES),
@@ -319,7 +354,10 @@ test "compiled dsp rejects delay_samples exceeding delay_max_samples via set_par
 
 ///|
 test "compiled dsp accepts valid delay_samples within bounds via set_param" {
-  let context = DspContext::new(STANDARD_SAMPLE_RATE, SMALL_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::delay(0, DELAY_CAPACITY, delay_samples=DELAY_SAMPLES),

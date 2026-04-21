@@ -156,7 +156,7 @@ fn[T, O : Output] GraphSlot::ensure(
     self.block_size.val == block {
     return true
   }
-  let ctx = @moondsp.DspContext::new(rate, block)
+  let ctx = @moondsp.DspContext::new(sample_rate=rate, block_size=block)
   match (self.compile)(ctx) {
     Some(g) => {
       self.output.allocate(block)

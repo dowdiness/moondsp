@@ -12,7 +12,12 @@ test "node_accepts_slot: Constant rejects Value1" {
 
 ///|
 test "node_accepts_slot: Biquad accepts Value0 and Value1" {
-  let node = DspNode::biquad(0, BiquadMode::LowPass, 1000.0, 0.707)
+  let node = DspNode::biquad(
+    input=0,
+    mode=BiquadMode::LowPass,
+    cutoff_hz=1000.0,
+    q=0.707,
+  )
   assert_true(node_accepts_slot(node, GraphParamSlot::Value0))
   assert_true(node_accepts_slot(node, GraphParamSlot::Value1))
 }

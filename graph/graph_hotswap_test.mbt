@@ -15,7 +15,10 @@ const HOT_SWAP_CENTER_GAIN : Double = 0.7071067811865476
 
 ///|
 test "compiled dsp hot swap crossfades equal-power between graphs" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   let old_graph = CompiledDsp::compile(
     [DspNode::constant(0.0), DspNode::output(0)],
     context,
@@ -64,7 +67,10 @@ test "compiled dsp hot swap crossfades equal-power between graphs" {
 
 ///|
 test "compiled dsp hot swap can replace instantly" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   let old_graph = CompiledDsp::compile(
     [DspNode::constant(0.25), DspNode::output(0)],
     context,
@@ -85,10 +91,13 @@ test "compiled dsp hot swap can replace instantly" {
 ///|
 test "compiled dsp hot swap rejects incompatible replacement graph" {
   let active_context = DspContext::new(
-    HOT_SWAP_SAMPLE_RATE,
-    HOT_SWAP_BLOCK_SIZE,
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let incompatible_context = DspContext::new(HOT_SWAP_SAMPLE_RATE, 8)
+  let incompatible_context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=8,
+  )
   let active = CompiledDsp::compile(
     [DspNode::constant(0.0), DspNode::output(0)],
     active_context,
@@ -108,7 +117,10 @@ test "compiled dsp hot swap rejects incompatible replacement graph" {
 
 ///|
 test "compiled dsp hot swap mirrors runtime param changes into pending graph" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   let active = CompiledDsp::compile(
     [DspNode::constant(1.0), DspNode::gain(0, 0.25), DspNode::output(1)],
     context,
@@ -150,7 +162,10 @@ test "compiled dsp hot swap mirrors runtime param changes into pending graph" {
 
 ///|
 test "compiled stereo dsp hot swap crossfades equal-power between graphs" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   let old_graph = CompiledStereoDsp::compile(
     [DspNode::constant(0.0), DspNode::pan(0, 0.0), DspNode::stereo_output(1)],
     context,
@@ -232,7 +247,10 @@ test "compiled stereo dsp hot swap crossfades equal-power between graphs" {
 
 ///|
 test "compiled stereo dsp hot swap mirrors pan changes into pending graph" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   let active = CompiledStereoDsp::compile(
     [DspNode::constant(0.5), DspNode::pan(0, 0.0), DspNode::stereo_output(1)],
     context,

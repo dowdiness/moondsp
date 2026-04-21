@@ -1,6 +1,9 @@
 ///|
 test "compiled dsp topology controller crossfades a replaced node" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   let topology = CompiledDspTopologyController::from_nodes(
     [DspNode::constant(1.0), DspNode::gain(0, 0.25), DspNode::output(1)],
     context,
@@ -46,7 +49,10 @@ test "compiled dsp topology controller crossfades a replaced node" {
 
 ///|
 test "compiled dsp topology controller rejects invalid edit batches transactionally" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   let topology = CompiledDspTopologyController::from_nodes(
     [DspNode::constant(1.0), DspNode::gain(0, 0.25), DspNode::output(1)],
     context,
@@ -66,7 +72,10 @@ test "compiled dsp topology controller rejects invalid edit batches transactiona
 
 ///|
 test "compiled dsp topology controller mirrors runtime params into queued edit" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   let topology = CompiledDspTopologyController::from_nodes(
     [DspNode::constant(1.0), DspNode::gain(0, 0.25), DspNode::output(1)],
     context,
@@ -105,7 +114,10 @@ test "compiled dsp topology controller mirrors runtime params into queued edit" 
 
 ///|
 test "compiled dsp topology controller preserves runtime params across later topology edits" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   let topology = CompiledDspTopologyController::from_nodes(
     [DspNode::constant(1.0), DspNode::gain(0, 0.25), DspNode::output(1)],
     context,
@@ -156,7 +168,10 @@ test "compiled dsp topology controller preserves runtime params across later top
 
 ///|
 test "compiled dsp topology controller crossfades a rewired input" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   let topology = CompiledDspTopologyController::from_nodes(
     [
       DspNode::constant(2.0),
@@ -210,7 +225,10 @@ test "compiled dsp topology controller crossfades a rewired input" {
 
 ///|
 test "compiled dsp topology controller rejects invalid rewires transactionally" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   let topology = CompiledDspTopologyController::from_nodes(
     [
       DspNode::constant(2.0),
@@ -237,7 +255,10 @@ test "compiled dsp topology controller rejects invalid rewires transactionally" 
 
 ///|
 test "compiled dsp topology controller crossfades an inserted node" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   let topology = CompiledDspTopologyController::from_nodes(
     [DspNode::constant(1.0), DspNode::output(0)],
     context,
@@ -287,7 +308,10 @@ test "compiled dsp topology controller crossfades an inserted node" {
 
 ///|
 test "compiled dsp topology controller rejects invalid insert templates transactionally" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   let topology = CompiledDspTopologyController::from_nodes(
     [DspNode::constant(1.0), DspNode::output(0)],
     context,
@@ -310,7 +334,10 @@ test "compiled dsp topology controller rejects invalid insert templates transact
 
 ///|
 test "compiled dsp topology controller crossfades a deleted node" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   let topology = CompiledDspTopologyController::from_nodes(
     [DspNode::constant(1.0), DspNode::gain(0, 0.5), DspNode::output(1)],
     context,
@@ -356,7 +383,10 @@ test "compiled dsp topology controller crossfades a deleted node" {
 
 ///|
 test "compiled dsp topology controller rejects invalid deletes transactionally" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   let topology = CompiledDspTopologyController::from_nodes(
     [DspNode::constant(1.0), DspNode::gain(0, 0.5), DspNode::output(1)],
     context,
@@ -375,7 +405,10 @@ test "compiled dsp topology controller rejects invalid deletes transactionally" 
 
 ///|
 test "compiled dsp topology controller insert delete roundtrip restores baseline" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   let topology = CompiledDspTopologyController::from_nodes(
     [DspNode::constant(1.0), DspNode::output(0)],
     context,
@@ -439,7 +472,10 @@ test "compiled dsp topology controller insert delete roundtrip restores baseline
 
 ///|
 test "compiled dsp topology controller rejects deletes with mismatched retarget nodes" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   let topology = CompiledDspTopologyController::from_nodes(
     [DspNode::constant(1.0), DspNode::gain(0, 0.5), DspNode::output(1)],
     context,
@@ -458,7 +494,10 @@ test "compiled dsp topology controller rejects deletes with mismatched retarget 
 
 ///|
 test "compiled stereo dsp topology controller crossfades a replaced pan node" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   let topology = CompiledStereoDspTopologyController::from_nodes(
     [DspNode::constant(1.0), DspNode::pan(0, 0.0), DspNode::stereo_output(1)],
     context,
@@ -524,7 +563,10 @@ test "compiled stereo dsp topology controller crossfades a replaced pan node" {
 
 ///|
 test "compiled stereo dsp topology controller rejects invalid edit batches transactionally" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   let topology = CompiledStereoDspTopologyController::from_nodes(
     [DspNode::constant(1.0), DspNode::pan(0, 0.0), DspNode::stereo_output(1)],
     context,
@@ -554,7 +596,10 @@ test "compiled stereo dsp topology controller rejects invalid edit batches trans
 
 ///|
 test "compiled stereo dsp topology controller accepts insert nodes" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   let topology = CompiledStereoDspTopologyController::from_nodes(
     [DspNode::constant(1.0), DspNode::pan(0, 0.0), DspNode::stereo_output(1)],
     context,
@@ -597,7 +642,10 @@ test "compiled stereo dsp topology controller accepts insert nodes" {
 
 ///|
 test "compiled stereo dsp topology controller accepts delete nodes" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   // Graph: constant -> pan -> stereo_gain -> stereo_output
   let topology = CompiledStereoDspTopologyController::from_nodes(
     [
@@ -643,7 +691,10 @@ test "compiled stereo dsp topology controller accepts delete nodes" {
 
 ///|
 test "compiled stereo dsp topology controller mirrors runtime params into queued edit" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   let topology = CompiledStereoDspTopologyController::from_nodes(
     [DspNode::constant(1.0), DspNode::pan(0, 0.0), DspNode::stereo_output(1)],
     context,
@@ -700,7 +751,10 @@ test "compiled stereo dsp topology controller mirrors runtime params into queued
 
 ///|
 test "compiled stereo dsp topology controller crossfades a rewired input" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   let topology = CompiledStereoDspTopologyController::from_nodes(
     [
       DspNode::constant(1.0),
@@ -781,7 +835,10 @@ test "compiled stereo dsp topology controller crossfades a rewired input" {
 
 ///|
 test "compiled stereo dsp topology controller preserves runtime params across later topology edits" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   let topology = CompiledStereoDspTopologyController::from_nodes(
     [DspNode::constant(1.0), DspNode::pan(0, 0.0), DspNode::stereo_output(1)],
     context,
@@ -842,7 +899,10 @@ test "compiled stereo dsp topology controller preserves runtime params across la
 
 ///|
 test "topology edit: insert chain of two gain nodes" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   // Graph: constant(1.0) -> output(0)
   let topology = CompiledDspTopologyController::from_nodes(
     [DspNode::constant(1.0), DspNode::output(0)],
@@ -873,7 +933,10 @@ test "topology edit: insert chain of two gain nodes" {
 
 ///|
 test "topology edit: delete chain reverses insert chain" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   // Graph: constant(1.0) -> output(0)
   let topology = CompiledDspTopologyController::from_nodes(
     [DspNode::constant(1.0), DspNode::output(0)],
@@ -924,7 +987,10 @@ test "topology edit: delete chain reverses insert chain" {
 
 ///|
 test "topology edit: insert_chain rejects empty chain" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   let topology = CompiledDspTopologyController::from_nodes(
     [DspNode::constant(1.0), DspNode::output(0)],
     context,
@@ -942,7 +1008,10 @@ test "topology edit: insert_chain rejects empty chain" {
 
 ///|
 test "topology edit: insert_chain rejects chain with binary node" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   let topology = CompiledDspTopologyController::from_nodes(
     [DspNode::constant(1.0), DspNode::output(0)],
     context,
@@ -964,7 +1033,10 @@ test "topology edit: insert_chain rejects chain with binary node" {
 
 ///|
 test "topology edit: delete_chain rejects chain with binary node" {
-  let context = DspContext::new(HOT_SWAP_SAMPLE_RATE, HOT_SWAP_BLOCK_SIZE)
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
   // Build a graph with a binary node (mix) in the potential delete range
   let topology = CompiledDspTopologyController::from_nodes(
     [
@@ -1000,7 +1072,7 @@ test "topology edit preserves oscillator phase across recompilation" {
     DspNode::oscillator_from(0, Waveform::Sine),
     DspNode::output(1),
   ]
-  let ctx = DspContext::new(48000.0, 128)
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
   let controller = CompiledDspTopologyController::from_nodes(
     nodes,
     ctx,
@@ -1037,7 +1109,7 @@ test "topology edit preserves stereo oscillator phase across recompilation" {
     DspNode::pan(1, 0.0),
     DspNode::stereo_output(2),
   ]
-  let ctx = DspContext::new(48000.0, 128)
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
   let controller = CompiledStereoDspTopologyController::from_nodes(
     nodes,
     ctx,
