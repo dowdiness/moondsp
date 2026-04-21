@@ -1,5 +1,5 @@
 ///|
-let demo : @ref.Ref[@lib.DemoSource] = @ref.new(@lib.DemoSource::new())
+let demo : @ref.Ref[@moondsp.DemoSource] = @ref.new(@moondsp.DemoSource::new())
 
 ///|
 /// Browser test wrapper package that proves mono compiled fallback when
@@ -24,13 +24,13 @@ const BROWSER_TEST_FEEDBACK_CLIP_THRESHOLD : Double = 1.0
 const BROWSER_TEST_FEEDBACK_MAX_GAIN : Double = 0.95
 
 ///|
-let compiled_graph : @ref.Ref[@lib.CompiledDsp?] = @ref.new(None)
+let compiled_graph : @ref.Ref[@moondsp.CompiledDsp?] = @ref.new(None)
 
 ///|
-let compiled_context : @ref.Ref[@lib.DspContext?] = @ref.new(None)
+let compiled_context : @ref.Ref[@moondsp.DspContext?] = @ref.new(None)
 
 ///|
-let compiled_output : @ref.Ref[@lib.AudioBuffer?] = @ref.new(None)
+let compiled_output : @ref.Ref[@moondsp.AudioBuffer?] = @ref.new(None)
 
 ///|
 let compiled_sample_rate : @ref.Ref[Double] = @ref.new(0.0)
@@ -75,14 +75,14 @@ pub fn process_compiled_block(
   }
   let graph = compiled_graph.val.unwrap()
   if !graph.apply_controls([
-      @lib.GraphControl::set_param(
+      @moondsp.GraphControl::set_param(
         0,
-        @lib.GraphParamSlot::Value0,
+        @moondsp.GraphParamSlot::Value0,
         bounded_feedback_constant(freq),
       ),
-      @lib.GraphControl::set_param(
+      @moondsp.GraphControl::set_param(
         2,
-        @lib.GraphParamSlot::Value0,
+        @moondsp.GraphParamSlot::Value0,
         bounded_feedback_gain(gain),
       ),
     ]) {
@@ -148,16 +148,16 @@ fn ensure_compiled_graph(sample_rate : Double, block_size : Int) -> Bool {
     return true
   }
 
-  let context = @lib.DspContext::new(sample_rate, block_size)
-  let output = @lib.AudioBuffer::filled(block_size)
+  let context = @moondsp.DspContext::new(sample_rate, block_size)
+  let output = @moondsp.AudioBuffer::filled(block_size)
   let nodes = [
-    @lib.DspNode::constant(BROWSER_TEST_FEEDBACK_DEFAULT_CONSTANT),
-    @lib.DspNode::mix(0, 3),
-    @lib.DspNode::gain(1, BROWSER_TEST_FEEDBACK_DEFAULT_GAIN),
-    @lib.DspNode::clip(2, BROWSER_TEST_FEEDBACK_CLIP_THRESHOLD),
-    @lib.DspNode::output(3),
+    @moondsp.DspNode::constant(BROWSER_TEST_FEEDBACK_DEFAULT_CONSTANT),
+    @moondsp.DspNode::mix(0, 3),
+    @moondsp.DspNode::gain(1, BROWSER_TEST_FEEDBACK_DEFAULT_GAIN),
+    @moondsp.DspNode::clip(2, BROWSER_TEST_FEEDBACK_CLIP_THRESHOLD),
+    @moondsp.DspNode::output(3),
   ]
-  match @lib.CompiledDsp::compile(nodes, context) {
+  match @moondsp.CompiledDsp::compile(nodes, context) {
     Some(graph) => {
       compiled_graph.val = Some(graph)
       compiled_context.val = Some(context)
@@ -217,17 +217,17 @@ fn reset_compiled_graph() -> Unit {
 /// wasm-gc release build produces non-trivial audio — counter-evidence to the
 /// former "Mul wasm-gc bug" memory. Returns -1.0 if compile fails.
 pub fn mul_adsr_peak(sample_rate : Double, block_size : Int) -> Double {
-  let ctx = @lib.DspContext::new(sample_rate, block_size)
+  let ctx = @moondsp.DspContext::new(sample_rate, block_size)
   let nodes = [
-    @lib.DspNode::oscillator(@lib.Waveform::Sine, 440.0),
-    @lib.DspNode::adsr(5.0, 5.0, 0.5, 50.0),
-    @lib.DspNode::mul(0, 1),
-    @lib.DspNode::output(2),
+    @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 440.0),
+    @moondsp.DspNode::adsr(5.0, 5.0, 0.5, 50.0),
+    @moondsp.DspNode::mul(0, 1),
+    @moondsp.DspNode::output(2),
   ]
-  match @lib.CompiledDsp::compile(nodes, ctx) {
+  match @moondsp.CompiledDsp::compile(nodes, ctx) {
     Some(graph) => {
       ignore(graph.gate_on(1))
-      let buf = @lib.AudioBuffer::filled(block_size)
+      let buf = @moondsp.AudioBuffer::filled(block_size)
       graph.process(ctx, buf)
       let mut peak = 0.0
       for i = 0; i < block_size; i = i + 1 {

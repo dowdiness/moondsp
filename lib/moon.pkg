@@ -1,5 +1,0 @@
-import {
-  "dowdiness/moondsp/dsp" @dsp,
-  "dowdiness/moondsp/graph" @graph,
-  "dowdiness/moondsp/voice" @voice,
-}

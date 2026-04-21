@@ -15,12 +15,11 @@ remains open for native targets such as CLAP plugins.
 
 | Package | Path | Purpose |
 |---------|------|---------|
-| `dowdiness/moondsp` | `./` | Library public API facade — `pub using @lib { ... }` re-exports the full library surface so external consumers write `@moondsp.X` |
+| `dowdiness/moondsp` | `./` | Library public API facade — re-exports the full library surface from `@dsp`, `@graph`, and `@voice` so external consumers and internal sub-packages both write `@moondsp.X` |
 | `dowdiness/moondsp/dsp` | `dsp/` | DSP primitives (oscillators, filters, tagless algebra, pan math) |
 | `dowdiness/moondsp/graph` | `graph/` | Compiled graph runtime (compile, optimize, topology edit, hot-swap, control binding) |
 | `dowdiness/moondsp/voice` | `voice/` | Polyphonic voice pool with priority stealing |
-| `dowdiness/moondsp/lib` | `lib/` | Re-export facade (dsp/ + graph/ + voice/) |
-| `dowdiness/moondsp/pattern` | `pattern/` | Standalone pattern engine (rational time, combinators, control maps) — zero dep on `lib/` |
+| `dowdiness/moondsp/pattern` | `pattern/` | Standalone pattern engine (rational time, combinators, control maps) — zero dep on the DSP layers |
 | `dowdiness/moondsp/mini` | `mini/` | Mini-notation parser: text → `Pat[ControlMap]` (e.g. `s("bd sd hh sd").fast(2)`) |
 | `dowdiness/moondsp/scheduler` | `scheduler/` | Pattern scheduler — bridges pattern engine to DSP voice pool |
 | `dowdiness/moondsp/browser` | `browser/` | AudioWorklet export wrapper with multi-pool drum routing |

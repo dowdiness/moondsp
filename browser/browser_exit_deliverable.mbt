@@ -31,11 +31,11 @@ let exit_cutoff : @ref.Ref[Double] = @ref.new(800.0)
 let exit_gain : @ref.Ref[Double] = @ref.new(0.3)
 
 ///|
-let exit_deliverable : GraphSlot[@lib.CompiledDsp, MonoOut] = GraphSlot(
+let exit_deliverable : GraphSlot[@moondsp.CompiledDsp, MonoOut] = GraphSlot(
   output=MonoOut(),
   compile=fn(ctx) {
-    let builder : @lib.GraphBuilder = @lib.exit_deliverable()
-    @lib.CompiledDsp::compile(builder.nodes(), ctx)
+    let builder : @moondsp.GraphBuilder = @moondsp.exit_deliverable()
+    @moondsp.CompiledDsp::compile(builder.nodes(), ctx)
   },
 )
 
@@ -92,27 +92,27 @@ pub fn process_exit_deliverable_block(
   // rejects all. Individual controls are independent.
   ignore(
     graph.apply_control(
-      @lib.GraphControl::set_param(
+      @moondsp.GraphControl::set_param(
         EXIT_LFO_RATE_NODE,
-        @lib.GraphParamSlot::Value0,
+        @moondsp.GraphParamSlot::Value0,
         exit_lfo_rate.val,
       ),
     ),
   )
   ignore(
     graph.apply_control(
-      @lib.GraphControl::set_param(
+      @moondsp.GraphControl::set_param(
         EXIT_BIQUAD_NODE,
-        @lib.GraphParamSlot::Value0,
+        @moondsp.GraphParamSlot::Value0,
         exit_cutoff.val,
       ),
     ),
   )
   ignore(
     graph.apply_control(
-      @lib.GraphControl::set_param(
+      @moondsp.GraphControl::set_param(
         EXIT_GAIN_NODE,
-        @lib.GraphParamSlot::Value0,
+        @moondsp.GraphParamSlot::Value0,
         exit_gain.val,
       ),
     ),

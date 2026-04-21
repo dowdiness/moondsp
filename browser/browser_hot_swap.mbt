@@ -1,18 +1,18 @@
 ///|
-let compiled_hot_swap : GraphSlot[@lib.CompiledDspHotSwap, MonoOut] = GraphSlot(
+let compiled_hot_swap : GraphSlot[@moondsp.CompiledDspHotSwap, MonoOut] = GraphSlot(
   output=MonoOut(),
   compile=fn(ctx) {
     match
-      @lib.CompiledDsp::compile(
+      @moondsp.CompiledDsp::compile(
         [
-          @lib.DspNode::constant(BROWSER_HOT_SWAP_OLD_CONSTANT),
-          @lib.DspNode::output(0),
+          @moondsp.DspNode::constant(BROWSER_HOT_SWAP_OLD_CONSTANT),
+          @moondsp.DspNode::output(0),
         ],
         ctx,
       ) {
       Some(active) =>
         Some(
-          @lib.CompiledDspHotSwap::from_graph(
+          @moondsp.CompiledDspHotSwap::from_graph(
             active,
             crossfade_samples=BROWSER_HOT_SWAP_CROSSFADE_SAMPLES,
           ),
@@ -43,10 +43,10 @@ pub fn queue_compiled_hot_swap() -> Bool {
     None => return false
   }
   let replacement = match
-    @lib.CompiledDsp::compile(
+    @moondsp.CompiledDsp::compile(
       [
-        @lib.DspNode::constant(BROWSER_HOT_SWAP_NEW_CONSTANT),
-        @lib.DspNode::output(0),
+        @moondsp.DspNode::constant(BROWSER_HOT_SWAP_NEW_CONSTANT),
+        @moondsp.DspNode::output(0),
       ],
       ctx,
     ) {

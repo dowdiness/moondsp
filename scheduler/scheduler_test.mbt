@@ -24,16 +24,16 @@ test "midi_to_hz: MIDI 127" {
 
 ///|
 test "PatternScheduler::new initializes with zero position" {
-  let template : Array[@lib.DspNode] = [
-    @lib.DspNode::oscillator(@lib.Waveform::Sine, 440.0),
-    @lib.DspNode::gain(0, 1.0),
-    @lib.DspNode::adsr(0.01, 0.1, 0.7, 0.3),
-    @lib.DspNode::output(1),
+  let template : Array[@moondsp.DspNode] = [
+    @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 440.0),
+    @moondsp.DspNode::gain(0, 1.0),
+    @moondsp.DspNode::adsr(0.01, 0.1, 0.7, 0.3),
+    @moondsp.DspNode::output(1),
   ]
-  let ctx = @lib.DspContext::new(48000.0, 128)
-  let bindings = @lib.ControlBindingBuilder::new()
-    .bind(key="note", node_index=0, slot=@lib.GraphParamSlot::Value0)
-    .build(@lib.CompiledTemplate::analyze(template))
+  let ctx = @moondsp.DspContext::new(48000.0, 128)
+  let bindings = @moondsp.ControlBindingBuilder::new()
+    .bind(key="note", node_index=0, slot=@moondsp.GraphParamSlot::Value0)
+    .build(@moondsp.CompiledTemplate::analyze(template))
   match bindings {
     Ok(b) => {
       let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b, ctx~)
@@ -46,7 +46,7 @@ test "PatternScheduler::new initializes with zero position" {
 
 ///|
 test "compute_arc: first block at 120 BPM" {
-  let ctx = @lib.DspContext::new(48000.0, 128)
+  let ctx = @moondsp.DspContext::new(48000.0, 128)
   let arc = @scheduler.compute_arc(0L, 120.0, ctx)
   let zero = @pattern.Rational::from_int(0)
   assert_true(arc.begin == zero)
@@ -56,7 +56,7 @@ test "compute_arc: first block at 120 BPM" {
 
 ///|
 test "compute_arc: second block at 120 BPM" {
-  let ctx = @lib.DspContext::new(48000.0, 128)
+  let ctx = @moondsp.DspContext::new(48000.0, 128)
   let arc = @scheduler.compute_arc(128L, 120.0, ctx)
   let expected_start = @pattern.Rational::new(15360L, 2880000L)
   let expected_end = @pattern.Rational::new(30720L, 2880000L)
@@ -66,7 +66,7 @@ test "compute_arc: second block at 120 BPM" {
 
 ///|
 test "compute_arc: fractional BPM 120.5 preserves precision" {
-  let ctx = @lib.DspContext::new(48000.0, 128)
+  let ctx = @moondsp.DspContext::new(48000.0, 128)
   // 120.5 BPM → bpm_scaled = 1205, denominator = 48000 * 600 = 28800000
   // arc_end = 128 * 1205 / 28800000 = 154240 / 28800000
   let arc = @scheduler.compute_arc(0L, 120.5, ctx)
@@ -82,15 +82,19 @@ test "compute_arc: fractional BPM 120.5 preserves precision" {
 /// template. Envelope_gain wires the ADSR at index 1 into the signal path so
 /// `VoicePool::new`'s orphan-ADSR gate accepts it; swapping to bare `gain(0)`
 /// would orphan the ADSR and be rejected.
-fn make_test_pool() -> (@lib.VoicePool, Array[@lib.DspNode], @lib.DspContext) {
-  let template : Array[@lib.DspNode] = [
-    @lib.DspNode::oscillator(@lib.Waveform::Sine, 440.0),
-    @lib.DspNode::adsr(0.01, 0.1, 0.7, 0.3),
-    @lib.DspNode::envelope_gain(0, 1, 1.0),
-    @lib.DspNode::output(2),
+fn make_test_pool() -> (
+  @moondsp.VoicePool,
+  Array[@moondsp.DspNode],
+  @moondsp.DspContext,
+) {
+  let template : Array[@moondsp.DspNode] = [
+    @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 440.0),
+    @moondsp.DspNode::adsr(0.01, 0.1, 0.7, 0.3),
+    @moondsp.DspNode::envelope_gain(0, 1, 1.0),
+    @moondsp.DspNode::output(2),
   ]
-  let ctx = @lib.DspContext::new(48000.0, 128)
-  let pool = @lib.VoicePool::new(template, ctx, max_voices=4)
+  let ctx = @moondsp.DspContext::new(48000.0, 128)
+  let pool = @moondsp.VoicePool::new(template, ctx, max_voices=4)
   match pool {
     Some(p) => (p, template, ctx)
     None => abort("test pool creation failed")
@@ -100,20 +104,20 @@ fn make_test_pool() -> (@lib.VoicePool, Array[@lib.DspNode], @lib.DspContext) {
 ///|
 /// Helper: build pool + scheduler + audio buffers for standard test setup.
 fn make_test_sched() -> (
-  @lib.VoicePool,
+  @moondsp.VoicePool,
   @scheduler.PatternScheduler,
-  @lib.AudioBuffer,
-  @lib.AudioBuffer,
+  @moondsp.AudioBuffer,
+  @moondsp.AudioBuffer,
 ) {
   let (pool, template, ctx) = make_test_pool()
-  let bindings = @lib.ControlBindingBuilder::new()
-    .bind(key="note", node_index=0, slot=@lib.GraphParamSlot::Value0)
-    .build(@lib.CompiledTemplate::analyze(template))
+  let bindings = @moondsp.ControlBindingBuilder::new()
+    .bind(key="note", node_index=0, slot=@moondsp.GraphParamSlot::Value0)
+    .build(@moondsp.CompiledTemplate::analyze(template))
   match bindings {
     Ok(b) => {
       let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b, ctx~)
-      let left = @lib.AudioBuffer::filled(128)
-      let right = @lib.AudioBuffer::filled(128)
+      let left = @moondsp.AudioBuffer::filled(128)
+      let right = @moondsp.AudioBuffer::filled(128)
       (pool, sched, left, right)
     }
     Err(_) => abort("test bindings creation failed")
@@ -123,9 +127,9 @@ fn make_test_sched() -> (
 ///|
 test "expire_notes: removes notes past their end_time" {
   let (pool, template, ctx) = make_test_pool()
-  let bindings = @lib.ControlBindingBuilder::new()
-    .bind(key="note", node_index=0, slot=@lib.GraphParamSlot::Value0)
-    .build(@lib.CompiledTemplate::analyze(template))
+  let bindings = @moondsp.ControlBindingBuilder::new()
+    .bind(key="note", node_index=0, slot=@moondsp.GraphParamSlot::Value0)
+    .build(@moondsp.CompiledTemplate::analyze(template))
   match bindings {
     Err(_) => assert_true(false)
     Ok(b) => {
@@ -229,20 +233,20 @@ test "process_block: dense pattern fires multiple note-ons per block" {
 
 ///|
 test "process_block: stolen voice gate-off is harmless" {
-  let template : Array[@lib.DspNode] = [
-    @lib.DspNode::oscillator(@lib.Waveform::Sine, 440.0),
-    @lib.DspNode::adsr(0.01, 0.1, 0.7, 0.3),
-    @lib.DspNode::envelope_gain(0, 1, 1.0),
-    @lib.DspNode::output(2),
+  let template : Array[@moondsp.DspNode] = [
+    @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 440.0),
+    @moondsp.DspNode::adsr(0.01, 0.1, 0.7, 0.3),
+    @moondsp.DspNode::envelope_gain(0, 1, 1.0),
+    @moondsp.DspNode::output(2),
   ]
-  let ctx = @lib.DspContext::new(48000.0, 128)
-  let pool = @lib.VoicePool::new(template, ctx, max_voices=1)
+  let ctx = @moondsp.DspContext::new(48000.0, 128)
+  let pool = @moondsp.VoicePool::new(template, ctx, max_voices=1)
   match pool {
     None => assert_true(false)
     Some(pool) => {
-      let bindings = @lib.ControlBindingBuilder::new()
-        .bind(key="note", node_index=0, slot=@lib.GraphParamSlot::Value0)
-        .build(@lib.CompiledTemplate::analyze(template))
+      let bindings = @moondsp.ControlBindingBuilder::new()
+        .bind(key="note", node_index=0, slot=@moondsp.GraphParamSlot::Value0)
+        .build(@moondsp.CompiledTemplate::analyze(template))
       match bindings {
         Err(_) => assert_true(false)
         Ok(b) => {
@@ -252,8 +256,8 @@ test "process_block: stolen voice gate-off is harmless" {
             ctx~,
           )
           let pat = @pattern.note(60.0).fast(@pattern.Rational::from_int(2))
-          let left = @lib.AudioBuffer::filled(128)
-          let right = @lib.AudioBuffer::filled(128)
+          let left = @moondsp.AudioBuffer::filled(128)
+          let right = @moondsp.AudioBuffer::filled(128)
           for _i = 0; _i < 200; _i = _i + 1 {
             sched.process_block(pat, pool, left, right)
           }

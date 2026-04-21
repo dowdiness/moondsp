@@ -3,14 +3,14 @@ let stereo_topo_edit_level : @ref.Ref[Double] = @ref.new(1.0)
 
 ///|
 let compiled_stereo_topology_edit : GraphSlot[
-  @lib.CompiledStereoDspTopologyController,
+  @moondsp.CompiledStereoDspTopologyController,
   StereoOut,
 ] = GraphSlot(output=StereoOut(), compile=fn(ctx) {
-  @lib.CompiledStereoDspTopologyController::from_nodes(
+  @moondsp.CompiledStereoDspTopologyController::from_nodes(
     [
-      @lib.DspNode::constant(1.0),
-      @lib.DspNode::pan(0, BROWSER_STEREO_TOPOLOGY_EDIT_OLD_PAN),
-      @lib.DspNode::stereo_output(1),
+      @moondsp.DspNode::constant(1.0),
+      @moondsp.DspNode::pan(0, BROWSER_STEREO_TOPOLOGY_EDIT_OLD_PAN),
+      @moondsp.DspNode::stereo_output(1),
     ],
     ctx,
     crossfade_samples=BROWSER_STEREO_TOPOLOGY_EDIT_CROSSFADE_SAMPLES,
@@ -37,9 +37,9 @@ pub fn queue_compiled_stereo_topology_edit() -> Bool {
     None => return false
   }
   topology.queue_topology_edit(
-    @lib.GraphTopologyEdit::replace_node(
+    @moondsp.GraphTopologyEdit::replace_node(
       1,
-      @lib.DspNode::pan(0, BROWSER_STEREO_TOPOLOGY_EDIT_NEW_PAN),
+      @moondsp.DspNode::pan(0, BROWSER_STEREO_TOPOLOGY_EDIT_NEW_PAN),
     ),
   )
 }
@@ -66,9 +66,9 @@ pub fn process_compiled_stereo_topology_edit_block(
   }
   let topology = compiled_stereo_topology_edit.graph_val()
   if !topology.apply_control(
-      @lib.GraphControl::set_param(
+      @moondsp.GraphControl::set_param(
         0,
-        @lib.GraphParamSlot::Value0,
+        @moondsp.GraphParamSlot::Value0,
         stereo_topo_edit_level.val,
       ),
     ) {

@@ -6,13 +6,13 @@ let topo_edit_inserted : @ref.Ref[Bool] = @ref.new(false)
 
 ///|
 let compiled_topology_edit : GraphSlot[
-  @lib.CompiledDspTopologyController,
+  @moondsp.CompiledDspTopologyController,
   MonoOut,
 ] = GraphSlot(output=MonoOut(), compile=fn(ctx) {
-  @lib.CompiledDspTopologyController::from_nodes(
+  @moondsp.CompiledDspTopologyController::from_nodes(
     [
-      @lib.DspNode::constant(BROWSER_COMPILED_DEFAULT_GAIN),
-      @lib.DspNode::output(0),
+      @moondsp.DspNode::constant(BROWSER_COMPILED_DEFAULT_GAIN),
+      @moondsp.DspNode::output(0),
     ],
     ctx,
     crossfade_samples=BROWSER_TOPOLOGY_EDIT_CROSSFADE_SAMPLES,
@@ -43,10 +43,10 @@ pub fn queue_compiled_topology_edit() -> Bool {
     return false
   }
   let queued = topology.queue_topology_edit(
-    @lib.GraphTopologyEdit::insert_node(
+    @moondsp.GraphTopologyEdit::insert_node(
       1,
-      @lib.GraphTopologyInputSlot::Input0,
-      @lib.DspNode::gain(0, BROWSER_TOPOLOGY_EDIT_INSERTED_GAIN),
+      @moondsp.GraphTopologyInputSlot::Input0,
+      @moondsp.DspNode::gain(0, BROWSER_TOPOLOGY_EDIT_INSERTED_GAIN),
     ),
   )
   if queued {
@@ -67,10 +67,10 @@ pub fn queue_compiled_topology_delete_edit() -> Bool {
     return false
   }
   let queued = topology.queue_topology_edit(
-    @lib.GraphTopologyEdit::delete_node(
+    @moondsp.GraphTopologyEdit::delete_node(
       2,
       1,
-      @lib.GraphTopologyInputSlot::Input0,
+      @moondsp.GraphTopologyInputSlot::Input0,
       2,
     ),
   )
@@ -104,9 +104,9 @@ pub fn process_compiled_topology_edit_block(
   }
   let topology = compiled_topology_edit.graph_val()
   if !topology.apply_control(
-      @lib.GraphControl::set_param(
+      @moondsp.GraphControl::set_param(
         0,
-        @lib.GraphParamSlot::Value0,
+        @moondsp.GraphParamSlot::Value0,
         topo_edit_gain.val,
       ),
     ) {

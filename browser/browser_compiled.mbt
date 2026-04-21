@@ -1,16 +1,16 @@
 ///|
-let compiled : GraphSlot[@lib.CompiledDsp, MonoOut] = GraphSlot(
+let compiled : GraphSlot[@moondsp.CompiledDsp, MonoOut] = GraphSlot(
   output=MonoOut(),
   compile=fn(ctx) {
-    @lib.CompiledDsp::compile(
+    @moondsp.CompiledDsp::compile(
       [
-        @lib.DspNode::oscillator(
-          @lib.Waveform::Triangle,
+        @moondsp.DspNode::oscillator(
+          @moondsp.Waveform::Triangle,
           BROWSER_COMPILED_DEFAULT_FREQ,
         ),
-        @lib.DspNode::gain(0, BROWSER_COMPILED_DEFAULT_GAIN),
-        @lib.DspNode::clip(1, BROWSER_COMPILED_CLIP_THRESHOLD),
-        @lib.DspNode::output(2),
+        @moondsp.DspNode::gain(0, BROWSER_COMPILED_DEFAULT_GAIN),
+        @moondsp.DspNode::clip(1, BROWSER_COMPILED_CLIP_THRESHOLD),
+        @moondsp.DspNode::output(2),
       ],
       ctx,
     )
@@ -36,8 +36,8 @@ pub fn process_compiled_block(
   }
   let graph = compiled.graph_val()
   if !graph.apply_controls([
-      @lib.GraphControl::set_param(0, @lib.GraphParamSlot::Value0, freq),
-      @lib.GraphControl::set_param(1, @lib.GraphParamSlot::Value0, gain),
+      @moondsp.GraphControl::set_param(0, @moondsp.GraphParamSlot::Value0, freq),
+      @moondsp.GraphControl::set_param(1, @moondsp.GraphParamSlot::Value0, gain),
     ]) {
     return false
   }

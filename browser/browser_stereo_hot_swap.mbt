@@ -1,20 +1,20 @@
 ///|
 let compiled_stereo_hot_swap : GraphSlot[
-  @lib.CompiledStereoDspHotSwap,
+  @moondsp.CompiledStereoDspHotSwap,
   StereoOut,
 ] = GraphSlot(output=StereoOut(), compile=fn(ctx) {
   match
-    @lib.CompiledStereoDsp::compile(
+    @moondsp.CompiledStereoDsp::compile(
       [
-        @lib.DspNode::constant(BROWSER_STEREO_HOT_SWAP_OLD_CONSTANT),
-        @lib.DspNode::pan(0, 0.0),
-        @lib.DspNode::stereo_output(1),
+        @moondsp.DspNode::constant(BROWSER_STEREO_HOT_SWAP_OLD_CONSTANT),
+        @moondsp.DspNode::pan(0, 0.0),
+        @moondsp.DspNode::stereo_output(1),
       ],
       ctx,
     ) {
     Some(active) =>
       Some(
-        @lib.CompiledStereoDspHotSwap::from_graph(
+        @moondsp.CompiledStereoDspHotSwap::from_graph(
           active,
           crossfade_samples=BROWSER_STEREO_HOT_SWAP_CROSSFADE_SAMPLES,
         ),
@@ -44,11 +44,11 @@ pub fn queue_compiled_stereo_hot_swap() -> Bool {
     None => return false
   }
   let replacement = match
-    @lib.CompiledStereoDsp::compile(
+    @moondsp.CompiledStereoDsp::compile(
       [
-        @lib.DspNode::constant(BROWSER_STEREO_HOT_SWAP_NEW_CONSTANT),
-        @lib.DspNode::pan(0, 0.0),
-        @lib.DspNode::stereo_output(1),
+        @moondsp.DspNode::constant(BROWSER_STEREO_HOT_SWAP_NEW_CONSTANT),
+        @moondsp.DspNode::pan(0, 0.0),
+        @moondsp.DspNode::stereo_output(1),
       ],
       ctx,
     ) {

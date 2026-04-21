@@ -1,5 +1,5 @@
 import {
-  "dowdiness/moondsp/lib" @lib,
+  "dowdiness/moondsp" @moondsp,
   "dowdiness/moondsp/mini" @mini,
   "dowdiness/moondsp/scheduler" @scheduler,
   "dowdiness/moondsp/pattern" @pattern,

@@ -28,6 +28,18 @@ for `dowdiness/moondsp`. Read order below goes roughly from "new user" to
 - **[`performance/`](performance/)** — dated benchmark snapshots. New
   measurements go in new files (do not edit historical entries in place).
 
+## Reviews
+
+Point-in-time analyses. Each review is dated and should be moved to
+`archive/` once its recommendations have shipped or been rejected, rather
+than edited in place.
+
+- **[`api-design-review-2026-04-21.md`](api-design-review-2026-04-21.md)**
+  — public-API design review of the root `@moondsp` facade and `dsp` /
+  `graph` / `voice` sub-packages. Flags facade drift, over-exposed DSP
+  struct fields, and the silent-failure `Bool`-return family as
+  pre-1.0 stability risks.
+
 ## Contributor design docs
 
 Per-feature design briefs and task-level plans. "Current" is what has not

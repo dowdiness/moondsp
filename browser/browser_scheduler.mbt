@@ -7,10 +7,10 @@ let sched_active_pattern : @ref.Ref[@pattern.Pat[@pattern.ControlMap]?] = @ref.n
 ///|
 /// Per-sound pool state: voice pool + scheduler + tmp buffers.
 struct SoundPool {
-  pool : @lib.VoicePool
+  pool : @moondsp.VoicePool
   scheduler : @scheduler.PatternScheduler
-  tmp_left : @lib.AudioBuffer
-  tmp_right : @lib.AudioBuffer
+  tmp_left : @moondsp.AudioBuffer
+  tmp_right : @moondsp.AudioBuffer
 }
 
 ///|
@@ -26,16 +26,16 @@ let sched_hh : @ref.Ref[SoundPool?] = @ref.new(None)
 let sched_synth : @ref.Ref[SoundPool?] = @ref.new(None)
 
 ///|
-let sched_left : @ref.Ref[@lib.AudioBuffer?] = @ref.new(None)
+let sched_left : @ref.Ref[@moondsp.AudioBuffer?] = @ref.new(None)
 
 ///|
-let sched_right : @ref.Ref[@lib.AudioBuffer?] = @ref.new(None)
+let sched_right : @ref.Ref[@moondsp.AudioBuffer?] = @ref.new(None)
 
 ///|
 let sched_gain : @ref.Ref[Double] = @ref.new(0.3)
 
 ///|
-fn bd_template() -> Array[@lib.DspNode] {
+fn bd_template() -> Array[@moondsp.DspNode] {
   // Kick drum: pitch sweep 240→60 Hz + amplitude envelope
   // [0] pitch ADSR: fast decay creates frequency sweep
   // [1] scale pitch envelope by 180 Hz range
@@ -46,19 +46,19 @@ fn bd_template() -> Array[@lib.DspNode] {
   // [6] envelope_gain: signal * amp envelope
   // [7] output
   [
-    @lib.DspNode::adsr(0.5, 40.0, 0.0, 40.0),
-    @lib.DspNode::gain(0, 180.0),
-    @lib.DspNode::constant(60.0),
-    @lib.DspNode::mix(1, 2),
-    @lib.DspNode::oscillator_from(3, @lib.Waveform::Sine),
-    @lib.DspNode::adsr(0.5, 120.0, 0.0, 80.0),
-    @lib.DspNode::envelope_gain(4, 5, 1.0),
-    @lib.DspNode::output(6),
+    @moondsp.DspNode::adsr(0.5, 40.0, 0.0, 40.0),
+    @moondsp.DspNode::gain(0, 180.0),
+    @moondsp.DspNode::constant(60.0),
+    @moondsp.DspNode::mix(1, 2),
+    @moondsp.DspNode::oscillator_from(3, @moondsp.Waveform::Sine),
+    @moondsp.DspNode::adsr(0.5, 120.0, 0.0, 80.0),
+    @moondsp.DspNode::envelope_gain(4, 5, 1.0),
+    @moondsp.DspNode::output(6),
   ]
 }
 
 ///|
-fn sd_template() -> Array[@lib.DspNode] {
+fn sd_template() -> Array[@moondsp.DspNode] {
   // Snare: bandpass noise + sine body, amplitude envelope
   // [0] noise source
   // [1] bandpass filter at 1.5 kHz (snare body)
@@ -68,18 +68,18 @@ fn sd_template() -> Array[@lib.DspNode] {
   // [5] envelope_gain: signal * envelope
   // [6] output
   [
-    @lib.DspNode::noise(12345U),
-    @lib.DspNode::biquad(0, @lib.BiquadMode::BandPass, 1500.0, 1.5),
-    @lib.DspNode::oscillator(@lib.Waveform::Sine, 180.0),
-    @lib.DspNode::mix(1, 2),
-    @lib.DspNode::adsr(0.5, 60.0, 0.0, 40.0),
-    @lib.DspNode::envelope_gain(3, 4, 1.0),
-    @lib.DspNode::output(5),
+    @moondsp.DspNode::noise(12345U),
+    @moondsp.DspNode::biquad(0, @moondsp.BiquadMode::BandPass, 1500.0, 1.5),
+    @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 180.0),
+    @moondsp.DspNode::mix(1, 2),
+    @moondsp.DspNode::adsr(0.5, 60.0, 0.0, 40.0),
+    @moondsp.DspNode::envelope_gain(3, 4, 1.0),
+    @moondsp.DspNode::output(5),
   ]
 }
 
 ///|
-fn hh_template() -> Array[@lib.DspNode] {
+fn hh_template() -> Array[@moondsp.DspNode] {
   // Hi-hat: high-pass filtered noise, short envelope
   // [0] noise source
   // [1] high-pass filter at 7 kHz
@@ -87,36 +87,36 @@ fn hh_template() -> Array[@lib.DspNode] {
   // [3] envelope_gain: signal * envelope
   // [4] output
   [
-    @lib.DspNode::noise(67890U),
-    @lib.DspNode::biquad(0, @lib.BiquadMode::HighPass, 7000.0, 1.5),
-    @lib.DspNode::adsr(0.5, 25.0, 0.0, 15.0),
-    @lib.DspNode::envelope_gain(1, 2, 0.6),
-    @lib.DspNode::output(3),
+    @moondsp.DspNode::noise(67890U),
+    @moondsp.DspNode::biquad(0, @moondsp.BiquadMode::HighPass, 7000.0, 1.5),
+    @moondsp.DspNode::adsr(0.5, 25.0, 0.0, 15.0),
+    @moondsp.DspNode::envelope_gain(1, 2, 0.6),
+    @moondsp.DspNode::output(3),
   ]
 }
 
 ///|
-fn synth_template() -> Array[@lib.DspNode] {
+fn synth_template() -> Array[@moondsp.DspNode] {
   [
-    @lib.DspNode::oscillator(@lib.Waveform::Sine, 440.0),
-    @lib.DspNode::adsr(10.0, 100.0, 0.7, 300.0),
-    @lib.DspNode::envelope_gain(0, 1, 1.0),
-    @lib.DspNode::output(2),
+    @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 440.0),
+    @moondsp.DspNode::adsr(10.0, 100.0, 0.7, 300.0),
+    @moondsp.DspNode::envelope_gain(0, 1, 1.0),
+    @moondsp.DspNode::output(2),
   ]
 }
 
 ///|
 /// Create a SoundPool for a drum template (no control bindings needed).
 fn make_drum_pool(
-  template : Array[@lib.DspNode],
-  ctx : @lib.DspContext,
+  template : Array[@moondsp.DspNode],
+  ctx : @moondsp.DspContext,
   block_size : Int,
 ) -> SoundPool? {
-  match @lib.VoicePool::new(template, ctx, max_voices=4) {
+  match @moondsp.VoicePool::new(template, ctx, max_voices=4) {
     None => None
     Some(pool) => {
-      let bindings_result = @lib.ControlBindingBuilder::new().build(
-        @lib.CompiledTemplate::analyze(template),
+      let bindings_result = @moondsp.ControlBindingBuilder::new().build(
+        @moondsp.CompiledTemplate::analyze(template),
       )
       match bindings_result {
         Err(_) => None
@@ -129,8 +129,8 @@ fn make_drum_pool(
           Some({
             pool,
             scheduler,
-            tmp_left: @lib.AudioBuffer::filled(block_size),
-            tmp_right: @lib.AudioBuffer::filled(block_size),
+            tmp_left: @moondsp.AudioBuffer::filled(block_size),
+            tmp_right: @moondsp.AudioBuffer::filled(block_size),
           })
         }
       }
@@ -140,14 +140,14 @@ fn make_drum_pool(
 
 ///|
 /// Create a SoundPool for the synth template (with note->freq binding).
-fn make_synth_pool(ctx : @lib.DspContext, block_size : Int) -> SoundPool? {
+fn make_synth_pool(ctx : @moondsp.DspContext, block_size : Int) -> SoundPool? {
   let template = synth_template()
-  match @lib.VoicePool::new(template, ctx, max_voices=8) {
+  match @moondsp.VoicePool::new(template, ctx, max_voices=8) {
     None => None
     Some(pool) => {
-      let bindings_result = @lib.ControlBindingBuilder::new()
-        .bind(key="note", node_index=0, slot=@lib.GraphParamSlot::Value0)
-        .build(@lib.CompiledTemplate::analyze(template))
+      let bindings_result = @moondsp.ControlBindingBuilder::new()
+        .bind(key="note", node_index=0, slot=@moondsp.GraphParamSlot::Value0)
+        .build(@moondsp.CompiledTemplate::analyze(template))
       match bindings_result {
         Err(_) => None
         Ok(bindings) => {
@@ -159,8 +159,8 @@ fn make_synth_pool(ctx : @lib.DspContext, block_size : Int) -> SoundPool? {
           Some({
             pool,
             scheduler,
-            tmp_left: @lib.AudioBuffer::filled(block_size),
-            tmp_right: @lib.AudioBuffer::filled(block_size),
+            tmp_left: @moondsp.AudioBuffer::filled(block_size),
+            tmp_right: @moondsp.AudioBuffer::filled(block_size),
           })
         }
       }
@@ -174,7 +174,7 @@ pub fn init_scheduler_graph(sample_rate : Double, block_size : Int) -> Bool {
     reset_scheduler_graph()
     return false
   }
-  let ctx = @lib.DspContext::new(sample_rate, block_size)
+  let ctx = @moondsp.DspContext::new(sample_rate, block_size)
   let bd = make_drum_pool(bd_template(), ctx, block_size)
   let sd = make_drum_pool(sd_template(), ctx, block_size)
   let hh = make_drum_pool(hh_template(), ctx, block_size)
@@ -187,8 +187,8 @@ pub fn init_scheduler_graph(sample_rate : Double, block_size : Int) -> Bool {
   sched_sd.val = sd
   sched_hh.val = hh
   sched_synth.val = synth
-  sched_left.val = Some(@lib.AudioBuffer::filled(block_size))
-  sched_right.val = Some(@lib.AudioBuffer::filled(block_size))
+  sched_left.val = Some(@moondsp.AudioBuffer::filled(block_size))
+  sched_right.val = Some(@moondsp.AudioBuffer::filled(block_size))
   sched_gain.val = 0.3
   sched_active_pattern.val = None
   true
@@ -221,8 +221,8 @@ pub fn scheduler_right_sample(index : Int) -> Double {
 fn process_sub_pool(
   sp : SoundPool,
   sub_pat : @pattern.Pat[@pattern.ControlMap],
-  left : @lib.AudioBuffer,
-  right : @lib.AudioBuffer,
+  left : @moondsp.AudioBuffer,
+  right : @moondsp.AudioBuffer,
 ) -> Unit {
   sp.tmp_left.fill(0.0)
   sp.tmp_right.fill(0.0)

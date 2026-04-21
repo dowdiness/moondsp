@@ -1,33 +1,79 @@
 ///|
 /// Public API facade for the `dowdiness/moondsp` library.
 ///
-/// This file re-exports the library surface provided by `@lib`, which in
-/// turn consolidates `@dsp`, `@graph`, and `@voice`. External consumers
-/// should prefer `@moondsp.X` over `@moondsp.lib.X`; the `@lib` layer remains
-/// as the internal re-export hub that project packages import.
-pub using @lib {
-  type Adsr,
+/// This file re-exports the library surface directly from `@dsp`, `@graph`,
+/// and `@voice`. External consumers and internal sub-packages both import
+/// `dowdiness/moondsp` and access types as `@moondsp.X`.
+
+///|
+// Re-export dsp/ package — DSP primitives, tagless algebra, utilities.
+pub using @dsp {
   type AudioBuffer,
+  type DspContext,
+  type Mono,
+  type Stereo,
+
+  // DSP primitives — stateful
+  type Oscillator,
+  type Noise,
+  type Adsr,
   type Biquad,
-  type BiquadMode,
+  type DelayLine,
+  type ParamSmoother,
+
+  // DSP primitives — stateless
+  type Gain,
   type Clip,
+  type Mix,
+  type Pan,
+
+  // Enums
+  type Waveform,
+  type BiquadMode,
+  type EnvStage,
+
+  // Tagless algebra traits
+  trait ArithSym,
+  trait DspSym,
+  trait FilterSym,
+  trait DelaySym,
+  trait StereoSym,
+  trait StereoFilterSym,
+  trait StereoDelaySym,
+  trait ChannelSpec,
+
+  // Utility functions
+  is_finite,
+  is_finite_positive,
+  effective_sample_count,
+  sanitize_buffer,
+  mono_shape,
+  stereo_shape,
+  max_feedback_amount,
+  pan_left_gain,
+  pan_right_gain,
+
+  // Tagless compositions
+  exit_deliverable,
+  range,
+  lin_map,
+
+  // Demo
+  type DemoSource,
+}
+
+///|
+// Re-export graph/ package — compiled graph runtime, topology editing, etc.
+pub using @graph {
   type CompiledDsp,
   type CompiledDspHotSwap,
   type CompiledDspTopologyController,
   type CompiledStereoDsp,
   type CompiledStereoDspHotSwap,
   type CompiledStereoDspTopologyController,
-  type ControlBinding,
-  type ControlBindingBuilder,
-  type ControlBindingError,
-  type ControlBindingMap,
-  type DelayLine,
-  type DemoSource,
-  type DspContext,
+  type CompiledTemplate,
   type DspNode,
   type DspNodeKind,
-  type EnvStage,
-  type Gain,
   type GraphBuilder,
   type GraphControl,
   type GraphControlKind,
@@ -35,44 +81,27 @@ pub using @lib {
   type GraphTopologyEdit,
   type GraphTopologyInputSlot,
   type GraphValidationError,
-  type Mix,
-  type Mono,
-  type Noise,
-  type Oscillator,
-  type Pan,
-  type ParamSmoother,
-  type Stereo,
-  type VoiceHandle,
-  type VoicePool,
-  type VoiceState,
-  type Waveform,
-  trait ArithSym,
-  trait ChannelSpec,
-  trait DelaySym,
-  trait DspSym,
-  trait FilterSym,
+
+  // Control binding
+  type ControlBinding,
+  type ControlBindingBuilder,
+  type ControlBindingError,
+  type ControlBindingMap,
+
+  // Traits
   trait GraphControllable,
   trait GraphDebuggable,
   trait NodeEditable,
   trait NodeFoldable,
   trait NodeSpanning,
   trait NodeStateful,
-  trait StereoDelaySym,
-  trait StereoFilterSym,
-  trait StereoSym,
-  effective_sample_count,
-  exit_deliverable,
-  is_finite,
-  is_finite_positive,
-  lin_map,
-  max_feedback_amount,
-  mono_shape,
+
+  // Functions
   node_accepts_slot,
   optimize_graph,
-  pan_left_gain,
-  pan_right_gain,
-  range,
   replay,
-  sanitize_buffer,
-  stereo_shape,
 }
+
+///|
+// Re-export voice/ package — polyphonic voice pool with priority stealing.
+pub using @voice {type VoiceHandle, type VoicePool, type VoiceState}

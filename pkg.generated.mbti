@@ -65,6 +65,8 @@ pub using @graph {type CompiledStereoDspHotSwap}
 
 pub using @graph {type CompiledStereoDspTopologyController}
 
+pub using @graph {type CompiledTemplate}
+
 pub using @graph {type ControlBinding}
 
 pub using @graph {type ControlBindingBuilder}

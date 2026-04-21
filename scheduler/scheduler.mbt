@@ -1,7 +1,7 @@
 ///|
 /// Tracks a sounding voice for gate-off scheduling.
 struct ActiveNote {
-  handle : @lib.VoiceHandle
+  handle : @moondsp.VoiceHandle
   /// WHY end_time from whole.end_: In the Strudel/Tidal model, `whole` is the
   /// event's full intended duration in cycle time, while `part` is just the
   /// fragment visible within the queried arc. Gate-off uses `whole.end_`
@@ -68,15 +68,15 @@ pub fn default_control_mapper() -> ControlMapper {
 pub struct PatternScheduler {
   mut bpm : Double
   mut sample_counter : Int64
-  ctx : @lib.DspContext
+  ctx : @moondsp.DspContext
   active_notes : Array[ActiveNote]
-  bindings : @lib.ControlBindingMap
+  bindings : @moondsp.ControlBindingMap
   mapper : ControlMapper
 
   fn new(
     bpm~ : Double,
-    bindings~ : @lib.ControlBindingMap,
-    ctx~ : @lib.DspContext,
+    bindings~ : @moondsp.ControlBindingMap,
+    ctx~ : @moondsp.DspContext,
     mapper? : ControlMapper,
   ) -> PatternScheduler
 }
@@ -94,8 +94,8 @@ fn sanitize_bpm(bpm : Double) -> Double {
 ///|
 pub fn PatternScheduler::new(
   bpm~ : Double,
-  bindings~ : @lib.ControlBindingMap,
-  ctx~ : @lib.DspContext,
+  bindings~ : @moondsp.ControlBindingMap,
+  ctx~ : @moondsp.DspContext,
   mapper? : ControlMapper,
 ) -> PatternScheduler {
   {
@@ -138,7 +138,7 @@ pub fn midi_to_hz(midi : Double) -> Double {
 /// or gate-off at expiry will silently no-op (note_off returns false).
 pub fn PatternScheduler::push_active_note(
   self : PatternScheduler,
-  handle : @lib.VoiceHandle,
+  handle : @moondsp.VoiceHandle,
   end_time : @pattern.Rational,
 ) -> Unit {
   self.active_notes.push({ handle, end_time })
@@ -150,7 +150,7 @@ pub fn PatternScheduler::push_active_note(
 /// (~2.7ms at 48kHz/128 samples — inaudible for musical purposes).
 pub fn PatternScheduler::expire_notes(
   self : PatternScheduler,
-  pool : @lib.VoicePool,
+  pool : @moondsp.VoicePool,
   arc : @pattern.TimeSpan,
 ) -> Unit {
   let mut i = 0
@@ -183,7 +183,7 @@ pub fn PatternScheduler::process_events(
   self : PatternScheduler,
   events : Array[@pattern.Event[@pattern.ControlMap]],
   arc : @pattern.TimeSpan,
-  pool : @lib.VoicePool,
+  pool : @moondsp.VoicePool,
 ) -> Unit {
   // Sort by onset for deterministic voice allocation.
   // None-whole events sort last but are always skipped below.
@@ -247,9 +247,9 @@ pub fn PatternScheduler::process_events(
 pub fn PatternScheduler::process_block(
   self : PatternScheduler,
   pat : @pattern.Pat[@pattern.ControlMap],
-  pool : @lib.VoicePool,
-  left : @lib.AudioBuffer,
-  right : @lib.AudioBuffer,
+  pool : @moondsp.VoicePool,
+  left : @moondsp.AudioBuffer,
+  right : @moondsp.AudioBuffer,
 ) -> Unit {
   let arc = compute_arc(self.sample_counter, self.bpm, self.ctx)
   self.expire_notes(pool, arc)
@@ -272,7 +272,7 @@ pub fn PatternScheduler::process_block(
 pub fn compute_arc(
   sample_counter : Int64,
   bpm : Double,
-  ctx : @lib.DspContext,
+  ctx : @moondsp.DspContext,
 ) -> @pattern.TimeSpan {
   // WHY scale by 10: BPM is a Double but Rational needs Int64. Multiplying
   // by 10 preserves one decimal place (120.5 → 1205) which covers all

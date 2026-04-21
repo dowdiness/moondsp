@@ -31,7 +31,7 @@
 /// during a `process_*` call.
 
 ///|
-let demo : @ref.Ref[@lib.DemoSource] = @ref.new(@lib.DemoSource::new())
+let demo : @ref.Ref[@moondsp.DemoSource] = @ref.new(@moondsp.DemoSource::new())
 
 ///|
 /// Browser-export wrapper package that preserves the original Phase 0/1 wasm ABI.

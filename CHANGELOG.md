@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Collapsed facade**: removed the `dowdiness/moondsp/lib` sub-package. The
+  root `dowdiness/moondsp` module now re-exports directly from `@dsp`,
+  `@graph`, and `@voice`, eliminating a drift source where symbols added to
+  one facade were missed in the other (notably `CompiledTemplate`, now
+  exposed at the root). Internal sub-packages that previously imported
+  `dowdiness/moondsp/lib @lib` now import `dowdiness/moondsp @moondsp`.
+
 ## [0.1.0] - 2026-04-21
 
 First public release. MoonBit DSP audio engine covering Phases 0–5 of the
@@ -45,8 +54,9 @@ scheduler with mini-notation support.
 - **Browser AudioWorklet integration** (`browser/`) — wasm-gc build with
   multi-pool drum routing and a Playwright-tested end-to-end path.
 - **Facade re-export** — the top-level `dowdiness/moondsp` module exposes
-  the full library surface via `pub using @lib`, so consumers write
-  `@moondsp.X`.
+  the full library surface via `pub using` (initially through a
+  `dowdiness/moondsp/lib` sub-package, collapsed post-release), so
+  consumers write `@moondsp.X`.
 - **Test suite** — 470 tests across DSP, graph, voice, pattern, mini,
   scheduler, and browser integration.
 
