@@ -125,7 +125,7 @@ Start at the **[docs index](docs/README.md)**, which groups material by audience
 - **[Technical reference](docs/salat-engine-technical-reference.md)** — node types, parameter slots, runtime control surface (authoritative for graph runtime-control behavior)
 - **[Blueprint](docs/salat-engine-blueprint.md)** — full architecture vision, design principles, roadmap
 - **[Performance snapshots](docs/performance/)** — dated benchmark results (new measurements go in new files)
-- **[Design specs](docs/superpowers/specs/)** and **[implementation plans](docs/superpowers/plans/)** — per-feature design + task-level plans
+- **[Architecture decisions](docs/decisions/)** — short ADRs distilling *why* the codebase looks the way it does (each links to the archived plan/spec)
 - **[`CLAUDE.md`](CLAUDE.md)** — project map and conventions for contributors
 
 ## Project status

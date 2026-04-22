@@ -53,8 +53,16 @@ Per-feature design briefs and task-level plans. "Current" is what has not
 shipped yet; once a feature is merged its design/plan is moved under
 `archive/` and should not be read as a description of live behavior.
 
-- **[`superpowers/specs/`](superpowers/specs/)** — current design specs.
-- **[`superpowers/plans/`](superpowers/plans/)** — current implementation plans.
+For the durable architectural rationale behind shipped work, prefer the
+ADRs under [`decisions/`](decisions/) — those distill *why* the codebase
+looks the way it does, and link back to the specific archived plan/spec
+for full context.
+
+- **[`superpowers/specs/`](superpowers/specs/)** — design specs for
+  in-flight work. Currently empty (no active design work between releases);
+  shipped specs live under `archive/`.
+- **[`superpowers/plans/`](superpowers/plans/)** — implementation plans
+  for in-flight work. Currently empty; shipped plans live under `archive/`.
 - `superpowers/specs/archive/` and `superpowers/plans/archive/` — shipped
   features. Historical context only.
 

@@ -137,8 +137,8 @@ MoonBit's ecosystem is young. Avoid large foundation libraries. Each library (`i
 | `loom` | Parser framework | Active (6 defects identified) |
 | `seam` | Language-agnostic CST / green-red tree | Active |
 | `ecs` | Entity-Component-System | Phase 1 ready |
-| **`salat-dsp`** | **DSP engine (this project)** | **Phases 1–3 complete** |
-| **`salat-pattern`** | **Pattern engine** | **Phase 4 complete** |
+| **`dowdiness/moondsp`** | **DSP engine (this project)** — `dsp/`, `graph/`, `voice/` | **Phases 1–3 complete** |
+| **`dowdiness/moondsp/pattern`** | **Pattern engine** | **Phase 4 complete** |
 
 ---
 
@@ -160,7 +160,7 @@ MoonBit's ecosystem is young. Avoid large foundation libraries. Each library (`i
 **Question**: Can we build a minimal but useful set of DSP building blocks?
 
 ```
-salat-dsp/
+dsp/
 ├── buffer.mbt       AudioBuffer (FixedArray[Double] wrapper)
 ├── context.mbt      DspContext (sample rate + block size)
 ├── osc.mbt          Sine, Saw, Square, Triangle (phase accumulator)
@@ -173,7 +173,7 @@ salat-dsp/
 ├── clip.mbt         Hard clipping / explicit range limiting
 ├── pan.mbt          Equal-power mono-to-stereo pan
 ├── smooth.mbt       One-pole parameter smoother
-└── integration_test.mbt  End-to-end DSP chain coverage
+└── mdsp_wbtest.mbt  End-to-end DSP chain coverage
 ```
 
 The current implementation uses small, explicit structs and `process(...)`
@@ -270,7 +270,7 @@ Implemented:
 - Transactional `note_on` with param validation via `apply_controls`
 - Per-voice equal-power pan cached at control rate (no trig in audio thread)
 - Recompile-on-steal template changes (no N-voice recompile spike)
-- 21 tests in `lib/voice.mbt` / `lib/voice_test.mbt`
+- 21 tests in `voice/voice.mbt` / `voice/voice_test.mbt`
 
 **Deliverable**: Polyphonic synth — multiple overlapping notes with independent filter/envelope per voice.
 
@@ -413,8 +413,8 @@ Make pattern and DSP graph changes incremental:
                         ┌─── incr (Signal/Memo) ───┐
                         │                           │
                         ▼                           ▼
-    loom + seam ──── text DSL parsing      salat-pattern (query memoization)
-    (parser infra)   (future: text REPL)   salat-dsp (parameter tracking)
+    loom + seam ──── text DSL parsing      moondsp/pattern (query memoization)
+    (parser infra)   (future: text REPL)   moondsp/dsp + graph (parameter tracking)
                                                     │
                         ┌───────────────────────────┘
                         ▼
@@ -461,13 +461,22 @@ Ranked by impact × uncertainty:
 
 ## Appendix A: Naming
 
-Working title: **Salat Engine** (a nod to kabelsalat / "cable salad" / tangled wires).
+The project's working title was **Salat Engine** (a nod to kabelsalat /
+"cable salad" / tangled wires) and earlier `mdsp`. It shipped as
+`dowdiness/moondsp`.
 
-Packages:
-- `salat-dsp` — DSP engine
-- `salat-pattern` — Pattern engine  
-- `salat-web` — Browser platform layer
-- `salat-native` — Native platform layer (CLAP)
+Packages (as shipped):
+- `dowdiness/moondsp` (root) — facade + library entry point
+- `dowdiness/moondsp/dsp` — DSP primitives + tagless algebra
+- `dowdiness/moondsp/graph` — compiled graph runtime
+- `dowdiness/moondsp/voice` — polyphonic voice pool
+- `dowdiness/moondsp/pattern` — pattern engine (standalone)
+- `dowdiness/moondsp/mini` — mini-notation parser
+- `dowdiness/moondsp/scheduler` — pattern → voice-pool bridge
+- `dowdiness/moondsp/browser` — AudioWorklet wrapper
+
+Planned:
+- Native platform layer (CLAP)
 
 ---
 
