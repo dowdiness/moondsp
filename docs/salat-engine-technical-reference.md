@@ -66,27 +66,25 @@ println("debug: \{value}")     // allocates String, calls FFI
 ### 1.4 Audio-Safe Patterns
 
 ```moonbit
-// Pattern: Pre-allocate all buffers at initialization time
-struct DspContext {
+// Pattern: Shared execution context — sample rate + block size only.
+// Constructed once on the main thread, passed by value to every per-block
+// process() call on the audio thread. Labelled args avoid argument-order
+// confusion between the two Doubles a positional API would expose.
+pub struct DspContext {
   sample_rate : Double
-  buffer_size : Int
-  // Pre-allocated scratch buffers
-  temp1 : FixedArray[Double]
-  temp2 : FixedArray[Double]
+  block_size : Int
+
+  fn new(sample_rate~ : Double, block_size~ : Int) -> DspContext
 }
 
-fn DspContext::new(sample_rate : Double, buffer_size : Int) -> DspContext {
-  {
-    sample_rate,
-    buffer_size,
-    temp1: FixedArray::make(buffer_size, 0.0),
-    temp2: FixedArray::make(buffer_size, 0.0),
-  }
-}
+// Pattern: Pre-allocate buffers at initialization time, never in the hot path.
+// In moondsp these live as AudioBuffer wrappers around FixedArray[Double];
+// the audio thread only reads/writes existing slots.
+let scratch : FixedArray[Double] = FixedArray::make(128, 0.0)
 
 // Pattern: In-place buffer operations (no allocation)
 fn apply_gain(buf : FixedArray[Double], gain : Double) -> Unit {
-  for i = 0; i < buf.length(); i = i + 1 {
+  for i in 0..<buf.length() {
     buf[i] = buf[i] * gain
   }
 }
@@ -96,16 +94,18 @@ struct Oscillator {
   mut phase : Double
 }
 
-// This function allocates NOTHING — only reads/writes mut fields and FixedArray slots
-fn Oscillator::process(
+// This function allocates NOTHING — only reads/writes mut fields and
+// AudioBuffer slots. The labelled `freq_hz~` arg names what the value is
+// at the call site, removing the only Double in the trailing position.
+pub fn Oscillator::process(
   self : Oscillator,
-  output : FixedArray[Double],
-  freq : Double,
-  sample_rate : Double,
+  context : DspContext,
+  output : AudioBuffer,
+  freq_hz~ : Double,
 ) -> Unit {
-  let phase_inc = freq / sample_rate
+  let phase_inc = freq_hz / context.sample_rate()
   let two_pi = 6.283185307179586
-  for i = 0; i < output.length(); i = i + 1 {
+  for i in 0..<output.length() {
     output[i] = @math.sin(self.phase * two_pi)
     self.phase = self.phase + phase_inc
     if self.phase >= 1.0 {
@@ -171,7 +171,7 @@ fn get_time() -> Double {
 
 All algorithms assume:
 - `sample_rate`: 48000.0 Hz
-- `buffer_size`: 128 samples (WebAudio render quantum)
+- `block_size`: 128 samples (WebAudio render quantum)
 - All state is `mut` fields on a struct
 - All processing is in-place on `FixedArray[Double]`
 
@@ -612,7 +612,7 @@ fn run_buffer(
     let out = buffers[i]
     match nodes[i].node_type {
       Num(v) => {
-        for j = 0; j < ctx.buffer_size; j = j + 1 {
+        for j = 0; j < ctx.block_size(); j = j + 1 {
           out[j] = v
         }
       }
@@ -623,7 +623,7 @@ fn run_buffer(
       Mul => {
         let a = buffers[nodes[i].ins[0]]
         let b = buffers[nodes[i].ins[1]]
-        for j = 0; j < ctx.buffer_size; j = j + 1 {
+        for j = 0; j < ctx.block_size(); j = j + 1 {
           out[j] = a[j] * b[j]
         }
       }
