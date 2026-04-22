@@ -40,6 +40,13 @@ than edited in place.
   struct fields, and the silent-failure `Bool`-return family as
   pre-1.0 stability risks.
 
+## Decisions
+
+- **[`decisions/`](decisions/)** — Architecture Decision Records. Short,
+  durable summaries of *why* the codebase looks the way it does. Read these
+  before re-litigating a settled architectural choice; the source plan/spec
+  for each decision lives under `superpowers/{plans,specs}/archive/`.
+
 ## Contributor design docs
 
 Per-feature design briefs and task-level plans. "Current" is what has not
