@@ -11,7 +11,11 @@
         --ink-muted: #5a5248;
         --panel: rgba(255, 252, 245, 0.92);
         --accent: #b44f2c;
+        --accent-soft: #e8c2a2;
         --border: rgba(29, 27, 24, 0.14);
+        --ok-fg: #577d21;
+        --ok-bg: #f4faee;
+        --ok-border: rgba(71, 125, 33, 0.25);
         --err-fg: #c35a2b;
         --err-bg: #fff0ec;
         --err-border: rgba(180, 32, 32, 0.28);
@@ -33,7 +37,8 @@
       header {
         display: flex;
         justify-content: space-between;
-        align-items: baseline;
+        align-items: center;
+        gap: 1rem;
       }
       header h1 {
         font-size: 1rem;
@@ -41,10 +46,33 @@
         margin: 0;
         letter-spacing: 0.02em;
       }
+      header .controls {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+      }
       header .status {
         font-size: 0.85rem;
         color: var(--ink-muted);
         font-variant-numeric: tabular-nums;
+      }
+      button {
+        font: inherit;
+        font-size: 0.85rem;
+        padding: 0.4rem 0.9rem;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--accent);
+        color: white;
+        cursor: pointer;
+        transition: opacity 0.1s ease;
+      }
+      button:hover:not([disabled]) { opacity: 0.9; }
+      button[disabled] {
+        opacity: 0.5;
+        cursor: not-allowed;
+        background: var(--accent-soft);
+        color: var(--ink);
       }
       #editor {
         background: var(--panel);
@@ -54,7 +82,10 @@
         min-height: 0;
       }
       .cm-editor { height: 100%; }
-      .cm-content { font-family: ui-monospace, "JetBrains Mono", "Fira Code", monospace; font-size: 0.95rem; }
+      .cm-content {
+        font-family: ui-monospace, "JetBrains Mono", "Fira Code", monospace;
+        font-size: 0.95rem;
+      }
       footer {
         display: flex;
         gap: 0.75rem;
@@ -69,6 +100,12 @@
         border: 1px solid var(--border);
         border-radius: 6px;
         font-family: ui-monospace, monospace;
+        transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+      }
+      footer .panel.ok {
+        color: var(--ok-fg);
+        background: var(--ok-bg);
+        border-color: var(--ok-border);
       }
       footer .panel.error {
         color: var(--err-fg);
@@ -79,12 +116,15 @@
   </head>
   <body>
     <header>
-      <h1>moondsp · live (phase A bootstrap)</h1>
-      <span class="status" id="status">editor only — engine not wired</span>
+      <h1>moondsp · live</h1>
+      <div class="controls">
+        <span class="status" id="status" aria-live="polite">idle — click Start</span>
+        <button id="start" type="button">Start audio</button>
+      </div>
     </header>
     <main id="editor"></main>
     <footer>
-      <div class="panel" id="log">ready</div>
+      <div class="panel" id="log" aria-live="polite">edit the pattern, audio updates live</div>
     </footer>
     <script type="module" src="/src/main.ts"></script>
   </body>

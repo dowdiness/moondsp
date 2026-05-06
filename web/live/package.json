@@ -5,6 +5,9 @@
   "type": "module",
   "description": "Live-coding REPL surface for moondsp (phase A bootstrap).",
   "scripts": {
+    "sync:assets": "node scripts/sync-assets.mjs",
+    "predev": "npm run sync:assets",
+    "prebuild": "npm run sync:assets",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
