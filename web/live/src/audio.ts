@@ -62,6 +62,7 @@ export class AudioEngine {
 
     try {
       const ctx = new AudioContext({ sampleRate: 48000 });
+      await ctx.resume();
       await ctx.audioWorklet.addModule(this.processorUrl);
 
       const wasmResponse = await fetch(this.wasmUrl);
@@ -71,7 +72,7 @@ export class AudioEngine {
       const wasmBytes = await wasmResponse.arrayBuffer();
       const wasmModule = await WebAssembly.compile(wasmBytes);
 
-      const node = new AudioWorkletNode(ctx, "moonbit-dsp-processor", {
+      const node = new AudioWorkletNode(ctx, "moonbit-dsp", {
         numberOfInputs: 0,
         numberOfOutputs: 1,
         outputChannelCount: [2],
@@ -81,16 +82,35 @@ export class AudioEngine {
         },
       });
 
-      node.port.onmessage = (event) => {
-        const data = event.data as WorkletReply;
-        if (!data || typeof data !== "object") return;
-        for (const h of this.replyHandlers) h(data);
-        if (data.type === "error") {
-          this.setStatus({ kind: "error", message: String(data.message ?? "worklet error") });
-        }
-      };
+      // Wait for the worklet to confirm wasm init before declaring `running`.
+      // Messages sent before `ready` are silently dropped by processor.js.
+      const ready = new Promise<void>((resolve, reject) => {
+        const timeoutId = window.setTimeout(() => {
+          reject(new Error("worklet ready timeout (5s)"));
+        }, 5000);
+        node.port.onmessage = (event) => {
+          const data = event.data as WorkletReply;
+          if (!data || typeof data !== "object") return;
+          if (data.type === "ready") {
+            window.clearTimeout(timeoutId);
+            // Swap in the steady-state handler before resolving.
+            node.port.onmessage = (e) => this.dispatchReply(e.data as WorkletReply);
+            resolve();
+            return;
+          }
+          if (data.type === "error") {
+            window.clearTimeout(timeoutId);
+            reject(new Error(String(data.message ?? "worklet error")));
+            return;
+          }
+          // Forward anything else through normal channels.
+          this.dispatchReply(data);
+        };
+      });
 
       node.connect(ctx.destination);
+
+      await ready;
 
       this.ctx = ctx;
       this.node = node;
@@ -99,6 +119,14 @@ export class AudioEngine {
       const message = err instanceof Error ? err.message : String(err);
       this.setStatus({ kind: "error", message });
       throw err;
+    }
+  }
+
+  private dispatchReply(data: WorkletReply): void {
+    if (!data || typeof data !== "object") return;
+    for (const h of this.replyHandlers) h(data);
+    if (data.type === "error") {
+      this.setStatus({ kind: "error", message: String(data.message ?? "worklet error") });
     }
   }
 

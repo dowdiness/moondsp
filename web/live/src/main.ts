@@ -57,7 +57,9 @@ view.dispatch({
 
 const engine = new AudioEngine();
 
-let lastGood = INITIAL;
+// Empty sentinel — nothing has been sent to the worklet yet, so the first
+// evalNow call must go through even if the doc still equals INITIAL.
+let lastGood = "";
 let pending: number | null = null;
 
 function setLog(message: string, kind: "ok" | "error" | "info" = "info"): void {
@@ -72,19 +74,25 @@ function applyStatus(s: AudioStatus): void {
       statusEl.textContent = "idle — click Start";
       startBtn.disabled = false;
       startBtn.textContent = "Start audio";
+      startBtn.dataset.action = "start";
       break;
     case "starting":
       statusEl.textContent = "starting…";
       startBtn.disabled = true;
+      startBtn.textContent = "Starting…";
+      startBtn.dataset.action = "start";
       break;
     case "running":
       statusEl.textContent = "running · 48 kHz · 128 frames";
-      startBtn.disabled = true;
+      startBtn.disabled = false;
+      startBtn.textContent = "Stop audio";
+      startBtn.dataset.action = "stop";
       break;
     case "error":
       statusEl.textContent = `error: ${s.message}`;
       startBtn.disabled = false;
       startBtn.textContent = "Retry";
+      startBtn.dataset.action = "start";
       break;
   }
 }
@@ -127,6 +135,23 @@ adapter.onIntent((intent: UserIntent) => {
 // ── Start handler ───────────────────────────────────────────
 
 startBtn.addEventListener("click", async () => {
+  if (startBtn.dataset.action === "stop") {
+    try {
+      await engine.stop();
+      // Cancel any pending debounced eval so it doesn't fire post-stop.
+      if (pending !== null) {
+        window.clearTimeout(pending);
+        pending = null;
+      }
+      lastGood = "";
+      setLog("stopped", "info");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setLog(`✗ stop failed: ${msg}`, "error");
+    }
+    return;
+  }
+
   try {
     await engine.start();
     engine.setBpm(DEFAULT_BPM);
