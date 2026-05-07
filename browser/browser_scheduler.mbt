@@ -404,6 +404,27 @@ pub fn get_scheduler_parse_error() -> String {
 }
 
 ///|
+/// Length of the last parse-error message, in chars.
+/// Char-by-char accessor companion to `get_pattern_error_char` for JS
+/// consumers that can't receive MoonBit strings across the wasm-gc boundary.
+pub fn get_pattern_error_length() -> Int {
+  sched_last_error.val.length()
+}
+
+///|
+/// i-th character (UTF-16 code unit) of the last parse-error message.
+/// Returns 0 if `i` is out of range; callers should respect
+/// `get_pattern_error_length` first.
+pub fn get_pattern_error_char(i : Int) -> Int {
+  let s = sched_last_error.val
+  if i < 0 || i >= s.length() {
+    0
+  } else {
+    s[i].to_int()
+  }
+}
+
+///|
 pub fn set_scheduler_bpm(bpm : Double) -> Unit {
   match sched_bd.val {
     Some(sp) => sp.scheduler.set_bpm(bpm)

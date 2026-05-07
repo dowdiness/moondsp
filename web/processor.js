@@ -61,7 +61,22 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
           if (result === 0) {
             this.port.postMessage({ type: "pattern-updated" });
           } else {
-            this.port.postMessage({ type: "pattern-error", message: "parse error" });
+            // Read the error message char-by-char if the wasm exports the
+            // accessor pair. Falls back to a generic string otherwise so
+            // older builds keep working.
+            let message = "parse error";
+            if (typeof this.wasm.get_pattern_error_length === "function" &&
+                typeof this.wasm.get_pattern_error_char === "function") {
+              const len = this.wasm.get_pattern_error_length();
+              if (len > 0) {
+                const codes = new Array(len);
+                for (let i = 0; i < len; i++) {
+                  codes[i] = this.wasm.get_pattern_error_char(i);
+                }
+                message = String.fromCharCode(...codes);
+              }
+            }
+            this.port.postMessage({ type: "pattern-error", message });
           }
         }
       } else if (data.type === "set-scheduler-bpm") {

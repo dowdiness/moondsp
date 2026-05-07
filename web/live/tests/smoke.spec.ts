@@ -112,7 +112,14 @@ test.describe("Audio path", () => {
     await page.keyboard.press("Control+A");
     await page.keyboard.type(`s("bogus_drum")`);
 
-    await expect(page.locator("#log")).toContainText("kept last good", { timeout: 3_000 });
+    const log = page.locator("#log");
+    await expect(log).toContainText("kept last good", { timeout: 3_000 });
+    // Verify the rich error string crossed the wasm-gc boundary — the
+    // worklet's char-by-char readback should preserve the parser's
+    // "position N: unknown drum name 'bogus_drum'" message, not the
+    // legacy generic "parse error" fallback.
+    await expect(log).toContainText("bogus_drum");
+    await expect(log).toContainText("position");
     // Status stays running — engine kept playing the previous graph.
     await expect(page.locator("#status")).toContainText("running");
   });
