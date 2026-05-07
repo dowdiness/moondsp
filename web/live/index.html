@@ -86,6 +86,18 @@
         font-family: ui-monospace, "JetBrains Mono", "Fira Code", monospace;
         font-size: 0.95rem;
       }
+      .cm-diagnostic {
+        text-decoration: underline wavy;
+        text-decoration-skip-ink: none;
+        text-underline-offset: 0.2em;
+      }
+      .cm-diagnostic-error {
+        text-decoration-color: var(--err-fg);
+        background: var(--err-bg);
+      }
+      .cm-diagnostic-warning { text-decoration-color: #d8a227; }
+      .cm-diagnostic-info    { text-decoration-color: #4682b4; }
+      .cm-diagnostic-hint    { text-decoration-color: var(--ink-muted); }
       footer {
         display: flex;
         gap: 0.75rem;

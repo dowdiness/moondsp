@@ -122,5 +122,20 @@ test.describe("Audio path", () => {
     await expect(log).toContainText("position");
     // Status stays running — engine kept playing the previous graph.
     await expect(page.locator("#status")).toContainText("running");
+
+    // Inline diagnostic squiggle is rendered via the canopy adapter's
+    // SetDiagnostics path. The mark carries the parser's message in its
+    // title attribute; severity classifier appears in data-severity.
+    const diagnostic = page.locator(".cm-diagnostic-error").first();
+    await expect(diagnostic).toBeVisible();
+    await expect(diagnostic).toHaveAttribute("data-severity", "error");
+    const title = await diagnostic.getAttribute("title");
+    expect(title).toContain("bogus_drum");
+
+    // Recovery clears the diagnostic.
+    await page.keyboard.press("Control+A");
+    await page.keyboard.type(`s("bd sd")`);
+    await expect(log).toContainText("pattern updated", { timeout: 3_000 });
+    await expect(page.locator(".cm-diagnostic-error")).toHaveCount(0);
   });
 });

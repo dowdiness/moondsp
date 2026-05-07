@@ -11,7 +11,7 @@ import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { bracketMatching } from "@codemirror/language";
 
 import { CM6Adapter } from "./canopy";
-import type { UserIntent } from "./canopy";
+import type { Diagnostic, UserIntent } from "./canopy";
 import { AudioEngine } from "./audio";
 import type { AudioStatus, WorkletReply } from "./audio";
 
@@ -99,12 +99,29 @@ function applyStatus(s: AudioStatus): void {
 
 engine.onStatus(applyStatus);
 
+// Parses "position N: message" → { from, to, message }. Spans one
+// character at the position; if the position is at or past EOF, anchors
+// to the last char so the squiggly is always visible.
+function diagnosticFromError(raw: string, docLength: number): Diagnostic {
+  const m = /^position (\d+):\s*(.*)$/.exec(raw);
+  if (!m) {
+    return { from: 0, to: Math.max(1, docLength), severity: "error", message: raw };
+  }
+  const pos = Math.min(Math.max(0, Number.parseInt(m[1], 10)), docLength);
+  const from = pos >= docLength ? Math.max(0, docLength - 1) : pos;
+  const to = Math.min(docLength, from + 1);
+  return { from, to, severity: "error", message: m[2] || raw };
+}
+
 engine.onReply((reply: WorkletReply) => {
   if (reply.type === "pattern-updated") {
     setLog(`✓ pattern updated`, "ok");
+    adapter.applyPatches([{ type: "SetDiagnostics", diagnostics: [] }]);
   } else if (reply.type === "pattern-error") {
     const msg = String(reply.message ?? "parse error");
     setLog(`✗ ${msg} (kept last good)`, "error");
+    const diag = diagnosticFromError(msg, view.state.doc.length);
+    adapter.applyPatches([{ type: "SetDiagnostics", diagnostics: [diag] }]);
   }
   // Ignore other worklet messages (telemetry, hot-swap acks, etc.) for now.
 });

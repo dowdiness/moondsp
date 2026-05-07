@@ -3,9 +3,9 @@
 These files are a **vendor copy** of `@canopy/editor-adapter`, taken at:
 
 - Repo: `dowdiness/canopy`
-- Commit: `9df029d` (chore(editor-adapter): publish as 0.1.0-alpha.0)
+- Commit: `6f1d5c2` (feat(editor-adapter): implement SetDiagnostics in CM6Adapter)
 - Path: `adapters/editor-adapter/`
-- Version on copy: `0.1.0-alpha.0`
+- Version on copy: `0.1.0-alpha.0` + SetDiagnostics impl
 
 ## Why vendor
 
