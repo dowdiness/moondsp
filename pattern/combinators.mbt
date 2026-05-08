@@ -215,6 +215,65 @@ pub fn[A] Pat::euclid(
 }
 
 ///|
+/// Deterministic per-event pseudo-random in `[0, 1)`. Same `(num, den, seed)`
+/// always produces the same value, so `degrade_by` is reproducible across
+/// queries of the same arc — required for live coding (no audible glitch
+/// when the worklet re-queries a cycle that was already partly scheduled).
+fn hash_unit(num : Int64, den : Int64, seed : Int) -> Double {
+  let n = num.to_double()
+  let d = den.to_double()
+  let s = seed.to_double()
+  let v = @math.sin(n * 12.9898 + d * 78.233 + s * 37.719) * 43758.5453
+  let frac = v - v.floor()
+  if frac < 0.0 {
+    frac + 1.0
+  } else {
+    frac
+  }
+}
+
+///|
+/// Drop each event with probability `p` (clamped to `[0, 1]`). The drop
+/// decision is deterministic per `(event.whole.begin, seed)` so multiple
+/// queries of the same arc produce identical event sets.
+///
+/// `seed` lets users decorrelate two `degrade_by` instances that would
+/// otherwise drop the same events.
+///
+/// `bd?` in mini-notation is sugar for `degrade_by(0.5)`.
+pub fn[A] Pat::degrade_by(
+  self : Pat[A],
+  p : Double,
+  seed? : Int = 42,
+) -> Pat[A] {
+  let prob = if p < 0.0 { 0.0 } else if p > 1.0 { 1.0 } else { p }
+  if prob <= 0.0 {
+    return self
+  }
+  if prob >= 1.0 {
+    return Pat::silence()
+  }
+  let inner = self
+  {
+    query: fn(arc) {
+      let events = inner.query(arc)
+      let result : Array[Event[A]] = []
+      for ev in events {
+        let key = match ev.whole {
+          Some(w) => w.begin
+          None => ev.part.begin
+        }
+        let r = hash_unit(key.num, key.den, seed)
+        if r >= prob {
+          result.push(ev)
+        }
+      }
+      result
+    },
+  }
+}
+
+///|
 pub fn[A] every(n : Int, f : (Pat[A]) -> Pat[A], pat : Pat[A]) -> Pat[A] {
   if n <= 0 {
     return pat

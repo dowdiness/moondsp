@@ -285,6 +285,84 @@ test "parse step replicate missing number returns error" {
 }
 
 ///|
+test "parse degrade step bd? drops some events deterministically" {
+  // 16-step pattern with `?` — expect strict subset, repeatable.
+  let pat = unwrap_ok(
+    @mini.parse(
+      "s(\"bd bd bd bd bd bd bd bd bd bd bd bd bd bd bd bd\").fast(1)",
+    ),
+  )
+  let kept_full = query_one_cycle(pat).length()
+  inspect(kept_full, content="16")
+  let pat_q = unwrap_ok(
+    @mini.parse(
+      "s(\"bd? bd? bd? bd? bd? bd? bd? bd? bd? bd? bd? bd? bd? bd? bd? bd?\")",
+    ),
+  )
+  let kept_q = query_one_cycle(pat_q).length()
+  // Strictly less than full, strictly more than zero
+  inspect(kept_q < 16 && kept_q > 0, content="true")
+  // Determinism: querying again yields same count
+  inspect(query_one_cycle(pat_q).length() == kept_q, content="true")
+}
+
+///|
+test "parse degradeBy method chain" {
+  let pat = unwrap_ok(
+    @mini.parse(
+      "s(\"bd bd bd bd bd bd bd bd bd bd bd bd bd bd bd bd\").degradeBy(0.5)",
+    ),
+  )
+  let kept = query_one_cycle(pat).length()
+  inspect(kept < 16 && kept > 0, content="true")
+}
+
+///|
+test "parse degradeBy(0.0) keeps everything" {
+  let pat = unwrap_ok(@mini.parse("s(\"bd sd hh sd\").degradeBy(0.0)"))
+  inspect(query_one_cycle(pat).length(), content="4")
+}
+
+///|
+test "parse every(2, fast(2)) doubles events on cycle 0" {
+  let pat = unwrap_ok(@mini.parse("s(\"bd sd\").every(2, fast(2))"))
+  let events = query_one_cycle(pat)
+  // Cycle 0: every fires → fast(2) on the 2-element pattern → 4 events
+  inspect(events.length(), content="4")
+}
+
+///|
+test "parse every(2, rev) — cycle 0 timing reversed" {
+  let pat = unwrap_ok(@mini.parse("s(\"bd sd hh\").every(2, rev)"))
+  let events = query_one_cycle(pat)
+  // rev mirrors timing, not array order. bd's slot under rev moves from
+  // [0, 1/3) to [2/3, 1) on cycle 0.
+  inspect(events.length(), content="3")
+  inspect(
+    events[0].part,
+    content=(
+      #|{ begin: { num: 2, den: 3 }, end_: { num: 1, den: 1 } }
+    ),
+  )
+}
+
+///|
+test "parse every with unknown callback returns error" {
+  match @mini.parse("s(\"bd sd\").every(2, weird)") {
+    Err(_) => () // expected
+    Ok(_) => fail("expected Err for unknown every() callback")
+  }
+}
+
+///|
+test "parse every with non-positive n returns error" {
+  match @mini.parse("s(\"bd sd\").every(0, rev)") {
+    Err(_) => () // expected
+    Ok(_) => fail("expected Err for every(0, ...)")
+  }
+}
+
+///|
 test "parse with rev method" {
   let pat = unwrap_ok(@mini.parse("s(\"bd sd hh\").rev()"))
   let events = query_one_cycle(pat)

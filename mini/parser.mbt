@@ -5,11 +5,14 @@
 ///   expr     = primary ( "." method )*
 ///   primary  = "s(" string ")" | "note(" string ")"
 ///   method   = "fast(" number ")" | "slow(" number ")" | "rev()"
+///            | "degradeBy(" number ")"
+///            | "every(" int "," every-callback ")"
+/// every-callback = "fast(" int ")" | "slow(" int ")" | "rev" "()"?
 ///   string   = '"' notation '"'
 ///   notation = layer ( "," layer )*
 ///   layer    = element+
 ///   element  = (atom | "[" notation "]") postfix*
-///   postfix  = euclid | "*" int | "/" int
+///   postfix  = euclid | "*" int | "/" int | "?"
 ///   euclid   = "(" int "," int ("," int)? ")"
 ///   atom     = identifier | number
 
@@ -232,7 +235,107 @@ fn Parser::parse_method(
       self.expect_char(')')
       pat.rev()
     }
+    "degradeBy" => {
+      self.expect_char('(')
+      self.skip_whitespace()
+      let p = self.read_number()
+      self.skip_whitespace()
+      self.expect_char(')')
+      pat.degrade_by(p)
+    }
+    "every" => {
+      self.expect_char('(')
+      self.skip_whitespace()
+      let n_dbl = self.read_number()
+      self.skip_whitespace()
+      self.expect_char(',')
+      self.skip_whitespace()
+      let f_name = self.read_ident()
+      let f = self.parse_every_callback(method_start, f_name)
+      self.skip_whitespace()
+      self.expect_char(')')
+      let n = n_dbl.to_int()
+      guard n > 0 else {
+        raise ParseError(
+          "position \{method_start}: every() requires a positive integer, got \{n}",
+        )
+      }
+      @pattern.every(n, f, pat)
+    }
     _ => raise ParseError("position \{method_start}: unknown method '\{name}'")
+  }
+}
+
+///|
+/// Type alias avoids parsing ambiguity between the outer fn's
+/// `raise ParseError` effect and the returned function type.
+type EveryCallback = (@pattern.Pat[@pattern.ControlMap]) -> @pattern.Pat[
+  @pattern.ControlMap,
+]
+
+///|
+fn make_every_fast(factor : @pattern.Rational) -> EveryCallback {
+  fn(p) { p.fast(factor) }
+}
+
+///|
+fn make_every_slow(factor : @pattern.Rational) -> EveryCallback {
+  fn(p) { p.slow(factor) }
+}
+
+///|
+fn make_every_rev() -> EveryCallback {
+  fn(p) { p.rev() }
+}
+
+///|
+/// Parse the second argument to `.every(n, f)`. Supported forms:
+///   fast(N) | slow(N) | rev — a fixed grammar rather than a general
+///   function literal, since mini is primarily a string DSL.
+fn Parser::parse_every_callback(
+  self : Parser,
+  method_start : Int,
+  name : String,
+) -> EveryCallback raise ParseError {
+  match name {
+    "fast" => {
+      self.expect_char('(')
+      self.skip_whitespace()
+      let k = self.read_number()
+      self.skip_whitespace()
+      self.expect_char(')')
+      guard k > 0.0 else {
+        raise ParseError(
+          "position \{method_start}: every(fast(k)) requires a positive number, got \{k}",
+        )
+      }
+      make_every_fast(@pattern.Rational::from_int(k.to_int()))
+    }
+    "slow" => {
+      self.expect_char('(')
+      self.skip_whitespace()
+      let k = self.read_number()
+      self.skip_whitespace()
+      self.expect_char(')')
+      guard k > 0.0 else {
+        raise ParseError(
+          "position \{method_start}: every(slow(k)) requires a positive number, got \{k}",
+        )
+      }
+      make_every_slow(@pattern.Rational::from_int(k.to_int()))
+    }
+    "rev" => {
+      // Accept both `rev` and `rev()` as the callback form.
+      if !self.at_end() && self.input[self.pos] == '(' {
+        self.expect_char('(')
+        self.expect_char(')')
+      }
+      make_every_rev()
+    }
+    _ =>
+      raise ParseError(
+        "position \{method_start}: every() callback must be fast(N), slow(N), or rev; got '\{name}'",
+      )
   }
 }
 
@@ -366,6 +469,14 @@ fn NotationParser::parse_element(
         applied = true
       } else if c == '/' {
         pat = self.apply_step_slow(pat)
+        applied = true
+      } else if c == '?' {
+        // Per-occurrence seed from source position so adjacent `?` elements
+        // hash independently — sequence places each inner pattern at the
+        // same local arc, so a fixed seed would drop them in lockstep.
+        let salt = self.pos
+        self.pos += 1 // consume '?'
+        pat = pat.degrade_by(0.5, seed=salt)
         applied = true
       }
     }
