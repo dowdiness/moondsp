@@ -139,6 +139,31 @@ test.describe("Audio path", () => {
     await expect(page.locator(".cm-diagnostic-error")).toHaveCount(0);
   });
 
+  test("clearing the editor is a soft no-op (no inline error)", async ({ page }) => {
+    await page.goto("/");
+    await page.locator("#start").click();
+    await expect(page.locator("#status")).toContainText("running", { timeout: 10_000 });
+    await expect(page.locator("#log")).toContainText("pattern updated", { timeout: 5_000 });
+
+    const editor = page.locator(".cm-content");
+    await editor.click();
+    await page.keyboard.press("Control+A");
+    await page.keyboard.press("Delete");
+
+    // Empty input must NOT route through the parser ("empty input" with
+    // no position would otherwise paint a clamped, invisible diagnostic
+    // and a useless footer error). Instead the UI surfaces a hint and
+    // the engine keeps playing the previous graph.
+    const log = page.locator("#log");
+    await expect(log).toContainText("keeping previous", { timeout: 2_000 });
+    await expect(page.locator(".cm-diagnostic-error")).toHaveCount(0);
+    await expect(page.locator("#status")).toContainText("running");
+
+    // Typing again resumes normal eval.
+    await page.keyboard.type(`s("bd")`);
+    await expect(log).toContainText("pattern updated", { timeout: 3_000 });
+  });
+
   test("Retry after engine error rebuilds and re-sends pattern", async ({ page }) => {
     // Force the wasm fetch to 404 so AudioEngine.start() throws and
     // status flips to "error". The UI should then show "Retry" and

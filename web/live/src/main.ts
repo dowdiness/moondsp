@@ -157,6 +157,17 @@ engine.onReply((reply: WorkletReply) => {
 function evalNow(text: string): void {
   if (engine.getStatus().kind !== "running") return;
   if (text === lastGood) return;
+  if (text.trim() === "") {
+    // Empty input: skip the wasm round trip entirely. The parser would
+    // synthesize an "empty input" error with no position, which the
+    // adapter would clamp to a 0..0 range and drop on an empty doc —
+    // leaving the user with a footer error and no inline marker.
+    // Treat as a soft no-op: clear any existing diagnostic, surface a
+    // hint, and let the worklet keep playing the last good graph.
+    adapter.applyPatches([{ type: "SetDiagnostics", diagnostics: [] }]);
+    setLog("(empty — keeping previous pattern)", "info");
+    return;
+  }
   const rev = ++revCounter;
   latestSentRev = rev;
   latestSentText = text;

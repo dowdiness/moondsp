@@ -37,3 +37,48 @@ jobs:
 
       - name: Run browser smoke test
         run: npm run test:browser
+
+  live-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/live/package-lock.json
+
+      - name: Set up MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - name: Fetch MoonBit dependencies
+        run: moon update
+
+      - name: Build wasm-gc browser bundle
+        run: moon build browser --target wasm-gc --release
+
+      - name: Sync wasm into web/
+        run: ./playwright-sync-wasm.sh
+
+      - name: Install web/live npm dependencies
+        working-directory: web/live
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: web/live
+        run: npx playwright install --with-deps chromium
+
+      - name: Build web/live (also syncs assets into dist/)
+        working-directory: web/live
+        run: npm run build
+
+      - name: Run web/live smoke tests
+        working-directory: web/live
+        run: npm test
