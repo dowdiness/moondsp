@@ -277,7 +277,7 @@ test('browser demo retunes stereo feedback gain and reacts to pan', async ({ pag
   expect(highCutoffVariation).toBeGreaterThan(lowCutoffVariation);
 
   await setRangeValue(page, '#panSlider', -100);
-  await expect(page.locator('#panValue')).toHaveText('-100');
+  await expect(page.locator('#panValue')).toHaveText('L100');
   await expect
     .poll(async () => {
       const telemetry = await currentTelemetry(page);
@@ -292,7 +292,7 @@ test('browser demo retunes stereo feedback gain and reacts to pan', async ({ pag
     .toBeGreaterThan(0.8);
 
   await setRangeValue(page, '#panSlider', 0);
-  await expect(page.locator('#panValue')).toHaveText('0');
+  await expect(page.locator('#panValue')).toHaveText('center');
   await expect
     .poll(async () => {
       const { left, right } = await renderPeaks(page);
@@ -301,7 +301,7 @@ test('browser demo retunes stereo feedback gain and reacts to pan', async ({ pag
     .toBeLessThan(0.05);
 
   await setRangeValue(page, '#panSlider', 100);
-  await expect(page.locator('#panValue')).toHaveText('100');
+  await expect(page.locator('#panValue')).toHaveText('R100');
   await expect
     .poll(async () => {
       const telemetry = await currentTelemetry(page);
