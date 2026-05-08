@@ -8,7 +8,8 @@
 ///   string   = '"' notation '"'
 ///   notation = layer ( "," layer )*
 ///   layer    = element+
-///   element  = (atom | "[" notation "]") euclid?
+///   element  = (atom | "[" notation "]") postfix*
+///   postfix  = euclid | "*" int | "/" int
 ///   euclid   = "(" int "," int ("," int)? ")"
 ///   atom     = identifier | number
 
@@ -329,8 +330,9 @@ fn NotationParser::parse_layer(
 }
 
 ///|
-/// Parse an element: (atom | "[" notation "]") euclid?
-/// where euclid = "(" int "," int ("," int)? ")"
+/// Parse an element: (atom | "[" notation "]") postfix*
+/// where postfix = euclid | "*" int | "/" int
+/// and   euclid  = "(" int "," int ("," int)? ")"
 fn NotationParser::parse_element(
   self : NotationParser,
 ) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
@@ -349,7 +351,60 @@ fn NotationParser::parse_element(
   } else {
     self.parse_atom()
   }
-  self.maybe_apply_euclid(base)
+  // Apply zero or more postfix modifiers in left-to-right order.
+  let mut pat = base
+  let mut applied = true
+  while applied {
+    applied = false
+    if !self.at_end() {
+      let c = self.input[self.pos]
+      if c == '(' {
+        pat = self.maybe_apply_euclid(pat)
+        applied = true
+      } else if c == '*' {
+        pat = self.apply_replicate(pat)
+        applied = true
+      } else if c == '/' {
+        pat = self.apply_step_slow(pat)
+        applied = true
+      }
+    }
+  }
+  pat
+}
+
+///|
+/// Apply `*n` to a pattern: in-slot replication via `pat.fast(n)`.
+fn NotationParser::apply_replicate(
+  self : NotationParser,
+  pat : @pattern.Pat[@pattern.ControlMap],
+) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
+  let op_pos = self.pos
+  self.pos += 1 // consume '*'
+  let n = self.read_int_signed(op_pos)
+  guard n > 0 else {
+    raise ParseError(
+      "position \{op_pos}: '*' requires a positive integer, got \{n}",
+    )
+  }
+  pat.fast(@pattern.Rational::from_int(n))
+}
+
+///|
+/// Apply `/n` to a pattern: in-slot stretch via `pat.slow(n)`.
+fn NotationParser::apply_step_slow(
+  self : NotationParser,
+  pat : @pattern.Pat[@pattern.ControlMap],
+) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
+  let op_pos = self.pos
+  self.pos += 1 // consume '/'
+  let n = self.read_int_signed(op_pos)
+  guard n > 0 else {
+    raise ParseError(
+      "position \{op_pos}: '/' requires a positive integer, got \{n}",
+    )
+  }
+  pat.slow(@pattern.Rational::from_int(n))
 }
 
 ///|
