@@ -26,6 +26,9 @@ const editorEl = document.getElementById("editor") as HTMLElement;
 const logEl = document.getElementById("log") as HTMLElement;
 const statusEl = document.getElementById("status") as HTMLElement;
 const startBtn = document.getElementById("start") as HTMLButtonElement;
+const cheatEl = document.getElementById("cheat") as HTMLElement;
+const cheatToggle = document.getElementById("cheat-toggle") as HTMLButtonElement;
+const workspaceEl = document.querySelector("main.workspace") as HTMLElement;
 
 // ── Editor ──────────────────────────────────────────────────
 
@@ -227,6 +230,27 @@ startBtn.addEventListener("click", async () => {
     const msg = err instanceof Error ? err.message : String(err);
     setLog(`✗ start failed: ${msg}`, "error");
   }
+});
+
+// ── Cheatsheet ──────────────────────────────────────────────
+
+cheatToggle.addEventListener("click", () => {
+  const collapsed = workspaceEl.classList.toggle("cheat-collapsed");
+  cheatToggle.setAttribute("aria-expanded", String(!collapsed));
+  cheatToggle.textContent = collapsed ? "Show help" : "Hide help";
+});
+
+cheatEl.addEventListener("click", (ev) => {
+  const target = ev.target as HTMLElement;
+  const example = target.closest<HTMLElement>(".example");
+  if (!example) return;
+  const text = example.dataset.example;
+  if (!text) return;
+  view.dispatch({
+    changes: { from: 0, to: view.state.doc.length, insert: text },
+  });
+  scheduleEval(text);
+  view.focus();
 });
 
 // Test hook: exposes the engine so smoke tests can inject synthetic

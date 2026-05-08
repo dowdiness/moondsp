@@ -34,6 +34,20 @@
         gap: 1rem;
         padding: 1.25rem;
       }
+      main.workspace {
+        display: grid;
+        grid-template-columns: 1fr min(320px, 32vw);
+        gap: 1rem;
+        min-height: 0;
+      }
+      main.workspace.cheat-collapsed {
+        grid-template-columns: 1fr 0;
+      }
+      main.workspace.cheat-collapsed #cheat { display: none; }
+      @media (max-width: 720px) {
+        main.workspace { grid-template-columns: 1fr; }
+        #cheat { max-height: 40vh; }
+      }
       header {
         display: flex;
         justify-content: space-between;
@@ -80,6 +94,77 @@
         border-radius: 6px;
         overflow: hidden;
         min-height: 0;
+      }
+      #cheat {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 0.75rem 0.9rem;
+        overflow-y: auto;
+        font-size: 0.78rem;
+        line-height: 1.45;
+        color: var(--ink);
+      }
+      #cheat h2 {
+        font-size: 0.68rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--ink-muted);
+        margin: 1rem 0 0.4rem;
+      }
+      #cheat h2:first-child { margin-top: 0; }
+      #cheat dl {
+        margin: 0;
+        display: grid;
+        grid-template-columns: minmax(0, auto) 1fr;
+        column-gap: 0.6rem;
+        row-gap: 0.25rem;
+      }
+      #cheat dt {
+        font-family: ui-monospace, "JetBrains Mono", "Fira Code", monospace;
+        color: var(--accent);
+        white-space: nowrap;
+      }
+      #cheat dd {
+        margin: 0;
+        color: var(--ink-muted);
+      }
+      #cheat code {
+        font-family: ui-monospace, monospace;
+        background: rgba(180, 79, 44, 0.08);
+        padding: 0.05em 0.3em;
+        border-radius: 3px;
+        color: var(--accent);
+      }
+      #cheat ul {
+        margin: 0;
+        padding-left: 1.1rem;
+      }
+      #cheat ul li { margin-bottom: 0.2rem; }
+      #cheat .example {
+        font-family: ui-monospace, monospace;
+        font-size: 0.75rem;
+        background: rgba(29, 27, 24, 0.05);
+        padding: 0.4rem 0.55rem;
+        border-radius: 4px;
+        border: 1px solid var(--border);
+        cursor: pointer;
+        margin-bottom: 0.35rem;
+        color: var(--ink);
+        transition: background 0.1s ease;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      #cheat .example:hover { background: var(--accent-soft); }
+      header button.toggle {
+        background: transparent;
+        color: var(--ink-muted);
+        border: 1px solid var(--border);
+      }
+      header button.toggle:hover:not([disabled]) {
+        background: var(--panel);
+        opacity: 1;
       }
       .cm-editor { height: 100%; }
       .cm-content {
@@ -131,10 +216,57 @@
       <h1>moondsp · live</h1>
       <div class="controls">
         <span class="status" id="status" aria-live="polite">idle — click Start</span>
+        <button id="cheat-toggle" type="button" class="toggle" aria-controls="cheat" aria-expanded="true">Hide help</button>
         <button id="start" type="button">Start audio</button>
       </div>
     </header>
-    <main id="editor"></main>
+    <main class="workspace">
+      <div id="editor"></div>
+      <aside id="cheat" aria-label="mini-notation cheatsheet">
+        <h2>Layers</h2>
+        <dl>
+          <dt>s("…")</dt><dd>drum sounds</dd>
+          <dt>note("…")</dt><dd>MIDI numbers</dd>
+        </dl>
+
+        <h2>Inside the string</h2>
+        <dl>
+          <dt>a b c</dt><dd>sequence in 1 cycle</dd>
+          <dt>[a b]</dt><dd>group (subdivide)</dd>
+          <dt>l1, l2</dt><dd>stack layers</dd>
+          <dt>a*4</dt><dd>repeat 4× faster</dd>
+          <dt>a/2</dt><dd>stretch 2× slower</dd>
+          <dt>a?</dt><dd>50% drop (random)</dd>
+          <dt>a(3,8)</dt><dd>Euclidean (3 hits / 8 steps)</dd>
+        </dl>
+
+        <h2>Drum names</h2>
+        <p style="margin:0;color:var(--ink-muted)">
+          <code>bd</code> <code>sd</code> <code>hh</code> <code>oh</code>
+          <code>cp</code> <code>cb</code> <code>rim</code> <code>tom</code>
+        </p>
+
+        <h2>Methods</h2>
+        <dl>
+          <dt>.fast(n)</dt><dd>n× faster</dd>
+          <dt>.slow(n)</dt><dd>n× slower</dd>
+          <dt>.rev()</dt><dd>reverse</dd>
+          <dt>.degradeBy(p)</dt><dd>drop probability p</dd>
+          <dt>.every(n, f)</dt><dd>apply f every n cycles</dd>
+          <dt>.jux(f)</dt><dd>self left, f(self) right</dd>
+        </dl>
+        <p style="margin:0.4rem 0 0;color:var(--ink-muted)">
+          <em>f</em> = <code>fast(k)</code> | <code>slow(k)</code> | <code>rev</code>
+        </p>
+
+        <h2>Try it (click to load)</h2>
+        <div class="example" data-example='s("bd sd hh sd")'>s("bd sd hh sd")</div>
+        <div class="example" data-example='s("bd(3,8), hh*16?, sd(2,8,2)").jux(rev)'>s("bd(3,8), hh*16?, sd(2,8,2)").jux(rev)</div>
+        <div class="example" data-example='s("bd*4").every(3, fast(2))'>s("bd*4").every(3, fast(2))</div>
+        <div class="example" data-example='note("60 64 67 72").jux(rev)'>note("60 64 67 72").jux(rev)</div>
+        <div class="example" data-example='s("[bd sd, hh*8]").degradeBy(0.3)'>s("[bd sd, hh*8]").degradeBy(0.3)</div>
+      </aside>
+    </main>
     <footer>
       <div class="panel" id="log" aria-live="polite">edit the pattern, audio updates live</div>
     </footer>
