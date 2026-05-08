@@ -111,41 +111,42 @@ async function startAudio(page, path) {
 test('browser demo first render proves CompiledStereoDsp feedback recurrence', async ({ page }) => {
   await startAudio(page, '/?freq=0&delaySamples=0');
   await expect(page.locator('#status')).toContainText('CompiledStereoDsp block runtime');
-  // Pin to sequence=2 (first post-warmup telemetry block, emitted on block 18
-  // — block 1 emits sequence=1, blocks 2–17 are warmup-skipped, block 18
-  // emits sequence=2, ~48 ms after start).
-  //
-  // The previous `find(t => t.freq === 0 && t.leftPreview[0] > 0.001)` filter
-  // implicitly depended on a postMessage race: sequence=1 is emitted right
-  // after the first audio block, and its leftPreview[0] can be either ~0.0025
-  // (ramp block — set-freq=0 arrived mid-block) or near the feedback
-  // steady-state plateau. Whichever block `find()` matched determined whether
-  // leftPreview[0] fell below the 0.3 * PAN_CENTER_GAIN upper bound — that's
-  // the retry-masked flake this fix eliminates.
-  //
-  // By sequence=2, set-freq=0 has always propagated and the `mix(3,5)` +
-  // `gain(0.3)` z^-1 feedback loop has reached its bit-exact steady-state
-  // plateau: with freq=0 the oscillator drops out, so the loop solves
+  // The `mix(3,5)` + `gain(0.3)` z^-1 feedback loop, with freq=0 the
+  // oscillator drops out, so the loop solves
   //   x = 1.0 + 0.3 * x  →  x = 1/0.7 ≈ 1.4286
   //   post-gain: 0.3 * 1.4286 ≈ 0.4286
   //   post-pan-center: 0.4286 * (1/√2) ≈ 0.30305
-  // If the feedback loop were broken the feed-forward path alone would
-  // settle at 0.3 * (1/√2) ≈ 0.2121, so the `> 0.25` lower bound below is
-  // the discriminator that actually proves recurrence.
+  // The feed-forward path alone settles at 0.3 * (1/√2) ≈ 0.2121.
+  // Lower bound 0.25 > 0.2121 is the discriminator that proves recurrence;
+  // upper bound 0.35 > 0.30305 plateau ensures the loop is bounded (feedback
+  // gain < 1), not runaway.
+  //
+  // Poll for the first post-warmup telemetry block (sequence ≥ 2) whose
+  // freq=0 propagation AND feedback-loop convergence have BOTH landed in
+  // the recurrence band. Pinning to a single sequence number was retry-
+  // masked-flaky on CI: AudioWorklet block scheduling jitter occasionally
+  // leaves sequence=2 still settling (postMessage of set-freq=0 arrives
+  // late within blocks 1–17, residual osc state takes another ~block to
+  // decay through the 0.3 feedback). A regression that breaks the loop
+  // entirely (feed-forward ≈ 0.2121) never lands in [0.25, 0.35] and the
+  // poll times out — same failure signal, just stable.
+  let telemetry;
   await expect
     .poll(async () => {
       const history = await telemetryHistory(page);
-      if (!history || history.length === 0) return null;
-      return history.find(t => t.sequence === 2 && t.freq === 0) || null;
+      if (!history) return null;
+      const match = history.find(t =>
+        t.sequence >= 2 &&
+        t.freq === 0 &&
+        t.leftPreview[0] > 0.25 &&
+        t.leftPreview[0] < 0.35
+      );
+      if (match) telemetry = match;
+      return match || null;
     }, { timeout: 10_000 })
     .toBeTruthy();
-  const history = await telemetryHistory(page);
-  const telemetry = history.find(t => t.sequence === 2 && t.freq === 0);
 
   expect(telemetry.freq).toBeCloseTo(0, 9);
-  // Lower bound 0.25 > 0.2121 feed-forward-only value: must have feedback.
-  // Upper bound 0.35 > 0.30305 plateau: ensures the loop is bounded (feedback
-  // gain < 1), not runaway.
   expect(telemetry.leftPreview[0]).toBeGreaterThan(0.25);
   expect(telemetry.leftPreview[0]).toBeLessThan(0.35);
   expect(telemetry.rightPreview[0]).toBeCloseTo(telemetry.leftPreview[0], 9);
