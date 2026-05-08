@@ -250,7 +250,13 @@ test "jux(rev): event count and pan keys" {
 
 ///|
 test "jux(rev): channel identity (pan=-1 matches self, pan=+1 matches f(self))" {
-  let pat = sequence([sound(36.0), sound(38.0)])
+  // Use a multi-key pattern so the comparison loop catches any bug that
+  // drops a control key while routing through merge_control. Without
+  // a non-pan secondary key, the test only proves part+sound parity.
+  let pat = merge_control(
+    sequence([sound(36.0), sound(38.0)]),
+    s_cutoff(800.0),
+  )
   let result = pat.jux(fn(p) { p.rev() })
   let arc = span(0, 1, 1, 1)
   let combined = result.query(arc)
@@ -266,17 +272,19 @@ test "jux(rev): channel identity (pan=-1 matches self, pan=+1 matches f(self))" 
       _ => ()
     }
   }
-  // Left channel matches self exactly (parts and sound values)
+  // Compare key-by-key for sound and cutoff (every non-pan key from
+  // the input). If jux drops or mangles any of them, this fails.
   assert_eq(left.length(), self_events.length())
   for i in 0..<left.length() {
     assert_eq(left[i].part, self_events[i].part)
     assert_eq(left[i].value.0.get("sound"), self_events[i].value.0.get("sound"))
+    assert_eq(left[i].value.0.get("cutoff"), self_events[i].value.0.get("cutoff"))
   }
-  // Right channel matches f(self) exactly
   assert_eq(right.length(), f_events.length())
   for i in 0..<right.length() {
     assert_eq(right[i].part, f_events[i].part)
     assert_eq(right[i].value.0.get("sound"), f_events[i].value.0.get("sound"))
+    assert_eq(right[i].value.0.get("cutoff"), f_events[i].value.0.get("cutoff"))
   }
 }
 
@@ -286,6 +294,8 @@ test "jux: overrides pre-existing pan" {
   let pat = merge_control(sound(36.0), s_pan(0.5))
   let result = pat.jux(fn(p) { p.rev() })
   let events = result.query(span(0, 1, 1, 1))
+  // Guard against a vacuously-passing empty result.
+  assert_eq(events.length(), 2)
   for ev in events {
     let p = ev.value.0.get("pan")
     let is_pm1 = p == Some(-1.0) || p == Some(1.0)
@@ -491,14 +501,16 @@ between .every and .jux."
 
 ---
 
-## Task 4: Scheduler-level stereo proof
+## Task 4: Scheduler-level stereo regression tests
 
-Two audio-buffer tests that prove pan actually flips L/R routing end-to-end. Uses `make_test_sched()`'s existing helper which returns `(pool, sched, left, right)` audio buffers.
+**Note: this is a characterization task, not TDD.** Stereo routing is already implemented end-to-end (per-event `pan` → `SetPan` → `VoiceSlot::update_pan` → `StereoOut`); these tests *lock in* an existing contract that the previous pan test only proved by "voice was created". Codex flagged this in spec review — `.jux` depends on this routing invariant, so it's worth pinning down before we ship the combinator.
+
+Run multiple `process_block` calls before asserting energy: a single 128-frame block at the start of an envelope can be near-zero. The existing `process_block: produces non-zero output` test in `scheduler_test.mbt` runs **4 blocks** before checking — we mirror that here. The strict assertion is on the *silent* side (right < ε for hard-left), which holds at any block count because pan_right_gain is exactly 0.
 
 **Files:**
 - Modify: `scheduler/scheduler_test.mbt`
 
-- [ ] **Step 1: Write the two failing tests**
+- [ ] **Step 1: Add the two regression tests**
 
 Append to `scheduler/scheduler_test.mbt`:
 
@@ -520,33 +532,40 @@ fn buffer_abs_sum(buf : @moondsp.AudioBuffer) -> Double {
 test "process_block: pan=-1 routes signal to left buffer only" {
   let (pool, sched, left, right) = make_test_sched()
   let pat = @pattern.merge_control(@pattern.note(60.0), @pattern.s_pan(-1.0))
-  sched.process_block(pat, pool, left, right)
+  // Run 4 blocks so the ADSR attack accumulates audible energy; matches
+  // the existing `process_block: produces non-zero output` test shape.
+  for _ in 0..<4 {
+    sched.process_block(pat, pool, left, right)
+  }
   let left_energy = buffer_abs_sum(left)
   let right_energy = buffer_abs_sum(right)
-  // Hard left: left buffer carries signal, right is silent (within tolerance)
-  assert_true(left_energy > 0.001)
-  assert_true(right_energy < 0.000001)
+  // Strict assertion is on the silent side: pan_right_gain is exactly 0
+  // for pan=-1, so right_energy is exactly 0 regardless of envelope phase.
+  assert_eq(right_energy, 0.0)
+  // Loose assertion on the active side: any non-zero proves routing fired.
+  assert_true(left_energy > 0.0)
 }
 
 ///|
 test "process_block: pan=+1 routes signal to right buffer only" {
   let (pool, sched, left, right) = make_test_sched()
   let pat = @pattern.merge_control(@pattern.note(60.0), @pattern.s_pan(1.0))
-  sched.process_block(pat, pool, left, right)
+  for _ in 0..<4 {
+    sched.process_block(pat, pool, left, right)
+  }
   let left_energy = buffer_abs_sum(left)
   let right_energy = buffer_abs_sum(right)
-  // Hard right: right buffer carries signal, left is silent
-  assert_true(right_energy > 0.001)
-  assert_true(left_energy < 0.000001)
+  assert_eq(left_energy, 0.0)
+  assert_true(right_energy > 0.0)
 }
 ```
 
 - [ ] **Step 2: Run the tests to verify they pass**
 
 Run: `moon test -p dowdiness/moondsp/scheduler`
-Expected: Both new tests pass. (The implementation is already in place — `VoiceSlot::update_pan` + `StereoOut` handle this end-to-end. These tests are formalising an existing contract that was previously only proven by "voice was created", per Codex review.)
+Expected: Both new tests pass first try. The asymmetric assertions (`assert_eq(silent_side, 0.0)` strict, `assert_true(active_side > 0.0)` loose) are robust to envelope-phase variation: `pan_left_gain`/`pan_right_gain` are computed as exact gains (one of them is exactly 0 at hard pan), so the silent side is bit-exact silent.
 
-If a test fails because the energy thresholds don't match, inspect with a printout — the stub pool may produce a known-tiny attack envelope. Adjust `> 0.001` to `> 0.0001` if needed, but the silent-side `< 0.000001` should hold strictly.
+If the active-side assertion fails (energy is exactly 0.0 on both sides), the issue is upstream — the test pool's note-on isn't firing. Debug with `assert_true(pool.active_voice_count() > 0)` first.
 
 - [ ] **Step 3: Commit**
 
@@ -605,10 +624,12 @@ Replace with:
   match @moondsp.VoicePool::new(template, ctx, max_voices=16) {
 ```
 
-- [ ] **Step 2: Run the tests to verify nothing regressed**
+- [ ] **Step 2: Run `moon check` to catch any type errors from the bump**
 
-Run: `moon test -p dowdiness/moondsp/browser`
-Expected: All browser tests pass. (Pool size only affects steal pressure under load; tests don't push to that limit.)
+Run: `moon check`
+Expected: clean (`Finished. moon: ran N tasks, now up to date`).
+
+There are no MoonBit `test` blocks under `browser/` — `moon test -p dowdiness/moondsp/browser` would be a no-op. Pool size only affects steal pressure under load; the change is a literal-value bump that `moon check` validates structurally. The full `moon test` in Task 7 covers the rest.
 
 - [ ] **Step 3: Commit**
 
