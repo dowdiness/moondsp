@@ -15,7 +15,7 @@ import type { Diagnostic, UserIntent } from "./canopy";
 import { AudioEngine } from "./audio";
 import type { AudioStatus, WorkletReply } from "./audio";
 
-const INITIAL = `s("bd sd hh sd").fast(2)`;
+const INITIAL = `s("bd(3,8), hh(7,8), sd(2,8,2)")`;
 const DEBOUNCE_MS = 200;
 const DEFAULT_BPM = 120;
 const DEFAULT_GAIN = 0.6;

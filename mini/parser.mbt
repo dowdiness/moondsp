@@ -8,7 +8,8 @@
 ///   string   = '"' notation '"'
 ///   notation = layer ( "," layer )*
 ///   layer    = element+
-///   element  = atom | "[" notation "]"
+///   element  = (atom | "[" notation "]") euclid?
+///   euclid   = "(" int "," int ("," int)? ")"
 ///   atom     = identifier | number
 
 ///|
@@ -328,7 +329,8 @@ fn NotationParser::parse_layer(
 }
 
 ///|
-/// Parse an element: atom or "[" notation "]"
+/// Parse an element: (atom | "[" notation "]") euclid?
+/// where euclid = "(" int "," int ("," int)? ")"
 fn NotationParser::parse_element(
   self : NotationParser,
 ) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
@@ -336,7 +338,7 @@ fn NotationParser::parse_element(
   guard !self.at_end() else {
     raise ParseError("position \{self.pos}: unexpected end of notation")
   }
-  if self.input[self.pos] == '[' {
+  let base = if self.input[self.pos] == '[' {
     self.pos += 1 // consume '['
     let inner = self.parse_notation()
     guard !self.at_end() && self.input[self.pos] == ']' else {
@@ -346,6 +348,80 @@ fn NotationParser::parse_element(
     inner
   } else {
     self.parse_atom()
+  }
+  self.maybe_apply_euclid(base)
+}
+
+///|
+/// Optionally apply euclid `(k,n[,r])` if it follows the current position.
+fn NotationParser::maybe_apply_euclid(
+  self : NotationParser,
+  pat : @pattern.Pat[@pattern.ControlMap],
+) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
+  if self.at_end() || self.input[self.pos] != '(' {
+    return pat
+  }
+  let euclid_start = self.pos
+  self.pos += 1 // consume '('
+  self.skip_spaces()
+  let k = self.read_int_signed(euclid_start)
+  self.skip_spaces()
+  guard !self.at_end() && self.input[self.pos] == ',' else {
+    raise ParseError("position \{self.pos}: expected ',' in euclid (k,n)")
+  }
+  self.pos += 1 // consume ','
+  self.skip_spaces()
+  let n = self.read_int_signed(euclid_start)
+  self.skip_spaces()
+  let mut rotation = 0
+  if !self.at_end() && self.input[self.pos] == ',' {
+    self.pos += 1 // consume ','
+    self.skip_spaces()
+    rotation = self.read_int_signed(euclid_start)
+    self.skip_spaces()
+  }
+  guard !self.at_end() && self.input[self.pos] == ')' else {
+    raise ParseError("position \{self.pos}: expected ')' to close euclid")
+  }
+  self.pos += 1 // consume ')'
+  pat.euclid(k, n, rotation~)
+}
+
+///|
+/// Read a signed integer at current position (no decimal point allowed).
+fn NotationParser::read_int_signed(
+  self : NotationParser,
+  err_pos : Int,
+) -> Int raise ParseError {
+  let start = self.pos
+  if !self.at_end() && self.input[self.pos] == '-' {
+    self.pos += 1
+  }
+  let digits_start = self.pos
+  while !self.at_end() &&
+        self.input[self.pos] >= '0' &&
+        self.input[self.pos] <= '9' {
+    self.pos += 1
+  }
+  guard self.pos > digits_start else {
+    self.pos = start
+    raise ParseError("position \{err_pos}: expected integer")
+  }
+  let s = self.input[start:self.pos].to_string()
+  let mut value = 0
+  let mut i = 0
+  let negative = s.length() > 0 && s[0] == '-'
+  if negative {
+    i = 1
+  }
+  while i < s.length() {
+    value = value * 10 + (s[i].to_int() - '0'.to_int())
+    i += 1
+  }
+  if negative {
+    -value
+  } else {
+    value
   }
 }
 

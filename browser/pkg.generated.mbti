@@ -26,6 +26,10 @@ pub fn eval_pattern_input() -> Int
 
 pub fn exit_deliverable_output_sample(Int) -> Double
 
+pub fn get_pattern_error_char(Int) -> Int
+
+pub fn get_pattern_error_length() -> Int
+
 pub fn get_scheduler_parse_error() -> String
 
 pub fn init_compiled_graph(Double, Int) -> Bool

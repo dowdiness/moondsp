@@ -81,16 +81,14 @@ pub struct ControlBinding {
   key : String
   node_index : Int
   slot : GraphParamSlot
-
-  fn new(key~ : String, node_index~ : Int, slot~ : GraphParamSlot) -> ControlBinding
 } derive(Eq, @debug.Debug)
+pub fn ControlBinding::ControlBinding(key~ : String, node_index~ : Int, slot~ : GraphParamSlot) -> Self
 pub impl Show for ControlBinding
 
 pub struct ControlBindingBuilder {
   bindings : Array[ControlBinding]
-
-  fn new() -> ControlBindingBuilder
 } derive(@debug.Debug)
+pub fn ControlBindingBuilder::ControlBindingBuilder() -> Self
 pub fn ControlBindingBuilder::bind(Self, key~ : String, node_index~ : Int, slot~ : GraphParamSlot) -> Self
 pub fn ControlBindingBuilder::build(Self, CompiledTemplate) -> Result[ControlBindingMap, ControlBindingError]
 pub fn ControlBindingBuilder::new() -> Self
@@ -124,9 +122,8 @@ pub struct DspNode {
   delay_max_samples : Int
   delay_samples : Int
   seed : UInt
-
-  fn new(DspNodeKind, Int, Int, Double, Double, Double, Double, @dsp.Waveform, @dsp.BiquadMode, Int, Int, UInt) -> DspNode
 }
+pub fn DspNode::DspNode(DspNodeKind, Int, Int, Double, Double, Double, Double, @dsp.Waveform, @dsp.BiquadMode, Int, Int, UInt) -> Self
 pub fn DspNode::adsr(attack_ms~ : Double, decay_ms~ : Double, sustain~ : Double, release_ms~ : Double) -> Self
 pub fn DspNode::biquad(input~ : Int, mode~ : @dsp.BiquadMode, cutoff_hz~ : Double, q~ : Double) -> Self
 pub fn DspNode::clip(Int, Double) -> Self
@@ -191,9 +188,8 @@ pub struct GraphControl {
   node_index : Int
   slot : GraphParamSlot
   value : Double
-
-  fn new(GraphControlKind, Int, GraphParamSlot, Double) -> GraphControl
 }
+pub fn GraphControl::GraphControl(GraphControlKind, Int, GraphParamSlot, Double) -> Self
 pub fn GraphControl::gate_off(Int) -> Self
 pub fn GraphControl::gate_on(Int) -> Self
 pub fn GraphControl::set_param(Int, GraphParamSlot, Double) -> Self

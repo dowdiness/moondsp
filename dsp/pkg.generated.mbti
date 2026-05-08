@@ -37,9 +37,8 @@ pub struct Adsr {
   mut stage : EnvStage
   mut level : Double
   mut level_at_release : Double
-
-  fn new(attack_ms~ : Double, decay_ms~ : Double, sustain~ : Double, release_ms~ : Double) -> Adsr
 }
+pub fn Adsr::Adsr(attack_ms~ : Double, decay_ms~ : Double, sustain~ : Double, release_ms~ : Double) -> Self
 pub fn Adsr::gate_off(Self) -> Unit
 pub fn Adsr::gate_on(Self) -> Unit
 pub fn Adsr::level(Self) -> Double
@@ -51,9 +50,8 @@ pub fn Adsr::tick(Self, DspContext) -> Double
 
 pub struct AudioBuffer {
   data : FixedArray[Double]
-
-  fn new(FixedArray[Double]) -> AudioBuffer
 }
+pub fn AudioBuffer::AudioBuffer(FixedArray[Double]) -> Self
 pub fn AudioBuffer::as_fixed_array(Self) -> FixedArray[Double]
 pub fn AudioBuffer::fill(Self, Double) -> Unit
 pub fn AudioBuffer::filled(Int, init? : Double) -> Self
@@ -64,9 +62,8 @@ pub fn AudioBuffer::set(Self, Int, Double) -> Unit
 
 pub struct Biquad {
   // private fields
-
-  fn new() -> Biquad
 }
+pub fn Biquad::Biquad() -> Self
 pub fn Biquad::new() -> Self
 pub fn Biquad::process(Self, DspContext, AudioBuffer) -> Unit
 pub fn Biquad::reset(Self) -> Unit
@@ -81,9 +78,8 @@ pub(all) enum BiquadMode {
 
 pub struct Clip {
   unit : Unit
-
-  fn new() -> Clip
 }
+pub fn Clip::Clip() -> Self
 pub fn Clip::new() -> Self
 pub fn Clip::process(Self, DspContext, AudioBuffer, Double) -> Unit
 
@@ -92,9 +88,8 @@ pub struct DelayLine {
   mut write_pos : Int
   mut delay_samples : Int
   mut feedback : Double
-
-  fn new(Int, delay_samples? : Int, feedback? : Double) -> DelayLine
 }
+pub fn DelayLine::DelayLine(Int, delay_samples? : Int, feedback? : Double) -> Self
 pub fn DelayLine::delay_samples(Self) -> Int
 pub fn DelayLine::feedback(Self) -> Double
 pub fn DelayLine::max_delay_samples(Self) -> Int
@@ -107,9 +102,8 @@ pub fn DelayLine::tick(Self, Double) -> Double
 
 pub struct DemoSource {
   // private fields
-
-  fn new() -> DemoSource
 }
+pub fn DemoSource::DemoSource() -> Self
 pub fn DemoSource::new() -> Self
 pub fn DemoSource::reset(Self) -> Unit
 pub fn DemoSource::tick_source(Self, Int, Double, Double) -> Double
@@ -117,9 +111,8 @@ pub fn DemoSource::tick_source(Self, Int, Double, Double) -> Double
 pub struct DspContext {
   sample_rate : Double
   block_size : Int
-
-  fn new(sample_rate~ : Double, block_size~ : Int) -> DspContext
 }
+pub fn DspContext::DspContext(sample_rate~ : Double, block_size~ : Int) -> Self
 pub fn DspContext::block_size(Self) -> Int
 pub fn DspContext::new(sample_rate~ : Double, block_size~ : Int) -> Self
 pub fn DspContext::sample_rate(Self) -> Double
@@ -134,17 +127,15 @@ pub(all) enum EnvStage {
 
 pub struct Gain {
   unit : Unit
-
-  fn new() -> Gain
 }
+pub fn Gain::Gain() -> Self
 pub fn Gain::new() -> Self
 pub fn Gain::process(Self, DspContext, AudioBuffer, Double) -> Unit
 
 pub struct Mix {
   unit : Unit
-
-  fn new() -> Mix
 }
+pub fn Mix::Mix() -> Self
 pub fn Mix::new() -> Self
 pub fn Mix::process(Self, DspContext, AudioBuffer, AudioBuffer) -> Unit
 
@@ -175,9 +166,8 @@ pub fn Oscillator::tick_waveform(Self, Waveform, Double, Double) -> Double
 
 pub struct Pan {
   unit : Unit
-
-  fn new() -> Pan
 }
+pub fn Pan::Pan() -> Self
 pub fn Pan::new() -> Self
 pub fn Pan::process(Self, DspContext, AudioBuffer, AudioBuffer, AudioBuffer, Double) -> Unit
 

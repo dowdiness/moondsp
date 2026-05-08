@@ -153,6 +153,73 @@ test "parse with slow method" {
 }
 
 ///|
+test "parse euclid bd(3,8) tresillo" {
+  let pat = unwrap_ok(@mini.parse("s(\"bd(3,8)\")"))
+  let events = query_one_cycle(pat)
+  inspect(events.length(), content="3")
+  inspect(
+    events[0].value,
+    content=(
+      #|ControlMap({ "sound": 36 })
+    ),
+  )
+}
+
+///|
+test "parse euclid with rotation bd(3,8,2)" {
+  let pat = unwrap_ok(@mini.parse("s(\"bd(3,8,2)\")"))
+  let events = query_one_cycle(pat)
+  // Rotation does not change pulse count
+  inspect(events.length(), content="3")
+}
+
+///|
+test "parse euclid on group [bd sd](5,8)" {
+  let pat = unwrap_ok(@mini.parse("s(\"[bd sd](5,8)\")"))
+  let events = query_one_cycle(pat)
+  // 5 pulse slots, each containing the [bd sd] sub-group (2 events per slot)
+  inspect(events.length(), content="10")
+}
+
+///|
+test "parse euclid alongside other elements" {
+  let pat = unwrap_ok(@mini.parse("s(\"bd(3,8) sd\")"))
+  let events = query_one_cycle(pat)
+  // bd(3,8) takes first half (3 pulses), sd takes second half (1 event) = 4
+  inspect(events.length(), content="4")
+}
+
+///|
+test "parse euclid k=0 produces silence for that element" {
+  let pat = unwrap_ok(@mini.parse("s(\"bd(0,8) sd\")"))
+  let events = query_one_cycle(pat)
+  // bd(0,8) is silent, only sd plays in second half
+  inspect(events.length(), content="1")
+  inspect(
+    events[0].value,
+    content=(
+      #|ControlMap({ "sound": 38 })
+    ),
+  )
+}
+
+///|
+test "parse euclid missing comma returns error" {
+  match @mini.parse("s(\"bd(3 8)\")") {
+    Err(_) => () // expected
+    Ok(_) => fail("expected Err for malformed euclid")
+  }
+}
+
+///|
+test "parse euclid unclosed paren returns error" {
+  match @mini.parse("s(\"bd(3,8\")") {
+    Err(_) => () // expected
+    Ok(_) => fail("expected Err for unclosed euclid")
+  }
+}
+
+///|
 test "parse with rev method" {
   let pat = unwrap_ok(@mini.parse("s(\"bd sd hh\").rev()"))
   let events = query_one_cycle(pat)
