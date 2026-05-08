@@ -61,9 +61,12 @@ export class AudioEngine {
     this.setStatus({ kind: "starting" });
 
     try {
-      const ctx = new AudioContext({ sampleRate: 48000 });
-      await ctx.resume();
-      await ctx.audioWorklet.addModule(this.processorUrl);
+      // Assign to instance fields immediately so teardownGraph() can see
+      // them if any later step throws (404 wasm, addModule failure, ready
+      // timeout). Without this, partially-constructed contexts leak.
+      this.ctx = new AudioContext({ sampleRate: 48000 });
+      await this.ctx.resume();
+      await this.ctx.audioWorklet.addModule(this.processorUrl);
 
       const wasmResponse = await fetch(this.wasmUrl);
       if (!wasmResponse.ok) {
@@ -72,7 +75,7 @@ export class AudioEngine {
       const wasmBytes = await wasmResponse.arrayBuffer();
       const wasmModule = await WebAssembly.compile(wasmBytes);
 
-      const node = new AudioWorkletNode(ctx, "moonbit-dsp", {
+      this.node = new AudioWorkletNode(this.ctx, "moonbit-dsp", {
         numberOfInputs: 0,
         numberOfOutputs: 1,
         outputChannelCount: [2],
@@ -81,6 +84,7 @@ export class AudioEngine {
           useScheduler: true,
         },
       });
+      const node = this.node;
 
       // Wait for the worklet to confirm wasm init before declaring `running`.
       // Messages sent before `ready` are silently dropped by processor.js.
@@ -108,14 +112,15 @@ export class AudioEngine {
         };
       });
 
-      node.connect(ctx.destination);
+      node.connect(this.ctx.destination);
 
       await ready;
 
-      this.ctx = ctx;
-      this.node = node;
       this.setStatus({ kind: "running" });
     } catch (err) {
+      // Tear down any partial graph (ctx/node may have been created above)
+      // before transitioning to error so a Retry click rebuilds cleanly.
+      this.teardownGraph();
       const message = err instanceof Error ? err.message : String(err);
       this.setStatus({ kind: "error", message });
       throw err;

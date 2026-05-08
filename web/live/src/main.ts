@@ -143,6 +143,12 @@ engine.onReply((reply: WorkletReply) => {
   }
 
   if (reply.type === "pattern-updated") {
+    // Only commit lastGood on a confirmed success. If we updated it
+    // optimistically in evalNow (as the prior version did), a parse
+    // error would persist as lastGood — and re-typing the same bad
+    // text after clearing would short-circuit on `text === lastGood`,
+    // never re-painting the squiggle.
+    lastGood = latestSentText;
     setLog(`✓ pattern updated`, "ok");
     adapter.applyPatches([{ type: "SetDiagnostics", diagnostics: [] }]);
   } else if (reply.type === "pattern-error") {
@@ -172,7 +178,8 @@ function evalNow(text: string): void {
   latestSentRev = rev;
   latestSentText = text;
   engine.setPatternText(text, rev);
-  lastGood = text; // worklet keeps last graph on error, so this is safe
+  // lastGood is committed by the pattern-updated reply handler — not
+  // here — so an in-flight parse error doesn't poison the dedupe.
 }
 
 function scheduleEval(text: string): void {

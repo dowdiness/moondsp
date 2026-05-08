@@ -164,6 +164,32 @@ test.describe("Audio path", () => {
     await expect(log).toContainText("pattern updated", { timeout: 3_000 });
   });
 
+  test("re-typing the same invalid pattern after clear re-paints the squiggle", async ({ page }) => {
+    await page.goto("/");
+    await page.locator("#start").click();
+    await expect(page.locator("#status")).toContainText("running", { timeout: 10_000 });
+    await expect(page.locator("#log")).toContainText("pattern updated", { timeout: 5_000 });
+
+    const editor = page.locator(".cm-content");
+    await editor.click();
+
+    // First parse error → squiggle.
+    await page.keyboard.press("Control+A");
+    await page.keyboard.type(`s("bogus_drum")`);
+    await expect(page.locator(".cm-diagnostic-error")).toBeVisible({ timeout: 3_000 });
+
+    // Clear → soft no-op, squiggle clears.
+    await page.keyboard.press("Control+A");
+    await page.keyboard.press("Delete");
+    await expect(page.locator(".cm-diagnostic-error")).toHaveCount(0, { timeout: 2_000 });
+
+    // Re-type the *same* invalid pattern. Without the lastGood/latestSentText
+    // reset in the empty-input branch this would short-circuit on
+    // text === lastGood and the squiggle would never come back.
+    await page.keyboard.type(`s("bogus_drum")`);
+    await expect(page.locator(".cm-diagnostic-error")).toBeVisible({ timeout: 3_000 });
+  });
+
   test("Retry after engine error rebuilds and re-sends pattern", async ({ page }) => {
     // Force the wasm fetch to 404 so AudioEngine.start() throws and
     // status flips to "error". The UI should then show "Retry" and
