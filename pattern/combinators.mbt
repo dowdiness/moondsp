@@ -110,6 +110,111 @@ pub fn[A] Pat::filter_map(self : Pat[A], f : (A) -> A?) -> Pat[A] {
 }
 
 ///|
+/// Bjorklund's algorithm: distribute `k` pulses across `n` steps as evenly
+/// as possible, returning a `Bool[]` of length `n` with `k` `true` entries.
+///
+/// Algorithm: start with `k` front-groups of `[true]` and `n-k` back-groups
+/// of `[false]`. Repeatedly merge front with back pair-wise (concatenating
+/// each pair) until ≤ 1 trailing group remains. Concatenate front then
+/// back to produce the final pattern.
+///
+/// Edge cases: `k <= 0` → all-false; `k >= n` → all-true (saturates).
+fn bjorklund(k : Int, n : Int) -> Array[Bool] {
+  if n <= 0 {
+    return []
+  }
+  if k <= 0 {
+    return Array::make(n, false)
+  }
+  if k >= n {
+    return Array::make(n, true)
+  }
+  let mut front : Array[Array[Bool]] = []
+  for _ in 0..<k {
+    front.push([true])
+  }
+  let mut back : Array[Array[Bool]] = []
+  for _ in 0..<(n - k) {
+    back.push([false])
+  }
+  while back.length() > 1 {
+    let pairs = if front.length() < back.length() {
+      front.length()
+    } else {
+      back.length()
+    }
+    let new_front : Array[Array[Bool]] = []
+    for i in 0..<pairs {
+      let merged : Array[Bool] = []
+      for b in front[i] {
+        merged.push(b)
+      }
+      for b in back[i] {
+        merged.push(b)
+      }
+      new_front.push(merged)
+    }
+    let new_back : Array[Array[Bool]] = []
+    if front.length() > pairs {
+      for i in pairs..<front.length() {
+        new_back.push(front[i])
+      }
+    } else {
+      for i in pairs..<back.length() {
+        new_back.push(back[i])
+      }
+    }
+    front = new_front
+    back = new_back
+    if front.length() <= 1 {
+      break
+    }
+  }
+  let result : Array[Bool] = []
+  for group in front {
+    for b in group {
+      result.push(b)
+    }
+  }
+  for group in back {
+    for b in group {
+      result.push(b)
+    }
+  }
+  result
+}
+
+///|
+/// Euclidean rhythm: distribute `k` pulses across `n` steps within one
+/// cycle using Bjorklund's algorithm. Pulse positions play `self`, off
+/// positions are silent. Each step occupies `1/n` of the cycle.
+///
+/// `rotation` left-rotates the pulse pattern by that many steps (mod n).
+/// `k <= 0` or `n <= 0` yields silence; `k >= n` yields one pulse per step.
+pub fn[A] Pat::euclid(
+  self : Pat[A],
+  k : Int,
+  n : Int,
+  rotation? : Int = 0,
+) -> Pat[A] {
+  if n <= 0 || k <= 0 {
+    return Pat::silence()
+  }
+  let pattern = bjorklund(k, n)
+  let r = (rotation % n + n) % n
+  let pats : Array[Pat[A]] = []
+  for i in 0..<n {
+    let idx = (i + r) % n
+    if pattern[idx] {
+      pats.push(self)
+    } else {
+      pats.push(Pat::silence())
+    }
+  }
+  sequence(pats)
+}
+
+///|
 pub fn[A] every(n : Int, f : (Pat[A]) -> Pat[A], pat : Pat[A]) -> Pat[A] {
   if n <= 0 {
     return pat

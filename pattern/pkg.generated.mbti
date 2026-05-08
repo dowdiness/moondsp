@@ -42,6 +42,7 @@ pub impl[A : @debug.Debug] Show for Event[A]
 pub struct Pat[A] {
   query : (TimeSpan) -> Array[Event[A]]
 }
+pub fn[A] Pat::euclid(Self[A], Int, Int, rotation? : Int) -> Self[A]
 pub fn[A] Pat::fast(Self[A], Rational) -> Self[A]
 pub fn[A] Pat::filter_map(Self[A], (A) -> A?) -> Self[A]
 pub fn[A] Pat::pure(A) -> Self[A]

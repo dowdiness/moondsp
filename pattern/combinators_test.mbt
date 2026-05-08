@@ -163,6 +163,132 @@ test "filter_map: on silence returns empty" {
 }
 
 ///|
+test "euclid: (3,8) tresillo — 3 pulses at steps 0, 3, 6" {
+  let pat = Pat::pure(1)
+  let p = pat.euclid(3, 8)
+  let events = p.query(span(0, 1, 1, 1))
+  inspect(events.length(), content="3")
+  // Hits at slots 0, 3, 6 of 8 → parts [0,1/8), [3/8,1/2), [3/4,7/8)
+  inspect(
+    events[0].part,
+    content=(
+      #|{ begin: { num: 0, den: 1 }, end_: { num: 1, den: 8 } }
+    ),
+  )
+  inspect(
+    events[1].part,
+    content=(
+      #|{ begin: { num: 3, den: 8 }, end_: { num: 1, den: 2 } }
+    ),
+  )
+  inspect(
+    events[2].part,
+    content=(
+      #|{ begin: { num: 3, den: 4 }, end_: { num: 7, den: 8 } }
+    ),
+  )
+}
+
+///|
+test "euclid: (5,8) cinquillo — 5 pulses at steps 0, 2, 3, 5, 6" {
+  let p = Pat::pure(1).euclid(5, 8)
+  let events = p.query(span(0, 1, 1, 1))
+  inspect(events.length(), content="5")
+  // Verify slot positions: 0, 2, 3, 5, 6 (each slot is 1/8)
+  inspect(
+    events[0].part,
+    content=(
+      #|{ begin: { num: 0, den: 1 }, end_: { num: 1, den: 8 } }
+    ),
+  )
+  inspect(
+    events[1].part,
+    content=(
+      #|{ begin: { num: 1, den: 4 }, end_: { num: 3, den: 8 } }
+    ),
+  )
+  inspect(
+    events[2].part,
+    content=(
+      #|{ begin: { num: 3, den: 8 }, end_: { num: 1, den: 2 } }
+    ),
+  )
+  inspect(
+    events[3].part,
+    content=(
+      #|{ begin: { num: 5, den: 8 }, end_: { num: 3, den: 4 } }
+    ),
+  )
+  inspect(
+    events[4].part,
+    content=(
+      #|{ begin: { num: 3, den: 4 }, end_: { num: 7, den: 8 } }
+    ),
+  )
+}
+
+///|
+test "euclid: rotation=1 shifts (3,8) pulses left by one slot" {
+  let p = Pat::pure(1).euclid(3, 8, rotation=1)
+  let events = p.query(span(0, 1, 1, 1))
+  inspect(events.length(), content="3")
+  // Original tresillo: hits at 0,3,6
+  // Left-rotate by 1 → hits at -1,2,5 → wrapped: 7,2,5 → sorted by time: 2,5,7
+  inspect(
+    events[0].part,
+    content=(
+      #|{ begin: { num: 1, den: 4 }, end_: { num: 3, den: 8 } }
+    ),
+  )
+  inspect(
+    events[1].part,
+    content=(
+      #|{ begin: { num: 5, den: 8 }, end_: { num: 3, den: 4 } }
+    ),
+  )
+  inspect(
+    events[2].part,
+    content=(
+      #|{ begin: { num: 7, den: 8 }, end_: { num: 1, den: 1 } }
+    ),
+  )
+}
+
+///|
+test "euclid: k>=n produces n pulses (every slot)" {
+  let p = Pat::pure(1).euclid(8, 8)
+  inspect(p.query(span(0, 1, 1, 1)).length(), content="8")
+  let p2 = Pat::pure(1).euclid(10, 8)
+  inspect(p2.query(span(0, 1, 1, 1)).length(), content="8")
+}
+
+///|
+test "euclid: k=0 or k<0 produces silence" {
+  let p0 = Pat::pure(1).euclid(0, 8)
+  inspect(p0.query(span(0, 1, 1, 1)).length(), content="0")
+  let pn = Pat::pure(1).euclid(-3, 8)
+  inspect(pn.query(span(0, 1, 1, 1)).length(), content="0")
+}
+
+///|
+test "euclid: n<=0 produces silence" {
+  let p = Pat::pure(1).euclid(3, 0)
+  inspect(p.query(span(0, 1, 1, 1)).length(), content="0")
+}
+
+///|
+test "euclid: rotation wraps modulo n (rotation=8 same as 0)" {
+  let pa = Pat::pure(1).euclid(3, 8)
+  let pb = Pat::pure(1).euclid(3, 8, rotation=8)
+  let ea = pa.query(span(0, 1, 1, 1))
+  let eb = pb.query(span(0, 1, 1, 1))
+  inspect(ea.length() == eb.length(), content="true")
+  for i in 0..<ea.length() {
+    inspect(ea[i].part == eb[i].part, content="true")
+  }
+}
+
+///|
 test "filter_map: preserves event timing (whole and part spans unchanged)" {
   let p = Pat::pure(42)
   let filtered = p.filter_map(fn(x) { Some(x + 1) })
