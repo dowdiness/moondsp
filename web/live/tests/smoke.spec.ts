@@ -190,6 +190,60 @@ test.describe("Audio path", () => {
     await expect(page.locator(".cm-diagnostic-error")).toBeVisible({ timeout: 3_000 });
   });
 
+  test("runtime worklet error tears down graph; Retry rebuilds cleanly", async ({ page }) => {
+    await page.goto("/");
+    await page.locator("#start").click();
+    await expect(page.locator("#status")).toContainText("running", { timeout: 10_000 });
+    await expect(page.locator("#log")).toContainText("pattern updated", { timeout: 5_000 });
+
+    // Make the editor produce a parse error so a diagnostic squiggle is
+    // visible, giving us a positive signal that the error transition
+    // actually clears it.
+    const editor = page.locator(".cm-content");
+    await editor.click();
+    await page.keyboard.press("Control+A");
+    await page.keyboard.type(`s("bogus")`);
+    await expect(page.locator(".cm-diagnostic-error")).toBeVisible({ timeout: 3_000 });
+
+    // Inject a synthetic runtime worklet error. This goes through the
+    // same AudioEngine.dispatchReply path the worklet uses for real
+    // {type:"error"} messages — exercising teardownGraph() + the
+    // status=error transition that the start-failure test can't reach
+    // (start-failure throws before this.ctx/this.node are set).
+    await page.evaluate(() => {
+      window.__moondspEngine?._testInjectReply({
+        type: "error",
+        message: "synthetic runtime worklet failure",
+      });
+    });
+
+    const status = page.locator("#status");
+    const btn = page.locator("#start");
+    await expect(status).toContainText("error: synthetic runtime worklet failure", { timeout: 2_000 });
+    await expect(btn).toHaveText("Retry");
+    await expect(btn).toHaveAttribute("data-action", "start");
+    // applyStatus("error") should have cleared the diagnostic too.
+    await expect(page.locator(".cm-diagnostic-error")).toHaveCount(0);
+
+    // Type something else into the editor while engine is down, to
+    // verify Retry-then-edit also flows correctly through the
+    // rebuilt context.
+    await page.keyboard.press("Control+A");
+    await page.keyboard.type(`s("bd sd")`);
+
+    // Retry rebuilds: a real start() runs, including evalNow on the
+    // current doc. The "pattern updated" reply is the load-bearing
+    // assertion — it proves the new ctx + node are actually live and
+    // the wasm parse round-trip survived a teardown.
+    await btn.click();
+    await expect(status).toContainText("running", { timeout: 10_000 });
+    await expect(page.locator("#log")).toContainText("pattern updated", { timeout: 5_000 });
+
+    // Stop cleanly.
+    await btn.click();
+    await expect(status).toContainText("idle");
+  });
+
   test("Retry after engine error rebuilds and re-sends pattern", async ({ page }) => {
     // Force the wasm fetch to 404 so AudioEngine.start() throws and
     // status flips to "error". The UI should then show "Retry" and

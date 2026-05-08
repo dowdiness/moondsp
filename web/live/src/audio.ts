@@ -139,6 +139,15 @@ export class AudioEngine {
     }
   }
 
+  /**
+   * Test-only: inject a synthetic worklet reply through the dispatch
+   * pipeline. Used by smoke tests to exercise the runtime-error path
+   * without crashing the actual wasm graph. Do not call from app code.
+   */
+  _testInjectReply(reply: WorkletReply): void {
+    this.dispatchReply(reply);
+  }
+
   private teardownGraph(): void {
     if (this.node) {
       try {
