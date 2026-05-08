@@ -138,4 +138,48 @@ test.describe("Audio path", () => {
     await expect(log).toContainText("pattern updated", { timeout: 3_000 });
     await expect(page.locator(".cm-diagnostic-error")).toHaveCount(0);
   });
+
+  test("Retry after engine error rebuilds and re-sends pattern", async ({ page }) => {
+    // Force the wasm fetch to 404 so AudioEngine.start() throws and
+    // status flips to "error". The UI should then show "Retry" and
+    // clear lastGood / latestSentText so a successful retry actually
+    // re-sends the editor doc instead of short-circuiting.
+    let blockWasm = true;
+    await page.route("**/moonbit_dsp.wasm", async (route) => {
+      if (blockWasm) {
+        await route.fulfill({ status: 404, body: "blocked by test" });
+      } else {
+        await route.continue();
+      }
+    });
+
+    await page.goto("/");
+
+    const btn = page.locator("#start");
+    const status = page.locator("#status");
+    const log = page.locator("#log");
+
+    // First attempt fails on wasm fetch.
+    await btn.click();
+    await expect(status).toContainText("error", { timeout: 10_000 });
+    await expect(btn).toHaveText("Retry");
+    await expect(btn).toHaveAttribute("data-action", "start");
+
+    // Unblock the wasm and retry.
+    blockWasm = false;
+    await btn.click();
+    await expect(status).toContainText("running", { timeout: 10_000 });
+    await expect(btn).toHaveText("Stop audio");
+
+    // Crucial: the initial pattern must evaluate after retry — proves
+    // lastGood was cleared on the error→Retry transition. If it weren't,
+    // evalNow would short-circuit (text === lastGood) and "pattern
+    // updated" would never appear.
+    await expect(log).toContainText("pattern updated", { timeout: 5_000 });
+
+    // Clean stop after retry confirms no leaked context state.
+    await btn.click();
+    await expect(status).toContainText("idle");
+    await expect(btn).toHaveText("Start audio");
+  });
 });
