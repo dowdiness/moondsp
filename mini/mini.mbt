@@ -9,8 +9,12 @@
 /// - Step operators (postfix on atoms or groups):
 ///   `bd*4` — replicate within slot (4 events in one slot);
 ///   `bd/2` — stretch within slot (`pat.slow(n)`);
-///   stacks with euclid in left-to-right order: `bd*2(3,8)` is legal
-/// - Method chains: `.fast(n)`, `.slow(n)`, `.rev()`
+///   `bd?` — degrade-by-50% (deterministic per-event drop);
+///   stacks with euclid in left-to-right order: `bd*2(3,8)?` is legal
+/// - Method chains:
+///   `.fast(n)`, `.slow(n)`, `.rev()`,
+///   `.degradeBy(p)` (drop with probability p),
+///   `.every(n, fast(k)|slow(k)|rev)` (apply f every n cycles)
 pub fn parse(
   input : String,
 ) -> Result[@pattern.Pat[@pattern.ControlMap], String] {

@@ -289,6 +289,116 @@ test "euclid: rotation wraps modulo n (rotation=8 same as 0)" {
 }
 
 ///|
+test "degrade_by(0.0) keeps every event" {
+  let p = sequence([Pat::pure(1), Pat::pure(2), Pat::pure(3), Pat::pure(4)])
+  let d = p.degrade_by(0.0)
+  inspect(d.query(span(0, 1, 1, 1)).length(), content="4")
+}
+
+///|
+test "degrade_by(1.0) drops every event (silence)" {
+  let p = sequence([Pat::pure(1), Pat::pure(2), Pat::pure(3), Pat::pure(4)])
+  let d = p.degrade_by(1.0)
+  inspect(d.query(span(0, 1, 1, 1)).length(), content="0")
+}
+
+///|
+test "degrade_by is deterministic — same query yields same result" {
+  let p = sequence([
+    Pat::pure(1),
+    Pat::pure(2),
+    Pat::pure(3),
+    Pat::pure(4),
+    Pat::pure(5),
+    Pat::pure(6),
+    Pat::pure(7),
+    Pat::pure(8),
+  ])
+  let d = p.degrade_by(0.5)
+  let a = d.query(span(0, 1, 1, 1))
+  let b = d.query(span(0, 1, 1, 1))
+  inspect(a.length() == b.length(), content="true")
+  for i in 0..<a.length() {
+    inspect(a[i].value == b[i].value, content="true")
+  }
+}
+
+///|
+test "degrade_by(0.5) drops some but not all events from 32-event pattern" {
+  let pats : Array[Pat[Int]] = []
+  for i in 0..<32 {
+    pats.push(Pat::pure(i))
+  }
+  let p = sequence(pats)
+  let d = p.degrade_by(0.5)
+  let kept = d.query(span(0, 1, 1, 1)).length()
+  inspect(kept > 0 && kept < 32, content="true")
+}
+
+///|
+test "degrade_by: split-arc query equivalent to single full-arc query" {
+  // Worklet shape: the audio thread queries half-cycles, not full cycles.
+  // Drop decisions must be identical whether we query [0,1) once or
+  // [0,1/2) + [1/2,1). A different keying scheme (e.g. arc-begin based)
+  // would diverge here.
+  let pats : Array[Pat[Int]] = []
+  for i in 0..<8 {
+    pats.push(Pat::pure(i))
+  }
+  let p = sequence(pats).degrade_by(0.5)
+  let full = p.query(span(0, 1, 1, 1))
+  let first_half = p.query(span(0, 1, 1, 2))
+  let second_half = p.query(span(1, 2, 1, 1))
+  inspect(
+    first_half.length() + second_half.length() == full.length(),
+    content="true",
+  )
+  // Values that survived in the full query must also survive in the
+  // corresponding half — pin the union to the full set.
+  let mut idx = 0
+  for ev in first_half {
+    inspect(ev.value == full[idx].value, content="true")
+    idx += 1
+  }
+  for ev in second_half {
+    inspect(ev.value == full[idx].value, content="true")
+    idx += 1
+  }
+}
+
+///|
+test "every(2, rev) on sequence — cycle 0 timing reversed, cycle 1 not" {
+  // Pat::rev mirrors event *timing*, not array order. So we check the
+  // part.begin of the first array element: under rev cycle 0, the first
+  // element's slot moves from [0, 1/3) to [2/3, 1).
+  let p = sequence([Pat::pure(36), Pat::pure(38), Pat::pure(42)])
+  let p2 = every(2, fn(x) { x.rev() }, p)
+  let cyc0 = p2.query(span(0, 1, 1, 1))
+  inspect(cyc0.length(), content="3")
+  inspect(
+    cyc0[0].part,
+    content=(
+      #|{ begin: { num: 2, den: 3 }, end_: { num: 1, den: 1 } }
+    ),
+  )
+  // Cycle 1: every does not fire — value 36 returns to slot [1, 4/3).
+  let cyc1 = p2.query(span(1, 1, 2, 1))
+  inspect(
+    cyc1[0].part,
+    content=(
+      #|{ begin: { num: 1, den: 1 }, end_: { num: 4, den: 3 } }
+    ),
+  )
+}
+
+///|
+test "degrade_by clamps p outside [0,1]" {
+  let p = sequence([Pat::pure(1), Pat::pure(2)])
+  inspect(p.degrade_by(-0.5).query(span(0, 1, 1, 1)).length(), content="2")
+  inspect(p.degrade_by(2.0).query(span(0, 1, 1, 1)).length(), content="0")
+}
+
+///|
 test "filter_map: preserves event timing (whole and part spans unchanged)" {
   let p = Pat::pure(42)
   let filtered = p.filter_map(fn(x) { Some(x + 1) })
