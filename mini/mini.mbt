@@ -6,6 +6,10 @@
 /// - `note("60 64 67")` — MIDI note numbers
 /// - Euclidean rhythms: `s("bd(3,8)")` distributes 3 pulses across 8 steps;
 ///   `s("bd(3,8,2)")` adds left-rotation; works on groups too: `s("[bd sd](5,8)")`
+/// - Step operators (postfix on atoms or groups):
+///   `bd*4` — replicate within slot (4 events in one slot);
+///   `bd/2` — stretch within slot (`pat.slow(n)`);
+///   stacks with euclid in left-to-right order: `bd*2(3,8)` is legal
 /// - Method chains: `.fast(n)`, `.slow(n)`, `.rev()`
 pub fn parse(
   input : String,
