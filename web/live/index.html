@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>moondsp — live</title>
+    <style>
+      :root {
+        --bg: #f3efe5;
+        --ink: #1d1b18;
+        --ink-muted: #5a5248;
+        --panel: rgba(255, 252, 245, 0.92);
+        --accent: #b44f2c;
+        --accent-soft: #e8c2a2;
+        --border: rgba(29, 27, 24, 0.14);
+        --ok-fg: #577d21;
+        --ok-bg: #f4faee;
+        --ok-border: rgba(71, 125, 33, 0.25);
+        --err-fg: #c35a2b;
+        --err-bg: #fff0ec;
+        --err-border: rgba(180, 32, 32, 0.28);
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        height: 100%;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      body {
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        gap: 1rem;
+        padding: 1.25rem;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+      }
+      header h1 {
+        font-size: 1rem;
+        font-weight: 600;
+        margin: 0;
+        letter-spacing: 0.02em;
+      }
+      header .controls {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+      }
+      header .status {
+        font-size: 0.85rem;
+        color: var(--ink-muted);
+        font-variant-numeric: tabular-nums;
+      }
+      button {
+        font: inherit;
+        font-size: 0.85rem;
+        padding: 0.4rem 0.9rem;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--accent);
+        color: white;
+        cursor: pointer;
+        transition: opacity 0.1s ease;
+      }
+      button:hover:not([disabled]) { opacity: 0.9; }
+      button[disabled] {
+        opacity: 0.5;
+        cursor: not-allowed;
+        background: var(--accent-soft);
+        color: var(--ink);
+      }
+      #editor {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        overflow: hidden;
+        min-height: 0;
+      }
+      .cm-editor { height: 100%; }
+      .cm-content {
+        font-family: ui-monospace, "JetBrains Mono", "Fira Code", monospace;
+        font-size: 0.95rem;
+      }
+      .cm-diagnostic {
+        text-decoration: underline wavy;
+        text-decoration-skip-ink: none;
+        text-underline-offset: 0.2em;
+      }
+      .cm-diagnostic-error {
+        text-decoration-color: var(--err-fg);
+        background: var(--err-bg);
+      }
+      .cm-diagnostic-warning { text-decoration-color: #d8a227; }
+      .cm-diagnostic-info    { text-decoration-color: #4682b4; }
+      .cm-diagnostic-hint    { text-decoration-color: var(--ink-muted); }
+      footer {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+        font-size: 0.8rem;
+        color: var(--ink-muted);
+      }
+      footer .panel {
+        flex: 1;
+        padding: 0.5rem 0.75rem;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        font-family: ui-monospace, monospace;
+        transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+      }
+      footer .panel.ok {
+        color: var(--ok-fg);
+        background: var(--ok-bg);
+        border-color: var(--ok-border);
+      }
+      footer .panel.error {
+        color: var(--err-fg);
+        background: var(--err-bg);
+        border-color: var(--err-border);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>moondsp · live</h1>
+      <div class="controls">
+        <span class="status" id="status" aria-live="polite">idle — click Start</span>
+        <button id="start" type="button">Start audio</button>
+      </div>
+    </header>
+    <main id="editor"></main>
+    <footer>
+      <div class="panel" id="log" aria-live="polite">edit the pattern, audio updates live</div>
+    </footer>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
