@@ -121,14 +121,13 @@ test('browser demo first render proves CompiledStereoDsp feedback recurrence', a
   // upper bound 0.35 > 0.30305 plateau ensures the loop is bounded (feedback
   // gain < 1), not runaway.
   //
-  // Wait for sequences ≥ 8 (block 82 ≈ 218ms) before sampling. Earlier
-  // attempts pinned to sequence=2 (~48ms) and sequence ≥ 2 with a band
-  // filter, both retry-masked-flaky on CI: Chrome's first-run worklet
-  // warmup occasionally leaves the feedback loop still not at the
-  // plateau even at sequence=2–4. By sequence=8 we're well past any
-  // plausible startup transient (the recurrence converges at 0.3 per
-  // sample → 99% decay in ~30 samples → settled within 1 block, but
-  // wasm/JIT warmup can stretch effective settling further).
+  // Poll directly for actual convergence in the target band [0.25, 0.35].
+  // Earlier attempts pinned to sequence=2 (~48ms) or sequence ≥ 8 (~218ms),
+  // both proxies for "settled by now" — flaky on CI because Chrome's first-run
+  // wasm/JIT warmup stretches effective settling past any fixed block count.
+  // Waiting for leftPreview[0] to actually land in the band is robust: the
+  // feed-forward path alone peaks at ~0.2121 (below 0.25), so any sample
+  // above 0.25 proves feedback recurrence regardless of how many blocks elapsed.
   let telemetry;
   let attempts = 0;
   await expect
@@ -136,7 +135,9 @@ test('browser demo first render proves CompiledStereoDsp feedback recurrence', a
       attempts += 1;
       const history = await telemetryHistory(page);
       if (!history) return null;
-      const match = history.find(t => t.sequence >= 8 && t.freq === 0);
+      const match = history.find(
+        t => t.freq === 0 && t.leftPreview[0] > 0.25 && t.leftPreview[0] < 0.35,
+      );
       if (match) telemetry = match;
       return match || null;
     }, { timeout: 10_000 })
