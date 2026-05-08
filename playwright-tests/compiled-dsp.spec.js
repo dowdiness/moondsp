@@ -121,30 +121,43 @@ test('browser demo first render proves CompiledStereoDsp feedback recurrence', a
   // upper bound 0.35 > 0.30305 plateau ensures the loop is bounded (feedback
   // gain < 1), not runaway.
   //
-  // Poll for the first post-warmup telemetry block (sequence ≥ 2) whose
-  // freq=0 propagation AND feedback-loop convergence have BOTH landed in
-  // the recurrence band. Pinning to a single sequence number was retry-
-  // masked-flaky on CI: AudioWorklet block scheduling jitter occasionally
-  // leaves sequence=2 still settling (postMessage of set-freq=0 arrives
-  // late within blocks 1–17, residual osc state takes another ~block to
-  // decay through the 0.3 feedback). A regression that breaks the loop
-  // entirely (feed-forward ≈ 0.2121) never lands in [0.25, 0.35] and the
-  // poll times out — same failure signal, just stable.
+  // Wait for sequences ≥ 8 (block 82 ≈ 218ms) before sampling. Earlier
+  // attempts pinned to sequence=2 (~48ms) and sequence ≥ 2 with a band
+  // filter, both retry-masked-flaky on CI: Chrome's first-run worklet
+  // warmup occasionally leaves the feedback loop still not at the
+  // plateau even at sequence=2–4. By sequence=8 we're well past any
+  // plausible startup transient (the recurrence converges at 0.3 per
+  // sample → 99% decay in ~30 samples → settled within 1 block, but
+  // wasm/JIT warmup can stretch effective settling further).
   let telemetry;
+  let attempts = 0;
   await expect
     .poll(async () => {
+      attempts += 1;
       const history = await telemetryHistory(page);
       if (!history) return null;
-      const match = history.find(t =>
-        t.sequence >= 2 &&
-        t.freq === 0 &&
-        t.leftPreview[0] > 0.25 &&
-        t.leftPreview[0] < 0.35
-      );
+      const match = history.find(t => t.sequence >= 8 && t.freq === 0);
       if (match) telemetry = match;
       return match || null;
     }, { timeout: 10_000 })
     .toBeTruthy();
+
+  // Diagnostic on out-of-band: surface recent telemetry so a real
+  // regression (feedback loop broken) is distinguishable from the
+  // CI worklet-warmup flake we just stretched past.
+  if (telemetry.leftPreview[0] <= 0.25 || telemetry.leftPreview[0] >= 0.35) {
+    const history = await telemetryHistory(page);
+    const recent = history.slice(-8).map(t => ({
+      sequence: t.sequence,
+      freq: t.freq,
+      lp0: Number(t.leftPreview[0]?.toFixed?.(6) ?? t.leftPreview[0]),
+    }));
+    throw new Error(
+      `Feedback recurrence sample out of band [0.25, 0.35]: ` +
+      `leftPreview[0]=${telemetry.leftPreview[0]} at sequence=${telemetry.sequence}, ` +
+      `attempts=${attempts}, recent=${JSON.stringify(recent)}`,
+    );
+  }
 
   expect(telemetry.freq).toBeCloseTo(0, 9);
   expect(telemetry.leftPreview[0]).toBeGreaterThan(0.25);
