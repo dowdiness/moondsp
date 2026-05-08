@@ -251,7 +251,7 @@ fn Parser::parse_method(
       self.expect_char(',')
       self.skip_whitespace()
       let f_name = self.read_ident()
-      let f = self.parse_every_callback(method_start, f_name)
+      let f = self.parse_callback(method_start, f_name, calling_method="every")
       self.skip_whitespace()
       self.expect_char(')')
       let n = require_integer(n_dbl, method_start, "every() first argument")
@@ -284,36 +284,41 @@ fn require_integer(
 }
 
 ///|
+/// Callback grammar shared between `.every(n, f)` and `.jux(f)`.
 /// Type alias avoids parsing ambiguity between the outer fn's
 /// `raise ParseError` effect and the returned function type.
-type EveryCallback = (@pattern.Pat[@pattern.ControlMap]) -> @pattern.Pat[
+type Callback = (@pattern.Pat[@pattern.ControlMap]) -> @pattern.Pat[
   @pattern.ControlMap,
 ]
 
 ///|
-fn make_every_fast(factor : @pattern.Rational) -> EveryCallback {
+fn make_fast(factor : @pattern.Rational) -> Callback {
   fn(p) { p.fast(factor) }
 }
 
 ///|
-fn make_every_slow(factor : @pattern.Rational) -> EveryCallback {
+fn make_slow(factor : @pattern.Rational) -> Callback {
   fn(p) { p.slow(factor) }
 }
 
 ///|
-fn make_every_rev() -> EveryCallback {
+fn make_rev() -> Callback {
   fn(p) { p.rev() }
 }
 
 ///|
-/// Parse the second argument to `.every(n, f)`. Supported forms:
-///   fast(N) | slow(N) | rev — a fixed grammar rather than a general
-///   function literal, since mini is primarily a string DSL.
-fn Parser::parse_every_callback(
+/// Parse the callback argument for `.every(n, f)` or `.jux(f)`.
+/// Supported forms: `fast(N)` | `slow(N)` | `rev` | `rev()`.
+///
+/// `calling_method` is the user-visible method name (`"every"` or
+/// `"jux"`) used in error messages — keeps the parse error specific
+/// to whichever method the user actually wrote.
+fn Parser::parse_callback(
   self : Parser,
   method_start : Int,
   name : String,
-) -> EveryCallback raise ParseError {
+  calling_method~ : String,
+) -> Callback raise ParseError {
   match name {
     "fast" => {
       self.expect_char('(')
@@ -321,13 +326,17 @@ fn Parser::parse_every_callback(
       let k_dbl = self.read_number()
       self.skip_whitespace()
       self.expect_char(')')
-      let k = require_integer(k_dbl, method_start, "every(fast(k))")
+      let k = require_integer(
+        k_dbl,
+        method_start,
+        "\{calling_method}(fast(k))",
+      )
       guard k > 0 else {
         raise ParseError(
-          "position \{method_start}: every(fast(k)) requires a positive integer, got \{k}",
+          "position \{method_start}: \{calling_method}(fast(k)) requires a positive integer, got \{k}",
         )
       }
-      make_every_fast(@pattern.Rational::from_int(k))
+      make_fast(@pattern.Rational::from_int(k))
     }
     "slow" => {
       self.expect_char('(')
@@ -335,13 +344,17 @@ fn Parser::parse_every_callback(
       let k_dbl = self.read_number()
       self.skip_whitespace()
       self.expect_char(')')
-      let k = require_integer(k_dbl, method_start, "every(slow(k))")
+      let k = require_integer(
+        k_dbl,
+        method_start,
+        "\{calling_method}(slow(k))",
+      )
       guard k > 0 else {
         raise ParseError(
-          "position \{method_start}: every(slow(k)) requires a positive integer, got \{k}",
+          "position \{method_start}: \{calling_method}(slow(k)) requires a positive integer, got \{k}",
         )
       }
-      make_every_slow(@pattern.Rational::from_int(k))
+      make_slow(@pattern.Rational::from_int(k))
     }
     "rev" => {
       // Accept both `rev` and `rev()` as the callback form.
@@ -349,11 +362,11 @@ fn Parser::parse_every_callback(
         self.expect_char('(')
         self.expect_char(')')
       }
-      make_every_rev()
+      make_rev()
     }
     _ =>
       raise ParseError(
-        "position \{method_start}: every() callback must be fast(N), slow(N), or rev; got '\{name}'",
+        "position \{method_start}: \{calling_method}() callback must be fast(N), slow(N), or rev; got '\{name}'",
       )
   }
 }
