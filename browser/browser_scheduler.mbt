@@ -147,7 +147,12 @@ fn make_drum_pool(
   ctx : @moondsp.DspContext,
   block_size : Int,
 ) -> SoundPool? {
-  match @moondsp.VoicePool::new(template, ctx, max_voices=4) {
+  // 8 voices = defensive headroom for .jux(f) patterns where f causes
+  // same-sound overlap (e.g. the demo's hh*16? layer puts left's hh at
+  // slot t and right's hh at slot 1-t — frequent coincidence at fine
+  // subdivisions). Multi-sound patterns like s("bd sd hh sd").jux(rev)
+  // do NOT need this headroom because per-pool pressure stays at 1.
+  match @moondsp.VoicePool::new(template, ctx, max_voices=8) {
     None => None
     Some(pool) => {
       let bindings_result = @moondsp.ControlBindingBuilder::new().build(
@@ -177,7 +182,8 @@ fn make_drum_pool(
 /// Create a SoundPool for the synth template (with note->freq binding).
 fn make_synth_pool(ctx : @moondsp.DspContext, block_size : Int) -> SoundPool? {
   let template = synth_template()
-  match @moondsp.VoicePool::new(template, ctx, max_voices=8) {
+  // See make_drum_pool for the .jux headroom rationale.
+  match @moondsp.VoicePool::new(template, ctx, max_voices=16) {
     None => None
     Some(pool) => {
       let bindings_result = @moondsp.ControlBindingBuilder::new()

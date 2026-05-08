@@ -284,6 +284,19 @@ test "process_block: stolen voice gate-off is harmless" {
 }
 
 ///|
+/// Sum of absolute sample values across an `AudioBuffer`. Used to
+/// detect whether a buffer carries any signal vs is silent.
+fn buffer_abs_sum(buf : @moondsp.AudioBuffer) -> Double {
+  let arr = buf.as_fixed_array()
+  let mut total = 0.0
+  for i in 0..<arr.length() {
+    let v = arr[i]
+    total = total + (if v < 0.0 { -v } else { v })
+  }
+  total
+}
+
+///|
 test "process_block silence produces zero output" {
   let (pool, sched, left, right) = make_test_sched()
   let pat : @pattern.Pat[@pattern.ControlMap] = @pattern.Pat::silence()
@@ -312,6 +325,37 @@ test "process_block note pattern produces non-zero output" {
     }
   }
   inspect(has_nonzero, content="true")
+}
+
+///|
+test "process_block: pan=-1 routes signal to left buffer only" {
+  let (pool, sched, left, right) = make_test_sched()
+  let pat = @pattern.merge_control(@pattern.note(60.0), @pattern.s_pan(-1.0))
+  // Run 4 blocks so the ADSR attack accumulates audible energy; matches
+  // the existing `process_block: produces non-zero output` test shape.
+  for _i = 0; _i < 4; _i = _i + 1 {
+    sched.process_block(pat, pool, left, right)
+  }
+  let left_energy = buffer_abs_sum(left)
+  let right_energy = buffer_abs_sum(right)
+  // Strict assertion is on the silent side: pan_right_gain is exactly 0
+  // for pan=-1, so right_energy is exactly 0 regardless of envelope phase.
+  assert_eq(right_energy, 0.0)
+  // Loose assertion on the active side: any non-zero proves routing fired.
+  assert_true(left_energy > 0.0)
+}
+
+///|
+test "process_block: pan=+1 routes signal to right buffer only" {
+  let (pool, sched, left, right) = make_test_sched()
+  let pat = @pattern.merge_control(@pattern.note(60.0), @pattern.s_pan(1.0))
+  for _i = 0; _i < 4; _i = _i + 1 {
+    sched.process_block(pat, pool, left, right)
+  }
+  let left_energy = buffer_abs_sum(left)
+  let right_energy = buffer_abs_sum(right)
+  assert_eq(left_energy, 0.0)
+  assert_true(right_energy > 0.0)
 }
 
 ///|

@@ -99,6 +99,27 @@ pub fn s_pan(p : Double) -> Pat[ControlMap] {
 }
 
 ///|
+/// Strudel-style stereo split. Plays `self` panned hard left and
+/// `f(self)` panned hard right, both stacked. Pre-existing `pan`
+/// values on the input are overridden by the ±1 outer pan (Strudel-
+/// correct: `jux` sets pan unconditionally).
+///
+/// Doubles per-pool concurrency only when `f` causes same-sound
+/// coincidence (e.g. `fast(2)` packs the right channel denser, or
+/// `rev` over a single-sound layer like `hh*16` puts left's hh at
+/// slot t and right's hh at slot 1-t). For sparse multi-sound
+/// patterns like `s("bd sd hh sd").jux(rev)` the per-pool pressure
+/// stays at 1.
+pub fn Pat::jux(
+  self : Pat[ControlMap],
+  f : (Pat[ControlMap]) -> Pat[ControlMap],
+) -> Pat[ControlMap] {
+  let left = merge_control(self, s_pan(-1.0))
+  let right = merge_control(f(self), s_pan(1.0))
+  stack([left, right])
+}
+
+///|
 fn merge_maps(a : ControlMap, b : ControlMap) -> ControlMap {
   let result : Map[String, Double] = {}
   a.0.each(fn(k, v) { result[k] = v })
