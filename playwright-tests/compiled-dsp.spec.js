@@ -111,41 +111,55 @@ async function startAudio(page, path) {
 test('browser demo first render proves CompiledStereoDsp feedback recurrence', async ({ page }) => {
   await startAudio(page, '/?freq=0&delaySamples=0');
   await expect(page.locator('#status')).toContainText('CompiledStereoDsp block runtime');
-  // Pin to sequence=2 (first post-warmup telemetry block, emitted on block 18
-  // — block 1 emits sequence=1, blocks 2–17 are warmup-skipped, block 18
-  // emits sequence=2, ~48 ms after start).
-  //
-  // The previous `find(t => t.freq === 0 && t.leftPreview[0] > 0.001)` filter
-  // implicitly depended on a postMessage race: sequence=1 is emitted right
-  // after the first audio block, and its leftPreview[0] can be either ~0.0025
-  // (ramp block — set-freq=0 arrived mid-block) or near the feedback
-  // steady-state plateau. Whichever block `find()` matched determined whether
-  // leftPreview[0] fell below the 0.3 * PAN_CENTER_GAIN upper bound — that's
-  // the retry-masked flake this fix eliminates.
-  //
-  // By sequence=2, set-freq=0 has always propagated and the `mix(3,5)` +
-  // `gain(0.3)` z^-1 feedback loop has reached its bit-exact steady-state
-  // plateau: with freq=0 the oscillator drops out, so the loop solves
+  // The `mix(3,5)` + `gain(0.3)` z^-1 feedback loop, with freq=0 the
+  // oscillator drops out, so the loop solves
   //   x = 1.0 + 0.3 * x  →  x = 1/0.7 ≈ 1.4286
   //   post-gain: 0.3 * 1.4286 ≈ 0.4286
   //   post-pan-center: 0.4286 * (1/√2) ≈ 0.30305
-  // If the feedback loop were broken the feed-forward path alone would
-  // settle at 0.3 * (1/√2) ≈ 0.2121, so the `> 0.25` lower bound below is
-  // the discriminator that actually proves recurrence.
+  // The feed-forward path alone settles at 0.3 * (1/√2) ≈ 0.2121.
+  // Lower bound 0.25 > 0.2121 is the discriminator that proves recurrence;
+  // upper bound 0.35 > 0.30305 plateau ensures the loop is bounded (feedback
+  // gain < 1), not runaway.
+  //
+  // Wait for sequences ≥ 8 (block 82 ≈ 218ms) before sampling. Earlier
+  // attempts pinned to sequence=2 (~48ms) and sequence ≥ 2 with a band
+  // filter, both retry-masked-flaky on CI: Chrome's first-run worklet
+  // warmup occasionally leaves the feedback loop still not at the
+  // plateau even at sequence=2–4. By sequence=8 we're well past any
+  // plausible startup transient (the recurrence converges at 0.3 per
+  // sample → 99% decay in ~30 samples → settled within 1 block, but
+  // wasm/JIT warmup can stretch effective settling further).
+  let telemetry;
+  let attempts = 0;
   await expect
     .poll(async () => {
+      attempts += 1;
       const history = await telemetryHistory(page);
-      if (!history || history.length === 0) return null;
-      return history.find(t => t.sequence === 2 && t.freq === 0) || null;
+      if (!history) return null;
+      const match = history.find(t => t.sequence >= 8 && t.freq === 0);
+      if (match) telemetry = match;
+      return match || null;
     }, { timeout: 10_000 })
     .toBeTruthy();
-  const history = await telemetryHistory(page);
-  const telemetry = history.find(t => t.sequence === 2 && t.freq === 0);
+
+  // Diagnostic on out-of-band: surface recent telemetry so a real
+  // regression (feedback loop broken) is distinguishable from the
+  // CI worklet-warmup flake we just stretched past.
+  if (telemetry.leftPreview[0] <= 0.25 || telemetry.leftPreview[0] >= 0.35) {
+    const history = await telemetryHistory(page);
+    const recent = history.slice(-8).map(t => ({
+      sequence: t.sequence,
+      freq: t.freq,
+      lp0: Number(t.leftPreview[0]?.toFixed?.(6) ?? t.leftPreview[0]),
+    }));
+    throw new Error(
+      `Feedback recurrence sample out of band [0.25, 0.35]: ` +
+      `leftPreview[0]=${telemetry.leftPreview[0]} at sequence=${telemetry.sequence}, ` +
+      `attempts=${attempts}, recent=${JSON.stringify(recent)}`,
+    );
+  }
 
   expect(telemetry.freq).toBeCloseTo(0, 9);
-  // Lower bound 0.25 > 0.2121 feed-forward-only value: must have feedback.
-  // Upper bound 0.35 > 0.30305 plateau: ensures the loop is bounded (feedback
-  // gain < 1), not runaway.
   expect(telemetry.leftPreview[0]).toBeGreaterThan(0.25);
   expect(telemetry.leftPreview[0]).toBeLessThan(0.35);
   expect(telemetry.rightPreview[0]).toBeCloseTo(telemetry.leftPreview[0], 9);
