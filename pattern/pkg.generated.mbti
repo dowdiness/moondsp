@@ -30,8 +30,6 @@ pub fn[A] stack(Array[Pat[A]]) -> Pat[A]
 
 // Types and methods
 pub struct ControlMap(Map[String, Double]) derive(@debug.Debug)
-#deprecated
-pub fn ControlMap::inner(Self) -> Map[String, Double]
 pub impl Show for ControlMap
 
 pub struct Event[A] {

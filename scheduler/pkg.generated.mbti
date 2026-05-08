@@ -23,9 +23,8 @@ type ActiveNote
 pub struct ControlMapper {
   transform : (String, Double) -> (String, Double)?
   voice_action : (String, Double) -> VoiceAction?
-
-  fn new(transform~ : (String, Double) -> (String, Double)?, voice_action~ : (String, Double) -> VoiceAction?) -> ControlMapper
 }
+pub fn ControlMapper::ControlMapper(transform~ : (String, Double) -> (String, Double)?, voice_action~ : (String, Double) -> VoiceAction?) -> Self
 pub fn ControlMapper::new(transform~ : (String, Double) -> (String, Double)?, voice_action~ : (String, Double) -> VoiceAction?) -> Self
 
 pub struct PatternScheduler {
@@ -35,9 +34,8 @@ pub struct PatternScheduler {
   active_notes : Array[ActiveNote]
   bindings : @graph.ControlBindingMap
   mapper : ControlMapper
-
-  fn new(bpm~ : Double, bindings~ : @graph.ControlBindingMap, ctx~ : @dsp.DspContext, mapper? : ControlMapper) -> PatternScheduler
 }
+pub fn PatternScheduler::PatternScheduler(bpm~ : Double, bindings~ : @graph.ControlBindingMap, ctx~ : @dsp.DspContext, mapper? : ControlMapper) -> Self
 pub fn PatternScheduler::active_note_count(Self) -> Int
 pub fn PatternScheduler::expire_notes(Self, @voice.VoicePool, @pattern.TimeSpan) -> Unit
 pub fn PatternScheduler::new(bpm~ : Double, bindings~ : @graph.ControlBindingMap, ctx~ : @dsp.DspContext, mapper? : ControlMapper) -> Self
