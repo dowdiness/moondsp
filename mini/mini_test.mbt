@@ -220,6 +220,71 @@ test "parse euclid unclosed paren returns error" {
 }
 
 ///|
+test "parse step replicate bd*4 in single-element layer" {
+  let pat = unwrap_ok(@mini.parse("s(\"bd*4\")"))
+  let events = query_one_cycle(pat)
+  // Single slot, replicated 4× via fast(4) → 4 events
+  inspect(events.length(), content="4")
+}
+
+///|
+test "parse step replicate within sequence" {
+  let pat = unwrap_ok(@mini.parse("s(\"bd sd*3\")"))
+  let events = query_one_cycle(pat)
+  // bd takes first half (1 event), sd*3 takes second half (3 events) = 4
+  inspect(events.length(), content="4")
+}
+
+///|
+test "parse step slow bd/2 in single-element layer" {
+  let pat = unwrap_ok(@mini.parse("s(\"bd/2\")"))
+  let events = query_one_cycle(pat)
+  // slow(2) on a single-cycle pure event: querying [0,1) sees one event
+  inspect(events.length(), content="1")
+}
+
+///|
+test "parse step ops compose with euclid: bd*2(3,8)" {
+  let pat = unwrap_ok(@mini.parse("s(\"bd*2(3,8)\")"))
+  let events = query_one_cycle(pat)
+  // bd*2 fires 2 events per slot, distributed via euclid (3,8) over 8 slots
+  // 3 active slots × 2 events each = 6
+  inspect(events.length(), content="6")
+}
+
+///|
+test "parse step replicate on group [bd sd]*2" {
+  let pat = unwrap_ok(@mini.parse("s(\"[bd sd]*2\")"))
+  let events = query_one_cycle(pat)
+  // Group plays 2× via fast(2) → 2 × 2 = 4 events
+  inspect(events.length(), content="4")
+}
+
+///|
+test "parse step replicate with zero returns error" {
+  match @mini.parse("s(\"bd*0\")") {
+    Err(_) => () // expected
+    Ok(_) => fail("expected Err for bd*0")
+  }
+}
+
+///|
+test "parse step slow with zero returns error" {
+  match @mini.parse("s(\"bd/0\")") {
+    Err(_) => () // expected
+    Ok(_) => fail("expected Err for bd/0")
+  }
+}
+
+///|
+test "parse step replicate missing number returns error" {
+  match @mini.parse("s(\"bd*\")") {
+    Err(_) => () // expected
+    Ok(_) => fail("expected Err for bd*")
+  }
+}
+
+///|
 test "parse with rev method" {
   let pat = unwrap_ok(@mini.parse("s(\"bd sd hh\").rev()"))
   let events = query_one_cycle(pat)

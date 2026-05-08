@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const INITIAL_PATTERN = `s("bd(3,8), hh(7,8), sd(2,8,2)")`;
+const INITIAL_PATTERN = `s("bd(3,8), hh*8, sd(2,8,2)")`;
 
 test.describe("UI smoke (no audio)", () => {
   test.beforeEach(async ({ page }) => {
