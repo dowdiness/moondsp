@@ -4,6 +4,11 @@
 **Phase:** Phase B — Strudel mini-notation extensions (the deferred
 companion to PRs #15–#17)
 
+**Prerequisite:** PR #17 must be merged first. This spec relies on the
+shared `Callback` grammar (renamed from PR #17's `EveryCallback`) which
+does not exist on `main` today. Implementation order is hard:
+land #15 → #16 → #17 → this work.
+
 ## Goal
 
 Add a `.jux(f)` combinator to the moondsp pattern language so users can
@@ -103,8 +108,12 @@ All in MoonBit (`pattern/control_test.mbt` and `mini/mini_test.mbt`):
 
 1. **`jux(rev)` event count and pan keys** — `s("bd sd").jux(rev)`
    produces 4 events; assert two have `pan=-1`, two have `pan=1`.
-2. **Right channel timing is `f`-applied** — for `jux(rev)`, the `pan=1`
-   events have parts mirrored relative to the `pan=-1` events.
+2. **Channel identity** — for `jux(rev)`, the `pan=-1` events match
+   `self.query(arc)` exactly (same parts, same non-pan keys), and the
+   `pan=1` events match `f(self).query(arc)` exactly. This pins the
+   convention down to "left=original, right=f(original)" and rejects
+   a channel-swapped implementation that would still pass a weaker
+   "the two sides differ" assertion.
 3. **`jux` overrides pre-existing pan** — `merge_control(pat,
    pure(pan=0.5)).jux(rev)` still produces only ±1 pan values.
 4. **`jux(fast(2))` doubles the right channel** — 2-event input → 6
@@ -114,6 +123,11 @@ All in MoonBit (`pattern/control_test.mbt` and `mini/mini_test.mbt`):
    `ParseError`.
 7. **Parser smoke: `note("60 64").jux(rev)` parses** (covers non-`s`
    primary).
+8. **Scheduler-level stereo proof** (in `scheduler/scheduler_test.mbt`)
+   — schedule two simultaneous events with opposite pans and assert
+   the resulting voice slots have asymmetric `pan_left_gain` /
+   `pan_right_gain`. The existing scheduler pan test only verifies a
+   voice was created; this one proves stereo routing actually flips.
 
 ## Out of scope
 
@@ -130,10 +144,21 @@ All in MoonBit (`pattern/control_test.mbt` and `mini/mini_test.mbt`):
 - **Pan override semantics surprise:** users who set `.pan(0.5)` then
   `.jux(rev)` lose the 0.5 — this is Strudel-correct but worth one
   test (item 3 above) so the contract is locked in.
-- **Voice pool capacity:** `.jux` doubles the simultaneous event count.
-  An 8-voice pool that comfortably ran a single pattern will steal
-  voices under `.jux`. Not a bug in `.jux` itself — but a user-visible
-  change. Document in the docstring; no code response.
+- **Voice pool capacity (sharper than I first thought):** `.jux`
+  doubles the simultaneous event count *within the same per-sound
+  pool*. The browser demo today configures only 4 voices for the drum
+  pool and 8 for the synth pool (`browser/browser_scheduler.mbt`), and
+  the steal policy is "oldest active note" — which under `.jux` can
+  cut the left or right sibling of a stereo pair rather than an older
+  unrelated note. Audible result: collapsed stereo on dense passages,
+  not a graceful fade.
+  Mitigation **in this PR**: bump the browser demo's drum pool to 8
+  and synth pool to 16 alongside the `.jux` rollout. Document the
+  doubling in the `Pat::jux` docstring. Per-channel routing is *not*
+  the right response — the issue is pool-size headroom, not topology.
+  Out of this PR: a future `voice/voice.mbt` change to stabilise
+  equal-onset stealing (so siblings of a `.jux` pair survive together)
+  is a separate cleanup if the doubled headroom proves insufficient.
 - **Parser callback grammar drift:** sharing `parse_callback` between
   `.every` and `.jux` means any future extension (e.g. accepting
   `degradeBy(p)` as a callback) automatically applies to both. That's
@@ -142,10 +167,16 @@ All in MoonBit (`pattern/control_test.mbt` and `mini/mini_test.mbt`):
 
 ## Acceptance criteria
 
-- All seven new tests pass; total test count rises by 7.
+- All eight new tests pass; total test count rises by 8.
 - `moon check && moon test` clean.
-- `mini/pkg.generated.mbti` shows the new `Pat::jux` export and no
-  unrelated drift.
+- `pattern/pkg.generated.mbti` shows the new `Pat::jux` export. (The
+  combinator lives in the `pattern` package, not `mini` — the parser
+  only adds a method-arm that calls it. The root `dowdiness/moondsp`
+  facade does not re-export `pattern` APIs today, so no facade change
+  is needed.)
+- Browser demo pool sizes bumped — `browser/browser_scheduler.mbt`
+  drum pool 4→8 and synth pool 8→16, plus a brief note in the
+  module-level comment explaining the headroom is for `.jux`.
 - Live demo loads with the new pattern and produces audible stereo
   separation (left = original, right = reversed) when verified manually
   in browser.
