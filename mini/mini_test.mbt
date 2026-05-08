@@ -419,3 +419,33 @@ test "parse with rev method" {
     ),
   )
 }
+
+///|
+test "parse jux(rev) produces 4 events from 2-element pattern" {
+  let pat = unwrap_ok(@mini.parse("s(\"bd sd\").jux(rev)"))
+  let events = query_one_cycle(pat)
+  // 2 events left + 2 events right = 4
+  inspect(events.length(), content="4")
+}
+
+///|
+test "parse jux(weird) errors with jux() in the message" {
+  match @mini.parse("s(\"bd\").jux(weird)") {
+    Err(msg) => {
+      // Lock in error-message threading: must say jux(), not every()
+      let has_jux = msg.contains("jux()")
+      let has_every = msg.contains("every()")
+      assert_true(has_jux)
+      assert_true(!has_every)
+    }
+    Ok(_) => fail("expected Err for jux(weird)")
+  }
+}
+
+///|
+test "parse note(60 64).jux(rev) parses (non-s primary)" {
+  let pat = unwrap_ok(@mini.parse("note(\"60 64\").jux(rev)"))
+  let events = query_one_cycle(pat)
+  // 2 events left + 2 events right = 4
+  inspect(events.length(), content="4")
+}

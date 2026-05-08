@@ -6,8 +6,9 @@
 ///   primary  = "s(" string ")" | "note(" string ")"
 ///   method   = "fast(" number ")" | "slow(" number ")" | "rev()"
 ///            | "degradeBy(" number ")"
-///            | "every(" int "," every-callback ")"
-/// every-callback = "fast(" int ")" | "slow(" int ")" | "rev" "()"?
+///            | "every(" int "," callback ")"
+///            | "jux(" callback ")"
+/// callback = "fast(" int ")" | "slow(" int ")" | "rev" "()"?
 ///   string   = '"' notation '"'
 ///   notation = layer ( "," layer )*
 ///   layer    = element+
@@ -262,6 +263,15 @@ fn Parser::parse_method(
       }
       @pattern.every(n, f, pat)
     }
+    "jux" => {
+      self.expect_char('(')
+      self.skip_whitespace()
+      let f_name = self.read_ident()
+      let f = self.parse_callback(method_start, f_name, calling_method="jux")
+      self.skip_whitespace()
+      self.expect_char(')')
+      pat.jux(f)
+    }
     _ => raise ParseError("position \{method_start}: unknown method '\{name}'")
   }
 }
@@ -326,11 +336,7 @@ fn Parser::parse_callback(
       let k_dbl = self.read_number()
       self.skip_whitespace()
       self.expect_char(')')
-      let k = require_integer(
-        k_dbl,
-        method_start,
-        "\{calling_method}(fast(k))",
-      )
+      let k = require_integer(k_dbl, method_start, "\{calling_method}(fast(k))")
       guard k > 0 else {
         raise ParseError(
           "position \{method_start}: \{calling_method}(fast(k)) requires a positive integer, got \{k}",
@@ -344,11 +350,7 @@ fn Parser::parse_callback(
       let k_dbl = self.read_number()
       self.skip_whitespace()
       self.expect_char(')')
-      let k = require_integer(
-        k_dbl,
-        method_start,
-        "\{calling_method}(slow(k))",
-      )
+      let k = require_integer(k_dbl, method_start, "\{calling_method}(slow(k))")
       guard k > 0 else {
         raise ParseError(
           "position \{method_start}: \{calling_method}(slow(k)) requires a positive integer, got \{k}",
