@@ -14,8 +14,8 @@ export type AudioStatus =
   | { kind: "error"; message: string };
 
 export type WorkletReply =
-  | { type: "pattern-updated" }
-  | { type: "pattern-error"; message: string }
+  | { type: "pattern-updated"; revision?: number }
+  | { type: "pattern-error"; message: string; revision?: number }
   | { type: "error"; message: string }
   | { type: string; [key: string]: unknown };
 
@@ -126,13 +126,34 @@ export class AudioEngine {
     if (!data || typeof data !== "object") return;
     for (const h of this.replyHandlers) h(data);
     if (data.type === "error") {
+      // Tear down the live audio graph so a Retry click rebuilds a fresh
+      // context. Without this we'd leak the old AudioContext and stack a
+      // second one on top of it.
+      this.teardownGraph();
       this.setStatus({ kind: "error", message: String(data.message ?? "worklet error") });
     }
   }
 
-  setPatternText(text: string): void {
+  private teardownGraph(): void {
+    if (this.node) {
+      try {
+        this.node.disconnect();
+      } catch {
+        /* already disconnected */
+      }
+      this.node = null;
+    }
+    if (this.ctx) {
+      // Fire-and-forget; close() returns a Promise but we don't need to await
+      // it for the host to begin a fresh start().
+      void this.ctx.close().catch(() => undefined);
+      this.ctx = null;
+    }
+  }
+
+  setPatternText(text: string, revision?: number): void {
     if (!this.node) return;
-    this.node.port.postMessage({ type: "set-pattern-text", text });
+    this.node.port.postMessage({ type: "set-pattern-text", text, revision });
   }
 
   setBpm(bpm: number): void {
@@ -147,11 +168,19 @@ export class AudioEngine {
 
   async stop(): Promise<void> {
     if (this.node) {
-      this.node.disconnect();
+      try {
+        this.node.disconnect();
+      } catch {
+        /* already disconnected */
+      }
       this.node = null;
     }
     if (this.ctx) {
-      await this.ctx.close();
+      try {
+        await this.ctx.close();
+      } catch {
+        /* already closed */
+      }
       this.ctx = null;
     }
     this.setStatus({ kind: "idle" });

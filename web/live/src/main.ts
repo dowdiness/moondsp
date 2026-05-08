@@ -62,6 +62,14 @@ const engine = new AudioEngine();
 let lastGood = "";
 let pending: number | null = null;
 
+// Revision tagging guards diagnostic application against stale worklet
+// replies: if the user has typed since we sent text v=N, the v=N reply
+// is silently discarded so we don't paint a squiggle at positions that
+// no longer line up with the current document.
+let revCounter = 0;
+let latestSentRev = 0;
+let latestSentText = "";
+
 function setLog(message: string, kind: "ok" | "error" | "info" = "info"): void {
   logEl.textContent = message;
   logEl.classList.toggle("error", kind === "error");
@@ -93,6 +101,15 @@ function applyStatus(s: AudioStatus): void {
       startBtn.disabled = false;
       startBtn.textContent = "Retry";
       startBtn.dataset.action = "start";
+      // Engine torn itself down — drop any in-flight debounce and reset
+      // last-good so Retry will re-send the current document.
+      if (pending !== null) {
+        window.clearTimeout(pending);
+        pending = null;
+      }
+      lastGood = "";
+      latestSentText = "";
+      adapter.applyPatches([{ type: "SetDiagnostics", diagnostics: [] }]);
       break;
   }
 }
@@ -114,6 +131,17 @@ function diagnosticFromError(raw: string, docLength: number): Diagnostic {
 }
 
 engine.onReply((reply: WorkletReply) => {
+  if (reply.type === "pattern-updated" || reply.type === "pattern-error") {
+    // Drop replies for older submissions — a newer eval is in flight
+    // (or already landed) and its reply will carry the right state.
+    const rev = typeof reply.revision === "number" ? reply.revision : undefined;
+    if (rev !== undefined && rev !== latestSentRev) return;
+    // Drop replies whose submitted text no longer matches the current
+    // document. The user typed during the in-flight eval; the next
+    // debounced send will produce a reply that does match.
+    if (latestSentText !== view.state.doc.toString()) return;
+  }
+
   if (reply.type === "pattern-updated") {
     setLog(`✓ pattern updated`, "ok");
     adapter.applyPatches([{ type: "SetDiagnostics", diagnostics: [] }]);
@@ -129,9 +157,10 @@ engine.onReply((reply: WorkletReply) => {
 function evalNow(text: string): void {
   if (engine.getStatus().kind !== "running") return;
   if (text === lastGood) return;
-  // Optimistic: update lastGood only after the worklet confirms,
-  // but track the most recent submitted text so we don't double-send.
-  engine.setPatternText(text);
+  const rev = ++revCounter;
+  latestSentRev = rev;
+  latestSentText = text;
+  engine.setPatternText(text, rev);
   lastGood = text; // worklet keeps last graph on error, so this is safe
 }
 
@@ -161,6 +190,7 @@ startBtn.addEventListener("click", async () => {
         pending = null;
       }
       lastGood = "";
+      latestSentText = "";
       setLog("stopped", "info");
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
