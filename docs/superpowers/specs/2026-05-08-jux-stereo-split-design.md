@@ -4,10 +4,11 @@
 **Phase:** Phase B — Strudel mini-notation extensions (the deferred
 companion to PRs #15–#17)
 
-**Prerequisite:** PR #17 must be merged first. This spec relies on the
-shared `Callback` grammar (renamed from PR #17's `EveryCallback`) which
-does not exist on `main` today. Implementation order is hard:
-land #15 → #16 → #17 → this work.
+**Prerequisite (resolved 2026-05-08):** PRs #15, #18 (replaced #16),
+and #17 are now merged on `main`. The shared `Callback` grammar this
+spec relies on is the rename of PR #17's `EveryCallback` /
+`parse_every_callback` / `make_every_*` symbols. Implementation can
+proceed directly.
 
 ## Goal
 
@@ -71,17 +72,37 @@ parse_every_callback :: Parser × method_start × name → EveryCallback
 
 with arms for `fast(N) | slow(N) | rev[()]`.
 
-Rename to `Callback` / `parse_callback` so the same grammar is shared
-between `.every` and `.jux`. Add a `"jux"` arm in `parse_method`:
+Rename to `Callback` / `parse_callback` / `make_*` so the same grammar
+is shared between `.every` and `.jux`. Add a `"jux"` arm in
+`parse_method`:
 
 ```
 "jux" => {
-  expect '(' ; let f = parse_callback(...) ; expect ')'
+  expect '(' ; skip_ws ; let name = read_ident()
+  let f = self.parse_callback(method_start, name, calling_method="jux")
+  skip_ws ; expect ')'
   pat.jux(f)
 }
 ```
 
-No new tokens, no new grammar — just a second consumer of the existing
+**Error-message threading:** PR #17's callback error reads
+`"position N: every() callback must be fast(N), slow(N), or rev; got 'X'"`.
+After sharing between `.every` and `.jux`, the literal `every()` is
+wrong for `.jux(weird)`. Thread the caller's method name through:
+
+```moonbit
+fn parse_callback(
+  self, method_start, name,
+  calling_method~ : String,
+) -> Callback raise ParseError
+```
+
+Both call sites pass `"every"` or `"jux"`; the error string interpolates
+that name. This is the load-bearing nuance of the rename — easy to
+miss, and parser test #6 should assert the error mentions `jux()` so
+the regression is locked in.
+
+No new tokens, no new grammar — just a second consumer of the shared
 `Callback` parser. Grammar comment updates accordingly.
 
 ### Mini-notation surface
@@ -119,15 +140,29 @@ All in MoonBit (`pattern/control_test.mbt` and `mini/mini_test.mbt`):
 4. **`jux(fast(2))` doubles the right channel** — 2-event input → 6
    events out (2 left + 4 right).
 5. **Parser: `s("bd sd").jux(rev)` parses, event count 4.**
-6. **Parser: `s("bd").jux(weird)` errors** with a callback-name
-   `ParseError`.
+6. **Parser: `s("bd").jux(weird)` errors** with a `ParseError` whose
+   message contains `"jux()"` (not `"every()"`) — locks in the
+   error-message threading from the parser section above.
 7. **Parser smoke: `note("60 64").jux(rev)` parses** (covers non-`s`
    primary).
 8. **Scheduler-level stereo proof** (in `scheduler/scheduler_test.mbt`)
-   — schedule two simultaneous events with opposite pans and assert
-   the resulting voice slots have asymmetric `pan_left_gain` /
-   `pan_right_gain`. The existing scheduler pan test only verifies a
-   voice was created; this one proves stereo routing actually flips.
+   — uses `make_test_sched()` which already returns left/right
+   `AudioBuffer`s. Schedule a single event with `pan=-1` (hard left),
+   call `sched.process_block(...)`, then assert
+   `sum(|left.as_fixed_array()|) > epsilon` and
+   `sum(|right.as_fixed_array()|) < epsilon`.
+   Mirror with a second test for `pan=+1`. This proves stereo routing
+   actually flips end-to-end without exposing the private
+   `pan_left_gain` / `pan_right_gain` fields on `priv struct VoiceSlot`.
+   The existing scheduler pan test only proves a voice was *created*.
+
+   **Why not "two simultaneous opposite-pan events":** if both fire
+   the same DSP template, left and right buffers end up with identical
+   magnitudes (each carries one event's signal), defeating the
+   asymmetry assertion. The single-event-per-test shape is sharper.
+
+   Counts as **two test cases** in the test count below (one per
+   direction) — total new tests is therefore 9, not 8.
 
 ## Out of scope
 
@@ -144,21 +179,31 @@ All in MoonBit (`pattern/control_test.mbt` and `mini/mini_test.mbt`):
 - **Pan override semantics surprise:** users who set `.pan(0.5)` then
   `.jux(rev)` lose the 0.5 — this is Strudel-correct but worth one
   test (item 3 above) so the contract is locked in.
-- **Voice pool capacity (sharper than I first thought):** `.jux`
-  doubles the simultaneous event count *within the same per-sound
-  pool*. The browser demo today configures only 4 voices for the drum
-  pool and 8 for the synth pool (`browser/browser_scheduler.mbt`), and
-  the steal policy is "oldest active note" — which under `.jux` can
-  cut the left or right sibling of a stereo pair rather than an older
-  unrelated note. Audible result: collapsed stereo on dense passages,
-  not a graceful fade.
-  Mitigation **in this PR**: bump the browser demo's drum pool to 8
-  and synth pool to 16 alongside the `.jux` rollout. Document the
-  doubling in the `Pat::jux` docstring. Per-channel routing is *not*
-  the right response — the issue is pool-size headroom, not topology.
-  Out of this PR: a future `voice/voice.mbt` change to stabilise
-  equal-onset stealing (so siblings of a `.jux` pair survive together)
-  is a separate cleanup if the doubled headroom proves insufficient.
+- **Voice pool capacity — situational, not universal:** `.jux` does
+  *not* always double per-pool concurrency. For `.jux(rev)` on a
+  pattern with distinct per-slot sounds (e.g. `s("bd sd hh sd")`),
+  left and right channels fire different sounds at any given instant
+  — bd-pool sees 1 simultaneous event, not 2. The doubling only
+  manifests when `f` causes same-sound coincidence: `.jux(fast(2))`
+  packs the right channel denser, and `.jux(rev)` over a single-sound
+  layer like the demo's `hh*16?` puts left's hh at slot t and right's
+  hh at slot 1−t — frequent coincidence at fine subdivisions.
+  The browser demo today (`browser/browser_scheduler.mbt`) configures
+  three drum pools — `bd`, `sd`, `hh` — each at `max_voices=4`, and
+  one synth pool at `max_voices=8`. The steal policy is "oldest active
+  note", so a saturated pool under `.jux` can cut a `.jux` sibling
+  rather than an unrelated older note. Audible result: collapsed
+  stereo on dense layers, not a graceful fade.
+  Mitigation **in this PR**: bump *all four* pool sizes — bd/sd/hh
+  drum pools each 4→8, synth pool 8→16 — alongside the `.jux` rollout.
+  Frame this in code comments as "defensive headroom for `.jux(f)`
+  patterns where `f` causes same-sound overlap (e.g. the demo's
+  `hh*16?` layer)", *not* as "all `.jux` doubles concurrency".
+  Per-channel routing is *not* the right response — the issue is
+  pool-size headroom, not topology. Out of this PR: a future
+  `voice/voice.mbt` change to stabilise equal-onset stealing (so
+  siblings of a `.jux` pair survive together) is a separate cleanup
+  if the doubled headroom proves insufficient.
 - **Parser callback grammar drift:** sharing `parse_callback` between
   `.every` and `.jux` means any future extension (e.g. accepting
   `degradeBy(p)` as a callback) automatically applies to both. That's
@@ -167,7 +212,8 @@ All in MoonBit (`pattern/control_test.mbt` and `mini/mini_test.mbt`):
 
 ## Acceptance criteria
 
-- All eight new tests pass; total test count rises by 8.
+- All nine new tests pass (test items 1–7, plus item 8's two
+  directional cases); total test count rises by 9.
 - `moon check && moon test` clean.
 - `pattern/pkg.generated.mbti` shows the new `Pat::jux` export. (The
   combinator lives in the `pattern` package, not `mini` — the parser
@@ -175,8 +221,9 @@ All in MoonBit (`pattern/control_test.mbt` and `mini/mini_test.mbt`):
   facade does not re-export `pattern` APIs today, so no facade change
   is needed.)
 - Browser demo pool sizes bumped — `browser/browser_scheduler.mbt`
-  drum pool 4→8 and synth pool 8→16, plus a brief note in the
-  module-level comment explaining the headroom is for `.jux`.
+  bd/sd/hh drum pools each 4→8 and synth pool 8→16, plus a brief
+  note explaining the headroom is defensive for `.jux(f)` patterns
+  with same-sound overlap.
 - Live demo loads with the new pattern and produces audible stereo
   separation (left = original, right = reversed) when verified manually
   in browser.
