@@ -336,6 +336,37 @@ test "degrade_by(0.5) drops some but not all events from 32-event pattern" {
 }
 
 ///|
+test "degrade_by: split-arc query equivalent to single full-arc query" {
+  // Worklet shape: the audio thread queries half-cycles, not full cycles.
+  // Drop decisions must be identical whether we query [0,1) once or
+  // [0,1/2) + [1/2,1). A different keying scheme (e.g. arc-begin based)
+  // would diverge here.
+  let pats : Array[Pat[Int]] = []
+  for i in 0..<8 {
+    pats.push(Pat::pure(i))
+  }
+  let p = sequence(pats).degrade_by(0.5)
+  let full = p.query(span(0, 1, 1, 1))
+  let first_half = p.query(span(0, 1, 1, 2))
+  let second_half = p.query(span(1, 2, 1, 1))
+  inspect(
+    first_half.length() + second_half.length() == full.length(),
+    content="true",
+  )
+  // Values that survived in the full query must also survive in the
+  // corresponding half — pin the union to the full set.
+  let mut idx = 0
+  for ev in first_half {
+    inspect(ev.value == full[idx].value, content="true")
+    idx += 1
+  }
+  for ev in second_half {
+    inspect(ev.value == full[idx].value, content="true")
+    idx += 1
+  }
+}
+
+///|
 test "every(2, rev) on sequence — cycle 0 timing reversed, cycle 1 not" {
   // Pat::rev mirrors event *timing*, not array order. So we check the
   // part.begin of the first array element: under rev cycle 0, the first

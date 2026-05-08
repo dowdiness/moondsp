@@ -363,6 +363,38 @@ test "parse every with non-positive n returns error" {
 }
 
 ///|
+test "parse every with non-integer n returns error (no silent truncation)" {
+  match @mini.parse("s(\"bd sd\").every(2.5, rev)") {
+    Err(_) => () // expected
+    Ok(_) => fail("expected Err for every(2.5, ...)")
+  }
+}
+
+///|
+test "parse every with non-integer callback arg returns error" {
+  match @mini.parse("s(\"bd sd\").every(2, fast(1.5))") {
+    Err(_) => () // expected
+    Ok(_) => fail("expected Err for every(2, fast(1.5))")
+  }
+}
+
+///|
+test "parse chained postfix bd*3*4 stacks replications" {
+  let pat = unwrap_ok(@mini.parse("s(\"bd*3*4\")"))
+  let events = query_one_cycle(pat)
+  // *3 then *4 → fast(3).fast(4) = 12 events in one slot
+  inspect(events.length(), content="12")
+}
+
+///|
+test "parse euclid with negative rotation" {
+  let pat = unwrap_ok(@mini.parse("s(\"bd(3,8,-1)\")"))
+  let events = query_one_cycle(pat)
+  // Negative rotation should still produce 3 pulses (modulo wrap)
+  inspect(events.length(), content="3")
+}
+
+///|
 test "parse with rev method" {
   let pat = unwrap_ok(@mini.parse("s(\"bd sd hh\").rev()"))
   let events = query_one_cycle(pat)

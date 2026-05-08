@@ -254,7 +254,7 @@ fn Parser::parse_method(
       let f = self.parse_every_callback(method_start, f_name)
       self.skip_whitespace()
       self.expect_char(')')
-      let n = n_dbl.to_int()
+      let n = require_integer(n_dbl, method_start, "every() first argument")
       guard n > 0 else {
         raise ParseError(
           "position \{method_start}: every() requires a positive integer, got \{n}",
@@ -264,6 +264,23 @@ fn Parser::parse_method(
     }
     _ => raise ParseError("position \{method_start}: unknown method '\{name}'")
   }
+}
+
+///|
+/// Reject silent integer truncation. `every(2.5, ...)` and
+/// `every(2, fast(1.9))` should raise rather than round to 2/1.
+fn require_integer(
+  value : Double,
+  method_start : Int,
+  label : String,
+) -> Int raise ParseError {
+  let n = value.to_int()
+  if value != n.to_double() {
+    raise ParseError(
+      "position \{method_start}: \{label} requires an integer, got \{value}",
+    )
+  }
+  n
 }
 
 ///|
@@ -301,28 +318,30 @@ fn Parser::parse_every_callback(
     "fast" => {
       self.expect_char('(')
       self.skip_whitespace()
-      let k = self.read_number()
+      let k_dbl = self.read_number()
       self.skip_whitespace()
       self.expect_char(')')
-      guard k > 0.0 else {
+      let k = require_integer(k_dbl, method_start, "every(fast(k))")
+      guard k > 0 else {
         raise ParseError(
-          "position \{method_start}: every(fast(k)) requires a positive number, got \{k}",
+          "position \{method_start}: every(fast(k)) requires a positive integer, got \{k}",
         )
       }
-      make_every_fast(@pattern.Rational::from_int(k.to_int()))
+      make_every_fast(@pattern.Rational::from_int(k))
     }
     "slow" => {
       self.expect_char('(')
       self.skip_whitespace()
-      let k = self.read_number()
+      let k_dbl = self.read_number()
       self.skip_whitespace()
       self.expect_char(')')
-      guard k > 0.0 else {
+      let k = require_integer(k_dbl, method_start, "every(slow(k))")
+      guard k > 0 else {
         raise ParseError(
-          "position \{method_start}: every(slow(k)) requires a positive number, got \{k}",
+          "position \{method_start}: every(slow(k)) requires a positive integer, got \{k}",
         )
       }
-      make_every_slow(@pattern.Rational::from_int(k.to_int()))
+      make_every_slow(@pattern.Rational::from_int(k))
     }
     "rev" => {
       // Accept both `rev` and `rev()` as the callback form.
