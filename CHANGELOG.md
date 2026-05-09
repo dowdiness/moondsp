@@ -5,6 +5,47 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Mini-notation grammar extensions:**
+  - **Top-level `stack(p1, p2, ...)` primitive** (#20) — combine independent
+    patterns at the expression level, including cross-source mixes like
+    `stack(s("bd sd"), note("60 64"))`. Each argument is a full expression,
+    so per-arg method chains and result method chains both work. Closes
+    the gap that previously forced layer-stacking inside a single notation
+    string (which can't mix `s` and `note`).
+  - **Euclidean rhythms** (#15) — `s("bd(3,8)")` and `s("bd(3,8,2)")` for
+    pulses, steps, and rotation.
+  - **Step operators `*n` / `/n`** (#18) — in-slot replication and stretch
+    (`s("bd*4")`, `s("bd/2")`).
+  - **`degradeBy(p)` method, `every(n, f)` method, `?` step operator** (#17)
+    — probabilistic event drop, periodic transformations, and per-step
+    50% drop with deterministic seeding.
+  - **`.jux(f)` method** (#19) — Strudel-style stereo split with `f`
+    applied to the right channel only.
+- **Drum sounds:** `cp` (clap, MIDI 39) and `oh` (open hi-hat, MIDI 46),
+  with synthesis templates and per-sound routing (#21).
+- **Live-coding REPL** (#12) — `web/live/` Strudel-style editor surface
+  with CodeMirror 6, debounced eval, inline parse-error squiggles via
+  the canopy adapter, and a "kept last good" recovery model. Includes
+  runtime-error teardown coverage (#14), design-system overhaul
+  (typography, tokens, motion, a11y), and a mini-notation cheatsheet
+  sidebar.
+
+### Changed
+
+- Drum names cheatsheet trimmed to only the implemented sounds
+  (`bd, sd, hh, cp, oh`); `cb`/`rim`/`tom` removed pending real
+  synthesis design.
+
+### Fixed
+
+- Feedback-recurrence Playwright flake — replaced fixed-sequence guard
+  with polling for actual convergence band, removing CI runner timing
+  dependence.
+
 ## [0.1.0] - 2026-04-22
 
 First public release. MoonBit DSP audio engine covering Phases 0–5 of the

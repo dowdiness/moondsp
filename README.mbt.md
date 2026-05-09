@@ -46,7 +46,7 @@ sequence([note_name("c3"), note_name("e3"), note_name("g3")]).fast(Rational::fro
 
 Querying this over one cycle produces 6 events with exact rational time boundaries — no floating-point drift.
 
-**Mini-notation parser** — the `mini/` package turns a short text string into a `Pat[ControlMap]`, so you can write `s("bd sd hh sd")` or `note("60 64 67")` and chain `.fast(n)`, `.slow(n)`, `.rev()` on the result.
+**Mini-notation parser** — the `mini/` package turns a short text string into a `Pat[ControlMap]`, so you can write `s("bd sd hh sd")` or `note("60 64 67")`, combine sources with `stack(s("bd sd"), note("60 64"))`, and chain methods like `.fast(n)`, `.slow(n)`, `.rev()`, `.degradeBy(p)`, `.every(n, f)`, and `.jux(f)`. Inside the string, sequences support sub-groups (`[a b]`), comma-stacked layers, Euclidean rhythms (`bd(3,8)`), step replicate/stretch (`*n`, `/n`), and 50%-drop (`?`).
 
 **Pattern → DSP scheduler** — the `scheduler/` package drives a `VoicePool` from a `Pat[ControlMap]`: it converts the pattern's event stream into `note_on`/`note_off` calls, routes control-map entries through a `ControlBindingMap`, and ticks the block clock. `PatternScheduler::process_block` is the one call that turns patterns into audio.
 
