@@ -383,6 +383,7 @@
         <dl>
           <dt>s("…")</dt><dd>drum sounds</dd>
           <dt>note("…")</dt><dd>MIDI numbers</dd>
+          <dt>stack(p, q)</dt><dd>combine layers</dd>
         </dl>
 
         <h2>Inside the string</h2>
@@ -427,6 +428,7 @@
         <button type="button" class="example" data-example='s("bd*4").every(3, fast(2))'>s("bd*4").every(3, fast(2))</button>
         <button type="button" class="example" data-example='note("60 64 67 72").jux(rev)'>note("60 64 67 72").jux(rev)</button>
         <button type="button" class="example" data-example='s("[bd sd, hh*8]").degradeBy(0.3)'>s("[bd sd, hh*8]").degradeBy(0.3)</button>
+        <button type="button" class="example" data-example='stack(s("bd sd hh sd"), note("60 64 67 72"))'>stack(s("bd sd hh sd"), note("60 64 67 72"))</button>
       </aside>
     </main>
     <footer>

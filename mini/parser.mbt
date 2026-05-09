@@ -4,6 +4,7 @@
 /// Grammar:
 ///   expr     = primary ( "." method )*
 ///   primary  = "s(" string ")" | "note(" string ")"
+///            | "stack(" expr ( "," expr )* ")"
 ///   method   = "fast(" number ")" | "slow(" number ")" | "rev()"
 ///            | "degradeBy(" number ")"
 ///            | "every(" int "," callback ")"
@@ -58,6 +59,25 @@ fn Parser::expect_char(self : Parser, c : Char) -> Unit raise ParseError {
     )
   }
   self.pos += 1
+}
+
+///|
+/// If `kw` matches the input at `self.pos`, consume it and return true.
+/// Otherwise leave `self.pos` untouched and return false. Char-by-char
+/// to avoid the StringView→String allocation `to_owned`/`to_string` would
+/// require.
+fn Parser::match_keyword(self : Parser, kw : String) -> Bool {
+  let len = kw.length()
+  if self.pos + len > self.input.length() {
+    return false
+  }
+  for i in 0..<len {
+    if self.input[self.pos + i] != kw[i] {
+      return false
+    }
+  }
+  self.pos += len
+  true
 }
 
 ///|
@@ -166,7 +186,8 @@ fn Parser::parse_expr(
 }
 
 ///|
-/// Parse primary: "s(" string ")" | "note(" string ")"
+/// Parse primary:
+///   "s(" string ")" | "note(" string ")" | "stack(" expr ("," expr)* ")"
 fn Parser::parse_primary(
   self : Parser,
 ) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
@@ -174,26 +195,39 @@ fn Parser::parse_primary(
   guard !self.at_end() else {
     raise ParseError("position \{self.pos}: unexpected end of input")
   }
-  // Try "s("
-  if self.pos + 2 <= self.input.length() &&
-    self.input[self.pos] == 's' &&
-    self.input[self.pos + 1] == '(' {
-    self.pos += 2
+  // Each match_keyword check is exact (keyword + '('), so branch order
+  // doesn't disambiguate — `s(` won't accidentally consume `stack(`
+  // because the second char ('t' vs '(') makes match_keyword("s(") fail.
+  let stack_start = self.pos
+  if self.match_keyword("stack(") {
+    self.skip_whitespace()
+    guard !self.at_end() && self.input[self.pos] != ')' else {
+      raise ParseError(
+        "position \{stack_start}: stack() requires at least one argument",
+      )
+    }
+    let args : Array[@pattern.Pat[@pattern.ControlMap]] = [self.parse_expr()]
+    self.skip_whitespace()
+    while !self.at_end() && self.input[self.pos] == ',' {
+      self.pos += 1 // consume ','
+      self.skip_whitespace()
+      args.push(self.parse_expr())
+      self.skip_whitespace()
+    }
+    self.expect_char(')')
+    return if args.length() == 1 { args[0] } else { @pattern.stack(args) }
+  }
+  if self.match_keyword("s(") {
     let content = self.read_quoted_string()
     self.expect_char(')')
     return parse_sound_notation(content)
   }
-  // Try "note("
-  if self.pos + 5 <= self.input.length() {
-    let maybe_note = self.input[self.pos:self.pos + 5].to_string()
-    if maybe_note == "note(" {
-      self.pos += 5
-      let content = self.read_quoted_string()
-      self.expect_char(')')
-      return parse_note_notation(content)
-    }
+  if self.match_keyword("note(") {
+    let content = self.read_quoted_string()
+    self.expect_char(')')
+    return parse_note_notation(content)
   }
-  raise ParseError("position \{self.pos}: expected 's(' or 'note('")
+  raise ParseError("position \{self.pos}: expected 's(', 'note(', or 'stack('")
 }
 
 ///|

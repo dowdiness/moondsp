@@ -449,3 +449,82 @@ test "parse note(60 64).jux(rev) parses (non-s primary)" {
   // 2 events left + 2 events right = 4
   inspect(events.length(), content="4")
 }
+
+///|
+test "parse stack(s, note) combines drum + melodic primaries" {
+  let pat = unwrap_ok(@mini.parse("stack(s(\"bd\"), note(\"60\"))"))
+  let events = query_one_cycle(pat)
+  // 1 sound event + 1 note event = 2
+  inspect(events.length(), content="2")
+}
+
+///|
+test "parse stack with method chain on result" {
+  let pat = unwrap_ok(
+    @mini.parse("stack(s(\"bd sd\"), note(\"60 64\")).fast(2)"),
+  )
+  let events = query_one_cycle(pat)
+  // (2 + 2) stacked = 4 events, fast(2) doubles = 8
+  inspect(events.length(), content="8")
+}
+
+///|
+test "parse stack with per-arg method chain" {
+  let pat = unwrap_ok(@mini.parse("stack(s(\"bd\").fast(2), note(\"60\"))"))
+  let events = query_one_cycle(pat)
+  // bd.fast(2) = 2 events, note(60) = 1 event = 3
+  inspect(events.length(), content="3")
+}
+
+///|
+test "parse stack with single argument is a no-op" {
+  let pat = unwrap_ok(@mini.parse("stack(s(\"bd sd\"))"))
+  let events = query_one_cycle(pat)
+  inspect(events.length(), content="2")
+}
+
+///|
+test "parse stack tolerates whitespace around args" {
+  let pat = unwrap_ok(@mini.parse("stack( s(\"bd\") , note(\"60\") )"))
+  let events = query_one_cycle(pat)
+  inspect(events.length(), content="2")
+}
+
+///|
+test "parse stack() with no args returns error" {
+  match @mini.parse("stack()") {
+    Err(_) => () // expected
+    Ok(_) => fail("expected Err for stack() with no args")
+  }
+}
+
+///|
+test "parse stack with missing close paren returns error" {
+  match @mini.parse("stack(s(\"bd\"), note(\"60\")") {
+    Err(_) => () // expected
+    Ok(_) => fail("expected Err for unclosed stack(")
+  }
+}
+
+///|
+test "parse nested stack(stack(...), ...) recurses through parse_expr" {
+  let pat = unwrap_ok(
+    @mini.parse("stack(stack(s(\"bd\"), note(\"60\")), s(\"sd\"))"),
+  )
+  let events = query_one_cycle(pat)
+  // Inner stack: 1 sound (bd) + 1 note = 2 events.
+  // Outer stack adds s("sd") = 1 sound. Total 3 events.
+  inspect(events.length(), content="3")
+}
+
+///|
+test "parse stack with trailing comma returns error" {
+  // Trailing comma forces another parse_expr() call which sees ')' and
+  // fails to find a primary. Locks current behavior — if the diagnostic
+  // is ever improved (e.g. "expected expression after ','"), update this
+  // test to assert the new message.
+  match @mini.parse("stack(s(\"bd\"),)") {
+    Err(_) => () // expected
+    Ok(_) => fail("expected Err for stack with trailing comma")
+  }
+}
