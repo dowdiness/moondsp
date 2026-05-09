@@ -253,6 +253,26 @@ test.describe("Audio path", () => {
     await expect(status).toContainText("idle");
   });
 
+  test("s(\"cp oh\") routes through new drum pools without diagnostic", async ({ page }) => {
+    // Locks in the cp (clap, MIDI 39) + oh (open hi-hat, MIDI 46) drums
+    // and their per-sound routing in process_scheduler_block. Before this
+    // change the cheatsheet advertised both names but typing them
+    // produced "unknown drum name" — a UI/runtime drift bug.
+    await page.goto("/");
+    await page.locator("#start").click();
+    await expect(page.locator("#status")).toContainText("running", { timeout: 10_000 });
+    await expect(page.locator("#log")).toContainText("pattern updated", { timeout: 5_000 });
+
+    const editor = page.locator(".cm-content");
+    await editor.click();
+    await page.keyboard.press("Control+A");
+    await page.keyboard.type(`s("cp oh")`);
+
+    await expect(page.locator("#log")).toContainText("pattern updated", { timeout: 3_000 });
+    await expect(page.locator(".cm-diagnostic-error")).toHaveCount(0);
+    await expect(page.locator("#status")).toContainText("running");
+  });
+
   test("stack(s, note) cross-source pattern evaluates end-to-end", async ({ page }) => {
     // Top-level stack(...) lets a single pattern produce events for two
     // different routing keys (s → drum pools by MIDI number, note → synth
