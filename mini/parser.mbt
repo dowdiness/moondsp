@@ -195,7 +195,9 @@ fn Parser::parse_primary(
   guard !self.at_end() else {
     raise ParseError("position \{self.pos}: unexpected end of input")
   }
-  // Try "stack(" before "s(" — both start with 's', longest first wins.
+  // Each match_keyword check is exact (keyword + '('), so branch order
+  // doesn't disambiguate — `s(` won't accidentally consume `stack(`
+  // because the second char ('t' vs '(') makes match_keyword("s(") fail.
   let stack_start = self.pos
   if self.match_keyword("stack(") {
     self.skip_whitespace()

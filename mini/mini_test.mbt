@@ -505,3 +505,26 @@ test "parse stack with missing close paren returns error" {
     Ok(_) => fail("expected Err for unclosed stack(")
   }
 }
+
+///|
+test "parse nested stack(stack(...), ...) recurses through parse_expr" {
+  let pat = unwrap_ok(
+    @mini.parse("stack(stack(s(\"bd\"), note(\"60\")), s(\"sd\"))"),
+  )
+  let events = query_one_cycle(pat)
+  // Inner stack: 1 sound (bd) + 1 note = 2 events.
+  // Outer stack adds s("sd") = 1 sound. Total 3 events.
+  inspect(events.length(), content="3")
+}
+
+///|
+test "parse stack with trailing comma returns error" {
+  // Trailing comma forces another parse_expr() call which sees ')' and
+  // fails to find a primary. Locks current behavior — if the diagnostic
+  // is ever improved (e.g. "expected expression after ','"), update this
+  // test to assert the new message.
+  match @mini.parse("stack(s(\"bd\"),)") {
+    Err(_) => () // expected
+    Ok(_) => fail("expected Err for stack with trailing comma")
+  }
+}
