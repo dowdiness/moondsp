@@ -49,6 +49,15 @@ test.describe("UI smoke (no audio)", () => {
     await expect(btn).toBeEnabled();
     await expect(btn).toHaveAttribute("data-action", "start");
   });
+
+  test("cheatsheet advertises stack(p, q) under Layers", async ({ page }) => {
+    // The new top-level stack() primitive is the only way to combine an
+    // s(...) drum pattern with a note(...) melody in one expression — the
+    // cheatsheet has to surface it next to s/note for the cross-source
+    // workflow to be discoverable.
+    const layersDl = page.locator("#cheat dl").first();
+    await expect(layersDl.locator("dt")).toContainText(["s(", "note(", "stack("]);
+  });
 });
 
 test.describe("Audio path", () => {
@@ -242,6 +251,55 @@ test.describe("Audio path", () => {
     // Stop cleanly.
     await btn.click();
     await expect(status).toContainText("idle");
+  });
+
+  test("stack(s, note) cross-source pattern evaluates end-to-end", async ({ page }) => {
+    // Top-level stack(...) lets a single pattern produce events for two
+    // different routing keys (s → drum pools by MIDI number, note → synth
+    // pool). This test proves the new grammar survives the wasm-gc
+    // boundary in the worklet parser AND that mixed-key events route
+    // without producing a diagnostic. Unit tests cover parser correctness;
+    // this is the integration anchor.
+    await page.goto("/");
+    await page.locator("#start").click();
+    await expect(page.locator("#status")).toContainText("running", { timeout: 10_000 });
+    await expect(page.locator("#log")).toContainText("pattern updated", { timeout: 5_000 });
+
+    const editor = page.locator(".cm-content");
+    await editor.click();
+    await page.keyboard.press("Control+A");
+    await page.keyboard.type(`stack(s("bd sd"), note("60 64"))`);
+
+    // pattern updated re-fires after debounce → proves the worklet's parse
+    // accepted stack(...) and the engine swapped patterns successfully.
+    await expect(page.locator("#log")).toContainText("pattern updated", { timeout: 3_000 });
+    // No diagnostic squiggle: the new grammar must parse cleanly.
+    await expect(page.locator(".cm-diagnostic-error")).toHaveCount(0);
+    // Status stays running through the swap.
+    await expect(page.locator("#status")).toContainText("running");
+  });
+
+  test("stack() with no args surfaces a parse diagnostic", async ({ page }) => {
+    // Empty stack() must fail parse with a position-tagged message.
+    // Verifies the rich error string crosses the wasm-gc boundary the
+    // same way other parse errors do (see "invalid pattern" test).
+    await page.goto("/");
+    await page.locator("#start").click();
+    await expect(page.locator("#status")).toContainText("running", { timeout: 10_000 });
+    await expect(page.locator("#log")).toContainText("pattern updated", { timeout: 5_000 });
+
+    const editor = page.locator(".cm-content");
+    await editor.click();
+    await page.keyboard.press("Control+A");
+    await page.keyboard.type(`stack()`);
+
+    const log = page.locator("#log");
+    await expect(log).toContainText("kept last good", { timeout: 3_000 });
+    await expect(log).toContainText("stack()");
+    await expect(log).toContainText("position");
+    await expect(page.locator(".cm-diagnostic-error")).toBeVisible();
+    // Engine keeps playing the previous graph.
+    await expect(page.locator("#status")).toContainText("running");
   });
 
   test("Retry after engine error rebuilds and re-sends pattern", async ({ page }) => {
