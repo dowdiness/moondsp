@@ -23,6 +23,12 @@ let sched_sd : @ref.Ref[SoundPool?] = @ref.new(None)
 let sched_hh : @ref.Ref[SoundPool?] = @ref.new(None)
 
 ///|
+let sched_cp : @ref.Ref[SoundPool?] = @ref.new(None)
+
+///|
+let sched_oh : @ref.Ref[SoundPool?] = @ref.new(None)
+
+///|
 let sched_synth : @ref.Ref[SoundPool?] = @ref.new(None)
 
 ///|
@@ -126,6 +132,55 @@ fn hh_template() -> Array[@moondsp.DspNode] {
 }
 
 ///|
+fn oh_template() -> Array[@moondsp.DspNode] {
+  // Open hi-hat: same shape as hh but longer decay + slightly lower
+  // cutoff so it reads as "open" against the closed hh in patterns.
+  // Different noise seed so layered hh + oh don't beat phase-coherently.
+  [
+    @moondsp.DspNode::noise(24680U),
+    @moondsp.DspNode::biquad(
+      input=0,
+      mode=@moondsp.BiquadMode::HighPass,
+      cutoff_hz=6000.0,
+      q=1.5,
+    ),
+    @moondsp.DspNode::adsr(
+      attack_ms=0.5,
+      decay_ms=200.0,
+      sustain=0.0,
+      release_ms=100.0,
+    ),
+    @moondsp.DspNode::envelope_gain(1, 2, 0.45),
+    @moondsp.DspNode::output(3),
+  ]
+}
+
+///|
+fn cp_template() -> Array[@moondsp.DspNode] {
+  // Clap: bandpass noise around 1.2 kHz with a sharp short envelope.
+  // The classic 808 multi-burst texture would need a multi-tap envelope
+  // primitive we don't have; a single sharp burst still reads as "clap"
+  // distinct from sd (which has a tonal sine body and broader bandpass).
+  [
+    @moondsp.DspNode::noise(13579U),
+    @moondsp.DspNode::biquad(
+      input=0,
+      mode=@moondsp.BiquadMode::BandPass,
+      cutoff_hz=1200.0,
+      q=2.0,
+    ),
+    @moondsp.DspNode::adsr(
+      attack_ms=0.5,
+      decay_ms=40.0,
+      sustain=0.0,
+      release_ms=30.0,
+    ),
+    @moondsp.DspNode::envelope_gain(1, 2, 0.7),
+    @moondsp.DspNode::output(3),
+  ]
+}
+
+///|
 fn synth_template() -> Array[@moondsp.DspNode] {
   [
     @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 440.0),
@@ -219,14 +274,23 @@ pub fn init_scheduler_graph(sample_rate : Double, block_size : Int) -> Bool {
   let bd = make_drum_pool(bd_template(), ctx, block_size)
   let sd = make_drum_pool(sd_template(), ctx, block_size)
   let hh = make_drum_pool(hh_template(), ctx, block_size)
+  let cp = make_drum_pool(cp_template(), ctx, block_size)
+  let oh = make_drum_pool(oh_template(), ctx, block_size)
   let synth = make_synth_pool(ctx, block_size)
-  guard bd is Some(_) && sd is Some(_) && hh is Some(_) && synth is Some(_) else {
+  guard bd is Some(_) &&
+    sd is Some(_) &&
+    hh is Some(_) &&
+    cp is Some(_) &&
+    oh is Some(_) &&
+    synth is Some(_) else {
     reset_scheduler_graph()
     return false
   }
   sched_bd.val = bd
   sched_sd.val = sd
   sched_hh.val = hh
+  sched_cp.val = cp
+  sched_oh.val = oh
   sched_synth.val = synth
   sched_left.val = Some(@moondsp.AudioBuffer::filled(block_size))
   sched_right.val = Some(@moondsp.AudioBuffer::filled(block_size))
@@ -240,6 +304,8 @@ fn reset_scheduler_graph() -> Unit {
   sched_bd.val = None
   sched_sd.val = None
   sched_hh.val = None
+  sched_cp.val = None
+  sched_oh.val = None
   sched_synth.val = None
   sched_left.val = None
   sched_right.val = None
@@ -323,6 +389,30 @@ pub fn process_scheduler_block() -> Bool {
       let sub = pat.filter_map(fn(cm) {
         match cm.0.get("sound") {
           Some(v) => if v == 42.0 { Some(cm) } else { None }
+          _ => None
+        }
+      })
+      process_sub_pool(sp, sub, left, right)
+    }
+    None => ()
+  }
+  match sched_cp.val {
+    Some(sp) => {
+      let sub = pat.filter_map(fn(cm) {
+        match cm.0.get("sound") {
+          Some(v) => if v == 39.0 { Some(cm) } else { None }
+          _ => None
+        }
+      })
+      process_sub_pool(sp, sub, left, right)
+    }
+    None => ()
+  }
+  match sched_oh.val {
+    Some(sp) => {
+      let sub = pat.filter_map(fn(cm) {
+        match cm.0.get("sound") {
+          Some(v) => if v == 46.0 { Some(cm) } else { None }
           _ => None
         }
       })
@@ -441,6 +531,14 @@ pub fn set_scheduler_bpm(bpm : Double) -> Unit {
     None => ()
   }
   match sched_hh.val {
+    Some(sp) => sp.scheduler.set_bpm(bpm)
+    None => ()
+  }
+  match sched_cp.val {
+    Some(sp) => sp.scheduler.set_bpm(bpm)
+    None => ()
+  }
+  match sched_oh.val {
     Some(sp) => sp.scheduler.set_bpm(bpm)
     None => ()
   }

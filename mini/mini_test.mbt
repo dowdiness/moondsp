@@ -2,7 +2,28 @@
 test "drum_midi returns correct GM numbers" {
   inspect(@mini.drum_midi("bd"), content="Some(36)")
   inspect(@mini.drum_midi("sd"), content="Some(38)")
+  inspect(@mini.drum_midi("cp"), content="Some(39)")
   inspect(@mini.drum_midi("hh"), content="Some(42)")
+  inspect(@mini.drum_midi("oh"), content="Some(46)")
+}
+
+///|
+test "parse s(\"cp oh\") cross-pool drum sequence" {
+  let pat = unwrap_ok(@mini.parse("s(\"cp oh\")"))
+  let events = query_one_cycle(pat)
+  inspect(events.length(), content="2")
+  inspect(
+    events[0].value,
+    content=(
+      #|ControlMap({ "sound": 39 })
+    ),
+  )
+  inspect(
+    events[1].value,
+    content=(
+      #|ControlMap({ "sound": 46 })
+    ),
+  )
 }
 
 ///|
