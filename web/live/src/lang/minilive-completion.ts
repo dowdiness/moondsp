@@ -49,6 +49,20 @@ function ancestorOfType(node: SyntaxNode | null, name: string): SyntaxNode | nul
   return null;
 }
 
+function isClosedString(text: string): boolean {
+  // The grammar's String token regex `'"' (![\\\n"] | "\\" _)* '"'?`
+  // allows an optional closing quote. A trailing `"` is the close ONLY
+  // when an even number of backslashes precede it — odd parity means
+  // the final `"` was consumed as the second half of an `\"` escape and
+  // the token is actually unterminated. Without this, a string like
+  // `"foo\"` (length 6, endsWith `"`) would be misclassified as closed
+  // and reject completion at the end-of-string position.
+  if (text.length < 2 || !text.endsWith('"')) return false;
+  let backslashes = 0;
+  for (let i = text.length - 2; i >= 1 && text[i] === "\\"; i--) backslashes++;
+  return backslashes % 2 === 0;
+}
+
 function pastFirstComma(args: SyntaxNode, pos: number, doc: { sliceString(from: number, to: number): string }): boolean {
   // Only commas at the OUTER Args nesting level separate arguments.
   // A raw includes(",") would falsely fire for `every(stack(a,b)|` —
@@ -70,7 +84,12 @@ function pastFirstComma(args: SyntaxNode, pos: number, doc: { sliceString(from: 
     }
     if (ch === '"') inString = true;
     else if (ch === "(" || ch === "[") depth++;
-    else if (ch === ")" || ch === "]") depth--;
+    else if (ch === ")" || ch === "]") {
+      // Clamp at zero — a stray unmatched close from a typo would
+      // otherwise drive depth negative and prevent any later top-level
+      // comma from being recognized.
+      if (depth > 0) depth--;
+    }
     else if (ch === "," && depth === 0) return true;
   }
   return false;
@@ -90,8 +109,7 @@ export function miniliveCompletion(context: CompletionContext): CompletionResult
     // inside the contents; once the closing quote exists, the same
     // position sits AFTER the close and must be rejected.
     const text = state.doc.sliceString(stringNode.from, stringNode.to);
-    const closed = text.length >= 2 && text.endsWith('"');
-    const inside = closed
+    const inside = isClosedString(text)
       ? pos > stringNode.from && pos < stringNode.to
       : pos > stringNode.from && pos <= stringNode.to;
     if (!inside) return null;
