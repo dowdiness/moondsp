@@ -25,6 +25,8 @@ for `dowdiness/moondsp`. Read order below goes roughly from "new user" to
   — **authoritative** for graph runtime-control behavior: node types,
   parameter slots, control-binding surface, topology editing, hot-swap. If
   code and any other doc disagree, this document and the code take priority.
+- **[`next-actions.md`](next-actions.md)** — active handoff list for future
+  sessions. Keep this short and update it when priorities change.
 - **[`performance/`](performance/)** — dated benchmark snapshots. New
   measurements go in new files (do not edit historical entries in place).
   Latest:

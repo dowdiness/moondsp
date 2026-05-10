@@ -123,6 +123,7 @@ The project follows an incremental edit rule: run `moon check` after every file 
 Start at the **[docs index](docs/README.md)**, which groups material by audience:
 
 - **[Technical reference](docs/salat-engine-technical-reference.md)** — node types, parameter slots, runtime control surface (authoritative for graph runtime-control behavior)
+- **[Next actions](docs/next-actions.md)** — active handoff list for future sessions and API-hardening priorities
 - **[Blueprint](docs/salat-engine-blueprint.md)** — full architecture vision, design principles, roadmap
 - **[Performance snapshots](docs/performance/)** — dated benchmark results (new measurements go in new files)
 - **[Architecture decisions](docs/decisions/)** — short ADRs distilling *why* the codebase looks the way it does (each links to the archived plan/spec)
@@ -138,7 +139,7 @@ Start at the **[docs index](docs/README.md)**, which groups material by audience
 | 3 — Voice management | Complete | 32+ voice pool with priority stealing and stereo mixdown |
 | 4 — Pattern engine | Complete | Rational time, 8 combinators, ControlMap output |
 | 5 — Pattern × DSP | Complete | `scheduler/` + `mini/` wire pattern events to voice allocation |
-| 6 — incr integration | Planned | Incremental memoization for pattern/graph changes |
+| 6 — incr integration | Planned | Incremental memoization for pattern/graph changes, after wrapper runtime-control result parity is settled |
 | 7+ — UI, native, collab | Planned | REPL, CLAP plugins, CRDT multi-user |
 
 ## License

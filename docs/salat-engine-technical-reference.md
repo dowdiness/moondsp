@@ -708,6 +708,9 @@ Current runtime control support:
   `gate_on_result(...)`, `gate_off_result(...)`, and
   `set_param_result(...)` for callers that need a concrete
   `GraphControlError` rejection reason
+- hot-swap and topology wrappers participate in the same `GraphControllable`
+  boolean runtime-control surface today; result-typed runtime-control
+  companions for those wrappers are the next API-hardening slice
 - `apply_controls(Array[GraphControl])` applies control batches transactionally
   in batch order while targeting nodes by authoring index
 - compatibility helpers remain available:
