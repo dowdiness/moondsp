@@ -79,6 +79,31 @@ test.describe("UI smoke (no audio)", () => {
     await expect(editor).toContainText(`${INITIAL_PATTERN}.fast(`);
   });
 
+  test("Tab accepts the highlighted autocomplete option", async ({ page }) => {
+    // Tab is bound to acceptCompletion in main.ts at Prec.highest so it
+    // wins over the snippet-field navigation Tab binding registered by
+    // autocompletion(). CM6 default keymap binds Enter only; Tab is what
+    // most live-coding editors (Strudel, VS Code) use as the primary
+    // accept key.
+    //
+    // The 120ms wait clears CM6's `interactionDelay` (default 75ms) —
+    // an anti-typo guard that rejects acceptCompletion calls landing
+    // within that window after the popup opens. Real users typing on
+    // a keyboard exceed 75ms between keystrokes naturally; Playwright
+    // doesn't, so the wait makes the test mimic real usage.
+    const editor = page.locator(".cm-content");
+    await editor.click();
+    await page.keyboard.press("Control+End");
+    await page.keyboard.type(".fa");
+    const tooltip = page.locator(".cm-tooltip-autocomplete");
+    await expect(tooltip).toBeVisible({ timeout: 2_000 });
+    await expect(tooltip.locator('[aria-selected="true"]')).toContainText("fast");
+    await page.waitForTimeout(120);
+    await page.keyboard.press("Tab");
+    await expect(tooltip).toBeHidden({ timeout: 2_000 });
+    await expect(editor).toContainText(`${INITIAL_PATTERN}.fast(`);
+  });
+
   test("autocomplete in every() arg 1 ignores commas inside nested calls", async ({ page }) => {
     // Regression: `pastFirstComma` originally treated any `,` between
     // the opening `(` and the cursor as a slot separator, which made
