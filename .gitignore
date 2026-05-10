@@ -10,3 +10,10 @@ web/moonbit_dsp_test.wasm
 .worktrees/
 .codex
 .claude/scheduled_tasks.lock
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
