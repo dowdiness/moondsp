@@ -7,8 +7,8 @@
 /// existing array, and binary ops merge two arrays when they originate
 /// from different sources.
 pub struct GraphBuilder {
-  nodes_ : Array[DspNode]
-  index : Int
+  priv nodes_ : Array[DspNode]
+  priv index : Int
 }
 
 ///|
@@ -218,7 +218,9 @@ pub impl StereoFilterSym for GraphBuilder with stereo_biquad(
   q,
 ) -> GraphBuilder {
   let idx = self.nodes_.length()
-  self.nodes_.push(DspNode::stereo_biquad(self.index, mode, cutoff, q))
+  self.nodes_.push(
+    DspNode::stereo_biquad(input=self.index, mode~, cutoff_hz=cutoff, q~),
+  )
   { nodes_: self.nodes_, index: idx }
 }
 

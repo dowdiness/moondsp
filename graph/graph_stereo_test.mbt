@@ -83,7 +83,12 @@ test "compiled stereo dsp applies stereo biquad after pan" {
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_biquad(1, BiquadMode::LowPass, LOWPASS_CUTOFF, LOWPASS_Q),
+    DspNode::stereo_biquad(
+      input=1,
+      mode=BiquadMode::LowPass,
+      cutoff_hz=LOWPASS_CUTOFF,
+      q=LOWPASS_Q,
+    ),
     DspNode::stereo_output(2),
   ]
   let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
@@ -200,7 +205,12 @@ test "compiled stereo dsp runtime params update stereo biquad" {
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_biquad(1, BiquadMode::LowPass, LOWPASS_CUTOFF, LOWPASS_Q),
+    DspNode::stereo_biquad(
+      input=1,
+      mode=BiquadMode::LowPass,
+      cutoff_hz=LOWPASS_CUTOFF,
+      q=LOWPASS_Q,
+    ),
     DspNode::stereo_output(2),
   ]
   let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
@@ -448,7 +458,12 @@ test "compiled dsp runtime params update stereo biquad before mixdown" {
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_biquad(1, BiquadMode::LowPass, LOWPASS_CUTOFF, LOWPASS_Q),
+    DspNode::stereo_biquad(
+      input=1,
+      mode=BiquadMode::LowPass,
+      cutoff_hz=LOWPASS_CUTOFF,
+      q=LOWPASS_Q,
+    ),
     DspNode::stereo_mixdown(2),
     DspNode::output(3),
   ]

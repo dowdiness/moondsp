@@ -31,7 +31,12 @@ test "compiled dsp rejects stereo-only nodes" {
   ]
   let stereo_biquad_nodes = [
     DspNode::constant(UNIT_SAMPLE),
-    DspNode::stereo_biquad(0, BiquadMode::LowPass, LOWPASS_CUTOFF, LOWPASS_Q),
+    DspNode::stereo_biquad(
+      input=0,
+      mode=BiquadMode::LowPass,
+      cutoff_hz=LOWPASS_CUTOFF,
+      q=LOWPASS_Q,
+    ),
     DspNode::output(1),
   ]
   let stereo_delay_nodes = [

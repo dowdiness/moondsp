@@ -447,10 +447,10 @@ fn topology_inserted_node(template : DspNode, input_source : Int) -> DspNode? {
     DspNodeKind::StereoBiquad =>
       Some(
         DspNode::stereo_biquad(
-          input_source,
-          template.filter_mode,
-          template.value0,
-          template.value1,
+          input=input_source,
+          mode=template.filter_mode,
+          cutoff_hz=template.value0,
+          q=template.value1,
         ),
       )
     DspNodeKind::StereoDelay =>
@@ -520,10 +520,10 @@ fn apply_topology_rewire_input(
     (DspNodeKind::StereoBiquad, GraphTopologyInputSlot::Input0) =>
       Some(
         DspNode::stereo_biquad(
-          source_index,
-          node.filter_mode,
-          node.value0,
-          node.value1,
+          input=source_index,
+          mode=node.filter_mode,
+          cutoff_hz=node.value0,
+          q=node.value1,
         ),
       )
     (DspNodeKind::StereoDelay, GraphTopologyInputSlot::Input0) =>

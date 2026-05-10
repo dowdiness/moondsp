@@ -544,16 +544,16 @@ pub fn DspNode::stereo_clip(input : Int, threshold : Double) -> DspNode {
 ///|
 /// Create a stereo biquad node from one stereo upstream node.
 pub fn DspNode::stereo_biquad(
-  input : Int,
-  mode : BiquadMode,
-  cutoff : Double,
-  q : Double,
+  input~ : Int,
+  mode~ : BiquadMode,
+  cutoff_hz~ : Double,
+  q~ : Double,
 ) -> DspNode {
   DspNode::new(
     DspNodeKind::StereoBiquad,
     input,
     -1,
-    cutoff,
+    cutoff_hz,
     q,
     0.0,
     0.0,

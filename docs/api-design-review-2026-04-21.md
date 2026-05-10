@@ -30,24 +30,25 @@ to `archive/` rather than edited in place.
   external tests using accessors instead. `GraphControl` likewise hides its
   raw positional constructor behind `gate_on`, `gate_off`, `set_param`, and
   read accessors. `ControlBindingBuilder` hides its mutable accumulator.
+  `GraphBuilder` now hides its mutable node array and current-index layout
+  behind `nodes()` and the tagless graph constructors.
 - **(3) Label the footgun constructors — ✅ shipped 2026-04-21.**
-  `DspContext::new`, `Adsr::new`, `DspNode::adsr`, `DspNode::biquad`, and
-  `Oscillator::process` now use labelled-required arguments, so call
-  sites are unit-self-documenting (`attack_ms`, `release_ms`,
-  `sample_rate`, `block_size`, `cutoff_hz`, `freq_hz`, etc.). Trait-level
-  variants (`DspSym::adsr`, `FilterSym::biquad`) remain positional; a
+  `DspContext::new`, `Adsr::new`, `DspNode::adsr`, `DspNode::biquad`,
+  `DspNode::stereo_biquad`, and `Oscillator::process` now use
+  labelled-required arguments, so call sites are unit-self-documenting
+  (`attack_ms`, `release_ms`, `sample_rate`, `block_size`, `cutoff_hz`,
+  `freq_hz`, etc.). Trait-level variants (`DspSym::adsr`,
+  `FilterSym::biquad`, `StereoFilterSym::stereo_biquad`) remain positional; a
   separate pass would be needed to extend labelling through the tagless
   symantic traits.
 
   **Deferred sub-items (API-consistency follow-ups, not correctness bugs):**
   - `Oscillator::process_waveform` / `tick` / `tick_waveform` are still
     positional — asymmetric with the now-labelled `process`.
-  - `DspNode::stereo_biquad` is still positional — asymmetric with the
-    now-labelled `DspNode::biquad`. Same pattern likely applies to other
-    stereo / process methods (`Gain::process`, `Clip::process`,
-    `Pan::process`, `stereo_gain`, `stereo_clip`). If we extend labelling
-    to these, we should do it as a single consistent sweep rather than
-    piecemeal.
+  - Other stereo / process methods (`Gain::process`, `Clip::process`,
+    `Pan::process`, `DspNode::stereo_gain`, `DspNode::stereo_clip`) are
+    still positional. If we extend labelling to these, we should do it as a
+    single consistent sweep rather than piecemeal.
 
 ## Step 1 — Facts / Assumptions / Unknowns
 
@@ -562,9 +563,9 @@ checked for success.
   exhaustive matchers downstream.
 
 **Abstraction leaks:**
-- `GraphBuilder::nodes_ : Array[DspNode]` field — the underscore hints at
-  "don't touch me" but the field is still `pub`. If the builder ever
-  needs to store auxiliary state (debug origin, index maps), this leaks.
+- `GraphBuilder::nodes()` still returns the accumulated mutable node array.
+  The raw `nodes_` / `index` fields are now hidden, but the builder still
+  exposes its array representation for compile/replay interoperability.
 - `PatternScheduler` (scheduler package) exposes `mut bpm`,
   `mut sample_counter`, `ctx`, `active_notes`, `bindings`, `mapper` —
   four internal fields, mutable, public. Highest-churn structure in the

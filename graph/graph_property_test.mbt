@@ -169,7 +169,14 @@ fn gen_stereo_graph(seed : Int) -> Array[DspNode] {
   if stereo_bits / 4 % 2 >= 1 {
     let cutoff = 200.0 + (s % 4000).to_double()
     let q = 0.5 + (s % 10).to_double() * 0.1
-    nodes.push(DspNode::stereo_biquad(last, prop_biquad_mode(s / 3), cutoff, q))
+    nodes.push(
+      DspNode::stereo_biquad(
+        input=last,
+        mode=prop_biquad_mode(s / 3),
+        cutoff_hz=cutoff,
+        q~,
+      ),
+    )
     last = nodes.length() - 1
   }
   if stereo_bits / 8 % 2 >= 1 {
