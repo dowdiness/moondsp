@@ -935,8 +935,14 @@ Current semantics:
   mono/stereo hot-swap wrappers and reports sample-rate or block-capacity
   mismatches explicitly
 - `queue_topology_edit(...)` / `queue_topology_edits(...)` apply an ordered
-  `GraphTopologyEdit` batch to the stored mono authoring nodes, recompile a new
-  `CompiledDsp`, and stage that replacement through the inner hot-swap wrapper
+  `GraphTopologyEdit` batch to the stored authoring nodes, recompile a
+  replacement graph, and stage that replacement through the inner hot-swap
+  wrapper
+- `queue_topology_edit_result(...)` / `queue_topology_edits_result(...)` are
+  the result-typed topology queue companions for mono and stereo controllers;
+  they preserve the same transactional behavior as the boolean APIs while
+  reporting `PendingSwap`, `InvalidEdit(index)`, `RecompileRejected`, or a
+  wrapped `HotSwapQueueError`
 - topology-edit batches are transactional:
   - if any edit has an invalid authoring index, nothing is changed
   - if the edited node array fails recompilation, nothing is staged

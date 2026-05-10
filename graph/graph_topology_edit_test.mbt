@@ -71,6 +71,79 @@ test "compiled dsp topology controller rejects invalid edit batches transactiona
 }
 
 ///|
+test "compiled dsp topology controller result reports invalid edit index" {
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
+  let topology = CompiledDspTopologyController::from_nodes(
+    [DspNode::constant(1.0), DspNode::gain(0, 0.25), DspNode::output(1)],
+    context,
+  ).unwrap()
+  let output = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+
+  match
+    topology.queue_topology_edits_result([
+      GraphTopologyEdit::replace_node(0, DspNode::constant(0.5)),
+      GraphTopologyEdit::replace_node(99, DspNode::constant(0.75)),
+    ]) {
+    Err(GraphTopologyQueueError::InvalidEdit(index)) => assert_eq(index, 1)
+    other => fail("expected InvalidEdit, got \{other}")
+  }
+  topology.process(context, output)
+
+  assert_true(output.as_fixed_array().every(sample => sample == 0.25))
+}
+
+///|
+test "compiled dsp topology controller result reports recompile rejection" {
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
+  let topology = CompiledDspTopologyController::from_nodes(
+    [DspNode::constant(1.0), DspNode::gain(0, 0.25), DspNode::output(1)],
+    context,
+  ).unwrap()
+
+  match
+    topology.queue_topology_edit_result(
+      GraphTopologyEdit::replace_node(2, DspNode::gain(1, 0.5)),
+    ) {
+    Err(GraphTopologyQueueError::RecompileRejected) => ()
+    other => fail("expected RecompileRejected, got \{other}")
+  }
+}
+
+///|
+test "compiled dsp topology controller result reports pending swap" {
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
+  let topology = CompiledDspTopologyController::from_nodes(
+    [DspNode::constant(1.0), DspNode::gain(0, 0.25), DspNode::output(1)],
+    context,
+    crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
+  ).unwrap()
+
+  match
+    topology.queue_topology_edit_result(
+      GraphTopologyEdit::replace_node(0, DspNode::constant(0.5)),
+    ) {
+    Ok(_) => ()
+    other => fail("expected Ok, got \{other}")
+  }
+  match
+    topology.queue_topology_edit_result(
+      GraphTopologyEdit::replace_node(0, DspNode::constant(0.25)),
+    ) {
+    Err(GraphTopologyQueueError::PendingSwap) => ()
+    other => fail("expected PendingSwap, got \{other}")
+  }
+}
+
+///|
 test "compiled dsp topology controller mirrors runtime params into queued edit" {
   let context = DspContext::new(
     sample_rate=HOT_SWAP_SAMPLE_RATE,
@@ -592,6 +665,32 @@ test "compiled stereo dsp topology controller rejects invalid edit batches trans
     .as_fixed_array()
     .every(sample => (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON),
   )
+}
+
+///|
+test "compiled stereo dsp topology controller result queues valid edit" {
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
+  let topology = CompiledStereoDspTopologyController::from_nodes(
+    [DspNode::constant(1.0), DspNode::pan(0, 0.0), DspNode::stereo_output(1)],
+    context,
+  ).unwrap()
+  let left = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+  let right = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+
+  match
+    topology.queue_topology_edit_result(
+      GraphTopologyEdit::replace_node(1, DspNode::pan(0, 1.0)),
+    ) {
+    Ok(_) => ()
+    other => fail("expected Ok, got \{other}")
+  }
+  topology.process(context, left, right)
+
+  assert_true(left.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(right.as_fixed_array().every(sample => sample == 1.0))
 }
 
 ///|

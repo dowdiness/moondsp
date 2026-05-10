@@ -154,7 +154,7 @@ pub fn CompiledDspHotSwap::queue_swap(
   self : CompiledDspHotSwap,
   next : CompiledDsp,
 ) -> Bool {
-  self.queue_swap_result(next) is Ok(_)
+  self.0.queue_swap_impl(next.0)
 }
 
 ///|
@@ -308,7 +308,7 @@ pub fn CompiledStereoDspHotSwap::queue_swap(
   self : CompiledStereoDspHotSwap,
   next : CompiledStereoDsp,
 ) -> Bool {
-  self.queue_swap_result(next) is Ok(_)
+  self.0.queue_swap_impl(next.0)
 }
 
 ///|

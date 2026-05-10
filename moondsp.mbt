@@ -81,6 +81,7 @@ pub using @graph {
   type GraphParamSlot,
   type GraphTopologyEdit,
   type GraphTopologyInputSlot,
+  type GraphTopologyQueueError,
   type GraphValidationError,
   type HotSwapQueueError,
 

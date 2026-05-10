@@ -1,14 +1,15 @@
 ///|
-fn apply_topology_edits(
+fn apply_topology_edits_result(
   nodes : Array[DspNode],
   edits : Array[GraphTopologyEdit],
-) -> Bool {
-  for edit in edits {
+) -> Result[Unit, Int] {
+  for index = 0; index < edits.length(); index = index + 1 {
+    let edit = edits[index]
     if !apply_topology_edit(nodes, edit) {
-      return false
+      return Err(index)
     }
   }
-  true
+  Ok(())
 }
 
 ///|

@@ -107,6 +107,8 @@ pub using @graph {type GraphTopologyEdit}
 
 pub using @graph {type GraphTopologyInputSlot}
 
+pub using @graph {type GraphTopologyQueueError}
+
 pub using @graph {type GraphValidationError}
 
 pub using @graph {type HotSwapQueueError}

@@ -51,7 +51,9 @@ type CompiledDspTopologyController
 pub fn CompiledDspTopologyController::from_nodes(Array[DspNode], @dsp.DspContext, crossfade_samples? : Int) -> Self?
 pub fn CompiledDspTopologyController::process(Self, @dsp.DspContext, @dsp.AudioBuffer) -> Unit
 pub fn CompiledDspTopologyController::queue_topology_edit(Self, GraphTopologyEdit) -> Bool
+pub fn CompiledDspTopologyController::queue_topology_edit_result(Self, GraphTopologyEdit) -> Result[Unit, GraphTopologyQueueError]
 pub fn CompiledDspTopologyController::queue_topology_edits(Self, Array[GraphTopologyEdit]) -> Bool
+pub fn CompiledDspTopologyController::queue_topology_edits_result(Self, Array[GraphTopologyEdit]) -> Result[Unit, GraphTopologyQueueError]
 pub impl GraphControllable for CompiledDspTopologyController
 
 type CompiledStereoDsp
@@ -82,7 +84,9 @@ type CompiledStereoDspTopologyController
 pub fn CompiledStereoDspTopologyController::from_nodes(Array[DspNode], @dsp.DspContext, crossfade_samples? : Int) -> Self?
 pub fn CompiledStereoDspTopologyController::process(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn CompiledStereoDspTopologyController::queue_topology_edit(Self, GraphTopologyEdit) -> Bool
+pub fn CompiledStereoDspTopologyController::queue_topology_edit_result(Self, GraphTopologyEdit) -> Result[Unit, GraphTopologyQueueError]
 pub fn CompiledStereoDspTopologyController::queue_topology_edits(Self, Array[GraphTopologyEdit]) -> Bool
+pub fn CompiledStereoDspTopologyController::queue_topology_edits_result(Self, Array[GraphTopologyEdit]) -> Result[Unit, GraphTopologyQueueError]
 pub impl GraphControllable for CompiledStereoDspTopologyController
 
 pub struct CompiledTemplate {
@@ -250,6 +254,14 @@ pub(all) enum GraphTopologyInputSlot {
   Input0
   Input1
 } derive(Eq)
+
+pub(all) enum GraphTopologyQueueError {
+  PendingSwap
+  InvalidEdit(Int)
+  RecompileRejected
+  HotSwap(HotSwapQueueError)
+} derive(@debug.Debug)
+pub impl Show for GraphTopologyQueueError
 
 pub(all) enum GraphValidationError {
   InvalidInput0(Int, Int, Int)
