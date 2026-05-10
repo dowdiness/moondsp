@@ -1,5 +1,7 @@
 # `.jux(f)` Implementation Plan
 
+**Status:** Shipped; archived after implementation landed on `main`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a `.jux(f)` combinator to moondsp's pattern language so that `s("bd sd hh sd").jux(rev)` plays the original pattern hard-left and `f(original)` hard-right, both stacked.
@@ -8,7 +10,7 @@
 
 **Tech Stack:** MoonBit (`pattern/`, `mini/`, `scheduler/`, `browser/`), Vite/Playwright (`web/live/`).
 
-**Spec:** `docs/superpowers/specs/2026-05-08-jux-stereo-split-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-05-08-jux-stereo-split-design.md`
 
 ---
 
@@ -708,7 +710,9 @@ identical so the smoke test diff is minimal."
 
 ## Task 7: Final verification + spec doc
 
-The spec doc lives on the `jux-spec-stash` branch. The branch already has it; the implementation work above lands on the same branch. This task is bookkeeping.
+Archived note: this task was completed before the plan was moved to
+`docs/superpowers/plans/archive/`. The commands below are historical context,
+not active branch instructions.
 
 **Files:**
 - Verify only: end-to-end test pass, spec doc present.
@@ -727,13 +731,13 @@ Expected: clean. `pattern/pkg.generated.mbti` should now show `Pat::jux`.
 
 - [ ] **Step 3: Verify spec doc is on the branch**
 
-Run: `ls docs/superpowers/specs/2026-05-08-jux-stereo-split-design.md`
+Run: `ls docs/superpowers/specs/archive/2026-05-08-jux-stereo-split-design.md`
 Expected: file exists.
 
 - [ ] **Step 4: Push and open the PR**
 
 ```bash
-git push -u origin jux-spec-stash:feat/mini-jux
+git push -u origin <implementation-branch>:feat/mini-jux
 ```
 
 Then:
@@ -749,7 +753,7 @@ gh pr create --base main --head feat/mini-jux \
 - Browser demo pool sizes bumped (drum 4→8, synth 8→16) for same-sound `.jux` overlap headroom.
 - Live demo now `s("bd(3,8), hh*16?, sd(2,8,2)").jux(rev)`.
 
-This closes Phase B from the spec at `docs/superpowers/specs/2026-05-08-jux-stereo-split-design.md`.
+This closes Phase B from the spec at `docs/superpowers/specs/archive/2026-05-08-jux-stereo-split-design.md`.
 
 ## Test plan
 
