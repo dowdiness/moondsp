@@ -5,7 +5,7 @@ let stereo_topo_edit_level : @ref.Ref[Double] = @ref.new(1.0)
 let compiled_stereo_topology_edit : GraphSlot[
   @moondsp.CompiledStereoDspTopologyController,
   StereoOut,
-] = GraphSlot(output=StereoOut(), compile=fn(ctx) {
+] = GraphSlot::new(output=StereoOut::new(), compile=fn(ctx) {
   @moondsp.CompiledStereoDspTopologyController::from_nodes(
     [
       @moondsp.DspNode::constant(1.0),

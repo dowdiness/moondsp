@@ -95,7 +95,7 @@ fn Parser::read_ident(self : Parser) -> String {
       break
     }
   }
-  self.input[start:self.pos].to_string()
+  self.input[start:self.pos].to_owned()
 }
 
 ///|
@@ -167,7 +167,7 @@ fn Parser::read_quoted_string(self : Parser) -> String raise ParseError {
   while !self.at_end() && self.input[self.pos] != '"' {
     self.pos += 1
   }
-  let content = self.input[start:self.pos].to_string()
+  let content = self.input[start:self.pos].to_owned()
   self.expect_char('"')
   content
 }
@@ -641,7 +641,7 @@ fn NotationParser::read_int_signed(
     self.pos = start
     raise ParseError("position \{err_pos}: expected integer")
   }
-  let s = self.input[start:self.pos].to_string()
+  let s = self.input[start:self.pos].to_owned()
   let mut value = 0
   let mut i = 0
   let negative = s.length() > 0 && s[0] == '-'
@@ -695,7 +695,7 @@ fn NotationParser::read_ident(self : NotationParser) -> String {
       break
     }
   }
-  self.input[start:self.pos].to_string()
+  self.input[start:self.pos].to_owned()
 }
 
 ///|

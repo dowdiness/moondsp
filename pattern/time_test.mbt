@@ -69,14 +69,14 @@ test "intersect: overlapping [0,1) and [1/2,2) = [1/2, 1)" {
 test "intersect: disjoint [0,1) and [2,3) = None" {
   let a = span(0, 1, 1, 1)
   let b = span(2, 1, 3, 1)
-  inspect(a.intersect(b), content="None")
+  debug_inspect(a.intersect(b), content="None")
 }
 
 ///|
 test "intersect: touching [0,1) and [1,2) = None (half-open)" {
   let a = span(0, 1, 1, 1)
   let b = span(1, 1, 2, 1)
-  inspect(a.intersect(b), content="None")
+  debug_inspect(a.intersect(b), content="None")
 }
 
 ///|

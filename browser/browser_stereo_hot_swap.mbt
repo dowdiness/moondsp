@@ -2,7 +2,7 @@
 let compiled_stereo_hot_swap : GraphSlot[
   @moondsp.CompiledStereoDspHotSwap,
   StereoOut,
-] = GraphSlot(output=StereoOut(), compile=fn(ctx) {
+] = GraphSlot::new(output=StereoOut::new(), compile=fn(ctx) {
   match
     @moondsp.CompiledStereoDsp::compile(
       [

@@ -31,8 +31,8 @@ let exit_cutoff : @ref.Ref[Double] = @ref.new(800.0)
 let exit_gain : @ref.Ref[Double] = @ref.new(0.3)
 
 ///|
-let exit_deliverable : GraphSlot[@moondsp.CompiledDsp, MonoOut] = GraphSlot(
-  output=MonoOut(),
+let exit_deliverable : GraphSlot[@moondsp.CompiledDsp, MonoOut] = GraphSlot::new(
+  output=MonoOut::new(),
   compile=fn(ctx) {
     let builder : @moondsp.GraphBuilder = @moondsp.exit_deliverable()
     @moondsp.CompiledDsp::compile(builder.nodes(), ctx)

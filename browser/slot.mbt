@@ -16,8 +16,6 @@ priv trait Output {
 /// Single-buffer output used by mono graph variants.
 priv struct MonoOut {
   buffer : @ref.Ref[@moondsp.AudioBuffer?]
-
-  fn new() -> MonoOut
 }
 
 ///|
@@ -51,8 +49,6 @@ fn MonoOut::sample(self : MonoOut, index : Int) -> Double {
 priv struct StereoOut {
   left : @ref.Ref[@moondsp.AudioBuffer?]
   right : @ref.Ref[@moondsp.AudioBuffer?]
-
-  fn new() -> StereoOut
 }
 
 ///|
@@ -106,11 +102,6 @@ priv struct GraphSlot[T, O] {
   sample_rate : @ref.Ref[Double]
   block_size : @ref.Ref[Int]
   compile : (@moondsp.DspContext) -> T?
-
-  fn[T, O] new(
-    output~ : O,
-    compile~ : (@moondsp.DspContext) -> T?,
-  ) -> GraphSlot[T, O]
 }
 
 ///|

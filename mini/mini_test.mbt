@@ -1,10 +1,10 @@
 ///|
 test "drum_midi returns correct GM numbers" {
-  inspect(@mini.drum_midi("bd"), content="Some(36)")
-  inspect(@mini.drum_midi("sd"), content="Some(38)")
-  inspect(@mini.drum_midi("cp"), content="Some(39)")
-  inspect(@mini.drum_midi("hh"), content="Some(42)")
-  inspect(@mini.drum_midi("oh"), content="Some(46)")
+  debug_inspect(@mini.drum_midi("bd"), content="Some(36)")
+  debug_inspect(@mini.drum_midi("sd"), content="Some(38)")
+  debug_inspect(@mini.drum_midi("cp"), content="Some(39)")
+  debug_inspect(@mini.drum_midi("hh"), content="Some(42)")
+  debug_inspect(@mini.drum_midi("oh"), content="Some(46)")
 }
 
 ///|
@@ -28,9 +28,9 @@ test "parse s(\"cp oh\") cross-pool drum sequence" {
 
 ///|
 test "drum_midi returns None for unknown names" {
-  inspect(@mini.drum_midi("snare"), content="None")
-  inspect(@mini.drum_midi(""), content="None")
-  inspect(@mini.drum_midi("123"), content="None")
+  debug_inspect(@mini.drum_midi("snare"), content="None")
+  debug_inspect(@mini.drum_midi(""), content="None")
+  debug_inspect(@mini.drum_midi("123"), content="None")
 }
 
 ///|

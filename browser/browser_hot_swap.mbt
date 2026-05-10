@@ -1,6 +1,6 @@
 ///|
-let compiled_hot_swap : GraphSlot[@moondsp.CompiledDspHotSwap, MonoOut] = GraphSlot(
-  output=MonoOut(),
+let compiled_hot_swap : GraphSlot[@moondsp.CompiledDspHotSwap, MonoOut] = GraphSlot::new(
+  output=MonoOut::new(),
   compile=fn(ctx) {
     match
       @moondsp.CompiledDsp::compile(

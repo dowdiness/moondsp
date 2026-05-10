@@ -406,7 +406,7 @@ test "filter_map: preserves event timing (whole and part spans unchanged)" {
   inspect(events.length(), content="1")
   inspect(events[0].value, content="43")
   // whole should be [0, 1)
-  inspect(
+  debug_inspect(
     events[0].whole,
     content=(
       #|Some({ begin: { num: 0, den: 1 }, end_: { num: 1, den: 1 } })

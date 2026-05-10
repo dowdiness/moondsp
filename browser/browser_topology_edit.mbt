@@ -8,7 +8,7 @@ let topo_edit_inserted : @ref.Ref[Bool] = @ref.new(false)
 let compiled_topology_edit : GraphSlot[
   @moondsp.CompiledDspTopologyController,
   MonoOut,
-] = GraphSlot(output=MonoOut(), compile=fn(ctx) {
+] = GraphSlot::new(output=MonoOut::new(), compile=fn(ctx) {
   @moondsp.CompiledDspTopologyController::from_nodes(
     [
       @moondsp.DspNode::constant(BROWSER_COMPILED_DEFAULT_GAIN),

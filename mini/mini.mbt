@@ -25,7 +25,7 @@ pub fn parse(
   p.skip_whitespace()
   guard p.at_end() else {
     return Err(
-      "position \{p.pos}: unexpected trailing input '\{input[p.pos:].to_string()}'",
+      "position \{p.pos}: unexpected trailing input '\{input[p.pos:].to_owned()}'",
     )
   }
   Ok(result)

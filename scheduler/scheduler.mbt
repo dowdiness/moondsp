@@ -29,11 +29,14 @@ pub enum VoiceAction {
 pub struct ControlMapper {
   transform : (String, Double) -> (String, Double)?
   voice_action : (String, Double) -> VoiceAction?
+}
 
-  fn new(
-    transform~ : (String, Double) -> (String, Double)?,
-    voice_action~ : (String, Double) -> VoiceAction?,
-  ) -> ControlMapper
+///|
+pub fn ControlMapper::ControlMapper(
+  transform~ : (String, Double) -> (String, Double)?,
+  voice_action~ : (String, Double) -> VoiceAction?,
+) -> ControlMapper {
+  { transform, voice_action }
 }
 
 ///|
@@ -41,7 +44,7 @@ pub fn ControlMapper::new(
   transform~ : (String, Double) -> (String, Double)?,
   voice_action~ : (String, Double) -> VoiceAction?,
 ) -> ControlMapper {
-  { transform, voice_action }
+  ControlMapper(transform~, voice_action~)
 }
 
 ///|
@@ -72,13 +75,6 @@ pub struct PatternScheduler {
   active_notes : Array[ActiveNote]
   bindings : @moondsp.ControlBindingMap
   mapper : ControlMapper
-
-  fn new(
-    bpm~ : Double,
-    bindings~ : @moondsp.ControlBindingMap,
-    ctx~ : @moondsp.DspContext,
-    mapper? : ControlMapper,
-  ) -> PatternScheduler
 }
 
 ///|
@@ -93,6 +89,16 @@ fn sanitize_bpm(bpm : Double) -> Double {
 
 ///|
 pub fn PatternScheduler::new(
+  bpm~ : Double,
+  bindings~ : @moondsp.ControlBindingMap,
+  ctx~ : @moondsp.DspContext,
+  mapper? : ControlMapper,
+) -> PatternScheduler {
+  PatternScheduler(bpm~, bindings~, ctx~, mapper?)
+}
+
+///|
+pub fn PatternScheduler::PatternScheduler(
   bpm~ : Double,
   bindings~ : @moondsp.ControlBindingMap,
   ctx~ : @moondsp.DspContext,
