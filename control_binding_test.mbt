@@ -107,12 +107,12 @@ test "resolve: all present keys converted in binding insertion order" {
   let controls : Map[String, Double] = { "note": 60.0, "gain": 0.5 }
   let result = map.resolve_controls(controls)
   assert_eq(result.length(), 2)
-  assert_eq(result[0].node_index, 0)
-  assert_eq(result[0].slot, GraphParamSlot::Value0)
-  assert_eq(result[0].value, 60.0)
-  assert_eq(result[1].node_index, 1)
-  assert_eq(result[1].slot, GraphParamSlot::Value0)
-  assert_eq(result[1].value, 0.5)
+  assert_eq(result[0].node_index(), 0)
+  assert_eq(result[0].slot(), GraphParamSlot::Value0)
+  assert_eq(result[0].value(), 60.0)
+  assert_eq(result[1].node_index(), 1)
+  assert_eq(result[1].slot(), GraphParamSlot::Value0)
+  assert_eq(result[1].value(), 0.5)
 }
 
 ///|
@@ -130,8 +130,8 @@ test "resolve: partial map skips missing keys" {
   let controls : Map[String, Double] = { "gain": 0.8 }
   let result = map.resolve_controls(controls)
   assert_eq(result.length(), 1)
-  assert_eq(result[0].node_index, 1)
-  assert_eq(result[0].value, 0.8)
+  assert_eq(result[0].node_index(), 1)
+  assert_eq(result[0].value(), 0.8)
 }
 
 ///|
@@ -144,7 +144,7 @@ test "resolve: extra keys in map are ignored" {
   let controls : Map[String, Double] = { "freq": 220.0, "unknown": 99.0 }
   let result = map.resolve_controls(controls)
   assert_eq(result.length(), 1)
-  assert_eq(result[0].value, 220.0)
+  assert_eq(result[0].value(), 220.0)
 }
 
 ///|

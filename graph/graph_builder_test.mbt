@@ -11,13 +11,13 @@ test "GraphBuilder: mul merges two constants" {
   let product : GraphBuilder = ArithSym::mul(a, b)
   let nodes = product.nodes()
   assert_eq(nodes.length(), 3) // const(3), const(4), mul(0,1)
-  assert_true(nodes[0].kind is DspNodeKind::Constant)
-  assert_eq(nodes[0].value0, 3.0)
-  assert_true(nodes[1].kind is DspNodeKind::Constant)
-  assert_eq(nodes[1].value0, 4.0)
-  assert_true(nodes[2].kind is DspNodeKind::Mul)
-  assert_eq(nodes[2].input0, 0)
-  assert_eq(nodes[2].input1, 1)
+  assert_true(nodes[0].kind() is DspNodeKind::Constant)
+  assert_eq(nodes[0].value0(), 3.0)
+  assert_true(nodes[1].kind() is DspNodeKind::Constant)
+  assert_eq(nodes[1].value0(), 4.0)
+  assert_true(nodes[2].kind() is DspNodeKind::Mul)
+  assert_eq(nodes[2].input0(), 0)
+  assert_eq(nodes[2].input1(), 1)
 }
 
 ///|
@@ -27,9 +27,9 @@ test "GraphBuilder: mix merges two constants" {
   let result : GraphBuilder = ArithSym::mix(a, b)
   let nodes = result.nodes()
   assert_eq(nodes.length(), 3)
-  assert_true(nodes[2].kind is DspNodeKind::Mix)
-  assert_eq(nodes[2].input0, 0)
-  assert_eq(nodes[2].input1, 1)
+  assert_true(nodes[2].kind() is DspNodeKind::Mix)
+  assert_eq(nodes[2].input0(), 0)
+  assert_eq(nodes[2].input1(), 1)
 }
 
 ///|
@@ -46,9 +46,9 @@ test "GraphBuilder: oscillator with frequency input" {
   let osc : GraphBuilder = DspSym::oscillator(freq, Waveform::Sine)
   let nodes = osc.nodes()
   assert_eq(nodes.length(), 2) // const, oscillator
-  assert_true(nodes[1].kind is DspNodeKind::Oscillator)
-  assert_eq(nodes[1].input0, 0)
-  assert_true(nodes[1].waveform is Waveform::Sine)
+  assert_true(nodes[1].kind() is DspNodeKind::Oscillator)
+  assert_eq(nodes[1].input0(), 0)
+  assert_true(nodes[1].waveform() is Waveform::Sine)
 }
 
 ///|
@@ -56,8 +56,8 @@ test "GraphBuilder: noise source" {
   let n : GraphBuilder = DspSym::noise(42U)
   let nodes = n.nodes()
   assert_eq(nodes.length(), 1)
-  assert_true(nodes[0].kind is DspNodeKind::Noise)
-  assert_eq(nodes[0].seed, 42U)
+  assert_true(nodes[0].kind() is DspNodeKind::Noise)
+  assert_eq(nodes[0].seed(), 42U)
 }
 
 ///|
@@ -65,11 +65,11 @@ test "GraphBuilder: adsr source" {
   let e : GraphBuilder = DspSym::adsr(10.0, 50.0, 0.7, 200.0)
   let nodes = e.nodes()
   assert_eq(nodes.length(), 1)
-  assert_true(nodes[0].kind is DspNodeKind::Adsr)
-  assert_eq(nodes[0].value0, 10.0)
-  assert_eq(nodes[0].value1, 50.0)
-  assert_eq(nodes[0].value2, 0.7)
-  assert_eq(nodes[0].value3, 200.0)
+  assert_true(nodes[0].kind() is DspNodeKind::Adsr)
+  assert_eq(nodes[0].value0(), 10.0)
+  assert_eq(nodes[0].value1(), 50.0)
+  assert_eq(nodes[0].value2(), 0.7)
+  assert_eq(nodes[0].value3(), 200.0)
 }
 
 ///|
@@ -78,9 +78,9 @@ test "GraphBuilder: clip" {
   let clipped : GraphBuilder = ArithSym::clip(c, 0.5)
   let nodes = clipped.nodes()
   assert_eq(nodes.length(), 2)
-  assert_true(nodes[1].kind is DspNodeKind::Clip)
-  assert_eq(nodes[1].input0, 0)
-  assert_eq(nodes[1].value0, 0.5)
+  assert_true(nodes[1].kind() is DspNodeKind::Clip)
+  assert_eq(nodes[1].input0(), 0)
+  assert_eq(nodes[1].value0(), 0.5)
 }
 
 ///|
@@ -94,11 +94,11 @@ test "GraphBuilder: biquad filter" {
   )
   let nodes = filtered.nodes()
   assert_eq(nodes.length(), 2)
-  assert_true(nodes[1].kind is DspNodeKind::Biquad)
-  assert_eq(nodes[1].input0, 0)
-  assert_eq(nodes[1].value0, 1000.0)
-  assert_eq(nodes[1].value1, 0.707)
-  assert_true(nodes[1].filter_mode is BiquadMode::LowPass)
+  assert_true(nodes[1].kind() is DspNodeKind::Biquad)
+  assert_eq(nodes[1].input0(), 0)
+  assert_eq(nodes[1].value0(), 1000.0)
+  assert_eq(nodes[1].value1(), 0.707)
+  assert_true(nodes[1].filter_mode() is BiquadMode::LowPass)
 }
 
 ///|
@@ -107,11 +107,11 @@ test "GraphBuilder: delay" {
   let delayed : GraphBuilder = DelaySym::delay(c, 48000, 24000, 0.5)
   let nodes = delayed.nodes()
   assert_eq(nodes.length(), 2)
-  assert_true(nodes[1].kind is DspNodeKind::Delay)
-  assert_eq(nodes[1].input0, 0)
-  assert_eq(nodes[1].delay_max_samples, 48000)
-  assert_eq(nodes[1].delay_samples, 24000)
-  assert_eq(nodes[1].value0, 0.5)
+  assert_true(nodes[1].kind() is DspNodeKind::Delay)
+  assert_eq(nodes[1].input0(), 0)
+  assert_eq(nodes[1].delay_max_samples(), 48000)
+  assert_eq(nodes[1].delay_samples(), 24000)
+  assert_eq(nodes[1].value0(), 0.5)
 }
 
 ///|
@@ -120,9 +120,9 @@ test "GraphBuilder: pan" {
   let panned : GraphBuilder = StereoSym::pan(c, 0.3)
   let nodes = panned.nodes()
   assert_eq(nodes.length(), 2)
-  assert_true(nodes[1].kind is DspNodeKind::Pan)
-  assert_eq(nodes[1].input0, 0)
-  assert_eq(nodes[1].value0, 0.3)
+  assert_true(nodes[1].kind() is DspNodeKind::Pan)
+  assert_eq(nodes[1].input0(), 0)
+  assert_eq(nodes[1].value0(), 0.3)
 }
 
 ///|
@@ -132,9 +132,9 @@ test "GraphBuilder: stereo_gain" {
   let sg : GraphBuilder = StereoSym::stereo_gain(p, 0.8)
   let nodes = sg.nodes()
   assert_eq(nodes.length(), 3)
-  assert_true(nodes[2].kind is DspNodeKind::StereoGain)
-  assert_eq(nodes[2].input0, 1)
-  assert_eq(nodes[2].value0, 0.8)
+  assert_true(nodes[2].kind() is DspNodeKind::StereoGain)
+  assert_eq(nodes[2].input0(), 1)
+  assert_eq(nodes[2].value0(), 0.8)
 }
 
 ///|
@@ -144,9 +144,9 @@ test "GraphBuilder: stereo_clip" {
   let sc : GraphBuilder = StereoSym::stereo_clip(p, 0.5)
   let nodes = sc.nodes()
   assert_eq(nodes.length(), 3)
-  assert_true(nodes[2].kind is DspNodeKind::StereoClip)
-  assert_eq(nodes[2].input0, 1)
-  assert_eq(nodes[2].value0, 0.5)
+  assert_true(nodes[2].kind() is DspNodeKind::StereoClip)
+  assert_eq(nodes[2].input0(), 1)
+  assert_eq(nodes[2].value0(), 0.5)
 }
 
 ///|
@@ -161,11 +161,11 @@ test "GraphBuilder: stereo_biquad" {
   )
   let nodes = sb.nodes()
   assert_eq(nodes.length(), 3)
-  assert_true(nodes[2].kind is DspNodeKind::StereoBiquad)
-  assert_eq(nodes[2].input0, 1)
-  assert_eq(nodes[2].value0, 500.0)
-  assert_eq(nodes[2].value1, 1.0)
-  assert_true(nodes[2].filter_mode is BiquadMode::HighPass)
+  assert_true(nodes[2].kind() is DspNodeKind::StereoBiquad)
+  assert_eq(nodes[2].input0(), 1)
+  assert_eq(nodes[2].value0(), 500.0)
+  assert_eq(nodes[2].value1(), 1.0)
+  assert_true(nodes[2].filter_mode() is BiquadMode::HighPass)
 }
 
 ///|
@@ -175,11 +175,11 @@ test "GraphBuilder: stereo_delay" {
   let sd : GraphBuilder = StereoDelaySym::stereo_delay(p, 48000, 12000, 0.3)
   let nodes = sd.nodes()
   assert_eq(nodes.length(), 3)
-  assert_true(nodes[2].kind is DspNodeKind::StereoDelay)
-  assert_eq(nodes[2].input0, 1)
-  assert_eq(nodes[2].delay_max_samples, 48000)
-  assert_eq(nodes[2].delay_samples, 12000)
-  assert_eq(nodes[2].value0, 0.3)
+  assert_true(nodes[2].kind() is DspNodeKind::StereoDelay)
+  assert_eq(nodes[2].input0(), 1)
+  assert_eq(nodes[2].delay_max_samples(), 48000)
+  assert_eq(nodes[2].delay_samples(), 12000)
+  assert_eq(nodes[2].value0(), 0.3)
 }
 
 ///|
@@ -190,9 +190,9 @@ test "GraphBuilder: stereo_mixdown unary" {
   let nodes = mixed.nodes()
   // const(1.0)=0, pan(0)=1, stereo_mixdown(1)=2
   assert_eq(nodes.length(), 3)
-  assert_true(nodes[2].kind is DspNodeKind::StereoMixDown)
-  assert_eq(nodes[2].input0, 1)
-  assert_eq(nodes[2].input1, -1)
+  assert_true(nodes[2].kind() is DspNodeKind::StereoMixDown)
+  assert_eq(nodes[2].input0(), 1)
+  assert_eq(nodes[2].input1(), -1)
 }
 
 ///|
@@ -202,9 +202,9 @@ test "GraphBuilder: stereo_output unary" {
   let out : GraphBuilder = StereoSym::stereo_output(p)
   let nodes = out.nodes()
   assert_eq(nodes.length(), 3)
-  assert_true(nodes[2].kind is DspNodeKind::StereoOutput)
-  assert_eq(nodes[2].input0, 1)
-  assert_eq(nodes[2].input1, -1)
+  assert_true(nodes[2].kind() is DspNodeKind::StereoOutput)
+  assert_eq(nodes[2].input0(), 1)
+  assert_eq(nodes[2].input1(), -1)
 }
 
 ///|
@@ -223,13 +223,13 @@ test "GraphBuilder: remap preserves correct indices during merge" {
   // Merged:   const(2)=3, gain(3)=4
   // Mul(2,4)=5
   assert_eq(nodes.length(), 6)
-  assert_true(nodes[3].kind is DspNodeKind::Constant)
-  assert_eq(nodes[3].value0, 2.0)
-  assert_true(nodes[4].kind is DspNodeKind::Gain)
-  assert_eq(nodes[4].input0, 3) // remapped from 0 to 0+3=3
-  assert_true(nodes[5].kind is DspNodeKind::Mul)
-  assert_eq(nodes[5].input0, 2)
-  assert_eq(nodes[5].input1, 4)
+  assert_true(nodes[3].kind() is DspNodeKind::Constant)
+  assert_eq(nodes[3].value0(), 2.0)
+  assert_true(nodes[4].kind() is DspNodeKind::Gain)
+  assert_eq(nodes[4].input0(), 3) // remapped from 0 to 0+3=3
+  assert_true(nodes[5].kind() is DspNodeKind::Mul)
+  assert_eq(nodes[5].input0(), 2)
+  assert_eq(nodes[5].input1(), 4)
 }
 
 ///|
@@ -244,9 +244,9 @@ test "GraphBuilder: same-array binary op does not duplicate" {
   let nodes = result.nodes()
   // const=0, gain(0)=1, mul(0,1)=2
   assert_eq(nodes.length(), 3)
-  assert_true(nodes[2].kind is DspNodeKind::Mul)
-  assert_eq(nodes[2].input0, 0)
-  assert_eq(nodes[2].input1, 1)
+  assert_true(nodes[2].kind() is DspNodeKind::Mul)
+  assert_eq(nodes[2].input0(), 0)
+  assert_eq(nodes[2].input1(), 1)
 }
 
 ///|
@@ -264,11 +264,11 @@ test "GraphBuilder: full mono pipeline" {
   let out : GraphBuilder = DspSym::output(filtered)
   let nodes = out.nodes()
   assert_eq(nodes.length(), 5) // const, osc, gain, biquad, output
-  assert_true(nodes[0].kind is DspNodeKind::Constant)
-  assert_true(nodes[1].kind is DspNodeKind::Oscillator)
-  assert_true(nodes[2].kind is DspNodeKind::Gain)
-  assert_true(nodes[3].kind is DspNodeKind::Biquad)
-  assert_true(nodes[4].kind is DspNodeKind::Output)
+  assert_true(nodes[0].kind() is DspNodeKind::Constant)
+  assert_true(nodes[1].kind() is DspNodeKind::Oscillator)
+  assert_true(nodes[2].kind() is DspNodeKind::Gain)
+  assert_true(nodes[3].kind() is DspNodeKind::Biquad)
+  assert_true(nodes[4].kind() is DspNodeKind::Output)
 }
 
 ///|
@@ -282,13 +282,13 @@ test "GraphBuilder: adsr * osc pipeline" {
   // adsr=0 | const(440)=0, osc(0)=1 -> merged at offset 1
   // result: adsr=0, const(440)=1, osc(1)=2, mul(0,2)=3, output(3)=4
   assert_eq(nodes.length(), 5)
-  assert_true(nodes[0].kind is DspNodeKind::Adsr)
-  assert_true(nodes[1].kind is DspNodeKind::Constant)
-  assert_true(nodes[2].kind is DspNodeKind::Oscillator)
-  assert_eq(nodes[2].input0, 1) // remapped: was 0, offset 1, so 1
-  assert_true(nodes[3].kind is DspNodeKind::Mul)
-  assert_eq(nodes[3].input0, 0)
-  assert_eq(nodes[3].input1, 2)
-  assert_true(nodes[4].kind is DspNodeKind::Output)
-  assert_eq(nodes[4].input0, 3)
+  assert_true(nodes[0].kind() is DspNodeKind::Adsr)
+  assert_true(nodes[1].kind() is DspNodeKind::Constant)
+  assert_true(nodes[2].kind() is DspNodeKind::Oscillator)
+  assert_eq(nodes[2].input0(), 1) // remapped: was 0, offset 1, so 1
+  assert_true(nodes[3].kind() is DspNodeKind::Mul)
+  assert_eq(nodes[3].input0(), 0)
+  assert_eq(nodes[3].input1(), 2)
+  assert_true(nodes[4].kind() is DspNodeKind::Output)
+  assert_eq(nodes[4].input0(), 3)
 }

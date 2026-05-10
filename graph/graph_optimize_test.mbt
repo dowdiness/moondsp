@@ -8,8 +8,8 @@ test "fold constants: Mul(Constant, Constant) -> Constant" {
   ]
   let (optimized, _) = optimize_graph(nodes)
   assert_eq(optimized.length(), 2) // Constant(12) + Output
-  assert_true(optimized[0].kind is DspNodeKind::Constant)
-  assert_eq(optimized[0].value0, 12.0)
+  assert_true(optimized[0].kind() is DspNodeKind::Constant)
+  assert_eq(optimized[0].value0(), 12.0)
 }
 
 ///|
@@ -21,8 +21,8 @@ test "fold constants: Gain(Constant, amount) -> Constant" {
   ]
   let (optimized, _) = optimize_graph(nodes)
   assert_eq(optimized.length(), 2) // Constant(5) + Output
-  assert_true(optimized[0].kind is DspNodeKind::Constant)
-  assert_eq(optimized[0].value0, 5.0)
+  assert_true(optimized[0].kind() is DspNodeKind::Constant)
+  assert_eq(optimized[0].value0(), 5.0)
 }
 
 ///|

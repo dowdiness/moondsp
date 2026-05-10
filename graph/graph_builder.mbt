@@ -45,7 +45,7 @@ fn remap_node_by_offset(node : DspNode, offset : Int) -> DspNode {
   } else {
     node.input1
   }
-  DspNode(
+  DspNode::new(
     node.kind,
     new_input0,
     new_input1,

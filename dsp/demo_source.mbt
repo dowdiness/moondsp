@@ -8,8 +8,6 @@ const DEMO_NOISE_SEED : UInt = 0x6D2B79F5U
 pub struct DemoSource {
   priv oscillator : Oscillator
   priv noise : Noise
-
-  fn new() -> DemoSource
 }
 
 ///|

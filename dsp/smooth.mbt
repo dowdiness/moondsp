@@ -1,9 +1,9 @@
 ///|
 /// Stateful one-pole smoother for click-free control changes.
 pub struct ParamSmoother {
-  mut current : Double
-  mut target : Double
-  mut coeff : Double
+  priv mut current : Double
+  priv mut target : Double
+  priv mut coeff : Double
 }
 
 ///|

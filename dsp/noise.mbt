@@ -1,7 +1,7 @@
 ///|
 /// Deterministic white-noise source with explicit RNG state.
 pub struct Noise {
-  mut state : UInt
+  priv mut state : UInt
 }
 
 ///|

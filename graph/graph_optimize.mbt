@@ -71,7 +71,7 @@ fn fold_constants(
     let new_input1 = if node.input1 >= 0 { index_map[node.input1] } else { -1 }
     let new_index = folded.length()
     folded.push(
-      DspNode(
+      DspNode::new(
         node.kind,
         new_input0,
         new_input1,
@@ -146,7 +146,7 @@ fn eliminate_dead(
       -1
     }
     result.push(
-      DspNode(
+      DspNode::new(
         node.kind,
         new_input0,
         new_input1,

@@ -3,16 +3,10 @@ pub struct ControlBinding {
   key : String
   node_index : Int
   slot : GraphParamSlot
-
-  fn new(
-    key~ : String,
-    node_index~ : Int,
-    slot~ : GraphParamSlot,
-  ) -> ControlBinding
 } derive(Debug, Eq)
 
 ///|
-fn ControlBinding::new(
+pub fn ControlBinding::new(
   key~ : String,
   node_index~ : Int,
   slot~ : GraphParamSlot,
@@ -32,9 +26,7 @@ pub(all) enum ControlBindingError {
 
 ///|
 pub struct ControlBindingBuilder {
-  bindings : Array[ControlBinding]
-
-  fn new() -> ControlBindingBuilder
+  priv bindings : Array[ControlBinding]
 } derive(Debug)
 
 ///|
@@ -50,7 +42,7 @@ pub fn ControlBindingBuilder::bind(
   node_index~ : Int,
   slot~ : GraphParamSlot,
 ) -> ControlBindingBuilder {
-  self.bindings.push(ControlBinding(key~, node_index~, slot~))
+  self.bindings.push(ControlBinding::new(key~, node_index~, slot~))
   self
 }
 

@@ -1,15 +1,11 @@
 ///|
 /// Stateless in-place gain processor for Phase 1 block processing.
-pub struct Gain {
-  unit : Unit
-
-  fn new() -> Gain
-}
+pub struct Gain {}
 
 ///|
 /// Create a gain processor.
 pub fn Gain::new() -> Gain {
-  Gain::{ unit: () }
+  Gain::{  }
 }
 
 ///|

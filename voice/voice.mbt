@@ -97,7 +97,7 @@ fn gate_all_adsrs(
   gate_on : Bool,
 ) -> Unit {
   for i in 0..<template.length() {
-    if template[i].kind is Adsr {
+    if template[i].kind() is Adsr {
       if gate_on {
         ignore(compiled.gate_on(i))
       } else {
