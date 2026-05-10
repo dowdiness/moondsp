@@ -109,6 +109,8 @@ pub using @graph {type GraphTopologyInputSlot}
 
 pub using @graph {type GraphValidationError}
 
+pub using @graph {type HotSwapQueueError}
+
 pub using @dsp {type Mix}
 
 pub using @dsp {type Mono}

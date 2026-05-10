@@ -82,6 +82,7 @@ pub using @graph {
   type GraphTopologyEdit,
   type GraphTopologyInputSlot,
   type GraphValidationError,
+  type HotSwapQueueError,
 
   // Control binding
   type ControlBinding,

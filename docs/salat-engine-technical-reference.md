@@ -931,7 +931,9 @@ Current semantics:
 - `CompiledDspTopologyController` owns authoring-order mono nodes plus an inner
   `CompiledDspHotSwap`
 - `queue_swap(...)` stages one replacement graph for the next `process(...)`
-  call
+  call; `queue_swap_result(...)` is the result-typed companion for direct
+  mono/stereo hot-swap wrappers and reports sample-rate or block-capacity
+  mismatches explicitly
 - `queue_topology_edit(...)` / `queue_topology_edits(...)` apply an ordered
   `GraphTopologyEdit` batch to the stored mono authoring nodes, recompile a new
   `CompiledDsp`, and stage that replacement through the inner hot-swap wrapper

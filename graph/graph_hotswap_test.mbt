@@ -116,6 +116,66 @@ test "compiled dsp hot swap rejects incompatible replacement graph" {
 }
 
 ///|
+test "compiled dsp hot swap result reports sample rate mismatch" {
+  let active_context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
+  let incompatible_context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE * 2.0,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
+  let active = CompiledDsp::compile(
+    [DspNode::constant(0.0), DspNode::output(0)],
+    active_context,
+  ).unwrap()
+  let incompatible = CompiledDsp::compile(
+    [DspNode::constant(1.0), DspNode::output(0)],
+    incompatible_context,
+  ).unwrap()
+  let hot_swap = CompiledDspHotSwap::from_graph(active)
+
+  match hot_swap.queue_swap_result(incompatible) {
+    Err(HotSwapQueueError::SampleRateMismatch(active_rate, next_rate)) => {
+      assert_eq(active_rate, HOT_SWAP_SAMPLE_RATE)
+      assert_eq(next_rate, HOT_SWAP_SAMPLE_RATE * 2.0)
+    }
+    other => fail("expected SampleRateMismatch, got \{other}")
+  }
+}
+
+///|
+test "compiled dsp hot swap result reports block capacity mismatch" {
+  let active_context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
+  let incompatible_context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE * 2,
+  )
+  let active = CompiledDsp::compile(
+    [DspNode::constant(0.0), DspNode::output(0)],
+    active_context,
+  ).unwrap()
+  let incompatible = CompiledDsp::compile(
+    [DspNode::constant(1.0), DspNode::output(0)],
+    incompatible_context,
+  ).unwrap()
+  let hot_swap = CompiledDspHotSwap::from_graph(active)
+
+  match hot_swap.queue_swap_result(incompatible) {
+    Err(
+      HotSwapQueueError::BlockCapacityMismatch(active_capacity, next_capacity)
+    ) => {
+      assert_eq(active_capacity, HOT_SWAP_BLOCK_SIZE)
+      assert_eq(next_capacity, HOT_SWAP_BLOCK_SIZE * 2)
+    }
+    other => fail("expected BlockCapacityMismatch, got \{other}")
+  }
+}
+
+///|
 test "compiled dsp hot swap mirrors runtime param changes into pending graph" {
   let context = DspContext::new(
     sample_rate=HOT_SWAP_SAMPLE_RATE,
@@ -242,6 +302,39 @@ test "compiled stereo dsp hot swap crossfades equal-power between graphs" {
   assert_true(hot_swap_buffers_equal(first_left, first_right, HOT_SWAP_EPSILON))
   assert_true(
     hot_swap_buffers_equal(second_left, second_right, HOT_SWAP_EPSILON),
+  )
+}
+
+///|
+test "compiled stereo dsp hot swap result queues compatible graph" {
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
+  let old_graph = CompiledStereoDsp::compile(
+    [DspNode::constant(0.0), DspNode::pan(0, 0.0), DspNode::stereo_output(1)],
+    context,
+  ).unwrap()
+  let new_graph = CompiledStereoDsp::compile(
+    [DspNode::constant(1.0), DspNode::pan(0, 0.0), DspNode::stereo_output(1)],
+    context,
+  ).unwrap()
+  let hot_swap = CompiledStereoDspHotSwap::from_graph(old_graph)
+  let left = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+  let right = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+
+  assert_true(hot_swap.queue_swap_result(new_graph) is Ok(_))
+  hot_swap.process(context, left, right)
+
+  assert_true(
+    left
+    .as_fixed_array()
+    .every(sample => (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON),
+  )
+  assert_true(
+    right
+    .as_fixed_array()
+    .every(sample => (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON),
   )
 }
 

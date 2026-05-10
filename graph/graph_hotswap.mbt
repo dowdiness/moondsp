@@ -35,6 +35,18 @@ struct CompiledDspHotSwap(HotSwapGraph)
 struct CompiledStereoDspHotSwap(HotSwapGraph)
 
 ///|
+/// Failure reason for result-typed hot-swap queue APIs.
+pub(all) enum HotSwapQueueError {
+  SampleRateMismatch(Double, Double)
+  BlockCapacityMismatch(Int, Int)
+} derive(Debug)
+
+///|
+pub impl Show for HotSwapQueueError with output(self, logger) {
+  logger.write_string(@debug.to_string(self))
+}
+
+///|
 /// Queue a new compiled graph, resetting the crossfade position.
 ///
 /// Returns `false` when the replacement graph is incompatible with the active
@@ -43,15 +55,32 @@ fn HotSwapGraph::queue_swap_impl(
   self : HotSwapGraph,
   next : CompiledGraph,
 ) -> Bool {
+  self.queue_swap_result_impl(next) is Ok(_)
+}
+
+///|
+fn HotSwapGraph::queue_swap_result_impl(
+  self : HotSwapGraph,
+  next : CompiledGraph,
+) -> Result[Unit, HotSwapQueueError] {
   if self.active.compile_sample_rate != next.compile_sample_rate {
-    return false
+    return Err(
+      HotSwapQueueError::SampleRateMismatch(
+        self.active.compile_sample_rate,
+        next.compile_sample_rate,
+      ),
+    )
   }
-  if self.active.compiled_buffer_capacity() != next.compiled_buffer_capacity() {
-    return false
+  let active_capacity = self.active.compiled_buffer_capacity()
+  let next_capacity = next.compiled_buffer_capacity()
+  if active_capacity != next_capacity {
+    return Err(
+      HotSwapQueueError::BlockCapacityMismatch(active_capacity, next_capacity),
+    )
   }
   self.pending = Some(next)
   self.crossfade_position = 0
-  true
+  Ok(())
 }
 
 ///|
@@ -125,7 +154,16 @@ pub fn CompiledDspHotSwap::queue_swap(
   self : CompiledDspHotSwap,
   next : CompiledDsp,
 ) -> Bool {
-  self.0.queue_swap_impl(next.0)
+  self.queue_swap_result(next) is Ok(_)
+}
+
+///|
+/// Result-typed companion to `queue_swap(...)`.
+pub fn CompiledDspHotSwap::queue_swap_result(
+  self : CompiledDspHotSwap,
+  next : CompiledDsp,
+) -> Result[Unit, HotSwapQueueError] {
+  self.0.queue_swap_result_impl(next.0)
 }
 
 ///|
@@ -270,7 +308,16 @@ pub fn CompiledStereoDspHotSwap::queue_swap(
   self : CompiledStereoDspHotSwap,
   next : CompiledStereoDsp,
 ) -> Bool {
-  self.0.queue_swap_impl(next.0)
+  self.queue_swap_result(next) is Ok(_)
+}
+
+///|
+/// Result-typed companion to `queue_swap(...)`.
+pub fn CompiledStereoDspHotSwap::queue_swap_result(
+  self : CompiledStereoDspHotSwap,
+  next : CompiledStereoDsp,
+) -> Result[Unit, HotSwapQueueError] {
+  self.0.queue_swap_result_impl(next.0)
 }
 
 ///|

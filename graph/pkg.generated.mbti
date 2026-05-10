@@ -44,6 +44,7 @@ type CompiledDspHotSwap
 pub fn CompiledDspHotSwap::from_graph(CompiledDsp, crossfade_samples? : Int) -> Self
 pub fn CompiledDspHotSwap::process(Self, @dsp.DspContext, @dsp.AudioBuffer) -> Unit
 pub fn CompiledDspHotSwap::queue_swap(Self, CompiledDsp) -> Bool
+pub fn CompiledDspHotSwap::queue_swap_result(Self, CompiledDsp) -> Result[Unit, HotSwapQueueError]
 pub impl GraphControllable for CompiledDspHotSwap
 
 type CompiledDspTopologyController
@@ -74,6 +75,7 @@ type CompiledStereoDspHotSwap
 pub fn CompiledStereoDspHotSwap::from_graph(CompiledStereoDsp, crossfade_samples? : Int) -> Self
 pub fn CompiledStereoDspHotSwap::process(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn CompiledStereoDspHotSwap::queue_swap(Self, CompiledStereoDsp) -> Bool
+pub fn CompiledStereoDspHotSwap::queue_swap_result(Self, CompiledStereoDsp) -> Result[Unit, HotSwapQueueError]
 pub impl GraphControllable for CompiledStereoDspHotSwap
 
 type CompiledStereoDspTopologyController
@@ -255,6 +257,12 @@ pub(all) enum GraphValidationError {
   InvalidStateIndex(Int, String)
 } derive(Eq, @debug.Debug)
 pub impl Show for GraphValidationError
+
+pub(all) enum HotSwapQueueError {
+  SampleRateMismatch(Double, Double)
+  BlockCapacityMismatch(Int, Int)
+} derive(@debug.Debug)
+pub impl Show for HotSwapQueueError
 
 // Type aliases
 pub using @dsp {type Adsr}
