@@ -135,9 +135,9 @@ pub fn DspNode::output(Int) -> Self
 pub fn DspNode::pan(Int, Double) -> Self
 pub fn DspNode::seed(Self) -> UInt
 pub fn DspNode::stereo_biquad(input~ : Int, mode~ : @dsp.BiquadMode, cutoff_hz~ : Double, q~ : Double) -> Self
-pub fn DspNode::stereo_clip(Int, Double) -> Self
+pub fn DspNode::stereo_clip(input~ : Int, threshold~ : Double) -> Self
 pub fn DspNode::stereo_delay(Int, Int, delay_samples? : Int, feedback? : Double) -> Self
-pub fn DspNode::stereo_gain(Int, Double) -> Self
+pub fn DspNode::stereo_gain(input~ : Int, amount~ : Double) -> Self
 pub fn DspNode::stereo_mixdown(Int) -> Self
 pub fn DspNode::stereo_output(Int) -> Self
 pub fn DspNode::value0(Self) -> Double

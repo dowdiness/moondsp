@@ -158,12 +158,12 @@ fn gen_stereo_graph(seed : Int) -> Array[DspNode] {
   let stereo_bits = s / 7 % 16
   if stereo_bits % 2 >= 1 {
     let gain_val = 0.1 + (s % 9).to_double() * 0.1
-    nodes.push(DspNode::stereo_gain(last, gain_val))
+    nodes.push(DspNode::stereo_gain(input=last, amount=gain_val))
     last = nodes.length() - 1
   }
   if stereo_bits / 2 % 2 >= 1 {
     let threshold = 0.1 + (s % 9).to_double() * 0.1
-    nodes.push(DspNode::stereo_clip(last, threshold))
+    nodes.push(DspNode::stereo_clip(input=last, threshold~))
     last = nodes.length() - 1
   }
   if stereo_bits / 4 % 2 >= 1 {
@@ -323,7 +323,7 @@ fn gen_stereo_feedback_graph(seed : Int) -> Array[DspNode] {
     DspNode::mix(0, 5),
     DspNode::gain(1, feedback_gain),
     DspNode::pan(2, pan_pos),
-    DspNode::stereo_gain(3, stereo_gain_val),
+    DspNode::stereo_gain(input=3, amount=stereo_gain_val),
     DspNode::stereo_mixdown(4),
     DspNode::stereo_output(4),
   ]

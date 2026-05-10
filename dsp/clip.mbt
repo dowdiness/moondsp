@@ -12,9 +12,9 @@ pub fn Clip::new() -> Clip {
 /// Apply hard clipping in place using a symmetric threshold.
 pub fn Clip::process(
   self : Clip,
-  context : DspContext,
-  buffer : AudioBuffer,
-  threshold : Double,
+  context~ : DspContext,
+  buffer~ : AudioBuffer,
+  threshold~ : Double,
 ) -> Unit {
   ignore(self)
   let sample_rate = context.sample_rate()

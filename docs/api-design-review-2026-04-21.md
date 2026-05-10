@@ -34,21 +34,16 @@ to `archive/` rather than edited in place.
   behind `nodes()` and the tagless graph constructors.
 - **(3) Label the footgun constructors — ✅ shipped 2026-04-21.**
   `DspContext::new`, `Adsr::new`, `DspNode::adsr`, `DspNode::biquad`,
-  `DspNode::stereo_biquad`, and `Oscillator::process` now use
-  labelled-required arguments, so call sites are unit-self-documenting
-  (`attack_ms`, `release_ms`, `sample_rate`, `block_size`, `cutoff_hz`,
-  `freq_hz`, etc.). Trait-level variants (`DspSym::adsr`,
-  `FilterSym::biquad`, `StereoFilterSym::stereo_biquad`) remain positional; a
-  separate pass would be needed to extend labelling through the tagless
-  symantic traits.
-
-  **Deferred sub-items (API-consistency follow-ups, not correctness bugs):**
-  - `Oscillator::process_waveform` / `tick` / `tick_waveform` are still
-    positional — asymmetric with the now-labelled `process`.
-  - Other stereo / process methods (`Gain::process`, `Clip::process`,
-    `Pan::process`, `DspNode::stereo_gain`, `DspNode::stereo_clip`) are
-    still positional. If we extend labelling to these, we should do it as a
-    single consistent sweep rather than piecemeal.
+  `DspNode::stereo_biquad`, `Oscillator::process`, and the follow-up API
+  consistency sweep (`Oscillator::process_waveform` / `tick` /
+  `tick_waveform`, `Gain::process`, `Clip::process`, `Pan::process`,
+  `DspNode::stereo_gain`, `DspNode::stereo_clip`) now use labelled-required
+  arguments, so call sites are unit-self-documenting (`attack_ms`,
+  `release_ms`, `sample_rate`, `block_size`, `cutoff_hz`, `freq_hz`, etc.).
+  Trait-level variants (`DspSym::adsr`, `FilterSym::biquad`,
+  `StereoFilterSym::stereo_biquad`, `StereoSym::stereo_gain`,
+  `StereoSym::stereo_clip`) remain positional; a separate pass would be needed
+  to extend labelling through the tagless symantic traits.
 - **(4) Remove scheduler binding staleness — ✅ shipped 2026-05-11.**
   `BoundVoicePool` now owns both the low-level `VoicePool` and the
   `ControlBindingMap` proven against the current template. `PatternScheduler`

@@ -38,15 +38,35 @@ pub fn DemoSource::tick_source(
   sample_rate : Double,
 ) -> Double {
   match source_id {
-    1 => self.oscillator.tick_waveform(Waveform::Saw, freq, sample_rate)
-    2 => self.oscillator.tick_waveform(Waveform::Square, freq, sample_rate)
-    3 => self.oscillator.tick_waveform(Waveform::Triangle, freq, sample_rate)
+    1 =>
+      self.oscillator.tick_waveform(
+        waveform=Waveform::Saw,
+        freq_hz=freq,
+        sample_rate~,
+      )
+    2 =>
+      self.oscillator.tick_waveform(
+        waveform=Waveform::Square,
+        freq_hz=freq,
+        sample_rate~,
+      )
+    3 =>
+      self.oscillator.tick_waveform(
+        waveform=Waveform::Triangle,
+        freq_hz=freq,
+        sample_rate~,
+      )
     4 =>
       if !is_finite(sample_rate) || sample_rate <= 0.0 {
         0.0
       } else {
         self.noise.tick()
       }
-    _ => self.oscillator.tick_waveform(Waveform::Sine, freq, sample_rate)
+    _ =>
+      self.oscillator.tick_waveform(
+        waveform=Waveform::Sine,
+        freq_hz=freq,
+        sample_rate~,
+      )
   }
 }

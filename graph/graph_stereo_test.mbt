@@ -30,7 +30,7 @@ test "compiled stereo dsp applies stereo gain after pan" {
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_gain(1, HALF_GAIN),
+    DspNode::stereo_gain(input=1, amount=HALF_GAIN),
     DspNode::stereo_output(2),
   ]
   let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
@@ -59,7 +59,7 @@ test "compiled stereo dsp applies stereo clip after pan" {
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_clip(1, STEREO_CLIP_THRESHOLD),
+    DspNode::stereo_clip(input=1, threshold=STEREO_CLIP_THRESHOLD),
     DspNode::stereo_output(2),
   ]
   let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
@@ -114,7 +114,7 @@ test "compiled stereo dsp compile_template matches compile output" {
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_gain(1, HALF_GAIN),
+    DspNode::stereo_gain(input=1, amount=HALF_GAIN),
     DspNode::stereo_output(2),
   ]
   let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
@@ -201,8 +201,8 @@ test "compiled stereo dsp runtime params update stereo gain and clip" {
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_gain(1, UNIT_SAMPLE),
-    DspNode::stereo_clip(2, UNIT_SAMPLE),
+    DspNode::stereo_gain(input=1, amount=UNIT_SAMPLE),
+    DspNode::stereo_clip(input=2, threshold=UNIT_SAMPLE),
     DspNode::stereo_output(3),
   ]
   let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
@@ -449,8 +449,8 @@ test "compiled dsp runtime params update stereo nodes before mixdown" {
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_gain(1, UNIT_SAMPLE),
-    DspNode::stereo_clip(2, UNIT_SAMPLE),
+    DspNode::stereo_gain(input=1, amount=UNIT_SAMPLE),
+    DspNode::stereo_clip(input=2, threshold=UNIT_SAMPLE),
     DspNode::stereo_mixdown(3),
     DspNode::output(4),
   ]

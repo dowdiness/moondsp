@@ -345,7 +345,7 @@ test "compiled stereo dsp accepts stereo-shaped feedback edges via self-register
     DspNode::mix(0, 5),
     DspNode::gain(1, HALF_GAIN),
     DspNode::pan(2, PAN_CENTER),
-    DspNode::stereo_gain(3, HALF_GAIN),
+    DspNode::stereo_gain(input=3, amount=HALF_GAIN),
     DspNode::stereo_mixdown(4),
     DspNode::stereo_output(4),
   ]

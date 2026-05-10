@@ -617,7 +617,7 @@ test "compiled stereo dsp topology controller accepts insert nodes" {
       GraphTopologyEdit::insert_node(
         2,
         GraphTopologyInputSlot::Input0,
-        DspNode::stereo_gain(0, 0.5),
+        DspNode::stereo_gain(input=0, amount=0.5),
       ),
     ),
   )
@@ -651,7 +651,7 @@ test "compiled stereo dsp topology controller accepts delete nodes" {
     [
       DspNode::constant(1.0),
       DspNode::pan(0, 0.0),
-      DspNode::stereo_gain(1, 0.5),
+      DspNode::stereo_gain(input=1, amount=0.5),
       DspNode::stereo_output(2),
     ],
     context,
@@ -1125,7 +1125,7 @@ test "topology edit preserves stereo oscillator phase across recompilation" {
   let edit = GraphTopologyEdit::insert_node(
     3,
     GraphTopologyInputSlot::Input0,
-    DspNode::stereo_gain(-1, 1.0),
+    DspNode::stereo_gain(input=-1, amount=1.0),
   )
   assert_true(controller.queue_topology_edit(edit))
   controller.process(ctx, left, right) // applies the swap

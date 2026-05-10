@@ -68,7 +68,7 @@ fn CompiledGraph::process_feedback_graph_impl(
           }
           let value = self.osc_states[node_index]
             .unwrap()
-            .tick_waveform(node.waveform, freq, sample_rate)
+            .tick_waveform(waveform=node.waveform, freq_hz=freq, sample_rate~)
           sample_values[node_index] = value
           self.buffers[node_index].set(sample_index, value)
         }

@@ -505,7 +505,7 @@ pub fn DspNode::pan(input : Int, position : Double) -> DspNode {
 
 ///|
 /// Create a stereo gain node from one stereo upstream node.
-pub fn DspNode::stereo_gain(input : Int, amount : Double) -> DspNode {
+pub fn DspNode::stereo_gain(input~ : Int, amount~ : Double) -> DspNode {
   DspNode::new(
     DspNodeKind::StereoGain,
     input,
@@ -524,7 +524,7 @@ pub fn DspNode::stereo_gain(input : Int, amount : Double) -> DspNode {
 
 ///|
 /// Create a stereo clip node from one stereo upstream node.
-pub fn DspNode::stereo_clip(input : Int, threshold : Double) -> DspNode {
+pub fn DspNode::stereo_clip(input~ : Int, threshold~ : Double) -> DspNode {
   DspNode::new(
     DspNodeKind::StereoClip,
     input,

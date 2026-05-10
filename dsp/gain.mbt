@@ -12,9 +12,9 @@ pub fn Gain::new() -> Gain {
 /// Apply a scalar gain to a block of audio samples in place.
 pub fn Gain::process(
   self : Gain,
-  context : DspContext,
-  buffer : AudioBuffer,
-  amount : Double,
+  context~ : DspContext,
+  buffer~ : AudioBuffer,
+  amount~ : Double,
 ) -> Unit {
   ignore(self)
   let sample_rate = context.sample_rate()

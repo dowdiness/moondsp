@@ -5,7 +5,13 @@ test "pan center splits signal equally" {
   let input = AudioBuffer::filled(4, init=1.0)
   let left = AudioBuffer::filled(4)
   let right = AudioBuffer::filled(4)
-  pan.process(ctx, input, left, right, 0.0)
+  pan.process(
+    context=ctx,
+    input~,
+    left_output=left,
+    right_output=right,
+    position=0.0,
+  )
   for i = 0; i < 4; i = i + 1 {
     assert_true((left.get(i) - 0.7071067811865476).abs() < 0.0001)
     assert_true((right.get(i) - 0.7071067811865476).abs() < 0.0001)
@@ -19,7 +25,13 @@ test "pan hard left sends signal only to left" {
   let input = AudioBuffer::filled(4, init=1.0)
   let left = AudioBuffer::filled(4)
   let right = AudioBuffer::filled(4)
-  pan.process(ctx, input, left, right, -1.0)
+  pan.process(
+    context=ctx,
+    input~,
+    left_output=left,
+    right_output=right,
+    position=-1.0,
+  )
   for i = 0; i < 4; i = i + 1 {
     assert_true(left.get(i) > 0.99)
     assert_true(right.get(i).abs() < 0.0001)
@@ -33,7 +45,13 @@ test "pan hard right sends signal only to right" {
   let input = AudioBuffer::filled(4, init=1.0)
   let left = AudioBuffer::filled(4)
   let right = AudioBuffer::filled(4)
-  pan.process(ctx, input, left, right, 1.0)
+  pan.process(
+    context=ctx,
+    input~,
+    left_output=left,
+    right_output=right,
+    position=1.0,
+  )
   for i = 0; i < 4; i = i + 1 {
     assert_true(left.get(i).abs() < 0.0001)
     assert_true(right.get(i) > 0.99)
@@ -47,7 +65,13 @@ test "pan zero input produces zero output regardless of position" {
   let input = AudioBuffer::filled(4)
   let left = AudioBuffer::filled(4)
   let right = AudioBuffer::filled(4)
-  pan.process(ctx, input, left, right, 0.5)
+  pan.process(
+    context=ctx,
+    input~,
+    left_output=left,
+    right_output=right,
+    position=0.5,
+  )
   for i = 0; i < 4; i = i + 1 {
     assert_true(left.get(i) == 0.0)
     assert_true(right.get(i) == 0.0)
@@ -67,7 +91,13 @@ test "prop: pan preserves energy (equal-power law)" {
       let input = AudioBuffer::filled(1, init=1.0)
       let left = AudioBuffer::filled(1)
       let right = AudioBuffer::filled(1)
-      pan.process(ctx, input, left, right, pan_pos)
+      pan.process(
+        context=ctx,
+        input~,
+        left_output=left,
+        right_output=right,
+        position=pan_pos,
+      )
       let l = left.get(0)
       let r = right.get(0)
       let energy = l * l + r * r

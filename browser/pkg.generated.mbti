@@ -105,6 +105,10 @@ pub fn tick_source(Int, Double, Double) -> Double
 // Errors
 
 // Types and methods
+type SchedulerRoute
+
+type SchedulerRouteSelector
+
 type SoundPool
 
 // Type aliases

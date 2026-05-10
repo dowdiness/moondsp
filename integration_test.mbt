@@ -193,11 +193,16 @@ test "voice chain stays bounded across note on and release" {
   assert_true(filter.update(context, BiquadMode::LowPass, 1200.0, 0.707))
 
   env.gate_on()
-  osc.process_waveform(context, signal, Waveform::Saw, 220.0)
+  osc.process_waveform(
+    context~,
+    output=signal,
+    waveform=Waveform::Saw,
+    freq_hz=220.0,
+  )
   env.process(context, envelope)
   integration_apply_modulation(signal, envelope)
   filter.process(context, signal)
-  gain.process(context, signal, 0.8)
+  gain.process(context~, buffer=signal, amount=0.8)
 
   assert_true(integration_buffer_is_finite_and_bounded(signal, 1.0))
   assert_true(integration_any_non_zero(signal))
@@ -205,18 +210,23 @@ test "voice chain stays bounded across note on and release" {
   delay.process(context, signal)
 
   assert_true(integration_buffer_is_finite_and_bounded(signal, 1.0))
-  clip.process(context, signal, 0.35)
+  clip.process(context~, buffer=signal, threshold=0.35)
 
   assert_true(integration_buffer_is_finite_and_bounded(signal, 0.35))
   assert_true(integration_any_non_zero(signal))
   assert_true(env.stage() is EnvStage::Sustain)
 
   env.gate_off()
-  osc.process_waveform(context, signal, Waveform::Saw, 220.0)
+  osc.process_waveform(
+    context~,
+    output=signal,
+    waveform=Waveform::Saw,
+    freq_hz=220.0,
+  )
   env.process(context, envelope)
   integration_apply_modulation(signal, envelope)
   filter.process(context, signal)
-  gain.process(context, signal, 0.8)
+  gain.process(context~, buffer=signal, amount=0.8)
 
   assert_true(integration_buffer_is_finite_and_bounded(signal, 1.0))
   assert_true(integration_any_non_zero(signal))
@@ -224,7 +234,7 @@ test "voice chain stays bounded across note on and release" {
   delay.process(context, signal)
 
   assert_true(integration_buffer_is_finite_and_bounded(signal, 1.0))
-  clip.process(context, signal, 0.35)
+  clip.process(context~, buffer=signal, threshold=0.35)
 
   assert_true(integration_buffer_is_finite_and_bounded(signal, 0.35))
   assert_true(env.stage() is EnvStage::Release)
@@ -244,7 +254,12 @@ test "mixed oscillator and noise buses remain finite and bounded" {
 
   assert_true(filter.update(context, BiquadMode::HighPass, 800.0, 0.707))
 
-  osc.process_waveform(context, tone, Waveform::Triangle, 110.0)
+  osc.process_waveform(
+    context~,
+    output=tone,
+    waveform=Waveform::Triangle,
+    freq_hz=110.0,
+  )
   let tone_before_mix = integration_copy_samples(tone)
   noise.process(context, noise_bus)
   filter.process(context, noise_bus)
@@ -260,7 +275,7 @@ test "mixed oscillator and noise buses remain finite and bounded" {
   assert_true(
     integration_buffer_differs_from_fixed_array(tone, tone_before_mix),
   )
-  clip.process(context, tone, 0.75)
+  clip.process(context~, buffer=tone, threshold=0.75)
 
   assert_true(integration_buffer_is_finite_and_bounded(tone, 0.75))
   assert_true(integration_any_non_zero(tone))
@@ -286,16 +301,27 @@ test "stereo voice path with pan stays balanced and bounded" {
   assert_true(filter.update(context, BiquadMode::BandPass, 900.0, 0.9))
 
   env.gate_on()
-  osc.process_waveform(context, mono, Waveform::Triangle, 330.0)
+  osc.process_waveform(
+    context~,
+    output=mono,
+    waveform=Waveform::Triangle,
+    freq_hz=330.0,
+  )
   env.process(context, envelope)
   integration_apply_modulation(mono, envelope)
   filter.process(context, mono)
-  gain.process(context, mono, 0.8)
+  gain.process(context~, buffer=mono, amount=0.8)
 
   assert_true(integration_buffer_is_finite_and_bounded(mono, 1.0))
   assert_true(integration_any_non_zero(mono))
 
-  pan.process(context, mono, left, right, 0.0)
+  pan.process(
+    context~,
+    input=mono,
+    left_output=left,
+    right_output=right,
+    position=0.0,
+  )
 
   assert_true(integration_buffer_is_finite_and_bounded(left, 1.0))
   assert_true(integration_buffer_is_finite_and_bounded(right, 1.0))
@@ -303,8 +329,8 @@ test "stereo voice path with pan stays balanced and bounded" {
   assert_true(integration_any_non_zero(right))
   assert_true(integration_buffers_close(left, right, 0.000000001))
 
-  left_clip.process(context, left, 0.4)
-  right_clip.process(context, right, 0.4)
+  left_clip.process(context~, buffer=left, threshold=0.4)
+  right_clip.process(context~, buffer=right, threshold=0.4)
 
   assert_true(integration_buffer_is_finite_and_bounded(left, 0.4))
   assert_true(integration_buffer_is_finite_and_bounded(right, 0.4))
@@ -320,8 +346,8 @@ test "compiled stereo graph voice path responds to runtime pan updates" {
     DspNode::oscillator(Waveform::Triangle, GRAPH_STEREO_FREQ),
     DspNode::gain(0, GRAPH_STEREO_GAIN),
     DspNode::pan(1, GRAPH_STEREO_CENTER),
-    DspNode::stereo_gain(2, GRAPH_STEREO_POST_GAIN),
-    DspNode::stereo_clip(3, GRAPH_STEREO_CLIP),
+    DspNode::stereo_gain(input=2, amount=GRAPH_STEREO_POST_GAIN),
+    DspNode::stereo_clip(input=3, threshold=GRAPH_STEREO_CLIP),
     DspNode::stereo_output(4),
   ]
   let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
@@ -376,8 +402,8 @@ test "compiled stereo graph applies batched control frames" {
     DspNode::oscillator(Waveform::Triangle, GRAPH_STEREO_FREQ),
     DspNode::gain(0, GRAPH_STEREO_GAIN),
     DspNode::pan(1, GRAPH_STEREO_CENTER),
-    DspNode::stereo_gain(2, GRAPH_STEREO_POST_GAIN),
-    DspNode::stereo_clip(3, GRAPH_STEREO_CLIP),
+    DspNode::stereo_gain(input=2, amount=GRAPH_STEREO_POST_GAIN),
+    DspNode::stereo_clip(input=3, threshold=GRAPH_STEREO_CLIP),
     DspNode::stereo_output(4),
   ]
   let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
@@ -446,8 +472,8 @@ test "compiled stereo graph stereo biquad retune changes output" {
       cutoff_hz=GRAPH_STEREO_FILTER_INITIAL_CUTOFF,
       q=GRAPH_STEREO_FILTER_Q,
     ),
-    DspNode::stereo_gain(2, GRAPH_STEREO_POST_GAIN),
-    DspNode::stereo_clip(3, GRAPH_STEREO_CLIP),
+    DspNode::stereo_gain(input=2, amount=GRAPH_STEREO_POST_GAIN),
+    DspNode::stereo_clip(input=3, threshold=GRAPH_STEREO_CLIP),
     DspNode::stereo_output(4),
   ]
   let baseline = CompiledStereoDsp::compile(baseline_nodes, context).unwrap()
@@ -700,8 +726,8 @@ test "compiled graph stereo mixdown matches equivalent mono gain path" {
     DspNode::oscillator(Waveform::Triangle, GRAPH_STEREO_FREQ),
     DspNode::gain(0, GRAPH_STEREO_GAIN),
     DspNode::pan(1, GRAPH_STEREO_CENTER),
-    DspNode::stereo_gain(2, GRAPH_STEREO_POST_GAIN),
-    DspNode::stereo_clip(3, 1.0),
+    DspNode::stereo_gain(input=2, amount=GRAPH_STEREO_POST_GAIN),
+    DspNode::stereo_clip(input=3, threshold=1.0),
     DspNode::stereo_mixdown(4),
     DspNode::output(5),
   ]

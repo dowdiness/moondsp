@@ -36,15 +36,15 @@ pub fn Oscillator::phase(self : Oscillator) -> Double {
 /// state.
 pub fn Oscillator::tick_waveform(
   self : Oscillator,
-  waveform : Waveform,
-  freq : Double,
-  sample_rate : Double,
+  waveform~ : Waveform,
+  freq_hz~ : Double,
+  sample_rate~ : Double,
 ) -> Double {
-  if !is_finite(freq) || !is_finite(sample_rate) || sample_rate <= 0.0 {
+  if !is_finite(freq_hz) || !is_finite(sample_rate) || sample_rate <= 0.0 {
     return 0.0
   }
   let out = sample_for_phase(waveform, self.phase)
-  self.phase = wrap_phase(self.phase + freq / sample_rate)
+  self.phase = wrap_phase(self.phase + freq_hz / sample_rate)
   out
 }
 
@@ -52,25 +52,25 @@ pub fn Oscillator::tick_waveform(
 /// Generate one sine sample and advance the oscillator state.
 pub fn Oscillator::tick(
   self : Oscillator,
-  freq : Double,
-  sample_rate : Double,
+  freq_hz~ : Double,
+  sample_rate~ : Double,
 ) -> Double {
-  self.tick_waveform(Waveform::Sine, freq, sample_rate)
+  self.tick_waveform(waveform=Waveform::Sine, freq_hz~, sample_rate~)
 }
 
 ///|
 /// Fill an output buffer with samples for the selected waveform.
 pub fn Oscillator::process_waveform(
   self : Oscillator,
-  context : DspContext,
-  output : AudioBuffer,
-  waveform : Waveform,
-  freq : Double,
+  context~ : DspContext,
+  output~ : AudioBuffer,
+  waveform~ : Waveform,
+  freq_hz~ : Double,
 ) -> Unit {
   let sample_rate = context.sample_rate()
   let sample_count = effective_sample_count(context, output)
 
-  if !is_finite(freq) ||
+  if !is_finite(freq_hz) ||
     !is_finite(sample_rate) ||
     sample_rate <= 0.0 ||
     sample_count <= 0 {
@@ -79,7 +79,7 @@ pub fn Oscillator::process_waveform(
   }
 
   for index = 0; index < sample_count; index = index + 1 {
-    output.set(index, self.tick_waveform(waveform, freq, sample_rate))
+    output.set(index, self.tick_waveform(waveform~, freq_hz~, sample_rate~))
   }
 
   for index = sample_count; index < output.length(); index = index + 1 {
@@ -95,7 +95,7 @@ pub fn Oscillator::process(
   output : AudioBuffer,
   freq_hz~ : Double,
 ) -> Unit {
-  self.process_waveform(context, output, Waveform::Sine, freq_hz)
+  self.process_waveform(context~, output~, waveform=Waveform::Sine, freq_hz~)
 }
 
 ///|

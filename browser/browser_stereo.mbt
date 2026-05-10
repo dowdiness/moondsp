@@ -25,7 +25,10 @@ let compiled_stereo : GraphSlot[@moondsp.CompiledStereoDsp, StereoOut] = GraphSl
           cutoff_hz=BROWSER_COMPILED_DEFAULT_CUTOFF,
           q=BROWSER_COMPILED_FILTER_Q,
         ),
-        @moondsp.DspNode::stereo_clip(8, BROWSER_COMPILED_CLIP_THRESHOLD),
+        @moondsp.DspNode::stereo_clip(
+          input=8,
+          threshold=BROWSER_COMPILED_CLIP_THRESHOLD,
+        ),
         @moondsp.DspNode::stereo_output(9),
       ],
       ctx,

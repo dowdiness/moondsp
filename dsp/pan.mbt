@@ -16,11 +16,11 @@ pub fn Pan::new() -> Pan {
 /// write silence to both outputs.
 pub fn Pan::process(
   self : Pan,
-  context : DspContext,
-  input : AudioBuffer,
-  left_output : AudioBuffer,
-  right_output : AudioBuffer,
-  position : Double,
+  context~ : DspContext,
+  input~ : AudioBuffer,
+  left_output~ : AudioBuffer,
+  right_output~ : AudioBuffer,
+  position~ : Double,
 ) -> Unit {
   ignore(self)
   let sample_rate = context.sample_rate()

@@ -14,22 +14,19 @@ struct SoundPool {
 }
 
 ///|
-let sched_bd : @ref.Ref[SoundPool?] = @ref.new(None)
+enum SchedulerRouteSelector {
+  RouteSound(Double)
+  RouteSynth
+}
 
 ///|
-let sched_sd : @ref.Ref[SoundPool?] = @ref.new(None)
+struct SchedulerRoute {
+  selector : SchedulerRouteSelector
+  pool : SoundPool
+}
 
 ///|
-let sched_hh : @ref.Ref[SoundPool?] = @ref.new(None)
-
-///|
-let sched_cp : @ref.Ref[SoundPool?] = @ref.new(None)
-
-///|
-let sched_oh : @ref.Ref[SoundPool?] = @ref.new(None)
-
-///|
-let sched_synth : @ref.Ref[SoundPool?] = @ref.new(None)
+let sched_routes : @ref.Ref[Array[SchedulerRoute]] = @ref.new([])
 
 ///|
 let sched_left : @ref.Ref[@moondsp.AudioBuffer?] = @ref.new(None)
@@ -257,33 +254,55 @@ fn make_synth_pool(ctx : @moondsp.DspContext, block_size : Int) -> SoundPool? {
 }
 
 ///|
+fn make_drum_route(
+  sound_code : Double,
+  template : Array[@moondsp.DspNode],
+  ctx : @moondsp.DspContext,
+  block_size : Int,
+) -> SchedulerRoute? {
+  match make_drum_pool(template, ctx, block_size) {
+    Some(pool) => Some({ selector: RouteSound(sound_code), pool })
+    None => None
+  }
+}
+
+///|
+fn make_synth_route(
+  ctx : @moondsp.DspContext,
+  block_size : Int,
+) -> SchedulerRoute? {
+  match make_synth_pool(ctx, block_size) {
+    Some(pool) => Some({ selector: RouteSynth, pool })
+    None => None
+  }
+}
+
+///|
 pub fn init_scheduler_graph(sample_rate : Double, block_size : Int) -> Bool {
   if sample_rate <= 0.0 || block_size <= 0 {
     reset_scheduler_graph()
     return false
   }
   let ctx = @moondsp.DspContext::new(sample_rate~, block_size~)
-  let bd = make_drum_pool(bd_template(), ctx, block_size)
-  let sd = make_drum_pool(sd_template(), ctx, block_size)
-  let hh = make_drum_pool(hh_template(), ctx, block_size)
-  let cp = make_drum_pool(cp_template(), ctx, block_size)
-  let oh = make_drum_pool(oh_template(), ctx, block_size)
-  let synth = make_synth_pool(ctx, block_size)
-  guard bd is Some(_) &&
-    sd is Some(_) &&
-    hh is Some(_) &&
-    cp is Some(_) &&
-    oh is Some(_) &&
-    synth is Some(_) else {
-    reset_scheduler_graph()
-    return false
+  let route_candidates = [
+    make_drum_route(36.0, bd_template(), ctx, block_size),
+    make_drum_route(38.0, sd_template(), ctx, block_size),
+    make_drum_route(42.0, hh_template(), ctx, block_size),
+    make_drum_route(39.0, cp_template(), ctx, block_size),
+    make_drum_route(46.0, oh_template(), ctx, block_size),
+    make_synth_route(ctx, block_size),
+  ]
+  let routes : Array[SchedulerRoute] = []
+  for candidate in route_candidates {
+    match candidate {
+      Some(route) => routes.push(route)
+      None => {
+        reset_scheduler_graph()
+        return false
+      }
+    }
   }
-  sched_bd.val = bd
-  sched_sd.val = sd
-  sched_hh.val = hh
-  sched_cp.val = cp
-  sched_oh.val = oh
-  sched_synth.val = synth
+  sched_routes.val = routes
   sched_left.val = Some(@moondsp.AudioBuffer::filled(block_size))
   sched_right.val = Some(@moondsp.AudioBuffer::filled(block_size))
   sched_gain.val = 0.3
@@ -293,12 +312,7 @@ pub fn init_scheduler_graph(sample_rate : Double, block_size : Int) -> Bool {
 
 ///|
 fn reset_scheduler_graph() -> Unit {
-  sched_bd.val = None
-  sched_sd.val = None
-  sched_hh.val = None
-  sched_cp.val = None
-  sched_oh.val = None
-  sched_synth.val = None
+  sched_routes.val = []
   sched_left.val = None
   sched_right.val = None
   sched_gain.val = 0.3
@@ -334,6 +348,25 @@ fn process_sub_pool(
 }
 
 ///|
+fn route_matches(
+  selector : SchedulerRouteSelector,
+  cm : @pattern.ControlMap,
+) -> Bool {
+  match selector {
+    RouteSound(sound_code) =>
+      match cm.0.get("sound") {
+        Some(v) => v == sound_code
+        None => false
+      }
+    RouteSynth =>
+      match cm.0.get("note") {
+        Some(_) => true
+        None => false
+      }
+  }
+}
+
+///|
 pub fn process_scheduler_block() -> Bool {
   let left = match sched_left.val {
     Some(b) => b
@@ -351,78 +384,17 @@ pub fn process_scheduler_block() -> Bool {
     Some(p) => p
     None => return true
   }
-  // Route drum events to their pools, note events to synth
-  match sched_bd.val {
-    Some(sp) => {
-      let sub = pat.filter_map(fn(cm) {
-        match cm.0.get("sound") {
-          Some(v) => if v == 36.0 { Some(cm) } else { None }
-          _ => None
-        }
-      })
-      process_sub_pool(sp, sub, left, right)
-    }
-    None => ()
-  }
-  match sched_sd.val {
-    Some(sp) => {
-      let sub = pat.filter_map(fn(cm) {
-        match cm.0.get("sound") {
-          Some(v) => if v == 38.0 { Some(cm) } else { None }
-          _ => None
-        }
-      })
-      process_sub_pool(sp, sub, left, right)
-    }
-    None => ()
-  }
-  match sched_hh.val {
-    Some(sp) => {
-      let sub = pat.filter_map(fn(cm) {
-        match cm.0.get("sound") {
-          Some(v) => if v == 42.0 { Some(cm) } else { None }
-          _ => None
-        }
-      })
-      process_sub_pool(sp, sub, left, right)
-    }
-    None => ()
-  }
-  match sched_cp.val {
-    Some(sp) => {
-      let sub = pat.filter_map(fn(cm) {
-        match cm.0.get("sound") {
-          Some(v) => if v == 39.0 { Some(cm) } else { None }
-          _ => None
-        }
-      })
-      process_sub_pool(sp, sub, left, right)
-    }
-    None => ()
-  }
-  match sched_oh.val {
-    Some(sp) => {
-      let sub = pat.filter_map(fn(cm) {
-        match cm.0.get("sound") {
-          Some(v) => if v == 46.0 { Some(cm) } else { None }
-          _ => None
-        }
-      })
-      process_sub_pool(sp, sub, left, right)
-    }
-    None => ()
-  }
-  match sched_synth.val {
-    Some(sp) => {
-      let sub = pat.filter_map(fn(cm) {
-        match cm.0.get("note") {
-          Some(_) => Some(cm)
-          _ => None
-        }
-      })
-      process_sub_pool(sp, sub, left, right)
-    }
-    None => ()
+  // Route drum events to their pools, note events to synth.
+  for route in sched_routes.val {
+    let selector = route.selector
+    let sub = pat.filter_map(fn(cm) {
+      if route_matches(selector, cm) {
+        Some(cm)
+      } else {
+        None
+      }
+    })
+    process_sub_pool(route.pool, sub, left, right)
   }
   // Apply master gain
   let gain = sched_gain.val
@@ -514,29 +486,8 @@ pub fn get_pattern_error_char(i : Int) -> Int {
 
 ///|
 pub fn set_scheduler_bpm(bpm : Double) -> Unit {
-  match sched_bd.val {
-    Some(sp) => sp.scheduler.set_bpm(bpm)
-    None => ()
-  }
-  match sched_sd.val {
-    Some(sp) => sp.scheduler.set_bpm(bpm)
-    None => ()
-  }
-  match sched_hh.val {
-    Some(sp) => sp.scheduler.set_bpm(bpm)
-    None => ()
-  }
-  match sched_cp.val {
-    Some(sp) => sp.scheduler.set_bpm(bpm)
-    None => ()
-  }
-  match sched_oh.val {
-    Some(sp) => sp.scheduler.set_bpm(bpm)
-    None => ()
-  }
-  match sched_synth.val {
-    Some(sp) => sp.scheduler.set_bpm(bpm)
-    None => ()
+  for route in sched_routes.val {
+    route.pool.scheduler.set_bpm(bpm)
   }
 }
 

@@ -70,7 +70,7 @@ pub(all) enum BiquadMode {
 pub struct Clip {
 }
 pub fn Clip::new() -> Self
-pub fn Clip::process(Self, DspContext, AudioBuffer, Double) -> Unit
+pub fn Clip::process(Self, context~ : DspContext, buffer~ : AudioBuffer, threshold~ : Double) -> Unit
 
 pub struct DelayLine {
   // private fields
@@ -111,7 +111,7 @@ pub(all) enum EnvStage {
 pub struct Gain {
 }
 pub fn Gain::new() -> Self
-pub fn Gain::process(Self, DspContext, AudioBuffer, Double) -> Unit
+pub fn Gain::process(Self, context~ : DspContext, buffer~ : AudioBuffer, amount~ : Double) -> Unit
 
 pub struct Mix {
 }
@@ -138,15 +138,15 @@ pub struct Oscillator {
 pub fn Oscillator::new() -> Self
 pub fn Oscillator::phase(Self) -> Double
 pub fn Oscillator::process(Self, DspContext, AudioBuffer, freq_hz~ : Double) -> Unit
-pub fn Oscillator::process_waveform(Self, DspContext, AudioBuffer, Waveform, Double) -> Unit
+pub fn Oscillator::process_waveform(Self, context~ : DspContext, output~ : AudioBuffer, waveform~ : Waveform, freq_hz~ : Double) -> Unit
 pub fn Oscillator::reset(Self) -> Unit
-pub fn Oscillator::tick(Self, Double, Double) -> Double
-pub fn Oscillator::tick_waveform(Self, Waveform, Double, Double) -> Double
+pub fn Oscillator::tick(Self, freq_hz~ : Double, sample_rate~ : Double) -> Double
+pub fn Oscillator::tick_waveform(Self, waveform~ : Waveform, freq_hz~ : Double, sample_rate~ : Double) -> Double
 
 pub struct Pan {
 }
 pub fn Pan::new() -> Self
-pub fn Pan::process(Self, DspContext, AudioBuffer, AudioBuffer, AudioBuffer, Double) -> Unit
+pub fn Pan::process(Self, context~ : DspContext, input~ : AudioBuffer, left_output~ : AudioBuffer, right_output~ : AudioBuffer, position~ : Double) -> Unit
 
 pub struct ParamSmoother {
   // private fields

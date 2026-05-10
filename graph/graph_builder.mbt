@@ -181,14 +181,14 @@ pub impl StereoSym for GraphBuilder with pan(self, position) -> GraphBuilder {
 ///|
 pub impl StereoSym for GraphBuilder with stereo_gain(self, amount) -> GraphBuilder {
   let idx = self.nodes_.length()
-  self.nodes_.push(DspNode::stereo_gain(self.index, amount))
+  self.nodes_.push(DspNode::stereo_gain(input=self.index, amount~))
   { nodes_: self.nodes_, index: idx }
 }
 
 ///|
 pub impl StereoSym for GraphBuilder with stereo_clip(self, threshold) -> GraphBuilder {
   let idx = self.nodes_.length()
-  self.nodes_.push(DspNode::stereo_clip(self.index, threshold))
+  self.nodes_.push(DspNode::stereo_clip(input=self.index, threshold~))
   { nodes_: self.nodes_, index: idx }
 }
 

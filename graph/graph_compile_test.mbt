@@ -21,12 +21,12 @@ test "compiled dsp rejects stereo-only nodes" {
   )
   let stereo_gain_nodes = [
     DspNode::constant(UNIT_SAMPLE),
-    DspNode::stereo_gain(0, HALF_GAIN),
+    DspNode::stereo_gain(input=0, amount=HALF_GAIN),
     DspNode::output(1),
   ]
   let stereo_clip_nodes = [
     DspNode::constant(UNIT_SAMPLE),
-    DspNode::stereo_clip(0, STEREO_CLIP_THRESHOLD),
+    DspNode::stereo_clip(input=0, threshold=STEREO_CLIP_THRESHOLD),
     DspNode::output(1),
   ]
   let stereo_biquad_nodes = [

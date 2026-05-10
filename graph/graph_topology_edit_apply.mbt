@@ -420,9 +420,9 @@ fn topology_inserted_node(template : DspNode, input_source : Int) -> DspNode? {
     DspNodeKind::Clip => Some(DspNode::clip(input_source, template.value0))
     DspNodeKind::Pan => Some(DspNode::pan(input_source, template.value0))
     DspNodeKind::StereoGain =>
-      Some(DspNode::stereo_gain(input_source, template.value0))
+      Some(DspNode::stereo_gain(input=input_source, amount=template.value0))
     DspNodeKind::StereoClip =>
-      Some(DspNode::stereo_clip(input_source, template.value0))
+      Some(DspNode::stereo_clip(input=input_source, threshold=template.value0))
     DspNodeKind::StereoMixDown => Some(DspNode::stereo_mixdown(input_source))
     DspNodeKind::Output => Some(DspNode::output(input_source))
     DspNodeKind::StereoOutput => Some(DspNode::stereo_output(input_source))
@@ -492,9 +492,9 @@ fn apply_topology_rewire_input(
     (DspNodeKind::Pan, GraphTopologyInputSlot::Input0) =>
       Some(DspNode::pan(source_index, node.value0))
     (DspNodeKind::StereoGain, GraphTopologyInputSlot::Input0) =>
-      Some(DspNode::stereo_gain(source_index, node.value0))
+      Some(DspNode::stereo_gain(input=source_index, amount=node.value0))
     (DspNodeKind::StereoClip, GraphTopologyInputSlot::Input0) =>
-      Some(DspNode::stereo_clip(source_index, node.value0))
+      Some(DspNode::stereo_clip(input=source_index, threshold=node.value0))
     (DspNodeKind::StereoMixDown, GraphTopologyInputSlot::Input0) =>
       Some(DspNode::stereo_mixdown(source_index))
     (DspNodeKind::StereoOutput, GraphTopologyInputSlot::Input0) =>

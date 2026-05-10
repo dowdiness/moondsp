@@ -19,12 +19,24 @@ fn process_node_block(
         let freq_buf = graph.buffers[node.input0]
         let sr = context.sample_rate()
         for i in 0..<sample_count {
-          buffer.set(i, osc.tick_waveform(node.waveform, freq_buf.get(i), sr))
+          buffer.set(
+            i,
+            osc.tick_waveform(
+              waveform=node.waveform,
+              freq_hz=freq_buf.get(i),
+              sample_rate=sr,
+            ),
+          )
         }
       } else {
         graph.osc_states[index]
         .unwrap()
-        .process_waveform(context, buffer, node.waveform, node.value0)
+        .process_waveform(
+          context~,
+          output=buffer,
+          waveform=node.waveform,
+          freq_hz=node.value0,
+        )
       }
     Noise => graph.noise_states[index].unwrap().process(context, buffer)
     Adsr => graph.env_states[index].unwrap().process(context, buffer)
@@ -78,11 +90,11 @@ fn process_node_block(
     Output => copy_buffer(graph.buffers[node.input0], buffer, sample_count)
     Pan =>
       pan.process(
-        context,
-        graph.buffers[node.input0],
-        graph.left_buffers[index],
-        graph.right_buffers[index],
-        node.value0,
+        context~,
+        input=graph.buffers[node.input0],
+        left_output=graph.left_buffers[index],
+        right_output=graph.right_buffers[index],
+        position=node.value0,
       )
     StereoGain => {
       copy_stereo_buffers(

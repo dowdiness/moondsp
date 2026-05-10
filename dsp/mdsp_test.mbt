@@ -1,8 +1,8 @@
 ///|
 test "tick returns silence for non-positive sample rate" {
   let osc = Oscillator::new()
-  let first = osc.tick(440.0, 0.0)
-  let second = osc.tick(440.0, -1.0)
+  let first = osc.tick(freq_hz=440.0, sample_rate=0.0)
+  let second = osc.tick(freq_hz=440.0, sample_rate=-1.0)
   assert_eq(first, 0.0)
   assert_eq(second, 0.0)
   assert_eq(osc.phase(), 0.0)
@@ -11,8 +11,8 @@ test "tick returns silence for non-positive sample rate" {
 ///|
 test "tick advances phase continuously" {
   let osc = Oscillator::new()
-  let first = osc.tick(440.0, 48000.0)
-  let second = osc.tick(440.0, 48000.0)
+  let first = osc.tick(freq_hz=440.0, sample_rate=48000.0)
+  let second = osc.tick(freq_hz=440.0, sample_rate=48000.0)
 
   assert_eq(first, 0.0)
   assert_true(second > first)
@@ -39,9 +39,21 @@ test "process fills a block with bounded samples" {
 test "saw waveform ramps upward from negative values" {
   let osc = Oscillator::new()
 
-  let first = osc.tick_waveform(Waveform::Saw, 440.0, 48000.0)
-  let second = osc.tick_waveform(Waveform::Saw, 440.0, 48000.0)
-  let third = osc.tick_waveform(Waveform::Saw, 440.0, 48000.0)
+  let first = osc.tick_waveform(
+    waveform=Waveform::Saw,
+    freq_hz=440.0,
+    sample_rate=48000.0,
+  )
+  let second = osc.tick_waveform(
+    waveform=Waveform::Saw,
+    freq_hz=440.0,
+    sample_rate=48000.0,
+  )
+  let third = osc.tick_waveform(
+    waveform=Waveform::Saw,
+    freq_hz=440.0,
+    sample_rate=48000.0,
+  )
 
   assert_true(first < second)
   assert_true(second < third)
@@ -54,7 +66,12 @@ test "square waveform toggles only between bipolar levels" {
   let context = DspContext::new(sample_rate=48000.0, block_size=8)
   let buffer = AudioBuffer::filled(8)
 
-  osc.process_waveform(context, buffer, Waveform::Square, 440.0)
+  osc.process_waveform(
+    context~,
+    output=buffer,
+    waveform=Waveform::Square,
+    freq_hz=440.0,
+  )
 
   assert_true(
     buffer.as_fixed_array().every(sample => sample == 1.0 || sample == -1.0),
@@ -67,7 +84,12 @@ test "triangle waveform stays bounded and changes smoothly" {
   let context = DspContext::new(sample_rate=48000.0, block_size=8)
   let buffer = AudioBuffer::filled(8)
 
-  osc.process_waveform(context, buffer, Waveform::Triangle, 440.0)
+  osc.process_waveform(
+    context~,
+    output=buffer,
+    waveform=Waveform::Triangle,
+    freq_hz=440.0,
+  )
 
   assert_true(
     buffer.as_fixed_array().every(sample => sample >= -1.0 && sample <= 1.0),
@@ -126,7 +148,7 @@ test "gain with unity amount preserves samples" {
   let context = DspContext::new(sample_rate=48000.0, block_size=4)
   let buffer = AudioBuffer::new(make_gain_test_samples())
 
-  gain.process(context, buffer, 1.0)
+  gain.process(context~, buffer~, amount=1.0)
 
   assert_eq(buffer.get(0), 0.25)
   assert_eq(buffer.get(1), -0.5)
@@ -140,7 +162,7 @@ test "gain with zero amount silences samples" {
   let context = DspContext::new(sample_rate=48000.0, block_size=4)
   let buffer = AudioBuffer::new(make_gain_test_samples())
 
-  gain.process(context, buffer, 0.0)
+  gain.process(context~, buffer~, amount=0.0)
 
   assert_true(buffer.as_fixed_array().every(sample => sample == 0.0))
 }
@@ -151,7 +173,7 @@ test "gain with negative amount inverts polarity" {
   let context = DspContext::new(sample_rate=48000.0, block_size=4)
   let buffer = AudioBuffer::new(make_gain_test_samples())
 
-  gain.process(context, buffer, -2.0)
+  gain.process(context~, buffer~, amount=-2.0)
 
   assert_eq(buffer.get(0), -0.5)
   assert_eq(buffer.get(1), 1.0)
@@ -276,7 +298,7 @@ test "clip limits positive and negative peaks symmetrically" {
   let context = DspContext::new(sample_rate=48000.0, block_size=4)
   let buffer = AudioBuffer::new(make_clip_test_samples())
 
-  clip.process(context, buffer, 0.5)
+  clip.process(context~, buffer~, threshold=0.5)
 
   assert_eq(buffer.get(0), -0.5)
   assert_eq(buffer.get(1), -0.25)
@@ -290,7 +312,7 @@ test "clip leaves in-range samples unchanged" {
   let context = DspContext::new(sample_rate=48000.0, block_size=4)
   let buffer = AudioBuffer::new(make_clip_in_range_samples())
 
-  clip.process(context, buffer, 0.5)
+  clip.process(context~, buffer~, threshold=0.5)
 
   assert_eq(buffer.get(0), -0.4)
   assert_eq(buffer.get(1), -0.1)
@@ -447,7 +469,13 @@ test "pan sends mono input fully left at -1 position" {
   let left = AudioBuffer::filled(4)
   let right = AudioBuffer::filled(4)
 
-  pan.process(context, input, left, right, -1.0)
+  pan.process(
+    context~,
+    input~,
+    left_output=left,
+    right_output=right,
+    position=-1.0,
+  )
 
   assert_eq(left.get(0), 1.0)
   assert_eq(left.get(1), 0.5)
@@ -464,7 +492,13 @@ test "pan uses equal-power gains at center" {
   let left = AudioBuffer::filled(4)
   let right = AudioBuffer::filled(4)
 
-  pan.process(context, input, left, right, 0.0)
+  pan.process(
+    context~,
+    input~,
+    left_output=left,
+    right_output=right,
+    position=0.0,
+  )
 
   let center_gain = 0.5.sqrt()
   assert_true((left.get(0) - center_gain).abs() < 0.000000001)
@@ -481,7 +515,13 @@ test "pan sends mono input fully right at +1 position" {
   let left = AudioBuffer::filled(4)
   let right = AudioBuffer::filled(4)
 
-  pan.process(context, input, left, right, 1.0)
+  pan.process(
+    context~,
+    input~,
+    left_output=left,
+    right_output=right,
+    position=1.0,
+  )
 
   assert_true(left.as_fixed_array().every(sample => sample == 0.0))
   assert_eq(right.get(0), 1.0)
@@ -498,7 +538,13 @@ test "pan clamps finite positions outside the supported range" {
   let left = AudioBuffer::filled(2)
   let right = AudioBuffer::filled(2)
 
-  pan.process(context, input, left, right, 2.0)
+  pan.process(
+    context~,
+    input~,
+    left_output=left,
+    right_output=right,
+    position=2.0,
+  )
 
   assert_true(left.as_fixed_array().every(sample => sample == 0.0))
   assert_eq(right.get(0), 1.0)
