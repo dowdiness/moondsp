@@ -63,8 +63,10 @@ looks the way it does, and link back to the specific archived plan/spec
 for full context.
 
 - **[`superpowers/specs/`](superpowers/specs/)** — design specs for
-  in-flight work. Currently empty (no active design work between releases);
-  shipped specs live under `archive/`.
+  in-flight work. Active:
+  [`2026-05-11-bound-voice-pool-design.md`](superpowers/specs/2026-05-11-bound-voice-pool-design.md)
+  for the binding-staleness / duplicate-template-analysis API hardening pass.
+  Shipped specs live under `archive/`.
 - **[`superpowers/plans/`](superpowers/plans/)** — implementation plans
   for in-flight work. Currently empty; shipped plans live under `archive/`.
 - `superpowers/specs/archive/` and `superpowers/plans/archive/` — shipped
