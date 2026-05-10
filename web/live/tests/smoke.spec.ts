@@ -50,10 +50,16 @@ test.describe("UI smoke (no audio)", () => {
     await expect(btn).toHaveAttribute("data-action", "start");
   });
 
-  test("autocomplete offers method names after `.`", async ({ page }) => {
-    // After typing `.` on a method-chain expression the completion
-    // popup should list every method advertised in the cheatsheet.
-    // This covers the second-priority context in miniliveCompletion.
+  test("autocomplete offers method names after `.` and accepting expands snippet", async ({ page }) => {
+    // Two assertions in one test: that the popup is populated correctly
+    // (covers context #2 in miniliveCompletion), and that accepting a
+    // completion actually expands the snippet into the doc. Acceptance
+    // here goes through the click code path rather than Enter — the
+    // keyboard path races the autocomplete view's filter pass during
+    // sequential runs, while click delegates directly to CM6's
+    // applyCompletion. Both paths exercise the same snippet-expansion
+    // logic, so this still guards against breakage in the snippet
+    // wiring (snippetCompletion vs plain Completion, label-text format).
     const editor = page.locator(".cm-content");
     await editor.click();
     await page.keyboard.press("Control+End");
@@ -63,6 +69,14 @@ test.describe("UI smoke (no audio)", () => {
     for (const m of ["fast", "slow", "rev", "degradeBy", "every", "jux"]) {
       await expect(tooltip).toContainText(m);
     }
+    // The completion-list item carrying the label `fast` (exact match
+    // to avoid `degradeBy`-style substring hits, though no overlap
+    // exists in the current vocabulary).
+    await tooltip.getByText("fast", { exact: true }).first().click();
+    await expect(tooltip).toBeHidden({ timeout: 2_000 });
+    // Snippet expansion places the cursor at `${n}`; the expansion
+    // itself is what we're verifying — `.fast(` must appear in the doc.
+    await expect(editor).toContainText(`${INITIAL_PATTERN}.fast(`);
   });
 
   test("autocomplete in every() arg 1 ignores commas inside nested calls", async ({ page }) => {
