@@ -703,6 +703,11 @@ Current graph node support:
 Current runtime control support:
 
 - `apply_control(GraphControl)` is the preferred runtime-control entrypoint
+  for compatibility callers; direct compiled mono/stereo graphs also expose
+  `apply_control_result(...)` / `apply_controls_result(...)` plus
+  `gate_on_result(...)`, `gate_off_result(...)`, and
+  `set_param_result(...)` for callers that need a concrete
+  `GraphControlError` rejection reason
 - `apply_controls(Array[GraphControl])` applies control batches transactionally
   in batch order while targeting nodes by authoring index
 - compatibility helpers remain available:

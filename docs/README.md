@@ -38,11 +38,7 @@ Point-in-time analyses. Each review is dated and should be moved to
 `archive/` once its recommendations have shipped or been rejected, rather
 than edited in place.
 
-- **[`api-design-review-2026-04-21.md`](api-design-review-2026-04-21.md)**
-  — public-API design review of the root `@moondsp` facade and `dsp` /
-  `graph` / `voice` sub-packages. Flags facade drift, over-exposed DSP
-  struct fields, and the silent-failure `Bool`-return family as
-  pre-1.0 stability risks.
+Currently empty; completed reviews live under [`archive/`](archive/).
 
 ## Decisions
 
@@ -87,6 +83,8 @@ context. These documents describe past work and will not match current code.
 
 - [`archive/`](archive/) — shipped phase design briefs, the early audit, the
   original bootstrap instructions, and the Phase 0/1/2 status log:
+  - `archive/api-design-review-2026-04-21.md` — public-API design review
+    whose prioritized recommendations have shipped.
   - `archive/audit-2026-04-02.md` — deep technical audit snapshot.
   - `archive/phase1-*-long-stretch.md` — Phase 1 DSP-primitive design briefs.
   - `archive/phase2-*-design-brief.md` — Phase 2 stereo-graph design briefs.

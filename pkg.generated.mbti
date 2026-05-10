@@ -97,6 +97,8 @@ pub using @graph {type GraphBuilder}
 
 pub using @graph {type GraphControl}
 
+pub using @graph {type GraphControlError}
+
 pub using @graph {type GraphControlKind}
 
 pub using @graph {type GraphParamSlot}

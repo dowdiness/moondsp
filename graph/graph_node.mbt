@@ -19,7 +19,7 @@ pub(all) enum DspNodeKind {
   StereoDelay
   StereoMixDown
   StereoOutput
-} derive(Eq)
+} derive(Eq, Debug)
 
 ///|
 /// Runtime-updatable numeric graph parameter slots.

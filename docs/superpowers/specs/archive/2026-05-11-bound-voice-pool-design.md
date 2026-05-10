@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-11
 **Status:** Implemented 2026-05-11
-**Related:** `docs/api-design-review-2026-04-21.md`, PR #8/#9 follow-up
+**Related:** `docs/archive/api-design-review-2026-04-21.md`, PR #8/#9 follow-up
 
 ## Goal
 

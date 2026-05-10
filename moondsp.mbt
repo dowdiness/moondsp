@@ -76,6 +76,7 @@ pub using @graph {
   type DspNodeKind,
   type GraphBuilder,
   type GraphControl,
+  type GraphControlError,
   type GraphControlKind,
   type GraphParamSlot,
   type GraphTopologyEdit,

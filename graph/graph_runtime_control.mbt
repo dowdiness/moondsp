@@ -1,9 +1,35 @@
 ///|
+/// Failure reason for result-typed runtime graph control APIs.
+pub(all) enum GraphControlError {
+  InvalidNodeIndex(Int)
+  /// The authoring node existed but was eliminated by graph optimization.
+  OrphanNode(Int)
+  InvalidGateNode(Int, DspNodeKind)
+  InvalidSlotForNode(Int, DspNodeKind, GraphParamSlot)
+  InvalidParamValue(Int, DspNodeKind, GraphParamSlot, Double)
+  MissingRuntimeState(Int, DspNodeKind)
+} derive(Debug)
+
+///|
+pub impl Show for GraphControlError with output(self, logger) {
+  logger.write_string(@debug.to_string(self))
+}
+
+///|
 /// Trigger `gate_on()` on an ADSR node using its original authoring index.
 ///
 /// Compatibility helper; prefer `apply_control(GraphControl::gate_on(...))`.
 pub fn CompiledDsp::gate_on(self : CompiledDsp, node_index : Int) -> Bool {
-  self.apply_control(GraphControl::gate_on(node_index))
+  self.gate_on_result(node_index) is Ok(_)
+}
+
+///|
+/// Result-typed companion to `gate_on(...)`.
+pub fn CompiledDsp::gate_on_result(
+  self : CompiledDsp,
+  node_index : Int,
+) -> Result[Unit, GraphControlError] {
+  self.apply_control_result(GraphControl::gate_on(node_index))
 }
 
 ///|
@@ -11,7 +37,16 @@ pub fn CompiledDsp::gate_on(self : CompiledDsp, node_index : Int) -> Bool {
 ///
 /// Compatibility helper; prefer `apply_control(GraphControl::gate_off(...))`.
 pub fn CompiledDsp::gate_off(self : CompiledDsp, node_index : Int) -> Bool {
-  self.apply_control(GraphControl::gate_off(node_index))
+  self.gate_off_result(node_index) is Ok(_)
+}
+
+///|
+/// Result-typed companion to `gate_off(...)`.
+pub fn CompiledDsp::gate_off_result(
+  self : CompiledDsp,
+  node_index : Int,
+) -> Result[Unit, GraphControlError] {
+  self.apply_control_result(GraphControl::gate_off(node_index))
 }
 
 ///|
@@ -29,7 +64,36 @@ pub fn CompiledDsp::set_param(
   slot : GraphParamSlot,
   value : Double,
 ) -> Bool {
-  self.apply_control(GraphControl::set_param(node_index, slot, value))
+  self.set_param_result(node_index, slot, value) is Ok(_)
+}
+
+///|
+/// Result-typed companion to `set_param(...)`.
+pub fn CompiledDsp::set_param_result(
+  self : CompiledDsp,
+  node_index : Int,
+  slot : GraphParamSlot,
+  value : Double,
+) -> Result[Unit, GraphControlError] {
+  self.apply_control_result(GraphControl::set_param(node_index, slot, value))
+}
+
+///|
+/// Apply one runtime control message, returning a specific rejection reason.
+pub fn CompiledDsp::apply_control_result(
+  self : CompiledDsp,
+  control : GraphControl,
+) -> Result[Unit, GraphControlError] {
+  self.0.apply_control_result_impl(control)
+}
+
+///|
+/// Apply a runtime control batch transactionally.
+pub fn CompiledDsp::apply_controls_result(
+  self : CompiledDsp,
+  controls : Array[GraphControl],
+) -> Result[Unit, GraphControlError] {
+  self.0.apply_controls_result_impl(controls)
 }
 
 ///|
@@ -73,7 +137,16 @@ pub fn CompiledStereoDsp::gate_on(
   self : CompiledStereoDsp,
   node_index : Int,
 ) -> Bool {
-  self.apply_control(GraphControl::gate_on(node_index))
+  self.gate_on_result(node_index) is Ok(_)
+}
+
+///|
+/// Result-typed companion to `gate_on(...)`.
+pub fn CompiledStereoDsp::gate_on_result(
+  self : CompiledStereoDsp,
+  node_index : Int,
+) -> Result[Unit, GraphControlError] {
+  self.apply_control_result(GraphControl::gate_on(node_index))
 }
 
 ///|
@@ -83,7 +156,16 @@ pub fn CompiledStereoDsp::gate_off(
   self : CompiledStereoDsp,
   node_index : Int,
 ) -> Bool {
-  self.apply_control(GraphControl::gate_off(node_index))
+  self.gate_off_result(node_index) is Ok(_)
+}
+
+///|
+/// Result-typed companion to `gate_off(...)`.
+pub fn CompiledStereoDsp::gate_off_result(
+  self : CompiledStereoDsp,
+  node_index : Int,
+) -> Result[Unit, GraphControlError] {
+  self.apply_control_result(GraphControl::gate_off(node_index))
 }
 
 ///|
@@ -95,7 +177,36 @@ pub fn CompiledStereoDsp::set_param(
   slot : GraphParamSlot,
   value : Double,
 ) -> Bool {
-  self.apply_control(GraphControl::set_param(node_index, slot, value))
+  self.set_param_result(node_index, slot, value) is Ok(_)
+}
+
+///|
+/// Result-typed companion to `set_param(...)`.
+pub fn CompiledStereoDsp::set_param_result(
+  self : CompiledStereoDsp,
+  node_index : Int,
+  slot : GraphParamSlot,
+  value : Double,
+) -> Result[Unit, GraphControlError] {
+  self.apply_control_result(GraphControl::set_param(node_index, slot, value))
+}
+
+///|
+/// Apply one runtime control message, returning a specific rejection reason.
+pub fn CompiledStereoDsp::apply_control_result(
+  self : CompiledStereoDsp,
+  control : GraphControl,
+) -> Result[Unit, GraphControlError] {
+  self.0.apply_control_result_impl(control)
+}
+
+///|
+/// Apply a runtime control batch transactionally.
+pub fn CompiledStereoDsp::apply_controls_result(
+  self : CompiledStereoDsp,
+  controls : Array[GraphControl],
+) -> Result[Unit, GraphControlError] {
+  self.0.apply_controls_result_impl(controls)
 }
 
 ///|
@@ -103,11 +214,19 @@ fn CompiledGraph::apply_control_impl(
   self : CompiledGraph,
   control : GraphControl,
 ) -> Bool {
+  self.apply_control_result_impl(control) is Ok(_)
+}
+
+///|
+fn CompiledGraph::apply_control_result_impl(
+  self : CompiledGraph,
+  control : GraphControl,
+) -> Result[Unit, GraphControlError] {
   match control.kind {
-    GateOn => apply_graph_gate_control(self, control.node_index, true)
-    GateOff => apply_graph_gate_control(self, control.node_index, false)
+    GateOn => apply_graph_gate_control_result(self, control.node_index, true)
+    GateOff => apply_graph_gate_control_result(self, control.node_index, false)
     SetParam =>
-      apply_graph_param_control(
+      apply_graph_param_control_result(
         self,
         control.node_index,
         control.slot,
@@ -121,65 +240,108 @@ fn CompiledGraph::apply_controls_impl(
   self : CompiledGraph,
   controls : Array[GraphControl],
 ) -> Bool {
+  self.apply_controls_result_impl(controls) is Ok(_)
+}
+
+///|
+fn CompiledGraph::apply_controls_result_impl(
+  self : CompiledGraph,
+  controls : Array[GraphControl],
+) -> Result[Unit, GraphControlError] {
   let simulated_nodes = FixedArray::makei(self.nodes.length(), index => {
     self.nodes[index]
   })
   for index = 0; index < controls.length(); index = index + 1 {
-    if !valid_graph_control(self, simulated_nodes, controls[index]) {
-      return false
+    match valid_graph_control_result(self, simulated_nodes, controls[index]) {
+      Ok(_) => ()
+      Err(error) => return Err(error)
     }
   }
 
   for index = 0; index < controls.length(); index = index + 1 {
-    if !self.apply_control_impl(controls[index]) {
-      return false
+    match self.apply_control_result_impl(controls[index]) {
+      Ok(_) => ()
+      Err(error) => return Err(error)
     }
   }
-  true
+  Ok(())
 }
 
 ///|
-fn apply_graph_gate_control(
+fn CompiledGraph::compiled_index_result(
+  self : CompiledGraph,
+  node_index : Int,
+) -> Result[Int, GraphControlError] {
+  match self.compiled_index_for(node_index) {
+    Some(compiled) => Ok(compiled)
+    None =>
+      if node_index < 0 || node_index >= self.index_map.length() {
+        Err(GraphControlError::InvalidNodeIndex(node_index))
+      } else {
+        Err(GraphControlError::OrphanNode(node_index))
+      }
+  }
+}
+
+///|
+fn apply_graph_gate_control_result(
   graph : CompiledGraph,
   node_index : Int,
   gate_on : Bool,
-) -> Bool {
-  match graph.compiled_index_for(node_index) {
-    Some(compiled_index) =>
-      match graph.env_states[compiled_index] {
-        Some(env) => {
-          if gate_on {
-            env.gate_on()
-          } else {
-            env.gate_off()
-          }
-          true
-        }
-        None => false
+) -> Result[Unit, GraphControlError] {
+  let compiled_index = match graph.compiled_index_result(node_index) {
+    Ok(index) => index
+    Err(error) => return Err(error)
+  }
+  match graph.env_states[compiled_index] {
+    Some(env) => {
+      if gate_on {
+        env.gate_on()
+      } else {
+        env.gate_off()
       }
-    None => false
+      Ok(())
+    }
+    None => {
+      let node = graph.nodes[compiled_index]
+      if node.kind is Adsr {
+        Err(GraphControlError::MissingRuntimeState(node_index, node.kind))
+      } else {
+        Err(GraphControlError::InvalidGateNode(node_index, node.kind))
+      }
+    }
   }
 }
 
 ///|
-fn apply_graph_param_control(
+fn apply_graph_param_control_result(
   graph : CompiledGraph,
   node_index : Int,
   slot : GraphParamSlot,
   value : Double,
-) -> Bool {
-  let compiled_index = match graph.compiled_index_for(node_index) {
-    Some(compiled_index) => compiled_index
-    None => return false
+) -> Result[Unit, GraphControlError] {
+  let compiled_index = match graph.compiled_index_result(node_index) {
+    Ok(index) => index
+    Err(error) => return Err(error)
   }
   let node = graph.nodes[compiled_index]
   let updated = match
-    updated_node_param(node, slot, value, graph.compile_sample_rate) {
-    Some(updated) => updated
-    None => return false
+    updated_node_param_result(
+      node,
+      node_index,
+      slot,
+      value,
+      graph.compile_sample_rate,
+    ) {
+    Ok(updated) => updated
+    Err(error) => return Err(error)
   }
   graph.nodes[compiled_index] = updated
-  apply_runtime_param_side_effect(graph, compiled_index, updated, slot)
+  if apply_runtime_param_side_effect(graph, compiled_index, updated, slot) {
+    Ok(())
+  } else {
+    Err(GraphControlError::MissingRuntimeState(node_index, node.kind))
+  }
 }
 
 ///|
@@ -188,11 +350,20 @@ fn valid_graph_control(
   simulated_nodes : FixedArray[DspNode],
   control : GraphControl,
 ) -> Bool {
+  valid_graph_control_result(graph, simulated_nodes, control) is Ok(_)
+}
+
+///|
+fn valid_graph_control_result(
+  graph : CompiledGraph,
+  simulated_nodes : FixedArray[DspNode],
+  control : GraphControl,
+) -> Result[Unit, GraphControlError] {
   match control.kind {
-    GateOn => valid_graph_gate_control(graph, control.node_index)
-    GateOff => valid_graph_gate_control(graph, control.node_index)
+    GateOn => valid_graph_gate_control_result(graph, control.node_index)
+    GateOff => valid_graph_gate_control_result(graph, control.node_index)
     SetParam =>
-      valid_graph_param_control(
+      valid_graph_param_control_result(
         graph,
         simulated_nodes,
         control.node_index,
@@ -203,40 +374,75 @@ fn valid_graph_control(
 }
 
 ///|
-fn valid_graph_gate_control(graph : CompiledGraph, node_index : Int) -> Bool {
-  match graph.compiled_index_for(node_index) {
-    Some(compiled_index) => graph.env_states[compiled_index] is Some(_)
-    None => false
+fn valid_graph_gate_control_result(
+  graph : CompiledGraph,
+  node_index : Int,
+) -> Result[Unit, GraphControlError] {
+  let compiled_index = match graph.compiled_index_result(node_index) {
+    Ok(index) => index
+    Err(error) => return Err(error)
+  }
+  match graph.env_states[compiled_index] {
+    Some(_) => Ok(())
+    None => {
+      let node = graph.nodes[compiled_index]
+      if node.kind is Adsr {
+        Err(GraphControlError::MissingRuntimeState(node_index, node.kind))
+      } else {
+        Err(GraphControlError::InvalidGateNode(node_index, node.kind))
+      }
+    }
   }
 }
 
 ///|
-fn valid_graph_param_control(
+fn valid_graph_param_control_result(
   graph : CompiledGraph,
   simulated_nodes : FixedArray[DspNode],
   node_index : Int,
   slot : GraphParamSlot,
   value : Double,
-) -> Bool {
-  let compiled_index = match graph.compiled_index_for(node_index) {
-    Some(compiled_index) => compiled_index
-    None => return false
+) -> Result[Unit, GraphControlError] {
+  let compiled_index = match graph.compiled_index_result(node_index) {
+    Ok(index) => index
+    Err(error) => return Err(error)
   }
   let updated = match
-    updated_node_param(
+    updated_node_param_result(
       simulated_nodes[compiled_index],
+      node_index,
       slot,
       value,
       graph.compile_sample_rate,
     ) {
-    Some(updated) => updated
-    None => return false
+    Ok(updated) => updated
+    Err(error) => return Err(error)
   }
   simulated_nodes[compiled_index] = updated
-  true
+  Ok(())
 }
 
 ///|
+fn updated_node_param_result(
+  node : DspNode,
+  node_index : Int,
+  slot : GraphParamSlot,
+  value : Double,
+  sample_rate : Double,
+) -> Result[DspNode, GraphControlError] {
+  if !node_accepts_slot(node, slot) {
+    return Err(
+      GraphControlError::InvalidSlotForNode(node_index, node.kind, slot),
+    )
+  }
+  match updated_node_param(node, slot, value, sample_rate) {
+    Some(updated) => Ok(updated)
+    None =>
+      Err(
+        GraphControlError::InvalidParamValue(node_index, node.kind, slot, value),
+      )
+  }
+}
 
 ///|
 fn updated_node_param(

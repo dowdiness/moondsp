@@ -136,6 +136,153 @@ test "compiled dsp rejects invalid control batches without partial updates" {
 }
 
 ///|
+test "compiled dsp apply_control_result reports invalid node index" {
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::gain(0, QUARTER_SAMPLE),
+    DspNode::output(1),
+  ]
+  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+
+  match
+    compiled.apply_control_result(
+      GraphControl::set_param(99, GraphParamSlot::Value0, HALF_GAIN),
+    ) {
+    Err(GraphControlError::InvalidNodeIndex(99)) => ()
+    other => fail("expected InvalidNodeIndex, got \{other}")
+  }
+}
+
+///|
+test "compiled dsp apply_control_result reports orphan optimized node" {
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::constant(HALF_GAIN),
+    DspNode::output(1),
+  ]
+  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+
+  match
+    compiled.apply_control_result(
+      GraphControl::set_param(0, GraphParamSlot::Value0, QUARTER_SAMPLE),
+    ) {
+    Err(GraphControlError::OrphanNode(0)) => ()
+    other => fail("expected OrphanNode, got \{other}")
+  }
+}
+
+///|
+test "compiled dsp apply_control_result reports invalid slot and value" {
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::delay(0, DELAY_CAPACITY, delay_samples=0),
+    DspNode::output(1),
+  ]
+  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+
+  match
+    compiled.apply_control_result(
+      GraphControl::set_param(0, GraphParamSlot::DelaySamples, 1.0),
+    ) {
+    Err(
+      GraphControlError::InvalidSlotForNode(
+        0,
+        DspNodeKind::Constant,
+        GraphParamSlot::DelaySamples
+      )
+    ) => ()
+    other => fail("expected InvalidSlotForNode, got \{other}")
+  }
+
+  match
+    compiled.apply_control_result(
+      GraphControl::set_param(1, GraphParamSlot::DelaySamples, 1.5),
+    ) {
+    Err(
+      GraphControlError::InvalidParamValue(
+        1,
+        DspNodeKind::Delay,
+        GraphParamSlot::DelaySamples,
+        1.5
+      )
+    ) => ()
+    other => fail("expected InvalidParamValue, got \{other}")
+  }
+}
+
+///|
+test "compiled dsp apply_controls_result is transactional" {
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::gain(0, QUARTER_SAMPLE),
+    DspNode::output(1),
+  ]
+  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+
+  match
+    compiled.apply_controls_result([
+      GraphControl::set_param(1, GraphParamSlot::Value0, HALF_GAIN),
+      GraphControl::set_param(
+        1,
+        GraphParamSlot::DelaySamples,
+        DELAY_SAMPLES_DOUBLE,
+      ),
+    ]) {
+    Err(
+      GraphControlError::InvalidSlotForNode(
+        1,
+        DspNodeKind::Constant,
+        GraphParamSlot::DelaySamples
+      )
+    ) => ()
+    other => fail("expected InvalidSlotForNode, got \{other}")
+  }
+
+  compiled.process(context, output)
+
+  assert_eq(output.get(0), QUARTER_SAMPLE)
+  assert_eq(output.get(1), QUARTER_SAMPLE)
+  assert_eq(output.get(2), QUARTER_SAMPLE)
+  assert_eq(output.get(3), QUARTER_SAMPLE)
+}
+
+///|
+test "compiled stereo dsp apply_control_result reports invalid gate target" {
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::pan(0, 0.0),
+    DspNode::stereo_output(1),
+  ]
+  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+
+  match compiled.apply_control_result(GraphControl::gate_on(1)) {
+    Err(GraphControlError::InvalidGateNode(1, DspNodeKind::Pan)) => ()
+    other => fail("expected InvalidGateNode, got \{other}")
+  }
+}
+
+///|
 test "compiled dsp runtime param update rejects unsupported or invalid values" {
   let context = DspContext::new(
     sample_rate=STANDARD_SAMPLE_RATE,
