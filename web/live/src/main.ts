@@ -9,7 +9,9 @@ import { Compartment, EditorState } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers, highlightActiveLine } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { bracketMatching } from "@codemirror/language";
+import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 
+import { minilive } from "./lang/minilive";
 import { CM6Adapter } from "./canopy";
 import type { Diagnostic, UserIntent } from "./canopy";
 import { AudioEngine } from "./audio";
@@ -42,8 +44,10 @@ const view = new EditorView({
       lineNumbers(),
       highlightActiveLine(),
       bracketMatching(),
+      closeBrackets(),
       history(),
-      keymap.of([...defaultKeymap, ...historyKeymap]),
+      minilive(),
+      keymap.of([...defaultKeymap, ...historyKeymap, ...closeBracketsKeymap]),
       ...CM6Adapter.extensions(),
       listenerCompartment.of([]),
     ],

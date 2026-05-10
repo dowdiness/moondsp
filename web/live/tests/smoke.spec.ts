@@ -50,6 +50,60 @@ test.describe("UI smoke (no audio)", () => {
     await expect(btn).toHaveAttribute("data-action", "start");
   });
 
+  test("autocomplete offers method names after `.`", async ({ page }) => {
+    // After typing `.` on a method-chain expression the completion
+    // popup should list every method advertised in the cheatsheet.
+    // This covers the second-priority context in miniliveCompletion.
+    const editor = page.locator(".cm-content");
+    await editor.click();
+    await page.keyboard.press("Control+End");
+    await page.keyboard.type(".");
+    const tooltip = page.locator(".cm-tooltip-autocomplete");
+    await expect(tooltip).toBeVisible({ timeout: 2_000 });
+    for (const m of ["fast", "slow", "rev", "degradeBy", "every", "jux"]) {
+      await expect(tooltip).toContainText(m);
+    }
+  });
+
+  test("autocomplete in every() arg 1 ignores commas inside nested calls", async ({ page }) => {
+    // Regression: `pastFirstComma` originally treated any `,` between
+    // the opening `(` and the cursor as a slot separator, which made
+    // the cursor in `every(stack(a,b)|` look like slot 2 and surfaced
+    // callback completions (rev/fast/slow) where they don't belong.
+    // The bracket-depth scan now only counts top-level commas — so this
+    // position must NOT offer callbacks. Top-level identifiers are
+    // still expected since the slot accepts any expression.
+    const editor = page.locator(".cm-content");
+    await editor.click();
+    await page.keyboard.press("Control+A");
+    // closeBrackets auto-pairs `(` `[` `"`, so typing only the openers
+    // (and stepping over auto-closes) lands the cursor between the
+    // inner `stack(...)` close and the outer `every(...)` close.
+    await page.keyboard.type(`s("bd").every(stack(s("bd"),s("sd"))`);
+    await page.keyboard.press("Control+Space");
+    const tooltip = page.locator(".cm-tooltip-autocomplete");
+    await expect(tooltip).toBeVisible({ timeout: 2_000 });
+    // Callbacks must not appear here — this is still slot 1.
+    await expect(tooltip).not.toContainText("rev");
+    // But top-level expression completions should be available.
+    await expect(tooltip).toContainText("stack");
+  });
+
+  test("autocomplete offers drum names inside s(\"…\")", async ({ page }) => {
+    // Inside a string whose enclosing call is s(...), the popup should
+    // surface the synthesized drum vocabulary — not method names.
+    const editor = page.locator(".cm-content");
+    await editor.click();
+    await page.keyboard.press("Control+A");
+    await page.keyboard.type('s("b');
+    // Wait for parser to settle so the syntax-tree lookup sees a String.
+    const tooltip = page.locator(".cm-tooltip-autocomplete");
+    await expect(tooltip).toBeVisible({ timeout: 2_000 });
+    await expect(tooltip).toContainText("bd");
+    // Method names must not bleed into the string-context popup.
+    await expect(tooltip).not.toContainText("degradeBy");
+  });
+
   test("cheatsheet advertises stack(p, q) under Layers", async ({ page }) => {
     // The new top-level stack() primitive is the only way to combine an
     // s(...) drum pattern with a note(...) melody in one expression — the

@@ -1,0 +1,33 @@
+// Outer surface for the moondsp live REPL: identifier-headed calls
+// (`s(...)`, `note(...)`, `stack(...)`) followed by zero or more
+// dotted method calls (`.fast(2)`, `.jux(rev)`). The mini-notation
+// itself stays opaque inside String tokens — completion handles
+// "we're inside a string whose enclosing call is s()" by walking the
+// syntax tree and the source between cursor and the surrounding
+// String node.
+
+@top Program { Expression? }
+
+@skip { space }
+
+Expression { Call MemberCall* }
+
+Call       { CallName Args? }
+MemberCall { "." MethodName Args? }
+
+Args { "(" (arg ("," arg)*)? ")" }
+
+arg { String | Number | Expression }
+
+CallName   { identifier }
+MethodName { identifier }
+
+@tokens {
+  identifier { $[a-zA-Z_] $[a-zA-Z0-9_]* }
+  Number     { $[0-9]+ ("." $[0-9]+)? }
+  String     { '"' (![\\\n"] | "\\" _)* '"'? }
+  space      { $[ \t\n\r]+ }
+  "(" ")" "." ","
+}
+
+@detectDelim
