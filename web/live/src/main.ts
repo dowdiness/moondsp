@@ -5,11 +5,13 @@
 // Parse failures keep the last good pattern playing; the error message
 // surfaces in the footer panel.
 
-import { Compartment, EditorState } from "@codemirror/state";
+import { Compartment, EditorState, Prec } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers, highlightActiveLine } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { bracketMatching } from "@codemirror/language";
+import { closeBrackets, closeBracketsKeymap, acceptCompletion } from "@codemirror/autocomplete";
 
+import { minilive } from "./lang/minilive";
 import { CM6Adapter } from "./canopy";
 import type { Diagnostic, UserIntent } from "./canopy";
 import { AudioEngine } from "./audio";
@@ -42,8 +44,20 @@ const view = new EditorView({
       lineNumbers(),
       highlightActiveLine(),
       bracketMatching(),
+      closeBrackets(),
       history(),
-      keymap.of([...defaultKeymap, ...historyKeymap]),
+      minilive(),
+      // Tab → accept the highlighted completion when the popup is open.
+      // CM6's default completion keymap only binds Enter; most editors
+      // (VS Code, Strudel) use Tab as the primary accept key. The
+      // `autocompletion()` extension registers its own Tab binding for
+      // snippet-field navigation at Prec.highest, so we have to match
+      // that precedence to win. When no popup is open `acceptCompletion`
+      // returns false and falls through to the snippet keymap below
+      // (which advances the active snippet field if any) and then to
+      // the default Tab handling.
+      Prec.highest(keymap.of([{ key: "Tab", run: acceptCompletion }])),
+      keymap.of([...defaultKeymap, ...historyKeymap, ...closeBracketsKeymap]),
       ...CM6Adapter.extensions(),
       listenerCompartment.of([]),
     ],

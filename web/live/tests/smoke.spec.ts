@@ -50,6 +50,99 @@ test.describe("UI smoke (no audio)", () => {
     await expect(btn).toHaveAttribute("data-action", "start");
   });
 
+  test("autocomplete offers method names after `.` and accepting expands snippet", async ({ page }) => {
+    // Two assertions in one test: that the popup is populated correctly
+    // (covers context #2 in miniliveCompletion), and that accepting a
+    // completion actually expands the snippet into the doc. Acceptance
+    // here goes through the click code path rather than Enter — the
+    // keyboard path races the autocomplete view's filter pass during
+    // sequential runs, while click delegates directly to CM6's
+    // applyCompletion. Both paths exercise the same snippet-expansion
+    // logic, so this still guards against breakage in the snippet
+    // wiring (snippetCompletion vs plain Completion, label-text format).
+    const editor = page.locator(".cm-content");
+    await editor.click();
+    await page.keyboard.press("Control+End");
+    await page.keyboard.type(".");
+    const tooltip = page.locator(".cm-tooltip-autocomplete");
+    await expect(tooltip).toBeVisible({ timeout: 2_000 });
+    for (const m of ["fast", "slow", "rev", "degradeBy", "every", "jux"]) {
+      await expect(tooltip).toContainText(m);
+    }
+    // The completion-list item carrying the label `fast` (exact match
+    // to avoid `degradeBy`-style substring hits, though no overlap
+    // exists in the current vocabulary).
+    await tooltip.getByText("fast", { exact: true }).first().click();
+    await expect(tooltip).toBeHidden({ timeout: 2_000 });
+    // Snippet expansion places the cursor at `${n}`; the expansion
+    // itself is what we're verifying — `.fast(` must appear in the doc.
+    await expect(editor).toContainText(`${INITIAL_PATTERN}.fast(`);
+  });
+
+  test("Tab accepts the highlighted autocomplete option", async ({ page }) => {
+    // Tab is bound to acceptCompletion in main.ts at Prec.highest so it
+    // wins over the snippet-field navigation Tab binding registered by
+    // autocompletion(). CM6 default keymap binds Enter only; Tab is what
+    // most live-coding editors (Strudel, VS Code) use as the primary
+    // accept key.
+    //
+    // The 120ms wait clears CM6's `interactionDelay` (default 75ms) —
+    // an anti-typo guard that rejects acceptCompletion calls landing
+    // within that window after the popup opens. Real users typing on
+    // a keyboard exceed 75ms between keystrokes naturally; Playwright
+    // doesn't, so the wait makes the test mimic real usage.
+    const editor = page.locator(".cm-content");
+    await editor.click();
+    await page.keyboard.press("Control+End");
+    await page.keyboard.type(".fa");
+    const tooltip = page.locator(".cm-tooltip-autocomplete");
+    await expect(tooltip).toBeVisible({ timeout: 2_000 });
+    await expect(tooltip.locator('[aria-selected="true"]')).toContainText("fast");
+    await page.waitForTimeout(120);
+    await page.keyboard.press("Tab");
+    await expect(tooltip).toBeHidden({ timeout: 2_000 });
+    await expect(editor).toContainText(`${INITIAL_PATTERN}.fast(`);
+  });
+
+  test("autocomplete in every() arg 1 ignores commas inside nested calls", async ({ page }) => {
+    // Regression: `pastFirstComma` originally treated any `,` between
+    // the opening `(` and the cursor as a slot separator, which made
+    // the cursor in `every(stack(a,b)|` look like slot 2 and surfaced
+    // callback completions (rev/fast/slow) where they don't belong.
+    // The bracket-depth scan now only counts top-level commas — so this
+    // position must NOT offer callbacks. Top-level identifiers are
+    // still expected since the slot accepts any expression.
+    const editor = page.locator(".cm-content");
+    await editor.click();
+    await page.keyboard.press("Control+A");
+    // closeBrackets auto-pairs `(` `[` `"`, so typing only the openers
+    // (and stepping over auto-closes) lands the cursor between the
+    // inner `stack(...)` close and the outer `every(...)` close.
+    await page.keyboard.type(`s("bd").every(stack(s("bd"),s("sd"))`);
+    await page.keyboard.press("Control+Space");
+    const tooltip = page.locator(".cm-tooltip-autocomplete");
+    await expect(tooltip).toBeVisible({ timeout: 2_000 });
+    // Callbacks must not appear here — this is still slot 1.
+    await expect(tooltip).not.toContainText("rev");
+    // But top-level expression completions should be available.
+    await expect(tooltip).toContainText("stack");
+  });
+
+  test("autocomplete offers drum names inside s(\"…\")", async ({ page }) => {
+    // Inside a string whose enclosing call is s(...), the popup should
+    // surface the synthesized drum vocabulary — not method names.
+    const editor = page.locator(".cm-content");
+    await editor.click();
+    await page.keyboard.press("Control+A");
+    await page.keyboard.type('s("b');
+    // Wait for parser to settle so the syntax-tree lookup sees a String.
+    const tooltip = page.locator(".cm-tooltip-autocomplete");
+    await expect(tooltip).toBeVisible({ timeout: 2_000 });
+    await expect(tooltip).toContainText("bd");
+    // Method names must not bleed into the string-context popup.
+    await expect(tooltip).not.toContainText("degradeBy");
+  });
+
   test("cheatsheet advertises stack(p, q) under Layers", async ({ page }) => {
     // The new top-level stack() primitive is the only way to combine an
     // s(...) drum pattern with a note(...) melody in one expression — the

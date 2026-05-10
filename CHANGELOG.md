@@ -33,6 +33,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   runtime-error teardown coverage (#14), design-system overhaul
   (typography, tokens, motion, a11y), and a mini-notation cheatsheet
   sidebar.
+- **Live REPL autocomplete + syntax highlighting** (#23) — context-aware
+  completions across four cursor positions: top-level functions
+  (`s`, `note`, `stack`), method chain (`.fast` / `.slow` / `.rev` /
+  `.degradeBy` / `.every` / `.jux`), drum names inside `s("…")`, and
+  callbacks inside `jux(…)` / `every(_, …)`. Backed by a small Lezer
+  grammar for the outer surface; the inner mini-notation stays opaque
+  to keep the wasm-side parser the single source of truth. Includes
+  default syntax highlighting and bracket auto-pairing.
 
 ### Changed
 
