@@ -1,9 +1,10 @@
 # Performance Snapshot - 2026-05-10 (Post-Architecture Redesign; .jux Shipped)
 
 Snapshot after the graph package split, API-stabilization pass, pattern
-scheduler, mini-notation pipeline, and `.jux` stereo split support. The
-benchmarks below measure the existing graph hot paths; `.jux` is covered by
-the regression suite but does not yet have a dedicated performance benchmark.
+scheduler, mini-notation pipeline, and `.jux` stereo split support. The graph
+hot-path benchmarks remain comparable to prior snapshots; dedicated `.jux`
+benchmarks cover pattern query, mini parse, scheduler dispatch, and stereo
+routing.
 
 This snapshot keeps the existing graph hot-path benchmark suite unchanged so
 the process/compile/hot-swap/topology numbers remain comparable to the
@@ -16,9 +17,14 @@ the process/compile/hot-swap/topology numbers remain comparable to the
 - **MoonBit:** moon 0.1.20260427 (48d7def 2026-04-27)
 - **Git commit:** 07c8210912e5c51e7e82dea8a116ffca8efe79ee
 - **Target:** wasm-gc (release)
-- **Command:** `moon bench --release -p graph -f graph_benchmark.mbt`
-- **Benchmark result:** 18 benchmark test groups passed, covering 45 measured
+- **Graph command:** `moon bench --release -p graph -f graph_benchmark.mbt`
+- **Graph result:** 18 benchmark test groups passed, covering 45 measured
   cases across process, compile, hot-swap, and topology benchmarks.
+- **.jux commands:**
+  - `moon bench --release -p pattern -f jux_benchmark.mbt`
+  - `moon bench --release -p mini -f jux_benchmark.mbt`
+  - `moon bench --release -p scheduler -f jux_benchmark.mbt`
+- **.jux result:** 5 benchmark test groups passed, covering 8 measured cases.
 - **Regression suite:** `moon test` - 632 passed, 0 failed
 
 ## Process Benchmarks (us)
@@ -59,6 +65,19 @@ the process/compile/hot-swap/topology numbers remain comparable to the
 | replace_node | 12.66 | 22.46 | 44.17 |
 | insert_delete_roundtrip | 23.91 | 42.20 | 78.94 |
 
+## Dedicated .jux Benchmarks (us)
+
+| Area | Case | Time |
+|------|------|-----:|
+| pattern query | rev_4step | 3.86 |
+| pattern query | fast_4step | 5.72 |
+| mini parse | s_rev | 0.68 |
+| mini parse | s_fast | 0.78 |
+| mini parse | stack_rev | 0.86 |
+| scheduler dispatch | process_events_8_jux_events | 17.93 |
+| stereo routing | voicepool_process_8_panned_jux_voices | 28.54 |
+| scheduler block | process_block_jux_rev | 10.25 |
+
 ## Comparison vs 2026-04-09 (128 samples)
 
 | Category | Graph / edit | 2026-04-09 | 2026-05-10 | Delta |
@@ -89,11 +108,10 @@ the process/compile/hot-swap/topology numbers remain comparable to the
   128-sample process benchmark is `fm_voice` at 7.20 us.
 - The package split changed the benchmark command from the historical
   `-p lib` path to `-p graph`.
-- `.jux` has shipped in the pattern/mini/scheduler path and is covered by the
-  normal regression suite, but this benchmark suite does not yet measure
-  pattern query, mini parse, scheduler dispatch, or `.jux`-specific stereo
-  routing cost. Add a dedicated scheduler/pattern benchmark before treating
-  `.jux` performance as measured.
+- `.jux` is now measured at four layers: pure pattern query, mini parser,
+  scheduler event dispatch, and voice-pool stereo routing. `process_block` is
+  included as a realistic timeline benchmark, but dispatch is measured
+  separately because most audio blocks do not contain note onsets.
 - Current numbers are faster than the 2026-04-09 snapshot across every
   comparable 128-sample graph benchmark. Treat exact deltas as point-in-time
   measurements; the useful signal is that there is no regression in the

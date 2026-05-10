@@ -27,6 +27,10 @@ for `dowdiness/moondsp`. Read order below goes roughly from "new user" to
   code and any other doc disagree, this document and the code take priority.
 - **[`performance/`](performance/)** — dated benchmark snapshots. New
   measurements go in new files (do not edit historical entries in place).
+  Latest:
+  [`performance/2026-05-10-post-architecture-redesign-and-jux.md`](performance/2026-05-10-post-architecture-redesign-and-jux.md)
+  covers the post-architecture graph hot paths plus dedicated `.jux`
+  pattern/mini/scheduler benchmarks.
 
 ## Reviews
 
