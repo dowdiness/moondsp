@@ -660,6 +660,12 @@ The current repository already implements:
   path
 - input nodes may be declared in authoring order; the compiler topologically
   sorts reachable nodes from a single terminal output node
+- `CompiledTemplate::analyze(...)` captures the authoring template, the
+  optimizer's authoring-index map, and the optimized node array; callers that
+  already need template analysis can compile mono or stereo graphs with
+  `CompiledDsp::compile_template(...)` or
+  `CompiledStereoDsp::compile_template(...)` without running the graph
+  optimizer a second time
 - compile rejects:
   - unsupported feedback cycles
   - multiple outputs
@@ -780,7 +786,8 @@ Current limits:
   with self-registers rather than a separate linked-list infrastructure
 - constant folding and dead-node elimination are integrated into
   `CompiledDsp::compile()` and `CompiledStereoDsp::compile()` via
-  `optimize_graph()`
+  `optimize_graph()`; pre-analyzed `CompiledTemplate` callers reuse the same
+  optimized graph through `compile_template(...)`
 - `InsertChain` / `DeleteChain` topology edit variants support multi-node
   subgraph operations with stereo parity
 - state preservation across topology edit recompilation is supported
@@ -828,6 +835,42 @@ Current limits of the control-frame model:
 - `GraphControl` still does not cover topology changes or stereo graph routing
   changes directly; hot-swap and the first topology-edit slice remain separate
   wrapper APIs in this phase
+
+### 3.5.3 Pattern-to-DSP Control Binding
+
+Pattern playback now has a bound voice-pool layer that keeps template validation
+and control-key routing together.
+
+Current semantics:
+
+- `VoicePool` remains the low-level polyphonic mono-voice allocator and mixer
+  with priority stealing, per-slot template snapshots, and per-voice pan gains
+- `BoundVoicePool` owns both a `VoicePool` and the `ControlBindingMap` proven
+  against that pool's current `CompiledTemplate`
+- `BoundVoicePool::new(...)` analyzes the template once, validates voice-pool
+  requirements, and builds bindings against the same analyzed template
+- `BoundVoicePool::set_template(...)` is transactional:
+  - it analyzes and validates the replacement template first
+  - it builds the replacement `ControlBindingMap` against that replacement
+    template before mutating the live pool
+  - if validation or binding fails, the previous template and bindings remain
+    active
+- `BoundVoicePool::note_on_controls(...)` accepts pattern/control-map values,
+  resolves them through the current binding map, and delegates to the inner
+  `VoicePool::note_on(...)`
+- each `VoicePool::note_on(...)` compiles the already analyzed template through
+  `CompiledDsp::compile_template(...)`, so per-voice graph creation reuses the
+  optimized nodes captured during template validation
+- `PatternScheduler` stores tempo, sample position, active note handles, and a
+  `ControlMapper`; it no longer stores a separate `ControlBindingMap`
+- `PatternScheduler::process_block(...)` takes a `BoundVoicePool`, expires old
+  notes, queries the pattern for the current block arc, converts raw control
+  maps through the scheduler's mapper, calls `note_on_controls(...)`, applies
+  per-voice side effects such as pan, then renders through the bound pool
+
+This prevents a stale scheduler-owned binding map from being paired with a
+voice pool after a template swap, and it removes the previous double
+`optimize_graph(...)` pass from the voice-template path.
 
 ### 3.6 Graph Hot-Swap
 

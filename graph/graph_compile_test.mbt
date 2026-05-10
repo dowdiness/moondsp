@@ -201,6 +201,53 @@ test "compiled dsp optimizes constant subgraph during compilation" {
 }
 
 ///|
+test "compiled dsp compile_template matches compile output" {
+  let nodes : Array[DspNode] = [
+    DspNode::constant(3.0),
+    DspNode::constant(4.0),
+    DspNode::mul(0, 1),
+    DspNode::gain(2, HALF_GAIN),
+    DspNode::output(3),
+  ]
+  let ctx = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
+  let compiled = CompiledDsp::compile(nodes, ctx).unwrap()
+  let compiled_template = CompiledDsp::compile_template(
+    CompiledTemplate::analyze(nodes),
+    ctx,
+  ).unwrap()
+  let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+  let template_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+
+  compiled.process(ctx, output)
+  compiled_template.process(ctx, template_output)
+
+  for i in 0..<SMALL_BLOCK_SIZE {
+    assert_eq(template_output.get(i), output.get(i))
+  }
+}
+
+///|
+test "compiled dsp compile_template preserves authoring control indices" {
+  let nodes = [
+    DspNode::output(1),
+    DspNode::oscillator(Waveform::Sine, OSCILLATOR_FREQ),
+  ]
+  let ctx = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
+  let compiled = CompiledDsp::compile_template(
+    CompiledTemplate::analyze(nodes),
+    ctx,
+  ).unwrap()
+
+  assert_true(compiled.set_param(1, GraphParamSlot::Value0, 880.0))
+}
+
+///|
 test "compiled dsp delay node keeps zero-capacity default as passthrough" {
   let context = DspContext::new(
     sample_rate=STANDARD_SAMPLE_RATE,

@@ -24,29 +24,10 @@ test "midi_to_hz: MIDI 127" {
 
 ///|
 test "PatternScheduler::new initializes with zero position" {
-  let template : Array[@moondsp.DspNode] = [
-    @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 440.0),
-    @moondsp.DspNode::gain(0, 1.0),
-    @moondsp.DspNode::adsr(
-      attack_ms=0.01,
-      decay_ms=0.1,
-      sustain=0.7,
-      release_ms=0.3,
-    ),
-    @moondsp.DspNode::output(1),
-  ]
   let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
-  let bindings = @moondsp.ControlBindingBuilder::new()
-    .bind(key="note", node_index=0, slot=@moondsp.GraphParamSlot::Value0)
-    .build(@moondsp.CompiledTemplate::analyze(template))
-  match bindings {
-    Ok(b) => {
-      let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b, ctx~)
-      assert_eq(sched.sample_counter(), 0L)
-      assert_eq(sched.active_note_count(), 0)
-    }
-    Err(_) => assert_true(false)
-  }
+  let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~)
+  assert_eq(sched.sample_counter(), 0L)
+  assert_eq(sched.active_note_count(), 0)
 }
 
 ///|
@@ -88,7 +69,7 @@ test "compute_arc: fractional BPM 120.5 preserves precision" {
 /// `VoicePool::new`'s orphan-ADSR gate accepts it; swapping to bare `gain(0)`
 /// would orphan the ADSR and be rejected.
 fn make_test_pool() -> (
-  @moondsp.VoicePool,
+  @moondsp.BoundVoicePool,
   Array[@moondsp.DspNode],
   @moondsp.DspContext,
 ) {
@@ -104,61 +85,53 @@ fn make_test_pool() -> (
     @moondsp.DspNode::output(2),
   ]
   let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
-  let pool = @moondsp.VoicePool::new(template, ctx, max_voices=4)
+  let pool = @moondsp.BoundVoicePool::new(
+    template,
+    ctx,
+    @moondsp.ControlBindingBuilder::new().bind(
+      key="note",
+      node_index=0,
+      slot=@moondsp.GraphParamSlot::Value0,
+    ),
+    max_voices=4,
+  )
   match pool {
-    Some(p) => (p, template, ctx)
-    None => abort("test pool creation failed")
+    Ok(p) => (p, template, ctx)
+    Err(_) => abort("test pool creation failed")
   }
 }
 
 ///|
 /// Helper: build pool + scheduler + audio buffers for standard test setup.
 fn make_test_sched() -> (
-  @moondsp.VoicePool,
+  @moondsp.BoundVoicePool,
   @scheduler.PatternScheduler,
   @moondsp.AudioBuffer,
   @moondsp.AudioBuffer,
 ) {
-  let (pool, template, ctx) = make_test_pool()
-  let bindings = @moondsp.ControlBindingBuilder::new()
-    .bind(key="note", node_index=0, slot=@moondsp.GraphParamSlot::Value0)
-    .build(@moondsp.CompiledTemplate::analyze(template))
-  match bindings {
-    Ok(b) => {
-      let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b, ctx~)
-      let left = @moondsp.AudioBuffer::filled(128)
-      let right = @moondsp.AudioBuffer::filled(128)
-      (pool, sched, left, right)
-    }
-    Err(_) => abort("test bindings creation failed")
-  }
+  let (pool, _, ctx) = make_test_pool()
+  let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~)
+  let left = @moondsp.AudioBuffer::filled(128)
+  let right = @moondsp.AudioBuffer::filled(128)
+  (pool, sched, left, right)
 }
 
 ///|
 test "expire_notes: removes notes past their end_time" {
-  let (pool, template, ctx) = make_test_pool()
-  let bindings = @moondsp.ControlBindingBuilder::new()
-    .bind(key="note", node_index=0, slot=@moondsp.GraphParamSlot::Value0)
-    .build(@moondsp.CompiledTemplate::analyze(template))
-  match bindings {
-    Err(_) => assert_true(false)
-    Ok(b) => {
-      let sched = @scheduler.PatternScheduler::new(bpm=120.0, bindings=b, ctx~)
-      let controls = b.resolve_controls({ "note": 440.0 })
-      let handle = pool.note_on(controls)
-      match handle {
-        None => assert_true(false)
-        Some(h) => {
-          sched.push_active_note(h, @pattern.Rational::from_int(0))
-          assert_eq(sched.active_note_count(), 1)
-          let arc = @pattern.TimeSpan::new(
-            @pattern.Rational::from_int(1),
-            @pattern.Rational::from_int(2),
-          )
-          sched.expire_notes(pool, arc)
-          assert_eq(sched.active_note_count(), 0)
-        }
-      }
+  let (pool, _, ctx) = make_test_pool()
+  let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~)
+  let handle = pool.note_on_controls({ "note": 440.0 })
+  match handle {
+    None => assert_true(false)
+    Some(h) => {
+      sched.push_active_note(h, @pattern.Rational::from_int(0))
+      assert_eq(sched.active_note_count(), 1)
+      let arc = @pattern.TimeSpan::new(
+        @pattern.Rational::from_int(1),
+        @pattern.Rational::from_int(2),
+      )
+      sched.expire_notes(pool, arc)
+      assert_eq(sched.active_note_count(), 0)
     }
   }
 }
@@ -255,30 +228,27 @@ test "process_block: stolen voice gate-off is harmless" {
     @moondsp.DspNode::output(2),
   ]
   let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
-  let pool = @moondsp.VoicePool::new(template, ctx, max_voices=1)
+  let pool = @moondsp.BoundVoicePool::new(
+    template,
+    ctx,
+    @moondsp.ControlBindingBuilder::new().bind(
+      key="note",
+      node_index=0,
+      slot=@moondsp.GraphParamSlot::Value0,
+    ),
+    max_voices=1,
+  )
   match pool {
-    None => assert_true(false)
-    Some(pool) => {
-      let bindings = @moondsp.ControlBindingBuilder::new()
-        .bind(key="note", node_index=0, slot=@moondsp.GraphParamSlot::Value0)
-        .build(@moondsp.CompiledTemplate::analyze(template))
-      match bindings {
-        Err(_) => assert_true(false)
-        Ok(b) => {
-          let sched = @scheduler.PatternScheduler::new(
-            bpm=120.0,
-            bindings=b,
-            ctx~,
-          )
-          let pat = @pattern.note(60.0).fast(@pattern.Rational::from_int(2))
-          let left = @moondsp.AudioBuffer::filled(128)
-          let right = @moondsp.AudioBuffer::filled(128)
-          for _i = 0; _i < 200; _i = _i + 1 {
-            sched.process_block(pat, pool, left, right)
-          }
-          assert_true(true)
-        }
+    Err(_) => assert_true(false)
+    Ok(pool) => {
+      let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~)
+      let pat = @pattern.note(60.0).fast(@pattern.Rational::from_int(2))
+      let left = @moondsp.AudioBuffer::filled(128)
+      let right = @moondsp.AudioBuffer::filled(128)
+      for _i = 0; _i < 200; _i = _i + 1 {
+        sched.process_block(pat, pool, left, right)
       }
+      assert_true(true)
     }
   }
 }

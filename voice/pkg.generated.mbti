@@ -12,6 +12,28 @@ import {
 // Errors
 
 // Types and methods
+pub struct BoundVoicePool {
+  // private fields
+}
+pub fn BoundVoicePool::active_voice_count(Self) -> Int
+pub fn BoundVoicePool::last_sanitized_count(Self) -> Int
+pub fn BoundVoicePool::new(Array[@graph.DspNode], @dsp.DspContext, @graph.ControlBindingBuilder, max_voices? : Int) -> Result[Self, BoundVoicePoolError]
+pub fn BoundVoicePool::note_off(Self, VoiceHandle) -> Bool
+pub fn BoundVoicePool::note_off_all(Self) -> Unit
+pub fn BoundVoicePool::note_on_controls(Self, Map[String, Double]) -> VoiceHandle?
+pub fn BoundVoicePool::process(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
+pub fn BoundVoicePool::set_template(Self, Array[@graph.DspNode], @graph.ControlBindingBuilder) -> Result[Unit, BoundVoicePoolError]
+pub fn BoundVoicePool::set_voice_pan(Self, VoiceHandle, Double) -> Bool
+pub fn BoundVoicePool::voice_state(Self, VoiceHandle) -> VoiceState
+
+pub(all) enum BoundVoicePoolError {
+  InvalidMaxVoices
+  OrphanAdsr
+  CompileRejected
+  Binding(@graph.ControlBindingError)
+} derive(Eq, @debug.Debug)
+pub impl Show for BoundVoicePoolError
+
 pub struct VoiceHandle {
   slot : Int
   generation : Int

@@ -106,6 +106,37 @@ test "compiled stereo dsp applies stereo biquad after pan" {
 }
 
 ///|
+test "compiled stereo dsp compile_template matches compile output" {
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::pan(0, PAN_CENTER),
+    DspNode::stereo_gain(1, HALF_GAIN),
+    DspNode::stereo_output(2),
+  ]
+  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let compiled_template = CompiledStereoDsp::compile_template(
+    CompiledTemplate::analyze(nodes),
+    context,
+  ).unwrap()
+  let left = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+  let right = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+  let template_left = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+  let template_right = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+
+  compiled.process(context, left, right)
+  compiled_template.process(context, template_left, template_right)
+
+  for i in 0..<SMALL_BLOCK_SIZE {
+    assert_eq(template_left.get(i), left.get(i))
+    assert_eq(template_right.get(i), right.get(i))
+  }
+}
+
+///|
 test "compiled stereo dsp applies stereo delay after pan" {
   let context = DspContext::new(
     sample_rate=STANDARD_SAMPLE_RATE,

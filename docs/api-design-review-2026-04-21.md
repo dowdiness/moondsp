@@ -49,6 +49,14 @@ to `archive/` rather than edited in place.
     `Pan::process`, `DspNode::stereo_gain`, `DspNode::stereo_clip`) are
     still positional. If we extend labelling to these, we should do it as a
     single consistent sweep rather than piecemeal.
+- **(4) Remove scheduler binding staleness — ✅ shipped 2026-05-11.**
+  `BoundVoicePool` now owns both the low-level `VoicePool` and the
+  `ControlBindingMap` proven against the current template. `PatternScheduler`
+  no longer stores bindings separately, so scheduler/browser code cannot pair
+  a stale binding map with a pool after a template swap. `CompiledTemplate`
+  now carries optimized nodes, and `CompiledDsp::compile_template` /
+  `CompiledStereoDsp::compile_template` reuse that topology artifact to avoid
+  the extra `optimize_graph` pass in pool setup.
 
 ## Step 1 — Facts / Assumptions / Unknowns
 
@@ -567,8 +575,8 @@ checked for success.
   The raw `nodes_` / `index` fields are now hidden, but the builder still
   exposes its array representation for compile/replay interoperability.
 - `PatternScheduler` (scheduler package) exposes `mut bpm`,
-  `mut sample_counter`, `ctx`, `active_notes`, `bindings`, `mapper` —
-  four internal fields, mutable, public. Highest-churn structure in the
+  `mut sample_counter`, `ctx`, `active_notes`, `mapper` — internal fields
+  remain public, though the stale `bindings` field has been removed from the
   surface.
 
 **Must NEVER be exposed:**

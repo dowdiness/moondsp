@@ -73,7 +73,6 @@ pub struct PatternScheduler {
   mut sample_counter : Int64
   ctx : @moondsp.DspContext
   active_notes : Array[ActiveNote]
-  bindings : @moondsp.ControlBindingMap
   mapper : ControlMapper
 }
 
@@ -90,17 +89,15 @@ fn sanitize_bpm(bpm : Double) -> Double {
 ///|
 pub fn PatternScheduler::new(
   bpm~ : Double,
-  bindings~ : @moondsp.ControlBindingMap,
   ctx~ : @moondsp.DspContext,
   mapper? : ControlMapper,
 ) -> PatternScheduler {
-  PatternScheduler(bpm~, bindings~, ctx~, mapper?)
+  PatternScheduler(bpm~, ctx~, mapper?)
 }
 
 ///|
 pub fn PatternScheduler::PatternScheduler(
   bpm~ : Double,
-  bindings~ : @moondsp.ControlBindingMap,
   ctx~ : @moondsp.DspContext,
   mapper? : ControlMapper,
 ) -> PatternScheduler {
@@ -109,7 +106,6 @@ pub fn PatternScheduler::PatternScheduler(
     sample_counter: 0L,
     ctx,
     active_notes: [],
-    bindings,
     mapper: mapper.unwrap_or(default_control_mapper()),
   }
 }
@@ -156,7 +152,7 @@ pub fn PatternScheduler::push_active_note(
 /// (~2.7ms at 48kHz/128 samples — inaudible for musical purposes).
 pub fn PatternScheduler::expire_notes(
   self : PatternScheduler,
-  pool : @moondsp.VoicePool,
+  pool : @moondsp.BoundVoicePool,
   arc : @pattern.TimeSpan,
 ) -> Unit {
   let mut i = 0
@@ -189,7 +185,7 @@ pub fn PatternScheduler::process_events(
   self : PatternScheduler,
   events : Array[@pattern.Event[@pattern.ControlMap]],
   arc : @pattern.TimeSpan,
-  pool : @moondsp.VoicePool,
+  pool : @moondsp.BoundVoicePool,
 ) -> Unit {
   // Sort by onset for deterministic voice allocation.
   // None-whole events sort last but are always skipped below.
@@ -229,8 +225,7 @@ pub fn PatternScheduler::process_events(
             None => ()
           }
         })
-        let controls = self.bindings.resolve_controls(map)
-        match pool.note_on(controls) {
+        match pool.note_on_controls(map) {
           None => ()
           Some(handle) => {
             self.active_notes.push({ handle, end_time: whole.end_ })
@@ -253,7 +248,7 @@ pub fn PatternScheduler::process_events(
 pub fn PatternScheduler::process_block(
   self : PatternScheduler,
   pat : @pattern.Pat[@pattern.ControlMap],
-  pool : @moondsp.VoicePool,
+  pool : @moondsp.BoundVoicePool,
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
 ) -> Unit {

@@ -104,4 +104,10 @@ pub using @graph {
 
 ///|
 // Re-export voice/ package — polyphonic voice pool with priority stealing.
-pub using @voice {type VoiceHandle, type VoicePool, type VoiceState}
+pub using @voice {
+  type BoundVoicePool,
+  type BoundVoicePoolError,
+  type VoiceHandle,
+  type VoicePool,
+  type VoiceState,
+}

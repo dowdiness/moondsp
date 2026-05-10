@@ -36,29 +36,30 @@ fn bench_template() -> Array[@moondsp.DspNode] {
 }
 
 ///|
-fn bench_bindings(
-  template : Array[@moondsp.DspNode],
-) -> @moondsp.ControlBindingMap {
-  @moondsp.ControlBindingBuilder::new()
-  .bind(key="note", node_index=0, slot=@moondsp.GraphParamSlot::Value0)
-  .build(@moondsp.CompiledTemplate::analyze(template))
-  .unwrap()
+fn bench_binding_builder() -> @moondsp.ControlBindingBuilder {
+  @moondsp.ControlBindingBuilder::new().bind(
+    key="note",
+    node_index=0,
+    slot=@moondsp.GraphParamSlot::Value0,
+  )
 }
 
 ///|
 fn bench_pool(
   template : Array[@moondsp.DspNode],
   ctx : @moondsp.DspContext,
-) -> @moondsp.VoicePool {
-  @moondsp.VoicePool::new(template, ctx, max_voices=16).unwrap()
+) -> @moondsp.BoundVoicePool {
+  @moondsp.BoundVoicePool::new(
+    template,
+    ctx,
+    bench_binding_builder(),
+    max_voices=16,
+  ).unwrap()
 }
 
 ///|
-fn bench_scheduler(
-  bindings : @moondsp.ControlBindingMap,
-  ctx : @moondsp.DspContext,
-) -> PatternScheduler {
-  PatternScheduler::new(bpm=120.0, bindings~, ctx~)
+fn bench_scheduler(ctx : @moondsp.DspContext) -> PatternScheduler {
+  PatternScheduler::new(bpm=120.0, ctx~)
 }
 
 ///|
@@ -74,7 +75,7 @@ fn bench_jux_pattern() -> @pattern.Pat[@pattern.ControlMap] {
 ///|
 fn bench_seed_jux_voices(
   scheduler : PatternScheduler,
-  pool : @moondsp.VoicePool,
+  pool : @moondsp.BoundVoicePool,
 ) -> Unit {
   let arc = bench_arc()
   let events = bench_jux_pattern().query(arc)
@@ -85,8 +86,7 @@ fn bench_seed_jux_voices(
 test "bench/jux/scheduler_dispatch" (b : @bench.T) {
   let ctx = bench_ctx()
   let template = bench_template()
-  let bindings = bench_bindings(template)
-  let scheduler = bench_scheduler(bindings, ctx)
+  let scheduler = bench_scheduler(ctx)
   let pool = bench_pool(template, ctx)
   let arc = bench_arc()
   let expire_arc = @pattern.TimeSpan::new(
@@ -105,8 +105,7 @@ test "bench/jux/scheduler_dispatch" (b : @bench.T) {
 test "bench/jux/stereo_routing" (b : @bench.T) {
   let ctx = bench_ctx()
   let template = bench_template()
-  let bindings = bench_bindings(template)
-  let scheduler = bench_scheduler(bindings, ctx)
+  let scheduler = bench_scheduler(ctx)
   let pool = bench_pool(template, ctx)
   bench_seed_jux_voices(scheduler, pool)
   let left = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)
@@ -124,8 +123,7 @@ test "bench/jux/stereo_routing" (b : @bench.T) {
 test "bench/jux/process_block" (b : @bench.T) {
   let ctx = bench_ctx()
   let template = bench_template()
-  let bindings = bench_bindings(template)
-  let scheduler = bench_scheduler(bindings, ctx)
+  let scheduler = bench_scheduler(ctx)
   let pool = bench_pool(template, ctx)
   let pattern = bench_jux_pattern()
   let left = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)

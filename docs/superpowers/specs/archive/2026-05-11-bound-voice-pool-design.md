@@ -1,7 +1,7 @@
 # Bound Voice Pool — Design Spec
 
 **Date:** 2026-05-11
-**Status:** Draft — awaiting implementation
+**Status:** Implemented 2026-05-11
 **Related:** `docs/api-design-review-2026-04-21.md`, PR #8/#9 follow-up
 
 ## Goal
@@ -301,10 +301,10 @@ Recommended compatibility posture:
   `CompiledTemplate::analyze` directly.
 - Existing `moon test` suite remains green.
 
-## Open Questions
+## Implementation Decisions
 
-- Should `VoicePool::new` become result-typed in the same implementation pass,
-  or should `BoundVoicePool::new` be the first result-typed pool constructor?
-- Should `BoundVoicePool::note_on_controls` return `VoiceHandle?` for parity
-  with `VoicePool::note_on`, or a result type that distinguishes rejected
-  controls from compile failure?
+- `VoicePool::new` kept its existing `VoicePool?` surface for low-level
+  compatibility. `BoundVoicePool::new` is the new result-typed constructor.
+- `BoundVoicePool::note_on_controls` returns `VoiceHandle?` for parity with
+  `VoicePool::note_on`; rejected controls and compile failure remain collapsed
+  at note-trigger time for now.

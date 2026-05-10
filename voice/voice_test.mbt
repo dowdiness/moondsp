@@ -2,7 +2,13 @@
 using @dsp {type AudioBuffer, type DspContext, type Waveform}
 
 ///|
-using @graph {type CompiledDsp, type DspNode}
+using @graph {
+  type CompiledDsp,
+  type ControlBindingBuilder,
+  type ControlBindingError,
+  type DspNode,
+  type GraphParamSlot,
+}
 
 ///|
 test "is_voice_finished returns false during active envelope" {
@@ -174,6 +180,65 @@ test "set_template rejects invalid template" {
   let nodes = [DspNode::constant(440.0), DspNode::output(0)]
   let pool = VoicePool::new(nodes, ctx).unwrap()
   assert_true(!pool.set_template([]))
+}
+
+///|
+test "bound voice pool constructor accepts valid empty bindings" {
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
+  let nodes = [DspNode::constant(440.0), DspNode::output(0)]
+  let pool = BoundVoicePool::new(nodes, ctx, ControlBindingBuilder::new())
+  assert_true(pool is Ok(_))
+}
+
+///|
+test "bound voice pool constructor reports invalid bindings" {
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
+  let nodes = [DspNode::constant(440.0), DspNode::output(0)]
+  let result = BoundVoicePool::new(
+    nodes,
+    ctx,
+    ControlBindingBuilder::new().bind(
+      key="bad",
+      node_index=5,
+      slot=GraphParamSlot::Value0,
+    ),
+  )
+  match result {
+    Err(BoundVoicePoolError::Binding(ControlBindingError::InvalidNodeIndex(5))) =>
+      ()
+    _ => assert_true(false)
+  }
+}
+
+///|
+test "bound voice pool set_template rejection leaves prior bindings active" {
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
+  let nodes_a = [DspNode::oscillator(Waveform::Sine, 440.0), DspNode::output(0)]
+  let nodes_b = [DspNode::noise(1U), DspNode::output(0)]
+  let pool = BoundVoicePool::new(
+    nodes_a,
+    ctx,
+    ControlBindingBuilder::new().bind(
+      key="note",
+      node_index=0,
+      slot=GraphParamSlot::Value0,
+    ),
+  ).unwrap()
+  let rejected = pool.set_template(
+    nodes_b,
+    ControlBindingBuilder::new().bind(
+      key="note",
+      node_index=0,
+      slot=GraphParamSlot::Value0,
+    ),
+  )
+  match rejected {
+    Err(BoundVoicePoolError::Binding(_)) => ()
+    _ => assert_true(false)
+  }
+  let controls : Map[String, Double] = { "note": 880.0 }
+  assert_true(pool.note_on_controls(controls) is Some(_))
+  assert_true(pool.active_voice_count() == 1)
 }
 
 ///|

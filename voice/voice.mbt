@@ -3,6 +3,9 @@ using @dsp {type AudioBuffer, type DspContext}
 
 ///|
 using @graph {
+  type ControlBindingBuilder,
+  type ControlBindingError,
+  type ControlBindingMap,
   type CompiledDsp,
   type CompiledTemplate,
   type DspNode,
@@ -35,6 +38,19 @@ pub struct VoiceHandle {
 
 ///|
 pub impl Show for VoiceHandle with output(self, logger) {
+  logger.write_string(@debug.to_string(self))
+}
+
+///|
+pub(all) enum BoundVoicePoolError {
+  InvalidMaxVoices
+  OrphanAdsr
+  CompileRejected
+  Binding(ControlBindingError)
+} derive(Eq, Debug)
+
+///|
+pub impl Show for BoundVoicePoolError with output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
 
@@ -128,10 +144,69 @@ fn VoicePool::resolve_slot(
 pub struct VoicePool {
   priv slots : FixedArray[VoiceSlot]
   priv mut template : Array[DspNode]
+  priv mut compiled_template : CompiledTemplate
   priv compile_context : DspContext
   priv mut next_allocation_order : Int
   priv max_voices : Int
   priv mut last_sanitized_count : Int
+}
+
+///|
+fn validate_voice_template(
+  compiled_template : CompiledTemplate,
+  context : DspContext,
+) -> Result[Unit, BoundVoicePoolError] {
+  if compiled_template.orphan_adsr_count() > 0 {
+    return Err(BoundVoicePoolError::OrphanAdsr)
+  }
+  // Sanity-compile to catch non-orphan problems (feedback cycle validation
+  // etc.). Result discarded — per-voice slots compile their own on note_on.
+  if CompiledDsp::compile_template(compiled_template, context) is None {
+    return Err(BoundVoicePoolError::CompileRejected)
+  }
+  Ok(())
+}
+
+///|
+fn VoicePool::new_validated(
+  template : Array[DspNode],
+  compiled_template : CompiledTemplate,
+  context : DspContext,
+  max_voices : Int,
+) -> Result[VoicePool, BoundVoicePoolError] {
+  if max_voices <= 0 {
+    return Err(BoundVoicePoolError::InvalidMaxVoices)
+  }
+  match validate_voice_template(compiled_template, context) {
+    Err(error) => return Err(error)
+    Ok(_) => ()
+  }
+  let block_size = context.block_size()
+  let slots = FixedArray::makei(max_voices, _ => VoiceSlot::new(block_size))
+  Ok({
+    slots,
+    template: template.copy(),
+    compiled_template,
+    compile_context: context,
+    next_allocation_order: 0,
+    max_voices,
+    last_sanitized_count: 0,
+  })
+}
+
+///|
+fn VoicePool::set_template_validated(
+  self : VoicePool,
+  template : Array[DspNode],
+  compiled_template : CompiledTemplate,
+) -> Result[Unit, BoundVoicePoolError] {
+  match validate_voice_template(compiled_template, self.compile_context) {
+    Err(error) => return Err(error)
+    Ok(_) => ()
+  }
+  self.template = template.copy()
+  self.compiled_template = compiled_template
+  Ok(())
 }
 
 ///|
@@ -155,28 +230,12 @@ pub fn VoicePool::new(
   context : DspContext,
   max_voices? : Int = 32,
 ) -> VoicePool? {
-  if max_voices <= 0 {
-    return None
-  }
   let compiled_template = CompiledTemplate::analyze(template)
-  if compiled_template.orphan_adsr_count() > 0 {
-    return None
+  match
+    VoicePool::new_validated(template, compiled_template, context, max_voices) {
+    Ok(pool) => Some(pool)
+    Err(_) => None
   }
-  // Sanity-compile to catch non-orphan problems (feedback cycle validation
-  // etc.). Result discarded — per-voice slots compile their own on note_on.
-  if CompiledDsp::compile(template, context) is None {
-    return None
-  }
-  let block_size = context.block_size()
-  let slots = FixedArray::makei(max_voices, _ => VoiceSlot::new(block_size))
-  Some({
-    slots,
-    template: template.copy(),
-    compile_context: context,
-    next_allocation_order: 0,
-    max_voices,
-    last_sanitized_count: 0,
-  })
 }
 
 ///|
@@ -185,14 +244,111 @@ pub fn VoicePool::set_template(
   template : Array[DspNode],
 ) -> Bool {
   let compiled_template = CompiledTemplate::analyze(template)
-  if compiled_template.orphan_adsr_count() > 0 {
-    return false
+  self.set_template_validated(template, compiled_template) is Ok(_)
+}
+
+///|
+pub struct BoundVoicePool {
+  priv pool : VoicePool
+  priv mut bindings : ControlBindingMap
+}
+
+///|
+pub fn BoundVoicePool::new(
+  template : Array[DspNode],
+  context : DspContext,
+  bindings : ControlBindingBuilder,
+  max_voices? : Int = 32,
+) -> Result[BoundVoicePool, BoundVoicePoolError] {
+  let compiled_template = CompiledTemplate::analyze(template)
+  let pool = match
+    VoicePool::new_validated(template, compiled_template, context, max_voices) {
+    Ok(pool) => pool
+    Err(error) => return Err(error)
   }
-  if CompiledDsp::compile(template, self.compile_context) is None {
-    return false
+  match bindings.build(compiled_template) {
+    Ok(bindings) => Ok({ pool, bindings })
+    Err(error) => Err(BoundVoicePoolError::Binding(error))
   }
-  self.template = template.copy()
-  true
+}
+
+///|
+pub fn BoundVoicePool::set_template(
+  self : BoundVoicePool,
+  template : Array[DspNode],
+  bindings : ControlBindingBuilder,
+) -> Result[Unit, BoundVoicePoolError] {
+  let compiled_template = CompiledTemplate::analyze(template)
+  match validate_voice_template(compiled_template, self.pool.compile_context) {
+    Err(error) => return Err(error)
+    Ok(_) => ()
+  }
+  let next_bindings = match bindings.build(compiled_template) {
+    Ok(bindings) => bindings
+    Err(error) => return Err(BoundVoicePoolError::Binding(error))
+  }
+  self.pool.template = template.copy()
+  self.pool.compiled_template = compiled_template
+  self.bindings = next_bindings
+  Ok(())
+}
+
+///|
+pub fn BoundVoicePool::note_on_controls(
+  self : BoundVoicePool,
+  controls : Map[String, Double],
+) -> VoiceHandle? {
+  self.pool.note_on(self.bindings.resolve_controls(controls))
+}
+
+///|
+pub fn BoundVoicePool::note_off(
+  self : BoundVoicePool,
+  handle : VoiceHandle,
+) -> Bool {
+  self.pool.note_off(handle)
+}
+
+///|
+pub fn BoundVoicePool::note_off_all(self : BoundVoicePool) -> Unit {
+  self.pool.note_off_all()
+}
+
+///|
+pub fn BoundVoicePool::set_voice_pan(
+  self : BoundVoicePool,
+  handle : VoiceHandle,
+  pan : Double,
+) -> Bool {
+  self.pool.set_voice_pan(handle, pan)
+}
+
+///|
+pub fn BoundVoicePool::voice_state(
+  self : BoundVoicePool,
+  handle : VoiceHandle,
+) -> VoiceState {
+  self.pool.voice_state(handle)
+}
+
+///|
+pub fn BoundVoicePool::active_voice_count(self : BoundVoicePool) -> Int {
+  self.pool.active_voice_count()
+}
+
+///|
+pub fn BoundVoicePool::last_sanitized_count(self : BoundVoicePool) -> Int {
+  self.pool.last_sanitized_count()
+}
+
+///|
+pub fn BoundVoicePool::process(
+  self : BoundVoicePool,
+  context : DspContext,
+  left : AudioBuffer,
+  right : AudioBuffer,
+) -> Unit {
+  self.pool.process(context, left, right)
 }
 
 ///|
@@ -281,7 +437,7 @@ pub fn VoicePool::note_on(
   let slot_index = self.find_slot()
   let slot = self.slots[slot_index]
   let compiled = match
-    CompiledDsp::compile(self.template, self.compile_context) {
+    CompiledDsp::compile_template(self.compiled_template, self.compile_context) {
     Some(c) => c
     None => return None
   }

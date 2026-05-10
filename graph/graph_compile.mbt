@@ -97,6 +97,23 @@ pub fn CompiledDsp::compile(
 }
 
 ///|
+/// Compile a pre-analyzed template without re-running optimize_graph.
+///
+/// Intended for callers that already need `CompiledTemplate` for topology
+/// checks such as orphan-ADSR and control-binding validation.
+pub fn CompiledDsp::compile_template(
+  compiled_template : CompiledTemplate,
+  context : DspContext,
+) -> CompiledDsp? {
+  CompiledDsp::compile_internal(
+    compiled_template.optimized,
+    context,
+    compiled_template.template.length(),
+    compiled_template.index_map,
+  )
+}
+
+///|
 /// Compile without optimization — used by topology controllers where authoring
 /// indices must be preserved for runtime controls.
 fn CompiledDsp::compile_raw(
@@ -290,6 +307,21 @@ pub fn CompiledStereoDsp::compile(
   let original_count = nodes.length()
   let (nodes, opt_map) = optimize_graph(nodes)
   CompiledStereoDsp::compile_internal(nodes, context, original_count, opt_map)
+}
+
+///|
+/// Compile a pre-analyzed terminal-stereo template without re-running
+/// optimize_graph.
+pub fn CompiledStereoDsp::compile_template(
+  compiled_template : CompiledTemplate,
+  context : DspContext,
+) -> CompiledStereoDsp? {
+  CompiledStereoDsp::compile_internal(
+    compiled_template.optimized,
+    context,
+    compiled_template.template.length(),
+    compiled_template.index_map,
+  )
 }
 
 ///|

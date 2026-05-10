@@ -48,7 +48,7 @@ Querying this over one cycle produces 6 events with exact rational time boundari
 
 **Mini-notation parser** — the `mini/` package turns a short text string into a `Pat[ControlMap]`, so you can write `s("bd sd hh sd")` or `note("60 64 67")`, combine sources with `stack(s("bd sd"), note("60 64"))`, and chain methods like `.fast(n)`, `.slow(n)`, `.rev()`, `.degradeBy(p)`, `.every(n, f)`, and `.jux(f)`. Inside the string, sequences support sub-groups (`[a b]`), comma-stacked layers, Euclidean rhythms (`bd(3,8)`), step replicate/stretch (`*n`, `/n`), and 50%-drop (`?`).
 
-**Pattern → DSP scheduler** — the `scheduler/` package drives a `VoicePool` from a `Pat[ControlMap]`: it converts the pattern's event stream into `note_on`/`note_off` calls, routes control-map entries through a `ControlBindingMap`, and ticks the block clock. `PatternScheduler::process_block` is the one call that turns patterns into audio.
+**Pattern → DSP scheduler** — the `scheduler/` package drives a `BoundVoicePool` from a `Pat[ControlMap]`: it converts the pattern's event stream into note on/off calls while the pool owns the `ControlBindingMap` proven against its current template. `PatternScheduler::process_block` is the one call that turns patterns into audio.
 
 ## How it works
 
@@ -59,7 +59,7 @@ Pattern Engine                    DSP Engine
   Pat.query(arc)                    CompiledDsp.process(ctx, buf)
        |                                  |
        v                                  v
-  Array[Event[ControlMap]]         VoicePool.process(ctx, L, R)
+  Array[Event[ControlMap]]         BoundVoicePool.process(ctx, L, R)
        |                                  ^
        +-- { note: 60, cutoff: 800 } -----+
            PatternScheduler.process_block
@@ -69,7 +69,7 @@ Pattern Engine                    DSP Engine
 
 **DSP layer** operates at "audio time" — 128 samples per callback at 48 kHz (2.67 ms budget). It compiles declarative node graphs into flat execution plans and runs them without allocation.
 
-**Bridge** — `scheduler/` connects the two: `PatternScheduler::process_block` queries a `Pat[ControlMap]` over the current block's time arc, turns events into `VoicePool::note_on`/`note_off` calls, and pushes control-map entries through a `ControlBindingMap` onto `GraphControl` slots.
+**Bridge** — `scheduler/` connects the two: `PatternScheduler::process_block` queries a `Pat[ControlMap]` over the current block's time arc, turns events into bound-pool note on/off calls, and lets `BoundVoicePool` resolve control-map entries through the binding map attached to its current template.
 
 ## Repository layout
 

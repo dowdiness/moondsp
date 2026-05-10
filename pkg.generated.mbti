@@ -51,6 +51,10 @@ pub using @dsp {type Biquad}
 
 pub using @dsp {type BiquadMode}
 
+pub using @voice {type BoundVoicePool}
+
+pub using @voice {type BoundVoicePoolError}
+
 pub using @dsp {type Clip}
 
 pub using @graph {type CompiledDsp}

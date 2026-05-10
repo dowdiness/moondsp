@@ -24,6 +24,7 @@ pub fn[T : @dsp.ArithSym + @dsp.DspSym + @dsp.FilterSym + @dsp.DelaySym + @dsp.S
 // Types and methods
 type CompiledDsp
 pub fn CompiledDsp::compile(Array[DspNode], @dsp.DspContext) -> Self?
+pub fn CompiledDsp::compile_template(CompiledTemplate, @dsp.DspContext) -> Self?
 pub fn CompiledDsp::gate_off(Self, Int) -> Bool
 pub fn CompiledDsp::gate_on(Self, Int) -> Bool
 pub fn CompiledDsp::has_feedback_edges(Self) -> Bool
@@ -49,6 +50,7 @@ pub impl GraphControllable for CompiledDspTopologyController
 
 type CompiledStereoDsp
 pub fn CompiledStereoDsp::compile(Array[DspNode], @dsp.DspContext) -> Self?
+pub fn CompiledStereoDsp::compile_template(CompiledTemplate, @dsp.DspContext) -> Self?
 pub fn CompiledStereoDsp::gate_off(Self, Int) -> Bool
 pub fn CompiledStereoDsp::gate_on(Self, Int) -> Bool
 pub fn CompiledStereoDsp::has_feedback_edges(Self) -> Bool

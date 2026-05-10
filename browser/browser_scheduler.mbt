@@ -7,7 +7,7 @@ let sched_active_pattern : @ref.Ref[@pattern.Pat[@pattern.ControlMap]?] = @ref.n
 ///|
 /// Per-sound pool state: voice pool + scheduler + tmp buffers.
 struct SoundPool {
-  pool : @moondsp.VoicePool
+  pool : @moondsp.BoundVoicePool
   scheduler : @scheduler.PatternScheduler
   tmp_left : @moondsp.AudioBuffer
   tmp_right : @moondsp.AudioBuffer
@@ -207,28 +207,22 @@ fn make_drum_pool(
   // slot t and right's hh at slot 1-t — frequent coincidence at fine
   // subdivisions). Multi-sound patterns like s("bd sd hh sd").jux(rev)
   // do NOT need this headroom because per-pool pressure stays at 1.
-  match @moondsp.VoicePool::new(template, ctx, max_voices=8) {
-    None => None
-    Some(pool) => {
-      let bindings_result = @moondsp.ControlBindingBuilder::new().build(
-        @moondsp.CompiledTemplate::analyze(template),
-      )
-      match bindings_result {
-        Err(_) => None
-        Ok(bindings) => {
-          let scheduler = @scheduler.PatternScheduler::new(
-            bpm=120.0,
-            bindings~,
-            ctx~,
-          )
-          Some({
-            pool,
-            scheduler,
-            tmp_left: @moondsp.AudioBuffer::filled(block_size),
-            tmp_right: @moondsp.AudioBuffer::filled(block_size),
-          })
-        }
-      }
+  match
+    @moondsp.BoundVoicePool::new(
+      template,
+      ctx,
+      @moondsp.ControlBindingBuilder::new(),
+      max_voices=8,
+    ) {
+    Err(_) => None
+    Ok(pool) => {
+      let scheduler = @scheduler.PatternScheduler::new(bpm=120.0, ctx~)
+      Some({
+        pool,
+        scheduler,
+        tmp_left: @moondsp.AudioBuffer::filled(block_size),
+        tmp_right: @moondsp.AudioBuffer::filled(block_size),
+      })
     }
   }
 }
@@ -238,28 +232,26 @@ fn make_drum_pool(
 fn make_synth_pool(ctx : @moondsp.DspContext, block_size : Int) -> SoundPool? {
   let template = synth_template()
   // See make_drum_pool for the .jux headroom rationale.
-  match @moondsp.VoicePool::new(template, ctx, max_voices=16) {
-    None => None
-    Some(pool) => {
-      let bindings_result = @moondsp.ControlBindingBuilder::new()
-        .bind(key="note", node_index=0, slot=@moondsp.GraphParamSlot::Value0)
-        .build(@moondsp.CompiledTemplate::analyze(template))
-      match bindings_result {
-        Err(_) => None
-        Ok(bindings) => {
-          let scheduler = @scheduler.PatternScheduler::new(
-            bpm=120.0,
-            bindings~,
-            ctx~,
-          )
-          Some({
-            pool,
-            scheduler,
-            tmp_left: @moondsp.AudioBuffer::filled(block_size),
-            tmp_right: @moondsp.AudioBuffer::filled(block_size),
-          })
-        }
-      }
+  match
+    @moondsp.BoundVoicePool::new(
+      template,
+      ctx,
+      @moondsp.ControlBindingBuilder::new().bind(
+        key="note",
+        node_index=0,
+        slot=@moondsp.GraphParamSlot::Value0,
+      ),
+      max_voices=16,
+    ) {
+    Err(_) => None
+    Ok(pool) => {
+      let scheduler = @scheduler.PatternScheduler::new(bpm=120.0, ctx~)
+      Some({
+        pool,
+        scheduler,
+        tmp_left: @moondsp.AudioBuffer::filled(block_size),
+        tmp_right: @moondsp.AudioBuffer::filled(block_size),
+      })
     }
   }
 }

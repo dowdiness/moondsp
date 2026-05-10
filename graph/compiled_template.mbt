@@ -11,6 +11,7 @@
 /// (the same CompiledTemplate shape applies to any graph variant).
 pub struct CompiledTemplate {
   priv template : Array[DspNode]
+  priv optimized : Array[DspNode]
   priv index_map : FixedArray[Int]
 }
 
@@ -29,8 +30,8 @@ pub struct CompiledTemplate {
 /// and cheap.
 pub fn CompiledTemplate::analyze(template : Array[DspNode]) -> CompiledTemplate {
   let snapshot = template.copy()
-  let (_, index_map) = optimize_graph(snapshot)
-  { template: snapshot, index_map }
+  let (optimized, index_map) = optimize_graph(snapshot)
+  { template: snapshot, optimized, index_map }
 }
 
 ///|
