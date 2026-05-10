@@ -21,7 +21,15 @@ to `archive/` rather than edited in place.
   sub-packages migrated from `@lib` to `@moondsp`. The "Scope" paragraph
   above still mentions `lib` as that was the state at the time of the
   review; the current code no longer has a `lib/` package.
-- **(2) Abstract state-bearing DSP structs — open.**
+- **(2) Abstract state-bearing DSP structs — partially shipped 2026-05-10.**
+  Core DSP state carriers (`Adsr`, `AudioBuffer`, `DelayLine`, `DspContext`,
+  `Noise`, `Oscillator`, `ParamSmoother`) now hide their fields behind
+  constructors, accessors, and mutator methods. Stateless DSP marker structs
+  no longer expose dummy `unit` fields. `DspNode` now hides its raw field
+  layout and raw constructor from the generated public interface, with
+  external tests using accessors instead. `GraphControl` likewise hides its
+  raw positional constructor behind `gate_on`, `gate_off`, `set_param`, and
+  read accessors. `ControlBindingBuilder` hides its mutable accumulator.
 - **(3) Label the footgun constructors — ✅ shipped 2026-04-21.**
   `DspContext::new`, `Adsr::new`, `DspNode::adsr`, `DspNode::biquad`, and
   `Oscillator::process` now use labelled-required arguments, so call

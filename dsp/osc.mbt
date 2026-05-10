@@ -10,7 +10,7 @@ pub(all) enum Waveform {
 ///|
 /// Stateful oscillator for the first reusable Phase 1 DSP primitive.
 pub struct Oscillator {
-  mut phase : Double
+  priv mut phase : Double
 }
 
 ///|

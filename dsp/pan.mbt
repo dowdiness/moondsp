@@ -1,15 +1,11 @@
 ///|
 /// Stateless equal-power pan processor for mono-to-stereo routing.
-pub struct Pan {
-  unit : Unit
-
-  fn new() -> Pan
-}
+pub struct Pan {}
 
 ///|
 /// Create a pan processor.
 pub fn Pan::new() -> Pan {
-  Pan::{ unit: () }
+  Pan::{  }
 }
 
 ///|

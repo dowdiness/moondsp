@@ -294,7 +294,7 @@ fn topology_chain_compacted_node_inputs(
   start_deleted : Int,
   end_deleted : Int,
 ) -> DspNode {
-  DspNode(
+  DspNode::new(
     node.kind,
     topology_chain_compacted_input(node.input0, start_deleted, end_deleted),
     topology_chain_compacted_input(node.input1, start_deleted, end_deleted),
@@ -356,7 +356,7 @@ fn topology_compacted_node_inputs(
   node : DspNode,
   deleted_index : Int,
 ) -> DspNode {
-  DspNode(
+  DspNode::new(
     node.kind,
     topology_compacted_input(node.input0, deleted_index),
     topology_compacted_input(node.input1, deleted_index),

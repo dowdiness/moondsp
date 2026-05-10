@@ -1,15 +1,11 @@
 ///|
 /// Stateless in-place mixer for combining audio buffers.
-pub struct Mix {
-  unit : Unit
-
-  fn new() -> Mix
-}
+pub struct Mix {}
 
 ///|
 /// Create a mix processor.
 pub fn Mix::new() -> Mix {
-  Mix::{ unit: () }
+  Mix::{  }
 }
 
 ///|

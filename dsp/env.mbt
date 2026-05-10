@@ -11,20 +11,13 @@ pub(all) enum EnvStage {
 ///|
 /// Stateful ADSR envelope generator.
 pub struct Adsr {
-  attack_ms : Double
-  decay_ms : Double
-  sustain : Double
-  release_ms : Double
-  mut stage : EnvStage
-  mut level : Double
-  mut level_at_release : Double
-
-  fn new(
-    attack_ms~ : Double,
-    decay_ms~ : Double,
-    sustain~ : Double,
-    release_ms~ : Double,
-  ) -> Adsr
+  priv attack_ms : Double
+  priv decay_ms : Double
+  priv sustain : Double
+  priv release_ms : Double
+  priv mut stage : EnvStage
+  priv mut level : Double
+  priv mut level_at_release : Double
 }
 
 ///|

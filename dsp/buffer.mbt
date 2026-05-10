@@ -1,9 +1,7 @@
 ///|
 /// Thin wrapper around `FixedArray[Double]` for DSP block processing.
 pub struct AudioBuffer {
-  data : FixedArray[Double]
-
-  fn new(data : FixedArray[Double]) -> AudioBuffer
+  priv data : FixedArray[Double]
 }
 
 ///|
@@ -15,7 +13,7 @@ pub fn AudioBuffer::new(data : FixedArray[Double]) -> AudioBuffer {
 ///|
 /// Create a new owned audio buffer with all samples initialized to the same value.
 pub fn AudioBuffer::filled(size : Int, init? : Double = 0.0) -> AudioBuffer {
-  AudioBuffer(FixedArray::make(size, init))
+  AudioBuffer::new(FixedArray::make(size, init))
 }
 
 ///|

@@ -1,16 +1,10 @@
 ///|
 /// Stateful integer-sample delay line backed by a circular buffer.
 pub struct DelayLine {
-  buffer : FixedArray[Double]
-  mut write_pos : Int
-  mut delay_samples : Int
-  mut feedback : Double
-
-  fn new(
-    max_delay_samples : Int,
-    delay_samples? : Int,
-    feedback? : Double,
-  ) -> DelayLine
+  priv buffer : FixedArray[Double]
+  priv mut write_pos : Int
+  priv mut delay_samples : Int
+  priv mut feedback : Double
 }
 
 ///|

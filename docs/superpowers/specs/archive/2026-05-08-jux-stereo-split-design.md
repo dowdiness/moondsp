@@ -1,14 +1,15 @@
 # `.jux(f)` — Strudel-style stereo split
 
 **Date:** 2026-05-08
+**Status:** Shipped; archived after implementation landed on `main`
 **Phase:** Phase B — Strudel mini-notation extensions (the deferred
 companion to PRs #15–#17)
 
 **Prerequisite (resolved 2026-05-08):** PRs #15, #18 (replaced #16),
 and #17 are now merged on `main`. The shared `Callback` grammar this
 spec relies on is the rename of PR #17's `EveryCallback` /
-`parse_every_callback` / `make_every_*` symbols. Implementation can
-proceed directly.
+`parse_every_callback` / `make_every_*` symbols. This prerequisite note is
+preserved as historical context.
 
 ## Goal
 

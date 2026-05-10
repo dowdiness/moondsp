@@ -64,7 +64,8 @@ for full context.
 - **[`superpowers/plans/`](superpowers/plans/)** — implementation plans
   for in-flight work. Currently empty; shipped plans live under `archive/`.
 - `superpowers/specs/archive/` and `superpowers/plans/archive/` — shipped
-  features. Historical context only.
+  features. Historical context only. The `.jux(f)` stereo-split spec and
+  implementation plan shipped and now live there.
 
 ## Exploratory / vision (not implemented)
 

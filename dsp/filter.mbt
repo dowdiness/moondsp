@@ -17,8 +17,6 @@ pub struct Biquad {
   priv mut z1 : Double
   priv mut z2 : Double
   priv mut configured : Bool
-
-  fn new() -> Biquad
 }
 
 ///|

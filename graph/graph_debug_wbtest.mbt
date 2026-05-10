@@ -8,7 +8,7 @@ fn corrupt_input0(
 ) -> Unit {
   let nodes = compiled.0.nodes
   let node = nodes[node_index]
-  nodes[node_index] = DspNode(
+  nodes[node_index] = DspNode::new(
     node.kind,
     value,
     node.input1,

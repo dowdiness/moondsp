@@ -1,15 +1,11 @@
 ///|
 /// Stateless hard-clipping processor for explicit range limiting.
-pub struct Clip {
-  unit : Unit
-
-  fn new() -> Clip
-}
+pub struct Clip {}
 
 ///|
 /// Create a clip processor.
 pub fn Clip::new() -> Clip {
-  Clip::{ unit: () }
+  Clip::{  }
 }
 
 ///|
