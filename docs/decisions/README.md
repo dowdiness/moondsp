@@ -9,9 +9,10 @@ shipped plan or spec.
 
 - One decision per file. Numbered sequentially: `NNNN-kebab-title.md`.
 - Status values: `Proposed`, `Accepted`, `Superseded by ADR-NNNN`, `Rejected`.
-- Source links point to the original plan or spec under
-  `docs/superpowers/{plans,specs}/archive/`. The plan/spec is the design
-  artifact; the ADR is the durable summary.
+- Source links usually point to the original plan or spec under
+  `docs/superpowers/{plans,specs}/archive/`. When a decision originates in a
+  PR discussion without an archived plan, link or name that PR instead. The
+  plan/spec/PR is the design artifact; the ADR is the durable summary.
 - An ADR is updated when the decision is **superseded** (record under a new
   ADR and mark the old one) — not when implementation evolves around it.
 
@@ -21,3 +22,6 @@ shipped plan or spec.
 - [ADR-0002 — Generic GraphSlot for browser variants](0002-graph-slot-capability-trait.md)
 - [ADR-0003 — CompiledTemplate topology artifact](0003-compiled-template-topology-artifact.md)
 - [ADR-0004 — Hand-written mini-notation parser](0004-handwritten-mini-notation-parser.md)
+- [ADR-0005 — Song sections as the long-form structure layer](0005-song-section-layer.md)
+- [ADR-0006 — Scheduler note expiry uses performance time](0006-scheduler-performance-time-expiry.md)
+- [ADR-0007 — ControlMap keeps a map-backed accessor surface](0007-control-map-accessor-surface.md)

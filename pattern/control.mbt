@@ -8,21 +8,65 @@ pub impl Show for ControlMap with output(self, logger) {
 }
 
 ///|
-fn single_control(key : String, value : Double) -> ControlMap {
+pub fn ControlMap::empty() -> ControlMap {
+  ControlMap({})
+}
+
+///|
+pub fn ControlMap::single(key : String, value : Double) -> ControlMap {
   let m : Map[String, Double] = {}
   m[key] = value
   ControlMap(m)
 }
 
 ///|
+pub fn ControlMap::get(self : ControlMap, key : String) -> Double? {
+  self.0.get(key)
+}
+
+///|
+pub fn ControlMap::each(
+  self : ControlMap,
+  f : (String, Double) -> Unit,
+) -> Unit {
+  self.0.each(f)
+}
+
+///|
+/// Return a fresh map snapshot of this control map.
+pub fn ControlMap::entries(self : ControlMap) -> Map[String, Double] {
+  let result : Map[String, Double] = {}
+  self.0.each(fn(k, v) { result[k] = v })
+  result
+}
+
+///|
+pub fn ControlMap::set(
+  self : ControlMap,
+  key : String,
+  value : Double,
+) -> ControlMap {
+  let result = self.entries()
+  result[key] = value
+  ControlMap(result)
+}
+
+///|
+pub fn ControlMap::merge(self : ControlMap, other : ControlMap) -> ControlMap {
+  let result = self.entries()
+  other.0.each(fn(k, v) { result[k] = v })
+  ControlMap(result)
+}
+
+///|
 pub fn note(n : Double) -> Pat[ControlMap] {
-  Pat::pure(single_control("note", n))
+  Pat::pure(ControlMap::single("note", n))
 }
 
 ///|
 /// Create a sound control pattern from a MIDI drum number.
 pub fn sound(midi : Double) -> Pat[ControlMap] {
-  Pat::pure(single_control("sound", midi))
+  Pat::pure(ControlMap::single("sound", midi))
 }
 
 ///|
@@ -85,17 +129,17 @@ fn parse_note_name(name : String) -> Double {
 
 ///|
 pub fn s_cutoff(f : Double) -> Pat[ControlMap] {
-  Pat::pure(single_control("cutoff", f))
+  Pat::pure(ControlMap::single("cutoff", f))
 }
 
 ///|
 pub fn s_gain(g : Double) -> Pat[ControlMap] {
-  Pat::pure(single_control("gain", g))
+  Pat::pure(ControlMap::single("gain", g))
 }
 
 ///|
 pub fn s_pan(p : Double) -> Pat[ControlMap] {
-  Pat::pure(single_control("pan", p))
+  Pat::pure(ControlMap::single("pan", p))
 }
 
 ///|
@@ -121,10 +165,7 @@ pub fn Pat::jux(
 
 ///|
 fn merge_maps(a : ControlMap, b : ControlMap) -> ControlMap {
-  let result : Map[String, Double] = {}
-  a.0.each(fn(k, v) { result[k] = v })
-  b.0.each(fn(k, v) { result[k] = v })
-  ControlMap(result)
+  a.merge(b)
 }
 
 ///|

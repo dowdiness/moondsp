@@ -64,6 +64,44 @@ test "compute_arc: fractional BPM 120.5 preserves precision" {
 }
 
 ///|
+test "cycle_to_sample: one cycle at 120 BPM is 24000 samples" {
+  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
+  let sample = @scheduler.cycle_to_sample(
+    @pattern.Rational::from_int(1),
+    120.0,
+    ctx,
+  )
+  assert_eq(sample, 24000L)
+}
+
+///|
+test "cycle_to_sample: rounds up to the first sample at or after cycle" {
+  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
+  let sample = @scheduler.cycle_to_sample(
+    @pattern.Rational::new(1L, 3L),
+    120.0,
+    ctx,
+  )
+  assert_eq(sample, 8000L)
+  let rounded = @scheduler.cycle_to_sample(
+    @pattern.Rational::new(1L, 7L),
+    120.0,
+    ctx,
+  )
+  assert_eq(rounded, 3429L)
+}
+
+///|
+test "current_block exposes sample range and logical arc" {
+  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
+  let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~)
+  let frame = sched.current_block()
+  assert_eq(frame.sample_begin, 0L)
+  assert_eq(frame.sample_end, 128L)
+  assert_true(frame.logical_arc == @scheduler.compute_arc(0L, 120.0, ctx))
+}
+
+///|
 /// Helper: build a VoicePool with a minimal osc→adsr→envelope_gain→output
 /// template. Envelope_gain wires the ADSR at index 1 into the signal path so
 /// `VoicePool::new`'s orphan-ADSR gate accepts it; swapping to bare `gain(0)`
@@ -137,6 +175,23 @@ test "expire_notes: removes notes past their end_time" {
 }
 
 ///|
+test "expire_notes_at: expires on performance sample boundary" {
+  let (pool, _, ctx) = make_test_pool()
+  let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~)
+  let handle = pool.note_on_controls({ "note": 440.0 })
+  match handle {
+    None => assert_true(false)
+    Some(h) => {
+      sched.push_active_note(h, @pattern.Rational::from_int(1))
+      sched.expire_notes_at(pool, @scheduler.PerformanceTime(23999L))
+      assert_eq(sched.active_note_count(), 1)
+      sched.expire_notes_at(pool, @scheduler.PerformanceTime(24000L))
+      assert_eq(sched.active_note_count(), 0)
+    }
+  }
+}
+
+///|
 test "process_events: single note-on creates active voice" {
   let (pool, sched, _, _) = make_test_sched()
   let arc = @pattern.TimeSpan::new(
@@ -157,6 +212,27 @@ test "process_block: note(60) triggers one voice" {
   assert_eq(pool.active_voice_count(), 1)
   assert_eq(sched.active_note_count(), 1)
   assert_eq(sched.sample_counter(), 128L)
+}
+
+///|
+test "process_section_block: identity section matches pattern scheduling" {
+  let (pattern_pool, pattern_sched, pattern_left, pattern_right) = make_test_sched()
+  let (section_pool, section_sched, section_left, section_right) = make_test_sched()
+  let pat = @pattern.note(60.0)
+  let section = @song.Section::from_pattern(name="main", body=pat)
+  pattern_sched.process_block(pat, pattern_pool, pattern_left, pattern_right)
+  section_sched.process_section_block(
+    section, section_pool, section_left, section_right,
+  )
+  assert_eq(pattern_sched.sample_counter(), section_sched.sample_counter())
+  assert_eq(
+    pattern_sched.active_note_count(),
+    section_sched.active_note_count(),
+  )
+  assert_eq(
+    pattern_pool.active_voice_count(),
+    section_pool.active_voice_count(),
+  )
 }
 
 ///|
@@ -195,6 +271,21 @@ test "process_block: gate-off fires after note ends" {
   }
   // After crossing cycle boundary, old note expired, new one triggered
   assert_eq(sched.active_note_count(), 1)
+}
+
+///|
+test "process_block: sample-time expiry stays block-quantized" {
+  let (pool, sched, left, right) = make_test_sched()
+  let note_pat = @pattern.note(60.0)
+  let silence_pat : @pattern.Pat[@pattern.ControlMap] = @pattern.Pat::silence()
+  sched.process_block(note_pat, pool, left, right)
+  for _i = 0; _i < 187; _i = _i + 1 {
+    sched.process_block(silence_pat, pool, left, right)
+  }
+  assert_eq(sched.sample_counter(), 24064L)
+  assert_eq(sched.active_note_count(), 1)
+  sched.process_block(silence_pat, pool, left, right)
+  assert_eq(sched.active_note_count(), 0)
 }
 
 ///|
