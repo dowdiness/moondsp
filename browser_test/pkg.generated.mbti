@@ -20,9 +20,9 @@ pub fn process_compiled_stereo_block(Double, Double, Double, Double, Double, Dou
 
 pub fn reset_phase() -> Unit
 
-pub fn tick(Double, Double) -> Double
+pub fn tick(freq_hz~ : Double, sample_rate~ : Double) -> Double
 
-pub fn tick_source(Int, Double, Double) -> Double
+pub fn tick_source(source_id~ : Int, freq_hz~ : Double, sample_rate~ : Double) -> Double
 
 // Errors
 

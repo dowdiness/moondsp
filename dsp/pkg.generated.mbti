@@ -90,7 +90,7 @@ pub struct DemoSource {
 }
 pub fn DemoSource::new() -> Self
 pub fn DemoSource::reset(Self) -> Unit
-pub fn DemoSource::tick_source(Self, Int, Double, Double) -> Double
+pub fn DemoSource::tick_source(Self, source_id~ : Int, freq_hz~ : Double, sample_rate~ : Double) -> Double
 
 pub struct DspContext {
   // private fields
@@ -137,7 +137,7 @@ pub struct Oscillator {
 }
 pub fn Oscillator::new() -> Self
 pub fn Oscillator::phase(Self) -> Double
-pub fn Oscillator::process(Self, DspContext, AudioBuffer, freq_hz~ : Double) -> Unit
+pub fn Oscillator::process(Self, context~ : DspContext, output~ : AudioBuffer, freq_hz~ : Double) -> Unit
 pub fn Oscillator::process_waveform(Self, context~ : DspContext, output~ : AudioBuffer, waveform~ : Waveform, freq_hz~ : Double) -> Unit
 pub fn Oscillator::reset(Self) -> Unit
 pub fn Oscillator::tick(Self, freq_hz~ : Double, sample_rate~ : Double) -> Double

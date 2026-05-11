@@ -45,17 +45,17 @@ pub fn reset_phase() -> Unit {
 }
 
 ///|
-pub fn tick(freq : Double, sample_rate : Double) -> Double {
-  demo.val.tick_source(0, freq, sample_rate)
+pub fn tick(freq_hz~ : Double, sample_rate~ : Double) -> Double {
+  demo.val.tick_source(source_id=0, freq_hz~, sample_rate~)
 }
 
 ///|
 pub fn tick_source(
-  source_id : Int,
-  freq : Double,
-  sample_rate : Double,
+  source_id~ : Int,
+  freq_hz~ : Double,
+  sample_rate~ : Double,
 ) -> Double {
-  demo.val.tick_source(source_id, freq, sample_rate)
+  demo.val.tick_source(source_id~, freq_hz~, sample_rate~)
 }
 
 ///|

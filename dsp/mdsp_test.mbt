@@ -25,7 +25,7 @@ test "process fills a block with bounded samples" {
   let context = DspContext::new(sample_rate=48000.0, block_size=128)
   let buffer = AudioBuffer::filled(128)
 
-  osc.process(context, buffer, freq_hz=440.0)
+  osc.process(context~, output=buffer, freq_hz=440.0)
 
   assert_eq(buffer.length(), 128)
   assert_eq(buffer.get(0), 0.0)

@@ -106,9 +106,9 @@ pub fn set_scheduler_bpm(Double) -> Unit
 
 pub fn set_scheduler_gain(Double) -> Unit
 
-pub fn tick(Double, Double) -> Double
+pub fn tick(freq_hz~ : Double, sample_rate~ : Double) -> Double
 
-pub fn tick_source(Int, Double, Double) -> Double
+pub fn tick_source(source_id~ : Int, freq_hz~ : Double, sample_rate~ : Double) -> Double
 
 // Errors
 

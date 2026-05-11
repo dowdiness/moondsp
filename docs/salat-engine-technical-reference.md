@@ -95,12 +95,12 @@ struct Oscillator {
 }
 
 // This function allocates NOTHING — only reads/writes mut fields and
-// AudioBuffer slots. The labelled `freq_hz~` arg names what the value is
-// at the call site, removing the only Double in the trailing position.
+// AudioBuffer slots. Labels name all call-site values whose position would
+// otherwise be easy to swap.
 pub fn Oscillator::process(
   self : Oscillator,
-  context : DspContext,
-  output : AudioBuffer,
+  context~ : DspContext,
+  output~ : AudioBuffer,
   freq_hz~ : Double,
 ) -> Unit {
   let phase_inc = freq_hz / context.sample_rate()

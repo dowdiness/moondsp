@@ -47,6 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Drum names cheatsheet trimmed to only the implemented sounds
   (`bd, sd, hh, cp, oh`); `cb`/`rim`/`tom` removed pending real
   synthesis design.
+- DSP/browser demo helper APIs now label the remaining ambiguity-prone
+  `Oscillator::process`, `DemoSource::tick_source`, `tick`, and
+  `tick_source` parameters.
 
 ### Fixed
 

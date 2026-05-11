@@ -91,8 +91,8 @@ pub fn Oscillator::process_waveform(
 /// Fill an output buffer with oscillator samples.
 pub fn Oscillator::process(
   self : Oscillator,
-  context : DspContext,
-  output : AudioBuffer,
+  context~ : DspContext,
+  output~ : AudioBuffer,
   freq_hz~ : Double,
 ) -> Unit {
   self.process_waveform(context~, output~, waveform=Waveform::Sine, freq_hz~)

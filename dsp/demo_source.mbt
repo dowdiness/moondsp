@@ -33,27 +33,27 @@ pub fn DemoSource::reset(self : DemoSource) -> Unit {
 /// - `4`: noise
 pub fn DemoSource::tick_source(
   self : DemoSource,
-  source_id : Int,
-  freq : Double,
-  sample_rate : Double,
+  source_id~ : Int,
+  freq_hz~ : Double,
+  sample_rate~ : Double,
 ) -> Double {
   match source_id {
     1 =>
       self.oscillator.tick_waveform(
         waveform=Waveform::Saw,
-        freq_hz=freq,
+        freq_hz~,
         sample_rate~,
       )
     2 =>
       self.oscillator.tick_waveform(
         waveform=Waveform::Square,
-        freq_hz=freq,
+        freq_hz~,
         sample_rate~,
       )
     3 =>
       self.oscillator.tick_waveform(
         waveform=Waveform::Triangle,
-        freq_hz=freq,
+        freq_hz~,
         sample_rate~,
       )
     4 =>
@@ -65,7 +65,7 @@ pub fn DemoSource::tick_source(
     _ =>
       self.oscillator.tick_waveform(
         waveform=Waveform::Sine,
-        freq_hz=freq,
+        freq_hz~,
         sample_rate~,
       )
   }
