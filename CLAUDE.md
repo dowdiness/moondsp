@@ -40,7 +40,7 @@ remains open for native targets such as CLAP plugins.
 ## Commands
 
 ```bash
-moon check && moon test        # 673 tests
+moon check && moon test        # 677 tests
 moon build --target wasm-gc    # Browser WASM build
 moon run cmd/main              # CLI entry point
 ```

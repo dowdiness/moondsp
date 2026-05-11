@@ -13,11 +13,17 @@ pub(all) suberror SectionBuildError {
   NonPositiveLength
 } derive(Eq, @debug.Debug)
 
+pub(all) suberror SectionPatchError {
+  MissingLayer(String)
+  DuplicateLayer(String)
+} derive(Eq, @debug.Debug)
+
 // Types and methods
 pub struct Section[A] {
   // private fields
 }
 pub fn[A] Section::Section(name~ : String, length_cycles~ : @pattern.Rational, scope~ : TimeScope, body~ : SectionBody[A]) -> Self[A] raise SectionBuildError
+pub fn[A] Section::apply_patch(Self[A], SectionPatch[A]) -> Self[A] raise SectionPatchError
 pub fn[A] Section::body(Self[A]) -> @pattern.Pat[A]
 pub fn[A] Section::from_pattern(name~ : String, body~ : @pattern.Pat[A]) -> Self[A]
 pub fn[A] Section::get_layer(Self[A], String) -> @pattern.Pat[A]?
@@ -44,6 +50,13 @@ pub struct SectionLayer[A] {
 pub fn[A] SectionLayer::SectionLayer(name~ : String, body~ : @pattern.Pat[A]) -> Self[A]
 pub fn[A] SectionLayer::body(Self[A]) -> @pattern.Pat[A]
 pub fn[A] SectionLayer::name(Self[A]) -> String
+
+pub enum SectionPatch[A] {
+  SetLayer(String, @pattern.Pat[A])
+  AddLayer(String, @pattern.Pat[A])
+}
+pub fn[A] SectionPatch::add_layer(String, @pattern.Pat[A]) -> Self[A]
+pub fn[A] SectionPatch::set_layer(String, @pattern.Pat[A]) -> Self[A]
 
 pub struct TimeScope {
   // private fields

@@ -3,6 +3,8 @@ using @song {
   type Section,
   type SectionBody,
   type SectionBuildError,
+  type SectionPatch,
+  type SectionPatchError,
   type TimeScope,
 }
 
@@ -121,4 +123,63 @@ test "Section::layer replaces existing layer by name" {
   let events = section.body().query(arc)
   assert_eq(events.length(), 1)
   assert_true(events[0].value.get("note") == Some(60.0))
+}
+
+///|
+test "Section::apply_patch add layer appends named layer" {
+  let base = Section::from_pattern(name="verse", body=@pattern.note(48.0))
+  let result = try? base.apply_patch(
+    SectionPatch::add_layer("counter", @pattern.note(55.0)),
+  )
+  let section = match result {
+    Ok(section) => section
+    Err(_) => abort("patch failed")
+  }
+  assert_eq(section.layer_count(), 2)
+  assert_true(section.get_layer("counter") is Some(_))
+}
+
+///|
+test "Section::apply_patch set layer replaces existing layer" {
+  let single = Section::from_pattern(name="verse", body=@pattern.note(48.0))
+  let base = single.layer(name="counter", body=@pattern.note(55.0))
+  let result = try? base.apply_patch(
+    SectionPatch::set_layer("counter", @pattern.note(67.0)),
+  )
+  let section = match result {
+    Ok(section) => section
+    Err(_) => abort("patch failed")
+  }
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::from_int(1),
+  )
+  let events = section.body().query(arc)
+  assert_eq(events.length(), 2)
+  assert_true(events[0].value.get("note") == Some(48.0))
+  assert_true(events[1].value.get("note") == Some(67.0))
+}
+
+///|
+test "Section::apply_patch add layer rejects duplicate layer" {
+  let base = Section::from_pattern(name="verse", body=@pattern.note(48.0))
+  let result = try? base.apply_patch(
+    SectionPatch::add_layer("main", @pattern.note(55.0)),
+  )
+  match result {
+    Err(SectionPatchError::DuplicateLayer("main")) => ()
+    _ => assert_true(false)
+  }
+}
+
+///|
+test "Section::apply_patch set layer rejects missing layer" {
+  let base = Section::from_pattern(name="verse", body=@pattern.note(48.0))
+  let result = try? base.apply_patch(
+    SectionPatch::set_layer("counter", @pattern.note(55.0)),
+  )
+  match result {
+    Err(SectionPatchError::MissingLayer("counter")) => ()
+    _ => assert_true(false)
+  }
 }

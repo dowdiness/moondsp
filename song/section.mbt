@@ -7,6 +7,12 @@ pub(all) suberror SectionBuildError {
 } derive(Eq, Debug)
 
 ///|
+pub(all) suberror SectionPatchError {
+  MissingLayer(String)
+  DuplicateLayer(String)
+} derive(Eq, Debug)
+
+///|
 /// Named pattern layer inside a section body.
 ///
 /// Layers are ordered by their array position so stacked playback is
@@ -42,6 +48,33 @@ pub fn[A] SectionLayer::body(self : SectionLayer[A]) -> @pattern.Pat[A] {
 pub enum SectionBody[A] {
   Single(@pattern.Pat[A])
   Layers(Array[SectionLayer[A]])
+}
+
+///|
+/// Small typed patch language for section variations.
+///
+/// This intentionally covers only layer add/replace operations. Addressing,
+/// ranges, and boundary operations need a song-layout model and should be
+/// layered on later.
+pub enum SectionPatch[A] {
+  SetLayer(String, @pattern.Pat[A])
+  AddLayer(String, @pattern.Pat[A])
+}
+
+///|
+pub fn[A] SectionPatch::set_layer(
+  name : String,
+  body : @pattern.Pat[A],
+) -> SectionPatch[A] {
+  SetLayer(name, body)
+}
+
+///|
+pub fn[A] SectionPatch::add_layer(
+  name : String,
+  body : @pattern.Pat[A],
+) -> SectionPatch[A] {
+  AddLayer(name, body)
 }
 
 ///|
@@ -138,6 +171,50 @@ fn[A] SectionBody::upsert_layer(
 }
 
 ///|
+fn[A] SectionBody::add_layer(
+  self : SectionBody[A],
+  name : String,
+  body : @pattern.Pat[A],
+) -> SectionBody[A] raise SectionPatchError {
+  match self.get_layer(name) {
+    Some(_) => raise DuplicateLayer(name)
+    None => self.upsert_layer(name, body)
+  }
+}
+
+///|
+fn[A] SectionBody::set_layer(
+  self : SectionBody[A],
+  name : String,
+  body : @pattern.Pat[A],
+) -> SectionBody[A] raise SectionPatchError {
+  let result : Array[SectionLayer[A]] = []
+  match self {
+    Single(_) =>
+      if name == DEFAULT_LAYER_NAME {
+        Single(body)
+      } else {
+        raise MissingLayer(name)
+      }
+    Layers(layers) => {
+      let mut replaced = false
+      for layer in layers {
+        if layer.name() == name {
+          result.push(SectionLayer(name~, body~))
+          replaced = true
+        } else {
+          result.push(layer)
+        }
+      }
+      if !replaced {
+        raise MissingLayer(name)
+      }
+      Layers(result)
+    }
+  }
+}
+
+///|
 /// Named long-form region over a pattern body.
 ///
 /// `Section` is polymorphic for the same reason `Pat[A]` is polymorphic:
@@ -227,5 +304,22 @@ pub fn[A] Section::layer(
     length_cycles: self.length_cycles,
     scope: self.scope,
     body: self.body.upsert_layer(name, body),
+  }
+}
+
+///|
+pub fn[A] Section::apply_patch(
+  self : Section[A],
+  patch : SectionPatch[A],
+) -> Section[A] raise SectionPatchError {
+  let body = match patch {
+    SetLayer(name, body) => self.body.set_layer(name, body)
+    AddLayer(name, body) => self.body.add_layer(name, body)
+  }
+  {
+    name: self.name,
+    length_cycles: self.length_cycles,
+    scope: self.scope,
+    body,
   }
 }
