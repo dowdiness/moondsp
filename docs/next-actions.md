@@ -8,38 +8,38 @@ actionable; move completed design notes or implementation plans under
 
 ## Current State
 
-- `main` is clean and pushed through `195acc3 feat: add topology queue result APIs`.
+- `main` was last pushed through `a15d572 feat: add wrapper control result APIs`;
+  current working tree contains the browser queue/control error-visibility
+  slice.
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
   - `GraphTopologyQueueError` result APIs for mono/stereo topology edit queues.
   - runtime-control `GraphControlError` result APIs for mono/stereo hot-swap
     and topology wrapper controls.
+  - browser graph queue/control paths expose last-error string/code helpers
+    while preserving the boolean wasm ABI.
   - `BoundVoicePool` owns template validation and `ControlBindingMap` lifetime,
     so `PatternScheduler` no longer carries stale bindings.
-- Latest full verification for topology queue result APIs:
+- Latest full verification for browser queue/control error visibility:
   - `rtk moon fmt`
   - `rtk moon info`
   - `rtk moon check`
   - `rtk moon test`
   - `rtk moon build --target wasm-gc`
+  - `rtk node --check web/processor.js`
+  - `rtk npm run test:browser`
   - `rtk git diff --check`
 
 ## Recommended Next Slice
 
-1. Add browser error visibility for queue/control failures.
-
-   Keep the wasm-facing boolean exports if that is easiest for the browser ABI,
-   but route internals through result APIs and expose a small last-error
-   string/code helper for hot-swap, topology, and runtime-control paths.
-
-2. Decide whether topology edit diagnostics need to be more precise.
+1. Decide whether topology edit diagnostics need to be more precise.
 
    `GraphTopologyQueueError::InvalidEdit(index)` is intentionally compact. If
    callers need richer edit-shape reasons, expand it before the topology queue
    API hardens further. Otherwise leave it as the stable contract.
 
-3. Start Phase 6 design after the browser error-visibility decision is settled.
+2. Start Phase 6 design after the topology diagnostic decision is settled.
 
    The Phase 6 design should focus on stable IDs, incremental invalidation
    boundaries, and how pattern/DSP graph edits map onto existing result-typed

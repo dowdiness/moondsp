@@ -100,7 +100,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
               telemetrySequence: this.telemetrySequence,
             });
           } else {
-            this.port.postMessage({ type: "error", message: "CompiledDspHotSwap queue_swap failed" });
+            this.postBrowserError("CompiledDspHotSwap queue_swap failed");
           }
         }
       } else if (data.type === "queue-stereo-hot-swap") {
@@ -113,7 +113,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
               telemetrySequence: this.telemetrySequence,
             });
           } else {
-            this.port.postMessage({ type: "error", message: "CompiledStereoDspHotSwap queue_swap failed" });
+            this.postBrowserError("CompiledStereoDspHotSwap queue_swap failed");
           }
         }
       } else if (data.type === "queue-stereo-topology-edit") {
@@ -126,7 +126,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
               telemetrySequence: this.telemetrySequence,
             });
           } else {
-            this.port.postMessage({ type: "error", message: "CompiledStereoDspTopologyController queue_topology_edit failed" });
+            this.postBrowserError("CompiledStereoDspTopologyController queue_topology_edit failed");
           }
         }
       } else if (data.type === "queue-topology-edit") {
@@ -139,7 +139,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
               telemetrySequence: this.telemetrySequence,
             });
           } else {
-            this.port.postMessage({ type: "error", message: "CompiledDspTopologyController queue_topology_edit failed" });
+            this.postBrowserError("CompiledDspTopologyController queue_topology_edit failed");
           }
         }
       } else if (data.type === "queue-topology-delete-edit") {
@@ -152,7 +152,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
               telemetrySequence: this.telemetrySequence,
             });
           } else {
-            this.port.postMessage({ type: "error", message: "CompiledDspTopologyController queue_topology_delete_edit failed" });
+            this.postBrowserError("CompiledDspTopologyController queue_topology_delete_edit failed");
           }
         }
       }
@@ -358,7 +358,9 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
           supportsCompiledGraph
         )
       ) {
-        throw new Error("Compiled browser graph failed to initialize");
+        throw new Error(
+          this.browserErrorMessage("Compiled browser graph failed to initialize"),
+        );
       }
 
       if (
@@ -431,13 +433,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
       );
       if (!processed) {
         this.fillSilence(left, right);
-        if (!this.reportedRuntimeError) {
-          this.reportedRuntimeError = true;
-          this.port.postMessage({
-            type: "error",
-            message: "CompiledDspHotSwap browser block processing failed",
-          });
-        }
+        this.reportRuntimeFailure("CompiledDspHotSwap browser block processing failed");
         return true;
       }
 
@@ -458,13 +454,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
         const updated = this.wasm.set_compiled_topology_edit_gain(this.gain);
         if (!updated) {
           this.fillSilence(left, right);
-          if (!this.reportedRuntimeError) {
-            this.reportedRuntimeError = true;
-            this.port.postMessage({
-              type: "error",
-              message: "CompiledDspTopologyController browser control update failed",
-            });
-          }
+          this.reportRuntimeFailure("CompiledDspTopologyController browser control update failed");
           return true;
         }
       }
@@ -474,13 +464,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
       );
       if (!processed) {
         this.fillSilence(left, right);
-        if (!this.reportedRuntimeError) {
-          this.reportedRuntimeError = true;
-          this.port.postMessage({
-            type: "error",
-            message: "CompiledDspTopologyController browser block processing failed",
-          });
-        }
+        this.reportRuntimeFailure("CompiledDspTopologyController browser block processing failed");
         return true;
       }
 
@@ -501,13 +485,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
         const updated = this.wasm.set_compiled_stereo_topology_edit_level(this.gain);
         if (!updated) {
           this.fillSilence(left, right);
-          if (!this.reportedRuntimeError) {
-            this.reportedRuntimeError = true;
-            this.port.postMessage({
-              type: "error",
-              message: "CompiledStereoDspTopologyController browser control update failed",
-            });
-          }
+          this.reportRuntimeFailure("CompiledStereoDspTopologyController browser control update failed");
           return true;
         }
       }
@@ -517,13 +495,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
       );
       if (!processed) {
         this.fillSilence(left, right);
-        if (!this.reportedRuntimeError) {
-          this.reportedRuntimeError = true;
-          this.port.postMessage({
-            type: "error",
-            message: "CompiledStereoDspTopologyController browser block processing failed",
-          });
-        }
+        this.reportRuntimeFailure("CompiledStereoDspTopologyController browser block processing failed");
         return true;
       }
 
@@ -554,13 +526,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
       );
       if (!processed) {
         this.fillSilence(left, right);
-        if (!this.reportedRuntimeError) {
-          this.reportedRuntimeError = true;
-          this.port.postMessage({
-            type: "error",
-            message: "Exit deliverable browser block processing failed",
-          });
-        }
+        this.reportRuntimeFailure("Exit deliverable browser block processing failed");
         return true;
       }
 
@@ -583,13 +549,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
       );
       if (!processed) {
         this.fillSilence(left, right);
-        if (!this.reportedRuntimeError) {
-          this.reportedRuntimeError = true;
-          this.port.postMessage({
-            type: "error",
-            message: "CompiledStereoDspHotSwap browser block processing failed",
-          });
-        }
+        this.reportRuntimeFailure("CompiledStereoDspHotSwap browser block processing failed");
         return true;
       }
 
@@ -641,13 +601,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
       );
       if (!processed) {
         this.fillSilence(left, right);
-        if (!this.reportedRuntimeError) {
-          this.reportedRuntimeError = true;
-          this.port.postMessage({
-            type: "error",
-            message: "CompiledStereoDsp browser block processing failed",
-          });
-        }
+        this.reportRuntimeFailure("CompiledStereoDsp browser block processing failed");
         return true;
       }
 
@@ -671,13 +625,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
       );
       if (!processed) {
         this.fillSilence(left, right);
-        if (!this.reportedRuntimeError) {
-          this.reportedRuntimeError = true;
-          this.port.postMessage({
-            type: "error",
-            message: "CompiledDsp browser block processing failed",
-          });
-        }
+        this.reportRuntimeFailure("CompiledDsp browser block processing failed");
         return true;
       }
 
@@ -716,6 +664,45 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
     left.fill(0);
     if (right) {
       right.fill(0);
+    }
+  }
+
+  browserErrorCode() {
+    if (this.wasm && typeof this.wasm.get_browser_error_code === "function") {
+      return this.wasm.get_browser_error_code();
+    }
+    return 0;
+  }
+
+  browserErrorMessage(fallback) {
+    if (this.wasm &&
+        typeof this.wasm.get_browser_error_length === "function" &&
+        typeof this.wasm.get_browser_error_char === "function") {
+      const len = this.wasm.get_browser_error_length();
+      if (len > 0) {
+        const codes = new Array(len);
+        for (let i = 0; i < len; i++) {
+          codes[i] = this.wasm.get_browser_error_char(i);
+        }
+        return String.fromCharCode(...codes);
+      }
+    }
+    return fallback;
+  }
+
+  postBrowserError(fallback) {
+    const code = this.browserErrorCode();
+    this.port.postMessage({
+      type: "error",
+      message: this.browserErrorMessage(fallback),
+      code,
+    });
+  }
+
+  reportRuntimeFailure(fallback) {
+    if (!this.reportedRuntimeError) {
+      this.reportedRuntimeError = true;
+      this.postBrowserError(fallback);
     }
   }
 

@@ -16,7 +16,7 @@ export type AudioStatus =
 export type WorkletReply =
   | { type: "pattern-updated"; revision?: number }
   | { type: "pattern-error"; message: string; revision?: number }
-  | { type: "error"; message: string }
+  | { type: "error"; message: string; code?: number }
   | { type: string; [key: string]: unknown };
 
 export class AudioEngine {

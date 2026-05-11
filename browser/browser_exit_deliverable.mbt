@@ -45,7 +45,12 @@ pub fn init_exit_deliverable_graph(
   sample_rate : Double,
   block_size : Int,
 ) -> Bool {
-  exit_deliverable.ensure(sample_rate, block_size)
+  if exit_deliverable.ensure(sample_rate, block_size) {
+    clear_browser_error()
+    true
+  } else {
+    set_browser_init_error("exit_deliverable.init")
+  }
 }
 
 ///|
@@ -85,39 +90,49 @@ pub fn process_exit_deliverable_block(
   block_size : Int,
 ) -> Bool {
   if !exit_deliverable.ensure(sample_rate, block_size) {
-    return false
+    return set_browser_init_error("exit_deliverable.process")
   }
   let graph = exit_deliverable.graph_val()
   // Apply controls individually — batch is transactional and one failure
   // rejects all. Individual controls are independent.
-  ignore(
-    graph.apply_control(
+  match
+    graph.apply_control_result(
       @moondsp.GraphControl::set_param(
         EXIT_LFO_RATE_NODE,
         @moondsp.GraphParamSlot::Value0,
         exit_lfo_rate.val,
       ),
-    ),
-  )
-  ignore(
-    graph.apply_control(
+    ) {
+    Ok(_) => ()
+    Err(error) =>
+      return set_browser_control_error("exit_deliverable.lfo", error)
+  }
+  match
+    graph.apply_control_result(
       @moondsp.GraphControl::set_param(
         EXIT_BIQUAD_NODE,
         @moondsp.GraphParamSlot::Value0,
         exit_cutoff.val,
       ),
-    ),
-  )
-  ignore(
-    graph.apply_control(
+    ) {
+    Ok(_) => ()
+    Err(error) =>
+      return set_browser_control_error("exit_deliverable.cutoff", error)
+  }
+  match
+    graph.apply_control_result(
       @moondsp.GraphControl::set_param(
         EXIT_GAIN_NODE,
         @moondsp.GraphParamSlot::Value0,
         exit_gain.val,
       ),
-    ),
-  )
+    ) {
+    Ok(_) => ()
+    Err(error) =>
+      return set_browser_control_error("exit_deliverable.gain", error)
+  }
   graph.process(exit_deliverable.ctx_val(), exit_deliverable.output.get())
+  clear_browser_error()
   true
 }
 
@@ -133,4 +148,5 @@ fn reset_exit_deliverable_graph() -> Unit {
   exit_lfo_rate.val = 2.0
   exit_cutoff.val = 800.0
   exit_gain.val = 0.3
+  clear_browser_error()
 }

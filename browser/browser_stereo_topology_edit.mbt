@@ -24,7 +24,12 @@ pub fn init_compiled_stereo_topology_edit_graph(
   sample_rate : Double,
   block_size : Int,
 ) -> Bool {
-  compiled_stereo_topology_edit.ensure(sample_rate, block_size)
+  if compiled_stereo_topology_edit.ensure(sample_rate, block_size) {
+    clear_browser_error()
+    true
+  } else {
+    set_browser_init_error("compiled_stereo_topology_edit.init")
+  }
 }
 
 ///|
@@ -34,23 +39,37 @@ pub fn init_compiled_stereo_topology_edit_graph(
 pub fn queue_compiled_stereo_topology_edit() -> Bool {
   let topology = match compiled_stereo_topology_edit.graph.val {
     Some(t) => t
-    None => return false
+    None =>
+      return set_browser_not_initialized("compiled_stereo_topology_edit.queue")
   }
-  topology.queue_topology_edit(
-    @moondsp.GraphTopologyEdit::replace_node(
-      1,
-      @moondsp.DspNode::pan(0, BROWSER_STEREO_TOPOLOGY_EDIT_NEW_PAN),
-    ),
-  )
+  match
+    topology.queue_topology_edit_result(
+      @moondsp.GraphTopologyEdit::replace_node(
+        1,
+        @moondsp.DspNode::pan(0, BROWSER_STEREO_TOPOLOGY_EDIT_NEW_PAN),
+      ),
+    ) {
+    Ok(_) => {
+      clear_browser_error()
+      true
+    }
+    Err(error) =>
+      set_browser_topology_queue_error(
+        "compiled_stereo_topology_edit.queue", error,
+      )
+  }
 }
 
 ///|
 /// Update the fixed browser stereo topology-edit level control.
 pub fn set_compiled_stereo_topology_edit_level(level : Double) -> Bool {
   if compiled_stereo_topology_edit.graph.val is None {
-    return false
+    return set_browser_not_initialized(
+      "compiled_stereo_topology_edit.set_level",
+    )
   }
   stereo_topo_edit_level.val = level
+  clear_browser_error()
   true
 }
 
@@ -62,23 +81,29 @@ pub fn process_compiled_stereo_topology_edit_block(
   block_size : Int,
 ) -> Bool {
   if !compiled_stereo_topology_edit.ensure(sample_rate, block_size) {
-    return false
+    return set_browser_init_error("compiled_stereo_topology_edit.process")
   }
   let topology = compiled_stereo_topology_edit.graph_val()
-  if !topology.apply_control(
+  match
+    topology.apply_control_result(
       @moondsp.GraphControl::set_param(
         0,
         @moondsp.GraphParamSlot::Value0,
         stereo_topo_edit_level.val,
       ),
     ) {
-    return false
+    Ok(_) => ()
+    Err(error) =>
+      return set_browser_control_error(
+        "compiled_stereo_topology_edit.process", error,
+      )
   }
   topology.process(
     compiled_stereo_topology_edit.ctx_val(),
     compiled_stereo_topology_edit.output.left_buf(),
     compiled_stereo_topology_edit.output.right_buf(),
   )
+  clear_browser_error()
   true
 }
 
@@ -98,4 +123,5 @@ pub fn compiled_stereo_topology_edit_right_sample(index : Int) -> Double {
 fn reset_compiled_stereo_topology_edit_graph() -> Unit {
   compiled_stereo_topology_edit.reset()
   stereo_topo_edit_level.val = 1.0
+  clear_browser_error()
 }

@@ -20,7 +20,12 @@ let compiled : GraphSlot[@moondsp.CompiledDsp, MonoOut] = GraphSlot::new(
 ///|
 /// Initialize the browser proof graph that runs through `CompiledDsp`.
 pub fn init_compiled_graph(sample_rate : Double, block_size : Int) -> Bool {
-  compiled.ensure(sample_rate, block_size)
+  if compiled.ensure(sample_rate, block_size) {
+    clear_browser_error()
+    true
+  } else {
+    set_browser_init_error("compiled.init")
+  }
 }
 
 ///|
@@ -32,16 +37,19 @@ pub fn process_compiled_block(
   block_size : Int,
 ) -> Bool {
   if !compiled.ensure(sample_rate, block_size) {
-    return false
+    return set_browser_init_error("compiled.process")
   }
   let graph = compiled.graph_val()
-  if !graph.apply_controls([
+  match
+    graph.apply_controls_result([
       @moondsp.GraphControl::set_param(0, @moondsp.GraphParamSlot::Value0, freq),
       @moondsp.GraphControl::set_param(1, @moondsp.GraphParamSlot::Value0, gain),
     ]) {
-    return false
+    Ok(_) => ()
+    Err(error) => return set_browser_control_error("compiled.process", error)
   }
   graph.process(compiled.ctx_val(), compiled.output.get())
+  clear_browser_error()
   true
 }
 
@@ -54,4 +62,5 @@ pub fn compiled_output_sample(index : Int) -> Double {
 ///|
 fn reset_compiled_graph() -> Unit {
   compiled.reset()
+  clear_browser_error()
 }

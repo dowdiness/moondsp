@@ -26,6 +26,14 @@ pub fn eval_pattern_input() -> Int
 
 pub fn exit_deliverable_output_sample(Int) -> Double
 
+pub fn get_browser_error_char(Int) -> Int
+
+pub fn get_browser_error_code() -> Int
+
+pub fn get_browser_error_length() -> Int
+
+pub fn get_browser_last_error() -> String
+
 pub fn get_pattern_error_char(Int) -> Int
 
 pub fn get_pattern_error_length() -> Int

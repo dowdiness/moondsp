@@ -42,7 +42,12 @@ pub fn init_compiled_stereo_graph(
   sample_rate : Double,
   block_size : Int,
 ) -> Bool {
-  compiled_stereo.ensure(sample_rate, block_size)
+  if compiled_stereo.ensure(sample_rate, block_size) {
+    clear_browser_error()
+    true
+  } else {
+    set_browser_init_error("compiled_stereo.init")
+  }
 }
 
 ///|
@@ -57,10 +62,11 @@ pub fn process_compiled_stereo_block(
   block_size : Int,
 ) -> Bool {
   if !compiled_stereo.ensure(sample_rate, block_size) {
-    return false
+    return set_browser_init_error("compiled_stereo.process")
   }
   let graph = compiled_stereo.graph_val()
-  if !graph.apply_controls([
+  match
+    graph.apply_controls_result([
       @moondsp.GraphControl::set_param(1, @moondsp.GraphParamSlot::Value0, freq),
       @moondsp.GraphControl::set_param(
         5,
@@ -79,13 +85,16 @@ pub fn process_compiled_stereo_block(
         cutoff,
       ),
     ]) {
-    return false
+    Ok(_) => ()
+    Err(error) =>
+      return set_browser_control_error("compiled_stereo.process", error)
   }
   graph.process(
     compiled_stereo.ctx_val(),
     compiled_stereo.output.left_buf(),
     compiled_stereo.output.right_buf(),
   )
+  clear_browser_error()
   true
 }
 
@@ -104,4 +113,5 @@ pub fn compiled_stereo_right_sample(index : Int) -> Double {
 ///|
 fn reset_compiled_stereo_graph() -> Unit {
   compiled_stereo.reset()
+  clear_browser_error()
 }

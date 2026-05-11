@@ -1002,6 +1002,13 @@ Current limits:
   terminal-stereo `CompiledStereoDspHotSwap` proof paths, and Playwright checks
   both the mixed crossfade block and the settled replacement block in the
   AudioWorklet pipeline
+- browser queue/control paths route through the result-typed APIs and retain a
+  last graph-error string/code for JavaScript callers:
+  `get_browser_error_code()`, `get_browser_error_length()`, and
+  `get_browser_error_char(i)`. The queue/process exports keep their boolean ABI
+  and return `false` while the helper exports carry the specific
+  `HotSwapQueueError`, `GraphTopologyQueueError`, or `GraphControlError`
+  summary.
 - browser/AudioWorklet topology-edit proof is now present for the mono slice:
   the `browser/` wrapper exports a dedicated `CompiledDspTopologyController`
   proof path, and Playwright checks an `InsertNode` / `DeleteNode` round-trip:
