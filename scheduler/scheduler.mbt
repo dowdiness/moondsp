@@ -17,7 +17,7 @@ pub struct PerformanceTime {
 }
 
 ///|
-pub fn PerformanceTime::new(sample : Int64) -> PerformanceTime {
+pub fn PerformanceTime::PerformanceTime(sample : Int64) -> PerformanceTime {
   { sample, }
 }
 
@@ -226,7 +226,7 @@ pub fn PatternScheduler::expire_notes(
 ) -> Unit {
   self.expire_notes_at(
     pool,
-    PerformanceTime::new(cycle_to_sample(arc.begin, self.bpm, self.ctx)),
+    PerformanceTime(cycle_to_sample(arc.begin, self.bpm, self.ctx)),
   )
 }
 
@@ -348,7 +348,7 @@ pub fn PatternScheduler::process_block(
   right : @moondsp.AudioBuffer,
 ) -> Unit {
   let frame = self.current_block()
-  self.expire_notes_at(pool, PerformanceTime::new(frame.sample_begin))
+  self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
   let events = self.query_pattern_block(pat, frame)
   self.process_block_events(events, frame, pool, left, right)
 }
@@ -367,7 +367,7 @@ pub fn PatternScheduler::process_section_block(
   right : @moondsp.AudioBuffer,
 ) -> Unit {
   let frame = self.current_block()
-  self.expire_notes_at(pool, PerformanceTime::new(frame.sample_begin))
+  self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
   let events = section.body().query(frame.logical_arc)
   self.process_block_events(events, frame, pool, left, right)
 }

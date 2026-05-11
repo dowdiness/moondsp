@@ -2,6 +2,11 @@
 const DEFAULT_LAYER_NAME = "main"
 
 ///|
+pub(all) suberror SectionBuildError {
+  NonPositiveLength
+} derive(Eq, Debug)
+
+///|
 /// Named pattern layer inside a section body.
 ///
 /// Layers are ordered by their array position so stacked playback is
@@ -12,7 +17,7 @@ pub struct SectionLayer[A] {
 }
 
 ///|
-pub fn[A] SectionLayer::new(
+pub fn[A] SectionLayer::SectionLayer(
   name~ : String,
   body~ : @pattern.Pat[A],
 ) -> SectionLayer[A] {
@@ -109,23 +114,23 @@ fn[A] SectionBody::upsert_layer(
   match self {
     Single(existing) =>
       if name == DEFAULT_LAYER_NAME {
-        result.push(SectionLayer::new(name~, body~))
+        result.push(SectionLayer(name~, body~))
       } else {
-        result.push(SectionLayer::new(name=DEFAULT_LAYER_NAME, body=existing))
-        result.push(SectionLayer::new(name~, body~))
+        result.push(SectionLayer(name=DEFAULT_LAYER_NAME, body=existing))
+        result.push(SectionLayer(name~, body~))
       }
     Layers(layers) => {
       let mut replaced = false
       for layer in layers {
         if layer.name() == name {
-          result.push(SectionLayer::new(name~, body~))
+          result.push(SectionLayer(name~, body~))
           replaced = true
         } else {
           result.push(layer)
         }
       }
       if !replaced {
-        result.push(SectionLayer::new(name~, body~))
+        result.push(SectionLayer(name~, body~))
       }
     }
   }
@@ -147,31 +152,16 @@ pub struct Section[A] {
 }
 
 ///|
-pub fn[A] Section::new(
-  name~ : String,
-  length_cycles~ : @pattern.Rational,
-  scope~ : TimeScope,
-  body~ : @pattern.Pat[A],
-) -> Section[A]? {
-  Section::new_body(
-    name~,
-    length_cycles~,
-    scope~,
-    body=SectionBody::single(body),
-  )
-}
-
-///|
-pub fn[A] Section::new_body(
+pub fn[A] Section::Section(
   name~ : String,
   length_cycles~ : @pattern.Rational,
   scope~ : TimeScope,
   body~ : SectionBody[A],
-) -> Section[A]? {
+) -> Section[A] raise SectionBuildError {
   if length_cycles.num <= 0L {
-    None
+    raise NonPositiveLength
   } else {
-    Some({ name, length_cycles, scope, body: body.snapshot() })
+    { name, length_cycles, scope, body: body.snapshot() }
   }
 }
 
@@ -180,15 +170,11 @@ pub fn[A] Section::from_pattern(
   name~ : String,
   body~ : @pattern.Pat[A],
 ) -> Section[A] {
-  match
-    Section::new(
-      name~,
-      length_cycles=@pattern.Rational::from_int(1),
-      scope=TimeScope::identity(),
-      body~,
-    ) {
-    Some(section) => section
-    None => abort("Section::from_pattern: identity length rejected")
+  {
+    name,
+    length_cycles: @pattern.Rational::from_int(1),
+    scope: TimeScope::identity(),
+    body: SectionBody::single(body),
   }
 }
 

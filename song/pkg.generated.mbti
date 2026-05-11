@@ -3,16 +3,21 @@ package "dowdiness/moondsp/song"
 
 import {
   "dowdiness/moondsp/pattern",
+  "moonbitlang/core/debug",
 }
 
 // Values
 
 // Errors
+pub(all) suberror SectionBuildError {
+  NonPositiveLength
+} derive(Eq, @debug.Debug)
 
 // Types and methods
 pub struct Section[A] {
   // private fields
 }
+pub fn[A] Section::Section(name~ : String, length_cycles~ : @pattern.Rational, scope~ : TimeScope, body~ : SectionBody[A]) -> Self[A] raise SectionBuildError
 pub fn[A] Section::body(Self[A]) -> @pattern.Pat[A]
 pub fn[A] Section::from_pattern(name~ : String, body~ : @pattern.Pat[A]) -> Self[A]
 pub fn[A] Section::get_layer(Self[A], String) -> @pattern.Pat[A]?
@@ -20,8 +25,6 @@ pub fn[A] Section::layer(Self[A], name~ : String, body~ : @pattern.Pat[A]) -> Se
 pub fn[A] Section::layer_count(Self[A]) -> Int
 pub fn[A] Section::length_cycles(Self[A]) -> @pattern.Rational
 pub fn[A] Section::name(Self[A]) -> String
-pub fn[A] Section::new(name~ : String, length_cycles~ : @pattern.Rational, scope~ : TimeScope, body~ : @pattern.Pat[A]) -> Self[A]?
-pub fn[A] Section::new_body(name~ : String, length_cycles~ : @pattern.Rational, scope~ : TimeScope, body~ : SectionBody[A]) -> Self[A]?
 pub fn[A] Section::scope(Self[A]) -> TimeScope
 pub fn[A] Section::section_body(Self[A]) -> SectionBody[A]
 
@@ -38,16 +41,16 @@ pub fn[A] SectionBody::to_pattern(Self[A]) -> @pattern.Pat[A]
 pub struct SectionLayer[A] {
   // private fields
 }
+pub fn[A] SectionLayer::SectionLayer(name~ : String, body~ : @pattern.Pat[A]) -> Self[A]
 pub fn[A] SectionLayer::body(Self[A]) -> @pattern.Pat[A]
 pub fn[A] SectionLayer::name(Self[A]) -> String
-pub fn[A] SectionLayer::new(name~ : String, body~ : @pattern.Pat[A]) -> Self[A]
 
 pub struct TimeScope {
   // private fields
 }
+pub fn TimeScope::TimeScope() -> Self
 pub fn TimeScope::identity() -> Self
 pub fn TimeScope::is_identity(Self) -> Bool
-pub fn TimeScope::new() -> Self
 
 // Type aliases
 

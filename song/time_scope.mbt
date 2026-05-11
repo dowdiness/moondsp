@@ -9,13 +9,13 @@ pub struct TimeScope {
 }
 
 ///|
-pub fn TimeScope::identity() -> TimeScope {
+pub fn TimeScope::TimeScope() -> TimeScope {
   { identity: true }
 }
 
 ///|
-pub fn TimeScope::new() -> TimeScope {
-  TimeScope::identity()
+pub fn TimeScope::identity() -> TimeScope {
+  TimeScope()
 }
 
 ///|

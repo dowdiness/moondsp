@@ -183,9 +183,9 @@ test "expire_notes_at: expires on performance sample boundary" {
     None => assert_true(false)
     Some(h) => {
       sched.push_active_note(h, @pattern.Rational::from_int(1))
-      sched.expire_notes_at(pool, @scheduler.PerformanceTime::new(23999L))
+      sched.expire_notes_at(pool, @scheduler.PerformanceTime(23999L))
       assert_eq(sched.active_note_count(), 1)
-      sched.expire_notes_at(pool, @scheduler.PerformanceTime::new(24000L))
+      sched.expire_notes_at(pool, @scheduler.PerformanceTime(24000L))
       assert_eq(sched.active_note_count(), 0)
     }
   }

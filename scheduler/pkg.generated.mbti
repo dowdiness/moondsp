@@ -58,7 +58,7 @@ pub fn PatternScheduler::set_bpm(Self, Double) -> Unit
 pub struct PerformanceTime {
   sample : Int64
 }
-pub fn PerformanceTime::new(Int64) -> Self
+pub fn PerformanceTime::PerformanceTime(Int64) -> Self
 
 pub enum VoiceAction {
   SetPan(Double)
