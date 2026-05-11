@@ -11,14 +11,26 @@ pub struct BlockFrame {
 }
 
 ///|
+/// Absolute performance/audio time in samples.
+pub struct PerformanceTime {
+  sample : Int64
+}
+
+///|
+pub fn PerformanceTime::new(sample : Int64) -> PerformanceTime {
+  { sample, }
+}
+
+///|
 /// Tracks a sounding voice for gate-off scheduling.
 struct ActiveNote {
   handle : @moondsp.VoiceHandle
-  /// WHY end_time from whole.end_: In the Strudel/Tidal model, `whole` is the
+  /// WHY end_sample from whole.end_: In the Strudel/Tidal model, `whole` is the
   /// event's full intended duration in cycle time, while `part` is just the
-  /// fragment visible within the queried arc. Gate-off uses `whole.end_`
-  /// because that represents the musical note boundary, not the query window.
-  end_time : @pattern.Rational
+  /// fragment visible within the queried arc. The scheduler converts
+  /// `whole.end_` to performance time at note-on so future groove/rubato layers
+  /// can expire voices against audio time rather than logical time.
+  end_sample : Int64
 }
 
 ///|
@@ -150,8 +162,8 @@ fn PatternScheduler::advance_block(self : PatternScheduler) -> Unit {
 }
 
 ///|
-/// Update tempo in-place. Active notes continue with existing gate-off times —
-/// those cycle positions simply arrive faster/slower with the new BPM.
+/// Update tempo in-place. Newly scheduled notes use the updated tempo. Active
+/// notes keep their already-computed performance-time gate-off sample.
 pub fn PatternScheduler::set_bpm(self : PatternScheduler, bpm : Double) -> Unit {
   self.bpm = sanitize_bpm(bpm)
 }
@@ -172,25 +184,28 @@ pub fn PatternScheduler::push_active_note(
   handle : @moondsp.VoiceHandle,
   end_time : @pattern.Rational,
 ) -> Unit {
-  self.active_notes.push({ handle, end_time })
+  self.active_notes.push({
+    handle,
+    end_sample: cycle_to_sample(end_time, self.bpm, self.ctx),
+  })
 }
 
 ///|
-/// Gate-off all notes whose end_time has been reached, then remove them.
+/// Gate-off all notes whose end sample has been reached, then remove them.
 /// Block-quantized: notes ending mid-block stay active until the next block
 /// (~2.7ms at 48kHz/128 samples — inaudible for musical purposes).
-pub fn PatternScheduler::expire_notes(
+pub fn PatternScheduler::expire_notes_at(
   self : PatternScheduler,
   pool : @moondsp.BoundVoicePool,
-  arc : @pattern.TimeSpan,
+  time : PerformanceTime,
 ) -> Unit {
   let mut i = 0
   while i < self.active_notes.length() {
-    if self.active_notes[i].end_time <= arc.begin {
+    if self.active_notes[i].end_sample <= time.sample {
       ignore(pool.note_off(self.active_notes[i].handle))
       // WHY swap-remove: Array::remove shifts all later elements O(n).
       // Swap with last + pop is O(1). Order of active_notes doesn't matter
-      // because gate-off correctness depends only on end_time, not position.
+      // because gate-off correctness depends only on end_sample, not position.
       let last = self.active_notes.length() - 1
       if i < last {
         self.active_notes[i] = self.active_notes[last]
@@ -200,6 +215,19 @@ pub fn PatternScheduler::expire_notes(
       i = i + 1
     }
   }
+}
+
+///|
+/// Compatibility wrapper for callers that still expire against a logical arc.
+pub fn PatternScheduler::expire_notes(
+  self : PatternScheduler,
+  pool : @moondsp.BoundVoicePool,
+  arc : @pattern.TimeSpan,
+) -> Unit {
+  self.expire_notes_at(
+    pool,
+    PerformanceTime::new(cycle_to_sample(arc.begin, self.bpm, self.ctx)),
+  )
 }
 
 ///|
@@ -256,7 +284,10 @@ pub fn PatternScheduler::process_events(
         match pool.note_on_controls(map) {
           None => ()
           Some(handle) => {
-            self.active_notes.push({ handle, end_time: whole.end_ })
+            self.active_notes.push({
+              handle,
+              end_sample: cycle_to_sample(whole.end_, self.bpm, self.ctx),
+            })
             for action in actions {
               match action {
                 SetPan(pan) => ignore(pool.set_voice_pan(handle, pan))
@@ -317,7 +348,7 @@ pub fn PatternScheduler::process_block(
   right : @moondsp.AudioBuffer,
 ) -> Unit {
   let frame = self.current_block()
-  self.expire_notes(pool, frame.logical_arc)
+  self.expire_notes_at(pool, PerformanceTime::new(frame.sample_begin))
   let events = self.query_pattern_block(pat, frame)
   self.process_block_events(events, frame, pool, left, right)
 }
@@ -336,7 +367,7 @@ pub fn PatternScheduler::process_section_block(
   right : @moondsp.AudioBuffer,
 ) -> Unit {
   let frame = self.current_block()
-  self.expire_notes(pool, frame.logical_arc)
+  self.expire_notes_at(pool, PerformanceTime::new(frame.sample_begin))
   let events = section.body().query(frame.logical_arc)
   self.process_block_events(events, frame, pool, left, right)
 }
@@ -367,4 +398,31 @@ pub fn compute_arc(
     sr600,
   )
   @pattern.TimeSpan::new(arc_start, arc_end)
+}
+
+///|
+fn ceil_div_i64(num : Int64, den : Int64) -> Int64 {
+  if den <= 0L {
+    abort("ceil_div_i64: denominator must be positive")
+  }
+  let q = num / den
+  let r = num % den
+  if r == 0L || num < 0L {
+    q
+  } else {
+    q + 1L
+  }
+}
+
+///|
+/// Convert an absolute logical cycle position into the first sample at or after
+/// that cycle position for the scheduler's BPM scaling convention.
+pub fn cycle_to_sample(
+  cycle : @pattern.Rational,
+  bpm : Double,
+  ctx : @moondsp.DspContext,
+) -> Int64 {
+  let bpm_scaled = (sanitize_bpm(bpm) * 10.0).to_int64()
+  let sr600 = ctx.sample_rate().to_int().to_int64() * 600L
+  ceil_div_i64(cycle.num * sr600, cycle.den * bpm_scaled)
 }

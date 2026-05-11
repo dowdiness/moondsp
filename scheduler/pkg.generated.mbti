@@ -11,6 +11,8 @@ import {
 // Values
 pub fn compute_arc(Int64, Double, @dsp.DspContext) -> @pattern.TimeSpan
 
+pub fn cycle_to_sample(@pattern.Rational, Double, @dsp.DspContext) -> Int64
+
 pub fn default_control_mapper() -> ControlMapper
 
 pub fn midi_to_hz(Double) -> Double
@@ -44,6 +46,7 @@ pub fn PatternScheduler::PatternScheduler(bpm~ : Double, ctx~ : @dsp.DspContext,
 pub fn PatternScheduler::active_note_count(Self) -> Int
 pub fn PatternScheduler::current_block(Self) -> BlockFrame
 pub fn PatternScheduler::expire_notes(Self, @voice.BoundVoicePool, @pattern.TimeSpan) -> Unit
+pub fn PatternScheduler::expire_notes_at(Self, @voice.BoundVoicePool, PerformanceTime) -> Unit
 pub fn PatternScheduler::new(bpm~ : Double, ctx~ : @dsp.DspContext, mapper? : ControlMapper) -> Self
 pub fn PatternScheduler::process_block(Self, @pattern.Pat[@pattern.ControlMap], @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::process_events(Self, Array[@pattern.Event[@pattern.ControlMap]], @pattern.TimeSpan, @voice.BoundVoicePool) -> Unit
@@ -51,6 +54,11 @@ pub fn PatternScheduler::process_section_block(Self, @song.Section[@pattern.Cont
 pub fn PatternScheduler::push_active_note(Self, @voice.VoiceHandle, @pattern.Rational) -> Unit
 pub fn PatternScheduler::sample_counter(Self) -> Int64
 pub fn PatternScheduler::set_bpm(Self, Double) -> Unit
+
+pub struct PerformanceTime {
+  sample : Int64
+}
+pub fn PerformanceTime::new(Int64) -> Self
 
 pub enum VoiceAction {
   SetPan(Double)

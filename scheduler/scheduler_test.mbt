@@ -64,6 +64,34 @@ test "compute_arc: fractional BPM 120.5 preserves precision" {
 }
 
 ///|
+test "cycle_to_sample: one cycle at 120 BPM is 24000 samples" {
+  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
+  let sample = @scheduler.cycle_to_sample(
+    @pattern.Rational::from_int(1),
+    120.0,
+    ctx,
+  )
+  assert_eq(sample, 24000L)
+}
+
+///|
+test "cycle_to_sample: rounds up to the first sample at or after cycle" {
+  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
+  let sample = @scheduler.cycle_to_sample(
+    @pattern.Rational::new(1L, 3L),
+    120.0,
+    ctx,
+  )
+  assert_eq(sample, 8000L)
+  let rounded = @scheduler.cycle_to_sample(
+    @pattern.Rational::new(1L, 7L),
+    120.0,
+    ctx,
+  )
+  assert_eq(rounded, 3429L)
+}
+
+///|
 test "current_block exposes sample range and logical arc" {
   let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
   let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~)
@@ -141,6 +169,23 @@ test "expire_notes: removes notes past their end_time" {
         @pattern.Rational::from_int(2),
       )
       sched.expire_notes(pool, arc)
+      assert_eq(sched.active_note_count(), 0)
+    }
+  }
+}
+
+///|
+test "expire_notes_at: expires on performance sample boundary" {
+  let (pool, _, ctx) = make_test_pool()
+  let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~)
+  let handle = pool.note_on_controls({ "note": 440.0 })
+  match handle {
+    None => assert_true(false)
+    Some(h) => {
+      sched.push_active_note(h, @pattern.Rational::from_int(1))
+      sched.expire_notes_at(pool, @scheduler.PerformanceTime::new(23999L))
+      assert_eq(sched.active_note_count(), 1)
+      sched.expire_notes_at(pool, @scheduler.PerformanceTime::new(24000L))
       assert_eq(sched.active_note_count(), 0)
     }
   }
@@ -226,6 +271,21 @@ test "process_block: gate-off fires after note ends" {
   }
   // After crossing cycle boundary, old note expired, new one triggered
   assert_eq(sched.active_note_count(), 1)
+}
+
+///|
+test "process_block: sample-time expiry stays block-quantized" {
+  let (pool, sched, left, right) = make_test_sched()
+  let note_pat = @pattern.note(60.0)
+  let silence_pat : @pattern.Pat[@pattern.ControlMap] = @pattern.Pat::silence()
+  sched.process_block(note_pat, pool, left, right)
+  for _i = 0; _i < 187; _i = _i + 1 {
+    sched.process_block(silence_pat, pool, left, right)
+  }
+  assert_eq(sched.sample_counter(), 24064L)
+  assert_eq(sched.active_note_count(), 1)
+  sched.process_block(silence_pat, pool, left, right)
+  assert_eq(sched.active_note_count(), 0)
 }
 
 ///|
