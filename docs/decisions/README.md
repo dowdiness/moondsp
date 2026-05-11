@@ -25,3 +25,4 @@ shipped plan or spec.
 - [ADR-0005 — Song sections as the long-form structure layer](0005-song-section-layer.md)
 - [ADR-0006 — Scheduler note expiry uses performance time](0006-scheduler-performance-time-expiry.md)
 - [ADR-0007 — ControlMap keeps a map-backed accessor surface](0007-control-map-accessor-surface.md)
+- [ADR-0008 — Contiguous song layout with computed occurrences](0008-contiguous-song-layout.md)

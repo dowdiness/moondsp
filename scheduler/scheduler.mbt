@@ -373,6 +373,24 @@ pub fn PatternScheduler::process_section_block(
 }
 
 ///|
+/// Song entry point with contiguous identity timing semantics.
+///
+/// The song layer returns events in song-global logical time, matching the
+/// scheduler frame's logical arc.
+pub fn PatternScheduler::process_song_block(
+  self : PatternScheduler,
+  song : @song.Song[@pattern.ControlMap],
+  pool : @moondsp.BoundVoicePool,
+  left : @moondsp.AudioBuffer,
+  right : @moondsp.AudioBuffer,
+) -> Unit {
+  let frame = self.current_block()
+  self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
+  let events = song.query(frame.logical_arc)
+  self.process_block_events(events, frame, pool, left, right)
+}
+
+///|
 /// Derive the cycle-time arc for a block from the integer sample counter.
 ///
 /// At BPM, one cycle lasts 60/BPM seconds. The formula

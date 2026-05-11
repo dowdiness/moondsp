@@ -44,6 +44,7 @@ pub struct Event[A] {
   part : TimeSpan
   value : A
 } derive(@debug.Debug)
+pub fn[A] Event::shift(Self[A], Rational) -> Self[A]
 pub impl[A : @debug.Debug] Show for Event[A]
 
 pub struct Pat[A] {
@@ -83,6 +84,7 @@ pub fn TimeSpan::contains(Self, Rational) -> Bool
 pub fn TimeSpan::duration(Self) -> Rational
 pub fn TimeSpan::intersect(Self, Self) -> Self?
 pub fn TimeSpan::new(Rational, Rational) -> Self
+pub fn TimeSpan::shift(Self, Rational) -> Self
 pub fn TimeSpan::whole_cycles(Self) -> Array[Self]
 pub impl Show for TimeSpan
 

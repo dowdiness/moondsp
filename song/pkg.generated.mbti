@@ -18,6 +18,11 @@ pub(all) suberror SectionPatchError {
   DuplicateLayer(String)
 } derive(Eq, @debug.Debug)
 
+pub(all) suberror SongBuildError {
+  EmptySong
+  DuplicateOccurrence(String)
+} derive(Eq, @debug.Debug)
+
 // Types and methods
 pub struct Section[A] {
   // private fields
@@ -51,12 +56,41 @@ pub fn[A] SectionLayer::SectionLayer(name~ : String, body~ : @pattern.Pat[A]) ->
 pub fn[A] SectionLayer::body(Self[A]) -> @pattern.Pat[A]
 pub fn[A] SectionLayer::name(Self[A]) -> String
 
+pub struct SectionOccurrence[A] {
+  // private fields
+}
+pub fn[A] SectionOccurrence::end_(Self[A]) -> @pattern.Rational
+pub fn[A] SectionOccurrence::name(Self[A]) -> String
+pub fn[A] SectionOccurrence::section(Self[A]) -> Section[A]
+pub fn[A] SectionOccurrence::span(Self[A]) -> @pattern.TimeSpan
+pub fn[A] SectionOccurrence::start(Self[A]) -> @pattern.Rational
+
 pub enum SectionPatch[A] {
   SetLayer(String, @pattern.Pat[A])
   AddLayer(String, @pattern.Pat[A])
 }
 pub fn[A] SectionPatch::add_layer(String, @pattern.Pat[A]) -> Self[A]
 pub fn[A] SectionPatch::set_layer(String, @pattern.Pat[A]) -> Self[A]
+
+pub struct Song[A] {
+  // private fields
+}
+pub fn[A] Song::Song(parts~ : Array[SongPart[A]]) -> Self[A] raise SongBuildError
+pub fn[A] Song::duration(Self[A]) -> @pattern.Rational
+pub fn[A] Song::from_sections(Array[Section[A]]) -> Self[A] raise SongBuildError
+pub fn[A] Song::get_occurrence(Self[A], String) -> SectionOccurrence[A]?
+pub fn[A] Song::occurrence(Self[A], Int) -> SectionOccurrence[A]?
+pub fn[A] Song::occurrence_at(Self[A], @pattern.Rational) -> SectionOccurrence[A]?
+pub fn[A] Song::occurrence_count(Self[A]) -> Int
+pub fn[A] Song::occurrences(Self[A]) -> Array[SectionOccurrence[A]]
+pub fn[A] Song::query(Self[A], @pattern.TimeSpan) -> Array[@pattern.Event[A]]
+
+pub struct SongPart[A] {
+  // private fields
+}
+pub fn[A] SongPart::SongPart(name~ : String, section~ : Section[A]) -> Self[A]
+pub fn[A] SongPart::name(Self[A]) -> String
+pub fn[A] SongPart::section(Self[A]) -> Section[A]
 
 pub struct TimeScope {
   // private fields

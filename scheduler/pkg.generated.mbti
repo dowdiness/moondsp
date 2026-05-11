@@ -51,6 +51,7 @@ pub fn PatternScheduler::new(bpm~ : Double, ctx~ : @dsp.DspContext, mapper? : Co
 pub fn PatternScheduler::process_block(Self, @pattern.Pat[@pattern.ControlMap], @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::process_events(Self, Array[@pattern.Event[@pattern.ControlMap]], @pattern.TimeSpan, @voice.BoundVoicePool) -> Unit
 pub fn PatternScheduler::process_section_block(Self, @song.Section[@pattern.ControlMap], @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
+pub fn PatternScheduler::process_song_block(Self, @song.Song[@pattern.ControlMap], @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::push_active_note(Self, @voice.VoiceHandle, @pattern.Rational) -> Unit
 pub fn PatternScheduler::sample_counter(Self) -> Int64
 pub fn PatternScheduler::set_bpm(Self, Double) -> Unit

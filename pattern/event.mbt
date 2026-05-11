@@ -16,6 +16,18 @@ pub struct Event[A] {
 } derive(Debug)
 
 ///|
+pub fn[A] Event::shift(self : Event[A], offset : Rational) -> Event[A] {
+  {
+    whole: match self.whole {
+      Some(whole) => Some(whole.shift(offset))
+      None => None
+    },
+    part: self.part.shift(offset),
+    value: self.value,
+  }
+}
+
+///|
 pub impl[A : Debug] Show for Event[A] with output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
