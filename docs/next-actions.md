@@ -8,10 +8,8 @@ actionable; move completed design notes or implementation plans under
 
 ## Current State
 
-- `origin/main` was last pushed through
-  `def8b39 chore: label remaining dsp helper args`; local `main` is ahead by
-  `2dfee93 docs: refresh next actions handoff`.
-  The current working tree settles topology queue diagnostics.
+- `main` was last pushed through
+  `8d3ce3c feat: add topology edit failure reasons`.
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
