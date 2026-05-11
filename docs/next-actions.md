@@ -13,6 +13,8 @@ actionable; move completed design notes or implementation plans under
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
   - `GraphTopologyQueueError` result APIs for mono/stereo topology edit queues.
+  - runtime-control `GraphControlError` result APIs for mono/stereo hot-swap
+    and topology wrapper controls.
   - `BoundVoicePool` owns template validation and `ControlBindingMap` lifetime,
     so `PatternScheduler` no longer carries stale bindings.
 - Latest full verification for topology queue result APIs:
@@ -25,30 +27,19 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Add runtime-control result parity for wrappers.
-
-   Direct `CompiledDsp` and `CompiledStereoDsp` expose result-typed runtime
-   control APIs, but `CompiledDspHotSwap`, `CompiledStereoDspHotSwap`,
-   `CompiledDspTopologyController`, and `CompiledStereoDspTopologyController`
-   still expose runtime-control failure mainly through `GraphControllable`'s
-   boolean methods. Add concrete result companions for those wrapper types so
-   in-flight crossfade/control mirroring failures report `GraphControlError`
-   instead of collapsing to `false`.
-
-2. Add browser error visibility for queue/control failures.
+1. Add browser error visibility for queue/control failures.
 
    Keep the wasm-facing boolean exports if that is easiest for the browser ABI,
    but route internals through result APIs and expose a small last-error
    string/code helper for hot-swap, topology, and runtime-control paths.
 
-3. Decide whether topology edit diagnostics need to be more precise.
+2. Decide whether topology edit diagnostics need to be more precise.
 
    `GraphTopologyQueueError::InvalidEdit(index)` is intentionally compact. If
    callers need richer edit-shape reasons, expand it before the topology queue
    API hardens further. Otherwise leave it as the stable contract.
 
-4. Start Phase 6 design only after the wrapper runtime-control result parity
-   decision is settled.
+3. Start Phase 6 design after the browser error-visibility decision is settled.
 
    The Phase 6 design should focus on stable IDs, incremental invalidation
    boundaries, and how pattern/DSP graph edits map onto existing result-typed

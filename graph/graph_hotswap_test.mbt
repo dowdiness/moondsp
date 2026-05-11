@@ -221,6 +221,42 @@ test "compiled dsp hot swap mirrors runtime param changes into pending graph" {
 }
 
 ///|
+test "compiled dsp hot swap result reports pending graph control rejection" {
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
+  let active = CompiledDsp::compile(
+    [DspNode::constant(1.0), DspNode::gain(0, 0.25), DspNode::output(1)],
+    context,
+  ).unwrap()
+  let replacement = CompiledDsp::compile(
+    [DspNode::constant(1.0), DspNode::output(0)],
+    context,
+  ).unwrap()
+  let hot_swap = CompiledDspHotSwap::from_graph(
+    active,
+    crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
+  )
+  let first_block = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+
+  assert_true(hot_swap.queue_swap(replacement))
+  match hot_swap.set_param_result(1, GraphParamSlot::Value0, 0.5) {
+    Err(
+      GraphControlError::InvalidSlotForNode(
+        1,
+        DspNodeKind::Output,
+        GraphParamSlot::Value0
+      )
+    ) => ()
+    other => fail("expected pending InvalidSlotForNode, got \{other}")
+  }
+  hot_swap.process(context, first_block)
+
+  assert_true((first_block.get(0) - 0.25).abs() < HOT_SWAP_EPSILON)
+}
+
+///|
 test "compiled stereo dsp hot swap crossfades equal-power between graphs" {
   let context = DspContext::new(
     sample_rate=HOT_SWAP_SAMPLE_RATE,
@@ -397,6 +433,36 @@ test "compiled stereo dsp hot swap mirrors pan changes into pending graph" {
     .every(sample => !sample.is_nan() && !sample.is_inf() && sample >= 1.0),
   )
   assert_true(settled_right.as_fixed_array().every(sample => sample == 1.0))
+}
+
+///|
+test "compiled stereo dsp hot swap result reports pending graph control rejection" {
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
+  let active = CompiledStereoDsp::compile(
+    [
+      DspNode::adsr(attack_ms=0.01, decay_ms=0.1, sustain=0.5, release_ms=0.2),
+      DspNode::pan(0, 0.0),
+      DspNode::stereo_output(1),
+    ],
+    context,
+  ).unwrap()
+  let replacement = CompiledStereoDsp::compile(
+    [DspNode::constant(1.0), DspNode::pan(0, 0.0), DspNode::stereo_output(1)],
+    context,
+  ).unwrap()
+  let hot_swap = CompiledStereoDspHotSwap::from_graph(
+    active,
+    crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
+  )
+
+  assert_true(hot_swap.queue_swap(replacement))
+  match hot_swap.gate_on_result(0) {
+    Err(GraphControlError::InvalidGateNode(0, DspNodeKind::Constant)) => ()
+    other => fail("expected pending InvalidGateNode, got \{other}")
+  }
 }
 
 ///|

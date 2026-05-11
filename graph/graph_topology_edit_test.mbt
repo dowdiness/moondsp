@@ -186,6 +186,74 @@ test "compiled dsp topology controller mirrors runtime params into queued edit" 
 }
 
 ///|
+test "compiled dsp topology controller result reports pending graph control rejection" {
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
+  let topology = CompiledDspTopologyController::from_nodes(
+    [DspNode::constant(1.0), DspNode::gain(0, 0.25), DspNode::output(1)],
+    context,
+    crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
+  ).unwrap()
+  let first_block = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+
+  assert_true(
+    topology.queue_topology_edit(
+      GraphTopologyEdit::replace_node(1, DspNode::mix(0, 0)),
+    ),
+  )
+  match topology.set_param_result(1, GraphParamSlot::Value0, 0.5) {
+    Err(
+      GraphControlError::InvalidSlotForNode(
+        1,
+        DspNodeKind::Mix,
+        GraphParamSlot::Value0
+      )
+    ) => ()
+    other => fail("expected pending InvalidSlotForNode, got \{other}")
+  }
+  topology.process(context, first_block)
+
+  assert_true((first_block.get(0) - 0.25).abs() < HOT_SWAP_EPSILON)
+}
+
+///|
+test "compiled dsp topology controller rejected control batch does not mirror authoring nodes" {
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
+  let topology = CompiledDspTopologyController::from_nodes(
+    [DspNode::constant(1.0), DspNode::gain(0, 0.25), DspNode::output(1)],
+    context,
+    crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
+  ).unwrap()
+  let first_block = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+  let second_block = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+  let settled_block = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+
+  match
+    topology.apply_controls_result([
+      GraphControl::set_param(1, GraphParamSlot::Value0, 0.5),
+      GraphControl::set_param(99, GraphParamSlot::Value0, 0.5),
+    ]) {
+    Err(GraphControlError::InvalidNodeIndex(99)) => ()
+    other => fail("expected InvalidNodeIndex, got \{other}")
+  }
+  assert_true(
+    topology.queue_topology_edit(
+      GraphTopologyEdit::replace_node(0, DspNode::constant(2.0)),
+    ),
+  )
+  topology.process(context, first_block)
+  topology.process(context, second_block)
+  topology.process(context, settled_block)
+
+  assert_true(settled_block.as_fixed_array().every(sample => sample == 0.5))
+}
+
+///|
 test "compiled dsp topology controller preserves runtime params across later topology edits" {
   let context = DspContext::new(
     sample_rate=HOT_SWAP_SAMPLE_RATE,
@@ -845,6 +913,44 @@ test "compiled stereo dsp topology controller mirrors runtime params into queued
     settled_right
     .as_fixed_array()
     .every(sample => sample.abs() < HOT_SWAP_EPSILON),
+  )
+}
+
+///|
+test "compiled stereo dsp topology controller set_param_result reports invalid value" {
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
+  let topology = CompiledStereoDspTopologyController::from_nodes(
+    [DspNode::constant(1.0), DspNode::pan(0, 0.0), DspNode::stereo_output(1)],
+    context,
+  ).unwrap()
+  let left = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+  let right = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
+
+  match topology.set_param_result(1, GraphParamSlot::Value0, 0.0 / 0.0) {
+    Err(
+      GraphControlError::InvalidParamValue(
+        1,
+        DspNodeKind::Pan,
+        GraphParamSlot::Value0,
+        _
+      )
+    ) => ()
+    other => fail("expected InvalidParamValue, got \{other}")
+  }
+  topology.process(context, left, right)
+
+  assert_true(
+    left
+    .as_fixed_array()
+    .every(sample => (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON),
+  )
+  assert_true(
+    right
+    .as_fixed_array()
+    .every(sample => (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON),
   )
 }
 

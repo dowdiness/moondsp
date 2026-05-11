@@ -89,16 +89,35 @@ fn HotSwapGraph::apply_control_impl(
   self : HotSwapGraph,
   control : GraphControl,
 ) -> Bool {
+  self.apply_control_result_impl(control) is Ok(_)
+}
+
+///|
+/// Apply one runtime control message to the active (and pending) graph.
+fn HotSwapGraph::apply_control_result_impl(
+  self : HotSwapGraph,
+  control : GraphControl,
+) -> Result[Unit, GraphControlError] {
   match self.pending {
-    None => self.active.apply_control_impl(control)
+    None => self.active.apply_control_result_impl(control)
     Some(next) => {
-      if !valid_hot_swap_control_graph(self.active, control) ||
-        !valid_hot_swap_control_graph(next, control) {
-        return false
+      match valid_hot_swap_control_graph_result(self.active, control) {
+        Ok(_) => ()
+        Err(error) => return Err(error)
       }
-      ignore(self.active.apply_control_impl(control))
-      ignore(next.apply_control_impl(control))
-      true
+      match valid_hot_swap_control_graph_result(next, control) {
+        Ok(_) => ()
+        Err(error) => return Err(error)
+      }
+      match self.active.apply_control_result_impl(control) {
+        Ok(_) => ()
+        Err(error) => return Err(error)
+      }
+      match next.apply_control_result_impl(control) {
+        Ok(_) => ()
+        Err(error) => return Err(error)
+      }
+      Ok(())
     }
   }
 }
@@ -109,16 +128,35 @@ fn HotSwapGraph::apply_controls_impl(
   self : HotSwapGraph,
   controls : Array[GraphControl],
 ) -> Bool {
+  self.apply_controls_result_impl(controls) is Ok(_)
+}
+
+///|
+/// Apply a batch of runtime control messages to the active (and pending) graph.
+fn HotSwapGraph::apply_controls_result_impl(
+  self : HotSwapGraph,
+  controls : Array[GraphControl],
+) -> Result[Unit, GraphControlError] {
   match self.pending {
-    None => self.active.apply_controls_impl(controls)
+    None => self.active.apply_controls_result_impl(controls)
     Some(next) => {
-      if !valid_hot_swap_controls_graph(self.active, controls) ||
-        !valid_hot_swap_controls_graph(next, controls) {
-        return false
+      match valid_hot_swap_controls_graph_result(self.active, controls) {
+        Ok(_) => ()
+        Err(error) => return Err(error)
       }
-      ignore(self.active.apply_controls_impl(controls))
-      ignore(next.apply_controls_impl(controls))
-      true
+      match valid_hot_swap_controls_graph_result(next, controls) {
+        Ok(_) => ()
+        Err(error) => return Err(error)
+      }
+      match self.active.apply_controls_result_impl(controls) {
+        Ok(_) => ()
+        Err(error) => return Err(error)
+      }
+      match next.apply_controls_result_impl(controls) {
+        Ok(_) => ()
+        Err(error) => return Err(error)
+      }
+      Ok(())
     }
   }
 }
@@ -442,30 +480,32 @@ fn equal_power_new_gain(progress : Double) -> Double {
 }
 
 ///|
-fn valid_hot_swap_control_graph(
+fn valid_hot_swap_control_graph_result(
   compiled : CompiledGraph,
   control : GraphControl,
-) -> Bool {
+) -> Result[Unit, GraphControlError] {
   let simulated_nodes = FixedArray::makei(compiled.nodes.length(), index => {
     compiled.nodes[index]
   })
-  valid_graph_control(compiled, simulated_nodes, control)
+  valid_graph_control_result(compiled, simulated_nodes, control)
 }
 
 ///|
-fn valid_hot_swap_controls_graph(
+fn valid_hot_swap_controls_graph_result(
   compiled : CompiledGraph,
   controls : Array[GraphControl],
-) -> Bool {
+) -> Result[Unit, GraphControlError] {
   let simulated_nodes = FixedArray::makei(compiled.nodes.length(), index => {
     compiled.nodes[index]
   })
   for index = 0; index < controls.length(); index = index + 1 {
-    if !valid_graph_control(compiled, simulated_nodes, controls[index]) {
-      return false
+    match
+      valid_graph_control_result(compiled, simulated_nodes, controls[index]) {
+      Ok(_) => ()
+      Err(error) => return Err(error)
     }
   }
-  true
+  Ok(())
 }
 
 ///|

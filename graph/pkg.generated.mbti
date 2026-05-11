@@ -41,19 +41,29 @@ pub impl GraphControllable for CompiledDsp
 pub impl GraphDebuggable for CompiledDsp
 
 type CompiledDspHotSwap
+pub fn CompiledDspHotSwap::apply_control_result(Self, GraphControl) -> Result[Unit, GraphControlError]
+pub fn CompiledDspHotSwap::apply_controls_result(Self, Array[GraphControl]) -> Result[Unit, GraphControlError]
 pub fn CompiledDspHotSwap::from_graph(CompiledDsp, crossfade_samples? : Int) -> Self
+pub fn CompiledDspHotSwap::gate_off_result(Self, Int) -> Result[Unit, GraphControlError]
+pub fn CompiledDspHotSwap::gate_on_result(Self, Int) -> Result[Unit, GraphControlError]
 pub fn CompiledDspHotSwap::process(Self, @dsp.DspContext, @dsp.AudioBuffer) -> Unit
 pub fn CompiledDspHotSwap::queue_swap(Self, CompiledDsp) -> Bool
 pub fn CompiledDspHotSwap::queue_swap_result(Self, CompiledDsp) -> Result[Unit, HotSwapQueueError]
+pub fn CompiledDspHotSwap::set_param_result(Self, Int, GraphParamSlot, Double) -> Result[Unit, GraphControlError]
 pub impl GraphControllable for CompiledDspHotSwap
 
 type CompiledDspTopologyController
+pub fn CompiledDspTopologyController::apply_control_result(Self, GraphControl) -> Result[Unit, GraphControlError]
+pub fn CompiledDspTopologyController::apply_controls_result(Self, Array[GraphControl]) -> Result[Unit, GraphControlError]
 pub fn CompiledDspTopologyController::from_nodes(Array[DspNode], @dsp.DspContext, crossfade_samples? : Int) -> Self?
+pub fn CompiledDspTopologyController::gate_off_result(Self, Int) -> Result[Unit, GraphControlError]
+pub fn CompiledDspTopologyController::gate_on_result(Self, Int) -> Result[Unit, GraphControlError]
 pub fn CompiledDspTopologyController::process(Self, @dsp.DspContext, @dsp.AudioBuffer) -> Unit
 pub fn CompiledDspTopologyController::queue_topology_edit(Self, GraphTopologyEdit) -> Bool
 pub fn CompiledDspTopologyController::queue_topology_edit_result(Self, GraphTopologyEdit) -> Result[Unit, GraphTopologyQueueError]
 pub fn CompiledDspTopologyController::queue_topology_edits(Self, Array[GraphTopologyEdit]) -> Bool
 pub fn CompiledDspTopologyController::queue_topology_edits_result(Self, Array[GraphTopologyEdit]) -> Result[Unit, GraphTopologyQueueError]
+pub fn CompiledDspTopologyController::set_param_result(Self, Int, GraphParamSlot, Double) -> Result[Unit, GraphControlError]
 pub impl GraphControllable for CompiledDspTopologyController
 
 type CompiledStereoDsp
@@ -74,19 +84,29 @@ pub impl GraphControllable for CompiledStereoDsp
 pub impl GraphDebuggable for CompiledStereoDsp
 
 type CompiledStereoDspHotSwap
+pub fn CompiledStereoDspHotSwap::apply_control_result(Self, GraphControl) -> Result[Unit, GraphControlError]
+pub fn CompiledStereoDspHotSwap::apply_controls_result(Self, Array[GraphControl]) -> Result[Unit, GraphControlError]
 pub fn CompiledStereoDspHotSwap::from_graph(CompiledStereoDsp, crossfade_samples? : Int) -> Self
+pub fn CompiledStereoDspHotSwap::gate_off_result(Self, Int) -> Result[Unit, GraphControlError]
+pub fn CompiledStereoDspHotSwap::gate_on_result(Self, Int) -> Result[Unit, GraphControlError]
 pub fn CompiledStereoDspHotSwap::process(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn CompiledStereoDspHotSwap::queue_swap(Self, CompiledStereoDsp) -> Bool
 pub fn CompiledStereoDspHotSwap::queue_swap_result(Self, CompiledStereoDsp) -> Result[Unit, HotSwapQueueError]
+pub fn CompiledStereoDspHotSwap::set_param_result(Self, Int, GraphParamSlot, Double) -> Result[Unit, GraphControlError]
 pub impl GraphControllable for CompiledStereoDspHotSwap
 
 type CompiledStereoDspTopologyController
+pub fn CompiledStereoDspTopologyController::apply_control_result(Self, GraphControl) -> Result[Unit, GraphControlError]
+pub fn CompiledStereoDspTopologyController::apply_controls_result(Self, Array[GraphControl]) -> Result[Unit, GraphControlError]
 pub fn CompiledStereoDspTopologyController::from_nodes(Array[DspNode], @dsp.DspContext, crossfade_samples? : Int) -> Self?
+pub fn CompiledStereoDspTopologyController::gate_off_result(Self, Int) -> Result[Unit, GraphControlError]
+pub fn CompiledStereoDspTopologyController::gate_on_result(Self, Int) -> Result[Unit, GraphControlError]
 pub fn CompiledStereoDspTopologyController::process(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn CompiledStereoDspTopologyController::queue_topology_edit(Self, GraphTopologyEdit) -> Bool
 pub fn CompiledStereoDspTopologyController::queue_topology_edit_result(Self, GraphTopologyEdit) -> Result[Unit, GraphTopologyQueueError]
 pub fn CompiledStereoDspTopologyController::queue_topology_edits(Self, Array[GraphTopologyEdit]) -> Bool
 pub fn CompiledStereoDspTopologyController::queue_topology_edits_result(Self, Array[GraphTopologyEdit]) -> Result[Unit, GraphTopologyQueueError]
+pub fn CompiledStereoDspTopologyController::set_param_result(Self, Int, GraphParamSlot, Double) -> Result[Unit, GraphControlError]
 pub impl GraphControllable for CompiledStereoDspTopologyController
 
 pub struct CompiledTemplate {

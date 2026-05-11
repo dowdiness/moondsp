@@ -83,20 +83,30 @@ fn TopologyGraph::apply_control_impl(
   self : TopologyGraph,
   control : GraphControl,
 ) -> Bool {
+  self.apply_control_result_impl(control) is Ok(_)
+}
+
+///|
+/// Apply one runtime control message to the active or in-flight graph.
+fn TopologyGraph::apply_control_result_impl(
+  self : TopologyGraph,
+  control : GraphControl,
+) -> Result[Unit, GraphControlError] {
   let updated_authoring_nodes = match
-    topology_control_updated_nodes(
+    topology_control_updated_nodes_result(
       self.authoring_nodes,
       self.compile_sample_rate,
       [control],
     ) {
-    Some(updated_authoring_nodes) => updated_authoring_nodes
-    None => return false
+    Ok(updated_authoring_nodes) => updated_authoring_nodes
+    Err(error) => return Err(error)
   }
-  if !self.hot_swap.apply_control_impl(control) {
-    return false
+  match self.hot_swap.apply_control_result_impl(control) {
+    Ok(_) => ()
+    Err(error) => return Err(error)
   }
   self.authoring_nodes = updated_authoring_nodes
-  true
+  Ok(())
 }
 
 ///|
@@ -105,20 +115,30 @@ fn TopologyGraph::apply_controls_impl(
   self : TopologyGraph,
   controls : Array[GraphControl],
 ) -> Bool {
+  self.apply_controls_result_impl(controls) is Ok(_)
+}
+
+///|
+/// Apply a batch of runtime control messages to the active or in-flight graph.
+fn TopologyGraph::apply_controls_result_impl(
+  self : TopologyGraph,
+  controls : Array[GraphControl],
+) -> Result[Unit, GraphControlError] {
   let updated_authoring_nodes = match
-    topology_control_updated_nodes(
+    topology_control_updated_nodes_result(
       self.authoring_nodes,
       self.compile_sample_rate,
       controls,
     ) {
-    Some(updated_authoring_nodes) => updated_authoring_nodes
-    None => return false
+    Ok(updated_authoring_nodes) => updated_authoring_nodes
+    Err(error) => return Err(error)
   }
-  if !self.hot_swap.apply_controls_impl(controls) {
-    return false
+  match self.hot_swap.apply_controls_result_impl(controls) {
+    Ok(_) => ()
+    Err(error) => return Err(error)
   }
   self.authoring_nodes = updated_authoring_nodes
-  true
+  Ok(())
 }
 
 ///|
@@ -332,47 +352,50 @@ pub fn CompiledStereoDspTopologyController::process(
 }
 
 ///|
-fn topology_control_updated_nodes(
+fn topology_control_updated_nodes_result(
   authoring_nodes : Array[DspNode],
   compile_sample_rate : Double,
   controls : Array[GraphControl],
-) -> Array[DspNode]? {
+) -> Result[Array[DspNode], GraphControlError] {
   let updated_nodes = authoring_nodes.copy()
   for control in controls {
-    if !apply_topology_runtime_control(
+    match
+      apply_topology_runtime_control_result(
         updated_nodes, compile_sample_rate, control,
       ) {
-      return None
+      Ok(_) => ()
+      Err(error) => return Err(error)
     }
   }
-  Some(updated_nodes)
+  Ok(updated_nodes)
 }
 
 ///|
-fn apply_topology_runtime_control(
+fn apply_topology_runtime_control_result(
   nodes : Array[DspNode],
   compile_sample_rate : Double,
   control : GraphControl,
-) -> Bool {
+) -> Result[Unit, GraphControlError] {
   match control.kind {
     SetParam => {
       if control.node_index < 0 || control.node_index >= nodes.length() {
-        return false
+        return Err(GraphControlError::InvalidNodeIndex(control.node_index))
       }
       let updated = match
-        updated_node_param(
+        updated_node_param_result(
           nodes[control.node_index],
+          control.node_index,
           control.slot,
           control.value,
           compile_sample_rate,
         ) {
-        Some(updated) => updated
-        None => return false
+        Ok(updated) => updated
+        Err(error) => return Err(error)
       }
       nodes[control.node_index] = updated
-      true
+      Ok(())
     }
-    _ => true
+    _ => Ok(())
   }
 }
 

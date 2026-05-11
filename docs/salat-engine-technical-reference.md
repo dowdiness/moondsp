@@ -703,14 +703,15 @@ Current graph node support:
 Current runtime control support:
 
 - `apply_control(GraphControl)` is the preferred runtime-control entrypoint
-  for compatibility callers; direct compiled mono/stereo graphs also expose
-  `apply_control_result(...)` / `apply_controls_result(...)` plus
+  for compatibility callers; direct compiled mono/stereo graphs and their
+  hot-swap/topology wrappers also expose `apply_control_result(...)` /
+  `apply_controls_result(...)` plus
   `gate_on_result(...)`, `gate_off_result(...)`, and
   `set_param_result(...)` for callers that need a concrete
   `GraphControlError` rejection reason
 - hot-swap and topology wrappers participate in the same `GraphControllable`
-  boolean runtime-control surface today; result-typed runtime-control
-  companions for those wrappers are the next API-hardening slice
+  boolean runtime-control surface; their result-typed companions preserve the
+  same behavior while reporting the first `GraphControlError`
 - `apply_controls(Array[GraphControl])` applies control batches transactionally
   in batch order while targeting nodes by authoring index
 - compatibility helpers remain available:
@@ -967,6 +968,7 @@ Current semantics:
 - during an in-flight crossfade, runtime controls are validated against both
   active and pending graphs and applied to both graphs transactionally
   - if either graph rejects the control batch, nothing is applied
+  - result-typed wrapper APIs return that rejection as `GraphControlError`
 - topology controllers also mirror accepted runtime `set_param(...)` updates
   into their stored authoring-order nodes, so later `queue_topology_edit(...)`
   recompiles preserve the current parameter baseline instead of rebuilding from
