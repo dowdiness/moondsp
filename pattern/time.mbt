@@ -27,6 +27,11 @@ pub fn TimeSpan::duration(self : TimeSpan) -> Rational {
 }
 
 ///|
+pub fn TimeSpan::shift(self : TimeSpan, offset : Rational) -> TimeSpan {
+  TimeSpan::new(self.begin + offset, self.end_ + offset)
+}
+
+///|
 pub fn TimeSpan::contains(self : TimeSpan, time : Rational) -> Bool {
   self.begin <= time && time < self.end_
 }

@@ -236,6 +236,26 @@ test "process_section_block: identity section matches pattern scheduling" {
 }
 
 ///|
+test "process_song_block: one-section song matches section scheduling" {
+  let (section_pool, section_sched, section_left, section_right) = make_test_sched()
+  let (song_pool, song_sched, song_left, song_right) = make_test_sched()
+  let pat = @pattern.note(60.0)
+  let section = @song.Section::from_pattern(name="main", body=pat)
+  let result = try? @song.Song(parts=[@song.SongPart(name="main", section~)])
+  let song = match result {
+    Ok(song) => song
+    Err(_) => abort("song creation failed")
+  }
+  section_sched.process_section_block(
+    section, section_pool, section_left, section_right,
+  )
+  song_sched.process_song_block(song, song_pool, song_left, song_right)
+  assert_eq(section_sched.sample_counter(), song_sched.sample_counter())
+  assert_eq(section_sched.active_note_count(), song_sched.active_note_count())
+  assert_eq(section_pool.active_voice_count(), song_pool.active_voice_count())
+}
+
+///|
 test "process_block: empty pattern triggers no voices" {
   let (pool, sched, left, right) = make_test_sched()
   let pat : @pattern.Pat[@pattern.ControlMap] = @pattern.Pat::silence()

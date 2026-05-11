@@ -26,6 +26,17 @@ test "duration: [1/4, 3/4) = 1/2" {
 }
 
 ///|
+test "shift: [1/4, 3/4) shifted by 2 = [9/4, 11/4)" {
+  let ts = span(1, 4, 3, 4).shift(r(2, 1))
+  inspect(
+    ts,
+    content=(
+      #|{ begin: { num: 9, den: 4 }, end_: { num: 11, den: 4 } }
+    ),
+  )
+}
+
+///|
 test "contains: [0, 1) contains 1/2" {
   let ts = span(0, 1, 1, 1)
   assert_true(ts.contains(r(1, 2)))
