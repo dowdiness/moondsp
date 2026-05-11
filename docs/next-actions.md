@@ -8,9 +8,8 @@ actionable; move completed design notes or implementation plans under
 
 ## Current State
 
-- `main` was last pushed through `a15d572 feat: add wrapper control result APIs`;
-  current working tree contains the browser queue/control error-visibility
-  slice.
+- `main` was last pushed through
+  `def8b39 chore: label remaining dsp helper args`.
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -21,13 +20,18 @@ actionable; move completed design notes or implementation plans under
     while preserving the boolean wasm ABI.
   - `BoundVoicePool` owns template validation and `ControlBindingMap` lifetime,
     so `PatternScheduler` no longer carries stale bindings.
-- Latest full verification for browser queue/control error visibility:
+  - remaining ambiguity-prone DSP/browser helper parameters are labelled:
+    `Oscillator::process`, `DemoSource::tick_source`, browser `tick`, and
+    browser `tick_source`. The generated interfaces also confirm the earlier
+    `Oscillator::{process_waveform,tick,tick_waveform}`,
+    `Gain::process`, `Clip::process`, `Pan::process`,
+    `DspNode::stereo_gain`, and `DspNode::stereo_clip` labels.
+- Latest full verification for current `main`:
   - `rtk moon fmt`
   - `rtk moon info`
   - `rtk moon check`
   - `rtk moon test`
   - `rtk moon build --target wasm-gc`
-  - `rtk node --check web/processor.js`
   - `rtk npm run test:browser`
   - `rtk git diff --check`
 
