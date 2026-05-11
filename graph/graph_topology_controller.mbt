@@ -12,9 +12,33 @@ priv struct TopologyGraph {
 
 ///|
 /// Failure reason for result-typed topology queue APIs.
+pub(all) enum GraphTopologyEditError {
+  InvalidNodeIndex(Int)
+  InvalidSourceIndex(Int)
+  UnsupportedInputSlot(Int, GraphTopologyInputSlot, DspNodeKind)
+  UnsupportedInsertTemplate(DspNodeKind)
+  EmptyInsertChain
+  UnsupportedChainNode(Int, DspNodeKind)
+  InvalidDeleteRange(Int, Int)
+  ReplacementSourceInDeletedRange(Int)
+  DeleteNodeRequiresUnary(Int, DspNodeKind)
+  DeleteNodeRequiresSingleConsumer(Int)
+  DeleteNodeConsumerMismatch(Int, Int)
+  DeleteChainRequiresUnary(Int, DspNodeKind)
+  DeleteChainRequiresSingleConsumer(Int)
+  DeleteChainConsumerMismatch(Int, Int, Int)
+} derive(Debug)
+
+///|
+pub impl Show for GraphTopologyEditError with output(self, logger) {
+  logger.write_string(@debug.to_string(self))
+}
+
+///|
+/// Failure reason for result-typed topology queue APIs.
 pub(all) enum GraphTopologyQueueError {
   PendingSwap
-  InvalidEdit(Int)
+  InvalidEdit(Int, GraphTopologyEditError)
   RecompileRejected
   HotSwap(HotSwapQueueError)
 } derive(Debug)
@@ -190,7 +214,10 @@ fn TopologyGraph::queue_topology_edits_result_impl(
   let edited_nodes = self.authoring_nodes.copy()
   match apply_topology_edits_result(edited_nodes, edits) {
     Ok(_) => ()
-    Err(index) => return Err(GraphTopologyQueueError::InvalidEdit(index))
+    Err(failure) =>
+      return Err(
+        GraphTopologyQueueError::InvalidEdit(failure.edit_index, failure.reason),
+      )
   }
   let compile_context = DspContext::new(
     sample_rate=self.compile_sample_rate,

@@ -3,7 +3,7 @@
 pub(all) enum GraphTopologyInputSlot {
   Input0
   Input1
-} derive(Eq)
+} derive(Eq, Debug)
 
 ///|
 /// Declarative topology edit applied in authoring order before recompilation.

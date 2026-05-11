@@ -945,8 +945,13 @@ Current semantics:
 - `queue_topology_edit_result(...)` / `queue_topology_edits_result(...)` are
   the result-typed topology queue companions for mono and stereo controllers;
   they preserve the same transactional behavior as the boolean APIs while
-  reporting `PendingSwap`, `InvalidEdit(index)`, `RecompileRejected`, or a
-  wrapped `HotSwapQueueError`
+  reporting `PendingSwap`, `InvalidEdit(index, reason)`, `RecompileRejected`,
+  or a wrapped `HotSwapQueueError`
+- `InvalidEdit(index, reason)` reports the zero-based edit position in the
+  submitted batch and a stable `GraphTopologyEditError` reason such as invalid
+  node/source indices, unsupported input slots, unsupported inserted node
+  templates, invalid delete ranges, replacement sources inside a deleted chain,
+  or delete shapes that are not unary/single-consumer chains
 - topology-edit batches are transactional:
   - if any edit has an invalid authoring index, nothing is changed
   - if the edited node array fails recompilation, nothing is staged

@@ -50,6 +50,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DSP/browser demo helper APIs now label the remaining ambiguity-prone
   `Oscillator::process`, `DemoSource::tick_source`, `tick`, and
   `tick_source` parameters.
+- Topology queue diagnostics now report
+  `InvalidEdit(index, reason)` with stable `GraphTopologyEditError` reasons
+  instead of only the failing batch index.
 
 ### Fixed
 

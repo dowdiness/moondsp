@@ -87,12 +87,68 @@ test "compiled dsp topology controller result reports invalid edit index" {
       GraphTopologyEdit::replace_node(0, DspNode::constant(0.5)),
       GraphTopologyEdit::replace_node(99, DspNode::constant(0.75)),
     ]) {
-    Err(GraphTopologyQueueError::InvalidEdit(index)) => assert_eq(index, 1)
+    Err(
+      GraphTopologyQueueError::InvalidEdit(
+        index,
+        GraphTopologyEditError::InvalidNodeIndex(node_index)
+      )
+    ) => {
+      assert_eq(index, 1)
+      assert_eq(node_index, 99)
+    }
     other => fail("expected InvalidEdit, got \{other}")
   }
   topology.process(context, output)
 
   assert_true(output.as_fixed_array().every(sample => sample == 0.25))
+}
+
+///|
+test "compiled dsp topology controller result reports invalid edit reason" {
+  let context = DspContext::new(
+    sample_rate=HOT_SWAP_SAMPLE_RATE,
+    block_size=HOT_SWAP_BLOCK_SIZE,
+  )
+  let topology = CompiledDspTopologyController::from_nodes(
+    [DspNode::constant(1.0), DspNode::gain(0, 0.25), DspNode::output(1)],
+    context,
+  ).unwrap()
+
+  match
+    topology.queue_topology_edit_result(
+      GraphTopologyEdit::rewire_input(0, GraphTopologyInputSlot::Input0, 1),
+    ) {
+    Err(
+      GraphTopologyQueueError::InvalidEdit(
+        index,
+        GraphTopologyEditError::UnsupportedInputSlot(
+          node_index,
+          GraphTopologyInputSlot::Input0,
+          DspNodeKind::Constant
+        )
+      )
+    ) => {
+      assert_eq(index, 0)
+      assert_eq(node_index, 0)
+    }
+    other => fail("expected UnsupportedInputSlot, got \{other}")
+  }
+  match
+    topology.queue_topology_edit_result(
+      GraphTopologyEdit::insert_node(
+        2,
+        GraphTopologyInputSlot::Input0,
+        DspNode::constant(0.5),
+      ),
+    ) {
+    Err(
+      GraphTopologyQueueError::InvalidEdit(
+        index,
+        GraphTopologyEditError::UnsupportedInsertTemplate(DspNodeKind::Constant)
+      )
+    ) => assert_eq(index, 0)
+    other => fail("expected UnsupportedInsertTemplate, got \{other}")
+  }
 }
 
 ///|

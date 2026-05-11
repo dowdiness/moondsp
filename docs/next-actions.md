@@ -8,8 +8,10 @@ actionable; move completed design notes or implementation plans under
 
 ## Current State
 
-- `main` was last pushed through
-  `def8b39 chore: label remaining dsp helper args`.
+- `origin/main` was last pushed through
+  `def8b39 chore: label remaining dsp helper args`; local `main` is ahead by
+  `2dfee93 docs: refresh next actions handoff`.
+  The current working tree settles topology queue diagnostics.
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -26,6 +28,10 @@ actionable; move completed design notes or implementation plans under
     `Oscillator::{process_waveform,tick,tick_waveform}`,
     `Gain::process`, `Clip::process`, `Pan::process`,
     `DspNode::stereo_gain`, and `DspNode::stereo_clip` labels.
+  - topology queue diagnostics are settled on
+    `InvalidEdit(index, reason)`, where `reason` is a stable
+    `GraphTopologyEditError` for invalid indices, unsupported slots/templates,
+    invalid delete ranges, and non-unary or non-single-consumer delete shapes.
 - Latest full verification for current `main`:
   - `rtk moon fmt`
   - `rtk moon info`
@@ -37,13 +43,7 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Decide whether topology edit diagnostics need to be more precise.
-
-   `GraphTopologyQueueError::InvalidEdit(index)` is intentionally compact. If
-   callers need richer edit-shape reasons, expand it before the topology queue
-   API hardens further. Otherwise leave it as the stable contract.
-
-2. Start Phase 6 design after the topology diagnostic decision is settled.
+1. Start Phase 6 design.
 
    The Phase 6 design should focus on stable IDs, incremental invalidation
    boundaries, and how pattern/DSP graph edits map onto existing result-typed

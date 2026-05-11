@@ -1,38 +1,46 @@
 ///|
+priv struct GraphTopologyEditFailure {
+  edit_index : Int
+  reason : GraphTopologyEditError
+}
+
+///|
 fn apply_topology_edits_result(
   nodes : Array[DspNode],
   edits : Array[GraphTopologyEdit],
-) -> Result[Unit, Int] {
+) -> Result[Unit, GraphTopologyEditFailure] {
   for index = 0; index < edits.length(); index = index + 1 {
     let edit = edits[index]
-    if !apply_topology_edit(nodes, edit) {
-      return Err(index)
+    match apply_topology_edit_result(nodes, edit) {
+      Ok(_) => ()
+      Err(reason) => return Err({ edit_index: index, reason })
     }
   }
   Ok(())
 }
 
 ///|
-fn apply_topology_edit(
+fn apply_topology_edit_result(
   nodes : Array[DspNode],
   edit : GraphTopologyEdit,
-) -> Bool {
+) -> Result[Unit, GraphTopologyEditError] {
   match edit {
     ReplaceNode(node_index, replacement) =>
       if node_index < 0 || node_index >= nodes.length() {
-        false
+        Err(GraphTopologyEditError::InvalidNodeIndex(node_index))
       } else {
         nodes[node_index] = replacement
-        true
+        Ok(())
       }
     RewireInput(node_index, input_slot, source_index) =>
-      if node_index < 0 ||
-        node_index >= nodes.length() ||
-        source_index < 0 ||
-        source_index >= nodes.length() {
-        false
+      if node_index < 0 || node_index >= nodes.length() {
+        Err(GraphTopologyEditError::InvalidNodeIndex(node_index))
+      } else if source_index < 0 || source_index >= nodes.length() {
+        Err(GraphTopologyEditError::InvalidSourceIndex(source_index))
       } else {
-        apply_topology_rewire_input(nodes, node_index, input_slot, source_index)
+        apply_topology_rewire_input_result(
+          nodes, node_index, input_slot, source_index,
+        )
       }
     InsertNode(retarget_node_index, retarget_input_slot, inserted_node) =>
       apply_topology_insert_node(
@@ -48,7 +56,13 @@ fn apply_topology_edit(
         delete_node_index >= nodes.length() ||
         replacement_source_index < 0 ||
         replacement_source_index >= nodes.length() {
-        false
+        if delete_node_index < 0 || delete_node_index >= nodes.length() {
+          Err(GraphTopologyEditError::InvalidNodeIndex(delete_node_index))
+        } else {
+          Err(
+            GraphTopologyEditError::InvalidSourceIndex(replacement_source_index),
+          )
+        }
       } else {
         apply_topology_delete_node(
           nodes, delete_node_index, retarget_node_index, retarget_input_slot, replacement_source_index,
@@ -75,28 +89,42 @@ fn apply_topology_insert_node(
   retarget_node_index : Int,
   inserted_template : DspNode,
   retarget_input_slot : GraphTopologyInputSlot,
-) -> Bool {
+) -> Result[Unit, GraphTopologyEditError] {
   if retarget_node_index < 0 || retarget_node_index >= nodes.length() {
-    return false
+    return Err(GraphTopologyEditError::InvalidNodeIndex(retarget_node_index))
   }
   let old_source = match
     topology_node_input(nodes[retarget_node_index], retarget_input_slot) {
     Some(old_source) => old_source
-    None => return false
+    None =>
+      return Err(
+        GraphTopologyEditError::UnsupportedInputSlot(
+          retarget_node_index,
+          retarget_input_slot,
+          nodes[retarget_node_index].kind,
+        ),
+      )
   }
   let inserted = match topology_inserted_node(inserted_template, old_source) {
     Some(inserted) => inserted
-    None => return false
+    None =>
+      return Err(
+        GraphTopologyEditError::UnsupportedInsertTemplate(
+          inserted_template.kind,
+        ),
+      )
   }
   let inserted_index = nodes.length()
   nodes.push(inserted)
-  if apply_topology_rewire_input(
+  match
+    apply_topology_rewire_input_result(
       nodes, retarget_node_index, retarget_input_slot, inserted_index,
     ) {
-    true
-  } else {
-    ignore(nodes.pop())
-    false
+    Ok(_) => Ok(())
+    Err(error) => {
+      ignore(nodes.pop())
+      Err(error)
+    }
   }
 }
 
@@ -107,25 +135,40 @@ fn apply_topology_delete_node(
   retarget_node_index : Int,
   retarget_input_slot : GraphTopologyInputSlot,
   replacement_source_index : Int,
-) -> Bool {
+) -> Result[Unit, GraphTopologyEditError] {
   let unary_input = match
     topology_node_input(
       nodes[delete_node_index],
       GraphTopologyInputSlot::Input0,
     ) {
     Some(unary_input) => unary_input
-    None => return false
+    None =>
+      return Err(
+        GraphTopologyEditError::DeleteNodeRequiresUnary(
+          delete_node_index,
+          nodes[delete_node_index].kind,
+        ),
+      )
   }
   if retarget_node_index < 0 || retarget_node_index >= nodes.length() {
-    return false
+    return Err(GraphTopologyEditError::InvalidNodeIndex(retarget_node_index))
   }
   let consumer_index = match
     topology_single_consumer_for_input(nodes, delete_node_index) {
     Some(consumer_index) => consumer_index
-    _ => return false
+    _ =>
+      return Err(
+        GraphTopologyEditError::DeleteNodeRequiresSingleConsumer(
+          delete_node_index,
+        ),
+      )
   }
   if consumer_index != retarget_node_index {
-    return false
+    return Err(
+      GraphTopologyEditError::DeleteNodeConsumerMismatch(
+        consumer_index, retarget_node_index,
+      ),
+    )
   }
   // If the caller specified the deleted node itself as the replacement source,
   // substitute its upstream input instead — the deleted node won't exist.
@@ -134,10 +177,12 @@ fn apply_topology_delete_node(
   } else {
     replacement_source_index
   }
-  if !apply_topology_rewire_input(
+  match
+    apply_topology_rewire_input_result(
       nodes, consumer_index, retarget_input_slot, expected_replacement,
     ) {
-    return false
+    Ok(_) => ()
+    Err(error) => return Err(error)
   }
   let compacted = Array::new(capacity=nodes.length() - 1)
   for index in 0..<nodes.length() {
@@ -151,7 +196,7 @@ fn apply_topology_delete_node(
   for node in compacted {
     nodes.push(node)
   }
-  true
+  Ok(())
 }
 
 ///|
@@ -160,24 +205,32 @@ fn apply_topology_insert_chain(
   retarget_node_index : Int,
   retarget_input_slot : GraphTopologyInputSlot,
   chain_nodes : Array[DspNode],
-) -> Bool {
+) -> Result[Unit, GraphTopologyEditError] {
   if chain_nodes.length() == 0 {
-    return false
+    return Err(GraphTopologyEditError::EmptyInsertChain)
   }
   if retarget_node_index < 0 || retarget_node_index >= nodes.length() {
-    return false
+    return Err(GraphTopologyEditError::InvalidNodeIndex(retarget_node_index))
   }
   // Validate all chain nodes are unary (no input1)
-  for node in chain_nodes {
+  for index = 0; index < chain_nodes.length(); index = index + 1 {
+    let node = chain_nodes[index]
     if node.input1 >= 0 {
-      return false
+      return Err(GraphTopologyEditError::UnsupportedChainNode(index, node.kind))
     }
   }
   // Get original source of the retarget node's input
   let old_source = match
     topology_node_input(nodes[retarget_node_index], retarget_input_slot) {
     Some(old_source) => old_source
-    None => return false
+    None =>
+      return Err(
+        GraphTopologyEditError::UnsupportedInputSlot(
+          retarget_node_index,
+          retarget_input_slot,
+          nodes[retarget_node_index].kind,
+        ),
+      )
   }
   // For each node in the chain: append to authoring array
   let mut prev_source = old_source
@@ -191,7 +244,9 @@ fn apply_topology_insert_chain(
         while nodes.length() > first_chain_index {
           ignore(nodes.pop())
         }
-        return false
+        return Err(
+          GraphTopologyEditError::UnsupportedInsertTemplate(chain_node.kind),
+        )
       }
     }
     last_index = nodes.length()
@@ -199,16 +254,18 @@ fn apply_topology_insert_chain(
     prev_source = last_index
   }
   // Retarget the downstream node's input to the last chain node
-  if apply_topology_rewire_input(
+  match
+    apply_topology_rewire_input_result(
       nodes, retarget_node_index, retarget_input_slot, last_index,
     ) {
-    true
-  } else {
-    // Roll back
-    while nodes.length() > first_chain_index {
-      ignore(nodes.pop())
+    Ok(_) => Ok(())
+    Err(error) => {
+      // Roll back
+      while nodes.length() > first_chain_index {
+        ignore(nodes.pop())
+      }
+      Err(error)
     }
-    false
   }
 }
 
@@ -220,53 +277,86 @@ fn apply_topology_delete_chain(
   retarget_node_index : Int,
   retarget_input_slot : GraphTopologyInputSlot,
   replacement_source_index : Int,
-) -> Bool {
+) -> Result[Unit, GraphTopologyEditError] {
   // Basic bounds check
-  if start_node_index < 0 ||
-    start_node_index >= nodes.length() ||
-    end_node_index < 0 ||
-    end_node_index >= nodes.length() ||
-    start_node_index > end_node_index ||
-    retarget_node_index < 0 ||
-    retarget_node_index >= nodes.length() ||
-    replacement_source_index < 0 ||
-    replacement_source_index >= nodes.length() {
-    return false
+  if start_node_index < 0 || start_node_index >= nodes.length() {
+    return Err(GraphTopologyEditError::InvalidNodeIndex(start_node_index))
+  }
+  if end_node_index < 0 || end_node_index >= nodes.length() {
+    return Err(GraphTopologyEditError::InvalidNodeIndex(end_node_index))
+  }
+  if start_node_index > end_node_index {
+    return Err(
+      GraphTopologyEditError::InvalidDeleteRange(
+        start_node_index, end_node_index,
+      ),
+    )
+  }
+  if retarget_node_index < 0 || retarget_node_index >= nodes.length() {
+    return Err(GraphTopologyEditError::InvalidNodeIndex(retarget_node_index))
+  }
+  if replacement_source_index < 0 || replacement_source_index >= nodes.length() {
+    return Err(
+      GraphTopologyEditError::InvalidSourceIndex(replacement_source_index),
+    )
   }
   // Reject if replacement_source is inside the deleted span
   if replacement_source_index >= start_node_index &&
     replacement_source_index <= end_node_index {
-    return false
+    return Err(
+      GraphTopologyEditError::ReplacementSourceInDeletedRange(
+        replacement_source_index,
+      ),
+    )
   }
   // Validate: each node in the chain must be unary (input1 < 0) and not
   // Output/StereoOutput, and each must feed exactly one downstream consumer
   for index = start_node_index; index <= end_node_index; index = index + 1 {
     let node = nodes[index]
     if node.input1 >= 0 {
-      return false
+      return Err(
+        GraphTopologyEditError::DeleteChainRequiresUnary(index, node.kind),
+      )
     }
     if node.kind is Output || node.kind is StereoOutput {
-      return false
+      return Err(
+        GraphTopologyEditError::DeleteChainRequiresUnary(index, node.kind),
+      )
     }
     let consumer = match topology_single_consumer_for_input(nodes, index) {
       Some(consumer) => consumer
-      None => return false
+      None =>
+        return Err(
+          GraphTopologyEditError::DeleteChainRequiresSingleConsumer(index),
+        )
     }
     // Each chain node except the last must feed the next node in the chain
     if index < end_node_index {
       if consumer != index + 1 {
-        return false
+        return Err(
+          GraphTopologyEditError::DeleteChainConsumerMismatch(
+            index,
+            consumer,
+            index + 1,
+          ),
+        )
       }
       // Last chain node must feed the retarget node
     } else if consumer != retarget_node_index {
-      return false
+      return Err(
+        GraphTopologyEditError::DeleteChainConsumerMismatch(
+          index, consumer, retarget_node_index,
+        ),
+      )
     }
   }
   // Retarget the downstream node's input to the replacement source
-  if !apply_topology_rewire_input(
+  match
+    apply_topology_rewire_input_result(
       nodes, retarget_node_index, retarget_input_slot, replacement_source_index,
     ) {
-    return false
+    Ok(_) => ()
+    Err(error) => return Err(error)
   }
   // Build compacted array excluding all chain nodes, adjusting indices
   // We need to delete nodes from start_node_index to end_node_index inclusive
@@ -286,7 +376,7 @@ fn apply_topology_delete_chain(
   for node in compacted {
     nodes.push(node)
   }
-  true
+  Ok(())
 }
 
 ///|
@@ -468,12 +558,12 @@ fn topology_inserted_node(template : DspNode, input_source : Int) -> DspNode? {
 }
 
 ///|
-fn apply_topology_rewire_input(
+fn apply_topology_rewire_input_result(
   nodes : Array[DspNode],
   node_index : Int,
   input_slot : GraphTopologyInputSlot,
   source_index : Int,
-) -> Bool {
+) -> Result[Unit, GraphTopologyEditError] {
   let node = nodes[node_index]
   let rewired = match (node.kind, input_slot) {
     (DspNodeKind::Gain, GraphTopologyInputSlot::Input0) =>
@@ -541,8 +631,15 @@ fn apply_topology_rewire_input(
   match rewired {
     Some(rewired) => {
       nodes[node_index] = rewired
-      true
+      Ok(())
     }
-    None => false
+    None =>
+      Err(
+        GraphTopologyEditError::UnsupportedInputSlot(
+          node_index,
+          input_slot,
+          node.kind,
+        ),
+      )
   }
 }

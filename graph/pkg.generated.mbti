@@ -270,14 +270,32 @@ pub fn GraphTopologyEdit::insert_node(Int, GraphTopologyInputSlot, DspNode) -> S
 pub fn GraphTopologyEdit::replace_node(Int, DspNode) -> Self
 pub fn GraphTopologyEdit::rewire_input(Int, GraphTopologyInputSlot, Int) -> Self
 
+pub(all) enum GraphTopologyEditError {
+  InvalidNodeIndex(Int)
+  InvalidSourceIndex(Int)
+  UnsupportedInputSlot(Int, GraphTopologyInputSlot, DspNodeKind)
+  UnsupportedInsertTemplate(DspNodeKind)
+  EmptyInsertChain
+  UnsupportedChainNode(Int, DspNodeKind)
+  InvalidDeleteRange(Int, Int)
+  ReplacementSourceInDeletedRange(Int)
+  DeleteNodeRequiresUnary(Int, DspNodeKind)
+  DeleteNodeRequiresSingleConsumer(Int)
+  DeleteNodeConsumerMismatch(Int, Int)
+  DeleteChainRequiresUnary(Int, DspNodeKind)
+  DeleteChainRequiresSingleConsumer(Int)
+  DeleteChainConsumerMismatch(Int, Int, Int)
+} derive(@debug.Debug)
+pub impl Show for GraphTopologyEditError
+
 pub(all) enum GraphTopologyInputSlot {
   Input0
   Input1
-} derive(Eq)
+} derive(Eq, @debug.Debug)
 
 pub(all) enum GraphTopologyQueueError {
   PendingSwap
-  InvalidEdit(Int)
+  InvalidEdit(Int, GraphTopologyEditError)
   RecompileRejected
   HotSwap(HotSwapQueueError)
 } derive(@debug.Debug)
