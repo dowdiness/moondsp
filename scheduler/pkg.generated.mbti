@@ -4,6 +4,7 @@ package "dowdiness/moondsp/scheduler"
 import {
   "dowdiness/moondsp/dsp",
   "dowdiness/moondsp/pattern",
+  "dowdiness/moondsp/song",
   "dowdiness/moondsp/voice",
 }
 
@@ -18,6 +19,12 @@ pub fn midi_to_hz(Double) -> Double
 
 // Types and methods
 type ActiveNote
+
+pub struct BlockFrame {
+  sample_begin : Int64
+  sample_end : Int64
+  logical_arc : @pattern.TimeSpan
+}
 
 pub struct ControlMapper {
   transform : (String, Double) -> (String, Double)?
@@ -35,10 +42,12 @@ pub struct PatternScheduler {
 }
 pub fn PatternScheduler::PatternScheduler(bpm~ : Double, ctx~ : @dsp.DspContext, mapper? : ControlMapper) -> Self
 pub fn PatternScheduler::active_note_count(Self) -> Int
+pub fn PatternScheduler::current_block(Self) -> BlockFrame
 pub fn PatternScheduler::expire_notes(Self, @voice.BoundVoicePool, @pattern.TimeSpan) -> Unit
 pub fn PatternScheduler::new(bpm~ : Double, ctx~ : @dsp.DspContext, mapper? : ControlMapper) -> Self
 pub fn PatternScheduler::process_block(Self, @pattern.Pat[@pattern.ControlMap], @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::process_events(Self, Array[@pattern.Event[@pattern.ControlMap]], @pattern.TimeSpan, @voice.BoundVoicePool) -> Unit
+pub fn PatternScheduler::process_section_block(Self, @song.Section[@pattern.ControlMap], @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::push_active_note(Self, @voice.VoiceHandle, @pattern.Rational) -> Unit
 pub fn PatternScheduler::sample_counter(Self) -> Int64
 pub fn PatternScheduler::set_bpm(Self, Double) -> Unit

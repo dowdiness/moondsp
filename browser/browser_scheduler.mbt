@@ -354,12 +354,12 @@ fn route_matches(
 ) -> Bool {
   match selector {
     RouteSound(sound_code) =>
-      match cm.0.get("sound") {
+      match cm.get("sound") {
         Some(v) => v == sound_code
         None => false
       }
     RouteSynth =>
-      match cm.0.get("note") {
+      match cm.get("note") {
         Some(_) => true
         None => false
       }

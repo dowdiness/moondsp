@@ -21,6 +21,7 @@ remains open for native targets such as CLAP plugins.
 | `dowdiness/moondsp/voice` | `voice/` | Polyphonic voice pool with priority stealing |
 | `dowdiness/moondsp/pattern` | `pattern/` | Standalone pattern engine (rational time, combinators, control maps) — zero dep on the DSP layers |
 | `dowdiness/moondsp/mini` | `mini/` | Mini-notation parser: text → `Pat[ControlMap]` (e.g. `s("bd sd hh sd").fast(2)`) |
+| `dowdiness/moondsp/song` | `song/` | Long-form section scaffold with identity `TimeScope`, between pattern and scheduler |
 | `dowdiness/moondsp/scheduler` | `scheduler/` | Pattern scheduler — bridges pattern engine to DSP voice pool |
 | `dowdiness/moondsp/browser` | `browser/` | AudioWorklet export wrapper with multi-pool drum routing |
 | `dowdiness/moondsp/browser_test` | `browser_test/` | Browser integration test wrapper |
@@ -39,7 +40,7 @@ remains open for native targets such as CLAP plugins.
 ## Commands
 
 ```bash
-moon check && moon test        # 632 tests
+moon check && moon test        # 664 tests
 moon build --target wasm-gc    # Browser WASM build
 moon run cmd/main              # CLI entry point
 ```

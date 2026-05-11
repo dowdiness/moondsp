@@ -80,6 +80,7 @@ graph/          Compiled graph runtime, topology editing, hot-swap, control bind
 voice/          Polyphonic voice pool with priority stealing
 pattern/        Pattern engine: rational time, combinators, control maps (standalone)
 mini/           Mini-notation parser: text → Pat[ControlMap]
+song/           Long-form section scaffold with identity TimeScope
 scheduler/      Pattern scheduler: bridges pattern events to voice pool
 browser/        AudioWorklet integration (wasm-gc/js exports)
 browser_test/   Browser-integration test wrapper

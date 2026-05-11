@@ -30,6 +30,13 @@ pub fn[A] stack(Array[Pat[A]]) -> Pat[A]
 
 // Types and methods
 pub struct ControlMap(Map[String, Double]) derive(@debug.Debug)
+pub fn ControlMap::each(Self, (String, Double) -> Unit) -> Unit
+pub fn ControlMap::empty() -> Self
+pub fn ControlMap::entries(Self) -> Map[String, Double]
+pub fn ControlMap::get(Self, String) -> Double?
+pub fn ControlMap::merge(Self, Self) -> Self
+pub fn ControlMap::set(Self, String, Double) -> Self
+pub fn ControlMap::single(String, Double) -> Self
 pub impl Show for ControlMap
 
 pub struct Event[A] {

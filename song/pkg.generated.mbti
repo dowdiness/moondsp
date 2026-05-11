@@ -1,0 +1,33 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp/song"
+
+import {
+  "dowdiness/moondsp/pattern",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct Section[A] {
+  // private fields
+}
+pub fn[A] Section::body(Self[A]) -> @pattern.Pat[A]
+pub fn[A] Section::from_pattern(name~ : String, body~ : @pattern.Pat[A]) -> Self[A]
+pub fn[A] Section::length_cycles(Self[A]) -> @pattern.Rational
+pub fn[A] Section::name(Self[A]) -> String
+pub fn[A] Section::new(name~ : String, length_cycles~ : @pattern.Rational, scope~ : TimeScope, body~ : @pattern.Pat[A]) -> Self[A]?
+pub fn[A] Section::scope(Self[A]) -> TimeScope
+
+pub struct TimeScope {
+  // private fields
+}
+pub fn TimeScope::identity() -> Self
+pub fn TimeScope::is_identity(Self) -> Bool
+pub fn TimeScope::new() -> Self
+
+// Type aliases
+
+// Traits
+

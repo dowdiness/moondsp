@@ -1,4 +1,16 @@
 ///|
+/// Audio-block frame derived from the scheduler clock.
+///
+/// `logical_arc` keeps the existing rational-cycle semantics; the sample range
+/// gives the future song layer a stable audio-time anchor without changing the
+/// current pattern scheduler behavior.
+pub struct BlockFrame {
+  sample_begin : Int64
+  sample_end : Int64
+  logical_arc : @pattern.TimeSpan
+}
+
+///|
 /// Tracks a sounding voice for gate-off scheduling.
 struct ActiveNote {
   handle : @moondsp.VoiceHandle
@@ -121,6 +133,23 @@ pub fn PatternScheduler::active_note_count(self : PatternScheduler) -> Int {
 }
 
 ///|
+/// Current block frame without advancing the scheduler clock.
+pub fn PatternScheduler::current_block(self : PatternScheduler) -> BlockFrame {
+  let sample_begin = self.sample_counter
+  let sample_end = sample_begin + self.ctx.block_size().to_int64()
+  {
+    sample_begin,
+    sample_end,
+    logical_arc: compute_arc(sample_begin, self.bpm, self.ctx),
+  }
+}
+
+///|
+fn PatternScheduler::advance_block(self : PatternScheduler) -> Unit {
+  self.sample_counter = self.sample_counter + self.ctx.block_size().to_int64()
+}
+
+///|
 /// Update tempo in-place. Active notes continue with existing gate-off times —
 /// those cycle positions simply arrive faster/slower with the new BPM.
 pub fn PatternScheduler::set_bpm(self : PatternScheduler, bpm : Double) -> Unit {
@@ -211,11 +240,10 @@ pub fn PatternScheduler::process_events(
         // reuse event arrays across calls. Building a fresh map avoids
         // mutating the original ControlMap. The ControlMapper transforms
         // values (e.g. MIDI→Hz) and extracts per-voice actions (e.g. pan).
-        let raw_controls = event.value.0
         let map : Map[String, Double] = {}
         let actions : Array[VoiceAction] = []
         let mapper = self.mapper
-        raw_controls.each(fn(k, v) {
+        event.value.each(fn(k, v) {
           match (mapper.voice_action)(k, v) {
             Some(action) => actions.push(action)
             None => ()
@@ -242,6 +270,42 @@ pub fn PatternScheduler::process_events(
 }
 
 ///|
+fn PatternScheduler::query_pattern_block(
+  self : PatternScheduler,
+  pat : @pattern.Pat[@pattern.ControlMap],
+  frame : BlockFrame,
+) -> Array[@pattern.Event[@pattern.ControlMap]] {
+  ignore(self)
+  pat.query(frame.logical_arc)
+}
+
+///|
+fn PatternScheduler::render_block(
+  self : PatternScheduler,
+  pool : @moondsp.BoundVoicePool,
+  left : @moondsp.AudioBuffer,
+  right : @moondsp.AudioBuffer,
+) -> Unit {
+  left.fill(0.0)
+  right.fill(0.0)
+  pool.process(self.ctx, left, right)
+}
+
+///|
+fn PatternScheduler::process_block_events(
+  self : PatternScheduler,
+  events : Array[@pattern.Event[@pattern.ControlMap]],
+  frame : BlockFrame,
+  pool : @moondsp.BoundVoicePool,
+  left : @moondsp.AudioBuffer,
+  right : @moondsp.AudioBuffer,
+) -> Unit {
+  self.process_events(events, frame.logical_arc, pool)
+  self.advance_block()
+  self.render_block(pool, left, right)
+}
+
+///|
 /// Main entry point: called once per audio block (128 samples at 48kHz).
 /// Computes the cycle-time arc, expires old notes, queries the pattern for
 /// new events, triggers voices, advances the sample counter, and renders.
@@ -252,14 +316,29 @@ pub fn PatternScheduler::process_block(
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
 ) -> Unit {
-  let arc = compute_arc(self.sample_counter, self.bpm, self.ctx)
-  self.expire_notes(pool, arc)
-  let events = pat.query(arc)
-  self.process_events(events, arc, pool)
-  self.sample_counter = self.sample_counter + self.ctx.block_size().to_int64()
-  left.fill(0.0)
-  right.fill(0.0)
-  pool.process(self.ctx, left, right)
+  let frame = self.current_block()
+  self.expire_notes(pool, frame.logical_arc)
+  let events = self.query_pattern_block(pat, frame)
+  self.process_block_events(events, frame, pool, left, right)
+}
+
+///|
+/// Section entry point with identity timing semantics.
+///
+/// This intentionally matches `process_block(section.body(), ...)` today. The
+/// separate method gives the song layer a stable scheduler boundary before
+/// groove or rubato changes event timing.
+pub fn PatternScheduler::process_section_block(
+  self : PatternScheduler,
+  section : @song.Section[@pattern.ControlMap],
+  pool : @moondsp.BoundVoicePool,
+  left : @moondsp.AudioBuffer,
+  right : @moondsp.AudioBuffer,
+) -> Unit {
+  let frame = self.current_block()
+  self.expire_notes(pool, frame.logical_arc)
+  let events = section.body().query(frame.logical_arc)
+  self.process_block_events(events, frame, pool, left, right)
 }
 
 ///|

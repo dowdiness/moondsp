@@ -52,6 +52,21 @@ test "merge_control right-biased on conflict" {
 }
 
 ///|
+test "ControlMap helpers preserve value semantics" {
+  let base = ControlMap::single("note", 60.0)
+  let with_cutoff = base.set("cutoff", 800.0)
+  assert_true(base.get("note") == Some(60.0))
+  assert_true(base.get("cutoff") is None)
+  assert_true(with_cutoff.get("note") == Some(60.0))
+  assert_true(with_cutoff.get("cutoff") == Some(800.0))
+  let replaced = with_cutoff.merge(ControlMap::single("note", 72.0))
+  assert_true(replaced.get("note") == Some(72.0))
+  let entries = replaced.entries()
+  entries["note"] = 12.0
+  assert_true(replaced.get("note") == Some(72.0))
+}
+
+///|
 test "jux(rev): event count and pan keys" {
   let pat = sequence([sound(36.0), sound(38.0)])
   let result = pat.jux(fn(p) { p.rev() })
