@@ -2,6 +2,7 @@
 package "dowdiness/moondsp/song"
 
 import {
+  "dowdiness/moondsp/identity",
   "dowdiness/moondsp/pattern",
   "moonbitlang/core/debug",
 }
@@ -21,6 +22,8 @@ pub(all) suberror SectionPatchError {
 pub(all) suberror SongBuildError {
   EmptySong
   DuplicateOccurrence(String)
+  DuplicateOccurrenceId(String)
+  InvalidOccurrenceId(String)
 } derive(Eq, @debug.Debug)
 
 // Types and methods
@@ -60,6 +63,7 @@ pub struct SectionOccurrence[A] {
   // private fields
 }
 pub fn[A] SectionOccurrence::end_(Self[A]) -> @pattern.Rational
+pub fn[A] SectionOccurrence::id(Self[A]) -> @identity.OccurrenceId
 pub fn[A] SectionOccurrence::name(Self[A]) -> String
 pub fn[A] SectionOccurrence::section(Self[A]) -> Section[A]
 pub fn[A] SectionOccurrence::span(Self[A]) -> @pattern.TimeSpan
@@ -79,6 +83,7 @@ pub fn[A] Song::Song(parts~ : Array[SongPart[A]]) -> Self[A] raise SongBuildErro
 pub fn[A] Song::duration(Self[A]) -> @pattern.Rational
 pub fn[A] Song::from_sections(Array[Section[A]]) -> Self[A] raise SongBuildError
 pub fn[A] Song::get_occurrence(Self[A], String) -> SectionOccurrence[A]?
+pub fn[A] Song::get_occurrence_by_id(Self[A], @identity.OccurrenceId) -> SectionOccurrence[A]?
 pub fn[A] Song::occurrence(Self[A], Int) -> SectionOccurrence[A]?
 pub fn[A] Song::occurrence_at(Self[A], @pattern.Rational) -> SectionOccurrence[A]?
 pub fn[A] Song::occurrence_count(Self[A]) -> Int
@@ -89,8 +94,10 @@ pub struct SongPart[A] {
   // private fields
 }
 pub fn[A] SongPart::SongPart(name~ : String, section~ : Section[A]) -> Self[A]
+pub fn[A] SongPart::id(Self[A]) -> @identity.OccurrenceId?
 pub fn[A] SongPart::name(Self[A]) -> String
 pub fn[A] SongPart::section(Self[A]) -> Section[A]
+pub fn[A] SongPart::with_id(id~ : @identity.OccurrenceId, name~ : String, section~ : Section[A]) -> Self[A]
 
 pub struct TimeScope {
   // private fields

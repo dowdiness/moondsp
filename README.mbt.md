@@ -78,6 +78,7 @@ Pattern Engine                    DSP Engine
 dsp/            DSP primitives, tagless algebra, pan math
 graph/          Compiled graph runtime, topology editing, hot-swap, control binding
 voice/          Polyphonic voice pool with priority stealing
+identity/       Stable ID wrappers and revision tokens for incremental editing
 pattern/        Pattern engine: rational time, combinators, control maps (standalone)
 mini/           Mini-notation parser: text → Pat[ControlMap]
 song/           Long-form section scaffold with identity TimeScope
@@ -140,7 +141,7 @@ Start at the **[docs index](docs/README.md)**, which groups material by audience
 | 3 — Voice management | Complete | 32+ voice pool with priority stealing and stereo mixdown |
 | 4 — Pattern engine | Complete | Rational time, 8 combinators, ControlMap output |
 | 5 — Pattern × DSP | Complete | `scheduler/` + `mini/` wire pattern events to voice allocation |
-| 6 — incr integration | Planned | Incremental memoization for pattern/graph changes, after wrapper runtime-control result parity is settled |
+| 6 — incr integration | In progress | Stable identity groundwork for incremental pattern/song/graph edits |
 | 7+ — UI, native, collab | Planned | REPL, CLAP plugins, CRDT multi-user |
 
 ## License

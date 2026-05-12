@@ -1,3 +1,4 @@
 import {
+  "dowdiness/moondsp/identity" @identity,
   "dowdiness/moondsp/pattern" @pattern,
 }

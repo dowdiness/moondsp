@@ -1,6 +1,6 @@
 # Next Actions
 
-Updated: 2026-05-11
+Updated: 2026-05-12
 
 This is the active handoff list for future sessions. It should stay short and
 actionable; move completed design notes or implementation plans under
@@ -8,8 +8,9 @@ actionable; move completed design notes or implementation plans under
 
 ## Current State
 
-- `main` was last pushed through
-  `8d3ce3c feat: add topology edit failure reasons`.
+- `main` is currently at
+  `44ccb09 Merge pull request #30 from dowdiness/codex-song-layout-model`
+  (`558f644 feat(song): add contiguous song layout`).
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -30,22 +31,36 @@ actionable; move completed design notes or implementation plans under
     `InvalidEdit(index, reason)`, where `reason` is a stable
     `GraphTopologyEditError` for invalid indices, unsupported slots/templates,
     invalid delete ranges, and non-unary or non-single-consumer delete shapes.
-- Latest full verification for current `main`:
+- Song scaffold shipped so far:
+  - named section layering and patchable section variations.
+  - contiguous long-form layout with computed song-global occurrence spans and
+    occurrence querying.
+  - scheduler support for section and song structures in addition to raw
+    patterns.
+  - Phase 6 identity groundwork separates stable occurrence identity from
+    display labels through a dependency-free identity model.
+  - deferred song work remains explicit starts, gaps, overlaps, range
+    addressing, boundary fills, song mini-notation, non-identity time-scope
+    transforms, and efficient secondary lookup indexes.
+- Latest full verification for current `main` plus local Phase 6 identity
+  groundwork:
   - `rtk moon fmt`
   - `rtk moon info`
   - `rtk moon check`
   - `rtk moon test`
   - `rtk moon build --target wasm-gc`
-  - `rtk npm run test:browser`
   - `rtk git diff --check`
 
 ## Recommended Next Slice
 
-1. Start Phase 6 design.
+1. Implement the Phase 6 pattern authoring layer from
+   `docs/superpowers/specs/2026-05-12-phase6-incremental-playback-design.md`.
 
-   The Phase 6 design should focus on stable IDs, incremental invalidation
-   boundaries, and how pattern/DSP graph edits map onto existing result-typed
-   control, hot-swap, topology, and bound voice-pool APIs.
+   Start by adding an identity-bearing pattern authoring document over the
+   existing runtime query model. Keep node storage private, version edits, and
+   provide a lowering path that can later become an incremental cache boundary.
+   Do not change mini-notation or scheduler snapshot swapping in the first
+   pattern slice.
 
 ## Acceptance Checks For API-Hardening Slices
 

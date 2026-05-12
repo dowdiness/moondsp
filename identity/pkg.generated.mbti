@@ -1,0 +1,45 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp/identity"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+
+// Errors
+pub(all) suberror StableIdError {
+  EmptyId
+  InvalidId(String)
+} derive(Eq, @debug.Debug)
+
+// Types and methods
+pub struct GraphNodeId(String) derive(Eq, @debug.Debug)
+pub fn GraphNodeId::from_string(String) -> Self raise StableIdError
+pub fn GraphNodeId::value(Self) -> String
+
+pub struct OccurrenceId(String) derive(Eq, @debug.Debug)
+pub fn OccurrenceId::from_string(String) -> Self raise StableIdError
+pub fn OccurrenceId::value(Self) -> String
+
+pub struct PatternNodeId(String) derive(Eq, @debug.Debug)
+pub fn PatternNodeId::from_string(String) -> Self raise StableIdError
+pub fn PatternNodeId::value(Self) -> String
+
+pub struct Revision(Int64) derive(Eq, @debug.Debug)
+pub fn Revision::next(Self) -> Self
+pub fn Revision::value(Self) -> Int64
+pub fn Revision::zero() -> Self
+
+pub struct SectionId(String) derive(Eq, @debug.Debug)
+pub fn SectionId::from_string(String) -> Self raise StableIdError
+pub fn SectionId::value(Self) -> String
+
+pub struct SectionLayerId(String) derive(Eq, @debug.Debug)
+pub fn SectionLayerId::from_string(String) -> Self raise StableIdError
+pub fn SectionLayerId::value(Self) -> String
+
+// Type aliases
+
+// Traits
+
