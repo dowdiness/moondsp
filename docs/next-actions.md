@@ -9,8 +9,7 @@ actionable; move completed design notes or implementation plans under
 ## Current State
 
 - `main` is currently at
-  `44ccb09 Merge pull request #30 from dowdiness/codex-song-layout-model`
-  (`558f644 feat(song): add contiguous song layout`).
+  `fdfa12b Merge pull request #31 from dowdiness/codex/phase6-stable-identity`.
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -42,12 +41,23 @@ actionable; move completed design notes or implementation plans under
   - deferred song work remains explicit starts, gaps, overlaps, range
     addressing, boundary fills, song mini-notation, non-identity time-scope
     transforms, and efficient secondary lookup indexes.
-- Latest full verification for current `main` plus local Phase 6 identity
-  groundwork:
+- Pattern authoring groundwork shipped so far:
+  - identity-bearing authoring documents over the existing runtime query model.
+  - private node storage with stable node lookup helpers.
+  - revisioned edits for root changes, node replacement, and core
+    structure-building operations.
+  - aggregate document revisions derive from child revisions, with property
+    coverage for rebuilt sequence/stack roots over edited children.
+  - lowering snapshots back to the runtime query model.
+  - deferred pattern work remains full combinator-specific authoring coverage,
+    lowering caches, mini-notation ID reconciliation, and scheduler snapshot
+    swapping.
+- Latest full verification for current head plus local Phase 6 pattern
+  authoring groundwork:
   - `rtk moon fmt`
   - `rtk moon info`
   - `rtk moon check`
-  - `rtk moon test`
+  - `rtk moon test` (715 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
 
@@ -56,11 +66,11 @@ actionable; move completed design notes or implementation plans under
 1. Implement the Phase 6 pattern authoring layer from
    `docs/superpowers/specs/2026-05-12-phase6-incremental-playback-design.md`.
 
-   Start by adding an identity-bearing pattern authoring document over the
-   existing runtime query model. Keep node storage private, version edits, and
-   provide a lowering path that can later become an incremental cache boundary.
-   Do not change mini-notation or scheduler snapshot swapping in the first
-   pattern slice.
+   Continue from the first authoring-document slice by covering the remaining
+   pattern operations as explicit authoring nodes and adding the first lowering
+   cache boundary. Keep mini-notation reconciliation and scheduler snapshot
+   swapping out of the next slice unless the cache boundary requires a small
+   integration test.
 
 ## Acceptance Checks For API-Hardening Slices
 

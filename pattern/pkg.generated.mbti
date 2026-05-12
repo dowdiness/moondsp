@@ -2,6 +2,7 @@
 package "dowdiness/moondsp/pattern"
 
 import {
+  "dowdiness/moondsp/identity",
   "moonbitlang/core/debug",
 }
 
@@ -27,6 +28,11 @@ pub fn sound(Double) -> Pat[ControlMap]
 pub fn[A] stack(Array[Pat[A]]) -> Pat[A]
 
 // Errors
+pub(all) suberror PatternDocError {
+  MissingNode(String)
+  DuplicateNodeId(String)
+  EmptyPatternDocs
+} derive(Eq, @debug.Debug)
 
 // Types and methods
 pub struct ControlMap(Map[String, Double]) derive(@debug.Debug)
@@ -60,6 +66,37 @@ pub fn[A] Pat::query(Self[A], TimeSpan) -> Array[Event[A]]
 pub fn[A] Pat::rev(Self[A]) -> Self[A]
 pub fn[A] Pat::silence() -> Self[A]
 pub fn[A] Pat::slow(Self[A], Rational) -> Self[A]
+
+pub struct PatternDoc[A] {
+  // private fields
+}
+pub fn[A] PatternDoc::contains_node(Self[A], @identity.PatternNodeId) -> Bool
+pub fn[A] PatternDoc::fast(Self[A], id~ : @identity.PatternNodeId, factor~ : Rational) -> Self[A] raise PatternDocError
+pub fn[A] PatternDoc::from_pattern(id~ : @identity.PatternNodeId, pat~ : Pat[A]) -> Self[A]
+pub fn[A] PatternDoc::lower(Self[A]) -> PatternSnapshot[A] raise PatternDocError
+pub fn[A] PatternDoc::node_count(Self[A]) -> Int
+pub fn[A] PatternDoc::pure(id~ : @identity.PatternNodeId, value~ : A) -> Self[A]
+pub fn[A] PatternDoc::replace_with_pattern(Self[A], id~ : @identity.PatternNodeId, pat~ : Pat[A]) -> Self[A] raise PatternDocError
+pub fn[A] PatternDoc::replace_with_pure(Self[A], id~ : @identity.PatternNodeId, value~ : A) -> Self[A] raise PatternDocError
+pub fn[A] PatternDoc::replace_with_silence(Self[A], id~ : @identity.PatternNodeId) -> Self[A] raise PatternDocError
+pub fn[A] PatternDoc::rev(Self[A], id~ : @identity.PatternNodeId) -> Self[A] raise PatternDocError
+pub fn[A] PatternDoc::revision(Self[A]) -> @identity.Revision
+pub fn[A] PatternDoc::root(Self[A]) -> @identity.PatternNodeId
+pub fn[A] PatternDoc::sequence(id~ : @identity.PatternNodeId, docs~ : Array[Self[A]]) -> Self[A] raise PatternDocError
+pub fn[A] PatternDoc::silence(id~ : @identity.PatternNodeId) -> Self[A]
+pub fn[A] PatternDoc::slow(Self[A], id~ : @identity.PatternNodeId, factor~ : Rational) -> Self[A] raise PatternDocError
+pub fn[A] PatternDoc::stack(id~ : @identity.PatternNodeId, docs~ : Array[Self[A]]) -> Self[A] raise PatternDocError
+pub fn[A] PatternDoc::with_root(Self[A], root~ : @identity.PatternNodeId) -> Self[A] raise PatternDocError
+
+type PatternDocNode[A]
+
+pub struct PatternSnapshot[A] {
+  // private fields
+}
+pub fn[A] PatternSnapshot::pat(Self[A]) -> Pat[A]
+pub fn[A] PatternSnapshot::query(Self[A], TimeSpan) -> Array[Event[A]]
+pub fn[A] PatternSnapshot::revision(Self[A]) -> @identity.Revision
+pub fn[A] PatternSnapshot::root(Self[A]) -> @identity.PatternNodeId
 
 pub struct Rational {
   num : Int64

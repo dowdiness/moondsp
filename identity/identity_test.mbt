@@ -17,6 +17,14 @@ test "Revision starts at zero and increments" {
 }
 
 ///|
+test "Revision::max keeps the newer token" {
+  let zero = Revision::zero()
+  let one = zero.next()
+  assert_eq(zero.max(one).value(), 1L)
+  assert_eq(one.max(zero).value(), 1L)
+}
+
+///|
 test "stable IDs accept portable authoring strings" {
   let pattern = try? PatternNodeId::from_string("pat:intro_1")
   let section = try? SectionId::from_string("section.intro")
