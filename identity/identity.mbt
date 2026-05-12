@@ -5,21 +5,33 @@ pub(all) suberror StableIdError {
 } derive(Eq, Debug)
 
 ///|
-pub struct Revision(Int64) derive(Eq, Debug)
+pub struct Revision {
+  priv value : Int64
+  priv fingerprint : Int64
+} derive(Eq, Debug)
 
 ///|
 pub fn Revision::zero() -> Revision {
-  Revision(0L)
+  { value: 0L, fingerprint: 0L }
 }
 
 ///|
 pub fn Revision::next(self : Revision) -> Revision {
-  Revision(self.0 + 1L)
+  let modulus = 2147483629L
+  let multiplier = 131071L
+  {
+    value: self.value + 1L,
+    fingerprint: (self.fingerprint % modulus * multiplier + 1L) % modulus,
+  }
 }
 
 ///|
 pub fn Revision::max(self : Revision, other : Revision) -> Revision {
-  if self.0 >= other.0 {
+  if self.value > other.value {
+    self
+  } else if self.value < other.value {
+    other
+  } else if self.fingerprint >= other.fingerprint {
     self
   } else {
     other
@@ -27,8 +39,25 @@ pub fn Revision::max(self : Revision, other : Revision) -> Revision {
 }
 
 ///|
+pub fn Revision::combine(self : Revision, other : Revision) -> Revision {
+  let modulus = 2147483647L
+  let multiplier = 65537L
+  let fingerprint_modulus = 2147483629L
+  let fingerprint_multiplier = 131071L
+  {
+    value: (self.value % modulus * multiplier + other.value % modulus) % modulus,
+    fingerprint: (
+      self.fingerprint % fingerprint_modulus * fingerprint_multiplier +
+      other.fingerprint % fingerprint_modulus +
+      1L
+    ) %
+    fingerprint_modulus,
+  }
+}
+
+///|
 pub fn Revision::value(self : Revision) -> Int64 {
-  self.0
+  self.value
 }
 
 ///|

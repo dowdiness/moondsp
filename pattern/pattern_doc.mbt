@@ -13,6 +13,16 @@ enum PatternDocNode[A] {
   Fast(@identity.PatternNodeId, Rational)
   Slow(@identity.PatternNodeId, Rational)
   Rev(@identity.PatternNodeId)
+  FilterMap(@identity.PatternNodeId, (A) -> A?)
+  Euclid(@identity.PatternNodeId, Int, Int, Int)
+  DegradeBy(@identity.PatternNodeId, Double, Int)
+  Every(@identity.PatternNodeId, Int, (Pat[A]) -> Pat[A])
+  Jux(@identity.PatternNodeId, (Pat[A]) -> Pat[A])
+  MergeControl(
+    @identity.PatternNodeId,
+    @identity.PatternNodeId,
+    (Pat[A], Pat[A]) -> Pat[A]
+  )
   Sequence(Array[@identity.PatternNodeId])
   Stack(Array[@identity.PatternNodeId])
 }
@@ -26,6 +36,12 @@ fn[A] PatternDocNode::snapshot(self : PatternDocNode[A]) -> PatternDocNode[A] {
     Fast(child, factor) => Fast(child, factor)
     Slow(child, factor) => Slow(child, factor)
     Rev(child) => Rev(child)
+    FilterMap(child, f) => FilterMap(child, f)
+    Euclid(child, k, n, rotation) => Euclid(child, k, n, rotation)
+    DegradeBy(child, p, seed) => DegradeBy(child, p, seed)
+    Every(child, n, f) => Every(child, n, f)
+    Jux(child, f) => Jux(child, f)
+    MergeControl(left, right, f) => MergeControl(left, right, f)
     Sequence(children) => Sequence(children.copy())
     Stack(children) => Stack(children.copy())
   }
@@ -82,7 +98,7 @@ fn[A] aggregate_pattern_revision(
 ) -> @identity.Revision {
   let mut revision = @identity.Revision::zero()
   for doc in docs {
-    revision = revision.max(doc.revision)
+    revision = revision.combine(doc.revision)
   }
   revision.next()
 }
@@ -115,6 +131,15 @@ fn[A] lower_pattern_node(
         Fast(child, factor) => lower_pattern_node(nodes, child).fast(factor)
         Slow(child, factor) => lower_pattern_node(nodes, child).slow(factor)
         Rev(child) => lower_pattern_node(nodes, child).rev()
+        FilterMap(child, f) => lower_pattern_node(nodes, child).filter_map(f)
+        Euclid(child, k, n, rotation) =>
+          lower_pattern_node(nodes, child).euclid(k, n, rotation~)
+        DegradeBy(child, p, seed) =>
+          lower_pattern_node(nodes, child).degrade_by(p, seed~)
+        Every(child, n, f) => every(n, f, lower_pattern_node(nodes, child))
+        Jux(child, f) => f(lower_pattern_node(nodes, child))
+        MergeControl(left, right, f) =>
+          f(lower_pattern_node(nodes, left), lower_pattern_node(nodes, right))
         Sequence(children) => {
           let pats : Array[Pat[A]] = []
           for child in children {
@@ -324,6 +349,83 @@ pub fn[A] PatternDoc::rev(
   let nodes = copy_pattern_nodes(self.nodes)
   insert_pattern_node(nodes, id, Rev(self.root))
   { root: id, revision: self.revision.next(), nodes }
+}
+
+///|
+pub fn[A] PatternDoc::filter_map(
+  self : PatternDoc[A],
+  id~ : @identity.PatternNodeId,
+  f~ : (A) -> A?,
+) -> PatternDoc[A] raise PatternDocError {
+  let nodes = copy_pattern_nodes(self.nodes)
+  insert_pattern_node(nodes, id, FilterMap(self.root, f))
+  { root: id, revision: self.revision.next(), nodes }
+}
+
+///|
+pub fn[A] PatternDoc::euclid(
+  self : PatternDoc[A],
+  id~ : @identity.PatternNodeId,
+  k~ : Int,
+  n~ : Int,
+  rotation? : Int = 0,
+) -> PatternDoc[A] raise PatternDocError {
+  let nodes = copy_pattern_nodes(self.nodes)
+  insert_pattern_node(nodes, id, Euclid(self.root, k, n, rotation))
+  { root: id, revision: self.revision.next(), nodes }
+}
+
+///|
+pub fn[A] PatternDoc::degrade_by(
+  self : PatternDoc[A],
+  id~ : @identity.PatternNodeId,
+  p~ : Double,
+  seed? : Int = 42,
+) -> PatternDoc[A] raise PatternDocError {
+  let nodes = copy_pattern_nodes(self.nodes)
+  insert_pattern_node(nodes, id, DegradeBy(self.root, p, seed))
+  { root: id, revision: self.revision.next(), nodes }
+}
+
+///|
+pub fn[A] PatternDoc::every(
+  self : PatternDoc[A],
+  id~ : @identity.PatternNodeId,
+  n~ : Int,
+  f~ : (Pat[A]) -> Pat[A],
+) -> PatternDoc[A] raise PatternDocError {
+  let nodes = copy_pattern_nodes(self.nodes)
+  insert_pattern_node(nodes, id, Every(self.root, n, f))
+  { root: id, revision: self.revision.next(), nodes }
+}
+
+///|
+pub fn PatternDoc::jux(
+  self : PatternDoc[ControlMap],
+  id~ : @identity.PatternNodeId,
+  f~ : (Pat[ControlMap]) -> Pat[ControlMap],
+) -> PatternDoc[ControlMap] raise PatternDocError {
+  let nodes = copy_pattern_nodes(self.nodes)
+  insert_pattern_node(nodes, id, Jux(self.root, fn(p) { p.jux(f) }))
+  { root: id, revision: self.revision.next(), nodes }
+}
+
+///|
+pub fn PatternDoc::merge_control(
+  id~ : @identity.PatternNodeId,
+  left~ : PatternDoc[ControlMap],
+  right~ : PatternDoc[ControlMap],
+) -> PatternDoc[ControlMap] raise PatternDocError {
+  let docs = [left, right]
+  let nodes : Map[String, PatternDocNode[ControlMap]] = {}
+  merge_pattern_nodes(nodes, left.nodes)
+  merge_pattern_nodes(nodes, right.nodes)
+  insert_pattern_node(
+    nodes,
+    id,
+    MergeControl(left.root, right.root, merge_control),
+  )
+  { root: id, revision: aggregate_pattern_revision(docs), nodes }
 }
 
 ///|

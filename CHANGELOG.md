@@ -42,14 +42,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to keep the wasm-side parser the single source of truth. Includes
   default syntax highlighting and bracket auto-pairing.
 - **Phase 6 identity groundwork** — new dependency-free `identity/` package
-  with typed stable IDs, `Revision`, and revision comparison helpers; `song/`
-  now supports explicit occurrence IDs, stable-ID lookup, and ID-preserving
-  tests across reordering and section length changes.
+  with typed stable IDs, `Revision`, and revision comparison plus ordered
+  aggregation helpers; `song/` now supports explicit occurrence IDs, stable-ID
+  lookup, and ID-preserving tests across reordering and section length changes.
 - **Phase 6 pattern authoring groundwork** — `pattern/` now has an
   identity-bearing authoring document with private node storage, revisioned
   edits, stable node lookup helpers, and lowering back to the existing runtime
   pattern query model. Aggregate pattern documents derive their revision from
-  child revisions so changed child content invalidates parent snapshots.
+  an ordered child-revision mix so changed child content invalidates parent
+  snapshots. The authoring layer covers the runtime pattern operations,
+  including filtering, Euclidean rhythms, degradation, periodic transforms,
+  stereo split, and control-map merging.
 
 ### Changed
 
