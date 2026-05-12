@@ -27,7 +27,11 @@ pub fn Revision::next(self : Revision) -> Revision {
 
 ///|
 pub fn Revision::max(self : Revision, other : Revision) -> Revision {
-  if self.value >= other.value {
+  if self.value > other.value {
+    self
+  } else if self.value < other.value {
+    other
+  } else if self.fingerprint >= other.fingerprint {
     self
   } else {
     other

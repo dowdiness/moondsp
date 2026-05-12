@@ -42,6 +42,15 @@ test "Revision::combine preserves aggregate identity beyond compact value" {
 }
 
 ///|
+test "Revision::max breaks compact value ties deterministically" {
+  let zero = Revision::zero()
+  let aggregate = zero.combine(zero)
+  assert_eq(zero.value(), aggregate.value())
+  assert_true(zero.max(aggregate) == aggregate)
+  assert_true(aggregate.max(zero) == aggregate)
+}
+
+///|
 test "stable IDs accept portable authoring strings" {
   let pattern = try? PatternNodeId::from_string("pat:intro_1")
   let section = try? SectionId::from_string("section.intro")

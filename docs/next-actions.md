@@ -60,7 +60,7 @@ actionable; move completed design notes or implementation plans under
   - `rtk moon fmt`
   - `rtk moon info`
   - `rtk moon check`
-  - `rtk moon test` (726 passed)
+  - `rtk moon test` (727 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
 
