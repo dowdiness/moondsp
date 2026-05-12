@@ -1,6 +1,6 @@
 # Next Actions
 
-Updated: 2026-05-12
+Updated: 2026-05-13
 
 This is the active handoff list for future sessions. It should stay short and
 actionable; move completed design notes or implementation plans under
@@ -9,7 +9,10 @@ actionable; move completed design notes or implementation plans under
 ## Current State
 
 - `main` is currently at
-  `fdfa12b Merge pull request #31 from dowdiness/codex/phase6-stable-identity`.
+  `f48a4bc Merge pull request #32 from dowdiness/codex/phase6-pattern-authoring`.
+- PR #33 (`codex/phase6-pattern-cache`) is open, not draft, mergeable, and
+  clean against `main` at head `16788ed Stabilize revision max tie handling`;
+  5/5 GitHub checks pass and the CodeRabbit thread is resolved.
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -41,22 +44,24 @@ actionable; move completed design notes or implementation plans under
   - deferred song work remains explicit starts, gaps, overlaps, range
     addressing, boundary fills, song mini-notation, non-identity time-scope
     transforms, and efficient secondary lookup indexes.
-- Pattern authoring groundwork shipped so far:
+- Pattern authoring groundwork shipped so far on `main`:
   - identity-bearing authoring documents over the existing runtime query model.
   - private node storage with stable node lookup helpers.
   - revisioned edits for root changes, node replacement, and core
     structure-building operations.
+  - lowering snapshots back to the runtime query model.
+- PR #33 extends the pattern authoring groundwork with:
   - aggregate document revisions derive from an ordered child-revision mix,
     with coverage for rebuilt sequence/stack roots, mixed-revision merged
     inputs, and shifted child-revision aliases.
+  - `Revision::max` breaks equal compact-value ties deterministically by
+    comparing the private fingerprint.
   - explicit authoring nodes cover the runtime operations, including filtering,
     Euclidean rhythms, degradation, periodic transforms, stereo split, and
     control-map merging.
-  - lowering snapshots back to the runtime query model.
   - deferred pattern work remains lowering caches, mini-notation ID
     reconciliation, and scheduler snapshot swapping.
-- Latest full verification for current head plus local Phase 6 pattern
-  authoring groundwork:
+- Latest full local verification for PR #33 head `16788ed`:
   - `rtk moon fmt`
   - `rtk moon info`
   - `rtk moon check`
@@ -66,7 +71,9 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Implement the Phase 6 pattern authoring layer from
+1. Merge PR #33.
+
+2. Implement the first Phase 6 lowering cache boundary from
    `docs/superpowers/specs/2026-05-12-phase6-incremental-playback-design.md`.
 
    Continue from the explicit-node slice by adding the first lowering cache
