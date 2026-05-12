@@ -451,8 +451,10 @@ test for pattern and graph IDs without changing mini-notation or browser UI.
 - First slice shipped an authoring document with private node storage, stable
   node IDs, revisioned edits, and lowering snapshots back to the existing
   runtime query model.
+- The explicit-node slice covers the runtime pattern operations, including
+  filtering, Euclidean rhythms, degradation, periodic transforms, stereo split,
+  and control-map merging.
 - Add a lowering cache keyed by node ID and revision.
-- Cover the remaining runtime combinators as explicit authoring nodes.
 - Update mini-notation parsing to preserve IDs across text edits where a small
   reconciliation pass can prove syntactic continuity.
 

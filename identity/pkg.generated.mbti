@@ -26,7 +26,10 @@ pub struct PatternNodeId(String) derive(Eq, @debug.Debug)
 pub fn PatternNodeId::from_string(String) -> Self raise StableIdError
 pub fn PatternNodeId::value(Self) -> String
 
-pub struct Revision(Int64) derive(Eq, @debug.Debug)
+pub struct Revision {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn Revision::combine(Self, Self) -> Self
 pub fn Revision::max(Self, Self) -> Self
 pub fn Revision::next(Self) -> Self
 pub fn Revision::value(Self) -> Int64

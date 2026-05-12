@@ -46,18 +46,21 @@ actionable; move completed design notes or implementation plans under
   - private node storage with stable node lookup helpers.
   - revisioned edits for root changes, node replacement, and core
     structure-building operations.
-  - aggregate document revisions derive from child revisions, with property
-    coverage for rebuilt sequence/stack roots over edited children.
+  - aggregate document revisions derive from an ordered child-revision mix,
+    with coverage for rebuilt sequence/stack roots, mixed-revision merged
+    inputs, and shifted child-revision aliases.
+  - explicit authoring nodes cover the runtime operations, including filtering,
+    Euclidean rhythms, degradation, periodic transforms, stereo split, and
+    control-map merging.
   - lowering snapshots back to the runtime query model.
-  - deferred pattern work remains full combinator-specific authoring coverage,
-    lowering caches, mini-notation ID reconciliation, and scheduler snapshot
-    swapping.
+  - deferred pattern work remains lowering caches, mini-notation ID
+    reconciliation, and scheduler snapshot swapping.
 - Latest full verification for current head plus local Phase 6 pattern
   authoring groundwork:
   - `rtk moon fmt`
   - `rtk moon info`
   - `rtk moon check`
-  - `rtk moon test` (715 passed)
+  - `rtk moon test` (726 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
 
@@ -66,11 +69,10 @@ actionable; move completed design notes or implementation plans under
 1. Implement the Phase 6 pattern authoring layer from
    `docs/superpowers/specs/2026-05-12-phase6-incremental-playback-design.md`.
 
-   Continue from the first authoring-document slice by covering the remaining
-   pattern operations as explicit authoring nodes and adding the first lowering
-   cache boundary. Keep mini-notation reconciliation and scheduler snapshot
-   swapping out of the next slice unless the cache boundary requires a small
-   integration test.
+   Continue from the explicit-node slice by adding the first lowering cache
+   boundary. Keep mini-notation reconciliation and scheduler snapshot swapping
+   out of the next slice unless the cache boundary requires a small integration
+   test.
 
 ## Acceptance Checks For API-Hardening Slices
 

@@ -71,9 +71,15 @@ pub struct PatternDoc[A] {
   // private fields
 }
 pub fn[A] PatternDoc::contains_node(Self[A], @identity.PatternNodeId) -> Bool
+pub fn[A] PatternDoc::degrade_by(Self[A], id~ : @identity.PatternNodeId, p~ : Double, seed? : Int) -> Self[A] raise PatternDocError
+pub fn[A] PatternDoc::euclid(Self[A], id~ : @identity.PatternNodeId, k~ : Int, n~ : Int, rotation? : Int) -> Self[A] raise PatternDocError
+pub fn[A] PatternDoc::every(Self[A], id~ : @identity.PatternNodeId, n~ : Int, f~ : (Pat[A]) -> Pat[A]) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::fast(Self[A], id~ : @identity.PatternNodeId, factor~ : Rational) -> Self[A] raise PatternDocError
+pub fn[A] PatternDoc::filter_map(Self[A], id~ : @identity.PatternNodeId, f~ : (A) -> A?) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::from_pattern(id~ : @identity.PatternNodeId, pat~ : Pat[A]) -> Self[A]
+pub fn PatternDoc::jux(Self[ControlMap], id~ : @identity.PatternNodeId, f~ : (Pat[ControlMap]) -> Pat[ControlMap]) -> Self[ControlMap] raise PatternDocError
 pub fn[A] PatternDoc::lower(Self[A]) -> PatternSnapshot[A] raise PatternDocError
+pub fn PatternDoc::merge_control(id~ : @identity.PatternNodeId, left~ : Self[ControlMap], right~ : Self[ControlMap]) -> Self[ControlMap] raise PatternDocError
 pub fn[A] PatternDoc::node_count(Self[A]) -> Int
 pub fn[A] PatternDoc::pure(id~ : @identity.PatternNodeId, value~ : A) -> Self[A]
 pub fn[A] PatternDoc::replace_with_pattern(Self[A], id~ : @identity.PatternNodeId, pat~ : Pat[A]) -> Self[A] raise PatternDocError
