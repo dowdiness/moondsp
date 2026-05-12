@@ -26,3 +26,4 @@ shipped plan or spec.
 - [ADR-0006 — Scheduler note expiry uses performance time](0006-scheduler-performance-time-expiry.md)
 - [ADR-0007 — ControlMap keeps a map-backed accessor surface](0007-control-map-accessor-surface.md)
 - [ADR-0008 — Contiguous song layout with computed occurrences](0008-contiguous-song-layout.md)
+- [ADR-0009 — Stable identity groundwork for Phase 6](0009-stable-identity-groundwork.md)

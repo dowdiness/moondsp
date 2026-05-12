@@ -1,4 +1,7 @@
 ///|
+using @identity {type OccurrenceId}
+
+///|
 using @song {type Song, type SongBuildError, type SongPart}
 
 ///|
@@ -46,6 +49,15 @@ fn make_song(
 }
 
 ///|
+fn occurrence_id(value : String) -> OccurrenceId {
+  let result = try? OccurrenceId::from_string(value)
+  match result {
+    Ok(id) => id
+    Err(_) => abort("occurrence id creation failed")
+  }
+}
+
+///|
 test "Song constructor computes contiguous duration and occurrences" {
   let intro = make_section("intro", @pattern.Rational::from_int(1), 60.0)
   let verse = make_section("verse", @pattern.Rational::from_int(2), 62.0)
@@ -60,6 +72,7 @@ test "Song constructor computes contiguous duration and occurrences" {
       assert_true(occurrence.start() == @pattern.Rational::from_int(1))
       assert_true(occurrence.end_() == @pattern.Rational::from_int(3))
       assert_eq(occurrence.section().name(), "verse")
+      assert_eq(occurrence.id().value(), "verse1")
     }
     None => abort("expected verse1 occurrence")
   }
@@ -89,6 +102,30 @@ test "Song constructor rejects duplicate occurrence names" {
 }
 
 ///|
+test "Song constructor rejects occurrence names that cannot seed IDs" {
+  let section = make_section("verse", @pattern.Rational::from_int(1), 60.0)
+  let result = try? Song(parts=[SongPart(name="verse one", section~)])
+  match result {
+    Err(SongBuildError::InvalidOccurrenceId("verse one")) => ()
+    _ => assert_true(false)
+  }
+}
+
+///|
+test "Song constructor rejects duplicate explicit occurrence IDs" {
+  let section = make_section("verse", @pattern.Rational::from_int(1), 60.0)
+  let id = occurrence_id("verse:shared")
+  let result = try? Song(parts=[
+    SongPart::with_id(id~, name="verse one", section~),
+    SongPart::with_id(id~, name="verse two", section~),
+  ])
+  match result {
+    Err(SongBuildError::DuplicateOccurrenceId("verse:shared")) => ()
+    _ => assert_true(false)
+  }
+}
+
+///|
 test "Song::from_sections uses section names as occurrence names" {
   let intro = make_section("intro", @pattern.Rational::from_int(1), 60.0)
   let chorus = make_section("chorus", @pattern.Rational::from_int(1), 64.0)
@@ -100,6 +137,20 @@ test "Song::from_sections uses section names as occurrence names" {
   assert_true(song.duration() == @pattern.Rational::from_int(2))
   assert_true(song.get_occurrence("intro") is Some(_))
   assert_true(song.get_occurrence("chorus") is Some(_))
+}
+
+///|
+test "Song supports occurrence lookup by stable ID" {
+  let verse = make_section("verse", @pattern.Rational::from_int(1), 60.0)
+  let id = occurrence_id("verse:1")
+  let song = make_song([SongPart::with_id(id~, name="Verse 1", section=verse)])
+  match song.get_occurrence_by_id(id) {
+    Some(occurrence) => {
+      assert_eq(occurrence.id().value(), "verse:1")
+      assert_eq(occurrence.name(), "Verse 1")
+    }
+    None => abort("expected occurrence by ID")
+  }
 }
 
 ///|
@@ -121,6 +172,63 @@ test "Song::occurrence_at uses half-open occurrence boundaries" {
   match song.occurrence_at(@pattern.Rational::from_int(3)) {
     None => ()
     Some(_) => assert_true(false)
+  }
+}
+
+///|
+test "Song keeps explicit occurrence IDs across reordering" {
+  let verse = make_section("verse", @pattern.Rational::from_int(1), 60.0)
+  let chorus = make_section("chorus", @pattern.Rational::from_int(1), 64.0)
+  let verse_id = occurrence_id("verse:1")
+  let chorus_id = occurrence_id("chorus:1")
+  let original = make_song([
+    SongPart::with_id(id=verse_id, name="Verse 1", section=verse),
+    SongPart::with_id(id=chorus_id, name="Chorus 1", section=chorus),
+  ])
+  let reordered = make_song([
+    SongPart::with_id(id=chorus_id, name="Chorus 1", section=chorus),
+    SongPart::with_id(id=verse_id, name="Verse 1", section=verse),
+  ])
+  match
+    (
+      original.get_occurrence_by_id(verse_id),
+      reordered.get_occurrence_by_id(verse_id),
+    ) {
+    (Some(before), Some(after)) => {
+      assert_eq(before.id().value(), after.id().value())
+      assert_true(before.start() == @pattern.Rational::from_int(0))
+      assert_true(after.start() == @pattern.Rational::from_int(1))
+    }
+    _ => abort("expected verse occurrence by ID")
+  }
+}
+
+///|
+test "Song keeps explicit occurrence IDs across section length changes" {
+  let verse_short = make_section("verse", @pattern.Rational::from_int(1), 60.0)
+  let verse_long = make_section("verse", @pattern.Rational::from_int(2), 60.0)
+  let chorus = make_section("chorus", @pattern.Rational::from_int(1), 64.0)
+  let verse_id = occurrence_id("verse:1")
+  let chorus_id = occurrence_id("chorus:1")
+  let short_layout = make_song([
+    SongPart::with_id(id=verse_id, name="Verse 1", section=verse_short),
+    SongPart::with_id(id=chorus_id, name="Chorus 1", section=chorus),
+  ])
+  let long_layout = make_song([
+    SongPart::with_id(id=verse_id, name="Verse 1", section=verse_long),
+    SongPart::with_id(id=chorus_id, name="Chorus 1", section=chorus),
+  ])
+  match
+    (
+      short_layout.get_occurrence_by_id(chorus_id),
+      long_layout.get_occurrence_by_id(chorus_id),
+    ) {
+    (Some(before), Some(after)) => {
+      assert_eq(before.id().value(), after.id().value())
+      assert_true(before.start() == @pattern.Rational::from_int(1))
+      assert_true(after.start() == @pattern.Rational::from_int(2))
+    }
+    _ => abort("expected chorus occurrence by ID")
   }
 }
 

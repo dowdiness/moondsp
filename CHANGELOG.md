@@ -41,6 +41,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   grammar for the outer surface; the inner mini-notation stays opaque
   to keep the wasm-side parser the single source of truth. Includes
   default syntax highlighting and bracket auto-pairing.
+- **Phase 6 identity groundwork** — new dependency-free `identity/` package
+  with typed stable IDs and `Revision`; `song/` now supports explicit
+  occurrence IDs, stable-ID lookup, and ID-preserving tests across reordering
+  and section length changes.
 
 ### Changed
 

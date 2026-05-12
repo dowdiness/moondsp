@@ -61,7 +61,9 @@ looks the way it does, and link back to the specific archived plan/spec
 for full context.
 
 - **[`superpowers/specs/`](superpowers/specs/)** — design specs for
-  in-flight work. Currently empty; shipped specs live under `archive/`.
+  in-flight work. Current:
+  [`2026-05-12-phase6-incremental-playback-design.md`](superpowers/specs/2026-05-12-phase6-incremental-playback-design.md).
+  Shipped specs live under `archive/`.
 - **[`superpowers/plans/`](superpowers/plans/)** — implementation plans
   for in-flight work. Currently empty; shipped plans live under `archive/`.
 - `superpowers/specs/archive/` and `superpowers/plans/archive/` — shipped

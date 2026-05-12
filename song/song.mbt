@@ -2,6 +2,8 @@
 pub(all) suberror SongBuildError {
   EmptySong
   DuplicateOccurrence(String)
+  DuplicateOccurrenceId(String)
+  InvalidOccurrenceId(String)
 } derive(Eq, Debug)
 
 ///|
@@ -10,6 +12,7 @@ pub(all) suberror SongBuildError {
 /// A `SongPart` names one placement of a reusable `Section`. Reusing the same
 /// section body multiple times is allowed by giving each part a distinct name.
 pub struct SongPart[A] {
+  priv id : @identity.OccurrenceId?
   priv name : String
   priv section : Section[A]
 }
@@ -19,7 +22,21 @@ pub fn[A] SongPart::SongPart(
   name~ : String,
   section~ : Section[A],
 ) -> SongPart[A] {
-  { name, section }
+  { id: None, name, section }
+}
+
+///|
+pub fn[A] SongPart::with_id(
+  id~ : @identity.OccurrenceId,
+  name~ : String,
+  section~ : Section[A],
+) -> SongPart[A] {
+  { id: Some(id), name, section }
+}
+
+///|
+pub fn[A] SongPart::id(self : SongPart[A]) -> @identity.OccurrenceId? {
+  self.id
 }
 
 ///|
@@ -35,6 +52,7 @@ pub fn[A] SongPart::section(self : SongPart[A]) -> Section[A] {
 ///|
 /// Computed placement of a section in song-global logical time.
 pub struct SectionOccurrence[A] {
+  priv id : @identity.OccurrenceId
   priv name : String
   priv section : Section[A]
   priv span : @pattern.TimeSpan
@@ -44,7 +62,14 @@ pub struct SectionOccurrence[A] {
 fn[A] SectionOccurrence::snapshot(
   self : SectionOccurrence[A],
 ) -> SectionOccurrence[A] {
-  { name: self.name, section: self.section, span: self.span }
+  { id: self.id, name: self.name, section: self.section, span: self.span }
+}
+
+///|
+pub fn[A] SectionOccurrence::id(
+  self : SectionOccurrence[A],
+) -> @identity.OccurrenceId {
+  self.id
 }
 
 ///|
@@ -85,20 +110,24 @@ pub fn[A] SectionOccurrence::end_(
 /// and `Pat`. Scheduler integration specializes it to `Song[ControlMap]`.
 pub struct Song[A] {
   priv occurrences : Array[SectionOccurrence[A]]
+  priv occurrence_index : Map[String, Int]
   priv duration : @pattern.Rational
 }
 
 ///|
-fn[A] occurrence_name_exists(
-  occurrences : Array[SectionOccurrence[A]],
-  name : String,
-) -> Bool {
-  for occurrence in occurrences {
-    if occurrence.name == name {
-      return true
+fn[A] occurrence_id_for_part(
+  part : SongPart[A],
+) -> @identity.OccurrenceId raise SongBuildError {
+  match part.id {
+    Some(id) => id
+    None => {
+      let result = try? @identity.OccurrenceId::from_string(part.name)
+      match result {
+        Ok(id) => id
+        Err(_) => raise InvalidOccurrenceId(part.name)
+      }
     }
   }
-  false
 }
 
 ///|
@@ -120,20 +149,30 @@ pub fn[A] Song::Song(
     raise EmptySong
   }
   let occurrences : Array[SectionOccurrence[A]] = []
+  let occurrence_index : Map[String, Int] = {}
+  let occurrence_names : Map[String, Bool] = {}
   let mut cursor = @pattern.Rational::from_int(0)
   for part in parts {
-    if occurrence_name_exists(occurrences, part.name) {
+    if occurrence_names.contains(part.name) {
       raise DuplicateOccurrence(part.name)
     }
+    let id = occurrence_id_for_part(part)
+    if occurrence_index.contains(id.value()) {
+      raise DuplicateOccurrenceId(id.value())
+    }
     let end_ = cursor + part.section.length_cycles()
+    let index = occurrences.length()
+    occurrence_index[id.value()] = index
+    occurrence_names[part.name] = true
     occurrences.push({
+      id,
       name: part.name,
       section: part.section,
       span: @pattern.TimeSpan::new(cursor, end_),
     })
     cursor = end_
   }
-  { occurrences, duration: cursor }
+  { occurrences, occurrence_index, duration: cursor }
 }
 
 ///|
@@ -197,6 +236,17 @@ pub fn[A] Song::get_occurrence(
     }
   }
   None
+}
+
+///|
+pub fn[A] Song::get_occurrence_by_id(
+  self : Song[A],
+  id : @identity.OccurrenceId,
+) -> SectionOccurrence[A]? {
+  match self.occurrence_index.get(id.value()) {
+    Some(index) => self.occurrence(index)
+    None => None
+  }
 }
 
 ///|
