@@ -1,7 +1,8 @@
 # Phase 6: Incremental Playback Edit Model - Design Spec
 
 **Date:** 2026-05-12
-**Status:** Draft; first identity/song slice implemented 2026-05-12
+**Status:** Draft; first identity/song slice implemented 2026-05-12; first
+pattern authoring slice implemented 2026-05-12
 **Related:**
 `docs/next-actions.md`,
 `docs/salat-engine-blueprint.md`,
@@ -447,9 +448,11 @@ test for pattern and graph IDs without changing mini-notation or browser UI.
 
 ### Pattern Authoring Layer
 
-- Add `PatternDoc[A]` with private node storage and stable `PatternNodeId`s.
-- Lower `PatternDoc[A]` to `Pat[A]` through a cache keyed by node ID and
-  revision.
+- First slice shipped an authoring document with private node storage, stable
+  node IDs, revisioned edits, and lowering snapshots back to the existing
+  runtime query model.
+- Add a lowering cache keyed by node ID and revision.
+- Cover the remaining runtime combinators as explicit authoring nodes.
 - Update mini-notation parsing to preserve IDs across text edits where a small
   reconciliation pass can prove syntactic continuity.
 

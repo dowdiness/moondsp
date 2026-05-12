@@ -18,6 +18,15 @@ pub fn Revision::next(self : Revision) -> Revision {
 }
 
 ///|
+pub fn Revision::max(self : Revision, other : Revision) -> Revision {
+  if self.0 >= other.0 {
+    self
+  } else {
+    other
+  }
+}
+
+///|
 pub fn Revision::value(self : Revision) -> Int64 {
   self.0
 }

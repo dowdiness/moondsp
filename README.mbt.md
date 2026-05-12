@@ -37,7 +37,7 @@ This compiles into an FM synthesis patch: a 2 Hz LFO sweeps a carrier between 20
 
 **Polyphonic voice pool** — 32+ simultaneous voices with priority-based stealing (idle > oldest releasing > oldest active), generation-tagged handles for safe note control, two-stage silence detection (ADSR idle AND output buffer silent), and per-voice equal-power pan mixed to stereo. No allocation during `process()`.
 
-**Pattern engine** — a standalone `pattern/` package implementing Strudel's core model: patterns are query functions over rational-time arcs, producing events with control maps. Eight combinators (`silence`, `pure`, `fast`, `slow`, `rev`, `sequence`, `stack`, `every`) compose into expressive rhythmic structures:
+**Pattern engine** — a standalone `pattern/` package implementing Strudel's core model: patterns are query functions over rational-time arcs, producing events with control maps. Combinators such as `silence`, `pure`, `fast`, `slow`, `rev`, `sequence`, `stack`, and `every` compose into expressive rhythmic structures:
 
 ```moonbit nocheck
 // C major triad played twice per cycle
@@ -45,6 +45,10 @@ sequence([note_name("c3"), note_name("e3"), note_name("g3")]).fast(Rational::fro
 ```
 
 Querying this over one cycle produces 6 events with exact rational time boundaries — no floating-point drift.
+
+For incremental editing, the pattern package also includes an identity-bearing
+authoring document that tracks stable node identities and revisions, then
+lowers back to the same runtime query model.
 
 **Mini-notation parser** — the `mini/` package turns a short text string into a `Pat[ControlMap]`, so you can write `s("bd sd hh sd")` or `note("60 64 67")`, combine sources with `stack(s("bd sd"), note("60 64"))`, and chain methods like `.fast(n)`, `.slow(n)`, `.rev()`, `.degradeBy(p)`, `.every(n, f)`, and `.jux(f)`. Inside the string, sequences support sub-groups (`[a b]`), comma-stacked layers, Euclidean rhythms (`bd(3,8)`), step replicate/stretch (`*n`, `/n`), and 50%-drop (`?`).
 
@@ -79,7 +83,7 @@ dsp/            DSP primitives, tagless algebra, pan math
 graph/          Compiled graph runtime, topology editing, hot-swap, control binding
 voice/          Polyphonic voice pool with priority stealing
 identity/       Stable ID wrappers and revision tokens for incremental editing
-pattern/        Pattern engine: rational time, combinators, control maps (standalone)
+pattern/        Pattern engine: rational time, combinators, control maps, authoring docs
 mini/           Mini-notation parser: text → Pat[ControlMap]
 song/           Long-form section scaffold with identity TimeScope
 scheduler/      Pattern scheduler: bridges pattern events to voice pool
@@ -141,7 +145,7 @@ Start at the **[docs index](docs/README.md)**, which groups material by audience
 | 3 — Voice management | Complete | 32+ voice pool with priority stealing and stereo mixdown |
 | 4 — Pattern engine | Complete | Rational time, 8 combinators, ControlMap output |
 | 5 — Pattern × DSP | Complete | `scheduler/` + `mini/` wire pattern events to voice allocation |
-| 6 — incr integration | In progress | Stable identity groundwork for incremental pattern/song/graph edits |
+| 6 — incr integration | In progress | Stable identity plus initial pattern/song authoring groundwork |
 | 7+ — UI, native, collab | Planned | REPL, CLAP plugins, CRDT multi-user |
 
 ## License

@@ -20,7 +20,7 @@ remains open for native targets such as CLAP plugins.
 | `dowdiness/moondsp/graph` | `graph/` | Compiled graph runtime (compile, optimize, topology edit, hot-swap, control binding) |
 | `dowdiness/moondsp/voice` | `voice/` | Polyphonic voice pool with priority stealing |
 | `dowdiness/moondsp/identity` | `identity/` | Dependency-free stable ID wrappers and revision tokens for incremental editing |
-| `dowdiness/moondsp/pattern` | `pattern/` | Standalone pattern engine (rational time, combinators, control maps) — zero dep on the DSP layers |
+| `dowdiness/moondsp/pattern` | `pattern/` | Standalone pattern engine (rational time, combinators, control maps, authoring docs) — zero dep on the DSP layers |
 | `dowdiness/moondsp/mini` | `mini/` | Mini-notation parser: text → `Pat[ControlMap]` (e.g. `s("bd sd hh sd").fast(2)`) |
 | `dowdiness/moondsp/song` | `song/` | Long-form section scaffold with identity `TimeScope`, between pattern and scheduler |
 | `dowdiness/moondsp/scheduler` | `scheduler/` | Pattern scheduler — bridges pattern engine to DSP voice pool |
@@ -41,7 +41,7 @@ remains open for native targets such as CLAP plugins.
 ## Commands
 
 ```bash
-moon check && moon test        # 697 tests
+moon check && moon test        # 715 tests
 moon build --target wasm-gc    # Browser WASM build
 moon run cmd/main              # CLI entry point
 ```
