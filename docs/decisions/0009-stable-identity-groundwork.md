@@ -16,36 +16,30 @@ identity. That is enough for static layout, but it is too fragile for future
 range addressing, rename operations, and incremental invalidation.
 
 The identity model also needs to serve future pattern and graph work. Putting
-shared ID types inside `song/` would force lower-level packages such as
-`pattern/` or `graph/` to depend on a higher-level song package, or to
-duplicate ID and revision conventions.
+shared identity conventions inside one higher-level authoring area would either
+force the lower-level layers to depend upward or encourage each layer to invent
+incompatible identity and revision rules.
 
 ## Decision
 
-Add a dependency-free `identity/` package containing:
+Introduce a small, dependency-free identity layer that all authoring packages
+can share without creating package cycles. It provides validated stable
+identities for authoring objects and revision tokens for future incremental
+invalidation.
 
-- `Revision`
-- `PatternNodeId`
-- `SectionId`
-- `SectionLayerId`
-- `OccurrenceId`
-- `GraphNodeId`
-- `StableIdError`
+Stable identities use a portable text representation. They reject empty values
+and characters outside the agreed authoring subset so serialized references,
+generated names, and user-authored references can share the same rules.
 
-Stable IDs are string wrappers with named constructors and `value()` accessors.
-They reject empty strings and characters outside a portable authoring subset:
-ASCII letters, digits, `_`, `-`, `.`, and `:`.
+Apply the first implementation slice to song occurrences. Occurrence identity
+is now separate from display labels, while compatibility paths continue to
+derive identity from simple labels where possible. Song construction validates
+identity uniqueness up front, so later lookup and invalidation logic can assume
+that occurrence identity is unambiguous.
 
-Use this package in `song/` for the first Phase 6 implementation slice:
-
-- `SongPart[A]` keeps the existing `SongPart(name~, section~)` constructor,
-  deriving `OccurrenceId` from the name for compatibility.
-- `SongPart::with_id(id~, name~, section~)` lets callers separate stable
-  identity from display names.
-- `SectionOccurrence[A]` exposes `id()`.
-- `Song[A]` keeps name lookup and adds `get_occurrence_by_id(...)`.
-- duplicate names still raise `DuplicateOccurrence`; duplicate explicit or
-  derived IDs raise `DuplicateOccurrenceId`.
+Detailed public API names and generated interface changes live in the Phase 6
+design spec, changelog, and generated package interfaces rather than this
+decision record.
 
 ## Consequences
 
@@ -53,7 +47,8 @@ Use this package in `song/` for the first Phase 6 implementation slice:
 
 - Phase 6 now has a shared identity vocabulary without introducing package
   cycles.
-- Existing song callers continue using `SongPart(name~, section~)`.
+- Existing song callers can keep using the simple construction path when labels
+  are valid stable identities.
 - Display names can contain spaces or other non-ID characters when callers use
   explicit IDs.
 - Occurrence lookup by stable ID survives reordering and section length
@@ -63,15 +58,15 @@ Use this package in `song/` for the first Phase 6 implementation slice:
 
 - The compatibility constructor now requires occurrence names to be valid ID
   strings because the name is used to seed the ID.
-- Public APIs now expose `identity/` types from `song/`, so downstream users
-  who adopt explicit IDs import one more package.
+- Downstream users who adopt explicit identities now work with the shared
+  identity layer directly.
 - Name lookup remains linear; only stable-ID lookup has an index in this slice.
 
 **Deferred**
 
-- Pattern authoring documents with stable `PatternNodeId`s.
-- Graph authoring/index maps with stable `GraphNodeId`s.
+- Pattern authoring documents with stable node identities.
+- Graph authoring and index maps with stable graph identities.
 - Scheduler snapshot swapping and no-retroactive edit commit behavior.
 - Efficient name/range indexes, explicit occurrence starts, gaps, overlaps,
   range addressing, boundary fills, song mini-notation, and non-identity
-  `TimeScope` behavior.
+  time-scope behavior.
