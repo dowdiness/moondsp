@@ -9,11 +9,9 @@ actionable; move completed design notes or implementation plans under
 ## Current State
 
 - `main` is currently at
-  `cd9b9fa [codex] Add mini-notation stable ID reconciliation (#36)`.
-- Branch `codex/phase6-graph-identity` starts the DSP graph identity mapping
-  slice from that merged head.
-- PR #37 is open and merge-ready at
-  `06e0959 fix(graph): expose identity docs from facade`.
+  `a793efc [codex] Add DSP graph stable identity mapping (#37)`.
+- PR #37 is merged:
+  https://github.com/dowdiness/moondsp/pull/37
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -91,7 +89,7 @@ actionable; move completed design notes or implementation plans under
     cache, token replacement preserves unaffected token IDs, insertion/removal
     keeps surviving token IDs, and changed tokens miss the cache while
     unchanged nodes hit.
-- DSP graph identity mapping on active branch:
+- DSP graph identity mapping shipped so far on `main`:
   - `GraphTemplateDoc` owns stable `GraphNodeId` authoring IDs, graph nodes,
     revision state, and a retired-ID set.
   - `GraphIndexMap` maps stable IDs to existing graph indices and builds
@@ -106,7 +104,7 @@ actionable; move completed design notes or implementation plans under
   - coverage proves control, binding, and compile mapping; duplicate ID
     rejection; replace/rewire ID preservation; single-node and chain
     insert/delete compaction; and retired-ID rejection.
-- Latest local verification for active branch:
+- Latest local verification for PR #37 before merge:
   - `rtk moon fmt`
   - `rtk moon info`
   - `rtk moon check`
@@ -125,10 +123,9 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Merge PR #37.
+1. Start a new branch from `main`.
 
-2. After PR #37 merges, start the next Phase 6 slice from `main` and update
-   this handoff with the merge SHA. Likely candidates are song explicit
+2. Choose the next Phase 6 slice. Likely candidates are song explicit
    starts/gaps/overlaps/range addressing or the next deferred song-layout
    boundary from the Phase 6 design.
 
