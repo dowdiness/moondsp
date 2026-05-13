@@ -276,6 +276,25 @@ pub fn[A] Section::body(self : Section[A]) -> @pattern.Pat[A] {
 }
 
 ///|
+/// Query the section body in section-local time with this section's
+/// `TimeScope` applied.
+///
+/// `Section::body()` intentionally exposes the raw unscoped pattern for
+/// structural callers. Playback and song layout should use this method so
+/// non-identity scopes can map event spans without changing occurrence layout.
+pub fn[A] Section::query(
+  self : Section[A],
+  arc : @pattern.TimeSpan,
+) -> Array[@pattern.Event[A]] {
+  let body = self.body.to_pattern()
+  if self.scope.is_identity() {
+    body.query(arc)
+  } else {
+    body.fast(self.scope.rate()).query(arc)
+  }
+}
+
+///|
 pub fn[A] Section::section_body(self : Section[A]) -> SectionBody[A] {
   self.body.snapshot()
 }

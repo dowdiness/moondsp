@@ -18,6 +18,10 @@ actionable; move completed design notes or implementation plans under
   https://github.com/dowdiness/moondsp/pull/39
 - PR #40 is merged:
   https://github.com/dowdiness/moondsp/pull/40
+- Active branch: `codex/phase6-song-time-scope-transforms`, based on
+  `2474a1e docs: mark song mini notation merged`.
+- PR #41 is open as a draft:
+  https://github.com/dowdiness/moondsp/pull/41
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -52,8 +56,8 @@ actionable; move completed design notes or implementation plans under
     spans while preserving existing occurrence identity and authoring order.
   - song mini-notation parses sections, parts, explicit starts, explicit
     occurrence IDs, gaps, overlaps, and fills.
-  - deferred song work remains non-identity time-scope transforms and efficient
-    secondary lookup indexes.
+  - deferred song work remains efficient secondary lookup indexes after the
+    active non-identity `TimeScope` branch.
 - Pattern authoring groundwork shipped so far on `main`:
   - identity-bearing authoring documents over the existing runtime query model.
   - private node storage with stable node lookup helpers.
@@ -112,6 +116,27 @@ actionable; move completed design notes or implementation plans under
   - coverage proves implicit sections/parts, exact rational starts and gaps,
     explicit overlaps with authoring order, boundary fills, explicit occurrence
     IDs, and unknown-section errors.
+- Active TimeScope transform branch:
+  - `TimeScope` now carries an exact body-cycles-per-section-cycle rate and
+    exposes identity, `at_rate`, `fast`, `slow`, and non-positive validation.
+  - `Section::query` applies the section scope while `Section::body` continues
+    to expose the raw unscoped pattern for structural callers.
+  - `Song::query` and `PatternScheduler::process_section_block` now route
+    through `Section::query`, so song and direct section playback observe the
+    same scope mapping.
+  - coverage proves fast/slow scope construction, invalid rate rejection,
+    scoped section query output, and song occurrence spans staying unchanged
+    while scoped events move inside those spans.
+- Latest local verification on `codex/phase6-song-time-scope-transforms`:
+  - `rtk moon fmt`
+  - `rtk moon info`
+  - `rtk moon check`
+  - `rtk moon test song` (37 passed)
+  - `rtk moon test scheduler` (33 passed)
+  - `rtk moon check --target all`
+  - `rtk moon test` (763 passed)
+  - `rtk moon build --target wasm-gc`
+  - `rtk git diff --check`
 - Latest local verification for PR #40 before merge:
   - `moon fmt`
   - `moon info`
@@ -193,10 +218,11 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Start a new branch from `main`.
+1. Review PR #41 and address any feedback:
+   https://github.com/dowdiness/moondsp/pull/41
 
-2. Recommended next Phase 6 slice: non-identity `TimeScope` transforms for
-   song sections. Keep efficient secondary lookup indexes queued after that.
+2. After the TimeScope branch merges, recommended next Phase 6 slice:
+   efficient secondary lookup indexes for song occurrence lookups.
 
 ## Acceptance Checks For API-Hardening Slices
 
