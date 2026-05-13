@@ -9,7 +9,7 @@ actionable; move completed design notes or implementation plans under
 ## Current State
 
 - `main` is currently at
-  `f836a2d feat(mini): parse song layout notation (#40)`.
+  `c80f01b [codex] Add song TimeScope transforms (#41)`.
 - PR #37 is merged:
   https://github.com/dowdiness/moondsp/pull/37
 - PR #38 is merged:
@@ -18,10 +18,10 @@ actionable; move completed design notes or implementation plans under
   https://github.com/dowdiness/moondsp/pull/39
 - PR #40 is merged:
   https://github.com/dowdiness/moondsp/pull/40
-- Active branch: `codex/phase6-song-time-scope-transforms`, based on
-  `2474a1e docs: mark song mini notation merged`.
-- PR #41 is open as a draft:
+- PR #41 is merged:
   https://github.com/dowdiness/moondsp/pull/41
+- Active branch: `codex/phase6-song-lookup-indexes`, based on
+  `c80f01b [codex] Add song TimeScope transforms (#41)`.
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -56,8 +56,10 @@ actionable; move completed design notes or implementation plans under
     spans while preserving existing occurrence identity and authoring order.
   - song mini-notation parses sections, parts, explicit starts, explicit
     occurrence IDs, gaps, overlaps, and fills.
-  - deferred song work remains efficient secondary lookup indexes after the
-    active non-identity `TimeScope` branch.
+  - non-identity `TimeScope` transforms apply section-local rate changes
+    through song and direct section playback.
+  - deferred song work is now efficient secondary lookup indexes on the
+    active branch.
 - Pattern authoring groundwork shipped so far on `main`:
   - identity-bearing authoring documents over the existing runtime query model.
   - private node storage with stable node lookup helpers.
@@ -116,7 +118,7 @@ actionable; move completed design notes or implementation plans under
   - coverage proves implicit sections/parts, exact rational starts and gaps,
     explicit overlaps with authoring order, boundary fills, explicit occurrence
     IDs, and unknown-section errors.
-- Active TimeScope transform branch:
+- TimeScope transforms shipped so far on `main`:
   - `TimeScope` now carries an exact body-cycles-per-section-cycle rate and
     exposes identity, `at_rate`, `fast`, `slow`, and non-positive validation.
   - `Section::query` applies the section scope while `Section::body` continues
@@ -127,7 +129,7 @@ actionable; move completed design notes or implementation plans under
   - coverage proves fast/slow scope construction, invalid rate rejection,
     scoped section query output, and song occurrence spans staying unchanged
     while scoped events move inside those spans.
-- Latest local verification on `codex/phase6-song-time-scope-transforms`:
+- Latest local verification for PR #41 before merge:
   - `rtk moon fmt`
   - `rtk moon info`
   - `rtk moon check`
@@ -135,6 +137,26 @@ actionable; move completed design notes or implementation plans under
   - `rtk moon test scheduler` (33 passed)
   - `rtk moon check --target all`
   - `rtk moon test` (763 passed)
+  - `rtk moon build --target wasm-gc`
+  - `rtk git diff --check`
+- Active song lookup-index branch:
+  - `Song` now keeps private secondary indexes for occurrence name, stable ID,
+    start time, and end time.
+  - point and range occurrence lookups bound candidate scans with the start/end
+    indexes, then return hits in authoring order to preserve overlap semantics.
+  - `Song::query`, `Song::gap_spans`, `Song::get_occurrence`, and
+    `Song::get_occurrence_by_id` now use the indexed paths without changing
+    the public song API surface.
+  - coverage proves timeline-sorted overlapping occurrences still return in
+    authoring order for `occurrence_at`, `occurrences_at`, and
+    `occurrences_intersecting`.
+- Latest local verification on `codex/phase6-song-lookup-indexes`:
+  - `rtk moon fmt`
+  - `rtk moon info`
+  - `rtk moon check`
+  - `rtk moon test song` (38 passed)
+  - `rtk moon check --target all`
+  - `rtk moon test` (764 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
 - Latest local verification for PR #40 before merge:
@@ -218,11 +240,10 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Review PR #41 and address any feedback:
-   https://github.com/dowdiness/moondsp/pull/41
+1. Review, commit, push, and open the PR for
+   `codex/phase6-song-lookup-indexes`.
 
-2. After the TimeScope branch merges, recommended next Phase 6 slice:
-   efficient secondary lookup indexes for song occurrence lookups.
+2. After the lookup-index branch merges, choose the next Phase 6 song slice.
 
 ## Acceptance Checks For API-Hardening Slices
 
