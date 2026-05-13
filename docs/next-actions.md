@@ -9,7 +9,7 @@ actionable; move completed design notes or implementation plans under
 ## Current State
 
 - `main` is currently at
-  `c80f01b [codex] Add song TimeScope transforms (#41)`.
+  `a68648f [codex] Index song occurrence lookups (#42)`.
 - PR #37 is merged:
   https://github.com/dowdiness/moondsp/pull/37
 - PR #38 is merged:
@@ -20,10 +20,10 @@ actionable; move completed design notes or implementation plans under
   https://github.com/dowdiness/moondsp/pull/40
 - PR #41 is merged:
   https://github.com/dowdiness/moondsp/pull/41
-- Active branch: `codex/phase6-song-lookup-indexes`, based on
-  `c80f01b [codex] Add song TimeScope transforms (#41)`.
-- PR #42 is open as a draft:
+- PR #42 is merged:
   https://github.com/dowdiness/moondsp/pull/42
+- Active branch: `codex/phase6-song-section-identity`, based on
+  `a68648f [codex] Index song occurrence lookups (#42)`.
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -60,8 +60,10 @@ actionable; move completed design notes or implementation plans under
     occurrence IDs, gaps, overlaps, and fills.
   - non-identity `TimeScope` transforms apply section-local rate changes
     through song and direct section playback.
-  - deferred song work is now efficient secondary lookup indexes on the
-    active branch.
+  - efficient secondary lookup indexes now cover occurrence name, stable ID,
+    start time, and end time while preserving authoring-order overlap results.
+  - deferred song work is now section/layer identity and revision boundaries
+    on the active branch.
 - Pattern authoring groundwork shipped so far on `main`:
   - identity-bearing authoring documents over the existing runtime query model.
   - private node storage with stable node lookup helpers.
@@ -141,7 +143,7 @@ actionable; move completed design notes or implementation plans under
   - `rtk moon test` (763 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
-- Active song lookup-index branch:
+- Song lookup indexes shipped so far on `main`:
   - `Song` now keeps private secondary indexes for occurrence name, stable ID,
     start time, and end time.
   - point and range occurrence lookups bound candidate scans with the start/end
@@ -152,7 +154,7 @@ actionable; move completed design notes or implementation plans under
   - coverage proves timeline-sorted overlapping occurrences still return in
     authoring order for `occurrence_at`, `occurrences_at`, and
     `occurrences_intersecting`.
-- Latest local verification on `codex/phase6-song-lookup-indexes`:
+- Latest local verification for PR #42 before merge:
   - `rtk moon fmt`
   - `rtk moon info`
   - `rtk moon check`
@@ -161,6 +163,14 @@ actionable; move completed design notes or implementation plans under
   - `rtk moon test` (764 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
+- Active section/layer identity branch:
+  - planned work: add stable identity and revision boundaries for reusable
+    song section definitions and section layers.
+  - keep existing `Section`, `SectionLayer`, and `Song` constructors usable
+    while introducing identity-bearing adapters or documents for incremental
+    authoring.
+  - preserve current playback/query behavior; the goal is stable edit identity
+    and invalidation metadata, not new layout semantics.
 - Latest local verification for PR #40 before merge:
   - `moon fmt`
   - `moon info`
@@ -242,10 +252,12 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Review PR #42 and address any feedback:
-   https://github.com/dowdiness/moondsp/pull/42
+1. Implement section/layer identity and revision groundwork on
+   `codex/phase6-song-section-identity`.
 
-2. After the lookup-index branch merges, choose the next Phase 6 song slice.
+2. Prove section/layer IDs survive harmless display-name edits and that changed
+   section/layer content advances the appropriate revision boundary without
+   changing occurrence IDs or song layout unless section length/scope changes.
 
 ## Acceptance Checks For API-Hardening Slices
 
