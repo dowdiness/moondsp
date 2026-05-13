@@ -14,6 +14,18 @@ pub(all) suberror SectionBuildError {
   NonPositiveLength
 } derive(Eq, @debug.Debug)
 
+pub(all) suberror SectionDocBuildError {
+  NonPositiveSectionLength
+  EmptyLayers
+  DuplicateLayerId(String)
+  DuplicateLayerName(String)
+} derive(Eq, @debug.Debug)
+
+pub(all) suberror SectionDocEditError {
+  MissingLayerId(String)
+  DuplicateLayerName(String)
+} derive(Eq, @debug.Debug)
+
 pub(all) suberror SectionPatchError {
   MissingLayer(String)
   DuplicateLayer(String)
@@ -57,12 +69,53 @@ pub fn[A] SectionBody::layers(Array[SectionLayer[A]]) -> Self[A]
 pub fn[A] SectionBody::single(@pattern.Pat[A]) -> Self[A]
 pub fn[A] SectionBody::to_pattern(Self[A]) -> @pattern.Pat[A]
 
+pub struct SectionDoc[A] {
+  // private fields
+}
+pub fn[A] SectionDoc::SectionDoc(id~ : @identity.SectionId, name~ : String, length_cycles~ : @pattern.Rational, scope~ : TimeScope, body~ : SectionDocBody[A]) -> Self[A] raise SectionDocBuildError
+pub fn[A] SectionDoc::body(Self[A]) -> SectionDocBody[A]
+pub fn[A] SectionDoc::get_layer(Self[A], @identity.SectionLayerId) -> SectionLayerDoc[A]?
+pub fn[A] SectionDoc::id(Self[A]) -> @identity.SectionId
+pub fn[A] SectionDoc::layer_count(Self[A]) -> Int
+pub fn[A] SectionDoc::length_cycles(Self[A]) -> @pattern.Rational
+pub fn[A] SectionDoc::name(Self[A]) -> String
+pub fn[A] SectionDoc::rename(Self[A], name~ : String) -> Self[A]
+pub fn[A] SectionDoc::rename_layer(Self[A], @identity.SectionLayerId, name~ : String) -> Self[A] raise SectionDocEditError
+pub fn[A] SectionDoc::replace_layer_body(Self[A], @identity.SectionLayerId, body~ : @pattern.Pat[A]) -> Self[A] raise SectionDocEditError
+pub fn[A] SectionDoc::revision(Self[A]) -> @identity.Revision
+pub fn[A] SectionDoc::scope(Self[A]) -> TimeScope
+pub fn[A] SectionDoc::single(id~ : @identity.SectionId, name~ : String, length_cycles~ : @pattern.Rational, scope~ : TimeScope, layer_id~ : @identity.SectionLayerId, body~ : @pattern.Pat[A]) -> Self[A] raise SectionDocBuildError
+pub fn[A] SectionDoc::to_section(Self[A]) -> Section[A]
+pub fn[A] SectionDoc::with_length(Self[A], length_cycles~ : @pattern.Rational) -> Self[A] raise SectionDocBuildError
+pub fn[A] SectionDoc::with_scope(Self[A], scope~ : TimeScope) -> Self[A]
+
+pub enum SectionDocBody[A] {
+  Single(SectionLayerDoc[A])
+  Layers(Array[SectionLayerDoc[A]])
+}
+pub fn[A] SectionDocBody::get_layer(Self[A], @identity.SectionLayerId) -> SectionLayerDoc[A]?
+pub fn[A] SectionDocBody::layer_count(Self[A]) -> Int
+pub fn[A] SectionDocBody::layers(Array[SectionLayerDoc[A]]) -> Self[A]
+pub fn[A] SectionDocBody::single(SectionLayerDoc[A]) -> Self[A]
+
 pub struct SectionLayer[A] {
   // private fields
 }
 pub fn[A] SectionLayer::SectionLayer(name~ : String, body~ : @pattern.Pat[A]) -> Self[A]
 pub fn[A] SectionLayer::body(Self[A]) -> @pattern.Pat[A]
 pub fn[A] SectionLayer::name(Self[A]) -> String
+
+pub struct SectionLayerDoc[A] {
+  // private fields
+}
+pub fn[A] SectionLayerDoc::SectionLayerDoc(id~ : @identity.SectionLayerId, name~ : String, body~ : @pattern.Pat[A]) -> Self[A]
+pub fn[A] SectionLayerDoc::body(Self[A]) -> @pattern.Pat[A]
+pub fn[A] SectionLayerDoc::id(Self[A]) -> @identity.SectionLayerId
+pub fn[A] SectionLayerDoc::name(Self[A]) -> String
+pub fn[A] SectionLayerDoc::rename(Self[A], name~ : String) -> Self[A]
+pub fn[A] SectionLayerDoc::replace_body(Self[A], body~ : @pattern.Pat[A]) -> Self[A]
+pub fn[A] SectionLayerDoc::revision(Self[A]) -> @identity.Revision
+pub fn[A] SectionLayerDoc::to_layer(Self[A]) -> SectionLayer[A]
 
 pub struct SectionOccurrence[A] {
   // private fields
