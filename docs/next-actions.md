@@ -9,11 +9,13 @@ actionable; move completed design notes or implementation plans under
 ## Current State
 
 - `main` is currently at
-  `df0f745 docs: mark graph identity PR merged`.
-- Branch `codex/phase6-song-layout-ranges` starts the song layout explicit
-  starts/gaps/overlaps/range-addressing slice from that merged head.
+  `06a2787 feat(song): add explicit layout ranges (#38)`.
+- Branch `codex/phase6-song-boundary-fills` starts the next deferred
+  song-layout boundary slice from that merged head.
 - PR #37 is merged:
   https://github.com/dowdiness/moondsp/pull/37
+- PR #38 is merged:
+  https://github.com/dowdiness/moondsp/pull/38
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -42,9 +44,10 @@ actionable; move completed design notes or implementation plans under
     patterns.
   - Phase 6 identity groundwork separates stable occurrence identity from
     display labels through a dependency-free identity model.
-  - deferred song work remains explicit starts, gaps, overlaps, range
-    addressing, boundary fills, song mini-notation, non-identity time-scope
-    transforms, and efficient secondary lookup indexes.
+  - explicit occurrence starts can now create gaps and overlaps, with point and
+    range occurrence lookup over overlapping layouts.
+  - deferred song work remains boundary fills, song mini-notation, non-identity
+    time-scope transforms, and efficient secondary lookup indexes.
 - Pattern authoring groundwork shipped so far on `main`:
   - identity-bearing authoring documents over the existing runtime query model.
   - private node storage with stable node lookup helpers.
@@ -106,7 +109,7 @@ actionable; move completed design notes or implementation plans under
   - coverage proves control, binding, and compile mapping; duplicate ID
     rejection; replace/rewire ID preservation; single-node and chain
     insert/delete compaction; and retired-ID rejection.
-- Song layout ranges on active branch:
+- Song layout ranges shipped so far on `main`:
   - `SongPart` can carry an optional explicit start via `SongPart::at` and
     `SongPart::with_id_at`; existing constructors remain implicit-contiguous.
   - implicit parts continue from the latest occurrence end, so explicit starts
@@ -115,7 +118,7 @@ actionable; move completed design notes or implementation plans under
     and range lookup across overlapping layouts.
   - coverage proves gaps, overlap queries, range-address half-open boundaries,
     and implicit continuation after explicit overlaps.
-- Latest local verification for active branch:
+- Latest local verification for PR #38 before merge:
   - `rtk moon fmt`
   - `rtk moon info`
   - `rtk moon check`
@@ -143,12 +146,10 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Review, commit, and open the PR for
-   `codex/phase6-song-layout-ranges`.
+1. Implement the boundary fills slice on `codex/phase6-song-boundary-fills`.
 
-2. After that branch merges, continue with the next deferred song-layout
-   boundary: boundary fills, song mini-notation, non-identity time-scope
-   transforms, or efficient secondary lookup indexes.
+2. After that branch merges, continue with song mini-notation, non-identity
+   time-scope transforms, or efficient secondary lookup indexes.
 
 ## Acceptance Checks For API-Hardening Slices
 
