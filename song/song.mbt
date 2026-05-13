@@ -137,7 +137,10 @@ pub fn[A] SectionOccurrence::end_(
 /// and `Pat`. Scheduler integration specializes it to `Song[ControlMap]`.
 pub struct Song[A] {
   priv occurrences : Array[SectionOccurrence[A]]
-  priv occurrence_index : Map[String, Int]
+  priv occurrence_by_id : Map[String, Int]
+  priv occurrence_by_name : Map[String, Int]
+  priv occurrence_by_start : Array[Int]
+  priv occurrence_by_end : Array[Int]
   priv duration : @pattern.Rational
 }
 
@@ -169,18 +172,198 @@ fn[A] copy_occurrences(
 }
 
 ///|
-fn[A] sorted_occurrences_by_start(
+fn[A] sorted_occurrence_indexes_by_start(
   occurrences : Array[SectionOccurrence[A]],
-) -> Array[SectionOccurrence[A]] {
-  let result : Array[SectionOccurrence[A]] = []
-  for occurrence in occurrences {
-    result.push(occurrence.snapshot())
+) -> Array[Int] {
+  let result : Array[Int] = []
+  for occurrence_index in 0..<occurrences.length() {
+    result.push(occurrence_index)
     let mut index = result.length() - 1
-    while index > 0 && result[index].start() < result[index - 1].start() {
+    while index > 0 &&
+          occurrences[result[index]].start() <
+          occurrences[result[index - 1]].start() {
       let previous = result[index - 1]
       result[index - 1] = result[index]
       result[index] = previous
       index = index - 1
+    }
+  }
+  result
+}
+
+///|
+fn[A] sorted_occurrence_indexes_by_end(
+  occurrences : Array[SectionOccurrence[A]],
+) -> Array[Int] {
+  let result : Array[Int] = []
+  for occurrence_index in 0..<occurrences.length() {
+    result.push(occurrence_index)
+    let mut index = result.length() - 1
+    while index > 0 &&
+          occurrences[result[index]].end_() <
+          occurrences[result[index - 1]].end_() {
+      let previous = result[index - 1]
+      result[index - 1] = result[index]
+      result[index] = previous
+      index = index - 1
+    }
+  }
+  result
+}
+
+///|
+fn[A] first_start_not_before(
+  occurrences : Array[SectionOccurrence[A]],
+  indexes : Array[Int],
+  time : @pattern.Rational,
+) -> Int {
+  let mut low = 0
+  let mut high = indexes.length()
+  while low < high {
+    let middle = (low + high) / 2
+    if occurrences[indexes[middle]].start() < time {
+      low = middle + 1
+    } else {
+      high = middle
+    }
+  }
+  low
+}
+
+///|
+fn[A] first_start_after(
+  occurrences : Array[SectionOccurrence[A]],
+  indexes : Array[Int],
+  time : @pattern.Rational,
+) -> Int {
+  let mut low = 0
+  let mut high = indexes.length()
+  while low < high {
+    let middle = (low + high) / 2
+    if occurrences[indexes[middle]].start() <= time {
+      low = middle + 1
+    } else {
+      high = middle
+    }
+  }
+  low
+}
+
+///|
+fn[A] first_end_after(
+  occurrences : Array[SectionOccurrence[A]],
+  indexes : Array[Int],
+  time : @pattern.Rational,
+) -> Int {
+  let mut low = 0
+  let mut high = indexes.length()
+  while low < high {
+    let middle = (low + high) / 2
+    if occurrences[indexes[middle]].end_() <= time {
+      low = middle + 1
+    } else {
+      high = middle
+    }
+  }
+  low
+}
+
+///|
+fn push_index_in_authoring_order(
+  indexes : Array[Int],
+  occurrence_index : Int,
+) -> Unit {
+  let mut insert_at = indexes.length()
+  let mut cursor = 0
+  let mut searching = true
+  let mut duplicate = false
+  while cursor < indexes.length() && searching {
+    if indexes[cursor] == occurrence_index {
+      duplicate = true
+      searching = false
+    } else if occurrence_index < indexes[cursor] {
+      insert_at = cursor
+      searching = false
+    } else {
+      cursor = cursor + 1
+    }
+  }
+  if !duplicate {
+    indexes.push(occurrence_index)
+    let mut index = indexes.length() - 1
+    while index > insert_at {
+      indexes[index] = indexes[index - 1]
+      index = index - 1
+    }
+    indexes[insert_at] = occurrence_index
+  }
+}
+
+///|
+fn[A] Song::occurrence_indexes_at(
+  self : Song[A],
+  time : @pattern.Rational,
+) -> Array[Int] {
+  let result : Array[Int] = []
+  let start_limit = first_start_after(
+    self.occurrences,
+    self.occurrence_by_start,
+    time,
+  )
+  let end_begin = first_end_after(
+    self.occurrences,
+    self.occurrence_by_end,
+    time,
+  )
+  let end_count = self.occurrence_by_end.length() - end_begin
+  if start_limit <= end_count {
+    for index in 0..<start_limit {
+      let occurrence_index = self.occurrence_by_start[index]
+      if self.occurrences[occurrence_index].span.contains(time) {
+        push_index_in_authoring_order(result, occurrence_index)
+      }
+    }
+  } else {
+    for index in end_begin..<self.occurrence_by_end.length() {
+      let occurrence_index = self.occurrence_by_end[index]
+      if self.occurrences[occurrence_index].span.contains(time) {
+        push_index_in_authoring_order(result, occurrence_index)
+      }
+    }
+  }
+  result
+}
+
+///|
+fn[A] Song::occurrence_indexes_intersecting(
+  self : Song[A],
+  arc : @pattern.TimeSpan,
+) -> Array[Int] {
+  let result : Array[Int] = []
+  let start_limit = first_start_not_before(
+    self.occurrences,
+    self.occurrence_by_start,
+    arc.end_,
+  )
+  let end_begin = first_end_after(
+    self.occurrences,
+    self.occurrence_by_end,
+    arc.begin,
+  )
+  let end_count = self.occurrence_by_end.length() - end_begin
+  if start_limit <= end_count {
+    for index in 0..<start_limit {
+      let occurrence_index = self.occurrence_by_start[index]
+      if self.occurrences[occurrence_index].span.intersect(arc) is Some(_) {
+        push_index_in_authoring_order(result, occurrence_index)
+      }
+    }
+  } else {
+    for index in end_begin..<self.occurrence_by_end.length() {
+      let occurrence_index = self.occurrence_by_end[index]
+      if self.occurrences[occurrence_index].span.intersect(arc) is Some(_) {
+        push_index_in_authoring_order(result, occurrence_index)
+      }
     }
   }
   result
@@ -206,22 +389,22 @@ pub fn[A] Song::Song(
     raise EmptySong
   }
   let occurrences : Array[SectionOccurrence[A]] = []
-  let occurrence_index : Map[String, Int] = {}
-  let occurrence_names : Map[String, Bool] = {}
+  let by_id : Map[String, Int] = {}
+  let by_name : Map[String, Int] = {}
   let mut cursor = @pattern.Rational::from_int(0)
   for part in parts {
-    if occurrence_names.contains(part.name) {
+    if by_name.contains(part.name) {
       raise DuplicateOccurrence(part.name)
     }
     let id = occurrence_id_for_part(part)
-    if occurrence_index.contains(id.value()) {
+    if by_id.contains(id.value()) {
       raise DuplicateOccurrenceId(id.value())
     }
     let start = part.start.unwrap_or(cursor)
     let end_ = start + part.section.length_cycles()
     let index = occurrences.length()
-    occurrence_index[id.value()] = index
-    occurrence_names[part.name] = true
+    by_id[id.value()] = index
+    by_name[part.name] = index
     occurrences.push({
       id,
       name: part.name,
@@ -230,7 +413,14 @@ pub fn[A] Song::Song(
     })
     cursor = max_rational(cursor, end_)
   }
-  { occurrences, occurrence_index, duration: cursor }
+  {
+    occurrences,
+    occurrence_by_id: by_id,
+    occurrence_by_name: by_name,
+    occurrence_by_start: sorted_occurrence_indexes_by_start(occurrences),
+    occurrence_by_end: sorted_occurrence_indexes_by_end(occurrences),
+    duration: cursor,
+  }
 }
 
 ///|
@@ -275,12 +465,11 @@ pub fn[A] Song::occurrence_at(
   self : Song[A],
   time : @pattern.Rational,
 ) -> SectionOccurrence[A]? {
-  for occurrence in self.occurrences {
-    if occurrence.span.contains(time) {
-      return Some(occurrence.snapshot())
-    }
+  let indexes = self.occurrence_indexes_at(time)
+  match indexes.get(0) {
+    Some(index) => self.occurrence(index)
+    None => None
   }
-  None
 }
 
 ///|
@@ -289,10 +478,9 @@ pub fn[A] Song::occurrences_at(
   time : @pattern.Rational,
 ) -> Array[SectionOccurrence[A]] {
   let result : Array[SectionOccurrence[A]] = []
-  for occurrence in self.occurrences {
-    if occurrence.span.contains(time) {
-      result.push(occurrence.snapshot())
-    }
+  let indexes = self.occurrence_indexes_at(time)
+  for index in indexes {
+    result.push(self.occurrences[index].snapshot())
   }
   result
 }
@@ -303,10 +491,9 @@ pub fn[A] Song::occurrences_intersecting(
   arc : @pattern.TimeSpan,
 ) -> Array[SectionOccurrence[A]] {
   let result : Array[SectionOccurrence[A]] = []
-  for occurrence in self.occurrences {
-    if occurrence.span.intersect(arc) is Some(_) {
-      result.push(occurrence.snapshot())
-    }
+  let indexes = self.occurrence_indexes_intersecting(arc)
+  for index in indexes {
+    result.push(self.occurrences[index].snapshot())
   }
   result
 }
@@ -315,8 +502,8 @@ pub fn[A] Song::occurrences_intersecting(
 pub fn[A] Song::gap_spans(self : Song[A]) -> Array[@pattern.TimeSpan] {
   let result : Array[@pattern.TimeSpan] = []
   let mut cursor = @pattern.Rational::from_int(0)
-  let sorted = sorted_occurrences_by_start(self.occurrences)
-  for occurrence in sorted {
+  for index in self.occurrence_by_start {
+    let occurrence = self.occurrences[index]
     if cursor < occurrence.start() {
       result.push(@pattern.TimeSpan::new(cursor, occurrence.start()))
     }
@@ -389,12 +576,10 @@ pub fn[A] Song::get_occurrence(
   self : Song[A],
   name : String,
 ) -> SectionOccurrence[A]? {
-  for occurrence in self.occurrences {
-    if occurrence.name == name {
-      return Some(occurrence.snapshot())
-    }
+  match self.occurrence_by_name.get(name) {
+    Some(index) => self.occurrence(index)
+    None => None
   }
-  None
 }
 
 ///|
@@ -402,7 +587,7 @@ pub fn[A] Song::get_occurrence_by_id(
   self : Song[A],
   id : @identity.OccurrenceId,
 ) -> SectionOccurrence[A]? {
-  match self.occurrence_index.get(id.value()) {
+  match self.occurrence_by_id.get(id.value()) {
     Some(index) => self.occurrence(index)
     None => None
   }
@@ -430,7 +615,9 @@ pub fn[A] Song::query(
   arc : @pattern.TimeSpan,
 ) -> Array[@pattern.Event[A]] {
   let result : Array[@pattern.Event[A]] = []
-  for occurrence in self.occurrences {
+  let indexes = self.occurrence_indexes_intersecting(arc)
+  for index in indexes {
+    let occurrence = self.occurrences[index]
     match occurrence.span.intersect(arc) {
       Some(global_arc) => {
         let local_arc = unshift_span(global_arc, occurrence.span.begin)

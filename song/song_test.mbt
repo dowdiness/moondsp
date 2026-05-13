@@ -253,6 +253,36 @@ test "SongPart explicit starts can overlap and range lookup returns all hits" {
 }
 
 ///|
+test "indexed occurrence lookups preserve authoring order for timeline-sorted overlaps" {
+  let late = make_section("late", @pattern.Rational::from_int(3), 60.0)
+  let early = make_section("early", @pattern.Rational::from_int(3), 64.0)
+  let song = make_song([
+    SongPart::at(
+      start=@pattern.Rational::from_int(1),
+      name="late1",
+      section=late,
+    ),
+    SongPart::at(
+      start=@pattern.Rational::from_int(0),
+      name="early1",
+      section=early,
+    ),
+  ])
+  match song.occurrence_at(rat(3L, 2L)) {
+    Some(occurrence) => assert_eq(occurrence.name(), "late1")
+    None => abort("expected first authored occurrence at overlap")
+  }
+  let at_hits = song.occurrences_at(rat(3L, 2L))
+  assert_eq(at_hits.length(), 2)
+  assert_eq(at_hits[0].name(), "late1")
+  assert_eq(at_hits[1].name(), "early1")
+  let range_hits = song.occurrences_intersecting(span(2L, 1L, 3L, 1L))
+  assert_eq(range_hits.length(), 2)
+  assert_eq(range_hits[0].name(), "late1")
+  assert_eq(range_hits[1].name(), "early1")
+}
+
+///|
 test "implicit parts continue after latest explicit occurrence end" {
   let a = make_section("a", @pattern.Rational::from_int(1), 60.0)
   let b = make_section("b", @pattern.Rational::from_int(1), 62.0)
