@@ -24,6 +24,8 @@ actionable; move completed design notes or implementation plans under
   https://github.com/dowdiness/moondsp/pull/42
 - PR #43 is merged:
   https://github.com/dowdiness/moondsp/pull/43
+- PR #44 is open as a draft for the active song layout authoring branch:
+  https://github.com/dowdiness/moondsp/pull/44
 - Active branch: `codex/phase6-song-layout-doc`, based on
   `e11e83c [codex] Add song section identity docs`.
 - Core silent-failure hardening shipped so far:
@@ -290,8 +292,9 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Review, commit, push, and open the PR for
-   `codex/phase6-song-layout-doc`.
+1. Review PR #44, address any feedback, then mark it ready and merge when
+   checks/review are clean:
+   https://github.com/dowdiness/moondsp/pull/44
 
 2. After that lands, wire the song layout revision boundary into scheduler
    snapshot commit behavior for song edits during playback.
