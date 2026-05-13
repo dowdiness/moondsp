@@ -10,7 +10,7 @@ actionable; move completed design notes or implementation plans under
 
 - `main` is currently at
   `aa5f773 Merge pull request #33 from dowdiness/codex/phase6-pattern-cache`.
-- Branch `codex/phase6-lowering-cache` contains the first Phase 6
+- PR #34 (`codex/phase6-lowering-cache`) is open for the first Phase 6
   lowering-cache boundary slice, still unmerged.
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
@@ -90,7 +90,7 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Commit `codex/phase6-lowering-cache`, push it, and open the PR.
+1. Review PR #34 checks and review feedback; fix issues or merge when ready.
 
 2. After this branch merges, choose the next Phase 6 slice from
    `docs/superpowers/specs/2026-05-12-phase6-incremental-playback-design.md`:
