@@ -81,7 +81,9 @@ pub struct Song[A] {
 }
 pub fn[A] Song::Song(parts~ : Array[SongPart[A]]) -> Self[A] raise SongBuildError
 pub fn[A] Song::duration(Self[A]) -> @pattern.Rational
+pub fn[A] Song::fill_gaps(Self[A], prefix~ : String, section~ : Section[A]) -> Self[A] raise SongBuildError
 pub fn[A] Song::from_sections(Array[Section[A]]) -> Self[A] raise SongBuildError
+pub fn[A] Song::gap_spans(Self[A]) -> Array[@pattern.TimeSpan]
 pub fn[A] Song::get_occurrence(Self[A], String) -> SectionOccurrence[A]?
 pub fn[A] Song::get_occurrence_by_id(Self[A], @identity.OccurrenceId) -> SectionOccurrence[A]?
 pub fn[A] Song::occurrence(Self[A], Int) -> SectionOccurrence[A]?
