@@ -9,7 +9,9 @@ actionable; move completed design notes or implementation plans under
 ## Current State
 
 - `main` is currently at
-  `fcc0ae3 [codex] Add song boundary gap fills (#39)`.
+  `364a01c docs: mark song boundary fills merged`.
+- Branch `codex/phase6-song-mini-notation` starts the next Phase 6 song
+  mini-notation slice from that pushed head.
 - PR #37 is merged:
   https://github.com/dowdiness/moondsp/pull/37
 - PR #38 is merged:
@@ -48,8 +50,10 @@ actionable; move completed design notes or implementation plans under
     range occurrence lookup over overlapping layouts.
   - boundary fills now derive generated fill occurrences from uncovered song
     spans while preserving existing occurrence identity and authoring order.
-  - deferred song work remains song mini-notation, non-identity time-scope
-    transforms, and efficient secondary lookup indexes.
+  - song mini-notation is implemented on the current branch over sections,
+    parts, explicit starts, explicit occurrence IDs, gaps, overlaps, and fills.
+  - deferred song work remains non-identity time-scope transforms and efficient
+    secondary lookup indexes.
 - Pattern authoring groundwork shipped so far on `main`:
   - identity-bearing authoring documents over the existing runtime query model.
   - private node storage with stable node lookup helpers.
@@ -96,6 +100,27 @@ actionable; move completed design notes or implementation plans under
     cache, token replacement preserves unaffected token IDs, insertion/removal
     keeps surviving token IDs, and changed tokens miss the cache while
     unchanged nodes hit.
+- Song mini-notation implemented so far on `codex/phase6-song-mini-notation`:
+  - `parse_song` parses `song(...)` text into `Song[ControlMap]`.
+  - `section("name", length, pattern_expr)` reuses the existing pattern mini
+    expression surface, including `s(...)`, `note(...)`, `stack(...)`, and
+    method chains.
+  - `part(...)` supports implicit-contiguous and explicit rational starts;
+    `part_id(...)` supports stable occurrence IDs separate from display names.
+  - `fill("prefix", "section")` applies the boundary-fill surface over parsed
+    gaps after the base song layout is built.
+  - coverage proves implicit sections/parts, exact rational starts and gaps,
+    explicit overlaps with authoring order, boundary fills, explicit occurrence
+    IDs, and unknown-section errors.
+- Latest local verification for the song mini-notation branch:
+  - `moon fmt`
+  - `moon info`
+  - `moon check`
+  - `moon test mini` (64 passed)
+  - `moon check --target all`
+  - `moon test` (759 passed)
+  - `moon build --target wasm-gc`
+  - `git diff --check`
 - DSP graph identity mapping shipped so far on `main`:
   - `GraphTemplateDoc` owns stable `GraphNodeId` authoring IDs, graph nodes,
     revision state, and a retired-ID set.
@@ -168,11 +193,11 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Start a new branch from `main`.
+1. Review, commit, push, and open the PR for the song mini-notation slice on
+   `codex/phase6-song-mini-notation`.
 
-2. Recommended next Phase 6 slice: song mini-notation over the current song
-   layout surface. Keep non-identity time-scope transforms and efficient
-   secondary lookup indexes queued after that.
+2. After that branch merges, continue with non-identity time-scope transforms
+   or efficient secondary lookup indexes.
 
 ## Acceptance Checks For API-Hardening Slices
 

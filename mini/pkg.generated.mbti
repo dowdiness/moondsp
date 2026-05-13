@@ -3,6 +3,7 @@ package "dowdiness/moondsp/mini"
 
 import {
   "dowdiness/moondsp/pattern",
+  "dowdiness/moondsp/song",
 }
 
 // Values
@@ -17,6 +18,8 @@ pub fn parse_doc_reusing(String, @pattern.PatternDoc[@pattern.ControlMap]) -> Re
 pub fn parse_snapshot(String) -> Result[@pattern.PatternSnapshot[@pattern.ControlMap], String]
 
 pub fn parse_snapshot_reusing(String, @pattern.PatternDoc[@pattern.ControlMap]) -> Result[@pattern.PatternSnapshot[@pattern.ControlMap], String]
+
+pub fn parse_song(String) -> Result[@song.Song[@pattern.ControlMap], String]
 
 // Errors
 
