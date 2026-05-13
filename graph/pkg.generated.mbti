@@ -3,6 +3,7 @@ package "dowdiness/moondsp/graph"
 
 import {
   "dowdiness/moondsp/dsp",
+  "dowdiness/moondsp/identity",
   "moonbitlang/core/debug",
 }
 
@@ -20,6 +21,14 @@ pub fn[T : @dsp.ArithSym] range(T, Double, Double) -> T
 pub fn[T : @dsp.ArithSym + @dsp.DspSym + @dsp.FilterSym + @dsp.DelaySym + @dsp.StereoSym + @dsp.StereoFilterSym + @dsp.StereoDelaySym] replay(Array[DspNode]) -> T?
 
 // Errors
+pub(all) suberror GraphTemplateDocError {
+  LengthMismatch(Int, Int)
+  DuplicateNodeId(String)
+  MissingNodeId(String)
+  RetiredNodeId(String)
+  Topology(GraphTopologyEditError)
+} derive(@debug.Debug)
+pub impl Show for GraphTemplateDocError
 
 // Types and methods
 type CompiledDsp
@@ -246,6 +255,24 @@ pub(all) enum GraphControlKind {
   SetParam
 } derive(Eq)
 
+pub struct GraphIndexMap {
+  // private fields
+}
+pub fn GraphIndexMap::bind_control(Self, ControlBindingBuilder, String, @identity.GraphNodeId, GraphParamSlot) -> ControlBindingBuilder?
+pub fn GraphIndexMap::delete_chain(Self, @identity.GraphNodeId, @identity.GraphNodeId, @identity.GraphNodeId, GraphTopologyInputSlot, @identity.GraphNodeId) -> GraphTopologyEdit?
+pub fn GraphIndexMap::delete_node(Self, @identity.GraphNodeId, @identity.GraphNodeId, GraphTopologyInputSlot, @identity.GraphNodeId) -> GraphTopologyEdit?
+pub fn GraphIndexMap::gate_off(Self, @identity.GraphNodeId) -> GraphControl?
+pub fn GraphIndexMap::gate_on(Self, @identity.GraphNodeId) -> GraphControl?
+pub fn GraphIndexMap::insert_chain(Self, @identity.GraphNodeId, GraphTopologyInputSlot, Array[DspNode]) -> GraphTopologyEdit?
+pub fn GraphIndexMap::insert_node(Self, @identity.GraphNodeId, GraphTopologyInputSlot, DspNode) -> GraphTopologyEdit?
+pub fn GraphIndexMap::length(Self) -> Int
+pub fn GraphIndexMap::node_id_at(Self, Int) -> @identity.GraphNodeId?
+pub fn GraphIndexMap::node_index(Self, @identity.GraphNodeId) -> Int?
+pub fn GraphIndexMap::replace_node(Self, @identity.GraphNodeId, DspNode) -> GraphTopologyEdit?
+pub fn GraphIndexMap::revision(Self) -> @identity.Revision
+pub fn GraphIndexMap::rewire_input(Self, @identity.GraphNodeId, GraphTopologyInputSlot, @identity.GraphNodeId) -> GraphTopologyEdit?
+pub fn GraphIndexMap::set_param(Self, @identity.GraphNodeId, GraphParamSlot, Double) -> GraphControl?
+
 pub(all) enum GraphParamSlot {
   Value0
   Value1
@@ -254,6 +281,29 @@ pub(all) enum GraphParamSlot {
   DelaySamples
 } derive(Eq, @debug.Debug)
 pub impl Show for GraphParamSlot
+
+pub struct GraphTemplateDoc {
+  // private fields
+}
+pub fn GraphTemplateDoc::analyze(Self) -> CompiledTemplate
+pub fn GraphTemplateDoc::compile(Self, @dsp.DspContext) -> CompiledDsp?
+pub fn GraphTemplateDoc::compile_stereo(Self, @dsp.DspContext) -> CompiledStereoDsp?
+pub fn GraphTemplateDoc::contains_node(Self, @identity.GraphNodeId) -> Bool
+pub fn GraphTemplateDoc::contains_retired_node(Self, @identity.GraphNodeId) -> Bool
+pub fn GraphTemplateDoc::delete_chain(Self, @identity.GraphNodeId, @identity.GraphNodeId, @identity.GraphNodeId, GraphTopologyInputSlot, @identity.GraphNodeId) -> Self raise GraphTemplateDocError
+pub fn GraphTemplateDoc::delete_node(Self, @identity.GraphNodeId, @identity.GraphNodeId, GraphTopologyInputSlot, @identity.GraphNodeId) -> Self raise GraphTemplateDocError
+pub fn GraphTemplateDoc::from_nodes(ids~ : Array[@identity.GraphNodeId], nodes~ : Array[DspNode]) -> Self raise GraphTemplateDocError
+pub fn GraphTemplateDoc::index_map(Self) -> GraphIndexMap
+pub fn GraphTemplateDoc::insert_chain(Self, Array[@identity.GraphNodeId], @identity.GraphNodeId, GraphTopologyInputSlot, Array[DspNode]) -> Self raise GraphTemplateDocError
+pub fn GraphTemplateDoc::insert_node(Self, @identity.GraphNodeId, @identity.GraphNodeId, GraphTopologyInputSlot, DspNode) -> Self raise GraphTemplateDocError
+pub fn GraphTemplateDoc::length(Self) -> Int
+pub fn GraphTemplateDoc::node_at(Self, @identity.GraphNodeId) -> DspNode?
+pub fn GraphTemplateDoc::node_id_at(Self, Int) -> @identity.GraphNodeId?
+pub fn GraphTemplateDoc::node_index(Self, @identity.GraphNodeId) -> Int?
+pub fn GraphTemplateDoc::nodes(Self) -> Array[DspNode]
+pub fn GraphTemplateDoc::replace_node(Self, @identity.GraphNodeId, DspNode) -> Self raise GraphTemplateDocError
+pub fn GraphTemplateDoc::revision(Self) -> @identity.Revision
+pub fn GraphTemplateDoc::rewire_input(Self, @identity.GraphNodeId, GraphTopologyInputSlot, @identity.GraphNodeId) -> Self raise GraphTemplateDocError
 
 pub(all) enum GraphTopologyEdit {
   ReplaceNode(Int, DspNode)

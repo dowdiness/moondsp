@@ -1,5 +1,6 @@
 import {
   "dowdiness/moondsp/dsp" @dsp,
   "dowdiness/moondsp/graph" @graph,
+  "dowdiness/moondsp/identity" @identity,
   "dowdiness/moondsp/voice" @voice,
 }

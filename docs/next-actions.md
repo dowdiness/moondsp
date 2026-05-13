@@ -9,9 +9,11 @@ actionable; move completed design notes or implementation plans under
 ## Current State
 
 - `main` is currently at
-  `5c9f895 [codex] Add scheduler snapshot swap boundary (#35)`.
-- PR #36 (`codex/phase6-mini-stable-ids`) is open as a draft for the
-  mini-notation stable-ID reconciliation slice from that merged head.
+  `cd9b9fa [codex] Add mini-notation stable ID reconciliation (#36)`.
+- Branch `codex/phase6-graph-identity` starts the DSP graph identity mapping
+  slice from that merged head.
+- PR #37 is open and merge-ready at
+  `06e0959 fix(graph): expose identity docs from facade`.
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -77,7 +79,7 @@ actionable; move completed design notes or implementation plans under
   - coverage proves block-boundary commit, no retroactive scheduling for past
     onsets, active-note let-ring across a silent replacement, and coalescing
     multiple pending snapshots to the latest staged snapshot.
-- Mini-notation stable-ID reconciliation on active branch:
+- Mini-notation stable-ID reconciliation shipped so far on `main`:
   - deterministic `PatternNodeId` assignment for parsed mini atoms,
     combinators, sequences, stacks, and method chains.
   - `parse_doc`, `parse_doc_reusing`, `parse_snapshot`, and
@@ -89,11 +91,27 @@ actionable; move completed design notes or implementation plans under
     cache, token replacement preserves unaffected token IDs, insertion/removal
     keeps surviving token IDs, and changed tokens miss the cache while
     unchanged nodes hit.
+- DSP graph identity mapping on active branch:
+  - `GraphTemplateDoc` owns stable `GraphNodeId` authoring IDs, graph nodes,
+    revision state, and a retired-ID set.
+  - `GraphIndexMap` maps stable IDs to existing graph indices and builds
+    existing `GraphControl`, `ControlBindingBuilder`, and `GraphTopologyEdit`
+    values at API boundaries.
+  - the root `@moondsp` facade re-exports the graph identity API plus
+    `GraphNodeId`, `Revision`, and `StableIdError` for documented facade
+    consumers.
+  - graph document edits preserve IDs for replacements and rewires, append IDs
+    for inserted nodes/chains, compact IDs for deletions, and reject reuse of
+    deleted IDs inside the same document.
+  - coverage proves control, binding, and compile mapping; duplicate ID
+    rejection; replace/rewire ID preservation; single-node and chain
+    insert/delete compaction; and retired-ID rejection.
 - Latest local verification for active branch:
   - `rtk moon fmt`
   - `rtk moon info`
   - `rtk moon check`
-  - `rtk moon test` (739 passed)
+  - `rtk moon test graph` (241 passed)
+  - `rtk moon test` (744 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk moon check --target all`
   - `rtk git diff --check`
@@ -107,11 +125,12 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Review PR #36 checks and review feedback; fix issues or merge when ready.
+1. Merge PR #37.
 
-2. After that branch merges, choose the next Phase 6 slice from
-   `docs/superpowers/specs/2026-05-12-phase6-incremental-playback-design.md`.
-   DSP graph identity remains the main deferred identity boundary.
+2. After PR #37 merges, start the next Phase 6 slice from `main` and update
+   this handoff with the merge SHA. Likely candidates are song explicit
+   starts/gaps/overlaps/range addressing or the next deferred song-layout
+   boundary from the Phase 6 design.
 
 ## Acceptance Checks For API-Hardening Slices
 
