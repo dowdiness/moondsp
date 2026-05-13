@@ -10,8 +10,8 @@ actionable; move completed design notes or implementation plans under
 
 - `main` is currently at
   `6d804d5 Merge pull request #34 from dowdiness/codex/phase6-lowering-cache`.
-- Branch `codex/phase6-scheduler-snapshot-swap` implements the first scheduler
-  snapshot-swap slice from that merged head.
+- PR #35 (`codex/phase6-scheduler-snapshot-swap`) is open as a draft for the
+  first scheduler snapshot-swap slice from that merged head.
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -95,7 +95,7 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Review, commit, and open PR for `codex/phase6-scheduler-snapshot-swap`.
+1. Review PR #35 checks and review feedback; fix issues or merge when ready.
 
 2. After that branch merges, take the next Phase 6 slice from
    `docs/superpowers/specs/2026-05-12-phase6-incremental-playback-design.md`:
