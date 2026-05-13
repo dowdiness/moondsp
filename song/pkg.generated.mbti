@@ -88,16 +88,21 @@ pub fn[A] Song::occurrence(Self[A], Int) -> SectionOccurrence[A]?
 pub fn[A] Song::occurrence_at(Self[A], @pattern.Rational) -> SectionOccurrence[A]?
 pub fn[A] Song::occurrence_count(Self[A]) -> Int
 pub fn[A] Song::occurrences(Self[A]) -> Array[SectionOccurrence[A]]
+pub fn[A] Song::occurrences_at(Self[A], @pattern.Rational) -> Array[SectionOccurrence[A]]
+pub fn[A] Song::occurrences_intersecting(Self[A], @pattern.TimeSpan) -> Array[SectionOccurrence[A]]
 pub fn[A] Song::query(Self[A], @pattern.TimeSpan) -> Array[@pattern.Event[A]]
 
 pub struct SongPart[A] {
   // private fields
 }
 pub fn[A] SongPart::SongPart(name~ : String, section~ : Section[A]) -> Self[A]
+pub fn[A] SongPart::at(start~ : @pattern.Rational, name~ : String, section~ : Section[A]) -> Self[A]
 pub fn[A] SongPart::id(Self[A]) -> @identity.OccurrenceId?
 pub fn[A] SongPart::name(Self[A]) -> String
 pub fn[A] SongPart::section(Self[A]) -> Section[A]
+pub fn[A] SongPart::start(Self[A]) -> @pattern.Rational?
 pub fn[A] SongPart::with_id(id~ : @identity.OccurrenceId, name~ : String, section~ : Section[A]) -> Self[A]
+pub fn[A] SongPart::with_id_at(id~ : @identity.OccurrenceId, start~ : @pattern.Rational, name~ : String, section~ : Section[A]) -> Self[A]
 
 pub struct TimeScope {
   // private fields

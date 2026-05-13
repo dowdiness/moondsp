@@ -176,6 +176,90 @@ test "Song::occurrence_at uses half-open occurrence boundaries" {
 }
 
 ///|
+test "SongPart explicit starts create gaps and set duration to latest end" {
+  let intro = make_section("intro", @pattern.Rational::from_int(1), 60.0)
+  let chorus = make_section("chorus", @pattern.Rational::from_int(1), 64.0)
+  let song = make_song([
+    SongPart(name="intro", section=intro),
+    SongPart::at(
+      start=@pattern.Rational::from_int(2),
+      name="chorus1",
+      section=chorus,
+    ),
+  ])
+  assert_true(song.duration() == @pattern.Rational::from_int(3))
+  match song.occurrence_at(rat(3L, 2L)) {
+    None => ()
+    Some(_) => abort("expected gap between explicit occurrences")
+  }
+  match song.get_occurrence("chorus1") {
+    Some(occurrence) => {
+      assert_true(occurrence.start() == @pattern.Rational::from_int(2))
+      assert_true(occurrence.end_() == @pattern.Rational::from_int(3))
+    }
+    None => abort("expected explicitly placed occurrence")
+  }
+  let events = song.query(span(1L, 1L, 2L, 1L))
+  assert_eq(events.length(), 0)
+}
+
+///|
+test "SongPart explicit starts can overlap and range lookup returns all hits" {
+  let verse = make_section("verse", @pattern.Rational::from_int(2), 60.0)
+  let pad = make_section("pad", @pattern.Rational::from_int(2), 64.0)
+  let song = make_song([
+    SongPart(name="verse1", section=verse),
+    SongPart::at(start=@pattern.Rational::from_int(1), name="pad1", section=pad),
+  ])
+  assert_true(song.duration() == @pattern.Rational::from_int(3))
+  let at_overlap = song.occurrences_at(rat(3L, 2L))
+  assert_eq(at_overlap.length(), 2)
+  assert_eq(at_overlap[0].name(), "verse1")
+  assert_eq(at_overlap[1].name(), "pad1")
+  let range_hits = song.occurrences_intersecting(span(1L, 1L, 2L, 1L))
+  assert_eq(range_hits.length(), 2)
+  let events = song.query(span(1L, 1L, 2L, 1L))
+  assert_eq(events.length(), 2)
+  assert_true(events[0].value.get("note") == Some(60.0))
+  assert_true(events[1].value.get("note") == Some(64.0))
+}
+
+///|
+test "implicit parts continue after latest explicit occurrence end" {
+  let a = make_section("a", @pattern.Rational::from_int(1), 60.0)
+  let b = make_section("b", @pattern.Rational::from_int(1), 62.0)
+  let c = make_section("c", @pattern.Rational::from_int(1), 64.0)
+  let song = make_song([
+    SongPart(name="a1", section=a),
+    SongPart::at(start=rat(1L, 2L), name="b1", section=b),
+    SongPart(name="c1", section=c),
+  ])
+  assert_true(song.duration() == rat(5L, 2L))
+  match song.get_occurrence("c1") {
+    Some(occurrence) => {
+      assert_true(occurrence.start() == rat(3L, 2L))
+      assert_true(occurrence.end_() == rat(5L, 2L))
+    }
+    None => abort("expected implicit occurrence after overlap")
+  }
+}
+
+///|
+test "Song::occurrences_intersecting uses half-open range boundaries" {
+  let a = make_section("a", @pattern.Rational::from_int(1), 60.0)
+  let b = make_section("b", @pattern.Rational::from_int(1), 62.0)
+  let song = make_song([
+    SongPart(name="a1", section=a),
+    SongPart::at(start=@pattern.Rational::from_int(2), name="b1", section=b),
+  ])
+  let gap_hits = song.occurrences_intersecting(span(1L, 1L, 2L, 1L))
+  assert_eq(gap_hits.length(), 0)
+  let boundary_hits = song.occurrences_intersecting(span(1L, 1L, 3L, 1L))
+  assert_eq(boundary_hits.length(), 1)
+  assert_eq(boundary_hits[0].name(), "b1")
+}
+
+///|
 test "Song keeps explicit occurrence IDs across reordering" {
   let verse = make_section("verse", @pattern.Rational::from_int(1), 60.0)
   let chorus = make_section("chorus", @pattern.Rational::from_int(1), 64.0)
