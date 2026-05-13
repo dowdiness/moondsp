@@ -177,48 +177,55 @@ fn pattern_cache_token_equal(left : Array[Int64], right : Array[Int64]) -> Bool 
 }
 
 ///|
-fn[A] pattern_node_cache_token(
+fn[A] pattern_node_cache_token_memoized(
   nodes : Map[String, PatternDocEntry[A]],
   id : @identity.PatternNodeId,
+  memo : Map[String, Array[Int64]],
 ) -> Array[Int64] raise PatternDocError {
-  match nodes.get(id.value()) {
-    None => raise MissingNode(id.value())
-    Some(entry) => {
-      let token : Array[Int64] = [entry.generation]
-      match entry.node {
-        Runtime(_) | Silence | Pure(_) => ()
-        Fast(child, _)
-        | Slow(child, _)
-        | Rev(child)
-        | FilterMap(child, _)
-        | Euclid(child, _, _, _)
-        | DegradeBy(child, _, _)
-        | Every(child, _, _)
-        | Jux(child, _) =>
-          append_pattern_cache_token(
-            token,
-            pattern_node_cache_token(nodes, child),
-          )
-        MergeControl(left, right, _) => {
-          append_pattern_cache_token(
-            token,
-            pattern_node_cache_token(nodes, left),
-          )
-          append_pattern_cache_token(
-            token,
-            pattern_node_cache_token(nodes, right),
-          )
-        }
-        Sequence(children) | Stack(children) =>
-          for child in children {
-            append_pattern_cache_token(
-              token,
-              pattern_node_cache_token(nodes, child),
-            )
+  let key = id.value()
+  match memo.get(key) {
+    Some(token) => token
+    None =>
+      match nodes.get(key) {
+        None => raise MissingNode(id.value())
+        Some(entry) => {
+          let token : Array[Int64] = [entry.generation]
+          match entry.node {
+            Runtime(_) | Silence | Pure(_) => ()
+            Fast(child, _)
+            | Slow(child, _)
+            | Rev(child)
+            | FilterMap(child, _)
+            | Euclid(child, _, _, _)
+            | DegradeBy(child, _, _)
+            | Every(child, _, _)
+            | Jux(child, _) =>
+              append_pattern_cache_token(
+                token,
+                pattern_node_cache_token_memoized(nodes, child, memo),
+              )
+            MergeControl(left, right, _) => {
+              append_pattern_cache_token(
+                token,
+                pattern_node_cache_token_memoized(nodes, left, memo),
+              )
+              append_pattern_cache_token(
+                token,
+                pattern_node_cache_token_memoized(nodes, right, memo),
+              )
+            }
+            Sequence(children) | Stack(children) =>
+              for child in children {
+                append_pattern_cache_token(
+                  token,
+                  pattern_node_cache_token_memoized(nodes, child, memo),
+                )
+              }
           }
+          memo[key] = token
+          token
+        }
       }
-      token
-    }
   }
 }
 
@@ -227,32 +234,56 @@ fn[A] pattern_node_revision(
   nodes : Map[String, PatternDocEntry[A]],
   id : @identity.PatternNodeId,
 ) -> @identity.Revision raise PatternDocError {
-  match nodes.get(id.value()) {
-    None => raise MissingNode(id.value())
-    Some(entry) => {
-      let mut revision = entry.revision
-      match entry.node {
-        Runtime(_) | Silence | Pure(_) => ()
-        Fast(child, _)
-        | Slow(child, _)
-        | Rev(child)
-        | FilterMap(child, _)
-        | Euclid(child, _, _, _)
-        | DegradeBy(child, _, _)
-        | Every(child, _, _)
-        | Jux(child, _) =>
-          revision = revision.combine(pattern_node_revision(nodes, child))
-        MergeControl(left, right, _) => {
-          revision = revision.combine(pattern_node_revision(nodes, left))
-          revision = revision.combine(pattern_node_revision(nodes, right))
-        }
-        Sequence(children) | Stack(children) =>
-          for child in children {
-            revision = revision.combine(pattern_node_revision(nodes, child))
+  let memo : Map[String, @identity.Revision] = {}
+  pattern_node_revision_memoized(nodes, id, memo)
+}
+
+///|
+fn[A] pattern_node_revision_memoized(
+  nodes : Map[String, PatternDocEntry[A]],
+  id : @identity.PatternNodeId,
+  memo : Map[String, @identity.Revision],
+) -> @identity.Revision raise PatternDocError {
+  let key = id.value()
+  match memo.get(key) {
+    Some(revision) => revision
+    None =>
+      match nodes.get(key) {
+        None => raise MissingNode(id.value())
+        Some(entry) => {
+          let mut revision = entry.revision
+          match entry.node {
+            Runtime(_) | Silence | Pure(_) => ()
+            Fast(child, _)
+            | Slow(child, _)
+            | Rev(child)
+            | FilterMap(child, _)
+            | Euclid(child, _, _, _)
+            | DegradeBy(child, _, _)
+            | Every(child, _, _)
+            | Jux(child, _) =>
+              revision = revision.combine(
+                pattern_node_revision_memoized(nodes, child, memo),
+              )
+            MergeControl(left, right, _) => {
+              revision = revision.combine(
+                pattern_node_revision_memoized(nodes, left, memo),
+              )
+              revision = revision.combine(
+                pattern_node_revision_memoized(nodes, right, memo),
+              )
+            }
+            Sequence(children) | Stack(children) =>
+              for child in children {
+                revision = revision.combine(
+                  pattern_node_revision_memoized(nodes, child, memo),
+                )
+              }
           }
+          memo[key] = revision
+          revision
+        }
       }
-      revision
-    }
   }
 }
 
@@ -378,9 +409,11 @@ fn[A] lower_pattern_node_cached(
   nodes : Map[String, PatternDocEntry[A]],
   id : @identity.PatternNodeId,
   cache : PatternLoweringCache[A],
+  revision_memo : Map[String, @identity.Revision],
+  token_memo : Map[String, Array[Int64]],
 ) -> Pat[A] raise PatternDocError {
-  let revision = pattern_node_revision(nodes, id)
-  let token = pattern_node_cache_token(nodes, id)
+  let revision = pattern_node_revision_memoized(nodes, id, revision_memo)
+  let token = pattern_node_cache_token_memoized(nodes, id, token_memo)
   match cache.lookup(id, token, revision) {
     Some(pat) => pat
     None => {
@@ -392,42 +425,71 @@ fn[A] lower_pattern_node_cached(
             Silence => Pat::silence()
             Pure(value) => Pat::pure(value)
             Fast(child, factor) =>
-              lower_pattern_node_cached(nodes, child, cache).fast(factor)
+              lower_pattern_node_cached(
+                nodes, child, cache, revision_memo, token_memo,
+              ).fast(factor)
             Slow(child, factor) =>
-              lower_pattern_node_cached(nodes, child, cache).slow(factor)
-            Rev(child) => lower_pattern_node_cached(nodes, child, cache).rev()
+              lower_pattern_node_cached(
+                nodes, child, cache, revision_memo, token_memo,
+              ).slow(factor)
+            Rev(child) =>
+              lower_pattern_node_cached(
+                nodes, child, cache, revision_memo, token_memo,
+              ).rev()
             FilterMap(child, f) =>
-              lower_pattern_node_cached(nodes, child, cache).filter_map(f)
+              lower_pattern_node_cached(
+                nodes, child, cache, revision_memo, token_memo,
+              ).filter_map(f)
             Euclid(child, k, n, rotation) =>
-              lower_pattern_node_cached(nodes, child, cache).euclid(
-                k,
-                n,
-                rotation~,
-              )
+              lower_pattern_node_cached(
+                nodes, child, cache, revision_memo, token_memo,
+              ).euclid(k, n, rotation~)
             DegradeBy(child, p, seed) =>
-              lower_pattern_node_cached(nodes, child, cache).degrade_by(
-                p,
-                seed~,
-              )
+              lower_pattern_node_cached(
+                nodes, child, cache, revision_memo, token_memo,
+              ).degrade_by(p, seed~)
             Every(child, n, f) =>
-              every(n, f, lower_pattern_node_cached(nodes, child, cache))
-            Jux(child, f) => f(lower_pattern_node_cached(nodes, child, cache))
+              every(
+                n,
+                f,
+                lower_pattern_node_cached(
+                  nodes, child, cache, revision_memo, token_memo,
+                ),
+              )
+            Jux(child, f) =>
+              f(
+                lower_pattern_node_cached(
+                  nodes, child, cache, revision_memo, token_memo,
+                ),
+              )
             MergeControl(left, right, f) =>
               f(
-                lower_pattern_node_cached(nodes, left, cache),
-                lower_pattern_node_cached(nodes, right, cache),
+                lower_pattern_node_cached(
+                  nodes, left, cache, revision_memo, token_memo,
+                ),
+                lower_pattern_node_cached(
+                  nodes, right, cache, revision_memo, token_memo,
+                ),
               )
             Sequence(children) => {
               let pats : Array[Pat[A]] = []
               for child in children {
-                pats.push(lower_pattern_node_cached(nodes, child, cache))
+                pats.push(
+                  lower_pattern_node_cached(
+                    nodes, child, cache, revision_memo, token_memo,
+                  ),
+                )
               }
               sequence(pats)
             }
             Stack(children) => {
               let pats : Array[Pat[A]] = []
               for child in children {
-                pats.push(lower_pattern_node_cached(nodes, child, cache))
+                pats.push(
+                  lower_pattern_node_cached(
+                    nodes, child, cache, revision_memo, token_memo,
+                  ),
+                )
               }
               stack(pats)
             }
@@ -603,10 +665,18 @@ pub fn[A] PatternDoc::lower_with_cache(
   self : PatternDoc[A],
   cache : PatternLoweringCache[A],
 ) -> PatternSnapshot[A] raise PatternDocError {
+  let revision_memo : Map[String, @identity.Revision] = {}
+  let token_memo : Map[String, Array[Int64]] = {}
   {
     root: self.root,
     revision: self.revision,
-    pat: lower_pattern_node_cached(self.nodes, self.root, cache),
+    pat: lower_pattern_node_cached(
+      self.nodes,
+      self.root,
+      cache,
+      revision_memo,
+      token_memo,
+    ),
   }
 }
 

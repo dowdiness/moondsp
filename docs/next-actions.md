@@ -61,12 +61,10 @@ actionable; move completed design notes or implementation plans under
   - deferred pattern work remains mini-notation ID reconciliation and
     scheduler snapshot swapping.
 - Active lowering-cache branch adds:
-  - private per-node revision entries inside `PatternDoc` storage.
-  - `PatternDoc::node_revision` for stable ID plus revision invalidation
-    boundaries.
-  - `PatternLoweringCache` and `PatternDoc::lower_with_cache`, keyed by stable
-    node ID plus a recursive private subtree token plus full `Revision`
-    equality.
+  - private per-node revision metadata inside authoring-document storage.
+  - stable node identity plus revision boundaries for subtree invalidation.
+  - lowering reuse keyed by stable node identity, a recursive private subtree
+    token, and full revision equality.
   - coverage that editing one child invalidates that child and ancestors while
     reusing unchanged sibling lowerings.
   - regression coverage that a reused cache does not return stale audio for a
