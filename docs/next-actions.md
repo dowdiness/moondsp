@@ -22,6 +22,8 @@ actionable; move completed design notes or implementation plans under
   https://github.com/dowdiness/moondsp/pull/41
 - Active branch: `codex/phase6-song-lookup-indexes`, based on
   `c80f01b [codex] Add song TimeScope transforms (#41)`.
+- PR #42 is open as a draft:
+  https://github.com/dowdiness/moondsp/pull/42
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -240,8 +242,8 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Review, commit, push, and open the PR for
-   `codex/phase6-song-lookup-indexes`.
+1. Review PR #42 and address any feedback:
+   https://github.com/dowdiness/moondsp/pull/42
 
 2. After the lookup-index branch merges, choose the next Phase 6 song slice.
 
