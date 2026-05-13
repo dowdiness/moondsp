@@ -6,6 +6,7 @@ using @song {
   type SectionPatch,
   type SectionPatchError,
   type TimeScope,
+  type TimeScopeBuildError,
 }
 
 ///|
@@ -42,6 +43,65 @@ test "Section constructor rejects non-positive lengths" {
 ///|
 test "TimeScope constructor creates identity scope" {
   assert_true(TimeScope().is_identity())
+}
+
+///|
+test "TimeScope fast and slow constructors expose exact rates" {
+  let fast_result = try? TimeScope::fast(factor=@pattern.Rational::from_int(2))
+  let fast = match fast_result {
+    Ok(scope) => scope
+    Err(_) => abort("fast scope creation failed")
+  }
+  assert_true(!fast.is_identity())
+  assert_true(fast.rate() == @pattern.Rational::from_int(2))
+  let slow_result = try? TimeScope::slow(factor=@pattern.Rational::from_int(2))
+  let slow = match slow_result {
+    Ok(scope) => scope
+    Err(_) => abort("slow scope creation failed")
+  }
+  assert_true(!slow.is_identity())
+  assert_true(slow.rate() == @pattern.Rational::new(1L, 2L))
+}
+
+///|
+test "TimeScope rejects non-positive rates" {
+  let result = try? TimeScope::fast(factor=@pattern.Rational::from_int(0))
+  match result {
+    Err(TimeScopeBuildError::NonPositiveRate) => ()
+    _ => assert_true(false)
+  }
+}
+
+///|
+test "Section::query applies non-identity TimeScope" {
+  let scope_result = try? TimeScope::fast(factor=@pattern.Rational::from_int(2))
+  let scope = match scope_result {
+    Ok(scope) => scope
+    Err(_) => abort("scope creation failed")
+  }
+  let result = try? Section(
+    name="fast",
+    length_cycles=@pattern.Rational::from_int(1),
+    scope~,
+    body=SectionBody::single(@pattern.note(60.0)),
+  )
+  let section = match result {
+    Ok(section) => section
+    Err(_) => abort("section creation failed")
+  }
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::from_int(1),
+  )
+  let scoped_events = section.query(arc)
+  let raw_events = section.body().query(arc)
+  assert_eq(raw_events.length(), 1)
+  assert_eq(scoped_events.length(), 2)
+  assert_true(scoped_events[0].part.begin == @pattern.Rational::from_int(0))
+  assert_true(scoped_events[1].part.begin == @pattern.Rational::new(1L, 2L))
+  assert_true(
+    scoped_events[1].whole.unwrap().begin == @pattern.Rational::new(1L, 2L),
+  )
 }
 
 ///|

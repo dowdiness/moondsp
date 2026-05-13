@@ -434,7 +434,7 @@ pub fn[A] Song::query(
     match occurrence.span.intersect(arc) {
       Some(global_arc) => {
         let local_arc = unshift_span(global_arc, occurrence.span.begin)
-        let events = occurrence.section.body().query(local_arc)
+        let events = occurrence.section.query(local_arc)
         for event in events {
           result.push(event.shift(occurrence.span.begin))
         }

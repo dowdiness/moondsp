@@ -38,6 +38,34 @@ fn make_section(
 }
 
 ///|
+fn make_scoped_section(
+  name : String,
+  length : @pattern.Rational,
+  scope : @song.TimeScope,
+  midi : Double,
+) -> @song.Section[@pattern.ControlMap] {
+  let result = try? @song.Section(
+    name~,
+    length_cycles=length,
+    scope~,
+    body=@song.SectionBody::single(@pattern.note(midi)),
+  )
+  match result {
+    Ok(section) => section
+    Err(_) => abort("section creation failed")
+  }
+}
+
+///|
+fn fast_scope(n : Int) -> @song.TimeScope {
+  let result = try? @song.TimeScope::fast(factor=@pattern.Rational::from_int(n))
+  match result {
+    Ok(scope) => scope
+    Err(_) => abort("time scope creation failed")
+  }
+}
+
+///|
 fn make_song(
   parts : Array[SongPart[@pattern.ControlMap]],
 ) -> Song[@pattern.ControlMap] {
@@ -499,6 +527,32 @@ test "Song::query shifts event whole and part into song time" {
   assert_true(events[2].whole.unwrap().begin == @pattern.Rational::from_int(2))
   assert_true(events[2].part.begin == @pattern.Rational::from_int(2))
   assert_true(events[2].value.get("note") == Some(64.0))
+}
+
+///|
+test "Song::query applies section TimeScope without changing occurrence span" {
+  let section = make_scoped_section(
+    "riff",
+    @pattern.Rational::from_int(1),
+    fast_scope(2),
+    60.0,
+  )
+  let song = make_song([
+    SongPart::at(start=@pattern.Rational::from_int(1), name="riff1", section~),
+  ])
+  match song.get_occurrence("riff1") {
+    Some(occurrence) => {
+      assert_true(occurrence.start() == @pattern.Rational::from_int(1))
+      assert_true(occurrence.end_() == @pattern.Rational::from_int(2))
+    }
+    None => abort("expected scoped occurrence")
+  }
+  let events = song.query(span(1L, 1L, 2L, 1L))
+  assert_eq(events.length(), 2)
+  assert_true(events[0].whole.unwrap().begin == @pattern.Rational::from_int(1))
+  assert_true(events[0].part.begin == @pattern.Rational::from_int(1))
+  assert_true(events[1].whole.unwrap().begin == rat(3L, 2L))
+  assert_true(events[1].part.begin == rat(3L, 2L))
 }
 
 ///|

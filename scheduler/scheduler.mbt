@@ -434,11 +434,11 @@ pub fn PatternScheduler::process_snapshot_block(
 }
 
 ///|
-/// Section entry point with identity timing semantics.
+/// Section entry point with section-local timing semantics.
 ///
-/// This intentionally matches `process_block(section.body(), ...)` today. The
-/// separate method gives the song layer a stable scheduler boundary before
-/// groove or rubato changes event timing.
+/// This intentionally routes through `Section::query` rather than the raw
+/// `Section::body()` pattern so non-identity `TimeScope`s affect event timing
+/// while keeping the scheduler's logical frame unchanged.
 pub fn PatternScheduler::process_section_block(
   self : PatternScheduler,
   section : @song.Section[@pattern.ControlMap],
@@ -448,12 +448,12 @@ pub fn PatternScheduler::process_section_block(
 ) -> Unit {
   let frame = self.current_block()
   self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
-  let events = section.body().query(frame.logical_arc)
+  let events = section.query(frame.logical_arc)
   self.process_block_events(events, frame, pool, left, right)
 }
 
 ///|
-/// Song entry point with contiguous identity timing semantics.
+/// Song entry point with song-global layout timing semantics.
 ///
 /// The song layer returns events in song-global logical time, matching the
 /// scheduler frame's logical arc.
