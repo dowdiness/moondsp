@@ -10,8 +10,8 @@ actionable; move completed design notes or implementation plans under
 
 - `main` is currently at
   `5c9f895 [codex] Add scheduler snapshot swap boundary (#35)`.
-- Branch `codex/phase6-mini-stable-ids` starts the mini-notation stable-ID
-  reconciliation slice from that merged head.
+- PR #36 (`codex/phase6-mini-stable-ids`) is open as a draft for the
+  mini-notation stable-ID reconciliation slice from that merged head.
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -107,7 +107,7 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Review, commit, and open PR for `codex/phase6-mini-stable-ids`.
+1. Review PR #36 checks and review feedback; fix issues or merge when ready.
 
 2. After that branch merges, choose the next Phase 6 slice from
    `docs/superpowers/specs/2026-05-12-phase6-incremental-playback-design.md`.
