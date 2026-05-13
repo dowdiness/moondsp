@@ -189,6 +189,26 @@ actionable; move completed design notes or implementation plans under
   - `rtk moon test` (769 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
+- Active song layout authoring branch:
+  - identity-preserving song layout authoring now covers section placements and
+    lowers back to the existing playback/query surface.
+  - occurrence display renames advance the authoring revision while preserving
+    the layout revision, stable occurrence identity, and computed spans.
+  - occurrence insertion, removal, reordering, and explicit-start edits advance
+    the layout revision and preserve surviving occurrence identities.
+  - same-length section edits reuse the existing layout boundary, while section
+    length edits advance the layout revision and shift downstream spans.
+  - coverage proves rename stability, insertion/removal, reorder, downstream
+    span shifts, unchanged section reuse, and missing-ID edit errors.
+- Latest local verification on `codex/phase6-song-layout-doc`:
+  - `rtk moon fmt`
+  - `rtk moon info`
+  - `rtk moon check`
+  - `rtk moon test song` (49 passed)
+  - `rtk moon check --target all`
+  - `rtk moon test` (775 passed)
+  - `rtk moon build --target wasm-gc`
+  - `rtk git diff --check`
 - Latest local verification for PR #40 before merge:
   - `moon fmt`
   - `moon info`
@@ -270,17 +290,8 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Implement the song layout authoring document slice on
-   `codex/phase6-song-layout-doc`:
-   - add an identity-preserving authoring layer for song layouts and section
-     placements.
-   - preserve surviving occurrence identities across rename, insert, delete,
-     and reorder edits.
-   - separate display-only revisions from layout-affecting revisions.
-   - lower the authoring model back to the existing playback/query surface
-     without changing current scheduler semantics.
-   - add tests for rename stability, insertion/removal, reorder, length-driven
-     downstream span shifts, and unchanged section reuse.
+1. Review, commit, push, and open the PR for
+   `codex/phase6-song-layout-doc`.
 
 2. After that lands, wire the song layout revision boundary into scheduler
    snapshot commit behavior for song edits during playback.
