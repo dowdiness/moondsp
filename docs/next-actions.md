@@ -9,10 +9,9 @@ actionable; move completed design notes or implementation plans under
 ## Current State
 
 - `main` is currently at
-  `f48a4bc Merge pull request #32 from dowdiness/codex/phase6-pattern-authoring`.
-- PR #33 (`codex/phase6-pattern-cache`) is open, not draft, mergeable, and
-  clean against `main` at head `16788ed Stabilize revision max tie handling`;
-  5/5 GitHub checks pass and the CodeRabbit thread is resolved.
+  `aa5f773 Merge pull request #33 from dowdiness/codex/phase6-pattern-cache`.
+- Branch `codex/phase6-lowering-cache` contains the first Phase 6
+  lowering-cache boundary slice, still unmerged.
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -50,7 +49,7 @@ actionable; move completed design notes or implementation plans under
   - revisioned edits for root changes, node replacement, and core
     structure-building operations.
   - lowering snapshots back to the runtime query model.
-- PR #33 extends the pattern authoring groundwork with:
+- Pattern authoring explicit-node groundwork shipped so far on `main`:
   - aggregate document revisions derive from an ordered child-revision mix,
     with coverage for rebuilt sequence/stack roots, mixed-revision merged
     inputs, and shifted child-revision aliases.
@@ -59,9 +58,27 @@ actionable; move completed design notes or implementation plans under
   - explicit authoring nodes cover the runtime operations, including filtering,
     Euclidean rhythms, degradation, periodic transforms, stereo split, and
     control-map merging.
-  - deferred pattern work remains lowering caches, mini-notation ID
-    reconciliation, and scheduler snapshot swapping.
-- Latest full local verification for PR #33 head `16788ed`:
+  - deferred pattern work remains mini-notation ID reconciliation and
+    scheduler snapshot swapping.
+- Active lowering-cache branch adds:
+  - private per-node revision entries inside `PatternDoc` storage.
+  - `PatternDoc::node_revision` for stable ID plus revision invalidation
+    boundaries.
+  - `PatternLoweringCache` and `PatternDoc::lower_with_cache`, keyed by stable
+    node ID plus a private node-generation guard plus full `Revision`
+    equality.
+  - coverage that editing one child invalidates that child and ancestors while
+    reusing unchanged sibling lowerings.
+  - regression coverage that a reused cache does not return stale audio for a
+    freshly rebuilt document with the same stable ID and zero revision.
+- Latest local verification for active branch:
+  - `rtk moon fmt`
+  - `rtk moon info`
+  - `rtk moon check`
+  - `rtk moon test` (730 passed)
+  - `rtk moon build --target wasm-gc`
+  - `rtk git diff --check`
+- Latest full local verification for PR #33 merge base `aa5f773`:
   - `rtk moon fmt`
   - `rtk moon info`
   - `rtk moon check`
@@ -71,15 +88,12 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Merge PR #33.
+1. Commit `codex/phase6-lowering-cache`, push it, and open the PR.
 
-2. Implement the first Phase 6 lowering cache boundary from
-   `docs/superpowers/specs/2026-05-12-phase6-incremental-playback-design.md`.
-
-   Continue from the explicit-node slice by adding the first lowering cache
-   boundary. Keep mini-notation reconciliation and scheduler snapshot swapping
-   out of the next slice unless the cache boundary requires a small integration
-   test.
+2. After this branch merges, choose the next Phase 6 slice from
+   `docs/superpowers/specs/2026-05-12-phase6-incremental-playback-design.md`:
+   mini-notation ID reconciliation or scheduler snapshot swapping. Keep DSP
+   graph identity for a later dedicated slice.
 
 ## Acceptance Checks For API-Hardening Slices
 

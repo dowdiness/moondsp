@@ -36,6 +36,16 @@ fn[A] unwrap_snapshot(
 }
 
 ///|
+fn unwrap_revision(
+  result : Result[@identity.Revision, PatternDocError],
+) -> @identity.Revision {
+  match result {
+    Ok(revision) => revision
+    Err(_) => abort("expected pattern node revision")
+  }
+}
+
+///|
 fn edited_leaf_doc(edit_count : Int, value : Int) -> PatternDoc[Int] {
   let count = edit_count.abs() % 8 + 1
   let mut doc = PatternDoc::pure(id=pid("leaf"), value~)
@@ -118,6 +128,73 @@ test "PatternDoc snapshot remains stable after document edit" {
   )
   inspect(old_events[0].value, content="1")
   inspect(new_events[0].value, content="2")
+}
+
+///|
+test "PatternDoc node revisions invalidate ancestors but not siblings" {
+  let left = PatternDoc::pure(id=pid("left"), value=1)
+  let right = PatternDoc::pure(id=pid("right"), value=2)
+  let base = unwrap_doc(
+    try? PatternDoc::sequence(id=pid("seq"), docs=[left, right]),
+  )
+  let edited = unwrap_doc(try? base.replace_with_pure(id=pid("left"), value=3))
+  let base_left = unwrap_revision(try? base.node_revision(pid("left")))
+  let edited_left = unwrap_revision(try? edited.node_revision(pid("left")))
+  let base_right = unwrap_revision(try? base.node_revision(pid("right")))
+  let edited_right = unwrap_revision(try? edited.node_revision(pid("right")))
+  let base_root = unwrap_revision(try? base.node_revision(pid("seq")))
+  let edited_root = unwrap_revision(try? edited.node_revision(pid("seq")))
+  assert_true(base_left != edited_left)
+  assert_true(base_right == edited_right)
+  assert_true(base_root != edited_root)
+}
+
+///|
+test "PatternLoweringCache reuses unchanged child after pattern edit" {
+  let left = PatternDoc::pure(id=pid("left"), value=1)
+  let right = PatternDoc::pure(id=pid("right"), value=2)
+  let base = unwrap_doc(
+    try? PatternDoc::sequence(id=pid("seq"), docs=[left, right]),
+  )
+  let cache : PatternLoweringCache[Int] = PatternLoweringCache::new()
+  ignore(unwrap_snapshot(try? base.lower_with_cache(cache)))
+  inspect(cache.hit_count(), content="0")
+  inspect(cache.miss_count(), content="3")
+  inspect(cache.entry_count(), content="3")
+  let edited_left = unwrap_doc(
+    try? left.replace_with_pure(id=pid("left"), value=3),
+  )
+  let edited = unwrap_doc(
+    try? PatternDoc::sequence(id=pid("seq"), docs=[edited_left, right]),
+  )
+  cache.reset_stats()
+  let snapshot = unwrap_snapshot(try? edited.lower_with_cache(cache))
+  let events = snapshot.query(doc_span(0, 1, 1, 1))
+  inspect(events.length(), content="2")
+  inspect(events[0].value, content="3")
+  inspect(events[1].value, content="2")
+  inspect(cache.hit_count(), content="1")
+  inspect(cache.miss_count(), content="2")
+  inspect(cache.entry_count(), content="5")
+  cache.reset_stats()
+  ignore(unwrap_snapshot(try? edited.lower_with_cache(cache)))
+  inspect(cache.hit_count(), content="1")
+  inspect(cache.miss_count(), content="0")
+}
+
+///|
+test "PatternLoweringCache does not reuse fresh doc with same id and revision" {
+  let first = PatternDoc::pure(id=pid("leaf"), value=1)
+  let second = PatternDoc::pure(id=pid("leaf"), value=2)
+  let cache : PatternLoweringCache[Int] = PatternLoweringCache::new()
+  let first_snapshot = unwrap_snapshot(try? first.lower_with_cache(cache))
+  inspect(first_snapshot.query(doc_span(0, 1, 1, 1))[0].value, content="1")
+  cache.reset_stats()
+  let second_snapshot = unwrap_snapshot(try? second.lower_with_cache(cache))
+  inspect(second_snapshot.query(doc_span(0, 1, 1, 1))[0].value, content="2")
+  inspect(cache.hit_count(), content="0")
+  inspect(cache.miss_count(), content="1")
+  inspect(cache.entry_count(), content="2")
 }
 
 ///|
