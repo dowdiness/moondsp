@@ -9,9 +9,9 @@ actionable; move completed design notes or implementation plans under
 ## Current State
 
 - `main` is currently at
-  `aa5f773 Merge pull request #33 from dowdiness/codex/phase6-pattern-cache`.
-- PR #34 (`codex/phase6-lowering-cache`) is open for the first Phase 6
-  lowering-cache boundary slice, still unmerged.
+  `6d804d5 Merge pull request #34 from dowdiness/codex/phase6-lowering-cache`.
+- Branch `codex/phase6-scheduler-snapshot-swap` implements the first scheduler
+  snapshot-swap slice from that merged head.
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -58,9 +58,8 @@ actionable; move completed design notes or implementation plans under
   - explicit authoring nodes cover the runtime operations, including filtering,
     Euclidean rhythms, degradation, periodic transforms, stereo split, and
     control-map merging.
-  - deferred pattern work remains mini-notation ID reconciliation and
-    scheduler snapshot swapping.
-- Active lowering-cache branch adds:
+  - deferred pattern work remains mini-notation ID reconciliation.
+- Pattern lowering-cache groundwork shipped so far on `main`:
   - private per-node revision metadata inside authoring-document storage.
   - stable node identity plus revision boundaries for subtree invalidation.
   - lowering reuse keyed by stable node identity, a recursive private subtree
@@ -71,11 +70,19 @@ actionable; move completed design notes or implementation plans under
     freshly rebuilt document with the same stable ID and zero revision.
   - regression coverage that divergent replacement edits forked from the same
     base document do not alias cache entries for the edited child or ancestors.
+- Scheduler snapshot-swap groundwork on active branch:
+  - `PatternScheduler::queue_pattern_snapshot` stages a lowered
+    `PatternSnapshot[ControlMap]` without changing playback immediately.
+  - `PatternScheduler::process_snapshot_block` commits the pending snapshot at
+    block start, before note expiry and event query for that block.
+  - coverage proves block-boundary commit, no retroactive scheduling for past
+    onsets, active-note let-ring across a silent replacement, and coalescing
+    multiple pending snapshots to the latest staged snapshot.
 - Latest local verification for active branch:
   - `rtk moon fmt`
   - `rtk moon info`
   - `rtk moon check`
-  - `rtk moon test` (731 passed)
+  - `rtk moon test` (735 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
 - Latest full local verification for PR #33 merge base `aa5f773`:
@@ -88,12 +95,12 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Review PR #34 checks and review feedback; fix issues or merge when ready.
+1. Review, commit, and open PR for `codex/phase6-scheduler-snapshot-swap`.
 
-2. After this branch merges, choose the next Phase 6 slice from
+2. After that branch merges, take the next Phase 6 slice from
    `docs/superpowers/specs/2026-05-12-phase6-incremental-playback-design.md`:
-   mini-notation ID reconciliation or scheduler snapshot swapping. Keep DSP
-   graph identity for a later dedicated slice.
+   mini-notation stable-ID reconciliation. Keep DSP graph identity for a later
+   dedicated slice.
 
 ## Acceptance Checks For API-Hardening Slices
 

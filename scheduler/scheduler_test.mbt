@@ -155,6 +155,50 @@ fn make_test_sched() -> (
 }
 
 ///|
+fn pid(value : String) -> @identity.PatternNodeId {
+  let result = try? @identity.PatternNodeId::from_string(value)
+  match result {
+    Ok(id) => id
+    Err(_) => abort("expected valid pattern node id")
+  }
+}
+
+///|
+fn unwrap_control_snapshot(
+  result : Result[
+    @pattern.PatternSnapshot[@pattern.ControlMap],
+    @pattern.PatternDocError,
+  ],
+) -> @pattern.PatternSnapshot[@pattern.ControlMap] {
+  match result {
+    Ok(snapshot) => snapshot
+    Err(_) => abort("expected pattern snapshot")
+  }
+}
+
+///|
+fn note_snapshot(
+  id_value : String,
+  note_value : Double,
+) -> @pattern.PatternSnapshot[@pattern.ControlMap] {
+  let doc = @pattern.PatternDoc::from_pattern(
+    id=pid(id_value),
+    pat=@pattern.note(note_value),
+  )
+  unwrap_control_snapshot(try? doc.lower())
+}
+
+///|
+fn silence_snapshot(
+  id_value : String,
+) -> @pattern.PatternSnapshot[@pattern.ControlMap] {
+  let doc : @pattern.PatternDoc[@pattern.ControlMap] = @pattern.PatternDoc::silence(
+    id=pid(id_value),
+  )
+  unwrap_control_snapshot(try? doc.lower())
+}
+
+///|
 test "expire_notes: removes notes past their end_time" {
   let (pool, _, ctx) = make_test_pool()
   let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~)
@@ -212,6 +256,58 @@ test "process_block: note(60) triggers one voice" {
   assert_eq(pool.active_voice_count(), 1)
   assert_eq(sched.active_note_count(), 1)
   assert_eq(sched.sample_counter(), 128L)
+}
+
+///|
+test "process_snapshot_block: pending snapshot commits at block boundary" {
+  let (pool, sched, left, right) = make_test_sched()
+  sched.queue_pattern_snapshot(note_snapshot("snapshot_note", 60.0))
+  assert_true(sched.has_pending_pattern_snapshot())
+  assert_true(!sched.has_active_pattern_snapshot())
+  assert_eq(pool.active_voice_count(), 0)
+  sched.process_snapshot_block(pool, left, right)
+  assert_true(!sched.has_pending_pattern_snapshot())
+  assert_true(sched.has_active_pattern_snapshot())
+  assert_eq(pool.active_voice_count(), 1)
+  assert_eq(sched.active_note_count(), 1)
+  assert_eq(sched.sample_counter(), 128L)
+}
+
+///|
+test "process_snapshot_block: queued snapshot does not backfill past onsets" {
+  let (pool, sched, left, right) = make_test_sched()
+  sched.process_snapshot_block(pool, left, right)
+  assert_eq(sched.sample_counter(), 128L)
+  sched.queue_pattern_snapshot(note_snapshot("late_snapshot_note", 60.0))
+  sched.process_snapshot_block(pool, left, right)
+  assert_eq(pool.active_voice_count(), 0)
+  assert_eq(sched.active_note_count(), 0)
+  assert_eq(sched.sample_counter(), 256L)
+}
+
+///|
+test "process_snapshot_block: silent edit lets active note ring" {
+  let (pool, sched, left, right) = make_test_sched()
+  sched.queue_pattern_snapshot(note_snapshot("ring_note", 60.0))
+  sched.process_snapshot_block(pool, left, right)
+  assert_eq(pool.active_voice_count(), 1)
+  assert_eq(sched.active_note_count(), 1)
+  sched.queue_pattern_snapshot(silence_snapshot("ring_silence"))
+  sched.process_snapshot_block(pool, left, right)
+  assert_eq(pool.active_voice_count(), 1)
+  assert_eq(sched.active_note_count(), 1)
+}
+
+///|
+test "process_snapshot_block: multiple pending snapshots keep the latest" {
+  let (pool, sched, left, right) = make_test_sched()
+  sched.queue_pattern_snapshot(note_snapshot("coalesced_note", 60.0))
+  sched.queue_pattern_snapshot(silence_snapshot("coalesced_silence"))
+  sched.process_snapshot_block(pool, left, right)
+  assert_eq(pool.active_voice_count(), 0)
+  assert_eq(sched.active_note_count(), 0)
+  assert_true(sched.has_active_pattern_snapshot())
+  assert_true(!sched.has_pending_pattern_snapshot())
 }
 
 ///|

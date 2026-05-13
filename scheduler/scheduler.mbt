@@ -98,6 +98,12 @@ pub struct PatternScheduler {
   ctx : @moondsp.DspContext
   active_notes : Array[ActiveNote]
   mapper : ControlMapper
+  priv mut active_pattern_snapshot : @pattern.PatternSnapshot[
+    @pattern.ControlMap,
+  ]?
+  priv mut pending_pattern_snapshot : @pattern.PatternSnapshot[
+    @pattern.ControlMap,
+  ]?
 }
 
 ///|
@@ -131,6 +137,8 @@ pub fn PatternScheduler::PatternScheduler(
     ctx,
     active_notes: [],
     mapper: mapper.unwrap_or(default_control_mapper()),
+    active_pattern_snapshot: None,
+    pending_pattern_snapshot: None,
   }
 }
 
@@ -166,6 +174,50 @@ fn PatternScheduler::advance_block(self : PatternScheduler) -> Unit {
 /// notes keep their already-computed performance-time gate-off sample.
 pub fn PatternScheduler::set_bpm(self : PatternScheduler, bpm : Double) -> Unit {
   self.bpm = sanitize_bpm(bpm)
+}
+
+///|
+/// Stage a lowered authoring snapshot for playback. The staged snapshot becomes
+/// active at the start of the next `process_snapshot_block` call, giving callers
+/// a stable block boundary for pattern edits during playback.
+pub fn PatternScheduler::queue_pattern_snapshot(
+  self : PatternScheduler,
+  snapshot : @pattern.PatternSnapshot[@pattern.ControlMap],
+) -> Unit {
+  self.pending_pattern_snapshot = Some(snapshot)
+}
+
+///|
+pub fn PatternScheduler::has_active_pattern_snapshot(
+  self : PatternScheduler,
+) -> Bool {
+  match self.active_pattern_snapshot {
+    Some(_) => true
+    None => false
+  }
+}
+
+///|
+pub fn PatternScheduler::has_pending_pattern_snapshot(
+  self : PatternScheduler,
+) -> Bool {
+  match self.pending_pattern_snapshot {
+    Some(_) => true
+    None => false
+  }
+}
+
+///|
+fn PatternScheduler::commit_pending_pattern_snapshot(
+  self : PatternScheduler,
+) -> Unit {
+  match self.pending_pattern_snapshot {
+    Some(snapshot) => {
+      self.active_pattern_snapshot = Some(snapshot)
+      self.pending_pattern_snapshot = None
+    }
+    None => ()
+  }
 }
 
 ///|
@@ -311,6 +363,17 @@ fn PatternScheduler::query_pattern_block(
 }
 
 ///|
+fn PatternScheduler::query_snapshot_block(
+  self : PatternScheduler,
+  frame : BlockFrame,
+) -> Array[@pattern.Event[@pattern.ControlMap]] {
+  match self.active_pattern_snapshot {
+    Some(snapshot) => snapshot.query(frame.logical_arc)
+    None => []
+  }
+}
+
+///|
 fn PatternScheduler::render_block(
   self : PatternScheduler,
   pool : @moondsp.BoundVoicePool,
@@ -350,6 +413,23 @@ pub fn PatternScheduler::process_block(
   let frame = self.current_block()
   self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
   let events = self.query_pattern_block(pat, frame)
+  self.process_block_events(events, frame, pool, left, right)
+}
+
+///|
+/// Snapshot entry point for authoring-time pattern edits. Pending snapshots are
+/// swapped in once, at the beginning of the audio block; note expiry and event
+/// queries for that block then observe one coherent snapshot.
+pub fn PatternScheduler::process_snapshot_block(
+  self : PatternScheduler,
+  pool : @moondsp.BoundVoicePool,
+  left : @moondsp.AudioBuffer,
+  right : @moondsp.AudioBuffer,
+) -> Unit {
+  let frame = self.current_block()
+  self.commit_pending_pattern_snapshot()
+  self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
+  let events = self.query_snapshot_block(frame)
   self.process_block_events(events, frame, pool, left, right)
 }
 
