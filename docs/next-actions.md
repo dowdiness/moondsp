@@ -9,7 +9,7 @@ actionable; move completed design notes or implementation plans under
 ## Current State
 
 - `main` is currently at
-  `a68648f [codex] Index song occurrence lookups (#42)`.
+  `e11e83c [codex] Add song section identity docs`.
 - PR #37 is merged:
   https://github.com/dowdiness/moondsp/pull/37
 - PR #38 is merged:
@@ -22,10 +22,10 @@ actionable; move completed design notes or implementation plans under
   https://github.com/dowdiness/moondsp/pull/41
 - PR #42 is merged:
   https://github.com/dowdiness/moondsp/pull/42
-- Active branch: `codex/phase6-song-section-identity`, based on
-  `a68648f [codex] Index song occurrence lookups (#42)`.
-- PR #43 is open as a draft for the active section/layer identity branch:
+- PR #43 is merged:
   https://github.com/dowdiness/moondsp/pull/43
+- Active branch: `codex/phase6-song-layout-doc`, based on
+  `e11e83c [codex] Add song section identity docs`.
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -64,8 +64,10 @@ actionable; move completed design notes or implementation plans under
     through song and direct section playback.
   - efficient secondary lookup indexes now cover occurrence name, stable ID,
     start time, and end time while preserving authoring-order overlap results.
-  - deferred song work is now section/layer identity and revision boundaries
-    on the active branch.
+  - section/layer authoring identity and revision boundaries now cover reusable
+    section definitions and layered section bodies.
+  - deferred song work is now an identity-bearing song layout authoring model
+    for occurrence edits and layout revision boundaries.
 - Pattern authoring groundwork shipped so far on `main`:
   - identity-bearing authoring documents over the existing runtime query model.
   - private node storage with stable node lookup helpers.
@@ -165,7 +167,7 @@ actionable; move completed design notes or implementation plans under
   - `rtk moon test` (764 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
-- Active section/layer identity branch:
+- Song section/layer identity shipped so far on `main`:
   - identity-preserving section and layer authoring adapters now cover reusable
     section definitions and layered section bodies.
   - section and layer display renames preserve stable identities and revisions;
@@ -178,7 +180,7 @@ actionable; move completed design notes or implementation plans under
   - coverage proves section/layer display rename stability, duplicate layer
     display-name rejection, body revision boundaries without layout changes,
     and length-driven layout shifts with stable occurrence IDs.
-- Latest local verification on `codex/phase6-song-section-identity`:
+- Latest local verification for PR #43 before merge:
   - `rtk moon fmt`
   - `rtk moon info`
   - `rtk moon check`
@@ -268,12 +270,20 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Review PR #43, address any feedback, then mark it ready and merge when
-   checks/review are clean:
-   https://github.com/dowdiness/moondsp/pull/43
+1. Implement the song layout authoring document slice on
+   `codex/phase6-song-layout-doc`:
+   - add an identity-preserving authoring layer for song layouts and section
+     placements.
+   - preserve surviving occurrence identities across rename, insert, delete,
+     and reorder edits.
+   - separate display-only revisions from layout-affecting revisions.
+   - lower the authoring model back to the existing playback/query surface
+     without changing current scheduler semantics.
+   - add tests for rename stability, insertion/removal, reorder, length-driven
+     downstream span shifts, and unchanged section reuse.
 
-2. After the section/layer identity branch merges, choose the next Phase 6 song
-   slice.
+2. After that lands, wire the song layout revision boundary into scheduler
+   snapshot commit behavior for song edits during playback.
 
 ## Acceptance Checks For API-Hardening Slices
 
