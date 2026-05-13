@@ -198,6 +198,30 @@ test "PatternLoweringCache does not reuse fresh doc with same id and revision" {
 }
 
 ///|
+test "PatternLoweringCache does not reuse divergent replacements" {
+  let left = PatternDoc::pure(id=pid("left"), value=1)
+  let right = PatternDoc::pure(id=pid("right"), value=2)
+  let base = unwrap_doc(
+    try? PatternDoc::sequence(id=pid("seq"), docs=[left, right]),
+  )
+  let first = unwrap_doc(try? base.replace_with_pure(id=pid("left"), value=3))
+  let second = unwrap_doc(try? base.replace_with_pure(id=pid("left"), value=4))
+  let cache : PatternLoweringCache[Int] = PatternLoweringCache::new()
+  let first_snapshot = unwrap_snapshot(try? first.lower_with_cache(cache))
+  let first_events = first_snapshot.query(doc_span(0, 1, 1, 1))
+  inspect(first_events[0].value, content="3")
+  inspect(first_events[1].value, content="2")
+  cache.reset_stats()
+  let second_snapshot = unwrap_snapshot(try? second.lower_with_cache(cache))
+  let second_events = second_snapshot.query(doc_span(0, 1, 1, 1))
+  inspect(second_events[0].value, content="4")
+  inspect(second_events[1].value, content="2")
+  inspect(cache.hit_count(), content="1")
+  inspect(cache.miss_count(), content="2")
+  inspect(cache.entry_count(), content="5")
+}
+
+///|
 test "PatternDoc::replace_with_pattern swaps runtime body under stable id" {
   let doc = PatternDoc::pure(id=pid("leaf"), value=1)
   let edited = unwrap_doc(

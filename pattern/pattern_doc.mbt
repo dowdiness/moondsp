@@ -150,10 +150,75 @@ fn[A] replace_pattern_node(
     None => raise MissingNode(key)
     Some(entry) =>
       nodes[key] = {
-        generation: entry.generation,
+        generation: next_pattern_node_generation(),
         revision: entry.revision.next(),
         node: node.snapshot(),
       }
+  }
+}
+
+///|
+fn append_pattern_cache_token(
+  target : Array[Int64],
+  source : Array[Int64],
+) -> Unit {
+  for value in source {
+    target.push(value)
+  }
+}
+
+///|
+fn pattern_cache_token_equal(left : Array[Int64], right : Array[Int64]) -> Bool {
+  guard left.length() == right.length() else { return false }
+  for index in 0..<left.length() {
+    guard left[index] == right[index] else { return false }
+  }
+  true
+}
+
+///|
+fn[A] pattern_node_cache_token(
+  nodes : Map[String, PatternDocEntry[A]],
+  id : @identity.PatternNodeId,
+) -> Array[Int64] raise PatternDocError {
+  match nodes.get(id.value()) {
+    None => raise MissingNode(id.value())
+    Some(entry) => {
+      let token : Array[Int64] = [entry.generation]
+      match entry.node {
+        Runtime(_) | Silence | Pure(_) => ()
+        Fast(child, _)
+        | Slow(child, _)
+        | Rev(child)
+        | FilterMap(child, _)
+        | Euclid(child, _, _, _)
+        | DegradeBy(child, _, _)
+        | Every(child, _, _)
+        | Jux(child, _) =>
+          append_pattern_cache_token(
+            token,
+            pattern_node_cache_token(nodes, child),
+          )
+        MergeControl(left, right, _) => {
+          append_pattern_cache_token(
+            token,
+            pattern_node_cache_token(nodes, left),
+          )
+          append_pattern_cache_token(
+            token,
+            pattern_node_cache_token(nodes, right),
+          )
+        }
+        Sequence(children) | Stack(children) =>
+          for child in children {
+            append_pattern_cache_token(
+              token,
+              pattern_node_cache_token(nodes, child),
+            )
+          }
+      }
+      token
+    }
   }
 }
 
@@ -235,7 +300,7 @@ fn[A] lower_pattern_node(
 
 ///|
 priv struct PatternLoweringCacheEntry[A] {
-  generation : Int64
+  token : Array[Int64]
   revision : @identity.Revision
   pat : Pat[A]
 }
@@ -243,10 +308,10 @@ priv struct PatternLoweringCacheEntry[A] {
 ///|
 /// Cache for lowered pattern subtrees.
 ///
-/// Entries are keyed by stable `PatternNodeId`, a private node-generation guard,
-/// and full `Revision` equality. The generation guard prevents stale hits when
-/// callers rebuild unrelated documents with the same stable IDs and fresh
-/// zero revisions.
+/// Entries are keyed by stable `PatternNodeId`, a recursive private subtree
+/// token, and full `Revision` equality. The subtree token prevents stale hits
+/// when callers rebuild unrelated docs or fork divergent edits from the same
+/// base with identical stable IDs and revision counters.
 pub struct PatternLoweringCache[A] {
   priv entries : Map[String, Array[PatternLoweringCacheEntry[A]]]
   priv mut hits : Int
@@ -262,7 +327,7 @@ pub fn[A] PatternLoweringCache::new() -> PatternLoweringCache[A] {
 fn[A] PatternLoweringCache::lookup(
   self : PatternLoweringCache[A],
   id : @identity.PatternNodeId,
-  generation : Int64,
+  token : Array[Int64],
   revision : @identity.Revision,
 ) -> Pat[A]? {
   match self.entries.get(id.value()) {
@@ -272,7 +337,8 @@ fn[A] PatternLoweringCache::lookup(
     }
     Some(entries) => {
       for entry in entries {
-        if entry.generation == generation && entry.revision == revision {
+        if pattern_cache_token_equal(entry.token, token) &&
+          entry.revision == revision {
           self.hits += 1
           return Some(entry.pat)
         }
@@ -287,22 +353,22 @@ fn[A] PatternLoweringCache::lookup(
 fn[A] PatternLoweringCache::store(
   self : PatternLoweringCache[A],
   id : @identity.PatternNodeId,
-  generation : Int64,
+  token : Array[Int64],
   revision : @identity.Revision,
   pat : Pat[A],
 ) -> Unit {
   let key = id.value()
   match self.entries.get(key) {
-    None => self.entries[key] = [{ generation, revision, pat }]
+    None => self.entries[key] = [{ token: token.copy(), revision, pat }]
     Some(entries) => {
       for index in 0..<entries.length() {
-        if entries[index].generation == generation &&
+        if pattern_cache_token_equal(entries[index].token, token) &&
           entries[index].revision == revision {
-          entries[index] = { generation, revision, pat }
+          entries[index] = { token: token.copy(), revision, pat }
           return
         }
       }
-      entries.push({ generation, revision, pat })
+      entries.push({ token: token.copy(), revision, pat })
     }
   }
 }
@@ -313,17 +379,13 @@ fn[A] lower_pattern_node_cached(
   id : @identity.PatternNodeId,
   cache : PatternLoweringCache[A],
 ) -> Pat[A] raise PatternDocError {
-  let key = id.value()
   let revision = pattern_node_revision(nodes, id)
-  let generation = match nodes.get(key) {
-    None => raise MissingNode(key)
-    Some(entry) => entry.generation
-  }
-  match cache.lookup(id, generation, revision) {
+  let token = pattern_node_cache_token(nodes, id)
+  match cache.lookup(id, token, revision) {
     Some(pat) => pat
     None => {
-      let pat = match nodes.get(key) {
-        None => raise MissingNode(key)
+      let pat = match nodes.get(id.value()) {
+        None => raise MissingNode(id.value())
         Some(entry) =>
           match entry.node {
             Runtime(pat) => pat
@@ -371,7 +433,7 @@ fn[A] lower_pattern_node_cached(
             }
           }
       }
-      cache.store(id, generation, revision, pat)
+      cache.store(id, token, revision, pat)
       pat
     }
   }

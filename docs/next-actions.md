@@ -65,17 +65,19 @@ actionable; move completed design notes or implementation plans under
   - `PatternDoc::node_revision` for stable ID plus revision invalidation
     boundaries.
   - `PatternLoweringCache` and `PatternDoc::lower_with_cache`, keyed by stable
-    node ID plus a private node-generation guard plus full `Revision`
+    node ID plus a recursive private subtree token plus full `Revision`
     equality.
   - coverage that editing one child invalidates that child and ancestors while
     reusing unchanged sibling lowerings.
   - regression coverage that a reused cache does not return stale audio for a
     freshly rebuilt document with the same stable ID and zero revision.
+  - regression coverage that divergent replacement edits forked from the same
+    base document do not alias cache entries for the edited child or ancestors.
 - Latest local verification for active branch:
   - `rtk moon fmt`
   - `rtk moon info`
   - `rtk moon check`
-  - `rtk moon test` (730 passed)
+  - `rtk moon test` (731 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
 - Latest full local verification for PR #33 merge base `aa5f773`:
