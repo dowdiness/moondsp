@@ -239,6 +239,43 @@ fn[A] pattern_node_revision(
 }
 
 ///|
+fn[A] copy_reachable_pattern_nodes(
+  source : Map[String, PatternDocEntry[A]],
+  id : @identity.PatternNodeId,
+  target : Map[String, PatternDocEntry[A]],
+) -> Unit raise PatternDocError {
+  let key = id.value()
+  if target.contains(key) {
+    return
+  }
+  match source.get(key) {
+    None => raise MissingNode(key)
+    Some(entry) => {
+      target[key] = entry.snapshot()
+      match entry.node {
+        Runtime(_) | Silence | Pure(_) => ()
+        Fast(child, _)
+        | Slow(child, _)
+        | Rev(child)
+        | FilterMap(child, _)
+        | Euclid(child, _, _, _)
+        | DegradeBy(child, _, _)
+        | Every(child, _, _)
+        | Jux(child, _) => copy_reachable_pattern_nodes(source, child, target)
+        MergeControl(left, right, _) => {
+          copy_reachable_pattern_nodes(source, left, target)
+          copy_reachable_pattern_nodes(source, right, target)
+        }
+        Sequence(children) | Stack(children) =>
+          for child in children {
+            copy_reachable_pattern_nodes(source, child, target)
+          }
+      }
+    }
+  }
+}
+
+///|
 fn[A] pattern_node_revision_memoized(
   nodes : Map[String, PatternDocEntry[A]],
   id : @identity.PatternNodeId,
@@ -639,6 +676,16 @@ pub fn[A] PatternDoc::contains_node(
   id : @identity.PatternNodeId,
 ) -> Bool {
   self.nodes.contains(id.value())
+}
+
+///|
+pub fn[A] PatternDoc::subdoc(
+  self : PatternDoc[A],
+  root~ : @identity.PatternNodeId,
+) -> PatternDoc[A] raise PatternDocError {
+  let nodes : Map[String, PatternDocEntry[A]] = {}
+  copy_reachable_pattern_nodes(self.nodes, root, nodes)
+  { root, revision: pattern_node_revision(nodes, root), nodes }
 }
 
 ///|

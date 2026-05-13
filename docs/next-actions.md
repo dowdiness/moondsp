@@ -9,9 +9,9 @@ actionable; move completed design notes or implementation plans under
 ## Current State
 
 - `main` is currently at
-  `6d804d5 Merge pull request #34 from dowdiness/codex/phase6-lowering-cache`.
-- PR #35 (`codex/phase6-scheduler-snapshot-swap`) is open as a draft for the
-  first scheduler snapshot-swap slice from that merged head.
+  `5c9f895 [codex] Add scheduler snapshot swap boundary (#35)`.
+- Branch `codex/phase6-mini-stable-ids` starts the mini-notation stable-ID
+  reconciliation slice from that merged head.
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -58,7 +58,6 @@ actionable; move completed design notes or implementation plans under
   - explicit authoring nodes cover the runtime operations, including filtering,
     Euclidean rhythms, degradation, periodic transforms, stereo split, and
     control-map merging.
-  - deferred pattern work remains mini-notation ID reconciliation.
 - Pattern lowering-cache groundwork shipped so far on `main`:
   - private per-node revision metadata inside authoring-document storage.
   - stable node identity plus revision boundaries for subtree invalidation.
@@ -70,7 +69,7 @@ actionable; move completed design notes or implementation plans under
     freshly rebuilt document with the same stable ID and zero revision.
   - regression coverage that divergent replacement edits forked from the same
     base document do not alias cache entries for the edited child or ancestors.
-- Scheduler snapshot-swap groundwork on active branch:
+- Scheduler snapshot-swap groundwork shipped so far on `main`:
   - `PatternScheduler::queue_pattern_snapshot` stages a lowered
     `PatternSnapshot[ControlMap]` without changing playback immediately.
   - `PatternScheduler::process_snapshot_block` commits the pending snapshot at
@@ -78,12 +77,25 @@ actionable; move completed design notes or implementation plans under
   - coverage proves block-boundary commit, no retroactive scheduling for past
     onsets, active-note let-ring across a silent replacement, and coalescing
     multiple pending snapshots to the latest staged snapshot.
+- Mini-notation stable-ID reconciliation on active branch:
+  - deterministic `PatternNodeId` assignment for parsed mini atoms,
+    combinators, sequences, stacks, and method chains.
+  - `parse_doc`, `parse_doc_reusing`, `parse_snapshot`, and
+    `parse_snapshot_reusing` expose mini output through `PatternDoc` and
+    `PatternSnapshot` without breaking the existing `parse` API.
+  - `PatternDoc::subdoc` lets reconciliation reuse unchanged parsed subtrees
+    with their existing generation/revision metadata.
+  - coverage proves whitespace-only reparses preserve IDs and hit the lowering
+    cache, token replacement preserves unaffected token IDs, insertion/removal
+    keeps surviving token IDs, and changed tokens miss the cache while
+    unchanged nodes hit.
 - Latest local verification for active branch:
   - `rtk moon fmt`
   - `rtk moon info`
   - `rtk moon check`
-  - `rtk moon test` (735 passed)
+  - `rtk moon test` (739 passed)
   - `rtk moon build --target wasm-gc`
+  - `rtk moon check --target all`
   - `rtk git diff --check`
 - Latest full local verification for PR #33 merge base `aa5f773`:
   - `rtk moon fmt`
@@ -95,12 +107,11 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Review PR #35 checks and review feedback; fix issues or merge when ready.
+1. Review, commit, and open PR for `codex/phase6-mini-stable-ids`.
 
-2. After that branch merges, take the next Phase 6 slice from
-   `docs/superpowers/specs/2026-05-12-phase6-incremental-playback-design.md`:
-   mini-notation stable-ID reconciliation. Keep DSP graph identity for a later
-   dedicated slice.
+2. After that branch merges, choose the next Phase 6 slice from
+   `docs/superpowers/specs/2026-05-12-phase6-incremental-playback-design.md`.
+   DSP graph identity remains the main deferred identity boundary.
 
 ## Acceptance Checks For API-Hardening Slices
 

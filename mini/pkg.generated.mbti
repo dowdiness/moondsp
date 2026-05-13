@@ -10,6 +10,14 @@ pub fn drum_midi(String) -> Int?
 
 pub fn parse(String) -> Result[@pattern.Pat[@pattern.ControlMap], String]
 
+pub fn parse_doc(String) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
+
+pub fn parse_doc_reusing(String, @pattern.PatternDoc[@pattern.ControlMap]) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
+
+pub fn parse_snapshot(String) -> Result[@pattern.PatternSnapshot[@pattern.ControlMap], String]
+
+pub fn parse_snapshot_reusing(String, @pattern.PatternDoc[@pattern.ControlMap]) -> Result[@pattern.PatternSnapshot[@pattern.ControlMap], String]
+
 // Errors
 
 // Types and methods
