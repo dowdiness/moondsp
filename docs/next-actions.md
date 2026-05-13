@@ -166,14 +166,15 @@ actionable; move completed design notes or implementation plans under
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
 - Active section/layer identity branch:
-  - `SectionLayerDoc`, `SectionDocBody`, and `SectionDoc` add identity-bearing
-    authoring adapters for reusable section definitions and layers.
-  - section and layer display renames preserve stable IDs and revisions; layer
-    body edits advance the layer revision and containing section revision.
+  - identity-preserving section and layer authoring adapters now cover reusable
+    section definitions and layered section bodies.
+  - section and layer display renames preserve stable identities and revisions;
+    layer body edits advance the affected layer revision and the containing
+    section revision.
   - section length and scope edits advance the section revision; length edits
-    still shift downstream song layout while preserving occurrence IDs.
-  - `SectionDoc::to_section` lowers back to the existing playback `Section`
-    surface, so current song/scheduler query behavior is unchanged.
+    may still shift downstream song layout while preserving occurrence IDs.
+  - the authoring model lowers back to the existing playback/query surface
+    without changing current song/scheduler query semantics.
   - coverage proves section/layer display rename stability, duplicate layer
     display-name rejection, body revision boundaries without layout changes,
     and length-driven layout shifts with stable occurrence IDs.
