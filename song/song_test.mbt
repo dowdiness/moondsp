@@ -260,6 +260,157 @@ test "Song::occurrences_intersecting uses half-open range boundaries" {
 }
 
 ///|
+test "Song::gap_spans reports uncovered boundary ranges" {
+  let a = make_section("a", @pattern.Rational::from_int(1), 60.0)
+  let b = make_section("b", @pattern.Rational::from_int(1), 62.0)
+  let c = make_section("c", @pattern.Rational::from_int(1), 64.0)
+  let song = make_song([
+    SongPart(name="a1", section=a),
+    SongPart::at(start=@pattern.Rational::from_int(3), name="b1", section=b),
+    SongPart::at(start=@pattern.Rational::from_int(5), name="c1", section=c),
+  ])
+  let gaps = song.gap_spans()
+  assert_eq(gaps.length(), 2)
+  assert_true(gaps[0] == span(1L, 1L, 3L, 1L))
+  assert_true(gaps[1] == span(4L, 1L, 5L, 1L))
+}
+
+///|
+test "Song::fill_gaps inserts sized fill occurrences in uncovered ranges" {
+  let a = make_section("a", @pattern.Rational::from_int(1), 60.0)
+  let b = make_section("b", @pattern.Rational::from_int(1), 62.0)
+  let fill = make_section("fill", @pattern.Rational::from_int(1), 70.0)
+  let song = make_song([
+    SongPart(name="a1", section=a),
+    SongPart::at(start=@pattern.Rational::from_int(3), name="b1", section=b),
+  ])
+  let result = try? song.fill_gaps(prefix="fill", section=fill)
+  let filled = match result {
+    Ok(song) => song
+    Err(_) => abort("expected filled song")
+  }
+  assert_eq(filled.occurrence_count(), 3)
+  match filled.get_occurrence("fill:0") {
+    Some(occurrence) => {
+      assert_eq(occurrence.id().value(), "fill:0")
+      assert_true(occurrence.start() == @pattern.Rational::from_int(1))
+      assert_true(occurrence.end_() == @pattern.Rational::from_int(3))
+      assert_true(
+        occurrence.section().length_cycles() == @pattern.Rational::from_int(2),
+      )
+    }
+    None => abort("expected generated fill occurrence")
+  }
+  assert_eq(filled.gap_spans().length(), 0)
+  let events = filled.query(span(1L, 1L, 3L, 1L))
+  assert_eq(events.length(), 2)
+  assert_true(events[0].value.get("note") == Some(70.0))
+  assert_true(events[1].value.get("note") == Some(70.0))
+}
+
+///|
+test "Song::fill_gaps preserves existing IDs and ignores covered overlap" {
+  let a = make_section("a", @pattern.Rational::from_int(2), 60.0)
+  let b = make_section("b", @pattern.Rational::from_int(2), 62.0)
+  let c = make_section("c", @pattern.Rational::from_int(1), 64.0)
+  let fill = make_section("fill", @pattern.Rational::from_int(1), 70.0)
+  let a_id = occurrence_id("a:1")
+  let b_id = occurrence_id("b:1")
+  let c_id = occurrence_id("c:1")
+  let song = make_song([
+    SongPart::with_id(id=a_id, name="A", section=a),
+    SongPart::with_id_at(
+      id=b_id,
+      start=@pattern.Rational::from_int(1),
+      name="B",
+      section=b,
+    ),
+    SongPart::with_id_at(
+      id=c_id,
+      start=@pattern.Rational::from_int(4),
+      name="C",
+      section=c,
+    ),
+  ])
+  let gaps = song.gap_spans()
+  assert_eq(gaps.length(), 1)
+  assert_true(gaps[0] == span(3L, 1L, 4L, 1L))
+  let result = try? song.fill_gaps(prefix="fill", section=fill)
+  let filled = match result {
+    Ok(song) => song
+    Err(_) => abort("expected filled song")
+  }
+  assert_eq(filled.occurrence_count(), 4)
+  assert_true(filled.get_occurrence_by_id(a_id) is Some(_))
+  assert_true(filled.get_occurrence_by_id(b_id) is Some(_))
+  assert_true(filled.get_occurrence_by_id(c_id) is Some(_))
+  match filled.get_occurrence("fill:0") {
+    Some(occurrence) => {
+      assert_true(occurrence.start() == @pattern.Rational::from_int(3))
+      assert_true(occurrence.end_() == @pattern.Rational::from_int(4))
+    }
+    None => abort("expected generated overlap fill")
+  }
+}
+
+///|
+test "Song::fill_gaps preserves authoring order for out-of-order overlaps" {
+  let late = make_section("late", @pattern.Rational::from_int(2), 60.0)
+  let early = make_section("early", @pattern.Rational::from_int(2), 64.0)
+  let fill = make_section("fill", @pattern.Rational::from_int(1), 70.0)
+  let song = make_song([
+    SongPart::at(
+      start=@pattern.Rational::from_int(1),
+      name="late1",
+      section=late,
+    ),
+    SongPart::at(
+      start=@pattern.Rational::from_int(0),
+      name="early1",
+      section=early,
+    ),
+  ])
+  let result = try? song.fill_gaps(prefix="fill", section=fill)
+  let filled = match result {
+    Ok(song) => song
+    Err(_) => abort("expected filled song")
+  }
+  assert_eq(filled.occurrence_count(), 2)
+  let overlap_hits = filled.occurrences_at(rat(3L, 2L))
+  assert_eq(overlap_hits.length(), 2)
+  assert_eq(overlap_hits[0].name(), "late1")
+  assert_eq(overlap_hits[1].name(), "early1")
+  let events = filled.query(span(1L, 1L, 2L, 1L))
+  assert_eq(events.length(), 2)
+  assert_true(events[0].value.get("note") == Some(60.0))
+  assert_true(events[1].value.get("note") == Some(64.0))
+}
+
+///|
+test "Song::fill_gaps rejects generated occurrence name collisions" {
+  let a = make_section("a", @pattern.Rational::from_int(1), 60.0)
+  let existing_fill = make_section(
+    "existing_fill",
+    @pattern.Rational::from_int(1),
+    62.0,
+  )
+  let fill = make_section("fill", @pattern.Rational::from_int(1), 70.0)
+  let song = make_song([
+    SongPart(name="a1", section=a),
+    SongPart::at(
+      start=@pattern.Rational::from_int(2),
+      name="fill:0",
+      section=existing_fill,
+    ),
+  ])
+  let result = try? song.fill_gaps(prefix="fill", section=fill)
+  match result {
+    Err(SongBuildError::DuplicateOccurrence("fill:0")) => ()
+    _ => assert_true(false)
+  }
+}
+
+///|
 test "Song keeps explicit occurrence IDs across reordering" {
   let verse = make_section("verse", @pattern.Rational::from_int(1), 60.0)
   let chorus = make_section("chorus", @pattern.Rational::from_int(1), 64.0)

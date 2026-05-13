@@ -9,11 +9,14 @@ actionable; move completed design notes or implementation plans under
 ## Current State
 
 - `main` is currently at
-  `df0f745 docs: mark graph identity PR merged`.
-- Branch `codex/phase6-song-layout-ranges` starts the song layout explicit
-  starts/gaps/overlaps/range-addressing slice from that merged head.
+  `06a2787 feat(song): add explicit layout ranges (#38)`.
+- Branch `codex/phase6-song-boundary-fills` starts the next deferred
+  song-layout boundary slice from that merged head. It currently includes
+  `8f9adc7 docs: mark song layout ranges merged`.
 - PR #37 is merged:
   https://github.com/dowdiness/moondsp/pull/37
+- PR #38 is merged:
+  https://github.com/dowdiness/moondsp/pull/38
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -42,8 +45,11 @@ actionable; move completed design notes or implementation plans under
     patterns.
   - Phase 6 identity groundwork separates stable occurrence identity from
     display labels through a dependency-free identity model.
-  - deferred song work remains explicit starts, gaps, overlaps, range
-    addressing, boundary fills, song mini-notation, non-identity time-scope
+  - explicit occurrence starts can now create gaps and overlaps, with point and
+    range occurrence lookup over overlapping layouts.
+  - boundary fills are implemented on the current branch via uncovered-span
+    detection and generated fill occurrences.
+  - deferred song work remains song mini-notation, non-identity time-scope
     transforms, and efficient secondary lookup indexes.
 - Pattern authoring groundwork shipped so far on `main`:
   - identity-bearing authoring documents over the existing runtime query model.
@@ -106,7 +112,7 @@ actionable; move completed design notes or implementation plans under
   - coverage proves control, binding, and compile mapping; duplicate ID
     rejection; replace/rewire ID preservation; single-node and chain
     insert/delete compaction; and retired-ID rejection.
-- Song layout ranges on active branch:
+- Song layout ranges shipped so far on `main`:
   - `SongPart` can carry an optional explicit start via `SongPart::at` and
     `SongPart::with_id_at`; existing constructors remain implicit-contiguous.
   - implicit parts continue from the latest occurrence end, so explicit starts
@@ -115,7 +121,27 @@ actionable; move completed design notes or implementation plans under
     and range lookup across overlapping layouts.
   - coverage proves gaps, overlap queries, range-address half-open boundaries,
     and implicit continuation after explicit overlaps.
-- Latest local verification for active branch:
+- Song boundary fills implemented so far on `codex/phase6-song-boundary-fills`:
+  - `Song::gap_spans` reports uncovered ranges in song-time order, treating
+    overlaps as covered time rather than as new gaps.
+  - `Song::fill_gaps(prefix~, section~)` returns a derived song with generated
+    `prefix:index` occurrences for uncovered spans.
+  - generated fill occurrences reuse the supplied section body/scope, resize
+    section length to the uncovered span, and preserve all existing occurrence
+    IDs and authoring order.
+  - coverage proves multi-gap detection, fill sizing and query output, overlap
+    coverage, existing-ID/order preservation, and generated-name collision
+    errors.
+- Latest local verification for the boundary-fill branch:
+  - `moon fmt`
+  - `moon info`
+  - `moon check`
+  - `moon test song` (33 passed)
+  - `moon check --target all`
+  - `moon test` (753 passed)
+  - `moon build --target wasm-gc`
+  - `git diff --check`
+- Latest local verification for PR #38 before merge:
   - `rtk moon fmt`
   - `rtk moon info`
   - `rtk moon check`
@@ -143,12 +169,11 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Review, commit, and open the PR for
-   `codex/phase6-song-layout-ranges`.
+1. Review, commit, push, and open the PR for the boundary fills slice on
+   `codex/phase6-song-boundary-fills`.
 
-2. After that branch merges, continue with the next deferred song-layout
-   boundary: boundary fills, song mini-notation, non-identity time-scope
-   transforms, or efficient secondary lookup indexes.
+2. After that branch merges, continue with song mini-notation, non-identity
+   time-scope transforms, or efficient secondary lookup indexes.
 
 ## Acceptance Checks For API-Hardening Slices
 

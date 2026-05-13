@@ -7,7 +7,7 @@ pub(all) suberror SongBuildError {
 } derive(Eq, Debug)
 
 ///|
-/// User-authored contiguous song part.
+/// User-authored song part.
 ///
 /// A `SongPart` names one placement of a reusable `Section`. Reusing the same
 /// section body multiple times is allowed by giving each part a distinct name.
@@ -169,6 +169,24 @@ fn[A] copy_occurrences(
 }
 
 ///|
+fn[A] sorted_occurrences_by_start(
+  occurrences : Array[SectionOccurrence[A]],
+) -> Array[SectionOccurrence[A]] {
+  let result : Array[SectionOccurrence[A]] = []
+  for occurrence in occurrences {
+    result.push(occurrence.snapshot())
+    let mut index = result.length() - 1
+    while index > 0 && result[index].start() < result[index - 1].start() {
+      let previous = result[index - 1]
+      result[index - 1] = result[index]
+      result[index] = previous
+      index = index - 1
+    }
+  }
+  result
+}
+
+///|
 fn max_rational(
   left : @pattern.Rational,
   right : @pattern.Rational,
@@ -291,6 +309,79 @@ pub fn[A] Song::occurrences_intersecting(
     }
   }
   result
+}
+
+///|
+pub fn[A] Song::gap_spans(self : Song[A]) -> Array[@pattern.TimeSpan] {
+  let result : Array[@pattern.TimeSpan] = []
+  let mut cursor = @pattern.Rational::from_int(0)
+  let sorted = sorted_occurrences_by_start(self.occurrences)
+  for occurrence in sorted {
+    if cursor < occurrence.start() {
+      result.push(@pattern.TimeSpan::new(cursor, occurrence.start()))
+    }
+    cursor = max_rational(cursor, occurrence.end_())
+  }
+  result
+}
+
+///|
+fn[A] section_with_length(
+  section : Section[A],
+  length_cycles : @pattern.Rational,
+) -> Section[A] {
+  {
+    name: section.name(),
+    length_cycles,
+    scope: section.scope(),
+    body: section.section_body(),
+  }
+}
+
+///|
+fn fill_occurrence_name(prefix : String, index : Int) -> String {
+  "\{prefix}:\{index}"
+}
+
+///|
+fn[A] occurrence_to_part(occurrence : SectionOccurrence[A]) -> SongPart[A] {
+  SongPart::with_id_at(
+    id=occurrence.id(),
+    start=occurrence.start(),
+    name=occurrence.name(),
+    section=occurrence.section(),
+  )
+}
+
+///|
+/// Return a derived song where uncovered time between occurrences is filled.
+///
+/// Existing occurrences keep their stable IDs and authoring order. Generated
+/// fill names use deterministic `prefix:index` values in song-time gap order.
+/// Each fill occurrence reuses the supplied section body/scope with its length
+/// adjusted to the uncovered span.
+pub fn[A] Song::fill_gaps(
+  self : Song[A],
+  prefix~ : String,
+  section~ : Section[A],
+) -> Song[A] raise SongBuildError {
+  let parts : Array[SongPart[A]] = []
+  for occurrence in self.occurrences {
+    parts.push(occurrence_to_part(occurrence))
+  }
+  let gaps = self.gap_spans()
+  for index in 0..<gaps.length() {
+    let gap = gaps[index]
+    let fill_name = fill_occurrence_name(prefix, index)
+    parts.push(
+      SongPart::at(
+        start=gap.begin,
+        name=fill_name,
+        section=section_with_length(section, gap.duration()),
+      ),
+    )
+  }
+  Song(parts~)
 }
 
 ///|
