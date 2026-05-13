@@ -4,6 +4,7 @@ package "dowdiness/moondsp"
 import {
   "dowdiness/moondsp/dsp",
   "dowdiness/moondsp/graph",
+  "dowdiness/moondsp/identity",
   "dowdiness/moondsp/voice",
 }
 
@@ -101,7 +102,15 @@ pub using @graph {type GraphControlError}
 
 pub using @graph {type GraphControlKind}
 
+pub using @graph {type GraphIndexMap}
+
+pub using @identity {type GraphNodeId}
+
 pub using @graph {type GraphParamSlot}
+
+pub using @graph {type GraphTemplateDoc}
+
+pub using @graph {type GraphTemplateDocError}
 
 pub using @graph {type GraphTopologyEdit}
 
@@ -124,6 +133,10 @@ pub using @dsp {type Oscillator}
 pub using @dsp {type Pan}
 
 pub using @dsp {type ParamSmoother}
+
+pub using @identity {type Revision}
+
+pub using @identity {type StableIdError}
 
 pub using @dsp {type Stereo}
 

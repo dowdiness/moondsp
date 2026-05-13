@@ -63,6 +63,11 @@ pub using @dsp {
 }
 
 ///|
+// Re-export identity/ package — stable IDs and revision tokens used by
+// authoring-layer APIs.
+pub using @identity {type GraphNodeId, type Revision, type StableIdError}
+
+///|
 // Re-export graph/ package — compiled graph runtime, topology editing, etc.
 pub using @graph {
   type CompiledDsp,
@@ -78,7 +83,10 @@ pub using @graph {
   type GraphControl,
   type GraphControlError,
   type GraphControlKind,
+  type GraphIndexMap,
   type GraphParamSlot,
+  type GraphTemplateDoc,
+  type GraphTemplateDocError,
   type GraphTopologyEdit,
   type GraphTopologyInputSlot,
   type GraphTopologyQueueError,
