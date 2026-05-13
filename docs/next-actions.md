@@ -12,6 +12,8 @@ actionable; move completed design notes or implementation plans under
   `cd9b9fa [codex] Add mini-notation stable ID reconciliation (#36)`.
 - Branch `codex/phase6-graph-identity` starts the DSP graph identity mapping
   slice from that merged head.
+- PR #37 is open and merge-ready at
+  `06e0959 fix(graph): expose identity docs from facade`.
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -95,18 +97,21 @@ actionable; move completed design notes or implementation plans under
   - `GraphIndexMap` maps stable IDs to existing graph indices and builds
     existing `GraphControl`, `ControlBindingBuilder`, and `GraphTopologyEdit`
     values at API boundaries.
+  - the root `@moondsp` facade re-exports the graph identity API plus
+    `GraphNodeId`, `Revision`, and `StableIdError` for documented facade
+    consumers.
   - graph document edits preserve IDs for replacements and rewires, append IDs
     for inserted nodes/chains, compact IDs for deletions, and reject reuse of
     deleted IDs inside the same document.
   - coverage proves control, binding, and compile mapping; duplicate ID
-    rejection; replace/rewire ID preservation; insert/delete compaction; and
-    retired-ID rejection.
+    rejection; replace/rewire ID preservation; single-node and chain
+    insert/delete compaction; and retired-ID rejection.
 - Latest local verification for active branch:
   - `rtk moon fmt`
   - `rtk moon info`
   - `rtk moon check`
-  - `rtk moon test graph` (240 passed)
-  - `rtk moon test` (743 passed)
+  - `rtk moon test graph` (241 passed)
+  - `rtk moon test` (744 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk moon check --target all`
   - `rtk git diff --check`
@@ -120,11 +125,12 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Review, commit, and open the PR for `codex/phase6-graph-identity`.
+1. Merge PR #37.
 
-2. After that PR merges, start the next Phase 6 slice from `main`. Likely
-   candidates are song explicit starts/gaps/overlaps/range addressing or the
-   next deferred song-layout boundary from the Phase 6 design.
+2. After PR #37 merges, start the next Phase 6 slice from `main` and update
+   this handoff with the merge SHA. Likely candidates are song explicit
+   starts/gaps/overlaps/range addressing or the next deferred song-layout
+   boundary from the Phase 6 design.
 
 ## Acceptance Checks For API-Hardening Slices
 
