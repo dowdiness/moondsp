@@ -38,6 +38,20 @@ pub(all) suberror SongBuildError {
   InvalidOccurrenceId(String)
 } derive(Eq, @debug.Debug)
 
+pub(all) suberror SongDocBuildError {
+  EmptySongDoc
+  DuplicateSongDocOccurrenceId(String)
+  DuplicateSongDocOccurrenceName(String)
+} derive(Eq, @debug.Debug)
+
+pub(all) suberror SongDocEditError {
+  MissingSongDocOccurrenceId(String)
+  DuplicateEditedSongDocOccurrenceId(String)
+  DuplicateEditedSongDocOccurrenceName(String)
+  InvalidSongDocOccurrenceIndex(Int)
+  CannotRemoveLastSongDocOccurrence
+} derive(Eq, @debug.Debug)
+
 pub(all) suberror TimeScopeBuildError {
   NonPositiveRate
 } derive(Eq, @debug.Debug)
@@ -151,6 +165,41 @@ pub fn[A] Song::occurrences(Self[A]) -> Array[SectionOccurrence[A]]
 pub fn[A] Song::occurrences_at(Self[A], @pattern.Rational) -> Array[SectionOccurrence[A]]
 pub fn[A] Song::occurrences_intersecting(Self[A], @pattern.TimeSpan) -> Array[SectionOccurrence[A]]
 pub fn[A] Song::query(Self[A], @pattern.TimeSpan) -> Array[@pattern.Event[A]]
+
+pub struct SongDoc[A] {
+  // private fields
+}
+pub fn[A] SongDoc::SongDoc(parts~ : Array[SongOccurrenceDoc[A]]) -> Self[A] raise SongDocBuildError
+pub fn[A] SongDoc::clear_occurrence_start(Self[A], @identity.OccurrenceId) -> Self[A] raise SongDocEditError
+pub fn[A] SongDoc::get_occurrence(Self[A], @identity.OccurrenceId) -> SongOccurrenceDoc[A]?
+pub fn[A] SongDoc::insert_occurrence(Self[A], index~ : Int, occurrence~ : SongOccurrenceDoc[A]) -> Self[A] raise SongDocEditError
+pub fn[A] SongDoc::layout_revision(Self[A]) -> @identity.Revision
+pub fn[A] SongDoc::move_occurrence(Self[A], @identity.OccurrenceId, index~ : Int) -> Self[A] raise SongDocEditError
+pub fn[A] SongDoc::occurrence(Self[A], Int) -> SongOccurrenceDoc[A]?
+pub fn[A] SongDoc::occurrence_count(Self[A]) -> Int
+pub fn[A] SongDoc::occurrences(Self[A]) -> Array[SongOccurrenceDoc[A]]
+pub fn[A] SongDoc::remove_occurrence(Self[A], @identity.OccurrenceId) -> Self[A] raise SongDocEditError
+pub fn[A] SongDoc::rename_occurrence(Self[A], @identity.OccurrenceId, name~ : String) -> Self[A] raise SongDocEditError
+pub fn[A] SongDoc::replace_occurrence_section(Self[A], @identity.OccurrenceId, section~ : SectionDoc[A]) -> Self[A] raise SongDocEditError
+pub fn[A] SongDoc::revision(Self[A]) -> @identity.Revision
+pub fn[A] SongDoc::set_occurrence_start(Self[A], @identity.OccurrenceId, start~ : @pattern.Rational) -> Self[A] raise SongDocEditError
+pub fn[A] SongDoc::to_song(Self[A]) -> Song[A] raise SongBuildError
+
+pub struct SongOccurrenceDoc[A] {
+  // private fields
+}
+pub fn[A] SongOccurrenceDoc::SongOccurrenceDoc(id~ : @identity.OccurrenceId, name~ : String, section~ : SectionDoc[A]) -> Self[A]
+pub fn[A] SongOccurrenceDoc::at(id~ : @identity.OccurrenceId, start~ : @pattern.Rational, name~ : String, section~ : SectionDoc[A]) -> Self[A]
+pub fn[A] SongOccurrenceDoc::clear_start(Self[A]) -> Self[A]
+pub fn[A] SongOccurrenceDoc::id(Self[A]) -> @identity.OccurrenceId
+pub fn[A] SongOccurrenceDoc::layout_revision(Self[A]) -> @identity.Revision
+pub fn[A] SongOccurrenceDoc::name(Self[A]) -> String
+pub fn[A] SongOccurrenceDoc::rename(Self[A], name~ : String) -> Self[A]
+pub fn[A] SongOccurrenceDoc::replace_section(Self[A], section~ : SectionDoc[A]) -> Self[A]
+pub fn[A] SongOccurrenceDoc::revision(Self[A]) -> @identity.Revision
+pub fn[A] SongOccurrenceDoc::section(Self[A]) -> SectionDoc[A]
+pub fn[A] SongOccurrenceDoc::start(Self[A]) -> @pattern.Rational?
+pub fn[A] SongOccurrenceDoc::with_start(Self[A], start~ : @pattern.Rational) -> Self[A]
 
 pub struct SongPart[A] {
   // private fields
