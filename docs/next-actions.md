@@ -20,6 +20,8 @@ actionable; move completed design notes or implementation plans under
   https://github.com/dowdiness/moondsp/pull/40
 - Active branch: `codex/phase6-song-time-scope-transforms`, based on
   `2474a1e docs: mark song mini notation merged`.
+- PR #41 is open as a draft:
+  https://github.com/dowdiness/moondsp/pull/41
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -216,8 +218,8 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Review, commit, push, and open the PR for
-   `codex/phase6-song-time-scope-transforms`.
+1. Review PR #41 and address any feedback:
+   https://github.com/dowdiness/moondsp/pull/41
 
 2. After the TimeScope branch merges, recommended next Phase 6 slice:
    efficient secondary lookup indexes for song occurrence lookups.
