@@ -24,6 +24,8 @@ actionable; move completed design notes or implementation plans under
   https://github.com/dowdiness/moondsp/pull/42
 - Active branch: `codex/phase6-song-section-identity`, based on
   `a68648f [codex] Index song occurrence lookups (#42)`.
+- PR #43 is open as a draft for the active section/layer identity branch:
+  https://github.com/dowdiness/moondsp/pull/43
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -265,8 +267,9 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Review, commit, push, and open the PR for
-   `codex/phase6-song-section-identity`.
+1. Review PR #43, address any feedback, then mark it ready and merge when
+   checks/review are clean:
+   https://github.com/dowdiness/moondsp/pull/43
 
 2. After the section/layer identity branch merges, choose the next Phase 6 song
    slice.
