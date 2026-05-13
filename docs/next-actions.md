@@ -164,13 +164,26 @@ actionable; move completed design notes or implementation plans under
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
 - Active section/layer identity branch:
-  - planned work: add stable identity and revision boundaries for reusable
-    song section definitions and section layers.
-  - keep existing `Section`, `SectionLayer`, and `Song` constructors usable
-    while introducing identity-bearing adapters or documents for incremental
-    authoring.
-  - preserve current playback/query behavior; the goal is stable edit identity
-    and invalidation metadata, not new layout semantics.
+  - `SectionLayerDoc`, `SectionDocBody`, and `SectionDoc` add identity-bearing
+    authoring adapters for reusable section definitions and layers.
+  - section and layer display renames preserve stable IDs and revisions; layer
+    body edits advance the layer revision and containing section revision.
+  - section length and scope edits advance the section revision; length edits
+    still shift downstream song layout while preserving occurrence IDs.
+  - `SectionDoc::to_section` lowers back to the existing playback `Section`
+    surface, so current song/scheduler query behavior is unchanged.
+  - coverage proves section/layer display rename stability, duplicate layer
+    display-name rejection, body revision boundaries without layout changes,
+    and length-driven layout shifts with stable occurrence IDs.
+- Latest local verification on `codex/phase6-song-section-identity`:
+  - `rtk moon fmt`
+  - `rtk moon info`
+  - `rtk moon check`
+  - `rtk moon test song` (43 passed)
+  - `rtk moon check --target all`
+  - `rtk moon test` (769 passed)
+  - `rtk moon build --target wasm-gc`
+  - `rtk git diff --check`
 - Latest local verification for PR #40 before merge:
   - `moon fmt`
   - `moon info`
@@ -252,12 +265,11 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Implement section/layer identity and revision groundwork on
+1. Review, commit, push, and open the PR for
    `codex/phase6-song-section-identity`.
 
-2. Prove section/layer IDs survive harmless display-name edits and that changed
-   section/layer content advances the appropriate revision boundary without
-   changing occurrence IDs or song layout unless section length/scope changes.
+2. After the section/layer identity branch merges, choose the next Phase 6 song
+   slice.
 
 ## Acceptance Checks For API-Hardening Slices
 

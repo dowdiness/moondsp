@@ -3,10 +3,62 @@ using @song {
   type Section,
   type SectionBody,
   type SectionBuildError,
+  type SectionDoc,
+  type SectionDocBody,
+  type SectionDocEditError,
   type SectionPatch,
   type SectionPatchError,
   type TimeScope,
   type TimeScopeBuildError,
+}
+
+///|
+fn section_test_section_id(value : String) -> @identity.SectionId {
+  let result = try? @identity.SectionId::from_string(value)
+  match result {
+    Ok(id) => id
+    Err(_) => abort("section id creation failed")
+  }
+}
+
+///|
+fn section_test_layer_id(value : String) -> @identity.SectionLayerId {
+  let result = try? @identity.SectionLayerId::from_string(value)
+  match result {
+    Ok(id) => id
+    Err(_) => abort("layer id creation failed")
+  }
+}
+
+///|
+fn section_test_occurrence_id(value : String) -> @identity.OccurrenceId {
+  let result = try? @identity.OccurrenceId::from_string(value)
+  match result {
+    Ok(id) => id
+    Err(_) => abort("occurrence id creation failed")
+  }
+}
+
+///|
+fn section_test_section_doc(
+  section_id : @identity.SectionId,
+  layer_id : @identity.SectionLayerId,
+  name : String,
+  length : @pattern.Rational,
+  midi : Double,
+) -> SectionDoc[@pattern.ControlMap] {
+  let result = try? SectionDoc::single(
+    id=section_id,
+    name~,
+    length_cycles=length,
+    scope=TimeScope::identity(),
+    layer_id~,
+    body=@pattern.note(midi),
+  )
+  match result {
+    Ok(doc) => doc
+    Err(_) => abort("section doc creation failed")
+  }
 }
 
 ///|
@@ -102,6 +154,235 @@ test "Section::query applies non-identity TimeScope" {
   assert_true(
     scoped_events[1].whole.unwrap().begin == @pattern.Rational::new(1L, 2L),
   )
+}
+
+///|
+test "SectionDoc display renames preserve section and layer IDs and revisions" {
+  let section_id = section_test_section_id("section:verse")
+  let lead_id = section_test_layer_id("layer:lead")
+  let pad_id = section_test_layer_id("layer:pad")
+  let doc_result = try? SectionDoc(
+    id=section_id,
+    name="Verse",
+    length_cycles=@pattern.Rational::from_int(1),
+    scope=TimeScope::identity(),
+    body=SectionDocBody::layers([
+      @song.SectionLayerDoc(id=lead_id, name="Lead", body=@pattern.note(60.0)),
+      @song.SectionLayerDoc(id=pad_id, name="Pad", body=@pattern.note(67.0)),
+    ]),
+  )
+  let doc = match doc_result {
+    Ok(doc) => doc
+    Err(_) => abort("section doc creation failed")
+  }
+  let original_lead = match doc.get_layer(lead_id) {
+    Some(layer) => layer
+    None => abort("expected lead layer")
+  }
+  let renamed_result = try? doc
+    .rename(name="Verse Display")
+    .rename_layer(lead_id, name="Lead Display")
+  let renamed = match renamed_result {
+    Ok(doc) => doc
+    Err(_) => abort("rename failed")
+  }
+  assert_eq(renamed.id().value(), "section:verse")
+  assert_eq(renamed.name(), "Verse Display")
+  assert_true(renamed.revision() == doc.revision())
+  let renamed_lead = match renamed.get_layer(lead_id) {
+    Some(layer) => layer
+    None => abort("expected renamed lead layer")
+  }
+  assert_eq(renamed_lead.id().value(), "layer:lead")
+  assert_eq(renamed_lead.name(), "Lead Display")
+  assert_true(renamed_lead.revision() == original_lead.revision())
+  let section = renamed.to_section()
+  assert_eq(section.name(), "Verse Display")
+  assert_true(section.get_layer("Lead Display") is Some(_))
+  assert_true(section.get_layer("Lead") is None)
+}
+
+///|
+test "SectionDoc rejects duplicate renamed layer display names" {
+  let lead_id = section_test_layer_id("layer:lead")
+  let pad_id = section_test_layer_id("layer:pad")
+  let doc_result = try? SectionDoc(
+    id=section_test_section_id("section:dup"),
+    name="Dup",
+    length_cycles=@pattern.Rational::from_int(1),
+    scope=TimeScope::identity(),
+    body=SectionDocBody::layers([
+      @song.SectionLayerDoc(id=lead_id, name="Lead", body=@pattern.note(60.0)),
+      @song.SectionLayerDoc(id=pad_id, name="Pad", body=@pattern.note(67.0)),
+    ]),
+  )
+  let doc = match doc_result {
+    Ok(doc) => doc
+    Err(_) => abort("section doc creation failed")
+  }
+  let result = try? doc.rename_layer(lead_id, name="Pad")
+  match result {
+    Err(SectionDocEditError::DuplicateLayerName("Pad")) => ()
+    _ => assert_true(false)
+  }
+}
+
+///|
+test "SectionDoc rename reports missing layer before duplicate display name" {
+  let lead_id = section_test_layer_id("layer:lead")
+  let missing_id = section_test_layer_id("layer:missing")
+  let doc_result = try? SectionDoc(
+    id=section_test_section_id("section:missing"),
+    name="Missing",
+    length_cycles=@pattern.Rational::from_int(1),
+    scope=TimeScope::identity(),
+    body=SectionDocBody::layers([
+      @song.SectionLayerDoc(id=lead_id, name="Lead", body=@pattern.note(60.0)),
+    ]),
+  )
+  let doc = match doc_result {
+    Ok(doc) => doc
+    Err(_) => abort("section doc creation failed")
+  }
+  let result = try? doc.rename_layer(missing_id, name="Lead")
+  match result {
+    Err(SectionDocEditError::MissingLayerId("layer:missing")) => ()
+    _ => assert_true(false)
+  }
+}
+
+///|
+test "SectionDoc layer body edits advance layer and section revisions without layout changes" {
+  let section_id = section_test_section_id("section:body")
+  let layer_id = section_test_layer_id("layer:main")
+  let occurrence_id = section_test_occurrence_id("body:1")
+  let doc = section_test_section_doc(
+    section_id,
+    layer_id,
+    "Body",
+    @pattern.Rational::from_int(2),
+    60.0,
+  )
+  let edited_result = try? doc.replace_layer_body(
+    layer_id,
+    body=@pattern.note(64.0),
+  )
+  let edited = match edited_result {
+    Ok(doc) => doc
+    Err(_) => abort("replace layer body failed")
+  }
+  assert_eq(edited.id().value(), doc.id().value())
+  assert_true(edited.length_cycles() == doc.length_cycles())
+  assert_true(edited.revision().value() > doc.revision().value())
+  let original_layer = match doc.get_layer(layer_id) {
+    Some(layer) => layer
+    None => abort("expected original layer")
+  }
+  let edited_layer = match edited.get_layer(layer_id) {
+    Some(layer) => layer
+    None => abort("expected edited layer")
+  }
+  assert_eq(edited_layer.id().value(), original_layer.id().value())
+  assert_true(
+    edited_layer.revision().value() > original_layer.revision().value(),
+  )
+  let before_song_result = try? @song.Song(parts=[
+    @song.SongPart::with_id(
+      id=occurrence_id,
+      name="Body 1",
+      section=doc.to_section(),
+    ),
+  ])
+  let after_song_result = try? @song.Song(parts=[
+    @song.SongPart::with_id(
+      id=occurrence_id,
+      name="Body 1",
+      section=edited.to_section(),
+    ),
+  ])
+  let before_song = match before_song_result {
+    Ok(song) => song
+    Err(_) => abort("before song creation failed")
+  }
+  let after_song = match after_song_result {
+    Ok(song) => song
+    Err(_) => abort("after song creation failed")
+  }
+  match
+    (
+      before_song.get_occurrence_by_id(occurrence_id),
+      after_song.get_occurrence_by_id(occurrence_id),
+    ) {
+    (Some(before), Some(after)) => {
+      assert_eq(before.id().value(), after.id().value())
+      assert_true(before.start() == after.start())
+      assert_true(before.end_() == after.end_())
+    }
+    _ => abort("expected matching occurrences")
+  }
+  let events = after_song.query(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+    ),
+  )
+  assert_eq(events.length(), 1)
+  assert_true(events[0].value.get("note") == Some(64.0))
+}
+
+///|
+test "SectionDoc length edits advance section revision and shift layout while preserving IDs" {
+  let verse_id = section_test_occurrence_id("verse:doc")
+  let chorus_id = section_test_occurrence_id("chorus:doc")
+  let doc = section_test_section_doc(
+    section_test_section_id("section:length"),
+    section_test_layer_id("layer:length"),
+    "Length",
+    @pattern.Rational::from_int(1),
+    60.0,
+  )
+  let longer_result = try? doc.with_length(
+    length_cycles=@pattern.Rational::from_int(2),
+  )
+  let longer = match longer_result {
+    Ok(doc) => doc
+    Err(_) => abort("length edit failed")
+  }
+  assert_eq(longer.id().value(), doc.id().value())
+  assert_true(longer.revision().value() > doc.revision().value())
+  let chorus = Section::from_pattern(name="chorus", body=@pattern.note(67.0))
+  let before_result = try? @song.Song(parts=[
+    @song.SongPart::with_id(id=verse_id, name="Verse", section=doc.to_section()),
+    @song.SongPart::with_id(id=chorus_id, name="Chorus", section=chorus),
+  ])
+  let after_result = try? @song.Song(parts=[
+    @song.SongPart::with_id(
+      id=verse_id,
+      name="Verse",
+      section=longer.to_section(),
+    ),
+    @song.SongPart::with_id(id=chorus_id, name="Chorus", section=chorus),
+  ])
+  let before = match before_result {
+    Ok(song) => song
+    Err(_) => abort("before song creation failed")
+  }
+  let after = match after_result {
+    Ok(song) => song
+    Err(_) => abort("after song creation failed")
+  }
+  match
+    (
+      before.get_occurrence_by_id(chorus_id),
+      after.get_occurrence_by_id(chorus_id),
+    ) {
+    (Some(before_chorus), Some(after_chorus)) => {
+      assert_eq(before_chorus.id().value(), after_chorus.id().value())
+      assert_true(before_chorus.start() == @pattern.Rational::from_int(1))
+      assert_true(after_chorus.start() == @pattern.Rational::from_int(2))
+    }
+    _ => abort("expected chorus occurrences")
+  }
 }
 
 ///|
