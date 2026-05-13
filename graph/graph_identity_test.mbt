@@ -189,3 +189,70 @@ test "GraphTemplateDoc insert and delete compact ids without reuse" {
     _ => fail("expected retired id rejection")
   }
 }
+
+///|
+test "GraphTemplateDoc insert and delete chain round trips stable ids" {
+  let base = unwrap_graph_doc(
+    try? GraphTemplateDoc::from_nodes(ids=[gid("osc"), gid("out")], nodes=[
+      DspNode::oscillator(Waveform::Sine, 440.0),
+      DspNode::output(0),
+    ]),
+  )
+  let inserted = unwrap_graph_doc(
+    try? base.insert_chain(
+      [gid("gain-a"), gid("gain-b")],
+      gid("out"),
+      GraphTopologyInputSlot::Input0,
+      [DspNode::gain(0, 0.5), DspNode::gain(0, 0.8)],
+    ),
+  )
+  inspect(inserted.length(), content="4")
+  match inserted.node_index(gid("out")) {
+    Some(index) => inspect(index, content="1")
+    None => fail("expected output id")
+  }
+  match inserted.node_index(gid("gain-a")) {
+    Some(index) => inspect(index, content="2")
+    None => fail("expected first chain id")
+  }
+  match inserted.node_index(gid("gain-b")) {
+    Some(index) => inspect(index, content="3")
+    None => fail("expected second chain id")
+  }
+  let first_gain = unwrap_graph_node(inserted.node_at(gid("gain-a")))
+  let second_gain = unwrap_graph_node(inserted.node_at(gid("gain-b")))
+  let inserted_output = unwrap_graph_node(inserted.node_at(gid("out")))
+  inspect(first_gain.input0(), content="0")
+  inspect(second_gain.input0(), content="2")
+  inspect(inserted_output.input0(), content="3")
+  let deleted = unwrap_graph_doc(
+    try? inserted.delete_chain(
+      gid("gain-a"),
+      gid("gain-b"),
+      gid("out"),
+      GraphTopologyInputSlot::Input0,
+      gid("osc"),
+    ),
+  )
+  inspect(deleted.length(), content="2")
+  match deleted.node_index(gid("out")) {
+    Some(index) => inspect(index, content="1")
+    None => fail("expected output id after chain delete")
+  }
+  assert_true(deleted.node_index(gid("gain-a")) is None)
+  assert_true(deleted.node_index(gid("gain-b")) is None)
+  assert_true(deleted.contains_retired_node(gid("gain-a")))
+  assert_true(deleted.contains_retired_node(gid("gain-b")))
+  let deleted_output = unwrap_graph_node(deleted.node_at(gid("out")))
+  inspect(deleted_output.input0(), content="0")
+  let reuse_result = try? deleted.insert_chain(
+    [gid("gain-a"), gid("gain-c")],
+    gid("out"),
+    GraphTopologyInputSlot::Input0,
+    [DspNode::gain(0, 0.5), DspNode::gain(0, 0.8)],
+  )
+  match reuse_result {
+    Err(RetiredNodeId(value)) => inspect(value, content="gain-a")
+    _ => fail("expected retired chain id rejection")
+  }
+}
