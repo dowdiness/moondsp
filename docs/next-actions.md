@@ -9,15 +9,15 @@ actionable; move completed design notes or implementation plans under
 ## Current State
 
 - `main` is currently at
-  `364a01c docs: mark song boundary fills merged`.
-- Branch `codex/phase6-song-mini-notation` starts the next Phase 6 song
-  mini-notation slice from that pushed head.
+  `f836a2d feat(mini): parse song layout notation (#40)`.
 - PR #37 is merged:
   https://github.com/dowdiness/moondsp/pull/37
 - PR #38 is merged:
   https://github.com/dowdiness/moondsp/pull/38
 - PR #39 is merged:
   https://github.com/dowdiness/moondsp/pull/39
+- PR #40 is merged:
+  https://github.com/dowdiness/moondsp/pull/40
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -50,8 +50,8 @@ actionable; move completed design notes or implementation plans under
     range occurrence lookup over overlapping layouts.
   - boundary fills now derive generated fill occurrences from uncovered song
     spans while preserving existing occurrence identity and authoring order.
-  - song mini-notation is implemented on the current branch over sections,
-    parts, explicit starts, explicit occurrence IDs, gaps, overlaps, and fills.
+  - song mini-notation parses sections, parts, explicit starts, explicit
+    occurrence IDs, gaps, overlaps, and fills.
   - deferred song work remains non-identity time-scope transforms and efficient
     secondary lookup indexes.
 - Pattern authoring groundwork shipped so far on `main`:
@@ -100,7 +100,7 @@ actionable; move completed design notes or implementation plans under
     cache, token replacement preserves unaffected token IDs, insertion/removal
     keeps surviving token IDs, and changed tokens miss the cache while
     unchanged nodes hit.
-- Song mini-notation implemented so far on `codex/phase6-song-mini-notation`:
+- Song mini-notation shipped so far on `main`:
   - `parse_song` parses `song(...)` text into `Song[ControlMap]`.
   - `section("name", length, pattern_expr)` reuses the existing pattern mini
     expression surface, including `s(...)`, `note(...)`, `stack(...)`, and
@@ -112,7 +112,7 @@ actionable; move completed design notes or implementation plans under
   - coverage proves implicit sections/parts, exact rational starts and gaps,
     explicit overlaps with authoring order, boundary fills, explicit occurrence
     IDs, and unknown-section errors.
-- Latest local verification for the song mini-notation branch:
+- Latest local verification for PR #40 before merge:
   - `moon fmt`
   - `moon info`
   - `moon check`
@@ -193,11 +193,10 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Review, commit, push, and open the PR for the song mini-notation slice on
-   `codex/phase6-song-mini-notation`.
+1. Start a new branch from `main`.
 
-2. After that branch merges, continue with non-identity time-scope transforms
-   or efficient secondary lookup indexes.
+2. Recommended next Phase 6 slice: non-identity `TimeScope` transforms for
+   song sections. Keep efficient secondary lookup indexes queued after that.
 
 ## Acceptance Checks For API-Hardening Slices
 
