@@ -9,14 +9,13 @@ actionable; move completed design notes or implementation plans under
 ## Current State
 
 - `main` is currently at
-  `06a2787 feat(song): add explicit layout ranges (#38)`.
-- Branch `codex/phase6-song-boundary-fills` starts the next deferred
-  song-layout boundary slice from that merged head. It currently includes
-  `8f9adc7 docs: mark song layout ranges merged`.
+  `fcc0ae3 [codex] Add song boundary gap fills (#39)`.
 - PR #37 is merged:
   https://github.com/dowdiness/moondsp/pull/37
 - PR #38 is merged:
   https://github.com/dowdiness/moondsp/pull/38
+- PR #39 is merged:
+  https://github.com/dowdiness/moondsp/pull/39
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -47,8 +46,8 @@ actionable; move completed design notes or implementation plans under
     display labels through a dependency-free identity model.
   - explicit occurrence starts can now create gaps and overlaps, with point and
     range occurrence lookup over overlapping layouts.
-  - boundary fills are implemented on the current branch via uncovered-span
-    detection and generated fill occurrences.
+  - boundary fills now derive generated fill occurrences from uncovered song
+    spans while preserving existing occurrence identity and authoring order.
   - deferred song work remains song mini-notation, non-identity time-scope
     transforms, and efficient secondary lookup indexes.
 - Pattern authoring groundwork shipped so far on `main`:
@@ -121,7 +120,7 @@ actionable; move completed design notes or implementation plans under
     and range lookup across overlapping layouts.
   - coverage proves gaps, overlap queries, range-address half-open boundaries,
     and implicit continuation after explicit overlaps.
-- Song boundary fills implemented so far on `codex/phase6-song-boundary-fills`:
+- Song boundary fills shipped so far on `main`:
   - `Song::gap_spans` reports uncovered ranges in song-time order, treating
     overlaps as covered time rather than as new gaps.
   - `Song::fill_gaps(prefix~, section~)` returns a derived song with generated
@@ -132,7 +131,7 @@ actionable; move completed design notes or implementation plans under
   - coverage proves multi-gap detection, fill sizing and query output, overlap
     coverage, existing-ID/order preservation, and generated-name collision
     errors.
-- Latest local verification for the boundary-fill branch:
+- Latest local verification for PR #39 before merge:
   - `moon fmt`
   - `moon info`
   - `moon check`
@@ -169,11 +168,11 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Review, commit, push, and open the PR for the boundary fills slice on
-   `codex/phase6-song-boundary-fills`.
+1. Start a new branch from `main`.
 
-2. After that branch merges, continue with song mini-notation, non-identity
-   time-scope transforms, or efficient secondary lookup indexes.
+2. Recommended next Phase 6 slice: song mini-notation over the current song
+   layout surface. Keep non-identity time-scope transforms and efficient
+   secondary lookup indexes queued after that.
 
 ## Acceptance Checks For API-Hardening Slices
 
