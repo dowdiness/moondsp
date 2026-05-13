@@ -11,8 +11,11 @@ pub(all) suberror SongBuildError {
 ///
 /// A `SongPart` names one placement of a reusable `Section`. Reusing the same
 /// section body multiple times is allowed by giving each part a distinct name.
+/// Parts without an explicit start are placed at the current layout cursor;
+/// parts with an explicit start may create gaps or overlaps.
 pub struct SongPart[A] {
   priv id : @identity.OccurrenceId?
+  priv start : @pattern.Rational?
   priv name : String
   priv section : Section[A]
 }
@@ -22,7 +25,7 @@ pub fn[A] SongPart::SongPart(
   name~ : String,
   section~ : Section[A],
 ) -> SongPart[A] {
-  { id: None, name, section }
+  { id: None, start: None, name, section }
 }
 
 ///|
@@ -31,12 +34,36 @@ pub fn[A] SongPart::with_id(
   name~ : String,
   section~ : Section[A],
 ) -> SongPart[A] {
-  { id: Some(id), name, section }
+  { id: Some(id), start: None, name, section }
+}
+
+///|
+pub fn[A] SongPart::at(
+  start~ : @pattern.Rational,
+  name~ : String,
+  section~ : Section[A],
+) -> SongPart[A] {
+  { id: None, start: Some(start), name, section }
+}
+
+///|
+pub fn[A] SongPart::with_id_at(
+  id~ : @identity.OccurrenceId,
+  start~ : @pattern.Rational,
+  name~ : String,
+  section~ : Section[A],
+) -> SongPart[A] {
+  { id: Some(id), start: Some(start), name, section }
 }
 
 ///|
 pub fn[A] SongPart::id(self : SongPart[A]) -> @identity.OccurrenceId? {
   self.id
+}
+
+///|
+pub fn[A] SongPart::start(self : SongPart[A]) -> @pattern.Rational? {
+  self.start
 }
 
 ///|
@@ -104,7 +131,7 @@ pub fn[A] SectionOccurrence::end_(
 }
 
 ///|
-/// Contiguous long-form arrangement of named section occurrences.
+/// Long-form arrangement of named section occurrences.
 ///
 /// `Song` is intentionally polymorphic in the same payload type as `Section`
 /// and `Pat`. Scheduler integration specializes it to `Song[ControlMap]`.
@@ -142,6 +169,18 @@ fn[A] copy_occurrences(
 }
 
 ///|
+fn max_rational(
+  left : @pattern.Rational,
+  right : @pattern.Rational,
+) -> @pattern.Rational {
+  if left >= right {
+    left
+  } else {
+    right
+  }
+}
+
+///|
 pub fn[A] Song::Song(
   parts~ : Array[SongPart[A]],
 ) -> Song[A] raise SongBuildError {
@@ -160,7 +199,8 @@ pub fn[A] Song::Song(
     if occurrence_index.contains(id.value()) {
       raise DuplicateOccurrenceId(id.value())
     }
-    let end_ = cursor + part.section.length_cycles()
+    let start = part.start.unwrap_or(cursor)
+    let end_ = start + part.section.length_cycles()
     let index = occurrences.length()
     occurrence_index[id.value()] = index
     occurrence_names[part.name] = true
@@ -168,9 +208,9 @@ pub fn[A] Song::Song(
       id,
       name: part.name,
       section: part.section,
-      span: @pattern.TimeSpan::new(cursor, end_),
+      span: @pattern.TimeSpan::new(start, end_),
     })
-    cursor = end_
+    cursor = max_rational(cursor, end_)
   }
   { occurrences, occurrence_index, duration: cursor }
 }
@@ -223,6 +263,34 @@ pub fn[A] Song::occurrence_at(
     }
   }
   None
+}
+
+///|
+pub fn[A] Song::occurrences_at(
+  self : Song[A],
+  time : @pattern.Rational,
+) -> Array[SectionOccurrence[A]] {
+  let result : Array[SectionOccurrence[A]] = []
+  for occurrence in self.occurrences {
+    if occurrence.span.contains(time) {
+      result.push(occurrence.snapshot())
+    }
+  }
+  result
+}
+
+///|
+pub fn[A] Song::occurrences_intersecting(
+  self : Song[A],
+  arc : @pattern.TimeSpan,
+) -> Array[SectionOccurrence[A]] {
+  let result : Array[SectionOccurrence[A]] = []
+  for occurrence in self.occurrences {
+    if occurrence.span.intersect(arc) is Some(_) {
+      result.push(occurrence.snapshot())
+    }
+  }
+  result
 }
 
 ///|

@@ -9,7 +9,9 @@ actionable; move completed design notes or implementation plans under
 ## Current State
 
 - `main` is currently at
-  `a793efc [codex] Add DSP graph stable identity mapping (#37)`.
+  `df0f745 docs: mark graph identity PR merged`.
+- Branch `codex/phase6-song-layout-ranges` starts the song layout explicit
+  starts/gaps/overlaps/range-addressing slice from that merged head.
 - PR #37 is merged:
   https://github.com/dowdiness/moondsp/pull/37
 - Core silent-failure hardening shipped so far:
@@ -104,6 +106,24 @@ actionable; move completed design notes or implementation plans under
   - coverage proves control, binding, and compile mapping; duplicate ID
     rejection; replace/rewire ID preservation; single-node and chain
     insert/delete compaction; and retired-ID rejection.
+- Song layout ranges on active branch:
+  - `SongPart` can carry an optional explicit start via `SongPart::at` and
+    `SongPart::with_id_at`; existing constructors remain implicit-contiguous.
+  - implicit parts continue from the latest occurrence end, so explicit starts
+    can create gaps or overlaps without pulling later implicit parts backward.
+  - `Song::occurrences_at` and `Song::occurrences_intersecting` expose point
+    and range lookup across overlapping layouts.
+  - coverage proves gaps, overlap queries, range-address half-open boundaries,
+    and implicit continuation after explicit overlaps.
+- Latest local verification for active branch:
+  - `rtk moon fmt`
+  - `rtk moon info`
+  - `rtk moon check`
+  - `rtk moon test song` (28 passed)
+  - `rtk moon test` (748 passed)
+  - `rtk moon build --target wasm-gc`
+  - `rtk moon check --target all`
+  - `rtk git diff --check`
 - Latest local verification for PR #37 before merge:
   - `rtk moon fmt`
   - `rtk moon info`
@@ -123,11 +143,12 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Start a new branch from `main`.
+1. Review, commit, and open the PR for
+   `codex/phase6-song-layout-ranges`.
 
-2. Choose the next Phase 6 slice. Likely candidates are song explicit
-   starts/gaps/overlaps/range addressing or the next deferred song-layout
-   boundary from the Phase 6 design.
+2. After that branch merges, continue with the next deferred song-layout
+   boundary: boundary fills, song mini-notation, non-identity time-scope
+   transforms, or efficient secondary lookup indexes.
 
 ## Acceptance Checks For API-Hardening Slices
 
