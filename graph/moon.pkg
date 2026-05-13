@@ -1,4 +1,5 @@
 import {
+  "dowdiness/moondsp/identity" @identity,
   "dowdiness/moondsp/dsp" @dsp,
   "moonbitlang/core/bench" @bench,
   "moonbitlang/core/debug" @debug,
