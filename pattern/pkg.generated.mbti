@@ -94,6 +94,7 @@ pub fn[A] PatternDoc::sequence(id~ : @identity.PatternNodeId, docs~ : Array[Self
 pub fn[A] PatternDoc::silence(id~ : @identity.PatternNodeId) -> Self[A]
 pub fn[A] PatternDoc::slow(Self[A], id~ : @identity.PatternNodeId, factor~ : Rational) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::stack(id~ : @identity.PatternNodeId, docs~ : Array[Self[A]]) -> Self[A] raise PatternDocError
+pub fn[A] PatternDoc::subdoc(Self[A], root~ : @identity.PatternNodeId) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::with_root(Self[A], root~ : @identity.PatternNodeId) -> Self[A] raise PatternDocError
 
 pub struct PatternLoweringCache[A] {

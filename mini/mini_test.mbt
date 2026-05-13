@@ -57,6 +57,48 @@ fn unwrap_ok(
 }
 
 ///|
+fn unwrap_doc(
+  result : Result[@pattern.PatternDoc[@pattern.ControlMap], String],
+) -> @pattern.PatternDoc[@pattern.ControlMap] {
+  match result {
+    Ok(doc) => doc
+    Err(msg) => abort("expected Ok, got Err(\{msg})")
+  }
+}
+
+///|
+fn unwrap_mini_snapshot(
+  result : Result[@pattern.PatternSnapshot[@pattern.ControlMap], String],
+) -> @pattern.PatternSnapshot[@pattern.ControlMap] {
+  match result {
+    Ok(snapshot) => snapshot
+    Err(msg) => abort("expected Ok, got Err(\{msg})")
+  }
+}
+
+///|
+fn unwrap_lowered_snapshot(
+  result : Result[
+    @pattern.PatternSnapshot[@pattern.ControlMap],
+    @pattern.PatternDocError,
+  ],
+) -> @pattern.PatternSnapshot[@pattern.ControlMap] {
+  match result {
+    Ok(snapshot) => snapshot
+    Err(_) => abort("expected lowered pattern snapshot")
+  }
+}
+
+///|
+fn pid(value : String) -> @identity.PatternNodeId {
+  let result = try? @identity.PatternNodeId::from_string(value)
+  match result {
+    Ok(id) => id
+    Err(_) => abort("expected valid pattern node id")
+  }
+}
+
+///|
 test "parse single drum sound" {
   let pat = unwrap_ok(@mini.parse("s(\"bd\")"))
   let events = query_one_cycle(pat)
@@ -67,6 +109,80 @@ test "parse single drum sound" {
       #|ControlMap({ "sound": 36 })
     ),
   )
+}
+
+///|
+test "parse_snapshot lowers mini output through PatternDoc" {
+  let snapshot = unwrap_mini_snapshot(@mini.parse_snapshot("s(\"bd sd\")"))
+  inspect(
+    snapshot.root().value(),
+    content="mini:seq:mini:sound:bd:0:mini:sound:sd:0",
+  )
+  let events = snapshot.query(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+    ),
+  )
+  inspect(events.length(), content="2")
+}
+
+///|
+test "parse_doc_reusing preserves ids across whitespace edits" {
+  let doc = unwrap_doc(@mini.parse_doc("s(\"bd sd\")"))
+  let edited = unwrap_doc(@mini.parse_doc_reusing("s(\"  bd   sd  \")", doc))
+  assert_eq(doc.root().value(), edited.root().value())
+  assert_true(edited.contains_node(pid("mini:sound:bd:0")))
+  assert_true(edited.contains_node(pid("mini:sound:sd:0")))
+  let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
+  ignore(unwrap_lowered_snapshot(try? doc.lower_with_cache(cache)))
+  cache.reset_stats()
+  ignore(unwrap_lowered_snapshot(try? edited.lower_with_cache(cache)))
+  inspect(cache.hit_count(), content="1")
+  inspect(cache.miss_count(), content="0")
+}
+
+///|
+test "parse_doc_reusing token replacement preserves unaffected token ids" {
+  let doc = unwrap_doc(@mini.parse_doc("s(\"bd sd hh\")"))
+  let edited = unwrap_doc(@mini.parse_doc_reusing("s(\"bd cp hh\")", doc))
+  assert_true(edited.contains_node(pid("mini:sound:bd:0")))
+  assert_true(!edited.contains_node(pid("mini:sound:sd:0")))
+  assert_true(edited.contains_node(pid("mini:sound:cp:0")))
+  assert_true(edited.contains_node(pid("mini:sound:hh:0")))
+  let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
+  ignore(unwrap_lowered_snapshot(try? doc.lower_with_cache(cache)))
+  cache.reset_stats()
+  let snapshot = unwrap_lowered_snapshot(try? edited.lower_with_cache(cache))
+  assert_true(cache.hit_count() >= 2)
+  assert_true(cache.miss_count() >= 1)
+  let events = snapshot.query(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+    ),
+  )
+  let mut saw_cp = false
+  for event in events {
+    match event.value.get("sound") {
+      Some(value) => if value == 39.0 { saw_cp = true }
+      None => ()
+    }
+  }
+  assert_true(saw_cp)
+}
+
+///|
+test "parse_doc_reusing insertion and removal keep surviving token ids" {
+  let doc = unwrap_doc(@mini.parse_doc("s(\"bd sd\")"))
+  let inserted = unwrap_doc(@mini.parse_doc_reusing("s(\"hh bd sd\")", doc))
+  assert_true(inserted.contains_node(pid("mini:sound:hh:0")))
+  assert_true(inserted.contains_node(pid("mini:sound:bd:0")))
+  assert_true(inserted.contains_node(pid("mini:sound:sd:0")))
+  let removed = unwrap_doc(@mini.parse_doc_reusing("s(\"bd\")", inserted))
+  assert_true(removed.contains_node(pid("mini:sound:bd:0")))
+  assert_true(!removed.contains_node(pid("mini:sound:hh:0")))
+  assert_true(!removed.contains_node(pid("mini:sound:sd:0")))
 }
 
 ///|
