@@ -400,6 +400,23 @@ This should not be added to `Event[A]` in the first slice. A wrapper around
 queried events is enough for scheduler/live orchestration. Keep `pattern/`
 standalone and payload-polymorphic.
 
+Implementation direction as of the affected-voice policy slice: explicit
+playback-event queries attach provenance where the committed snapshot has it,
+while default audio-block processing continues through raw event queries and
+empty sources. This keeps compatibility and avoids reintroducing wrapper
+allocation into the default block-processing path. Pattern snapshots provide
+authored structural provenance that preserves ancestor and leaf identities; for
+callback-style transforms, the provenance conservatively includes the wrapper
+identity plus all reachable child subtree identities. Song snapshots provide
+authored occurrence and section-layer provenance from the authoring document.
+
+With provenance paths in place, the affected-voice policy surface supports three
+explicit outcomes:
+
+- Preserve existing voices unchanged.
+- Release matched scheduler-owned voices and drop scheduler ownership.
+- Immediately stop matched scheduler-owned voices and drop scheduler ownership.
+
 ## Edit Behavior Matrix
 
 | Edit while playing | Commit result | Active voices | Future note-ons |
@@ -410,6 +427,7 @@ standalone and payload-polymorphic.
 | Change section length | New song layout revision | Let ring with old end samples | Downstream occurrence spans shift |
 | Insert song occurrence | New song layout revision | Let ring | New occurrence schedules future onsets only |
 | Delete song occurrence | New song layout revision | Let ring | Removed occurrence stops scheduling future onsets |
+| Delete active occurrence with kill policy | New song layout revision | Kill matched occurrence voices immediately | Removed occurrence stops scheduling future onsets |
 | Rename occurrence | Display-only revision | Let ring | No timing change |
 | Change DSP template default | Transactional pool swap | Existing voices keep old compiled graph | New voices use new template |
 | Change DSP topology | Transactional pool swap | Existing voices keep old compiled graph | New voices use new topology |
@@ -503,7 +521,9 @@ For implementation slices:
   only the subset emitted by mini-notation?
 - Should section length edits immediately affect the current cycle after the
   commit block, or only future cycle boundaries?
-- What provenance is required before adding `GateOffAffected` or
-  `KillAffected` edit policies?
-- Should live active-voice controls target every active voice, only voices from
-  selected provenance, or only future voices by default?
+- Should callback-heavy pattern APIs later grow a typed sourced-query contract
+  for exact leaf attribution, or is conservative subtree coverage sufficient
+  for edit policies?
+- Should live active-voice controls beyond explicit affected-voice policies
+  target every active voice, selected provenance, or only future voices by
+  default?

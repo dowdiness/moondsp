@@ -36,6 +36,22 @@ fn[A] unwrap_snapshot(
 }
 
 ///|
+fn[A] assert_pattern_event_path(
+  event : PatternSnapshotEvent[A],
+  expected : Array[String],
+) -> Unit {
+  let nodes = event.pattern_nodes()
+  if nodes.length() != expected.length() {
+    abort("unexpected pattern source path length")
+  }
+  for index in 0..<expected.length() {
+    if nodes[index] != pid(expected[index]) {
+      abort("unexpected pattern source path")
+    }
+  }
+}
+
+///|
 fn unwrap_revision(
   result : Result[@identity.Revision, PatternDocError],
 ) -> @identity.Revision {
@@ -97,6 +113,116 @@ test "PatternDoc::fast adds stable root and bumps revision" {
   assert_true(doc.contains_node(pid("leaf")))
   let events = unwrap_snapshot(try? doc.lower()).query(doc_span(0, 1, 1, 1))
   inspect(events.length(), content="2")
+}
+
+///|
+test "PatternSnapshot::query_sourced_events tags fast ancestor and leaf path" {
+  let doc = unwrap_doc(
+    try? PatternDoc::pure(id=pid("leaf"), value=7).fast(
+      id=pid("fast"),
+      factor=Rational::from_int(2),
+    ),
+  )
+  let snapshot = unwrap_snapshot(try? doc.lower())
+  let events = snapshot.query_sourced_events(doc_span(0, 1, 1, 1))
+  let raw_events = snapshot.query(doc_span(0, 1, 1, 1))
+  assert_eq(events.length(), raw_events.length())
+  assert_eq(events.length(), 2)
+  assert_pattern_event_path(events[0], ["fast", "leaf"])
+  assert_pattern_event_path(events[1], ["fast", "leaf"])
+  assert_true(events[0].pattern_node() == Some(pid("leaf")))
+  assert_true(events[0].event().value == raw_events[0].value)
+  assert_true(events[1].event().part.begin == raw_events[1].part.begin)
+}
+
+///|
+test "PatternSnapshot::query_sourced_events tags sequence and stack children" {
+  let left = PatternDoc::pure(id=pid("left"), value=1)
+  let right = PatternDoc::pure(id=pid("right"), value=2)
+  let seq = unwrap_doc(
+    try? PatternDoc::sequence(id=pid("seq"), docs=[left, right]),
+  )
+  let seq_events = unwrap_snapshot(try? seq.lower()).query_sourced_events(
+    doc_span(0, 1, 1, 1),
+  )
+  assert_eq(seq_events.length(), 2)
+  assert_pattern_event_path(seq_events[0], ["seq", "left"])
+  assert_pattern_event_path(seq_events[1], ["seq", "right"])
+  assert_true(seq_events[0].event().value == 1)
+  assert_true(seq_events[1].event().value == 2)
+  let stack = unwrap_doc(
+    try? PatternDoc::stack(id=pid("stack"), docs=[
+      PatternDoc::pure(id=pid("stack-left"), value=3),
+      PatternDoc::pure(id=pid("stack-right"), value=4),
+    ]),
+  )
+  let stack_events = unwrap_snapshot(try? stack.lower()).query_sourced_events(
+    doc_span(0, 1, 1, 1),
+  )
+  assert_eq(stack_events.length(), 2)
+  assert_pattern_event_path(stack_events[0], ["stack", "stack-left"])
+  assert_pattern_event_path(stack_events[1], ["stack", "stack-right"])
+}
+
+///|
+test "PatternSnapshot::query_sourced_events covers every callback subtrees" {
+  let child = unwrap_doc(
+    try? PatternDoc::stack(id=pid("every-stack"), docs=[
+      PatternDoc::pure(id=pid("every-left"), value=1),
+      PatternDoc::pure(id=pid("every-right"), value=2),
+    ]),
+  )
+  let doc = unwrap_doc(
+    try? child.every(id=pid("every"), n=1, f=fn(p) {
+      p.fast(Rational::from_int(2))
+    }),
+  )
+  let events = unwrap_snapshot(try? doc.lower()).query_sourced_events(
+    doc_span(0, 1, 1, 100),
+  )
+  assert_true(events.length() > 0)
+  assert_pattern_event_path(events[0], [
+    "every", "every-stack", "every-left", "every-right",
+  ])
+}
+
+///|
+test "PatternSnapshot::query_sourced_events covers jux callback subtrees" {
+  let child = unwrap_doc(
+    try? PatternDoc::stack(id=pid("jux-stack"), docs=[
+      PatternDoc::from_pattern(id=pid("jux-left"), pat=note(60.0)),
+      PatternDoc::from_pattern(id=pid("jux-right"), pat=note(67.0)),
+    ]),
+  )
+  let doc = unwrap_doc(
+    try? child.jux(id=pid("jux"), f=fn(p) { p.fast(Rational::from_int(2)) }),
+  )
+  let events = unwrap_snapshot(try? doc.lower()).query_sourced_events(
+    doc_span(0, 1, 1, 100),
+  )
+  assert_true(events.length() > 0)
+  assert_pattern_event_path(events[0], [
+    "jux", "jux-stack", "jux-left", "jux-right",
+  ])
+}
+
+///|
+test "PatternSnapshot::query_sourced_events covers merge_control inputs" {
+  let left = PatternDoc::from_pattern(id=pid("merge-left"), pat=note(60.0))
+  let right = PatternDoc::from_pattern(
+    id=pid("merge-right"),
+    pat=s_cutoff(800.0),
+  )
+  let doc = unwrap_doc(
+    try? PatternDoc::merge_control(id=pid("merge"), left~, right~),
+  )
+  let events = unwrap_snapshot(try? doc.lower()).query_sourced_events(
+    doc_span(0, 1, 1, 100),
+  )
+  assert_eq(events.length(), 1)
+  assert_pattern_event_path(events[0], ["merge", "merge-left", "merge-right"])
+  assert_true(events[0].event().value.get("note") == Some(60.0))
+  assert_true(events[0].event().value.get("cutoff") == Some(800.0))
 }
 
 ///|

@@ -9,7 +9,7 @@ actionable; move completed design notes or implementation plans under
 ## Current State
 
 - `main` is currently at
-  `5caf016 [codex] Add song layout authoring docs`.
+  `81b1b19 [codex] Add scheduler song snapshots and playback provenance (#45)`.
 - PR #37 is merged:
   https://github.com/dowdiness/moondsp/pull/37
 - PR #38 is merged:
@@ -26,8 +26,10 @@ actionable; move completed design notes or implementation plans under
   https://github.com/dowdiness/moondsp/pull/43
 - PR #44 is merged:
   https://github.com/dowdiness/moondsp/pull/44
-- Active branch: `codex/phase6-song-layout-scheduler`, based on
-  `5caf016 [codex] Add song layout authoring docs`.
+- PR #45 is merged:
+  https://github.com/dowdiness/moondsp/pull/45
+- Active branch: `codex/phase6-affected-voice-policy`, based on
+  `81b1b19 [codex] Add scheduler song snapshots and playback provenance (#45)`.
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -211,7 +213,7 @@ actionable; move completed design notes or implementation plans under
   - `rtk moon test` (775 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
-- Active song layout scheduler branch:
+- Song layout scheduler snapshot/provenance shipped so far on `main`:
   - song authoring lowers to runtime snapshots that carry both whole-document
     and layout-scoped revision tokens, so playback can distinguish content-only
     edits from timeline-boundary edits.
@@ -245,6 +247,47 @@ actionable; move completed design notes or implementation plans under
   - `rtk moon test scheduler` (43 passed)
   - `rtk moon check --target all`
   - `rtk moon test` (785 passed)
+  - `rtk moon build --target wasm-gc`
+  - `rtk git diff --check`
+  - final PR #45 CI passed before merge; merged at `81b1b19`.
+- Active affected-voice policy branch:
+  - provenance selectors can target active voices by pattern node, section,
+    layer, occurrence, or a combined subset of those IDs.
+  - empty selectors intentionally match nothing, and empty-source compatibility
+    voices are not affected by provenance-targeted edits.
+  - the policy surface keeps preserve, release, and immediate-stop outcomes
+    explicit for matched scheduler-owned voices, with destructive stopping kept
+    behind the constrained scheduler-facing path.
+  - sourced snapshot queries now attach authored pattern provenance and
+    occurrence/section/layer provenance where available, while block-processing
+    compatibility paths continue to use raw events and empty sources.
+  - sourced song queries carry authored occurrence and section-layer provenance
+    so scheduler wrappers do not need to reconstruct identity from runtime-only
+    section values.
+  - sourced pattern queries carry authored structural provenance, and scheduler
+    event sources keep pattern-node paths so affected-voice selectors match
+    both leaf and ancestor identities. Callback-style structural transforms now
+    conservatively tag their wrapper plus all reachable child subtree identities.
+  - coverage proves selector matching, empty-source safety, let-ring no-op,
+    pattern-node targeting, section targeting, occurrence/layout targeting,
+    sourced pattern/song snapshot queries, pattern sub-node path matching,
+    callback subtree coverage, song layer targeting, immediate kill behavior,
+    and empty-source block processing.
+  - refactor commit `8bce0b9` keeps the internal raw kill primitive private,
+    leaves the public scheduler-facing kill path constrained to bound pools, and
+    consolidates affected-note release and immediate-stop removal into one
+    scheduler helper.
+- Latest local verification on `codex/phase6-affected-voice-policy`:
+  - `rtk moon fmt`
+  - `rtk moon info`
+  - `rtk moon check --deny-warn`
+  - `rtk moon check --target all`
+  - `rtk moon test pattern` (144 passed)
+  - `rtk moon test song` (50 passed)
+  - `rtk moon test voice` (33 passed)
+  - `rtk moon test scheduler` (54 passed)
+  - `rtk moon test` (803 passed)
+  - `rtk moon test --release` (803 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
 - Latest local verification for PR #40 before merge:
@@ -328,12 +371,12 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Review and merge PR #45 (`codex/phase6-song-layout-scheduler`), then record
-   the merged SHA, final CI/local verification status, branch cleanup, and any
-   deployment or migration follow-up in this handoff doc.
+1. Continue the stacked Phase 6 branch without opening a PR yet.
 
-2. After this lands, use scheduler event provenance to define the first
-   affected-voice policy surface.
+2. Next implementation choice: decide whether to prepare this stacked branch
+   for review, or add higher-level edit orchestration helpers that choose
+   `LetRing`, `GateOffAffected`, or `KillAffected` from concrete pattern/song
+   edit operations.
 
 ## Acceptance Checks For API-Hardening Slices
 

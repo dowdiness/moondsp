@@ -415,6 +415,29 @@ test "process reclaims finished releasing voices" {
 }
 
 ///|
+test "kill immediately idles an active voice" {
+  let ctx = DspContext::new(sample_rate=1000.0, block_size=8)
+  let nodes = [
+    DspNode::constant(1.0),
+    DspNode::adsr(attack_ms=0.0, decay_ms=0.0, sustain=1.0, release_ms=100.0),
+    DspNode::envelope_gain(0, 1, 1.0),
+    DspNode::output(2),
+  ]
+  let pool = BoundVoicePool::new(
+    nodes,
+    ctx,
+    ControlBindingBuilder::new(),
+    max_voices=4,
+  ).unwrap()
+  let handle = pool.note_on_controls({}).unwrap()
+  assert_true(pool.active_voice_count() == 1)
+  assert_true(pool.kill(handle))
+  assert_true(pool.active_voice_count() == 0)
+  assert_true(pool.voice_state(handle) is VoiceState::Idle)
+  assert_true(!pool.kill(handle))
+}
+
+///|
 test "process mixes multiple voices" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]

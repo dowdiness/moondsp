@@ -28,10 +28,32 @@ pub fn PerformanceTime::PerformanceTime(sample : Int64) -> PerformanceTime {
 /// pattern engine stays payload-polymorphic and independent of authoring IDs.
 pub struct EventSource {
   priv pattern_node : @identity.PatternNodeId?
+  priv pattern_nodes : Array[@identity.PatternNodeId]
   priv section : @identity.SectionId?
   priv layer : @identity.SectionLayerId?
   priv occurrence : @identity.OccurrenceId?
 } derive(Eq, Debug)
+
+///|
+fn pattern_node_path_from_primary(
+  pattern_node : @identity.PatternNodeId?,
+) -> Array[@identity.PatternNodeId] {
+  match pattern_node {
+    Some(id) => [id]
+    None => []
+  }
+}
+
+///|
+fn primary_pattern_node(
+  pattern_nodes : Array[@identity.PatternNodeId],
+) -> @identity.PatternNodeId? {
+  if pattern_nodes.length() == 0 {
+    None
+  } else {
+    Some(pattern_nodes[pattern_nodes.length() - 1])
+  }
+}
 
 ///|
 pub fn EventSource::EventSource(
@@ -40,12 +62,41 @@ pub fn EventSource::EventSource(
   layer~ : @identity.SectionLayerId?,
   occurrence~ : @identity.OccurrenceId?,
 ) -> EventSource {
-  { pattern_node, section, layer, occurrence }
+  {
+    pattern_node,
+    pattern_nodes: pattern_node_path_from_primary(pattern_node),
+    section,
+    layer,
+    occurrence,
+  }
+}
+
+///|
+pub fn EventSource::from_pattern_nodes(
+  pattern_nodes~ : Array[@identity.PatternNodeId],
+  section~ : @identity.SectionId?,
+  layer~ : @identity.SectionLayerId?,
+  occurrence~ : @identity.OccurrenceId?,
+) -> EventSource {
+  let nodes = pattern_nodes.copy()
+  {
+    pattern_node: primary_pattern_node(nodes),
+    pattern_nodes: nodes,
+    section,
+    layer,
+    occurrence,
+  }
 }
 
 ///|
 pub fn EventSource::none() -> EventSource {
-  { pattern_node: None, section: None, layer: None, occurrence: None }
+  {
+    pattern_node: None,
+    pattern_nodes: [],
+    section: None,
+    layer: None,
+    occurrence: None,
+  }
 }
 
 ///|
@@ -53,6 +104,26 @@ pub fn EventSource::pattern_node(
   self : EventSource,
 ) -> @identity.PatternNodeId? {
   self.pattern_node
+}
+
+///|
+pub fn EventSource::pattern_nodes(
+  self : EventSource,
+) -> Array[@identity.PatternNodeId] {
+  self.pattern_nodes.copy()
+}
+
+///|
+fn EventSource::has_pattern_node(
+  self : EventSource,
+  id : @identity.PatternNodeId,
+) -> Bool {
+  for node in self.pattern_nodes {
+    if node == id {
+      return true
+    }
+  }
+  false
 }
 
 ///|
@@ -73,6 +144,7 @@ pub fn EventSource::occurrence(self : EventSource) -> @identity.OccurrenceId? {
 ///|
 pub fn EventSource::is_empty(self : EventSource) -> Bool {
   self.pattern_node is None &&
+  self.pattern_nodes.length() == 0 &&
   self.section is None &&
   self.layer is None &&
   self.occurrence is None
@@ -121,18 +193,6 @@ fn copy_playback_events(events : Array[PlaybackEvent]) -> Array[PlaybackEvent] {
   let result : Array[PlaybackEvent] = []
   for event in events {
     result.push(event)
-  }
-  result
-}
-
-///|
-fn playback_events_from_events(
-  events : Array[@pattern.Event[@pattern.ControlMap]],
-  source : EventSource,
-) -> Array[PlaybackEvent] {
-  let result : Array[PlaybackEvent] = []
-  for event in events {
-    result.push(PlaybackEvent(event~, source~))
   }
   result
 }
@@ -281,15 +341,59 @@ pub fn PlaybackSnapshot::query(
 }
 
 ///|
+fn playback_events_from_pattern_snapshot(
+  snapshot : @pattern.PatternSnapshot[@pattern.ControlMap],
+  arc : @pattern.TimeSpan,
+) -> Array[PlaybackEvent] {
+  let result : Array[PlaybackEvent] = []
+  let events = snapshot.query_sourced_events(arc)
+  for event in events {
+    let source = EventSource::from_pattern_nodes(
+      pattern_nodes=event.pattern_nodes(),
+      section=None,
+      layer=None,
+      occurrence=None,
+    )
+    result.push(PlaybackEvent(event=event.event(), source~))
+  }
+  result
+}
+
+///|
+fn playback_events_from_song_snapshot(
+  snapshot : @song.SongSnapshot[@pattern.ControlMap],
+  arc : @pattern.TimeSpan,
+) -> Array[PlaybackEvent] {
+  let result : Array[PlaybackEvent] = []
+  let events = snapshot.query_sourced_events(arc)
+  for event in events {
+    let source = EventSource(
+      pattern_node=None,
+      section=event.section(),
+      layer=event.layer(),
+      occurrence=Some(event.occurrence()),
+    )
+    result.push(PlaybackEvent(event=event.event(), source~))
+  }
+  result
+}
+
+///|
 /// Compatibility helper for consumers that want sourced scheduler events.
 ///
 /// This allocates a wrapper array and is intentionally not used by the
-/// audio-block processing path.
+/// audio-block processing path. Pattern snapshots tag queried events with their
+/// root pattern node. Song snapshots tag queried events with occurrence,
+/// section, and section-layer IDs when the snapshot was lowered from the
+/// authoring layer.
 pub fn PlaybackSnapshot::query_playback_events(
   self : PlaybackSnapshot,
   arc : @pattern.TimeSpan,
 ) -> Array[PlaybackEvent] {
-  playback_events_from_events(self.query(arc), EventSource::none())
+  match self {
+    Pattern(snapshot) => playback_events_from_pattern_snapshot(snapshot, arc)
+    Song(snapshot) => playback_events_from_song_snapshot(snapshot, arc)
+  }
 }
 
 ///|

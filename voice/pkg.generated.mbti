@@ -16,6 +16,7 @@ pub struct BoundVoicePool {
   // private fields
 }
 pub fn BoundVoicePool::active_voice_count(Self) -> Int
+pub fn BoundVoicePool::kill(Self, VoiceHandle) -> Bool
 pub fn BoundVoicePool::last_sanitized_count(Self) -> Int
 pub fn BoundVoicePool::new(Array[@graph.DspNode], @dsp.DspContext, @graph.ControlBindingBuilder, max_voices? : Int) -> Result[Self, BoundVoicePoolError]
 pub fn BoundVoicePool::note_off(Self, VoiceHandle) -> Bool

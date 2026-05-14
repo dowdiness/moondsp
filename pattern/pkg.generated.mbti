@@ -112,8 +112,16 @@ pub struct PatternSnapshot[A] {
 }
 pub fn[A] PatternSnapshot::pat(Self[A]) -> Pat[A]
 pub fn[A] PatternSnapshot::query(Self[A], TimeSpan) -> Array[Event[A]]
+pub fn[A] PatternSnapshot::query_sourced_events(Self[A], TimeSpan) -> Array[PatternSnapshotEvent[A]]
 pub fn[A] PatternSnapshot::revision(Self[A]) -> @identity.Revision
 pub fn[A] PatternSnapshot::root(Self[A]) -> @identity.PatternNodeId
+
+pub struct PatternSnapshotEvent[A] {
+  // private fields
+}
+pub fn[A] PatternSnapshotEvent::event(Self[A]) -> Event[A]
+pub fn[A] PatternSnapshotEvent::pattern_node(Self[A]) -> @identity.PatternNodeId?
+pub fn[A] PatternSnapshotEvent::pattern_nodes(Self[A]) -> Array[@identity.PatternNodeId]
 
 pub struct Rational {
   num : Int64
