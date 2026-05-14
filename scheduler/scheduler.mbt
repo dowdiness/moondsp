@@ -106,18 +106,6 @@ pub fn PlaybackEvent::source(self : PlaybackEvent) -> EventSource {
 }
 
 ///|
-fn playback_events_from_events(
-  events : Array[@pattern.Event[@pattern.ControlMap]],
-  source : EventSource,
-) -> Array[PlaybackEvent] {
-  let result : Array[PlaybackEvent] = []
-  for event in events {
-    result.push(PlaybackEvent(event~, source~))
-  }
-  result
-}
-
-///|
 /// Tracks a sounding voice for gate-off scheduling.
 struct ActiveNote {
   handle : @moondsp.VoiceHandle
@@ -258,14 +246,6 @@ pub fn PlaybackSnapshot::query(
     Pattern(snapshot) => snapshot.query(arc)
     Song(snapshot) => snapshot.query(arc)
   }
-}
-
-///|
-pub fn PlaybackSnapshot::query_playback_events(
-  self : PlaybackSnapshot,
-  arc : @pattern.TimeSpan,
-) -> Array[PlaybackEvent] {
-  playback_events_from_events(self.query(arc), EventSource::none())
 }
 
 ///|
@@ -592,11 +572,82 @@ pub fn PatternScheduler::process_events(
   arc : @pattern.TimeSpan,
   pool : @moondsp.BoundVoicePool,
 ) -> Unit {
-  self.process_playback_events(
-    playback_events_from_events(events, EventSource::none()),
-    arc,
-    pool,
-  )
+  self.process_events_with_source(events, arc, pool, EventSource::none())
+}
+
+///|
+fn PatternScheduler::process_single_event(
+  self : PatternScheduler,
+  event : @pattern.Event[@pattern.ControlMap],
+  source : EventSource,
+  arc : @pattern.TimeSpan,
+  pool : @moondsp.BoundVoicePool,
+) -> Unit {
+  match event.whole {
+    None => ()
+    Some(whole) =>
+      if !arc.contains(whole.begin) {
+        ()
+      } else {
+        // WHY fresh map: process_events takes Array[Event] so callers may
+        // reuse event arrays across calls. Building a fresh map avoids
+        // mutating the original ControlMap. The ControlMapper transforms
+        // values (e.g. MIDI→Hz) and extracts per-voice actions (e.g. pan).
+        let map : Map[String, Double] = {}
+        let actions : Array[VoiceAction] = []
+        let mapper = self.mapper
+        event.value.each(fn(k, v) {
+          match (mapper.voice_action)(k, v) {
+            Some(action) => actions.push(action)
+            None => ()
+          }
+          match (mapper.transform)(k, v) {
+            Some((tk, tv)) => map[tk] = tv
+            None => ()
+          }
+        })
+        match pool.note_on_controls(map) {
+          None => ()
+          Some(handle) => {
+            self.active_notes.push({
+              handle,
+              source,
+              end_sample: cycle_to_sample(whole.end_, self.bpm, self.ctx),
+            })
+            for action in actions {
+              match action {
+                SetPan(pan) => ignore(pool.set_voice_pan(handle, pan))
+              }
+            }
+          }
+        }
+      }
+  }
+}
+
+///|
+fn PatternScheduler::process_events_with_source(
+  self : PatternScheduler,
+  events : Array[@pattern.Event[@pattern.ControlMap]],
+  arc : @pattern.TimeSpan,
+  pool : @moondsp.BoundVoicePool,
+  source : EventSource,
+) -> Unit {
+  // Sort by onset for deterministic voice allocation.
+  // None-whole events sort last but are always skipped below.
+  if events.length() > 1 {
+    events.sort_by(fn(a, b) {
+      match (a.whole, b.whole) {
+        (Some(wa), Some(wb)) => wa.begin.compare(wb.begin)
+        (Some(_), None) => -1
+        (None, Some(_)) => 1
+        (None, None) => 0
+      }
+    })
+  }
+  for i = 0; i < events.length(); i = i + 1 {
+    self.process_single_event(events[i], source, arc, pool)
+  }
 }
 
 ///|
@@ -620,47 +671,12 @@ pub fn PatternScheduler::process_playback_events(
   }
   for i = 0; i < events.length(); i = i + 1 {
     let playback_event = events[i]
-    let event = playback_event.event
-    match event.whole {
-      None => continue i + 1
-      Some(whole) => {
-        if !arc.contains(whole.begin) {
-          continue i + 1
-        }
-        // WHY fresh map: process_events takes Array[Event] so callers may
-        // reuse event arrays across calls. Building a fresh map avoids
-        // mutating the original ControlMap. The ControlMapper transforms
-        // values (e.g. MIDI→Hz) and extracts per-voice actions (e.g. pan).
-        let map : Map[String, Double] = {}
-        let actions : Array[VoiceAction] = []
-        let mapper = self.mapper
-        event.value.each(fn(k, v) {
-          match (mapper.voice_action)(k, v) {
-            Some(action) => actions.push(action)
-            None => ()
-          }
-          match (mapper.transform)(k, v) {
-            Some((tk, tv)) => map[tk] = tv
-            None => ()
-          }
-        })
-        match pool.note_on_controls(map) {
-          None => ()
-          Some(handle) => {
-            self.active_notes.push({
-              handle,
-              source: playback_event.source,
-              end_sample: cycle_to_sample(whole.end_, self.bpm, self.ctx),
-            })
-            for action in actions {
-              match action {
-                SetPan(pan) => ignore(pool.set_voice_pan(handle, pan))
-              }
-            }
-          }
-        }
-      }
-    }
+    self.process_single_event(
+      playback_event.event,
+      playback_event.source,
+      arc,
+      pool,
+    )
   }
 }
 
@@ -669,18 +685,18 @@ fn PatternScheduler::query_pattern_block(
   self : PatternScheduler,
   pat : @pattern.Pat[@pattern.ControlMap],
   frame : BlockFrame,
-) -> Array[PlaybackEvent] {
+) -> Array[@pattern.Event[@pattern.ControlMap]] {
   ignore(self)
-  playback_events_from_events(pat.query(frame.logical_arc), EventSource::none())
+  pat.query(frame.logical_arc)
 }
 
 ///|
 fn PatternScheduler::query_snapshot_block(
   self : PatternScheduler,
   frame : BlockFrame,
-) -> Array[PlaybackEvent] {
+) -> Array[@pattern.Event[@pattern.ControlMap]] {
   match self.active_playback_snapshot {
-    Some(snapshot) => snapshot.query_playback_events(frame.logical_arc)
+    Some(snapshot) => snapshot.query(frame.logical_arc)
     None => []
   }
 }
@@ -700,13 +716,14 @@ fn PatternScheduler::render_block(
 ///|
 fn PatternScheduler::process_block_events(
   self : PatternScheduler,
-  events : Array[PlaybackEvent],
+  events : Array[@pattern.Event[@pattern.ControlMap]],
+  source : EventSource,
   frame : BlockFrame,
   pool : @moondsp.BoundVoicePool,
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
 ) -> Unit {
-  self.process_playback_events(events, frame.logical_arc, pool)
+  self.process_events_with_source(events, frame.logical_arc, pool, source)
   self.advance_block()
   self.render_block(pool, left, right)
 }
@@ -725,7 +742,14 @@ pub fn PatternScheduler::process_block(
   let frame = self.current_block()
   self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
   let events = self.query_pattern_block(pat, frame)
-  self.process_block_events(events, frame, pool, left, right)
+  self.process_block_events(
+    events,
+    EventSource::none(),
+    frame,
+    pool,
+    left,
+    right,
+  )
 }
 
 ///|
@@ -756,7 +780,14 @@ pub fn PatternScheduler::process_playback_snapshot_block(
   self.commit_pending_playback_snapshot()
   self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
   let events = self.query_snapshot_block(frame)
-  self.process_block_events(events, frame, pool, left, right)
+  self.process_block_events(
+    events,
+    EventSource::none(),
+    frame,
+    pool,
+    left,
+    right,
+  )
 }
 
 ///|
@@ -787,11 +818,15 @@ pub fn PatternScheduler::process_section_block(
 ) -> Unit {
   let frame = self.current_block()
   self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
-  let events = playback_events_from_events(
-    section.query(frame.logical_arc),
+  let events = section.query(frame.logical_arc)
+  self.process_block_events(
+    events,
     EventSource::none(),
+    frame,
+    pool,
+    left,
+    right,
   )
-  self.process_block_events(events, frame, pool, left, right)
 }
 
 ///|
@@ -808,11 +843,15 @@ pub fn PatternScheduler::process_song_block(
 ) -> Unit {
   let frame = self.current_block()
   self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
-  let events = playback_events_from_events(
-    song.query(frame.logical_arc),
+  let events = song.query(frame.logical_arc)
+  self.process_block_events(
+    events,
     EventSource::none(),
+    frame,
+    pool,
+    left,
+    right,
   )
-  self.process_block_events(events, frame, pool, left, right)
 }
 
 ///|
