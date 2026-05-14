@@ -106,6 +106,38 @@ pub fn PlaybackEvent::source(self : PlaybackEvent) -> EventSource {
 }
 
 ///|
+fn copy_control_events(
+  events : Array[@pattern.Event[@pattern.ControlMap]],
+) -> Array[@pattern.Event[@pattern.ControlMap]] {
+  let result : Array[@pattern.Event[@pattern.ControlMap]] = []
+  for event in events {
+    result.push(event)
+  }
+  result
+}
+
+///|
+fn copy_playback_events(events : Array[PlaybackEvent]) -> Array[PlaybackEvent] {
+  let result : Array[PlaybackEvent] = []
+  for event in events {
+    result.push(event)
+  }
+  result
+}
+
+///|
+fn playback_events_from_events(
+  events : Array[@pattern.Event[@pattern.ControlMap]],
+  source : EventSource,
+) -> Array[PlaybackEvent] {
+  let result : Array[PlaybackEvent] = []
+  for event in events {
+    result.push(PlaybackEvent(event~, source~))
+  }
+  result
+}
+
+///|
 /// Tracks a sounding voice for gate-off scheduling.
 struct ActiveNote {
   handle : @moondsp.VoiceHandle
@@ -246,6 +278,18 @@ pub fn PlaybackSnapshot::query(
     Pattern(snapshot) => snapshot.query(arc)
     Song(snapshot) => snapshot.query(arc)
   }
+}
+
+///|
+/// Compatibility helper for consumers that want sourced scheduler events.
+///
+/// This allocates a wrapper array and is intentionally not used by the
+/// audio-block processing path.
+pub fn PlaybackSnapshot::query_playback_events(
+  self : PlaybackSnapshot,
+  arc : @pattern.TimeSpan,
+) -> Array[PlaybackEvent] {
+  playback_events_from_events(self.query(arc), EventSource::none())
 }
 
 ///|
@@ -572,7 +616,12 @@ pub fn PatternScheduler::process_events(
   arc : @pattern.TimeSpan,
   pool : @moondsp.BoundVoicePool,
 ) -> Unit {
-  self.process_events_with_source(events, arc, pool, EventSource::none())
+  self.process_events_with_source(
+    copy_control_events(events),
+    arc,
+    pool,
+    EventSource::none(),
+  )
 }
 
 ///|
@@ -652,6 +701,16 @@ fn PatternScheduler::process_events_with_source(
 
 ///|
 pub fn PatternScheduler::process_playback_events(
+  self : PatternScheduler,
+  events : Array[PlaybackEvent],
+  arc : @pattern.TimeSpan,
+  pool : @moondsp.BoundVoicePool,
+) -> Unit {
+  self.process_owned_playback_events(copy_playback_events(events), arc, pool)
+}
+
+///|
+fn PatternScheduler::process_owned_playback_events(
   self : PatternScheduler,
   events : Array[PlaybackEvent],
   arc : @pattern.TimeSpan,

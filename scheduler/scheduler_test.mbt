@@ -299,6 +299,22 @@ test "EventSource records optional authoring IDs" {
 }
 
 ///|
+test "PlaybackSnapshot::query_playback_events returns empty-source wrappers" {
+  let snapshot = @scheduler.PlaybackSnapshot::pattern(
+    note_snapshot("playback-events:pattern", 60.0),
+  )
+  let events = snapshot.query_playback_events(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::new(1L, 100L),
+    ),
+  )
+  assert_eq(events.length(), 1)
+  assert_true(events[0].source().is_empty())
+  assert_true(events[0].event().value.get("note") == Some(60.0))
+}
+
+///|
 test "expire_notes: removes notes past their end_time" {
   let (pool, _, ctx) = make_test_pool()
   let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~)
@@ -349,6 +365,27 @@ test "process_events: single note-on creates active voice" {
   match sched.active_note_source(0) {
     Some(source) => assert_true(source.is_empty())
     None => assert_true(false)
+  }
+}
+
+///|
+test "process_events: preserves caller-owned event order" {
+  let (pool, sched, _, _) = make_test_sched()
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::from_int(2),
+  )
+  let early = @pattern.note(60.0).query(arc)[0]
+  let late = early.shift(@pattern.Rational::new(1L, 2L))
+  let events = [late, early]
+  sched.process_events(events, arc, pool)
+  assert_eq(sched.active_note_count(), 2)
+  match (events[0].whole, events[1].whole) {
+    (Some(first), Some(second)) => {
+      assert_true(first.begin == @pattern.Rational::new(1L, 2L))
+      assert_true(second.begin == @pattern.Rational::from_int(0))
+    }
+    _ => assert_true(false)
   }
 }
 

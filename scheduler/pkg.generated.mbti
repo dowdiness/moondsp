@@ -109,6 +109,7 @@ pub fn PlaybackSnapshot::is_pattern(Self) -> Bool
 pub fn PlaybackSnapshot::is_song(Self) -> Bool
 pub fn PlaybackSnapshot::pattern(@pattern.PatternSnapshot[@pattern.ControlMap]) -> Self
 pub fn PlaybackSnapshot::query(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@pattern.ControlMap]]
+pub fn PlaybackSnapshot::query_playback_events(Self, @pattern.TimeSpan) -> Array[PlaybackEvent]
 pub fn PlaybackSnapshot::revision(Self) -> @identity.Revision
 pub fn PlaybackSnapshot::song(@song.SongSnapshot[@pattern.ControlMap]) -> Self
 pub fn PlaybackSnapshot::song_layout_revision(Self) -> @identity.Revision?

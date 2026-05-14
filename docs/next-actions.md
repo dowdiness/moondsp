@@ -225,6 +225,9 @@ actionable; move completed design notes or implementation plans under
   - active notes now retain the source attached to the event that triggered
     them, while existing raw pattern, section, song, and snapshot paths use an
     empty source until authoring snapshots provide richer provenance.
+  - public raw-event processing preserves caller-owned event array ordering,
+    while scheduler audio-block paths avoid per-event provenance wrapper
+    allocation on the empty-source path.
   - committed song revision and layout-revision tokens are exposed for
     scheduler/live orchestration without changing the raw
     `process_song_block(song, ...)` compatibility entry point.
@@ -234,15 +237,17 @@ actionable; move completed design notes or implementation plans under
     replacement, plus coalescing multiple pending song snapshots to the latest
     staged snapshot and coalescing mixed pattern/song snapshots through the
     unified playback slot. Provenance coverage proves empty default sources for
-    existing event APIs and explicit source retention for playback events.
+    existing event APIs, explicit source retention for playback events, public
+    `PlaybackSnapshot::query_playback_events` compatibility, and caller-owned
+    event-order preservation.
 - Latest local verification on `codex/phase6-song-layout-scheduler`:
   - `rtk moon fmt`
   - `rtk moon info`
   - `rtk moon check`
   - `rtk moon test song` (49 passed)
-  - `rtk moon test scheduler` (41 passed)
+  - `rtk moon test scheduler` (43 passed)
   - `rtk moon check --target all`
-  - `rtk moon test` (783 passed)
+  - `rtk moon test` (785 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
 - Latest local verification for PR #40 before merge:
