@@ -174,6 +174,7 @@ pub fn[A] SongDoc::clear_occurrence_start(Self[A], @identity.OccurrenceId) -> Se
 pub fn[A] SongDoc::get_occurrence(Self[A], @identity.OccurrenceId) -> SongOccurrenceDoc[A]?
 pub fn[A] SongDoc::insert_occurrence(Self[A], index~ : Int, occurrence~ : SongOccurrenceDoc[A]) -> Self[A] raise SongDocEditError
 pub fn[A] SongDoc::layout_revision(Self[A]) -> @identity.Revision
+pub fn[A] SongDoc::lower(Self[A]) -> SongSnapshot[A] raise SongBuildError
 pub fn[A] SongDoc::move_occurrence(Self[A], @identity.OccurrenceId, index~ : Int) -> Self[A] raise SongDocEditError
 pub fn[A] SongDoc::occurrence(Self[A], Int) -> SongOccurrenceDoc[A]?
 pub fn[A] SongDoc::occurrence_count(Self[A]) -> Int
@@ -212,6 +213,14 @@ pub fn[A] SongPart::section(Self[A]) -> Section[A]
 pub fn[A] SongPart::start(Self[A]) -> @pattern.Rational?
 pub fn[A] SongPart::with_id(id~ : @identity.OccurrenceId, name~ : String, section~ : Section[A]) -> Self[A]
 pub fn[A] SongPart::with_id_at(id~ : @identity.OccurrenceId, start~ : @pattern.Rational, name~ : String, section~ : Section[A]) -> Self[A]
+
+pub struct SongSnapshot[A] {
+  // private fields
+}
+pub fn[A] SongSnapshot::layout_revision(Self[A]) -> @identity.Revision
+pub fn[A] SongSnapshot::query(Self[A], @pattern.TimeSpan) -> Array[@pattern.Event[A]]
+pub fn[A] SongSnapshot::revision(Self[A]) -> @identity.Revision
+pub fn[A] SongSnapshot::song(Self[A]) -> Song[A]
 
 pub struct TimeScope {
   // private fields

@@ -317,6 +317,43 @@ fn[A] move_song_doc_occurrence_to(
 }
 
 ///|
+/// Lowered song snapshot for scheduler/runtime consumers.
+///
+/// `revision` tracks any authoring content change. `layout_revision` advances
+/// only when occurrence placement or section length can change computed song
+/// spans, giving schedulers a stable boundary for layout-sensitive commits.
+pub struct SongSnapshot[A] {
+  priv revision : @identity.Revision
+  priv layout_revision : @identity.Revision
+  priv song : Song[A]
+}
+
+///|
+pub fn[A] SongSnapshot::revision(self : SongSnapshot[A]) -> @identity.Revision {
+  self.revision
+}
+
+///|
+pub fn[A] SongSnapshot::layout_revision(
+  self : SongSnapshot[A],
+) -> @identity.Revision {
+  self.layout_revision
+}
+
+///|
+pub fn[A] SongSnapshot::song(self : SongSnapshot[A]) -> Song[A] {
+  self.song
+}
+
+///|
+pub fn[A] SongSnapshot::query(
+  self : SongSnapshot[A],
+  arc : @pattern.TimeSpan,
+) -> Array[@pattern.Event[A]] {
+  self.song.query(arc)
+}
+
+///|
 /// Identity-bearing song layout document for incremental occurrence edits.
 ///
 /// This authoring layer keeps stable occurrence IDs across display renames,
@@ -546,4 +583,15 @@ pub fn[A] SongDoc::to_song(self : SongDoc[A]) -> Song[A] raise SongBuildError {
     parts.push(part.to_part())
   }
   Song(parts~)
+}
+
+///|
+pub fn[A] SongDoc::lower(
+  self : SongDoc[A],
+) -> SongSnapshot[A] raise SongBuildError {
+  {
+    revision: self.revision,
+    layout_revision: self.layout_revision,
+    song: self.to_song(),
+  }
 }
