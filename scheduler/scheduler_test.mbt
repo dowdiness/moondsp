@@ -376,9 +376,10 @@ test "AffectedVoiceTarget matches explicit provenance and ignores empty targets"
 }
 
 ///|
-test "PlaybackSnapshot::query_playback_events returns empty-source wrappers" {
+test "PlaybackSnapshot::query_playback_events tags pattern root provenance" {
+  let root_id = "playback-events:pattern"
   let snapshot = @scheduler.PlaybackSnapshot::pattern(
-    note_snapshot("playback-events:pattern", 60.0),
+    note_snapshot(root_id, 60.0),
   )
   let events = snapshot.query_playback_events(
     @pattern.TimeSpan::new(
@@ -387,8 +388,47 @@ test "PlaybackSnapshot::query_playback_events returns empty-source wrappers" {
     ),
   )
   assert_eq(events.length(), 1)
-  assert_true(events[0].source().is_empty())
+  assert_true(events[0].source().pattern_node() == Some(pid(root_id)))
+  assert_true(events[0].source().section() is None)
+  assert_true(events[0].source().occurrence() is None)
   assert_true(events[0].event().value.get("note") == Some(60.0))
+}
+
+///|
+test "PlaybackSnapshot::query_playback_events tags song occurrence provenance" {
+  let (pool, sched, _, _) = make_test_sched()
+  let occurrence_id = oid("playback-events:song-occurrence")
+  let section_id_value = "section:playback-events-song"
+  let section = scheduler_section_doc(section_id_value, "Main", 60.0)
+  let doc = scheduler_song_doc([
+    @song.SongOccurrenceDoc(id=occurrence_id, name="Main", section~),
+  ])
+  let snapshot = @scheduler.PlaybackSnapshot::song(song_snapshot(doc))
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::new(1L, 100L),
+  )
+  let events = snapshot.query_playback_events(arc)
+  assert_eq(events.length(), 1)
+  assert_true(events[0].source().pattern_node() is None)
+  assert_true(events[0].source().section() == Some(sid(section_id_value)))
+  assert_true(events[0].source().layer() is None)
+  assert_true(events[0].source().occurrence() == Some(occurrence_id))
+  assert_true(events[0].event().value.get("note") == Some(60.0))
+  sched.process_playback_events(events, arc, pool)
+  let target = @scheduler.AffectedVoiceTarget::from_section(
+    sid(section_id_value),
+  )
+  assert_eq(sched.affected_active_note_count(target), 1)
+  assert_eq(
+    sched.apply_affected_voice_policy(
+      @scheduler.AffectedVoicePolicy::GateOffAffected,
+      target,
+      pool,
+    ),
+    1,
+  )
+  assert_eq(sched.active_note_count(), 0)
 }
 
 ///|
@@ -774,6 +814,10 @@ test "process_song_snapshot_block: pending song snapshot commits at block bounda
   )
   assert_eq(pool.active_voice_count(), 1)
   assert_eq(sched.active_note_count(), 1)
+  match sched.active_note_source(0) {
+    Some(source) => assert_true(source.is_empty())
+    None => assert_true(false)
+  }
   assert_eq(sched.sample_counter(), 128L)
 }
 

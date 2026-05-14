@@ -258,18 +258,23 @@ actionable; move completed design notes or implementation plans under
   - the first policy surface keeps the default let-ring behavior explicit and
     adds an explicit gate-off path for matched active voices without adding
     allocation to the audio-block query path.
+  - explicit sourced snapshot queries now attach root pattern provenance for
+    pattern snapshots and occurrence/section provenance for song snapshots,
+    while block-processing compatibility paths continue to use raw events and
+    empty sources.
   - coverage proves selector matching, empty-source safety, let-ring no-op,
-    pattern-node targeting, section targeting, and occurrence/layout targeting.
+    pattern-node targeting, section targeting, occurrence/layout targeting,
+    sourced pattern/song snapshot queries, and empty-source block processing.
 - Latest local verification on `codex/phase6-affected-voice-policy`:
   - `rtk moon update`
   - `rtk moon fmt`
   - `rtk moon info`
   - `rtk moon check --deny-warn`
-  - `rtk moon test scheduler` (47 passed)
+  - `rtk moon test scheduler` (48 passed)
   - `rtk moon test song` (49 passed)
   - `rtk moon check --target all`
-  - `rtk moon test` (789 passed)
-  - `rtk moon test --release` (789 passed)
+  - `rtk moon test` (790 passed)
+  - `rtk moon test --release` (790 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
 - Latest local verification for PR #40 before merge:
@@ -353,12 +358,11 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Review, commit, push, and open a PR for
-   `codex/phase6-affected-voice-policy`.
+1. Continue the stacked Phase 6 branch without opening a PR yet.
 
-2. After this lands, decide whether authored snapshot queries should attach
-   provenance directly or whether live orchestration should keep supplying
-   sourced playback wrappers at scheduler boundaries.
+2. Next implementation choice: add layer-level song provenance or pattern
+   sub-node provenance. The current sourced wrapper query surface is intentionally
+   coarse for pattern snapshots and does not yet identify section layers.
 
 ## Acceptance Checks For API-Hardening Slices
 

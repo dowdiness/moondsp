@@ -400,6 +400,15 @@ This should not be added to `Event[A]` in the first slice. A wrapper around
 queried events is enough for scheduler/live orchestration. Keep `pattern/`
 standalone and payload-polymorphic.
 
+Implementation direction as of the affected-voice policy slice: explicit
+playback-event query helpers attach provenance where the committed snapshot has
+it, while default audio-block processing continues through raw event queries and
+empty sources. This keeps compatibility and avoids reintroducing wrapper
+allocation into the default block-processing path. Pattern snapshots currently
+provide coarse root-node provenance; song snapshots provide occurrence and
+section provenance from the authoring document. Layer-level song provenance and
+pattern sub-node provenance remain follow-up work.
+
 ## Edit Behavior Matrix
 
 | Edit while playing | Commit result | Active voices | Future note-ons |
@@ -503,7 +512,8 @@ For implementation slices:
   only the subset emitted by mini-notation?
 - Should section length edits immediately affect the current cycle after the
   commit block, or only future cycle boundaries?
-- What provenance is required before adding `GateOffAffected` or
-  `KillAffected` edit policies?
-- Should live active-voice controls target every active voice, only voices from
-  selected provenance, or only future voices by default?
+- What additional layer-level or pattern-subtree provenance is required before
+  adding a destructive kill policy?
+- Should live active-voice controls beyond explicit affected-voice policies
+  target every active voice, selected provenance, or only future voices by
+  default?

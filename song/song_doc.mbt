@@ -317,6 +317,17 @@ fn[A] move_song_doc_occurrence_to(
 }
 
 ///|
+fn[A] song_snapshot_section_ids(
+  parts : Array[SongOccurrenceDoc[A]],
+) -> Map[String, @identity.SectionId] {
+  let result : Map[String, @identity.SectionId] = {}
+  for part in parts {
+    result[part.id().value()] = part.section().id()
+  }
+  result
+}
+
+///|
 /// Lowered song snapshot for scheduler/runtime consumers.
 ///
 /// `revision` tracks any authoring content change. `layout_revision` advances
@@ -326,6 +337,7 @@ pub struct SongSnapshot[A] {
   priv revision : @identity.Revision
   priv layout_revision : @identity.Revision
   priv song : Song[A]
+  priv occurrence_section_ids : Map[String, @identity.SectionId]
 }
 
 ///|
@@ -343,6 +355,14 @@ pub fn[A] SongSnapshot::layout_revision(
 ///|
 pub fn[A] SongSnapshot::song(self : SongSnapshot[A]) -> Song[A] {
   self.song
+}
+
+///|
+pub fn[A] SongSnapshot::section_id_for_occurrence(
+  self : SongSnapshot[A],
+  occurrence : @identity.OccurrenceId,
+) -> @identity.SectionId? {
+  self.occurrence_section_ids.get(occurrence.value())
 }
 
 ///|
@@ -593,5 +613,6 @@ pub fn[A] SongDoc::lower(
     revision: self.revision,
     layout_revision: self.layout_revision,
     song: self.to_song(),
+    occurrence_section_ids: song_snapshot_section_ids(self.parts),
   }
 }
