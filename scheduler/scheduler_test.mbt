@@ -412,7 +412,9 @@ test "PlaybackSnapshot::query_playback_events tags song occurrence provenance" {
   assert_eq(events.length(), 1)
   assert_true(events[0].source().pattern_node() is None)
   assert_true(events[0].source().section() == Some(sid(section_id_value)))
-  assert_true(events[0].source().layer() is None)
+  assert_true(
+    events[0].source().layer() == Some(lid("\{section_id_value}:main")),
+  )
   assert_true(events[0].source().occurrence() == Some(occurrence_id))
   assert_true(events[0].event().value.get("note") == Some(60.0))
   sched.process_playback_events(events, arc, pool)
@@ -429,6 +431,75 @@ test "PlaybackSnapshot::query_playback_events tags song occurrence provenance" {
     1,
   )
   assert_eq(sched.active_note_count(), 0)
+}
+
+///|
+test "PlaybackSnapshot::query_playback_events tags song layer provenance" {
+  let (pool, sched, _, _) = make_test_sched()
+  let occurrence_id = oid("playback-events:layered-occurrence")
+  let section_id = sid("section:playback-events-layered")
+  let lead_id = lid("layer:playback-events-lead")
+  let pad_id = lid("layer:playback-events-pad")
+  let section_result = try? @song.SectionDoc::SectionDoc(
+    id=section_id,
+    name="Layered",
+    length_cycles=@pattern.Rational::from_int(1),
+    scope=@song.TimeScope::identity(),
+    body=@song.SectionDocBody::layers([
+      @song.SectionLayerDoc(id=lead_id, name="Lead", body=@pattern.note(60.0)),
+      @song.SectionLayerDoc(id=pad_id, name="Pad", body=@pattern.note(67.0)),
+    ]),
+  )
+  let section = match section_result {
+    Ok(section) => section
+    Err(_) => abort("expected layered section doc")
+  }
+  let doc = scheduler_song_doc([
+    @song.SongOccurrenceDoc(id=occurrence_id, name="Layered", section~),
+  ])
+  let snapshot = @scheduler.PlaybackSnapshot::song(song_snapshot(doc))
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::new(1L, 100L),
+  )
+  let events = snapshot.query_playback_events(arc)
+  assert_eq(events.length(), 2)
+  assert_true(events[0].source().section() == Some(section_id))
+  assert_true(events[0].source().layer() == Some(lead_id))
+  assert_true(events[0].source().occurrence() == Some(occurrence_id))
+  assert_true(events[0].event().value.get("note") == Some(60.0))
+  assert_true(events[1].source().section() == Some(section_id))
+  assert_true(events[1].source().layer() == Some(pad_id))
+  assert_true(events[1].source().occurrence() == Some(occurrence_id))
+  assert_true(events[1].event().value.get("note") == Some(67.0))
+  sched.process_playback_events(events, arc, pool)
+  assert_eq(
+    sched.affected_active_note_count(
+      @scheduler.AffectedVoiceTarget::from_layer(lead_id),
+    ),
+    1,
+  )
+  assert_eq(
+    sched.affected_active_note_count(
+      @scheduler.AffectedVoiceTarget::from_layer(pad_id),
+    ),
+    1,
+  )
+  assert_eq(
+    sched.apply_affected_voice_policy(
+      @scheduler.AffectedVoicePolicy::GateOffAffected,
+      @scheduler.AffectedVoiceTarget::from_layer(lead_id),
+      pool,
+    ),
+    1,
+  )
+  assert_eq(sched.active_note_count(), 1)
+  assert_eq(
+    sched.affected_active_note_count(
+      @scheduler.AffectedVoiceTarget::from_layer(pad_id),
+    ),
+    1,
+  )
 }
 
 ///|

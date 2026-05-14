@@ -317,14 +317,85 @@ fn[A] move_song_doc_occurrence_to(
 }
 
 ///|
-fn[A] song_snapshot_section_ids(
+priv struct SongSnapshotLayerSource {
+  single : @identity.SectionLayerId?
+  named : Map[String, @identity.SectionLayerId]
+}
+
+///|
+priv struct SongSnapshotOccurrenceSource {
+  section : @identity.SectionId
+  layers : SongSnapshotLayerSource
+}
+
+///|
+fn[A] song_snapshot_layer_source(
+  section : SectionDoc[A],
+) -> SongSnapshotLayerSource {
+  let named : Map[String, @identity.SectionLayerId] = {}
+  match section.body() {
+    Single(layer) => {
+      named[layer.name()] = layer.id()
+      { single: Some(layer.id()), named }
+    }
+    Layers(layers) => {
+      for layer in layers {
+        named[layer.name()] = layer.id()
+      }
+      { single: None, named }
+    }
+  }
+}
+
+///|
+fn[A] song_snapshot_sources(
   parts : Array[SongOccurrenceDoc[A]],
-) -> Map[String, @identity.SectionId] {
-  let result : Map[String, @identity.SectionId] = {}
+) -> Map[String, SongSnapshotOccurrenceSource] {
+  let result : Map[String, SongSnapshotOccurrenceSource] = {}
   for part in parts {
-    result[part.id().value()] = part.section().id()
+    let section = part.section()
+    result[part.id().value()] = {
+      section: section.id(),
+      layers: song_snapshot_layer_source(section),
+    }
   }
   result
+}
+
+///|
+pub struct SongSnapshotEvent[A] {
+  priv event : @pattern.Event[A]
+  priv occurrence : @identity.OccurrenceId
+  priv section : @identity.SectionId?
+  priv layer : @identity.SectionLayerId?
+}
+
+///|
+pub fn[A] SongSnapshotEvent::event(
+  self : SongSnapshotEvent[A],
+) -> @pattern.Event[A] {
+  self.event
+}
+
+///|
+pub fn[A] SongSnapshotEvent::occurrence(
+  self : SongSnapshotEvent[A],
+) -> @identity.OccurrenceId {
+  self.occurrence
+}
+
+///|
+pub fn[A] SongSnapshotEvent::section(
+  self : SongSnapshotEvent[A],
+) -> @identity.SectionId? {
+  self.section
+}
+
+///|
+pub fn[A] SongSnapshotEvent::layer(
+  self : SongSnapshotEvent[A],
+) -> @identity.SectionLayerId? {
+  self.layer
 }
 
 ///|
@@ -337,7 +408,7 @@ pub struct SongSnapshot[A] {
   priv revision : @identity.Revision
   priv layout_revision : @identity.Revision
   priv song : Song[A]
-  priv occurrence_section_ids : Map[String, @identity.SectionId]
+  priv occurrence_sources : Map[String, SongSnapshotOccurrenceSource]
 }
 
 ///|
@@ -362,7 +433,96 @@ pub fn[A] SongSnapshot::section_id_for_occurrence(
   self : SongSnapshot[A],
   occurrence : @identity.OccurrenceId,
 ) -> @identity.SectionId? {
-  self.occurrence_section_ids.get(occurrence.value())
+  match self.occurrence_sources.get(occurrence.value()) {
+    Some(source) => Some(source.section)
+    None => None
+  }
+}
+
+///|
+fn[A] query_scoped_snapshot_layer(
+  body : @pattern.Pat[A],
+  scope : TimeScope,
+  arc : @pattern.TimeSpan,
+) -> Array[@pattern.Event[A]] {
+  if scope.is_identity() {
+    body.query(arc)
+  } else {
+    body.fast(scope.rate()).query(arc)
+  }
+}
+
+///|
+fn[A] push_song_snapshot_layer_events(
+  result : Array[SongSnapshotEvent[A]],
+  occurrence : SectionOccurrence[A],
+  section : @identity.SectionId?,
+  layer : @identity.SectionLayerId?,
+  body : @pattern.Pat[A],
+  local_arc : @pattern.TimeSpan,
+) -> Unit {
+  let events = query_scoped_snapshot_layer(
+    body,
+    occurrence.section().scope(),
+    local_arc,
+  )
+  for event in events {
+    result.push({
+      event: event.shift(occurrence.start()),
+      occurrence: occurrence.id(),
+      section,
+      layer,
+    })
+  }
+}
+
+///|
+pub fn[A] SongSnapshot::query_sourced_events(
+  self : SongSnapshot[A],
+  arc : @pattern.TimeSpan,
+) -> Array[SongSnapshotEvent[A]] {
+  let result : Array[SongSnapshotEvent[A]] = []
+  let occurrences = self.song.occurrences_intersecting(arc)
+  for occurrence in occurrences {
+    match occurrence.span().intersect(arc) {
+      Some(global_arc) => {
+        let local_arc = unshift_span(global_arc, occurrence.start())
+        let source = self.occurrence_sources.get(occurrence.id().value())
+        let section = match source {
+          Some(source) => Some(source.section)
+          None => None
+        }
+        match occurrence.section().section_body() {
+          Single(body) => {
+            let layer = match source {
+              Some(source) => source.layers.single
+              None => None
+            }
+            push_song_snapshot_layer_events(
+              result, occurrence, section, layer, body, local_arc,
+            )
+          }
+          Layers(layers) =>
+            for layer_doc in layers {
+              let layer = match source {
+                Some(source) => source.layers.named.get(layer_doc.name())
+                None => None
+              }
+              push_song_snapshot_layer_events(
+                result,
+                occurrence,
+                section,
+                layer,
+                layer_doc.body(),
+                local_arc,
+              )
+            }
+        }
+      }
+      None => ()
+    }
+  }
+  result
 }
 
 ///|
@@ -613,6 +773,6 @@ pub fn[A] SongDoc::lower(
     revision: self.revision,
     layout_revision: self.layout_revision,
     song: self.to_song(),
-    occurrence_section_ids: song_snapshot_section_ids(self.parts),
+    occurrence_sources: song_snapshot_sources(self.parts),
   }
 }

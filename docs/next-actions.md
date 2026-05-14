@@ -259,22 +259,25 @@ actionable; move completed design notes or implementation plans under
     adds an explicit gate-off path for matched active voices without adding
     allocation to the audio-block query path.
   - explicit sourced snapshot queries now attach root pattern provenance for
-    pattern snapshots and occurrence/section provenance for song snapshots,
-    while block-processing compatibility paths continue to use raw events and
-    empty sources.
+    pattern snapshots and occurrence/section/layer provenance for song
+    snapshots, while block-processing compatibility paths continue to use raw
+    events and empty sources.
+  - `SongSnapshot::query_sourced_events` exposes authored song provenance so
+    scheduler wrappers do not need to reconstruct section-layer identity from
+    runtime-only `Section` values.
   - coverage proves selector matching, empty-source safety, let-ring no-op,
     pattern-node targeting, section targeting, occurrence/layout targeting,
-    sourced pattern/song snapshot queries, and empty-source block processing.
+    sourced pattern/song snapshot queries, song layer targeting, and
+    empty-source block processing.
 - Latest local verification on `codex/phase6-affected-voice-policy`:
-  - `rtk moon update`
   - `rtk moon fmt`
   - `rtk moon info`
   - `rtk moon check --deny-warn`
-  - `rtk moon test scheduler` (48 passed)
-  - `rtk moon test song` (49 passed)
   - `rtk moon check --target all`
-  - `rtk moon test` (790 passed)
-  - `rtk moon test --release` (790 passed)
+  - `rtk moon test song` (50 passed)
+  - `rtk moon test scheduler` (49 passed)
+  - `rtk moon test` (792 passed)
+  - `rtk moon test --release` (792 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
 - Latest local verification for PR #40 before merge:
@@ -360,9 +363,9 @@ actionable; move completed design notes or implementation plans under
 
 1. Continue the stacked Phase 6 branch without opening a PR yet.
 
-2. Next implementation choice: add layer-level song provenance or pattern
-   sub-node provenance. The current sourced wrapper query surface is intentionally
-   coarse for pattern snapshots and does not yet identify section layers.
+2. Next implementation choice: add pattern sub-node provenance. Song snapshot
+   wrappers now carry occurrence/section/layer IDs, while pattern snapshots
+   remain intentionally coarse at root-node provenance.
 
 ## Acceptance Checks For API-Hardening Slices
 

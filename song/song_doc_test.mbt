@@ -69,6 +69,58 @@ fn song_doc_test_song(
 }
 
 ///|
+fn song_doc_test_snapshot(
+  doc : @song.SongDoc[@pattern.ControlMap],
+) -> @song.SongSnapshot[@pattern.ControlMap] {
+  let result = try? doc.lower()
+  match result {
+    Ok(snapshot) => snapshot
+    Err(_) => abort("song snapshot lowering failed")
+  }
+}
+
+///|
+test "SongSnapshot::query_sourced_events tags occurrence section and layer IDs" {
+  let occurrence_id = song_doc_test_occurrence_id("occurrence:sourced-layer")
+  let section_id = song_doc_test_section_id("section:sourced-layer")
+  let lead_id = song_doc_test_layer_id("layer:sourced-lead")
+  let pad_id = song_doc_test_layer_id("layer:sourced-pad")
+  let section_result = try? @song.SectionDoc::SectionDoc(
+    id=section_id,
+    name="Sourced",
+    length_cycles=@pattern.Rational::from_int(1),
+    scope=@song.TimeScope::identity(),
+    body=@song.SectionDocBody::layers([
+      @song.SectionLayerDoc(id=lead_id, name="Lead", body=@pattern.note(60.0)),
+      @song.SectionLayerDoc(id=pad_id, name="Pad", body=@pattern.note(67.0)),
+    ]),
+  )
+  let section = match section_result {
+    Ok(section) => section
+    Err(_) => abort("section doc creation failed")
+  }
+  let doc = song_doc_test_doc([
+    @song.SongOccurrenceDoc(id=occurrence_id, name="Sourced", section~),
+  ])
+  let snapshot = song_doc_test_snapshot(doc)
+  let events = snapshot.query_sourced_events(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::new(1L, 100L),
+    ),
+  )
+  assert_eq(events.length(), 2)
+  assert_true(events[0].occurrence() == occurrence_id)
+  assert_true(events[0].section() == Some(section_id))
+  assert_true(events[0].layer() == Some(lead_id))
+  assert_true(events[0].event().value.get("note") == Some(60.0))
+  assert_true(events[1].occurrence() == occurrence_id)
+  assert_true(events[1].section() == Some(section_id))
+  assert_true(events[1].layer() == Some(pad_id))
+  assert_true(events[1].event().value.get("note") == Some(67.0))
+}
+
+///|
 test "SongDoc occurrence renames preserve identity and layout revision" {
   let verse_id = song_doc_test_occurrence_id("verse:layout")
   let chorus_id = song_doc_test_occurrence_id("chorus:layout")

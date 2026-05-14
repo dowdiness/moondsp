@@ -297,39 +297,20 @@ fn playback_events_from_pattern_snapshot(
 }
 
 ///|
-fn unshift_playback_span(
-  span : @pattern.TimeSpan,
-  offset : @pattern.Rational,
-) -> @pattern.TimeSpan {
-  @pattern.TimeSpan::new(span.begin - offset, span.end_ - offset)
-}
-
-///|
 fn playback_events_from_song_snapshot(
   snapshot : @song.SongSnapshot[@pattern.ControlMap],
   arc : @pattern.TimeSpan,
 ) -> Array[PlaybackEvent] {
   let result : Array[PlaybackEvent] = []
-  let song = snapshot.song()
-  let occurrences = song.occurrences_intersecting(arc)
-  for occurrence in occurrences {
-    match occurrence.span().intersect(arc) {
-      Some(global_arc) => {
-        let start = occurrence.start()
-        let local_arc = unshift_playback_span(global_arc, start)
-        let source = EventSource(
-          pattern_node=None,
-          section=snapshot.section_id_for_occurrence(occurrence.id()),
-          layer=None,
-          occurrence=Some(occurrence.id()),
-        )
-        let events = occurrence.section().query(local_arc)
-        for event in events {
-          result.push(PlaybackEvent(event=event.shift(start), source~))
-        }
-      }
-      None => ()
-    }
+  let events = snapshot.query_sourced_events(arc)
+  for event in events {
+    let source = EventSource(
+      pattern_node=None,
+      section=event.section(),
+      layer=event.layer(),
+      occurrence=Some(event.occurrence()),
+    )
+    result.push(PlaybackEvent(event=event.event(), source~))
   }
   result
 }
@@ -339,8 +320,9 @@ fn playback_events_from_song_snapshot(
 ///
 /// This allocates a wrapper array and is intentionally not used by the
 /// audio-block processing path. Pattern snapshots tag queried events with their
-/// root pattern node. Song snapshots tag queried events with occurrence and
-/// section IDs when the snapshot was lowered from the authoring layer.
+/// root pattern node. Song snapshots tag queried events with occurrence,
+/// section, and section-layer IDs when the snapshot was lowered from the
+/// authoring layer.
 pub fn PlaybackSnapshot::query_playback_events(
   self : PlaybackSnapshot,
   arc : @pattern.TimeSpan,

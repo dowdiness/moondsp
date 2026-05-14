@@ -406,8 +406,9 @@ it, while default audio-block processing continues through raw event queries and
 empty sources. This keeps compatibility and avoids reintroducing wrapper
 allocation into the default block-processing path. Pattern snapshots currently
 provide coarse root-node provenance; song snapshots provide occurrence and
-section provenance from the authoring document. Layer-level song provenance and
-pattern sub-node provenance remain follow-up work.
+section/layer provenance from the authoring document through
+`SongSnapshot::query_sourced_events`. Pattern sub-node provenance remains
+follow-up work.
 
 ## Edit Behavior Matrix
 
@@ -512,8 +513,8 @@ For implementation slices:
   only the subset emitted by mini-notation?
 - Should section length edits immediately affect the current cycle after the
   commit block, or only future cycle boundaries?
-- What additional layer-level or pattern-subtree provenance is required before
-  adding a destructive kill policy?
+- What additional pattern-subtree provenance is required before adding a
+  destructive kill policy?
 - Should live active-voice controls beyond explicit affected-voice policies
   target every active voice, selected provenance, or only future voices by
   default?
