@@ -401,26 +401,21 @@ queried events is enough for scheduler/live orchestration. Keep `pattern/`
 standalone and payload-polymorphic.
 
 Implementation direction as of the affected-voice policy slice: explicit
-playback-event query helpers attach provenance where the committed snapshot has
-it, while default audio-block processing continues through raw event queries and
+playback-event queries attach provenance where the committed snapshot has it,
+while default audio-block processing continues through raw event queries and
 empty sources. This keeps compatibility and avoids reintroducing wrapper
-allocation into the default block-processing path. Pattern snapshots currently
-provide authored pattern-node path provenance through
-`PatternSnapshot::query_sourced_events`; structural nodes preserve ancestor and
-leaf IDs, while callback nodes (`every`, `jux`, `merge_control`)
-conservatively tag their wrapper ID plus all reachable child subtree node IDs.
-Song snapshots provide occurrence and section/layer provenance from the
-authoring document through
-`SongSnapshot::query_sourced_events`.
+allocation into the default block-processing path. Pattern snapshots provide
+authored structural provenance that preserves ancestor and leaf identities; for
+callback-style transforms, the provenance conservatively includes the wrapper
+identity plus all reachable child subtree identities. Song snapshots provide
+authored occurrence and section-layer provenance from the authoring document.
 
-With provenance paths in place, the affected-voice policy surface supports
-three explicit choices:
+With provenance paths in place, the affected-voice policy surface supports three
+explicit outcomes:
 
-- `LetRing`: keep existing voices unchanged.
-- `GateOffAffected`: send release/gate-off to matched scheduler-owned voices
-  and drop scheduler ownership.
-- `KillAffected`: immediately idle matched scheduler-owned voices through the
-  voice pool kill primitive and drop scheduler ownership.
+- Preserve existing voices unchanged.
+- Release matched scheduler-owned voices and drop scheduler ownership.
+- Immediately stop matched scheduler-owned voices and drop scheduler ownership.
 
 ## Edit Behavior Matrix
 

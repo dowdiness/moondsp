@@ -187,6 +187,9 @@ pub fn PatternScheduler::apply_affected_voice_policy(
   target : AffectedVoiceTarget,
   pool : @moondsp.BoundVoicePool,
 ) -> Int {
+  if target.is_empty() {
+    return 0
+  }
   match policy {
     LetRing => 0
     GateOffAffected => self.remove_affected_notes(target, pool, stop=GateOff)

@@ -255,31 +255,28 @@ actionable; move completed design notes or implementation plans under
     layer, occurrence, or a combined subset of those IDs.
   - empty selectors intentionally match nothing, and empty-source compatibility
     voices are not affected by provenance-targeted edits.
-  - the policy surface keeps the default let-ring behavior explicit, supports
-    gate-off release for matched active voices, and now adds
-    `KillAffected` for immediate destructive removal of matched scheduler-owned
-    voices through `BoundVoicePool::kill`.
-  - explicit sourced snapshot queries now attach pattern node paths for authored
-    pattern snapshots and occurrence/section/layer provenance for song
-    snapshots, while block-processing compatibility paths continue to use raw
-    events and empty sources.
-  - `SongSnapshot::query_sourced_events` exposes authored song provenance so
-    scheduler wrappers do not need to reconstruct section-layer identity from
-    runtime-only `Section` values.
-  - `PatternSnapshot::query_sourced_events` exposes authored pattern provenance
-    for structural nodes, and scheduler `EventSource` now keeps a pattern-node
-    path so affected-voice selectors match both leaf and ancestor pattern IDs.
-    Callback nodes (`every`, `jux`, `merge_control`) now conservatively tag
-    their wrapper node plus all reachable child subtree node IDs.
+  - the policy surface keeps preserve, release, and immediate-stop outcomes
+    explicit for matched scheduler-owned voices, with destructive stopping kept
+    behind the constrained scheduler-facing path.
+  - sourced snapshot queries now attach authored pattern provenance and
+    occurrence/section/layer provenance where available, while block-processing
+    compatibility paths continue to use raw events and empty sources.
+  - sourced song queries carry authored occurrence and section-layer provenance
+    so scheduler wrappers do not need to reconstruct identity from runtime-only
+    section values.
+  - sourced pattern queries carry authored structural provenance, and scheduler
+    event sources keep pattern-node paths so affected-voice selectors match
+    both leaf and ancestor identities. Callback-style structural transforms now
+    conservatively tag their wrapper plus all reachable child subtree identities.
   - coverage proves selector matching, empty-source safety, let-ring no-op,
     pattern-node targeting, section targeting, occurrence/layout targeting,
     sourced pattern/song snapshot queries, pattern sub-node path matching,
     callback subtree coverage, song layer targeting, immediate kill behavior,
     and empty-source block processing.
-  - refactor commit `8bce0b9` keeps the raw `VoicePool::kill` primitive
-    private, leaves `BoundVoicePool::kill` as the public scheduler-facing API,
-    and consolidates affected-note release/kill removal into one scheduler
-    helper.
+  - refactor commit `8bce0b9` keeps the internal raw kill primitive private,
+    leaves the public scheduler-facing kill path constrained to bound pools, and
+    consolidates affected-note release and immediate-stop removal into one
+    scheduler helper.
 - Latest local verification on `codex/phase6-affected-voice-policy`:
   - `rtk moon fmt`
   - `rtk moon info`
