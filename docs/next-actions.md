@@ -9,7 +9,7 @@ actionable; move completed design notes or implementation plans under
 ## Current State
 
 - `main` is currently at
-  `81b1b19 [codex] Add scheduler song snapshots and playback provenance (#45)`.
+  `680308a [codex] Add affected voice policy controls (#46)`.
 - PR #37 is merged:
   https://github.com/dowdiness/moondsp/pull/37
 - PR #38 is merged:
@@ -28,8 +28,10 @@ actionable; move completed design notes or implementation plans under
   https://github.com/dowdiness/moondsp/pull/44
 - PR #45 is merged:
   https://github.com/dowdiness/moondsp/pull/45
-- Active branch: `codex/phase6-affected-voice-policy`, based on
-  `81b1b19 [codex] Add scheduler song snapshots and playback provenance (#45)`.
+- PR #46 is merged:
+  https://github.com/dowdiness/moondsp/pull/46
+- Active branch for the next Phase 6 slice:
+  `codex/phase6-edit-orchestration`, based on `main` at `680308a`.
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -250,7 +252,7 @@ actionable; move completed design notes or implementation plans under
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
   - final PR #45 CI passed before merge; merged at `81b1b19`.
-- Active affected-voice policy branch:
+- Affected-voice policy controls shipped on `main`:
   - provenance selectors can target active voices by pattern node, section,
     layer, occurrence, or a combined subset of those IDs.
   - empty selectors intentionally match nothing, and empty-source compatibility
@@ -277,7 +279,7 @@ actionable; move completed design notes or implementation plans under
     leaves the public scheduler-facing kill path constrained to bound pools, and
     consolidates affected-note release and immediate-stop removal into one
     scheduler helper.
-- Latest local verification on `codex/phase6-affected-voice-policy`:
+- Latest local verification for PR #46 before merge:
   - `rtk moon fmt`
   - `rtk moon info`
   - `rtk moon check --deny-warn`
@@ -371,12 +373,17 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Continue the stacked Phase 6 branch without opening a PR yet.
+1. Continue on `codex/phase6-edit-orchestration`.
 
-2. Next implementation choice: decide whether to prepare this stacked branch
-   for review, or add higher-level edit orchestration helpers that choose
-   `LetRing`, `GateOffAffected`, or `KillAffected` from concrete pattern/song
-   edit operations.
+2. Add higher-level edit orchestration helpers over the merged provenance and
+   affected-voice policy surface:
+   - map concrete pattern edits to pattern-node targets.
+   - map song occurrence, section, and layer edits to the corresponding
+     provenance targets.
+   - keep policy selection explicit at the call site with preserve, release,
+     and immediate-stop outcomes.
+   - add focused tests proving the helpers affect only the intended active
+     voices and preserve empty-source compatibility behavior.
 
 ## Acceptance Checks For API-Hardening Slices
 
