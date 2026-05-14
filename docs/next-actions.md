@@ -219,6 +219,12 @@ actionable; move completed design notes or implementation plans under
   - `PlaybackSnapshot` now unifies prepared pattern and song snapshots behind a
     single pending scheduler slot while preserving the older pattern/song queue
     and process helpers.
+  - scheduler-local `EventSource` and `PlaybackEvent` carry optional pattern
+    node, section, layer, and occurrence provenance without changing
+    `pattern.Event`.
+  - active notes now retain the source attached to the event that triggered
+    them, while existing raw pattern, section, song, and snapshot paths use an
+    empty source until authoring snapshots provide richer provenance.
   - committed song revision and layout-revision tokens are exposed for
     scheduler/live orchestration without changing the raw
     `process_song_block(song, ...)` compatibility entry point.
@@ -227,15 +233,16 @@ actionable; move completed design notes or implementation plans under
     backfill after layout edits, and active-note let-ring across song layout
     replacement, plus coalescing multiple pending song snapshots to the latest
     staged snapshot and coalescing mixed pattern/song snapshots through the
-    unified playback slot.
+    unified playback slot. Provenance coverage proves empty default sources for
+    existing event APIs and explicit source retention for playback events.
 - Latest local verification on `codex/phase6-song-layout-scheduler`:
   - `rtk moon fmt`
   - `rtk moon info`
   - `rtk moon check`
   - `rtk moon test song` (49 passed)
-  - `rtk moon test scheduler` (39 passed)
+  - `rtk moon test scheduler` (41 passed)
   - `rtk moon check --target all`
-  - `rtk moon test` (781 passed)
+  - `rtk moon test` (783 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
 - Latest local verification for PR #40 before merge:
@@ -322,8 +329,8 @@ actionable; move completed design notes or implementation plans under
 1. Review, commit, push, and open a PR for
    `codex/phase6-song-layout-scheduler`.
 
-2. After this lands, add scheduler event provenance needed for future
-   affected-voice policies.
+2. After this lands, use scheduler event provenance to define the first
+   affected-voice policy surface.
 
 ## Acceptance Checks For API-Hardening Slices
 

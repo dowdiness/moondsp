@@ -7,6 +7,7 @@ import {
   "dowdiness/moondsp/pattern",
   "dowdiness/moondsp/song",
   "dowdiness/moondsp/voice",
+  "moonbitlang/core/debug",
 }
 
 // Values
@@ -36,6 +37,17 @@ pub struct ControlMapper {
 pub fn ControlMapper::ControlMapper(transform~ : (String, Double) -> (String, Double)?, voice_action~ : (String, Double) -> VoiceAction?) -> Self
 pub fn ControlMapper::new(transform~ : (String, Double) -> (String, Double)?, voice_action~ : (String, Double) -> VoiceAction?) -> Self
 
+pub struct EventSource {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn EventSource::EventSource(pattern_node~ : @identity.PatternNodeId?, section~ : @identity.SectionId?, layer~ : @identity.SectionLayerId?, occurrence~ : @identity.OccurrenceId?) -> Self
+pub fn EventSource::is_empty(Self) -> Bool
+pub fn EventSource::layer(Self) -> @identity.SectionLayerId?
+pub fn EventSource::none() -> Self
+pub fn EventSource::occurrence(Self) -> @identity.OccurrenceId?
+pub fn EventSource::pattern_node(Self) -> @identity.PatternNodeId?
+pub fn EventSource::section(Self) -> @identity.SectionId?
+
 pub struct PatternScheduler {
   mut bpm : Double
   mut sample_counter : Int64
@@ -46,6 +58,7 @@ pub struct PatternScheduler {
 }
 pub fn PatternScheduler::PatternScheduler(bpm~ : Double, ctx~ : @dsp.DspContext, mapper? : ControlMapper) -> Self
 pub fn PatternScheduler::active_note_count(Self) -> Int
+pub fn PatternScheduler::active_note_source(Self, Int) -> EventSource?
 pub fn PatternScheduler::active_playback_revision(Self) -> @identity.Revision?
 pub fn PatternScheduler::active_playback_song_layout_revision(Self) -> @identity.Revision?
 pub fn PatternScheduler::active_song_layout_revision(Self) -> @identity.Revision?
@@ -62,12 +75,14 @@ pub fn PatternScheduler::has_pending_song_snapshot(Self) -> Bool
 pub fn PatternScheduler::new(bpm~ : Double, ctx~ : @dsp.DspContext, mapper? : ControlMapper) -> Self
 pub fn PatternScheduler::process_block(Self, @pattern.Pat[@pattern.ControlMap], @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::process_events(Self, Array[@pattern.Event[@pattern.ControlMap]], @pattern.TimeSpan, @voice.BoundVoicePool) -> Unit
+pub fn PatternScheduler::process_playback_events(Self, Array[PlaybackEvent], @pattern.TimeSpan, @voice.BoundVoicePool) -> Unit
 pub fn PatternScheduler::process_playback_snapshot_block(Self, @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::process_section_block(Self, @song.Section[@pattern.ControlMap], @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::process_snapshot_block(Self, @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::process_song_block(Self, @song.Song[@pattern.ControlMap], @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::process_song_snapshot_block(Self, @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::push_active_note(Self, @voice.VoiceHandle, @pattern.Rational) -> Unit
+pub fn PatternScheduler::push_active_note_with_source(Self, @voice.VoiceHandle, @pattern.Rational, EventSource) -> Unit
 pub fn PatternScheduler::queue_pattern_snapshot(Self, @pattern.PatternSnapshot[@pattern.ControlMap]) -> Unit
 pub fn PatternScheduler::queue_playback_snapshot(Self, PlaybackSnapshot) -> Unit
 pub fn PatternScheduler::queue_song_snapshot(Self, @song.SongSnapshot[@pattern.ControlMap]) -> Unit
@@ -79,6 +94,13 @@ pub struct PerformanceTime {
 }
 pub fn PerformanceTime::PerformanceTime(Int64) -> Self
 
+pub struct PlaybackEvent {
+  // private fields
+}
+pub fn PlaybackEvent::PlaybackEvent(event~ : @pattern.Event[@pattern.ControlMap], source~ : EventSource) -> Self
+pub fn PlaybackEvent::event(Self) -> @pattern.Event[@pattern.ControlMap]
+pub fn PlaybackEvent::source(Self) -> EventSource
+
 pub enum PlaybackSnapshot {
   Pattern(@pattern.PatternSnapshot[@pattern.ControlMap])
   Song(@song.SongSnapshot[@pattern.ControlMap])
@@ -87,6 +109,7 @@ pub fn PlaybackSnapshot::is_pattern(Self) -> Bool
 pub fn PlaybackSnapshot::is_song(Self) -> Bool
 pub fn PlaybackSnapshot::pattern(@pattern.PatternSnapshot[@pattern.ControlMap]) -> Self
 pub fn PlaybackSnapshot::query(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@pattern.ControlMap]]
+pub fn PlaybackSnapshot::query_playback_events(Self, @pattern.TimeSpan) -> Array[PlaybackEvent]
 pub fn PlaybackSnapshot::revision(Self) -> @identity.Revision
 pub fn PlaybackSnapshot::song(@song.SongSnapshot[@pattern.ControlMap]) -> Self
 pub fn PlaybackSnapshot::song_layout_revision(Self) -> @identity.Revision?

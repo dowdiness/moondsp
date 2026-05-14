@@ -274,6 +274,31 @@ fn song_snapshot(
 }
 
 ///|
+test "EventSource records optional authoring IDs" {
+  let pattern_id = pid("source:pattern")
+  let section_id = sid("source:section")
+  let layer_id = lid("source:layer")
+  let occurrence_id = oid("source:occurrence")
+  let empty = @scheduler.EventSource::none()
+  assert_true(empty.is_empty())
+  assert_true(empty.pattern_node() is None)
+  assert_true(empty.section() is None)
+  assert_true(empty.layer() is None)
+  assert_true(empty.occurrence() is None)
+  let source = @scheduler.EventSource(
+    pattern_node=Some(pattern_id),
+    section=Some(section_id),
+    layer=Some(layer_id),
+    occurrence=Some(occurrence_id),
+  )
+  assert_true(!source.is_empty())
+  assert_true(source.pattern_node() == Some(pattern_id))
+  assert_true(source.section() == Some(section_id))
+  assert_true(source.layer() == Some(layer_id))
+  assert_true(source.occurrence() == Some(occurrence_id))
+}
+
+///|
 test "expire_notes: removes notes past their end_time" {
   let (pool, _, ctx) = make_test_pool()
   let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~)
@@ -321,6 +346,40 @@ test "process_events: single note-on creates active voice" {
   sched.process_events(events, arc, pool)
   assert_eq(sched.active_note_count(), 1)
   assert_eq(pool.active_voice_count(), 1)
+  match sched.active_note_source(0) {
+    Some(source) => assert_true(source.is_empty())
+    None => assert_true(false)
+  }
+}
+
+///|
+test "process_playback_events: active note keeps explicit event source" {
+  let (pool, sched, _, _) = make_test_sched()
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::new(1L, 100L),
+  )
+  let events = @pattern.note(60.0).query(arc)
+  let event = match events.get(0) {
+    Some(event) => event
+    None => abort("expected note event")
+  }
+  let source = @scheduler.EventSource(
+    pattern_node=Some(pid("source:active-pattern")),
+    section=Some(sid("source:active-section")),
+    layer=Some(lid("source:active-layer")),
+    occurrence=Some(oid("source:active-occurrence")),
+  )
+  sched.process_playback_events(
+    [@scheduler.PlaybackEvent(event~, source~)],
+    arc,
+    pool,
+  )
+  assert_eq(sched.active_note_count(), 1)
+  match sched.active_note_source(0) {
+    Some(active_source) => assert_true(active_source == source)
+    None => assert_true(false)
+  }
 }
 
 ///|

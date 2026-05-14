@@ -22,9 +22,106 @@ pub fn PerformanceTime::PerformanceTime(sample : Int64) -> PerformanceTime {
 }
 
 ///|
+/// Optional authoring provenance for one scheduled event.
+///
+/// This intentionally lives in `scheduler/` instead of `pattern.Event` so the
+/// pattern engine stays payload-polymorphic and independent of authoring IDs.
+pub struct EventSource {
+  priv pattern_node : @identity.PatternNodeId?
+  priv section : @identity.SectionId?
+  priv layer : @identity.SectionLayerId?
+  priv occurrence : @identity.OccurrenceId?
+} derive(Eq, Debug)
+
+///|
+pub fn EventSource::EventSource(
+  pattern_node~ : @identity.PatternNodeId?,
+  section~ : @identity.SectionId?,
+  layer~ : @identity.SectionLayerId?,
+  occurrence~ : @identity.OccurrenceId?,
+) -> EventSource {
+  { pattern_node, section, layer, occurrence }
+}
+
+///|
+pub fn EventSource::none() -> EventSource {
+  { pattern_node: None, section: None, layer: None, occurrence: None }
+}
+
+///|
+pub fn EventSource::pattern_node(
+  self : EventSource,
+) -> @identity.PatternNodeId? {
+  self.pattern_node
+}
+
+///|
+pub fn EventSource::section(self : EventSource) -> @identity.SectionId? {
+  self.section
+}
+
+///|
+pub fn EventSource::layer(self : EventSource) -> @identity.SectionLayerId? {
+  self.layer
+}
+
+///|
+pub fn EventSource::occurrence(self : EventSource) -> @identity.OccurrenceId? {
+  self.occurrence
+}
+
+///|
+pub fn EventSource::is_empty(self : EventSource) -> Bool {
+  self.pattern_node is None &&
+  self.section is None &&
+  self.layer is None &&
+  self.occurrence is None
+}
+
+///|
+/// Scheduler-local event wrapper that keeps provenance out of `pattern.Event`.
+pub struct PlaybackEvent {
+  priv event : @pattern.Event[@pattern.ControlMap]
+  priv source : EventSource
+}
+
+///|
+pub fn PlaybackEvent::PlaybackEvent(
+  event~ : @pattern.Event[@pattern.ControlMap],
+  source~ : EventSource,
+) -> PlaybackEvent {
+  { event, source }
+}
+
+///|
+pub fn PlaybackEvent::event(
+  self : PlaybackEvent,
+) -> @pattern.Event[@pattern.ControlMap] {
+  self.event
+}
+
+///|
+pub fn PlaybackEvent::source(self : PlaybackEvent) -> EventSource {
+  self.source
+}
+
+///|
+fn playback_events_from_events(
+  events : Array[@pattern.Event[@pattern.ControlMap]],
+  source : EventSource,
+) -> Array[PlaybackEvent] {
+  let result : Array[PlaybackEvent] = []
+  for event in events {
+    result.push(PlaybackEvent(event~, source~))
+  }
+  result
+}
+
+///|
 /// Tracks a sounding voice for gate-off scheduling.
 struct ActiveNote {
   handle : @moondsp.VoiceHandle
+  source : EventSource
   /// WHY end_sample from whole.end_: In the Strudel/Tidal model, `whole` is the
   /// event's full intended duration in cycle time, while `part` is just the
   /// fragment visible within the queried arc. The scheduler converts
@@ -164,6 +261,14 @@ pub fn PlaybackSnapshot::query(
 }
 
 ///|
+pub fn PlaybackSnapshot::query_playback_events(
+  self : PlaybackSnapshot,
+  arc : @pattern.TimeSpan,
+) -> Array[PlaybackEvent] {
+  playback_events_from_events(self.query(arc), EventSource::none())
+}
+
+///|
 pub struct PatternScheduler {
   mut bpm : Double
   mut sample_counter : Int64
@@ -218,6 +323,17 @@ pub fn PatternScheduler::sample_counter(self : PatternScheduler) -> Int64 {
 ///|
 pub fn PatternScheduler::active_note_count(self : PatternScheduler) -> Int {
   self.active_notes.length()
+}
+
+///|
+pub fn PatternScheduler::active_note_source(
+  self : PatternScheduler,
+  index : Int,
+) -> EventSource? {
+  match self.active_notes.get(index) {
+    Some(note) => Some(note.source)
+    None => None
+  }
 }
 
 ///|
@@ -404,8 +520,20 @@ pub fn PatternScheduler::push_active_note(
   handle : @moondsp.VoiceHandle,
   end_time : @pattern.Rational,
 ) -> Unit {
+  self.push_active_note_with_source(handle, end_time, EventSource::none())
+}
+
+///|
+/// Test/future-policy helper: inject an active note with explicit provenance.
+pub fn PatternScheduler::push_active_note_with_source(
+  self : PatternScheduler,
+  handle : @moondsp.VoiceHandle,
+  end_time : @pattern.Rational,
+  source : EventSource,
+) -> Unit {
   self.active_notes.push({
     handle,
+    source,
     end_sample: cycle_to_sample(end_time, self.bpm, self.ctx),
   })
 }
@@ -464,11 +592,25 @@ pub fn PatternScheduler::process_events(
   arc : @pattern.TimeSpan,
   pool : @moondsp.BoundVoicePool,
 ) -> Unit {
+  self.process_playback_events(
+    playback_events_from_events(events, EventSource::none()),
+    arc,
+    pool,
+  )
+}
+
+///|
+pub fn PatternScheduler::process_playback_events(
+  self : PatternScheduler,
+  events : Array[PlaybackEvent],
+  arc : @pattern.TimeSpan,
+  pool : @moondsp.BoundVoicePool,
+) -> Unit {
   // Sort by onset for deterministic voice allocation.
   // None-whole events sort last but are always skipped below.
   if events.length() > 1 {
     events.sort_by(fn(a, b) {
-      match (a.whole, b.whole) {
+      match (a.event.whole, b.event.whole) {
         (Some(wa), Some(wb)) => wa.begin.compare(wb.begin)
         (Some(_), None) => -1
         (None, Some(_)) => 1
@@ -477,7 +619,8 @@ pub fn PatternScheduler::process_events(
     })
   }
   for i = 0; i < events.length(); i = i + 1 {
-    let event = events[i]
+    let playback_event = events[i]
+    let event = playback_event.event
     match event.whole {
       None => continue i + 1
       Some(whole) => {
@@ -506,6 +649,7 @@ pub fn PatternScheduler::process_events(
           Some(handle) => {
             self.active_notes.push({
               handle,
+              source: playback_event.source,
               end_sample: cycle_to_sample(whole.end_, self.bpm, self.ctx),
             })
             for action in actions {
@@ -525,18 +669,18 @@ fn PatternScheduler::query_pattern_block(
   self : PatternScheduler,
   pat : @pattern.Pat[@pattern.ControlMap],
   frame : BlockFrame,
-) -> Array[@pattern.Event[@pattern.ControlMap]] {
+) -> Array[PlaybackEvent] {
   ignore(self)
-  pat.query(frame.logical_arc)
+  playback_events_from_events(pat.query(frame.logical_arc), EventSource::none())
 }
 
 ///|
 fn PatternScheduler::query_snapshot_block(
   self : PatternScheduler,
   frame : BlockFrame,
-) -> Array[@pattern.Event[@pattern.ControlMap]] {
+) -> Array[PlaybackEvent] {
   match self.active_playback_snapshot {
-    Some(snapshot) => snapshot.query(frame.logical_arc)
+    Some(snapshot) => snapshot.query_playback_events(frame.logical_arc)
     None => []
   }
 }
@@ -556,13 +700,13 @@ fn PatternScheduler::render_block(
 ///|
 fn PatternScheduler::process_block_events(
   self : PatternScheduler,
-  events : Array[@pattern.Event[@pattern.ControlMap]],
+  events : Array[PlaybackEvent],
   frame : BlockFrame,
   pool : @moondsp.BoundVoicePool,
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
 ) -> Unit {
-  self.process_events(events, frame.logical_arc, pool)
+  self.process_playback_events(events, frame.logical_arc, pool)
   self.advance_block()
   self.render_block(pool, left, right)
 }
@@ -643,7 +787,10 @@ pub fn PatternScheduler::process_section_block(
 ) -> Unit {
   let frame = self.current_block()
   self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
-  let events = section.query(frame.logical_arc)
+  let events = playback_events_from_events(
+    section.query(frame.logical_arc),
+    EventSource::none(),
+  )
   self.process_block_events(events, frame, pool, left, right)
 }
 
@@ -661,7 +808,10 @@ pub fn PatternScheduler::process_song_block(
 ) -> Unit {
   let frame = self.current_block()
   self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
-  let events = song.query(frame.logical_arc)
+  let events = playback_events_from_events(
+    song.query(frame.logical_arc),
+    EventSource::none(),
+  )
   self.process_block_events(events, frame, pool, left, right)
 }
 
