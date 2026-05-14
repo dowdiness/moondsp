@@ -1,11 +1,8 @@
 import {
   "dowdiness/moondsp" @moondsp,
+  "dowdiness/moondsp/identity" @identity,
   "dowdiness/moondsp/pattern",
   "dowdiness/moondsp/song" @song,
   "moonbitlang/core/bench" @bench,
   "moonbitlang/core/math" @math,
 }
-
-import {
-  "dowdiness/moondsp/identity" @identity,
-} for "test"

@@ -1,6 +1,6 @@
 # Next Actions
 
-Updated: 2026-05-13
+Updated: 2026-05-14
 
 This is the active handoff list for future sessions. It should stay short and
 actionable; move completed design notes or implementation plans under
@@ -9,7 +9,7 @@ actionable; move completed design notes or implementation plans under
 ## Current State
 
 - `main` is currently at
-  `e11e83c [codex] Add song section identity docs`.
+  `5caf016 [codex] Add song layout authoring docs`.
 - PR #37 is merged:
   https://github.com/dowdiness/moondsp/pull/37
 - PR #38 is merged:
@@ -24,10 +24,10 @@ actionable; move completed design notes or implementation plans under
   https://github.com/dowdiness/moondsp/pull/42
 - PR #43 is merged:
   https://github.com/dowdiness/moondsp/pull/43
-- PR #44 is open as a draft for the active song layout authoring branch:
+- PR #44 is merged:
   https://github.com/dowdiness/moondsp/pull/44
-- Active branch: `codex/phase6-song-layout-doc`, based on
-  `e11e83c [codex] Add song section identity docs`.
+- Active branch: `codex/phase6-song-layout-scheduler`, based on
+  `5caf016 [codex] Add song layout authoring docs`.
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -191,7 +191,7 @@ actionable; move completed design notes or implementation plans under
   - `rtk moon test` (769 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
-- Active song layout authoring branch:
+- Song layout authoring shipped so far on `main`:
   - identity-preserving song layout authoring now covers section placements and
     lowers back to the existing playback/query surface.
   - occurrence display renames advance the authoring revision while preserving
@@ -202,13 +202,36 @@ actionable; move completed design notes or implementation plans under
     length edits advance the layout revision and shift downstream spans.
   - coverage proves rename stability, insertion/removal, reorder, downstream
     span shifts, unchanged section reuse, and missing-ID edit errors.
-- Latest local verification on `codex/phase6-song-layout-doc`:
+- Latest local verification for PR #44 before merge:
   - `rtk moon fmt`
   - `rtk moon info`
   - `rtk moon check`
   - `rtk moon test song` (49 passed)
   - `rtk moon check --target all`
   - `rtk moon test` (775 passed)
+  - `rtk moon build --target wasm-gc`
+  - `rtk git diff --check`
+- Active song layout scheduler branch:
+  - `SongDoc::lower` now produces a `SongSnapshot` carrying the full authoring
+    revision plus the narrower song layout revision.
+  - `PatternScheduler` can queue and process song snapshots at block
+    boundaries, parallel to the existing pattern snapshot path.
+  - committed song revision and layout-revision tokens are exposed for
+    scheduler/live orchestration without changing the raw
+    `process_song_block(song, ...)` compatibility entry point.
+  - coverage proves block-boundary song snapshot commit, same-layout song body
+    edits committing without a layout boundary change, no retroactive note-on
+    backfill after layout edits, and active-note let-ring across song layout
+    replacement, plus coalescing multiple pending song snapshots to the latest
+    staged snapshot.
+- Latest local verification on `codex/phase6-song-layout-scheduler`:
+  - `rtk moon fmt`
+  - `rtk moon info`
+  - `rtk moon check`
+  - `rtk moon test song` (49 passed)
+  - `rtk moon test scheduler` (38 passed)
+  - `rtk moon check --target all`
+  - `rtk moon test` (780 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
 - Latest local verification for PR #40 before merge:
@@ -292,12 +315,12 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Review PR #44, address any feedback, then mark it ready and merge when
-   checks/review are clean:
-   https://github.com/dowdiness/moondsp/pull/44
+1. Review, commit, push, and open a PR for
+   `codex/phase6-song-layout-scheduler`.
 
-2. After that lands, wire the song layout revision boundary into scheduler
-   snapshot commit behavior for song edits during playback.
+2. After this lands, choose the next Phase 6 live-playback slice: either unify
+   pattern/song staging behind a prepared playback snapshot, or add scheduler
+   event provenance needed for future affected-voice policies.
 
 ## Acceptance Checks For API-Hardening Slices
 

@@ -199,6 +199,81 @@ fn silence_snapshot(
 }
 
 ///|
+fn oid(value : String) -> @identity.OccurrenceId {
+  let result = try? @identity.OccurrenceId::from_string(value)
+  match result {
+    Ok(id) => id
+    Err(_) => abort("expected valid occurrence id")
+  }
+}
+
+///|
+fn sid(value : String) -> @identity.SectionId {
+  let result = try? @identity.SectionId::from_string(value)
+  match result {
+    Ok(id) => id
+    Err(_) => abort("expected valid section id")
+  }
+}
+
+///|
+fn lid(value : String) -> @identity.SectionLayerId {
+  let result = try? @identity.SectionLayerId::from_string(value)
+  match result {
+    Ok(id) => id
+    Err(_) => abort("expected valid section layer id")
+  }
+}
+
+///|
+fn scheduler_section_doc(
+  id_value : String,
+  name : String,
+  midi : Double,
+) -> @song.SectionDoc[@pattern.ControlMap] {
+  let result = try? @song.SectionDoc::single(
+    id=sid(id_value),
+    name~,
+    length_cycles=@pattern.Rational::from_int(1),
+    scope=@song.TimeScope::identity(),
+    layer_id=lid("\{id_value}:main"),
+    body=@pattern.note(midi),
+  )
+  match result {
+    Ok(section) => section
+    Err(_) => abort("expected section doc")
+  }
+}
+
+///|
+fn scheduler_song_doc(
+  occurrences : Array[@song.SongOccurrenceDoc[@pattern.ControlMap]],
+) -> @song.SongDoc[@pattern.ControlMap] {
+  let result = try? @song.SongDoc(parts=occurrences)
+  match result {
+    Ok(doc) => doc
+    Err(_) => abort("expected song doc")
+  }
+}
+
+///|
+fn unwrap_song_snapshot(
+  result : Result[@song.SongSnapshot[@pattern.ControlMap], @song.SongBuildError],
+) -> @song.SongSnapshot[@pattern.ControlMap] {
+  match result {
+    Ok(snapshot) => snapshot
+    Err(_) => abort("expected song snapshot")
+  }
+}
+
+///|
+fn song_snapshot(
+  doc : @song.SongDoc[@pattern.ControlMap],
+) -> @song.SongSnapshot[@pattern.ControlMap] {
+  unwrap_song_snapshot(try? doc.lower())
+}
+
+///|
 test "expire_notes: removes notes past their end_time" {
   let (pool, _, ctx) = make_test_pool()
   let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~)
@@ -308,6 +383,161 @@ test "process_snapshot_block: multiple pending snapshots keep the latest" {
   assert_eq(sched.active_note_count(), 0)
   assert_true(sched.has_active_pattern_snapshot())
   assert_true(!sched.has_pending_pattern_snapshot())
+}
+
+///|
+test "process_song_snapshot_block: pending song snapshot commits at block boundary" {
+  let (pool, sched, left, right) = make_test_sched()
+  let main_id = oid("song-snapshot:main")
+  let section = scheduler_section_doc("section:song-snapshot", "Main", 60.0)
+  let doc = scheduler_song_doc([
+    @song.SongOccurrenceDoc(id=main_id, name="Main", section~),
+  ])
+  sched.queue_song_snapshot(song_snapshot(doc))
+  assert_true(sched.has_pending_song_snapshot())
+  assert_true(!sched.has_active_song_snapshot())
+  assert_true(sched.active_song_revision() is None)
+  sched.process_song_snapshot_block(pool, left, right)
+  assert_true(!sched.has_pending_song_snapshot())
+  assert_true(sched.has_active_song_snapshot())
+  assert_true(sched.active_song_revision() == Some(doc.revision()))
+  assert_true(
+    sched.active_song_layout_revision() == Some(doc.layout_revision()),
+  )
+  assert_eq(pool.active_voice_count(), 1)
+  assert_eq(sched.active_note_count(), 1)
+  assert_eq(sched.sample_counter(), 128L)
+}
+
+///|
+test "process_song_snapshot_block: same-layout song edit commits without layout boundary change" {
+  let (pool, sched, left, right) = make_test_sched()
+  let main_id = oid("song-snapshot:same-layout")
+  let section_id = "section:same-layout"
+  let layer_id = lid("\{section_id}:main")
+  let section = scheduler_section_doc(section_id, "Main", 60.0)
+  let doc = scheduler_song_doc([
+    @song.SongOccurrenceDoc(id=main_id, name="Main", section~),
+  ])
+  sched.queue_song_snapshot(song_snapshot(doc))
+  sched.process_song_snapshot_block(pool, left, right)
+  let edited_section_result = try? section.replace_layer_body(
+    layer_id,
+    body=@pattern.note(62.0),
+  )
+  let edited_section = match edited_section_result {
+    Ok(section) => section
+    Err(_) => abort("expected section body edit")
+  }
+  let edited_result = try? doc.replace_occurrence_section(
+    main_id,
+    section=edited_section,
+  )
+  let edited = match edited_result {
+    Ok(doc) => doc
+    Err(_) => abort("expected song body edit")
+  }
+  assert_true(edited.revision() != doc.revision())
+  assert_true(edited.layout_revision() == doc.layout_revision())
+  sched.queue_song_snapshot(song_snapshot(edited))
+  sched.process_song_snapshot_block(pool, left, right)
+  assert_true(sched.active_song_revision() == Some(edited.revision()))
+  assert_true(
+    sched.active_song_layout_revision() == Some(doc.layout_revision()),
+  )
+  assert_eq(sched.sample_counter(), 256L)
+}
+
+///|
+test "process_song_snapshot_block: layout edit does not backfill past onsets" {
+  let (pool, sched, left, right) = make_test_sched()
+  let main_id = oid("song-snapshot:no-backfill")
+  let section = scheduler_section_doc("section:no-backfill", "Main", 60.0)
+  let doc = scheduler_song_doc([
+    @song.SongOccurrenceDoc::at(
+      id=main_id,
+      start=@pattern.Rational::from_int(1),
+      name="Main",
+      section~,
+    ),
+  ])
+  sched.queue_song_snapshot(song_snapshot(doc))
+  sched.process_song_snapshot_block(pool, left, right)
+  assert_eq(pool.active_voice_count(), 0)
+  let edited_result = try? doc.set_occurrence_start(
+    main_id,
+    start=@pattern.Rational::from_int(0),
+  )
+  let edited = match edited_result {
+    Ok(doc) => doc
+    Err(_) => abort("expected layout edit")
+  }
+  assert_true(edited.layout_revision() != doc.layout_revision())
+  sched.queue_song_snapshot(song_snapshot(edited))
+  sched.process_song_snapshot_block(pool, left, right)
+  assert_true(
+    sched.active_song_layout_revision() == Some(edited.layout_revision()),
+  )
+  assert_eq(pool.active_voice_count(), 0)
+  assert_eq(sched.active_note_count(), 0)
+  assert_eq(sched.sample_counter(), 256L)
+}
+
+///|
+test "process_song_snapshot_block: layout replacement lets active note ring" {
+  let (pool, sched, left, right) = make_test_sched()
+  let main_id = oid("song-snapshot:ring")
+  let section = scheduler_section_doc("section:ring", "Main", 60.0)
+  let doc = scheduler_song_doc([
+    @song.SongOccurrenceDoc(id=main_id, name="Main", section~),
+  ])
+  sched.queue_song_snapshot(song_snapshot(doc))
+  sched.process_song_snapshot_block(pool, left, right)
+  assert_eq(pool.active_voice_count(), 1)
+  assert_eq(sched.active_note_count(), 1)
+  let edited_result = try? doc.set_occurrence_start(
+    main_id,
+    start=@pattern.Rational::from_int(2),
+  )
+  let edited = match edited_result {
+    Ok(doc) => doc
+    Err(_) => abort("expected layout edit")
+  }
+  sched.queue_song_snapshot(song_snapshot(edited))
+  sched.process_song_snapshot_block(pool, left, right)
+  assert_true(
+    sched.active_song_layout_revision() == Some(edited.layout_revision()),
+  )
+  assert_eq(pool.active_voice_count(), 1)
+  assert_eq(sched.active_note_count(), 1)
+}
+
+///|
+test "process_song_snapshot_block: multiple pending song snapshots keep the latest" {
+  let (pool, sched, left, right) = make_test_sched()
+  let main_id = oid("song-snapshot:coalesced")
+  let section = scheduler_section_doc("section:coalesced", "Main", 60.0)
+  let first = scheduler_song_doc([
+    @song.SongOccurrenceDoc(id=main_id, name="Main", section~),
+  ])
+  let latest_result = try? first.set_occurrence_start(
+    main_id,
+    start=@pattern.Rational::from_int(2),
+  )
+  let latest = match latest_result {
+    Ok(doc) => doc
+    Err(_) => abort("expected layout edit")
+  }
+  sched.queue_song_snapshot(song_snapshot(first))
+  sched.queue_song_snapshot(song_snapshot(latest))
+  sched.process_song_snapshot_block(pool, left, right)
+  assert_true(!sched.has_pending_song_snapshot())
+  assert_true(sched.has_active_song_snapshot())
+  assert_true(
+    sched.active_song_layout_revision() == Some(latest.layout_revision()),
+  )
+  assert_eq(pool.active_voice_count(), 0)
+  assert_eq(sched.active_note_count(), 0)
 }
 
 ///|

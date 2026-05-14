@@ -104,6 +104,8 @@ pub struct PatternScheduler {
   priv mut pending_pattern_snapshot : @pattern.PatternSnapshot[
     @pattern.ControlMap,
   ]?
+  priv mut active_song_snapshot : @song.SongSnapshot[@pattern.ControlMap]?
+  priv mut pending_song_snapshot : @song.SongSnapshot[@pattern.ControlMap]?
 }
 
 ///|
@@ -139,6 +141,8 @@ pub fn PatternScheduler::PatternScheduler(
     mapper: mapper.unwrap_or(default_control_mapper()),
     active_pattern_snapshot: None,
     pending_pattern_snapshot: None,
+    active_song_snapshot: None,
+    pending_song_snapshot: None,
   }
 }
 
@@ -188,6 +192,17 @@ pub fn PatternScheduler::queue_pattern_snapshot(
 }
 
 ///|
+/// Stage a lowered song snapshot for playback. The snapshot carries both the
+/// authoring revision and the narrower layout revision; both become observable
+/// only when the snapshot commits at the next song snapshot block boundary.
+pub fn PatternScheduler::queue_song_snapshot(
+  self : PatternScheduler,
+  snapshot : @song.SongSnapshot[@pattern.ControlMap],
+) -> Unit {
+  self.pending_song_snapshot = Some(snapshot)
+}
+
+///|
 pub fn PatternScheduler::has_active_pattern_snapshot(
   self : PatternScheduler,
 ) -> Bool {
@@ -208,6 +223,46 @@ pub fn PatternScheduler::has_pending_pattern_snapshot(
 }
 
 ///|
+pub fn PatternScheduler::has_active_song_snapshot(
+  self : PatternScheduler,
+) -> Bool {
+  match self.active_song_snapshot {
+    Some(_) => true
+    None => false
+  }
+}
+
+///|
+pub fn PatternScheduler::has_pending_song_snapshot(
+  self : PatternScheduler,
+) -> Bool {
+  match self.pending_song_snapshot {
+    Some(_) => true
+    None => false
+  }
+}
+
+///|
+pub fn PatternScheduler::active_song_revision(
+  self : PatternScheduler,
+) -> @identity.Revision? {
+  match self.active_song_snapshot {
+    Some(snapshot) => Some(snapshot.revision())
+    None => None
+  }
+}
+
+///|
+pub fn PatternScheduler::active_song_layout_revision(
+  self : PatternScheduler,
+) -> @identity.Revision? {
+  match self.active_song_snapshot {
+    Some(snapshot) => Some(snapshot.layout_revision())
+    None => None
+  }
+}
+
+///|
 fn PatternScheduler::commit_pending_pattern_snapshot(
   self : PatternScheduler,
 ) -> Unit {
@@ -215,6 +270,19 @@ fn PatternScheduler::commit_pending_pattern_snapshot(
     Some(snapshot) => {
       self.active_pattern_snapshot = Some(snapshot)
       self.pending_pattern_snapshot = None
+    }
+    None => ()
+  }
+}
+
+///|
+fn PatternScheduler::commit_pending_song_snapshot(
+  self : PatternScheduler,
+) -> Unit {
+  match self.pending_song_snapshot {
+    Some(snapshot) => {
+      self.active_song_snapshot = Some(snapshot)
+      self.pending_song_snapshot = None
     }
     None => ()
   }
@@ -374,6 +442,17 @@ fn PatternScheduler::query_snapshot_block(
 }
 
 ///|
+fn PatternScheduler::query_song_snapshot_block(
+  self : PatternScheduler,
+  frame : BlockFrame,
+) -> Array[@pattern.Event[@pattern.ControlMap]] {
+  match self.active_song_snapshot {
+    Some(snapshot) => snapshot.query(frame.logical_arc)
+    None => []
+  }
+}
+
+///|
 fn PatternScheduler::render_block(
   self : PatternScheduler,
   pool : @moondsp.BoundVoicePool,
@@ -430,6 +509,23 @@ pub fn PatternScheduler::process_snapshot_block(
   self.commit_pending_pattern_snapshot()
   self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
   let events = self.query_snapshot_block(frame)
+  self.process_block_events(events, frame, pool, left, right)
+}
+
+///|
+/// Song snapshot entry point for authoring-time song edits. Pending snapshots
+/// are swapped in at the start of the audio block, so layout revisions become
+/// visible on the same stable boundary as pattern snapshots.
+pub fn PatternScheduler::process_song_snapshot_block(
+  self : PatternScheduler,
+  pool : @moondsp.BoundVoicePool,
+  left : @moondsp.AudioBuffer,
+  right : @moondsp.AudioBuffer,
+) -> Unit {
+  let frame = self.current_block()
+  self.commit_pending_song_snapshot()
+  self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
+  let events = self.query_song_snapshot_block(frame)
   self.process_block_events(events, frame, pool, left, right)
 }
 
