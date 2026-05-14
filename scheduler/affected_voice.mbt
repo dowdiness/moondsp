@@ -104,7 +104,7 @@ pub fn AffectedVoiceTarget::matches(
     return false
   }
   let pattern_matches = match self.pattern_node {
-    Some(id) => source.pattern_node == Some(id)
+    Some(id) => source.has_pattern_node(id)
     None => true
   }
   let section_matches = match self.section {

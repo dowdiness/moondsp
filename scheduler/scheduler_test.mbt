@@ -302,6 +302,7 @@ test "EventSource records optional authoring IDs" {
   let empty = @scheduler.EventSource::none()
   assert_true(empty.is_empty())
   assert_true(empty.pattern_node() is None)
+  assert_eq(empty.pattern_nodes().length(), 0)
   assert_true(empty.section() is None)
   assert_true(empty.layer() is None)
   assert_true(empty.occurrence() is None)
@@ -313,9 +314,31 @@ test "EventSource records optional authoring IDs" {
   )
   assert_true(!source.is_empty())
   assert_true(source.pattern_node() == Some(pattern_id))
+  let pattern_nodes = source.pattern_nodes()
+  assert_eq(pattern_nodes.length(), 1)
+  assert_true(pattern_nodes[0] == pattern_id)
   assert_true(source.section() == Some(section_id))
   assert_true(source.layer() == Some(layer_id))
   assert_true(source.occurrence() == Some(occurrence_id))
+}
+
+///|
+test "EventSource pattern-node path matches ancestors and primary leaf" {
+  let root_id = pid("source:root")
+  let leaf_id = pid("source:leaf")
+  let source = @scheduler.EventSource::from_pattern_nodes(
+    pattern_nodes=[root_id, leaf_id],
+    section=None,
+    layer=None,
+    occurrence=None,
+  )
+  assert_true(source.pattern_node() == Some(leaf_id))
+  assert_true(
+    source.matches(@scheduler.AffectedVoiceTarget::from_pattern_node(root_id)),
+  )
+  assert_true(
+    source.matches(@scheduler.AffectedVoiceTarget::from_pattern_node(leaf_id)),
+  )
 }
 
 ///|
@@ -389,9 +412,58 @@ test "PlaybackSnapshot::query_playback_events tags pattern root provenance" {
   )
   assert_eq(events.length(), 1)
   assert_true(events[0].source().pattern_node() == Some(pid(root_id)))
+  let pattern_nodes = events[0].source().pattern_nodes()
+  assert_eq(pattern_nodes.length(), 1)
+  assert_true(pattern_nodes[0] == pid(root_id))
   assert_true(events[0].source().section() is None)
   assert_true(events[0].source().occurrence() is None)
   assert_true(events[0].event().value.get("note") == Some(60.0))
+}
+
+///|
+test "PlaybackSnapshot::query_playback_events tags pattern sub-node path" {
+  let (pool, sched, _, _) = make_test_sched()
+  let doc_result = try? @pattern.PatternDoc::from_pattern(
+    id=pid("playback-events:leaf"),
+    pat=@pattern.note(60.0),
+  ).fast(id=pid("playback-events:fast"), factor=@pattern.Rational::from_int(2))
+  let doc = match doc_result {
+    Ok(doc) => doc
+    Err(_) => abort("expected pattern doc")
+  }
+  let snapshot = @scheduler.PlaybackSnapshot::pattern(
+    unwrap_control_snapshot(try? doc.lower()),
+  )
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::new(1L, 100L),
+  )
+  let events = snapshot.query_playback_events(arc)
+  assert_eq(events.length(), 1)
+  let pattern_nodes = events[0].source().pattern_nodes()
+  assert_eq(pattern_nodes.length(), 2)
+  assert_true(pattern_nodes[0] == pid("playback-events:fast"))
+  assert_true(pattern_nodes[1] == pid("playback-events:leaf"))
+  assert_true(
+    events[0].source().pattern_node() == Some(pid("playback-events:leaf")),
+  )
+  sched.process_playback_events(events, arc, pool)
+  assert_eq(
+    sched.affected_active_note_count(
+      @scheduler.AffectedVoiceTarget::from_pattern_node(
+        pid("playback-events:fast"),
+      ),
+    ),
+    1,
+  )
+  assert_eq(
+    sched.affected_active_note_count(
+      @scheduler.AffectedVoiceTarget::from_pattern_node(
+        pid("playback-events:leaf"),
+      ),
+    ),
+    1,
+  )
 }
 
 ///|
