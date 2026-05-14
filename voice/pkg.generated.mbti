@@ -45,7 +45,6 @@ pub struct VoicePool {
   // private fields
 }
 pub fn VoicePool::active_voice_count(Self) -> Int
-pub fn VoicePool::kill(Self, VoiceHandle) -> Bool
 pub fn VoicePool::last_sanitized_count(Self) -> Int
 pub fn VoicePool::new(Array[@graph.DspNode], @dsp.DspContext, max_voices? : Int) -> Self?
 pub fn VoicePool::note_off(Self, VoiceHandle) -> Bool

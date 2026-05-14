@@ -423,8 +423,13 @@ test "kill immediately idles an active voice" {
     DspNode::envelope_gain(0, 1, 1.0),
     DspNode::output(2),
   ]
-  let pool = VoicePool::new(nodes, ctx, max_voices=4).unwrap()
-  let handle = pool.note_on([]).unwrap()
+  let pool = BoundVoicePool::new(
+    nodes,
+    ctx,
+    ControlBindingBuilder::new(),
+    max_voices=4,
+  ).unwrap()
+  let handle = pool.note_on_controls({}).unwrap()
   assert_true(pool.active_voice_count() == 1)
   assert_true(pool.kill(handle))
   assert_true(pool.active_voice_count() == 0)

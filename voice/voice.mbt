@@ -504,7 +504,7 @@ pub fn VoicePool::note_off(self : VoicePool, handle : VoiceHandle) -> Bool {
 }
 
 ///|
-pub fn VoicePool::kill(self : VoicePool, handle : VoiceHandle) -> Bool {
+fn VoicePool::kill(self : VoicePool, handle : VoiceHandle) -> Bool {
   match self.resolve_slot(handle) {
     None => false
     Some(slot) => {

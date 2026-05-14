@@ -143,6 +143,12 @@ pub(all) enum AffectedVoicePolicy {
 } derive(Eq, Debug)
 
 ///|
+priv enum AffectedVoiceStop {
+  GateOff
+  Kill
+}
+
+///|
 pub fn PatternScheduler::active_note_matches(
   self : PatternScheduler,
   index : Int,
@@ -183,46 +189,35 @@ pub fn PatternScheduler::apply_affected_voice_policy(
 ) -> Int {
   match policy {
     LetRing => 0
-    GateOffAffected => self.gate_off_affected_notes(target, pool)
-    KillAffected => self.kill_affected_notes(target, pool)
+    GateOffAffected => self.remove_affected_notes(target, pool, stop=GateOff)
+    KillAffected => self.remove_affected_notes(target, pool, stop=Kill)
   }
 }
 
 ///|
-fn PatternScheduler::gate_off_affected_notes(
+fn stop_affected_note(
+  handle : @moondsp.VoiceHandle,
+  pool : @moondsp.BoundVoicePool,
+  stop : AffectedVoiceStop,
+) -> Unit {
+  match stop {
+    GateOff => ignore(pool.note_off(handle))
+    Kill => ignore(pool.kill(handle))
+  }
+}
+
+///|
+fn PatternScheduler::remove_affected_notes(
   self : PatternScheduler,
   target : AffectedVoiceTarget,
   pool : @moondsp.BoundVoicePool,
+  stop~ : AffectedVoiceStop,
 ) -> Int {
   let mut count = 0
   let mut i = 0
   while i < self.active_notes.length() {
     if self.active_notes[i].source.matches(target) {
-      ignore(pool.note_off(self.active_notes[i].handle))
-      let last = self.active_notes.length() - 1
-      if i < last {
-        self.active_notes[i] = self.active_notes[last]
-      }
-      ignore(self.active_notes.pop())
-      count = count + 1
-    } else {
-      i = i + 1
-    }
-  }
-  count
-}
-
-///|
-fn PatternScheduler::kill_affected_notes(
-  self : PatternScheduler,
-  target : AffectedVoiceTarget,
-  pool : @moondsp.BoundVoicePool,
-) -> Int {
-  let mut count = 0
-  let mut i = 0
-  while i < self.active_notes.length() {
-    if self.active_notes[i].source.matches(target) {
-      ignore(pool.kill(self.active_notes[i].handle))
+      stop_affected_note(self.active_notes[i].handle, pool, stop)
       let last = self.active_notes.length() - 1
       if i < last {
         self.active_notes[i] = self.active_notes[last]
