@@ -212,36 +212,30 @@ actionable; move completed design notes or implementation plans under
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
 - Active song layout scheduler branch:
-  - `SongDoc::lower` now produces a `SongSnapshot` carrying the full authoring
-    revision plus the narrower song layout revision.
-  - `PatternScheduler` can queue and process song snapshots at block
-    boundaries, parallel to the existing pattern snapshot path.
-  - `PlaybackSnapshot` now unifies prepared pattern and song snapshots behind a
-    single pending scheduler slot while preserving the older pattern/song queue
-    and process helpers.
-  - scheduler-local `EventSource` and `PlaybackEvent` carry optional pattern
-    node, section, layer, and occurrence provenance without changing
-    `pattern.Event`.
-  - active notes now retain the source attached to the event that triggered
-    them, while existing raw pattern, section, song, and snapshot paths use an
-    empty source until authoring snapshots provide richer provenance.
-  - public raw-event processing preserves caller-owned event array ordering,
-    while scheduler audio-block paths avoid per-event provenance wrapper
-    allocation on the empty-source path.
-  - the provenance refactor keeps internal kind checks and source-injection
-    helpers private, so the public scheduler surface exposes only the wrapper
-    types, queue/process entry points, and read accessors callers need.
-  - committed song revision and layout-revision tokens are exposed for
-    scheduler/live orchestration without changing the raw
-    `process_song_block(song, ...)` compatibility entry point.
-  - coverage proves block-boundary song snapshot commit, same-layout song body
-    edits committing without a layout boundary change, no retroactive note-on
-    backfill after layout edits, and active-note let-ring across song layout
-    replacement, plus coalescing multiple pending song snapshots to the latest
-    staged snapshot and coalescing mixed pattern/song snapshots through the
-    unified playback slot. Provenance coverage proves empty default sources for
-    existing event APIs, explicit source retention for playback events, public
-    `PlaybackSnapshot::query_playback_events` compatibility, and caller-owned
+  - song authoring lowers to runtime snapshots that carry both whole-document
+    and layout-scoped revision tokens, so playback can distinguish content-only
+    edits from timeline-boundary edits.
+  - staged playback changes commit only at audio block boundaries, and multiple
+    staged changes coalesce so the latest pending state wins before the next
+    block starts.
+  - pattern and song playback share one staging boundary while existing pattern,
+    section, song, snapshot, and raw-event processing entry points remain
+    compatible.
+  - authored playback can propagate source provenance into active notes, while
+    legacy raw-event paths continue to use an explicit empty source until richer
+    authoring context is available.
+  - raw-event processing preserves caller-owned event array ordering and never
+    sorts or mutates those arrays in place.
+  - audio-block paths avoid per-event wrapper allocation on empty-source
+    compatibility paths.
+  - runtime revision tokens remain available to orchestration layers for
+    snapshot-swap decisions without changing existing raw song-processing
+    behavior.
+  - coverage proves block-boundary commit timing, same-layout body edits
+    committing without layout-boundary churn, no retroactive note-on backfill,
+    active-note let-ring across layout replacement, latest-staged-state
+    coalescing, empty default source behavior, explicit source retention for
+    authored playback, public event-query compatibility, and caller-owned
     event-order preservation.
 - Latest local verification on `codex/phase6-song-layout-scheduler`:
   - `rtk moon fmt`
@@ -334,8 +328,9 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Review, commit, push, and open a PR for
-   `codex/phase6-song-layout-scheduler`.
+1. Review and merge PR #45 (`codex/phase6-song-layout-scheduler`), then record
+   the merged SHA, final CI/local verification status, branch cleanup, and any
+   deployment or migration follow-up in this handoff doc.
 
 2. After this lands, use scheduler event provenance to define the first
    affected-voice policy surface.
