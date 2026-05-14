@@ -255,9 +255,10 @@ actionable; move completed design notes or implementation plans under
     layer, occurrence, or a combined subset of those IDs.
   - empty selectors intentionally match nothing, and empty-source compatibility
     voices are not affected by provenance-targeted edits.
-  - the first policy surface keeps the default let-ring behavior explicit and
-    adds an explicit gate-off path for matched active voices without adding
-    allocation to the audio-block query path.
+  - the policy surface keeps the default let-ring behavior explicit, supports
+    gate-off release for matched active voices, and now adds
+    `KillAffected` for immediate destructive removal of matched scheduler-owned
+    voices through `BoundVoicePool::kill`.
   - explicit sourced snapshot queries now attach pattern node paths for authored
     pattern snapshots and occurrence/section/layer provenance for song
     snapshots, while block-processing compatibility paths continue to use raw
@@ -273,8 +274,8 @@ actionable; move completed design notes or implementation plans under
   - coverage proves selector matching, empty-source safety, let-ring no-op,
     pattern-node targeting, section targeting, occurrence/layout targeting,
     sourced pattern/song snapshot queries, pattern sub-node path matching,
-    callback subtree coverage, song layer targeting, and empty-source block
-    processing.
+    callback subtree coverage, song layer targeting, immediate kill behavior,
+    and empty-source block processing.
 - Latest local verification on `codex/phase6-affected-voice-policy`:
   - `rtk moon fmt`
   - `rtk moon info`
@@ -282,9 +283,10 @@ actionable; move completed design notes or implementation plans under
   - `rtk moon check --target all`
   - `rtk moon test pattern` (144 passed)
   - `rtk moon test song` (50 passed)
-  - `rtk moon test scheduler` (51 passed)
-  - `rtk moon test` (799 passed)
-  - `rtk moon test --release` (799 passed)
+  - `rtk moon test voice` (33 passed)
+  - `rtk moon test scheduler` (54 passed)
+  - `rtk moon test` (803 passed)
+  - `rtk moon test --release` (803 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
 - Latest local verification for PR #40 before merge:
@@ -370,8 +372,10 @@ actionable; move completed design notes or implementation plans under
 
 1. Continue the stacked Phase 6 branch without opening a PR yet.
 
-2. Next implementation choice: add an explicit destructive `KillAffected`
-   policy now that pattern/song provenance paths exist.
+2. Next implementation choice: decide whether to prepare this stacked branch
+   for review, or add higher-level edit orchestration helpers that choose
+   `LetRing`, `GateOffAffected`, or `KillAffected` from concrete pattern/song
+   edit operations.
 
 ## Acceptance Checks For API-Hardening Slices
 

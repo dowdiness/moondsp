@@ -792,6 +792,93 @@ test "affected voice policy gates only matching pattern-node active notes" {
 }
 
 ///|
+test "affected voice policy kills matching pattern leaf and ancestor notes" {
+  let (pool, sched, _, _) = make_test_sched()
+  let doc_result = try? @pattern.PatternDoc::from_pattern(
+    id=pid("kill:leaf"),
+    pat=@pattern.note(60.0),
+  ).fast(id=pid("kill:fast"), factor=@pattern.Rational::from_int(2))
+  let doc = match doc_result {
+    Ok(doc) => doc
+    Err(_) => abort("expected pattern doc")
+  }
+  let snapshot = @scheduler.PlaybackSnapshot::pattern(
+    unwrap_control_snapshot(try? doc.lower()),
+  )
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::new(1L, 100L),
+  )
+  sched.process_playback_events(snapshot.query_playback_events(arc), arc, pool)
+  let leaf_target = @scheduler.AffectedVoiceTarget::from_pattern_node(
+    pid("kill:leaf"),
+  )
+  let ancestor_target = @scheduler.AffectedVoiceTarget::from_pattern_node(
+    pid("kill:fast"),
+  )
+  assert_eq(sched.active_note_count(), 1)
+  assert_eq(pool.active_voice_count(), 1)
+  assert_eq(sched.affected_active_note_count(leaf_target), 1)
+  assert_eq(sched.affected_active_note_count(ancestor_target), 1)
+  assert_eq(
+    sched.apply_affected_voice_policy(
+      @scheduler.AffectedVoicePolicy::KillAffected,
+      ancestor_target,
+      pool,
+    ),
+    1,
+  )
+  assert_eq(sched.active_note_count(), 0)
+  assert_eq(pool.active_voice_count(), 0)
+}
+
+///|
+test "affected voice policy kills callback subtree pattern notes" {
+  let (pool, sched, _, _) = make_test_sched()
+  let child_result = try? @pattern.PatternDoc::from_pattern(
+    id=pid("kill:callback-leaf"),
+    pat=@pattern.note(60.0),
+  ).fast(id=pid("kill:callback-child"), factor=@pattern.Rational::from_int(2))
+  let child = match child_result {
+    Ok(doc) => doc
+    Err(_) => abort("expected callback child doc")
+  }
+  let doc_result = try? child.every(id=pid("kill:callback-every"), n=1, f=fn(
+    p,
+  ) {
+    p.fast(@pattern.Rational::from_int(2))
+  })
+  let doc = match doc_result {
+    Ok(doc) => doc
+    Err(_) => abort("expected callback doc")
+  }
+  let snapshot = @scheduler.PlaybackSnapshot::pattern(
+    unwrap_control_snapshot(try? doc.lower()),
+  )
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::new(1L, 100L),
+  )
+  sched.process_playback_events(snapshot.query_playback_events(arc), arc, pool)
+  let leaf_target = @scheduler.AffectedVoiceTarget::from_pattern_node(
+    pid("kill:callback-leaf"),
+  )
+  assert_eq(sched.active_note_count(), 1)
+  assert_eq(pool.active_voice_count(), 1)
+  assert_eq(sched.affected_active_note_count(leaf_target), 1)
+  assert_eq(
+    sched.apply_affected_voice_policy(
+      @scheduler.AffectedVoicePolicy::KillAffected,
+      leaf_target,
+      pool,
+    ),
+    1,
+  )
+  assert_eq(sched.active_note_count(), 0)
+  assert_eq(pool.active_voice_count(), 0)
+}
+
+///|
 test "affected voice policy can target section and occurrence boundaries" {
   let (pool, sched, _, _) = make_test_sched()
   let arc = @pattern.TimeSpan::new(
@@ -872,6 +959,66 @@ test "affected voice policy can target section and occurrence boundaries" {
     ),
     1,
   )
+}
+
+///|
+test "affected voice policy kills section layer and occurrence targets" {
+  let (pool, sched, _, _) = make_test_sched()
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::new(1L, 100L),
+  )
+  let section = sid("kill:section")
+  let layer = lid("kill:layer")
+  let first_occurrence = oid("kill:first-occurrence")
+  let second_occurrence = oid("kill:second-occurrence")
+  let first_source = @scheduler.EventSource(
+    pattern_node=None,
+    section=Some(section),
+    layer=Some(layer),
+    occurrence=Some(first_occurrence),
+  )
+  let second_source = @scheduler.EventSource(
+    pattern_node=None,
+    section=Some(section),
+    layer=Some(layer),
+    occurrence=Some(second_occurrence),
+  )
+  sched.process_playback_events(
+    [
+      playback_note_event(60.0, first_source, arc),
+      playback_note_event(62.0, second_source, arc),
+    ],
+    arc,
+    pool,
+  )
+  let first_occurrence_target = @scheduler.AffectedVoiceTarget::from_occurrence(
+    first_occurrence,
+  )
+  let layer_target = @scheduler.AffectedVoiceTarget::from_layer(layer)
+  assert_eq(sched.active_note_count(), 2)
+  assert_eq(pool.active_voice_count(), 2)
+  assert_eq(
+    sched.apply_affected_voice_policy(
+      @scheduler.AffectedVoicePolicy::KillAffected,
+      first_occurrence_target,
+      pool,
+    ),
+    1,
+  )
+  assert_eq(sched.active_note_count(), 1)
+  assert_eq(pool.active_voice_count(), 1)
+  assert_eq(sched.affected_active_note_count(layer_target), 1)
+  assert_eq(
+    sched.apply_affected_voice_policy(
+      @scheduler.AffectedVoicePolicy::KillAffected,
+      layer_target,
+      pool,
+    ),
+    1,
+  )
+  assert_eq(sched.active_note_count(), 0)
+  assert_eq(pool.active_voice_count(), 0)
 }
 
 ///|

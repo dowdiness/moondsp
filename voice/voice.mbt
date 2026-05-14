@@ -310,6 +310,14 @@ pub fn BoundVoicePool::note_off(
 }
 
 ///|
+pub fn BoundVoicePool::kill(
+  self : BoundVoicePool,
+  handle : VoiceHandle,
+) -> Bool {
+  self.pool.kill(handle)
+}
+
+///|
 pub fn BoundVoicePool::note_off_all(self : BoundVoicePool) -> Unit {
   self.pool.note_off_all()
 }
@@ -490,6 +498,21 @@ pub fn VoicePool::note_off(self : VoicePool, handle : VoiceHandle) -> Bool {
         None => ()
       }
       slot.state = VoiceState::Releasing
+      true
+    }
+  }
+}
+
+///|
+pub fn VoicePool::kill(self : VoicePool, handle : VoiceHandle) -> Bool {
+  match self.resolve_slot(handle) {
+    None => false
+    Some(slot) => {
+      if slot.state is VoiceState::Idle {
+        return false
+      }
+      slot.compiled = None
+      slot.state = VoiceState::Idle
       true
     }
   }

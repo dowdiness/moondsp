@@ -27,6 +27,7 @@ type ActiveNote
 pub(all) enum AffectedVoicePolicy {
   LetRing
   GateOffAffected
+  KillAffected
 } derive(Eq, @debug.Debug)
 
 pub struct AffectedVoiceTarget {

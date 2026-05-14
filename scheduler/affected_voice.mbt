@@ -138,6 +138,8 @@ pub(all) enum AffectedVoicePolicy {
   LetRing
   /// Gate off matching voices now and stop scheduler ownership of those notes.
   GateOffAffected
+  /// Immediately stop matching voices and stop scheduler ownership.
+  KillAffected
 } derive(Eq, Debug)
 
 ///|
@@ -182,6 +184,7 @@ pub fn PatternScheduler::apply_affected_voice_policy(
   match policy {
     LetRing => 0
     GateOffAffected => self.gate_off_affected_notes(target, pool)
+    KillAffected => self.kill_affected_notes(target, pool)
   }
 }
 
@@ -196,6 +199,30 @@ fn PatternScheduler::gate_off_affected_notes(
   while i < self.active_notes.length() {
     if self.active_notes[i].source.matches(target) {
       ignore(pool.note_off(self.active_notes[i].handle))
+      let last = self.active_notes.length() - 1
+      if i < last {
+        self.active_notes[i] = self.active_notes[last]
+      }
+      ignore(self.active_notes.pop())
+      count = count + 1
+    } else {
+      i = i + 1
+    }
+  }
+  count
+}
+
+///|
+fn PatternScheduler::kill_affected_notes(
+  self : PatternScheduler,
+  target : AffectedVoiceTarget,
+  pool : @moondsp.BoundVoicePool,
+) -> Int {
+  let mut count = 0
+  let mut i = 0
+  while i < self.active_notes.length() {
+    if self.active_notes[i].source.matches(target) {
+      ignore(pool.kill(self.active_notes[i].handle))
       let last = self.active_notes.length() - 1
       if i < last {
         self.active_notes[i] = self.active_notes[last]

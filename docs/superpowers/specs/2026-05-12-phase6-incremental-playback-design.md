@@ -413,6 +413,15 @@ Song snapshots provide occurrence and section/layer provenance from the
 authoring document through
 `SongSnapshot::query_sourced_events`.
 
+With provenance paths in place, the affected-voice policy surface supports
+three explicit choices:
+
+- `LetRing`: keep existing voices unchanged.
+- `GateOffAffected`: send release/gate-off to matched scheduler-owned voices
+  and drop scheduler ownership.
+- `KillAffected`: immediately idle matched scheduler-owned voices through the
+  voice pool kill primitive and drop scheduler ownership.
+
 ## Edit Behavior Matrix
 
 | Edit while playing | Commit result | Active voices | Future note-ons |
@@ -423,6 +432,7 @@ authoring document through
 | Change section length | New song layout revision | Let ring with old end samples | Downstream occurrence spans shift |
 | Insert song occurrence | New song layout revision | Let ring | New occurrence schedules future onsets only |
 | Delete song occurrence | New song layout revision | Let ring | Removed occurrence stops scheduling future onsets |
+| Delete active occurrence with kill policy | New song layout revision | Kill matched occurrence voices immediately | Removed occurrence stops scheduling future onsets |
 | Rename occurrence | Display-only revision | Let ring | No timing change |
 | Change DSP template default | Transactional pool swap | Existing voices keep old compiled graph | New voices use new template |
 | Change DSP topology | Transactional pool swap | Existing voices keep old compiled graph | New voices use new topology |
