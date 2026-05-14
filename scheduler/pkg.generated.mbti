@@ -24,6 +24,26 @@ pub fn midi_to_hz(Double) -> Double
 // Types and methods
 type ActiveNote
 
+pub(all) enum AffectedVoicePolicy {
+  LetRing
+  GateOffAffected
+} derive(Eq, @debug.Debug)
+
+pub struct AffectedVoiceTarget {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn AffectedVoiceTarget::AffectedVoiceTarget(pattern_node~ : @identity.PatternNodeId?, section~ : @identity.SectionId?, layer~ : @identity.SectionLayerId?, occurrence~ : @identity.OccurrenceId?) -> Self
+pub fn AffectedVoiceTarget::from_layer(@identity.SectionLayerId) -> Self
+pub fn AffectedVoiceTarget::from_occurrence(@identity.OccurrenceId) -> Self
+pub fn AffectedVoiceTarget::from_pattern_node(@identity.PatternNodeId) -> Self
+pub fn AffectedVoiceTarget::from_section(@identity.SectionId) -> Self
+pub fn AffectedVoiceTarget::is_empty(Self) -> Bool
+pub fn AffectedVoiceTarget::layer(Self) -> @identity.SectionLayerId?
+pub fn AffectedVoiceTarget::matches(Self, EventSource) -> Bool
+pub fn AffectedVoiceTarget::occurrence(Self) -> @identity.OccurrenceId?
+pub fn AffectedVoiceTarget::pattern_node(Self) -> @identity.PatternNodeId?
+pub fn AffectedVoiceTarget::section(Self) -> @identity.SectionId?
+
 pub struct BlockFrame {
   sample_begin : Int64
   sample_end : Int64
@@ -43,6 +63,7 @@ pub struct EventSource {
 pub fn EventSource::EventSource(pattern_node~ : @identity.PatternNodeId?, section~ : @identity.SectionId?, layer~ : @identity.SectionLayerId?, occurrence~ : @identity.OccurrenceId?) -> Self
 pub fn EventSource::is_empty(Self) -> Bool
 pub fn EventSource::layer(Self) -> @identity.SectionLayerId?
+pub fn EventSource::matches(Self, AffectedVoiceTarget) -> Bool
 pub fn EventSource::none() -> Self
 pub fn EventSource::occurrence(Self) -> @identity.OccurrenceId?
 pub fn EventSource::pattern_node(Self) -> @identity.PatternNodeId?
@@ -58,11 +79,14 @@ pub struct PatternScheduler {
 }
 pub fn PatternScheduler::PatternScheduler(bpm~ : Double, ctx~ : @dsp.DspContext, mapper? : ControlMapper) -> Self
 pub fn PatternScheduler::active_note_count(Self) -> Int
+pub fn PatternScheduler::active_note_matches(Self, Int, AffectedVoiceTarget) -> Bool?
 pub fn PatternScheduler::active_note_source(Self, Int) -> EventSource?
 pub fn PatternScheduler::active_playback_revision(Self) -> @identity.Revision?
 pub fn PatternScheduler::active_playback_song_layout_revision(Self) -> @identity.Revision?
 pub fn PatternScheduler::active_song_layout_revision(Self) -> @identity.Revision?
 pub fn PatternScheduler::active_song_revision(Self) -> @identity.Revision?
+pub fn PatternScheduler::affected_active_note_count(Self, AffectedVoiceTarget) -> Int
+pub fn PatternScheduler::apply_affected_voice_policy(Self, AffectedVoicePolicy, AffectedVoiceTarget, @voice.BoundVoicePool) -> Int
 pub fn PatternScheduler::current_block(Self) -> BlockFrame
 pub fn PatternScheduler::expire_notes(Self, @voice.BoundVoicePool, @pattern.TimeSpan) -> Unit
 pub fn PatternScheduler::expire_notes_at(Self, @voice.BoundVoicePool, PerformanceTime) -> Unit

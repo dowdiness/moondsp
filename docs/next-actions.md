@@ -9,7 +9,7 @@ actionable; move completed design notes or implementation plans under
 ## Current State
 
 - `main` is currently at
-  `5caf016 [codex] Add song layout authoring docs`.
+  `81b1b19 [codex] Add scheduler song snapshots and playback provenance (#45)`.
 - PR #37 is merged:
   https://github.com/dowdiness/moondsp/pull/37
 - PR #38 is merged:
@@ -26,8 +26,10 @@ actionable; move completed design notes or implementation plans under
   https://github.com/dowdiness/moondsp/pull/43
 - PR #44 is merged:
   https://github.com/dowdiness/moondsp/pull/44
-- Active branch: `codex/phase6-song-layout-scheduler`, based on
-  `5caf016 [codex] Add song layout authoring docs`.
+- PR #45 is merged:
+  https://github.com/dowdiness/moondsp/pull/45
+- Active branch: `codex/phase6-affected-voice-policy`, based on
+  `81b1b19 [codex] Add scheduler song snapshots and playback provenance (#45)`.
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -211,7 +213,7 @@ actionable; move completed design notes or implementation plans under
   - `rtk moon test` (775 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
-- Active song layout scheduler branch:
+- Song layout scheduler snapshot/provenance shipped so far on `main`:
   - song authoring lowers to runtime snapshots that carry both whole-document
     and layout-scoped revision tokens, so playback can distinguish content-only
     edits from timeline-boundary edits.
@@ -245,6 +247,29 @@ actionable; move completed design notes or implementation plans under
   - `rtk moon test scheduler` (43 passed)
   - `rtk moon check --target all`
   - `rtk moon test` (785 passed)
+  - `rtk moon build --target wasm-gc`
+  - `rtk git diff --check`
+  - final PR #45 CI passed before merge; merged at `81b1b19`.
+- Active affected-voice policy branch:
+  - provenance selectors can target active voices by pattern node, section,
+    layer, occurrence, or a combined subset of those IDs.
+  - empty selectors intentionally match nothing, and empty-source compatibility
+    voices are not affected by provenance-targeted edits.
+  - the first policy surface keeps the default let-ring behavior explicit and
+    adds an explicit gate-off path for matched active voices without adding
+    allocation to the audio-block query path.
+  - coverage proves selector matching, empty-source safety, let-ring no-op,
+    pattern-node targeting, section targeting, and occurrence/layout targeting.
+- Latest local verification on `codex/phase6-affected-voice-policy`:
+  - `rtk moon update`
+  - `rtk moon fmt`
+  - `rtk moon info`
+  - `rtk moon check --deny-warn`
+  - `rtk moon test scheduler` (47 passed)
+  - `rtk moon test song` (49 passed)
+  - `rtk moon check --target all`
+  - `rtk moon test` (789 passed)
+  - `rtk moon test --release` (789 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
 - Latest local verification for PR #40 before merge:
@@ -328,12 +353,12 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Review and merge PR #45 (`codex/phase6-song-layout-scheduler`), then record
-   the merged SHA, final CI/local verification status, branch cleanup, and any
-   deployment or migration follow-up in this handoff doc.
+1. Review, commit, push, and open a PR for
+   `codex/phase6-affected-voice-policy`.
 
-2. After this lands, use scheduler event provenance to define the first
-   affected-voice policy surface.
+2. After this lands, decide whether authored snapshot queries should attach
+   provenance directly or whether live orchestration should keep supplying
+   sourced playback wrappers at scheduler boundaries.
 
 ## Acceptance Checks For API-Hardening Slices
 

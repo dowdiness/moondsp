@@ -274,6 +274,26 @@ fn song_snapshot(
 }
 
 ///|
+fn note_event(
+  note_value : Double,
+  arc : @pattern.TimeSpan,
+) -> @pattern.Event[@pattern.ControlMap] {
+  match @pattern.note(note_value).query(arc).get(0) {
+    Some(event) => event
+    None => abort("expected note event")
+  }
+}
+
+///|
+fn playback_note_event(
+  note_value : Double,
+  source : @scheduler.EventSource,
+  arc : @pattern.TimeSpan,
+) -> @scheduler.PlaybackEvent {
+  @scheduler.PlaybackEvent(event=note_event(note_value, arc), source~)
+}
+
+///|
 test "EventSource records optional authoring IDs" {
   let pattern_id = pid("source:pattern")
   let section_id = sid("source:section")
@@ -296,6 +316,63 @@ test "EventSource records optional authoring IDs" {
   assert_true(source.section() == Some(section_id))
   assert_true(source.layer() == Some(layer_id))
   assert_true(source.occurrence() == Some(occurrence_id))
+}
+
+///|
+test "AffectedVoiceTarget matches explicit provenance and ignores empty targets" {
+  let pattern_id = pid("target:pattern")
+  let section_id = sid("target:section")
+  let layer_id = lid("target:layer")
+  let occurrence_id = oid("target:occurrence")
+  let source = @scheduler.EventSource(
+    pattern_node=Some(pattern_id),
+    section=Some(section_id),
+    layer=Some(layer_id),
+    occurrence=Some(occurrence_id),
+  )
+  let empty_target = @scheduler.AffectedVoiceTarget(
+    pattern_node=None,
+    section=None,
+    layer=None,
+    occurrence=None,
+  )
+  assert_true(empty_target.is_empty())
+  assert_true(!source.matches(empty_target))
+  assert_true(
+    source.matches(
+      @scheduler.AffectedVoiceTarget::from_pattern_node(pattern_id),
+    ),
+  )
+  assert_true(
+    source.matches(@scheduler.AffectedVoiceTarget::from_section(section_id)),
+  )
+  assert_true(
+    source.matches(@scheduler.AffectedVoiceTarget::from_layer(layer_id)),
+  )
+  assert_true(
+    source.matches(
+      @scheduler.AffectedVoiceTarget::from_occurrence(occurrence_id),
+    ),
+  )
+  let combined = @scheduler.AffectedVoiceTarget(
+    pattern_node=Some(pattern_id),
+    section=Some(section_id),
+    layer=None,
+    occurrence=Some(occurrence_id),
+  )
+  assert_true(source.matches(combined))
+  let wrong_occurrence = @scheduler.AffectedVoiceTarget(
+    pattern_node=Some(pattern_id),
+    section=Some(section_id),
+    layer=None,
+    occurrence=Some(oid("target:other-occurrence")),
+  )
+  assert_true(!source.matches(wrong_occurrence))
+  assert_true(
+    !@scheduler.EventSource::none().matches(
+      @scheduler.AffectedVoiceTarget::from_pattern_node(pattern_id),
+    ),
+  )
 }
 
 ///|
@@ -417,6 +494,201 @@ test "process_playback_events: active note keeps explicit event source" {
     Some(active_source) => assert_true(active_source == source)
     None => assert_true(false)
   }
+}
+
+///|
+test "affected voice policy preserves empty-source voices and let-ring policy" {
+  let (pool, sched, _, _) = make_test_sched()
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::new(1L, 100L),
+  )
+  let pattern_id = pid("affected:ring-pattern")
+  let target = @scheduler.AffectedVoiceTarget::from_pattern_node(pattern_id)
+  let source = @scheduler.EventSource(
+    pattern_node=Some(pattern_id),
+    section=None,
+    layer=None,
+    occurrence=None,
+  )
+  sched.process_playback_events(
+    [playback_note_event(60.0, source, arc)],
+    arc,
+    pool,
+  )
+  sched.process_events(@pattern.note(62.0).query(arc), arc, pool)
+  assert_eq(sched.active_note_count(), 2)
+  assert_eq(sched.affected_active_note_count(target), 1)
+  assert_eq(
+    sched.apply_affected_voice_policy(
+      @scheduler.AffectedVoicePolicy::LetRing,
+      target,
+      pool,
+    ),
+    0,
+  )
+  assert_eq(sched.active_note_count(), 2)
+  assert_true(sched.active_note_matches(0, target) == Some(true))
+  assert_true(sched.active_note_matches(99, target) is None)
+  assert_eq(
+    sched.apply_affected_voice_policy(
+      @scheduler.AffectedVoicePolicy::GateOffAffected,
+      @scheduler.AffectedVoiceTarget(
+        pattern_node=None,
+        section=None,
+        layer=None,
+        occurrence=None,
+      ),
+      pool,
+    ),
+    0,
+  )
+  assert_eq(sched.active_note_count(), 2)
+  assert_eq(
+    sched.apply_affected_voice_policy(
+      @scheduler.AffectedVoicePolicy::GateOffAffected,
+      target,
+      pool,
+    ),
+    1,
+  )
+  assert_eq(sched.active_note_count(), 1)
+  match sched.active_note_source(0) {
+    Some(active_source) => assert_true(active_source.is_empty())
+    None => assert_true(false)
+  }
+}
+
+///|
+test "affected voice policy gates only matching pattern-node active notes" {
+  let (pool, sched, _, _) = make_test_sched()
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::new(1L, 100L),
+  )
+  let first_id = pid("affected:first-pattern")
+  let second_id = pid("affected:second-pattern")
+  let first_source = @scheduler.EventSource(
+    pattern_node=Some(first_id),
+    section=None,
+    layer=None,
+    occurrence=None,
+  )
+  let second_source = @scheduler.EventSource(
+    pattern_node=Some(second_id),
+    section=None,
+    layer=None,
+    occurrence=None,
+  )
+  sched.process_playback_events(
+    [
+      playback_note_event(60.0, first_source, arc),
+      playback_note_event(62.0, second_source, arc),
+    ],
+    arc,
+    pool,
+  )
+  let first_target = @scheduler.AffectedVoiceTarget::from_pattern_node(first_id)
+  let second_target = @scheduler.AffectedVoiceTarget::from_pattern_node(
+    second_id,
+  )
+  assert_eq(sched.active_note_count(), 2)
+  assert_eq(sched.affected_active_note_count(first_target), 1)
+  assert_eq(sched.affected_active_note_count(second_target), 1)
+  assert_eq(
+    sched.apply_affected_voice_policy(
+      @scheduler.AffectedVoicePolicy::GateOffAffected,
+      first_target,
+      pool,
+    ),
+    1,
+  )
+  assert_eq(sched.active_note_count(), 1)
+  assert_eq(sched.affected_active_note_count(first_target), 0)
+  assert_eq(sched.affected_active_note_count(second_target), 1)
+}
+
+///|
+test "affected voice policy can target section and occurrence boundaries" {
+  let (pool, sched, _, _) = make_test_sched()
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::new(1L, 100L),
+  )
+  let main_section = sid("affected:main-section")
+  let other_section = sid("affected:other-section")
+  let layer = lid("affected:main-layer")
+  let first_occurrence = oid("affected:first-occurrence")
+  let second_occurrence = oid("affected:second-occurrence")
+  let other_occurrence = oid("affected:other-occurrence")
+  let first_source = @scheduler.EventSource(
+    pattern_node=None,
+    section=Some(main_section),
+    layer=Some(layer),
+    occurrence=Some(first_occurrence),
+  )
+  let second_source = @scheduler.EventSource(
+    pattern_node=None,
+    section=Some(main_section),
+    layer=Some(layer),
+    occurrence=Some(second_occurrence),
+  )
+  let other_source = @scheduler.EventSource(
+    pattern_node=None,
+    section=Some(other_section),
+    layer=None,
+    occurrence=Some(other_occurrence),
+  )
+  sched.process_playback_events(
+    [
+      playback_note_event(60.0, first_source, arc),
+      playback_note_event(62.0, second_source, arc),
+      playback_note_event(64.0, other_source, arc),
+    ],
+    arc,
+    pool,
+  )
+  let section_target = @scheduler.AffectedVoiceTarget::from_section(
+    main_section,
+  )
+  let first_occurrence_target = @scheduler.AffectedVoiceTarget::from_occurrence(
+    first_occurrence,
+  )
+  let combined_target = @scheduler.AffectedVoiceTarget(
+    pattern_node=None,
+    section=Some(main_section),
+    layer=None,
+    occurrence=Some(first_occurrence),
+  )
+  assert_eq(sched.active_note_count(), 3)
+  assert_eq(sched.affected_active_note_count(section_target), 2)
+  assert_eq(sched.affected_active_note_count(first_occurrence_target), 1)
+  assert_eq(sched.affected_active_note_count(combined_target), 1)
+  assert_eq(
+    sched.apply_affected_voice_policy(
+      @scheduler.AffectedVoicePolicy::GateOffAffected,
+      first_occurrence_target,
+      pool,
+    ),
+    1,
+  )
+  assert_eq(sched.active_note_count(), 2)
+  assert_eq(sched.affected_active_note_count(section_target), 1)
+  assert_eq(
+    sched.apply_affected_voice_policy(
+      @scheduler.AffectedVoicePolicy::GateOffAffected,
+      section_target,
+      pool,
+    ),
+    1,
+  )
+  assert_eq(sched.active_note_count(), 1)
+  assert_eq(
+    sched.affected_active_note_count(
+      @scheduler.AffectedVoiceTarget::from_section(other_section),
+    ),
+    1,
+  )
 }
 
 ///|
