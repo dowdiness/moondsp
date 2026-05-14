@@ -276,6 +276,10 @@ actionable; move completed design notes or implementation plans under
     sourced pattern/song snapshot queries, pattern sub-node path matching,
     callback subtree coverage, song layer targeting, immediate kill behavior,
     and empty-source block processing.
+  - refactor commit `8bce0b9` keeps the raw `VoicePool::kill` primitive
+    private, leaves `BoundVoicePool::kill` as the public scheduler-facing API,
+    and consolidates affected-note release/kill removal into one scheduler
+    helper.
 - Latest local verification on `codex/phase6-affected-voice-policy`:
   - `rtk moon fmt`
   - `rtk moon info`
