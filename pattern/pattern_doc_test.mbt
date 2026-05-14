@@ -165,6 +165,67 @@ test "PatternSnapshot::query_sourced_events tags sequence and stack children" {
 }
 
 ///|
+test "PatternSnapshot::query_sourced_events covers every callback subtrees" {
+  let child = unwrap_doc(
+    try? PatternDoc::stack(id=pid("every-stack"), docs=[
+      PatternDoc::pure(id=pid("every-left"), value=1),
+      PatternDoc::pure(id=pid("every-right"), value=2),
+    ]),
+  )
+  let doc = unwrap_doc(
+    try? child.every(id=pid("every"), n=1, f=fn(p) {
+      p.fast(Rational::from_int(2))
+    }),
+  )
+  let events = unwrap_snapshot(try? doc.lower()).query_sourced_events(
+    doc_span(0, 1, 1, 100),
+  )
+  assert_true(events.length() > 0)
+  assert_pattern_event_path(events[0], [
+    "every", "every-stack", "every-left", "every-right",
+  ])
+}
+
+///|
+test "PatternSnapshot::query_sourced_events covers jux callback subtrees" {
+  let child = unwrap_doc(
+    try? PatternDoc::stack(id=pid("jux-stack"), docs=[
+      PatternDoc::from_pattern(id=pid("jux-left"), pat=note(60.0)),
+      PatternDoc::from_pattern(id=pid("jux-right"), pat=note(67.0)),
+    ]),
+  )
+  let doc = unwrap_doc(
+    try? child.jux(id=pid("jux"), f=fn(p) { p.fast(Rational::from_int(2)) }),
+  )
+  let events = unwrap_snapshot(try? doc.lower()).query_sourced_events(
+    doc_span(0, 1, 1, 100),
+  )
+  assert_true(events.length() > 0)
+  assert_pattern_event_path(events[0], [
+    "jux", "jux-stack", "jux-left", "jux-right",
+  ])
+}
+
+///|
+test "PatternSnapshot::query_sourced_events covers merge_control inputs" {
+  let left = PatternDoc::from_pattern(id=pid("merge-left"), pat=note(60.0))
+  let right = PatternDoc::from_pattern(
+    id=pid("merge-right"),
+    pat=s_cutoff(800.0),
+  )
+  let doc = unwrap_doc(
+    try? PatternDoc::merge_control(id=pid("merge"), left~, right~),
+  )
+  let events = unwrap_snapshot(try? doc.lower()).query_sourced_events(
+    doc_span(0, 1, 1, 100),
+  )
+  assert_eq(events.length(), 1)
+  assert_pattern_event_path(events[0], ["merge", "merge-left", "merge-right"])
+  assert_true(events[0].event().value.get("note") == Some(60.0))
+  assert_true(events[0].event().value.get("cutoff") == Some(800.0))
+}
+
+///|
 test "PatternDoc edit preserves ids and changes lowered future events" {
   let doc = unwrap_doc(
     try? PatternDoc::pure(id=pid("leaf"), value=1).fast(

@@ -407,9 +407,10 @@ empty sources. This keeps compatibility and avoids reintroducing wrapper
 allocation into the default block-processing path. Pattern snapshots currently
 provide authored pattern-node path provenance through
 `PatternSnapshot::query_sourced_events`; structural nodes preserve ancestor and
-leaf IDs, while opaque callback nodes fall back to their wrapper ID plus
-immediate child roots. Song snapshots provide occurrence and section/layer
-provenance from the authoring document through
+leaf IDs, while callback nodes (`every`, `jux`, `merge_control`)
+conservatively tag their wrapper ID plus all reachable child subtree node IDs.
+Song snapshots provide occurrence and section/layer provenance from the
+authoring document through
 `SongSnapshot::query_sourced_events`.
 
 ## Edit Behavior Matrix
@@ -515,9 +516,9 @@ For implementation slices:
   only the subset emitted by mini-notation?
 - Should section length edits immediately affect the current cycle after the
   commit block, or only future cycle boundaries?
-- Should opaque pattern callback nodes (`every`, `jux`, `merge_control`) get a
-  richer typed sourced-query contract before adding a destructive kill policy,
-  or is wrapper-plus-child-root provenance sufficient for the first kill slice?
+- Should callback-heavy pattern APIs later grow a typed sourced-query contract
+  for exact leaf attribution, or is conservative subtree coverage sufficient
+  for edit policies?
 - Should live active-voice controls beyond explicit affected-voice policies
   target every active voice, selected provenance, or only future voices by
   default?

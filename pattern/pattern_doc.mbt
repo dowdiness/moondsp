@@ -396,13 +396,56 @@ fn pattern_source_path_with_parent(
 }
 
 ///|
-fn pattern_source_path_for_opaque_children(
+fn[A] append_reachable_pattern_source_ids(
+  nodes : Map[String, PatternDocEntry[A]],
+  id : @identity.PatternNodeId,
+  result : Array[@identity.PatternNodeId],
+  seen : Map[String, Bool],
+) -> Unit raise PatternDocError {
+  let key = id.value()
+  if seen.contains(key) {
+    return
+  }
+  match nodes.get(key) {
+    None => raise MissingNode(key)
+    Some(entry) => {
+      seen[key] = true
+      result.push(id)
+      match entry.node {
+        Runtime(_) | Silence | Pure(_) => ()
+        Fast(child, _)
+        | Slow(child, _)
+        | Rev(child)
+        | FilterMap(child, _)
+        | Euclid(child, _, _, _)
+        | DegradeBy(child, _, _)
+        | Every(child, _, _)
+        | Jux(child, _) =>
+          append_reachable_pattern_source_ids(nodes, child, result, seen)
+        MergeControl(left, right, _) => {
+          append_reachable_pattern_source_ids(nodes, left, result, seen)
+          append_reachable_pattern_source_ids(nodes, right, result, seen)
+        }
+        Sequence(children) | Stack(children) =>
+          for child in children {
+            append_reachable_pattern_source_ids(nodes, child, result, seen)
+          }
+      }
+    }
+  }
+}
+
+///|
+fn[A] pattern_source_path_for_opaque_children(
+  nodes : Map[String, PatternDocEntry[A]],
   id : @identity.PatternNodeId,
   children : Array[@identity.PatternNodeId],
-) -> Array[@identity.PatternNodeId] {
+) -> Array[@identity.PatternNodeId] raise PatternDocError {
   let result : Array[@identity.PatternNodeId] = [id]
+  let seen : Map[String, Bool] = {}
+  seen[id.value()] = true
   for child in children {
-    result.push(child)
+    append_reachable_pattern_source_ids(nodes, child, result, seen)
   }
   result
 }
@@ -660,11 +703,9 @@ fn[A] query_sourced_euclid(
 ///|
 fn[A] query_opaque_pattern_source(
   pat : Pat[A],
-  id : @identity.PatternNodeId,
-  children : Array[@identity.PatternNodeId],
+  path : Array[@identity.PatternNodeId],
   arc : TimeSpan,
 ) -> Array[PatternSnapshotEvent[A]] {
-  let path = pattern_source_path_for_opaque_children(id, children)
   let result : Array[PatternSnapshotEvent[A]] = []
   for event in pat.query(arc) {
     result.push(PatternSnapshotEvent(event~, pattern_nodes=path))
@@ -681,8 +722,10 @@ fn[A] lower_sourced_pattern_node(
     None => raise MissingNode(id.value())
     Some(entry) =>
       match entry.node {
-        Runtime(pat) =>
-          { query: fn(arc) { query_opaque_pattern_source(pat, id, [], arc) } }
+        Runtime(pat) => {
+          let path = pattern_source_path(id)
+          { query: fn(arc) { query_opaque_pattern_source(pat, path, arc) } }
+        }
         Silence => { query: fn(_arc) { [] } }
         Pure(value) =>
           {
@@ -770,6 +813,11 @@ fn[A] lower_sourced_pattern_node(
         Every(child, n, f) => {
           let child_pat = lower_sourced_pattern_node(nodes, child)
           let raw_child = lower_pattern_node(nodes, child)
+          let fallback_path = pattern_source_path_for_opaque_children(
+            nodes,
+            id,
+            [child],
+          )
           {
             query: fn(arc) {
               if n <= 0 {
@@ -787,13 +835,7 @@ fn[A] lower_sourced_pattern_node(
                 if rem == 0L {
                   for event in f(raw_child).query(cycle_arc) {
                     result.push(
-                      PatternSnapshotEvent(
-                        event~,
-                        pattern_nodes=pattern_source_path_for_opaque_children(
-                          id,
-                          [child],
-                        ),
-                      ),
+                      PatternSnapshotEvent(event~, pattern_nodes=fallback_path),
                     )
                   }
                 } else {
@@ -809,9 +851,14 @@ fn[A] lower_sourced_pattern_node(
         Jux(child, f) => {
           let raw_child = lower_pattern_node(nodes, child)
           let fallback = f(raw_child)
+          let fallback_path = pattern_source_path_for_opaque_children(
+            nodes,
+            id,
+            [child],
+          )
           {
             query: fn(arc) {
-              query_opaque_pattern_source(fallback, id, [child], arc)
+              query_opaque_pattern_source(fallback, fallback_path, arc)
             },
           }
         }
@@ -820,9 +867,14 @@ fn[A] lower_sourced_pattern_node(
             lower_pattern_node(nodes, left),
             lower_pattern_node(nodes, right),
           )
+          let fallback_path = pattern_source_path_for_opaque_children(
+            nodes,
+            id,
+            [left, right],
+          )
           {
             query: fn(arc) {
-              query_opaque_pattern_source(fallback, id, [left, right], arc)
+              query_opaque_pattern_source(fallback, fallback_path, arc)
             },
           }
         }

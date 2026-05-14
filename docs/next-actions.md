@@ -268,22 +268,23 @@ actionable; move completed design notes or implementation plans under
   - `PatternSnapshot::query_sourced_events` exposes authored pattern provenance
     for structural nodes, and scheduler `EventSource` now keeps a pattern-node
     path so affected-voice selectors match both leaf and ancestor pattern IDs.
-    Opaque callback nodes (`every`, `jux`, `merge_control`) currently fall back
-    to their wrapper node plus immediate child roots.
+    Callback nodes (`every`, `jux`, `merge_control`) now conservatively tag
+    their wrapper node plus all reachable child subtree node IDs.
   - coverage proves selector matching, empty-source safety, let-ring no-op,
     pattern-node targeting, section targeting, occurrence/layout targeting,
-    sourced pattern/song snapshot queries, pattern sub-node path matching, song
-    layer targeting, and empty-source block processing.
+    sourced pattern/song snapshot queries, pattern sub-node path matching,
+    callback subtree coverage, song layer targeting, and empty-source block
+    processing.
 - Latest local verification on `codex/phase6-affected-voice-policy`:
   - `rtk moon fmt`
   - `rtk moon info`
   - `rtk moon check --deny-warn`
   - `rtk moon check --target all`
-  - `rtk moon test pattern` (141 passed)
+  - `rtk moon test pattern` (144 passed)
   - `rtk moon test song` (50 passed)
   - `rtk moon test scheduler` (51 passed)
-  - `rtk moon test` (796 passed)
-  - `rtk moon test --release` (796 passed)
+  - `rtk moon test` (799 passed)
+  - `rtk moon test --release` (799 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
 - Latest local verification for PR #40 before merge:
@@ -369,10 +370,8 @@ actionable; move completed design notes or implementation plans under
 
 1. Continue the stacked Phase 6 branch without opening a PR yet.
 
-2. Next implementation choice: decide whether to add an explicit destructive
-   `KillAffected` policy now that pattern/song provenance paths exist, or first
-   remove the remaining opaque-callback fallback for pattern `every`, `jux`, and
-   `merge_control`.
+2. Next implementation choice: add an explicit destructive `KillAffected`
+   policy now that pattern/song provenance paths exist.
 
 ## Acceptance Checks For API-Hardening Slices
 
