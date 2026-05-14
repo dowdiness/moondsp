@@ -92,20 +92,86 @@ pub fn default_control_mapper() -> ControlMapper {
 }
 
 ///|
+/// Prepared scheduler input for the next authoring snapshot commit.
+///
+/// Pattern and song snapshots share the same pending slot so callers have one
+/// coherent staging boundary when higher-level live orchestration prepares the
+/// next playback state.
+pub enum PlaybackSnapshot {
+  Pattern(@pattern.PatternSnapshot[@pattern.ControlMap])
+  Song(@song.SongSnapshot[@pattern.ControlMap])
+}
+
+///|
+pub fn PlaybackSnapshot::pattern(
+  snapshot : @pattern.PatternSnapshot[@pattern.ControlMap],
+) -> PlaybackSnapshot {
+  Pattern(snapshot)
+}
+
+///|
+pub fn PlaybackSnapshot::song(
+  snapshot : @song.SongSnapshot[@pattern.ControlMap],
+) -> PlaybackSnapshot {
+  Song(snapshot)
+}
+
+///|
+pub fn PlaybackSnapshot::revision(
+  self : PlaybackSnapshot,
+) -> @identity.Revision {
+  match self {
+    Pattern(snapshot) => snapshot.revision()
+    Song(snapshot) => snapshot.revision()
+  }
+}
+
+///|
+pub fn PlaybackSnapshot::song_layout_revision(
+  self : PlaybackSnapshot,
+) -> @identity.Revision? {
+  match self {
+    Pattern(_) => None
+    Song(snapshot) => Some(snapshot.layout_revision())
+  }
+}
+
+///|
+pub fn PlaybackSnapshot::is_pattern(self : PlaybackSnapshot) -> Bool {
+  match self {
+    Pattern(_) => true
+    Song(_) => false
+  }
+}
+
+///|
+pub fn PlaybackSnapshot::is_song(self : PlaybackSnapshot) -> Bool {
+  match self {
+    Pattern(_) => false
+    Song(_) => true
+  }
+}
+
+///|
+pub fn PlaybackSnapshot::query(
+  self : PlaybackSnapshot,
+  arc : @pattern.TimeSpan,
+) -> Array[@pattern.Event[@pattern.ControlMap]] {
+  match self {
+    Pattern(snapshot) => snapshot.query(arc)
+    Song(snapshot) => snapshot.query(arc)
+  }
+}
+
+///|
 pub struct PatternScheduler {
   mut bpm : Double
   mut sample_counter : Int64
   ctx : @moondsp.DspContext
   active_notes : Array[ActiveNote]
   mapper : ControlMapper
-  priv mut active_pattern_snapshot : @pattern.PatternSnapshot[
-    @pattern.ControlMap,
-  ]?
-  priv mut pending_pattern_snapshot : @pattern.PatternSnapshot[
-    @pattern.ControlMap,
-  ]?
-  priv mut active_song_snapshot : @song.SongSnapshot[@pattern.ControlMap]?
-  priv mut pending_song_snapshot : @song.SongSnapshot[@pattern.ControlMap]?
+  priv mut active_playback_snapshot : PlaybackSnapshot?
+  priv mut pending_playback_snapshot : PlaybackSnapshot?
 }
 
 ///|
@@ -139,10 +205,8 @@ pub fn PatternScheduler::PatternScheduler(
     ctx,
     active_notes: [],
     mapper: mapper.unwrap_or(default_control_mapper()),
-    active_pattern_snapshot: None,
-    pending_pattern_snapshot: None,
-    active_song_snapshot: None,
-    pending_song_snapshot: None,
+    active_playback_snapshot: None,
+    pending_playback_snapshot: None,
   }
 }
 
@@ -188,7 +252,7 @@ pub fn PatternScheduler::queue_pattern_snapshot(
   self : PatternScheduler,
   snapshot : @pattern.PatternSnapshot[@pattern.ControlMap],
 ) -> Unit {
-  self.pending_pattern_snapshot = Some(snapshot)
+  self.queue_playback_snapshot(PlaybackSnapshot::pattern(snapshot))
 }
 
 ///|
@@ -199,15 +263,26 @@ pub fn PatternScheduler::queue_song_snapshot(
   self : PatternScheduler,
   snapshot : @song.SongSnapshot[@pattern.ControlMap],
 ) -> Unit {
-  self.pending_song_snapshot = Some(snapshot)
+  self.queue_playback_snapshot(PlaybackSnapshot::song(snapshot))
+}
+
+///|
+/// Stage the next prepared playback snapshot. Pattern and song snapshots use
+/// the same pending slot; if several edits arrive before the next audio block,
+/// only the latest successfully prepared snapshot commits.
+pub fn PatternScheduler::queue_playback_snapshot(
+  self : PatternScheduler,
+  snapshot : PlaybackSnapshot,
+) -> Unit {
+  self.pending_playback_snapshot = Some(snapshot)
 }
 
 ///|
 pub fn PatternScheduler::has_active_pattern_snapshot(
   self : PatternScheduler,
 ) -> Bool {
-  match self.active_pattern_snapshot {
-    Some(_) => true
+  match self.active_playback_snapshot {
+    Some(snapshot) => snapshot.is_pattern()
     None => false
   }
 }
@@ -216,8 +291,8 @@ pub fn PatternScheduler::has_active_pattern_snapshot(
 pub fn PatternScheduler::has_pending_pattern_snapshot(
   self : PatternScheduler,
 ) -> Bool {
-  match self.pending_pattern_snapshot {
-    Some(_) => true
+  match self.pending_playback_snapshot {
+    Some(snapshot) => snapshot.is_pattern()
     None => false
   }
 }
@@ -226,8 +301,8 @@ pub fn PatternScheduler::has_pending_pattern_snapshot(
 pub fn PatternScheduler::has_active_song_snapshot(
   self : PatternScheduler,
 ) -> Bool {
-  match self.active_song_snapshot {
-    Some(_) => true
+  match self.active_playback_snapshot {
+    Some(snapshot) => snapshot.is_song()
     None => false
   }
 }
@@ -236,9 +311,39 @@ pub fn PatternScheduler::has_active_song_snapshot(
 pub fn PatternScheduler::has_pending_song_snapshot(
   self : PatternScheduler,
 ) -> Bool {
-  match self.pending_song_snapshot {
+  match self.pending_playback_snapshot {
+    Some(snapshot) => snapshot.is_song()
+    None => false
+  }
+}
+
+///|
+pub fn PatternScheduler::has_active_playback_snapshot(
+  self : PatternScheduler,
+) -> Bool {
+  match self.active_playback_snapshot {
     Some(_) => true
     None => false
+  }
+}
+
+///|
+pub fn PatternScheduler::has_pending_playback_snapshot(
+  self : PatternScheduler,
+) -> Bool {
+  match self.pending_playback_snapshot {
+    Some(_) => true
+    None => false
+  }
+}
+
+///|
+pub fn PatternScheduler::active_playback_revision(
+  self : PatternScheduler,
+) -> @identity.Revision? {
+  match self.active_playback_snapshot {
+    Some(snapshot) => Some(snapshot.revision())
+    None => None
   }
 }
 
@@ -246,8 +351,19 @@ pub fn PatternScheduler::has_pending_song_snapshot(
 pub fn PatternScheduler::active_song_revision(
   self : PatternScheduler,
 ) -> @identity.Revision? {
-  match self.active_song_snapshot {
-    Some(snapshot) => Some(snapshot.revision())
+  if self.has_active_song_snapshot() {
+    self.active_playback_revision()
+  } else {
+    None
+  }
+}
+
+///|
+pub fn PatternScheduler::active_playback_song_layout_revision(
+  self : PatternScheduler,
+) -> @identity.Revision? {
+  match self.active_playback_snapshot {
+    Some(snapshot) => snapshot.song_layout_revision()
     None => None
   }
 }
@@ -256,33 +372,17 @@ pub fn PatternScheduler::active_song_revision(
 pub fn PatternScheduler::active_song_layout_revision(
   self : PatternScheduler,
 ) -> @identity.Revision? {
-  match self.active_song_snapshot {
-    Some(snapshot) => Some(snapshot.layout_revision())
-    None => None
-  }
+  self.active_playback_song_layout_revision()
 }
 
 ///|
-fn PatternScheduler::commit_pending_pattern_snapshot(
+fn PatternScheduler::commit_pending_playback_snapshot(
   self : PatternScheduler,
 ) -> Unit {
-  match self.pending_pattern_snapshot {
+  match self.pending_playback_snapshot {
     Some(snapshot) => {
-      self.active_pattern_snapshot = Some(snapshot)
-      self.pending_pattern_snapshot = None
-    }
-    None => ()
-  }
-}
-
-///|
-fn PatternScheduler::commit_pending_song_snapshot(
-  self : PatternScheduler,
-) -> Unit {
-  match self.pending_song_snapshot {
-    Some(snapshot) => {
-      self.active_song_snapshot = Some(snapshot)
-      self.pending_song_snapshot = None
+      self.active_playback_snapshot = Some(snapshot)
+      self.pending_playback_snapshot = None
     }
     None => ()
   }
@@ -435,18 +535,7 @@ fn PatternScheduler::query_snapshot_block(
   self : PatternScheduler,
   frame : BlockFrame,
 ) -> Array[@pattern.Event[@pattern.ControlMap]] {
-  match self.active_pattern_snapshot {
-    Some(snapshot) => snapshot.query(frame.logical_arc)
-    None => []
-  }
-}
-
-///|
-fn PatternScheduler::query_song_snapshot_block(
-  self : PatternScheduler,
-  frame : BlockFrame,
-) -> Array[@pattern.Event[@pattern.ControlMap]] {
-  match self.active_song_snapshot {
+  match self.active_playback_snapshot {
     Some(snapshot) => snapshot.query(frame.logical_arc)
     None => []
   }
@@ -496,17 +585,31 @@ pub fn PatternScheduler::process_block(
 }
 
 ///|
-/// Snapshot entry point for authoring-time pattern edits. Pending snapshots are
-/// swapped in once, at the beginning of the audio block; note expiry and event
-/// queries for that block then observe one coherent snapshot.
+/// Snapshot entry point kept for existing pattern-snapshot callers. It now
+/// processes the unified prepared playback snapshot slot, so song snapshots
+/// staged through `queue_song_snapshot` observe the same block-boundary
+/// semantics.
 pub fn PatternScheduler::process_snapshot_block(
   self : PatternScheduler,
   pool : @moondsp.BoundVoicePool,
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
 ) -> Unit {
+  self.process_playback_snapshot_block(pool, left, right)
+}
+
+///|
+/// Unified snapshot entry point for prepared pattern or song playback edits.
+/// Pending snapshots are swapped in once at block start; note expiry and event
+/// queries then observe the same committed playback state for the whole block.
+pub fn PatternScheduler::process_playback_snapshot_block(
+  self : PatternScheduler,
+  pool : @moondsp.BoundVoicePool,
+  left : @moondsp.AudioBuffer,
+  right : @moondsp.AudioBuffer,
+) -> Unit {
   let frame = self.current_block()
-  self.commit_pending_pattern_snapshot()
+  self.commit_pending_playback_snapshot()
   self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
   let events = self.query_snapshot_block(frame)
   self.process_block_events(events, frame, pool, left, right)
@@ -522,11 +625,7 @@ pub fn PatternScheduler::process_song_snapshot_block(
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
 ) -> Unit {
-  let frame = self.current_block()
-  self.commit_pending_song_snapshot()
-  self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
-  let events = self.query_song_snapshot_block(frame)
-  self.process_block_events(events, frame, pool, left, right)
+  self.process_playback_snapshot_block(pool, left, right)
 }
 
 ///|

@@ -541,6 +541,45 @@ test "process_song_snapshot_block: multiple pending song snapshots keep the late
 }
 
 ///|
+test "process_playback_snapshot_block: pattern and song snapshots share one pending slot" {
+  let (pool, sched, left, right) = make_test_sched()
+  let pattern = note_snapshot("playback-snapshot:pattern", 60.0)
+  let main_id = oid("playback-snapshot:song")
+  let section = scheduler_section_doc("section:playback-snapshot", "Main", 64.0)
+  let song_doc = scheduler_song_doc([
+    @song.SongOccurrenceDoc::at(
+      id=main_id,
+      start=@pattern.Rational::from_int(2),
+      name="Main",
+      section~,
+    ),
+  ])
+  sched.queue_playback_snapshot(@scheduler.PlaybackSnapshot::pattern(pattern))
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::song(song_snapshot(song_doc)),
+  )
+  assert_true(sched.has_pending_playback_snapshot())
+  assert_true(!sched.has_pending_pattern_snapshot())
+  assert_true(sched.has_pending_song_snapshot())
+  sched.process_playback_snapshot_block(pool, left, right)
+  assert_true(sched.has_active_playback_snapshot())
+  assert_true(!sched.has_active_pattern_snapshot())
+  assert_true(sched.has_active_song_snapshot())
+  assert_true(sched.active_playback_revision() == Some(song_doc.revision()))
+  assert_true(
+    sched.active_playback_song_layout_revision() ==
+    Some(song_doc.layout_revision()),
+  )
+  assert_eq(pool.active_voice_count(), 0)
+  sched.queue_playback_snapshot(@scheduler.PlaybackSnapshot::pattern(pattern))
+  sched.process_playback_snapshot_block(pool, left, right)
+  assert_true(sched.has_active_pattern_snapshot())
+  assert_true(!sched.has_active_song_snapshot())
+  assert_true(sched.active_playback_revision() == Some(pattern.revision()))
+  assert_true(sched.active_playback_song_layout_revision() is None)
+}
+
+///|
 test "process_section_block: identity section matches pattern scheduling" {
   let (pattern_pool, pattern_sched, pattern_left, pattern_right) = make_test_sched()
   let (section_pool, section_sched, section_left, section_right) = make_test_sched()
