@@ -228,6 +228,9 @@ actionable; move completed design notes or implementation plans under
   - public raw-event processing preserves caller-owned event array ordering,
     while scheduler audio-block paths avoid per-event provenance wrapper
     allocation on the empty-source path.
+  - the provenance refactor keeps internal kind checks and source-injection
+    helpers private, so the public scheduler surface exposes only the wrapper
+    types, queue/process entry points, and read accessors callers need.
   - committed song revision and layout-revision tokens are exposed for
     scheduler/live orchestration without changing the raw
     `process_song_block(song, ...)` compatibility entry point.

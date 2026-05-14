@@ -254,7 +254,7 @@ pub fn PlaybackSnapshot::song_layout_revision(
 }
 
 ///|
-pub fn PlaybackSnapshot::is_pattern(self : PlaybackSnapshot) -> Bool {
+fn PlaybackSnapshot::is_pattern(self : PlaybackSnapshot) -> Bool {
   match self {
     Pattern(_) => true
     Song(_) => false
@@ -262,7 +262,7 @@ pub fn PlaybackSnapshot::is_pattern(self : PlaybackSnapshot) -> Bool {
 }
 
 ///|
-pub fn PlaybackSnapshot::is_song(self : PlaybackSnapshot) -> Bool {
+fn PlaybackSnapshot::is_song(self : PlaybackSnapshot) -> Bool {
   match self {
     Pattern(_) => false
     Song(_) => true
@@ -548,8 +548,8 @@ pub fn PatternScheduler::push_active_note(
 }
 
 ///|
-/// Test/future-policy helper: inject an active note with explicit provenance.
-pub fn PatternScheduler::push_active_note_with_source(
+/// Future-policy helper: inject an active note with explicit provenance.
+fn PatternScheduler::push_active_note_with_source(
   self : PatternScheduler,
   handle : @moondsp.VoiceHandle,
   end_time : @pattern.Rational,
@@ -694,7 +694,7 @@ fn PatternScheduler::process_events_with_source(
       }
     })
   }
-  for i = 0; i < events.length(); i = i + 1 {
+  for i in 0..<events.length() {
     self.process_single_event(events[i], source, arc, pool)
   }
 }
@@ -728,7 +728,7 @@ fn PatternScheduler::process_owned_playback_events(
       }
     })
   }
-  for i = 0; i < events.length(); i = i + 1 {
+  for i in 0..<events.length() {
     let playback_event = events[i]
     self.process_single_event(
       playback_event.event,
