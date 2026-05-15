@@ -9,7 +9,7 @@ actionable; move completed design notes or implementation plans under
 ## Current State
 
 - `main` is currently at
-  `d3e4fff docs: mark edit application merged`.
+  `ee2b762 scheduler: add active voice live controls (#49)`.
 - PR #37 is merged:
   https://github.com/dowdiness/moondsp/pull/37
 - PR #38 is merged:
@@ -34,8 +34,10 @@ actionable; move completed design notes or implementation plans under
   https://github.com/dowdiness/moondsp/pull/47
 - PR #48 is merged:
   https://github.com/dowdiness/moondsp/pull/48
+- PR #49 is merged:
+  https://github.com/dowdiness/moondsp/pull/49
 - Active branch for the next Phase 6 slice:
-  `codex/phase6-active-voice-controls`, based on `main` at `d3e4fff`.
+  none yet; start from `main` at `ee2b762`.
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -335,8 +337,7 @@ actionable; move completed design notes or implementation plans under
   - `rtk moon test` (810 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
-- Active-voice live control helpers are in open PR #49 on
-  `codex/phase6-active-voice-controls`:
+- Active-voice live control helpers shipped on `main`:
   - live-control batches can be preflighted without mutating compiled graph
     state, preserving all-or-nothing behavior for multi-voice edits.
   - per-voice live-control application mutates only validated active targets;
@@ -347,7 +348,7 @@ actionable; move completed design notes or implementation plans under
   - coverage proves matched-only application, invalid-control rollback, stale
     handle rejection, active-note preservation, active-voice mutation, and
     unchanged future voice defaults.
-- Latest local verification on `codex/phase6-active-voice-controls`:
+- Latest local verification for PR #49 before merge:
   - `rtk moon check --deny-warn`
   - `rtk moon test voice` (37 passed)
   - `rtk moon test scheduler` (63 passed)
@@ -439,11 +440,11 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Merge the open PR for `codex/phase6-active-voice-controls` after review and
-   CI remain green.
+1. Start a new branch from `main` for the next Phase 6 slice.
 
-2. After merge, update the handoff on `main`, then create the next follow-up
-   branch or task for remaining Phase 6 work.
+2. Recommended next slice: integrate live-control edit application so one edit
+   transaction can stage playback replacement, apply affected-voice policy, and
+   optionally apply live graph-control changes to matched active voices.
 
 ## Acceptance Checks For API-Hardening Slices
 
