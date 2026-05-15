@@ -9,7 +9,7 @@ actionable; move completed design notes or implementation plans under
 ## Current State
 
 - `main` is currently at
-  `5dc4235 scheduler: integrate live-control edit application (#50)`.
+  `85b3078 docs: mark live-control edit application merged`.
 - PR #37 is merged:
   https://github.com/dowdiness/moondsp/pull/37
 - PR #38 is merged:
@@ -39,7 +39,7 @@ actionable; move completed design notes or implementation plans under
 - PR #50 is merged:
   https://github.com/dowdiness/moondsp/pull/50
 - Active branch for the next Phase 6 slice:
-  none yet; start from `main` at `5dc4235`.
+  `codex/phase6-edit-orchestration-docs`, based on `main` at `85b3078`.
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -382,6 +382,22 @@ actionable; move completed design notes or implementation plans under
   - `rtk moon test` (820 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
+- Edit orchestration docs/API example is implemented locally on
+  `codex/phase6-edit-orchestration-docs`:
+  - the scheduler package now has a tested README example showing the public
+    edit orchestration workflow from a sourced active pattern snapshot through
+    replacement staging, affected-voice policy, optional live-control changes,
+    and outcome counts.
+  - the example uses checked markdown so future API drift fails package checks.
+- Latest local verification on `codex/phase6-edit-orchestration-docs`:
+  - `rtk moon check --deny-warn`
+  - `rtk moon test scheduler` (68 passed)
+  - `rtk moon info`
+  - `rtk moon fmt`
+  - `rtk moon check --target all`
+  - `rtk moon test` (821 passed)
+  - `rtk moon build --target wasm-gc`
+  - `rtk git diff --check`
 - Latest local verification for PR #40 before merge:
   - `moon fmt`
   - `moon info`
@@ -463,11 +479,8 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Start `codex/phase6-edit-orchestration-docs` from `main`.
-
-2. Recommended next slice: add a small public docs/API example pass for the
-   edit orchestration flow, covering snapshot staging, affected-voice policy,
-   and optional live-control changes in one workflow.
+1. Commit, push, and open the next PR for the edit orchestration docs/API
+   example slice on `codex/phase6-edit-orchestration-docs`.
 
 ## Acceptance Checks For API-Hardening Slices
 
