@@ -131,6 +131,58 @@ pub fn EventSource::matches(
 }
 
 ///|
+/// Authoring edit boundary that can be mapped to active voice provenance.
+///
+/// This does not choose a stop policy. Callers still choose whether matching
+/// voices preserve, release, or stop immediately.
+pub struct AffectedVoiceEditScope {
+  priv target : AffectedVoiceTarget
+} derive(Eq, Debug)
+
+///|
+pub fn AffectedVoiceEditScope::pattern_node(
+  pattern_node : @identity.PatternNodeId,
+) -> AffectedVoiceEditScope {
+  { target: AffectedVoiceTarget::from_pattern_node(pattern_node) }
+}
+
+///|
+pub fn AffectedVoiceEditScope::song_occurrence(
+  occurrence : @identity.OccurrenceId,
+) -> AffectedVoiceEditScope {
+  { target: AffectedVoiceTarget::from_occurrence(occurrence) }
+}
+
+///|
+pub fn AffectedVoiceEditScope::song_section(
+  section : @identity.SectionId,
+) -> AffectedVoiceEditScope {
+  { target: AffectedVoiceTarget::from_section(section) }
+}
+
+///|
+pub fn AffectedVoiceEditScope::song_layer(
+  section~ : @identity.SectionId,
+  layer~ : @identity.SectionLayerId,
+) -> AffectedVoiceEditScope {
+  {
+    target: AffectedVoiceTarget(
+      pattern_node=None,
+      section=Some(section),
+      layer=Some(layer),
+      occurrence=None,
+    ),
+  }
+}
+
+///|
+pub fn AffectedVoiceEditScope::target(
+  self : AffectedVoiceEditScope,
+) -> AffectedVoiceTarget {
+  self.target
+}
+
+///|
 /// Policy for already-sounding voices when an authoring edit is known to affect
 /// their provenance.
 pub(all) enum AffectedVoicePolicy {
@@ -195,6 +247,17 @@ pub fn PatternScheduler::apply_affected_voice_policy(
     GateOffAffected => self.remove_affected_notes(target, pool, stop=GateOff)
     KillAffected => self.remove_affected_notes(target, pool, stop=Kill)
   }
+}
+
+///|
+/// Apply an explicit voice policy for a concrete authoring edit boundary.
+pub fn PatternScheduler::apply_affected_voice_policy_for_edit(
+  self : PatternScheduler,
+  policy : AffectedVoicePolicy,
+  edit : AffectedVoiceEditScope,
+  pool : @moondsp.BoundVoicePool,
+) -> Int {
+  self.apply_affected_voice_policy(policy, edit.target(), pool)
 }
 
 ///|
