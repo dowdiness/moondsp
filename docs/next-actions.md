@@ -9,7 +9,7 @@ actionable; move completed design notes or implementation plans under
 ## Current State
 
 - `main` is currently at
-  `fe30a3c [codex] Add edit orchestration helpers (#47)`.
+  `6947ce9 scheduler: add edit application helpers (#48)`.
 - PR #37 is merged:
   https://github.com/dowdiness/moondsp/pull/37
 - PR #38 is merged:
@@ -32,8 +32,10 @@ actionable; move completed design notes or implementation plans under
   https://github.com/dowdiness/moondsp/pull/46
 - PR #47 is merged:
   https://github.com/dowdiness/moondsp/pull/47
+- PR #48 is merged:
+  https://github.com/dowdiness/moondsp/pull/48
 - Active branch for the next Phase 6 slice:
-  `codex/phase6-edit-application`, based on `main` at `fe30a3c`.
+  none yet; start from `main` at `6947ce9`.
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -313,8 +315,7 @@ actionable; move completed design notes or implementation plans under
   - `rtk moon test` (807 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
-- Edit application helpers are implemented locally on
-  `codex/phase6-edit-application`:
+- Edit application helpers shipped on `main`:
   - `PatternScheduler::queue_playback_snapshot_edit` stages a replacement
     `PlaybackSnapshot` for the existing block-boundary commit and immediately
     applies the selected `AffectedVoicePolicy` to the matching
@@ -325,7 +326,7 @@ actionable; move completed design notes or implementation plans under
   - coverage proves pattern-node preserve and gate-off behavior, song
     occurrence gate-off, song section let-ring, song layer kill behavior, and
     block-boundary commit of the staged replacement snapshot.
-- Latest local verification on `codex/phase6-edit-application`:
+- Latest local verification for PR #48 before merge:
   - `rtk moon check --deny-warn`
   - `rtk moon test scheduler` (61 passed)
   - `rtk moon info`
@@ -415,9 +416,18 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Review and commit `codex/phase6-edit-application`.
+1. Start a new branch from `main`, suggested name
+   `codex/phase6-active-voice-controls`.
 
-2. Push the branch and open the next PR for the edit application helper slice.
+2. Add active-voice live control edit helpers over the existing graph identity,
+   voice-pool, scheduler provenance, and edit-application surfaces:
+   - add a constrained `BoundVoicePool` API for applying validated graph
+     controls to one active `VoiceHandle`.
+   - add a scheduler helper that applies those controls to active voices
+     matched by `AffectedVoiceEditScope`.
+   - keep invalid controls and stale handles result-typed and non-destructive.
+   - add focused tests for matched-only active control edits, stale handles,
+     invalid controls, and future-voice/template behavior staying unchanged.
 
 ## Acceptance Checks For API-Hardening Slices
 
