@@ -97,6 +97,15 @@ pub fn CompiledDsp::apply_controls_result(
 }
 
 ///|
+/// Validate a runtime control batch without mutating the compiled graph.
+pub fn CompiledDsp::validate_controls_result(
+  self : CompiledDsp,
+  controls : Array[GraphControl],
+) -> Result[Unit, GraphControlError] {
+  self.0.validate_controls_result_impl(controls)
+}
+
+///|
 /// Returns true when a voice using this compiled graph can be safely reclaimed.
 ///
 /// Two-stage check:
@@ -207,6 +216,15 @@ pub fn CompiledStereoDsp::apply_controls_result(
   controls : Array[GraphControl],
 ) -> Result[Unit, GraphControlError] {
   self.0.apply_controls_result_impl(controls)
+}
+
+///|
+/// Validate a runtime control batch without mutating the compiled graph.
+pub fn CompiledStereoDsp::validate_controls_result(
+  self : CompiledStereoDsp,
+  controls : Array[GraphControl],
+) -> Result[Unit, GraphControlError] {
+  self.0.validate_controls_result_impl(controls)
 }
 
 ///|
@@ -441,18 +459,30 @@ fn CompiledGraph::apply_controls_result_impl(
   self : CompiledGraph,
   controls : Array[GraphControl],
 ) -> Result[Unit, GraphControlError] {
+  match self.validate_controls_result_impl(controls) {
+    Ok(_) => ()
+    Err(error) => return Err(error)
+  }
+
+  for index = 0; index < controls.length(); index = index + 1 {
+    match self.apply_control_result_impl(controls[index]) {
+      Ok(_) => ()
+      Err(error) => return Err(error)
+    }
+  }
+  Ok(())
+}
+
+///|
+fn CompiledGraph::validate_controls_result_impl(
+  self : CompiledGraph,
+  controls : Array[GraphControl],
+) -> Result[Unit, GraphControlError] {
   let simulated_nodes = FixedArray::makei(self.nodes.length(), index => {
     self.nodes[index]
   })
   for index = 0; index < controls.length(); index = index + 1 {
     match valid_graph_control_result(self, simulated_nodes, controls[index]) {
-      Ok(_) => ()
-      Err(error) => return Err(error)
-    }
-  }
-
-  for index = 0; index < controls.length(); index = index + 1 {
-    match self.apply_control_result_impl(controls[index]) {
       Ok(_) => ()
       Err(error) => return Err(error)
     }

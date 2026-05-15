@@ -16,6 +16,8 @@ pub struct BoundVoicePool {
   // private fields
 }
 pub fn BoundVoicePool::active_voice_count(Self) -> Int
+pub fn BoundVoicePool::apply_voice_control_result(Self, VoiceHandle, @graph.GraphControl) -> Result[Unit, VoiceControlError]
+pub fn BoundVoicePool::apply_voice_controls_result(Self, VoiceHandle, Array[@graph.GraphControl]) -> Result[Unit, VoiceControlError]
 pub fn BoundVoicePool::kill(Self, VoiceHandle) -> Bool
 pub fn BoundVoicePool::last_sanitized_count(Self) -> Int
 pub fn BoundVoicePool::new(Array[@graph.DspNode], @dsp.DspContext, @graph.ControlBindingBuilder, max_voices? : Int) -> Result[Self, BoundVoicePoolError]
@@ -25,6 +27,7 @@ pub fn BoundVoicePool::note_on_controls(Self, Map[String, Double]) -> VoiceHandl
 pub fn BoundVoicePool::process(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn BoundVoicePool::set_template(Self, Array[@graph.DspNode], @graph.ControlBindingBuilder) -> Result[Unit, BoundVoicePoolError]
 pub fn BoundVoicePool::set_voice_pan(Self, VoiceHandle, Double) -> Bool
+pub fn BoundVoicePool::validate_voice_controls_result(Self, VoiceHandle, Array[@graph.GraphControl]) -> Result[Unit, VoiceControlError]
 pub fn BoundVoicePool::voice_state(Self, VoiceHandle) -> VoiceState
 
 pub(all) enum BoundVoicePoolError {
@@ -34,6 +37,12 @@ pub(all) enum BoundVoicePoolError {
   Binding(@graph.ControlBindingError)
 } derive(Eq, @debug.Debug)
 pub impl Show for BoundVoicePoolError
+
+pub(all) enum VoiceControlError {
+  InvalidVoiceHandle(VoiceHandle)
+  Graph(@graph.GraphControlError)
+} derive(@debug.Debug)
+pub impl Show for VoiceControlError
 
 pub struct VoiceHandle {
   slot : Int

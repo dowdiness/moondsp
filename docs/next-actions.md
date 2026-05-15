@@ -9,7 +9,7 @@ actionable; move completed design notes or implementation plans under
 ## Current State
 
 - `main` is currently at
-  `6947ce9 scheduler: add edit application helpers (#48)`.
+  `d3e4fff docs: mark edit application merged`.
 - PR #37 is merged:
   https://github.com/dowdiness/moondsp/pull/37
 - PR #38 is merged:
@@ -35,7 +35,7 @@ actionable; move completed design notes or implementation plans under
 - PR #48 is merged:
   https://github.com/dowdiness/moondsp/pull/48
 - Active branch for the next Phase 6 slice:
-  none yet; start from `main` at `6947ce9`.
+  `codex/phase6-active-voice-controls`, based on `main` at `d3e4fff`.
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -335,6 +335,33 @@ actionable; move completed design notes or implementation plans under
   - `rtk moon test` (810 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
+- Active-voice live control helpers are implemented locally on
+  `codex/phase6-active-voice-controls`:
+  - `CompiledDsp`/`CompiledStereoDsp` expose batch validation-only
+    runtime-control companions so callers can preflight graph-control batches
+    without mutating compiled graph state.
+  - `BoundVoicePool` exposes result-typed live-control APIs for applying
+    validated graph controls to one active `VoiceHandle`, with stale handles and
+    graph-control failures reported through `VoiceControlError`.
+  - `PatternScheduler::apply_voice_control_for_edit_result` and
+    `PatternScheduler::apply_voice_controls_for_edit_result` preflight all
+    voices matched by an `AffectedVoiceEditScope` before mutating any matched
+    voice.
+  - coverage proves matched-only scheduler live controls, invalid scheduler
+    controls preserving active notes, stale handle rejection, invalid batch
+    rollback, active voice mutation, and future voice template defaults staying
+    unchanged.
+- Latest local verification on `codex/phase6-active-voice-controls`:
+  - `rtk moon check --deny-warn`
+  - `rtk moon test voice` (37 passed)
+  - `rtk moon test scheduler` (63 passed)
+  - `rtk moon info`
+  - `rtk moon fmt`
+  - `rtk moon test graph` (241 passed)
+  - `rtk moon check --target all`
+  - `rtk moon test` (816 passed)
+  - `rtk moon build --target wasm-gc`
+  - `rtk git diff --check`
 - Latest local verification for PR #40 before merge:
   - `moon fmt`
   - `moon info`
@@ -416,18 +443,10 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Start a new branch from `main`, suggested name
-   `codex/phase6-active-voice-controls`.
+1. Review and commit `codex/phase6-active-voice-controls`.
 
-2. Add active-voice live control edit helpers over the existing graph identity,
-   voice-pool, scheduler provenance, and edit-application surfaces:
-   - add a constrained `BoundVoicePool` API for applying validated graph
-     controls to one active `VoiceHandle`.
-   - add a scheduler helper that applies those controls to active voices
-     matched by `AffectedVoiceEditScope`.
-   - keep invalid controls and stale handles result-typed and non-destructive.
-   - add focused tests for matched-only active control edits, stale handles,
-     invalid controls, and future-voice/template behavior staying unchanged.
+2. Push the branch and open the next PR for the active-voice live-control
+   helper slice.
 
 ## Acceptance Checks For API-Hardening Slices
 
