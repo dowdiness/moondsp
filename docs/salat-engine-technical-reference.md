@@ -832,9 +832,9 @@ Current semantics:
   - if the batch succeeds, all controls are committed before the next
     `process(...)` call
 - `apply_control(...)` remains the single-message form of the same runtime API
-- `validate_controls_result(...)` preflights the same runtime control rules
-  without mutating compiled graph state; live orchestration uses it for
-  all-or-nothing multi-voice edit checks
+- control preflight checks verify the same runtime control rules without
+  mutating compiled graph state; live orchestration uses this non-mutating check
+  to keep multi-voice edits all-or-nothing
 
 This is enough for the current compiled mono and terminal-stereo graph paths to
 support per-block parameter and gate updates from a host, UI, or future pattern
@@ -870,10 +870,9 @@ Current semantics:
 - `BoundVoicePool::note_on_controls(...)` accepts pattern/control-map values,
   resolves them through the current binding map, and delegates to the inner
   `VoicePool::note_on(...)`
-- `BoundVoicePool::{validate_voice_controls_result, apply_voice_control_result,
-  apply_voice_controls_result}` target already-sounding voices by
-  `VoiceHandle`; stale handles and invalid graph controls return
-  `VoiceControlError` without changing the voice-pool template or bindings
+- voice-control validation and application target already-sounding voices by
+  active voice identifier; stale identifiers and invalid control changes are
+  rejected without changing the voice-pool template or bindings
 - each `VoicePool::note_on(...)` compiles the already analyzed template through
   `CompiledDsp::compile_template(...)`, so per-voice graph creation reuses the
   optimized nodes captured during template validation

@@ -335,22 +335,18 @@ actionable; move completed design notes or implementation plans under
   - `rtk moon test` (810 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
-- Active-voice live control helpers are implemented locally on
+- Active-voice live control helpers are in open PR #49 on
   `codex/phase6-active-voice-controls`:
-  - `CompiledDsp`/`CompiledStereoDsp` expose batch validation-only
-    runtime-control companions so callers can preflight graph-control batches
-    without mutating compiled graph state.
-  - `BoundVoicePool` exposes result-typed live-control APIs for applying
-    validated graph controls to one active `VoiceHandle`, with stale handles and
-    graph-control failures reported through `VoiceControlError`.
-  - `PatternScheduler::apply_voice_control_for_edit_result` and
-    `PatternScheduler::apply_voice_controls_for_edit_result` preflight all
-    voices matched by an `AffectedVoiceEditScope` before mutating any matched
-    voice.
-  - coverage proves matched-only scheduler live controls, invalid scheduler
-    controls preserving active notes, stale handle rejection, invalid batch
-    rollback, active voice mutation, and future voice template defaults staying
-    unchanged.
+  - live-control batches can be preflighted without mutating compiled graph
+    state, preserving all-or-nothing behavior for multi-voice edits.
+  - per-voice live-control application mutates only validated active targets;
+    stale voice references and invalid control changes are reported without
+    changing future voice defaults, templates, or bindings.
+  - playback edit orchestration preflights every matched active voice before any
+    matched voice is mutated.
+  - coverage proves matched-only application, invalid-control rollback, stale
+    handle rejection, active-note preservation, active-voice mutation, and
+    unchanged future voice defaults.
 - Latest local verification on `codex/phase6-active-voice-controls`:
   - `rtk moon check --deny-warn`
   - `rtk moon test voice` (37 passed)
@@ -443,10 +439,11 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Review and commit `codex/phase6-active-voice-controls`.
+1. Merge the open PR for `codex/phase6-active-voice-controls` after review and
+   CI remain green.
 
-2. Push the branch and open the next PR for the active-voice live-control
-   helper slice.
+2. After merge, update the handoff on `main`, then create the next follow-up
+   branch or task for remaining Phase 6 work.
 
 ## Acceptance Checks For API-Hardening Slices
 
