@@ -1500,6 +1500,112 @@ test "queue_song_snapshot_edit applies occurrence section and layer edit policie
 }
 
 ///|
+test "active voice live controls apply only matching edit-scope voices" {
+  let (pool, sched, _, _) = make_test_sched()
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::new(1L, 100L),
+  )
+  let edited_pattern = pid("live-control:pattern")
+  let other_pattern = pid("live-control:other")
+  sched.process_playback_events(
+    [
+      playback_note_event(
+        60.0,
+        @scheduler.EventSource(
+          pattern_node=Some(edited_pattern),
+          section=None,
+          layer=None,
+          occurrence=None,
+        ),
+        arc,
+      ),
+      playback_note_event(
+        62.0,
+        @scheduler.EventSource(
+          pattern_node=Some(other_pattern),
+          section=None,
+          layer=None,
+          occurrence=None,
+        ),
+        arc,
+      ),
+    ],
+    arc,
+    pool,
+  )
+  let edited_target = @scheduler.AffectedVoiceEditScope::pattern_node(
+    edited_pattern,
+  ).target()
+  let other_target = @scheduler.AffectedVoiceEditScope::pattern_node(
+    other_pattern,
+  ).target()
+  assert_eq(sched.active_note_count(), 2)
+  match
+    sched.apply_voice_control_for_edit_result(
+      edit=@scheduler.AffectedVoiceEditScope::pattern_node(edited_pattern),
+      control=@moondsp.GraphControl::set_param(
+        0,
+        @moondsp.GraphParamSlot::Value0,
+        330.0,
+      ),
+      pool~,
+    ) {
+    Ok(count) => assert_eq(count, 1)
+    Err(_) => assert_true(false)
+  }
+  assert_eq(sched.active_note_count(), 2)
+  assert_eq(pool.active_voice_count(), 2)
+  assert_eq(sched.affected_active_note_count(edited_target), 1)
+  assert_eq(sched.affected_active_note_count(other_target), 1)
+}
+
+///|
+test "active voice live controls reject invalid controls without dropping notes" {
+  let (pool, sched, _, _) = make_test_sched()
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::new(1L, 100L),
+  )
+  let edited_pattern = pid("live-control:invalid-pattern")
+  sched.process_playback_events(
+    [
+      playback_note_event(
+        60.0,
+        @scheduler.EventSource(
+          pattern_node=Some(edited_pattern),
+          section=None,
+          layer=None,
+          occurrence=None,
+        ),
+        arc,
+      ),
+    ],
+    arc,
+    pool,
+  )
+  match
+    sched.apply_voice_control_for_edit_result(
+      edit=@scheduler.AffectedVoiceEditScope::pattern_node(edited_pattern),
+      control=@moondsp.GraphControl::set_param(
+        99,
+        @moondsp.GraphParamSlot::Value0,
+        330.0,
+      ),
+      pool~,
+    ) {
+    Err(
+      @moondsp.VoiceControlError::Graph(
+        @moondsp.GraphControlError::InvalidNodeIndex(99)
+      )
+    ) => ()
+    _ => assert_true(false)
+  }
+  assert_eq(sched.active_note_count(), 1)
+  assert_eq(pool.active_voice_count(), 1)
+}
+
+///|
 test "process_block: note(60) triggers one voice" {
   let (pool, sched, left, right) = make_test_sched()
   let pat = @pattern.note(60.0)

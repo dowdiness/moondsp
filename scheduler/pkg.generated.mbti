@@ -3,6 +3,7 @@ package "dowdiness/moondsp/scheduler"
 
 import {
   "dowdiness/moondsp/dsp",
+  "dowdiness/moondsp/graph",
   "dowdiness/moondsp/identity",
   "dowdiness/moondsp/pattern",
   "dowdiness/moondsp/song",
@@ -100,6 +101,8 @@ pub fn PatternScheduler::active_song_revision(Self) -> @identity.Revision?
 pub fn PatternScheduler::affected_active_note_count(Self, AffectedVoiceTarget) -> Int
 pub fn PatternScheduler::apply_affected_voice_policy(Self, AffectedVoicePolicy, AffectedVoiceTarget, @voice.BoundVoicePool) -> Int
 pub fn PatternScheduler::apply_affected_voice_policy_for_edit(Self, AffectedVoicePolicy, AffectedVoiceEditScope, @voice.BoundVoicePool) -> Int
+pub fn PatternScheduler::apply_voice_control_for_edit_result(Self, edit~ : AffectedVoiceEditScope, control~ : @graph.GraphControl, pool~ : @voice.BoundVoicePool) -> Result[Int, @voice.VoiceControlError]
+pub fn PatternScheduler::apply_voice_controls_for_edit_result(Self, edit~ : AffectedVoiceEditScope, controls~ : Array[@graph.GraphControl], pool~ : @voice.BoundVoicePool) -> Result[Int, @voice.VoiceControlError]
 pub fn PatternScheduler::current_block(Self) -> BlockFrame
 pub fn PatternScheduler::expire_notes(Self, @voice.BoundVoicePool, @pattern.TimeSpan) -> Unit
 pub fn PatternScheduler::expire_notes_at(Self, @voice.BoundVoicePool, PerformanceTime) -> Unit

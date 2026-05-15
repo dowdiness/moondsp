@@ -118,6 +118,7 @@ pub using @graph {
 pub using @voice {
   type BoundVoicePool,
   type BoundVoicePoolError,
+  type VoiceControlError,
   type VoiceHandle,
   type VoicePool,
   type VoiceState,

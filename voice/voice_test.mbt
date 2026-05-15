@@ -7,6 +7,8 @@ using @graph {
   type ControlBindingBuilder,
   type ControlBindingError,
   type DspNode,
+  type GraphControl,
+  type GraphControlError,
   type GraphParamSlot,
 }
 
@@ -239,6 +241,120 @@ test "bound voice pool set_template rejection leaves prior bindings active" {
   let controls : Map[String, Double] = { "note": 880.0 }
   assert_true(pool.note_on_controls(controls) is Some(_))
   assert_true(pool.active_voice_count() == 1)
+}
+
+///|
+test "bound voice live control updates one active voice" {
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
+  let nodes = [DspNode::constant(1.0), DspNode::output(0)]
+  let pool = BoundVoicePool::new(
+    nodes,
+    ctx,
+    ControlBindingBuilder::new(),
+    max_voices=4,
+  ).unwrap()
+  let handle = pool.note_on_controls({}).unwrap()
+  let before_left = AudioBuffer::filled(4)
+  let before_right = AudioBuffer::filled(4)
+  pool.process(ctx, before_left, before_right)
+  let before = before_left.get(0)
+  match
+    pool.apply_voice_control_result(
+      handle,
+      GraphControl::set_param(0, GraphParamSlot::Value0, 2.0),
+    ) {
+    Ok(_) => ()
+    Err(_) => assert_true(false)
+  }
+  let after_left = AudioBuffer::filled(4)
+  let after_right = AudioBuffer::filled(4)
+  pool.process(ctx, after_left, after_right)
+  assert_true(after_left.get(0) > before * 1.5)
+}
+
+///|
+test "bound voice live control rejects stale handles" {
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
+  let nodes = [DspNode::constant(1.0), DspNode::output(0)]
+  let pool = BoundVoicePool::new(
+    nodes,
+    ctx,
+    ControlBindingBuilder::new(),
+    max_voices=1,
+  ).unwrap()
+  let stale = pool.note_on_controls({}).unwrap()
+  let current = pool.note_on_controls({}).unwrap()
+  match
+    pool.apply_voice_control_result(
+      stale,
+      GraphControl::set_param(0, GraphParamSlot::Value0, 2.0),
+    ) {
+    Err(VoiceControlError::InvalidVoiceHandle(handle)) =>
+      assert_true(handle == stale)
+    _ => assert_true(false)
+  }
+  assert_true(pool.voice_state(current) is VoiceState::Active)
+}
+
+///|
+test "bound voice live control invalid batch leaves voice unchanged" {
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
+  let nodes = [DspNode::constant(1.0), DspNode::output(0)]
+  let pool = BoundVoicePool::new(
+    nodes,
+    ctx,
+    ControlBindingBuilder::new(),
+    max_voices=4,
+  ).unwrap()
+  let handle = pool.note_on_controls({}).unwrap()
+  let before_left = AudioBuffer::filled(4)
+  let before_right = AudioBuffer::filled(4)
+  pool.process(ctx, before_left, before_right)
+  let before = before_left.get(0)
+  match
+    pool.apply_voice_controls_result(handle, [
+      GraphControl::set_param(0, GraphParamSlot::Value0, 2.0),
+      GraphControl::set_param(99, GraphParamSlot::Value0, 3.0),
+    ]) {
+    Err(VoiceControlError::Graph(GraphControlError::InvalidNodeIndex(99))) => ()
+    _ => assert_true(false)
+  }
+  let after_left = AudioBuffer::filled(4)
+  let after_right = AudioBuffer::filled(4)
+  pool.process(ctx, after_left, after_right)
+  assert_true((after_left.get(0) - before).abs() < 0.001)
+}
+
+///|
+test "bound voice live control leaves future voice template unchanged" {
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
+  let nodes = [DspNode::constant(1.0), DspNode::output(0)]
+  let pool = BoundVoicePool::new(
+    nodes,
+    ctx,
+    ControlBindingBuilder::new(),
+    max_voices=4,
+  ).unwrap()
+  let first = pool.note_on_controls({}).unwrap()
+  let before_left = AudioBuffer::filled(4)
+  let before_right = AudioBuffer::filled(4)
+  pool.process(ctx, before_left, before_right)
+  let template_output = before_left.get(0)
+  match
+    pool.apply_voice_control_result(
+      first,
+      GraphControl::set_param(0, GraphParamSlot::Value0, 2.0),
+    ) {
+    Ok(_) => ()
+    Err(_) => assert_true(false)
+  }
+  assert_true(pool.kill(first))
+  let future = pool.note_on_controls({}).unwrap()
+  let future_left = AudioBuffer::filled(4)
+  let future_right = AudioBuffer::filled(4)
+  pool.process(ctx, future_left, future_right)
+  assert_true(pool.voice_state(future) is VoiceState::Active)
+  assert_true((future_left.get(0) - template_output).abs() < 0.001)
 }
 
 ///|

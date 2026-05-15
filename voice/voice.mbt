@@ -10,6 +10,7 @@ using @graph {
   type CompiledTemplate,
   type DspNode,
   type GraphControl,
+  type GraphControlError,
 }
 
 ///|
@@ -51,6 +52,17 @@ pub(all) enum BoundVoicePoolError {
 
 ///|
 pub impl Show for BoundVoicePoolError with output(self, logger) {
+  logger.write_string(@debug.to_string(self))
+}
+
+///|
+pub(all) enum VoiceControlError {
+  InvalidVoiceHandle(VoiceHandle)
+  Graph(GraphControlError)
+} derive(Debug)
+
+///|
+pub impl Show for VoiceControlError with output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
 
@@ -332,6 +344,36 @@ pub fn BoundVoicePool::set_voice_pan(
 }
 
 ///|
+/// Validate a live control batch against an active voice without mutating it.
+pub fn BoundVoicePool::validate_voice_controls_result(
+  self : BoundVoicePool,
+  handle : VoiceHandle,
+  controls : Array[GraphControl],
+) -> Result[Unit, VoiceControlError] {
+  self.pool.validate_voice_controls_result(handle, controls)
+}
+
+///|
+/// Apply one validated graph control to an already-sounding voice.
+pub fn BoundVoicePool::apply_voice_control_result(
+  self : BoundVoicePool,
+  handle : VoiceHandle,
+  control : GraphControl,
+) -> Result[Unit, VoiceControlError] {
+  self.pool.apply_voice_controls_result(handle, [control])
+}
+
+///|
+/// Apply a graph-control batch transactionally to an already-sounding voice.
+pub fn BoundVoicePool::apply_voice_controls_result(
+  self : BoundVoicePool,
+  handle : VoiceHandle,
+  controls : Array[GraphControl],
+) -> Result[Unit, VoiceControlError] {
+  self.pool.apply_voice_controls_result(handle, controls)
+}
+
+///|
 pub fn BoundVoicePool::voice_state(
   self : BoundVoicePool,
   handle : VoiceHandle,
@@ -545,6 +587,57 @@ pub fn VoicePool::set_voice_pan(
       slot.update_pan(pan)
       true
     }
+  }
+}
+
+///|
+fn VoicePool::compiled_voice_result(
+  self : VoicePool,
+  handle : VoiceHandle,
+) -> Result[CompiledDsp, VoiceControlError] {
+  match self.resolve_slot(handle) {
+    None => Err(VoiceControlError::InvalidVoiceHandle(handle))
+    Some(slot) =>
+      if slot.state is VoiceState::Idle {
+        Err(VoiceControlError::InvalidVoiceHandle(handle))
+      } else {
+        match slot.compiled {
+          Some(compiled) => Ok(compiled)
+          None => Err(VoiceControlError::InvalidVoiceHandle(handle))
+        }
+      }
+  }
+}
+
+///|
+fn VoicePool::validate_voice_controls_result(
+  self : VoicePool,
+  handle : VoiceHandle,
+  controls : Array[GraphControl],
+) -> Result[Unit, VoiceControlError] {
+  let compiled = match self.compiled_voice_result(handle) {
+    Ok(compiled) => compiled
+    Err(error) => return Err(error)
+  }
+  match compiled.validate_controls_result(controls) {
+    Ok(_) => Ok(())
+    Err(error) => Err(VoiceControlError::Graph(error))
+  }
+}
+
+///|
+fn VoicePool::apply_voice_controls_result(
+  self : VoicePool,
+  handle : VoiceHandle,
+  controls : Array[GraphControl],
+) -> Result[Unit, VoiceControlError] {
+  let compiled = match self.compiled_voice_result(handle) {
+    Ok(compiled) => compiled
+    Err(error) => return Err(error)
+  }
+  match compiled.apply_controls_result(controls) {
+    Ok(_) => Ok(())
+    Err(error) => Err(VoiceControlError::Graph(error))
   }
 }
 
