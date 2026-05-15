@@ -124,10 +124,13 @@ pub fn PatternScheduler::process_song_snapshot_block(Self, @voice.BoundVoicePool
 pub fn PatternScheduler::push_active_note(Self, @voice.VoiceHandle, @pattern.Rational) -> Unit
 pub fn PatternScheduler::queue_pattern_snapshot(Self, @pattern.PatternSnapshot[@pattern.ControlMap]) -> Unit
 pub fn PatternScheduler::queue_pattern_snapshot_edit(Self, snapshot~ : @pattern.PatternSnapshot[@pattern.ControlMap], policy~ : AffectedVoicePolicy, edit~ : AffectedVoiceEditScope, pool~ : @voice.BoundVoicePool) -> Int
+pub fn PatternScheduler::queue_pattern_snapshot_live_control_edit_result(Self, snapshot~ : @pattern.PatternSnapshot[@pattern.ControlMap], policy~ : AffectedVoicePolicy, edit~ : AffectedVoiceEditScope, controls~ : Array[@graph.GraphControl], pool~ : @voice.BoundVoicePool) -> Result[PlaybackEditOutcome, @voice.VoiceControlError]
 pub fn PatternScheduler::queue_playback_snapshot(Self, PlaybackSnapshot) -> Unit
 pub fn PatternScheduler::queue_playback_snapshot_edit(Self, snapshot~ : PlaybackSnapshot, policy~ : AffectedVoicePolicy, edit~ : AffectedVoiceEditScope, pool~ : @voice.BoundVoicePool) -> Int
+pub fn PatternScheduler::queue_playback_snapshot_live_control_edit_result(Self, snapshot~ : PlaybackSnapshot, policy~ : AffectedVoicePolicy, edit~ : AffectedVoiceEditScope, controls~ : Array[@graph.GraphControl], pool~ : @voice.BoundVoicePool) -> Result[PlaybackEditOutcome, @voice.VoiceControlError]
 pub fn PatternScheduler::queue_song_snapshot(Self, @song.SongSnapshot[@pattern.ControlMap]) -> Unit
 pub fn PatternScheduler::queue_song_snapshot_edit(Self, snapshot~ : @song.SongSnapshot[@pattern.ControlMap], policy~ : AffectedVoicePolicy, edit~ : AffectedVoiceEditScope, pool~ : @voice.BoundVoicePool) -> Int
+pub fn PatternScheduler::queue_song_snapshot_live_control_edit_result(Self, snapshot~ : @song.SongSnapshot[@pattern.ControlMap], policy~ : AffectedVoicePolicy, edit~ : AffectedVoiceEditScope, controls~ : Array[@graph.GraphControl], pool~ : @voice.BoundVoicePool) -> Result[PlaybackEditOutcome, @voice.VoiceControlError]
 pub fn PatternScheduler::sample_counter(Self) -> Int64
 pub fn PatternScheduler::set_bpm(Self, Double) -> Unit
 
@@ -135,6 +138,11 @@ pub struct PerformanceTime {
   sample : Int64
 }
 pub fn PerformanceTime::PerformanceTime(Int64) -> Self
+
+pub struct PlaybackEditOutcome {
+  controlled_voice_count : Int
+  removed_active_note_count : Int
+} derive(Eq, @debug.Debug)
 
 pub struct PlaybackEvent {
   // private fields
