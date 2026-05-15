@@ -1500,6 +1500,167 @@ test "queue_song_snapshot_edit applies occurrence section and layer edit policie
 }
 
 ///|
+test "queue_pattern_snapshot_live_control_edit_result controls voices and stages replacement" {
+  let (pool, sched, left, right) = make_test_sched()
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::new(1L, 100L),
+  )
+  let edited_pattern = pid("edit-application:live-control-pattern")
+  sched.process_playback_events(
+    [
+      playback_note_event(
+        60.0,
+        @scheduler.EventSource(
+          pattern_node=Some(edited_pattern),
+          section=None,
+          layer=None,
+          occurrence=None,
+        ),
+        arc,
+      ),
+    ],
+    arc,
+    pool,
+  )
+  let replacement = silence_snapshot("edit-application:live-control-silence")
+  match
+    sched.queue_pattern_snapshot_live_control_edit_result(
+      snapshot=replacement,
+      policy=@scheduler.AffectedVoicePolicy::LetRing,
+      edit=@scheduler.AffectedVoiceEditScope::pattern_node(edited_pattern),
+      controls=[
+        @moondsp.GraphControl::set_param(
+          0,
+          @moondsp.GraphParamSlot::Value0,
+          330.0,
+        ),
+      ],
+      pool~,
+    ) {
+    Ok(result) => {
+      assert_eq(result.controlled_voice_count, 1)
+      assert_eq(result.removed_active_note_count, 0)
+    }
+    Err(_) => assert_true(false)
+  }
+  assert_true(sched.has_pending_pattern_snapshot())
+  assert_eq(sched.active_note_count(), 1)
+  assert_eq(pool.active_voice_count(), 1)
+  sched.process_snapshot_block(pool, left, right)
+  assert_true(!sched.has_pending_pattern_snapshot())
+  assert_true(sched.has_active_pattern_snapshot())
+  assert_true(sched.active_playback_revision() == Some(replacement.revision()))
+}
+
+///|
+test "queue_pattern_snapshot_live_control_edit_result rejects invalid controls without staging or policy" {
+  let (pool, sched, _, _) = make_test_sched()
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::new(1L, 100L),
+  )
+  let edited_pattern = pid("edit-application:live-control-invalid")
+  sched.process_playback_events(
+    [
+      playback_note_event(
+        60.0,
+        @scheduler.EventSource(
+          pattern_node=Some(edited_pattern),
+          section=None,
+          layer=None,
+          occurrence=None,
+        ),
+        arc,
+      ),
+    ],
+    arc,
+    pool,
+  )
+  let target = @scheduler.AffectedVoiceEditScope::pattern_node(edited_pattern).target()
+  match
+    sched.queue_pattern_snapshot_live_control_edit_result(
+      snapshot=silence_snapshot("edit-application:live-control-invalid-silence"),
+      policy=@scheduler.AffectedVoicePolicy::GateOffAffected,
+      edit=@scheduler.AffectedVoiceEditScope::pattern_node(edited_pattern),
+      controls=[
+        @moondsp.GraphControl::set_param(
+          99,
+          @moondsp.GraphParamSlot::Value0,
+          330.0,
+        ),
+      ],
+      pool~,
+    ) {
+    Err(
+      @moondsp.VoiceControlError::Graph(
+        @moondsp.GraphControlError::InvalidNodeIndex(99)
+      )
+    ) => ()
+    _ => assert_true(false)
+  }
+  assert_true(!sched.has_pending_pattern_snapshot())
+  assert_eq(sched.active_note_count(), 1)
+  assert_eq(pool.active_voice_count(), 1)
+  assert_eq(sched.affected_active_note_count(target), 1)
+}
+
+///|
+test "queue_song_snapshot_live_control_edit_result supports policy-only edits" {
+  let (pool, sched, _, _) = make_test_sched()
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::new(1L, 100L),
+  )
+  let section = sid("edit-application:live-song-section")
+  let occurrence = oid("edit-application:live-song-occurrence")
+  sched.process_playback_events(
+    [
+      playback_note_event(
+        60.0,
+        @scheduler.EventSource(
+          pattern_node=None,
+          section=Some(section),
+          layer=None,
+          occurrence=Some(occurrence),
+        ),
+        arc,
+      ),
+    ],
+    arc,
+    pool,
+  )
+  let replacement_section = scheduler_section_doc(
+    "edit-application:live-song-replacement-section", "Replacement", 67.0,
+  )
+  let replacement_doc = scheduler_song_doc([
+    @song.SongOccurrenceDoc::at(
+      id=oid("edit-application:live-song-replacement-occurrence"),
+      start=@pattern.Rational::from_int(1),
+      name="Replacement",
+      section=replacement_section,
+    ),
+  ])
+  match
+    sched.queue_song_snapshot_live_control_edit_result(
+      snapshot=song_snapshot(replacement_doc),
+      policy=@scheduler.AffectedVoicePolicy::GateOffAffected,
+      edit=@scheduler.AffectedVoiceEditScope::song_occurrence(occurrence),
+      controls=[],
+      pool~,
+    ) {
+    Ok(result) => {
+      assert_eq(result.controlled_voice_count, 0)
+      assert_eq(result.removed_active_note_count, 1)
+    }
+    Err(_) => assert_true(false)
+  }
+  assert_true(sched.has_pending_song_snapshot())
+  assert_eq(sched.active_note_count(), 0)
+  assert_eq(pool.active_voice_count(), 1)
+}
+
+///|
 test "active voice live controls apply only matching edit-scope voices" {
   let (pool, sched, _, _) = make_test_sched()
   let arc = @pattern.TimeSpan::new(
@@ -1600,6 +1761,43 @@ test "active voice live controls reject invalid controls without dropping notes"
       )
     ) => ()
     _ => assert_true(false)
+  }
+  assert_eq(sched.active_note_count(), 1)
+  assert_eq(pool.active_voice_count(), 1)
+}
+
+///|
+test "active voice live controls ignore empty batches" {
+  let (pool, sched, _, _) = make_test_sched()
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::new(1L, 100L),
+  )
+  let edited_pattern = pid("live-control:empty-batch")
+  sched.process_playback_events(
+    [
+      playback_note_event(
+        60.0,
+        @scheduler.EventSource(
+          pattern_node=Some(edited_pattern),
+          section=None,
+          layer=None,
+          occurrence=None,
+        ),
+        arc,
+      ),
+    ],
+    arc,
+    pool,
+  )
+  match
+    sched.apply_voice_controls_for_edit_result(
+      edit=@scheduler.AffectedVoiceEditScope::pattern_node(edited_pattern),
+      controls=[],
+      pool~,
+    ) {
+    Ok(count) => assert_eq(count, 0)
+    Err(_) => assert_true(false)
   }
   assert_eq(sched.active_note_count(), 1)
   assert_eq(pool.active_voice_count(), 1)

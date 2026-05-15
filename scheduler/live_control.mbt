@@ -24,7 +24,7 @@ pub fn PatternScheduler::apply_voice_controls_for_edit_result(
   pool~ : @moondsp.BoundVoicePool,
 ) -> Result[Int, @moondsp.VoiceControlError] {
   let target = edit.target()
-  if target.is_empty() {
+  if target.is_empty() || controls.length() == 0 {
     return Ok(0)
   }
   for note in self.active_notes {
