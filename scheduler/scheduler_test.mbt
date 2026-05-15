@@ -1282,6 +1282,224 @@ test "edit orchestration song layer scope is bounded by section" {
 }
 
 ///|
+test "queue_pattern_snapshot_edit preserves affected notes and stages replacement" {
+  let (pool, sched, left, right) = make_test_sched()
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::new(1L, 100L),
+  )
+  let edited_pattern = pid("edit-application:pattern-preserve")
+  sched.process_playback_events(
+    [
+      playback_note_event(
+        60.0,
+        @scheduler.EventSource(
+          pattern_node=Some(edited_pattern),
+          section=None,
+          layer=None,
+          occurrence=None,
+        ),
+        arc,
+      ),
+    ],
+    arc,
+    pool,
+  )
+  let replacement = silence_snapshot("edit-application:pattern-silence")
+  assert_eq(
+    sched.queue_pattern_snapshot_edit(
+      snapshot=replacement,
+      policy=@scheduler.AffectedVoicePolicy::LetRing,
+      edit=@scheduler.AffectedVoiceEditScope::pattern_node(edited_pattern),
+      pool~,
+    ),
+    0,
+  )
+  assert_true(sched.has_pending_pattern_snapshot())
+  assert_true(!sched.has_active_pattern_snapshot())
+  assert_eq(sched.active_note_count(), 1)
+  assert_eq(pool.active_voice_count(), 1)
+  sched.process_snapshot_block(pool, left, right)
+  assert_true(!sched.has_pending_pattern_snapshot())
+  assert_true(sched.has_active_pattern_snapshot())
+  assert_true(sched.active_playback_revision() == Some(replacement.revision()))
+  assert_eq(sched.active_note_count(), 1)
+  assert_eq(pool.active_voice_count(), 1)
+}
+
+///|
+test "queue_pattern_snapshot_edit gates only affected pattern notes" {
+  let (pool, sched, _, _) = make_test_sched()
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::new(1L, 100L),
+  )
+  let edited_pattern = pid("edit-application:pattern-gate")
+  let other_pattern = pid("edit-application:pattern-other")
+  sched.process_playback_events(
+    [
+      playback_note_event(
+        60.0,
+        @scheduler.EventSource(
+          pattern_node=Some(edited_pattern),
+          section=None,
+          layer=None,
+          occurrence=None,
+        ),
+        arc,
+      ),
+      playback_note_event(
+        62.0,
+        @scheduler.EventSource(
+          pattern_node=Some(other_pattern),
+          section=None,
+          layer=None,
+          occurrence=None,
+        ),
+        arc,
+      ),
+    ],
+    arc,
+    pool,
+  )
+  let edited_target = @scheduler.AffectedVoiceEditScope::pattern_node(
+    edited_pattern,
+  ).target()
+  let other_target = @scheduler.AffectedVoiceEditScope::pattern_node(
+    other_pattern,
+  ).target()
+  assert_eq(sched.active_note_count(), 2)
+  assert_eq(pool.active_voice_count(), 2)
+  assert_eq(
+    sched.queue_pattern_snapshot_edit(
+      snapshot=silence_snapshot("edit-application:pattern-gate-silence"),
+      policy=@scheduler.AffectedVoicePolicy::GateOffAffected,
+      edit=@scheduler.AffectedVoiceEditScope::pattern_node(edited_pattern),
+      pool~,
+    ),
+    1,
+  )
+  assert_true(sched.has_pending_pattern_snapshot())
+  assert_eq(sched.active_note_count(), 1)
+  assert_eq(pool.active_voice_count(), 2)
+  assert_eq(sched.affected_active_note_count(edited_target), 0)
+  assert_eq(sched.affected_active_note_count(other_target), 1)
+}
+
+///|
+test "queue_song_snapshot_edit applies occurrence section and layer edit policies" {
+  let (pool, sched, left, right) = make_test_sched()
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::new(1L, 100L),
+  )
+  let section = sid("edit-application:song-section")
+  let other_section = sid("edit-application:song-other-section")
+  let lead_layer = lid("edit-application:song-lead-layer")
+  let pad_layer = lid("edit-application:song-pad-layer")
+  let first_occurrence = oid("edit-application:song-first-occurrence")
+  let second_occurrence = oid("edit-application:song-second-occurrence")
+  let other_occurrence = oid("edit-application:song-other-occurrence")
+  sched.process_playback_events(
+    [
+      playback_note_event(
+        60.0,
+        @scheduler.EventSource(
+          pattern_node=None,
+          section=Some(section),
+          layer=Some(lead_layer),
+          occurrence=Some(first_occurrence),
+        ),
+        arc,
+      ),
+      playback_note_event(
+        62.0,
+        @scheduler.EventSource(
+          pattern_node=None,
+          section=Some(section),
+          layer=Some(pad_layer),
+          occurrence=Some(second_occurrence),
+        ),
+        arc,
+      ),
+      playback_note_event(
+        64.0,
+        @scheduler.EventSource(
+          pattern_node=None,
+          section=Some(other_section),
+          layer=None,
+          occurrence=Some(other_occurrence),
+        ),
+        arc,
+      ),
+    ],
+    arc,
+    pool,
+  )
+  let replacement_section = scheduler_section_doc(
+    "edit-application:song-replacement-section", "Replacement", 67.0,
+  )
+  let replacement_doc = scheduler_song_doc([
+    @song.SongOccurrenceDoc::at(
+      id=oid("edit-application:song-replacement-occurrence"),
+      start=@pattern.Rational::from_int(1),
+      name="Replacement",
+      section=replacement_section,
+    ),
+  ])
+  let replacement = song_snapshot(replacement_doc)
+  assert_eq(sched.active_note_count(), 3)
+  assert_eq(pool.active_voice_count(), 3)
+  assert_eq(
+    sched.queue_song_snapshot_edit(
+      snapshot=replacement,
+      policy=@scheduler.AffectedVoicePolicy::GateOffAffected,
+      edit=@scheduler.AffectedVoiceEditScope::song_occurrence(first_occurrence),
+      pool~,
+    ),
+    1,
+  )
+  assert_true(sched.has_pending_song_snapshot())
+  assert_eq(sched.active_note_count(), 2)
+  assert_eq(pool.active_voice_count(), 3)
+  assert_eq(
+    sched.queue_song_snapshot_edit(
+      snapshot=replacement,
+      policy=@scheduler.AffectedVoicePolicy::LetRing,
+      edit=@scheduler.AffectedVoiceEditScope::song_section(section),
+      pool~,
+    ),
+    0,
+  )
+  assert_eq(sched.active_note_count(), 2)
+  assert_eq(
+    sched.queue_song_snapshot_edit(
+      snapshot=replacement,
+      policy=@scheduler.AffectedVoicePolicy::KillAffected,
+      edit=@scheduler.AffectedVoiceEditScope::song_layer(
+        section~,
+        layer=pad_layer,
+      ),
+      pool~,
+    ),
+    1,
+  )
+  assert_eq(sched.active_note_count(), 1)
+  assert_eq(pool.active_voice_count(), 2)
+  assert_eq(
+    sched.affected_active_note_count(
+      @scheduler.AffectedVoiceEditScope::song_occurrence(other_occurrence).target(),
+    ),
+    1,
+  )
+  sched.process_song_snapshot_block(pool, left, right)
+  assert_true(!sched.has_pending_song_snapshot())
+  assert_true(sched.has_active_song_snapshot())
+  assert_true(sched.active_song_revision() == Some(replacement_doc.revision()))
+  assert_eq(sched.active_note_count(), 1)
+}
+
+///|
 test "process_block: note(60) triggers one voice" {
   let (pool, sched, left, right) = make_test_sched()
   let pat = @pattern.note(60.0)

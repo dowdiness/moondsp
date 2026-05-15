@@ -1,6 +1,6 @@
 # Next Actions
 
-Updated: 2026-05-14
+Updated: 2026-05-15
 
 This is the active handoff list for future sessions. It should stay short and
 actionable; move completed design notes or implementation plans under
@@ -9,7 +9,7 @@ actionable; move completed design notes or implementation plans under
 ## Current State
 
 - `main` is currently at
-  `680308a [codex] Add affected voice policy controls (#46)`.
+  `fe30a3c [codex] Add edit orchestration helpers (#47)`.
 - PR #37 is merged:
   https://github.com/dowdiness/moondsp/pull/37
 - PR #38 is merged:
@@ -30,8 +30,10 @@ actionable; move completed design notes or implementation plans under
   https://github.com/dowdiness/moondsp/pull/45
 - PR #46 is merged:
   https://github.com/dowdiness/moondsp/pull/46
+- PR #47 is merged:
+  https://github.com/dowdiness/moondsp/pull/47
 - Active branch for the next Phase 6 slice:
-  `codex/phase6-edit-orchestration`, based on `main` at `680308a`.
+  `codex/phase6-edit-application`, based on `main` at `fe30a3c`.
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -292,6 +294,46 @@ actionable; move completed design notes or implementation plans under
   - `rtk moon test --release` (803 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
+- Edit orchestration helpers shipped on `main`:
+  - `AffectedVoiceEditScope` maps concrete pattern-node, song occurrence,
+    song section, and section-bounded song-layer edits to affected-voice
+    targets.
+  - song-layer edit scopes require both section and layer identity so reused
+    layer IDs in different sections do not overmatch unrelated active voices.
+  - `PatternScheduler::apply_affected_voice_policy_for_edit` keeps preserve,
+    release, and immediate-stop policy selection explicit while routing through
+    the constrained scheduler-owned voice path.
+  - coverage proves edit-scope mapping, pattern-node edits, occurrence,
+    section, and bounded layer scopes, policy behavior, and empty-source
+    compatibility.
+- Latest local verification for PR #47 before merge:
+  - `rtk moon check --deny-warn`
+  - `rtk moon test scheduler` (58 passed)
+  - `rtk moon check --target all`
+  - `rtk moon test` (807 passed)
+  - `rtk moon build --target wasm-gc`
+  - `rtk git diff --check`
+- Edit application helpers are implemented locally on
+  `codex/phase6-edit-application`:
+  - `PatternScheduler::queue_playback_snapshot_edit` stages a replacement
+    `PlaybackSnapshot` for the existing block-boundary commit and immediately
+    applies the selected `AffectedVoicePolicy` to the matching
+    `AffectedVoiceEditScope`.
+  - `PatternScheduler::queue_pattern_snapshot_edit` and
+    `PatternScheduler::queue_song_snapshot_edit` provide pattern/song-specific
+    convenience wrappers over the unified helper.
+  - coverage proves pattern-node preserve and gate-off behavior, song
+    occurrence gate-off, song section let-ring, song layer kill behavior, and
+    block-boundary commit of the staged replacement snapshot.
+- Latest local verification on `codex/phase6-edit-application`:
+  - `rtk moon check --deny-warn`
+  - `rtk moon test scheduler` (61 passed)
+  - `rtk moon info`
+  - `rtk moon fmt`
+  - `rtk moon check --target all`
+  - `rtk moon test` (810 passed)
+  - `rtk moon build --target wasm-gc`
+  - `rtk git diff --check`
 - Latest local verification for PR #40 before merge:
   - `moon fmt`
   - `moon info`
@@ -373,17 +415,9 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Continue on `codex/phase6-edit-orchestration`.
+1. Review and commit `codex/phase6-edit-application`.
 
-2. Add higher-level edit orchestration helpers over the merged provenance and
-   affected-voice policy surface:
-   - map concrete pattern edits to pattern-node targets.
-   - map song occurrence, section, and layer edits to the corresponding
-     provenance targets.
-   - keep policy selection explicit at the call site with preserve, release,
-     and immediate-stop outcomes.
-   - add focused tests proving the helpers affect only the intended active
-     voices and preserve empty-source compatibility behavior.
+2. Push the branch and open the next PR for the edit application helper slice.
 
 ## Acceptance Checks For API-Hardening Slices
 
