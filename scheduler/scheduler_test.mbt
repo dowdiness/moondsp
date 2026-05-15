@@ -399,6 +399,36 @@ test "AffectedVoiceTarget matches explicit provenance and ignores empty targets"
 }
 
 ///|
+test "AffectedVoiceEditScope maps concrete edit boundaries to targets" {
+  let pattern_id = pid("edit-scope:pattern")
+  let occurrence_id = oid("edit-scope:occurrence")
+  let section_id = sid("edit-scope:section")
+  let layer_id = lid("edit-scope:layer")
+  let pattern_target = @scheduler.AffectedVoiceEditScope::pattern_node(
+    pattern_id,
+  ).target()
+  assert_true(pattern_target.pattern_node() == Some(pattern_id))
+  assert_true(pattern_target.section() is None)
+  let occurrence_target = @scheduler.AffectedVoiceEditScope::song_occurrence(
+    occurrence_id,
+  ).target()
+  assert_true(occurrence_target.occurrence() == Some(occurrence_id))
+  assert_true(occurrence_target.pattern_node() is None)
+  let section_target = @scheduler.AffectedVoiceEditScope::song_section(
+    section_id,
+  ).target()
+  assert_true(section_target.section() == Some(section_id))
+  assert_true(section_target.layer() is None)
+  let layer_target = @scheduler.AffectedVoiceEditScope::song_layer(
+    section=section_id,
+    layer=layer_id,
+  ).target()
+  assert_true(layer_target.section() == Some(section_id))
+  assert_true(layer_target.layer() == Some(layer_id))
+  assert_true(layer_target.occurrence() is None)
+}
+
+///|
 test "PlaybackSnapshot::query_playback_events tags pattern root provenance" {
   let root_id = "playback-events:pattern"
   let snapshot = @scheduler.PlaybackSnapshot::pattern(
@@ -743,6 +773,76 @@ test "affected voice policy preserves empty-source voices and let-ring policy" {
 }
 
 ///|
+test "edit orchestration helper gates pattern edits and preserves empty sources" {
+  let (pool, sched, _, _) = make_test_sched()
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::new(1L, 100L),
+  )
+  let edited_pattern = pid("edit-policy:pattern")
+  let other_pattern = pid("edit-policy:other")
+  let edited_source = @scheduler.EventSource(
+    pattern_node=Some(edited_pattern),
+    section=None,
+    layer=None,
+    occurrence=None,
+  )
+  let other_source = @scheduler.EventSource(
+    pattern_node=Some(other_pattern),
+    section=None,
+    layer=None,
+    occurrence=None,
+  )
+  sched.process_playback_events(
+    [
+      playback_note_event(60.0, edited_source, arc),
+      playback_note_event(62.0, other_source, arc),
+    ],
+    arc,
+    pool,
+  )
+  sched.process_events(@pattern.note(64.0).query(arc), arc, pool)
+  let edit = @scheduler.AffectedVoiceEditScope::pattern_node(edited_pattern)
+  let edited_target = edit.target()
+  let other_target = @scheduler.AffectedVoiceEditScope::pattern_node(
+    other_pattern,
+  ).target()
+  assert_eq(sched.active_note_count(), 3)
+  assert_eq(sched.affected_active_note_count(edited_target), 1)
+  assert_eq(
+    sched.apply_affected_voice_policy_for_edit(
+      @scheduler.AffectedVoicePolicy::LetRing,
+      edit,
+      pool,
+    ),
+    0,
+  )
+  assert_eq(sched.active_note_count(), 3)
+  assert_eq(
+    sched.apply_affected_voice_policy_for_edit(
+      @scheduler.AffectedVoicePolicy::GateOffAffected,
+      edit,
+      pool,
+    ),
+    1,
+  )
+  assert_eq(sched.active_note_count(), 2)
+  assert_eq(sched.affected_active_note_count(edited_target), 0)
+  assert_eq(sched.affected_active_note_count(other_target), 1)
+  let mut empty_source_count = 0
+  for i in 0..<sched.active_note_count() {
+    match sched.active_note_source(i) {
+      Some(source) =>
+        if source.is_empty() {
+          empty_source_count = empty_source_count + 1
+        }
+      None => ()
+    }
+  }
+  assert_eq(empty_source_count, 1)
+}
+
+///|
 test "affected voice policy gates only matching pattern-node active notes" {
   let (pool, sched, _, _) = make_test_sched()
   let arc = @pattern.TimeSpan::new(
@@ -1019,6 +1119,166 @@ test "affected voice policy kills section layer and occurrence targets" {
   )
   assert_eq(sched.active_note_count(), 0)
   assert_eq(pool.active_voice_count(), 0)
+}
+
+///|
+test "edit orchestration helper applies explicit policy to song scopes" {
+  let (pool, sched, _, _) = make_test_sched()
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::new(1L, 100L),
+  )
+  let section = sid("edit-policy:section")
+  let other_section = sid("edit-policy:other-section")
+  let lead_layer = lid("edit-policy:lead-layer")
+  let pad_layer = lid("edit-policy:pad-layer")
+  let first_occurrence = oid("edit-policy:first-occurrence")
+  let second_occurrence = oid("edit-policy:second-occurrence")
+  let other_occurrence = oid("edit-policy:other-occurrence")
+  sched.process_playback_events(
+    [
+      playback_note_event(
+        60.0,
+        @scheduler.EventSource(
+          pattern_node=None,
+          section=Some(section),
+          layer=Some(lead_layer),
+          occurrence=Some(first_occurrence),
+        ),
+        arc,
+      ),
+      playback_note_event(
+        62.0,
+        @scheduler.EventSource(
+          pattern_node=None,
+          section=Some(section),
+          layer=Some(pad_layer),
+          occurrence=Some(second_occurrence),
+        ),
+        arc,
+      ),
+      playback_note_event(
+        64.0,
+        @scheduler.EventSource(
+          pattern_node=None,
+          section=Some(other_section),
+          layer=None,
+          occurrence=Some(other_occurrence),
+        ),
+        arc,
+      ),
+    ],
+    arc,
+    pool,
+  )
+  assert_eq(sched.active_note_count(), 3)
+  assert_eq(
+    sched.apply_affected_voice_policy_for_edit(
+      @scheduler.AffectedVoicePolicy::GateOffAffected,
+      @scheduler.AffectedVoiceEditScope::song_occurrence(first_occurrence),
+      pool,
+    ),
+    1,
+  )
+  assert_eq(sched.active_note_count(), 2)
+  assert_eq(
+    sched.apply_affected_voice_policy_for_edit(
+      @scheduler.AffectedVoicePolicy::LetRing,
+      @scheduler.AffectedVoiceEditScope::song_section(section),
+      pool,
+    ),
+    0,
+  )
+  assert_eq(sched.active_note_count(), 2)
+  assert_eq(
+    sched.apply_affected_voice_policy_for_edit(
+      @scheduler.AffectedVoicePolicy::KillAffected,
+      @scheduler.AffectedVoiceEditScope::song_layer(section~, layer=pad_layer),
+      pool,
+    ),
+    1,
+  )
+  assert_eq(sched.active_note_count(), 1)
+  assert_eq(
+    sched.apply_affected_voice_policy_for_edit(
+      @scheduler.AffectedVoicePolicy::GateOffAffected,
+      @scheduler.AffectedVoiceEditScope::song_section(other_section),
+      pool,
+    ),
+    1,
+  )
+  assert_eq(sched.active_note_count(), 0)
+}
+
+///|
+test "edit orchestration song layer scope is bounded by section" {
+  let (pool, sched, _, _) = make_test_sched()
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::new(1L, 100L),
+  )
+  let edited_section = sid("edit-policy:shared-layer-section")
+  let other_section = sid("edit-policy:shared-layer-other-section")
+  let shared_layer = lid("edit-policy:shared-layer")
+  let edited_occurrence = oid("edit-policy:shared-layer-occurrence")
+  let other_occurrence = oid("edit-policy:shared-layer-other-occurrence")
+  sched.process_playback_events(
+    [
+      playback_note_event(
+        60.0,
+        @scheduler.EventSource(
+          pattern_node=None,
+          section=Some(edited_section),
+          layer=Some(shared_layer),
+          occurrence=Some(edited_occurrence),
+        ),
+        arc,
+      ),
+      playback_note_event(
+        62.0,
+        @scheduler.EventSource(
+          pattern_node=None,
+          section=Some(other_section),
+          layer=Some(shared_layer),
+          occurrence=Some(other_occurrence),
+        ),
+        arc,
+      ),
+    ],
+    arc,
+    pool,
+  )
+  assert_eq(sched.active_note_count(), 2)
+  assert_eq(
+    sched.affected_active_note_count(
+      @scheduler.AffectedVoiceTarget::from_layer(shared_layer),
+    ),
+    2,
+  )
+  assert_eq(
+    sched.apply_affected_voice_policy_for_edit(
+      @scheduler.AffectedVoicePolicy::KillAffected,
+      @scheduler.AffectedVoiceEditScope::song_layer(
+        section=edited_section,
+        layer=shared_layer,
+      ),
+      pool,
+    ),
+    1,
+  )
+  assert_eq(sched.active_note_count(), 1)
+  assert_eq(pool.active_voice_count(), 1)
+  assert_eq(
+    sched.affected_active_note_count(
+      @scheduler.AffectedVoiceTarget(
+        pattern_node=None,
+        section=Some(other_section),
+        layer=Some(shared_layer),
+        occurrence=None,
+      ),
+    ),
+    1,
+  )
 }
 
 ///|
