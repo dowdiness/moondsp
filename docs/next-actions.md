@@ -9,7 +9,7 @@ actionable; move completed design notes or implementation plans under
 ## Current State
 
 - `main` is currently at
-  `9c9ad71 docs: mark active voice controls merged`.
+  `5dc4235 scheduler: integrate live-control edit application (#50)`.
 - PR #37 is merged:
   https://github.com/dowdiness/moondsp/pull/37
 - PR #38 is merged:
@@ -36,9 +36,10 @@ actionable; move completed design notes or implementation plans under
   https://github.com/dowdiness/moondsp/pull/48
 - PR #49 is merged:
   https://github.com/dowdiness/moondsp/pull/49
+- PR #50 is merged:
+  https://github.com/dowdiness/moondsp/pull/50
 - Active branch for the next Phase 6 slice:
-  `codex/phase6-live-control-edit-application`, based on `main` at
-  `9c9ad71`.
+  none yet; start from `main` at `5dc4235`.
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -360,8 +361,7 @@ actionable; move completed design notes or implementation plans under
   - `rtk moon test` (816 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
-- Live-control edit application integration is implemented locally on
-  `codex/phase6-live-control-edit-application`:
+- Live-control edit application integration shipped on `main`:
   - edit application can validate optional live-control changes before staging
     playback replacement or applying active-voice policy.
   - successful edit applications report both live-controlled voice count and
@@ -372,7 +372,7 @@ actionable; move completed design notes or implementation plans under
   - coverage proves successful live-control plus replacement staging, invalid
     control rejection without staging or policy side effects, policy-only song
     edits, and empty live-control batch no-ops.
-- Latest local verification on `codex/phase6-live-control-edit-application`:
+- Latest local verification for PR #50 before merge:
   - `rtk moon update`
   - `rtk moon check --deny-warn`
   - `rtk moon test scheduler` (67 passed)
@@ -463,10 +463,11 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Review and commit `codex/phase6-live-control-edit-application`.
+1. Start `codex/phase6-edit-orchestration-docs` from `main`.
 
-2. Push the branch and open the next PR for the live-control edit application
-   integration slice.
+2. Recommended next slice: add a small public docs/API example pass for the
+   edit orchestration flow, covering snapshot staging, affected-voice policy,
+   and optional live-control changes in one workflow.
 
 ## Acceptance Checks For API-Hardening Slices
 
