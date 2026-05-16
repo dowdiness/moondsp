@@ -25,12 +25,23 @@ For shipped-work history, read `CHANGELOG.md`. For the broader backlog
 
 ## Recommended Next Slice
 
-**Narrow `GraphBuilder::nodes()`.** Only abstraction leak still tracked
-under Action (2) of the pre-1.0 API review (per
-`memory/project_backlog.md`). Currently exposes `Array[DspNode]` (mutable,
-accumulated). Options: leave as-is, narrow to `ArrayView[DspNode]`, or
-replace with a snapshot accessor. Decide before v1.0; brainstorm before
-plan.
+**Brainstorm the public boundary type for the graph layer.** A 2026-05-16
+inventory of `GraphBuilder::nodes()` (originally framed as a local
+abstraction leak) revealed the issue is structural: `Array[DspNode]` is
+the public exchange currency across 12 entries in
+`graph/pkg.generated.mbti` (compile, optimize_graph, replay,
+CompiledTemplate::analyze, topology controllers, GraphTemplateDoc, etc.).
+Narrowing one return type to `ArrayView` is a half-measure.
+
+The real question: should `Array[DspNode]` stay the public boundary type,
+or should `CompiledTemplate` (already exists, partially used via
+`compile_template`) be promoted to that role across the surface? Run a
+brainstorm + Codex design pass before any implementation. Do not start a
+narrow `ArrayView` change in the meantime — that locks in `Array[DspNode]`
+as the boundary for everything else.
+
+See `memory/project_backlog.md` → Pre-1.0 API hygiene → Action (2) for the
+full inventory.
 
 ## Alternative Slices
 
