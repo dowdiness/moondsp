@@ -78,7 +78,7 @@ Pattern Engine                    DSP Engine
 ## Repository layout
 
 ```
-./              Library public API facade (`moondsp.mbt` re-exports from dsp/, graph/, voice/)
+./              Library public API facade (`moondsp.mbt` re-exports from dsp/, graph/, voice/, identity/)
 dsp/            DSP primitives, tagless algebra, pan math
 graph/          Compiled graph runtime, topology editing, hot-swap, control binding
 voice/          Polyphonic voice pool with priority stealing

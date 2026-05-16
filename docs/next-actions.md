@@ -1,6 +1,6 @@
 # Next Actions
 
-Updated: 2026-05-15
+Updated: 2026-05-16
 
 This is the active handoff list for future sessions. It should stay short and
 actionable; move completed design notes or implementation plans under
@@ -9,7 +9,7 @@ actionable; move completed design notes or implementation plans under
 ## Current State
 
 - `main` is currently at
-  `85b3078 docs: mark live-control edit application merged`.
+  `b3d0358 docs: add scheduler edit orchestration example (#51)`.
 - PR #37 is merged:
   https://github.com/dowdiness/moondsp/pull/37
 - PR #38 is merged:
@@ -38,8 +38,9 @@ actionable; move completed design notes or implementation plans under
   https://github.com/dowdiness/moondsp/pull/49
 - PR #50 is merged:
   https://github.com/dowdiness/moondsp/pull/50
-- Active branch for the next Phase 6 slice:
-  `codex/phase6-edit-orchestration-docs`, based on `main` at `85b3078`.
+- PR #51 is merged:
+  https://github.com/dowdiness/moondsp/pull/51
+- No active feature branch; `main` is the current working tip.
 - Core silent-failure hardening shipped so far:
   - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
   - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
@@ -382,14 +383,13 @@ actionable; move completed design notes or implementation plans under
   - `rtk moon test` (820 passed)
   - `rtk moon build --target wasm-gc`
   - `rtk git diff --check`
-- Edit orchestration docs/API example is implemented locally on
-  `codex/phase6-edit-orchestration-docs`:
+- Edit orchestration docs/API example shipped on `main` (PR #51):
   - the scheduler package now has a tested README example showing the public
     edit orchestration workflow from a sourced active pattern snapshot through
     replacement staging, affected-voice policy, optional live-control changes,
     and outcome counts.
   - the example uses checked markdown so future API drift fails package checks.
-- Latest local verification on `codex/phase6-edit-orchestration-docs`:
+- Latest local verification before PR #51 merge:
   - `rtk moon check --deny-warn`
   - `rtk moon test scheduler` (68 passed)
   - `rtk moon info`
@@ -479,8 +479,31 @@ actionable; move completed design notes or implementation plans under
 
 ## Recommended Next Slice
 
-1. Commit, push, and open the next PR for the edit orchestration docs/API
-   example slice on `codex/phase6-edit-orchestration-docs`.
+The Phase 6 edit-orchestration arc (snapshot swap → affected-voice policy →
+edit application → live-control integration → orchestration docs) is now
+landed on `main`. Conservative next slice: a release-prep pass before
+opening another feature arc.
+
+1. **Changelog and API review for the post-`v0.1.0` Phase 6 surface.**
+   - Walk the `Unreleased` section of `CHANGELOG.md` against the Phase 6
+     "shipped on `main`" blocks above and confirm every user-facing addition
+     is summarized (identity, song authoring/layout, pattern authoring and
+     lowering cache, mini stable-ID reconciliation, graph identity mapping,
+     scheduler snapshot/edit orchestration, affected-voice policies,
+     active-voice live controls, scheduler README example).
+   - Re-run `rtk moon info` and skim `git diff *.mbti` since `v0.1.0` for
+     any unintentional public API drift before the next tagged release.
+   - Decide whether the next tag should be a `0.1.x` patch or a `0.2.0`
+     minor based on the surface review.
+
+Alternative slices (pick only after release prep):
+
+- Issue #22 — collapse the per-sound globals in
+  `browser/browser_scheduler.mbt` behind a single iterable structure so
+  adding a sound is one entry instead of five touch points. Pure tech debt;
+  no user-visible behavior change.
+- Continue Phase 6 with the next authoring/orchestration slice once a
+  fresh design pass has scoped it.
 
 ## Acceptance Checks For API-Hardening Slices
 

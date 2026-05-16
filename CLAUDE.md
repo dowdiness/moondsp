@@ -15,7 +15,7 @@ remains open for native targets such as CLAP plugins.
 
 | Package | Path | Purpose |
 |---------|------|---------|
-| `dowdiness/moondsp` | `./` | Library public API facade — re-exports the full library surface from `@dsp`, `@graph`, and `@voice` so external consumers and internal sub-packages both write `@moondsp.X` |
+| `dowdiness/moondsp` | `./` | Library public API facade — re-exports the full library surface from `@dsp`, `@graph`, `@voice`, and `@identity` so external consumers and internal sub-packages both write `@moondsp.X` |
 | `dowdiness/moondsp/dsp` | `dsp/` | DSP primitives (oscillators, filters, tagless algebra, pan math) |
 | `dowdiness/moondsp/graph` | `graph/` | Compiled graph runtime (compile, optimize, topology edit, hot-swap, control binding) |
 | `dowdiness/moondsp/voice` | `voice/` | Polyphonic voice pool with priority stealing |
@@ -41,7 +41,7 @@ remains open for native targets such as CLAP plugins.
 ## Commands
 
 ```bash
-moon check && moon test        # 727 tests
+moon check && moon test        # 821 tests
 moon build --target wasm-gc    # Browser WASM build
 moon run cmd/main              # CLI entry point
 ```
