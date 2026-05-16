@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "moondsp",
+  "compatibility_date": "2026-05-10",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "web"
+  },
+  "compatibility_flags": [
+    "nodejs_compat"
+  ]
+}

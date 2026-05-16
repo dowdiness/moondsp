@@ -4,9 +4,12 @@
   "scripts": {
     "build:browser": "moon build browser --target wasm-gc --release",
     "test:browser": "moon build --target wasm-gc --release && ./playwright-sync-wasm.sh && playwright test",
-    "test:browser:headed": "moon build --target wasm-gc --release && ./playwright-sync-wasm.sh && playwright test --headed"
+    "test:browser:headed": "moon build --target wasm-gc --release && ./playwright-sync-wasm.sh && playwright test --headed",
+    "deploy": "wrangler deploy",
+    "preview": "wrangler dev"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2"
+    "@playwright/test": "^1.58.2",
+    "wrangler": "^4.90.0"
   }
 }
