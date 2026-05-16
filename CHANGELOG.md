@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking changes
+
+- **`DspNode::delay`, `DspNode::stereo_delay`, `DspNode::envelope_gain` now
+  require labelled arguments.** Each of these constructors takes two `Int`
+  positions for distinct roles (input source vs delay-buffer capacity;
+  input signal vs envelope modulator) where order is silently flippable.
+  New signatures (label names match the existing parameter names — no
+  rename, no defaults changed):
+  - `DspNode::delay(input~, max_delay_samples~, delay_samples?, feedback?)`
+  - `DspNode::stereo_delay(input~, max_delay_samples~, delay_samples?, feedback?)`
+  - `DspNode::envelope_gain(input~, envelope~, amount~)`
+
 ## [0.2.0] - 2026-05-16
 
 ### Breaking changes
