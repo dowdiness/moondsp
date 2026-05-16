@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-16
+
 ### Breaking changes
 
 - **`DspNode::delay`, `DspNode::stereo_delay`, `DspNode::envelope_gain` now
@@ -18,6 +20,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `DspNode::delay(input~, max_delay_samples~, delay_samples?, feedback?)`
   - `DspNode::stereo_delay(input~, max_delay_samples~, delay_samples?, feedback?)`
   - `DspNode::envelope_gain(input~, envelope~, amount~)`
+- **`PatternScheduler` struct fields are now private.** The fields `bpm`,
+  `sample_counter`, `ctx`, `active_notes`, and `mapper` were exposed as
+  public on the struct, allowing external readers (and external writers
+  for the `mut` ones) to bypass the scheduler's invariants. They are now
+  `priv`. Read access continues through accessor methods
+  (`PatternScheduler::sample_counter`, `PatternScheduler::set_bpm`, etc.);
+  no internal scheduler behavior changed.
+- **`NodeSpanning`, `NodeFoldable`, `NodeStateful`, `NodeEditable` traits
+  removed from the public `@moondsp` facade.** These are graph-internal
+  implementation-detail traits (used to classify `DspNode` variants
+  during compile/optimize/edit). They had no documented external
+  consumers and the trait surface itself remains usable inside
+  `@dowdiness/moondsp/graph` for internal extension.
 
 ## [0.2.0] - 2026-05-16
 
@@ -281,5 +296,6 @@ scheduler with mini-notation support.
 - The `moondsp-browser-tools` npm workspace is `private: true` and exists
   only to host Playwright tests for the browser demo.
 
+[0.3.0]: https://github.com/dowdiness/moondsp/releases/tag/v0.3.0
 [0.2.0]: https://github.com/dowdiness/moondsp/releases/tag/v0.2.0
 [0.1.0]: https://github.com/dowdiness/moondsp/releases/tag/v0.1.0

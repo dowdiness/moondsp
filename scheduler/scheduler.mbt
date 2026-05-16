@@ -391,11 +391,11 @@ pub fn PlaybackSnapshot::query_playback_events(
 
 ///|
 pub struct PatternScheduler {
-  mut bpm : Double
-  mut sample_counter : Int64
-  ctx : @moondsp.DspContext
-  active_notes : Array[ActiveNote]
-  mapper : ControlMapper
+  priv mut bpm : Double
+  priv mut sample_counter : Int64
+  priv ctx : @moondsp.DspContext
+  priv active_notes : Array[ActiveNote]
+  priv mapper : ControlMapper
   priv mut active_playback_snapshot : PlaybackSnapshot?
   priv mut pending_playback_snapshot : PlaybackSnapshot?
 }
