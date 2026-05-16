@@ -24,15 +24,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `sample_counter`, `ctx`, `active_notes`, and `mapper` were exposed as
   public on the struct, allowing external readers (and external writers
   for the `mut` ones) to bypass the scheduler's invariants. They are now
-  `priv`. Read access continues through accessor methods
-  (`PatternScheduler::sample_counter`, `PatternScheduler::set_bpm`, etc.);
-  no internal scheduler behavior changed.
+  `priv`. Purpose-built observation remains through methods
+  (`sample_counter`, `current_block`, `active_note_count`,
+  `active_note_source`, `active_note_matches`); BPM changes go through
+  `set_bpm`. Direct reads of `bpm`, `ctx`, `mapper`, and the backing
+  `active_notes` array are no longer public API; a `PatternScheduler::bpm()`
+  read accessor will follow in a patch release.
 - **`NodeSpanning`, `NodeFoldable`, `NodeStateful`, `NodeEditable` traits
   removed from the public `@moondsp` facade.** These are graph-internal
   implementation-detail traits (used to classify `DspNode` variants
   during compile/optimize/edit). They had no documented external
   consumers and the trait surface itself remains usable inside
   `@dowdiness/moondsp/graph` for internal extension.
+
+### Changed
+
+- **Constructors migrated to canonical `Type::Type` form** across the
+  codebase (v0.9.2 toolchain alignment; 30 `#alias(new)` shims total,
+  of which 21 are public constructor aliases in the generated
+  interfaces). Old `Type::new(…)` call sites continue to work via the
+  shims — no migration required for consumers, but new code should
+  prefer the canonical form (`Adsr::Adsr(...)`,
+  `DspContext::DspContext(...)`, `Rational::Rational(...)`, etc.).
 
 ## [0.2.0] - 2026-05-16
 
