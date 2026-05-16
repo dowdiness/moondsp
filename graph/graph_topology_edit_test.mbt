@@ -96,7 +96,7 @@ test "compiled dsp topology controller result reports invalid edit index" {
       @debug.assert_eq(index, 1)
       @debug.assert_eq(node_index, 99)
     }
-    other => fail("expected InvalidEdit, got \{other}")
+    other => fail("expected InvalidEdit, got \{@debug.to_string(other)}")
   }
   topology.process(context, output)
 
@@ -131,7 +131,7 @@ test "compiled dsp topology controller result reports invalid edit reason" {
       @debug.assert_eq(index, 0)
       @debug.assert_eq(node_index, 0)
     }
-    other => fail("expected UnsupportedInputSlot, got \{other}")
+    other => fail("expected UnsupportedInputSlot, got \{@debug.to_string(other)}")
   }
   match
     topology.queue_topology_edit_result(
@@ -147,7 +147,7 @@ test "compiled dsp topology controller result reports invalid edit reason" {
         GraphTopologyEditError::UnsupportedInsertTemplate(DspNodeKind::Constant)
       )
     ) => @debug.assert_eq(index, 0)
-    other => fail("expected UnsupportedInsertTemplate, got \{other}")
+    other => fail("expected UnsupportedInsertTemplate, got \{@debug.to_string(other)}")
   }
 }
 
@@ -167,7 +167,7 @@ test "compiled dsp topology controller result reports recompile rejection" {
       GraphTopologyEdit::replace_node(2, DspNode::gain(1, 0.5)),
     ) {
     Err(GraphTopologyQueueError::RecompileRejected) => ()
-    other => fail("expected RecompileRejected, got \{other}")
+    other => fail("expected RecompileRejected, got \{@debug.to_string(other)}")
   }
 }
 
@@ -188,14 +188,14 @@ test "compiled dsp topology controller result reports pending swap" {
       GraphTopologyEdit::replace_node(0, DspNode::constant(0.5)),
     ) {
     Ok(_) => ()
-    other => fail("expected Ok, got \{other}")
+    other => fail("expected Ok, got \{@debug.to_string(other)}")
   }
   match
     topology.queue_topology_edit_result(
       GraphTopologyEdit::replace_node(0, DspNode::constant(0.25)),
     ) {
     Err(GraphTopologyQueueError::PendingSwap) => ()
-    other => fail("expected PendingSwap, got \{other}")
+    other => fail("expected PendingSwap, got \{@debug.to_string(other)}")
   }
 }
 
@@ -267,7 +267,7 @@ test "compiled dsp topology controller result reports pending graph control reje
         GraphParamSlot::Value0
       )
     ) => ()
-    other => fail("expected pending InvalidSlotForNode, got \{other}")
+    other => fail("expected pending InvalidSlotForNode, got \{@debug.to_string(other)}")
   }
   topology.process(context, first_block)
 
@@ -295,7 +295,7 @@ test "compiled dsp topology controller rejected control batch does not mirror au
       GraphControl::set_param(99, GraphParamSlot::Value0, 0.5),
     ]) {
     Err(GraphControlError::InvalidNodeIndex(99)) => ()
-    other => fail("expected InvalidNodeIndex, got \{other}")
+    other => fail("expected InvalidNodeIndex, got \{@debug.to_string(other)}")
   }
   assert_true(
     topology.queue_topology_edit(
@@ -809,7 +809,7 @@ test "compiled stereo dsp topology controller result queues valid edit" {
       GraphTopologyEdit::replace_node(1, DspNode::pan(0, 1.0)),
     ) {
     Ok(_) => ()
-    other => fail("expected Ok, got \{other}")
+    other => fail("expected Ok, got \{@debug.to_string(other)}")
   }
   topology.process(context, left, right)
 
@@ -994,7 +994,7 @@ test "compiled stereo dsp topology controller set_param_result reports invalid v
         _
       )
     ) => ()
-    other => fail("expected InvalidParamValue, got \{other}")
+    other => fail("expected InvalidParamValue, got \{@debug.to_string(other)}")
   }
   topology.process(context, left, right)
 

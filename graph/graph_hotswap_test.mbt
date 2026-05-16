@@ -140,7 +140,7 @@ test "compiled dsp hot swap result reports sample rate mismatch" {
       @debug.assert_eq(active_rate, HOT_SWAP_SAMPLE_RATE)
       @debug.assert_eq(next_rate, HOT_SWAP_SAMPLE_RATE * 2.0)
     }
-    other => fail("expected SampleRateMismatch, got \{other}")
+    other => fail("expected SampleRateMismatch, got \{@debug.to_string(other)}")
   }
 }
 
@@ -171,7 +171,7 @@ test "compiled dsp hot swap result reports block capacity mismatch" {
       @debug.assert_eq(active_capacity, HOT_SWAP_BLOCK_SIZE)
       @debug.assert_eq(next_capacity, HOT_SWAP_BLOCK_SIZE * 2)
     }
-    other => fail("expected BlockCapacityMismatch, got \{other}")
+    other => fail("expected BlockCapacityMismatch, got \{@debug.to_string(other)}")
   }
 }
 
@@ -249,7 +249,7 @@ test "compiled dsp hot swap result reports pending graph control rejection" {
         GraphParamSlot::Value0
       )
     ) => ()
-    other => fail("expected pending InvalidSlotForNode, got \{other}")
+    other => fail("expected pending InvalidSlotForNode, got \{@debug.to_string(other)}")
   }
   hot_swap.process(context, first_block)
 
@@ -461,7 +461,7 @@ test "compiled stereo dsp hot swap result reports pending graph control rejectio
   assert_true(hot_swap.queue_swap(replacement))
   match hot_swap.gate_on_result(0) {
     Err(GraphControlError::InvalidGateNode(0, DspNodeKind::Constant)) => ()
-    other => fail("expected pending InvalidGateNode, got \{other}")
+    other => fail("expected pending InvalidGateNode, got \{@debug.to_string(other)}")
   }
 }
 

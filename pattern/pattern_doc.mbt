@@ -35,7 +35,7 @@ priv struct PatternDocEntry[A] {
 }
 
 ///|
-let pattern_node_generation_counter : Ref[Int64] = Ref::new(0L)
+let pattern_node_generation_counter : Ref[Int64] = Ref(0L)
 
 ///|
 fn next_pattern_node_generation() -> Int64 {

@@ -153,7 +153,7 @@ test "compiled dsp apply_control_result reports invalid node index" {
       GraphControl::set_param(99, GraphParamSlot::Value0, HALF_GAIN),
     ) {
     Err(GraphControlError::InvalidNodeIndex(99)) => ()
-    other => fail("expected InvalidNodeIndex, got \{other}")
+    other => fail("expected InvalidNodeIndex, got \{@debug.to_string(other)}")
   }
 }
 
@@ -175,7 +175,7 @@ test "compiled dsp apply_control_result reports orphan optimized node" {
       GraphControl::set_param(0, GraphParamSlot::Value0, QUARTER_SAMPLE),
     ) {
     Err(GraphControlError::OrphanNode(0)) => ()
-    other => fail("expected OrphanNode, got \{other}")
+    other => fail("expected OrphanNode, got \{@debug.to_string(other)}")
   }
 }
 
@@ -203,7 +203,7 @@ test "compiled dsp apply_control_result reports invalid slot and value" {
         GraphParamSlot::DelaySamples
       )
     ) => ()
-    other => fail("expected InvalidSlotForNode, got \{other}")
+    other => fail("expected InvalidSlotForNode, got \{@debug.to_string(other)}")
   }
 
   match
@@ -218,7 +218,7 @@ test "compiled dsp apply_control_result reports invalid slot and value" {
         1.5
       )
     ) => ()
-    other => fail("expected InvalidParamValue, got \{other}")
+    other => fail("expected InvalidParamValue, got \{@debug.to_string(other)}")
   }
 }
 
@@ -252,7 +252,7 @@ test "compiled dsp apply_controls_result is transactional" {
         GraphParamSlot::DelaySamples
       )
     ) => ()
-    other => fail("expected InvalidSlotForNode, got \{other}")
+    other => fail("expected InvalidSlotForNode, got \{@debug.to_string(other)}")
   }
 
   compiled.process(context, output)
@@ -278,7 +278,7 @@ test "compiled stereo dsp apply_control_result reports invalid gate target" {
 
   match compiled.apply_control_result(GraphControl::gate_on(1)) {
     Err(GraphControlError::InvalidGateNode(1, DspNodeKind::Pan)) => ()
-    other => fail("expected InvalidGateNode, got \{other}")
+    other => fail("expected InvalidGateNode, got \{@debug.to_string(other)}")
   }
 }
 
