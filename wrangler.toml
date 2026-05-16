@@ -1,6 +1,0 @@
-name = "moondsp"
-compatibility_date = "2025-01-01"
-
-[assets]
-directory = "./web/live/dist"
-not_found_handling = "single-page-application"

@@ -20,7 +20,7 @@
     "package.json",
     "package-lock.json",
     "serve.sh",
-    "wrangler.toml",
+    "wrangler.jsonc",
     "scripts/",
     "specs/",
     "web/",
