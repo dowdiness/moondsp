@@ -2,508 +2,56 @@
 
 Updated: 2026-05-16
 
-This is the active handoff list for future sessions. It should stay short and
-actionable; move completed design notes or implementation plans under
-`docs/superpowers/{specs,plans}/archive/` when they ship.
+Forward-looking handoff for the next session. Keep short and actionable;
+per-PR verification logs and merged-PR lists live in `git log` and
+`CHANGELOG.md`, not here.
 
 ## Current State
 
-- `main` is currently at
-  `b3d0358 docs: add scheduler edit orchestration example (#51)`.
-- PR #37 is merged:
-  https://github.com/dowdiness/moondsp/pull/37
-- PR #38 is merged:
-  https://github.com/dowdiness/moondsp/pull/38
-- PR #39 is merged:
-  https://github.com/dowdiness/moondsp/pull/39
-- PR #40 is merged:
-  https://github.com/dowdiness/moondsp/pull/40
-- PR #41 is merged:
-  https://github.com/dowdiness/moondsp/pull/41
-- PR #42 is merged:
-  https://github.com/dowdiness/moondsp/pull/42
-- PR #43 is merged:
-  https://github.com/dowdiness/moondsp/pull/43
-- PR #44 is merged:
-  https://github.com/dowdiness/moondsp/pull/44
-- PR #45 is merged:
-  https://github.com/dowdiness/moondsp/pull/45
-- PR #46 is merged:
-  https://github.com/dowdiness/moondsp/pull/46
-- PR #47 is merged:
-  https://github.com/dowdiness/moondsp/pull/47
-- PR #48 is merged:
-  https://github.com/dowdiness/moondsp/pull/48
-- PR #49 is merged:
-  https://github.com/dowdiness/moondsp/pull/49
-- PR #50 is merged:
-  https://github.com/dowdiness/moondsp/pull/50
-- PR #51 is merged:
-  https://github.com/dowdiness/moondsp/pull/51
-- No active feature branch; `main` is the current working tip.
-- Core silent-failure hardening shipped so far:
-  - `GraphControlError` result APIs for direct compiled mono/stereo graphs.
-  - `HotSwapQueueError` result APIs for mono/stereo hot-swap queues.
-  - `GraphTopologyQueueError` result APIs for mono/stereo topology edit queues.
-  - runtime-control `GraphControlError` result APIs for mono/stereo hot-swap
-    and topology wrapper controls.
-  - browser graph queue/control paths expose last-error string/code helpers
-    while preserving the boolean wasm ABI.
-  - `BoundVoicePool` owns template validation and `ControlBindingMap` lifetime,
-    so `PatternScheduler` no longer carries stale bindings.
-  - remaining ambiguity-prone DSP/browser helper parameters are labelled:
-    `Oscillator::process`, `DemoSource::tick_source`, browser `tick`, and
-    browser `tick_source`. The generated interfaces also confirm the earlier
-    `Oscillator::{process_waveform,tick,tick_waveform}`,
-    `Gain::process`, `Clip::process`, `Pan::process`,
-    `DspNode::stereo_gain`, and `DspNode::stereo_clip` labels.
-  - topology queue diagnostics are settled on
-    `InvalidEdit(index, reason)`, where `reason` is a stable
-    `GraphTopologyEditError` for invalid indices, unsupported slots/templates,
-    invalid delete ranges, and non-unary or non-single-consumer delete shapes.
-- Song scaffold shipped so far:
-  - named section layering and patchable section variations.
-  - contiguous long-form layout with computed song-global occurrence spans and
-    occurrence querying.
-  - scheduler support for section and song structures in addition to raw
-    patterns.
-  - Phase 6 identity groundwork separates stable occurrence identity from
-    display labels through a dependency-free identity model.
-  - explicit occurrence starts can now create gaps and overlaps, with point and
-    range occurrence lookup over overlapping layouts.
-  - boundary fills now derive generated fill occurrences from uncovered song
-    spans while preserving existing occurrence identity and authoring order.
-  - song mini-notation parses sections, parts, explicit starts, explicit
-    occurrence IDs, gaps, overlaps, and fills.
-  - non-identity `TimeScope` transforms apply section-local rate changes
-    through song and direct section playback.
-  - efficient secondary lookup indexes now cover occurrence name, stable ID,
-    start time, and end time while preserving authoring-order overlap results.
-  - section/layer authoring identity and revision boundaries now cover reusable
-    section definitions and layered section bodies.
-  - deferred song work is now an identity-bearing song layout authoring model
-    for occurrence edits and layout revision boundaries.
-- Pattern authoring groundwork shipped so far on `main`:
-  - identity-bearing authoring documents over the existing runtime query model.
-  - private node storage with stable node lookup helpers.
-  - revisioned edits for root changes, node replacement, and core
-    structure-building operations.
-  - lowering snapshots back to the runtime query model.
-- Pattern authoring explicit-node groundwork shipped so far on `main`:
-  - aggregate document revisions derive from an ordered child-revision mix,
-    with coverage for rebuilt sequence/stack roots, mixed-revision merged
-    inputs, and shifted child-revision aliases.
-  - `Revision::max` breaks equal compact-value ties deterministically by
-    comparing the private fingerprint.
-  - explicit authoring nodes cover the runtime operations, including filtering,
-    Euclidean rhythms, degradation, periodic transforms, stereo split, and
-    control-map merging.
-- Pattern lowering-cache groundwork shipped so far on `main`:
-  - private per-node revision metadata inside authoring-document storage.
-  - stable node identity plus revision boundaries for subtree invalidation.
-  - lowering reuse keyed by stable node identity, a recursive private subtree
-    token, and full revision equality.
-  - coverage that editing one child invalidates that child and ancestors while
-    reusing unchanged sibling lowerings.
-  - regression coverage that a reused cache does not return stale audio for a
-    freshly rebuilt document with the same stable ID and zero revision.
-  - regression coverage that divergent replacement edits forked from the same
-    base document do not alias cache entries for the edited child or ancestors.
-- Scheduler snapshot-swap groundwork shipped so far on `main`:
-  - `PatternScheduler::queue_pattern_snapshot` stages a lowered
-    `PatternSnapshot[ControlMap]` without changing playback immediately.
-  - `PatternScheduler::process_snapshot_block` commits the pending snapshot at
-    block start, before note expiry and event query for that block.
-  - coverage proves block-boundary commit, no retroactive scheduling for past
-    onsets, active-note let-ring across a silent replacement, and coalescing
-    multiple pending snapshots to the latest staged snapshot.
-- Mini-notation stable-ID reconciliation shipped so far on `main`:
-  - deterministic `PatternNodeId` assignment for parsed mini atoms,
-    combinators, sequences, stacks, and method chains.
-  - `parse_doc`, `parse_doc_reusing`, `parse_snapshot`, and
-    `parse_snapshot_reusing` expose mini output through `PatternDoc` and
-    `PatternSnapshot` without breaking the existing `parse` API.
-  - `PatternDoc::subdoc` lets reconciliation reuse unchanged parsed subtrees
-    with their existing generation/revision metadata.
-  - coverage proves whitespace-only reparses preserve IDs and hit the lowering
-    cache, token replacement preserves unaffected token IDs, insertion/removal
-    keeps surviving token IDs, and changed tokens miss the cache while
-    unchanged nodes hit.
-- Song mini-notation shipped so far on `main`:
-  - `parse_song` parses `song(...)` text into `Song[ControlMap]`.
-  - `section("name", length, pattern_expr)` reuses the existing pattern mini
-    expression surface, including `s(...)`, `note(...)`, `stack(...)`, and
-    method chains.
-  - `part(...)` supports implicit-contiguous and explicit rational starts;
-    `part_id(...)` supports stable occurrence IDs separate from display names.
-  - `fill("prefix", "section")` applies the boundary-fill surface over parsed
-    gaps after the base song layout is built.
-  - coverage proves implicit sections/parts, exact rational starts and gaps,
-    explicit overlaps with authoring order, boundary fills, explicit occurrence
-    IDs, and unknown-section errors.
-- TimeScope transforms shipped so far on `main`:
-  - `TimeScope` now carries an exact body-cycles-per-section-cycle rate and
-    exposes identity, `at_rate`, `fast`, `slow`, and non-positive validation.
-  - `Section::query` applies the section scope while `Section::body` continues
-    to expose the raw unscoped pattern for structural callers.
-  - `Song::query` and `PatternScheduler::process_section_block` now route
-    through `Section::query`, so song and direct section playback observe the
-    same scope mapping.
-  - coverage proves fast/slow scope construction, invalid rate rejection,
-    scoped section query output, and song occurrence spans staying unchanged
-    while scoped events move inside those spans.
-- Latest local verification for PR #41 before merge:
-  - `rtk moon fmt`
-  - `rtk moon info`
-  - `rtk moon check`
-  - `rtk moon test song` (37 passed)
-  - `rtk moon test scheduler` (33 passed)
-  - `rtk moon check --target all`
-  - `rtk moon test` (763 passed)
-  - `rtk moon build --target wasm-gc`
-  - `rtk git diff --check`
-- Song lookup indexes shipped so far on `main`:
-  - `Song` now keeps private secondary indexes for occurrence name, stable ID,
-    start time, and end time.
-  - point and range occurrence lookups bound candidate scans with the start/end
-    indexes, then return hits in authoring order to preserve overlap semantics.
-  - `Song::query`, `Song::gap_spans`, `Song::get_occurrence`, and
-    `Song::get_occurrence_by_id` now use the indexed paths without changing
-    the public song API surface.
-  - coverage proves timeline-sorted overlapping occurrences still return in
-    authoring order for `occurrence_at`, `occurrences_at`, and
-    `occurrences_intersecting`.
-- Latest local verification for PR #42 before merge:
-  - `rtk moon fmt`
-  - `rtk moon info`
-  - `rtk moon check`
-  - `rtk moon test song` (38 passed)
-  - `rtk moon check --target all`
-  - `rtk moon test` (764 passed)
-  - `rtk moon build --target wasm-gc`
-  - `rtk git diff --check`
-- Song section/layer identity shipped so far on `main`:
-  - identity-preserving section and layer authoring adapters now cover reusable
-    section definitions and layered section bodies.
-  - section and layer display renames preserve stable identities and revisions;
-    layer body edits advance the affected layer revision and the containing
-    section revision.
-  - section length and scope edits advance the section revision; length edits
-    may still shift downstream song layout while preserving occurrence IDs.
-  - the authoring model lowers back to the existing playback/query surface
-    without changing current song/scheduler query semantics.
-  - coverage proves section/layer display rename stability, duplicate layer
-    display-name rejection, body revision boundaries without layout changes,
-    and length-driven layout shifts with stable occurrence IDs.
-- Latest local verification for PR #43 before merge:
-  - `rtk moon fmt`
-  - `rtk moon info`
-  - `rtk moon check`
-  - `rtk moon test song` (43 passed)
-  - `rtk moon check --target all`
-  - `rtk moon test` (769 passed)
-  - `rtk moon build --target wasm-gc`
-  - `rtk git diff --check`
-- Song layout authoring shipped so far on `main`:
-  - identity-preserving song layout authoring now covers section placements and
-    lowers back to the existing playback/query surface.
-  - occurrence display renames advance the authoring revision while preserving
-    the layout revision, stable occurrence identity, and computed spans.
-  - occurrence insertion, removal, reordering, and explicit-start edits advance
-    the layout revision and preserve surviving occurrence identities.
-  - same-length section edits reuse the existing layout boundary, while section
-    length edits advance the layout revision and shift downstream spans.
-  - coverage proves rename stability, insertion/removal, reorder, downstream
-    span shifts, unchanged section reuse, and missing-ID edit errors.
-- Latest local verification for PR #44 before merge:
-  - `rtk moon fmt`
-  - `rtk moon info`
-  - `rtk moon check`
-  - `rtk moon test song` (49 passed)
-  - `rtk moon check --target all`
-  - `rtk moon test` (775 passed)
-  - `rtk moon build --target wasm-gc`
-  - `rtk git diff --check`
-- Song layout scheduler snapshot/provenance shipped so far on `main`:
-  - song authoring lowers to runtime snapshots that carry both whole-document
-    and layout-scoped revision tokens, so playback can distinguish content-only
-    edits from timeline-boundary edits.
-  - staged playback changes commit only at audio block boundaries, and multiple
-    staged changes coalesce so the latest pending state wins before the next
-    block starts.
-  - pattern and song playback share one staging boundary while existing pattern,
-    section, song, snapshot, and raw-event processing entry points remain
-    compatible.
-  - authored playback can propagate source provenance into active notes, while
-    legacy raw-event paths continue to use an explicit empty source until richer
-    authoring context is available.
-  - raw-event processing preserves caller-owned event array ordering and never
-    sorts or mutates those arrays in place.
-  - audio-block paths avoid per-event wrapper allocation on empty-source
-    compatibility paths.
-  - runtime revision tokens remain available to orchestration layers for
-    snapshot-swap decisions without changing existing raw song-processing
-    behavior.
-  - coverage proves block-boundary commit timing, same-layout body edits
-    committing without layout-boundary churn, no retroactive note-on backfill,
-    active-note let-ring across layout replacement, latest-staged-state
-    coalescing, empty default source behavior, explicit source retention for
-    authored playback, public event-query compatibility, and caller-owned
-    event-order preservation.
-- Latest local verification on `codex/phase6-song-layout-scheduler`:
-  - `rtk moon fmt`
-  - `rtk moon info`
-  - `rtk moon check`
-  - `rtk moon test song` (49 passed)
-  - `rtk moon test scheduler` (43 passed)
-  - `rtk moon check --target all`
-  - `rtk moon test` (785 passed)
-  - `rtk moon build --target wasm-gc`
-  - `rtk git diff --check`
-  - final PR #45 CI passed before merge; merged at `81b1b19`.
-- Affected-voice policy controls shipped on `main`:
-  - provenance selectors can target active voices by pattern node, section,
-    layer, occurrence, or a combined subset of those IDs.
-  - empty selectors intentionally match nothing, and empty-source compatibility
-    voices are not affected by provenance-targeted edits.
-  - the policy surface keeps preserve, release, and immediate-stop outcomes
-    explicit for matched scheduler-owned voices, with destructive stopping kept
-    behind the constrained scheduler-facing path.
-  - sourced snapshot queries now attach authored pattern provenance and
-    occurrence/section/layer provenance where available, while block-processing
-    compatibility paths continue to use raw events and empty sources.
-  - sourced song queries carry authored occurrence and section-layer provenance
-    so scheduler wrappers do not need to reconstruct identity from runtime-only
-    section values.
-  - sourced pattern queries carry authored structural provenance, and scheduler
-    event sources keep pattern-node paths so affected-voice selectors match
-    both leaf and ancestor identities. Callback-style structural transforms now
-    conservatively tag their wrapper plus all reachable child subtree identities.
-  - coverage proves selector matching, empty-source safety, let-ring no-op,
-    pattern-node targeting, section targeting, occurrence/layout targeting,
-    sourced pattern/song snapshot queries, pattern sub-node path matching,
-    callback subtree coverage, song layer targeting, immediate kill behavior,
-    and empty-source block processing.
-  - refactor commit `8bce0b9` keeps the internal raw kill primitive private,
-    leaves the public scheduler-facing kill path constrained to bound pools, and
-    consolidates affected-note release and immediate-stop removal into one
-    scheduler helper.
-- Latest local verification for PR #46 before merge:
-  - `rtk moon fmt`
-  - `rtk moon info`
-  - `rtk moon check --deny-warn`
-  - `rtk moon check --target all`
-  - `rtk moon test pattern` (144 passed)
-  - `rtk moon test song` (50 passed)
-  - `rtk moon test voice` (33 passed)
-  - `rtk moon test scheduler` (54 passed)
-  - `rtk moon test` (803 passed)
-  - `rtk moon test --release` (803 passed)
-  - `rtk moon build --target wasm-gc`
-  - `rtk git diff --check`
-- Edit orchestration helpers shipped on `main`:
-  - `AffectedVoiceEditScope` maps concrete pattern-node, song occurrence,
-    song section, and section-bounded song-layer edits to affected-voice
-    targets.
-  - song-layer edit scopes require both section and layer identity so reused
-    layer IDs in different sections do not overmatch unrelated active voices.
-  - `PatternScheduler::apply_affected_voice_policy_for_edit` keeps preserve,
-    release, and immediate-stop policy selection explicit while routing through
-    the constrained scheduler-owned voice path.
-  - coverage proves edit-scope mapping, pattern-node edits, occurrence,
-    section, and bounded layer scopes, policy behavior, and empty-source
-    compatibility.
-- Latest local verification for PR #47 before merge:
-  - `rtk moon check --deny-warn`
-  - `rtk moon test scheduler` (58 passed)
-  - `rtk moon check --target all`
-  - `rtk moon test` (807 passed)
-  - `rtk moon build --target wasm-gc`
-  - `rtk git diff --check`
-- Edit application helpers shipped on `main`:
-  - `PatternScheduler::queue_playback_snapshot_edit` stages a replacement
-    `PlaybackSnapshot` for the existing block-boundary commit and immediately
-    applies the selected `AffectedVoicePolicy` to the matching
-    `AffectedVoiceEditScope`.
-  - `PatternScheduler::queue_pattern_snapshot_edit` and
-    `PatternScheduler::queue_song_snapshot_edit` provide pattern/song-specific
-    convenience wrappers over the unified helper.
-  - coverage proves pattern-node preserve and gate-off behavior, song
-    occurrence gate-off, song section let-ring, song layer kill behavior, and
-    block-boundary commit of the staged replacement snapshot.
-- Latest local verification for PR #48 before merge:
-  - `rtk moon check --deny-warn`
-  - `rtk moon test scheduler` (61 passed)
-  - `rtk moon info`
-  - `rtk moon fmt`
-  - `rtk moon check --target all`
-  - `rtk moon test` (810 passed)
-  - `rtk moon build --target wasm-gc`
-  - `rtk git diff --check`
-- Active-voice live control helpers shipped on `main`:
-  - live-control batches can be preflighted without mutating compiled graph
-    state, preserving all-or-nothing behavior for multi-voice edits.
-  - per-voice live-control application mutates only validated active targets;
-    stale voice references and invalid control changes are reported without
-    changing future voice defaults, templates, or bindings.
-  - playback edit orchestration preflights every matched active voice before any
-    matched voice is mutated.
-  - coverage proves matched-only application, invalid-control rollback, stale
-    handle rejection, active-note preservation, active-voice mutation, and
-    unchanged future voice defaults.
-- Latest local verification for PR #49 before merge:
-  - `rtk moon check --deny-warn`
-  - `rtk moon test voice` (37 passed)
-  - `rtk moon test scheduler` (63 passed)
-  - `rtk moon info`
-  - `rtk moon fmt`
-  - `rtk moon test graph` (241 passed)
-  - `rtk moon check --target all`
-  - `rtk moon test` (816 passed)
-  - `rtk moon build --target wasm-gc`
-  - `rtk git diff --check`
-- Live-control edit application integration shipped on `main`:
-  - edit application can validate optional live-control changes before staging
-    playback replacement or applying active-voice policy.
-  - successful edit applications report both live-controlled voice count and
-    scheduler-owned active-note removals, so orchestration can observe each
-    side effect separately.
-  - empty live-control batches are treated as no live-control change, allowing
-    policy-only edits through the integrated path.
-  - coverage proves successful live-control plus replacement staging, invalid
-    control rejection without staging or policy side effects, policy-only song
-    edits, and empty live-control batch no-ops.
-- Latest local verification for PR #50 before merge:
-  - `rtk moon update`
-  - `rtk moon check --deny-warn`
-  - `rtk moon test scheduler` (67 passed)
-  - `rtk moon info`
-  - `rtk moon fmt`
-  - `rtk moon check --target all`
-  - `rtk moon test` (820 passed)
-  - `rtk moon build --target wasm-gc`
-  - `rtk git diff --check`
-- Edit orchestration docs/API example shipped on `main` (PR #51):
-  - the scheduler package now has a tested README example showing the public
-    edit orchestration workflow from a sourced active pattern snapshot through
-    replacement staging, affected-voice policy, optional live-control changes,
-    and outcome counts.
-  - the example uses checked markdown so future API drift fails package checks.
-- Latest local verification before PR #51 merge:
-  - `rtk moon check --deny-warn`
-  - `rtk moon test scheduler` (68 passed)
-  - `rtk moon info`
-  - `rtk moon fmt`
-  - `rtk moon check --target all`
-  - `rtk moon test` (821 passed)
-  - `rtk moon build --target wasm-gc`
-  - `rtk git diff --check`
-- Latest local verification for PR #40 before merge:
-  - `moon fmt`
-  - `moon info`
-  - `moon check`
-  - `moon test mini` (64 passed)
-  - `moon check --target all`
-  - `moon test` (759 passed)
-  - `moon build --target wasm-gc`
-  - `git diff --check`
-- DSP graph identity mapping shipped so far on `main`:
-  - `GraphTemplateDoc` owns stable `GraphNodeId` authoring IDs, graph nodes,
-    revision state, and a retired-ID set.
-  - `GraphIndexMap` maps stable IDs to existing graph indices and builds
-    existing `GraphControl`, `ControlBindingBuilder`, and `GraphTopologyEdit`
-    values at API boundaries.
-  - the root `@moondsp` facade re-exports the graph identity API plus
-    `GraphNodeId`, `Revision`, and `StableIdError` for documented facade
-    consumers.
-  - graph document edits preserve IDs for replacements and rewires, append IDs
-    for inserted nodes/chains, compact IDs for deletions, and reject reuse of
-    deleted IDs inside the same document.
-  - coverage proves control, binding, and compile mapping; duplicate ID
-    rejection; replace/rewire ID preservation; single-node and chain
-    insert/delete compaction; and retired-ID rejection.
-- Song layout ranges shipped so far on `main`:
-  - `SongPart` can carry an optional explicit start via `SongPart::at` and
-    `SongPart::with_id_at`; existing constructors remain implicit-contiguous.
-  - implicit parts continue from the latest occurrence end, so explicit starts
-    can create gaps or overlaps without pulling later implicit parts backward.
-  - `Song::occurrences_at` and `Song::occurrences_intersecting` expose point
-    and range lookup across overlapping layouts.
-  - coverage proves gaps, overlap queries, range-address half-open boundaries,
-    and implicit continuation after explicit overlaps.
-- Song boundary fills shipped so far on `main`:
-  - `Song::gap_spans` reports uncovered ranges in song-time order, treating
-    overlaps as covered time rather than as new gaps.
-  - `Song::fill_gaps(prefix~, section~)` returns a derived song with generated
-    `prefix:index` occurrences for uncovered spans.
-  - generated fill occurrences reuse the supplied section body/scope, resize
-    section length to the uncovered span, and preserve all existing occurrence
-    IDs and authoring order.
-  - coverage proves multi-gap detection, fill sizing and query output, overlap
-    coverage, existing-ID/order preservation, and generated-name collision
-    errors.
-- Latest local verification for PR #39 before merge:
-  - `moon fmt`
-  - `moon info`
-  - `moon check`
-  - `moon test song` (33 passed)
-  - `moon check --target all`
-  - `moon test` (753 passed)
-  - `moon build --target wasm-gc`
-  - `git diff --check`
-- Latest local verification for PR #38 before merge:
-  - `rtk moon fmt`
-  - `rtk moon info`
-  - `rtk moon check`
-  - `rtk moon test song` (28 passed)
-  - `rtk moon test` (748 passed)
-  - `rtk moon build --target wasm-gc`
-  - `rtk moon check --target all`
-  - `rtk git diff --check`
-- Latest local verification for PR #37 before merge:
-  - `rtk moon fmt`
-  - `rtk moon info`
-  - `rtk moon check`
-  - `rtk moon test graph` (241 passed)
-  - `rtk moon test` (744 passed)
-  - `rtk moon build --target wasm-gc`
-  - `rtk moon check --target all`
-  - `rtk git diff --check`
-- Latest full local verification for PR #33 merge base `aa5f773`:
-  - `rtk moon fmt`
-  - `rtk moon info`
-  - `rtk moon check`
-  - `rtk moon test` (727 passed)
-  - `rtk moon build --target wasm-gc`
-  - `rtk git diff --check`
+- `main` HEAD: `a92a3a3 docs(changelog): amend v0.3.0 entry per Codex review`.
+- Latest release: **v0.3.0** (2026-05-16) — hide graph-internal `NodeXxx`
+  traits, lock down `PatternScheduler` fields, require labelled args on
+  `DspNode::{delay, stereo_delay, envelope_gain}`.
+- No active feature branch; no open PRs.
+- Known outstanding warnings: 8 `[0020]` Show-vs-Debug deprecations in
+  `pattern/property_test.mbt` + `pattern/pattern_doc_test.mbt`, originating
+  in `@qc.quick_check_fn`'s trait bound. Pinned on `moonbitlang/quickcheck`
+  publishing ≥0.14.0 (verified: 0.13.0 still has the old bound). No action
+  on our side until mooncakes ships 0.14.0.
+
+For shipped-work history, read `CHANGELOG.md`. For the broader backlog
+(quick wins, pre-1.0 API hygiene, Phase 6+ roadmap), read
+`memory/project_backlog.md`.
 
 ## Recommended Next Slice
 
-The Phase 6 edit-orchestration arc (snapshot swap → affected-voice policy →
-edit application → live-control integration → orchestration docs) is now
-landed on `main`. Conservative next slice: a release-prep pass before
-opening another feature arc.
+**Brainstorm the public boundary type for the graph layer.** A 2026-05-16
+inventory of `GraphBuilder::nodes()` (originally framed as a local
+abstraction leak) revealed the issue is structural: `Array[DspNode]` is
+the public exchange currency across 12 entries in
+`graph/pkg.generated.mbti` (compile, optimize_graph, replay,
+CompiledTemplate::analyze, topology controllers, GraphTemplateDoc, etc.).
+Narrowing one return type to `ArrayView` is a half-measure.
 
-1. **Changelog and API review for the post-`v0.1.0` Phase 6 surface.**
-   - Walk the `Unreleased` section of `CHANGELOG.md` against the Phase 6
-     "shipped on `main`" blocks above and confirm every user-facing addition
-     is summarized (identity, song authoring/layout, pattern authoring and
-     lowering cache, mini stable-ID reconciliation, graph identity mapping,
-     scheduler snapshot/edit orchestration, affected-voice policies,
-     active-voice live controls, scheduler README example).
-   - Re-run `rtk moon info` and skim `git diff *.mbti` since `v0.1.0` for
-     any unintentional public API drift before the next tagged release.
-   - Decide whether the next tag should be a `0.1.x` patch or a `0.2.0`
-     minor based on the surface review.
+The real question: should `Array[DspNode]` stay the public boundary type,
+or should `CompiledTemplate` (already exists, partially used via
+`compile_template`) be promoted to that role across the surface? Run a
+brainstorm + Codex design pass before any implementation. Do not start a
+narrow `ArrayView` change in the meantime — that locks in `Array[DspNode]`
+as the boundary for everything else.
 
-Alternative slices (pick only after release prep):
+See `memory/project_backlog.md` → Pre-1.0 API hygiene → Action (2) for the
+full inventory.
 
-- Issue #22 — collapse the per-sound globals in
-  `browser/browser_scheduler.mbt` behind a single iterable structure so
-  adding a sound is one entry instead of five touch points. Pure tech debt;
-  no user-visible behavior change.
-- Continue Phase 6 with the next authoring/orchestration slice once a
-  fresh design pass has scoped it.
+## Alternative Slices
+
+- **Issue #22 follow-up cleanup** if anything remains after the
+  `sched_routes` consolidation closed the issue on 2026-05-16.
+
+- **Open another Phase 6+ slice** (per `memory/project_backlog.md`):
+  incremental reparsing with loom, canopy structural editor, or per-sound
+  parameter control. Each is multi-session scope; brainstorm before
+  planning.
 
 ## Acceptance Checks For API-Hardening Slices
 

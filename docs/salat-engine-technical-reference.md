@@ -876,12 +876,30 @@ Current semantics:
 - each `VoicePool::note_on(...)` compiles the already analyzed template through
   `CompiledDsp::compile_template(...)`, so per-voice graph creation reuses the
   optimized nodes captured during template validation
-- `PatternScheduler` stores tempo, sample position, active note handles, and a
-  `ControlMapper`; it no longer stores a separate `ControlBindingMap`
+- `PatternScheduler` stores tempo, sample position, a `DspContext`, active note
+  handles, a `ControlMapper`, and an optional active + pending
+  `PlaybackSnapshot` pair; it no longer stores a separate `ControlBindingMap`.
+  All struct fields are `priv` as of v0.3.0 — public observation goes through
+  named methods (`bpm`, `sample_counter`, `current_block`, `active_note_count`,
+  `active_note_source`, `active_note_matches`)
 - `PatternScheduler::process_block(...)` takes a `BoundVoicePool`, expires old
   notes, queries the pattern for the current block arc, converts raw control
   maps through the scheduler's mapper, calls `note_on_controls(...)`, applies
   per-voice side effects such as pan, then renders through the bound pool
+- Phase 6 incremental authoring adds a snapshot-swap layer over the same
+  block-processing loop. `queue_pattern_snapshot` / `queue_song_snapshot`
+  stage a lowered `PlaybackSnapshot` without changing playback immediately;
+  `process_snapshot_block` (and the pattern/song/playback variants) commits
+  the pending snapshot at block start before note expiry and event query,
+  giving callers a stable block boundary for pattern edits during playback.
+  Multiple staged snapshots coalesce so the latest staged state wins
+- `apply_affected_voice_policy(...)` and `apply_affected_voice_policy_for_edit(...)`
+  preserve, release, or immediately stop scheduler-owned active voices whose
+  authored provenance matches a selector, while
+  `queue_playback_snapshot_edit(...)` (and the pattern/song-specific wrappers)
+  combines staged replacement with an affected-voice policy and optional
+  validated live-control changes in one atomic call. See
+  `scheduler/README.mbt.md` for a checked end-to-end edit orchestration example
 
 This prevents a stale scheduler-owned binding map from being paired with a
 voice pool after a template swap, and it removes the previous double

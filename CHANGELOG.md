@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-05-17
+
+### Added
+
+- **`PatternScheduler::bpm()` read accessor.** Restores public read access
+  to the current tempo after v0.3.0 privatized the `bpm` field. The
+  accessor returns the sanitized value (NaN/Inf rejected, clamped to
+  ≥1.0 at construction and `set_bpm`). Symmetric with the existing
+  `sample_counter()` reader; non-breaking.
+
 ## [0.3.0] - 2026-05-16
 
 ### Breaking changes
@@ -28,8 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`sample_counter`, `current_block`, `active_note_count`,
   `active_note_source`, `active_note_matches`); BPM changes go through
   `set_bpm`. Direct reads of `bpm`, `ctx`, `mapper`, and the backing
-  `active_notes` array are no longer public API; a `PatternScheduler::bpm()`
-  read accessor will follow in a patch release.
+  `active_notes` array are no longer public API. (A `PatternScheduler::bpm()`
+  read accessor lands in v0.3.1.)
 - **`NodeSpanning`, `NodeFoldable`, `NodeStateful`, `NodeEditable` traits
   removed from the public `@moondsp` facade.** These are graph-internal
   implementation-detail traits (used to classify `DspNode` variants

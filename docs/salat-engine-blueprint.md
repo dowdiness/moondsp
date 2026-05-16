@@ -139,6 +139,8 @@ MoonBit's ecosystem is young. Avoid large foundation libraries. Each library (`i
 | `ecs` | Entity-Component-System | Phase 1 ready |
 | **`dowdiness/moondsp`** | **DSP engine (this project)** — `dsp/`, `graph/`, `voice/` | **Phases 1–3 complete** |
 | **`dowdiness/moondsp/pattern`** | **Pattern engine** | **Phase 4 complete** |
+| **`dowdiness/moondsp/mini` + `/scheduler`** | **Text-to-audio pipeline** | **Phase 5 complete** |
+| **`dowdiness/moondsp/song` + `/identity`** | **Long-form section authoring + identity model** | **Phase 6 incremental authoring (landing)** |
 
 ---
 
@@ -472,8 +474,10 @@ Packages (as shipped):
 - `dowdiness/moondsp/dsp` — DSP primitives + tagless algebra
 - `dowdiness/moondsp/graph` — compiled graph runtime
 - `dowdiness/moondsp/voice` — polyphonic voice pool
+- `dowdiness/moondsp/identity` — dependency-free stable ID wrappers and revision tokens for incremental editing
 - `dowdiness/moondsp/pattern` — pattern engine (standalone)
 - `dowdiness/moondsp/mini` — mini-notation parser
+- `dowdiness/moondsp/song` — long-form section scaffold with identity `TimeScope`
 - `dowdiness/moondsp/scheduler` — pattern → voice-pool bridge
 - `dowdiness/moondsp/browser` — AudioWorklet wrapper
 
