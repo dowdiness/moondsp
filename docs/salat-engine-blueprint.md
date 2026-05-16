@@ -242,7 +242,9 @@ Completed in Phase 2:
 - `GraphBuilder` interpretation and `replay()` tagless round-trip
 - Composed `range()` / `lin_map()` operations as generic `ArithSym` functions
 - Oscillator FM mode via `DspNode::oscillator_from()`
-- `NodeSpanning`, `NodeFoldable`, `NodeStateful`, `NodeEditable` capability traits
+- `NodeSpanning`, `NodeFoldable`, `NodeStateful`, `NodeEditable` capability
+  traits (graph-internal — `pub(open)` inside `@graph` for internal
+  extension; not re-exported from the `@moondsp` facade as of v0.3.0)
 
 Deferred to later phases:
 - Broader stereo node coverage beyond the current filter/delay slice
