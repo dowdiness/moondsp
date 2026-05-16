@@ -31,6 +31,18 @@ test "PatternScheduler::new initializes with zero position" {
 }
 
 ///|
+test "PatternScheduler::bpm round-trips construction and set_bpm" {
+  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
+  let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~)
+  @debug.assert_eq(sched.bpm(), 120.0)
+  sched.set_bpm(174.0)
+  @debug.assert_eq(sched.bpm(), 174.0)
+  // sanitization is preserved through the reader: <1.0 clamps to 1.0.
+  sched.set_bpm(0.0)
+  @debug.assert_eq(sched.bpm(), 1.0)
+}
+
+///|
 test "compute_arc: first block at 120 BPM" {
   let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
   let arc = @scheduler.compute_arc(0L, 120.0, ctx)

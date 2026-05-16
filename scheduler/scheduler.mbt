@@ -434,6 +434,13 @@ pub fn PatternScheduler::sample_counter(self : PatternScheduler) -> Int64 {
 }
 
 ///|
+/// Current tempo in beats per minute. The value is always sanitized:
+/// construction and `set_bpm` reject NaN/Inf and clamp to a minimum of 1.0.
+pub fn PatternScheduler::bpm(self : PatternScheduler) -> Double {
+  self.bpm
+}
+
+///|
 pub fn PatternScheduler::active_note_count(self : PatternScheduler) -> Int {
   self.active_notes.length()
 }

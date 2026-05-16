@@ -99,6 +99,7 @@ pub fn PatternScheduler::apply_affected_voice_policy(Self, AffectedVoicePolicy, 
 pub fn PatternScheduler::apply_affected_voice_policy_for_edit(Self, AffectedVoicePolicy, AffectedVoiceEditScope, @voice.BoundVoicePool) -> Int
 pub fn PatternScheduler::apply_voice_control_for_edit_result(Self, edit~ : AffectedVoiceEditScope, control~ : @graph.GraphControl, pool~ : @voice.BoundVoicePool) -> Result[Int, @voice.VoiceControlError]
 pub fn PatternScheduler::apply_voice_controls_for_edit_result(Self, edit~ : AffectedVoiceEditScope, controls~ : Array[@graph.GraphControl], pool~ : @voice.BoundVoicePool) -> Result[Int, @voice.VoiceControlError]
+pub fn PatternScheduler::bpm(Self) -> Double
 pub fn PatternScheduler::current_block(Self) -> BlockFrame
 pub fn PatternScheduler::expire_notes(Self, @voice.BoundVoicePool, @pattern.TimeSpan) -> Unit
 pub fn PatternScheduler::expire_notes_at(Self, @voice.BoundVoicePool, PerformanceTime) -> Unit
