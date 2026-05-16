@@ -94,13 +94,13 @@ test "Song constructor computes contiguous duration and occurrences" {
     SongPart(name="verse1", section=verse),
   ])
   assert_true(song.duration() == @pattern.Rational::from_int(3))
-  assert_eq(song.occurrence_count(), 2)
+  @debug.assert_eq(song.occurrence_count(), 2)
   match song.get_occurrence("verse1") {
     Some(occurrence) => {
       assert_true(occurrence.start() == @pattern.Rational::from_int(1))
       assert_true(occurrence.end_() == @pattern.Rational::from_int(3))
-      assert_eq(occurrence.section().name(), "verse")
-      assert_eq(occurrence.id().value(), "verse1")
+      @debug.assert_eq(occurrence.section().name(), "verse")
+      @debug.assert_eq(occurrence.id().value(), "verse1")
     }
     None => abort("expected verse1 occurrence")
   }
@@ -174,8 +174,8 @@ test "Song supports occurrence lookup by stable ID" {
   let song = make_song([SongPart::with_id(id~, name="Verse 1", section=verse)])
   match song.get_occurrence_by_id(id) {
     Some(occurrence) => {
-      assert_eq(occurrence.id().value(), "verse:1")
-      assert_eq(occurrence.name(), "Verse 1")
+      @debug.assert_eq(occurrence.id().value(), "verse:1")
+      @debug.assert_eq(occurrence.name(), "Verse 1")
     }
     None => abort("expected occurrence by ID")
   }
@@ -190,11 +190,11 @@ test "Song::occurrence_at uses half-open occurrence boundaries" {
     SongPart(name="chorus1", section=chorus),
   ])
   match song.occurrence_at(@pattern.Rational::from_int(0)) {
-    Some(occurrence) => assert_eq(occurrence.name(), "verse1")
+    Some(occurrence) => @debug.assert_eq(occurrence.name(), "verse1")
     None => abort("expected verse1 at song start")
   }
   match song.occurrence_at(@pattern.Rational::from_int(2)) {
-    Some(occurrence) => assert_eq(occurrence.name(), "chorus1")
+    Some(occurrence) => @debug.assert_eq(occurrence.name(), "chorus1")
     None => abort("expected chorus1 at boundary")
   }
   match song.occurrence_at(@pattern.Rational::from_int(3)) {
@@ -228,7 +228,7 @@ test "SongPart explicit starts create gaps and set duration to latest end" {
     None => abort("expected explicitly placed occurrence")
   }
   let events = song.query(span(1L, 1L, 2L, 1L))
-  assert_eq(events.length(), 0)
+  @debug.assert_eq(events.length(), 0)
 }
 
 ///|
@@ -241,13 +241,13 @@ test "SongPart explicit starts can overlap and range lookup returns all hits" {
   ])
   assert_true(song.duration() == @pattern.Rational::from_int(3))
   let at_overlap = song.occurrences_at(rat(3L, 2L))
-  assert_eq(at_overlap.length(), 2)
-  assert_eq(at_overlap[0].name(), "verse1")
-  assert_eq(at_overlap[1].name(), "pad1")
+  @debug.assert_eq(at_overlap.length(), 2)
+  @debug.assert_eq(at_overlap[0].name(), "verse1")
+  @debug.assert_eq(at_overlap[1].name(), "pad1")
   let range_hits = song.occurrences_intersecting(span(1L, 1L, 2L, 1L))
-  assert_eq(range_hits.length(), 2)
+  @debug.assert_eq(range_hits.length(), 2)
   let events = song.query(span(1L, 1L, 2L, 1L))
-  assert_eq(events.length(), 2)
+  @debug.assert_eq(events.length(), 2)
   assert_true(events[0].value.get("note") == Some(60.0))
   assert_true(events[1].value.get("note") == Some(64.0))
 }
@@ -269,17 +269,17 @@ test "indexed occurrence lookups preserve authoring order for timeline-sorted ov
     ),
   ])
   match song.occurrence_at(rat(3L, 2L)) {
-    Some(occurrence) => assert_eq(occurrence.name(), "late1")
+    Some(occurrence) => @debug.assert_eq(occurrence.name(), "late1")
     None => abort("expected first authored occurrence at overlap")
   }
   let at_hits = song.occurrences_at(rat(3L, 2L))
-  assert_eq(at_hits.length(), 2)
-  assert_eq(at_hits[0].name(), "late1")
-  assert_eq(at_hits[1].name(), "early1")
+  @debug.assert_eq(at_hits.length(), 2)
+  @debug.assert_eq(at_hits[0].name(), "late1")
+  @debug.assert_eq(at_hits[1].name(), "early1")
   let range_hits = song.occurrences_intersecting(span(2L, 1L, 3L, 1L))
-  assert_eq(range_hits.length(), 2)
-  assert_eq(range_hits[0].name(), "late1")
-  assert_eq(range_hits[1].name(), "early1")
+  @debug.assert_eq(range_hits.length(), 2)
+  @debug.assert_eq(range_hits[0].name(), "late1")
+  @debug.assert_eq(range_hits[1].name(), "early1")
 }
 
 ///|
@@ -311,10 +311,10 @@ test "Song::occurrences_intersecting uses half-open range boundaries" {
     SongPart::at(start=@pattern.Rational::from_int(2), name="b1", section=b),
   ])
   let gap_hits = song.occurrences_intersecting(span(1L, 1L, 2L, 1L))
-  assert_eq(gap_hits.length(), 0)
+  @debug.assert_eq(gap_hits.length(), 0)
   let boundary_hits = song.occurrences_intersecting(span(1L, 1L, 3L, 1L))
-  assert_eq(boundary_hits.length(), 1)
-  assert_eq(boundary_hits[0].name(), "b1")
+  @debug.assert_eq(boundary_hits.length(), 1)
+  @debug.assert_eq(boundary_hits[0].name(), "b1")
 }
 
 ///|
@@ -328,7 +328,7 @@ test "Song::gap_spans reports uncovered boundary ranges" {
     SongPart::at(start=@pattern.Rational::from_int(5), name="c1", section=c),
   ])
   let gaps = song.gap_spans()
-  assert_eq(gaps.length(), 2)
+  @debug.assert_eq(gaps.length(), 2)
   assert_true(gaps[0] == span(1L, 1L, 3L, 1L))
   assert_true(gaps[1] == span(4L, 1L, 5L, 1L))
 }
@@ -347,10 +347,10 @@ test "Song::fill_gaps inserts sized fill occurrences in uncovered ranges" {
     Ok(song) => song
     Err(_) => abort("expected filled song")
   }
-  assert_eq(filled.occurrence_count(), 3)
+  @debug.assert_eq(filled.occurrence_count(), 3)
   match filled.get_occurrence("fill:0") {
     Some(occurrence) => {
-      assert_eq(occurrence.id().value(), "fill:0")
+      @debug.assert_eq(occurrence.id().value(), "fill:0")
       assert_true(occurrence.start() == @pattern.Rational::from_int(1))
       assert_true(occurrence.end_() == @pattern.Rational::from_int(3))
       assert_true(
@@ -359,9 +359,9 @@ test "Song::fill_gaps inserts sized fill occurrences in uncovered ranges" {
     }
     None => abort("expected generated fill occurrence")
   }
-  assert_eq(filled.gap_spans().length(), 0)
+  @debug.assert_eq(filled.gap_spans().length(), 0)
   let events = filled.query(span(1L, 1L, 3L, 1L))
-  assert_eq(events.length(), 2)
+  @debug.assert_eq(events.length(), 2)
   assert_true(events[0].value.get("note") == Some(70.0))
   assert_true(events[1].value.get("note") == Some(70.0))
 }
@@ -391,14 +391,14 @@ test "Song::fill_gaps preserves existing IDs and ignores covered overlap" {
     ),
   ])
   let gaps = song.gap_spans()
-  assert_eq(gaps.length(), 1)
+  @debug.assert_eq(gaps.length(), 1)
   assert_true(gaps[0] == span(3L, 1L, 4L, 1L))
   let result = try? song.fill_gaps(prefix="fill", section=fill)
   let filled = match result {
     Ok(song) => song
     Err(_) => abort("expected filled song")
   }
-  assert_eq(filled.occurrence_count(), 4)
+  @debug.assert_eq(filled.occurrence_count(), 4)
   assert_true(filled.get_occurrence_by_id(a_id) is Some(_))
   assert_true(filled.get_occurrence_by_id(b_id) is Some(_))
   assert_true(filled.get_occurrence_by_id(c_id) is Some(_))
@@ -433,13 +433,13 @@ test "Song::fill_gaps preserves authoring order for out-of-order overlaps" {
     Ok(song) => song
     Err(_) => abort("expected filled song")
   }
-  assert_eq(filled.occurrence_count(), 2)
+  @debug.assert_eq(filled.occurrence_count(), 2)
   let overlap_hits = filled.occurrences_at(rat(3L, 2L))
-  assert_eq(overlap_hits.length(), 2)
-  assert_eq(overlap_hits[0].name(), "late1")
-  assert_eq(overlap_hits[1].name(), "early1")
+  @debug.assert_eq(overlap_hits.length(), 2)
+  @debug.assert_eq(overlap_hits[0].name(), "late1")
+  @debug.assert_eq(overlap_hits[1].name(), "early1")
   let events = filled.query(span(1L, 1L, 2L, 1L))
-  assert_eq(events.length(), 2)
+  @debug.assert_eq(events.length(), 2)
   assert_true(events[0].value.get("note") == Some(60.0))
   assert_true(events[1].value.get("note") == Some(64.0))
 }
@@ -488,7 +488,7 @@ test "Song keeps explicit occurrence IDs across reordering" {
       reordered.get_occurrence_by_id(verse_id),
     ) {
     (Some(before), Some(after)) => {
-      assert_eq(before.id().value(), after.id().value())
+      @debug.assert_eq(before.id().value(), after.id().value())
       assert_true(before.start() == @pattern.Rational::from_int(0))
       assert_true(after.start() == @pattern.Rational::from_int(1))
     }
@@ -517,7 +517,7 @@ test "Song keeps explicit occurrence IDs across section length changes" {
       long_layout.get_occurrence_by_id(chorus_id),
     ) {
     (Some(before), Some(after)) => {
-      assert_eq(before.id().value(), after.id().value())
+      @debug.assert_eq(before.id().value(), after.id().value())
       assert_true(before.start() == @pattern.Rational::from_int(1))
       assert_true(after.start() == @pattern.Rational::from_int(2))
     }
@@ -533,7 +533,7 @@ test "Song allows repeated sections with distinct occurrence names" {
     SongPart(name="verse2", section=verse),
   ])
   let events = song.query(span(0L, 1L, 2L, 1L))
-  assert_eq(events.length(), 2)
+  @debug.assert_eq(events.length(), 2)
   assert_true(events[0].value.get("note") == Some(60.0))
   assert_true(events[0].whole.unwrap().begin == @pattern.Rational::from_int(0))
   assert_true(events[1].value.get("note") == Some(60.0))
@@ -549,7 +549,7 @@ test "Song::query shifts event whole and part into song time" {
     SongPart(name="chorus1", section=chorus),
   ])
   let events = song.query(span(0L, 1L, 3L, 1L))
-  assert_eq(events.length(), 3)
+  @debug.assert_eq(events.length(), 3)
   assert_true(events[0].whole.unwrap().begin == @pattern.Rational::from_int(0))
   assert_true(events[0].part.begin == @pattern.Rational::from_int(0))
   assert_true(events[1].whole.unwrap().begin == @pattern.Rational::from_int(1))
@@ -578,7 +578,7 @@ test "Song::query applies section TimeScope without changing occurrence span" {
     None => abort("expected scoped occurrence")
   }
   let events = song.query(span(1L, 1L, 2L, 1L))
-  assert_eq(events.length(), 2)
+  @debug.assert_eq(events.length(), 2)
   assert_true(events[0].whole.unwrap().begin == @pattern.Rational::from_int(1))
   assert_true(events[0].part.begin == @pattern.Rational::from_int(1))
   assert_true(events[1].whole.unwrap().begin == rat(3L, 2L))
@@ -594,7 +594,7 @@ test "Song::query clips parts at occurrence boundaries without clipping whole" {
     SongPart(name="chorus1", section=chorus),
   ])
   let events = song.query(span(1L, 2L, 3L, 2L))
-  assert_eq(events.length(), 2)
+  @debug.assert_eq(events.length(), 2)
   assert_true(events[0].whole.unwrap().begin == @pattern.Rational::from_int(0))
   assert_true(events[0].whole.unwrap().end_ == @pattern.Rational::from_int(1))
   assert_true(events[0].part.begin == rat(1L, 2L))

@@ -5,7 +5,8 @@ priv struct MiniDocBuilder {
 }
 
 ///|
-fn MiniDocBuilder::new(
+#alias(new)
+fn MiniDocBuilder::MiniDocBuilder(
   previous~ : @pattern.PatternDoc[@pattern.ControlMap]?,
 ) -> MiniDocBuilder {
   { previous, counters: {} }

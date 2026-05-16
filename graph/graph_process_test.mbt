@@ -10,10 +10,10 @@ test "compiled dsp renders a constant graph" {
 
   compiled.process(context, output)
 
-  assert_eq(output.get(0), QUARTER_SAMPLE)
-  assert_eq(output.get(1), QUARTER_SAMPLE)
-  assert_eq(output.get(2), QUARTER_SAMPLE)
-  assert_eq(output.get(3), QUARTER_SAMPLE)
+  @debug.assert_eq(output.get(0), QUARTER_SAMPLE)
+  @debug.assert_eq(output.get(1), QUARTER_SAMPLE)
+  @debug.assert_eq(output.get(2), QUARTER_SAMPLE)
+  @debug.assert_eq(output.get(3), QUARTER_SAMPLE)
 }
 
 ///|
@@ -33,7 +33,7 @@ test "compiled dsp renders an oscillator gain clip chain" {
 
   compiled.process(context, output)
 
-  assert_eq(output.get(0), ZERO_SAMPLE)
+  @debug.assert_eq(output.get(0), ZERO_SAMPLE)
   assert_true(output.as_fixed_array().any(sample => sample != ZERO_SAMPLE))
   assert_true(
     output
@@ -59,10 +59,10 @@ test "compiled dsp mixes two constants" {
 
   compiled.process(context, output)
 
-  assert_eq(output.get(0), MIXED_SAMPLE)
-  assert_eq(output.get(1), MIXED_SAMPLE)
-  assert_eq(output.get(2), MIXED_SAMPLE)
-  assert_eq(output.get(3), MIXED_SAMPLE)
+  @debug.assert_eq(output.get(0), MIXED_SAMPLE)
+  @debug.assert_eq(output.get(1), MIXED_SAMPLE)
+  @debug.assert_eq(output.get(2), MIXED_SAMPLE)
+  @debug.assert_eq(output.get(3), MIXED_SAMPLE)
 }
 
 ///|
@@ -108,18 +108,18 @@ test "compiled dsp applies adsr envelope through multiply" {
   assert_true(compiled.apply_control(GraphControl::gate_on(2)))
   compiled.process(context, output)
 
-  assert_eq(output.get(0), UNIT_SAMPLE)
-  assert_eq(output.get(1), ADSR_SUSTAIN_LEVEL)
-  assert_eq(output.get(2), ADSR_SUSTAIN_LEVEL)
-  assert_eq(output.get(3), ADSR_SUSTAIN_LEVEL)
+  @debug.assert_eq(output.get(0), UNIT_SAMPLE)
+  @debug.assert_eq(output.get(1), ADSR_SUSTAIN_LEVEL)
+  @debug.assert_eq(output.get(2), ADSR_SUSTAIN_LEVEL)
+  @debug.assert_eq(output.get(3), ADSR_SUSTAIN_LEVEL)
 
   assert_true(compiled.apply_control(GraphControl::gate_off(2)))
   compiled.process(context, output)
 
-  assert_eq(output.get(0), 0.125)
-  assert_eq(output.get(1), ZERO_SAMPLE)
-  assert_eq(output.get(2), ZERO_SAMPLE)
-  assert_eq(output.get(3), ZERO_SAMPLE)
+  @debug.assert_eq(output.get(0), 0.125)
+  @debug.assert_eq(output.get(1), ZERO_SAMPLE)
+  @debug.assert_eq(output.get(2), ZERO_SAMPLE)
+  @debug.assert_eq(output.get(3), ZERO_SAMPLE)
 }
 
 ///|
@@ -198,17 +198,17 @@ test "compiled dsp applies delay line in graph across blocks" {
 
   compiled.process(context, output)
 
-  assert_eq(output.get(0), ZERO_SAMPLE)
-  assert_eq(output.get(1), ZERO_SAMPLE)
-  assert_eq(output.get(2), UNIT_SAMPLE)
-  assert_eq(output.get(3), UNIT_SAMPLE)
+  @debug.assert_eq(output.get(0), ZERO_SAMPLE)
+  @debug.assert_eq(output.get(1), ZERO_SAMPLE)
+  @debug.assert_eq(output.get(2), UNIT_SAMPLE)
+  @debug.assert_eq(output.get(3), UNIT_SAMPLE)
 
   compiled.process(context, output)
 
-  assert_eq(output.get(0), UNIT_SAMPLE)
-  assert_eq(output.get(1), UNIT_SAMPLE)
-  assert_eq(output.get(2), UNIT_SAMPLE)
-  assert_eq(output.get(3), UNIT_SAMPLE)
+  @debug.assert_eq(output.get(0), UNIT_SAMPLE)
+  @debug.assert_eq(output.get(1), UNIT_SAMPLE)
+  @debug.assert_eq(output.get(2), UNIT_SAMPLE)
+  @debug.assert_eq(output.get(3), UNIT_SAMPLE)
 }
 
 ///|
@@ -246,7 +246,7 @@ test "compiled dsp: oscillator reads frequency from input buffer" {
 
   compiled.process(context, output)
 
-  assert_eq(output.get(0), ZERO_SAMPLE)
+  @debug.assert_eq(output.get(0), ZERO_SAMPLE)
   assert_true(output.as_fixed_array().any(sample => sample != ZERO_SAMPLE))
 }
 
@@ -285,7 +285,7 @@ test "process: clean graph has zero sanitized count" {
   let compiled = CompiledDsp::compile(nodes, context).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   compiled.process(context, output)
-  assert_eq(compiled.last_sanitized_count(), 0)
+  @debug.assert_eq(compiled.last_sanitized_count(), 0)
 }
 
 ///|
@@ -309,8 +309,8 @@ test "process: last_sanitized_count resets each call" {
   let compiled = CompiledDsp::compile(nodes, context).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   compiled.process(context, output)
-  assert_eq(compiled.last_sanitized_count(), 0)
+  @debug.assert_eq(compiled.last_sanitized_count(), 0)
   // Second call also returns 0
   compiled.process(context, output)
-  assert_eq(compiled.last_sanitized_count(), 0)
+  @debug.assert_eq(compiled.last_sanitized_count(), 0)
 }

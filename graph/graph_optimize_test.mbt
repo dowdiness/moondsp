@@ -7,9 +7,9 @@ test "fold constants: Mul(Constant, Constant) -> Constant" {
     DspNode::output(2),
   ]
   let (optimized, _) = optimize_graph(nodes)
-  assert_eq(optimized.length(), 2) // Constant(12) + Output
+  @debug.assert_eq(optimized.length(), 2) // Constant(12) + Output
   assert_true(optimized[0].kind() is DspNodeKind::Constant)
-  assert_eq(optimized[0].value0(), 12.0)
+  @debug.assert_eq(optimized[0].value0(), 12.0)
 }
 
 ///|
@@ -20,9 +20,9 @@ test "fold constants: Gain(Constant, amount) -> Constant" {
     DspNode::output(1),
   ]
   let (optimized, _) = optimize_graph(nodes)
-  assert_eq(optimized.length(), 2) // Constant(5) + Output
+  @debug.assert_eq(optimized.length(), 2) // Constant(5) + Output
   assert_true(optimized[0].kind() is DspNodeKind::Constant)
-  assert_eq(optimized[0].value0(), 5.0)
+  @debug.assert_eq(optimized[0].value0(), 5.0)
 }
 
 ///|
@@ -32,7 +32,7 @@ test "fold constants: stateful nodes not folded" {
     DspNode::output(0),
   ]
   let (optimized, _) = optimize_graph(nodes)
-  assert_eq(optimized.length(), 2) // unchanged
+  @debug.assert_eq(optimized.length(), 2) // unchanged
 }
 
 ///|
@@ -43,7 +43,7 @@ test "dead-node elimination: removes unreachable nodes" {
     DspNode::output(0), // 2: reachable
   ]
   let (optimized, _) = optimize_graph(nodes)
-  assert_eq(optimized.length(), 2) // Constant(1) + Output
+  @debug.assert_eq(optimized.length(), 2) // Constant(1) + Output
 }
 
 ///|
@@ -68,8 +68,8 @@ test "optimize: index_map tracks original to optimized indices" {
   // Original indices 0, 1 should map to -1 (eliminated)
   // Original index 2 should map to 0 (the folded Constant)
   // Original index 3 should map to 1 (the Output)
-  assert_eq(index_map[0], -1)
-  assert_eq(index_map[1], -1)
-  assert_eq(index_map[2], 0)
-  assert_eq(index_map[3], 1)
+  @debug.assert_eq(index_map[0], -1)
+  @debug.assert_eq(index_map[1], -1)
+  @debug.assert_eq(index_map[2], 0)
+  @debug.assert_eq(index_map[3], 1)
 }

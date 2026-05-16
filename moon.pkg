@@ -4,3 +4,7 @@ import {
   "dowdiness/moondsp/identity" @identity,
   "dowdiness/moondsp/voice" @voice,
 }
+
+import {
+  "moonbitlang/core/debug" @debug,
+} for "test"

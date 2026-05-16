@@ -30,7 +30,7 @@ test "build: invalid node index returns InvalidNodeIndex" {
   let result = ControlBindingBuilder::new()
     .bind(key="note", node_index=5, slot=GraphParamSlot::Value0)
     .build(CompiledTemplate::analyze(template))
-  assert_eq(result, Err(ControlBindingError::InvalidNodeIndex(5)))
+  @debug.assert_eq(result, Err(ControlBindingError::InvalidNodeIndex(5)))
 }
 
 ///|
@@ -39,7 +39,7 @@ test "build: negative node index returns InvalidNodeIndex" {
   let result = ControlBindingBuilder::new()
     .bind(key="note", node_index=-1, slot=GraphParamSlot::Value0)
     .build(CompiledTemplate::analyze(template))
-  assert_eq(result, Err(ControlBindingError::InvalidNodeIndex(-1)))
+  @debug.assert_eq(result, Err(ControlBindingError::InvalidNodeIndex(-1)))
 }
 
 ///|
@@ -48,7 +48,7 @@ test "build: invalid slot for node returns InvalidSlotForNode" {
   let result = ControlBindingBuilder::new()
     .bind(key="x", node_index=1, slot=GraphParamSlot::Value0)
     .build(CompiledTemplate::analyze(template))
-  assert_eq(
+  @debug.assert_eq(
     result,
     Err(ControlBindingError::InvalidSlotForNode(1, GraphParamSlot::Value0)),
   )
@@ -67,7 +67,7 @@ test "build: duplicate keys returns DuplicateKey" {
     .bind(key="freq", node_index=0, slot=GraphParamSlot::Value0)
     .bind(key="freq", node_index=1, slot=GraphParamSlot::Value0)
     .build(CompiledTemplate::analyze(template))
-  assert_eq(result, Err(ControlBindingError::DuplicateKey("freq")))
+  @debug.assert_eq(result, Err(ControlBindingError::DuplicateKey("freq")))
 }
 
 ///|
@@ -106,13 +106,13 @@ test "resolve: all present keys converted in binding insertion order" {
     .unwrap()
   let controls : Map[String, Double] = { "note": 60.0, "gain": 0.5 }
   let result = map.resolve_controls(controls)
-  assert_eq(result.length(), 2)
-  assert_eq(result[0].node_index(), 0)
-  assert_eq(result[0].slot(), GraphParamSlot::Value0)
-  assert_eq(result[0].value(), 60.0)
-  assert_eq(result[1].node_index(), 1)
-  assert_eq(result[1].slot(), GraphParamSlot::Value0)
-  assert_eq(result[1].value(), 0.5)
+  @debug.assert_eq(result.length(), 2)
+  @debug.assert_eq(result[0].node_index(), 0)
+  @debug.assert_eq(result[0].slot(), GraphParamSlot::Value0)
+  @debug.assert_eq(result[0].value(), 60.0)
+  @debug.assert_eq(result[1].node_index(), 1)
+  @debug.assert_eq(result[1].slot(), GraphParamSlot::Value0)
+  @debug.assert_eq(result[1].value(), 0.5)
 }
 
 ///|
@@ -129,9 +129,9 @@ test "resolve: partial map skips missing keys" {
     .unwrap()
   let controls : Map[String, Double] = { "gain": 0.8 }
   let result = map.resolve_controls(controls)
-  assert_eq(result.length(), 1)
-  assert_eq(result[0].node_index(), 1)
-  assert_eq(result[0].value(), 0.8)
+  @debug.assert_eq(result.length(), 1)
+  @debug.assert_eq(result[0].node_index(), 1)
+  @debug.assert_eq(result[0].value(), 0.8)
 }
 
 ///|
@@ -143,8 +143,8 @@ test "resolve: extra keys in map are ignored" {
     .unwrap()
   let controls : Map[String, Double] = { "freq": 220.0, "unknown": 99.0 }
   let result = map.resolve_controls(controls)
-  assert_eq(result.length(), 1)
-  assert_eq(result[0].value(), 220.0)
+  @debug.assert_eq(result.length(), 1)
+  @debug.assert_eq(result[0].value(), 220.0)
 }
 
 ///|
@@ -156,7 +156,7 @@ test "resolve: empty map produces empty controls" {
     .unwrap()
   let controls : Map[String, Double] = {}
   let result = map.resolve_controls(controls)
-  assert_eq(result.length(), 0)
+  @debug.assert_eq(result.length(), 0)
 }
 
 ///|
@@ -167,7 +167,7 @@ test "resolve: empty binding map produces empty controls" {
     .unwrap()
   let controls : Map[String, Double] = { "freq": 440.0 }
   let result = map.resolve_controls(controls)
-  assert_eq(result.length(), 0)
+  @debug.assert_eq(result.length(), 0)
 }
 
 ///|
@@ -202,7 +202,7 @@ test "build: post-build bind does not mutate validated map" {
   let map = builder.build(CompiledTemplate::analyze(template)).unwrap()
   // Mutate the builder after build — must not affect the validated map
   ignore(builder.bind(key="extra", node_index=0, slot=GraphParamSlot::Value0))
-  assert_eq(map.length(), 1)
+  @debug.assert_eq(map.length(), 1)
 }
 
 ///|
@@ -223,7 +223,10 @@ test "build: orphan binding returns OrphanBinding with key and index" {
   let result = ControlBindingBuilder::new()
     .bind(key="orphan_freq", node_index=1, slot=GraphParamSlot::Value0)
     .build(CompiledTemplate::analyze(orphan_template()))
-  assert_eq(result, Err(ControlBindingError::OrphanBinding("orphan_freq", 1)))
+  @debug.assert_eq(
+    result,
+    Err(ControlBindingError::OrphanBinding("orphan_freq", 1)),
+  )
 }
 
 ///|
@@ -234,7 +237,10 @@ test "build: orphan error carries the specific binding's key" {
     .bind(key="orphan_a", node_index=1, slot=GraphParamSlot::Value0)
     .bind(key="orphan_b", node_index=1, slot=GraphParamSlot::Value0)
     .build(CompiledTemplate::analyze(orphan_template()))
-  assert_eq(result, Err(ControlBindingError::OrphanBinding("orphan_a", 1)))
+  @debug.assert_eq(
+    result,
+    Err(ControlBindingError::OrphanBinding("orphan_a", 1)),
+  )
 }
 
 ///|
@@ -245,7 +251,7 @@ test "build: slot error preempts orphan check" {
   let result = ControlBindingBuilder::new()
     .bind(key="x", node_index=1, slot=GraphParamSlot::Value0)
     .build(CompiledTemplate::analyze(template))
-  assert_eq(
+  @debug.assert_eq(
     result,
     Err(ControlBindingError::InvalidSlotForNode(1, GraphParamSlot::Value0)),
   )
@@ -258,7 +264,7 @@ test "build: bounds error preempts orphan check" {
   let result = ControlBindingBuilder::new()
     .bind(key="x", node_index=99, slot=GraphParamSlot::Value0)
     .build(CompiledTemplate::analyze(orphan_template()))
-  assert_eq(result, Err(ControlBindingError::InvalidNodeIndex(99)))
+  @debug.assert_eq(result, Err(ControlBindingError::InvalidNodeIndex(99)))
 }
 
 ///|
@@ -268,7 +274,7 @@ test "build: orphan preempts duplicate key" {
     .bind(key="dup", node_index=1, slot=GraphParamSlot::Value0)
     .bind(key="dup", node_index=0, slot=GraphParamSlot::Value0)
     .build(CompiledTemplate::analyze(orphan_template()))
-  assert_eq(result, Err(ControlBindingError::OrphanBinding("dup", 1)))
+  @debug.assert_eq(result, Err(ControlBindingError::OrphanBinding("dup", 1)))
 }
 
 ///|
@@ -283,7 +289,7 @@ test "build: duplicate key still reported for live-node bindings" {
     .bind(key="g", node_index=0, slot=GraphParamSlot::Value0)
     .bind(key="g", node_index=1, slot=GraphParamSlot::Value0)
     .build(CompiledTemplate::analyze(template))
-  assert_eq(result, Err(ControlBindingError::DuplicateKey("g")))
+  @debug.assert_eq(result, Err(ControlBindingError::DuplicateKey("g")))
 }
 
 ///|
@@ -309,5 +315,5 @@ test "build: orphan via constant-folding rejected" {
   let result = ControlBindingBuilder::new()
     .bind(key="base", node_index=0, slot=GraphParamSlot::Value0)
     .build(CompiledTemplate::analyze(template))
-  assert_eq(result, Err(ControlBindingError::OrphanBinding("base", 0)))
+  @debug.assert_eq(result, Err(ControlBindingError::OrphanBinding("base", 0)))
 }

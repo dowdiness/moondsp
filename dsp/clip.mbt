@@ -4,7 +4,8 @@ pub struct Clip {}
 
 ///|
 /// Create a clip processor.
-pub fn Clip::new() -> Clip {
+#alias(new)
+pub fn Clip::Clip() -> Clip {
   Clip::{  }
 }
 

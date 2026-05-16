@@ -31,7 +31,8 @@ priv struct Parser {
 }
 
 ///|
-fn Parser::new(input : String) -> Parser {
+#alias(new)
+fn Parser::Parser(input : String) -> Parser {
   { input, pos: 0 }
 }
 
@@ -440,7 +441,11 @@ priv struct NotationParser {
 }
 
 ///|
-fn NotationParser::new(input : String, sound~ : Bool) -> NotationParser {
+#alias(new)
+fn NotationParser::NotationParser(
+  input : String,
+  sound~ : Bool,
+) -> NotationParser {
   { input, pos: 0, sound }
 }
 

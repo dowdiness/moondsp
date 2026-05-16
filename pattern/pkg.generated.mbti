@@ -127,9 +127,10 @@ pub struct Rational {
   num : Int64
   den : Int64
 } derive(Eq, @debug.Debug)
+#alias(new)
+pub fn Rational::Rational(Int64, Int64) -> Self
 pub fn Rational::floor(Self) -> Int64
 pub fn Rational::from_int(Int) -> Self
-pub fn Rational::new(Int64, Int64) -> Self
 pub fn Rational::to_double(Self) -> Double
 pub impl Add for Rational
 pub impl Compare for Rational
@@ -142,10 +143,11 @@ pub struct TimeSpan {
   begin : Rational
   end_ : Rational
 } derive(Eq, @debug.Debug)
+#alias(new)
+pub fn TimeSpan::TimeSpan(Rational, Rational) -> Self
 pub fn TimeSpan::contains(Self, Rational) -> Bool
 pub fn TimeSpan::duration(Self) -> Rational
 pub fn TimeSpan::intersect(Self, Self) -> Self?
-pub fn TimeSpan::new(Rational, Rational) -> Self
 pub fn TimeSpan::shift(Self, Rational) -> Self
 pub fn TimeSpan::whole_cycles(Self) -> Array[Self]
 pub impl Show for TimeSpan

@@ -30,25 +30,25 @@ test "NodeStateful: Gain is not stateful" {
 ///|
 test "NodeFoldable: fold Mul evaluates 3.0 * 4.0 = 12.0" {
   let node = DspNode::mul(0, 1)
-  assert_eq(node.fold_value(3.0, 4.0), 12.0)
+  @debug.assert_eq(node.fold_value(3.0, 4.0), 12.0)
 }
 
 ///|
 test "NodeFoldable: fold Clip clamps 5.0 at threshold 3.0 = 3.0" {
   let node = DspNode::clip(0, 3.0)
-  assert_eq(node.fold_value(5.0, 0.0), 3.0)
+  @debug.assert_eq(node.fold_value(5.0, 0.0), 3.0)
 }
 
 ///|
 test "NodeSpanning: Gain has mono shape (0)" {
   let node = DspNode::gain(0, 0.5)
-  assert_eq(node.signal_shape(), 0)
+  @debug.assert_eq(node.signal_shape(), 0)
 }
 
 ///|
 test "NodeSpanning: Pan has stereo shape (1)" {
   let node = DspNode::pan(0, 0.0)
-  assert_eq(node.signal_shape(), 1)
+  @debug.assert_eq(node.signal_shape(), 1)
 }
 
 ///|

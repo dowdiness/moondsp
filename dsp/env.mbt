@@ -22,7 +22,8 @@ pub struct Adsr {
 
 ///|
 /// Create a new ADSR envelope with normalized parameters.
-pub fn Adsr::new(
+#alias(new)
+pub fn Adsr::Adsr(
   attack_ms~ : Double,
   decay_ms~ : Double,
   sustain~ : Double,

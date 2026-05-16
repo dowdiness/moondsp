@@ -63,7 +63,8 @@ pub struct GraphControl {
 }
 
 ///|
-fn GraphControl::new(
+#alias(new)
+fn GraphControl::GraphControl(
   kind : GraphControlKind,
   node_index : Int,
   slot : GraphParamSlot,
@@ -123,7 +124,8 @@ pub struct DspNode {
 }
 
 ///|
-fn DspNode::new(
+#alias(new)
+fn DspNode::DspNode(
   kind : DspNodeKind,
   input0 : Int,
   input1 : Int,

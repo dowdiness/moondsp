@@ -65,8 +65,8 @@ pub struct ControlMapper {
   transform : (String, Double) -> (String, Double)?
   voice_action : (String, Double) -> VoiceAction?
 }
+#alias(new)
 pub fn ControlMapper::ControlMapper(transform~ : (String, Double) -> (String, Double)?, voice_action~ : (String, Double) -> VoiceAction?) -> Self
-pub fn ControlMapper::new(transform~ : (String, Double) -> (String, Double)?, voice_action~ : (String, Double) -> VoiceAction?) -> Self
 
 pub struct EventSource {
   // private fields
@@ -90,6 +90,7 @@ pub struct PatternScheduler {
   mapper : ControlMapper
   // private fields
 }
+#alias(new)
 pub fn PatternScheduler::PatternScheduler(bpm~ : Double, ctx~ : @dsp.DspContext, mapper? : ControlMapper) -> Self
 pub fn PatternScheduler::active_note_count(Self) -> Int
 pub fn PatternScheduler::active_note_matches(Self, Int, AffectedVoiceTarget) -> Bool?
@@ -112,7 +113,6 @@ pub fn PatternScheduler::has_active_song_snapshot(Self) -> Bool
 pub fn PatternScheduler::has_pending_pattern_snapshot(Self) -> Bool
 pub fn PatternScheduler::has_pending_playback_snapshot(Self) -> Bool
 pub fn PatternScheduler::has_pending_song_snapshot(Self) -> Bool
-pub fn PatternScheduler::new(bpm~ : Double, ctx~ : @dsp.DspContext, mapper? : ControlMapper) -> Self
 pub fn PatternScheduler::process_block(Self, @pattern.Pat[@pattern.ControlMap], @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::process_events(Self, Array[@pattern.Event[@pattern.ControlMap]], @pattern.TimeSpan, @voice.BoundVoicePool) -> Unit
 pub fn PatternScheduler::process_playback_events(Self, Array[PlaybackEvent], @pattern.TimeSpan, @voice.BoundVoicePool) -> Unit

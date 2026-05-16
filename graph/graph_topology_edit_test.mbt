@@ -93,8 +93,8 @@ test "compiled dsp topology controller result reports invalid edit index" {
         GraphTopologyEditError::InvalidNodeIndex(node_index)
       )
     ) => {
-      assert_eq(index, 1)
-      assert_eq(node_index, 99)
+      @debug.assert_eq(index, 1)
+      @debug.assert_eq(node_index, 99)
     }
     other => fail("expected InvalidEdit, got \{other}")
   }
@@ -128,8 +128,8 @@ test "compiled dsp topology controller result reports invalid edit reason" {
         )
       )
     ) => {
-      assert_eq(index, 0)
-      assert_eq(node_index, 0)
+      @debug.assert_eq(index, 0)
+      @debug.assert_eq(node_index, 0)
     }
     other => fail("expected UnsupportedInputSlot, got \{other}")
   }
@@ -146,7 +146,7 @@ test "compiled dsp topology controller result reports invalid edit reason" {
         index,
         GraphTopologyEditError::UnsupportedInsertTemplate(DspNodeKind::Constant)
       )
-    ) => assert_eq(index, 0)
+    ) => @debug.assert_eq(index, 0)
     other => fail("expected UnsupportedInsertTemplate, got \{other}")
   }
 }

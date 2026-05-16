@@ -69,8 +69,8 @@ test "compiled stereo dsp applies stereo clip after pan" {
   compiled.process(context, left_output, right_output)
 
   for index = 0; index < SMALL_BLOCK_SIZE; index = index + 1 {
-    assert_eq(left_output.get(index), STEREO_CLIP_THRESHOLD)
-    assert_eq(right_output.get(index), STEREO_CLIP_THRESHOLD)
+    @debug.assert_eq(left_output.get(index), STEREO_CLIP_THRESHOLD)
+    @debug.assert_eq(right_output.get(index), STEREO_CLIP_THRESHOLD)
   }
 }
 
@@ -131,8 +131,8 @@ test "compiled stereo dsp compile_template matches compile output" {
   compiled_template.process(context, template_left, template_right)
 
   for i in 0..<SMALL_BLOCK_SIZE {
-    assert_eq(template_left.get(i), left.get(i))
-    assert_eq(template_right.get(i), right.get(i))
+    @debug.assert_eq(template_left.get(i), left.get(i))
+    @debug.assert_eq(template_right.get(i), right.get(i))
   }
 }
 
@@ -154,12 +154,12 @@ test "compiled stereo dsp applies stereo delay after pan" {
 
   compiled.process(context, left_output, right_output)
 
-  assert_eq(left_output.get(0), ZERO_SAMPLE)
-  assert_eq(left_output.get(1), ZERO_SAMPLE)
+  @debug.assert_eq(left_output.get(0), ZERO_SAMPLE)
+  @debug.assert_eq(left_output.get(1), ZERO_SAMPLE)
   assert_true((left_output.get(2) - PAN_CENTER_GAIN).abs() < 0.000000001)
   assert_true((left_output.get(3) - PAN_CENTER_GAIN).abs() < 0.000000001)
-  assert_eq(right_output.get(0), ZERO_SAMPLE)
-  assert_eq(right_output.get(1), ZERO_SAMPLE)
+  @debug.assert_eq(right_output.get(0), ZERO_SAMPLE)
+  @debug.assert_eq(right_output.get(1), ZERO_SAMPLE)
   assert_true((right_output.get(2) - PAN_CENTER_GAIN).abs() < 0.000000001)
   assert_true((right_output.get(3) - PAN_CENTER_GAIN).abs() < 0.000000001)
 }
@@ -187,8 +187,8 @@ test "compiled stereo dsp apply_control updates pan position" {
   compiled.process(context, left_output, right_output)
 
   for index = 0; index < SMALL_BLOCK_SIZE; index = index + 1 {
-    assert_eq(left_output.get(index), ZERO_SAMPLE)
-    assert_eq(right_output.get(index), UNIT_SAMPLE)
+    @debug.assert_eq(left_output.get(index), ZERO_SAMPLE)
+    @debug.assert_eq(right_output.get(index), UNIT_SAMPLE)
   }
 }
 
@@ -222,8 +222,8 @@ test "compiled stereo dsp runtime params update stereo gain and clip" {
   compiled.process(context, left_output, right_output)
 
   for index = 0; index < SMALL_BLOCK_SIZE; index = index + 1 {
-    assert_eq(left_output.get(index), STEREO_CLIP_THRESHOLD)
-    assert_eq(right_output.get(index), STEREO_CLIP_THRESHOLD)
+    @debug.assert_eq(left_output.get(index), STEREO_CLIP_THRESHOLD)
+    @debug.assert_eq(right_output.get(index), STEREO_CLIP_THRESHOLD)
   }
 }
 
@@ -298,12 +298,12 @@ test "compiled stereo dsp runtime params update stereo delay" {
   )
   compiled.process(context, left_output, right_output)
 
-  assert_eq(left_output.get(0), ZERO_SAMPLE)
-  assert_eq(left_output.get(1), ZERO_SAMPLE)
+  @debug.assert_eq(left_output.get(0), ZERO_SAMPLE)
+  @debug.assert_eq(left_output.get(1), ZERO_SAMPLE)
   assert_true((left_output.get(2) - PAN_CENTER_GAIN).abs() < 0.000000001)
   assert_true((left_output.get(3) - PAN_CENTER_GAIN).abs() < 0.000000001)
-  assert_eq(right_output.get(0), ZERO_SAMPLE)
-  assert_eq(right_output.get(1), ZERO_SAMPLE)
+  @debug.assert_eq(right_output.get(0), ZERO_SAMPLE)
+  @debug.assert_eq(right_output.get(1), ZERO_SAMPLE)
   assert_true((right_output.get(2) - PAN_CENTER_GAIN).abs() < 0.000000001)
   assert_true((right_output.get(3) - PAN_CENTER_GAIN).abs() < 0.000000001)
 }
@@ -470,7 +470,7 @@ test "compiled dsp runtime params update stereo nodes before mixdown" {
   compiled.process(context, output)
 
   for index = 0; index < SMALL_BLOCK_SIZE; index = index + 1 {
-    assert_eq(output.get(index), STEREO_CLIP_THRESHOLD)
+    @debug.assert_eq(output.get(index), STEREO_CLIP_THRESHOLD)
   }
   assert_true(
     compiled.apply_controls([
@@ -540,8 +540,8 @@ test "compiled dsp applies stereo delay before mixdown" {
 
   compiled.process(context, output)
 
-  assert_eq(output.get(0), ZERO_SAMPLE)
-  assert_eq(output.get(1), ZERO_SAMPLE)
+  @debug.assert_eq(output.get(0), ZERO_SAMPLE)
+  @debug.assert_eq(output.get(1), ZERO_SAMPLE)
   assert_true((output.get(2) - PAN_CENTER_GAIN).abs() < 0.000000001)
   assert_true((output.get(3) - PAN_CENTER_GAIN).abs() < 0.000000001)
 }
@@ -573,8 +573,8 @@ test "compiled dsp runtime params update stereo delay before mixdown" {
   )
   compiled.process(context, output)
 
-  assert_eq(output.get(0), ZERO_SAMPLE)
-  assert_eq(output.get(1), ZERO_SAMPLE)
+  @debug.assert_eq(output.get(0), ZERO_SAMPLE)
+  @debug.assert_eq(output.get(1), ZERO_SAMPLE)
   assert_true((output.get(2) - PAN_CENTER_GAIN).abs() < 0.000000001)
   assert_true((output.get(3) - PAN_CENTER_GAIN).abs() < 0.000000001)
 }
@@ -634,5 +634,5 @@ test "stereo process: clean graph has zero sanitized count" {
   let left = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let right = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   compiled.process(context, left, right)
-  assert_eq(compiled.last_sanitized_count(), 0)
+  @debug.assert_eq(compiled.last_sanitized_count(), 0)
 }

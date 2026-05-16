@@ -5,13 +5,13 @@ test "browser error reports queue before initialization" {
   assert_false(queue_compiled_hot_swap())
 
   let message = get_browser_last_error()
-  assert_eq(get_browser_error_code(), BROWSER_ERROR_NOT_INITIALIZED)
+  @debug.assert_eq(get_browser_error_code(), BROWSER_ERROR_NOT_INITIALIZED)
   assert_true(message.contains("compiled_hot_swap.queue"))
   assert_true(message.contains("graph not initialized"))
-  assert_eq(get_browser_error_length(), message.length())
-  assert_eq(get_browser_error_char(0), message[0].to_int())
-  assert_eq(get_browser_error_char(-1), 0)
-  assert_eq(get_browser_error_char(message.length()), 0)
+  @debug.assert_eq(get_browser_error_length(), message.length())
+  @debug.assert_eq(get_browser_error_char(0), message[0].to_int())
+  @debug.assert_eq(get_browser_error_char(-1), 0)
+  @debug.assert_eq(get_browser_error_char(message.length()), 0)
 }
 
 ///|
@@ -22,7 +22,7 @@ test "browser error reports compiled runtime control failure" {
   assert_false(process_compiled_block(0.0 / 0.0, 0.3, 48000.0, 4))
 
   let message = get_browser_last_error()
-  assert_eq(get_browser_error_code(), BROWSER_ERROR_RUNTIME_CONTROL)
+  @debug.assert_eq(get_browser_error_code(), BROWSER_ERROR_RUNTIME_CONTROL)
   assert_true(message.contains("compiled.process"))
   assert_true(message.contains("InvalidParamValue"))
 }
@@ -35,7 +35,7 @@ test "browser error reports invalid topology queue state" {
   assert_false(queue_compiled_topology_delete_edit())
 
   let message = get_browser_last_error()
-  assert_eq(get_browser_error_code(), BROWSER_ERROR_TOPOLOGY_QUEUE)
+  @debug.assert_eq(get_browser_error_code(), BROWSER_ERROR_TOPOLOGY_QUEUE)
   assert_true(message.contains("compiled_topology_delete.queue"))
   assert_true(message.contains("no inserted node to delete"))
 }

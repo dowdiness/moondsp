@@ -61,29 +61,29 @@ test "context-based setup matches explicit sample rate setup" {
 test "invalid smoothing parameters snap immediately" {
   let smoother = ParamSmoother::new(0.0, 0.0, 48000.0)
   smoother.set_target(1.0)
-  assert_eq(smoother.tick(), 1.0)
+  @debug.assert_eq(smoother.tick(), 1.0)
 
   smoother.reset(0.0)
   smoother.set_smoothing_time(5.0, 0.0)
   smoother.set_target(0.5)
-  assert_eq(smoother.tick(), 0.5)
+  @debug.assert_eq(smoother.tick(), 0.5)
 
   let context = DspContext::new(sample_rate=0.0, block_size=128)
   smoother.reset(0.0)
   smoother.set_smoothing_time_from_context(5.0, context)
   smoother.set_target(-0.25)
-  assert_eq(smoother.tick(), -0.25)
+  @debug.assert_eq(smoother.tick(), -0.25)
 }
 
 ///|
 test "invalid values are normalized or ignored deterministically" {
   let smoother = ParamSmoother::new(0.0 / 0.0, 10.0, 48000.0)
-  assert_eq(smoother.current(), 0.0)
-  assert_eq(smoother.target(), 0.0)
+  @debug.assert_eq(smoother.current(), 0.0)
+  @debug.assert_eq(smoother.target(), 0.0)
 
   smoother.set_target(1.0 / 0.0)
-  assert_eq(smoother.target(), 0.0)
-  assert_eq(smoother.tick(), 0.0)
+  @debug.assert_eq(smoother.target(), 0.0)
+  @debug.assert_eq(smoother.tick(), 0.0)
 
   smoother.reset(0.75)
   smoother.set_target(-0.5)

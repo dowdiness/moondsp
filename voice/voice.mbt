@@ -88,7 +88,8 @@ priv struct VoiceSlot {
 }
 
 ///|
-fn VoiceSlot::new(block_size : Int) -> VoiceSlot {
+#alias(new)
+fn VoiceSlot::VoiceSlot(block_size : Int) -> VoiceSlot {
   {
     compiled: None,
     template_snapshot: [],

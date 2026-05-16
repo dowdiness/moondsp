@@ -126,8 +126,8 @@ test "PatternSnapshot::query_sourced_events tags fast ancestor and leaf path" {
   let snapshot = unwrap_snapshot(try? doc.lower())
   let events = snapshot.query_sourced_events(doc_span(0, 1, 1, 1))
   let raw_events = snapshot.query(doc_span(0, 1, 1, 1))
-  assert_eq(events.length(), raw_events.length())
-  assert_eq(events.length(), 2)
+  @debug.assert_eq(events.length(), raw_events.length())
+  @debug.assert_eq(events.length(), 2)
   assert_pattern_event_path(events[0], ["fast", "leaf"])
   assert_pattern_event_path(events[1], ["fast", "leaf"])
   assert_true(events[0].pattern_node() == Some(pid("leaf")))
@@ -145,7 +145,7 @@ test "PatternSnapshot::query_sourced_events tags sequence and stack children" {
   let seq_events = unwrap_snapshot(try? seq.lower()).query_sourced_events(
     doc_span(0, 1, 1, 1),
   )
-  assert_eq(seq_events.length(), 2)
+  @debug.assert_eq(seq_events.length(), 2)
   assert_pattern_event_path(seq_events[0], ["seq", "left"])
   assert_pattern_event_path(seq_events[1], ["seq", "right"])
   assert_true(seq_events[0].event().value == 1)
@@ -159,7 +159,7 @@ test "PatternSnapshot::query_sourced_events tags sequence and stack children" {
   let stack_events = unwrap_snapshot(try? stack.lower()).query_sourced_events(
     doc_span(0, 1, 1, 1),
   )
-  assert_eq(stack_events.length(), 2)
+  @debug.assert_eq(stack_events.length(), 2)
   assert_pattern_event_path(stack_events[0], ["stack", "stack-left"])
   assert_pattern_event_path(stack_events[1], ["stack", "stack-right"])
 }
@@ -219,7 +219,7 @@ test "PatternSnapshot::query_sourced_events covers merge_control inputs" {
   let events = unwrap_snapshot(try? doc.lower()).query_sourced_events(
     doc_span(0, 1, 1, 100),
   )
-  assert_eq(events.length(), 1)
+  @debug.assert_eq(events.length(), 1)
   assert_pattern_event_path(events[0], ["merge", "merge-left", "merge-right"])
   assert_true(events[0].event().value.get("note") == Some(60.0))
   assert_true(events[0].event().value.get("cutoff") == Some(800.0))

@@ -4,7 +4,10 @@ test "biquad rejects invalid parameters and writes silence" {
   let context = DspContext::new(sample_rate=48000.0, block_size=4)
   let buffer = AudioBuffer::filled(4, init=1.0)
 
-  assert_eq(biquad.update(context, BiquadMode::LowPass, 0.0, 0.707), false)
+  @debug.assert_eq(
+    biquad.update(context, BiquadMode::LowPass, 0.0, 0.707),
+    false,
+  )
 
   biquad.process(context, buffer)
 
@@ -70,6 +73,6 @@ test "biquad respects context block size" {
 
   assert_true(buffer.get(0) > 0.0)
   assert_true(buffer.get(1) > buffer.get(0))
-  assert_eq(buffer.get(2), 0.0)
-  assert_eq(buffer.get(3), 0.0)
+  @debug.assert_eq(buffer.get(2), 0.0)
+  @debug.assert_eq(buffer.get(3), 0.0)
 }

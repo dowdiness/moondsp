@@ -4,7 +4,8 @@ pub struct Gain {}
 
 ///|
 /// Create a gain processor.
-pub fn Gain::new() -> Gain {
+#alias(new)
+pub fn Gain::Gain() -> Gain {
   Gain::{  }
 }
 

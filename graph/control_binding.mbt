@@ -6,7 +6,8 @@ pub struct ControlBinding {
 } derive(Debug, Eq)
 
 ///|
-pub fn ControlBinding::new(
+#alias(new)
+pub fn ControlBinding::ControlBinding(
   key~ : String,
   node_index~ : Int,
   slot~ : GraphParamSlot,
@@ -30,7 +31,8 @@ pub struct ControlBindingBuilder {
 } derive(Debug)
 
 ///|
-pub fn ControlBindingBuilder::new() -> ControlBindingBuilder {
+#alias(new)
+pub fn ControlBindingBuilder::ControlBindingBuilder() -> ControlBindingBuilder {
   { bindings: [] }
 }
 

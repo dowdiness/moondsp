@@ -4,3 +4,7 @@ import {
   "dowdiness/moondsp/song" @song,
   "moonbitlang/core/bench" @bench,
 }
+
+import {
+  "moonbitlang/core/debug" @debug,
+} for "test"

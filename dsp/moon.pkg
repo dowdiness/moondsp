@@ -3,6 +3,7 @@ import {
 }
 
 import {
+  "moonbitlang/core/debug" @debug,
   "moonbitlang/core/double" @double,
   "moonbitlang/quickcheck" @qc,
 } for "test"

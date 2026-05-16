@@ -109,7 +109,7 @@ test "SongSnapshot::query_sourced_events tags occurrence section and layer IDs" 
       @pattern.Rational::new(1L, 100L),
     ),
   )
-  assert_eq(events.length(), 2)
+  @debug.assert_eq(events.length(), 2)
   assert_true(events[0].occurrence() == occurrence_id)
   assert_true(events[0].section() == Some(section_id))
   assert_true(events[0].layer() == Some(lead_id))
@@ -154,8 +154,8 @@ test "SongDoc occurrence renames preserve identity and layout revision" {
     Some(occurrence) => occurrence
     None => abort("expected renamed occurrence doc")
   }
-  assert_eq(renamed_occurrence.id().value(), "verse:layout")
-  assert_eq(renamed_occurrence.name(), "Verse Intro")
+  @debug.assert_eq(renamed_occurrence.id().value(), "verse:layout")
+  @debug.assert_eq(renamed_occurrence.name(), "Verse Intro")
   assert_true(renamed.revision() != doc.revision())
   assert_true(renamed.layout_revision() == doc.layout_revision())
   assert_true(renamed_occurrence.revision() != before_occurrence.revision())
@@ -166,8 +166,8 @@ test "SongDoc occurrence renames preserve identity and layout revision" {
       after_song.get_occurrence_by_id(verse_id),
     ) {
     (Some(before), Some(after)) => {
-      assert_eq(before.id().value(), after.id().value())
-      assert_eq(after.name(), "Verse Intro")
+      @debug.assert_eq(before.id().value(), after.id().value())
+      @debug.assert_eq(after.name(), "Verse Intro")
       assert_true(before.start() == after.start())
       assert_true(before.end_() == after.end_())
     }
@@ -212,10 +212,10 @@ test "SongDoc insertion and removal preserve surviving occurrence identities" {
   }
   assert_true(inserted.layout_revision() != doc.layout_revision())
   let inserted_song = song_doc_test_song(inserted)
-  assert_eq(inserted_song.occurrence_count(), 3)
+  @debug.assert_eq(inserted_song.occurrence_count(), 3)
   match inserted_song.get_occurrence_by_id(chorus_id) {
     Some(chorus_occurrence) => {
-      assert_eq(chorus_occurrence.id().value(), "chorus:insert")
+      @debug.assert_eq(chorus_occurrence.id().value(), "chorus:insert")
       assert_true(chorus_occurrence.start() == @pattern.Rational::from_int(2))
     }
     None => abort("expected chorus after insertion")
@@ -282,9 +282,9 @@ test "SongDoc reorder preserves IDs while recomputing implicit spans" {
       assert_true(c_occurrence.start() == @pattern.Rational::from_int(0))
       assert_true(a_occurrence.start() == @pattern.Rational::from_int(1))
       assert_true(b_occurrence.start() == @pattern.Rational::from_int(2))
-      assert_eq(c_occurrence.id().value(), "c:reorder")
-      assert_eq(a_occurrence.id().value(), "a:reorder")
-      assert_eq(b_occurrence.id().value(), "b:reorder")
+      @debug.assert_eq(c_occurrence.id().value(), "c:reorder")
+      @debug.assert_eq(a_occurrence.id().value(), "a:reorder")
+      @debug.assert_eq(b_occurrence.id().value(), "b:reorder")
     }
     _ => abort("expected moved occurrences by id")
   }
@@ -329,7 +329,7 @@ test "SongDoc section length edits shift downstream spans and preserve IDs" {
   let edited_song = song_doc_test_song(edited)
   match edited_song.get_occurrence_by_id(chorus_id) {
     Some(chorus_occurrence) => {
-      assert_eq(chorus_occurrence.id().value(), "chorus:length-doc")
+      @debug.assert_eq(chorus_occurrence.id().value(), "chorus:length-doc")
       assert_true(chorus_occurrence.start() == @pattern.Rational::from_int(2))
     }
     None => abort("expected chorus after length edit")
@@ -397,7 +397,7 @@ test "SongDoc same-length section edits reuse layout and unchanged sections" {
       @pattern.Rational::from_int(1),
     ),
   )
-  assert_eq(events.length(), 1)
+  @debug.assert_eq(events.length(), 1)
   assert_true(events[0].value.get("note") == Some(61.0))
 }
 

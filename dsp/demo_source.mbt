@@ -11,7 +11,8 @@ pub struct DemoSource {
 }
 
 ///|
-pub fn DemoSource::new() -> DemoSource {
+#alias(new)
+pub fn DemoSource::DemoSource() -> DemoSource {
   { oscillator: Oscillator::new(), noise: Noise::new(DEMO_NOISE_SEED) }
 }
 

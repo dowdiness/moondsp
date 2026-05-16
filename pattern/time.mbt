@@ -17,7 +17,8 @@ pub impl Show for TimeSpan with output(self, logger) {
 }
 
 ///|
-pub fn TimeSpan::new(begin : Rational, end_ : Rational) -> TimeSpan {
+#alias(new)
+pub fn TimeSpan::TimeSpan(begin : Rational, end_ : Rational) -> TimeSpan {
   { begin, end_ }
 }
 

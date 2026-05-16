@@ -13,7 +13,7 @@ test "compiled dsp runtime param update changes gain output" {
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)
-  assert_eq(output.get(0), QUARTER_SAMPLE)
+  @debug.assert_eq(output.get(0), QUARTER_SAMPLE)
 
   assert_true(
     compiled.apply_control(
@@ -22,10 +22,10 @@ test "compiled dsp runtime param update changes gain output" {
   )
   compiled.process(context, output)
 
-  assert_eq(output.get(0), HALF_GAIN)
-  assert_eq(output.get(1), HALF_GAIN)
-  assert_eq(output.get(2), HALF_GAIN)
-  assert_eq(output.get(3), HALF_GAIN)
+  @debug.assert_eq(output.get(0), HALF_GAIN)
+  @debug.assert_eq(output.get(1), HALF_GAIN)
+  @debug.assert_eq(output.get(2), HALF_GAIN)
+  @debug.assert_eq(output.get(3), HALF_GAIN)
 }
 
 ///|
@@ -43,8 +43,8 @@ test "compiled dsp runtime param update changes delay length" {
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)
-  assert_eq(output.get(0), ZERO_SAMPLE)
-  assert_eq(output.get(3), ZERO_SAMPLE)
+  @debug.assert_eq(output.get(0), ZERO_SAMPLE)
+  @debug.assert_eq(output.get(3), ZERO_SAMPLE)
 
   assert_true(
     compiled.apply_control(
@@ -62,10 +62,10 @@ test "compiled dsp runtime param update changes delay length" {
   )
   compiled.process(context, output)
 
-  assert_eq(output.get(0), ZERO_SAMPLE)
-  assert_eq(output.get(1), ZERO_SAMPLE)
-  assert_eq(output.get(2), UNIT_SAMPLE)
-  assert_eq(output.get(3), UNIT_SAMPLE)
+  @debug.assert_eq(output.get(0), ZERO_SAMPLE)
+  @debug.assert_eq(output.get(1), ZERO_SAMPLE)
+  @debug.assert_eq(output.get(2), UNIT_SAMPLE)
+  @debug.assert_eq(output.get(3), UNIT_SAMPLE)
 }
 
 ///|
@@ -96,10 +96,10 @@ test "compiled dsp applies mixed control batches in order" {
   )
   compiled.process(context, output)
 
-  assert_eq(output.get(0), HALF_GAIN)
-  assert_eq(output.get(1), HALF_GAIN * ADSR_SUSTAIN_LEVEL)
-  assert_eq(output.get(2), HALF_GAIN * ADSR_SUSTAIN_LEVEL)
-  assert_eq(output.get(3), HALF_GAIN * ADSR_SUSTAIN_LEVEL)
+  @debug.assert_eq(output.get(0), HALF_GAIN)
+  @debug.assert_eq(output.get(1), HALF_GAIN * ADSR_SUSTAIN_LEVEL)
+  @debug.assert_eq(output.get(2), HALF_GAIN * ADSR_SUSTAIN_LEVEL)
+  @debug.assert_eq(output.get(3), HALF_GAIN * ADSR_SUSTAIN_LEVEL)
 }
 
 ///|
@@ -129,10 +129,10 @@ test "compiled dsp rejects invalid control batches without partial updates" {
 
   compiled.process(context, output)
 
-  assert_eq(output.get(0), QUARTER_SAMPLE)
-  assert_eq(output.get(1), QUARTER_SAMPLE)
-  assert_eq(output.get(2), QUARTER_SAMPLE)
-  assert_eq(output.get(3), QUARTER_SAMPLE)
+  @debug.assert_eq(output.get(0), QUARTER_SAMPLE)
+  @debug.assert_eq(output.get(1), QUARTER_SAMPLE)
+  @debug.assert_eq(output.get(2), QUARTER_SAMPLE)
+  @debug.assert_eq(output.get(3), QUARTER_SAMPLE)
 }
 
 ///|
@@ -257,10 +257,10 @@ test "compiled dsp apply_controls_result is transactional" {
 
   compiled.process(context, output)
 
-  assert_eq(output.get(0), QUARTER_SAMPLE)
-  assert_eq(output.get(1), QUARTER_SAMPLE)
-  assert_eq(output.get(2), QUARTER_SAMPLE)
-  assert_eq(output.get(3), QUARTER_SAMPLE)
+  @debug.assert_eq(output.get(0), QUARTER_SAMPLE)
+  @debug.assert_eq(output.get(1), QUARTER_SAMPLE)
+  @debug.assert_eq(output.get(2), QUARTER_SAMPLE)
+  @debug.assert_eq(output.get(3), QUARTER_SAMPLE)
 }
 
 ///|
@@ -332,10 +332,10 @@ test "compiled dsp runtime param update rejects unsupported or invalid values" {
 
   compiled.process(context, output)
 
-  assert_eq(output.get(0), UNIT_SAMPLE)
-  assert_eq(output.get(1), UNIT_SAMPLE)
-  assert_eq(output.get(2), UNIT_SAMPLE)
-  assert_eq(output.get(3), UNIT_SAMPLE)
+  @debug.assert_eq(output.get(0), UNIT_SAMPLE)
+  @debug.assert_eq(output.get(1), UNIT_SAMPLE)
+  @debug.assert_eq(output.get(2), UNIT_SAMPLE)
+  @debug.assert_eq(output.get(3), UNIT_SAMPLE)
 }
 
 ///|
@@ -404,7 +404,7 @@ test "compiled dsp legacy wrappers match apply_control" {
   unified_compiled.process(context, unified_output)
 
   for index = 0; index < SMALL_BLOCK_SIZE; index = index + 1 {
-    assert_eq(wrapper_output.get(index), unified_output.get(index))
+    @debug.assert_eq(wrapper_output.get(index), unified_output.get(index))
   }
 
   assert_true(wrapper_compiled.gate_off(2))
@@ -414,7 +414,7 @@ test "compiled dsp legacy wrappers match apply_control" {
   unified_compiled.process(context, unified_output)
 
   for index = 0; index < SMALL_BLOCK_SIZE; index = index + 1 {
-    assert_eq(wrapper_output.get(index), unified_output.get(index))
+    @debug.assert_eq(wrapper_output.get(index), unified_output.get(index))
   }
 }
 
@@ -445,7 +445,7 @@ test "compiled dsp set_param wrapper matches apply_control" {
   unified_compiled.process(context, unified_output)
 
   for index = 0; index < SMALL_BLOCK_SIZE; index = index + 1 {
-    assert_eq(wrapper_output.get(index), unified_output.get(index))
+    @debug.assert_eq(wrapper_output.get(index), unified_output.get(index))
   }
 }
 
@@ -471,7 +471,7 @@ test "compiled dsp rejects negative delay_samples via set_param" {
   // Verify the node still works with the original valid delay_samples
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   compiled.process(context, output)
-  assert_eq(output.get(0), ZERO_SAMPLE)
+  @debug.assert_eq(output.get(0), ZERO_SAMPLE)
 }
 
 ///|

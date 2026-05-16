@@ -4,7 +4,8 @@ pub struct Pan {}
 
 ///|
 /// Create a pan processor.
-pub fn Pan::new() -> Pan {
+#alias(new)
+pub fn Pan::Pan() -> Pan {
   Pan::{  }
 }
 

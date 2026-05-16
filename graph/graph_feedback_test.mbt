@@ -114,10 +114,10 @@ test "compiled dsp runtime delay update matches fixed feedback loop compile" {
   runtime_compiled.process(context, runtime_output)
   fixed_compiled.process(context, fixed_output)
 
-  assert_eq(runtime_output.get(0), ZERO_SAMPLE)
-  assert_eq(runtime_output.get(1), ZERO_SAMPLE)
-  assert_eq(runtime_output.get(2), HALF_GAIN)
-  assert_eq(runtime_output.get(3), HALF_GAIN)
+  @debug.assert_eq(runtime_output.get(0), ZERO_SAMPLE)
+  @debug.assert_eq(runtime_output.get(1), ZERO_SAMPLE)
+  @debug.assert_eq(runtime_output.get(2), HALF_GAIN)
+  @debug.assert_eq(runtime_output.get(3), HALF_GAIN)
   for index = 0; index < runtime_output.length(); index = index + 1 {
     assert_true(
       (runtime_output.get(index) - fixed_output.get(index)).abs() < 0.000000001,
@@ -274,10 +274,10 @@ test "compiled dsp accepts direct self-feedback with zero-initialized z^-1 state
 
   compiled.process(context, output)
 
-  assert_eq(output.get(0), ZERO_SAMPLE)
-  assert_eq(output.get(1), ZERO_SAMPLE)
-  assert_eq(output.get(2), ZERO_SAMPLE)
-  assert_eq(output.get(3), ZERO_SAMPLE)
+  @debug.assert_eq(output.get(0), ZERO_SAMPLE)
+  @debug.assert_eq(output.get(1), ZERO_SAMPLE)
+  @debug.assert_eq(output.get(2), ZERO_SAMPLE)
+  @debug.assert_eq(output.get(3), ZERO_SAMPLE)
 }
 
 ///|

@@ -6,7 +6,8 @@ pub struct Noise {
 
 ///|
 /// Create a new white-noise generator from an explicit seed.
-pub fn Noise::new(seed : UInt) -> Noise {
+#alias(new)
+pub fn Noise::Noise(seed : UInt) -> Noise {
   { state: normalize_seed(seed) }
 }
 

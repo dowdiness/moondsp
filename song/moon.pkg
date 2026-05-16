@@ -2,3 +2,7 @@ import {
   "dowdiness/moondsp/identity" @identity,
   "dowdiness/moondsp/pattern" @pattern,
 }
+
+import {
+  "moonbitlang/core/debug" @debug,
+} for "test"

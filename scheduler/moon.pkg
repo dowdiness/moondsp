@@ -6,3 +6,7 @@ import {
   "moonbitlang/core/bench" @bench,
   "moonbitlang/core/math" @math,
 }
+
+import {
+  "moonbitlang/core/debug" @debug,
+} for "test"

@@ -233,19 +233,12 @@ pub struct ControlMapper {
 }
 
 ///|
+#alias(new)
 pub fn ControlMapper::ControlMapper(
   transform~ : (String, Double) -> (String, Double)?,
   voice_action~ : (String, Double) -> VoiceAction?,
 ) -> ControlMapper {
   { transform, voice_action }
-}
-
-///|
-pub fn ControlMapper::new(
-  transform~ : (String, Double) -> (String, Double)?,
-  voice_action~ : (String, Double) -> VoiceAction?,
-) -> ControlMapper {
-  ControlMapper(transform~, voice_action~)
 }
 
 ///|
@@ -418,15 +411,7 @@ fn sanitize_bpm(bpm : Double) -> Double {
 }
 
 ///|
-pub fn PatternScheduler::new(
-  bpm~ : Double,
-  ctx~ : @moondsp.DspContext,
-  mapper? : ControlMapper,
-) -> PatternScheduler {
-  PatternScheduler(bpm~, ctx~, mapper?)
-}
-
-///|
+#alias(new)
 pub fn PatternScheduler::PatternScheduler(
   bpm~ : Double,
   ctx~ : @moondsp.DspContext,

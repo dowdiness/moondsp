@@ -9,7 +9,8 @@ pub struct ParamSmoother {
 ///|
 /// Create a parameter smoother from an initial value, smoothing time, and
 /// explicit sample rate.
-pub fn ParamSmoother::new(
+#alias(new)
+pub fn ParamSmoother::ParamSmoother(
   initial : Double,
   smoothing_ms : Double,
   sample_rate : Double,

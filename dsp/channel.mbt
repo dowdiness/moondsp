@@ -7,7 +7,8 @@ pub(open) trait ChannelSpec {
 pub struct Mono {}
 
 ///|
-pub fn Mono::new() -> Mono {
+#alias(new)
+pub fn Mono::Mono() -> Mono {
   Mono::{  }
 }
 
@@ -20,7 +21,8 @@ pub impl ChannelSpec for Mono with channel_count(_self) {
 pub struct Stereo {}
 
 ///|
-pub fn Stereo::new() -> Stereo {
+#alias(new)
+pub fn Stereo::Stereo() -> Stereo {
   Stereo::{  }
 }
 

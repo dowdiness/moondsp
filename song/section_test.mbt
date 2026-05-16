@@ -65,7 +65,7 @@ fn section_test_section_doc(
 test "Section::from_pattern wraps a pattern with identity scope" {
   let pat = @pattern.note(60.0)
   let section = Section::from_pattern(name="main", body=pat)
-  assert_eq(section.name(), "main")
+  @debug.assert_eq(section.name(), "main")
   assert_true(section.length_cycles() == @pattern.Rational::from_int(1))
   assert_true(section.scope().is_identity())
   let arc = @pattern.TimeSpan::new(
@@ -73,7 +73,7 @@ test "Section::from_pattern wraps a pattern with identity scope" {
     @pattern.Rational::from_int(1),
   )
   let events = section.body().query(arc)
-  assert_eq(events.length(), 1)
+  @debug.assert_eq(events.length(), 1)
   assert_true(events[0].value.get("note") == Some(60.0))
 }
 
@@ -147,8 +147,8 @@ test "Section::query applies non-identity TimeScope" {
   )
   let scoped_events = section.query(arc)
   let raw_events = section.body().query(arc)
-  assert_eq(raw_events.length(), 1)
-  assert_eq(scoped_events.length(), 2)
+  @debug.assert_eq(raw_events.length(), 1)
+  @debug.assert_eq(scoped_events.length(), 2)
   assert_true(scoped_events[0].part.begin == @pattern.Rational::from_int(0))
   assert_true(scoped_events[1].part.begin == @pattern.Rational::new(1L, 2L))
   assert_true(
@@ -186,18 +186,18 @@ test "SectionDoc display renames preserve section and layer IDs and revisions" {
     Ok(doc) => doc
     Err(_) => abort("rename failed")
   }
-  assert_eq(renamed.id().value(), "section:verse")
-  assert_eq(renamed.name(), "Verse Display")
+  @debug.assert_eq(renamed.id().value(), "section:verse")
+  @debug.assert_eq(renamed.name(), "Verse Display")
   assert_true(renamed.revision() == doc.revision())
   let renamed_lead = match renamed.get_layer(lead_id) {
     Some(layer) => layer
     None => abort("expected renamed lead layer")
   }
-  assert_eq(renamed_lead.id().value(), "layer:lead")
-  assert_eq(renamed_lead.name(), "Lead Display")
+  @debug.assert_eq(renamed_lead.id().value(), "layer:lead")
+  @debug.assert_eq(renamed_lead.name(), "Lead Display")
   assert_true(renamed_lead.revision() == original_lead.revision())
   let section = renamed.to_section()
-  assert_eq(section.name(), "Verse Display")
+  @debug.assert_eq(section.name(), "Verse Display")
   assert_true(section.get_layer("Lead Display") is Some(_))
   assert_true(section.get_layer("Lead") is None)
 }
@@ -271,7 +271,7 @@ test "SectionDoc layer body edits advance layer and section revisions without la
     Ok(doc) => doc
     Err(_) => abort("replace layer body failed")
   }
-  assert_eq(edited.id().value(), doc.id().value())
+  @debug.assert_eq(edited.id().value(), doc.id().value())
   assert_true(edited.length_cycles() == doc.length_cycles())
   assert_true(edited.revision().value() > doc.revision().value())
   let original_layer = match doc.get_layer(layer_id) {
@@ -282,7 +282,7 @@ test "SectionDoc layer body edits advance layer and section revisions without la
     Some(layer) => layer
     None => abort("expected edited layer")
   }
-  assert_eq(edited_layer.id().value(), original_layer.id().value())
+  @debug.assert_eq(edited_layer.id().value(), original_layer.id().value())
   assert_true(
     edited_layer.revision().value() > original_layer.revision().value(),
   )
@@ -314,7 +314,7 @@ test "SectionDoc layer body edits advance layer and section revisions without la
       after_song.get_occurrence_by_id(occurrence_id),
     ) {
     (Some(before), Some(after)) => {
-      assert_eq(before.id().value(), after.id().value())
+      @debug.assert_eq(before.id().value(), after.id().value())
       assert_true(before.start() == after.start())
       assert_true(before.end_() == after.end_())
     }
@@ -326,7 +326,7 @@ test "SectionDoc layer body edits advance layer and section revisions without la
       @pattern.Rational::from_int(1),
     ),
   )
-  assert_eq(events.length(), 1)
+  @debug.assert_eq(events.length(), 1)
   assert_true(events[0].value.get("note") == Some(64.0))
 }
 
@@ -348,7 +348,7 @@ test "SectionDoc length edits advance section revision and shift layout while pr
     Ok(doc) => doc
     Err(_) => abort("length edit failed")
   }
-  assert_eq(longer.id().value(), doc.id().value())
+  @debug.assert_eq(longer.id().value(), doc.id().value())
   assert_true(longer.revision().value() > doc.revision().value())
   let chorus = Section::from_pattern(name="chorus", body=@pattern.note(67.0))
   let before_result = try? @song.Song(parts=[
@@ -377,7 +377,7 @@ test "SectionDoc length edits advance section revision and shift layout while pr
       after.get_occurrence_by_id(chorus_id),
     ) {
     (Some(before_chorus), Some(after_chorus)) => {
-      assert_eq(before_chorus.id().value(), after_chorus.id().value())
+      @debug.assert_eq(before_chorus.id().value(), after_chorus.id().value())
       assert_true(before_chorus.start() == @pattern.Rational::from_int(1))
       assert_true(after_chorus.start() == @pattern.Rational::from_int(2))
     }
@@ -400,7 +400,7 @@ test "SectionBody::layers stacks ordered named layers" {
     Ok(section) => section
     Err(_) => abort("section creation failed")
   }
-  assert_eq(section.layer_count(), 2)
+  @debug.assert_eq(section.layer_count(), 2)
   assert_true(section.get_layer("bass") is Some(_))
   assert_true(section.get_layer("lead") is Some(_))
   let arc = @pattern.TimeSpan::new(
@@ -408,7 +408,7 @@ test "SectionBody::layers stacks ordered named layers" {
     @pattern.Rational::from_int(1),
   )
   let events = section.body().query(arc)
-  assert_eq(events.length(), 2)
+  @debug.assert_eq(events.length(), 2)
   assert_true(events[0].value.get("note") == Some(36.0))
   assert_true(events[1].value.get("note") == Some(64.0))
 }
@@ -431,7 +431,7 @@ test "Section constructor accepts pattern body wrapper" {
     @pattern.Rational::from_int(1),
   )
   let events = section.body().query(arc)
-  assert_eq(events.length(), 1)
+  @debug.assert_eq(events.length(), 1)
   assert_true(events[0].value.get("note") == Some(60.0))
 }
 
@@ -439,7 +439,7 @@ test "Section constructor accepts pattern body wrapper" {
 test "Section::layer converts single body to named layers" {
   let base = Section::from_pattern(name="verse", body=@pattern.note(48.0))
   let section = base.layer(name="counter", body=@pattern.note(55.0))
-  assert_eq(section.layer_count(), 2)
+  @debug.assert_eq(section.layer_count(), 2)
   assert_true(section.get_layer("main") is Some(_))
   assert_true(section.get_layer("counter") is Some(_))
   let arc = @pattern.TimeSpan::new(
@@ -447,7 +447,7 @@ test "Section::layer converts single body to named layers" {
     @pattern.Rational::from_int(1),
   )
   let events = section.body().query(arc)
-  assert_eq(events.length(), 2)
+  @debug.assert_eq(events.length(), 2)
   assert_true(events[0].value.get("note") == Some(48.0))
   assert_true(events[1].value.get("note") == Some(55.0))
 }
@@ -456,13 +456,13 @@ test "Section::layer converts single body to named layers" {
 test "Section::layer replaces existing layer by name" {
   let base = Section::from_pattern(name="verse", body=@pattern.note(48.0))
   let section = base.layer(name="main", body=@pattern.note(60.0))
-  assert_eq(section.layer_count(), 1)
+  @debug.assert_eq(section.layer_count(), 1)
   let arc = @pattern.TimeSpan::new(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
   let events = section.body().query(arc)
-  assert_eq(events.length(), 1)
+  @debug.assert_eq(events.length(), 1)
   assert_true(events[0].value.get("note") == Some(60.0))
 }
 
@@ -476,7 +476,7 @@ test "Section::apply_patch add layer appends named layer" {
     Ok(section) => section
     Err(_) => abort("patch failed")
   }
-  assert_eq(section.layer_count(), 2)
+  @debug.assert_eq(section.layer_count(), 2)
   assert_true(section.get_layer("counter") is Some(_))
 }
 
@@ -496,7 +496,7 @@ test "Section::apply_patch set layer replaces existing layer" {
     @pattern.Rational::from_int(1),
   )
   let events = section.body().query(arc)
-  assert_eq(events.length(), 2)
+  @debug.assert_eq(events.length(), 2)
   assert_true(events[0].value.get("note") == Some(48.0))
   assert_true(events[1].value.get("note") == Some(67.0))
 }

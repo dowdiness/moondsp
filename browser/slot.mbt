@@ -19,7 +19,8 @@ priv struct MonoOut {
 }
 
 ///|
-fn MonoOut::new() -> MonoOut {
+#alias(new)
+fn MonoOut::MonoOut() -> MonoOut {
   { buffer: @ref.new(None) }
 }
 
@@ -52,7 +53,8 @@ priv struct StereoOut {
 }
 
 ///|
-fn StereoOut::new() -> StereoOut {
+#alias(new)
+fn StereoOut::StereoOut() -> StereoOut {
   { left: @ref.new(None), right: @ref.new(None) }
 }
 
@@ -105,7 +107,8 @@ priv struct GraphSlot[T, O] {
 }
 
 ///|
-fn[T, O] GraphSlot::new(
+#alias(new)
+fn[T, O] GraphSlot::GraphSlot(
   output~ : O,
   compile~ : (@moondsp.DspContext) -> T?,
 ) -> GraphSlot[T, O] {

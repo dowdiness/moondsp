@@ -12,16 +12,16 @@ using @identity {
 ///|
 test "Revision starts at zero and increments" {
   let zero = Revision::zero()
-  assert_eq(zero.value(), 0L)
-  assert_eq(zero.next().value(), 1L)
+  @debug.assert_eq(zero.value(), 0L)
+  @debug.assert_eq(zero.next().value(), 1L)
 }
 
 ///|
 test "Revision::max keeps the newer token" {
   let zero = Revision::zero()
   let one = zero.next()
-  assert_eq(zero.max(one).value(), 1L)
-  assert_eq(one.max(zero).value(), 1L)
+  @debug.assert_eq(zero.max(one).value(), 1L)
+  @debug.assert_eq(one.max(zero).value(), 1L)
 }
 
 ///|
@@ -29,7 +29,7 @@ test "Revision::combine mixes ordered aggregate tokens" {
   let zero = Revision::zero()
   let one = Revision::zero().next()
   let two = one.next()
-  assert_eq(zero.combine(zero).value(), 0L)
+  @debug.assert_eq(zero.combine(zero).value(), 0L)
   assert_true(one.combine(two) != two.combine(one))
 }
 
@@ -37,7 +37,7 @@ test "Revision::combine mixes ordered aggregate tokens" {
 test "Revision::combine preserves aggregate identity beyond compact value" {
   let zero = Revision::zero()
   let aggregate = zero.combine(zero)
-  assert_eq(aggregate.value(), zero.value())
+  @debug.assert_eq(aggregate.value(), zero.value())
   assert_true(aggregate != zero)
 }
 
@@ -45,7 +45,7 @@ test "Revision::combine preserves aggregate identity beyond compact value" {
 test "Revision::max breaks compact value ties deterministically" {
   let zero = Revision::zero()
   let aggregate = zero.combine(zero)
-  assert_eq(zero.value(), aggregate.value())
+  @debug.assert_eq(zero.value(), aggregate.value())
   assert_true(zero.max(aggregate) == aggregate)
   assert_true(aggregate.max(zero) == aggregate)
 }
@@ -59,11 +59,11 @@ test "stable IDs accept portable authoring strings" {
   let graph = try? GraphNodeId::from_string("graph.node_3")
   match (pattern, section, layer, occurrence, graph) {
     (Ok(pattern), Ok(section), Ok(layer), Ok(occurrence), Ok(graph)) => {
-      assert_eq(pattern.value(), "pat:intro_1")
-      assert_eq(section.value(), "section.intro")
-      assert_eq(layer.value(), "layer-main")
-      assert_eq(occurrence.value(), "verse:2")
-      assert_eq(graph.value(), "graph.node_3")
+      @debug.assert_eq(pattern.value(), "pat:intro_1")
+      @debug.assert_eq(section.value(), "section.intro")
+      @debug.assert_eq(layer.value(), "layer-main")
+      @debug.assert_eq(occurrence.value(), "verse:2")
+      @debug.assert_eq(graph.value(), "graph.node_3")
     }
     _ => abort("expected valid IDs")
   }

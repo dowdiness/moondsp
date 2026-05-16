@@ -6,7 +6,8 @@ pub struct AudioBuffer {
 
 ///|
 /// Wrap an existing `FixedArray[Double]` without copying.
-pub fn AudioBuffer::new(data : FixedArray[Double]) -> AudioBuffer {
+#alias(new)
+pub fn AudioBuffer::AudioBuffer(data : FixedArray[Double]) -> AudioBuffer {
   { data, }
 }
 

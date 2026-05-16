@@ -39,7 +39,7 @@ test "debug: invalid input0 produces InvalidInput0 error" {
   let output = AudioBuffer::filled(4)
   compiled.process(context, output)
   let errors = compiled.last_validation_errors()
-  assert_eq(errors.length(), 1)
+  @debug.assert_eq(errors.length(), 1)
   // max_valid depends on compiled node count (may differ from source due to optimization)
   assert_true(errors[0] is GraphValidationError::InvalidInput0(1, 99, _))
 }
@@ -60,7 +60,7 @@ test "debug: skipped node outputs silence, downstream processes normally" {
   let output = AudioBuffer::filled(4)
   compiled.process(context, output)
   for i = 0; i < 4; i = i + 1 {
-    assert_eq(output.get(i), 0.0)
+    @debug.assert_eq(output.get(i), 0.0)
   }
 }
 
@@ -78,11 +78,11 @@ test "debug: errors reset on next process call" {
   corrupt_input0(compiled, 1, 99)
   let output = AudioBuffer::filled(4)
   compiled.process(context, output)
-  assert_eq(compiled.last_validation_errors().length(), 1)
+  @debug.assert_eq(compiled.last_validation_errors().length(), 1)
   // Fix the corruption and process again — errors should be empty
   corrupt_input0(compiled, 1, 0)
   compiled.process(context, output)
-  assert_eq(compiled.last_validation_errors().length(), 0)
+  @debug.assert_eq(compiled.last_validation_errors().length(), 0)
 }
 
 ///|
@@ -105,7 +105,7 @@ test "debug: feedback graph validation failure yields silence and records errors
   compiled.process(context, output)
   // Output should be silence
   for i = 0; i < 4; i = i + 1 {
-    assert_eq(output.get(i), 0.0)
+    @debug.assert_eq(output.get(i), 0.0)
   }
   // Validation errors should be recorded
   let errors = compiled.last_validation_errors()

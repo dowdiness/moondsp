@@ -42,18 +42,18 @@ test "parse_song builds sections and implicit parts" {
       "song(section(\"intro\",1,s(\"bd\")),section(\"verse\",2,note(\"60\")),part(\"intro1\",\"intro\"),part(\"verse1\",\"verse\"))",
     ),
   )
-  assert_eq(song.occurrence_count(), 2)
+  @debug.assert_eq(song.occurrence_count(), 2)
   assert_true(song.duration() == @pattern.Rational::from_int(3))
   match song.get_occurrence("verse1") {
     Some(occurrence) => {
       assert_true(occurrence.start() == @pattern.Rational::from_int(1))
       assert_true(occurrence.end_() == @pattern.Rational::from_int(3))
-      assert_eq(occurrence.section().name(), "verse")
+      @debug.assert_eq(occurrence.section().name(), "verse")
     }
     None => abort("expected verse occurrence")
   }
   let events = song.query(song_span(0L, 1L, 3L, 1L))
-  assert_eq(events.length(), 3)
+  @debug.assert_eq(events.length(), 3)
   assert_true(events[0].value.get("sound") == Some(36.0))
   assert_true(events[1].value.get("note") == Some(60.0))
 }
@@ -71,7 +71,7 @@ test "parse_song supports explicit rational starts and gaps" {
     Some(_) => abort("expected explicit gap")
   }
   let gaps = song.gap_spans()
-  assert_eq(gaps.length(), 1)
+  @debug.assert_eq(gaps.length(), 1)
   assert_true(gaps[0] == song_span(1L, 1L, 3L, 2L))
 }
 
@@ -83,11 +83,11 @@ test "parse_song preserves authoring order for explicit overlaps" {
     ),
   )
   let hits = song.occurrences_at(song_rat(3L, 2L))
-  assert_eq(hits.length(), 2)
-  assert_eq(hits[0].name(), "late1")
-  assert_eq(hits[1].name(), "early1")
+  @debug.assert_eq(hits.length(), 2)
+  @debug.assert_eq(hits[0].name(), "late1")
+  @debug.assert_eq(hits[1].name(), "early1")
   let events = song.query(song_span(1L, 1L, 2L, 1L))
-  assert_eq(events.length(), 2)
+  @debug.assert_eq(events.length(), 2)
   assert_true(events[0].value.get("sound") == Some(36.0))
   assert_true(events[1].value.get("sound") == Some(38.0))
 }
@@ -99,7 +99,7 @@ test "parse_song applies boundary fill directives" {
       "song(section(\"a\",1,s(\"bd\")),section(\"b\",1,s(\"sd\")),section(\"fill\",1,s(\"hh\")),part(\"a1\",\"a\"),part(\"b1\",\"b\",3),fill(\"fill\",\"fill\"))",
     ),
   )
-  assert_eq(song.occurrence_count(), 3)
+  @debug.assert_eq(song.occurrence_count(), 3)
   match song.get_occurrence("fill:0") {
     Some(occurrence) => {
       assert_true(occurrence.start() == @pattern.Rational::from_int(1))
@@ -110,9 +110,9 @@ test "parse_song applies boundary fill directives" {
     }
     None => abort("expected generated fill occurrence")
   }
-  assert_eq(song.gap_spans().length(), 0)
+  @debug.assert_eq(song.gap_spans().length(), 0)
   let events = song.query(song_span(1L, 1L, 3L, 1L))
-  assert_eq(events.length(), 2)
+  @debug.assert_eq(events.length(), 2)
   assert_true(events[0].value.get("sound") == Some(42.0))
   assert_true(events[1].value.get("sound") == Some(42.0))
 }
@@ -127,8 +127,8 @@ test "parse_song supports explicit occurrence IDs and display names" {
   let id = song_occurrence_id("verse:1")
   match song.get_occurrence_by_id(id) {
     Some(occurrence) => {
-      assert_eq(occurrence.name(), "Verse 1")
-      assert_eq(occurrence.id().value(), "verse:1")
+      @debug.assert_eq(occurrence.name(), "Verse 1")
+      @debug.assert_eq(occurrence.id().value(), "verse:1")
     }
     None => abort("expected occurrence by explicit ID")
   }

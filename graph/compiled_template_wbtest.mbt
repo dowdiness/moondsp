@@ -17,7 +17,7 @@ test "analyze: length matches input template length" {
     DspNode::output(1),
   ]
   let ct = CompiledTemplate::analyze(template)
-  assert_eq(ct.length(), 3)
+  @debug.assert_eq(ct.length(), 3)
 }
 
 ///|
@@ -30,7 +30,7 @@ test "orphan_adsr_count: live ADSR returns 0" {
     DspNode::output(2),
   ]
   let ct = CompiledTemplate::analyze(template)
-  assert_eq(ct.orphan_adsr_count(), 0)
+  @debug.assert_eq(ct.orphan_adsr_count(), 0)
 }
 
 ///|
@@ -43,7 +43,7 @@ test "orphan_adsr_count: dead ADSR returns 1" {
     DspNode::output(2),
   ]
   let ct = CompiledTemplate::analyze(template)
-  assert_eq(ct.orphan_adsr_count(), 1)
+  @debug.assert_eq(ct.orphan_adsr_count(), 1)
 }
 
 ///|
@@ -57,7 +57,7 @@ test "orphan_adsr_count: multiple dead ADSRs returns correct count" {
     DspNode::output(4),
   ]
   let ct = CompiledTemplate::analyze(template)
-  assert_eq(ct.orphan_adsr_count(), 3)
+  @debug.assert_eq(ct.orphan_adsr_count(), 3)
 }
 
 ///|

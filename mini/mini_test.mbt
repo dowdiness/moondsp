@@ -131,7 +131,7 @@ test "parse_snapshot lowers mini output through PatternDoc" {
 test "parse_doc_reusing preserves ids across whitespace edits" {
   let doc = unwrap_doc(@mini.parse_doc("s(\"bd sd\")"))
   let edited = unwrap_doc(@mini.parse_doc_reusing("s(\"  bd   sd  \")", doc))
-  assert_eq(doc.root().value(), edited.root().value())
+  @debug.assert_eq(doc.root().value(), edited.root().value())
   assert_true(edited.contains_node(pid("mini:sound:bd:0")))
   assert_true(edited.contains_node(pid("mini:sound:sd:0")))
   let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()

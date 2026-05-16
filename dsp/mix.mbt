@@ -4,7 +4,8 @@ pub struct Mix {}
 
 ///|
 /// Create a mix processor.
-pub fn Mix::new() -> Mix {
+#alias(new)
+pub fn Mix::Mix() -> Mix {
   Mix::{  }
 }
 

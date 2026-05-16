@@ -137,8 +137,8 @@ test "compiled dsp hot swap result reports sample rate mismatch" {
 
   match hot_swap.queue_swap_result(incompatible) {
     Err(HotSwapQueueError::SampleRateMismatch(active_rate, next_rate)) => {
-      assert_eq(active_rate, HOT_SWAP_SAMPLE_RATE)
-      assert_eq(next_rate, HOT_SWAP_SAMPLE_RATE * 2.0)
+      @debug.assert_eq(active_rate, HOT_SWAP_SAMPLE_RATE)
+      @debug.assert_eq(next_rate, HOT_SWAP_SAMPLE_RATE * 2.0)
     }
     other => fail("expected SampleRateMismatch, got \{other}")
   }
@@ -168,8 +168,8 @@ test "compiled dsp hot swap result reports block capacity mismatch" {
     Err(
       HotSwapQueueError::BlockCapacityMismatch(active_capacity, next_capacity)
     ) => {
-      assert_eq(active_capacity, HOT_SWAP_BLOCK_SIZE)
-      assert_eq(next_capacity, HOT_SWAP_BLOCK_SIZE * 2)
+      @debug.assert_eq(active_capacity, HOT_SWAP_BLOCK_SIZE)
+      @debug.assert_eq(next_capacity, HOT_SWAP_BLOCK_SIZE * 2)
     }
     other => fail("expected BlockCapacityMismatch, got \{other}")
   }

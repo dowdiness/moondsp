@@ -623,7 +623,7 @@ test "VoicePool process sanitizes final mixdown output" {
   let right = AudioBuffer::filled(4)
   pool.process(ctx, left, right)
   // Clean constant output should have zero sanitized count
-  assert_eq(pool.last_sanitized_count(), 0)
+  @debug.assert_eq(pool.last_sanitized_count(), 0)
   // Verify output is non-zero (voice was active)
   assert_true(left.get(0) > 0.0)
 }

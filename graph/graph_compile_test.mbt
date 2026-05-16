@@ -171,7 +171,7 @@ test "compiled dsp topologically sorts declarative node order" {
 
   compiled.process(context, output)
 
-  assert_eq(output.get(0), ZERO_SAMPLE)
+  @debug.assert_eq(output.get(0), ZERO_SAMPLE)
   assert_true(output.as_fixed_array().any(sample => sample != ZERO_SAMPLE))
   assert_true(
     output
@@ -197,7 +197,7 @@ test "compiled dsp optimizes constant subgraph during compilation" {
   let compiled = compiled.unwrap()
   let buf = AudioBuffer::filled(128)
   compiled.process(ctx, buf)
-  assert_eq(buf.get(0), 12.0)
+  @debug.assert_eq(buf.get(0), 12.0)
 }
 
 ///|
@@ -225,7 +225,7 @@ test "compiled dsp compile_template matches compile output" {
   compiled_template.process(ctx, template_output)
 
   for i in 0..<SMALL_BLOCK_SIZE {
-    assert_eq(template_output.get(i), output.get(i))
+    @debug.assert_eq(template_output.get(i), output.get(i))
   }
 }
 
@@ -263,10 +263,10 @@ test "compiled dsp delay node keeps zero-capacity default as passthrough" {
 
   compiled.process(context, output)
 
-  assert_eq(output.get(0), QUARTER_SAMPLE)
-  assert_eq(output.get(1), QUARTER_SAMPLE)
-  assert_eq(output.get(2), QUARTER_SAMPLE)
-  assert_eq(output.get(3), QUARTER_SAMPLE)
+  @debug.assert_eq(output.get(0), QUARTER_SAMPLE)
+  @debug.assert_eq(output.get(1), QUARTER_SAMPLE)
+  @debug.assert_eq(output.get(2), QUARTER_SAMPLE)
+  @debug.assert_eq(output.get(3), QUARTER_SAMPLE)
 }
 
 ///|

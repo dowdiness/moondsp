@@ -31,7 +31,8 @@ fn gcd(a : Int64, b : Int64) -> Int64 {
 }
 
 ///|
-pub fn Rational::new(num : Int64, den : Int64) -> Rational {
+#alias(new)
+pub fn Rational::Rational(num : Int64, den : Int64) -> Rational {
   if den == 0L {
     abort("Rational: denominator cannot be zero")
   }
