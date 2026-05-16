@@ -102,10 +102,6 @@ pub using @graph {
   // Traits
   trait GraphControllable,
   trait GraphDebuggable,
-  trait NodeEditable,
-  trait NodeFoldable,
-  trait NodeSpanning,
-  trait NodeStateful,
 
   // Functions
   node_accepts_slot,

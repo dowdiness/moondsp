@@ -83,11 +83,6 @@ pub fn EventSource::pattern_nodes(Self) -> Array[@identity.PatternNodeId]
 pub fn EventSource::section(Self) -> @identity.SectionId?
 
 pub struct PatternScheduler {
-  mut bpm : Double
-  mut sample_counter : Int64
-  ctx : @dsp.DspContext
-  active_notes : Array[ActiveNote]
-  mapper : ControlMapper
   // private fields
 }
 #alias(new)
