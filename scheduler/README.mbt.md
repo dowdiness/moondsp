@@ -19,7 +19,7 @@ test "edit orchestration stages a replacement and reconciles active voices" {
         sustain=0.7,
         release_ms=0.3,
       ),
-      @moondsp.DspNode::envelope_gain(0, 1, 1.0),
+      @moondsp.DspNode::envelope_gain(input=0, envelope=1, amount=1.0),
       @moondsp.DspNode::output(2),
     ],
     ctx,

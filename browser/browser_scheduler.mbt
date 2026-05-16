@@ -65,7 +65,7 @@ fn bd_template() -> Array[@moondsp.DspNode] {
       sustain=0.0,
       release_ms=80.0,
     ),
-    @moondsp.DspNode::envelope_gain(4, 5, 1.0),
+    @moondsp.DspNode::envelope_gain(input=4, envelope=5, amount=1.0),
     @moondsp.DspNode::output(6),
   ]
 }
@@ -96,7 +96,7 @@ fn sd_template() -> Array[@moondsp.DspNode] {
       sustain=0.0,
       release_ms=40.0,
     ),
-    @moondsp.DspNode::envelope_gain(3, 4, 1.0),
+    @moondsp.DspNode::envelope_gain(input=3, envelope=4, amount=1.0),
     @moondsp.DspNode::output(5),
   ]
 }
@@ -123,7 +123,7 @@ fn hh_template() -> Array[@moondsp.DspNode] {
       sustain=0.0,
       release_ms=15.0,
     ),
-    @moondsp.DspNode::envelope_gain(1, 2, 0.6),
+    @moondsp.DspNode::envelope_gain(input=1, envelope=2, amount=0.6),
     @moondsp.DspNode::output(3),
   ]
 }
@@ -147,7 +147,7 @@ fn oh_template() -> Array[@moondsp.DspNode] {
       sustain=0.0,
       release_ms=100.0,
     ),
-    @moondsp.DspNode::envelope_gain(1, 2, 0.45),
+    @moondsp.DspNode::envelope_gain(input=1, envelope=2, amount=0.45),
     @moondsp.DspNode::output(3),
   ]
 }
@@ -172,7 +172,7 @@ fn cp_template() -> Array[@moondsp.DspNode] {
       sustain=0.0,
       release_ms=30.0,
     ),
-    @moondsp.DspNode::envelope_gain(1, 2, 0.7),
+    @moondsp.DspNode::envelope_gain(input=1, envelope=2, amount=0.7),
     @moondsp.DspNode::output(3),
   ]
 }
@@ -187,7 +187,7 @@ fn synth_template() -> Array[@moondsp.DspNode] {
       sustain=0.7,
       release_ms=300.0,
     ),
-    @moondsp.DspNode::envelope_gain(0, 1, 1.0),
+    @moondsp.DspNode::envelope_gain(input=0, envelope=1, amount=1.0),
     @moondsp.DspNode::output(2),
   ]
 }

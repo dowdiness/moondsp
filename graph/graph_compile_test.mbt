@@ -41,7 +41,11 @@ test "compiled dsp rejects stereo-only nodes" {
   ]
   let stereo_delay_nodes = [
     DspNode::constant(UNIT_SAMPLE),
-    DspNode::stereo_delay(0, DELAY_CAPACITY, delay_samples=DELAY_SAMPLES),
+    DspNode::stereo_delay(
+      input=0,
+      max_delay_samples=DELAY_CAPACITY,
+      delay_samples=DELAY_SAMPLES,
+    ),
     DspNode::output(1),
   ]
 
@@ -255,7 +259,7 @@ test "compiled dsp delay node keeps zero-capacity default as passthrough" {
   )
   let nodes = [
     DspNode::constant(QUARTER_SAMPLE),
-    DspNode::delay(0, 0),
+    DspNode::delay(input=0, max_delay_samples=0),
     DspNode::output(1),
   ]
   let compiled = CompiledDsp::compile(nodes, context).unwrap()
@@ -278,8 +282,8 @@ test "compiled graphs reject delay feedback outside live supported range" {
   let mono_nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::delay(
-      0,
-      DELAY_CAPACITY,
+      input=0,
+      max_delay_samples=DELAY_CAPACITY,
       delay_samples=DELAY_SAMPLES,
       feedback=CLAMPED_HIGH_DELAY_FEEDBACK,
     ),
@@ -289,8 +293,8 @@ test "compiled graphs reject delay feedback outside live supported range" {
     DspNode::constant(UNIT_SAMPLE),
     DspNode::pan(0, PAN_CENTER),
     DspNode::stereo_delay(
-      1,
-      DELAY_CAPACITY,
+      input=1,
+      max_delay_samples=DELAY_CAPACITY,
       delay_samples=DELAY_SAMPLES,
       feedback=CLAMPED_LOW_DELAY_FEEDBACK,
     ),

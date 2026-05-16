@@ -65,7 +65,12 @@ test "is_voice_finished returns false when delay tail is audible" {
     DspNode::oscillator(Waveform::Sine, 440.0),
     DspNode::adsr(attack_ms=0.0, decay_ms=0.0, sustain=1.0, release_ms=0.0),
     DspNode::mul(0, 1),
-    DspNode::delay(2, 4800, delay_samples=16, feedback=0.9),
+    DspNode::delay(
+      input=2,
+      max_delay_samples=4800,
+      delay_samples=16,
+      feedback=0.9,
+    ),
     DspNode::output(3),
   ]
   let compiled = CompiledDsp::compile(nodes, ctx).unwrap()
@@ -116,7 +121,7 @@ test "voice pool constructor accepts wired-ADSR template via envelope_gain" {
   let template = [
     DspNode::oscillator(Waveform::Sine, 440.0),
     DspNode::adsr(attack_ms=5.0, decay_ms=5.0, sustain=0.5, release_ms=50.0),
-    DspNode::envelope_gain(0, 1, 1.0),
+    DspNode::envelope_gain(input=0, envelope=1, amount=1.0),
     DspNode::output(2),
   ]
   let pool = VoicePool::new(template, ctx)
@@ -129,7 +134,7 @@ test "set_template rejects template with orphan ADSR" {
   let wired_template = [
     DspNode::oscillator(Waveform::Sine, 440.0),
     DspNode::adsr(attack_ms=5.0, decay_ms=5.0, sustain=0.5, release_ms=50.0),
-    DspNode::envelope_gain(0, 1, 1.0),
+    DspNode::envelope_gain(input=0, envelope=1, amount=1.0),
     DspNode::output(2),
   ]
   let pool = VoicePool::new(wired_template, ctx).unwrap()
@@ -151,7 +156,7 @@ test "set_template rejection leaves previous template intact" {
   let wired_template = [
     DspNode::oscillator(Waveform::Sine, 440.0),
     DspNode::adsr(attack_ms=5.0, decay_ms=5.0, sustain=0.5, release_ms=50.0),
-    DspNode::envelope_gain(0, 1, 1.0),
+    DspNode::envelope_gain(input=0, envelope=1, amount=1.0),
     DspNode::output(2),
   ]
   let pool = VoicePool::new(wired_template, ctx).unwrap()
@@ -449,7 +454,7 @@ test "drum template sd: noise envelope decays to silence via envelope_gain" {
       q=2.0,
     ),
     DspNode::adsr(attack_ms=1.0, decay_ms=80.0, sustain=0.0, release_ms=50.0),
-    DspNode::envelope_gain(1, 2, 1.0),
+    DspNode::envelope_gain(input=1, envelope=2, amount=1.0),
     DspNode::output(3),
   ]
   let pool = VoicePool::new(nodes, ctx, max_voices=4).unwrap()
@@ -536,7 +541,7 @@ test "kill immediately idles an active voice" {
   let nodes = [
     DspNode::constant(1.0),
     DspNode::adsr(attack_ms=0.0, decay_ms=0.0, sustain=1.0, release_ms=100.0),
-    DspNode::envelope_gain(0, 1, 1.0),
+    DspNode::envelope_gain(input=0, envelope=1, amount=1.0),
     DspNode::output(2),
   ]
   let pool = BoundVoicePool::new(

@@ -346,8 +346,8 @@ pub fn DspNode::biquad(
 ///|
 /// Create a fixed-delay node from one upstream node.
 pub fn DspNode::delay(
-  input : Int,
-  max_delay_samples : Int,
+  input~ : Int,
+  max_delay_samples~ : Int,
   delay_samples? : Int = graph_default_delay_samples(max_delay_samples),
   feedback? : Double = 0.0,
 ) -> DspNode {
@@ -390,9 +390,9 @@ pub fn DspNode::gain(input : Int, amount : Double) -> DspNode {
 /// Create a gain node with envelope modulation from two upstream nodes.
 /// The output is: input_signal * envelope_buffer * amount.
 pub fn DspNode::envelope_gain(
-  input : Int,
-  envelope : Int,
-  amount : Double,
+  input~ : Int,
+  envelope~ : Int,
+  amount~ : Double,
 ) -> DspNode {
   DspNode::new(
     DspNodeKind::Gain,
@@ -570,8 +570,8 @@ pub fn DspNode::stereo_biquad(
 ///|
 /// Create a stereo delay node from one stereo upstream node.
 pub fn DspNode::stereo_delay(
-  input : Int,
-  max_delay_samples : Int,
+  input~ : Int,
+  max_delay_samples~ : Int,
   delay_samples? : Int = graph_default_delay_samples(max_delay_samples),
   feedback? : Double = 0.0,
 ) -> DspNode {

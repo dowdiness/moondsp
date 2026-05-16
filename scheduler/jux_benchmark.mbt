@@ -30,7 +30,7 @@ fn bench_template() -> Array[@moondsp.DspNode] {
       sustain=0.7,
       release_ms=0.3,
     ),
-    @moondsp.DspNode::envelope_gain(0, 1, 1.0),
+    @moondsp.DspNode::envelope_gain(input=0, envelope=1, amount=1.0),
     @moondsp.DspNode::output(2),
   ]
 }

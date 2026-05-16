@@ -119,7 +119,7 @@ fn make_test_pool() -> (
       sustain=0.7,
       release_ms=0.3,
     ),
-    @moondsp.DspNode::envelope_gain(0, 1, 1.0),
+    @moondsp.DspNode::envelope_gain(input=0, envelope=1, amount=1.0),
     @moondsp.DspNode::output(2),
   ]
   let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
@@ -2193,7 +2193,7 @@ test "process_block: stolen voice gate-off is harmless" {
       sustain=0.7,
       release_ms=0.3,
     ),
-    @moondsp.DspNode::envelope_gain(0, 1, 1.0),
+    @moondsp.DspNode::envelope_gain(input=0, envelope=1, amount=1.0),
     @moondsp.DspNode::output(2),
   ]
   let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)

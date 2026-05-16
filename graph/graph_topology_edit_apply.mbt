@@ -529,8 +529,8 @@ fn topology_inserted_node(template : DspNode, input_source : Int) -> DspNode? {
     DspNodeKind::Delay =>
       Some(
         DspNode::delay(
-          input_source,
-          template.delay_max_samples,
+          input=input_source,
+          max_delay_samples=template.delay_max_samples,
           delay_samples=template.delay_samples,
           feedback=template.value0,
         ),
@@ -547,8 +547,8 @@ fn topology_inserted_node(template : DspNode, input_source : Int) -> DspNode? {
     DspNodeKind::StereoDelay =>
       Some(
         DspNode::stereo_delay(
-          input_source,
-          template.delay_max_samples,
+          input=input_source,
+          max_delay_samples=template.delay_max_samples,
           delay_samples=template.delay_samples,
           feedback=template.value0,
         ),
@@ -602,8 +602,8 @@ fn apply_topology_rewire_input_result(
     (DspNodeKind::Delay, GraphTopologyInputSlot::Input0) =>
       Some(
         DspNode::delay(
-          source_index,
-          node.delay_max_samples,
+          input=source_index,
+          max_delay_samples=node.delay_max_samples,
           delay_samples=node.delay_samples,
           feedback=node.value0,
         ),
@@ -620,8 +620,8 @@ fn apply_topology_rewire_input_result(
     (DspNodeKind::StereoDelay, GraphTopologyInputSlot::Input0) =>
       Some(
         DspNode::stereo_delay(
-          source_index,
-          node.delay_max_samples,
+          input=source_index,
+          max_delay_samples=node.delay_max_samples,
           delay_samples=node.delay_samples,
           feedback=node.value0,
         ),

@@ -36,7 +36,7 @@ test "compiled dsp runtime param update changes delay length" {
   )
   let nodes = [
     DspNode::constant(ZERO_SAMPLE),
-    DspNode::delay(0, DELAY_CAPACITY, delay_samples=0),
+    DspNode::delay(input=0, max_delay_samples=DELAY_CAPACITY, delay_samples=0),
     DspNode::output(1),
   ]
   let compiled = CompiledDsp::compile(nodes, context).unwrap()
@@ -187,7 +187,7 @@ test "compiled dsp apply_control_result reports invalid slot and value" {
   )
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
-    DspNode::delay(0, DELAY_CAPACITY, delay_samples=0),
+    DspNode::delay(input=0, max_delay_samples=DELAY_CAPACITY, delay_samples=0),
     DspNode::output(1),
   ]
   let compiled = CompiledDsp::compile(nodes, context).unwrap()
@@ -290,7 +290,7 @@ test "compiled dsp runtime param update rejects unsupported or invalid values" {
   )
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
-    DspNode::delay(0, DELAY_CAPACITY, delay_samples=0),
+    DspNode::delay(input=0, max_delay_samples=DELAY_CAPACITY, delay_samples=0),
     DspNode::output(1),
   ]
   let compiled = CompiledDsp::compile(nodes, context).unwrap()
@@ -457,7 +457,11 @@ test "compiled dsp rejects negative delay_samples via set_param" {
   )
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
-    DspNode::delay(0, DELAY_CAPACITY, delay_samples=DELAY_SAMPLES),
+    DspNode::delay(
+      input=0,
+      max_delay_samples=DELAY_CAPACITY,
+      delay_samples=DELAY_SAMPLES,
+    ),
     DspNode::output(1),
   ]
   let compiled = CompiledDsp::compile(nodes, context).unwrap()
@@ -482,7 +486,11 @@ test "compiled dsp rejects delay_samples exceeding delay_max_samples via set_par
   )
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
-    DspNode::delay(0, DELAY_CAPACITY, delay_samples=DELAY_SAMPLES),
+    DspNode::delay(
+      input=0,
+      max_delay_samples=DELAY_CAPACITY,
+      delay_samples=DELAY_SAMPLES,
+    ),
     DspNode::output(1),
   ]
   let compiled = CompiledDsp::compile(nodes, context).unwrap()
@@ -507,7 +515,11 @@ test "compiled dsp accepts valid delay_samples within bounds via set_param" {
   )
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
-    DspNode::delay(0, DELAY_CAPACITY, delay_samples=DELAY_SAMPLES),
+    DspNode::delay(
+      input=0,
+      max_delay_samples=DELAY_CAPACITY,
+      delay_samples=DELAY_SAMPLES,
+    ),
     DspNode::output(1),
   ]
   let compiled = CompiledDsp::compile(nodes, context).unwrap()

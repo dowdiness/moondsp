@@ -114,7 +114,14 @@ fn gen_mono_graph(seed : Int) -> Array[DspNode] {
     let max_samples = 4 + s % 60
     let delay_samples = 1 + s % max_samples
     let feedback = (s % 8).to_double() * 0.1
-    nodes.push(DspNode::delay(last, max_samples, delay_samples~, feedback~))
+    nodes.push(
+      DspNode::delay(
+        input=last,
+        max_delay_samples=max_samples,
+        delay_samples~,
+        feedback~,
+      ),
+    )
     last = nodes.length() - 1
   }
   // Terminal
@@ -184,7 +191,12 @@ fn gen_stereo_graph(seed : Int) -> Array[DspNode] {
     let delay_samples = 1 + s % max_samples
     let feedback = (s % 8).to_double() * 0.1
     nodes.push(
-      DspNode::stereo_delay(last, max_samples, delay_samples~, feedback~),
+      DspNode::stereo_delay(
+        input=last,
+        max_delay_samples=max_samples,
+        delay_samples~,
+        feedback~,
+      ),
     )
     last = nodes.length() - 1
   }
@@ -296,7 +308,12 @@ fn gen_mono_feedback_graph(seed : Int) -> Array[DspNode] {
       [
         DspNode::constant(constant_val),
         DspNode::mix(0, 3),
-        DspNode::delay(1, max_samples, delay_samples~, feedback=0.0),
+        DspNode::delay(
+          input=1,
+          max_delay_samples=max_samples,
+          delay_samples~,
+          feedback=0.0,
+        ),
         DspNode::gain(2, feedback_gain),
         DspNode::output(3),
       ]
@@ -787,8 +804,8 @@ test "prop: runtime control variants are deterministic" {
           let nodes = [
             DspNode::oscillator(Waveform::Sine, 220.0),
             DspNode::delay(
-              0,
-              max_samples,
+              input=0,
+              max_delay_samples=max_samples,
               delay_samples=initial_delay,
               feedback=0.3,
             ),

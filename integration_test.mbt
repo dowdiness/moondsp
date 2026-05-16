@@ -542,8 +542,8 @@ test "compiled stereo graph stereo delay retune changes output" {
     DspNode::constant(1.0),
     DspNode::pan(0, GRAPH_STEREO_CENTER),
     DspNode::stereo_delay(
-      1,
-      GRAPH_STEREO_DELAY_CAPACITY,
+      input=1,
+      max_delay_samples=GRAPH_STEREO_DELAY_CAPACITY,
       delay_samples=GRAPH_STEREO_DELAY_SAMPLES,
     ),
     DspNode::stereo_output(2),
@@ -611,8 +611,8 @@ test "compiled stereo graph stereo delay feedback increases tail energy" {
     DspNode::constant(1.0),
     DspNode::pan(0, GRAPH_STEREO_CENTER),
     DspNode::stereo_delay(
-      1,
-      GRAPH_STEREO_DELAY_CAPACITY,
+      input=1,
+      max_delay_samples=GRAPH_STEREO_DELAY_CAPACITY,
       delay_samples=GRAPH_STEREO_DELAY_SAMPLES,
     ),
     DspNode::stereo_output(2),
@@ -674,8 +674,8 @@ test "compiled graph stereo delay mixdown matches equivalent mono delay path" {
     DspNode::constant(1.0),
     DspNode::pan(0, GRAPH_STEREO_CENTER),
     DspNode::stereo_delay(
-      1,
-      GRAPH_STEREO_DELAY_CAPACITY,
+      input=1,
+      max_delay_samples=GRAPH_STEREO_DELAY_CAPACITY,
       delay_samples=GRAPH_STEREO_DELAY_SAMPLES,
     ),
     DspNode::stereo_mixdown(2),
@@ -684,8 +684,8 @@ test "compiled graph stereo delay mixdown matches equivalent mono delay path" {
   let mono_nodes = [
     DspNode::constant(GRAPH_STEREO_CENTER_GAIN),
     DspNode::delay(
-      0,
-      GRAPH_STEREO_DELAY_CAPACITY,
+      input=0,
+      max_delay_samples=GRAPH_STEREO_DELAY_CAPACITY,
       delay_samples=GRAPH_STEREO_DELAY_SAMPLES,
     ),
     DspNode::output(1),
@@ -1360,8 +1360,8 @@ test "compiled graph voice path stays coherent across gates and runtime updates"
     DspNode::output(1),
     DspNode::clip(2, GRAPH_VOICE_CLIP),
     DspNode::delay(
-      3,
-      GRAPH_VOICE_DELAY_CAPACITY,
+      input=3,
+      max_delay_samples=GRAPH_VOICE_DELAY_CAPACITY,
       delay_samples=GRAPH_VOICE_DELAY_SAMPLES,
     ),
     DspNode::gain(4, GRAPH_VOICE_GAIN),
@@ -1454,8 +1454,8 @@ test "compiled graph control frames apply batched runtime changes per block" {
     DspNode::output(1),
     DspNode::clip(2, GRAPH_VOICE_CLIP),
     DspNode::delay(
-      3,
-      GRAPH_VOICE_DELAY_CAPACITY,
+      input=3,
+      max_delay_samples=GRAPH_VOICE_DELAY_CAPACITY,
       delay_samples=GRAPH_VOICE_DELAY_SAMPLES,
     ),
     DspNode::gain(4, GRAPH_VOICE_GAIN),

@@ -166,10 +166,10 @@ pub fn DspNode::adsr(attack_ms~ : Double, decay_ms~ : Double, sustain~ : Double,
 pub fn DspNode::biquad(input~ : Int, mode~ : @dsp.BiquadMode, cutoff_hz~ : Double, q~ : Double) -> Self
 pub fn DspNode::clip(Int, Double) -> Self
 pub fn DspNode::constant(Double) -> Self
-pub fn DspNode::delay(Int, Int, delay_samples? : Int, feedback? : Double) -> Self
+pub fn DspNode::delay(input~ : Int, max_delay_samples~ : Int, delay_samples? : Int, feedback? : Double) -> Self
 pub fn DspNode::delay_max_samples(Self) -> Int
 pub fn DspNode::delay_samples(Self) -> Int
-pub fn DspNode::envelope_gain(Int, Int, Double) -> Self
+pub fn DspNode::envelope_gain(input~ : Int, envelope~ : Int, amount~ : Double) -> Self
 pub fn DspNode::filter_mode(Self) -> @dsp.BiquadMode
 pub fn DspNode::gain(Int, Double) -> Self
 pub fn DspNode::input0(Self) -> Int
@@ -185,7 +185,7 @@ pub fn DspNode::pan(Int, Double) -> Self
 pub fn DspNode::seed(Self) -> UInt
 pub fn DspNode::stereo_biquad(input~ : Int, mode~ : @dsp.BiquadMode, cutoff_hz~ : Double, q~ : Double) -> Self
 pub fn DspNode::stereo_clip(input~ : Int, threshold~ : Double) -> Self
-pub fn DspNode::stereo_delay(Int, Int, delay_samples? : Int, feedback? : Double) -> Self
+pub fn DspNode::stereo_delay(input~ : Int, max_delay_samples~ : Int, delay_samples? : Int, feedback? : Double) -> Self
 pub fn DspNode::stereo_gain(input~ : Int, amount~ : Double) -> Self
 pub fn DspNode::stereo_mixdown(Int) -> Self
 pub fn DspNode::stereo_output(Int) -> Self

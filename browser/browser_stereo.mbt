@@ -15,8 +15,8 @@ let compiled_stereo : GraphSlot[@moondsp.CompiledStereoDsp, StereoOut] = GraphSl
         @moondsp.DspNode::gain(4, BROWSER_COMPILED_DEFAULT_GAIN),
         @moondsp.DspNode::pan(5, BROWSER_COMPILED_DEFAULT_PAN),
         @moondsp.DspNode::stereo_delay(
-          6,
-          BROWSER_COMPILED_DELAY_CAPACITY,
+          input=6,
+          max_delay_samples=BROWSER_COMPILED_DELAY_CAPACITY,
           delay_samples=BROWSER_COMPILED_DELAY_SAMPLES,
         ),
         @moondsp.DspNode::stereo_biquad(
