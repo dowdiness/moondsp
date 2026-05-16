@@ -131,7 +131,8 @@ test "compiled dsp topology controller result reports invalid edit reason" {
       @debug.assert_eq(index, 0)
       @debug.assert_eq(node_index, 0)
     }
-    other => fail("expected UnsupportedInputSlot, got \{@debug.to_string(other)}")
+    other =>
+      fail("expected UnsupportedInputSlot, got \{@debug.to_string(other)}")
   }
   match
     topology.queue_topology_edit_result(
@@ -147,7 +148,8 @@ test "compiled dsp topology controller result reports invalid edit reason" {
         GraphTopologyEditError::UnsupportedInsertTemplate(DspNodeKind::Constant)
       )
     ) => @debug.assert_eq(index, 0)
-    other => fail("expected UnsupportedInsertTemplate, got \{@debug.to_string(other)}")
+    other =>
+      fail("expected UnsupportedInsertTemplate, got \{@debug.to_string(other)}")
   }
 }
 
@@ -267,7 +269,10 @@ test "compiled dsp topology controller result reports pending graph control reje
         GraphParamSlot::Value0
       )
     ) => ()
-    other => fail("expected pending InvalidSlotForNode, got \{@debug.to_string(other)}")
+    other =>
+      fail(
+        "expected pending InvalidSlotForNode, got \{@debug.to_string(other)}",
+      )
   }
   topology.process(context, first_block)
 
