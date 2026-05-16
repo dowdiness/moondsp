@@ -162,7 +162,12 @@ pub impl DelaySym for GraphBuilder with delay(
 ) -> GraphBuilder {
   let idx = self.nodes_.length()
   self.nodes_.push(
-    DspNode::delay(self.index, max_samples, delay_samples~, feedback~),
+    DspNode::delay(
+      input=self.index,
+      max_delay_samples=max_samples,
+      delay_samples~,
+      feedback~,
+    ),
   )
   { nodes_: self.nodes_, index: idx }
 }
@@ -237,7 +242,12 @@ pub impl StereoDelaySym for GraphBuilder with stereo_delay(
 ) -> GraphBuilder {
   let idx = self.nodes_.length()
   self.nodes_.push(
-    DspNode::stereo_delay(self.index, max_samples, delay_samples~, feedback~),
+    DspNode::stereo_delay(
+      input=self.index,
+      max_delay_samples=max_samples,
+      delay_samples~,
+      feedback~,
+    ),
   )
   { nodes_: self.nodes_, index: idx }
 }

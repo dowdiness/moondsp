@@ -190,7 +190,11 @@ test "compiled dsp applies delay line in graph across blocks" {
   )
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
-    DspNode::delay(0, DELAY_CAPACITY, delay_samples=DELAY_SAMPLES),
+    DspNode::delay(
+      input=0,
+      max_delay_samples=DELAY_CAPACITY,
+      delay_samples=DELAY_SAMPLES,
+    ),
     DspNode::output(1),
   ]
   let compiled = CompiledDsp::compile(nodes, context).unwrap()

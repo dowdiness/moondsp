@@ -86,14 +86,18 @@ test "compiled dsp runtime delay update matches fixed feedback loop compile" {
   let runtime_nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::mix(0, 3),
-    DspNode::delay(1, DELAY_CAPACITY, delay_samples=0),
+    DspNode::delay(input=1, max_delay_samples=DELAY_CAPACITY, delay_samples=0),
     DspNode::gain(2, HALF_GAIN),
     DspNode::output(3),
   ]
   let fixed_nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::mix(0, 3),
-    DspNode::delay(1, DELAY_CAPACITY, delay_samples=DELAY_SAMPLES),
+    DspNode::delay(
+      input=1,
+      max_delay_samples=DELAY_CAPACITY,
+      delay_samples=DELAY_SAMPLES,
+    ),
     DspNode::gain(2, HALF_GAIN),
     DspNode::output(3),
   ]

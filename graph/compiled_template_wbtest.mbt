@@ -26,7 +26,7 @@ test "orphan_adsr_count: live ADSR returns 0" {
   let template = [
     DspNode::oscillator(Waveform::Sine, 440.0),
     DspNode::adsr(attack_ms=10.0, decay_ms=100.0, sustain=0.7, release_ms=300.0),
-    DspNode::envelope_gain(0, 1, 1.0),
+    DspNode::envelope_gain(input=0, envelope=1, amount=1.0),
     DspNode::output(2),
   ]
   let ct = CompiledTemplate::analyze(template)

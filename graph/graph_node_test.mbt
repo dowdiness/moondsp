@@ -24,7 +24,7 @@ test "node_accepts_slot: Biquad accepts Value0 and Value1" {
 
 ///|
 test "node_accepts_slot: Delay accepts Value0 and DelaySamples" {
-  let node = DspNode::delay(0, 128, delay_samples=0)
+  let node = DspNode::delay(input=0, max_delay_samples=128, delay_samples=0)
   assert_true(node_accepts_slot(node, GraphParamSlot::Value0))
   assert_true(node_accepts_slot(node, GraphParamSlot::DelaySamples))
   assert_false(node_accepts_slot(node, GraphParamSlot::Value1))

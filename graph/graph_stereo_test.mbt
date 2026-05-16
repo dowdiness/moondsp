@@ -145,7 +145,11 @@ test "compiled stereo dsp applies stereo delay after pan" {
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_delay(1, DELAY_CAPACITY, delay_samples=DELAY_SAMPLES),
+    DspNode::stereo_delay(
+      input=1,
+      max_delay_samples=DELAY_CAPACITY,
+      delay_samples=DELAY_SAMPLES,
+    ),
     DspNode::stereo_output(2),
   ]
   let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
@@ -280,7 +284,11 @@ test "compiled stereo dsp runtime params update stereo delay" {
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_delay(1, DELAY_CAPACITY, delay_samples=0),
+    DspNode::stereo_delay(
+      input=1,
+      max_delay_samples=DELAY_CAPACITY,
+      delay_samples=0,
+    ),
     DspNode::stereo_output(2),
   ]
   let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
@@ -317,7 +325,11 @@ test "compiled stereo dsp runtime params update stereo delay feedback" {
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_delay(1, DELAY_CAPACITY, delay_samples=DELAY_SAMPLES),
+    DspNode::stereo_delay(
+      input=1,
+      max_delay_samples=DELAY_CAPACITY,
+      delay_samples=DELAY_SAMPLES,
+    ),
     DspNode::stereo_output(2),
   ]
   let baseline = CompiledStereoDsp::compile(nodes, context).unwrap()
@@ -388,7 +400,11 @@ test "compiled stereo dsp rejects out-of-bounds delay_samples via set_param" {
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::pan(0, ZERO_SAMPLE),
-    DspNode::stereo_delay(1, DELAY_CAPACITY, delay_samples=DELAY_SAMPLES),
+    DspNode::stereo_delay(
+      input=1,
+      max_delay_samples=DELAY_CAPACITY,
+      delay_samples=DELAY_SAMPLES,
+    ),
     DspNode::stereo_output(2),
   ]
   let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
@@ -531,7 +547,11 @@ test "compiled dsp applies stereo delay before mixdown" {
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_delay(1, DELAY_CAPACITY, delay_samples=DELAY_SAMPLES),
+    DspNode::stereo_delay(
+      input=1,
+      max_delay_samples=DELAY_CAPACITY,
+      delay_samples=DELAY_SAMPLES,
+    ),
     DspNode::stereo_mixdown(2),
     DspNode::output(3),
   ]
@@ -555,7 +575,11 @@ test "compiled dsp runtime params update stereo delay before mixdown" {
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_delay(1, DELAY_CAPACITY, delay_samples=0),
+    DspNode::stereo_delay(
+      input=1,
+      max_delay_samples=DELAY_CAPACITY,
+      delay_samples=0,
+    ),
     DspNode::stereo_mixdown(2),
     DspNode::output(3),
   ]
@@ -588,7 +612,11 @@ test "compiled dsp runtime params update stereo delay feedback before mixdown" {
   let nodes = [
     DspNode::constant(UNIT_SAMPLE),
     DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_delay(1, DELAY_CAPACITY, delay_samples=DELAY_SAMPLES),
+    DspNode::stereo_delay(
+      input=1,
+      max_delay_samples=DELAY_CAPACITY,
+      delay_samples=DELAY_SAMPLES,
+    ),
     DspNode::stereo_mixdown(2),
     DspNode::output(3),
   ]

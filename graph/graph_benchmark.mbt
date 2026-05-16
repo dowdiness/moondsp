@@ -68,7 +68,12 @@ fn build_bench_feedback_voice_nodes() -> Array[DspNode] {
       q=0.707,
     ), // 2: filter
     DspNode::mix(2, 5), // 3: mix (filter + feedback from gain) — back-edge
-    DspNode::delay(3, 4800, delay_samples=2400, feedback=0.0), // 4: delay
+    DspNode::delay(
+      input=3,
+      max_delay_samples=4800,
+      delay_samples=2400,
+      feedback=0.0,
+    ), // 4: delay
     DspNode::gain(4, 0.5), // 5: gain (feedback source)
     DspNode::output(5), // 6: output
   ]
