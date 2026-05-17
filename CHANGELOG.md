@@ -7,6 +7,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-05-17
+
+**Graph runtime exchange boundary now `CompiledTemplate`.** `Array[DspNode]`
+remains the *authoring* exchange type; `CompiledTemplate` is the *runtime*
+exchange type, produced by the single canonical crossing
+`CompiledTemplate::analyze`. See
+[ADR-0010](docs/decisions/0010-compiled-template-runtime-boundary.md) for
+the contract and `scripts/check-public-boundary.sh` for enforcement.
+
+### Migration
+
+```moonbit
+// Before (v0.3.x)
+CompiledDsp::compile(nodes, ctx)
+CompiledStereoDsp::compile(nodes, ctx)
+VoicePool::new(nodes, ctx, max_voices=4)              // -> VoicePool?
+VoicePool::set_template(pool, nodes)                  // -> Bool
+BoundVoicePool::new(nodes, ctx, builder, max_voices=4)
+BoundVoicePool::set_template(pool, nodes, builder)
+
+// After (v0.4.0)
+let template = CompiledTemplate::analyze(nodes)
+CompiledDsp::compile(template, ctx)
+CompiledStereoDsp::compile(template, ctx)
+VoicePool::new(template, ctx, max_voices=4)           // -> Result[VoicePool, VoicePoolError]
+VoicePool::set_template(pool, template)               // -> Result[Unit, VoicePoolError]
+BoundVoicePool::new(template, ctx, builder, max_voices=4)
+BoundVoicePool::set_template(pool, template, builder)
+```
+
+### Breaking changes
+
+- **`CompiledDsp::compile(Array[DspNode], DspContext)` removed.**
+  `compile_template` renamed to `compile(CompiledTemplate, DspContext)`.
+  Same for `CompiledStereoDsp`.
+- **`VoicePool::new` and `set_template` now take `CompiledTemplate` and
+  return `Result[..., VoicePoolError]`.** Variants: `InvalidMaxVoices`,
+  `OrphanAdsr`, `CompileRejected`. Mirrors `BoundVoicePoolError` minus
+  `Binding(...)`.
+- **`BoundVoicePool::new` and `set_template` now take `CompiledTemplate`.**
+  Return shape (`Result[..., BoundVoicePoolError]`) unchanged.
+- **`optimize_graph` is now package-private.** Use
+  `CompiledTemplate::analyze` instead — it runs constant folding and
+  dead-node elimination exactly once and produces the runtime boundary
+  type in one step. Removed from the root facade re-export list.
+
+### Added
+
+- `CompiledTemplate::adsr_authoring_indices(Self) -> FixedArray[Int]` —
+  authoring indices of surviving ADSR nodes, used by `voice/` for
+  note_on / note_off gating.
+- `GraphBuilder::analyze(Self) -> CompiledTemplate` — sugar over
+  `CompiledTemplate::analyze(builder.nodes())`.
+- `VoicePoolError` re-exported through the root `@moondsp` facade so
+  consumers can pattern-match `VoicePool::new` Results ergonomically.
+
+### Carve-outs (NOT migrated — see ADR-0010 § Boundary exceptions)
+
+- `replay(Array[DspNode])` — pre-optimize debug / round-trip.
+- `Compiled{Mono,Stereo}DspTopologyController::from_nodes(Array, ctx, crossfade?)`
+  — edit-as-you-go composites.
+- `GraphBuilder::nodes`, `GraphTemplateDoc::nodes` — authoring /
+  inspection accessors.
+- `GraphTemplateDoc::from_nodes`, `::insert_chain`, `::compile`,
+  `::compile_stereo` — authoring artifact surface.
+- `GraphIndexMap::insert_chain`, `GraphTopologyEdit::InsertChain` (and
+  constructor) — authoring payloads.
+
+### Internal
+
+- `voice/` internal storage migrated from `Array[DspNode]` snapshots to
+  `FixedArray[Int]` ADSR-authoring-index snapshots. No behavior change
+  for already-sounding voices across `set_template` hot-swap.
+- Added `scripts/check-public-boundary.sh` and
+  `.github/workflows/boundary-check.yml` enforcing ADR-0010 carve-outs
+  in CI.
+
 ## [0.3.1] - 2026-05-17
 
 ### Added
