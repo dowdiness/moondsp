@@ -920,7 +920,10 @@ Current semantics:
 
 This prevents a stale scheduler-owned binding map from being paired with a
 voice pool after a template swap, and it removes the previous double
-`optimize_graph(...)` pass from the voice-template path.
+`optimize_graph(...)` pass from the voice-template path. **Planned per
+ADR-0010 (Proposed):** the boundary type makes single-optimize a static
+guarantee, not just a dynamic property — `optimize_graph` becomes
+package-private and runs exactly once inside `CompiledTemplate::analyze`.
 
 ### 3.6 Graph Hot-Swap
 
