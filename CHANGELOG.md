@@ -60,26 +60,37 @@ BoundVoicePool::set_template(pool, template, builder)
   note_on / note_off gating.
 - `GraphBuilder::analyze(Self) -> CompiledTemplate` — sugar over
   `CompiledTemplate::analyze(builder.nodes())`.
+- `BoundVoicePoolError::from_voice_pool(VoicePoolError) -> Self` —
+  remaps a `VoicePoolError` into a `BoundVoicePoolError` for callers
+  composing the two error types.
 - `VoicePoolError` re-exported through the root `@moondsp` facade so
   consumers can pattern-match `VoicePool::new` Results ergonomically.
 
 ### Carve-outs (NOT migrated — see ADR-0010 § Boundary exceptions)
 
+The following public APIs keep `Array[DspNode]` in their signatures by
+design. Each is enforced by an allowlist entry in
+`scripts/check-public-boundary.sh`.
+
+- `CompiledTemplate::analyze(Array[DspNode])` — the canonical authoring
+  → runtime crossing; the entire migration is built around this entry
+  point.
 - `replay(Array[DspNode])` — pre-optimize debug / round-trip.
 - `Compiled{Mono,Stereo}DspTopologyController::from_nodes(Array, ctx, crossfade?)`
   — edit-as-you-go composites.
 - `GraphBuilder::nodes`, `GraphTemplateDoc::nodes` — authoring /
   inspection accessors.
-- `GraphTemplateDoc::from_nodes`, `::insert_chain`, `::compile`,
-  `::compile_stereo` — authoring artifact surface.
+- `GraphTemplateDoc::from_nodes`, `::insert_chain` — authoring artifact
+  construction.
 - `GraphIndexMap::insert_chain`, `GraphTopologyEdit::InsertChain` (and
   constructor) — authoring payloads.
 
 ### Internal
 
 - `voice/` internal storage migrated from `Array[DspNode]` snapshots to
-  `FixedArray[Int]` ADSR-authoring-index snapshots. No behavior change
-  for already-sounding voices across `set_template` hot-swap.
+  `FixedArray[Int]` ADSR-authoring-index snapshots. The PR-2 pinning
+  tests (`voice/voice_pinning_test.mbt`) pin the public outcome of
+  `VoicePool::new` and `set_template` across the migration.
 - Added `scripts/check-public-boundary.sh` and
   `.github/workflows/boundary-check.yml` enforcing ADR-0010 carve-outs
   in CI.
