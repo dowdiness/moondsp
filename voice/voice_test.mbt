@@ -649,3 +649,43 @@ test "VoicePool process sanitizes final mixdown output" {
   // Verify output is non-zero (voice was active)
   assert_true(left.get(0) > 0.0)
 }
+
+///| B7: VoicePoolError::InvalidMaxVoices fires under max_voices <= 0.
+test "B7: VoicePool::new with max_voices=0 returns InvalidMaxVoices" {
+  let nodes : Array[DspNode] = [
+    DspNode::oscillator(Waveform::Sine, 440.0),
+    DspNode::output(0),
+  ]
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
+  let template = CompiledTemplate::analyze(nodes)
+  match VoicePool::new(template, ctx, max_voices=0) {
+    Err(e) => @debug.assert_eq(e, VoicePoolError::InvalidMaxVoices)
+    Ok(_) => fail("expected Err(InvalidMaxVoices), got Ok")
+  }
+}
+
+///| B7: VoicePoolError::OrphanAdsr fires for dead-code ADSR.
+test "B7: VoicePool::new with orphan ADSR returns OrphanAdsr" {
+  let nodes : Array[DspNode] = [
+    DspNode::oscillator(Waveform::Sine, 440.0),
+    DspNode::adsr(attack_ms=10.0, decay_ms=50.0, sustain=0.5, release_ms=100.0),
+    DspNode::output(0),
+  ]
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
+  let template = CompiledTemplate::analyze(nodes)
+  match VoicePool::new(template, ctx, max_voices=4) {
+    Err(e) => @debug.assert_eq(e, VoicePoolError::OrphanAdsr)
+    Ok(_) => fail("expected Err(OrphanAdsr), got Ok")
+  }
+}
+
+///| B7: VoicePoolError::CompileRejected fires for missing Output.
+test "B7: VoicePool::new with missing Output returns CompileRejected" {
+  let nodes : Array[DspNode] = [DspNode::oscillator(Waveform::Sine, 440.0)]
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
+  let template = CompiledTemplate::analyze(nodes)
+  match VoicePool::new(template, ctx, max_voices=4) {
+    Err(e) => @debug.assert_eq(e, VoicePoolError::CompileRejected)
+    Ok(_) => fail("expected Err(CompileRejected), got Ok")
+  }
+}
