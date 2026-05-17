@@ -20,11 +20,11 @@ test "compiled dsp hot swap crossfades equal-power between graphs" {
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
   let old_graph = CompiledDsp::compile(
-    [DspNode::constant(0.0), DspNode::output(0)],
+    CompiledTemplate::analyze([DspNode::constant(0.0), DspNode::output(0)]),
     context,
   ).unwrap()
   let new_graph = CompiledDsp::compile(
-    [DspNode::constant(1.0), DspNode::output(0)],
+    CompiledTemplate::analyze([DspNode::constant(1.0), DspNode::output(0)]),
     context,
   ).unwrap()
   let hot_swap = CompiledDspHotSwap::from_graph(
@@ -72,11 +72,11 @@ test "compiled dsp hot swap can replace instantly" {
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
   let old_graph = CompiledDsp::compile(
-    [DspNode::constant(0.25), DspNode::output(0)],
+    CompiledTemplate::analyze([DspNode::constant(0.25), DspNode::output(0)]),
     context,
   ).unwrap()
   let new_graph = CompiledDsp::compile(
-    [DspNode::constant(0.75), DspNode::output(0)],
+    CompiledTemplate::analyze([DspNode::constant(0.75), DspNode::output(0)]),
     context,
   ).unwrap()
   let hot_swap = CompiledDspHotSwap::from_graph(old_graph)
@@ -99,11 +99,11 @@ test "compiled dsp hot swap rejects incompatible replacement graph" {
     block_size=8,
   )
   let active = CompiledDsp::compile(
-    [DspNode::constant(0.0), DspNode::output(0)],
+    CompiledTemplate::analyze([DspNode::constant(0.0), DspNode::output(0)]),
     active_context,
   ).unwrap()
   let incompatible = CompiledDsp::compile(
-    [DspNode::constant(1.0), DspNode::output(0)],
+    CompiledTemplate::analyze([DspNode::constant(1.0), DspNode::output(0)]),
     incompatible_context,
   ).unwrap()
   let hot_swap = CompiledDspHotSwap::from_graph(active)
@@ -126,11 +126,11 @@ test "compiled dsp hot swap result reports sample rate mismatch" {
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
   let active = CompiledDsp::compile(
-    [DspNode::constant(0.0), DspNode::output(0)],
+    CompiledTemplate::analyze([DspNode::constant(0.0), DspNode::output(0)]),
     active_context,
   ).unwrap()
   let incompatible = CompiledDsp::compile(
-    [DspNode::constant(1.0), DspNode::output(0)],
+    CompiledTemplate::analyze([DspNode::constant(1.0), DspNode::output(0)]),
     incompatible_context,
   ).unwrap()
   let hot_swap = CompiledDspHotSwap::from_graph(active)
@@ -155,11 +155,11 @@ test "compiled dsp hot swap result reports block capacity mismatch" {
     block_size=HOT_SWAP_BLOCK_SIZE * 2,
   )
   let active = CompiledDsp::compile(
-    [DspNode::constant(0.0), DspNode::output(0)],
+    CompiledTemplate::analyze([DspNode::constant(0.0), DspNode::output(0)]),
     active_context,
   ).unwrap()
   let incompatible = CompiledDsp::compile(
-    [DspNode::constant(1.0), DspNode::output(0)],
+    CompiledTemplate::analyze([DspNode::constant(1.0), DspNode::output(0)]),
     incompatible_context,
   ).unwrap()
   let hot_swap = CompiledDspHotSwap::from_graph(active)
@@ -183,11 +183,19 @@ test "compiled dsp hot swap mirrors runtime param changes into pending graph" {
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
   let active = CompiledDsp::compile(
-    [DspNode::constant(1.0), DspNode::gain(0, 0.25), DspNode::output(1)],
+    CompiledTemplate::analyze([
+      DspNode::constant(1.0),
+      DspNode::gain(0, 0.25),
+      DspNode::output(1),
+    ]),
     context,
   ).unwrap()
   let replacement = CompiledDsp::compile(
-    [DspNode::constant(1.0), DspNode::gain(0, 0.75), DspNode::output(1)],
+    CompiledTemplate::analyze([
+      DspNode::constant(1.0),
+      DspNode::gain(0, 0.75),
+      DspNode::output(1),
+    ]),
     context,
   ).unwrap()
   let hot_swap = CompiledDspHotSwap::from_graph(
@@ -228,11 +236,15 @@ test "compiled dsp hot swap result reports pending graph control rejection" {
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
   let active = CompiledDsp::compile(
-    [DspNode::constant(1.0), DspNode::gain(0, 0.25), DspNode::output(1)],
+    CompiledTemplate::analyze([
+      DspNode::constant(1.0),
+      DspNode::gain(0, 0.25),
+      DspNode::output(1),
+    ]),
     context,
   ).unwrap()
   let replacement = CompiledDsp::compile(
-    [DspNode::constant(1.0), DspNode::output(0)],
+    CompiledTemplate::analyze([DspNode::constant(1.0), DspNode::output(0)]),
     context,
   ).unwrap()
   let hot_swap = CompiledDspHotSwap::from_graph(
@@ -267,11 +279,19 @@ test "compiled stereo dsp hot swap crossfades equal-power between graphs" {
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
   let old_graph = CompiledStereoDsp::compile(
-    [DspNode::constant(0.0), DspNode::pan(0, 0.0), DspNode::stereo_output(1)],
+    CompiledTemplate::analyze([
+      DspNode::constant(0.0),
+      DspNode::pan(0, 0.0),
+      DspNode::stereo_output(1),
+    ]),
     context,
   ).unwrap()
   let new_graph = CompiledStereoDsp::compile(
-    [DspNode::constant(1.0), DspNode::pan(0, 0.0), DspNode::stereo_output(1)],
+    CompiledTemplate::analyze([
+      DspNode::constant(1.0),
+      DspNode::pan(0, 0.0),
+      DspNode::stereo_output(1),
+    ]),
     context,
   ).unwrap()
   let hot_swap = CompiledStereoDspHotSwap::from_graph(
@@ -352,11 +372,19 @@ test "compiled stereo dsp hot swap result queues compatible graph" {
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
   let old_graph = CompiledStereoDsp::compile(
-    [DspNode::constant(0.0), DspNode::pan(0, 0.0), DspNode::stereo_output(1)],
+    CompiledTemplate::analyze([
+      DspNode::constant(0.0),
+      DspNode::pan(0, 0.0),
+      DspNode::stereo_output(1),
+    ]),
     context,
   ).unwrap()
   let new_graph = CompiledStereoDsp::compile(
-    [DspNode::constant(1.0), DspNode::pan(0, 0.0), DspNode::stereo_output(1)],
+    CompiledTemplate::analyze([
+      DspNode::constant(1.0),
+      DspNode::pan(0, 0.0),
+      DspNode::stereo_output(1),
+    ]),
     context,
   ).unwrap()
   let hot_swap = CompiledStereoDspHotSwap::from_graph(old_graph)
@@ -385,11 +413,19 @@ test "compiled stereo dsp hot swap mirrors pan changes into pending graph" {
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
   let active = CompiledStereoDsp::compile(
-    [DspNode::constant(0.5), DspNode::pan(0, 0.0), DspNode::stereo_output(1)],
+    CompiledTemplate::analyze([
+      DspNode::constant(0.5),
+      DspNode::pan(0, 0.0),
+      DspNode::stereo_output(1),
+    ]),
     context,
   ).unwrap()
   let replacement = CompiledStereoDsp::compile(
-    [DspNode::constant(1.0), DspNode::pan(0, 0.0), DspNode::stereo_output(1)],
+    CompiledTemplate::analyze([
+      DspNode::constant(1.0),
+      DspNode::pan(0, 0.0),
+      DspNode::stereo_output(1),
+    ]),
     context,
   ).unwrap()
   let hot_swap = CompiledStereoDspHotSwap::from_graph(
@@ -446,15 +482,19 @@ test "compiled stereo dsp hot swap result reports pending graph control rejectio
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
   let active = CompiledStereoDsp::compile(
-    [
+    CompiledTemplate::analyze([
       DspNode::adsr(attack_ms=0.01, decay_ms=0.1, sustain=0.5, release_ms=0.2),
       DspNode::pan(0, 0.0),
       DspNode::stereo_output(1),
-    ],
+    ]),
     context,
   ).unwrap()
   let replacement = CompiledStereoDsp::compile(
-    [DspNode::constant(1.0), DspNode::pan(0, 0.0), DspNode::stereo_output(1)],
+    CompiledTemplate::analyze([
+      DspNode::constant(1.0),
+      DspNode::pan(0, 0.0),
+      DspNode::stereo_output(1),
+    ]),
     context,
   ).unwrap()
   let hot_swap = CompiledStereoDspHotSwap::from_graph(

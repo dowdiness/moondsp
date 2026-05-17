@@ -4,10 +4,10 @@ let compiled_hot_swap : GraphSlot[@moondsp.CompiledDspHotSwap, MonoOut] = GraphS
   compile=fn(ctx) {
     match
       @moondsp.CompiledDsp::compile(
-        [
+        @moondsp.CompiledTemplate::analyze([
           @moondsp.DspNode::constant(BROWSER_HOT_SWAP_OLD_CONSTANT),
           @moondsp.DspNode::output(0),
-        ],
+        ]),
         ctx,
       ) {
       Some(active) =>
@@ -49,10 +49,10 @@ pub fn queue_compiled_hot_swap() -> Bool {
   }
   let replacement = match
     @moondsp.CompiledDsp::compile(
-      [
+      @moondsp.CompiledTemplate::analyze([
         @moondsp.DspNode::constant(BROWSER_HOT_SWAP_NEW_CONSTANT),
         @moondsp.DspNode::output(0),
-      ],
+      ]),
       ctx,
     ) {
     Some(r) => r

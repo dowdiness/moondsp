@@ -157,7 +157,11 @@ fn ensure_compiled_graph(sample_rate : Double, block_size : Int) -> Bool {
     @moondsp.DspNode::clip(2, BROWSER_TEST_FEEDBACK_CLIP_THRESHOLD),
     @moondsp.DspNode::output(3),
   ]
-  match @moondsp.CompiledDsp::compile(nodes, context) {
+  match
+    @moondsp.CompiledDsp::compile(
+      @moondsp.CompiledTemplate::analyze(nodes),
+      context,
+    ) {
     Some(graph) => {
       compiled_graph.val = Some(graph)
       compiled_context.val = Some(context)
@@ -229,7 +233,11 @@ pub fn mul_adsr_peak(sample_rate : Double, block_size : Int) -> Double {
     @moondsp.DspNode::mul(0, 1),
     @moondsp.DspNode::output(2),
   ]
-  match @moondsp.CompiledDsp::compile(nodes, ctx) {
+  match
+    @moondsp.CompiledDsp::compile(
+      @moondsp.CompiledTemplate::analyze(nodes),
+      ctx,
+    ) {
     Some(graph) => {
       ignore(graph.gate_on(1))
       let buf = @moondsp.AudioBuffer::filled(block_size)

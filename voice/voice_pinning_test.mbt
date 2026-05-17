@@ -21,51 +21,40 @@ enum A3Reason {
 } derive(Eq, @debug.Debug)
 
 ///|
-/// Closure type for A2. PR 3 swaps the body to call the new
-/// VoicePool::new(CompiledTemplate, ctx, max_voices?) -> Result[Self, VoicePoolError]
-/// and maps VoicePoolError variants to A2Reason via an inline match.
-type A2Closure = (Array[DspNode], DspContext, Int) -> Result[
-  VoicePool,
-  A2Reason,
-]
-
-///|
-type A3Closure = (VoicePool, Array[DspNode]) -> Result[Unit, A3Reason]
-
-///|
-/// PR-2 A2 closure: pre-classify failure reasons before calling the
-/// current Option-returning VoicePool::new. PR 3 replaces this body
-/// with a direct call to VoicePool::new(CompiledTemplate::analyze(nodes), ctx,
-/// max_voices?) and an inline match mapping VoicePoolError variants to A2Reason.
+/// PR-3 A2 closure: direct call to the new Result-returning VoicePool::new.
 fn pr2_a2_closure(
   nodes : Array[DspNode],
   ctx : DspContext,
   max_voices : Int,
 ) -> Result[VoicePool, A2Reason] {
-  guard max_voices > 0 else { return Err(A2Reason::InvalidMaxVoices) }
-  guard @graph.CompiledTemplate::analyze(nodes).orphan_adsr_count() == 0 else {
-    return Err(A2Reason::OrphanAdsr)
-  }
-  match VoicePool::new(nodes, ctx, max_voices~) {
-    Some(pool) => Ok(pool)
-    None => Err(A2Reason::CompileRejected)
-  }
+  VoicePool::new(@graph.CompiledTemplate::analyze(nodes), ctx, max_voices~).map_err(fn(
+      e,
+    ) {
+      match e {
+        VoicePoolError::InvalidMaxVoices => A2Reason::InvalidMaxVoices
+        VoicePoolError::OrphanAdsr => A2Reason::OrphanAdsr
+        VoicePoolError::CompileRejected => A2Reason::CompileRejected
+      }
+    },
+  )
 }
 
 ///|
-/// PR-2 A3 closure: pre-classify orphan_adsr before calling the
-/// current Bool-returning VoicePool::set_template.
+/// PR-3 A3 closure: direct call to the new Result-returning VoicePool::set_template.
 fn pr2_a3_closure(
   pool : VoicePool,
   nodes : Array[DspNode],
 ) -> Result[Unit, A3Reason] {
-  guard @graph.CompiledTemplate::analyze(nodes).orphan_adsr_count() == 0 else {
-    return Err(A3Reason::OrphanAdsr)
-  }
-  if VoicePool::set_template(pool, nodes) {
-    Ok(())
-  } else {
-    Err(A3Reason::CompileRejected)
+  match VoicePool::set_template(pool, @graph.CompiledTemplate::analyze(nodes)) {
+    Ok(_) => Ok(())
+    Err(VoicePoolError::OrphanAdsr) => Err(A3Reason::OrphanAdsr)
+    Err(VoicePoolError::CompileRejected) => Err(A3Reason::CompileRejected)
+    // set_template doesn't accept max_voices, so InvalidMaxVoices must
+    // never appear here. abort() catches a future regression where the
+    // validation chain leaks an InvalidMaxVoices through, instead of
+    // silently remapping it to CompileRejected and hiding the bug.
+    Err(VoicePoolError::InvalidMaxVoices) =>
+      abort("unexpected InvalidMaxVoices from VoicePool::set_template")
   }
 }
 
@@ -138,7 +127,11 @@ test "A3: well-formed replacement succeeds" {
     DspNode::output(0),
   ]
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
-  let pool = VoicePool::new(nodes, ctx, max_voices=4).unwrap()
+  let pool = VoicePool::new(
+    @graph.CompiledTemplate::analyze(nodes),
+    ctx,
+    max_voices=4,
+  ).unwrap()
   let new_nodes : Array[DspNode] = [
     DspNode::oscillator(Waveform::Square, 880.0),
     DspNode::output(0),
@@ -154,7 +147,11 @@ test "A3: orphan ADSR replacement fails with OrphanAdsr" {
     DspNode::output(0),
   ]
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
-  let pool = VoicePool::new(nodes, ctx, max_voices=4).unwrap()
+  let pool = VoicePool::new(
+    @graph.CompiledTemplate::analyze(nodes),
+    ctx,
+    max_voices=4,
+  ).unwrap()
   let new_nodes : Array[DspNode] = [
     DspNode::oscillator(Waveform::Sine, 440.0),
     DspNode::adsr(attack_ms=10.0, decay_ms=50.0, sustain=0.5, release_ms=100.0),
@@ -171,7 +168,11 @@ test "A3: missing Output replacement fails with CompileRejected" {
     DspNode::output(0),
   ]
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
-  let pool = VoicePool::new(nodes, ctx, max_voices=4).unwrap()
+  let pool = VoicePool::new(
+    @graph.CompiledTemplate::analyze(nodes),
+    ctx,
+    max_voices=4,
+  ).unwrap()
   let new_nodes : Array[DspNode] = [DspNode::oscillator(Waveform::Sine, 440.0)]
   @debug.assert_eq(
     pr2_a3_closure(pool, new_nodes),
@@ -189,7 +190,12 @@ fn pr2_a4_closure(
   builder : ControlBindingBuilder,
   max_voices : Int,
 ) -> Result[BoundVoicePool, BoundVoicePoolError] {
-  BoundVoicePool::new(nodes, ctx, builder, max_voices~)
+  BoundVoicePool::new(
+    CompiledTemplate::analyze(nodes),
+    ctx,
+    builder,
+    max_voices~,
+  )
 }
 
 ///|

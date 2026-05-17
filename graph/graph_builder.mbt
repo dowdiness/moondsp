@@ -393,6 +393,15 @@ pub fn[
 }
 
 ///|
+/// Produce a CompiledTemplate from the builder's current node list.
+/// Sugar over `CompiledTemplate::analyze(self.nodes())` — exists
+/// because GraphBuilder is the canonical entry point and the runtime
+/// boundary is CompiledTemplate. See ADR-0010.
+pub fn GraphBuilder::analyze(self : GraphBuilder) -> CompiledTemplate {
+  CompiledTemplate::analyze(self.nodes())
+}
+
+///|
 /// Safely access a replay result by index, returning None for out-of-bounds
 /// or missing results.
 fn[T] replay_get_result(results : FixedArray[T?], index : Int) -> T? {

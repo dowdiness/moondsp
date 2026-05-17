@@ -71,3 +71,35 @@ pub fn CompiledTemplate::orphan_adsr_count(self : CompiledTemplate) -> Int {
   }
   count
 }
+
+///|
+/// Authoring indices of ADSR nodes that survived optimize_graph,
+/// in authoring order. Used by voice/ to gate the surviving ADSRs
+/// on note_on / note_off — they call CompiledDsp::gate_on/gate_off
+/// which take authoring indices and remap through index_map internally.
+///
+/// WHY authoring indices, not runtime: CompiledDsp::gate_on/gate_off
+/// expect the original authoring index; returning runtime indices
+/// would cause voice/ to double-map and target wrong nodes.
+///
+/// WHY a separate accessor instead of exposing length/node_at:
+/// keeps the accessor surface minimal (principle 7). Specific
+/// validation patterns get their own public method; generic
+/// introspection waits for a concrete consumer.
+pub fn CompiledTemplate::adsr_authoring_indices(
+  self : CompiledTemplate,
+) -> FixedArray[Int] {
+  let result = FixedArray::make(self.template.length(), -1)
+  let mut n = 0
+  for i in 0..<self.template.length() {
+    if self.template[i].kind is Adsr && self.index_map[i] >= 0 {
+      result[n] = i
+      n = n + 1
+    }
+  }
+  let snapshot = FixedArray::make(n, 0)
+  for i in 0..<n {
+    snapshot[i] = result[i]
+  }
+  snapshot
+}

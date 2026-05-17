@@ -213,9 +213,7 @@ fn compose_index_maps(
 ///
 /// Returns (optimized_nodes, index_map) where index_map maps each
 /// original node index to its final optimized index (-1 if eliminated).
-pub fn optimize_graph(
-  nodes : Array[DspNode],
-) -> (Array[DspNode], FixedArray[Int]) {
+fn optimize_graph(nodes : Array[DspNode]) -> (Array[DspNode], FixedArray[Int]) {
   let n = nodes.length()
   let mut current = nodes
   let mut total_map = FixedArray::makei(n, fn(i) { i })

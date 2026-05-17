@@ -3,7 +3,7 @@ let compiled : GraphSlot[@moondsp.CompiledDsp, MonoOut] = GraphSlot::new(
   output=MonoOut::new(),
   compile=fn(ctx) {
     @moondsp.CompiledDsp::compile(
-      [
+      @moondsp.CompiledTemplate::analyze([
         @moondsp.DspNode::oscillator(
           @moondsp.Waveform::Triangle,
           BROWSER_COMPILED_DEFAULT_FREQ,
@@ -11,7 +11,7 @@ let compiled : GraphSlot[@moondsp.CompiledDsp, MonoOut] = GraphSlot::new(
         @moondsp.DspNode::gain(0, BROWSER_COMPILED_DEFAULT_GAIN),
         @moondsp.DspNode::clip(1, BROWSER_COMPILED_CLIP_THRESHOLD),
         @moondsp.DspNode::output(2),
-      ],
+      ]),
       ctx,
     )
   },

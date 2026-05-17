@@ -22,7 +22,7 @@ fn set_next_allocation_order(pool : VoicePool, value : Int) -> Unit {
 test "VoiceHandle becomes invalid after generation overflow resets to 0" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
   let nodes = [DspNode::constant(440.0), DspNode::output(0)]
-  let pool = VoicePool::new(nodes, ctx, max_voices=1).unwrap()
+  let pool = VoicePool::new(CompiledTemplate::analyze(nodes), ctx, max_voices=1).unwrap()
   // Force generation near the overflow cap (@int.MAX_VALUE - 1 = 2147483646).
   // Next note_on increments to 2147483646, the one after triggers the guard.
   set_slot_generation(pool, 0, @int.MAX_VALUE - 2)
@@ -42,7 +42,7 @@ test "VoiceHandle becomes invalid after generation overflow resets to 0" {
 test "compact_allocation_orders preserves relative voice age" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
   let nodes = [DspNode::constant(440.0), DspNode::output(0)]
-  let pool = VoicePool::new(nodes, ctx, max_voices=4).unwrap()
+  let pool = VoicePool::new(CompiledTemplate::analyze(nodes), ctx, max_voices=4).unwrap()
   // Activate 3 voices so they get sequential allocation_orders 0, 1, 2
   let h0 = pool.note_on([]).unwrap()
   let h1 = pool.note_on([]).unwrap()

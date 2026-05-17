@@ -379,7 +379,7 @@ fn compile_mono(nodes : Array[DspNode]) -> CompiledDsp {
     sample_rate=PROP_SAMPLE_RATE,
     block_size=PROP_BLOCK_SIZE,
   )
-  CompiledDsp::compile(nodes, context).unwrap()
+  CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
 }
 
 ///|
@@ -389,7 +389,7 @@ fn compile_stereo(nodes : Array[DspNode]) -> CompiledStereoDsp {
     sample_rate=PROP_SAMPLE_RATE,
     block_size=PROP_BLOCK_SIZE,
   )
-  CompiledStereoDsp::compile(nodes, context).unwrap()
+  CompiledStereoDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
 }
 
 ///|
@@ -479,8 +479,14 @@ test "prop: mono ADSR graph — compile twice, process identically" {
         sample_rate=PROP_SAMPLE_RATE,
         block_size=PROP_BLOCK_SIZE,
       )
-      let compiled_a = CompiledDsp::compile(nodes, context).unwrap()
-      let compiled_b = CompiledDsp::compile(nodes, context).unwrap()
+      let compiled_a = CompiledDsp::compile(
+        CompiledTemplate::analyze(nodes),
+        context,
+      ).unwrap()
+      let compiled_b = CompiledDsp::compile(
+        CompiledTemplate::analyze(nodes),
+        context,
+      ).unwrap()
       ignore(compiled_a.gate_on(0))
       ignore(compiled_b.gate_on(0))
       let out_a = AudioBuffer::filled(PROP_BLOCK_SIZE)
@@ -552,8 +558,14 @@ test "prop: mono feedback cycle — runtime retune is deterministic" {
         sample_rate=PROP_SAMPLE_RATE,
         block_size=PROP_BLOCK_SIZE,
       )
-      let compiled_a = CompiledDsp::compile(nodes, context).unwrap()
-      let compiled_b = CompiledDsp::compile(nodes, context).unwrap()
+      let compiled_a = CompiledDsp::compile(
+        CompiledTemplate::analyze(nodes),
+        context,
+      ).unwrap()
+      let compiled_b = CompiledDsp::compile(
+        CompiledTemplate::analyze(nodes),
+        context,
+      ).unwrap()
       // The gain node is always the last before Output in our feedback graphs
       let gain_index = nodes.length() - 2
       let new_gain = 0.05 + (s / 13 % 18).to_double() * 0.05
@@ -715,8 +727,14 @@ test "prop: runtime param update is deterministic across compilations" {
         sample_rate=PROP_SAMPLE_RATE,
         block_size=PROP_BLOCK_SIZE,
       )
-      let compiled_a = CompiledDsp::compile(nodes, context).unwrap()
-      let compiled_b = CompiledDsp::compile(nodes, context).unwrap()
+      let compiled_a = CompiledDsp::compile(
+        CompiledTemplate::analyze(nodes),
+        context,
+      ).unwrap()
+      let compiled_b = CompiledDsp::compile(
+        CompiledTemplate::analyze(nodes),
+        context,
+      ).unwrap()
       ignore(
         compiled_a.apply_control(
           GraphControl::set_param(1, GraphParamSlot::Value0, new_gain),
@@ -768,8 +786,14 @@ test "prop: runtime control variants are deterministic" {
             ),
             DspNode::output(1),
           ]
-          let ca = CompiledDsp::compile(nodes, context).unwrap()
-          let cb = CompiledDsp::compile(nodes, context).unwrap()
+          let ca = CompiledDsp::compile(
+            CompiledTemplate::analyze(nodes),
+            context,
+          ).unwrap()
+          let cb = CompiledDsp::compile(
+            CompiledTemplate::analyze(nodes),
+            context,
+          ).unwrap()
           ca.process(context, out_a)
           cb.process(context, out_b)
           ignore(
@@ -811,8 +835,14 @@ test "prop: runtime control variants are deterministic" {
             ),
             DspNode::output(1),
           ]
-          let ca = CompiledDsp::compile(nodes, context).unwrap()
-          let cb = CompiledDsp::compile(nodes, context).unwrap()
+          let ca = CompiledDsp::compile(
+            CompiledTemplate::analyze(nodes),
+            context,
+          ).unwrap()
+          let cb = CompiledDsp::compile(
+            CompiledTemplate::analyze(nodes),
+            context,
+          ).unwrap()
           ca.process(context, out_a)
           cb.process(context, out_b)
           ignore(
@@ -849,8 +879,14 @@ test "prop: runtime control variants are deterministic" {
             DspNode::mul(0, 1),
             DspNode::output(2),
           ]
-          let ca = CompiledDsp::compile(nodes, context).unwrap()
-          let cb = CompiledDsp::compile(nodes, context).unwrap()
+          let ca = CompiledDsp::compile(
+            CompiledTemplate::analyze(nodes),
+            context,
+          ).unwrap()
+          let cb = CompiledDsp::compile(
+            CompiledTemplate::analyze(nodes),
+            context,
+          ).unwrap()
           ignore(ca.gate_on(0))
           ignore(cb.gate_on(0))
           ca.process(context, out_a)

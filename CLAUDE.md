@@ -35,6 +35,7 @@ remains open for native targets such as CLAP plugins.
 - **No audio-thread allocation:** pre-allocated buffers only
 - **Incremental computation:** memoized DSP graph updates
 - **Audio constants:** 48000 Hz sample rate, 128 samples per buffer
+- **Graph boundary types:** `Array[DspNode]` is the authoring exchange type; `CompiledTemplate` is the runtime exchange type. One canonical crossing: `CompiledTemplate::analyze`. See ADR-0010 for the contract and `scripts/check-public-boundary.sh` for enforcement.
 
 **Source of truth:** `docs/salat-engine-technical-reference.md` is authoritative for graph runtime-control behavior. Update it first whenever these change.
 

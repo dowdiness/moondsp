@@ -14,8 +14,6 @@ pub fn is_finite(Double) -> Bool
 
 pub fn node_accepts_slot(DspNode, GraphParamSlot) -> Bool
 
-pub fn optimize_graph(Array[DspNode]) -> (Array[DspNode], FixedArray[Int])
-
 pub fn[T : @dsp.ArithSym] range(T, Double, Double) -> T
 
 pub fn[T : @dsp.ArithSym + @dsp.DspSym + @dsp.FilterSym + @dsp.DelaySym + @dsp.StereoSym + @dsp.StereoFilterSym + @dsp.StereoDelaySym] replay(Array[DspNode]) -> T?
@@ -34,8 +32,7 @@ pub impl Show for GraphTemplateDocError
 type CompiledDsp
 pub fn CompiledDsp::apply_control_result(Self, GraphControl) -> Result[Unit, GraphControlError]
 pub fn CompiledDsp::apply_controls_result(Self, Array[GraphControl]) -> Result[Unit, GraphControlError]
-pub fn CompiledDsp::compile(Array[DspNode], @dsp.DspContext) -> Self?
-pub fn CompiledDsp::compile_template(CompiledTemplate, @dsp.DspContext) -> Self?
+pub fn CompiledDsp::compile(CompiledTemplate, @dsp.DspContext) -> Self?
 pub fn CompiledDsp::gate_off(Self, Int) -> Bool
 pub fn CompiledDsp::gate_off_result(Self, Int) -> Result[Unit, GraphControlError]
 pub fn CompiledDsp::gate_on(Self, Int) -> Bool
@@ -79,8 +76,7 @@ pub impl GraphControllable for CompiledDspTopologyController
 type CompiledStereoDsp
 pub fn CompiledStereoDsp::apply_control_result(Self, GraphControl) -> Result[Unit, GraphControlError]
 pub fn CompiledStereoDsp::apply_controls_result(Self, Array[GraphControl]) -> Result[Unit, GraphControlError]
-pub fn CompiledStereoDsp::compile(Array[DspNode], @dsp.DspContext) -> Self?
-pub fn CompiledStereoDsp::compile_template(CompiledTemplate, @dsp.DspContext) -> Self?
+pub fn CompiledStereoDsp::compile(CompiledTemplate, @dsp.DspContext) -> Self?
 pub fn CompiledStereoDsp::gate_off(Self, Int) -> Bool
 pub fn CompiledStereoDsp::gate_off_result(Self, Int) -> Result[Unit, GraphControlError]
 pub fn CompiledStereoDsp::gate_on(Self, Int) -> Bool
@@ -123,6 +119,7 @@ pub impl GraphControllable for CompiledStereoDspTopologyController
 pub struct CompiledTemplate {
   // private fields
 }
+pub fn CompiledTemplate::adsr_authoring_indices(Self) -> FixedArray[Int]
 pub fn CompiledTemplate::analyze(Array[DspNode]) -> Self
 pub fn CompiledTemplate::orphan_adsr_count(Self) -> Int
 
@@ -223,6 +220,7 @@ pub(all) enum DspNodeKind {
 pub struct GraphBuilder {
   // private fields
 }
+pub fn GraphBuilder::analyze(Self) -> CompiledTemplate
 pub fn GraphBuilder::nodes(Self) -> Array[DspNode]
 pub impl @dsp.ArithSym for GraphBuilder
 pub impl @dsp.DelaySym for GraphBuilder

@@ -10,7 +10,9 @@ test "compiled dsp rejects implicit stereo to mono output" {
     DspNode::output(1),
   ]
 
-  assert_true(CompiledDsp::compile(nodes, context) is None)
+  assert_true(
+    CompiledDsp::compile(CompiledTemplate::analyze(nodes), context) is None,
+  )
 }
 
 ///|
@@ -49,10 +51,25 @@ test "compiled dsp rejects stereo-only nodes" {
     DspNode::output(1),
   ]
 
-  assert_true(CompiledDsp::compile(stereo_gain_nodes, context) is None)
-  assert_true(CompiledDsp::compile(stereo_clip_nodes, context) is None)
-  assert_true(CompiledDsp::compile(stereo_biquad_nodes, context) is None)
-  assert_true(CompiledDsp::compile(stereo_delay_nodes, context) is None)
+  assert_true(
+    CompiledDsp::compile(CompiledTemplate::analyze(stereo_gain_nodes), context)
+    is None,
+  )
+  assert_true(
+    CompiledDsp::compile(CompiledTemplate::analyze(stereo_clip_nodes), context)
+    is None,
+  )
+  assert_true(
+    CompiledDsp::compile(
+      CompiledTemplate::analyze(stereo_biquad_nodes),
+      context,
+    )
+    is None,
+  )
+  assert_true(
+    CompiledDsp::compile(CompiledTemplate::analyze(stereo_delay_nodes), context)
+    is None,
+  )
 }
 
 ///|
@@ -71,7 +88,9 @@ test "compiled dsp rejects non-finite adsr parameters" {
     DspNode::output(0),
   ]
 
-  assert_true(CompiledDsp::compile(nodes, context) is None)
+  assert_true(
+    CompiledDsp::compile(CompiledTemplate::analyze(nodes), context) is None,
+  )
 }
 
 ///|
@@ -83,8 +102,12 @@ test "compiled dsp rejects non-finite constants" {
   let nan_nodes = [DspNode::constant(0.0 / 0.0), DspNode::output(0)]
   let inf_nodes = [DspNode::constant(1.0 / 0.0), DspNode::output(0)]
 
-  assert_true(CompiledDsp::compile(nan_nodes, context) is None)
-  assert_true(CompiledDsp::compile(inf_nodes, context) is None)
+  assert_true(
+    CompiledDsp::compile(CompiledTemplate::analyze(nan_nodes), context) is None,
+  )
+  assert_true(
+    CompiledDsp::compile(CompiledTemplate::analyze(inf_nodes), context) is None,
+  )
 }
 
 ///|
@@ -95,7 +118,9 @@ test "compiled dsp rejects graphs without a final output node" {
   )
   let nodes = [DspNode::constant(QUARTER_SAMPLE)]
 
-  assert_true(CompiledDsp::compile(nodes, context) is None)
+  assert_true(
+    CompiledDsp::compile(CompiledTemplate::analyze(nodes), context) is None,
+  )
 }
 
 ///|
@@ -110,7 +135,9 @@ test "compiled dsp rejects multiple output nodes" {
     DspNode::output(0),
   ]
 
-  assert_true(CompiledDsp::compile(nodes, context) is None)
+  assert_true(
+    CompiledDsp::compile(CompiledTemplate::analyze(nodes), context) is None,
+  )
 }
 
 ///|
@@ -130,7 +157,9 @@ test "compiled dsp rejects invalid biquad parameters" {
     DspNode::output(1),
   ]
 
-  assert_true(CompiledDsp::compile(nodes, context) is None)
+  assert_true(
+    CompiledDsp::compile(CompiledTemplate::analyze(nodes), context) is None,
+  )
 }
 
 ///|
@@ -149,7 +178,7 @@ test "compiled dsp topologically sorts declarative filter graph" {
     ),
     DspNode::constant(UNIT_SAMPLE),
   ]
-  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
   let output = AudioBuffer::filled(LARGE_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -170,7 +199,7 @@ test "compiled dsp topologically sorts declarative node order" {
     DspNode::gain(2, HALF_GAIN),
     DspNode::oscillator(Waveform::Sine, OSCILLATOR_FREQ),
   ]
-  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -195,7 +224,7 @@ test "compiled dsp optimizes constant subgraph during compilation" {
     DspNode::output(2),
   ]
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
-  let compiled = CompiledDsp::compile(nodes, ctx)
+  let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), ctx)
   assert_true(compiled is Some(_))
   // Process and verify output = 12.0 (constant)
   let compiled = compiled.unwrap()
@@ -205,36 +234,7 @@ test "compiled dsp optimizes constant subgraph during compilation" {
 }
 
 ///|
-test "compiled dsp compile_template matches compile output" {
-  let nodes : Array[DspNode] = [
-    DspNode::constant(3.0),
-    DspNode::constant(4.0),
-    DspNode::mul(0, 1),
-    DspNode::gain(2, HALF_GAIN),
-    DspNode::output(3),
-  ]
-  let ctx = DspContext::new(
-    sample_rate=STANDARD_SAMPLE_RATE,
-    block_size=SMALL_BLOCK_SIZE,
-  )
-  let compiled = CompiledDsp::compile(nodes, ctx).unwrap()
-  let compiled_template = CompiledDsp::compile_template(
-    CompiledTemplate::analyze(nodes),
-    ctx,
-  ).unwrap()
-  let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
-  let template_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
-
-  compiled.process(ctx, output)
-  compiled_template.process(ctx, template_output)
-
-  for i in 0..<SMALL_BLOCK_SIZE {
-    @debug.assert_eq(template_output.get(i), output.get(i))
-  }
-}
-
-///|
-test "compiled dsp compile_template preserves authoring control indices" {
+test "compiled dsp compile preserves authoring control indices" {
   let nodes = [
     DspNode::output(1),
     DspNode::oscillator(Waveform::Sine, OSCILLATOR_FREQ),
@@ -243,10 +243,7 @@ test "compiled dsp compile_template preserves authoring control indices" {
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
-  let compiled = CompiledDsp::compile_template(
-    CompiledTemplate::analyze(nodes),
-    ctx,
-  ).unwrap()
+  let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), ctx).unwrap()
 
   assert_true(compiled.set_param(1, GraphParamSlot::Value0, 880.0))
 }
@@ -262,7 +259,7 @@ test "compiled dsp delay node keeps zero-capacity default as passthrough" {
     DspNode::delay(input=0, max_delay_samples=0),
     DspNode::output(1),
   ]
-  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -301,8 +298,13 @@ test "compiled graphs reject delay feedback outside live supported range" {
     DspNode::stereo_output(2),
   ]
 
-  assert_true(CompiledDsp::compile(mono_nodes, context) is None)
-  assert_true(CompiledStereoDsp::compile(stereo_nodes, context) is None)
+  assert_true(
+    CompiledDsp::compile(CompiledTemplate::analyze(mono_nodes), context) is None,
+  )
+  assert_true(
+    CompiledStereoDsp::compile(CompiledTemplate::analyze(stereo_nodes), context)
+    is None,
+  )
 }
 
 ///|
@@ -313,7 +315,10 @@ test "compiled stereo dsp rejects mono direct to stereo output" {
   )
   let nodes = [DspNode::constant(UNIT_SAMPLE), DspNode::stereo_output(0)]
 
-  assert_true(CompiledStereoDsp::compile(nodes, context) is None)
+  assert_true(
+    CompiledStereoDsp::compile(CompiledTemplate::analyze(nodes), context)
+    is None,
+  )
 }
 
 ///|
@@ -329,7 +334,10 @@ test "compiled stereo dsp rejects stereo post processing after pan" {
     DspNode::stereo_output(2),
   ]
 
-  assert_true(CompiledStereoDsp::compile(nodes, context) is None)
+  assert_true(
+    CompiledStereoDsp::compile(CompiledTemplate::analyze(nodes), context)
+    is None,
+  )
 }
 
 ///|
@@ -345,7 +353,10 @@ test "compiled stereo dsp rejects stereo mixdown before stereo output" {
     DspNode::stereo_output(2),
   ]
 
-  assert_true(CompiledStereoDsp::compile(nodes, context) is None)
+  assert_true(
+    CompiledStereoDsp::compile(CompiledTemplate::analyze(nodes), context)
+    is None,
+  )
 }
 
 ///|
@@ -363,5 +374,8 @@ test "compiled stereo dsp rejects internal stereo mixdown roundtrip" {
     DspNode::stereo_output(4),
   ]
 
-  assert_true(CompiledStereoDsp::compile(nodes, context) is None)
+  assert_true(
+    CompiledStereoDsp::compile(CompiledTemplate::analyze(nodes), context)
+    is None,
+  )
 }

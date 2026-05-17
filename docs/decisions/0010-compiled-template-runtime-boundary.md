@@ -1,6 +1,6 @@
 # ADR-0010: CompiledTemplate as the runtime exchange boundary
 
-- **Status:** Proposed (will flip to Accepted when PR 3 lands)
+- **Status:** Accepted
 - **Date:** 2026-05-17
 - **Source:** [`docs/superpowers/specs/2026-05-17-graph-boundary-type-design.md`](../superpowers/specs/2026-05-17-graph-boundary-type-design.md)
 - **Related:** ADR-0001 (layered package architecture), ADR-0003 (CompiledTemplate as topology artifact)
