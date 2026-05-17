@@ -99,12 +99,12 @@ pub impl Show for VoiceControlError with output(self, logger) {
 ///|
 priv struct VoiceSlot {
   mut compiled : CompiledDsp?
-  /// WHY per-slot template snapshot: after set_template, the pool's template
-  /// changes. note_off must iterate the SAME template that was used at
-  /// note_on time to find the correct ADSR node indices. Without this,
-  /// gate_off would target wrong nodes if the new template has ADSRs at
-  /// different positions.
-  mut template_snapshot : Array[DspNode]
+  /// WHY per-slot snapshot: after set_template, the pool's
+  /// adsr_authoring_indices changes. note_off must iterate the SAME
+  /// indices used at note_on to gate the right ADSRs. Without this,
+  /// gate_off would target wrong nodes (or miss freshly-orphaned ADSRs)
+  /// if the new template differs.
+  mut adsr_authoring_indices_snapshot : FixedArray[Int]
   mut state : VoiceState
   mut generation : Int
   mut allocation_order : Int
@@ -122,7 +122,7 @@ priv struct VoiceSlot {
 fn VoiceSlot::VoiceSlot(block_size : Int) -> VoiceSlot {
   {
     compiled: None,
-    template_snapshot: [],
+    adsr_authoring_indices_snapshot: FixedArray::make(0, 0),
     state: VoiceState::Idle,
     generation: 0,
     allocation_order: 0,
@@ -146,22 +146,21 @@ fn VoiceSlot::update_pan(self : VoiceSlot, pan : Double) -> Unit {
 }
 
 ///|
-/// Gate on or off all ADSR nodes in a compiled graph using authoring indices.
+/// Gate on or off all surviving ADSR nodes using authoring indices.
 /// WHY authoring indices: CompiledDsp::gate_on/gate_off accept original
-/// authoring indices and internally map through index_map (which accounts
-/// for optimizer elimination + topological reordering).
+/// authoring indices and internally map through index_map (which
+/// accounts for optimizer elimination + topological reordering).
 fn gate_all_adsrs(
   compiled : CompiledDsp,
-  template : Array[DspNode],
+  authoring_indices : FixedArray[Int],
   gate_on : Bool,
 ) -> Unit {
-  for i in 0..<template.length() {
-    if template[i].kind() is Adsr {
-      if gate_on {
-        ignore(compiled.gate_on(i))
-      } else {
-        ignore(compiled.gate_off(i))
-      }
+  for n in 0..<authoring_indices.length() {
+    let i = authoring_indices[n]
+    if gate_on {
+      ignore(compiled.gate_on(i))
+    } else {
+      ignore(compiled.gate_off(i))
     }
   }
 }
@@ -186,7 +185,7 @@ fn VoicePool::resolve_slot(
 ///|
 pub struct VoicePool {
   priv slots : FixedArray[VoiceSlot]
-  priv mut template : Array[DspNode]
+  priv mut adsr_authoring_indices : FixedArray[Int]
   priv mut compiled_template : CompiledTemplate
   priv compile_context : DspContext
   priv mut next_allocation_order : Int
@@ -228,7 +227,7 @@ fn VoicePool::new_validated(
   let slots = FixedArray::makei(max_voices, _ => VoiceSlot::new(block_size))
   Ok({
     slots,
-    template: template.copy(),
+    adsr_authoring_indices: compiled_template.adsr_authoring_indices(),
     compiled_template,
     compile_context: context,
     next_allocation_order: 0,
@@ -247,7 +246,7 @@ fn VoicePool::set_template_validated(
     Err(error) => return Err(BoundVoicePoolError::from_voice_pool(error))
     Ok(_) => ()
   }
-  self.template = template.copy()
+  self.adsr_authoring_indices = compiled_template.adsr_authoring_indices()
   self.compiled_template = compiled_template
   Ok(())
 }
@@ -263,11 +262,13 @@ fn VoicePool::set_template_validated(
 /// index to -1 and silently no-ops, and voices play with a 0 envelope —
 /// a frustrating footgun. Reject at pool-construction time with a clear
 /// failure rather than at note-trigger time with silent audio.
-/// WHY template.copy(): the pool's long-lived snapshot (used by note_on
-/// compiles and by set_template transitions) must be independent of the
-/// caller's array, which can be mutated after VoicePool::new returns.
-/// optimize_graph does not mutate its input, so neither CompiledTemplate::analyze
-/// nor CompiledDsp::compile disturbs the caller's array.
+/// WHY adsr_authoring_indices snapshot: the pool's long-lived snapshot
+/// (used by note_on to gate ADSRs, and refreshed by set_template) stores
+/// only the indices needed for gating — not the full template — so the
+/// caller's Array[DspNode] can be freely mutated after VoicePool::new
+/// returns. optimize_graph does not mutate its input, so neither
+/// CompiledTemplate::analyze nor CompiledDsp::compile disturbs the
+/// caller's array.
 pub fn VoicePool::new(
   template : Array[DspNode],
   context : DspContext,
@@ -330,7 +331,7 @@ pub fn BoundVoicePool::set_template(
     Ok(bindings) => bindings
     Err(error) => return Err(BoundVoicePoolError::Binding(error))
   }
-  self.pool.template = template.copy()
+  self.pool.adsr_authoring_indices = compiled_template.adsr_authoring_indices()
   self.pool.compiled_template = compiled_template
   self.bindings = next_bindings
   Ok(())
@@ -529,11 +530,14 @@ pub fn VoicePool::note_on(
       return None
     }
   }
-  gate_all_adsrs(compiled, self.template, true)
+  gate_all_adsrs(compiled, self.adsr_authoring_indices, true)
   slot.compiled = Some(compiled)
-  // WHY snapshot: note_off needs the SAME template to find ADSR indices.
-  // See VoiceSlot.template_snapshot doc comment for the full rationale.
-  slot.template_snapshot = self.template
+  // WHY snapshot + copy: note_off needs the SAME indices that were used at
+  // note_on to gate the right ADSRs. .copy() is load-bearing — without it,
+  // a subsequent set_template would mutate this slot's snapshot and the
+  // already-sounding voice would gate_off against the wrong index set.
+  // See VoiceSlot.adsr_authoring_indices_snapshot doc comment.
+  slot.adsr_authoring_indices_snapshot = self.adsr_authoring_indices.copy()
   slot.state = VoiceState::Active
   // WHY overflow guard on generation: after 2^31 increments the counter
   // wraps negative, which could revalidate stale VoiceHandles. Resetting
@@ -564,10 +568,11 @@ pub fn VoicePool::note_off(self : VoicePool, handle : VoiceHandle) -> Bool {
         return false
       }
       match slot.compiled {
-        // WHY template_snapshot: uses the template from note_on time, not
-        // the current self.template which may have changed via set_template.
+        // WHY adsr_authoring_indices_snapshot: uses the indices from
+        // note_on time, not the current self.adsr_authoring_indices which
+        // may have changed via set_template.
         Some(compiled) =>
-          gate_all_adsrs(compiled, slot.template_snapshot, false)
+          gate_all_adsrs(compiled, slot.adsr_authoring_indices_snapshot, false)
         None => ()
       }
       slot.state = VoiceState::Releasing
@@ -598,7 +603,7 @@ pub fn VoicePool::note_off_all(self : VoicePool) -> Unit {
     if slot.state is VoiceState::Active {
       match slot.compiled {
         Some(compiled) =>
-          gate_all_adsrs(compiled, slot.template_snapshot, false)
+          gate_all_adsrs(compiled, slot.adsr_authoring_indices_snapshot, false)
         None => ()
       }
       slot.state = VoiceState::Releasing
