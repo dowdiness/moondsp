@@ -660,6 +660,12 @@ The current repository already implements:
   path
 - input nodes may be declared in authoring order; the compiler topologically
   sorts reachable nodes from a single terminal output node
+- **Planned per ADR-0010 (Proposed):** `CompiledDsp::compile` will accept
+  `CompiledTemplate` directly; the current `Array[DspNode]` overload and
+  the separate `compile_template` accessor collapse into a single entry
+  point. The boundary type is produced via `CompiledTemplate::analyze`.
+  Current behavior: `CompiledDsp::compile(Array[DspNode], DspContext) -> Self?`
+  alongside `CompiledDsp::compile_template(CompiledTemplate, DspContext) -> Self?`.
 - `CompiledTemplate::analyze(...)` captures the authoring template, the
   optimizer's authoring-index map, and the optimized node array; callers that
   already need template analysis can compile mono or stereo graphs with
