@@ -36,6 +36,7 @@ pub(all) enum BoundVoicePoolError {
   CompileRejected
   Binding(@graph.ControlBindingError)
 } derive(Eq, @debug.Debug)
+pub fn BoundVoicePoolError::from_voice_pool(VoicePoolError) -> Self
 pub impl Show for BoundVoicePoolError
 
 pub(all) enum VoiceControlError {
@@ -63,6 +64,13 @@ pub fn VoicePool::process(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuf
 pub fn VoicePool::set_template(Self, Array[@graph.DspNode]) -> Bool
 pub fn VoicePool::set_voice_pan(Self, VoiceHandle, Double) -> Bool
 pub fn VoicePool::voice_state(Self, VoiceHandle) -> VoiceState
+
+pub(all) enum VoicePoolError {
+  InvalidMaxVoices
+  OrphanAdsr
+  CompileRejected
+} derive(Eq, @debug.Debug)
+pub impl Show for VoicePoolError
 
 pub enum VoiceState {
   Idle

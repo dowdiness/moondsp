@@ -123,6 +123,7 @@ pub impl GraphControllable for CompiledStereoDspTopologyController
 pub struct CompiledTemplate {
   // private fields
 }
+pub fn CompiledTemplate::adsr_authoring_indices(Self) -> FixedArray[Int]
 pub fn CompiledTemplate::analyze(Array[DspNode]) -> Self
 pub fn CompiledTemplate::orphan_adsr_count(Self) -> Int
 
@@ -223,6 +224,7 @@ pub(all) enum DspNodeKind {
 pub struct GraphBuilder {
   // private fields
 }
+pub fn GraphBuilder::analyze(Self) -> CompiledTemplate
 pub fn GraphBuilder::nodes(Self) -> Array[DspNode]
 pub impl @dsp.ArithSym for GraphBuilder
 pub impl @dsp.DelaySym for GraphBuilder
