@@ -21,18 +21,6 @@ enum A3Reason {
 } derive(Eq, @debug.Debug)
 
 ///|
-/// Closure type for A2. PR 3 swaps the body to call the new
-/// VoicePool::new(CompiledTemplate, ctx, max_voices?) -> Result[Self, VoicePoolError]
-/// and maps VoicePoolError variants to A2Reason via an inline match.
-type A2Closure = (Array[DspNode], DspContext, Int) -> Result[
-  VoicePool,
-  A2Reason,
-]
-
-///|
-type A3Closure = (VoicePool, Array[DspNode]) -> Result[Unit, A3Reason]
-
-///|
 /// PR-3 A2 closure: direct call to the new Result-returning VoicePool::new.
 fn pr2_a2_closure(
   nodes : Array[DspNode],

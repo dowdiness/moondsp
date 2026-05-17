@@ -77,10 +77,13 @@ pub fn CompiledStereoDsp::has_feedback_edges(self : CompiledStereoDsp) -> Bool {
 }
 
 ///|
-/// Compile a pre-analyzed template without re-running optimize_graph.
+/// Compile a declarative mono graph into an executable buffer graph.
 ///
-/// Intended for callers that already need `CompiledTemplate` for topology
-/// checks such as orphan-ADSR and control-binding validation.
+/// Accepts a `CompiledTemplate` (the runtime exchange boundary per
+/// ADR-0010) and returns `None` if the template's topology is rejected
+/// (e.g., no reachable `Output`, invalid feedback cycle, missing node
+/// inputs). Produce the input via `CompiledTemplate::analyze(nodes)` or
+/// `GraphBuilder::analyze`.
 pub fn CompiledDsp::compile(
   compiled_template : CompiledTemplate,
   context : DspContext,
@@ -276,8 +279,13 @@ fn CompiledDsp::compile_internal(
 }
 
 ///|
-/// Compile a pre-analyzed terminal-stereo template without re-running
-/// optimize_graph.
+/// Compile a declarative terminal-stereo graph into an executable
+/// stereo graph.
+///
+/// Accepts a `CompiledTemplate` (the runtime exchange boundary per
+/// ADR-0010) and returns `None` if the template's topology is rejected
+/// — including the stereo-specific requirement of a single reachable
+/// `StereoOutput`.
 pub fn CompiledStereoDsp::compile(
   compiled_template : CompiledTemplate,
   context : DspContext,
