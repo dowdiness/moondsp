@@ -650,7 +650,8 @@ test "VoicePool process sanitizes final mixdown output" {
   assert_true(left.get(0) > 0.0)
 }
 
-///| B7: VoicePoolError::InvalidMaxVoices fires under max_voices <= 0.
+///|
+/// B7: VoicePoolError::InvalidMaxVoices fires under max_voices <= 0.
 test "B7: VoicePool::new with max_voices=0 returns InvalidMaxVoices" {
   let nodes : Array[DspNode] = [
     DspNode::oscillator(Waveform::Sine, 440.0),
@@ -664,7 +665,8 @@ test "B7: VoicePool::new with max_voices=0 returns InvalidMaxVoices" {
   }
 }
 
-///| B7: VoicePoolError::OrphanAdsr fires for dead-code ADSR.
+///|
+/// B7: VoicePoolError::OrphanAdsr fires for dead-code ADSR.
 test "B7: VoicePool::new with orphan ADSR returns OrphanAdsr" {
   let nodes : Array[DspNode] = [
     DspNode::oscillator(Waveform::Sine, 440.0),
@@ -679,7 +681,8 @@ test "B7: VoicePool::new with orphan ADSR returns OrphanAdsr" {
   }
 }
 
-///| B7: VoicePoolError::CompileRejected fires for missing Output.
+///|
+/// B7: VoicePoolError::CompileRejected fires for missing Output.
 test "B7: VoicePool::new with missing Output returns CompileRejected" {
   let nodes : Array[DspNode] = [DspNode::oscillator(Waveform::Sine, 440.0)]
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
