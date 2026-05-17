@@ -803,6 +803,10 @@ Current limits:
   `CompiledDsp::compile()` and `CompiledStereoDsp::compile()` via
   `optimize_graph()`; pre-analyzed `CompiledTemplate` callers reuse the same
   optimized graph through `compile_template(...)`
+- **Planned per ADR-0010 (Proposed):** `compile_template` is removed; its
+  behavior becomes the new `compile(CompiledTemplate, ctx)` signature.
+  Current behavior: separate side-door entry; see compile-path section
+  above for the unified shape.
 - `InsertChain` / `DeleteChain` topology edit variants support multi-node
   subgraph operations with stereo parity
 - state preservation across topology edit recompilation is supported
