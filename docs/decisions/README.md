@@ -27,3 +27,4 @@ shipped plan or spec.
 - [ADR-0007 — ControlMap keeps a map-backed accessor surface](0007-control-map-accessor-surface.md)
 - [ADR-0008 — Contiguous song layout with computed occurrences](0008-contiguous-song-layout.md)
 - [ADR-0009 — Stable identity groundwork for Phase 6](0009-stable-identity-groundwork.md)
+- [ADR-0010 — CompiledTemplate as the runtime exchange boundary](0010-compiled-template-runtime-boundary.md) (Proposed)
