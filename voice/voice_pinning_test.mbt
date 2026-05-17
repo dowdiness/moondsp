@@ -57,17 +57,17 @@ fn pr2_a3_closure(
   pool : VoicePool,
   nodes : Array[DspNode],
 ) -> Result[Unit, A3Reason] {
-  VoicePool::set_template(pool, @graph.CompiledTemplate::analyze(nodes)).map_err(fn(
-      e,
-    ) {
-      match e {
-        VoicePoolError::OrphanAdsr => A3Reason::OrphanAdsr
-        VoicePoolError::CompileRejected => A3Reason::CompileRejected
-        VoicePoolError::InvalidMaxVoices => A3Reason::CompileRejected
-        // unreachable: set_template doesn't take max_voices, but match must be total
-      }
-    },
-  )
+  match VoicePool::set_template(pool, @graph.CompiledTemplate::analyze(nodes)) {
+    Ok(_) => Ok(())
+    Err(VoicePoolError::OrphanAdsr) => Err(A3Reason::OrphanAdsr)
+    Err(VoicePoolError::CompileRejected) => Err(A3Reason::CompileRejected)
+    // set_template doesn't accept max_voices, so InvalidMaxVoices must
+    // never appear here. abort() catches a future regression where the
+    // validation chain leaks an InvalidMaxVoices through, instead of
+    // silently remapping it to CompileRejected and hiding the bug.
+    Err(VoicePoolError::InvalidMaxVoices) =>
+      abort("unexpected InvalidMaxVoices from VoicePool::set_template")
+  }
 }
 
 ///|
