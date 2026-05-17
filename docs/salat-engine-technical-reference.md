@@ -487,6 +487,13 @@ FlatNode[] (sorted: dependencies before dependents)
 Executable form (interpreter loop or generated code)
 ```
 
+**Planned per ADR-0010 (Proposed):** in the concrete library API, the
+pipeline becomes
+`Array[DspNode] → CompiledTemplate::analyze → CompiledTemplate →
+CompiledDsp::compile → CompiledDsp`. `CompiledTemplate` is the single
+runtime exchange type between authoring and compile. See ADR-0010 for
+the contract.
+
 ### 3.2 Flatten
 
 Convert the recursive tree into a flat array where `ins` are integer indices:
