@@ -35,24 +35,31 @@ The boundary is crossed by exactly one canonical operation:
 
 ### Signature migration (graph/)
 
-- `CompiledDsp::compile(Array, ctx) -> Self?` → `compile(CompiledTemplate, ctx) -> Self?`
-- `CompiledStereoDsp::compile(Array, ctx) -> Self?` → `compile(CompiledTemplate, ctx) -> Self?`
-- `compile_template(CompiledTemplate, ctx)` → **removed** (collapses into `compile`)
-- `optimize_graph(Array) -> (..., ...)` → **package-private**
+| Current signature | New signature |
+|---|---|
+| `CompiledDsp::compile(Array[DspNode], DspContext) -> Self?` | `CompiledDsp::compile(CompiledTemplate, DspContext) -> Self?` |
+| `CompiledStereoDsp::compile(Array[DspNode], DspContext) -> Self?` | `CompiledStereoDsp::compile(CompiledTemplate, DspContext) -> Self?` |
+| `CompiledDsp::compile_template(CompiledTemplate, DspContext) -> Self?` | **removed** (collapses into `compile`) |
+| `CompiledStereoDsp::compile_template(CompiledTemplate, DspContext) -> Self?` | **removed** |
+| `optimize_graph(Array[DspNode]) -> (Array[DspNode], FixedArray[Int])` | **package-private** |
 
 ### Signature migration (voice/)
 
-- `VoicePool::new(Array, ctx, max_voices?) -> Self?`
-  → `new(CompiledTemplate, ctx, max_voices?) -> Result[Self, VoicePoolError]`
-- `VoicePool::set_template(Self, Array) -> Bool`
-  → `set_template(Self, CompiledTemplate) -> Result[Unit, VoicePoolError]`
-- `BoundVoicePool::new(Array, ctx, builder, ...)` → `new(CompiledTemplate, ctx, builder, ...)`
-- `BoundVoicePool::set_template(Self, Array, builder)` → `set_template(Self, CompiledTemplate, builder)`
+| Current signature | New signature |
+|---|---|
+| `VoicePool::new(Array[DspNode], DspContext, max_voices?) -> Self?` | `VoicePool::new(CompiledTemplate, DspContext, max_voices?) -> Result[Self, VoicePoolError]` |
+| `VoicePool::set_template(Self, Array[DspNode]) -> Bool` | `VoicePool::set_template(Self, CompiledTemplate) -> Result[Unit, VoicePoolError]` |
+| `BoundVoicePool::new(Array[DspNode], DspContext, ControlBindingBuilder, max_voices?) -> Result[Self, BoundVoicePoolError]` | `BoundVoicePool::new(CompiledTemplate, DspContext, ControlBindingBuilder, max_voices?) -> Result[Self, BoundVoicePoolError]` |
+| `BoundVoicePool::set_template(Self, Array[DspNode], ControlBindingBuilder) -> Result[Unit, BoundVoicePoolError]` | `BoundVoicePool::set_template(Self, CompiledTemplate, ControlBindingBuilder) -> Result[Unit, BoundVoicePoolError]` |
 
 ### New public additions
 
 - `CompiledTemplate::adsr_authoring_indices(Self) -> FixedArray[Int]`
-  — runtime gating for voice/.
+  — runtime gating for voice/. Returns **authoring** indices of ADSR
+  nodes that survived optimization, in authoring order — never runtime
+  indices. (Authoring-vs-runtime matters: `CompiledDsp::gate_on/gate_off`
+  take authoring indices and map through `index_map` internally;
+  returning runtime indices would double-map and target wrong nodes.)
 - `GraphBuilder::analyze(Self) -> CompiledTemplate` — sugar.
 - `VoicePoolError { InvalidMaxVoices, OrphanAdsr, CompileRejected }` —
   mirrors `BoundVoicePoolError` minus `Binding(...)`.
@@ -78,7 +85,7 @@ These remain on the authoring side and continue to take or return
 - `GraphTemplateDoc::nodes`, `::from_nodes`, `::insert_chain`,
   `::compile`, `::compile_stereo`
 - `GraphIndexMap::insert_chain`
-- `GraphTopologyEdit::InsertChain` and constructor
+- `GraphTopologyEdit::InsertChain(...)` variant and `GraphTopologyEdit::insert_chain(...)` constructor
 
 ## Consequences
 
@@ -107,6 +114,15 @@ These remain on the authoring side and continue to take or return
 - `CompiledDsp::compile` Result migration (`Self?` → `Result[Self,
   GraphCompileError]`). Blocks splitting
   `VoicePoolError::CompileRejected` into finer variants.
+- `CompiledTemplate::is_node_live` / `node_at` / `length` public
+  promotion. Reserved for the Phase 7+ structural editor; promote when
+  a concrete consumer drives the shape (e.g., `live_indices() -> Iter[Int]`
+  for highlighting eliminated nodes in the editor UI).
+- `derive(Debug)` cascade for `DspNode` / `Waveform` / `BiquadMode`.
+  Not needed by current consumers; add when the first consumer arrives.
+
+See the source spec's §What's Deferred for the canonical list and the
+deferral rationale per item.
 
 ## Test enforcement
 
