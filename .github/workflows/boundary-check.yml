@@ -1,0 +1,29 @@
+name: Boundary Check
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  check-boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - name: Fetch MoonBit dependencies
+        run: moon update
+
+      - name: Install MoonBit deps
+        run: moon install
+
+      - name: Run boundary check
+        run: ./scripts/check-public-boundary.sh
