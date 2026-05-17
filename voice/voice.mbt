@@ -210,48 +210,6 @@ fn validate_voice_template(
 }
 
 ///|
-fn VoicePool::new_validated(
-  template : Array[DspNode],
-  compiled_template : CompiledTemplate,
-  context : DspContext,
-  max_voices : Int,
-) -> Result[VoicePool, BoundVoicePoolError] {
-  if max_voices <= 0 {
-    return Err(BoundVoicePoolError::InvalidMaxVoices)
-  }
-  match validate_voice_template(compiled_template, context) {
-    Err(error) => return Err(BoundVoicePoolError::from_voice_pool(error))
-    Ok(_) => ()
-  }
-  let block_size = context.block_size()
-  let slots = FixedArray::makei(max_voices, _ => VoiceSlot::new(block_size))
-  Ok({
-    slots,
-    adsr_authoring_indices: compiled_template.adsr_authoring_indices(),
-    compiled_template,
-    compile_context: context,
-    next_allocation_order: 0,
-    max_voices,
-    last_sanitized_count: 0,
-  })
-}
-
-///|
-fn VoicePool::set_template_validated(
-  self : VoicePool,
-  template : Array[DspNode],
-  compiled_template : CompiledTemplate,
-) -> Result[Unit, BoundVoicePoolError] {
-  match validate_voice_template(compiled_template, self.compile_context) {
-    Err(error) => return Err(BoundVoicePoolError::from_voice_pool(error))
-    Ok(_) => ()
-  }
-  self.adsr_authoring_indices = compiled_template.adsr_authoring_indices()
-  self.compiled_template = compiled_template
-  Ok(())
-}
-
-///|
 /// WHY test_compile: validates the template structurally (reachable Output
 /// node, no invalid cycles, valid node indices) before accepting it. This
 /// is a correctness gate so that per-voice note_on compiles can assume the
@@ -317,16 +275,14 @@ pub struct BoundVoicePool {
 
 ///|
 pub fn BoundVoicePool::new(
-  template : Array[DspNode],
+  compiled_template : CompiledTemplate,
   context : DspContext,
   bindings : ControlBindingBuilder,
   max_voices? : Int = 32,
 ) -> Result[BoundVoicePool, BoundVoicePoolError] {
-  let compiled_template = CompiledTemplate::analyze(template)
-  let pool = match
-    VoicePool::new_validated(template, compiled_template, context, max_voices) {
+  let pool = match VoicePool::new(compiled_template, context, max_voices~) {
     Ok(pool) => pool
-    Err(error) => return Err(error)
+    Err(error) => return Err(BoundVoicePoolError::from_voice_pool(error))
   }
   match bindings.build(compiled_template) {
     Ok(bindings) => Ok({ pool, bindings })
@@ -337,10 +293,9 @@ pub fn BoundVoicePool::new(
 ///|
 pub fn BoundVoicePool::set_template(
   self : BoundVoicePool,
-  template : Array[DspNode],
+  compiled_template : CompiledTemplate,
   bindings : ControlBindingBuilder,
 ) -> Result[Unit, BoundVoicePoolError] {
-  let compiled_template = CompiledTemplate::analyze(template)
   match validate_voice_template(compiled_template, self.pool.compile_context) {
     Err(error) => return Err(BoundVoicePoolError::from_voice_pool(error))
     Ok(_) => ()

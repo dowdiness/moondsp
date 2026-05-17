@@ -11,7 +11,7 @@ replacement commits at the next block boundary.
 test "edit orchestration stages a replacement and reconciles active voices" {
   let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
   let pool = @moondsp.BoundVoicePool::new(
-    [
+    @moondsp.CompiledTemplate::analyze([
       @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 440.0),
       @moondsp.DspNode::adsr(
         attack_ms=0.01,
@@ -21,7 +21,7 @@ test "edit orchestration stages a replacement and reconciles active voices" {
       ),
       @moondsp.DspNode::envelope_gain(input=0, envelope=1, amount=1.0),
       @moondsp.DspNode::output(2),
-    ],
+    ]),
     ctx,
     @moondsp.ControlBindingBuilder::new().bind(
       key="note",

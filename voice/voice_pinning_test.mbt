@@ -202,7 +202,12 @@ fn pr2_a4_closure(
   builder : ControlBindingBuilder,
   max_voices : Int,
 ) -> Result[BoundVoicePool, BoundVoicePoolError] {
-  BoundVoicePool::new(nodes, ctx, builder, max_voices~)
+  BoundVoicePool::new(
+    CompiledTemplate::analyze(nodes),
+    ctx,
+    builder,
+    max_voices~,
+  )
 }
 
 ///|

@@ -20,12 +20,12 @@ pub fn BoundVoicePool::apply_voice_control_result(Self, VoiceHandle, @graph.Grap
 pub fn BoundVoicePool::apply_voice_controls_result(Self, VoiceHandle, Array[@graph.GraphControl]) -> Result[Unit, VoiceControlError]
 pub fn BoundVoicePool::kill(Self, VoiceHandle) -> Bool
 pub fn BoundVoicePool::last_sanitized_count(Self) -> Int
-pub fn BoundVoicePool::new(Array[@graph.DspNode], @dsp.DspContext, @graph.ControlBindingBuilder, max_voices? : Int) -> Result[Self, BoundVoicePoolError]
+pub fn BoundVoicePool::new(@graph.CompiledTemplate, @dsp.DspContext, @graph.ControlBindingBuilder, max_voices? : Int) -> Result[Self, BoundVoicePoolError]
 pub fn BoundVoicePool::note_off(Self, VoiceHandle) -> Bool
 pub fn BoundVoicePool::note_off_all(Self) -> Unit
 pub fn BoundVoicePool::note_on_controls(Self, Map[String, Double]) -> VoiceHandle?
 pub fn BoundVoicePool::process(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
-pub fn BoundVoicePool::set_template(Self, Array[@graph.DspNode], @graph.ControlBindingBuilder) -> Result[Unit, BoundVoicePoolError]
+pub fn BoundVoicePool::set_template(Self, @graph.CompiledTemplate, @graph.ControlBindingBuilder) -> Result[Unit, BoundVoicePoolError]
 pub fn BoundVoicePool::set_voice_pan(Self, VoiceHandle, Double) -> Bool
 pub fn BoundVoicePool::validate_voice_controls_result(Self, VoiceHandle, Array[@graph.GraphControl]) -> Result[Unit, VoiceControlError]
 pub fn BoundVoicePool::voice_state(Self, VoiceHandle) -> VoiceState

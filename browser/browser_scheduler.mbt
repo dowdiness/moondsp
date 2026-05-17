@@ -206,7 +206,7 @@ fn make_drum_pool(
   // do NOT need this headroom because per-pool pressure stays at 1.
   match
     @moondsp.BoundVoicePool::new(
-      template,
+      @moondsp.CompiledTemplate::analyze(template),
       ctx,
       @moondsp.ControlBindingBuilder::new(),
       max_voices=8,
@@ -231,7 +231,7 @@ fn make_synth_pool(ctx : @moondsp.DspContext, block_size : Int) -> SoundPool? {
   // See make_drum_pool for the .jux headroom rationale.
   match
     @moondsp.BoundVoicePool::new(
-      template,
+      @moondsp.CompiledTemplate::analyze(template),
       ctx,
       @moondsp.ControlBindingBuilder::new().bind(
         key="note",

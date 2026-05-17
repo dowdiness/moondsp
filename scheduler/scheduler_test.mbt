@@ -136,7 +136,7 @@ fn make_test_pool() -> (
   ]
   let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
   let pool = @moondsp.BoundVoicePool::new(
-    template,
+    @moondsp.CompiledTemplate::analyze(template),
     ctx,
     @moondsp.ControlBindingBuilder::new().bind(
       key="note",
@@ -2210,7 +2210,7 @@ test "process_block: stolen voice gate-off is harmless" {
   ]
   let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
   let pool = @moondsp.BoundVoicePool::new(
-    template,
+    @moondsp.CompiledTemplate::analyze(template),
     ctx,
     @moondsp.ControlBindingBuilder::new().bind(
       key="note",

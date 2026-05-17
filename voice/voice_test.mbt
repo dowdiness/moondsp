@@ -198,7 +198,11 @@ test "set_template rejects invalid template" {
 test "bound voice pool constructor accepts valid empty bindings" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
   let nodes = [DspNode::constant(440.0), DspNode::output(0)]
-  let pool = BoundVoicePool::new(nodes, ctx, ControlBindingBuilder::new())
+  let pool = BoundVoicePool::new(
+    CompiledTemplate::analyze(nodes),
+    ctx,
+    ControlBindingBuilder::new(),
+  )
   assert_true(pool is Ok(_))
 }
 
@@ -207,7 +211,7 @@ test "bound voice pool constructor reports invalid bindings" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
   let nodes = [DspNode::constant(440.0), DspNode::output(0)]
   let result = BoundVoicePool::new(
-    nodes,
+    CompiledTemplate::analyze(nodes),
     ctx,
     ControlBindingBuilder::new().bind(
       key="bad",
@@ -228,7 +232,7 @@ test "bound voice pool set_template rejection leaves prior bindings active" {
   let nodes_a = [DspNode::oscillator(Waveform::Sine, 440.0), DspNode::output(0)]
   let nodes_b = [DspNode::noise(1U), DspNode::output(0)]
   let pool = BoundVoicePool::new(
-    nodes_a,
+    CompiledTemplate::analyze(nodes_a),
     ctx,
     ControlBindingBuilder::new().bind(
       key="note",
@@ -237,7 +241,7 @@ test "bound voice pool set_template rejection leaves prior bindings active" {
     ),
   ).unwrap()
   let rejected = pool.set_template(
-    nodes_b,
+    CompiledTemplate::analyze(nodes_b),
     ControlBindingBuilder::new().bind(
       key="note",
       node_index=0,
@@ -258,7 +262,7 @@ test "bound voice live control updates one active voice" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]
   let pool = BoundVoicePool::new(
-    nodes,
+    CompiledTemplate::analyze(nodes),
     ctx,
     ControlBindingBuilder::new(),
     max_voices=4,
@@ -287,7 +291,7 @@ test "bound voice live control rejects stale handles" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]
   let pool = BoundVoicePool::new(
-    nodes,
+    CompiledTemplate::analyze(nodes),
     ctx,
     ControlBindingBuilder::new(),
     max_voices=1,
@@ -311,7 +315,7 @@ test "bound voice live control invalid batch leaves voice unchanged" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]
   let pool = BoundVoicePool::new(
-    nodes,
+    CompiledTemplate::analyze(nodes),
     ctx,
     ControlBindingBuilder::new(),
     max_voices=4,
@@ -340,7 +344,7 @@ test "bound voice live control leaves future voice template unchanged" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]
   let pool = BoundVoicePool::new(
-    nodes,
+    CompiledTemplate::analyze(nodes),
     ctx,
     ControlBindingBuilder::new(),
     max_voices=4,
@@ -550,7 +554,7 @@ test "kill immediately idles an active voice" {
     DspNode::output(2),
   ]
   let pool = BoundVoicePool::new(
-    nodes,
+    CompiledTemplate::analyze(nodes),
     ctx,
     ControlBindingBuilder::new(),
     max_voices=4,
