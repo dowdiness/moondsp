@@ -31,3 +31,40 @@ type A2Closure = (Array[DspNode], DspContext, Int) -> Result[
 
 ///|
 type A3Closure = (VoicePool, Array[DspNode]) -> Result[Unit, A3Reason]
+
+///|
+/// PR-2 A2 closure: pre-classify failure reasons before calling the
+/// current Option-returning VoicePool::new. PR 3 replaces this body
+/// with `VoicePool::new(CompiledTemplate::analyze(nodes), ctx, max_voices?)
+/// .map_err(A2Reason::from_voice_pool)`.
+fn pr2_a2_closure(
+  nodes : Array[DspNode],
+  ctx : DspContext,
+  max_voices : Int,
+) -> Result[VoicePool, A2Reason] {
+  guard max_voices > 0 else { return Err(A2Reason::InvalidMaxVoices) }
+  guard @graph.CompiledTemplate::analyze(nodes).orphan_adsr_count() == 0 else {
+    return Err(A2Reason::OrphanAdsr)
+  }
+  match VoicePool::new(nodes, ctx, max_voices~) {
+    Some(pool) => Ok(pool)
+    None => Err(A2Reason::CompileRejected)
+  }
+}
+
+///|
+/// PR-2 A3 closure: pre-classify orphan_adsr before calling the
+/// current Bool-returning VoicePool::set_template.
+fn pr2_a3_closure(
+  pool : VoicePool,
+  nodes : Array[DspNode],
+) -> Result[Unit, A3Reason] {
+  guard @graph.CompiledTemplate::analyze(nodes).orphan_adsr_count() == 0 else {
+    return Err(A3Reason::OrphanAdsr)
+  }
+  if VoicePool::set_template(pool, nodes) {
+    Ok(())
+  } else {
+    Err(A3Reason::CompileRejected)
+  }
+}
