@@ -56,12 +56,12 @@ pub struct VoicePool {
 }
 pub fn VoicePool::active_voice_count(Self) -> Int
 pub fn VoicePool::last_sanitized_count(Self) -> Int
-pub fn VoicePool::new(Array[@graph.DspNode], @dsp.DspContext, max_voices? : Int) -> Self?
+pub fn VoicePool::new(@graph.CompiledTemplate, @dsp.DspContext, max_voices? : Int) -> Result[Self, VoicePoolError]
 pub fn VoicePool::note_off(Self, VoiceHandle) -> Bool
 pub fn VoicePool::note_off_all(Self) -> Unit
 pub fn VoicePool::note_on(Self, Array[@graph.GraphControl]) -> VoiceHandle?
 pub fn VoicePool::process(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
-pub fn VoicePool::set_template(Self, Array[@graph.DspNode]) -> Bool
+pub fn VoicePool::set_template(Self, @graph.CompiledTemplate) -> Result[Unit, VoicePoolError]
 pub fn VoicePool::set_voice_pan(Self, VoiceHandle, Double) -> Bool
 pub fn VoicePool::voice_state(Self, VoiceHandle) -> VoiceState
 

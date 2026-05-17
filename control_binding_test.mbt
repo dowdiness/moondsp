@@ -178,7 +178,11 @@ test "integration: resolved controls accepted by VoicePool::note_on" {
     DspNode::gain(0, 0.3),
     DspNode::output(1),
   ]
-  let pool = VoicePool::new(template, ctx, max_voices=4).unwrap()
+  let pool = VoicePool::new(
+    CompiledTemplate::analyze(template),
+    ctx,
+    max_voices=4,
+  ).unwrap()
   let bindings = ControlBindingBuilder::new()
     .bind(key="note", node_index=0, slot=GraphParamSlot::Value0)
     .bind(key="gain", node_index=1, slot=GraphParamSlot::Value0)

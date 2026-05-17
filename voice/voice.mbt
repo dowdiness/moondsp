@@ -265,30 +265,48 @@ fn VoicePool::set_template_validated(
 /// WHY adsr_authoring_indices snapshot: the pool's long-lived snapshot
 /// (used by note_on to gate ADSRs, and refreshed by set_template) stores
 /// only the indices needed for gating — not the full template — so the
-/// caller's Array[DspNode] can be freely mutated after VoicePool::new
+/// caller's CompiledTemplate can be freely discarded after VoicePool::new
 /// returns. optimize_graph does not mutate its input, so neither
 /// CompiledTemplate::analyze nor CompiledDsp::compile disturbs the
 /// caller's array.
 pub fn VoicePool::new(
-  template : Array[DspNode],
+  compiled_template : CompiledTemplate,
   context : DspContext,
   max_voices? : Int = 32,
-) -> VoicePool? {
-  let compiled_template = CompiledTemplate::analyze(template)
-  match
-    VoicePool::new_validated(template, compiled_template, context, max_voices) {
-    Ok(pool) => Some(pool)
-    Err(_) => None
+) -> Result[VoicePool, VoicePoolError] {
+  if max_voices <= 0 {
+    return Err(VoicePoolError::InvalidMaxVoices)
+  }
+  match validate_voice_template(compiled_template, context) {
+    Err(error) => Err(error)
+    Ok(_) => {
+      let block_size = context.block_size()
+      let slots = FixedArray::makei(max_voices, _ => VoiceSlot::new(block_size))
+      Ok({
+        slots,
+        adsr_authoring_indices: compiled_template.adsr_authoring_indices(),
+        compiled_template,
+        compile_context: context,
+        next_allocation_order: 0,
+        max_voices,
+        last_sanitized_count: 0,
+      })
+    }
   }
 }
 
 ///|
 pub fn VoicePool::set_template(
   self : VoicePool,
-  template : Array[DspNode],
-) -> Bool {
-  let compiled_template = CompiledTemplate::analyze(template)
-  self.set_template_validated(template, compiled_template) is Ok(_)
+  compiled_template : CompiledTemplate,
+) -> Result[Unit, VoicePoolError] {
+  match validate_voice_template(compiled_template, self.compile_context) {
+    Err(error) => return Err(error)
+    Ok(_) => ()
+  }
+  self.compiled_template = compiled_template
+  self.adsr_authoring_indices = compiled_template.adsr_authoring_indices()
+  Ok(())
 }
 
 ///|
