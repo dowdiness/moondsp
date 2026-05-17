@@ -2,7 +2,7 @@
 test "debug: off by default" {
   let context = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]
-  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   @debug.assert_eq(compiled.last_validation_errors().length(), 0)
 }
 
@@ -10,7 +10,7 @@ test "debug: off by default" {
 test "debug: enable and disable toggle" {
   let context = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]
-  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   compiled.enable_debug_validation()
   let output = AudioBuffer::filled(4)
   compiled.process(context, output)
@@ -28,7 +28,7 @@ test "debug: valid graph produces no errors" {
     DspNode::gain(0, 0.3),
     DspNode::output(1),
   ]
-  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   compiled.enable_debug_validation()
   let output = AudioBuffer::filled(4)
   compiled.process(context, output)
@@ -41,7 +41,7 @@ test "debug: valid graph produces no errors" {
 test "debug: errors reset each process call" {
   let context = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]
-  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   compiled.enable_debug_validation()
   let output = AudioBuffer::filled(4)
   compiled.process(context, output)
@@ -58,7 +58,7 @@ test "debug stereo: valid graph produces no errors" {
     DspNode::pan(0, 0.0),
     DspNode::stereo_output(1),
   ]
-  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledStereoDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   compiled.enable_debug_validation()
   let left = AudioBuffer::filled(4)
   let right = AudioBuffer::filled(4)

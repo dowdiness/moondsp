@@ -9,7 +9,7 @@ test "compiled dsp runtime param update changes gain output" {
     DspNode::gain(0, QUARTER_SAMPLE),
     DspNode::output(1),
   ]
-  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -39,7 +39,7 @@ test "compiled dsp runtime param update changes delay length" {
     DspNode::delay(input=0, max_delay_samples=DELAY_CAPACITY, delay_samples=0),
     DspNode::output(1),
   ]
-  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -85,7 +85,7 @@ test "compiled dsp applies mixed control batches in order" {
     ),
     DspNode::constant(UNIT_SAMPLE),
   ]
-  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   assert_true(
@@ -113,7 +113,7 @@ test "compiled dsp rejects invalid control batches without partial updates" {
     DspNode::gain(0, QUARTER_SAMPLE),
     DspNode::output(1),
   ]
-  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   assert_false(
@@ -146,7 +146,7 @@ test "compiled dsp apply_control_result reports invalid node index" {
     DspNode::gain(0, QUARTER_SAMPLE),
     DspNode::output(1),
   ]
-  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
 
   match
     compiled.apply_control_result(
@@ -168,7 +168,7 @@ test "compiled dsp apply_control_result reports orphan optimized node" {
     DspNode::constant(HALF_GAIN),
     DspNode::output(1),
   ]
-  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
 
   match
     compiled.apply_control_result(
@@ -190,7 +190,7 @@ test "compiled dsp apply_control_result reports invalid slot and value" {
     DspNode::delay(input=0, max_delay_samples=DELAY_CAPACITY, delay_samples=0),
     DspNode::output(1),
   ]
-  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
 
   match
     compiled.apply_control_result(
@@ -233,7 +233,7 @@ test "compiled dsp apply_controls_result is transactional" {
     DspNode::gain(0, QUARTER_SAMPLE),
     DspNode::output(1),
   ]
-  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   match
@@ -274,7 +274,7 @@ test "compiled stereo dsp apply_control_result reports invalid gate target" {
     DspNode::pan(0, 0.0),
     DspNode::stereo_output(1),
   ]
-  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledStereoDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
 
   match compiled.apply_control_result(GraphControl::gate_on(1)) {
     Err(GraphControlError::InvalidGateNode(1, DspNodeKind::Pan)) => ()
@@ -293,7 +293,7 @@ test "compiled dsp runtime param update rejects unsupported or invalid values" {
     DspNode::delay(input=0, max_delay_samples=DELAY_CAPACITY, delay_samples=0),
     DspNode::output(1),
   ]
-  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   assert_false(
@@ -354,7 +354,7 @@ test "compiled dsp runtime param update rejects invalid biquad values" {
     ),
     DspNode::output(1),
   ]
-  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   let output = AudioBuffer::filled(LARGE_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -392,8 +392,8 @@ test "compiled dsp legacy wrappers match apply_control" {
     ),
     DspNode::constant(UNIT_SAMPLE),
   ]
-  let wrapper_compiled = CompiledDsp::compile(nodes, context).unwrap()
-  let unified_compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let wrapper_compiled = CompiledDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
+  let unified_compiled = CompiledDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   let wrapper_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let unified_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
@@ -429,8 +429,8 @@ test "compiled dsp set_param wrapper matches apply_control" {
     DspNode::gain(0, QUARTER_SAMPLE),
     DspNode::output(1),
   ]
-  let wrapper_compiled = CompiledDsp::compile(nodes, context).unwrap()
-  let unified_compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let wrapper_compiled = CompiledDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
+  let unified_compiled = CompiledDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   let wrapper_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let unified_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
@@ -464,7 +464,7 @@ test "compiled dsp rejects negative delay_samples via set_param" {
     ),
     DspNode::output(1),
   ]
-  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
 
   // Negative delay_samples must be rejected
   assert_false(
@@ -493,7 +493,7 @@ test "compiled dsp rejects delay_samples exceeding delay_max_samples via set_par
     ),
     DspNode::output(1),
   ]
-  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
 
   // delay_samples > delay_max_samples (DELAY_CAPACITY=4) must be rejected
   assert_false(
@@ -522,7 +522,7 @@ test "compiled dsp accepts valid delay_samples within bounds via set_param" {
     ),
     DspNode::output(1),
   ]
-  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
 
   // delay_samples == 0 (lower bound) is valid
   assert_true(

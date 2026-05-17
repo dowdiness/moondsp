@@ -9,7 +9,7 @@ test "compiled stereo dsp pans mono input to stereo output" {
     DspNode::pan(0, PAN_CENTER),
     DspNode::stereo_output(1),
   ]
-  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledStereoDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
@@ -33,7 +33,7 @@ test "compiled stereo dsp applies stereo gain after pan" {
     DspNode::stereo_gain(input=1, amount=HALF_GAIN),
     DspNode::stereo_output(2),
   ]
-  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledStereoDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
@@ -62,7 +62,7 @@ test "compiled stereo dsp applies stereo clip after pan" {
     DspNode::stereo_clip(input=1, threshold=STEREO_CLIP_THRESHOLD),
     DspNode::stereo_output(2),
   ]
-  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledStereoDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
@@ -91,7 +91,7 @@ test "compiled stereo dsp applies stereo biquad after pan" {
     ),
     DspNode::stereo_output(2),
   ]
-  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledStereoDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   let left_output = AudioBuffer::filled(LARGE_BLOCK_SIZE)
   let right_output = AudioBuffer::filled(LARGE_BLOCK_SIZE)
 
@@ -117,7 +117,7 @@ test "compiled stereo dsp compile_template matches compile output" {
     DspNode::stereo_gain(input=1, amount=HALF_GAIN),
     DspNode::stereo_output(2),
   ]
-  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledStereoDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   let compiled_template = CompiledStereoDsp::compile_template(
     CompiledTemplate::analyze(nodes),
     context,
@@ -152,7 +152,7 @@ test "compiled stereo dsp applies stereo delay after pan" {
     ),
     DspNode::stereo_output(2),
   ]
-  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledStereoDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
@@ -179,7 +179,7 @@ test "compiled stereo dsp apply_control updates pan position" {
     DspNode::pan(0, PAN_CENTER),
     DspNode::stereo_output(1),
   ]
-  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledStereoDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
@@ -209,7 +209,7 @@ test "compiled stereo dsp runtime params update stereo gain and clip" {
     DspNode::stereo_clip(input=2, threshold=UNIT_SAMPLE),
     DspNode::stereo_output(3),
   ]
-  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledStereoDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
@@ -248,7 +248,7 @@ test "compiled stereo dsp runtime params update stereo biquad" {
     ),
     DspNode::stereo_output(2),
   ]
-  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledStereoDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   let baseline_left = AudioBuffer::filled(LARGE_BLOCK_SIZE)
   let baseline_right = AudioBuffer::filled(LARGE_BLOCK_SIZE)
   let retuned_left = AudioBuffer::filled(LARGE_BLOCK_SIZE)
@@ -291,7 +291,7 @@ test "compiled stereo dsp runtime params update stereo delay" {
     ),
     DspNode::stereo_output(2),
   ]
-  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledStereoDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
@@ -332,8 +332,8 @@ test "compiled stereo dsp runtime params update stereo delay feedback" {
     ),
     DspNode::stereo_output(2),
   ]
-  let baseline = CompiledStereoDsp::compile(nodes, context).unwrap()
-  let retuned = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let baseline = CompiledStereoDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
+  let retuned = CompiledStereoDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   let baseline_left = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let baseline_right = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let retuned_left = AudioBuffer::filled(SMALL_BLOCK_SIZE)
@@ -368,7 +368,7 @@ test "compiled stereo dsp apply_controls updates pan and source together" {
     DspNode::pan(0, PAN_HARD_LEFT),
     DspNode::stereo_output(1),
   ]
-  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledStereoDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
@@ -407,7 +407,7 @@ test "compiled stereo dsp rejects out-of-bounds delay_samples via set_param" {
     ),
     DspNode::stereo_output(2),
   ]
-  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledStereoDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
 
   // Negative delay_samples must be rejected
   assert_false(
@@ -441,7 +441,7 @@ test "compiled dsp folds stereo graph back to mono output" {
     DspNode::stereo_mixdown(1),
     DspNode::output(2),
   ]
-  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -470,7 +470,7 @@ test "compiled dsp runtime params update stereo nodes before mixdown" {
     DspNode::stereo_mixdown(3),
     DspNode::output(4),
   ]
-  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   assert_true(
@@ -514,7 +514,7 @@ test "compiled dsp runtime params update stereo biquad before mixdown" {
     DspNode::stereo_mixdown(2),
     DspNode::output(3),
   ]
-  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   let output = AudioBuffer::filled(LARGE_BLOCK_SIZE)
 
   assert_true(
@@ -555,7 +555,7 @@ test "compiled dsp applies stereo delay before mixdown" {
     DspNode::stereo_mixdown(2),
     DspNode::output(3),
   ]
-  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -583,7 +583,7 @@ test "compiled dsp runtime params update stereo delay before mixdown" {
     DspNode::stereo_mixdown(2),
     DspNode::output(3),
   ]
-  let compiled = CompiledDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   assert_true(
@@ -620,8 +620,8 @@ test "compiled dsp runtime params update stereo delay feedback before mixdown" {
     DspNode::stereo_mixdown(2),
     DspNode::output(3),
   ]
-  let baseline = CompiledDsp::compile(nodes, context).unwrap()
-  let retuned = CompiledDsp::compile(nodes, context).unwrap()
+  let baseline = CompiledDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
+  let retuned = CompiledDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   let baseline_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let retuned_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
@@ -658,7 +658,7 @@ test "stereo process: clean graph has zero sanitized count" {
     DspNode::pan(0, 0.0),
     DspNode::stereo_output(1),
   ]
-  let compiled = CompiledStereoDsp::compile(nodes, context).unwrap()
+  let compiled = CompiledStereoDsp::compile_template(CompiledTemplate::analyze(nodes), context).unwrap()
   let left = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let right = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   compiled.process(context, left, right)
