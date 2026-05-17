@@ -198,14 +198,14 @@ pub struct VoicePool {
 fn validate_voice_template(
   compiled_template : CompiledTemplate,
   context : DspContext,
-) -> Result[Unit, BoundVoicePoolError] {
+) -> Result[Unit, VoicePoolError] {
   if compiled_template.orphan_adsr_count() > 0 {
-    return Err(BoundVoicePoolError::OrphanAdsr)
+    return Err(VoicePoolError::OrphanAdsr)
   }
   // Sanity-compile to catch non-orphan problems (feedback cycle validation
   // etc.). Result discarded — per-voice slots compile their own on note_on.
   if CompiledDsp::compile_template(compiled_template, context) is None {
-    return Err(BoundVoicePoolError::CompileRejected)
+    return Err(VoicePoolError::CompileRejected)
   }
   Ok(())
 }
@@ -221,7 +221,7 @@ fn VoicePool::new_validated(
     return Err(BoundVoicePoolError::InvalidMaxVoices)
   }
   match validate_voice_template(compiled_template, context) {
-    Err(error) => return Err(error)
+    Err(error) => return Err(BoundVoicePoolError::from_voice_pool(error))
     Ok(_) => ()
   }
   let block_size = context.block_size()
@@ -244,7 +244,7 @@ fn VoicePool::set_template_validated(
   compiled_template : CompiledTemplate,
 ) -> Result[Unit, BoundVoicePoolError] {
   match validate_voice_template(compiled_template, self.compile_context) {
-    Err(error) => return Err(error)
+    Err(error) => return Err(BoundVoicePoolError::from_voice_pool(error))
     Ok(_) => ()
   }
   self.template = template.copy()
@@ -323,7 +323,7 @@ pub fn BoundVoicePool::set_template(
 ) -> Result[Unit, BoundVoicePoolError] {
   let compiled_template = CompiledTemplate::analyze(template)
   match validate_voice_template(compiled_template, self.pool.compile_context) {
-    Err(error) => return Err(error)
+    Err(error) => return Err(BoundVoicePoolError::from_voice_pool(error))
     Ok(_) => ()
   }
   let next_bindings = match bindings.build(compiled_template) {
