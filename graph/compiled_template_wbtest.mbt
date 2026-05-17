@@ -94,3 +94,53 @@ test "is_node_live: out-of-bounds index returns false (does not abort)" {
   assert_false(ct.is_node_live(100))
   assert_false(ct.is_node_live(2)) // exactly one past end
 }
+
+///|
+/// B5: adsr_authoring_indices count + orphan_adsr_count equals total ADSRs.
+test "B5: adsr_authoring_indices accounts for all authoring ADSRs" {
+  let nodes : Array[DspNode] = [
+    DspNode::oscillator(@dsp.Waveform::Sine, 440.0),
+    DspNode::adsr(attack_ms=10.0, decay_ms=50.0, sustain=0.5, release_ms=100.0),
+    DspNode::envelope_gain(input=0, envelope=1, amount=1.0),
+    DspNode::output(2),
+  ]
+  let t = CompiledTemplate::analyze(nodes)
+  let live = t.adsr_authoring_indices()
+  @debug.assert_eq(live.length() + t.orphan_adsr_count(), 1)
+  for i in 0..<live.length() {
+    let idx = live[i]
+    @debug.assert_eq(t.template[idx].kind is Adsr, true)
+    @debug.assert_eq(t.index_map[idx] >= 0, true)
+  }
+}
+
+///|
+/// B5: orphan ADSR excluded from adsr_authoring_indices.
+test "B5: orphan ADSR is excluded from adsr_authoring_indices" {
+  let nodes : Array[DspNode] = [
+    DspNode::oscillator(@dsp.Waveform::Sine, 440.0),
+    DspNode::adsr(attack_ms=10.0, decay_ms=50.0, sustain=0.5, release_ms=100.0),
+    DspNode::output(0), // ADSR at index 1 is orphan
+  ]
+  let t = CompiledTemplate::analyze(nodes)
+  @debug.assert_eq(t.adsr_authoring_indices().length(), 0)
+  @debug.assert_eq(t.orphan_adsr_count(), 1)
+}
+
+///|
+/// B6: adsr_authoring_indices is monotonically increasing (authoring order).
+test "B6: adsr_authoring_indices preserves authoring order" {
+  let nodes : Array[DspNode] = [
+    DspNode::adsr(attack_ms=10.0, decay_ms=50.0, sustain=0.5, release_ms=100.0),
+    DspNode::oscillator(@dsp.Waveform::Sine, 440.0),
+    DspNode::adsr(attack_ms=5.0, decay_ms=25.0, sustain=0.7, release_ms=50.0),
+    DspNode::envelope_gain(input=1, envelope=0, amount=1.0),
+    DspNode::envelope_gain(input=3, envelope=2, amount=1.0),
+    DspNode::output(4),
+  ]
+  let live = CompiledTemplate::analyze(nodes).adsr_authoring_indices()
+  @debug.assert_eq(live.length(), 2)
+  for i in 1..<live.length() {
+    @debug.assert_eq(live[i - 1] < live[i], true)
+  }
+}
