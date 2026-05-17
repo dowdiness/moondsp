@@ -60,6 +60,13 @@ The unifying design principle is the **Incremental Hylomorphism Pipeline**: ever
 │                                                  ▼           │
 │                                         Audio Samples        │
 └─────────────────────────────────────────┬────────────────────┘
+
+> **Planned per ADR-0010 (Proposed):** the boundary type makes the
+> pipeline more explicit:
+> `DspNode → CompiledTemplate::analyze → CompiledTemplate → CompiledDsp::compile → CompiledDsp`.
+> `CompiledTemplate` is the runtime exchange boundary between authoring
+> and compile. See ADR-0010 for the contract.
+
                                           │
                                           ▼
 ┌───────────────────────────────────────────────────────────────┐
