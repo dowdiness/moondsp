@@ -292,3 +292,25 @@ test "GraphBuilder: adsr * osc pipeline" {
   assert_true(nodes[4].kind() is DspNodeKind::Output)
   @debug.assert_eq(nodes[4].input0(), 3)
 }
+
+///|
+/// B8: GraphBuilder::analyze produces a CompiledTemplate semantically
+/// equivalent to CompiledTemplate::analyze(builder.nodes()). Verified
+/// via downstream CompiledDsp output equivalence.
+test "B8: GraphBuilder::analyze ≡ CompiledTemplate::analyze(builder.nodes())" {
+  let freq : GraphBuilder = ArithSym::constant(440.0)
+  let osc : GraphBuilder = DspSym::oscillator(freq, Waveform::Sine)
+  let builder : GraphBuilder = DspSym::output(osc)
+  let template_a = builder.analyze()
+  let template_b = CompiledTemplate::analyze(builder.nodes())
+  let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=128)
+  let compiled_a = CompiledDsp::compile_template(template_a, ctx).unwrap()
+  let compiled_b = CompiledDsp::compile_template(template_b, ctx).unwrap()
+  let buf_a = @dsp.AudioBuffer::filled(128)
+  let buf_b = @dsp.AudioBuffer::filled(128)
+  compiled_a.process(ctx, buf_a)
+  compiled_b.process(ctx, buf_b)
+  for i in 0..<128 {
+    @debug.assert_eq(buf_a.get(i), buf_b.get(i))
+  }
+}
