@@ -73,6 +73,13 @@ The unifying design principle is the **Incremental Hylomorphism Pipeline**: ever
 └───────────────────────────────────────────────────────────────┘
 ```
 
+> **Planned per ADR-0010 (Proposed):** inside the DSP Engine box above,
+> the `DspNode enum → compile() → CompiledDsp` flow gains an explicit
+> intermediate stage:
+> `DspNode → CompiledTemplate::analyze → CompiledTemplate → CompiledDsp::compile → CompiledDsp`.
+> `CompiledTemplate` is the runtime exchange boundary between authoring
+> and compile. See ADR-0010 for the contract.
+
 ### Key Separation
 
 | Concern | Engine | Rate | Update trigger |
@@ -194,6 +201,12 @@ DspNode enum  ──(flatten)──▶  Array[FlatNode]
               ──(topo-sort)──▶  sorted execution order
               ──(compile)──▶   CompiledDsp (process() function)
 ```
+
+> **Planned per ADR-0010 (Proposed):** the boundary type makes the
+> pipeline more explicit:
+> `DspNode → CompiledTemplate::analyze → CompiledTemplate → CompiledDsp::compile → CompiledDsp`.
+> `CompiledTemplate` is the runtime exchange boundary between authoring
+> and compile. See ADR-0010 for the contract.
 
 Current implemented surface:
 - Declarative mono `DspNode` graph compiled into opaque `CompiledDsp`

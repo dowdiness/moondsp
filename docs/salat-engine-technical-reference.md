@@ -487,6 +487,13 @@ FlatNode[] (sorted: dependencies before dependents)
 Executable form (interpreter loop or generated code)
 ```
 
+**Planned per ADR-0010 (Proposed):** in the concrete library API, the
+pipeline becomes
+`Array[DspNode] → CompiledTemplate::analyze → CompiledTemplate →
+CompiledDsp::compile → CompiledDsp`. `CompiledTemplate` is the single
+runtime exchange type between authoring and compile. See ADR-0010 for
+the contract.
+
 ### 3.2 Flatten
 
 Convert the recursive tree into a flat array where `ins` are integer indices:
@@ -660,6 +667,12 @@ The current repository already implements:
   path
 - input nodes may be declared in authoring order; the compiler topologically
   sorts reachable nodes from a single terminal output node
+- **Planned per ADR-0010 (Proposed):** `CompiledDsp::compile` will accept
+  `CompiledTemplate` directly; the current `Array[DspNode]` overload and
+  the separate `compile_template` accessor collapse into a single entry
+  point. The boundary type is produced via `CompiledTemplate::analyze`.
+  Current behavior: `CompiledDsp::compile(Array[DspNode], DspContext) -> Self?`
+  alongside `CompiledDsp::compile_template(CompiledTemplate, DspContext) -> Self?`.
 - `CompiledTemplate::analyze(...)` captures the authoring template, the
   optimizer's authoring-index map, and the optimized node array; callers that
   already need template analysis can compile mono or stereo graphs with
@@ -797,6 +810,10 @@ Current limits:
   `CompiledDsp::compile()` and `CompiledStereoDsp::compile()` via
   `optimize_graph()`; pre-analyzed `CompiledTemplate` callers reuse the same
   optimized graph through `compile_template(...)`
+- **Planned per ADR-0010 (Proposed):** `compile_template` is removed; its
+  behavior becomes the new `compile(CompiledTemplate, ctx)` signature.
+  Current behavior: separate side-door entry; see compile-path section
+  above for the unified shape.
 - `InsertChain` / `DeleteChain` topology edit variants support multi-node
   subgraph operations with stereo parity
 - state preservation across topology edit recompilation is supported
@@ -855,6 +872,13 @@ and control-key routing together.
 
 Current semantics:
 
+- **Planned per ADR-0010 (Proposed):** `VoicePool::new` /
+  `VoicePool::set_template` migrate from `Array[DspNode]` to
+  `CompiledTemplate` inputs and from Option/Bool to
+  `Result[..., VoicePoolError]` returns (variants:
+  `InvalidMaxVoices`, `OrphanAdsr`, `CompileRejected`).
+  `BoundVoicePool` migrates analogously, keeping `BoundVoicePoolError`.
+  Current behavior described below.
 - `VoicePool` remains the low-level polyphonic mono-voice allocator and mixer
   with priority stealing, per-slot template snapshots, and per-voice pan gains
 - `BoundVoicePool` owns both a `VoicePool` and the `ControlBindingMap` proven
@@ -903,13 +927,31 @@ Current semantics:
 
 This prevents a stale scheduler-owned binding map from being paired with a
 voice pool after a template swap, and it removes the previous double
-`optimize_graph(...)` pass from the voice-template path.
+`optimize_graph(...)` pass from the voice-template path. **Planned per
+ADR-0010 (Proposed):** the boundary type makes single-optimize a static
+guarantee, not just a dynamic property — `optimize_graph` becomes
+package-private and runs exactly once inside `CompiledTemplate::analyze`.
 
 ### 3.6 Graph Hot-Swap
 
 The current implementation provides narrow mono and terminal-stereo hot-swap
 wrappers, plus a first mono topology-edit wrapper layered on top of mono
 hot-swap:
+
+**Planned per ADR-0010 (Proposed):** the example below becomes:
+
+```moonbit
+let old_template = CompiledTemplate::analyze(old_nodes)
+let new_template = CompiledTemplate::analyze(new_nodes)
+let active = CompiledDsp::compile(old_template, context).unwrap()
+let replacement = CompiledDsp::compile(new_template, context).unwrap()
+let hot_swap = CompiledDspHotSwap::from_graph(active, crossfade_samples=128)
+
+assert(hot_swap.queue_swap(replacement))
+hot_swap.process(context, output)
+```
+
+Current behavior:
 
 ```moonbit
 let active = CompiledDsp::compile(old_nodes, context).unwrap()
@@ -919,6 +961,24 @@ let hot_swap = CompiledDspHotSwap::from_graph(active, crossfade_samples=128)
 assert(hot_swap.queue_swap(replacement))
 hot_swap.process(context, output)
 ```
+
+**Planned per ADR-0010 (Proposed):** the stereo example below becomes:
+
+```moonbit
+let old_template = CompiledTemplate::analyze(old_nodes)
+let new_template = CompiledTemplate::analyze(new_nodes)
+let active_stereo = CompiledStereoDsp::compile(old_template, context).unwrap()
+let replacement_stereo = CompiledStereoDsp::compile(new_template, context).unwrap()
+let hot_swap_stereo = CompiledStereoDspHotSwap::from_graph(
+  active_stereo,
+  crossfade_samples=128,
+)
+
+assert(hot_swap_stereo.queue_swap(replacement_stereo))
+hot_swap_stereo.process(context, left_output, right_output)
+```
+
+Current behavior:
 
 ```moonbit
 let active_stereo = CompiledStereoDsp::compile(old_nodes, context).unwrap()
