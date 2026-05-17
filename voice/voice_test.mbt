@@ -4,6 +4,7 @@ using @dsp {type AudioBuffer, type DspContext, type Waveform}
 ///|
 using @graph {
   type CompiledDsp,
+  type CompiledTemplate,
   type ControlBindingBuilder,
   type ControlBindingError,
   type DspNode,
@@ -21,7 +22,10 @@ test "is_voice_finished returns false during active envelope" {
     DspNode::mul(0, 1),
     DspNode::output(2),
   ]
-  let compiled = CompiledDsp::compile(nodes, ctx).unwrap()
+  let compiled = CompiledDsp::compile_template(
+    CompiledTemplate::analyze(nodes),
+    ctx,
+  ).unwrap()
   ignore(compiled.gate_on(1))
   let buf = AudioBuffer::filled(16)
   compiled.process(ctx, buf)
@@ -37,7 +41,10 @@ test "is_voice_finished returns true after envelope completes release" {
     DspNode::mul(0, 1),
     DspNode::output(2),
   ]
-  let compiled = CompiledDsp::compile(nodes, ctx).unwrap()
+  let compiled = CompiledDsp::compile_template(
+    CompiledTemplate::analyze(nodes),
+    ctx,
+  ).unwrap()
   ignore(compiled.gate_on(1))
   let buf = AudioBuffer::filled(8)
   compiled.process(ctx, buf)
@@ -52,7 +59,10 @@ test "is_voice_finished returns true after envelope completes release" {
 test "is_voice_finished returns true for graph with no ADSR when output is silent" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(0.0), DspNode::output(0)]
-  let compiled = CompiledDsp::compile(nodes, ctx).unwrap()
+  let compiled = CompiledDsp::compile_template(
+    CompiledTemplate::analyze(nodes),
+    ctx,
+  ).unwrap()
   let buf = AudioBuffer::filled(4)
   compiled.process(ctx, buf)
   assert_true(compiled.is_voice_finished())
@@ -73,7 +83,10 @@ test "is_voice_finished returns false when delay tail is audible" {
     ),
     DspNode::output(3),
   ]
-  let compiled = CompiledDsp::compile(nodes, ctx).unwrap()
+  let compiled = CompiledDsp::compile_template(
+    CompiledTemplate::analyze(nodes),
+    ctx,
+  ).unwrap()
   ignore(compiled.gate_on(1))
   let buf = AudioBuffer::filled(16)
   compiled.process(ctx, buf)

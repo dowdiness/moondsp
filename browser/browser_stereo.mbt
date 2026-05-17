@@ -2,8 +2,8 @@
 let compiled_stereo : GraphSlot[@moondsp.CompiledStereoDsp, StereoOut] = GraphSlot::new(
   output=StereoOut::new(),
   compile=fn(ctx) {
-    @moondsp.CompiledStereoDsp::compile(
-      [
+    @moondsp.CompiledStereoDsp::compile_template(
+      @moondsp.CompiledTemplate::analyze([
         @moondsp.DspNode::constant(1.0),
         @moondsp.DspNode::oscillator(
           @moondsp.Waveform::Sine,
@@ -30,7 +30,7 @@ let compiled_stereo : GraphSlot[@moondsp.CompiledStereoDsp, StereoOut] = GraphSl
           threshold=BROWSER_COMPILED_CLIP_THRESHOLD,
         ),
         @moondsp.DspNode::stereo_output(9),
-      ],
+      ]),
       ctx,
     )
   },

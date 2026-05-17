@@ -35,7 +35,10 @@ let exit_deliverable : GraphSlot[@moondsp.CompiledDsp, MonoOut] = GraphSlot::new
   output=MonoOut::new(),
   compile=fn(ctx) {
     let builder : @moondsp.GraphBuilder = @moondsp.exit_deliverable()
-    @moondsp.CompiledDsp::compile(builder.nodes(), ctx)
+    @moondsp.CompiledDsp::compile_template(
+      @moondsp.CompiledTemplate::analyze(builder.nodes()),
+      ctx,
+    )
   },
 )
 
