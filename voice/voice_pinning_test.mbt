@@ -68,3 +68,62 @@ fn pr2_a3_closure(
     Err(A3Reason::CompileRejected)
   }
 }
+
+///|
+/// A2 well-formed: a minimal valid template (Oscillator → Output)
+/// produces a VoicePool successfully.
+test "A2: well-formed template constructs VoicePool successfully" {
+  let nodes : Array[DspNode] = [
+    DspNode::oscillator(Waveform::Sine, 440.0),
+    DspNode::output(0),
+  ]
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
+  let result = pr2_a2_closure(nodes, ctx, 4)
+  assert_true(result is Ok(_))
+}
+
+///|
+/// A2 InvalidMaxVoices: max_voices=0 fails with the specific reason.
+test "A2: max_voices=0 fails with InvalidMaxVoices" {
+  let nodes : Array[DspNode] = [
+    DspNode::oscillator(Waveform::Sine, 440.0),
+    DspNode::output(0),
+  ]
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
+  let result = pr2_a2_closure(nodes, ctx, 0)
+  match result {
+    Err(reason) => @debug.assert_eq(reason, A2Reason::InvalidMaxVoices)
+    Ok(_) => fail("expected Err(InvalidMaxVoices), got Ok")
+  }
+}
+
+///|
+/// A2 OrphanAdsr: a dead-code ADSR node (no consumer) fails with the
+/// specific reason. Note: ADSR must be in the template but unreferenced
+/// by Output, so optimize_graph eliminates it.
+test "A2: orphan ADSR fails with OrphanAdsr" {
+  let nodes : Array[DspNode] = [
+    DspNode::oscillator(Waveform::Sine, 440.0),
+    DspNode::adsr(attack_ms=10.0, decay_ms=50.0, sustain=0.5, release_ms=100.0), // orphan — not referenced by Output
+    DspNode::output(0),
+  ]
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
+  let result = pr2_a2_closure(nodes, ctx, 4)
+  match result {
+    Err(reason) => @debug.assert_eq(reason, A2Reason::OrphanAdsr)
+    Ok(_) => fail("expected Err(OrphanAdsr), got Ok")
+  }
+}
+
+///|
+/// A2 CompileRejected: a template with no Output node fails with
+/// CompileRejected.
+test "A2: missing Output fails with CompileRejected" {
+  let nodes : Array[DspNode] = [DspNode::oscillator(Waveform::Sine, 440.0)]
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
+  let result = pr2_a2_closure(nodes, ctx, 4)
+  match result {
+    Err(reason) => @debug.assert_eq(reason, A2Reason::CompileRejected)
+    Ok(_) => fail("expected Err(CompileRejected), got Ok")
+  }
+}
