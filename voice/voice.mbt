@@ -150,7 +150,7 @@ fn VoiceSlot::update_pan(self : VoiceSlot, pan : Double) -> Unit {
 /// WHY authoring indices: CompiledDsp::gate_on/gate_off accept original
 /// authoring indices and internally map through index_map (which
 /// accounts for optimizer elimination + topological reordering).
-fn gate_all_adsrs(
+fn gate_adsrs_at(
   compiled : CompiledDsp,
   authoring_indices : FixedArray[Int],
   gate_on : Bool,
@@ -503,7 +503,7 @@ pub fn VoicePool::note_on(
       return None
     }
   }
-  gate_all_adsrs(compiled, self.adsr_authoring_indices, true)
+  gate_adsrs_at(compiled, self.adsr_authoring_indices, true)
   slot.compiled = Some(compiled)
   // WHY snapshot + copy: note_off needs the SAME indices that were used at
   // note_on to gate the right ADSRs. .copy() is load-bearing — without it,
@@ -545,7 +545,7 @@ pub fn VoicePool::note_off(self : VoicePool, handle : VoiceHandle) -> Bool {
         // note_on time, not the current self.adsr_authoring_indices which
         // may have changed via set_template.
         Some(compiled) =>
-          gate_all_adsrs(compiled, slot.adsr_authoring_indices_snapshot, false)
+          gate_adsrs_at(compiled, slot.adsr_authoring_indices_snapshot, false)
         None => ()
       }
       slot.state = VoiceState::Releasing
@@ -576,7 +576,7 @@ pub fn VoicePool::note_off_all(self : VoicePool) -> Unit {
     if slot.state is VoiceState::Active {
       match slot.compiled {
         Some(compiled) =>
-          gate_all_adsrs(compiled, slot.adsr_authoring_indices_snapshot, false)
+          gate_adsrs_at(compiled, slot.adsr_authoring_indices_snapshot, false)
         None => ()
       }
       slot.state = VoiceState::Releasing
