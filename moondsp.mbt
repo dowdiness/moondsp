@@ -105,7 +105,6 @@ pub using @graph {
 
   // Functions
   node_accepts_slot,
-  optimize_graph,
   replay,
 }
 
@@ -117,5 +116,6 @@ pub using @voice {
   type VoiceControlError,
   type VoiceHandle,
   type VoicePool,
+  type VoicePoolError,
   type VoiceState,
 }

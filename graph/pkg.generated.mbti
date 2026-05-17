@@ -14,8 +14,6 @@ pub fn is_finite(Double) -> Bool
 
 pub fn node_accepts_slot(DspNode, GraphParamSlot) -> Bool
 
-pub fn optimize_graph(Array[DspNode]) -> (Array[DspNode], FixedArray[Int])
-
 pub fn[T : @dsp.ArithSym] range(T, Double, Double) -> T
 
 pub fn[T : @dsp.ArithSym + @dsp.DspSym + @dsp.FilterSym + @dsp.DelaySym + @dsp.StereoSym + @dsp.StereoFilterSym + @dsp.StereoDelaySym] replay(Array[DspNode]) -> T?
