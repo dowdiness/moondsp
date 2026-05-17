@@ -931,6 +931,21 @@ The current implementation provides narrow mono and terminal-stereo hot-swap
 wrappers, plus a first mono topology-edit wrapper layered on top of mono
 hot-swap:
 
+**Planned per ADR-0010 (Proposed):** the example below becomes:
+
+```moonbit
+let old_template = CompiledTemplate::analyze(old_nodes)
+let new_template = CompiledTemplate::analyze(new_nodes)
+let active = CompiledDsp::compile(old_template, context).unwrap()
+let replacement = CompiledDsp::compile(new_template, context).unwrap()
+let hot_swap = CompiledDspHotSwap::from_graph(active, crossfade_samples=128)
+
+assert(hot_swap.queue_swap(replacement))
+hot_swap.process(context, output)
+```
+
+Current behavior:
+
 ```moonbit
 let active = CompiledDsp::compile(old_nodes, context).unwrap()
 let replacement = CompiledDsp::compile(new_nodes, context).unwrap()
@@ -939,6 +954,24 @@ let hot_swap = CompiledDspHotSwap::from_graph(active, crossfade_samples=128)
 assert(hot_swap.queue_swap(replacement))
 hot_swap.process(context, output)
 ```
+
+**Planned per ADR-0010 (Proposed):** the stereo example below becomes:
+
+```moonbit
+let old_template = CompiledTemplate::analyze(old_nodes)
+let new_template = CompiledTemplate::analyze(new_nodes)
+let active_stereo = CompiledStereoDsp::compile(old_template, context).unwrap()
+let replacement_stereo = CompiledStereoDsp::compile(new_template, context).unwrap()
+let hot_swap_stereo = CompiledStereoDspHotSwap::from_graph(
+  active_stereo,
+  crossfade_samples=128,
+)
+
+assert(hot_swap_stereo.queue_swap(replacement_stereo))
+hot_swap_stereo.process(context, left_output, right_output)
+```
+
+Current behavior:
 
 ```moonbit
 let active_stereo = CompiledStereoDsp::compile(old_nodes, context).unwrap()
