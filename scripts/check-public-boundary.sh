@@ -34,6 +34,12 @@ ALLOWED_PATTERNS=(
   "^  InsertChain\(Int, GraphTopologyInputSlot, ${DSPN}\)"
 )
 
+# Public mbti files audited by this script. The list is intentionally
+# explicit (not auto-discovered): adding a public package is a deliberate
+# architectural decision, and updating this list is the audit trail that
+# proves the decision was reviewed against ADR-0010. Auto-discovery would
+# let a new public surface slip in silently — exactly what this script is
+# designed to prevent.
 FILES=(
   "graph/pkg.generated.mbti"
   "voice/pkg.generated.mbti"
