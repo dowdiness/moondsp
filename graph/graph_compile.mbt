@@ -77,31 +77,11 @@ pub fn CompiledStereoDsp::has_feedback_edges(self : CompiledStereoDsp) -> Bool {
 }
 
 ///|
-/// Compile a declarative mono graph into an executable buffer graph.
-///
-/// This first Phase 2 slice accepts nodes in authoring order, requires exactly
-/// one reachable `Output` node, rejects unreachable nodes, and supports a
-/// narrow mono-only feedback slice by resolving detected back-edges as
-/// implicit `z^-1` inputs.
-///
-/// Current limitation: runtime graph control is still partial.
-/// `CompiledDsp::apply_control(...)` provides a unified entrypoint, but only the
-/// node/slot combinations implemented in this slice are supported.
-pub fn CompiledDsp::compile(
-  nodes : Array[DspNode],
-  context : DspContext,
-) -> CompiledDsp? {
-  let original_count = nodes.length()
-  let (nodes, opt_map) = optimize_graph(nodes)
-  CompiledDsp::compile_internal(nodes, context, original_count, opt_map)
-}
-
-///|
 /// Compile a pre-analyzed template without re-running optimize_graph.
 ///
 /// Intended for callers that already need `CompiledTemplate` for topology
 /// checks such as orphan-ADSR and control-binding validation.
-pub fn CompiledDsp::compile_template(
+pub fn CompiledDsp::compile(
   compiled_template : CompiledTemplate,
   context : DspContext,
 ) -> CompiledDsp? {
@@ -296,23 +276,9 @@ fn CompiledDsp::compile_internal(
 }
 
 ///|
-/// Compile a declarative terminal-stereo graph into an executable stereo graph.
-///
-/// This stereo slice keeps the existing `DspNode` language but requires a
-/// single reachable `StereoOutput` node and an overall terminal stereo shape.
-pub fn CompiledStereoDsp::compile(
-  nodes : Array[DspNode],
-  context : DspContext,
-) -> CompiledStereoDsp? {
-  let original_count = nodes.length()
-  let (nodes, opt_map) = optimize_graph(nodes)
-  CompiledStereoDsp::compile_internal(nodes, context, original_count, opt_map)
-}
-
-///|
 /// Compile a pre-analyzed terminal-stereo template without re-running
 /// optimize_graph.
-pub fn CompiledStereoDsp::compile_template(
+pub fn CompiledStereoDsp::compile(
   compiled_template : CompiledTemplate,
   context : DspContext,
 ) -> CompiledStereoDsp? {

@@ -4,7 +4,7 @@ let compiled_stereo_hot_swap : GraphSlot[
   StereoOut,
 ] = GraphSlot::new(output=StereoOut::new(), compile=fn(ctx) {
   match
-    @moondsp.CompiledStereoDsp::compile_template(
+    @moondsp.CompiledStereoDsp::compile(
       @moondsp.CompiledTemplate::analyze([
         @moondsp.DspNode::constant(BROWSER_STEREO_HOT_SWAP_OLD_CONSTANT),
         @moondsp.DspNode::pan(0, 0.0),
@@ -49,7 +49,7 @@ pub fn queue_compiled_stereo_hot_swap() -> Bool {
     None => return set_browser_not_initialized("compiled_stereo_hot_swap.queue")
   }
   let replacement = match
-    @moondsp.CompiledStereoDsp::compile_template(
+    @moondsp.CompiledStereoDsp::compile(
       @moondsp.CompiledTemplate::analyze([
         @moondsp.DspNode::constant(BROWSER_STEREO_HOT_SWAP_NEW_CONSTANT),
         @moondsp.DspNode::pan(0, 0.0),

@@ -203,7 +203,7 @@ fn validate_voice_template(
   }
   // Sanity-compile to catch non-orphan problems (feedback cycle validation
   // etc.). Result discarded — per-voice slots compile their own on note_on.
-  if CompiledDsp::compile_template(compiled_template, context) is None {
+  if CompiledDsp::compile(compiled_template, context) is None {
     return Err(VoicePoolError::CompileRejected)
   }
   Ok(())
@@ -519,7 +519,7 @@ pub fn VoicePool::note_on(
   let slot_index = self.find_slot()
   let slot = self.slots[slot_index]
   let compiled = match
-    CompiledDsp::compile_template(self.compiled_template, self.compile_context) {
+    CompiledDsp::compile(self.compiled_template, self.compile_context) {
     Some(c) => c
     None => return None
   }

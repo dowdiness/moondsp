@@ -350,7 +350,7 @@ test "compiled stereo graph voice path responds to runtime pan updates" {
     DspNode::stereo_clip(input=3, threshold=GRAPH_STEREO_CLIP),
     DspNode::stereo_output(4),
   ]
-  let compiled = CompiledStereoDsp::compile_template(
+  let compiled = CompiledStereoDsp::compile(
     CompiledTemplate::analyze(nodes),
     context,
   ).unwrap()
@@ -409,7 +409,7 @@ test "compiled stereo graph applies batched control frames" {
     DspNode::stereo_clip(input=3, threshold=GRAPH_STEREO_CLIP),
     DspNode::stereo_output(4),
   ]
-  let compiled = CompiledStereoDsp::compile_template(
+  let compiled = CompiledStereoDsp::compile(
     CompiledTemplate::analyze(nodes),
     context,
   ).unwrap()
@@ -482,11 +482,11 @@ test "compiled stereo graph stereo biquad retune changes output" {
     DspNode::stereo_clip(input=3, threshold=GRAPH_STEREO_CLIP),
     DspNode::stereo_output(4),
   ]
-  let baseline = CompiledStereoDsp::compile_template(
+  let baseline = CompiledStereoDsp::compile(
     CompiledTemplate::analyze(baseline_nodes),
     context,
   ).unwrap()
-  let retuned = CompiledStereoDsp::compile_template(
+  let retuned = CompiledStereoDsp::compile(
     CompiledTemplate::analyze(baseline_nodes),
     context,
   ).unwrap()
@@ -560,11 +560,11 @@ test "compiled stereo graph stereo delay retune changes output" {
     ),
     DspNode::stereo_output(2),
   ]
-  let baseline = CompiledStereoDsp::compile_template(
+  let baseline = CompiledStereoDsp::compile(
     CompiledTemplate::analyze(nodes),
     context,
   ).unwrap()
-  let retuned = CompiledStereoDsp::compile_template(
+  let retuned = CompiledStereoDsp::compile(
     CompiledTemplate::analyze(nodes),
     context,
   ).unwrap()
@@ -635,11 +635,11 @@ test "compiled stereo graph stereo delay feedback increases tail energy" {
     ),
     DspNode::stereo_output(2),
   ]
-  let baseline = CompiledStereoDsp::compile_template(
+  let baseline = CompiledStereoDsp::compile(
     CompiledTemplate::analyze(nodes),
     context,
   ).unwrap()
-  let retuned = CompiledStereoDsp::compile_template(
+  let retuned = CompiledStereoDsp::compile(
     CompiledTemplate::analyze(nodes),
     context,
   ).unwrap()
@@ -714,11 +714,11 @@ test "compiled graph stereo delay mixdown matches equivalent mono delay path" {
     ),
     DspNode::output(1),
   ]
-  let stereo_mixdown = CompiledDsp::compile_template(
+  let stereo_mixdown = CompiledDsp::compile(
     CompiledTemplate::analyze(stereo_nodes),
     context,
   ).unwrap()
-  let mono = CompiledDsp::compile_template(
+  let mono = CompiledDsp::compile(
     CompiledTemplate::analyze(mono_nodes),
     context,
   ).unwrap()
@@ -767,11 +767,11 @@ test "compiled graph stereo mixdown matches equivalent mono gain path" {
     DspNode::clip(1, 1.0),
     DspNode::output(2),
   ]
-  let stereo_mixdown = CompiledDsp::compile_template(
+  let stereo_mixdown = CompiledDsp::compile(
     CompiledTemplate::analyze(stereo_nodes),
     context,
   ).unwrap()
-  let mono = CompiledDsp::compile_template(
+  let mono = CompiledDsp::compile(
     CompiledTemplate::analyze(mono_nodes),
     context,
   ).unwrap()
@@ -806,10 +806,7 @@ test "compiled graph z^-1 feedback cycle persists across blocks and stays bounde
     DspNode::gain(1, GRAPH_FEEDBACK_GAIN),
     DspNode::output(2),
   ]
-  let compiled = CompiledDsp::compile_template(
-    CompiledTemplate::analyze(nodes),
-    context,
-  ).unwrap()
+  let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
   let first_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
   let second_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
 
@@ -841,10 +838,7 @@ test "compiled graph z^-1 feedback cycle applies batched runtime changes" {
     DspNode::gain(1, GRAPH_FEEDBACK_GAIN),
     DspNode::output(2),
   ]
-  let compiled = CompiledDsp::compile_template(
-    CompiledTemplate::analyze(nodes),
-    context,
-  ).unwrap()
+  let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
   let first_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
   let second_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
 
@@ -888,7 +882,7 @@ test "compiled stereo graph mono z^-1 feedback cycle persists across blocks" {
     DspNode::pan(2, GRAPH_STEREO_CENTER),
     DspNode::stereo_output(3),
   ]
-  let compiled = CompiledStereoDsp::compile_template(
+  let compiled = CompiledStereoDsp::compile(
     CompiledTemplate::analyze(nodes),
     context,
   ).unwrap()
@@ -950,7 +944,7 @@ test "compiled stereo graph mono z^-1 feedback cycle applies batched runtime cha
     DspNode::pan(2, GRAPH_STEREO_CENTER),
     DspNode::stereo_output(3),
   ]
-  let compiled = CompiledStereoDsp::compile_template(
+  let compiled = CompiledStereoDsp::compile(
     CompiledTemplate::analyze(nodes),
     context,
   ).unwrap()
@@ -991,11 +985,11 @@ test "compiled graph hot swap crossfades between bounded mono graphs" {
     sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
     block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
-  let active = CompiledDsp::compile_template(
+  let active = CompiledDsp::compile(
     CompiledTemplate::analyze([DspNode::constant(0.25), DspNode::output(0)]),
     context,
   ).unwrap()
-  let replacement = CompiledDsp::compile_template(
+  let replacement = CompiledDsp::compile(
     CompiledTemplate::analyze([DspNode::constant(0.75), DspNode::output(0)]),
     context,
   ).unwrap()
@@ -1243,7 +1237,7 @@ test "compiled stereo graph hot swap preserves bounded stereo output" {
     sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
     block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
-  let active = CompiledStereoDsp::compile_template(
+  let active = CompiledStereoDsp::compile(
     CompiledTemplate::analyze([
       DspNode::constant(0.25),
       DspNode::pan(0, GRAPH_STEREO_CENTER),
@@ -1251,7 +1245,7 @@ test "compiled stereo graph hot swap preserves bounded stereo output" {
     ]),
     context,
   ).unwrap()
-  let replacement = CompiledStereoDsp::compile_template(
+  let replacement = CompiledStereoDsp::compile(
     CompiledTemplate::analyze([
       DspNode::constant(0.75),
       DspNode::pan(0, GRAPH_STEREO_CENTER),
@@ -1428,10 +1422,7 @@ test "compiled graph voice path stays coherent across gates and runtime updates"
     ),
     DspNode::oscillator(Waveform::Square, GRAPH_VOICE_FREQ),
   ]
-  let compiled = CompiledDsp::compile_template(
-    CompiledTemplate::analyze(nodes),
-    context,
-  ).unwrap()
+  let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
   let output = AudioBuffer::filled(GRAPH_VOICE_BLOCK_SIZE)
 
   assert_true(compiled.apply_control(GraphControl::gate_on(6)))
@@ -1525,10 +1516,7 @@ test "compiled graph control frames apply batched runtime changes per block" {
     ),
     DspNode::oscillator(Waveform::Square, GRAPH_VOICE_FREQ),
   ]
-  let compiled = CompiledDsp::compile_template(
-    CompiledTemplate::analyze(nodes),
-    context,
-  ).unwrap()
+  let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
   let output = AudioBuffer::filled(GRAPH_VOICE_BLOCK_SIZE)
 
   assert_true(
@@ -1598,14 +1586,8 @@ test "compiled graph multi-source path responds to runtime biquad retune" {
     DspNode::clip(5, GRAPH_MULTI_SOURCE_CLIP),
     DspNode::output(6),
   ]
-  let baseline = CompiledDsp::compile_template(
-    CompiledTemplate::analyze(nodes),
-    context,
-  ).unwrap()
-  let retuned = CompiledDsp::compile_template(
-    CompiledTemplate::analyze(nodes),
-    context,
-  ).unwrap()
+  let baseline = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
+  let retuned = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
   let baseline_output = AudioBuffer::filled(GRAPH_MULTI_SOURCE_BLOCK_SIZE)
   let retuned_output = AudioBuffer::filled(GRAPH_MULTI_SOURCE_BLOCK_SIZE)
 
@@ -1687,14 +1669,8 @@ test "compiled graph runtime high-pass retune changes output directionally" {
     DspNode::clip(1, GRAPH_HIGHPASS_CLIP),
     DspNode::output(2),
   ]
-  let baseline = CompiledDsp::compile_template(
-    CompiledTemplate::analyze(nodes),
-    context,
-  ).unwrap()
-  let retuned = CompiledDsp::compile_template(
-    CompiledTemplate::analyze(nodes),
-    context,
-  ).unwrap()
+  let baseline = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
+  let retuned = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
   let baseline_output = AudioBuffer::filled(GRAPH_HIGHPASS_BLOCK_SIZE)
   let retuned_output = AudioBuffer::filled(GRAPH_HIGHPASS_BLOCK_SIZE)
 
@@ -1757,14 +1733,8 @@ test "compiled graph runtime band-pass retune changes output" {
     DspNode::clip(1, GRAPH_BANDPASS_CLIP),
     DspNode::output(2),
   ]
-  let baseline = CompiledDsp::compile_template(
-    CompiledTemplate::analyze(nodes),
-    context,
-  ).unwrap()
-  let retuned = CompiledDsp::compile_template(
-    CompiledTemplate::analyze(nodes),
-    context,
-  ).unwrap()
+  let baseline = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
+  let retuned = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
   let baseline_output = AudioBuffer::filled(GRAPH_BANDPASS_BLOCK_SIZE)
   let retuned_output = AudioBuffer::filled(GRAPH_BANDPASS_BLOCK_SIZE)
 
@@ -1814,7 +1784,7 @@ test "compiled graph runtime band-pass retune changes output" {
 test "exit deliverable compiles and produces non-zero output" {
   let graph : GraphBuilder = exit_deliverable()
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
-  let compiled = CompiledDsp::compile_template(
+  let compiled = CompiledDsp::compile(
     CompiledTemplate::analyze(graph.nodes()),
     ctx,
   )

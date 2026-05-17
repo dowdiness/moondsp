@@ -2,7 +2,7 @@
 let compiled : GraphSlot[@moondsp.CompiledDsp, MonoOut] = GraphSlot::new(
   output=MonoOut::new(),
   compile=fn(ctx) {
-    @moondsp.CompiledDsp::compile_template(
+    @moondsp.CompiledDsp::compile(
       @moondsp.CompiledTemplate::analyze([
         @moondsp.DspNode::oscillator(
           @moondsp.Waveform::Triangle,

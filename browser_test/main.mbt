@@ -158,7 +158,7 @@ fn ensure_compiled_graph(sample_rate : Double, block_size : Int) -> Bool {
     @moondsp.DspNode::output(3),
   ]
   match
-    @moondsp.CompiledDsp::compile_template(
+    @moondsp.CompiledDsp::compile(
       @moondsp.CompiledTemplate::analyze(nodes),
       context,
     ) {
@@ -234,7 +234,7 @@ pub fn mul_adsr_peak(sample_rate : Double, block_size : Int) -> Double {
     @moondsp.DspNode::output(2),
   ]
   match
-    @moondsp.CompiledDsp::compile_template(
+    @moondsp.CompiledDsp::compile(
       @moondsp.CompiledTemplate::analyze(nodes),
       ctx,
     ) {

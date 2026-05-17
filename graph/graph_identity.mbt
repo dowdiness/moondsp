@@ -248,7 +248,7 @@ pub fn GraphTemplateDoc::compile(
   self : GraphTemplateDoc,
   context : DspContext,
 ) -> CompiledDsp? {
-  CompiledDsp::compile_template(self.analyze(), context)
+  CompiledDsp::compile(self.analyze(), context)
 }
 
 ///|
@@ -256,7 +256,7 @@ pub fn GraphTemplateDoc::compile_stereo(
   self : GraphTemplateDoc,
   context : DspContext,
 ) -> CompiledStereoDsp? {
-  CompiledStereoDsp::compile_template(self.analyze(), context)
+  CompiledStereoDsp::compile(self.analyze(), context)
 }
 
 ///|
