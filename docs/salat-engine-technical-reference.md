@@ -865,6 +865,13 @@ and control-key routing together.
 
 Current semantics:
 
+- **Planned per ADR-0010 (Proposed):** `VoicePool::new` /
+  `VoicePool::set_template` migrate from `Array[DspNode]` to
+  `CompiledTemplate` inputs and from Option/Bool to
+  `Result[..., VoicePoolError]` returns (variants:
+  `InvalidMaxVoices`, `OrphanAdsr`, `CompileRejected`).
+  `BoundVoicePool` migrates analogously, keeping `BoundVoicePoolError`.
+  Current behavior described below.
 - `VoicePool` remains the low-level polyphonic mono-voice allocator and mixer
   with priority stealing, per-slot template snapshots, and per-voice pan gains
 - `BoundVoicePool` owns both a `VoicePool` and the `ControlBindingMap` proven
