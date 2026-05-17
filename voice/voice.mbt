@@ -56,6 +56,36 @@ pub impl Show for BoundVoicePoolError with output(self, logger) {
 }
 
 ///|
+/// Failure modes for VoicePool construction and template replacement.
+/// Mirrors BoundVoicePoolError minus the Binding(...) variant
+/// (VoicePool has no bindings).
+pub(all) enum VoicePoolError {
+  InvalidMaxVoices
+  OrphanAdsr
+  CompileRejected
+} derive(Eq, Debug)
+
+///|
+pub impl Show for VoicePoolError with output(self, logger) {
+  logger.write_string(@debug.to_string(self))
+}
+
+///|
+/// Lift a VoicePoolError to a BoundVoicePoolError. Used by
+/// BoundVoicePool's constructors after delegating to
+/// validate_voice_template (which now returns VoicePoolError after
+/// the boundary-type migration per ADR-0010).
+pub fn BoundVoicePoolError::from_voice_pool(
+  e : VoicePoolError,
+) -> BoundVoicePoolError {
+  match e {
+    VoicePoolError::InvalidMaxVoices => BoundVoicePoolError::InvalidMaxVoices
+    VoicePoolError::OrphanAdsr => BoundVoicePoolError::OrphanAdsr
+    VoicePoolError::CompileRejected => BoundVoicePoolError::CompileRejected
+  }
+}
+
+///|
 pub(all) enum VoiceControlError {
   InvalidVoiceHandle(VoiceHandle)
   Graph(GraphControlError)
