@@ -71,7 +71,9 @@ fn pr2_a3_closure(
 
 ///|
 /// A2 well-formed: a minimal valid template (Oscillator → Output)
-/// produces a VoicePool successfully.
+/// produces a VoicePool successfully. The `4` for `max_voices` is any
+/// positive value — the rest of the A2 suite uses the same sentinel
+/// when max_voices isn't under test (orphan, missing Output).
 test "A2: well-formed template constructs VoicePool successfully" {
   let nodes : Array[DspNode] = [
     DspNode::oscillator(Waveform::Sine, 440.0),
