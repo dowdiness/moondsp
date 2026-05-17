@@ -176,3 +176,77 @@ test "A3: missing Output replacement fails with CompileRejected" {
     Err(A3Reason::CompileRejected),
   )
 }
+
+///|
+/// PR-2 A4 closure: passes through unchanged. BoundVoicePool already
+/// returns Result[..., BoundVoicePoolError]. PR 3 changes only the
+/// input type (Array → CompiledTemplate).
+fn pr2_a4_closure(
+  nodes : Array[DspNode],
+  ctx : DspContext,
+  builder : ControlBindingBuilder,
+  max_voices : Int,
+) -> Result[BoundVoicePool, BoundVoicePoolError] {
+  BoundVoicePool::new(nodes, ctx, builder, max_voices~)
+}
+
+///|
+/// A4: well-formed template + valid bindings constructs BoundVoicePool.
+test "A4: well-formed template constructs BoundVoicePool successfully" {
+  let nodes : Array[DspNode] = [
+    DspNode::oscillator(Waveform::Sine, 440.0),
+    DspNode::output(0),
+  ]
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
+  let builder = ControlBindingBuilder::new()
+  let result = pr2_a4_closure(nodes, ctx, builder, 4)
+  assert_true(result is Ok(_))
+}
+
+///|
+/// A4 InvalidMaxVoices: max_voices=0 fails with the specific variant.
+test "A4: max_voices=0 fails with InvalidMaxVoices" {
+  let nodes : Array[DspNode] = [
+    DspNode::oscillator(Waveform::Sine, 440.0),
+    DspNode::output(0),
+  ]
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
+  let builder = ControlBindingBuilder::new()
+  let result = pr2_a4_closure(nodes, ctx, builder, 0)
+  match result {
+    Err(reason) =>
+      @debug.assert_eq(reason, BoundVoicePoolError::InvalidMaxVoices)
+    Ok(_) => fail("expected Err(InvalidMaxVoices), got Ok")
+  }
+}
+
+///|
+/// A4 OrphanAdsr: dead-code ADSR fails with the specific variant.
+test "A4: orphan ADSR fails with OrphanAdsr" {
+  let nodes : Array[DspNode] = [
+    DspNode::oscillator(Waveform::Sine, 440.0),
+    DspNode::adsr(attack_ms=10.0, decay_ms=50.0, sustain=0.5, release_ms=100.0),
+    DspNode::output(0),
+  ]
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
+  let builder = ControlBindingBuilder::new()
+  let result = pr2_a4_closure(nodes, ctx, builder, 4)
+  match result {
+    Err(reason) => @debug.assert_eq(reason, BoundVoicePoolError::OrphanAdsr)
+    Ok(_) => fail("expected Err(OrphanAdsr), got Ok")
+  }
+}
+
+///|
+/// A4 CompileRejected: missing Output fails with the specific variant.
+test "A4: missing Output fails with CompileRejected" {
+  let nodes : Array[DspNode] = [DspNode::oscillator(Waveform::Sine, 440.0)]
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
+  let builder = ControlBindingBuilder::new()
+  let result = pr2_a4_closure(nodes, ctx, builder, 4)
+  match result {
+    Err(reason) =>
+      @debug.assert_eq(reason, BoundVoicePoolError::CompileRejected)
+    Ok(_) => fail("expected Err(CompileRejected), got Ok")
+  }
+}
