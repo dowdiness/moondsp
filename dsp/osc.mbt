@@ -80,6 +80,10 @@ pub fn Oscillator::process_waveform(
   }
 
   let phase_increment = freq_hz / sample_rate
+  if !is_finite(phase_increment) {
+    output.fill(0.0)
+    return
+  }
   for index = 0; index < sample_count; index = index + 1 {
     output.set(index, self.tick_step(waveform, phase_increment))
   }
