@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.0] - 2026-05-18
 
-This release bundles two breaking refactors of the graph public API:
+This release bundles two breaking refactors of the graph public API plus
+a `dsp` package visibility tightening:
 
 1. **Graph runtime exchange boundary is now `CompiledTemplate`.**
    `Array[DspNode]` remains the *authoring* exchange type; `CompiledTemplate`
@@ -34,6 +35,14 @@ This release bundles two breaking refactors of the graph public API:
    `validate_voice_controls_result` in the `voice/` package keep their
    suffix; that surface is unchanged by this release and will be
    harmonized in a follow-up.)
+3. **`dsp` package visibility tightening.** `EnvStage` enum tightened from
+   `pub(all)` to `pub`; `ChannelSpec` trait tightened from `pub(open)` to
+   `pub`. External `is EnvStage::X` pattern matching continues to work;
+   external variant construction and external `ChannelSpec` impls are
+   no longer permitted. See "Breaking changes — `dsp` visibility
+   tightening" below. (Also in this release, but non-breaking: a
+   per-block-constant hoisting pass on `Adsr::process` and
+   `Oscillator::process_waveform` — see "Performance" below.)
 
 ### Migration — `CompiledTemplate` boundary
 
@@ -61,7 +70,7 @@ BoundVoicePool::set_template(pool, template, builder)
 ```moonbit
 // Before (v0.3.x)
 let ok = compiled.gate_on(0)                          // -> Bool
-let ok = compiled.set_param(1, Value0, 0.5)           // -> Bool
+let ok = compiled.set_param(1, GraphParamSlot::Value0, 0.5)  // -> Bool
 let ok = compiled.apply_control(GraphControl::gate_on(0))    // -> Bool (via trait)
 let ok = hot_swap.queue_swap(replacement)             // -> Bool
 let ok = topology.queue_topology_edit(edit)           // -> Bool
@@ -70,7 +79,7 @@ let r = compiled.gate_on_result(0)                    // -> Result[Unit, GraphCo
 
 // After (v0.4.0)
 let r = compiled.gate_on(0)                           // -> Result[Unit, GraphControlError]
-let r = compiled.set_param(1, Value0, 0.5)            // -> Result[Unit, GraphControlError]
+let r = compiled.set_param(1, GraphParamSlot::Value0, 0.5)   // -> Result[Unit, GraphControlError]
 let r = compiled.apply_control(GraphControl::gate_on(0))     // -> Result[Unit, GraphControlError]
 let r = hot_swap.queue_swap(replacement)              // -> Result[Unit, HotSwapQueueError]
 let r = topology.queue_topology_edit(edit)            // -> Result[Unit, GraphTopologyQueueError]
@@ -121,8 +130,10 @@ Common assertion-rewrite patterns:
   names and return `Result[Unit, GraphTopologyQueueError]`. Other control
   methods are renamed (no Bool peers existed).
 - **`GraphControllable` trait now returns `Result[Unit, GraphControlError]`**
-  from both `apply_control` and `apply_controls`. Any downstream
-  implementor of this `pub(open)` trait must update return types.
+  from both `apply_control` and `apply_controls`. The trait was also
+  tightened from `pub(open)` to `pub` in this release, sealing it against
+  external impls; only the in-package `Compiled*` types implement it, and
+  they have been updated.
 - **All `*_result`-suffixed public methods on graph `Compiled*` types
   removed** (their behaviour is now the only behaviour, exposed without
   the suffix): `apply_control_result`, `apply_controls_result`,
@@ -180,10 +191,11 @@ Common assertion-rewrite patterns:
   loop, eliminating both per-sample validation and per-sample division.
   Added a guard on the quotient: the buffer is silenced if
   `phase_increment` is non-finite (e.g. `Double::MAX / Double::MIN_POSITIVE`
-  → `Inf`), matching dsp's existing fill-0-on-invalid pattern. This also
-  closes a latent NaN-poisoning hole in `tick_waveform` that has existed
-  since v0.1.0 — pathological quotients used to propagate into the
-  oscillator phase and silence the rest of the block via NaN arithmetic.
+  → `Inf`), matching dsp's existing fill-0-on-invalid pattern. The
+  block-processing path (`process_waveform`) is now safe against
+  pathological quotients that would previously NaN-poison the oscillator
+  phase. Direct callers of `tick_waveform` still need to validate the
+  quotient themselves; that path is unchanged in this release.
 - Replaced the magic literal `6.283185307179586` with `2.0 * @math.PI` in
   `sample_for_phase`, matching the convention in `filter.mbt` and
   `pan.mbt`.
@@ -198,8 +210,9 @@ design. Each is enforced by an allowlist entry in
   → runtime crossing; the entire migration is built around this entry
   point.
 - `replay(Array[DspNode])` — pre-optimize debug / round-trip.
-- `Compiled{Mono,Stereo}DspTopologyController::from_nodes(Array, ctx, crossfade?)`
-  — edit-as-you-go composites.
+- `CompiledDspTopologyController::from_nodes(Array, ctx, crossfade?)` and
+  `CompiledStereoDspTopologyController::from_nodes(...)` — edit-as-you-go
+  composites.
 - `GraphBuilder::nodes`, `GraphTemplateDoc::nodes` — authoring /
   inspection accessors.
 - `GraphTemplateDoc::from_nodes`, `::insert_chain` — authoring artifact
