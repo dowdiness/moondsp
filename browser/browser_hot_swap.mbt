@@ -58,7 +58,7 @@ pub fn queue_compiled_hot_swap() -> Bool {
     Some(r) => r
     None => return set_browser_compile_error("compiled_hot_swap.queue")
   }
-  match hot_swap.queue_swap_result(replacement) {
+  match hot_swap.queue_swap(replacement) {
     Ok(_) => {
       clear_browser_error()
       true

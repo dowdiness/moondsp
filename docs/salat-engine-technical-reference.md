@@ -710,23 +710,26 @@ Current graph node support:
 
 Current runtime control support:
 
-- `apply_control(GraphControl)` is the preferred runtime-control entrypoint
-  for compatibility callers; direct compiled mono/stereo graphs and their
-  hot-swap/topology wrappers also expose `apply_control_result(...)` /
-  `apply_controls_result(...)` plus
-  `gate_on_result(...)`, `gate_off_result(...)`, and
-  `set_param_result(...)` for callers that need a concrete
-  `GraphControlError` rejection reason
+- `apply_control(GraphControl) -> Result[Unit, GraphControlError]` is the
+  runtime-control entrypoint. Direct compiled mono/stereo graphs and their
+  hot-swap/topology wrappers all return `Result[Unit, GraphControlError]` and
+  report the specific rejection reason (`InvalidNodeIndex`, `OrphanNode`,
+  `InvalidGateNode`, `InvalidSlotForNode`, `InvalidParamValue`,
+  `MissingRuntimeState`) when a control is refused
 - hot-swap and topology wrappers participate in the same `GraphControllable`
-  boolean runtime-control surface; their result-typed companions preserve the
-  same behavior while reporting the first `GraphControlError`
-- `apply_controls(Array[GraphControl])` applies control batches transactionally
-  in batch order while targeting nodes by authoring index
-- compatibility helpers remain available:
+  trait surface; the trait returns `Result[Unit, GraphControlError]` so
+  consumer code can be written generically over any controllable graph
+- `apply_controls(Array[GraphControl]) -> Result[Unit, GraphControlError]`
+  applies control batches transactionally in batch order while targeting nodes
+  by authoring index; the batch is validated against a simulated copy first
+  and rejected as a unit on the first error
+- per-kind convenience methods on every wrapper:
   - `gate_on(node_index)` / `gate_off(node_index)` for `Adsr`
-- partial `set_param(node_index, slot, value)` for selected numeric params
-  (`Gain`, `Clip`, `Biquad`, `Delay`, `Constant`, `Oscillator`, `Pan`,
-  `StereoGain`, `StereoClip`, `StereoBiquad`, `StereoDelay`)
+  - `set_param(node_index, slot, value)` for selected numeric params
+    (`Gain`, `Clip`, `Biquad`, `Delay`, `Constant`, `Oscillator`, `Pan`,
+    `StereoGain`, `StereoClip`, `StereoBiquad`, `StereoDelay`)
+  - all return `Result[Unit, GraphControlError]` with the same rejection
+    reasons as `apply_control(...)`
 - `Delay` and `StereoDelay` now each expose a node-local feedback coefficient:
   `Value0 = feedback` and `DelaySamples = delay length`
 - integration coverage now includes successful runtime `Biquad` retunes in
@@ -977,19 +980,16 @@ Current semantics:
 - `CompiledStereoDspHotSwap` owns one active terminal-stereo `CompiledStereoDsp`
 - `CompiledDspTopologyController` owns authoring-order mono nodes plus an inner
   `CompiledDspHotSwap`
-- `queue_swap(...)` stages one replacement graph for the next `process(...)`
-  call; `queue_swap_result(...)` is the result-typed companion for direct
-  mono/stereo hot-swap wrappers and reports sample-rate or block-capacity
-  mismatches explicitly
-- `queue_topology_edit(...)` / `queue_topology_edits(...)` apply an ordered
-  `GraphTopologyEdit` batch to the stored authoring nodes, recompile a
-  replacement graph, and stage that replacement through the inner hot-swap
-  wrapper
-- `queue_topology_edit_result(...)` / `queue_topology_edits_result(...)` are
-  the result-typed topology queue companions for mono and stereo controllers;
-  they preserve the same transactional behavior as the boolean APIs while
-  reporting `PendingSwap`, `InvalidEdit(index, reason)`, `RecompileRejected`,
-  or a wrapped `HotSwapQueueError`
+- `queue_swap(...) -> Result[Unit, HotSwapQueueError]` stages one replacement
+  graph for the next `process(...)` call on direct mono/stereo hot-swap
+  wrappers; reports `SampleRateMismatch` or `BlockCapacityMismatch` explicitly
+- `queue_topology_edit(...) -> Result[Unit, GraphTopologyQueueError]` /
+  `queue_topology_edits(...) -> Result[Unit, GraphTopologyQueueError]` apply
+  an ordered `GraphTopologyEdit` batch to the stored authoring nodes,
+  recompile a replacement graph, and stage that replacement through the inner
+  hot-swap wrapper. The batch is transactional and reports `PendingSwap`,
+  `InvalidEdit(index, reason)`, `RecompileRejected`, or a wrapped
+  `HotSwapQueueError`
 - `InvalidEdit(index, reason)` reports the zero-based edit position in the
   submitted batch and a stable `GraphTopologyEditError` reason such as invalid
   node/source indices, unsupported input slots, unsupported inserted node

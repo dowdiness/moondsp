@@ -99,7 +99,7 @@ pub fn process_exit_deliverable_block(
   // Apply controls individually — batch is transactional and one failure
   // rejects all. Individual controls are independent.
   match
-    graph.apply_control_result(
+    graph.apply_control(
       @moondsp.GraphControl::set_param(
         EXIT_LFO_RATE_NODE,
         @moondsp.GraphParamSlot::Value0,
@@ -111,7 +111,7 @@ pub fn process_exit_deliverable_block(
       return set_browser_control_error("exit_deliverable.lfo", error)
   }
   match
-    graph.apply_control_result(
+    graph.apply_control(
       @moondsp.GraphControl::set_param(
         EXIT_BIQUAD_NODE,
         @moondsp.GraphParamSlot::Value0,
@@ -123,7 +123,7 @@ pub fn process_exit_deliverable_block(
       return set_browser_control_error("exit_deliverable.cutoff", error)
   }
   match
-    graph.apply_control_result(
+    graph.apply_control(
       @moondsp.GraphControl::set_param(
         EXIT_GAIN_NODE,
         @moondsp.GraphParamSlot::Value0,

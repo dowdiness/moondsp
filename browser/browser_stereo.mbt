@@ -66,7 +66,7 @@ pub fn process_compiled_stereo_block(
   }
   let graph = compiled_stereo.graph_val()
   match
-    graph.apply_controls_result([
+    graph.apply_controls([
       @moondsp.GraphControl::set_param(1, @moondsp.GraphParamSlot::Value0, freq),
       @moondsp.GraphControl::set_param(
         5,

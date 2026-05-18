@@ -35,7 +35,7 @@ test "compiled dsp hot swap crossfades equal-power between graphs" {
   let second_block = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
   let settled_block = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
 
-  assert_true(hot_swap.queue_swap(new_graph))
+  assert_true(hot_swap.queue_swap(new_graph) is Ok(_))
   hot_swap.process(context, first_block)
   hot_swap.process(context, second_block)
   hot_swap.process(context, settled_block)
@@ -82,7 +82,7 @@ test "compiled dsp hot swap can replace instantly" {
   let hot_swap = CompiledDspHotSwap::from_graph(old_graph)
   let output = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
 
-  assert_true(hot_swap.queue_swap(new_graph))
+  assert_true(hot_swap.queue_swap(new_graph) is Ok(_))
   hot_swap.process(context, output)
 
   assert_true(output.as_fixed_array().every(sample => sample == 0.75))
@@ -109,7 +109,7 @@ test "compiled dsp hot swap rejects incompatible replacement graph" {
   let hot_swap = CompiledDspHotSwap::from_graph(active)
   let output = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
 
-  assert_false(hot_swap.queue_swap(incompatible))
+  assert_true(hot_swap.queue_swap(incompatible) is Err(_))
   hot_swap.process(active_context, output)
 
   assert_true(output.as_fixed_array().every(sample => sample == 0.0))
@@ -135,7 +135,7 @@ test "compiled dsp hot swap result reports sample rate mismatch" {
   ).unwrap()
   let hot_swap = CompiledDspHotSwap::from_graph(active)
 
-  match hot_swap.queue_swap_result(incompatible) {
+  match hot_swap.queue_swap(incompatible) {
     Err(HotSwapQueueError::SampleRateMismatch(active_rate, next_rate)) => {
       @debug.assert_eq(active_rate, HOT_SWAP_SAMPLE_RATE)
       @debug.assert_eq(next_rate, HOT_SWAP_SAMPLE_RATE * 2.0)
@@ -164,7 +164,7 @@ test "compiled dsp hot swap result reports block capacity mismatch" {
   ).unwrap()
   let hot_swap = CompiledDspHotSwap::from_graph(active)
 
-  match hot_swap.queue_swap_result(incompatible) {
+  match hot_swap.queue_swap(incompatible) {
     Err(
       HotSwapQueueError::BlockCapacityMismatch(active_capacity, next_capacity)
     ) => {
@@ -206,11 +206,12 @@ test "compiled dsp hot swap mirrors runtime param changes into pending graph" {
   let second_block = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
   let settled_block = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
 
-  assert_true(hot_swap.queue_swap(replacement))
+  assert_true(hot_swap.queue_swap(replacement) is Ok(_))
   assert_true(
     hot_swap.apply_control(
       GraphControl::set_param(1, GraphParamSlot::Value0, 0.5),
-    ),
+    )
+    is Ok(_),
   )
   hot_swap.process(context, first_block)
   hot_swap.process(context, second_block)
@@ -253,8 +254,8 @@ test "compiled dsp hot swap result reports pending graph control rejection" {
   )
   let first_block = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
 
-  assert_true(hot_swap.queue_swap(replacement))
-  match hot_swap.set_param_result(1, GraphParamSlot::Value0, 0.5) {
+  assert_true(hot_swap.queue_swap(replacement) is Ok(_))
+  match hot_swap.set_param(1, GraphParamSlot::Value0, 0.5) {
     Err(
       GraphControlError::InvalidSlotForNode(
         1,
@@ -305,7 +306,7 @@ test "compiled stereo dsp hot swap crossfades equal-power between graphs" {
   let settled_left = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
   let settled_right = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
 
-  assert_true(hot_swap.queue_swap(new_graph))
+  assert_true(hot_swap.queue_swap(new_graph) is Ok(_))
   hot_swap.process(context, first_left, first_right)
   hot_swap.process(context, second_left, second_right)
   hot_swap.process(context, settled_left, settled_right)
@@ -391,7 +392,7 @@ test "compiled stereo dsp hot swap result queues compatible graph" {
   let left = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
   let right = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
 
-  assert_true(hot_swap.queue_swap_result(new_graph) is Ok(_))
+  assert_true(hot_swap.queue_swap(new_graph) is Ok(_))
   hot_swap.process(context, left, right)
 
   assert_true(
@@ -439,11 +440,12 @@ test "compiled stereo dsp hot swap mirrors pan changes into pending graph" {
   let settled_left = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
   let settled_right = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
 
-  assert_true(hot_swap.queue_swap(replacement))
+  assert_true(hot_swap.queue_swap(replacement) is Ok(_))
   assert_true(
     hot_swap.apply_control(
       GraphControl::set_param(1, GraphParamSlot::Value0, 1.0),
-    ),
+    )
+    is Ok(_),
   )
   hot_swap.process(context, first_left, first_right)
   hot_swap.process(context, second_left, second_right)
@@ -502,8 +504,8 @@ test "compiled stereo dsp hot swap result reports pending graph control rejectio
     crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
   )
 
-  assert_true(hot_swap.queue_swap(replacement))
-  match hot_swap.gate_on_result(0) {
+  assert_true(hot_swap.queue_swap(replacement) is Ok(_))
+  match hot_swap.gate_on(0) {
     Err(GraphControlError::InvalidGateNode(0, DspNodeKind::Constant)) => ()
     other =>
       fail("expected pending InvalidGateNode, got \{@debug.to_string(other)}")

@@ -43,7 +43,7 @@ pub fn queue_compiled_stereo_topology_edit() -> Bool {
       return set_browser_not_initialized("compiled_stereo_topology_edit.queue")
   }
   match
-    topology.queue_topology_edit_result(
+    topology.queue_topology_edit(
       @moondsp.GraphTopologyEdit::replace_node(
         1,
         @moondsp.DspNode::pan(0, BROWSER_STEREO_TOPOLOGY_EDIT_NEW_PAN),
@@ -85,7 +85,7 @@ pub fn process_compiled_stereo_topology_edit_block(
   }
   let topology = compiled_stereo_topology_edit.graph_val()
   match
-    topology.apply_control_result(
+    topology.apply_control(
       @moondsp.GraphControl::set_param(
         0,
         @moondsp.GraphParamSlot::Value0,

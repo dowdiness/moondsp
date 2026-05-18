@@ -41,7 +41,7 @@ pub fn process_compiled_block(
   }
   let graph = compiled.graph_val()
   match
-    graph.apply_controls_result([
+    graph.apply_controls([
       @moondsp.GraphControl::set_param(0, @moondsp.GraphParamSlot::Value0, freq),
       @moondsp.GraphControl::set_param(1, @moondsp.GraphParamSlot::Value0, gain),
     ]) {

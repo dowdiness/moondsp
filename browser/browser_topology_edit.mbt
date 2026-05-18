@@ -51,7 +51,7 @@ pub fn queue_compiled_topology_edit() -> Bool {
     )
   }
   match
-    topology.queue_topology_edit_result(
+    topology.queue_topology_edit(
       @moondsp.GraphTopologyEdit::insert_node(
         1,
         @moondsp.GraphTopologyInputSlot::Input0,
@@ -83,7 +83,7 @@ pub fn queue_compiled_topology_delete_edit() -> Bool {
     )
   }
   match
-    topology.queue_topology_edit_result(
+    topology.queue_topology_edit(
       @moondsp.GraphTopologyEdit::delete_node(
         2,
         1,
@@ -126,7 +126,7 @@ pub fn process_compiled_topology_edit_block(
   }
   let topology = compiled_topology_edit.graph_val()
   match
-    topology.apply_control_result(
+    topology.apply_control(
       @moondsp.GraphControl::set_param(
         0,
         @moondsp.GraphParamSlot::Value0,

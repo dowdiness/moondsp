@@ -395,7 +395,7 @@ test "bench/hotswap/minimal_voice" (b : @bench.T) {
     b.bench(name="minimal_voice/\{block_size}", fn() {
       let next = if use_b.val { compiled_b } else { compiled_a }
       use_b.val = !use_b.val
-      ignore(hs.queue_swap(next))
+      hs.queue_swap(next).unwrap()
       hs.process(ctx, output)
       b.keep(output)
     })
@@ -425,7 +425,7 @@ test "bench/hotswap/fm_voice" (b : @bench.T) {
     b.bench(name="fm_voice/\{block_size}", fn() {
       let next = if use_b.val { compiled_b } else { compiled_a }
       use_b.val = !use_b.val
-      ignore(hs.queue_swap(next))
+      hs.queue_swap(next).unwrap()
       hs.process(ctx, output)
       b.keep(output)
     })
@@ -455,7 +455,7 @@ test "bench/hotswap/full_voice" (b : @bench.T) {
     b.bench(name="full_voice/\{block_size}", fn() {
       let next = if use_b.val { compiled_b } else { compiled_a }
       use_b.val = !use_b.val
-      ignore(hs.queue_swap(next))
+      hs.queue_swap(next).unwrap()
       hs.process(ctx, output)
       b.keep(output)
     })
@@ -486,7 +486,7 @@ test "bench/hotswap/stereo_chain" (b : @bench.T) {
     b.bench(name="stereo_chain/\{block_size}", fn() {
       let next = if use_b.val { compiled_b } else { compiled_a }
       use_b.val = !use_b.val
-      ignore(hs.queue_swap(next))
+      hs.queue_swap(next).unwrap()
       hs.process(ctx, left, right)
       b.keep(left)
       b.keep(right)
@@ -517,7 +517,7 @@ test "bench/topology/replace_node" (b : @bench.T) {
     let output = AudioBuffer::filled(block_size)
     let edit = GraphTopologyEdit::replace_node(0, DspNode::constant(3.0))
     b.bench(name="replace_node/\{block_size}", fn() {
-      ignore(tc.queue_topology_edit(edit))
+      tc.queue_topology_edit(edit).unwrap()
       tc.process(ctx, output)
       b.keep(output)
     })
@@ -559,9 +559,9 @@ test "bench/topology/insert_delete_roundtrip" (b : @bench.T) {
       last_index + 1,
     )
     b.bench(name="insert_delete_roundtrip/\{block_size}", fn() {
-      ignore(tc.queue_topology_edit(insert_edit))
+      tc.queue_topology_edit(insert_edit).unwrap()
       tc.process(ctx, output)
-      ignore(tc.queue_topology_edit(delete_edit))
+      tc.queue_topology_edit(delete_edit).unwrap()
       tc.process(ctx, output)
       b.keep(output)
     })

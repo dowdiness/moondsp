@@ -41,7 +41,8 @@ test "compiled dsp runtime gain update retunes accepted feedback cycle" {
   assert_true(
     compiled.apply_control(
       GraphControl::set_param(2, GraphParamSlot::Value0, QUARTER_SAMPLE),
-    ),
+    )
+    is Ok(_),
   )
   compiled.process(context, retuned_output)
 
@@ -119,7 +120,8 @@ test "compiled dsp runtime delay update matches fixed feedback loop compile" {
         GraphParamSlot::DelaySamples,
         DELAY_SAMPLES_DOUBLE,
       ),
-    ),
+    )
+    is Ok(_),
   )
   runtime_compiled.process(context, runtime_output)
   fixed_compiled.process(context, fixed_output)
@@ -180,7 +182,8 @@ test "compiled dsp runtime biquad update matches fixed feedback loop compile" {
   assert_true(
     runtime_compiled.apply_control(
       GraphControl::set_param(2, GraphParamSlot::Value0, retuned_cutoff),
-    ),
+    )
+    is Ok(_),
   )
   runtime_compiled.process(context, runtime_output)
   fixed_compiled.process(context, fixed_output)
@@ -260,7 +263,8 @@ test "compiled stereo dsp runtime gain update retunes accepted mono feedback cyc
   assert_true(
     compiled.apply_control(
       GraphControl::set_param(2, GraphParamSlot::Value0, QUARTER_SAMPLE),
-    ),
+    )
+    is Ok(_),
   )
   compiled.process(context, retuned_left, retuned_right)
 

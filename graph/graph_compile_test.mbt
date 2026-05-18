@@ -245,7 +245,7 @@ test "compiled dsp compile preserves authoring control indices" {
   )
   let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), ctx).unwrap()
 
-  assert_true(compiled.set_param(1, GraphParamSlot::Value0, 880.0))
+  assert_true(compiled.set_param(1, GraphParamSlot::Value0, 880.0) is Ok(_))
 }
 
 ///|

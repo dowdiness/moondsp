@@ -378,7 +378,8 @@ test "compiled stereo graph voice path responds to runtime pan updates" {
   assert_true(
     compiled.apply_control(
       GraphControl::set_param(2, GraphParamSlot::Value0, GRAPH_STEREO_HARD_LEFT),
-    ),
+    )
+    is Ok(_),
   )
   compiled.process(context, left_output, right_output)
 
@@ -425,7 +426,8 @@ test "compiled stereo graph applies batched control frames" {
       ),
       GraphControl::set_param(2, GraphParamSlot::Value0, GRAPH_STEREO_HARD_LEFT),
       GraphControl::set_param(3, GraphParamSlot::Value0, HALF_GAIN),
-    ]),
+    ])
+    is Ok(_),
   )
   compiled.process(context, left_output, right_output)
 
@@ -446,7 +448,8 @@ test "compiled stereo graph applies batched control frames" {
         GRAPH_STEREO_HARD_RIGHT,
       ),
       GraphControl::set_param(4, GraphParamSlot::Value0, GRAPH_STEREO_CLIP),
-    ]),
+    ])
+    is Ok(_),
   )
   compiled.process(context, left_output, right_output)
 
@@ -522,7 +525,8 @@ test "compiled stereo graph stereo biquad retune changes output" {
         GraphParamSlot::Value0,
         GRAPH_STEREO_FILTER_RETUNED_CUTOFF,
       ),
-    ),
+    )
+    is Ok(_),
   )
   retuned.process(context, retuned_left, retuned_right)
 
@@ -577,7 +581,8 @@ test "compiled stereo graph stereo delay retune changes output" {
   assert_true(
     retuned.apply_control(
       GraphControl::set_param(2, GraphParamSlot::DelaySamples, 0.0),
-    ),
+    )
+    is Ok(_),
   )
   retuned.process(context, retuned_left, retuned_right)
 
@@ -657,7 +662,8 @@ test "compiled stereo graph stereo delay feedback increases tail energy" {
         GraphParamSlot::Value0,
         GRAPH_STEREO_DELAY_FEEDBACK,
       ),
-    ),
+    )
+    is Ok(_),
   )
   baseline.process(context, baseline_left, baseline_right)
   retuned.process(context, retuned_left, retuned_right)
@@ -855,7 +861,8 @@ test "compiled graph z^-1 feedback cycle applies batched runtime changes" {
         GraphParamSlot::Value0,
         GRAPH_FEEDBACK_RETUNED_GAIN,
       ),
-    ]),
+    ])
+    is Ok(_),
   )
   compiled.process(context, second_block)
 
@@ -962,7 +969,8 @@ test "compiled stereo graph mono z^-1 feedback cycle applies batched runtime cha
         GRAPH_FEEDBACK_RETUNED_GAIN,
       ),
       GraphControl::set_param(3, GraphParamSlot::Value0, GRAPH_STEREO_HARD_LEFT),
-    ]),
+    ])
+    is Ok(_),
   )
   compiled.process(context, second_left, second_right)
 
@@ -998,7 +1006,7 @@ test "compiled graph hot swap crossfades between bounded mono graphs" {
   let second_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
   let settled_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
 
-  assert_true(hot_swap.queue_swap(replacement))
+  assert_true(hot_swap.queue_swap(replacement) is Ok(_))
   hot_swap.process(context, first_block)
   hot_swap.process(context, second_block)
   hot_swap.process(context, settled_block)
@@ -1032,12 +1040,14 @@ test "compiled graph topology edit crossfades rebuilt mono graphs" {
   assert_true(
     topology.queue_topology_edit(
       GraphTopologyEdit::replace_node(1, DspNode::gain(0, 0.75)),
-    ),
+    )
+    is Ok(_),
   )
   assert_true(
     topology.apply_control(
       GraphControl::set_param(1, GraphParamSlot::Value0, HALF_GAIN),
-    ),
+    )
+    is Ok(_),
   )
   topology.process(context, first_block)
   topology.process(context, second_block)
@@ -1085,7 +1095,8 @@ test "compiled graph topology edit rewires rebuilt mono graphs" {
   assert_true(
     topology.queue_topology_edit(
       GraphTopologyEdit::rewire_input(4, GraphTopologyInputSlot::Input1, 0),
-    ),
+    )
+    is Ok(_),
   )
   topology.process(context, first_block)
   topology.process(context, second_block)
@@ -1121,7 +1132,8 @@ test "compiled graph topology edit inserts rebuilt mono graphs" {
         GraphTopologyInputSlot::Input0,
         DspNode::gain(0, HALF_GAIN),
       ),
-    ),
+    )
+    is Ok(_),
   )
   topology.process(context, first_block)
   topology.process(context, second_block)
@@ -1157,7 +1169,8 @@ test "compiled graph topology edit deletes rebuilt mono graphs" {
   assert_true(
     topology.queue_topology_edit(
       GraphTopologyEdit::delete_node(1, 2, GraphTopologyInputSlot::Input0, 1),
-    ),
+    )
+    is Ok(_),
   )
   topology.process(context, first_block)
   topology.process(context, second_block)
@@ -1196,7 +1209,8 @@ test "compiled graph topology edit insert delete roundtrip restores rebuilt mono
         GraphTopologyInputSlot::Input0,
         DspNode::gain(0, HALF_GAIN),
       ),
-    ),
+    )
+    is Ok(_),
   )
   topology.process(context, insert_first_block)
   topology.process(context, insert_second_block)
@@ -1205,7 +1219,8 @@ test "compiled graph topology edit insert delete roundtrip restores rebuilt mono
   assert_true(
     topology.queue_topology_edit(
       GraphTopologyEdit::delete_node(2, 1, GraphTopologyInputSlot::Input0, 2),
-    ),
+    )
+    is Ok(_),
   )
   topology.process(context, delete_first_block)
   topology.process(context, delete_second_block)
@@ -1264,7 +1279,7 @@ test "compiled stereo graph hot swap preserves bounded stereo output" {
   let settled_left = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
   let settled_right = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
 
-  assert_true(hot_swap.queue_swap(replacement))
+  assert_true(hot_swap.queue_swap(replacement) is Ok(_))
   hot_swap.process(context, first_left, first_right)
   hot_swap.process(context, second_left, second_right)
   hot_swap.process(context, settled_left, settled_right)
@@ -1355,12 +1370,14 @@ test "compiled stereo graph topology edit crossfades rebuilt stereo graphs" {
         1,
         DspNode::pan(0, GRAPH_STEREO_HARD_RIGHT),
       ),
-    ),
+    )
+    is Ok(_),
   )
   assert_true(
     topology.apply_control(
       GraphControl::set_param(1, GraphParamSlot::Value0, GRAPH_STEREO_HARD_LEFT),
-    ),
+    )
+    is Ok(_),
   )
   topology.process(context, first_left, first_right)
   topology.process(context, second_left, second_right)
@@ -1425,7 +1442,7 @@ test "compiled graph voice path stays coherent across gates and runtime updates"
   let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
   let output = AudioBuffer::filled(GRAPH_VOICE_BLOCK_SIZE)
 
-  assert_true(compiled.apply_control(GraphControl::gate_on(6)))
+  assert_true(compiled.apply_control(GraphControl::gate_on(6)) is Ok(_))
   compiled.process(context, output)
 
   assert_true(
@@ -1436,7 +1453,8 @@ test "compiled graph voice path stays coherent across gates and runtime updates"
   assert_true(
     compiled.apply_control(
       GraphControl::set_param(3, GraphParamSlot::Value0, 0.0),
-    ),
+    )
+    is Ok(_),
   )
   compiled.process(context, output)
 
@@ -1449,7 +1467,8 @@ test "compiled graph voice path stays coherent across gates and runtime updates"
   assert_true(
     compiled.apply_control(
       GraphControl::set_param(3, GraphParamSlot::Value0, GRAPH_VOICE_GAIN),
-    ),
+    )
+    is Ok(_),
   )
   assert_true(
     compiled.apply_control(
@@ -1458,7 +1477,8 @@ test "compiled graph voice path stays coherent across gates and runtime updates"
         GraphParamSlot::DelaySamples,
         GRAPH_VOICE_DELAY_SAMPLES_DOUBLE,
       ),
-    ),
+    )
+    is Ok(_),
   )
   compiled.process(context, output)
 
@@ -1467,7 +1487,7 @@ test "compiled graph voice path stays coherent across gates and runtime updates"
   )
   assert_true(integration_any_non_zero(output))
 
-  assert_true(compiled.apply_control(GraphControl::gate_off(6)))
+  assert_true(compiled.apply_control(GraphControl::gate_off(6)) is Ok(_))
   compiled.process(context, output)
 
   assert_true(
@@ -1523,7 +1543,8 @@ test "compiled graph control frames apply batched runtime changes per block" {
     compiled.apply_controls([
       GraphControl::gate_on(6),
       GraphControl::set_param(3, GraphParamSlot::Value0, 0.0),
-    ]),
+    ])
+    is Ok(_),
   )
   compiled.process(context, output)
 
@@ -1536,7 +1557,8 @@ test "compiled graph control frames apply batched runtime changes per block" {
     compiled.apply_controls([
       GraphControl::set_param(3, GraphParamSlot::Value0, GRAPH_VOICE_GAIN),
       GraphControl::set_param(2, GraphParamSlot::DelaySamples, 0.0),
-    ]),
+    ])
+    is Ok(_),
   )
   compiled.process(context, output)
 
@@ -1545,7 +1567,7 @@ test "compiled graph control frames apply batched runtime changes per block" {
   )
   assert_true(integration_any_non_zero(output))
 
-  assert_true(compiled.apply_controls([GraphControl::gate_off(6)]))
+  assert_true(compiled.apply_controls([GraphControl::gate_off(6)]) is Ok(_))
   compiled.process(context, output)
 
   assert_true(
@@ -1623,7 +1645,8 @@ test "compiled graph multi-source path responds to runtime biquad retune" {
         GraphParamSlot::Value0,
         GRAPH_MULTI_SOURCE_RETUNED_CUTOFF,
       ),
-    ),
+    )
+    is Ok(_),
   )
 
   baseline.process(context, baseline_output)
@@ -1684,7 +1707,8 @@ test "compiled graph runtime high-pass retune changes output directionally" {
         GraphParamSlot::Value0,
         GRAPH_HIGHPASS_RETUNED_CUTOFF,
       ),
-    ),
+    )
+    is Ok(_),
   )
 
   baseline.process(context, baseline_output)
@@ -1748,7 +1772,8 @@ test "compiled graph runtime band-pass retune changes output" {
         GraphParamSlot::Value0,
         GRAPH_BANDPASS_RETUNED_CUTOFF,
       ),
-    ),
+    )
+    is Ok(_),
   )
 
   baseline.process(context, baseline_output)

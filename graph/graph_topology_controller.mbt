@@ -106,15 +106,6 @@ pub fn CompiledDspTopologyController::from_nodes(
 fn TopologyGraph::apply_control_impl(
   self : TopologyGraph,
   control : GraphControl,
-) -> Bool {
-  self.apply_control_result_impl(control) is Ok(_)
-}
-
-///|
-/// Apply one runtime control message to the active or in-flight graph.
-fn TopologyGraph::apply_control_result_impl(
-  self : TopologyGraph,
-  control : GraphControl,
 ) -> Result[Unit, GraphControlError] {
   let updated_authoring_nodes = match
     topology_control_updated_nodes_result(
@@ -125,7 +116,7 @@ fn TopologyGraph::apply_control_result_impl(
     Ok(updated_authoring_nodes) => updated_authoring_nodes
     Err(error) => return Err(error)
   }
-  match self.hot_swap.apply_control_result_impl(control) {
+  match self.hot_swap.apply_control_impl(control) {
     Ok(_) => ()
     Err(error) => return Err(error)
   }
@@ -138,15 +129,6 @@ fn TopologyGraph::apply_control_result_impl(
 fn TopologyGraph::apply_controls_impl(
   self : TopologyGraph,
   controls : Array[GraphControl],
-) -> Bool {
-  self.apply_controls_result_impl(controls) is Ok(_)
-}
-
-///|
-/// Apply a batch of runtime control messages to the active or in-flight graph.
-fn TopologyGraph::apply_controls_result_impl(
-  self : TopologyGraph,
-  controls : Array[GraphControl],
 ) -> Result[Unit, GraphControlError] {
   let updated_authoring_nodes = match
     topology_control_updated_nodes_result(
@@ -157,7 +139,7 @@ fn TopologyGraph::apply_controls_result_impl(
     Ok(updated_authoring_nodes) => updated_authoring_nodes
     Err(error) => return Err(error)
   }
-  match self.hot_swap.apply_controls_result_impl(controls) {
+  match self.hot_swap.apply_controls_impl(controls) {
     Ok(_) => ()
     Err(error) => return Err(error)
   }
@@ -171,18 +153,8 @@ fn TopologyGraph::queue_topology_edit_impl(
   self : TopologyGraph,
   edit : GraphTopologyEdit,
   compile_fn : (Array[DspNode], DspContext) -> CompiledGraph?,
-) -> Bool {
-  self.queue_topology_edit_result_impl(edit, compile_fn) is Ok(_)
-}
-
-///|
-/// Queue one topology edit for the next hot-swap recompilation.
-fn TopologyGraph::queue_topology_edit_result_impl(
-  self : TopologyGraph,
-  edit : GraphTopologyEdit,
-  compile_fn : (Array[DspNode], DspContext) -> CompiledGraph?,
 ) -> Result[Unit, GraphTopologyQueueError] {
-  self.queue_topology_edits_result_impl([edit], compile_fn)
+  self.queue_topology_edits_impl([edit], compile_fn)
 }
 
 ///|
@@ -191,19 +163,6 @@ fn TopologyGraph::queue_topology_edit_result_impl(
 /// The batch is transactional: invalid node indices or a recompilation failure
 /// reject the whole edit set and leave the current graph unchanged.
 fn TopologyGraph::queue_topology_edits_impl(
-  self : TopologyGraph,
-  edits : Array[GraphTopologyEdit],
-  compile_fn : (Array[DspNode], DspContext) -> CompiledGraph?,
-) -> Bool {
-  self.queue_topology_edits_result_impl(edits, compile_fn) is Ok(_)
-}
-
-///|
-/// Queue an ordered topology-edit batch.
-///
-/// The batch is transactional: invalid node indices or a recompilation failure
-/// reject the whole edit set and leave the current graph unchanged.
-fn TopologyGraph::queue_topology_edits_result_impl(
   self : TopologyGraph,
   edits : Array[GraphTopologyEdit],
   compile_fn : (Array[DspNode], DspContext) -> CompiledGraph?,
@@ -236,7 +195,7 @@ fn TopologyGraph::queue_topology_edits_result_impl(
   if !has_delete {
     copy_compiled_graph_state(self.hot_swap.active, replacement)
   }
-  match self.hot_swap.queue_swap_result_impl(replacement) {
+  match self.hot_swap.queue_swap_impl(replacement) {
     Ok(_) => ()
     Err(error) => return Err(GraphTopologyQueueError::HotSwap(error))
   }
@@ -249,17 +208,8 @@ fn TopologyGraph::queue_topology_edits_result_impl(
 pub fn CompiledDspTopologyController::queue_topology_edit(
   self : CompiledDspTopologyController,
   edit : GraphTopologyEdit,
-) -> Bool {
-  self.0.queue_topology_edit_impl(edit, compile_mono_graph)
-}
-
-///|
-/// Queue one topology edit for the next hot-swap recompilation.
-pub fn CompiledDspTopologyController::queue_topology_edit_result(
-  self : CompiledDspTopologyController,
-  edit : GraphTopologyEdit,
 ) -> Result[Unit, GraphTopologyQueueError] {
-  self.0.queue_topology_edit_result_impl(edit, compile_mono_graph)
+  self.0.queue_topology_edit_impl(edit, compile_mono_graph)
 }
 
 ///|
@@ -270,20 +220,8 @@ pub fn CompiledDspTopologyController::queue_topology_edit_result(
 pub fn CompiledDspTopologyController::queue_topology_edits(
   self : CompiledDspTopologyController,
   edits : Array[GraphTopologyEdit],
-) -> Bool {
-  self.0.queue_topology_edits_impl(edits, compile_mono_graph)
-}
-
-///|
-/// Queue an ordered topology-edit batch.
-///
-/// The batch is transactional: invalid node indices or a recompilation failure
-/// reject the whole edit set and leave the current graph unchanged.
-pub fn CompiledDspTopologyController::queue_topology_edits_result(
-  self : CompiledDspTopologyController,
-  edits : Array[GraphTopologyEdit],
 ) -> Result[Unit, GraphTopologyQueueError] {
-  self.0.queue_topology_edits_result_impl(edits, compile_mono_graph)
+  self.0.queue_topology_edits_impl(edits, compile_mono_graph)
 }
 
 ///|
@@ -328,17 +266,8 @@ pub fn CompiledStereoDspTopologyController::from_nodes(
 pub fn CompiledStereoDspTopologyController::queue_topology_edit(
   self : CompiledStereoDspTopologyController,
   edit : GraphTopologyEdit,
-) -> Bool {
-  self.0.queue_topology_edit_impl(edit, compile_stereo_graph)
-}
-
-///|
-/// Queue one topology edit for the next stereo hot-swap recompilation.
-pub fn CompiledStereoDspTopologyController::queue_topology_edit_result(
-  self : CompiledStereoDspTopologyController,
-  edit : GraphTopologyEdit,
 ) -> Result[Unit, GraphTopologyQueueError] {
-  self.0.queue_topology_edit_result_impl(edit, compile_stereo_graph)
+  self.0.queue_topology_edit_impl(edit, compile_stereo_graph)
 }
 
 ///|
@@ -349,20 +278,8 @@ pub fn CompiledStereoDspTopologyController::queue_topology_edit_result(
 pub fn CompiledStereoDspTopologyController::queue_topology_edits(
   self : CompiledStereoDspTopologyController,
   edits : Array[GraphTopologyEdit],
-) -> Bool {
-  self.0.queue_topology_edits_impl(edits, compile_stereo_graph)
-}
-
-///|
-/// Queue an ordered stereo topology-edit batch.
-///
-/// The batch is transactional: invalid node indices or a recompilation failure
-/// reject the whole edit set and leave the current graph unchanged.
-pub fn CompiledStereoDspTopologyController::queue_topology_edits_result(
-  self : CompiledStereoDspTopologyController,
-  edits : Array[GraphTopologyEdit],
 ) -> Result[Unit, GraphTopologyQueueError] {
-  self.0.queue_topology_edits_result_impl(edits, compile_stereo_graph)
+  self.0.queue_topology_edits_impl(edits, compile_stereo_graph)
 }
 
 ///|

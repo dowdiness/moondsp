@@ -105,7 +105,7 @@ test "compiled dsp applies adsr envelope through multiply" {
   let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
-  assert_true(compiled.apply_control(GraphControl::gate_on(2)))
+  assert_true(compiled.apply_control(GraphControl::gate_on(2)) is Ok(_))
   compiled.process(context, output)
 
   @debug.assert_eq(output.get(0), UNIT_SAMPLE)
@@ -113,7 +113,7 @@ test "compiled dsp applies adsr envelope through multiply" {
   @debug.assert_eq(output.get(2), ADSR_SUSTAIN_LEVEL)
   @debug.assert_eq(output.get(3), ADSR_SUSTAIN_LEVEL)
 
-  assert_true(compiled.apply_control(GraphControl::gate_off(2)))
+  assert_true(compiled.apply_control(GraphControl::gate_off(2)) is Ok(_))
   compiled.process(context, output)
 
   @debug.assert_eq(output.get(0), 0.125)
@@ -149,7 +149,7 @@ test "compiled dsp resets adsr state on invalid context" {
   ).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
-  assert_true(compiled.apply_control(GraphControl::gate_on(2)))
+  assert_true(compiled.apply_control(GraphControl::gate_on(2)) is Ok(_))
   compiled.process(valid_context, output)
   compiled.process(invalid_context, output)
   compiled.process(valid_context, output)

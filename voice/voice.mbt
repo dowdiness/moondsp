@@ -499,7 +499,7 @@ pub fn VoicePool::note_on(
   // WHY transactional: if any param is invalid, the voice is not activated.
   // This prevents partially-configured voices with default/stale settings.
   if params.length() > 0 {
-    if !compiled.apply_controls(params) {
+    if compiled.apply_controls(params) is Err(_) {
       return None
     }
   }
@@ -628,7 +628,7 @@ fn VoicePool::validate_voice_controls_result(
     Ok(compiled) => compiled
     Err(error) => return Err(error)
   }
-  match compiled.validate_controls_result(controls) {
+  match compiled.validate_controls(controls) {
     Ok(_) => Ok(())
     Err(error) => Err(VoiceControlError::Graph(error))
   }
@@ -644,7 +644,7 @@ fn VoicePool::apply_voice_controls_result(
     Ok(compiled) => compiled
     Err(error) => return Err(error)
   }
-  match compiled.apply_controls_result(controls) {
+  match compiled.apply_controls(controls) {
     Ok(_) => Ok(())
     Err(error) => Err(VoiceControlError::Graph(error))
   }
