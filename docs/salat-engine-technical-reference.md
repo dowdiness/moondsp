@@ -890,7 +890,7 @@ Current semantics:
   active voice identifier; stale identifiers and invalid control changes are
   rejected without changing the voice-pool template or bindings
 - each `VoicePool::note_on(...)` compiles the already analyzed template through
-  `CompiledDsp::compile_template(...)`, so per-voice graph creation reuses the
+  `CompiledDsp::compile(template, ctx)`, so per-voice graph creation reuses the
   optimized nodes captured during template validation
 - `PatternScheduler` stores tempo, sample position, a `DspContext`, active note
   handles, a `ControlMapper`, and an optional active + pending

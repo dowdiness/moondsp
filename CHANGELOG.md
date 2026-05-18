@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.4.0] - 2026-05-17
+## [0.4.0] - 2026-05-18
 
 This release bundles two breaking refactors of the graph public API:
 
@@ -138,6 +138,22 @@ Common assertion-rewrite patterns:
   trait methods on `NodeEditable` / `NodeFoldable` / `NodeStateful`,
   the module-level `is_finite`) are unaffected.
 
+### Breaking changes — `dsp` visibility tightening
+
+- **`EnvStage` enum tightened from `pub(all)` to `pub`.** External
+  `is EnvStage::X` pattern matching continues to work per MoonBit
+  access-control rules (`pub` types remain readable / destructurable from
+  outside the package). External *construction* of `EnvStage` variants is
+  no longer permitted; downstream code that needs an `EnvStage` value
+  should read it from `Adsr::stage(self)`. No call site in the workspace
+  constructed `EnvStage` variants externally.
+- **`ChannelSpec` trait tightened from `pub(open)` to `pub`.** Only `Mono`
+  and `Stereo` implement `ChannelSpec`, both inside `dsp/`. Downstream
+  packages can no longer add their own `ChannelSpec` impls. The
+  tagless-algebra traits (`ArithSym`, `DspSym`, `FilterSym`, `StereoSym`,
+  `DelaySym`, `StereoFilterSym`, `StereoDelaySym`) stay `pub(open)` —
+  alternate interpreters like `GraphBuilder` need them.
+
 ### Added
 
 - `CompiledTemplate::adsr_authoring_indices(Self) -> FixedArray[Int]` —
@@ -150,6 +166,27 @@ Common assertion-rewrite patterns:
   composing the two error types.
 - `VoicePoolError` re-exported through the root `@moondsp` facade so
   consumers can pattern-match `VoicePool::new` Results ergonomically.
+
+### Performance — `dsp` per-block hoisting
+
+- **`Adsr::process` no longer re-validates `sample_rate` per sample.**
+  Validation runs once at block entry; a new private `Adsr::tick_step`
+  stepper assumes a finite positive `sample_rate` and is called directly
+  inside the per-sample loop. The public `Adsr::tick(context)` retains
+  its full validation contract for direct callers.
+- **`Oscillator::process_waveform` hoists `freq_hz / sample_rate` out of
+  the per-sample loop.** A new private
+  `Oscillator::tick_step(waveform, phase_increment)` is called inside the
+  loop, eliminating both per-sample validation and per-sample division.
+  Added a guard on the quotient: the buffer is silenced if
+  `phase_increment` is non-finite (e.g. `Double::MAX / Double::MIN_POSITIVE`
+  → `Inf`), matching dsp's existing fill-0-on-invalid pattern. This also
+  closes a latent NaN-poisoning hole in `tick_waveform` that has existed
+  since v0.1.0 — pathological quotients used to propagate into the
+  oscillator phase and silence the rest of the block via NaN arithmetic.
+- Replaced the magic literal `6.283185307179586` with `2.0 * @math.PI` in
+  `sample_for_phase`, matching the convention in `filter.mbt` and
+  `pan.mbt`.
 
 ### Carve-outs (NOT migrated — see ADR-0010 § Boundary exceptions)
 
