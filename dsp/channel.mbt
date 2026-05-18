@@ -1,5 +1,5 @@
 ///|
-pub(open) trait ChannelSpec {
+pub trait ChannelSpec {
   channel_count(Self) -> Int
 }
 

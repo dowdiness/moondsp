@@ -107,7 +107,7 @@ pub fn DspContext::block_size(Self) -> Int
 pub fn DspContext::make_buffer(Self, init? : Double) -> AudioBuffer
 pub fn DspContext::sample_rate(Self) -> Double
 
-pub(all) enum EnvStage {
+pub enum EnvStage {
   Idle
   Attack
   Decay
@@ -198,7 +198,7 @@ pub(open) trait ArithSym {
   clip(Self, Double) -> Self
 }
 
-pub(open) trait ChannelSpec {
+pub trait ChannelSpec {
   channel_count(Self) -> Int
 }
 
