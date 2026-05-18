@@ -1,5 +1,5 @@
 ///|
-/// Failure reason for result-typed runtime graph control APIs.
+/// Failure reason for runtime graph control APIs.
 pub(all) enum GraphControlError {
   InvalidNodeIndex(Int)
   /// The authoring node existed but was eliminated by graph optimization.
@@ -17,92 +17,59 @@ pub impl Show for GraphControlError with output(self, logger) {
 
 ///|
 /// Trigger `gate_on()` on an ADSR node using its original authoring index.
-///
-/// Compatibility helper; prefer `apply_control(GraphControl::gate_on(...))`.
-pub fn CompiledDsp::gate_on(self : CompiledDsp, node_index : Int) -> Bool {
-  self.gate_on_result(node_index) is Ok(_)
-}
-
-///|
-/// Result-typed companion to `gate_on(...)`.
-pub fn CompiledDsp::gate_on_result(
+pub fn CompiledDsp::gate_on(
   self : CompiledDsp,
   node_index : Int,
 ) -> Result[Unit, GraphControlError] {
-  self.apply_control_result(GraphControl::gate_on(node_index))
+  self.apply_control(GraphControl::gate_on(node_index))
 }
 
 ///|
 /// Trigger `gate_off()` on an ADSR node using its original authoring index.
-///
-/// Compatibility helper; prefer `apply_control(GraphControl::gate_off(...))`.
-pub fn CompiledDsp::gate_off(self : CompiledDsp, node_index : Int) -> Bool {
-  self.gate_off_result(node_index) is Ok(_)
-}
-
-///|
-/// Result-typed companion to `gate_off(...)`.
-pub fn CompiledDsp::gate_off_result(
+pub fn CompiledDsp::gate_off(
   self : CompiledDsp,
   node_index : Int,
 ) -> Result[Unit, GraphControlError] {
-  self.apply_control_result(GraphControl::gate_off(node_index))
+  self.apply_control(GraphControl::gate_off(node_index))
 }
 
 ///|
 /// Update a runtime parameter on a compiled node using its original authoring
 /// index.
-///
-/// Returns `false` when the node index is invalid, the slot is unsupported for
-/// that node kind, or the new value is invalid for that slot.
-///
-/// Compatibility helper; prefer
-/// `apply_control(GraphControl::set_param(...))`.
 pub fn CompiledDsp::set_param(
   self : CompiledDsp,
   node_index : Int,
   slot : GraphParamSlot,
   value : Double,
-) -> Bool {
-  self.set_param_result(node_index, slot, value) is Ok(_)
-}
-
-///|
-/// Result-typed companion to `set_param(...)`.
-pub fn CompiledDsp::set_param_result(
-  self : CompiledDsp,
-  node_index : Int,
-  slot : GraphParamSlot,
-  value : Double,
 ) -> Result[Unit, GraphControlError] {
-  self.apply_control_result(GraphControl::set_param(node_index, slot, value))
+  self.apply_control(GraphControl::set_param(node_index, slot, value))
 }
 
 ///|
 /// Apply one runtime control message, returning a specific rejection reason.
-pub fn CompiledDsp::apply_control_result(
+pub fn CompiledDsp::apply_control(
   self : CompiledDsp,
   control : GraphControl,
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_control_result_impl(control)
+  self.0.apply_control_impl(control)
 }
 
 ///|
 /// Apply a runtime control batch transactionally.
-pub fn CompiledDsp::apply_controls_result(
+pub fn CompiledDsp::apply_controls(
   self : CompiledDsp,
   controls : Array[GraphControl],
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_controls_result_impl(controls)
+  self.0.apply_controls_impl(controls)
 }
 
 ///|
 /// Validate a runtime control batch without mutating the compiled graph.
-pub fn CompiledDsp::validate_controls_result(
+pub fn CompiledDsp::validate_controls(
   self : CompiledDsp,
   controls : Array[GraphControl],
 ) -> Result[Unit, GraphControlError] {
-  self.0.validate_controls_result_impl(controls)
+  self.0.validate_controls_impl(controls)
 }
 
 ///|
@@ -145,17 +112,8 @@ pub fn CompiledDsp::is_voice_finished(self : CompiledDsp) -> Bool {
 pub fn CompiledStereoDsp::gate_on(
   self : CompiledStereoDsp,
   node_index : Int,
-) -> Bool {
-  self.gate_on_result(node_index) is Ok(_)
-}
-
-///|
-/// Result-typed companion to `gate_on(...)`.
-pub fn CompiledStereoDsp::gate_on_result(
-  self : CompiledStereoDsp,
-  node_index : Int,
 ) -> Result[Unit, GraphControlError] {
-  self.apply_control_result(GraphControl::gate_on(node_index))
+  self.apply_control(GraphControl::gate_on(node_index))
 }
 
 ///|
@@ -164,17 +122,8 @@ pub fn CompiledStereoDsp::gate_on_result(
 pub fn CompiledStereoDsp::gate_off(
   self : CompiledStereoDsp,
   node_index : Int,
-) -> Bool {
-  self.gate_off_result(node_index) is Ok(_)
-}
-
-///|
-/// Result-typed companion to `gate_off(...)`.
-pub fn CompiledStereoDsp::gate_off_result(
-  self : CompiledStereoDsp,
-  node_index : Int,
 ) -> Result[Unit, GraphControlError] {
-  self.apply_control_result(GraphControl::gate_off(node_index))
+  self.apply_control(GraphControl::gate_off(node_index))
 }
 
 ///|
@@ -185,251 +134,228 @@ pub fn CompiledStereoDsp::set_param(
   node_index : Int,
   slot : GraphParamSlot,
   value : Double,
-) -> Bool {
-  self.set_param_result(node_index, slot, value) is Ok(_)
-}
-
-///|
-/// Result-typed companion to `set_param(...)`.
-pub fn CompiledStereoDsp::set_param_result(
-  self : CompiledStereoDsp,
-  node_index : Int,
-  slot : GraphParamSlot,
-  value : Double,
 ) -> Result[Unit, GraphControlError] {
-  self.apply_control_result(GraphControl::set_param(node_index, slot, value))
+  self.apply_control(GraphControl::set_param(node_index, slot, value))
 }
 
 ///|
 /// Apply one runtime control message, returning a specific rejection reason.
-pub fn CompiledStereoDsp::apply_control_result(
+pub fn CompiledStereoDsp::apply_control(
   self : CompiledStereoDsp,
   control : GraphControl,
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_control_result_impl(control)
+  self.0.apply_control_impl(control)
 }
 
 ///|
 /// Apply a runtime control batch transactionally.
-pub fn CompiledStereoDsp::apply_controls_result(
+pub fn CompiledStereoDsp::apply_controls(
   self : CompiledStereoDsp,
   controls : Array[GraphControl],
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_controls_result_impl(controls)
+  self.0.apply_controls_impl(controls)
 }
 
 ///|
 /// Validate a runtime control batch without mutating the compiled graph.
-pub fn CompiledStereoDsp::validate_controls_result(
+pub fn CompiledStereoDsp::validate_controls(
   self : CompiledStereoDsp,
   controls : Array[GraphControl],
 ) -> Result[Unit, GraphControlError] {
-  self.0.validate_controls_result_impl(controls)
+  self.0.validate_controls_impl(controls)
 }
 
 ///|
-/// Result-typed companion for runtime gate-on through a mono hot-swap wrapper.
-pub fn CompiledDspHotSwap::gate_on_result(
+/// Trigger runtime gate-on through a mono hot-swap wrapper.
+pub fn CompiledDspHotSwap::gate_on(
   self : CompiledDspHotSwap,
   node_index : Int,
 ) -> Result[Unit, GraphControlError] {
-  self.apply_control_result(GraphControl::gate_on(node_index))
+  self.apply_control(GraphControl::gate_on(node_index))
 }
 
 ///|
-/// Result-typed companion for runtime gate-off through a mono hot-swap wrapper.
-pub fn CompiledDspHotSwap::gate_off_result(
+/// Trigger runtime gate-off through a mono hot-swap wrapper.
+pub fn CompiledDspHotSwap::gate_off(
   self : CompiledDspHotSwap,
   node_index : Int,
 ) -> Result[Unit, GraphControlError] {
-  self.apply_control_result(GraphControl::gate_off(node_index))
+  self.apply_control(GraphControl::gate_off(node_index))
 }
 
 ///|
-/// Result-typed companion for runtime parameter updates through a mono
-/// hot-swap wrapper.
-pub fn CompiledDspHotSwap::set_param_result(
+/// Update a runtime parameter through a mono hot-swap wrapper.
+pub fn CompiledDspHotSwap::set_param(
   self : CompiledDspHotSwap,
   node_index : Int,
   slot : GraphParamSlot,
   value : Double,
 ) -> Result[Unit, GraphControlError] {
-  self.apply_control_result(GraphControl::set_param(node_index, slot, value))
+  self.apply_control(GraphControl::set_param(node_index, slot, value))
 }
 
 ///|
 /// Apply one runtime control message through a mono hot-swap wrapper.
-pub fn CompiledDspHotSwap::apply_control_result(
+pub fn CompiledDspHotSwap::apply_control(
   self : CompiledDspHotSwap,
   control : GraphControl,
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_control_result_impl(control)
+  self.0.apply_control_impl(control)
 }
 
 ///|
 /// Apply a runtime control batch transactionally through a mono hot-swap wrapper.
-pub fn CompiledDspHotSwap::apply_controls_result(
+pub fn CompiledDspHotSwap::apply_controls(
   self : CompiledDspHotSwap,
   controls : Array[GraphControl],
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_controls_result_impl(controls)
+  self.0.apply_controls_impl(controls)
 }
 
 ///|
-/// Result-typed companion for runtime gate-on through a stereo hot-swap wrapper.
-pub fn CompiledStereoDspHotSwap::gate_on_result(
+/// Trigger runtime gate-on through a stereo hot-swap wrapper.
+pub fn CompiledStereoDspHotSwap::gate_on(
   self : CompiledStereoDspHotSwap,
   node_index : Int,
 ) -> Result[Unit, GraphControlError] {
-  self.apply_control_result(GraphControl::gate_on(node_index))
+  self.apply_control(GraphControl::gate_on(node_index))
 }
 
 ///|
-/// Result-typed companion for runtime gate-off through a stereo hot-swap wrapper.
-pub fn CompiledStereoDspHotSwap::gate_off_result(
+/// Trigger runtime gate-off through a stereo hot-swap wrapper.
+pub fn CompiledStereoDspHotSwap::gate_off(
   self : CompiledStereoDspHotSwap,
   node_index : Int,
 ) -> Result[Unit, GraphControlError] {
-  self.apply_control_result(GraphControl::gate_off(node_index))
+  self.apply_control(GraphControl::gate_off(node_index))
 }
 
 ///|
-/// Result-typed companion for runtime parameter updates through a stereo
-/// hot-swap wrapper.
-pub fn CompiledStereoDspHotSwap::set_param_result(
+/// Update a runtime parameter through a stereo hot-swap wrapper.
+pub fn CompiledStereoDspHotSwap::set_param(
   self : CompiledStereoDspHotSwap,
   node_index : Int,
   slot : GraphParamSlot,
   value : Double,
 ) -> Result[Unit, GraphControlError] {
-  self.apply_control_result(GraphControl::set_param(node_index, slot, value))
+  self.apply_control(GraphControl::set_param(node_index, slot, value))
 }
 
 ///|
 /// Apply one runtime control message through a stereo hot-swap wrapper.
-pub fn CompiledStereoDspHotSwap::apply_control_result(
+pub fn CompiledStereoDspHotSwap::apply_control(
   self : CompiledStereoDspHotSwap,
   control : GraphControl,
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_control_result_impl(control)
+  self.0.apply_control_impl(control)
 }
 
 ///|
 /// Apply a runtime control batch transactionally through a stereo hot-swap wrapper.
-pub fn CompiledStereoDspHotSwap::apply_controls_result(
+pub fn CompiledStereoDspHotSwap::apply_controls(
   self : CompiledStereoDspHotSwap,
   controls : Array[GraphControl],
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_controls_result_impl(controls)
+  self.0.apply_controls_impl(controls)
 }
 
 ///|
-/// Result-typed companion for runtime gate-on through a mono topology controller.
-pub fn CompiledDspTopologyController::gate_on_result(
+/// Trigger runtime gate-on through a mono topology controller.
+pub fn CompiledDspTopologyController::gate_on(
   self : CompiledDspTopologyController,
   node_index : Int,
 ) -> Result[Unit, GraphControlError] {
-  self.apply_control_result(GraphControl::gate_on(node_index))
+  self.apply_control(GraphControl::gate_on(node_index))
 }
 
 ///|
-/// Result-typed companion for runtime gate-off through a mono topology controller.
-pub fn CompiledDspTopologyController::gate_off_result(
+/// Trigger runtime gate-off through a mono topology controller.
+pub fn CompiledDspTopologyController::gate_off(
   self : CompiledDspTopologyController,
   node_index : Int,
 ) -> Result[Unit, GraphControlError] {
-  self.apply_control_result(GraphControl::gate_off(node_index))
+  self.apply_control(GraphControl::gate_off(node_index))
 }
 
 ///|
-/// Result-typed companion for runtime parameter updates through a mono
-/// topology controller.
-pub fn CompiledDspTopologyController::set_param_result(
+/// Update a runtime parameter through a mono topology controller.
+pub fn CompiledDspTopologyController::set_param(
   self : CompiledDspTopologyController,
   node_index : Int,
   slot : GraphParamSlot,
   value : Double,
 ) -> Result[Unit, GraphControlError] {
-  self.apply_control_result(GraphControl::set_param(node_index, slot, value))
+  self.apply_control(GraphControl::set_param(node_index, slot, value))
 }
 
 ///|
 /// Apply one runtime control message through a mono topology controller.
-pub fn CompiledDspTopologyController::apply_control_result(
+pub fn CompiledDspTopologyController::apply_control(
   self : CompiledDspTopologyController,
   control : GraphControl,
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_control_result_impl(control)
+  self.0.apply_control_impl(control)
 }
 
 ///|
 /// Apply a runtime control batch transactionally through a mono topology controller.
-pub fn CompiledDspTopologyController::apply_controls_result(
+pub fn CompiledDspTopologyController::apply_controls(
   self : CompiledDspTopologyController,
   controls : Array[GraphControl],
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_controls_result_impl(controls)
+  self.0.apply_controls_impl(controls)
 }
 
 ///|
-/// Result-typed companion for runtime gate-on through a stereo topology controller.
-pub fn CompiledStereoDspTopologyController::gate_on_result(
+/// Trigger runtime gate-on through a stereo topology controller.
+pub fn CompiledStereoDspTopologyController::gate_on(
   self : CompiledStereoDspTopologyController,
   node_index : Int,
 ) -> Result[Unit, GraphControlError] {
-  self.apply_control_result(GraphControl::gate_on(node_index))
+  self.apply_control(GraphControl::gate_on(node_index))
 }
 
 ///|
-/// Result-typed companion for runtime gate-off through a stereo topology controller.
-pub fn CompiledStereoDspTopologyController::gate_off_result(
+/// Trigger runtime gate-off through a stereo topology controller.
+pub fn CompiledStereoDspTopologyController::gate_off(
   self : CompiledStereoDspTopologyController,
   node_index : Int,
 ) -> Result[Unit, GraphControlError] {
-  self.apply_control_result(GraphControl::gate_off(node_index))
+  self.apply_control(GraphControl::gate_off(node_index))
 }
 
 ///|
-/// Result-typed companion for runtime parameter updates through a stereo
-/// topology controller.
-pub fn CompiledStereoDspTopologyController::set_param_result(
+/// Update a runtime parameter through a stereo topology controller.
+pub fn CompiledStereoDspTopologyController::set_param(
   self : CompiledStereoDspTopologyController,
   node_index : Int,
   slot : GraphParamSlot,
   value : Double,
 ) -> Result[Unit, GraphControlError] {
-  self.apply_control_result(GraphControl::set_param(node_index, slot, value))
+  self.apply_control(GraphControl::set_param(node_index, slot, value))
 }
 
 ///|
 /// Apply one runtime control message through a stereo topology controller.
-pub fn CompiledStereoDspTopologyController::apply_control_result(
+pub fn CompiledStereoDspTopologyController::apply_control(
   self : CompiledStereoDspTopologyController,
   control : GraphControl,
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_control_result_impl(control)
+  self.0.apply_control_impl(control)
 }
 
 ///|
 /// Apply a runtime control batch transactionally through a stereo topology
 /// controller.
-pub fn CompiledStereoDspTopologyController::apply_controls_result(
+pub fn CompiledStereoDspTopologyController::apply_controls(
   self : CompiledStereoDspTopologyController,
   controls : Array[GraphControl],
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_controls_result_impl(controls)
+  self.0.apply_controls_impl(controls)
 }
 
 ///|
 fn CompiledGraph::apply_control_impl(
-  self : CompiledGraph,
-  control : GraphControl,
-) -> Bool {
-  self.apply_control_result_impl(control) is Ok(_)
-}
-
-///|
-fn CompiledGraph::apply_control_result_impl(
   self : CompiledGraph,
   control : GraphControl,
 ) -> Result[Unit, GraphControlError] {
@@ -450,22 +376,14 @@ fn CompiledGraph::apply_control_result_impl(
 fn CompiledGraph::apply_controls_impl(
   self : CompiledGraph,
   controls : Array[GraphControl],
-) -> Bool {
-  self.apply_controls_result_impl(controls) is Ok(_)
-}
-
-///|
-fn CompiledGraph::apply_controls_result_impl(
-  self : CompiledGraph,
-  controls : Array[GraphControl],
 ) -> Result[Unit, GraphControlError] {
-  match self.validate_controls_result_impl(controls) {
+  match self.validate_controls_impl(controls) {
     Ok(_) => ()
     Err(error) => return Err(error)
   }
 
   for index = 0; index < controls.length(); index = index + 1 {
-    match self.apply_control_result_impl(controls[index]) {
+    match self.apply_control_impl(controls[index]) {
       Ok(_) => ()
       Err(error) => return Err(error)
     }
@@ -474,7 +392,7 @@ fn CompiledGraph::apply_controls_result_impl(
 }
 
 ///|
-fn CompiledGraph::validate_controls_result_impl(
+fn CompiledGraph::validate_controls_impl(
   self : CompiledGraph,
   controls : Array[GraphControl],
 ) -> Result[Unit, GraphControlError] {

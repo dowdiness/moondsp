@@ -487,8 +487,9 @@ test "prop: mono ADSR graph — compile twice, process identically" {
         CompiledTemplate::analyze(nodes),
         context,
       ).unwrap()
-      ignore(compiled_a.gate_on(0))
-      ignore(compiled_b.gate_on(0))
+      if compiled_a.gate_on(0) is Err(_) || compiled_b.gate_on(0) is Err(_) {
+        return false
+      }
       let out_a = AudioBuffer::filled(PROP_BLOCK_SIZE)
       let out_b = AudioBuffer::filled(PROP_BLOCK_SIZE)
       let mut identical = true
@@ -499,8 +500,9 @@ test "prop: mono ADSR graph — compile twice, process identically" {
           identical = false
         }
       }
-      ignore(compiled_a.gate_off(0))
-      ignore(compiled_b.gate_off(0))
+      if compiled_a.gate_off(0) is Err(_) || compiled_b.gate_off(0) is Err(_) {
+        return false
+      }
       for _block = 0; _block < PROP_NUM_BLOCKS; _block = _block + 1 {
         compiled_a.process(context, out_a)
         compiled_b.process(context, out_b)
@@ -577,16 +579,16 @@ test "prop: mono feedback cycle — runtime retune is deterministic" {
       if !buffers_identical(out_a, out_b, PROP_BLOCK_SIZE) {
         return false
       }
-      ignore(
-        compiled_a.apply_control(
+      if compiled_a.apply_control(
           GraphControl::set_param(gain_index, GraphParamSlot::Value0, new_gain),
-        ),
-      )
-      ignore(
+        )
+        is Err(_) ||
         compiled_b.apply_control(
           GraphControl::set_param(gain_index, GraphParamSlot::Value0, new_gain),
-        ),
-      )
+        )
+        is Err(_) {
+        return false
+      }
       compiled_a.process(context, out_a)
       compiled_b.process(context, out_b)
       buffers_identical(out_a, out_b, PROP_BLOCK_SIZE)
@@ -643,8 +645,10 @@ test "prop: mono hot-swap — same swap sequence produces identical output" {
       if !buffers_identical(out_a, out_b, PROP_BLOCK_SIZE) {
         return false
       }
-      ignore(hs_a.queue_swap(compile_mono(nodes_replacement)))
-      ignore(hs_b.queue_swap(compile_mono(nodes_replacement)))
+      if hs_a.queue_swap(compile_mono(nodes_replacement)) is Err(_) ||
+        hs_b.queue_swap(compile_mono(nodes_replacement)) is Err(_) {
+        return false
+      }
       let mut identical = true
       for _block = 0; _block < 4; _block = _block + 1 {
         hs_a.process(context, out_a)
@@ -689,8 +693,10 @@ test "prop: stereo hot-swap — same swap sequence produces identical output" {
         !buffers_identical(ra, rb, PROP_BLOCK_SIZE) {
         return false
       }
-      ignore(hs_a.queue_swap(compile_stereo(nodes_replacement)))
-      ignore(hs_b.queue_swap(compile_stereo(nodes_replacement)))
+      if hs_a.queue_swap(compile_stereo(nodes_replacement)) is Err(_) ||
+        hs_b.queue_swap(compile_stereo(nodes_replacement)) is Err(_) {
+        return false
+      }
       let mut identical = true
       for _block in 0..<4 {
         hs_a.process(context, la, ra)
@@ -735,16 +741,16 @@ test "prop: runtime param update is deterministic across compilations" {
         CompiledTemplate::analyze(nodes),
         context,
       ).unwrap()
-      ignore(
-        compiled_a.apply_control(
+      if compiled_a.apply_control(
           GraphControl::set_param(1, GraphParamSlot::Value0, new_gain),
-        ),
-      )
-      ignore(
+        )
+        is Err(_) ||
         compiled_b.apply_control(
           GraphControl::set_param(1, GraphParamSlot::Value0, new_gain),
-        ),
-      )
+        )
+        is Err(_) {
+        return false
+      }
       let out_a = AudioBuffer::filled(PROP_BLOCK_SIZE)
       let out_b = AudioBuffer::filled(PROP_BLOCK_SIZE)
       compiled_a.process(context, out_a)
@@ -796,26 +802,24 @@ test "prop: runtime control variants are deterministic" {
           ).unwrap()
           ca.process(context, out_a)
           cb.process(context, out_b)
-          ignore(
-            ca.apply_control(
+          if ca.apply_control(
               GraphControl::set_param(1, GraphParamSlot::Value0, new_cutoff),
-            ),
-          )
-          ignore(
+            )
+            is Err(_) ||
             cb.apply_control(
               GraphControl::set_param(1, GraphParamSlot::Value0, new_cutoff),
-            ),
-          )
-          ignore(
+            )
+            is Err(_) ||
             ca.apply_control(
               GraphControl::set_param(1, GraphParamSlot::Value1, new_q),
-            ),
-          )
-          ignore(
+            )
+            is Err(_) ||
             cb.apply_control(
               GraphControl::set_param(1, GraphParamSlot::Value1, new_q),
-            ),
-          )
+            )
+            is Err(_) {
+            return false
+          }
           ca.process(context, out_a)
           cb.process(context, out_b)
           buffers_identical(out_a, out_b, PROP_BLOCK_SIZE)
@@ -845,24 +849,24 @@ test "prop: runtime control variants are deterministic" {
           ).unwrap()
           ca.process(context, out_a)
           cb.process(context, out_b)
-          ignore(
-            ca.apply_control(
+          if ca.apply_control(
               GraphControl::set_param(
                 1,
                 GraphParamSlot::DelaySamples,
                 new_delay.to_double(),
               ),
-            ),
-          )
-          ignore(
+            )
+            is Err(_) ||
             cb.apply_control(
               GraphControl::set_param(
                 1,
                 GraphParamSlot::DelaySamples,
                 new_delay.to_double(),
               ),
-            ),
-          )
+            )
+            is Err(_) {
+            return false
+          }
           ca.process(context, out_a)
           cb.process(context, out_b)
           buffers_identical(out_a, out_b, PROP_BLOCK_SIZE)
@@ -887,15 +891,17 @@ test "prop: runtime control variants are deterministic" {
             CompiledTemplate::analyze(nodes),
             context,
           ).unwrap()
-          ignore(ca.gate_on(0))
-          ignore(cb.gate_on(0))
+          if ca.gate_on(0) is Err(_) || cb.gate_on(0) is Err(_) {
+            return false
+          }
           ca.process(context, out_a)
           cb.process(context, out_b)
           if !buffers_identical(out_a, out_b, PROP_BLOCK_SIZE) {
             return false
           }
-          ignore(ca.gate_off(0))
-          ignore(cb.gate_off(0))
+          if ca.gate_off(0) is Err(_) || cb.gate_off(0) is Err(_) {
+            return false
+          }
           ca.process(context, out_a)
           cb.process(context, out_b)
           buffers_identical(out_a, out_b, PROP_BLOCK_SIZE)

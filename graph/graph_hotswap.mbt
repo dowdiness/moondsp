@@ -48,18 +48,7 @@ pub impl Show for HotSwapQueueError with output(self, logger) {
 
 ///|
 /// Queue a new compiled graph, resetting the crossfade position.
-///
-/// Returns `false` when the replacement graph is incompatible with the active
-/// graph's compile-time sample rate or block capacity.
 fn HotSwapGraph::queue_swap_impl(
-  self : HotSwapGraph,
-  next : CompiledGraph,
-) -> Bool {
-  self.queue_swap_result_impl(next) is Ok(_)
-}
-
-///|
-fn HotSwapGraph::queue_swap_result_impl(
   self : HotSwapGraph,
   next : CompiledGraph,
 ) -> Result[Unit, HotSwapQueueError] {
@@ -88,18 +77,9 @@ fn HotSwapGraph::queue_swap_result_impl(
 fn HotSwapGraph::apply_control_impl(
   self : HotSwapGraph,
   control : GraphControl,
-) -> Bool {
-  self.apply_control_result_impl(control) is Ok(_)
-}
-
-///|
-/// Apply one runtime control message to the active (and pending) graph.
-fn HotSwapGraph::apply_control_result_impl(
-  self : HotSwapGraph,
-  control : GraphControl,
 ) -> Result[Unit, GraphControlError] {
   match self.pending {
-    None => self.active.apply_control_result_impl(control)
+    None => self.active.apply_control_impl(control)
     Some(next) => {
       match valid_hot_swap_control_graph_result(self.active, control) {
         Ok(_) => ()
@@ -109,11 +89,11 @@ fn HotSwapGraph::apply_control_result_impl(
         Ok(_) => ()
         Err(error) => return Err(error)
       }
-      match self.active.apply_control_result_impl(control) {
+      match self.active.apply_control_impl(control) {
         Ok(_) => ()
         Err(error) => return Err(error)
       }
-      match next.apply_control_result_impl(control) {
+      match next.apply_control_impl(control) {
         Ok(_) => ()
         Err(error) => return Err(error)
       }
@@ -127,18 +107,9 @@ fn HotSwapGraph::apply_control_result_impl(
 fn HotSwapGraph::apply_controls_impl(
   self : HotSwapGraph,
   controls : Array[GraphControl],
-) -> Bool {
-  self.apply_controls_result_impl(controls) is Ok(_)
-}
-
-///|
-/// Apply a batch of runtime control messages to the active (and pending) graph.
-fn HotSwapGraph::apply_controls_result_impl(
-  self : HotSwapGraph,
-  controls : Array[GraphControl],
 ) -> Result[Unit, GraphControlError] {
   match self.pending {
-    None => self.active.apply_controls_result_impl(controls)
+    None => self.active.apply_controls_impl(controls)
     Some(next) => {
       match valid_hot_swap_controls_graph_result(self.active, controls) {
         Ok(_) => ()
@@ -148,11 +119,11 @@ fn HotSwapGraph::apply_controls_result_impl(
         Ok(_) => ()
         Err(error) => return Err(error)
       }
-      match self.active.apply_controls_result_impl(controls) {
+      match self.active.apply_controls_impl(controls) {
         Ok(_) => ()
         Err(error) => return Err(error)
       }
-      match next.apply_controls_result_impl(controls) {
+      match next.apply_controls_impl(controls) {
         Ok(_) => ()
         Err(error) => return Err(error)
       }
@@ -186,22 +157,13 @@ pub fn CompiledDspHotSwap::from_graph(
 ///|
 /// Queue a replacement graph for the next `process(...)` call.
 ///
-/// Returns `false` when the replacement graph is incompatible with the active
+/// Returns an error when the replacement graph is incompatible with the active
 /// graph's compile-time sample rate or block capacity.
 pub fn CompiledDspHotSwap::queue_swap(
   self : CompiledDspHotSwap,
   next : CompiledDsp,
-) -> Bool {
-  self.0.queue_swap_impl(next.0)
-}
-
-///|
-/// Result-typed companion to `queue_swap(...)`.
-pub fn CompiledDspHotSwap::queue_swap_result(
-  self : CompiledDspHotSwap,
-  next : CompiledDsp,
 ) -> Result[Unit, HotSwapQueueError] {
-  self.0.queue_swap_result_impl(next.0)
+  self.0.queue_swap_impl(next.0)
 }
 
 ///|
@@ -340,22 +302,13 @@ pub fn CompiledStereoDspHotSwap::from_graph(
 ///|
 /// Queue a replacement stereo graph for the next `process(...)` call.
 ///
-/// Returns `false` when the replacement graph is incompatible with the active
+/// Returns an error when the replacement graph is incompatible with the active
 /// graph's compile-time sample rate or block capacity.
 pub fn CompiledStereoDspHotSwap::queue_swap(
   self : CompiledStereoDspHotSwap,
   next : CompiledStereoDsp,
-) -> Bool {
-  self.0.queue_swap_impl(next.0)
-}
-
-///|
-/// Result-typed companion to `queue_swap(...)`.
-pub fn CompiledStereoDspHotSwap::queue_swap_result(
-  self : CompiledStereoDspHotSwap,
-  next : CompiledStereoDsp,
 ) -> Result[Unit, HotSwapQueueError] {
-  self.0.queue_swap_result_impl(next.0)
+  self.0.queue_swap_impl(next.0)
 }
 
 ///|

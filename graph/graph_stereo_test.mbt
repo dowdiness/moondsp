@@ -207,7 +207,8 @@ test "compiled stereo dsp apply_control updates pan position" {
   assert_true(
     compiled.apply_control(
       GraphControl::set_param(1, GraphParamSlot::Value0, PAN_HARD_RIGHT),
-    ),
+    )
+    is Ok(_),
   )
   compiled.process(context, left_output, right_output)
 
@@ -240,12 +241,14 @@ test "compiled stereo dsp runtime params update stereo gain and clip" {
   assert_true(
     compiled.apply_control(
       GraphControl::set_param(2, GraphParamSlot::Value0, HALF_GAIN),
-    ),
+    )
+    is Ok(_),
   )
   assert_true(
     compiled.apply_control(
       GraphControl::set_param(3, GraphParamSlot::Value0, STEREO_CLIP_THRESHOLD),
-    ),
+    )
+    is Ok(_),
   )
   compiled.process(context, left_output, right_output)
 
@@ -289,12 +292,14 @@ test "compiled stereo dsp runtime params update stereo biquad" {
         GraphParamSlot::Value0,
         HALF_GAIN * LOWPASS_CUTOFF,
       ),
-    ),
+    )
+    is Ok(_),
   )
   assert_true(
     compiled.apply_control(
       GraphControl::set_param(2, GraphParamSlot::Value1, 1.2),
-    ),
+    )
+    is Ok(_),
   )
   compiled.process(context, retuned_left, retuned_right)
 
@@ -332,7 +337,8 @@ test "compiled stereo dsp runtime params update stereo delay" {
         GraphParamSlot::DelaySamples,
         DELAY_SAMPLES_DOUBLE,
       ),
-    ),
+    )
+    is Ok(_),
   )
   compiled.process(context, left_output, right_output)
 
@@ -380,7 +386,8 @@ test "compiled stereo dsp runtime params update stereo delay feedback" {
   assert_true(
     retuned.apply_control(
       GraphControl::set_param(2, GraphParamSlot::Value0, DELAY_FEEDBACK),
-    ),
+    )
+    is Ok(_),
   )
   baseline.process(context, baseline_left, baseline_right)
   retuned.process(context, retuned_left, retuned_right)
@@ -415,7 +422,8 @@ test "compiled stereo dsp apply_controls updates pan and source together" {
     compiled.apply_controls([
       GraphControl::set_param(0, GraphParamSlot::Value0, HALF_GAIN),
       GraphControl::set_param(1, GraphParamSlot::Value0, PAN_CENTER),
-    ]),
+    ])
+    is Ok(_),
   )
   compiled.process(context, left_output, right_output)
 
@@ -452,22 +460,25 @@ test "compiled stereo dsp rejects out-of-bounds delay_samples via set_param" {
   ).unwrap()
 
   // Negative delay_samples must be rejected
-  assert_false(
+  assert_true(
     compiled.apply_control(
       GraphControl::set_param(2, GraphParamSlot::DelaySamples, -1.0),
-    ),
+    )
+    is Err(_),
   )
   // Exceeding max must be rejected
-  assert_false(
+  assert_true(
     compiled.apply_control(
       GraphControl::set_param(2, GraphParamSlot::DelaySamples, 5.0),
-    ),
+    )
+    is Err(_),
   )
   // Valid value must be accepted
   assert_true(
     compiled.apply_control(
       GraphControl::set_param(2, GraphParamSlot::DelaySamples, 3.0),
-    ),
+    )
+    is Ok(_),
   )
 }
 
@@ -491,10 +502,11 @@ test "compiled dsp folds stereo graph back to mono output" {
   for index = 0; index < SMALL_BLOCK_SIZE; index = index + 1 {
     assert_true((output.get(index) - PAN_CENTER_GAIN).abs() < 0.000000001)
   }
-  assert_false(
+  assert_true(
     compiled.apply_control(
       GraphControl::set_param(2, GraphParamSlot::Value0, 1.0),
-    ),
+    )
+    is Err(_),
   )
 }
 
@@ -518,12 +530,14 @@ test "compiled dsp runtime params update stereo nodes before mixdown" {
   assert_true(
     compiled.apply_control(
       GraphControl::set_param(2, GraphParamSlot::Value0, HALF_GAIN),
-    ),
+    )
+    is Ok(_),
   )
   assert_true(
     compiled.apply_control(
       GraphControl::set_param(3, GraphParamSlot::Value0, STEREO_CLIP_THRESHOLD),
-    ),
+    )
+    is Ok(_),
   )
   compiled.process(context, output)
 
@@ -534,7 +548,8 @@ test "compiled dsp runtime params update stereo nodes before mixdown" {
     compiled.apply_controls([
       GraphControl::set_param(2, GraphParamSlot::Value0, UNIT_SAMPLE),
       GraphControl::set_param(3, GraphParamSlot::Value0, UNIT_SAMPLE),
-    ]),
+    ])
+    is Ok(_),
   )
 }
 
@@ -566,12 +581,14 @@ test "compiled dsp runtime params update stereo biquad before mixdown" {
         GraphParamSlot::Value0,
         HALF_GAIN * LOWPASS_CUTOFF,
       ),
-    ),
+    )
+    is Ok(_),
   )
   assert_true(
     compiled.apply_control(
       GraphControl::set_param(2, GraphParamSlot::Value1, 1.2),
-    ),
+    )
+    is Ok(_),
   )
   compiled.process(context, output)
 
@@ -635,7 +652,8 @@ test "compiled dsp runtime params update stereo delay before mixdown" {
         GraphParamSlot::DelaySamples,
         DELAY_SAMPLES_DOUBLE,
       ),
-    ),
+    )
+    is Ok(_),
   )
   compiled.process(context, output)
 
@@ -672,7 +690,8 @@ test "compiled dsp runtime params update stereo delay feedback before mixdown" {
   assert_true(
     retuned.apply_control(
       GraphControl::set_param(2, GraphParamSlot::Value0, DELAY_FEEDBACK),
-    ),
+    )
+    is Ok(_),
   )
   baseline.process(context, baseline_output)
   retuned.process(context, retuned_output)

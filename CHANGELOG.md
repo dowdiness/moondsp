@@ -9,14 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.0] - 2026-05-17
 
-**Graph runtime exchange boundary now `CompiledTemplate`.** `Array[DspNode]`
-remains the *authoring* exchange type; `CompiledTemplate` is the *runtime*
-exchange type, produced by the single canonical crossing
-`CompiledTemplate::analyze`. See
-[ADR-0010](docs/decisions/0010-compiled-template-runtime-boundary.md) for
-the contract and `scripts/check-public-boundary.sh` for enforcement.
+This release bundles two breaking refactors of the graph public API:
 
-### Migration
+1. **Graph runtime exchange boundary is now `CompiledTemplate`.**
+   `Array[DspNode]` remains the *authoring* exchange type; `CompiledTemplate`
+   is the *runtime* exchange type, produced by the single canonical crossing
+   `CompiledTemplate::analyze`. See
+   [ADR-0010](docs/decisions/0010-compiled-template-runtime-boundary.md) for
+   the contract and `scripts/check-public-boundary.sh` for enforcement.
+2. **Runtime graph control API is now `Result`-typed.** Across all six
+   `Compiled*` wrapper types in the graph package and the
+   `GraphControllable` trait, every control method (`gate_on`, `gate_off`,
+   `set_param`, `apply_control`, `apply_controls`, `queue_swap`,
+   `queue_topology_edit`, `queue_topology_edits`) returns
+   `Result[Unit, ErrorType]` with a specific rejection reason. The
+   `_result` suffix is gone from these graph control methods:
+   `apply_control_result` is now `apply_control`, etc. This closes the
+   silent-failure footgun class addressed previously by `BoundVoicePool`
+   (see
+   `docs/superpowers/specs/archive/2026-05-11-bound-voice-pool-design.md`),
+   where `ignore(...)` on a Bool control return swallowed the rejection
+   reason and let stale-template errors propagate unnoticed. (Note:
+   `BoundVoicePool::apply_voice_control_result` / `_controls_result` /
+   `validate_voice_controls_result` in the `voice/` package keep their
+   suffix; that surface is unchanged by this release and will be
+   harmonized in a follow-up.)
+
+### Migration — `CompiledTemplate` boundary
 
 ```moonbit
 // Before (v0.3.x)
@@ -37,7 +56,38 @@ BoundVoicePool::new(template, ctx, builder, max_voices=4)
 BoundVoicePool::set_template(pool, template, builder)
 ```
 
-### Breaking changes
+### Migration — Result-typed control API
+
+```moonbit
+// Before (v0.3.x)
+let ok = compiled.gate_on(0)                          // -> Bool
+let ok = compiled.set_param(1, Value0, 0.5)           // -> Bool
+let ok = compiled.apply_control(GraphControl::gate_on(0))    // -> Bool (via trait)
+let ok = hot_swap.queue_swap(replacement)             // -> Bool
+let ok = topology.queue_topology_edit(edit)           // -> Bool
+// Result-typed peers were spelled with a `_result` suffix:
+let r = compiled.gate_on_result(0)                    // -> Result[Unit, GraphControlError]
+
+// After (v0.4.0)
+let r = compiled.gate_on(0)                           // -> Result[Unit, GraphControlError]
+let r = compiled.set_param(1, Value0, 0.5)            // -> Result[Unit, GraphControlError]
+let r = compiled.apply_control(GraphControl::gate_on(0))     // -> Result[Unit, GraphControlError]
+let r = hot_swap.queue_swap(replacement)              // -> Result[Unit, HotSwapQueueError]
+let r = topology.queue_topology_edit(edit)            // -> Result[Unit, GraphTopologyQueueError]
+// The `_result`-suffixed methods are gone. Drop the suffix to get the same behavior.
+```
+
+Common assertion-rewrite patterns:
+
+| Before                                              | After                                                        |
+| --------------------------------------------------- | ------------------------------------------------------------ |
+| `assert_true(x.gate_on(i))`                         | `assert_true(x.gate_on(i) is Ok(_))`                         |
+| `assert_false(x.queue_swap(g))`                     | `assert_true(x.queue_swap(g) is Err(_))`                     |
+| `if !x.apply_controls(params) { ... }`              | `if x.apply_controls(params) is Err(_) { ... }`              |
+| `match x.gate_on_result(i) { ... }`                 | `match x.gate_on(i) { ... }` — drop the `_result` suffix     |
+| `ignore(x.gate_on(i))` in production code           | `ignore(x.gate_on(i))` still type-checks, but consider whether swallowing the error is correct; in tests, prefer `is Ok(_)`; in benchmarks where success is required, `.unwrap()` |
+
+### Breaking changes — `CompiledTemplate` boundary
 
 - **`CompiledDsp::compile(Array[DspNode], DspContext)` removed.**
   `compile_template` renamed to `compile(CompiledTemplate, DspContext)`.
@@ -52,6 +102,41 @@ BoundVoicePool::set_template(pool, template, builder)
   `CompiledTemplate::analyze` instead — it runs constant folding and
   dead-node elimination exactly once and produces the runtime boundary
   type in one step. Removed from the root facade re-export list.
+
+### Breaking changes — Result-typed control API
+
+- **Bool-returning control methods deleted on `CompiledDsp` and
+  `CompiledStereoDsp`** (`gate_on`, `gate_off`, `set_param`,
+  `apply_control`, `apply_controls`). The previously-named `_result` peers
+  absorb those names and return `Result[Unit, GraphControlError]`.
+- **Bool-returning `queue_swap` deleted on `CompiledDspHotSwap` and
+  `CompiledStereoDspHotSwap`.** `queue_swap_result` is renamed
+  `queue_swap` and returns `Result[Unit, HotSwapQueueError]`. The other
+  control methods (`gate_on`, `gate_off`, `set_param`, `apply_control`,
+  `apply_controls`) on these types had no Bool peer — they are renamed
+  (suffix dropped) but no API was deleted.
+- **Bool-returning `queue_topology_edit` / `queue_topology_edits` deleted
+  on `CompiledDspTopologyController` and
+  `CompiledStereoDspTopologyController`.** `_result` peers absorb those
+  names and return `Result[Unit, GraphTopologyQueueError]`. Other control
+  methods are renamed (no Bool peers existed).
+- **`GraphControllable` trait now returns `Result[Unit, GraphControlError]`**
+  from both `apply_control` and `apply_controls`. Any downstream
+  implementor of this `pub(open)` trait must update return types.
+- **All `*_result`-suffixed public methods on graph `Compiled*` types
+  removed** (their behaviour is now the only behaviour, exposed without
+  the suffix): `apply_control_result`, `apply_controls_result`,
+  `validate_controls_result`, `gate_on_result`, `gate_off_result`,
+  `set_param_result`, `queue_swap_result`, `queue_topology_edit_result`,
+  `queue_topology_edits_result`. The `voice/` package's
+  `BoundVoicePool::apply_voice_control_result` family is *not* part of
+  this change and keeps its current names.
+- Pure Bool queries on `Compiled*` types — `is_voice_finished` and
+  `has_feedback_edges` — are intentionally kept; they are queries, not
+  control operations. Other Bool-returning public APIs across the package
+  (`node_accepts_slot`, `GraphTemplateDoc::contains_node` / `contains_retired_node`,
+  trait methods on `NodeEditable` / `NodeFoldable` / `NodeStateful`,
+  the module-level `is_finite`) are unaffected.
 
 ### Added
 

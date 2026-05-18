@@ -74,7 +74,7 @@ pub fn process_compiled_block(
     return false
   }
   let graph = compiled_graph.val.unwrap()
-  if !graph.apply_controls([
+  if graph.apply_controls([
       @moondsp.GraphControl::set_param(
         0,
         @moondsp.GraphParamSlot::Value0,
@@ -85,7 +85,8 @@ pub fn process_compiled_block(
         @moondsp.GraphParamSlot::Value0,
         bounded_feedback_gain(gain),
       ),
-    ]) {
+    ])
+    is Err(_) {
     return false
   }
   graph.process(compiled_context.val.unwrap(), compiled_output.val.unwrap())
