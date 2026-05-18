@@ -579,16 +579,16 @@ test "prop: mono feedback cycle — runtime retune is deterministic" {
       if !buffers_identical(out_a, out_b, PROP_BLOCK_SIZE) {
         return false
       }
-      ignore(
-        compiled_a.apply_control(
+      if compiled_a.apply_control(
           GraphControl::set_param(gain_index, GraphParamSlot::Value0, new_gain),
-        ),
-      )
-      ignore(
+        )
+        is Err(_) ||
         compiled_b.apply_control(
           GraphControl::set_param(gain_index, GraphParamSlot::Value0, new_gain),
-        ),
-      )
+        )
+        is Err(_) {
+        return false
+      }
       compiled_a.process(context, out_a)
       compiled_b.process(context, out_b)
       buffers_identical(out_a, out_b, PROP_BLOCK_SIZE)

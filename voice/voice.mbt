@@ -150,6 +150,10 @@ fn VoiceSlot::update_pan(self : VoiceSlot, pan : Double) -> Unit {
 /// WHY authoring indices: CompiledDsp::gate_on/gate_off accept original
 /// authoring indices and internally map through index_map (which
 /// accounts for optimizer elimination + topological reordering).
+/// WHY unwrap: VoicePool construction rejects orphan ADSRs (see
+/// validate_voice_template) and adsr_authoring_indices is a snapshot of
+/// surviving ADSR indices only. Gate operations on those indices must
+/// succeed; an Err here means an invariant has been violated.
 fn gate_adsrs_at(
   compiled : CompiledDsp,
   authoring_indices : FixedArray[Int],
@@ -158,9 +162,9 @@ fn gate_adsrs_at(
   for n in 0..<authoring_indices.length() {
     let i = authoring_indices[n]
     if gate_on {
-      ignore(compiled.gate_on(i))
+      compiled.gate_on(i).unwrap()
     } else {
-      ignore(compiled.gate_off(i))
+      compiled.gate_off(i).unwrap()
     }
   }
 }
@@ -215,11 +219,12 @@ fn validate_voice_template(
 /// is a correctness gate so that per-voice note_on compiles can assume the
 /// template is well-formed. The compiled result is discarded.
 /// WHY orphan-ADSR reject: `VoicePool::note_on` calls `gate_on` for every
-/// ADSR index in the template. If an ADSR is authored into the template but
-/// not wired to Output, optimize_graph eliminates it, `gate_on` maps the
-/// index to -1 and silently no-ops, and voices play with a 0 envelope —
-/// a frustrating footgun. Reject at pool-construction time with a clear
-/// failure rather than at note-trigger time with silent audio.
+/// ADSR index in the template. If an ADSR is authored into the template
+/// but not wired to Output, optimize_graph eliminates it and `gate_on`
+/// would now return `Err(OrphanNode)`. Rejecting at pool-construction
+/// time keeps the per-note `gate_adsrs_at(...)` loop infallible (it can
+/// `.unwrap()`) and surfaces the misconfiguration at the earliest
+/// observable point rather than at every note trigger.
 /// WHY adsr_authoring_indices snapshot: the pool's long-lived snapshot
 /// (used by note_on to gate ADSRs, and refreshed by set_template) stores
 /// only the indices needed for gating — not the full template — so the

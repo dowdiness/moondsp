@@ -17,17 +17,23 @@ This release bundles two breaking refactors of the graph public API:
    `CompiledTemplate::analyze`. See
    [ADR-0010](docs/decisions/0010-compiled-template-runtime-boundary.md) for
    the contract and `scripts/check-public-boundary.sh` for enforcement.
-2. **Runtime control API is now `Result`-typed end to end.** Across all six
-   `Compiled*` wrapper types and the `GraphControllable` trait, every control
-   method (`gate_on`, `gate_off`, `set_param`, `apply_control`,
-   `apply_controls`, `queue_swap`, `queue_topology_edit`,
-   `queue_topology_edits`) returns `Result[Unit, ErrorType]` with a specific
-   rejection reason. The `_result` suffix is gone from every public method:
+2. **Runtime graph control API is now `Result`-typed.** Across all six
+   `Compiled*` wrapper types in the graph package and the
+   `GraphControllable` trait, every control method (`gate_on`, `gate_off`,
+   `set_param`, `apply_control`, `apply_controls`, `queue_swap`,
+   `queue_topology_edit`, `queue_topology_edits`) returns
+   `Result[Unit, ErrorType]` with a specific rejection reason. The
+   `_result` suffix is gone from these graph control methods:
    `apply_control_result` is now `apply_control`, etc. This closes the
-   silent-failure footgun class addressed mid-PR-9 by `BoundVoicePool` (see
+   silent-failure footgun class addressed previously by `BoundVoicePool`
+   (see
    `docs/superpowers/specs/archive/2026-05-11-bound-voice-pool-design.md`),
-   where `ignore(...)` on Bool returns let stale-template control errors
-   propagate unnoticed.
+   where `ignore(...)` on a Bool control return swallowed the rejection
+   reason and let stale-template errors propagate unnoticed. (Note:
+   `BoundVoicePool::apply_voice_control_result` / `_controls_result` /
+   `validate_voice_controls_result` in the `voice/` package keep their
+   suffix; that surface is unchanged by this release and will be
+   harmonized in a follow-up.)
 
 ### Migration — `CompiledTemplate` boundary
 
@@ -117,11 +123,14 @@ Common assertion-rewrite patterns:
 - **`GraphControllable` trait now returns `Result[Unit, GraphControlError]`**
   from both `apply_control` and `apply_controls`. Any downstream
   implementor of this `pub(open)` trait must update return types.
-- **All `*_result`-suffixed public methods removed** (their behaviour is
-  now the only behaviour, exposed without the suffix): `apply_control_result`,
-  `apply_controls_result`, `validate_controls_result`, `gate_on_result`,
-  `gate_off_result`, `set_param_result`, `queue_swap_result`,
-  `queue_topology_edit_result`, `queue_topology_edits_result`.
+- **All `*_result`-suffixed public methods on graph `Compiled*` types
+  removed** (their behaviour is now the only behaviour, exposed without
+  the suffix): `apply_control_result`, `apply_controls_result`,
+  `validate_controls_result`, `gate_on_result`, `gate_off_result`,
+  `set_param_result`, `queue_swap_result`, `queue_topology_edit_result`,
+  `queue_topology_edits_result`. The `voice/` package's
+  `BoundVoicePool::apply_voice_control_result` family is *not* part of
+  this change and keeps its current names.
 - Pure Bool queries on `Compiled*` types — `is_voice_finished` and
   `has_feedback_edges` — are intentionally kept; they are queries, not
   control operations. Other Bool-returning public APIs across the package

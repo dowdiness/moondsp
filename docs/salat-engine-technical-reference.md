@@ -830,9 +830,14 @@ compiled.apply_controls([
   GraphControl::gate_on(env_node),
   GraphControl::set_param(gain_node, GraphParamSlot::Value0, 0.5),
   GraphControl::set_param(filter_node, GraphParamSlot::Value0, 1200.0),
-])
+]).unwrap()
 compiled.process(context, output)
 ```
+
+`apply_controls(...)` returns `Result[Unit, GraphControlError]`; the
+example uses `.unwrap()` for brevity, but real callers typically pattern
+match on the specific rejection reason (`InvalidNodeIndex`,
+`InvalidSlotForNode`, `InvalidParamValue`, etc.).
 
 Current semantics:
 
@@ -934,7 +939,7 @@ let active = CompiledDsp::compile(old_template, context).unwrap()
 let replacement = CompiledDsp::compile(new_template, context).unwrap()
 let hot_swap = CompiledDspHotSwap::from_graph(active, crossfade_samples=128)
 
-assert(hot_swap.queue_swap(replacement))
+hot_swap.queue_swap(replacement).unwrap()
 hot_swap.process(context, output)
 ```
 
@@ -950,7 +955,7 @@ let hot_swap_stereo = CompiledStereoDspHotSwap::from_graph(
   crossfade_samples=128,
 )
 
-assert(hot_swap_stereo.queue_swap(replacement_stereo))
+hot_swap_stereo.queue_swap(replacement_stereo).unwrap()
 hot_swap_stereo.process(context, left_output, right_output)
 ```
 
@@ -961,16 +966,16 @@ let topology = CompiledDspTopologyController::from_nodes(
   crossfade_samples=128,
 ).unwrap()
 
-assert(
-  topology.queue_topology_edit(
+topology
+  .queue_topology_edit(
     GraphTopologyEdit::delete_node(
       gain_node,
       output_node,
       GraphTopologyInputSlot::Input0,
       gain_node,
     ),
-  ),
-)
+  )
+  .unwrap()
 topology.process(context, output)
 ```
 

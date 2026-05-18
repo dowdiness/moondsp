@@ -56,9 +56,10 @@ fn CompiledTemplate::is_node_live(self : CompiledTemplate, index : Int) -> Bool 
 
 ///|
 /// Count Adsr nodes in the template snapshot whose compiled index is < 0
-/// (eliminated by optimize_graph as dead code). An orphan ADSR silently
-/// no-ops its gate_on, producing voices that never envelope — VoicePool::new
-/// and set_template reject templates where this count is > 0.
+/// (eliminated by optimize_graph as dead code). On a CompiledDsp, `gate_on`
+/// for an orphan ADSR returns `Err(OrphanNode)` — VoicePool::new and
+/// set_template reject templates where this count is > 0 so the per-note
+/// gate loop can `.unwrap()` instead of branching on every voice trigger.
 ///
 /// Parameterless because the template snapshot is owned by self; callers
 /// do not need to remember which template was compiled.
