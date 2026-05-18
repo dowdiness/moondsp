@@ -1,6 +1,6 @@
 ///|
 /// Public ADSR stage names for diagnostics and tests.
-pub(all) enum EnvStage {
+pub enum EnvStage {
   Idle
   Attack
   Decay
@@ -82,16 +82,17 @@ pub fn Adsr::reset(self : Adsr) -> Unit {
 /// Advance the envelope by one sample using the given DSP context.
 pub fn Adsr::tick(self : Adsr, context : DspContext) -> Double {
   let sample_rate = context.sample_rate()
-  self.tick_with_sample_rate(sample_rate)
-}
-
-///|
-fn Adsr::tick_with_sample_rate(self : Adsr, sample_rate : Double) -> Double {
   if !is_finite_positive(sample_rate) {
     self.reset()
     return 0.0
   }
+  self.tick_step(sample_rate)
+}
 
+///|
+/// Step the envelope by one sample assuming `sample_rate` is finite and positive.
+/// Callers must validate before invoking.
+fn Adsr::tick_step(self : Adsr, sample_rate : Double) -> Double {
   // WHY bounded loop: zero-time stages (e.g. attack_ms=0) advance to the next
   // stage without producing a sample. The loop re-evaluates until a non-zero
   // stage is reached. Bound of 4 = number of ADSR stages, guaranteeing termination.
@@ -172,7 +173,7 @@ pub fn Adsr::process(
   }
 
   for index = 0; index < sample_count; index = index + 1 {
-    output.set(index, self.tick(context))
+    output.set(index, self.tick_step(sample_rate))
   }
 
   for index = sample_count; index < output.length(); index = index + 1 {

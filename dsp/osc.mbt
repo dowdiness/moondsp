@@ -79,13 +79,27 @@ pub fn Oscillator::process_waveform(
     return
   }
 
+  let phase_increment = freq_hz / sample_rate
   for index = 0; index < sample_count; index = index + 1 {
-    output.set(index, self.tick_waveform(waveform~, freq_hz~, sample_rate~))
+    output.set(index, self.tick_step(waveform, phase_increment))
   }
 
   for index = sample_count; index < output.length(); index = index + 1 {
     output.set(index, 0.0)
   }
+}
+
+///|
+/// Step the oscillator by `phase_increment` and return the current sample.
+/// Callers must ensure `phase_increment` is finite.
+fn Oscillator::tick_step(
+  self : Oscillator,
+  waveform : Waveform,
+  phase_increment : Double,
+) -> Double {
+  let out = sample_for_phase(waveform, self.phase)
+  self.phase = wrap_phase(self.phase + phase_increment)
+  out
 }
 
 ///|
@@ -102,7 +116,7 @@ pub fn Oscillator::process(
 ///|
 fn sample_for_phase(waveform : Waveform, phase : Double) -> Double {
   match waveform {
-    Sine => @math.sin(phase * 6.283185307179586)
+    Sine => @math.sin(phase * 2.0 * @math.PI)
     Saw => 2.0 * phase - 1.0
     Square => if phase < 0.5 { 1.0 } else { -1.0 }
     Triangle => if phase < 0.5 { 4.0 * phase - 1.0 } else { 3.0 - 4.0 * phase }
