@@ -43,9 +43,9 @@ pub fn AudioBuffer::adopt(data : FixedArray[Double]) -> AudioBuffer {
 /// Construct an audio buffer pre-filled with `init` (default 0.0).
 ///
 /// The buffer's storage is freshly allocated and not shared with any
-/// caller-visible array. Routed through `adopt` to avoid an
-/// unnecessary copy of the freshly-allocated `FixedArray` once
-/// `AudioBuffer::new` switches to a defensive-copy default.
+/// caller-visible array. Routed through `adopt` to avoid the
+/// unnecessary copy `AudioBuffer::new` would now perform on the
+/// freshly-allocated `FixedArray`.
 pub fn AudioBuffer::filled(size : Int, init? : Double = 0.0) -> AudioBuffer {
   AudioBuffer::adopt(FixedArray::make(size, init))
 }
