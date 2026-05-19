@@ -1,6 +1,7 @@
 import {
   "dowdiness/moondsp/dsp" @dsp,
   "dowdiness/moondsp/graph" @graph,
+  "moonbitlang/core/bench" @bench,
   "moonbitlang/core/debug" @debug,
   "moonbitlang/core/int" @int,
 }
