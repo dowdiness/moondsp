@@ -34,11 +34,9 @@ test "compiled dsp renders an oscillator gain clip chain" {
   compiled.process(context, output)
 
   @debug.assert_eq(output.get(0), ZERO_SAMPLE)
-  assert_true(output.as_fixed_array().any(sample => sample != ZERO_SAMPLE))
+  assert_true(output.any(sample => sample != ZERO_SAMPLE))
   assert_true(
-    output
-    .as_fixed_array()
-    .every(sample => sample >= -CLIP_THRESHOLD && sample <= CLIP_THRESHOLD),
+    output.every(sample => sample >= -CLIP_THRESHOLD && sample <= CLIP_THRESHOLD),
   )
 }
 
@@ -77,11 +75,9 @@ test "compiled dsp noise graph stays bounded and non-zero" {
 
   compiled.process(context, output)
 
-  assert_true(output.as_fixed_array().any(sample => sample != ZERO_SAMPLE))
+  assert_true(output.any(sample => sample != ZERO_SAMPLE))
   assert_true(
-    output
-    .as_fixed_array()
-    .every(sample => sample >= -UNIT_SAMPLE && sample <= UNIT_SAMPLE),
+    output.every(sample => sample >= -UNIT_SAMPLE && sample <= UNIT_SAMPLE),
   )
 }
 
@@ -154,7 +150,7 @@ test "compiled dsp resets adsr state on invalid context" {
   compiled.process(invalid_context, output)
   compiled.process(valid_context, output)
 
-  assert_true(output.as_fixed_array().every(sample => sample == ZERO_SAMPLE))
+  assert_true(output.every(sample => sample == ZERO_SAMPLE))
 }
 
 ///|
@@ -237,7 +233,7 @@ test "compiled dsp silences when runtime block exceeds compiled capacity" {
 
   compiled.process(runtime_context, output)
 
-  assert_true(output.as_fixed_array().every(sample => sample == ZERO_SAMPLE))
+  assert_true(output.every(sample => sample == ZERO_SAMPLE))
 }
 
 ///|
@@ -257,7 +253,7 @@ test "compiled dsp: oscillator reads frequency from input buffer" {
   compiled.process(context, output)
 
   @debug.assert_eq(output.get(0), ZERO_SAMPLE)
-  assert_true(output.as_fixed_array().any(sample => sample != ZERO_SAMPLE))
+  assert_true(output.any(sample => sample != ZERO_SAMPLE))
 }
 
 ///|
@@ -279,7 +275,7 @@ test "compiled dsp: FM oscillator with modulated frequency" {
 
   compiled.process(context, output)
 
-  assert_true(output.as_fixed_array().any(sample => sample != ZERO_SAMPLE))
+  assert_true(output.any(sample => sample != ZERO_SAMPLE))
 }
 
 ///|

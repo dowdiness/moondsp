@@ -20,7 +20,7 @@ test "process with invalid sample rate writes silence" {
 
   osc.process(context~, output=buffer, freq_hz=440.0)
 
-  assert_true(buffer.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(buffer.every(sample => sample == 0.0))
   assert_eq(osc.phase(), 0.0)
 }
 
@@ -111,7 +111,7 @@ test "process_waveform rejects non-finite frequency without advancing phase" {
     freq_hz=0.0 / 0.0,
   )
 
-  assert_true(buffer.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(buffer.every(sample => sample == 0.0))
   assert_eq(osc.phase(), 0.0)
 }
 
@@ -137,7 +137,7 @@ test "gain with invalid context writes silence" {
 
   gain.process(context~, buffer~, amount=0.5)
 
-  assert_true(buffer.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(buffer.every(sample => sample == 0.0))
 }
 
 ///|
@@ -148,7 +148,7 @@ test "gain with invalid amount writes silence" {
 
   gain.process(context~, buffer~, amount=0.0 / 0.0)
 
-  assert_true(buffer.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(buffer.every(sample => sample == 0.0))
 }
 
 ///|
@@ -194,7 +194,7 @@ test "mix with invalid context writes silence" {
 
   mix.process(context, output, input)
 
-  assert_true(output.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(output.every(sample => sample == 0.0))
 }
 
 ///|
@@ -272,7 +272,7 @@ test "noise with invalid context writes silence without advancing state" {
 
   noise.process(context, buffer)
 
-  assert_true(buffer.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(buffer.every(sample => sample == 0.0))
   assert_eq(noise.seed(), state_before)
 }
 
@@ -298,7 +298,7 @@ test "clip with invalid context writes silence" {
 
   clip.process(context~, buffer~, threshold=0.5)
 
-  assert_true(buffer.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(buffer.every(sample => sample == 0.0))
 }
 
 ///|
@@ -309,7 +309,7 @@ test "clip with invalid threshold writes silence" {
 
   clip.process(context~, buffer~, threshold=0.0)
 
-  assert_true(buffer.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(buffer.every(sample => sample == 0.0))
 }
 
 ///|
@@ -350,7 +350,7 @@ test "adsr invalid context resets to idle silence" {
   env.gate_on()
   env.process(context, buffer)
 
-  assert_true(buffer.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(buffer.every(sample => sample == 0.0))
   assert_true(env.stage() is EnvStage::Idle)
   assert_eq(env.level(), 0.0)
 }
@@ -423,7 +423,7 @@ test "adsr non-finite sample rate resets to idle silence" {
   env.gate_on()
   env.process(context, buffer)
 
-  assert_true(buffer.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(buffer.every(sample => sample == 0.0))
   assert_true(env.stage() is EnvStage::Idle)
   assert_eq(env.level(), 0.0)
 }
@@ -470,7 +470,7 @@ test "delay line zero-sample process writes silence" {
 
   delay.process(context, buffer)
 
-  assert_true(buffer.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(buffer.every(sample => sample == 0.0))
 }
 
 ///|
@@ -486,7 +486,7 @@ test "delay line invalid context writes silence without resetting state" {
   delay.process(invalid_context, invalid_buffer)
   delay.process(valid_context, valid_buffer)
 
-  assert_true(invalid_buffer.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(invalid_buffer.every(sample => sample == 0.0))
   assert_eq(valid_buffer.get(0), 1.0)
 }
 
@@ -526,8 +526,8 @@ test "pan invalid context writes silence to both outputs" {
     position=0.0,
   )
 
-  assert_true(left.as_fixed_array().every(sample => sample == 0.0))
-  assert_true(right.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(left.every(sample => sample == 0.0))
+  assert_true(right.every(sample => sample == 0.0))
 }
 
 ///|
@@ -546,8 +546,8 @@ test "pan invalid position writes silence to both outputs" {
     position=0.0 / 0.0,
   )
 
-  assert_true(left.as_fixed_array().every(sample => sample == 0.0))
-  assert_true(right.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(left.every(sample => sample == 0.0))
+  assert_true(right.every(sample => sample == 0.0))
 }
 
 ///|
@@ -570,7 +570,7 @@ test "pan respects context block size and zeros both tails" {
   assert_eq(left.get(1), 0.5)
   assert_eq(left.get(2), 0.0)
   assert_eq(left.get(3), 0.0)
-  assert_true(right.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(right.every(sample => sample == 0.0))
 }
 
 ///|

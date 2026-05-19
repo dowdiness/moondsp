@@ -11,7 +11,7 @@ test "biquad rejects invalid parameters and writes silence" {
 
   biquad.process(context, buffer)
 
-  assert_true(buffer.as_fixed_array().all(sample => sample == 0.0))
+  assert_true(buffer.all(sample => sample == 0.0))
 }
 
 ///|

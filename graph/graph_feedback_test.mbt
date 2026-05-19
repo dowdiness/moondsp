@@ -188,9 +188,7 @@ test "compiled dsp runtime biquad update matches fixed feedback loop compile" {
   runtime_compiled.process(context, runtime_output)
   fixed_compiled.process(context, fixed_output)
 
-  assert_true(
-    runtime_output.as_fixed_array().any(sample => sample != ZERO_SAMPLE),
-  )
+  assert_true(runtime_output.any(sample => sample != ZERO_SAMPLE))
   for index = 0; index < runtime_output.length(); index = index + 1 {
     assert_true(
       (runtime_output.get(index) - fixed_output.get(index)).abs() < 0.000000001,
@@ -337,11 +335,7 @@ test "compiled dsp accepts stereo-involved feedback cycles via self-registers" {
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   compiled.process(context, output)
   // Output should be finite and bounded
-  assert_true(
-    output
-    .as_fixed_array()
-    .every(sample => !sample.is_nan() && !sample.is_inf()),
-  )
+  assert_true(output.every(sample => !sample.is_nan() && !sample.is_inf()))
 }
 
 ///|
@@ -387,18 +381,12 @@ test "compiled stereo dsp accepts stereo-shaped feedback edges via self-register
   let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   compiled.process(context, left_output, right_output)
   // Output should be finite and bounded
+  assert_true(left_output.every(sample => !sample.is_nan() && !sample.is_inf()))
   assert_true(
-    left_output
-    .as_fixed_array()
-    .every(sample => !sample.is_nan() && !sample.is_inf()),
-  )
-  assert_true(
-    right_output
-    .as_fixed_array()
-    .every(sample => !sample.is_nan() && !sample.is_inf()),
+    right_output.every(sample => !sample.is_nan() && !sample.is_inf()),
   )
   // Output should have non-zero values (the constant propagates through)
-  assert_true(left_output.as_fixed_array().any(sample => sample != ZERO_SAMPLE))
+  assert_true(left_output.any(sample => sample != ZERO_SAMPLE))
 }
 
 ///|
@@ -413,7 +401,7 @@ test "self-register fields initialized for acyclic graph" {
   let buf = AudioBuffer::filled(128)
   compiled.process(ctx, buf)
   // Acyclic graph should process normally — oscillator produces non-zero output
-  assert_true(buf.as_fixed_array().any(sample => sample != 0.0))
+  assert_true(buf.any(sample => sample != 0.0))
 }
 
 ///|
@@ -444,9 +432,9 @@ test "self-register: mono self-feedback produces bounded recurrence" {
   assert_true((output.get(3) - 0.9375).abs() < 0.000000001)
   // All samples are finite and bounded
   assert_true(
-    output
-    .as_fixed_array()
-    .every(sample => !sample.is_nan() && !sample.is_inf() && sample.abs() <= 2.0),
+    output.every(sample => {
+      !sample.is_nan() && !sample.is_inf() && sample.abs() <= 2.0
+    }),
   )
 }
 
@@ -549,9 +537,9 @@ test "self-register: mixed-shape feedback across mono/stereo boundary" {
 
   // All output should be finite and bounded
   assert_true(
-    output
-    .as_fixed_array()
-    .every(sample => !sample.is_nan() && !sample.is_inf() && sample.abs() <= 2.0),
+    output.every(sample => {
+      !sample.is_nan() && !sample.is_inf() && sample.abs() <= 2.0
+    }),
   )
   // The recurrence converges because gain < 1.
   // Sample 0: Mix(1.0, 0.0)=1.0 -> Pan -> MixDown(0.707) -> Gain(0.3535)

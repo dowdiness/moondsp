@@ -62,7 +62,7 @@ test "compiled dsp hot swap crossfades equal-power between graphs" {
   assert_true(
     (second_block.get(3) - 0.9807852804032304).abs() < HOT_SWAP_EPSILON,
   )
-  assert_true(settled_block.as_fixed_array().every(sample => sample == 1.0))
+  assert_true(settled_block.every(sample => sample == 1.0))
 }
 
 ///|
@@ -85,7 +85,7 @@ test "compiled dsp hot swap can replace instantly" {
   assert_true(hot_swap.queue_swap(new_graph) is Ok(_))
   hot_swap.process(context, output)
 
-  assert_true(output.as_fixed_array().every(sample => sample == 0.75))
+  assert_true(output.every(sample => sample == 0.75))
 }
 
 ///|
@@ -112,7 +112,7 @@ test "compiled dsp hot swap rejects incompatible replacement graph" {
   assert_true(hot_swap.queue_swap(incompatible) is Err(_))
   hot_swap.process(active_context, output)
 
-  assert_true(output.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(output.every(sample => sample == 0.0))
 }
 
 ///|
@@ -218,16 +218,16 @@ test "compiled dsp hot swap mirrors runtime param changes into pending graph" {
   hot_swap.process(context, settled_block)
 
   assert_true(
-    first_block
-    .as_fixed_array()
-    .every(sample => !sample.is_nan() && !sample.is_inf() && sample >= 0.5),
+    first_block.every(sample => {
+      !sample.is_nan() && !sample.is_inf() && sample >= 0.5
+    }),
   )
   assert_true(
-    second_block
-    .as_fixed_array()
-    .every(sample => !sample.is_nan() && !sample.is_inf() && sample >= 0.5),
+    second_block.every(sample => {
+      !sample.is_nan() && !sample.is_inf() && sample >= 0.5
+    }),
   )
-  assert_true(settled_block.as_fixed_array().every(sample => sample == 0.5))
+  assert_true(settled_block.every(sample => sample == 0.5))
 }
 
 ///|
@@ -341,24 +341,20 @@ test "compiled stereo dsp hot swap crossfades equal-power between graphs" {
     HOT_SWAP_EPSILON,
   )
   assert_true(
-    first_left
-    .as_fixed_array()
-    .all(sample => sample >= 0.0 && sample <= HOT_SWAP_CENTER_GAIN),
+    first_left.all(sample => sample >= 0.0 && sample <= HOT_SWAP_CENTER_GAIN),
   )
   assert_true(
-    second_left
-    .as_fixed_array()
-    .all(sample => sample >= 0.0 && sample <= HOT_SWAP_CENTER_GAIN),
+    second_left.all(sample => sample >= 0.0 && sample <= HOT_SWAP_CENTER_GAIN),
   )
   assert_true(
-    settled_left
-    .as_fixed_array()
-    .every(sample => (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON),
+    settled_left.every(sample => {
+      (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON
+    }),
   )
   assert_true(
-    settled_right
-    .as_fixed_array()
-    .every(sample => (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON),
+    settled_right.every(sample => {
+      (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON
+    }),
   )
   assert_true(hot_swap_buffers_equal(first_left, first_right, HOT_SWAP_EPSILON))
   assert_true(
@@ -396,14 +392,14 @@ test "compiled stereo dsp hot swap result queues compatible graph" {
   hot_swap.process(context, left, right)
 
   assert_true(
-    left
-    .as_fixed_array()
-    .every(sample => (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON),
+    left.every(sample => {
+      (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON
+    }),
   )
   assert_true(
-    right
-    .as_fixed_array()
-    .every(sample => (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON),
+    right.every(sample => {
+      (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON
+    }),
   )
 }
 
@@ -451,30 +447,20 @@ test "compiled stereo dsp hot swap mirrors pan changes into pending graph" {
   hot_swap.process(context, second_left, second_right)
   hot_swap.process(context, settled_left, settled_right)
 
+  assert_true(first_left.every(sample => sample.abs() < HOT_SWAP_EPSILON))
+  assert_true(second_left.every(sample => sample.abs() < HOT_SWAP_EPSILON))
+  assert_true(settled_left.every(sample => sample.abs() < HOT_SWAP_EPSILON))
   assert_true(
-    first_left.as_fixed_array().every(sample => sample.abs() < HOT_SWAP_EPSILON),
+    first_right.every(sample => {
+      !sample.is_nan() && !sample.is_inf() && sample >= 0.5
+    }),
   )
   assert_true(
-    second_left
-    .as_fixed_array()
-    .every(sample => sample.abs() < HOT_SWAP_EPSILON),
+    second_right.every(sample => {
+      !sample.is_nan() && !sample.is_inf() && sample >= 1.0
+    }),
   )
-  assert_true(
-    settled_left
-    .as_fixed_array()
-    .every(sample => sample.abs() < HOT_SWAP_EPSILON),
-  )
-  assert_true(
-    first_right
-    .as_fixed_array()
-    .every(sample => !sample.is_nan() && !sample.is_inf() && sample >= 0.5),
-  )
-  assert_true(
-    second_right
-    .as_fixed_array()
-    .every(sample => !sample.is_nan() && !sample.is_inf() && sample >= 1.0),
-  )
-  assert_true(settled_right.as_fixed_array().every(sample => sample == 1.0))
+  assert_true(settled_right.every(sample => sample == 1.0))
 }
 
 ///|

@@ -387,7 +387,7 @@ test "compiled dsp runtime param update rejects invalid biquad values" {
 
   assert_true(output.get(0) > ZERO_SAMPLE)
   assert_true(output.get(0) < UNIT_SAMPLE)
-  assert_true(output.as_fixed_array().any(sample => sample != ZERO_SAMPLE))
+  assert_true(output.any(sample => sample != ZERO_SAMPLE))
 }
 
 ///|

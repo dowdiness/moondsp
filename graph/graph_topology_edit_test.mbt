@@ -45,7 +45,7 @@ test "compiled dsp topology controller crossfades a replaced node" {
       (second_block.get(index) - second_expected).abs() < HOT_SWAP_EPSILON,
     )
   }
-  assert_true(settled_block.as_fixed_array().every(sample => sample == 0.75))
+  assert_true(settled_block.every(sample => sample == 0.75))
 }
 
 ///|
@@ -69,7 +69,7 @@ test "compiled dsp topology controller rejects invalid edit batches transactiona
   )
   topology.process(context, output)
 
-  assert_true(output.as_fixed_array().every(sample => sample == 0.25))
+  assert_true(output.every(sample => sample == 0.25))
 }
 
 ///|
@@ -102,7 +102,7 @@ test "compiled dsp topology controller result reports invalid edit index" {
   }
   topology.process(context, output)
 
-  assert_true(output.as_fixed_array().every(sample => sample == 0.25))
+  assert_true(output.every(sample => sample == 0.25))
 }
 
 ///|
@@ -235,16 +235,16 @@ test "compiled dsp topology controller mirrors runtime params into queued edit" 
   topology.process(context, settled_block)
 
   assert_true(
-    first_block
-    .as_fixed_array()
-    .every(sample => !sample.is_nan() && !sample.is_inf() && sample >= 0.5),
+    first_block.every(sample => {
+      !sample.is_nan() && !sample.is_inf() && sample >= 0.5
+    }),
   )
   assert_true(
-    second_block
-    .as_fixed_array()
-    .every(sample => !sample.is_nan() && !sample.is_inf() && sample >= 0.5),
+    second_block.every(sample => {
+      !sample.is_nan() && !sample.is_inf() && sample >= 0.5
+    }),
   )
-  assert_true(settled_block.as_fixed_array().every(sample => sample == 0.5))
+  assert_true(settled_block.every(sample => sample == 0.5))
 }
 
 ///|
@@ -317,7 +317,7 @@ test "compiled dsp topology controller rejected control batch does not mirror au
   topology.process(context, second_block)
   topology.process(context, settled_block)
 
-  assert_true(settled_block.as_fixed_array().every(sample => sample == 0.5))
+  assert_true(settled_block.every(sample => sample == 0.5))
 }
 
 ///|
@@ -373,7 +373,7 @@ test "compiled dsp topology controller preserves runtime params across later top
       (second_block.get(index) - second_expected).abs() < HOT_SWAP_EPSILON,
     )
   }
-  assert_true(settled_block.as_fixed_array().every(sample => sample == 1.0))
+  assert_true(settled_block.every(sample => sample == 1.0))
 }
 
 ///|
@@ -431,7 +431,7 @@ test "compiled dsp topology controller crossfades a rewired input" {
       (second_block.get(index) - second_expected).abs() < HOT_SWAP_EPSILON,
     )
   }
-  assert_true(settled_block.as_fixed_array().every(sample => sample == 3.5))
+  assert_true(settled_block.every(sample => sample == 3.5))
 }
 
 ///|
@@ -462,7 +462,7 @@ test "compiled dsp topology controller rejects invalid rewires transactionally" 
   )
   topology.process(context, output)
 
-  assert_true(output.as_fixed_array().every(sample => sample == 2.0))
+  assert_true(output.every(sample => sample == 2.0))
 }
 
 ///|
@@ -516,7 +516,7 @@ test "compiled dsp topology controller crossfades an inserted node" {
       (second_block.get(index) - second_expected).abs() < HOT_SWAP_EPSILON,
     )
   }
-  assert_true(settled_block.as_fixed_array().every(sample => sample == 0.5))
+  assert_true(settled_block.every(sample => sample == 0.5))
 }
 
 ///|
@@ -543,7 +543,7 @@ test "compiled dsp topology controller rejects invalid insert templates transact
   )
   topology.process(context, output)
 
-  assert_true(output.as_fixed_array().every(sample => sample == 1.0))
+  assert_true(output.every(sample => sample == 1.0))
 }
 
 ///|
@@ -593,7 +593,7 @@ test "compiled dsp topology controller crossfades a deleted node" {
       (second_block.get(index) - second_expected).abs() < HOT_SWAP_EPSILON,
     )
   }
-  assert_true(settled_block.as_fixed_array().every(sample => sample == 1.0))
+  assert_true(settled_block.every(sample => sample == 1.0))
 }
 
 ///|
@@ -616,7 +616,7 @@ test "compiled dsp topology controller rejects invalid deletes transactionally" 
   )
   topology.process(context, output)
 
-  assert_true(output.as_fixed_array().every(sample => sample == 0.5))
+  assert_true(output.every(sample => sample == 0.5))
 }
 
 ///|
@@ -650,7 +650,7 @@ test "compiled dsp topology controller insert delete roundtrip restores baseline
   topology.process(context, insert_first_block)
   topology.process(context, insert_second_block)
   topology.process(context, inserted_block)
-  assert_true(inserted_block.as_fixed_array().every(sample => sample == 0.5))
+  assert_true(inserted_block.every(sample => sample == 0.5))
 
   assert_true(
     topology.queue_topology_edit(
@@ -685,7 +685,7 @@ test "compiled dsp topology controller insert delete roundtrip restores baseline
       HOT_SWAP_EPSILON,
     )
   }
-  assert_true(restored_block.as_fixed_array().every(sample => sample == 1.0))
+  assert_true(restored_block.every(sample => sample == 1.0))
 }
 
 ///|
@@ -708,7 +708,7 @@ test "compiled dsp topology controller rejects deletes with mismatched retarget 
   )
   topology.process(context, output)
 
-  assert_true(output.as_fixed_array().every(sample => sample == 0.5))
+  assert_true(output.every(sample => sample == 0.5))
 }
 
 ///|
@@ -773,12 +773,8 @@ test "compiled stereo dsp topology controller crossfades a replaced pan node" {
       (second_right.get(index) - second_expected_right).abs() < HOT_SWAP_EPSILON,
     )
   }
-  assert_true(
-    settled_left
-    .as_fixed_array()
-    .every(sample => sample.abs() < HOT_SWAP_EPSILON),
-  )
-  assert_true(settled_right.as_fixed_array().every(sample => sample == 1.0))
+  assert_true(settled_left.every(sample => sample.abs() < HOT_SWAP_EPSILON))
+  assert_true(settled_right.every(sample => sample == 1.0))
 }
 
 ///|
@@ -804,14 +800,14 @@ test "compiled stereo dsp topology controller rejects invalid edit batches trans
   topology.process(context, left, right)
 
   assert_true(
-    left
-    .as_fixed_array()
-    .every(sample => (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON),
+    left.every(sample => {
+      (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON
+    }),
   )
   assert_true(
-    right
-    .as_fixed_array()
-    .every(sample => (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON),
+    right.every(sample => {
+      (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON
+    }),
   )
 }
 
@@ -837,8 +833,8 @@ test "compiled stereo dsp topology controller result queues valid edit" {
   }
   topology.process(context, left, right)
 
-  assert_true(left.as_fixed_array().every(sample => sample == 0.0))
-  assert_true(right.as_fixed_array().every(sample => sample == 1.0))
+  assert_true(left.every(sample => sample == 0.0))
+  assert_true(right.every(sample => sample == 1.0))
 }
 
 ///|
@@ -877,14 +873,10 @@ test "compiled stereo dsp topology controller accepts insert nodes" {
   // stereo_output. Center pan = ~0.707, then * 0.5 = ~0.354
   let expected = HOT_SWAP_CENTER_GAIN * 0.5
   assert_true(
-    settled_left
-    .as_fixed_array()
-    .every(sample => (sample - expected).abs() < HOT_SWAP_EPSILON),
+    settled_left.every(sample => (sample - expected).abs() < HOT_SWAP_EPSILON),
   )
   assert_true(
-    settled_right
-    .as_fixed_array()
-    .every(sample => (sample - expected).abs() < HOT_SWAP_EPSILON),
+    settled_right.every(sample => (sample - expected).abs() < HOT_SWAP_EPSILON),
   )
 }
 
@@ -927,14 +919,14 @@ test "compiled stereo dsp topology controller accepts delete nodes" {
   // After delete: constant(1.0) -> pan(0, 0.0) -> stereo_output
   // Center pan with gain 1.0 = ~0.707 on each channel
   assert_true(
-    settled_left
-    .as_fixed_array()
-    .every(sample => (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON),
+    settled_left.every(sample => {
+      (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON
+    }),
   )
   assert_true(
-    settled_right
-    .as_fixed_array()
-    .every(sample => (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON),
+    settled_right.every(sample => {
+      (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON
+    }),
   )
 }
 
@@ -973,31 +965,19 @@ test "compiled stereo dsp topology controller mirrors runtime params into queued
   topology.process(context, settled_left, settled_right)
 
   assert_true(
-    first_left
-    .as_fixed_array()
-    .every(sample => !sample.is_nan() && !sample.is_inf() && sample >= 1.0),
+    first_left.every(sample => {
+      !sample.is_nan() && !sample.is_inf() && sample >= 1.0
+    }),
   )
   assert_true(
-    second_left
-    .as_fixed_array()
-    .every(sample => !sample.is_nan() && !sample.is_inf() && sample >= 1.0),
+    second_left.every(sample => {
+      !sample.is_nan() && !sample.is_inf() && sample >= 1.0
+    }),
   )
-  assert_true(settled_left.as_fixed_array().every(sample => sample == 1.0))
-  assert_true(
-    first_right
-    .as_fixed_array()
-    .every(sample => sample.abs() < HOT_SWAP_EPSILON),
-  )
-  assert_true(
-    second_right
-    .as_fixed_array()
-    .every(sample => sample.abs() < HOT_SWAP_EPSILON),
-  )
-  assert_true(
-    settled_right
-    .as_fixed_array()
-    .every(sample => sample.abs() < HOT_SWAP_EPSILON),
-  )
+  assert_true(settled_left.every(sample => sample == 1.0))
+  assert_true(first_right.every(sample => sample.abs() < HOT_SWAP_EPSILON))
+  assert_true(second_right.every(sample => sample.abs() < HOT_SWAP_EPSILON))
+  assert_true(settled_right.every(sample => sample.abs() < HOT_SWAP_EPSILON))
 }
 
 ///|
@@ -1027,14 +1007,14 @@ test "compiled stereo dsp topology controller set_param reports invalid value" {
   topology.process(context, left, right)
 
   assert_true(
-    left
-    .as_fixed_array()
-    .every(sample => (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON),
+    left.every(sample => {
+      (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON
+    }),
   )
   assert_true(
-    right
-    .as_fixed_array()
-    .every(sample => (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON),
+    right.every(sample => {
+      (sample - HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON
+    }),
   )
 }
 
@@ -1108,16 +1088,12 @@ test "compiled stereo dsp topology controller crossfades a rewired input" {
     )
   }
   assert_true(
-    settled_left
-    .as_fixed_array()
-    .every(sample => {
+    settled_left.every(sample => {
       (sample - 1.75 * HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON
     }),
   )
   assert_true(
-    settled_right
-    .as_fixed_array()
-    .every(sample => {
+    settled_right.every(sample => {
       (sample - 1.75 * HOT_SWAP_CENTER_GAIN).abs() < HOT_SWAP_EPSILON
     }),
   )
@@ -1181,12 +1157,8 @@ test "compiled stereo dsp topology controller preserves runtime params across la
     )
     assert_true(second_right.get(index).abs() < HOT_SWAP_EPSILON)
   }
-  assert_true(settled_left.as_fixed_array().every(sample => sample == 0.5))
-  assert_true(
-    settled_right
-    .as_fixed_array()
-    .every(sample => sample.abs() < HOT_SWAP_EPSILON),
-  )
+  assert_true(settled_left.every(sample => sample == 0.5))
+  assert_true(settled_right.every(sample => sample.abs() < HOT_SWAP_EPSILON))
 }
 
 ///|
@@ -1221,7 +1193,7 @@ test "topology edit: insert chain of two gain nodes" {
 
   // After insert: constant(1.0) -> gain(0.5) -> gain(0.8) -> output
   // Output = 1.0 * 0.5 * 0.8 = 0.4
-  assert_true(settled_block.as_fixed_array().every(sample => sample == 0.4))
+  assert_true(settled_block.every(sample => sample == 0.4))
 }
 
 ///|
@@ -1253,7 +1225,7 @@ test "topology edit: delete chain reverses insert chain" {
   topology.process(context, insert_first)
   topology.process(context, insert_second)
   topology.process(context, inserted_block)
-  assert_true(inserted_block.as_fixed_array().every(sample => sample == 0.4))
+  assert_true(inserted_block.every(sample => sample == 0.4))
 
   // After insert: [constant(1.0), output(3), gain(0,0.5), gain(2,0.8)]
   // Indices: 0=constant, 1=output, 2=gain(0.5), 3=gain(0.8)
@@ -1277,7 +1249,7 @@ test "topology edit: delete chain reverses insert chain" {
   topology.process(context, delete_first)
   topology.process(context, delete_second)
   topology.process(context, restored_block)
-  assert_true(restored_block.as_fixed_array().every(sample => sample == 1.0))
+  assert_true(restored_block.every(sample => sample == 1.0))
 }
 
 ///|
@@ -1299,7 +1271,7 @@ test "topology edit: insert_chain rejects empty chain" {
     is Err(_),
   )
   topology.process(context, output)
-  assert_true(output.as_fixed_array().every(sample => sample == 1.0))
+  assert_true(output.every(sample => sample == 1.0))
 }
 
 ///|
@@ -1325,7 +1297,7 @@ test "topology edit: insert_chain rejects chain with binary node" {
     is Err(_),
   )
   topology.process(context, output)
-  assert_true(output.as_fixed_array().every(sample => sample == 1.0))
+  assert_true(output.every(sample => sample == 1.0))
 }
 
 ///|
@@ -1360,7 +1332,7 @@ test "topology edit: delete_chain rejects chain with binary node" {
     is Err(_),
   )
   topology.process(context, output)
-  assert_true(output.as_fixed_array().every(sample => sample == 1.5))
+  assert_true(output.every(sample => sample == 1.5))
 }
 
 ///|
