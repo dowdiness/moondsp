@@ -121,6 +121,20 @@ test "audio buffer can wrap an existing fixed array without copying" {
 }
 
 ///|
+test "audio buffer adopt shares storage with source array" {
+  let samples = FixedArray::make(4, 0.0)
+  let buffer = AudioBuffer::adopt(samples)
+
+  // buffer-to-source: writes via buf.set propagate to the source array
+  buffer.set(2, 0.5)
+  @debug.assert_eq(samples[2], 0.5)
+
+  // source-to-buffer: writes through the source handle appear in the buffer
+  samples[1] = -0.25
+  @debug.assert_eq(buffer.get(1), -0.25)
+}
+
+///|
 test "dsp context stores normalized runtime values" {
   let context = DspContext::new(sample_rate=48000.0, block_size=128)
 

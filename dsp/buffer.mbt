@@ -12,6 +12,27 @@ pub fn AudioBuffer::AudioBuffer(data : FixedArray[Double]) -> AudioBuffer {
 }
 
 ///|
+/// Wrap a `FixedArray[Double]` without copying.
+///
+/// The buffer and the source array share storage in both directions:
+/// writes through the buffer (`set` / `fill`) mutate the source, and
+/// mutations through the source handle appear through the buffer.
+/// Two specific bypasses follow from this: (a) the buffer's initial
+/// contents are whatever the source array holds at adoption time, not
+/// run through any normalization that future `set`/`fill` may apply;
+/// and (b) any later mutation through the retained source handle
+/// skips `AudioBuffer::set` entirely. (Writes through `buf.set(...)`
+/// or `buf.fill(...)` on an adopted buffer still go through those
+/// methods and pick up whatever validation they perform.) Use this
+/// only for FFI-bridged buffers (e.g., `TypedArray` or
+/// `SharedArrayBuffer` wrappers) where the copy cost is genuinely
+/// prohibitive and the caller can reason about the source lifetime.
+/// Otherwise use `AudioBuffer::new`.
+pub fn AudioBuffer::adopt(data : FixedArray[Double]) -> AudioBuffer {
+  { data, }
+}
+
+///|
 /// Create a new owned audio buffer with all samples initialized to the same value.
 pub fn AudioBuffer::filled(size : Int, init? : Double = 0.0) -> AudioBuffer {
   AudioBuffer::new(FixedArray::make(size, init))
