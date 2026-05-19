@@ -8,17 +8,15 @@ per-PR verification logs and merged-PR lists live in `git log` and
 
 ## Current State
 
-- `main` HEAD: `8de2106 refactor(dsp): tighten AudioBuffer encapsulation (#60)`.
+- `main` HEAD: `79c5ab9 refactor(dsp)!: AudioBuffer::new defensive copy + AudioBuffer::adopt (#62)`.
 - Latest release: **v0.4.0** (tagged 2026-05-18; GitHub release pinned;
-  `mooncakes` `dowdiness/moondsp@0.4.0` published 2026-05-19).
-- Open PR: **#61 `bench(voice): microbenchmark validate_voice_template
-  double-compile`** — CI green, awaiting merge. Adds
-  `voice/voice_benchmark.mbt` + `docs/performance/2026-05-19-...md`. No
-  behavior change. The microbench measured a 0.89×–1.06× waste-to-
-  productive compile ratio across wasm-gc and native, but only 1.6–7 µs
-  of control-thread cost per call — well below user-perceptible
-  authoring thresholds. **Verdict: defer the `is_compilable_in`
-  optimization indefinitely** (see snapshot for details).
+  `mooncakes` `dowdiness/moondsp@0.4.0` published 2026-05-19). The v0.4.0
+  branch of pre-1.0 API hygiene is closed; remaining slices are
+  free-choice.
+- No open PRs.
+- `## [Unreleased]` in `CHANGELOG.md` now carries the AudioBuffer::new
+  defensive-copy breaking change + AudioBuffer::adopt addition. Rolls
+  into the next release tag.
 - Known outstanding warnings: 8 `[0020]` Show-vs-Debug deprecations in
   `pattern/property_test.mbt` + `pattern/pattern_doc_test.mbt`, originating
   in `@qc.quick_check_fn`'s trait bound. Pinned on `moonbitlang/quickcheck`
@@ -31,9 +29,8 @@ For shipped-work history, read `CHANGELOG.md`. For the broader backlog
 
 ## Recommended Next Slice
 
-**Merge PR #61**, then pick the next slice from "Alternative Slices"
-below or from `memory/project_backlog.md`. The post-v0.4.0 work is no
-longer release-gated, so the next slice is free choice.
+Free choice — pick from "Alternative Slices" below or from
+`memory/project_backlog.md`. Nothing is release-gated.
 
 ## Alternative Slices
 
@@ -43,12 +40,38 @@ longer release-gated, so the next slice is free choice.
   no runtime impact. Single-line mechanical rewrite to
   `for i in 0..<left.length()`; bundle with the next scheduler-test touch.
 
+- **AudioBuffer write-time validation** — surfaced by the constructor
+  refactor (PR #62, spec
+  `docs/superpowers/specs/2026-05-19-audiobuffer-constructor-design.md`,
+  "What this design does NOT promise" section). `new`'s ingest,
+  `filled`'s ingest, `fill`, and `adopt` all bypass `set`, so any future
+  write-time validation (NaN screening, clipping, normalization) must
+  factor into a shared internal path covering all four entrypoints —
+  not just `set`. Brainstorm the validation contract before planning;
+  the decision shapes both the public surface and the FFI / SAB story
+  on `adopt`.
+
 - **Open another Phase 6+ slice** (per `memory/project_backlog.md`):
   incremental reparsing with loom, canopy structural editor, or
   per-sound parameter control. Each is multi-session scope; brainstorm
   before planning.
 
 ### Closed since the last update
+
+- ~~**`AudioBuffer::new` constructor encapsulation leak**~~ — SHIPPED
+  2026-05-19 in PR #62 (`refactor/audiobuffer-constructor`, squash
+  commit `79c5ab9`). `new` now defensively copies; `adopt` carries the
+  explicit zero-copy contract; `filled` re-routes through `adopt` to
+  preserve the single-allocation production hot path. Codex PR review:
+  one Low docstring-tense finding, fixed.
+
+- ~~**`validate_voice_template` double-compile microbenchmark**~~ —
+  SHIPPED 2026-05-19 in PR #61 (squash commit `20bae6b`). Measured a
+  0.89×–1.06× waste-to-productive compile ratio across wasm-gc and
+  native, but only 1.6–7 µs of control-thread cost per call — well
+  below user-perceptible authoring thresholds. **Verdict: defer the
+  `is_compilable_in` optimization indefinitely** (see
+  `docs/performance/2026-05-19-validate-voice-template-double-compile.md`).
 
 - ~~**`AudioBuffer::as_fixed_array` encapsulation cleanup**~~ — SHIPPED
   2026-05-19 in PR #60. `every`/`any` added with `raise?` parity,
