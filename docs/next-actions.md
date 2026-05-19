@@ -37,15 +37,6 @@ longer release-gated, so the next slice is free choice.
 
 ## Alternative Slices
 
-- **`AudioBuffer::new(FixedArray)` constructor leak** — recorded in
-  `memory/project_backlog.md`. The zero-copy constructor accepts external
-  storage by reference; callers can retain the original `FixedArray` and
-  mutate it after construction, bypassing future write-time validation.
-  Pre-1.0 API hygiene; brainstorm whether to (a) split into
-  `AudioBuffer::from_copy` (defensive) + a package-private zero-copy
-  variant, (b) document a borrow-style contract, or (c) leave as-is.
-  Surfaced by Codex during PR #60 design review (2026-05-19).
-
 - **C-style loops in `scheduler/scheduler_test.mbt:2255/2272`** — two
   helpers use `for i = 0; i < left.length(); i = i + 1 { ... }`,
   re-evaluating `length()` per iteration. Pre-existing, test-helper-only,
