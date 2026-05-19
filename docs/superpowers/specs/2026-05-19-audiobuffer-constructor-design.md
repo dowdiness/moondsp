@@ -31,12 +31,12 @@ Keep the existing public API surface — `AudioBuffer::AudioBuffer(FixedArray)` 
 ```moonbit
 /// Wrap a `FixedArray[Double]` by copying its contents.
 ///
-/// The buffer is fully owned after construction; the source array and
-/// the buffer are independent. Mutating the source has no effect on
-/// the buffer, and writes through the buffer (via `set` / `fill`) do
-/// not propagate back to the source. Use this when ingesting external
-/// data of unclear lifetime. For explicit zero-copy adoption, see
-/// `AudioBuffer::adopt`.
+/// The buffer's underlying storage is distinct from the source array;
+/// neither side observes mutations made through the other. Mutating
+/// the source has no effect on the buffer, and writes through the
+/// buffer (via `set` / `fill`) do not propagate back to the source.
+/// Use this when ingesting external data of unclear lifetime. For
+/// explicit zero-copy adoption, see `AudioBuffer::adopt`.
 #alias(new)
 pub fn AudioBuffer::AudioBuffer(data : FixedArray[Double]) -> AudioBuffer {
   AudioBuffer::adopt(data.copy())
@@ -44,9 +44,9 @@ pub fn AudioBuffer::AudioBuffer(data : FixedArray[Double]) -> AudioBuffer {
 
 /// Construct an audio buffer pre-filled with `init` (default 0.0).
 ///
-/// The buffer is fully owned. Unchanged from before; routed through
-/// `adopt` to avoid an unnecessary copy of the freshly-allocated
-/// `FixedArray`.
+/// The buffer's storage is freshly allocated and not shared with any
+/// caller-visible array. Routed through `adopt` to avoid an
+/// unnecessary copy of the freshly-allocated `FixedArray`.
 pub fn AudioBuffer::filled(size : Int, init? : Double = 0.0) -> AudioBuffer {
   AudioBuffer::adopt(FixedArray::make(size, init))
 }
@@ -56,11 +56,17 @@ pub fn AudioBuffer::filled(size : Int, init? : Double = 0.0) -> AudioBuffer {
 /// The buffer and the source array share storage in both directions:
 /// writes through the buffer (`set` / `fill`) mutate the source, and
 /// mutations through the source handle appear through the buffer.
-/// This bypasses any validation/instrumentation built on top of
-/// `AudioBuffer::set`. Use this only for FFI-bridged buffers (e.g.,
-/// `TypedArray` or `SharedArrayBuffer` wrappers) where the copy cost
-/// is genuinely prohibitive and the caller can reason about the
-/// source lifetime. Otherwise use `AudioBuffer::new`.
+/// Two specific bypasses follow from this: (a) the buffer's initial
+/// contents are whatever the source array holds at adoption time, not
+/// run through any normalization that future `set`/`fill` may apply;
+/// and (b) any later mutation through the retained source handle
+/// skips `AudioBuffer::set` entirely. (Writes through `buf.set(...)`
+/// or `buf.fill(...)` on an adopted buffer still go through those
+/// methods and pick up whatever validation they perform.) Use this
+/// only for FFI-bridged buffers (e.g., `TypedArray` or
+/// `SharedArrayBuffer` wrappers) where the copy cost is genuinely
+/// prohibitive and the caller can reason about the source lifetime.
+/// Otherwise use `AudioBuffer::new`.
 pub fn AudioBuffer::adopt(data : FixedArray[Double]) -> AudioBuffer {
   { data, }
 }
@@ -70,8 +76,8 @@ Why route `filled` through `adopt`: `filled` constructs the `FixedArray` itself,
 
 ### Why this shape
 
-- **Safe by default.** Callers of `AudioBuffer::new(data)` — the bulk of internal tests and any uninspected downstream code — automatically get encapsulation. The canonical-name path becomes the validation-friendly path.
-- **Zero API churn for unaliased callers.** The exposed signature for `AudioBuffer::AudioBuffer` and the `new` alias are unchanged in `dsp/pkg.generated.mbti`. No mooncake consumer recompile is required for callers that weren't exploiting the aliasing.
+- **Safe by default.** Callers of `AudioBuffer::new(data)` — the bulk of internal tests and any uninspected downstream code — automatically get the storage-isolation guarantee. The canonical-name path becomes the validation-friendly path.
+- **No source migration for unaliased callers.** The exposed signature for `AudioBuffer::AudioBuffer` and the `new` alias are unchanged in `dsp/pkg.generated.mbti`. Callers that weren't exploiting the aliasing hit no compile error on upgrade — only the silent behavioral change. (Downstream consumers still recompile on a normal upgrade; the point is that no source edits are required.)
 - **Explicit escape hatch with audit-friendly name.** `adopt` names the dangerous contract verbally. The asymmetry with the default constructor (no `from_`/`new` prefix) telegraphs that this is not a normal conversion. A grep for `AudioBuffer::adopt` enumerates every zero-copy adoption site for review; the default path needs no such audit.
 - **No `filled` regression.** `filled` is re-pointed at `adopt` (legal because `filled` owns the freshly-made array). Production hot paths see no allocation overhead.
 
@@ -83,7 +89,7 @@ Write-time validation will require more than swapping `new`'s body. The followin
 - `AudioBuffer::fill(value)` writes via `self.data.fill(value)`, not via `set`.
 - `AudioBuffer::adopt`-constructed buffers can be mutated externally through the retained source handle.
 
-The future write-time-validation slice must factor sample normalization into a single internal helper that all of `new`'s ingest, `filled`'s ingest, `fill`, and `set` route through. This spec only restores the *option* of doing that correctly — it does not deliver validation itself, and the internal-helper refactor is in that slice's scope, not this one.
+The future write-time-validation slice must factor sample normalization into a shared internal validation/normalization path that all of `new`'s ingest, `filled`'s ingest, `fill`, and `set` route through. The exact shape (e.g., a `validate_sample` helper, a buffer-level `validate_all` pass, or per-method inline checks) is for that slice to decide. This spec only restores the *option* of doing it correctly — it does not deliver validation itself, and the internal-helper refactor is in that slice's scope, not this one.
 
 ### Behavioral change
 
@@ -149,7 +155,7 @@ Pre-1.0 leeway covers the change for downstream consumers, but it is **breaking 
 
 When the write-time-validation slice lands:
 
-- It must introduce a single internal `validate_sample(Double) -> Double` (or `normalize_sample`) helper and route **all** ingest/write paths through it: `AudioBuffer::new`'s `data.copy()` ingest, `AudioBuffer::filled`'s `FixedArray::make` ingest, `AudioBuffer::fill`, and `AudioBuffer::set`. Without this refactor, the default constructor's defensive copy is not actually a validation surface — it just ingests bytes raw.
+- It must introduce a shared internal validation/normalization path and route **all** ingest/write paths through it: `AudioBuffer::new`'s `data.copy()` ingest, `AudioBuffer::filled`'s `FixedArray::make` ingest, `AudioBuffer::fill`, and `AudioBuffer::set`. The specific shape (per-sample helper, buffer-level pass, inline checks) is for that slice; the constraint is uniform coverage. Without this refactor, the default constructor's defensive copy is not actually a validation surface — it just ingests bytes raw.
 - `AudioBuffer::adopt` buffers bypass validation by design — this is the documented contract. Callers needing validation on externally-sourced data should either use the default constructor (paying the copy cost) or instrument the source array themselves before adoption.
 
 Optional follow-up (not required for this slice): a debug-only shadow-buffer mode for `adopt` buffers — store a snapshot at adoption time and have `set`/`fill` update both, then assert at chosen boundaries that the live data still matches the shadow modulo recorded writes. Catches accidental external mutation during development. Cost: memory and time, so keep it opt-in or `#cfg(debug)`. Scope it only if the validation slice finds real bugs caused by silent `adopt` misuse.
