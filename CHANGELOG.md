@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking changes
+
+- **`AudioBuffer::new` (and `AudioBuffer::AudioBuffer`) now defensively
+  copies its argument.** Previously, the constructor stored the caller's
+  `FixedArray` by reference, so the buffer and the source array shared
+  storage in both directions: writes to the source appeared in the
+  buffer, and writes through `AudioBuffer::set` / `AudioBuffer::fill`
+  mutated the source. Both directions are now decoupled.
+
+  **Migration:** callers that depended on the shared-storage behavior
+  should replace `AudioBuffer::new(arr)` with `AudioBuffer::adopt(arr)`.
+  See the constructor docstrings in `dsp/buffer.mbt` for the full
+  contract on both forms.
+
+### Added
+
+- `AudioBuffer::adopt(FixedArray[Double]) -> AudioBuffer` — explicit
+  zero-copy adoption for FFI / SharedArrayBuffer–style buffer bridging.
+  The buffer and the source array share storage; mutations through the
+  retained source handle bypass any future write-time validation by
+  design.
+
 ## [0.4.0] - 2026-05-18
 
 This release bundles two breaking refactors of the graph public API plus
