@@ -5,10 +5,17 @@ pub struct AudioBuffer {
 }
 
 ///|
-/// Wrap an existing `FixedArray[Double]` without copying.
+/// Wrap a `FixedArray[Double]` by copying its contents.
+///
+/// The buffer's underlying storage is distinct from the source array;
+/// neither side observes mutations made through the other. Mutating
+/// the source has no effect on the buffer, and writes through the
+/// buffer (via `set` / `fill`) do not propagate back to the source.
+/// Use this when ingesting external data of unclear lifetime. For
+/// explicit zero-copy adoption, see `AudioBuffer::adopt`.
 #alias(new)
 pub fn AudioBuffer::AudioBuffer(data : FixedArray[Double]) -> AudioBuffer {
-  { data, }
+  AudioBuffer::adopt(data.copy())
 }
 
 ///|

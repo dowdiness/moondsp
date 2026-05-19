@@ -109,18 +109,6 @@ test "audio buffer initializes and mutates samples" {
 }
 
 ///|
-test "audio buffer can wrap an existing fixed array without copying" {
-  let samples = FixedArray::make(4, 0.0)
-  let buffer = AudioBuffer::new(samples)
-
-  buffer.set(2, 0.5)
-
-  @debug.assert_eq(samples[2], 0.5)
-  samples[1] = -0.25
-  @debug.assert_eq(buffer.get(1), -0.25)
-}
-
-///|
 test "audio buffer adopt shares storage with source array" {
   let samples = FixedArray::make(4, 0.0)
   let buffer = AudioBuffer::adopt(samples)
@@ -132,6 +120,20 @@ test "audio buffer adopt shares storage with source array" {
   // source-to-buffer: writes through the source handle appear in the buffer
   samples[1] = -0.25
   @debug.assert_eq(buffer.get(1), -0.25)
+}
+
+///|
+test "audio buffer new does not share storage with source array" {
+  let samples = FixedArray::make(4, 0.0)
+  let buffer = AudioBuffer::new(samples)
+
+  // source-to-buffer: mutating the source must NOT affect the buffer
+  samples[0] = 0.75
+  @debug.assert_eq(buffer.get(0), 0.0)
+
+  // buffer-to-source: writes via buf.set must NOT affect the source
+  buffer.set(1, -0.25)
+  @debug.assert_eq(samples[1], 0.0)
 }
 
 ///|
