@@ -29,10 +29,8 @@ test "process fills a block with bounded samples" {
 
   @debug.assert_eq(buffer.length(), 128)
   @debug.assert_eq(buffer.get(0), 0.0)
-  assert_true(buffer.as_fixed_array().any(sample => sample != 0.0))
-  assert_true(
-    buffer.as_fixed_array().every(sample => sample >= -1.0 && sample <= 1.0),
-  )
+  assert_true(buffer.any(sample => sample != 0.0))
+  assert_true(buffer.every(sample => sample >= -1.0 && sample <= 1.0))
 }
 
 ///|
@@ -73,9 +71,7 @@ test "square waveform toggles only between bipolar levels" {
     freq_hz=440.0,
   )
 
-  assert_true(
-    buffer.as_fixed_array().every(sample => sample == 1.0 || sample == -1.0),
-  )
+  assert_true(buffer.every(sample => sample == 1.0 || sample == -1.0))
 }
 
 ///|
@@ -91,9 +87,7 @@ test "triangle waveform stays bounded and changes smoothly" {
     freq_hz=440.0,
   )
 
-  assert_true(
-    buffer.as_fixed_array().every(sample => sample >= -1.0 && sample <= 1.0),
-  )
+  assert_true(buffer.every(sample => sample >= -1.0 && sample <= 1.0))
   assert_true((buffer.get(1) - buffer.get(0)).abs() < 0.1)
   assert_true((buffer.get(2) - buffer.get(1)).abs() < 0.1)
 }
@@ -164,7 +158,7 @@ test "gain with zero amount silences samples" {
 
   gain.process(context~, buffer~, amount=0.0)
 
-  assert_true(buffer.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(buffer.every(sample => sample == 0.0))
 }
 
 ///|
@@ -286,10 +280,8 @@ test "noise process fills a block with bounded samples" {
   noise.process(context, buffer)
 
   @debug.assert_eq(buffer.length(), 128)
-  assert_true(buffer.as_fixed_array().any(sample => sample != 0.0))
-  assert_true(
-    buffer.as_fixed_array().every(sample => sample >= -1.0 && sample <= 1.0),
-  )
+  assert_true(buffer.any(sample => sample != 0.0))
+  assert_true(buffer.every(sample => sample >= -1.0 && sample <= 1.0))
 }
 
 ///|
@@ -481,7 +473,7 @@ test "pan sends mono input fully left at -1 position" {
   @debug.assert_eq(left.get(1), 0.5)
   @debug.assert_eq(left.get(2), -0.5)
   @debug.assert_eq(left.get(3), -1.0)
-  assert_true(right.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(right.every(sample => sample == 0.0))
 }
 
 ///|
@@ -523,7 +515,7 @@ test "pan sends mono input fully right at +1 position" {
     position=1.0,
   )
 
-  assert_true(left.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(left.every(sample => sample == 0.0))
   @debug.assert_eq(right.get(0), 1.0)
   @debug.assert_eq(right.get(1), 0.5)
   @debug.assert_eq(right.get(2), -0.5)
@@ -546,7 +538,7 @@ test "pan clamps finite positions outside the supported range" {
     position=2.0,
   )
 
-  assert_true(left.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(left.every(sample => sample == 0.0))
   @debug.assert_eq(right.get(0), 1.0)
   @debug.assert_eq(right.get(1), 0.5)
 }

@@ -14,7 +14,7 @@ test "copy_buffer: same length copies all samples" {
   let src = AudioBuffer::filled(4, init=0.5)
   let tgt = AudioBuffer::filled(4, init=1.0)
   copy_buffer(src, tgt, 4)
-  assert_true(tgt.as_fixed_array().every(sample => sample == 0.5))
+  assert_true(tgt.every(sample => sample == 0.5))
 }
 
 ///|
@@ -42,35 +42,35 @@ test "fill_constant_buffer: partial fill zero-fills remainder" {
 test "fill_constant_buffer: full fill" {
   let buf = AudioBuffer::filled(4)
   fill_constant_buffer(buf, 4, 0.3)
-  assert_true(buf.as_fixed_array().every(sample => sample == 0.3))
+  assert_true(buf.every(sample => sample == 0.3))
 }
 
 ///|
 test "apply_gain_buffer: gain zero produces silence" {
   let buf = AudioBuffer::filled(4, init=0.8)
   apply_gain_buffer(buf, 4, 0.0)
-  assert_true(buf.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(buf.every(sample => sample == 0.0))
 }
 
 ///|
 test "apply_gain_buffer: gain one is passthrough" {
   let buf = AudioBuffer::filled(4, init=0.6)
   apply_gain_buffer(buf, 4, 1.0)
-  assert_true(buf.as_fixed_array().every(sample => sample == 0.6))
+  assert_true(buf.every(sample => sample == 0.6))
 }
 
 ///|
 test "apply_gain_buffer: gain half halves values" {
   let buf = AudioBuffer::filled(4, init=1.0)
   apply_gain_buffer(buf, 4, 0.5)
-  assert_true(buf.as_fixed_array().every(sample => sample == 0.5))
+  assert_true(buf.every(sample => sample == 0.5))
 }
 
 ///|
 test "apply_gain_buffer: negative gain inverts signal" {
   let buf = AudioBuffer::filled(4, init=0.4)
   apply_gain_buffer(buf, 4, -1.0)
-  assert_true(buf.as_fixed_array().every(sample => sample == -0.4))
+  assert_true(buf.every(sample => sample == -0.4))
 }
 
 ///|
@@ -98,28 +98,28 @@ test "multiply_buffers: ring modulation with zero" {
   let right = AudioBuffer::filled(4, init=0.0)
   let output = AudioBuffer::filled(4)
   multiply_buffers(left, right, output, 4)
-  assert_true(output.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(output.every(sample => sample == 0.0))
 }
 
 ///|
 test "clip_buffer: values within threshold unchanged" {
   let buf = AudioBuffer::filled(4, init=0.3)
   clip_buffer(buf, 4, 1.0)
-  assert_true(buf.as_fixed_array().every(sample => sample == 0.3))
+  assert_true(buf.every(sample => sample == 0.3))
 }
 
 ///|
 test "clip_buffer: values exceeding threshold are clipped" {
   let buf = AudioBuffer::filled(4, init=1.5)
   clip_buffer(buf, 4, 1.0)
-  assert_true(buf.as_fixed_array().every(sample => sample == 1.0))
+  assert_true(buf.every(sample => sample == 1.0))
 }
 
 ///|
 test "clip_buffer: negative values clipped to negative threshold" {
   let buf = AudioBuffer::filled(4, init=-2.0)
   clip_buffer(buf, 4, 0.5)
-  assert_true(buf.as_fixed_array().every(sample => sample == -0.5))
+  assert_true(buf.every(sample => sample == -0.5))
 }
 
 ///|
@@ -137,8 +137,8 @@ test "copy_stereo_buffers: copies both channels" {
   let tl = AudioBuffer::filled(4)
   let tr = AudioBuffer::filled(4)
   copy_stereo_buffers(sl, sr, tl, tr, 4)
-  assert_true(tl.as_fixed_array().every(sample => sample == 0.4))
-  assert_true(tr.as_fixed_array().every(sample => sample == 0.6))
+  assert_true(tl.every(sample => sample == 0.4))
+  assert_true(tr.every(sample => sample == 0.6))
 }
 
 ///|
@@ -147,5 +147,5 @@ test "mixdown_stereo_buffers: averages left and right" {
   let right = AudioBuffer::filled(4, init=0.2)
   let output = AudioBuffer::filled(4)
   mixdown_stereo_buffers(left, right, output, 4)
-  assert_true(output.as_fixed_array().every(sample => sample == 0.5))
+  assert_true(output.every(sample => sample == 0.5))
 }

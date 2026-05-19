@@ -205,11 +205,9 @@ test "compiled dsp topologically sorts declarative node order" {
   compiled.process(context, output)
 
   @debug.assert_eq(output.get(0), ZERO_SAMPLE)
-  assert_true(output.as_fixed_array().any(sample => sample != ZERO_SAMPLE))
+  assert_true(output.any(sample => sample != ZERO_SAMPLE))
   assert_true(
-    output
-    .as_fixed_array()
-    .every(sample => sample >= -HALF_GAIN && sample <= HALF_GAIN),
+    output.every(sample => sample >= -HALF_GAIN && sample <= HALF_GAIN),
   )
 }
 

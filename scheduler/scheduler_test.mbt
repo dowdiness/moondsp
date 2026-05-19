@@ -2238,10 +2238,9 @@ test "process_block: stolen voice gate-off is harmless" {
 /// Sum of absolute sample values across an `AudioBuffer`. Used to
 /// detect whether a buffer carries any signal vs is silent.
 fn buffer_abs_sum(buf : @moondsp.AudioBuffer) -> Double {
-  let arr = buf.as_fixed_array()
   let mut total = 0.0
-  for i in 0..<arr.length() {
-    let v = arr[i]
+  for i in 0..<buf.length() {
+    let v = buf.get(i)
     total = total + (if v < 0.0 { -v } else { v })
   }
   total

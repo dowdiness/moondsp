@@ -46,7 +46,20 @@ pub fn AudioBuffer::set(
 }
 
 ///|
-/// Expose the underlying fixed array for low-level integration points.
-pub fn AudioBuffer::as_fixed_array(self : AudioBuffer) -> FixedArray[Double] {
-  self.data
+/// Test whether `predicate` holds for every sample in the buffer.
+#alias(every)
+pub fn AudioBuffer::all(
+  self : AudioBuffer,
+  predicate : (Double) -> Bool raise?,
+) -> Bool raise? {
+  self.data.all(predicate)
+}
+
+///|
+/// Test whether `predicate` holds for at least one sample in the buffer.
+pub fn AudioBuffer::any(
+  self : AudioBuffer,
+  predicate : (Double) -> Bool raise?,
+) -> Bool raise? {
+  self.data.any(predicate)
 }

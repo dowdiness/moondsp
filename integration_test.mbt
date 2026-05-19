@@ -390,7 +390,7 @@ test "compiled stereo graph voice path responds to runtime pan updates" {
     integration_buffer_is_finite_and_bounded(right_output, GRAPH_STEREO_CLIP),
   )
   assert_true(integration_any_non_zero(left_output))
-  assert_true(right_output.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(right_output.every(sample => sample == 0.0))
   assert_true(
     integration_abs_sum(left_output) > integration_abs_sum(right_output),
   )
@@ -434,7 +434,7 @@ test "compiled stereo graph applies batched control frames" {
   assert_true(integration_buffer_is_finite_and_bounded(left_output, HALF_GAIN))
   assert_true(integration_buffer_is_finite_and_bounded(right_output, HALF_GAIN))
   assert_true(integration_any_non_zero(left_output))
-  assert_true(right_output.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(right_output.every(sample => sample == 0.0))
   assert_true(
     integration_abs_sum(left_output) > integration_abs_sum(right_output),
   )
@@ -459,7 +459,7 @@ test "compiled stereo graph applies batched control frames" {
   assert_true(
     integration_buffer_is_finite_and_bounded(right_output, GRAPH_STEREO_CLIP),
   )
-  assert_true(left_output.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(left_output.every(sample => sample == 0.0))
   assert_true(integration_any_non_zero(right_output))
   assert_true(
     integration_abs_sum(right_output) > integration_abs_sum(left_output),
@@ -980,9 +980,7 @@ test "compiled stereo graph mono z^-1 feedback cycle applies batched runtime cha
     (second_left.get(0) - 0.4990234375).abs() < INTEGRATION_BUFFER_EPSILON,
   )
   assert_true(
-    second_right
-    .as_fixed_array()
-    .all(sample => sample.abs() < INTEGRATION_BUFFER_EPSILON),
+    second_right.all(sample => sample.abs() < INTEGRATION_BUFFER_EPSILON),
   )
   assert_true(second_left.get(second_left.length() - 1) < second_left.get(0))
 }
@@ -1018,8 +1016,8 @@ test "compiled graph hot swap crossfades between bounded mono graphs" {
   assert_true(first_block.get(1) > first_block.get(0))
   assert_true(first_block.get(2) > first_block.get(1))
   assert_true(first_block.get(3) > first_block.get(2))
-  assert_true(second_block.as_fixed_array().every(sample => sample == 0.75))
-  assert_true(settled_block.as_fixed_array().every(sample => sample == 0.75))
+  assert_true(second_block.every(sample => sample == 0.75))
+  assert_true(settled_block.every(sample => sample == 0.75))
 }
 
 ///|
@@ -1064,9 +1062,7 @@ test "compiled graph topology edit crossfades rebuilt mono graphs" {
   )
   assert_true(first_block.get(0) == HALF_GAIN)
   assert_true(second_block.get(0) >= HALF_GAIN)
-  assert_true(
-    settled_block.as_fixed_array().every(sample => sample == HALF_GAIN),
-  )
+  assert_true(settled_block.every(sample => sample == HALF_GAIN))
 }
 
 ///|
@@ -1107,7 +1103,7 @@ test "compiled graph topology edit rewires rebuilt mono graphs" {
   assert_true(integration_buffer_is_finite_and_bounded(settled_block, 3.5))
   assert_true(first_block.get(0) == 2.0)
   assert_true(second_block.get(0) >= 2.0)
-  assert_true(settled_block.as_fixed_array().every(sample => sample == 3.5))
+  assert_true(settled_block.every(sample => sample == 3.5))
 }
 
 ///|
@@ -1146,9 +1142,7 @@ test "compiled graph topology edit inserts rebuilt mono graphs" {
   )
   assert_true(first_block.get(0) == 1.0)
   assert_true(second_block.get(0) >= HALF_GAIN)
-  assert_true(
-    settled_block.as_fixed_array().every(sample => sample == HALF_GAIN),
-  )
+  assert_true(settled_block.every(sample => sample == HALF_GAIN))
 }
 
 ///|
@@ -1181,7 +1175,7 @@ test "compiled graph topology edit deletes rebuilt mono graphs" {
   assert_true(integration_buffer_is_finite_and_bounded(settled_block, 1.0))
   assert_true(first_block.get(0) == HALF_GAIN)
   assert_true(second_block.get(0) >= HALF_GAIN)
-  assert_true(settled_block.as_fixed_array().every(sample => sample == 1.0))
+  assert_true(settled_block.every(sample => sample == 1.0))
 }
 
 ///|
@@ -1239,11 +1233,9 @@ test "compiled graph topology edit insert delete roundtrip restores rebuilt mono
   )
   assert_true(integration_buffer_is_finite_and_bounded(restored_block, 1.0))
   assert_true(insert_first_block.get(0) == 1.0)
-  assert_true(
-    inserted_block.as_fixed_array().every(sample => sample == HALF_GAIN),
-  )
+  assert_true(inserted_block.every(sample => sample == HALF_GAIN))
   assert_true(delete_first_block.get(0) == HALF_GAIN)
-  assert_true(restored_block.as_fixed_array().every(sample => sample == 1.0))
+  assert_true(restored_block.every(sample => sample == 1.0))
 }
 
 ///|
@@ -1325,17 +1317,13 @@ test "compiled stereo graph hot swap preserves bounded stereo output" {
   )
   assert_true(first_left.get(0) == 0.25 * GRAPH_STEREO_CENTER_GAIN)
   assert_true(
-    second_left
-    .as_fixed_array()
-    .every(sample => {
+    second_left.every(sample => {
       (sample - 0.75 * GRAPH_STEREO_CENTER_GAIN).abs() <
       INTEGRATION_BUFFER_EPSILON
     }),
   )
   assert_true(
-    settled_left
-    .as_fixed_array()
-    .every(sample => {
+    settled_left.every(sample => {
       (sample - 0.75 * GRAPH_STEREO_CENTER_GAIN).abs() <
       INTEGRATION_BUFFER_EPSILON
     }),
@@ -1392,20 +1380,14 @@ test "compiled stereo graph topology edit crossfades rebuilt stereo graphs" {
   assert_true(first_left.get(0) == 1.0)
   assert_true(second_left.get(0) >= 1.0)
   assert_true(
-    first_right
-    .as_fixed_array()
-    .every(sample => sample.abs() < INTEGRATION_BUFFER_EPSILON),
+    first_right.every(sample => sample.abs() < INTEGRATION_BUFFER_EPSILON),
   )
   assert_true(
-    second_right
-    .as_fixed_array()
-    .every(sample => sample.abs() < INTEGRATION_BUFFER_EPSILON),
+    second_right.every(sample => sample.abs() < INTEGRATION_BUFFER_EPSILON),
   )
-  assert_true(settled_left.as_fixed_array().every(sample => sample == 1.0))
+  assert_true(settled_left.every(sample => sample == 1.0))
   assert_true(
-    settled_right
-    .as_fixed_array()
-    .every(sample => sample.abs() < INTEGRATION_BUFFER_EPSILON),
+    settled_right.every(sample => sample.abs() < INTEGRATION_BUFFER_EPSILON),
   )
 }
 
@@ -1551,7 +1533,7 @@ test "compiled graph control frames apply batched runtime changes per block" {
   assert_true(
     integration_buffer_is_finite_and_bounded(output, GRAPH_VOICE_CLIP),
   )
-  assert_true(output.as_fixed_array().every(sample => sample == 0.0))
+  assert_true(output.every(sample => sample == 0.0))
 
   assert_true(
     compiled.apply_controls([
@@ -1855,7 +1837,7 @@ fn integration_apply_smoothed_gain(
 
 ///|
 fn integration_any_non_zero(buffer : AudioBuffer) -> Bool {
-  buffer.as_fixed_array().any(sample => sample != 0.0)
+  buffer.any(sample => sample != 0.0)
 }
 
 ///|
@@ -1932,9 +1914,7 @@ fn integration_buffer_is_finite_and_bounded(
   buffer : AudioBuffer,
   limit : Double,
 ) -> Bool {
-  buffer
-  .as_fixed_array()
-  .every(sample => {
+  buffer.every(sample => {
     !sample.is_nan() && !sample.is_inf() && sample >= -limit && sample <= limit
   })
 }
