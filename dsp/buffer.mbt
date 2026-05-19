@@ -57,6 +57,7 @@ pub fn AudioBuffer::all(
 
 ///|
 /// Test whether `predicate` holds for at least one sample in the buffer.
+#alias(exists)
 pub fn AudioBuffer::any(
   self : AudioBuffer,
   predicate : (Double) -> Bool raise?,

@@ -49,6 +49,7 @@ pub struct AudioBuffer {
 pub fn AudioBuffer::AudioBuffer(FixedArray[Double]) -> Self
 #alias(every)
 pub fn AudioBuffer::all(Self, (Double) -> Bool raise?) -> Bool raise?
+#alias(exists)
 pub fn AudioBuffer::any(Self, (Double) -> Bool raise?) -> Bool raise?
 pub fn AudioBuffer::fill(Self, Double) -> Unit
 pub fn AudioBuffer::filled(Int, init? : Double) -> Self
