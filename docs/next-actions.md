@@ -8,15 +8,15 @@ per-PR verification logs and merged-PR lists live in `git log` and
 
 ## Current State
 
-- `main` HEAD: `16bb9b0 docs: document mini scalar controls`.
-- Latest release: **v0.5.0** (tagged 2026-05-20; GitHub release pinned;
-  `mooncakes` `dowdiness/moondsp@0.5.0` published 2026-05-20). The
-  AudioBuffer API-hardening branch is closed; remaining slices are
-  free-choice.
+- `main` HEAD: `a50bdfd chore: prepare v0.5.1 release`.
+- Latest release: **v0.5.1** (tagged 2026-05-20; GitHub release pinned;
+  `mooncakes` `dowdiness/moondsp@0.5.1` published 2026-05-20). The mini
+  per-sound scalar-control branch is closed; remaining slices are free-choice.
 - No open PRs.
-- `CHANGELOG.md` has a prepared `## [0.5.1] - 2026-05-20` section for the
-  post-v0.5.0 mini per-sound control additions from PR #66 and #67.
-- Next release target: **v0.5.1**.
+- `CHANGELOG.md` has an empty `## [Unreleased]` section after the
+  `## [0.5.1] - 2026-05-20` release section.
+- Next release target: **v0.5.2** unless the next slice introduces a
+  minor-version feature.
 - Known outstanding warnings: 8 `[0020]` Show-vs-Debug deprecations from
   `@qc.quick_check_fn` in DSP and pattern property tests. Treat as
   dependency-bound unless `moonbitlang/quickcheck` has changed its trait
@@ -49,6 +49,11 @@ scalar controls.
   brainstorm before planning.
 
 ### Closed since the last update
+
+- ~~**v0.5.1 mini scalar-control release**~~ — SHIPPED 2026-05-20 as tag
+  `v0.5.1`, GitHub release, and mooncakes `dowdiness/moondsp@0.5.1`.
+  Bundles PR #66 and #67 plus documentation updates for `.cutoff(f)`,
+  `.gain(g)`, and `.pan(p)`.
 
 - ~~**Mini per-sound parameter control**~~ — SHIPPED 2026-05-20 in PR
   #66 and #67 (squash commits `b187efe` and `8432075`). Mini notation now
