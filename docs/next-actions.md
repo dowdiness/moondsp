@@ -1,6 +1,6 @@
 # Next Actions
 
-Updated: 2026-05-19
+Updated: 2026-05-20
 
 Forward-looking handoff for the next session. Keep short and actionable;
 per-PR verification logs and merged-PR lists live in `git log` and
@@ -8,20 +8,20 @@ per-PR verification logs and merged-PR lists live in `git log` and
 
 ## Current State
 
-- `main` HEAD: `79c5ab9 refactor(dsp)!: AudioBuffer::new defensive copy + AudioBuffer::adopt (#62)`.
+- `main` HEAD: `bf02217 [codex] Normalize scheduler test loops (#64)`.
 - Latest release: **v0.4.0** (tagged 2026-05-18; GitHub release pinned;
   `mooncakes` `dowdiness/moondsp@0.4.0` published 2026-05-19). The v0.4.0
   branch of pre-1.0 API hygiene is closed; remaining slices are
   free-choice.
 - No open PRs.
 - `## [Unreleased]` in `CHANGELOG.md` now carries the AudioBuffer::new
-  defensive-copy breaking change + AudioBuffer::adopt addition. Rolls
-  into the next release tag.
-- Known outstanding warnings: 8 `[0020]` Show-vs-Debug deprecations in
-  `pattern/property_test.mbt` + `pattern/pattern_doc_test.mbt`, originating
-  in `@qc.quick_check_fn`'s trait bound. Pinned on `moonbitlang/quickcheck`
-  publishing ≥0.14.0 (verified: 0.13.0 still has the old bound). No action
-  on our side until mooncakes ships 0.14.0.
+  defensive-copy breaking change + AudioBuffer::adopt addition, plus the
+  AudioBuffer write-time non-finite normalization from PR #63. Rolls into
+  the next release tag.
+- Known outstanding warnings: 8 `[0020]` Show-vs-Debug deprecations from
+  `@qc.quick_check_fn` in DSP and pattern property tests. Treat as
+  dependency-bound unless `moonbitlang/quickcheck` has changed its trait
+  bound; verify the current mooncakes state before planning local edits.
 
 For shipped-work history, read `CHANGELOG.md`. For the broader backlog
 (quick wins, pre-1.0 API hygiene, Phase 6+ roadmap), read
@@ -30,26 +30,17 @@ For shipped-work history, read `CHANGELOG.md`. For the broader backlog
 ## Recommended Next Slice
 
 Free choice — pick from "Alternative Slices" below or from
-`memory/project_backlog.md`. Nothing is release-gated.
+`memory/project_backlog.md`. Nothing is release-gated. The most concrete
+small follow-up is the quickcheck warning sweep, but only after verifying
+whether a dependency update removes the deprecated `Show` bound.
 
 ## Alternative Slices
 
-- **C-style loops in `scheduler/scheduler_test.mbt:2255/2272`** — two
-  helpers use `for i = 0; i < left.length(); i = i + 1 { ... }`,
-  re-evaluating `length()` per iteration. Pre-existing, test-helper-only,
-  no runtime impact. Single-line mechanical rewrite to
-  `for i in 0..<left.length()`; bundle with the next scheduler-test touch.
-
-- **AudioBuffer write-time validation** — surfaced by the constructor
-  refactor (PR #62, spec
-  `docs/superpowers/specs/2026-05-19-audiobuffer-constructor-design.md`,
-  "What this design does NOT promise" section). `new`'s ingest,
-  `filled`'s ingest, `fill`, and `adopt` all bypass `set`, so any future
-  write-time validation (NaN screening, clipping, normalization) must
-  factor into a shared internal path covering all four entrypoints —
-  not just `set`. Brainstorm the validation contract before planning;
-  the decision shapes both the public surface and the FFI / SAB story
-  on `adopt`.
+- **Quickcheck warning sweep** — `rtk moon check` still reports 8
+  dependency-bound `[0020]` Show-vs-Debug warnings from
+  `@qc.quick_check_fn` in property tests. First verify whether a
+  `moonbitlang/quickcheck` update removes the old bound; only plan local
+  suppressions or test rewrites if the dependency remains blocked.
 
 - **Open another Phase 6+ slice** (per `memory/project_backlog.md`):
   incremental reparsing with loom, canopy structural editor, or
@@ -57,6 +48,17 @@ Free choice — pick from "Alternative Slices" below or from
   before planning.
 
 ### Closed since the last update
+
+- ~~**C-style loops in `scheduler/scheduler_test.mbt:2255/2272`**~~ —
+  SHIPPED 2026-05-20 in PR #64 (squash commit `bf02217`). The two
+  sample-scan helper loops now use `for i in 0..<left.length()`; no
+  scheduler behavior changed.
+
+- ~~**AudioBuffer write-time validation**~~ — SHIPPED 2026-05-20 in PR
+  #63 (squash commit `f431b13`). MoonBit-owned writes through `new`,
+  `filled`, `fill`, and `set` normalize non-finite samples to `0.0`;
+  finite samples pass through unchanged. `adopt` remains the explicit
+  retained-handle bypass, with normalized writes through buffer methods.
 
 - ~~**`AudioBuffer::new` constructor encapsulation leak**~~ — SHIPPED
   2026-05-19 in PR #62 (`refactor/audiobuffer-constructor`, squash
