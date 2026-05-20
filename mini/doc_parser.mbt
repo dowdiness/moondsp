@@ -244,7 +244,10 @@ fn MiniDocBuilder::cutoff_doc(
   doc : @pattern.PatternDoc[@pattern.ControlMap],
   cutoff : Double,
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
-  let control_id = self.node_id("control", "cutoff:\{cutoff}")
+  let control_id = self.node_id(
+    "control",
+    "\{doc.root().value()}:cutoff:\{cutoff}",
+  )
   let control_doc = self.pure_doc(
     control_id,
     @pattern.ControlMap::single("cutoff", cutoff),

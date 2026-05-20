@@ -165,6 +165,38 @@ test "parse_snapshot lowers cutoff method through PatternDoc" {
 }
 
 ///|
+test "parse_snapshot supports repeated cutoff values in PatternDoc" {
+  let snapshot = unwrap_mini_snapshot(
+    @mini.parse_snapshot("stack(s(\"bd\").cutoff(200), s(\"sd\").cutoff(200))"),
+  )
+  let events = snapshot.query(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+    ),
+  )
+  inspect(events.length(), content="2")
+  assert_true(events[0].value.get("cutoff") == Some(200.0))
+  assert_true(events[1].value.get("cutoff") == Some(200.0))
+}
+
+///|
+test "parse_snapshot supports repeated cutoff chain in PatternDoc" {
+  let snapshot = unwrap_mini_snapshot(
+    @mini.parse_snapshot("s(\"bd\").cutoff(200).cutoff(200)"),
+  )
+  let events = snapshot.query(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+    ),
+  )
+  inspect(events.length(), content="1")
+  assert_true(events[0].value.get("sound") == Some(36.0))
+  assert_true(events[0].value.get("cutoff") == Some(200.0))
+}
+
+///|
 test "parse_doc_reusing preserves ids across whitespace edits" {
   let doc = unwrap_doc(@mini.parse_doc("s(\"bd sd\")"))
   let edited = unwrap_doc(@mini.parse_doc_reusing("s(\"  bd   sd  \")", doc))
