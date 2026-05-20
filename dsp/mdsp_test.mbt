@@ -137,6 +137,93 @@ test "audio buffer new does not share storage with source array" {
 }
 
 ///|
+test "audio buffer set normalizes non-finite samples" {
+  let buffer = AudioBuffer::filled(4, init=0.25)
+
+  buffer.set(0, @double.not_a_number)
+  buffer.set(1, @double.infinity)
+  buffer.set(2, @double.neg_infinity)
+  buffer.set(3, 1.5)
+
+  @debug.assert_eq(buffer.get(0), 0.0)
+  @debug.assert_eq(buffer.get(1), 0.0)
+  @debug.assert_eq(buffer.get(2), 0.0)
+  @debug.assert_eq(buffer.get(3), 1.5)
+}
+
+///|
+test "audio buffer fill normalizes non-finite value once" {
+  let buffer = AudioBuffer::filled(4, init=0.25)
+
+  buffer.fill(@double.infinity)
+
+  @debug.assert_eq(buffer.get(0), 0.0)
+  @debug.assert_eq(buffer.get(1), 0.0)
+  @debug.assert_eq(buffer.get(2), 0.0)
+  @debug.assert_eq(buffer.get(3), 0.0)
+}
+
+///|
+test "audio buffer new normalizes copied source samples" {
+  let samples = FixedArray::make(4, 0.0)
+  samples[0] = @double.not_a_number
+  samples[1] = @double.infinity
+  samples[2] = @double.neg_infinity
+  samples[3] = 1.5
+
+  let buffer = AudioBuffer::new(samples)
+
+  @debug.assert_eq(buffer.get(0), 0.0)
+  @debug.assert_eq(buffer.get(1), 0.0)
+  @debug.assert_eq(buffer.get(2), 0.0)
+  @debug.assert_eq(buffer.get(3), 1.5)
+
+  samples[3] = 0.25
+  @debug.assert_eq(buffer.get(3), 1.5)
+  buffer.set(3, 2.0)
+  @debug.assert_eq(samples[3], 0.25)
+}
+
+///|
+test "audio buffer filled normalizes non-finite initializer" {
+  let buffer = AudioBuffer::filled(3, init=@double.neg_infinity)
+
+  @debug.assert_eq(buffer.get(0), 0.0)
+  @debug.assert_eq(buffer.get(1), 0.0)
+  @debug.assert_eq(buffer.get(2), 0.0)
+}
+
+///|
+test "audio buffer adopt source handle remains validation bypass" {
+  let samples = FixedArray::make(3, 0.0)
+  let buffer = AudioBuffer::adopt(samples)
+
+  samples[0] = @double.not_a_number
+  samples[1] = @double.infinity
+  samples[2] = -1.5
+
+  assert_true(buffer.get(0).is_nan())
+  assert_true(buffer.get(1).is_inf())
+  @debug.assert_eq(buffer.get(2), -1.5)
+}
+
+///|
+test "audio buffer adopted writes through methods still normalize" {
+  let samples = FixedArray::make(2, 0.25)
+  let buffer = AudioBuffer::adopt(samples)
+
+  buffer.set(0, @double.not_a_number)
+  @debug.assert_eq(buffer.get(0), 0.0)
+  @debug.assert_eq(samples[0], 0.0)
+
+  buffer.fill(@double.infinity)
+  @debug.assert_eq(buffer.get(0), 0.0)
+  @debug.assert_eq(buffer.get(1), 0.0)
+  @debug.assert_eq(samples[0], 0.0)
+  @debug.assert_eq(samples[1], 0.0)
+}
+
+///|
 test "dsp context stores normalized runtime values" {
   let context = DspContext::new(sample_rate=48000.0, block_size=128)
 
