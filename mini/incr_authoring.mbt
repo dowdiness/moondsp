@@ -14,6 +14,8 @@
 ///   parse, not token-level incremental parsing.
 /// - Scope owns the long-lived cells, and persistent Observer handles anchor
 ///   the public parsed/snapshot reads for the pipeline lifetime.
+/// - Compute counters are exposed for tests and diagnostics so callers can
+///   distinguish whole-document recomputation from lowering-cache reuse.
 ///
 /// This intentionally wraps `parse_doc_reusing` before introducing loom or a
 /// token-level incremental parser. The runtime parser and PatternDoc parser
@@ -28,6 +30,8 @@ pub struct MiniAuthoringPipeline {
     Result[@pattern.PatternSnapshot[@pattern.ControlMap], String],
   ]
   priv lowering_cache : @pattern.PatternLoweringCache[@pattern.ControlMap]
+  priv parse_compute_count_fn : () -> Int
+  priv snapshot_compute_count_fn : () -> Int
 }
 
 ///|
@@ -38,9 +42,11 @@ pub fn MiniAuthoringPipeline::new(input : String) -> MiniAuthoringPipeline {
   // Last successful parse is intentional mutable state: errors should surface
   // to callers without discarding the previous reusable PatternDoc.
   let mut previous : @pattern.PatternDoc[@pattern.ControlMap]? = None
+  let mut parse_compute_count = 0
   let parsed = @incr.Memo::new_no_backdate(
     rt,
     fn() {
+      parse_compute_count += 1
       let result = match previous {
         None => parse_doc(text.get())
         Some(doc) => parse_doc_reusing(text.get(), doc)
@@ -58,9 +64,11 @@ pub fn MiniAuthoringPipeline::new(input : String) -> MiniAuthoringPipeline {
   scope.add_cell_ids([parsed.id()])
   let parsed_observer = scope.add_observer(parsed.observe())
   let lowering_cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
+  let mut snapshot_compute_count = 0
   let snapshot = @incr.Memo::new_no_backdate(
     rt,
     fn() {
+      snapshot_compute_count += 1
       match parsed.get() {
         Err(msg) => Err(msg)
         Ok(doc) => {
@@ -76,7 +84,15 @@ pub fn MiniAuthoringPipeline::new(input : String) -> MiniAuthoringPipeline {
   )
   scope.add_cell_ids([snapshot.id()])
   let snapshot_observer = scope.add_observer(snapshot.observe())
-  { scope, text, parsed_observer, snapshot_observer, lowering_cache }
+  {
+    scope,
+    text,
+    parsed_observer,
+    snapshot_observer,
+    lowering_cache,
+    parse_compute_count_fn: fn() { parse_compute_count },
+    snapshot_compute_count_fn: fn() { snapshot_compute_count },
+  }
 }
 
 ///|
@@ -137,4 +153,18 @@ pub fn MiniAuthoringPipeline::lowering_cache_entries(
   self : MiniAuthoringPipeline,
 ) -> Int {
   self.lowering_cache.entry_count()
+}
+
+///|
+pub fn MiniAuthoringPipeline::parse_compute_count(
+  self : MiniAuthoringPipeline,
+) -> Int {
+  (self.parse_compute_count_fn)()
+}
+
+///|
+pub fn MiniAuthoringPipeline::snapshot_compute_count(
+  self : MiniAuthoringPipeline,
+) -> Int {
+  (self.snapshot_compute_count_fn)()
 }

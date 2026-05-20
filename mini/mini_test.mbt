@@ -431,6 +431,43 @@ test "MiniAuthoringPipeline keeps last reusable doc after parse error" {
 }
 
 ///|
+test "MiniAuthoringPipeline exposes whole-document recomputation counts" {
+  let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd sd\")")
+  inspect(pipeline.parse_compute_count(), content="0")
+  inspect(pipeline.snapshot_compute_count(), content="0")
+  ignore(unwrap_doc(pipeline.parse_doc()))
+  inspect(pipeline.parse_compute_count(), content="1")
+  inspect(pipeline.snapshot_compute_count(), content="0")
+  ignore(unwrap_doc(pipeline.parse_doc()))
+  inspect(pipeline.parse_compute_count(), content="1")
+  pipeline.set_input("s(\"bd sd\")")
+  ignore(unwrap_doc(pipeline.parse_doc()))
+  inspect(pipeline.parse_compute_count(), content="1")
+  pipeline.set_input("s(\"  bd sd\")")
+  ignore(unwrap_doc(pipeline.parse_doc()))
+  inspect(pipeline.parse_compute_count(), content="2")
+  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
+  inspect(pipeline.snapshot_compute_count(), content="1")
+}
+
+///|
+test "MiniAuthoringPipeline token replacement reuses unaffected lowered subtrees" {
+  let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd sd hh oh\")")
+  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
+  pipeline.reset_lowering_stats()
+  pipeline.set_input("s(\"bd cp hh oh\")")
+  let edited = unwrap_doc(pipeline.parse_doc())
+  assert_true(edited.contains_node(pid("mini:sound:bd:0")))
+  assert_true(!edited.contains_node(pid("mini:sound:sd:0")))
+  assert_true(edited.contains_node(pid("mini:sound:cp:0")))
+  assert_true(edited.contains_node(pid("mini:sound:hh:0")))
+  assert_true(edited.contains_node(pid("mini:sound:oh:0")))
+  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
+  assert_true(pipeline.lowering_cache_hits() >= 3)
+  assert_true(pipeline.lowering_cache_misses() >= 1)
+}
+
+///|
 test "parse drum sequence" {
   let pat = unwrap_ok(@mini.parse("s(\"bd sd hh sd\")"))
   let events = query_one_cycle(pat)

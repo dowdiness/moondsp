@@ -33,10 +33,12 @@ pub fn MiniAuthoringPipeline::lowering_cache_entries(Self) -> Int
 pub fn MiniAuthoringPipeline::lowering_cache_hits(Self) -> Int
 pub fn MiniAuthoringPipeline::lowering_cache_misses(Self) -> Int
 pub fn MiniAuthoringPipeline::new(String) -> Self
+pub fn MiniAuthoringPipeline::parse_compute_count(Self) -> Int
 pub fn MiniAuthoringPipeline::parse_doc(Self) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
 pub fn MiniAuthoringPipeline::parse_snapshot(Self) -> Result[@pattern.PatternSnapshot[@pattern.ControlMap], String]
 pub fn MiniAuthoringPipeline::reset_lowering_stats(Self) -> Unit
 pub fn MiniAuthoringPipeline::set_input(Self, String) -> Unit
+pub fn MiniAuthoringPipeline::snapshot_compute_count(Self) -> Int
 
 // Type aliases
 
