@@ -29,6 +29,7 @@ pub struct MiniAuthoringPipeline {
   priv snapshot_observer : @incr.Observer[
     Result[@pattern.PatternSnapshot[@pattern.ControlMap], String],
   ]
+  priv token_count_observer : @incr.Observer[Int]
   priv lowering_cache : @pattern.PatternLoweringCache[@pattern.ControlMap]
   priv parse_compute_count_fn : () -> Int
   priv snapshot_compute_count_fn : () -> Int
@@ -39,6 +40,15 @@ pub fn MiniAuthoringPipeline::new(input : String) -> MiniAuthoringPipeline {
   let rt = @incr.Runtime::new()
   let scope = @incr.Scope::new(rt)
   let text = scope.signal(input, label="mini.text")
+  let token_count = scope.memo(
+    fn() {
+      let tokens = tokenize_mini_authoring_source(text.get())
+      ignore(mini_authoring_token_fingerprint(tokens))
+      tokens.length()
+    },
+    label="mini.token_count",
+  )
+  let token_count_observer = scope.add_observer(token_count.observe())
   // Last successful parse is intentional mutable state: errors should surface
   // to callers without discarding the previous reusable PatternDoc.
   let mut previous : @pattern.PatternDoc[@pattern.ControlMap]? = None
@@ -89,6 +99,7 @@ pub fn MiniAuthoringPipeline::new(input : String) -> MiniAuthoringPipeline {
     text,
     parsed_observer,
     snapshot_observer,
+    token_count_observer,
     lowering_cache,
     parse_compute_count_fn: fn() { parse_compute_count },
     snapshot_compute_count_fn: fn() { snapshot_compute_count },
@@ -167,4 +178,11 @@ pub fn MiniAuthoringPipeline::snapshot_compute_count(
   self : MiniAuthoringPipeline,
 ) -> Int {
   (self.snapshot_compute_count_fn)()
+}
+
+///|
+pub fn MiniAuthoringPipeline::authoring_token_count(
+  self : MiniAuthoringPipeline,
+) -> Int {
+  self.token_count_observer.get()
 }

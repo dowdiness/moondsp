@@ -468,6 +468,16 @@ test "MiniAuthoringPipeline token replacement reuses unaffected lowered subtrees
 }
 
 ///|
+test "MiniAuthoringPipeline tracks internal authoring token count" {
+  let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd sd\")")
+  inspect(pipeline.authoring_token_count(), content="7")
+  pipeline.set_input("s( \"  bd   sd  \" )")
+  inspect(pipeline.authoring_token_count(), content="7")
+  pipeline.set_input("s(\"hh bd sd\")")
+  inspect(pipeline.authoring_token_count(), content="8")
+}
+
+///|
 test "parse drum sequence" {
   let pat = unwrap_ok(@mini.parse("s(\"bd sd hh sd\")"))
   let events = query_one_cycle(pat)
