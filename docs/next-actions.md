@@ -8,13 +8,14 @@ per-PR verification logs and merged-PR lists live in `git log` and
 
 ## Current State
 
-- `main` HEAD: `2978629 chore: prepare v0.5.0 release`.
+- `main` HEAD: `8432075 feat: add mini gain and pan methods (#67)`.
 - Latest release: **v0.5.0** (tagged 2026-05-20; GitHub release pinned;
   `mooncakes` `dowdiness/moondsp@0.5.0` published 2026-05-20). The
   AudioBuffer API-hardening branch is closed; remaining slices are
   free-choice.
 - No open PRs.
-- `## [Unreleased]` in `CHANGELOG.md` is empty after v0.5.0.
+- `## [Unreleased]` in `CHANGELOG.md` contains the post-v0.5.0 mini
+  per-sound control additions from PR #66 and #67.
 - Known outstanding warnings: 8 `[0020]` Show-vs-Debug deprecations from
   `@qc.quick_check_fn` in DSP and pattern property tests. Treat as
   dependency-bound unless `moonbitlang/quickcheck` has changed its trait
@@ -28,8 +29,10 @@ For shipped-work history, read `CHANGELOG.md`. For the broader backlog
 
 Free choice — pick from "Alternative Slices" below or from
 `memory/project_backlog.md`. Nothing is release-gated. The most concrete
-small follow-up is the quickcheck warning sweep, but only after verifying
-whether a dependency update removes the deprecated `Show` bound.
+Phase 6+ follow-up is now incremental reparsing with loom: per-sound
+parameter control has shipped, so the next authoring improvement should focus
+on preserving stable ids through smaller text edits rather than adding more
+scalar controls.
 
 ## Alternative Slices
 
@@ -40,11 +43,18 @@ whether a dependency update removes the deprecated `Show` bound.
   suppressions or test rewrites if the dependency remains blocked.
 
 - **Open another Phase 6+ slice** (per `memory/project_backlog.md`):
-  incremental reparsing with loom, canopy structural editor, or
-  per-sound parameter control. Each is multi-session scope; brainstorm
-  before planning.
+  incremental reparsing with loom, canopy structural editor, or another
+  targeted mini authoring improvement. Each is multi-session scope;
+  brainstorm before planning.
 
 ### Closed since the last update
+
+- ~~**Mini per-sound parameter control**~~ — SHIPPED 2026-05-20 in PR
+  #66 and #67 (squash commits `b187efe` and `8432075`). Mini notation now
+  supports `.cutoff(f)`, `.gain(g)`, and `.pan(p)` method chains in both the
+  runtime parser and PatternDoc parser, lowering through existing
+  `ControlMap` / `merge_control` behavior. Regression coverage includes
+  repeated scalar-control values and `.pan(...).jux(...)` override behavior.
 
 - ~~**v0.5.0 AudioBuffer API-hardening release**~~ — SHIPPED 2026-05-20
   as tag `v0.5.0`, GitHub release, and mooncakes
