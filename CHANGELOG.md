@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-05-20
+
 ### Added
 
 - Mini notation now accepts `.cutoff(f)` method chains such as
@@ -596,7 +598,8 @@ scheduler with mini-notation support.
 - The `moondsp-browser-tools` npm workspace is `private: true` and exists
   only to host Playwright tests for the browser demo.
 
-[Unreleased]: https://github.com/dowdiness/moondsp/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/dowdiness/moondsp/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/dowdiness/moondsp/releases/tag/v0.5.1
 [0.5.0]: https://github.com/dowdiness/moondsp/releases/tag/v0.5.0
 [0.4.0]: https://github.com/dowdiness/moondsp/releases/tag/v0.4.0
 [0.3.1]: https://github.com/dowdiness/moondsp/releases/tag/v0.3.1
