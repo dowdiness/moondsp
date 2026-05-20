@@ -112,6 +112,19 @@ test "parse single drum sound" {
 }
 
 ///|
+test "parse cutoff method merges sound control" {
+  let pat = unwrap_ok(@mini.parse("s(\"bd\").cutoff(200)"))
+  let events = query_one_cycle(pat)
+  inspect(events.length(), content="1")
+  inspect(
+    events[0].value,
+    content=(
+      #|ControlMap({ "sound": 36, "cutoff": 200 })
+    ),
+  )
+}
+
+///|
 test "parse_snapshot lowers mini output through PatternDoc" {
   let snapshot = unwrap_mini_snapshot(@mini.parse_snapshot("s(\"bd sd\")"))
   inspect(
@@ -128,6 +141,30 @@ test "parse_snapshot lowers mini output through PatternDoc" {
 }
 
 ///|
+test "parse_snapshot lowers cutoff method through PatternDoc" {
+  let snapshot = unwrap_mini_snapshot(
+    @mini.parse_snapshot("s(\"bd\").cutoff(200)"),
+  )
+  inspect(
+    snapshot.root().value(),
+    content="mini:merge_control:mini:sound:bd:0:cutoff:200",
+  )
+  let events = snapshot.query(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+    ),
+  )
+  inspect(events.length(), content="1")
+  inspect(
+    events[0].value,
+    content=(
+      #|ControlMap({ "sound": 36, "cutoff": 200 })
+    ),
+  )
+}
+
+///|
 test "parse_doc_reusing preserves ids across whitespace edits" {
   let doc = unwrap_doc(@mini.parse_doc("s(\"bd sd\")"))
   let edited = unwrap_doc(@mini.parse_doc_reusing("s(\"  bd   sd  \")", doc))
@@ -140,6 +177,33 @@ test "parse_doc_reusing preserves ids across whitespace edits" {
   ignore(unwrap_lowered_snapshot(try? edited.lower_with_cache(cache)))
   inspect(cache.hit_count(), content="1")
   inspect(cache.miss_count(), content="0")
+}
+
+///|
+test "parse_doc_reusing cutoff edit preserves sound atom id" {
+  let doc = unwrap_doc(@mini.parse_doc("s(\"bd\").cutoff(200)"))
+  let edited = unwrap_doc(@mini.parse_doc_reusing("s(\"bd\").cutoff(300)", doc))
+  assert_true(edited.contains_node(pid("mini:sound:bd:0")))
+  assert_true(
+    edited.contains_node(pid("mini:merge_control:mini:sound:bd:0:cutoff:300")),
+  )
+  assert_true(
+    !edited.contains_node(pid("mini:merge_control:mini:sound:bd:0:cutoff:200")),
+  )
+  let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
+  ignore(unwrap_lowered_snapshot(try? doc.lower_with_cache(cache)))
+  cache.reset_stats()
+  let snapshot = unwrap_lowered_snapshot(try? edited.lower_with_cache(cache))
+  assert_true(cache.hit_count() >= 1)
+  let events = snapshot.query(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+    ),
+  )
+  inspect(events.length(), content="1")
+  assert_true(events[0].value.get("sound") == Some(36.0))
+  assert_true(events[0].value.get("cutoff") == Some(300.0))
 }
 
 ///|

@@ -239,6 +239,34 @@ fn MiniDocBuilder::jux_doc(
 }
 
 ///|
+fn MiniDocBuilder::cutoff_doc(
+  self : MiniDocBuilder,
+  doc : @pattern.PatternDoc[@pattern.ControlMap],
+  cutoff : Double,
+) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
+  let control_id = self.node_id("control", "cutoff:\{cutoff}")
+  let control_doc = self.pure_doc(
+    control_id,
+    @pattern.ControlMap::single("cutoff", cutoff),
+  )
+  let id = self.node_id(
+    "merge_control",
+    "\{doc.root().value()}:cutoff:\{cutoff}",
+  )
+  match self.reuse_doc(id) {
+    Some(doc) => doc
+    None =>
+      unwrap_doc_result(
+        try? @pattern.PatternDoc::merge_control(
+          id~,
+          left=doc,
+          right=control_doc,
+        ),
+      )
+  }
+}
+
+///|
 fn doc_root_signature(
   docs : Array[@pattern.PatternDoc[@pattern.ControlMap]],
 ) -> String {
@@ -439,6 +467,10 @@ fn Parser::parse_doc_method(
       self.skip_whitespace()
       self.expect_char(')')
       builder.degrade_doc(doc, p, stable_seed(doc.root().value()))
+    }
+    "cutoff" => {
+      let cutoff = self.read_method_number_argument()
+      builder.cutoff_doc(doc, cutoff)
     }
     "every" => {
       self.expect_char('(')

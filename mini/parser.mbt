@@ -130,6 +130,18 @@ fn Parser::read_number(self : Parser) -> Double raise ParseError {
 }
 
 ///|
+fn Parser::read_method_number_argument(
+  self : Parser,
+) -> Double raise ParseError {
+  self.expect_char('(')
+  self.skip_whitespace()
+  let value = self.read_number()
+  self.skip_whitespace()
+  self.expect_char(')')
+  value
+}
+
+///|
 /// Simple manual double parsing to avoid strconv dependency issues.
 fn parse_double_manual(s : String, start : Int, end : Int) -> Double {
   let mut result = 0.0
@@ -278,6 +290,10 @@ fn Parser::parse_method(
       self.skip_whitespace()
       self.expect_char(')')
       pat.degrade_by(p)
+    }
+    "cutoff" => {
+      let cutoff = self.read_method_number_argument()
+      @pattern.merge_control(pat, @pattern.s_cutoff(cutoff))
     }
     "every" => {
       self.expect_char('(')

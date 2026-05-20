@@ -14,6 +14,7 @@
 /// - Method chains:
 ///   `.fast(n)`, `.slow(n)`, `.rev()`,
 ///   `.degradeBy(p)` (drop with probability p),
+///   `.cutoff(f)` (merge per-event cutoff control),
 ///   `.every(n, fast(k)|slow(k)|rev)` (apply f every n cycles),
 ///   `.jux(fast(k)|slow(k)|rev)` — split stereo, apply f to right channel
 pub fn parse(
