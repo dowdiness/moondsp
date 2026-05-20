@@ -125,6 +125,16 @@ test "parse cutoff method merges sound control" {
 }
 
 ///|
+test "parse gain and pan methods merge sound controls" {
+  let pat = unwrap_ok(@mini.parse("s(\"bd\").gain(0.5).pan(-0.25)"))
+  let events = query_one_cycle(pat)
+  inspect(events.length(), content="1")
+  assert_true(events[0].value.get("sound") == Some(36.0))
+  assert_true(events[0].value.get("gain") == Some(0.5))
+  assert_true(events[0].value.get("pan") == Some(-0.25))
+}
+
+///|
 test "parse_snapshot lowers mini output through PatternDoc" {
   let snapshot = unwrap_mini_snapshot(@mini.parse_snapshot("s(\"bd sd\")"))
   inspect(
@@ -165,6 +175,27 @@ test "parse_snapshot lowers cutoff method through PatternDoc" {
 }
 
 ///|
+test "parse_snapshot lowers gain and pan methods through PatternDoc" {
+  let snapshot = unwrap_mini_snapshot(
+    @mini.parse_snapshot("s(\"bd\").gain(0.5).pan(-0.25)"),
+  )
+  inspect(
+    snapshot.root().value(),
+    content="mini:merge_control:mini:merge_control:mini:sound:bd:0:gain:0.5:pan:-0.25",
+  )
+  let events = snapshot.query(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+    ),
+  )
+  inspect(events.length(), content="1")
+  assert_true(events[0].value.get("sound") == Some(36.0))
+  assert_true(events[0].value.get("gain") == Some(0.5))
+  assert_true(events[0].value.get("pan") == Some(-0.25))
+}
+
+///|
 test "parse_snapshot supports repeated cutoff values in PatternDoc" {
   let snapshot = unwrap_mini_snapshot(
     @mini.parse_snapshot("stack(s(\"bd\").cutoff(200), s(\"sd\").cutoff(200))"),
@@ -194,6 +225,44 @@ test "parse_snapshot supports repeated cutoff chain in PatternDoc" {
   inspect(events.length(), content="1")
   assert_true(events[0].value.get("sound") == Some(36.0))
   assert_true(events[0].value.get("cutoff") == Some(200.0))
+}
+
+///|
+test "parse_snapshot supports repeated gain and pan values in PatternDoc" {
+  let snapshot = unwrap_mini_snapshot(
+    @mini.parse_snapshot(
+      "stack(s(\"bd\").gain(0.5).pan(-0.25), s(\"sd\").gain(0.5).pan(-0.25))",
+    ),
+  )
+  let events = snapshot.query(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+    ),
+  )
+  inspect(events.length(), content="2")
+  for event in events {
+    assert_true(event.value.get("gain") == Some(0.5))
+    assert_true(event.value.get("pan") == Some(-0.25))
+  }
+}
+
+///|
+test "parse pan method is overridden by jux outer pan" {
+  let pat = unwrap_ok(@mini.parse("s(\"bd\").pan(0.5).jux(rev)"))
+  let events = query_one_cycle(pat)
+  inspect(events.length(), content="2")
+  let mut pan_neg1 = 0
+  let mut pan_pos1 = 0
+  for event in events {
+    match event.value.get("pan") {
+      Some(-1.0) => pan_neg1 += 1
+      Some(1.0) => pan_pos1 += 1
+      _ => ()
+    }
+  }
+  inspect(pan_neg1, content="1")
+  inspect(pan_pos1, content="1")
 }
 
 ///|
@@ -236,6 +305,50 @@ test "parse_doc_reusing cutoff edit preserves sound atom id" {
   inspect(events.length(), content="1")
   assert_true(events[0].value.get("sound") == Some(36.0))
   assert_true(events[0].value.get("cutoff") == Some(300.0))
+}
+
+///|
+test "parse_doc_reusing gain edit preserves sound atom id" {
+  let doc = unwrap_doc(@mini.parse_doc("s(\"bd\").gain(1)"))
+  let edited = unwrap_doc(@mini.parse_doc_reusing("s(\"bd\").gain(2)", doc))
+  assert_true(edited.contains_node(pid("mini:sound:bd:0")))
+  assert_true(
+    edited.contains_node(pid("mini:merge_control:mini:sound:bd:0:gain:2")),
+  )
+  assert_true(
+    !edited.contains_node(pid("mini:merge_control:mini:sound:bd:0:gain:1")),
+  )
+  let events = unwrap_lowered_snapshot(try? edited.lower()).query(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+    ),
+  )
+  inspect(events.length(), content="1")
+  assert_true(events[0].value.get("sound") == Some(36.0))
+  assert_true(events[0].value.get("gain") == Some(2.0))
+}
+
+///|
+test "parse_doc_reusing pan edit preserves sound atom id" {
+  let doc = unwrap_doc(@mini.parse_doc("s(\"bd\").pan(-1)"))
+  let edited = unwrap_doc(@mini.parse_doc_reusing("s(\"bd\").pan(0)", doc))
+  assert_true(edited.contains_node(pid("mini:sound:bd:0")))
+  assert_true(
+    edited.contains_node(pid("mini:merge_control:mini:sound:bd:0:pan:0")),
+  )
+  assert_true(
+    !edited.contains_node(pid("mini:merge_control:mini:sound:bd:0:pan:-1")),
+  )
+  let events = unwrap_lowered_snapshot(try? edited.lower()).query(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+    ),
+  )
+  inspect(events.length(), content="1")
+  assert_true(events[0].value.get("sound") == Some(36.0))
+  assert_true(events[0].value.get("pan") == Some(0.0))
 }
 
 ///|

@@ -295,6 +295,14 @@ fn Parser::parse_method(
       let cutoff = self.read_method_number_argument()
       @pattern.merge_control(pat, @pattern.s_cutoff(cutoff))
     }
+    "gain" => {
+      let gain = self.read_method_number_argument()
+      @pattern.merge_control(pat, @pattern.s_gain(gain))
+    }
+    "pan" => {
+      let pan = self.read_method_number_argument()
+      @pattern.merge_control(pat, @pattern.s_pan(pan))
+    }
     "every" => {
       self.expect_char('(')
       self.skip_whitespace()
