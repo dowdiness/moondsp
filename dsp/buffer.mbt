@@ -5,17 +5,37 @@ pub struct AudioBuffer {
 }
 
 ///|
+fn normalize_audio_sample(value : Double) -> Double {
+  if is_finite(value) {
+    value
+  } else {
+    0.0
+  }
+}
+
+///|
+fn normalize_audio_samples(data : FixedArray[Double]) -> Unit {
+  for index in 0..<data.length() {
+    data[index] = normalize_audio_sample(data[index])
+  }
+}
+
+///|
 /// Wrap a `FixedArray[Double]` by copying its contents.
 ///
 /// The buffer's underlying storage is distinct from the source array;
 /// neither side observes mutations made through the other. Mutating
 /// the source has no effect on the buffer, and writes through the
 /// buffer (via `set` / `fill`) do not propagate back to the source.
+/// Non-finite source samples (`NaN`, `+Inf`, `-Inf`) are normalized to
+/// `0.0` in the copied storage; finite samples pass through unchanged.
 /// Use this when ingesting external data of unclear lifetime. For
 /// explicit zero-copy adoption, see `AudioBuffer::adopt`.
 #alias(new)
 pub fn AudioBuffer::AudioBuffer(data : FixedArray[Double]) -> AudioBuffer {
-  AudioBuffer::adopt(data.copy())
+  let copy = data.copy()
+  normalize_audio_samples(copy)
+  AudioBuffer::adopt(copy)
 }
 
 ///|
@@ -26,15 +46,15 @@ pub fn AudioBuffer::AudioBuffer(data : FixedArray[Double]) -> AudioBuffer {
 /// mutations through the source handle appear through the buffer.
 /// Two specific bypasses follow from this: (a) the buffer's initial
 /// contents are whatever the source array holds at adoption time, not
-/// run through any normalization that future `set`/`fill` may apply;
-/// and (b) any later mutation through the retained source handle
-/// skips `AudioBuffer::set` entirely. (Writes through `buf.set(...)`
-/// or `buf.fill(...)` on an adopted buffer still go through those
-/// methods and pick up whatever validation they perform.) Use this
-/// only for FFI-bridged buffers (e.g., `TypedArray` or
-/// `SharedArrayBuffer` wrappers) where the copy cost is genuinely
-/// prohibitive and the caller can reason about the source lifetime.
-/// Otherwise use `AudioBuffer::new`.
+/// run through the normal non-finite-to-0.0 normalization path; and
+/// (b) any later mutation through the retained source handle skips
+/// AudioBuffer validation entirely. Writes through `buf.set(...)` or
+/// `buf.fill(...)` on an adopted buffer still go through those methods
+/// and normalize non-finite values to `0.0`. Use this only for
+/// FFI-bridged buffers (e.g., `TypedArray` or `SharedArrayBuffer`
+/// wrappers) where the copy cost is genuinely prohibitive and the
+/// caller can reason about the source lifetime. Otherwise use
+/// `AudioBuffer::new`.
 pub fn AudioBuffer::adopt(data : FixedArray[Double]) -> AudioBuffer {
   { data, }
 }
@@ -46,8 +66,10 @@ pub fn AudioBuffer::adopt(data : FixedArray[Double]) -> AudioBuffer {
 /// caller-visible array. Routed through `adopt` to avoid the
 /// unnecessary copy `AudioBuffer::new` would now perform on the
 /// freshly-allocated `FixedArray`.
+/// The initializer is normalized once before allocation: non-finite
+/// values become `0.0`, while finite values pass through unchanged.
 pub fn AudioBuffer::filled(size : Int, init? : Double = 0.0) -> AudioBuffer {
-  AudioBuffer::adopt(FixedArray::make(size, init))
+  AudioBuffer::adopt(FixedArray::make(size, normalize_audio_sample(init)))
 }
 
 ///|
@@ -58,8 +80,10 @@ pub fn AudioBuffer::length(self : AudioBuffer) -> Int {
 
 ///|
 /// Fill the buffer with a single sample value.
+///
+/// Non-finite values (`NaN`, `+Inf`, `-Inf`) are normalized to `0.0`.
 pub fn AudioBuffer::fill(self : AudioBuffer, value : Double) -> Unit {
-  self.data.fill(value)
+  self.data.fill(normalize_audio_sample(value))
 }
 
 ///|
@@ -70,12 +94,14 @@ pub fn AudioBuffer::get(self : AudioBuffer, index : Int) -> Double {
 
 ///|
 /// Write one sample into the buffer.
+///
+/// Non-finite values (`NaN`, `+Inf`, `-Inf`) are normalized to `0.0`.
 pub fn AudioBuffer::set(
   self : AudioBuffer,
   index : Int,
   value : Double,
 ) -> Unit {
-  self.data[index] = value
+  self.data[index] = normalize_audio_sample(value)
 }
 
 ///|

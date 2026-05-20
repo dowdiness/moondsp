@@ -21,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   See the constructor docstrings in `dsp/buffer.mbt` for the full
   contract on both forms.
 
+- **`AudioBuffer` now normalizes non-finite samples on MoonBit-owned
+  writes.** Values written through `AudioBuffer::new`, `AudioBuffer::filled`,
+  `AudioBuffer::fill`, and `AudioBuffer::set` convert `NaN`, `+Inf`, and
+  `-Inf` to `0.0`; finite values, including values outside `[-1, 1]`, pass
+  through unchanged. `AudioBuffer::adopt` remains the explicit zero-copy
+  bypass for retained source-handle mutation, though writes through
+  `buf.set(...)` and `buf.fill(...)` on an adopted buffer still normalize.
+
 ### Added
 
 - `AudioBuffer::adopt(FixedArray[Double]) -> AudioBuffer` — explicit
