@@ -28,3 +28,4 @@ shipped plan or spec.
 - [ADR-0008 — Contiguous song layout with computed occurrences](0008-contiguous-song-layout.md)
 - [ADR-0009 — Stable identity groundwork for Phase 6](0009-stable-identity-groundwork.md)
 - [ADR-0010 — CompiledTemplate as the runtime exchange boundary](0010-compiled-template-runtime-boundary.md)
+- [ADR-0011 — Incr-backed mini authoring pipeline](0011-incr-backed-mini-authoring-pipeline.md)

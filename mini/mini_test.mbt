@@ -395,6 +395,42 @@ test "parse_doc_reusing insertion and removal keep surviving token ids" {
 }
 
 ///|
+test "MiniAuthoringPipeline reuses stable ids and lowering cache across text edits" {
+  let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd sd\")")
+  let doc = unwrap_doc(pipeline.parse_doc())
+  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
+  pipeline.reset_lowering_stats()
+  pipeline.set_input("s(\"  bd   sd  \")")
+  let edited = unwrap_doc(pipeline.parse_doc())
+  @debug.assert_eq(doc.root().value(), edited.root().value())
+  assert_true(edited.contains_node(pid("mini:sound:bd:0")))
+  assert_true(edited.contains_node(pid("mini:sound:sd:0")))
+  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
+  inspect(pipeline.lowering_cache_hits(), content="1")
+  inspect(pipeline.lowering_cache_misses(), content="0")
+}
+
+///|
+test "MiniAuthoringPipeline keeps last reusable doc after parse error" {
+  let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd sd\")")
+  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
+  pipeline.set_input("s(\"bd sd\"")
+  match pipeline.parse_doc() {
+    Ok(_) => abort("expected parse error")
+    Err(msg) =>
+      inspect(msg, content="position 9: expected ')', got end of input")
+  }
+  pipeline.reset_lowering_stats()
+  pipeline.set_input("s(\"  bd   sd  \")")
+  let recovered = unwrap_doc(pipeline.parse_doc())
+  assert_true(recovered.contains_node(pid("mini:sound:bd:0")))
+  assert_true(recovered.contains_node(pid("mini:sound:sd:0")))
+  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
+  inspect(pipeline.lowering_cache_hits(), content="1")
+  inspect(pipeline.lowering_cache_misses(), content="0")
+}
+
+///|
 test "parse drum sequence" {
   let pat = unwrap_ok(@mini.parse("s(\"bd sd hh sd\")"))
   let events = query_one_cycle(pat)
