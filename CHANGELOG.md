@@ -7,7 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-05-20
+
 ### Breaking changes
+
+- **`AudioBuffer::as_fixed_array` has been removed.** The method exposed
+  the buffer's internal storage directly, letting callers bypass the
+  `AudioBuffer` write methods and any validation attached to them.
+
+  **Migration:** use `AudioBuffer::all` / `AudioBuffer::any` for
+  predicate-style scans, or use `length` + `get` for indexed reads.
+  Use `AudioBuffer::adopt` only when an explicit zero-copy shared-storage
+  contract is required.
 
 - **`AudioBuffer::new` (and `AudioBuffer::AudioBuffer`) now defensively
   copies its argument.** Previously, the constructor stored the caller's
@@ -30,6 +41,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `buf.set(...)` and `buf.fill(...)` on an adopted buffer still normalize.
 
 ### Added
+
+- `AudioBuffer::all((Double) -> Bool raise?) -> Bool raise?` and
+  `AudioBuffer::any((Double) -> Bool raise?) -> Bool raise?` — predicate
+  scans over buffer samples with `raise?` parity to the underlying
+  collection helpers.
 
 - `AudioBuffer::adopt(FixedArray[Double]) -> AudioBuffer` — explicit
   zero-copy adoption for FFI / SharedArrayBuffer–style buffer bridging.
@@ -572,6 +588,10 @@ scheduler with mini-notation support.
 - The `moondsp-browser-tools` npm workspace is `private: true` and exists
   only to host Playwright tests for the browser demo.
 
+[Unreleased]: https://github.com/dowdiness/moondsp/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/dowdiness/moondsp/releases/tag/v0.5.0
+[0.4.0]: https://github.com/dowdiness/moondsp/releases/tag/v0.4.0
+[0.3.1]: https://github.com/dowdiness/moondsp/releases/tag/v0.3.1
 [0.3.0]: https://github.com/dowdiness/moondsp/releases/tag/v0.3.0
 [0.2.0]: https://github.com/dowdiness/moondsp/releases/tag/v0.2.0
 [0.1.0]: https://github.com/dowdiness/moondsp/releases/tag/v0.1.0
