@@ -64,7 +64,7 @@ collapsed into the root package once consumers had migrated.
 - Re-exporting bare enum constructors via `pub using` does not work — consumers
   who pattern-match on `@dsp` enum constructors must use the source package
   prefix or `using @pkg { type T }` plus `T::Constructor(args)`.
-- Adding a new sub-package requires updates to both `moon.pkg.json` and the
+- Adding a new sub-package requires updates to both `moon.pkg` and the
   root facade's `pub using` block.
 
 **Neutral**

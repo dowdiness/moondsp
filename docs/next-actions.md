@@ -8,7 +8,7 @@ per-PR verification logs and merged-PR lists live in `git log` and
 
 ## Current State
 
-- `main` HEAD: `8432075 feat: add mini gain and pan methods (#67)`.
+- `main` HEAD: `28c1a25 docs: refresh next actions after mini controls`.
 - Latest release: **v0.5.0** (tagged 2026-05-20; GitHub release pinned;
   `mooncakes` `dowdiness/moondsp@0.5.0` published 2026-05-20). The
   AudioBuffer API-hardening branch is closed; remaining slices are
@@ -16,6 +16,8 @@ per-PR verification logs and merged-PR lists live in `git log` and
 - No open PRs.
 - `## [Unreleased]` in `CHANGELOG.md` contains the post-v0.5.0 mini
   per-sound control additions from PR #66 and #67.
+- Next release target: **v0.5.1**. Treat the mini per-sound control work as a
+  patch release over v0.5.0, not a v0.6.0 minor release.
 - Known outstanding warnings: 8 `[0020]` Show-vs-Debug deprecations from
   `@qc.quick_check_fn` in DSP and pattern property tests. Treat as
   dependency-bound unless `moonbitlang/quickcheck` has changed its trait
