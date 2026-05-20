@@ -2252,7 +2252,7 @@ test "process_block silence produces zero output" {
   let pat : @pattern.Pat[@pattern.ControlMap] = @pattern.Pat::silence()
   sched.process_block(pat, pool, left, right)
   let mut all_zero = true
-  for i = 0; i < left.length(); i = i + 1 {
+  for i in 0..<left.length() {
     if left.get(i) != 0.0 || right.get(i) != 0.0 {
       all_zero = false
     }
@@ -2269,7 +2269,7 @@ test "process_block note pattern produces non-zero output" {
     sched.process_block(pat, pool, left, right)
   }
   let mut has_nonzero = false
-  for i = 0; i < left.length(); i = i + 1 {
+  for i in 0..<left.length() {
     if left.get(i) != 0.0 || right.get(i) != 0.0 {
       has_nonzero = true
     }
