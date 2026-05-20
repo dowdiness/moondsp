@@ -1,4 +1,7 @@
 ///|
+using @graph {type DspNode}
+
+///|
 /// Force a slot's generation to a specific value.
 /// Whitebox test helper — needs access to private `slots` field.
 fn set_slot_generation(

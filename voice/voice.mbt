@@ -8,7 +8,6 @@ using @graph {
   type ControlBindingMap,
   type CompiledDsp,
   type CompiledTemplate,
-  type DspNode,
   type GraphControl,
   type GraphControlError,
 }
