@@ -8,7 +8,7 @@ per-PR verification logs and merged-PR lists live in `git log` and
 
 ## Current State
 
-- `main` HEAD: `a50bdfd chore: prepare v0.5.1 release`.
+- `main` is current with `origin/main` after the post-v0.5.1 docs refresh.
 - Latest release: **v0.5.1** (tagged 2026-05-20; GitHub release pinned;
   `mooncakes` `dowdiness/moondsp@0.5.1` published 2026-05-20). The mini
   per-sound scalar-control branch is closed; remaining slices are free-choice.
