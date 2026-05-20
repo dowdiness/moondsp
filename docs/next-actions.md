@@ -8,16 +8,13 @@ per-PR verification logs and merged-PR lists live in `git log` and
 
 ## Current State
 
-- `main` HEAD: `bf02217 [codex] Normalize scheduler test loops (#64)`.
-- Latest release: **v0.4.0** (tagged 2026-05-18; GitHub release pinned;
-  `mooncakes` `dowdiness/moondsp@0.4.0` published 2026-05-19). The v0.4.0
-  branch of pre-1.0 API hygiene is closed; remaining slices are
+- `main` HEAD: `2978629 chore: prepare v0.5.0 release`.
+- Latest release: **v0.5.0** (tagged 2026-05-20; GitHub release pinned;
+  `mooncakes` `dowdiness/moondsp@0.5.0` published 2026-05-20). The
+  AudioBuffer API-hardening branch is closed; remaining slices are
   free-choice.
 - No open PRs.
-- `## [Unreleased]` in `CHANGELOG.md` now carries the AudioBuffer::new
-  defensive-copy breaking change + AudioBuffer::adopt addition, plus the
-  AudioBuffer write-time non-finite normalization from PR #63. Rolls into
-  the next release tag.
+- `## [Unreleased]` in `CHANGELOG.md` is empty after v0.5.0.
 - Known outstanding warnings: 8 `[0020]` Show-vs-Debug deprecations from
   `@qc.quick_check_fn` in DSP and pattern property tests. Treat as
   dependency-bound unless `moonbitlang/quickcheck` has changed its trait
@@ -48,6 +45,13 @@ whether a dependency update removes the deprecated `Show` bound.
   before planning.
 
 ### Closed since the last update
+
+- ~~**v0.5.0 AudioBuffer API-hardening release**~~ — SHIPPED 2026-05-20
+  as tag `v0.5.0`, GitHub release, and mooncakes
+  `dowdiness/moondsp@0.5.0`. Bundles PR #60, #62, and #63: removes
+  `AudioBuffer::as_fixed_array`, adds `AudioBuffer::all` / `any` and
+  `AudioBuffer::adopt`, switches `AudioBuffer::new` to defensive copy,
+  and normalizes non-finite samples on MoonBit-owned writes.
 
 - ~~**C-style loops in `scheduler/scheduler_test.mbt:2255/2272`**~~ —
   SHIPPED 2026-05-20 in PR #64 (squash commit `bf02217`). The two
