@@ -239,22 +239,23 @@ fn MiniDocBuilder::jux_doc(
 }
 
 ///|
-fn MiniDocBuilder::cutoff_doc(
+fn MiniDocBuilder::scalar_control_doc(
   self : MiniDocBuilder,
   doc : @pattern.PatternDoc[@pattern.ControlMap],
-  cutoff : Double,
+  key : String,
+  value : Double,
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
   let control_id = self.node_id(
     "control",
-    "\{doc.root().value()}:cutoff:\{cutoff}",
+    "\{doc.root().value()}:\{key}:\{value}",
   )
   let control_doc = self.pure_doc(
     control_id,
-    @pattern.ControlMap::single("cutoff", cutoff),
+    @pattern.ControlMap::single(key, value),
   )
   let id = self.node_id(
     "merge_control",
-    "\{doc.root().value()}:cutoff:\{cutoff}",
+    "\{doc.root().value()}:\{key}:\{value}",
   )
   match self.reuse_doc(id) {
     Some(doc) => doc
@@ -473,7 +474,15 @@ fn Parser::parse_doc_method(
     }
     "cutoff" => {
       let cutoff = self.read_method_number_argument()
-      builder.cutoff_doc(doc, cutoff)
+      builder.scalar_control_doc(doc, "cutoff", cutoff)
+    }
+    "gain" => {
+      let gain = self.read_method_number_argument()
+      builder.scalar_control_doc(doc, "gain", gain)
+    }
+    "pan" => {
+      let pan = self.read_method_number_argument()
+      builder.scalar_control_doc(doc, "pan", pan)
     }
     "every" => {
       self.expect_char('(')

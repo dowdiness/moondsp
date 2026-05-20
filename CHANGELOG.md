@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Mini notation now accepts `.cutoff(f)` method chains such as
   `s("bd").cutoff(200)`, lowering through the existing `ControlMap` and
   `merge_control` path in both runtime parsing and PatternDoc parsing.
+- Mini notation now accepts `.gain(g)` and `.pan(p)` method chains with the
+  same runtime and PatternDoc lowering path as `.cutoff(f)`.
 
 ## [0.5.0] - 2026-05-20
 
