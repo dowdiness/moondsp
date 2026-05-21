@@ -61,16 +61,16 @@ test "apply_edit deletion updates duplicate atom spans and reuses unchanged node
 test "parse_tokens_indexed reproduces mini deletion without parser wrapper reuse" {
   let old_source = "s(\"bd sd bd\")"
   let new_source = "s(\"bd bd\")"
+  let edit = @core.Edit::delete(5, 8)
   let (old_tree, old_diagnostics) = parse_cst(old_source)
   inspect(old_diagnostics.length(), content="0")
   let new_tokens = tokenize(new_source)
   let new_starts = @core.build_starts(new_tokens)
   let cache = @core.OldTokenCache::empty()
-  cache.apply_edit(5, 8, 5)
-  let cursor = @core.ReuseCursor::new(
+  cache.apply_source_edit(edit)
+  let cursor = @core.ReuseCursor::new_with_edit(
     old_tree,
-    5,
-    8,
+    edit,
     new_tokens.length(),
     fn(i) { new_tokens[i].token },
     fn(i) { new_starts[i] },
@@ -82,7 +82,6 @@ test "parse_tokens_indexed reproduces mini deletion without parser wrapper reuse
     },
     mini_spec,
     old_token_cache=cache,
-    new_damage_end=5,
   )
   let (_, _new_diagnostics, reuse_count) = @core.parse_tokens_indexed(
     new_source,
@@ -99,16 +98,16 @@ test "parse_tokens_indexed reproduces mini deletion without parser wrapper reuse
 test "parse_tokens_indexed reproduces mini prefix deletion reuse" {
   let old_source = "s(\"bd sd bd\")"
   let new_source = "s(\"sd bd\")"
+  let edit = @core.Edit::delete(3, 6)
   let (old_tree, old_diagnostics) = parse_cst(old_source)
   inspect(old_diagnostics.length(), content="0")
   let new_tokens = tokenize(new_source)
   let new_starts = @core.build_starts(new_tokens)
   let cache = @core.OldTokenCache::empty()
-  cache.apply_edit(3, 6, 3)
-  let cursor = @core.ReuseCursor::new(
+  cache.apply_source_edit(edit)
+  let cursor = @core.ReuseCursor::new_with_edit(
     old_tree,
-    3,
-    6,
+    edit,
     new_tokens.length(),
     fn(i) { new_tokens[i].token },
     fn(i) { new_starts[i] },
@@ -120,7 +119,6 @@ test "parse_tokens_indexed reproduces mini prefix deletion reuse" {
     },
     mini_spec,
     old_token_cache=cache,
-    new_damage_end=3,
   )
   let (_, _new_diagnostics, reuse_count) = @core.parse_tokens_indexed(
     new_source,
@@ -137,16 +135,16 @@ test "parse_tokens_indexed reproduces mini prefix deletion reuse" {
 test "parse_tokens_indexed reproduces mini suffix deletion reuse" {
   let old_source = "s(\"bd sd bd\")"
   let new_source = "s(\"bd sd\")"
+  let edit = @core.Edit::delete(8, 11)
   let (old_tree, old_diagnostics) = parse_cst(old_source)
   inspect(old_diagnostics.length(), content="0")
   let new_tokens = tokenize(new_source)
   let new_starts = @core.build_starts(new_tokens)
   let cache = @core.OldTokenCache::empty()
-  cache.apply_edit(8, 11, 8)
-  let cursor = @core.ReuseCursor::new(
+  cache.apply_source_edit(edit)
+  let cursor = @core.ReuseCursor::new_with_edit(
     old_tree,
-    8,
-    11,
+    edit,
     new_tokens.length(),
     fn(i) { new_tokens[i].token },
     fn(i) { new_starts[i] },
@@ -158,7 +156,6 @@ test "parse_tokens_indexed reproduces mini suffix deletion reuse" {
     },
     mini_spec,
     old_token_cache=cache,
-    new_damage_end=8,
   )
   let (_, _new_diagnostics, reuse_count) = @core.parse_tokens_indexed(
     new_source,
@@ -177,16 +174,16 @@ test "parser apply_edit path uses direct parse_tokens_indexed-like cursor inputs
   let new_source = "s(\"bd bd\")"
   let parser = @loom.new_parser(old_source, mini_grammar)
   let before = parser.runtime().read(parser.snapshot())
-  parser.apply_edit(@core.Edit::delete(5, 8), new_source)
+  let edit = @core.Edit::delete(5, 8)
+  parser.apply_edit(edit, new_source)
   let after = parser.runtime().read(parser.snapshot())
   let new_tokens = tokenize(new_source)
   let new_starts = @core.build_starts(new_tokens)
   let cache = @core.OldTokenCache::empty()
-  cache.apply_edit(5, 8, 5)
-  let cursor = @core.ReuseCursor::new(
+  cache.apply_source_edit(edit)
+  let cursor = @core.ReuseCursor::new_with_edit(
     before.syntax.cst_node(),
-    5,
-    8,
+    edit,
     new_tokens.length(),
     fn(i) { new_tokens[i].token },
     fn(i) { new_starts[i] },
@@ -198,7 +195,6 @@ test "parser apply_edit path uses direct parse_tokens_indexed-like cursor inputs
     },
     mini_spec,
     old_token_cache=cache,
-    new_damage_end=5,
   )
   let (_, _, direct_reuse_count) = @core.parse_tokens_indexed(
     new_source,
@@ -232,18 +228,16 @@ test "parser reuse count compares against direct TokenBuffer parse path" {
   }
   let new_starts = buffer.get_starts()
   let cache = @core.OldTokenCache::empty()
-  cache.apply_edit(5, 8, 5)
-  let cursor = @core.ReuseCursor::new(
+  cache.apply_source_edit(edit)
+  let cursor = @core.ReuseCursor::new_with_edit(
     parse_cst(old_source).0,
-    5,
-    8,
+    edit,
     buffer.token_count(),
     fn(i) { buffer.get_token(i) },
     fn(i) { new_starts[i] },
     fn(i) { buffer.get_view(i) },
     mini_spec,
     old_token_cache=cache,
-    new_damage_end=5,
   )
   let (_, _, direct_reuse_count) = @core.parse_tokens_indexed(
     new_source,
