@@ -42,6 +42,12 @@ pub impl @seam.ToRawKind for MiniSyntaxKind with to_raw(self) {
 }
 
 ///|
+/// Raw kind for mini atom nodes, exposed for black-box spec assertions.
+pub fn mini_atom_node_raw_kind() -> @seam.RawKind {
+  AtomNode.to_raw()
+}
+
+///|
 pub fn MiniSyntaxKind::from_raw(raw : @seam.RawKind) -> MiniSyntaxKind {
   match raw.0 {
     0 => SKeywordToken
