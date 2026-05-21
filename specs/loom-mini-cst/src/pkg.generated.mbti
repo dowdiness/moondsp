@@ -16,6 +16,8 @@ pub fn ident_token_spans_from_syntax(@seam.SyntaxNode) -> Array[String]
 
 pub fn lex(String) -> @core.LexResult[MiniToken]
 
+pub fn mini_atom_node_raw_kind() -> @seam.RawKind
+
 pub fn mini_fold_node(@seam.SyntaxNode, (@seam.SyntaxNode) -> MiniAst) -> MiniAst
 
 pub let mini_grammar : @loom.Grammar[MiniToken, MiniSyntaxKind, MiniAst]

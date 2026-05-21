@@ -1,3 +1,11 @@
+// Loom PR #135 contract pinned by this spec:
+// pure deletions may preserve reusable left-adjacent CST subtrees when
+// leading and trailing token context still validate. This is deletion-safe
+// CST reuse, not parser-owned token/subtree identity projection.
+//
+// Explicit non-goals: stable logical identity through insertions, token
+// splits/merges, full reparses, or AST/domain projections.
+
 ///|
 test "lexer exposes duplicate mini atoms as separate tokens" {
   let expected =
@@ -31,6 +39,30 @@ test "cst diagnostics survive malformed notation" {
 }
 
 ///|
+fn find_first_atom_node(root : @seam.SyntaxNode) -> @seam.SyntaxNode? {
+  if root.kind() == mini_atom_node_raw_kind() {
+    Some(root)
+  } else {
+    for child in root.children() {
+      match find_first_atom_node(child) {
+        Some(node) => break Some(node)
+        None => ()
+      }
+    } nobreak {
+      None
+    }
+  }
+}
+
+///|
+fn first_atom_node_or_abort(root : @seam.SyntaxNode) -> @seam.SyntaxNode {
+  match find_first_atom_node(root) {
+    Some(node) => node
+    None => abort("expected AtomNode")
+  }
+}
+
+///|
 test "apply_edit insertion updates duplicate atom spans through parser CST" {
   let parser = @loom.new_parser("s(\"bd sd bd\")", mini_grammar)
   let before =
@@ -55,9 +87,142 @@ test "apply_edit deletion updates duplicate atom spans and reuses unchanged node
     #|["bd@[3,5)", "bd@[6,8)"]
   debug_inspect(parser_ident_token_spans(parser), content=after)
   inspect(parser.runtime().read(parser.diagnostics()).length(), content="0")
-  inspect(parser.runtime().read(parser.snapshot()).reuse_count > 0, content="true")
+  inspect(
+    parser.runtime().read(parser.snapshot()).reuse_count > 0,
+    content="true",
+  )
 }
 
+///|
+test "parser pure deletion preserves left-adjacent mini atom reuse" {
+  let parser = @loom.new_parser("s(\"bd \")", mini_grammar)
+  parser.apply_edit(@core.Edit::delete(5, 6), "s(\"bd\")")
+  let after_snapshot = parser.runtime().read(parser.snapshot())
+  let after =
+    #|["bd@[3,5)"]
+  debug_inspect(parser_ident_token_spans(parser), content=after)
+  inspect(parser.runtime().read(parser.diagnostics()).length(), content="0")
+  inspect(after_snapshot.reuse_count > 0, content="true")
+}
+
+///|
+test "parser adjacent insertion does not claim deletion-style mini atom reuse" {
+  let parser = @loom.new_parser("s(\"bd\")", mini_grammar)
+  parser.apply_edit(@core.Edit::insert(5, 1), "s(\"bd \")")
+  let after_snapshot = parser.runtime().read(parser.snapshot())
+  let after =
+    #|["bd@[3,5)"]
+  debug_inspect(parser_ident_token_spans(parser), content=after)
+  inspect(parser.runtime().read(parser.diagnostics()).length(), content="0")
+  inspect(after_snapshot.reuse_count, content="0")
+}
+
+///|
+test "parser deletion that merges mini atoms stays conservative" {
+  let parser = @loom.new_parser("s(\"bd sd\")", mini_grammar)
+  parser.apply_edit(@core.Edit::delete(5, 6), "s(\"bdsd\")")
+  let after_snapshot = parser.runtime().read(parser.snapshot())
+  let after =
+    #|["bdsd@[3,7)"]
+  debug_inspect(parser_ident_token_spans(parser), content=after)
+  inspect(parser.runtime().read(parser.diagnostics()).length(), content="0")
+  inspect(after_snapshot.reuse_count, content="0")
+}
+
+///|
+test "reuse cursor can opt into safe left-adjacent mini deletion" {
+  let old_source = "s(\"bd \")"
+  let new_source = "s(\"bd\")"
+  let edit = @core.Edit::delete(5, 6)
+  let (old_tree, old_diagnostics) = parse_cst(old_source)
+  inspect(old_diagnostics.length(), content="0")
+  let old_atom = first_atom_node_or_abort(@seam.SyntaxNode::from_cst(old_tree))
+  let new_tokens = tokenize(new_source)
+  let new_starts = @core.build_starts(new_tokens)
+
+  let strict_cache = @core.OldTokenCache::empty()
+  strict_cache.apply_source_edit(edit)
+  let strict_cursor = @core.ReuseCursor::new_with_edit(
+    old_tree,
+    edit,
+    new_tokens.length(),
+    fn(i) { new_tokens[i].token },
+    fn(i) { new_starts[i] },
+    fn(i) {
+      new_source.view(
+        start_offset=new_starts[i],
+        end_offset=new_starts[i] + new_tokens[i].len,
+      )
+    },
+    mini_spec,
+    old_token_cache=strict_cache,
+  )
+  let atom_raw = mini_atom_node_raw_kind()
+  inspect(strict_cursor.try_reuse(atom_raw, 3, 3) is None, content="true")
+
+  let relaxed_cache = @core.OldTokenCache::empty()
+  relaxed_cache.apply_source_edit(edit)
+  let relaxed_cursor = @core.ReuseCursor::new_with_edit(
+    old_tree,
+    edit,
+    new_tokens.length(),
+    fn(i) { new_tokens[i].token },
+    fn(i) { new_starts[i] },
+    fn(i) {
+      new_source.view(
+        start_offset=new_starts[i],
+        end_offset=new_starts[i] + new_tokens[i].len,
+      )
+    },
+    mini_spec,
+    old_token_cache=relaxed_cache,
+    allow_left_adjacent_reuse=true,
+  )
+  let reused_atom = relaxed_cursor.try_reuse(atom_raw, 3, 3)
+  inspect(reused_atom is Some(_), content="true")
+  match reused_atom {
+    Some(node) =>
+      // This physical equality is meaningful because ReuseCursor returns a
+      // subtree selected from old_tree, before any new tree interning happens.
+      inspect(physical_equal(old_atom.cst_node(), node), content="true")
+    None => abort("expected left-adjacent atom reuse")
+  }
+}
+
+///|
+test "reuse cursor rejects mini token merge with deletion opt-in" {
+  let old_source = "s(\"bd sd\")"
+  let new_source = "s(\"bdsd\")"
+  let edit = @core.Edit::delete(5, 6)
+  let (old_tree, old_diagnostics) = parse_cst(old_source)
+  inspect(old_diagnostics.length(), content="0")
+  let new_tokens = tokenize(new_source)
+  let new_starts = @core.build_starts(new_tokens)
+  let cache = @core.OldTokenCache::empty()
+  cache.apply_source_edit(edit)
+  let cursor = @core.ReuseCursor::new_with_edit(
+    old_tree,
+    edit,
+    new_tokens.length(),
+    fn(i) { new_tokens[i].token },
+    fn(i) { new_starts[i] },
+    fn(i) {
+      new_source.view(
+        start_offset=new_starts[i],
+        end_offset=new_starts[i] + new_tokens[i].len,
+      )
+    },
+    mini_spec,
+    old_token_cache=cache,
+    allow_left_adjacent_reuse=true,
+  )
+  inspect(
+    cursor.try_reuse(mini_atom_node_raw_kind(), 3, 3) is None,
+    content="true",
+  )
+}
+
+///|
 test "parse_tokens_indexed reproduces mini deletion without parser wrapper reuse" {
   let old_source = "s(\"bd sd bd\")"
   let new_source = "s(\"bd bd\")"
@@ -95,6 +260,7 @@ test "parse_tokens_indexed reproduces mini deletion without parser wrapper reuse
   inspect(reuse_count > 0, content="true")
 }
 
+///|
 test "parse_tokens_indexed reproduces mini prefix deletion reuse" {
   let old_source = "s(\"bd sd bd\")"
   let new_source = "s(\"sd bd\")"
@@ -132,6 +298,7 @@ test "parse_tokens_indexed reproduces mini prefix deletion reuse" {
   inspect(reuse_count > 0, content="true")
 }
 
+///|
 test "parse_tokens_indexed reproduces mini suffix deletion reuse" {
   let old_source = "s(\"bd sd bd\")"
   let new_source = "s(\"bd sd\")"
@@ -169,6 +336,7 @@ test "parse_tokens_indexed reproduces mini suffix deletion reuse" {
   inspect(reuse_count > 0, content="true")
 }
 
+///|
 test "parser apply_edit path uses direct parse_tokens_indexed-like cursor inputs" {
   let old_source = "s(\"bd sd bd\")"
   let new_source = "s(\"bd bd\")"
@@ -209,6 +377,7 @@ test "parser apply_edit path uses direct parse_tokens_indexed-like cursor inputs
   inspect(after.reuse_count > 0, content="true")
 }
 
+///|
 test "parser reuse count compares against direct TokenBuffer parse path" {
   let old_source = "s(\"bd sd bd\")"
   let new_source = "s(\"bd bd\")"
@@ -221,7 +390,7 @@ test "parser reuse count compares against direct TokenBuffer parse path" {
     new_source,
     lex_fn=lex,
     eof_token=EOF,
-    incremental_relex_enabled = false,
+    incremental_relex_enabled=false,
   )
   buffer.update(edit, new_source) catch {
     @core.LexError(_) => abort("unexpected lexer failure")
@@ -255,6 +424,7 @@ test "parser reuse count compares against direct TokenBuffer parse path" {
   inspect(parser_reuse, content="true")
 }
 
+///|
 test "imperative parser reuse path matches direct deletion expectations" {
   let parser = @loom.new_imperative_parser("s(\"bd sd bd\")", mini_grammar)
   let _ = parser.parse()

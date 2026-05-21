@@ -9,6 +9,7 @@ web/moonbit_dsp.wasm
 web/moonbit_dsp_test.wasm
 .worktrees/
 .codex
+.codex-runtime/
 .claude/scheduled_tasks.lock
 
 # wrangler files
