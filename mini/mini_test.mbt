@@ -99,6 +99,36 @@ fn pid(value : String) -> @identity.PatternNodeId {
 }
 
 ///|
+fn assert_snapshot_event_has_node(
+  event : @pattern.PatternSnapshotEvent[@pattern.ControlMap],
+  id : String,
+) -> Unit {
+  let expected = pid(id)
+  for node in event.pattern_nodes() {
+    if node == expected {
+      return
+    }
+  }
+  abort("expected event to include pattern node \{id}")
+}
+
+///|
+fn snapshot_events_contain_node(
+  events : Array[@pattern.PatternSnapshotEvent[@pattern.ControlMap]],
+  id : String,
+) -> Unit {
+  let expected = pid(id)
+  for event in events {
+    for node in event.pattern_nodes() {
+      if node == expected {
+        return
+      }
+    }
+  }
+  abort("expected events to include pattern node \{id}")
+}
+
+///|
 test "parse single drum sound" {
   let pat = unwrap_ok(@mini.parse("s(\"bd\")"))
   let events = query_one_cycle(pat)
@@ -392,6 +422,229 @@ test "parse_doc_reusing insertion and removal keep surviving token ids" {
   assert_true(removed.contains_node(pid("mini:sound:bd:0")))
   assert_true(!removed.contains_node(pid("mini:sound:hh:0")))
   assert_true(!removed.contains_node(pid("mini:sound:sd:0")))
+}
+
+///|
+test "MiniAuthoringPipeline reuses stable ids and lowering cache across text edits" {
+  let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd sd\")")
+  let doc = unwrap_doc(pipeline.parse_doc())
+  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
+  pipeline.reset_lowering_stats()
+  pipeline.set_input("s(\"  bd   sd  \")")
+  let edited = unwrap_doc(pipeline.parse_doc())
+  @debug.assert_eq(doc.root().value(), edited.root().value())
+  assert_true(edited.contains_node(pid("mini:sound:bd:0")))
+  assert_true(edited.contains_node(pid("mini:sound:sd:0")))
+  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
+  inspect(pipeline.lowering_cache_hits(), content="1")
+  inspect(pipeline.lowering_cache_misses(), content="0")
+}
+
+///|
+test "MiniAuthoringPipeline keeps last reusable doc after parse error" {
+  let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd sd\")")
+  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
+  pipeline.set_input("s(\"bd sd\"")
+  match pipeline.parse_doc() {
+    Ok(_) => abort("expected parse error")
+    Err(msg) =>
+      inspect(msg, content="position 9: expected ')', got end of input")
+  }
+  pipeline.reset_lowering_stats()
+  pipeline.set_input("s(\"  bd   sd  \")")
+  let recovered = unwrap_doc(pipeline.parse_doc())
+  assert_true(recovered.contains_node(pid("mini:sound:bd:0")))
+  assert_true(recovered.contains_node(pid("mini:sound:sd:0")))
+  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
+  inspect(pipeline.lowering_cache_hits(), content="1")
+  inspect(pipeline.lowering_cache_misses(), content="0")
+}
+
+///|
+test "MiniAuthoringPipeline exposes whole-document recomputation counts" {
+  let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd sd\")")
+  inspect(pipeline.parse_compute_count(), content="0")
+  inspect(pipeline.snapshot_compute_count(), content="0")
+  ignore(unwrap_doc(pipeline.parse_doc()))
+  inspect(pipeline.parse_compute_count(), content="1")
+  inspect(pipeline.snapshot_compute_count(), content="0")
+  ignore(unwrap_doc(pipeline.parse_doc()))
+  inspect(pipeline.parse_compute_count(), content="1")
+  pipeline.set_input("s(\"bd sd\")")
+  ignore(unwrap_doc(pipeline.parse_doc()))
+  inspect(pipeline.parse_compute_count(), content="1")
+  pipeline.set_input("s(\"  bd sd\")")
+  ignore(unwrap_doc(pipeline.parse_doc()))
+  inspect(pipeline.parse_compute_count(), content="2")
+  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
+  inspect(pipeline.snapshot_compute_count(), content="1")
+}
+
+///|
+test "MiniAuthoringPipeline token replacement reuses unaffected lowered subtrees" {
+  let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd sd hh oh\")")
+  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
+  pipeline.reset_lowering_stats()
+  pipeline.set_input("s(\"bd cp hh oh\")")
+  let edited = unwrap_doc(pipeline.parse_doc())
+  assert_true(edited.contains_node(pid("mini:sound:bd:0")))
+  assert_true(!edited.contains_node(pid("mini:sound:sd:0")))
+  assert_true(edited.contains_node(pid("mini:sound:cp:0")))
+  assert_true(edited.contains_node(pid("mini:sound:hh:0")))
+  assert_true(edited.contains_node(pid("mini:sound:oh:0")))
+  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
+  assert_true(pipeline.lowering_cache_hits() >= 3)
+  assert_true(pipeline.lowering_cache_misses() >= 1)
+}
+
+///|
+test "MiniAuthoringPipeline tracks internal authoring token count" {
+  let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd sd\")")
+  inspect(pipeline.authoring_token_count(), content="7")
+  pipeline.set_input("s( \"  bd   sd  \" )")
+  inspect(pipeline.authoring_token_count(), content="7")
+  pipeline.set_input("s(\"hh bd sd\")")
+  inspect(pipeline.authoring_token_count(), content="8")
+}
+
+///|
+test "MiniAuthoringPipeline accepts source edit span updates" {
+  let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd bd bd\")")
+  inspect(pipeline.authoring_token_count(), content="8")
+  pipeline.set_input_with_source_edit(
+    "s(\"bd bd bd bd\")",
+    old_start=6,
+    old_end=6,
+    new_end=9,
+  )
+  inspect(pipeline.authoring_token_count(), content="9")
+  let edited = unwrap_doc(pipeline.parse_doc())
+  assert_true(edited.contains_node(pid("mini:sound:bd:0")))
+  assert_true(edited.contains_node(pid("mini:sound:bd:1")))
+  assert_true(edited.contains_node(pid("mini:sound:bd:2")))
+  assert_true(edited.contains_node(pid("mini:sound:bd:3")))
+}
+
+///|
+test "MiniAuthoringPipeline source edit preserves duplicate atom provenance" {
+  let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd sd bd\")")
+  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
+  pipeline.reset_lowering_stats()
+  pipeline.set_input_with_source_edit(
+    "s(\"bd sd bd bd\")",
+    old_start=9,
+    old_end=9,
+    new_end=12,
+  )
+  let snapshot = unwrap_mini_snapshot(pipeline.parse_snapshot())
+  assert_true(pipeline.lowering_cache_hits() >= 3)
+  let events = snapshot.query_sourced_events(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+    ),
+  )
+  inspect(events.length(), content="4")
+  assert_snapshot_event_has_node(events[0], "mini:sound:bd:0")
+  assert_snapshot_event_has_node(events[1], "mini:sound:sd:0")
+  assert_snapshot_event_has_node(events[2], "mini:sound:bd:2")
+  assert_snapshot_event_has_node(events[3], "mini:sound:bd:1")
+}
+
+///|
+test "MiniAuthoringPipeline consecutive source-edit updates reuse stable identities" {
+  let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd sd bd\")")
+  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
+  let intermediate = "s(\"bd sd cp bd\")"
+  let final_state = "s(\"bd sd hh bd\")"
+  pipeline.set_input_with_source_edit(
+    intermediate,
+    old_start=8,
+    old_end=8,
+    new_end=11,
+  )
+  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
+  pipeline.set_input_with_source_edit(
+    final_state,
+    old_start=9,
+    old_end=11,
+    new_end=11,
+  )
+  let snapshot = unwrap_mini_snapshot(pipeline.parse_snapshot())
+  let events = snapshot.query_sourced_events(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+    ),
+  )
+  inspect(events.length(), content="4")
+  snapshot_events_contain_node(events, "mini:sound:bd:0")
+  snapshot_events_contain_node(events, "mini:sound:hh:0")
+  snapshot_events_contain_node(events, "mini:sound:sd:0")
+  snapshot_events_contain_node(events, "mini:sound:bd:1")
+}
+
+///|
+test "MiniAuthoringPipeline source edit preserves duplicate note provenance" {
+  let pipeline = @mini.MiniAuthoringPipeline::new("note(\"60 62 60\")")
+  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
+  pipeline.reset_lowering_stats()
+  pipeline.set_input_with_source_edit(
+    "note(\"60 62 60 60\")",
+    old_start=12,
+    old_end=12,
+    new_end=15,
+  )
+  let snapshot = unwrap_mini_snapshot(pipeline.parse_snapshot())
+  assert_true(pipeline.lowering_cache_hits() >= 3)
+  let events = snapshot.query_sourced_events(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+    ),
+  )
+  inspect(events.length(), content="4")
+  assert_snapshot_event_has_node(events[0], "mini:note:60:0")
+  assert_snapshot_event_has_node(events[1], "mini:note:62:0")
+  assert_snapshot_event_has_node(events[2], "mini:note:60:2")
+  assert_snapshot_event_has_node(events[3], "mini:note:60:1")
+}
+
+///|
+test "MiniAuthoringPipeline source edit parse error preserves previous token baseline" {
+  let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd sd bd\")")
+  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
+  pipeline.set_input_with_source_edit(
+    "s(\"bd sd bd bd\"",
+    old_start=9,
+    old_end=9,
+    new_end=12,
+  )
+  match pipeline.parse_doc() {
+    Ok(_) => abort("expected parse error")
+    Err(msg) =>
+      inspect(msg, content="position 15: expected ')', got end of input")
+  }
+  pipeline.reset_lowering_stats()
+  pipeline.set_input_with_source_edit(
+    "s(\"bd sd bd bd\")",
+    old_start=9,
+    old_end=9,
+    new_end=12,
+  )
+  let snapshot = unwrap_mini_snapshot(pipeline.parse_snapshot())
+  assert_true(pipeline.lowering_cache_hits() >= 3)
+  let events = snapshot.query_sourced_events(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+    ),
+  )
+  inspect(events.length(), content="4")
+  assert_snapshot_event_has_node(events[0], "mini:sound:bd:0")
+  assert_snapshot_event_has_node(events[1], "mini:sound:sd:0")
+  assert_snapshot_event_has_node(events[2], "mini:sound:bd:2")
+  assert_snapshot_event_has_node(events[3], "mini:sound:bd:1")
 }
 
 ///|

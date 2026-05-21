@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added internal mini authoring token edit-span realignment coverage so
+  unchanged prefix/suffix tokens preserve identity while changed duplicate
+  tokens receive fresh keys.
+- Added `MiniAuthoringPipeline::set_input_with_source_edit(...)` so editor
+  integrations can provide the concrete source edit span for ambiguous
+  identical-token edits.
+- Mini authoring now feeds aligned token identities into `PatternDoc` atom IDs
+  inside the pipeline, preserving duplicate sound/note provenance across
+  source-span edits while retaining the existing `mini:sound:bd:N` ID shape.
+- Added source-span regression coverage for duplicate note provenance and parse
+  error recovery in the mini authoring pipeline.
+- Added ADR-0012 to scope a loom/CST mini authoring evaluation before any
+  runtime parser migration.
+- Added a nested `specs/loom-mini-cst/` spike module with a tiny loom grammar
+  for duplicate mini atom span evaluation.
+- Extended the loom/CST spike with `apply_edit` insertion/deletion
+  characterization tests, including current deletion no-reuse behavior.
+
 ## [0.5.1] - 2026-05-20
 
 ### Added

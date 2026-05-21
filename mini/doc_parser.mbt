@@ -2,14 +2,52 @@
 priv struct MiniDocBuilder {
   previous : @pattern.PatternDoc[@pattern.ControlMap]?
   counters : Map[String, Int]
+  token_id_by_location : Map[String, String]?
 }
 
 ///|
 #alias(new)
 fn MiniDocBuilder::MiniDocBuilder(
   previous~ : @pattern.PatternDoc[@pattern.ControlMap]?,
+  tokens? : Array[MiniToken]? = None,
 ) -> MiniDocBuilder {
-  { previous, counters: {} }
+  {
+    previous,
+    counters: {},
+    token_id_by_location:
+      match tokens {
+        None => None
+        Some(tokens) => {
+          let index : Map[String, String] = {}
+          for token in tokens {
+            if mini_token_kind_equal(token.kind, Identifier) {
+              let suffix = mini_token_identity_occurrence_suffix(token)
+              let key =
+                mini_doc_token_id_key("sound", token.text, token.start, token.end)
+              let id = "mini:sound:\{token.text}:\{suffix}"
+              index[key] = id
+            } else if mini_token_kind_equal(token.kind, Number) {
+              let suffix = mini_token_identity_occurrence_suffix(token)
+              let key =
+                mini_doc_token_id_key("note", token.text, token.start, token.end)
+              let id = "mini:note:\{token.text}:\{suffix}"
+              index[key] = id
+            }
+          }
+          Some(index)
+        }
+      },
+  }
+}
+
+///|
+fn mini_doc_token_id_key(
+  kind : String,
+  value : String,
+  start : Int,
+  end : Int,
+) -> String {
+  "mini-doc-token-id|\{kind}|\{start}|\{end}|\{value}"
 }
 
 ///|
@@ -44,6 +82,40 @@ fn MiniDocBuilder::atom_id(
   let key = "\{kind}:\{value}"
   let occurrence = self.next_occurrence(key)
   self.id("mini:\{kind}:\{value}:\{occurrence}")
+}
+
+///|
+fn MiniDocBuilder::token_atom_id(
+  self : MiniDocBuilder,
+  kind : String,
+  value : String,
+  start : Int,
+  end : Int,
+) -> @identity.PatternNodeId? raise ParseError {
+  match self.token_id_by_location {
+    None => None
+    Some(index) => {
+      let key = mini_doc_token_id_key(kind, value, start, end)
+      match index.get(key) {
+        None => None
+        Some(id) => Some(self.id(id))
+      }
+    }
+  }
+}
+
+///|
+fn MiniDocBuilder::atom_id_at(
+  self : MiniDocBuilder,
+  kind : String,
+  value : String,
+  start : Int,
+  end : Int,
+) -> @identity.PatternNodeId raise ParseError {
+  match self.token_atom_id(kind, value, start, end) {
+    Some(id) => id
+    None => self.atom_id(kind, value)
+  }
 }
 
 ///|
@@ -297,10 +369,11 @@ fn stable_seed(value : String) -> Int {
 fn parse_doc_internal(
   input : String,
   previous : @pattern.PatternDoc[@pattern.ControlMap]?,
+  tokens? : Array[MiniToken]? = None,
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
   guard input.length() > 0 else { return Err("empty input") }
   let p = Parser::new(input)
-  let builder = MiniDocBuilder::new(previous~)
+  let builder = MiniDocBuilder::new(previous~, tokens~)
   let result = p.parse_doc_expr(builder) catch {
     ParseError(msg) => return Err(msg)
   }
@@ -333,6 +406,15 @@ pub fn parse_doc_reusing(
   previous : @pattern.PatternDoc[@pattern.ControlMap],
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
   parse_doc_internal(input, Some(previous))
+}
+
+///|
+fn parse_doc_with_token_identities(
+  input : String,
+  previous : @pattern.PatternDoc[@pattern.ControlMap]?,
+  tokens : Array[MiniToken],
+) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
+  parse_doc_internal(input, previous, tokens=Some(tokens))
 }
 
 ///|
@@ -412,16 +494,38 @@ fn Parser::parse_doc_primary(
     return builder.stack_doc(args)
   }
   if self.match_keyword("s(") {
-    let content = self.read_quoted_string()
+    let (content, content_start) = self.read_quoted_string_with_start()
     self.expect_char(')')
-    return parse_sound_doc_notation(content, builder)
+    return parse_sound_doc_notation(
+      content,
+      builder,
+      source_offset=content_start,
+    )
   }
   if self.match_keyword("note(") {
-    let content = self.read_quoted_string()
+    let (content, content_start) = self.read_quoted_string_with_start()
     self.expect_char(')')
-    return parse_note_doc_notation(content, builder)
+    return parse_note_doc_notation(
+      content,
+      builder,
+      source_offset=content_start,
+    )
   }
   raise ParseError("position \{self.pos}: expected 's(', 'note(', or 'stack('")
+}
+
+///|
+fn Parser::read_quoted_string_with_start(
+  self : Parser,
+) -> (String, Int) raise ParseError {
+  self.expect_char('"')
+  let start = self.pos
+  while !self.at_end() && self.input[self.pos] != '"' {
+    self.pos += 1
+  }
+  let content = self.input[start:self.pos].to_owned()
+  self.expect_char('"')
+  (content, start)
 }
 
 ///|
@@ -578,11 +682,12 @@ fn Parser::parse_doc_callback(
 fn parse_sound_doc_notation(
   content : String,
   builder : MiniDocBuilder,
+  source_offset~ : Int,
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
   guard content.length() > 0 else {
     raise ParseError("position 0: empty notation")
   }
-  let sub = NotationParser::new(content, sound=true)
+  let sub = NotationParser::new(content, sound=true, source_offset~)
   sub.parse_doc_notation(builder)
 }
 
@@ -590,11 +695,12 @@ fn parse_sound_doc_notation(
 fn parse_note_doc_notation(
   content : String,
   builder : MiniDocBuilder,
+  source_offset~ : Int,
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
   guard content.length() > 0 else {
     raise ParseError("position 0: empty notation")
   }
-  let sub = NotationParser::new(content, sound=false)
+  let sub = NotationParser::new(content, sound=false, source_offset~)
   sub.parse_doc_notation(builder)
 }
 
@@ -762,7 +868,12 @@ fn NotationParser::parse_doc_atom(
     }
     match drum_midi(name) {
       Some(midi) => {
-        let id = builder.atom_id("sound", name)
+        let id = builder.atom_id_at(
+          "sound",
+          name,
+          self.source_offset + start,
+          self.source_offset + self.pos,
+        )
         builder.pure_doc(
           id,
           @pattern.ControlMap::single("sound", midi.to_double()),
@@ -771,8 +882,15 @@ fn NotationParser::parse_doc_atom(
       None => raise ParseError("position \{start}: unknown drum name '\{name}'")
     }
   } else {
-    let (note, token) = self.read_note_number_value(start)
-    let id = builder.atom_id("note", token)
+    let (note, token, token_start, token_end) = self.read_note_number_value(
+      start,
+    )
+    let id = builder.atom_id_at(
+      "note",
+      token,
+      self.source_offset + token_start,
+      self.source_offset + token_end,
+    )
     builder.pure_doc(id, @pattern.ControlMap::single("note", note))
   }
 }
@@ -781,7 +899,7 @@ fn NotationParser::parse_doc_atom(
 fn NotationParser::read_note_number_value(
   self : NotationParser,
   start : Int,
-) -> (Double, String) raise ParseError {
+) -> (Double, String, Int, Int) raise ParseError {
   let num_start = self.pos
   if !self.at_end() && self.input[self.pos] == '-' {
     self.pos += 1
@@ -807,5 +925,10 @@ fn NotationParser::read_note_number_value(
     raise ParseError("position \{start}: expected number")
   }
   let token = self.input[num_start:self.pos].to_owned()
-  (parse_double_manual(self.input, num_start, self.pos), token)
+  (
+    parse_double_manual(self.input, num_start, self.pos),
+    token,
+    num_start,
+    self.pos,
+  )
 }
