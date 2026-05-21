@@ -1,0 +1,6 @@
+import {
+  "dowdiness/loom" @loom,
+  "dowdiness/loom/core" @core,
+  "dowdiness/seam" @seam,
+  "moonbitlang/core/debug",
+}

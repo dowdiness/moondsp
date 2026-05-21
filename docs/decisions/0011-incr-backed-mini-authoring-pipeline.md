@@ -58,6 +58,16 @@ lowering-cache reuse after parsing.
 - The pipeline uses incr's lifecycle model directly (`Scope` plus persistent
   `Observer` anchors), so later authoring UI code has a concrete ownership
   pattern to follow.
+- The mini token layer now has an internal contiguous token edit-span helper.
+  It preserves unchanged prefix/suffix token identity and allocates fresh keys
+  inside the changed window, including duplicate-token insertion/deletion
+  cases.
+- `MiniAuthoringPipeline::set_input_with_source_edit(...)` gives editor
+  integrations a concrete way to provide cursor-owned source edit spans without
+  exposing the token-span representation.
+- The pipeline feeds aligned token identities into `PatternDoc` atom IDs for
+  sound/note leaves. Aggregate nodes remain structural, and public atom IDs keep
+  the existing `mini:sound:bd:N` / `mini:note:60:N` shape.
 
 **Negative**
 
@@ -65,12 +75,23 @@ lowering-cache reuse after parsing.
   lowering work when stable IDs survive an edit.
 - The parsed memo closes over mutable `previous` state. That state is part of
   the contract and must not be updated on parse errors.
+- Token-aware atom IDs are currently attached inside `MiniAuthoringPipeline`;
+  direct `parse_doc` / `parse_doc_reusing` calls keep deterministic structural
+  occurrence IDs unless they are routed through a token-aware internal path.
+  This keeps the public one-shot parser API stable and avoids accepting partial
+  editor state without a clear owner for source edit spans.
 - Public API surface grows with an experimental authoring type before there is
   a full editor integration.
+- Old/new token sequences alone cannot represent cursor intent for ambiguous
+  identical-token edits. Editor-provided source spans cover this for the
+  current token layer; loom/CST ownership may still be preferable if future
+  incremental parsing needs the CST to own token identity directly.
 
 ## Revisit when
 
-Add edit-span and token-identity tests before deciding whether loom enters the
-design. The next design question is whether loom owns token/CST identity before
-`parse_doc_reusing`, or whether the current parser first gains a narrower
-tokenization layer that feeds the existing `PatternDoc` builder.
+Before deciding whether loom enters the design, compare the editor-provided
+source-span path against loom/CST-owned token identity. The current path is
+enough to preserve leaf identity and provenance for ambiguous identical-token
+edits, but it still keeps parsing whole-document and leaves CST ownership
+unresolved. ADR-0012 scopes that comparison as an authoring-only loom/CST
+evaluation before any runtime parser migration.

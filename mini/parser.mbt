@@ -462,6 +462,7 @@ priv struct NotationParser {
   input : String
   mut pos : Int
   sound : Bool // true = drum names, false = note numbers
+  source_offset : Int
 }
 
 ///|
@@ -469,8 +470,9 @@ priv struct NotationParser {
 fn NotationParser::NotationParser(
   input : String,
   sound~ : Bool,
+  source_offset? : Int = 0,
 ) -> NotationParser {
-  { input, pos: 0, sound }
+  { input, pos: 0, sound, source_offset }
 }
 
 ///|

@@ -18,6 +18,28 @@ priv struct MiniToken {
 }
 
 ///|
+priv struct MiniTokenEditSpan {
+  old_start : Int
+  old_end : Int
+  new_start : Int
+  new_end : Int
+}
+
+///|
+priv struct MiniSourceEditSpan {
+  old_start : Int
+  old_end : Int
+  new_end : Int
+}
+
+///|
+impl Eq for MiniSourceEditSpan with equal(self, other) {
+  self.old_start == other.old_start &&
+  self.old_end == other.old_end &&
+  self.new_end == other.new_end
+}
+
+///|
 fn mini_token_kind_label(kind : MiniTokenKind) -> String {
   match kind {
     Identifier => "ident"
@@ -30,12 +52,32 @@ fn mini_token_kind_label(kind : MiniTokenKind) -> String {
 }
 
 ///|
+fn mini_token_base_key(kind : MiniTokenKind, text : String) -> String {
+  "\{mini_token_kind_label(kind)}:\{text}"
+}
+
+///|
+fn mini_token_identity_key(
+  kind : MiniTokenKind,
+  text : String,
+  occurrence : Int,
+) -> String {
+  "\{mini_token_base_key(kind, text)}:\{occurrence}"
+}
+
+///|
+fn mini_token_identity_occurrence_suffix(token : MiniToken) -> String {
+  let prefix = "\{mini_token_base_key(token.kind, token.text)}:"
+  token.identity_key[prefix.length():].to_owned()
+}
+
+///|
 fn mini_token_occurrence(
   counters : Map[String, Int],
   kind : MiniTokenKind,
   text : String,
 ) -> Int {
-  let base = "\{mini_token_kind_label(kind)}:\{text}"
+  let base = mini_token_base_key(kind, text)
   let occurrence = match counters.get(base) {
     Some(value) => value
     None => 0
@@ -58,8 +100,197 @@ fn mini_token(
     text,
     start,
     end,
-    identity_key: "\{mini_token_kind_label(kind)}:\{text}:\{occurrence}",
+    identity_key: mini_token_identity_key(kind, text, occurrence),
   }
+}
+
+///|
+fn mini_token_with_identity(
+  token : MiniToken,
+  identity_key : String,
+) -> MiniToken {
+  {
+    kind: token.kind,
+    text: token.text,
+    start: token.start,
+    end: token.end,
+    identity_key,
+  }
+}
+
+///|
+fn mini_token_kind_equal(left : MiniTokenKind, right : MiniTokenKind) -> Bool {
+  mini_token_kind_label(left) == mini_token_kind_label(right)
+}
+
+///|
+fn mini_token_signature_equal(left : MiniToken, right : MiniToken) -> Bool {
+  mini_token_kind_equal(left.kind, right.kind) && left.text == right.text
+}
+
+///|
+fn mini_token_edit_span(
+  old_tokens : Array[MiniToken],
+  new_tokens : Array[MiniToken],
+) -> MiniTokenEditSpan {
+  let mut prefix = 0
+  while prefix < old_tokens.length() &&
+        prefix < new_tokens.length() &&
+        mini_token_signature_equal(old_tokens[prefix], new_tokens[prefix]) {
+    prefix += 1
+  }
+  let mut suffix = 0
+  while suffix < old_tokens.length() - prefix &&
+        suffix < new_tokens.length() - prefix &&
+        mini_token_signature_equal(
+          old_tokens[old_tokens.length() - 1 - suffix],
+          new_tokens[new_tokens.length() - 1 - suffix],
+        ) {
+    suffix += 1
+  }
+  {
+    old_start: prefix,
+    old_end: old_tokens.length() - suffix,
+    new_start: prefix,
+    new_end: new_tokens.length() - suffix,
+  }
+}
+
+///|
+fn mini_first_token_ending_after(
+  tokens : Array[MiniToken],
+  offset : Int,
+) -> Int {
+  let mut index = 0
+  while index < tokens.length() && tokens[index].end <= offset {
+    index += 1
+  }
+  index
+}
+
+///|
+fn mini_first_token_starting_at_or_after(
+  tokens : Array[MiniToken],
+  offset : Int,
+) -> Int {
+  let mut index = 0
+  while index < tokens.length() && tokens[index].start < offset {
+    index += 1
+  }
+  index
+}
+
+///|
+fn mini_token_edit_span_from_source(
+  old_tokens : Array[MiniToken],
+  new_tokens : Array[MiniToken],
+  source_edit : MiniSourceEditSpan,
+) -> MiniTokenEditSpan {
+  {
+    old_start: mini_first_token_ending_after(old_tokens, source_edit.old_start),
+    old_end: mini_first_token_starting_at_or_after(
+      old_tokens,
+      source_edit.old_end,
+    ),
+    new_start: mini_first_token_ending_after(new_tokens, source_edit.old_start),
+    new_end: mini_first_token_starting_at_or_after(
+      new_tokens,
+      source_edit.new_end,
+    ),
+  }
+}
+
+///|
+fn mini_mark_old_identity(
+  used : Map[String, Bool],
+  old_tokens : Array[MiniToken],
+  index : Int,
+) -> Unit {
+  used[old_tokens[index].identity_key] = true
+}
+
+///|
+fn mini_allocate_changed_identity(
+  counters : Map[String, Int],
+  used : Map[String, Bool],
+  token : MiniToken,
+) -> String {
+  let base = mini_token_base_key(token.kind, token.text)
+  let mut occurrence = match counters.get(base) {
+    Some(value) => value
+    None => 0
+  }
+  let mut key = mini_token_identity_key(token.kind, token.text, occurrence)
+  while used.contains(key) {
+    occurrence += 1
+    key = mini_token_identity_key(token.kind, token.text, occurrence)
+  }
+  counters[base] = occurrence + 1
+  used[key] = true
+  key
+}
+
+///|
+fn mini_realign_token_identities(
+  old_tokens : Array[MiniToken],
+  new_tokens : Array[MiniToken],
+) -> Array[MiniToken] {
+  mini_realign_token_identities_with_span(
+    old_tokens,
+    new_tokens,
+    mini_token_edit_span(old_tokens, new_tokens),
+  )
+}
+
+///|
+fn mini_realign_token_identities_with_span(
+  old_tokens : Array[MiniToken],
+  new_tokens : Array[MiniToken],
+  span : MiniTokenEditSpan,
+) -> Array[MiniToken] {
+  let used : Map[String, Bool] = {}
+  for index in 0..<old_tokens.length() {
+    mini_mark_old_identity(used, old_tokens, index)
+  }
+  let counters : Map[String, Int] = {}
+  let aligned : Array[MiniToken] = []
+  for index in 0..<new_tokens.length() {
+    let identity_key = if index < span.old_start && index < span.new_start {
+      old_tokens[index].identity_key
+    } else if index >= span.new_end {
+      old_tokens[span.old_end + index - span.new_end].identity_key
+    } else {
+      mini_allocate_changed_identity(counters, used, new_tokens[index])
+    }
+    aligned.push(mini_token_with_identity(new_tokens[index], identity_key))
+  }
+  aligned
+}
+
+///|
+fn realign_mini_authoring_tokens(
+  old_input : String,
+  new_input : String,
+) -> Array[MiniToken] {
+  mini_realign_token_identities(
+    tokenize_mini_authoring_source(old_input),
+    tokenize_mini_authoring_source(new_input),
+  )
+}
+
+///|
+fn realign_mini_authoring_tokens_with_source_edit(
+  old_input : String,
+  new_input : String,
+  source_edit : MiniSourceEditSpan,
+) -> Array[MiniToken] {
+  let old_tokens = tokenize_mini_authoring_source(old_input)
+  let new_tokens = tokenize_mini_authoring_source(new_input)
+  mini_realign_token_identities_with_span(
+    old_tokens,
+    new_tokens,
+    mini_token_edit_span_from_source(old_tokens, new_tokens, source_edit),
+  )
 }
 
 ///|

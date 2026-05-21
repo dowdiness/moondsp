@@ -23,6 +23,7 @@
 pub struct MiniAuthoringPipeline {
   priv scope : @incr.Scope
   priv text : @incr.Signal[String]
+  priv source_edit : @incr.Signal[MiniSourceEditSpan?]
   priv parsed_observer : @incr.Observer[
     Result[@pattern.PatternDoc[@pattern.ControlMap], String],
   ]
@@ -40,9 +41,22 @@ pub fn MiniAuthoringPipeline::new(input : String) -> MiniAuthoringPipeline {
   let rt = @incr.Runtime::new()
   let scope = @incr.Scope::new(rt)
   let text = scope.signal(input, label="mini.text")
+  let source_edit : @incr.Signal[MiniSourceEditSpan?] = scope.signal(
+    None,
+    label="mini.source_edit",
+  )
+  let mut previous_token_source = input
   let token_count = scope.memo(
     fn() {
-      let tokens = tokenize_mini_authoring_source(text.get())
+      let current = text.get()
+      let tokens = match source_edit.get() {
+        Some(span) =>
+          realign_mini_authoring_tokens_with_source_edit(
+            previous_token_source, current, span,
+          )
+        None => realign_mini_authoring_tokens(previous_token_source, current)
+      }
+      previous_token_source = current
       ignore(mini_authoring_token_fingerprint(tokens))
       tokens.length()
     },
@@ -52,18 +66,32 @@ pub fn MiniAuthoringPipeline::new(input : String) -> MiniAuthoringPipeline {
   // Last successful parse is intentional mutable state: errors should surface
   // to callers without discarding the previous reusable PatternDoc.
   let mut previous : @pattern.PatternDoc[@pattern.ControlMap]? = None
+  let mut previous_parse_token_source = input
   let mut parse_compute_count = 0
   let parsed = @incr.Memo::new_no_backdate(
     rt,
     fn() {
       parse_compute_count += 1
-      let result = match previous {
-        None => parse_doc(text.get())
-        Some(doc) => parse_doc_reusing(text.get(), doc)
+      let current = text.get()
+      let tokens = match previous {
+        None => tokenize_mini_authoring_source(current)
+        Some(_) =>
+          match source_edit.get() {
+            Some(span) =>
+              realign_mini_authoring_tokens_with_source_edit(
+                previous_parse_token_source, current, span,
+              )
+            None =>
+              realign_mini_authoring_tokens(
+                previous_parse_token_source, current,
+              )
+          }
       }
+      let result = parse_doc_with_token_identities(current, previous, tokens)
       match result {
         Ok(doc) => {
           previous = Some(doc)
+          previous_parse_token_source = current
           Ok(doc)
         }
         Err(msg) => Err(msg)
@@ -97,6 +125,7 @@ pub fn MiniAuthoringPipeline::new(input : String) -> MiniAuthoringPipeline {
   {
     scope,
     text,
+    source_edit,
     parsed_observer,
     snapshot_observer,
     token_count_observer,
@@ -116,6 +145,19 @@ pub fn MiniAuthoringPipeline::set_input(
   self : MiniAuthoringPipeline,
   input : String,
 ) -> Unit {
+  self.source_edit.set(None)
+  self.text.set(input)
+}
+
+///|
+pub fn MiniAuthoringPipeline::set_input_with_source_edit(
+  self : MiniAuthoringPipeline,
+  input : String,
+  old_start~ : Int,
+  old_end~ : Int,
+  new_end~ : Int,
+) -> Unit {
+  self.source_edit.set(Some({ old_start, old_end, new_end }))
   self.text.set(input)
 }
 

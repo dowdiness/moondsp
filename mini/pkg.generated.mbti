@@ -39,6 +39,7 @@ pub fn MiniAuthoringPipeline::parse_doc(Self) -> Result[@pattern.PatternDoc[@pat
 pub fn MiniAuthoringPipeline::parse_snapshot(Self) -> Result[@pattern.PatternSnapshot[@pattern.ControlMap], String]
 pub fn MiniAuthoringPipeline::reset_lowering_stats(Self) -> Unit
 pub fn MiniAuthoringPipeline::set_input(Self, String) -> Unit
+pub fn MiniAuthoringPipeline::set_input_with_source_edit(Self, String, old_start~ : Int, old_end~ : Int, new_end~ : Int) -> Unit
 pub fn MiniAuthoringPipeline::snapshot_compute_count(Self) -> Int
 
 // Type aliases

@@ -50,6 +50,33 @@ fn assert_token_keys_equal(
 }
 
 ///|
+fn assert_token_edit_span(
+  span : MiniTokenEditSpan,
+  old_start~ : Int,
+  old_end~ : Int,
+  new_start~ : Int,
+  new_end~ : Int,
+) -> Unit {
+  guard span.old_start == old_start &&
+    span.old_end == old_end &&
+    span.new_start == new_start &&
+    span.new_end == new_end else {
+    abort(
+      "unexpected edit span: old[\{span.old_start},\{span.old_end}) new[\{span.new_start},\{span.new_end})",
+    )
+  }
+}
+
+///|
+fn source_edit(
+  old_start~ : Int,
+  old_end~ : Int,
+  new_end~ : Int,
+) -> MiniSourceEditSpan {
+  { old_start, old_end, new_end }
+}
+
+///|
 test "mini tokens ignore whitespace in identity keys" {
   let compact = tokenize_mini_authoring_source("s(\"bd sd\")")
   let spaced = tokenize_mini_authoring_source("s( \"  bd   sd  \" )")
@@ -72,6 +99,105 @@ test "mini tokens insertion keeps surviving identifier keys" {
   assert_has_token_key(inserted, "ident:bd:0")
   assert_has_token_key(inserted, "ident:sd:0")
   assert_has_token_key(inserted, "ident:oh:0")
+}
+
+///|
+test "mini token edit span isolates duplicate-token insertion" {
+  let old_tokens = tokenize_mini_authoring_source("s(\"bd bd sd\")")
+  let new_tokens = tokenize_mini_authoring_source("s(\"bd bd bd sd\")")
+  assert_token_edit_span(
+    mini_token_edit_span(old_tokens, new_tokens),
+    old_start=5,
+    old_end=5,
+    new_start=5,
+    new_end=6,
+  )
+}
+
+///|
+test "mini token realignment preserves suffix duplicate identities" {
+  let aligned = realign_mini_authoring_tokens(
+    "s(\"bd bd sd\")", "s(\"bd bd bd sd\")",
+  )
+  let keys = token_keys(aligned)
+  inspect(keys[3], content="ident:bd:0")
+  inspect(keys[4], content="ident:bd:1")
+  inspect(keys[5], content="ident:bd:2")
+  inspect(keys[6], content="ident:sd:0")
+}
+
+///|
+test "mini token realignment preserves suffix identities after deletion" {
+  let aligned = realign_mini_authoring_tokens(
+    "s(\"bd bd bd sd\")", "s(\"bd bd sd\")",
+  )
+  let keys = token_keys(aligned)
+  inspect(keys[3], content="ident:bd:0")
+  inspect(keys[4], content="ident:bd:1")
+  inspect(keys[5], content="ident:sd:0")
+}
+
+///|
+test "mini token realignment gives changed-window repeats fresh identities" {
+  let aligned = realign_mini_authoring_tokens("s(\"bd sd\")", "s(\"sd bd\")")
+  let keys = token_keys(aligned)
+  inspect(keys[3], content="ident:sd:1")
+  inspect(keys[4], content="ident:bd:1")
+}
+
+///|
+test "mini source edit span disambiguates insertion before first duplicate" {
+  let aligned = realign_mini_authoring_tokens_with_source_edit(
+    "s(\"bd bd bd\")",
+    "s(\"bd bd bd bd\")",
+    source_edit(old_start=3, old_end=3, new_end=6),
+  )
+  let keys = token_keys(aligned)
+  inspect(keys[3], content="ident:bd:3")
+  inspect(keys[4], content="ident:bd:0")
+  inspect(keys[5], content="ident:bd:1")
+  inspect(keys[6], content="ident:bd:2")
+}
+
+///|
+test "mini source edit span disambiguates insertion before middle duplicate" {
+  let aligned = realign_mini_authoring_tokens_with_source_edit(
+    "s(\"bd bd bd\")",
+    "s(\"bd bd bd bd\")",
+    source_edit(old_start=6, old_end=6, new_end=9),
+  )
+  let keys = token_keys(aligned)
+  inspect(keys[3], content="ident:bd:0")
+  inspect(keys[4], content="ident:bd:3")
+  inspect(keys[5], content="ident:bd:1")
+  inspect(keys[6], content="ident:bd:2")
+}
+
+///|
+test "mini source edit span disambiguates insertion before last duplicate" {
+  let aligned = realign_mini_authoring_tokens_with_source_edit(
+    "s(\"bd bd bd\")",
+    "s(\"bd bd bd bd\")",
+    source_edit(old_start=9, old_end=9, new_end=12),
+  )
+  let keys = token_keys(aligned)
+  inspect(keys[3], content="ident:bd:0")
+  inspect(keys[4], content="ident:bd:1")
+  inspect(keys[5], content="ident:bd:3")
+  inspect(keys[6], content="ident:bd:2")
+}
+
+///|
+test "mini source edit span preserves suffix identities after duplicate deletion" {
+  let aligned = realign_mini_authoring_tokens_with_source_edit(
+    "s(\"bd bd bd bd\")",
+    "s(\"bd bd bd\")",
+    source_edit(old_start=6, old_end=9, new_end=6),
+  )
+  let keys = token_keys(aligned)
+  inspect(keys[3], content="ident:bd:0")
+  inspect(keys[4], content="ident:bd:2")
+  inspect(keys[5], content="ident:bd:3")
 }
 
 ///|

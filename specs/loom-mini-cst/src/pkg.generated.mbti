@@ -1,0 +1,79 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp/loom-mini-cst-spike"
+
+import {
+  "dowdiness/loom",
+  "dowdiness/loom/core",
+  "dowdiness/loom/pipeline",
+  "dowdiness/seam",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn ident_token_spans(String) -> Array[String] raise @core.LexError
+
+pub fn ident_token_spans_from_syntax(@seam.SyntaxNode) -> Array[String]
+
+pub fn lex(String) -> @core.LexResult[MiniToken]
+
+pub fn mini_fold_node(@seam.SyntaxNode, (@seam.SyntaxNode) -> MiniAst) -> MiniAst
+
+pub let mini_grammar : @loom.Grammar[MiniToken, MiniSyntaxKind, MiniAst]
+
+pub let mini_spec : @core.LanguageSpec[MiniToken, MiniSyntaxKind]
+
+pub fn mini_step_lexer(String, Int) -> @core.LexStep[MiniToken]
+
+pub fn parse_cst(String) -> (@seam.CstNode, @core.DiagnosticSet) raise @core.LexError
+
+pub fn parser_ident_token_spans(@pipeline.Parser[MiniAst]) -> Array[String]
+
+pub fn token_debug(String) -> Array[String]
+
+pub fn tokenize(String) -> Array[@core.TokenInfo[MiniToken]]
+
+// Errors
+
+// Types and methods
+pub(all) enum MiniAst {
+  Parsed
+} derive(Eq, @debug.Debug)
+
+pub(all) enum MiniSyntaxKind {
+  SKeywordToken
+  LParenToken
+  RParenToken
+  QuoteToken
+  IdentToken
+  WhitespaceToken
+  ErrorToken
+  EofToken
+  RootNode
+  CallNode
+  NotationNode
+  AtomNode
+  ErrorNode
+} derive(Eq, @debug.Debug)
+pub fn MiniSyntaxKind::from_raw(@seam.RawKind) -> Self
+pub impl @seam.ToRawKind for MiniSyntaxKind
+pub impl Show for MiniSyntaxKind
+
+pub(all) enum MiniToken {
+  SKeyword
+  LParen
+  RParen
+  Quote
+  Ident
+  Whitespace
+  Error(String)
+  EOF
+} derive(Eq, @debug.Debug)
+pub impl @seam.IsEof for MiniToken
+pub impl @seam.IsTrivia for MiniToken
+pub impl @seam.ToRawKind for MiniToken
+pub impl Show for MiniToken
+
+// Type aliases
+
+// Traits
+

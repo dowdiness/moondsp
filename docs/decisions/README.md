@@ -29,3 +29,4 @@ shipped plan or spec.
 - [ADR-0009 — Stable identity groundwork for Phase 6](0009-stable-identity-groundwork.md)
 - [ADR-0010 — CompiledTemplate as the runtime exchange boundary](0010-compiled-template-runtime-boundary.md)
 - [ADR-0011 — Incr-backed mini authoring pipeline](0011-incr-backed-mini-authoring-pipeline.md)
+- [ADR-0012 — Loom/CST evaluation for mini authoring](0012-loom-cst-mini-authoring-evaluation.md)
