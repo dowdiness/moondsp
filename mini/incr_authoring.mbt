@@ -45,18 +45,21 @@ pub fn MiniAuthoringPipeline::new(input : String) -> MiniAuthoringPipeline {
     None,
     label="mini.source_edit",
   )
-  let mut previous_token_source = input
+  let source_edit_base : @incr.Signal[String] = scope.signal(
+    input,
+    label="mini.source_edit_base",
+  )
   let token_count = scope.memo(
     fn() {
       let current = text.get()
+      let baseline = source_edit_base.get()
       let tokens = match source_edit.get() {
         Some(span) =>
           realign_mini_authoring_tokens_with_source_edit(
-            previous_token_source, current, span,
+            baseline, current, span,
           )
-        None => realign_mini_authoring_tokens(previous_token_source, current)
+        None => realign_mini_authoring_tokens(baseline, current)
       }
-      previous_token_source = current
       ignore(mini_authoring_token_fingerprint(tokens))
       tokens.length()
     },
@@ -66,32 +69,30 @@ pub fn MiniAuthoringPipeline::new(input : String) -> MiniAuthoringPipeline {
   // Last successful parse is intentional mutable state: errors should surface
   // to callers without discarding the previous reusable PatternDoc.
   let mut previous : @pattern.PatternDoc[@pattern.ControlMap]? = None
-  let mut previous_parse_token_source = input
   let mut parse_compute_count = 0
   let parsed = @incr.Memo::new_no_backdate(
     rt,
     fn() {
       parse_compute_count += 1
       let current = text.get()
+      let baseline = source_edit_base.get()
       let tokens = match previous {
         None => tokenize_mini_authoring_source(current)
         Some(_) =>
           match source_edit.get() {
             Some(span) =>
               realign_mini_authoring_tokens_with_source_edit(
-                previous_parse_token_source, current, span,
+                baseline, current, span,
               )
             None =>
-              realign_mini_authoring_tokens(
-                previous_parse_token_source, current,
-              )
+              realign_mini_authoring_tokens(baseline, current)
           }
       }
       let result = parse_doc_with_token_identities(current, previous, tokens)
       match result {
         Ok(doc) => {
+          source_edit_base.set(current)
           previous = Some(doc)
-          previous_parse_token_source = current
           Ok(doc)
         }
         Err(msg) => Err(msg)

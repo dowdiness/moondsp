@@ -2,7 +2,7 @@
 priv struct MiniDocBuilder {
   previous : @pattern.PatternDoc[@pattern.ControlMap]?
   counters : Map[String, Int]
-  tokens : Array[MiniToken]?
+  token_id_by_location : Map[String, String]?
 }
 
 ///|
@@ -11,7 +11,43 @@ fn MiniDocBuilder::MiniDocBuilder(
   previous~ : @pattern.PatternDoc[@pattern.ControlMap]?,
   tokens? : Array[MiniToken]? = None,
 ) -> MiniDocBuilder {
-  { previous, counters: {}, tokens }
+  {
+    previous,
+    counters: {},
+    token_id_by_location:
+      match tokens {
+        None => None
+        Some(tokens) => {
+          let index : Map[String, String] = {}
+          for token in tokens {
+            if mini_token_kind_equal(token.kind, Identifier) {
+              let suffix = mini_token_identity_occurrence_suffix(token)
+              let key =
+                mini_doc_token_id_key("sound", token.text, token.start, token.end)
+              let id = "mini:sound:\{token.text}:\{suffix}"
+              index[key] = id
+            } else if mini_token_kind_equal(token.kind, Number) {
+              let suffix = mini_token_identity_occurrence_suffix(token)
+              let key =
+                mini_doc_token_id_key("note", token.text, token.start, token.end)
+              let id = "mini:note:\{token.text}:\{suffix}"
+              index[key] = id
+            }
+          }
+          Some(index)
+        }
+      },
+  }
+}
+
+///|
+fn mini_doc_token_id_key(
+  kind : String,
+  value : String,
+  start : Int,
+  end : Int,
+) -> String {
+  "mini-doc-token-id|\{kind}|\{start}|\{end}|\{value}"
 }
 
 ///|
@@ -49,12 +85,6 @@ fn MiniDocBuilder::atom_id(
 }
 
 ///|
-fn mini_token_kind_matches_doc_atom(token : MiniToken, kind : String) -> Bool {
-  (kind == "sound" && mini_token_kind_equal(token.kind, Identifier)) ||
-  (kind == "note" && mini_token_kind_equal(token.kind, Number))
-}
-
-///|
 fn MiniDocBuilder::token_atom_id(
   self : MiniDocBuilder,
   kind : String,
@@ -62,19 +92,14 @@ fn MiniDocBuilder::token_atom_id(
   start : Int,
   end : Int,
 ) -> @identity.PatternNodeId? raise ParseError {
-  match self.tokens {
+  match self.token_id_by_location {
     None => None
-    Some(tokens) => {
-      for token in tokens {
-        if token.start == start &&
-          token.end == end &&
-          token.text == value &&
-          mini_token_kind_matches_doc_atom(token, kind) {
-          let occurrence = mini_token_identity_occurrence_suffix(token)
-          return Some(self.id("mini:\{kind}:\{value}:\{occurrence}"))
-        }
+    Some(index) => {
+      let key = mini_doc_token_id_key(kind, value, start, end)
+      match index.get(key) {
+        None => None
+        Some(id) => Some(self.id(id))
       }
-      None
     }
   }
 }

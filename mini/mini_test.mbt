@@ -113,6 +113,22 @@ fn assert_snapshot_event_has_node(
 }
 
 ///|
+fn snapshot_events_contain_node(
+  events : Array[@pattern.PatternSnapshotEvent[@pattern.ControlMap]],
+  id : String,
+) -> Unit {
+  let expected = pid(id)
+  for event in events {
+    for node in event.pattern_nodes() {
+      if node == expected {
+        return
+      }
+    }
+  }
+  abort("expected events to include pattern node \{id}")
+}
+
+///|
 test "parse single drum sound" {
   let pat = unwrap_ok(@mini.parse("s(\"bd\")"))
   let events = query_one_cycle(pat)
@@ -533,6 +549,39 @@ test "MiniAuthoringPipeline source edit preserves duplicate atom provenance" {
   assert_snapshot_event_has_node(events[1], "mini:sound:sd:0")
   assert_snapshot_event_has_node(events[2], "mini:sound:bd:2")
   assert_snapshot_event_has_node(events[3], "mini:sound:bd:1")
+}
+
+///|
+test "MiniAuthoringPipeline consecutive source-edit updates reuse stable identities" {
+  let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd sd bd\")")
+  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
+  let intermediate = "s(\"bd sd cp bd\")"
+  let final_state = "s(\"bd sd hh bd\")"
+  pipeline.set_input_with_source_edit(
+    intermediate,
+    old_start=8,
+    old_end=8,
+    new_end=11,
+  )
+  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
+  pipeline.set_input_with_source_edit(
+    final_state,
+    old_start=9,
+    old_end=11,
+    new_end=11,
+  )
+  let snapshot = unwrap_mini_snapshot(pipeline.parse_snapshot())
+  let events = snapshot.query_sourced_events(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+    ),
+  )
+  inspect(events.length(), content="4")
+  snapshot_events_contain_node(events, "mini:sound:bd:0")
+  snapshot_events_contain_node(events, "mini:sound:hh:0")
+  snapshot_events_contain_node(events, "mini:sound:sd:0")
+  snapshot_events_contain_node(events, "mini:sound:bd:1")
 }
 
 ///|
