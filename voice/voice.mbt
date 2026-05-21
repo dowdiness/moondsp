@@ -327,7 +327,15 @@ pub fn BoundVoicePool::note_off(
   self : BoundVoicePool,
   handle : VoiceHandle,
 ) -> Bool {
-  self.pool.note_off(handle)
+  self.note_off_result(handle) is Ok(_)
+}
+
+///|
+pub fn BoundVoicePool::note_off_result(
+  self : BoundVoicePool,
+  handle : VoiceHandle,
+) -> Result[Unit, VoiceControlError] {
+  self.pool.note_off_result(handle)
 }
 
 ///|
@@ -335,7 +343,15 @@ pub fn BoundVoicePool::kill(
   self : BoundVoicePool,
   handle : VoiceHandle,
 ) -> Bool {
-  self.pool.kill(handle)
+  self.kill_result(handle) is Ok(_)
+}
+
+///|
+pub fn BoundVoicePool::kill_result(
+  self : BoundVoicePool,
+  handle : VoiceHandle,
+) -> Result[Unit, VoiceControlError] {
+  self.pool.kill_result(handle)
 }
 
 ///|
@@ -349,7 +365,16 @@ pub fn BoundVoicePool::set_voice_pan(
   handle : VoiceHandle,
   pan : Double,
 ) -> Bool {
-  self.pool.set_voice_pan(handle, pan)
+  self.set_voice_pan_result(handle, pan) is Ok(_)
+}
+
+///|
+pub fn BoundVoicePool::set_voice_pan_result(
+  self : BoundVoicePool,
+  handle : VoiceHandle,
+  pan : Double,
+) -> Result[Unit, VoiceControlError] {
+  self.pool.set_voice_pan_result(handle, pan)
 }
 
 ///|
@@ -538,11 +563,19 @@ pub fn VoicePool::note_on(
 
 ///|
 pub fn VoicePool::note_off(self : VoicePool, handle : VoiceHandle) -> Bool {
+  self.note_off_result(handle) is Ok(_)
+}
+
+///|
+pub fn VoicePool::note_off_result(
+  self : VoicePool,
+  handle : VoiceHandle,
+) -> Result[Unit, VoiceControlError] {
   match self.resolve_slot(handle) {
-    None => false
+    None => Err(VoiceControlError::InvalidVoiceHandle(handle))
     Some(slot) => {
       if slot.state is VoiceState::Idle {
-        return false
+        return Err(VoiceControlError::InvalidVoiceHandle(handle))
       }
       match slot.compiled {
         // WHY adsr_authoring_indices_snapshot: uses the indices from
@@ -550,25 +583,28 @@ pub fn VoicePool::note_off(self : VoicePool, handle : VoiceHandle) -> Bool {
         // may have changed via set_template.
         Some(compiled) =>
           gate_adsrs_at(compiled, slot.adsr_authoring_indices_snapshot, false)
-        None => ()
+        None => return Err(VoiceControlError::InvalidVoiceHandle(handle))
       }
       slot.state = VoiceState::Releasing
-      true
+      Ok(())
     }
   }
 }
 
 ///|
-fn VoicePool::kill(self : VoicePool, handle : VoiceHandle) -> Bool {
+fn VoicePool::kill_result(
+  self : VoicePool,
+  handle : VoiceHandle,
+) -> Result[Unit, VoiceControlError] {
   match self.resolve_slot(handle) {
-    None => false
+    None => Err(VoiceControlError::InvalidVoiceHandle(handle))
     Some(slot) => {
       if slot.state is VoiceState::Idle {
-        return false
+        return Err(VoiceControlError::InvalidVoiceHandle(handle))
       }
       slot.compiled = None
       slot.state = VoiceState::Idle
-      true
+      Ok(())
     }
   }
 }
@@ -594,11 +630,20 @@ pub fn VoicePool::set_voice_pan(
   handle : VoiceHandle,
   pan : Double,
 ) -> Bool {
+  self.set_voice_pan_result(handle, pan) is Ok(_)
+}
+
+///|
+pub fn VoicePool::set_voice_pan_result(
+  self : VoicePool,
+  handle : VoiceHandle,
+  pan : Double,
+) -> Result[Unit, VoiceControlError] {
   match self.resolve_slot(handle) {
-    None => false
+    None => Err(VoiceControlError::InvalidVoiceHandle(handle))
     Some(slot) => {
       slot.update_pan(pan)
-      true
+      Ok(())
     }
   }
 }

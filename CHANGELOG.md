@@ -26,6 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for duplicate mini atom span evaluation.
 - Extended the loom/CST spike with `apply_edit` insertion/deletion
   characterization tests, including current deletion no-reuse behavior.
+- Added typed voice mutation APIs for handle-based controls:
+  `VoicePool::note_off_result`, `VoicePool::set_voice_pan_result`,
+  `BoundVoicePool::note_off_result`, `BoundVoicePool::kill_result`, and
+  `BoundVoicePool::set_voice_pan_result`. Existing Bool-returning wrappers
+  remain and delegate to the result path.
 
 ## [0.5.1] - 2026-05-20
 

@@ -14,6 +14,18 @@ using @graph {
 }
 
 ///|
+fn assert_invalid_voice_handle(
+  result : Result[Unit, VoiceControlError],
+  expected : VoiceHandle,
+) -> Unit raise {
+  match result {
+    Err(VoiceControlError::InvalidVoiceHandle(handle)) =>
+      assert_true(handle == expected)
+    _ => assert_true(false)
+  }
+}
+
+///|
 test "is_voice_finished returns false during active envelope" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
   let nodes = [
@@ -421,6 +433,21 @@ test "note_off transitions voice to Releasing" {
 }
 
 ///|
+test "note_off_result transitions voice to Releasing" {
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
+  let nodes = [
+    DspNode::constant(440.0),
+    DspNode::adsr(attack_ms=5.0, decay_ms=5.0, sustain=0.5, release_ms=50.0),
+    DspNode::output(1),
+  ]
+  let pool = VoicePool::new(CompiledTemplate::analyze(nodes), ctx, max_voices=4).unwrap()
+  let handle = pool.note_on([]).unwrap()
+  assert_true(pool.voice_state(handle) is VoiceState::Active)
+  assert_true(pool.note_off_result(handle) is Ok(_))
+  assert_true(pool.voice_state(handle) is VoiceState::Releasing)
+}
+
+///|
 test "stale handle note_off returns false" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
   let nodes = [DspNode::constant(440.0), DspNode::output(0)]
@@ -428,6 +455,16 @@ test "stale handle note_off returns false" {
   let h1 = pool.note_on([]).unwrap()
   ignore(pool.note_on([]))
   assert_true(!pool.note_off(h1))
+}
+
+///|
+test "stale handle note_off_result reports invalid handle" {
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
+  let nodes = [DspNode::constant(440.0), DspNode::output(0)]
+  let pool = VoicePool::new(CompiledTemplate::analyze(nodes), ctx, max_voices=1).unwrap()
+  let h1 = pool.note_on([]).unwrap()
+  ignore(pool.note_on([]))
+  assert_invalid_voice_handle(pool.note_off_result(h1), h1)
 }
 
 ///|
@@ -448,6 +485,16 @@ test "set_voice_pan with stale handle returns false" {
   let h1 = pool.note_on([]).unwrap()
   ignore(pool.note_on([]))
   assert_true(!pool.set_voice_pan(h1, 0.5))
+}
+
+///|
+test "stale handle set_voice_pan_result reports invalid handle" {
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
+  let nodes = [DspNode::constant(440.0), DspNode::output(0)]
+  let pool = VoicePool::new(CompiledTemplate::analyze(nodes), ctx, max_voices=1).unwrap()
+  let h1 = pool.note_on([]).unwrap()
+  ignore(pool.note_on([]))
+  assert_invalid_voice_handle(pool.set_voice_pan_result(h1, 0.5), h1)
 }
 
 ///|
@@ -524,6 +571,22 @@ test "process pans hard left" {
 }
 
 ///|
+test "set_voice_pan_result pans hard right" {
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
+  let nodes = [DspNode::constant(1.0), DspNode::output(0)]
+  let pool = VoicePool::new(CompiledTemplate::analyze(nodes), ctx, max_voices=4).unwrap()
+  let handle = pool.note_on([]).unwrap()
+  assert_true(pool.set_voice_pan_result(handle, 1.0) is Ok(_))
+  let left = AudioBuffer::filled(4)
+  let right = AudioBuffer::filled(4)
+  pool.process(ctx, left, right)
+  for i = 0; i < 4; i = i + 1 {
+    assert_true(left.get(i).abs() < 0.0001)
+    assert_true(right.get(i) > 0.9)
+  }
+}
+
+///|
 test "process reclaims finished releasing voices" {
   let ctx = DspContext::new(sample_rate=1000.0, block_size=8)
   let nodes = [
@@ -565,6 +628,103 @@ test "kill immediately idles an active voice" {
   assert_true(pool.active_voice_count() == 0)
   assert_true(pool.voice_state(handle) is VoiceState::Idle)
   assert_true(!pool.kill(handle))
+}
+
+///|
+test "kill_result immediately idles an active voice" {
+  let ctx = DspContext::new(sample_rate=1000.0, block_size=8)
+  let nodes = [
+    DspNode::constant(1.0),
+    DspNode::adsr(attack_ms=0.0, decay_ms=0.0, sustain=1.0, release_ms=100.0),
+    DspNode::envelope_gain(input=0, envelope=1, amount=1.0),
+    DspNode::output(2),
+  ]
+  let pool = BoundVoicePool::new(
+    CompiledTemplate::analyze(nodes),
+    ctx,
+    ControlBindingBuilder::new(),
+    max_voices=4,
+  ).unwrap()
+  let handle = pool.note_on_controls({}).unwrap()
+  assert_true(pool.active_voice_count() == 1)
+  assert_true(pool.kill_result(handle) is Ok(_))
+  assert_true(pool.active_voice_count() == 0)
+  assert_true(pool.voice_state(handle) is VoiceState::Idle)
+  assert_invalid_voice_handle(pool.kill_result(handle), handle)
+}
+
+///|
+test "bound note_off_result transitions voice to Releasing" {
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
+  let nodes = [
+    DspNode::constant(440.0),
+    DspNode::adsr(attack_ms=5.0, decay_ms=5.0, sustain=0.5, release_ms=50.0),
+    DspNode::output(1),
+  ]
+  let pool = BoundVoicePool::new(
+    CompiledTemplate::analyze(nodes),
+    ctx,
+    ControlBindingBuilder::new(),
+    max_voices=4,
+  ).unwrap()
+  let handle = pool.note_on_controls({}).unwrap()
+  assert_true(pool.voice_state(handle) is VoiceState::Active)
+  assert_true(pool.note_off_result(handle) is Ok(_))
+  assert_true(pool.voice_state(handle) is VoiceState::Releasing)
+}
+
+///|
+test "bound note_off_result reports stale handle" {
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
+  let nodes = [DspNode::constant(440.0), DspNode::output(0)]
+  let pool = BoundVoicePool::new(
+    CompiledTemplate::analyze(nodes),
+    ctx,
+    ControlBindingBuilder::new(),
+    max_voices=1,
+  ).unwrap()
+  let stale = pool.note_on_controls({}).unwrap()
+  let current = pool.note_on_controls({}).unwrap()
+  assert_invalid_voice_handle(pool.note_off_result(stale), stale)
+  assert_true(pool.voice_state(current) is VoiceState::Active)
+  assert_true(!pool.note_off(stale))
+}
+
+///|
+test "bound set_voice_pan_result pans hard left" {
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
+  let nodes = [DspNode::constant(1.0), DspNode::output(0)]
+  let pool = BoundVoicePool::new(
+    CompiledTemplate::analyze(nodes),
+    ctx,
+    ControlBindingBuilder::new(),
+    max_voices=4,
+  ).unwrap()
+  let handle = pool.note_on_controls({}).unwrap()
+  assert_true(pool.set_voice_pan_result(handle, -1.0) is Ok(_))
+  let left = AudioBuffer::filled(4)
+  let right = AudioBuffer::filled(4)
+  pool.process(ctx, left, right)
+  for i = 0; i < 4; i = i + 1 {
+    assert_true(left.get(i) > 0.9)
+    assert_true(right.get(i).abs() < 0.0001)
+  }
+}
+
+///|
+test "bound set_voice_pan_result reports stale handle" {
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
+  let nodes = [DspNode::constant(440.0), DspNode::output(0)]
+  let pool = BoundVoicePool::new(
+    CompiledTemplate::analyze(nodes),
+    ctx,
+    ControlBindingBuilder::new(),
+    max_voices=1,
+  ).unwrap()
+  let stale = pool.note_on_controls({}).unwrap()
+  ignore(pool.note_on_controls({}))
+  assert_invalid_voice_handle(pool.set_voice_pan_result(stale, 0.5), stale)
+  assert_true(!pool.set_voice_pan(stale, 0.5))
 }
 
 ///|
