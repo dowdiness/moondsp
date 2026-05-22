@@ -1,6 +1,6 @@
 # Next Actions
 
-Updated: 2026-05-20
+Updated: 2026-05-21
 
 Forward-looking handoff for the next session. Keep short and actionable;
 per-PR verification logs and merged-PR lists live in `git log` and
@@ -8,15 +8,19 @@ per-PR verification logs and merged-PR lists live in `git log` and
 
 ## Current State
 
-- `main` is current with `origin/main` after the post-v0.5.1 docs refresh.
+- `origin/main` is current after PR #70 (`test(loom-mini-cst): pin
+  deletion-safe reuse contract`, squash commit `bafaa30`). The root checkout
+  may be detached at `origin/main` because `main` is checked out in the
+  mini-incr loom evaluation worktree.
 - Latest release: **v0.5.1** (tagged 2026-05-20; GitHub release pinned;
-  `mooncakes` `dowdiness/moondsp@0.5.1` published 2026-05-20). The mini
-  per-sound scalar-control branch is closed; remaining slices are free-choice.
-- No open PRs.
-- `CHANGELOG.md` has an empty `## [Unreleased]` section after the
-  `## [0.5.1] - 2026-05-20` release section.
-- Next release target: **v0.5.2** unless the next slice introduces a
-  minor-version feature.
+  `mooncakes` `dowdiness/moondsp@0.5.1` published 2026-05-20).
+- No open PRs as of 2026-05-21.
+- `CHANGELOG.md` has non-empty `## [Unreleased]` entries from PR #68
+  (mini incr authoring / loom-CST evaluation) and PR #69 (typed voice
+  mutation APIs).
+- Next release target: **v0.6.0** if releasing current `Unreleased`, because
+  PR #69 added public API. Use a patch release only after carving out or
+  intentionally reclassifying public additive 0.x API changes.
 - Known outstanding warnings: 8 `[0020]` Show-vs-Debug deprecations from
   `@qc.quick_check_fn` in DSP and pattern property tests. Treat as
   dependency-bound unless `moonbitlang/quickcheck` has changed its trait
@@ -29,11 +33,10 @@ For shipped-work history, read `CHANGELOG.md`. For the broader backlog
 ## Recommended Next Slice
 
 Free choice — pick from "Alternative Slices" below or from
-`memory/project_backlog.md`. Nothing is release-gated. The most concrete
-Phase 6+ follow-up is now incremental reparsing with loom: per-sound
-parameter control has shipped, so the next authoring improvement should focus
-on preserving stable ids through smaller text edits rather than adding more
-scalar controls.
+`memory/project_backlog.md`. Nothing is release-gated. The most concrete loom
+follow-up is dependency hardening: after Loom PR #135 lands, publish or pin Loom
+and companion modules so `specs/loom-mini-cst` can stop relying on sibling
+local path dependencies.
 
 ## Alternative Slices
 
@@ -43,12 +46,48 @@ scalar controls.
   `moonbitlang/quickcheck` update removes the old bound; only plan local
   suppressions or test rewrites if the dependency remains blocked.
 
+- **Loom dependency publish/pin follow-up** — PR #70 intentionally validates
+  against the sibling Loom checkout containing PR #135 behavior. Once Loom
+  PR #135 lands, publish or otherwise pin `dowdiness/loom` plus companion
+  modules (`seam`, `pretty`, `text_change`, and likely `moji`) and replace
+  `specs/loom-mini-cst` local path deps with versioned deps.
+
+- **Voice API result hardening follow-up** — PR #69 added typed result peers
+  for handle mutators while keeping Bool wrappers. The next design question is
+  whether to deprecate/remove those wrappers, rename voice `*_result` methods
+  to graph-style unsuffixed `Result` methods, or first migrate
+  `CompiledDsp::compile` away from `Self?`.
+
+- **v0.6.0 release prep** — `Unreleased` now contains public API additions and
+  authoring-pipeline work. If cutting a release, run normal release prep and
+  treat the target as `v0.6.0` unless deliberately carving scope down.
+
 - **Open another Phase 6+ slice** (per `memory/project_backlog.md`):
   incremental reparsing with loom, canopy structural editor, or another
   targeted mini authoring improvement. Each is multi-session scope;
   brainstorm before planning.
 
 ### Closed since the last update
+
+- ~~**Loom mini-CST deletion-safe reuse spec**~~ — SHIPPED 2026-05-21 in
+  PR #70 (squash commit `bafaa30`). The nested `specs/loom-mini-cst/` spike now
+  pins Loom PR #135 semantics as deletion-safe left-adjacent CST reuse, not
+  parser-owned token/subtree identity projection. Remaining follow-up:
+  publish or pin Loom dependencies instead of relying on sibling local paths.
+
+- ~~**Voice result mutator APIs**~~ — SHIPPED 2026-05-21 in PR #69
+  (squash commit `cfa7af9`). Added typed result-returning peers for
+  `VoicePool::note_off`, `VoicePool::set_voice_pan`,
+  `BoundVoicePool::note_off`, `BoundVoicePool::kill`, and
+  `BoundVoicePool::set_voice_pan`; existing Bool wrappers remain and delegate
+  to the result path. Validation: CI green, `rtk moon test` 891/891 before
+  merge.
+
+- ~~**Mini incr authoring / loom-CST evaluation**~~ — SHIPPED 2026-05-21
+  in PR #68 (tip commit `bd423f4`). Added `MiniAuthoringPipeline`,
+  source-edit-aware token identity realignment, ADR-0011/0012 updates, and a
+  nested `specs/loom-mini-cst/` spike for duplicate atom span evaluation.
+  Loom production migration remains separate and active in its own worktree.
 
 - ~~**v0.5.1 mini scalar-control release**~~ — SHIPPED 2026-05-20 as tag
   `v0.5.1`, GitHub release, and mooncakes `dowdiness/moondsp@0.5.1`.
@@ -99,6 +138,7 @@ scalar controls.
   2026-05-19 in PR #60. `every`/`any` added with `raise?` parity,
   `as_fixed_array` deleted, ~145 call sites migrated, zero codegen
   overhead verified at the WAT level.
+
 ## Acceptance Checks For API-Hardening Slices
 
 - Run `rtk moon info` and review `.mbti` diffs for intentional public API
