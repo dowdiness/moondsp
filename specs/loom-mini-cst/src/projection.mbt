@@ -221,50 +221,60 @@ fn loom_mini_apply_method_expr(
       methods.push(child)
     }
   }
-  match methods {
-    [] => Ok(base)
-    [call] => {
-      let names = loom_mini_direct_tokens_of_kind(call, MethodNameToken.to_raw())
-      let name = match names {
-        [] => return Err("loom atom projection expected method name")
-        [token, ..] => token.text()
-      }
-      if name != "fast" && name != "slow" && name != "rev" {
-        return Err(
-          "loom atom projection only supports .fast(N), .slow(N), or .rev() methods",
-        )
-      }
-      if loom_mini_direct_tokens_of_kind(call, CommaToken.to_raw()).length() > 0 {
-        return Err(
-          "loom atom projection only supports .fast(N), .slow(N), or .rev() methods",
-        )
-      }
-      let numbers = loom_mini_direct_tokens_of_kind(call, NumberToken.to_raw())
-      if name == "rev" {
-        if names.length() != 1 || numbers.length() != 0 {
-          return Err("loom atom projection expected .rev() with no arguments")
-        }
-        Ok(RevExpr(base))
-      } else {
-        if names.length() != 1 {
-          return Err("loom atom projection expected numeric method argument")
-        }
-        let number = match numbers {
-          [token] => token.text()
-          _ => return Err("loom atom projection expected method argument")
-        }
-        let factor = match loom_mini_parse_positive_int(number) {
-          Ok(n) => n
-          Err(msg) => return Err(msg)
-        }
-        if name == "fast" {
-          Ok(FastExpr(base, factor))
-        } else {
-          Ok(SlowExpr(base, factor))
-        }
-      }
+  let expr = for call in methods; expr = base {
+    match loom_mini_apply_single_method_expr(call, expr) {
+      Ok(next) => continue next
+      Err(msg) => return Err(msg)
     }
-    _ => Err("loom atom projection only supports one method")
+  } nobreak {
+    expr
+  }
+  Ok(expr)
+}
+
+///|
+fn loom_mini_apply_single_method_expr(
+  call : @seam.SyntaxNode,
+  base : LoomMiniExpr,
+) -> Result[LoomMiniExpr, String] {
+  let names = loom_mini_direct_tokens_of_kind(call, MethodNameToken.to_raw())
+  let name = match names {
+    [] => return Err("loom atom projection expected method name")
+    [token, ..] => token.text()
+  }
+  if name != "fast" && name != "slow" && name != "rev" {
+    return Err(
+      "loom atom projection only supports .fast(N), .slow(N), or .rev() methods",
+    )
+  }
+  if loom_mini_direct_tokens_of_kind(call, CommaToken.to_raw()).length() > 0 {
+    return Err(
+      "loom atom projection only supports .fast(N), .slow(N), or .rev() methods",
+    )
+  }
+  let numbers = loom_mini_direct_tokens_of_kind(call, NumberToken.to_raw())
+  if name == "rev" {
+    if names.length() != 1 || numbers.length() != 0 {
+      return Err("loom atom projection expected .rev() with no arguments")
+    }
+    Ok(RevExpr(base))
+  } else {
+    if names.length() != 1 {
+      return Err("loom atom projection expected numeric method argument")
+    }
+    let number = match numbers {
+      [token] => token.text()
+      _ => return Err("loom atom projection expected method argument")
+    }
+    let factor = match loom_mini_parse_positive_int(number) {
+      Ok(n) => n
+      Err(msg) => return Err(msg)
+    }
+    if name == "fast" {
+      Ok(FastExpr(base, factor))
+    } else {
+      Ok(SlowExpr(base, factor))
+    }
   }
 }
 
