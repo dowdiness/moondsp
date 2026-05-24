@@ -2,7 +2,7 @@
   "name": "dowdiness/moondsp",
   "version": "0.5.1",
   "deps": {
-    "dowdiness/incr": "0.5.1",
+    "dowdiness/incr": "0.6.0",
     "moonbitlang/quickcheck": "0.11.2"
   },
   "readme": "README.mbt.md",
