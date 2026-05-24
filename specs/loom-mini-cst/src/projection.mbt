@@ -10,6 +10,7 @@ priv struct LoomMiniRawAtom {
   text : String
   start : Int
   end : Int
+  fast_factor : Int
 }
 
 ///|
@@ -292,38 +293,78 @@ fn loom_mini_collect_plain_call_atoms(
   }
   if loom_mini_direct_layer_count(notation) != 1 ||
     loom_mini_contains_node_kind(notation, SubNotationNode.to_raw()) ||
-    loom_mini_contains_node_kind(notation, PostfixNode.to_raw()) ||
     loom_mini_contains_node_kind(notation, EuclidNode.to_raw()) {
     return Err("loom atom projection only supports one plain atom layer")
   }
   let atoms : Array[LoomMiniRawAtom] = []
-  fn visit(node : @seam.SyntaxNode) -> Unit {
+  fn visit(node : @seam.SyntaxNode) -> Result[Unit, String] {
     if node.kind() == AtomNode.to_raw() {
       let token = match kind {
         SoundAtom => node.find_token(IdentToken.to_raw())
         NoteAtom => node.find_token(NumberToken.to_raw())
       }
       match token {
-        Some(token) =>
+        Some(token) => {
+          let fast_factor = match loom_mini_atom_star_postfix_factor(node) {
+            Ok(factor) => factor
+            Err(msg) => return Err(msg)
+          }
           atoms.push({
             kind,
             text: token.text(),
             start: token.start(),
             end: token.end(),
+            fast_factor,
           })
+        }
         None => ()
       }
     }
     for child in node.children() {
-      visit(child)
+      match visit(child) {
+        Ok(_) => ()
+        Err(msg) => return Err(msg)
+      }
     }
+    Ok(())
   }
-  visit(notation)
+  match visit(notation) {
+    Ok(_) => ()
+    Err(msg) => return Err(msg)
+  }
   if atoms.length() == 0 {
     Err("loom atom projection expected at least one atom")
   } else {
     Ok(atoms)
   }
+}
+
+///|
+fn loom_mini_atom_star_postfix_factor(
+  atom : @seam.SyntaxNode,
+) -> Result[Int, String] {
+  let mut factor = 1
+  let mut seen = false
+  for child in atom.children() {
+    if child.kind() == PostfixNode.to_raw() {
+      if seen {
+        return Err("loom atom projection only supports one star postfix per atom")
+      }
+      seen = true
+      if child.find_token(StarToken.to_raw()) is None {
+        return Err("loom atom projection only supports star postfix atoms")
+      }
+      let number = match child.find_token(NumberToken.to_raw()) {
+        Some(token) => token.text()
+        None => return Err("loom atom projection expected star postfix argument")
+      }
+      factor = match loom_mini_parse_positive_int(number) {
+        Ok(n) => n
+        Err(msg) => return Err(msg)
+      }
+    }
+  }
+  Ok(factor)
 }
 
 ///|
@@ -618,14 +659,23 @@ fn loom_mini_lower_atom_group(
   cursor : LoomMiniProjectedCursor,
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
   let docs : Array[@pattern.PatternDoc[@pattern.ControlMap]] = []
-  for _ in raw_atoms {
+  for raw in raw_atoms {
     if cursor.offset >= cursor.atoms.length() {
       return Err("internal loom mini atom grouping mismatch")
     }
-    match loom_mini_atom_doc(builder, cursor.atoms[cursor.offset]) {
-      Ok(doc) => docs.push(doc)
+    let atom_doc = match loom_mini_atom_doc(builder, cursor.atoms[cursor.offset]) {
+      Ok(doc) => doc
       Err(msg) => return Err(msg)
     }
+    let doc = if raw.fast_factor == 1 {
+      atom_doc
+    } else {
+      match builder.fast(atom_doc, @pattern.Rational::from_int(raw.fast_factor)) {
+        Ok(doc) => doc
+        Err(msg) => return Err(msg)
+      }
+    }
+    docs.push(doc)
     cursor.offset += 1
   }
   builder.sequence(docs)
