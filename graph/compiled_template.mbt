@@ -93,12 +93,14 @@ pub fn CompiledTemplate::adsr_authoring_indices(
   self : CompiledTemplate,
 ) -> FixedArray[Int] {
   let result = FixedArray::make(self.template.length(), -1)
-  let mut n = 0
-  for i in 0..<self.template.length() {
+  let n = for i in 0..<self.template.length(); count = 0 {
     if self.template[i].kind is Adsr && self.index_map[i] >= 0 {
-      result[n] = i
-      n = n + 1
+      result[count] = i
+      continue count + 1
     }
+    continue count
+  } nobreak {
+    count
   }
   let snapshot = FixedArray::make(n, 0)
   for i in 0..<n {

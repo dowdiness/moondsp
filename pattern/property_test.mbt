@@ -255,20 +255,19 @@ test "rev of sequence reverses correctly" {
   @debug.assert_eq(events.length(), 3)
   // Events are in inner-query order (1, 2, 3) but their time positions
   // are mirrored: value 1 is now at [2/3, 1), value 3 is at [0, 1/3)
-  // Find the event at position [0, 1/3) — it should have value 3
-  let mut first_pos_value = 0
-  for ev in events {
+  // Find the event at position [0, 1/3) — it should have value 3,
+  // and the event at position [2/3, 1) — it should have value 1.
+  let (first_pos_value, last_pos_value) = for ev in events; first = 0, last = 0 {
     if ev.part.begin == r_prop(0, 1) {
-      first_pos_value = ev.value
+      continue ev.value, last
     }
+    if ev.part.begin == r_prop(2, 3) {
+      continue first, ev.value
+    }
+    continue first, last
+  } nobreak {
+    (first, last)
   }
   @debug.assert_eq(first_pos_value, 3)
-  // Find the event at position [2/3, 1) — it should have value 1
-  let mut last_pos_value = 0
-  for ev in events {
-    if ev.part.begin == r_prop(2, 3) {
-      last_pos_value = ev.value
-    }
-  }
   @debug.assert_eq(last_pos_value, 1)
 }

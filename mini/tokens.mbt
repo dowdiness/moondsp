@@ -394,13 +394,15 @@ fn tokenize_mini_authoring_source(input : String) -> Array[MiniToken] {
 
 ///|
 fn mini_authoring_token_fingerprint(tokens : Array[MiniToken]) -> Int {
-  let mut fingerprint = 0
-  for token in tokens {
-    fingerprint += mini_token_kind_label(token.kind).length()
-    fingerprint += token.text.length()
-    fingerprint += token.start
-    fingerprint += token.end
-    fingerprint += token.identity_key.length()
+  let fingerprint = for token in tokens; total = 0 {
+    continue total +
+      mini_token_kind_label(token.kind).length() +
+      token.text.length() +
+      token.start +
+      token.end +
+      token.identity_key.length()
+  } nobreak {
+    total
   }
   fingerprint
 }

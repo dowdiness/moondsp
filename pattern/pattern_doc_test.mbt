@@ -617,14 +617,14 @@ test "PatternDoc::jux lowers through control-map runtime combinator" {
   inspect(juxed.revision().value(), content="1")
   let events = unwrap_snapshot(try? juxed.lower()).query(doc_span(0, 1, 1, 1))
   inspect(events.length(), content="4")
-  let mut pan_neg1 = 0
-  let mut pan_pos1 = 0
-  for event in events {
+  let (pan_neg1, pan_pos1) = for event in events; neg = 0, pos = 0 {
     match event.value.get("pan") {
-      Some(-1.0) => pan_neg1 += 1
-      Some(1.0) => pan_pos1 += 1
-      _ => ()
+      Some(-1.0) => continue neg + 1, pos
+      Some(1.0) => continue neg, pos + 1
+      _ => continue neg, pos
     }
+  } nobreak {
+    (neg, pos)
   }
   inspect(pan_neg1, content="2")
   inspect(pan_pos1, content="2")
