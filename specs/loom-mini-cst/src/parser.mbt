@@ -129,6 +129,6 @@ pub fn ident_token_spans_from_syntax(root : @seam.SyntaxNode) -> Array[String] {
 pub fn parser_ident_token_spans(
   parser : @loom.Parser[MiniAst],
 ) -> Array[String] {
-  let root = parser.runtime().read(parser.syntax_tree())
+  let root = parser.syntax_tree().read_or_abort()
   ident_token_spans_from_syntax(root)
 }
