@@ -1,8 +1,18 @@
 ///|
 pub(all) enum MiniToken {
   SKeyword
+  NoteKeyword
+  StackKeyword
   LParen
   RParen
+  Comma
+  Dot
+  Number
+  Star
+  Slash
+  Question
+  LBracket
+  RBracket
   Quote
   Ident
   Whitespace
@@ -11,12 +21,22 @@ pub(all) enum MiniToken {
 } derive(Eq, Debug)
 
 ///|
-pub impl Show for MiniToken with output(self, logger) {
+pub impl Show for MiniToken with fn output(self, logger) {
   logger.write_string(
     match self {
       SKeyword => "s"
+      NoteKeyword => "note"
+      StackKeyword => "stack"
       LParen => "("
       RParen => ")"
+      Comma => ","
+      Dot => "."
+      Number => "<number>"
+      Star => "*"
+      Slash => "/"
+      Question => "?"
+      LBracket => "["
+      RBracket => "]"
       Quote => "\""
       Ident => "<ident>"
       Whitespace => " "
@@ -27,17 +47,17 @@ pub impl Show for MiniToken with output(self, logger) {
 }
 
 ///|
-pub impl @seam.IsTrivia for MiniToken with is_trivia(self) {
+pub impl @seam.IsTrivia for MiniToken with fn is_trivia(self) {
   self == Whitespace
 }
 
 ///|
-pub impl @seam.IsEof for MiniToken with is_eof(self) {
+pub impl @seam.IsEof for MiniToken with fn is_eof(self) {
   self == EOF
 }
 
 ///|
-pub impl @seam.ToRawKind for MiniToken with to_raw(self) {
+pub impl @seam.ToRawKind for MiniToken with fn to_raw(self) {
   @seam.RawKind(
     match self {
       SKeyword => 0
@@ -48,6 +68,16 @@ pub impl @seam.ToRawKind for MiniToken with to_raw(self) {
       Whitespace => 5
       Error(_) => 6
       EOF => 7
+      NoteKeyword => 8
+      StackKeyword => 9
+      Comma => 10
+      Dot => 11
+      Number => 12
+      Star => 13
+      Slash => 14
+      Question => 15
+      LBracket => 16
+      RBracket => 17
     },
   )
 }
