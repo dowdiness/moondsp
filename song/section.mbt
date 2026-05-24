@@ -357,14 +357,15 @@ fn[A] SectionBody::upsert_layer(
         result.push(SectionLayer(name~, body~))
       }
     Layers(layers) => {
-      let mut replaced = false
-      for layer in layers {
+      let replaced = for layer in layers; did_replace = false {
         if layer.name() == name {
           result.push(SectionLayer(name~, body~))
-          replaced = true
-        } else {
-          result.push(layer)
+          continue true
         }
+        result.push(layer)
+        continue did_replace
+      } nobreak {
+        did_replace
       }
       if !replaced {
         result.push(SectionLayer(name~, body~))
@@ -401,14 +402,15 @@ fn[A] SectionBody::set_layer(
         raise MissingLayer(name)
       }
     Layers(layers) => {
-      let mut replaced = false
-      for layer in layers {
+      let replaced = for layer in layers; did_replace = false {
         if layer.name() == name {
           result.push(SectionLayer(name~, body~))
-          replaced = true
-        } else {
-          result.push(layer)
+          continue true
         }
+        result.push(layer)
+        continue did_replace
+      } nobreak {
+        did_replace
       }
       if !replaced {
         raise MissingLayer(name)
@@ -600,29 +602,29 @@ pub fn[A] SectionDoc::rename_layer(
   id : @identity.SectionLayerId,
   name~ : String,
 ) -> SectionDoc[A] raise SectionDocEditError {
-  let mut found = false
-  let body = match self.body {
+  let (body, found) = match self.body {
     Single(layer) =>
       if layer.id() == id {
-        found = true
-        SectionDocBody::single(layer.rename(name~))
+        (SectionDocBody::single(layer.rename(name~)), true)
       } else {
-        self.body.snapshot()
+        (self.body.snapshot(), false)
       }
     Layers(layers) => {
       let result : Array[SectionLayerDoc[A]] = []
-      for layer in layers {
+      let found = for layer in layers; did_find = false {
         if layer.id() == id {
           if section_doc_body_has_layer_name_except(self.body, name, id) {
             raise DuplicateLayerName(name)
           }
           result.push(layer.rename(name~))
-          found = true
-        } else {
-          result.push(layer)
+          continue true
         }
+        result.push(layer)
+        continue did_find
+      } nobreak {
+        did_find
       }
-      SectionDocBody::layers(result)
+      (SectionDocBody::layers(result), found)
     }
   }
   if !found {
@@ -644,26 +646,26 @@ pub fn[A] SectionDoc::replace_layer_body(
   id : @identity.SectionLayerId,
   body~ : @pattern.Pat[A],
 ) -> SectionDoc[A] raise SectionDocEditError {
-  let mut found = false
-  let doc_body = match self.body {
+  let (doc_body, found) = match self.body {
     Single(layer) =>
       if layer.id() == id {
-        found = true
-        SectionDocBody::single(layer.replace_body(body~))
+        (SectionDocBody::single(layer.replace_body(body~)), true)
       } else {
-        self.body.snapshot()
+        (self.body.snapshot(), false)
       }
     Layers(layers) => {
       let result : Array[SectionLayerDoc[A]] = []
-      for layer in layers {
+      let found = for layer in layers; did_find = false {
         if layer.id() == id {
           result.push(layer.replace_body(body~))
-          found = true
-        } else {
-          result.push(layer)
+          continue true
         }
+        result.push(layer)
+        continue did_find
+      } nobreak {
+        did_find
       }
-      SectionDocBody::layers(result)
+      (SectionDocBody::layers(result), found)
     }
   }
   if !found {

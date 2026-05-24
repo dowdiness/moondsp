@@ -492,25 +492,30 @@ test "prop: mono ADSR graph — compile twice, process identically" {
       }
       let out_a = AudioBuffer::filled(PROP_BLOCK_SIZE)
       let out_b = AudioBuffer::filled(PROP_BLOCK_SIZE)
-      let mut identical = true
-      for _block = 0; _block < PROP_NUM_BLOCKS; _block = _block + 1 {
+      let attack_identical = for _block in 0..<PROP_NUM_BLOCKS; same = true {
         compiled_a.process(context, out_a)
         compiled_b.process(context, out_b)
         if !buffers_identical(out_a, out_b, PROP_BLOCK_SIZE) {
-          identical = false
+          continue false
         }
+        continue same
+      } nobreak {
+        same
       }
       if compiled_a.gate_off(0) is Err(_) || compiled_b.gate_off(0) is Err(_) {
         return false
       }
-      for _block = 0; _block < PROP_NUM_BLOCKS; _block = _block + 1 {
+      let release_identical = for _block in 0..<PROP_NUM_BLOCKS; same = attack_identical {
         compiled_a.process(context, out_a)
         compiled_b.process(context, out_b)
         if !buffers_identical(out_a, out_b, PROP_BLOCK_SIZE) {
-          identical = false
+          continue false
         }
+        continue same
+      } nobreak {
+        same
       }
-      identical
+      release_identical
     },
     max_success=100,
   )
@@ -649,13 +654,15 @@ test "prop: mono hot-swap — same swap sequence produces identical output" {
         hs_b.queue_swap(compile_mono(nodes_replacement)) is Err(_) {
         return false
       }
-      let mut identical = true
-      for _block = 0; _block < 4; _block = _block + 1 {
+      let identical = for _block in 0..<4; same = true {
         hs_a.process(context, out_a)
         hs_b.process(context, out_b)
         if !buffers_identical(out_a, out_b, PROP_BLOCK_SIZE) {
-          identical = false
+          continue false
         }
+        continue same
+      } nobreak {
+        same
       }
       identical
     },
@@ -697,14 +704,16 @@ test "prop: stereo hot-swap — same swap sequence produces identical output" {
         hs_b.queue_swap(compile_stereo(nodes_replacement)) is Err(_) {
         return false
       }
-      let mut identical = true
-      for _block in 0..<4 {
+      let identical = for _block in 0..<4; same = true {
         hs_a.process(context, la, ra)
         hs_b.process(context, lb, rb)
         if !buffers_identical(la, lb, PROP_BLOCK_SIZE) ||
           !buffers_identical(ra, rb, PROP_BLOCK_SIZE) {
-          identical = false
+          continue false
         }
+        continue same
+      } nobreak {
+        same
       }
       identical
     },
@@ -930,11 +939,12 @@ test "prop: mono graphs produce finite output" {
         ),
         output,
       )
-      let mut all_finite = true
-      for s = 0; s < PROP_BLOCK_SIZE; s = s + 1 {
+      let all_finite = for s in 0..<PROP_BLOCK_SIZE {
         if !is_finite(output.get(s)) {
-          all_finite = false
+          break false
         }
+      } nobreak {
+        true
       }
       all_finite
     },
@@ -958,11 +968,12 @@ test "prop: stereo graphs produce finite output" {
         left,
         right,
       )
-      let mut all_finite = true
-      for s = 0; s < PROP_BLOCK_SIZE; s = s + 1 {
+      let all_finite = for s in 0..<PROP_BLOCK_SIZE {
         if !is_finite(left.get(s)) || !is_finite(right.get(s)) {
-          all_finite = false
+          break false
         }
+      } nobreak {
+        true
       }
       all_finite
     },
@@ -982,14 +993,21 @@ test "prop: mono feedback graphs produce finite output" {
       )
       let output = AudioBuffer::filled(PROP_BLOCK_SIZE)
       // Process multiple blocks — feedback can diverge over time
-      let mut all_finite = true
-      for _block = 0; _block < PROP_NUM_BLOCKS; _block = _block + 1 {
+      let all_finite = for _block in 0..<PROP_NUM_BLOCKS; finite = true {
         compiled.process(context, output)
-        for s = 0; s < PROP_BLOCK_SIZE; s = s + 1 {
+        let block_finite = for s in 0..<PROP_BLOCK_SIZE {
           if !is_finite(output.get(s)) {
-            all_finite = false
+            break false
           }
+        } nobreak {
+          true
         }
+        if !block_finite {
+          continue false
+        }
+        continue finite
+      } nobreak {
+        finite
       }
       all_finite
     },
@@ -1009,14 +1027,21 @@ test "prop: stereo feedback graphs produce finite output" {
       )
       let left = AudioBuffer::filled(PROP_BLOCK_SIZE)
       let right = AudioBuffer::filled(PROP_BLOCK_SIZE)
-      let mut all_finite = true
-      for _block = 0; _block < PROP_NUM_BLOCKS; _block = _block + 1 {
+      let all_finite = for _block in 0..<PROP_NUM_BLOCKS; finite = true {
         compiled.process(context, left, right)
-        for s = 0; s < PROP_BLOCK_SIZE; s = s + 1 {
+        let block_finite = for s in 0..<PROP_BLOCK_SIZE {
           if !is_finite(left.get(s)) || !is_finite(right.get(s)) {
-            all_finite = false
+            break false
           }
+        } nobreak {
+          true
         }
+        if !block_finite {
+          continue false
+        }
+        continue finite
+      } nobreak {
+        finite
       }
       all_finite
     },
@@ -1042,13 +1067,15 @@ test "prop: debug mode produces same output as normal mode (acyclic)" {
         sample_rate=PROP_SAMPLE_RATE,
         block_size=PROP_BLOCK_SIZE,
       )
-      let mut identical = true
-      for _block = 0; _block < PROP_NUM_BLOCKS; _block = _block + 1 {
+      let identical = for _block in 0..<PROP_NUM_BLOCKS; same = true {
         compiled_normal.process(context, out_normal)
         compiled_debug.process(context, out_debug)
         if !buffers_identical(out_normal, out_debug, PROP_BLOCK_SIZE) {
-          identical = false
+          continue false
         }
+        continue same
+      } nobreak {
+        same
       }
       identical
     },
@@ -1072,14 +1099,16 @@ test "prop: stereo debug mode produces same output as normal mode (acyclic)" {
         sample_rate=PROP_SAMPLE_RATE,
         block_size=PROP_BLOCK_SIZE,
       )
-      let mut identical = true
-      for _block = 0; _block < PROP_NUM_BLOCKS; _block = _block + 1 {
+      let identical = for _block in 0..<PROP_NUM_BLOCKS; same = true {
         compiled_normal.process(context, left_normal, right_normal)
         compiled_debug.process(context, left_debug, right_debug)
         if !buffers_identical(left_normal, left_debug, PROP_BLOCK_SIZE) ||
           !buffers_identical(right_normal, right_debug, PROP_BLOCK_SIZE) {
-          identical = false
+          continue false
         }
+        continue same
+      } nobreak {
+        same
       }
       identical
     },
@@ -1105,13 +1134,15 @@ test "prop: debug mode equals production for mono feedback graphs" {
         sample_rate=PROP_SAMPLE_RATE,
         block_size=PROP_BLOCK_SIZE,
       )
-      let mut identical = true
-      for _block = 0; _block < PROP_NUM_BLOCKS; _block = _block + 1 {
+      let identical = for _block in 0..<PROP_NUM_BLOCKS; same = true {
         compiled_debug.process(context, out_debug)
         compiled_prod.process(context, out_prod)
         if !buffers_identical(out_debug, out_prod, PROP_BLOCK_SIZE) {
-          identical = false
+          continue false
         }
+        continue same
+      } nobreak {
+        same
       }
       identical
     },
@@ -1139,14 +1170,16 @@ test "prop: debug mode equals production for stereo feedback graphs" {
         sample_rate=PROP_SAMPLE_RATE,
         block_size=PROP_BLOCK_SIZE,
       )
-      let mut identical = true
-      for _block = 0; _block < PROP_NUM_BLOCKS; _block = _block + 1 {
+      let identical = for _block in 0..<PROP_NUM_BLOCKS; same = true {
         compiled_debug.process(context, left_debug, right_debug)
         compiled_prod.process(context, left_prod, right_prod)
         if !buffers_identical(left_debug, left_prod, PROP_BLOCK_SIZE) ||
           !buffers_identical(right_debug, right_prod, PROP_BLOCK_SIZE) {
-          identical = false
+          continue false
         }
+        continue same
+      } nobreak {
+        same
       }
       identical
     },
