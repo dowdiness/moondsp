@@ -39,6 +39,14 @@ remains open for native targets such as CLAP plugins.
 
 **Source of truth:** `docs/salat-engine-technical-reference.md` is authoritative for graph runtime-control behavior. Update it first whenever these change.
 
+## MoonBit Style Notes
+
+- Loop expressions are best for loops that naturally compute a value: sums,
+  counts, folds, `any`/`all` scans, min/max/peak searches, and small tuple
+  accumulators. Do not mechanically rewrite procedural loops; keep parser
+  state machines, buffer-filling loops, hot DSP paths, and side-effect-heavy
+  graph/edit code imperative when that is clearer.
+
 ## Commands
 
 ```bash
