@@ -44,6 +44,7 @@ pub struct MiniDocBuilder {
 }
 pub fn MiniDocBuilder::fast(Self, @pattern.PatternDoc[@pattern.ControlMap], @pattern.Rational) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
 pub fn MiniDocBuilder::note_atom(Self, @identity.PatternNodeId, String) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
+pub fn MiniDocBuilder::rev(Self, @pattern.PatternDoc[@pattern.ControlMap]) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
 pub fn MiniDocBuilder::sequence(Self, Array[@pattern.PatternDoc[@pattern.ControlMap]]) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
 pub fn MiniDocBuilder::slow(Self, @pattern.PatternDoc[@pattern.ControlMap], @pattern.Rational) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
 pub fn MiniDocBuilder::sound_atom(Self, @identity.PatternNodeId, String) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]

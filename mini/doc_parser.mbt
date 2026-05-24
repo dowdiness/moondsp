@@ -142,6 +142,16 @@ pub fn MiniDocBuilder::slow(
 }
 
 ///|
+/// Build a mini rev transform using production root-ID and reuse rules.
+pub fn MiniDocBuilder::rev(
+  self : MiniDocBuilder,
+  doc : @pattern.PatternDoc[@pattern.ControlMap],
+) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
+  let doc = self.rev_doc(doc) catch { ParseError(msg) => return Err(msg) }
+  Ok(doc)
+}
+
+///|
 /// Build a mini sequence document using production root-ID and reuse rules.
 pub fn MiniDocBuilder::sequence(
   self : MiniDocBuilder,

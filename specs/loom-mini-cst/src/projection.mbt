@@ -27,6 +27,7 @@ priv enum LoomMiniExpr {
   StackExpr(Array[LoomMiniExpr])
   FastExpr(LoomMiniExpr, Int)
   SlowExpr(LoomMiniExpr, Int)
+  RevExpr(LoomMiniExpr)
 }
 
 ///|
@@ -226,24 +227,35 @@ fn loom_mini_apply_method_expr(
         Some(token) => token.text()
         None => return Err("loom atom projection expected method name")
       }
-      if name != "fast" && name != "slow" {
-        return Err("loom atom projection only supports .fast(N) or .slow(N) methods")
+      if name != "fast" && name != "slow" && name != "rev" {
+        return Err(
+          "loom atom projection only supports .fast(N), .slow(N), or .rev() methods",
+        )
       }
       if call.find_token(CommaToken.to_raw()) is Some(_) {
-        return Err("loom atom projection only supports .fast(N) or .slow(N) methods")
+        return Err(
+          "loom atom projection only supports .fast(N), .slow(N), or .rev() methods",
+        )
       }
-      let number = match call.find_token(NumberToken.to_raw()) {
-        Some(token) => token.text()
-        None => return Err("loom atom projection expected method argument")
-      }
-      let factor = match loom_mini_parse_positive_int(number) {
-        Ok(n) => n
-        Err(msg) => return Err(msg)
-      }
-      if name == "fast" {
-        Ok(FastExpr(base, factor))
+      if name == "rev" {
+        if call.find_token(NumberToken.to_raw()) is Some(_) {
+          return Err("loom atom projection expected .rev() with no arguments")
+        }
+        Ok(RevExpr(base))
       } else {
-        Ok(SlowExpr(base, factor))
+        let number = match call.find_token(NumberToken.to_raw()) {
+          Some(token) => token.text()
+          None => return Err("loom atom projection expected method argument")
+        }
+        let factor = match loom_mini_parse_positive_int(number) {
+          Ok(n) => n
+          Err(msg) => return Err(msg)
+        }
+        if name == "fast" {
+          Ok(FastExpr(base, factor))
+        } else {
+          Ok(SlowExpr(base, factor))
+        }
       }
     }
     _ => Err("loom atom projection only supports one method")
@@ -589,6 +601,11 @@ fn loom_mini_lower_expr(
     SlowExpr(inner, factor) =>
       match loom_mini_lower_expr(builder, inner, cursor) {
         Ok(doc) => builder.slow(doc, @pattern.Rational::from_int(factor))
+        Err(msg) => Err(msg)
+      }
+    RevExpr(inner) =>
+      match loom_mini_lower_expr(builder, inner, cursor) {
+        Ok(doc) => builder.rev(doc)
         Err(msg) => Err(msg)
       }
   }
