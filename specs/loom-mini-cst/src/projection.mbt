@@ -224,29 +224,34 @@ fn loom_mini_apply_method_expr(
   match methods {
     [] => Ok(base)
     [call] => {
-      let name = match call.find_token(MethodNameToken.to_raw()) {
-        Some(token) => token.text()
-        None => return Err("loom atom projection expected method name")
+      let names = loom_mini_direct_tokens_of_kind(call, MethodNameToken.to_raw())
+      let name = match names {
+        [] => return Err("loom atom projection expected method name")
+        [token, ..] => token.text()
       }
       if name != "fast" && name != "slow" && name != "rev" {
         return Err(
           "loom atom projection only supports .fast(N), .slow(N), or .rev() methods",
         )
       }
-      if call.find_token(CommaToken.to_raw()) is Some(_) {
+      if loom_mini_direct_tokens_of_kind(call, CommaToken.to_raw()).length() > 0 {
         return Err(
           "loom atom projection only supports .fast(N), .slow(N), or .rev() methods",
         )
       }
+      let numbers = loom_mini_direct_tokens_of_kind(call, NumberToken.to_raw())
       if name == "rev" {
-        if call.find_token(NumberToken.to_raw()) is Some(_) {
+        if names.length() != 1 || numbers.length() != 0 {
           return Err("loom atom projection expected .rev() with no arguments")
         }
         Ok(RevExpr(base))
       } else {
-        let number = match call.find_token(NumberToken.to_raw()) {
-          Some(token) => token.text()
-          None => return Err("loom atom projection expected method argument")
+        if names.length() != 1 {
+          return Err("loom atom projection expected numeric method argument")
+        }
+        let number = match numbers {
+          [token] => token.text()
+          _ => return Err("loom atom projection expected method argument")
         }
         let factor = match loom_mini_parse_positive_int(number) {
           Ok(n) => n
@@ -261,6 +266,24 @@ fn loom_mini_apply_method_expr(
     }
     _ => Err("loom atom projection only supports one method")
   }
+}
+
+///|
+fn loom_mini_direct_tokens_of_kind(
+  node : @seam.SyntaxNode,
+  kind : @seam.RawKind,
+) -> Array[@seam.SyntaxToken] {
+  let tokens : Array[@seam.SyntaxToken] = []
+  for child in node.all_children() {
+    match child {
+      Token(token) =>
+        if token.kind() == kind {
+          tokens.push(token)
+        }
+      Node(_) => ()
+    }
+  }
+  tokens
 }
 
 ///|

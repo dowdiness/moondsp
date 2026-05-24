@@ -212,6 +212,34 @@ test "loom atom projection matches mini PatternDoc for star postfix" {
 }
 
 ///|
+test "loom atom projection rejects rev method with callback argument" {
+  let projection = LoomMiniAtomProjection::new("s(\"bd\").rev(foo)")
+  match projection.parse_doc() {
+    Err(msg) =>
+      inspect(
+        msg,
+        content="loom atom projection expected .rev() with no arguments",
+      )
+    Ok(_) => abort("expected rev callback projection to fail")
+  }
+  projection.dispose()
+}
+
+///|
+test "loom atom projection rejects fast method with callback argument" {
+  let projection = LoomMiniAtomProjection::new("s(\"bd\").fast(slow(2))")
+  match projection.parse_doc() {
+    Err(msg) =>
+      inspect(
+        msg,
+        content="loom atom projection expected numeric method argument",
+      )
+    Ok(_) => abort("expected fast callback projection to fail")
+  }
+  projection.dispose()
+}
+
+///|
 test "loom atom projection rejects nested stack instead of dropping it" {
   let projection = LoomMiniAtomProjection::new(
     "stack(stack(s(\"bd\"), note(\"60\")), s(\"sd\"))",
