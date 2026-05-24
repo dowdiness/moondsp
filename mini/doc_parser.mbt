@@ -116,6 +116,32 @@ fn parse_mini_doc_builder_note_text(text : String) -> Result[Double, String] {
 }
 
 ///|
+/// Build a mini fast transform using production root-ID and reuse rules.
+pub fn MiniDocBuilder::fast(
+  self : MiniDocBuilder,
+  doc : @pattern.PatternDoc[@pattern.ControlMap],
+  factor : @pattern.Rational,
+) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
+  let doc = self.fast_doc(doc, factor) catch {
+    ParseError(msg) => return Err(msg)
+  }
+  Ok(doc)
+}
+
+///|
+/// Build a mini slow transform using production root-ID and reuse rules.
+pub fn MiniDocBuilder::slow(
+  self : MiniDocBuilder,
+  doc : @pattern.PatternDoc[@pattern.ControlMap],
+  factor : @pattern.Rational,
+) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
+  let doc = self.slow_doc(doc, factor) catch {
+    ParseError(msg) => return Err(msg)
+  }
+  Ok(doc)
+}
+
+///|
 /// Build a mini sequence document using production root-ID and reuse rules.
 pub fn MiniDocBuilder::sequence(
   self : MiniDocBuilder,

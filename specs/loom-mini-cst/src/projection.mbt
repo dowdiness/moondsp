@@ -22,16 +22,23 @@ priv struct LoomMiniProjectedAtom {
 }
 
 ///|
-priv enum LoomMiniProjectionShape {
-  SequenceShape
-  StackShape
+priv enum LoomMiniExpr {
+  AtomGroupExpr(Array[LoomMiniRawAtom])
+  StackExpr(Array[LoomMiniExpr])
+  FastExpr(LoomMiniExpr, Int)
+  SlowExpr(LoomMiniExpr, Int)
 }
 
 ///|
 priv struct LoomMiniRawProjection {
-  shape : LoomMiniProjectionShape
-  groups : Array[Array[LoomMiniRawAtom]]
+  expr : LoomMiniExpr
   atoms : Array[LoomMiniRawAtom]
+}
+
+///|
+priv struct LoomMiniProjectedCursor {
+  atoms : Array[LoomMiniProjectedAtom]
+  mut offset : Int
 }
 
 ///|
@@ -81,8 +88,7 @@ pub fn LoomMiniAtomProjection::new(input : String) -> LoomMiniAtomProjection {
       match
         loom_mini_build_projected_doc(
           builder,
-          raw_projection.shape,
-          raw_projection.groups,
+          raw_projection.expr,
           atoms,
         ) {
         Ok(doc) => {
@@ -126,38 +132,23 @@ pub fn LoomMiniAtomProjection::dispose(self : LoomMiniAtomProjection) -> Unit {
 fn loom_mini_collect_raw_projection(
   root : @seam.SyntaxNode,
 ) -> Result[LoomMiniRawProjection, String] {
-  if loom_mini_contains_node_kind(root, MethodCallNode.to_raw()) {
-    return Err(
-      "loom atom projection only supports plain s(...), note(...), or stack(...)",
-    )
+  let base = match loom_mini_collect_base_expr(root) {
+    Ok(projection) => projection
+    Err(msg) => return Err(msg)
   }
+  let expr = match loom_mini_apply_method_expr(root, base.expr) {
+    Ok(expr) => expr
+    Err(msg) => return Err(msg)
+  }
+  Ok({ expr, atoms: base.atoms })
+}
+
+///|
+fn loom_mini_collect_base_expr(
+  root : @seam.SyntaxNode,
+) -> Result[LoomMiniRawProjection, String] {
   match root.child_of_kind(StackCallNode.to_raw()) {
-    Some(stack_call) => {
-      let groups : Array[Array[LoomMiniRawAtom]] = []
-      let atoms : Array[LoomMiniRawAtom] = []
-      for child in stack_call.children() {
-        let group = if child.kind() == CallNode.to_raw() {
-          loom_mini_collect_plain_call_atoms(child, SoundAtom)
-        } else if child.kind() == NoteCallNode.to_raw() {
-          loom_mini_collect_plain_call_atoms(child, NoteAtom)
-        } else {
-          return Err("loom atom projection only supports plain stack arguments")
-        }
-        match group {
-          Ok(group) => {
-            for atom in group {
-              atoms.push(atom)
-            }
-            groups.push(group)
-          }
-          Err(msg) => return Err(msg)
-        }
-      }
-      if groups.length() == 0 {
-        return Err("loom atom projection expected stack arguments")
-      }
-      Ok({ shape: StackShape, groups, atoms })
-    }
+    Some(stack_call) => loom_mini_collect_stack_expr(stack_call)
     None => {
       let (kind, call) = match root.child_of_kind(CallNode.to_raw()) {
         Some(call) => (SoundAtom, call)
@@ -170,12 +161,111 @@ fn loom_mini_collect_raw_projection(
               )
           }
       }
-      let atoms = match loom_mini_collect_plain_call_atoms(call, kind) {
-        Ok(atoms) => atoms
+      loom_mini_collect_atom_group_expr(call, kind)
+    }
+  }
+}
+
+///|
+fn loom_mini_collect_stack_expr(
+  stack_call : @seam.SyntaxNode,
+) -> Result[LoomMiniRawProjection, String] {
+  let children : Array[LoomMiniExpr] = []
+  let atoms : Array[LoomMiniRawAtom] = []
+  for child in stack_call.children() {
+    let projection = if child.kind() == CallNode.to_raw() {
+      loom_mini_collect_atom_group_expr(child, SoundAtom)
+    } else if child.kind() == NoteCallNode.to_raw() {
+      loom_mini_collect_atom_group_expr(child, NoteAtom)
+    } else {
+      return Err("loom atom projection only supports plain stack arguments")
+    }
+    match projection {
+      Ok(projection) => {
+        children.push(projection.expr)
+        for atom in projection.atoms {
+          atoms.push(atom)
+        }
+      }
+      Err(msg) => return Err(msg)
+    }
+  }
+  if children.length() == 0 {
+    return Err("loom atom projection expected stack arguments")
+  }
+  Ok({ expr: StackExpr(children), atoms })
+}
+
+///|
+fn loom_mini_collect_atom_group_expr(
+  call : @seam.SyntaxNode,
+  kind : LoomMiniAtomKind,
+) -> Result[LoomMiniRawProjection, String] {
+  let atoms = match loom_mini_collect_plain_call_atoms(call, kind) {
+    Ok(atoms) => atoms
+    Err(msg) => return Err(msg)
+  }
+  Ok({ expr: AtomGroupExpr(atoms), atoms })
+}
+
+///|
+fn loom_mini_apply_method_expr(
+  root : @seam.SyntaxNode,
+  base : LoomMiniExpr,
+) -> Result[LoomMiniExpr, String] {
+  let methods : Array[@seam.SyntaxNode] = []
+  for child in root.children() {
+    if child.kind() == MethodCallNode.to_raw() {
+      methods.push(child)
+    }
+  }
+  match methods {
+    [] => Ok(base)
+    [call] => {
+      let name = match call.find_token(MethodNameToken.to_raw()) {
+        Some(token) => token.text()
+        None => return Err("loom atom projection expected method name")
+      }
+      if name != "fast" && name != "slow" {
+        return Err("loom atom projection only supports .fast(N) or .slow(N) methods")
+      }
+      if call.find_token(CommaToken.to_raw()) is Some(_) {
+        return Err("loom atom projection only supports .fast(N) or .slow(N) methods")
+      }
+      let number = match call.find_token(NumberToken.to_raw()) {
+        Some(token) => token.text()
+        None => return Err("loom atom projection expected method argument")
+      }
+      let factor = match loom_mini_parse_positive_int(number) {
+        Ok(n) => n
         Err(msg) => return Err(msg)
       }
-      Ok({ shape: SequenceShape, groups: [atoms], atoms })
+      if name == "fast" {
+        Ok(FastExpr(base, factor))
+      } else {
+        Ok(SlowExpr(base, factor))
+      }
     }
+    _ => Err("loom atom projection only supports one method")
+  }
+}
+
+///|
+fn loom_mini_parse_positive_int(text : String) -> Result[Int, String] {
+  let mut result = 0
+  if text.length() == 0 {
+    return Err("loom atom projection expected positive integer")
+  }
+  for ch in text {
+    if ch < '0' || ch > '9' {
+      return Err("loom atom projection expected positive integer")
+    }
+    result = result * 10 + (ch.to_int() - '0'.to_int())
+  }
+  if result <= 0 {
+    Err("loom atom projection expected positive integer")
+  } else {
+    Ok(result)
   }
 }
 
@@ -449,39 +539,79 @@ fn loom_mini_first_raw_atom_starting_at_or_after(
 }
 
 ///|
+fn LoomMiniProjectedCursor::new(
+  atoms : Array[LoomMiniProjectedAtom],
+) -> LoomMiniProjectedCursor {
+  { atoms, offset: 0 }
+}
+
+///|
 fn loom_mini_build_projected_doc(
   builder : @mini.MiniDocBuilder,
-  shape : LoomMiniProjectionShape,
-  groups : Array[Array[LoomMiniRawAtom]],
+  expr : LoomMiniExpr,
   atoms : Array[LoomMiniProjectedAtom],
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
-  let group_docs : Array[@pattern.PatternDoc[@pattern.ControlMap]] = []
-  let mut offset = 0
-  for group in groups {
-    let docs : Array[@pattern.PatternDoc[@pattern.ControlMap]] = []
-    let group_end = offset + group.length()
-    while offset < group_end {
-      if offset >= atoms.length() {
-        return Err("internal loom mini atom grouping mismatch")
-      }
-      match loom_mini_atom_doc(builder, atoms[offset]) {
-        Ok(doc) => docs.push(doc)
-        Err(msg) => return Err(msg)
-      }
-      offset += 1
-    }
-    match builder.sequence(docs) {
-      Ok(doc) => group_docs.push(doc)
-      Err(msg) => return Err(msg)
-    }
+  let cursor = LoomMiniProjectedCursor::new(atoms)
+  let doc = match loom_mini_lower_expr(builder, expr, cursor) {
+    Ok(doc) => doc
+    Err(msg) => return Err(msg)
   }
-  if offset != atoms.length() {
+  if cursor.offset != atoms.length() {
     return Err("internal loom mini atom grouping mismatch")
   }
-  match shape {
-    SequenceShape => builder.sequence(group_docs)
-    StackShape => builder.stack(group_docs)
+  Ok(doc)
+}
+
+///|
+fn loom_mini_lower_expr(
+  builder : @mini.MiniDocBuilder,
+  expr : LoomMiniExpr,
+  cursor : LoomMiniProjectedCursor,
+) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
+  match expr {
+    AtomGroupExpr(raw_atoms) =>
+      loom_mini_lower_atom_group(builder, raw_atoms, cursor)
+    StackExpr(children) => {
+      let docs : Array[@pattern.PatternDoc[@pattern.ControlMap]] = []
+      for child in children {
+        match loom_mini_lower_expr(builder, child, cursor) {
+          Ok(doc) => docs.push(doc)
+          Err(msg) => return Err(msg)
+        }
+      }
+      builder.stack(docs)
+    }
+    FastExpr(inner, factor) =>
+      match loom_mini_lower_expr(builder, inner, cursor) {
+        Ok(doc) => builder.fast(doc, @pattern.Rational::from_int(factor))
+        Err(msg) => Err(msg)
+      }
+    SlowExpr(inner, factor) =>
+      match loom_mini_lower_expr(builder, inner, cursor) {
+        Ok(doc) => builder.slow(doc, @pattern.Rational::from_int(factor))
+        Err(msg) => Err(msg)
+      }
   }
+}
+
+///|
+fn loom_mini_lower_atom_group(
+  builder : @mini.MiniDocBuilder,
+  raw_atoms : Array[LoomMiniRawAtom],
+  cursor : LoomMiniProjectedCursor,
+) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
+  let docs : Array[@pattern.PatternDoc[@pattern.ControlMap]] = []
+  for _ in raw_atoms {
+    if cursor.offset >= cursor.atoms.length() {
+      return Err("internal loom mini atom grouping mismatch")
+    }
+    match loom_mini_atom_doc(builder, cursor.atoms[cursor.offset]) {
+      Ok(doc) => docs.push(doc)
+      Err(msg) => return Err(msg)
+    }
+    cursor.offset += 1
+  }
+  builder.sequence(docs)
 }
 
 ///|

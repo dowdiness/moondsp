@@ -160,6 +160,32 @@ test "loom atom projection matches mini PatternDoc for plain stack" {
 }
 
 ///|
+test "loom atom projection matches mini PatternDoc for fast method" {
+  let input = "s(\"bd sd\").fast(2)"
+  let projection = LoomMiniAtomProjection::new(input)
+  let loom_doc = projection_boundary_doc(projection.parse_doc())
+  let mini_doc = projection_boundary_doc(@mini.parse_doc(input))
+  @debug.assert_eq(loom_doc.root().value(), mini_doc.root().value())
+  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
+  let mini_ids = projection_boundary_leaf_ids_from_doc(mini_doc)
+  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
+  projection.dispose()
+}
+
+///|
+test "loom atom projection matches mini PatternDoc for slow method" {
+  let input = "s(\"bd sd\").slow(2)"
+  let projection = LoomMiniAtomProjection::new(input)
+  let loom_doc = projection_boundary_doc(projection.parse_doc())
+  let mini_doc = projection_boundary_doc(@mini.parse_doc(input))
+  @debug.assert_eq(loom_doc.root().value(), mini_doc.root().value())
+  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
+  let mini_ids = projection_boundary_leaf_ids_from_doc(mini_doc)
+  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
+  projection.dispose()
+}
+
+///|
 test "loom atom projection rejects nested stack instead of dropping it" {
   let projection = LoomMiniAtomProjection::new(
     "stack(stack(s(\"bd\"), note(\"60\")), s(\"sd\"))",
