@@ -149,15 +149,15 @@ fn loom_mini_collect_raw_projection(
 fn loom_mini_collect_base_expr(
   root : @seam.SyntaxNode,
 ) -> Result[LoomMiniRawProjection, String] {
-  match root.child_of_kind(StackCallNode.to_raw()) {
-    Some(stack_call) => loom_mini_collect_stack_expr(stack_call)
-    None => {
-      let (kind, call) = match root.child_of_kind(CallNode.to_raw()) {
-        Some(call) => (SoundAtom, call)
-        None =>
-          match root.child_of_kind(NoteCallNode.to_raw()) {
-            Some(call) => (NoteAtom, call)
-            None =>
+  match root.direct_children_of_kind(StackCallNode.to_raw()) {
+    [stack_call, ..] => loom_mini_collect_stack_expr(stack_call)
+    [] => {
+      let (kind, call) = match root.direct_children_of_kind(CallNode.to_raw()) {
+        [call, ..] => (SoundAtom, call)
+        [] =>
+          match root.direct_children_of_kind(NoteCallNode.to_raw()) {
+            [call, ..] => (NoteAtom, call)
+            [] =>
               return Err(
                 "loom atom projection only supports s(...), note(...), or stack(...)",
               )
@@ -215,12 +215,7 @@ fn loom_mini_apply_method_expr(
   root : @seam.SyntaxNode,
   base : LoomMiniExpr,
 ) -> Result[LoomMiniExpr, String] {
-  let methods : Array[@seam.SyntaxNode] = []
-  for child in root.children() {
-    if child.kind() == MethodCallNode.to_raw() {
-      methods.push(child)
-    }
-  }
+  let methods = root.direct_children_of_kind(MethodCallNode.to_raw())
   let expr = for call in methods; expr = base {
     match loom_mini_apply_single_method_expr(call, expr) {
       Ok(next) => continue next
@@ -237,7 +232,7 @@ fn loom_mini_apply_single_method_expr(
   call : @seam.SyntaxNode,
   base : LoomMiniExpr,
 ) -> Result[LoomMiniExpr, String] {
-  let names = loom_mini_direct_tokens_of_kind(call, MethodNameToken.to_raw())
+  let names = call.direct_tokens_of_kind(MethodNameToken.to_raw())
   let name = match names {
     [] => return Err("loom atom projection expected method name")
     [token, ..] => token.text()
@@ -247,12 +242,12 @@ fn loom_mini_apply_single_method_expr(
       "loom atom projection only supports .fast(N), .slow(N), or .rev() methods",
     )
   }
-  if loom_mini_direct_tokens_of_kind(call, CommaToken.to_raw()).length() > 0 {
+  if call.direct_tokens_of_kind(CommaToken.to_raw()).length() > 0 {
     return Err(
       "loom atom projection only supports .fast(N), .slow(N), or .rev() methods",
     )
   }
-  let numbers = loom_mini_direct_tokens_of_kind(call, NumberToken.to_raw())
+  let numbers = call.direct_tokens_of_kind(NumberToken.to_raw())
   if name == "rev" {
     if names.length() != 1 || numbers.length() != 0 {
       return Err("loom atom projection expected .rev() with no arguments")
@@ -279,24 +274,6 @@ fn loom_mini_apply_single_method_expr(
 }
 
 ///|
-fn loom_mini_direct_tokens_of_kind(
-  node : @seam.SyntaxNode,
-  kind : @seam.RawKind,
-) -> Array[@seam.SyntaxToken] {
-  let tokens : Array[@seam.SyntaxToken] = []
-  for child in node.all_children() {
-    match child {
-      Token(token) =>
-        if token.kind() == kind {
-          tokens.push(token)
-        }
-      Node(_) => ()
-    }
-  }
-  tokens
-}
-
-///|
 fn loom_mini_parse_positive_int(text : String) -> Result[Int, String] {
   let mut result = 0
   if text.length() == 0 {
@@ -320,9 +297,9 @@ fn loom_mini_collect_plain_call_atoms(
   call : @seam.SyntaxNode,
   kind : LoomMiniAtomKind,
 ) -> Result[Array[LoomMiniRawAtom], String] {
-  let notation = match call.child_of_kind(NotationNode.to_raw()) {
-    Some(notation) => notation
-    None => return Err("loom atom projection expected notation")
+  let notation = match call.direct_children_of_kind(NotationNode.to_raw()) {
+    [notation, ..] => notation
+    [] => return Err("loom atom projection expected notation")
   }
   if loom_mini_direct_layer_count(notation) != 1 ||
     loom_mini_contains_node_kind(notation, SubNotationNode.to_raw()) ||
@@ -333,8 +310,8 @@ fn loom_mini_collect_plain_call_atoms(
   fn visit(node : @seam.SyntaxNode) -> Result[Unit, String] {
     if node.kind() == AtomNode.to_raw() {
       let token = match kind {
-        SoundAtom => node.find_token(IdentToken.to_raw())
-        NoteAtom => node.find_token(NumberToken.to_raw())
+        SoundAtom => node.direct_token_of_kind(IdentToken.to_raw())
+        NoteAtom => node.direct_token_of_kind(NumberToken.to_raw())
       }
       match token {
         Some(token) => {
@@ -384,10 +361,10 @@ fn loom_mini_atom_star_postfix_factor(
         return Err("loom atom projection only supports one star postfix per atom")
       }
       seen = true
-      if child.find_token(StarToken.to_raw()) is None {
+      if child.direct_token_of_kind(StarToken.to_raw()) is None {
         return Err("loom atom projection only supports star postfix atoms")
       }
-      let number = match child.find_token(NumberToken.to_raw()) {
+      let number = match child.direct_token_of_kind(NumberToken.to_raw()) {
         Some(token) => token.text()
         None => return Err("loom atom projection expected star postfix argument")
       }
