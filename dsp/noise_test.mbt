@@ -16,12 +16,12 @@ test "noise is deterministic given same seed" {
 test "different seeds produce different sequences" {
   let noise1 = Noise::new(1U)
   let noise2 = Noise::new(2U)
-  let mut differs = false
-  for i = 0; i < 16; i = i + 1 {
+  let differs = for _i in 0..<16 {
     if noise1.tick() != noise2.tick() {
-      differs = true
-      break
+      break true
     }
+  } nobreak {
+    false
   }
   assert_true(differs)
 }

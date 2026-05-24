@@ -1799,12 +1799,12 @@ test "exit deliverable compiles and produces non-zero output" {
   let compiled = compiled.unwrap()
   let buf = AudioBuffer::filled(128)
   compiled.process(ctx, buf)
-  let mut has_nonzero = false
-  for i = 0; i < 128; i = i + 1 {
+  let has_nonzero = for i in 0..<128 {
     if buf.get(i) != 0.0 {
-      has_nonzero = true
-      break
+      break true
     }
+  } nobreak {
+    false
   }
   assert_true(has_nonzero)
 }

@@ -519,12 +519,12 @@ test "drum template sd: noise envelope decays to silence via envelope_gain" {
   let left1 = AudioBuffer::filled(128)
   let right1 = AudioBuffer::filled(128)
   pool.process(ctx, left1, right1)
-  let mut has_nonzero = false
-  for i = 0; i < 128; i = i + 1 {
+  let has_nonzero = for i in 0..<128 {
     if left1.get(i).abs() > 0.001 {
-      has_nonzero = true
-      break
+      break true
     }
+  } nobreak {
+    false
   }
   assert_true(has_nonzero)
   // After note_off + several blocks, output should decay to silence
