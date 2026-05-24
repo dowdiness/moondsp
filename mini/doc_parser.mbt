@@ -80,11 +80,39 @@ pub fn MiniDocBuilder::note_atom(
   id : @identity.PatternNodeId,
   text : String,
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
-  let note = parse_double_manual(text, 0, text.length())
+  let note = match parse_mini_doc_builder_note_text(text) {
+    Ok(note) => note
+    Err(msg) => return Err(msg)
+  }
   let doc = self.pure_doc(id, @pattern.ControlMap::single("note", note)) catch {
     ParseError(msg) => return Err(msg)
   }
   Ok(doc)
+}
+
+///|
+fn parse_mini_doc_builder_note_text(text : String) -> Result[Double, String] {
+  let mut pos = 0
+  if pos < text.length() && text[pos] == '-' {
+    pos += 1
+  }
+  let mut has_digit = false
+  while pos < text.length() && text[pos] >= '0' && text[pos] <= '9' {
+    pos += 1
+    has_digit = true
+  }
+  if pos < text.length() && text[pos] == '.' {
+    pos += 1
+    while pos < text.length() && text[pos] >= '0' && text[pos] <= '9' {
+      pos += 1
+      has_digit = true
+    }
+  }
+  if !has_digit || pos != text.length() {
+    Err("invalid note number '\{text}'")
+  } else {
+    Ok(parse_double_manual(text, 0, text.length()))
+  }
 }
 
 ///|
