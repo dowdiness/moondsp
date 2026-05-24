@@ -841,15 +841,13 @@ test "edit orchestration helper gates pattern edits and preserves empty sources"
   @debug.assert_eq(sched.active_note_count(), 2)
   @debug.assert_eq(sched.affected_active_note_count(edited_target), 0)
   @debug.assert_eq(sched.affected_active_note_count(other_target), 1)
-  let mut empty_source_count = 0
-  for i in 0..<sched.active_note_count() {
+  let empty_source_count = for i in 0..<sched.active_note_count(); count = 0 {
     match sched.active_note_source(i) {
-      Some(source) =>
-        if source.is_empty() {
-          empty_source_count = empty_source_count + 1
-        }
-      None => ()
+      Some(source) if source.is_empty() => continue count + 1
+      _ => continue count
     }
+  } nobreak {
+    count
   }
   @debug.assert_eq(empty_source_count, 1)
 }
@@ -2238,10 +2236,11 @@ test "process_block: stolen voice gate-off is harmless" {
 /// Sum of absolute sample values across an `AudioBuffer`. Used to
 /// detect whether a buffer carries any signal vs is silent.
 fn buffer_abs_sum(buf : @moondsp.AudioBuffer) -> Double {
-  let mut total = 0.0
-  for i in 0..<buf.length() {
+  let total = for i in 0..<buf.length(); sum = 0.0 {
     let v = buf.get(i)
-    total = total + (if v < 0.0 { -v } else { v })
+    continue sum + (if v < 0.0 { -v } else { v })
+  } nobreak {
+    sum
   }
   total
 }
@@ -2251,11 +2250,12 @@ test "process_block silence produces zero output" {
   let (pool, sched, left, right) = make_test_sched()
   let pat : @pattern.Pat[@pattern.ControlMap] = @pattern.Pat::silence()
   sched.process_block(pat, pool, left, right)
-  let mut all_zero = true
-  for i in 0..<left.length() {
+  let all_zero = for i in 0..<left.length() {
     if left.get(i) != 0.0 || right.get(i) != 0.0 {
-      all_zero = false
+      break false
     }
+  } nobreak {
+    true
   }
   inspect(all_zero, content="true")
 }
@@ -2268,11 +2268,12 @@ test "process_block note pattern produces non-zero output" {
   for _i = 0; _i < 4; _i = _i + 1 {
     sched.process_block(pat, pool, left, right)
   }
-  let mut has_nonzero = false
-  for i in 0..<left.length() {
+  let has_nonzero = for i in 0..<left.length() {
     if left.get(i) != 0.0 || right.get(i) != 0.0 {
-      has_nonzero = true
+      break true
     }
+  } nobreak {
+    false
   }
   inspect(has_nonzero, content="true")
 }

@@ -296,14 +296,14 @@ test "parse pan method is overridden by jux outer pan" {
   let pat = unwrap_ok(@mini.parse("s(\"bd\").pan(0.5).jux(rev)"))
   let events = query_one_cycle(pat)
   inspect(events.length(), content="2")
-  let mut pan_neg1 = 0
-  let mut pan_pos1 = 0
-  for event in events {
+  let (pan_neg1, pan_pos1) = for event in events; neg = 0, pos = 0 {
     match event.value.get("pan") {
-      Some(-1.0) => pan_neg1 += 1
-      Some(1.0) => pan_pos1 += 1
-      _ => ()
+      Some(-1.0) => continue neg + 1, pos
+      Some(1.0) => continue neg, pos + 1
+      _ => continue neg, pos
     }
+  } nobreak {
+    (neg, pos)
   }
   inspect(pan_neg1, content="1")
   inspect(pan_pos1, content="1")
@@ -432,12 +432,13 @@ test "parse_doc_reusing token replacement preserves unaffected token ids" {
       @pattern.Rational::from_int(1),
     ),
   )
-  let mut saw_cp = false
-  for event in events {
+  let saw_cp = for event in events {
     match event.value.get("sound") {
-      Some(value) => if value == 39.0 { saw_cp = true }
-      None => ()
+      Some(39.0) => break true
+      _ => ()
     }
+  } nobreak {
+    false
   }
   assert_true(saw_cp)
 }

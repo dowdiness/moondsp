@@ -437,11 +437,13 @@ pub fn BoundVoicePool::process(
 
 ///|
 pub fn VoicePool::active_voice_count(self : VoicePool) -> Int {
-  let mut count = 0
-  for i = 0; i < self.max_voices; i = i + 1 {
+  let count = for i in 0..<self.max_voices; total = 0 {
     if !(self.slots[i].state is VoiceState::Idle) {
-      count = count + 1
+      continue total + 1
     }
+    continue total
+  } nobreak {
+    total
   }
   count
 }

@@ -35,14 +35,16 @@ pub fn PatternScheduler::apply_voice_controls_for_edit_result(
       }
     }
   }
-  let mut count = 0
-  for note in self.active_notes {
+  let count = for note in self.active_notes; applied = 0 {
     if note.source.matches(target) {
       match pool.apply_voice_controls_result(note.handle, controls) {
-        Ok(_) => count = count + 1
+        Ok(_) => continue applied + 1
         Err(error) => return Err(error)
       }
     }
+    continue applied
+  } nobreak {
+    applied
   }
   Ok(count)
 }

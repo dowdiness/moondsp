@@ -72,14 +72,14 @@ test "jux(rev): event count and pan keys" {
   let result = pat.jux(fn(p) { p.rev() })
   let events = result.query(span(0, 1, 1, 1))
   @debug.assert_eq(events.length(), 4)
-  let mut pan_neg1 = 0
-  let mut pan_pos1 = 0
-  for ev in events {
+  let (pan_neg1, pan_pos1) = for ev in events; neg = 0, pos = 0 {
     match ev.value.0.get("pan") {
-      Some(-1.0) => pan_neg1 += 1
-      Some(1.0) => pan_pos1 += 1
-      _ => ()
+      Some(-1.0) => continue neg + 1, pos
+      Some(1.0) => continue neg, pos + 1
+      _ => continue neg, pos
     }
+  } nobreak {
+    (neg, pos)
   }
   @debug.assert_eq(pan_neg1, 2)
   @debug.assert_eq(pan_pos1, 2)

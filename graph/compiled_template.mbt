@@ -64,11 +64,13 @@ fn CompiledTemplate::is_node_live(self : CompiledTemplate, index : Int) -> Bool 
 /// Parameterless because the template snapshot is owned by self; callers
 /// do not need to remember which template was compiled.
 pub fn CompiledTemplate::orphan_adsr_count(self : CompiledTemplate) -> Int {
-  let mut count = 0
-  for i in 0..<self.template.length() {
+  let count = for i in 0..<self.template.length(); total = 0 {
     if self.template[i].kind is Adsr && self.index_map[i] < 0 {
-      count = count + 1
+      continue total + 1
     }
+    continue total
+  } nobreak {
+    total
   }
   count
 }
@@ -91,12 +93,14 @@ pub fn CompiledTemplate::adsr_authoring_indices(
   self : CompiledTemplate,
 ) -> FixedArray[Int] {
   let result = FixedArray::make(self.template.length(), -1)
-  let mut n = 0
-  for i in 0..<self.template.length() {
+  let n = for i in 0..<self.template.length(); count = 0 {
     if self.template[i].kind is Adsr && self.index_map[i] >= 0 {
-      result[n] = i
-      n = n + 1
+      result[count] = i
+      continue count + 1
     }
+    continue count
+  } nobreak {
+    count
   }
   let snapshot = FixedArray::make(n, 0)
   for i in 0..<n {

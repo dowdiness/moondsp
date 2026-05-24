@@ -217,11 +217,13 @@ pub fn PatternScheduler::affected_active_note_count(
   self : PatternScheduler,
   target : AffectedVoiceTarget,
 ) -> Int {
-  let mut count = 0
-  for note in self.active_notes {
+  let count = for note in self.active_notes; total = 0 {
     if note.source.matches(target) {
-      count = count + 1
+      continue total + 1
     }
+    continue total
+  } nobreak {
+    total
   }
   count
 }
