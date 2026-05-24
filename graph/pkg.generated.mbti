@@ -393,31 +393,31 @@ pub using @dsp {trait StereoSym}
 
 // Traits
 pub trait GraphControllable {
-  apply_control(Self, GraphControl) -> Result[Unit, GraphControlError]
-  apply_controls(Self, Array[GraphControl]) -> Result[Unit, GraphControlError]
+  fn apply_control(Self, GraphControl) -> Result[Unit, GraphControlError]
+  fn apply_controls(Self, Array[GraphControl]) -> Result[Unit, GraphControlError]
 }
 
 pub(open) trait GraphDebuggable {
-  enable_debug_validation(Self) -> Unit
-  disable_debug_validation(Self) -> Unit
-  last_validation_errors(Self) -> Array[GraphValidationError]
+  fn enable_debug_validation(Self) -> Unit
+  fn disable_debug_validation(Self) -> Unit
+  fn last_validation_errors(Self) -> Array[GraphValidationError]
 }
 
 pub(open) trait NodeEditable : NodeSpanning + NodeFoldable {
-  can_insert_after(Self) -> Bool
-  can_delete(Self) -> Bool
+  fn can_insert_after(Self) -> Bool
+  fn can_delete(Self) -> Bool
 }
 
 pub(open) trait NodeFoldable : NodeSpanning {
-  is_foldable(Self) -> Bool
-  fold_value(Self, Double, Double) -> Double
+  fn is_foldable(Self) -> Bool
+  fn fold_value(Self, Double, Double) -> Double
 }
 
 pub(open) trait NodeSpanning {
-  signal_shape(Self) -> Int
+  fn signal_shape(Self) -> Int
 }
 
 pub(open) trait NodeStateful : NodeSpanning {
-  is_stateful(Self) -> Bool
+  fn is_stateful(Self) -> Bool
 }
 

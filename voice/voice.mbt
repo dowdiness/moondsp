@@ -20,7 +20,7 @@ pub enum VoiceState {
 } derive(Eq, Debug)
 
 ///|
-pub impl Show for VoiceState with output(self, logger) {
+pub impl Show for VoiceState with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
 
@@ -37,7 +37,7 @@ pub struct VoiceHandle {
 } derive(Eq, Debug)
 
 ///|
-pub impl Show for VoiceHandle with output(self, logger) {
+pub impl Show for VoiceHandle with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
 
@@ -50,7 +50,7 @@ pub(all) enum BoundVoicePoolError {
 } derive(Eq, Debug)
 
 ///|
-pub impl Show for BoundVoicePoolError with output(self, logger) {
+pub impl Show for BoundVoicePoolError with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
 
@@ -65,7 +65,7 @@ pub(all) enum VoicePoolError {
 } derive(Eq, Debug)
 
 ///|
-pub impl Show for VoicePoolError with output(self, logger) {
+pub impl Show for VoicePoolError with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
 
@@ -91,7 +91,7 @@ pub(all) enum VoiceControlError {
 } derive(Debug)
 
 ///|
-pub impl Show for VoiceControlError with output(self, logger) {
+pub impl Show for VoiceControlError with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
 
