@@ -5,6 +5,7 @@ import {
   "dowdiness/loom",
   "dowdiness/loom/core",
   "dowdiness/loom/pipeline",
+  "dowdiness/moondsp/pattern",
   "dowdiness/seam",
   "moonbitlang/core/debug",
 }
@@ -37,6 +38,14 @@ pub fn tokenize(String) -> Array[@core.TokenInfo[MiniToken]]
 // Errors
 
 // Types and methods
+pub struct LoomMiniAtomProjection {
+  // private fields
+}
+pub fn LoomMiniAtomProjection::apply_edit(Self, @core.Edit, String) -> Unit
+pub fn LoomMiniAtomProjection::dispose(Self) -> Unit
+pub fn LoomMiniAtomProjection::new(String) -> Self
+pub fn LoomMiniAtomProjection::parse_doc(Self) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
+
 pub(all) enum MiniAst {
   Parsed
 } derive(Eq, @debug.Debug)

@@ -4,6 +4,7 @@
   "source": "src",
   "deps": {
     "dowdiness/loom": { "path": "../../../canopy/loom/loom" },
+    "dowdiness/moondsp": { "path": "../.." },
     "dowdiness/seam": { "path": "../../../canopy/loom/seam" },
     "dowdiness/pretty": { "path": "../../../canopy/loom/pretty" },
     "dowdiness/incr": { "path": "../../../canopy/loom/incr" },

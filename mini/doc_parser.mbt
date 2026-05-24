@@ -1,8 +1,8 @@
 ///|
-priv struct MiniDocBuilder {
-  previous : @pattern.PatternDoc[@pattern.ControlMap]?
-  counters : Map[String, Int]
-  token_id_by_location : Map[String, String]?
+pub struct MiniDocBuilder {
+  priv previous : @pattern.PatternDoc[@pattern.ControlMap]?
+  priv counters : Map[String, Int]
+  priv token_id_by_location : Map[String, String]?
 }
 
 ///|
@@ -45,6 +45,66 @@ fn MiniDocBuilder::MiniDocBuilder(
       }
     },
   }
+}
+
+///|
+/// Create a reusable mini `PatternDoc` semantic builder for external
+/// frontends. Pass the last successful document to preserve subtree reuse.
+pub fn MiniDocBuilder::with_previous(
+  previous : @pattern.PatternDoc[@pattern.ControlMap]?,
+) -> MiniDocBuilder {
+  MiniDocBuilder::new(previous~, tokens=None)
+}
+
+///|
+/// Build a sound atom with a caller-supplied stable node ID.
+pub fn MiniDocBuilder::sound_atom(
+  self : MiniDocBuilder,
+  id : @identity.PatternNodeId,
+  name : String,
+) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
+  let doc = match drum_midi(name) {
+    Some(midi) =>
+      self.pure_doc(id, @pattern.ControlMap::single("sound", midi.to_double())) catch {
+        ParseError(msg) => return Err(msg)
+      }
+    None => return Err("unknown drum name '\{name}'")
+  }
+  Ok(doc)
+}
+
+///|
+/// Build a note atom with a caller-supplied stable node ID.
+pub fn MiniDocBuilder::note_atom(
+  self : MiniDocBuilder,
+  id : @identity.PatternNodeId,
+  text : String,
+) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
+  let note = parse_double_manual(text, 0, text.length())
+  let doc = self.pure_doc(id, @pattern.ControlMap::single("note", note)) catch {
+    ParseError(msg) => return Err(msg)
+  }
+  Ok(doc)
+}
+
+///|
+/// Build a mini sequence document using production root-ID and reuse rules.
+pub fn MiniDocBuilder::sequence(
+  self : MiniDocBuilder,
+  docs : Array[@pattern.PatternDoc[@pattern.ControlMap]],
+) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
+  let doc = self.sequence_doc(docs) catch { ParseError(msg) => return Err(msg) }
+  Ok(doc)
+}
+
+///|
+/// Build a mini stack document using production root-ID and reuse rules.
+pub fn MiniDocBuilder::stack(
+  self : MiniDocBuilder,
+  docs : Array[@pattern.PatternDoc[@pattern.ControlMap]],
+) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
+  let doc = self.stack_doc(docs) catch { ParseError(msg) => return Err(msg) }
+  Ok(doc)
 }
 
 ///|

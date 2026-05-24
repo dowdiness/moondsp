@@ -2,6 +2,7 @@
 package "dowdiness/moondsp/mini"
 
 import {
+  "dowdiness/moondsp/identity",
   "dowdiness/moondsp/pattern",
   "dowdiness/moondsp/song",
 }
@@ -37,6 +38,15 @@ pub fn MiniAuthoringPipeline::reset_lowering_stats(Self) -> Unit
 pub fn MiniAuthoringPipeline::set_input(Self, String) -> Unit
 pub fn MiniAuthoringPipeline::set_input_with_source_edit(Self, String, old_start~ : Int, old_end~ : Int, new_end~ : Int) -> Unit
 pub fn MiniAuthoringPipeline::snapshot_compute_count(Self) -> Int
+
+pub struct MiniDocBuilder {
+  // private fields
+}
+pub fn MiniDocBuilder::note_atom(Self, @identity.PatternNodeId, String) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
+pub fn MiniDocBuilder::sequence(Self, Array[@pattern.PatternDoc[@pattern.ControlMap]]) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
+pub fn MiniDocBuilder::sound_atom(Self, @identity.PatternNodeId, String) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
+pub fn MiniDocBuilder::stack(Self, Array[@pattern.PatternDoc[@pattern.ControlMap]]) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
+pub fn MiniDocBuilder::with_previous(@pattern.PatternDoc[@pattern.ControlMap]?) -> Self
 
 // Type aliases
 
