@@ -397,22 +397,14 @@ fn parse_doc_internal(
 /// Parse a mini-notation string into an identity-bearing pattern document.
 ///
 /// IDs are deterministic from the parsed structure and ignore whitespace-only
-/// edits. Reparse with `parse_doc_reusing` to preserve unchanged subtree
-/// generations for lowering-cache reuse.
+/// edits. Pass `previous=Some(prior)` to reuse unchanged subtrees from a prior
+/// parsed document when their deterministic `PatternNodeId`s still appear —
+/// this preserves subtree generations for lowering-cache reuse.
 pub fn parse_doc(
   input : String,
+  previous? : @pattern.PatternDoc[@pattern.ControlMap]? = None,
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
-  parse_doc_internal(input, None)
-}
-
-///|
-/// Parse a mini-notation string while reusing unchanged subtrees from a previous
-/// parsed document when their deterministic `PatternNodeId`s still appear.
-pub fn parse_doc_reusing(
-  input : String,
-  previous : @pattern.PatternDoc[@pattern.ControlMap],
-) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
-  parse_doc_internal(input, Some(previous))
+  parse_doc_internal(input, previous)
 }
 
 ///|
@@ -425,27 +417,15 @@ fn parse_doc_with_token_identities(
 }
 
 ///|
+/// Parse a mini-notation string into a lowered pattern snapshot.
+///
+/// Pass `previous=Some(prior)` to reuse subtree IDs from a prior parsed
+/// document, mirroring `parse_doc`'s reuse semantics.
 pub fn parse_snapshot(
   input : String,
+  previous? : @pattern.PatternDoc[@pattern.ControlMap]? = None,
 ) -> Result[@pattern.PatternSnapshot[@pattern.ControlMap], String] {
-  match parse_doc(input) {
-    Err(msg) => Err(msg)
-    Ok(doc) => {
-      let result = try? doc.lower()
-      match result {
-        Ok(snapshot) => Ok(snapshot)
-        Err(_) => Err("internal mini PatternDoc lowering failed")
-      }
-    }
-  }
-}
-
-///|
-pub fn parse_snapshot_reusing(
-  input : String,
-  previous : @pattern.PatternDoc[@pattern.ControlMap],
-) -> Result[@pattern.PatternSnapshot[@pattern.ControlMap], String] {
-  match parse_doc_reusing(input, previous) {
+  match parse_doc(input, previous~) {
     Err(msg) => Err(msg)
     Ok(doc) => {
       let result = try? doc.lower()
