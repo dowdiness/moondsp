@@ -42,8 +42,11 @@ pub fn MiniAuthoringPipeline::snapshot_compute_count(Self) -> Int
 pub struct MiniDocBuilder {
   // private fields
 }
+pub fn MiniDocBuilder::fast(Self, @pattern.PatternDoc[@pattern.ControlMap], @pattern.Rational) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
 pub fn MiniDocBuilder::note_atom(Self, @identity.PatternNodeId, String) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
+pub fn MiniDocBuilder::rev(Self, @pattern.PatternDoc[@pattern.ControlMap]) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
 pub fn MiniDocBuilder::sequence(Self, Array[@pattern.PatternDoc[@pattern.ControlMap]]) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
+pub fn MiniDocBuilder::slow(Self, @pattern.PatternDoc[@pattern.ControlMap], @pattern.Rational) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
 pub fn MiniDocBuilder::sound_atom(Self, @identity.PatternNodeId, String) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
 pub fn MiniDocBuilder::stack(Self, Array[@pattern.PatternDoc[@pattern.ControlMap]]) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
 pub fn MiniDocBuilder::with_previous(@pattern.PatternDoc[@pattern.ControlMap]?) -> Self
