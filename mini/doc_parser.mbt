@@ -14,29 +14,36 @@ fn MiniDocBuilder::MiniDocBuilder(
   {
     previous,
     counters: {},
-    token_id_by_location:
-      match tokens {
-        None => None
-        Some(tokens) => {
-          let index : Map[String, String] = {}
-          for token in tokens {
-            if mini_token_kind_equal(token.kind, Identifier) {
-              let suffix = mini_token_identity_occurrence_suffix(token)
-              let key =
-                mini_doc_token_id_key("sound", token.text, token.start, token.end)
-              let id = "mini:sound:\{token.text}:\{suffix}"
-              index[key] = id
-            } else if mini_token_kind_equal(token.kind, Number) {
-              let suffix = mini_token_identity_occurrence_suffix(token)
-              let key =
-                mini_doc_token_id_key("note", token.text, token.start, token.end)
-              let id = "mini:note:\{token.text}:\{suffix}"
-              index[key] = id
-            }
+    token_id_by_location: match tokens {
+      None => None
+      Some(tokens) => {
+        let index : Map[String, String] = {}
+        for token in tokens {
+          if mini_token_kind_equal(token.kind, Identifier) {
+            let suffix = mini_token_identity_occurrence_suffix(token)
+            let key = mini_doc_token_id_key(
+              "sound",
+              token.text,
+              token.start,
+              token.end,
+            )
+            let id = "mini:sound:\{token.text}:\{suffix}"
+            index[key] = id
+          } else if mini_token_kind_equal(token.kind, Number) {
+            let suffix = mini_token_identity_occurrence_suffix(token)
+            let key = mini_doc_token_id_key(
+              "note",
+              token.text,
+              token.start,
+              token.end,
+            )
+            let id = "mini:note:\{token.text}:\{suffix}"
+            index[key] = id
           }
-          Some(index)
         }
-      },
+        Some(index)
+      }
+    },
   }
 }
 

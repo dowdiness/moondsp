@@ -196,45 +196,45 @@ pub(all) enum Waveform {
 
 // Traits
 pub(open) trait ArithSym {
-  constant(Double) -> Self
-  mul(Self, Self) -> Self
-  mix(Self, Self) -> Self
-  clip(Self, Double) -> Self
+  fn constant(Double) -> Self
+  fn mul(Self, Self) -> Self
+  fn mix(Self, Self) -> Self
+  fn clip(Self, Double) -> Self
 }
 
 pub trait ChannelSpec {
-  channel_count(Self) -> Int
+  fn channel_count(Self) -> Int
 }
 
 pub(open) trait DelaySym : DspSym {
-  delay(Self, Int, Int, Double) -> Self
+  fn delay(Self, Int, Int, Double) -> Self
 }
 
 pub(open) trait DspSym : ArithSym {
-  oscillator(Self, Waveform) -> Self
-  noise(UInt) -> Self
-  adsr(Double, Double, Double, Double) -> Self
-  gain(Self, Double) -> Self
-  output(Self) -> Self
+  fn oscillator(Self, Waveform) -> Self
+  fn noise(UInt) -> Self
+  fn adsr(Double, Double, Double, Double) -> Self
+  fn gain(Self, Double) -> Self
+  fn output(Self) -> Self
 }
 
 pub(open) trait FilterSym : DspSym {
-  biquad(Self, BiquadMode, Double, Double) -> Self
+  fn biquad(Self, BiquadMode, Double, Double) -> Self
 }
 
 pub(open) trait StereoDelaySym : StereoSym + DelaySym {
-  stereo_delay(Self, Int, Int, Double) -> Self
+  fn stereo_delay(Self, Int, Int, Double) -> Self
 }
 
 pub(open) trait StereoFilterSym : StereoSym + FilterSym {
-  stereo_biquad(Self, BiquadMode, Double, Double) -> Self
+  fn stereo_biquad(Self, BiquadMode, Double, Double) -> Self
 }
 
 pub(open) trait StereoSym : DspSym {
-  pan(Self, Double) -> Self
-  stereo_gain(Self, Double) -> Self
-  stereo_clip(Self, Double) -> Self
-  stereo_mixdown(Self) -> Self
-  stereo_output(Self) -> Self
+  fn pan(Self, Double) -> Self
+  fn stereo_gain(Self, Double) -> Self
+  fn stereo_clip(Self, Double) -> Self
+  fn stereo_mixdown(Self) -> Self
+  fn stereo_output(Self) -> Self
 }
 

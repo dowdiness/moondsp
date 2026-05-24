@@ -84,8 +84,7 @@ pub fn MiniAuthoringPipeline::new(input : String) -> MiniAuthoringPipeline {
               realign_mini_authoring_tokens_with_source_edit(
                 baseline, current, span,
               )
-            None =>
-              realign_mini_authoring_tokens(baseline, current)
+            None => realign_mini_authoring_tokens(baseline, current)
           }
       }
       let result = parse_doc_with_token_identities(current, previous, tokens)
