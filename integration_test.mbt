@@ -1921,11 +1921,10 @@ fn integration_buffer_is_finite_and_bounded(
 
 ///|
 fn integration_abs_sum(buffer : AudioBuffer) -> Double {
-  let mut total = 0.0
-
-  for index = 0; index < buffer.length(); index = index + 1 {
-    total = total + buffer.get(index).abs()
+  let total = for index in 0..<buffer.length(); sum = 0.0 {
+    continue sum + buffer.get(index).abs()
+  } nobreak {
+    sum
   }
-
   total
 }

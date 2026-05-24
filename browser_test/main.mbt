@@ -243,12 +243,14 @@ pub fn mul_adsr_peak(sample_rate : Double, block_size : Int) -> Double {
       ignore(graph.gate_on(1))
       let buf = @moondsp.AudioBuffer::filled(block_size)
       graph.process(ctx, buf)
-      let mut peak = 0.0
-      for i = 0; i < block_size; i = i + 1 {
+      let peak = for i in 0..<block_size; best = 0.0 {
         let s = buf.get(i).abs()
-        if s > peak {
-          peak = s
+        if s > best {
+          continue s
         }
+        continue best
+      } nobreak {
+        best
       }
       peak
     }
