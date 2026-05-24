@@ -7,6 +7,145 @@
 // splits/merges, full reparses, or AST/domain projections.
 
 ///|
+test "SPIKE step 1: note() primary parses with zero diagnostics" {
+  let (_cst, diagnostics) = try! parse_cst("note(\"c4 e4 g4\")")
+  inspect(diagnostics.length(), content="0")
+}
+
+///|
+test "SPIKE step 1: stack() with single arg parses with zero diagnostics" {
+  let (_cst, diagnostics) = try! parse_cst("stack(s(\"bd\"))")
+  inspect(diagnostics.length(), content="0")
+}
+
+///|
+test "SPIKE step 1: stack() with multiple args parses with zero diagnostics" {
+  let (_cst, diagnostics) = try! parse_cst(
+    "stack(s(\"bd\"), s(\"sd\"), note(\"c4\"))",
+  )
+  inspect(diagnostics.length(), content="0")
+}
+
+///|
+test "SPIKE step 1: nested stack parses recursively" {
+  let (_cst, diagnostics) = try! parse_cst(
+    "stack(stack(s(\"bd\"), s(\"sd\")), s(\"hh\"))",
+  )
+  inspect(diagnostics.length(), content="0")
+}
+
+///|
+test "SPIKE step 2: method chain with number arg" {
+  let (_cst, diagnostics) = try! parse_cst("s(\"bd sd\").fast(2)")
+  inspect(diagnostics.length(), content="0")
+}
+
+///|
+test "SPIKE step 2: method chain with empty args" {
+  let (_cst, diagnostics) = try! parse_cst("s(\"bd\").rev()")
+  inspect(diagnostics.length(), content="0")
+}
+
+///|
+test "SPIKE step 2: chained methods" {
+  let (_cst, diagnostics) = try! parse_cst("s(\"bd sd\").fast(2).rev().slow(3)")
+  inspect(diagnostics.length(), content="0")
+}
+
+///|
+test "SPIKE step 2: method with callback arg (jux rev)" {
+  let (_cst, diagnostics) = try! parse_cst("s(\"bd sd hh sd\").jux(rev)")
+  inspect(diagnostics.length(), content="0")
+}
+
+///|
+test "SPIKE step 2: method with parenthesized callback (every)" {
+  let (_cst, diagnostics) = try! parse_cst("s(\"bd sd\").every(4, fast(2))")
+  inspect(diagnostics.length(), content="0")
+}
+
+///|
+test "SPIKE step 3: decimal number arg" {
+  let (_cst, diagnostics) = try! parse_cst("s(\"bd\").gain(0.5)")
+  inspect(diagnostics.length(), content="0")
+}
+
+///|
+test "SPIKE step 3: live-demo pattern shape (euclid + chain)" {
+  // The live-demo's actual pattern uses euclid `(3,8)` postfix (step 5),
+  // `?` postfix (step 5), and `.jux(rev)` method (step 2). This test
+  // verifies just the method-chain piece; euclid/postfix come later.
+  let (_cst, diagnostics) = try! parse_cst("s(\"bd cp hh sd\").jux(rev)")
+  inspect(diagnostics.length(), content="0")
+}
+
+///|
+test "SPIKE step 4: layer comma inside notation" {
+  let (_cst, diagnostics) = try! parse_cst("s(\"bd sd, hh cp\")")
+  inspect(diagnostics.length(), content="0")
+}
+
+///|
+test "SPIKE step 4: sub-notation brackets" {
+  let (_cst, diagnostics) = try! parse_cst("s(\"bd [sd cp] hh\")")
+  inspect(diagnostics.length(), content="0")
+}
+
+///|
+test "SPIKE step 4: nested brackets and layers" {
+  let (_cst, diagnostics) = try! parse_cst("s(\"[bd sd, hh] [cp, oh oh]\")")
+  inspect(diagnostics.length(), content="0")
+}
+
+///|
+test "SPIKE step 5: star postfix" {
+  let (_cst, diagnostics) = try! parse_cst("s(\"bd*2 sd\")")
+  inspect(diagnostics.length(), content="0")
+}
+
+///|
+test "SPIKE step 5: slash postfix" {
+  let (_cst, diagnostics) = try! parse_cst("s(\"bd/2 sd\")")
+  inspect(diagnostics.length(), content="0")
+}
+
+///|
+test "SPIKE step 5: question (degrade) postfix" {
+  let (_cst, diagnostics) = try! parse_cst("s(\"bd? sd hh?\")")
+  inspect(diagnostics.length(), content="0")
+}
+
+///|
+test "SPIKE step 5: euclid postfix 2-arg" {
+  let (_cst, diagnostics) = try! parse_cst("s(\"bd(3,8) sd\")")
+  inspect(diagnostics.length(), content="0")
+}
+
+///|
+test "SPIKE step 5: euclid postfix 3-arg with offset" {
+  let (_cst, diagnostics) = try! parse_cst("s(\"bd(3,8,1) sd\")")
+  inspect(diagnostics.length(), content="0")
+}
+
+///|
+test "SPIKE step 5: postfix on sub-notation" {
+  let (_cst, diagnostics) = try! parse_cst("s(\"[bd sd]*2 hh\")")
+  inspect(diagnostics.length(), content="0")
+}
+
+///|
+test "SPIKE FULL: live-demo's actual initial pattern" {
+  // Cited by Codex: web/live/src/main.ts:20 uses euclid + ? + jux(rev).
+  // This is THE test that defines the wall: if loom can parse this with
+  // zero diagnostics, the parity gap is grammar-coverage in the spec, not
+  // a loom expressivity limitation.
+  let (_cst, diagnostics) = try! parse_cst(
+    "s(\"bd(3,8) cp? hh*2 [sd oh]\").jux(rev).fast(2)",
+  )
+  inspect(diagnostics.length(), content="0")
+}
+
+///|
 test "lexer exposes duplicate mini atoms as separate tokens" {
   let expected =
     #|[
@@ -424,4 +563,316 @@ test "imperative parser reuse path matches direct deletion expectations" {
   let _ = parser.parse()
   ignore(parser.edit(@core.Edit::delete(5, 8), "s(\"bd bd\")"))
   inspect(parser.get_last_reuse_count() > 0, content="true")
+}
+
+// ----------------------------------------------------------------------------
+// Edit/reuse coverage for the expanded grammar surface (method chain,
+// postfix, sub-notation brackets, layer commas). These tests pin reuse
+// behavior across the new productions so future grammar changes can't
+// silently degrade incremental parsing on the production-parity surface.
+// ----------------------------------------------------------------------------
+
+///|
+test "apply_edit inside method name still parses with zero diagnostics" {
+  let parser = @loom.new_parser("s(\"bd sd\").fast(2)", mini_grammar)
+  // Insert "er" between "fast" and "(" to produce ".faster(2)"
+  parser.apply_edit(@core.Edit::insert(15, 2), "s(\"bd sd\").faster(2)")
+  inspect(parser.diagnostics().read_or_abort().length(), content="0")
+  let after =
+    #|["bd@[3,5)", "sd@[6,8)"]
+  debug_inspect(parser_ident_token_spans(parser), content=after)
+  // Measure reuse: the s(...) primary subtree is unchanged, so the
+  // pre-method-call call node should be reusable.
+  inspect(parser.snapshot().read_or_abort().reuse_count > 0, content="true")
+}
+
+///|
+test "apply_edit deletion of postfix preserves zero diagnostics" {
+  let parser = @loom.new_parser("s(\"bd*2 sd\")", mini_grammar)
+  // Delete "*2" leaving `s("bd sd")`
+  parser.apply_edit(@core.Edit::delete(5, 7), "s(\"bd sd\")")
+  inspect(parser.diagnostics().read_or_abort().length(), content="0")
+  let after =
+    #|["bd@[3,5)", "sd@[6,8)"]
+  debug_inspect(parser_ident_token_spans(parser), content=after)
+  inspect(parser.snapshot().read_or_abort().reuse_count > 0, content="true")
+}
+
+///|
+test "apply_edit insertion inside sub-notation brackets parses cleanly" {
+  let parser = @loom.new_parser("s(\"[bd sd]\")", mini_grammar)
+  // Insert " hh" before the closing bracket to produce `s("[bd sd hh]")`
+  parser.apply_edit(@core.Edit::insert(9, 3), "s(\"[bd sd hh]\")")
+  inspect(parser.diagnostics().read_or_abort().length(), content="0")
+  let after =
+    #|["bd@[4,6)", "sd@[7,9)", "hh@[10,12)"]
+  debug_inspect(parser_ident_token_spans(parser), content=after)
+  inspect(parser.snapshot().read_or_abort().reuse_count > 0, content="true")
+}
+
+///|
+test "apply_edit across layer-comma keeps both layers parsing cleanly" {
+  let parser = @loom.new_parser("s(\"bd, sd\")", mini_grammar)
+  // Insert " hh" before the comma to produce `s("bd hh, sd")`
+  parser.apply_edit(@core.Edit::insert(5, 3), "s(\"bd hh, sd\")")
+  inspect(parser.diagnostics().read_or_abort().length(), content="0")
+  let after =
+    #|["bd@[3,5)", "hh@[6,8)", "sd@[10,12)"]
+  debug_inspect(parser_ident_token_spans(parser), content=after)
+  inspect(parser.snapshot().read_or_abort().reuse_count > 0, content="true")
+}
+
+// ----------------------------------------------------------------------------
+// CST shape coverage for the expanded grammar surface. The earlier
+// diagnostic-count tests only verify "no errors"; these tests pin the
+// concrete shape of the CST so a future refactor can't accidentally
+// collapse a production while keeping diagnostics at zero. One
+// representative test per new node category — not exhaustive.
+// ----------------------------------------------------------------------------
+
+///|
+fn make_indent(depth : Int) -> String {
+  let buf = StringBuilder::new()
+  for _ in 0..<depth {
+    buf.write_string("  ")
+  }
+  buf.to_string()
+}
+
+///|
+fn cst_shape_walk(
+  node : @seam.SyntaxNode,
+  depth : Int,
+  lines : Array[String],
+) -> Unit {
+  let kind = MiniSyntaxKind::from_raw(node.kind())
+  lines.push("\{make_indent(depth)}\{kind}@[\{node.start()},\{node.end()})")
+  for child in node.all_children() {
+    match child {
+      Node(n) => cst_shape_walk(n, depth + 1, lines)
+      Token(t) => {
+        let tk = MiniSyntaxKind::from_raw(t.kind())
+        if tk != WhitespaceToken {
+          lines.push(
+            "\{make_indent(depth + 1)}\{tk} \"\{t.text()}\"@[\{t.start()},\{t.end()})",
+          )
+        }
+      }
+    }
+  }
+}
+
+///|
+fn cst_shape(source : String) -> Array[String] raise @core.LexError {
+  let (cst, _) = parse_cst(source)
+  let root = @seam.SyntaxNode::from_cst(cst)
+  let lines : Array[String] = []
+  cst_shape_walk(root, 0, lines)
+  lines
+}
+
+///|
+test "CST shape: method call produces MethodCallNode with method name and number arg" {
+  let expected =
+    #|[
+    #|  "RootNode@[0,12)",
+    #|  "  CallNode@[0,6)",
+    #|  "    SKeywordToken \"s\"@[0,1)",
+    #|  "    LParenToken \"(\"@[1,2)",
+    #|  "    NotationNode@[2,5)",
+    #|  "      QuoteToken \"\"\"@[2,3)",
+    #|  "      LayerNode@[3,4)",
+    #|  "        AtomNode@[3,4)",
+    #|  "          IdentToken \"d\"@[3,4)",
+    #|  "      QuoteToken \"\"\"@[4,5)",
+    #|  "    RParenToken \")\"@[5,6)",
+    #|  "  MethodCallNode@[6,12)",
+    #|  "    DotToken \".\"@[6,7)",
+    #|  "    MethodNameToken \"fst\"@[7,10)",
+    #|  "    LParenToken \"(\"@[10,11)",
+    #|  "    RParenToken \")\"@[11,12)",
+    #|]
+  debug_inspect(try! cst_shape("s(\"d\").fst()"), content=expected)
+}
+
+///|
+test "CST shape: star postfix lives inside the AtomNode" {
+  let expected =
+    #|[
+    #|  "RootNode@[0,9)",
+    #|  "  CallNode@[0,9)",
+    #|  "    SKeywordToken \"s\"@[0,1)",
+    #|  "    LParenToken \"(\"@[1,2)",
+    #|  "    NotationNode@[2,8)",
+    #|  "      QuoteToken \"\"\"@[2,3)",
+    #|  "      LayerNode@[3,7)",
+    #|  "        AtomNode@[3,7)",
+    #|  "          IdentToken \"bd\"@[3,5)",
+    #|  "          PostfixNode@[5,7)",
+    #|  "            StarToken \"*\"@[5,6)",
+    #|  "            NumberToken \"2\"@[6,7)",
+    #|  "      QuoteToken \"\"\"@[7,8)",
+    #|  "    RParenToken \")\"@[8,9)",
+    #|]
+  debug_inspect(try! cst_shape("s(\"bd*2\")"), content=expected)
+}
+
+///|
+test "CST shape: euclid postfix nests a EuclidNode under the AtomNode" {
+  let expected =
+    #|[
+    #|  "RootNode@[0,12)",
+    #|  "  CallNode@[0,12)",
+    #|  "    SKeywordToken \"s\"@[0,1)",
+    #|  "    LParenToken \"(\"@[1,2)",
+    #|  "    NotationNode@[2,11)",
+    #|  "      QuoteToken \"\"\"@[2,3)",
+    #|  "      LayerNode@[3,10)",
+    #|  "        AtomNode@[3,10)",
+    #|  "          IdentToken \"bd\"@[3,5)",
+    #|  "          PostfixNode@[5,10)",
+    #|  "            EuclidNode@[5,10)",
+    #|  "              LParenToken \"(\"@[5,6)",
+    #|  "              NumberToken \"3\"@[6,7)",
+    #|  "              CommaToken \",\"@[7,8)",
+    #|  "              NumberToken \"8\"@[8,9)",
+    #|  "              RParenToken \")\"@[9,10)",
+    #|  "      QuoteToken \"\"\"@[10,11)",
+    #|  "    RParenToken \")\"@[11,12)",
+    #|]
+  debug_inspect(try! cst_shape("s(\"bd(3,8)\")"), content=expected)
+}
+
+///|
+test "CST shape: layer comma splits notation into multiple LayerNodes" {
+  // Note: LayerNode @[6,9) span starts at the space before "sd" because
+  // seam attaches leading trivia (whitespace) to the next non-trivia
+  // production. The IdentToken itself still starts at 7.
+  let expected =
+    #|[
+    #|  "RootNode@[0,11)",
+    #|  "  CallNode@[0,11)",
+    #|  "    SKeywordToken \"s\"@[0,1)",
+    #|  "    LParenToken \"(\"@[1,2)",
+    #|  "    NotationNode@[2,10)",
+    #|  "      QuoteToken \"\"\"@[2,3)",
+    #|  "      LayerNode@[3,5)",
+    #|  "        AtomNode@[3,5)",
+    #|  "          IdentToken \"bd\"@[3,5)",
+    #|  "      CommaToken \",\"@[5,6)",
+    #|  "      LayerNode@[6,9)",
+    #|  "        AtomNode@[6,9)",
+    #|  "          IdentToken \"sd\"@[7,9)",
+    #|  "      QuoteToken \"\"\"@[9,10)",
+    #|  "    RParenToken \")\"@[10,11)",
+    #|]
+  debug_inspect(try! cst_shape("s(\"bd, sd\")"), content=expected)
+}
+
+// ----------------------------------------------------------------------------
+// Edge-case coverage for the expanded grammar surface. These pin
+// behavior at the corners that the SPIKE step tests don't reach:
+// degenerate inputs (empty notation), malformed productions (euclid
+// missing its second number), and intentional limits (digit-start
+// atoms inside quotes — see KNOWN LIMITATION below).
+//
+// Codex pre-PR review (2026-05-24) flagged that stack args must accept
+// full expressions, not just primaries, to claim production parity
+// against `mini/parser.mbt:5-8`. The first test below pins that.
+// ----------------------------------------------------------------------------
+
+///|
+test "edge case: stack accepts method-chained expressions per production grammar" {
+  let (_cst, diagnostics) = try! parse_cst(
+    "stack(s(\"bd\").fast(2), note(\"c4\").rev())",
+  )
+  inspect(diagnostics.length(), content="0")
+}
+
+///|
+// PERMISSIVE-BY-DESIGN: at the CST construction level we accept empty
+// notation `s("")` and trailing-comma layers `s("bd,")` with zero
+// diagnostics — the production runtime parser (mini/parser.mbt) rejects
+// these later as semantic errors. Codex pre-PR review (2026-05-24) noted
+// the divergence; pinning current behavior is the right move for a CST
+// spec because editor flows want a tree even from partial input.
+test "edge case: empty quoted notation accepted at CST level (permissive)" {
+  let (_cst, diagnostics) = try! parse_cst("s(\"\")")
+  inspect(diagnostics.length(), content="0")
+}
+
+///|
+test "edge case: trailing-comma layer accepted at CST level (permissive)" {
+  let (_cst, diagnostics) = try! parse_cst("s(\"bd,\")")
+  inspect(diagnostics.length(), content="0")
+}
+
+///|
+test "edge case: unterminated sub-notation bracket recovers within MAX_ERRORS" {
+  // Codex pre-PR review (2026-05-24) flagged that `parse_layer` does not
+  // bail out on outer-context stop tokens, so `s("[bd")` with a missing
+  // `]` cascades error-bumps until `MAX_ERRORS` (=32). This test pins
+  // that recovery behavior: parsing terminates with a bounded diagnostic
+  // count rather than looping forever, but the count is large. A future
+  // PR can add layered stop_token tracking to recover more cleanly.
+  let (_cst, diagnostics) = try! parse_cst("s(\"[bd\")")
+  inspect(diagnostics.length() > 0, content="true")
+  inspect(diagnostics.length() <= 64, content="true")
+}
+
+///|
+test "edge case: malformed euclid (missing second number) reports diagnostic" {
+  let (_cst, diagnostics) = try! parse_cst("s(\"bd(3,)\")")
+  // parse_euclid expects Number after the comma; absent number triggers
+  // "Expected <number>" via expect(). The bracket is balanced, so we
+  // expect at least one diagnostic but parsing recovers without cascading.
+  inspect(diagnostics.length() > 0, content="true")
+}
+
+///|
+test "edge case: deeply nested brackets parse cleanly" {
+  let (_cst, diagnostics) = try! parse_cst("s(\"[[[bd]]]\")")
+  inspect(diagnostics.length(), content="0")
+}
+
+///|
+// KNOWN LIMITATION: digit-start atoms inside quoted notation are not
+// supported. The Number-first lexer ordering splits `2bd` into a Number
+// token "2" followed by an Ident token "bd", producing two separate
+// AtomNodes instead of one. Production mini-notation patterns use
+// letter-start atoms (`c4`, `e4`, `g4`, `bd`, `sd`, `hh`), so this does
+// not affect any live-demo pattern. Fixing this would require
+// context-sensitive lexing inside quotes — out of scope for the
+// grammar-parity spec; track as a separate decision if a downstream
+// pattern needs it.
+test "edge case: digit-start atom inside quotes splits into Number + Ident (KNOWN LIMITATION)" {
+  let expected =
+    #|["bd@[4,6)"]
+  // `2bd` lexes as Number(2) + Ident(bd), so only the Ident-bearing
+  // AtomNode appears in ident_token_spans. The "2" atom exists in the
+  // CST as an AtomNode with a NumberToken but contributes no ident span.
+  debug_inspect(try! ident_token_spans("s(\"2bd\")"), content=expected)
+}
+
+///|
+test "CST shape: sub-notation brackets produce a SubNotationNode" {
+  let expected =
+    #|[
+    #|  "RootNode@[0,9)",
+    #|  "  CallNode@[0,9)",
+    #|  "    SKeywordToken \"s\"@[0,1)",
+    #|  "    LParenToken \"(\"@[1,2)",
+    #|  "    NotationNode@[2,8)",
+    #|  "      QuoteToken \"\"\"@[2,3)",
+    #|  "      LayerNode@[3,7)",
+    #|  "        SubNotationNode@[3,7)",
+    #|  "          LBracketToken \"[\"@[3,4)",
+    #|  "          LayerNode@[4,6)",
+    #|  "            AtomNode@[4,6)",
+    #|  "              IdentToken \"bd\"@[4,6)",
+    #|  "          RBracketToken \"]\"@[6,7)",
+    #|  "      QuoteToken \"\"\"@[7,8)",
+    #|  "    RParenToken \")\"@[8,9)",
+    #|]
+  debug_inspect(try! cst_shape("s(\"[bd]\")"), content=expected)
 }

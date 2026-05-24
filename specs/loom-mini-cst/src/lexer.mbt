@@ -14,6 +14,18 @@ fn is_ident_char(ch : Char) -> Bool {
 }
 
 ///|
+fn is_digit_char(ch : Char) -> Bool {
+  let code = ch.to_int()
+  code >= 48 && code <= 57
+}
+
+///|
+fn is_ident_start_char(ch : Char) -> Bool {
+  let code = ch.to_int()
+  (code >= 65 && code <= 90) || (code >= 97 && code <= 122) || ch == '_'
+}
+
+///|
 pub fn mini_step_lexer(
   source : String,
   start : Int,
@@ -23,6 +35,18 @@ pub fn mini_step_lexer(
     return Done
   }
   match cursor.view() {
+    ['s', 't', 'a', 'c', 'k', '(', ..] => {
+      for _ in 0..<5 {
+        ignore(cursor.advance_char())
+      }
+      cursor.produced(StackKeyword)
+    }
+    ['n', 'o', 't', 'e', '(', ..] => {
+      for _ in 0..<4 {
+        ignore(cursor.advance_char())
+      }
+      cursor.produced(NoteKeyword)
+    }
     ['s', '(', ..] => {
       ignore(cursor.advance_char())
       cursor.produced(SKeyword)
@@ -35,6 +59,34 @@ pub fn mini_step_lexer(
       cursor.set_view(rest)
       cursor.produced(RParen)
     }
+    [',', .. rest] => {
+      cursor.set_view(rest)
+      cursor.produced(Comma)
+    }
+    ['.', .. rest] => {
+      cursor.set_view(rest)
+      cursor.produced(Dot)
+    }
+    ['*', .. rest] => {
+      cursor.set_view(rest)
+      cursor.produced(Star)
+    }
+    ['/', .. rest] => {
+      cursor.set_view(rest)
+      cursor.produced(Slash)
+    }
+    ['?', .. rest] => {
+      cursor.set_view(rest)
+      cursor.produced(Question)
+    }
+    ['[', .. rest] => {
+      cursor.set_view(rest)
+      cursor.produced(LBracket)
+    }
+    [']', .. rest] => {
+      cursor.set_view(rest)
+      cursor.produced(RBracket)
+    }
     ['"', .. rest] => {
       cursor.set_view(rest)
       cursor.produced(Quote)
@@ -43,7 +95,18 @@ pub fn mini_step_lexer(
       ignore(cursor.take_while(is_whitespace_char))
       cursor.produced(Whitespace)
     }
-    [ident, ..] if is_ident_char(ident) => {
+    [d, ..] if is_digit_char(d) => {
+      ignore(cursor.take_while(is_digit_char))
+      match cursor.view() {
+        ['.', d2, ..] if is_digit_char(d2) => {
+          ignore(cursor.advance_char())
+          ignore(cursor.take_while(is_digit_char))
+        }
+        _ => ()
+      }
+      cursor.produced(Number)
+    }
+    [ident, ..] if is_ident_start_char(ident) => {
       ignore(cursor.take_while(is_ident_char))
       cursor.produced(Ident)
     }

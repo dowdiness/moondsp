@@ -55,6 +55,24 @@ pub(all) enum MiniSyntaxKind {
   NotationNode
   AtomNode
   ErrorNode
+  NoteKeywordToken
+  StackKeywordToken
+  NoteCallNode
+  StackCallNode
+  CommaToken
+  DotToken
+  NumberToken
+  MethodCallNode
+  MethodNameToken
+  StarToken
+  SlashToken
+  QuestionToken
+  LBracketToken
+  RBracketToken
+  LayerNode
+  SubNotationNode
+  PostfixNode
+  EuclidNode
 } derive(Eq, @debug.Debug)
 pub fn MiniSyntaxKind::from_raw(@seam.RawKind) -> Self
 pub impl @seam.ToRawKind for MiniSyntaxKind
@@ -62,8 +80,18 @@ pub impl Show for MiniSyntaxKind
 
 pub(all) enum MiniToken {
   SKeyword
+  NoteKeyword
+  StackKeyword
   LParen
   RParen
+  Comma
+  Dot
+  Number
+  Star
+  Slash
+  Question
+  LBracket
+  RBracket
   Quote
   Ident
   Whitespace
