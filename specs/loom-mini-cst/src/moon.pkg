@@ -1,6 +1,10 @@
 import {
-  "dowdiness/loom" @loom,
-  "dowdiness/loom/core" @core,
-  "dowdiness/seam" @seam,
+  "dowdiness/loom",
+  "dowdiness/loom/core",
+  "dowdiness/incr",
+  "dowdiness/moondsp/identity",
+  "dowdiness/moondsp/mini",
+  "dowdiness/moondsp/pattern",
+  "dowdiness/seam",
   "moonbitlang/core/debug",
 }

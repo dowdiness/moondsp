@@ -99,6 +99,20 @@ fn pid(value : String) -> @identity.PatternNodeId {
 }
 
 ///|
+fn assert_builder_result_error(
+  result : Result[@pattern.PatternDoc[@pattern.ControlMap], String],
+  expected : String,
+) -> Unit {
+  match result {
+    Err(msg) =>
+      if msg != expected {
+        abort("expected error '\{expected}', got '\{msg}'")
+      }
+    Ok(_) => abort("expected MiniDocBuilder operation to fail")
+  }
+}
+
+///|
 fn assert_snapshot_event_has_node(
   event : @pattern.PatternSnapshotEvent[@pattern.ControlMap],
   id : String,
@@ -293,6 +307,23 @@ test "parse pan method is overridden by jux outer pan" {
   }
   inspect(pan_neg1, content="1")
   inspect(pan_pos1, content="1")
+}
+
+///|
+test "MiniDocBuilder::note_atom rejects invalid note text" {
+  let builder = @mini.MiniDocBuilder::with_previous(None)
+  assert_builder_result_error(
+    builder.note_atom(pid("mini:note:bad:0"), ""),
+    "invalid note number ''",
+  )
+  assert_builder_result_error(
+    builder.note_atom(pid("mini:note:bad:1"), "-"),
+    "invalid note number '-'",
+  )
+  assert_builder_result_error(
+    builder.note_atom(pid("mini:note:bad:2"), "60abc"),
+    "invalid note number '60abc'",
+  )
 }
 
 ///|
