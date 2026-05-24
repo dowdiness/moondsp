@@ -199,6 +199,19 @@ test "loom atom projection matches mini PatternDoc for rev method" {
 }
 
 ///|
+test "loom atom projection matches mini PatternDoc for chained root methods" {
+  let input = "s(\"bd sd\").fast(2).rev().slow(3)"
+  let projection = LoomMiniAtomProjection::new(input)
+  let loom_doc = projection_boundary_doc(projection.parse_doc())
+  let mini_doc = projection_boundary_doc(@mini.parse_doc(input))
+  @debug.assert_eq(loom_doc.root().value(), mini_doc.root().value())
+  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
+  let mini_ids = projection_boundary_leaf_ids_from_doc(mini_doc)
+  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
+  projection.dispose()
+}
+
+///|
 test "loom atom projection matches mini PatternDoc for star postfix" {
   let input = "s(\"bd*2 sd\")"
   let projection = LoomMiniAtomProjection::new(input)
