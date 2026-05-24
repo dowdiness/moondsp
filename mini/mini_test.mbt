@@ -298,7 +298,7 @@ test "parse pan method is overridden by jux outer pan" {
 ///|
 test "parse_doc_reusing preserves ids across whitespace edits" {
   let doc = unwrap_doc(@mini.parse_doc("s(\"bd sd\")"))
-  let edited = unwrap_doc(@mini.parse_doc_reusing("s(\"  bd   sd  \")", doc))
+  let edited = unwrap_doc(@mini.parse_doc("s(\"  bd   sd  \")", previous=Some(doc)))
   @debug.assert_eq(doc.root().value(), edited.root().value())
   assert_true(edited.contains_node(pid("mini:sound:bd:0")))
   assert_true(edited.contains_node(pid("mini:sound:sd:0")))
@@ -313,7 +313,7 @@ test "parse_doc_reusing preserves ids across whitespace edits" {
 ///|
 test "parse_doc_reusing cutoff edit preserves sound atom id" {
   let doc = unwrap_doc(@mini.parse_doc("s(\"bd\").cutoff(200)"))
-  let edited = unwrap_doc(@mini.parse_doc_reusing("s(\"bd\").cutoff(300)", doc))
+  let edited = unwrap_doc(@mini.parse_doc("s(\"bd\").cutoff(300)", previous=Some(doc)))
   assert_true(edited.contains_node(pid("mini:sound:bd:0")))
   assert_true(
     edited.contains_node(pid("mini:merge_control:mini:sound:bd:0:cutoff:300")),
@@ -340,7 +340,7 @@ test "parse_doc_reusing cutoff edit preserves sound atom id" {
 ///|
 test "parse_doc_reusing gain edit preserves sound atom id" {
   let doc = unwrap_doc(@mini.parse_doc("s(\"bd\").gain(1)"))
-  let edited = unwrap_doc(@mini.parse_doc_reusing("s(\"bd\").gain(2)", doc))
+  let edited = unwrap_doc(@mini.parse_doc("s(\"bd\").gain(2)", previous=Some(doc)))
   assert_true(edited.contains_node(pid("mini:sound:bd:0")))
   assert_true(
     edited.contains_node(pid("mini:merge_control:mini:sound:bd:0:gain:2")),
@@ -362,7 +362,7 @@ test "parse_doc_reusing gain edit preserves sound atom id" {
 ///|
 test "parse_doc_reusing pan edit preserves sound atom id" {
   let doc = unwrap_doc(@mini.parse_doc("s(\"bd\").pan(-1)"))
-  let edited = unwrap_doc(@mini.parse_doc_reusing("s(\"bd\").pan(0)", doc))
+  let edited = unwrap_doc(@mini.parse_doc("s(\"bd\").pan(0)", previous=Some(doc)))
   assert_true(edited.contains_node(pid("mini:sound:bd:0")))
   assert_true(
     edited.contains_node(pid("mini:merge_control:mini:sound:bd:0:pan:0")),
@@ -384,7 +384,7 @@ test "parse_doc_reusing pan edit preserves sound atom id" {
 ///|
 test "parse_doc_reusing token replacement preserves unaffected token ids" {
   let doc = unwrap_doc(@mini.parse_doc("s(\"bd sd hh\")"))
-  let edited = unwrap_doc(@mini.parse_doc_reusing("s(\"bd cp hh\")", doc))
+  let edited = unwrap_doc(@mini.parse_doc("s(\"bd cp hh\")", previous=Some(doc)))
   assert_true(edited.contains_node(pid("mini:sound:bd:0")))
   assert_true(!edited.contains_node(pid("mini:sound:sd:0")))
   assert_true(edited.contains_node(pid("mini:sound:cp:0")))
@@ -414,11 +414,11 @@ test "parse_doc_reusing token replacement preserves unaffected token ids" {
 ///|
 test "parse_doc_reusing insertion and removal keep surviving token ids" {
   let doc = unwrap_doc(@mini.parse_doc("s(\"bd sd\")"))
-  let inserted = unwrap_doc(@mini.parse_doc_reusing("s(\"hh bd sd\")", doc))
+  let inserted = unwrap_doc(@mini.parse_doc("s(\"hh bd sd\")", previous=Some(doc)))
   assert_true(inserted.contains_node(pid("mini:sound:hh:0")))
   assert_true(inserted.contains_node(pid("mini:sound:bd:0")))
   assert_true(inserted.contains_node(pid("mini:sound:sd:0")))
-  let removed = unwrap_doc(@mini.parse_doc_reusing("s(\"bd\")", inserted))
+  let removed = unwrap_doc(@mini.parse_doc("s(\"bd\")", previous=Some(inserted)))
   assert_true(removed.contains_node(pid("mini:sound:bd:0")))
   assert_true(!removed.contains_node(pid("mini:sound:hh:0")))
   assert_true(!removed.contains_node(pid("mini:sound:sd:0")))

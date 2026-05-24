@@ -5,8 +5,9 @@
 /// - The input text is the only mutable authoring signal.
 /// - Parsing remains delegated to the handwritten PatternDoc parser and still
 ///   reparses the whole source string on each text change.
-/// - Successful reparses pass the last successful PatternDoc to
-///   `parse_doc_reusing`, preserving stable subtree IDs across edits.
+/// - Successful reparses pass the last successful PatternDoc as the
+///   `previous` argument to `parse_doc`, preserving stable subtree IDs
+///   across edits.
 /// - Parse errors are propagated as `Err(String)` and do not replace the last
 ///   reusable document.
 /// - Lowering uses one persistent PatternLoweringCache owned by the pipeline,
@@ -17,9 +18,10 @@
 /// - Compute counters are exposed for tests and diagnostics so callers can
 ///   distinguish whole-document recomputation from lowering-cache reuse.
 ///
-/// This intentionally wraps `parse_doc_reusing` before introducing loom or a
-/// token-level incremental parser. The runtime parser and PatternDoc parser
-/// remain separate entry points for now.
+/// This intentionally wraps `parse_doc` (with `previous=Some(...)` for
+/// reuse) before introducing loom or a token-level incremental parser.
+/// The runtime parser and PatternDoc parser remain separate entry points
+/// for now.
 pub struct MiniAuthoringPipeline {
   priv scope : @incr.Scope
   priv text : @incr.Signal[String]
