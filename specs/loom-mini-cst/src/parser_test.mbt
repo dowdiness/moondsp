@@ -72,11 +72,8 @@ test "apply_edit insertion updates duplicate atom spans through parser CST" {
   let after =
     #|["bd@[3,5)", "sd@[6,8)", "cp@[9,11)", "bd@[12,14)"]
   debug_inspect(parser_ident_token_spans(parser), content=after)
-  inspect(parser.runtime().read(parser.diagnostics()).length(), content="0")
-  inspect(
-    parser.runtime().read(parser.snapshot()).reuse_count > 0,
-    content="true",
-  )
+  inspect(parser.diagnostics().read_or_abort().length(), content="0")
+  inspect(parser.snapshot().read_or_abort().reuse_count > 0, content="true")
 }
 
 ///|
@@ -86,22 +83,19 @@ test "apply_edit deletion updates duplicate atom spans and reuses unchanged node
   let after =
     #|["bd@[3,5)", "bd@[6,8)"]
   debug_inspect(parser_ident_token_spans(parser), content=after)
-  inspect(parser.runtime().read(parser.diagnostics()).length(), content="0")
-  inspect(
-    parser.runtime().read(parser.snapshot()).reuse_count > 0,
-    content="true",
-  )
+  inspect(parser.diagnostics().read_or_abort().length(), content="0")
+  inspect(parser.snapshot().read_or_abort().reuse_count > 0, content="true")
 }
 
 ///|
 test "parser pure deletion preserves left-adjacent mini atom reuse" {
   let parser = @loom.new_parser("s(\"bd \")", mini_grammar)
   parser.apply_edit(@core.Edit::delete(5, 6), "s(\"bd\")")
-  let after_snapshot = parser.runtime().read(parser.snapshot())
+  let after_snapshot = parser.snapshot().read_or_abort()
   let after =
     #|["bd@[3,5)"]
   debug_inspect(parser_ident_token_spans(parser), content=after)
-  inspect(parser.runtime().read(parser.diagnostics()).length(), content="0")
+  inspect(parser.diagnostics().read_or_abort().length(), content="0")
   inspect(after_snapshot.reuse_count > 0, content="true")
 }
 
@@ -109,11 +103,11 @@ test "parser pure deletion preserves left-adjacent mini atom reuse" {
 test "parser adjacent insertion does not claim deletion-style mini atom reuse" {
   let parser = @loom.new_parser("s(\"bd\")", mini_grammar)
   parser.apply_edit(@core.Edit::insert(5, 1), "s(\"bd \")")
-  let after_snapshot = parser.runtime().read(parser.snapshot())
+  let after_snapshot = parser.snapshot().read_or_abort()
   let after =
     #|["bd@[3,5)"]
   debug_inspect(parser_ident_token_spans(parser), content=after)
-  inspect(parser.runtime().read(parser.diagnostics()).length(), content="0")
+  inspect(parser.diagnostics().read_or_abort().length(), content="0")
   inspect(after_snapshot.reuse_count, content="0")
 }
 
@@ -121,11 +115,11 @@ test "parser adjacent insertion does not claim deletion-style mini atom reuse" {
 test "parser deletion that merges mini atoms stays conservative" {
   let parser = @loom.new_parser("s(\"bd sd\")", mini_grammar)
   parser.apply_edit(@core.Edit::delete(5, 6), "s(\"bdsd\")")
-  let after_snapshot = parser.runtime().read(parser.snapshot())
+  let after_snapshot = parser.snapshot().read_or_abort()
   let after =
     #|["bdsd@[3,7)"]
   debug_inspect(parser_ident_token_spans(parser), content=after)
-  inspect(parser.runtime().read(parser.diagnostics()).length(), content="0")
+  inspect(parser.diagnostics().read_or_abort().length(), content="0")
   inspect(after_snapshot.reuse_count, content="0")
 }
 
@@ -341,10 +335,10 @@ test "parser apply_edit path uses direct parse_tokens_indexed-like cursor inputs
   let old_source = "s(\"bd sd bd\")"
   let new_source = "s(\"bd bd\")"
   let parser = @loom.new_parser(old_source, mini_grammar)
-  let before = parser.runtime().read(parser.snapshot())
+  let before = parser.snapshot().read_or_abort()
   let edit = @core.Edit::delete(5, 8)
   parser.apply_edit(edit, new_source)
-  let after = parser.runtime().read(parser.snapshot())
+  let after = parser.snapshot().read_or_abort()
   let new_tokens = tokenize(new_source)
   let new_starts = @core.build_starts(new_tokens)
   let cache = @core.OldTokenCache::empty()
@@ -384,7 +378,7 @@ test "parser reuse count compares against direct TokenBuffer parse path" {
   let edit = @core.Edit::delete(5, 8)
   let parser = @loom.new_parser(old_source, mini_grammar)
   parser.apply_edit(edit, new_source)
-  let after = parser.runtime().read(parser.snapshot())
+  let after = parser.snapshot().read_or_abort()
 
   let buffer = @core.TokenBuffer::new_from_lex(
     new_source,
