@@ -160,6 +160,22 @@ test "loom atom projection matches mini PatternDoc for plain stack" {
 }
 
 ///|
+test "loom atom projection rejects nested stack instead of dropping it" {
+  let projection = LoomMiniAtomProjection::new(
+    "stack(stack(s(\"bd\"), note(\"60\")), s(\"sd\"))",
+  )
+  match projection.parse_doc() {
+    Err(msg) =>
+      inspect(
+        msg,
+        content="loom atom projection only supports plain stack arguments",
+      )
+    Ok(_) => abort("expected nested stack projection to fail")
+  }
+  projection.dispose()
+}
+
+///|
 test "loom atom projection preserves duplicate sound provenance across insertion" {
   let input = "s(\"bd sd bd\")"
   let edited = "s(\"bd sd bd bd\")"

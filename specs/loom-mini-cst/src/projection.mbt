@@ -141,7 +141,7 @@ fn loom_mini_collect_raw_projection(
         } else if child.kind() == NoteCallNode.to_raw() {
           loom_mini_collect_plain_call_atoms(child, NoteAtom)
         } else {
-          continue
+          return Err("loom atom projection only supports plain stack arguments")
         }
         match group {
           Ok(group) => {
@@ -509,4 +509,3 @@ fn loom_mini_pattern_node_id(
     Err(_) => Err("internal loom mini id was invalid: \{value}")
   }
 }
-
