@@ -33,7 +33,7 @@ priv struct MiniSourceEditSpan {
 }
 
 ///|
-impl Eq for MiniSourceEditSpan with equal(self, other) {
+impl Eq for MiniSourceEditSpan with fn equal(self, other) {
   self.old_start == other.old_start &&
   self.old_end == other.old_end &&
   self.new_end == other.new_end
