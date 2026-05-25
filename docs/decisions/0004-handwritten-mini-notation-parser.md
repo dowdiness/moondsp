@@ -56,8 +56,9 @@ sub-patterns before routing to the corresponding `VoicePool`.
 - The parser is a single self-contained file with no external grammar DSL
   to learn — easy for a new contributor to read and modify.
 - Error messages carry position information (the spec's success criterion).
-- Removing loom/seam path deps from `moon.mod.json` (commit `ab43e60`)
-  simplified the build graph for the browser target.
+- Removing loom/seam path deps from the module manifest (then
+  `moon.mod.json`, commit `ab43e60`) simplified the build graph for the
+  browser target.
 
 **Negative**
 
