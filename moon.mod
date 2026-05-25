@@ -1,6 +1,6 @@
 name = "dowdiness/moondsp"
 
-version = "0.5.1"
+version = "0.6.0"
 
 import {
   "dowdiness/incr@0.6.0",
