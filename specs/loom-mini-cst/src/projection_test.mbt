@@ -238,6 +238,58 @@ test "loom atom projection matches mini PatternDoc for slow postfix" {
 }
 
 ///|
+test "loom atom projection matches mini PatternDoc for degrade postfix" {
+  let input = "s(\"bd? sd\")"
+  let projection = LoomMiniAtomProjection::new(input)
+  let loom_doc = projection_boundary_doc(projection.parse_doc())
+  let mini_doc = projection_boundary_doc(@mini.parse_doc(input))
+  @debug.assert_eq(loom_doc.root().value(), mini_doc.root().value())
+  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
+  let mini_ids = projection_boundary_leaf_ids_from_doc(mini_doc)
+  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
+  projection.dispose()
+}
+
+///|
+test "loom atom projection matches mini PatternDoc for euclid postfix" {
+  let input = "s(\"bd(3,8) sd\")"
+  let projection = LoomMiniAtomProjection::new(input)
+  let loom_doc = projection_boundary_doc(projection.parse_doc())
+  let mini_doc = projection_boundary_doc(@mini.parse_doc(input))
+  @debug.assert_eq(loom_doc.root().value(), mini_doc.root().value())
+  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
+  let mini_ids = projection_boundary_leaf_ids_from_doc(mini_doc)
+  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
+  projection.dispose()
+}
+
+///|
+test "loom atom projection matches mini PatternDoc for euclid rotation postfix" {
+  let input = "s(\"bd(3,8,1) sd\")"
+  let projection = LoomMiniAtomProjection::new(input)
+  let loom_doc = projection_boundary_doc(projection.parse_doc())
+  let mini_doc = projection_boundary_doc(@mini.parse_doc(input))
+  @debug.assert_eq(loom_doc.root().value(), mini_doc.root().value())
+  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
+  let mini_ids = projection_boundary_leaf_ids_from_doc(mini_doc)
+  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
+  projection.dispose()
+}
+
+///|
+test "loom atom projection matches mini PatternDoc for negative euclid rotation postfix" {
+  let input = "s(\"bd(3,8,-1) sd\")"
+  let projection = LoomMiniAtomProjection::new(input)
+  let loom_doc = projection_boundary_doc(projection.parse_doc())
+  let mini_doc = projection_boundary_doc(@mini.parse_doc(input))
+  @debug.assert_eq(loom_doc.root().value(), mini_doc.root().value())
+  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
+  let mini_ids = projection_boundary_leaf_ids_from_doc(mini_doc)
+  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
+  projection.dispose()
+}
+
+///|
 test "loom atom projection matches mini PatternDoc for star then slow postfixes" {
   let input = "s(\"bd*2/3 sd\")"
   let projection = LoomMiniAtomProjection::new(input)
@@ -485,6 +537,56 @@ test "loom atom projection matches mini PatternDoc after slow postfix insertion"
     old_start=5,
     old_end=5,
     new_end=7,
+  )
+  let loom_doc = projection_boundary_doc(projection.parse_doc())
+  let mini_doc = projection_boundary_doc(pipeline.parse_doc())
+  @debug.assert_eq(loom_doc.root().value(), mini_doc.root().value())
+  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
+  let mini_ids = projection_boundary_leaf_ids_from_doc(mini_doc)
+  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
+  projection.dispose()
+  pipeline.dispose()
+}
+
+///|
+test "loom atom projection matches mini PatternDoc after degrade postfix insertion" {
+  let input = "s(\"bd sd\")"
+  let edited = "s(\"bd? sd\")"
+  let projection = LoomMiniAtomProjection::new(input)
+  ignore(projection_boundary_doc(projection.parse_doc()))
+  let pipeline = @mini.MiniAuthoringPipeline::new(input)
+  ignore(projection_boundary_mini_snapshot(pipeline.parse_snapshot()))
+  projection.apply_edit(@core.Edit::insert(5, 1), edited)
+  pipeline.set_input_with_source_edit(
+    edited,
+    old_start=5,
+    old_end=5,
+    new_end=6,
+  )
+  let loom_doc = projection_boundary_doc(projection.parse_doc())
+  let mini_doc = projection_boundary_doc(pipeline.parse_doc())
+  @debug.assert_eq(loom_doc.root().value(), mini_doc.root().value())
+  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
+  let mini_ids = projection_boundary_leaf_ids_from_doc(mini_doc)
+  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
+  projection.dispose()
+  pipeline.dispose()
+}
+
+///|
+test "loom atom projection matches mini PatternDoc after euclid postfix insertion" {
+  let input = "s(\"bd sd\")"
+  let edited = "s(\"bd(3,8) sd\")"
+  let projection = LoomMiniAtomProjection::new(input)
+  ignore(projection_boundary_doc(projection.parse_doc()))
+  let pipeline = @mini.MiniAuthoringPipeline::new(input)
+  ignore(projection_boundary_mini_snapshot(pipeline.parse_snapshot()))
+  projection.apply_edit(@core.Edit::insert(5, 5), edited)
+  pipeline.set_input_with_source_edit(
+    edited,
+    old_start=5,
+    old_end=5,
+    new_end=10,
   )
   let loom_doc = projection_boundary_doc(projection.parse_doc())
   let mini_doc = projection_boundary_doc(pipeline.parse_doc())

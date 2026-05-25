@@ -152,6 +152,34 @@ pub fn MiniDocBuilder::rev(
 }
 
 ///|
+/// Build a mini euclid transform using production root-ID and reuse rules.
+pub fn MiniDocBuilder::euclid(
+  self : MiniDocBuilder,
+  doc : @pattern.PatternDoc[@pattern.ControlMap],
+  k : Int,
+  n : Int,
+  rotation : Int,
+) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
+  let doc = self.euclid_doc(doc, k, n, rotation) catch {
+    ParseError(msg) => return Err(msg)
+  }
+  Ok(doc)
+}
+
+///|
+/// Build a mini degrade transform using production root-ID, seed, and reuse rules.
+pub fn MiniDocBuilder::degrade(
+  self : MiniDocBuilder,
+  doc : @pattern.PatternDoc[@pattern.ControlMap],
+  p : Double,
+) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
+  let doc = self.degrade_doc(doc, p, stable_seed(doc.root().value())) catch {
+    ParseError(msg) => return Err(msg)
+  }
+  Ok(doc)
+}
+
+///|
 /// Build a mini sequence document using production root-ID and reuse rules.
 pub fn MiniDocBuilder::sequence(
   self : MiniDocBuilder,
