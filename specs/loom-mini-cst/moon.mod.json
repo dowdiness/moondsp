@@ -8,7 +8,7 @@
     "dowdiness/seam": { "path": "../../../canopy/loom/seam" },
     "dowdiness/pretty": { "path": "../../../canopy/loom/pretty" },
     "dowdiness/incr": { "path": "../../../canopy/loom/incr" },
-    "dowdiness/text_change": { "path": "../../../canopy/lib/text-change" }
+    "dowdiness/text_change": { "path": "../../../canopy/loom/text-change" }
   },
   "readme": "README.mbt.md",
   "repository": "https://github.com/dowdiness/moondsp",

@@ -377,3 +377,132 @@ test "loom atom projection preserves duplicate note provenance across deletion" 
     #|["mini:note:60:0", "mini:note:60:1"]
   debug_inspect(loom_ids, content=expected)
 }
+
+///|
+test "loom atom projection preserves unaffected sound provenance across replacement" {
+  let input = "s(\"bd sd hh\")"
+  let edited = "s(\"bd cp hh\")"
+  let (loom_ids, mini_ids) = projection_boundary_ids_after_edit(
+    input,
+    edited,
+    @core.Edit::replace(6, 8, 8),
+    old_start=6,
+    old_end=8,
+    new_end=8,
+  )
+  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
+  let expected =
+    #|["mini:sound:bd:0", "mini:sound:cp:0", "mini:sound:hh:0"]
+  debug_inspect(loom_ids, content=expected)
+}
+
+///|
+test "loom atom projection preserves unaffected note provenance across replacement" {
+  let input = "note(\"60 62 60\")"
+  let edited = "note(\"60 64 60\")"
+  let (loom_ids, mini_ids) = projection_boundary_ids_after_edit(
+    input,
+    edited,
+    @core.Edit::replace(9, 11, 11),
+    old_start=9,
+    old_end=11,
+    new_end=11,
+  )
+  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
+  let expected =
+    #|["mini:note:60:0", "mini:note:64:0", "mini:note:60:1"]
+  debug_inspect(loom_ids, content=expected)
+}
+
+///|
+test "loom atom projection preserves atom provenance across whitespace insertion" {
+  let input = "s(\"bd sd\")"
+  let edited = "s(\"bd   sd\")"
+  let (loom_ids, mini_ids) = projection_boundary_ids_after_edit(
+    input,
+    edited,
+    @core.Edit::insert(6, 2),
+    old_start=6,
+    old_end=6,
+    new_end=8,
+  )
+  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
+  let expected =
+    #|["mini:sound:bd:0", "mini:sound:sd:0"]
+  debug_inspect(loom_ids, content=expected)
+}
+
+///|
+test "loom atom projection preserves atom provenance across method replacement" {
+  let input = "s(\"bd sd\").fast(2)"
+  let edited = "s(\"bd sd\").slow(2)"
+  let projection = LoomMiniAtomProjection::new(input)
+  ignore(projection_boundary_doc(projection.parse_doc()))
+  let pipeline = @mini.MiniAuthoringPipeline::new(input)
+  ignore(projection_boundary_mini_snapshot(pipeline.parse_snapshot()))
+  projection.apply_edit(@core.Edit::replace(11, 15, 15), edited)
+  pipeline.set_input_with_source_edit(
+    edited,
+    old_start=11,
+    old_end=15,
+    new_end=15,
+  )
+  let loom_doc = projection_boundary_doc(projection.parse_doc())
+  let mini_doc = projection_boundary_doc(pipeline.parse_doc())
+  @debug.assert_eq(loom_doc.root().value(), mini_doc.root().value())
+  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
+  let mini_ids = projection_boundary_leaf_ids_from_doc(mini_doc)
+  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
+  projection.dispose()
+  pipeline.dispose()
+}
+
+///|
+test "loom atom projection reports diagnostics and recovers with previous provenance" {
+  let input = "s(\"bd sd bd\")"
+  let malformed = "s(\"bd sd bd bd\""
+  let recovered = "s(\"bd sd bd bd\")"
+  let projection = LoomMiniAtomProjection::new(input)
+  ignore(projection_boundary_doc(projection.parse_doc()))
+  let pipeline = @mini.MiniAuthoringPipeline::new(input)
+  ignore(projection_boundary_mini_snapshot(pipeline.parse_snapshot()))
+  projection.apply_edit(@core.Edit::insert(9, 3), malformed)
+  pipeline.set_input_with_source_edit(
+    malformed,
+    old_start=9,
+    old_end=9,
+    new_end=12,
+  )
+  match projection.parse_doc() {
+    Err(msg) => inspect(msg, content="loom mini syntax has diagnostics")
+    Ok(_) => abort("expected malformed loom projection to fail")
+  }
+  match pipeline.parse_doc() {
+    Err(_) => ()
+    Ok(_) => abort("expected malformed mini authoring parse to fail")
+  }
+  projection.apply_edit(@core.Edit::insert(15, 1), recovered)
+  pipeline.set_input_with_source_edit(
+    recovered,
+    old_start=9,
+    old_end=9,
+    new_end=12,
+  )
+  let loom_ids = projection_boundary_leaf_ids_from_doc(
+    projection_boundary_doc(projection.parse_doc()),
+  )
+  let mini_ids = projection_boundary_leaf_ids(
+    projection_boundary_mini_snapshot(pipeline.parse_snapshot()),
+  )
+  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
+  let expected =
+    #|[
+    #|  "mini:sound:bd:0",
+    #|  "mini:sound:sd:0",
+    #|  "mini:sound:bd:2",
+    #|  "mini:sound:bd:1",
+    #|]
+  debug_inspect(loom_ids, content=expected)
+  projection.dispose()
+  pipeline.dispose()
+}

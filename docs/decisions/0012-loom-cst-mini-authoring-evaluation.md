@@ -115,6 +115,14 @@ identity realignment above the CST. The corresponding upstream loom follow-up
 is tracked in canopy loom's `ROADMAP.md` as "Authoring identity after
 deletion/shift edits."
 
+A 2026-05-25 follow-up expanded the authoring-only projection comparison:
+replacement edits, whitespace-only insertions, method-name replacement, duplicate
+note edits, and parse-error recovery now compare the loom projection against
+`MiniAuthoringPipeline`. The projection keeps the caller's successful-source
+edit span pending across syntax errors so recovery preserves the same duplicate
+atom provenance as the current mini token layer. This strengthens Option C but
+still does not move loom into production parsing.
+
 The spike should pass these gates before loom owns mini edit identity:
 
 - Duplicate-token insertion, deletion, and replacement preserve the same leaf
