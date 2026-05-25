@@ -7,6 +7,7 @@ priv enum LoomMiniAtomKind {
 ///|
 priv enum LoomMiniAtomPostfix {
   StarPostfix(Int)
+  SlowPostfix(Int)
 }
 
 ///|
@@ -426,25 +427,30 @@ fn loom_mini_collect_atom_postfixes(
   let postfixes : Array[LoomMiniAtomPostfix] = []
   for child in atom.children() {
     if child.kind() == PostfixNode.to_raw() {
-      if postfixes.length() > 0 {
-        return Err(
-          "loom atom projection only supports one star postfix per atom",
-        )
+      let has_star =
+        loom_mini_direct_token_of_kind(child, StarToken.to_raw()) is Some(_)
+      let has_slash =
+        loom_mini_direct_token_of_kind(child, SlashToken.to_raw()) is Some(_)
+      if !has_star && !has_slash {
+        return Err("loom atom projection only supports '*' or '/' postfix atoms")
       }
-      if loom_mini_direct_token_of_kind(child, StarToken.to_raw()) is None {
-        return Err("loom atom projection only supports star postfix atoms")
+      if has_star && has_slash {
+        return Err("loom atom projection expected one atom postfix operator")
       }
       let number = match
         loom_mini_direct_token_of_kind(child, NumberToken.to_raw()) {
         Some(token) => token.text()
-        None =>
-          return Err("loom atom projection expected star postfix argument")
+        None => return Err("loom atom projection expected atom postfix argument")
       }
       let factor = match loom_mini_parse_positive_int(number) {
         Ok(n) => n
         Err(msg) => return Err(msg)
       }
-      postfixes.push(StarPostfix(factor))
+      if has_star {
+        postfixes.push(StarPostfix(factor))
+      } else {
+        postfixes.push(SlowPostfix(factor))
+      }
     }
   }
   Ok(postfixes)
@@ -832,6 +838,11 @@ fn loom_mini_apply_atom_postfixes(
     match postfix {
       StarPostfix(factor) =>
         match builder.fast(doc, @pattern.Rational::from_int(factor)) {
+          Ok(next) => continue next
+          Err(msg) => return Err(msg)
+        }
+      SlowPostfix(factor) =>
+        match builder.slow(doc, @pattern.Rational::from_int(factor)) {
           Ok(next) => continue next
           Err(msg) => return Err(msg)
         }
