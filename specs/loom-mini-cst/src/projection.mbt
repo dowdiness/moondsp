@@ -5,12 +5,17 @@ priv enum LoomMiniAtomKind {
 }
 
 ///|
+priv enum LoomMiniAtomPostfix {
+  StarPostfix(Int)
+}
+
+///|
 priv struct LoomMiniRawAtom {
   kind : LoomMiniAtomKind
   text : String
   start : Int
   end : Int
-  fast_factor : Int
+  postfixes : Array[LoomMiniAtomPostfix]
 }
 
 ///|
@@ -23,12 +28,17 @@ priv struct LoomMiniProjectedAtom {
 }
 
 ///|
+priv enum LoomMiniMethodCall {
+  FastMethod(Int)
+  SlowMethod(Int)
+  RevMethod
+}
+
+///|
 priv enum LoomMiniExpr {
   AtomGroupExpr(Array[LoomMiniRawAtom])
   StackExpr(Array[LoomMiniExpr])
-  FastExpr(LoomMiniExpr, Int)
-  SlowExpr(LoomMiniExpr, Int)
-  RevExpr(LoomMiniExpr)
+  MethodChainExpr(LoomMiniExpr, Array[LoomMiniMethodCall])
 }
 
 ///|
@@ -270,23 +280,27 @@ fn loom_mini_apply_method_expr(
   root : @seam.SyntaxNode,
   base : LoomMiniExpr,
 ) -> Result[LoomMiniExpr, String] {
-  let methods = loom_mini_direct_children_of_kind(root, MethodCallNode.to_raw())
-  let expr = for call in methods; expr = base {
-    match loom_mini_apply_single_method_expr(call, expr) {
-      Ok(next) => continue next
+  let method_nodes = loom_mini_direct_children_of_kind(
+    root,
+    MethodCallNode.to_raw(),
+  )
+  if method_nodes.length() == 0 {
+    return Ok(base)
+  }
+  let methods : Array[LoomMiniMethodCall] = []
+  for call in method_nodes {
+    match loom_mini_collect_method_call(call) {
+      Ok(call_ir) => methods.push(call_ir)
       Err(msg) => return Err(msg)
     }
-  } nobreak {
-    expr
   }
-  Ok(expr)
+  Ok(MethodChainExpr(base, methods))
 }
 
 ///|
-fn loom_mini_apply_single_method_expr(
+fn loom_mini_collect_method_call(
   call : @seam.SyntaxNode,
-  base : LoomMiniExpr,
-) -> Result[LoomMiniExpr, String] {
+) -> Result[LoomMiniMethodCall, String] {
   let names = loom_mini_direct_tokens_of_kind(call, MethodNameToken.to_raw())
   let name = match names {
     [] => return Err("loom atom projection expected method name")
@@ -307,7 +321,7 @@ fn loom_mini_apply_single_method_expr(
     if names.length() != 1 || numbers.length() != 0 {
       return Err("loom atom projection expected .rev() with no arguments")
     }
-    Ok(RevExpr(base))
+    Ok(RevMethod)
   } else {
     if names.length() != 1 {
       return Err("loom atom projection expected numeric method argument")
@@ -321,9 +335,9 @@ fn loom_mini_apply_single_method_expr(
       Err(msg) => return Err(msg)
     }
     if name == "fast" {
-      Ok(FastExpr(base, factor))
+      Ok(FastMethod(factor))
     } else {
-      Ok(SlowExpr(base, factor))
+      Ok(SlowMethod(factor))
     }
   }
 }
@@ -371,8 +385,8 @@ fn loom_mini_collect_plain_call_atoms(
       }
       match token {
         Some(token) => {
-          let fast_factor = match loom_mini_atom_star_postfix_factor(node) {
-            Ok(factor) => factor
+          let postfixes = match loom_mini_collect_atom_postfixes(node) {
+            Ok(postfixes) => postfixes
             Err(msg) => return Err(msg)
           }
           atoms.push({
@@ -380,7 +394,7 @@ fn loom_mini_collect_plain_call_atoms(
             text: token.text(),
             start: token.start(),
             end: token.end(),
-            fast_factor,
+            postfixes,
           })
         }
         None => ()
@@ -406,19 +420,17 @@ fn loom_mini_collect_plain_call_atoms(
 }
 
 ///|
-fn loom_mini_atom_star_postfix_factor(
+fn loom_mini_collect_atom_postfixes(
   atom : @seam.SyntaxNode,
-) -> Result[Int, String] {
-  let mut factor = 1
-  let mut seen = false
+) -> Result[Array[LoomMiniAtomPostfix], String] {
+  let postfixes : Array[LoomMiniAtomPostfix] = []
   for child in atom.children() {
     if child.kind() == PostfixNode.to_raw() {
-      if seen {
+      if postfixes.length() > 0 {
         return Err(
           "loom atom projection only supports one star postfix per atom",
         )
       }
-      seen = true
       if loom_mini_direct_token_of_kind(child, StarToken.to_raw()) is None {
         return Err("loom atom projection only supports star postfix atoms")
       }
@@ -428,13 +440,14 @@ fn loom_mini_atom_star_postfix_factor(
         None =>
           return Err("loom atom projection expected star postfix argument")
       }
-      factor = match loom_mini_parse_positive_int(number) {
+      let factor = match loom_mini_parse_positive_int(number) {
         Ok(n) => n
         Err(msg) => return Err(msg)
       }
+      postfixes.push(StarPostfix(factor))
     }
   }
-  Ok(factor)
+  Ok(postfixes)
 }
 
 ///|
@@ -744,22 +757,44 @@ fn loom_mini_lower_expr(
       }
       builder.stack(docs)
     }
-    FastExpr(inner, factor) =>
-      match loom_mini_lower_expr(builder, inner, cursor) {
-        Ok(doc) => builder.fast(doc, @pattern.Rational::from_int(factor))
-        Err(msg) => Err(msg)
+    MethodChainExpr(inner, methods) => {
+      let base_doc = match loom_mini_lower_expr(builder, inner, cursor) {
+        Ok(doc) => doc
+        Err(msg) => return Err(msg)
       }
-    SlowExpr(inner, factor) =>
-      match loom_mini_lower_expr(builder, inner, cursor) {
-        Ok(doc) => builder.slow(doc, @pattern.Rational::from_int(factor))
-        Err(msg) => Err(msg)
-      }
-    RevExpr(inner) =>
-      match loom_mini_lower_expr(builder, inner, cursor) {
-        Ok(doc) => builder.rev(doc)
-        Err(msg) => Err(msg)
-      }
+      loom_mini_apply_method_chain(builder, base_doc, methods)
+    }
   }
+}
+
+///|
+fn loom_mini_apply_method_chain(
+  builder : @mini.MiniDocBuilder,
+  base_doc : @pattern.PatternDoc[@pattern.ControlMap],
+  methods : Array[LoomMiniMethodCall],
+) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
+  let doc = for call_ir in methods; doc = base_doc {
+    match call_ir {
+      FastMethod(factor) =>
+        match builder.fast(doc, @pattern.Rational::from_int(factor)) {
+          Ok(next) => continue next
+          Err(msg) => return Err(msg)
+        }
+      SlowMethod(factor) =>
+        match builder.slow(doc, @pattern.Rational::from_int(factor)) {
+          Ok(next) => continue next
+          Err(msg) => return Err(msg)
+        }
+      RevMethod =>
+        match builder.rev(doc) {
+          Ok(next) => continue next
+          Err(msg) => return Err(msg)
+        }
+    }
+  } nobreak {
+    doc
+  }
+  Ok(doc)
 }
 
 ///|
@@ -778,19 +813,33 @@ fn loom_mini_lower_atom_group(
       Ok(doc) => doc
       Err(msg) => return Err(msg)
     }
-    let doc = if raw.fast_factor == 1 {
-      atom_doc
-    } else {
-      match
-        builder.fast(atom_doc, @pattern.Rational::from_int(raw.fast_factor)) {
-        Ok(doc) => doc
-        Err(msg) => return Err(msg)
-      }
+    match loom_mini_apply_atom_postfixes(builder, atom_doc, raw.postfixes) {
+      Ok(doc) => docs.push(doc)
+      Err(msg) => return Err(msg)
     }
-    docs.push(doc)
     cursor.offset += 1
   }
   builder.sequence(docs)
+}
+
+///|
+fn loom_mini_apply_atom_postfixes(
+  builder : @mini.MiniDocBuilder,
+  atom_doc : @pattern.PatternDoc[@pattern.ControlMap],
+  postfixes : Array[LoomMiniAtomPostfix],
+) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
+  let doc = for postfix in postfixes; doc = atom_doc {
+    match postfix {
+      StarPostfix(factor) =>
+        match builder.fast(doc, @pattern.Rational::from_int(factor)) {
+          Ok(next) => continue next
+          Err(msg) => return Err(msg)
+        }
+    }
+  } nobreak {
+    doc
+  }
+  Ok(doc)
 }
 
 ///|
