@@ -14,9 +14,11 @@ per-PR verification logs and merged-PR lists live in `git log` and
 - The next release should be **v0.6.0** if it includes the current
   `Unreleased` entries, because public API has been added since v0.5.1.
 - Open GitHub issues: none.
-- Open PRs: draft PR #78 (`codex/loom-mini-decision-memo`) adds ADR-0013 for
-  loom mini promotion criteria. Its checks are otherwise green, but WIP is
-  pending because it is still draft.
+- Open PRs: PR #86 (`release/v0.6.0`) is release prep and intentionally
+  remains open until an explicit release pass. Do not tag or publish v0.6.0 as
+  part of loom-authoring work.
+- ADR-0013 defines loom mini promotion criteria using PR #85's apply-edit
+  parity evidence, but it does not approve a production parser switch.
 - `moon.mod` is now the root manifest. `moon.mod.json` remains only in the
   nested `specs/loom-mini-cst` spike module.
 - Production mini parsing still uses the hand-written parser and
@@ -28,11 +30,11 @@ For the broader backlog, read
 
 ## Recommended Next Slice
 
-**Finish PR #78 or fold its ADR-0013 content forward.** It is the cleanest
-near-term follow-up because PR #85 strengthened loom apply-edit parity without
-changing production. ADR-0013 should define the forcing function and gates for
-any future loom-backed mini authoring path, while explicitly keeping production
-routing unchanged.
+**Refactor the loom projection IR before adding more mini syntax.** Keep the
+work under `specs/loom-mini-cst`; do not add loom/seam to root `moon.mod` and
+do not route `mini.parse`, `parse_doc`, or `MiniAuthoringPipeline` through
+loom. ADR-0013 records the promotion gates that must pass before any future
+production switch.
 
 ## Alternative Slices
 
