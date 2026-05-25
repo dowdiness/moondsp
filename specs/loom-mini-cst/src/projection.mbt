@@ -427,33 +427,42 @@ fn loom_mini_collect_atom_postfixes(
   let postfixes : Array[LoomMiniAtomPostfix] = []
   for child in atom.children() {
     if child.kind() == PostfixNode.to_raw() {
-      let has_star =
-        loom_mini_direct_token_of_kind(child, StarToken.to_raw()) is Some(_)
-      let has_slash =
-        loom_mini_direct_token_of_kind(child, SlashToken.to_raw()) is Some(_)
-      if !has_star && !has_slash {
-        return Err("loom atom projection only supports '*' or '/' postfix atoms")
-      }
-      if has_star && has_slash {
-        return Err("loom atom projection expected one atom postfix operator")
-      }
-      let number = match
-        loom_mini_direct_token_of_kind(child, NumberToken.to_raw()) {
-        Some(token) => token.text()
-        None => return Err("loom atom projection expected atom postfix argument")
-      }
-      let factor = match loom_mini_parse_positive_int(number) {
-        Ok(n) => n
+      match loom_mini_collect_numeric_atom_postfix(child) {
+        Ok(postfix) => postfixes.push(postfix)
         Err(msg) => return Err(msg)
-      }
-      if has_star {
-        postfixes.push(StarPostfix(factor))
-      } else {
-        postfixes.push(SlowPostfix(factor))
       }
     }
   }
   Ok(postfixes)
+}
+
+///|
+fn loom_mini_collect_numeric_atom_postfix(
+  postfix : @seam.SyntaxNode,
+) -> Result[LoomMiniAtomPostfix, String] {
+  let has_star =
+    loom_mini_direct_token_of_kind(postfix, StarToken.to_raw()) is Some(_)
+  let has_slash =
+    loom_mini_direct_token_of_kind(postfix, SlashToken.to_raw()) is Some(_)
+  if !has_star && !has_slash {
+    return Err("loom atom projection only supports '*' or '/' postfix atoms")
+  }
+  if has_star && has_slash {
+    return Err("loom atom projection expected one atom postfix operator")
+  }
+  let number = match loom_mini_direct_token_of_kind(postfix, NumberToken.to_raw()) {
+    Some(token) => token.text()
+    None => return Err("loom atom projection expected atom postfix argument")
+  }
+  let factor = match loom_mini_parse_positive_int(number) {
+    Ok(n) => n
+    Err(msg) => return Err(msg)
+  }
+  if has_star {
+    Ok(StarPostfix(factor))
+  } else {
+    Ok(SlowPostfix(factor))
+  }
 }
 
 ///|
