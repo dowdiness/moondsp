@@ -225,6 +225,19 @@ test "loom atom projection matches mini PatternDoc for star postfix" {
 }
 
 ///|
+test "loom atom projection matches mini PatternDoc for slow postfix" {
+  let input = "s(\"bd/2 sd\")"
+  let projection = LoomMiniAtomProjection::new(input)
+  let loom_doc = projection_boundary_doc(projection.parse_doc())
+  let mini_doc = projection_boundary_doc(@mini.parse_doc(input))
+  @debug.assert_eq(loom_doc.root().value(), mini_doc.root().value())
+  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
+  let mini_ids = projection_boundary_leaf_ids_from_doc(mini_doc)
+  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
+  projection.dispose()
+}
+
+///|
 test "loom atom projection rejects rev method with callback argument" {
   let projection = LoomMiniAtomProjection::new("s(\"bd\").rev(foo)")
   match projection.parse_doc() {
@@ -430,6 +443,31 @@ test "loom atom projection preserves atom provenance across whitespace insertion
   let expected =
     #|["mini:sound:bd:0", "mini:sound:sd:0"]
   debug_inspect(loom_ids, content=expected)
+}
+
+///|
+test "loom atom projection matches mini PatternDoc after slow postfix insertion" {
+  let input = "s(\"bd sd\")"
+  let edited = "s(\"bd/2 sd\")"
+  let projection = LoomMiniAtomProjection::new(input)
+  ignore(projection_boundary_doc(projection.parse_doc()))
+  let pipeline = @mini.MiniAuthoringPipeline::new(input)
+  ignore(projection_boundary_mini_snapshot(pipeline.parse_snapshot()))
+  projection.apply_edit(@core.Edit::insert(5, 2), edited)
+  pipeline.set_input_with_source_edit(
+    edited,
+    old_start=5,
+    old_end=5,
+    new_end=7,
+  )
+  let loom_doc = projection_boundary_doc(projection.parse_doc())
+  let mini_doc = projection_boundary_doc(pipeline.parse_doc())
+  @debug.assert_eq(loom_doc.root().value(), mini_doc.root().value())
+  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
+  let mini_ids = projection_boundary_leaf_ids_from_doc(mini_doc)
+  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
+  projection.dispose()
+  pipeline.dispose()
 }
 
 ///|
