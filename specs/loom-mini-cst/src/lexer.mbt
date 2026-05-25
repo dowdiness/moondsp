@@ -95,6 +95,18 @@ pub fn mini_step_lexer(
       ignore(cursor.take_while(is_whitespace_char))
       cursor.produced(Whitespace)
     }
+    ['-', d, ..] if is_digit_char(d) => {
+      ignore(cursor.advance_char())
+      ignore(cursor.take_while(is_digit_char))
+      match cursor.view() {
+        ['.', d2, ..] if is_digit_char(d2) => {
+          ignore(cursor.advance_char())
+          ignore(cursor.take_while(is_digit_char))
+        }
+        _ => ()
+      }
+      cursor.produced(Number)
+    }
     [d, ..] if is_digit_char(d) => {
       ignore(cursor.take_while(is_digit_char))
       match cursor.view() {

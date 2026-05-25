@@ -8,6 +8,8 @@ priv enum LoomMiniAtomKind {
 priv enum LoomMiniAtomPostfix {
   StarPostfix(Int)
   SlowPostfix(Int)
+  DegradePostfix
+  EuclidPostfix(Int, Int, Int)
 }
 
 ///|
@@ -345,18 +347,38 @@ fn loom_mini_collect_method_call(
 
 ///|
 fn loom_mini_parse_positive_int(text : String) -> Result[Int, String] {
-  let mut result = 0
-  if text.length() == 0 {
-    return Err("loom atom projection expected positive integer")
-  }
-  for ch in text {
-    if ch < '0' || ch > '9' {
-      return Err("loom atom projection expected positive integer")
-    }
-    result = result * 10 + (ch.to_int() - '0'.to_int())
+  let result = match loom_mini_parse_int(text) {
+    Ok(n) => n
+    Err(_) => return Err("loom atom projection expected positive integer")
   }
   if result <= 0 {
     Err("loom atom projection expected positive integer")
+  } else {
+    Ok(result)
+  }
+}
+
+///|
+fn loom_mini_parse_int(text : String) -> Result[Int, String] {
+  let mut index = 0
+  let negative = text.length() > 0 && text[0] == '-'
+  if negative {
+    index = 1
+  }
+  if index >= text.length() {
+    return Err("loom atom projection expected integer")
+  }
+  let mut result = 0
+  while index < text.length() {
+    let ch = text[index]
+    if ch < '0' || ch > '9' {
+      return Err("loom atom projection expected integer")
+    }
+    result = result * 10 + (ch.to_int() - '0'.to_int())
+    index += 1
+  }
+  if negative {
+    Ok(-result)
   } else {
     Ok(result)
   }
@@ -373,8 +395,7 @@ fn loom_mini_collect_plain_call_atoms(
     [] => return Err("loom atom projection expected notation")
   }
   if loom_mini_direct_layer_count(notation) != 1 ||
-    loom_mini_contains_node_kind(notation, SubNotationNode.to_raw()) ||
-    loom_mini_contains_node_kind(notation, EuclidNode.to_raw()) {
+    loom_mini_contains_node_kind(notation, SubNotationNode.to_raw()) {
     return Err("loom atom projection only supports one plain atom layer")
   }
   let atoms : Array[LoomMiniRawAtom] = []
@@ -427,13 +448,62 @@ fn loom_mini_collect_atom_postfixes(
   let postfixes : Array[LoomMiniAtomPostfix] = []
   for child in atom.children() {
     if child.kind() == PostfixNode.to_raw() {
-      match loom_mini_collect_numeric_atom_postfix(child) {
+      match loom_mini_collect_atom_postfix(child) {
         Ok(postfix) => postfixes.push(postfix)
         Err(msg) => return Err(msg)
       }
     }
   }
   Ok(postfixes)
+}
+
+///|
+fn loom_mini_collect_atom_postfix(
+  postfix : @seam.SyntaxNode,
+) -> Result[LoomMiniAtomPostfix, String] {
+  let euclids = loom_mini_direct_children_of_kind(postfix, EuclidNode.to_raw())
+  match euclids {
+    [euclid] => return loom_mini_collect_euclid_atom_postfix(euclid)
+    [_, _, ..] => return Err("loom atom projection expected one euclid postfix")
+    [] => ()
+  }
+  let has_question =
+    loom_mini_direct_token_of_kind(postfix, QuestionToken.to_raw()) is Some(_)
+  if has_question {
+    if loom_mini_direct_token_of_kind(postfix, StarToken.to_raw()) is Some(_) ||
+      loom_mini_direct_token_of_kind(postfix, SlashToken.to_raw()) is Some(_) {
+      return Err("loom atom projection expected one atom postfix operator")
+    }
+    return Ok(DegradePostfix)
+  }
+  loom_mini_collect_numeric_atom_postfix(postfix)
+}
+
+///|
+fn loom_mini_collect_euclid_atom_postfix(
+  euclid : @seam.SyntaxNode,
+) -> Result[LoomMiniAtomPostfix, String] {
+  let numbers = loom_mini_direct_tokens_of_kind(euclid, NumberToken.to_raw())
+  if numbers.length() != 2 && numbers.length() != 3 {
+    return Err("loom atom projection expected euclid (k,n[,rotation])")
+  }
+  let k = match loom_mini_parse_int(numbers[0].text()) {
+    Ok(n) => n
+    Err(msg) => return Err(msg)
+  }
+  let n = match loom_mini_parse_int(numbers[1].text()) {
+    Ok(n) => n
+    Err(msg) => return Err(msg)
+  }
+  let rotation = if numbers.length() == 3 {
+    match loom_mini_parse_int(numbers[2].text()) {
+      Ok(n) => n
+      Err(msg) => return Err(msg)
+    }
+  } else {
+    0
+  }
+  Ok(EuclidPostfix(k, n, rotation))
 }
 
 ///|
@@ -445,7 +515,9 @@ fn loom_mini_collect_numeric_atom_postfix(
   let has_slash =
     loom_mini_direct_token_of_kind(postfix, SlashToken.to_raw()) is Some(_)
   if !has_star && !has_slash {
-    return Err("loom atom projection only supports '*' or '/' postfix atoms")
+    return Err(
+      "loom atom projection only supports '*', '/', '?', or euclid postfix atoms",
+    )
   }
   if has_star && has_slash {
     return Err("loom atom projection expected one atom postfix operator")
@@ -852,6 +924,16 @@ fn loom_mini_apply_atom_postfixes(
         }
       SlowPostfix(factor) =>
         match builder.slow(doc, @pattern.Rational::from_int(factor)) {
+          Ok(next) => continue next
+          Err(msg) => return Err(msg)
+        }
+      DegradePostfix =>
+        match builder.degrade(doc, 0.5) {
+          Ok(next) => continue next
+          Err(msg) => return Err(msg)
+        }
+      EuclidPostfix(k, n, rotation) =>
+        match builder.euclid(doc, k, n, rotation) {
           Ok(next) => continue next
           Err(msg) => return Err(msg)
         }
