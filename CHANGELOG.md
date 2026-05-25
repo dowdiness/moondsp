@@ -7,30 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-05-25
+
+### Breaking changes
+
+- The mini PatternDoc reuse helpers were consolidated into optional arguments:
+  `parse_doc_reusing(input, previous)` is now
+  `parse_doc(input, previous=Some(previous))`, and
+  `parse_snapshot_reusing(input, previous)` is now
+  `parse_snapshot(input, previous=Some(previous))`. Calls that do not reuse a
+  previous document can continue to call `parse_doc(input)` and
+  `parse_snapshot(input)`.
+
 ### Added
 
-- Added internal mini authoring token edit-span realignment coverage so
-  unchanged prefix/suffix tokens preserve identity while changed duplicate
-  tokens receive fresh keys.
+- Added `MiniAuthoringPipeline`, an `incr`-backed mini authoring pipeline that
+  preserves reusable `PatternDoc` identity and lowering-cache state across text
+  edits. It exposes parse/snapshot methods plus counters for parse work,
+  snapshot work, authoring-token count, and lowering-cache hits/misses.
 - Added `MiniAuthoringPipeline::set_input_with_source_edit(...)` so editor
-  integrations can provide the concrete source edit span for ambiguous
-  identical-token edits.
-- Mini authoring now feeds aligned token identities into `PatternDoc` atom IDs
-  inside the pipeline, preserving duplicate sound/note provenance across
-  source-span edits while retaining the existing `mini:sound:bd:N` ID shape.
-- Added source-span regression coverage for duplicate note provenance and parse
-  error recovery in the mini authoring pipeline.
-- Added ADR-0012 to scope a loom/CST mini authoring evaluation before any
-  runtime parser migration.
-- Added a nested `specs/loom-mini-cst/` spike module with a tiny loom grammar
-  for duplicate mini atom span evaluation.
-- Extended the loom/CST spike with `apply_edit` insertion/deletion
-  characterization tests, including current deletion no-reuse behavior.
+  integrations can provide concrete source edit spans for ambiguous duplicate
+  token edits.
+- Mini authoring now feeds aligned token identities into `PatternDoc` atom IDs,
+  preserving duplicate sound/note provenance across source-span edits while
+  retaining the existing `mini:sound:bd:N` / `mini:note:60:N` ID shapes.
+- Added `MiniDocBuilder` as a semantic PatternDoc construction surface used by
+  the loom/CST evaluation path.
 - Added typed voice mutation APIs for handle-based controls:
   `VoicePool::note_off_result`, `VoicePool::set_voice_pan_result`,
   `BoundVoicePool::note_off_result`, `BoundVoicePool::kill_result`, and
   `BoundVoicePool::set_voice_pan_result`. Existing Bool-returning wrappers
   remain and delegate to the result path.
+- Added ADR-0011 and ADR-0012 for the incr-backed mini authoring pipeline and
+  loom/CST authoring evaluation.
+- Added a nested `specs/loom-mini-cst/` spike module for loom-based mini grammar
+  and PatternDoc projection evaluation. The spike now covers production-parity
+  grammar shape, direct seam CST queries, chained root methods, star postfixes,
+  replacements, whitespace edits, duplicate note/sound provenance, and
+  parse-error recovery against `MiniAuthoringPipeline`.
+
+### Changed
+
+- Migrated the root release manifest from `moon.mod.json` to `moon.mod`,
+  preserving package metadata, dependencies, and publish excludes.
+- Bumped `moonbitlang/quickcheck` to `0.14.0`, clearing the previous
+  Show-vs-Debug warnings under `moon check --deny-warn`.
+- Modernized value-producing accumulator/count/search loops with MoonBit loop
+  expressions and documented where not to use broad mechanical loop rewrites.
+
+### Fixed
+
+- Mini authoring parse errors now preserve the previous reusable token baseline
+  so recovery can keep duplicate atom provenance.
+- The loom mini-CST spike now keeps pending source-edit spans across syntax
+  errors so successful recovery matches the current mini authoring identity
+  contract.
 
 ## [0.5.1] - 2026-05-20
 
@@ -623,7 +654,8 @@ scheduler with mini-notation support.
 - The `moondsp-browser-tools` npm workspace is `private: true` and exists
   only to host Playwright tests for the browser demo.
 
-[Unreleased]: https://github.com/dowdiness/moondsp/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/dowdiness/moondsp/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/dowdiness/moondsp/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/dowdiness/moondsp/releases/tag/v0.5.1
 [0.5.0]: https://github.com/dowdiness/moondsp/releases/tag/v0.5.0
 [0.4.0]: https://github.com/dowdiness/moondsp/releases/tag/v0.4.0
