@@ -48,6 +48,7 @@ pub struct LoomMiniAtomProjection {
   priv parser : @loom.Parser[MiniAst]
   priv scope : @incr.Scope
   priv edit : @incr.Signal[@core.Edit?]
+  priv source_before_edit : @incr.Signal[String?]
   priv observer : @incr.Observer[
     Result[@pattern.PatternDoc[@pattern.ControlMap], String],
   ]
@@ -63,13 +64,32 @@ pub fn LoomMiniAtomProjection::new(input : String) -> LoomMiniAtomProjection {
     None,
     label="loom-mini-atom-projection.edit",
   )
+  let source_before_edit : @incr.Signal[String?] = @incr.Signal::new(
+    rt,
+    None,
+    label="loom-mini-atom-projection.source-before-edit",
+  )
   let mut previous_doc : @pattern.PatternDoc[@pattern.ControlMap]? = None
   let mut previous_atoms : Array[LoomMiniProjectedAtom] = []
+  let mut previous_source = input
+  let mut pending_source_edit : LoomMiniSourceEditSpan? = None
   let projected = @incr.Memo::new_no_backdate(
     rt,
     fn() {
+      let current_edit = edit.get()
+      let edit_source = source_before_edit.get()
+      let current_source = parser.source().get_or_abort()
       let diagnostics = parser.diagnostics().get_or_abort()
       if diagnostics.length() > 0 {
+        if edit_source is Some(source) && source == previous_source {
+          match current_edit {
+            Some(edit) =>
+              pending_source_edit = Some(
+                loom_mini_source_edit_span_from_edit(edit),
+              )
+            None => ()
+          }
+        }
         return Err("loom mini syntax has diagnostics")
       }
       let raw_projection = match
@@ -77,25 +97,34 @@ pub fn LoomMiniAtomProjection::new(input : String) -> LoomMiniAtomProjection {
         Ok(projection) => projection
         Err(msg) => return Err(msg)
       }
-      let atoms = match edit.get() {
-        Some(edit) =>
-          loom_mini_realign_projected_atoms(
-            previous_atoms,
-            raw_projection.atoms,
-            edit,
-          )
-        None => loom_mini_assign_projected_atoms(raw_projection.atoms)
+      let atoms = if previous_atoms.length() == 0 {
+        loom_mini_assign_projected_atoms(raw_projection.atoms)
+      } else {
+        let span = match (current_edit, edit_source) {
+          (Some(edit), Some(source)) if source == previous_source =>
+            loom_mini_source_edit_span_from_edit(edit)
+          _ =>
+            match pending_source_edit {
+              Some(span) => span
+              None =>
+                loom_mini_source_edit_span(previous_source, current_source)
+            }
+        }
+        loom_mini_realign_projected_atoms(
+          previous_atoms,
+          raw_projection.atoms,
+          old_start=span.old_start,
+          old_end=span.old_end,
+          new_end=span.new_end,
+        )
       }
       let builder = @mini.MiniDocBuilder::with_previous(previous_doc)
-      match
-        loom_mini_build_projected_doc(
-          builder,
-          raw_projection.expr,
-          atoms,
-        ) {
+      match loom_mini_build_projected_doc(builder, raw_projection.expr, atoms) {
         Ok(doc) => {
           previous_doc = Some(doc)
           previous_atoms = atoms
+          previous_source = current_source
+          pending_source_edit = None
           Ok(doc)
         }
         Err(msg) => Err(msg)
@@ -105,7 +134,7 @@ pub fn LoomMiniAtomProjection::new(input : String) -> LoomMiniAtomProjection {
   )
   scope.add_cell_ids([projected.id()])
   let observer = scope.add_observer(projected.observe())
-  { parser, scope, edit, observer }
+  { parser, scope, edit, source_before_edit, observer }
 }
 
 ///|
@@ -121,6 +150,7 @@ pub fn LoomMiniAtomProjection::apply_edit(
   edit : @core.Edit,
   new_source : String,
 ) -> Unit {
+  self.source_before_edit.set(Some(self.parser.source().read_or_abort()))
   self.edit.set(Some(edit))
   self.parser.apply_edit(edit, new_source)
 }
@@ -128,6 +158,30 @@ pub fn LoomMiniAtomProjection::apply_edit(
 ///|
 pub fn LoomMiniAtomProjection::dispose(self : LoomMiniAtomProjection) -> Unit {
   self.scope.dispose()
+}
+
+///|
+fn loom_mini_direct_children_of_kind(
+  node : @seam.SyntaxNode,
+  kind : @seam.RawKind,
+) -> Array[@seam.SyntaxNode] {
+  node.children().filter(fn(child) { child.kind() == kind })
+}
+
+///|
+fn loom_mini_direct_tokens_of_kind(
+  node : @seam.SyntaxNode,
+  kind : @seam.RawKind,
+) -> Array[@seam.SyntaxToken] {
+  node.tokens_of_kind(kind)
+}
+
+///|
+fn loom_mini_direct_token_of_kind(
+  node : @seam.SyntaxNode,
+  kind : @seam.RawKind,
+) -> @seam.SyntaxToken? {
+  node.find_token(kind)
 }
 
 ///|
@@ -149,13 +203,14 @@ fn loom_mini_collect_raw_projection(
 fn loom_mini_collect_base_expr(
   root : @seam.SyntaxNode,
 ) -> Result[LoomMiniRawProjection, String] {
-  match root.direct_children_of_kind(StackCallNode.to_raw()) {
+  match loom_mini_direct_children_of_kind(root, StackCallNode.to_raw()) {
     [stack_call, ..] => loom_mini_collect_stack_expr(stack_call)
     [] => {
-      let (kind, call) = match root.direct_children_of_kind(CallNode.to_raw()) {
+      let (kind, call) = match
+        loom_mini_direct_children_of_kind(root, CallNode.to_raw()) {
         [call, ..] => (SoundAtom, call)
         [] =>
-          match root.direct_children_of_kind(NoteCallNode.to_raw()) {
+          match loom_mini_direct_children_of_kind(root, NoteCallNode.to_raw()) {
             [call, ..] => (NoteAtom, call)
             [] =>
               return Err(
@@ -215,7 +270,7 @@ fn loom_mini_apply_method_expr(
   root : @seam.SyntaxNode,
   base : LoomMiniExpr,
 ) -> Result[LoomMiniExpr, String] {
-  let methods = root.direct_children_of_kind(MethodCallNode.to_raw())
+  let methods = loom_mini_direct_children_of_kind(root, MethodCallNode.to_raw())
   let expr = for call in methods; expr = base {
     match loom_mini_apply_single_method_expr(call, expr) {
       Ok(next) => continue next
@@ -232,7 +287,7 @@ fn loom_mini_apply_single_method_expr(
   call : @seam.SyntaxNode,
   base : LoomMiniExpr,
 ) -> Result[LoomMiniExpr, String] {
-  let names = call.direct_tokens_of_kind(MethodNameToken.to_raw())
+  let names = loom_mini_direct_tokens_of_kind(call, MethodNameToken.to_raw())
   let name = match names {
     [] => return Err("loom atom projection expected method name")
     [token, ..] => token.text()
@@ -242,12 +297,12 @@ fn loom_mini_apply_single_method_expr(
       "loom atom projection only supports .fast(N), .slow(N), or .rev() methods",
     )
   }
-  if call.direct_tokens_of_kind(CommaToken.to_raw()).length() > 0 {
+  if loom_mini_direct_tokens_of_kind(call, CommaToken.to_raw()).length() > 0 {
     return Err(
       "loom atom projection only supports .fast(N), .slow(N), or .rev() methods",
     )
   }
-  let numbers = call.direct_tokens_of_kind(NumberToken.to_raw())
+  let numbers = loom_mini_direct_tokens_of_kind(call, NumberToken.to_raw())
   if name == "rev" {
     if names.length() != 1 || numbers.length() != 0 {
       return Err("loom atom projection expected .rev() with no arguments")
@@ -297,7 +352,8 @@ fn loom_mini_collect_plain_call_atoms(
   call : @seam.SyntaxNode,
   kind : LoomMiniAtomKind,
 ) -> Result[Array[LoomMiniRawAtom], String] {
-  let notation = match call.direct_children_of_kind(NotationNode.to_raw()) {
+  let notation = match
+    loom_mini_direct_children_of_kind(call, NotationNode.to_raw()) {
     [notation, ..] => notation
     [] => return Err("loom atom projection expected notation")
   }
@@ -310,8 +366,8 @@ fn loom_mini_collect_plain_call_atoms(
   fn visit(node : @seam.SyntaxNode) -> Result[Unit, String] {
     if node.kind() == AtomNode.to_raw() {
       let token = match kind {
-        SoundAtom => node.direct_token_of_kind(IdentToken.to_raw())
-        NoteAtom => node.direct_token_of_kind(NumberToken.to_raw())
+        SoundAtom => loom_mini_direct_token_of_kind(node, IdentToken.to_raw())
+        NoteAtom => loom_mini_direct_token_of_kind(node, NumberToken.to_raw())
       }
       match token {
         Some(token) => {
@@ -358,15 +414,19 @@ fn loom_mini_atom_star_postfix_factor(
   for child in atom.children() {
     if child.kind() == PostfixNode.to_raw() {
       if seen {
-        return Err("loom atom projection only supports one star postfix per atom")
+        return Err(
+          "loom atom projection only supports one star postfix per atom",
+        )
       }
       seen = true
-      if child.direct_token_of_kind(StarToken.to_raw()) is None {
+      if loom_mini_direct_token_of_kind(child, StarToken.to_raw()) is None {
         return Err("loom atom projection only supports star postfix atoms")
       }
-      let number = match child.direct_token_of_kind(NumberToken.to_raw()) {
+      let number = match
+        loom_mini_direct_token_of_kind(child, NumberToken.to_raw()) {
         Some(token) => token.text()
-        None => return Err("loom atom projection expected star postfix argument")
+        None =>
+          return Err("loom atom projection expected star postfix argument")
       }
       factor = match loom_mini_parse_positive_int(number) {
         Ok(n) => n
@@ -429,18 +489,19 @@ fn loom_mini_assign_projected_atoms(
 fn loom_mini_realign_projected_atoms(
   old_atoms : Array[LoomMiniProjectedAtom],
   raw_atoms : Array[LoomMiniRawAtom],
-  edit : @core.Edit,
+  old_start~ : Int,
+  old_end~ : Int,
+  new_end~ : Int,
 ) -> Array[LoomMiniProjectedAtom] {
   if old_atoms.length() == 0 {
     return loom_mini_assign_projected_atoms(raw_atoms)
   }
-  let edit_start = edit.new_end() - edit.inserted_length()
   let span = loom_mini_atom_edit_span_from_source(
     old_atoms,
     raw_atoms,
-    old_start=edit_start,
-    old_end=edit.old_end(),
-    new_end=edit.new_end(),
+    old_start~,
+    old_end~,
+    new_end~,
   )
   let used : Map[String, Bool] = {}
   for atom in old_atoms {
@@ -525,6 +586,45 @@ fn loom_mini_atom_kind_label(kind : LoomMiniAtomKind) -> String {
     SoundAtom => "sound"
     NoteAtom => "note"
   }
+}
+
+///|
+priv struct LoomMiniSourceEditSpan {
+  old_start : Int
+  old_end : Int
+  new_end : Int
+}
+
+///|
+fn loom_mini_source_edit_span_from_edit(
+  edit : @core.Edit,
+) -> LoomMiniSourceEditSpan {
+  let edit_start = edit.new_end() - edit.inserted_length()
+  { old_start: edit_start, old_end: edit.old_end(), new_end: edit.new_end() }
+}
+
+///|
+fn loom_mini_source_edit_span(
+  old_source : String,
+  new_source : String,
+) -> LoomMiniSourceEditSpan {
+  let old_len = old_source.length()
+  let new_len = new_source.length()
+  let mut prefix = 0
+  while prefix < old_len &&
+        prefix < new_len &&
+        old_source[prefix] == new_source[prefix] {
+    prefix += 1
+  }
+  let mut old_end = old_len
+  let mut new_end = new_len
+  while old_end > prefix &&
+        new_end > prefix &&
+        old_source[old_end - 1] == new_source[new_end - 1] {
+    old_end -= 1
+    new_end -= 1
+  }
+  { old_start: prefix, old_end, new_end }
 }
 
 ///|
@@ -673,14 +773,16 @@ fn loom_mini_lower_atom_group(
     if cursor.offset >= cursor.atoms.length() {
       return Err("internal loom mini atom grouping mismatch")
     }
-    let atom_doc = match loom_mini_atom_doc(builder, cursor.atoms[cursor.offset]) {
+    let atom_doc = match
+      loom_mini_atom_doc(builder, cursor.atoms[cursor.offset]) {
       Ok(doc) => doc
       Err(msg) => return Err(msg)
     }
     let doc = if raw.fast_factor == 1 {
       atom_doc
     } else {
-      match builder.fast(atom_doc, @pattern.Rational::from_int(raw.fast_factor)) {
+      match
+        builder.fast(atom_doc, @pattern.Rational::from_int(raw.fast_factor)) {
         Ok(doc) => doc
         Err(msg) => return Err(msg)
       }
