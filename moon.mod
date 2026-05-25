@@ -1,16 +1,24 @@
-{
-  "name": "dowdiness/moondsp",
-  "version": "0.5.1",
-  "deps": {
-    "dowdiness/incr": "0.6.0",
-    "moonbitlang/quickcheck": "0.14.0"
-  },
-  "readme": "README.mbt.md",
-  "repository": "https://github.com/dowdiness/moondsp",
-  "license": "Apache-2.0",
-  "keywords": ["moonbit", "audio"],
-  "description": "MoonBit DSP audio engine",
-  "exclude": [
+name = "dowdiness/moondsp"
+
+version = "0.5.1"
+
+import {
+  "dowdiness/incr@0.6.0",
+  "moonbitlang/quickcheck@0.14.0",
+}
+
+readme = "README.mbt.md"
+
+repository = "https://github.com/dowdiness/moondsp"
+
+license = "Apache-2.0"
+
+keywords = [ "moonbit", "audio" ]
+
+description = "MoonBit DSP audio engine"
+
+options(
+  exclude: [
     "AGENTS.md",
     "CLAUDE.md",
     "TASK_TEMPLATE.md",
@@ -30,6 +38,6 @@
     "docs/dsp-structural-editor-architecture.md",
     "docs/next-actions.md",
     "docs/superpowers/",
-    "docs/archive/"
-  ]
-}
+    "docs/archive/",
+  ],
+)

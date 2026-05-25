@@ -505,7 +505,9 @@ test "prop: mono ADSR graph — compile twice, process identically" {
       if compiled_a.gate_off(0) is Err(_) || compiled_b.gate_off(0) is Err(_) {
         return false
       }
-      let release_identical = for _block in 0..<PROP_NUM_BLOCKS; same = attack_identical {
+      let release_identical = for
+        _block in 0..<PROP_NUM_BLOCKS
+        same = attack_identical {
         compiled_a.process(context, out_a)
         compiled_b.process(context, out_b)
         if !buffers_identical(out_a, out_b, PROP_BLOCK_SIZE) {
