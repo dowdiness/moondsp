@@ -13,6 +13,7 @@ pub(all) enum MiniToken {
   Question
   LBracket
   RBracket
+  DollarColon
   Quote
   Ident
   Whitespace
@@ -37,6 +38,7 @@ pub impl Show for MiniToken with fn output(self, logger) {
       Question => "?"
       LBracket => "["
       RBracket => "]"
+      DollarColon => "$:"
       Quote => "\""
       Ident => "<ident>"
       Whitespace => " "
@@ -78,6 +80,7 @@ pub impl @seam.ToRawKind for MiniToken with fn to_raw(self) {
       Question => 15
       LBracket => 16
       RBracket => 17
+      DollarColon => 18
     },
   )
 }

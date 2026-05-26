@@ -19,11 +19,62 @@ pub let mini_spec : @core.LanguageSpec[MiniToken, MiniSyntaxKind] = @core.Langua
 
 ///|
 fn parse_root(ctx : @core.ParserContext[MiniToken, MiniSyntaxKind]) -> Unit {
-  parse_expr(ctx)
+  if ctx.peek() == DollarColon {
+    parse_dollar_stack_program(ctx)
+  } else {
+    parse_expr(ctx)
+  }
   if ctx.peek() != EOF {
     ctx.error("Unexpected tokens after mini notation")
     let _ = ctx.skip_until(fn(token) { token == EOF })
   }
+}
+
+///|
+fn parse_dollar_stack_program(
+  ctx : @core.ParserContext[MiniToken, MiniSyntaxKind],
+) -> Unit {
+  ctx.node(DollarStackNode, fn() {
+    parse_dollar_stack_line(ctx)
+    while ctx.peek() == DollarColon &&
+          dollar_colon_starts_new_line(ctx) &&
+          ctx.error_count < MAX_ERRORS {
+      parse_dollar_stack_line(ctx)
+    }
+  })
+}
+
+///|
+fn dollar_colon_starts_new_line(
+  ctx : @core.ParserContext[MiniToken, MiniSyntaxKind],
+) -> Bool {
+  let mut pos = ctx.position
+  let mut saw_newline = false
+  while pos < ctx.token_count {
+    let token = (ctx.get_token)(pos)
+    if token.is_trivia() {
+      let text = ctx.token_text_at(pos)
+      for ch in text {
+        if ch == '\n' || ch == '\r' {
+          saw_newline = true
+        }
+      }
+      pos += 1
+    } else {
+      return token == DollarColon && saw_newline
+    }
+  }
+  false
+}
+
+///|
+fn parse_dollar_stack_line(
+  ctx : @core.ParserContext[MiniToken, MiniSyntaxKind],
+) -> Unit {
+  ctx.node(DollarLineNode, fn() {
+    expect(ctx, DollarColon, DollarColonToken) |> ignore
+    parse_expr(ctx)
+  })
 }
 
 ///|
