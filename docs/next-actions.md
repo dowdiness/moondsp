@@ -8,7 +8,7 @@ per-PR verification logs and merged-PR lists live in `git log` and
 
 ## Current State
 
-- `main` is aligned with `origin/main` after PR #92.
+- `main` is aligned with `origin/main` after PR #94.
 - Latest release: **v0.5.1** (tagged and published 2026-05-20).
 - The next release should be **v0.6.0** if it includes the current
   `Unreleased` entries, because public API has been added since v0.5.1.
@@ -30,21 +30,18 @@ For the broader backlog, read
 
 ## Recommended Next Slice
 
-**Add loom CST parity for top-level `$:` stack programs.** Keep the work under
-`specs/loom-mini-cst`; do not add loom/seam to root `moon.mod` and do not route
-`mini.parse`, `parse_doc`, or `MiniAuthoringPipeline` through loom. The
-production parser now supports `$:` lines, so the loom spike should learn that
-program shape next and compare against `@mini.parse_doc`.
+**Continue loom CST projection parity for callback methods.** `.jux(rev)` and
+`.every(2, rev)` now have first parity coverage against `@mini.parse_doc`; fill
+out the remaining `.jux(...)` / `.every(...)` callback variants such as
+`fast(k)` and `slow(k)`. Keep the work under `specs/loom-mini-cst`; do not add
+loom/seam to root `moon.mod` and do not route `mini.parse`, `parse_doc`, or
+`MiniAuthoringPipeline` through loom.
 
 ## Alternative Slices
 
 - **v0.6.0 release prep** — bump `moon.mod` to `0.6.0`, move `CHANGELOG.md`
   `Unreleased` entries under a dated `0.6.0` section, validate package
   contents, and publish only after review. Do not republish `0.5.1`.
-
-- **Loom callback-method parity** — after `$:` program parity, extend the spike
-  projection to cover `.jux(...)` and `.every(...)` callback methods. Keep this
-  in `specs/loom-mini-cst`; do not add loom/seam to root `moon.mod`.
 
 - **Voice API result hardening follow-up** — decide whether to deprecate/remove
   Bool wrappers, rename voice `*_result` methods to graph-style unsuffixed
@@ -55,6 +52,14 @@ program shape next and compare against `@mini.parse_doc`.
   policy before adding structural Eq.
 
 ## Closed Since Previous Update
+
+- ~~**PR #94 — `$:` docs refresh**~~ — SHIPPED 2026-05-26 (`cc95e75`).
+  Refreshed mini-notation docs, ADR/backlog pointers, and `$:` syntax summary;
+  no production parser switch.
+
+- ~~**PR #93 — loom `$:` stack-program parity**~~ — SHIPPED 2026-05-26
+  (`3b566d6`). Added loom mini-CST projection parity for top-level `$:` stack
+  programs against `@mini.parse_doc`; no callback-method projection yet.
 
 - ~~**PR #92 — Strudel-style `$:` stack lines**~~ — SHIPPED 2026-05-26
   (`2ce2930`). Added top-level `$:` stack syntax to the production mini parser,
