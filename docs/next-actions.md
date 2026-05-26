@@ -8,7 +8,7 @@ per-PR verification logs and merged-PR lists live in `git log` and
 
 ## Current State
 
-- `main` is aligned with `origin/main` after PR #94.
+- `main` is aligned with `origin/main` after PR #95.
 - Latest release: **v0.5.1** (tagged and published 2026-05-20).
 - The next release should be **v0.6.0** if it includes the current
   `Unreleased` entries, because public API has been added since v0.5.1.
@@ -30,12 +30,12 @@ For the broader backlog, read
 
 ## Recommended Next Slice
 
-**Continue loom CST projection parity for callback methods.** `.jux(rev)` and
-`.every(2, rev)` now have first parity coverage against `@mini.parse_doc`; fill
-out the remaining `.jux(...)` / `.every(...)` callback variants such as
-`fast(k)` and `slow(k)`. Keep the work under `specs/loom-mini-cst`; do not add
-loom/seam to root `moon.mod` and do not route `mini.parse`, `parse_doc`, or
-`MiniAuthoringPipeline` through loom.
+**Add loom CST parity for callback methods inside `$:` stack lines.** Callback
+method projection now covers direct `.jux(...)` / `.every(...)` forms plus
+callback edit/reuse against `MiniAuthoringPipeline`; next, pin the same callback
+method shapes inside multi-line `$:` programs. Keep the work under
+`specs/loom-mini-cst`; do not add loom/seam to root `moon.mod` and do not route
+`mini.parse`, `parse_doc`, or `MiniAuthoringPipeline` through loom.
 
 ## Alternative Slices
 
@@ -52,6 +52,11 @@ loom/seam to root `moon.mod` and do not route `mini.parse`, `parse_doc`, or
   policy before adding structural Eq.
 
 ## Closed Since Previous Update
+
+- ~~**PR #95 — loom callback-method projection parity**~~ — SHIPPED
+  2026-05-26 (`6d3d439`). Added callback-method projection/lowering for
+  `.jux(...)` and `.every(...)`, with initial `rev` parity tests against
+  `@mini.parse_doc`; production parsing remains hand-written.
 
 - ~~**PR #94 — `$:` docs refresh**~~ — SHIPPED 2026-05-26 (`cc95e75`).
   Refreshed mini-notation docs, ADR/backlog pointers, and `$:` syntax summary;
