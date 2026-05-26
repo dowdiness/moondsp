@@ -267,19 +267,27 @@ fn loom_mini_collect_base_expr(
 fn loom_mini_collect_dollar_stack_expr(
   dollar_stack : @seam.SyntaxNode,
 ) -> Result[LoomMiniRawProjection, String] {
-  let children : Array[LoomMiniExpr] = []
-  let atoms : Array[LoomMiniRawAtom] = []
-  for child in dollar_stack.children() {
-    if child.kind() == DollarLineNode.to_raw() {
-      let projection = match loom_mini_collect_raw_projection(child) {
-        Ok(projection) => projection
-        Err(msg) => return Err(msg)
-      }
-      children.push(projection.expr)
-      for atom in projection.atoms {
-        atoms.push(atom)
-      }
+  let initial_children : Array[LoomMiniExpr] = []
+  let initial_atoms : Array[LoomMiniRawAtom] = []
+  let (children, atoms) = for child in dollar_stack.children();
+                              children = initial_children,
+                              atoms = initial_atoms {
+    if child.kind() != DollarLineNode.to_raw() {
+      continue children, atoms
     }
+    let projection = match loom_mini_collect_raw_projection(child) {
+      Ok(projection) => projection
+      Err(msg) => return Err(msg)
+    }
+    let next_children = children.copy()
+    let next_atoms = atoms.copy()
+    next_children.push(projection.expr)
+    for atom in projection.atoms {
+      next_atoms.push(atom)
+    }
+    continue next_children, next_atoms
+  } nobreak {
+    (children, atoms)
   }
   if children.length() == 0 {
     return Err("loom atom projection expected dollar stack lines")
