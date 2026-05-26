@@ -253,6 +253,16 @@ test "loom atom projection matches mini PatternDoc for rev method" {
 }
 
 ///|
+test "loom atom projection matches mini PatternDoc for jux rev method" {
+  projection_boundary_assert_matches_mini_doc("s(\"bd sd\").jux(rev)")
+}
+
+///|
+test "loom atom projection matches mini PatternDoc for every rev method" {
+  projection_boundary_assert_matches_mini_doc("s(\"bd sd\").every(2, rev)")
+}
+
+///|
 test "loom atom projection matches mini PatternDoc for chained root methods" {
   let input = "s(\"bd sd\").fast(2).rev().slow(3)"
   let projection = LoomMiniAtomProjection::new(input)

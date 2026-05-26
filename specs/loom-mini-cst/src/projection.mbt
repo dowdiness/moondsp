@@ -53,11 +53,25 @@ priv struct LoomMiniSubNotationProjection {
 }
 
 ///|
+priv enum LoomMiniMethodCallback {
+  FastCallback(Int)
+  SlowCallback(Int)
+  RevCallback
+}
+
+///|
 priv enum LoomMiniMethodCall {
   FastMethod(Int)
   SlowMethod(Int)
   RevMethod
+  JuxMethod(LoomMiniMethodCallback)
+  EveryMethod(Int, LoomMiniMethodCallback)
 }
+
+///|
+type LoomMiniPatternCallback = (@pattern.Pat[@pattern.ControlMap]) -> @pattern.Pat[
+  @pattern.ControlMap,
+]
 
 ///|
 priv enum LoomMiniExpr {
@@ -368,40 +382,155 @@ fn loom_mini_collect_method_call(
     [] => return Err("loom atom projection expected method name")
     [token, ..] => token.text()
   }
-  if name != "fast" && name != "slow" && name != "rev" {
-    return Err(
-      "loom atom projection only supports .fast(N), .slow(N), or .rev() methods",
-    )
-  }
-  if loom_mini_direct_tokens_of_kind(call, CommaToken.to_raw()).length() > 0 {
-    return Err(
-      "loom atom projection only supports .fast(N), .slow(N), or .rev() methods",
-    )
-  }
+  let commas = loom_mini_direct_tokens_of_kind(call, CommaToken.to_raw())
   let numbers = loom_mini_direct_tokens_of_kind(call, NumberToken.to_raw())
-  if name == "rev" {
-    if names.length() != 1 || numbers.length() != 0 {
-      return Err("loom atom projection expected .rev() with no arguments")
-    }
-    Ok(RevMethod)
+  if name == "fast" || name == "slow" {
+    loom_mini_collect_rate_method_call(name, names, numbers, commas)
+  } else if name == "rev" {
+    loom_mini_collect_rev_method_call(names, numbers, commas)
+  } else if name == "jux" {
+    loom_mini_collect_jux_method_call(names, numbers, commas)
+  } else if name == "every" {
+    loom_mini_collect_every_method_call(names, numbers, commas)
   } else {
-    if names.length() != 1 {
-      return Err("loom atom projection expected numeric method argument")
-    }
+    Err(loom_mini_supported_method_error())
+  }
+}
+
+///|
+fn loom_mini_collect_rate_method_call(
+  name : String,
+  names : Array[@seam.SyntaxToken],
+  numbers : Array[@seam.SyntaxToken],
+  commas : Array[@seam.SyntaxToken],
+) -> Result[LoomMiniMethodCall, String] {
+  if commas.length() > 0 {
+    return Err(loom_mini_supported_method_error())
+  }
+  if names.length() != 1 {
+    return Err("loom atom projection expected numeric method argument")
+  }
+  let number = match numbers {
+    [token] => token.text()
+    _ => return Err("loom atom projection expected method argument")
+  }
+  let factor = match loom_mini_parse_positive_int(number) {
+    Ok(n) => n
+    Err(msg) => return Err(msg)
+  }
+  if name == "fast" {
+    Ok(FastMethod(factor))
+  } else {
+    Ok(SlowMethod(factor))
+  }
+}
+
+///|
+fn loom_mini_collect_rev_method_call(
+  names : Array[@seam.SyntaxToken],
+  numbers : Array[@seam.SyntaxToken],
+  commas : Array[@seam.SyntaxToken],
+) -> Result[LoomMiniMethodCall, String] {
+  if names.length() != 1 || numbers.length() != 0 || commas.length() != 0 {
+    return Err("loom atom projection expected .rev() with no arguments")
+  }
+  Ok(RevMethod)
+}
+
+///|
+fn loom_mini_collect_jux_method_call(
+  names : Array[@seam.SyntaxToken],
+  numbers : Array[@seam.SyntaxToken],
+  commas : Array[@seam.SyntaxToken],
+) -> Result[LoomMiniMethodCall, String] {
+  if names.length() != 2 || commas.length() != 0 {
+    return Err("loom atom projection expected jux(callback)")
+  }
+  let callback = match
+    loom_mini_collect_method_callback(names[1].text(), numbers, "jux") {
+    Ok(callback) => callback
+    Err(msg) => return Err(msg)
+  }
+  Ok(JuxMethod(callback))
+}
+
+///|
+fn loom_mini_collect_every_method_call(
+  names : Array[@seam.SyntaxToken],
+  numbers : Array[@seam.SyntaxToken],
+  commas : Array[@seam.SyntaxToken],
+) -> Result[LoomMiniMethodCall, String] {
+  if commas.length() != 1 {
+    return Err("loom atom projection expected every(n, callback)")
+  }
+  let comma_start = commas[0].start()
+  if names.length() != 2 || names[1].start() <= comma_start {
+    return Err("loom atom projection expected every(n, callback)")
+  }
+  let n_numbers = numbers.filter(fn(token) { token.start() < comma_start })
+  let callback_numbers = numbers.filter(fn(token) {
+    token.start() > comma_start
+  })
+  let n_text = match n_numbers {
+    [token] => token.text()
+    _ => return Err("loom atom projection expected every(n, callback)")
+  }
+  let n = match loom_mini_parse_positive_int(n_text) {
+    Ok(n) => n
+    Err(msg) => return Err(msg)
+  }
+  let callback = match
+    loom_mini_collect_method_callback(
+      names[1].text(),
+      callback_numbers,
+      "every",
+    ) {
+    Ok(callback) => callback
+    Err(msg) => return Err(msg)
+  }
+  Ok(EveryMethod(n, callback))
+}
+
+///|
+fn loom_mini_collect_method_callback(
+  name : String,
+  numbers : Array[@seam.SyntaxToken],
+  calling_method : String,
+) -> Result[LoomMiniMethodCallback, String] {
+  if name == "fast" || name == "slow" {
     let number = match numbers {
       [token] => token.text()
-      _ => return Err("loom atom projection expected method argument")
+      _ =>
+        return Err(
+          "loom atom projection expected \{calling_method}(\{name}(N)) callback argument",
+        )
     }
     let factor = match loom_mini_parse_positive_int(number) {
       Ok(n) => n
       Err(msg) => return Err(msg)
     }
     if name == "fast" {
-      Ok(FastMethod(factor))
+      Ok(FastCallback(factor))
     } else {
-      Ok(SlowMethod(factor))
+      Ok(SlowCallback(factor))
     }
+  } else if name == "rev" {
+    if numbers.length() != 0 {
+      return Err(
+        "loom atom projection expected \{calling_method}(rev) callback with no arguments",
+      )
+    }
+    Ok(RevCallback)
+  } else {
+    Err(
+      "loom atom projection \{calling_method}() callback must be fast(N), slow(N), or rev",
+    )
   }
+}
+
+///|
+fn loom_mini_supported_method_error() -> String {
+  "loom atom projection only supports .fast(N), .slow(N), .rev(), .jux(...), or .every(...) methods"
 }
 
 ///|
@@ -973,11 +1102,84 @@ fn loom_mini_apply_method_chain(
           Ok(next) => continue next
           Err(msg) => return Err(msg)
         }
+      JuxMethod(callback) =>
+        match loom_mini_apply_jux_method(doc, callback) {
+          Ok(next) => continue next
+          Err(msg) => return Err(msg)
+        }
+      EveryMethod(n, callback) =>
+        match loom_mini_apply_every_method(doc, n, callback) {
+          Ok(next) => continue next
+          Err(msg) => return Err(msg)
+        }
     }
   } nobreak {
     doc
   }
   Ok(doc)
+}
+
+///|
+fn loom_mini_apply_jux_method(
+  doc : @pattern.PatternDoc[@pattern.ControlMap],
+  callback : LoomMiniMethodCallback,
+) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
+  let signature = loom_mini_callback_signature(callback)
+  let id = match
+    loom_mini_pattern_node_id("mini:jux:\{doc.root().value()}:\{signature}") {
+    Ok(id) => id
+    Err(msg) => return Err(msg)
+  }
+  let f = loom_mini_callback_function(callback)
+  let result = try? doc.jux(id~, f~)
+  match result {
+    Ok(next) => Ok(next)
+    Err(_) => Err("internal loom mini PatternDoc construction failed")
+  }
+}
+
+///|
+fn loom_mini_apply_every_method(
+  doc : @pattern.PatternDoc[@pattern.ControlMap],
+  n : Int,
+  callback : LoomMiniMethodCallback,
+) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
+  let signature = loom_mini_callback_signature(callback)
+  let id = match
+    loom_mini_pattern_node_id(
+      "mini:every:\{doc.root().value()}:\{n}:\{signature}",
+    ) {
+    Ok(id) => id
+    Err(msg) => return Err(msg)
+  }
+  let f = loom_mini_callback_function(callback)
+  let result = try? doc.every(id~, n~, f~)
+  match result {
+    Ok(next) => Ok(next)
+    Err(_) => Err("internal loom mini PatternDoc construction failed")
+  }
+}
+
+///|
+fn loom_mini_callback_signature(callback : LoomMiniMethodCallback) -> String {
+  match callback {
+    FastCallback(factor) => "fast:\{factor}"
+    SlowCallback(factor) => "slow:\{factor}"
+    RevCallback => "rev"
+  }
+}
+
+///|
+fn loom_mini_callback_function(
+  callback : LoomMiniMethodCallback,
+) -> LoomMiniPatternCallback {
+  match callback {
+    FastCallback(factor) =>
+      fn(p) { p.fast(@pattern.Rational::from_int(factor)) }
+    SlowCallback(factor) =>
+      fn(p) { p.slow(@pattern.Rational::from_int(factor)) }
+    RevCallback => fn(p) { p.rev() }
+  }
 }
 
 ///|
