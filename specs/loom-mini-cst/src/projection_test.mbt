@@ -181,6 +181,21 @@ test "loom atom projection matches mini PatternDoc for dollar stack" {
 }
 
 ///|
+test "loom atom projection rejects same-line dollar stack marker like mini" {
+  let input = "$: s(\"bd\") $: note(\"60\")"
+  let projection = LoomMiniAtomProjection::new(input)
+  match projection.parse_doc() {
+    Ok(_) => abort("expected loom projection to reject same-line $: marker")
+    Err(_) => ()
+  }
+  match @mini.parse_doc(input) {
+    Ok(_) => abort("expected mini parser to reject same-line $: marker")
+    Err(_) => ()
+  }
+  projection.dispose()
+}
+
+///|
 test "loom atom projection matches mini PatternDoc after dollar stack line insertion" {
   let input = "$: s(\"bd\")"
   let edited = "$: s(\"bd\")\n$: note(\"60\")"

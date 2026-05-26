@@ -21,6 +21,12 @@ test "SPIKE step 1: dollar stack program parses with zero diagnostics" {
 }
 
 ///|
+test "edge case: same-line dollar stack marker is rejected" {
+  let (_cst, diagnostics) = try! parse_cst("$: s(\"bd\") $: note(\"60\")")
+  inspect(diagnostics.length() > 0, content="true")
+}
+
+///|
 test "SPIKE step 1: stack() with single arg parses with zero diagnostics" {
   let (_cst, diagnostics) = try! parse_cst("stack(s(\"bd\"))")
   inspect(diagnostics.length(), content="0")
