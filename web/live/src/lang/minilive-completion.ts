@@ -6,7 +6,7 @@
 //   3. Inside `Args` of a `MemberCall` whose method is `jux` (any
 //      position) or `every` (past the first comma) → callback names
 //      (`fast`, `slow`, `rev`).
-//   4. Top-level identifier prefix → `s`, `note`, `stack`.
+//   4. Top-level prefix → `$:`, `s`, `note`, `stack`.
 
 import type { CompletionContext, CompletionResult, Completion } from "@codemirror/autocomplete";
 import { snippetCompletion } from "@codemirror/autocomplete";
@@ -14,6 +14,7 @@ import { syntaxTree } from "@codemirror/language";
 import type { SyntaxNode } from "@lezer/common";
 
 const TOP_LEVEL: Completion[] = [
+  snippetCompletion('$: ${}', { label: "$:", type: "keyword", detail: "stack line" }),
   snippetCompletion('s("${}")', { label: "s", type: "function", detail: "drum sounds" }),
   snippetCompletion('note("${}")', { label: "note", type: "function", detail: "MIDI numbers" }),
   snippetCompletion("stack(${})", { label: "stack", type: "function", detail: "combine layers" }),
@@ -166,7 +167,15 @@ export function miniliveCompletion(context: CompletionContext): CompletionResult
     }
   }
 
-  // ── 4. Top-level identifier prefix ─────────────────────────
+  // ── 4. Top-level prefix ────────────────────────────────────
+  const dollarLine = context.matchBefore(/\$?$/);
+  if (dollarLine && (dollarLine.from < dollarLine.to || context.explicit)) {
+    return {
+      from: dollarLine.from,
+      options: TOP_LEVEL,
+      validFor: /^\$?$/,
+    };
+  }
   const ident = context.matchBefore(/[A-Za-z_]*$/);
   if (ident && (ident.from < ident.to || context.explicit)) {
     return {

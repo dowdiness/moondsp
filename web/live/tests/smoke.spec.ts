@@ -14,7 +14,9 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const INITIAL_PATTERN = `s("bd(3,8), hh*16?, sd(2,8,2)").jux(rev)`;
+const INITIAL_PATTERN = `$: s("bd(3,8), hh*16?, sd(2,8,2)").jux(rev)
+$: note("48(3,8) 60(2,8,2) 67(3,8) 60(2,8,3)").slow(3)`;
+const INITIAL_PATTERN_RENDERED = INITIAL_PATTERN.replace("\n", "");
 
 test.describe("UI smoke (no audio)", () => {
   test.beforeEach(async ({ page }) => {
@@ -32,7 +34,7 @@ test.describe("UI smoke (no audio)", () => {
     // CM6 renders the doc into .cm-content; line content is in .cm-line.
     const content = page.locator(".cm-content");
     await expect(content).toBeVisible();
-    await expect(content).toContainText(INITIAL_PATTERN);
+    await expect(content).toContainText(INITIAL_PATTERN_RENDERED);
   });
 
   test("editor accepts keyboard input", async ({ page }) => {
@@ -41,7 +43,7 @@ test.describe("UI smoke (no audio)", () => {
     // Move to end of doc and append a method chain.
     await page.keyboard.press("Control+End");
     await page.keyboard.type(".rev()");
-    await expect(editor).toContainText(`${INITIAL_PATTERN}.rev()`);
+    await expect(editor).toContainText(`${INITIAL_PATTERN_RENDERED}.rev()`);
   });
 
   test("Start button is enabled and clickable", async ({ page }) => {
@@ -76,7 +78,7 @@ test.describe("UI smoke (no audio)", () => {
     await expect(tooltip).toBeHidden({ timeout: 2_000 });
     // Snippet expansion places the cursor at `${n}`; the expansion
     // itself is what we're verifying — `.fast(` must appear in the doc.
-    await expect(editor).toContainText(`${INITIAL_PATTERN}.fast(`);
+    await expect(editor).toContainText(`${INITIAL_PATTERN_RENDERED}.fast(`);
   });
 
   test("Tab accepts the highlighted autocomplete option", async ({ page }) => {
@@ -101,7 +103,7 @@ test.describe("UI smoke (no audio)", () => {
     await page.waitForTimeout(120);
     await page.keyboard.press("Tab");
     await expect(tooltip).toBeHidden({ timeout: 2_000 });
-    await expect(editor).toContainText(`${INITIAL_PATTERN}.fast(`);
+    await expect(editor).toContainText(`${INITIAL_PATTERN_RENDERED}.fast(`);
   });
 
   test("autocomplete in every() arg 1 ignores commas inside nested calls", async ({ page }) => {
@@ -143,13 +145,11 @@ test.describe("UI smoke (no audio)", () => {
     await expect(tooltip).not.toContainText("degradeBy");
   });
 
-  test("cheatsheet advertises stack(p, q) under Layers", async ({ page }) => {
-    // The new top-level stack() primitive is the only way to combine an
-    // s(...) drum pattern with a note(...) melody in one expression — the
-    // cheatsheet has to surface it next to s/note for the cross-source
-    // workflow to be discoverable.
+  test("cheatsheet advertises dollar stack lines under Layers", async ({ page }) => {
+    // Strudel-style `$:` lines are the discoverable path for combining
+    // s(...) drum patterns with note(...) melodies in one live buffer.
     const layersDl = page.locator("#cheat dl").first();
-    await expect(layersDl.locator("dt")).toContainText(["s(", "note(", "stack("]);
+    await expect(layersDl.locator("dt")).toContainText(["s(", "note(", "$:"]);
   });
 });
 
@@ -366,10 +366,10 @@ test.describe("Audio path", () => {
     await expect(page.locator("#status")).toContainText("running");
   });
 
-  test("stack(s, note) cross-source pattern evaluates end-to-end", async ({ page }) => {
-    // Top-level stack(...) lets a single pattern produce events for two
-    // different routing keys (s → drum pools by MIDI number, note → synth
-    // pool). This test proves the new grammar survives the wasm-gc
+  test("dollar stack cross-source pattern evaluates end-to-end", async ({ page }) => {
+    // Top-level `$:` stack lines let a single pattern produce events for
+    // two different routing keys (s → drum pools by MIDI number, note →
+    // synth pool). This test proves the new grammar survives the wasm-gc
     // boundary in the worklet parser AND that mixed-key events route
     // without producing a diagnostic. Unit tests cover parser correctness;
     // this is the integration anchor.
@@ -381,10 +381,10 @@ test.describe("Audio path", () => {
     const editor = page.locator(".cm-content");
     await editor.click();
     await page.keyboard.press("Control+A");
-    await page.keyboard.type(`stack(s("bd sd"), note("60 64"))`);
+    await page.keyboard.type(`$: s("bd sd")\n$: note("60 64")`);
 
     // pattern updated re-fires after debounce → proves the worklet's parse
-    // accepted stack(...) and the engine swapped patterns successfully.
+    // accepted `$:` stack lines and the engine swapped patterns successfully.
     await expect(page.locator("#log")).toContainText("pattern updated", { timeout: 3_000 });
     // No diagnostic squiggle: the new grammar must parse cleanly.
     await expect(page.locator(".cm-diagnostic-error")).toHaveCount(0);

@@ -11,6 +11,7 @@
 ///   `bd/2` — stretch within slot (`pat.slow(n)`);
 ///   `bd?` — degrade-by-50% (deterministic per-event drop);
 ///   stacks with euclid in left-to-right order: `bd*2(3,8)?` is legal
+/// - Strudel-style stack lines: `$: s("bd")` / `$: note("60")` stack top-level lines
 /// - Method chains:
 ///   `.fast(n)`, `.slow(n)`, `.rev()`,
 ///   `.degradeBy(p)` (drop with probability p),
@@ -21,6 +22,11 @@ pub fn parse(
   input : String,
 ) -> Result[@pattern.Pat[@pattern.ControlMap], String] {
   guard input.length() > 0 else { return Err("empty input") }
+  match mini_collect_dollar_stack_lines(input) {
+    Err(msg) => return Err(msg)
+    Ok(Some(lines)) => return mini_parse_dollar_stack_program(input, lines)
+    Ok(None) => ()
+  }
   let p = Parser::new(input)
   let result = p.parse_expr() catch { ParseError(msg) => return Err(msg) }
   p.skip_whitespace()

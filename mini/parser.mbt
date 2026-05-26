@@ -2,6 +2,8 @@
 /// Recursive descent parser for mini-notation.
 ///
 /// Grammar:
+///   program  = expr | dollar_stack
+///   dollar_stack = ( "$:" expr newline? )+
 ///   expr     = primary ( "." method )*
 ///   primary  = "s(" string ")" | "note(" string ")"
 ///            | "stack(" expr ( "," expr )* ")"
@@ -34,6 +36,83 @@ priv struct Parser {
 #alias(new)
 fn Parser::Parser(input : String) -> Parser {
   { input, pos: 0 }
+}
+
+///|
+priv struct MiniDollarStackLine {
+  start : Int
+  end : Int
+}
+
+///|
+fn mini_collect_dollar_stack_lines(
+  input : String,
+) -> Result[Array[MiniDollarStackLine]?, String] {
+  let lines : Array[MiniDollarStackLine] = []
+  let mut saw_program = false
+  let mut pos = 0
+  while pos < input.length() {
+    let line_start = pos
+    let mut line_end = pos
+    while line_end < input.length() && input[line_end] != '\n' {
+      line_end += 1
+    }
+    let mut content_end = line_end
+    if content_end > line_start && input[content_end - 1] == '\r' {
+      content_end -= 1
+    }
+    let mut first = line_start
+    while first < content_end && input[first] == ' ' {
+      first += 1
+    }
+    if first < content_end {
+      if first + 2 <= content_end &&
+        input[first] == '$' &&
+        input[first + 1] == ':' {
+        saw_program = true
+        let expr_start = first + 2
+        let mut expr_first = expr_start
+        while expr_first < content_end && input[expr_first] == ' ' {
+          expr_first += 1
+        }
+        if expr_first == content_end {
+          return Err("position \{first}: $: requires an expression")
+        }
+        lines.push({ start: expr_start, end: content_end })
+      } else if saw_program {
+        return Err("position \{first}: expected '$:' stack line")
+      } else {
+        return Ok(None)
+      }
+    }
+    pos = if line_end < input.length() { line_end + 1 } else { line_end }
+  }
+  if saw_program {
+    Ok(Some(lines))
+  } else {
+    Ok(None)
+  }
+}
+
+///|
+fn mini_parse_dollar_stack_program(
+  input : String,
+  lines : Array[MiniDollarStackLine],
+) -> Result[@pattern.Pat[@pattern.ControlMap], String] {
+  let parser = Parser::new(input)
+  let args : Array[@pattern.Pat[@pattern.ControlMap]] = []
+  for line in lines {
+    parser.pos = line.start
+    let pat = parser.parse_expr() catch { ParseError(msg) => return Err(msg) }
+    parser.skip_whitespace()
+    if parser.pos != line.end {
+      return Err(
+        "position \{parser.pos}: unexpected trailing input '\{input[parser.pos:line.end].to_owned()}'",
+      )
+    }
+    args.push(pat)
+  }
+  Ok(if args.length() == 1 { args[0] } else { @pattern.stack(args) })
 }
 
 ///|

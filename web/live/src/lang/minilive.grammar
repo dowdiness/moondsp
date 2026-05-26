@@ -1,12 +1,15 @@
-// Outer surface for the moondsp live REPL: identifier-headed calls
-// (`s(...)`, `note(...)`, `stack(...)`) followed by zero or more
-// dotted method calls (`.fast(2)`, `.jux(rev)`). The mini-notation
+// Outer surface for the moondsp live REPL: Strudel-style `$:` stack
+// lines or identifier-headed calls (`s(...)`, `note(...)`, `stack(...)`)
+// followed by zero or more dotted method calls (`.fast(2)`, `.jux(rev)`). The mini-notation
 // itself stays opaque inside String tokens — completion handles
 // "we're inside a string whose enclosing call is s()" by walking the
 // syntax tree and the source between cursor and the surrounding
 // String node.
 
-@top Program { Expression? }
+@top Program { DollarStack | Expression? }
+
+DollarStack { DollarLine+ }
+DollarLine { "$:" Expression }
 
 @skip { space }
 
@@ -27,7 +30,7 @@ MethodName { identifier }
   Number     { $[0-9]+ ("." $[0-9]+)? }
   String     { '"' (![\\\n"] | "\\" _)* '"'? }
   space      { $[ \t\n\r]+ }
-  "(" ")" "." ","
+  "(" ")" "." "," "$:"
 }
 
 @detectDelim

@@ -1,6 +1,6 @@
 // CodeMirror language support for the moondsp live REPL surface
-// (mini-notation embedded in identifier-headed calls and method
-// chains). Wraps the Lezer parser with style tags for highlighting
+// (Strudel-style `$:` stack lines, mini-notation embedded in
+// identifier-headed calls, and method chains). Wraps the Lezer parser with style tags for highlighting
 // and registers the autocomplete source via languageData.
 
 import { LRLanguage, LanguageSupport, syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
@@ -20,6 +20,7 @@ const parserWithMetadata = parser.configure({
       "( )": t.paren,
       ".": t.derefOperator,
       ",": t.separator,
+      "$:": t.operator,
     }),
   ],
 });

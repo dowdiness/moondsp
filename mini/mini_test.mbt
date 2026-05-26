@@ -1136,6 +1136,77 @@ test "parse stack tolerates whitespace around args" {
 }
 
 ///|
+test "parse Strudel-style dollar stack lines" {
+  let input =
+    #|$: s("bd")
+    #|$: note("60")
+  let pat = unwrap_ok(@mini.parse(input))
+  let events = query_one_cycle(pat)
+  inspect(events.length(), content="2")
+}
+
+///|
+test "parse Strudel-style dollar stack lines with per-line methods" {
+  let input =
+    #|$: s("bd").fast(2)
+    #|$: s("hh")
+  let pat = unwrap_ok(@mini.parse(input))
+  let events = query_one_cycle(pat)
+  inspect(events.length(), content="3")
+}
+
+///|
+test "parse Strudel-style dollar single line is a no-op stack" {
+  let pat = unwrap_ok(@mini.parse("$: s(\"bd sd\")"))
+  let events = query_one_cycle(pat)
+  inspect(events.length(), content="2")
+}
+
+///|
+test "parse_doc lowers Strudel-style dollar stack lines" {
+  let input =
+    #|$: s("bd")
+    #|$: note("60")
+  let snapshot = unwrap_mini_snapshot(@mini.parse_snapshot(input))
+  let events = snapshot.query(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+    ),
+  )
+  inspect(
+    snapshot.root().value(),
+    content="mini:stack:mini:sound:bd:0:mini:note:60:0",
+  )
+  inspect(events.length(), content="2")
+}
+
+///|
+test "MiniAuthoringPipeline accepts Strudel-style dollar stack lines" {
+  let pipeline = @mini.MiniAuthoringPipeline::new("$: s(\"bd\")\n$: s(\"hh\")")
+  let snapshot = unwrap_mini_snapshot(pipeline.parse_snapshot())
+  let events = snapshot.query(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+    ),
+  )
+  inspect(events.length(), content="2")
+  pipeline.dispose()
+}
+
+///|
+test "parse Strudel-style dollar stack rejects non-dollar content after stack starts" {
+  let input =
+    #|$: s("bd")
+    #|s("hh")
+  match @mini.parse(input) {
+    Err(_) => ()
+    Ok(_) => fail("expected Err for non-dollar line in dollar stack")
+  }
+}
+
+///|
 test "parse stack() with no args returns error" {
   match @mini.parse("stack()") {
     Err(_) => () // expected
