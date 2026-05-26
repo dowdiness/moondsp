@@ -19,11 +19,37 @@ pub let mini_spec : @core.LanguageSpec[MiniToken, MiniSyntaxKind] = @core.Langua
 
 ///|
 fn parse_root(ctx : @core.ParserContext[MiniToken, MiniSyntaxKind]) -> Unit {
-  parse_expr(ctx)
+  if ctx.peek() == DollarColon {
+    parse_dollar_stack_program(ctx)
+  } else {
+    parse_expr(ctx)
+  }
   if ctx.peek() != EOF {
     ctx.error("Unexpected tokens after mini notation")
     let _ = ctx.skip_until(fn(token) { token == EOF })
   }
+}
+
+///|
+fn parse_dollar_stack_program(
+  ctx : @core.ParserContext[MiniToken, MiniSyntaxKind],
+) -> Unit {
+  ctx.node(DollarStackNode, fn() {
+    parse_dollar_stack_line(ctx)
+    while ctx.peek() == DollarColon && ctx.error_count < MAX_ERRORS {
+      parse_dollar_stack_line(ctx)
+    }
+  })
+}
+
+///|
+fn parse_dollar_stack_line(
+  ctx : @core.ParserContext[MiniToken, MiniSyntaxKind],
+) -> Unit {
+  ctx.node(DollarLineNode, fn() {
+    expect(ctx, DollarColon, DollarColonToken) |> ignore
+    parse_expr(ctx)
+  })
 }
 
 ///|

@@ -238,24 +238,53 @@ fn loom_mini_collect_raw_projection(
 fn loom_mini_collect_base_expr(
   root : @seam.SyntaxNode,
 ) -> Result[LoomMiniRawProjection, String] {
-  match loom_mini_direct_children_of_kind(root, StackCallNode.to_raw()) {
-    [stack_call, ..] => loom_mini_collect_stack_expr(stack_call)
-    [] => {
-      let (kind, call) = match
-        loom_mini_direct_children_of_kind(root, CallNode.to_raw()) {
-        [call, ..] => (SoundAtom, call)
-        [] =>
-          match loom_mini_direct_children_of_kind(root, NoteCallNode.to_raw()) {
-            [call, ..] => (NoteAtom, call)
+  match loom_mini_direct_children_of_kind(root, DollarStackNode.to_raw()) {
+    [dollar_stack, ..] => loom_mini_collect_dollar_stack_expr(dollar_stack)
+    [] =>
+      match loom_mini_direct_children_of_kind(root, StackCallNode.to_raw()) {
+        [stack_call, ..] => loom_mini_collect_stack_expr(stack_call)
+        [] => {
+          let (kind, call) = match
+            loom_mini_direct_children_of_kind(root, CallNode.to_raw()) {
+            [call, ..] => (SoundAtom, call)
             [] =>
-              return Err(
-                "loom atom projection only supports s(...), note(...), or stack(...)",
-              )
+              match
+                loom_mini_direct_children_of_kind(root, NoteCallNode.to_raw()) {
+                [call, ..] => (NoteAtom, call)
+                [] =>
+                  return Err(
+                    "loom atom projection only supports s(...), note(...), stack(...), or $: lines",
+                  )
+              }
           }
+          loom_mini_collect_atom_group_expr(call, kind)
+        }
       }
-      loom_mini_collect_atom_group_expr(call, kind)
+  }
+}
+
+///|
+fn loom_mini_collect_dollar_stack_expr(
+  dollar_stack : @seam.SyntaxNode,
+) -> Result[LoomMiniRawProjection, String] {
+  let children : Array[LoomMiniExpr] = []
+  let atoms : Array[LoomMiniRawAtom] = []
+  for child in dollar_stack.children() {
+    if child.kind() == DollarLineNode.to_raw() {
+      let projection = match loom_mini_collect_raw_projection(child) {
+        Ok(projection) => projection
+        Err(msg) => return Err(msg)
+      }
+      children.push(projection.expr)
+      for atom in projection.atoms {
+        atoms.push(atom)
+      }
     }
   }
+  if children.length() == 0 {
+    return Err("loom atom projection expected dollar stack lines")
+  }
+  Ok({ expr: StackExpr(children), atoms })
 }
 
 ///|

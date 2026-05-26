@@ -13,6 +13,14 @@ test "SPIKE step 1: note() primary parses with zero diagnostics" {
 }
 
 ///|
+test "SPIKE step 1: dollar stack program parses with zero diagnostics" {
+  let (_cst, diagnostics) = try! parse_cst(
+    "$: s(\"bd\")\n$: note(\"60\")",
+  )
+  inspect(diagnostics.length(), content="0")
+}
+
+///|
 test "SPIKE step 1: stack() with single arg parses with zero diagnostics" {
   let (_cst, diagnostics) = try! parse_cst("stack(s(\"bd\"))")
   inspect(diagnostics.length(), content="0")

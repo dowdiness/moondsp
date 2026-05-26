@@ -174,6 +174,31 @@ test "loom atom projection matches mini PatternDoc for plain stack" {
 }
 
 ///|
+test "loom atom projection matches mini PatternDoc for dollar stack" {
+  projection_boundary_assert_matches_mini_doc(
+    "$: s(\"bd\")\n$: note(\"60\")",
+  )
+}
+
+///|
+test "loom atom projection matches mini PatternDoc after dollar stack line insertion" {
+  let input = "$: s(\"bd\")"
+  let edited = "$: s(\"bd\")\n$: note(\"60\")"
+  let (loom_ids, mini_ids) = projection_boundary_ids_after_edit(
+    input,
+    edited,
+    @core.Edit::insert(10, 14),
+    old_start=10,
+    old_end=10,
+    new_end=24,
+  )
+  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
+  let expected =
+    #|["mini:sound:bd:0", "mini:note:60:0"]
+  debug_inspect(loom_ids, content=expected)
+}
+
+///|
 test "loom atom projection matches mini PatternDoc for fast method" {
   let input = "s(\"bd sd\").fast(2)"
   let projection = LoomMiniAtomProjection::new(input)

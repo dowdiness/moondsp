@@ -31,6 +31,9 @@ pub(all) enum MiniSyntaxKind {
   SubNotationNode
   PostfixNode
   EuclidNode
+  DollarColonToken
+  DollarStackNode
+  DollarLineNode
 } derive(Debug, Eq)
 
 ///|
@@ -73,6 +76,9 @@ pub impl @seam.ToRawKind for MiniSyntaxKind with fn to_raw(self) {
       SubNotationNode => 28
       PostfixNode => 29
       EuclidNode => 30
+      DollarColonToken => 31
+      DollarStackNode => 32
+      DollarLineNode => 33
     },
   )
 }
@@ -117,6 +123,9 @@ pub fn MiniSyntaxKind::from_raw(raw : @seam.RawKind) -> MiniSyntaxKind {
     28 => SubNotationNode
     29 => PostfixNode
     30 => EuclidNode
+    31 => DollarColonToken
+    32 => DollarStackNode
+    33 => DollarLineNode
     _ => ErrorToken
   }
 }

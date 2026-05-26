@@ -51,6 +51,10 @@ pub fn mini_step_lexer(
       ignore(cursor.advance_char())
       cursor.produced(SKeyword)
     }
+    ['$', ':', .. rest] => {
+      cursor.set_view(rest)
+      cursor.produced(DollarColon)
+    }
     ['(', .. rest] => {
       cursor.set_view(rest)
       cursor.produced(LParen)
