@@ -383,7 +383,7 @@
         <dl>
           <dt>s("…")</dt><dd>drum sounds</dd>
           <dt>note("…")</dt><dd>MIDI numbers</dd>
-          <dt>stack(p, q)</dt><dd>combine layers</dd>
+          <dt>$: p<br>$: q</dt><dd>combine top-level layers</dd>
         </dl>
 
         <h2>Inside the string</h2>
@@ -425,11 +425,11 @@
         <button type="button" class="example" data-example='s("bd*4").every(3, fast(2))'>s("bd*4").every(3, fast(2))</button>
         <button type="button" class="example" data-example='note("60 64 67 72").jux(rev)'>note("60 64 67 72").jux(rev)</button>
         <button type="button" class="example" data-example='s("[bd sd, hh*8]").degradeBy(0.3)'>s("[bd sd, hh*8]").degradeBy(0.3)</button>
-        <button type="button" class="example" data-example='stack(s("bd sd hh sd"), note("60 64 67 72"))'>stack(s("bd sd hh sd"), note("60 64 67 72"))</button>
+        <button type="button" class="example" data-example='$: s("bd sd hh sd")&#10;$: note("60 64 67 72")'>$: s("bd sd hh sd") / $: note("60 64 67 72")</button>
         <button type="button" class="example" data-example='note("60(3,8) 64(2,8,2) 67(3,8) 64(2,8) 60(3,8) 62(2,8,3) 64(3,8) 67(2,8)").slow(4).every(4, rev)'>note("60(3,8) 64(2,8,2) 67(3,8) 64(2,8) 60(3,8) 62(2,8,3) 64(3,8) 67(2,8)").slow(4).every(4, rev)</button>
-        <button type="button" class="example" data-example='stack(s("bd(3,8), hh(5,16)?, sd(2,8,4)").slow(2), note("48(3,8) 60(2,8,2) 67(3,8) 60(2,8,3) 48(3,8)").slow(3))'>stack(s("bd(3,8), hh(5,16)?, sd(2,8,4)").slow(2), note("48(3,8) 60(2,8,2) 67(3,8) 60(2,8,3) 48(3,8)").slow(3))</button>
+        <button type="button" class="example" data-example='$: s("bd(3,8), hh(5,16)?, sd(2,8,4)").slow(2)&#10;$: note("48(3,8) 60(2,8,2) 67(3,8) 60(2,8,3) 48(3,8)").slow(3)'>$: s("bd(3,8), hh(5,16)?, sd(2,8,4)").slow(2) / $: note("48…").slow(3)</button>
         <button type="button" class="example" data-example='note("48(3,8) 55(2,8,2) 60(3,8) 64(2,8) 67(3,8) 72(1,8)? 67(2,8,2) 60(3,8)").slow(4).jux(rev)'>note("48(3,8) 55(2,8,2) 60(3,8) 64(2,8) 67(3,8) 72(1,8)? 67(2,8,2) 60(3,8)").slow(4).jux(rev)</button>
-        <button type="button" class="example" data-example='stack(s("bd(1,4), sd(1,4,2)").slow(2), note("46*4 60*8, 40*16 192(1,16)?").slow(2)).jux(slow(2))'>stack(s("bd(1,4), sd(1,4,2)").slow(2), note("46*4 60*8, 40*16 192(1,16)?").slow(2)).jux(slow(2))</button>
+        <button type="button" class="example" data-example='$: s("bd(1,4), sd(1,4,2)").slow(2).jux(slow(2))&#10;$: note("46*4 60*8, 40*16 192(1,16)?").slow(2).jux(slow(2))'>$: s("bd…").slow(2).jux(slow(2)) / $: note("46…").slow(2).jux(slow(2))</button>
       </aside>
     </main>
     <footer>

@@ -531,6 +531,12 @@ fn parse_doc_internal(
   tokens? : Array[MiniToken]? = None,
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
   guard input.length() > 0 else { return Err("empty input") }
+  match mini_collect_dollar_stack_lines(input) {
+    Err(msg) => return Err(msg)
+    Ok(Some(lines)) =>
+      return parse_doc_dollar_stack_program(input, previous, lines, tokens~)
+    Ok(None) => ()
+  }
   let p = Parser::new(input)
   let builder = MiniDocBuilder::new(previous~, tokens~)
   let result = p.parse_doc_expr(builder) catch {
@@ -543,6 +549,33 @@ fn parse_doc_internal(
     )
   }
   Ok(result)
+}
+
+///|
+fn parse_doc_dollar_stack_program(
+  input : String,
+  previous : @pattern.PatternDoc[@pattern.ControlMap]?,
+  lines : Array[MiniDollarStackLine],
+  tokens? : Array[MiniToken]? = None,
+) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
+  let parser = Parser::new(input)
+  let builder = MiniDocBuilder::new(previous~, tokens~)
+  let args : Array[@pattern.PatternDoc[@pattern.ControlMap]] = []
+  for line in lines {
+    parser.pos = line.start
+    let doc = parser.parse_doc_expr(builder) catch {
+      ParseError(msg) => return Err(msg)
+    }
+    parser.skip_whitespace()
+    if parser.pos != line.end {
+      return Err(
+        "position \{parser.pos}: unexpected trailing input '\{input[parser.pos:line.end].to_owned()}'",
+      )
+    }
+    args.push(doc)
+  }
+  let doc = builder.stack_doc(args) catch { ParseError(msg) => return Err(msg) }
+  Ok(doc)
 }
 
 ///|

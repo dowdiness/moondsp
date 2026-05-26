@@ -17,7 +17,8 @@ import type { Diagnostic, UserIntent } from "./canopy";
 import { AudioEngine } from "./audio";
 import type { AudioStatus, WorkletReply } from "./audio";
 
-const INITIAL = `s("bd(3,8), hh*16?, sd(2,8,2)").jux(rev)`;
+const INITIAL = `$: s("bd(3,8), hh*16?, sd(2,8,2)").jux(rev)
+$: note("48(3,8) 60(2,8,2) 67(3,8) 60(2,8,3)").slow(3)`;
 const DEBOUNCE_MS = 200;
 const DEFAULT_BPM = 120;
 const DEFAULT_GAIN = 0.6;
