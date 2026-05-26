@@ -31,6 +31,28 @@ priv struct LoomMiniProjectedAtom {
 }
 
 ///|
+priv enum LoomMiniNotationElement {
+  AtomElement(LoomMiniRawAtom)
+  SubNotationElement(
+    Array[Array[LoomMiniNotationElement]],
+    Array[LoomMiniAtomPostfix],
+  )
+}
+
+///|
+priv struct LoomMiniRawNotation {
+  layers : Array[Array[LoomMiniNotationElement]]
+  atoms : Array[LoomMiniRawAtom]
+}
+
+///|
+priv struct LoomMiniSubNotationProjection {
+  layers : Array[Array[LoomMiniNotationElement]]
+  atoms : Array[LoomMiniRawAtom]
+  postfixes : Array[LoomMiniAtomPostfix]
+}
+
+///|
 priv enum LoomMiniMethodCall {
   FastMethod(Int)
   SlowMethod(Int)
@@ -39,7 +61,7 @@ priv enum LoomMiniMethodCall {
 
 ///|
 priv enum LoomMiniExpr {
-  AtomGroupExpr(Array[LoomMiniRawAtom])
+  NotationExpr(Array[Array[LoomMiniNotationElement]])
   StackExpr(Array[LoomMiniExpr])
   MethodChainExpr(LoomMiniExpr, Array[LoomMiniMethodCall])
 }
@@ -271,11 +293,11 @@ fn loom_mini_collect_atom_group_expr(
   call : @seam.SyntaxNode,
   kind : LoomMiniAtomKind,
 ) -> Result[LoomMiniRawProjection, String] {
-  let atoms = match loom_mini_collect_plain_call_atoms(call, kind) {
-    Ok(atoms) => atoms
+  let notation = match loom_mini_collect_call_notation(call, kind) {
+    Ok(notation) => notation
     Err(msg) => return Err(msg)
   }
-  Ok({ expr: AtomGroupExpr(atoms), atoms })
+  Ok({ expr: NotationExpr(notation.layers), atoms: notation.atoms })
 }
 
 ///|
@@ -385,59 +407,124 @@ fn loom_mini_parse_int(text : String) -> Result[Int, String] {
 }
 
 ///|
-fn loom_mini_collect_plain_call_atoms(
+fn loom_mini_collect_call_notation(
   call : @seam.SyntaxNode,
   kind : LoomMiniAtomKind,
-) -> Result[Array[LoomMiniRawAtom], String] {
+) -> Result[LoomMiniRawNotation, String] {
   let notation = match
     loom_mini_direct_children_of_kind(call, NotationNode.to_raw()) {
     [notation, ..] => notation
     [] => return Err("loom atom projection expected notation")
   }
-  if loom_mini_direct_layer_count(notation) != 1 ||
-    loom_mini_contains_node_kind(notation, SubNotationNode.to_raw()) {
-    return Err("loom atom projection only supports one plain atom layer")
+  loom_mini_collect_notation(notation, kind)
+}
+
+///|
+fn loom_mini_collect_notation(
+  notation : @seam.SyntaxNode,
+  kind : LoomMiniAtomKind,
+) -> Result[LoomMiniRawNotation, String] {
+  let layer_nodes = loom_mini_direct_children_of_kind(
+    notation,
+    LayerNode.to_raw(),
+  )
+  if layer_nodes.length() == 0 {
+    return Err("loom atom projection expected at least one atom")
   }
+  let layers : Array[Array[LoomMiniNotationElement]] = []
   let atoms : Array[LoomMiniRawAtom] = []
-  fn visit(node : @seam.SyntaxNode) -> Result[Unit, String] {
-    if node.kind() == AtomNode.to_raw() {
-      let token = match kind {
-        SoundAtom => loom_mini_direct_token_of_kind(node, IdentToken.to_raw())
-        NoteAtom => loom_mini_direct_token_of_kind(node, NumberToken.to_raw())
-      }
-      match token {
-        Some(token) => {
-          let postfixes = match loom_mini_collect_atom_postfixes(node) {
-            Ok(postfixes) => postfixes
-            Err(msg) => return Err(msg)
-          }
-          atoms.push({
-            kind,
-            text: token.text(),
-            start: token.start(),
-            end: token.end(),
-            postfixes,
-          })
-        }
-        None => ()
-      }
+  for layer in layer_nodes {
+    let collected = match loom_mini_collect_layer(layer, kind) {
+      Ok(collected) => collected
+      Err(msg) => return Err(msg)
     }
-    for child in node.children() {
-      match visit(child) {
-        Ok(_) => ()
-        Err(msg) => return Err(msg)
-      }
+    layers.push(collected.layers[0])
+    for atom in collected.atoms {
+      atoms.push(atom)
     }
-    Ok(())
-  }
-  match visit(notation) {
-    Ok(_) => ()
-    Err(msg) => return Err(msg)
   }
   if atoms.length() == 0 {
     Err("loom atom projection expected at least one atom")
   } else {
-    Ok(atoms)
+    Ok({ layers, atoms })
+  }
+}
+
+///|
+fn loom_mini_collect_layer(
+  layer : @seam.SyntaxNode,
+  kind : LoomMiniAtomKind,
+) -> Result[LoomMiniRawNotation, String] {
+  let elements : Array[LoomMiniNotationElement] = []
+  let atoms : Array[LoomMiniRawAtom] = []
+  for child in layer.children() {
+    if child.kind() == AtomNode.to_raw() {
+      match loom_mini_collect_raw_atom(child, kind) {
+        Ok(Some(atom)) => {
+          elements.push(AtomElement(atom))
+          atoms.push(atom)
+        }
+        Ok(None) => ()
+        Err(msg) => return Err(msg)
+      }
+    } else if child.kind() == SubNotationNode.to_raw() {
+      let collected = match loom_mini_collect_sub_notation(child, kind) {
+        Ok(collected) => collected
+        Err(msg) => return Err(msg)
+      }
+      elements.push(SubNotationElement(collected.layers, collected.postfixes))
+      for atom in collected.atoms {
+        atoms.push(atom)
+      }
+    }
+  }
+  if elements.length() == 0 {
+    Err("loom atom projection expected at least one atom")
+  } else {
+    Ok({ layers: [elements], atoms })
+  }
+}
+
+///|
+fn loom_mini_collect_sub_notation(
+  sub_notation : @seam.SyntaxNode,
+  kind : LoomMiniAtomKind,
+) -> Result[LoomMiniSubNotationProjection, String] {
+  let notation = match loom_mini_collect_notation(sub_notation, kind) {
+    Ok(notation) => notation
+    Err(msg) => return Err(msg)
+  }
+  let postfixes = match loom_mini_collect_atom_postfixes(sub_notation) {
+    Ok(postfixes) => postfixes
+    Err(msg) => return Err(msg)
+  }
+  Ok({ layers: notation.layers, atoms: notation.atoms, postfixes })
+}
+
+///|
+fn loom_mini_collect_raw_atom(
+  atom : @seam.SyntaxNode,
+  kind : LoomMiniAtomKind,
+) -> Result[LoomMiniRawAtom?, String] {
+  let token = match kind {
+    SoundAtom => loom_mini_direct_token_of_kind(atom, IdentToken.to_raw())
+    NoteAtom => loom_mini_direct_token_of_kind(atom, NumberToken.to_raw())
+  }
+  match token {
+    Some(token) => {
+      let postfixes = match loom_mini_collect_atom_postfixes(atom) {
+        Ok(postfixes) => postfixes
+        Err(msg) => return Err(msg)
+      }
+      Ok(Some({
+        kind,
+        text: token.text(),
+        start: token.start(),
+        end: token.end(),
+        postfixes,
+      }))
+    }
+    None => Ok(None)
   }
 }
 
@@ -535,33 +622,6 @@ fn loom_mini_collect_numeric_atom_postfix(
   } else {
     Ok(SlowPostfix(factor))
   }
-}
-
-///|
-fn loom_mini_contains_node_kind(
-  node : @seam.SyntaxNode,
-  kind : @seam.RawKind,
-) -> Bool {
-  if node.kind() == kind {
-    return true
-  }
-  for child in node.children() {
-    if loom_mini_contains_node_kind(child, kind) {
-      return true
-    }
-  }
-  false
-}
-
-///|
-fn loom_mini_direct_layer_count(node : @seam.SyntaxNode) -> Int {
-  let mut count = 0
-  for child in node.children() {
-    if child.kind() == LayerNode.to_raw() {
-      count += 1
-    }
-  }
-  count
 }
 
 ///|
@@ -832,8 +892,7 @@ fn loom_mini_lower_expr(
   cursor : LoomMiniProjectedCursor,
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
   match expr {
-    AtomGroupExpr(raw_atoms) =>
-      loom_mini_lower_atom_group(builder, raw_atoms, cursor)
+    NotationExpr(layers) => loom_mini_lower_notation(builder, layers, cursor)
     StackExpr(children) => {
       let docs : Array[@pattern.PatternDoc[@pattern.ControlMap]] = []
       for child in children {
@@ -885,37 +944,73 @@ fn loom_mini_apply_method_chain(
 }
 
 ///|
-fn loom_mini_lower_atom_group(
+fn loom_mini_lower_notation(
   builder : @mini.MiniDocBuilder,
-  raw_atoms : Array[LoomMiniRawAtom],
+  layers : Array[Array[LoomMiniNotationElement]],
   cursor : LoomMiniProjectedCursor,
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
   let docs : Array[@pattern.PatternDoc[@pattern.ControlMap]] = []
-  for raw in raw_atoms {
-    if cursor.offset >= cursor.atoms.length() {
-      return Err("internal loom mini atom grouping mismatch")
-    }
-    let atom_doc = match
-      loom_mini_atom_doc(builder, cursor.atoms[cursor.offset]) {
-      Ok(doc) => doc
-      Err(msg) => return Err(msg)
-    }
-    match loom_mini_apply_atom_postfixes(builder, atom_doc, raw.postfixes) {
+  for layer in layers {
+    match loom_mini_lower_layer(builder, layer, cursor) {
       Ok(doc) => docs.push(doc)
       Err(msg) => return Err(msg)
     }
-    cursor.offset += 1
+  }
+  builder.stack(docs)
+}
+
+///|
+fn loom_mini_lower_layer(
+  builder : @mini.MiniDocBuilder,
+  elements : Array[LoomMiniNotationElement],
+  cursor : LoomMiniProjectedCursor,
+) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
+  let docs : Array[@pattern.PatternDoc[@pattern.ControlMap]] = []
+  for element in elements {
+    match loom_mini_lower_element(builder, element, cursor) {
+      Ok(doc) => docs.push(doc)
+      Err(msg) => return Err(msg)
+    }
   }
   builder.sequence(docs)
 }
 
 ///|
-fn loom_mini_apply_atom_postfixes(
+fn loom_mini_lower_element(
   builder : @mini.MiniDocBuilder,
-  atom_doc : @pattern.PatternDoc[@pattern.ControlMap],
+  element : LoomMiniNotationElement,
+  cursor : LoomMiniProjectedCursor,
+) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
+  match element {
+    AtomElement(raw) => {
+      if cursor.offset >= cursor.atoms.length() {
+        return Err("internal loom mini atom grouping mismatch")
+      }
+      let atom_doc = match
+        loom_mini_atom_doc(builder, cursor.atoms[cursor.offset]) {
+        Ok(doc) => doc
+        Err(msg) => return Err(msg)
+      }
+      cursor.offset += 1
+      loom_mini_apply_postfixes(builder, atom_doc, raw.postfixes)
+    }
+    SubNotationElement(layers, postfixes) => {
+      let doc = match loom_mini_lower_notation(builder, layers, cursor) {
+        Ok(doc) => doc
+        Err(msg) => return Err(msg)
+      }
+      loom_mini_apply_postfixes(builder, doc, postfixes)
+    }
+  }
+}
+
+///|
+fn loom_mini_apply_postfixes(
+  builder : @mini.MiniDocBuilder,
+  base_doc : @pattern.PatternDoc[@pattern.ControlMap],
   postfixes : Array[LoomMiniAtomPostfix],
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
-  let doc = for postfix in postfixes; doc = atom_doc {
+  let doc = for postfix in postfixes; doc = base_doc {
     match postfix {
       StarPostfix(factor) =>
         match builder.fast(doc, @pattern.Rational::from_int(factor)) {
