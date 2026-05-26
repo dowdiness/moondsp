@@ -3,7 +3,7 @@
 - **Status:** Proposed
 - **Date:** 2026-05-25
 - **Source:** Follow-up design pass after PR #76 grammar parity, updated with
-  PR #85 apply-edit parity evidence
+  PR #85 apply-edit parity evidence and later mini-syntax parity work
 
 ## Context
 
@@ -52,10 +52,10 @@ The loom spec path now proves these evaluation-only contracts:
   including the live-demo pattern from PR #76, with zero diagnostics.
 - `@loom.new_parser(...).apply_edit(...)` has nonzero reuse coverage across
   several method, postfix, sub-notation, and layer-comma edits.
-- The spec-local projection can lower a limited private IR to `PatternDoc` for
-  atom groups, stacks, `.fast`, `.slow`, `.rev`, chained root methods, and
-  atom `*N` postfixes, then compare public root/leaf IDs against
-  `@mini.parse_doc`.
+- The spec-local projection can lower a private recursive notation IR to
+  `PatternDoc` for atom groups, stacks, sub-notation/groups, `.fast`, `.slow`,
+  `.rev`, chained root methods, and atom/group postfixes for `*N`, `/N`, `?`,
+  and Euclid, then compare public root/leaf IDs against `@mini.parse_doc`.
 - PR #85 expanded apply-edit parity against `MiniAuthoringPipeline` for
   duplicate sound/note insertion and deletion, unaffected-token replacement,
   whitespace-only insertion, method-name replacement, duplicate-note edits, and
@@ -79,8 +79,8 @@ This ADR does not approve any of the following:
 - Pulling the nested `specs/loom-mini-cst` path dependencies into releasable
   `moondsp` code.
 - Publishing, tagging, or otherwise unblocking a release.
-- Expanding the loom projection to `/`, `?`, Euclid, sub-notation, `jux`, or
-  `every` before the spec-local postfix and method-call IR shape is cleaned up.
+- Treating shipped spec-local parity for atom/group postfixes or sub-notation
+  as approval to route production parsing through loom.
 - Changing the public `Result[..., String]` error shape as a side effect of a
   parser implementation swap.
 
@@ -104,7 +104,8 @@ The following are not sufficient forcing functions by themselves:
 
 - Grammar parity in `specs/loom-mini-cst/`.
 - Nonzero CST reuse counts without full `PatternDoc` provenance parity.
-- PR #85's apply-edit parity slice while it remains spec-local and syntax-limited.
+- The shipped apply-edit and postfix/sub-notation parity slices while they
+  remain spec-local and syntax-limited.
 - A root-manifest migration or release-prep branch that does not prove a
   publishable loom dependency graph.
 - A desire to delete duplicate parser code while the current production path
@@ -122,10 +123,9 @@ A loom authoring switch would add real ownership and release cost:
 - Projection cost: the CST path needs a `SyntaxNode -> PatternDoc` projection
   that preserves public IDs, aggregate signatures, callback semantics, method
   lowering semantics, and parse-error behavior.
-- IR-shape cost: the current spec projection still has atom-local `fast_factor`
-  state and root-level method IR. That is enough for the present proof, but it
-  is not a shape to scale across more postfixes, sub-notation, or callback
-  methods without refactoring.
+- IR-shape cost: the current spec projection now has a recursive notation IR
+  for atom/group postfixes, but top-level program forms and callback methods
+  still need deliberate projection structures before promotion.
 - Compatibility cost: existing `MiniAuthoringPipeline` callers should not need
   to learn loom APIs. The public surface should remain text in, `PatternDoc` or
   snapshot out.
@@ -138,8 +138,9 @@ A loom authoring switch would add real ownership and release cost:
 
 ## Remaining promotion gates
 
-PR #85 closes several early apply-edit questions, but loom still cannot own
-mini authoring until these gates have direct evidence:
+The shipped apply-edit and postfix/sub-notation slices close several early
+questions, but loom still cannot own mini authoring until these gates have
+direct evidence:
 
 - **Full PatternDoc provenance:** duplicate-token insertion, deletion,
   replacement, whitespace edits, method edits, and recovery must preserve the
@@ -152,9 +153,9 @@ mini authoring until these gates have direct evidence:
   produce the same `PatternDoc` values and lowered event behavior for stack,
   method chains, callbacks, controls, Euclid, postfix, layers, and
   sub-notation.
-- **Projection IR shape:** atom postfixes and method calls need a deliberate IR
-  representation before adding `/`, `?`, Euclid, sub-notation, `jux`, or
-  `every` to the loom projection.
+- **Projection IR shape:** atom and group postfixes now have a more deliberate
+  recursive notation representation, but top-level `$:` programs and callback
+  methods still need explicit CST/projection coverage before promotion.
 - **Public error shape:** callers currently receive `Result[..., String]`.
   Either loom diagnostics must be adapted to that shape or the public API
   change needs a separate decision.
@@ -203,15 +204,13 @@ route production parsing through loom:
 
 1. Keep `specs/loom-mini-cst/` as the grammar, projection, and reuse
    characterization gate.
-2. Refactor the projection IR so atom postfixes and method calls are represented
-   deliberately instead of as atom-local `fast_factor` plus root-level method
-   wrappers.
-3. After that refactor, extend parity one syntax family at a time for `/`, `?`,
-   Euclid, sub-notation, `jux`, and `every`, comparing against `@mini.parse_doc`
-   and `MiniAuthoringPipeline` edit behavior.
-4. Keep PR #85's apply-edit parity cases as regression gates for any projection
+2. Extend parity one syntax family at a time for remaining production syntax,
+   starting with top-level `$:` stack programs, then `jux` and `every`,
+   comparing against `@mini.parse_doc` and `MiniAuthoringPipeline` edit
+   behavior.
+3. Keep PR #85's apply-edit parity cases as regression gates for any projection
    change.
-5. Only after full grammar, provenance, lowering, release-manifest, and browser
+4. Only after full grammar, provenance, lowering, release-manifest, and browser
    build gates pass, decide whether to put the projection behind
    `MiniAuthoringPipeline` as an authoring-only implementation detail.
 

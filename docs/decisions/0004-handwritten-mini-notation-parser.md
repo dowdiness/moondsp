@@ -10,6 +10,8 @@
 Phase 5 needed a mini-notation parser to take a TidalCycles-style pattern
 expression like `s("bd sd hh sd").fast(2)` and produce a `Pat[ControlMap]`
 that the existing scheduler/voice infrastructure could consume. The parser
+now also accepts Strudel-style top-level `$:` stack lines, but the same
+hand-written parser decision still applies. The parser
 runs **inside the AudioWorklet wasm instance** (so the main thread sends
 raw text and the worklet returns either a parsed pattern or an error
 message) — which means the parser must compile to **wasm-gc**.
@@ -32,16 +34,22 @@ cleanly for the wasm-gc target within the Phase 5 budget.
 Ship the fallback: a hand-written recursive-descent parser in
 `mini/parser.mbt`, with no path dependency on `loom` or `seam`.
 
-`mini/` ships with four files:
+Key `mini/` files:
 
-- `parser.mbt` — recursive-descent parser, `~420 LOC`. Implements the full
-  grammar in the spec (`expr`, `primary`, `method`, `notation`, `layer`,
-  `element`, `atom`).
+- `parser.mbt` — recursive-descent runtime parser. Implements top-level
+  expressions, `$:` stack programs, method chains, and quoted notation.
+- `doc_parser.mbt` — identity-bearing `PatternDoc` parser used by authoring
+  flows.
+- `incr_authoring.mbt` — incr-backed text → `PatternDoc` → snapshot pipeline
+  that wraps the hand-written parser and preserves the last successful doc
+  across parse errors.
+- `tokens.mbt` — token realignment helpers for source-edit identity reuse.
 - `drums.mbt` — `drum_midi(name) -> Int?` General-MIDI lookup (`bd`=36,
   `sd`=38, `hh`=42, etc.).
 - `mini.mbt` — public entry point.
 - `mini_test.mbt` — parser tests covering grammar, method chaining, error
-  cases, and position information in error messages.
+  cases, authoring reuse, `$:` stack lines, and position information in error
+  messages.
 
 `Pat::filter_map` (added to the `pattern/` package as part of the same
 phase) lets the browser layer split a parsed pattern into per-sound
