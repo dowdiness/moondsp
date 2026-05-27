@@ -130,6 +130,144 @@ fn projection_boundary_ids_after_edit(
 }
 
 ///|
+struct ProjectionProvenanceEditSpan {
+  old_start : Int
+  old_end : Int
+  new_end : Int
+}
+
+///|
+fn ProjectionProvenanceEditSpan::ProjectionProvenanceEditSpan(
+  old_start~ : Int,
+  old_end~ : Int,
+  new_end~ : Int,
+) -> ProjectionProvenanceEditSpan {
+  { old_start, old_end, new_end }
+}
+
+///|
+struct ProjectionProvenanceMatrixRow {
+  family : String
+  initial : String
+  edited : String
+  edit : @core.Edit
+  span : ProjectionProvenanceEditSpan
+  initial_diagnostics : Int
+  edited_diagnostics : Int
+  expected_lowered_event_ids : Array[String]
+}
+
+///|
+fn ProjectionProvenanceMatrixRow::ProjectionProvenanceMatrixRow(
+  family~ : String,
+  initial~ : String,
+  edited~ : String,
+  edit~ : @core.Edit,
+  span~ : ProjectionProvenanceEditSpan,
+  initial_diagnostics~ : Int,
+  edited_diagnostics~ : Int,
+  expected_lowered_event_ids~ : Array[String],
+) -> ProjectionProvenanceMatrixRow {
+  {
+    family,
+    initial,
+    edited,
+    edit,
+    span,
+    initial_diagnostics,
+    edited_diagnostics,
+    expected_lowered_event_ids,
+  }
+}
+
+///|
+fn projection_boundary_assert_int_equal(
+  label : String,
+  actual : Int,
+  expected : Int,
+) -> Unit {
+  if actual != expected {
+    abort("expected \{label} to be \{expected}, got \{actual}")
+  }
+}
+
+///|
+fn projection_boundary_assert_provenance_matrix_row(
+  row : ProjectionProvenanceMatrixRow,
+) -> Array[String] {
+  let (_initial_cst, initial_diagnostics) = try! parse_cst(row.initial)
+  projection_boundary_assert_int_equal(
+    "\{row.family} initial CST diagnostics",
+    initial_diagnostics.length(),
+    row.initial_diagnostics,
+  )
+  let (_edited_cst, edited_diagnostics) = try! parse_cst(row.edited)
+  projection_boundary_assert_int_equal(
+    "\{row.family} edited CST diagnostics",
+    edited_diagnostics.length(),
+    row.edited_diagnostics,
+  )
+  let projection = LoomMiniAtomProjection::new(row.initial)
+  ignore(projection_boundary_doc(projection.parse_doc()))
+  let pipeline = @mini.MiniAuthoringPipeline::new(row.initial)
+  ignore(projection_boundary_mini_snapshot(pipeline.parse_snapshot()))
+  projection.apply_edit(row.edit, row.edited)
+  pipeline.set_input_with_source_edit(
+    row.edited,
+    old_start=row.span.old_start,
+    old_end=row.span.old_end,
+    new_end=row.span.new_end,
+  )
+  let loom_doc = projection_boundary_doc(projection.parse_doc())
+  let mini_doc = projection_boundary_doc(pipeline.parse_doc())
+  if loom_doc.root().value() != mini_doc.root().value() {
+    abort("expected \{row.family} loom and mini root IDs to match")
+  }
+  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
+  let mini_ids = projection_boundary_leaf_ids(
+    projection_boundary_mini_snapshot(pipeline.parse_snapshot()),
+  )
+  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
+  projection_boundary_assert_ids_equal(row.expected_lowered_event_ids, loom_ids)
+  projection.dispose()
+  pipeline.dispose()
+  loom_ids
+}
+
+///|
+test "loom provenance matrix row covers duplicate sound insertion" {
+  let ids = projection_boundary_assert_provenance_matrix_row(
+    ProjectionProvenanceMatrixRow(
+      family="duplicate sound atoms",
+      initial="s(\"bd sd bd\")",
+      edited="s(\"bd sd bd bd\")",
+      edit=@core.Edit::insert(9, 3),
+      span=ProjectionProvenanceEditSpan(
+        old_start=9,
+        old_end=9,
+        new_end=12,
+      ),
+      initial_diagnostics=0,
+      edited_diagnostics=0,
+      expected_lowered_event_ids=[
+        "mini:sound:bd:0",
+        "mini:sound:sd:0",
+        "mini:sound:bd:2",
+        "mini:sound:bd:1",
+      ],
+    ),
+  )
+  let expected =
+    #|[
+    #|  "mini:sound:bd:0",
+    #|  "mini:sound:sd:0",
+    #|  "mini:sound:bd:2",
+    #|  "mini:sound:bd:1",
+    #|]
+  debug_inspect(ids, content=expected)
+}
+
+///|
 test "loom atom projection matches mini PatternDoc for duplicate sound atoms" {
   let input = "s(\"bd sd bd\")"
   let projection = LoomMiniAtomProjection::new(input)
