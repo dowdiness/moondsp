@@ -834,6 +834,56 @@ test "loom atom projection preserves atom provenance across every callback repla
 }
 
 ///|
+test "loom atom projection preserves atom provenance across dollar stack jux callback replacement" {
+  let input = "$: s(\"bd sd\").jux(rev)\n$: note(\"60 64\")"
+  let edited = "$: s(\"bd sd\").jux(fast(2))\n$: note(\"60 64\")"
+  let projection = LoomMiniAtomProjection::new(input)
+  ignore(projection_boundary_doc(projection.parse_doc()))
+  let pipeline = @mini.MiniAuthoringPipeline::new(input)
+  ignore(projection_boundary_mini_snapshot(pipeline.parse_snapshot()))
+  projection.apply_edit(@core.Edit::replace(18, 21, 25), edited)
+  pipeline.set_input_with_source_edit(
+    edited,
+    old_start=18,
+    old_end=21,
+    new_end=25,
+  )
+  let loom_doc = projection_boundary_doc(projection.parse_doc())
+  let mini_doc = projection_boundary_doc(pipeline.parse_doc())
+  @debug.assert_eq(loom_doc.root().value(), mini_doc.root().value())
+  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
+  let mini_ids = projection_boundary_leaf_ids_from_doc(mini_doc)
+  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
+  projection.dispose()
+  pipeline.dispose()
+}
+
+///|
+test "loom atom projection preserves atom provenance across dollar stack every callback replacement" {
+  let input = "$: s(\"bd sd\")\n$: note(\"60 64\").every(2, rev)"
+  let edited = "$: s(\"bd sd\")\n$: note(\"60 64\").every(2, fast(2))"
+  let projection = LoomMiniAtomProjection::new(input)
+  ignore(projection_boundary_doc(projection.parse_doc()))
+  let pipeline = @mini.MiniAuthoringPipeline::new(input)
+  ignore(projection_boundary_mini_snapshot(pipeline.parse_snapshot()))
+  projection.apply_edit(@core.Edit::replace(40, 43, 47), edited)
+  pipeline.set_input_with_source_edit(
+    edited,
+    old_start=40,
+    old_end=43,
+    new_end=47,
+  )
+  let loom_doc = projection_boundary_doc(projection.parse_doc())
+  let mini_doc = projection_boundary_doc(pipeline.parse_doc())
+  @debug.assert_eq(loom_doc.root().value(), mini_doc.root().value())
+  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
+  let mini_ids = projection_boundary_leaf_ids_from_doc(mini_doc)
+  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
+  projection.dispose()
+  pipeline.dispose()
+}
+
+///|
 test "loom atom projection reports diagnostics and recovers with previous provenance" {
   let input = "s(\"bd sd bd\")"
   let malformed = "s(\"bd sd bd bd\""
