@@ -268,6 +268,170 @@ test "loom provenance matrix row covers duplicate sound insertion" {
 }
 
 ///|
+test "loom provenance matrix row covers duplicate note insertion" {
+  let ids = projection_boundary_assert_provenance_matrix_row(
+    ProjectionProvenanceMatrixRow(
+      family="duplicate note atoms",
+      initial="note(\"60 62 60\")",
+      edited="note(\"60 62 60 60\")",
+      edit=@core.Edit::insert(12, 3),
+      span=ProjectionProvenanceEditSpan(
+        old_start=12,
+        old_end=12,
+        new_end=15,
+      ),
+      initial_diagnostics=0,
+      edited_diagnostics=0,
+      expected_lowered_event_ids=[
+        "mini:note:60:0",
+        "mini:note:62:0",
+        "mini:note:60:2",
+        "mini:note:60:1",
+      ],
+    ),
+  )
+  let expected =
+    #|[
+    #|  "mini:note:60:0",
+    #|  "mini:note:62:0",
+    #|  "mini:note:60:2",
+    #|  "mini:note:60:1",
+    #|]
+  debug_inspect(ids, content=expected)
+}
+
+///|
+test "loom provenance matrix row covers duplicate sound deletion" {
+  let ids = projection_boundary_assert_provenance_matrix_row(
+    ProjectionProvenanceMatrixRow(
+      family="duplicate sound atoms",
+      initial="s(\"bd sd bd\")",
+      edited="s(\"bd bd\")",
+      edit=@core.Edit::delete(5, 8),
+      span=ProjectionProvenanceEditSpan(
+        old_start=5,
+        old_end=8,
+        new_end=5,
+      ),
+      initial_diagnostics=0,
+      edited_diagnostics=0,
+      expected_lowered_event_ids=[
+        "mini:sound:bd:0",
+        "mini:sound:bd:1",
+      ],
+    ),
+  )
+  let expected =
+    #|["mini:sound:bd:0", "mini:sound:bd:1"]
+  debug_inspect(ids, content=expected)
+}
+
+///|
+test "loom provenance matrix row covers duplicate note deletion" {
+  let ids = projection_boundary_assert_provenance_matrix_row(
+    ProjectionProvenanceMatrixRow(
+      family="duplicate note atoms",
+      initial="note(\"60 62 60\")",
+      edited="note(\"60 60\")",
+      edit=@core.Edit::delete(8, 11),
+      span=ProjectionProvenanceEditSpan(
+        old_start=8,
+        old_end=11,
+        new_end=8,
+      ),
+      initial_diagnostics=0,
+      edited_diagnostics=0,
+      expected_lowered_event_ids=[
+        "mini:note:60:0",
+        "mini:note:60:1",
+      ],
+    ),
+  )
+  let expected =
+    #|["mini:note:60:0", "mini:note:60:1"]
+  debug_inspect(ids, content=expected)
+}
+
+///|
+test "loom provenance matrix row covers sound atom replacement" {
+  let ids = projection_boundary_assert_provenance_matrix_row(
+    ProjectionProvenanceMatrixRow(
+      family="sound atom replacement",
+      initial="s(\"bd sd hh\")",
+      edited="s(\"bd cp hh\")",
+      edit=@core.Edit::replace(6, 8, 8),
+      span=ProjectionProvenanceEditSpan(
+        old_start=6,
+        old_end=8,
+        new_end=8,
+      ),
+      initial_diagnostics=0,
+      edited_diagnostics=0,
+      expected_lowered_event_ids=[
+        "mini:sound:bd:0",
+        "mini:sound:cp:0",
+        "mini:sound:hh:0",
+      ],
+    ),
+  )
+  let expected =
+    #|["mini:sound:bd:0", "mini:sound:cp:0", "mini:sound:hh:0"]
+  debug_inspect(ids, content=expected)
+}
+
+///|
+test "loom provenance matrix row covers whitespace-only edit" {
+  let ids = projection_boundary_assert_provenance_matrix_row(
+    ProjectionProvenanceMatrixRow(
+      family="whitespace edit",
+      initial="s(\"bd sd\")",
+      edited="s(\"bd   sd\")",
+      edit=@core.Edit::insert(6, 2),
+      span=ProjectionProvenanceEditSpan(
+        old_start=6,
+        old_end=6,
+        new_end=8,
+      ),
+      initial_diagnostics=0,
+      edited_diagnostics=0,
+      expected_lowered_event_ids=[
+        "mini:sound:bd:0",
+        "mini:sound:sd:0",
+      ],
+    ),
+  )
+  let expected =
+    #|["mini:sound:bd:0", "mini:sound:sd:0"]
+  debug_inspect(ids, content=expected)
+}
+
+///|
+test "loom provenance matrix row covers dollar stack line insertion" {
+  let ids = projection_boundary_assert_provenance_matrix_row(
+    ProjectionProvenanceMatrixRow(
+      family="dollar stack line insertion",
+      initial="$: s(\"bd\")",
+      edited="$: s(\"bd\")\n$: note(\"60\")",
+      edit=@core.Edit::insert(10, 14),
+      span=ProjectionProvenanceEditSpan(
+        old_start=10,
+        old_end=10,
+        new_end=24,
+      ),
+      initial_diagnostics=0,
+      edited_diagnostics=0,
+      expected_lowered_event_ids=[
+        "mini:sound:bd:0",
+        "mini:note:60:0",
+      ],
+    ),
+  )
+  let expected =
+    #|["mini:sound:bd:0", "mini:note:60:0"]
+  debug_inspect(ids, content=expected)
+}
+
+///|
 test "loom atom projection matches mini PatternDoc for duplicate sound atoms" {
   let input = "s(\"bd sd bd\")"
   let projection = LoomMiniAtomProjection::new(input)
