@@ -10,17 +10,39 @@ async function setRangeValue(page, selector, value) {
   }, value);
 }
 
-async function renderPeaks(page) {
-  const [overall, left, right] = await Promise.all([
-    page.locator('#renderPeakValue').textContent(),
-    page.locator('#renderLeftPeakValue').textContent(),
-    page.locator('#renderRightPeakValue').textContent(),
-  ]);
-  return {
-    overall: Number.parseFloat(overall || '0'),
-    left: Number.parseFloat(left || '0'),
-    right: Number.parseFloat(right || '0'),
-  };
+async function telemetryHistory(page) {
+  return page.evaluate(() => window.__moondspTelemetryHistory || []);
+}
+
+async function currentTelemetry(page) {
+  return page.evaluate(() => window.__moondspTelemetry);
+}
+
+async function waitForAnyTelemetryPeak(page, threshold = 0, afterSequence = 0) {
+  let matched = null;
+  await expect
+    .poll(async () => {
+      const history = await telemetryHistory(page);
+      matched = history.find(
+        t => t.sequence > afterSequence && t.overallPeak > threshold,
+      ) || null;
+      return matched ? matched.overallPeak : 0;
+    }, { timeout: 10_000 })
+    .toBeGreaterThan(threshold);
+  return matched;
+}
+
+async function resetPatternStatus(page) {
+  await page.locator('#patternStatus').evaluate(element => {
+    element.textContent = '';
+    element.classList.remove('pattern-status-ok', 'pattern-status-err');
+  });
+}
+
+async function waitForNewPatternAudio(page) {
+  await expect(page.locator('#patternStatus')).toContainText('Pattern updated');
+  const baseline = (await currentTelemetry(page))?.sequence || 0;
+  await waitForAnyTelemetryPeak(page, 0, baseline);
 }
 
 async function startScheduler(page) {
@@ -33,18 +55,13 @@ test.describe('Scheduler Initialization', () => {
   test('Scheduler starts and produces audio', async ({ page }) => {
     // 1. Click the "Scheduler" button and wait for audio running status
     await startScheduler(page);
+    await expect(page.locator('#patternStatus')).toContainText('Pattern updated', { timeout: 5_000 });
 
-    // 2. Wait for audio to process and telemetry to arrive
-    await expect
-      .poll(async () => {
-        const peaks = await renderPeaks(page);
-        return peaks.overall;
-      }, { timeout: 10_000 })
-      .toBeGreaterThan(0);
-
-    // 3. Verify signal is flowing
-    const peaks = await renderPeaks(page);
-    expect(peaks.overall).toBeGreaterThan(0);
+    // 2. Wait for at least one non-silent telemetry block. Scheduler output
+    // is rhythmic, so the latest block can legitimately be silent after a
+    // successful pulse; checking history avoids racing an instantaneous gap.
+    const telemetry = await waitForAnyTelemetryPeak(page);
+    expect(telemetry.overallPeak).toBeGreaterThan(0);
   });
 
   test('Default pattern auto-evaluates', async ({ page }) => {
@@ -61,41 +78,29 @@ test.describe('Pattern Text Input', () => {
     await startScheduler(page);
     await expect(page.locator('#patternStatus')).toContainText('Pattern updated', { timeout: 5_000 });
 
-    // Clear and type new pattern
+    // Clear and type new pattern. Reset the status first so the assertion
+    // proves this submission was accepted, not the default auto-eval.
+    await resetPatternStatus(page);
     await page.locator('#patternInput').fill('s("bd sd hh sd")');
     await page.click('button:has-text("Eval")');
 
-    // Verify pattern was accepted
-    await expect(page.locator('#patternStatus')).toContainText('Pattern updated');
-
-    // Poll for audio signal — peaks reflect the most recent audio block, so
-    // a 300ms hardcoded wait can miss the signal on slow workers.
-    await expect
-      .poll(async () => {
-        const peaks = await renderPeaks(page);
-        return peaks.overall;
-      }, { timeout: 10_000 })
-      .toBeGreaterThan(0);
+    // Poll for audio after the accepted edit. Scheduler output is rhythmic,
+    // so use telemetry history rather than the latest block only.
+    await waitForNewPatternAudio(page);
   });
 
   test('Eval a note pattern via Enter key', async ({ page }) => {
     await startScheduler(page);
     await expect(page.locator('#patternStatus')).toContainText('Pattern updated', { timeout: 5_000 });
 
-    // Clear, type, and press Enter
+    // Clear, type, and press Enter. Reset the status first so the assertion
+    // proves this submission was accepted, not the default auto-eval.
+    await resetPatternStatus(page);
     await page.locator('#patternInput').fill('note("60 64 67")');
     await page.locator('#patternInput').press('Enter');
 
-    // Verify pattern was accepted
-    await expect(page.locator('#patternStatus')).toContainText('Pattern updated');
-
     // Poll for audio signal — same reason as drum pattern test above.
-    await expect
-      .poll(async () => {
-        const peaks = await renderPeaks(page);
-        return peaks.overall;
-      }, { timeout: 10_000 })
-      .toBeGreaterThan(0);
+    await waitForNewPatternAudio(page);
   });
 
   test('Parse error shows message', async ({ page }) => {
@@ -141,13 +146,8 @@ test.describe('BPM and Gain Controls', () => {
     await startScheduler(page);
     await expect(page.locator('#patternStatus')).toContainText('Pattern updated', { timeout: 5_000 });
 
-    // Wait for audio to start
-    await expect
-      .poll(async () => {
-        const peaks = await renderPeaks(page);
-        return peaks.overall;
-      }, { timeout: 10_000 })
-      .toBeGreaterThan(0);
+    // Wait for audio to start.
+    await waitForAnyTelemetryPeak(page);
 
     // Set gain to 0
     await setRangeValue(page, '#schedulerGainSlider', 0);
@@ -159,8 +159,8 @@ test.describe('BPM and Gain Controls', () => {
     // roughly one telemetry interval (~21ms) to propagate.
     await expect
       .poll(async () => {
-        const peaks = await renderPeaks(page);
-        return peaks.overall;
+        const telemetry = await currentTelemetry(page);
+        return telemetry ? telemetry.overallPeak : 1;
       }, { timeout: 10_000 })
       .toBeLessThan(0.001);
   });
@@ -171,15 +171,10 @@ test.describe('Stop and Restart', () => {
     await startScheduler(page);
     await expect(page.locator('#patternStatus')).toContainText('Pattern updated', { timeout: 5_000 });
 
-    // Wait for audio to actually start producing signal, rather than a fixed
-    // 300ms timeout that can miss the signal on slow workers (the retry-masked
-    // flake this replaces). Stop is only meaningful once audio is live.
-    await expect
-      .poll(async () => {
-        const peaks = await renderPeaks(page);
-        return peaks.overall;
-      }, { timeout: 10_000 })
-      .toBeGreaterThan(0);
+    // Wait for audio to actually start producing signal. Stop is only
+    // meaningful once audio is live; history avoids racing a silent rhythmic
+    // gap in the latest telemetry block.
+    await waitForAnyTelemetryPeak(page);
 
     await page.click('#stopBtn');
     await expect(page.locator('#status')).toContainText('Stopped.');
