@@ -174,6 +174,105 @@ test "loom atom projection matches mini PatternDoc for plain stack" {
 }
 
 ///|
+// KNOWN EDGE CHARACTERIZATION: empty quoted notation is CST-only recovery.
+// The Loom grammar emits a zero-diagnostic tree for editor partial input, but
+// semantic projection rejects it just like production @mini.parse_doc. This is
+// not a production mismatch and does not require an upstream Loom/seam fix.
+test "known edge case: empty notation is CST-only recovery, projection rejects like mini" {
+  let input = "s(\"\")"
+  let (_cst, diagnostics) = try! parse_cst(input)
+  inspect(diagnostics.length(), content="0")
+  let projection = LoomMiniAtomProjection::new(input)
+  match projection.parse_doc() {
+    Err(msg) =>
+      inspect(msg, content="loom atom projection expected at least one atom")
+    Ok(_) => abort("expected empty loom projection to fail")
+  }
+  match @mini.parse_doc(input) {
+    Err(msg) => inspect(msg, content="position 0: empty notation")
+    Ok(_) => abort("expected empty production parse_doc to fail")
+  }
+  projection.dispose()
+}
+
+///|
+// KNOWN EDGE CHARACTERIZATION: trailing-comma notation is also CST-only
+// recovery. The CST keeps an empty trailing LayerNode for editor flows, while
+// Loom projection and production @mini.parse_doc both reject the empty layer.
+test "known edge case: trailing comma is CST-only recovery, projection rejects like mini" {
+  let input = "s(\"bd,\")"
+  let (_cst, diagnostics) = try! parse_cst(input)
+  inspect(diagnostics.length(), content="0")
+  let projection = LoomMiniAtomProjection::new(input)
+  match projection.parse_doc() {
+    Err(msg) =>
+      inspect(msg, content="loom atom projection expected at least one atom")
+    Ok(_) => abort("expected trailing-comma loom projection to fail")
+  }
+  match @mini.parse_doc(input) {
+    Err(msg) =>
+      inspect(msg, content="position 3: expected at least one element in layer")
+    Ok(_) => abort("expected trailing-comma production parse_doc to fail")
+  }
+  projection.dispose()
+}
+
+///|
+// KNOWN EDGE CHARACTERIZATION: unterminated sub-notation remains a bounded
+// CST recovery-quality follow-up. Loom emits diagnostics and projection rejects
+// because diagnostics are present; production @mini.parse_doc also rejects the
+// malformed bracket, so this is not a production mismatch.
+test "known edge case: unterminated bracket has bounded CST recovery and rejects like mini" {
+  let input = "s(\"[bd\")"
+  let (_cst, diagnostics) = try! parse_cst(input)
+  inspect(diagnostics.length() > 0, content="true")
+  inspect(diagnostics.length() <= 64, content="true")
+  let projection = LoomMiniAtomProjection::new(input)
+  match projection.parse_doc() {
+    Err(msg) => inspect(msg, content="loom mini syntax has diagnostics")
+    Ok(_) => abort("expected unterminated-bracket loom projection to fail")
+  }
+  match @mini.parse_doc(input) {
+    Err(msg) => inspect(msg, content="position 3: expected ']'")
+    Ok(_) => abort("expected unterminated-bracket production parse_doc to fail")
+  }
+  projection.dispose()
+}
+
+///|
+// KNOWN EDGE CHARACTERIZATION: digit-start sound atoms are a production
+// mismatch in the current Loom spec-local lexer/projection. The CST accepts
+// `2bd` as NumberToken "2" plus IdentToken "bd" with no diagnostics, and the
+// projection drops the number-only sound atom, yielding `bd`; production
+// @mini.parse_doc rejects the digit-start sound atom. This needs a spec-local
+// lexer/projection decision before promotion, not a silent recovery fix.
+test "known edge case: digit-start sound atom projection mismatches production" {
+  let input = "s(\"2bd\")"
+  let (_cst, diagnostics) = try! parse_cst(input)
+  inspect(diagnostics.length(), content="0")
+  let projection = LoomMiniAtomProjection::new(input)
+  match projection.parse_doc() {
+    Ok(doc) => {
+      let expected =
+        #|["mini:sound:bd:0"]
+      debug_inspect(
+        projection_boundary_leaf_ids_from_doc(doc),
+        content=expected,
+      )
+    }
+    Err(msg) =>
+      abort(
+        "expected current loom projection to accept split atom, got " + msg,
+      )
+  }
+  match @mini.parse_doc(input) {
+    Err(msg) => inspect(msg, content="position 0: expected sound name")
+    Ok(_) => abort("expected digit-start production parse_doc to fail")
+  }
+  projection.dispose()
+}
+
+///|
 test "loom atom projection matches mini PatternDoc for dollar stack" {
   projection_boundary_assert_matches_mini_doc(
     "$: s(\"bd\")\n$: note(\"60\")",
