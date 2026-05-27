@@ -235,6 +235,106 @@ fn projection_boundary_assert_provenance_matrix_row(
 }
 
 ///|
+struct ProjectionProvenanceRecoveryMatrixRow {
+  family : String
+  initial : String
+  malformed : String
+  recovered : String
+  malformed_edit : @core.Edit
+  recovery_edit : @core.Edit
+  span : ProjectionProvenanceEditSpan
+  expected_loom_error : String
+  expected_lowered_event_ids : Array[String]
+}
+
+///|
+fn ProjectionProvenanceRecoveryMatrixRow::ProjectionProvenanceRecoveryMatrixRow(
+  family~ : String,
+  initial~ : String,
+  malformed~ : String,
+  recovered~ : String,
+  malformed_edit~ : @core.Edit,
+  recovery_edit~ : @core.Edit,
+  span~ : ProjectionProvenanceEditSpan,
+  expected_loom_error~ : String,
+  expected_lowered_event_ids~ : Array[String],
+) -> ProjectionProvenanceRecoveryMatrixRow {
+  {
+    family,
+    initial,
+    malformed,
+    recovered,
+    malformed_edit,
+    recovery_edit,
+    span,
+    expected_loom_error,
+    expected_lowered_event_ids,
+  }
+}
+
+///|
+fn projection_boundary_assert_recovery_matrix_row(
+  row : ProjectionProvenanceRecoveryMatrixRow,
+) -> Array[String] {
+  let (_initial_cst, initial_diagnostics) = try! parse_cst(row.initial)
+  projection_boundary_assert_int_equal(
+    "\{row.family} initial CST diagnostics",
+    initial_diagnostics.length(),
+    0,
+  )
+  let (_malformed_cst, malformed_diagnostics) = try! parse_cst(row.malformed)
+  if malformed_diagnostics.length() == 0 {
+    abort("expected \{row.family} malformed CST diagnostics")
+  }
+  let (_recovered_cst, recovered_diagnostics) = try! parse_cst(row.recovered)
+  projection_boundary_assert_int_equal(
+    "\{row.family} recovered CST diagnostics",
+    recovered_diagnostics.length(),
+    0,
+  )
+  let projection = LoomMiniAtomProjection::new(row.initial)
+  ignore(projection_boundary_doc(projection.parse_doc()))
+  let pipeline = @mini.MiniAuthoringPipeline::new(row.initial)
+  ignore(projection_boundary_mini_snapshot(pipeline.parse_snapshot()))
+  projection.apply_edit(row.malformed_edit, row.malformed)
+  pipeline.set_input_with_source_edit(
+    row.malformed,
+    old_start=row.span.old_start,
+    old_end=row.span.old_end,
+    new_end=row.span.new_end,
+  )
+  match projection.parse_doc() {
+    Err(msg) =>
+      if msg != row.expected_loom_error {
+        abort("expected \{row.family} loom error to match")
+      }
+    Ok(_) => abort("expected \{row.family} loom projection to fail")
+  }
+  match pipeline.parse_doc() {
+    Err(_) => ()
+    Ok(_) => abort("expected \{row.family} mini authoring parse to fail")
+  }
+  projection.apply_edit(row.recovery_edit, row.recovered)
+  pipeline.set_input_with_source_edit(
+    row.recovered,
+    old_start=row.span.old_start,
+    old_end=row.span.old_end,
+    new_end=row.span.new_end,
+  )
+  let loom_ids = projection_boundary_leaf_ids_from_doc(
+    projection_boundary_doc(projection.parse_doc()),
+  )
+  let mini_ids = projection_boundary_leaf_ids(
+    projection_boundary_mini_snapshot(pipeline.parse_snapshot()),
+  )
+  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
+  projection_boundary_assert_ids_equal(row.expected_lowered_event_ids, loom_ids)
+  projection.dispose()
+  pipeline.dispose()
+  loom_ids
+}
+
+///|
 test "loom provenance matrix row covers duplicate sound insertion" {
   let ids = projection_boundary_assert_provenance_matrix_row(
     ProjectionProvenanceMatrixRow(
@@ -428,6 +528,253 @@ test "loom provenance matrix row covers dollar stack line insertion" {
   )
   let expected =
     #|["mini:sound:bd:0", "mini:note:60:0"]
+  debug_inspect(ids, content=expected)
+}
+
+///|
+test "loom provenance matrix row covers layer comma insertion" {
+  let ids = projection_boundary_assert_provenance_matrix_row(
+    ProjectionProvenanceMatrixRow(
+      family="layer comma insertion",
+      initial="s(\"bd sd\")",
+      edited="s(\"bd, sd\")",
+      edit=@core.Edit::insert(5, 1),
+      span=ProjectionProvenanceEditSpan(
+        old_start=5,
+        old_end=5,
+        new_end=6,
+      ),
+      initial_diagnostics=0,
+      edited_diagnostics=0,
+      expected_lowered_event_ids=[
+        "mini:sound:bd:0",
+        "mini:sound:sd:0",
+      ],
+    ),
+  )
+  let expected =
+    #|["mini:sound:bd:0", "mini:sound:sd:0"]
+  debug_inspect(ids, content=expected)
+}
+
+///|
+test "loom provenance matrix row covers slow postfix insertion" {
+  let ids = projection_boundary_assert_provenance_matrix_row(
+    ProjectionProvenanceMatrixRow(
+      family="postfix insertion",
+      initial="s(\"bd sd\")",
+      edited="s(\"bd/2 sd\")",
+      edit=@core.Edit::insert(5, 2),
+      span=ProjectionProvenanceEditSpan(
+        old_start=5,
+        old_end=5,
+        new_end=7,
+      ),
+      initial_diagnostics=0,
+      edited_diagnostics=0,
+      expected_lowered_event_ids=[
+        "mini:sound:bd:0",
+        "mini:sound:sd:0",
+      ],
+    ),
+  )
+  let expected =
+    #|["mini:sound:bd:0", "mini:sound:sd:0"]
+  debug_inspect(ids, content=expected)
+}
+
+///|
+test "loom provenance matrix row covers euclid postfix insertion" {
+  let ids = projection_boundary_assert_provenance_matrix_row(
+    ProjectionProvenanceMatrixRow(
+      family="euclid postfix insertion",
+      initial="s(\"bd sd\")",
+      edited="s(\"bd(3,8) sd\")",
+      edit=@core.Edit::insert(5, 5),
+      span=ProjectionProvenanceEditSpan(
+        old_start=5,
+        old_end=5,
+        new_end=10,
+      ),
+      initial_diagnostics=0,
+      edited_diagnostics=0,
+      expected_lowered_event_ids=[
+        "mini:sound:bd:0",
+        "mini:sound:bd:0",
+        "mini:sound:bd:0",
+        "mini:sound:sd:0",
+      ],
+    ),
+  )
+  let expected =
+    #|[
+    #|  "mini:sound:bd:0",
+    #|  "mini:sound:bd:0",
+    #|  "mini:sound:bd:0",
+    #|  "mini:sound:sd:0",
+    #|]
+  debug_inspect(ids, content=expected)
+}
+
+///|
+test "loom provenance matrix row covers sub-notation postfix insertion" {
+  let ids = projection_boundary_assert_provenance_matrix_row(
+    ProjectionProvenanceMatrixRow(
+      family="sub-notation postfix insertion",
+      initial="s(\"[bd sd] hh\")",
+      edited="s(\"[bd sd]*2 hh\")",
+      edit=@core.Edit::insert(10, 2),
+      span=ProjectionProvenanceEditSpan(
+        old_start=10,
+        old_end=10,
+        new_end=12,
+      ),
+      initial_diagnostics=0,
+      edited_diagnostics=0,
+      expected_lowered_event_ids=[
+        "mini:sound:bd:0",
+        "mini:sound:sd:0",
+        "mini:sound:bd:0",
+        "mini:sound:sd:0",
+        "mini:sound:hh:0",
+      ],
+    ),
+  )
+  let expected =
+    #|[
+    #|  "mini:sound:bd:0",
+    #|  "mini:sound:sd:0",
+    #|  "mini:sound:bd:0",
+    #|  "mini:sound:sd:0",
+    #|  "mini:sound:hh:0",
+    #|]
+  debug_inspect(ids, content=expected)
+}
+
+///|
+test "loom provenance matrix row covers root method replacement" {
+  let ids = projection_boundary_assert_provenance_matrix_row(
+    ProjectionProvenanceMatrixRow(
+      family="root method replacement",
+      initial="s(\"bd sd\").fast(2)",
+      edited="s(\"bd sd\").slow(2)",
+      edit=@core.Edit::replace(11, 15, 15),
+      span=ProjectionProvenanceEditSpan(
+        old_start=11,
+        old_end=15,
+        new_end=15,
+      ),
+      initial_diagnostics=0,
+      edited_diagnostics=0,
+      expected_lowered_event_ids=["mini:sound:bd:0"],
+    ),
+  )
+  let expected =
+    #|["mini:sound:bd:0"]
+  debug_inspect(ids, content=expected)
+}
+
+///|
+test "loom provenance matrix row covers jux callback replacement" {
+  let ids = projection_boundary_assert_provenance_matrix_row(
+    ProjectionProvenanceMatrixRow(
+      family="jux callback replacement",
+      initial="s(\"bd sd\").jux(rev)",
+      edited="s(\"bd sd\").jux(fast(2))",
+      edit=@core.Edit::replace(15, 18, 22),
+      span=ProjectionProvenanceEditSpan(
+        old_start=15,
+        old_end=18,
+        new_end=22,
+      ),
+      initial_diagnostics=0,
+      edited_diagnostics=0,
+      expected_lowered_event_ids=[
+        "mini:sound:sd:0",
+        "mini:sound:sd:0",
+        "mini:sound:sd:0",
+        "mini:sound:sd:0",
+        "mini:sound:sd:0",
+        "mini:sound:sd:0",
+      ],
+    ),
+  )
+  let expected =
+    #|[
+    #|  "mini:sound:sd:0",
+    #|  "mini:sound:sd:0",
+    #|  "mini:sound:sd:0",
+    #|  "mini:sound:sd:0",
+    #|  "mini:sound:sd:0",
+    #|  "mini:sound:sd:0",
+    #|]
+  debug_inspect(ids, content=expected)
+}
+
+///|
+test "loom provenance matrix row covers every callback replacement" {
+  let ids = projection_boundary_assert_provenance_matrix_row(
+    ProjectionProvenanceMatrixRow(
+      family="every callback replacement",
+      initial="s(\"bd sd\").every(2, rev)",
+      edited="s(\"bd sd\").every(2, fast(2))",
+      edit=@core.Edit::replace(20, 23, 27),
+      span=ProjectionProvenanceEditSpan(
+        old_start=20,
+        old_end=23,
+        new_end=27,
+      ),
+      initial_diagnostics=0,
+      edited_diagnostics=0,
+      expected_lowered_event_ids=[
+        "mini:sound:sd:0",
+        "mini:sound:sd:0",
+        "mini:sound:sd:0",
+        "mini:sound:sd:0",
+      ],
+    ),
+  )
+  let expected =
+    #|[
+    #|  "mini:sound:sd:0",
+    #|  "mini:sound:sd:0",
+    #|  "mini:sound:sd:0",
+    #|  "mini:sound:sd:0",
+    #|]
+  debug_inspect(ids, content=expected)
+}
+
+///|
+test "loom provenance matrix row covers parse-error recovery" {
+  let ids = projection_boundary_assert_recovery_matrix_row(
+    ProjectionProvenanceRecoveryMatrixRow(
+      family="parse-error recovery",
+      initial="s(\"bd sd bd\")",
+      malformed="s(\"bd sd bd bd\"",
+      recovered="s(\"bd sd bd bd\")",
+      malformed_edit=@core.Edit::insert(9, 3),
+      recovery_edit=@core.Edit::insert(15, 1),
+      span=ProjectionProvenanceEditSpan(
+        old_start=9,
+        old_end=9,
+        new_end=12,
+      ),
+      expected_loom_error="loom mini syntax has diagnostics",
+      expected_lowered_event_ids=[
+        "mini:sound:bd:0",
+        "mini:sound:sd:0",
+        "mini:sound:bd:2",
+        "mini:sound:bd:1",
+      ],
+    ),
+  )
+  let expected =
+    #|[
+    #|  "mini:sound:bd:0",
+    #|  "mini:sound:sd:0",
+    #|  "mini:sound:bd:2",
+    #|  "mini:sound:bd:1",
+    #|]
   debug_inspect(ids, content=expected)
 }
 
