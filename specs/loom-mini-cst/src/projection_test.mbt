@@ -188,6 +188,16 @@ test "loom atom projection matches mini PatternDoc for dollar stack callback met
 }
 
 ///|
+test "loom atom projection matches mini PatternDoc for dollar stack callback variants" {
+  let input =
+    #|$: s("bd sd").jux(fast(2))
+    #|$: s("bd sd").jux(slow(2))
+    #|$: note("60 64").every(2, rev)
+    #|$: note("60 64").every(2, slow(2))
+  projection_boundary_assert_matches_mini_doc(input)
+}
+
+///|
 test "loom atom projection rejects same-line dollar stack marker like mini" {
   let input = "$: s(\"bd\") $: note(\"60\")"
   let projection = LoomMiniAtomProjection::new(input)
