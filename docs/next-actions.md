@@ -1,6 +1,6 @@
 # Next Actions
 
-Updated: 2026-05-26
+Updated: 2026-05-27
 
 Forward-looking handoff for the next session. Keep this short and actionable;
 per-PR verification logs and merged-PR lists live in `git log` and
@@ -8,7 +8,7 @@ per-PR verification logs and merged-PR lists live in `git log` and
 
 ## Current State
 
-- `main` is aligned with `origin/main` after PR #95.
+- `main` is aligned with `origin/main` after PR #97.
 - Latest release: **v0.5.1** (tagged and published 2026-05-20).
 - The next release should be **v0.6.0** if it includes the current
   `Unreleased` entries, because public API has been added since v0.5.1.
@@ -30,18 +30,18 @@ For the broader backlog, read
 
 ## Recommended Next Slice
 
-**Add loom CST parity for callback methods inside `$:` stack lines.** Callback
-method projection now covers direct `.jux(...)` / `.every(...)` forms plus
-callback edit/reuse against `MiniAuthoringPipeline`; next, pin the same callback
-method shapes inside multi-line `$:` programs. Keep the work under
-`specs/loom-mini-cst`; do not add loom/seam to root `moon.mod` and do not route
-`mini.parse`, `parse_doc`, or `MiniAuthoringPipeline` through loom.
+**v0.6.0 release prep.** Review the existing PR #86 release branch, then bump
+`moon.mod` to `0.6.0`, move `CHANGELOG.md` `Unreleased` entries under a dated
+`0.6.0` section, validate package contents, and publish only after review. Do
+not republish `0.5.1` and do not tag/publish v0.6.0 as part of unrelated
+loom-authoring work.
 
 ## Alternative Slices
 
-- **v0.6.0 release prep** — bump `moon.mod` to `0.6.0`, move `CHANGELOG.md`
-  `Unreleased` entries under a dated `0.6.0` section, validate package
-  contents, and publish only after review. Do not republish `0.5.1`.
+- **Loom mini promotion evidence refresh** — review ADR-0013 now that `$:`,
+  callback-method, variant, and edit/reuse parity are shipped. Keep this as a
+  docs/planning pass unless explicitly starting a production parser promotion;
+  do not add loom/seam to root `moon.mod` without that decision.
 
 - **Voice API result hardening follow-up** — decide whether to deprecate/remove
   Bool wrappers, rename voice `*_result` methods to graph-style unsuffixed
@@ -52,6 +52,15 @@ method shapes inside multi-line `$:` programs. Keep the work under
   policy before adding structural Eq.
 
 ## Closed Since Previous Update
+
+- ~~**PR #97 — loom `$:` callback parity**~~ — SHIPPED 2026-05-27
+  (`fceb86b`). Added Loom mini-CST projection parity for callback methods inside
+  `$:` stack-line programs, callback variants, and callback edit/reuse parity
+  against `MiniAuthoringPipeline`; production parsing remains hand-written.
+
+- ~~**PR #96 — loom callback variant and edit parity**~~ — SHIPPED
+  2026-05-27 (`57ff069`). Added direct `.jux(...)` / `.every(...)` callback
+  variants and direct callback edit/reuse parity; no `$:` stack-line coverage.
 
 - ~~**PR #95 — loom callback-method projection parity**~~ — SHIPPED
   2026-05-26 (`6d3d439`). Added callback-method projection/lowering for
