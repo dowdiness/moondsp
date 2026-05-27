@@ -38,10 +38,10 @@ loom-authoring work.
 
 ## Alternative Slices
 
-- **Loom mini promotion evidence refresh** — review ADR-0013 now that `$:`,
-  callback-method, variant, and edit/reuse parity are shipped. Keep this as a
-  docs/planning pass unless explicitly starting a production parser promotion;
-  do not add loom/seam to root `moon.mod` without that decision.
+- **Loom known edge-case characterization** — pin the current behavior for
+  permissive empty notation, unterminated-bracket recovery, and digit-start atom
+  lexing against ADR-0013's promotion criteria. Keep the work under
+  `specs/loom-mini-cst`; do not route production parsing through loom.
 
 - **Voice API result hardening follow-up** — decide whether to deprecate/remove
   Bool wrappers, rename voice `*_result` methods to graph-style unsuffixed
