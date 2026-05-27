@@ -1,6 +1,6 @@
 # Next Actions
 
-Updated: 2026-05-27
+Updated: 2026-05-28
 
 Forward-looking handoff for the next session. Keep this short and actionable;
 per-PR verification logs and merged-PR lists live in `git log` and
@@ -8,7 +8,7 @@ per-PR verification logs and merged-PR lists live in `git log` and
 
 ## Current State
 
-- `main` is aligned with `origin/main` after PR #100.
+- `main` is aligned with `origin/main` after PR #101.
 - Latest release: **v0.5.1** (tagged and published 2026-05-20).
 - The next release should be **v0.6.0** if it includes the current
   `Unreleased` entries, because public API has been added since v0.5.1.
@@ -16,9 +16,9 @@ per-PR verification logs and merged-PR lists live in `git log` and
 - Open PRs: PR #86 (`release/v0.6.0`) is release prep and intentionally
   remains open until an explicit release pass. Do not tag or publish v0.6.0 as
   part of loom-authoring work.
-- ADR-0013 defines loom mini promotion criteria using the shipped apply-edit
-  and projection parity evidence, but it does not approve a production parser
-  switch.
+- ADR-0013 defines loom mini promotion criteria using the shipped apply-edit,
+  projection parity, and PR #101 provenance-matrix evidence, but it does not
+  approve a production parser switch.
 - `moon.mod` is now the root manifest. `moon.mod.json` remains only in the
   nested `specs/loom-mini-cst` spike module.
 - Production mini parsing still uses the hand-written parser and
@@ -38,11 +38,11 @@ loom-authoring work.
 
 ## Alternative Slices
 
-- **Loom full-grammar provenance matrix** — turn the shipped parity slices and
-  known edge-case characterizations into a reviewed matrix across the full mini
-  grammar, including duplicate-token provenance, source-edit spans, diagnostics,
-  and lowered event behavior. Keep the work under `specs/loom-mini-cst`; do not
-  route production parsing through loom.
+- **Loom semantic projection/control-method parity** — ADR-0013's next
+  spec-local Loom gate is projection for production control methods
+  (`.cutoff(...)`, `.gain(...)`, `.pan(...)`) plus lowered event behavior. Keep
+  the work under `specs/loom-mini-cst`; do not add loom/seam to root `moon.mod`
+  and do not route production parsing through loom.
 
 - **Voice API result hardening follow-up** — decide whether to deprecate/remove
   Bool wrappers, rename voice `*_result` methods to graph-style unsuffixed
@@ -53,6 +53,13 @@ loom-authoring work.
   policy before adding structural Eq.
 
 ## Closed Since Previous Update
+
+- ~~**PR #101 — loom full-grammar provenance matrix**~~ — SHIPPED
+  2026-05-27 (`787e23a`). Added the matrix helper and representative rows under
+  `specs/loom-mini-cst/src/projection_test.mbt` for duplicate-token edits,
+  `$:` lines, layers, postfixes, callback/root method edits, recovery,
+  source-edit spans, and lowered event IDs. Production parsing remains
+  hand-written.
 
 - ~~**PR #100 — loom mode-incompatible atom rejection**~~ — SHIPPED
   2026-05-27 (`cc268e4`). Hardened the spec-local Loom projection so numeric
