@@ -240,34 +240,56 @@ test "known edge case: unterminated bracket has bounded CST recovery and rejects
 }
 
 ///|
-// KNOWN EDGE CHARACTERIZATION: digit-start sound atoms are a production
-// mismatch in the current Loom spec-local lexer/projection. The CST accepts
-// `2bd` as NumberToken "2" plus IdentToken "bd" with no diagnostics, and the
-// projection drops the number-only sound atom, yielding `bd`; production
-// @mini.parse_doc rejects the digit-start sound atom. This needs a spec-local
-// lexer/projection decision before promotion, not a silent recovery fix.
-test "known edge case: digit-start sound atom projection mismatches production" {
+// KNOWN EDGE CHARACTERIZATION: digit-start sound atoms remain a CST lexer
+// limitation, but projection now rejects the mode-incompatible NumberToken
+// instead of dropping it and projecting the following IdentToken. Production
+// @mini.parse_doc also rejects the digit-start sound atom.
+test "known edge case: digit-start sound atom projection rejects like production" {
   let input = "s(\"2bd\")"
   let (_cst, diagnostics) = try! parse_cst(input)
   inspect(diagnostics.length(), content="0")
   let projection = LoomMiniAtomProjection::new(input)
   match projection.parse_doc() {
-    Ok(doc) => {
-      let expected =
-        #|["mini:sound:bd:0"]
-      debug_inspect(
-        projection_boundary_leaf_ids_from_doc(doc),
-        content=expected,
-      )
-    }
-    Err(msg) =>
-      abort(
-        "expected current loom projection to accept split atom, got " + msg,
-      )
+    Err(msg) => inspect(msg, content="loom atom projection expected sound name")
+    Ok(_) => abort("expected digit-start loom projection to fail")
   }
   match @mini.parse_doc(input) {
     Err(msg) => inspect(msg, content="position 0: expected sound name")
     Ok(_) => abort("expected digit-start production parse_doc to fail")
+  }
+  projection.dispose()
+}
+
+///|
+test "loom atom projection rejects numeric sound atom instead of dropping it" {
+  let input = "s(\"2 bd\")"
+  let (_cst, diagnostics) = try! parse_cst(input)
+  inspect(diagnostics.length(), content="0")
+  let projection = LoomMiniAtomProjection::new(input)
+  match projection.parse_doc() {
+    Err(msg) => inspect(msg, content="loom atom projection expected sound name")
+    Ok(_) => abort("expected numeric sound atom projection to fail")
+  }
+  match @mini.parse_doc(input) {
+    Err(msg) => inspect(msg, content="position 0: expected sound name")
+    Ok(_) => abort("expected numeric sound atom production parse_doc to fail")
+  }
+  projection.dispose()
+}
+
+///|
+test "loom atom projection rejects identifier note atom instead of dropping it" {
+  let input = "note(\"bd 60\")"
+  let (_cst, diagnostics) = try! parse_cst(input)
+  inspect(diagnostics.length(), content="0")
+  let projection = LoomMiniAtomProjection::new(input)
+  match projection.parse_doc() {
+    Err(msg) => inspect(msg, content="loom atom projection expected note number")
+    Ok(_) => abort("expected identifier note atom projection to fail")
+  }
+  match @mini.parse_doc(input) {
+    Err(msg) => inspect(msg, content="position 0: expected number")
+    Ok(_) => abort("expected identifier note atom production parse_doc to fail")
   }
   projection.dispose()
 }
