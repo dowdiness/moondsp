@@ -3,7 +3,7 @@
 - **Status:** Proposed
 - **Date:** 2026-05-25
 - **Source:** Follow-up design pass after PR #76 grammar parity, updated with
-  PR #85 apply-edit parity evidence and PR #91–#97 projection/parity work
+  PR #85 apply-edit parity evidence and PR #91–#100 projection/parity work
 
 ## Context
 
@@ -20,11 +20,12 @@ That was an important result, but it was not a production parser switch. PRs
 projection path, chained root-method coverage, seam direct-query traversal,
 and apply-edit parity against `MiniAuthoringPipeline` for replacement,
 whitespace, method-name, duplicate-note, and parse-error recovery cases. PRs
-#91–#97 then filled major syntax and provenance gaps: recursive
+#91–#100 then filled major syntax, provenance, and edge-case gaps: recursive
 sub-notation/group postfix projection, production `$:` stack-line support in
 the hand-written parser, Loom `$:` stack-program projection, direct callback
-method projection/lowering, callback variants, and callback edit/reuse parity
-inside both direct expressions and `$:` stack-line programs.
+method projection/lowering, callback variants, callback edit/reuse parity
+inside both direct expressions and `$:` stack-line programs, known edge-case
+characterization, and spec-local rejection of mode-incompatible atoms.
 
 Those PRs improve the evidence for a future loom-backed authoring path, but
 they still live under the nested `specs/loom-mini-cst` module. Production mini
@@ -68,6 +69,10 @@ The loom spec path now proves these evaluation-only contracts:
   unaffected-token replacement, whitespace-only insertion, method-name
   replacement, duplicate-note edits, callback replacement, `$:` callback
   replacement, and parse-error recovery with previous provenance.
+- PRs #99 and #100 characterized the documented known edges: empty notation and
+  trailing-comma layers are CST-only recovery, unterminated brackets remain a
+  bounded CST recovery-quality follow-up, and digit-start/mode-incompatible
+  atoms now reject at projection time rather than being silently dropped.
 - The spec remains a nested module with path dependencies to loom, seam,
   pretty, and incr. It is intentionally not part of the published `moondsp`
   library surface.
@@ -175,9 +180,11 @@ direct evidence:
 - **Runtime isolation:** authoring-only adoption must not pull loom/seam into
   the AudioWorklet runtime path unless the browser build proof is part of the
   same decision.
-- **Known spec follow-ups:** permissive empty notation, unterminated-bracket
-  recovery, and digit-start atom lexing remain separate follow-ups. Promotion
-  criteria should record them, not silently fix them.
+- **Known spec follow-ups:** PR #99 records permissive empty notation,
+  trailing-comma layers, unterminated-bracket recovery, and digit-start atom
+  lexing as explicit promotion evidence; PR #100 hardens the digit-start /
+  mode-incompatible atom projection mismatch. Unterminated-bracket recovery
+  remains a CST recovery-quality follow-up, not a production parser mismatch.
 
 ## Migration criteria
 
@@ -215,10 +222,10 @@ requirements, not to route production parsing through loom:
 
 1. Keep `specs/loom-mini-cst/` as the grammar, projection, and reuse
    characterization gate.
-2. Characterize the known edge cases explicitly: permissive empty notation,
-   unterminated-bracket recovery, and digit-start atom lexing. Decide whether
-   each is a CST-only recovery behavior, a production parser mismatch, or an
-   upstream loom/seam requirement.
+2. Treat the known edge cases as recorded promotion evidence: empty notation
+   and trailing-comma layers are CST-only recovery, unterminated-bracket input
+   is bounded but noisy CST recovery, and digit-start/mode-incompatible atoms
+   reject during projection instead of silently dropping tokens.
 3. Build a full-grammar provenance matrix from the shipped parity slices,
    including duplicate-token edits, method/callback edits, `$:` stack-line
    edits, parse-error recovery, and lowered event behavior.
@@ -231,9 +238,10 @@ requirements, not to route production parsing through loom:
 
 PR #70's deletion-safe reuse contract, PR #76's grammar-parity contract, PR
 #80/#81/#83's projection-IR evidence, PR #85's apply-edit parity evidence, and
-PR #91–#97's postfix, `$:`, and callback parity evidence should all continue to
-exist. They answer different questions: whether loom can reuse safely across
-edits, whether it can express the production mini grammar shape, whether a CST
-can project to `PatternDoc`, and whether projection can track authoring edit
+PR #91–#100's postfix, `$:`, callback, and known-edge evidence should all
+continue to exist. They answer different questions: whether loom can reuse
+safely across edits, whether it can express the production mini grammar shape,
+whether a CST can project to `PatternDoc`, and whether projection can track
+authoring edit
 provenance across representative syntax families. A production switch requires
 all of those, plus the remaining promotion gates above.

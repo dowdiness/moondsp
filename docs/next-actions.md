@@ -8,7 +8,7 @@ per-PR verification logs and merged-PR lists live in `git log` and
 
 ## Current State
 
-- `main` is aligned with `origin/main` after PR #98.
+- `main` is aligned with `origin/main` after PR #100.
 - Latest release: **v0.5.1** (tagged and published 2026-05-20).
 - The next release should be **v0.6.0** if it includes the current
   `Unreleased` entries, because public API has been added since v0.5.1.
@@ -53,6 +53,16 @@ loom-authoring work.
   policy before adding structural Eq.
 
 ## Closed Since Previous Update
+
+- ~~**PR #100 — loom mode-incompatible atom rejection**~~ — SHIPPED
+  2026-05-27 (`cc268e4`). Hardened the spec-local Loom projection so numeric
+  atoms in `s(...)` and identifier atoms in `note(...)` reject instead of being
+  silently dropped; production parsing remains hand-written.
+
+- ~~**PR #99 — loom known edge-case characterization**~~ — SHIPPED
+  2026-05-27 (`0c7f5fb`). Characterized permissive empty notation,
+  trailing-comma layers, unterminated-bracket recovery, and digit-start atom
+  lexing under `specs/loom-mini-cst`; no production parser routing changed.
 
 - ~~**PR #97 — loom `$:` callback parity**~~ — SHIPPED 2026-05-27
   (`fceb86b`). Added Loom mini-CST projection parity for callback methods inside
