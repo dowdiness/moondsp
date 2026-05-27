@@ -3,7 +3,7 @@
 - **Status:** Proposed
 - **Date:** 2026-05-25
 - **Source:** Follow-up design pass after PR #76 grammar parity, updated with
-  PR #85 apply-edit parity evidence and PR #91–#100 projection/parity work
+  PR #85 apply-edit parity evidence and PR #91–#101 projection/parity work
 
 ## Context
 
@@ -20,12 +20,13 @@ That was an important result, but it was not a production parser switch. PRs
 projection path, chained root-method coverage, seam direct-query traversal,
 and apply-edit parity against `MiniAuthoringPipeline` for replacement,
 whitespace, method-name, duplicate-note, and parse-error recovery cases. PRs
-#91–#100 then filled major syntax, provenance, and edge-case gaps: recursive
+#91–#101 then filled major syntax, provenance, and edge-case gaps: recursive
 sub-notation/group postfix projection, production `$:` stack-line support in
 the hand-written parser, Loom `$:` stack-program projection, direct callback
 method projection/lowering, callback variants, callback edit/reuse parity
 inside both direct expressions and `$:` stack-line programs, known edge-case
-characterization, and spec-local rejection of mode-incompatible atoms.
+characterization, spec-local rejection of mode-incompatible atoms, and the
+reviewed full-grammar provenance matrix.
 
 Those PRs improve the evidence for a future loom-backed authoring path, but
 they still live under the nested `specs/loom-mini-cst` module. Production mini
@@ -64,11 +65,12 @@ The loom spec path now proves these evaluation-only contracts:
   and `$:` callback methods for `.jux(...)` / `.every(...)`, and atom/group
   postfixes for `*N`, `/N`, `?`, and Euclid, then compare public root/leaf IDs
   against `@mini.parse_doc`.
-- PRs #85, #96, and #97 expanded apply-edit parity against
+- PRs #85, #96, #97, and #101 expanded apply-edit parity against
   `MiniAuthoringPipeline` for duplicate sound/note insertion and deletion,
   unaffected-token replacement, whitespace-only insertion, method-name
   replacement, duplicate-note edits, callback replacement, `$:` callback
-  replacement, and parse-error recovery with previous provenance.
+  replacement, parse-error recovery with previous provenance, source-edit span
+  rows, and lowered event ID checks across the reviewed grammar matrix.
 - PRs #99 and #100 characterized the documented known edges: empty notation and
   trailing-comma layers are CST-only recovery, unterminated brackets remain a
   bounded CST recovery-quality follow-up, and digit-start/mode-incompatible
@@ -152,25 +154,26 @@ A loom authoring switch would add real ownership and release cost:
 
 ## Remaining promotion gates
 
-The shipped apply-edit and postfix/sub-notation slices close several early
-questions, but loom still cannot own mini authoring until these gates have
-direct evidence:
+The shipped apply-edit, postfix/sub-notation, and PR #101 provenance-matrix
+slices close several early questions, but loom still cannot own mini authoring
+until these gates have direct evidence:
 
-- **Full PatternDoc provenance:** duplicate-token insertion, deletion,
-  replacement, whitespace edits, method edits, and recovery must preserve the
-  same surviving sound/note node IDs as the current source-edit pipeline across
-  the full supported mini syntax, not only the current spec-local slice.
+- **Full PatternDoc provenance in any production-shaped prototype:** PR #101
+  provides the reviewed spec-local matrix for duplicate-token insertion,
+  deletion, replacement, whitespace edits, method/callback edits, `$:` edits,
+  source-edit spans, recovery, and lowered event IDs. Any promotion prototype
+  must keep that matrix passing through the candidate authoring boundary
+  without weakening stable-ID or lowering-cache assertions.
 - **Error recovery:** parse diagnostics must not replace the last successful
   reusable authoring document, and recovery after a valid edit must still reuse
   the correct baseline for broader grammar contexts.
 - **Semantic projection:** CST parsing alone is not enough. The projection must
   produce the same `PatternDoc` values and lowered event behavior for stack,
   method chains, callbacks, controls, Euclid, postfix, layers, and
-  sub-notation.
-- **Full grammar provenance matrix:** the newest `$:` and callback slices prove
-  targeted shapes, but promotion still needs a reviewed matrix that crosses the
-  full supported mini grammar with duplicate-token provenance, source-edit
-  spans, and lowered event behavior.
+  sub-notation. After PR #101, the clearest remaining spec-local gap is control
+  method projection for `.cutoff(...)`, `.gain(...)`, and `.pan(...)`, because
+  production mini supports those methods and the Loom projection does not yet
+  lower them.
 - **Public error shape:** callers currently receive `Result[..., String]`.
   Either loom diagnostics must be adapted to that shape or the public API
   change needs a separate decision.
@@ -226,22 +229,24 @@ requirements, not to route production parsing through loom:
    and trailing-comma layers are CST-only recovery, unterminated-bracket input
    is bounded but noisy CST recovery, and digit-start/mode-incompatible atoms
    reject during projection instead of silently dropping tokens.
-3. Build a full-grammar provenance matrix from the shipped parity slices,
-   including duplicate-token edits, method/callback edits, `$:` stack-line
-   edits, parse-error recovery, and lowered event behavior.
-4. Extract upstream Loom requirements for stable identity across deletion/shift
+3. Treat PR #101's full-grammar provenance matrix as the regression gate for
+   duplicate-token edits, method/callback edits, `$:` stack-line edits,
+   parse-error recovery, source-edit spans, and lowered event behavior.
+4. Fill the remaining semantic-projection gap for production control methods
+   (`.cutoff(...)`, `.gain(...)`, `.pan(...)`) under `specs/loom-mini-cst`.
+5. Extract upstream Loom requirements for stable identity across deletion/shift
    edits, projection helper ergonomics, and the canonical "diagnostics plus
    last successful semantic document" authoring pattern.
-5. Only after full grammar, provenance, lowering, release-manifest, and browser
+6. Only after full grammar, provenance, lowering, release-manifest, and browser
    build gates pass, decide whether to put the projection behind
    `MiniAuthoringPipeline` as an authoring-only implementation detail.
 
 PR #70's deletion-safe reuse contract, PR #76's grammar-parity contract, PR
-#80/#81/#83's projection-IR evidence, PR #85's apply-edit parity evidence, and
-PR #91–#100's postfix, `$:`, callback, and known-edge evidence should all
-continue to exist. They answer different questions: whether loom can reuse
-safely across edits, whether it can express the production mini grammar shape,
-whether a CST can project to `PatternDoc`, and whether projection can track
-authoring edit
-provenance across representative syntax families. A production switch requires
-all of those, plus the remaining promotion gates above.
+#80/#81/#83's projection-IR evidence, PR #85's apply-edit parity evidence, PR
+#91–#100's postfix, `$:`, callback, and known-edge evidence, and PR #101's
+full-grammar provenance matrix should all continue to exist. They answer
+different questions: whether loom can reuse safely across edits, whether it can
+express the production mini grammar shape, whether a CST can project to
+`PatternDoc`, and whether projection can track authoring edit provenance across
+representative syntax families. A production switch requires all of those, plus
+the remaining promotion gates above.
