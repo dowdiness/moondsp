@@ -690,7 +690,31 @@ fn loom_mini_collect_raw_atom(
         postfixes,
       }))
     }
-    None => Ok(None)
+    None =>
+      match kind {
+        SoundAtom => {
+          let has_number = loom_mini_direct_token_of_kind(
+            atom,
+            NumberToken.to_raw(),
+          ) is Some(_)
+          if has_number {
+            Err("loom atom projection expected sound name")
+          } else {
+            Ok(None)
+          }
+        }
+        NoteAtom => {
+          let has_ident = loom_mini_direct_token_of_kind(
+            atom,
+            IdentToken.to_raw(),
+          ) is Some(_)
+          if has_ident {
+            Err("loom atom projection expected note number")
+          } else {
+            Ok(None)
+          }
+        }
+      }
   }
 }
 
