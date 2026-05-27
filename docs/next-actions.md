@@ -8,7 +8,7 @@ per-PR verification logs and merged-PR lists live in `git log` and
 
 ## Current State
 
-- `main` is aligned with `origin/main` after PR #97.
+- `main` is aligned with `origin/main` after PR #98.
 - Latest release: **v0.5.1** (tagged and published 2026-05-20).
 - The next release should be **v0.6.0** if it includes the current
   `Unreleased` entries, because public API has been added since v0.5.1.
@@ -38,10 +38,11 @@ loom-authoring work.
 
 ## Alternative Slices
 
-- **Loom known edge-case characterization** — pin the current behavior for
-  permissive empty notation, unterminated-bracket recovery, and digit-start atom
-  lexing against ADR-0013's promotion criteria. Keep the work under
-  `specs/loom-mini-cst`; do not route production parsing through loom.
+- **Loom full-grammar provenance matrix** — turn the shipped parity slices and
+  known edge-case characterizations into a reviewed matrix across the full mini
+  grammar, including duplicate-token provenance, source-edit spans, diagnostics,
+  and lowered event behavior. Keep the work under `specs/loom-mini-cst`; do not
+  route production parsing through loom.
 
 - **Voice API result hardening follow-up** — decide whether to deprecate/remove
   Bool wrappers, rename voice `*_result` methods to graph-style unsuffixed
