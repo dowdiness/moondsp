@@ -64,6 +64,7 @@ priv enum LoomMiniMethodCall {
   FastMethod(Int)
   SlowMethod(Int)
   RevMethod
+  ControlMethod(String, Double)
   JuxMethod(LoomMiniMethodCallback)
   EveryMethod(Int, LoomMiniMethodCallback)
 }
@@ -168,7 +169,13 @@ pub fn LoomMiniAtomProjection::new(input : String) -> LoomMiniAtomProjection {
         )
       }
       let builder = @mini.MiniDocBuilder::with_previous(previous_doc)
-      match loom_mini_build_projected_doc(builder, raw_projection.expr, atoms) {
+      match
+        loom_mini_build_projected_doc(
+          builder,
+          previous_doc,
+          raw_projection.expr,
+          atoms,
+        ) {
         Ok(doc) => {
           previous_doc = Some(doc)
           previous_atoms = atoms
@@ -388,6 +395,8 @@ fn loom_mini_collect_method_call(
     loom_mini_collect_rate_method_call(name, names, numbers, commas)
   } else if name == "rev" {
     loom_mini_collect_rev_method_call(names, numbers, commas)
+  } else if name == "cutoff" || name == "gain" || name == "pan" {
+    loom_mini_collect_control_method_call(name, names, numbers, commas)
   } else if name == "jux" {
     loom_mini_collect_jux_method_call(names, numbers, commas)
   } else if name == "every" {
@@ -435,6 +444,30 @@ fn loom_mini_collect_rev_method_call(
     return Err("loom atom projection expected .rev() with no arguments")
   }
   Ok(RevMethod)
+}
+
+///|
+fn loom_mini_collect_control_method_call(
+  name : String,
+  names : Array[@seam.SyntaxToken],
+  numbers : Array[@seam.SyntaxToken],
+  commas : Array[@seam.SyntaxToken],
+) -> Result[LoomMiniMethodCall, String] {
+  if commas.length() > 0 {
+    return Err(loom_mini_supported_method_error())
+  }
+  if names.length() != 1 {
+    return Err("loom atom projection expected numeric method argument")
+  }
+  let number = match numbers {
+    [token] => token.text()
+    _ => return Err("loom atom projection expected method argument")
+  }
+  let value = match loom_mini_parse_double(number) {
+    Ok(value) => value
+    Err(msg) => return Err(msg)
+  }
+  Ok(ControlMethod(name, value))
 }
 
 ///|
@@ -530,7 +563,7 @@ fn loom_mini_collect_method_callback(
 
 ///|
 fn loom_mini_supported_method_error() -> String {
-  "loom atom projection only supports .fast(N), .slow(N), .rev(), .jux(...), or .every(...) methods"
+  "loom atom projection only supports .fast(N), .slow(N), .rev(), .cutoff(N), .gain(N), .pan(N), .jux(...), or .every(...) methods"
 }
 
 ///|
@@ -564,6 +597,40 @@ fn loom_mini_parse_int(text : String) -> Result[Int, String] {
     }
     result = result * 10 + (ch.to_int() - '0'.to_int())
     index += 1
+  }
+  if negative {
+    Ok(-result)
+  } else {
+    Ok(result)
+  }
+}
+
+///|
+fn loom_mini_parse_double(text : String) -> Result[Double, String] {
+  let mut index = 0
+  let negative = text.length() > 0 && text[0] == '-'
+  if negative {
+    index = 1
+  }
+  let mut has_digit = false
+  let mut result = 0.0
+  while index < text.length() && text[index] >= '0' && text[index] <= '9' {
+    result = result * 10.0 + (text[index].to_int() - '0'.to_int()).to_double()
+    index += 1
+    has_digit = true
+  }
+  if index < text.length() && text[index] == '.' {
+    index += 1
+    let mut frac = 0.1
+    while index < text.length() && text[index] >= '0' && text[index] <= '9' {
+      result += (text[index].to_int() - '0'.to_int()).to_double() * frac
+      frac *= 0.1
+      index += 1
+      has_digit = true
+    }
+  }
+  if !has_digit || index != text.length() {
+    return Err("loom atom projection expected number")
   }
   if negative {
     Ok(-result)
@@ -1061,11 +1128,12 @@ fn LoomMiniProjectedCursor::new(
 ///|
 fn loom_mini_build_projected_doc(
   builder : @mini.MiniDocBuilder,
+  previous_doc : @pattern.PatternDoc[@pattern.ControlMap]?,
   expr : LoomMiniExpr,
   atoms : Array[LoomMiniProjectedAtom],
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
   let cursor = LoomMiniProjectedCursor::new(atoms)
-  let doc = match loom_mini_lower_expr(builder, expr, cursor) {
+  let doc = match loom_mini_lower_expr(builder, previous_doc, expr, cursor) {
     Ok(doc) => doc
     Err(msg) => return Err(msg)
   }
@@ -1078,6 +1146,7 @@ fn loom_mini_build_projected_doc(
 ///|
 fn loom_mini_lower_expr(
   builder : @mini.MiniDocBuilder,
+  previous_doc : @pattern.PatternDoc[@pattern.ControlMap]?,
   expr : LoomMiniExpr,
   cursor : LoomMiniProjectedCursor,
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
@@ -1086,7 +1155,7 @@ fn loom_mini_lower_expr(
     StackExpr(children) => {
       let docs : Array[@pattern.PatternDoc[@pattern.ControlMap]] = []
       for child in children {
-        match loom_mini_lower_expr(builder, child, cursor) {
+        match loom_mini_lower_expr(builder, previous_doc, child, cursor) {
           Ok(doc) => docs.push(doc)
           Err(msg) => return Err(msg)
         }
@@ -1094,11 +1163,12 @@ fn loom_mini_lower_expr(
       builder.stack(docs)
     }
     MethodChainExpr(inner, methods) => {
-      let base_doc = match loom_mini_lower_expr(builder, inner, cursor) {
+      let base_doc = match
+        loom_mini_lower_expr(builder, previous_doc, inner, cursor) {
         Ok(doc) => doc
         Err(msg) => return Err(msg)
       }
-      loom_mini_apply_method_chain(builder, base_doc, methods)
+      loom_mini_apply_method_chain(builder, previous_doc, base_doc, methods)
     }
   }
 }
@@ -1106,6 +1176,7 @@ fn loom_mini_lower_expr(
 ///|
 fn loom_mini_apply_method_chain(
   builder : @mini.MiniDocBuilder,
+  previous_doc : @pattern.PatternDoc[@pattern.ControlMap]?,
   base_doc : @pattern.PatternDoc[@pattern.ControlMap],
   methods : Array[LoomMiniMethodCall],
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
@@ -1126,6 +1197,11 @@ fn loom_mini_apply_method_chain(
           Ok(next) => continue next
           Err(msg) => return Err(msg)
         }
+      ControlMethod(key, value) =>
+        match loom_mini_apply_control_method(previous_doc, doc, key, value) {
+          Ok(next) => continue next
+          Err(msg) => return Err(msg)
+        }
       JuxMethod(callback) =>
         match loom_mini_apply_jux_method(doc, callback) {
           Ok(next) => continue next
@@ -1141,6 +1217,73 @@ fn loom_mini_apply_method_chain(
     doc
   }
   Ok(doc)
+}
+
+///|
+fn loom_mini_apply_control_method(
+  previous_doc : @pattern.PatternDoc[@pattern.ControlMap]?,
+  doc : @pattern.PatternDoc[@pattern.ControlMap],
+  key : String,
+  value : Double,
+) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
+  let control_id = match
+    loom_mini_pattern_node_id(
+      "mini:control:\{doc.root().value()}:\{key}:\{value}",
+    ) {
+    Ok(id) => id
+    Err(msg) => return Err(msg)
+  }
+  let id = match
+    loom_mini_pattern_node_id(
+      "mini:merge_control:\{doc.root().value()}:\{key}:\{value}",
+    ) {
+    Ok(id) => id
+    Err(msg) => return Err(msg)
+  }
+  match loom_mini_reuse_previous_doc(previous_doc, id) {
+    Ok(Some(doc)) => return Ok(doc)
+    Ok(None) => ()
+    Err(msg) => return Err(msg)
+  }
+  let control_doc = match loom_mini_reuse_previous_doc(previous_doc, control_id) {
+    Ok(Some(doc)) => doc
+    Ok(None) =>
+      @pattern.PatternDoc::pure(
+        id=control_id,
+        value=@pattern.ControlMap::single(key, value),
+      )
+    Err(msg) => return Err(msg)
+  }
+  let result = try? @pattern.PatternDoc::merge_control(
+    id~,
+    left=doc,
+    right=control_doc,
+  )
+  match result {
+    Ok(next) => Ok(next)
+    Err(_) => Err("internal loom mini PatternDoc construction failed")
+  }
+}
+
+///|
+fn loom_mini_reuse_previous_doc(
+  previous_doc : @pattern.PatternDoc[@pattern.ControlMap]?,
+  id : @identity.PatternNodeId,
+) -> Result[@pattern.PatternDoc[@pattern.ControlMap]?, String] {
+  match previous_doc {
+    None => Ok(None)
+    Some(previous) =>
+      if previous.contains_node(id) {
+        let result = try? previous.subdoc(root=id)
+        match result {
+          Ok(doc) => Ok(Some(doc))
+          Err(_) =>
+            Err("internal loom mini id could not be reused: \{id.value()}")
+        }
+      } else {
+        Ok(None)
+      }
+  }
 }
 
 ///|
