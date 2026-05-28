@@ -104,6 +104,103 @@ fn projection_boundary_assert_matches_mini_doc(input : String) -> Unit {
 }
 
 ///|
+fn projection_boundary_assert_control_method_matches_mini(
+  input : String,
+  expected_root : String,
+  expected_controls : Array[(String, Double)],
+) -> Unit {
+  let projection = LoomMiniAtomProjection::new(input)
+  let loom_doc = projection_boundary_doc(projection.parse_doc())
+  let mini_doc = projection_boundary_doc(@mini.parse_doc(input))
+  if loom_doc.root().value() != mini_doc.root().value() {
+    abort("expected loom and mini root IDs to match")
+  }
+  if loom_doc.root().value() != expected_root {
+    abort("expected loom root ID to match control-method root")
+  }
+  let loom_snapshot = projection_boundary_snapshot(try? loom_doc.lower())
+  let mini_snapshot = projection_boundary_snapshot(try? mini_doc.lower())
+  let loom_ids = projection_boundary_leaf_ids(loom_snapshot)
+  let mini_ids = projection_boundary_leaf_ids(mini_snapshot)
+  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
+  let loom_events = loom_snapshot.query_sourced_events(
+    projection_boundary_one_cycle(),
+  )
+  let mini_events = mini_snapshot.query_sourced_events(
+    projection_boundary_one_cycle(),
+  )
+  if loom_events.length() != 1 {
+    abort("expected one loom lowered event")
+  }
+  if mini_events.length() != 1 {
+    abort("expected one mini lowered event")
+  }
+  if loom_events.length() != mini_events.length() {
+    abort("expected loom and mini lowered event counts to match")
+  }
+  for index in 0..<loom_events.length() {
+    let loom_value = loom_events[index].event().value
+    let mini_value = mini_events[index].event().value
+    let mut loom_control_count = 0
+    loom_value.each(fn(key, value) {
+      loom_control_count += 1
+      if mini_value.get(key) != Some(value) {
+        abort("expected lowered control '\{key}' to match mini")
+      }
+    })
+    let mut mini_control_count = 0
+    mini_value.each(fn(key, value) {
+      mini_control_count += 1
+      if loom_value.get(key) != Some(value) {
+        abort("expected mini control '\{key}' to match loom")
+      }
+    })
+    if loom_control_count != mini_control_count {
+      abort("expected lowered control count to match mini")
+    }
+    for expected in expected_controls {
+      let key = expected.0
+      let value = expected.1
+      if loom_value.get(key) != Some(value) {
+        abort("expected lowered control '\{key}' to match expected value")
+      }
+    }
+  }
+  projection.dispose()
+}
+
+///|
+fn projection_boundary_assert_control_method_cache_reused_after_edit(
+  input : String,
+  edited : String,
+  edit : @core.Edit,
+) -> Unit {
+  let projection = LoomMiniAtomProjection::new(input)
+  let initial_doc = projection_boundary_doc(projection.parse_doc())
+  let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] =
+    @pattern.PatternLoweringCache::new()
+  ignore(
+    projection_boundary_snapshot(try? initial_doc.lower_with_cache(cache)),
+  )
+  cache.reset_stats()
+  projection.apply_edit(edit, edited)
+  let edited_doc = projection_boundary_doc(projection.parse_doc())
+  if edited_doc.root().value() != initial_doc.root().value() {
+    abort("expected control-method edit to preserve root ID")
+  }
+  ignore(
+    projection_boundary_snapshot(try? edited_doc.lower_with_cache(cache)),
+  )
+  if cache.hit_count() != 1 {
+    abort("expected one control-method lowering-cache hit")
+  }
+  if cache.miss_count() != 0 {
+    abort("expected no control-method lowering-cache misses")
+  }
+  projection.dispose()
+}
+
+///|
 fn projection_boundary_ids_after_edit(
   input : String,
   edited : String,
@@ -1037,6 +1134,33 @@ test "loom atom projection matches mini PatternDoc for rev method" {
   let mini_ids = projection_boundary_leaf_ids_from_doc(mini_doc)
   projection_boundary_assert_ids_equal(loom_ids, mini_ids)
   projection.dispose()
+}
+
+///|
+test "loom atom projection matches mini PatternDoc and events for cutoff method" {
+  projection_boundary_assert_control_method_matches_mini(
+    "s(\"bd\").cutoff(200)",
+    "mini:merge_control:mini:sound:bd:0:cutoff:200",
+    [("sound", 36.0), ("cutoff", 200.0)],
+  )
+}
+
+///|
+test "loom atom projection matches mini PatternDoc and events for gain pan chain" {
+  projection_boundary_assert_control_method_matches_mini(
+    "s(\"bd\").gain(0.5).pan(-0.25)",
+    "mini:merge_control:mini:merge_control:mini:sound:bd:0:gain:0.5:pan:-0.25",
+    [("sound", 36.0), ("gain", 0.5), ("pan", -0.25)],
+  )
+}
+
+///|
+test "loom atom projection reuses control method lowering cache after whitespace edit" {
+  projection_boundary_assert_control_method_cache_reused_after_edit(
+    "s(\"bd\").gain(0.5).pan(-0.25)",
+    "s(\"  bd\").gain(0.5).pan(-0.25)",
+    @core.Edit::insert(3, 2),
+  )
 }
 
 ///|
