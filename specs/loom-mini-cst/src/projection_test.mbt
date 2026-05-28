@@ -418,9 +418,120 @@ fn projection_boundary_assert_recovery_matrix_row(
     old_end=row.span.old_end,
     new_end=row.span.new_end,
   )
-  let loom_ids = projection_boundary_leaf_ids_from_doc(
-    projection_boundary_doc(projection.parse_doc()),
+  let loom_doc = projection_boundary_doc(projection.parse_doc())
+  let mini_doc = projection_boundary_doc(pipeline.parse_doc())
+  if loom_doc.root().value() != mini_doc.root().value() {
+    abort("expected \{row.family} loom and mini recovered root IDs to match")
+  }
+  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
+  let mini_ids = projection_boundary_leaf_ids(
+    projection_boundary_mini_snapshot(pipeline.parse_snapshot()),
   )
+  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
+  projection_boundary_assert_ids_equal(row.expected_lowered_event_ids, loom_ids)
+  projection.dispose()
+  pipeline.dispose()
+  loom_ids
+}
+
+///|
+struct ProjectionProvenanceSemanticRecoveryMatrixRow {
+  family : String
+  initial : String
+  malformed : String
+  recovered : String
+  malformed_edit : @core.Edit
+  recovery_edit : @core.Edit
+  malformed_span : ProjectionProvenanceEditSpan
+  recovered_span : ProjectionProvenanceEditSpan
+  expected_loom_error : String
+  expected_lowered_event_ids : Array[String]
+}
+
+///|
+fn ProjectionProvenanceSemanticRecoveryMatrixRow::ProjectionProvenanceSemanticRecoveryMatrixRow(
+  family~ : String,
+  initial~ : String,
+  malformed~ : String,
+  recovered~ : String,
+  malformed_edit~ : @core.Edit,
+  recovery_edit~ : @core.Edit,
+  malformed_span~ : ProjectionProvenanceEditSpan,
+  recovered_span~ : ProjectionProvenanceEditSpan,
+  expected_loom_error~ : String,
+  expected_lowered_event_ids~ : Array[String],
+) -> ProjectionProvenanceSemanticRecoveryMatrixRow {
+  {
+    family,
+    initial,
+    malformed,
+    recovered,
+    malformed_edit,
+    recovery_edit,
+    malformed_span,
+    recovered_span,
+    expected_loom_error,
+    expected_lowered_event_ids,
+  }
+}
+
+///|
+fn projection_boundary_assert_semantic_recovery_matrix_row(
+  row : ProjectionProvenanceSemanticRecoveryMatrixRow,
+) -> Array[String] {
+  let (_initial_cst, initial_diagnostics) = try! parse_cst(row.initial)
+  projection_boundary_assert_int_equal(
+    "\{row.family} initial CST diagnostics",
+    initial_diagnostics.length(),
+    0,
+  )
+  let (_malformed_cst, malformed_diagnostics) = try! parse_cst(row.malformed)
+  projection_boundary_assert_int_equal(
+    "\{row.family} malformed CST diagnostics",
+    malformed_diagnostics.length(),
+    0,
+  )
+  let (_recovered_cst, recovered_diagnostics) = try! parse_cst(row.recovered)
+  projection_boundary_assert_int_equal(
+    "\{row.family} recovered CST diagnostics",
+    recovered_diagnostics.length(),
+    0,
+  )
+  let projection = LoomMiniAtomProjection::new(row.initial)
+  ignore(projection_boundary_doc(projection.parse_doc()))
+  let pipeline = @mini.MiniAuthoringPipeline::new(row.initial)
+  ignore(projection_boundary_mini_snapshot(pipeline.parse_snapshot()))
+  projection.apply_edit(row.malformed_edit, row.malformed)
+  pipeline.set_input_with_source_edit(
+    row.malformed,
+    old_start=row.malformed_span.old_start,
+    old_end=row.malformed_span.old_end,
+    new_end=row.malformed_span.new_end,
+  )
+  match projection.parse_doc() {
+    Err(msg) =>
+      if msg != row.expected_loom_error {
+        abort("expected \{row.family} loom error to match")
+      }
+    Ok(_) => abort("expected \{row.family} loom projection to fail")
+  }
+  match pipeline.parse_doc() {
+    Err(_) => ()
+    Ok(_) => abort("expected \{row.family} mini authoring parse to fail")
+  }
+  projection.apply_edit(row.recovery_edit, row.recovered)
+  pipeline.set_input_with_source_edit(
+    row.recovered,
+    old_start=row.recovered_span.old_start,
+    old_end=row.recovered_span.old_end,
+    new_end=row.recovered_span.new_end,
+  )
+  let loom_doc = projection_boundary_doc(projection.parse_doc())
+  let mini_doc = projection_boundary_doc(pipeline.parse_doc())
+  if loom_doc.root().value() != mini_doc.root().value() {
+    abort("expected \{row.family} loom and mini recovered root IDs to match")
+  }
+  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
   let mini_ids = projection_boundary_leaf_ids(
     projection_boundary_mini_snapshot(pipeline.parse_snapshot()),
   )
@@ -872,6 +983,168 @@ test "loom provenance matrix row covers parse-error recovery" {
     #|  "mini:sound:bd:2",
     #|  "mini:sound:bd:1",
     #|]
+  debug_inspect(ids, content=expected)
+}
+
+///|
+test "loom recovery matrix row covers dollar stack line recovery" {
+  let ids = projection_boundary_assert_recovery_matrix_row(
+    ProjectionProvenanceRecoveryMatrixRow(
+      family="dollar stack line recovery",
+      initial="$: s(\"bd\")",
+      malformed="$: s(\"bd\")\n$: note(\"60\"",
+      recovered="$: s(\"bd\")\n$: note(\"60\")",
+      malformed_edit=@core.Edit::insert(10, 14),
+      recovery_edit=@core.Edit::insert(23, 1),
+      span=ProjectionProvenanceEditSpan(
+        old_start=10,
+        old_end=10,
+        new_end=24,
+      ),
+      expected_loom_error="loom mini syntax has diagnostics",
+      expected_lowered_event_ids=[
+        "mini:sound:bd:0",
+        "mini:note:60:0",
+      ],
+    ),
+  )
+  let expected =
+    #|["mini:sound:bd:0", "mini:note:60:0"]
+  debug_inspect(ids, content=expected)
+}
+
+///|
+test "loom recovery matrix row covers direct callback recovery" {
+  let ids = projection_boundary_assert_recovery_matrix_row(
+    ProjectionProvenanceRecoveryMatrixRow(
+      family="direct callback recovery",
+      initial="s(\"bd sd\").jux(rev)",
+      malformed="s(\"bd sd\").jux(fast(2)",
+      recovered="s(\"bd sd\").jux(fast(2))",
+      malformed_edit=@core.Edit::replace(15, 18, 22),
+      recovery_edit=@core.Edit::insert(22, 1),
+      span=ProjectionProvenanceEditSpan(
+        old_start=15,
+        old_end=18,
+        new_end=22,
+      ),
+      expected_loom_error="loom mini syntax has diagnostics",
+      expected_lowered_event_ids=[
+        "mini:sound:sd:0",
+        "mini:sound:sd:0",
+        "mini:sound:sd:0",
+        "mini:sound:sd:0",
+        "mini:sound:sd:0",
+        "mini:sound:sd:0",
+      ],
+    ),
+  )
+  let expected =
+    #|[
+    #|  "mini:sound:sd:0",
+    #|  "mini:sound:sd:0",
+    #|  "mini:sound:sd:0",
+    #|  "mini:sound:sd:0",
+    #|  "mini:sound:sd:0",
+    #|  "mini:sound:sd:0",
+    #|]
+  debug_inspect(ids, content=expected)
+}
+
+///|
+test "loom recovery matrix row covers dollar stack callback recovery" {
+  let ids = projection_boundary_assert_recovery_matrix_row(
+    ProjectionProvenanceRecoveryMatrixRow(
+      family="dollar stack callback recovery",
+      initial="$: s(\"bd sd\").jux(rev)",
+      malformed="$: s(\"bd sd\").jux(fast(2)",
+      recovered="$: s(\"bd sd\").jux(fast(2))",
+      malformed_edit=@core.Edit::replace(18, 21, 25),
+      recovery_edit=@core.Edit::insert(25, 1),
+      span=ProjectionProvenanceEditSpan(
+        old_start=18,
+        old_end=21,
+        new_end=25,
+      ),
+      expected_loom_error="loom mini syntax has diagnostics",
+      expected_lowered_event_ids=[
+        "mini:sound:sd:0",
+        "mini:sound:sd:0",
+        "mini:sound:sd:0",
+        "mini:sound:sd:0",
+        "mini:sound:sd:0",
+        "mini:sound:sd:0",
+      ],
+    ),
+  )
+  let expected =
+    #|[
+    #|  "mini:sound:sd:0",
+    #|  "mini:sound:sd:0",
+    #|  "mini:sound:sd:0",
+    #|  "mini:sound:sd:0",
+    #|  "mini:sound:sd:0",
+    #|  "mini:sound:sd:0",
+    #|]
+  debug_inspect(ids, content=expected)
+}
+
+///|
+test "loom recovery matrix row covers control method recovery" {
+  let ids = projection_boundary_assert_recovery_matrix_row(
+    ProjectionProvenanceRecoveryMatrixRow(
+      family="control method recovery",
+      initial="s(\"bd\").gain(0.5)",
+      malformed="s(\"bd\").gain(0.5).pan(-0.25",
+      recovered="s(\"bd\").gain(0.5).pan(-0.25)",
+      malformed_edit=@core.Edit::insert(17, 11),
+      recovery_edit=@core.Edit::insert(27, 1),
+      span=ProjectionProvenanceEditSpan(
+        old_start=17,
+        old_end=17,
+        new_end=28,
+      ),
+      expected_loom_error="loom mini syntax has diagnostics",
+      expected_lowered_event_ids=[
+        "mini:control:mini:merge_control:mini:sound:bd:0:gain:0.5:pan:-0.25",
+      ],
+    ),
+  )
+  let expected =
+    #|["mini:control:mini:merge_control:mini:sound:bd:0:gain:0.5:pan:-0.25"]
+  debug_inspect(ids, content=expected)
+}
+
+///|
+test "loom semantic recovery matrix row covers projection-only failure" {
+  let ids = projection_boundary_assert_semantic_recovery_matrix_row(
+    ProjectionProvenanceSemanticRecoveryMatrixRow(
+      family="projection-only recovery",
+      initial="s(\"bd sd\")",
+      malformed="s(\"2 bd sd\")",
+      recovered="s(\"cp bd sd\")",
+      malformed_edit=@core.Edit::insert(3, 2),
+      recovery_edit=@core.Edit::replace(3, 4, 5),
+      malformed_span=ProjectionProvenanceEditSpan(
+        old_start=3,
+        old_end=3,
+        new_end=5,
+      ),
+      recovered_span=ProjectionProvenanceEditSpan(
+        old_start=3,
+        old_end=3,
+        new_end=6,
+      ),
+      expected_loom_error="loom atom projection expected sound name",
+      expected_lowered_event_ids=[
+        "mini:sound:cp:0",
+        "mini:sound:bd:0",
+        "mini:sound:sd:0",
+      ],
+    ),
+  )
+  let expected =
+    #|["mini:sound:cp:0", "mini:sound:bd:0", "mini:sound:sd:0"]
   debug_inspect(ids, content=expected)
 }
 
