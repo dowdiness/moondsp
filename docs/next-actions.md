@@ -8,7 +8,7 @@ per-PR verification logs and merged-PR lists live in `git log` and
 
 ## Current State
 
-- `main` is aligned with `origin/main` after PR #101.
+- `main` is aligned with `origin/main` after PR #104.
 - Latest release: **v0.5.1** (tagged and published 2026-05-20).
 - The next release should be **v0.6.0** if it includes the current
   `Unreleased` entries, because public API has been added since v0.5.1.
@@ -17,8 +17,9 @@ per-PR verification logs and merged-PR lists live in `git log` and
   remains open until an explicit release pass. Do not tag or publish v0.6.0 as
   part of loom-authoring work.
 - ADR-0013 defines loom mini promotion criteria using the shipped apply-edit,
-  projection parity, and PR #101 provenance-matrix evidence, but it does not
-  approve a production parser switch.
+  projection parity, PR #101 provenance-matrix evidence, and PR #104
+  control-method projection parity, but it does not approve a production parser
+  switch.
 - `moon.mod` is now the root manifest. `moon.mod.json` remains only in the
   nested `specs/loom-mini-cst` spike module.
 - Production mini parsing still uses the hand-written parser and
@@ -38,11 +39,12 @@ loom-authoring work.
 
 ## Alternative Slices
 
-- **Loom semantic projection/control-method parity** — ADR-0013's next
-  spec-local Loom gate is projection for production control methods
-  (`.cutoff(...)`, `.gain(...)`, `.pan(...)`) plus lowered event behavior. Keep
-  the work under `specs/loom-mini-cst`; do not add loom/seam to root `moon.mod`
-  and do not route production parsing through loom.
+- **Loom error recovery / last-good semantic document pattern** — PR #104
+  closes ADR-0013's named control-method projection gap. The next useful Loom
+  gate is proving that diagnostics do not replace the last successful reusable
+  semantic document and that recovery after a valid edit still uses the correct
+  baseline. Keep the work under `specs/loom-mini-cst`; do not add loom/seam to
+  root `moon.mod` and do not route production parsing through loom.
 
 - **Voice API result hardening follow-up** — decide whether to deprecate/remove
   Bool wrappers, rename voice `*_result` methods to graph-style unsuffixed
@@ -53,6 +55,12 @@ loom-authoring work.
   policy before adding structural Eq.
 
 ## Closed Since Previous Update
+
+- ~~**PR #104 — loom control-method projection parity**~~ — SHIPPED
+  2026-05-28 (`f1759c6`). Added spec-local projection/lowering support for
+  `.cutoff(...)`, `.gain(...)`, and `.pan(...)`, with parity against
+  `@mini.parse_doc`, lowered control-map checks, and a lowering-cache reuse
+  regression. Production parsing remains hand-written.
 
 - ~~**PR #101 — loom full-grammar provenance matrix**~~ — SHIPPED
   2026-05-27 (`787e23a`). Added the matrix helper and representative rows under
