@@ -8,7 +8,7 @@ per-PR verification logs and merged-PR lists live in `git log` and
 
 ## Current State
 
-- `main` is aligned with `origin/main` after PR #104.
+- `main` is aligned with `origin/main` after PR #105.
 - Latest release: **v0.5.1** (tagged and published 2026-05-20).
 - The next release should be **v0.6.0** if it includes the current
   `Unreleased` entries, because public API has been added since v0.5.1.

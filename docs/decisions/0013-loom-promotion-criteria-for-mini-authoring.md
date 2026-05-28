@@ -244,7 +244,9 @@ requirements, not to route production parsing through loom:
    prototype.
 5. Extract upstream Loom requirements for stable identity across deletion/shift
    edits, projection helper ergonomics, and the canonical "diagnostics plus
-   last successful semantic document" authoring pattern.
+   last successful semantic document" authoring pattern. The extracted
+   requirements live in
+   [`../loom-upstream-requirements.md`](../loom-upstream-requirements.md).
 6. Only after full grammar, provenance, lowering, release-manifest, and browser
    build gates pass, decide whether to put the projection behind
    `MiniAuthoringPipeline` as an authoring-only implementation detail.
