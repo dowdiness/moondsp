@@ -8,18 +8,18 @@ per-PR verification logs and merged-PR lists live in `git log` and
 
 ## Current State
 
-- `main` is aligned with `origin/main` after PR #105.
+- `main` is aligned with `origin/main` after PR #107.
 - Latest release: **v0.5.1** (tagged and published 2026-05-20).
 - The next release should be **v0.6.0** if it includes the current
   `Unreleased` entries, because public API has been added since v0.5.1.
-- Open GitHub issues: none.
+- Open moondsp GitHub issues: none.
 - Open PRs: PR #86 (`release/v0.6.0`) is release prep and intentionally
   remains open until an explicit release pass. Do not tag or publish v0.6.0 as
   part of loom-authoring work.
 - ADR-0013 defines loom mini promotion criteria using the shipped apply-edit,
-  projection parity, PR #101 provenance-matrix evidence, and PR #104
-  control-method projection parity, but it does not approve a production parser
-  switch.
+  projection parity, PR #101 provenance-matrix evidence, PR #104
+  control-method projection parity, and PR #107 recovery evidence, but it does
+  not approve a production parser switch.
 - `moon.mod` is now the root manifest. `moon.mod.json` remains only in the
   nested `specs/loom-mini-cst` spike module.
 - Production mini parsing still uses the hand-written parser and
@@ -39,12 +39,14 @@ loom-authoring work.
 
 ## Alternative Slices
 
-- **Loom error recovery / last-good semantic document pattern** — PR #104
-  closes ADR-0013's named control-method projection gap. The next useful Loom
-  gate is proving that diagnostics do not replace the last successful reusable
-  semantic document and that recovery after a valid edit still uses the correct
-  baseline. Keep the work under `specs/loom-mini-cst`; do not add loom/seam to
-  root `moon.mod` and do not route production parsing through loom.
+- **Loom upstream attachment / production-shaped boundary** — PR #107 expands
+  the spec-local recovery evidence for diagnostics plus last-good semantic
+  document behavior. Further Loom work should either happen upstream
+  (`dowdiness/loom#162`, `dowdiness/loom#163`, `dowdiness/loom#164`,
+  `dowdiness/seam#2`) or become a production-shaped authoring-boundary
+  prototype. Keep any moondsp work under `specs/loom-mini-cst`; do not add
+  loom/seam to root `moon.mod` and do not route production parsing through
+  loom.
 
 - **Voice API result hardening follow-up** — decide whether to deprecate/remove
   Bool wrappers, rename voice `*_result` methods to graph-style unsuffixed
@@ -55,6 +57,19 @@ loom-authoring work.
   policy before adding structural Eq.
 
 ## Closed Since Previous Update
+
+- ~~**PR #107 — loom recovery evidence expansion**~~ — SHIPPED 2026-05-28
+  (`07a4451`). Expanded the spec-local recovery matrix for `$:` stack-line
+  syntax, direct and `$:` callback syntax, control-method syntax, and
+  projection-only semantic failures; recovered states now compare Loom and
+  `MiniAuthoringPipeline` root IDs as well as lowered event IDs. Production
+  parsing remains hand-written.
+
+- ~~**PR #106 — loom upstream requirements extraction**~~ — SHIPPED
+  2026-05-28 (`49d1fe5`). Added `docs/loom-upstream-requirements.md`, linked
+  it from ADR-0013, and opened upstream follow-up issues in Loom/seam for
+  stable identity, projection ergonomics, diagnostics plus last-good semantic
+  documents, and authoring-only dependency boundaries.
 
 - ~~**PR #104 — loom control-method projection parity**~~ — SHIPPED
   2026-05-28 (`f1759c6`). Added spec-local projection/lowering support for
