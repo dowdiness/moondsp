@@ -864,18 +864,13 @@ fn loom_mini_realign_projected_atoms(
 ) -> Array[LoomMiniProjectedAtom] {
   let leaves = loom_mini_raw_atom_projection_leaves(raw_atoms)
   let allocate = loom_mini_atom_id_allocator(baseline)
-  let stable = match edit {
-    Some(edit) =>
-      @loom.realign_projection_identities(
-        baseline,
-        source,
-        leaves,
-        allocate,
-        edit=edit,
-      )
-    None =>
-      @loom.realign_projection_identities(baseline, source, leaves, allocate)
-  }
+  let stable = @loom.realign_projection_identities_with_optional_edit(
+    baseline,
+    source,
+    leaves,
+    allocate,
+    edit,
+  )
   loom_mini_projected_atoms_from_stable(raw_atoms, stable)
 }
 
