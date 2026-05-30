@@ -45,6 +45,7 @@ pub fn LoomMiniAtomProjection::apply_edit(Self, @core.Edit, String) -> Unit
 pub fn LoomMiniAtomProjection::dispose(Self) -> Unit
 pub fn LoomMiniAtomProjection::new(String) -> Self
 pub fn LoomMiniAtomProjection::parse_doc(Self) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
+pub fn LoomMiniAtomProjection::set_source(Self, String) -> Unit
 
 pub(all) enum MiniAst {
   Parsed
@@ -82,6 +83,9 @@ pub(all) enum MiniSyntaxKind {
   SubNotationNode
   PostfixNode
   EuclidNode
+  DollarColonToken
+  DollarStackNode
+  DollarLineNode
 } derive(Eq, @debug.Debug)
 pub fn MiniSyntaxKind::from_raw(@seam.RawKind) -> Self
 pub impl @seam.ToRawKind for MiniSyntaxKind
@@ -101,6 +105,7 @@ pub(all) enum MiniToken {
   Question
   LBracket
   RBracket
+  DollarColon
   Quote
   Ident
   Whitespace

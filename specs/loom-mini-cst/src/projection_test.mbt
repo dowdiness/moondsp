@@ -227,6 +227,25 @@ fn projection_boundary_ids_after_edit(
 }
 
 ///|
+test "loom set_source uses source-diff fallback for atom identity" {
+  let projection = LoomMiniAtomProjection::new("s(\"bd sd bd\")")
+  ignore(projection_boundary_doc(projection.parse_doc()))
+  projection.set_source("s(\"bd sd bd bd\")")
+  let ids = projection_boundary_leaf_ids_from_doc(
+    projection_boundary_doc(projection.parse_doc()),
+  )
+  let expected =
+    #|[
+    #|  "mini:sound:bd:0",
+    #|  "mini:sound:sd:0",
+    #|  "mini:sound:bd:1",
+    #|  "mini:sound:bd:2",
+    #|]
+  debug_inspect(ids, content=expected)
+  projection.dispose()
+}
+
+///|
 struct ProjectionProvenanceEditSpan {
   old_start : Int
   old_end : Int
