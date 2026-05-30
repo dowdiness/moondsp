@@ -88,6 +88,11 @@ The loom spec path now proves these evaluation-only contracts:
 - PR #107 expanded recovery evidence for `$:` stack-line syntax, direct and
   `$:` callback syntax, control-method syntax, and projection-only semantic
   failures, while checking recovered root IDs against `MiniAuthoringPipeline`.
+- A 2026-05-30 follow-up adopted Loom's stable projection identity helpers in
+  the spec-local projection: `ProjectionIdentityTracker` now owns the
+  last-good atom baseline, `ProjectionStringIdAllocator` owns collision-free
+  string ID allocation, and a `set_source` regression pins source-diff fallback
+  behavior. The production parser remains unchanged.
 - The spec remains a nested module with path dependencies to loom, seam,
   pretty, and incr. It is intentionally not part of the published `moondsp`
   library surface.
@@ -253,7 +258,11 @@ requirements, not to route production parsing through loom:
 4. Treat PR #104's production control-method projection, lowered-control, and
    cache-reuse checks as regression evidence for any future authoring
    prototype.
-5. Use the extracted upstream Loom requirements for stable identity across
+5. Keep consuming upstream Loom helpers when they preserve the spec-local
+   evidence: the mini projection now uses the stable identity tracker and
+   string-ID allocator, while the remaining exact-edit shim records behavior
+   that still belongs in a production-shaped authoring facade.
+6. Use the extracted upstream Loom requirements for stable identity across
    deletion/shift edits, projection helper ergonomics, and the canonical
    "diagnostics plus last successful semantic document" authoring pattern when
    working upstream. The requirements live in

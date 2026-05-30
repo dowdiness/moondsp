@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   source-span edits while retaining the existing `mini:sound:bd:N` ID shape.
 - Added source-span regression coverage for duplicate note provenance and parse
   error recovery in the mini authoring pipeline.
+- Updated the nested loom mini-CST spike to use Loom's stable projection identity
+  helpers for atom provenance, with `set_source` source-diff fallback coverage.
 - Added ADR-0012 to scope a loom/CST mini authoring evaluation before any
   runtime parser migration.
 - Added a nested `specs/loom-mini-cst/` spike module with a tiny loom grammar

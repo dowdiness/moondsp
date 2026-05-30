@@ -16,10 +16,12 @@ The current evidence is intentionally spec-local:
   parser with `@loom.new_parser(input, mini_grammar)`, shares
   `parser.runtime()` with the projection memo, and exposes the result through a
   long-lived observer.
-- `specs/loom-mini-cst/src/projection.mbt::LoomMiniAtomProjection::new` carries
-  `previous_doc`, `previous_atoms`, `previous_source`, and
-  `pending_source_edit` because stable semantic identity is not provided by the
-  CST API alone.
+- `specs/loom-mini-cst/src/projection.mbt::LoomMiniAtomProjection::new` now
+  uses Loom's `ProjectionIdentityTracker` and `ProjectionStringIdAllocator` for
+  last-good atom identity and fresh ID allocation. It still carries a small
+  `pending_source_edit` shim so editor-supplied baseline-relative spans survive
+  syntax/projection recovery when the recovery edit itself starts from malformed
+  parser text.
 - `specs/loom-mini-cst/src/projection_test.mbt` contains the provenance matrix,
   recovery matrix helper, and PR #104 control-method cache-reuse helper that
   define the current regression evidence.
@@ -54,10 +56,12 @@ able to choose its public ID shape; in `moondsp` that shape is
 
 ### Current workaround in `moondsp`
 
-`LoomMiniAtomProjection` realigns projected atoms itself. It preserves prefix
-and suffix IDs around an edit window, allocates fresh IDs inside the changed
-window, and carries a pending source-edit span through diagnostic states so the
-next valid parse can still reuse the correct baseline.
+`LoomMiniAtomProjection` delegates prefix/suffix ID realignment and fresh
+string-ID allocation to Loom's projection identity helpers. The remaining local
+logic chooses the correct baseline-relative edit: direct successful edits use
+the current editor edit, failed syntax/projection states keep the first exact
+last-good edit when one was supplied, and all other paths fall back to Loom's
+source-diff behavior.
 
 ### Acceptance evidence to preserve
 

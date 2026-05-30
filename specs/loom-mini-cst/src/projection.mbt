@@ -25,8 +25,6 @@ priv struct LoomMiniRawAtom {
 priv struct LoomMiniProjectedAtom {
   kind : LoomMiniAtomKind
   text : String
-  start : Int
-  end : Int
   id : String
 }
 
@@ -120,7 +118,12 @@ pub fn LoomMiniAtomProjection::new(input : String) -> LoomMiniAtomProjection {
     label="loom-mini-atom-projection.source-before-edit",
   )
   let mut previous_doc : @pattern.PatternDoc[@pattern.ControlMap]? = None
-  let mut previous_atom_baseline : @loom.ProjectionIdentityBaseline[String]? = None
+  let identity_tracker : @loom.ProjectionIdentityTracker[String] = @loom.ProjectionIdentityTracker::new()
+  // Preserve the first baseline-relative failed edit when editor span data is
+  // available. The tracker owns the last-good baseline and source-diff
+  // fallback; this exact edit keeps parity with MiniAuthoringPipeline through
+  // syntax/projection recovery where a later recovery edit starts from the
+  // malformed parser source rather than the last-good semantic source.
   let mut pending_source_edit : @core.Edit? = None
   let projected = @incr.Memo::new_no_backdate(
     rt,
@@ -130,39 +133,47 @@ pub fn LoomMiniAtomProjection::new(input : String) -> LoomMiniAtomProjection {
       let current_source = parser.source().get_or_abort()
       let diagnostics = parser.diagnostics().get_or_abort()
       if diagnostics.length() > 0 {
-        match previous_atom_baseline {
-          Some(baseline) =>
-            if edit_source is Some(source) && source == baseline.source() {
-              match current_edit {
-                Some(edit) => pending_source_edit = Some(edit)
-                None => ()
-              }
-            }
-          None => ()
-        }
+        pending_source_edit = loom_mini_pending_failed_projection_edit(
+          identity_tracker,
+          current_source,
+          edit_source,
+          current_edit,
+          pending_source_edit,
+        )
         return Err("loom mini syntax has diagnostics")
       }
       let raw_projection = match
         loom_mini_collect_raw_projection(parser.syntax_tree().get_or_abort()) {
         Ok(projection) => projection
-        Err(msg) => return Err(msg)
-      }
-      let atoms = match previous_atom_baseline {
-        None => loom_mini_assign_projected_atoms(raw_projection.atoms)
-        Some(baseline) => {
-          let edit_for_alignment = match (current_edit, edit_source) {
-            (Some(edit), Some(source)) if source == baseline.source() =>
-              Some(edit)
-            _ => pending_source_edit
-          }
-          loom_mini_realign_projected_atoms(
-            baseline,
+        Err(msg) => {
+          pending_source_edit = loom_mini_pending_failed_projection_edit(
+            identity_tracker,
             current_source,
-            raw_projection.atoms,
-            edit_for_alignment,
+            edit_source,
+            current_edit,
+            pending_source_edit,
           )
+          return Err(msg)
         }
       }
+      let leaves = loom_mini_raw_atom_projection_leaves(raw_projection.atoms)
+      let allocate = loom_mini_atom_id_allocator(identity_tracker)
+      let edit_for_alignment = loom_mini_success_projection_edit(
+        identity_tracker,
+        edit_source,
+        current_edit,
+        pending_source_edit,
+      )
+      let stable = identity_tracker.realign_success_with_optional_edit(
+        current_source,
+        leaves,
+        allocate,
+        edit_for_alignment,
+      )
+      let atoms = loom_mini_projected_atoms_from_stable(
+        raw_projection.atoms,
+        stable,
+      )
       let builder = @mini.MiniDocBuilder::with_previous(previous_doc)
       match
         loom_mini_build_projected_doc(
@@ -173,13 +184,20 @@ pub fn LoomMiniAtomProjection::new(input : String) -> LoomMiniAtomProjection {
         ) {
         Ok(doc) => {
           previous_doc = Some(doc)
-          previous_atom_baseline = Some(
-            loom_mini_atom_identity_baseline(current_source, atoms),
-          )
+          identity_tracker.commit_success(current_source, stable)
           pending_source_edit = None
           Ok(doc)
         }
-        Err(msg) => Err(msg)
+        Err(msg) => {
+          pending_source_edit = loom_mini_pending_failed_projection_edit(
+            identity_tracker,
+            current_source,
+            edit_source,
+            current_edit,
+            pending_source_edit,
+          )
+          Err(msg)
+        }
       }
     },
     label="loom-mini-atom-projection.doc",
@@ -208,8 +226,67 @@ pub fn LoomMiniAtomProjection::apply_edit(
 }
 
 ///|
+pub fn LoomMiniAtomProjection::set_source(
+  self : LoomMiniAtomProjection,
+  source : String,
+) -> Unit {
+  self.source_before_edit.set(None)
+  self.edit.set(None)
+  self.parser.set_source(source)
+}
+
+///|
 pub fn LoomMiniAtomProjection::dispose(self : LoomMiniAtomProjection) -> Unit {
   self.scope.dispose()
+}
+
+///|
+fn loom_mini_pending_failed_projection_edit(
+  tracker : @loom.ProjectionIdentityTracker[String],
+  current_source : String,
+  edit_source : String?,
+  current_edit : @core.Edit?,
+  pending : @core.Edit?,
+) -> @core.Edit? {
+  match tracker.baseline() {
+    Some(baseline) =>
+      match (edit_source, current_edit) {
+        (Some(source), Some(edit)) if source == baseline.source() => Some(edit)
+        _ =>
+          match pending {
+            Some(_) => pending
+            None => {
+              tracker.record_failed_input_with_optional_edit(
+                current_source,
+                None,
+                None,
+              )
+              None
+            }
+          }
+      }
+    None => {
+      tracker.record_failed_input_with_optional_edit(current_source, None, None)
+      pending
+    }
+  }
+}
+
+///|
+fn loom_mini_success_projection_edit(
+  tracker : @loom.ProjectionIdentityTracker[String],
+  edit_source : String?,
+  current_edit : @core.Edit?,
+  pending : @core.Edit?,
+) -> @core.Edit? {
+  match tracker.baseline() {
+    Some(baseline) =>
+      match (edit_source, current_edit) {
+        (Some(source), Some(edit)) if source == baseline.source() => Some(edit)
+        _ => pending
+      }
+    None => None
+  }
 }
 
 ///|
@@ -838,65 +915,17 @@ fn loom_mini_collect_numeric_atom_postfix(
 }
 
 ///|
-fn loom_mini_assign_projected_atoms(
-  raw_atoms : Array[LoomMiniRawAtom],
-) -> Array[LoomMiniProjectedAtom] {
-  let used : Map[String, Bool] = {}
-  let counters : Map[String, Int] = {}
-  raw_atoms.map(fn(atom) {
-    let key = loom_mini_atom_identity_key(atom.kind, atom.text)
-    {
-      kind: atom.kind,
-      text: atom.text,
-      start: atom.start,
-      end: atom.end,
-      id: loom_mini_allocate_atom_id(counters, used, key),
-    }
-  })
-}
-
-///|
-fn loom_mini_realign_projected_atoms(
-  baseline : @loom.ProjectionIdentityBaseline[String],
-  source : String,
-  raw_atoms : Array[LoomMiniRawAtom],
-  edit : @core.Edit?,
-) -> Array[LoomMiniProjectedAtom] {
-  let leaves = loom_mini_raw_atom_projection_leaves(raw_atoms)
-  let allocate = loom_mini_atom_id_allocator(baseline)
-  let stable = @loom.realign_projection_identities_with_optional_edit(
-    baseline,
-    source,
-    leaves,
-    allocate,
-    edit,
-  )
-  loom_mini_projected_atoms_from_stable(raw_atoms, stable)
-}
-
-///|
 fn loom_mini_atom_id_allocator(
-  baseline : @loom.ProjectionIdentityBaseline[String],
+  tracker : @loom.ProjectionIdentityTracker[String],
 ) -> (@loom.ProjectionLeaf) -> String {
-  let used : Map[String, Bool] = {}
-  for leaf in baseline.leaves() {
-    used[leaf.id] = true
+  let allocator = match tracker.baseline() {
+    None => @loom.ProjectionStringIdAllocator::new(loom_mini_atom_id)
+    Some(baseline) =>
+      @loom.ProjectionStringIdAllocator::from_baseline(
+        baseline, loom_mini_atom_id,
+      )
   }
-  let counters : Map[String, Int] = {}
-  fn(leaf : @loom.ProjectionLeaf) -> String {
-    loom_mini_allocate_atom_id(counters, used, leaf.key)
-  }
-}
-
-///|
-fn loom_mini_atom_identity_baseline(
-  source : String,
-  atoms : Array[LoomMiniProjectedAtom],
-) -> @loom.ProjectionIdentityBaseline[String] {
-  @loom.ProjectionIdentityBaseline::new(
-    source,
-    atoms.map(fn(atom) { loom_mini_projected_atom_stable_leaf(atom) }),
-  )
+  fn(leaf : @loom.ProjectionLeaf) -> String { allocator.allocate(leaf) }
 }
 
 ///|
@@ -918,18 +947,6 @@ fn loom_mini_raw_atom_projection_leaf(
 }
 
 ///|
-fn loom_mini_projected_atom_stable_leaf(
-  atom : LoomMiniProjectedAtom,
-) -> @loom.StableProjectionLeaf[String] {
-  @loom.StableProjectionLeaf::new(
-    atom.start,
-    atom.end,
-    loom_mini_atom_identity_key(atom.kind, atom.text),
-    atom.id,
-  )
-}
-
-///|
 fn loom_mini_projected_atoms_from_stable(
   raw_atoms : Array[LoomMiniRawAtom],
   stable : Array[@loom.StableProjectionLeaf[String]],
@@ -937,39 +954,16 @@ fn loom_mini_projected_atoms_from_stable(
   let atoms : Array[LoomMiniProjectedAtom] = []
   for index in 0..<raw_atoms.length() {
     let raw = raw_atoms[index]
-    atoms.push({
-      kind: raw.kind,
-      text: raw.text,
-      start: raw.start,
-      end: raw.end,
-      id: stable[index].id,
-    })
+    atoms.push({ kind: raw.kind, text: raw.text, id: stable[index].id })
   }
   atoms
 }
 
 ///|
-fn loom_mini_allocate_atom_id(
-  counters : Map[String, Int],
-  used : Map[String, Bool],
-  key : String,
+fn loom_mini_atom_identity_key(
+  kind : LoomMiniAtomKind,
+  text : String,
 ) -> String {
-  let mut occurrence = match counters.get(key) {
-    Some(value) => value
-    None => 0
-  }
-  let mut id = loom_mini_atom_id(key, occurrence)
-  while used.contains(id) {
-    occurrence += 1
-    id = loom_mini_atom_id(key, occurrence)
-  }
-  counters[key] = occurrence + 1
-  used[id] = true
-  id
-}
-
-///|
-fn loom_mini_atom_identity_key(kind : LoomMiniAtomKind, text : String) -> String {
   "\{loom_mini_atom_kind_label(kind)}:\{text}"
 }
 
