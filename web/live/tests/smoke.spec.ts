@@ -17,6 +17,21 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const INITIAL_PATTERN = `$: s("bd(3,8), hh*16?, sd(2,8,2)").jux(rev)
 $: note("48(3,8) 60(2,8,2) 67(3,8) 60(2,8,3)").slow(3)`;
 const INITIAL_PATTERN_RENDERED = INITIAL_PATTERN.replace("\n", "");
+const SONG_EXAMPLE = `song(
+  section(
+    "ode",
+    256,
+    stack(
+      s("bd").slow(4),
+      note("64 64 65 67
+67 65 64 62
+60 60 62 64
+64 62 62 62").slow(16)
+    )
+  ),
+  part("ode1", "ode")
+)`;
+const ODE_SONG_EXAMPLE = '.example[data-song-example="ode"]';
 
 test.describe("UI smoke (no audio)", () => {
   test.beforeEach(async ({ page }) => {
@@ -50,6 +65,30 @@ test.describe("UI smoke (no audio)", () => {
     const btn = page.locator("#start");
     await expect(btn).toBeEnabled();
     await expect(btn).toHaveAttribute("data-action", "start");
+  });
+
+  test("playback mode toggle is explicit", async ({ page }) => {
+    const pattern = page.locator("#mode-pattern");
+    const song = page.locator("#mode-song");
+    await expect(pattern).toHaveAttribute("aria-pressed", "true");
+    await expect(song).toHaveAttribute("aria-pressed", "false");
+
+    await song.click();
+    await expect(pattern).toHaveAttribute("aria-pressed", "false");
+    await expect(song).toHaveAttribute("aria-pressed", "true");
+
+    await pattern.click();
+    await expect(pattern).toHaveAttribute("aria-pressed", "true");
+    await expect(song).toHaveAttribute("aria-pressed", "false");
+  });
+
+  test("global BPM control is visible and editable", async ({ page }) => {
+    const bpm = page.locator("#global-bpm");
+    await expect(bpm).toHaveValue("60");
+    await bpm.fill("72.5");
+    await bpm.press("Enter");
+    await expect(bpm).toHaveValue("72.5");
+    await expect(page.locator("#log")).toContainText("BPM 72.5");
   });
 
   test("autocomplete offers method names after `.` and accepting expands snippet", async ({ page }) => {
@@ -151,6 +190,13 @@ test.describe("UI smoke (no audio)", () => {
     const layersDl = page.locator("#cheat dl").first();
     await expect(layersDl.locator("dt")).toContainText(["s(", "note(", "$:"]);
   });
+
+  test("cheatsheet includes a song-mode example", async ({ page }) => {
+    const songExample = page.locator(ODE_SONG_EXAMPLE);
+    await expect(songExample).toBeVisible();
+    await expect(songExample).toHaveAttribute("data-example", SONG_EXAMPLE);
+    await expect(songExample).toHaveAttribute("data-bpm", "72");
+  });
 });
 
 test.describe("Audio path", () => {
@@ -237,6 +283,50 @@ test.describe("Audio path", () => {
     // Recovery clears the diagnostic.
     await page.keyboard.press("Control+A");
     await page.keyboard.type(`s("bd sd")`);
+    await expect(log).toContainText("pattern updated", { timeout: 3_000 });
+    await expect(page.locator(".cm-diagnostic-error")).toHaveCount(0);
+  });
+
+  test("valid song expression evaluates in explicit song mode", async ({ page }) => {
+    await page.goto("/");
+    await page.locator("#start").click();
+    await expect(page.locator("#status")).toContainText("running", { timeout: 10_000 });
+    await expect(page.locator("#log")).toContainText("pattern updated", { timeout: 5_000 });
+
+    await page.locator(ODE_SONG_EXAMPLE).click();
+
+    await expect(page.locator("#mode-song")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("#global-bpm")).toHaveValue("72");
+    await expect(page.locator("#log")).toContainText("song updated", { timeout: 3_000 });
+    await expect(page.locator(".cm-diagnostic-error")).toHaveCount(0);
+    await expect(page.locator("#status")).toContainText("running");
+  });
+
+  test("invalid song surfaces error and keeps last good", async ({ page }) => {
+    await page.goto("/");
+    await page.locator("#start").click();
+    await expect(page.locator("#status")).toContainText("running", { timeout: 10_000 });
+    await expect(page.locator("#log")).toContainText("pattern updated", { timeout: 5_000 });
+
+    await page.locator(ODE_SONG_EXAMPLE).click();
+    await expect(page.locator("#log")).toContainText("song updated", { timeout: 3_000 });
+
+    const editor = page.locator(".cm-content");
+    await editor.click();
+    await page.keyboard.press("Control+A");
+    await page.keyboard.insertText('song(section("intro",0,s("bd")),part("intro1","intro"))');
+
+    const log = page.locator("#log");
+    await expect(log).toContainText("kept last good", { timeout: 3_000 });
+    await expect(log).toContainText("section 'intro' requires a positive length");
+    await expect(page.locator("#status")).toContainText("running");
+    await expect(page.locator(".cm-diagnostic-error")).toBeVisible();
+
+    // Pattern mode still works after a song parse failure.
+    await page.locator("#mode-pattern").click();
+    await editor.click();
+    await page.keyboard.press("Control+A");
+    await page.keyboard.insertText('s("bd sd")');
     await expect(log).toContainText("pattern updated", { timeout: 3_000 });
     await expect(page.locator(".cm-diagnostic-error")).toHaveCount(0);
   });

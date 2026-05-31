@@ -566,7 +566,7 @@ fn parse_doc_dollar_stack_program(
     let doc = parser.parse_doc_expr(builder) catch {
       ParseError(msg) => return Err(msg)
     }
-    parser.skip_whitespace()
+    parser.skip_inline_whitespace()
     if parser.pos != line.end {
       return Err(
         "position \{parser.pos}: unexpected trailing input '\{input[parser.pos:line.end].to_owned()}'",

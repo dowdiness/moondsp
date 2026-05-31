@@ -1,11 +1,12 @@
 // AudioContext + AudioWorklet bootstrap for moondsp's live REPL.
 //
 // Wraps the existing web/processor.js worklet protocol:
-//   send  { type: "set-pattern-text", text }
+//   send  { type: "set-pattern-text", text } | { type: "set-song-text", text }
 //   reply { type: "pattern-updated" } | { type: "pattern-error", message }
+//       | { type: "song-updated" }    | { type: "song-error", message }
 //
-// Does NOT own pattern-string state — main.ts decides when to send and
-// how to handle replies. This module is the transport boundary only.
+// Does NOT own playback-string state — main.ts decides which explicit mode
+// to send and how to handle replies. This module is the transport boundary only.
 
 export type AudioStatus =
   | { kind: "idle" }
@@ -16,6 +17,8 @@ export type AudioStatus =
 export type WorkletReply =
   | { type: "pattern-updated"; revision?: number }
   | { type: "pattern-error"; message: string; revision?: number }
+  | { type: "song-updated"; revision?: number }
+  | { type: "song-error"; message: string; revision?: number }
   | { type: "error"; message: string; code?: number }
   | { type: string; [key: string]: unknown };
 
@@ -168,6 +171,11 @@ export class AudioEngine {
   setPatternText(text: string, revision?: number): void {
     if (!this.node) return;
     this.node.port.postMessage({ type: "set-pattern-text", text, revision });
+  }
+
+  setSongText(text: string, revision?: number): void {
+    if (!this.node) return;
+    this.node.port.postMessage({ type: "set-song-text", text, revision });
   }
 
   setBpm(bpm: number): void {

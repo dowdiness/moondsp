@@ -4,6 +4,8 @@ package "dowdiness/moondsp/browser"
 // Values
 pub fn clear_pattern_input() -> Unit
 
+pub fn clear_song_input() -> Unit
+
 pub fn compiled_hot_swap_output_sample(Int) -> Double
 
 pub fn compiled_output_sample(Int) -> Double
@@ -24,6 +26,8 @@ pub fn compiled_topology_edit_output_sample(Int) -> Double
 
 pub fn eval_pattern_input() -> Int
 
+pub fn eval_song_input() -> Int
+
 pub fn exit_deliverable_output_sample(Int) -> Double
 
 pub fn get_browser_error_char(Int) -> Int
@@ -39,6 +43,12 @@ pub fn get_pattern_error_char(Int) -> Int
 pub fn get_pattern_error_length() -> Int
 
 pub fn get_scheduler_parse_error() -> String
+
+pub fn get_song_error_char(Int) -> Int
+
+pub fn get_song_error_length() -> Int
+
+pub fn get_song_parse_error() -> String
 
 pub fn init_compiled_graph(Double, Int) -> Bool
 
@@ -58,6 +68,8 @@ pub fn init_scheduler_graph(Double, Int) -> Bool
 
 pub fn parse_and_set_pattern(String) -> Int
 
+pub fn parse_and_set_song(String) -> Int
+
 pub fn process_compiled_block(Double, Double, Double, Int) -> Bool
 
 pub fn process_compiled_hot_swap_block(Double, Int) -> Bool
@@ -75,6 +87,8 @@ pub fn process_exit_deliverable_block(Double, Int) -> Bool
 pub fn process_scheduler_block() -> Bool
 
 pub fn push_pattern_char(Int) -> Unit
+
+pub fn push_song_char(Int) -> Unit
 
 pub fn queue_compiled_hot_swap() -> Bool
 

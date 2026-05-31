@@ -1,8 +1,12 @@
 ///|
-/// Active pattern parsed from mini-notation text.
-let sched_active_pattern : @ref.Ref[@pattern.Pat[@pattern.ControlMap]?] = @ref.new(
-  None,
-)
+/// Active playback source parsed from the explicit browser protocol.
+priv enum SchedulerActivePlayback {
+  ActivePattern(@pattern.Pat[@pattern.ControlMap])
+  ActiveSong(Array[@song.Song[@pattern.ControlMap]])
+}
+
+///|
+let sched_active_playback : @ref.Ref[SchedulerActivePlayback?] = @ref.new(None)
 
 ///|
 /// Per-sound pool state: voice pool + scheduler + tmp buffers.
@@ -306,7 +310,7 @@ pub fn init_scheduler_graph(sample_rate : Double, block_size : Int) -> Bool {
   sched_left.val = Some(@moondsp.AudioBuffer::filled(block_size))
   sched_right.val = Some(@moondsp.AudioBuffer::filled(block_size))
   sched_gain.val = 0.3
-  sched_active_pattern.val = None
+  sched_active_playback.val = None
   true
 }
 
@@ -316,7 +320,7 @@ fn reset_scheduler_graph() -> Unit {
   sched_left.val = None
   sched_right.val = None
   sched_gain.val = 0.3
-  sched_active_pattern.val = None
+  sched_active_playback.val = None
 }
 
 ///|
@@ -330,7 +334,20 @@ pub fn scheduler_right_sample(index : Int) -> Double {
 }
 
 ///|
-/// Process one sub-pattern through its sound pool, accumulating into main buffers.
+/// Accumulate one sub-pool's rendered tmp buffers into main buffers.
+fn accumulate_sub_pool(
+  sp : SoundPool,
+  left : @moondsp.AudioBuffer,
+  right : @moondsp.AudioBuffer,
+) -> Unit {
+  let len = left.length()
+  for i = 0; i < len; i = i + 1 {
+    left.set(i, left.get(i) + sp.tmp_left.get(i))
+    right.set(i, right.get(i) + sp.tmp_right.get(i))
+  }
+}
+
+///|
 fn process_sub_pool(
   sp : SoundPool,
   sub_pat : @pattern.Pat[@pattern.ControlMap],
@@ -340,11 +357,20 @@ fn process_sub_pool(
   sp.tmp_left.fill(0.0)
   sp.tmp_right.fill(0.0)
   sp.scheduler.process_block(sub_pat, sp.pool, sp.tmp_left, sp.tmp_right)
-  let len = left.length()
-  for i = 0; i < len; i = i + 1 {
-    left.set(i, left.get(i) + sp.tmp_left.get(i))
-    right.set(i, right.get(i) + sp.tmp_right.get(i))
-  }
+  accumulate_sub_pool(sp, left, right)
+}
+
+///|
+fn process_sub_song_pool(
+  sp : SoundPool,
+  song : @song.Song[@pattern.ControlMap],
+  left : @moondsp.AudioBuffer,
+  right : @moondsp.AudioBuffer,
+) -> Unit {
+  sp.tmp_left.fill(0.0)
+  sp.tmp_right.fill(0.0)
+  sp.scheduler.process_song_block(song, sp.pool, sp.tmp_left, sp.tmp_right)
+  accumulate_sub_pool(sp, left, right)
 }
 
 ///|
@@ -367,6 +393,121 @@ fn route_matches(
 }
 
 ///|
+fn control_map_for_route(
+  selector : SchedulerRouteSelector,
+  cm : @pattern.ControlMap,
+) -> @pattern.ControlMap? {
+  if route_matches(selector, cm) {
+    Some(cm)
+  } else {
+    None
+  }
+}
+
+///|
+fn filter_pat_for_route(
+  selector : SchedulerRouteSelector,
+  pat : @pattern.Pat[@pattern.ControlMap],
+) -> @pattern.Pat[@pattern.ControlMap] {
+  pat.filter_map(fn(cm) { control_map_for_route(selector, cm) })
+}
+
+///|
+fn filter_section_for_route(
+  selector : SchedulerRouteSelector,
+  section : @song.Section[@pattern.ControlMap],
+) -> Result[@song.Section[@pattern.ControlMap], String] {
+  let body = @song.SectionBody::single(
+    filter_pat_for_route(selector, section.body()),
+  )
+  let result = try? @song.Section(
+    name=section.name(),
+    length_cycles=section.length_cycles(),
+    scope=section.scope(),
+    body~,
+  )
+  match result {
+    Ok(filtered) => Ok(filtered)
+    Err(_) => Err("internal song routing error: invalid section length")
+  }
+}
+
+///|
+fn filter_song_for_route(
+  selector : SchedulerRouteSelector,
+  song : @song.Song[@pattern.ControlMap],
+) -> Result[@song.Song[@pattern.ControlMap], String] {
+  let parts : Array[@song.SongPart[@pattern.ControlMap]] = []
+  for occurrence in song.occurrences() {
+    match filter_section_for_route(selector, occurrence.section()) {
+      Ok(section) =>
+        parts.push(
+          @song.SongPart::with_id_at(
+            id=occurrence.id(),
+            start=occurrence.start(),
+            name=occurrence.name(),
+            section~,
+          ),
+        )
+      Err(msg) => return Err(msg)
+    }
+  }
+  let result = try? @song.Song(parts~)
+  match result {
+    Ok(filtered) => Ok(filtered)
+    Err(_) => Err("internal song routing error: invalid song layout")
+  }
+}
+
+///|
+fn route_songs_for_current_routes(
+  song : @song.Song[@pattern.ControlMap],
+) -> Result[Array[@song.Song[@pattern.ControlMap]], String] {
+  let route_songs : Array[@song.Song[@pattern.ControlMap]] = []
+  for route in sched_routes.val {
+    match filter_song_for_route(route.selector, song) {
+      Ok(route_song) => route_songs.push(route_song)
+      Err(msg) => return Err(msg)
+    }
+  }
+  Ok(route_songs)
+}
+
+///|
+fn reset_route_transports_for_song_start() -> Unit {
+  for route in sched_routes.val {
+    route.pool.scheduler.reset_transport_and_kill_notes(route.pool.pool)
+  }
+}
+
+///|
+fn process_pattern_routes(
+  pat : @pattern.Pat[@pattern.ControlMap],
+  left : @moondsp.AudioBuffer,
+  right : @moondsp.AudioBuffer,
+) -> Unit {
+  for route in sched_routes.val {
+    let sub = filter_pat_for_route(route.selector, pat)
+    process_sub_pool(route.pool, sub, left, right)
+  }
+}
+
+///|
+fn process_song_routes(
+  route_songs : Array[@song.Song[@pattern.ControlMap]],
+  left : @moondsp.AudioBuffer,
+  right : @moondsp.AudioBuffer,
+) -> Unit {
+  for i in 0..<sched_routes.val.length() {
+    match route_songs.get(i) {
+      Some(song) =>
+        process_sub_song_pool(sched_routes.val[i].pool, song, left, right)
+      None => ()
+    }
+  }
+}
+
+///|
 pub fn process_scheduler_block() -> Bool {
   let left = match sched_left.val {
     Some(b) => b
@@ -379,22 +520,12 @@ pub fn process_scheduler_block() -> Bool {
   // Clear main output buffers
   left.fill(0.0)
   right.fill(0.0)
-  // Get active pattern; if none set, output silence
-  let pat = match sched_active_pattern.val {
-    Some(p) => p
+  // Get active playback; if none set, output silence.
+  match sched_active_playback.val {
+    Some(ActivePattern(pat)) => process_pattern_routes(pat, left, right)
+    Some(ActiveSong(route_songs)) =>
+      process_song_routes(route_songs, left, right)
     None => return true
-  }
-  // Route drum events to their pools, note events to synth.
-  for route in sched_routes.val {
-    let selector = route.selector
-    let sub = pat.filter_map(fn(cm) {
-      if route_matches(selector, cm) {
-        Some(cm)
-      } else {
-        None
-      }
-    })
-    process_sub_pool(route.pool, sub, left, right)
   }
   // Apply master gain
   let gain = sched_gain.val
@@ -410,56 +541,113 @@ pub fn process_scheduler_block() -> Bool {
 let sched_last_error : @ref.Ref[String] = @ref.new("")
 
 ///|
-let sched_input_chars : Array[Int] = []
+let sched_pattern_input_chars : Array[Int] = []
+
+///|
+let sched_song_input_chars : Array[Int] = []
+
+///|
+fn input_chars_to_string(chars : Array[Int]) -> String {
+  let buf = StringBuilder::new()
+  for c in chars {
+    buf.write_char(c.unsafe_to_char())
+  }
+  buf.to_string()
+}
+
+///|
+fn set_active_pattern_text(text : String) -> Int {
+  match @mini.parse(text) {
+    Ok(pat) => {
+      sched_active_playback.val = Some(ActivePattern(pat))
+      sched_last_error.val = ""
+      0
+    }
+    Err(msg) => {
+      sched_last_error.val = msg
+      1
+    }
+  }
+}
+
+///|
+fn set_active_song_text(text : String) -> Int {
+  match @mini.parse_song_with_bpm(text) {
+    Ok(parsed) =>
+      match route_songs_for_current_routes(parsed.song()) {
+        Ok(route_songs) => {
+          match parsed.bpm() {
+            Some(bpm) => set_scheduler_bpm(bpm)
+            None => ()
+          }
+          reset_route_transports_for_song_start()
+          sched_active_playback.val = Some(ActiveSong(route_songs))
+          sched_last_error.val = ""
+          0
+        }
+        Err(msg) => {
+          sched_last_error.val = msg
+          1
+        }
+      }
+    Err(msg) => {
+      sched_last_error.val = msg
+      1
+    }
+  }
+}
 
 ///|
 pub fn clear_pattern_input() -> Unit {
-  sched_input_chars.clear()
+  sched_pattern_input_chars.clear()
 }
 
 ///|
 pub fn push_pattern_char(code : Int) -> Unit {
-  sched_input_chars.push(code)
+  sched_pattern_input_chars.push(code)
 }
 
 ///|
 pub fn eval_pattern_input() -> Int {
-  let buf = StringBuilder::new()
-  for c in sched_input_chars {
-    buf.write_char(c.unsafe_to_char())
-  }
-  let text = buf.to_string()
-  sched_input_chars.clear()
-  match @mini.parse(text) {
-    Ok(pat) => {
-      sched_active_pattern.val = Some(pat)
-      sched_last_error.val = ""
-      0
-    }
-    Err(msg) => {
-      sched_last_error.val = msg
-      1
-    }
-  }
+  let text = input_chars_to_string(sched_pattern_input_chars)
+  sched_pattern_input_chars.clear()
+  set_active_pattern_text(text)
 }
 
 ///|
 pub fn parse_and_set_pattern(text : String) -> Int {
-  match @mini.parse(text) {
-    Ok(pat) => {
-      sched_active_pattern.val = Some(pat)
-      sched_last_error.val = ""
-      0
-    }
-    Err(msg) => {
-      sched_last_error.val = msg
-      1
-    }
-  }
+  set_active_pattern_text(text)
+}
+
+///|
+pub fn clear_song_input() -> Unit {
+  sched_song_input_chars.clear()
+}
+
+///|
+pub fn push_song_char(code : Int) -> Unit {
+  sched_song_input_chars.push(code)
+}
+
+///|
+pub fn eval_song_input() -> Int {
+  let text = input_chars_to_string(sched_song_input_chars)
+  sched_song_input_chars.clear()
+  set_active_song_text(text)
+}
+
+///|
+pub fn parse_and_set_song(text : String) -> Int {
+  set_active_song_text(text)
 }
 
 ///|
 pub fn get_scheduler_parse_error() -> String {
+  sched_last_error.val
+}
+
+///|
+pub fn get_song_parse_error() -> String {
   sched_last_error.val
 }
 
@@ -482,6 +670,16 @@ pub fn get_pattern_error_char(i : Int) -> Int {
   } else {
     s[i].to_int()
   }
+}
+
+///|
+pub fn get_song_error_length() -> Int {
+  sched_last_error.val.length()
+}
+
+///|
+pub fn get_song_error_char(i : Int) -> Int {
+  get_pattern_error_char(i)
 }
 
 ///|

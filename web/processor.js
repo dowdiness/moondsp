@@ -64,22 +64,35 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
           if (result === 0) {
             this.port.postMessage({ type: "pattern-updated", revision });
           } else {
-            // Read the error message char-by-char if the wasm exports the
-            // accessor pair. Falls back to a generic string otherwise so
-            // older builds keep working.
-            let message = "parse error";
-            if (typeof this.wasm.get_pattern_error_length === "function" &&
-                typeof this.wasm.get_pattern_error_char === "function") {
-              const len = this.wasm.get_pattern_error_length();
-              if (len > 0) {
-                const codes = new Array(len);
-                for (let i = 0; i < len; i++) {
-                  codes[i] = this.wasm.get_pattern_error_char(i);
-                }
-                message = String.fromCharCode(...codes);
-              }
-            }
+            const message = this.parseErrorMessage(
+              "get_pattern_error_length",
+              "get_pattern_error_char",
+              "parse error",
+            );
             this.port.postMessage({ type: "pattern-error", message, revision });
+          }
+        }
+      } else if (data.type === "set-song-text") {
+        if (this.usesScheduler && this.wasm &&
+            typeof this.wasm.clear_song_input === "function" &&
+            typeof this.wasm.push_song_char === "function" &&
+            typeof this.wasm.eval_song_input === "function") {
+          this.wasm.clear_song_input();
+          const text = data.text || "";
+          for (let i = 0; i < text.length; i++) {
+            this.wasm.push_song_char(text.charCodeAt(i));
+          }
+          const result = this.wasm.eval_song_input();
+          const revision = typeof data.revision === "number" ? data.revision : undefined;
+          if (result === 0) {
+            this.port.postMessage({ type: "song-updated", revision });
+          } else {
+            const message = this.parseErrorMessage(
+              "get_song_error_length",
+              "get_song_error_char",
+              "song parse error",
+            );
+            this.port.postMessage({ type: "song-error", message, revision });
           }
         }
       } else if (data.type === "set-scheduler-bpm") {
@@ -667,6 +680,22 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
     }
   }
 
+  parseErrorMessage(lengthExport, charExport, fallback) {
+    if (this.wasm &&
+        typeof this.wasm[lengthExport] === "function" &&
+        typeof this.wasm[charExport] === "function") {
+      const len = this.wasm[lengthExport]();
+      if (len > 0) {
+        const codes = new Array(len);
+        for (let i = 0; i < len; i++) {
+          codes[i] = this.wasm[charExport](i);
+        }
+        return String.fromCharCode(...codes);
+      }
+    }
+    return fallback;
+  }
+
   browserErrorCode() {
     if (this.wasm && typeof this.wasm.get_browser_error_code === "function") {
       return this.wasm.get_browser_error_code();
@@ -675,19 +704,11 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
   }
 
   browserErrorMessage(fallback) {
-    if (this.wasm &&
-        typeof this.wasm.get_browser_error_length === "function" &&
-        typeof this.wasm.get_browser_error_char === "function") {
-      const len = this.wasm.get_browser_error_length();
-      if (len > 0) {
-        const codes = new Array(len);
-        for (let i = 0; i < len; i++) {
-          codes[i] = this.wasm.get_browser_error_char(i);
-        }
-        return String.fromCharCode(...codes);
-      }
-    }
-    return fallback;
+    return this.parseErrorMessage(
+      "get_browser_error_length",
+      "get_browser_error_char",
+      fallback,
+    );
   }
 
   postBrowserError(fallback) {

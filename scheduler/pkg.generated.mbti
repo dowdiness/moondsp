@@ -127,6 +127,8 @@ pub fn PatternScheduler::queue_playback_snapshot_live_control_edit_result(Self, 
 pub fn PatternScheduler::queue_song_snapshot(Self, @song.SongSnapshot[@pattern.ControlMap]) -> Unit
 pub fn PatternScheduler::queue_song_snapshot_edit(Self, snapshot~ : @song.SongSnapshot[@pattern.ControlMap], policy~ : AffectedVoicePolicy, edit~ : AffectedVoiceEditScope, pool~ : @voice.BoundVoicePool) -> Int
 pub fn PatternScheduler::queue_song_snapshot_live_control_edit_result(Self, snapshot~ : @song.SongSnapshot[@pattern.ControlMap], policy~ : AffectedVoicePolicy, edit~ : AffectedVoiceEditScope, controls~ : Array[@graph.GraphControl], pool~ : @voice.BoundVoicePool) -> Result[PlaybackEditOutcome, @voice.VoiceControlError]
+pub fn PatternScheduler::reset_transport(Self) -> Unit
+pub fn PatternScheduler::reset_transport_and_kill_notes(Self, @voice.BoundVoicePool) -> Unit
 pub fn PatternScheduler::sample_counter(Self) -> Int64
 pub fn PatternScheduler::set_bpm(Self, Double) -> Unit
 

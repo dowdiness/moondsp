@@ -104,7 +104,7 @@ fn mini_parse_dollar_stack_program(
   for line in lines {
     parser.pos = line.start
     let pat = parser.parse_expr() catch { ParseError(msg) => return Err(msg) }
-    parser.skip_whitespace()
+    parser.skip_inline_whitespace()
     if parser.pos != line.end {
       return Err(
         "position \{parser.pos}: unexpected trailing input '\{input[parser.pos:line.end].to_owned()}'",
@@ -122,7 +122,15 @@ fn Parser::at_end(self : Parser) -> Bool {
 
 ///|
 fn Parser::skip_whitespace(self : Parser) -> Unit {
-  while !self.at_end() && self.input[self.pos] == ' ' {
+  while !self.at_end() && mini_is_space(self.input[self.pos]) {
+    self.pos += 1
+  }
+}
+
+///|
+fn Parser::skip_inline_whitespace(self : Parser) -> Unit {
+  while !self.at_end() &&
+        (self.input[self.pos] == ' ' || self.input[self.pos] == '\t') {
     self.pos += 1
   }
 }
@@ -270,9 +278,17 @@ fn Parser::parse_expr(
   self : Parser,
 ) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
   let mut pat = self.parse_primary()
-  while !self.at_end() && self.input[self.pos] == '.' {
-    self.pos += 1 // consume '.'
-    pat = self.parse_method(pat)
+  let mut searching_method = true
+  while searching_method {
+    let before_ws = self.pos
+    self.skip_whitespace()
+    if !self.at_end() && self.input[self.pos] == '.' {
+      self.pos += 1 // consume '.'
+      pat = self.parse_method(pat)
+    } else {
+      self.pos = before_ws
+      searching_method = false
+    }
   }
   pat
 }
