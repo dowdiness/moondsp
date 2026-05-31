@@ -119,12 +119,6 @@ pub fn LoomMiniAtomProjection::new(input : String) -> LoomMiniAtomProjection {
   )
   let mut previous_doc : @pattern.PatternDoc[@pattern.ControlMap]? = None
   let identity_tracker : @loom.ProjectionIdentityTracker[String] = @loom.ProjectionIdentityTracker::new()
-  // Preserve the first baseline-relative failed edit when editor span data is
-  // available. The tracker owns the last-good baseline and source-diff
-  // fallback; this exact edit keeps parity with MiniAuthoringPipeline through
-  // syntax/projection recovery where a later recovery edit starts from the
-  // malformed parser source rather than the last-good semantic source.
-  let mut pending_source_edit : @core.Edit? = None
   let projected = @incr.Memo::new_no_backdate(
     rt,
     fn() {
@@ -133,12 +127,10 @@ pub fn LoomMiniAtomProjection::new(input : String) -> LoomMiniAtomProjection {
       let current_source = parser.source().get_or_abort()
       let diagnostics = parser.diagnostics().get_or_abort()
       if diagnostics.length() > 0 {
-        pending_source_edit = loom_mini_pending_failed_projection_edit(
-          identity_tracker,
+        identity_tracker.record_failed_input_with_optional_edit(
           current_source,
           edit_source,
           current_edit,
-          pending_source_edit,
         )
         return Err("loom mini syntax has diagnostics")
       }
@@ -146,29 +138,21 @@ pub fn LoomMiniAtomProjection::new(input : String) -> LoomMiniAtomProjection {
         loom_mini_collect_raw_projection(parser.syntax_tree().get_or_abort()) {
         Ok(projection) => projection
         Err(msg) => {
-          pending_source_edit = loom_mini_pending_failed_projection_edit(
-            identity_tracker,
+          identity_tracker.record_failed_input_with_optional_edit(
             current_source,
             edit_source,
             current_edit,
-            pending_source_edit,
           )
           return Err(msg)
         }
       }
       let leaves = loom_mini_raw_atom_projection_leaves(raw_projection.atoms)
       let allocate = loom_mini_atom_id_allocator(identity_tracker)
-      let edit_for_alignment = loom_mini_success_projection_edit(
-        identity_tracker,
-        edit_source,
-        current_edit,
-        pending_source_edit,
-      )
       let stable = identity_tracker.realign_success_with_optional_edit(
         current_source,
         leaves,
         allocate,
-        edit_for_alignment,
+        current_edit,
       )
       let atoms = loom_mini_projected_atoms_from_stable(
         raw_projection.atoms,
@@ -185,16 +169,13 @@ pub fn LoomMiniAtomProjection::new(input : String) -> LoomMiniAtomProjection {
         Ok(doc) => {
           previous_doc = Some(doc)
           identity_tracker.commit_success(current_source, stable)
-          pending_source_edit = None
           Ok(doc)
         }
         Err(msg) => {
-          pending_source_edit = loom_mini_pending_failed_projection_edit(
-            identity_tracker,
+          identity_tracker.record_failed_input_with_optional_edit(
             current_source,
             edit_source,
             current_edit,
-            pending_source_edit,
           )
           Err(msg)
         }
@@ -238,55 +219,6 @@ pub fn LoomMiniAtomProjection::set_source(
 ///|
 pub fn LoomMiniAtomProjection::dispose(self : LoomMiniAtomProjection) -> Unit {
   self.scope.dispose()
-}
-
-///|
-fn loom_mini_pending_failed_projection_edit(
-  tracker : @loom.ProjectionIdentityTracker[String],
-  current_source : String,
-  edit_source : String?,
-  current_edit : @core.Edit?,
-  pending : @core.Edit?,
-) -> @core.Edit? {
-  match tracker.baseline() {
-    Some(baseline) =>
-      match (edit_source, current_edit) {
-        (Some(source), Some(edit)) if source == baseline.source() => Some(edit)
-        _ =>
-          match pending {
-            Some(_) => pending
-            None => {
-              tracker.record_failed_input_with_optional_edit(
-                current_source,
-                None,
-                None,
-              )
-              None
-            }
-          }
-      }
-    None => {
-      tracker.record_failed_input_with_optional_edit(current_source, None, None)
-      pending
-    }
-  }
-}
-
-///|
-fn loom_mini_success_projection_edit(
-  tracker : @loom.ProjectionIdentityTracker[String],
-  edit_source : String?,
-  current_edit : @core.Edit?,
-  pending : @core.Edit?,
-) -> @core.Edit? {
-  match tracker.baseline() {
-    Some(baseline) =>
-      match (edit_source, current_edit) {
-        (Some(source), Some(edit)) if source == baseline.source() => Some(edit)
-        _ => pending
-      }
-    None => None
-  }
 }
 
 ///|
