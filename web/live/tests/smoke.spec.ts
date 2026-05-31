@@ -191,11 +191,20 @@ test.describe("UI smoke (no audio)", () => {
     await expect(layersDl.locator("dt")).toContainText(["s(", "note(", "$:"]);
   });
 
+  test("cheatsheet explains multiline songs and global BPM", async ({ page }) => {
+    const cheat = page.locator("#cheat");
+    await expect(cheat).toContainText('separators like spaces inside s("…") / note("…")');
+    await expect(cheat).toContainText("paste multiline blocks");
+    await expect(cheat).toContainText("Line breaks between section/part calls are OK");
+    await expect(cheat).toContainText("header control sets global tempo; clicking examples may set it");
+  });
+
   test("cheatsheet includes a song-mode example", async ({ page }) => {
     const songExample = page.locator(ODE_SONG_EXAMPLE);
     await expect(songExample).toBeVisible();
     await expect(songExample).toHaveAttribute("data-example", SONG_EXAMPLE);
     await expect(songExample).toHaveAttribute("data-bpm", "72");
+    await expect(songExample).toContainText("sets BPM 72");
   });
 });
 

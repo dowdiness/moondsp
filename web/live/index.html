@@ -430,6 +430,7 @@
         <h2>Inside the string</h2>
         <dl>
           <dt>a b c</dt><dd>sequence in 1 cycle</dd>
+          <dt>newlines</dt><dd>separators like spaces inside <code>s("…")</code> / <code>note("…")</code></dd>
           <dt>[a b]</dt><dd>group (subdivide)</dd>
           <dt>l1, l2</dt><dd>stack layers</dd>
           <dt>a*4</dt><dd>repeat 4× faster</dd>
@@ -462,14 +463,17 @@
 
         <h2>Song mode</h2>
         <dl>
-          <dt>song(…)</dt><dd>long-form sections and parts</dd>
-          <dt>BPM</dt><dd>header control sets global tempo</dd>
+          <dt>song(…)</dt><dd>long-form sections; paste multiline blocks</dd>
+          <dt>BPM</dt><dd>header control sets global tempo; clicking examples may set it</dd>
           <dt>section</dt><dd><code>section("name", cycles, pattern)</code></dd>
           <dt>part</dt><dd><code>part("id", "section")</code></dd>
         </dl>
+        <p class="cheat-note">
+          Line breaks between section/part calls are OK; write or paste full <code>song(...)</code> blocks.
+        </p>
 
         <h2>Try it</h2>
-        <button type="button" class="example" data-mode="song" data-song-example="ode" data-bpm="72" data-example='song(&#10;  section(&#10;    "ode",&#10;    256,&#10;    stack(&#10;      s("bd").slow(4),&#10;      note("64 64 65 67&#10;67 65 64 62&#10;60 60 62 64&#10;64 62 62 62").slow(16)&#10;    )&#10;  ),&#10;  part("ode1", "ode")&#10;)'>song("ode" — 72 bpm melody + kick)</button>
+        <button type="button" class="example" data-mode="song" data-song-example="ode" data-bpm="72" data-example='song(&#10;  section(&#10;    "ode",&#10;    256,&#10;    stack(&#10;      s("bd").slow(4),&#10;      note("64 64 65 67&#10;67 65 64 62&#10;60 60 62 64&#10;64 62 62 62").slow(16)&#10;    )&#10;  ),&#10;  part("ode1", "ode")&#10;)'>song("ode" — multiline melody + kick, sets BPM 72)</button>
         <button type="button" class="example" data-example='s("bd sd hh sd")'>s("bd sd hh sd")</button>
         <button type="button" class="example" data-example='s("bd(3,8), hh*16?, sd(2,8,2)").jux(rev)'>s("bd(3,8), hh*16?, sd(2,8,2)").jux(rev)</button>
         <button type="button" class="example" data-example='s("bd*4").every(3, fast(2))'>s("bd*4").every(3, fast(2))</button>
