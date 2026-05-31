@@ -59,6 +59,47 @@ test "parse_song builds sections and implicit parts" {
 }
 
 ///|
+test "parse_song_with_bpm captures optional tempo metadata" {
+  let parsed = match
+    @mini.parse_song_with_bpm(
+      "song(bpm(72),section(\"intro\",1,s(\"bd\")),part(\"intro1\",\"intro\"))",
+    ) {
+    Ok(value) => value
+    Err(msg) => abort("expected parsed song with bpm, got Err(\{msg})")
+  }
+  assert_true(parsed.bpm() == Some(72.0))
+  @debug.assert_eq(parsed.song().occurrence_count(), 1)
+}
+
+///|
+test "parse_song accepts multiline whitespace and notation newlines" {
+  let input =
+    #|song(
+    #|  section(
+    #|    "ode",
+    #|    4,
+    #|    stack(
+    #|      s("bd")
+    #|        .slow(4),
+    #|      note("64
+    #|64 65
+    #|67")
+    #|        .slow(4)
+    #|    )
+    #|  ),
+    #|  part("ode1", "ode")
+    #|)
+    #|
+  let song = unwrap_parsed_song(@mini.parse_song(input))
+  let events = song.query(song_span(0L, 1L, 4L, 1L))
+  @debug.assert_eq(events.length(), 5)
+  assert_true(events[0].value.get("sound") == Some(36.0))
+  assert_true(events[1].value.get("note") == Some(64.0))
+  assert_true(events[3].value.get("note") == Some(65.0))
+  assert_true(events[4].value.get("note") == Some(67.0))
+}
+
+///|
 test "parse_song supports explicit rational starts and gaps" {
   let song = unwrap_parsed_song(
     @mini.parse_song(

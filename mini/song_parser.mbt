@@ -13,10 +13,28 @@ priv struct SongFillSpec {
 }
 
 ///|
+/// Song parse result with optional playback metadata.
+pub struct ParsedSong {
+  song : @song.Song[@pattern.ControlMap]
+  bpm : Double?
+}
+
+///|
+pub fn ParsedSong::song(self : ParsedSong) -> @song.Song[@pattern.ControlMap] {
+  self.song
+}
+
+///|
+pub fn ParsedSong::bpm(self : ParsedSong) -> Double? {
+  self.bpm
+}
+
+///|
 /// Parse song mini-notation into the current song layout model.
 ///
 /// Grammar:
 /// - `song(item, ...)`
+/// - `bpm(number)`
 /// - `section("name", length, pattern_expr)`
 /// - `part("occurrence", "section"[, start])`
 /// - `part_id("id", "display name", "section"[, start])`
@@ -27,6 +45,17 @@ priv struct SongFillSpec {
 pub fn parse_song(
   input : String,
 ) -> Result[@song.Song[@pattern.ControlMap], String] {
+  match parse_song_with_bpm(input) {
+    Ok(parsed) => Ok(parsed.song())
+    Err(msg) => Err(msg)
+  }
+}
+
+///|
+/// Parse song mini-notation and preserve optional playback metadata such as
+/// `bpm(number)`. Plain `parse_song` intentionally keeps returning only the
+/// layout value for compatibility.
+pub fn parse_song_with_bpm(input : String) -> Result[ParsedSong, String] {
   guard input.length() > 0 else { return Err("empty input") }
   let p = Parser::new(input)
   let result = p.parse_song_expr() catch { ParseError(msg) => return Err(msg) }
@@ -40,9 +69,7 @@ pub fn parse_song(
 }
 
 ///|
-fn Parser::parse_song_expr(
-  self : Parser,
-) -> @song.Song[@pattern.ControlMap] raise ParseError {
+fn Parser::parse_song_expr(self : Parser) -> ParsedSong raise ParseError {
   self.skip_whitespace()
   let song_start = self.pos
   guard self.match_keyword("song(") else {
@@ -57,12 +84,13 @@ fn Parser::parse_song_expr(
   let sections : Map[String, @song.Section[@pattern.ControlMap]] = {}
   let part_specs : Array[SongPartSpec] = []
   let fill_specs : Array[SongFillSpec] = []
-  self.parse_song_item(sections, part_specs, fill_specs)
+  let bpm_values : Array[Double] = []
+  self.parse_song_item(sections, part_specs, fill_specs, bpm_values)
   self.skip_whitespace()
   while !self.at_end() && self.input[self.pos] == ',' {
     self.pos += 1
     self.skip_whitespace()
-    self.parse_song_item(sections, part_specs, fill_specs)
+    self.parse_song_item(sections, part_specs, fill_specs, bpm_values)
     self.skip_whitespace()
   }
   self.expect_char(')')
@@ -80,7 +108,11 @@ fn Parser::parse_song_expr(
         raise ParseError("song fill '\{fill.prefix}' could not be applied")
     }
   }
-  song
+  let bpm = match bpm_values.get(0) {
+    Some(value) => Some(value)
+    None => None
+  }
+  { song, bpm }
 }
 
 ///|
@@ -89,6 +121,7 @@ fn Parser::parse_song_item(
   sections : Map[String, @song.Section[@pattern.ControlMap]],
   part_specs : Array[SongPartSpec],
   fill_specs : Array[SongFillSpec],
+  bpm_values : Array[Double],
 ) -> Unit raise ParseError {
   self.skip_whitespace()
   let item_start = self.pos
@@ -100,6 +133,11 @@ fn Parser::parse_song_item(
       )
     }
     sections[section.name()] = section
+  } else if self.match_keyword("bpm(") {
+    if bpm_values.length() > 0 {
+      raise ParseError("position \{item_start}: duplicate bpm(...)")
+    }
+    bpm_values.push(self.parse_song_bpm(item_start))
   } else if self.match_keyword("part_id(") {
     part_specs.push(self.parse_song_part_with_id(item_start))
   } else if self.match_keyword("part(") {
@@ -108,9 +146,26 @@ fn Parser::parse_song_item(
     fill_specs.push(self.parse_song_fill())
   } else {
     raise ParseError(
-      "position \{item_start}: expected section(...), part(...), part_id(...), or fill(...)",
+      "position \{item_start}: expected bpm(...), section(...), part(...), part_id(...), or fill(...)",
     )
   }
+}
+
+///|
+fn Parser::parse_song_bpm(
+  self : Parser,
+  item_start : Int,
+) -> Double raise ParseError {
+  self.skip_whitespace()
+  let value = self.read_number()
+  self.skip_whitespace()
+  self.expect_char(')')
+  guard value > 0.0 else {
+    raise ParseError(
+      "position \{item_start}: bpm() requires a positive number, got \{value}",
+    )
+  }
+  value
 }
 
 ///|

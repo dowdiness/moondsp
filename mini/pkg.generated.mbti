@@ -18,6 +18,8 @@ pub fn parse_snapshot(String, previous? : @pattern.PatternDoc[@pattern.ControlMa
 
 pub fn parse_song(String) -> Result[@song.Song[@pattern.ControlMap], String]
 
+pub fn parse_song_with_bpm(String) -> Result[ParsedSong, String]
+
 // Errors
 
 // Types and methods
@@ -52,6 +54,13 @@ pub fn MiniDocBuilder::slow(Self, @pattern.PatternDoc[@pattern.ControlMap], @pat
 pub fn MiniDocBuilder::sound_atom(Self, @identity.PatternNodeId, String) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
 pub fn MiniDocBuilder::stack(Self, Array[@pattern.PatternDoc[@pattern.ControlMap]]) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
 pub fn MiniDocBuilder::with_previous(@pattern.PatternDoc[@pattern.ControlMap]?) -> Self
+
+pub struct ParsedSong {
+  song : @song.Song[@pattern.ControlMap]
+  bpm : Double?
+}
+pub fn ParsedSong::bpm(Self) -> Double?
+pub fn ParsedSong::song(Self) -> @song.Song[@pattern.ControlMap]
 
 // Type aliases
 

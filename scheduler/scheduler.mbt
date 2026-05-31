@@ -481,6 +481,25 @@ pub fn PatternScheduler::set_bpm(self : PatternScheduler, bpm : Double) -> Unit 
 }
 
 ///|
+/// Reset the transport to the beginning and forget tracked active notes.
+pub fn PatternScheduler::reset_transport(self : PatternScheduler) -> Unit {
+  self.sample_counter = 0L
+  self.active_notes.clear()
+}
+
+///|
+/// Reset the transport and immediately kill tracked active voices in `pool`.
+pub fn PatternScheduler::reset_transport_and_kill_notes(
+  self : PatternScheduler,
+  pool : @moondsp.BoundVoicePool,
+) -> Unit {
+  for note in self.active_notes {
+    ignore(pool.kill(note.handle))
+  }
+  self.reset_transport()
+}
+
+///|
 /// Stage a lowered authoring snapshot for playback. The staged snapshot becomes
 /// active at the start of the next `process_snapshot_block` call, giving callers
 /// a stable block boundary for pattern edits during playback.

@@ -48,7 +48,7 @@ fn NotationParser::at_end(self : NotationParser) -> Bool {
 
 ///|
 fn NotationParser::skip_spaces(self : NotationParser) -> Unit {
-  while !self.at_end() && self.input[self.pos] == ' ' {
+  while !self.at_end() && mini_is_space(self.input[self.pos]) {
     self.pos += 1
   }
 }

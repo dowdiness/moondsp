@@ -271,6 +271,39 @@
         background: var(--panel);
         opacity: 1;
       }
+      .mode-toggle,
+      .bpm-control {
+        display: flex;
+        gap: 0.35rem;
+        align-items: center;
+      }
+      .mode-toggle .toggle {
+        padding-inline: 0.7rem;
+      }
+      .mode-toggle .toggle.active {
+        background: var(--accent);
+        color: var(--text-on-accent);
+        border-color: color-mix(in srgb, var(--accent) 70%, var(--border));
+      }
+      .bpm-control {
+        color: var(--ink-muted);
+        font-size: var(--text-sm);
+        font-weight: 700;
+      }
+      .bpm-control input {
+        width: 4.8rem;
+        padding: 0.35rem 0.45rem;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--panel);
+        color: var(--ink);
+        font: inherit;
+        font-variant-numeric: tabular-nums;
+      }
+      .bpm-control input:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
       .cm-editor { height: 100%; }
       .cm-content {
         font-family: var(--font-mono);
@@ -371,6 +404,14 @@
     <header>
       <h1>moondsp · live</h1>
       <div class="controls">
+        <div class="mode-toggle" role="group" aria-label="Playback mode">
+          <button id="mode-pattern" type="button" class="toggle active" aria-pressed="true">Pattern</button>
+          <button id="mode-song" type="button" class="toggle" aria-pressed="false">Song</button>
+        </div>
+        <label class="bpm-control" for="global-bpm">
+          <span>BPM</span>
+          <input id="global-bpm" type="number" min="1" step="0.1" value="60" inputmode="decimal" aria-label="Global BPM" />
+        </label>
         <span class="status" id="status" aria-live="polite">idle — click Start</span>
         <button id="cheat-toggle" type="button" class="toggle" aria-controls="cheat" aria-expanded="true">Hide help</button>
         <button id="start" type="button">Start audio</button>
@@ -419,7 +460,16 @@
           <em>f</em> = <code>fast(k)</code> | <code>slow(k)</code> | <code>rev</code>
         </p>
 
+        <h2>Song mode</h2>
+        <dl>
+          <dt>song(…)</dt><dd>long-form sections and parts</dd>
+          <dt>BPM</dt><dd>header control sets global tempo</dd>
+          <dt>section</dt><dd><code>section("name", cycles, pattern)</code></dd>
+          <dt>part</dt><dd><code>part("id", "section")</code></dd>
+        </dl>
+
         <h2>Try it</h2>
+        <button type="button" class="example" data-mode="song" data-song-example="ode" data-bpm="72" data-example='song(&#10;  section(&#10;    "ode",&#10;    256,&#10;    stack(&#10;      s("bd").slow(4),&#10;      note("64 64 65 67&#10;67 65 64 62&#10;60 60 62 64&#10;64 62 62 62").slow(16)&#10;    )&#10;  ),&#10;  part("ode1", "ode")&#10;)'>song("ode" — 72 bpm melody + kick)</button>
         <button type="button" class="example" data-example='s("bd sd hh sd")'>s("bd sd hh sd")</button>
         <button type="button" class="example" data-example='s("bd(3,8), hh*16?, sd(2,8,2)").jux(rev)'>s("bd(3,8), hh*16?, sd(2,8,2)").jux(rev)</button>
         <button type="button" class="example" data-example='s("bd*4").every(3, fast(2))'>s("bd*4").every(3, fast(2))</button>
@@ -433,7 +483,7 @@
       </aside>
     </main>
     <footer>
-      <div class="panel" id="log" aria-live="polite">edit the pattern, audio updates live</div>
+      <div class="panel" id="log" aria-live="polite">edit the pattern, or switch to song mode</div>
     </footer>
     <script>
       // Synchronously collapse the cheat panel on narrow viewports before the
