@@ -18,10 +18,11 @@ The current evidence is intentionally spec-local:
   long-lived observer.
 - `specs/loom-mini-cst/src/projection.mbt::LoomMiniAtomProjection::new` now
   uses Loom's `ProjectionIdentityTracker` and `ProjectionStringIdAllocator` for
-  last-good atom identity and fresh ID allocation. It still carries a small
-  `pending_source_edit` shim so editor-supplied baseline-relative spans survive
-  syntax/projection recovery when the recovery edit itself starts from malformed
-  parser text.
+  last-good atom identity, optional editor-edit handling, failed-input edit
+  composition across recovery, source-diff fallback, and fresh ID allocation.
+  The spec-local `pending_source_edit` shim has been removed; the projection
+  records the current edit/source-before-edit signals and delegates baseline
+  selection to Loom.
 - `specs/loom-mini-cst/src/projection_test.mbt` contains the provenance matrix,
   recovery matrix helper, and PR #104 control-method cache-reuse helper that
   define the current regression evidence.
@@ -56,12 +57,12 @@ able to choose its public ID shape; in `moondsp` that shape is
 
 ### Current workaround in `moondsp`
 
-`LoomMiniAtomProjection` delegates prefix/suffix ID realignment and fresh
-string-ID allocation to Loom's projection identity helpers. The remaining local
-logic chooses the correct baseline-relative edit: direct successful edits use
-the current editor edit, failed syntax/projection states keep the first exact
-last-good edit when one was supplied, and all other paths fall back to Loom's
-source-diff behavior.
+`LoomMiniAtomProjection` delegates prefix/suffix ID realignment, optional
+editor-edit handling, failed-input edit composition, source-diff fallback, and
+fresh string-ID allocation to Loom's projection identity helpers. The remaining
+local logic only stores the current editor edit/source-before-edit signals and
+passes them to `ProjectionIdentityTracker`; it no longer keeps a separate
+pending edit shim.
 
 ### Acceptance evidence to preserve
 
@@ -138,10 +139,12 @@ one until projection succeeds again.
 
 `LoomMiniAtomProjection::new` reads parser diagnostics before projection. When
 diagnostics are present, it returns `Err("loom mini syntax has diagnostics")`
-without updating `previous_doc`, `previous_atoms`, or `previous_source`. If the
-malformed edit came from the last successful source, it stores a
-`pending_source_edit`; after recovery, that pending span drives semantic ID
-realignment and is cleared only after a successful document is built.
+without updating `previous_doc` or committing a new tracker baseline. It calls
+`ProjectionIdentityTracker::record_failed_input_with_optional_edit(...)` for
+syntax and semantic projection failures. After recovery,
+`realign_success_with_optional_edit(...)` uses the tracker's composed failed
+edit or source-diff fallback, and `commit_success(...)` updates the reusable
+baseline only after a successful document is built.
 
 ### Acceptance evidence to preserve
 

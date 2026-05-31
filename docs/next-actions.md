@@ -1,6 +1,6 @@
 # Next Actions
 
-Updated: 2026-05-28
+Updated: 2026-05-31
 
 Forward-looking handoff for the next session. Keep this short and actionable;
 per-PR verification logs and merged-PR lists live in `git log` and
@@ -8,7 +8,9 @@ per-PR verification logs and merged-PR lists live in `git log` and
 
 ## Current State
 
-- `main` is aligned with `origin/main` after PR #107.
+- `main` is aligned with `origin/main` after PR #112 (`1f54c54`), which
+  consumes Loom's tracker-owned failed-edit composition and removes the
+  spec-local `pending_source_edit` shim.
 - Latest release: **v0.5.1** (tagged and published 2026-05-20).
 - The next release should be **v0.6.0** if it includes the current
   `Unreleased` entries, because public API has been added since v0.5.1.
@@ -18,8 +20,9 @@ per-PR verification logs and merged-PR lists live in `git log` and
   part of loom-authoring work.
 - ADR-0013 defines loom mini promotion criteria using the shipped apply-edit,
   projection parity, PR #101 provenance-matrix evidence, PR #104
-  control-method projection parity, and PR #107 recovery evidence, but it does
-  not approve a production parser switch.
+  control-method projection parity, PR #107 recovery evidence, and PR #109–#112
+  identity-helper adoption, but it does not approve a production parser
+  switch.
 - `moon.mod` is now the root manifest. `moon.mod.json` remains only in the
   nested `specs/loom-mini-cst` spike module.
 - Production mini parsing still uses the hand-written parser and
@@ -39,9 +42,10 @@ loom-authoring work.
 
 ## Alternative Slices
 
-- **Loom upstream attachment / production-shaped boundary** — PR #107 expands
-  the spec-local recovery evidence for diagnostics plus last-good semantic
-  document behavior. Further Loom work should either happen upstream
+- **Loom upstream attachment / production-shaped boundary** — PRs #109–#112
+  moved spec-local identity realignment, optional-edit handling, source-diff
+  fallback, and failed-edit composition onto Loom helpers while preserving the
+  recovery evidence. Further Loom work should either happen upstream
   (`dowdiness/loom#162`, `dowdiness/loom#163`, `dowdiness/loom#164`,
   `dowdiness/seam#2`) or become a production-shaped authoring-boundary
   prototype. Keep any moondsp work under `specs/loom-mini-cst`; do not add
@@ -57,6 +61,17 @@ loom-authoring work.
   policy before adding structural Eq.
 
 ## Closed Since Previous Update
+
+- ~~**PR #112 — loom tracker failed-edit composition cleanup**~~ — SHIPPED
+  2026-05-31 (`1f54c54`). Removed the spec-local `pending_source_edit` shim;
+  the spec projection now delegates optional-edit and failed-recovery
+  composition to Loom's `ProjectionIdentityTracker`. Production parsing remains
+  hand-written.
+
+- ~~**PRs #109–#111 — loom projection helper adoption**~~ — SHIPPED
+  2026-05-29/31 (`dbfd781`, `98df144`, `32601d7`). Adopted Loom identity,
+  string-ID, optional-edit, and source-diff fallback helpers in the nested
+  mini-CST spike. Production parsing remains hand-written.
 
 - ~~**PR #107 — loom recovery evidence expansion**~~ — SHIPPED 2026-05-28
   (`07a4451`). Expanded the spec-local recovery matrix for `$:` stack-line
@@ -146,12 +161,13 @@ loom-authoring work.
 
 ## Acceptance Checks
 
-- Normal code/docs slices: `rtk moon check --deny-warn` and
-  `rtk moon test --release`.
+- Normal code/docs slices: `NEW_MOON_MOD=0 moon check --deny-warn` and
+  `NEW_MOON_MOD=0 moon test --release`.
 - `specs/loom-mini-cst` slices: also run
-  `rtk moon -C specs/loom-mini-cst check --deny-warn` and
-  `rtk moon -C specs/loom-mini-cst test`.
-- Release prep: also run `rtk moon fmt`, `rtk moon info`, and
-  `rtk moon package --list`, then inspect the generated zip contents.
+  `NEW_MOON_MOD=0 moon -C specs/loom-mini-cst check --deny-warn` and
+  `NEW_MOON_MOD=0 moon -C specs/loom-mini-cst test`.
+- Release prep: also run `NEW_MOON_MOD=0 moon fmt`,
+  `NEW_MOON_MOD=0 moon info`, and `NEW_MOON_MOD=0 moon package --list`, then
+  inspect the generated zip contents.
 - Graph runtime-control behavior changes: update
   `docs/salat-engine-technical-reference.md` first.
