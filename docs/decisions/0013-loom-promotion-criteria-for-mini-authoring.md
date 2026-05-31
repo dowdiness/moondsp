@@ -3,8 +3,8 @@
 - **Status:** Proposed
 - **Date:** 2026-05-25
 - **Source:** Follow-up design pass after PR #76 grammar parity, updated with
-  PR #85 apply-edit parity evidence and PR #91–#107 projection, parity, and
-  recovery work
+  PR #85 apply-edit parity evidence and PR #91–#112 projection, parity,
+  recovery, and identity-helper work
 
 ## Context
 
@@ -31,7 +31,10 @@ full-grammar provenance matrix, and production control-method projection for
 `.cutoff(...)`, `.gain(...)`, and `.pan(...)` with lowered-event and cache-reuse
 checks. PR #107 then expanded the recovery matrix across `$:` stack lines,
 direct and `$:` callbacks, control methods, and projection-only semantic
-failures.
+failures. PRs #109–#112 consumed upstream Loom projection helpers for stable
+identity, collision-free string ID allocation, optional editor edits,
+source-diff fallback, and failed-edit composition, removing the spec-local
+`pending_source_edit` shim without changing production parsing.
 
 Those PRs improve the evidence for a future loom-backed authoring path, but
 they still live under the nested `specs/loom-mini-cst` module. Production mini
@@ -88,11 +91,13 @@ The loom spec path now proves these evaluation-only contracts:
 - PR #107 expanded recovery evidence for `$:` stack-line syntax, direct and
   `$:` callback syntax, control-method syntax, and projection-only semantic
   failures, while checking recovered root IDs against `MiniAuthoringPipeline`.
-- A 2026-05-30 follow-up adopted Loom's stable projection identity helpers in
+- 2026-05-29/31 follow-ups adopted Loom's stable projection identity helpers in
   the spec-local projection: `ProjectionIdentityTracker` now owns the
-  last-good atom baseline, `ProjectionStringIdAllocator` owns collision-free
-  string ID allocation, and a `set_source` regression pins source-diff fallback
-  behavior. The production parser remains unchanged.
+  last-good atom baseline, optional editor-edit handling, failed-input edit
+  composition across recovery, and source-diff fallback;
+  `ProjectionStringIdAllocator` owns collision-free string ID allocation; and
+  PR #112 removed the spec-local `pending_source_edit` shim. The production
+  parser remains unchanged.
 - The spec remains a nested module with path dependencies to loom, seam,
   pretty, and incr. It is intentionally not part of the published `moondsp`
   library surface.
@@ -173,9 +178,9 @@ A loom authoring switch would add real ownership and release cost:
 ## Remaining promotion gates
 
 The shipped apply-edit, postfix/sub-notation, PR #101 provenance-matrix,
-PR #104 control-method, and PR #107 recovery slices close several early
-questions, but loom still cannot own mini authoring until these gates have
-direct evidence:
+PR #104 control-method, PR #107 recovery, and PR #109–#112 helper-adoption
+slices close several early questions, but loom still cannot own mini authoring
+until these gates have direct evidence:
 
 - **Full PatternDoc provenance in any production-shaped prototype:** PR #101
   provides the reviewed spec-local matrix for duplicate-token insertion,
@@ -259,23 +264,26 @@ requirements, not to route production parsing through loom:
    cache-reuse checks as regression evidence for any future authoring
    prototype.
 5. Keep consuming upstream Loom helpers when they preserve the spec-local
-   evidence: the mini projection now uses the stable identity tracker and
-   string-ID allocator, while the remaining exact-edit shim records behavior
-   that still belongs in a production-shaped authoring facade.
+   evidence: the mini projection now uses the stable identity tracker,
+   string-ID allocator, optional-edit handling, source-diff fallback, and
+   failed-edit composition. There is no remaining spec-local exact-edit shim;
+   further downstream work should be a production-shaped authoring facade, not
+   parser routing.
 6. Use the extracted upstream Loom requirements for stable identity across
    deletion/shift edits, projection helper ergonomics, and the canonical
    "diagnostics plus last successful semantic document" authoring pattern when
    working upstream. The requirements live in
    [`../loom-upstream-requirements.md`](../loom-upstream-requirements.md).
-6. Only after full grammar, provenance, lowering, release-manifest, and browser
+7. Only after full grammar, provenance, lowering, release-manifest, and browser
    build gates pass, decide whether to put the projection behind
    `MiniAuthoringPipeline` as an authoring-only implementation detail.
 
 PR #70's deletion-safe reuse contract, PR #76's grammar-parity contract, PR
 #80/#81/#83's projection-IR evidence, PR #85's apply-edit parity evidence, PR
 #91–#100's postfix, `$:`, callback, and known-edge evidence, PR #101's
-full-grammar provenance matrix, PR #104's control-method projection parity, and
-PR #107's expanded recovery matrix should all continue to exist. They answer
+full-grammar provenance matrix, PR #104's control-method projection parity,
+PR #107's expanded recovery matrix, and PR #109–#112's identity-helper adoption
+should all continue to exist. They answer
 different questions: whether loom can reuse safely across edits, whether it can
 express the production mini grammar shape, whether a CST can project to
 `PatternDoc`, and whether projection can track authoring edit provenance across
