@@ -2,8 +2,9 @@
 
 This guide defines the public boundary for editors, text DSLs, or graph DSLs
 that generate MoonDsp graphs. It complements ADR-0010 (the
-`CompiledTemplate` runtime boundary) and ADR-0014 (authoring equality and typed
-compile diagnostics).
+`CompiledTemplate` runtime boundary), ADR-0014 (authoring equality and typed
+compile diagnostics), and the Mini/graph bridge contract in
+`docs/mini-graph-authoring-boundary.md`.
 
 ## Intended flow
 
