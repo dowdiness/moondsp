@@ -28,6 +28,10 @@ for `dowdiness/moondsp`. Read order below goes roughly from "new user" to
 - **[`mini-notation.md`](mini-notation.md)** — current text-pattern syntax,
   including Strudel-style `$:` stack lines, quoted notation, postfixes, and
   method chains.
+- **[`external-dsl-lowering.md`](external-dsl-lowering.md)** — contract for
+  external editors/DSLs that lower validated authoring graphs into
+  `Array[DspNode]`, analyze them into `CompiledTemplate`, and compile or
+  hot-swap on the control side.
 - **[`next-actions.md`](next-actions.md)** — active handoff list for future
   sessions. Keep this short and update it when priorities change.
 - **[`performance/`](performance/)** — dated benchmark snapshots. New

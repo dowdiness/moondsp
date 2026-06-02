@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added an external DSL lowering contract guide and regression fixtures for
+  `Array[DspNode]` → `CompiledTemplate` → compile/control binding flows.
 - Added `DspNode` / `CompiledTemplate` authoring equality and result-typed
   `CompiledDsp::compile_result` / `CompiledStereoDsp::compile_result` graph
   diagnostics for external reactive authoring flows.
