@@ -1,10 +1,11 @@
 # Mini pattern ↔ graph authoring boundary
 
 This contract defines how MoonDsp's Mini pattern/control DSL composes with a
-separate graph/topology DSL. It complements the external DSL lowering contract:
-external graph authoring still lowers validated topology to `Array[DspNode]`,
-crosses into MoonDsp through `CompiledTemplate::analyze`, and builds validated
-control bindings on the control side.
+separate graph/topology DSL. It complements the external DSL lowering contract
+and the editor preview handoff: external graph authoring still lowers validated
+topology to `Array[DspNode]`, crosses into MoonDsp through
+`CompiledTemplate::analyze`, and builds validated control bindings on the
+control side.
 
 ## Intended flow
 

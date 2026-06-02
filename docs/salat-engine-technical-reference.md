@@ -492,8 +492,10 @@ In the concrete library API, the pipeline is
 CompiledDsp::compile → CompiledDsp`. `CompiledTemplate` is the single
 runtime exchange type between authoring and compile. See ADR-0010 for
 the boundary contract, `docs/external-dsl-lowering.md` for the external
-DSL lowering contract, and `docs/mini-graph-authoring-boundary.md` for
-Mini `ControlMap` integration with graph templates.
+DSL lowering contract, `docs/mini-graph-authoring-boundary.md` for Mini
+`ControlMap` integration with graph templates, and
+`docs/editor-audio-preview-handoff.md` for editor-facing preview ownership and
+state transitions.
 
 ### 3.2 Flatten
 
