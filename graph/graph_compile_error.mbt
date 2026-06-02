@@ -30,21 +30,17 @@ pub fn CompiledDsp::compile_result(
   compiled_template : CompiledTemplate,
   context : DspContext,
 ) -> Result[CompiledDsp, GraphCompileError] {
-  match
-    compile_error_for_template(compiled_template, context, DspNodeKind::Output) {
-    Some(error) => Err(error)
-    None =>
-      match
-        CompiledDsp::compile_internal(
-          compiled_template.optimized,
-          context,
-          compiled_template.template.length(),
-          compiled_template.index_map,
-        ) {
-        Some(compiled) => Ok(compiled)
-        None => Err(GraphCompileError::InternalRejected(DspNodeKind::Output))
-      }
-  }
+  compile_checked_template(compiled_template, context, DspNodeKind::Output, fn(
+    template,
+    context,
+  ) {
+    CompiledDsp::compile_internal(
+      template.optimized,
+      context,
+      template.template.length(),
+      template.index_map,
+    )
+  })
 }
 
 ///|
@@ -54,24 +50,34 @@ pub fn CompiledStereoDsp::compile_result(
   compiled_template : CompiledTemplate,
   context : DspContext,
 ) -> Result[CompiledStereoDsp, GraphCompileError] {
-  match
-    compile_error_for_template(
-      compiled_template,
-      context,
-      DspNodeKind::StereoOutput,
-    ) {
+  compile_checked_template(
+    compiled_template,
+    context,
+    DspNodeKind::StereoOutput,
+    fn(template, context) {
+      CompiledStereoDsp::compile_internal(
+        template.optimized,
+        context,
+        template.template.length(),
+        template.index_map,
+      )
+    },
+  )
+}
+
+///|
+fn[T] compile_checked_template(
+  compiled_template : CompiledTemplate,
+  context : DspContext,
+  output_kind : DspNodeKind,
+  compile : (CompiledTemplate, DspContext) -> T?,
+) -> Result[T, GraphCompileError] {
+  match compile_error_for_template(compiled_template, context, output_kind) {
     Some(error) => Err(error)
     None =>
-      match
-        CompiledStereoDsp::compile_internal(
-          compiled_template.optimized,
-          context,
-          compiled_template.template.length(),
-          compiled_template.index_map,
-        ) {
+      match compile(compiled_template, context) {
         Some(compiled) => Ok(compiled)
-        None =>
-          Err(GraphCompileError::InternalRejected(DspNodeKind::StereoOutput))
+        None => Err(GraphCompileError::InternalRejected(output_kind))
       }
   }
 }
@@ -299,13 +305,14 @@ fn remap_graph_compile_error(
 
 ///|
 fn count_output_kind(nodes : Array[DspNode], output_kind : DspNodeKind) -> Int {
-  let mut count = 0
-  for node in nodes {
+  for node in nodes; count = 0 {
     if node.kind == output_kind {
-      count += 1
+      continue count + 1
     }
+    continue count
+  } nobreak {
+    count
   }
-  count
 }
 
 ///|
@@ -356,37 +363,19 @@ fn invalid_oscillator_node(
 
 ///|
 fn invalid_adsr_node(index : Int, node : DspNode) -> GraphCompileError? {
-  match
-    invalid_finite_param(index, node.kind, GraphParamSlot::Value0, node.value0) {
-    Some(error) => Some(error)
-    None =>
-      match
-        invalid_finite_param(
-          index,
-          node.kind,
-          GraphParamSlot::Value1,
-          node.value1,
-        ) {
-        Some(error) => Some(error)
-        None =>
-          match
-            invalid_finite_param(
-              index,
-              node.kind,
-              GraphParamSlot::Value2,
-              node.value2,
-            ) {
-            Some(error) => Some(error)
-            None =>
-              invalid_finite_param(
-                index,
-                node.kind,
-                GraphParamSlot::Value3,
-                node.value3,
-              )
-          }
-      }
+  let params : Array[(GraphParamSlot, Double)] = [
+    (GraphParamSlot::Value0, node.value0),
+    (GraphParamSlot::Value1, node.value1),
+    (GraphParamSlot::Value2, node.value2),
+    (GraphParamSlot::Value3, node.value3),
+  ]
+  for param in params {
+    match invalid_finite_param(index, node.kind, param.0, param.1) {
+      Some(error) => return Some(error)
+      None => ()
+    }
   }
+  None
 }
 
 ///|
