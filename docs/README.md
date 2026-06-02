@@ -35,6 +35,9 @@ for `dowdiness/moondsp`. Read order below goes roughly from "new user" to
   external editors/DSLs that lower validated authoring graphs into
   `Array[DspNode]`, analyze them into `CompiledTemplate`, and compile or
   hot-swap on the control side.
+- **[`editor-audio-preview-handoff.md`](editor-audio-preview-handoff.md)** —
+  editor-visible preview state machine and ownership contract for staging graph
+  topology replacements and parameter-only control edits.
 - **[`next-actions.md`](next-actions.md)** — active handoff list for future
   sessions. Keep this short and update it when priorities change.
 - **[`performance/`](performance/)** — dated benchmark snapshots. New
