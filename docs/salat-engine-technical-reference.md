@@ -491,7 +491,8 @@ In the concrete library API, the pipeline is
 `Array[DspNode] → CompiledTemplate::analyze → CompiledTemplate →
 CompiledDsp::compile → CompiledDsp`. `CompiledTemplate` is the single
 runtime exchange type between authoring and compile. See ADR-0010 for
-the contract.
+the boundary contract and `docs/external-dsl-lowering.md` for the external
+DSL lowering contract.
 
 ### 3.2 Flatten
 
