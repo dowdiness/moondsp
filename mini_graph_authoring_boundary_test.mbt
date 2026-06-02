@@ -52,10 +52,11 @@ fn find_prepared_template(
 ) -> MiniGraphPreparedTemplate? {
   for entry in registry {
     if entry.name == name {
-      return Some(entry)
+      break Some(entry)
     }
+  } nobreak {
+    None
   }
-  None
 }
 
 ///|
@@ -70,6 +71,16 @@ fn first_mini_control_map(input : String) -> @pattern.ControlMap {
 }
 
 ///|
+fn mini_sound_selector_label(sound : Double) -> String {
+  let code = sound.to_int()
+  if sound == code.to_double() {
+    "\{code}"
+  } else {
+    "\{sound}"
+  }
+}
+
+///|
 fn resolve_mini_graph_controls(
   controls : @pattern.ControlMap,
   registry : Array[MiniGraphPreparedTemplate],
@@ -80,7 +91,10 @@ fn resolve_mini_graph_controls(
   }
   let template_name = match mini_template_name_for_sound(sound) {
     Some(name) => name
-    None => return Err(MiniGraphBridgeError::MissingTemplate("sound"))
+    None =>
+      return Err(
+        MiniGraphBridgeError::MissingTemplate(mini_sound_selector_label(sound)),
+      )
   }
   let prepared = match find_prepared_template(registry, template_name) {
     Some(entry) => entry
@@ -129,5 +143,15 @@ test "Mini graph boundary: missing selected template is diagnostic" {
     Err(MiniGraphBridgeError::MissingTemplate(name)) =>
       @debug.assert_eq(name, "sd")
     _ => fail("expected Mini sound selector to report missing graph template")
+  }
+}
+
+///|
+test "Mini graph boundary: unknown sound selector is diagnostic" {
+  match
+    resolve_mini_graph_controls(@pattern.ControlMap::single("sound", 999.0), []) {
+    Err(MiniGraphBridgeError::MissingTemplate(name)) =>
+      @debug.assert_eq(name, "999")
+    _ => fail("expected unknown Mini sound selector to be reported")
   }
 }
