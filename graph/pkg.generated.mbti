@@ -33,6 +33,7 @@ type CompiledDsp
 pub fn CompiledDsp::apply_control(Self, GraphControl) -> Result[Unit, GraphControlError]
 pub fn CompiledDsp::apply_controls(Self, Array[GraphControl]) -> Result[Unit, GraphControlError]
 pub fn CompiledDsp::compile(CompiledTemplate, @dsp.DspContext) -> Self?
+pub fn CompiledDsp::compile_result(CompiledTemplate, @dsp.DspContext) -> Result[Self, GraphCompileError]
 pub fn CompiledDsp::gate_off(Self, Int) -> Result[Unit, GraphControlError]
 pub fn CompiledDsp::gate_on(Self, Int) -> Result[Unit, GraphControlError]
 pub fn CompiledDsp::has_feedback_edges(Self) -> Bool
@@ -71,6 +72,7 @@ type CompiledStereoDsp
 pub fn CompiledStereoDsp::apply_control(Self, GraphControl) -> Result[Unit, GraphControlError]
 pub fn CompiledStereoDsp::apply_controls(Self, Array[GraphControl]) -> Result[Unit, GraphControlError]
 pub fn CompiledStereoDsp::compile(CompiledTemplate, @dsp.DspContext) -> Self?
+pub fn CompiledStereoDsp::compile_result(CompiledTemplate, @dsp.DspContext) -> Result[Self, GraphCompileError]
 pub fn CompiledStereoDsp::gate_off(Self, Int) -> Result[Unit, GraphControlError]
 pub fn CompiledStereoDsp::gate_on(Self, Int) -> Result[Unit, GraphControlError]
 pub fn CompiledStereoDsp::has_feedback_edges(Self) -> Bool
@@ -110,6 +112,7 @@ pub struct CompiledTemplate {
 pub fn CompiledTemplate::adsr_authoring_indices(Self) -> FixedArray[Int]
 pub fn CompiledTemplate::analyze(Array[DspNode]) -> Self
 pub fn CompiledTemplate::orphan_adsr_count(Self) -> Int
+pub impl Eq for CompiledTemplate
 
 pub struct ControlBinding {
   key : String
@@ -183,6 +186,7 @@ pub impl NodeEditable for DspNode
 pub impl NodeFoldable for DspNode
 pub impl NodeSpanning for DspNode
 pub impl NodeStateful for DspNode
+pub impl Eq for DspNode
 
 pub(all) enum DspNodeKind {
   Constant
@@ -217,6 +221,22 @@ pub impl @dsp.FilterSym for GraphBuilder
 pub impl @dsp.StereoDelaySym for GraphBuilder
 pub impl @dsp.StereoFilterSym for GraphBuilder
 pub impl @dsp.StereoSym for GraphBuilder
+
+pub(all) enum GraphCompileError {
+  InvalidSampleRate(Double)
+  MissingOutput(DspNodeKind)
+  MultipleOutputs(DspNodeKind)
+  WrongOutputKind(Int, DspNodeKind, DspNodeKind)
+  InvalidInput(Int, DspNodeKind, GraphTopologyInputSlot, Int)
+  InvalidParamValue(Int, DspNodeKind, GraphParamSlot, Double)
+  InvalidDelaySamples(Int, Int, Int)
+  UnreachableNode(Int)
+  InvalidFeedbackEdge(Int, Int, Int)
+  DuplicateFeedbackInput(Int, GraphTopologyInputSlot)
+  InvalidTerminalShape(DspNodeKind)
+  InternalRejected(DspNodeKind)
+} derive(@debug.Debug)
+pub impl Show for GraphCompileError
 
 pub struct GraphControl {
   // private fields
