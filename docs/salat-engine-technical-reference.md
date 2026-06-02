@@ -666,14 +666,20 @@ The current repository already implements:
   path
 - input nodes may be declared in authoring order; the compiler topologically
   sorts reachable nodes from a single terminal output node
-- `CompiledDsp::compile(CompiledTemplate, DspContext) -> Self?` is the
-  single entry point; `CompiledTemplate::analyze(Array[DspNode])` produces
-  the input. See ADR-0010 for the boundary contract.
+- `CompiledDsp::compile(CompiledTemplate, DspContext) -> Self?` remains the
+  compatibility compile entry point; `CompiledDsp::compile_result(...)` returns
+  `Result[CompiledDsp, GraphCompileError]` for callers that need a typed
+  rejection reason, with node errors mapped back to original authoring indices
+  when the analyzed template retains that mapping. `CompiledStereoDsp` has the
+  same optional/result pair. `CompiledTemplate::analyze(Array[DspNode])`
+  produces the input. See ADR-0010 for the boundary contract and ADR-0014 for
+  the equality/diagnostic policy.
 - `CompiledTemplate::analyze(...)` captures the authoring template, the
   optimizer's authoring-index map, and the optimized node array; both mono
   and stereo graphs compile from the same analyzed template via
-  `CompiledDsp::compile(...)` or `CompiledStereoDsp::compile(...)`,
-  reusing the optimized nodes without running the graph optimizer a second time
+  `CompiledDsp::compile(...)` / `compile_result(...)` or
+  `CompiledStereoDsp::compile(...)` / `compile_result(...)`, reusing the
+  optimized nodes without running the graph optimizer a second time
 - compile rejects:
   - unsupported feedback cycles
   - multiple outputs
@@ -805,9 +811,14 @@ Current limits:
   `CompiledStereoDsp` process feedback through a unified per-sample loop
   with self-registers rather than a separate linked-list infrastructure
 - constant folding and dead-node elimination run exactly once inside
-  `CompiledTemplate::analyze(...)` via `optimize_graph()`; both
-  `CompiledDsp::compile(...)` and `CompiledStereoDsp::compile(...)` receive
-  the pre-optimized template and do not re-run the optimizer
+  `CompiledTemplate::analyze(...)` via `optimize_graph()`; both optional and
+  result-typed mono/stereo compile entry points receive the pre-optimized
+  template and do not re-run the optimizer
+- `DspNode` and `CompiledTemplate` equality are authoring/artifact equality,
+  not DSP sample equality: `NaN` compares equal to `NaN`, `+0.0` compares equal
+  to `-0.0`, and finite values otherwise compare structurally. This keeps
+  invalid-but-unchanged authoring templates stable for future incr-backed
+  last-good-template flows.
 - `InsertChain` / `DeleteChain` topology edit variants support multi-node
   subgraph operations with stereo parity
 - state preservation across topology edit recompilation is supported

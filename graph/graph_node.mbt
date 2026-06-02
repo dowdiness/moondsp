@@ -32,7 +32,7 @@ pub(all) enum GraphParamSlot {
 } derive(Eq, Debug)
 
 ///|
-pub impl Show for GraphParamSlot with output(self, logger) {
+pub impl Show for GraphParamSlot with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
 
@@ -153,6 +153,39 @@ fn DspNode::DspNode(
     delay_samples,
     seed,
   }
+}
+
+///|
+/// Authoring-structural Double equality for graph nodes.
+///
+/// This is intentionally not IEEE sample equality: invalid authoring graphs may
+/// contain NaN while an editor keeps the last-good compiled template alive. Treat
+/// NaN as a stable sentinel so unchanged invalid templates can still compare
+/// equal in incr-backed pipelines. Normal Double equality already treats +0.0
+/// and -0.0 as equal, which is the authoring policy we want.
+fn graph_authoring_double_equal(left : Double, right : Double) -> Bool {
+  if left.is_nan() && right.is_nan() {
+    true
+  } else {
+    left == right
+  }
+}
+
+///|
+/// Structural equality for authoring graph nodes.
+pub impl Eq for DspNode with fn equal(self, other) {
+  self.kind == other.kind &&
+  self.input0 == other.input0 &&
+  self.input1 == other.input1 &&
+  graph_authoring_double_equal(self.value0, other.value0) &&
+  graph_authoring_double_equal(self.value1, other.value1) &&
+  graph_authoring_double_equal(self.value2, other.value2) &&
+  graph_authoring_double_equal(self.value3, other.value3) &&
+  self.waveform == other.waveform &&
+  self.filter_mode == other.filter_mode &&
+  self.delay_max_samples == other.delay_max_samples &&
+  self.delay_samples == other.delay_samples &&
+  self.seed == other.seed
 }
 
 ///|

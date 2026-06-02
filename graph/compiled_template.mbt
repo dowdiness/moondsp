@@ -16,6 +16,43 @@ pub struct CompiledTemplate {
 }
 
 ///|
+fn dsp_node_array_equal(left : Array[DspNode], right : Array[DspNode]) -> Bool {
+  if left.length() != right.length() {
+    return false
+  }
+  for index in 0..<left.length() {
+    if left[index] != right[index] {
+      return false
+    }
+  }
+  true
+}
+
+///|
+fn int_fixed_array_equal(
+  left : FixedArray[Int],
+  right : FixedArray[Int],
+) -> Bool {
+  if left.length() != right.length() {
+    return false
+  }
+  for index in 0..<left.length() {
+    if left[index] != right[index] {
+      return false
+    }
+  }
+  true
+}
+
+///|
+/// Structural equality for analyzed template artifacts.
+pub impl Eq for CompiledTemplate with fn equal(self, other) {
+  dsp_node_array_equal(self.template, other.template) &&
+  dsp_node_array_equal(self.optimized, other.optimized) &&
+  int_fixed_array_equal(self.index_map, other.index_map)
+}
+
+///|
 /// Snapshot the template and run optimize_graph once.
 ///
 /// WHY defensive copy: the caller's `template` array is mutable from

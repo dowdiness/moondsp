@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `DspNode` / `CompiledTemplate` authoring equality and result-typed
+  `CompiledDsp::compile_result` / `CompiledStereoDsp::compile_result` graph
+  diagnostics for external reactive authoring flows.
 - Added internal mini authoring token edit-span realignment coverage so
   unchanged prefix/suffix tokens preserve identity while changed duplicate
   tokens receive fresh keys.

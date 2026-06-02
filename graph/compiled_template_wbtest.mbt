@@ -144,3 +144,30 @@ test "B6: adsr_authoring_indices preserves authoring order" {
     @debug.assert_eq(live[i - 1] < live[i], true)
   }
 }
+
+///|
+test "CompiledTemplate equality treats unchanged NaN templates as equal" {
+  let left = CompiledTemplate::analyze([
+    DspNode::constant(0.0 / 0.0),
+    DspNode::output(0),
+  ])
+  let right = CompiledTemplate::analyze([
+    DspNode::constant(0.0 / 0.0),
+    DspNode::output(0),
+  ])
+  assert_true(left == right)
+}
+
+///|
+test "CompiledTemplate equality keeps authoring-only dead nodes visible" {
+  let left = CompiledTemplate::analyze([
+    DspNode::constant(1.0),
+    DspNode::output(0),
+  ])
+  let right = CompiledTemplate::analyze([
+    DspNode::constant(1.0),
+    DspNode::constant(2.0),
+    DspNode::output(0),
+  ])
+  assert_false(left == right)
+}

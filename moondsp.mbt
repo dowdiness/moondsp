@@ -80,6 +80,7 @@ pub using @graph {
   type DspNode,
   type DspNodeKind,
   type GraphBuilder,
+  type GraphCompileError,
   type GraphControl,
   type GraphControlError,
   type GraphControlKind,

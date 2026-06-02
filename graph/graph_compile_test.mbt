@@ -111,6 +111,86 @@ test "compiled dsp rejects non-finite constants" {
 }
 
 ///|
+test "compile_result reports non-finite constant parameter" {
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
+  let nodes = [DspNode::constant(0.0 / 0.0), DspNode::output(0)]
+
+  match CompiledDsp::compile_result(CompiledTemplate::analyze(nodes), context) {
+    Err(GraphCompileError::InvalidParamValue(index, kind, slot, value)) => {
+      @debug.assert_eq(index, 0)
+      @debug.assert_eq(kind, DspNodeKind::Constant)
+      @debug.assert_eq(slot, GraphParamSlot::Value0)
+      assert_true(value.is_nan())
+    }
+    _ => fail("expected InvalidParamValue for NaN constant")
+  }
+}
+
+///|
+test "compile_result maps optimized errors back to authoring indices" {
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
+  let nodes = [
+    DspNode::constant(QUARTER_SAMPLE), // eliminated before compile
+    DspNode::constant(0.0 / 0.0),
+    DspNode::output(1),
+  ]
+
+  match CompiledDsp::compile_result(CompiledTemplate::analyze(nodes), context) {
+    Err(GraphCompileError::InvalidParamValue(index, kind, slot, value)) => {
+      @debug.assert_eq(index, 1)
+      @debug.assert_eq(kind, DspNodeKind::Constant)
+      @debug.assert_eq(slot, GraphParamSlot::Value0)
+      assert_true(value.is_nan())
+    }
+    _ => fail("expected authoring-indexed InvalidParamValue")
+  }
+}
+
+///|
+test "compile_result preserves invalid authoring input before optimization" {
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
+  let nodes = [
+    DspNode::constant(QUARTER_SAMPLE), // eliminated before compile
+    DspNode::gain(99, HALF_GAIN),
+    DspNode::output(1),
+  ]
+
+  match CompiledDsp::compile_result(CompiledTemplate::analyze(nodes), context) {
+    Err(GraphCompileError::InvalidInput(index, kind, slot, input)) => {
+      @debug.assert_eq(index, 1)
+      @debug.assert_eq(kind, DspNodeKind::Gain)
+      @debug.assert_eq(slot, GraphTopologyInputSlot::Input0)
+      @debug.assert_eq(input, 99)
+    }
+    _ => fail("expected authoring-indexed InvalidInput")
+  }
+}
+
+///|
+test "compile_result reports missing output" {
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
+  let nodes = [DspNode::constant(QUARTER_SAMPLE)]
+
+  match CompiledDsp::compile_result(CompiledTemplate::analyze(nodes), context) {
+    Err(GraphCompileError::MissingOutput(kind)) =>
+      @debug.assert_eq(kind, DspNodeKind::Output)
+    _ => fail("expected MissingOutput")
+  }
+}
+
+///|
 test "compiled dsp rejects graphs without a final output node" {
   let context = DspContext::new(
     sample_rate=STANDARD_SAMPLE_RATE,

@@ -94,6 +94,8 @@ pub using @dsp {type Gain}
 
 pub using @graph {type GraphBuilder}
 
+pub using @graph {type GraphCompileError}
+
 pub using @graph {type GraphControl}
 
 pub using @graph {type GraphControlError}
