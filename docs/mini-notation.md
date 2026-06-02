@@ -1,9 +1,12 @@
 # Mini notation
 
 `mini/` parses compact text patterns into `Pat[ControlMap]` for the
-scheduler and browser live-coding surface. Production parsing is still the
-hand-written MoonBit parser; the loom CST work remains an evaluation path
-under `specs/loom-mini-cst/`.
+scheduler and browser live-coding surface. Mini owns event timing and numeric
+controls, not DSP graph topology; see
+[`mini-graph-authoring-boundary.md`](mini-graph-authoring-boundary.md) for the
+contract that bridges Mini events into graph templates. Production parsing is
+still the hand-written MoonBit parser; the loom CST work remains an evaluation
+path under `specs/loom-mini-cst/`.
 
 ## Top-level forms
 

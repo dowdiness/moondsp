@@ -491,8 +491,9 @@ In the concrete library API, the pipeline is
 `Array[DspNode] → CompiledTemplate::analyze → CompiledTemplate →
 CompiledDsp::compile → CompiledDsp`. `CompiledTemplate` is the single
 runtime exchange type between authoring and compile. See ADR-0010 for
-the boundary contract and `docs/external-dsl-lowering.md` for the external
-DSL lowering contract.
+the boundary contract, `docs/external-dsl-lowering.md` for the external
+DSL lowering contract, and `docs/mini-graph-authoring-boundary.md` for
+Mini `ControlMap` integration with graph templates.
 
 ### 3.2 Flatten
 
@@ -879,7 +880,11 @@ Current limits of the control-frame model:
 ### 3.5.3 Pattern-to-DSP Control Binding
 
 Pattern playback now has a bound voice-pool layer that keeps template validation
-and control-key routing together.
+and control-key routing together. When Mini patterns drive externally authored
+graph templates, `docs/mini-graph-authoring-boundary.md` defines the layer split:
+Mini owns timing and `ControlMap` values, graph authoring owns topology and
+control declarations, and the bridge selects a prepared template plus validated
+bindings on the control side.
 
 Current semantics:
 
