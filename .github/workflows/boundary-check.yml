@@ -25,5 +25,8 @@ jobs:
       - name: Install MoonBit deps
         run: moon install
 
-      - name: Run boundary check
+      - name: Run public boundary check
         run: ./scripts/check-public-boundary.sh
+
+      - name: Run architecture boundary check
+        run: ./scripts/check-architecture-boundaries.sh
