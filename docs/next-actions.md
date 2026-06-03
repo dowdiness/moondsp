@@ -196,6 +196,8 @@ loom-authoring work.
 
 - Normal code/docs slices: `NEW_MOON_MOD=0 moon check --deny-warn` and
   `NEW_MOON_MOD=0 moon test --release`.
+- Architecture boundary checks: `./scripts/check-public-boundary.sh` and
+  `./scripts/check-architecture-boundaries.sh`.
 - `specs/loom-mini-cst` slices: also run
   `NEW_MOON_MOD=0 moon -C specs/loom-mini-cst check --deny-warn` and
   `NEW_MOON_MOD=0 moon -C specs/loom-mini-cst test`.
