@@ -270,6 +270,184 @@ fn bench_external_rewire_roundtrip(
 }
 
 ///|
+fn[T, E] bench_expect_err(result : Result[T, E], label : String) -> E {
+  match result {
+    Err(error) => error
+    Ok(_) => abort("expected \{label} to reject")
+  }
+}
+
+///|
+fn bench_external_control_binding_rejection(
+  b : @bench.T,
+  make_builder : (GraphIndexMap, BenchExternalAuthoringFixture) -> ControlBindingBuilder,
+  label : String,
+) -> Unit {
+  for fixture in bench_external_authoring_fixtures() {
+    let doc = bench_external_doc(fixture)
+    let template = doc.analyze()
+    let builder = make_builder(doc.index_map(), fixture)
+    b.bench(name=fixture.name, fn() {
+      let error = bench_expect_err(builder.build(template), label)
+      b.keep(error)
+    })
+  }
+}
+
+///|
+fn bench_external_compile_result_rejection(
+  b : @bench.T,
+  make_template : (BenchExternalAuthoringFixture) -> CompiledTemplate,
+  label : String,
+) -> Unit {
+  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
+  for fixture in bench_external_authoring_fixtures() {
+    let template = make_template(fixture)
+    b.bench(name=fixture.name, fn() {
+      let error = bench_expect_err(
+        CompiledDsp::compile_result(template, ctx),
+        label,
+      )
+      b.keep(error)
+    })
+  }
+}
+
+///|
+fn bench_external_invalid_index_binding_builder(
+  index_map : GraphIndexMap,
+  fixture : BenchExternalAuthoringFixture,
+) -> ControlBindingBuilder {
+  let builder = build_bench_external_binding_builder(index_map, fixture)
+  builder.bind(
+    key="diagnostic:invalid-index",
+    node_index=fixture.nodes.length() + 7,
+    slot=GraphParamSlot::Value0,
+  )
+}
+
+///|
+fn bench_external_invalid_slot_binding_builder(
+  index_map : GraphIndexMap,
+  fixture : BenchExternalAuthoringFixture,
+) -> ControlBindingBuilder {
+  let builder = build_bench_external_binding_builder(index_map, fixture)
+  builder.bind(
+    key="diagnostic:invalid-slot",
+    node_index=1,
+    slot=GraphParamSlot::Value1,
+  )
+}
+
+///|
+fn bench_external_duplicate_key_binding_builder(
+  index_map : GraphIndexMap,
+  fixture : BenchExternalAuthoringFixture,
+) -> ControlBindingBuilder {
+  let builder = build_bench_external_binding_builder(index_map, fixture)
+  builder.bind(
+    key=fixture.control_keys[0],
+    node_index=1,
+    slot=GraphParamSlot::Value0,
+  )
+}
+
+///|
+fn bench_external_invalid_param_batch(
+  fixture : BenchExternalAuthoringFixture,
+  offset : Double,
+) -> Array[GraphControl] {
+  let controls = bench_external_control_batch(fixture, offset)
+  // Node 3 is the first generated Clip stage in all benchmark fixtures.
+  controls.push(GraphControl::set_param(3, GraphParamSlot::Value0, -1.0))
+  controls
+}
+
+///|
+fn bench_external_invalid_topology_edit() -> GraphTopologyEdit {
+  GraphTopologyEdit::rewire_input(0, GraphTopologyInputSlot::Input0, 1)
+}
+
+///|
+fn bench_external_valid_replace_edit(amount : Double) -> GraphTopologyEdit {
+  GraphTopologyEdit::replace_node(1, DspNode::gain(0, amount))
+}
+
+///|
+fn bench_external_invalid_topology_edit_batch() -> Array[GraphTopologyEdit] {
+  [
+    bench_external_valid_replace_edit(0.55),
+    bench_external_invalid_topology_edit(),
+  ]
+}
+
+///|
+fn bench_external_recompile_rejected_topology_edit(
+  fixture : BenchExternalAuthoringFixture,
+) -> GraphTopologyEdit {
+  let output_index = fixture.nodes.length() - 1
+  GraphTopologyEdit::replace_node(
+    output_index,
+    DspNode::gain(output_index - 1, 0.5),
+  )
+}
+
+///|
+fn bench_external_invalid_doc_rewire(
+  doc : GraphTemplateDoc,
+  fixture : BenchExternalAuthoringFixture,
+) -> GraphTemplateDocError {
+  try
+    doc.rewire_input(
+      fixture.ids[0],
+      GraphTopologyInputSlot::Input0,
+      fixture.ids[1],
+    )
+  catch {
+    error => error
+  } noraise {
+    _ => abort("expected invalid topology document rewire")
+  }
+}
+
+///|
+fn bench_external_missing_output_template(
+  fixture : BenchExternalAuthoringFixture,
+) -> CompiledTemplate {
+  let nodes = fixture.nodes.copy()
+  ignore(nodes.pop())
+  CompiledTemplate::analyze(nodes)
+}
+
+///|
+fn bench_external_multiple_outputs_template(
+  fixture : BenchExternalAuthoringFixture,
+) -> CompiledTemplate {
+  let nodes = fixture.nodes.copy()
+  nodes.push(DspNode::output(fixture.nodes.length() - 2))
+  CompiledTemplate::analyze(nodes)
+}
+
+///|
+fn bench_external_invalid_input_template(
+  fixture : BenchExternalAuthoringFixture,
+) -> CompiledTemplate {
+  let nodes = fixture.nodes.copy()
+  let output_index = nodes.length() - 1
+  nodes[output_index] = DspNode::output(nodes.length() + 17)
+  CompiledTemplate::analyze(nodes)
+}
+
+///|
+fn bench_external_invalid_param_template(
+  fixture : BenchExternalAuthoringFixture,
+) -> CompiledTemplate {
+  let nodes = fixture.nodes.copy()
+  nodes[1] = DspNode::gain(0, 0.0 / 0.0)
+  CompiledTemplate::analyze(nodes)
+}
+
+///|
 test "bench graph: external authoring fixtures compile, bind, and edit" {
   let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   for fixture in bench_external_authoring_fixtures() {
@@ -302,6 +480,113 @@ test "bench graph: external authoring fixtures compile, bind, and edit" {
     assert_true(
       bench_external_rewire_roundtrip(doc, fixture).length() ==
       fixture.nodes.length(),
+    )
+  }
+}
+
+///|
+test "bench graph: external authoring diagnostic fixtures reject safely" {
+  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
+  for fixture in bench_external_authoring_fixtures() {
+    let doc = bench_external_doc(fixture)
+    let index_map = doc.index_map()
+    let template = doc.analyze()
+    assert_true(
+      bench_external_invalid_index_binding_builder(index_map, fixture).build(
+        template,
+      )
+      is Err(_),
+    )
+    assert_true(
+      bench_external_invalid_slot_binding_builder(index_map, fixture).build(
+        template,
+      )
+      is Err(_),
+    )
+    assert_true(
+      bench_external_duplicate_key_binding_builder(index_map, fixture).build(
+        template,
+      )
+      is Err(_),
+    )
+    ignore(bench_external_invalid_doc_rewire(doc, fixture))
+    assert_true(doc.length() == fixture.nodes.length())
+    assert_true(
+      CompiledDsp::compile_result(
+        bench_external_missing_output_template(fixture),
+        ctx,
+      )
+      is Err(_),
+    )
+    assert_true(
+      CompiledDsp::compile_result(
+        bench_external_multiple_outputs_template(fixture),
+        ctx,
+      )
+      is Err(_),
+    )
+    assert_true(
+      CompiledDsp::compile_result(
+        bench_external_invalid_input_template(fixture),
+        ctx,
+      )
+      is Err(_),
+    )
+    assert_true(
+      CompiledDsp::compile_result(
+        bench_external_invalid_param_template(fixture),
+        ctx,
+      )
+      is Err(_),
+    )
+    let compiled = CompiledDsp::compile(template, ctx).unwrap()
+    assert_true(
+      compiled.apply_controls(bench_external_invalid_param_batch(fixture, 0.01))
+      is Err(_),
+    )
+    assert_true(
+      compiled.apply_controls(bench_external_control_batch(fixture, 0.02))
+      is Ok(_),
+    )
+    let controller = CompiledDspTopologyController::from_nodes(
+      fixture.nodes,
+      ctx,
+      crossfade_samples=128,
+    ).unwrap()
+    assert_true(
+      controller.apply_controls(
+        bench_external_invalid_param_batch(fixture, 0.03),
+      )
+      is Err(_),
+    )
+    assert_true(
+      controller.apply_controls(bench_external_control_batch(fixture, 0.04))
+      is Ok(_),
+    )
+    assert_true(
+      controller.queue_topology_edit(bench_external_invalid_topology_edit())
+      is Err(_),
+    )
+    assert_true(
+      controller.queue_topology_edit(bench_external_valid_replace_edit(0.55))
+      is Ok(_),
+    )
+    let recompile_controller = CompiledDspTopologyController::from_nodes(
+      fixture.nodes,
+      ctx,
+      crossfade_samples=128,
+    ).unwrap()
+    assert_true(
+      recompile_controller.queue_topology_edit(
+        bench_external_recompile_rejected_topology_edit(fixture),
+      )
+      is Err(_),
+    )
+    assert_true(
+      recompile_controller.queue_topology_edit(
+        bench_external_valid_replace_edit(0.56),
+      )
+      is Ok(_),
     )
   }
 }
@@ -480,4 +765,226 @@ test "bench/external_authoring/queue_prepared_hotswap_setup" (b : @bench.T) {
       b.keep(hs)
     })
   }
+}
+
+// ---- External diagnostic/failure benchmarks ----
+// These isolate editor/control-thread rejection paths. Invalid candidates are
+// prepared outside audio processing; rejected work must leave the current
+// compiled/template state usable.
+
+///|
+test "bench/external_authoring_diagnostics/control_binding_invalid_index" (
+  b : @bench.T,
+) {
+  bench_external_control_binding_rejection(
+    b, bench_external_invalid_index_binding_builder, "invalid-index control binding",
+  )
+}
+
+///|
+test "bench/external_authoring_diagnostics/control_binding_invalid_slot" (
+  b : @bench.T,
+) {
+  bench_external_control_binding_rejection(
+    b, bench_external_invalid_slot_binding_builder, "invalid-slot control binding",
+  )
+}
+
+///|
+test "bench/external_authoring_diagnostics/control_binding_duplicate_key" (
+  b : @bench.T,
+) {
+  bench_external_control_binding_rejection(
+    b, bench_external_duplicate_key_binding_builder, "duplicate-key control binding",
+  )
+}
+
+///|
+test "bench/external_control_diagnostics/apply_invalid_param_batch_compiled" (
+  b : @bench.T,
+) {
+  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
+  for fixture in bench_external_authoring_fixtures() {
+    let compiled = CompiledDsp::compile(
+      CompiledTemplate::analyze(fixture.nodes),
+      ctx,
+    ).unwrap()
+    let controls_a = bench_external_invalid_param_batch(fixture, 0.01)
+    let controls_b = bench_external_invalid_param_batch(fixture, 0.02)
+    let use_b = @ref.new(false)
+    b.bench(name=fixture.name, fn() {
+      let controls = if use_b.val { controls_b } else { controls_a }
+      use_b.val = !use_b.val
+      let error = bench_expect_err(
+        compiled.apply_controls(controls),
+        "compiled invalid param batch",
+      )
+      b.keep(error)
+    })
+  }
+}
+
+///|
+test "bench/external_control_diagnostics/apply_invalid_param_batch_topology_controller" (
+  b : @bench.T,
+) {
+  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
+  for fixture in bench_external_authoring_fixtures() {
+    let controller = CompiledDspTopologyController::from_nodes(
+      fixture.nodes,
+      ctx,
+      crossfade_samples=128,
+    ).unwrap()
+    let controls_a = bench_external_invalid_param_batch(fixture, 0.01)
+    let controls_b = bench_external_invalid_param_batch(fixture, 0.02)
+    let use_b = @ref.new(false)
+    b.bench(name=fixture.name, fn() {
+      let controls = if use_b.val { controls_b } else { controls_a }
+      use_b.val = !use_b.val
+      let error = bench_expect_err(
+        controller.apply_controls(controls),
+        "topology-controller invalid param batch",
+      )
+      b.keep(error)
+    })
+  }
+}
+
+///|
+test "bench/external_authoring_diagnostics/topology_doc_invalid_rewire" (
+  b : @bench.T,
+) {
+  for fixture in bench_external_authoring_fixtures() {
+    let doc = bench_external_doc(fixture)
+    b.bench(name=fixture.name, fn() {
+      let error = bench_external_invalid_doc_rewire(doc, fixture)
+      b.keep(error)
+    })
+  }
+}
+
+///|
+test "bench/external_authoring_diagnostics/queue_invalid_topology_edit" (
+  b : @bench.T,
+) {
+  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
+  for fixture in bench_external_authoring_fixtures() {
+    let controller = CompiledDspTopologyController::from_nodes(
+      fixture.nodes,
+      ctx,
+      crossfade_samples=128,
+    ).unwrap()
+    let edit = bench_external_invalid_topology_edit()
+    b.bench(name=fixture.name, fn() {
+      let error = bench_expect_err(
+        controller.queue_topology_edit(edit),
+        "invalid topology edit",
+      )
+      b.keep(error)
+    })
+  }
+}
+
+///|
+test "bench/external_authoring_diagnostics/queue_invalid_topology_edit_batch" (
+  b : @bench.T,
+) {
+  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
+  for fixture in bench_external_authoring_fixtures() {
+    let controller = CompiledDspTopologyController::from_nodes(
+      fixture.nodes,
+      ctx,
+      crossfade_samples=128,
+    ).unwrap()
+    let edits = bench_external_invalid_topology_edit_batch()
+    b.bench(name=fixture.name, fn() {
+      let error = bench_expect_err(
+        controller.queue_topology_edits(edits),
+        "invalid topology edit batch",
+      )
+      b.keep(error)
+    })
+  }
+}
+
+///|
+test "bench/external_authoring_diagnostics/queue_topology_recompile_rejected" (
+  b : @bench.T,
+) {
+  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
+  for fixture in bench_external_authoring_fixtures() {
+    let controller = CompiledDspTopologyController::from_nodes(
+      fixture.nodes,
+      ctx,
+      crossfade_samples=128,
+    ).unwrap()
+    let edit = bench_external_recompile_rejected_topology_edit(fixture)
+    b.bench(name=fixture.name, fn() {
+      let error = bench_expect_err(
+        controller.queue_topology_edit(edit),
+        "topology recompile rejection",
+      )
+      b.keep(error)
+    })
+  }
+}
+
+///|
+test "bench/external_authoring_diagnostics/queue_topology_pending_rejection" (
+  b : @bench.T,
+) {
+  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
+  for fixture in bench_external_authoring_fixtures() {
+    let controller = CompiledDspTopologyController::from_nodes(
+      fixture.nodes,
+      ctx,
+      crossfade_samples=128,
+    ).unwrap()
+    controller
+    .queue_topology_edit(bench_external_valid_replace_edit(0.55))
+    .unwrap()
+    b.bench(name=fixture.name, fn() {
+      let error = bench_expect_err(
+        controller.queue_topology_edit(bench_external_valid_replace_edit(0.56)),
+        "pending topology queue",
+      )
+      b.keep(error)
+    })
+  }
+}
+
+///|
+test "bench/external_authoring_diagnostics/compile_result_missing_output" (
+  b : @bench.T,
+) {
+  bench_external_compile_result_rejection(
+    b, bench_external_missing_output_template, "compile missing output",
+  )
+}
+
+///|
+test "bench/external_authoring_diagnostics/compile_result_multiple_outputs" (
+  b : @bench.T,
+) {
+  bench_external_compile_result_rejection(
+    b, bench_external_multiple_outputs_template, "compile multiple outputs",
+  )
+}
+
+///|
+test "bench/external_authoring_diagnostics/compile_result_invalid_input" (
+  b : @bench.T,
+) {
+  bench_external_compile_result_rejection(
+    b, bench_external_invalid_input_template, "compile invalid input",
+  )
+}
+
+///|
+test "bench/external_authoring_diagnostics/compile_result_invalid_param" (
+  b : @bench.T,
+) {
+  bench_external_compile_result_rejection(
+    b, bench_external_invalid_param_template, "compile invalid param",
+  )
 }
