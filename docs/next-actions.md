@@ -15,7 +15,9 @@ per-PR verification logs and merged-PR lists live in `git log` and
 - Latest release: **v0.5.1** (tagged and published 2026-05-20).
 - The next release should be **v0.6.0** if it includes the current
   `Unreleased` entries, because public API has been added since v0.5.1.
-- Open moondsp GitHub issues: none.
+- Open moondsp GitHub issues: #133–#140 track the architecture-boundary
+  roadmap from ADR-0015 (validation wiring, graph facade/internal extraction,
+  scheduler split, and browser ABI/demo-host split).
 - Open PRs: PR #86 (`release/v0.6.0`) is release prep and intentionally
   remains open until an explicit release pass. Do not tag or publish v0.6.0 as
   part of unrelated docs, benchmark, or loom-authoring work.
