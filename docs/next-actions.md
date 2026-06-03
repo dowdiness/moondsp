@@ -1,6 +1,6 @@
 # Next Actions
 
-Updated: 2026-05-31
+Updated: 2026-06-03
 
 Forward-looking handoff for the next session. Keep this short and actionable;
 per-PR verification logs and merged-PR lists live in `git log` and
@@ -8,16 +8,17 @@ per-PR verification logs and merged-PR lists live in `git log` and
 
 ## Current State
 
-- `main` is aligned with `origin/main` after PR #112 (`1f54c54`), which
-  consumes Loom's tracker-owned failed-edit composition and removes the
-  spec-local `pending_source_edit` shim.
+- `main` is aligned with `origin/main` after PR #132 (`44a1335`), which
+  closed issue #129 by adding cross-target external-authoring benchmark
+  snapshots. The external-authoring boundary and benchmark follow-ups are now
+  shipped through issues #117–#121 and #118/#127/#128/#129.
 - Latest release: **v0.5.1** (tagged and published 2026-05-20).
 - The next release should be **v0.6.0** if it includes the current
   `Unreleased` entries, because public API has been added since v0.5.1.
 - Open moondsp GitHub issues: none.
 - Open PRs: PR #86 (`release/v0.6.0`) is release prep and intentionally
   remains open until an explicit release pass. Do not tag or publish v0.6.0 as
-  part of loom-authoring work.
+  part of unrelated docs, benchmark, or loom-authoring work.
 - ADR-0013 defines loom mini promotion criteria using the shipped apply-edit,
   projection parity, PR #101 provenance-matrix evidence, PR #104
   control-method projection parity, PR #107 recovery evidence, and PR #109–#112
@@ -56,11 +57,41 @@ loom-authoring work.
   Bool wrappers, rename voice `*_result` methods to graph-style unsuffixed
   `Result` methods, or first migrate `CompiledDsp::compile` away from `Self?`.
 
-- **CompiledTemplate / DspNode Eq with NaN policy** — still deferred until an
-  incr/Salsa-style early-cutoff use case needs it. Decide the NaN equality
-  policy before adding structural Eq.
+- **Incr early-cutoff use of DspNode/CompiledTemplate Eq** — structural Eq and
+  typed compile diagnostics shipped in PR #122. Do not wire Eq into an
+  incr/Salsa-style early-cutoff path until a benchmark reproduces meaningful
+  authoring-side cost.
 
 ## Closed Since Previous Update
+
+- ~~**Issue #129 / PR #132 — cross-target external-authoring snapshots**~~ —
+  SHIPPED 2026-06-03 (`44a1335`). Added a dated performance snapshot comparing
+  wasm-gc, native, and JS target runs for valid paths, diagnostic/failure paths,
+  and realistic graph shapes. Verdict: no bottleneck demonstrated; keep results
+  target-qualified and preserve the audio block-boundary vs UI/control-thread
+  budget split.
+
+- ~~**External-authoring boundary and benchmark sequence**~~ — SHIPPED
+  2026-06-02/03 (`89da733`, `c067cf5`, `87142af`, `f361bc3`, `37e6558`,
+  `bc55c43`). Added the external DSL lowering contract, Mini pattern DSL ↔
+  graph DSL boundary, editor audio-preview handoff, valid-path benchmarks,
+  diagnostic/failure-path benchmarks, and realistic graph-shape benchmarks.
+  Parser/projection/lowering/template preparation remains off the audio
+  callback.
+
+- ~~**Issue #119 / PR #122 — authoring Eq and compile diagnostics**~~ — SHIPPED
+  2026-06-02 (`1fb2615`). Added ADR-0014, structural authoring equality for
+  `DspNode`/`CompiledTemplate`, and additive typed `compile_result` diagnostics
+  while preserving the compatibility `compile(...) -> Self?` APIs.
+
+- ~~**Issue #114 / PRs #115–#116 — browser song playback and UI docs**~~ —
+  SHIPPED 2026-05-31 (`47b163c`, `3a64b1d`). Added browser/live song playback,
+  Pattern/Song mode UI, global BPM behavior, and multiline song-syntax help.
+  Production parsing remains hand-written.
+
+- ~~**PR #113 — loom promotion notes refresh**~~ — SHIPPED 2026-05-31
+  (`24e150d`). Aligned ADR-0013, Loom upstream requirements, and this handoff
+  with the PR #112 tracker cleanup. Production parsing remains hand-written.
 
 - ~~**PR #112 — loom tracker failed-edit composition cleanup**~~ — SHIPPED
   2026-05-31 (`1f54c54`). Removed the spec-local `pending_source_edit` shim;
