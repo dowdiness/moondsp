@@ -71,7 +71,7 @@ fn bench_fm_voice_nodes() -> Array[@graph.DspNode] {
     @graph.DspNode::mul(5, 6), // 7: amp-modulated carrier
     @graph.DspNode::biquad(
       input=7,
-      mode=@graph.BiquadMode::LowPass,
+      mode=@dsp.BiquadMode::LowPass,
       cutoff_hz=1200.0,
       q=0.707,
     ), // 8: filter
@@ -99,7 +99,7 @@ fn bench_full_voice_nodes() -> Array[@graph.DspNode] {
     @graph.DspNode::mul(3, 4), // 5: modulated
     @graph.DspNode::biquad(
       input=5,
-      mode=@graph.BiquadMode::LowPass,
+      mode=@dsp.BiquadMode::LowPass,
       cutoff_hz=1200.0,
       q=0.707,
     ), // 6: filter
