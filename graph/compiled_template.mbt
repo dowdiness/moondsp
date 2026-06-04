@@ -9,47 +9,48 @@
 /// need topology — making that a lightweight standalone type avoids
 /// paying for buffers we never use, and keeps the API mono/stereo-agnostic
 /// (the same CompiledTemplate shape applies to any graph variant).
+///
+/// This public facade keeps `Array[DspNode] -> CompiledTemplate` as the
+/// canonical authoring/runtime crossing while the implementation lives in
+/// `graph/internal/template` over the raw graph model.
 pub struct CompiledTemplate {
-  priv template : Array[DspNode]
-  priv optimized : Array[DspNode]
-  priv index_map : FixedArray[Int]
+  priv raw : @template.CompiledTemplate
 }
 
 ///|
-fn dsp_node_array_equal(left : Array[DspNode], right : Array[DspNode]) -> Bool {
-  if left.length() != right.length() {
-    return false
-  }
-  for index in 0..<left.length() {
-    if left[index] != right[index] {
-      return false
-    }
-  }
-  true
+fn CompiledTemplate::from_internal(
+  raw : @template.CompiledTemplate,
+) -> CompiledTemplate {
+  { raw, }
 }
 
 ///|
-fn int_fixed_array_equal(
-  left : FixedArray[Int],
-  right : FixedArray[Int],
-) -> Bool {
-  if left.length() != right.length() {
-    return false
+fn CompiledTemplate::raw(self : CompiledTemplate) -> @template.CompiledTemplate {
+  self.raw
+}
+
+///|
+fn dsp_nodes_to_model(nodes : Array[DspNode]) -> Array[@model.DspNode] {
+  let raw_nodes = Array::new(capacity=nodes.length())
+  for node in nodes {
+    raw_nodes.push(node.raw())
   }
-  for index in 0..<left.length() {
-    if left[index] != right[index] {
-      return false
-    }
+  raw_nodes
+}
+
+///|
+fn dsp_nodes_from_model(nodes : Array[@model.DspNode]) -> Array[DspNode] {
+  let facade_nodes = Array::new(capacity=nodes.length())
+  for node in nodes {
+    facade_nodes.push(DspNode::from_model(node))
   }
-  true
+  facade_nodes
 }
 
 ///|
 /// Structural equality for analyzed template artifacts.
 pub impl Eq for CompiledTemplate with fn equal(self, other) {
-  dsp_node_array_equal(self.template, other.template) &&
-  dsp_node_array_equal(self.optimized, other.optimized) &&
-  int_fixed_array_equal(self.index_map, other.index_map)
+  self.raw == other.raw
 }
 
 ///|
@@ -57,7 +58,7 @@ pub impl Eq for CompiledTemplate with fn equal(self, other) {
 ///
 /// WHY defensive copy: the caller's `template` array is mutable from
 /// outside. Without a snapshot, any post-analyze mutation of the source
-/// array would corrupt the `self.template` field we rely on for every
+/// array would corrupt the authoring snapshot we rely on for every
 /// subsequent query. `optimize_graph` itself does not mutate its input,
 /// so the copy is only guarding against caller-side mutation.
 ///
@@ -66,29 +67,47 @@ pub impl Eq for CompiledTemplate with fn equal(self, other) {
 /// dead-code elimination. Omitting the context makes analyze infallible
 /// and cheap.
 pub fn CompiledTemplate::analyze(template : Array[DspNode]) -> CompiledTemplate {
-  let snapshot = template.copy()
-  let (optimized, index_map) = optimize_graph(snapshot)
-  { template: snapshot, optimized, index_map }
+  CompiledTemplate::from_internal(
+    @template.CompiledTemplate::analyze(dsp_nodes_to_model(template)),
+  )
 }
 
 ///|
 /// Length of the authoring template snapshot.
 fn CompiledTemplate::length(self : CompiledTemplate) -> Int {
-  self.template.length()
+  self.raw.length()
 }
 
 ///|
 /// Return the authoring node at `index` (panics if out of range; callers
 /// are expected to bounds-check first).
 fn CompiledTemplate::node_at(self : CompiledTemplate, index : Int) -> DspNode {
-  self.template[index]
+  DspNode::from_model(self.raw.node_at(index))
+}
+
+///|
+/// Return the authoring template snapshot as public facade nodes.
+fn CompiledTemplate::authoring_nodes(self : CompiledTemplate) -> Array[DspNode] {
+  dsp_nodes_from_model(self.raw.authoring_nodes())
+}
+
+///|
+/// Return the optimized template snapshot as public facade nodes.
+fn CompiledTemplate::optimized_nodes(self : CompiledTemplate) -> Array[DspNode] {
+  dsp_nodes_from_model(self.raw.optimized_nodes())
+}
+
+///|
+/// Return the authoring-to-optimized index map.
+fn CompiledTemplate::index_map(self : CompiledTemplate) -> FixedArray[Int] {
+  self.raw.index_map()
 }
 
 ///|
 /// Does authoring index `i` survive the optimizer? Returns false for
 /// out-of-range indices (no abort).
 fn CompiledTemplate::is_node_live(self : CompiledTemplate, index : Int) -> Bool {
-  index >= 0 && index < self.index_map.length() && self.index_map[index] >= 0
+  self.raw.is_node_live(index)
 }
 
 ///|
@@ -101,8 +120,8 @@ fn CompiledTemplate::is_node_live(self : CompiledTemplate, index : Int) -> Bool 
 /// Parameterless because the template snapshot is owned by self; callers
 /// do not need to remember which template was compiled.
 pub fn CompiledTemplate::orphan_adsr_count(self : CompiledTemplate) -> Int {
-  let count = for i in 0..<self.template.length(); total = 0 {
-    if self.template[i].kind() is Adsr && self.index_map[i] < 0 {
+  let count = for i in 0..<self.length(); total = 0 {
+    if self.node_at(i).kind() is Adsr && !self.is_node_live(i) {
       continue total + 1
     }
     continue total
@@ -129,19 +148,5 @@ pub fn CompiledTemplate::orphan_adsr_count(self : CompiledTemplate) -> Int {
 pub fn CompiledTemplate::adsr_authoring_indices(
   self : CompiledTemplate,
 ) -> FixedArray[Int] {
-  let result = FixedArray::make(self.template.length(), -1)
-  let n = for i in 0..<self.template.length(); count = 0 {
-    if self.template[i].kind() is Adsr && self.index_map[i] >= 0 {
-      result[count] = i
-      continue count + 1
-    }
-    continue count
-  } nobreak {
-    count
-  }
-  let snapshot = FixedArray::make(n, 0)
-  for i in 0..<n {
-    snapshot[i] = result[i]
-  }
-  snapshot
+  self.raw.adsr_authoring_indices()
 }

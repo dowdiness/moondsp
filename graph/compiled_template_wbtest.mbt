@@ -109,8 +109,8 @@ test "B5: adsr_authoring_indices accounts for all authoring ADSRs" {
   @debug.assert_eq(live.length() + t.orphan_adsr_count(), 1)
   for i in 0..<live.length() {
     let idx = live[i]
-    @debug.assert_eq(t.template[idx].kind() is Adsr, true)
-    @debug.assert_eq(t.index_map[idx] >= 0, true)
+    @debug.assert_eq(t.node_at(idx).kind() is Adsr, true)
+    @debug.assert_eq(t.is_node_live(idx), true)
   }
 }
 

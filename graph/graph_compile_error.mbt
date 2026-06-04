@@ -35,10 +35,10 @@ pub fn CompiledDsp::compile_result(
     context,
   ) {
     CompiledDsp::compile_internal(
-      template.optimized,
+      template.optimized_nodes(),
       context,
-      template.template.length(),
-      template.index_map,
+      template.length(),
+      template.index_map(),
     )
   })
 }
@@ -56,10 +56,10 @@ pub fn CompiledStereoDsp::compile_result(
     DspNodeKind::StereoOutput,
     fn(template, context) {
       CompiledStereoDsp::compile_internal(
-        template.optimized,
+        template.optimized_nodes(),
         context,
-        template.template.length(),
-        template.index_map,
+        template.length(),
+        template.index_map(),
       )
     },
   )
@@ -94,21 +94,22 @@ fn compile_error_for_template(
   }
   match
     authoring_graph_compile_error(
-      compiled_template.template,
+      compiled_template.authoring_nodes(),
       sample_rate,
       output_kind,
     ) {
     Some(error) => return Some(error)
     None => ()
   }
-  match graph_compile_error(compiled_template.optimized, context, output_kind) {
+  let optimized = compiled_template.optimized_nodes()
+  match graph_compile_error(optimized, context, output_kind) {
     Some(error) =>
       Some(
         remap_graph_compile_error(
           error,
           compile_error_inverse_map(
-            compiled_template.index_map,
-            compiled_template.optimized.length(),
+            compiled_template.index_map(),
+            optimized.length(),
           ),
         ),
       )
@@ -226,6 +227,32 @@ fn authoring_graph_compile_error(
     }
   }
   None
+}
+
+///|
+/// Iteratively mark an authoring node and its inputs as reachable using a
+/// worklist. This is intentionally compile-diagnostic-local: the optimizer's
+/// equivalent raw-model helper lives in `graph/internal/template`.
+fn mark_reachable(
+  nodes : Array[DspNode],
+  reachable : FixedArray[Bool],
+  start : Int,
+) -> Unit {
+  let stack : Array[Int] = [start]
+  while stack.length() > 0 {
+    let index = stack.pop().unwrap()
+    if index < 0 || index >= nodes.length() || reachable[index] {
+      continue
+    }
+    reachable[index] = true
+    let node = nodes[index]
+    if node.input0() >= 0 {
+      stack.push(node.input0())
+    }
+    if node.input1() >= 0 {
+      stack.push(node.input1())
+    }
+  }
 }
 
 ///|
