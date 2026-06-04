@@ -67,6 +67,11 @@ pub struct GraphControl {
 }
 
 ///|
+fn GraphControl::from_model(raw : @model.GraphControl) -> GraphControl {
+  { raw, }
+}
+
+///|
 pub fn GraphControl::kind(self : GraphControl) -> GraphControlKind {
   graph_control_kind_from_model(self.raw.kind())
 }

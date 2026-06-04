@@ -1,4 +1,12 @@
 ///|
+fn analyzed_optimized_graph(
+  nodes : Array[DspNode],
+) -> (Array[DspNode], FixedArray[Int]) {
+  let analyzed = CompiledTemplate::analyze(nodes)
+  (analyzed.optimized_nodes(), analyzed.index_map())
+}
+
+///|
 test "fold constants: Mul(Constant, Constant) -> Constant" {
   let nodes : Array[DspNode] = [
     DspNode::constant(3.0),
@@ -6,7 +14,7 @@ test "fold constants: Mul(Constant, Constant) -> Constant" {
     DspNode::mul(0, 1),
     DspNode::output(2),
   ]
-  let (optimized, _) = optimize_graph(nodes)
+  let (optimized, _) = analyzed_optimized_graph(nodes)
   @debug.assert_eq(optimized.length(), 2) // Constant(12) + Output
   assert_true(optimized[0].kind() is DspNodeKind::Constant)
   @debug.assert_eq(optimized[0].value0(), 12.0)
@@ -19,7 +27,7 @@ test "fold constants: Gain(Constant, amount) -> Constant" {
     DspNode::gain(0, 0.5),
     DspNode::output(1),
   ]
-  let (optimized, _) = optimize_graph(nodes)
+  let (optimized, _) = analyzed_optimized_graph(nodes)
   @debug.assert_eq(optimized.length(), 2) // Constant(5) + Output
   assert_true(optimized[0].kind() is DspNodeKind::Constant)
   @debug.assert_eq(optimized[0].value0(), 5.0)
@@ -31,7 +39,7 @@ test "fold constants: stateful nodes not folded" {
     DspNode::oscillator(Waveform::Sine, 440.0),
     DspNode::output(0),
   ]
-  let (optimized, _) = optimize_graph(nodes)
+  let (optimized, _) = analyzed_optimized_graph(nodes)
   @debug.assert_eq(optimized.length(), 2) // unchanged
 }
 
@@ -42,7 +50,7 @@ test "dead-node elimination: removes unreachable nodes" {
     DspNode::constant(999.0), // 1: dead (not referenced)
     DspNode::output(0), // 2: reachable
   ]
-  let (optimized, _) = optimize_graph(nodes)
+  let (optimized, _) = analyzed_optimized_graph(nodes)
   @debug.assert_eq(optimized.length(), 2) // Constant(1) + Output
 }
 
@@ -52,7 +60,7 @@ test "optimize: range subgraph with constant input collapses" {
   let input : GraphBuilder = ArithSym::constant(-1.0)
   let mapped = range(input, 200.0, 400.0)
   let output : GraphBuilder = DspSym::output(mapped)
-  let (optimized, _) = optimize_graph(output.nodes())
+  let (optimized, _) = analyzed_optimized_graph(output.nodes())
   assert_true(optimized.length() < output.nodes().length())
 }
 
@@ -64,7 +72,7 @@ test "optimize: index_map tracks original to optimized indices" {
     DspNode::mul(0, 1), // 2 -> becomes Constant(12.0) at index 0
     DspNode::output(2), // 3 -> Output at index 1
   ]
-  let (_, index_map) = optimize_graph(nodes)
+  let (_, index_map) = analyzed_optimized_graph(nodes)
   // Original indices 0, 1 should map to -1 (eliminated)
   // Original index 2 should map to 0 (the folded Constant)
   // Original index 3 should map to 1 (the Output)

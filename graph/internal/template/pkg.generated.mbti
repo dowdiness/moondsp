@@ -1,0 +1,29 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp/graph/internal/template"
+
+import {
+  "dowdiness/moondsp/graph/internal/model",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct CompiledTemplate {
+  // private fields
+}
+pub fn CompiledTemplate::adsr_authoring_indices(Self) -> FixedArray[Int]
+pub fn CompiledTemplate::analyze(Array[@model.DspNode]) -> Self
+pub fn CompiledTemplate::authoring_nodes(Self) -> Array[@model.DspNode]
+pub fn CompiledTemplate::index_map(Self) -> FixedArray[Int]
+pub fn CompiledTemplate::is_node_live(Self, Int) -> Bool
+pub fn CompiledTemplate::length(Self) -> Int
+pub fn CompiledTemplate::node_at(Self, Int) -> @model.DspNode
+pub fn CompiledTemplate::optimized_nodes(Self) -> Array[@model.DspNode]
+pub impl Eq for CompiledTemplate
+
+// Type aliases
+
+// Traits
+

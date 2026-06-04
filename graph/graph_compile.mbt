@@ -89,10 +89,10 @@ pub fn CompiledDsp::compile(
   context : DspContext,
 ) -> CompiledDsp? {
   CompiledDsp::compile_internal(
-    compiled_template.optimized,
+    compiled_template.optimized_nodes(),
     context,
-    compiled_template.template.length(),
-    compiled_template.index_map,
+    compiled_template.length(),
+    compiled_template.index_map(),
   )
 }
 
@@ -291,10 +291,10 @@ pub fn CompiledStereoDsp::compile(
   context : DspContext,
 ) -> CompiledStereoDsp? {
   CompiledStereoDsp::compile_internal(
-    compiled_template.optimized,
+    compiled_template.optimized_nodes(),
     context,
-    compiled_template.template.length(),
-    compiled_template.index_map,
+    compiled_template.length(),
+    compiled_template.index_map(),
   )
 }
 

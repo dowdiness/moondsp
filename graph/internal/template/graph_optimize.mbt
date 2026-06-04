@@ -3,8 +3,8 @@
 /// whose inputs are all constants with new Constant nodes.
 /// Returns (folded_nodes, index_map, changed).
 fn fold_constants(
-  nodes : Array[DspNode],
-) -> (Array[DspNode], FixedArray[Int], Bool) {
+  nodes : Array[@model.DspNode],
+) -> (Array[@model.DspNode], FixedArray[Int], Bool) {
   let n = nodes.length()
   // Bail out if nodes are not in topological order (forward references present)
   for i = 0; i < n; i = i + 1 {
@@ -14,31 +14,31 @@ fn fold_constants(
       return (nodes, FixedArray::makei(n, fn(i) { i }), false)
     }
   }
-  let folded : Array[DspNode] = []
+  let folded : Array[@model.DspNode] = []
   let index_map = FixedArray::make(n, -1)
   let mut changed = false
   for i = 0; i < n; i = i + 1 {
     let node = nodes[i]
-    let is_constant = node.kind() is DspNodeKind::Constant
-    if node.is_foldable() && !is_constant {
+    let is_constant = node.kind() is @model.DspNodeKind::Constant
+    if @model.node_is_foldable(node) && !is_constant {
       // Check if all inputs are Constant in the folded array
       let has_input0 = node.input0() >= 0
       let has_input1 = node.input1() >= 0
       let input0_is_const = if has_input0 {
         let mapped = index_map[node.input0()]
-        mapped >= 0 && folded[mapped].kind() is DspNodeKind::Constant
+        mapped >= 0 && folded[mapped].kind() is @model.DspNodeKind::Constant
       } else {
         true
       }
       let input1_is_const = if has_input1 {
         let mapped = index_map[node.input1()]
-        mapped >= 0 && folded[mapped].kind() is DspNodeKind::Constant
+        mapped >= 0 && folded[mapped].kind() is @model.DspNodeKind::Constant
       } else {
         true
       }
       if input0_is_const && input1_is_const {
         // Skip folding Clip with invalid threshold — let validation reject it
-        if node.kind() is DspNodeKind::Clip && !(node.value0() > 0.0) {
+        if node.kind() is @model.DspNodeKind::Clip && !(node.value0() > 0.0) {
           // Invalid Clip threshold — fall through to keep as-is
         } else {
           // Get input values
@@ -52,13 +52,13 @@ fn fold_constants(
           } else {
             0.0
           }
-          let result = node.fold_value(v0, v1)
+          let result = @model.node_fold_value(node, v0, v1)
           // Skip folding if result is non-finite
           if !@dsp.is_finite(result) {
             // Fall through to keep node as-is
           } else {
             let new_index = folded.length()
-            folded.push(DspNode::constant(result))
+            folded.push(@model.DspNode::constant(result))
             index_map[i] = new_index
             changed = true
             continue
@@ -78,7 +78,9 @@ fn fold_constants(
       -1
     }
     let new_index = folded.length()
-    folded.push(node_with_inputs(node, input0=new_input0, input1=new_input1))
+    folded.push(
+      @model.node_with_inputs(node, input0=new_input0, input1=new_input1),
+    )
     index_map[i] = new_index
   }
   (folded, index_map, changed)
@@ -88,8 +90,8 @@ fn fold_constants(
 /// Dead-node elimination pass: removes nodes not reachable from the output.
 /// Returns (live_nodes, index_map, changed).
 fn eliminate_dead(
-  nodes : Array[DspNode],
-) -> (Array[DspNode], FixedArray[Int], Bool) {
+  nodes : Array[@model.DspNode],
+) -> (Array[@model.DspNode], FixedArray[Int], Bool) {
   let n = nodes.length()
   if n == 0 {
     return ([], FixedArray::make(0, -1), false)
@@ -99,7 +101,8 @@ fn eliminate_dead(
   // Walk backward from all output nodes
   for i = n - 1; i >= 0; i = i - 1 {
     match nodes[i].kind() {
-      Output | StereoOutput => mark_reachable(nodes, reachable, i)
+      @model.DspNodeKind::Output | @model.DspNodeKind::StereoOutput =>
+        mark_reachable(nodes, reachable, i)
       _ => ()
     }
   }
@@ -116,7 +119,7 @@ fn eliminate_dead(
   }
   // Build compacted array
   let index_map = FixedArray::make(n, -1)
-  let live : Array[DspNode] = []
+  let live : Array[@model.DspNode] = []
   for i = 0; i < n; i = i + 1 {
     if reachable[i] {
       index_map[i] = live.length()
@@ -125,7 +128,7 @@ fn eliminate_dead(
   }
   // Remap inputs in live nodes
   let remap = index_map
-  let result : Array[DspNode] = []
+  let result : Array[@model.DspNode] = []
   for i = 0; i < live.length(); i = i + 1 {
     let node = live[i]
     let new_input0 = if node.input0() >= 0 && node.input0() < remap.length() {
@@ -138,7 +141,9 @@ fn eliminate_dead(
     } else {
       -1
     }
-    result.push(node_with_inputs(node, input0=new_input0, input1=new_input1))
+    result.push(
+      @model.node_with_inputs(node, input0=new_input0, input1=new_input1),
+    )
   }
   (result, index_map, true)
 }
@@ -146,7 +151,7 @@ fn eliminate_dead(
 ///|
 /// Iteratively mark a node and its inputs as reachable using a worklist.
 fn mark_reachable(
-  nodes : Array[DspNode],
+  nodes : Array[@model.DspNode],
   reachable : FixedArray[Bool],
   start : Int,
 ) -> Unit {
@@ -191,7 +196,9 @@ fn compose_index_maps(
 ///
 /// Returns (optimized_nodes, index_map) where index_map maps each
 /// original node index to its final optimized index (-1 if eliminated).
-fn optimize_graph(nodes : Array[DspNode]) -> (Array[DspNode], FixedArray[Int]) {
+fn optimize_graph(
+  nodes : Array[@model.DspNode],
+) -> (Array[@model.DspNode], FixedArray[Int]) {
   let n = nodes.length()
   let mut current = nodes
   let mut total_map = FixedArray::makei(n, fn(i) { i })

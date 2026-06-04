@@ -1,0 +1,39 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp/graph/internal/binding"
+
+import {
+  "dowdiness/moondsp/graph/internal/model",
+  "dowdiness/moondsp/graph/internal/template",
+  "moonbitlang/core/debug",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct ControlBindingBuilder {
+  // private fields
+} derive(@debug.Debug)
+#alias(new)
+pub fn ControlBindingBuilder::ControlBindingBuilder() -> Self
+pub fn ControlBindingBuilder::bind(Self, key~ : String, node_index~ : Int, slot~ : @model.GraphParamSlot) -> Self
+pub fn ControlBindingBuilder::build(Self, @template.CompiledTemplate) -> Result[ControlBindingMap, ControlBindingError]
+
+pub enum ControlBindingError {
+  InvalidNodeIndex(Int)
+  InvalidSlotForNode(Int, @model.GraphParamSlot)
+  DuplicateKey(String)
+  OrphanBinding(String, Int)
+} derive(Eq, @debug.Debug)
+
+pub struct ControlBindingMap {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn ControlBindingMap::length(Self) -> Int
+pub fn ControlBindingMap::resolve_controls(Self, Map[String, Double]) -> Array[@model.GraphControl]
+
+// Type aliases
+
+// Traits
+

@@ -1,24 +1,23 @@
 ///|
-pub struct ControlBinding {
+priv struct ControlBinding {
   key : String
   node_index : Int
-  slot : GraphParamSlot
+  slot : @model.GraphParamSlot
 } derive(Debug, Eq)
 
 ///|
-#alias(new)
-pub fn ControlBinding::ControlBinding(
+fn ControlBinding::ControlBinding(
   key~ : String,
   node_index~ : Int,
-  slot~ : GraphParamSlot,
+  slot~ : @model.GraphParamSlot,
 ) -> ControlBinding {
   { key, node_index, slot }
 }
 
 ///|
-pub(all) enum ControlBindingError {
+pub enum ControlBindingError {
   InvalidNodeIndex(Int)
-  InvalidSlotForNode(Int, GraphParamSlot)
+  InvalidSlotForNode(Int, @model.GraphParamSlot)
   DuplicateKey(String)
   /// Binding (key, node_index) targets a template node that
   /// optimize_graph eliminated. Prevents silent set_param no-ops.
@@ -26,33 +25,14 @@ pub(all) enum ControlBindingError {
 } derive(Debug, Eq)
 
 ///|
-fn control_binding_error_from_internal(
-  error : @binding.ControlBindingError,
-) -> ControlBindingError {
-  match error {
-    @binding.ControlBindingError::InvalidNodeIndex(index) =>
-      ControlBindingError::InvalidNodeIndex(index)
-    @binding.ControlBindingError::InvalidSlotForNode(index, slot) =>
-      ControlBindingError::InvalidSlotForNode(
-        index,
-        graph_param_slot_from_model(slot),
-      )
-    @binding.ControlBindingError::DuplicateKey(key) =>
-      ControlBindingError::DuplicateKey(key)
-    @binding.ControlBindingError::OrphanBinding(key, index) =>
-      ControlBindingError::OrphanBinding(key, index)
-  }
-}
-
-///|
 pub struct ControlBindingBuilder {
-  priv raw : @binding.ControlBindingBuilder
+  priv bindings : Array[ControlBinding]
 } derive(Debug)
 
 ///|
 #alias(new)
 pub fn ControlBindingBuilder::ControlBindingBuilder() -> ControlBindingBuilder {
-  { raw: @binding.ControlBindingBuilder::new() }
+  { bindings: [] }
 }
 
 ///|
@@ -61,9 +41,10 @@ pub fn ControlBindingBuilder::bind(
   self : ControlBindingBuilder,
   key~ : String,
   node_index~ : Int,
-  slot~ : GraphParamSlot,
+  slot~ : @model.GraphParamSlot,
 ) -> ControlBindingBuilder {
-  { raw: self.raw.bind(key~, node_index~, slot=slot.to_model()) }
+  self.bindings.push(ControlBinding(key~, node_index~, slot~))
+  self
 }
 
 ///|
@@ -81,20 +62,13 @@ pub fn ControlBindingBuilder::bind(
 /// ControlBindingMap whenever the template changes. Structural staleness
 /// detection is tracked as a follow-up.
 pub struct ControlBindingMap {
-  priv raw : @binding.ControlBindingMap
+  priv bindings : Array[ControlBinding]
 } derive(Debug, Eq)
-
-///|
-fn ControlBindingMap::from_internal(
-  raw : @binding.ControlBindingMap,
-) -> ControlBindingMap {
-  { raw, }
-}
 
 ///|
 /// Number of validated bindings in this map.
 pub fn ControlBindingMap::length(self : ControlBindingMap) -> Int {
-  self.raw.length()
+  self.bindings.length()
 }
 
 ///|
@@ -105,12 +79,40 @@ pub fn ControlBindingMap::length(self : ControlBindingMap) -> Int {
 /// optimize_graph), and key uniqueness. Returns the first error found.
 pub fn ControlBindingBuilder::build(
   self : ControlBindingBuilder,
-  compiled_template : CompiledTemplate,
+  compiled_template : @template.CompiledTemplate,
 ) -> Result[ControlBindingMap, ControlBindingError] {
-  match self.raw.build(compiled_template.raw()) {
-    Ok(map) => Ok(ControlBindingMap::from_internal(map))
-    Err(error) => Err(control_binding_error_from_internal(error))
+  let seen_keys : Map[String, Bool] = {}
+  for i in 0..<self.bindings.length() {
+    let binding = self.bindings[i]
+    if binding.node_index < 0 ||
+      binding.node_index >= compiled_template.length() {
+      return Err(ControlBindingError::InvalidNodeIndex(binding.node_index))
+    }
+    if !@model.node_accepts_slot(
+        compiled_template.node_at(binding.node_index),
+        binding.slot,
+      ) {
+      return Err(
+        ControlBindingError::InvalidSlotForNode(
+          binding.node_index,
+          binding.slot,
+        ),
+      )
+    }
+    if !compiled_template.is_node_live(binding.node_index) {
+      return Err(
+        ControlBindingError::OrphanBinding(binding.key, binding.node_index),
+      )
+    }
+    if seen_keys.contains(binding.key) {
+      return Err(ControlBindingError::DuplicateKey(binding.key))
+    }
+    seen_keys[binding.key] = true
   }
+  // WHY copy: self.bindings is a mutable Array shared with the builder.
+  // Without copying, post-build bind() calls would mutate the validated map,
+  // breaking the proven-valid invariant.
+  Ok({ bindings: self.bindings.copy() })
 }
 
 ///|
@@ -121,31 +123,21 @@ pub fn ControlBindingBuilder::build(
 pub fn ControlBindingMap::resolve_controls(
   self : ControlBindingMap,
   controls : Map[String, Double],
-) -> Array[GraphControl] {
-  let raw_controls = self.raw.resolve_controls(controls)
-  let result = Array::new(capacity=raw_controls.length())
-  for control in raw_controls {
-    result.push(GraphControl::from_model(control))
+) -> Array[@model.GraphControl] {
+  let result = Array::new(capacity=self.bindings.length())
+  for i in 0..<self.bindings.length() {
+    let binding = self.bindings[i]
+    match controls.get(binding.key) {
+      Some(value) =>
+        result.push(
+          @model.GraphControl::set_param(
+            binding.node_index,
+            binding.slot,
+            value,
+          ),
+        )
+      None => ()
+    }
   }
   result
-}
-
-///|
-pub impl Show for ControlBinding with fn output(self, logger) {
-  logger.write_string(@debug.to_string(self))
-}
-
-///|
-pub impl Show for ControlBindingError with fn output(self, logger) {
-  logger.write_string(@debug.to_string(self))
-}
-
-///|
-pub impl Show for ControlBindingBuilder with fn output(self, logger) {
-  logger.write_string(@debug.to_string(self))
-}
-
-///|
-pub impl Show for ControlBindingMap with fn output(self, logger) {
-  logger.write_string(@debug.to_string(self))
 }
