@@ -39,15 +39,6 @@ fn dsp_nodes_to_model(nodes : Array[DspNode]) -> Array[@model.DspNode] {
 }
 
 ///|
-fn dsp_nodes_from_model(nodes : Array[@model.DspNode]) -> Array[DspNode] {
-  let facade_nodes = Array::new(capacity=nodes.length())
-  for node in nodes {
-    facade_nodes.push(DspNode::from_model(node))
-  }
-  facade_nodes
-}
-
-///|
 /// Structural equality for analyzed template artifacts.
 pub impl Eq for CompiledTemplate with fn equal(self, other) {
   self.raw == other.raw
@@ -83,24 +74,6 @@ fn CompiledTemplate::length(self : CompiledTemplate) -> Int {
 /// are expected to bounds-check first).
 fn CompiledTemplate::node_at(self : CompiledTemplate, index : Int) -> DspNode {
   DspNode::from_model(self.raw.node_at(index))
-}
-
-///|
-/// Return the authoring template snapshot as public facade nodes.
-fn CompiledTemplate::authoring_nodes(self : CompiledTemplate) -> Array[DspNode] {
-  dsp_nodes_from_model(self.raw.authoring_nodes())
-}
-
-///|
-/// Return the optimized template snapshot as public facade nodes.
-fn CompiledTemplate::optimized_nodes(self : CompiledTemplate) -> Array[DspNode] {
-  dsp_nodes_from_model(self.raw.optimized_nodes())
-}
-
-///|
-/// Return the authoring-to-optimized index map.
-fn CompiledTemplate::index_map(self : CompiledTemplate) -> FixedArray[Int] {
-  self.raw.index_map()
 }
 
 ///|

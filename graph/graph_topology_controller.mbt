@@ -152,7 +152,7 @@ fn TopologyGraph::apply_controls_impl(
 fn TopologyGraph::queue_topology_edit_impl(
   self : TopologyGraph,
   edit : GraphTopologyEdit,
-  compile_fn : (Array[DspNode], DspContext) -> CompiledGraph?,
+  compile_fn : (Array[DspNode], DspContext) -> @runtime.CompiledGraph?,
 ) -> Result[Unit, GraphTopologyQueueError] {
   self.queue_topology_edits_impl([edit], compile_fn)
 }
@@ -165,7 +165,7 @@ fn TopologyGraph::queue_topology_edit_impl(
 fn TopologyGraph::queue_topology_edits_impl(
   self : TopologyGraph,
   edits : Array[GraphTopologyEdit],
-  compile_fn : (Array[DspNode], DspContext) -> CompiledGraph?,
+  compile_fn : (Array[DspNode], DspContext) -> @runtime.CompiledGraph?,
 ) -> Result[Unit, GraphTopologyQueueError] {
   if self.hot_swap.pending is Some(_) {
     return Err(GraphTopologyQueueError::PendingSwap)
@@ -193,7 +193,7 @@ fn TopologyGraph::queue_topology_edits_impl(
     .iter()
     .any(fn(e) { e is DeleteNode(_) || e is DeleteChain(_) })
   if !has_delete {
-    copy_compiled_graph_state(self.hot_swap.active, replacement)
+    replacement.copy_compatible_runtime_state_from(self.hot_swap.active)
   }
   match self.hot_swap.queue_swap_impl(replacement) {
     Ok(_) => ()
@@ -348,8 +348,8 @@ fn apply_topology_runtime_control_result(
 fn compile_mono_graph(
   nodes : Array[DspNode],
   context : DspContext,
-) -> CompiledGraph? {
-  CompiledDsp::compile_raw(nodes, context).map(fn(c) { c.0 })
+) -> @runtime.CompiledGraph? {
+  CompiledDsp::compile_raw(nodes, context).map(fn(c) { c.raw_graph() })
 }
 
 ///|
@@ -357,78 +357,6 @@ fn compile_mono_graph(
 fn compile_stereo_graph(
   nodes : Array[DspNode],
   context : DspContext,
-) -> CompiledGraph? {
-  CompiledStereoDsp::compile_raw(nodes, context).map(fn(c) { c.0 })
-}
-
-///|
-/// Copy runtime state from an old compiled graph to a new one for nodes
-/// that share the same authoring index and node kind.
-fn copy_compiled_graph_state(
-  old_graph : CompiledGraph,
-  new_graph : CompiledGraph,
-) -> Unit {
-  let old_map = old_graph.index_map
-  let new_map = new_graph.index_map
-  let shared_count = if old_map.length() < new_map.length() {
-    old_map.length()
-  } else {
-    new_map.length()
-  }
-  for authoring_idx = 0
-      authoring_idx < shared_count
-      authoring_idx = authoring_idx + 1 {
-    let old_compiled = old_map[authoring_idx]
-    let new_compiled = new_map[authoring_idx]
-    if old_compiled >= 0 &&
-      new_compiled >= 0 &&
-      old_compiled < old_graph.nodes.length() &&
-      new_compiled < new_graph.nodes.length() &&
-      old_graph.nodes[old_compiled].kind() ==
-      new_graph.nodes[new_compiled].kind() {
-      new_graph.osc_states[new_compiled] = old_graph.osc_states[old_compiled]
-      new_graph.noise_states[new_compiled] = old_graph.noise_states[old_compiled]
-      new_graph.env_states[new_compiled] = old_graph.env_states[old_compiled]
-      new_graph.biquad_states[new_compiled] = old_graph.biquad_states[old_compiled]
-      new_graph.stereo_biquad_left_states[new_compiled] = old_graph.stereo_biquad_left_states[old_compiled]
-      new_graph.stereo_biquad_right_states[new_compiled] = old_graph.stereo_biquad_right_states[old_compiled]
-      // Only copy delay state if buffer capacity matches
-      match
-        (
-          old_graph.delay_states[old_compiled],
-          new_graph.delay_states[new_compiled],
-        ) {
-        (Some(old_delay), Some(new_delay)) =>
-          if old_delay.max_delay_samples() == new_delay.max_delay_samples() {
-            new_graph.delay_states[new_compiled] = old_graph.delay_states[old_compiled]
-          }
-        _ => ()
-      }
-      match
-        (
-          old_graph.stereo_delay_left_states[old_compiled],
-          new_graph.stereo_delay_left_states[new_compiled],
-        ) {
-        (Some(old_delay), Some(new_delay)) =>
-          if old_delay.max_delay_samples() == new_delay.max_delay_samples() {
-            new_graph.stereo_delay_left_states[new_compiled] = old_graph.stereo_delay_left_states[old_compiled]
-          }
-        _ => ()
-      }
-      match
-        (
-          old_graph.stereo_delay_right_states[old_compiled],
-          new_graph.stereo_delay_right_states[new_compiled],
-        ) {
-        (Some(old_delay), Some(new_delay)) =>
-          if old_delay.max_delay_samples() == new_delay.max_delay_samples() {
-            new_graph.stereo_delay_right_states[new_compiled] = old_graph.stereo_delay_right_states[old_compiled]
-          }
-        _ => ()
-      }
-      new_graph.self_values[new_compiled] = old_graph.self_values[old_compiled]
-      new_graph.self_left_values[new_compiled] = old_graph.self_left_values[old_compiled]
-      new_graph.self_right_values[new_compiled] = old_graph.self_right_values[old_compiled]
-    }
-  }
+) -> @runtime.CompiledGraph? {
+  CompiledStereoDsp::compile_raw(nodes, context).map(fn(c) { c.raw_graph() })
 }

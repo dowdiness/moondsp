@@ -1,0 +1,103 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp/graph/internal/runtime"
+
+import {
+  "dowdiness/moondsp/dsp",
+  "dowdiness/moondsp/graph/internal/model",
+  "dowdiness/moondsp/graph/internal/template",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn updated_model_node_param_result(@model.DspNode, Int, @model.GraphParamSlot, Double, Double) -> Result[@model.DspNode, GraphControlError]
+
+// Errors
+
+// Types and methods
+type CompiledDsp
+pub fn CompiledDsp::apply_control(Self, @model.GraphControl) -> Result[Unit, GraphControlError]
+pub fn CompiledDsp::apply_controls(Self, Array[@model.GraphControl]) -> Result[Unit, GraphControlError]
+pub fn CompiledDsp::compile(@template.CompiledTemplate, @dsp.DspContext) -> Self?
+pub fn CompiledDsp::compile_raw(Array[@model.DspNode], @dsp.DspContext) -> Self?
+pub fn CompiledDsp::compile_result(@template.CompiledTemplate, @dsp.DspContext) -> Result[Self, GraphCompileError]
+pub fn CompiledDsp::compiled_buffer_capacity(Self) -> Int
+pub fn CompiledDsp::disable_debug_validation(Self) -> Unit
+pub fn CompiledDsp::enable_debug_validation(Self) -> Unit
+pub fn CompiledDsp::from_graph(CompiledGraph) -> Self
+pub fn CompiledDsp::has_feedback_edges(Self) -> Bool
+pub fn CompiledDsp::is_voice_finished(Self) -> Bool
+pub fn CompiledDsp::last_sanitized_count(Self) -> Int
+pub fn CompiledDsp::last_validation_errors(Self) -> Array[GraphValidationError]
+pub fn CompiledDsp::process(Self, @dsp.DspContext, @dsp.AudioBuffer) -> Unit
+pub fn CompiledDsp::raw_graph(Self) -> CompiledGraph
+pub fn CompiledDsp::validate_controls(Self, Array[@model.GraphControl]) -> Result[Unit, GraphControlError]
+
+pub struct CompiledGraph {
+  // private fields
+}
+pub fn CompiledGraph::apply_control_impl(Self, @model.GraphControl) -> Result[Unit, GraphControlError]
+pub fn CompiledGraph::apply_controls_impl(Self, Array[@model.GraphControl]) -> Result[Unit, GraphControlError]
+pub fn CompiledGraph::compile_sample_rate(Self) -> Double
+pub fn CompiledGraph::compiled_buffer_capacity(Self) -> Int
+pub fn CompiledGraph::copy_compatible_runtime_state_from(Self, Self) -> Unit
+pub fn CompiledGraph::validate_controls_impl(Self, Array[@model.GraphControl]) -> Result[Unit, GraphControlError]
+
+type CompiledStereoDsp
+pub fn CompiledStereoDsp::apply_control(Self, @model.GraphControl) -> Result[Unit, GraphControlError]
+pub fn CompiledStereoDsp::apply_controls(Self, Array[@model.GraphControl]) -> Result[Unit, GraphControlError]
+pub fn CompiledStereoDsp::compile(@template.CompiledTemplate, @dsp.DspContext) -> Self?
+pub fn CompiledStereoDsp::compile_raw(Array[@model.DspNode], @dsp.DspContext) -> Self?
+pub fn CompiledStereoDsp::compile_result(@template.CompiledTemplate, @dsp.DspContext) -> Result[Self, GraphCompileError]
+pub fn CompiledStereoDsp::compiled_buffer_capacity(Self) -> Int
+pub fn CompiledStereoDsp::disable_debug_validation(Self) -> Unit
+pub fn CompiledStereoDsp::enable_debug_validation(Self) -> Unit
+pub fn CompiledStereoDsp::from_graph(CompiledGraph) -> Self
+pub fn CompiledStereoDsp::has_feedback_edges(Self) -> Bool
+pub fn CompiledStereoDsp::last_sanitized_count(Self) -> Int
+pub fn CompiledStereoDsp::last_validation_errors(Self) -> Array[GraphValidationError]
+pub fn CompiledStereoDsp::process(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
+pub fn CompiledStereoDsp::raw_graph(Self) -> CompiledGraph
+pub fn CompiledStereoDsp::validate_controls(Self, Array[@model.GraphControl]) -> Result[Unit, GraphControlError]
+
+pub enum GraphCompileError {
+  InvalidSampleRate(Double)
+  MissingOutput(@model.DspNodeKind)
+  MultipleOutputs(@model.DspNodeKind)
+  WrongOutputKind(Int, @model.DspNodeKind, @model.DspNodeKind)
+  InvalidInput(Int, @model.DspNodeKind, GraphInputSlot, Int)
+  InvalidParamValue(Int, @model.DspNodeKind, @model.GraphParamSlot, Double)
+  InvalidDelaySamples(Int, Int, Int)
+  UnreachableNode(Int)
+  InvalidFeedbackEdge(Int, Int, Int)
+  DuplicateFeedbackInput(Int, GraphInputSlot)
+  InvalidTerminalShape(@model.DspNodeKind)
+  InternalRejected(@model.DspNodeKind)
+} derive(@debug.Debug)
+pub impl Show for GraphCompileError
+
+pub enum GraphControlError {
+  InvalidNodeIndex(Int)
+  OrphanNode(Int)
+  InvalidGateNode(Int, @model.DspNodeKind)
+  InvalidSlotForNode(Int, @model.DspNodeKind, @model.GraphParamSlot)
+  InvalidParamValue(Int, @model.DspNodeKind, @model.GraphParamSlot, Double)
+  MissingRuntimeState(Int, @model.DspNodeKind)
+} derive(@debug.Debug)
+pub impl Show for GraphControlError
+
+pub enum GraphInputSlot {
+  Input0
+  Input1
+} derive(Eq, @debug.Debug)
+
+pub enum GraphValidationError {
+  InvalidInput0(Int, Int, Int)
+  InvalidInput1(Int, Int, Int)
+  InvalidStateIndex(Int, String)
+} derive(Eq, @debug.Debug)
+pub impl Show for GraphValidationError
+
+// Type aliases
+
+// Traits
+

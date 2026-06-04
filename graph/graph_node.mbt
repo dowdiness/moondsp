@@ -52,15 +52,6 @@ pub(all) enum GraphControlKind {
 } derive(Eq)
 
 ///|
-const NYQUIST_RATIO : Double = @model.NYQUIST_RATIO
-
-///|
-const MONO_SIGNAL_SHAPE : Int = @model.MONO_SIGNAL_SHAPE
-
-///|
-const STEREO_SIGNAL_SHAPE : Int = @model.STEREO_SIGNAL_SHAPE
-
-///|
 /// Runtime control message for a compiled graph.
 pub struct GraphControl {
   priv raw : @model.GraphControl
@@ -69,6 +60,11 @@ pub struct GraphControl {
 ///|
 fn GraphControl::from_model(raw : @model.GraphControl) -> GraphControl {
   { raw, }
+}
+
+///|
+fn GraphControl::raw(self : GraphControl) -> @model.GraphControl {
+  self.raw
 }
 
 ///|
@@ -366,25 +362,6 @@ fn node_with_inputs(node : DspNode, input0~ : Int, input1~ : Int) -> DspNode {
 ///|
 fn node_with_offset_inputs(node : DspNode, offset : Int) -> DspNode {
   DspNode::from_model(@model.node_with_offset_inputs(node.raw(), offset))
-}
-
-///|
-fn valid_biquad_graph_params(
-  sample_rate : Double,
-  cutoff : Double,
-  q : Double,
-) -> Bool {
-  @model.valid_biquad_graph_params(sample_rate, cutoff, q)
-}
-
-///|
-fn valid_delay_feedback(value : Double) -> Bool {
-  @model.valid_delay_feedback(value)
-}
-
-///|
-fn valid_delay_samples(delay_samples : Int, delay_max_samples : Int) -> Bool {
-  @model.valid_delay_samples(delay_samples, delay_max_samples)
 }
 
 ///|

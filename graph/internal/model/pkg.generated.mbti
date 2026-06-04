@@ -89,7 +89,7 @@ pub impl NodeSpanning for DspNode
 pub impl NodeStateful for DspNode
 pub impl Eq for DspNode
 
-pub enum DspNodeKind {
+pub(all) enum DspNodeKind {
   Constant
   Oscillator
   Noise

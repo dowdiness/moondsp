@@ -1,6 +1,6 @@
 ///|
 /// Minimal Phase 2 graph node kinds for compiled mono DSP graphs.
-pub enum DspNodeKind {
+pub(all) enum DspNodeKind {
   Constant
   Oscillator
   Noise

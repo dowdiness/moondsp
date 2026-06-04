@@ -1,0 +1,2 @@
+///|
+using @template {type CompiledTemplate}

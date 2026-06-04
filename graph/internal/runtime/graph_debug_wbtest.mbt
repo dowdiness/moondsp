@@ -109,8 +109,8 @@ test "debug: multiple errors in one block" {
   let context = DspContext::new(sample_rate=48000.0, block_size=4)
   // Use oscillators (stateful, not foldable) to prevent optimization
   let nodes = [
-    DspNode::oscillator(Waveform::Sine, 440.0),
-    DspNode::oscillator(Waveform::Sine, 220.0),
+    DspNode::oscillator(@dsp.Waveform::Sine, 440.0),
+    DspNode::oscillator(@dsp.Waveform::Sine, 220.0),
     DspNode::mix(0, 1),
     DspNode::output(2),
   ]

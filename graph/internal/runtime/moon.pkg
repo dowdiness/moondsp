@@ -1,8 +1,6 @@
 import {
   "dowdiness/moondsp/dsp",
   "dowdiness/moondsp/graph/internal/model",
-}
-
-import {
+  "dowdiness/moondsp/graph/internal/template",
   "moonbitlang/core/debug",
-} for "wbtest"
+}
