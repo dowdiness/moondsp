@@ -78,31 +78,30 @@ fn HotSwapGraph::apply_control_impl(
   self : HotSwapGraph,
   control : GraphControl,
 ) -> Result[Unit, GraphControlError] {
+  let raw_control = control.raw()
   match self.pending {
     None =>
       graph_control_result_from_runtime(
-        self.active.apply_control_impl(control.raw()),
+        self.active.apply_control_impl(raw_control),
       )
     Some(next) => {
-      match valid_hot_swap_control_graph_result(self.active, control) {
+      match valid_hot_swap_control_graph_result(self.active, raw_control) {
         Ok(_) => ()
         Err(error) => return Err(error)
       }
-      match valid_hot_swap_control_graph_result(next, control) {
-        Ok(_) => ()
-        Err(error) => return Err(error)
-      }
-      match
-        graph_control_result_from_runtime(
-          self.active.apply_control_impl(control.raw()),
-        ) {
+      match valid_hot_swap_control_graph_result(next, raw_control) {
         Ok(_) => ()
         Err(error) => return Err(error)
       }
       match
         graph_control_result_from_runtime(
-          next.apply_control_impl(control.raw()),
+          self.active.apply_control_impl(raw_control),
         ) {
+        Ok(_) => ()
+        Err(error) => return Err(error)
+      }
+      match
+        graph_control_result_from_runtime(next.apply_control_impl(raw_control)) {
         Ok(_) => ()
         Err(error) => return Err(error)
       }
@@ -124,11 +123,11 @@ fn HotSwapGraph::apply_controls_impl(
         self.active.apply_controls_impl(raw_controls),
       )
     Some(next) => {
-      match valid_hot_swap_controls_graph_result(self.active, controls) {
+      match valid_hot_swap_controls_graph_result(self.active, raw_controls) {
         Ok(_) => ()
         Err(error) => return Err(error)
       }
-      match valid_hot_swap_controls_graph_result(next, controls) {
+      match valid_hot_swap_controls_graph_result(next, raw_controls) {
         Ok(_) => ()
         Err(error) => return Err(error)
       }
@@ -183,6 +182,31 @@ pub fn CompiledDspHotSwap::queue_swap(
   next : CompiledDsp,
 ) -> Result[Unit, HotSwapQueueError] {
   self.0.queue_swap_impl(next.raw_graph())
+}
+
+///|
+/// Hot-swap stores bare runtime graph state; processing still goes through the
+/// mono runtime wrapper so mono/stereo behavior stays owned by runtime.
+fn process_mono_runtime_graph(
+  graph : @runtime.CompiledGraph,
+  context : DspContext,
+  output : AudioBuffer,
+) -> Unit {
+  @runtime.CompiledDsp::from_graph(graph).process(context, output)
+}
+
+///|
+/// Hot-swap stores bare runtime graph state; processing still goes through the
+/// stereo runtime wrapper so mono/stereo behavior stays owned by runtime.
+fn process_stereo_runtime_graph(
+  graph : @runtime.CompiledGraph,
+  context : DspContext,
+  left_output : AudioBuffer,
+  right_output : AudioBuffer,
+) -> Unit {
+  @runtime.CompiledStereoDsp::from_graph(graph).process(
+    context, left_output, right_output,
+  )
 }
 
 ///|
@@ -270,19 +294,16 @@ pub fn CompiledDspHotSwap::process(
   output : AudioBuffer,
 ) -> Unit {
   match self.0.pending {
-    None => compiled_graph_to_mono(self.0.active).process(context, output)
+    None => process_mono_runtime_graph(self.0.active, context, output)
     Some(next) =>
       if self.0.crossfade_samples <= 0 {
         self.0.active = next
         self.0.pending = None
         self.0.crossfade_position = 0
-        compiled_graph_to_mono(self.0.active).process(context, output)
+        process_mono_runtime_graph(self.0.active, context, output)
       } else {
-        compiled_graph_to_mono(self.0.active).process(
-          context,
-          self.0.old_output,
-        )
-        compiled_graph_to_mono(next).process(context, self.0.new_output)
+        process_mono_runtime_graph(self.0.active, context, self.0.old_output)
+        process_mono_runtime_graph(next, context, self.0.new_output)
         let sample_count = compiled_hot_swap_sample_count(
           context,
           output,
@@ -344,24 +365,32 @@ pub fn CompiledStereoDspHotSwap::process(
 ) -> Unit {
   match self.0.pending {
     None =>
-      compiled_graph_to_stereo(self.0.active).process(
-        context, left_output, right_output,
+      process_stereo_runtime_graph(
+        self.0.active,
+        context,
+        left_output,
+        right_output,
       )
     Some(next) =>
       if self.0.crossfade_samples <= 0 {
         self.0.active = next
         self.0.pending = None
         self.0.crossfade_position = 0
-        compiled_graph_to_stereo(self.0.active).process(
-          context, left_output, right_output,
+        process_stereo_runtime_graph(
+          self.0.active,
+          context,
+          left_output,
+          right_output,
         )
       } else {
-        compiled_graph_to_stereo(self.0.active).process(
+        process_stereo_runtime_graph(
+          self.0.active,
           context,
           self.0.old_left,
           self.0.old_right,
         )
-        compiled_graph_to_stereo(next).process(
+        process_stereo_runtime_graph(
+          next,
           context,
           self.0.new_left,
           self.0.new_right,
@@ -457,21 +486,17 @@ fn equal_power_new_gain(progress : Double) -> Double {
 ///|
 fn valid_hot_swap_control_graph_result(
   compiled : @runtime.CompiledGraph,
-  control : GraphControl,
+  control : @model.GraphControl,
 ) -> Result[Unit, GraphControlError] {
-  graph_control_result_from_runtime(
-    compiled.validate_controls_impl([control.raw()]),
-  )
+  graph_control_result_from_runtime(compiled.validate_controls_impl([control]))
 }
 
 ///|
 fn valid_hot_swap_controls_graph_result(
   compiled : @runtime.CompiledGraph,
-  controls : Array[GraphControl],
+  controls : Array[@model.GraphControl],
 ) -> Result[Unit, GraphControlError] {
-  graph_control_result_from_runtime(
-    compiled.validate_controls_impl(graph_controls_to_model(controls)),
-  )
+  graph_control_result_from_runtime(compiled.validate_controls_impl(controls))
 }
 
 ///|

@@ -47,20 +47,6 @@ fn CompiledStereoDsp::raw_graph(
 }
 
 ///|
-fn compiled_graph_to_mono(graph : @runtime.CompiledGraph) -> CompiledDsp {
-  CompiledDsp::from_internal(@runtime.CompiledDsp::from_graph(graph))
-}
-
-///|
-fn compiled_graph_to_stereo(
-  graph : @runtime.CompiledGraph,
-) -> CompiledStereoDsp {
-  CompiledStereoDsp::from_internal(
-    @runtime.CompiledStereoDsp::from_graph(graph),
-  )
-}
-
-///|
 /// Number of non-finite samples replaced with 0.0 during the most recent
 /// process() call. Returns 0 if output was clean.
 pub fn CompiledDsp::last_sanitized_count(self : CompiledDsp) -> Int {
