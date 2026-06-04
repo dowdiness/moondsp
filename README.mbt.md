@@ -118,7 +118,7 @@ moon test             # run the full test suite
 moon test -p dowdiness/moondsp  # run integration tests against the facade (root package only)
 moon test -p pattern  # run pattern-engine tests only
 moon info && moon fmt # regenerate interfaces + format (run before committing)
-moon bench --release -p graph -f graph_benchmark.mbt  # run performance benchmarks
+moon bench --release -p dowdiness/moondsp/graph -f graph_benchmark.mbt  # run performance benchmarks
 npm run test:browser  # Playwright browser-integration tests (builds wasm-gc first)
 ```
 

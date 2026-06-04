@@ -6,8 +6,8 @@
 /// are zero-length). Zero-length rather than Option so crossfade code can
 /// call buffer methods unconditionally without branching per sample.
 priv struct HotSwapGraph {
-  mut active : CompiledGraph
-  mut pending : CompiledGraph?
+  mut active : @runtime.CompiledGraph
+  mut pending : @runtime.CompiledGraph?
   crossfade_samples : Int
   mut crossfade_position : Int
   old_output : AudioBuffer
@@ -50,13 +50,13 @@ pub impl Show for HotSwapQueueError with fn output(self, logger) {
 /// Queue a new compiled graph, resetting the crossfade position.
 fn HotSwapGraph::queue_swap_impl(
   self : HotSwapGraph,
-  next : CompiledGraph,
+  next : @runtime.CompiledGraph,
 ) -> Result[Unit, HotSwapQueueError] {
-  if self.active.compile_sample_rate != next.compile_sample_rate {
+  if self.active.compile_sample_rate() != next.compile_sample_rate() {
     return Err(
       HotSwapQueueError::SampleRateMismatch(
-        self.active.compile_sample_rate,
-        next.compile_sample_rate,
+        self.active.compile_sample_rate(),
+        next.compile_sample_rate(),
       ),
     )
   }
@@ -79,7 +79,10 @@ fn HotSwapGraph::apply_control_impl(
   control : GraphControl,
 ) -> Result[Unit, GraphControlError] {
   match self.pending {
-    None => self.active.apply_control_impl(control)
+    None =>
+      graph_control_result_from_runtime(
+        self.active.apply_control_impl(control.raw()),
+      )
     Some(next) => {
       match valid_hot_swap_control_graph_result(self.active, control) {
         Ok(_) => ()
@@ -89,11 +92,17 @@ fn HotSwapGraph::apply_control_impl(
         Ok(_) => ()
         Err(error) => return Err(error)
       }
-      match self.active.apply_control_impl(control) {
+      match
+        graph_control_result_from_runtime(
+          self.active.apply_control_impl(control.raw()),
+        ) {
         Ok(_) => ()
         Err(error) => return Err(error)
       }
-      match next.apply_control_impl(control) {
+      match
+        graph_control_result_from_runtime(
+          next.apply_control_impl(control.raw()),
+        ) {
         Ok(_) => ()
         Err(error) => return Err(error)
       }
@@ -108,8 +117,12 @@ fn HotSwapGraph::apply_controls_impl(
   self : HotSwapGraph,
   controls : Array[GraphControl],
 ) -> Result[Unit, GraphControlError] {
+  let raw_controls = graph_controls_to_model(controls)
   match self.pending {
-    None => self.active.apply_controls_impl(controls)
+    None =>
+      graph_control_result_from_runtime(
+        self.active.apply_controls_impl(raw_controls),
+      )
     Some(next) => {
       match valid_hot_swap_controls_graph_result(self.active, controls) {
         Ok(_) => ()
@@ -119,11 +132,17 @@ fn HotSwapGraph::apply_controls_impl(
         Ok(_) => ()
         Err(error) => return Err(error)
       }
-      match self.active.apply_controls_impl(controls) {
+      match
+        graph_control_result_from_runtime(
+          self.active.apply_controls_impl(raw_controls),
+        ) {
         Ok(_) => ()
         Err(error) => return Err(error)
       }
-      match next.apply_controls_impl(controls) {
+      match
+        graph_control_result_from_runtime(
+          next.apply_controls_impl(raw_controls),
+        ) {
         Ok(_) => ()
         Err(error) => return Err(error)
       }
@@ -141,7 +160,7 @@ pub fn CompiledDspHotSwap::from_graph(
   let clamped_crossfade = clamp_crossfade_samples(crossfade_samples)
   let capacity = active.compiled_buffer_capacity()
   CompiledDspHotSwap({
-    active: active.0,
+    active: active.raw_graph(),
     pending: None,
     crossfade_samples: clamped_crossfade,
     crossfade_position: 0,
@@ -163,7 +182,7 @@ pub fn CompiledDspHotSwap::queue_swap(
   self : CompiledDspHotSwap,
   next : CompiledDsp,
 ) -> Result[Unit, HotSwapQueueError] {
-  self.0.queue_swap_impl(next.0)
+  self.0.queue_swap_impl(next.raw_graph())
 }
 
 ///|
@@ -251,16 +270,19 @@ pub fn CompiledDspHotSwap::process(
   output : AudioBuffer,
 ) -> Unit {
   match self.0.pending {
-    None => CompiledDsp(self.0.active).process(context, output)
+    None => compiled_graph_to_mono(self.0.active).process(context, output)
     Some(next) =>
       if self.0.crossfade_samples <= 0 {
         self.0.active = next
         self.0.pending = None
         self.0.crossfade_position = 0
-        CompiledDsp(self.0.active).process(context, output)
+        compiled_graph_to_mono(self.0.active).process(context, output)
       } else {
-        CompiledDsp(self.0.active).process(context, self.0.old_output)
-        CompiledDsp(next).process(context, self.0.new_output)
+        compiled_graph_to_mono(self.0.active).process(
+          context,
+          self.0.old_output,
+        )
+        compiled_graph_to_mono(next).process(context, self.0.new_output)
         let sample_count = compiled_hot_swap_sample_count(
           context,
           output,
@@ -286,7 +308,7 @@ pub fn CompiledStereoDspHotSwap::from_graph(
   let clamped_crossfade = clamp_crossfade_samples(crossfade_samples)
   let capacity = active.compiled_buffer_capacity()
   CompiledStereoDspHotSwap({
-    active: active.0,
+    active: active.raw_graph(),
     pending: None,
     crossfade_samples: clamped_crossfade,
     crossfade_position: 0,
@@ -308,7 +330,7 @@ pub fn CompiledStereoDspHotSwap::queue_swap(
   self : CompiledStereoDspHotSwap,
   next : CompiledStereoDsp,
 ) -> Result[Unit, HotSwapQueueError] {
-  self.0.queue_swap_impl(next.0)
+  self.0.queue_swap_impl(next.raw_graph())
 }
 
 ///|
@@ -322,7 +344,7 @@ pub fn CompiledStereoDspHotSwap::process(
 ) -> Unit {
   match self.0.pending {
     None =>
-      CompiledStereoDsp(self.0.active).process(
+      compiled_graph_to_stereo(self.0.active).process(
         context, left_output, right_output,
       )
     Some(next) =>
@@ -330,16 +352,16 @@ pub fn CompiledStereoDspHotSwap::process(
         self.0.active = next
         self.0.pending = None
         self.0.crossfade_position = 0
-        CompiledStereoDsp(self.0.active).process(
+        compiled_graph_to_stereo(self.0.active).process(
           context, left_output, right_output,
         )
       } else {
-        CompiledStereoDsp(self.0.active).process(
+        compiled_graph_to_stereo(self.0.active).process(
           context,
           self.0.old_left,
           self.0.old_right,
         )
-        CompiledStereoDsp(next).process(
+        compiled_graph_to_stereo(next).process(
           context,
           self.0.new_left,
           self.0.new_right,
@@ -434,31 +456,40 @@ fn equal_power_new_gain(progress : Double) -> Double {
 
 ///|
 fn valid_hot_swap_control_graph_result(
-  compiled : CompiledGraph,
+  compiled : @runtime.CompiledGraph,
   control : GraphControl,
 ) -> Result[Unit, GraphControlError] {
-  let simulated_nodes = FixedArray::makei(compiled.nodes.length(), index => {
-    compiled.nodes[index]
-  })
-  valid_graph_control_result(compiled, simulated_nodes, control)
+  graph_control_result_from_runtime(
+    compiled.validate_controls_impl([control.raw()]),
+  )
 }
 
 ///|
 fn valid_hot_swap_controls_graph_result(
-  compiled : CompiledGraph,
+  compiled : @runtime.CompiledGraph,
   controls : Array[GraphControl],
 ) -> Result[Unit, GraphControlError] {
-  let simulated_nodes = FixedArray::makei(compiled.nodes.length(), index => {
-    compiled.nodes[index]
-  })
-  for index = 0; index < controls.length(); index = index + 1 {
-    match
-      valid_graph_control_result(compiled, simulated_nodes, controls[index]) {
-      Ok(_) => ()
-      Err(error) => return Err(error)
-    }
+  graph_control_result_from_runtime(
+    compiled.validate_controls_impl(graph_controls_to_model(controls)),
+  )
+}
+
+///|
+fn compiled_stereo_sample_count(
+  context : DspContext,
+  left_output : AudioBuffer,
+  right_output : AudioBuffer,
+) -> Int {
+  let output_length = if left_output.length() < right_output.length() {
+    left_output.length()
+  } else {
+    right_output.length()
   }
-  Ok(())
+  if output_length < context.block_size() {
+    output_length
+  } else {
+    context.block_size()
+  }
 }
 
 ///|

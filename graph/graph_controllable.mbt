@@ -18,13 +18,13 @@
 /// transactional — validate the whole batch first, then apply, leaving
 /// the graph unchanged on the first error.
 ///
-/// WHY 12 identical impl blocks below: MoonBit has no blanket impls or
+/// WHY 12 near-identical impl blocks below: MoonBit has no blanket impls or
 /// default trait methods. Each of the 6 wrapper types (CompiledDsp,
 /// CompiledStereoDsp, CompiledDspHotSwap, CompiledStereoDspHotSwap,
 /// CompiledDspTopologyController, CompiledStereoDspTopologyController)
-/// must declare both methods individually, all delegating to
-/// `.0.apply_control_impl()` / `.0.apply_controls_impl()`. This is
-/// irreducible boilerplate under the current type system.
+/// must declare both methods individually. The compiled wrappers delegate to
+/// `graph/internal/runtime`; staging wrappers delegate to their local state.
+/// This is irreducible boilerplate under the current type system.
 pub trait GraphControllable {
   fn apply_control(Self, GraphControl) -> Result[Unit, GraphControlError]
   fn apply_controls(Self, Array[GraphControl]) -> Result[
@@ -38,7 +38,7 @@ pub impl GraphControllable for CompiledDsp with fn apply_control(self, control) 
   Unit,
   GraphControlError,
 ] {
-  self.0.apply_control_impl(control)
+  graph_control_result_from_runtime(self.raw().apply_control(control.raw()))
 }
 
 ///|
@@ -46,7 +46,9 @@ pub impl GraphControllable for CompiledDsp with fn apply_controls(
   self,
   controls,
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_controls_impl(controls)
+  graph_control_result_from_runtime(
+    self.raw().apply_controls(graph_controls_to_model(controls)),
+  )
 }
 
 ///|
@@ -54,7 +56,7 @@ pub impl GraphControllable for CompiledStereoDsp with fn apply_control(
   self,
   control,
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_control_impl(control)
+  graph_control_result_from_runtime(self.raw().apply_control(control.raw()))
 }
 
 ///|
@@ -62,7 +64,9 @@ pub impl GraphControllable for CompiledStereoDsp with fn apply_controls(
   self,
   controls,
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_controls_impl(controls)
+  graph_control_result_from_runtime(
+    self.raw().apply_controls(graph_controls_to_model(controls)),
+  )
 }
 
 ///|
