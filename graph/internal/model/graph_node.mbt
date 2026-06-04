@@ -1,0 +1,862 @@
+///|
+/// Minimal Phase 2 graph node kinds for compiled mono DSP graphs.
+pub enum DspNodeKind {
+  Constant
+  Oscillator
+  Noise
+  Adsr
+  Biquad
+  Delay
+  Gain
+  Mul
+  Mix
+  Clip
+  Output
+  Pan
+  StereoGain
+  StereoClip
+  StereoBiquad
+  StereoDelay
+  StereoMixDown
+  StereoOutput
+} derive(Eq, Debug)
+
+///|
+/// Runtime-updatable numeric graph parameter slots.
+pub(all) enum GraphParamSlot {
+  Value0
+  Value1
+  Value2
+  Value3
+  DelaySamples
+} derive(Eq, Debug)
+
+///|
+pub impl Show for GraphParamSlot with fn output(self, logger) {
+  logger.write_string(@debug.to_string(self))
+}
+
+///|
+/// Unified runtime control kinds for compiled graphs.
+pub enum GraphControlKind {
+  GateOn
+  GateOff
+  SetParam
+} derive(Eq)
+
+///|
+pub const NYQUIST_RATIO : Double = 0.5
+
+///|
+pub const MONO_SIGNAL_SHAPE : Int = 0
+
+///|
+pub const STEREO_SIGNAL_SHAPE : Int = 1
+
+///|
+/// Runtime control message for a compiled graph.
+pub struct GraphControl {
+  priv kind : GraphControlKind
+  priv node_index : Int
+  priv slot : GraphParamSlot
+  priv value : Double
+}
+
+///|
+#alias(new)
+fn GraphControl::GraphControl(
+  kind : GraphControlKind,
+  node_index : Int,
+  slot : GraphParamSlot,
+  value : Double,
+) -> GraphControl {
+  { kind, node_index, slot, value }
+}
+
+///|
+pub fn GraphControl::kind(self : GraphControl) -> GraphControlKind {
+  self.kind
+}
+
+///|
+pub fn GraphControl::node_index(self : GraphControl) -> Int {
+  self.node_index
+}
+
+///|
+pub fn GraphControl::slot(self : GraphControl) -> GraphParamSlot {
+  self.slot
+}
+
+///|
+pub fn GraphControl::value(self : GraphControl) -> Double {
+  self.value
+}
+
+///|
+/// Flat graph node representation for compiled DSP graphs.
+///
+/// Design decision: DspNode uses a flat struct with generic fields (value0-value3)
+/// rather than per-kind structs or a tagged union with payloads. This is deliberate:
+///
+/// 1. **Flat memory layout** — all nodes are the same size, enabling fixed-array
+///    storage without boxing. Critical for zero-allocation audio processing.
+/// 2. **Copy-on-update** — node_with_value0/value1/delay_samples create updated
+///    copies without knowing the node kind, supporting runtime parameter changes.
+/// 3. **Serialization** — uniform layout simplifies graph serialization for
+///    hot-swap and topology editing.
+///
+/// The cost is that field semantics depend on `kind` — see each constructor
+/// (e.g. `DspNode::oscillator`, `DspNode::biquad`) for the field mapping.
+pub struct DspNode {
+  priv kind : DspNodeKind
+  priv input0 : Int
+  priv input1 : Int
+  priv value0 : Double
+  priv value1 : Double
+  priv value2 : Double
+  priv value3 : Double
+  priv waveform : Waveform
+  priv filter_mode : BiquadMode
+  priv delay_max_samples : Int
+  priv delay_samples : Int
+  priv seed : UInt
+}
+
+///|
+#alias(new)
+fn DspNode::DspNode(
+  kind : DspNodeKind,
+  input0 : Int,
+  input1 : Int,
+  value0 : Double,
+  value1 : Double,
+  value2 : Double,
+  value3 : Double,
+  waveform : Waveform,
+  filter_mode : BiquadMode,
+  delay_max_samples : Int,
+  delay_samples : Int,
+  seed : UInt,
+) -> DspNode {
+  {
+    kind,
+    input0,
+    input1,
+    value0,
+    value1,
+    value2,
+    value3,
+    waveform,
+    filter_mode,
+    delay_max_samples,
+    delay_samples,
+    seed,
+  }
+}
+
+///|
+/// Authoring-structural Double equality for graph nodes.
+///
+/// This is intentionally not IEEE sample equality: invalid authoring graphs may
+/// contain NaN while an editor keeps the last-good compiled template alive. Treat
+/// NaN as a stable sentinel so unchanged invalid templates can still compare
+/// equal in incr-backed pipelines. Normal Double equality already treats +0.0
+/// and -0.0 as equal, which is the authoring policy we want.
+fn graph_authoring_double_equal(left : Double, right : Double) -> Bool {
+  if left.is_nan() && right.is_nan() {
+    true
+  } else {
+    left == right
+  }
+}
+
+///|
+/// Structural equality for authoring graph nodes.
+pub impl Eq for DspNode with fn equal(self, other) {
+  self.kind == other.kind &&
+  self.input0 == other.input0 &&
+  self.input1 == other.input1 &&
+  graph_authoring_double_equal(self.value0, other.value0) &&
+  graph_authoring_double_equal(self.value1, other.value1) &&
+  graph_authoring_double_equal(self.value2, other.value2) &&
+  graph_authoring_double_equal(self.value3, other.value3) &&
+  self.waveform == other.waveform &&
+  self.filter_mode == other.filter_mode &&
+  self.delay_max_samples == other.delay_max_samples &&
+  self.delay_samples == other.delay_samples &&
+  self.seed == other.seed
+}
+
+///|
+pub fn DspNode::kind(self : DspNode) -> DspNodeKind {
+  self.kind
+}
+
+///|
+pub fn DspNode::input0(self : DspNode) -> Int {
+  self.input0
+}
+
+///|
+pub fn DspNode::input1(self : DspNode) -> Int {
+  self.input1
+}
+
+///|
+pub fn DspNode::value0(self : DspNode) -> Double {
+  self.value0
+}
+
+///|
+pub fn DspNode::value1(self : DspNode) -> Double {
+  self.value1
+}
+
+///|
+pub fn DspNode::value2(self : DspNode) -> Double {
+  self.value2
+}
+
+///|
+pub fn DspNode::value3(self : DspNode) -> Double {
+  self.value3
+}
+
+///|
+pub fn DspNode::waveform(self : DspNode) -> Waveform {
+  self.waveform
+}
+
+///|
+pub fn DspNode::filter_mode(self : DspNode) -> BiquadMode {
+  self.filter_mode
+}
+
+///|
+pub fn DspNode::delay_max_samples(self : DspNode) -> Int {
+  self.delay_max_samples
+}
+
+///|
+pub fn DspNode::delay_samples(self : DspNode) -> Int {
+  self.delay_samples
+}
+
+///|
+pub fn DspNode::seed(self : DspNode) -> UInt {
+  self.seed
+}
+
+///|
+/// Create a constant-value node.
+pub fn DspNode::constant(value : Double) -> DspNode {
+  DspNode::new(
+    DspNodeKind::Constant,
+    -1,
+    -1,
+    value,
+    0.0,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    BiquadMode::LowPass,
+    0,
+    0,
+    0U,
+  )
+}
+
+///|
+/// Create an oscillator node with a fixed frequency.
+pub fn DspNode::oscillator(waveform : Waveform, freq : Double) -> DspNode {
+  DspNode::new(
+    DspNodeKind::Oscillator,
+    -1,
+    -1,
+    freq,
+    0.0,
+    0.0,
+    0.0,
+    waveform,
+    BiquadMode::LowPass,
+    0,
+    0,
+    0U,
+  )
+}
+
+///|
+/// Create an oscillator node that reads frequency from another node (FM mode).
+pub fn DspNode::oscillator_from(input : Int, waveform : Waveform) -> DspNode {
+  DspNode::new(
+    DspNodeKind::Oscillator,
+    input,
+    -1,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    waveform,
+    BiquadMode::LowPass,
+    0,
+    0,
+    0U,
+  )
+}
+
+///|
+/// Create a white-noise source node.
+pub fn DspNode::noise(seed : UInt) -> DspNode {
+  DspNode::new(
+    DspNodeKind::Noise,
+    -1,
+    -1,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    BiquadMode::LowPass,
+    0,
+    0,
+    seed,
+  )
+}
+
+///|
+/// Create an ADSR envelope source node.
+///
+/// Use `CompiledDsp::apply_control(GraphControl::gate_on(...))` and
+/// `CompiledDsp::apply_control(GraphControl::gate_off(...))` to drive the
+/// envelope after compilation.
+pub fn DspNode::adsr(
+  attack_ms~ : Double,
+  decay_ms~ : Double,
+  sustain~ : Double,
+  release_ms~ : Double,
+) -> DspNode {
+  DspNode::new(
+    DspNodeKind::Adsr,
+    -1,
+    -1,
+    attack_ms,
+    decay_ms,
+    sustain,
+    release_ms,
+    Waveform::Sine,
+    BiquadMode::LowPass,
+    0,
+    0,
+    0U,
+  )
+}
+
+///|
+/// Create a fixed-parameter biquad node from one upstream node.
+pub fn DspNode::biquad(
+  input~ : Int,
+  mode~ : BiquadMode,
+  cutoff_hz~ : Double,
+  q~ : Double,
+) -> DspNode {
+  DspNode::new(
+    DspNodeKind::Biquad,
+    input,
+    -1,
+    cutoff_hz,
+    q,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    mode,
+    0,
+    0,
+    0U,
+  )
+}
+
+///|
+/// Create a fixed-delay node from one upstream node.
+pub fn DspNode::delay(
+  input~ : Int,
+  max_delay_samples~ : Int,
+  delay_samples? : Int = graph_default_delay_samples(max_delay_samples),
+  feedback? : Double = 0.0,
+) -> DspNode {
+  DspNode::new(
+    DspNodeKind::Delay,
+    input,
+    -1,
+    feedback,
+    0.0,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    BiquadMode::LowPass,
+    max_delay_samples,
+    delay_samples,
+    0U,
+  )
+}
+
+///|
+/// Create an in-place gain node from one upstream node.
+pub fn DspNode::gain(input : Int, amount : Double) -> DspNode {
+  DspNode::new(
+    DspNodeKind::Gain,
+    input,
+    -1,
+    amount,
+    0.0,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    BiquadMode::LowPass,
+    0,
+    0,
+    0U,
+  )
+}
+
+///|
+/// Create a gain node with envelope modulation from two upstream nodes.
+/// The output is: input_signal * envelope_buffer * amount.
+pub fn DspNode::envelope_gain(
+  input~ : Int,
+  envelope~ : Int,
+  amount~ : Double,
+) -> DspNode {
+  DspNode::new(
+    DspNodeKind::Gain,
+    input,
+    envelope,
+    amount,
+    0.0,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    BiquadMode::LowPass,
+    0,
+    0,
+    0U,
+  )
+}
+
+///|
+/// Create a sample-wise multiply node from two upstream nodes.
+pub fn DspNode::mul(left : Int, right : Int) -> DspNode {
+  DspNode::new(
+    DspNodeKind::Mul,
+    left,
+    right,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    BiquadMode::LowPass,
+    0,
+    0,
+    0U,
+  )
+}
+
+///|
+/// Create a mix node from two upstream nodes.
+pub fn DspNode::mix(left : Int, right : Int) -> DspNode {
+  DspNode::new(
+    DspNodeKind::Mix,
+    left,
+    right,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    BiquadMode::LowPass,
+    0,
+    0,
+    0U,
+  )
+}
+
+///|
+/// Create a clip node from one upstream node.
+pub fn DspNode::clip(input : Int, threshold : Double) -> DspNode {
+  DspNode::new(
+    DspNodeKind::Clip,
+    input,
+    -1,
+    threshold,
+    0.0,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    BiquadMode::LowPass,
+    0,
+    0,
+    0U,
+  )
+}
+
+///|
+/// Mark the final output node.
+pub fn DspNode::output(input : Int) -> DspNode {
+  DspNode::new(
+    DspNodeKind::Output,
+    input,
+    -1,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    BiquadMode::LowPass,
+    0,
+    0,
+    0U,
+  )
+}
+
+///|
+/// Create a terminal stereo pan node from one mono upstream node.
+pub fn DspNode::pan(input : Int, position : Double) -> DspNode {
+  DspNode::new(
+    DspNodeKind::Pan,
+    input,
+    -1,
+    position,
+    0.0,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    BiquadMode::LowPass,
+    0,
+    0,
+    0U,
+  )
+}
+
+///|
+/// Create a stereo gain node from one stereo upstream node.
+pub fn DspNode::stereo_gain(input~ : Int, amount~ : Double) -> DspNode {
+  DspNode::new(
+    DspNodeKind::StereoGain,
+    input,
+    -1,
+    amount,
+    0.0,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    BiquadMode::LowPass,
+    0,
+    0,
+    0U,
+  )
+}
+
+///|
+/// Create a stereo clip node from one stereo upstream node.
+pub fn DspNode::stereo_clip(input~ : Int, threshold~ : Double) -> DspNode {
+  DspNode::new(
+    DspNodeKind::StereoClip,
+    input,
+    -1,
+    threshold,
+    0.0,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    BiquadMode::LowPass,
+    0,
+    0,
+    0U,
+  )
+}
+
+///|
+/// Create a stereo biquad node from one stereo upstream node.
+pub fn DspNode::stereo_biquad(
+  input~ : Int,
+  mode~ : BiquadMode,
+  cutoff_hz~ : Double,
+  q~ : Double,
+) -> DspNode {
+  DspNode::new(
+    DspNodeKind::StereoBiquad,
+    input,
+    -1,
+    cutoff_hz,
+    q,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    mode,
+    0,
+    0,
+    0U,
+  )
+}
+
+///|
+/// Create a stereo delay node from one stereo upstream node.
+pub fn DspNode::stereo_delay(
+  input~ : Int,
+  max_delay_samples~ : Int,
+  delay_samples? : Int = graph_default_delay_samples(max_delay_samples),
+  feedback? : Double = 0.0,
+) -> DspNode {
+  DspNode::new(
+    DspNodeKind::StereoDelay,
+    input,
+    -1,
+    feedback,
+    0.0,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    BiquadMode::LowPass,
+    max_delay_samples,
+    delay_samples,
+    0U,
+  )
+}
+
+///|
+/// Create a fixed-policy stereo-to-mono fold-down node.
+pub fn DspNode::stereo_mixdown(input : Int) -> DspNode {
+  DspNode::new(
+    DspNodeKind::StereoMixDown,
+    input,
+    -1,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    BiquadMode::LowPass,
+    0,
+    0,
+    0U,
+  )
+}
+
+///|
+/// Mark the final stereo output node.
+pub fn DspNode::stereo_output(input : Int) -> DspNode {
+  DspNode::new(
+    DspNodeKind::StereoOutput,
+    input,
+    -1,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    Waveform::Sine,
+    BiquadMode::LowPass,
+    0,
+    0,
+    0U,
+  )
+}
+
+///|
+/// Create a runtime gate-on control targeting an original authoring index.
+pub fn GraphControl::gate_on(node_index : Int) -> GraphControl {
+  GraphControl::new(
+    GraphControlKind::GateOn,
+    node_index,
+    GraphParamSlot::Value0,
+    0.0,
+  )
+}
+
+///|
+/// Create a runtime gate-off control targeting an original authoring index.
+pub fn GraphControl::gate_off(node_index : Int) -> GraphControl {
+  GraphControl::new(
+    GraphControlKind::GateOff,
+    node_index,
+    GraphParamSlot::Value0,
+    0.0,
+  )
+}
+
+///|
+/// Create a runtime numeric parameter update targeting an original authoring
+/// index.
+pub fn GraphControl::set_param(
+  node_index : Int,
+  slot : GraphParamSlot,
+  value : Double,
+) -> GraphControl {
+  GraphControl::new(GraphControlKind::SetParam, node_index, slot, value)
+}
+
+///|
+pub fn remap_node_inputs(node : DspNode, remap : FixedArray[Int]) -> DspNode {
+  node_with_inputs(
+    node,
+    input0=remapped_input(node.input0, remap),
+    input1=remapped_input(node.input1, remap),
+  )
+}
+
+///|
+pub fn node_with_inputs(
+  node : DspNode,
+  input0~ : Int,
+  input1~ : Int,
+) -> DspNode {
+  DspNode::new(
+    node.kind,
+    input0,
+    input1,
+    node.value0,
+    node.value1,
+    node.value2,
+    node.value3,
+    node.waveform,
+    node.filter_mode,
+    node.delay_max_samples,
+    node.delay_samples,
+    node.seed,
+  )
+}
+
+///|
+pub fn node_with_offset_inputs(node : DspNode, offset : Int) -> DspNode {
+  let input0 = if node.input0 >= 0 { node.input0 + offset } else { node.input0 }
+  let input1 = if node.input1 >= 0 { node.input1 + offset } else { node.input1 }
+  node_with_inputs(node, input0~, input1~)
+}
+
+///|
+pub fn node_with_value0(node : DspNode, value0 : Double) -> DspNode {
+  DspNode::new(
+    node.kind,
+    node.input0,
+    node.input1,
+    value0,
+    node.value1,
+    node.value2,
+    node.value3,
+    node.waveform,
+    node.filter_mode,
+    node.delay_max_samples,
+    node.delay_samples,
+    node.seed,
+  )
+}
+
+///|
+pub fn node_with_value1(node : DspNode, value1 : Double) -> DspNode {
+  DspNode::new(
+    node.kind,
+    node.input0,
+    node.input1,
+    node.value0,
+    value1,
+    node.value2,
+    node.value3,
+    node.waveform,
+    node.filter_mode,
+    node.delay_max_samples,
+    node.delay_samples,
+    node.seed,
+  )
+}
+
+///|
+pub fn node_with_delay_samples(node : DspNode, delay_samples : Int) -> DspNode {
+  DspNode::new(
+    node.kind,
+    node.input0,
+    node.input1,
+    node.value0,
+    node.value1,
+    node.value2,
+    node.value3,
+    node.waveform,
+    node.filter_mode,
+    node.delay_max_samples,
+    delay_samples,
+    node.seed,
+  )
+}
+
+///|
+pub fn valid_biquad_graph_params(
+  sample_rate : Double,
+  cutoff : Double,
+  q : Double,
+) -> Bool {
+  let nyquist = sample_rate * NYQUIST_RATIO
+  @dsp.is_finite(sample_rate) &&
+  sample_rate > 0.0 &&
+  @dsp.is_finite(cutoff) &&
+  cutoff > 0.0 &&
+  cutoff < nyquist &&
+  @dsp.is_finite(q) &&
+  q > 0.0
+}
+
+///|
+pub fn valid_delay_feedback(value : Double) -> Bool {
+  @dsp.is_finite(value) &&
+  value >= -@dsp.max_feedback_amount() &&
+  value <= @dsp.max_feedback_amount()
+}
+
+///|
+pub fn valid_delay_samples(
+  delay_samples : Int,
+  delay_max_samples : Int,
+) -> Bool {
+  delay_samples >= 0 && delay_samples <= delay_max_samples
+}
+
+///|
+/// Structural check: does this node kind accept SetParam on the given slot?
+pub fn node_accepts_slot(node : DspNode, slot : GraphParamSlot) -> Bool {
+  match node.kind {
+    Constant => slot is Value0
+    Oscillator => node.input0 < 0 && slot is Value0
+    Noise => false
+    Adsr => false
+    Biquad => slot is Value0 || slot is Value1
+    Delay => slot is Value0 || slot is DelaySamples
+    Gain => slot is Value0
+    Mul => false
+    Mix => false
+    Clip => slot is Value0
+    Output => false
+    Pan => slot is Value0
+    StereoGain => slot is Value0
+    StereoClip => slot is Value0
+    StereoBiquad => slot is Value0 || slot is Value1
+    StereoDelay => slot is Value0 || slot is DelaySamples
+    StereoMixDown => false
+    StereoOutput => false
+  }
+}
+
+///|
+fn graph_default_delay_samples(value : Int) -> Int {
+  if value > 0 {
+    value
+  } else {
+    0
+  }
+}
+
+///|
+fn remapped_input(input : Int, remap : FixedArray[Int]) -> Int {
+  if input >= 0 {
+    remap[input]
+  } else {
+    -1
+  }
+}

@@ -102,7 +102,7 @@ fn CompiledTemplate::is_node_live(self : CompiledTemplate, index : Int) -> Bool 
 /// do not need to remember which template was compiled.
 pub fn CompiledTemplate::orphan_adsr_count(self : CompiledTemplate) -> Int {
   let count = for i in 0..<self.template.length(); total = 0 {
-    if self.template[i].kind is Adsr && self.index_map[i] < 0 {
+    if self.template[i].kind() is Adsr && self.index_map[i] < 0 {
       continue total + 1
     }
     continue total
@@ -131,7 +131,7 @@ pub fn CompiledTemplate::adsr_authoring_indices(
 ) -> FixedArray[Int] {
   let result = FixedArray::make(self.template.length(), -1)
   let n = for i in 0..<self.template.length(); count = 0 {
-    if self.template[i].kind is Adsr && self.index_map[i] >= 0 {
+    if self.template[i].kind() is Adsr && self.index_map[i] >= 0 {
       result[count] = i
       continue count + 1
     }

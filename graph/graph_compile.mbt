@@ -8,7 +8,7 @@
 /// uniform layout enables hot-swap state copy without knowing the variant.
 priv struct CompiledGraph {
   compile_sample_rate : Double
-  nodes : FixedArray[DspNode]
+  nodes : FixedArray[@model.DspNode]
   index_map : FixedArray[Int]
   // Mono signal path buffers — one per node
   buffers : FixedArray[AudioBuffer]
@@ -125,7 +125,7 @@ fn compile_graph_impl(
     Array[Int],
     Array[(Int, Int, Int)],
   )?,
-  validate : (FixedArray[DspNode], FixedArray[(Int, Int, Int)]) -> Bool,
+  validate : (FixedArray[@model.DspNode], FixedArray[(Int, Int, Int)]) -> Bool,
 ) -> CompiledGraph? {
   let plan = match compile_plan(nodes, context) {
     Some(plan) => plan
@@ -150,7 +150,7 @@ fn compile_graph_impl(
   })
 
   let fixed_nodes = FixedArray::makei(node_count, index => {
-    remap_node_inputs(nodes[order[index]], topo_map)
+    @model.remap_node_inputs(nodes[order[index]].raw(), topo_map)
   })
   let feedback_edges = remapped_feedback_edges(plan.1, topo_map)
   if !validate(fixed_nodes, feedback_edges) {
@@ -465,12 +465,12 @@ fn visit_graph_dependencies_with_feedback(
   feedback_edges : Array[(Int, Int, Int)],
 ) -> Unit {
   let node = nodes[index]
-  match node.kind {
+  match node.kind() {
     Constant => ()
     Oscillator =>
-      if node.input0 >= 0 {
+      if node.input0() >= 0 {
         visit_graph_input_with_feedback(
-          node.input0,
+          node.input0(),
           index,
           0,
           nodes,
@@ -483,7 +483,7 @@ fn visit_graph_dependencies_with_feedback(
     Adsr => ()
     Biquad =>
       visit_graph_input_with_feedback(
-        node.input0,
+        node.input0(),
         index,
         0,
         nodes,
@@ -493,7 +493,7 @@ fn visit_graph_dependencies_with_feedback(
       )
     Delay =>
       visit_graph_input_with_feedback(
-        node.input0,
+        node.input0(),
         index,
         0,
         nodes,
@@ -503,7 +503,7 @@ fn visit_graph_dependencies_with_feedback(
       )
     Gain => {
       visit_graph_input_with_feedback(
-        node.input0,
+        node.input0(),
         index,
         0,
         nodes,
@@ -511,9 +511,9 @@ fn visit_graph_dependencies_with_feedback(
         order,
         feedback_edges,
       )
-      if node.input1 >= 0 {
+      if node.input1() >= 0 {
         visit_graph_input_with_feedback(
-          node.input1,
+          node.input1(),
           index,
           1,
           nodes,
@@ -525,7 +525,7 @@ fn visit_graph_dependencies_with_feedback(
     }
     Mul => {
       visit_graph_input_with_feedback(
-        node.input0,
+        node.input0(),
         index,
         0,
         nodes,
@@ -534,7 +534,7 @@ fn visit_graph_dependencies_with_feedback(
         feedback_edges,
       )
       visit_graph_input_with_feedback(
-        node.input1,
+        node.input1(),
         index,
         1,
         nodes,
@@ -545,7 +545,7 @@ fn visit_graph_dependencies_with_feedback(
     }
     Mix => {
       visit_graph_input_with_feedback(
-        node.input0,
+        node.input0(),
         index,
         0,
         nodes,
@@ -554,7 +554,7 @@ fn visit_graph_dependencies_with_feedback(
         feedback_edges,
       )
       visit_graph_input_with_feedback(
-        node.input1,
+        node.input1(),
         index,
         1,
         nodes,
@@ -565,7 +565,7 @@ fn visit_graph_dependencies_with_feedback(
     }
     Clip =>
       visit_graph_input_with_feedback(
-        node.input0,
+        node.input0(),
         index,
         0,
         nodes,
@@ -575,7 +575,7 @@ fn visit_graph_dependencies_with_feedback(
       )
     Output =>
       visit_graph_input_with_feedback(
-        node.input0,
+        node.input0(),
         index,
         0,
         nodes,
@@ -585,7 +585,7 @@ fn visit_graph_dependencies_with_feedback(
       )
     Pan =>
       visit_graph_input_with_feedback(
-        node.input0,
+        node.input0(),
         index,
         0,
         nodes,
@@ -595,7 +595,7 @@ fn visit_graph_dependencies_with_feedback(
       )
     StereoGain =>
       visit_graph_input_with_feedback(
-        node.input0,
+        node.input0(),
         index,
         0,
         nodes,
@@ -605,7 +605,7 @@ fn visit_graph_dependencies_with_feedback(
       )
     StereoClip =>
       visit_graph_input_with_feedback(
-        node.input0,
+        node.input0(),
         index,
         0,
         nodes,
@@ -615,7 +615,7 @@ fn visit_graph_dependencies_with_feedback(
       )
     StereoBiquad =>
       visit_graph_input_with_feedback(
-        node.input0,
+        node.input0(),
         index,
         0,
         nodes,
@@ -625,7 +625,7 @@ fn visit_graph_dependencies_with_feedback(
       )
     StereoDelay =>
       visit_graph_input_with_feedback(
-        node.input0,
+        node.input0(),
         index,
         0,
         nodes,
@@ -635,7 +635,7 @@ fn visit_graph_dependencies_with_feedback(
       )
     StereoMixDown =>
       visit_graph_input_with_feedback(
-        node.input0,
+        node.input0(),
         index,
         0,
         nodes,
@@ -645,7 +645,7 @@ fn visit_graph_dependencies_with_feedback(
       )
     StereoOutput =>
       visit_graph_input_with_feedback(
-        node.input0,
+        node.input0(),
         index,
         0,
         nodes,
@@ -686,7 +686,7 @@ fn find_single_output_index_of_kind(
 ) -> Int? {
   let mut output_index = -1
   for index = 0; index < nodes.length(); index = index + 1 {
-    if nodes[index].kind == kind {
+    if nodes[index].kind() == kind {
       if output_index >= 0 {
         return None
       }
@@ -721,31 +721,31 @@ fn compiled_block_size(context : DspContext) -> Int {
 }
 
 ///|
-fn make_graph_osc_state(node : DspNode) -> Oscillator? {
-  match node.kind {
+fn make_graph_osc_state(node : @model.DspNode) -> Oscillator? {
+  match node.kind() {
     Oscillator => Some(Oscillator::new())
     _ => None
   }
 }
 
 ///|
-fn make_graph_noise_state(node : DspNode) -> Noise? {
-  match node.kind {
-    Noise => Some(Noise::new(node.seed))
+fn make_graph_noise_state(node : @model.DspNode) -> Noise? {
+  match node.kind() {
+    Noise => Some(Noise::new(node.seed()))
     _ => None
   }
 }
 
 ///|
-fn make_graph_env_state(node : DspNode) -> Adsr? {
-  match node.kind {
+fn make_graph_env_state(node : @model.DspNode) -> Adsr? {
+  match node.kind() {
     Adsr =>
       Some(
         Adsr::new(
-          attack_ms=node.value0,
-          decay_ms=node.value1,
-          sustain=node.value2,
-          release_ms=node.value3,
+          attack_ms=node.value0(),
+          decay_ms=node.value1(),
+          sustain=node.value2(),
+          release_ms=node.value3(),
         ),
       )
     _ => None
@@ -753,30 +753,30 @@ fn make_graph_env_state(node : DspNode) -> Adsr? {
 }
 
 ///|
-fn make_graph_biquad_state(node : DspNode) -> Biquad? {
-  match node.kind {
+fn make_graph_biquad_state(node : @model.DspNode) -> Biquad? {
+  match node.kind() {
     Biquad => Some(Biquad::new())
     _ => None
   }
 }
 
 ///|
-fn make_graph_stereo_biquad_state(node : DspNode) -> Biquad? {
-  match node.kind {
+fn make_graph_stereo_biquad_state(node : @model.DspNode) -> Biquad? {
+  match node.kind() {
     StereoBiquad => Some(Biquad::new())
     _ => None
   }
 }
 
 ///|
-fn make_graph_stereo_delay_state(node : DspNode) -> DelayLine? {
-  match node.kind {
+fn make_graph_stereo_delay_state(node : @model.DspNode) -> DelayLine? {
+  match node.kind() {
     StereoDelay =>
       Some(
         DelayLine::new(
-          node.delay_max_samples,
-          delay_samples=node.delay_samples,
-          feedback=node.value0,
+          node.delay_max_samples(),
+          delay_samples=node.delay_samples(),
+          feedback=node.value0(),
         ),
       )
     _ => None

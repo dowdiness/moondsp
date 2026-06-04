@@ -26,12 +26,15 @@
 /// `.0.apply_control_impl()` / `.0.apply_controls_impl()`. This is
 /// irreducible boilerplate under the current type system.
 pub trait GraphControllable {
-  apply_control(Self, GraphControl) -> Result[Unit, GraphControlError]
-  apply_controls(Self, Array[GraphControl]) -> Result[Unit, GraphControlError]
+  fn apply_control(Self, GraphControl) -> Result[Unit, GraphControlError]
+  fn apply_controls(Self, Array[GraphControl]) -> Result[
+    Unit,
+    GraphControlError,
+  ]
 }
 
 ///|
-pub impl GraphControllable for CompiledDsp with apply_control(self, control) -> Result[
+pub impl GraphControllable for CompiledDsp with fn apply_control(self, control) -> Result[
   Unit,
   GraphControlError,
 ] {
@@ -39,23 +42,7 @@ pub impl GraphControllable for CompiledDsp with apply_control(self, control) -> 
 }
 
 ///|
-pub impl GraphControllable for CompiledDsp with apply_controls(self, controls) -> Result[
-  Unit,
-  GraphControlError,
-] {
-  self.0.apply_controls_impl(controls)
-}
-
-///|
-pub impl GraphControllable for CompiledStereoDsp with apply_control(
-  self,
-  control,
-) -> Result[Unit, GraphControlError] {
-  self.0.apply_control_impl(control)
-}
-
-///|
-pub impl GraphControllable for CompiledStereoDsp with apply_controls(
+pub impl GraphControllable for CompiledDsp with fn apply_controls(
   self,
   controls,
 ) -> Result[Unit, GraphControlError] {
@@ -63,7 +50,7 @@ pub impl GraphControllable for CompiledStereoDsp with apply_controls(
 }
 
 ///|
-pub impl GraphControllable for CompiledDspHotSwap with apply_control(
+pub impl GraphControllable for CompiledStereoDsp with fn apply_control(
   self,
   control,
 ) -> Result[Unit, GraphControlError] {
@@ -71,7 +58,7 @@ pub impl GraphControllable for CompiledDspHotSwap with apply_control(
 }
 
 ///|
-pub impl GraphControllable for CompiledDspHotSwap with apply_controls(
+pub impl GraphControllable for CompiledStereoDsp with fn apply_controls(
   self,
   controls,
 ) -> Result[Unit, GraphControlError] {
@@ -79,7 +66,7 @@ pub impl GraphControllable for CompiledDspHotSwap with apply_controls(
 }
 
 ///|
-pub impl GraphControllable for CompiledStereoDspHotSwap with apply_control(
+pub impl GraphControllable for CompiledDspHotSwap with fn apply_control(
   self,
   control,
 ) -> Result[Unit, GraphControlError] {
@@ -87,7 +74,7 @@ pub impl GraphControllable for CompiledStereoDspHotSwap with apply_control(
 }
 
 ///|
-pub impl GraphControllable for CompiledStereoDspHotSwap with apply_controls(
+pub impl GraphControllable for CompiledDspHotSwap with fn apply_controls(
   self,
   controls,
 ) -> Result[Unit, GraphControlError] {
@@ -95,7 +82,7 @@ pub impl GraphControllable for CompiledStereoDspHotSwap with apply_controls(
 }
 
 ///|
-pub impl GraphControllable for CompiledDspTopologyController with apply_control(
+pub impl GraphControllable for CompiledStereoDspHotSwap with fn apply_control(
   self,
   control,
 ) -> Result[Unit, GraphControlError] {
@@ -103,7 +90,7 @@ pub impl GraphControllable for CompiledDspTopologyController with apply_control(
 }
 
 ///|
-pub impl GraphControllable for CompiledDspTopologyController with apply_controls(
+pub impl GraphControllable for CompiledStereoDspHotSwap with fn apply_controls(
   self,
   controls,
 ) -> Result[Unit, GraphControlError] {
@@ -111,7 +98,7 @@ pub impl GraphControllable for CompiledDspTopologyController with apply_controls
 }
 
 ///|
-pub impl GraphControllable for CompiledStereoDspTopologyController with apply_control(
+pub impl GraphControllable for CompiledDspTopologyController with fn apply_control(
   self,
   control,
 ) -> Result[Unit, GraphControlError] {
@@ -119,7 +106,23 @@ pub impl GraphControllable for CompiledStereoDspTopologyController with apply_co
 }
 
 ///|
-pub impl GraphControllable for CompiledStereoDspTopologyController with apply_controls(
+pub impl GraphControllable for CompiledDspTopologyController with fn apply_controls(
+  self,
+  controls,
+) -> Result[Unit, GraphControlError] {
+  self.0.apply_controls_impl(controls)
+}
+
+///|
+pub impl GraphControllable for CompiledStereoDspTopologyController with fn apply_control(
+  self,
+  control,
+) -> Result[Unit, GraphControlError] {
+  self.0.apply_control_impl(control)
+}
+
+///|
+pub impl GraphControllable for CompiledStereoDspTopologyController with fn apply_controls(
   self,
   controls,
 ) -> Result[Unit, GraphControlError] {

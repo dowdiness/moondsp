@@ -36,9 +36,9 @@ fn CompiledGraph::process_feedback_graph_impl(
   let sample_rate = context.sample_rate()
   // Pre-compute pan trig gains once per block (position is constant within block)
   for i = 0; i < self.nodes.length(); i = i + 1 {
-    if self.nodes[i].kind is Pan {
-      self.pan_left_gains[i] = @dsp.pan_left_gain(self.nodes[i].value0)
-      self.pan_right_gains[i] = @dsp.pan_right_gain(self.nodes[i].value0)
+    if self.nodes[i].kind() is Pan {
+      self.pan_left_gains[i] = @dsp.pan_left_gain(self.nodes[i].value0())
+      self.pan_right_gains[i] = @dsp.pan_right_gain(self.nodes[i].value0())
     }
   }
 
@@ -49,26 +49,26 @@ fn CompiledGraph::process_feedback_graph_impl(
         node_index < self.nodes.length()
         node_index = node_index + 1 {
       let node = self.nodes[node_index]
-      match node.kind {
+      match node.kind() {
         Constant => {
-          let value = node.value0
+          let value = node.value0()
           sample_values[node_index] = value
           self.buffers[node_index].set(sample_index, value)
         }
         Oscillator => {
-          let freq = if node.input0 >= 0 {
+          let freq = if node.input0() >= 0 {
             self_register_input_sample(
               sample_values,
               self.self_values,
-              node.input0,
+              node.input0(),
               self.back_edge_input0_source[node_index],
             )
           } else {
-            node.value0
+            node.value0()
           }
           let value = self.osc_states[node_index]
             .unwrap()
-            .tick_waveform(waveform=node.waveform, freq_hz=freq, sample_rate~)
+            .tick_waveform(waveform=node.waveform(), freq_hz=freq, sample_rate~)
           sample_values[node_index] = value
           self.buffers[node_index].set(sample_index, value)
         }
@@ -86,7 +86,7 @@ fn CompiledGraph::process_feedback_graph_impl(
           let input0 = self_register_input_sample(
             sample_values,
             self.self_values,
-            node.input0,
+            node.input0(),
             self.back_edge_input0_source[node_index],
           )
           let value = self.biquad_states[node_index].unwrap().tick(input0)
@@ -97,7 +97,7 @@ fn CompiledGraph::process_feedback_graph_impl(
           let input0 = self_register_input_sample(
             sample_values,
             self.self_values,
-            node.input0,
+            node.input0(),
             self.back_edge_input0_source[node_index],
           )
           let value = self.delay_states[node_index].unwrap().tick(input0)
@@ -108,10 +108,10 @@ fn CompiledGraph::process_feedback_graph_impl(
           let input0 = self_register_input_sample(
             sample_values,
             self.self_values,
-            node.input0,
+            node.input0(),
             self.back_edge_input0_source[node_index],
           )
-          let value = input0 * node.value0
+          let value = input0 * node.value0()
           sample_values[node_index] = value
           self.buffers[node_index].set(sample_index, value)
         }
@@ -119,13 +119,13 @@ fn CompiledGraph::process_feedback_graph_impl(
           let input0 = self_register_input_sample(
             sample_values,
             self.self_values,
-            node.input0,
+            node.input0(),
             self.back_edge_input0_source[node_index],
           )
           let input1 = self_register_input_sample(
             sample_values,
             self.self_values,
-            node.input1,
+            node.input1(),
             self.back_edge_input1_source[node_index],
           )
           let value = input0 * input1
@@ -136,13 +136,13 @@ fn CompiledGraph::process_feedback_graph_impl(
           let input0 = self_register_input_sample(
             sample_values,
             self.self_values,
-            node.input0,
+            node.input0(),
             self.back_edge_input0_source[node_index],
           )
           let input1 = self_register_input_sample(
             sample_values,
             self.self_values,
-            node.input1,
+            node.input1(),
             self.back_edge_input1_source[node_index],
           )
           let value = input0 + input1
@@ -153,10 +153,10 @@ fn CompiledGraph::process_feedback_graph_impl(
           let input0 = self_register_input_sample(
             sample_values,
             self.self_values,
-            node.input0,
+            node.input0(),
             self.back_edge_input0_source[node_index],
           )
-          let value = clip_feedback_sample(input0, node.value0)
+          let value = clip_feedback_sample(input0, node.value0())
           sample_values[node_index] = value
           self.buffers[node_index].set(sample_index, value)
         }
@@ -166,7 +166,7 @@ fn CompiledGraph::process_feedback_graph_impl(
           let input0 = self_register_input_sample(
             sample_values,
             self.self_values,
-            node.input0,
+            node.input0(),
             self.back_edge_input0_source[node_index],
           )
           sample_values[node_index] = input0
@@ -176,7 +176,7 @@ fn CompiledGraph::process_feedback_graph_impl(
           let input0 = self_register_input_sample(
             sample_values,
             self.self_values,
-            node.input0,
+            node.input0(),
             self.back_edge_input0_source[node_index],
           )
           let pan_left = input0 * self.pan_left_gains[node_index]
@@ -190,17 +190,17 @@ fn CompiledGraph::process_feedback_graph_impl(
           let input_left = self_register_stereo_input_left(
             left_sv,
             self.self_left_values,
-            node.input0,
+            node.input0(),
             self.back_edge_input0_source[node_index],
           )
           let input_right = self_register_stereo_input_right(
             right_sv,
             self.self_right_values,
-            node.input0,
+            node.input0(),
             self.back_edge_input0_source[node_index],
           )
-          let left = input_left * node.value0
-          let right = input_right * node.value0
+          let left = input_left * node.value0()
+          let right = input_right * node.value0()
           left_sv[node_index] = left
           right_sv[node_index] = right
           self.left_buffers[node_index].set(sample_index, left)
@@ -210,17 +210,17 @@ fn CompiledGraph::process_feedback_graph_impl(
           let input_left = self_register_stereo_input_left(
             left_sv,
             self.self_left_values,
-            node.input0,
+            node.input0(),
             self.back_edge_input0_source[node_index],
           )
           let input_right = self_register_stereo_input_right(
             right_sv,
             self.self_right_values,
-            node.input0,
+            node.input0(),
             self.back_edge_input0_source[node_index],
           )
-          let left = clip_feedback_sample(input_left, node.value0)
-          let right = clip_feedback_sample(input_right, node.value0)
+          let left = clip_feedback_sample(input_left, node.value0())
+          let right = clip_feedback_sample(input_right, node.value0())
           left_sv[node_index] = left
           right_sv[node_index] = right
           self.left_buffers[node_index].set(sample_index, left)
@@ -230,13 +230,13 @@ fn CompiledGraph::process_feedback_graph_impl(
           let input_left = self_register_stereo_input_left(
             left_sv,
             self.self_left_values,
-            node.input0,
+            node.input0(),
             self.back_edge_input0_source[node_index],
           )
           let input_right = self_register_stereo_input_right(
             right_sv,
             self.self_right_values,
-            node.input0,
+            node.input0(),
             self.back_edge_input0_source[node_index],
           )
           let left = self.stereo_biquad_left_states[node_index]
@@ -254,13 +254,13 @@ fn CompiledGraph::process_feedback_graph_impl(
           let input_left = self_register_stereo_input_left(
             left_sv,
             self.self_left_values,
-            node.input0,
+            node.input0(),
             self.back_edge_input0_source[node_index],
           )
           let input_right = self_register_stereo_input_right(
             right_sv,
             self.self_right_values,
-            node.input0,
+            node.input0(),
             self.back_edge_input0_source[node_index],
           )
           let left = self.stereo_delay_left_states[node_index]
@@ -278,13 +278,13 @@ fn CompiledGraph::process_feedback_graph_impl(
           let input_left = self_register_stereo_input_left(
             left_sv,
             self.self_left_values,
-            node.input0,
+            node.input0(),
             self.back_edge_input0_source[node_index],
           )
           let input_right = self_register_stereo_input_right(
             right_sv,
             self.self_right_values,
-            node.input0,
+            node.input0(),
             self.back_edge_input0_source[node_index],
           )
           let value = (input_left + input_right) * 0.5
@@ -297,13 +297,13 @@ fn CompiledGraph::process_feedback_graph_impl(
           let input_left = self_register_stereo_input_left(
             left_sv,
             self.self_left_values,
-            node.input0,
+            node.input0(),
             self.back_edge_input0_source[node_index],
           )
           let input_right = self_register_stereo_input_right(
             right_sv,
             self.self_right_values,
-            node.input0,
+            node.input0(),
             self.back_edge_input0_source[node_index],
           )
           left_sv[node_index] = input_left
@@ -390,23 +390,23 @@ fn CompiledGraph::prepare_feedback_biquads(
 ) -> Unit {
   for index = 0; index < self.nodes.length(); index = index + 1 {
     let node = self.nodes[index]
-    match node.kind {
+    match node.kind() {
       Biquad =>
         ignore(
           self.biquad_states[index]
           .unwrap()
-          .update(context, node.filter_mode, node.value0, node.value1),
+          .update(context, node.filter_mode(), node.value0(), node.value1()),
         )
       StereoBiquad => {
         ignore(
           self.stereo_biquad_left_states[index]
           .unwrap()
-          .update(context, node.filter_mode, node.value0, node.value1),
+          .update(context, node.filter_mode(), node.value0(), node.value1()),
         )
         ignore(
           self.stereo_biquad_right_states[index]
           .unwrap()
-          .update(context, node.filter_mode, node.value0, node.value1),
+          .update(context, node.filter_mode(), node.value0(), node.value1()),
         )
       }
       _ => ()

@@ -1,13 +1,14 @@
 import {
-  "dowdiness/moondsp/identity" @identity,
-  "dowdiness/moondsp/dsp" @dsp,
-  "moonbitlang/core/bench" @bench,
-  "moonbitlang/core/debug" @debug,
-  "moonbitlang/core/math" @math,
-  "moonbitlang/core/ref" @ref,
+  "dowdiness/moondsp/identity",
+  "dowdiness/moondsp/dsp",
+  "dowdiness/moondsp/graph/internal/model",
+  "moonbitlang/core/bench",
+  "moonbitlang/core/debug",
+  "moonbitlang/core/math",
+  "moonbitlang/core/ref",
 }
 
 import {
-  "moonbitlang/core/double" @double,
+  "moonbitlang/core/double",
   "moonbitlang/quickcheck" @qc,
 } for "test"

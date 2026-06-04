@@ -140,21 +140,21 @@ pub fn ControlBindingMap::resolve_controls(
 }
 
 ///|
-pub impl Show for ControlBinding with output(self, logger) {
+pub impl Show for ControlBinding with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
 
 ///|
-pub impl Show for ControlBindingError with output(self, logger) {
+pub impl Show for ControlBindingError with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
 
 ///|
-pub impl Show for ControlBindingBuilder with output(self, logger) {
+pub impl Show for ControlBindingBuilder with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
 
 ///|
-pub impl Show for ControlBindingMap with output(self, logger) {
+pub impl Show for ControlBindingMap with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }

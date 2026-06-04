@@ -8,7 +8,7 @@ pub(all) suberror GraphTemplateDocError {
 } derive(Debug)
 
 ///|
-pub impl Show for GraphTemplateDocError with output(self, logger) {
+pub impl Show for GraphTemplateDocError with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
 

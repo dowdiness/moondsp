@@ -5,59 +5,62 @@ fn valid_any_node_inputs(
   sample_rate : Double,
   output_kind : DspNodeKind,
 ) -> Bool {
-  match node.kind {
-    Constant => @dsp.is_finite(node.value0)
+  match node.kind() {
+    Constant => @dsp.is_finite(node.value0())
     Oscillator =>
-      if node.input0 >= 0 {
-        valid_reference(node.input0, node_count)
+      if node.input0() >= 0 {
+        valid_reference(node.input0(), node_count)
       } else {
-        @dsp.is_finite(node.value0)
+        @dsp.is_finite(node.value0())
       }
     Noise => true
     Adsr =>
-      @dsp.is_finite(node.value0) &&
-      @dsp.is_finite(node.value1) &&
-      @dsp.is_finite(node.value2) &&
-      @dsp.is_finite(node.value3)
+      @dsp.is_finite(node.value0()) &&
+      @dsp.is_finite(node.value1()) &&
+      @dsp.is_finite(node.value2()) &&
+      @dsp.is_finite(node.value3())
     Biquad =>
-      valid_reference(node.input0, node_count) &&
-      valid_biquad_graph_params(sample_rate, node.value0, node.value1)
+      valid_reference(node.input0(), node_count) &&
+      valid_biquad_graph_params(sample_rate, node.value0(), node.value1())
     Delay =>
-      valid_reference(node.input0, node_count) &&
-      valid_delay_feedback(node.value0) &&
-      valid_delay_samples(node.delay_samples, node.delay_max_samples)
+      valid_reference(node.input0(), node_count) &&
+      valid_delay_feedback(node.value0()) &&
+      valid_delay_samples(node.delay_samples(), node.delay_max_samples())
     Gain =>
-      valid_reference(node.input0, node_count) && @dsp.is_finite(node.value0)
+      valid_reference(node.input0(), node_count) &&
+      @dsp.is_finite(node.value0())
     Mul =>
-      valid_reference(node.input0, node_count) &&
-      valid_reference(node.input1, node_count)
+      valid_reference(node.input0(), node_count) &&
+      valid_reference(node.input1(), node_count)
     Mix =>
-      valid_reference(node.input0, node_count) &&
-      valid_reference(node.input1, node_count)
+      valid_reference(node.input0(), node_count) &&
+      valid_reference(node.input1(), node_count)
     Clip =>
-      valid_reference(node.input0, node_count) &&
-      @dsp.is_finite(node.value0) &&
-      node.value0 > 0.0
+      valid_reference(node.input0(), node_count) &&
+      @dsp.is_finite(node.value0()) &&
+      node.value0() > 0.0
     Output =>
-      node.kind == output_kind && valid_reference(node.input0, node_count)
+      node.kind() == output_kind && valid_reference(node.input0(), node_count)
     Pan =>
-      valid_reference(node.input0, node_count) && @dsp.is_finite(node.value0)
+      valid_reference(node.input0(), node_count) &&
+      @dsp.is_finite(node.value0())
     StereoGain =>
-      valid_reference(node.input0, node_count) && @dsp.is_finite(node.value0)
+      valid_reference(node.input0(), node_count) &&
+      @dsp.is_finite(node.value0())
     StereoClip =>
-      valid_reference(node.input0, node_count) &&
-      @dsp.is_finite(node.value0) &&
-      node.value0 > 0.0
+      valid_reference(node.input0(), node_count) &&
+      @dsp.is_finite(node.value0()) &&
+      node.value0() > 0.0
     StereoBiquad =>
-      valid_reference(node.input0, node_count) &&
-      valid_biquad_graph_params(sample_rate, node.value0, node.value1)
+      valid_reference(node.input0(), node_count) &&
+      valid_biquad_graph_params(sample_rate, node.value0(), node.value1())
     StereoDelay =>
-      valid_reference(node.input0, node_count) &&
-      valid_delay_feedback(node.value0) &&
-      valid_delay_samples(node.delay_samples, node.delay_max_samples)
-    StereoMixDown => valid_reference(node.input0, node_count)
+      valid_reference(node.input0(), node_count) &&
+      valid_delay_feedback(node.value0()) &&
+      valid_delay_samples(node.delay_samples(), node.delay_max_samples())
+    StereoMixDown => valid_reference(node.input0(), node_count)
     StereoOutput =>
-      node.kind == output_kind && valid_reference(node.input0, node_count)
+      node.kind() == output_kind && valid_reference(node.input0(), node_count)
   }
 }
 
@@ -88,7 +91,7 @@ fn valid_reference(input : Int, node_count : Int) -> Bool {
 
 ///|
 fn valid_feedback_terminal_mono_graph(
-  nodes : FixedArray[DspNode],
+  nodes : FixedArray[@model.DspNode],
   feedback_edges : FixedArray[(Int, Int, Int)],
 ) -> Bool {
   // Build per-slot back-edge source maps for shape resolution.
@@ -105,13 +108,13 @@ fn valid_feedback_terminal_mono_graph(
   let shapes = FixedArray::make(nodes.length(), MONO_SIGNAL_SHAPE)
   for index = 0; index < nodes.length(); index = index + 1 {
     let node = nodes[index]
-    let shape = match node.kind {
+    let shape = match node.kind() {
       Constant => MONO_SIGNAL_SHAPE
       Oscillator =>
-        if node.input0 >= 0 {
+        if node.input0() >= 0 {
           match
             feedback_resolved_input_shape(
-              node.input0,
+              node.input0(),
               be_input0_src[index],
               shapes,
               nodes,
@@ -127,7 +130,7 @@ fn valid_feedback_terminal_mono_graph(
       Biquad =>
         match
           feedback_resolved_input_shape(
-            node.input0,
+            node.input0(),
             be_input0_src[index],
             shapes,
             nodes,
@@ -138,7 +141,7 @@ fn valid_feedback_terminal_mono_graph(
       Delay =>
         match
           feedback_resolved_input_shape(
-            node.input0,
+            node.input0(),
             be_input0_src[index],
             shapes,
             nodes,
@@ -149,7 +152,7 @@ fn valid_feedback_terminal_mono_graph(
       Gain =>
         match
           feedback_resolved_input_shape(
-            node.input0,
+            node.input0(),
             be_input0_src[index],
             shapes,
             nodes,
@@ -159,13 +162,13 @@ fn valid_feedback_terminal_mono_graph(
         }
       Mul => {
         let s0 = feedback_resolved_input_shape(
-          node.input0,
+          node.input0(),
           be_input0_src[index],
           shapes,
           nodes,
         )
         let s1 = feedback_resolved_input_shape(
-          node.input1,
+          node.input1(),
           be_input1_src[index],
           shapes,
           nodes,
@@ -178,13 +181,13 @@ fn valid_feedback_terminal_mono_graph(
       }
       Mix => {
         let s0 = feedback_resolved_input_shape(
-          node.input0,
+          node.input0(),
           be_input0_src[index],
           shapes,
           nodes,
         )
         let s1 = feedback_resolved_input_shape(
-          node.input1,
+          node.input1(),
           be_input1_src[index],
           shapes,
           nodes,
@@ -198,7 +201,7 @@ fn valid_feedback_terminal_mono_graph(
       Clip =>
         match
           feedback_resolved_input_shape(
-            node.input0,
+            node.input0(),
             be_input0_src[index],
             shapes,
             nodes,
@@ -209,7 +212,7 @@ fn valid_feedback_terminal_mono_graph(
       Output =>
         match
           feedback_resolved_input_shape(
-            node.input0,
+            node.input0(),
             be_input0_src[index],
             shapes,
             nodes,
@@ -220,7 +223,7 @@ fn valid_feedback_terminal_mono_graph(
       Pan =>
         match
           feedback_resolved_input_shape(
-            node.input0,
+            node.input0(),
             be_input0_src[index],
             shapes,
             nodes,
@@ -231,7 +234,7 @@ fn valid_feedback_terminal_mono_graph(
       StereoGain =>
         match
           feedback_resolved_input_shape(
-            node.input0,
+            node.input0(),
             be_input0_src[index],
             shapes,
             nodes,
@@ -242,7 +245,7 @@ fn valid_feedback_terminal_mono_graph(
       StereoClip =>
         match
           feedback_resolved_input_shape(
-            node.input0,
+            node.input0(),
             be_input0_src[index],
             shapes,
             nodes,
@@ -253,7 +256,7 @@ fn valid_feedback_terminal_mono_graph(
       StereoBiquad =>
         match
           feedback_resolved_input_shape(
-            node.input0,
+            node.input0(),
             be_input0_src[index],
             shapes,
             nodes,
@@ -264,7 +267,7 @@ fn valid_feedback_terminal_mono_graph(
       StereoDelay =>
         match
           feedback_resolved_input_shape(
-            node.input0,
+            node.input0(),
             be_input0_src[index],
             shapes,
             nodes,
@@ -275,7 +278,7 @@ fn valid_feedback_terminal_mono_graph(
       StereoMixDown =>
         match
           feedback_resolved_input_shape(
-            node.input0,
+            node.input0(),
             be_input0_src[index],
             shapes,
             nodes,
@@ -290,7 +293,7 @@ fn valid_feedback_terminal_mono_graph(
   // Verify no feedback edges go through Output nodes
   for index = 0; index < feedback_edges.length(); index = index + 1 {
     let edge = feedback_edges[index]
-    if nodes[edge.0].kind is Output || nodes[edge.1].kind is Output {
+    if nodes[edge.0].kind() is Output || nodes[edge.1].kind() is Output {
       return false
     }
     // Verify shape compatibility
@@ -303,19 +306,20 @@ fn valid_feedback_terminal_mono_graph(
     }
   }
   let last = nodes.length() - 1
-  nodes[last].kind is DspNodeKind::Output && shapes[last] == MONO_SIGNAL_SHAPE
+  nodes[last].kind() is @model.DspNodeKind::Output &&
+  shapes[last] == MONO_SIGNAL_SHAPE
 }
 
 ///|
-fn valid_terminal_mono_shapes(nodes : FixedArray[DspNode]) -> Bool {
+fn valid_terminal_mono_shapes(nodes : FixedArray[@model.DspNode]) -> Bool {
   let shapes = FixedArray::make(nodes.length(), MONO_SIGNAL_SHAPE)
   for index = 0; index < nodes.length(); index = index + 1 {
     let node = nodes[index]
-    let shape = match node.kind {
+    let shape = match node.kind() {
       Constant => MONO_SIGNAL_SHAPE
       Oscillator =>
-        if node.input0 >= 0 {
-          match input_shape(node.input0, shapes) {
+        if node.input0() >= 0 {
+          match input_shape(node.input0(), shapes) {
             Some(MONO_SIGNAL_SHAPE) => MONO_SIGNAL_SHAPE
             _ => return false
           }
@@ -325,71 +329,71 @@ fn valid_terminal_mono_shapes(nodes : FixedArray[DspNode]) -> Bool {
       Noise => MONO_SIGNAL_SHAPE
       Adsr => MONO_SIGNAL_SHAPE
       Biquad =>
-        match input_shape(node.input0, shapes) {
+        match input_shape(node.input0(), shapes) {
           Some(MONO_SIGNAL_SHAPE) => MONO_SIGNAL_SHAPE
           _ => return false
         }
       Delay =>
-        match input_shape(node.input0, shapes) {
+        match input_shape(node.input0(), shapes) {
           Some(MONO_SIGNAL_SHAPE) => MONO_SIGNAL_SHAPE
           _ => return false
         }
       Gain =>
-        match input_shape(node.input0, shapes) {
+        match input_shape(node.input0(), shapes) {
           Some(MONO_SIGNAL_SHAPE) => MONO_SIGNAL_SHAPE
           _ => return false
         }
       Mul =>
-        if is_mono_shape(input_shape(node.input0, shapes)) &&
-          is_mono_shape(input_shape(node.input1, shapes)) {
+        if is_mono_shape(input_shape(node.input0(), shapes)) &&
+          is_mono_shape(input_shape(node.input1(), shapes)) {
           MONO_SIGNAL_SHAPE
         } else {
           return false
         }
       Mix =>
-        if is_mono_shape(input_shape(node.input0, shapes)) &&
-          is_mono_shape(input_shape(node.input1, shapes)) {
+        if is_mono_shape(input_shape(node.input0(), shapes)) &&
+          is_mono_shape(input_shape(node.input1(), shapes)) {
           MONO_SIGNAL_SHAPE
         } else {
           return false
         }
       Clip =>
-        match input_shape(node.input0, shapes) {
+        match input_shape(node.input0(), shapes) {
           Some(MONO_SIGNAL_SHAPE) => MONO_SIGNAL_SHAPE
           _ => return false
         }
       Output =>
-        match input_shape(node.input0, shapes) {
+        match input_shape(node.input0(), shapes) {
           Some(MONO_SIGNAL_SHAPE) => MONO_SIGNAL_SHAPE
           _ => return false
         }
       Pan =>
-        match input_shape(node.input0, shapes) {
+        match input_shape(node.input0(), shapes) {
           Some(MONO_SIGNAL_SHAPE) => STEREO_SIGNAL_SHAPE
           _ => return false
         }
       StereoGain =>
-        match input_shape(node.input0, shapes) {
+        match input_shape(node.input0(), shapes) {
           Some(STEREO_SIGNAL_SHAPE) => STEREO_SIGNAL_SHAPE
           _ => return false
         }
       StereoClip =>
-        match input_shape(node.input0, shapes) {
+        match input_shape(node.input0(), shapes) {
           Some(STEREO_SIGNAL_SHAPE) => STEREO_SIGNAL_SHAPE
           _ => return false
         }
       StereoBiquad =>
-        match input_shape(node.input0, shapes) {
+        match input_shape(node.input0(), shapes) {
           Some(STEREO_SIGNAL_SHAPE) => STEREO_SIGNAL_SHAPE
           _ => return false
         }
       StereoDelay =>
-        match input_shape(node.input0, shapes) {
+        match input_shape(node.input0(), shapes) {
           Some(STEREO_SIGNAL_SHAPE) => STEREO_SIGNAL_SHAPE
           _ => return false
         }
       StereoMixDown =>
-        match input_shape(node.input0, shapes) {
+        match input_shape(node.input0(), shapes) {
           Some(STEREO_SIGNAL_SHAPE) => MONO_SIGNAL_SHAPE
           _ => return false
         }
@@ -399,24 +403,27 @@ fn valid_terminal_mono_shapes(nodes : FixedArray[DspNode]) -> Bool {
   }
 
   let last = nodes.length() - 1
-  nodes[last].kind is DspNodeKind::Output && shapes[last] == MONO_SIGNAL_SHAPE
+  nodes[last].kind() is @model.DspNodeKind::Output &&
+  shapes[last] == MONO_SIGNAL_SHAPE
 }
 
 ///|
-fn valid_terminal_stereo_shapes(nodes : FixedArray[DspNode]) -> Bool {
+fn valid_terminal_stereo_shapes(nodes : FixedArray[@model.DspNode]) -> Bool {
   compiled_stereo_shapes(nodes) is Some(_)
 }
 
 ///|
-fn compiled_stereo_shapes(nodes : FixedArray[DspNode]) -> FixedArray[Int]? {
+fn compiled_stereo_shapes(
+  nodes : FixedArray[@model.DspNode],
+) -> FixedArray[Int]? {
   let shapes = FixedArray::make(nodes.length(), MONO_SIGNAL_SHAPE)
   for index = 0; index < nodes.length(); index = index + 1 {
     let node = nodes[index]
-    let shape = match node.kind {
+    let shape = match node.kind() {
       Constant => MONO_SIGNAL_SHAPE
       Oscillator =>
-        if node.input0 >= 0 {
-          match input_shape(node.input0, shapes) {
+        if node.input0() >= 0 {
+          match input_shape(node.input0(), shapes) {
             Some(MONO_SIGNAL_SHAPE) => MONO_SIGNAL_SHAPE
             _ => return None
           }
@@ -426,68 +433,68 @@ fn compiled_stereo_shapes(nodes : FixedArray[DspNode]) -> FixedArray[Int]? {
       Noise => MONO_SIGNAL_SHAPE
       Adsr => MONO_SIGNAL_SHAPE
       Biquad =>
-        match input_shape(node.input0, shapes) {
+        match input_shape(node.input0(), shapes) {
           Some(MONO_SIGNAL_SHAPE) => MONO_SIGNAL_SHAPE
           _ => return None
         }
       Delay =>
-        match input_shape(node.input0, shapes) {
+        match input_shape(node.input0(), shapes) {
           Some(MONO_SIGNAL_SHAPE) => MONO_SIGNAL_SHAPE
           _ => return None
         }
       Gain =>
-        match input_shape(node.input0, shapes) {
+        match input_shape(node.input0(), shapes) {
           Some(MONO_SIGNAL_SHAPE) => MONO_SIGNAL_SHAPE
           _ => return None
         }
       Mul =>
-        if is_mono_shape(input_shape(node.input0, shapes)) &&
-          is_mono_shape(input_shape(node.input1, shapes)) {
+        if is_mono_shape(input_shape(node.input0(), shapes)) &&
+          is_mono_shape(input_shape(node.input1(), shapes)) {
           MONO_SIGNAL_SHAPE
         } else {
           return None
         }
       Mix =>
-        if is_mono_shape(input_shape(node.input0, shapes)) &&
-          is_mono_shape(input_shape(node.input1, shapes)) {
+        if is_mono_shape(input_shape(node.input0(), shapes)) &&
+          is_mono_shape(input_shape(node.input1(), shapes)) {
           MONO_SIGNAL_SHAPE
         } else {
           return None
         }
       Clip =>
-        match input_shape(node.input0, shapes) {
+        match input_shape(node.input0(), shapes) {
           Some(MONO_SIGNAL_SHAPE) => MONO_SIGNAL_SHAPE
           _ => return None
         }
       Output => return None
       Pan =>
-        match input_shape(node.input0, shapes) {
+        match input_shape(node.input0(), shapes) {
           Some(MONO_SIGNAL_SHAPE) => STEREO_SIGNAL_SHAPE
           _ => return None
         }
       StereoGain =>
-        match input_shape(node.input0, shapes) {
+        match input_shape(node.input0(), shapes) {
           Some(STEREO_SIGNAL_SHAPE) => STEREO_SIGNAL_SHAPE
           _ => return None
         }
       StereoClip =>
-        match input_shape(node.input0, shapes) {
+        match input_shape(node.input0(), shapes) {
           Some(STEREO_SIGNAL_SHAPE) => STEREO_SIGNAL_SHAPE
           _ => return None
         }
       StereoBiquad =>
-        match input_shape(node.input0, shapes) {
+        match input_shape(node.input0(), shapes) {
           Some(STEREO_SIGNAL_SHAPE) => STEREO_SIGNAL_SHAPE
           _ => return None
         }
       StereoDelay =>
-        match input_shape(node.input0, shapes) {
+        match input_shape(node.input0(), shapes) {
           Some(STEREO_SIGNAL_SHAPE) => STEREO_SIGNAL_SHAPE
           _ => return None
         }
       StereoMixDown => return None
       StereoOutput =>
-        match input_shape(node.input0, shapes) {
+        match input_shape(node.input0(), shapes) {
           Some(STEREO_SIGNAL_SHAPE) => STEREO_SIGNAL_SHAPE
           _ => return None
         }
@@ -496,7 +503,7 @@ fn compiled_stereo_shapes(nodes : FixedArray[DspNode]) -> FixedArray[Int]? {
   }
 
   let last = nodes.length() - 1
-  if nodes[last].kind is DspNodeKind::StereoOutput &&
+  if nodes[last].kind() is @model.DspNodeKind::StereoOutput &&
     shapes[last] == STEREO_SIGNAL_SHAPE {
     Some(shapes)
   } else {
@@ -510,7 +517,7 @@ fn compiled_stereo_shapes(nodes : FixedArray[DspNode]) -> FixedArray[Int]? {
 /// forward propagation, which lets the analysis succeed for cycles that cross
 /// the mono/stereo boundary (e.g. Pan -> StereoGain -> StereoMixDown -> Mix).
 fn compiled_feedback_stereo_shapes(
-  nodes : FixedArray[DspNode],
+  nodes : FixedArray[@model.DspNode],
   feedback_edges : FixedArray[(Int, Int, Int)],
 ) -> FixedArray[Int]? {
   // Build per-slot back-edge source maps so we can skip them during forward
@@ -528,12 +535,12 @@ fn compiled_feedback_stereo_shapes(
   let shapes = FixedArray::make(nodes.length(), MONO_SIGNAL_SHAPE)
   for index = 0; index < nodes.length(); index = index + 1 {
     let node = nodes[index]
-    let shape = match node.kind {
+    let shape = match node.kind() {
       Constant => MONO_SIGNAL_SHAPE
       Oscillator =>
-        if node.input0 >= 0 {
+        if node.input0() >= 0 {
           let s = feedback_resolved_input_shape(
-            node.input0,
+            node.input0(),
             be_input0_src[index],
             shapes,
             nodes,
@@ -549,7 +556,7 @@ fn compiled_feedback_stereo_shapes(
       Adsr => MONO_SIGNAL_SHAPE
       Biquad => {
         let s = feedback_resolved_input_shape(
-          node.input0,
+          node.input0(),
           be_input0_src[index],
           shapes,
           nodes,
@@ -561,7 +568,7 @@ fn compiled_feedback_stereo_shapes(
       }
       Delay => {
         let s = feedback_resolved_input_shape(
-          node.input0,
+          node.input0(),
           be_input0_src[index],
           shapes,
           nodes,
@@ -573,7 +580,7 @@ fn compiled_feedback_stereo_shapes(
       }
       Gain => {
         let s = feedback_resolved_input_shape(
-          node.input0,
+          node.input0(),
           be_input0_src[index],
           shapes,
           nodes,
@@ -585,13 +592,13 @@ fn compiled_feedback_stereo_shapes(
       }
       Mul => {
         let s0 = feedback_resolved_input_shape(
-          node.input0,
+          node.input0(),
           be_input0_src[index],
           shapes,
           nodes,
         )
         let s1 = feedback_resolved_input_shape(
-          node.input1,
+          node.input1(),
           be_input1_src[index],
           shapes,
           nodes,
@@ -604,13 +611,13 @@ fn compiled_feedback_stereo_shapes(
       }
       Mix => {
         let s0 = feedback_resolved_input_shape(
-          node.input0,
+          node.input0(),
           be_input0_src[index],
           shapes,
           nodes,
         )
         let s1 = feedback_resolved_input_shape(
-          node.input1,
+          node.input1(),
           be_input1_src[index],
           shapes,
           nodes,
@@ -623,7 +630,7 @@ fn compiled_feedback_stereo_shapes(
       }
       Clip => {
         let s = feedback_resolved_input_shape(
-          node.input0,
+          node.input0(),
           be_input0_src[index],
           shapes,
           nodes,
@@ -635,7 +642,7 @@ fn compiled_feedback_stereo_shapes(
       }
       Output => {
         let s = feedback_resolved_input_shape(
-          node.input0,
+          node.input0(),
           be_input0_src[index],
           shapes,
           nodes,
@@ -647,7 +654,7 @@ fn compiled_feedback_stereo_shapes(
       }
       Pan => {
         let s = feedback_resolved_input_shape(
-          node.input0,
+          node.input0(),
           be_input0_src[index],
           shapes,
           nodes,
@@ -659,7 +666,7 @@ fn compiled_feedback_stereo_shapes(
       }
       StereoGain => {
         let s = feedback_resolved_input_shape(
-          node.input0,
+          node.input0(),
           be_input0_src[index],
           shapes,
           nodes,
@@ -671,7 +678,7 @@ fn compiled_feedback_stereo_shapes(
       }
       StereoClip => {
         let s = feedback_resolved_input_shape(
-          node.input0,
+          node.input0(),
           be_input0_src[index],
           shapes,
           nodes,
@@ -683,7 +690,7 @@ fn compiled_feedback_stereo_shapes(
       }
       StereoBiquad => {
         let s = feedback_resolved_input_shape(
-          node.input0,
+          node.input0(),
           be_input0_src[index],
           shapes,
           nodes,
@@ -695,7 +702,7 @@ fn compiled_feedback_stereo_shapes(
       }
       StereoDelay => {
         let s = feedback_resolved_input_shape(
-          node.input0,
+          node.input0(),
           be_input0_src[index],
           shapes,
           nodes,
@@ -707,7 +714,7 @@ fn compiled_feedback_stereo_shapes(
       }
       StereoMixDown => {
         let s = feedback_resolved_input_shape(
-          node.input0,
+          node.input0(),
           be_input0_src[index],
           shapes,
           nodes,
@@ -719,7 +726,7 @@ fn compiled_feedback_stereo_shapes(
       }
       StereoOutput => {
         let s = feedback_resolved_input_shape(
-          node.input0,
+          node.input0(),
           be_input0_src[index],
           shapes,
           nodes,
@@ -734,7 +741,7 @@ fn compiled_feedback_stereo_shapes(
   }
 
   let last = nodes.length() - 1
-  if nodes[last].kind is DspNodeKind::StereoOutput &&
+  if nodes[last].kind() is @model.DspNodeKind::StereoOutput &&
     shapes[last] == STEREO_SIGNAL_SHAPE {
     Some(shapes)
   } else {
@@ -749,10 +756,10 @@ fn feedback_resolved_input_shape(
   input_index : Int,
   back_edge_source : Int,
   shapes : FixedArray[Int],
-  nodes : FixedArray[DspNode],
+  nodes : FixedArray[@model.DspNode],
 ) -> Int? {
   if back_edge_source >= 0 {
-    Some(nodes[back_edge_source].signal_shape())
+    Some(@model.node_signal_shape(nodes[back_edge_source]))
   } else {
     input_shape(input_index, shapes)
   }
@@ -760,7 +767,7 @@ fn feedback_resolved_input_shape(
 
 ///|
 fn valid_feedback_terminal_stereo_graph(
-  nodes : FixedArray[DspNode],
+  nodes : FixedArray[@model.DspNode],
   feedback_edges : FixedArray[(Int, Int, Int)],
 ) -> Bool {
   let shapes = match compiled_feedback_stereo_shapes(nodes, feedback_edges) {
@@ -769,10 +776,10 @@ fn valid_feedback_terminal_stereo_graph(
   }
   for index = 0; index < feedback_edges.length(); index = index + 1 {
     let edge = feedback_edges[index]
-    if nodes[edge.0].kind is Output ||
-      nodes[edge.0].kind is StereoOutput ||
-      nodes[edge.1].kind is Output ||
-      nodes[edge.1].kind is StereoOutput {
+    if nodes[edge.0].kind() is Output ||
+      nodes[edge.0].kind() is StereoOutput ||
+      nodes[edge.1].kind() is Output ||
+      nodes[edge.1].kind() is StereoOutput {
       return false
     }
     // Verify shape compatibility: source shape must match what target slot expects
@@ -788,8 +795,8 @@ fn valid_feedback_terminal_stereo_graph(
 }
 
 ///|
-fn feedback_target_shape(node : DspNode, target_slot : Int) -> Int? {
-  match node.kind {
+fn feedback_target_shape(node : @model.DspNode, target_slot : Int) -> Int? {
+  match node.kind() {
     Biquad => if target_slot == 0 { Some(MONO_SIGNAL_SHAPE) } else { None }
     Delay => if target_slot == 0 { Some(MONO_SIGNAL_SHAPE) } else { None }
     Gain => if target_slot == 0 { Some(MONO_SIGNAL_SHAPE) } else { None }

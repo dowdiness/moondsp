@@ -9,7 +9,7 @@ pub(all) enum GraphValidationError {
 } derive(Debug, Eq)
 
 ///|
-pub impl Show for GraphValidationError with output(self, logger) {
+pub impl Show for GraphValidationError with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
 
@@ -17,25 +17,33 @@ pub impl Show for GraphValidationError with output(self, logger) {
 /// Check that node's input0 and input1 are within buffer bounds.
 /// Called per node in debug mode only. Returns true if valid.
 fn validate_node_inputs(
-  node : DspNode,
+  node : @model.DspNode,
   node_index : Int,
   buffer_count : Int,
   errors : Array[GraphValidationError],
 ) -> Bool {
   let max_valid = buffer_count - 1
   let mut valid = true
-  if node.input0 >= 0 && node.input0 >= buffer_count {
+  if node.input0() >= 0 && node.input0() >= buffer_count {
     if errors.length() < MAX_DEBUG_ERRORS {
       errors.push(
-        GraphValidationError::InvalidInput0(node_index, node.input0, max_valid),
+        GraphValidationError::InvalidInput0(
+          node_index,
+          node.input0(),
+          max_valid,
+        ),
       )
     }
     valid = false
   }
-  if node.input1 >= 0 && node.input1 >= buffer_count {
+  if node.input1() >= 0 && node.input1() >= buffer_count {
     if errors.length() < MAX_DEBUG_ERRORS {
       errors.push(
-        GraphValidationError::InvalidInput1(node_index, node.input1, max_valid),
+        GraphValidationError::InvalidInput1(
+          node_index,
+          node.input1(),
+          max_valid,
+        ),
       )
     }
     valid = false
@@ -48,11 +56,11 @@ fn validate_node_inputs(
 /// Called per node in debug mode only. Returns true if valid.
 fn validate_node_state(
   graph : CompiledGraph,
-  node : DspNode,
+  node : @model.DspNode,
   node_index : Int,
   errors : Array[GraphValidationError],
 ) -> Bool {
-  let missing = match node.kind {
+  let missing = match node.kind() {
     Oscillator =>
       if graph.osc_states[node_index] is None {
         Some("osc")

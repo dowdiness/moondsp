@@ -11,7 +11,7 @@ pub(all) enum GraphControlError {
 } derive(Debug)
 
 ///|
-pub impl Show for GraphControlError with output(self, logger) {
+pub impl Show for GraphControlError with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
 
@@ -86,7 +86,7 @@ pub fn CompiledDsp::is_voice_finished(self : CompiledDsp) -> Bool {
   let nodes = self.0.nodes
   let env_states = self.0.env_states
   for i = 0; i < nodes.length(); i = i + 1 {
-    if nodes[i].kind is Adsr {
+    if nodes[i].kind() is Adsr {
       match env_states[i] {
         Some(adsr) => if !(adsr.stage() is EnvStage::Idle) { return false }
         None => ()
@@ -359,15 +359,16 @@ fn CompiledGraph::apply_control_impl(
   self : CompiledGraph,
   control : GraphControl,
 ) -> Result[Unit, GraphControlError] {
-  match control.kind {
-    GateOn => apply_graph_gate_control_result(self, control.node_index, true)
-    GateOff => apply_graph_gate_control_result(self, control.node_index, false)
+  match control.kind() {
+    GateOn => apply_graph_gate_control_result(self, control.node_index(), true)
+    GateOff =>
+      apply_graph_gate_control_result(self, control.node_index(), false)
     SetParam =>
       apply_graph_param_control_result(
         self,
-        control.node_index,
-        control.slot,
-        control.value,
+        control.node_index(),
+        control.slot(),
+        control.value(),
       )
   }
 }
@@ -445,10 +446,11 @@ fn apply_graph_gate_control_result(
     }
     None => {
       let node = graph.nodes[compiled_index]
-      if node.kind is Adsr {
-        Err(GraphControlError::MissingRuntimeState(node_index, node.kind))
+      let kind = dsp_node_kind_from_model(node.kind())
+      if node.kind() is Adsr {
+        Err(GraphControlError::MissingRuntimeState(node_index, kind))
       } else {
-        Err(GraphControlError::InvalidGateNode(node_index, node.kind))
+        Err(GraphControlError::InvalidGateNode(node_index, kind))
       }
     }
   }
@@ -467,7 +469,7 @@ fn apply_graph_param_control_result(
   }
   let node = graph.nodes[compiled_index]
   let updated = match
-    updated_node_param_result(
+    updated_model_node_param_result(
       node,
       node_index,
       slot,
@@ -481,26 +483,31 @@ fn apply_graph_param_control_result(
   if apply_runtime_param_side_effect(graph, compiled_index, updated, slot) {
     Ok(())
   } else {
-    Err(GraphControlError::MissingRuntimeState(node_index, node.kind))
+    Err(
+      GraphControlError::MissingRuntimeState(
+        node_index,
+        dsp_node_kind_from_model(node.kind()),
+      ),
+    )
   }
 }
 
 ///|
 fn valid_graph_control_result(
   graph : CompiledGraph,
-  simulated_nodes : FixedArray[DspNode],
+  simulated_nodes : FixedArray[@model.DspNode],
   control : GraphControl,
 ) -> Result[Unit, GraphControlError] {
-  match control.kind {
-    GateOn => valid_graph_gate_control_result(graph, control.node_index)
-    GateOff => valid_graph_gate_control_result(graph, control.node_index)
+  match control.kind() {
+    GateOn => valid_graph_gate_control_result(graph, control.node_index())
+    GateOff => valid_graph_gate_control_result(graph, control.node_index())
     SetParam =>
       valid_graph_param_control_result(
         graph,
         simulated_nodes,
-        control.node_index,
-        control.slot,
-        control.value,
+        control.node_index(),
+        control.slot(),
+        control.value(),
       )
   }
 }
@@ -518,10 +525,11 @@ fn valid_graph_gate_control_result(
     Some(_) => Ok(())
     None => {
       let node = graph.nodes[compiled_index]
-      if node.kind is Adsr {
-        Err(GraphControlError::MissingRuntimeState(node_index, node.kind))
+      let kind = dsp_node_kind_from_model(node.kind())
+      if node.kind() is Adsr {
+        Err(GraphControlError::MissingRuntimeState(node_index, kind))
       } else {
-        Err(GraphControlError::InvalidGateNode(node_index, node.kind))
+        Err(GraphControlError::InvalidGateNode(node_index, kind))
       }
     }
   }
@@ -530,7 +538,7 @@ fn valid_graph_gate_control_result(
 ///|
 fn valid_graph_param_control_result(
   graph : CompiledGraph,
-  simulated_nodes : FixedArray[DspNode],
+  simulated_nodes : FixedArray[@model.DspNode],
   node_index : Int,
   slot : GraphParamSlot,
   value : Double,
@@ -540,7 +548,7 @@ fn valid_graph_param_control_result(
     Err(error) => return Err(error)
   }
   let updated = match
-    updated_node_param_result(
+    updated_model_node_param_result(
       simulated_nodes[compiled_index],
       node_index,
       slot,
@@ -555,48 +563,47 @@ fn valid_graph_param_control_result(
 }
 
 ///|
-fn updated_node_param_result(
-  node : DspNode,
+fn updated_model_node_param_result(
+  node : @model.DspNode,
   node_index : Int,
   slot : GraphParamSlot,
   value : Double,
   sample_rate : Double,
-) -> Result[DspNode, GraphControlError] {
-  if !node_accepts_slot(node, slot) {
-    return Err(
-      GraphControlError::InvalidSlotForNode(node_index, node.kind, slot),
-    )
+) -> Result[@model.DspNode, GraphControlError] {
+  let kind = dsp_node_kind_from_model(node.kind())
+  if !@model.node_accepts_slot(node, slot.to_model()) {
+    return Err(GraphControlError::InvalidSlotForNode(node_index, kind, slot))
   }
-  match updated_node_param(node, slot, value, sample_rate) {
+  match updated_model_node_param(node, slot, value, sample_rate) {
     Some(updated) => Ok(updated)
     None =>
-      Err(
-        GraphControlError::InvalidParamValue(node_index, node.kind, slot, value),
-      )
+      Err(GraphControlError::InvalidParamValue(node_index, kind, slot, value))
   }
 }
 
 ///|
-fn updated_node_param(
-  node : DspNode,
+fn updated_model_node_param(
+  node : @model.DspNode,
   slot : GraphParamSlot,
   value : Double,
   sample_rate : Double,
-) -> DspNode? {
-  match node.kind {
+) -> @model.DspNode? {
+  match node.kind() {
     Constant =>
       match slot {
-        Value0 if @dsp.is_finite(value) => Some(node_with_value0(node, value))
+        Value0 if @dsp.is_finite(value) =>
+          Some(@model.node_with_value0(node, value))
         _ => None
       }
     Oscillator =>
       // FM oscillators (input0 >= 0) read frequency from input buffer;
       // reject Value0 updates for them since the value is unused.
-      if node.input0 >= 0 {
+      if node.input0() >= 0 {
         None
       } else {
         match slot {
-          Value0 if @dsp.is_finite(value) => Some(node_with_value0(node, value))
+          Value0 if @dsp.is_finite(value) =>
+            Some(@model.node_with_value0(node, value))
           _ => None
         }
       }
@@ -604,27 +611,28 @@ fn updated_node_param(
     Noise => None
     Biquad =>
       match slot {
-        Value0 if valid_biquad_graph_params(sample_rate, value, node.value1) =>
-          Some(node_with_value0(node, value))
-        Value1 if valid_biquad_graph_params(sample_rate, node.value0, value) =>
-          Some(node_with_value1(node, value))
+        Value0 if valid_biquad_graph_params(sample_rate, value, node.value1()) =>
+          Some(@model.node_with_value0(node, value))
+        Value1 if valid_biquad_graph_params(sample_rate, node.value0(), value) =>
+          Some(@model.node_with_value1(node, value))
         _ => None
       }
     Delay =>
       match slot {
         Value0 if valid_delay_feedback(value) =>
-          Some(node_with_value0(node, value))
+          Some(@model.node_with_value0(node, value))
         DelaySamples =>
           match exact_int_value(value) {
-            Some(ds) if valid_delay_samples(ds, node.delay_max_samples) =>
-              Some(node_with_delay_samples(node, ds))
+            Some(ds) if valid_delay_samples(ds, node.delay_max_samples()) =>
+              Some(@model.node_with_delay_samples(node, ds))
             _ => None
           }
         _ => None
       }
     Gain =>
       match slot {
-        Value0 if @dsp.is_finite(value) => Some(node_with_value0(node, value))
+        Value0 if @dsp.is_finite(value) =>
+          Some(@model.node_with_value0(node, value))
         _ => None
       }
     Mul => None
@@ -632,42 +640,44 @@ fn updated_node_param(
     Clip =>
       match slot {
         Value0 if @dsp.is_finite(value) && value > 0.0 =>
-          Some(node_with_value0(node, value))
+          Some(@model.node_with_value0(node, value))
         _ => None
       }
     Output => None
     Pan =>
       match slot {
-        Value0 if @dsp.is_finite(value) => Some(node_with_value0(node, value))
+        Value0 if @dsp.is_finite(value) =>
+          Some(@model.node_with_value0(node, value))
         _ => None
       }
     StereoGain =>
       match slot {
-        Value0 if @dsp.is_finite(value) => Some(node_with_value0(node, value))
+        Value0 if @dsp.is_finite(value) =>
+          Some(@model.node_with_value0(node, value))
         _ => None
       }
     StereoClip =>
       match slot {
         Value0 if @dsp.is_finite(value) && value > 0.0 =>
-          Some(node_with_value0(node, value))
+          Some(@model.node_with_value0(node, value))
         _ => None
       }
     StereoBiquad =>
       match slot {
-        Value0 if valid_biquad_graph_params(sample_rate, value, node.value1) =>
-          Some(node_with_value0(node, value))
-        Value1 if valid_biquad_graph_params(sample_rate, node.value0, value) =>
-          Some(node_with_value1(node, value))
+        Value0 if valid_biquad_graph_params(sample_rate, value, node.value1()) =>
+          Some(@model.node_with_value0(node, value))
+        Value1 if valid_biquad_graph_params(sample_rate, node.value0(), value) =>
+          Some(@model.node_with_value1(node, value))
         _ => None
       }
     StereoDelay =>
       match slot {
         Value0 if valid_delay_feedback(value) =>
-          Some(node_with_value0(node, value))
+          Some(@model.node_with_value0(node, value))
         DelaySamples =>
           match exact_int_value(value) {
-            Some(ds) if valid_delay_samples(ds, node.delay_max_samples) =>
-              Some(node_with_delay_samples(node, ds))
+            Some(ds) if valid_delay_samples(ds, node.delay_max_samples()) =>
+              Some(@model.node_with_delay_samples(node, ds))
             _ => None
           }
         _ => None
@@ -678,20 +688,41 @@ fn updated_node_param(
 }
 
 ///|
+fn updated_node_param_result(
+  node : DspNode,
+  node_index : Int,
+  slot : GraphParamSlot,
+  value : Double,
+  sample_rate : Double,
+) -> Result[DspNode, GraphControlError] {
+  match
+    updated_model_node_param_result(
+      node.raw(),
+      node_index,
+      slot,
+      value,
+      sample_rate,
+    ) {
+    Ok(updated) => Ok(DspNode::from_model(updated))
+    Err(error) => Err(error)
+  }
+}
+
+///|
 fn apply_runtime_param_side_effect(
   graph : CompiledGraph,
   compiled_index : Int,
-  node : DspNode,
+  node : @model.DspNode,
   slot : GraphParamSlot,
 ) -> Bool {
-  match node.kind {
+  match node.kind() {
     Delay =>
       match slot {
         Value0 =>
           match graph.delay_states[compiled_index] {
             Some(delay) => {
-              delay.set_feedback(node.value0)
-              delay.set_delay_samples(node.delay_samples)
+              delay.set_feedback(node.value0())
+              delay.set_delay_samples(node.delay_samples())
               true
             }
             None => false
@@ -699,8 +730,8 @@ fn apply_runtime_param_side_effect(
         DelaySamples =>
           match graph.delay_states[compiled_index] {
             Some(delay) => {
-              delay.set_feedback(node.value0)
-              delay.set_delay_samples(node.delay_samples)
+              delay.set_feedback(node.value0())
+              delay.set_delay_samples(node.delay_samples())
               true
             }
             None => false
@@ -723,16 +754,16 @@ fn apply_runtime_param_side_effect(
             graph.stereo_delay_left_states,
             graph.stereo_delay_right_states,
             compiled_index,
-            node.delay_samples,
-            node.value0,
+            node.delay_samples(),
+            node.value0(),
           )
         DelaySamples =>
           apply_stereo_delay_param_side_effect(
             graph.stereo_delay_left_states,
             graph.stereo_delay_right_states,
             compiled_index,
-            node.delay_samples,
-            node.value0,
+            node.delay_samples(),
+            node.value0(),
           )
         _ => false
       }
@@ -751,72 +782,6 @@ fn exact_int_value(value : Double) -> Int? {
     Some(int_value)
   } else {
     None
-  }
-}
-
-///|
-fn valid_biquad_graph_params(
-  sample_rate : Double,
-  cutoff : Double,
-  q : Double,
-) -> Bool {
-  let nyquist = sample_rate * NYQUIST_RATIO
-  @dsp.is_finite(sample_rate) &&
-  sample_rate > 0.0 &&
-  @dsp.is_finite(cutoff) &&
-  cutoff > 0.0 &&
-  cutoff < nyquist &&
-  @dsp.is_finite(q) &&
-  q > 0.0
-}
-
-///|
-fn graph_default_delay_samples(value : Int) -> Int {
-  if value > 0 {
-    value
-  } else {
-    0
-  }
-}
-
-///|
-fn valid_delay_feedback(value : Double) -> Bool {
-  @dsp.is_finite(value) &&
-  value >= -@dsp.max_feedback_amount() &&
-  value <= @dsp.max_feedback_amount()
-}
-
-///|
-/// Shared validation for delay_samples used by both compile-time
-/// (`valid_any_node_inputs`) and runtime (`updated_node_param`) paths.
-fn valid_delay_samples(delay_samples : Int, delay_max_samples : Int) -> Bool {
-  delay_samples >= 0 && delay_samples <= delay_max_samples
-}
-
-///|
-/// Structural check: does this node kind accept SetParam on the given slot?
-/// Used by ControlBindingBuilder::build() to validate bindings at graph
-/// construction time. Does not check value-domain constraints.
-pub fn node_accepts_slot(node : DspNode, slot : GraphParamSlot) -> Bool {
-  match node.kind {
-    Constant => slot is Value0
-    Oscillator => node.input0 < 0 && slot is Value0
-    Noise => false
-    Adsr => false
-    Biquad => slot is Value0 || slot is Value1
-    Delay => slot is Value0 || slot is DelaySamples
-    Gain => slot is Value0
-    Mul => false
-    Mix => false
-    Clip => slot is Value0
-    Output => false
-    Pan => slot is Value0
-    StereoGain => slot is Value0
-    StereoClip => slot is Value0
-    StereoBiquad => slot is Value0 || slot is Value1
-    StereoDelay => slot is Value0 || slot is DelaySamples
-    StereoMixDown => false
-    StereoOutput => false
   }
 }
 
@@ -845,14 +810,14 @@ fn apply_stereo_delay_param_side_effect(
 }
 
 ///|
-fn make_graph_delay_state(node : DspNode) -> DelayLine? {
-  match node.kind {
+fn make_graph_delay_state(node : @model.DspNode) -> DelayLine? {
+  match node.kind() {
     Delay =>
       Some(
         DelayLine::new(
-          node.delay_max_samples,
-          delay_samples=node.delay_samples,
-          feedback=node.value0,
+          node.delay_max_samples(),
+          delay_samples=node.delay_samples(),
+          feedback=node.value0(),
         ),
       )
     _ => None
