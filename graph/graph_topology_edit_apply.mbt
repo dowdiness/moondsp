@@ -101,7 +101,7 @@ fn apply_topology_insert_node(
         GraphTopologyEditError::UnsupportedInputSlot(
           retarget_node_index,
           retarget_input_slot,
-          nodes[retarget_node_index].kind,
+          nodes[retarget_node_index].kind(),
         ),
       )
   }
@@ -110,7 +110,7 @@ fn apply_topology_insert_node(
     None =>
       return Err(
         GraphTopologyEditError::UnsupportedInsertTemplate(
-          inserted_template.kind,
+          inserted_template.kind(),
         ),
       )
   }
@@ -146,7 +146,7 @@ fn apply_topology_delete_node(
       return Err(
         GraphTopologyEditError::DeleteNodeRequiresUnary(
           delete_node_index,
-          nodes[delete_node_index].kind,
+          nodes[delete_node_index].kind(),
         ),
       )
   }
@@ -215,8 +215,10 @@ fn apply_topology_insert_chain(
   // Validate all chain nodes are unary (no input1)
   for index = 0; index < chain_nodes.length(); index = index + 1 {
     let node = chain_nodes[index]
-    if node.input1 >= 0 {
-      return Err(GraphTopologyEditError::UnsupportedChainNode(index, node.kind))
+    if node.input1() >= 0 {
+      return Err(
+        GraphTopologyEditError::UnsupportedChainNode(index, node.kind()),
+      )
     }
   }
   // Get original source of the retarget node's input
@@ -228,7 +230,7 @@ fn apply_topology_insert_chain(
         GraphTopologyEditError::UnsupportedInputSlot(
           retarget_node_index,
           retarget_input_slot,
-          nodes[retarget_node_index].kind,
+          nodes[retarget_node_index].kind(),
         ),
       )
   }
@@ -245,7 +247,7 @@ fn apply_topology_insert_chain(
           ignore(nodes.pop())
         }
         return Err(
-          GraphTopologyEditError::UnsupportedInsertTemplate(chain_node.kind),
+          GraphTopologyEditError::UnsupportedInsertTemplate(chain_node.kind()),
         )
       }
     }
@@ -313,14 +315,14 @@ fn apply_topology_delete_chain(
   // Output/StereoOutput, and each must feed exactly one downstream consumer
   for index = start_node_index; index <= end_node_index; index = index + 1 {
     let node = nodes[index]
-    if node.input1 >= 0 {
+    if node.input1() >= 0 {
       return Err(
-        GraphTopologyEditError::DeleteChainRequiresUnary(index, node.kind),
+        GraphTopologyEditError::DeleteChainRequiresUnary(index, node.kind()),
       )
     }
-    if node.kind is Output || node.kind is StereoOutput {
+    if node.kind() is Output || node.kind() is StereoOutput {
       return Err(
-        GraphTopologyEditError::DeleteChainRequiresUnary(index, node.kind),
+        GraphTopologyEditError::DeleteChainRequiresUnary(index, node.kind()),
       )
     }
     let consumer = match topology_single_consumer_for_input(nodes, index) {
@@ -385,19 +387,18 @@ fn topology_chain_compacted_node_inputs(
   start_deleted : Int,
   end_deleted : Int,
 ) -> DspNode {
-  DspNode::new(
-    node.kind,
-    topology_chain_compacted_input(node.input0, start_deleted, end_deleted),
-    topology_chain_compacted_input(node.input1, start_deleted, end_deleted),
-    node.value0,
-    node.value1,
-    node.value2,
-    node.value3,
-    node.waveform,
-    node.filter_mode,
-    node.delay_max_samples,
-    node.delay_samples,
-    node.seed,
+  node_with_inputs(
+    node,
+    input0=topology_chain_compacted_input(
+      node.input0(),
+      start_deleted,
+      end_deleted,
+    ),
+    input1=topology_chain_compacted_input(
+      node.input1(),
+      start_deleted,
+      end_deleted,
+    ),
   )
 }
 
@@ -428,7 +429,7 @@ fn topology_single_consumer_for_input(
   let mut consumer = -1
   for index in 0..<nodes.length() {
     let node = nodes[index]
-    if node.input0 == source_index || node.input1 == source_index {
+    if node.input0() == source_index || node.input1() == source_index {
       if consumer >= 0 {
         return None
       }
@@ -447,19 +448,10 @@ fn topology_compacted_node_inputs(
   node : DspNode,
   deleted_index : Int,
 ) -> DspNode {
-  DspNode::new(
-    node.kind,
-    topology_compacted_input(node.input0, deleted_index),
-    topology_compacted_input(node.input1, deleted_index),
-    node.value0,
-    node.value1,
-    node.value2,
-    node.value3,
-    node.waveform,
-    node.filter_mode,
-    node.delay_max_samples,
-    node.delay_samples,
-    node.seed,
+  node_with_inputs(
+    node,
+    input0=topology_compacted_input(node.input0(), deleted_index),
+    input1=topology_compacted_input(node.input1(), deleted_index),
   )
 }
 
@@ -477,43 +469,45 @@ fn topology_node_input(
   node : DspNode,
   input_slot : GraphTopologyInputSlot,
 ) -> Int? {
-  match (node.kind, input_slot) {
-    (DspNodeKind::Mul, GraphTopologyInputSlot::Input0) => Some(node.input0)
-    (DspNodeKind::Mul, GraphTopologyInputSlot::Input1) => Some(node.input1)
-    (DspNodeKind::Mix, GraphTopologyInputSlot::Input0) => Some(node.input0)
-    (DspNodeKind::Mix, GraphTopologyInputSlot::Input1) => Some(node.input1)
-    (DspNodeKind::Gain, GraphTopologyInputSlot::Input0) => Some(node.input0)
-    (DspNodeKind::Clip, GraphTopologyInputSlot::Input0) => Some(node.input0)
-    (DspNodeKind::Output, GraphTopologyInputSlot::Input0) => Some(node.input0)
-    (DspNodeKind::Pan, GraphTopologyInputSlot::Input0) => Some(node.input0)
+  match (node.kind(), input_slot) {
+    (DspNodeKind::Mul, GraphTopologyInputSlot::Input0) => Some(node.input0())
+    (DspNodeKind::Mul, GraphTopologyInputSlot::Input1) => Some(node.input1())
+    (DspNodeKind::Mix, GraphTopologyInputSlot::Input0) => Some(node.input0())
+    (DspNodeKind::Mix, GraphTopologyInputSlot::Input1) => Some(node.input1())
+    (DspNodeKind::Gain, GraphTopologyInputSlot::Input0) => Some(node.input0())
+    (DspNodeKind::Clip, GraphTopologyInputSlot::Input0) => Some(node.input0())
+    (DspNodeKind::Output, GraphTopologyInputSlot::Input0) => Some(node.input0())
+    (DspNodeKind::Pan, GraphTopologyInputSlot::Input0) => Some(node.input0())
     (DspNodeKind::StereoGain, GraphTopologyInputSlot::Input0) =>
-      Some(node.input0)
+      Some(node.input0())
     (DspNodeKind::StereoClip, GraphTopologyInputSlot::Input0) =>
-      Some(node.input0)
+      Some(node.input0())
     (DspNodeKind::StereoMixDown, GraphTopologyInputSlot::Input0) =>
-      Some(node.input0)
+      Some(node.input0())
     (DspNodeKind::StereoOutput, GraphTopologyInputSlot::Input0) =>
-      Some(node.input0)
-    (DspNodeKind::Biquad, GraphTopologyInputSlot::Input0) => Some(node.input0)
-    (DspNodeKind::Delay, GraphTopologyInputSlot::Input0) => Some(node.input0)
+      Some(node.input0())
+    (DspNodeKind::Biquad, GraphTopologyInputSlot::Input0) => Some(node.input0())
+    (DspNodeKind::Delay, GraphTopologyInputSlot::Input0) => Some(node.input0())
     (DspNodeKind::StereoBiquad, GraphTopologyInputSlot::Input0) =>
-      Some(node.input0)
+      Some(node.input0())
     (DspNodeKind::StereoDelay, GraphTopologyInputSlot::Input0) =>
-      Some(node.input0)
+      Some(node.input0())
     _ => None
   }
 }
 
 ///|
 fn topology_inserted_node(template : DspNode, input_source : Int) -> DspNode? {
-  match template.kind {
-    DspNodeKind::Gain => Some(DspNode::gain(input_source, template.value0))
-    DspNodeKind::Clip => Some(DspNode::clip(input_source, template.value0))
-    DspNodeKind::Pan => Some(DspNode::pan(input_source, template.value0))
+  match template.kind() {
+    DspNodeKind::Gain => Some(DspNode::gain(input_source, template.value0()))
+    DspNodeKind::Clip => Some(DspNode::clip(input_source, template.value0()))
+    DspNodeKind::Pan => Some(DspNode::pan(input_source, template.value0()))
     DspNodeKind::StereoGain =>
-      Some(DspNode::stereo_gain(input=input_source, amount=template.value0))
+      Some(DspNode::stereo_gain(input=input_source, amount=template.value0()))
     DspNodeKind::StereoClip =>
-      Some(DspNode::stereo_clip(input=input_source, threshold=template.value0))
+      Some(
+        DspNode::stereo_clip(input=input_source, threshold=template.value0()),
+      )
     DspNodeKind::StereoMixDown => Some(DspNode::stereo_mixdown(input_source))
     DspNodeKind::Output => Some(DspNode::output(input_source))
     DspNodeKind::StereoOutput => Some(DspNode::stereo_output(input_source))
@@ -521,36 +515,36 @@ fn topology_inserted_node(template : DspNode, input_source : Int) -> DspNode? {
       Some(
         DspNode::biquad(
           input=input_source,
-          mode=template.filter_mode,
-          cutoff_hz=template.value0,
-          q=template.value1,
+          mode=template.filter_mode(),
+          cutoff_hz=template.value0(),
+          q=template.value1(),
         ),
       )
     DspNodeKind::Delay =>
       Some(
         DspNode::delay(
           input=input_source,
-          max_delay_samples=template.delay_max_samples,
-          delay_samples=template.delay_samples,
-          feedback=template.value0,
+          max_delay_samples=template.delay_max_samples(),
+          delay_samples=template.delay_samples(),
+          feedback=template.value0(),
         ),
       )
     DspNodeKind::StereoBiquad =>
       Some(
         DspNode::stereo_biquad(
           input=input_source,
-          mode=template.filter_mode,
-          cutoff_hz=template.value0,
-          q=template.value1,
+          mode=template.filter_mode(),
+          cutoff_hz=template.value0(),
+          q=template.value1(),
         ),
       )
     DspNodeKind::StereoDelay =>
       Some(
         DspNode::stereo_delay(
           input=input_source,
-          max_delay_samples=template.delay_max_samples,
-          delay_samples=template.delay_samples,
-          feedback=template.value0,
+          max_delay_samples=template.delay_max_samples(),
+          delay_samples=template.delay_samples(),
+          feedback=template.value0(),
         ),
       )
     _ => None
@@ -565,27 +559,27 @@ fn apply_topology_rewire_input_result(
   source_index : Int,
 ) -> Result[Unit, GraphTopologyEditError] {
   let node = nodes[node_index]
-  let rewired = match (node.kind, input_slot) {
+  let rewired = match (node.kind(), input_slot) {
     (DspNodeKind::Gain, GraphTopologyInputSlot::Input0) =>
-      Some(DspNode::gain(source_index, node.value0))
+      Some(DspNode::gain(source_index, node.value0()))
     (DspNodeKind::Mul, GraphTopologyInputSlot::Input0) =>
-      Some(DspNode::mul(source_index, node.input1))
+      Some(DspNode::mul(source_index, node.input1()))
     (DspNodeKind::Mul, GraphTopologyInputSlot::Input1) =>
-      Some(DspNode::mul(node.input0, source_index))
+      Some(DspNode::mul(node.input0(), source_index))
     (DspNodeKind::Mix, GraphTopologyInputSlot::Input0) =>
-      Some(DspNode::mix(source_index, node.input1))
+      Some(DspNode::mix(source_index, node.input1()))
     (DspNodeKind::Mix, GraphTopologyInputSlot::Input1) =>
-      Some(DspNode::mix(node.input0, source_index))
+      Some(DspNode::mix(node.input0(), source_index))
     (DspNodeKind::Clip, GraphTopologyInputSlot::Input0) =>
-      Some(DspNode::clip(source_index, node.value0))
+      Some(DspNode::clip(source_index, node.value0()))
     (DspNodeKind::Output, GraphTopologyInputSlot::Input0) =>
       Some(DspNode::output(source_index))
     (DspNodeKind::Pan, GraphTopologyInputSlot::Input0) =>
-      Some(DspNode::pan(source_index, node.value0))
+      Some(DspNode::pan(source_index, node.value0()))
     (DspNodeKind::StereoGain, GraphTopologyInputSlot::Input0) =>
-      Some(DspNode::stereo_gain(input=source_index, amount=node.value0))
+      Some(DspNode::stereo_gain(input=source_index, amount=node.value0()))
     (DspNodeKind::StereoClip, GraphTopologyInputSlot::Input0) =>
-      Some(DspNode::stereo_clip(input=source_index, threshold=node.value0))
+      Some(DspNode::stereo_clip(input=source_index, threshold=node.value0()))
     (DspNodeKind::StereoMixDown, GraphTopologyInputSlot::Input0) =>
       Some(DspNode::stereo_mixdown(source_index))
     (DspNodeKind::StereoOutput, GraphTopologyInputSlot::Input0) =>
@@ -594,36 +588,36 @@ fn apply_topology_rewire_input_result(
       Some(
         DspNode::biquad(
           input=source_index,
-          mode=node.filter_mode,
-          cutoff_hz=node.value0,
-          q=node.value1,
+          mode=node.filter_mode(),
+          cutoff_hz=node.value0(),
+          q=node.value1(),
         ),
       )
     (DspNodeKind::Delay, GraphTopologyInputSlot::Input0) =>
       Some(
         DspNode::delay(
           input=source_index,
-          max_delay_samples=node.delay_max_samples,
-          delay_samples=node.delay_samples,
-          feedback=node.value0,
+          max_delay_samples=node.delay_max_samples(),
+          delay_samples=node.delay_samples(),
+          feedback=node.value0(),
         ),
       )
     (DspNodeKind::StereoBiquad, GraphTopologyInputSlot::Input0) =>
       Some(
         DspNode::stereo_biquad(
           input=source_index,
-          mode=node.filter_mode,
-          cutoff_hz=node.value0,
-          q=node.value1,
+          mode=node.filter_mode(),
+          cutoff_hz=node.value0(),
+          q=node.value1(),
         ),
       )
     (DspNodeKind::StereoDelay, GraphTopologyInputSlot::Input0) =>
       Some(
         DspNode::stereo_delay(
           input=source_index,
-          max_delay_samples=node.delay_max_samples,
-          delay_samples=node.delay_samples,
-          feedback=node.value0,
+          max_delay_samples=node.delay_max_samples(),
+          delay_samples=node.delay_samples(),
+          feedback=node.value0(),
         ),
       )
     _ => None
@@ -638,7 +632,7 @@ fn apply_topology_rewire_input_result(
         GraphTopologyEditError::UnsupportedInputSlot(
           node_index,
           input_slot,
-          node.kind,
+          node.kind(),
         ),
       )
   }

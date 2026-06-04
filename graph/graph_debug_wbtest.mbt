@@ -8,19 +8,10 @@ fn corrupt_input0(
 ) -> Unit {
   let nodes = compiled.0.nodes
   let node = nodes[node_index]
-  nodes[node_index] = DspNode::new(
-    node.kind,
-    value,
-    node.input1,
-    node.value0,
-    node.value1,
-    node.value2,
-    node.value3,
-    node.waveform,
-    node.filter_mode,
-    node.delay_max_samples,
-    node.delay_samples,
-    node.seed,
+  nodes[node_index] = @model.node_with_inputs(
+    node,
+    input0=value,
+    input1=node.input1(),
   )
 }
 

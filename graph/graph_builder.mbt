@@ -35,30 +35,7 @@ fn merge_into(target : Array[DspNode], source : Array[DspNode]) -> Int {
 /// Create a copy of `node` with `input0` and `input1` shifted by `offset`.
 /// Inputs that are `-1` (meaning "no input") are left unchanged.
 fn remap_node_by_offset(node : DspNode, offset : Int) -> DspNode {
-  let new_input0 = if node.input0 >= 0 {
-    node.input0 + offset
-  } else {
-    node.input0
-  }
-  let new_input1 = if node.input1 >= 0 {
-    node.input1 + offset
-  } else {
-    node.input1
-  }
-  DspNode::new(
-    node.kind,
-    new_input0,
-    new_input1,
-    node.value0,
-    node.value1,
-    node.value2,
-    node.value3,
-    node.waveform,
-    node.filter_mode,
-    node.delay_max_samples,
-    node.delay_samples,
-    node.seed,
-  )
+  node_with_offset_inputs(node, offset)
 }
 
 // ---------------------------------------------------------------------------
@@ -66,14 +43,14 @@ fn remap_node_by_offset(node : DspNode, offset : Int) -> DspNode {
 // ---------------------------------------------------------------------------
 
 ///|
-pub impl ArithSym for GraphBuilder with constant(v) -> GraphBuilder {
+pub impl ArithSym for GraphBuilder with fn constant(v) -> GraphBuilder {
   let nodes : Array[DspNode] = []
   nodes.push(DspNode::constant(v))
   { nodes_: nodes, index: 0 }
 }
 
 ///|
-pub impl ArithSym for GraphBuilder with mul(a, b) -> GraphBuilder {
+pub impl ArithSym for GraphBuilder with fn mul(a, b) -> GraphBuilder {
   let b_offset = merge_into(a.nodes_, b.nodes_)
   let b_index = b.index + b_offset
   let idx = a.nodes_.length()
@@ -82,7 +59,7 @@ pub impl ArithSym for GraphBuilder with mul(a, b) -> GraphBuilder {
 }
 
 ///|
-pub impl ArithSym for GraphBuilder with mix(a, b) -> GraphBuilder {
+pub impl ArithSym for GraphBuilder with fn mix(a, b) -> GraphBuilder {
   let b_offset = merge_into(a.nodes_, b.nodes_)
   let b_index = b.index + b_offset
   let idx = a.nodes_.length()
@@ -91,7 +68,7 @@ pub impl ArithSym for GraphBuilder with mix(a, b) -> GraphBuilder {
 }
 
 ///|
-pub impl ArithSym for GraphBuilder with clip(self, threshold) -> GraphBuilder {
+pub impl ArithSym for GraphBuilder with fn clip(self, threshold) -> GraphBuilder {
   let idx = self.nodes_.length()
   self.nodes_.push(DspNode::clip(self.index, threshold))
   { nodes_: self.nodes_, index: idx }
@@ -102,35 +79,35 @@ pub impl ArithSym for GraphBuilder with clip(self, threshold) -> GraphBuilder {
 // ---------------------------------------------------------------------------
 
 ///|
-pub impl DspSym for GraphBuilder with oscillator(freq, waveform) -> GraphBuilder {
+pub impl DspSym for GraphBuilder with fn oscillator(freq, waveform) -> GraphBuilder {
   let idx = freq.nodes_.length()
   freq.nodes_.push(DspNode::oscillator_from(freq.index, waveform))
   { nodes_: freq.nodes_, index: idx }
 }
 
 ///|
-pub impl DspSym for GraphBuilder with noise(seed) -> GraphBuilder {
+pub impl DspSym for GraphBuilder with fn noise(seed) -> GraphBuilder {
   let nodes : Array[DspNode] = []
   nodes.push(DspNode::noise(seed))
   { nodes_: nodes, index: 0 }
 }
 
 ///|
-pub impl DspSym for GraphBuilder with adsr(a, d, s, r) -> GraphBuilder {
+pub impl DspSym for GraphBuilder with fn adsr(a, d, s, r) -> GraphBuilder {
   let nodes : Array[DspNode] = []
   nodes.push(DspNode::adsr(attack_ms=a, decay_ms=d, sustain=s, release_ms=r))
   { nodes_: nodes, index: 0 }
 }
 
 ///|
-pub impl DspSym for GraphBuilder with gain(self, amount) -> GraphBuilder {
+pub impl DspSym for GraphBuilder with fn gain(self, amount) -> GraphBuilder {
   let idx = self.nodes_.length()
   self.nodes_.push(DspNode::gain(self.index, amount))
   { nodes_: self.nodes_, index: idx }
 }
 
 ///|
-pub impl DspSym for GraphBuilder with output(self) -> GraphBuilder {
+pub impl DspSym for GraphBuilder with fn output(self) -> GraphBuilder {
   let idx = self.nodes_.length()
   self.nodes_.push(DspNode::output(self.index))
   { nodes_: self.nodes_, index: idx }
@@ -141,7 +118,7 @@ pub impl DspSym for GraphBuilder with output(self) -> GraphBuilder {
 // ---------------------------------------------------------------------------
 
 ///|
-pub impl FilterSym for GraphBuilder with biquad(self, mode, cutoff, q) -> GraphBuilder {
+pub impl FilterSym for GraphBuilder with fn biquad(self, mode, cutoff, q) -> GraphBuilder {
   let idx = self.nodes_.length()
   self.nodes_.push(
     DspNode::biquad(input=self.index, mode~, cutoff_hz=cutoff, q~),
@@ -154,7 +131,7 @@ pub impl FilterSym for GraphBuilder with biquad(self, mode, cutoff, q) -> GraphB
 // ---------------------------------------------------------------------------
 
 ///|
-pub impl DelaySym for GraphBuilder with delay(
+pub impl DelaySym for GraphBuilder with fn delay(
   self,
   max_samples,
   delay_samples,
@@ -177,35 +154,35 @@ pub impl DelaySym for GraphBuilder with delay(
 // ---------------------------------------------------------------------------
 
 ///|
-pub impl StereoSym for GraphBuilder with pan(self, position) -> GraphBuilder {
+pub impl StereoSym for GraphBuilder with fn pan(self, position) -> GraphBuilder {
   let idx = self.nodes_.length()
   self.nodes_.push(DspNode::pan(self.index, position))
   { nodes_: self.nodes_, index: idx }
 }
 
 ///|
-pub impl StereoSym for GraphBuilder with stereo_gain(self, amount) -> GraphBuilder {
+pub impl StereoSym for GraphBuilder with fn stereo_gain(self, amount) -> GraphBuilder {
   let idx = self.nodes_.length()
   self.nodes_.push(DspNode::stereo_gain(input=self.index, amount~))
   { nodes_: self.nodes_, index: idx }
 }
 
 ///|
-pub impl StereoSym for GraphBuilder with stereo_clip(self, threshold) -> GraphBuilder {
+pub impl StereoSym for GraphBuilder with fn stereo_clip(self, threshold) -> GraphBuilder {
   let idx = self.nodes_.length()
   self.nodes_.push(DspNode::stereo_clip(input=self.index, threshold~))
   { nodes_: self.nodes_, index: idx }
 }
 
 ///|
-pub impl StereoSym for GraphBuilder with stereo_mixdown(a) -> GraphBuilder {
+pub impl StereoSym for GraphBuilder with fn stereo_mixdown(a) -> GraphBuilder {
   let idx = a.nodes_.length()
   a.nodes_.push(DspNode::stereo_mixdown(a.index))
   { nodes_: a.nodes_, index: idx }
 }
 
 ///|
-pub impl StereoSym for GraphBuilder with stereo_output(a) -> GraphBuilder {
+pub impl StereoSym for GraphBuilder with fn stereo_output(a) -> GraphBuilder {
   let idx = a.nodes_.length()
   a.nodes_.push(DspNode::stereo_output(a.index))
   { nodes_: a.nodes_, index: idx }
@@ -216,7 +193,7 @@ pub impl StereoSym for GraphBuilder with stereo_output(a) -> GraphBuilder {
 // ---------------------------------------------------------------------------
 
 ///|
-pub impl StereoFilterSym for GraphBuilder with stereo_biquad(
+pub impl StereoFilterSym for GraphBuilder with fn stereo_biquad(
   self,
   mode,
   cutoff,
@@ -234,7 +211,7 @@ pub impl StereoFilterSym for GraphBuilder with stereo_biquad(
 // ---------------------------------------------------------------------------
 
 ///|
-pub impl StereoDelaySym for GraphBuilder with stereo_delay(
+pub impl StereoDelaySym for GraphBuilder with fn stereo_delay(
   self,
   max_samples,
   delay_samples,
@@ -272,48 +249,51 @@ pub fn[
   let results : FixedArray[T?] = FixedArray::make(len, None)
   for i = 0; i < len; i = i + 1 {
     let node = nodes[i]
-    let value : T? = match node.kind {
-      Constant => Some(T::constant(node.value0))
+    let value : T? = match node.kind() {
+      Constant => Some(T::constant(node.value0()))
       Oscillator =>
-        if node.input0 >= 0 {
-          match replay_get_result(results, node.input0) {
-            Some(v) => Some(T::oscillator(v, node.waveform))
+        if node.input0() >= 0 {
+          match replay_get_result(results, node.input0()) {
+            Some(v) => Some(T::oscillator(v, node.waveform()))
             None => None
           }
         } else {
-          Some(T::oscillator(T::constant(node.value0), node.waveform))
+          Some(T::oscillator(T::constant(node.value0()), node.waveform()))
         }
-      Noise => Some(T::noise(node.seed))
-      Adsr => Some(T::adsr(node.value0, node.value1, node.value2, node.value3))
+      Noise => Some(T::noise(node.seed()))
+      Adsr =>
+        Some(
+          T::adsr(node.value0(), node.value1(), node.value2(), node.value3()),
+        )
       Biquad =>
-        match replay_get_result(results, node.input0) {
+        match replay_get_result(results, node.input0()) {
           Some(v) =>
-            Some(T::biquad(v, node.filter_mode, node.value0, node.value1))
+            Some(T::biquad(v, node.filter_mode(), node.value0(), node.value1()))
           None => None
         }
       Delay =>
-        match replay_get_result(results, node.input0) {
+        match replay_get_result(results, node.input0()) {
           Some(v) =>
             Some(
               T::delay(
                 v,
-                node.delay_max_samples,
-                node.delay_samples,
-                node.value0,
+                node.delay_max_samples(),
+                node.delay_samples(),
+                node.value0(),
               ),
             )
           None => None
         }
       Gain =>
-        match replay_get_result(results, node.input0) {
-          Some(v) => Some(T::gain(v, node.value0))
+        match replay_get_result(results, node.input0()) {
+          Some(v) => Some(T::gain(v, node.value0()))
           None => None
         }
       Mul =>
         match
           (
-            replay_get_result(results, node.input0),
-            replay_get_result(results, node.input1),
+            replay_get_result(results, node.input0()),
+            replay_get_result(results, node.input1()),
           ) {
           (Some(a), Some(b)) => Some(T::mul(a, b))
           _ => None
@@ -321,65 +301,70 @@ pub fn[
       Mix =>
         match
           (
-            replay_get_result(results, node.input0),
-            replay_get_result(results, node.input1),
+            replay_get_result(results, node.input0()),
+            replay_get_result(results, node.input1()),
           ) {
           (Some(a), Some(b)) => Some(T::mix(a, b))
           _ => None
         }
       Clip =>
-        match replay_get_result(results, node.input0) {
-          Some(v) => Some(T::clip(v, node.value0))
+        match replay_get_result(results, node.input0()) {
+          Some(v) => Some(T::clip(v, node.value0()))
           None => None
         }
       Output =>
-        match replay_get_result(results, node.input0) {
+        match replay_get_result(results, node.input0()) {
           Some(v) => Some(T::output(v))
           None => None
         }
       Pan =>
-        match replay_get_result(results, node.input0) {
-          Some(v) => Some(T::pan(v, node.value0))
+        match replay_get_result(results, node.input0()) {
+          Some(v) => Some(T::pan(v, node.value0()))
           None => None
         }
       StereoGain =>
-        match replay_get_result(results, node.input0) {
-          Some(v) => Some(T::stereo_gain(v, node.value0))
+        match replay_get_result(results, node.input0()) {
+          Some(v) => Some(T::stereo_gain(v, node.value0()))
           None => None
         }
       StereoClip =>
-        match replay_get_result(results, node.input0) {
-          Some(v) => Some(T::stereo_clip(v, node.value0))
+        match replay_get_result(results, node.input0()) {
+          Some(v) => Some(T::stereo_clip(v, node.value0()))
           None => None
         }
       StereoBiquad =>
-        match replay_get_result(results, node.input0) {
+        match replay_get_result(results, node.input0()) {
           Some(v) =>
             Some(
-              T::stereo_biquad(v, node.filter_mode, node.value0, node.value1),
+              T::stereo_biquad(
+                v,
+                node.filter_mode(),
+                node.value0(),
+                node.value1(),
+              ),
             )
           None => None
         }
       StereoDelay =>
-        match replay_get_result(results, node.input0) {
+        match replay_get_result(results, node.input0()) {
           Some(v) =>
             Some(
               T::stereo_delay(
                 v,
-                node.delay_max_samples,
-                node.delay_samples,
-                node.value0,
+                node.delay_max_samples(),
+                node.delay_samples(),
+                node.value0(),
               ),
             )
           None => None
         }
       StereoMixDown =>
-        match replay_get_result(results, node.input0) {
+        match replay_get_result(results, node.input0()) {
           Some(v) => Some(T::stereo_mixdown(v))
           None => None
         }
       StereoOutput =>
-        match replay_get_result(results, node.input0) {
+        match replay_get_result(results, node.input0()) {
           Some(v) => Some(T::stereo_output(v))
           None => None
         }

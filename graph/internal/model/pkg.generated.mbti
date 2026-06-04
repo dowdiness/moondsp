@@ -1,0 +1,159 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp/graph/internal/model"
+
+import {
+  "dowdiness/moondsp/dsp",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub const MONO_SIGNAL_SHAPE : Int = 0
+
+pub const NYQUIST_RATIO : Double = 0.5
+
+pub const STEREO_SIGNAL_SHAPE : Int = 1
+
+pub fn node_accepts_slot(DspNode, GraphParamSlot) -> Bool
+
+pub fn node_can_delete(DspNode) -> Bool
+
+pub fn node_can_insert_after(DspNode) -> Bool
+
+pub fn node_fold_value(DspNode, Double, Double) -> Double
+
+pub fn node_is_foldable(DspNode) -> Bool
+
+pub fn node_is_stateful(DspNode) -> Bool
+
+pub fn node_signal_shape(DspNode) -> Int
+
+pub fn node_with_delay_samples(DspNode, Int) -> DspNode
+
+pub fn node_with_inputs(DspNode, input0~ : Int, input1~ : Int) -> DspNode
+
+pub fn node_with_offset_inputs(DspNode, Int) -> DspNode
+
+pub fn node_with_value0(DspNode, Double) -> DspNode
+
+pub fn node_with_value1(DspNode, Double) -> DspNode
+
+pub fn remap_node_inputs(DspNode, FixedArray[Int]) -> DspNode
+
+pub fn valid_biquad_graph_params(Double, Double, Double) -> Bool
+
+pub fn valid_delay_feedback(Double) -> Bool
+
+pub fn valid_delay_samples(Int, Int) -> Bool
+
+// Errors
+
+// Types and methods
+pub struct DspNode {
+  // private fields
+}
+pub fn DspNode::adsr(attack_ms~ : Double, decay_ms~ : Double, sustain~ : Double, release_ms~ : Double) -> Self
+pub fn DspNode::biquad(input~ : Int, mode~ : @dsp.BiquadMode, cutoff_hz~ : Double, q~ : Double) -> Self
+pub fn DspNode::clip(Int, Double) -> Self
+pub fn DspNode::constant(Double) -> Self
+pub fn DspNode::delay(input~ : Int, max_delay_samples~ : Int, delay_samples? : Int, feedback? : Double) -> Self
+pub fn DspNode::delay_max_samples(Self) -> Int
+pub fn DspNode::delay_samples(Self) -> Int
+pub fn DspNode::envelope_gain(input~ : Int, envelope~ : Int, amount~ : Double) -> Self
+pub fn DspNode::filter_mode(Self) -> @dsp.BiquadMode
+pub fn DspNode::gain(Int, Double) -> Self
+pub fn DspNode::input0(Self) -> Int
+pub fn DspNode::input1(Self) -> Int
+pub fn DspNode::kind(Self) -> DspNodeKind
+pub fn DspNode::mix(Int, Int) -> Self
+pub fn DspNode::mul(Int, Int) -> Self
+pub fn DspNode::noise(UInt) -> Self
+pub fn DspNode::oscillator(@dsp.Waveform, Double) -> Self
+pub fn DspNode::oscillator_from(Int, @dsp.Waveform) -> Self
+pub fn DspNode::output(Int) -> Self
+pub fn DspNode::pan(Int, Double) -> Self
+pub fn DspNode::seed(Self) -> UInt
+pub fn DspNode::stereo_biquad(input~ : Int, mode~ : @dsp.BiquadMode, cutoff_hz~ : Double, q~ : Double) -> Self
+pub fn DspNode::stereo_clip(input~ : Int, threshold~ : Double) -> Self
+pub fn DspNode::stereo_delay(input~ : Int, max_delay_samples~ : Int, delay_samples? : Int, feedback? : Double) -> Self
+pub fn DspNode::stereo_gain(input~ : Int, amount~ : Double) -> Self
+pub fn DspNode::stereo_mixdown(Int) -> Self
+pub fn DspNode::stereo_output(Int) -> Self
+pub fn DspNode::value0(Self) -> Double
+pub fn DspNode::value1(Self) -> Double
+pub fn DspNode::value2(Self) -> Double
+pub fn DspNode::value3(Self) -> Double
+pub fn DspNode::waveform(Self) -> @dsp.Waveform
+pub impl NodeEditable for DspNode
+pub impl NodeFoldable for DspNode
+pub impl NodeSpanning for DspNode
+pub impl NodeStateful for DspNode
+pub impl Eq for DspNode
+
+pub enum DspNodeKind {
+  Constant
+  Oscillator
+  Noise
+  Adsr
+  Biquad
+  Delay
+  Gain
+  Mul
+  Mix
+  Clip
+  Output
+  Pan
+  StereoGain
+  StereoClip
+  StereoBiquad
+  StereoDelay
+  StereoMixDown
+  StereoOutput
+} derive(Eq, @debug.Debug)
+
+pub struct GraphControl {
+  // private fields
+}
+pub fn GraphControl::gate_off(Int) -> Self
+pub fn GraphControl::gate_on(Int) -> Self
+pub fn GraphControl::kind(Self) -> GraphControlKind
+pub fn GraphControl::node_index(Self) -> Int
+pub fn GraphControl::set_param(Int, GraphParamSlot, Double) -> Self
+pub fn GraphControl::slot(Self) -> GraphParamSlot
+pub fn GraphControl::value(Self) -> Double
+
+pub enum GraphControlKind {
+  GateOn
+  GateOff
+  SetParam
+} derive(Eq)
+
+pub(all) enum GraphParamSlot {
+  Value0
+  Value1
+  Value2
+  Value3
+  DelaySamples
+} derive(Eq, @debug.Debug)
+pub impl Show for GraphParamSlot
+
+// Type aliases
+
+// Traits
+pub trait NodeEditable : NodeSpanning + NodeFoldable {
+  fn can_insert_after(Self) -> Bool
+  fn can_delete(Self) -> Bool
+}
+
+pub trait NodeFoldable : NodeSpanning {
+  fn is_foldable(Self) -> Bool
+  fn fold_value(Self, Double, Double) -> Double
+}
+
+pub trait NodeSpanning {
+  fn signal_shape(Self) -> Int
+}
+
+pub trait NodeStateful : NodeSpanning {
+  fn is_stateful(Self) -> Bool
+}
+

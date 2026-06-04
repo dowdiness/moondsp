@@ -6,7 +6,7 @@ test "analyze: returns CompiledTemplate with snapshot that survives caller mutat
   ]
   let ct = CompiledTemplate::analyze(template)
   template[0] = DspNode::constant(1.0)
-  assert_true(ct.node_at(0).kind is DspNodeKind::Oscillator)
+  assert_true(ct.node_at(0).kind() is DspNodeKind::Oscillator)
 }
 
 ///|
@@ -109,7 +109,7 @@ test "B5: adsr_authoring_indices accounts for all authoring ADSRs" {
   @debug.assert_eq(live.length() + t.orphan_adsr_count(), 1)
   for i in 0..<live.length() {
     let idx = live[i]
-    @debug.assert_eq(t.template[idx].kind is Adsr, true)
+    @debug.assert_eq(t.template[idx].kind() is Adsr, true)
     @debug.assert_eq(t.index_map[idx] >= 0, true)
   }
 }

@@ -167,7 +167,7 @@ fn graph_compile_error(
     topo_map[order[new_index]] = new_index
   }
   let fixed_nodes = FixedArray::makei(nodes.length(), index => {
-    remap_node_inputs(nodes[order[index]], topo_map)
+    @model.remap_node_inputs(nodes[order[index]].raw(), topo_map)
   })
   let feedback_edges = remapped_feedback_edges(raw_feedback_edges, topo_map)
   match invalid_feedback_edges(feedback_edges, fixed_nodes.length()) {
@@ -306,7 +306,7 @@ fn remap_graph_compile_error(
 ///|
 fn count_output_kind(nodes : Array[DspNode], output_kind : DspNodeKind) -> Int {
   for node in nodes; count = 0 {
-    if node.kind == output_kind {
+    if node.kind() == output_kind {
       continue count + 1
     }
     continue count
@@ -323,13 +323,13 @@ fn invalid_compile_node(
   sample_rate : Double,
   output_kind : DspNodeKind,
 ) -> GraphCompileError? {
-  match node.kind {
+  match node.kind() {
     Constant =>
       invalid_finite_param(
         index,
-        node.kind,
+        node.kind(),
         GraphParamSlot::Value0,
-        node.value0,
+        node.value0(),
       )
     Oscillator => invalid_oscillator_node(index, node, node_count)
     Noise => None
@@ -354,23 +354,28 @@ fn invalid_oscillator_node(
   node : DspNode,
   node_count : Int,
 ) -> GraphCompileError? {
-  if node.input0 >= 0 {
+  if node.input0() >= 0 {
     invalid_unary_input_node(index, node, node_count)
   } else {
-    invalid_finite_param(index, node.kind, GraphParamSlot::Value0, node.value0)
+    invalid_finite_param(
+      index,
+      node.kind(),
+      GraphParamSlot::Value0,
+      node.value0(),
+    )
   }
 }
 
 ///|
 fn invalid_adsr_node(index : Int, node : DspNode) -> GraphCompileError? {
   let params : Array[(GraphParamSlot, Double)] = [
-    (GraphParamSlot::Value0, node.value0),
-    (GraphParamSlot::Value1, node.value1),
-    (GraphParamSlot::Value2, node.value2),
-    (GraphParamSlot::Value3, node.value3),
+    (GraphParamSlot::Value0, node.value0()),
+    (GraphParamSlot::Value1, node.value1()),
+    (GraphParamSlot::Value2, node.value2()),
+    (GraphParamSlot::Value3, node.value3()),
   ]
   for param in params {
-    match invalid_finite_param(index, node.kind, param.0, param.1) {
+    match invalid_finite_param(index, node.kind(), param.0, param.1) {
       Some(error) => return Some(error)
       None => ()
     }
@@ -390,10 +395,10 @@ fn invalid_biquad_node(
     None =>
       invalid_biquad_params(
         index,
-        node.kind,
+        node.kind(),
         sample_rate,
-        node.value0,
-        node.value1,
+        node.value0(),
+        node.value1(),
       )
   }
 }
@@ -409,10 +414,10 @@ fn invalid_delay_node(
     None =>
       invalid_delay_params(
         index,
-        node.kind,
-        node.value0,
-        node.delay_samples,
-        node.delay_max_samples,
+        node.kind(),
+        node.value0(),
+        node.delay_samples(),
+        node.delay_max_samples(),
       )
   }
 }
@@ -426,30 +431,30 @@ fn invalid_gain_node(
   match invalid_unary_input_node(index, node, node_count) {
     Some(error) => Some(error)
     None =>
-      if node.input1 >= 0 {
+      if node.input1() >= 0 {
         match
           invalid_input(
             index,
-            node.kind,
+            node.kind(),
             GraphTopologyInputSlot::Input1,
-            node.input1,
+            node.input1(),
             node_count,
           ) {
           Some(error) => Some(error)
           None =>
             invalid_finite_param(
               index,
-              node.kind,
+              node.kind(),
               GraphParamSlot::Value0,
-              node.value0,
+              node.value0(),
             )
         }
       } else {
         invalid_finite_param(
           index,
-          node.kind,
+          node.kind(),
           GraphParamSlot::Value0,
-          node.value0,
+          node.value0(),
         )
       }
   }
@@ -466,9 +471,9 @@ fn invalid_binary_input_node(
     None =>
       invalid_input(
         index,
-        node.kind,
+        node.kind(),
         GraphTopologyInputSlot::Input1,
-        node.input1,
+        node.input1(),
         node_count,
       )
   }
@@ -483,15 +488,15 @@ fn invalid_unary_positive_param_node(
   match invalid_unary_input_node(index, node, node_count) {
     Some(error) => Some(error)
     None =>
-      if @dsp.is_finite(node.value0) && node.value0 > 0.0 {
+      if @dsp.is_finite(node.value0()) && node.value0() > 0.0 {
         None
       } else {
         Some(
           GraphCompileError::InvalidParamValue(
             index,
-            node.kind,
+            node.kind(),
             GraphParamSlot::Value0,
-            node.value0,
+            node.value0(),
           ),
         )
       }
@@ -505,8 +510,8 @@ fn invalid_output_node(
   node_count : Int,
   output_kind : DspNodeKind,
 ) -> GraphCompileError? {
-  if node.kind != output_kind {
-    Some(GraphCompileError::WrongOutputKind(index, node.kind, output_kind))
+  if node.kind() != output_kind {
+    Some(GraphCompileError::WrongOutputKind(index, node.kind(), output_kind))
   } else {
     invalid_unary_input_node(index, node, node_count)
   }
@@ -523,9 +528,9 @@ fn invalid_unary_finite_param_node(
     None =>
       invalid_finite_param(
         index,
-        node.kind,
+        node.kind(),
         GraphParamSlot::Value0,
-        node.value0,
+        node.value0(),
       )
   }
 }
@@ -538,9 +543,9 @@ fn invalid_unary_input_node(
 ) -> GraphCompileError? {
   invalid_input(
     index,
-    node.kind,
+    node.kind(),
     GraphTopologyInputSlot::Input0,
-    node.input0,
+    node.input0(),
     node_count,
   )
 }

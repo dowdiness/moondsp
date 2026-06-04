@@ -30,7 +30,7 @@ pub(all) enum GraphTopologyEditError {
 } derive(Debug)
 
 ///|
-pub impl Show for GraphTopologyEditError with output(self, logger) {
+pub impl Show for GraphTopologyEditError with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
 
@@ -44,7 +44,7 @@ pub(all) enum GraphTopologyQueueError {
 } derive(Debug)
 
 ///|
-pub impl Show for GraphTopologyQueueError with output(self, logger) {
+pub impl Show for GraphTopologyQueueError with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
 
@@ -320,23 +320,23 @@ fn apply_topology_runtime_control_result(
   compile_sample_rate : Double,
   control : GraphControl,
 ) -> Result[Unit, GraphControlError] {
-  match control.kind {
+  match control.kind() {
     SetParam => {
-      if control.node_index < 0 || control.node_index >= nodes.length() {
-        return Err(GraphControlError::InvalidNodeIndex(control.node_index))
+      if control.node_index() < 0 || control.node_index() >= nodes.length() {
+        return Err(GraphControlError::InvalidNodeIndex(control.node_index()))
       }
       let updated = match
         updated_node_param_result(
-          nodes[control.node_index],
-          control.node_index,
-          control.slot,
-          control.value,
+          nodes[control.node_index()],
+          control.node_index(),
+          control.slot(),
+          control.value(),
           compile_sample_rate,
         ) {
         Ok(updated) => updated
         Err(error) => return Err(error)
       }
-      nodes[control.node_index] = updated
+      nodes[control.node_index()] = updated
       Ok(())
     }
     _ => Ok(())
@@ -384,7 +384,8 @@ fn copy_compiled_graph_state(
       new_compiled >= 0 &&
       old_compiled < old_graph.nodes.length() &&
       new_compiled < new_graph.nodes.length() &&
-      old_graph.nodes[old_compiled].kind == new_graph.nodes[new_compiled].kind {
+      old_graph.nodes[old_compiled].kind() ==
+      new_graph.nodes[new_compiled].kind() {
       new_graph.osc_states[new_compiled] = old_graph.osc_states[old_compiled]
       new_graph.noise_states[new_compiled] = old_graph.noise_states[old_compiled]
       new_graph.env_states[new_compiled] = old_graph.env_states[old_compiled]

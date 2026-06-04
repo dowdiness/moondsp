@@ -9,8 +9,8 @@ fn fold_constants(
   // Bail out if nodes are not in topological order (forward references present)
   for i = 0; i < n; i = i + 1 {
     let node = nodes[i]
-    if (node.input0 >= 0 && node.input0 >= i) ||
-      (node.input1 >= 0 && node.input1 >= i) {
+    if (node.input0() >= 0 && node.input0() >= i) ||
+      (node.input1() >= 0 && node.input1() >= i) {
       return (nodes, FixedArray::makei(n, fn(i) { i }), false)
     }
   }
@@ -19,36 +19,36 @@ fn fold_constants(
   let mut changed = false
   for i = 0; i < n; i = i + 1 {
     let node = nodes[i]
-    let is_constant = node.kind is DspNodeKind::Constant
+    let is_constant = node.kind() is DspNodeKind::Constant
     if node.is_foldable() && !is_constant {
       // Check if all inputs are Constant in the folded array
-      let has_input0 = node.input0 >= 0
-      let has_input1 = node.input1 >= 0
+      let has_input0 = node.input0() >= 0
+      let has_input1 = node.input1() >= 0
       let input0_is_const = if has_input0 {
-        let mapped = index_map[node.input0]
-        mapped >= 0 && folded[mapped].kind is DspNodeKind::Constant
+        let mapped = index_map[node.input0()]
+        mapped >= 0 && folded[mapped].kind() is DspNodeKind::Constant
       } else {
         true
       }
       let input1_is_const = if has_input1 {
-        let mapped = index_map[node.input1]
-        mapped >= 0 && folded[mapped].kind is DspNodeKind::Constant
+        let mapped = index_map[node.input1()]
+        mapped >= 0 && folded[mapped].kind() is DspNodeKind::Constant
       } else {
         true
       }
       if input0_is_const && input1_is_const {
         // Skip folding Clip with invalid threshold — let validation reject it
-        if node.kind is DspNodeKind::Clip && !(node.value0 > 0.0) {
+        if node.kind() is DspNodeKind::Clip && !(node.value0() > 0.0) {
           // Invalid Clip threshold — fall through to keep as-is
         } else {
           // Get input values
           let v0 = if has_input0 {
-            folded[index_map[node.input0]].value0
+            folded[index_map[node.input0()]].value0()
           } else {
             0.0
           }
           let v1 = if has_input1 {
-            folded[index_map[node.input1]].value0
+            folded[index_map[node.input1()]].value0()
           } else {
             0.0
           }
@@ -67,25 +67,18 @@ fn fold_constants(
       }
     }
     // Keep node as-is, remapping inputs
-    let new_input0 = if node.input0 >= 0 { index_map[node.input0] } else { -1 }
-    let new_input1 = if node.input1 >= 0 { index_map[node.input1] } else { -1 }
+    let new_input0 = if node.input0() >= 0 {
+      index_map[node.input0()]
+    } else {
+      -1
+    }
+    let new_input1 = if node.input1() >= 0 {
+      index_map[node.input1()]
+    } else {
+      -1
+    }
     let new_index = folded.length()
-    folded.push(
-      DspNode::new(
-        node.kind,
-        new_input0,
-        new_input1,
-        node.value0,
-        node.value1,
-        node.value2,
-        node.value3,
-        node.waveform,
-        node.filter_mode,
-        node.delay_max_samples,
-        node.delay_samples,
-        node.seed,
-      ),
-    )
+    folded.push(node_with_inputs(node, input0=new_input0, input1=new_input1))
     index_map[i] = new_index
   }
   (folded, index_map, changed)
@@ -105,7 +98,7 @@ fn eliminate_dead(
   let reachable = FixedArray::make(n, false)
   // Walk backward from all output nodes
   for i = n - 1; i >= 0; i = i - 1 {
-    match nodes[i].kind {
+    match nodes[i].kind() {
       Output | StereoOutput => mark_reachable(nodes, reachable, i)
       _ => ()
     }
@@ -135,32 +128,17 @@ fn eliminate_dead(
   let result : Array[DspNode] = []
   for i = 0; i < live.length(); i = i + 1 {
     let node = live[i]
-    let new_input0 = if node.input0 >= 0 && node.input0 < remap.length() {
-      remap[node.input0]
+    let new_input0 = if node.input0() >= 0 && node.input0() < remap.length() {
+      remap[node.input0()]
     } else {
       -1
     }
-    let new_input1 = if node.input1 >= 0 && node.input1 < remap.length() {
-      remap[node.input1]
+    let new_input1 = if node.input1() >= 0 && node.input1() < remap.length() {
+      remap[node.input1()]
     } else {
       -1
     }
-    result.push(
-      DspNode::new(
-        node.kind,
-        new_input0,
-        new_input1,
-        node.value0,
-        node.value1,
-        node.value2,
-        node.value3,
-        node.waveform,
-        node.filter_mode,
-        node.delay_max_samples,
-        node.delay_samples,
-        node.seed,
-      ),
-    )
+    result.push(node_with_inputs(node, input0=new_input0, input1=new_input1))
   }
   (result, index_map, true)
 }
@@ -180,11 +158,11 @@ fn mark_reachable(
     }
     reachable[index] = true
     let node = nodes[index]
-    if node.input0 >= 0 {
-      stack.push(node.input0)
+    if node.input0() >= 0 {
+      stack.push(node.input0())
     }
-    if node.input1 >= 0 {
-      stack.push(node.input1)
+    if node.input1() >= 0 {
+      stack.push(node.input1())
     }
   }
 }
