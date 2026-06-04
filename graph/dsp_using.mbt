@@ -1,8 +1,8 @@
 ///|
-/// Re-export dsp/ types and traits so graph source and test files can use them
-/// unqualified. `pub using` is needed because blackbox tests (`_test.mbt`)
-/// only see the package's public API.
-pub using @dsp {
+/// Import dsp/ types and traits for graph source and whitebox tests without
+/// re-exporting them through the public graph facade. Blackbox tests get their
+/// own test-only import in `dsp_using_test.mbt`.
+using @dsp {
   type AudioBuffer,
   type DspContext,
   type Oscillator,
@@ -22,10 +22,6 @@ pub using @dsp {
   trait StereoFilterSym,
   trait StereoDelaySym,
 
-  // Utility functions
-  is_finite,
-
   // Tagless compositions
   exit_deliverable,
-  range,
 }

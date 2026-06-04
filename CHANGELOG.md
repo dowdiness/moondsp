@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking changes
+
+- Removed the graph package's accidental DSP facade re-exports. Import DSP
+  types, traits, and helpers from `dowdiness/moondsp/dsp` or the root
+  `dowdiness/moondsp` facade instead of `dowdiness/moondsp/graph`.
+
 ### Added
 
 - Added an external DSL lowering contract guide and regression fixtures for

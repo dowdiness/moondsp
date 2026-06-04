@@ -8,13 +8,7 @@ import {
 }
 
 // Values
-pub fn[T : @dsp.FilterSym] exit_deliverable() -> T
-
-pub fn is_finite(Double) -> Bool
-
 pub fn node_accepts_slot(DspNode, GraphParamSlot) -> Bool
-
-pub fn[T : @dsp.ArithSym] range(T, Double, Double) -> T
 
 pub fn[T : @dsp.ArithSym + @dsp.DspSym + @dsp.FilterSym + @dsp.DelaySym + @dsp.StereoSym + @dsp.StereoFilterSym + @dsp.StereoDelaySym] replay(Array[DspNode]) -> T?
 
@@ -375,41 +369,6 @@ pub(all) enum HotSwapQueueError {
 pub impl Show for HotSwapQueueError
 
 // Type aliases
-pub using @dsp {type Adsr}
-
-pub using @dsp {type AudioBuffer}
-
-pub using @dsp {type Biquad}
-
-pub using @dsp {type BiquadMode}
-
-pub using @dsp {type DelayLine}
-
-pub using @dsp {type DspContext}
-
-pub using @dsp {type EnvStage}
-
-pub using @dsp {type Noise}
-
-pub using @dsp {type Oscillator}
-
-pub using @dsp {type Pan}
-
-pub using @dsp {type Waveform}
-
-pub using @dsp {trait ArithSym}
-
-pub using @dsp {trait DelaySym}
-
-pub using @dsp {trait DspSym}
-
-pub using @dsp {trait FilterSym}
-
-pub using @dsp {trait StereoDelaySym}
-
-pub using @dsp {trait StereoFilterSym}
-
-pub using @dsp {trait StereoSym}
 
 // Traits
 pub trait GraphControllable {

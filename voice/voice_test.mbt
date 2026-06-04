@@ -505,7 +505,7 @@ test "drum template sd: noise envelope decays to silence via envelope_gain" {
     DspNode::noise(12345U),
     DspNode::biquad(
       input=0,
-      mode=@graph.BiquadMode::BandPass,
+      mode=@dsp.BiquadMode::BandPass,
       cutoff_hz=800.0,
       q=2.0,
     ),

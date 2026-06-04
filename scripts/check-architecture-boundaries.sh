@@ -1,16 +1,21 @@
 #!/usr/bin/env bash
 #
-# Audits moondsp package imports against the architectural dependency rules.
+# Audits moondsp package imports and public facade boundaries against the
+# architectural dependency rules.
 #
-# This is intentionally manifest-based and explicit: MoonBit package manifests
-# are the enforceable boundary. Additions to the package graph should update this
-# script together with the ADR or design note that justifies the new edge.
+# This is intentionally explicit: MoonBit package manifests and generated public
+# interfaces are the enforceable boundary. Additions to the package graph or
+# public facade should update this script together with the ADR or design note
+# that justifies the new edge.
 #
 # See docs/decisions/0015-graph-internal-boundaries-and-maintainability.md.
 
 set -euo pipefail
 
 violations=()
+
+# Regenerate public interfaces before checking facade-level re-export rules.
+moon info --quiet
 
 repo_import_re='^dowdiness/moondsp($|/)'
 
@@ -131,13 +136,51 @@ check_manifest "browser/internal/slot/moon.pkg" '^(dowdiness/moondsp)$'
 check_manifest "browser/internal/demo_templates/moon.pkg" '^(dowdiness/moondsp)$'
 check_manifest "browser/internal/playback_host/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(mini|scheduler|pattern|song))$'
 
+# Graph is not a secondary DSP facade. It may expose graph APIs whose signatures
+# mention @dsp types, but it must not publicly re-export DSP package types,
+# traits, or helper functions. The root dowdiness/moondsp facade remains the
+# intended combined public surface.
+declare -A dsp_public_values=()
+if [[ -f "dsp/pkg.generated.mbti" ]]; then
+  while IFS= read -r name; do
+    if [[ -n "$name" ]]; then
+      dsp_public_values["$name"]=1
+    fi
+  done < <(
+    awk '
+      /^\/\/ Values/ { in_values = 1; next }
+      /^\/\/ / && in_values { exit }
+      in_values && /^pub fn/ {
+        line = $0
+        sub(/^pub fn(\[[^]]+\])?[[:space:]]+/, "", line)
+        sub(/\(.*/, "", line)
+        print line
+      }
+    ' "dsp/pkg.generated.mbti"
+  )
+fi
+
+if [[ -f "graph/pkg.generated.mbti" ]]; then
+  while IFS= read -r line; do
+    if [[ "$line" =~ ^pub[[:space:]]using[[:space:]]@dsp ]]; then
+      violations+=("graph/pkg.generated.mbti re-exports DSP through graph: $line")
+    fi
+    if [[ "$line" =~ ^pub[[:space:]]fn ]]; then
+      graph_fn=$(echo "$line" | sed -E 's/^pub fn(\[[^]]+\])?[[:space:]]+//; s/\(.*$//')
+      if [[ "$graph_fn" != *::* && -n "${dsp_public_values[$graph_fn]:-}" ]]; then
+        violations+=("graph/pkg.generated.mbti re-exports DSP helper through graph: $line")
+      fi
+    fi
+  done < "graph/pkg.generated.mbti"
+fi
+
 if [[ ${#violations[@]} -gt 0 ]]; then
-  echo "ERROR: package imports violate architecture boundary rules:"
+  echo "ERROR: architecture boundary violations:"
   printf '  %s\n' "${violations[@]}"
   echo ""
-  echo "Either remove the dependency edge or update this script together with"
-  echo "the ADR/design rationale that makes the new edge intentional."
+  echo "Either remove the dependency/public-surface leak or update this script"
+  echo "together with the ADR/design rationale that makes the edge intentional."
   exit 1
 fi
 
-echo "OK: package imports match architecture boundary rules."
+echo "OK: architecture boundaries match rules."
