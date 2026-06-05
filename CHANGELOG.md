@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking changes
 
+- Removed legacy browser facade route shell types `SoundPool`,
+  `SchedulerRouteSelector`, and `SchedulerRoute`. They existed only to keep an
+  older leaked browser interface shape alive; runtime routing remains behind the
+  browser worklet exports.
 - Removed the graph package's accidental DSP facade re-exports. Import DSP
   types, traits, and helpers from `dowdiness/moondsp/dsp` or the root
   `dowdiness/moondsp` facade instead of `dowdiness/moondsp/graph`.

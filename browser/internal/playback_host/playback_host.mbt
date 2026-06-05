@@ -182,22 +182,6 @@ pub fn reset_scheduler_graph() -> Unit {
 }
 
 ///|
-/// Visit initialized route kinds for the browser facade's legacy route type
-/// compatibility shell. This intentionally exposes only route tags, not the
-/// host-owned selector enum, pools, schedulers, or buffers.
-pub fn for_each_route_kind(
-  on_sound : (Double) -> Unit,
-  on_synth : () -> Unit,
-) -> Unit {
-  for route in sched_routes.val {
-    match route.selector {
-      RouteSound(sound_code) => on_sound(sound_code)
-      RouteSynth => on_synth()
-    }
-  }
-}
-
-///|
 fn checked_sample(index : Int, output : @moondsp.AudioBuffer?) -> Double {
   match output {
     Some(buffer) =>

@@ -127,11 +127,6 @@ pub fn tick_source(source_id~ : Int, freq_hz~ : Double, sample_rate~ : Double) -
 // Errors
 
 // Types and methods
-type SchedulerRoute
-
-type SchedulerRouteSelector
-
-type SoundPool
 
 // Type aliases
 
