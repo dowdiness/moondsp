@@ -8,9 +8,9 @@ per-PR verification logs and merged-PR lists live in `git log` and
 
 ## Current State
 
-- `main` is clean after PR #155 (`79e7d24`), which closed issue #150 by
-  removing the legacy browser facade route shell types while preserving the
-  JS/wasm-gc worklet exports.
+- `main` includes PR #159 (`9b6c2dc`), which documented the browser
+  facade/worklet ABI contract after issue #150 removed the legacy browser route
+  shell types while preserving the JS/wasm-gc worklet exports.
 - ADR-0015 graph, scheduler, and browser internal-boundary extraction slices
   (#135–#140) have shipped, as have browser safety/helper follow-ups #152,
   #151, and #150. The browser facade/export ABI is now guarded by
@@ -37,13 +37,14 @@ For the broader backlog, read
 
 ## Recommended Next Slice
 
-**Decide issue #158 — parse/control result codes and error transport.**
+**Pick the next API hygiene slice after issue #158.**
 
-The legacy browser route shell cleanup has shipped. The browser facade/worklet
-ABI contract now has a separate guide.
+Issue #158 formalizes the browser parse/control result-code and error transport
+contract without growing the source facade or worklet export list.
 
-Treat #158 as the next browser API idealization candidate. Keep scheduler
-status/introspection (#156) separate unless concrete host use cases justify it.
+Keep scheduler status/introspection (#156) separate unless concrete host use
+cases justify it. If no browser host use case appears, the smallest remaining
+API hygiene candidate is the Voice API result hardening follow-up below.
 
 ## Alternative Slices
 
