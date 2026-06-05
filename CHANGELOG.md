@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added an automated browser facade/export ABI baseline check for
+  `browser/pkg.generated.mbti` and the JS/wasm-gc export lists in
+  `browser/moon.pkg`.
 - Added an external DSL lowering contract guide and regression fixtures for
   `Array[DspNode]` → `CompiledTemplate` → compile/control binding flows.
 - Added `DspNode` / `CompiledTemplate` authoring equality and result-typed

@@ -8,22 +8,22 @@ per-PR verification logs and merged-PR lists live in `git log` and
 
 ## Current State
 
-- `main` is clean after PR #148 (`a01c72a`), which closed issue #139 by
-  extracting scheduler transport, playback, voice-runtime, and edit-policy
-  internals behind the existing public scheduler facade. ADR-0015 graph and
-  scheduler internals shipped so far: model (#135 / PR #144), template+binding
-  (#136 / PR #145), runtime (#137 / PR #146), staging+authoring (#138 /
-  PR #147), and scheduler internals (#139 / PR #148).
-- Active browser-boundary slice: issue #140 splits browser ABI/demo-host
-  internals behind the existing public browser facade. Preserve the exported
-  worklet/browser ABI and do not revisit scheduler semantics.
+- `main` is clean after PR #149 (`cbdce35`), which closed issue #140 by
+  extracting browser slot, demo-template, and playback-host internals behind
+  the existing public browser facade. ADR-0015 graph, scheduler, and browser
+  internal-boundary extraction slices (#135–#140) have shipped.
+- Active browser-boundary safety slice: issue #152 adds automated browser
+  facade/export ABI stability checks before deeper browser cleanup. Preserve
+  the exported worklet/browser ABI unless intentionally approving a baseline
+  update, and do not revisit scheduler semantics.
 - Latest release: **v0.5.1** (tagged and published 2026-05-20).
 - The next release should be **v0.6.0** if it includes the current
   `Unreleased` entries, because public API has been added since v0.5.1.
-- Open moondsp GitHub issues #133–#140 track the ADR-0015 boundary roadmap
-  (validation wiring, graph facade/internal extraction, scheduler split, and
-  browser ABI/demo-host split). Browser ABI/demo-host work is the active #140
-  follow-up; keep release prep and parser/runtime changes separate.
+- The ADR-0015 boundary roadmap issues #133–#140 have shipped. Open browser
+  follow-ups are #150 (legacy facade route type cleanup), #151
+  (`browser/internal/playback_host` API tightening), and #152 (automated
+  browser ABI/facade checks). Keep release prep and parser/runtime changes
+  separate.
 - Open PRs: PR #86 (`release/v0.6.0`) is release prep and intentionally
   remains open until an explicit release pass. Do not tag or publish v0.6.0 as
   part of unrelated docs, benchmark, or loom-authoring work.
@@ -39,12 +39,10 @@ For the broader backlog, read
 
 ## Recommended Next Slice
 
-**Start issue #140 / ADR-0015 browser internal extraction.** Split browser slot,
-demo-template, and playback-host helpers behind the existing public browser
-facade. Keep `browser/pkg.generated.mbti` and root `pkg.generated.mbti`
-source-compatible, preserve the browser ABI/exported worklet surface, run the
-architecture boundary checks, strict check/test, wasm build, browser smoke, and
-README/example checks.
+**Start issue #152 — automated browser ABI/facade stability checks.** Add the
+smallest CI-friendly guard that fails on unexpected `browser/pkg.generated.mbti`
+or `browser/moon.pkg` export-list drift. Keep the existing browser/worklet ABI
+baseline unchanged unless the diff is intentionally reviewed and approved.
 
 ## Alternative Slices
 
@@ -68,6 +66,12 @@ README/example checks.
   authoring-side cost.
 
 ## Closed Since Previous Update
+
+- ~~**Issue #140 / PR #149 — browser internal extraction**~~ — SHIPPED
+  2026-06-05 (`cbdce35`). Extracted browser slot, demo-template, and
+  playback-host internals behind the public browser facade while preserving
+  `browser/pkg.generated.mbti`, root `pkg.generated.mbti`, and the exported
+  JS/wasm-gc worklet ABI. Follow-ups remain #150, #151, and #152.
 
 - ~~**Issue #139 / PR #148 — scheduler internal extraction**~~ — SHIPPED
   2026-06-05 (`a01c72a`). Extracted scheduler transport, playback,
