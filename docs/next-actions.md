@@ -1,6 +1,6 @@
 # Next Actions
 
-Updated: 2026-06-03
+Updated: 2026-06-05
 
 Forward-looking handoff for the next session. Keep this short and actionable;
 per-PR verification logs and merged-PR lists live in `git log` and
@@ -8,40 +8,44 @@ per-PR verification logs and merged-PR lists live in `git log` and
 
 ## Current State
 
-- `main` is aligned with `origin/main` after PR #132 (`44a1335`), which
-  closed issue #129 by adding cross-target external-authoring benchmark
-  snapshots. The external-authoring boundary and benchmark follow-ups are now
-  shipped through issues #117–#121 and #118/#127/#128/#129.
+- `main` is clean after PR #146 (`1f15a9e`), which closed issue #137 by
+  extracting `graph/internal/runtime`. ADR-0015 graph internals shipped so far:
+  model (#135 / PR #144), template+binding (#136 / PR #145), and runtime
+  (#137 / PR #146).
+- Active graph-boundary slice: issue #138 extracts `graph/internal/staging`
+  (hot-swap/topology controllers) and `graph/internal/authoring`
+  (`GraphTemplateDoc` / `GraphIndexMap`) behind the existing public graph
+  facade. Preserve the ADR-0010 boundary: `Array[DspNode]` authoring exchange,
+  `CompiledTemplate` runtime exchange, and `CompiledTemplate::analyze` as the
+  canonical crossing.
 - Latest release: **v0.5.1** (tagged and published 2026-05-20).
 - The next release should be **v0.6.0** if it includes the current
   `Unreleased` entries, because public API has been added since v0.5.1.
-- Open moondsp GitHub issues: #133–#140 track the architecture-boundary
-  roadmap from ADR-0015 (validation wiring, graph facade/internal extraction,
-  scheduler split, and browser ABI/demo-host split).
+- Open moondsp GitHub issues #133–#140 track the ADR-0015 boundary roadmap
+  (validation wiring, graph facade/internal extraction, scheduler split, and
+  browser ABI/demo-host split). Scheduler and browser splits remain later
+  follow-ups; do not fold them into issue #138.
 - Open PRs: PR #86 (`release/v0.6.0`) is release prep and intentionally
   remains open until an explicit release pass. Do not tag or publish v0.6.0 as
   part of unrelated docs, benchmark, or loom-authoring work.
-- ADR-0013 defines loom mini promotion criteria using the shipped apply-edit,
-  projection parity, PR #101 provenance-matrix evidence, PR #104
-  control-method projection parity, PR #107 recovery evidence, and PR #109–#112
-  identity-helper adoption, but it does not approve a production parser
-  switch.
+- ADR-0013 defines loom mini promotion criteria, but it does not approve a
+  production parser switch. Production mini parsing still uses the hand-written
+  parser and `mini/incr_authoring.mbt::MiniAuthoringPipeline`; loom remains an
+  authoring-only evaluation path under `specs/loom-mini-cst`.
 - `moon.mod` is now the root manifest. `moon.mod.json` remains only in the
   nested `specs/loom-mini-cst` spike module.
-- Production mini parsing still uses the hand-written parser and
-  `mini/incr_authoring.mbt::MiniAuthoringPipeline`; loom remains an
-  authoring-only evaluation path under `specs/loom-mini-cst`.
 
 For the broader backlog, read
 `~/.claude/projects/-home-antisatori-ghq-github-com-dowdiness-moondsp/memory/project_backlog.md`.
 
 ## Recommended Next Slice
 
-**v0.6.0 release prep.** Review the existing PR #86 release branch, then bump
-`moon.mod` to `0.6.0`, move `CHANGELOG.md` `Unreleased` entries under a dated
-`0.6.0` section, validate package contents, and publish only after review. Do
-not republish `0.5.1` and do not tag/publish v0.6.0 as part of unrelated
-loom-authoring work.
+**Finish issue #138 / ADR-0015 graph staging+authoring extraction.** Keep the
+public graph/root facades source-compatible, verify `graph/pkg.generated.mbti`
+and `pkg.generated.mbti` stay unchanged, and run the architecture boundary,
+strict check/test, wasm build, and graph benchmark gates before opening the PR.
+If issue #138 is already merged, continue with the later scheduler/browser
+ADR-0015 follow-ups rather than revisiting graph runtime internals.
 
 ## Alternative Slices
 

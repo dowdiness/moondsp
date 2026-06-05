@@ -5,6 +5,8 @@ import {
   "dowdiness/moondsp/graph/internal/template",
   "dowdiness/moondsp/graph/internal/binding",
   "dowdiness/moondsp/graph/internal/runtime",
+  "dowdiness/moondsp/graph/internal/staging",
+  "dowdiness/moondsp/graph/internal/authoring",
   "moonbitlang/core/bench",
   "moonbitlang/core/debug",
   "moonbitlang/core/math",

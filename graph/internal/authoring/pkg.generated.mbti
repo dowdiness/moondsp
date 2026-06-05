@@ -1,0 +1,68 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp/graph/internal/authoring"
+
+import {
+  "dowdiness/moondsp/graph/internal/binding",
+  "dowdiness/moondsp/graph/internal/model",
+  "dowdiness/moondsp/graph/internal/staging",
+  "dowdiness/moondsp/graph/internal/template",
+  "dowdiness/moondsp/identity",
+  "moonbitlang/core/debug",
+}
+
+// Values
+
+// Errors
+pub(all) suberror GraphTemplateDocError {
+  LengthMismatch(Int, Int)
+  DuplicateNodeId(String)
+  MissingNodeId(String)
+  RetiredNodeId(String)
+  Topology(@staging.GraphTopologyEditError)
+} derive(@debug.Debug)
+pub impl Show for GraphTemplateDocError
+
+// Types and methods
+pub struct GraphIndexMap {
+  // private fields
+}
+pub fn GraphIndexMap::bind_control(Self, @binding.ControlBindingBuilder, String, @identity.GraphNodeId, @model.GraphParamSlot) -> @binding.ControlBindingBuilder?
+pub fn GraphIndexMap::delete_chain(Self, @identity.GraphNodeId, @identity.GraphNodeId, @identity.GraphNodeId, @staging.GraphTopologyInputSlot, @identity.GraphNodeId) -> @staging.GraphTopologyEdit?
+pub fn GraphIndexMap::delete_node(Self, @identity.GraphNodeId, @identity.GraphNodeId, @staging.GraphTopologyInputSlot, @identity.GraphNodeId) -> @staging.GraphTopologyEdit?
+pub fn GraphIndexMap::gate_off(Self, @identity.GraphNodeId) -> @model.GraphControl?
+pub fn GraphIndexMap::gate_on(Self, @identity.GraphNodeId) -> @model.GraphControl?
+pub fn GraphIndexMap::insert_chain(Self, @identity.GraphNodeId, @staging.GraphTopologyInputSlot, Array[@model.DspNode]) -> @staging.GraphTopologyEdit?
+pub fn GraphIndexMap::insert_node(Self, @identity.GraphNodeId, @staging.GraphTopologyInputSlot, @model.DspNode) -> @staging.GraphTopologyEdit?
+pub fn GraphIndexMap::length(Self) -> Int
+pub fn GraphIndexMap::node_id_at(Self, Int) -> @identity.GraphNodeId?
+pub fn GraphIndexMap::node_index(Self, @identity.GraphNodeId) -> Int?
+pub fn GraphIndexMap::replace_node(Self, @identity.GraphNodeId, @model.DspNode) -> @staging.GraphTopologyEdit?
+pub fn GraphIndexMap::revision(Self) -> @identity.Revision
+pub fn GraphIndexMap::rewire_input(Self, @identity.GraphNodeId, @staging.GraphTopologyInputSlot, @identity.GraphNodeId) -> @staging.GraphTopologyEdit?
+pub fn GraphIndexMap::set_param(Self, @identity.GraphNodeId, @model.GraphParamSlot, Double) -> @model.GraphControl?
+
+pub struct GraphTemplateDoc {
+  // private fields
+}
+pub fn GraphTemplateDoc::analyze(Self) -> @template.CompiledTemplate
+pub fn GraphTemplateDoc::contains_node(Self, @identity.GraphNodeId) -> Bool
+pub fn GraphTemplateDoc::contains_retired_node(Self, @identity.GraphNodeId) -> Bool
+pub fn GraphTemplateDoc::delete_chain(Self, @identity.GraphNodeId, @identity.GraphNodeId, @identity.GraphNodeId, @staging.GraphTopologyInputSlot, @identity.GraphNodeId) -> Self raise GraphTemplateDocError
+pub fn GraphTemplateDoc::delete_node(Self, @identity.GraphNodeId, @identity.GraphNodeId, @staging.GraphTopologyInputSlot, @identity.GraphNodeId) -> Self raise GraphTemplateDocError
+pub fn GraphTemplateDoc::from_nodes(ids~ : Array[@identity.GraphNodeId], nodes~ : Array[@model.DspNode]) -> Self raise GraphTemplateDocError
+pub fn GraphTemplateDoc::index_map(Self) -> GraphIndexMap
+pub fn GraphTemplateDoc::insert_chain(Self, Array[@identity.GraphNodeId], @identity.GraphNodeId, @staging.GraphTopologyInputSlot, Array[@model.DspNode]) -> Self raise GraphTemplateDocError
+pub fn GraphTemplateDoc::insert_node(Self, @identity.GraphNodeId, @identity.GraphNodeId, @staging.GraphTopologyInputSlot, @model.DspNode) -> Self raise GraphTemplateDocError
+pub fn GraphTemplateDoc::length(Self) -> Int
+pub fn GraphTemplateDoc::node_at(Self, @identity.GraphNodeId) -> @model.DspNode?
+pub fn GraphTemplateDoc::node_id_at(Self, Int) -> @identity.GraphNodeId?
+pub fn GraphTemplateDoc::node_index(Self, @identity.GraphNodeId) -> Int?
+pub fn GraphTemplateDoc::nodes(Self) -> Array[@model.DspNode]
+pub fn GraphTemplateDoc::replace_node(Self, @identity.GraphNodeId, @model.DspNode) -> Self raise GraphTemplateDocError
+pub fn GraphTemplateDoc::revision(Self) -> @identity.Revision
+pub fn GraphTemplateDoc::rewire_input(Self, @identity.GraphNodeId, @staging.GraphTopologyInputSlot, @identity.GraphNodeId) -> Self raise GraphTemplateDocError
+
+// Type aliases
+
+// Traits
+
