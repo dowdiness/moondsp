@@ -8,13 +8,14 @@ pub struct EventSource {
 }
 
 ///|
-pub fn EventSource::EventSource(
+/// Internal no-copy constructor for scheduler-owned provenance arrays.
+pub fn EventSource::from_trusted_parts(
   pattern_nodes~ : Array[@identity.PatternNodeId],
   section~ : @identity.SectionId?,
   layer~ : @identity.SectionLayerId?,
   occurrence~ : @identity.OccurrenceId?,
 ) -> EventSource {
-  { pattern_nodes: pattern_nodes.copy(), section, layer, occurrence }
+  { pattern_nodes, section, layer, occurrence }
 }
 
 ///|
@@ -49,14 +50,14 @@ pub fn EventSource::occurrence(self : EventSource) -> @identity.OccurrenceId? {
 ///|
 /// Scheduler-owned active voice with its performance-sample gate-off time.
 pub struct ActiveNote {
-  priv handle : @moondsp.VoiceHandle
+  priv handle : @voice.VoiceHandle
   priv source : EventSource
   priv end_sample : Int64
 }
 
 ///|
 pub fn ActiveNote::ActiveNote(
-  handle~ : @moondsp.VoiceHandle,
+  handle~ : @voice.VoiceHandle,
   source~ : EventSource,
   end_sample~ : Int64,
 ) -> ActiveNote {
@@ -64,7 +65,7 @@ pub fn ActiveNote::ActiveNote(
 }
 
 ///|
-pub fn ActiveNote::handle(self : ActiveNote) -> @moondsp.VoiceHandle {
+pub fn ActiveNote::handle(self : ActiveNote) -> @voice.VoiceHandle {
   self.handle
 }
 
@@ -81,7 +82,7 @@ pub fn ActiveNote::expires_at(self : ActiveNote, sample : Int64) -> Bool {
 ///|
 pub fn ActiveNote::note_off(
   self : ActiveNote,
-  pool : @moondsp.BoundVoicePool,
+  pool : @voice.BoundVoicePool,
 ) -> Unit {
   ignore(pool.note_off(self.handle))
 }
@@ -89,7 +90,7 @@ pub fn ActiveNote::note_off(
 ///|
 pub fn ActiveNote::kill(
   self : ActiveNote,
-  pool : @moondsp.BoundVoicePool,
+  pool : @voice.BoundVoicePool,
 ) -> Unit {
   ignore(pool.kill(self.handle))
 }

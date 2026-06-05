@@ -184,7 +184,7 @@ fn copy_playback_events(events : Array[PlaybackEvent]) -> Array[PlaybackEvent] {
 fn EventSource::to_voice_runtime(
   self : EventSource,
 ) -> @voice_runtime.EventSource {
-  @voice_runtime.EventSource(
+  @voice_runtime.EventSource::from_trusted_parts(
     pattern_nodes=self.pattern_nodes,
     section=self.section,
     layer=self.layer,

@@ -6,8 +6,6 @@ import {
 }
 
 // Values
-pub fn source_matches_target(EventSource, AffectedVoiceTarget) -> Bool
-
 pub fn source_parts_match_target(pattern_nodes~ : Array[@identity.PatternNodeId], section~ : @identity.SectionId?, layer~ : @identity.SectionLayerId?, occurrence~ : @identity.OccurrenceId?, AffectedVoiceTarget) -> Bool
 
 pub fn stop_for_policy(AffectedVoicePolicy, AffectedVoiceTarget) -> AffectedVoiceStop?
@@ -30,11 +28,6 @@ pub struct AffectedVoiceTarget {
   // private fields
 }
 pub fn AffectedVoiceTarget::AffectedVoiceTarget(pattern_node~ : @identity.PatternNodeId?, section~ : @identity.SectionId?, layer~ : @identity.SectionLayerId?, occurrence~ : @identity.OccurrenceId?) -> Self
-
-pub struct EventSource {
-  // private fields
-}
-pub fn EventSource::EventSource(pattern_nodes~ : Array[@identity.PatternNodeId], section~ : @identity.SectionId?, layer~ : @identity.SectionLayerId?, occurrence~ : @identity.OccurrenceId?) -> Self
 
 // Type aliases
 

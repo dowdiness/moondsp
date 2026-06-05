@@ -30,8 +30,8 @@ pub fn ActiveNote::source(Self) -> EventSource
 pub struct EventSource {
   // private fields
 }
-pub fn EventSource::EventSource(pattern_nodes~ : Array[@identity.PatternNodeId], section~ : @identity.SectionId?, layer~ : @identity.SectionLayerId?, occurrence~ : @identity.OccurrenceId?) -> Self
 pub fn EventSource::borrow_pattern_nodes(Self) -> Array[@identity.PatternNodeId]
+pub fn EventSource::from_trusted_parts(pattern_nodes~ : Array[@identity.PatternNodeId], section~ : @identity.SectionId?, layer~ : @identity.SectionLayerId?, occurrence~ : @identity.OccurrenceId?) -> Self
 pub fn EventSource::layer(Self) -> @identity.SectionLayerId?
 pub fn EventSource::occurrence(Self) -> @identity.OccurrenceId?
 pub fn EventSource::pattern_nodes(Self) -> Array[@identity.PatternNodeId]

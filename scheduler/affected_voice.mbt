@@ -108,22 +108,15 @@ fn AffectedVoiceTarget::to_edit_policy(
 }
 
 ///|
-fn EventSource::to_edit_policy(self : EventSource) -> @edit_policy.EventSource {
-  @edit_policy.EventSource(
-    pattern_nodes=self.pattern_nodes,
-    section=self.section,
-    layer=self.layer,
-    occurrence=self.occurrence,
-  )
-}
-
-///|
 pub fn AffectedVoiceTarget::matches(
   self : AffectedVoiceTarget,
   source : EventSource,
 ) -> Bool {
-  @edit_policy.source_matches_target(
-    source.to_edit_policy(),
+  @edit_policy.source_parts_match_target(
+    pattern_nodes=source.pattern_nodes,
+    section=source.section,
+    layer=source.layer,
+    occurrence=source.occurrence,
     self.to_edit_policy(),
   )
 }

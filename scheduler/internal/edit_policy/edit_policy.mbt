@@ -26,25 +26,6 @@ fn AffectedVoiceTarget::is_empty(self : AffectedVoiceTarget) -> Bool {
 }
 
 ///|
-/// Internal event provenance used for edit-policy matching.
-pub struct EventSource {
-  priv pattern_nodes : Array[@identity.PatternNodeId]
-  priv section : @identity.SectionId?
-  priv layer : @identity.SectionLayerId?
-  priv occurrence : @identity.OccurrenceId?
-}
-
-///|
-pub fn EventSource::EventSource(
-  pattern_nodes~ : Array[@identity.PatternNodeId],
-  section~ : @identity.SectionId?,
-  layer~ : @identity.SectionLayerId?,
-  occurrence~ : @identity.OccurrenceId?,
-) -> EventSource {
-  { pattern_nodes: pattern_nodes.copy(), section, layer, occurrence }
-}
-
-///|
 fn pattern_nodes_contain(
   pattern_nodes : Array[@identity.PatternNodeId],
   id : @identity.PatternNodeId,
@@ -85,20 +66,6 @@ pub fn source_parts_match_target(
     None => true
   }
   pattern_matches && section_matches && layer_matches && occurrence_matches
-}
-
-///|
-pub fn source_matches_target(
-  source : EventSource,
-  target : AffectedVoiceTarget,
-) -> Bool {
-  source_parts_match_target(
-    pattern_nodes=source.pattern_nodes,
-    section=source.section,
-    layer=source.layer,
-    occurrence=source.occurrence,
-    target,
-  )
 }
 
 ///|
