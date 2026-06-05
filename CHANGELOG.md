@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added a browser facade/worklet ABI contract guide covering supported exports,
+  internal boundaries, semver policy, and the ABI baseline review workflow.
 - Added an automated browser facade/export ABI baseline check for
   `browser/pkg.generated.mbti` and the JS/wasm-gc export lists in
   `browser/moon.pkg`.

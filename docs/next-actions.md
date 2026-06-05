@@ -8,25 +8,23 @@ per-PR verification logs and merged-PR lists live in `git log` and
 
 ## Current State
 
-- `main` is clean after PR #154 (`1b844a1`), which closed issue #151 by
-  tightening the `browser/internal/playback_host` helper API. Browser
-  whitebox probes are now package-local, route-selector internals are private,
-  and the facade compatibility hook no longer exposes host-owned pools,
-  schedulers, or buffers.
+- `main` is clean after PR #155 (`79e7d24`), which closed issue #150 by
+  removing the legacy browser facade route shell types while preserving the
+  JS/wasm-gc worklet exports.
 - ADR-0015 graph, scheduler, and browser internal-boundary extraction slices
-  (#135–#140) have shipped, as have browser safety/helper follow-ups #152 and
-  #151. The remaining browser follow-up is #150, an explicit legacy public
-  facade type cleanup. Treat it as an API-cleanup window, not an internal-only
-  refactor.
+  (#135–#140) have shipped, as have browser safety/helper follow-ups #152,
+  #151, and #150. The browser facade/export ABI is now guarded by
+  `scripts/check-browser-abi.sh`; `browser/pkg.generated.mbti` exposes values
+  only, with no browser-specific public route/pool/scheduler types.
 - Latest release: **v0.5.1** (tagged and published 2026-05-20).
 - The next release should be **v0.6.0** if it includes the current
   `Unreleased` entries, because public API has been added since v0.5.1.
-- The ADR-0015 boundary roadmap issues #133–#140 have shipped. Browser
-  follow-ups #151 and #152 have shipped; #150 (legacy facade route type
-  cleanup) remains open. Keep release prep and parser/runtime changes separate.
+- Keep release prep, parser/runtime changes, and browser API idealization
+  issues separate. PR #86 (`release/v0.6.0`) remains release prep; do not tag or
+  publish v0.6.0 as part of unrelated docs, benchmark, or browser API-contract
+  work.
 - Open PRs: PR #86 (`release/v0.6.0`) is release prep and intentionally
-  remains open until an explicit release pass. Do not tag or publish v0.6.0 as
-  part of unrelated docs, benchmark, or loom-authoring work.
+  remains open until an explicit release pass.
 - ADR-0013 defines loom mini promotion criteria, but it does not approve a
   production parser switch. Production mini parsing still uses the hand-written
   parser and `mini/incr_authoring.mbt::MiniAuthoringPipeline`; loom remains an
@@ -39,12 +37,13 @@ For the broader backlog, read
 
 ## Recommended Next Slice
 
-**Decide/start issue #150 — retire the legacy browser scheduler route type
-shell.** This is the remaining browser follow-up and likely changes
-`browser/pkg.generated.mbti`, so treat it as an explicit public API cleanup:
-document the breaking change, verify the JS/wasm-gc worklet export ABI stays
-unchanged, and update `browser/browser_abi.baseline` only after reviewing the
-facade diff.
+**Decide issue #158 — parse/control result codes and error transport.**
+
+The legacy browser route shell cleanup has shipped. The browser facade/worklet
+ABI contract now has a separate guide.
+
+Treat #158 as the next browser API idealization candidate. Keep scheduler
+status/introspection (#156) separate unless concrete host use cases justify it.
 
 ## Alternative Slices
 
@@ -67,7 +66,14 @@ facade diff.
   incr/Salsa-style early-cutoff path until a benchmark reproduces meaningful
   authoring-side cost.
 
-## Closed Since Previous Update
+## Closed since previous update
+
+- ~~**Issue #150 / PR #155 — legacy browser route shell cleanup**~~ — SHIPPED
+  2026-06-05 (`79e7d24`). Removed the accidental browser facade route shell
+  types `SoundPool`, `SchedulerRouteSelector`, and `SchedulerRoute` while
+  preserving the JS/wasm-gc worklet export lists. `CHANGELOG.md` records the
+  breaking source API cleanup, and `browser/pkg.generated.mbti` now has no
+  browser-specific public types under `Types and methods`.
 
 - ~~**Issue #151 / PR #154 — playback-host helper API tightening**~~ — SHIPPED
   2026-06-05 (`1b844a1`). Moved browser scheduler whitebox probes into
@@ -87,7 +93,7 @@ facade diff.
   playback-host internals behind the public browser facade while preserving
   `browser/pkg.generated.mbti`, root `pkg.generated.mbti`, and the exported
   JS/wasm-gc worklet ABI. Follow-ups opened from review caveats: #150, #151,
-  and #152; #151/#152 have since shipped.
+  and #152; all three have since shipped.
 
 - ~~**Issue #139 / PR #148 — scheduler internal extraction**~~ — SHIPPED
   2026-06-05 (`a01c72a`). Extracted scheduler transport, playback,
@@ -233,6 +239,9 @@ facade diff.
   `NEW_MOON_MOD=0 moon test --release`.
 - Architecture boundary checks: `./scripts/check-public-boundary.sh` and
   `./scripts/check-architecture-boundaries.sh`.
+- Browser facade/export slices: `./scripts/check-browser-abi.sh`; update
+  `browser/browser_abi.baseline` only for reviewed intentional facade/export
+  changes.
 - `specs/loom-mini-cst` slices: also run
   `NEW_MOON_MOD=0 moon -C specs/loom-mini-cst check --deny-warn` and
   `NEW_MOON_MOD=0 moon -C specs/loom-mini-cst test`.
