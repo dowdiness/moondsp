@@ -1,0 +1,28 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp/browser/internal/demo_templates"
+
+import {
+  "dowdiness/moondsp/graph",
+}
+
+// Values
+pub fn bd_template() -> Array[@graph.DspNode]
+
+pub fn cp_template() -> Array[@graph.DspNode]
+
+pub fn hh_template() -> Array[@graph.DspNode]
+
+pub fn oh_template() -> Array[@graph.DspNode]
+
+pub fn sd_template() -> Array[@graph.DspNode]
+
+pub fn synth_template() -> Array[@graph.DspNode]
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+

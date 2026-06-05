@@ -1,9 +1,9 @@
 import {
   "dowdiness/moondsp",
-  "dowdiness/moondsp/mini",
   "dowdiness/moondsp/scheduler",
-  "dowdiness/moondsp/pattern",
-  "dowdiness/moondsp/song",
+  "dowdiness/moondsp/browser/internal/slot",
+  "dowdiness/moondsp/browser/internal/demo_templates",
+  "dowdiness/moondsp/browser/internal/playback_host",
   "moonbitlang/core/debug",
   "moonbitlang/core/ref",
 }

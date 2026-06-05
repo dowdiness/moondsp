@@ -1,0 +1,54 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp/browser/internal/slot"
+
+import {
+  "dowdiness/moondsp/dsp",
+  "moonbitlang/core/ref",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct GraphSlot[T, O] {
+  graph : @ref.Ref[T?]
+  context : @ref.Ref[@dsp.DspContext?]
+  output : O
+  // private fields
+}
+#alias(new)
+pub fn[T, O] GraphSlot::GraphSlot(output~ : O, compile~ : (@dsp.DspContext) -> T?) -> Self[T, O]
+pub fn[T, O] GraphSlot::ctx_val(Self[T, O]) -> @dsp.DspContext
+pub fn[T, O : Output] GraphSlot::ensure(Self[T, O], Double, Int, on_rebuild? : () -> Unit) -> Bool
+pub fn[T, O] GraphSlot::graph_val(Self[T, O]) -> T
+pub fn[T, O : Output] GraphSlot::reset(Self[T, O]) -> Unit
+
+pub struct MonoOut {
+  // private fields
+}
+#alias(new)
+pub fn MonoOut::MonoOut() -> Self
+pub fn MonoOut::get(Self) -> @dsp.AudioBuffer
+pub fn MonoOut::sample(Self, Int) -> Double
+pub impl Output for MonoOut
+
+pub struct StereoOut {
+  // private fields
+}
+#alias(new)
+pub fn StereoOut::StereoOut() -> Self
+pub fn StereoOut::left_buf(Self) -> @dsp.AudioBuffer
+pub fn StereoOut::left_sample(Self, Int) -> Double
+pub fn StereoOut::right_buf(Self) -> @dsp.AudioBuffer
+pub fn StereoOut::right_sample(Self, Int) -> Double
+pub impl Output for StereoOut
+
+// Type aliases
+
+// Traits
+pub trait Output {
+  fn reset(Self) -> Unit
+  fn allocate(Self, Int) -> Unit
+}
+

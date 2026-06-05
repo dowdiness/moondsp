@@ -1,15 +1,7 @@
 ///|
-/// Active playback source parsed from the explicit browser protocol.
-priv enum SchedulerActivePlayback {
-  ActivePattern(@pattern.Pat[@pattern.ControlMap])
-  ActiveSong(Array[@song.Song[@pattern.ControlMap]])
-}
-
-///|
-let sched_active_playback : @ref.Ref[SchedulerActivePlayback?] = @ref.new(None)
-
-///|
-/// Per-sound pool state: voice pool + scheduler + tmp buffers.
+/// Per-sound pool state retained in the browser facade interface for
+/// source compatibility. Runtime playback state now lives in
+/// `browser/internal/playback_host`.
 struct SoundPool {
   pool : @moondsp.BoundVoicePool
   scheduler : @scheduler.PatternScheduler
@@ -30,625 +22,163 @@ struct SchedulerRoute {
 }
 
 ///|
-let sched_routes : @ref.Ref[Array[SchedulerRoute]] = @ref.new([])
+/// Keep the legacy facade-only scheduler route shells live without routing
+/// playback through them. This preserves `browser/pkg.generated.mbti` exactly
+/// while the real host state lives in `@playback_host`.
+fn facade_selector_from_host(
+  selector : @playback_host.SchedulerRouteSelector,
+) -> SchedulerRouteSelector {
+  match selector {
+    @playback_host.SchedulerRouteSelector::RouteSound(sound_code) =>
+      RouteSound(sound_code)
+    @playback_host.SchedulerRouteSelector::RouteSynth => RouteSynth
+  }
+}
 
 ///|
-let sched_left : @ref.Ref[@moondsp.AudioBuffer?] = @ref.new(None)
+fn touch_scheduler_facade_route(
+  selector : @playback_host.SchedulerRouteSelector,
+  bound_pool : @moondsp.BoundVoicePool,
+  scheduler : @scheduler.PatternScheduler,
+  tmp_left : @moondsp.AudioBuffer,
+  tmp_right : @moondsp.AudioBuffer,
+) -> Unit {
+  let pool : SoundPool = { pool: bound_pool, scheduler, tmp_left, tmp_right }
+  let facade_route : SchedulerRoute = {
+    selector: facade_selector_from_host(selector),
+    pool,
+  }
+  match facade_route.selector {
+    RouteSound(sound_code) => ignore(sound_code)
+    RouteSynth => ()
+  }
+  ignore(facade_route.pool.pool)
+  ignore(facade_route.pool.scheduler)
+  ignore(facade_route.pool.tmp_left)
+  ignore(facade_route.pool.tmp_right)
+}
 
 ///|
-let sched_right : @ref.Ref[@moondsp.AudioBuffer?] = @ref.new(None)
-
-///|
-let sched_gain : @ref.Ref[Double] = @ref.new(0.3)
+fn touch_scheduler_facade_types() -> Unit {
+  @playback_host.for_each_route(touch_scheduler_facade_route)
+}
 
 ///|
 fn bd_template() -> Array[@moondsp.DspNode] {
-  // Kick drum: pitch sweep 240→60 Hz + amplitude envelope
-  // [0] pitch ADSR: fast decay creates frequency sweep
-  // [1] scale pitch envelope by 180 Hz range
-  // [2] base frequency 60 Hz
-  // [3] mix = 60 + env*180 → frequency sweeps 240→60
-  // [4] FM sine oscillator reading frequency from mix
-  // [5] amplitude ADSR
-  // [6] envelope_gain: signal * amp envelope
-  // [7] output
-  [
-    @moondsp.DspNode::adsr(
-      attack_ms=0.5,
-      decay_ms=40.0,
-      sustain=0.0,
-      release_ms=40.0,
-    ),
-    @moondsp.DspNode::gain(0, 180.0),
-    @moondsp.DspNode::constant(60.0),
-    @moondsp.DspNode::mix(1, 2),
-    @moondsp.DspNode::oscillator_from(3, @moondsp.Waveform::Sine),
-    @moondsp.DspNode::adsr(
-      attack_ms=0.5,
-      decay_ms=120.0,
-      sustain=0.0,
-      release_ms=80.0,
-    ),
-    @moondsp.DspNode::envelope_gain(input=4, envelope=5, amount=1.0),
-    @moondsp.DspNode::output(6),
-  ]
+  @demo_templates.bd_template()
 }
 
 ///|
 fn sd_template() -> Array[@moondsp.DspNode] {
-  // Snare: bandpass noise + sine body, amplitude envelope
-  // [0] noise source
-  // [1] bandpass filter at 1.5 kHz (snare body)
-  // [2] sine at 180 Hz (tonal body)
-  // [3] mix noise + sine layers
-  // [4] amplitude ADSR
-  // [5] envelope_gain: signal * envelope
-  // [6] output
-  [
-    @moondsp.DspNode::noise(12345U),
-    @moondsp.DspNode::biquad(
-      input=0,
-      mode=@moondsp.BiquadMode::BandPass,
-      cutoff_hz=1500.0,
-      q=1.5,
-    ),
-    @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 180.0),
-    @moondsp.DspNode::mix(1, 2),
-    @moondsp.DspNode::adsr(
-      attack_ms=0.5,
-      decay_ms=60.0,
-      sustain=0.0,
-      release_ms=40.0,
-    ),
-    @moondsp.DspNode::envelope_gain(input=3, envelope=4, amount=1.0),
-    @moondsp.DspNode::output(5),
-  ]
+  @demo_templates.sd_template()
 }
 
 ///|
 fn hh_template() -> Array[@moondsp.DspNode] {
-  // Hi-hat: high-pass filtered noise, short envelope
-  // [0] noise source
-  // [1] high-pass filter at 7 kHz
-  // [2] amplitude ADSR (very short)
-  // [3] envelope_gain: signal * envelope
-  // [4] output
-  [
-    @moondsp.DspNode::noise(67890U),
-    @moondsp.DspNode::biquad(
-      input=0,
-      mode=@moondsp.BiquadMode::HighPass,
-      cutoff_hz=7000.0,
-      q=1.5,
-    ),
-    @moondsp.DspNode::adsr(
-      attack_ms=0.5,
-      decay_ms=25.0,
-      sustain=0.0,
-      release_ms=15.0,
-    ),
-    @moondsp.DspNode::envelope_gain(input=1, envelope=2, amount=0.6),
-    @moondsp.DspNode::output(3),
-  ]
+  @demo_templates.hh_template()
 }
 
 ///|
 fn oh_template() -> Array[@moondsp.DspNode] {
-  // Open hi-hat: same shape as hh but longer decay + slightly lower
-  // cutoff so it reads as "open" against the closed hh in patterns.
-  // Different noise seed so layered hh + oh don't beat phase-coherently.
-  [
-    @moondsp.DspNode::noise(24680U),
-    @moondsp.DspNode::biquad(
-      input=0,
-      mode=@moondsp.BiquadMode::HighPass,
-      cutoff_hz=6000.0,
-      q=1.5,
-    ),
-    @moondsp.DspNode::adsr(
-      attack_ms=0.5,
-      decay_ms=200.0,
-      sustain=0.0,
-      release_ms=100.0,
-    ),
-    @moondsp.DspNode::envelope_gain(input=1, envelope=2, amount=0.45),
-    @moondsp.DspNode::output(3),
-  ]
+  @demo_templates.oh_template()
 }
 
 ///|
 fn cp_template() -> Array[@moondsp.DspNode] {
-  // Clap: bandpass noise around 1.2 kHz with a sharp short envelope.
-  // The classic 808 multi-burst texture would need a multi-tap envelope
-  // primitive we don't have; a single sharp burst still reads as "clap"
-  // distinct from sd (which has a tonal sine body and broader bandpass).
-  [
-    @moondsp.DspNode::noise(13579U),
-    @moondsp.DspNode::biquad(
-      input=0,
-      mode=@moondsp.BiquadMode::BandPass,
-      cutoff_hz=1200.0,
-      q=2.0,
-    ),
-    @moondsp.DspNode::adsr(
-      attack_ms=0.5,
-      decay_ms=40.0,
-      sustain=0.0,
-      release_ms=30.0,
-    ),
-    @moondsp.DspNode::envelope_gain(input=1, envelope=2, amount=0.7),
-    @moondsp.DspNode::output(3),
-  ]
+  @demo_templates.cp_template()
 }
 
 ///|
 fn synth_template() -> Array[@moondsp.DspNode] {
-  [
-    @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 440.0),
-    @moondsp.DspNode::adsr(
-      attack_ms=10.0,
-      decay_ms=100.0,
-      sustain=0.7,
-      release_ms=300.0,
-    ),
-    @moondsp.DspNode::envelope_gain(input=0, envelope=1, amount=1.0),
-    @moondsp.DspNode::output(2),
-  ]
-}
-
-///|
-/// Create a SoundPool for a drum template (no control bindings needed).
-fn make_drum_pool(
-  template : Array[@moondsp.DspNode],
-  ctx : @moondsp.DspContext,
-  block_size : Int,
-) -> SoundPool? {
-  // 8 voices = defensive headroom for .jux(f) patterns where f causes
-  // same-sound overlap (e.g. the demo's hh*16? layer puts left's hh at
-  // slot t and right's hh at slot 1-t — frequent coincidence at fine
-  // subdivisions). Multi-sound patterns like s("bd sd hh sd").jux(rev)
-  // do NOT need this headroom because per-pool pressure stays at 1.
-  match
-    @moondsp.BoundVoicePool::new(
-      @moondsp.CompiledTemplate::analyze(template),
-      ctx,
-      @moondsp.ControlBindingBuilder::new(),
-      max_voices=8,
-    ) {
-    Err(_) => None
-    Ok(pool) => {
-      let scheduler = @scheduler.PatternScheduler::new(bpm=120.0, ctx~)
-      Some({
-        pool,
-        scheduler,
-        tmp_left: @moondsp.AudioBuffer::filled(block_size),
-        tmp_right: @moondsp.AudioBuffer::filled(block_size),
-      })
-    }
-  }
-}
-
-///|
-/// Create a SoundPool for the synth template (with note->freq binding).
-fn make_synth_pool(ctx : @moondsp.DspContext, block_size : Int) -> SoundPool? {
-  let template = synth_template()
-  // See make_drum_pool for the .jux headroom rationale.
-  match
-    @moondsp.BoundVoicePool::new(
-      @moondsp.CompiledTemplate::analyze(template),
-      ctx,
-      @moondsp.ControlBindingBuilder::new().bind(
-        key="note",
-        node_index=0,
-        slot=@moondsp.GraphParamSlot::Value0,
-      ),
-      max_voices=16,
-    ) {
-    Err(_) => None
-    Ok(pool) => {
-      let scheduler = @scheduler.PatternScheduler::new(bpm=120.0, ctx~)
-      Some({
-        pool,
-        scheduler,
-        tmp_left: @moondsp.AudioBuffer::filled(block_size),
-        tmp_right: @moondsp.AudioBuffer::filled(block_size),
-      })
-    }
-  }
-}
-
-///|
-fn make_drum_route(
-  sound_code : Double,
-  template : Array[@moondsp.DspNode],
-  ctx : @moondsp.DspContext,
-  block_size : Int,
-) -> SchedulerRoute? {
-  match make_drum_pool(template, ctx, block_size) {
-    Some(pool) => Some({ selector: RouteSound(sound_code), pool })
-    None => None
-  }
-}
-
-///|
-fn make_synth_route(
-  ctx : @moondsp.DspContext,
-  block_size : Int,
-) -> SchedulerRoute? {
-  match make_synth_pool(ctx, block_size) {
-    Some(pool) => Some({ selector: RouteSynth, pool })
-    None => None
-  }
+  @demo_templates.synth_template()
 }
 
 ///|
 pub fn init_scheduler_graph(sample_rate : Double, block_size : Int) -> Bool {
-  if sample_rate <= 0.0 || block_size <= 0 {
-    reset_scheduler_graph()
-    return false
+  let ready = @playback_host.init_scheduler_graph_with_templates(
+    sample_rate,
+    block_size,
+    bd_template(),
+    sd_template(),
+    hh_template(),
+    cp_template(),
+    oh_template(),
+    synth_template(),
+  )
+  if ready {
+    touch_scheduler_facade_types()
   }
-  let ctx = @moondsp.DspContext::new(sample_rate~, block_size~)
-  let route_candidates = [
-    make_drum_route(36.0, bd_template(), ctx, block_size),
-    make_drum_route(38.0, sd_template(), ctx, block_size),
-    make_drum_route(42.0, hh_template(), ctx, block_size),
-    make_drum_route(39.0, cp_template(), ctx, block_size),
-    make_drum_route(46.0, oh_template(), ctx, block_size),
-    make_synth_route(ctx, block_size),
-  ]
-  let routes : Array[SchedulerRoute] = []
-  for candidate in route_candidates {
-    match candidate {
-      Some(route) => routes.push(route)
-      None => {
-        reset_scheduler_graph()
-        return false
-      }
-    }
-  }
-  sched_routes.val = routes
-  sched_left.val = Some(@moondsp.AudioBuffer::filled(block_size))
-  sched_right.val = Some(@moondsp.AudioBuffer::filled(block_size))
-  sched_gain.val = 0.3
-  sched_active_playback.val = None
-  true
+  ready
 }
 
 ///|
 fn reset_scheduler_graph() -> Unit {
-  sched_routes.val = []
-  sched_left.val = None
-  sched_right.val = None
-  sched_gain.val = 0.3
-  sched_active_playback.val = None
+  @playback_host.reset_scheduler_graph()
 }
 
 ///|
 pub fn scheduler_left_sample(index : Int) -> Double {
-  checked_sample(index, sched_left.val)
+  @playback_host.scheduler_left_sample(index)
 }
 
 ///|
 pub fn scheduler_right_sample(index : Int) -> Double {
-  checked_sample(index, sched_right.val)
-}
-
-///|
-/// Accumulate one sub-pool's rendered tmp buffers into main buffers.
-fn accumulate_sub_pool(
-  sp : SoundPool,
-  left : @moondsp.AudioBuffer,
-  right : @moondsp.AudioBuffer,
-) -> Unit {
-  let len = left.length()
-  for i = 0; i < len; i = i + 1 {
-    left.set(i, left.get(i) + sp.tmp_left.get(i))
-    right.set(i, right.get(i) + sp.tmp_right.get(i))
-  }
-}
-
-///|
-fn process_sub_pool(
-  sp : SoundPool,
-  sub_pat : @pattern.Pat[@pattern.ControlMap],
-  left : @moondsp.AudioBuffer,
-  right : @moondsp.AudioBuffer,
-) -> Unit {
-  sp.tmp_left.fill(0.0)
-  sp.tmp_right.fill(0.0)
-  sp.scheduler.process_block(sub_pat, sp.pool, sp.tmp_left, sp.tmp_right)
-  accumulate_sub_pool(sp, left, right)
-}
-
-///|
-fn process_sub_song_pool(
-  sp : SoundPool,
-  song : @song.Song[@pattern.ControlMap],
-  left : @moondsp.AudioBuffer,
-  right : @moondsp.AudioBuffer,
-) -> Unit {
-  sp.tmp_left.fill(0.0)
-  sp.tmp_right.fill(0.0)
-  sp.scheduler.process_song_block(song, sp.pool, sp.tmp_left, sp.tmp_right)
-  accumulate_sub_pool(sp, left, right)
-}
-
-///|
-fn route_matches(
-  selector : SchedulerRouteSelector,
-  cm : @pattern.ControlMap,
-) -> Bool {
-  match selector {
-    RouteSound(sound_code) =>
-      match cm.get("sound") {
-        Some(v) => v == sound_code
-        None => false
-      }
-    RouteSynth =>
-      match cm.get("note") {
-        Some(_) => true
-        None => false
-      }
-  }
-}
-
-///|
-fn control_map_for_route(
-  selector : SchedulerRouteSelector,
-  cm : @pattern.ControlMap,
-) -> @pattern.ControlMap? {
-  if route_matches(selector, cm) {
-    Some(cm)
-  } else {
-    None
-  }
-}
-
-///|
-fn filter_pat_for_route(
-  selector : SchedulerRouteSelector,
-  pat : @pattern.Pat[@pattern.ControlMap],
-) -> @pattern.Pat[@pattern.ControlMap] {
-  pat.filter_map(fn(cm) { control_map_for_route(selector, cm) })
-}
-
-///|
-fn filter_section_for_route(
-  selector : SchedulerRouteSelector,
-  section : @song.Section[@pattern.ControlMap],
-) -> Result[@song.Section[@pattern.ControlMap], String] {
-  let body = @song.SectionBody::single(
-    filter_pat_for_route(selector, section.body()),
-  )
-  let result = try? @song.Section(
-    name=section.name(),
-    length_cycles=section.length_cycles(),
-    scope=section.scope(),
-    body~,
-  )
-  match result {
-    Ok(filtered) => Ok(filtered)
-    Err(_) => Err("internal song routing error: invalid section length")
-  }
-}
-
-///|
-fn filter_song_for_route(
-  selector : SchedulerRouteSelector,
-  song : @song.Song[@pattern.ControlMap],
-) -> Result[@song.Song[@pattern.ControlMap], String] {
-  let parts : Array[@song.SongPart[@pattern.ControlMap]] = []
-  for occurrence in song.occurrences() {
-    match filter_section_for_route(selector, occurrence.section()) {
-      Ok(section) =>
-        parts.push(
-          @song.SongPart::with_id_at(
-            id=occurrence.id(),
-            start=occurrence.start(),
-            name=occurrence.name(),
-            section~,
-          ),
-        )
-      Err(msg) => return Err(msg)
-    }
-  }
-  let result = try? @song.Song(parts~)
-  match result {
-    Ok(filtered) => Ok(filtered)
-    Err(_) => Err("internal song routing error: invalid song layout")
-  }
-}
-
-///|
-fn route_songs_for_current_routes(
-  song : @song.Song[@pattern.ControlMap],
-) -> Result[Array[@song.Song[@pattern.ControlMap]], String] {
-  let route_songs : Array[@song.Song[@pattern.ControlMap]] = []
-  for route in sched_routes.val {
-    match filter_song_for_route(route.selector, song) {
-      Ok(route_song) => route_songs.push(route_song)
-      Err(msg) => return Err(msg)
-    }
-  }
-  Ok(route_songs)
-}
-
-///|
-fn reset_route_transports_for_song_start() -> Unit {
-  for route in sched_routes.val {
-    route.pool.scheduler.reset_transport_and_kill_notes(route.pool.pool)
-  }
-}
-
-///|
-fn process_pattern_routes(
-  pat : @pattern.Pat[@pattern.ControlMap],
-  left : @moondsp.AudioBuffer,
-  right : @moondsp.AudioBuffer,
-) -> Unit {
-  for route in sched_routes.val {
-    let sub = filter_pat_for_route(route.selector, pat)
-    process_sub_pool(route.pool, sub, left, right)
-  }
-}
-
-///|
-fn process_song_routes(
-  route_songs : Array[@song.Song[@pattern.ControlMap]],
-  left : @moondsp.AudioBuffer,
-  right : @moondsp.AudioBuffer,
-) -> Unit {
-  for i in 0..<sched_routes.val.length() {
-    match route_songs.get(i) {
-      Some(song) =>
-        process_sub_song_pool(sched_routes.val[i].pool, song, left, right)
-      None => ()
-    }
-  }
+  @playback_host.scheduler_right_sample(index)
 }
 
 ///|
 pub fn process_scheduler_block() -> Bool {
-  let left = match sched_left.val {
-    Some(b) => b
-    None => return false
-  }
-  let right = match sched_right.val {
-    Some(b) => b
-    None => return false
-  }
-  // Clear main output buffers
-  left.fill(0.0)
-  right.fill(0.0)
-  // Get active playback; if none set, output silence.
-  match sched_active_playback.val {
-    Some(ActivePattern(pat)) => process_pattern_routes(pat, left, right)
-    Some(ActiveSong(route_songs)) =>
-      process_song_routes(route_songs, left, right)
-    None => return true
-  }
-  // Apply master gain
-  let gain = sched_gain.val
-  let len = left.length()
-  for i = 0; i < len; i = i + 1 {
-    left.set(i, left.get(i) * gain)
-    right.set(i, right.get(i) * gain)
-  }
-  true
-}
-
-///|
-let sched_last_error : @ref.Ref[String] = @ref.new("")
-
-///|
-let sched_pattern_input_chars : Array[Int] = []
-
-///|
-let sched_song_input_chars : Array[Int] = []
-
-///|
-fn input_chars_to_string(chars : Array[Int]) -> String {
-  let buf = StringBuilder::new()
-  for c in chars {
-    buf.write_char(c.unsafe_to_char())
-  }
-  buf.to_string()
-}
-
-///|
-fn set_active_pattern_text(text : String) -> Int {
-  match @mini.parse(text) {
-    Ok(pat) => {
-      sched_active_playback.val = Some(ActivePattern(pat))
-      sched_last_error.val = ""
-      0
-    }
-    Err(msg) => {
-      sched_last_error.val = msg
-      1
-    }
-  }
-}
-
-///|
-fn set_active_song_text(text : String) -> Int {
-  match @mini.parse_song_with_bpm(text) {
-    Ok(parsed) =>
-      match route_songs_for_current_routes(parsed.song()) {
-        Ok(route_songs) => {
-          match parsed.bpm() {
-            Some(bpm) => set_scheduler_bpm(bpm)
-            None => ()
-          }
-          reset_route_transports_for_song_start()
-          sched_active_playback.val = Some(ActiveSong(route_songs))
-          sched_last_error.val = ""
-          0
-        }
-        Err(msg) => {
-          sched_last_error.val = msg
-          1
-        }
-      }
-    Err(msg) => {
-      sched_last_error.val = msg
-      1
-    }
-  }
+  @playback_host.process_scheduler_block()
 }
 
 ///|
 pub fn clear_pattern_input() -> Unit {
-  sched_pattern_input_chars.clear()
+  @playback_host.clear_pattern_input()
 }
 
 ///|
 pub fn push_pattern_char(code : Int) -> Unit {
-  sched_pattern_input_chars.push(code)
+  @playback_host.push_pattern_char(code)
 }
 
 ///|
 pub fn eval_pattern_input() -> Int {
-  let text = input_chars_to_string(sched_pattern_input_chars)
-  sched_pattern_input_chars.clear()
-  set_active_pattern_text(text)
+  @playback_host.eval_pattern_input()
 }
 
 ///|
 pub fn parse_and_set_pattern(text : String) -> Int {
-  set_active_pattern_text(text)
+  @playback_host.parse_and_set_pattern(text)
 }
 
 ///|
 pub fn clear_song_input() -> Unit {
-  sched_song_input_chars.clear()
+  @playback_host.clear_song_input()
 }
 
 ///|
 pub fn push_song_char(code : Int) -> Unit {
-  sched_song_input_chars.push(code)
+  @playback_host.push_song_char(code)
 }
 
 ///|
 pub fn eval_song_input() -> Int {
-  let text = input_chars_to_string(sched_song_input_chars)
-  sched_song_input_chars.clear()
-  set_active_song_text(text)
+  @playback_host.eval_song_input()
 }
 
 ///|
 pub fn parse_and_set_song(text : String) -> Int {
-  set_active_song_text(text)
+  @playback_host.parse_and_set_song(text)
 }
 
 ///|
 pub fn get_scheduler_parse_error() -> String {
-  sched_last_error.val
+  @playback_host.get_scheduler_parse_error()
 }
 
 ///|
 pub fn get_song_parse_error() -> String {
-  sched_last_error.val
+  @playback_host.get_song_parse_error()
 }
 
 ///|
@@ -656,7 +186,7 @@ pub fn get_song_parse_error() -> String {
 /// Char-by-char accessor companion to `get_pattern_error_char` for JS
 /// consumers that can't receive MoonBit strings across the wasm-gc boundary.
 pub fn get_pattern_error_length() -> Int {
-  sched_last_error.val.length()
+  @playback_host.get_pattern_error_length()
 }
 
 ///|
@@ -664,38 +194,25 @@ pub fn get_pattern_error_length() -> Int {
 /// Returns 0 if `i` is out of range; callers should respect
 /// `get_pattern_error_length` first.
 pub fn get_pattern_error_char(i : Int) -> Int {
-  let s = sched_last_error.val
-  if i < 0 || i >= s.length() {
-    0
-  } else {
-    s[i].to_int()
-  }
+  @playback_host.get_pattern_error_char(i)
 }
 
 ///|
 pub fn get_song_error_length() -> Int {
-  sched_last_error.val.length()
+  @playback_host.get_song_error_length()
 }
 
 ///|
 pub fn get_song_error_char(i : Int) -> Int {
-  get_pattern_error_char(i)
+  @playback_host.get_song_error_char(i)
 }
 
 ///|
 pub fn set_scheduler_bpm(bpm : Double) -> Unit {
-  for route in sched_routes.val {
-    route.pool.scheduler.set_bpm(bpm)
-  }
+  @playback_host.set_scheduler_bpm(bpm)
 }
 
 ///|
 pub fn set_scheduler_gain(gain : Double) -> Unit {
-  sched_gain.val = if gain < 0.0 {
-    0.0
-  } else if gain > 1.0 {
-    1.0
-  } else {
-    gain
-  }
+  @playback_host.set_scheduler_gain(gain)
 }

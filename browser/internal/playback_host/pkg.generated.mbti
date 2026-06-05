@@ -1,0 +1,79 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp/browser/internal/playback_host"
+
+import {
+  "dowdiness/moondsp/dsp",
+  "dowdiness/moondsp/graph",
+  "dowdiness/moondsp/scheduler",
+  "dowdiness/moondsp/voice",
+}
+
+// Values
+pub fn active_playback_is_pattern() -> Bool
+
+pub fn active_playback_is_song() -> Bool
+
+pub fn active_song_route_count() -> Int?
+
+pub fn clear_pattern_input() -> Unit
+
+pub fn clear_song_input() -> Unit
+
+pub fn eval_pattern_input() -> Int
+
+pub fn eval_song_input() -> Int
+
+pub fn for_each_route((SchedulerRouteSelector, @voice.BoundVoicePool, @scheduler.PatternScheduler, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit) -> Unit
+
+pub fn get_pattern_error_char(Int) -> Int
+
+pub fn get_pattern_error_length() -> Int
+
+pub fn get_scheduler_parse_error() -> String
+
+pub fn get_song_error_char(Int) -> Int
+
+pub fn get_song_error_length() -> Int
+
+pub fn get_song_parse_error() -> String
+
+pub fn init_scheduler_graph_with_templates(Double, Int, Array[@graph.DspNode], Array[@graph.DspNode], Array[@graph.DspNode], Array[@graph.DspNode], Array[@graph.DspNode], Array[@graph.DspNode]) -> Bool
+
+pub fn parse_and_set_pattern(String) -> Int
+
+pub fn parse_and_set_song(String) -> Int
+
+pub fn process_scheduler_block() -> Bool
+
+pub fn push_pattern_char(Int) -> Unit
+
+pub fn push_song_char(Int) -> Unit
+
+pub fn reset_scheduler_graph() -> Unit
+
+pub fn route_count() -> Int
+
+pub fn route_sample_counters() -> Array[Int64]
+
+pub fn routes_have_bpm(Double) -> Bool
+
+pub fn scheduler_left_sample(Int) -> Double
+
+pub fn scheduler_right_sample(Int) -> Double
+
+pub fn set_scheduler_bpm(Double) -> Unit
+
+pub fn set_scheduler_gain(Double) -> Unit
+
+// Errors
+
+// Types and methods
+pub enum SchedulerRouteSelector {
+  RouteSound(Double)
+  RouteSynth
+}
+
+// Type aliases
+
+// Traits
+
