@@ -8,23 +8,22 @@ per-PR verification logs and merged-PR lists live in `git log` and
 
 ## Current State
 
-- `main` is clean after PR #146 (`1f15a9e`), which closed issue #137 by
-  extracting `graph/internal/runtime`. ADR-0015 graph internals shipped so far:
-  model (#135 / PR #144), template+binding (#136 / PR #145), and runtime
-  (#137 / PR #146).
-- Active graph-boundary slice: issue #138 extracts `graph/internal/staging`
-  (hot-swap/topology controllers) and `graph/internal/authoring`
-  (`GraphTemplateDoc` / `GraphIndexMap`) behind the existing public graph
-  facade. Preserve the ADR-0010 boundary: `Array[DspNode]` authoring exchange,
-  `CompiledTemplate` runtime exchange, and `CompiledTemplate::analyze` as the
-  canonical crossing.
+- `main` is clean after PR #147 (`3eeaf5b`), which closed issue #138 by
+  extracting `graph/internal/staging` and `graph/internal/authoring`. ADR-0015
+  graph internals shipped so far: model (#135 / PR #144), template+binding
+  (#136 / PR #145), runtime (#137 / PR #146), and staging+authoring (#138 /
+  PR #147).
+- Active scheduler-boundary slice: issue #139 splits scheduler transport,
+  playback, voice-runtime, and edit-policy internals behind the existing public
+  scheduler facade. Preserve block-boundary playback snapshot commits and the
+  ADR-0006 performance-sample active-note expiry behavior.
 - Latest release: **v0.5.1** (tagged and published 2026-05-20).
 - The next release should be **v0.6.0** if it includes the current
   `Unreleased` entries, because public API has been added since v0.5.1.
 - Open moondsp GitHub issues #133–#140 track the ADR-0015 boundary roadmap
   (validation wiring, graph facade/internal extraction, scheduler split, and
-  browser ABI/demo-host split). Scheduler and browser splits remain later
-  follow-ups; do not fold them into issue #138.
+  browser ABI/demo-host split). Browser ABI/demo-host work remains a later
+  follow-up; do not fold it into issue #139.
 - Open PRs: PR #86 (`release/v0.6.0`) is release prep and intentionally
   remains open until an explicit release pass. Do not tag or publish v0.6.0 as
   part of unrelated docs, benchmark, or loom-authoring work.
@@ -40,12 +39,12 @@ For the broader backlog, read
 
 ## Recommended Next Slice
 
-**Finish issue #138 / ADR-0015 graph staging+authoring extraction.** Keep the
-public graph/root facades source-compatible, verify `graph/pkg.generated.mbti`
-and `pkg.generated.mbti` stay unchanged, and run the architecture boundary,
-strict check/test, wasm build, and graph benchmark gates before opening the PR.
-If issue #138 is already merged, continue with the later scheduler/browser
-ADR-0015 follow-ups rather than revisiting graph runtime internals.
+**Finish issue #139 / ADR-0015 scheduler internal extraction.** Split transport,
+playback, voice-runtime, and edit-policy helpers behind the existing public
+scheduler facade. Keep `scheduler/pkg.generated.mbti` and root
+`pkg.generated.mbti` source-compatible, run the architecture boundary checks,
+strict check/test, README/example checks, and avoid browser work until issue
+#140.
 
 ## Alternative Slices
 
@@ -69,6 +68,12 @@ ADR-0015 follow-ups rather than revisiting graph runtime internals.
   authoring-side cost.
 
 ## Closed Since Previous Update
+
+- ~~**Issue #138 / PR #147 — graph staging+authoring extraction**~~ — SHIPPED
+  2026-06-05 (`3eeaf5b`). Extracted `graph/internal/staging` and
+  `graph/internal/authoring` behind the public graph facade, preserving the
+  ADR-0010 `Array[DspNode]` authoring exchange, `CompiledTemplate` runtime
+  exchange, and `CompiledTemplate::analyze` crossing.
 
 - ~~**Issue #129 / PR #132 — cross-target external-authoring snapshots**~~ —
   SHIPPED 2026-06-03 (`44a1335`). Added a dated performance snapshot comparing

@@ -114,19 +114,6 @@ pub fn EventSource::pattern_nodes(
 }
 
 ///|
-fn EventSource::has_pattern_node(
-  self : EventSource,
-  id : @identity.PatternNodeId,
-) -> Bool {
-  for node in self.pattern_nodes {
-    if node == id {
-      return true
-    }
-  }
-  false
-}
-
-///|
 pub fn EventSource::section(self : EventSource) -> @identity.SectionId? {
   self.section
 }
@@ -181,11 +168,7 @@ pub fn PlaybackEvent::source(self : PlaybackEvent) -> EventSource {
 fn copy_control_events(
   events : Array[@pattern.Event[@pattern.ControlMap]],
 ) -> Array[@pattern.Event[@pattern.ControlMap]] {
-  let result : Array[@pattern.Event[@pattern.ControlMap]] = []
-  for event in events {
-    result.push(event)
-  }
-  result
+  @voice_runtime.copy_control_events(events)
 }
 
 ///|
@@ -198,16 +181,96 @@ fn copy_playback_events(events : Array[PlaybackEvent]) -> Array[PlaybackEvent] {
 }
 
 ///|
+fn EventSource::to_voice_runtime(
+  self : EventSource,
+) -> @voice_runtime.EventSource {
+  @voice_runtime.EventSource(
+    pattern_nodes=self.pattern_nodes,
+    section=self.section,
+    layer=self.layer,
+    occurrence=self.occurrence,
+  )
+}
+
+///|
+fn event_source_from_voice_runtime(
+  source : @voice_runtime.EventSource,
+) -> EventSource {
+  EventSource::from_pattern_nodes(
+    pattern_nodes=source.pattern_nodes(),
+    section=source.section(),
+    layer=source.layer(),
+    occurrence=source.occurrence(),
+  )
+}
+
+///|
 /// Tracks a sounding voice for gate-off scheduling.
 struct ActiveNote {
-  handle : @moondsp.VoiceHandle
-  source : EventSource
-  /// WHY end_sample from whole.end_: In the Strudel/Tidal model, `whole` is the
-  /// event's full intended duration in cycle time, while `part` is just the
-  /// fragment visible within the queried arc. The scheduler converts
-  /// `whole.end_` to performance time at note-on so future groove/rubato layers
-  /// can expire voices against audio time rather than logical time.
-  end_sample : Int64
+  raw : @voice_runtime.ActiveNote
+}
+
+///|
+fn ActiveNote::ActiveNote(
+  handle~ : @moondsp.VoiceHandle,
+  source~ : EventSource,
+  end_sample~ : Int64,
+) -> ActiveNote {
+  // WHY end_sample from whole.end_: In the Strudel/Tidal model, `whole` is the
+  // event's full intended duration in cycle time, while `part` is just the
+  // fragment visible within the queried arc. The scheduler converts
+  // `whole.end_` to performance time at note-on so future groove/rubato layers
+  // can expire voices against audio time rather than logical time.
+  {
+    raw: @voice_runtime.ActiveNote(
+      handle~,
+      source=source.to_voice_runtime(),
+      end_sample~,
+    ),
+  }
+}
+
+///|
+fn ActiveNote::handle(self : ActiveNote) -> @moondsp.VoiceHandle {
+  self.raw.handle()
+}
+
+///|
+fn ActiveNote::source(self : ActiveNote) -> EventSource {
+  event_source_from_voice_runtime(self.raw.source())
+}
+
+///|
+fn ActiveNote::matches_edit_policy(
+  self : ActiveNote,
+  target : @edit_policy.AffectedVoiceTarget,
+) -> Bool {
+  let source = self.raw.source()
+  @edit_policy.source_parts_match_target(
+    pattern_nodes=source.borrow_pattern_nodes(),
+    section=source.section(),
+    layer=source.layer(),
+    occurrence=source.occurrence(),
+    target,
+  )
+}
+
+///|
+fn ActiveNote::expires_at(self : ActiveNote, sample : Int64) -> Bool {
+  self.raw.expires_at(sample)
+}
+
+///|
+fn ActiveNote::note_off(
+  self : ActiveNote,
+  pool : @moondsp.BoundVoicePool,
+) -> Unit {
+  self.raw.note_off(pool)
+}
+
+///|
+fn ActiveNote::kill(self : ActiveNote, pool : @moondsp.BoundVoicePool) -> Unit {
+  self.raw.kill(pool)
 }
 
 ///|
@@ -287,39 +350,25 @@ pub fn PlaybackSnapshot::song(
 }
 
 ///|
+fn PlaybackSnapshot::raw(self : PlaybackSnapshot) -> @playback.PlaybackSnapshot {
+  match self {
+    Pattern(snapshot) => @playback.PlaybackSnapshot::pattern(snapshot)
+    Song(snapshot) => @playback.PlaybackSnapshot::song(snapshot)
+  }
+}
+
+///|
 pub fn PlaybackSnapshot::revision(
   self : PlaybackSnapshot,
 ) -> @identity.Revision {
-  match self {
-    Pattern(snapshot) => snapshot.revision()
-    Song(snapshot) => snapshot.revision()
-  }
+  self.raw().revision()
 }
 
 ///|
 pub fn PlaybackSnapshot::song_layout_revision(
   self : PlaybackSnapshot,
 ) -> @identity.Revision? {
-  match self {
-    Pattern(_) => None
-    Song(snapshot) => Some(snapshot.layout_revision())
-  }
-}
-
-///|
-fn PlaybackSnapshot::is_pattern(self : PlaybackSnapshot) -> Bool {
-  match self {
-    Pattern(_) => true
-    Song(_) => false
-  }
-}
-
-///|
-fn PlaybackSnapshot::is_song(self : PlaybackSnapshot) -> Bool {
-  match self {
-    Pattern(_) => false
-    Song(_) => true
-  }
+  self.raw().song_layout_revision()
 }
 
 ///|
@@ -327,48 +376,29 @@ pub fn PlaybackSnapshot::query(
   self : PlaybackSnapshot,
   arc : @pattern.TimeSpan,
 ) -> Array[@pattern.Event[@pattern.ControlMap]] {
-  match self {
-    Pattern(snapshot) => snapshot.query(arc)
-    Song(snapshot) => snapshot.query(arc)
-  }
+  self.raw().query_events(arc)
 }
 
 ///|
-fn playback_events_from_pattern_snapshot(
-  snapshot : @pattern.PatternSnapshot[@pattern.ControlMap],
-  arc : @pattern.TimeSpan,
-) -> Array[PlaybackEvent] {
-  let result : Array[PlaybackEvent] = []
-  let events = snapshot.query_sourced_events(arc)
-  for event in events {
-    let source = EventSource::from_pattern_nodes(
-      pattern_nodes=event.pattern_nodes(),
-      section=None,
-      layer=None,
-      occurrence=None,
-    )
-    result.push(PlaybackEvent(event=event.event(), source~))
-  }
-  result
+fn event_source_from_playback_source(
+  source : @playback.PlaybackEventSource,
+) -> EventSource {
+  EventSource::from_pattern_nodes(
+    pattern_nodes=source.pattern_nodes(),
+    section=source.section(),
+    layer=source.layer(),
+    occurrence=source.occurrence(),
+  )
 }
 
 ///|
-fn playback_events_from_song_snapshot(
-  snapshot : @song.SongSnapshot[@pattern.ControlMap],
-  arc : @pattern.TimeSpan,
-) -> Array[PlaybackEvent] {
-  let result : Array[PlaybackEvent] = []
-  let events = snapshot.query_sourced_events(arc)
-  for event in events {
-    let source = EventSource(
-      pattern_node=None,
-      section=event.section(),
-      layer=event.layer(),
-      occurrence=Some(event.occurrence()),
-    )
-    result.push(PlaybackEvent(event=event.event(), source~))
-  }
-  result
+fn playback_event_from_record(
+  record : @playback.PlaybackEventRecord,
+) -> PlaybackEvent {
+  PlaybackEvent(
+    event=record.event(),
+    source=event_source_from_playback_source(record.source()),
+  )
 }
 
 ///|
@@ -383,10 +413,12 @@ pub fn PlaybackSnapshot::query_playback_events(
   self : PlaybackSnapshot,
   arc : @pattern.TimeSpan,
 ) -> Array[PlaybackEvent] {
-  match self {
-    Pattern(snapshot) => playback_events_from_pattern_snapshot(snapshot, arc)
-    Song(snapshot) => playback_events_from_song_snapshot(snapshot, arc)
+  let result : Array[PlaybackEvent] = []
+  let events = self.raw().query_playback_events(arc)
+  for event in events {
+    result.push(playback_event_from_record(event))
   }
+  result
 }
 
 ///|
@@ -396,18 +428,13 @@ pub struct PatternScheduler {
   priv ctx : @moondsp.DspContext
   priv active_notes : Array[ActiveNote]
   priv mapper : ControlMapper
-  priv mut active_playback_snapshot : PlaybackSnapshot?
-  priv mut pending_playback_snapshot : PlaybackSnapshot?
+  priv playback_state : @playback.PlaybackState
 }
 
 ///|
 /// Reject NaN/Inf and clamp to minimum 1.0 BPM.
 fn sanitize_bpm(bpm : Double) -> Double {
-  if bpm.is_nan() || bpm.is_inf() || bpm < 1.0 {
-    1.0
-  } else {
-    bpm
-  }
+  @transport.sanitize_bpm(bpm)
 }
 
 ///|
@@ -423,8 +450,7 @@ pub fn PatternScheduler::PatternScheduler(
     ctx,
     active_notes: [],
     mapper: mapper.unwrap_or(default_control_mapper()),
-    active_playback_snapshot: None,
-    pending_playback_snapshot: None,
+    playback_state: @playback.PlaybackState(),
   }
 }
 
@@ -451,7 +477,7 @@ pub fn PatternScheduler::active_note_source(
   index : Int,
 ) -> EventSource? {
   match self.active_notes.get(index) {
-    Some(note) => Some(note.source)
+    Some(note) => Some(note.source())
     None => None
   }
 }
@@ -460,7 +486,7 @@ pub fn PatternScheduler::active_note_source(
 /// Current block frame without advancing the scheduler clock.
 pub fn PatternScheduler::current_block(self : PatternScheduler) -> BlockFrame {
   let sample_begin = self.sample_counter
-  let sample_end = sample_begin + self.ctx.block_size().to_int64()
+  let sample_end = @transport.block_sample_end(sample_begin, self.ctx)
   {
     sample_begin,
     sample_end,
@@ -470,7 +496,10 @@ pub fn PatternScheduler::current_block(self : PatternScheduler) -> BlockFrame {
 
 ///|
 fn PatternScheduler::advance_block(self : PatternScheduler) -> Unit {
-  self.sample_counter = self.sample_counter + self.ctx.block_size().to_int64()
+  self.sample_counter = @transport.advance_block_sample(
+    self.sample_counter,
+    self.ctx,
+  )
 }
 
 ///|
@@ -494,7 +523,7 @@ pub fn PatternScheduler::reset_transport_and_kill_notes(
   pool : @moondsp.BoundVoicePool,
 ) -> Unit {
   for note in self.active_notes {
-    ignore(pool.kill(note.handle))
+    note.kill(pool)
   }
   self.reset_transport()
 }
@@ -529,98 +558,70 @@ pub fn PatternScheduler::queue_playback_snapshot(
   self : PatternScheduler,
   snapshot : PlaybackSnapshot,
 ) -> Unit {
-  self.pending_playback_snapshot = Some(snapshot)
+  self.playback_state.queue(snapshot.raw())
 }
 
 ///|
 pub fn PatternScheduler::has_active_pattern_snapshot(
   self : PatternScheduler,
 ) -> Bool {
-  match self.active_playback_snapshot {
-    Some(snapshot) => snapshot.is_pattern()
-    None => false
-  }
+  self.playback_state.has_active_pattern()
 }
 
 ///|
 pub fn PatternScheduler::has_pending_pattern_snapshot(
   self : PatternScheduler,
 ) -> Bool {
-  match self.pending_playback_snapshot {
-    Some(snapshot) => snapshot.is_pattern()
-    None => false
-  }
+  self.playback_state.has_pending_pattern()
 }
 
 ///|
 pub fn PatternScheduler::has_active_song_snapshot(
   self : PatternScheduler,
 ) -> Bool {
-  match self.active_playback_snapshot {
-    Some(snapshot) => snapshot.is_song()
-    None => false
-  }
+  self.playback_state.has_active_song()
 }
 
 ///|
 pub fn PatternScheduler::has_pending_song_snapshot(
   self : PatternScheduler,
 ) -> Bool {
-  match self.pending_playback_snapshot {
-    Some(snapshot) => snapshot.is_song()
-    None => false
-  }
+  self.playback_state.has_pending_song()
 }
 
 ///|
 pub fn PatternScheduler::has_active_playback_snapshot(
   self : PatternScheduler,
 ) -> Bool {
-  match self.active_playback_snapshot {
-    Some(_) => true
-    None => false
-  }
+  self.playback_state.has_active()
 }
 
 ///|
 pub fn PatternScheduler::has_pending_playback_snapshot(
   self : PatternScheduler,
 ) -> Bool {
-  match self.pending_playback_snapshot {
-    Some(_) => true
-    None => false
-  }
+  self.playback_state.has_pending()
 }
 
 ///|
 pub fn PatternScheduler::active_playback_revision(
   self : PatternScheduler,
 ) -> @identity.Revision? {
-  match self.active_playback_snapshot {
-    Some(snapshot) => Some(snapshot.revision())
-    None => None
-  }
+  self.playback_state.active_revision()
 }
 
 ///|
 pub fn PatternScheduler::active_song_revision(
   self : PatternScheduler,
 ) -> @identity.Revision? {
-  if self.has_active_song_snapshot() {
-    self.active_playback_revision()
-  } else {
-    None
-  }
+  self.playback_state.active_song_revision()
 }
 
 ///|
 pub fn PatternScheduler::active_playback_song_layout_revision(
   self : PatternScheduler,
 ) -> @identity.Revision? {
-  match self.active_playback_snapshot {
-    Some(snapshot) => snapshot.song_layout_revision()
-    None => None
-  }
+  self.playback_state.active_song_layout_revision()
 }
 
 ///|
@@ -634,20 +635,14 @@ pub fn PatternScheduler::active_song_layout_revision(
 fn PatternScheduler::commit_pending_playback_snapshot(
   self : PatternScheduler,
 ) -> Unit {
-  match self.pending_playback_snapshot {
-    Some(snapshot) => {
-      self.active_playback_snapshot = Some(snapshot)
-      self.pending_playback_snapshot = None
-    }
-    None => ()
-  }
+  self.playback_state.commit_pending()
 }
 
 ///|
 /// Convert MIDI note number to frequency in Hz.
 /// Uses equal temperament: A4 (MIDI 69) = 440 Hz, each semitone is 2^(1/12).
 pub fn midi_to_hz(midi : Double) -> Double {
-  440.0 * @math.pow(2.0, (midi - 69.0) / 12.0)
+  @voice_runtime.midi_to_hz(midi)
 }
 
 ///|
@@ -670,11 +665,13 @@ fn PatternScheduler::push_active_note_with_source(
   end_time : @pattern.Rational,
   source : EventSource,
 ) -> Unit {
-  self.active_notes.push({
-    handle,
-    source,
-    end_sample: cycle_to_sample(end_time, self.bpm, self.ctx),
-  })
+  self.active_notes.push(
+    ActiveNote(
+      handle~,
+      source~,
+      end_sample=cycle_to_sample(end_time, self.bpm, self.ctx),
+    ),
+  )
 }
 
 ///|
@@ -688,8 +685,8 @@ pub fn PatternScheduler::expire_notes_at(
 ) -> Unit {
   let mut i = 0
   while i < self.active_notes.length() {
-    if self.active_notes[i].end_sample <= time.sample {
-      ignore(pool.note_off(self.active_notes[i].handle))
+    if self.active_notes[i].expires_at(time.sample) {
+      self.active_notes[i].note_off(pool)
       // WHY swap-remove: Array::remove shifts all later elements O(n).
       // Swap with last + pop is O(1). Order of active_notes doesn't matter
       // because gate-off correctness depends only on end_sample, not position.
@@ -773,11 +770,13 @@ fn PatternScheduler::process_single_event(
         match pool.note_on_controls(map) {
           None => ()
           Some(handle) => {
-            self.active_notes.push({
-              handle,
-              source,
-              end_sample: cycle_to_sample(whole.end_, self.bpm, self.ctx),
-            })
+            self.active_notes.push(
+              ActiveNote(
+                handle~,
+                source~,
+                end_sample=cycle_to_sample(whole.end_, self.bpm, self.ctx),
+              ),
+            )
             for action in actions {
               match action {
                 SetPan(pan) => ignore(pool.set_voice_pan(handle, pan))
@@ -800,14 +799,7 @@ fn PatternScheduler::process_events_with_source(
   // Sort by onset for deterministic voice allocation.
   // None-whole events sort last but are always skipped below.
   if events.length() > 1 {
-    events.sort_by(fn(a, b) {
-      match (a.whole, b.whole) {
-        (Some(wa), Some(wb)) => wa.begin.compare(wb.begin)
-        (Some(_), None) => -1
-        (None, Some(_)) => 1
-        (None, None) => 0
-      }
-    })
+    events.sort_by(fn(a, b) { @voice_runtime.compare_event_onset(a, b) })
   }
   for i in 0..<events.length() {
     self.process_single_event(events[i], source, arc, pool)
@@ -835,19 +827,14 @@ fn PatternScheduler::process_owned_playback_events(
   // None-whole events sort last but are always skipped below.
   if events.length() > 1 {
     events.sort_by(fn(a, b) {
-      match (a.event.whole, b.event.whole) {
-        (Some(wa), Some(wb)) => wa.begin.compare(wb.begin)
-        (Some(_), None) => -1
-        (None, Some(_)) => 1
-        (None, None) => 0
-      }
+      @voice_runtime.compare_event_onset(a.event(), b.event())
     })
   }
   for i in 0..<events.length() {
     let playback_event = events[i]
     self.process_single_event(
-      playback_event.event,
-      playback_event.source,
+      playback_event.event(),
+      playback_event.source(),
       arc,
       pool,
     )
@@ -869,10 +856,7 @@ fn PatternScheduler::query_snapshot_block(
   self : PatternScheduler,
   frame : BlockFrame,
 ) -> Array[@pattern.Event[@pattern.ControlMap]] {
-  match self.active_playback_snapshot {
-    Some(snapshot) => snapshot.query(frame.logical_arc)
-    None => []
-  }
+  self.playback_state.query_active_events(frame.logical_arc)
 }
 
 ///|
@@ -1041,33 +1025,7 @@ pub fn compute_arc(
   bpm : Double,
   ctx : @moondsp.DspContext,
 ) -> @pattern.TimeSpan {
-  // WHY scale by 10: BPM is a Double but Rational needs Int64. Multiplying
-  // by 10 preserves one decimal place (120.5 → 1205) which covers all
-  // standard tempos. The denominator becomes sample_rate * 600 instead of
-  // sample_rate * 60 — still well within Int64 range.
-  let bpm_scaled = (bpm * 10.0).to_int64()
-  let sr600 = ctx.sample_rate().to_int().to_int64() * 600L
-  let block_size = ctx.block_size().to_int64()
-  let arc_start = @pattern.Rational::new(sample_counter * bpm_scaled, sr600)
-  let arc_end = @pattern.Rational::new(
-    (sample_counter + block_size) * bpm_scaled,
-    sr600,
-  )
-  @pattern.TimeSpan::new(arc_start, arc_end)
-}
-
-///|
-fn ceil_div_i64(num : Int64, den : Int64) -> Int64 {
-  if den <= 0L {
-    abort("ceil_div_i64: denominator must be positive")
-  }
-  let q = num / den
-  let r = num % den
-  if r == 0L || num < 0L {
-    q
-  } else {
-    q + 1L
-  }
+  @transport.compute_arc(sample_counter, bpm, ctx)
 }
 
 ///|
@@ -1078,7 +1036,5 @@ pub fn cycle_to_sample(
   bpm : Double,
   ctx : @moondsp.DspContext,
 ) -> Int64 {
-  let bpm_scaled = (sanitize_bpm(bpm) * 10.0).to_int64()
-  let sr600 = ctx.sample_rate().to_int().to_int64() * 600L
-  ceil_div_i64(cycle.num * sr600, cycle.den * bpm_scaled)
+  @transport.cycle_to_sample(cycle, bpm, ctx)
 }

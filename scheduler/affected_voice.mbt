@@ -96,30 +96,36 @@ pub fn AffectedVoiceTarget::is_empty(self : AffectedVoiceTarget) -> Bool {
 }
 
 ///|
+fn AffectedVoiceTarget::to_edit_policy(
+  self : AffectedVoiceTarget,
+) -> @edit_policy.AffectedVoiceTarget {
+  @edit_policy.AffectedVoiceTarget(
+    pattern_node=self.pattern_node,
+    section=self.section,
+    layer=self.layer,
+    occurrence=self.occurrence,
+  )
+}
+
+///|
+fn EventSource::to_edit_policy(self : EventSource) -> @edit_policy.EventSource {
+  @edit_policy.EventSource(
+    pattern_nodes=self.pattern_nodes,
+    section=self.section,
+    layer=self.layer,
+    occurrence=self.occurrence,
+  )
+}
+
+///|
 pub fn AffectedVoiceTarget::matches(
   self : AffectedVoiceTarget,
   source : EventSource,
 ) -> Bool {
-  if self.is_empty() {
-    return false
-  }
-  let pattern_matches = match self.pattern_node {
-    Some(id) => source.has_pattern_node(id)
-    None => true
-  }
-  let section_matches = match self.section {
-    Some(id) => source.section == Some(id)
-    None => true
-  }
-  let layer_matches = match self.layer {
-    Some(id) => source.layer == Some(id)
-    None => true
-  }
-  let occurrence_matches = match self.occurrence {
-    Some(id) => source.occurrence == Some(id)
-    None => true
-  }
-  pattern_matches && section_matches && layer_matches && occurrence_matches
+  @edit_policy.source_matches_target(
+    source.to_edit_policy(),
+    self.to_edit_policy(),
+  )
 }
 
 ///|
@@ -195,9 +201,14 @@ pub(all) enum AffectedVoicePolicy {
 } derive(Eq, Debug)
 
 ///|
-priv enum AffectedVoiceStop {
-  GateOff
-  Kill
+fn AffectedVoicePolicy::to_edit_policy(
+  self : AffectedVoicePolicy,
+) -> @edit_policy.AffectedVoicePolicy {
+  match self {
+    LetRing => @edit_policy.AffectedVoicePolicy::LetRing
+    GateOffAffected => @edit_policy.AffectedVoicePolicy::GateOffAffected
+    KillAffected => @edit_policy.AffectedVoicePolicy::KillAffected
+  }
 }
 
 ///|
@@ -206,8 +217,9 @@ pub fn PatternScheduler::active_note_matches(
   index : Int,
   target : AffectedVoiceTarget,
 ) -> Bool? {
+  let raw_target = target.to_edit_policy()
   match self.active_notes.get(index) {
-    Some(note) => Some(note.source.matches(target))
+    Some(note) => Some(note.matches_edit_policy(raw_target))
     None => None
   }
 }
@@ -217,8 +229,9 @@ pub fn PatternScheduler::affected_active_note_count(
   self : PatternScheduler,
   target : AffectedVoiceTarget,
 ) -> Int {
+  let raw_target = target.to_edit_policy()
   let count = for note in self.active_notes; total = 0 {
-    if note.source.matches(target) {
+    if note.matches_edit_policy(raw_target) {
       continue total + 1
     }
     continue total
@@ -241,13 +254,10 @@ pub fn PatternScheduler::apply_affected_voice_policy(
   target : AffectedVoiceTarget,
   pool : @moondsp.BoundVoicePool,
 ) -> Int {
-  if target.is_empty() {
-    return 0
-  }
-  match policy {
-    LetRing => 0
-    GateOffAffected => self.remove_affected_notes(target, pool, stop=GateOff)
-    KillAffected => self.remove_affected_notes(target, pool, stop=Kill)
+  let raw_target = target.to_edit_policy()
+  match @edit_policy.stop_for_policy(policy.to_edit_policy(), raw_target) {
+    None => 0
+    Some(stop) => self.remove_affected_notes(raw_target, pool, stop~)
   }
 }
 
@@ -266,26 +276,26 @@ pub fn PatternScheduler::apply_affected_voice_policy_for_edit(
 fn stop_affected_note(
   handle : @moondsp.VoiceHandle,
   pool : @moondsp.BoundVoicePool,
-  stop : AffectedVoiceStop,
+  stop : @edit_policy.AffectedVoiceStop,
 ) -> Unit {
   match stop {
-    GateOff => ignore(pool.note_off(handle))
-    Kill => ignore(pool.kill(handle))
+    @edit_policy.AffectedVoiceStop::GateOff => ignore(pool.note_off(handle))
+    @edit_policy.AffectedVoiceStop::Kill => ignore(pool.kill(handle))
   }
 }
 
 ///|
 fn PatternScheduler::remove_affected_notes(
   self : PatternScheduler,
-  target : AffectedVoiceTarget,
+  target : @edit_policy.AffectedVoiceTarget,
   pool : @moondsp.BoundVoicePool,
-  stop~ : AffectedVoiceStop,
+  stop~ : @edit_policy.AffectedVoiceStop,
 ) -> Int {
   let mut count = 0
   let mut i = 0
   while i < self.active_notes.length() {
-    if self.active_notes[i].source.matches(target) {
-      stop_affected_note(self.active_notes[i].handle, pool, stop)
+    if self.active_notes[i].matches_edit_policy(target) {
+      stop_affected_note(self.active_notes[i].handle(), pool, stop)
       let last = self.active_notes.length() - 1
       if i < last {
         self.active_notes[i] = self.active_notes[last]

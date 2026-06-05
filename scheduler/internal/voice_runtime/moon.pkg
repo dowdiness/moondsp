@@ -1,0 +1,6 @@
+import {
+  "dowdiness/moondsp",
+  "dowdiness/moondsp/identity",
+  "dowdiness/moondsp/pattern",
+  "moonbitlang/core/math",
+}
