@@ -908,6 +908,9 @@ Current semantics:
 - voice-control validation and application target already-sounding voices by
   active voice identifier; stale identifiers and invalid control changes are
   rejected without changing the voice-pool template or bindings
+- result-returning voice mutators are the supported path for observing stale or
+  invalid handle errors; the old Bool wrappers remain only as deprecated
+  compatibility shims that collapse any rejection to `false`
 - each `VoicePool::note_on(...)` compiles the already analyzed template through
   `CompiledDsp::compile(template, ctx)`, so per-voice graph creation reuses the
   optimized nodes captured during template validation

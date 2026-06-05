@@ -84,7 +84,7 @@ pub fn ActiveNote::note_off(
   self : ActiveNote,
   pool : @voice.BoundVoicePool,
 ) -> Unit {
-  ignore(pool.note_off(self.handle))
+  ignore(pool.note_off_result(self.handle))
 }
 
 ///|
@@ -92,7 +92,7 @@ pub fn ActiveNote::kill(
   self : ActiveNote,
   pool : @voice.BoundVoicePool,
 ) -> Unit {
-  ignore(pool.kill(self.handle))
+  ignore(pool.kill_result(self.handle))
 }
 
 ///|

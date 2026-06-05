@@ -57,6 +57,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `BoundVoicePool::set_voice_pan_result`. Existing Bool-returning wrappers
   remain and delegate to the result path.
 
+### Deprecated
+
+- Deprecated the Bool-returning voice-control compatibility wrappers
+  `VoicePool::note_off`, `VoicePool::set_voice_pan`,
+  `BoundVoicePool::note_off`, `BoundVoicePool::kill`, and
+  `BoundVoicePool::set_voice_pan`. Use the corresponding `*_result` methods to
+  observe `VoiceControlError` instead of collapsing rejections to `false`.
+
 ### Changed
 
 - Tightened `browser/internal/playback_host` helper exposure so browser

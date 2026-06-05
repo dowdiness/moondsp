@@ -272,8 +272,9 @@ fn stop_affected_note(
   stop : @edit_policy.AffectedVoiceStop,
 ) -> Unit {
   match stop {
-    @edit_policy.AffectedVoiceStop::GateOff => ignore(pool.note_off(handle))
-    @edit_policy.AffectedVoiceStop::Kill => ignore(pool.kill(handle))
+    @edit_policy.AffectedVoiceStop::GateOff =>
+      ignore(pool.note_off_result(handle))
+    @edit_policy.AffectedVoiceStop::Kill => ignore(pool.kill_result(handle))
   }
 }
 

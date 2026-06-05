@@ -374,7 +374,7 @@ test "bound voice live control leaves future voice template unchanged" {
     Ok(_) => ()
     Err(_) => assert_true(false)
   }
-  assert_true(pool.kill(first))
+  assert_true(pool.kill_result(first) is Ok(_))
   let future = pool.note_on_controls({}).unwrap()
   let future_left = AudioBuffer::filled(4)
   let future_right = AudioBuffer::filled(4)
@@ -428,7 +428,7 @@ test "note_off transitions voice to Releasing" {
   let pool = VoicePool::new(CompiledTemplate::analyze(nodes), ctx, max_voices=4).unwrap()
   let handle = pool.note_on([]).unwrap()
   assert_true(pool.voice_state(handle) is VoiceState::Active)
-  assert_true(pool.note_off(handle))
+  assert_true(pool.note_off_result(handle) is Ok(_))
   assert_true(pool.voice_state(handle) is VoiceState::Releasing)
 }
 
@@ -448,13 +448,13 @@ test "note_off_result transitions voice to Releasing" {
 }
 
 ///|
-test "stale handle note_off returns false" {
+test "stale handle note_off_result returns error" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
   let nodes = [DspNode::constant(440.0), DspNode::output(0)]
   let pool = VoicePool::new(CompiledTemplate::analyze(nodes), ctx, max_voices=1).unwrap()
   let h1 = pool.note_on([]).unwrap()
   ignore(pool.note_on([]))
-  assert_true(!pool.note_off(h1))
+  assert_true(pool.note_off_result(h1) is Err(_))
 }
 
 ///|
@@ -478,13 +478,13 @@ test "stale handle voice_state returns Idle" {
 }
 
 ///|
-test "set_voice_pan with stale handle returns false" {
+test "stale handle set_voice_pan_result returns error" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
   let nodes = [DspNode::constant(440.0), DspNode::output(0)]
   let pool = VoicePool::new(CompiledTemplate::analyze(nodes), ctx, max_voices=1).unwrap()
   let h1 = pool.note_on([]).unwrap()
   ignore(pool.note_on([]))
-  assert_true(!pool.set_voice_pan(h1, 0.5))
+  assert_true(pool.set_voice_pan_result(h1, 0.5) is Err(_))
 }
 
 ///|
@@ -528,7 +528,7 @@ test "drum template sd: noise envelope decays to silence via envelope_gain" {
   }
   assert_true(has_nonzero)
   // After note_off + several blocks, output should decay to silence
-  assert_true(pool.note_off(handle))
+  assert_true(pool.note_off_result(handle) is Ok(_))
   for j = 0; j < 50; j = j + 1 {
     let left = AudioBuffer::filled(128)
     let right = AudioBuffer::filled(128)
@@ -560,7 +560,7 @@ test "process pans hard left" {
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]
   let pool = VoicePool::new(CompiledTemplate::analyze(nodes), ctx, max_voices=4).unwrap()
   let handle = pool.note_on([]).unwrap()
-  ignore(pool.set_voice_pan(handle, -1.0))
+  assert_true(pool.set_voice_pan_result(handle, -1.0) is Ok(_))
   let left = AudioBuffer::filled(4)
   let right = AudioBuffer::filled(4)
   pool.process(ctx, left, right)
@@ -600,7 +600,7 @@ test "process reclaims finished releasing voices" {
   let right = AudioBuffer::filled(8)
   pool.process(ctx, left, right)
   assert_true(pool.active_voice_count() == 1)
-  assert_true(pool.note_off(handle))
+  assert_true(pool.note_off_result(handle) is Ok(_))
   left.fill(0.0)
   right.fill(0.0)
   pool.process(ctx, left, right)
@@ -624,10 +624,10 @@ test "kill immediately idles an active voice" {
   ).unwrap()
   let handle = pool.note_on_controls({}).unwrap()
   assert_true(pool.active_voice_count() == 1)
-  assert_true(pool.kill(handle))
+  assert_true(pool.kill_result(handle) is Ok(_))
   assert_true(pool.active_voice_count() == 0)
   assert_true(pool.voice_state(handle) is VoiceState::Idle)
-  assert_true(!pool.kill(handle))
+  assert_true(pool.kill_result(handle) is Err(_))
 }
 
 ///|
@@ -687,7 +687,7 @@ test "bound note_off_result reports stale handle" {
   let current = pool.note_on_controls({}).unwrap()
   assert_invalid_voice_handle(pool.note_off_result(stale), stale)
   assert_true(pool.voice_state(current) is VoiceState::Active)
-  assert_true(!pool.note_off(stale))
+  assert_true(pool.note_off_result(stale) is Err(_))
 }
 
 ///|
@@ -724,7 +724,7 @@ test "bound set_voice_pan_result reports stale handle" {
   let stale = pool.note_on_controls({}).unwrap()
   ignore(pool.note_on_controls({}))
   assert_invalid_voice_handle(pool.set_voice_pan_result(stale, 0.5), stale)
-  assert_true(!pool.set_voice_pan(stale, 0.5))
+  assert_true(pool.set_voice_pan_result(stale, 0.5) is Err(_))
 }
 
 ///|
@@ -788,7 +788,7 @@ test "stealing prefers releasing over active" {
   let left = AudioBuffer::filled(16)
   let right = AudioBuffer::filled(16)
   pool.process(ctx, left, right)
-  assert_true(pool.note_off(h1))
+  assert_true(pool.note_off_result(h1) is Ok(_))
   assert_true(pool.voice_state(h1) is VoiceState::Releasing)
   assert_true(pool.voice_state(h2) is VoiceState::Active)
   let h3 = pool.note_on([]).unwrap()
