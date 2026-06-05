@@ -74,7 +74,7 @@ pub impl GraphControllable for CompiledDspHotSwap with fn apply_control(
   self,
   control,
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_control_impl(control)
+  self.apply_control(control)
 }
 
 ///|
@@ -82,7 +82,7 @@ pub impl GraphControllable for CompiledDspHotSwap with fn apply_controls(
   self,
   controls,
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_controls_impl(controls)
+  self.apply_controls(controls)
 }
 
 ///|
@@ -90,7 +90,7 @@ pub impl GraphControllable for CompiledStereoDspHotSwap with fn apply_control(
   self,
   control,
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_control_impl(control)
+  self.apply_control(control)
 }
 
 ///|
@@ -98,7 +98,7 @@ pub impl GraphControllable for CompiledStereoDspHotSwap with fn apply_controls(
   self,
   controls,
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_controls_impl(controls)
+  self.apply_controls(controls)
 }
 
 ///|
@@ -106,7 +106,7 @@ pub impl GraphControllable for CompiledDspTopologyController with fn apply_contr
   self,
   control,
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_control_impl(control)
+  self.apply_control(control)
 }
 
 ///|
@@ -114,7 +114,7 @@ pub impl GraphControllable for CompiledDspTopologyController with fn apply_contr
   self,
   controls,
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_controls_impl(controls)
+  self.apply_controls(controls)
 }
 
 ///|
@@ -122,7 +122,7 @@ pub impl GraphControllable for CompiledStereoDspTopologyController with fn apply
   self,
   control,
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_control_impl(control)
+  self.apply_control(control)
 }
 
 ///|
@@ -130,5 +130,5 @@ pub impl GraphControllable for CompiledStereoDspTopologyController with fn apply
   self,
   controls,
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_controls_impl(controls)
+  self.apply_controls(controls)
 }

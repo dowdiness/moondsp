@@ -355,11 +355,6 @@ pub fn GraphControl::set_param(
 }
 
 ///|
-fn node_with_inputs(node : DspNode, input0~ : Int, input1~ : Int) -> DspNode {
-  DspNode::from_model(@model.node_with_inputs(node.raw(), input0~, input1~))
-}
-
-///|
 fn node_with_offset_inputs(node : DspNode, offset : Int) -> DspNode {
   DspNode::from_model(@model.node_with_offset_inputs(node.raw(), offset))
 }

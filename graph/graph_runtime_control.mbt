@@ -58,6 +58,48 @@ fn graph_control_result_from_runtime(
 }
 
 ///|
+fn graph_control_error_from_staging(
+  error : @staging.GraphControlError,
+) -> GraphControlError {
+  match error {
+    @staging.GraphControlError::InvalidNodeIndex(index) =>
+      GraphControlError::InvalidNodeIndex(index)
+    @staging.GraphControlError::OrphanNode(index) =>
+      GraphControlError::OrphanNode(index)
+    @staging.GraphControlError::InvalidGateNode(index, kind) =>
+      GraphControlError::InvalidGateNode(index, dsp_node_kind_from_model(kind))
+    @staging.GraphControlError::InvalidSlotForNode(index, kind, slot) =>
+      GraphControlError::InvalidSlotForNode(
+        index,
+        dsp_node_kind_from_model(kind),
+        graph_param_slot_from_model(slot),
+      )
+    @staging.GraphControlError::InvalidParamValue(index, kind, slot, value) =>
+      GraphControlError::InvalidParamValue(
+        index,
+        dsp_node_kind_from_model(kind),
+        graph_param_slot_from_model(slot),
+        value,
+      )
+    @staging.GraphControlError::MissingRuntimeState(index, kind) =>
+      GraphControlError::MissingRuntimeState(
+        index,
+        dsp_node_kind_from_model(kind),
+      )
+  }
+}
+
+///|
+fn graph_control_result_from_staging(
+  result : Result[Unit, @staging.GraphControlError],
+) -> Result[Unit, GraphControlError] {
+  match result {
+    Ok(_) => Ok(())
+    Err(error) => Err(graph_control_error_from_staging(error))
+  }
+}
+
+///|
 /// Trigger `gate_on()` on an ADSR node using its original authoring index.
 pub fn CompiledDsp::gate_on(
   self : CompiledDsp,
@@ -230,7 +272,7 @@ pub fn CompiledDspHotSwap::apply_control(
   self : CompiledDspHotSwap,
   control : GraphControl,
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_control_impl(control)
+  graph_control_result_from_staging(self.0.apply_control(control.raw()))
 }
 
 ///|
@@ -239,7 +281,9 @@ pub fn CompiledDspHotSwap::apply_controls(
   self : CompiledDspHotSwap,
   controls : Array[GraphControl],
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_controls_impl(controls)
+  graph_control_result_from_staging(
+    self.0.apply_controls(graph_controls_to_model(controls)),
+  )
 }
 
 ///|
@@ -277,7 +321,7 @@ pub fn CompiledStereoDspHotSwap::apply_control(
   self : CompiledStereoDspHotSwap,
   control : GraphControl,
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_control_impl(control)
+  graph_control_result_from_staging(self.0.apply_control(control.raw()))
 }
 
 ///|
@@ -286,7 +330,9 @@ pub fn CompiledStereoDspHotSwap::apply_controls(
   self : CompiledStereoDspHotSwap,
   controls : Array[GraphControl],
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_controls_impl(controls)
+  graph_control_result_from_staging(
+    self.0.apply_controls(graph_controls_to_model(controls)),
+  )
 }
 
 ///|
@@ -324,7 +370,7 @@ pub fn CompiledDspTopologyController::apply_control(
   self : CompiledDspTopologyController,
   control : GraphControl,
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_control_impl(control)
+  graph_control_result_from_staging(self.0.apply_control(control.raw()))
 }
 
 ///|
@@ -333,7 +379,9 @@ pub fn CompiledDspTopologyController::apply_controls(
   self : CompiledDspTopologyController,
   controls : Array[GraphControl],
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_controls_impl(controls)
+  graph_control_result_from_staging(
+    self.0.apply_controls(graph_controls_to_model(controls)),
+  )
 }
 
 ///|
@@ -371,7 +419,7 @@ pub fn CompiledStereoDspTopologyController::apply_control(
   self : CompiledStereoDspTopologyController,
   control : GraphControl,
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_control_impl(control)
+  graph_control_result_from_staging(self.0.apply_control(control.raw()))
 }
 
 ///|
@@ -381,7 +429,9 @@ pub fn CompiledStereoDspTopologyController::apply_controls(
   self : CompiledStereoDspTopologyController,
   controls : Array[GraphControl],
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_controls_impl(controls)
+  graph_control_result_from_staging(
+    self.0.apply_controls(graph_controls_to_model(controls)),
+  )
 }
 
 ///|
@@ -393,25 +443,4 @@ fn graph_controls_to_model(
     raw_controls.push(control.raw())
   }
   raw_controls
-}
-
-///|
-fn updated_node_param_result(
-  node : DspNode,
-  node_index : Int,
-  slot : GraphParamSlot,
-  value : Double,
-  sample_rate : Double,
-) -> Result[DspNode, GraphControlError] {
-  match
-    @runtime.updated_model_node_param_result(
-      node.raw(),
-      node_index,
-      slot.to_model(),
-      value,
-      sample_rate,
-    ) {
-    Ok(updated) => Ok(DspNode::from_model(updated))
-    Err(error) => Err(graph_control_error_from_runtime(error))
-  }
 }

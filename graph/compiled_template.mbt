@@ -39,6 +39,15 @@ fn dsp_nodes_to_model(nodes : Array[DspNode]) -> Array[@model.DspNode] {
 }
 
 ///|
+fn dsp_nodes_from_model(nodes : Array[@model.DspNode]) -> Array[DspNode] {
+  let facade_nodes = Array::new(capacity=nodes.length())
+  for node in nodes {
+    facade_nodes.push(DspNode::from_model(node))
+  }
+  facade_nodes
+}
+
+///|
 /// Structural equality for analyzed template artifacts.
 pub impl Eq for CompiledTemplate with fn equal(self, other) {
   self.raw == other.raw

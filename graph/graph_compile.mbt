@@ -21,11 +21,6 @@ fn CompiledDsp::raw(self : CompiledDsp) -> @runtime.CompiledDsp {
 }
 
 ///|
-fn CompiledDsp::raw_graph(self : CompiledDsp) -> @runtime.CompiledGraph {
-  self.0.raw_graph()
-}
-
-///|
 fn CompiledStereoDsp::from_internal(
   raw : @runtime.CompiledStereoDsp,
 ) -> CompiledStereoDsp {
@@ -37,13 +32,6 @@ fn CompiledStereoDsp::raw(
   self : CompiledStereoDsp,
 ) -> @runtime.CompiledStereoDsp {
   self.0
-}
-
-///|
-fn CompiledStereoDsp::raw_graph(
-  self : CompiledStereoDsp,
-) -> @runtime.CompiledGraph {
-  self.0.raw_graph()
 }
 
 ///|
@@ -88,18 +76,6 @@ pub fn CompiledDsp::compile(
 }
 
 ///|
-/// Compile without optimization — used by topology controllers where authoring
-/// indices must be preserved for runtime controls.
-fn CompiledDsp::compile_raw(
-  nodes : Array[DspNode],
-  context : DspContext,
-) -> CompiledDsp? {
-  @runtime.CompiledDsp::compile_raw(dsp_nodes_to_model(nodes), context).map(
-    CompiledDsp::from_internal,
-  )
-}
-
-///|
 /// Compile a declarative terminal-stereo graph into an executable
 /// stereo graph.
 ///
@@ -114,24 +90,4 @@ pub fn CompiledStereoDsp::compile(
   @runtime.CompiledStereoDsp::compile(compiled_template.raw(), context).map(
     CompiledStereoDsp::from_internal,
   )
-}
-
-///|
-fn CompiledStereoDsp::compile_raw(
-  nodes : Array[DspNode],
-  context : DspContext,
-) -> CompiledStereoDsp? {
-  @runtime.CompiledStereoDsp::compile_raw(dsp_nodes_to_model(nodes), context).map(
-    CompiledStereoDsp::from_internal,
-  )
-}
-
-///|
-fn CompiledDsp::compiled_buffer_capacity(self : CompiledDsp) -> Int {
-  self.0.compiled_buffer_capacity()
-}
-
-///|
-fn CompiledStereoDsp::compiled_buffer_capacity(self : CompiledStereoDsp) -> Int {
-  self.0.compiled_buffer_capacity()
 }

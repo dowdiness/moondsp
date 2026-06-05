@@ -20,7 +20,7 @@ fn apply_topology_edits_result(
 }
 
 ///|
-fn apply_topology_edit_result(
+pub fn apply_topology_edit_result(
   nodes : Array[DspNode],
   edit : GraphTopologyEdit,
 ) -> Result[Unit, GraphTopologyEditError] {
@@ -387,7 +387,7 @@ fn topology_chain_compacted_node_inputs(
   start_deleted : Int,
   end_deleted : Int,
 ) -> DspNode {
-  node_with_inputs(
+  @model.node_with_inputs(
     node,
     input0=topology_chain_compacted_input(
       node.input0(),
@@ -448,7 +448,7 @@ fn topology_compacted_node_inputs(
   node : DspNode,
   deleted_index : Int,
 ) -> DspNode {
-  node_with_inputs(
+  @model.node_with_inputs(
     node,
     input0=topology_compacted_input(node.input0(), deleted_index),
     input1=topology_compacted_input(node.input1(), deleted_index),

@@ -1,16 +1,4 @@
 ///|
-/// Shared topology-edit state for both mono and stereo compiled graphs.
-///
-/// Holds the authoring-order nodes, compile-time parameters, and the
-/// hot-swap graph used for block-boundary graph replacement.
-priv struct TopologyGraph {
-  mut authoring_nodes : Array[DspNode]
-  compile_sample_rate : Double
-  compile_block_size : Int
-  hot_swap : HotSwapGraph
-}
-
-///|
 /// Failure reason for result-typed topology queue APIs.
 pub(all) enum GraphTopologyEditError {
   InvalidNodeIndex(Int)
@@ -49,41 +37,110 @@ pub impl Show for GraphTopologyQueueError with fn output(self, logger) {
 }
 
 ///|
-/// Mono topology-edit wrapper that recompiles authoring nodes and stages the
-/// replacement through `HotSwapGraph`.
-///
-/// This first slice keeps edits narrow and deterministic: only `ReplaceNode`
-/// and `RewireInput` frames are supported, plus narrow unary `InsertNode` and
-/// `DeleteNode` frames on the mono path. Only one staged topology replacement
-/// may be pending at a time.
-struct CompiledDspTopologyController(TopologyGraph)
+fn graph_topology_edit_error_from_staging(
+  error : @staging.GraphTopologyEditError,
+) -> GraphTopologyEditError {
+  match error {
+    @staging.GraphTopologyEditError::InvalidNodeIndex(index) =>
+      GraphTopologyEditError::InvalidNodeIndex(index)
+    @staging.GraphTopologyEditError::InvalidSourceIndex(index) =>
+      GraphTopologyEditError::InvalidSourceIndex(index)
+    @staging.GraphTopologyEditError::UnsupportedInputSlot(index, slot, kind) =>
+      GraphTopologyEditError::UnsupportedInputSlot(
+        index,
+        graph_topology_input_slot_from_staging(slot),
+        dsp_node_kind_from_model(kind),
+      )
+    @staging.GraphTopologyEditError::UnsupportedInsertTemplate(kind) =>
+      GraphTopologyEditError::UnsupportedInsertTemplate(
+        dsp_node_kind_from_model(kind),
+      )
+    @staging.GraphTopologyEditError::EmptyInsertChain =>
+      GraphTopologyEditError::EmptyInsertChain
+    @staging.GraphTopologyEditError::UnsupportedChainNode(index, kind) =>
+      GraphTopologyEditError::UnsupportedChainNode(
+        index,
+        dsp_node_kind_from_model(kind),
+      )
+    @staging.GraphTopologyEditError::InvalidDeleteRange(start_index, end_index) =>
+      GraphTopologyEditError::InvalidDeleteRange(start_index, end_index)
+    @staging.GraphTopologyEditError::ReplacementSourceInDeletedRange(index) =>
+      GraphTopologyEditError::ReplacementSourceInDeletedRange(index)
+    @staging.GraphTopologyEditError::DeleteNodeRequiresUnary(index, kind) =>
+      GraphTopologyEditError::DeleteNodeRequiresUnary(
+        index,
+        dsp_node_kind_from_model(kind),
+      )
+    @staging.GraphTopologyEditError::DeleteNodeRequiresSingleConsumer(index) =>
+      GraphTopologyEditError::DeleteNodeRequiresSingleConsumer(index)
+    @staging.GraphTopologyEditError::DeleteNodeConsumerMismatch(
+      consumer,
+      retarget
+    ) => GraphTopologyEditError::DeleteNodeConsumerMismatch(consumer, retarget)
+    @staging.GraphTopologyEditError::DeleteChainRequiresUnary(index, kind) =>
+      GraphTopologyEditError::DeleteChainRequiresUnary(
+        index,
+        dsp_node_kind_from_model(kind),
+      )
+    @staging.GraphTopologyEditError::DeleteChainRequiresSingleConsumer(index) =>
+      GraphTopologyEditError::DeleteChainRequiresSingleConsumer(index)
+    @staging.GraphTopologyEditError::DeleteChainConsumerMismatch(
+      index,
+      consumer,
+      expected
+    ) =>
+      GraphTopologyEditError::DeleteChainConsumerMismatch(
+        index, consumer, expected,
+      )
+  }
+}
 
 ///|
-/// Build a `TopologyGraph` from a compile+wrap callback.
-///
-/// WHY a callback instead of an enum: the mono and stereo paths produce
-/// different concrete wrappers (`CompiledDspHotSwap` vs `CompiledStereoDspHotSwap`)
-/// that allocate different buffer layouts (mono: old_output/new_output at
-/// capacity; stereo: old_left/old_right/new_left/new_right). A callback lets
-/// each `from_nodes` caller supply its variant-specific compile+unwrap logic
-/// without a `GraphKind` enum and a match inside this function.
-fn build_topology_graph(
-  nodes : Array[DspNode],
-  context : DspContext,
-  crossfade_samples : Int,
-  compile_and_wrap : (Array[DspNode], DspContext, Int) -> HotSwapGraph?,
-) -> TopologyGraph? {
-  let hot_swap = match compile_and_wrap(nodes, context, crossfade_samples) {
-    Some(hs) => hs
-    None => return None
+fn graph_topology_queue_error_from_staging(
+  error : @staging.GraphTopologyQueueError,
+) -> GraphTopologyQueueError {
+  match error {
+    @staging.GraphTopologyQueueError::PendingSwap =>
+      GraphTopologyQueueError::PendingSwap
+    @staging.GraphTopologyQueueError::InvalidEdit(index, reason) =>
+      GraphTopologyQueueError::InvalidEdit(
+        index,
+        graph_topology_edit_error_from_staging(reason),
+      )
+    @staging.GraphTopologyQueueError::RecompileRejected =>
+      GraphTopologyQueueError::RecompileRejected
+    @staging.GraphTopologyQueueError::HotSwap(error) =>
+      GraphTopologyQueueError::HotSwap(hot_swap_queue_error_from_staging(error))
   }
-  Some({
-    authoring_nodes: nodes.copy(),
-    compile_sample_rate: context.sample_rate(),
-    compile_block_size: context.block_size(),
-    hot_swap,
-  })
 }
+
+///|
+fn graph_topology_queue_result_from_staging(
+  result : Result[Unit, @staging.GraphTopologyQueueError],
+) -> Result[Unit, GraphTopologyQueueError] {
+  match result {
+    Ok(_) => Ok(())
+    Err(error) => Err(graph_topology_queue_error_from_staging(error))
+  }
+}
+
+///|
+fn graph_topology_edits_to_staging(
+  edits : Array[GraphTopologyEdit],
+) -> Array[@staging.GraphTopologyEdit] {
+  let raw_edits = Array::new(capacity=edits.length())
+  for edit in edits {
+    raw_edits.push(edit.to_staging())
+  }
+  raw_edits
+}
+
+///|
+/// Mono topology-edit wrapper that recompiles authoring nodes and stages the
+/// replacement through the internal hot-swap graph.
+///
+/// Public facade wrapper; implementation lives in `graph/internal/staging`.
+struct CompiledDspTopologyController(@staging.CompiledDspTopologyController)
 
 ///|
 /// Build a topology-edit wrapper from authoring-order mono nodes.
@@ -92,115 +149,11 @@ pub fn CompiledDspTopologyController::from_nodes(
   context : DspContext,
   crossfade_samples? : Int = 0,
 ) -> CompiledDspTopologyController? {
-  build_topology_graph(nodes, context, crossfade_samples, fn(ns, ctx, xf) {
-    match CompiledDsp::compile_raw(ns, ctx) {
-      Some(compiled) =>
-        Some(CompiledDspHotSwap::from_graph(compiled, crossfade_samples=xf).0)
-      None => None
-    }
-  }).map(fn(tg) { CompiledDspTopologyController(tg) })
-}
-
-///|
-/// Apply one runtime control message to the active or in-flight graph.
-fn TopologyGraph::apply_control_impl(
-  self : TopologyGraph,
-  control : GraphControl,
-) -> Result[Unit, GraphControlError] {
-  let updated_authoring_nodes = match
-    topology_control_updated_nodes_result(
-      self.authoring_nodes,
-      self.compile_sample_rate,
-      [control],
-    ) {
-    Ok(updated_authoring_nodes) => updated_authoring_nodes
-    Err(error) => return Err(error)
-  }
-  match self.hot_swap.apply_control_impl(control) {
-    Ok(_) => ()
-    Err(error) => return Err(error)
-  }
-  self.authoring_nodes = updated_authoring_nodes
-  Ok(())
-}
-
-///|
-/// Apply a batch of runtime control messages to the active or in-flight graph.
-fn TopologyGraph::apply_controls_impl(
-  self : TopologyGraph,
-  controls : Array[GraphControl],
-) -> Result[Unit, GraphControlError] {
-  let updated_authoring_nodes = match
-    topology_control_updated_nodes_result(
-      self.authoring_nodes,
-      self.compile_sample_rate,
-      controls,
-    ) {
-    Ok(updated_authoring_nodes) => updated_authoring_nodes
-    Err(error) => return Err(error)
-  }
-  match self.hot_swap.apply_controls_impl(controls) {
-    Ok(_) => ()
-    Err(error) => return Err(error)
-  }
-  self.authoring_nodes = updated_authoring_nodes
-  Ok(())
-}
-
-///|
-/// Queue one topology edit for the next hot-swap recompilation.
-fn TopologyGraph::queue_topology_edit_impl(
-  self : TopologyGraph,
-  edit : GraphTopologyEdit,
-  compile_fn : (Array[DspNode], DspContext) -> @runtime.CompiledGraph?,
-) -> Result[Unit, GraphTopologyQueueError] {
-  self.queue_topology_edits_impl([edit], compile_fn)
-}
-
-///|
-/// Queue an ordered topology-edit batch.
-///
-/// The batch is transactional: invalid node indices or a recompilation failure
-/// reject the whole edit set and leave the current graph unchanged.
-fn TopologyGraph::queue_topology_edits_impl(
-  self : TopologyGraph,
-  edits : Array[GraphTopologyEdit],
-  compile_fn : (Array[DspNode], DspContext) -> @runtime.CompiledGraph?,
-) -> Result[Unit, GraphTopologyQueueError] {
-  if self.hot_swap.pending is Some(_) {
-    return Err(GraphTopologyQueueError::PendingSwap)
-  }
-  let edited_nodes = self.authoring_nodes.copy()
-  match apply_topology_edits_result(edited_nodes, edits) {
-    Ok(_) => ()
-    Err(failure) =>
-      return Err(
-        GraphTopologyQueueError::InvalidEdit(failure.edit_index, failure.reason),
-      )
-  }
-  let compile_context = DspContext::new(
-    sample_rate=self.compile_sample_rate,
-    block_size=self.compile_block_size,
-  )
-  let replacement = match compile_fn(edited_nodes, compile_context) {
-    Some(replacement) => replacement
-    None => return Err(GraphTopologyQueueError::RecompileRejected)
-  }
-  // Skip state copy after delete operations — authoring indices shift,
-  // so position-based matching may copy state from the wrong node.
-  // The crossfade smooths the transition with fresh state.
-  let has_delete = edits
-    .iter()
-    .any(fn(e) { e is DeleteNode(_) || e is DeleteChain(_) })
-  if !has_delete {
-    replacement.copy_compatible_runtime_state_from(self.hot_swap.active)
-  }
-  match self.hot_swap.queue_swap_impl(replacement) {
-    Ok(_) => ()
-    Err(error) => return Err(GraphTopologyQueueError::HotSwap(error))
-  }
-  self.authoring_nodes = edited_nodes
-  Ok(())
+  @staging.CompiledDspTopologyController::from_nodes(
+    dsp_nodes_to_model(nodes),
+    context,
+    crossfade_samples~,
+  ).map(fn(raw) { CompiledDspTopologyController(raw) })
 }
 
 ///|
@@ -209,7 +162,9 @@ pub fn CompiledDspTopologyController::queue_topology_edit(
   self : CompiledDspTopologyController,
   edit : GraphTopologyEdit,
 ) -> Result[Unit, GraphTopologyQueueError] {
-  self.0.queue_topology_edit_impl(edit, compile_mono_graph)
+  graph_topology_queue_result_from_staging(
+    self.0.queue_topology_edit(edit.to_staging()),
+  )
 }
 
 ///|
@@ -221,7 +176,9 @@ pub fn CompiledDspTopologyController::queue_topology_edits(
   self : CompiledDspTopologyController,
   edits : Array[GraphTopologyEdit],
 ) -> Result[Unit, GraphTopologyQueueError] {
-  self.0.queue_topology_edits_impl(edits, compile_mono_graph)
+  graph_topology_queue_result_from_staging(
+    self.0.queue_topology_edits(graph_topology_edits_to_staging(edits)),
+  )
 }
 
 ///|
@@ -231,17 +188,17 @@ pub fn CompiledDspTopologyController::process(
   context : DspContext,
   output : AudioBuffer,
 ) -> Unit {
-  CompiledDspHotSwap(self.0.hot_swap).process(context, output)
+  self.0.process(context, output)
 }
 
 ///|
 /// Terminal-stereo topology-edit wrapper that recompiles authoring nodes and
-/// stages the replacement through `HotSwapGraph`.
+/// stages the replacement through the internal hot-swap graph.
 ///
-/// Supports the same edit kinds as the mono controller (all six variants
-/// of `GraphTopologyEdit`). Only one staged topology replacement may be
-/// pending at a time.
-struct CompiledStereoDspTopologyController(TopologyGraph)
+/// Public facade wrapper; implementation lives in `graph/internal/staging`.
+struct CompiledStereoDspTopologyController(
+  @staging.CompiledStereoDspTopologyController
+)
 
 ///|
 /// Build a topology-edit wrapper from authoring-order terminal-stereo nodes.
@@ -250,15 +207,11 @@ pub fn CompiledStereoDspTopologyController::from_nodes(
   context : DspContext,
   crossfade_samples? : Int = 0,
 ) -> CompiledStereoDspTopologyController? {
-  build_topology_graph(nodes, context, crossfade_samples, fn(ns, ctx, xf) {
-    match CompiledStereoDsp::compile_raw(ns, ctx) {
-      Some(compiled) =>
-        Some(
-          CompiledStereoDspHotSwap::from_graph(compiled, crossfade_samples=xf).0,
-        )
-      None => None
-    }
-  }).map(fn(tg) { CompiledStereoDspTopologyController(tg) })
+  @staging.CompiledStereoDspTopologyController::from_nodes(
+    dsp_nodes_to_model(nodes),
+    context,
+    crossfade_samples~,
+  ).map(fn(raw) { CompiledStereoDspTopologyController(raw) })
 }
 
 ///|
@@ -267,7 +220,9 @@ pub fn CompiledStereoDspTopologyController::queue_topology_edit(
   self : CompiledStereoDspTopologyController,
   edit : GraphTopologyEdit,
 ) -> Result[Unit, GraphTopologyQueueError] {
-  self.0.queue_topology_edit_impl(edit, compile_stereo_graph)
+  graph_topology_queue_result_from_staging(
+    self.0.queue_topology_edit(edit.to_staging()),
+  )
 }
 
 ///|
@@ -279,7 +234,9 @@ pub fn CompiledStereoDspTopologyController::queue_topology_edits(
   self : CompiledStereoDspTopologyController,
   edits : Array[GraphTopologyEdit],
 ) -> Result[Unit, GraphTopologyQueueError] {
-  self.0.queue_topology_edits_impl(edits, compile_stereo_graph)
+  graph_topology_queue_result_from_staging(
+    self.0.queue_topology_edits(graph_topology_edits_to_staging(edits)),
+  )
 }
 
 ///|
@@ -290,73 +247,5 @@ pub fn CompiledStereoDspTopologyController::process(
   left_output : AudioBuffer,
   right_output : AudioBuffer,
 ) -> Unit {
-  CompiledStereoDspHotSwap(self.0.hot_swap).process(
-    context, left_output, right_output,
-  )
-}
-
-///|
-fn topology_control_updated_nodes_result(
-  authoring_nodes : Array[DspNode],
-  compile_sample_rate : Double,
-  controls : Array[GraphControl],
-) -> Result[Array[DspNode], GraphControlError] {
-  let updated_nodes = authoring_nodes.copy()
-  for control in controls {
-    match
-      apply_topology_runtime_control_result(
-        updated_nodes, compile_sample_rate, control,
-      ) {
-      Ok(_) => ()
-      Err(error) => return Err(error)
-    }
-  }
-  Ok(updated_nodes)
-}
-
-///|
-fn apply_topology_runtime_control_result(
-  nodes : Array[DspNode],
-  compile_sample_rate : Double,
-  control : GraphControl,
-) -> Result[Unit, GraphControlError] {
-  match control.kind() {
-    SetParam => {
-      if control.node_index() < 0 || control.node_index() >= nodes.length() {
-        return Err(GraphControlError::InvalidNodeIndex(control.node_index()))
-      }
-      let updated = match
-        updated_node_param_result(
-          nodes[control.node_index()],
-          control.node_index(),
-          control.slot(),
-          control.value(),
-          compile_sample_rate,
-        ) {
-        Ok(updated) => updated
-        Err(error) => return Err(error)
-      }
-      nodes[control.node_index()] = updated
-      Ok(())
-    }
-    _ => Ok(())
-  }
-}
-
-///|
-/// Compile helper for mono graphs, returning `CompiledGraph` directly.
-fn compile_mono_graph(
-  nodes : Array[DspNode],
-  context : DspContext,
-) -> @runtime.CompiledGraph? {
-  CompiledDsp::compile_raw(nodes, context).map(fn(c) { c.raw_graph() })
-}
-
-///|
-/// Compile helper for stereo graphs, returning `CompiledGraph` directly.
-fn compile_stereo_graph(
-  nodes : Array[DspNode],
-  context : DspContext,
-) -> @runtime.CompiledGraph? {
-  CompiledStereoDsp::compile_raw(nodes, context).map(fn(c) { c.raw_graph() })
+  self.0.process(context, left_output, right_output)
 }

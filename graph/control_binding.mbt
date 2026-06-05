@@ -56,6 +56,13 @@ pub fn ControlBindingBuilder::ControlBindingBuilder() -> ControlBindingBuilder {
 }
 
 ///|
+fn ControlBindingBuilder::from_internal(
+  raw : @binding.ControlBindingBuilder,
+) -> ControlBindingBuilder {
+  { raw, }
+}
+
+///|
 /// Add a binding. Mutates internal array, returns self for chaining.
 pub fn ControlBindingBuilder::bind(
   self : ControlBindingBuilder,
