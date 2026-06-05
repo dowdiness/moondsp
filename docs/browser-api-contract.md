@@ -2,190 +2,106 @@
 
 The `dowdiness/moondsp/browser` package has two reviewed public surfaces:
 
-- the MoonBit source facade, generated in
+- the MoonBit source facade generated in
   [`browser/pkg.generated.mbti`](../browser/pkg.generated.mbti); and
-- the AudioWorklet export ABI, listed under `link.js.exports` and
+- the AudioWorklet export ABI listed under `link.js.exports` and
   `link.wasm-gc.exports` in [`browser/moon.pkg`](../browser/moon.pkg).
 
-Use this guide as the browser API reference for host code and PR review.
-Architecture decisions stay in ADRs. Graph runtime-control behavior stays in
+Use this guide when writing host code or reviewing browser API PRs. Keep
+architecture rationale in ADRs, and keep graph runtime-control behavior in
 [`salat-engine-technical-reference.md`](salat-engine-technical-reference.md).
 
 ## Contract summary
 
-- The supported MoonBit source API is the `Values` section of
-  `browser/pkg.generated.mbti`.
-- The supported worklet ABI is the JS and wasm-gc export lists in
-  `browser/moon.pkg`.
-- The browser facade exposes no public browser-specific types, traits, route
-  objects, pools, or scheduler handles.
-- `browser/internal/*` packages are implementation details, even when an
-  internal package uses `pub` for package-to-package wiring.
-- `browser/browser_abi.baseline` records the reviewed facade/export shape. Update
-  it only for an intentional public API or worklet ABI change.
+- `browser/pkg.generated.mbti` defines the supported MoonBit source facade.
+- `browser/moon.pkg` defines the supported JS and wasm-gc worklet exports.
+- The browser facade exposes functions only. It has no public browser-specific
+  route types, pools, scheduler handles, traits, or host state objects.
+- `browser/internal/*` packages are private implementation detail, even when an
+  internal package marks a symbol `pub` for package-to-package wiring.
+- `browser/browser_abi.baseline` records the reviewed facade/export shape.
+  Update it only for an intentional public API or worklet ABI change.
 
-For general graph construction, external DSL lowering, voice pools, scheduler
-extension, or Mini parsing, use the root, `graph`, `scheduler`, `voice`, `mini`,
-and `song` packages. The browser package is a host/demo ABI, not the general
-library authoring API.
+Use the root, `graph`, `scheduler`, `voice`, `mini`, and `song` packages for
+general graph authoring, voice pools, scheduler extension, and Mini parsing. The
+browser package is a host/demo ABI, not the general library authoring API.
 
 ## Supported facade groups
 
-The groups below are the supported browser facade. Function names are listed in
-plain text so host code can compare them directly with the export manifest.
-
-### Demo oscillator
+The exact function names below are part of the facade/export contract. They are
+grouped by host use case.
 
 ```text
-reset_phase
-tick
-tick_source
+demo oscillator:
+  reset_phase, tick, tick_source
+
+mono compiled graph:
+  init_compiled_graph, process_compiled_block, compiled_output_sample
+
+mono hot-swap graph:
+  init_compiled_hot_swap_graph, queue_compiled_hot_swap,
+  process_compiled_hot_swap_block, compiled_hot_swap_output_sample
+
+mono topology-edit graph:
+  init_compiled_topology_edit_graph, queue_compiled_topology_edit,
+  queue_compiled_topology_delete_edit, set_compiled_topology_edit_gain,
+  process_compiled_topology_edit_block, compiled_topology_edit_output_sample
+
+stereo compiled graph:
+  init_compiled_stereo_graph, process_compiled_stereo_block,
+  compiled_stereo_left_sample, compiled_stereo_right_sample
+
+stereo hot-swap graph:
+  init_compiled_stereo_hot_swap_graph, queue_compiled_stereo_hot_swap,
+  process_compiled_stereo_hot_swap_block, compiled_stereo_hot_swap_left_sample,
+  compiled_stereo_hot_swap_right_sample
+
+stereo topology-edit graph:
+  init_compiled_stereo_topology_edit_graph,
+  queue_compiled_stereo_topology_edit,
+  set_compiled_stereo_topology_edit_level,
+  process_compiled_stereo_topology_edit_block,
+  compiled_stereo_topology_edit_left_sample,
+  compiled_stereo_topology_edit_right_sample
+
+exit-deliverable graph:
+  init_exit_deliverable_graph, process_exit_deliverable_block,
+  exit_deliverable_output_sample, set_exit_deliverable_lfo_rate,
+  set_exit_deliverable_cutoff, set_exit_deliverable_gain
+
+scheduler pattern/song playback:
+  init_scheduler_graph, process_scheduler_block, scheduler_left_sample,
+  scheduler_right_sample, parse_and_set_pattern, clear_pattern_input,
+  push_pattern_char, eval_pattern_input, parse_and_set_song, clear_song_input,
+  push_song_char, eval_song_input, set_scheduler_bpm, set_scheduler_gain
+
+parse-error transport:
+  get_scheduler_parse_error, get_song_parse_error, get_pattern_error_length,
+  get_pattern_error_char, get_song_error_length, get_song_error_char
+
+browser graph-error transport:
+  get_browser_last_error, get_browser_error_code, get_browser_error_length,
+  get_browser_error_char
 ```
 
-These are the Phase-0 oscillator and demo entry points. `reset_phase` also
-resets the browser graph slots and scheduler state.
+Group meanings:
 
-### Mono compiled graph
-
-```text
-init_compiled_graph
-process_compiled_block
-compiled_output_sample
-```
-
-This group runs a fixed mono `CompiledDsp` demo graph. The process call accepts
-the live frequency and gain controls.
-
-### Mono hot-swap graph
-
-```text
-init_compiled_hot_swap_graph
-queue_compiled_hot_swap
-process_compiled_hot_swap_block
-compiled_hot_swap_output_sample
-```
-
-This group runs a fixed mono `CompiledDspHotSwap` demo graph. The queue call
-stages the fixed replacement graph.
-
-### Mono topology-edit graph
-
-```text
-init_compiled_topology_edit_graph
-queue_compiled_topology_edit
-queue_compiled_topology_delete_edit
-set_compiled_topology_edit_gain
-process_compiled_topology_edit_block
-compiled_topology_edit_output_sample
-```
-
-This group runs a fixed mono topology-controller demo graph. The queue calls
-insert or delete the demo gain node. The setter updates the live gain control
-used by the process call.
-
-### Stereo compiled graph
-
-```text
-init_compiled_stereo_graph
-process_compiled_stereo_block
-compiled_stereo_left_sample
-compiled_stereo_right_sample
-```
-
-This group runs a fixed stereo `CompiledStereoDsp` demo graph. The process call
-accepts frequency, gain, pan, delay, and cutoff controls.
-
-### Stereo hot-swap graph
-
-```text
-init_compiled_stereo_hot_swap_graph
-queue_compiled_stereo_hot_swap
-process_compiled_stereo_hot_swap_block
-compiled_stereo_hot_swap_left_sample
-compiled_stereo_hot_swap_right_sample
-```
-
-This group runs a fixed stereo hot-swap demo graph. The queue call stages the
-fixed replacement graph.
-
-### Stereo topology-edit graph
-
-```text
-init_compiled_stereo_topology_edit_graph
-queue_compiled_stereo_topology_edit
-set_compiled_stereo_topology_edit_level
-process_compiled_stereo_topology_edit_block
-compiled_stereo_topology_edit_left_sample
-compiled_stereo_topology_edit_right_sample
-```
-
-This group runs a fixed stereo topology-controller demo graph. The queue call
-replaces the demo pan node. The setter updates the live level control used by
-the process call.
-
-### Exit-deliverable graph
-
-```text
-init_exit_deliverable_graph
-process_exit_deliverable_block
-exit_deliverable_output_sample
-set_exit_deliverable_lfo_rate
-set_exit_deliverable_cutoff
-set_exit_deliverable_gain
-```
-
-This group runs the fixed tagless-composition demo graph. The setters update the
-LFO rate, cutoff, and gain values used by the process call.
-
-### Scheduler pattern/song playback
-
-```text
-init_scheduler_graph
-process_scheduler_block
-scheduler_left_sample
-scheduler_right_sample
-parse_and_set_pattern
-clear_pattern_input
-push_pattern_char
-eval_pattern_input
-parse_and_set_song
-clear_song_input
-push_song_char
-eval_song_input
-set_scheduler_bpm
-set_scheduler_gain
-```
-
-This group is the browser live-coding host for Mini pattern and song text. It
-owns the demo drum and synth pools. Event routing stays internal to the browser
-host.
-
-### Parse-error transport
-
-```text
-get_scheduler_parse_error
-get_song_parse_error
-get_pattern_error_length
-get_pattern_error_char
-get_song_error_length
-get_song_error_char
-```
-
-These functions expose the last scheduler parse or routing error. The length and
-char accessors exist for JS/wasm hosts that cannot receive MoonBit strings
-directly.
-
-### Browser graph-error transport
-
-```text
-get_browser_last_error
-get_browser_error_code
-get_browser_error_length
-get_browser_error_char
-```
-
-These functions expose the last graph init, queue, or runtime-control error that
-was routed through the browser error store.
+- Demo oscillator functions are the Phase-0 demo entry points. Resetting the
+  demo also resets browser graph slots and scheduler state.
+- Mono and stereo compiled graph groups run fixed demo graphs with live runtime
+  controls.
+- Hot-swap groups run fixed demo graphs and queue fixed replacement graphs.
+- Topology-edit groups run fixed controller demos. The mono path inserts or
+  deletes a demo gain node. The stereo path replaces a demo pan node.
+- The exit-deliverable group runs the fixed tagless-composition demo graph with
+  LFO, cutoff, and gain controls.
+- The scheduler group is the browser live-coding host for Mini pattern and song
+  text. Demo drum/synth pools and event routing stay internal.
+- Parse-error transport exposes the last scheduler parse or routing error.
+  Length/char accessors support JS/wasm hosts that cannot receive MoonBit
+  strings directly.
+- Browser graph-error transport exposes the last graph init, queue, or
+  runtime-control error routed through the browser error store.
 
 ## Worklet lifecycle and threading
 
@@ -194,7 +110,7 @@ sequence is:
 
 1. Call the matching `init_*_graph(sample_rate, block_size)` before audio starts.
 2. Call `process_*_block(...)` from the AudioWorklet render path.
-3. Read samples with the matching `*_sample(index)` accessors after a successful
+3. Read samples with the matching `*_sample(index)` accessor after a successful
    process call and before the next process call.
 4. Send `queue_*` and `set_*` calls from the control side between process calls.
    Use the host worklet-message protocol to serialize access.
@@ -227,8 +143,8 @@ string. The `clear_*_input`, `push_*_char`, and `eval_*_input` functions provide
 a character-buffer path for hosts that stream text into the worklet.
 
 `get_scheduler_parse_error()` and `get_song_parse_error()` read the same last
-scheduler error buffer, while `*_error_length` and `*_error_char(i)` expose that
-message as UTF-16 code units. Out-of-range indices return `0`.
+scheduler error buffer. The `*_error_length` and `*_error_char(i)` functions
+return that message as UTF-16 code units, with `0` for out-of-range indices.
 
 Issue #158 tracks a future parse/control result-code and error-transport design.
 Until that design is accepted, do not reinterpret the existing `0`/`1` parse
