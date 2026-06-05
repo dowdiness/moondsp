@@ -25,6 +25,9 @@ for `dowdiness/moondsp`. Read order below goes roughly from "new user" to
   — **authoritative** for graph runtime-control behavior: node types,
   parameter slots, control-binding surface, topology editing, hot-swap. If
   code and any other doc disagree, this document and the code take priority.
+- **[`browser-api-contract.md`](browser-api-contract.md)** — supported browser
+  facade and AudioWorklet export ABI, including semver and ABI-guard review
+  rules.
 - **[`mini-notation.md`](mini-notation.md)** — current text-pattern syntax,
   including Strudel-style `$:` stack lines, quoted notation, postfixes, and
   method chains.
@@ -85,8 +88,8 @@ for full context.
 
 ## Exploratory / vision (not implemented)
 
-These are direction documents, not descriptions of shipped behavior. They may
-diverge from current code.
+These direction documents describe possible futures. They may diverge from
+current code.
 
 - **[`dsp-structural-editor-vision.md`](dsp-structural-editor-vision.md)** —
   text-shaped authoring experience for `moondsp` (draft).
