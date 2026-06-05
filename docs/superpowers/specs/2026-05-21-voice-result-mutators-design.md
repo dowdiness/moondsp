@@ -1,7 +1,7 @@
 # Voice Result Mutators
 
 **Date:** 2026-05-21
-**Status:** Draft design
+**Status:** Implemented; follow-up deprecation selected 2026-06-05
 **Tracker:** follow-on from ADR-0010 result-surface hardening
 
 ## Context
@@ -45,6 +45,11 @@ The graph package already uses unsuffixed `Result` methods, but `voice/` still
 has mixed compatibility surface. Removing `Bool` wrappers or renaming methods
 should be a separate semver-minor or semver-major API cleanup once callers have
 a migration window.
+
+Follow-up decision (2026-06-05): deprecate the Bool wrappers and migrate in-repo
+call sites to the typed `*_result` methods. Keep source compatibility for
+external callers; defer wrapper removal and unsuffixed method renames until an
+explicit breaking API-cleanup scope.
 
 ## Error Semantics
 
@@ -100,7 +105,8 @@ the root `@moondsp` facade's re-exported `BoundVoicePool`, `VoicePool`, and
 in `voice/pkg.generated.mbti`.
 
 The changelog should describe this as a new typed failure path, not a breaking
-change.
+change. The 2026-06-05 follow-up adds deprecation annotations to the Bool
+wrappers while keeping them present for source compatibility.
 
 ## Tests
 
@@ -119,6 +125,10 @@ Add focused tests in `voice/voice_test.mbt`:
 - `BoundVoicePool::set_voice_pan_result` keeps the current pan behavior on
   success and reports stale handles as typed errors
 - existing `Bool` wrappers still return the old true/false values
+
+After the 2026-06-05 deprecation follow-up, in-repo tests and scheduler call
+sites use `*_result` directly so `moon check --deny-warn` remains warning-free;
+the wrappers stay as deprecated one-line compatibility shims.
 
 ## Verification
 

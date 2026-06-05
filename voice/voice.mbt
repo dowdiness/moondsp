@@ -323,6 +323,9 @@ pub fn BoundVoicePool::note_on_controls(
 }
 
 ///|
+/// Deprecated compatibility wrapper. Use `note_off_result` to observe stale
+/// or invalid handles as `VoiceControlError` values.
+#deprecated("Use BoundVoicePool::note_off_result(handle) to observe VoiceControlError")
 pub fn BoundVoicePool::note_off(
   self : BoundVoicePool,
   handle : VoiceHandle,
@@ -339,6 +342,9 @@ pub fn BoundVoicePool::note_off_result(
 }
 
 ///|
+/// Deprecated compatibility wrapper. Use `kill_result` to observe stale or
+/// invalid handles as `VoiceControlError` values.
+#deprecated("Use BoundVoicePool::kill_result(handle) to observe VoiceControlError")
 pub fn BoundVoicePool::kill(
   self : BoundVoicePool,
   handle : VoiceHandle,
@@ -360,6 +366,9 @@ pub fn BoundVoicePool::note_off_all(self : BoundVoicePool) -> Unit {
 }
 
 ///|
+/// Deprecated compatibility wrapper. Use `set_voice_pan_result` to observe
+/// stale or invalid handles as `VoiceControlError` values.
+#deprecated("Use BoundVoicePool::set_voice_pan_result(handle, pan) to observe VoiceControlError")
 pub fn BoundVoicePool::set_voice_pan(
   self : BoundVoicePool,
   handle : VoiceHandle,
@@ -564,6 +573,9 @@ pub fn VoicePool::note_on(
 }
 
 ///|
+/// Deprecated compatibility wrapper. Use `note_off_result` to observe stale
+/// or invalid handles as `VoiceControlError` values.
+#deprecated("Use VoicePool::note_off_result(handle) to observe VoiceControlError")
 pub fn VoicePool::note_off(self : VoicePool, handle : VoiceHandle) -> Bool {
   self.note_off_result(handle) is Ok(_)
 }
@@ -627,6 +639,9 @@ pub fn VoicePool::note_off_all(self : VoicePool) -> Unit {
 }
 
 ///|
+/// Deprecated compatibility wrapper. Use `set_voice_pan_result` to observe
+/// stale or invalid handles as `VoiceControlError` values.
+#deprecated("Use VoicePool::set_voice_pan_result(handle, pan) to observe VoiceControlError")
 pub fn VoicePool::set_voice_pan(
   self : VoicePool,
   handle : VoiceHandle,

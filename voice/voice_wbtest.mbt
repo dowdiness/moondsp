@@ -37,8 +37,8 @@ test "VoiceHandle becomes invalid after generation overflow resets to 0" {
   let h2 = pool.note_on([]).unwrap()
   assert_true(pool.voice_state(h2) is VoiceState::Active)
   assert_true(pool.voice_state(h1) is VoiceState::Idle)
-  assert_true(!pool.note_off(h1))
-  assert_true(pool.note_off(h2))
+  assert_true(pool.note_off_result(h1) is Err(_))
+  assert_true(pool.note_off_result(h2) is Ok(_))
 }
 
 ///|

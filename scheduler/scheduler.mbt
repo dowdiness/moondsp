@@ -779,7 +779,7 @@ fn PatternScheduler::process_single_event(
             )
             for action in actions {
               match action {
-                SetPan(pan) => ignore(pool.set_voice_pan(handle, pan))
+                SetPan(pan) => ignore(pool.set_voice_pan_result(handle, pan))
               }
             }
           }

@@ -8,9 +8,10 @@ per-PR verification logs and merged-PR lists live in `git log` and
 
 ## Current State
 
-- `main` includes PR #159 (`9b6c2dc`), which documented the browser
-  facade/worklet ABI contract after issue #150 removed the legacy browser route
-  shell types while preserving the JS/wasm-gc worklet exports.
+- `main` includes PR #160 (`529dd63`), which formalized browser parse/control
+  result-code and error transport after PR #159 (`9b6c2dc`) documented the
+  browser facade/worklet ABI contract. Both preserved the JS/wasm-gc worklet
+  exports.
 - ADR-0015 graph, scheduler, and browser internal-boundary extraction slices
   (#135–#140) have shipped, as have browser safety/helper follow-ups #152,
   #151, and #150. The browser facade/export ABI is now guarded by
@@ -37,14 +38,17 @@ For the broader backlog, read
 
 ## Recommended Next Slice
 
-**Pick the next API hygiene slice after issue #158.**
+**No further Voice API cleanup by default.**
 
-Issue #158 formalizes the browser parse/control result-code and error transport
-contract without growing the source facade or worklet export list.
+The post-#158 inventory found no production `VoicePool` Bool-wrapper callers and
+only scheduler-owned `BoundVoicePool` Bool-wrapper calls that intentionally
+ignored the collapsed result. The selected path is additive deprecation: keep the
+wrappers for source compatibility, mark them deprecated, and move in-repo callers
+to the typed `*_result` methods.
 
-Keep scheduler status/introspection (#156) separate unless concrete host use
-cases justify it. If no browser host use case appears, the smallest remaining
-API hygiene candidate is the Voice API result hardening follow-up below.
+Do not remove wrappers or rename voice methods to graph-style unsuffixed
+`Result` methods without an explicit breaking API-cleanup scope. Keep scheduler
+status/introspection (#156) separate unless concrete host use cases justify it.
 
 ## Alternative Slices
 
@@ -58,9 +62,11 @@ API hygiene candidate is the Voice API result hardening follow-up below.
   loom/seam to root `moon.mod` and do not route production parsing through
   loom.
 
-- **Voice API result hardening follow-up** — decide whether to deprecate/remove
-  Bool wrappers, rename voice `*_result` methods to graph-style unsuffixed
-  `Result` methods, or first migrate `CompiledDsp::compile` away from `Self?`.
+- **Voice API breaking cleanup (deferred)** — after a migration window, decide
+  whether to remove the deprecated Bool wrappers and rename voice `*_result`
+  methods to graph-style unsuffixed `Result` methods. Do not start by migrating
+  `CompiledDsp::compile` away from `Self?` unless the slice is explicitly scoped
+  as a broader graph API cleanup.
 
 - **Incr early-cutoff use of DspNode/CompiledTemplate Eq** — structural Eq and
   typed compile diagnostics shipped in PR #122. Do not wire Eq into an
