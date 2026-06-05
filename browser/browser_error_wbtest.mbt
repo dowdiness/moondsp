@@ -1,4 +1,15 @@
 ///|
+test "browser graph error code values stay ABI compatible" {
+  @debug.assert_eq(BROWSER_ERROR_NONE, 0)
+  @debug.assert_eq(BROWSER_ERROR_NOT_INITIALIZED, 1)
+  @debug.assert_eq(BROWSER_ERROR_COMPILE_REJECTED, 2)
+  @debug.assert_eq(BROWSER_ERROR_HOT_SWAP_QUEUE, 3)
+  @debug.assert_eq(BROWSER_ERROR_TOPOLOGY_QUEUE, 4)
+  @debug.assert_eq(BROWSER_ERROR_RUNTIME_CONTROL, 5)
+  @debug.assert_eq(BROWSER_ERROR_INIT, 6)
+}
+
+///|
 test "browser error reports queue before initialization" {
   reset_phase()
 

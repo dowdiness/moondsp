@@ -131,43 +131,61 @@ browser-error update.
 
 ## Pattern/song parse protocol
 
-The scheduler text protocol returns `Int` status codes:
+The scheduler text protocol returns stable `Int` result codes. The names below
+are documentation names for host code, not additional worklet exports.
 
-- `0` means parse or routing succeeded. The parsed pattern or song became the
-  active playback source.
-- `1` means parse or routing failed. The previous active playback source stays in
-  place, and the error accessors expose the message.
+| Documentation name | Code | Meaning |
+| --- | --- | --- |
+| `MOONDSP_BROWSER_RESULT_OK` | `0` | Parse and routing succeeded. The parsed pattern or song became the active playback source, and the scheduler error buffer was cleared. |
+| `MOONDSP_BROWSER_RESULT_ERROR` | `1` | Parse or routing failed. The previous active playback source stayed in place, and the scheduler error buffer was updated. |
+
+No additional scheduler text result codes are reserved or emitted. Defensive
+hosts may treat any unknown nonzero value as failure, but only `0` and `1` have
+stable meanings.
 
 `parse_and_set_pattern(text)` and `parse_and_set_song(text)` accept a whole
-string. The `clear_*_input`, `push_*_char`, and `eval_*_input` functions provide
-a character-buffer path for hosts that stream text into the worklet.
+string and return the result code directly. The `clear_*_input`, `push_*_char`,
+and `eval_*_input` functions provide the same protocol through a character-buffer
+path for hosts that stream text into the worklet.
 
-`get_scheduler_parse_error()` and `get_song_parse_error()` read the same last
-scheduler error buffer. The `*_error_length` and `*_error_char(i)` functions
-return that message as UTF-16 code units, with `0` for out-of-range indices.
+For JS and wasm-gc hosts, use the length/char transport:
 
-Issue #158 tracks a future parse/control result-code and error-transport design.
-Until that design is accepted, do not reinterpret the existing `0`/`1` parse
-codes or browser error code values in this document.
+- Pattern errors: `get_pattern_error_length()` with
+  `get_pattern_error_char(i)`.
+- Song errors: `get_song_error_length()` with `get_song_error_char(i)`.
+
+These accessors return the last scheduler error message as UTF-16 code units.
+Out-of-range indices return `0`. `get_scheduler_parse_error()` and
+`get_song_parse_error()` read the same buffer and remain string-returning
+facade/worklet exports for compatibility. Direct string crossing is not the
+canonical JS/wasm-gc transport.
 
 ## Browser graph-error protocol
 
-Browser graph failures that route through the browser error helpers store both a
-numeric code and a string message. The current code values are:
+Browser graph and runtime-control failures that route through the browser error
+helpers store both a numeric code and a string message. The code names below are
+documentation names for host code, not additional worklet exports.
 
-| Code | Meaning |
-| --- | --- |
-| `0` | no browser graph error |
-| `1` | graph not initialized |
-| `2` | compile or replacement graph rejected |
-| `3` | hot-swap queue failed |
-| `4` | topology queue failed |
-| `5` | runtime control failed |
-| `6` | graph initialization failed |
+| Documentation name | Code | Meaning |
+| --- | --- | --- |
+| `MOONDSP_BROWSER_GRAPH_ERROR_NONE` | `0` | no browser graph error |
+| `MOONDSP_BROWSER_GRAPH_ERROR_NOT_INITIALIZED` | `1` | graph not initialized |
+| `MOONDSP_BROWSER_GRAPH_ERROR_COMPILE_REJECTED` | `2` | compile or replacement graph rejected |
+| `MOONDSP_BROWSER_GRAPH_ERROR_HOT_SWAP_QUEUE` | `3` | hot-swap queue failed |
+| `MOONDSP_BROWSER_GRAPH_ERROR_TOPOLOGY_QUEUE` | `4` | topology queue failed |
+| `MOONDSP_BROWSER_GRAPH_ERROR_RUNTIME_CONTROL` | `5` | runtime control failed |
+| `MOONDSP_BROWSER_GRAPH_ERROR_INIT` | `6` | graph initialization failed |
 
-`get_browser_last_error()` returns the message when the host can receive a
-MoonBit string. `get_browser_error_length()` and `get_browser_error_char(i)`
-return the same message as UTF-16 code units. Out-of-range indices return `0`.
+The graph, queue, process, and runtime-control exports keep their boolean result
+ABI. When a call returns `false` and routes through the browser error helpers,
+`get_browser_error_code()` exposes one of the codes above. The scheduler text
+protocol uses its own error buffer and does not update this graph-error code.
+
+For JS and wasm-gc hosts, the supported graph-error message transport is
+`get_browser_error_length()` with `get_browser_error_char(i)`. The accessors
+return the message as UTF-16 code units, and out-of-range indices return `0`.
+`get_browser_last_error()` remains a string-returning facade/worklet export for
+compatibility; direct string crossing is not the canonical JS/wasm-gc transport.
 
 ## Source facade versus worklet exports
 

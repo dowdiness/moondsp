@@ -409,7 +409,25 @@ pub fn process_scheduler_block() -> Bool {
 }
 
 ///|
+const SCHEDULER_PARSE_STATUS_OK : Int = 0
+
+///|
+const SCHEDULER_PARSE_STATUS_ERROR : Int = 1
+
+///|
 let sched_last_error : @ref.Ref[String] = @ref.new("")
+
+///|
+fn set_scheduler_parse_success() -> Int {
+  sched_last_error.val = ""
+  SCHEDULER_PARSE_STATUS_OK
+}
+
+///|
+fn set_scheduler_parse_error(message : String) -> Int {
+  sched_last_error.val = message
+  SCHEDULER_PARSE_STATUS_ERROR
+}
 
 ///|
 let sched_pattern_input_chars : Array[Int] = []
@@ -431,13 +449,9 @@ fn set_active_pattern_text(text : String) -> Int {
   match @mini.parse(text) {
     Ok(pat) => {
       sched_active_playback.val = Some(ActivePattern(pat))
-      sched_last_error.val = ""
-      0
+      set_scheduler_parse_success()
     }
-    Err(msg) => {
-      sched_last_error.val = msg
-      1
-    }
+    Err(msg) => set_scheduler_parse_error(msg)
   }
 }
 
@@ -453,18 +467,11 @@ fn set_active_song_text(text : String) -> Int {
           }
           reset_route_transports_for_song_start()
           sched_active_playback.val = Some(ActiveSong(route_songs))
-          sched_last_error.val = ""
-          0
+          set_scheduler_parse_success()
         }
-        Err(msg) => {
-          sched_last_error.val = msg
-          1
-        }
+        Err(msg) => set_scheduler_parse_error(msg)
       }
-    Err(msg) => {
-      sched_last_error.val = msg
-      1
-    }
+    Err(msg) => set_scheduler_parse_error(msg)
   }
 }
 

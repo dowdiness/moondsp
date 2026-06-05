@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Formalized the browser parse/control result-code and error-message transport
+  contract, with stable documentation names for scheduler parse results and
+  browser graph error codes.
 - Added a browser facade/worklet ABI contract guide covering supported exports,
   internal boundaries, semver policy, and the ABI baseline review workflow.
 - Added an automated browser facade/export ABI baseline check for
