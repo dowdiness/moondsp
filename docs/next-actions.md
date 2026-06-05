@@ -8,22 +8,22 @@ per-PR verification logs and merged-PR lists live in `git log` and
 
 ## Current State
 
-- `main` is clean after PR #153 (`2b41a87`), which closed issue #152 by
-  adding automated browser facade/export ABI stability checks for
-  `browser/pkg.generated.mbti` and JS/wasm-gc exports in `browser/moon.pkg`.
-  ADR-0015 graph, scheduler, and browser internal-boundary extraction slices
-  (#135–#140) have shipped.
-- Active browser-boundary cleanup slice: issue #151 tightens the
-  `browser/internal/playback_host` helper API. Preserve the exported
-  worklet/browser ABI and do not revisit scheduler semantics or legacy facade
-  type cleanup (#150).
+- `main` is clean after PR #154 (`1b844a1`), which closed issue #151 by
+  tightening the `browser/internal/playback_host` helper API. Browser
+  whitebox probes are now package-local, route-selector internals are private,
+  and the facade compatibility hook no longer exposes host-owned pools,
+  schedulers, or buffers.
+- ADR-0015 graph, scheduler, and browser internal-boundary extraction slices
+  (#135–#140) have shipped, as have browser safety/helper follow-ups #152 and
+  #151. The remaining browser follow-up is #150, an explicit legacy public
+  facade type cleanup. Treat it as an API-cleanup window, not an internal-only
+  refactor.
 - Latest release: **v0.5.1** (tagged and published 2026-05-20).
 - The next release should be **v0.6.0** if it includes the current
   `Unreleased` entries, because public API has been added since v0.5.1.
-- The ADR-0015 boundary roadmap issues #133–#140 have shipped. Open browser
-  follow-ups are #150 (legacy facade route type cleanup) and #151
-  (`browser/internal/playback_host` API tightening). Issue #152 shipped in PR
-  #153; keep release prep and parser/runtime changes separate.
+- The ADR-0015 boundary roadmap issues #133–#140 have shipped. Browser
+  follow-ups #151 and #152 have shipped; #150 (legacy facade route type
+  cleanup) remains open. Keep release prep and parser/runtime changes separate.
 - Open PRs: PR #86 (`release/v0.6.0`) is release prep and intentionally
   remains open until an explicit release pass. Do not tag or publish v0.6.0 as
   part of unrelated docs, benchmark, or loom-authoring work.
@@ -39,10 +39,12 @@ For the broader backlog, read
 
 ## Recommended Next Slice
 
-**Start issue #151 — tighten `browser/internal/playback_host` helper API.**
-Reduce or classify internal-public helpers so the browser facade keeps only the
-forwarding API it needs, whitebox tests use narrow package-local seams, and
-`browser/pkg.generated.mbti` / the worklet export ABI stay unchanged.
+**Decide/start issue #150 — retire the legacy browser scheduler route type
+shell.** This is the remaining browser follow-up and likely changes
+`browser/pkg.generated.mbti`, so treat it as an explicit public API cleanup:
+document the breaking change, verify the JS/wasm-gc worklet export ABI stays
+unchanged, and update `browser/browser_abi.baseline` only after reviewing the
+facade diff.
 
 ## Alternative Slices
 
@@ -67,6 +69,13 @@ forwarding API it needs, whitebox tests use narrow package-local seams, and
 
 ## Closed Since Previous Update
 
+- ~~**Issue #151 / PR #154 — playback-host helper API tightening**~~ — SHIPPED
+  2026-06-05 (`1b844a1`). Moved browser scheduler whitebox probes into
+  `browser/internal/playback_host` package-local tests, removed broad
+  test-only public helpers, made the route selector private, and narrowed the
+  facade compatibility hook so it no longer exposes host-owned pools,
+  schedulers, or buffers. Browser facade/worklet ABI stayed unchanged.
+
 - ~~**Issue #152 / PR #153 — browser ABI/facade stability checks**~~ — SHIPPED
   2026-06-05 (`2b41a87`). Added `scripts/check-browser-abi.sh`, a checked-in
   `browser/browser_abi.baseline`, and CI wiring so unexpected
@@ -77,7 +86,8 @@ forwarding API it needs, whitebox tests use narrow package-local seams, and
   2026-06-05 (`cbdce35`). Extracted browser slot, demo-template, and
   playback-host internals behind the public browser facade while preserving
   `browser/pkg.generated.mbti`, root `pkg.generated.mbti`, and the exported
-  JS/wasm-gc worklet ABI. Follow-ups remain #150, #151, and #152.
+  JS/wasm-gc worklet ABI. Follow-ups opened from review caveats: #150, #151,
+  and #152; #151/#152 have since shipped.
 
 - ~~**Issue #139 / PR #148 — scheduler internal extraction**~~ — SHIPPED
   2026-06-05 (`a01c72a`). Extracted scheduler transport, playback,
