@@ -8,22 +8,22 @@ per-PR verification logs and merged-PR lists live in `git log` and
 
 ## Current State
 
-- `main` is clean after PR #149 (`cbdce35`), which closed issue #140 by
-  extracting browser slot, demo-template, and playback-host internals behind
-  the existing public browser facade. ADR-0015 graph, scheduler, and browser
-  internal-boundary extraction slices (#135–#140) have shipped.
-- Active browser-boundary safety slice: issue #152 adds automated browser
-  facade/export ABI stability checks before deeper browser cleanup. Preserve
-  the exported worklet/browser ABI unless intentionally approving a baseline
-  update, and do not revisit scheduler semantics.
+- `main` is clean after PR #153 (`2b41a87`), which closed issue #152 by
+  adding automated browser facade/export ABI stability checks for
+  `browser/pkg.generated.mbti` and JS/wasm-gc exports in `browser/moon.pkg`.
+  ADR-0015 graph, scheduler, and browser internal-boundary extraction slices
+  (#135–#140) have shipped.
+- Active browser-boundary cleanup slice: issue #151 tightens the
+  `browser/internal/playback_host` helper API. Preserve the exported
+  worklet/browser ABI and do not revisit scheduler semantics or legacy facade
+  type cleanup (#150).
 - Latest release: **v0.5.1** (tagged and published 2026-05-20).
 - The next release should be **v0.6.0** if it includes the current
   `Unreleased` entries, because public API has been added since v0.5.1.
 - The ADR-0015 boundary roadmap issues #133–#140 have shipped. Open browser
-  follow-ups are #150 (legacy facade route type cleanup), #151
-  (`browser/internal/playback_host` API tightening), and #152 (automated
-  browser ABI/facade checks). Keep release prep and parser/runtime changes
-  separate.
+  follow-ups are #150 (legacy facade route type cleanup) and #151
+  (`browser/internal/playback_host` API tightening). Issue #152 shipped in PR
+  #153; keep release prep and parser/runtime changes separate.
 - Open PRs: PR #86 (`release/v0.6.0`) is release prep and intentionally
   remains open until an explicit release pass. Do not tag or publish v0.6.0 as
   part of unrelated docs, benchmark, or loom-authoring work.
@@ -39,10 +39,10 @@ For the broader backlog, read
 
 ## Recommended Next Slice
 
-**Start issue #152 — automated browser ABI/facade stability checks.** Add the
-smallest CI-friendly guard that fails on unexpected `browser/pkg.generated.mbti`
-or `browser/moon.pkg` export-list drift. Keep the existing browser/worklet ABI
-baseline unchanged unless the diff is intentionally reviewed and approved.
+**Start issue #151 — tighten `browser/internal/playback_host` helper API.**
+Reduce or classify internal-public helpers so the browser facade keeps only the
+forwarding API it needs, whitebox tests use narrow package-local seams, and
+`browser/pkg.generated.mbti` / the worklet export ABI stay unchanged.
 
 ## Alternative Slices
 
@@ -66,6 +66,12 @@ baseline unchanged unless the diff is intentionally reviewed and approved.
   authoring-side cost.
 
 ## Closed Since Previous Update
+
+- ~~**Issue #152 / PR #153 — browser ABI/facade stability checks**~~ — SHIPPED
+  2026-06-05 (`2b41a87`). Added `scripts/check-browser-abi.sh`, a checked-in
+  `browser/browser_abi.baseline`, and CI wiring so unexpected
+  `browser/pkg.generated.mbti` or JS/wasm-gc export-list drift fails unless the
+  baseline is intentionally reviewed and updated.
 
 - ~~**Issue #140 / PR #149 — browser internal extraction**~~ — SHIPPED
   2026-06-05 (`cbdce35`). Extracted browser slot, demo-template, and

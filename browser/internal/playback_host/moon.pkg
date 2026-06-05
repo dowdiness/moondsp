@@ -6,3 +6,7 @@ import {
   "dowdiness/moondsp/song",
   "moonbitlang/core/ref",
 }
+
+import {
+  "moonbitlang/core/debug",
+} for "wbtest"

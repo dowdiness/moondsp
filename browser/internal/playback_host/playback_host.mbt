@@ -18,7 +18,7 @@ priv struct SoundPool {
 }
 
 ///|
-pub enum SchedulerRouteSelector {
+priv enum SchedulerRouteSelector {
   RouteSound(Double)
   RouteSynth
 }
@@ -182,65 +182,18 @@ pub fn reset_scheduler_graph() -> Unit {
 }
 
 ///|
-pub fn for_each_route(
-  f : (
-    SchedulerRouteSelector,
-    @moondsp.BoundVoicePool,
-    @scheduler.PatternScheduler,
-    @moondsp.AudioBuffer,
-    @moondsp.AudioBuffer,
-  ) -> Unit,
+/// Visit initialized route kinds for the browser facade's legacy route type
+/// compatibility shell. This intentionally exposes only route tags, not the
+/// host-owned selector enum, pools, schedulers, or buffers.
+pub fn for_each_route_kind(
+  on_sound : (Double) -> Unit,
+  on_synth : () -> Unit,
 ) -> Unit {
   for route in sched_routes.val {
-    f(
-      route.selector,
-      route.pool.pool,
-      route.pool.scheduler,
-      route.pool.tmp_left,
-      route.pool.tmp_right,
-    )
-  }
-}
-
-///|
-pub fn route_count() -> Int {
-  sched_routes.val.length()
-}
-
-///|
-pub fn routes_have_bpm(bpm : Double) -> Bool {
-  for route in sched_routes.val {
-    if route.pool.scheduler.bpm() != bpm {
-      return false
+    match route.selector {
+      RouteSound(sound_code) => on_sound(sound_code)
+      RouteSynth => on_synth()
     }
-  }
-  true
-}
-
-///|
-pub fn route_sample_counters() -> Array[Int64] {
-  let counters : Array[Int64] = []
-  for route in sched_routes.val {
-    counters.push(route.pool.scheduler.sample_counter())
-  }
-  counters
-}
-
-///|
-pub fn active_playback_is_pattern() -> Bool {
-  sched_active_playback.val is Some(ActivePattern(_))
-}
-
-///|
-pub fn active_playback_is_song() -> Bool {
-  sched_active_playback.val is Some(ActiveSong(_))
-}
-
-///|
-pub fn active_song_route_count() -> Int? {
-  match sched_active_playback.val {
-    Some(ActiveSong(route_songs)) => Some(route_songs.length())
-    _ => None
   }
 }
 

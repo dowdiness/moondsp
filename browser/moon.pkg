@@ -1,6 +1,5 @@
 import {
   "dowdiness/moondsp",
-  "dowdiness/moondsp/scheduler",
   "dowdiness/moondsp/browser/internal/slot",
   "dowdiness/moondsp/browser/internal/demo_templates",
   "dowdiness/moondsp/browser/internal/playback_host",
