@@ -7,65 +7,65 @@
 /// `StereoOut` types, preserving compile-time shape safety.
 
 ///|
-priv trait Output {
-  reset(Self) -> Unit
-  allocate(Self, block_size : Int) -> Unit
+pub trait Output {
+  fn reset(Self) -> Unit
+  fn allocate(Self, block_size : Int) -> Unit
 }
 
 ///|
 /// Single-buffer output used by mono graph variants.
-priv struct MonoOut {
-  buffer : @ref.Ref[@moondsp.AudioBuffer?]
+pub struct MonoOut {
+  priv buffer : @ref.Ref[@moondsp.AudioBuffer?]
 }
 
 ///|
 #alias(new)
-fn MonoOut::MonoOut() -> MonoOut {
+pub fn MonoOut::MonoOut() -> MonoOut {
   { buffer: @ref.new(None) }
 }
 
 ///|
-impl Output for MonoOut with reset(self) {
+pub impl Output for MonoOut with fn reset(self) {
   self.buffer.val = None
 }
 
 ///|
-impl Output for MonoOut with allocate(self, n) {
+pub impl Output for MonoOut with fn allocate(self, n) {
   self.buffer.val = Some(@moondsp.AudioBuffer::filled(n))
 }
 
 ///|
 /// Concrete mono API — NOT on the trait.
-fn MonoOut::get(self : MonoOut) -> @moondsp.AudioBuffer {
+pub fn MonoOut::get(self : MonoOut) -> @moondsp.AudioBuffer {
   self.buffer.val.unwrap()
 }
 
 ///|
-fn MonoOut::sample(self : MonoOut, index : Int) -> Double {
+pub fn MonoOut::sample(self : MonoOut, index : Int) -> Double {
   checked_sample(index, self.buffer.val)
 }
 
 ///|
 /// Paired-buffer output used by stereo graph variants.
-priv struct StereoOut {
-  left : @ref.Ref[@moondsp.AudioBuffer?]
-  right : @ref.Ref[@moondsp.AudioBuffer?]
+pub struct StereoOut {
+  priv left : @ref.Ref[@moondsp.AudioBuffer?]
+  priv right : @ref.Ref[@moondsp.AudioBuffer?]
 }
 
 ///|
 #alias(new)
-fn StereoOut::StereoOut() -> StereoOut {
+pub fn StereoOut::StereoOut() -> StereoOut {
   { left: @ref.new(None), right: @ref.new(None) }
 }
 
 ///|
-impl Output for StereoOut with reset(self) {
+pub impl Output for StereoOut with fn reset(self) {
   self.left.val = None
   self.right.val = None
 }
 
 ///|
-impl Output for StereoOut with allocate(self, n) {
+pub impl Output for StereoOut with fn allocate(self, n) {
   let left = @moondsp.AudioBuffer::filled(n)
   let right = @moondsp.AudioBuffer::filled(n)
   self.left.val = Some(left)
@@ -75,40 +75,40 @@ impl Output for StereoOut with allocate(self, n) {
 ///|
 /// Concrete stereo API — NOT on the trait. Type-safe: calling
 /// `mono.left_sample(i)` would fail to compile.
-fn StereoOut::left_buf(self : StereoOut) -> @moondsp.AudioBuffer {
+pub fn StereoOut::left_buf(self : StereoOut) -> @moondsp.AudioBuffer {
   self.left.val.unwrap()
 }
 
 ///|
-fn StereoOut::right_buf(self : StereoOut) -> @moondsp.AudioBuffer {
+pub fn StereoOut::right_buf(self : StereoOut) -> @moondsp.AudioBuffer {
   self.right.val.unwrap()
 }
 
 ///|
-fn StereoOut::left_sample(self : StereoOut, index : Int) -> Double {
+pub fn StereoOut::left_sample(self : StereoOut, index : Int) -> Double {
   checked_sample(index, self.left.val)
 }
 
 ///|
-fn StereoOut::right_sample(self : StereoOut, index : Int) -> Double {
+pub fn StereoOut::right_sample(self : StereoOut, index : Int) -> Double {
   checked_sample(index, self.right.val)
 }
 
 ///|
 /// Generic slot parameterised by graph type `T` and output shape `O`.
 /// Holds the uniform 5-Ref scaffolding and drives rate/block caching.
-priv struct GraphSlot[T, O] {
+pub struct GraphSlot[T, O] {
   graph : @ref.Ref[T?]
   context : @ref.Ref[@moondsp.DspContext?]
   output : O
-  sample_rate : @ref.Ref[Double]
-  block_size : @ref.Ref[Int]
-  compile : (@moondsp.DspContext) -> T?
+  priv sample_rate : @ref.Ref[Double]
+  priv block_size : @ref.Ref[Int]
+  priv compile : (@moondsp.DspContext) -> T?
 }
 
 ///|
 #alias(new)
-fn[T, O] GraphSlot::GraphSlot(
+pub fn[T, O] GraphSlot::GraphSlot(
   output~ : O,
   compile~ : (@moondsp.DspContext) -> T?,
 ) -> GraphSlot[T, O] {
@@ -135,7 +135,7 @@ fn[T, O] GraphSlot::GraphSlot(
 /// hit or reset). Use it to reset variant-owned structural state
 /// (e.g. a `topo_edit_inserted` flag) whose validity is tied to the
 /// specific compiled graph instance.
-fn[T, O : Output] GraphSlot::ensure(
+pub fn[T, O : Output] GraphSlot::ensure(
   self : GraphSlot[T, O],
   rate : Double,
   block : Int,
@@ -169,7 +169,7 @@ fn[T, O : Output] GraphSlot::ensure(
 }
 
 ///|
-fn[T, O : Output] GraphSlot::reset(self : GraphSlot[T, O]) -> Unit {
+pub fn[T, O : Output] GraphSlot::reset(self : GraphSlot[T, O]) -> Unit {
   self.graph.val = None
   self.context.val = None
   self.output.reset()
@@ -178,12 +178,12 @@ fn[T, O : Output] GraphSlot::reset(self : GraphSlot[T, O]) -> Unit {
 }
 
 ///|
-fn[T, O] GraphSlot::graph_val(self : GraphSlot[T, O]) -> T {
+pub fn[T, O] GraphSlot::graph_val(self : GraphSlot[T, O]) -> T {
   self.graph.val.unwrap()
 }
 
 ///|
-fn[T, O] GraphSlot::ctx_val(self : GraphSlot[T, O]) -> @moondsp.DspContext {
+pub fn[T, O] GraphSlot::ctx_val(self : GraphSlot[T, O]) -> @moondsp.DspContext {
   self.context.val.unwrap()
 }
 

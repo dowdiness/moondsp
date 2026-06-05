@@ -24,25 +24,20 @@ test "browser scheduler song input switches active playback explicitly" {
   push_song_text_for_test(BROWSER_SONG_TEST_INPUT)
   @debug.assert_eq(eval_song_input(), 0)
   @debug.assert_eq(get_song_error_length(), 0)
-  guard sched_active_playback.val is Some(ActiveSong(route_songs)) else {
-    fail("song eval did not activate song playback")
-  }
-  @debug.assert_eq(route_songs.length(), sched_routes.val.length())
-  for route in sched_routes.val {
-    @debug.assert_eq(route.pool.scheduler.bpm(), 72.0)
-  }
+  assert_true(@playback_host.active_playback_is_song())
+  @debug.assert_eq(
+    @playback_host.active_song_route_count(),
+    Some(@playback_host.route_count()),
+  )
+  assert_true(@playback_host.routes_have_bpm(72.0))
 
   push_pattern_text_for_test("invalid!!!")
   @debug.assert_eq(eval_pattern_input(), 1)
-  guard sched_active_playback.val is Some(ActiveSong(_)) else {
-    fail("pattern parse failure should keep last good song playback")
-  }
+  assert_true(@playback_host.active_playback_is_song())
 
   push_pattern_text_for_test("s(\"bd\")")
   @debug.assert_eq(eval_pattern_input(), 0)
-  guard sched_active_playback.val is Some(ActivePattern(_)) else {
-    fail("valid pattern did not switch active playback back to pattern")
-  }
+  assert_true(@playback_host.active_playback_is_pattern())
 }
 
 ///|
@@ -51,14 +46,14 @@ test "browser scheduler song start resets route transport" {
   push_pattern_text_for_test("s(\"bd\")")
   @debug.assert_eq(eval_pattern_input(), 0)
   assert_true(process_scheduler_block())
-  for route in sched_routes.val {
-    @debug.assert_eq(route.pool.scheduler.sample_counter(), 128L)
+  for counter in @playback_host.route_sample_counters() {
+    @debug.assert_eq(counter, 128L)
   }
 
   push_song_text_for_test(BROWSER_SONG_TEST_INPUT)
   @debug.assert_eq(eval_song_input(), 0)
-  for route in sched_routes.val {
-    @debug.assert_eq(route.pool.scheduler.sample_counter(), 0L)
+  for counter in @playback_host.route_sample_counters() {
+    @debug.assert_eq(counter, 0L)
   }
 }
 
@@ -71,9 +66,7 @@ test "browser scheduler song parse error accessors preserve last good pattern" {
     "song(section(\"intro\",0,s(\"bd\")),part(\"intro1\",\"intro\"))",
   )
   @debug.assert_eq(eval_song_input(), 1)
-  guard sched_active_playback.val is Some(ActivePattern(_)) else {
-    fail("song parse failure should keep last good pattern playback")
-  }
+  assert_true(@playback_host.active_playback_is_pattern())
   let message = get_song_parse_error()
   assert_true(message.contains("section 'intro' requires a positive length"))
   @debug.assert_eq(get_song_error_length(), message.length())
