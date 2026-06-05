@@ -1,22 +1,27 @@
-# ADR-0015: Graph internal boundaries and maintainability roadmap
+# ADR-0015: Graph, scheduler, and browser internal boundaries
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-06-03
-- **Source:** Architecture redesign pass after external-authoring, editor-preview,
-  typed compile diagnostic, and benchmark follow-ups
+- **Implemented:** 2026-06-05
+- **Source:** Architecture redesign pass after external-authoring,
+  editor-preview, typed compile diagnostic, and benchmark follow-ups
 - **Related:** ADR-0001 (layered package architecture), ADR-0010
   (`CompiledTemplate` as the runtime exchange boundary), ADR-0014 (authoring
   equality and typed graph compile diagnostics),
   [`../external-dsl-lowering.md`](../external-dsl-lowering.md),
   [`../editor-audio-preview-handoff.md`](../editor-audio-preview-handoff.md),
-  [`../mini-graph-authoring-boundary.md`](../mini-graph-authoring-boundary.md)
+  [`../mini-graph-authoring-boundary.md`](../mini-graph-authoring-boundary.md),
+  [`../browser-api-contract.md`](../browser-api-contract.md)
 
 ## Context
 
 ADR-0001 split the old `lib/` monolith into `dsp/`, `graph/`, `voice/`,
 `pattern/`, `song/`, `scheduler/`, `mini/`, and `browser/`. That package
-layout still gives the project the right top-level shape, but `graph/` has now
-absorbed several distinct responsibilities:
+layout still gives the project the right top-level shape, but several packages
+had accumulated enough responsibility that review discipline alone was no
+longer a sufficient boundary.
+
+The largest pressure was in `graph/`, which had absorbed distinct concerns:
 
 - the flat `DspNode` authoring model and node-kind semantics;
 - `CompiledTemplate`, optimization, liveness, and index-map behavior;
@@ -27,23 +32,32 @@ absorbed several distinct responsibilities:
 - identity-bearing `GraphTemplateDoc` / `GraphIndexMap` authoring helpers;
 - typed compile diagnostics and debug validation.
 
-This is a concrete change pressure, not just a cosmetic organization concern.
-External authoring, editor preview handoff, Mini-to-graph template selection,
-and last-good-runtime behavior now all rely on graph boundaries being stable
-and explainable. Future graph editor work or node-kind additions would currently
-touch many unrelated graph files and can accidentally couple authoring/control
-logic to audio-hot runtime logic.
+This was concrete change pressure, not cosmetic organization. External
+authoring, editor preview handoff, Mini-to-graph template selection, and
+last-good-runtime behavior all rely on graph boundaries being stable and
+explainable. Future graph editor work or node-kind additions would otherwise
+risk coupling authoring/control logic to audio-hot runtime logic.
 
-A smaller boundary leak also exists: `graph/` publicly re-exports several
-`dsp/` types and helper functions mainly for local source/test convenience. That
-makes `graph/` look like a secondary DSP facade even though the root package is
-the intended public facade.
+Two smaller pressures followed the same pattern:
+
+- `scheduler/` mixed transport time, playback snapshots, event provenance,
+  active-note lifecycle, edit policies, voice dispatch, and public facade
+  methods.
+- `browser/` mixed the stable worklet ABI with graph-slot lifecycle, demo graph
+  templates, playback-host routing, and browser error transport.
+
+A public-surface leak also existed: `graph/` exposed several `dsp/` types and
+helpers mainly for local source/test convenience. That made `graph/` look like a
+secondary DSP facade even though the root package is the intended combined
+facade.
 
 ## Decision
 
-Keep `dowdiness/moondsp/graph` as the public facade, but evolve its
-implementation into compiler-enforced internal packages. The intended long-term
-shape is:
+Keep the existing top-level packages and public facades, but move implementation
+behind compiler-enforced `internal/` packages. This is a boundary hardening
+change, not a rewrite.
+
+The shipped graph shape is:
 
 ```text
 graph/                         public facade; preserves source-facing API
@@ -55,6 +69,25 @@ graph/internal/staging/         hot-swap and topology controllers
 graph/internal/authoring/       GraphTemplateDoc, GraphIndexMap, stable-ID edits
 ```
 
+The shipped scheduler shape is:
+
+```text
+scheduler/                         public facade; preserves scheduler API
+scheduler/internal/transport/       sample/cycle transport helpers
+scheduler/internal/playback/        pattern/song playback snapshots
+scheduler/internal/voice_runtime/   active-note and voice-side runtime helpers
+scheduler/internal/edit_policy/     affected-voice edit policy matching
+```
+
+The shipped browser shape is:
+
+```text
+browser/                         function-only browser/worklet facade
+browser/internal/slot/            reusable graph-slot lifecycle wrapper
+browser/internal/demo_templates/  fixed demo graph templates
+browser/internal/playback_host/   scheduler playback host and routing internals
+```
+
 The runtime boundary from ADR-0010 remains unchanged:
 
 - `Array[DspNode]` is an authoring exchange type.
@@ -63,73 +96,86 @@ The runtime boundary from ADR-0010 remains unchanged:
 - Runtime APIs must not accept bare `Array[DspNode]` except the documented
   topology-controller and authoring exceptions.
 
-Additional boundary rules for the split:
+Additional boundary rules:
 
 - `graph/internal/runtime` must not import `identity`, `pattern`, `song`,
   `mini`, `scheduler`, `browser`, or the root facade.
-- `graph/internal/model` must stay independent of graph authoring and runtime
+- `graph/internal/model` stays independent of graph authoring and runtime
   staging. It may depend on `dsp` for waveform/filter tags and shape constants.
 - `graph/internal/template` may depend on model-level graph semantics, but not
   on authoring docs or runtime state.
 - `graph/internal/authoring` may depend on `identity` and may lower stable IDs
   to authoring indices, but runtime processing must not depend on it.
-- `graph/` may re-export internal symbols through `pub using`; external
-  consumers should continue to import `dowdiness/moondsp/graph` or the root
-  `dowdiness/moondsp` facade, not `graph/internal/*`.
+- `scheduler/internal/*` packages may depend on lower-level domain/runtime
+  packages they explicitly bridge, but they must not depend on `browser/`.
+- `browser/internal/*` packages may depend on the public runtime, scheduler,
+  Mini, pattern, and song surfaces needed by the host, but those packages must
+  not depend back on `browser/`.
+- Public facades may re-export or wrap internal symbols. External consumers
+  should continue to import `dowdiness/moondsp/graph`,
+  `dowdiness/moondsp/scheduler`, `dowdiness/moondsp/browser`, or the root
+  `dowdiness/moondsp` facade, not `*/internal/*` packages.
+- `graph/` is not a secondary DSP facade. Consumers should import DSP APIs from
+  `dowdiness/moondsp/dsp` or the root `dowdiness/moondsp` facade.
+- `browser/` remains a function-only facade. Browser route/pool/scheduler state
+  objects are implementation details unless a future API decision explicitly
+  promotes them.
 
-The same pressure exists at a smaller scale in `scheduler/` and `browser/`, but
-those splits are follow-ups. The first priority is the graph boundary, because
-it owns the audio-hot/runtime-control contract and has the largest public API.
+## Migration record
 
-## Migration plan
+The migration shipped incrementally rather than by replacement:
 
-This is an incremental migration, not a rewrite.
-
-1. **Pin boundaries first.** Add checks that document allowed package imports and
-   future internal-package direction. Continue running
-   `scripts/check-public-boundary.sh` for ADR-0010.
-2. **Remove accidental graph DSP re-export pressure.** Migrate graph tests and
-   local source toward explicit `@dsp` imports where needed, then deprecate or
-   remove graph-level DSP re-exports in a deliberate API window.
-3. **Extract `graph/internal/model`.** Move the flat graph model and pure
-   node-kind semantics first. Re-export from `graph/` and review generated
-   `.mbti` output for source compatibility.
-4. **Extract template and binding.** Move `CompiledTemplate`, optimization,
-   liveness, and control-binding validation after the model package is stable.
-5. **Extract runtime.** Move compile/process/runtime-control/debug internals
-   without changing hot loops or allocation behavior.
-6. **Extract staging and authoring.** Move hot-swap/topology controllers and
-   `GraphTemplateDoc` / `GraphIndexMap` once runtime no longer depends on
-   authoring helpers.
-7. **Only then split scheduler/browser internals.** Scheduler transport/edit
-   policy and browser ABI/demo-host splits should follow the same facade-plus-
-   internal-packages pattern after graph boundaries are stable.
+1. **Boundary checks were added.** `scripts/check-architecture-boundaries.sh`
+   documents allowed package imports and facade rules. `scripts/check-public-boundary.sh`
+   continues to enforce ADR-0010.
+2. **The accidental graph DSP facade was removed.** Graph source and tests now
+   use explicit DSP imports where needed, and graph no longer publicly
+   re-exports DSP helpers as a convenience surface.
+3. **Graph internals were extracted.** Model, template, binding, runtime,
+   staging, and authoring responsibilities moved behind `graph/internal/*` while
+   `graph/` preserved the public source-facing API.
+4. **Scheduler internals were extracted.** Transport, playback snapshots,
+   active-note/voice-runtime helpers, and edit-policy matching moved behind
+   `scheduler/internal/*` while `scheduler/` preserved its public facade.
+5. **Browser internals were extracted and tightened.** Graph slots, demo
+   templates, and playback-host routing moved behind `browser/internal/*`.
+   The package path and JS/wasm-gc worklet export ABI stayed stable, but the
+   MoonBit source facade was intentionally narrowed in a breaking cleanup that
+   removed the legacy leaked browser route shell types. Follow-up work added
+   `scripts/check-browser-abi.sh` plus the browser ABI baseline.
 
 ## Consequences
 
 **Positive**
 
-- The compiler can enforce boundaries that are currently maintained by review
-  discipline inside one large package.
-- Audio-hot runtime code becomes easier to protect from authoring/editor
-  concerns.
-- Node-kind additions get a clearer checklist: update model semantics,
+- Package boundaries now enforce rules that previously lived mostly in review
+  discipline.
+- Audio-hot graph runtime code is better protected from authoring/editor,
+  scheduler, Mini, and browser concerns.
+- Node-kind additions have a clearer checklist: update model semantics,
   template/compile validation, runtime processing/control, and public docs.
 - External authoring and editor preview contracts remain anchored on
   `CompiledTemplate`, not on runtime internals.
-- Public imports can stay stable through the `graph/` facade.
+- Scheduler public imports remain stable while implementation detail is hidden
+  behind `internal/` paths.
+- Browser implementation detail is hidden behind `browser/internal/*`; the
+  package import path and JS/wasm-gc worklet ABI remained stable, while the
+  MoonBit source facade was deliberately narrowed by the route-shell removal.
+- Future browser facade/export drift is now observable through an ABI baseline
+  check.
 
 **Negative**
 
-- Internal packages require additional `moon.pkg` manifests and explicit
-  re-export maintenance.
-- `pub using` through a facade can change generated `.mbti` origin paths; every
-  extraction must review `moon info` output and run an external facade smoke
-  test.
-- Some helpers that were package-private may need to become `pub` inside
-  `graph/internal/*`. The `internal/` path prevents downstream imports, but it
-  still increases intra-module API surface.
-- The migration adds short-term indirection before it removes complexity.
+- Internal packages require additional `moon.pkg` manifests and explicit facade
+  maintenance.
+- Facade wrappers and `pub using` can change generated `.mbti` origin paths;
+  boundary changes still require `moon info` review.
+- Some helpers that used to be package-private are now `pub` inside
+  `*/internal/*` packages. The `internal/` path prevents downstream imports, but
+  it still increases intra-module API surface.
+- The delivered structure adds indirection. It lowers long-term coupling, but it
+  can make local navigation less direct until contributors learn the package
+  map.
 
 ## Non-goals
 
@@ -143,7 +189,7 @@ This is an incremental migration, not a rewrite.
 
 ## Verification
 
-For every stage:
+For boundary-sensitive work, run:
 
 ```bash
 moon check
@@ -153,7 +199,13 @@ scripts/check-public-boundary.sh
 scripts/check-architecture-boundaries.sh
 ```
 
+For browser facade/export work, also run:
+
+```bash
+scripts/check-browser-abi.sh
+```
+
 For graph runtime-control changes, update
-`docs/salat-engine-technical-reference.md` first. For runtime extraction stages,
-also run `moon build --target wasm-gc` and the graph/browser integration checks
-when feasible.
+`docs/salat-engine-technical-reference.md` first. For runtime extraction or
+hot-path changes, also run `moon build --target wasm-gc` and the relevant
+benchmarks or browser integration checks when feasible.

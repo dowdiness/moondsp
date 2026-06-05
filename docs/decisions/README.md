@@ -32,4 +32,4 @@ shipped plan or spec.
 - [ADR-0012 — Loom/CST evaluation for mini authoring](0012-loom-cst-mini-authoring-evaluation.md)
 - [ADR-0013 — Loom promotion criteria for mini authoring](0013-loom-promotion-criteria-for-mini-authoring.md)
 - [ADR-0014 — Authoring equality and typed graph compile diagnostics](0014-dspnode-compiledtemplate-equality-and-compile-errors.md)
-- [ADR-0015 — Graph internal boundaries and maintainability roadmap](0015-graph-internal-boundaries-and-maintainability.md)
+- [ADR-0015 — Graph, scheduler, and browser internal boundaries](0015-graph-internal-boundaries-and-maintainability.md)
