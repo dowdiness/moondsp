@@ -14,8 +14,6 @@ pub fn eval_pattern_input() -> Int
 
 pub fn eval_song_input() -> Int
 
-pub fn for_each_route_kind((Double) -> Unit, () -> Unit) -> Unit
-
 pub fn get_pattern_error_char(Int) -> Int
 
 pub fn get_pattern_error_length() -> Int

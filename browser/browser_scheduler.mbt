@@ -1,97 +1,15 @@
 ///|
-/// Legacy facade-only route shell retained for source compatibility.
-/// Runtime playback state now lives in `browser/internal/playback_host`; this
-/// type intentionally carries no host-owned mutable state.
-struct SoundPool {}
-
-///|
-enum SchedulerRouteSelector {
-  RouteSound(Double)
-  RouteSynth
-}
-
-///|
-struct SchedulerRoute {
-  selector : SchedulerRouteSelector
-  pool : SoundPool
-}
-
-///|
-/// Keep the legacy facade-only scheduler route shells live without routing
-/// playback through them. This preserves `browser/pkg.generated.mbti` exactly
-/// while the real host state lives in `@playback_host`.
-fn touch_scheduler_facade_route(selector : SchedulerRouteSelector) -> Unit {
-  let facade_route : SchedulerRoute = { selector, pool: SoundPool::{  } }
-  match facade_route.selector {
-    RouteSound(sound_code) => ignore(sound_code)
-    RouteSynth => ()
-  }
-  ignore(facade_route.pool)
-}
-
-///|
-fn touch_scheduler_facade_sound(sound_code : Double) -> Unit {
-  touch_scheduler_facade_route(RouteSound(sound_code))
-}
-
-///|
-fn touch_scheduler_facade_synth() -> Unit {
-  touch_scheduler_facade_route(RouteSynth)
-}
-
-///|
-fn touch_scheduler_facade_types() -> Unit {
-  @playback_host.for_each_route_kind(
-    touch_scheduler_facade_sound, touch_scheduler_facade_synth,
-  )
-}
-
-///|
-fn bd_template() -> Array[@moondsp.DspNode] {
-  @demo_templates.bd_template()
-}
-
-///|
-fn sd_template() -> Array[@moondsp.DspNode] {
-  @demo_templates.sd_template()
-}
-
-///|
-fn hh_template() -> Array[@moondsp.DspNode] {
-  @demo_templates.hh_template()
-}
-
-///|
-fn oh_template() -> Array[@moondsp.DspNode] {
-  @demo_templates.oh_template()
-}
-
-///|
-fn cp_template() -> Array[@moondsp.DspNode] {
-  @demo_templates.cp_template()
-}
-
-///|
-fn synth_template() -> Array[@moondsp.DspNode] {
-  @demo_templates.synth_template()
-}
-
-///|
 pub fn init_scheduler_graph(sample_rate : Double, block_size : Int) -> Bool {
-  let ready = @playback_host.init_scheduler_graph_with_templates(
+  @playback_host.init_scheduler_graph_with_templates(
     sample_rate,
     block_size,
-    bd_template(),
-    sd_template(),
-    hh_template(),
-    cp_template(),
-    oh_template(),
-    synth_template(),
+    @demo_templates.bd_template(),
+    @demo_templates.sd_template(),
+    @demo_templates.hh_template(),
+    @demo_templates.cp_template(),
+    @demo_templates.oh_template(),
+    @demo_templates.synth_template(),
   )
-  if ready {
-    touch_scheduler_facade_types()
-  }
-  ready
 }
 
 ///|
