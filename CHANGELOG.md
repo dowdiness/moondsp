@@ -48,6 +48,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `BoundVoicePool::set_voice_pan_result`. Existing Bool-returning wrappers
   remain and delegate to the result path.
 
+### Changed
+
+- Tightened `browser/internal/playback_host` helper exposure so browser
+  whitebox probes are package-local and the facade compatibility hook no longer
+  exposes host-owned pools, schedulers, or buffers.
+
 ## [0.5.1] - 2026-05-20
 
 ### Added

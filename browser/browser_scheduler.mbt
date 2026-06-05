@@ -1,13 +1,8 @@
 ///|
-/// Per-sound pool state retained in the browser facade interface for
-/// source compatibility. Runtime playback state now lives in
-/// `browser/internal/playback_host`.
-struct SoundPool {
-  pool : @moondsp.BoundVoicePool
-  scheduler : @scheduler.PatternScheduler
-  tmp_left : @moondsp.AudioBuffer
-  tmp_right : @moondsp.AudioBuffer
-}
+/// Legacy facade-only route shell retained for source compatibility.
+/// Runtime playback state now lives in `browser/internal/playback_host`; this
+/// type intentionally carries no host-owned mutable state.
+struct SoundPool {}
 
 ///|
 enum SchedulerRouteSelector {
@@ -25,42 +20,30 @@ struct SchedulerRoute {
 /// Keep the legacy facade-only scheduler route shells live without routing
 /// playback through them. This preserves `browser/pkg.generated.mbti` exactly
 /// while the real host state lives in `@playback_host`.
-fn facade_selector_from_host(
-  selector : @playback_host.SchedulerRouteSelector,
-) -> SchedulerRouteSelector {
-  match selector {
-    @playback_host.SchedulerRouteSelector::RouteSound(sound_code) =>
-      RouteSound(sound_code)
-    @playback_host.SchedulerRouteSelector::RouteSynth => RouteSynth
-  }
-}
-
-///|
-fn touch_scheduler_facade_route(
-  selector : @playback_host.SchedulerRouteSelector,
-  bound_pool : @moondsp.BoundVoicePool,
-  scheduler : @scheduler.PatternScheduler,
-  tmp_left : @moondsp.AudioBuffer,
-  tmp_right : @moondsp.AudioBuffer,
-) -> Unit {
-  let pool : SoundPool = { pool: bound_pool, scheduler, tmp_left, tmp_right }
-  let facade_route : SchedulerRoute = {
-    selector: facade_selector_from_host(selector),
-    pool,
-  }
+fn touch_scheduler_facade_route(selector : SchedulerRouteSelector) -> Unit {
+  let facade_route : SchedulerRoute = { selector, pool: SoundPool::{  } }
   match facade_route.selector {
     RouteSound(sound_code) => ignore(sound_code)
     RouteSynth => ()
   }
-  ignore(facade_route.pool.pool)
-  ignore(facade_route.pool.scheduler)
-  ignore(facade_route.pool.tmp_left)
-  ignore(facade_route.pool.tmp_right)
+  ignore(facade_route.pool)
+}
+
+///|
+fn touch_scheduler_facade_sound(sound_code : Double) -> Unit {
+  touch_scheduler_facade_route(RouteSound(sound_code))
+}
+
+///|
+fn touch_scheduler_facade_synth() -> Unit {
+  touch_scheduler_facade_route(RouteSynth)
 }
 
 ///|
 fn touch_scheduler_facade_types() -> Unit {
-  @playback_host.for_each_route(touch_scheduler_facade_route)
+  @playback_host.for_each_route_kind(
+    touch_scheduler_facade_sound, touch_scheduler_facade_synth,
+  )
 }
 
 ///|
