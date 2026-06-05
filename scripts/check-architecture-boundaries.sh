@@ -110,7 +110,7 @@ check_manifest "song/moon.pkg" '^(dowdiness/moondsp/(identity|pattern))$'
 check_manifest "mini/moon.pkg" '^(dowdiness/moondsp/(identity|pattern|song))$'
 check_manifest "graph/moon.pkg" '^(dowdiness/moondsp/(dsp|identity|graph/internal/(model|template|binding|runtime|staging|authoring)))$'
 check_manifest "voice/moon.pkg" '^(dowdiness/moondsp/(dsp|graph))$'
-check_manifest "scheduler/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(identity|pattern|song))$'
+check_manifest "scheduler/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(identity|pattern|song|scheduler/internal/(transport|playback|voice_runtime|edit_policy)))$'
 check_manifest "browser/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(mini|scheduler|pattern|song))$'
 check_manifest "browser_test/moon.pkg" '^(dowdiness/moondsp)$'
 check_manifest "cmd/main/moon.pkg" '^$'
@@ -125,13 +125,13 @@ check_manifest "graph/internal/runtime/moon.pkg" '^(dowdiness/moondsp/(dsp|graph
 check_manifest "graph/internal/staging/moon.pkg" '^(dowdiness/moondsp/(dsp|graph/internal/(model|template|runtime)))$'
 check_manifest "graph/internal/authoring/moon.pkg" '^(dowdiness/moondsp/(identity|graph/internal/(model|template|binding|runtime|staging)))$'
 
-# Future scheduler/browser internals are intentionally looser for now than the
-# graph rules. They document the next facade-plus-internals direction without
-# blocking current production code paths.
+# Scheduler internals (and future browser internals) are intentionally looser
+# for now than the graph rules. They document the facade-plus-internals
+# direction without blocking current production code paths.
 check_manifest "scheduler/internal/transport/moon.pkg" '^(dowdiness/moondsp/(dsp|pattern))$'
 check_manifest "scheduler/internal/playback/moon.pkg" '^(dowdiness/moondsp/(identity|pattern|song))$'
-check_manifest "scheduler/internal/voice_runtime/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(identity|pattern|song))$'
-check_manifest "scheduler/internal/edit_policy/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(identity|pattern|song))$'
+check_manifest "scheduler/internal/voice_runtime/moon.pkg" '^(dowdiness/moondsp/(identity|pattern|voice))$'
+check_manifest "scheduler/internal/edit_policy/moon.pkg" '^(dowdiness/moondsp/identity)$'
 check_manifest "browser/internal/slot/moon.pkg" '^(dowdiness/moondsp)$'
 check_manifest "browser/internal/demo_templates/moon.pkg" '^(dowdiness/moondsp)$'
 check_manifest "browser/internal/playback_host/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(mini|scheduler|pattern|song))$'

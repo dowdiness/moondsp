@@ -27,17 +27,18 @@ pub fn PatternScheduler::apply_voice_controls_for_edit_result(
   if target.is_empty() || controls.length() == 0 {
     return Ok(0)
   }
+  let raw_target = target.to_edit_policy()
   for note in self.active_notes {
-    if note.source.matches(target) {
-      match pool.validate_voice_controls_result(note.handle, controls) {
+    if note.matches_edit_policy(raw_target) {
+      match pool.validate_voice_controls_result(note.handle(), controls) {
         Ok(_) => ()
         Err(error) => return Err(error)
       }
     }
   }
   let count = for note in self.active_notes; applied = 0 {
-    if note.source.matches(target) {
-      match pool.apply_voice_controls_result(note.handle, controls) {
+    if note.matches_edit_policy(raw_target) {
+      match pool.apply_voice_controls_result(note.handle(), controls) {
         Ok(_) => continue applied + 1
         Err(error) => return Err(error)
       }

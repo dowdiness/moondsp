@@ -1,0 +1,27 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp/scheduler/internal/transport"
+
+import {
+  "dowdiness/moondsp/dsp",
+  "dowdiness/moondsp/pattern",
+}
+
+// Values
+pub fn advance_block_sample(Int64, @dsp.DspContext) -> Int64
+
+pub fn block_sample_end(Int64, @dsp.DspContext) -> Int64
+
+pub fn compute_arc(Int64, Double, @dsp.DspContext) -> @pattern.TimeSpan
+
+pub fn cycle_to_sample(@pattern.Rational, Double, @dsp.DspContext) -> Int64
+
+pub fn sanitize_bpm(Double) -> Double
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+

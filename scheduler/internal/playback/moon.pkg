@@ -1,0 +1,5 @@
+import {
+  "dowdiness/moondsp/identity",
+  "dowdiness/moondsp/pattern",
+  "dowdiness/moondsp/song",
+}

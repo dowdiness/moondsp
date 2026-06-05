@@ -1,12 +1,15 @@
 import {
-  "dowdiness/moondsp" @moondsp,
-  "dowdiness/moondsp/identity" @identity,
+  "dowdiness/moondsp",
+  "dowdiness/moondsp/identity",
   "dowdiness/moondsp/pattern",
-  "dowdiness/moondsp/song" @song,
-  "moonbitlang/core/bench" @bench,
-  "moonbitlang/core/math" @math,
+  "dowdiness/moondsp/song",
+  "dowdiness/moondsp/scheduler/internal/edit_policy",
+  "dowdiness/moondsp/scheduler/internal/playback",
+  "dowdiness/moondsp/scheduler/internal/transport",
+  "dowdiness/moondsp/scheduler/internal/voice_runtime",
+  "moonbitlang/core/bench",
 }
 
 import {
-  "moonbitlang/core/debug" @debug,
+  "moonbitlang/core/debug",
 } for "test"
