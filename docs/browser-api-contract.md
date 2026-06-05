@@ -2,44 +2,190 @@
 
 The `dowdiness/moondsp/browser` package has two reviewed public surfaces:
 
-1. the MoonBit source-level facade, generated in
-   [`browser/pkg.generated.mbti`](../browser/pkg.generated.mbti); and
-2. the AudioWorklet export ABI, listed under `link.js.exports` and
-   `link.wasm-gc.exports` in [`browser/moon.pkg`](../browser/moon.pkg).
+- the MoonBit source facade, generated in
+  [`browser/pkg.generated.mbti`](../browser/pkg.generated.mbti); and
+- the AudioWorklet export ABI, listed under `link.js.exports` and
+  `link.wasm-gc.exports` in [`browser/moon.pkg`](../browser/moon.pkg).
 
-This guide documents the supported contract for those surfaces. Use it as a
-reference/development guide.
+Use this guide as the browser API reference for host code and PR review.
+Architecture decisions stay in ADRs. Graph runtime-control behavior stays in
+[`salat-engine-technical-reference.md`](salat-engine-technical-reference.md).
 
-Architecture decisions stay in ADRs, and graph runtime-control behavior stays
-in [`salat-engine-technical-reference.md`](salat-engine-technical-reference.md)
-as the authoritative reference.
+## Contract summary
 
-## What is public
+- The supported MoonBit source API is the `Values` section of
+  `browser/pkg.generated.mbti`.
+- The supported worklet ABI is the JS and wasm-gc export lists in
+  `browser/moon.pkg`.
+- The browser facade exposes no public browser-specific types, traits, route
+  objects, pools, or scheduler handles.
+- `browser/internal/*` packages are implementation details, even when an
+  internal package uses `pub` for package-to-package wiring.
+- `browser/browser_abi.baseline` records the reviewed facade/export shape. Update
+  it only for an intentional public API or worklet ABI change.
 
-The supported MoonBit source API is the `Values` section of
-`browser/pkg.generated.mbti`. The browser facade intentionally exposes no public
-browser-specific types or traits. Downstream code should not infer support from
-source files, internal package `.mbti` files, or historical names.
+For general graph construction, external DSL lowering, voice pools, scheduler
+extension, or Mini parsing, use the root, `graph`, `scheduler`, `voice`, `mini`,
+and `song` packages. The browser package is a host/demo ABI, not the general
+library authoring API.
 
-The current facade groups are:
+## Supported facade groups
 
-| Group | Supported functions | Contract |
-| --- | --- | --- |
-| Demo oscillator | `reset_phase`, `tick`, `tick_source` | Phase-0 style oscillator/demo entry points. `reset_phase` also resets all browser graph slots and scheduler state. |
-| Mono compiled graph | `init_compiled_graph`, `process_compiled_block`, `compiled_output_sample` | Fixed mono `CompiledDsp` proof graph with runtime frequency/gain controls. |
-| Mono hot-swap graph | `init_compiled_hot_swap_graph`, `queue_compiled_hot_swap`, `process_compiled_hot_swap_block`, `compiled_hot_swap_output_sample` | Fixed mono `CompiledDspHotSwap` proof graph and fixed replacement graph. |
-| Mono topology edit graph | `init_compiled_topology_edit_graph`, `queue_compiled_topology_edit`, `queue_compiled_topology_delete_edit`, `set_compiled_topology_edit_gain`, `process_compiled_topology_edit_block`, `compiled_topology_edit_output_sample` | Fixed mono topology-controller proof graph. The queue calls insert/delete the demo gain node; `set_*_gain` updates the live demo control. |
-| Stereo compiled graph | `init_compiled_stereo_graph`, `process_compiled_stereo_block`, `compiled_stereo_left_sample`, `compiled_stereo_right_sample` | Fixed stereo `CompiledStereoDsp` proof graph with frequency, gain, pan, delay, and cutoff controls. |
-| Stereo hot-swap graph | `init_compiled_stereo_hot_swap_graph`, `queue_compiled_stereo_hot_swap`, `process_compiled_stereo_hot_swap_block`, `compiled_stereo_hot_swap_left_sample`, `compiled_stereo_hot_swap_right_sample` | Fixed stereo hot-swap proof graph and fixed replacement graph. |
-| Stereo topology edit graph | `init_compiled_stereo_topology_edit_graph`, `queue_compiled_stereo_topology_edit`, `set_compiled_stereo_topology_edit_level`, `process_compiled_stereo_topology_edit_block`, `compiled_stereo_topology_edit_left_sample`, `compiled_stereo_topology_edit_right_sample` | Fixed stereo topology-controller proof graph. The queue call replaces the demo pan node; `set_*_level` updates the live demo control. |
-| Exit deliverable graph | `init_exit_deliverable_graph`, `process_exit_deliverable_block`, `exit_deliverable_output_sample`, `set_exit_deliverable_lfo_rate`, `set_exit_deliverable_cutoff`, `set_exit_deliverable_gain` | Fixed tagless-composition demo graph with LFO, cutoff, and gain controls. |
-| Scheduler pattern/song playback | `init_scheduler_graph`, `process_scheduler_block`, `scheduler_left_sample`, `scheduler_right_sample`, `parse_and_set_pattern`, `clear_pattern_input`, `push_pattern_char`, `eval_pattern_input`, `parse_and_set_song`, `clear_song_input`, `push_song_char`, `eval_song_input`, `set_scheduler_bpm`, `set_scheduler_gain` | Browser live-coding host for Mini pattern and song text. It owns the demo drum/synth pools and routes events internally. |
-| Parse-error transport | `get_scheduler_parse_error`, `get_song_parse_error`, `get_pattern_error_length`, `get_pattern_error_char`, `get_song_error_length`, `get_song_error_char` | Accessors for the last scheduler parse/routing error. The length/char form exists for JS/wasm hosts that cannot consume MoonBit strings directly. |
-| Browser error transport | `get_browser_last_error`, `get_browser_error_code`, `get_browser_error_length`, `get_browser_error_char` | Accessors for the last graph queue/control/init error from browser graph exports. |
+The groups below are the supported browser facade. Function names are listed in
+plain text so host code can compare them directly with the export manifest.
 
-For general graph construction, external DSL lowering, or scheduler extension,
-use the root, `graph`, `scheduler`, `voice`, `mini`, and `song` packages. The
-browser facade is a host/demo ABI, not the general library authoring API.
+### Demo oscillator
+
+```text
+reset_phase
+tick
+tick_source
+```
+
+These are the Phase-0 oscillator and demo entry points. `reset_phase` also
+resets the browser graph slots and scheduler state.
+
+### Mono compiled graph
+
+```text
+init_compiled_graph
+process_compiled_block
+compiled_output_sample
+```
+
+This group runs a fixed mono `CompiledDsp` demo graph. The process call accepts
+the live frequency and gain controls.
+
+### Mono hot-swap graph
+
+```text
+init_compiled_hot_swap_graph
+queue_compiled_hot_swap
+process_compiled_hot_swap_block
+compiled_hot_swap_output_sample
+```
+
+This group runs a fixed mono `CompiledDspHotSwap` demo graph. The queue call
+stages the fixed replacement graph.
+
+### Mono topology-edit graph
+
+```text
+init_compiled_topology_edit_graph
+queue_compiled_topology_edit
+queue_compiled_topology_delete_edit
+set_compiled_topology_edit_gain
+process_compiled_topology_edit_block
+compiled_topology_edit_output_sample
+```
+
+This group runs a fixed mono topology-controller demo graph. The queue calls
+insert or delete the demo gain node. The setter updates the live gain control
+used by the process call.
+
+### Stereo compiled graph
+
+```text
+init_compiled_stereo_graph
+process_compiled_stereo_block
+compiled_stereo_left_sample
+compiled_stereo_right_sample
+```
+
+This group runs a fixed stereo `CompiledStereoDsp` demo graph. The process call
+accepts frequency, gain, pan, delay, and cutoff controls.
+
+### Stereo hot-swap graph
+
+```text
+init_compiled_stereo_hot_swap_graph
+queue_compiled_stereo_hot_swap
+process_compiled_stereo_hot_swap_block
+compiled_stereo_hot_swap_left_sample
+compiled_stereo_hot_swap_right_sample
+```
+
+This group runs a fixed stereo hot-swap demo graph. The queue call stages the
+fixed replacement graph.
+
+### Stereo topology-edit graph
+
+```text
+init_compiled_stereo_topology_edit_graph
+queue_compiled_stereo_topology_edit
+set_compiled_stereo_topology_edit_level
+process_compiled_stereo_topology_edit_block
+compiled_stereo_topology_edit_left_sample
+compiled_stereo_topology_edit_right_sample
+```
+
+This group runs a fixed stereo topology-controller demo graph. The queue call
+replaces the demo pan node. The setter updates the live level control used by
+the process call.
+
+### Exit-deliverable graph
+
+```text
+init_exit_deliverable_graph
+process_exit_deliverable_block
+exit_deliverable_output_sample
+set_exit_deliverable_lfo_rate
+set_exit_deliverable_cutoff
+set_exit_deliverable_gain
+```
+
+This group runs the fixed tagless-composition demo graph. The setters update the
+LFO rate, cutoff, and gain values used by the process call.
+
+### Scheduler pattern/song playback
+
+```text
+init_scheduler_graph
+process_scheduler_block
+scheduler_left_sample
+scheduler_right_sample
+parse_and_set_pattern
+clear_pattern_input
+push_pattern_char
+eval_pattern_input
+parse_and_set_song
+clear_song_input
+push_song_char
+eval_song_input
+set_scheduler_bpm
+set_scheduler_gain
+```
+
+This group is the browser live-coding host for Mini pattern and song text. It
+owns the demo drum and synth pools. Event routing stays internal to the browser
+host.
+
+### Parse-error transport
+
+```text
+get_scheduler_parse_error
+get_song_parse_error
+get_pattern_error_length
+get_pattern_error_char
+get_song_error_length
+get_song_error_char
+```
+
+These functions expose the last scheduler parse or routing error. The length and
+char accessors exist for JS/wasm hosts that cannot receive MoonBit strings
+directly.
+
+### Browser graph-error transport
+
+```text
+get_browser_last_error
+get_browser_error_code
+get_browser_error_length
+get_browser_error_char
+```
+
+These functions expose the last graph init, queue, or runtime-control error that
+was routed through the browser error store.
 
 ## Worklet lifecycle and threading
 
@@ -50,13 +196,12 @@ sequence is:
 2. Call `process_*_block(...)` from the AudioWorklet render path.
 3. Read samples with the matching `*_sample(index)` accessors after a successful
    process call and before the next process call.
-4. Send `queue_*` and `set_*` calls from the control side only between process
-   calls, using the host worklet-message protocol to serialize access.
+4. Send `queue_*` and `set_*` calls from the control side between process calls.
+   Use the host worklet-message protocol to serialize access.
 
-The browser package does not provide synchronization. Concurrent calls that
-touch the same graph variant are outside the contract. Re-initializing a graph
-with a different rate or block size rebuilds that variant and must not overlap a
-process call.
+The browser package does not provide synchronization. Concurrent calls that touch
+the same graph variant are outside the contract. Re-initializing a graph with a
+new rate or block size rebuilds that variant and must not overlap a process call.
 
 Sample accessors return zero for out-of-range or uninitialized reads.
 
@@ -70,35 +215,35 @@ browser-error update.
 
 ## Pattern/song parse protocol
 
-The scheduler text protocol currently returns `Int` status codes:
+The scheduler text protocol returns `Int` status codes:
 
-- `0` means parse/routing succeeded and the parsed pattern or song became the
+- `0` means parse or routing succeeded. The parsed pattern or song became the
   active playback source.
-- `1` means parse/routing failed; the previous active playback source is left in
-  place and the error accessors expose the message.
+- `1` means parse or routing failed. The previous active playback source stays in
+  place, and the error accessors expose the message.
 
 `parse_and_set_pattern(text)` and `parse_and_set_song(text)` accept a whole
 string. The `clear_*_input`, `push_*_char`, and `eval_*_input` functions provide
 a character-buffer path for hosts that stream text into the worklet.
 
 `get_scheduler_parse_error()` and `get_song_parse_error()` read the same last
-scheduler error buffer. The `*_error_length` / `*_error_char(i)` accessors return
-UTF-16 code units and return `0` for out-of-range indices.
+scheduler error buffer, while `*_error_length` and `*_error_char(i)` expose that
+message as UTF-16 code units. Out-of-range indices return `0`.
 
 Issue #158 tracks a future parse/control result-code and error-transport design.
 Until that design is accepted, do not reinterpret the existing `0`/`1` parse
 codes or browser error code values in this document.
 
-## Browser graph error protocol
+## Browser graph-error protocol
 
-Browser graph failures that route through the browser error helpers store both
-a numeric code and a string message. The current code values are:
+Browser graph failures that route through the browser error helpers store both a
+numeric code and a string message. The current code values are:
 
 | Code | Meaning |
 | --- | --- |
 | `0` | no browser graph error |
 | `1` | graph not initialized |
-| `2` | compile/replacement graph rejected |
+| `2` | compile or replacement graph rejected |
 | `3` | hot-swap queue failed |
 | `4` | topology queue failed |
 | `5` | runtime control failed |
@@ -106,28 +251,28 @@ a numeric code and a string message. The current code values are:
 
 `get_browser_last_error()` returns the message when the host can receive a
 MoonBit string. `get_browser_error_length()` and `get_browser_error_char(i)`
-return the same message as UTF-16 code units, with `0` for out-of-range indices.
+return the same message as UTF-16 code units. Out-of-range indices return `0`.
 
 ## Source facade versus worklet exports
 
 The MoonBit source facade and the worklet export ABI are reviewed together, but
-they are not the same kind of contract:
+they serve different hosts:
 
 - The source facade is the public MoonBit package API. It includes MoonBit
   calling conventions such as labelled arguments on `tick` and `tick_source`.
 - The worklet ABI is the exported function-name list for JS and wasm-gc hosts.
   Hosts call exported names with positional primitive values.
 - A public MoonBit function is not a worklet export unless it appears in the
-  `exports` list for that target in `browser/moon.pkg`.
+  target's `exports` list in `browser/moon.pkg`.
 - A type or helper exposed by `browser/internal/*` is not part of either public
   contract, even if it is `pub` inside that internal package.
 
-The JS and wasm-gc export lists are expected to stay in lockstep unless a PR
-explicitly documents a target-specific reason to diverge.
+The JS and wasm-gc export lists should stay in lockstep unless a PR documents a
+target-specific reason to diverge.
 
 ## Unsupported browser internals
 
-The following are intentionally outside the public API:
+The following packages and concepts are outside the public API:
 
 - `dowdiness/moondsp/browser/internal/slot`
 - `dowdiness/moondsp/browser/internal/demo_templates`
@@ -147,18 +292,21 @@ API.
 
 Treat source facade changes and worklet export changes as public API changes:
 
-- Removing or renaming a facade function, changing a parameter or return type, or
-  changing documented result-code semantics is a breaking source API change.
-- Removing or renaming an exported worklet function, changing argument order,
-  changing argument/return representation, or changing documented result-code
-  semantics is a breaking worklet ABI change.
+- Removing or renaming a facade function is a breaking source API change.
+- Changing a facade parameter or return type is a breaking source API change.
+- Changing documented result-code semantics is breaking for source and worklet
+  hosts.
+- Removing or renaming an exported worklet function is a breaking worklet ABI
+  change.
+- Changing exported argument order or primitive representation is a breaking
+  worklet ABI change.
 - Adding a new facade function or export is additive, but it still requires ABI
-  review so the generated baseline records the intentional surface growth.
+  review so the baseline records the intentional surface growth.
 - Moving implementation behind `browser/internal/*` is not breaking when
   `browser/pkg.generated.mbti` and the JS/wasm-gc export lists stay unchanged.
 
-Document breaking changes in `CHANGELOG.md` and choose the release version from
-the stricter of the source API and worklet ABI impact. Do not tag or publish a
+Document breaking changes in `CHANGELOG.md`. Choose the release version from the
+stricter of the source API and worklet ABI impact. Do not tag or publish a
 release as part of an unrelated browser API documentation or cleanup PR.
 
 ## ABI guard workflow
