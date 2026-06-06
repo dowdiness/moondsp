@@ -43,6 +43,10 @@ for `dowdiness/moondsp`. Read order below goes roughly from "new user" to
   topology replacements and parameter-only control edits.
 - **[`next-actions.md`](next-actions.md)** — active handoff list for future
   sessions. Keep this short and update it when priorities change.
+- **[`development/graph-facade-model-parity.md`](development/graph-facade-model-parity.md)**
+  — contributor guardrails for keeping the public graph facade mirrored with
+  `graph/internal/model` without exposing the internal package as a supported
+  import path.
 - **[`performance/`](performance/)** — dated benchmark snapshots. New
   measurements go in new files (do not edit historical entries in place).
   Latest:
