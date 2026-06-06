@@ -82,6 +82,7 @@ scripts/build-clap-prototype.sh
 scripts/build-clap-prototype-windows.sh
 scripts/smoke-clap-prototype.sh
 scripts/validate-clap-prototype.sh
+scripts/audit-clap-audio-allocations.sh
 ```
 
 ## Bridge-symbol guard
@@ -100,13 +101,16 @@ payload symbols. `scripts/build-clap-prototype.sh` and
 - The Windows cross-built `.clap` has been checked as an x86_64 PE DLL exporting
   `clap_entry` and loaded successfully in Bitwig Studio 6.0.6 on Windows 11.
   See `docs/development/2026-06-06-clap-bitwig-windows-host-load.md`.
-- The engine still creates voices from note events through the current voice
-  pool path. Do a hard real-time allocation audit once host loading works.
+- The audio-callback allocation audit is now repeatable with
+  `scripts/audit-clap-audio-allocations.sh`. Steady render is measured
+  allocation-free, but note-on, release, and active-parameter event paths still
+  allocate. See `docs/development/2026-06-06-clap-audio-allocation-audit.md`.
 
 ## Next slice
 
-1. Audit audio-callback allocations and move any remaining allocation-heavy work
-   to activation/control-side preparation.
+1. Move the remaining event-path allocation work to activation/control-side
+   preparation and make `scripts/audit-clap-audio-allocations.sh --expect-zero`
+   pass.
 2. Exercise additional hosts/DAWs as the prototype matures.
 
 ## Real-time cautions

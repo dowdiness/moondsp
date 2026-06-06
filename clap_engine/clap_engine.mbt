@@ -95,6 +95,7 @@ pub struct ClapSynthEngine {
   priv pool : @moondsp.BoundVoicePool
   priv left : @moondsp.AudioBuffer
   priv right : @moondsp.AudioBuffer
+  priv render_contexts : FixedArray[@moondsp.DspContext]
   priv active_notes : Map[Int, ActiveClapNote]
   priv mut last_frame_count : Int
   priv mut master_gain : Double
@@ -193,6 +194,9 @@ pub fn ClapSynthEngine::new(
         pool,
         left: @moondsp.AudioBuffer::filled(max_block_size),
         right: @moondsp.AudioBuffer::filled(max_block_size),
+        render_contexts: FixedArray::makei(max_block_size + 1, fn(block_size) {
+          @moondsp.DspContext::new(sample_rate~, block_size~)
+        }),
         active_notes: {},
         last_frame_count: 0,
         master_gain: DEFAULT_MASTER_GAIN,
@@ -593,10 +597,7 @@ pub fn ClapSynthEngine::process(
   if frames <= 0 {
     return 0
   }
-  let ctx = @moondsp.DspContext::new(
-    sample_rate=self.sample_rate,
-    block_size=frames,
-  )
+  let ctx = self.render_contexts[frames]
   self.pool.process(ctx, self.left, self.right)
   let gain = self.master_gain
   for i = 0; i < frames; i = i + 1 {
