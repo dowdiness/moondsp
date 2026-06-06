@@ -33,6 +33,8 @@ typedef struct moondsp_plugin_state {
   double sample_rate;
   uint32_t max_frames_count;
   bool processing;
+  bool transport_known;
+  bool transport_playing;
 } moondsp_plugin_state_t;
 
 static bool moonbit_ready = false;
@@ -123,6 +125,9 @@ static bool moondsp_plugin_start_processing(const clap_plugin_t *plugin) {
 static void moondsp_plugin_stop_processing(const clap_plugin_t *plugin) {
   moondsp_plugin_state_t *state = state_from_plugin(plugin);
   if (state) {
+    if (state->engine_handle > 0) {
+      mb_engine_all_notes_off(state->engine_handle);
+    }
     state->processing = false;
   }
 }
@@ -139,6 +144,58 @@ static bool event_has_size(const clap_event_header_t *header,
   return header && header->size >= expected_size;
 }
 
+static void update_transport_playing(moondsp_plugin_state_t *state,
+                                     bool is_playing) {
+  if (!state) {
+    return;
+  }
+  if (state->transport_known && state->transport_playing && !is_playing &&
+      state->engine_handle > 0) {
+    mb_engine_all_notes_off(state->engine_handle);
+  }
+  state->transport_known = true;
+  state->transport_playing = is_playing;
+}
+
+static void handle_transport_event(moondsp_plugin_state_t *state,
+                                   const clap_event_transport_t *event) {
+  if (!event) {
+    return;
+  }
+  update_transport_playing(
+      state,
+      (event->flags & CLAP_TRANSPORT_IS_PLAYING) == CLAP_TRANSPORT_IS_PLAYING);
+}
+
+static void handle_midi_data(moondsp_plugin_state_t *state,
+                             const uint8_t data[3]) {
+  if (!state || state->engine_handle <= 0 || !data) {
+    return;
+  }
+  const uint8_t status = data[0] & 0xF0u;
+  const int32_t key = (int32_t)(data[1] & 0x7Fu);
+  const uint8_t value = data[2] & 0x7Fu;
+  switch (status) {
+  case 0x80u:
+    mb_engine_note_off(state->engine_handle, -1, key);
+    break;
+  case 0x90u:
+    if (value == 0) {
+      mb_engine_note_off(state->engine_handle, -1, key);
+    } else {
+      mb_engine_note_on(state->engine_handle, -1, key, (double)value / 127.0);
+    }
+    break;
+  case 0xB0u:
+    if (data[1] == 120u || data[1] == 123u) {
+      mb_engine_all_notes_off(state->engine_handle);
+    }
+    break;
+  default:
+    break;
+  }
+}
+
 static void handle_input_event(moondsp_plugin_state_t *state,
                                const clap_event_header_t *header) {
   if (!state || state->engine_handle <= 0 || !header ||
@@ -151,16 +208,25 @@ static void handle_input_event(moondsp_plugin_state_t *state,
       return;
     }
     const clap_event_note_t *event = (const clap_event_note_t *)header;
+    if (event->key < 0) {
+      return;
+    }
     mb_engine_note_on(state->engine_handle, event->note_id, (int32_t)event->key,
                       event->velocity);
     break;
   }
-  case CLAP_EVENT_NOTE_OFF: {
+  case CLAP_EVENT_NOTE_OFF:
+  case CLAP_EVENT_NOTE_CHOKE: {
     if (!event_has_size(header, sizeof(clap_event_note_t))) {
       return;
     }
     const clap_event_note_t *event = (const clap_event_note_t *)header;
-    mb_engine_note_off(state->engine_handle, event->note_id, (int32_t)event->key);
+    if (event->note_id < 0 && event->key < 0) {
+      mb_engine_all_notes_off(state->engine_handle);
+    } else {
+      mb_engine_note_off(state->engine_handle, event->note_id,
+                         (int32_t)event->key);
+    }
     break;
   }
   case CLAP_EVENT_PARAM_VALUE: {
@@ -171,6 +237,21 @@ static void handle_input_event(moondsp_plugin_state_t *state,
         (const clap_event_param_value_t *)header;
     mb_engine_set_param(state->engine_handle, (int32_t)event->param_id,
                         event->value);
+    break;
+  }
+  case CLAP_EVENT_TRANSPORT: {
+    if (!event_has_size(header, sizeof(clap_event_transport_t))) {
+      return;
+    }
+    handle_transport_event(state, (const clap_event_transport_t *)header);
+    break;
+  }
+  case CLAP_EVENT_MIDI: {
+    if (!event_has_size(header, sizeof(clap_event_midi_t))) {
+      return;
+    }
+    const clap_event_midi_t *event = (const clap_event_midi_t *)header;
+    handle_midi_data(state, event->data);
     break;
   }
   default:
@@ -256,6 +337,9 @@ static int32_t moondsp_plugin_process(const clap_plugin_t *plugin,
   clap_audio_buffer_t *output = &process->audio_outputs[0];
   const uint32_t frames_count = process->frames_count;
   clear_output(output, frames_count);
+  if (process->transport) {
+    handle_transport_event(state, process->transport);
+  }
   uint32_t cursor = 0;
   const clap_input_events_t *events = process->in_events;
   if (events && events->size && events->get) {

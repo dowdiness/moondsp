@@ -48,6 +48,13 @@ Build the Linux prototype shared object with:
 scripts/build-clap-prototype.sh
 ```
 
+Cross-build a Windows x86_64 prototype for Windows CLAP hosts such as Bitwig
+Studio with MinGW-w64:
+
+```bash
+scripts/build-clap-prototype-windows.sh
+```
+
 Run a local dlopen/process smoke test with a timestamped note event:
 
 ```bash
@@ -57,12 +64,13 @@ scripts/smoke-clap-prototype.sh
 This produces:
 
 ```text
-_build/native/release/clap/moondsp-synth.clap
+_build/native/release/clap/moondsp-synth.clap   # Linux ELF shared object
+_build/windows/release/clap/moondsp-synth.clap # Windows x86_64 PE DLL
 ```
 
-The build verifies `clap_plugin/moondsp_clap_moonbit.h` against the generated
-MoonBit payload C, then compiles that payload plus the C CLAP shim into an ELF
-shared object exporting `clap_entry`.
+Both builds verify `clap_plugin/moondsp_clap_moonbit.h` against the generated
+MoonBit payload C, then compile that payload plus the C CLAP shim into a native
+CLAP shared object exporting `clap_entry`.
 
 Validation:
 
@@ -71,6 +79,7 @@ moon check --target all
 moon test clap_engine --target native
 moon test clap_host --target native
 scripts/build-clap-prototype.sh
+scripts/build-clap-prototype-windows.sh
 scripts/smoke-clap-prototype.sh
 scripts/validate-clap-prototype.sh
 ```
@@ -80,22 +89,25 @@ scripts/validate-clap-prototype.sh
 MoonBit native package exports do not currently provide stable C aliases for the
 `clap_host` primitives, so the prototype keeps the C shim on stable
 `mb_engine_*` aliases and generates their mapping to MoonBit's package-mangled
-payload symbols. `scripts/build-clap-prototype.sh` fails if
+payload symbols. `scripts/build-clap-prototype.sh` and
+`scripts/build-clap-prototype-windows.sh` fail if
 `clap_plugin/moondsp_clap_moonbit.h` is stale for the generated payload.
 
 ## Remaining risks
 
-- The produced `.clap` passes the local dlopen/process smoke test and
-  `clap-validator` 0.3.2 via `scripts/validate-clap-prototype.sh`, but has not
-  yet been loaded in a DAW in this repo session.
+- The Linux `.clap` passes the local dlopen/process smoke test and
+  `clap-validator` 0.3.2 via `scripts/validate-clap-prototype.sh`.
+- The Windows cross-built `.clap` has been checked as an x86_64 PE DLL exporting
+  `clap_entry` and loaded successfully in Bitwig Studio 6.0.6 on Windows 11.
+  See `docs/development/2026-06-06-clap-bitwig-windows-host-load.md`.
 - The engine still creates voices from note events through the current voice
   pool path. Do a hard real-time allocation audit once host loading works.
 
 ## Next slice
 
-1. Load the built plugin in a real CLAP host/DAW after validator stays green.
-2. Audit audio-callback allocations and move any remaining allocation-heavy work
+1. Audit audio-callback allocations and move any remaining allocation-heavy work
    to activation/control-side preparation.
+2. Exercise additional hosts/DAWs as the prototype matures.
 
 ## Real-time cautions
 
@@ -103,5 +115,5 @@ payload symbols. `scripts/build-clap-prototype.sh` fails if
 - Preallocate for CLAP's max block size during activation.
 - Keep process-block splitting around CLAP event timestamps intact when adding
   more event types or automation paths.
-- Treat current CLAP support as a bring-up prototype until DAW tests pass and
-  the audio-thread allocation audit is complete.
+- Treat current CLAP support as a bring-up prototype until host-load coverage is
+  broader and the audio-thread allocation audit is complete.

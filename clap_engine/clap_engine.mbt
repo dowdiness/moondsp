@@ -75,15 +75,17 @@ pub impl Show for ClapEngineError with fn output(self, logger) {
 /// block, then copy `left_sample`/`right_sample` into the host's output ports.
 priv struct ActiveClapNote {
   handle : @moondsp.VoiceHandle
+  key : Int
   velocity : Double
 }
 
 ///|
 fn ActiveClapNote::new(
   handle~ : @moondsp.VoiceHandle,
+  key~ : Int,
   velocity~ : Double,
 ) -> ActiveClapNote {
-  { handle, velocity }
+  { handle, key, velocity }
 }
 
 ///|
@@ -228,16 +230,72 @@ pub fn ClapSynthEngine::pan(self : ClapSynthEngine) -> Double {
 }
 
 ///|
-/// Convert CLAP's `(note_id, key)` pair into the engine's active-note map key.
-/// CLAP sends `note_id = -1` when no stable note id is assigned; in that case
-/// use the MIDI key so note-off can still find the most recent voice for that
-/// pitch.
+/// Convert CLAP's `(note_id, key)` pair into the engine's primary active-note
+/// map key. CLAP sends `note_id = -1` when no stable note id is assigned; in
+/// that case use the MIDI key so note-off can still find the most recent voice
+/// for that pitch.
 fn note_map_key(note_id : Int, key : Int) -> Int {
   if note_id >= 0 {
     note_id
   } else {
     key
   }
+}
+
+///|
+fn ClapSynthEngine::find_active_note_by_key(
+  self : ClapSynthEngine,
+  key : Int,
+) -> Int? {
+  for map_key, note in self.active_notes {
+    if note.key == key {
+      return Some(map_key)
+    }
+  }
+  None
+}
+
+///|
+fn ClapSynthEngine::release_active_note(
+  self : ClapSynthEngine,
+  map_key : Int,
+) -> Bool {
+  match self.active_notes.get(map_key) {
+    None => false
+    Some(note) => {
+      self.active_notes.remove(map_key)
+      self.pool.note_off_result(note.handle) is Ok(_)
+    }
+  }
+}
+
+///|
+fn ClapSynthEngine::release_active_note_matching_key(
+  self : ClapSynthEngine,
+  map_key : Int,
+  key : Int,
+) -> Bool {
+  match self.active_notes.get(map_key) {
+    Some(note) if key < 0 || note.key == key =>
+      self.release_active_note(map_key)
+    _ => false
+  }
+}
+
+///|
+fn ClapSynthEngine::release_active_notes_by_key(
+  self : ClapSynthEngine,
+  key : Int,
+) -> Bool {
+  let mut released = false
+  let mut searching = true
+  while searching {
+    match self.find_active_note_by_key(key) {
+      None => searching = false
+      Some(map_key) => released = self.release_active_note(map_key) || released
+    }
+  }
+  released
 }
 
 ///|
@@ -349,8 +407,11 @@ pub fn ClapSynthEngine::note_on(
   key~ : Int,
   velocity~ : Double,
 ) -> Bool {
+  if key < 0 || key > 127 {
+    return false
+  }
   let map_key = note_map_key(note_id, key)
-  ignore(self.note_off(note_id~, key~))
+  ignore(self.release_active_note(map_key))
   let note_velocity = sanitize_velocity(velocity)
   match
     self.pool.note_on_controls(self.current_note_controls(key, note_velocity)) {
@@ -359,6 +420,7 @@ pub fn ClapSynthEngine::note_on(
       ignore(self.pool.set_voice_pan_result(handle, self.pan))
       self.active_notes[map_key] = ActiveClapNote::new(
         handle~,
+        key~,
         velocity=note_velocity,
       )
       true
@@ -372,13 +434,19 @@ pub fn ClapSynthEngine::note_off(
   note_id~ : Int,
   key~ : Int,
 ) -> Bool {
-  let map_key = note_map_key(note_id, key)
-  match self.active_notes.get(map_key) {
-    None => false
-    Some(note) => {
-      self.active_notes.remove(map_key)
-      self.pool.note_off_result(note.handle) is Ok(_)
-    }
+  if note_id < 0 && key < 0 {
+    let had_notes = self.active_notes.length() > 0
+    self.all_notes_off()
+    return had_notes
+  }
+  if note_id >= 0 {
+    let map_key = note_map_key(note_id, key)
+    return self.release_active_note_matching_key(map_key, key)
+  }
+  if key >= 0 {
+    self.release_active_notes_by_key(key)
+  } else {
+    false
   }
 }
 
