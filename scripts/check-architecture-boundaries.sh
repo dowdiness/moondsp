@@ -183,4 +183,6 @@ if [[ ${#violations[@]} -gt 0 ]]; then
   exit 1
 fi
 
+scripts/check-graph-model-facade-parity.sh
+
 echo "OK: architecture boundaries match rules."
