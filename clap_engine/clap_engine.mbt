@@ -31,6 +31,9 @@ const GAIN_NODE_INDEX : Int = 4
 const DEFAULT_SAMPLE_RATE : Double = 48000.0
 
 ///|
+const MIN_SAFE_SAMPLE_RATE : Double = 8000.0
+
+///|
 const DEFAULT_MAX_BLOCK_SIZE : Int = 128
 
 ///|
@@ -167,7 +170,7 @@ pub fn ClapSynthEngine::new(
   max_block_size? : Int = DEFAULT_MAX_BLOCK_SIZE,
   max_voices? : Int = DEFAULT_MAX_VOICES,
 ) -> Result[ClapSynthEngine, ClapEngineError] {
-  if !@moondsp.is_finite_positive(sample_rate) {
+  if !is_valid_sample_rate(sample_rate) {
     return Err(ClapEngineError::InvalidSampleRate)
   }
   if max_block_size <= 0 {
@@ -284,14 +287,28 @@ fn sanitize_resonance(value : Double) -> Double {
 }
 
 ///|
+fn is_valid_sample_rate(sample_rate : Double) -> Bool {
+  @moondsp.is_finite_positive(sample_rate) &&
+  sample_rate >= MIN_SAFE_SAMPLE_RATE
+}
+
+///|
 fn sanitize_cutoff(value : Double, sample_rate : Double) -> Double {
-  let nyquist = sample_rate * 0.5
-  if !@moondsp.is_finite_positive(value) {
+  let safe_sample_rate = if is_valid_sample_rate(sample_rate) {
+    sample_rate
+  } else {
+    MIN_SAFE_SAMPLE_RATE
+  }
+  let nyquist = safe_sample_rate * 0.5
+  let candidate = if @moondsp.is_finite_positive(value) {
+    value
+  } else {
     DEFAULT_CUTOFF_HZ
-  } else if value >= nyquist {
+  }
+  if candidate >= nyquist {
     nyquist - 1.0
   } else {
-    value
+    candidate
   }
 }
 
@@ -471,23 +488,23 @@ pub fn ClapSynthEngine::set_param(
   value : Double,
 ) -> Bool {
   match param_id {
-    0 => {
+    CLAP_PARAM_MASTER_GAIN => {
       ignore(self.set_master_gain(value))
       true
     }
-    1 => {
+    CLAP_PARAM_VOICE_GAIN => {
       ignore(self.set_voice_gain(value))
       true
     }
-    2 => {
+    CLAP_PARAM_CUTOFF_HZ => {
       ignore(self.set_cutoff_hz(value))
       true
     }
-    3 => {
+    CLAP_PARAM_RESONANCE => {
       ignore(self.set_resonance(value))
       true
     }
-    4 => {
+    CLAP_PARAM_PAN => {
       ignore(self.set_pan(value))
       true
     }

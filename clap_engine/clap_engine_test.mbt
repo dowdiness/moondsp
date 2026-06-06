@@ -61,6 +61,14 @@ test "engine initializes and renders silence before notes" {
 }
 
 ///|
+test "engine rejects unsafe tiny sample rates" {
+  match @clap_engine.ClapSynthEngine::new(sample_rate=1.0) {
+    Err(@clap_engine.ClapEngineError::InvalidSampleRate) => ()
+    _ => abort("expected invalid sample rate")
+  }
+}
+
+///|
 test "note on renders non-zero stereo samples and note off removes handle" {
   let engine = new_test_engine()
   assert_true(engine.note_on(note_id=7, key=69, velocity=1.0))

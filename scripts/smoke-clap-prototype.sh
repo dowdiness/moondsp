@@ -71,14 +71,30 @@ int main(int argc, char **argv) {
   }
   const clap_plugin_entry_t *entry =
       (const clap_plugin_entry_t *)dlsym(lib, "clap_entry");
-  if (!entry || !entry->init(argv[1])) {
+  if (!entry) {
+    fprintf(stderr, "clap_entry missing\n");
+    return 4;
+  }
+  if (!entry->init || !entry->deinit || !entry->get_factory) {
+    fprintf(stderr, "clap_entry callbacks missing\n");
+    return 4;
+  }
+  if (!entry->init(argv[1])) {
     fprintf(stderr, "clap_entry init failed\n");
     return 4;
   }
   const clap_plugin_factory_t *factory =
       (const clap_plugin_factory_t *)entry->get_factory(CLAP_PLUGIN_FACTORY_ID);
-  if (!factory || factory->get_plugin_count(factory) != 1) {
+  if (!factory) {
     fprintf(stderr, "plugin factory missing\n");
+    return 5;
+  }
+  if (!factory->get_plugin_count || !factory->create_plugin) {
+    fprintf(stderr, "plugin factory callbacks missing\n");
+    return 5;
+  }
+  if (factory->get_plugin_count(factory) != 1) {
+    fprintf(stderr, "unexpected plugin count\n");
     return 5;
   }
   clap_host_t host = {0};
@@ -92,9 +108,26 @@ int main(int argc, char **argv) {
       factory,
       &host,
       "com.dowdiness.moondsp.synth");
-  if (!plugin || !plugin->init(plugin) || !plugin->activate(plugin, 48000.0, 1, 128) ||
-      !plugin->start_processing(plugin)) {
-    fprintf(stderr, "plugin lifecycle failed\n");
+  if (!plugin) {
+    fprintf(stderr, "plugin create failed\n");
+    return 6;
+  }
+  if (!plugin->init || !plugin->activate || !plugin->start_processing ||
+      !plugin->process || !plugin->stop_processing || !plugin->deactivate ||
+      !plugin->destroy) {
+    fprintf(stderr, "plugin lifecycle callbacks missing\n");
+    return 6;
+  }
+  if (!plugin->init(plugin)) {
+    fprintf(stderr, "plugin init failed\n");
+    return 6;
+  }
+  if (!plugin->activate(plugin, 48000.0, 1, 128)) {
+    fprintf(stderr, "plugin activate failed\n");
+    return 6;
+  }
+  if (!plugin->start_processing(plugin)) {
+    fprintf(stderr, "plugin start_processing failed\n");
     return 6;
   }
 

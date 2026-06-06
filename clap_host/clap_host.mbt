@@ -18,15 +18,6 @@ fn valid_handle_index(handle : Int) -> Int? {
 
 ///|
 fn push_engine(engine : @engine.ClapSynthEngine) -> Int {
-  for i = 0; i < engine_slots.length(); i = i + 1 {
-    match engine_slots[i] {
-      None => {
-        engine_slots[i] = Some(engine)
-        return i + 1
-      }
-      Some(_) => ()
-    }
-  }
   engine_slots.push(Some(engine))
   engine_slots.length()
 }

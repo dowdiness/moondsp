@@ -45,6 +45,16 @@ test "flat host API creates and destroys primitive handles" {
 }
 
 ///|
+test "flat host API does not resurrect destroyed handles" {
+  let stale = create_test_handle()
+  destroy_test_handle(stale)
+  let next = create_test_handle()
+  assert_true(next != stale)
+  @debug.assert_eq(@clap_host.engine_process(stale, 1), 0)
+  destroy_test_handle(next)
+}
+
+///|
 test "flat host API renders silence before note events" {
   let handle = create_test_handle()
   @debug.assert_eq(@clap_host.engine_process(handle, 128), 128)

@@ -1,6 +1,7 @@
 #include "clap_minimal.h"
 #include "moondsp_clap_moonbit.h"
 
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -83,9 +84,10 @@ static bool moondsp_plugin_activate(const clap_plugin_t *plugin,
                                     double sample_rate,
                                     uint32_t min_frames_count,
                                     uint32_t max_frames_count) {
-  (void)min_frames_count;
   moondsp_plugin_state_t *state = state_from_plugin(plugin);
-  if (!state || sample_rate <= 0.0 || max_frames_count == 0) {
+  if (!state || !(sample_rate > 0.0) || min_frames_count == 0 ||
+      max_frames_count == 0 || min_frames_count > max_frames_count ||
+      max_frames_count > (uint32_t)INT32_MAX) {
     return false;
   }
   ensure_moonbit_runtime();
@@ -225,6 +227,9 @@ static void render_span(moondsp_plugin_state_t *state,
     return;
   }
   const uint32_t span = end_frame - start_frame;
+  if (span > (uint32_t)INT32_MAX) {
+    return;
+  }
   const int32_t rendered = mb_engine_process(state->engine_handle, (int32_t)span);
   if (rendered > 0) {
     copy_engine_output(state, output, start_frame, (uint32_t)rendered);
@@ -410,6 +415,11 @@ static bool params_value_to_text(const clap_plugin_t *plugin, clap_id param_id,
   return true;
 }
 
+static bool is_ascii_space(char c) {
+  return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' ||
+         c == '\v';
+}
+
 static bool params_text_to_value(const clap_plugin_t *plugin, clap_id param_id,
                                  const char *display, double *value) {
   (void)plugin;
@@ -419,6 +429,12 @@ static bool params_text_to_value(const clap_plugin_t *plugin, clap_id param_id,
   char *end = NULL;
   const double parsed = strtod(display, &end);
   if (end == display) {
+    return false;
+  }
+  while (is_ascii_space(*end)) {
+    end++;
+  }
+  if (*end != '\0') {
     return false;
   }
   *value = parsed;
