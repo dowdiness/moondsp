@@ -10,8 +10,9 @@ moondsp combines a Strudel/TidalCycles-inspired pattern algebra with a compiled 
 moon check && moon test       # type-check + run the full test suite
 moon build --target wasm-gc   # build for browser
 moon run cmd/main             # run CLI entry point
-scripts/build-clap-prototype.sh  # build Linux CLAP prototype shared object
-scripts/smoke-clap-prototype.sh  # dlopen/process smoke test for the prototype
+scripts/build-clap-prototype.sh     # build Linux CLAP prototype shared object
+scripts/smoke-clap-prototype.sh     # dlopen/process smoke test for the prototype
+scripts/validate-clap-prototype.sh  # build + run clap-validator for the prototype
 ```
 
 To hear it in the browser, open `web/index.html` after building. The AudioWorklet loads the compiled wasm-gc module and drives the DSP graph in real time.

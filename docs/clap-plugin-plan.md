@@ -66,6 +66,7 @@ moon test clap_engine --target native
 moon test clap_host --target native
 scripts/build-clap-prototype.sh
 scripts/smoke-clap-prototype.sh
+scripts/validate-clap-prototype.sh
 ```
 
 ## Remaining risks
@@ -76,18 +77,19 @@ scripts/smoke-clap-prototype.sh
   generated C payload. This is acceptable for bring-up, but a durable build
   should either generate this header or use stable native exports if MoonBit
   exposes them.
-- The produced `.clap` has a local dlopen/process smoke test, but has not yet
-  been run through `clap-validator` or a DAW in this repo session.
+- The produced `.clap` passes the local dlopen/process smoke test and
+  `clap-validator` 0.3.2 via `scripts/validate-clap-prototype.sh`, but has not
+  yet been loaded in a DAW in this repo session.
 - The engine still creates voices from note events through the current voice
   pool path. Do a hard real-time allocation audit once host loading works.
 
 ## Next slice
 
-1. Install/run `clap-validator` against `_build/native/release/clap/moondsp-synth.clap`.
-2. Replace `clap_minimal.h` with official CLAP headers or verify every struct
+1. Replace `clap_minimal.h` with official CLAP headers or verify every struct
    layout and constant against the official headers.
-3. Generate `moondsp_clap_moonbit.h` from the built payload C, or add a stable
+2. Generate `moondsp_clap_moonbit.h` from the built payload C, or add a stable
    native export path if the MoonBit toolchain supports one.
+3. Load the built plugin in a real CLAP host/DAW after validator stays green.
 4. Audit audio-callback allocations and move any remaining allocation-heavy work
    to activation/control-side preparation.
 
@@ -97,5 +99,5 @@ scripts/smoke-clap-prototype.sh
 - Preallocate for CLAP's max block size during activation.
 - Keep process-block splitting around CLAP event timestamps intact when adding
   more event types or automation paths.
-- Treat current CLAP support as a bring-up prototype until validator and DAW
-  tests pass.
+- Treat current CLAP support as a bring-up prototype until DAW tests pass and
+  the audio-thread allocation audit is complete.

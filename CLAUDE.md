@@ -58,6 +58,7 @@ moon build --target wasm-gc    # Browser WASM build
 moon run cmd/main              # CLI entry point
 scripts/build-clap-prototype.sh # Linux CLAP prototype shared object
 scripts/smoke-clap-prototype.sh # Local CLAP dlopen/process smoke test
+scripts/validate-clap-prototype.sh # Build + clap-validator prototype check
 ```
 
 Before every commit:

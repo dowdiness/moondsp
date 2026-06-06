@@ -22,6 +22,12 @@ Run the local dlopen/process smoke test:
 scripts/smoke-clap-prototype.sh
 ```
 
+Run the pinned `clap-validator` check:
+
+```bash
+scripts/validate-clap-prototype.sh
+```
+
 Output:
 
 ```text
@@ -29,4 +35,4 @@ _build/native/release/clap/moondsp-synth.clap
 ```
 
 Before production use, replace/verify the minimal CLAP header against official
-CLAP headers and run `clap-validator`.
+CLAP headers and load the plugin in a real CLAP host/DAW.
