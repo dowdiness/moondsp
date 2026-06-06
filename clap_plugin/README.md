@@ -4,9 +4,8 @@ This directory contains the native CLAP bring-up scaffold.
 
 - `clap_payload.mbt` is a MoonBit native main package used to emit generated C
   for the `clap_host/` primitive handle bridge.
-- `moondsp_clap.c` is the C CLAP ABI shim.
-- `clap_minimal.h` is a temporary local subset of CLAP headers for prototype
-  compilation.
+- `moondsp_clap.c` is the C CLAP ABI shim, compiled against the vendored
+  official CLAP 1.2.8 headers in `../third_party/clap/`.
 - `moondsp_clap_moonbit.h` declares the current MoonBit-mangled payload symbols
   used by the shim.
 
@@ -34,5 +33,5 @@ Output:
 _build/native/release/clap/moondsp-synth.clap
 ```
 
-Before production use, replace/verify the minimal CLAP header against official
-CLAP headers and load the plugin in a real CLAP host/DAW.
+Before production use, stabilize the MoonBit bridge symbols, load the plugin in
+a real CLAP host/DAW, and complete the audio-thread allocation audit.

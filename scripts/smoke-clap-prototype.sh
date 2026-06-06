@@ -3,14 +3,23 @@ set -euo pipefail
 
 repo_root=$(cd "$(dirname "$0")/.." && pwd)
 cc=${CC:-cc}
+clap_include="$repo_root/third_party/clap/include"
 plugin="$repo_root/_build/native/release/clap/moondsp-synth.clap"
 tmp_dir=$(mktemp -d)
 trap 'rm -rf "$tmp_dir"' EXIT
 
+if [[ ! -f "$clap_include/clap/entry.h" ]]; then
+  echo "Vendored CLAP headers not found under $clap_include" >&2
+  exit 1
+fi
+
 "$repo_root/scripts/build-clap-prototype.sh" >/dev/null
 
 cat > "$tmp_dir/smoke.c" <<'EOF'
-#include "clap_minimal.h"
+#include <clap/entry.h>
+#include <clap/events.h>
+#include <clap/factory/plugin-factory.h>
+#include <clap/process.h>
 
 #include <dlfcn.h>
 #include <math.h>
@@ -184,5 +193,5 @@ int main(int argc, char **argv) {
 }
 EOF
 
-"$cc" -std=gnu11 -I"$repo_root/clap_plugin" "$tmp_dir/smoke.c" -ldl -lm -o "$tmp_dir/smoke"
+"$cc" -std=gnu11 -I"$clap_include" "$tmp_dir/smoke.c" -ldl -lm -o "$tmp_dir/smoke"
 "$tmp_dir/smoke" "$plugin"

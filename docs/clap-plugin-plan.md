@@ -31,11 +31,14 @@ functions so C does not need to understand MoonBit objects, `Result`, or
 
 - `clap_payload.mbt`: a native main package that forces MoonBit to emit the
   CLAP payload C for `clap_host`;
-- `clap_minimal.h`: the small CLAP ABI subset used by this prototype;
 - `moondsp_clap.c`: descriptor/factory/plugin callbacks, audio/note/param
-  extensions, event translation, and output copying;
+  extensions, event translation, and output copying through the official CLAP
+  headers;
 - `moondsp_clap_moonbit.h`: declarations for the current MoonBit-mangled bridge
   symbols.
+
+`third_party/clap/` vendors the official CLAP 1.2.8 C headers used by the
+prototype build and smoke test.
 
 Build the Linux prototype shared object with:
 
@@ -71,8 +74,6 @@ scripts/validate-clap-prototype.sh
 
 ## Remaining risks
 
-- The C shim uses a minimal local CLAP header subset. Replace it with the
-  official CLAP headers before treating the ABI as production-grade.
 - `moondsp_clap_moonbit.h` currently names MoonBit-mangled symbols from the
   generated C payload. This is acceptable for bring-up, but a durable build
   should either generate this header or use stable native exports if MoonBit
@@ -85,12 +86,10 @@ scripts/validate-clap-prototype.sh
 
 ## Next slice
 
-1. Replace `clap_minimal.h` with official CLAP headers or verify every struct
-   layout and constant against the official headers.
-2. Generate `moondsp_clap_moonbit.h` from the built payload C, or add a stable
+1. Generate `moondsp_clap_moonbit.h` from the built payload C, or add a stable
    native export path if the MoonBit toolchain supports one.
-3. Load the built plugin in a real CLAP host/DAW after validator stays green.
-4. Audit audio-callback allocations and move any remaining allocation-heavy work
+2. Load the built plugin in a real CLAP host/DAW after validator stays green.
+3. Audit audio-callback allocations and move any remaining allocation-heavy work
    to activation/control-side preparation.
 
 ## Real-time cautions

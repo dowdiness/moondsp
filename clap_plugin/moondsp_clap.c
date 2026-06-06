@@ -1,4 +1,12 @@
-#include "clap_minimal.h"
+#include <clap/entry.h>
+#include <clap/events.h>
+#include <clap/ext/audio-ports.h>
+#include <clap/ext/note-ports.h>
+#include <clap/ext/params.h>
+#include <clap/factory/plugin-factory.h>
+#include <clap/plugin-features.h>
+#include <clap/process.h>
+
 #include "moondsp_clap_moonbit.h"
 
 #include <limits.h>
