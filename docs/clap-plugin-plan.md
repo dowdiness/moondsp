@@ -34,8 +34,10 @@ functions so C does not need to understand MoonBit objects, `Result`, or
 - `moondsp_clap.c`: descriptor/factory/plugin callbacks, audio/note/param
   extensions, event translation, and output copying through the official CLAP
   headers;
-- `moondsp_clap_moonbit.h`: declarations for the current MoonBit-mangled bridge
-  symbols.
+- `moondsp_clap_moonbit.h`: generated declarations mapping stable
+  `mb_engine_*` C aliases to the current MoonBit-mangled `clap_host` bridge
+  symbols; `scripts/generate-clap-moonbit-header.sh` regenerates or verifies it
+  from the native payload C.
 
 `third_party/clap/` vendors the official CLAP 1.2.8 C headers used by the
 prototype build and smoke test.
@@ -58,8 +60,9 @@ This produces:
 _build/native/release/clap/moondsp-synth.clap
 ```
 
-The build compiles the MoonBit generated C payload plus the C CLAP shim into an
-ELF shared object exporting `clap_entry`.
+The build verifies `clap_plugin/moondsp_clap_moonbit.h` against the generated
+MoonBit payload C, then compiles that payload plus the C CLAP shim into an ELF
+shared object exporting `clap_entry`.
 
 Validation:
 
@@ -72,12 +75,16 @@ scripts/smoke-clap-prototype.sh
 scripts/validate-clap-prototype.sh
 ```
 
+## Bridge-symbol guard
+
+MoonBit native package exports do not currently provide stable C aliases for the
+`clap_host` primitives, so the prototype keeps the C shim on stable
+`mb_engine_*` aliases and generates their mapping to MoonBit's package-mangled
+payload symbols. `scripts/build-clap-prototype.sh` fails if
+`clap_plugin/moondsp_clap_moonbit.h` is stale for the generated payload.
+
 ## Remaining risks
 
-- `moondsp_clap_moonbit.h` currently names MoonBit-mangled symbols from the
-  generated C payload. This is acceptable for bring-up, but a durable build
-  should either generate this header or use stable native exports if MoonBit
-  exposes them.
 - The produced `.clap` passes the local dlopen/process smoke test and
   `clap-validator` 0.3.2 via `scripts/validate-clap-prototype.sh`, but has not
   yet been loaded in a DAW in this repo session.
@@ -86,10 +93,8 @@ scripts/validate-clap-prototype.sh
 
 ## Next slice
 
-1. Generate `moondsp_clap_moonbit.h` from the built payload C, or add a stable
-   native export path if the MoonBit toolchain supports one.
-2. Load the built plugin in a real CLAP host/DAW after validator stays green.
-3. Audit audio-callback allocations and move any remaining allocation-heavy work
+1. Load the built plugin in a real CLAP host/DAW after validator stays green.
+2. Audit audio-callback allocations and move any remaining allocation-heavy work
    to activation/control-side preparation.
 
 ## Real-time cautions

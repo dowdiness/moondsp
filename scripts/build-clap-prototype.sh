@@ -20,11 +20,10 @@ if [[ ! -f "$clap_include/clap/entry.h" ]]; then
 fi
 
 moon -C "$repo_root" build --target native --release clap_plugin
-if ! grep -q '_M0FP39dowdiness7moondsp10clap__host14engine__create' "$payload_c"; then
-  echo "Expected MoonBit CLAP host bridge symbol not found in $payload_c" >&2
-  echo "moondsp_clap_moonbit.h may be stale for this MoonBit toolchain/package name." >&2
-  exit 1
-fi
+"$repo_root/scripts/generate-clap-moonbit-header.sh" \
+  --check \
+  "$payload_c" \
+  "$repo_root/clap_plugin/moondsp_clap_moonbit.h"
 mkdir -p "$out_dir"
 
 "$cc" -std=gnu11 -fPIC \
