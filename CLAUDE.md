@@ -42,6 +42,22 @@ remains open for native targets such as CLAP plugins.
 
 **Source of truth:** `docs/salat-engine-technical-reference.md` is authoritative for graph runtime-control behavior. Update it first whenever these change.
 
+## Native ABI and CLAP Policy
+
+- Keep host/plugin ABI details at the outer boundary: CLAP C ABI in
+  `clap_plugin/`, primitive MoonBit handles in `clap_host/`, synth state in
+  `clap_engine/`, reusable DSP below.
+- Prefer official vendored headers or repeatable verification over handwritten
+  native ABI subsets.
+- Vendored native headers must record upstream version, source URL, checksum,
+  and license.
+- Do not let CLAP host/plugin details leak into graph, voice, pattern,
+  scheduler, or browser packages.
+- Validator success is necessary evidence, not DAW-readiness. Do not claim
+  DAW-ready until a real CLAP host/DAW has loaded the plugin.
+- Keep the production gates explicit: stable MoonBit bridge symbols, real
+  host/DAW load, and audio-thread allocation audit.
+
 ## MoonBit Style Notes
 
 - Loop expressions are best for loops that naturally compute a value: sums,

@@ -6,11 +6,16 @@ moon_home=${MOON_HOME:-$HOME/.moon}
 cc=${CC:-cc}
 out_dir="$repo_root/_build/native/release/clap"
 payload_c="$repo_root/_build/native/release/build/clap_plugin/clap_plugin.c"
+clap_include="$repo_root/third_party/clap/include"
 runtime_pic="$out_dir/moonbit_runtime_pic.o"
 output="$out_dir/moondsp-synth.clap"
 
 if [[ ! -f "$moon_home/lib/runtime.c" ]]; then
   echo "MoonBit runtime.c not found under MOON_HOME=$moon_home" >&2
+  exit 1
+fi
+if [[ ! -f "$clap_include/clap/entry.h" ]]; then
+  echo "Vendored CLAP headers not found under $clap_include" >&2
   exit 1
 fi
 
@@ -28,7 +33,7 @@ mkdir -p "$out_dir"
   -o "$runtime_pic"
 
 "$cc" -std=gnu11 -shared -fPIC \
-  -I"$repo_root/clap_plugin" \
+  -I"$clap_include" \
   -I"$moon_home/include" \
   -o "$output" \
   "$repo_root/clap_plugin/moondsp_clap.c" \
