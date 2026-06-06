@@ -1,0 +1,59 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp/clap_engine"
+
+import {
+  "dowdiness/moondsp/graph",
+  "dowdiness/moondsp/voice",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub const CLAP_PARAM_CUTOFF_HZ : Int = 2
+
+pub const CLAP_PARAM_MASTER_GAIN : Int = 0
+
+pub const CLAP_PARAM_PAN : Int = 4
+
+pub const CLAP_PARAM_RESONANCE : Int = 3
+
+pub const CLAP_PARAM_VOICE_GAIN : Int = 1
+
+pub fn default_synth_template() -> Array[@graph.DspNode]
+
+// Errors
+
+// Types and methods
+pub(all) enum ClapEngineError {
+  InvalidSampleRate
+  InvalidMaxBlockSize
+  InvalidMaxVoices
+  PoolInitFailed(@voice.BoundVoicePoolError)
+} derive(Eq, @debug.Debug)
+pub impl Show for ClapEngineError
+
+pub struct ClapSynthEngine {
+  // private fields
+}
+pub fn ClapSynthEngine::all_notes_off(Self) -> Unit
+pub fn ClapSynthEngine::cutoff_hz(Self) -> Double
+pub fn ClapSynthEngine::left_sample(Self, Int) -> Double
+pub fn ClapSynthEngine::master_gain(Self) -> Double
+pub fn ClapSynthEngine::new(sample_rate? : Double, max_block_size? : Int, max_voices? : Int) -> Result[Self, ClapEngineError]
+pub fn ClapSynthEngine::note_off(Self, note_id~ : Int, key~ : Int) -> Bool
+pub fn ClapSynthEngine::note_on(Self, note_id~ : Int, key~ : Int, velocity~ : Double) -> Bool
+pub fn ClapSynthEngine::pan(Self) -> Double
+pub fn ClapSynthEngine::process(Self, Int) -> Int
+pub fn ClapSynthEngine::resonance(Self) -> Double
+pub fn ClapSynthEngine::right_sample(Self, Int) -> Double
+pub fn ClapSynthEngine::set_cutoff_hz(Self, Double) -> Double
+pub fn ClapSynthEngine::set_master_gain(Self, Double) -> Double
+pub fn ClapSynthEngine::set_pan(Self, Double) -> Double
+pub fn ClapSynthEngine::set_param(Self, Int, Double) -> Bool
+pub fn ClapSynthEngine::set_resonance(Self, Double) -> Double
+pub fn ClapSynthEngine::set_voice_gain(Self, Double) -> Double
+pub fn ClapSynthEngine::voice_gain(Self) -> Double
+
+// Type aliases
+
+// Traits
+

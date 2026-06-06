@@ -1,0 +1,40 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp/clap_host"
+
+// Values
+pub fn engine_all_notes_off(Int) -> Bool
+
+pub fn engine_create(Double, Int, Int) -> Int
+
+pub fn engine_cutoff_hz(Int) -> Double
+
+pub fn engine_destroy(Int) -> Bool
+
+pub fn engine_left_sample(Int, Int) -> Double
+
+pub fn engine_master_gain(Int) -> Double
+
+pub fn engine_note_off(Int, Int, Int) -> Bool
+
+pub fn engine_note_on(Int, Int, Int, Double) -> Bool
+
+pub fn engine_pan(Int) -> Double
+
+pub fn engine_process(Int, Int) -> Int
+
+pub fn engine_resonance(Int) -> Double
+
+pub fn engine_right_sample(Int, Int) -> Double
+
+pub fn engine_set_param(Int, Int, Double) -> Bool
+
+pub fn engine_voice_gain(Int) -> Double
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+

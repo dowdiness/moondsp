@@ -28,6 +28,8 @@ for `dowdiness/moondsp`. Read order below goes roughly from "new user" to
 - **[`browser-api-contract.md`](browser-api-contract.md)** — supported browser
   facade and AudioWorklet export ABI, including semver and ABI-guard review
   rules.
+- **[`clap-plugin-plan.md`](clap-plugin-plan.md)** — native CLAP bring-up plan
+  and current `clap_engine/` host-facing engine slice.
 - **[`mini-notation.md`](mini-notation.md)** — current text-pattern syntax,
   including Strudel-style `$:` stack lines, quoted notation, postfixes, and
   method chains.

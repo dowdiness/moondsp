@@ -26,6 +26,9 @@ remains open for native targets such as CLAP plugins.
 | `dowdiness/moondsp/scheduler` | `scheduler/` | Pattern scheduler — bridges pattern engine to DSP voice pool |
 | `dowdiness/moondsp/browser` | `browser/` | AudioWorklet export wrapper with multi-pool drum routing |
 | `dowdiness/moondsp/browser_test` | `browser_test/` | Browser integration test wrapper |
+| `dowdiness/moondsp/clap_engine` | `clap_engine/` | Native CLAP synth engine core around graph + voice pool |
+| `dowdiness/moondsp/clap_host` | `clap_host/` | Primitive integer-handle bridge for C CLAP shims |
+| `dowdiness/moondsp/clap_plugin` | `clap_plugin/` | Native payload package plus prototype CLAP C ABI shim |
 | `dowdiness/moondsp/cmd/main` | `cmd/main/` | CLI entry point |
 
 ## Architecture
@@ -53,6 +56,9 @@ remains open for native targets such as CLAP plugins.
 moon check && moon test        # full test suite
 moon build --target wasm-gc    # Browser WASM build
 moon run cmd/main              # CLI entry point
+scripts/build-clap-prototype.sh # Linux CLAP prototype shared object
+scripts/smoke-clap-prototype.sh # Local CLAP dlopen/process smoke test
+scripts/validate-clap-prototype.sh # Build + clap-validator prototype check
 ```
 
 Before every commit:

@@ -1,0 +1,9 @@
+import {
+  "dowdiness/moondsp",
+  "moonbitlang/core/debug",
+  "moonbitlang/core/math",
+}
+
+import {
+  "moonbitlang/core/debug",
+} for "test"
