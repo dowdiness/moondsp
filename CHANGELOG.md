@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added generated verification for the CLAP prototype's MoonBit native bridge
+  header, mapping stable `mb_engine_*` C aliases to the current generated
+  `clap_host` symbols.
 - Formalized the browser parse/control result-code and error-message transport
   contract, with stable documentation names for scheduler parse results and
   browser graph error codes.
