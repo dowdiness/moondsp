@@ -74,6 +74,45 @@ test "flat host API accepts CLAP note events and renders audio" {
 }
 
 ///|
+test "flat host API releases note id wildcard by key" {
+  let handle = create_test_handle()
+  assert_true(@clap_host.engine_note_on(handle, 184, 60, 1.0))
+  assert_true(@clap_host.engine_note_off(handle, -1, 60))
+  assert_true(!@clap_host.engine_note_off(handle, -1, 60))
+  destroy_test_handle(handle)
+}
+
+///|
+test "flat host API concrete note id respects specified key" {
+  let handle = create_test_handle()
+  assert_true(@clap_host.engine_note_on(handle, 7, 69, 1.0))
+  assert_true(!@clap_host.engine_note_off(handle, 7, 70))
+  assert_true(@clap_host.engine_note_off(handle, 7, 69))
+  destroy_test_handle(handle)
+}
+
+///|
+test "flat host API releases stacked key wildcard" {
+  let handle = create_test_handle()
+  assert_true(@clap_host.engine_note_on(handle, 184, 60, 1.0))
+  assert_true(@clap_host.engine_note_on(handle, 185, 60, 1.0))
+  assert_true(@clap_host.engine_note_off(handle, -1, 60))
+  assert_true(!@clap_host.engine_note_off(handle, 184, 60))
+  assert_true(!@clap_host.engine_note_off(handle, 185, 60))
+  destroy_test_handle(handle)
+}
+
+///|
+test "flat host API releases fully wildcard note off" {
+  let handle = create_test_handle()
+  assert_true(@clap_host.engine_note_on(handle, 1, 60, 1.0))
+  assert_true(@clap_host.engine_note_on(handle, 2, 64, 1.0))
+  assert_true(@clap_host.engine_note_off(handle, -1, -1))
+  assert_true(!@clap_host.engine_note_off(handle, -1, -1))
+  destroy_test_handle(handle)
+}
+
+///|
 test "flat host API clamps process size and rejects invalid handles" {
   let handle = create_test_handle()
   @debug.assert_eq(@clap_host.engine_process(handle, 1024), 128)

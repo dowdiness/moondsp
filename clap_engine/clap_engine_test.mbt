@@ -79,6 +79,41 @@ test "note on renders non-zero stereo samples and note off removes handle" {
 }
 
 ///|
+test "note off with wildcard note id releases matching key" {
+  let engine = new_test_engine()
+  assert_true(engine.note_on(note_id=184, key=60, velocity=1.0))
+  assert_true(engine.note_off(note_id=-1, key=60))
+  assert_true(!engine.note_off(note_id=-1, key=60))
+}
+
+///|
+test "note off with concrete note id respects specified key" {
+  let engine = new_test_engine()
+  assert_true(engine.note_on(note_id=7, key=69, velocity=1.0))
+  assert_true(!engine.note_off(note_id=7, key=70))
+  assert_true(engine.note_off(note_id=7, key=69))
+}
+
+///|
+test "note off with wildcard note id releases stacked matching key" {
+  let engine = new_test_engine()
+  assert_true(engine.note_on(note_id=184, key=60, velocity=1.0))
+  assert_true(engine.note_on(note_id=185, key=60, velocity=1.0))
+  assert_true(engine.note_off(note_id=-1, key=60))
+  assert_true(!engine.note_off(note_id=184, key=60))
+  assert_true(!engine.note_off(note_id=185, key=60))
+}
+
+///|
+test "fully wildcard note off releases all active notes" {
+  let engine = new_test_engine()
+  assert_true(engine.note_on(note_id=1, key=60, velocity=1.0))
+  assert_true(engine.note_on(note_id=2, key=64, velocity=1.0))
+  assert_true(engine.note_off(note_id=-1, key=-1))
+  assert_true(!engine.note_off(note_id=-1, key=-1))
+}
+
+///|
 test "process clamps CLAP frame count to the preallocated block" {
   let engine = new_test_engine()
   @debug.assert_eq(engine.process(1024), 128)

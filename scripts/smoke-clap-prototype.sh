@@ -28,6 +28,8 @@ cat > "$tmp_dir/smoke.c" <<'EOF'
 
 typedef struct events_ctx {
   clap_event_note_t note;
+  clap_event_midi_t midi;
+  const clap_event_header_t *event;
 } events_ctx_t;
 
 static const void *host_get_extension(const clap_host_t *host, const char *id) {
@@ -50,7 +52,7 @@ static const clap_event_header_t *events_get(
     return NULL;
   }
   const events_ctx_t *ctx = (const events_ctx_t *)list->ctx;
-  return &ctx->note.header;
+  return ctx->event;
 }
 
 static float peak(float *left, float *right, uint32_t start, uint32_t end) {
@@ -155,6 +157,7 @@ int main(int argc, char **argv) {
   event_ctx.note.note_id = 100;
   event_ctx.note.key = 69;
   event_ctx.note.velocity = 1.0;
+  event_ctx.event = &event_ctx.note.header;
   clap_input_events_t events = {0};
   events.ctx = &event_ctx;
   events.size = events_size;
@@ -170,6 +173,45 @@ int main(int argc, char **argv) {
   const float before = peak(left, right, 0, 64);
   const float after = peak(left, right, 64, 128);
 
+  event_ctx.note.header.time = 0;
+  event_ctx.note.header.type = CLAP_EVENT_NOTE_OFF;
+  event_ctx.note.note_id = -1;
+  event_ctx.note.key = 69;
+  event_ctx.note.velocity = 0.0;
+  const int32_t off_status = plugin->process(plugin, &process);
+
+  process.in_events = NULL;
+  int32_t tail_status = CLAP_PROCESS_CONTINUE;
+  float tail_peak = 0.0f;
+  for (uint32_t block = 0; block < 128; block++) {
+    tail_status = plugin->process(plugin, &process);
+    tail_peak = peak(left, right, 0, 128);
+  }
+
+  event_ctx.midi.header.size = sizeof(clap_event_midi_t);
+  event_ctx.midi.header.time = 0;
+  event_ctx.midi.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+  event_ctx.midi.header.type = CLAP_EVENT_MIDI;
+  event_ctx.midi.data[0] = 0x90;
+  event_ctx.midi.data[1] = 72;
+  event_ctx.midi.data[2] = 127;
+  event_ctx.event = &event_ctx.midi.header;
+  process.in_events = &events;
+  const int32_t midi_on_status = plugin->process(plugin, &process);
+  const float midi_peak = peak(left, right, 0, 128);
+
+  event_ctx.midi.data[0] = 0x80;
+  event_ctx.midi.data[2] = 0;
+  const int32_t midi_off_status = plugin->process(plugin, &process);
+
+  process.in_events = NULL;
+  int32_t midi_tail_status = CLAP_PROCESS_CONTINUE;
+  float midi_tail_peak = 0.0f;
+  for (uint32_t block = 0; block < 128; block++) {
+    midi_tail_status = plugin->process(plugin, &process);
+    midi_tail_peak = peak(left, right, 0, 128);
+  }
+
   plugin->stop_processing(plugin);
   plugin->deactivate(plugin);
   plugin->destroy(plugin);
@@ -180,6 +222,23 @@ int main(int argc, char **argv) {
     fprintf(stderr, "unexpected process status %d\n", status);
     return 7;
   }
+  if (off_status != CLAP_PROCESS_CONTINUE || tail_status != CLAP_PROCESS_CONTINUE) {
+    fprintf(stderr,
+            "unexpected note-off/tail status %d/%d\n",
+            off_status,
+            tail_status);
+    return 7;
+  }
+  if (midi_on_status != CLAP_PROCESS_CONTINUE ||
+      midi_off_status != CLAP_PROCESS_CONTINUE ||
+      midi_tail_status != CLAP_PROCESS_CONTINUE) {
+    fprintf(stderr,
+            "unexpected MIDI status %d/%d/%d\n",
+            midi_on_status,
+            midi_off_status,
+            midi_tail_status);
+    return 7;
+  }
   if (before > 0.0000001f) {
     fprintf(stderr, "event timestamp ignored: pre-event peak %g\n", before);
     return 8;
@@ -188,7 +247,24 @@ int main(int argc, char **argv) {
     fprintf(stderr, "no post-event audio: peak %g\n", after);
     return 9;
   }
-  printf("CLAP smoke passed: pre-event peak=%g post-event peak=%g\n", before, after);
+  if (tail_peak > 0.000001f) {
+    fprintf(stderr, "wildcard note-off did not release audio: peak %g\n", tail_peak);
+    return 10;
+  }
+  if (midi_peak <= 0.000001f) {
+    fprintf(stderr, "MIDI note-on produced no audio: peak %g\n", midi_peak);
+    return 11;
+  }
+  if (midi_tail_peak > 0.000001f) {
+    fprintf(stderr, "MIDI note-off did not release audio: peak %g\n", midi_tail_peak);
+    return 12;
+  }
+  printf(
+      "CLAP smoke passed: pre-event peak=%g post-event peak=%g tail peak=%g MIDI tail peak=%g\n",
+      before,
+      after,
+      tail_peak,
+      midi_tail_peak);
   return 0;
 }
 EOF
