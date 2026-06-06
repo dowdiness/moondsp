@@ -1,0 +1,8 @@
+import {
+  "dowdiness/moondsp/clap_engine" @engine,
+  "dowdiness/moondsp/clap_host" @host,
+}
+
+options(
+  "is-main": true,
+)

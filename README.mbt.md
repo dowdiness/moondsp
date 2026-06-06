@@ -10,6 +10,8 @@ moondsp combines a Strudel/TidalCycles-inspired pattern algebra with a compiled 
 moon check && moon test       # type-check + run the full test suite
 moon build --target wasm-gc   # build for browser
 moon run cmd/main             # run CLI entry point
+scripts/build-clap-prototype.sh  # build Linux CLAP prototype shared object
+scripts/smoke-clap-prototype.sh  # dlopen/process smoke test for the prototype
 ```
 
 To hear it in the browser, open `web/index.html` after building. The AudioWorklet loads the compiled wasm-gc module and drives the DSP graph in real time.
@@ -89,6 +91,9 @@ song/           Long-form section scaffold with identity TimeScope
 scheduler/      Pattern scheduler: bridges pattern events to voice pool
 browser/        AudioWorklet integration (wasm-gc/js exports)
 browser_test/   Browser-integration test wrapper
+clap_engine/    Native CLAP synth engine core (MoonBit host-facing wrapper)
+clap_host/      Primitive handle bridge for the C CLAP shim
+clap_plugin/    CLAP prototype payload package and C ABI shim
 web/            Browser demo UI (HTML + AudioWorklet processor)
 cmd/main/       CLI entry point
 docs/           Architecture blueprint, technical reference, performance snapshots
