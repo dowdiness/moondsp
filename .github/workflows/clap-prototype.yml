@@ -1,0 +1,43 @@
+name: CLAP Prototype
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  clap-prototype:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLAP_VALIDATOR_VERSION: "0.3.2"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - name: Fetch MoonBit dependencies
+        run: moon update
+
+      - name: Cache clap-validator
+        uses: actions/cache@v4
+        with:
+          path: _build/tools/clap-validator
+          key: ${{ runner.os }}-clap-validator-${{ env.CLAP_VALIDATOR_VERSION }}
+
+      - name: Check all MoonBit targets
+        run: moon check --target all
+
+      - name: Run CLAP smoke test
+        run: ./scripts/smoke-clap-prototype.sh
+
+      - name: Run CLAP validator
+        run: ./scripts/validate-clap-prototype.sh
