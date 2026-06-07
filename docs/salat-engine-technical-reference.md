@@ -695,6 +695,10 @@ The current repository already implements:
   - fixed `Delay` / `StereoDelay` feedback outside the live supported range
 - runtime processing fails closed to silence if the caller requests a block size
   larger than the graph was compiled for
+- `CompiledDsp::reset_runtime_state(...)` restores compile-time node
+  parameters, clears compiled buffers, and resets stateful DSP primitives so a
+  preallocated mono voice graph can be reused for a fresh voice without
+  recompilation
 
 Current graph node support:
 
@@ -904,16 +908,28 @@ Current semantics:
     active
 - `BoundVoicePool::note_on_controls(...)` accepts pattern/control-map values,
   resolves them through the current binding map, and delegates to the inner
-  `VoicePool::note_on(...)`
+  `VoicePool::note_on(...)`; hosts that already have a materialized
+  graph-control batch may call `note_on_graph_controls(...)` to bypass the
+  control-key map resolution layer. Stable-template hosts with a fixed four-
+  parameter note-on layout may use `note_on_prevalidated_params4_id(...)` to
+  reset a prepared graph, apply scalar parameters, set pan, and receive a packed
+  primitive handle id without constructing graph-control batches.
 - voice-control validation and application target already-sounding voices by
   active voice identifier; stale identifiers and invalid control changes are
   rejected without changing the voice-pool template or bindings
 - result-returning voice mutators are the supported path for observing stale or
-  invalid handle errors; the old Bool wrappers remain only as deprecated
-  compatibility shims that collapse any rejection to `false`
-- each `VoicePool::note_on(...)` compiles the already analyzed template through
-  `CompiledDsp::compile(template, ctx)`, so per-voice graph creation reuses the
-  optimized nodes captured during template validation
+  invalid handle errors; allocation-conscious Bool predicates are available for
+  host callback paths that have already validated their fixed control layout, and
+  the old Bool wrappers remain only as deprecated compatibility shims that
+  collapse any rejection to `false`
+- `VoicePool` precompiles per-slot runtime graphs at construction time and
+  `VoicePool::note_on(...)` resets/reuses a prepared graph when the selected
+  slot still matches the current template generation; after `set_template(...)`,
+  the generic graph-control note-on path can still lazily compile the replacement
+  template on next reuse while already-sounding voices keep their prior compiled
+  graph and ADSR snapshot. The prevalidated scalar note-on path instead requires
+  a matching prepared slot and fails closed with a negative packed handle id if
+  the slot is stale.
 - `PatternScheduler` stores tempo, sample position, a `DspContext`, active note
   handles, a `ControlMapper`, and an optional active + pending
   `PlaybackSnapshot` pair; it no longer stores a separate `ControlBindingMap`.

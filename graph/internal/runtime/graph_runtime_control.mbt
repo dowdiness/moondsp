@@ -43,6 +43,40 @@ pub fn CompiledDsp::validate_controls(
 }
 
 ///|
+/// Allocation-conscious gate-on primitive for prevalidated host paths.
+pub fn CompiledDsp::gate_on_bool(self : CompiledDsp, node_index : Int) -> Bool {
+  self.0.apply_gate_control_bool_impl(node_index, true)
+}
+
+///|
+/// Allocation-conscious gate-off primitive for prevalidated host paths.
+pub fn CompiledDsp::gate_off_bool(self : CompiledDsp, node_index : Int) -> Bool {
+  self.0.apply_gate_control_bool_impl(node_index, false)
+}
+
+///|
+/// Allocation-conscious parameter primitive for prevalidated host paths.
+pub fn CompiledDsp::set_param_bool(
+  self : CompiledDsp,
+  node_index : Int,
+  slot : GraphParamSlot,
+  value : Double,
+) -> Bool {
+  self.0.apply_param_control_bool_impl(node_index, slot, value)
+}
+
+///|
+/// Allocation-conscious parameter validation for prevalidated host paths.
+pub fn CompiledDsp::can_set_param_bool(
+  self : CompiledDsp,
+  node_index : Int,
+  slot : GraphParamSlot,
+  value : Double,
+) -> Bool {
+  self.0.can_param_control_bool_impl(node_index, slot, value)
+}
+
+///|
 /// Returns true when a voice using this compiled graph can be safely reclaimed.
 ///
 /// Two-stage check:
@@ -171,6 +205,70 @@ fn CompiledGraph::compiled_index_result(
       } else {
         Err(GraphControlError::OrphanNode(node_index))
       }
+  }
+}
+
+///|
+fn CompiledGraph::apply_gate_control_bool_impl(
+  self : CompiledGraph,
+  node_index : Int,
+  gate_on : Bool,
+) -> Bool {
+  match self.compiled_index_for(node_index) {
+    None => false
+    Some(compiled_index) =>
+      match self.env_states[compiled_index] {
+        Some(env) => {
+          if gate_on {
+            env.gate_on()
+          } else {
+            env.gate_off()
+          }
+          true
+        }
+        None => false
+      }
+  }
+}
+
+///|
+fn CompiledGraph::apply_param_control_bool_impl(
+  self : CompiledGraph,
+  node_index : Int,
+  slot : GraphParamSlot,
+  value : Double,
+) -> Bool {
+  match self.compiled_index_for(node_index) {
+    None => false
+    Some(compiled_index) => {
+      let node = self.nodes[compiled_index]
+      if !set_model_node_param_in_place(
+          node,
+          slot,
+          value,
+          self.compile_sample_rate,
+        ) {
+        return false
+      }
+      apply_runtime_param_side_effect(self, compiled_index, node, slot)
+    }
+  }
+}
+
+///|
+fn CompiledGraph::can_param_control_bool_impl(
+  self : CompiledGraph,
+  node_index : Int,
+  slot : GraphParamSlot,
+  value : Double,
+) -> Bool {
+  match self.compiled_index_for(node_index) {
+    None => false
+    Some(compiled_index) => {
+      let node = self.nodes[compiled_index]
+      model_node_param_valid(node, slot, value, self.compile_sample_rate) &&
+      runtime_param_state_available(self, compiled_index, node, slot)
+    }
   }
 }
 
@@ -322,6 +420,230 @@ pub fn updated_model_node_param_result(
     Some(updated) => Ok(updated)
     None =>
       Err(GraphControlError::InvalidParamValue(node_index, kind, slot, value))
+  }
+}
+
+///|
+fn model_node_param_valid(
+  node : @model.DspNode,
+  slot : GraphParamSlot,
+  value : Double,
+  sample_rate : Double,
+) -> Bool {
+  match node.kind() {
+    Constant => slot is Value0 && @dsp.is_finite(value)
+    Oscillator => node.input0() < 0 && slot is Value0 && @dsp.is_finite(value)
+    Adsr => false
+    Noise => false
+    Biquad =>
+      match slot {
+        Value0 => valid_biquad_graph_params(sample_rate, value, node.value1())
+        Value1 => valid_biquad_graph_params(sample_rate, node.value0(), value)
+        _ => false
+      }
+    Delay =>
+      match slot {
+        Value0 => valid_delay_feedback(value)
+        DelaySamples =>
+          match exact_int_value(value) {
+            Some(ds) => valid_delay_samples(ds, node.delay_max_samples())
+            _ => false
+          }
+        _ => false
+      }
+    Gain => slot is Value0 && @dsp.is_finite(value)
+    Mul => false
+    Mix => false
+    Clip => slot is Value0 && @dsp.is_finite(value) && value > 0.0
+    Output => false
+    Pan => slot is Value0 && @dsp.is_finite(value)
+    StereoGain => slot is Value0 && @dsp.is_finite(value)
+    StereoClip => slot is Value0 && @dsp.is_finite(value) && value > 0.0
+    StereoBiquad =>
+      match slot {
+        Value0 => valid_biquad_graph_params(sample_rate, value, node.value1())
+        Value1 => valid_biquad_graph_params(sample_rate, node.value0(), value)
+        _ => false
+      }
+    StereoDelay =>
+      match slot {
+        Value0 => valid_delay_feedback(value)
+        DelaySamples =>
+          match exact_int_value(value) {
+            Some(ds) => valid_delay_samples(ds, node.delay_max_samples())
+            _ => false
+          }
+        _ => false
+      }
+    StereoMixDown => false
+    StereoOutput => false
+  }
+}
+
+///|
+fn runtime_param_state_available(
+  graph : CompiledGraph,
+  compiled_index : Int,
+  node : @model.DspNode,
+  slot : GraphParamSlot,
+) -> Bool {
+  match node.kind() {
+    Delay =>
+      match slot {
+        Value0 | DelaySamples => graph.delay_states[compiled_index] is Some(_)
+        _ => false
+      }
+    StereoDelay =>
+      match slot {
+        Value0 | DelaySamples =>
+          graph.stereo_delay_left_states[compiled_index] is Some(_) &&
+          graph.stereo_delay_right_states[compiled_index] is Some(_)
+        _ => false
+      }
+    Constant
+    | Oscillator
+    | Biquad
+    | Gain
+    | Clip
+    | Pan
+    | StereoGain
+    | StereoClip
+    | StereoBiquad => true
+    _ => false
+  }
+}
+
+///|
+fn set_model_node_param_in_place(
+  node : @model.DspNode,
+  slot : GraphParamSlot,
+  value : Double,
+  sample_rate : Double,
+) -> Bool {
+  match node.kind() {
+    Constant =>
+      match slot {
+        Value0 if @dsp.is_finite(value) => {
+          @model.set_node_value0(node, value)
+          true
+        }
+        _ => false
+      }
+    Oscillator =>
+      if node.input0() >= 0 {
+        false
+      } else {
+        match slot {
+          Value0 if @dsp.is_finite(value) => {
+            @model.set_node_value0(node, value)
+            true
+          }
+          _ => false
+        }
+      }
+    Adsr => false
+    Noise => false
+    Biquad =>
+      match slot {
+        Value0 if valid_biquad_graph_params(sample_rate, value, node.value1()) => {
+          @model.set_node_value0(node, value)
+          true
+        }
+        Value1 if valid_biquad_graph_params(sample_rate, node.value0(), value) => {
+          @model.set_node_value1(node, value)
+          true
+        }
+        _ => false
+      }
+    Delay =>
+      match slot {
+        Value0 if valid_delay_feedback(value) => {
+          @model.set_node_value0(node, value)
+          true
+        }
+        DelaySamples =>
+          match exact_int_value(value) {
+            Some(ds) if valid_delay_samples(ds, node.delay_max_samples()) => {
+              @model.set_node_delay_samples(node, ds)
+              true
+            }
+            _ => false
+          }
+        _ => false
+      }
+    Gain =>
+      match slot {
+        Value0 if @dsp.is_finite(value) => {
+          @model.set_node_value0(node, value)
+          true
+        }
+        _ => false
+      }
+    Mul => false
+    Mix => false
+    Clip =>
+      match slot {
+        Value0 if @dsp.is_finite(value) && value > 0.0 => {
+          @model.set_node_value0(node, value)
+          true
+        }
+        _ => false
+      }
+    Output => false
+    Pan =>
+      match slot {
+        Value0 if @dsp.is_finite(value) => {
+          @model.set_node_value0(node, value)
+          true
+        }
+        _ => false
+      }
+    StereoGain =>
+      match slot {
+        Value0 if @dsp.is_finite(value) => {
+          @model.set_node_value0(node, value)
+          true
+        }
+        _ => false
+      }
+    StereoClip =>
+      match slot {
+        Value0 if @dsp.is_finite(value) && value > 0.0 => {
+          @model.set_node_value0(node, value)
+          true
+        }
+        _ => false
+      }
+    StereoBiquad =>
+      match slot {
+        Value0 if valid_biquad_graph_params(sample_rate, value, node.value1()) => {
+          @model.set_node_value0(node, value)
+          true
+        }
+        Value1 if valid_biquad_graph_params(sample_rate, node.value0(), value) => {
+          @model.set_node_value1(node, value)
+          true
+        }
+        _ => false
+      }
+    StereoDelay =>
+      match slot {
+        Value0 if valid_delay_feedback(value) => {
+          @model.set_node_value0(node, value)
+          true
+        }
+        DelaySamples =>
+          match exact_int_value(value) {
+            Some(ds) if valid_delay_samples(ds, node.delay_max_samples()) => {
+              @model.set_node_delay_samples(node, ds)
+              true
+            }
+            _ => false
+          }
+        _ => false
+      }
+    StereoMixDown => false
+    StereoOutput => false
   }
 }
 

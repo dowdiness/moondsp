@@ -72,6 +72,39 @@ test "compiled dsp runtime param update changes delay length" {
 }
 
 ///|
+test "compiled dsp reset restores runtime delay parameters" {
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
+  let nodes = [
+    DspNode::constant(UNIT_SAMPLE),
+    DspNode::delay(input=0, max_delay_samples=DELAY_CAPACITY, delay_samples=0),
+    DspNode::output(1),
+  ]
+  let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
+  let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+
+  assert_true(
+    compiled.apply_control(
+      GraphControl::set_param(
+        1,
+        GraphParamSlot::DelaySamples,
+        DELAY_SAMPLES_DOUBLE,
+      ),
+    )
+    is Ok(_),
+  )
+  compiled.reset_runtime_state()
+  compiled.process(context, output)
+
+  @debug.assert_eq(output.get(0), UNIT_SAMPLE)
+  @debug.assert_eq(output.get(1), UNIT_SAMPLE)
+  @debug.assert_eq(output.get(2), UNIT_SAMPLE)
+  @debug.assert_eq(output.get(3), UNIT_SAMPLE)
+}
+
+///|
 test "compiled dsp applies mixed control batches in order" {
   let context = DspContext::new(
     sample_rate=ADSR_TEST_SAMPLE_RATE,

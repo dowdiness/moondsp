@@ -71,7 +71,10 @@ pub impl Eq for CompiledTemplate with fn equal(self, other) {
 pub fn CompiledTemplate::analyze(
   template : Array[@model.DspNode],
 ) -> CompiledTemplate {
-  let snapshot = template.copy()
+  let snapshot : Array[@model.DspNode] = []
+  for node in template {
+    snapshot.push(@model.clone_node(node))
+  }
   let (optimized, index_map) = optimize_graph(snapshot)
   { template: snapshot, optimized, index_map }
 }
