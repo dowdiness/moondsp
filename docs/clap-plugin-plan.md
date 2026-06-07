@@ -87,15 +87,19 @@ scripts/audit-clap-audio-allocations.sh --expect-zero
 
 ## Bridge-symbol guard
 
-As of the 2026-06-07 #174 probe, MoonBit native package exports still do not
-provide stable C aliases for the `clap_host` primitives. The prototype therefore
-keeps the C shim on stable `mb_engine_*` aliases and generates their mapping to
-MoonBit's package-mangled payload symbols. `scripts/build-clap-prototype.sh` and
-`scripts/build-clap-prototype-windows.sh` fail if
-`clap_plugin/moondsp_clap_moonbit.h` is stale for the generated payload.
+The 2026-06-07 #174 probe showed that MoonBit native package exports do not yet
+provide stable C aliases for the `clap_host` primitives.
+
+Current guard:
+
+- the C shim calls stable `mb_engine_*` aliases;
+- `clap_plugin/moondsp_clap_moonbit.h` maps those aliases to MoonBit's
+  package-mangled payload symbols;
+- the Linux and Windows prototype build scripts verify that generated header and
+  fail if it is stale.
 
 See `docs/development/2026-06-07-clap-native-bridge-symbol-probe.md` for the
-tested toolchain and alias-probe evidence.
+exact toolchain and probe result.
 
 ## Remaining risks
 
@@ -115,12 +119,13 @@ tested toolchain and alias-probe evidence.
 1. Keep future template-edit paths from lazily compiling on the audio thread;
    the fixed CLAP stable-template path currently fails closed if a prepared slot
    is stale.
-2. Track issue #174 for true stable MoonBit/native bridge aliases. Until the
-   toolchain emits stable C aliases, keep the generated-header mapping as the
-   durable bridge guard.
-3. Exercise additional real hosts/DAWs as the prototype matures, verifying host
-   processes are stopped and installed artifact hashes match fresh builds before
-   interpreting behavior.
+2. Keep MoonBit/native bridge-symbol rechecks separate from host coverage. Open
+   a new bridge issue only if a future toolchain changes native export behavior.
+   Until then, keep the generated-header mapping as the durable bridge guard.
+3. Track broader real-host/DAW coverage in issue #180. Use
+   `docs/development/2026-06-07-clap-host-coverage.md` for the checklist and
+   matrix. Before interpreting host behavior, stop host processes and verify
+   that the installed artifact hash matches the fresh build.
 
 ## Real-time cautions
 
@@ -128,7 +133,7 @@ tested toolchain and alias-probe evidence.
 - Preallocate for CLAP's max block size during activation.
 - Keep process-block splitting around CLAP event timestamps intact when adding
   more event types or automation paths.
-- Treat current CLAP support as a bring-up prototype until stable native bridge
-  symbols and broader host-load coverage are satisfied. The audited CLAP
-  event/render allocation gate is complete, but rerun it after bridge or runtime
-  changes.
+- Treat current CLAP support as a bring-up prototype until bridge/toolchain,
+  broader host-load coverage, and audio-callback allocation gates are all
+  satisfied. The audited CLAP event/render allocation gate is complete, but
+  rerun it after bridge or runtime changes.
