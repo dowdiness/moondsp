@@ -82,17 +82,20 @@ scripts/build-clap-prototype.sh
 scripts/build-clap-prototype-windows.sh
 scripts/smoke-clap-prototype.sh
 scripts/validate-clap-prototype.sh
-scripts/audit-clap-audio-allocations.sh
+scripts/audit-clap-audio-allocations.sh --expect-zero
 ```
 
 ## Bridge-symbol guard
 
-MoonBit native package exports do not currently provide stable C aliases for the
-`clap_host` primitives, so the prototype keeps the C shim on stable
-`mb_engine_*` aliases and generates their mapping to MoonBit's package-mangled
-payload symbols. `scripts/build-clap-prototype.sh` and
+As of the 2026-06-07 #174 probe, MoonBit native package exports still do not
+provide stable C aliases for the `clap_host` primitives. The prototype therefore
+keeps the C shim on stable `mb_engine_*` aliases and generates their mapping to
+MoonBit's package-mangled payload symbols. `scripts/build-clap-prototype.sh` and
 `scripts/build-clap-prototype-windows.sh` fail if
 `clap_plugin/moondsp_clap_moonbit.h` is stale for the generated payload.
+
+See `docs/development/2026-06-07-clap-native-bridge-symbol-probe.md` for the
+tested toolchain and alias-probe evidence.
 
 ## Remaining risks
 
@@ -101,17 +104,23 @@ payload symbols. `scripts/build-clap-prototype.sh` and
 - The Windows cross-built `.clap` has been checked as an x86_64 PE DLL exporting
   `clap_entry` and loaded successfully in Bitwig Studio 6.0.6 on Windows 11.
   See `docs/development/2026-06-06-clap-bitwig-windows-host-load.md`.
-- The audio-callback allocation audit is now repeatable with
-  `scripts/audit-clap-audio-allocations.sh`. Steady render is measured
-  allocation-free, but note-on, release, and active-parameter event paths still
-  allocate. See `docs/development/2026-06-06-clap-audio-allocation-audit.md`.
+- The audio-callback allocation audit now passes
+  `scripts/audit-clap-audio-allocations.sh --expect-zero`. The audited steady
+  render, note/release, MIDI, transport, all-notes-off, and active-parameter
+  event paths are measured allocation-free. See
+  `docs/development/2026-06-06-clap-audio-allocation-audit.md`.
 
 ## Next slice
 
-1. Move the remaining event-path allocation work to activation/control-side
-   preparation and make `scripts/audit-clap-audio-allocations.sh --expect-zero`
-   pass.
-2. Exercise additional hosts/DAWs as the prototype matures.
+1. Keep future template-edit paths from lazily compiling on the audio thread;
+   the fixed CLAP stable-template path currently fails closed if a prepared slot
+   is stale.
+2. Track issue #174 for true stable MoonBit/native bridge aliases. Until the
+   toolchain emits stable C aliases, keep the generated-header mapping as the
+   durable bridge guard.
+3. Exercise additional real hosts/DAWs as the prototype matures, verifying host
+   processes are stopped and installed artifact hashes match fresh builds before
+   interpreting behavior.
 
 ## Real-time cautions
 
@@ -119,5 +128,7 @@ payload symbols. `scripts/build-clap-prototype.sh` and
 - Preallocate for CLAP's max block size during activation.
 - Keep process-block splitting around CLAP event timestamps intact when adding
   more event types or automation paths.
-- Treat current CLAP support as a bring-up prototype until host-load coverage is
-  broader and the audio-thread allocation audit is complete.
+- Treat current CLAP support as a bring-up prototype until stable native bridge
+  symbols and broader host-load coverage are satisfied. The audited CLAP
+  event/render allocation gate is complete, but rerun it after bridge or runtime
+  changes.
