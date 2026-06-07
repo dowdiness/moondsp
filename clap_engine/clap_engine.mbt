@@ -73,22 +73,6 @@ pub impl Show for ClapEngineError with fn output(self, logger) {
 /// The CLAP C shim should allocate one instance during plugin activation,
 /// call note/parameter methods from CLAP events, call `process` for each audio
 /// block, then copy `left_sample`/`right_sample` into the host's output ports.
-priv struct ActiveClapNote {
-  handle : @moondsp.VoiceHandle
-  key : Int
-  velocity : Double
-}
-
-///|
-fn ActiveClapNote::new(
-  handle~ : @moondsp.VoiceHandle,
-  key~ : Int,
-  velocity~ : Double,
-) -> ActiveClapNote {
-  { handle, key, velocity }
-}
-
-///|
 pub struct ClapSynthEngine {
   priv sample_rate : Double
   priv max_block_size : Int
@@ -96,13 +80,144 @@ pub struct ClapSynthEngine {
   priv left : @moondsp.AudioBuffer
   priv right : @moondsp.AudioBuffer
   priv render_contexts : FixedArray[@moondsp.DspContext]
-  priv active_notes : Map[Int, ActiveClapNote]
+  priv active_notes : ActiveNoteTable
   priv mut last_frame_count : Int
   priv mut master_gain : Double
   priv mut voice_gain : Double
   priv mut cutoff_hz : Double
   priv mut resonance : Double
   priv mut pan : Double
+}
+
+///|
+/// Fixed-capacity active-note index for the CLAP callback path.
+///
+/// WHY parallel FixedArrays instead of Map: note-on/note-off and automation run
+/// inside `process`, so active-note tracking must not allocate or resize.
+priv struct ActiveNoteTable {
+  used : FixedArray[Bool]
+  map_keys : FixedArray[Int]
+  keys : FixedArray[Int]
+  velocities : FixedArray[Double]
+  slots : FixedArray[Int]
+  generations : FixedArray[Int]
+  mut count : Int
+}
+
+///|
+fn ActiveNoteTable::new(capacity : Int) -> ActiveNoteTable {
+  {
+    used: FixedArray::make(capacity, false),
+    map_keys: FixedArray::make(capacity, 0),
+    keys: FixedArray::make(capacity, -1),
+    velocities: FixedArray::make(capacity, 0.0),
+    slots: FixedArray::make(capacity, -1),
+    generations: FixedArray::make(capacity, -1),
+    count: 0,
+  }
+}
+
+///|
+fn ActiveNoteTable::capacity(self : ActiveNoteTable) -> Int {
+  self.used.length()
+}
+
+///|
+fn ActiveNoteTable::is_used(self : ActiveNoteTable, index : Int) -> Bool {
+  self.used[index]
+}
+
+///|
+fn ActiveNoteTable::key_at(self : ActiveNoteTable, index : Int) -> Int {
+  self.keys[index]
+}
+
+///|
+fn ActiveNoteTable::velocity_at(self : ActiveNoteTable, index : Int) -> Double {
+  self.velocities[index]
+}
+
+///|
+fn ActiveNoteTable::handle_at(
+  self : ActiveNoteTable,
+  index : Int,
+) -> @moondsp.VoiceHandle {
+  @moondsp.VoiceHandle::from_parts(
+    slot=self.slots[index],
+    generation=self.generations[index],
+  )
+}
+
+///|
+fn ActiveNoteTable::index_for_map_key(
+  self : ActiveNoteTable,
+  map_key : Int,
+) -> Int? {
+  for index in 0..<self.used.length() {
+    if self.used[index] && self.map_keys[index] == map_key {
+      return Some(index)
+    }
+  }
+  None
+}
+
+///|
+fn ActiveNoteTable::find_by_key(self : ActiveNoteTable, key : Int) -> Int? {
+  for index in 0..<self.used.length() {
+    if self.used[index] && self.keys[index] == key {
+      return Some(index)
+    }
+  }
+  None
+}
+
+///|
+fn ActiveNoteTable::clear_index(self : ActiveNoteTable, index : Int) -> Unit {
+  if self.used[index] {
+    self.used[index] = false
+    self.count = self.count - 1
+  }
+}
+
+///|
+fn ActiveNoteTable::clear_all(self : ActiveNoteTable) -> Unit {
+  self.used.fill(false)
+  self.count = 0
+}
+
+///|
+fn ActiveNoteTable::remove_for_slot(self : ActiveNoteTable, slot : Int) -> Unit {
+  for index in 0..<self.used.length() {
+    if self.used[index] && self.slots[index] == slot {
+      self.clear_index(index)
+    }
+  }
+}
+
+///|
+fn ActiveNoteTable::store_handle_id(
+  self : ActiveNoteTable,
+  map_key : Int,
+  key : Int,
+  velocity : Double,
+  handle_id : Int64,
+) -> Unit {
+  let slot = @moondsp.VoiceHandle::packed_slot(handle_id)
+  self.remove_for_slot(slot)
+  for index in 0..<self.used.length() {
+    if !self.used[index] {
+      self.used[index] = true
+      self.map_keys[index] = map_key
+      self.keys[index] = key
+      self.velocities[index] = velocity
+      self.slots[index] = slot
+      self.generations[index] = @moondsp.VoiceHandle::packed_generation(
+        handle_id,
+      )
+      self.count = self.count + 1
+      return
+    }
+  }
 }
 
 ///|
@@ -197,7 +312,7 @@ pub fn ClapSynthEngine::new(
         render_contexts: FixedArray::makei(max_block_size + 1, fn(block_size) {
           @moondsp.DspContext::new(sample_rate~, block_size~)
         }),
-        active_notes: {},
+        active_notes: ActiveNoteTable::new(max_voices),
         last_frame_count: 0,
         master_gain: DEFAULT_MASTER_GAIN,
         voice_gain: DEFAULT_VOICE_GAIN,
@@ -247,16 +362,16 @@ fn note_map_key(note_id : Int, key : Int) -> Int {
 }
 
 ///|
-fn ClapSynthEngine::find_active_note_by_key(
+fn ClapSynthEngine::release_active_note_index(
   self : ClapSynthEngine,
-  key : Int,
-) -> Int? {
-  for map_key, note in self.active_notes {
-    if note.key == key {
-      return Some(map_key)
-    }
+  index : Int,
+) -> Bool {
+  if !self.active_notes.is_used(index) {
+    return false
   }
-  None
+  let handle = self.active_notes.handle_at(index)
+  self.active_notes.clear_index(index)
+  self.pool.note_off_bool(handle)
 }
 
 ///|
@@ -264,12 +379,9 @@ fn ClapSynthEngine::release_active_note(
   self : ClapSynthEngine,
   map_key : Int,
 ) -> Bool {
-  match self.active_notes.get(map_key) {
+  match self.active_notes.index_for_map_key(map_key) {
     None => false
-    Some(note) => {
-      self.active_notes.remove(map_key)
-      self.pool.note_off_result(note.handle) is Ok(_)
-    }
+    Some(index) => self.release_active_note_index(index)
   }
 }
 
@@ -279,9 +391,9 @@ fn ClapSynthEngine::release_active_note_matching_key(
   map_key : Int,
   key : Int,
 ) -> Bool {
-  match self.active_notes.get(map_key) {
-    Some(note) if key < 0 || note.key == key =>
-      self.release_active_note(map_key)
+  match self.active_notes.index_for_map_key(map_key) {
+    Some(index) if key < 0 || self.active_notes.key_at(index) == key =>
+      self.release_active_note_index(index)
     _ => false
   }
 }
@@ -294,9 +406,10 @@ fn ClapSynthEngine::release_active_notes_by_key(
   let mut released = false
   let mut searching = true
   while searching {
-    match self.find_active_note_by_key(key) {
+    match self.active_notes.find_by_key(key) {
       None => searching = false
-      Some(map_key) => released = self.release_active_note(map_key) || released
+      Some(index) =>
+        released = self.release_active_note_index(index) || released
     }
   }
   released
@@ -391,20 +504,6 @@ fn midi_to_hz(key : Int) -> Double {
 }
 
 ///|
-fn ClapSynthEngine::current_note_controls(
-  self : ClapSynthEngine,
-  key : Int,
-  velocity : Double,
-) -> Map[String, Double] {
-  {
-    "note": midi_to_hz(key),
-    "cutoff": self.cutoff_hz,
-    "q": self.resonance,
-    "gain": self.voice_gain * sanitize_velocity(velocity),
-  }
-}
-
-///|
 pub fn ClapSynthEngine::note_on(
   self : ClapSynthEngine,
   note_id~ : Int,
@@ -417,18 +516,26 @@ pub fn ClapSynthEngine::note_on(
   let map_key = note_map_key(note_id, key)
   ignore(self.release_active_note(map_key))
   let note_velocity = sanitize_velocity(velocity)
-  match
-    self.pool.note_on_controls(self.current_note_controls(key, note_velocity)) {
-    None => false
-    Some(handle) => {
-      ignore(self.pool.set_voice_pan_result(handle, self.pan))
-      self.active_notes[map_key] = ActiveClapNote::new(
-        handle~,
-        key~,
-        velocity=note_velocity,
-      )
-      true
-    }
+  let handle_id = self.pool.note_on_prevalidated_params4_id(
+    NOTE_NODE_INDEX,
+    @moondsp.GraphParamSlot::Value0,
+    midi_to_hz(key),
+    FILTER_NODE_INDEX,
+    @moondsp.GraphParamSlot::Value0,
+    self.cutoff_hz,
+    FILTER_NODE_INDEX,
+    @moondsp.GraphParamSlot::Value1,
+    self.resonance,
+    GAIN_NODE_INDEX,
+    @moondsp.GraphParamSlot::Value0,
+    self.voice_gain * note_velocity,
+    self.pan,
+  )
+  if handle_id < 0L {
+    false
+  } else {
+    self.active_notes.store_handle_id(map_key, key, note_velocity, handle_id)
+    true
   }
 }
 
@@ -439,7 +546,7 @@ pub fn ClapSynthEngine::note_off(
   key~ : Int,
 ) -> Bool {
   if note_id < 0 && key < 0 {
-    let had_notes = self.active_notes.length() > 0
+    let had_notes = self.active_notes.count > 0
     self.all_notes_off()
     return had_notes
   }
@@ -457,7 +564,7 @@ pub fn ClapSynthEngine::note_off(
 ///|
 pub fn ClapSynthEngine::all_notes_off(self : ClapSynthEngine) -> Unit {
   self.pool.note_off_all()
-  self.active_notes.clear()
+  self.active_notes.clear_all()
 }
 
 ///|
@@ -477,10 +584,18 @@ fn ClapSynthEngine::apply_param_to_active_voices(
   slot : @moondsp.GraphParamSlot,
   value : Double,
 ) -> Unit {
-  let control = @moondsp.GraphControl::set_param(node_index, slot, value)
-  self.active_notes.each(fn(_, note) {
-    ignore(self.pool.apply_voice_control_result(note.handle, control))
-  })
+  for index in 0..<self.active_notes.capacity() {
+    if self.active_notes.is_used(index) {
+      ignore(
+        self.pool.apply_voice_param_bool(
+          self.active_notes.handle_at(index),
+          node_index,
+          slot,
+          value,
+        ),
+      )
+    }
+  }
 }
 
 ///|
@@ -488,13 +603,17 @@ fn ClapSynthEngine::apply_voice_gain_to_active_notes(
   self : ClapSynthEngine,
   value : Double,
 ) -> Unit {
-  for _, note in self.active_notes {
-    let control = @moondsp.GraphControl::set_param(
-      GAIN_NODE_INDEX,
-      @moondsp.GraphParamSlot::Value0,
-      value * note.velocity,
-    )
-    ignore(self.pool.apply_voice_control_result(note.handle, control))
+  for index in 0..<self.active_notes.capacity() {
+    if self.active_notes.is_used(index) {
+      ignore(
+        self.pool.apply_voice_param_bool(
+          self.active_notes.handle_at(index),
+          GAIN_NODE_INDEX,
+          @moondsp.GraphParamSlot::Value0,
+          value * self.active_notes.velocity_at(index),
+        ),
+      )
+    }
   }
 }
 
@@ -546,9 +665,16 @@ pub fn ClapSynthEngine::set_pan(
 ) -> Double {
   let sanitized = sanitize_pan(value)
   self.pan = sanitized
-  self.active_notes.each(fn(_, note) {
-    ignore(self.pool.set_voice_pan_result(note.handle, sanitized))
-  })
+  for index in 0..<self.active_notes.capacity() {
+    if self.active_notes.is_used(index) {
+      ignore(
+        self.pool.set_voice_pan_bool(
+          self.active_notes.handle_at(index),
+          sanitized,
+        ),
+      )
+    }
+  }
   sanitized
 }
 

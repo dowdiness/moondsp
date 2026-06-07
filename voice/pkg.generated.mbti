@@ -18,6 +18,7 @@ pub struct BoundVoicePool {
 pub fn BoundVoicePool::active_voice_count(Self) -> Int
 pub fn BoundVoicePool::apply_voice_control_result(Self, VoiceHandle, @graph.GraphControl) -> Result[Unit, VoiceControlError]
 pub fn BoundVoicePool::apply_voice_controls_result(Self, VoiceHandle, Array[@graph.GraphControl]) -> Result[Unit, VoiceControlError]
+pub fn BoundVoicePool::apply_voice_param_bool(Self, VoiceHandle, Int, @graph.GraphParamSlot, Double) -> Bool
 #deprecated
 pub fn BoundVoicePool::kill(Self, VoiceHandle) -> Bool
 pub fn BoundVoicePool::kill_result(Self, VoiceHandle) -> Result[Unit, VoiceControlError]
@@ -26,12 +27,16 @@ pub fn BoundVoicePool::new(@graph.CompiledTemplate, @dsp.DspContext, @graph.Cont
 #deprecated
 pub fn BoundVoicePool::note_off(Self, VoiceHandle) -> Bool
 pub fn BoundVoicePool::note_off_all(Self) -> Unit
+pub fn BoundVoicePool::note_off_bool(Self, VoiceHandle) -> Bool
 pub fn BoundVoicePool::note_off_result(Self, VoiceHandle) -> Result[Unit, VoiceControlError]
 pub fn BoundVoicePool::note_on_controls(Self, Map[String, Double]) -> VoiceHandle?
+pub fn BoundVoicePool::note_on_graph_controls(Self, Array[@graph.GraphControl]) -> VoiceHandle?
+pub fn BoundVoicePool::note_on_prevalidated_params4_id(Self, Int, @graph.GraphParamSlot, Double, Int, @graph.GraphParamSlot, Double, Int, @graph.GraphParamSlot, Double, Int, @graph.GraphParamSlot, Double, Double) -> Int64
 pub fn BoundVoicePool::process(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn BoundVoicePool::set_template(Self, @graph.CompiledTemplate, @graph.ControlBindingBuilder) -> Result[Unit, BoundVoicePoolError]
 #deprecated
 pub fn BoundVoicePool::set_voice_pan(Self, VoiceHandle, Double) -> Bool
+pub fn BoundVoicePool::set_voice_pan_bool(Self, VoiceHandle, Double) -> Bool
 pub fn BoundVoicePool::set_voice_pan_result(Self, VoiceHandle, Double) -> Result[Unit, VoiceControlError]
 pub fn BoundVoicePool::validate_voice_controls_result(Self, VoiceHandle, Array[@graph.GraphControl]) -> Result[Unit, VoiceControlError]
 pub fn BoundVoicePool::voice_state(Self, VoiceHandle) -> VoiceState
@@ -55,6 +60,9 @@ pub struct VoiceHandle {
   slot : Int
   generation : Int
 } derive(Eq, @debug.Debug)
+pub fn VoiceHandle::from_parts(slot~ : Int, generation~ : Int) -> Self
+pub fn VoiceHandle::packed_generation(Int64) -> Int
+pub fn VoiceHandle::packed_slot(Int64) -> Int
 pub impl Show for VoiceHandle
 
 pub struct VoicePool {

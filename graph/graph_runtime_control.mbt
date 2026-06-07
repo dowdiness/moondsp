@@ -161,6 +161,40 @@ pub fn CompiledDsp::validate_controls(
 }
 
 ///|
+/// Allocation-conscious gate-on primitive for prevalidated host paths.
+pub fn CompiledDsp::gate_on_bool(self : CompiledDsp, node_index : Int) -> Bool {
+  self.raw().gate_on_bool(node_index)
+}
+
+///|
+/// Allocation-conscious gate-off primitive for prevalidated host paths.
+pub fn CompiledDsp::gate_off_bool(self : CompiledDsp, node_index : Int) -> Bool {
+  self.raw().gate_off_bool(node_index)
+}
+
+///|
+/// Allocation-conscious parameter primitive for prevalidated host paths.
+pub fn CompiledDsp::set_param_bool(
+  self : CompiledDsp,
+  node_index : Int,
+  slot : GraphParamSlot,
+  value : Double,
+) -> Bool {
+  self.raw().set_param_bool(node_index, slot.to_model(), value)
+}
+
+///|
+/// Allocation-conscious parameter validation for prevalidated host paths.
+pub fn CompiledDsp::can_set_param_bool(
+  self : CompiledDsp,
+  node_index : Int,
+  slot : GraphParamSlot,
+  value : Double,
+) -> Bool {
+  self.raw().can_set_param_bool(node_index, slot.to_model(), value)
+}
+
+///|
 /// Returns true when a voice using this compiled graph can be safely reclaimed.
 ///
 /// Two-stage check:
@@ -172,6 +206,12 @@ pub fn CompiledDsp::validate_controls(
 /// voices alive during sustain (where output is non-zero but expected).
 pub fn CompiledDsp::is_voice_finished(self : CompiledDsp) -> Bool {
   self.raw().is_voice_finished()
+}
+
+///|
+/// Reset mutable runtime state and restore compile-time node parameters.
+pub fn CompiledDsp::reset_runtime_state(self : CompiledDsp) -> Unit {
+  self.raw().reset_runtime_state()
 }
 
 ///|

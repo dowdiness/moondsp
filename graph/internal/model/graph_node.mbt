@@ -55,6 +55,7 @@ pub const STEREO_SIGNAL_SHAPE : Int = 1
 
 ///|
 /// Runtime control message for a compiled graph.
+#valtype
 pub struct GraphControl {
   priv kind : GraphControlKind
   priv node_index : Int
@@ -103,6 +104,8 @@ pub fn GraphControl::value(self : GraphControl) -> Double {
 ///    storage without boxing. Critical for zero-allocation audio processing.
 /// 2. **Copy-on-update** — node_with_value0/value1/delay_samples create updated
 ///    copies without knowing the node kind, supporting runtime parameter changes.
+///    Narrow in-place setters are reserved for compiled-graph hot paths that own
+///    their node storage and restore from separate defaults.
 /// 3. **Serialization** — uniform layout simplifies graph serialization for
 ///    hot-swap and topology editing.
 ///
@@ -112,14 +115,14 @@ pub struct DspNode {
   priv kind : DspNodeKind
   priv input0 : Int
   priv input1 : Int
-  priv value0 : Double
-  priv value1 : Double
+  priv mut value0 : Double
+  priv mut value1 : Double
   priv value2 : Double
   priv value3 : Double
   priv waveform : Waveform
   priv filter_mode : BiquadMode
   priv delay_max_samples : Int
-  priv delay_samples : Int
+  priv mut delay_samples : Int
   priv seed : UInt
 }
 
@@ -246,6 +249,51 @@ pub fn DspNode::delay_samples(self : DspNode) -> Int {
 ///|
 pub fn DspNode::seed(self : DspNode) -> UInt {
   self.seed
+}
+
+///|
+/// Return an independent node object with the same structural fields.
+pub fn clone_node(node : DspNode) -> DspNode {
+  DspNode::new(
+    node.kind(),
+    node.input0(),
+    node.input1(),
+    node.value0(),
+    node.value1(),
+    node.value2(),
+    node.value3(),
+    node.waveform(),
+    node.filter_mode(),
+    node.delay_max_samples(),
+    node.delay_samples(),
+    node.seed(),
+  )
+}
+
+///|
+/// Mutate runtime value0 in place. Intended for compiled graph hot paths.
+pub fn set_node_value0(node : DspNode, value : Double) -> Unit {
+  node.value0 = value
+}
+
+///|
+/// Mutate runtime value1 in place. Intended for compiled graph hot paths.
+pub fn set_node_value1(node : DspNode, value : Double) -> Unit {
+  node.value1 = value
+}
+
+///|
+/// Mutate runtime delay samples in place. Intended for compiled graph hot paths.
+pub fn set_node_delay_samples(node : DspNode, value : Int) -> Unit {
+  node.delay_samples = value
+}
+
+///|
+/// Restore runtime-mutable node parameters from a default node.
+pub fn restore_node_runtime_params(node : DspNode, defaults : DspNode) -> Unit {
+  node.value0 = defaults.value0()
+  node.value1 = defaults.value1()
+  node.delay_samples = defaults.delay_samples()
 }
 
 ///|

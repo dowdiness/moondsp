@@ -9,6 +9,7 @@
 pub struct CompiledGraph {
   priv compile_sample_rate : Double
   priv nodes : FixedArray[@model.DspNode]
+  priv default_nodes : FixedArray[@model.DspNode]
   priv index_map : FixedArray[Int]
   // Mono signal path buffers — one per node
   priv buffers : FixedArray[AudioBuffer]
@@ -317,6 +318,9 @@ fn compile_graph_impl(
   Some({
     compile_sample_rate,
     nodes: fixed_nodes,
+    default_nodes: FixedArray::makei(node_count, index => {
+      @model.clone_node(fixed_nodes[index])
+    }),
     index_map,
     buffers,
     left_buffers,

@@ -384,6 +384,123 @@ test "bound voice live control leaves future voice template unchanged" {
 }
 
 ///|
+test "bound voice graph-control note_on reuses template defaults" {
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
+  let nodes = [DspNode::constant(1.0), DspNode::output(0)]
+  let pool = BoundVoicePool::new(
+    CompiledTemplate::analyze(nodes),
+    ctx,
+    ControlBindingBuilder::new(),
+    max_voices=1,
+  ).unwrap()
+  let raised = pool
+    .note_on_graph_controls([
+      GraphControl::set_param(0, GraphParamSlot::Value0, 2.0),
+    ])
+    .unwrap()
+  let raised_left = AudioBuffer::filled(4)
+  let raised_right = AudioBuffer::filled(4)
+  pool.process(ctx, raised_left, raised_right)
+  assert_true(pool.kill_result(raised) is Ok(_))
+  let defaulted = pool.note_on_graph_controls([]).unwrap()
+  let default_left = AudioBuffer::filled(4)
+  let default_right = AudioBuffer::filled(4)
+  pool.process(ctx, default_left, default_right)
+  assert_true(pool.voice_state(defaulted) is VoiceState::Active)
+  assert_true(raised_left.get(0) > default_left.get(0) * 1.5)
+  assert_true(default_left.get(0) > 0.0)
+}
+
+///|
+test "bound voice graph-control invalid steal leaves active voice unchanged" {
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
+  let nodes = [DspNode::constant(1.0), DspNode::output(0)]
+  let pool = BoundVoicePool::new(
+    CompiledTemplate::analyze(nodes),
+    ctx,
+    ControlBindingBuilder::new(),
+    max_voices=1,
+  ).unwrap()
+  let current = pool
+    .note_on_graph_controls([
+      GraphControl::set_param(0, GraphParamSlot::Value0, 2.0),
+    ])
+    .unwrap()
+  let before_left = AudioBuffer::filled(4)
+  let before_right = AudioBuffer::filled(4)
+  pool.process(ctx, before_left, before_right)
+  assert_true(
+    pool.note_on_graph_controls([
+      GraphControl::set_param(99, GraphParamSlot::Value0, 3.0),
+    ])
+    is None,
+  )
+  let after_left = AudioBuffer::filled(4)
+  let after_right = AudioBuffer::filled(4)
+  pool.process(ctx, after_left, after_right)
+  assert_true(pool.voice_state(current) is VoiceState::Active)
+  assert_true((after_left.get(0) - before_left.get(0)).abs() < 0.001)
+}
+
+///|
+test "bound voice prevalidated params4 id sets params and rejects invalid steal" {
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
+  let nodes = [DspNode::constant(1.0), DspNode::output(0)]
+  let pool = BoundVoicePool::new(
+    CompiledTemplate::analyze(nodes),
+    ctx,
+    ControlBindingBuilder::new(),
+    max_voices=1,
+  ).unwrap()
+  let handle_id = pool.note_on_prevalidated_params4_id(
+    0,
+    GraphParamSlot::Value0,
+    2.0,
+    0,
+    GraphParamSlot::Value0,
+    2.0,
+    0,
+    GraphParamSlot::Value0,
+    2.0,
+    0,
+    GraphParamSlot::Value0,
+    2.0,
+    0.0,
+  )
+  assert_true(handle_id >= 0L)
+  let current = VoiceHandle::from_parts(
+    slot=VoiceHandle::packed_slot(handle_id),
+    generation=VoiceHandle::packed_generation(handle_id),
+  )
+  let before_left = AudioBuffer::filled(4)
+  let before_right = AudioBuffer::filled(4)
+  pool.process(ctx, before_left, before_right)
+  assert_true(pool.voice_state(current) is VoiceState::Active)
+  assert_true(before_left.get(0) > 1.0)
+  let rejected = pool.note_on_prevalidated_params4_id(
+    99,
+    GraphParamSlot::Value0,
+    3.0,
+    0,
+    GraphParamSlot::Value0,
+    1.0,
+    0,
+    GraphParamSlot::Value0,
+    1.0,
+    0,
+    GraphParamSlot::Value0,
+    1.0,
+    0.0,
+  )
+  assert_true(rejected < 0L)
+  let after_left = AudioBuffer::filled(4)
+  let after_right = AudioBuffer::filled(4)
+  pool.process(ctx, after_left, after_right)
+  assert_true(pool.voice_state(current) is VoiceState::Active)
+  assert_true((after_left.get(0) - before_left.get(0)).abs() < 0.001)
+}
+
+///|
 test "note_on allocates a voice and returns valid handle" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
   let nodes = [DspNode::constant(440.0), DspNode::output(0)]

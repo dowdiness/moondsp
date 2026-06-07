@@ -17,30 +17,34 @@ counter enabled only around each `plugin->process` call. The reusable command is
 scripts/audit-clap-audio-allocations.sh
 ```
 
-Use `scripts/audit-clap-audio-allocations.sh --expect-zero` only after the
-remaining event-path blockers are fixed.
+The current measured CLAP event/render paths pass:
+
+```bash
+scripts/audit-clap-audio-allocations.sh --expect-zero
+```
 
 ## Measured callback allocations
 
-After moving render `DspContext` creation to activation-owned engine state, the
-measured Linux callback-path allocation counts are:
+After moving render `DspContext` creation to activation-owned engine state and
+routing CLAP event handling through prepared scalar controls, the measured Linux
+callback-path allocation counts are:
 
 | Scenario | Allocations | Bytes |
 | --- | ---: | ---: |
 | Steady idle render, no events | 0 | 0 |
-| Note-on event at frame 64 | 178 | 23879 |
+| Note-on event at frame 64 | 0 | 0 |
 | Steady active render, no events | 0 | 0 |
 | Master-gain automation with active voice | 0 | 0 |
-| Cutoff automation with active voice | 20 | 488 |
-| Voice-gain automation with active voice | 25 | 596 |
-| Pan automation with active voice | 1 | 12 |
-| CLAP note-off with active voice | 9 | 132 |
+| Cutoff automation with active voice | 0 | 0 |
+| Voice-gain automation with active voice | 0 | 0 |
+| Pan automation with active voice | 0 | 0 |
+| CLAP note-off with active voice | 0 | 0 |
 | Transport play with active voice | 0 | 0 |
-| Transport stop with active voice | 5 | 84 |
-| MIDI note-on | 178 | 23879 |
+| Transport stop with active voice | 0 | 0 |
+| MIDI note-on | 0 | 0 |
 | Steady MIDI active render | 0 | 0 |
-| MIDI note-off with active voice | 17 | 312 |
-| MIDI all-notes-off CC with active voice | 5 | 84 |
+| MIDI note-off with active voice | 0 | 0 |
+| MIDI all-notes-off CC with active voice | 0 | 0 |
 
 `CLAP_PROCESS_CONTINUE` is reported as status `1` by the harness.
 
@@ -55,34 +59,32 @@ measured Linux callback-path allocation counts are:
 - Steady render is allocation-free in the measured native payload. The engine
   preallocates render contexts for supported span sizes during activation and
   selects the matching context per span.
-- Note-on and MIDI note-on are still allocation-heavy. The path builds a note
-  control map, resolves it to graph controls, compiles a fresh per-voice graph,
-  copies ADSR index snapshots, creates a voice handle, and stores an active-note
-  map entry.
-- Cutoff and voice-gain automation still allocate while voices are active. The
-  path builds graph-control objects and one-element arrays, validates by copying
-  simulated nodes, updates graph nodes by copy, and boxes `Result` values.
-- Pan automation is smaller but still allocates a boxed result on the active
-  voice-control path.
-- Note-off, transport-stop, and MIDI all-notes-off paths still allocate through
-  gate-off/result wrappers. MIDI note-off additionally takes the key-based
-  active-note search path.
+- Note-on and MIDI note-on are allocation-free in the measured stable-template
+  CLAP path. The path now bypasses CLAP note-control maps, graph-control batch
+  construction, result-typed graph-control application, ADSR snapshot copies,
+  boxed voice-handle return values, pan result boxing, and growable active-note
+  map insertion.
+- Cutoff, voice-gain, and pan automation are allocation-free in the measured
+  CLAP path. They use primitive active-note storage and allocation-conscious
+  voice/graph parameter predicates instead of graph-control arrays and boxed
+  result-returning wrappers.
+- CLAP note-off, MIDI note-off, transport-stop, and MIDI all-notes-off are
+  allocation-free in the measured path after switching ADSR gate helpers and
+  note-off dispatch to allocation-conscious primitives.
 - Output copying from the engine buffers to CLAP `data32`/`data64` does not
   allocate.
 
 ## Remaining production blockers
 
-Current CLAP support remains prototype-only. To resolve #173, the remaining work
-is to remove allocations from note, release, and active-parameter event paths:
+Current CLAP support remains prototype-only. The audited CLAP event/render paths
+now satisfy the allocation gate for #173, including `--expect-zero`. Do not treat
+that as DAW readiness. Remaining production gates are outside this allocation
+slice:
 
-1. Precompile or otherwise reserve per-voice runtime graphs during activation or
-   pool preparation, then reset/reuse them on note-on instead of compiling in the
-   audio callback.
-2. Replace the CLAP note-control `Map[String, Double]` path with a fixed,
-   prevalidated control path for the built-in synth parameters.
-3. Avoid graph-control arrays, simulated-node copies, copied `DspNode` updates,
-   and boxed `Result` values on audio-thread parameter automation.
-4. Replace or reserve the active-note lookup storage so note-on/off does not grow
-   or allocate in the callback.
-5. Re-run the allocation audit with `--expect-zero` before changing the CLAP
-   plan from prototype status.
+1. Keep any future template-edit path from lazily compiling on the audio thread;
+   the fixed CLAP stable-template path currently fails closed if a prepared slot
+   is stale.
+2. Stabilize the MoonBit/native bridge symbols and repeat the allocation audit
+   after bridge changes.
+3. Load the plugin in a real CLAP host/DAW before changing the CLAP plan from
+   prototype status.

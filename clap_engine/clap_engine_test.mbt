@@ -114,6 +114,23 @@ test "fully wildcard note off releases all active notes" {
 }
 
 ///|
+test "voice stealing removes stale active note for stolen slot" {
+  let engine = match
+    @clap_engine.ClapSynthEngine::new(
+      sample_rate=48000.0,
+      max_block_size=128,
+      max_voices=1,
+    ) {
+    Ok(engine) => engine
+    Err(error) => abort("expected one-voice engine: \{error}")
+  }
+  assert_true(engine.note_on(note_id=1, key=60, velocity=1.0))
+  assert_true(engine.note_on(note_id=2, key=64, velocity=1.0))
+  assert_true(!engine.note_off(note_id=1, key=60))
+  assert_true(engine.note_off(note_id=2, key=64))
+}
+
+///|
 test "process clamps CLAP frame count to the preallocated block" {
   let engine = new_test_engine()
   @debug.assert_eq(engine.process(1024), 128)

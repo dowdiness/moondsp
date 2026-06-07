@@ -10,6 +10,7 @@ using @graph {
   type CompiledTemplate,
   type GraphControl,
   type GraphControlError,
+  type GraphParamSlot,
 }
 
 ///|
@@ -25,12 +26,16 @@ pub impl Show for VoiceState with fn output(self, logger) {
 }
 
 ///|
+const VOICE_HANDLE_PACK_FACTOR : Int64 = 2147483648L
+
+///|
 /// Generation-tagged voice handle.
 /// WHY generation counter: slot indices are reused after voice stealing.
 /// Without a generation tag, a stale handle from a stolen note could
 /// accidentally gate_off or pan the wrong voice occupying that slot.
 /// Every note_on increments the slot's generation; all operations compare
 /// the handle's generation against the slot's current generation.
+#valtype
 pub struct VoiceHandle {
   slot : Int
   generation : Int
@@ -39,6 +44,27 @@ pub struct VoiceHandle {
 ///|
 pub impl Show for VoiceHandle with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
+}
+
+///|
+/// Construct a handle from primitive parts for host-side fixed storage.
+pub fn VoiceHandle::from_parts(slot~ : Int, generation~ : Int) -> VoiceHandle {
+  { slot, generation }
+}
+
+///|
+fn VoiceHandle::pack_parts(slot~ : Int, generation~ : Int) -> Int64 {
+  slot.to_int64() * VOICE_HANDLE_PACK_FACTOR + generation.to_int64()
+}
+
+///|
+pub fn VoiceHandle::packed_slot(handle_id : Int64) -> Int {
+  (handle_id / VOICE_HANDLE_PACK_FACTOR).to_int()
+}
+
+///|
+pub fn VoiceHandle::packed_generation(handle_id : Int64) -> Int {
+  (handle_id % VOICE_HANDLE_PACK_FACTOR).to_int()
 }
 
 ///|
@@ -107,6 +133,7 @@ priv struct VoiceSlot {
   mut state : VoiceState
   mut generation : Int
   mut allocation_order : Int
+  mut template_generation : Int
   /// WHY cached gains instead of a pan field: avoids 2 trig calls (cos + sin)
   /// per voice per block in process(). Updated only when pan changes
   /// (control-rate), not per block. The pan position is fully encoded by the
@@ -125,6 +152,7 @@ fn VoiceSlot::VoiceSlot(block_size : Int) -> VoiceSlot {
     state: VoiceState::Idle,
     generation: 0,
     allocation_order: 0,
+    template_generation: -1,
     // Center pan: cos(π/4) = sin(π/4) ≈ 0.7071
     pan_left_gain: @dsp.pan_left_gain(0.0),
     pan_right_gain: @dsp.pan_right_gain(0.0),
@@ -153,18 +181,33 @@ fn VoiceSlot::update_pan(self : VoiceSlot, pan : Double) -> Unit {
 /// validate_voice_template) and adsr_authoring_indices is a snapshot of
 /// surviving ADSR indices only. Gate operations on those indices must
 /// succeed; an Err here means an invariant has been violated.
+fn gate_adsrs_at_bool(
+  compiled : CompiledDsp,
+  authoring_indices : FixedArray[Int],
+  gate_on : Bool,
+) -> Bool {
+  for n in 0..<authoring_indices.length() {
+    let i = authoring_indices[n]
+    let ok = if gate_on {
+      compiled.gate_on_bool(i)
+    } else {
+      compiled.gate_off_bool(i)
+    }
+    if !ok {
+      return false
+    }
+  }
+  true
+}
+
+///|
 fn gate_adsrs_at(
   compiled : CompiledDsp,
   authoring_indices : FixedArray[Int],
   gate_on : Bool,
 ) -> Unit {
-  for n in 0..<authoring_indices.length() {
-    let i = authoring_indices[n]
-    if gate_on {
-      compiled.gate_on(i).unwrap()
-    } else {
-      compiled.gate_off(i).unwrap()
-    }
+  if !gate_adsrs_at_bool(compiled, authoring_indices, gate_on) {
+    abort("voice ADSR gate invariant violated")
   }
 }
 
@@ -192,6 +235,7 @@ pub struct VoicePool {
   priv mut compiled_template : CompiledTemplate
   priv compile_context : DspContext
   priv mut next_allocation_order : Int
+  priv mut template_generation : Int
   priv max_voices : Int
   priv mut last_sanitized_count : Int
 }
@@ -244,12 +288,22 @@ pub fn VoicePool::new(
     Ok(_) => {
       let block_size = context.block_size()
       let slots = FixedArray::makei(max_voices, _ => VoiceSlot::new(block_size))
+      for i in 0..<max_voices {
+        match CompiledDsp::compile(compiled_template, context) {
+          Some(compiled) => {
+            slots[i].compiled = Some(compiled)
+            slots[i].template_generation = 0
+          }
+          None => return Err(VoicePoolError::CompileRejected)
+        }
+      }
       Ok({
         slots,
         adsr_authoring_indices: compiled_template.adsr_authoring_indices(),
         compiled_template,
         compile_context: context,
         next_allocation_order: 0,
+        template_generation: 0,
         max_voices,
         last_sanitized_count: 0,
       })
@@ -268,7 +322,20 @@ pub fn VoicePool::set_template(
   }
   self.compiled_template = compiled_template
   self.adsr_authoring_indices = compiled_template.adsr_authoring_indices()
+  self.template_generation = self.next_template_generation()
   Ok(())
+}
+
+///|
+fn VoicePool::next_template_generation(self : VoicePool) -> Int {
+  if self.template_generation >= @int.MAX_VALUE - 1 {
+    for i in 0..<self.max_voices {
+      self.slots[i].template_generation = -1
+    }
+    0
+  } else {
+    self.template_generation + 1
+  }
 }
 
 ///|
@@ -308,8 +375,10 @@ pub fn BoundVoicePool::set_template(
     Ok(bindings) => bindings
     Err(error) => return Err(BoundVoicePoolError::Binding(error))
   }
-  self.pool.adsr_authoring_indices = compiled_template.adsr_authoring_indices()
-  self.pool.compiled_template = compiled_template
+  match self.pool.set_template(compiled_template) {
+    Err(error) => return Err(BoundVoicePoolError::from_voice_pool(error))
+    Ok(_) => ()
+  }
   self.bindings = next_bindings
   Ok(())
 }
@@ -323,6 +392,45 @@ pub fn BoundVoicePool::note_on_controls(
 }
 
 ///|
+/// Trigger a voice with an already-materialized graph-control batch.
+/// This bypasses string-key control-map resolution while preserving the same
+/// transactional semantics as `VoicePool::note_on`.
+pub fn BoundVoicePool::note_on_graph_controls(
+  self : BoundVoicePool,
+  controls : Array[GraphControl],
+) -> VoiceHandle? {
+  self.pool.note_on(controls)
+}
+
+///|
+/// Trigger a voice from four fixed, prevalidated parameter updates and set its
+/// pan before it becomes visible to callers. This is for host integrations that
+/// validate a stable template outside the audio callback and need a non-allocating
+/// note-on path. Returns a negative id on rejection; dynamic graph-control callers
+/// should use `note_on_graph_controls`.
+pub fn BoundVoicePool::note_on_prevalidated_params4_id(
+  self : BoundVoicePool,
+  node0 : Int,
+  slot0 : GraphParamSlot,
+  value0 : Double,
+  node1 : Int,
+  slot1 : GraphParamSlot,
+  value1 : Double,
+  node2 : Int,
+  slot2 : GraphParamSlot,
+  value2 : Double,
+  node3 : Int,
+  slot3 : GraphParamSlot,
+  value3 : Double,
+  pan : Double,
+) -> Int64 {
+  self.pool.note_on_prevalidated_params4_id(
+    node0, slot0, value0, node1, slot1, value1, node2, slot2, value2, node3, slot3,
+    value3, pan,
+  )
+}
+
+///|
 /// Deprecated compatibility wrapper. Use `note_off_result` to observe stale
 /// or invalid handles as `VoiceControlError` values.
 #deprecated("Use BoundVoicePool::note_off_result(handle) to observe VoiceControlError")
@@ -330,7 +438,16 @@ pub fn BoundVoicePool::note_off(
   self : BoundVoicePool,
   handle : VoiceHandle,
 ) -> Bool {
-  self.note_off_result(handle) is Ok(_)
+  self.note_off_bool(handle)
+}
+
+///|
+/// Allocation-conscious note-off predicate for host callback paths.
+pub fn BoundVoicePool::note_off_bool(
+  self : BoundVoicePool,
+  handle : VoiceHandle,
+) -> Bool {
+  self.pool.note_off_bool(handle)
 }
 
 ///|
@@ -374,7 +491,17 @@ pub fn BoundVoicePool::set_voice_pan(
   handle : VoiceHandle,
   pan : Double,
 ) -> Bool {
-  self.set_voice_pan_result(handle, pan) is Ok(_)
+  self.set_voice_pan_bool(handle, pan)
+}
+
+///|
+/// Allocation-conscious pan update predicate for host callback paths.
+pub fn BoundVoicePool::set_voice_pan_bool(
+  self : BoundVoicePool,
+  handle : VoiceHandle,
+  pan : Double,
+) -> Bool {
+  self.pool.set_voice_pan_bool(handle, pan)
 }
 
 ///|
@@ -404,6 +531,18 @@ pub fn BoundVoicePool::apply_voice_control_result(
   control : GraphControl,
 ) -> Result[Unit, VoiceControlError] {
   self.pool.apply_voice_controls_result(handle, [control])
+}
+
+///|
+/// Allocation-conscious live parameter update predicate for host callback paths.
+pub fn BoundVoicePool::apply_voice_param_bool(
+  self : BoundVoicePool,
+  handle : VoiceHandle,
+  node_index : Int,
+  slot : GraphParamSlot,
+  value : Double,
+) -> Bool {
+  self.pool.apply_voice_param_bool(handle, node_index, slot, value)
 }
 
 ///|
@@ -525,32 +664,24 @@ fn VoicePool::compact_allocation_orders(self : VoicePool) -> Unit {
 }
 
 ///|
-pub fn VoicePool::note_on(
+fn VoicePool::activate_slot(
   self : VoicePool,
-  params : Array[GraphControl],
-) -> VoiceHandle? {
-  let slot_index = self.find_slot()
-  let slot = self.slots[slot_index]
-  let compiled = match
-    CompiledDsp::compile(self.compiled_template, self.compile_context) {
-    Some(c) => c
-    None => return None
-  }
-  // WHY transactional: if any param is invalid, the voice is not activated.
-  // This prevents partially-configured voices with default/stale settings.
-  if params.length() > 0 {
-    if compiled.apply_controls(params) is Err(_) {
-      return None
-    }
-  }
+  slot : VoiceSlot,
+  slot_index : Int,
+  compiled : CompiledDsp,
+  update_pan : Bool,
+  pan : Double,
+) -> Int64 {
   gate_adsrs_at(compiled, self.adsr_authoring_indices, true)
   slot.compiled = Some(compiled)
-  // WHY snapshot + copy: note_off needs the SAME indices that were used at
-  // note_on to gate the right ADSRs. .copy() is load-bearing — without it,
-  // a subsequent set_template would mutate this slot's snapshot and the
-  // already-sounding voice would gate_off against the wrong index set.
-  // See VoiceSlot.adsr_authoring_indices_snapshot doc comment.
-  slot.adsr_authoring_indices_snapshot = self.adsr_authoring_indices.copy()
+  slot.template_generation = self.template_generation
+  // WHY direct snapshot reference: `set_template` replaces the pool snapshot
+  // instead of mutating it. Holding the current FixedArray preserves the note-on
+  // ADSR set for later note_off without allocating a per-note copy.
+  slot.adsr_authoring_indices_snapshot = self.adsr_authoring_indices
+  if update_pan {
+    slot.update_pan(pan)
+  }
   slot.state = VoiceState::Active
   // WHY overflow guard on generation: after 2^31 increments the counter
   // wraps negative, which could revalidate stale VoiceHandles. Resetting
@@ -569,7 +700,90 @@ pub fn VoicePool::note_on(
   } else {
     self.next_allocation_order = self.next_allocation_order + 1
   }
-  Some({ slot: slot_index, generation: slot.generation })
+  VoiceHandle::pack_parts(slot=slot_index, generation=slot.generation)
+}
+
+///|
+fn VoicePool::note_on_prevalidated_params4_id(
+  self : VoicePool,
+  node0 : Int,
+  slot0 : GraphParamSlot,
+  value0 : Double,
+  node1 : Int,
+  slot1 : GraphParamSlot,
+  value1 : Double,
+  node2 : Int,
+  slot2 : GraphParamSlot,
+  value2 : Double,
+  node3 : Int,
+  slot3 : GraphParamSlot,
+  value3 : Double,
+  pan : Double,
+) -> Int64 {
+  let slot_index = self.find_slot()
+  let slot = self.slots[slot_index]
+  let compiled = match slot.compiled {
+    Some(existing) if slot.template_generation == self.template_generation =>
+      existing
+    _ => return -1L
+  }
+  if !compiled.can_set_param_bool(node0, slot0, value0) ||
+    !compiled.can_set_param_bool(node1, slot1, value1) ||
+    !compiled.can_set_param_bool(node2, slot2, value2) ||
+    !compiled.can_set_param_bool(node3, slot3, value3) {
+    return -1L
+  }
+  compiled.reset_runtime_state()
+  if !compiled.set_param_bool(node0, slot0, value0) ||
+    !compiled.set_param_bool(node1, slot1, value1) ||
+    !compiled.set_param_bool(node2, slot2, value2) ||
+    !compiled.set_param_bool(node3, slot3, value3) {
+    return -1L
+  }
+  self.activate_slot(slot, slot_index, compiled, true, pan)
+}
+
+///|
+pub fn VoicePool::note_on(
+  self : VoicePool,
+  params : Array[GraphControl],
+) -> VoiceHandle? {
+  let slot_index = self.find_slot()
+  let slot = self.slots[slot_index]
+  // WHY fresh compile on active-slot params: keep the old active slot untouched
+  // if a stealing note's params reject. Idle slots can reset/reuse their
+  // prepared graph because no old voice can be damaged by a rejected note-on.
+  let force_fresh = !(slot.state is VoiceState::Idle) && params.length() > 0
+  let mut reused_prepared = false
+  let compiled = match slot.compiled {
+    Some(existing) if !force_fresh &&
+      slot.template_generation == self.template_generation => {
+      reused_prepared = true
+      existing
+    }
+    _ =>
+      match CompiledDsp::compile(self.compiled_template, self.compile_context) {
+        Some(c) => c
+        None => return None
+      }
+  }
+  if reused_prepared {
+    compiled.reset_runtime_state()
+  }
+  // WHY transactional: if any param is invalid, the voice is not activated.
+  // This prevents partially-configured voices with default/stale settings.
+  if params.length() > 0 {
+    if compiled.apply_controls(params) is Err(_) {
+      return None
+    }
+  }
+  let handle_id = self.activate_slot(slot, slot_index, compiled, false, 0.0)
+  Some(
+    VoiceHandle::from_parts(
+      slot=VoiceHandle::packed_slot(handle_id),
+      generation=VoiceHandle::packed_generation(handle_id),
+    ),
+  )
 }
 
 ///|
@@ -577,7 +791,34 @@ pub fn VoicePool::note_on(
 /// or invalid handles as `VoiceControlError` values.
 #deprecated("Use VoicePool::note_off_result(handle) to observe VoiceControlError")
 pub fn VoicePool::note_off(self : VoicePool, handle : VoiceHandle) -> Bool {
-  self.note_off_result(handle) is Ok(_)
+  self.note_off_bool(handle)
+}
+
+///|
+/// Allocation-conscious note-off predicate for host callback paths.
+fn VoicePool::note_off_bool(self : VoicePool, handle : VoiceHandle) -> Bool {
+  match self.resolve_slot(handle) {
+    None => false
+    Some(slot) => {
+      if slot.state is VoiceState::Idle {
+        return false
+      }
+      match slot.compiled {
+        Some(compiled) =>
+          if gate_adsrs_at_bool(
+              compiled,
+              slot.adsr_authoring_indices_snapshot,
+              false,
+            ) {
+            slot.state = VoiceState::Releasing
+            true
+          } else {
+            false
+          }
+        None => false
+      }
+    }
+  }
 }
 
 ///|
@@ -616,7 +857,10 @@ fn VoicePool::kill_result(
       if slot.state is VoiceState::Idle {
         return Err(VoiceControlError::InvalidVoiceHandle(handle))
       }
-      slot.compiled = None
+      match slot.compiled {
+        Some(compiled) => compiled.reset_runtime_state()
+        None => ()
+      }
       slot.state = VoiceState::Idle
       Ok(())
     }
@@ -647,7 +891,23 @@ pub fn VoicePool::set_voice_pan(
   handle : VoiceHandle,
   pan : Double,
 ) -> Bool {
-  self.set_voice_pan_result(handle, pan) is Ok(_)
+  self.set_voice_pan_bool(handle, pan)
+}
+
+///|
+/// Allocation-conscious pan update predicate for host callback paths.
+fn VoicePool::set_voice_pan_bool(
+  self : VoicePool,
+  handle : VoiceHandle,
+  pan : Double,
+) -> Bool {
+  match self.resolve_slot(handle) {
+    None => false
+    Some(slot) => {
+      slot.update_pan(pan)
+      true
+    }
+  }
 }
 
 ///|
@@ -717,6 +977,30 @@ fn VoicePool::apply_voice_controls_result(
 }
 
 ///|
+fn VoicePool::apply_voice_param_bool(
+  self : VoicePool,
+  handle : VoiceHandle,
+  node_index : Int,
+  slot : GraphParamSlot,
+  value : Double,
+) -> Bool {
+  match self.resolve_slot(handle) {
+    None => false
+    Some(slot_state) =>
+      if slot_state.state is VoiceState::Idle {
+        false
+      } else {
+        match slot_state.compiled {
+          Some(compiled) =>
+            compiled.can_set_param_bool(node_index, slot, value) &&
+            compiled.set_param_bool(node_index, slot, value)
+          None => false
+        }
+      }
+  }
+}
+
+///|
 pub fn VoicePool::voice_state(
   self : VoicePool,
   handle : VoiceHandle,
@@ -763,7 +1047,6 @@ pub fn VoicePool::process(
         }
         if slot.state is VoiceState::Releasing && compiled.is_voice_finished() {
           slot.state = VoiceState::Idle
-          slot.compiled = None
         }
       }
     }
