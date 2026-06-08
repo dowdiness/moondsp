@@ -1,8 +1,9 @@
 import {
-  "dowdiness/moondsp/identity" @identity,
-  "moonbitlang/core/bench" @bench,
-  "moonbitlang/core/debug" @debug,
-  "moonbitlang/core/math" @math,
+  "dowdiness/incr",
+  "dowdiness/moondsp/identity",
+  "moonbitlang/core/bench",
+  "moonbitlang/core/debug",
+  "moonbitlang/core/math",
 }
 
 import {
