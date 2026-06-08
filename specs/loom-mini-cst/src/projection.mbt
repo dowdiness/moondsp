@@ -100,6 +100,10 @@ pub struct LoomMiniAtomProjection {
   priv observer : @incr.Observer[
     Result[@pattern.PatternDoc[@pattern.ControlMap], String],
   ]
+  priv accepted : @incr.AcceptedDerived[
+    @pattern.PatternDoc[@pattern.ControlMap],
+    String,
+  ]
 }
 
 ///|
@@ -185,7 +189,20 @@ pub fn LoomMiniAtomProjection::new(input : String) -> LoomMiniAtomProjection {
   )
   scope.add_cell_ids([projected.id()])
   let observer = scope.add_observer(projected.observe())
-  { parser, scope, edit, source_before_edit, observer }
+  let accepted = scope.accepted_memo(
+    () => projected.get(),
+    label="loom-mini-atom-projection.accepted",
+  )
+  { parser, scope, edit, source_before_edit, observer, accepted }
+}
+
+///|
+/// The last successfully projected doc, retained across parse errors. Returns
+/// `None` until the first successful parse.
+pub fn LoomMiniAtomProjection::accepted_doc(
+  self : LoomMiniAtomProjection,
+) -> @pattern.PatternDoc[@pattern.ControlMap]? {
+  self.accepted.accepted_or_abort()
 }
 
 ///|

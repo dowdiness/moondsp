@@ -2,6 +2,7 @@
 package "dowdiness/moondsp/pattern"
 
 import {
+  "dowdiness/incr/types",
   "dowdiness/moondsp/identity",
   "moonbitlang/core/debug",
 }
@@ -96,6 +97,8 @@ pub fn[A] PatternDoc::slow(Self[A], id~ : @identity.PatternNodeId, factor~ : Rat
 pub fn[A] PatternDoc::stack(id~ : @identity.PatternNodeId, docs~ : Array[Self[A]]) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::subdoc(Self[A], root~ : @identity.PatternNodeId) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::with_root(Self[A], root~ : @identity.PatternNodeId) -> Self[A] raise PatternDocError
+pub impl[A] @types.BackdateEq for PatternDoc[A]
+pub impl[A] @types.HasChangedAt for PatternDoc[A]
 
 pub struct PatternLoweringCache[A] {
   // private fields

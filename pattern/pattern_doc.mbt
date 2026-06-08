@@ -1259,6 +1259,33 @@ pub fn[A] PatternDoc::revision(self : PatternDoc[A]) -> @identity.Revision {
 }
 
 ///|
+/// `PatternDoc` participates in incr's backdate-aware acceptance
+/// (`@incr.AcceptedDerived::accepted_memo`) through its `@identity.Revision`
+/// content stamp. `PatternDoc` is not `Eq` (it carries closure fields), so it
+/// qualifies via the revision identity rather than structural equality.
+///
+/// `changed_at` projects the revision's primary `value` into incr's 1-D
+/// `Revision`. This projection is intentionally lossy (it drops the
+/// `fingerprint`); it is NOT load-bearing because `backdate_equal` is
+/// overridden below to drive the acceptance decision directly.
+pub impl[A] @incr.HasChangedAt for PatternDoc[A] with fn changed_at(self) -> @incr.Revision {
+  @incr.Revision::{ value: self.revision.value().to_int() }
+}
+
+///|
+/// Override the default `backdate_equal` (which would compare only the lossy
+/// 1-D `changed_at` projection): compare the full 2-D `@identity.Revision`
+/// (`value` AND `fingerprint`) via its derived `Eq`, so two content-distinct
+/// docs that happen to collide on `value` are still treated as changed. This
+/// is the load-bearing acceptance predicate used by `accepted_memo`.
+pub impl[A] @incr.BackdateEq for PatternDoc[A] with fn backdate_equal(
+  self,
+  other,
+) -> Bool {
+  self.revision == other.revision
+}
+
+///|
 pub fn[A] PatternDoc::node_count(self : PatternDoc[A]) -> Int {
   self.nodes.length()
 }
