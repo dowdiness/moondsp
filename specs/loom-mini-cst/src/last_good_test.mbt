@@ -41,14 +41,40 @@ test "loom mini last-good: accepted_doc retains last good across a parse error" 
   }
 
   // Recover to a content-distinct valid source: the accepted channel advances to
-  // it (its revision differs from the first by the fingerprint).
+  // it (its revision differs from the first only by the fingerprint).
   projection.set_source("s(\"bd sd hh\")")
   let recovered_rev = projection_boundary_doc(projection.parse_doc()).revision()
+  // Pin the premise the fingerprint comparison relies on: the recovered doc
+  // COLLIDES with the first on the revision `value`, so a hypothetical
+  // value-only `backdate_equal` would wrongly treat the two as equal. The full
+  // revisions still differ — the difference is the fingerprint alone. Without
+  // this assertion, a value that stopped colliding (now or after a revision-
+  // scheme change) would let the acceptance check below pass even under a
+  // value-only predicate, silently ceasing to guard the fingerprint path.
+  if recovered_rev.value() != first_rev.value() {
+    abort("expected recovered and first revisions to collide on value")
+  }
   if recovered_rev == first_rev {
-    abort("expected the recovered parse to carry a new revision")
+    abort("expected recovered and first revisions to differ by fingerprint")
   }
   if last_good_accepted_revision(projection) != Some(recovered_rev) {
     abort("expected accepted doc to advance to the recovered doc")
+  }
+  projection.dispose()
+}
+
+///|
+test "loom mini last-good: accepted_doc is None before any successful parse" {
+  // A projection whose very first parse fails has accepted nothing yet: the
+  // accepted channel reports None — not the last-good of some earlier success
+  // (there is none), and not an abort.
+  let projection = LoomMiniAtomProjection::new("s(\"bd sd")
+  match projection.parse_doc() {
+    Err(_) => ()
+    Ok(_) => abort("expected malformed initial source to fail the first parse")
+  }
+  if last_good_accepted_revision(projection) != None {
+    abort("expected accepted_doc to be None before any successful parse")
   }
   projection.dispose()
 }
