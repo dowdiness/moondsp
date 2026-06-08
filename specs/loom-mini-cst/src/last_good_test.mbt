@@ -14,10 +14,7 @@
 fn last_good_accepted_revision(
   projection : LoomMiniAtomProjection,
 ) -> @identity.Revision? {
-  match projection.accepted_doc() {
-    Some(doc) => Some(doc.revision())
-    None => None
-  }
+  projection.accepted_doc().map(doc => doc.revision())
 }
 
 ///|
@@ -32,9 +29,8 @@ test "loom mini last-good: accepted_doc retains last good across a parse error" 
   // Edit to a malformed source: the current channel fails, the accepted
   // channel retains the last good doc unchanged.
   projection.set_source("s(\"bd sd")
-  match projection.parse_doc() {
-    Err(_) => ()
-    Ok(_) => abort("expected malformed source to fail the current parse")
+  guard projection.parse_doc() is Err(_) else {
+    abort("expected malformed source to fail the current parse")
   }
   if last_good_accepted_revision(projection) != Some(first_rev) {
     abort("expected accepted doc to retain the last good doc on parse error")
@@ -69,9 +65,8 @@ test "loom mini last-good: accepted_doc is None before any successful parse" {
   // accepted channel reports None — not the last-good of some earlier success
   // (there is none), and not an abort.
   let projection = LoomMiniAtomProjection::new("s(\"bd sd")
-  match projection.parse_doc() {
-    Err(_) => ()
-    Ok(_) => abort("expected malformed initial source to fail the first parse")
+  guard projection.parse_doc() is Err(_) else {
+    abort("expected malformed initial source to fail the first parse")
   }
   if last_good_accepted_revision(projection) != None {
     abort("expected accepted_doc to be None before any successful parse")

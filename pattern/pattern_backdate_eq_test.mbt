@@ -7,11 +7,10 @@
 
 ///|
 fn bd_pid(value : String) -> @identity.PatternNodeId {
-  let result = try? @identity.PatternNodeId::from_string(value)
-  match result {
-    Ok(id) => id
-    Err(_) => abort("expected valid pattern node id")
+  guard (try? @identity.PatternNodeId::from_string(value)) is Ok(id) else {
+    abort("expected valid pattern node id")
   }
+  id
 }
 
 ///|
@@ -23,13 +22,13 @@ fn bd_doc0(value : Int) -> PatternDoc[Int] {
 ///|
 /// A revision-1 doc (root reversed once) carrying `value`.
 fn bd_doc1(value : Int) -> PatternDoc[Int] {
-  let result = try? PatternDoc::pure(id=bd_pid("root"), value~).rev(
+  let reversed = try? PatternDoc::pure(id=bd_pid("root"), value~).rev(
     id=bd_pid("rev1"),
   )
-  match result {
-    Ok(doc) => doc
-    Err(_) => abort("rev should not fail on a fresh pure doc")
+  guard reversed is Ok(doc) else {
+    abort("rev should not fail on a fresh pure doc")
   }
+  doc
 }
 
 ///|
