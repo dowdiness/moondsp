@@ -41,6 +41,7 @@ pub fn tokenize(String) -> Array[@core.TokenInfo[MiniToken]]
 pub struct LoomMiniAtomProjection {
   // private fields
 }
+pub fn LoomMiniAtomProjection::accepted_doc(Self) -> @pattern.PatternDoc[@pattern.ControlMap]?
 pub fn LoomMiniAtomProjection::apply_edit(Self, @core.Edit, String) -> Unit
 pub fn LoomMiniAtomProjection::dispose(Self) -> Unit
 pub fn LoomMiniAtomProjection::new(String) -> Self
