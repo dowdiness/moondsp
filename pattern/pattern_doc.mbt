@@ -1268,8 +1268,8 @@ pub fn[A] PatternDoc::revision(self : PatternDoc[A]) -> @identity.Revision {
 /// `Revision`. This projection is intentionally lossy (it drops the
 /// `fingerprint`); it is NOT load-bearing because `backdate_equal` is
 /// overridden below to drive the acceptance decision directly.
-pub impl[A] @incr.HasChangedAt for PatternDoc[A] with fn changed_at(self) -> @incr.Revision {
-  @incr.Revision::{ value: self.revision.value().to_int() }
+pub impl[A] @types.HasChangedAt for PatternDoc[A] with fn changed_at(self) -> @types.Revision {
+  @types.Revision::{ value: self.revision.value().to_int() }
 }
 
 ///|
@@ -1278,7 +1278,7 @@ pub impl[A] @incr.HasChangedAt for PatternDoc[A] with fn changed_at(self) -> @in
 /// (`value` AND `fingerprint`) via its derived `Eq`, so two content-distinct
 /// docs that happen to collide on `value` are still treated as changed. This
 /// is the load-bearing acceptance predicate used by `accepted_memo`.
-pub impl[A] @incr.BackdateEq for PatternDoc[A] with fn backdate_equal(
+pub impl[A] @types.BackdateEq for PatternDoc[A] with fn backdate_equal(
   self,
   other,
 ) -> Bool {

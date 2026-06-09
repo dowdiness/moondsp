@@ -1,5 +1,5 @@
 import {
-  "dowdiness/incr",
+  "dowdiness/incr/types",
   "dowdiness/moondsp/identity",
   "moonbitlang/core/bench",
   "moonbitlang/core/debug",
