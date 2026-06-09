@@ -1,0 +1,91 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp/loom-backend-canary"
+
+import {
+  "dowdiness/loom",
+  "dowdiness/loom/core",
+  "dowdiness/loom/pipeline",
+  "dowdiness/seam",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn adapt_parse(String) -> Result[Int, String]
+
+pub fn canary_error_char(String, Int) -> Int
+
+pub fn canary_error_length(String) -> Int
+
+pub let canary_grammar : @loom.Grammar[CanaryToken, CanarySyntaxKind, CanaryAst]
+
+pub let canary_module_name : String
+
+pub let canary_spec : @core.LanguageSpec[CanaryToken, CanarySyntaxKind]
+
+pub let loom_stack_deps : Array[String]
+
+pub fn loom_stack_is_namespace_isolated() -> Bool
+
+pub fn probe_apply_edit(@pipeline.Parser[CanaryAst], String, String) -> Int
+
+pub fn probe_atom_count(@pipeline.Parser[CanaryAst]) -> Int
+
+pub fn probe_parser(String) -> @pipeline.Parser[CanaryAst]
+
+pub fn probe_projection_identity(@pipeline.Parser[CanaryAst], String) -> Int
+
+// Errors
+
+// Types and methods
+pub(all) enum CanaryAst {
+  Parsed
+} derive(Eq, @debug.Debug)
+
+pub(all) enum CanarySyntaxKind {
+  SKeywordToken
+  LParenToken
+  RParenToken
+  QuoteToken
+  CommaToken
+  DotToken
+  DollarColonToken
+  IdentToken
+  MethodNameToken
+  WhitespaceToken
+  ErrorToken
+  EofToken
+  RootNode
+  CallNode
+  NotationNode
+  LayerNode
+  AtomNode
+  MethodCallNode
+  DollarStackNode
+  DollarLineNode
+  ErrorNode
+} derive(Eq, @debug.Debug)
+pub impl @seam.ToRawKind for CanarySyntaxKind
+pub impl Show for CanarySyntaxKind
+
+pub(all) enum CanaryToken {
+  SKeyword
+  LParen
+  RParen
+  Quote
+  Comma
+  Dot
+  DollarColon
+  Ident
+  Whitespace
+  Error(String)
+  EOF
+} derive(Eq, @debug.Debug)
+pub impl @seam.IsEof for CanaryToken
+pub impl @seam.IsTrivia for CanaryToken
+pub impl @seam.ToRawKind for CanaryToken
+pub impl Show for CanaryToken
+
+// Type aliases
+
+// Traits
+

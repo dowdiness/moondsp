@@ -1,0 +1,619 @@
+Warning: [0020]
+     ╭─[ /home/antisatori/ghq/github.com/dowdiness/moondsp/browser/internal/playback_host/playback_host.mbt:294:16 ]
+     │
+ 294 │   let result = try? @song.Section(
+     │                ──┬─  
+     │                  ╰─── Warning (deprecated): `try?` is deprecated.
+
+Do not mechanically replace this with:
+  try expr |> Ok catch { e => Err(e) }
+
+That still creates a local `Result` wrapper and usually misses the intended migration.
+
+Default migration: handle the raising expression directly with `try ... catch ... noraise`, especially in local inspect/assert/match/guard/logging/test code:
+
+  try expr catch {
+    e => inspect(e, content=...)
+  } noraise {
+    value => inspect(value, content=...)
+  }
+
+Only create `Ok`/`Err` when the `Result` value must escape this local expression: stored, returned, passed to a Result-taking API, or kept for later comparison as data.
+─────╯
+Warning: [0020]
+     ╭─[ /home/antisatori/ghq/github.com/dowdiness/moondsp/browser/internal/playback_host/playback_host.mbt:326:16 ]
+     │
+ 326 │   let result = try? @song.Song(parts~)
+     │                ──┬─  
+     │                  ╰─── Warning (deprecated): `try?` is deprecated.
+
+Do not mechanically replace this with:
+  try expr |> Ok catch { e => Err(e) }
+
+That still creates a local `Result` wrapper and usually misses the intended migration.
+
+Default migration: handle the raising expression directly with `try ... catch ... noraise`, especially in local inspect/assert/match/guard/logging/test code:
+
+  try expr catch {
+    e => inspect(e, content=...)
+  } noraise {
+    value => inspect(value, content=...)
+  }
+
+Only create `Ok`/`Err` when the `Result` value must escape this local expression: stored, returned, passed to a Result-taking API, or kept for later comparison as data.
+─────╯
+Warning: [0020]
+    ╭─[ /home/antisatori/ghq/github.com/dowdiness/moondsp/graph/graph_identity.mbt:85:5 ]
+    │
+ 85 │     try? @authoring.GraphTemplateDoc::from_nodes(
+    │     ──┬─  
+    │       ╰─── Warning (deprecated): `try?` is deprecated.
+
+Do not mechanically replace this with:
+  try expr |> Ok catch { e => Err(e) }
+
+That still creates a local `Result` wrapper and usually misses the intended migration.
+
+Default migration: handle the raising expression directly with `try ... catch ... noraise`, especially in local inspect/assert/match/guard/logging/test code:
+
+  try expr catch {
+    e => inspect(e, content=...)
+  } noraise {
+    value => inspect(value, content=...)
+  }
+
+Only create `Ok`/`Err` when the `Result` value must escape this local expression: stored, returned, passed to a Result-taking API, or kept for later comparison as data.
+────╯
+Warning: [0020]
+     ╭─[ /home/antisatori/ghq/github.com/dowdiness/moondsp/graph/graph_identity.mbt:186:5 ]
+     │
+ 186 │     try? self.raw.replace_node(id, replacement.raw()),
+     │     ──┬─  
+     │       ╰─── Warning (deprecated): `try?` is deprecated.
+
+Do not mechanically replace this with:
+  try expr |> Ok catch { e => Err(e) }
+
+That still creates a local `Result` wrapper and usually misses the intended migration.
+
+Default migration: handle the raising expression directly with `try ... catch ... noraise`, especially in local inspect/assert/match/guard/logging/test code:
+
+  try expr catch {
+    e => inspect(e, content=...)
+  } noraise {
+    value => inspect(value, content=...)
+  }
+
+Only create `Ok`/`Err` when the `Result` value must escape this local expression: stored, returned, passed to a Result-taking API, or kept for later comparison as data.
+─────╯
+Warning: [0020]
+     ╭─[ /home/antisatori/ghq/github.com/dowdiness/moondsp/graph/graph_identity.mbt:198:5 ]
+     │
+ 198 │     try? self.raw.rewire_input(id, input_slot.to_staging(), source_id),
+     │     ──┬─  
+     │       ╰─── Warning (deprecated): `try?` is deprecated.
+
+Do not mechanically replace this with:
+  try expr |> Ok catch { e => Err(e) }
+
+That still creates a local `Result` wrapper and usually misses the intended migration.
+
+Default migration: handle the raising expression directly with `try ... catch ... noraise`, especially in local inspect/assert/match/guard/logging/test code:
+
+  try expr catch {
+    e => inspect(e, content=...)
+  } noraise {
+    value => inspect(value, content=...)
+  }
+
+Only create `Ok`/`Err` when the `Result` value must escape this local expression: stored, returned, passed to a Result-taking API, or kept for later comparison as data.
+─────╯
+Warning: [0020]
+     ╭─[ /home/antisatori/ghq/github.com/dowdiness/moondsp/graph/graph_identity.mbt:211:5 ]
+     │
+ 211 │     try? self.raw.insert_node(
+     │     ──┬─  
+     │       ╰─── Warning (deprecated): `try?` is deprecated.
+
+Do not mechanically replace this with:
+  try expr |> Ok catch { e => Err(e) }
+
+That still creates a local `Result` wrapper and usually misses the intended migration.
+
+Default migration: handle the raising expression directly with `try ... catch ... noraise`, especially in local inspect/assert/match/guard/logging/test code:
+
+  try expr catch {
+    e => inspect(e, content=...)
+  } noraise {
+    value => inspect(value, content=...)
+  }
+
+Only create `Ok`/`Err` when the `Result` value must escape this local expression: stored, returned, passed to a Result-taking API, or kept for later comparison as data.
+─────╯
+Warning: [0020]
+     ╭─[ /home/antisatori/ghq/github.com/dowdiness/moondsp/graph/graph_identity.mbt:229:5 ]
+     │
+ 229 │     try? self.raw.insert_chain(
+     │     ──┬─  
+     │       ╰─── Warning (deprecated): `try?` is deprecated.
+
+Do not mechanically replace this with:
+  try expr |> Ok catch { e => Err(e) }
+
+That still creates a local `Result` wrapper and usually misses the intended migration.
+
+Default migration: handle the raising expression directly with `try ... catch ... noraise`, especially in local inspect/assert/match/guard/logging/test code:
+
+  try expr catch {
+    e => inspect(e, content=...)
+  } noraise {
+    value => inspect(value, content=...)
+  }
+
+Only create `Ok`/`Err` when the `Result` value must escape this local expression: stored, returned, passed to a Result-taking API, or kept for later comparison as data.
+─────╯
+Warning: [0020]
+     ╭─[ /home/antisatori/ghq/github.com/dowdiness/moondsp/graph/graph_identity.mbt:247:5 ]
+     │
+ 247 │     try? self.raw.delete_node(
+     │     ──┬─  
+     │       ╰─── Warning (deprecated): `try?` is deprecated.
+
+Do not mechanically replace this with:
+  try expr |> Ok catch { e => Err(e) }
+
+That still creates a local `Result` wrapper and usually misses the intended migration.
+
+Default migration: handle the raising expression directly with `try ... catch ... noraise`, especially in local inspect/assert/match/guard/logging/test code:
+
+  try expr catch {
+    e => inspect(e, content=...)
+  } noraise {
+    value => inspect(value, content=...)
+  }
+
+Only create `Ok`/`Err` when the `Result` value must escape this local expression: stored, returned, passed to a Result-taking API, or kept for later comparison as data.
+─────╯
+Warning: [0020]
+     ╭─[ /home/antisatori/ghq/github.com/dowdiness/moondsp/graph/graph_identity.mbt:266:5 ]
+     │
+ 266 │     try? self.raw.delete_chain(
+     │     ──┬─  
+     │       ╰─── Warning (deprecated): `try?` is deprecated.
+
+Do not mechanically replace this with:
+  try expr |> Ok catch { e => Err(e) }
+
+That still creates a local `Result` wrapper and usually misses the intended migration.
+
+Default migration: handle the raising expression directly with `try ... catch ... noraise`, especially in local inspect/assert/match/guard/logging/test code:
+
+  try expr catch {
+    e => inspect(e, content=...)
+  } noraise {
+    value => inspect(value, content=...)
+  }
+
+Only create `Ok`/`Err` when the `Result` value must escape this local expression: stored, returned, passed to a Result-taking API, or kept for later comparison as data.
+─────╯
+Warning: [0020]
+     ╭─[ /home/antisatori/ghq/github.com/dowdiness/moondsp/mini/doc_parser.mbt:218:16 ]
+     │
+ 218 │   let result = try? @identity.PatternNodeId::from_string(value)
+     │                ──┬─  
+     │                  ╰─── Warning (deprecated): `try?` is deprecated.
+
+Do not mechanically replace this with:
+  try expr |> Ok catch { e => Err(e) }
+
+That still creates a local `Result` wrapper and usually misses the intended migration.
+
+Default migration: handle the raising expression directly with `try ... catch ... noraise`, especially in local inspect/assert/match/guard/logging/test code:
+
+  try expr catch {
+    e => inspect(e, content=...)
+  } noraise {
+    value => inspect(value, content=...)
+  }
+
+Only create `Ok`/`Err` when the `Result` value must escape this local expression: stored, returned, passed to a Result-taking API, or kept for later comparison as data.
+─────╯
+Warning: [0020]
+     ╭─[ /home/antisatori/ghq/github.com/dowdiness/moondsp/mini/doc_parser.mbt:298:22 ]
+     │
+ 298 │         let result = try? previous.subdoc(root=id)
+     │                      ──┬─  
+     │                        ╰─── Warning (deprecated): `try?` is deprecated.
+
+Do not mechanically replace this with:
+  try expr |> Ok catch { e => Err(e) }
+
+That still creates a local `Result` wrapper and usually misses the intended migration.
+
+Default migration: handle the raising expression directly with `try ... catch ... noraise`, especially in local inspect/assert/match/guard/logging/test code:
+
+  try expr catch {
+    e => inspect(e, content=...)
+  } noraise {
+    value => inspect(value, content=...)
+  }
+
+Only create `Ok`/`Err` when the `Result` value must escape this local expression: stored, returned, passed to a Result-taking API, or kept for later comparison as data.
+─────╯
+Warning: [0020]
+     ╭─[ /home/antisatori/ghq/github.com/dowdiness/moondsp/mini/doc_parser.mbt:348:31 ]
+     │
+ 348 │     None => unwrap_doc_result(try? @pattern.PatternDoc::sequence(id~, docs~))
+     │                               ──┬─  
+     │                                 ╰─── Warning (deprecated): `try?` is deprecated.
+
+Do not mechanically replace this with:
+  try expr |> Ok catch { e => Err(e) }
+
+That still creates a local `Result` wrapper and usually misses the intended migration.
+
+Default migration: handle the raising expression directly with `try ... catch ... noraise`, especially in local inspect/assert/match/guard/logging/test code:
+
+  try expr catch {
+    e => inspect(e, content=...)
+  } noraise {
+    value => inspect(value, content=...)
+  }
+
+Only create `Ok`/`Err` when the `Result` value must escape this local expression: stored, returned, passed to a Result-taking API, or kept for later comparison as data.
+─────╯
+Warning: [0020]
+     ╭─[ /home/antisatori/ghq/github.com/dowdiness/moondsp/mini/doc_parser.mbt:363:31 ]
+     │
+ 363 │     None => unwrap_doc_result(try? @pattern.PatternDoc::stack(id~, docs~))
+     │                               ──┬─  
+     │                                 ╰─── Warning (deprecated): `try?` is deprecated.
+
+Do not mechanically replace this with:
+  try expr |> Ok catch { e => Err(e) }
+
+That still creates a local `Result` wrapper and usually misses the intended migration.
+
+Default migration: handle the raising expression directly with `try ... catch ... noraise`, especially in local inspect/assert/match/guard/logging/test code:
+
+  try expr catch {
+    e => inspect(e, content=...)
+  } noraise {
+    value => inspect(value, content=...)
+  }
+
+Only create `Ok`/`Err` when the `Result` value must escape this local expression: stored, returned, passed to a Result-taking API, or kept for later comparison as data.
+─────╯
+Warning: [0020]
+     ╭─[ /home/antisatori/ghq/github.com/dowdiness/moondsp/mini/doc_parser.mbt:379:31 ]
+     │
+ 379 │     None => unwrap_doc_result(try? doc.fast(id~, factor~))
+     │                               ──┬─  
+     │                                 ╰─── Warning (deprecated): `try?` is deprecated.
+
+Do not mechanically replace this with:
+  try expr |> Ok catch { e => Err(e) }
+
+That still creates a local `Result` wrapper and usually misses the intended migration.
+
+Default migration: handle the raising expression directly with `try ... catch ... noraise`, especially in local inspect/assert/match/guard/logging/test code:
+
+  try expr catch {
+    e => inspect(e, content=...)
+  } noraise {
+    value => inspect(value, content=...)
+  }
+
+Only create `Ok`/`Err` when the `Result` value must escape this local expression: stored, returned, passed to a Result-taking API, or kept for later comparison as data.
+─────╯
+Warning: [0020]
+     ╭─[ /home/antisatori/ghq/github.com/dowdiness/moondsp/mini/doc_parser.mbt:395:31 ]
+     │
+ 395 │     None => unwrap_doc_result(try? doc.slow(id~, factor~))
+     │                               ──┬─  
+     │                                 ╰─── Warning (deprecated): `try?` is deprecated.
+
+Do not mechanically replace this with:
+  try expr |> Ok catch { e => Err(e) }
+
+That still creates a local `Result` wrapper and usually misses the intended migration.
+
+Default migration: handle the raising expression directly with `try ... catch ... noraise`, especially in local inspect/assert/match/guard/logging/test code:
+
+  try expr catch {
+    e => inspect(e, content=...)
+  } noraise {
+    value => inspect(value, content=...)
+  }
+
+Only create `Ok`/`Err` when the `Result` value must escape this local expression: stored, returned, passed to a Result-taking API, or kept for later comparison as data.
+─────╯
+Warning: [0020]
+     ╭─[ /home/antisatori/ghq/github.com/dowdiness/moondsp/mini/doc_parser.mbt:407:31 ]
+     │
+ 407 │     None => unwrap_doc_result(try? doc.rev(id~))
+     │                               ──┬─  
+     │                                 ╰─── Warning (deprecated): `try?` is deprecated.
+
+Do not mechanically replace this with:
+  try expr |> Ok catch { e => Err(e) }
+
+That still creates a local `Result` wrapper and usually misses the intended migration.
+
+Default migration: handle the raising expression directly with `try ... catch ... noraise`, especially in local inspect/assert/match/guard/logging/test code:
+
+  try expr catch {
+    e => inspect(e, content=...)
+  } noraise {
+    value => inspect(value, content=...)
+  }
+
+Only create `Ok`/`Err` when the `Result` value must escape this local expression: stored, returned, passed to a Result-taking API, or kept for later comparison as data.
+─────╯
+Warning: [0020]
+     ╭─[ /home/antisatori/ghq/github.com/dowdiness/moondsp/mini/doc_parser.mbt:422:31 ]
+     │
+ 422 │     None => unwrap_doc_result(try? doc.euclid(id~, k~, n~, rotation~))
+     │                               ──┬─  
+     │                                 ╰─── Warning (deprecated): `try?` is deprecated.
+
+Do not mechanically replace this with:
+  try expr |> Ok catch { e => Err(e) }
+
+That still creates a local `Result` wrapper and usually misses the intended migration.
+
+Default migration: handle the raising expression directly with `try ... catch ... noraise`, especially in local inspect/assert/match/guard/logging/test code:
+
+  try expr catch {
+    e => inspect(e, content=...)
+  } noraise {
+    value => inspect(value, content=...)
+  }
+
+Only create `Ok`/`Err` when the `Result` value must escape this local expression: stored, returned, passed to a Result-taking API, or kept for later comparison as data.
+─────╯
+Warning: [0020]
+     ╭─[ /home/antisatori/ghq/github.com/dowdiness/moondsp/mini/doc_parser.mbt:436:31 ]
+     │
+ 436 │     None => unwrap_doc_result(try? doc.degrade_by(id~, p~, seed~))
+     │                               ──┬─  
+     │                                 ╰─── Warning (deprecated): `try?` is deprecated.
+
+Do not mechanically replace this with:
+  try expr |> Ok catch { e => Err(e) }
+
+That still creates a local `Result` wrapper and usually misses the intended migration.
+
+Default migration: handle the raising expression directly with `try ... catch ... noraise`, especially in local inspect/assert/match/guard/logging/test code:
+
+  try expr catch {
+    e => inspect(e, content=...)
+  } noraise {
+    value => inspect(value, content=...)
+  }
+
+Only create `Ok`/`Err` when the `Result` value must escape this local expression: stored, returned, passed to a Result-taking API, or kept for later comparison as data.
+─────╯
+Warning: [0020]
+     ╭─[ /home/antisatori/ghq/github.com/dowdiness/moondsp/mini/doc_parser.mbt:454:31 ]
+     │
+ 454 │     None => unwrap_doc_result(try? doc.every(id~, n~, f~))
+     │                               ──┬─  
+     │                                 ╰─── Warning (deprecated): `try?` is deprecated.
+
+Do not mechanically replace this with:
+  try expr |> Ok catch { e => Err(e) }
+
+That still creates a local `Result` wrapper and usually misses the intended migration.
+
+Default migration: handle the raising expression directly with `try ... catch ... noraise`, especially in local inspect/assert/match/guard/logging/test code:
+
+  try expr catch {
+    e => inspect(e, content=...)
+  } noraise {
+    value => inspect(value, content=...)
+  }
+
+Only create `Ok`/`Err` when the `Result` value must escape this local expression: stored, returned, passed to a Result-taking API, or kept for later comparison as data.
+─────╯
+Warning: [0020]
+     ╭─[ /home/antisatori/ghq/github.com/dowdiness/moondsp/mini/doc_parser.mbt:468:31 ]
+     │
+ 468 │     None => unwrap_doc_result(try? doc.jux(id~, f~))
+     │                               ──┬─  
+     │                                 ╰─── Warning (deprecated): `try?` is deprecated.
+
+Do not mechanically replace this with:
+  try expr |> Ok catch { e => Err(e) }
+
+That still creates a local `Result` wrapper and usually misses the intended migration.
+
+Default migration: handle the raising expression directly with `try ... catch ... noraise`, especially in local inspect/assert/match/guard/logging/test code:
+
+  try expr catch {
+    e => inspect(e, content=...)
+  } noraise {
+    value => inspect(value, content=...)
+  }
+
+Only create `Ok`/`Err` when the `Result` value must escape this local expression: stored, returned, passed to a Result-taking API, or kept for later comparison as data.
+─────╯
+Warning: [0020]
+     ╭─[ /home/antisatori/ghq/github.com/dowdiness/moondsp/mini/doc_parser.mbt:495:9 ]
+     │
+ 495 │         try? @pattern.PatternDoc::merge_control(
+     │         ──┬─  
+     │           ╰─── Warning (deprecated): `try?` is deprecated.
+
+Do not mechanically replace this with:
+  try expr |> Ok catch { e => Err(e) }
+
+That still creates a local `Result` wrapper and usually misses the intended migration.
+
+Default migration: handle the raising expression directly with `try ... catch ... noraise`, especially in local inspect/assert/match/guard/logging/test code:
+
+  try expr catch {
+    e => inspect(e, content=...)
+  } noraise {
+    value => inspect(value, content=...)
+  }
+
+Only create `Ok`/`Err` when the `Result` value must escape this local expression: stored, returned, passed to a Result-taking API, or kept for later comparison as data.
+─────╯
+Warning: [0020]
+     ╭─[ /home/antisatori/ghq/github.com/dowdiness/moondsp/mini/doc_parser.mbt:616:20 ]
+     │
+ 616 │       let result = try? doc.lower()
+     │                    ──┬─  
+     │                      ╰─── Warning (deprecated): `try?` is deprecated.
+
+Do not mechanically replace this with:
+  try expr |> Ok catch { e => Err(e) }
+
+That still creates a local `Result` wrapper and usually misses the intended migration.
+
+Default migration: handle the raising expression directly with `try ... catch ... noraise`, especially in local inspect/assert/match/guard/logging/test code:
+
+  try expr catch {
+    e => inspect(e, content=...)
+  } noraise {
+    value => inspect(value, content=...)
+  }
+
+Only create `Ok`/`Err` when the `Result` value must escape this local expression: stored, returned, passed to a Result-taking API, or kept for later comparison as data.
+─────╯
+Warning: [0020]
+     ╭─[ /home/antisatori/ghq/github.com/dowdiness/moondsp/mini/incr_authoring.mbt:115:24 ]
+     │
+ 115 │           let result = try? doc.lower_with_cache(lowering_cache)
+     │                        ──┬─  
+     │                          ╰─── Warning (deprecated): `try?` is deprecated.
+
+Do not mechanically replace this with:
+  try expr |> Ok catch { e => Err(e) }
+
+That still creates a local `Result` wrapper and usually misses the intended migration.
+
+Default migration: handle the raising expression directly with `try ... catch ... noraise`, especially in local inspect/assert/match/guard/logging/test code:
+
+  try expr catch {
+    e => inspect(e, content=...)
+  } noraise {
+    value => inspect(value, content=...)
+  }
+
+Only create `Ok`/`Err` when the `Result` value must escape this local expression: stored, returned, passed to a Result-taking API, or kept for later comparison as data.
+─────╯
+Warning: [0020]
+     ╭─[ /home/antisatori/ghq/github.com/dowdiness/moondsp/mini/song_parser.mbt:104:18 ]
+     │
+ 104 │     let result = try? song.fill_gaps(prefix=fill.prefix, section~)
+     │                  ──┬─  
+     │                    ╰─── Warning (deprecated): `try?` is deprecated.
+
+Do not mechanically replace this with:
+  try expr |> Ok catch { e => Err(e) }
+
+That still creates a local `Result` wrapper and usually misses the intended migration.
+
+Default migration: handle the raising expression directly with `try ... catch ... noraise`, especially in local inspect/assert/match/guard/logging/test code:
+
+  try expr catch {
+    e => inspect(e, content=...)
+  } noraise {
+    value => inspect(value, content=...)
+  }
+
+Only create `Ok`/`Err` when the `Result` value must escape this local expression: stored, returned, passed to a Result-taking API, or kept for later comparison as data.
+─────╯
+Warning: [0020]
+     ╭─[ /home/antisatori/ghq/github.com/dowdiness/moondsp/mini/song_parser.mbt:184:16 ]
+     │
+ 184 │   let result = try? @song.Section(
+     │                ──┬─  
+     │                  ╰─── Warning (deprecated): `try?` is deprecated.
+
+Do not mechanically replace this with:
+  try expr |> Ok catch { e => Err(e) }
+
+That still creates a local `Result` wrapper and usually misses the intended migration.
+
+Default migration: handle the raising expression directly with `try ... catch ... noraise`, especially in local inspect/assert/match/guard/logging/test code:
+
+  try expr catch {
+    e => inspect(e, content=...)
+  } noraise {
+    value => inspect(value, content=...)
+  }
+
+Only create `Ok`/`Err` when the `Result` value must escape this local expression: stored, returned, passed to a Result-taking API, or kept for later comparison as data.
+─────╯
+Warning: [0020]
+     ╭─[ /home/antisatori/ghq/github.com/dowdiness/moondsp/mini/song_parser.mbt:328:16 ]
+     │
+ 328 │   let result = try? @identity.OccurrenceId::from_string(value)
+     │                ──┬─  
+     │                  ╰─── Warning (deprecated): `try?` is deprecated.
+
+Do not mechanically replace this with:
+  try expr |> Ok catch { e => Err(e) }
+
+That still creates a local `Result` wrapper and usually misses the intended migration.
+
+Default migration: handle the raising expression directly with `try ... catch ... noraise`, especially in local inspect/assert/match/guard/logging/test code:
+
+  try expr catch {
+    e => inspect(e, content=...)
+  } noraise {
+    value => inspect(value, content=...)
+  }
+
+Only create `Ok`/`Err` when the `Result` value must escape this local expression: stored, returned, passed to a Result-taking API, or kept for later comparison as data.
+─────╯
+Warning: [0020]
+     ╭─[ /home/antisatori/ghq/github.com/dowdiness/moondsp/mini/song_parser.mbt:366:16 ]
+     │
+ 366 │   let result = try? @song.Song(parts~)
+     │                ──┬─  
+     │                  ╰─── Warning (deprecated): `try?` is deprecated.
+
+Do not mechanically replace this with:
+  try expr |> Ok catch { e => Err(e) }
+
+That still creates a local `Result` wrapper and usually misses the intended migration.
+
+Default migration: handle the raising expression directly with `try ... catch ... noraise`, especially in local inspect/assert/match/guard/logging/test code:
+
+  try expr catch {
+    e => inspect(e, content=...)
+  } noraise {
+    value => inspect(value, content=...)
+  }
+
+Only create `Ok`/`Err` when the `Result` value must escape this local expression: stored, returned, passed to a Result-taking API, or kept for later comparison as data.
+─────╯
+Warning: [0020]
+     ╭─[ /home/antisatori/ghq/github.com/dowdiness/moondsp/song/song.mbt:154:20 ]
+     │
+ 154 │       let result = try? @identity.OccurrenceId::from_string(part.name)
+     │                    ──┬─  
+     │                      ╰─── Warning (deprecated): `try?` is deprecated.
+
+Do not mechanically replace this with:
+  try expr |> Ok catch { e => Err(e) }
+
+That still creates a local `Result` wrapper and usually misses the intended migration.
+
+Default migration: handle the raising expression directly with `try ... catch ... noraise`, especially in local inspect/assert/match/guard/logging/test code:
+
+  try expr catch {
+    e => inspect(e, content=...)
+  } noraise {
+    value => inspect(value, content=...)
+  }
+
+Only create `Ok`/`Err` when the `Result` value must escape this local expression: stored, returned, passed to a Result-taking API, or kept for later comparison as data.
+─────╯
+Finished. moon: ran 26 tasks, now up to date (28 warnings, 0 errors)
+OK: all public Array[DspNode] entries match ADR-0010 carve-outs.
+EXIT=0
