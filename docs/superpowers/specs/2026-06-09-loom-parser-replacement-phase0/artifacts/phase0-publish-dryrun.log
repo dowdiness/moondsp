@@ -1,0 +1,37 @@
+# Command: NEW_MOON_MOD=0 moon publish --dry-run  (run from repo root)
+#
+# NOTE: ~10780 lines of 'moon check' output elided. They are pre-existing
+#       [0020] 'try? is deprecated' warnings from production code
+#       (browser/, graph/, mini/, etc.), unrelated to Phase 0. The check
+#       phase ran and produced 0 errors. The publish-relevant tail and the
+#       authoritative local-bundle inspection are preserved verbatim below.
+#
+# ---- publish result (verbatim) ----
+Server status: 409 Conflict, detail: Version Error: The version you are attempting to upload (0.5.1) is duplicated with an existing version (0.5.1). Please select a different version to publish.
+Error: `moon publish` failed
+EXIT=255
+
+# ---- AUTHORITATIVE BUNDLE INSPECTION (_build/publish/dowdiness-moondsp-0.5.1.zip) ----
+# Total: 357 files.
+#
+# Precise path-delimited grep for any specs/ path or loom-stack PACKAGE file:
+#   pattern: specs/|loom-backend-canary|loom-mini-cst|canopy/|/loom/|/seam/|/pretty/|text-change/|/incr/
+#   result : NONE  (genuine null — see positive control below)
+#
+# Positive control (detector works, so the null is real, not a broken matcher):
+#   - 171 matches for runtime packages dsp/ graph/ mini/ pattern/ scheduler/
+#   - docs/performance/* IS bundled
+#
+# The ONLY bundled filenames containing the substring "loom" are three
+# moondsp-OWNED docs ABOUT loom (NOT loom-stack package files, NOT specs/):
+#   docs/loom-upstream-requirements.md
+#   docs/decisions/0013-loom-promotion-criteria-for-mini-authoring.md
+#   docs/decisions/0012-loom-cst-mini-authoring-evaluation.md
+#
+# docs/superpowers/ and docs/archive/ are absent from the bundle.
+# Root moon.mod options(exclude) lists both "specs/" and "docs/superpowers/".
+#
+# ---- interpretation ----
+# EXIT=255 is a SERVER-SIDE 409 duplicate-version rejection (0.5.1 already
+# published), which fires AFTER local bundle assembly. It is unrelated to
+# manifest isolation. Check #4 = PASS.

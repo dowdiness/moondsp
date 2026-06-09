@@ -1,0 +1,17 @@
+Finished. moon: ran 1 task, now up to date
+EXIT=0
+
+# ---- Check #2 build-graph evidence (persisted 2026-06-09) ----
+# Packages in the canary build graph (moon check --dry-run, deduped):
+#   dowdiness/canopy
+#   dowdiness/incr
+#   dowdiness/loom
+#   dowdiness/moji
+#   dowdiness/moondsp
+#   dowdiness/pretty
+#   dowdiness/seam
+#   dowdiness/text_change
+#
+# Explicit native-FFI / target-restricted probe over dry-run build commands:
+#   pattern: moonbitlang/x/(sys|ffi|os|io|thread|arg)
+#   result : NONE — zero moonbitlang/x/* in the consumed graph
