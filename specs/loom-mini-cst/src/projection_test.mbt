@@ -104,6 +104,89 @@ fn projection_boundary_assert_matches_mini_doc(input : String) -> Unit {
 }
 
 ///|
+/// Fixed differential parity window. WHY [0,8): captures the full period of the
+/// `slow`/`fast` factors the mini corpus uses, identical on both oracle and loom
+/// sides (apples-to-apples). Widen HERE, not per input, if a corpus case needs a
+/// longer period (Phase 2 plan, Orchestrator resolution 1).
+fn projection_boundary_parity_window() -> @pattern.TimeSpan {
+  @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::from_int(8),
+  )
+}
+
+///|
+/// Value-level canonical event: node id (or "<none>"), the ControlMap payload as
+/// an order-independent `Map[String, Double]` (ControlMap has NO derived `Eq`,
+/// so compare entries maps structurally), and both ideal/actual `TimeSpan`s
+/// (which derive `Eq`).
+priv struct BoundaryEvent {
+  id : String
+  control : Map[String, Double]
+  whole : @pattern.TimeSpan?
+  part : @pattern.TimeSpan
+}
+
+///|
+/// Canonicalize a lowered snapshot's sourced events over the fixed parity window
+/// for value-level differential parity (Phase 2 plan Step 2).
+fn projection_boundary_value_events(
+  snapshot : @pattern.PatternSnapshot[@pattern.ControlMap],
+) -> Array[BoundaryEvent] {
+  let events = snapshot.query_sourced_events(projection_boundary_parity_window())
+  let out : Array[BoundaryEvent] = []
+  for sourced in events {
+    let id = match sourced.pattern_node() {
+      Some(node) => node.value()
+      None => "<none>"
+    }
+    let ev = sourced.event()
+    out.push({ id, control: ev.value.entries(), whole: ev.whole, part: ev.part })
+  }
+  out
+}
+
+///|
+fn projection_boundary_value_events_from_doc(
+  doc : @pattern.PatternDoc[@pattern.ControlMap],
+) -> Array[BoundaryEvent] {
+  projection_boundary_value_events(
+    projection_boundary_snapshot(try? doc.lower()),
+  )
+}
+
+///|
+/// Value-level event parity (strengthens the id-only
+/// `projection_boundary_assert_ids_equal`): equal counts, ordered node ids,
+/// ControlMap payloads (order-independent Map equality), and both TimeSpans.
+fn projection_boundary_assert_value_events_equal(
+  left : Array[BoundaryEvent],
+  right : Array[BoundaryEvent],
+) -> Unit {
+  guard left.length() == right.length() else {
+    abort(
+      "expected equal event counts, got \{left.length()} and \{right.length()}",
+    )
+  }
+  for index in 0..<left.length() {
+    let l = left[index]
+    let r = right[index]
+    if l.id != r.id {
+      abort("event[\{index}] id mismatch: '\{l.id}' vs '\{r.id}'")
+    }
+    if l.control != r.control {
+      abort("event[\{index}] control mismatch: \{l.control} vs \{r.control}")
+    }
+    if l.whole != r.whole {
+      abort("event[\{index}] whole-span mismatch")
+    }
+    if l.part != r.part {
+      abort("event[\{index}] part-span mismatch")
+    }
+  }
+}
+
+///|
 fn projection_boundary_assert_control_method_matches_mini(
   input : String,
   expected_root : String,
@@ -2127,4 +2210,112 @@ test "loom atom projection reports diagnostics and recovers with previous proven
   debug_inspect(loom_ids, content=expected)
   projection.dispose()
   pipeline.dispose()
+}
+
+///|
+/// Canonical Phase 2 doc-parity corpus (plan Step 1). Seeded from the proven
+/// `parse_doc`-compatible literals already exercised across this spike: atoms,
+/// sequences, fast/slow/rev chains, euclid, sub-notation, postfix operators,
+/// control methods, jux/every, and known-malformed forms. Multiline `$:` stack
+/// inputs are covered by the existing dedicated tests and are a tracked corpus
+/// follow-up (plan Step 6), not silently dropped.
+fn projection_boundary_doc_corpus() -> Array[String] {
+  [
+    // valid
+    "s(\"bd\")", "s(\"bd sd\")", "s(\"bd sd bd\")", "s(\"bd sd hh\")",
+    "s(\"bd cp hh\")", "s(\"cp bd sd\")", "s(\"bd bd\")", "s(\"bd   sd\")",
+    "note(\"60 60\")", "note(\"60 62 60\")", "note(\"60 64 60\")",
+    "s(\"bd sd\").fast(2)", "s(\"bd sd\").slow(2)", "s(\"bd sd hh\").rev()",
+    "s(\"bd sd\").fast(2).rev().slow(3)", "s(\"bd*2 sd\")", "s(\"bd/2 sd\")",
+    "s(\"bd*2/3 sd\")", "s(\"bd/2*3 sd\")", "s(\"[bd sd] hh\")",
+    "s(\"[bd sd]*2 hh\")", "s(\"bd(3,8) sd\")", "s(\"bd(3,8,1) sd\")",
+    "s(\"bd(3,8,-1) sd\")", "s(\"bd? sd\")", "s(\"[bd sd]? hh\")",
+    "s(\"[bd sd](5,8) hh\")", "s(\"bd\").gain(0.5)",
+    "s(\"bd\").gain(0.5).pan(-0.25)", "s(\"bd\").cutoff(200)",
+    "s(\"bd sd\").jux(rev)", "s(\"bd sd\").jux(fast(2))",
+    "s(\"bd sd\").jux(slow(2))", "s(\"bd sd\").every(2, rev)",
+    "s(\"bd sd\").every(2, fast(2))", "s(\"bd sd\").every(2, slow(2))",
+    "s(\"bd\").fast(slow(2))",
+    // malformed — runner asserts both parsers AGREE on rejection
+    "s(\"[bd\")", "s(\"bd sd\").jux(fast(2)", "s(\"bd\").gain(0.5).pan(-0.25",
+  ]
+}
+
+///|
+/// Differential doc-parity runner (plan Step 3): run both parsers on one input
+/// and assert they AGREE — both `Ok` (then root-id + value-level event parity)
+/// or both `Err` (message text characterized, NOT asserted, per the authoring
+/// `Result[_, String]` contract). A one-sided `Ok`/`Err` is a real parity hole
+/// and aborts. Returns 1 when a both-`Err` message text divergence was
+/// characterized (Phase 3 error-adapter input), else 0.
+fn projection_boundary_assert_value_matches_mini(input : String) -> Int {
+  let projection = LoomMiniAtomProjection::new(input)
+  let loom_result = projection.parse_doc()
+  let mini_result = @mini.parse_doc(input)
+  let divergence = match (loom_result, mini_result) {
+    (Ok(loom_doc), Ok(mini_doc)) => {
+      if loom_doc.root().value() != mini_doc.root().value() {
+        abort("input '\{input}': root id mismatch")
+      }
+      projection_boundary_assert_value_events_equal(
+        projection_boundary_value_events_from_doc(loom_doc),
+        projection_boundary_value_events_from_doc(mini_doc),
+      )
+      0
+    }
+    (Err(loom_msg), Err(mini_msg)) => if loom_msg == mini_msg { 0 } else { 1 }
+    (Ok(_), Err(mini_msg)) =>
+      abort("input '\{input}': loom accepted but mini rejected (\{mini_msg})")
+    (Err(loom_msg), Ok(_)) =>
+      abort("input '\{input}': mini accepted but loom rejected (\{loom_msg})")
+  }
+  projection.dispose()
+  divergence
+}
+
+///|
+/// Positive control (plan Step 4): prove the value-level helper is sensitive,
+/// not vacuous. Build a divergence the id-only check MISSES (identical node ids
+/// and spans, perturbed ControlMap payload) and confirm the value-level helper
+/// aborts. The `panic ` prefix means the test PASSES iff an abort occurs.
+test "panic phase2 piece1 value parity catches control-only divergence" {
+  let doc = projection_boundary_doc(@mini.parse_doc("s(\"bd sd\")"))
+  let base = projection_boundary_value_events_from_doc(doc)
+  guard base.length() > 0 else {
+    abort("positive control needs at least one event")
+  }
+  let perturbed : Array[BoundaryEvent] = []
+  for index in 0..<base.length() {
+    let e = base[index]
+    if index == 0 {
+      let bumped : Map[String, Double] = {}
+      e.control.each(fn(k, v) { bumped[k] = v })
+      bumped["__divergence__"] = 1.0
+      perturbed.push({ id: e.id, control: bumped, whole: e.whole, part: e.part })
+    } else {
+      perturbed.push(e)
+    }
+  }
+  // Divergence is value-only: id sequences still match, so the id-only check
+  // would pass (this must NOT abort) ...
+  let base_ids = [for e in base => e.id]
+  let perturbed_ids = [for e in perturbed => e.id]
+  projection_boundary_assert_ids_equal(base_ids, perturbed_ids)
+  // ... but the value-level helper MUST abort on the control delta:
+  projection_boundary_assert_value_events_equal(base, perturbed)
+}
+
+///|
+/// Piece 1 green gate (plan Step 5): the whole canonical corpus passes Ok/Err
+/// agreement + value-level parity (any hole aborts in the runner above).
+/// Both-`Err` message divergences are characterized, not failed.
+test "phase2 piece1 doc value-parity corpus" {
+  let corpus = projection_boundary_doc_corpus()
+  let mut message_divergences = 0
+  for input in corpus {
+    message_divergences = message_divergences +
+      projection_boundary_assert_value_matches_mini(input)
+  }
+  ignore(message_divergences)
+  inspect(corpus.length() >= 30, content="true")
 }
