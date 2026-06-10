@@ -6,6 +6,7 @@ import {
   "dowdiness/loom/core",
   "dowdiness/loom/pipeline",
   "dowdiness/moondsp/pattern",
+  "dowdiness/moondsp/song",
   "dowdiness/seam",
   "moonbitlang/core/debug",
 }
@@ -16,6 +17,8 @@ pub fn ident_token_spans(String) -> Array[String] raise @core.LexError
 pub fn ident_token_spans_from_syntax(@seam.SyntaxNode) -> Array[String]
 
 pub fn lex(String) -> @core.LexResult[MiniToken]
+
+pub fn loom_mini_parse_song(String) -> Result[LoomMiniParsedSong, String]
 
 pub fn mini_atom_node_raw_kind() -> @seam.RawKind
 
@@ -29,7 +32,13 @@ pub fn mini_step_lexer(String, Int) -> @core.LexStep[MiniToken]
 
 pub fn parse_cst(String) -> (@seam.CstNode, @core.DiagnosticSet) raise @core.LexError
 
+pub fn parse_song_cst(String) -> (@seam.CstNode, @core.DiagnosticSet) raise @core.LexError
+
 pub fn parser_ident_token_spans(@pipeline.Parser[MiniAst]) -> Array[String]
+
+pub let song_grammar : @loom.Grammar[MiniToken, MiniSyntaxKind, MiniAst]
+
+pub let song_spec : @core.LanguageSpec[MiniToken, MiniSyntaxKind]
 
 pub fn token_debug(String) -> Array[String]
 
@@ -47,6 +56,12 @@ pub fn LoomMiniAtomProjection::dispose(Self) -> Unit
 pub fn LoomMiniAtomProjection::new(String) -> Self
 pub fn LoomMiniAtomProjection::parse_doc(Self) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
 pub fn LoomMiniAtomProjection::set_source(Self, String) -> Unit
+
+pub struct LoomMiniParsedSong {
+  // private fields
+}
+pub fn LoomMiniParsedSong::bpm(Self) -> Double?
+pub fn LoomMiniParsedSong::song(Self) -> @song.Song[@pattern.ControlMap]
 
 pub(all) enum MiniAst {
   Parsed
@@ -87,6 +102,17 @@ pub(all) enum MiniSyntaxKind {
   DollarColonToken
   DollarStackNode
   DollarLineNode
+  ColonToken
+  StringContentToken
+  SongNode
+  SongSectionNode
+  SongBpmNode
+  SongPartNode
+  SongPartIdNode
+  SongFillNode
+  SongStringNode
+  SongRationalNode
+  SongSectionBodyNode
 } derive(Eq, @debug.Debug)
 pub fn MiniSyntaxKind::from_raw(@seam.RawKind) -> Self
 pub impl @seam.ToRawKind for MiniSyntaxKind
@@ -107,6 +133,7 @@ pub(all) enum MiniToken {
   LBracket
   RBracket
   DollarColon
+  Colon
   Quote
   Ident
   Whitespace

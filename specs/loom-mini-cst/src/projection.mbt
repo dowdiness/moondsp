@@ -318,17 +318,36 @@ fn loom_mini_collect_dollar_stack_expr(
 fn loom_mini_collect_stack_expr(
   stack_call : @seam.SyntaxNode,
 ) -> Result[LoomMiniRawProjection, String] {
+  // Stack arguments are full expressions (`stack(s("bd").fast(2), …)`, cf.
+  // production `mini/parser.mbt`), and the grammar emits each arg's base call
+  // and trailing `.method(…)` calls as FLAT child nodes of `StackCallNode`
+  // delimited by `CommaToken` leaves. `children()` returns only nodes (commas
+  // are tokens), so partition the child nodes by counting how many comma offsets
+  // precede each — keeping every arg's method chain attached to its own base.
+  let comma_starts = stack_call
+    .direct_tokens_of_kind(CommaToken.to_raw())
+    .map(fn(token) { token.start() })
+  let groups : Array[Array[@seam.SyntaxNode]] = []
+  for _ in 0..<(comma_starts.length() + 1) {
+    groups.push([])
+  }
+  for child in stack_call.children() {
+    let start = child.start()
+    let mut index = 0
+    for comma_start in comma_starts {
+      if comma_start < start {
+        index += 1
+      }
+    }
+    groups[index].push(child)
+  }
   let children : Array[LoomMiniExpr] = []
   let atoms : Array[LoomMiniRawAtom] = []
-  for child in stack_call.children() {
-    let projection = if child.kind() == CallNode.to_raw() {
-      loom_mini_collect_atom_group_expr(child, SoundAtom)
-    } else if child.kind() == NoteCallNode.to_raw() {
-      loom_mini_collect_atom_group_expr(child, NoteAtom)
-    } else {
-      return Err("loom atom projection only supports plain stack arguments")
+  for group in groups {
+    if group.length() == 0 {
+      continue
     }
-    match projection {
+    match loom_mini_collect_stack_arg_expr(group) {
       Ok(projection) => {
         children.push(projection.expr)
         for atom in projection.atoms {
@@ -342,6 +361,48 @@ fn loom_mini_collect_stack_expr(
     return Err("loom atom projection expected stack arguments")
   }
   Ok({ expr: StackExpr(children), atoms })
+}
+
+///|
+/// Project one comma-delimited stack argument group: a base `s(…)`/`note(…)`
+/// call followed by zero or more `.method(…)` calls.
+fn loom_mini_collect_stack_arg_expr(
+  group : Array[@seam.SyntaxNode],
+) -> Result[LoomMiniRawProjection, String] {
+  let base_node = group[0]
+  // Nested `stack(...)` as a stack argument stays a characterized projection
+  // limitation, inherited from Piece 1 (cf. the doc test "rejects nested stack
+  // instead of dropping it"). The oracle accepts it, so a song section body
+  // using it would surface as a one-sided divergence the parity harness flags
+  // (not a silent pass); closing this gap is out of Piece 2 scope.
+  let kind = if base_node.kind() == CallNode.to_raw() {
+    SoundAtom
+  } else if base_node.kind() == NoteCallNode.to_raw() {
+    NoteAtom
+  } else {
+    return Err("loom atom projection only supports plain stack arguments")
+  }
+  let base = match loom_mini_collect_atom_group_expr(base_node, kind) {
+    Ok(base) => base
+    Err(msg) => return Err(msg)
+  }
+  let methods : Array[LoomMiniMethodCall] = []
+  for index in 1..<group.length() {
+    let method_node = group[index]
+    if method_node.kind() != MethodCallNode.to_raw() {
+      return Err("loom atom projection only supports plain stack arguments")
+    }
+    match loom_mini_collect_method_call(method_node) {
+      Ok(call) => methods.push(call)
+      Err(msg) => return Err(msg)
+    }
+  }
+  let expr = if methods.length() == 0 {
+    base.expr
+  } else {
+    MethodChainExpr(base.expr, methods)
+  }
+  Ok({ expr, atoms: base.atoms })
 }
 
 ///|
@@ -1279,5 +1340,381 @@ fn loom_mini_pattern_node_id(
   match result {
     Ok(id) => Ok(id)
     Err(_) => Err("internal loom mini id was invalid: \{value}")
+  }
+}
+
+// -- Song-level projection (Phase 2 Piece 2) ---------------------------------
+//
+// Materialize a `song(...)` CST (parsed by `song_grammar`) into a real
+// `@song.Song[ControlMap]` + optional bpm, reusing the mini song models and the
+// doc-level section-body lowering proven in Piece 1. Section bodies are lowered
+// through the SAME raw-projection + doc-build path used by `parse_doc`, applied
+// directly to each `SongSectionBodyNode` subtree (its direct children are the
+// `parse_expr` output the raw projector already walks). Building a genuine
+// `@song.Song` means part layout, fill gaps, and occurrence ids match the
+// oracle BY CONSTRUCTION — divergence can only enter through parsing or
+// body lowering, which is exactly what the parity harness measures.
+
+///|
+priv struct LoomSongPartSpec {
+  id : @identity.OccurrenceId?
+  name : String
+  section_name : String
+  start : @pattern.Rational?
+}
+
+///|
+priv struct LoomSongFillSpec {
+  prefix : String
+  section_name : String
+}
+
+///|
+/// Song parse result mirroring `@mini.ParsedSong` (layout + optional tempo).
+pub struct LoomMiniParsedSong {
+  priv song : @song.Song[@pattern.ControlMap]
+  priv bpm : Double?
+}
+
+///|
+pub fn LoomMiniParsedSong::song(
+  self : LoomMiniParsedSong,
+) -> @song.Song[@pattern.ControlMap] {
+  self.song
+}
+
+///|
+pub fn LoomMiniParsedSong::bpm(self : LoomMiniParsedSong) -> Double? {
+  self.bpm
+}
+
+///|
+/// Parse loom song mini-notation into a `@song.Song` + optional bpm. Mirrors
+/// `@mini.parse_song_with_bpm`'s assembly: collect section/part/fill/bpm specs
+/// from the CST, build sections (bodies lowered via the doc path), build the
+/// song, apply fills, and take the first bpm. Returns `Err` on any parser
+/// diagnostic or semantic violation (the authoring contract is `Result[_,
+/// String]`; message text is not contractual).
+pub fn loom_mini_parse_song(
+  input : String,
+) -> Result[LoomMiniParsedSong, String] {
+  let parser = @loom.new_parser(input, song_grammar)
+  let diagnostics = parser.diagnostics().read_or_abort()
+  if diagnostics.length() > 0 {
+    return Err("loom song syntax has diagnostics")
+  }
+  let root = parser.syntax_tree().read_or_abort()
+  let song_node = match root.direct_children_of_kind(SongNode.to_raw()) {
+    [node, ..] => node
+    [] => return Err("loom song projection expected song(...)")
+  }
+  let sections : Map[String, @song.Section[@pattern.ControlMap]] = {}
+  let part_specs : Array[LoomSongPartSpec] = []
+  let fill_specs : Array[LoomSongFillSpec] = []
+  let bpm_values : Array[Double] = []
+  for child in song_node.children() {
+    let kind = child.kind()
+    if kind == SongSectionNode.to_raw() {
+      let section = match loom_song_collect_section(input, child) {
+        Ok(section) => section
+        Err(msg) => return Err(msg)
+      }
+      if sections.contains(section.name()) {
+        return Err("duplicate section '\{section.name()}'")
+      }
+      sections[section.name()] = section
+    } else if kind == SongBpmNode.to_raw() {
+      if bpm_values.length() > 0 {
+        return Err("duplicate bpm(...)")
+      }
+      match loom_song_collect_bpm(child) {
+        Ok(value) => bpm_values.push(value)
+        Err(msg) => return Err(msg)
+      }
+    } else if kind == SongPartIdNode.to_raw() {
+      match loom_song_collect_part_id(input, child) {
+        Ok(spec) => part_specs.push(spec)
+        Err(msg) => return Err(msg)
+      }
+    } else if kind == SongPartNode.to_raw() {
+      match loom_song_collect_part(input, child) {
+        Ok(spec) => part_specs.push(spec)
+        Err(msg) => return Err(msg)
+      }
+    } else if kind == SongFillNode.to_raw() {
+      match loom_song_collect_fill(input, child) {
+        Ok(spec) => fill_specs.push(spec)
+        Err(msg) => return Err(msg)
+      }
+    }
+  }
+  let parts : Array[@song.SongPart[@pattern.ControlMap]] = []
+  for spec in part_specs {
+    match loom_song_spec_to_part(sections, spec) {
+      Ok(part) => parts.push(part)
+      Err(msg) => return Err(msg)
+    }
+  }
+  let built = try? @song.Song(parts~)
+  let mut song = match built {
+    Ok(song) => song
+    Err(_) => return Err("song construction failed")
+  }
+  for fill in fill_specs {
+    let section = match sections.get(fill.section_name) {
+      Some(section) => section
+      None => return Err("unknown song section '\{fill.section_name}'")
+    }
+    let filled = try? song.fill_gaps(prefix=fill.prefix, section~)
+    song = match filled {
+      Ok(filled) => filled
+      Err(_) => return Err("song fill '\{fill.prefix}' could not be applied")
+    }
+  }
+  Ok({ song, bpm: bpm_values.get(0) })
+}
+
+///|
+fn loom_song_collect_section(
+  input : String,
+  node : @seam.SyntaxNode,
+) -> Result[@song.Section[@pattern.ControlMap], String] {
+  let name = match node.direct_children_of_kind(SongStringNode.to_raw()) {
+    [string, ..] =>
+      match loom_song_string_value(input, string) {
+        Ok(value) => value
+        Err(msg) => return Err(msg)
+      }
+    [] => return Err("loom song section expected a name")
+  }
+  let length = match node.direct_children_of_kind(SongRationalNode.to_raw()) {
+    [rational, ..] =>
+      match loom_song_rational_value(rational) {
+        Ok(value) => value
+        Err(msg) => return Err(msg)
+      }
+    [] => return Err("loom song section expected a length")
+  }
+  let body_node = match
+    node.direct_children_of_kind(SongSectionBodyNode.to_raw()) {
+    [body, ..] => body
+    [] => return Err("loom song section expected a body")
+  }
+  let pat = match loom_song_section_body_pat(body_node) {
+    Ok(pat) => pat
+    Err(msg) => return Err(msg)
+  }
+  let built = try? @song.Section(
+    name~,
+    length_cycles=length,
+    scope=@song.TimeScope::identity(),
+    body=@song.SectionBody::single(pat),
+  )
+  match built {
+    Ok(section) => Ok(section)
+    Err(_) => Err("loom song section '\{name}' requires a positive length")
+  }
+}
+
+///|
+fn loom_song_section_body_pat(
+  body_node : @seam.SyntaxNode,
+) -> Result[@pattern.Pat[@pattern.ControlMap], String] {
+  let raw = match loom_mini_collect_raw_projection(body_node) {
+    Ok(raw) => raw
+    Err(msg) => return Err(msg)
+  }
+  let allocator = @loom.ProjectionStringIdAllocator::new(loom_mini_atom_id)
+  let atoms : Array[LoomMiniProjectedAtom] = []
+  for raw_atom in raw.atoms {
+    let leaf = loom_mini_raw_atom_projection_leaf(raw_atom)
+    let id = allocator.allocate(leaf)
+    atoms.push({ kind: raw_atom.kind, text: raw_atom.text, id })
+  }
+  let builder = @mini.MiniDocBuilder::with_previous(None)
+  let doc = match loom_mini_build_projected_doc(builder, None, raw.expr, atoms) {
+    Ok(doc) => doc
+    Err(msg) => return Err(msg)
+  }
+  let lowered = try? doc.lower()
+  match lowered {
+    Ok(snapshot) => Ok(snapshot.pat())
+    Err(_) => Err("loom song section body lowering failed")
+  }
+}
+
+///|
+fn loom_song_collect_bpm(node : @seam.SyntaxNode) -> Result[Double, String] {
+  let text = match node.direct_tokens_of_kind(NumberToken.to_raw()) {
+    [token, ..] => token.text()
+    [] => return Err("loom song bpm expected a number")
+  }
+  let value = match loom_mini_parse_double(text) {
+    Ok(value) => value
+    Err(msg) => return Err(msg)
+  }
+  if value > 0.0 {
+    Ok(value)
+  } else {
+    Err("loom song bpm() requires a positive number")
+  }
+}
+
+///|
+fn loom_song_collect_part(
+  input : String,
+  node : @seam.SyntaxNode,
+) -> Result[LoomSongPartSpec, String] {
+  let strings = node.direct_children_of_kind(SongStringNode.to_raw())
+  guard strings.length() == 2 else {
+    return Err("loom song part expected a name and a section")
+  }
+  let name = match loom_song_string_value(input, strings[0]) {
+    Ok(value) => value
+    Err(msg) => return Err(msg)
+  }
+  let section_name = match loom_song_string_value(input, strings[1]) {
+    Ok(value) => value
+    Err(msg) => return Err(msg)
+  }
+  let start = match loom_song_optional_start(node) {
+    Ok(start) => start
+    Err(msg) => return Err(msg)
+  }
+  Ok({ id: None, name, section_name, start })
+}
+
+///|
+fn loom_song_collect_part_id(
+  input : String,
+  node : @seam.SyntaxNode,
+) -> Result[LoomSongPartSpec, String] {
+  let strings = node.direct_children_of_kind(SongStringNode.to_raw())
+  guard strings.length() == 3 else {
+    return Err("loom song part_id expected an id, a name, and a section")
+  }
+  let id_value = match loom_song_string_value(input, strings[0]) {
+    Ok(value) => value
+    Err(msg) => return Err(msg)
+  }
+  let parsed_id = try? @identity.OccurrenceId::from_string(id_value)
+  let id = match parsed_id {
+    Ok(id) => id
+    Err(_) => return Err("loom song invalid occurrence id '\{id_value}'")
+  }
+  let name = match loom_song_string_value(input, strings[1]) {
+    Ok(value) => value
+    Err(msg) => return Err(msg)
+  }
+  let section_name = match loom_song_string_value(input, strings[2]) {
+    Ok(value) => value
+    Err(msg) => return Err(msg)
+  }
+  let start = match loom_song_optional_start(node) {
+    Ok(start) => start
+    Err(msg) => return Err(msg)
+  }
+  Ok({ id: Some(id), name, section_name, start })
+}
+
+///|
+fn loom_song_collect_fill(
+  input : String,
+  node : @seam.SyntaxNode,
+) -> Result[LoomSongFillSpec, String] {
+  let strings = node.direct_children_of_kind(SongStringNode.to_raw())
+  guard strings.length() == 2 else {
+    return Err("loom song fill expected a prefix and a section")
+  }
+  let prefix = match loom_song_string_value(input, strings[0]) {
+    Ok(value) => value
+    Err(msg) => return Err(msg)
+  }
+  let section_name = match loom_song_string_value(input, strings[1]) {
+    Ok(value) => value
+    Err(msg) => return Err(msg)
+  }
+  Ok({ prefix, section_name })
+}
+
+///|
+fn loom_song_optional_start(
+  node : @seam.SyntaxNode,
+) -> Result[@pattern.Rational?, String] {
+  match node.direct_children_of_kind(SongRationalNode.to_raw()) {
+    [rational, ..] =>
+      match loom_song_rational_value(rational) {
+        Ok(value) => Ok(Some(value))
+        Err(msg) => Err(msg)
+      }
+    [] => Ok(None)
+  }
+}
+
+///|
+fn loom_song_spec_to_part(
+  sections : Map[String, @song.Section[@pattern.ControlMap]],
+  spec : LoomSongPartSpec,
+) -> Result[@song.SongPart[@pattern.ControlMap], String] {
+  let section = match sections.get(spec.section_name) {
+    Some(section) => section
+    None => return Err("unknown song section '\{spec.section_name}'")
+  }
+  match (spec.id, spec.start) {
+    (Some(id), Some(start)) =>
+      Ok(@song.SongPart::with_id_at(id~, start~, name=spec.name, section~))
+    (Some(id), None) =>
+      Ok(@song.SongPart::with_id(id~, name=spec.name, section~))
+    (None, Some(start)) =>
+      Ok(@song.SongPart::at(start~, name=spec.name, section~))
+    (None, None) => Ok(@song.SongPart(name=spec.name, section~))
+  }
+}
+
+///|
+/// Reconstruct a quoted literal's value from the source span between its two
+/// quote tokens — robust to `:` and interior whitespace that the oracle's
+/// `read_quoted_string` also preserves verbatim.
+fn loom_song_string_value(
+  input : String,
+  node : @seam.SyntaxNode,
+) -> Result[String, String] {
+  let quotes = node.direct_tokens_of_kind(QuoteToken.to_raw())
+  guard quotes.length() == 2 else {
+    return Err("loom song expected a quoted string")
+  }
+  let start = quotes[0].end()
+  let end = quotes[1].start()
+  Ok(input.view(start_offset=start, end_offset=end).to_string())
+}
+
+///|
+fn loom_song_rational_value(
+  node : @seam.SyntaxNode,
+) -> Result[@pattern.Rational, String] {
+  let numbers = node.direct_tokens_of_kind(NumberToken.to_raw())
+  match numbers {
+    [num] => {
+      let n = match loom_mini_parse_int(num.text()) {
+        Ok(n) => n
+        Err(_) => return Err("loom song expected an integer")
+      }
+      Ok(@pattern.Rational::new(Int64::from_int(n), 1L))
+    }
+    [num, den] => {
+      let n = match loom_mini_parse_int(num.text()) {
+        Ok(n) => n
+        Err(_) => return Err("loom song expected an integer")
+      }
+      let d = match loom_mini_parse_int(den.text()) {
+        Ok(d) => d
+        Err(_) => return Err("loom song expected an integer")
+      }
+      if d == 0 {
+        return Err("loom song denominator cannot be zero")
+      }
+      Ok(@pattern.Rational::new(Int64::from_int(n), Int64::from_int(d)))
+    }
+    _ => Err("loom song expected a rational")
   }
 }
