@@ -33,3 +33,4 @@ shipped plan or spec.
 - [ADR-0013 — Loom promotion criteria for mini authoring](0013-loom-promotion-criteria-for-mini-authoring.md)
 - [ADR-0014 — Authoring equality and typed graph compile diagnostics](0014-dspnode-compiledtemplate-equality-and-compile-errors.md)
 - [ADR-0015 — Graph, scheduler, and browser internal boundaries](0015-graph-internal-boundaries-and-maintainability.md)
+- [ADR-0016 — Loom-backed runtime mini parser](0016-loom-backed-runtime-mini-parser.md)
