@@ -79,6 +79,7 @@ generated manifests; the repo already ships a hand-maintained `moon.mod`.
 NEW_MOON_MOD=0 moon check && NEW_MOON_MOD=0 moon test  # full test suite
 NEW_MOON_MOD=0 moon build --target wasm-gc             # Browser WASM build
 NEW_MOON_MOD=0 moon run cmd/main                       # CLI entry point
+NEW_MOON_MOD=0 moon bench                              # microbenchmarks (per package)
 scripts/build-clap-prototype.sh    # Linux CLAP prototype shared object
 scripts/smoke-clap-prototype.sh    # Local CLAP dlopen/process smoke test
 scripts/validate-clap-prototype.sh # Build + clap-validator prototype check
@@ -88,6 +89,16 @@ Before every commit:
 ```bash
 NEW_MOON_MOD=0 moon info && NEW_MOON_MOD=0 moon fmt
 ```
+
+**Scoping tests to one file:** pass the positional path
+(`NEW_MOON_MOD=0 moon test mini/mini_test.mbt`), not `-f`. The `-f/--filter`
+flag matches test *names* by glob, so a filename matches nothing and reports
+`Total tests: 0` with exit 0 — a silent no-op, not a failure.
+
+**Benchmarks:** the engine carries `*_benchmark.mbt` suites across `graph`,
+`mini`, `pattern`, `scheduler`, and `voice`. After any perf-relevant change,
+run `NEW_MOON_MOD=0 moon bench` and save a dated snapshot under
+`docs/performance/` (match the format of the existing snapshots).
 
 ## Documentation
 
