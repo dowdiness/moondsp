@@ -44,9 +44,7 @@ fn remap_node_by_offset(node : DspNode, offset : Int) -> DspNode {
 
 ///|
 pub impl ArithSym for GraphBuilder with fn constant(v) -> GraphBuilder {
-  let nodes : Array[DspNode] = []
-  nodes.push(DspNode::constant(v))
-  { nodes_: nodes, index: 0 }
+  { nodes_: [DspNode::constant(v)], index: 0 }
 }
 
 ///|
@@ -87,16 +85,15 @@ pub impl DspSym for GraphBuilder with fn oscillator(freq, waveform) -> GraphBuil
 
 ///|
 pub impl DspSym for GraphBuilder with fn noise(seed) -> GraphBuilder {
-  let nodes : Array[DspNode] = []
-  nodes.push(DspNode::noise(seed))
-  { nodes_: nodes, index: 0 }
+  { nodes_: [DspNode::noise(seed)], index: 0 }
 }
 
 ///|
 pub impl DspSym for GraphBuilder with fn adsr(a, d, s, r) -> GraphBuilder {
-  let nodes : Array[DspNode] = []
-  nodes.push(DspNode::adsr(attack_ms=a, decay_ms=d, sustain=s, release_ms=r))
-  { nodes_: nodes, index: 0 }
+  {
+    nodes_: [DspNode::adsr(attack_ms=a, decay_ms=d, sustain=s, release_ms=r)],
+    index: 0,
+  }
 }
 
 ///|

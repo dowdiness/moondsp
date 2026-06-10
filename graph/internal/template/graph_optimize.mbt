@@ -128,9 +128,7 @@ fn eliminate_dead(
   }
   // Remap inputs in live nodes
   let remap = index_map
-  let result : Array[@model.DspNode] = []
-  for i = 0; i < live.length(); i = i + 1 {
-    let node = live[i]
+  let result = live.map(node => {
     let new_input0 = if node.input0() >= 0 && node.input0() < remap.length() {
       remap[node.input0()]
     } else {
@@ -141,10 +139,8 @@ fn eliminate_dead(
     } else {
       -1
     }
-    result.push(
-      @model.node_with_inputs(node, input0=new_input0, input1=new_input1),
-    )
-  }
+    @model.node_with_inputs(node, input0=new_input0, input1=new_input1)
+  })
   (result, index_map, true)
 }
 

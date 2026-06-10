@@ -94,11 +94,11 @@ fn Parser::parse_song_expr(self : Parser) -> ParsedSong raise ParseError {
     self.skip_whitespace()
   }
   self.expect_char(')')
-  let parts : Array[@song.SongPart[@pattern.ControlMap]] = []
-  for spec in part_specs {
-    parts.push(spec.to_part(sections))
-  }
-  let mut song = build_song(parts)
+  let mut song = build_song(
+    [
+      for spec in part_specs => spec.to_part(sections)
+    ],
+  )
   for fill in fill_specs {
     let section = resolve_song_section(sections, fill.section_name)
     let result = try? song.fill_gaps(prefix=fill.prefix, section~)

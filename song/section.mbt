@@ -184,13 +184,7 @@ pub fn[A] SectionBody::layers(
 pub fn[A] SectionBody::to_pattern(self : SectionBody[A]) -> @pattern.Pat[A] {
   match self {
     Single(body) => body
-    Layers(layers) => {
-      let pats : Array[@pattern.Pat[A]] = []
-      for layer in layers {
-        pats.push(layer.body())
-      }
-      @pattern.stack(pats)
-    }
+    Layers(layers) => @pattern.stack(layers.map(layer => layer.body()))
   }
 }
 
@@ -259,13 +253,7 @@ fn[A] SectionDocBody::to_section_body(
 ) -> SectionBody[A] {
   match self {
     Single(layer) => SectionBody::single(layer.body())
-    Layers(layers) => {
-      let result : Array[SectionLayer[A]] = []
-      for layer in layers {
-        result.push(layer.to_layer())
-      }
-      SectionBody::layers(result)
-    }
+    Layers(layers) => SectionBody::layers(layers.map(layer => layer.to_layer()))
   }
 }
 

@@ -3,7 +3,7 @@
 pub struct ControlMap(Map[String, Double]) derive(Debug)
 
 ///|
-pub impl Show for ControlMap with output(self, logger) {
+pub impl Show for ControlMap with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
 
@@ -176,22 +176,19 @@ pub fn merge_control(
 ) -> Pat[ControlMap] {
   {
     query: fn(arc) {
-      let a_events = a.query(arc)
       let b_events = b.query(arc)
-      let events : Array[Event[ControlMap]] = []
-      for i = 0; i < a_events.length(); i = i + 1 {
-        let ae = a_events[i]
-        let mut merged = ae.value
-        for j = 0; j < b_events.length(); j = j + 1 {
-          let be = b_events[j]
-          match ae.part.intersect(be.part) {
-            Some(_) => merged = merge_maps(merged, be.value)
-            None => ()
+      a
+      .query(arc)
+      .map(ae => {
+        let merged = b_events.fold(init=ae.value, (merged, be) => {
+          if ae.part.intersect(be.part) is Some(_) {
+            merge_maps(merged, be.value)
+          } else {
+            merged
           }
-        }
-        events.push({ whole: ae.whole, part: ae.part, value: merged })
-      }
-      events
+        })
+        { whole: ae.whole, part: ae.part, value: merged }
+      })
     },
   }
 }

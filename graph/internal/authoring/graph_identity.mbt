@@ -130,13 +130,9 @@ fn compact_graph_ids_after_delete(
   start_index : Int,
   end_index : Int,
 ) -> Array[@identity.GraphNodeId] {
-  let result : Array[@identity.GraphNodeId] = []
-  for index in 0..<ids.length() {
-    if index < start_index || index > end_index {
-      result.push(ids[index])
-    }
-  }
-  result
+  [
+    for index, id in ids if index < start_index || index > end_index => id
+  ]
 }
 
 ///|

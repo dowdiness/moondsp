@@ -190,11 +190,7 @@ fn[A] SongOccurrenceDoc::to_part(self : SongOccurrenceDoc[A]) -> SongPart[A] {
 fn[A] copy_song_occurrence_docs(
   parts : Array[SongOccurrenceDoc[A]],
 ) -> Array[SongOccurrenceDoc[A]] {
-  let result : Array[SongOccurrenceDoc[A]] = []
-  for part in parts {
-    result.push(part)
-  }
-  result
+  parts.copy()
 }
 
 ///|
@@ -277,15 +273,7 @@ fn[A] insert_song_doc_occurrence_at(
   index : Int,
   occurrence : SongOccurrenceDoc[A],
 ) -> Array[SongOccurrenceDoc[A]] {
-  let result : Array[SongOccurrenceDoc[A]] = []
-  for cursor in 0..<index {
-    result.push(parts[cursor])
-  }
-  result.push(occurrence)
-  for cursor in index..<parts.length() {
-    result.push(parts[cursor])
-  }
-  result
+  [..parts[0:index], occurrence, ..parts[index:]]
 }
 
 ///|
@@ -295,20 +283,8 @@ fn[A] move_song_doc_occurrence_to(
   target_index : Int,
 ) -> Array[SongOccurrenceDoc[A]] {
   let moving = parts[current_index]
-  let result : Array[SongOccurrenceDoc[A]] = []
-  for index in 0..<parts.length() {
-    if index != current_index {
-      result.push(parts[index])
-    }
-  }
-  result.push(moving)
-  let mut cursor = result.length() - 1
-  while cursor > target_index {
-    result[cursor] = result[cursor - 1]
-    cursor = cursor - 1
-  }
-  result[target_index] = moving
-  result
+  let without = [ for index, part in parts if index != current_index => part ]
+  [..without[0:target_index], moving, ..without[target_index:]]
 }
 
 ///|
@@ -718,16 +694,12 @@ pub fn[A] SongDoc::remove_occurrence(
   if self.parts.length() == 1 {
     raise CannotRemoveLastSongDocOccurrence
   }
-  let result : Array[SongOccurrenceDoc[A]] = []
-  for cursor in 0..<self.parts.length() {
-    if cursor != index {
-      result.push(self.parts[cursor])
-    }
-  }
   {
     revision: self.revision.next(),
     layout_revision: self.layout_revision.next(),
-    parts: result,
+    parts: [
+      for cursor, part in self.parts if cursor != index => part
+    ],
   }
 }
 
@@ -753,11 +725,7 @@ pub fn[A] SongDoc::move_occurrence(
 
 ///|
 pub fn[A] SongDoc::to_song(self : SongDoc[A]) -> Song[A] raise SongBuildError {
-  let parts : Array[SongPart[A]] = []
-  for part in self.parts {
-    parts.push(part.to_part())
-  }
-  Song(parts~)
+  Song(parts=[ for part in self.parts => part.to_part() ])
 }
 
 ///|

@@ -9,6 +9,10 @@
 | Mutable variable           | `let mut`                           |                               |
 | Bail out early             | `guard`                             | `if ... { return }`           |
 | Branch on variants         | `match`                             | chained `if/else`             |
+| Option/Result inspection   | `match` or `x is Some(v)`           | `is_some()`/`is_none()` + unwrap |
+| Filter/map a collection (cold path) | `Iter` chain or `[ for x in xs if cond => f(x) ]` | `let mut out = []` + push loop |
+| First/last/shape of array  | view patterns `[head, ..tail]`      | `.length()` checks + indexing |
+| String prefix/suffix/shape | `s.view()` + pattern match          | converting to `Array[Char]`   |
 | Simple boolean             | `if/else`                           |                               |
 | Struct construction        | custom `fn Type::Type(...)` constructor | bare `{ field: value }`       |
 | Empty callback body        | `() => ()`                          | `() => {}` (map literal!)     |
