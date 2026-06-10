@@ -2231,12 +2231,16 @@ test "loom atom projection reports diagnostics and recovers with previous proven
 }
 
 ///|
-/// Canonical Phase 2 doc-parity corpus (plan Step 1). Seeded from the proven
-/// `parse_doc`-compatible literals already exercised across this spike: atoms,
-/// sequences, fast/slow/rev chains, euclid, sub-notation, postfix operators,
-/// control methods, jux/every, and known-malformed forms. Multiline `$:` stack
-/// inputs are covered by the existing dedicated tests and are a tracked corpus
-/// follow-up (plan Step 6), not silently dropped.
+/// Canonical Phase 2 doc-parity corpus (plan Step 1, widened in Step 6).
+/// Seeded from the proven `parse_doc`-compatible literals already exercised
+/// across this spike: atoms, sequences, fast/slow/rev chains, euclid,
+/// sub-notation, postfix operators, control methods, jux/every, and
+/// known-malformed forms. The Step 6 widening folds in the previously tracked
+/// follow-up families: multiline `$:` stack programs, `stack(...)` roots,
+/// comma stack layers, negative/decimal note atoms, postfix-operator
+/// combinations (euclid/replicate/degrade chains, where the position-seeded
+/// `?` makes offset-base drift between the parsers observable), nested
+/// sub-notation, and a broader malformed set.
 fn projection_boundary_doc_corpus() -> Array[String] {
   [
     // valid
@@ -2253,9 +2257,41 @@ fn projection_boundary_doc_corpus() -> Array[String] {
     "s(\"bd sd\").jux(rev)", "s(\"bd sd\").jux(fast(2))",
     "s(\"bd sd\").jux(slow(2))", "s(\"bd sd\").every(2, rev)",
     "s(\"bd sd\").every(2, fast(2))", "s(\"bd sd\").every(2, slow(2))",
-    "s(\"bd\").fast(slow(2))",
+    // valid — Step 6 widening: comma stack layers (notation-level stack)
+    "s(\"bd, hh\")", "s(\"bd sd, hh hh\")", "s(\"[bd, hh] sd\")",
+    "note(\"60, 64\")", "s(\"bd, sd, hh\")",
+    // valid — Step 6 widening: stack(...) roots
+    "stack(s(\"bd\"), note(\"60\"))",
+    "stack(s(\"bd\").fast(2), note(\"60\").rev())",
+    "stack(s(\"bd\"), s(\"sd\"), s(\"hh\"))",
+    // valid — Step 6 widening: multiline `$:` stack programs
+    "$: s(\"bd\")\n$: note(\"60\")",
+    "$: s(\"bd sd\").jux(rev)\n$: note(\"60 64\").every(2, fast(2))",
+    "$: s(\"bd sd\").fast(2)\n$: s(\"hh hh\")\n$: note(\"60\")",
+    // valid — Step 6 widening: negative/decimal note atoms
+    "note(\"-12 60\")", "note(\"60.5 61.25\")", "note(\"-0.5\")",
+    // valid — Step 6 widening: postfix combinations + position-seeded degrade
+    "s(\"bd(3,8)*2 sd\")", "s(\"bd(3,8)? sd\")", "s(\"bd*2? sd\")",
+    "s(\"bd?/2 sd\")", "s(\"bd? sd? hh?\")", "s(\"[bd sd?]? hh\")",
+    "s(\"[bd? sd]*2 hh\")",
+    // valid — Step 6 widening: nested sub-notation + whitespace probes
+    "s(\"[[bd sd] hh] cp\")", "s(\"[bd [sd hh]] cp\")",
+    "s(\"bd( 3 , 8 ) sd\")", "s(\"bd\tsd\")",
+    // valid — Step 6 widening: repeated/overriding control methods
+    "s(\"bd\").fast(2).fast(2)", "s(\"bd\").gain(0.5).gain(0.7)",
+    "s(\"bd sd\").every(3, rev)", "s(\"bd sd hh sd\").fast(4)",
+    "s(\"bd sd\").slow(8)",
     // malformed — runner asserts both parsers AGREE on rejection
+    // (`fast(slow(2))` sat in the valid section since Piece 1, but patterned
+    // tempo arguments are rejected by BOTH parsers — the Step 13 matrix's
+    // pinned ok/err split surfaced the mislabel)
+    "s(\"bd\").fast(slow(2))",
     "s(\"[bd\")", "s(\"bd sd\").jux(fast(2)", "s(\"bd\").gain(0.5).pan(-0.25",
+    // malformed — Step 6 widening
+    "s(\"xyz\")", "s(\"\")", "note(\"bd\")", "s(\"2bd\")", "s(\"bd*0 sd\")",
+    "s(\"bd/0 sd\")", "s(\"bd*-1 sd\")", "s(\"bd(3) sd\")", "s(\"bd(3,8 sd\")",
+    "s(\"bd,\")", "stack()", "stack(s(\"bd\")",
+    "$: s(\"bd\") $: note(\"60\")", "s(\"bd\").unknown(1)",
   ]
 }
 
@@ -2324,6 +2360,40 @@ test "panic phase2 piece1 value parity catches control-only divergence" {
 }
 
 ///|
+// SANCTIONED DIVERGENCE (plan Step 6/8, found by the Step 6 corpus widening):
+// the oracle's notation parser does not check at_end() after the top-level
+// layer, so a stray `]` outside any bracket group is silently ignored — and
+// every element after it is silently DROPPED (`s("bd] sd")` parses as just
+// `bd`, losing `sd`). Loom rejects both inputs with diagnostics. Loom's
+// strict rejection is the intended behavior; the oracle leniency is a
+// production parser defect that cannot be fixed here (Phase 2 confines all
+// edits to the spike boundary). This test pins BOTH sides of the asymmetry
+// so the sanctioned exception fails loudly if either parser changes.
+test "known divergence: oracle silently drops trailing junk after stray ']', loom rejects" {
+  for input in ["s(\"bd]\")", "s(\"bd] sd\")"] {
+    let projection = LoomMiniAtomProjection::new(input)
+    match projection.parse_doc() {
+      Ok(_) => abort("input '\{input}': expected loom to reject stray ']'")
+      Err(msg) => inspect(msg, content="loom mini syntax has diagnostics")
+    }
+    match @mini.parse_doc(input) {
+      Ok(doc) => {
+        // Pin the oracle's data loss: everything after the stray ']' is gone.
+        let ids = projection_boundary_leaf_ids_from_doc(doc)
+        let expected =
+          #|["mini:sound:bd:0"]
+        debug_inspect(ids, content=expected)
+      }
+      Err(msg) =>
+        abort(
+          "input '\{input}': oracle now rejects (\{msg}) — leniency fixed, fold input into the corpus malformed set",
+        )
+    }
+    projection.dispose()
+  }
+}
+
+///|
 /// Piece 1 green gate (plan Step 5): the whole canonical corpus passes Ok/Err
 /// agreement + value-level parity (any hole aborts in the runner above).
 /// Both-`Err` message divergences are characterized, not failed.
@@ -2336,4 +2406,103 @@ test "phase2 piece1 doc value-parity corpus" {
   }
   ignore(message_divergences)
   inspect(corpus.length() >= 30, content="true")
+}
+
+///|
+/// Phase 2 Piece 3 (plan Step 13): corpus-driven provenance record for one
+/// canonical doc input, derived from the parsers alone — no hand-picked rows.
+/// For both-Ok inputs it asserts root/leaf-ID parity, value-level event
+/// parity linkage (the Step 2 helper), and the loom last-good (accepted
+/// channel) transition Ok → Err → Ok: a generic breaking suffix fails the
+/// current channel while `accepted_doc` retains the good revision, and
+/// recovery to the original source restores identical leaf IDs and
+/// re-accepts. For both-Err inputs it asserts the accepted channel is empty
+/// (nothing was ever good). One-sided results abort as parity holes.
+/// Returns "ok" or "err" for the matrix tally.
+fn projection_boundary_provenance_matrix_record(input : String) -> String {
+  let projection = LoomMiniAtomProjection::new(input)
+  let status = match (projection.parse_doc(), @mini.parse_doc(input)) {
+    (Ok(loom_doc), Ok(mini_doc)) => {
+      guard loom_doc.root().value() == mini_doc.root().value() else {
+        abort("provenance matrix input '\{input}': root id mismatch")
+      }
+      let initial_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
+      projection_boundary_assert_ids_equal(
+        initial_ids,
+        projection_boundary_leaf_ids_from_doc(mini_doc),
+      )
+      projection_boundary_assert_value_events_equal(
+        projection_boundary_value_events_from_doc(loom_doc),
+        projection_boundary_value_events_from_doc(mini_doc),
+      )
+      let good_rev = loom_doc.revision()
+      guard last_good_accepted_revision(projection) == Some(good_rev) else {
+        abort(
+          "provenance matrix input '\{input}': accepted channel did not capture the good parse",
+        )
+      }
+      projection.set_source(input + "(")
+      guard projection.parse_doc() is Err(_) else {
+        abort(
+          "provenance matrix input '\{input}': breaking suffix did not fail the parse",
+        )
+      }
+      guard last_good_accepted_revision(projection) == Some(good_rev) else {
+        abort(
+          "provenance matrix input '\{input}': accepted channel lost the last-good doc",
+        )
+      }
+      projection.set_source(input)
+      let recovered_doc = projection_boundary_doc(projection.parse_doc())
+      projection_boundary_assert_ids_equal(
+        initial_ids,
+        projection_boundary_leaf_ids_from_doc(recovered_doc),
+      )
+      guard last_good_accepted_revision(projection) ==
+        Some(recovered_doc.revision()) else {
+        abort(
+          "provenance matrix input '\{input}': accepted channel did not track recovery",
+        )
+      }
+      "ok"
+    }
+    (Err(_), Err(_)) => {
+      guard last_good_accepted_revision(projection) is None else {
+        abort(
+          "provenance matrix input '\{input}': accepted channel non-empty before any good parse",
+        )
+      }
+      "err"
+    }
+    (Ok(_), Err(msg)) =>
+      abort(
+        "provenance matrix input '\{input}': loom accepted but mini rejected (\{msg})",
+      )
+    (Err(msg), Ok(_)) =>
+      abort(
+        "provenance matrix input '\{input}': mini accepted but loom rejected (\{msg})",
+      )
+  }
+  projection.dispose()
+  status
+}
+
+///|
+/// Piece 3 green gate (plan Step 13): the corpus-driven provenance matrix
+/// covers EVERY canonical doc input — parse status, leaf IDs, last-good
+/// transitions, and value-parity linkage — and the valid/malformed split is
+/// pinned so corpus growth keeps the matrix honest.
+test "phase2 piece3 corpus-driven provenance matrix" {
+  let corpus = projection_boundary_doc_corpus()
+  let (ok_count, err_count) = for input in corpus; ok = 0, err = 0 {
+    match projection_boundary_provenance_matrix_record(input) {
+      "ok" => continue ok + 1, err
+      _ => continue ok, err + 1
+    }
+  } nobreak {
+    (ok, err)
+  }
+  inspect(ok_count + err_count == corpus.length(), content="true")
+  inspect(ok_count, content="66")
+  inspect(err_count, content="18")
 }
