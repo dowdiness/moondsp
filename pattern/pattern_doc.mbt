@@ -349,7 +349,7 @@ pub fn[A] PatternSnapshotEvent::event(
 pub fn[A] PatternSnapshotEvent::pattern_node(
   self : PatternSnapshotEvent[A],
 ) -> @identity.PatternNodeId? {
-  if self.pattern_nodes.length() == 0 {
+  if self.pattern_nodes.is_empty() {
     None
   } else {
     Some(self.pattern_nodes[self.pattern_nodes.length() - 1])
@@ -1547,7 +1547,7 @@ pub fn[A] PatternDoc::sequence(
   id~ : @identity.PatternNodeId,
   docs~ : Array[PatternDoc[A]],
 ) -> PatternDoc[A] raise PatternDocError {
-  if docs.length() == 0 {
+  if docs.is_empty() {
     raise EmptyPatternDocs
   }
   let nodes : Map[String, PatternDocEntry[A]] = {}
@@ -1566,7 +1566,7 @@ pub fn[A] PatternDoc::stack(
   id~ : @identity.PatternNodeId,
   docs~ : Array[PatternDoc[A]],
 ) -> PatternDoc[A] raise PatternDocError {
-  if docs.length() == 0 {
+  if docs.is_empty() {
     raise EmptyPatternDocs
   }
   let nodes : Map[String, PatternDocEntry[A]] = {}

@@ -753,7 +753,7 @@ pub fn VoicePool::note_on(
   // WHY fresh compile on active-slot params: keep the old active slot untouched
   // if a stealing note's params reject. Idle slots can reset/reuse their
   // prepared graph because no old voice can be damaged by a rejected note-on.
-  let force_fresh = !(slot.state is VoiceState::Idle) && params.length() > 0
+  let force_fresh = !(slot.state is VoiceState::Idle) && !params.is_empty()
   let mut reused_prepared = false
   let compiled = match slot.compiled {
     Some(existing) if !force_fresh &&
@@ -772,7 +772,7 @@ pub fn VoicePool::note_on(
   }
   // WHY transactional: if any param is invalid, the voice is not activated.
   // This prevents partially-configured voices with default/stale settings.
-  if params.length() > 0 {
+  if !params.is_empty() {
     if compiled.apply_controls(params) is Err(_) {
       return None
     }

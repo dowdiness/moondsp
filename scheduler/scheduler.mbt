@@ -48,7 +48,7 @@ fn pattern_node_path_from_primary(
 fn primary_pattern_node(
   pattern_nodes : Array[@identity.PatternNodeId],
 ) -> @identity.PatternNodeId? {
-  if pattern_nodes.length() == 0 {
+  if pattern_nodes.is_empty() {
     None
   } else {
     Some(pattern_nodes[pattern_nodes.length() - 1])
@@ -131,7 +131,7 @@ pub fn EventSource::occurrence(self : EventSource) -> @identity.OccurrenceId? {
 ///|
 pub fn EventSource::is_empty(self : EventSource) -> Bool {
   self.pattern_node is None &&
-  self.pattern_nodes.length() == 0 &&
+  self.pattern_nodes.is_empty() &&
   self.section is None &&
   self.layer is None &&
   self.occurrence is None

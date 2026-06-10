@@ -21,7 +21,7 @@
 pub fn parse(
   input : String,
 ) -> Result[@pattern.Pat[@pattern.ControlMap], String] {
-  guard input.length() > 0 else { return Err("empty input") }
+  guard !input.is_empty() else { return Err("empty input") }
   match mini_collect_dollar_stack_lines(input) {
     Err(msg) => return Err(msg)
     Ok(Some(lines)) => return mini_parse_dollar_stack_program(input, lines)

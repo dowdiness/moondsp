@@ -71,17 +71,14 @@ pub fn[A] sequence(pats : Array[Pat[A]]) -> Pat[A] {
 
 ///|
 pub fn[A] stack(pats : Array[Pat[A]]) -> Pat[A] {
-  if pats.length() == 0 {
+  if pats.is_empty() {
     return Pat::silence()
   }
   {
     query: fn(arc) {
       let result : Array[Event[A]] = []
       for pat in pats {
-        let events = pat.query(arc)
-        for ev in events {
-          result.push(ev)
-        }
+        result.append(pat.query(arc))
       }
       result
     },
@@ -95,16 +92,15 @@ pub fn[A] Pat::filter_map(self : Pat[A], f : (A) -> A?) -> Pat[A] {
   let inner = self
   {
     query: fn(arc) {
-      let events = inner.query(arc)
-      let result : Array[Event[A]] = []
-      for ev in events {
-        match f(ev.value) {
-          Some(new_value) =>
-            result.push({ whole: ev.whole, part: ev.part, value: new_value })
-          None => ()
-        }
-      }
-      result
+      inner
+      .query(arc)
+      .filter_map(ev => {
+        f(ev.value).map(new_value => {
+          whole: ev.whole,
+          part: ev.part,
+          value: new_value,
+        })
+      })
     },
   }
 }
@@ -129,40 +125,19 @@ fn bjorklund(k : Int, n : Int) -> Array[Bool] {
   if k >= n {
     return Array::make(n, true)
   }
-  let mut front : Array[Array[Bool]] = []
-  for _ in 0..<k {
-    front.push([true])
-  }
-  let mut back : Array[Array[Bool]] = []
-  for _ in 0..<(n - k) {
-    back.push([false])
-  }
+  let mut front : Array[Array[Bool]] = Array::makei(k, _ => [true])
+  let mut back : Array[Array[Bool]] = Array::makei(n - k, _ => [false])
   while back.length() > 1 {
     let pairs = if front.length() < back.length() {
       front.length()
     } else {
       back.length()
     }
-    let new_front : Array[Array[Bool]] = []
-    for i in 0..<pairs {
-      let merged : Array[Bool] = []
-      for b in front[i] {
-        merged.push(b)
-      }
-      for b in back[i] {
-        merged.push(b)
-      }
-      new_front.push(merged)
-    }
-    let new_back : Array[Array[Bool]] = []
-    if front.length() > pairs {
-      for i in pairs..<front.length() {
-        new_back.push(front[i])
-      }
+    let new_front = Array::makei(pairs, i => front[i] + back[i])
+    let new_back = if front.length() > pairs {
+      front[pairs:].to_array()
     } else {
-      for i in pairs..<back.length() {
-        new_back.push(back[i])
-      }
+      back[pairs:].to_array()
     }
     front = new_front
     back = new_back
@@ -170,18 +145,7 @@ fn bjorklund(k : Int, n : Int) -> Array[Bool] {
       break
     }
   }
-  let result : Array[Bool] = []
-  for group in front {
-    for b in group {
-      result.push(b)
-    }
-  }
-  for group in back {
-    for b in group {
-      result.push(b)
-    }
-  }
-  result
+  front.flatten() + back.flatten()
 }
 
 ///|

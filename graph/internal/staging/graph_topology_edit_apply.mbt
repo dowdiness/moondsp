@@ -206,7 +206,7 @@ fn apply_topology_insert_chain(
   retarget_input_slot : GraphTopologyInputSlot,
   chain_nodes : Array[DspNode],
 ) -> Result[Unit, GraphTopologyEditError] {
-  if chain_nodes.length() == 0 {
+  if chain_nodes.is_empty() {
     return Err(GraphTopologyEditError::EmptyInsertChain)
   }
   if retarget_node_index < 0 || retarget_node_index >= nodes.length() {

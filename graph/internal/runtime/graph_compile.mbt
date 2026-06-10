@@ -162,12 +162,12 @@ pub fn CompiledStereoDsp::last_sanitized_count(self : CompiledStereoDsp) -> Int 
 /// True when the compiled graph contains feedback (back) edges that require
 /// per-sample processing with self-registers.
 pub fn CompiledDsp::has_feedback_edges(self : CompiledDsp) -> Bool {
-  self.0.feedback_edges.length() > 0
+  !self.0.feedback_edges.is_empty()
 }
 
 ///|
 pub fn CompiledStereoDsp::has_feedback_edges(self : CompiledStereoDsp) -> Bool {
-  self.0.feedback_edges.length() > 0
+  !self.0.feedback_edges.is_empty()
 }
 
 ///|
@@ -366,7 +366,7 @@ fn CompiledDsp::compile_internal(
     opt_map,
     mono_compile_plan,
     fn(fixed_nodes, feedback_edges) {
-      if feedback_edges.length() == 0 {
+      if feedback_edges.is_empty() {
         valid_terminal_mono_shapes(fixed_nodes)
       } else {
         valid_feedback_terminal_mono_graph(fixed_nodes, feedback_edges)
@@ -419,7 +419,7 @@ fn CompiledStereoDsp::compile_internal(
     opt_map,
     stereo_compile_plan,
     fn(fixed_nodes, feedback_edges) {
-      if feedback_edges.length() == 0 {
+      if feedback_edges.is_empty() {
         valid_terminal_stereo_shapes(fixed_nodes)
       } else {
         valid_feedback_terminal_stereo_graph(fixed_nodes, feedback_edges)
@@ -468,7 +468,7 @@ fn stereo_compile_plan(
 
 ///|
 pub fn CompiledGraph::compiled_buffer_capacity(self : CompiledGraph) -> Int {
-  if self.buffers.length() == 0 {
+  if self.buffers.is_empty() {
     0
   } else {
     self.buffers[0].length()

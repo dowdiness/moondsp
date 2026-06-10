@@ -224,19 +224,14 @@ fn[A] song_doc_has_occurrence_name_except(
   name : String,
   id : @identity.OccurrenceId,
 ) -> Bool {
-  for part in parts {
-    if part.id() != id && part.name() == name {
-      return true
-    }
-  }
-  false
+  parts.iter().any(part => part.id() != id && part.name() == name)
 }
 
 ///|
 fn[A] validate_song_doc_parts(
   parts : Array[SongOccurrenceDoc[A]],
 ) -> Unit raise SongDocBuildError {
-  if parts.length() == 0 {
+  if parts.is_empty() {
     raise EmptySongDoc
   }
   let ids : Map[String, Bool] = {}

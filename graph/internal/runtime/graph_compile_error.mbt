@@ -182,12 +182,12 @@ fn graph_compile_error(
     None => ()
   }
   let valid_shape = if output_kind is DspNodeKind::Output {
-    if feedback_edges.length() == 0 {
+    if feedback_edges.is_empty() {
       valid_terminal_mono_shapes(fixed_nodes)
     } else {
       valid_feedback_terminal_mono_graph(fixed_nodes, feedback_edges)
     }
-  } else if feedback_edges.length() == 0 {
+  } else if feedback_edges.is_empty() {
     valid_terminal_stereo_shapes(fixed_nodes)
   } else {
     valid_feedback_terminal_stereo_graph(fixed_nodes, feedback_edges)
@@ -245,7 +245,7 @@ fn mark_reachable(
   start : Int,
 ) -> Unit {
   let stack : Array[Int] = [start]
-  while stack.length() > 0 {
+  while !stack.is_empty() {
     let index = stack.pop().unwrap()
     if index < 0 || index >= nodes.length() || reachable[index] {
       continue
