@@ -2423,7 +2423,7 @@ fn projection_boundary_provenance_matrix_record(input : String) -> String {
   let projection = LoomMiniAtomProjection::new(input)
   let status = match (projection.parse_doc(), @mini.parse_doc(input)) {
     (Ok(loom_doc), Ok(mini_doc)) => {
-      if loom_doc.root().value() != mini_doc.root().value() {
+      guard loom_doc.root().value() == mini_doc.root().value() else {
         abort("provenance matrix input '\{input}': root id mismatch")
       }
       let initial_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
@@ -2436,7 +2436,7 @@ fn projection_boundary_provenance_matrix_record(input : String) -> String {
         projection_boundary_value_events_from_doc(mini_doc),
       )
       let good_rev = loom_doc.revision()
-      if last_good_accepted_revision(projection) != Some(good_rev) {
+      guard last_good_accepted_revision(projection) == Some(good_rev) else {
         abort(
           "provenance matrix input '\{input}': accepted channel did not capture the good parse",
         )
@@ -2447,7 +2447,7 @@ fn projection_boundary_provenance_matrix_record(input : String) -> String {
           "provenance matrix input '\{input}': breaking suffix did not fail the parse",
         )
       }
-      if last_good_accepted_revision(projection) != Some(good_rev) {
+      guard last_good_accepted_revision(projection) == Some(good_rev) else {
         abort(
           "provenance matrix input '\{input}': accepted channel lost the last-good doc",
         )
@@ -2458,8 +2458,8 @@ fn projection_boundary_provenance_matrix_record(input : String) -> String {
         initial_ids,
         projection_boundary_leaf_ids_from_doc(recovered_doc),
       )
-      if last_good_accepted_revision(projection) !=
-        Some(recovered_doc.revision()) {
+      guard last_good_accepted_revision(projection) ==
+        Some(recovered_doc.revision()) else {
         abort(
           "provenance matrix input '\{input}': accepted channel did not track recovery",
         )
@@ -2467,7 +2467,7 @@ fn projection_boundary_provenance_matrix_record(input : String) -> String {
       "ok"
     }
     (Err(_), Err(_)) => {
-      if last_good_accepted_revision(projection) != None {
+      guard last_good_accepted_revision(projection) is None else {
         abort(
           "provenance matrix input '\{input}': accepted channel non-empty before any good parse",
         )
@@ -2494,13 +2494,13 @@ fn projection_boundary_provenance_matrix_record(input : String) -> String {
 /// pinned so corpus growth keeps the matrix honest.
 test "phase2 piece3 corpus-driven provenance matrix" {
   let corpus = projection_boundary_doc_corpus()
-  let mut ok_count = 0
-  let mut err_count = 0
-  for input in corpus {
+  let (ok_count, err_count) = for input in corpus; ok = 0, err = 0 {
     match projection_boundary_provenance_matrix_record(input) {
-      "ok" => ok_count = ok_count + 1
-      _ => err_count = err_count + 1
+      "ok" => continue ok + 1, err
+      _ => continue ok, err + 1
     }
+  } nobreak {
+    (ok, err)
   }
   inspect(ok_count + err_count == corpus.length(), content="true")
   inspect(ok_count, content="66")
