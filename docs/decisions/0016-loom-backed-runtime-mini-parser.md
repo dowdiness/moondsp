@@ -1,6 +1,6 @@
 # ADR-0016: Loom-backed runtime mini parser
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-06-10, PR #196)
 - **Date:** 2026-06-10
 - **Source:** Loom parser replacement campaign —
   [Phase 0 feasibility report](../superpowers/specs/2026-06-09-loom-parser-replacement-phase0-report.md)

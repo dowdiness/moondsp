@@ -1,6 +1,11 @@
 # ADR-0013: Loom promotion criteria for mini authoring
 
-- **Status:** Proposed
+- **Status:** Proposed — runtime-swap clauses superseded by ADR-0016
+  (2026-06-10): the `mini.parse` routing non-goal, the root `moon.mod`
+  loom-dependency non-goal (registry versions only), the publish non-goal,
+  the spec-local-parity-is-not-approval clause, and the runtime-isolation
+  gate. The authoring-path non-goals and promotion gates remain in force; see
+  ADR-0016 "Relationship to prior ADRs" for the clause-level mapping.
 - **Date:** 2026-05-25
 - **Source:** Follow-up design pass after PR #76 grammar parity, updated with
   PR #85 apply-edit parity evidence and PR #91–#112 projection, parity,
