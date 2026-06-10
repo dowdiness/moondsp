@@ -33,6 +33,7 @@ options(
     "scripts/",
     "specs/",
     "web/",
+    "docs/moonbit-base.md",
     "docs/api-design-review-2026-04-21.md",
     "docs/dsp-structural-editor-vision.md",
     "docs/dsp-structural-editor-architecture.md",

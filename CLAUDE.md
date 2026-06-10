@@ -1,13 +1,18 @@
 # moondsp — MoonBit DSP Audio Engine
 
 `moondsp` is a MoonBit DSP audio engine library in the Salat Engine project.
-Phases 0–5 complete: AudioWorklet proof, DSP primitives, compiled graph
-runtime with hot-swap and stereo, voice pool with priority stealing,
-pattern engine with rational time, pattern scheduler, and text-to-audio
-pipeline with mini-notation parser and synthesized drum sounds. The path
-remains open for native targets such as CLAP plugins.
 
-@~/.claude/moonbit-base.md
+The browser audio path is complete: AudioWorklet proof, DSP primitives, compiled
+graph runtime with hot-swap and stereo, voice pool with priority stealing,
+pattern engine with rational time, pattern scheduler, and text-to-audio
+pipeline with mini-notation parser and synthesized drum sounds.
+
+A native CLAP plugin path exists in prototype form (`clap_engine`, `clap_host`,
+`clap_plugin`) and passes clap-validator, but is **not** production-gated — see
+the Native ABI and CLAP Policy section for the gates that separate prototype
+from DAW-ready.
+
+@docs/moonbit-base.md
 
 ## Project Structure
 
@@ -68,19 +73,35 @@ remains open for native targets such as CLAP plugins.
 
 ## Commands
 
+Prefix every direct `moon` invocation with `NEW_MOON_MOD=0`. The variable
+disables the experimental `moon.mod` auto-migration, which has corrupted
+generated manifests; the repo already ships a hand-maintained `moon.mod`.
+(Wrapper scripts below invoke `moon` internally and need no prefix.)
+
 ```bash
-moon check && moon test        # full test suite
-moon build --target wasm-gc    # Browser WASM build
-moon run cmd/main              # CLI entry point
-scripts/build-clap-prototype.sh # Linux CLAP prototype shared object
-scripts/smoke-clap-prototype.sh # Local CLAP dlopen/process smoke test
+NEW_MOON_MOD=0 moon check && NEW_MOON_MOD=0 moon test  # full test suite
+NEW_MOON_MOD=0 moon build --target wasm-gc             # Browser WASM build
+NEW_MOON_MOD=0 moon run cmd/main                       # CLI entry point
+NEW_MOON_MOD=0 moon bench                              # microbenchmarks (per package)
+scripts/build-clap-prototype.sh    # Linux CLAP prototype shared object
+scripts/smoke-clap-prototype.sh    # Local CLAP dlopen/process smoke test
 scripts/validate-clap-prototype.sh # Build + clap-validator prototype check
 ```
 
 Before every commit:
 ```bash
-moon info && moon fmt
+NEW_MOON_MOD=0 moon info && NEW_MOON_MOD=0 moon fmt
 ```
+
+**Scoping tests to one file:** pass the positional path
+(`NEW_MOON_MOD=0 moon test mini/mini_test.mbt`), not `-f`. The `-f/--filter`
+flag matches test *names* by glob, so a filename matches nothing and reports
+`Total tests: 0` with exit 0 — a silent no-op, not a failure.
+
+**Benchmarks:** the engine carries `*_benchmark.mbt` suites across `graph`,
+`mini`, `pattern`, `scheduler`, and `voice`. After any perf-relevant change,
+run `NEW_MOON_MOD=0 moon bench` and save a dated snapshot under
+`docs/performance/` (match the format of the existing snapshots).
 
 ## Documentation
 
