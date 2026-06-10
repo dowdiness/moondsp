@@ -1,13 +1,16 @@
 # moondsp — MoonBit DSP Audio Engine
 
 `moondsp` is a MoonBit DSP audio engine library in the Salat Engine project.
+
 The browser audio path is complete: AudioWorklet proof, DSP primitives, compiled
 graph runtime with hot-swap and stereo, voice pool with priority stealing,
 pattern engine with rational time, pattern scheduler, and text-to-audio
-pipeline with mini-notation parser and synthesized drum sounds. A native CLAP
-plugin path exists in prototype form (`clap_engine`, `clap_host`, `clap_plugin`)
-and passes clap-validator, but is **not** production-gated — see the Native ABI
-and CLAP Policy section for the gates that separate prototype from DAW-ready.
+pipeline with mini-notation parser and synthesized drum sounds.
+
+A native CLAP plugin path exists in prototype form (`clap_engine`, `clap_host`,
+`clap_plugin`) and passes clap-validator, but is **not** production-gated — see
+the Native ABI and CLAP Policy section for the gates that separate prototype
+from DAW-ready.
 
 @docs/moonbit-base.md
 
