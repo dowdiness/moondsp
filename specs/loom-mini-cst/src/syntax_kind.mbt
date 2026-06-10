@@ -34,6 +34,17 @@ pub(all) enum MiniSyntaxKind {
   DollarColonToken
   DollarStackNode
   DollarLineNode
+  ColonToken
+  StringContentToken
+  SongNode
+  SongSectionNode
+  SongBpmNode
+  SongPartNode
+  SongPartIdNode
+  SongFillNode
+  SongStringNode
+  SongRationalNode
+  SongSectionBodyNode
 } derive(Debug, Eq)
 
 ///|
@@ -79,6 +90,17 @@ pub impl @seam.ToRawKind for MiniSyntaxKind with fn to_raw(self) {
       DollarColonToken => 31
       DollarStackNode => 32
       DollarLineNode => 33
+      ColonToken => 34
+      StringContentToken => 35
+      SongNode => 36
+      SongSectionNode => 37
+      SongBpmNode => 38
+      SongPartNode => 39
+      SongPartIdNode => 40
+      SongFillNode => 41
+      SongStringNode => 42
+      SongRationalNode => 43
+      SongSectionBodyNode => 44
     },
   )
 }
@@ -126,6 +148,17 @@ pub fn MiniSyntaxKind::from_raw(raw : @seam.RawKind) -> MiniSyntaxKind {
     31 => DollarColonToken
     32 => DollarStackNode
     33 => DollarLineNode
+    34 => ColonToken
+    35 => StringContentToken
+    36 => SongNode
+    37 => SongSectionNode
+    38 => SongBpmNode
+    39 => SongPartNode
+    40 => SongPartIdNode
+    41 => SongFillNode
+    42 => SongStringNode
+    43 => SongRationalNode
+    44 => SongSectionBodyNode
     _ => ErrorToken
   }
 }

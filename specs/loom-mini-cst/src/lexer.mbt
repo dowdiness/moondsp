@@ -55,6 +55,10 @@ pub fn mini_step_lexer(
       cursor.set_view(rest)
       cursor.produced(DollarColon)
     }
+    [':', .. rest] => {
+      cursor.set_view(rest)
+      cursor.produced(Colon)
+    }
     ['(', .. rest] => {
       cursor.set_view(rest)
       cursor.produced(LParen)

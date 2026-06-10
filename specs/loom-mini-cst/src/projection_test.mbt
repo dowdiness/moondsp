@@ -1295,6 +1295,24 @@ test "loom atom projection matches mini PatternDoc for plain stack" {
 }
 
 ///|
+// Method-chained stack arguments (`stack(s("bd").fast(2), …)`) — the grammar
+// has accepted these since the Piece 1 Codex review (parser_test.mbt), but the
+// projection only gained per-arg method-chain grouping in Piece 2. Value-level
+// parity guards that fix.
+test "loom atom projection matches mini PatternDoc and events for method-chained stack args" {
+  let input = "stack(s(\"bd\").fast(2), note(\"60\").rev())"
+  let projection = LoomMiniAtomProjection::new(input)
+  let loom_doc = projection_boundary_doc(projection.parse_doc())
+  let mini_doc = projection_boundary_doc(@mini.parse_doc(input))
+  @debug.assert_eq(loom_doc.root().value(), mini_doc.root().value())
+  projection_boundary_assert_value_events_equal(
+    projection_boundary_value_events_from_doc(loom_doc),
+    projection_boundary_value_events_from_doc(mini_doc),
+  )
+  projection.dispose()
+}
+
+///|
 // KNOWN EDGE CHARACTERIZATION: empty quoted notation is CST-only recovery.
 // The Loom grammar emits a zero-diagnostic tree for editor partial input, but
 // semantic projection rejects it just like production @mini.parse_doc. This is

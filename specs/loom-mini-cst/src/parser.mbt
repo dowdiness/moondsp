@@ -394,3 +394,224 @@ pub fn parser_ident_token_spans(
   let root = parser.syntax_tree().read_or_abort()
   ident_token_spans_from_syntax(root)
 }
+
+// -- Song-level grammar (Phase 2 Piece 2) ------------------------------------
+//
+// A SEPARATE top-level grammar for `song(...)` wrapper forms, sharing the same
+// lexer and the same `parse_expr` pattern grammar for section bodies (mirroring
+// the oracle `mini/song_parser.mbt`, which reuses `parse_expr` under `parse`).
+// Outer keywords (`song`, `section`, `bpm`, `part`, `part_id`, `fill`) lex as
+// `Ident` + `LParen` — the `['s', '(']` keyword rule never matches `so…` — so
+// item dispatch keys on the ident text, and each item is wrapped in a distinct
+// node so projection disambiguates by node kind rather than keyword token.
+
+///|
+pub let song_spec : @core.LanguageSpec[MiniToken, MiniSyntaxKind] = @core.LanguageSpec::new(
+  WhitespaceToken,
+  ErrorToken,
+  RootNode,
+  EOF,
+  incomplete_kind=ErrorNode,
+  parse_root=parse_song_root,
+  reuse_size_threshold=1,
+)
+
+///|
+pub let song_grammar : @loom.Grammar[MiniToken, MiniSyntaxKind, MiniAst] = @loom.Grammar::new(
+  spec=song_spec,
+  lex~,
+  fold_node=mini_fold_node,
+  incremental_relex_enabled=false,
+  block_reparse_spec=None,
+)
+
+///|
+fn parse_song_root(
+  ctx : @core.ParserContext[MiniToken, MiniSyntaxKind],
+) -> Unit {
+  ctx.node(SongNode, fn() {
+    expect_song_keyword(ctx, "song") |> ignore
+    expect(ctx, LParen, LParenToken) |> ignore
+    if ctx.peek() == RParen {
+      ctx.error("song() requires at least one item")
+    } else {
+      parse_song_item(ctx)
+      while ctx.peek() == Comma && ctx.error_count < MAX_ERRORS {
+        expect(ctx, Comma, CommaToken) |> ignore
+        parse_song_item(ctx)
+      }
+    }
+    expect(ctx, RParen, RParenToken) |> ignore
+  })
+  if ctx.peek() != EOF {
+    ctx.error("Unexpected tokens after song notation")
+    let _ = ctx.skip_until(fn(token) { token == EOF })
+  }
+}
+
+///|
+fn parse_song_item(
+  ctx : @core.ParserContext[MiniToken, MiniSyntaxKind],
+) -> Unit {
+  if ctx.peek() != Ident {
+    ctx.error("Expected song item: section(...), bpm(...), part(...), part_id(...), or fill(...)")
+    ctx.bump_error()
+    return
+  }
+  match ctx.current_token_text().to_string() {
+    "section" => parse_song_section_item(ctx)
+    "bpm" => parse_song_bpm_item(ctx)
+    "part_id" => parse_song_part_id_item(ctx)
+    "part" => parse_song_part_item(ctx)
+    "fill" => parse_song_fill_item(ctx)
+    _ => {
+      ctx.error("Expected song item: section(...), bpm(...), part(...), part_id(...), or fill(...)")
+      ctx.bump_error()
+    }
+  }
+}
+
+///|
+fn parse_song_section_item(
+  ctx : @core.ParserContext[MiniToken, MiniSyntaxKind],
+) -> Unit {
+  ctx.node(SongSectionNode, fn() {
+    expect_song_keyword(ctx, "section") |> ignore
+    expect(ctx, LParen, LParenToken) |> ignore
+    parse_song_string(ctx)
+    expect(ctx, Comma, CommaToken) |> ignore
+    parse_song_rational(ctx)
+    expect(ctx, Comma, CommaToken) |> ignore
+    ctx.node(SongSectionBodyNode, fn() { parse_expr(ctx) })
+    expect(ctx, RParen, RParenToken) |> ignore
+  })
+}
+
+///|
+fn parse_song_bpm_item(
+  ctx : @core.ParserContext[MiniToken, MiniSyntaxKind],
+) -> Unit {
+  ctx.node(SongBpmNode, fn() {
+    expect_song_keyword(ctx, "bpm") |> ignore
+    expect(ctx, LParen, LParenToken) |> ignore
+    expect(ctx, Number, NumberToken) |> ignore
+    expect(ctx, RParen, RParenToken) |> ignore
+  })
+}
+
+///|
+fn parse_song_part_item(
+  ctx : @core.ParserContext[MiniToken, MiniSyntaxKind],
+) -> Unit {
+  ctx.node(SongPartNode, fn() {
+    expect_song_keyword(ctx, "part") |> ignore
+    expect(ctx, LParen, LParenToken) |> ignore
+    parse_song_string(ctx)
+    expect(ctx, Comma, CommaToken) |> ignore
+    parse_song_string(ctx)
+    if ctx.peek() == Comma {
+      expect(ctx, Comma, CommaToken) |> ignore
+      parse_song_rational(ctx)
+    }
+    expect(ctx, RParen, RParenToken) |> ignore
+  })
+}
+
+///|
+fn parse_song_part_id_item(
+  ctx : @core.ParserContext[MiniToken, MiniSyntaxKind],
+) -> Unit {
+  ctx.node(SongPartIdNode, fn() {
+    expect_song_keyword(ctx, "part_id") |> ignore
+    expect(ctx, LParen, LParenToken) |> ignore
+    parse_song_string(ctx)
+    expect(ctx, Comma, CommaToken) |> ignore
+    parse_song_string(ctx)
+    expect(ctx, Comma, CommaToken) |> ignore
+    parse_song_string(ctx)
+    if ctx.peek() == Comma {
+      expect(ctx, Comma, CommaToken) |> ignore
+      parse_song_rational(ctx)
+    }
+    expect(ctx, RParen, RParenToken) |> ignore
+  })
+}
+
+///|
+fn parse_song_fill_item(
+  ctx : @core.ParserContext[MiniToken, MiniSyntaxKind],
+) -> Unit {
+  ctx.node(SongFillNode, fn() {
+    expect_song_keyword(ctx, "fill") |> ignore
+    expect(ctx, LParen, LParenToken) |> ignore
+    parse_song_string(ctx)
+    expect(ctx, Comma, CommaToken) |> ignore
+    parse_song_string(ctx)
+    expect(ctx, RParen, RParenToken) |> ignore
+  })
+}
+
+///|
+/// A quoted literal string (section/part/id/fill name). Unlike `s("…")`
+/// notation, the interior is an opaque string (may contain `:` and spaces),
+/// so every interior token is captured as `StringContentToken` and the value
+/// is reconstructed from the source span between the quotes at projection time.
+fn parse_song_string(
+  ctx : @core.ParserContext[MiniToken, MiniSyntaxKind],
+) -> Unit {
+  ctx.node(SongStringNode, fn() {
+    expect(ctx, Quote, QuoteToken) |> ignore
+    while ctx.peek() != Quote &&
+          ctx.peek() != EOF &&
+          ctx.error_count < MAX_ERRORS {
+      ctx.emit_token(StringContentToken)
+    }
+    expect(ctx, Quote, QuoteToken) |> ignore
+  })
+}
+
+///|
+/// An integer or `num/den` rational (section length, optional part start).
+/// A leading `-` is part of the `Number` token, so negatives lower to a
+/// non-positive length and reject downstream, matching the oracle.
+fn parse_song_rational(
+  ctx : @core.ParserContext[MiniToken, MiniSyntaxKind],
+) -> Unit {
+  ctx.node(SongRationalNode, fn() {
+    expect(ctx, Number, NumberToken) |> ignore
+    if ctx.peek() == Slash {
+      expect(ctx, Slash, SlashToken) |> ignore
+      expect(ctx, Number, NumberToken) |> ignore
+    }
+  })
+}
+
+///|
+fn expect_song_keyword(
+  ctx : @core.ParserContext[MiniToken, MiniSyntaxKind],
+  word : String,
+) -> Bool {
+  if ctx.peek() == Ident && ctx.current_token_text().to_string() == word {
+    // The oracle matches `keyword(` as one contiguous literal, so it rejects a
+    // space before the paren. Reproduce that: require `(` immediately adjacent
+    // to the keyword (no intervening trivia) before consuming.
+    let keyword_end = ctx.current_token_range().end
+    ctx.emit_token(IdentToken)
+    if ctx.peek() == LParen && ctx.current_token_range().start == keyword_end {
+      true
+    } else {
+      ctx.error("Expected '" + word + "('")
+      false
+    }
+  } else {
+    ctx.error("Expected '" + word + "'")
+    false
+  }
+}
+
+///|
+pub fn parse_song_cst(
+  source : String,
+) -> (@seam.CstNode, @core.DiagnosticSet) raise @core.LexError {
+  song_grammar.parse_cst(source)
+}
