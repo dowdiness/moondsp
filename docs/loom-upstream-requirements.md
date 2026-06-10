@@ -297,6 +297,11 @@ trailing/empty argument differently from the current grouping.
 
 ## 7. Token adjacency / no-trivia contiguity check
 
+- **Status:** Fulfilled upstream — loom#280 shipped
+  `ParserContext::at_adjacent(expected)` and `expect_adjacent(expected, kind)`
+  (loom PR #284, 2026-06-10). `expect_song_keyword` now uses `at_adjacent`; the
+  hand-rolled `current_token_range` offset comparison described below is gone.
+
 ### Requirement
 
 A grammar that lexes `keyword(` as a single contiguous unit needs a way to
