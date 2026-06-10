@@ -173,11 +173,7 @@ fn copy_control_events(
 
 ///|
 fn copy_playback_events(events : Array[PlaybackEvent]) -> Array[PlaybackEvent] {
-  let result : Array[PlaybackEvent] = []
-  for event in events {
-    result.push(event)
-  }
-  result
+  events.copy()
 }
 
 ///|
@@ -413,12 +409,10 @@ pub fn PlaybackSnapshot::query_playback_events(
   self : PlaybackSnapshot,
   arc : @pattern.TimeSpan,
 ) -> Array[PlaybackEvent] {
-  let result : Array[PlaybackEvent] = []
-  let events = self.raw().query_playback_events(arc)
-  for event in events {
-    result.push(playback_event_from_record(event))
-  }
-  result
+  self
+  .raw()
+  .query_playback_events(arc)
+  .map(event => playback_event_from_record(event))
 }
 
 ///|

@@ -307,15 +307,14 @@ fn query_pattern_playback_events(
   snapshot : @pattern.PatternSnapshot[@pattern.ControlMap],
   arc : @pattern.TimeSpan,
 ) -> Array[PlaybackEventRecord] {
-  let result : Array[PlaybackEventRecord] = []
-  let events = snapshot.query_sourced_events(arc)
-  for event in events {
-    let source = PlaybackEventSource::pattern(
-      pattern_nodes=event.pattern_nodes(),
+  snapshot
+  .query_sourced_events(arc)
+  .map(event => {
+    PlaybackEventRecord(
+      event=event.event(),
+      source=PlaybackEventSource::pattern(pattern_nodes=event.pattern_nodes()),
     )
-    result.push(PlaybackEventRecord(event=event.event(), source~))
-  }
-  result
+  })
 }
 
 ///|
@@ -323,15 +322,16 @@ fn query_song_playback_events(
   snapshot : @song.SongSnapshot[@pattern.ControlMap],
   arc : @pattern.TimeSpan,
 ) -> Array[PlaybackEventRecord] {
-  let result : Array[PlaybackEventRecord] = []
-  let events = snapshot.query_sourced_events(arc)
-  for event in events {
-    let source = PlaybackEventSource::song(
-      section=event.section(),
-      layer=event.layer(),
-      occurrence=event.occurrence(),
+  snapshot
+  .query_sourced_events(arc)
+  .map(event => {
+    PlaybackEventRecord(
+      event=event.event(),
+      source=PlaybackEventSource::song(
+        section=event.section(),
+        layer=event.layer(),
+        occurrence=event.occurrence(),
+      ),
     )
-    result.push(PlaybackEventRecord(event=event.event(), source~))
-  }
-  result
+  })
 }

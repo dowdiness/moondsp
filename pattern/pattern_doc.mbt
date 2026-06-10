@@ -534,13 +534,11 @@ fn[A] query_sourced_fast(
   }
   let scaled_arc = TimeSpan::new(arc.begin * factor, arc.end_ * factor)
   let inv = Rational::new(1L, 1L) / factor
-  let result : Array[PatternSnapshotEvent[A]] = []
-  for event in child.query(scaled_arc) {
-    result.push(
-      prepend_pattern_source(scale_pattern_snapshot_event(event, inv), id),
-    )
-  }
-  result
+  child
+  .query(scaled_arc)
+  .map(event => {
+    prepend_pattern_source(scale_pattern_snapshot_event(event, inv), id)
+  })
 }
 
 ///|
@@ -550,36 +548,38 @@ fn[A] query_sourced_rev(
   arc : TimeSpan,
 ) -> Array[PatternSnapshotEvent[A]] {
   let one = Rational::from_int(1)
-  let result : Array[PatternSnapshotEvent[A]] = []
-  for cycle_arc in arc.whole_cycles() {
+  arc
+  .whole_cycles()
+  .iter()
+  .flat_map(cycle_arc => {
     let cycle_start = Rational::new(cycle_arc.begin.floor(), 1L)
     let cycle_end = cycle_start + one
     let mirror_arc = TimeSpan::new(
       cycle_end - cycle_arc.end_,
       cycle_end - cycle_arc.begin,
     )
-    for event in child.query(mirror_arc) {
-      result.push(
-        prepend_pattern_source(
-          mirror_pattern_snapshot_event(event, cycle_end),
-          id,
-        ),
+    child
+    .query(mirror_arc)
+    .iter()
+    .map(event => {
+      prepend_pattern_source(
+        mirror_pattern_snapshot_event(event, cycle_end),
+        id,
       )
-    }
-  }
-  result
+    })
+  })
+  .collect()
 }
 
 ///|
-fn[A] push_sourced_sequence_child_events(
-  result : Array[PatternSnapshotEvent[A]],
+fn[A] sourced_sequence_child_events(
   child : SourcedPat[A],
   id : @identity.PatternNodeId,
   child_index : Int,
   child_count : Int,
   cycle_start : Rational,
   query_intersect : TimeSpan,
-) -> Unit {
+) -> Array[PatternSnapshotEvent[A]] {
   let n_rat = Rational::from_int(child_count)
   let i_rat = Rational::from_int(child_index)
   let one = Rational::from_int(1)
@@ -592,33 +592,29 @@ fn[A] push_sourced_sequence_child_events(
     (slot_end - cycle_start) * n_rat - i_rat,
   )
   let query_pat_arc = TimeSpan::new(pat_begin, pat_end)
-  for event in child.query(full_pat_arc) {
+  child
+  .query(full_pat_arc)
+  .filter_map(event => {
     let raw = event.event()
-    let part = match raw.part.intersect(query_pat_arc) {
-      Some(part) => part
-      None => continue
-    }
-    let mapped_part = TimeSpan::new(
-      (part.begin + i_rat) / n_rat + cycle_start,
-      (part.end_ + i_rat) / n_rat + cycle_start,
-    )
-    let mapped_whole = match raw.whole {
-      Some(whole) =>
-        Some(
-          TimeSpan::new(
-            (whole.begin + i_rat) / n_rat + cycle_start,
-            (whole.end_ + i_rat) / n_rat + cycle_start,
-          ),
+    raw.part
+    .intersect(query_pat_arc)
+    .map(part => {
+      let mapped_part = TimeSpan::new(
+        (part.begin + i_rat) / n_rat + cycle_start,
+        (part.end_ + i_rat) / n_rat + cycle_start,
+      )
+      let mapped_whole = raw.whole.map(whole => {
+        TimeSpan::new(
+          (whole.begin + i_rat) / n_rat + cycle_start,
+          (whole.end_ + i_rat) / n_rat + cycle_start,
         )
-      None => None
-    }
-    result.push(
+      })
       prepend_pattern_source(
         retime_pattern_snapshot_event(event, mapped_whole, mapped_part),
         id,
-      ),
-    )
-  }
+      )
+    })
+  })
 }
 
 ///|
@@ -627,13 +623,13 @@ fn[A] query_sourced_sequence(
   id : @identity.PatternNodeId,
   arc : TimeSpan,
 ) -> Array[PatternSnapshotEvent[A]] {
-  let result : Array[PatternSnapshotEvent[A]] = []
   let n = children.length()
   if n == 0 {
-    return result
+    return []
   }
   let n_rat = Rational::from_int(n)
   let one = Rational::from_int(1)
+  let result : Array[PatternSnapshotEvent[A]] = []
   for cycle_arc in arc.whole_cycles() {
     let cycle_start = Rational::new(cycle_arc.begin.floor(), 1L)
     for index in 0..<n {
@@ -642,18 +638,17 @@ fn[A] query_sourced_sequence(
         cycle_start + i_rat / n_rat,
         cycle_start + (i_rat + one) / n_rat,
       )
-      match slot_arc.intersect(arc) {
-        Some(query_intersect) =>
-          push_sourced_sequence_child_events(
-            result,
+      if slot_arc.intersect(arc) is Some(query_intersect) {
+        result.append(
+          sourced_sequence_child_events(
             children[index],
             id,
             index,
             n,
             cycle_start,
             query_intersect,
-          )
-        None => ()
+          ),
+        )
       }
     }
   }
@@ -669,14 +664,14 @@ fn[A] query_sourced_euclid(
   n : Int,
   rotation : Int,
 ) -> Array[PatternSnapshotEvent[A]] {
-  let result : Array[PatternSnapshotEvent[A]] = []
   if n <= 0 || k <= 0 {
-    return result
+    return []
   }
   let pattern = bjorklund(k, n)
   let r = (rotation % n + n) % n
   let n_rat = Rational::from_int(n)
   let one = Rational::from_int(1)
+  let result : Array[PatternSnapshotEvent[A]] = []
   for cycle_arc in arc.whole_cycles() {
     let cycle_start = Rational::new(cycle_arc.begin.floor(), 1L)
     for index in 0..<n {
@@ -687,12 +682,12 @@ fn[A] query_sourced_euclid(
           cycle_start + i_rat / n_rat,
           cycle_start + (i_rat + one) / n_rat,
         )
-        match slot_arc.intersect(arc) {
-          Some(query_intersect) =>
-            push_sourced_sequence_child_events(
-              result, child, id, index, n, cycle_start, query_intersect,
-            )
-          None => ()
+        if slot_arc.intersect(arc) is Some(query_intersect) {
+          result.append(
+            sourced_sequence_child_events(
+              child, id, index, n, cycle_start, query_intersect,
+            ),
+          )
         }
       }
     }
@@ -706,11 +701,7 @@ fn[A] query_opaque_pattern_source(
   path : Array[@identity.PatternNodeId],
   arc : TimeSpan,
 ) -> Array[PatternSnapshotEvent[A]] {
-  let result : Array[PatternSnapshotEvent[A]] = []
-  for event in pat.query(arc) {
-    result.push(PatternSnapshotEvent(event~, pattern_nodes=path))
-  }
-  result
+  pat.query(arc).map(event => PatternSnapshotEvent(event~, pattern_nodes=path))
 }
 
 ///|
@@ -730,11 +721,9 @@ fn[A] lower_sourced_pattern_node(
         Pure(value) =>
           {
             query: fn(arc) {
-              let result : Array[PatternSnapshotEvent[A]] = []
-              for event in Pat::pure(value).query(arc) {
-                result.push(tag_pattern_event(event, id))
-              }
-              result
+              Pat::pure(value)
+              .query(arc)
+              .map(event => tag_pattern_event(event, id))
             },
           }
         Fast(child, factor) => {
@@ -758,24 +747,20 @@ fn[A] lower_sourced_pattern_node(
           let child_pat = lower_sourced_pattern_node(nodes, child)
           {
             query: fn(arc) {
-              let result : Array[PatternSnapshotEvent[A]] = []
-              for event in child_pat.query(arc) {
+              child_pat
+              .query(arc)
+              .filter_map(event => {
                 let raw = event.event()
-                match f(raw.value) {
-                  Some(value) =>
-                    result.push(
-                      prepend_pattern_source(
-                        PatternSnapshotEvent(
-                          event={ whole: raw.whole, part: raw.part, value },
-                          pattern_nodes=event.pattern_nodes(),
-                        ),
-                        id,
-                      ),
-                    )
-                  None => ()
-                }
-              }
-              result
+                f(raw.value).map(value => {
+                  prepend_pattern_source(
+                    PatternSnapshotEvent(
+                      event={ whole: raw.whole, part: raw.part, value },
+                      pattern_nodes=event.pattern_nodes(),
+                    ),
+                    id,
+                  )
+                })
+              })
             },
           }
         }
@@ -792,21 +777,20 @@ fn[A] lower_sourced_pattern_node(
           let prob = if p < 0.0 { 0.0 } else if p > 1.0 { 1.0 } else { p }
           {
             query: fn(arc) {
-              let result : Array[PatternSnapshotEvent[A]] = []
               if prob >= 1.0 {
-                return result
+                return []
               }
-              for event in child_pat.query(arc) {
+              child_pat
+              .query(arc)
+              .filter(event => {
                 let raw = event.event()
                 let key = match raw.whole {
                   Some(whole) => whole.begin
                   None => raw.part.begin
                 }
-                if prob <= 0.0 || hash_unit(key.num, key.den, seed) >= prob {
-                  result.push(prepend_pattern_source(event, id))
-                }
-              }
-              result
+                prob <= 0.0 || hash_unit(key.num, key.den, seed) >= prob
+              })
+              .map(event => prepend_pattern_source(event, id))
             },
           }
         }
@@ -821,30 +805,32 @@ fn[A] lower_sourced_pattern_node(
           {
             query: fn(arc) {
               if n <= 0 {
-                let result : Array[PatternSnapshotEvent[A]] = []
-                for event in child_pat.query(arc) {
-                  result.push(prepend_pattern_source(event, id))
-                }
-                return result
+                return child_pat
+                  .query(arc)
+                  .map(event => prepend_pattern_source(event, id))
               }
               let n64 = Int64::from_int(n)
-              let result : Array[PatternSnapshotEvent[A]] = []
-              for cycle_arc in arc.whole_cycles() {
+              arc
+              .whole_cycles()
+              .iter()
+              .flat_map(cycle_arc => {
                 let cycle_num = cycle_arc.begin.floor()
                 let rem = (cycle_num % n64 + n64) % n64
                 if rem == 0L {
-                  for event in f(raw_child).query(cycle_arc) {
-                    result.push(
-                      PatternSnapshotEvent(event~, pattern_nodes=fallback_path),
-                    )
-                  }
+                  f(raw_child)
+                  .query(cycle_arc)
+                  .iter()
+                  .map(event => {
+                    PatternSnapshotEvent(event~, pattern_nodes=fallback_path)
+                  })
                 } else {
-                  for event in child_pat.query(cycle_arc) {
-                    result.push(prepend_pattern_source(event, id))
-                  }
+                  child_pat
+                  .query(cycle_arc)
+                  .iter()
+                  .map(event => prepend_pattern_source(event, id))
                 }
-              }
-              result
+              })
+              .collect()
             },
           }
         }
@@ -879,28 +865,28 @@ fn[A] lower_sourced_pattern_node(
           }
         }
         Sequence(children) => {
-          let sourced_children : Array[SourcedPat[A]] = []
-          for child in children {
-            sourced_children.push(lower_sourced_pattern_node(nodes, child))
-          }
+          let sourced_children = [
+            for child in children => lower_sourced_pattern_node(nodes, child)
+          ]
           {
             query: fn(arc) { query_sourced_sequence(sourced_children, id, arc) },
           }
         }
         Stack(children) => {
-          let sourced_children : Array[SourcedPat[A]] = []
-          for child in children {
-            sourced_children.push(lower_sourced_pattern_node(nodes, child))
-          }
+          let sourced_children = [
+            for child in children => lower_sourced_pattern_node(nodes, child)
+          ]
           {
             query: fn(arc) {
-              let result : Array[PatternSnapshotEvent[A]] = []
-              for child in sourced_children {
-                for event in child.query(arc) {
-                  result.push(prepend_pattern_source(event, id))
-                }
-              }
-              result
+              sourced_children
+              .iter()
+              .flat_map(child => {
+                child
+                .query(arc)
+                .iter()
+                .map(event => prepend_pattern_source(event, id))
+              })
+              .collect()
             },
           }
         }
@@ -932,20 +918,14 @@ fn[A] lower_pattern_node(
         Jux(child, f) => f(lower_pattern_node(nodes, child))
         MergeControl(left, right, f) =>
           f(lower_pattern_node(nodes, left), lower_pattern_node(nodes, right))
-        Sequence(children) => {
-          let pats : Array[Pat[A]] = []
-          for child in children {
-            pats.push(lower_pattern_node(nodes, child))
-          }
-          sequence(pats)
-        }
-        Stack(children) => {
-          let pats : Array[Pat[A]] = []
-          for child in children {
-            pats.push(lower_pattern_node(nodes, child))
-          }
-          stack(pats)
-        }
+        Sequence(children) =>
+          sequence(
+            [
+              for child in children => lower_pattern_node(nodes, child)
+            ],
+          )
+        Stack(children) =>
+          stack([ for child in children => lower_pattern_node(nodes, child) ])
       }
   }
 }
@@ -1092,28 +1072,26 @@ fn[A] lower_pattern_node_cached(
                   nodes, right, cache, revision_memo, token_memo,
                 ),
               )
-            Sequence(children) => {
-              let pats : Array[Pat[A]] = []
-              for child in children {
-                pats.push(
-                  lower_pattern_node_cached(
-                    nodes, child, cache, revision_memo, token_memo,
-                  ),
-                )
-              }
-              sequence(pats)
-            }
-            Stack(children) => {
-              let pats : Array[Pat[A]] = []
-              for child in children {
-                pats.push(
-                  lower_pattern_node_cached(
-                    nodes, child, cache, revision_memo, token_memo,
-                  ),
-                )
-              }
-              stack(pats)
-            }
+            Sequence(children) =>
+              sequence(
+                [
+                  for child in children => {
+                    lower_pattern_node_cached(
+                      nodes, child, cache, revision_memo, token_memo,
+                    )
+                  }
+                ],
+              )
+            Stack(children) =>
+              stack(
+                [
+                  for child in children => {
+                    lower_pattern_node_cached(
+                      nodes, child, cache, revision_memo, token_memo,
+                    )
+                  }
+                ],
+              )
           }
       }
       cache.store(id, token, revision, pat)
@@ -1551,11 +1529,10 @@ pub fn[A] PatternDoc::sequence(
     raise EmptyPatternDocs
   }
   let nodes : Map[String, PatternDocEntry[A]] = {}
-  let children : Array[@identity.PatternNodeId] = []
   for doc in docs {
     merge_pattern_nodes(nodes, doc.nodes)
-    children.push(doc.root)
   }
+  let children = docs.map(doc => doc.root)
   let revision = aggregate_pattern_revision(docs)
   insert_pattern_node(nodes, id, Sequence(children), revision~)
   { root: id, revision, nodes }
@@ -1570,11 +1547,10 @@ pub fn[A] PatternDoc::stack(
     raise EmptyPatternDocs
   }
   let nodes : Map[String, PatternDocEntry[A]] = {}
-  let children : Array[@identity.PatternNodeId] = []
   for doc in docs {
     merge_pattern_nodes(nodes, doc.nodes)
-    children.push(doc.root)
   }
+  let children = docs.map(doc => doc.root)
   let revision = aggregate_pattern_revision(docs)
   insert_pattern_node(nodes, id, Stack(children), revision~)
   { root: id, revision, nodes }

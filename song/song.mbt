@@ -164,11 +164,7 @@ fn[A] occurrence_id_for_part(
 fn[A] copy_occurrences(
   occurrences : Array[SectionOccurrence[A]],
 ) -> Array[SectionOccurrence[A]] {
-  let result : Array[SectionOccurrence[A]] = []
-  for occurrence in occurrences {
-    result.push(occurrence.snapshot())
-  }
-  result
+  occurrences.map(occurrence => occurrence.snapshot())
 }
 
 ///|
@@ -427,11 +423,7 @@ pub fn[A] Song::Song(
 pub fn[A] Song::from_sections(
   sections : Array[Section[A]],
 ) -> Song[A] raise SongBuildError {
-  let parts : Array[SongPart[A]] = []
-  for section in sections {
-    parts.push(SongPart(name=section.name(), section~))
-  }
-  Song(parts~)
+  Song(parts=sections.map(section => SongPart(name=section.name(), section~)))
 }
 
 ///|
@@ -477,12 +469,9 @@ pub fn[A] Song::occurrences_at(
   self : Song[A],
   time : @pattern.Rational,
 ) -> Array[SectionOccurrence[A]] {
-  let result : Array[SectionOccurrence[A]] = []
-  let indexes = self.occurrence_indexes_at(time)
-  for index in indexes {
-    result.push(self.occurrences[index].snapshot())
-  }
-  result
+  self
+  .occurrence_indexes_at(time)
+  .map(index => self.occurrences[index].snapshot())
 }
 
 ///|
@@ -490,12 +479,9 @@ pub fn[A] Song::occurrences_intersecting(
   self : Song[A],
   arc : @pattern.TimeSpan,
 ) -> Array[SectionOccurrence[A]] {
-  let result : Array[SectionOccurrence[A]] = []
-  let indexes = self.occurrence_indexes_intersecting(arc)
-  for index in indexes {
-    result.push(self.occurrences[index].snapshot())
-  }
-  result
+  self
+  .occurrence_indexes_intersecting(arc)
+  .map(index => self.occurrences[index].snapshot())
 }
 
 ///|
@@ -552,18 +538,12 @@ pub fn[A] Song::fill_gaps(
   prefix~ : String,
   section~ : Section[A],
 ) -> Song[A] raise SongBuildError {
-  let parts : Array[SongPart[A]] = []
-  for occurrence in self.occurrences {
-    parts.push(occurrence_to_part(occurrence))
-  }
-  let gaps = self.gap_spans()
-  for index in 0..<gaps.length() {
-    let gap = gaps[index]
-    let fill_name = fill_occurrence_name(prefix, index)
+  let parts = self.occurrences.map(occurrence_to_part)
+  for index, gap in self.gap_spans() {
     parts.push(
       SongPart::at(
         start=gap.begin,
-        name=fill_name,
+        name=fill_occurrence_name(prefix, index),
         section=section_with_length(section, gap.duration()),
       ),
     )

@@ -90,11 +90,10 @@ pub fn CompiledDsp::is_voice_finished(self : CompiledDsp) -> Bool {
   let nodes = self.0.nodes
   let env_states = self.0.env_states
   for i = 0; i < nodes.length(); i = i + 1 {
-    if nodes[i].kind() is Adsr {
-      match env_states[i] {
-        Some(adsr) => if !(adsr.stage() is EnvStage::Idle) { return false }
-        None => ()
-      }
+    if nodes[i].kind() is Adsr &&
+      env_states[i] is Some(adsr) &&
+      !(adsr.stage() is EnvStage::Idle) {
+      return false
     }
   }
   let last_index = nodes.length() - 1

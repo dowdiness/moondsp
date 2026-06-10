@@ -21,21 +21,17 @@ pub fn[A] Pat::silence() -> Pat[A] {
 pub fn[A] Pat::pure(value : A) -> Pat[A] {
   {
     query: fn(arc) {
-      let events : Array[Event[A]] = []
-      let cycles = arc.whole_cycles()
-      for span in cycles {
+      arc
+      .whole_cycles()
+      .filter_map(span => {
         // the whole event spans one full cycle: [floor(begin), floor(begin)+1)
         let cycle_n = span.begin.floor()
         let whole_begin = Rational::new(cycle_n, 1L)
         let whole_end = Rational::new(cycle_n + 1L, 1L)
         let whole = TimeSpan::new(whole_begin, whole_end)
         // part is the intersection of whole with the original query arc
-        match whole.intersect(arc) {
-          Some(part) => events.push({ whole: Some(whole), part, value })
-          None => ()
-        }
-      }
-      events
+        whole.intersect(arc).map(part => { whole: Some(whole), part, value })
+      })
     },
   }
 }
@@ -62,24 +58,16 @@ pub fn[A] Pat::fast(self : Pat[A], factor : Rational) -> Pat[A] {
       let scaled_end = arc.end_ * factor
       let scaled_arc = TimeSpan::new(scaled_begin, scaled_end)
       let inv = Rational::new(1L, 1L) / factor
-      let events = inner.query(scaled_arc)
       // Scale the returned events back by 1/factor
-      let result : Array[Event[A]] = []
-      for ev in events {
-        let new_part_begin = ev.part.begin * inv
-        let new_part_end = ev.part.end_ * inv
-        let new_part = TimeSpan::new(new_part_begin, new_part_end)
-        let new_whole = match ev.whole {
-          Some(w) => {
-            let wb = w.begin * inv
-            let we = w.end_ * inv
-            Some(TimeSpan::new(wb, we))
-          }
-          None => None
-        }
-        result.push({ whole: new_whole, part: new_part, value: ev.value })
-      }
-      result
+      inner
+      .query(scaled_arc)
+      .map(ev => {
+        let new_part = TimeSpan::new(ev.part.begin * inv, ev.part.end_ * inv)
+        let new_whole = ev.whole.map(w => {
+          TimeSpan::new(w.begin * inv, w.end_ * inv)
+        })
+        { whole: new_whole, part: new_part, value: ev.value }
+      })
     },
   }
 }
@@ -99,35 +87,35 @@ pub fn[A] Pat::rev(self : Pat[A]) -> Pat[A] {
   {
     query: fn(arc) {
       let one = Rational::from_int(1)
-      let cycles = arc.whole_cycles()
-      let result : Array[Event[A]] = []
-      for cycle_arc in cycles {
+      arc
+      .whole_cycles()
+      .iter()
+      .flat_map(cycle_arc => {
         // Determine the full cycle boundaries from cycle_arc.begin
         let cycle_start = Rational::new(cycle_arc.begin.floor(), 1L)
         let cycle_end = cycle_start + one
         // Mirror the query sub-arc within the cycle:
         // [begin, end) -> [cycle_end - end, cycle_end - begin)
-        let mirror_begin = cycle_end - cycle_arc.end_
-        let mirror_end = cycle_end - cycle_arc.begin
-        let mirror_arc = TimeSpan::new(mirror_begin, mirror_end)
-        let events = inner.query(mirror_arc)
-        for ev in events {
+        let mirror_arc = TimeSpan::new(
+          cycle_end - cycle_arc.end_,
+          cycle_end - cycle_arc.begin,
+        )
+        inner
+        .query(mirror_arc)
+        .iter()
+        .map(ev => {
           // Mirror part back
-          let new_part_begin = cycle_end - ev.part.end_
-          let new_part_end = cycle_end - ev.part.begin
-          let new_part = TimeSpan::new(new_part_begin, new_part_end)
-          let new_whole = match ev.whole {
-            Some(w) => {
-              let wb = cycle_end - w.end_
-              let we = cycle_end - w.begin
-              Some(TimeSpan::new(wb, we))
-            }
-            None => None
-          }
-          result.push({ whole: new_whole, part: new_part, value: ev.value })
-        }
-      }
-      result
+          let new_part = TimeSpan::new(
+            cycle_end - ev.part.end_,
+            cycle_end - ev.part.begin,
+          )
+          let new_whole = ev.whole.map(w => {
+            TimeSpan::new(cycle_end - w.end_, cycle_end - w.begin)
+          })
+          { whole: new_whole, part: new_part, value: ev.value }
+        })
+      })
+      .collect()
     },
   }
 }

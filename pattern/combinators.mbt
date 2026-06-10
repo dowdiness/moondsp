@@ -76,11 +76,7 @@ pub fn[A] stack(pats : Array[Pat[A]]) -> Pat[A] {
   }
   {
     query: fn(arc) {
-      let result : Array[Event[A]] = []
-      for pat in pats {
-        result.append(pat.query(arc))
-      }
-      result
+      pats.iter().flat_map(pat => pat.query(arc).iter()).collect()
     },
   }
 }
@@ -166,16 +162,11 @@ pub fn[A] Pat::euclid(
   }
   let pattern = bjorklund(k, n)
   let r = (rotation % n + n) % n
-  let pats : Array[Pat[A]] = []
-  for i in 0..<n {
-    let idx = (i + r) % n
-    if pattern[idx] {
-      pats.push(self)
-    } else {
-      pats.push(Pat::silence())
-    }
-  }
-  sequence(pats)
+  sequence(
+    [
+      for i in 0..<n => if pattern[(i + r) % n] { self } else { Pat::silence() }
+    ],
+  )
 }
 
 ///|
@@ -220,19 +211,15 @@ pub fn[A] Pat::degrade_by(
   let inner = self
   {
     query: fn(arc) {
-      let events = inner.query(arc)
-      let result : Array[Event[A]] = []
-      for ev in events {
+      inner
+      .query(arc)
+      .filter(ev => {
         let key = match ev.whole {
           Some(w) => w.begin
           None => ev.part.begin
         }
-        let r = hash_unit(key.num, key.den, seed)
-        if r >= prob {
-          result.push(ev)
-        }
-      }
-      result
+        hash_unit(key.num, key.den, seed) >= prob
+      })
     },
   }
 }
@@ -246,22 +233,20 @@ pub fn[A] every(n : Int, f : (Pat[A]) -> Pat[A], pat : Pat[A]) -> Pat[A] {
   let inner = pat
   {
     query: fn(arc) {
-      let result : Array[Event[A]] = []
-      let cycles = arc.whole_cycles()
-      for cycle_arc in cycles {
+      arc
+      .whole_cycles()
+      .iter()
+      .flat_map(cycle_arc => {
         let cycle_num = cycle_arc.begin.floor()
         // Double-mod to handle negative cycle numbers correctly
         let rem = (cycle_num % n64 + n64) % n64
-        let events = if rem == 0L {
-          f(inner).query(cycle_arc)
+        if rem == 0L {
+          f(inner).query(cycle_arc).iter()
         } else {
-          inner.query(cycle_arc)
+          inner.query(cycle_arc).iter()
         }
-        for ev in events {
-          result.push(ev)
-        }
-      }
-      result
+      })
+      .collect()
     },
   }
 }

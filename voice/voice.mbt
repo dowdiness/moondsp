@@ -647,12 +647,11 @@ fn VoicePool::find_slot(self : VoicePool) -> Int {
 /// overflow. This keeps the oldest-first voice-stealing heuristic correct.
 fn VoicePool::compact_allocation_orders(self : VoicePool) -> Unit {
   // Collect (slot_index, allocation_order) pairs for non-idle slots
-  let pairs : Array[(Int, Int)] = []
-  for i = 0; i < self.max_voices; i = i + 1 {
-    if !(self.slots[i].state is VoiceState::Idle) {
-      pairs.push((i, self.slots[i].allocation_order))
+  let pairs = [
+    for i in 0..<self.max_voices if !(self.slots[i].state is VoiceState::Idle) => {
+      (i, self.slots[i].allocation_order)
     }
-  }
+  ]
   // Sort by allocation_order ascending to preserve relative age
   pairs.sort_by(fn(a, b) { a.1.compare(b.1) })
   // Reassign sequential orders starting from 0

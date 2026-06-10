@@ -105,11 +105,7 @@ pub fn midi_to_hz(midi : Double) -> Double {
 pub fn copy_control_events(
   events : Array[@pattern.Event[@pattern.ControlMap]],
 ) -> Array[@pattern.Event[@pattern.ControlMap]] {
-  let result : Array[@pattern.Event[@pattern.ControlMap]] = []
-  for event in events {
-    result.push(event)
-  }
-  result
+  events.copy()
 }
 
 ///|
