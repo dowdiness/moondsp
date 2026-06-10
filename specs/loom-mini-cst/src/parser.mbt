@@ -595,9 +595,8 @@ fn expect_song_keyword(
     // The oracle matches `keyword(` as one contiguous literal, so it rejects a
     // space before the paren. Reproduce that: require `(` immediately adjacent
     // to the keyword (no intervening trivia) before consuming.
-    let keyword_end = ctx.current_token_range().end
     ctx.emit_token(IdentToken)
-    if ctx.peek() == LParen && ctx.current_token_range().start == keyword_end {
+    if ctx.at_adjacent(LParen) {
       true
     } else {
       ctx.error("Expected '" + word + "('")
