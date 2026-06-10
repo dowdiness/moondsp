@@ -216,7 +216,7 @@ fn validate_all_nodes(graph : CompiledGraph) -> Bool {
       validate_node_state(graph, node, index, graph.last_validation_errors),
     )
   }
-  graph.last_validation_errors.length() == 0
+  graph.last_validation_errors.is_empty()
 }
 
 ///|
@@ -229,7 +229,7 @@ fn CompiledDsp::process_mono_debug(
   output : AudioBuffer,
   sample_count : Int,
 ) -> Unit {
-  if self.0.feedback_edges.length() > 0 {
+  if !self.0.feedback_edges.is_empty() {
     if validate_all_nodes(self.0) {
       self.process_feedback_graph(context, output, sample_count)
     } else {
@@ -254,7 +254,7 @@ fn CompiledStereoDsp::process_stereo_debug(
   right_output : AudioBuffer,
   sample_count : Int,
 ) -> Unit {
-  if self.0.feedback_edges.length() > 0 {
+  if !self.0.feedback_edges.is_empty() {
     if validate_all_nodes(self.0) {
       self.process_feedback_graph(
         context, left_output, right_output, sample_count,

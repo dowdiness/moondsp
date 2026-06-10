@@ -505,14 +505,7 @@ fn MiniDocBuilder::scalar_control_doc(
 fn doc_root_signature(
   docs : Array[@pattern.PatternDoc[@pattern.ControlMap]],
 ) -> String {
-  let mut result = ""
-  for index in 0..<docs.length() {
-    if index > 0 {
-      result = "\{result}:"
-    }
-    result = "\{result}\{docs[index].root().value()}"
-  }
-  result
+  docs.map(doc => doc.root().value()).join(":")
 }
 
 ///|
@@ -530,7 +523,7 @@ fn parse_doc_internal(
   previous : @pattern.PatternDoc[@pattern.ControlMap]?,
   tokens? : Array[MiniToken]? = None,
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
-  guard input.length() > 0 else { return Err("empty input") }
+  guard !input.is_empty() else { return Err("empty input") }
   match mini_collect_dollar_stack_lines(input) {
     Err(msg) => return Err(msg)
     Ok(Some(lines)) =>
@@ -856,7 +849,7 @@ fn parse_sound_doc_notation(
   builder : MiniDocBuilder,
   source_offset~ : Int,
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
-  guard content.length() > 0 else {
+  guard !content.is_empty() else {
     raise ParseError("position 0: empty notation")
   }
   let sub = NotationParser::new(content, sound=true, source_offset~)
@@ -869,7 +862,7 @@ fn parse_note_doc_notation(
   builder : MiniDocBuilder,
   source_offset~ : Int,
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
-  guard content.length() > 0 else {
+  guard !content.is_empty() else {
     raise ParseError("position 0: empty notation")
   }
   let sub = NotationParser::new(content, sound=false, source_offset~)
@@ -904,7 +897,7 @@ fn NotationParser::parse_doc_layer(
     elements.push(self.parse_doc_element(builder))
     self.skip_spaces()
   }
-  guard elements.length() > 0 else {
+  guard !elements.is_empty() else {
     raise ParseError(
       "position \{self.pos}: expected at least one element in layer",
     )
@@ -1035,7 +1028,7 @@ fn NotationParser::parse_doc_atom(
   let start = self.pos
   if self.sound {
     let name = self.read_ident()
-    guard name.length() > 0 else {
+    guard !name.is_empty() else {
       raise ParseError("position \{start}: expected sound name")
     }
     match drum_midi(name) {

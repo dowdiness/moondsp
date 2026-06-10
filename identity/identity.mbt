@@ -73,7 +73,7 @@ fn valid_id_code(code : Int) -> Bool {
 
 ///|
 fn validate_id_value(value : String) -> String raise StableIdError {
-  guard value.length() > 0 else { raise EmptyId }
+  guard !value.is_empty() else { raise EmptyId }
   for index in 0..<value.length() {
     guard valid_id_code(value[index].to_int()) else { raise InvalidId(value) }
   }

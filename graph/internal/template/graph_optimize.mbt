@@ -156,7 +156,7 @@ fn mark_reachable(
   start : Int,
 ) -> Unit {
   let stack : Array[Int] = [start]
-  while stack.length() > 0 {
+  while !stack.is_empty() {
     let index = stack.pop().unwrap()
     if index < 0 || index >= nodes.length() || reachable[index] {
       continue

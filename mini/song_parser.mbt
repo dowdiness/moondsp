@@ -56,7 +56,7 @@ pub fn parse_song(
 /// `bpm(number)`. Plain `parse_song` intentionally keeps returning only the
 /// layout value for compatibility.
 pub fn parse_song_with_bpm(input : String) -> Result[ParsedSong, String] {
-  guard input.length() > 0 else { return Err("empty input") }
+  guard !input.is_empty() else { return Err("empty input") }
   let p = Parser::new(input)
   let result = p.parse_song_expr() catch { ParseError(msg) => return Err(msg) }
   p.skip_whitespace()
@@ -134,7 +134,7 @@ fn Parser::parse_song_item(
     }
     sections[section.name()] = section
   } else if self.match_keyword("bpm(") {
-    if bpm_values.length() > 0 {
+    if !bpm_values.is_empty() {
       raise ParseError("position \{item_start}: duplicate bpm(...)")
     }
     bpm_values.push(self.parse_song_bpm(item_start))
@@ -305,7 +305,7 @@ fn Parser::read_song_int(
   let s = self.input[start:self.pos].to_owned()
   let mut value = 0
   let mut index = 0
-  let negative = s.length() > 0 && s[0] == '-'
+  let negative = !s.is_empty() && s[0] == '-'
   if negative {
     index = 1
   }

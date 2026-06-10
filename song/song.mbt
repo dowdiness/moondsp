@@ -385,7 +385,7 @@ fn max_rational(
 pub fn[A] Song::Song(
   parts~ : Array[SongPart[A]],
 ) -> Song[A] raise SongBuildError {
-  if parts.length() == 0 {
+  if parts.is_empty() {
     raise EmptySong
   }
   let occurrences : Array[SectionOccurrence[A]] = []

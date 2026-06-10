@@ -223,7 +223,7 @@ pub fn CompiledDsp::process(
     self.process_mono_debug(context, output, sample_count)
     return
   }
-  if self.0.feedback_edges.length() > 0 {
+  if !self.0.feedback_edges.is_empty() {
     self.process_feedback_graph(context, output, sample_count)
     self.0.last_sanitized_count = @dsp.sanitize_buffer(output, sample_count)
     return
@@ -269,7 +269,7 @@ pub fn CompiledStereoDsp::process(
     self.process_stereo_debug(context, left_output, right_output, sample_count)
     return
   }
-  if self.0.feedback_edges.length() > 0 {
+  if !self.0.feedback_edges.is_empty() {
     self.process_feedback_graph(
       context, left_output, right_output, sample_count,
     )

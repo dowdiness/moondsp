@@ -24,7 +24,7 @@ pub fn PatternScheduler::apply_voice_controls_for_edit_result(
   pool~ : @moondsp.BoundVoicePool,
 ) -> Result[Int, @moondsp.VoiceControlError] {
   let target = edit.target()
-  if target.is_empty() || controls.length() == 0 {
+  if target.is_empty() || controls.is_empty() {
     return Ok(0)
   }
   let raw_target = target.to_edit_policy()

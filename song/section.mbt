@@ -303,14 +303,8 @@ fn[A] section_doc_body_has_layer_name_except(
 ) -> Bool {
   match body {
     Single(layer) => layer.id() != id && layer.name() == name
-    Layers(layers) => {
-      for layer in layers {
-        if layer.id() != id && layer.name() == name {
-          return true
-        }
-      }
-      false
-    }
+    Layers(layers) =>
+      layers.iter().any(layer => layer.id() != id && layer.name() == name)
   }
 }
 
@@ -321,7 +315,7 @@ fn[A] validate_section_doc_body(
   match body {
     Single(_) => ()
     Layers(layers) => {
-      if layers.length() == 0 {
+      if layers.is_empty() {
         raise EmptyLayers
       }
       let ids : Map[String, Bool] = {}

@@ -26,19 +26,6 @@ fn AffectedVoiceTarget::is_empty(self : AffectedVoiceTarget) -> Bool {
 }
 
 ///|
-fn pattern_nodes_contain(
-  pattern_nodes : Array[@identity.PatternNodeId],
-  id : @identity.PatternNodeId,
-) -> Bool {
-  for node in pattern_nodes {
-    if node == id {
-      return true
-    }
-  }
-  false
-}
-
-///|
 pub fn source_parts_match_target(
   pattern_nodes~ : Array[@identity.PatternNodeId],
   section~ : @identity.SectionId?,
@@ -50,7 +37,7 @@ pub fn source_parts_match_target(
     return false
   }
   let pattern_matches = match target.pattern_node {
-    Some(id) => pattern_nodes_contain(pattern_nodes, id)
+    Some(id) => pattern_nodes.contains(id)
     None => true
   }
   let section_matches = match target.section {

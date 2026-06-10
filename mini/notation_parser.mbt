@@ -3,7 +3,7 @@
 fn parse_sound_notation(
   content : String,
 ) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
-  guard content.length() > 0 else {
+  guard !content.is_empty() else {
     raise ParseError("position 0: empty notation")
   }
   let sub = NotationParser::new(content, sound=true)
@@ -15,7 +15,7 @@ fn parse_sound_notation(
 fn parse_note_notation(
   content : String,
 ) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
-  guard content.length() > 0 else {
+  guard !content.is_empty() else {
     raise ParseError("position 0: empty notation")
   }
   let sub = NotationParser::new(content, sound=false)
@@ -85,7 +85,7 @@ fn NotationParser::parse_layer(
     elements.push(self.parse_element())
     self.skip_spaces()
   }
-  guard elements.length() > 0 else {
+  guard !elements.is_empty() else {
     raise ParseError(
       "position \{self.pos}: expected at least one element in layer",
     )
@@ -241,7 +241,7 @@ fn NotationParser::read_int_signed(
   let s = self.input[start:self.pos].to_owned()
   let mut value = 0
   let mut i = 0
-  let negative = s.length() > 0 && s[0] == '-'
+  let negative = !s.is_empty() && s[0] == '-'
   if negative {
     i = 1
   }
@@ -265,7 +265,7 @@ fn NotationParser::parse_atom(
   if self.sound {
     // Read identifier
     let name = self.read_ident()
-    guard name.length() > 0 else {
+    guard !name.is_empty() else {
       raise ParseError("position \{start}: expected sound name")
     }
     match drum_midi(name) {
