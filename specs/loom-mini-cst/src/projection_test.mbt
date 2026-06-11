@@ -1313,6 +1313,63 @@ test "loom atom projection matches mini PatternDoc and events for method-chained
 }
 
 ///|
+// PIN (loom#288 DirectElementGroup migration of loom_mini_collect_stack_expr):
+// three-argument stack exercises the N+1 comma-grouping with all groups
+// non-empty. Pins value-level parity so the helper swap preserves per-arg
+// partitioning.
+test "loom atom projection matches mini for three-argument stack" {
+  projection_boundary_assert_matches_mini_doc("stack(s(\"bd\"), s(\"sd\"), s(\"hh\"))")
+}
+
+///|
+// PIN (loom#288): a method chain (`slow(4)`) on a stack argument must stay
+// attached to its own base when grouping splits on commas. `slow` perturbs
+// timing, so value-event parity (not just ids) guards the attachment.
+test "loom atom projection matches mini for method-chained stack arg with slow" {
+  let input = "stack(s(\"bd\").slow(4), note(\"60\"))"
+  let projection = LoomMiniAtomProjection::new(input)
+  let loom_doc = projection_boundary_doc(projection.parse_doc())
+  let mini_doc = projection_boundary_doc(@mini.parse_doc(input))
+  @debug.assert_eq(loom_doc.root().value(), mini_doc.root().value())
+  projection_boundary_assert_value_events_equal(
+    projection_boundary_value_events_from_doc(loom_doc),
+    projection_boundary_value_events_from_doc(mini_doc),
+  )
+  projection.dispose()
+}
+
+///|
+// PIN (loom#288): whitespace tokens surround the comma separator. The
+// DirectElementGroup walk sees those trivia tokens (the old comma-offset count
+// did not), so this pins that interior whitespace does not perturb grouping.
+test "loom atom projection matches mini for stack with whitespace around comma" {
+  projection_boundary_assert_matches_mini_doc("stack(s(\"bd\") , s(\"sd\"))")
+}
+
+///|
+// PIN / CHARACTERIZATION (loom#288): a trailing comma inside `stack(...)` is
+// rejected at the parser diagnostics gate (loom mini syntax has diagnostics),
+// BEFORE `loom_mini_collect_stack_expr` runs. The empty-group skip inside that
+// collector is therefore defensive and not reachable through `parse_doc` with
+// the current grammar — this pins that the gate, not the collector, owns the
+// rejection so the migration's skip-vs-error choice stays externally invisible.
+test "loom rejects trailing-comma stack at the diagnostics gate, not the collector" {
+  let input = "stack(s(\"bd\"),)"
+  let (_cst, diagnostics) = try! parse_cst(input)
+  inspect(diagnostics.length() > 0, content="true")
+  let projection = LoomMiniAtomProjection::new(input)
+  match projection.parse_doc() {
+    Err(msg) => inspect(msg, content="loom mini syntax has diagnostics")
+    Ok(_) => abort("expected trailing-comma stack loom projection to fail")
+  }
+  match @mini.parse_doc(input) {
+    Err(_) => ()
+    Ok(_) => abort("expected trailing-comma stack production parse_doc to fail")
+  }
+  projection.dispose()
+}
+
+///|
 // KNOWN EDGE CHARACTERIZATION: empty quoted notation is CST-only recovery.
 // The Loom grammar emits a zero-diagnostic tree for editor partial input, but
 // semantic projection rejects it just like production @mini.parse_doc. This is

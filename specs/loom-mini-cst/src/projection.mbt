@@ -319,35 +319,30 @@ fn loom_mini_collect_stack_expr(
   stack_call : @seam.SyntaxNode,
 ) -> Result[LoomMiniRawProjection, String] {
   // Stack arguments are full expressions (`stack(s("bd").fast(2), …)`, cf.
-  // production `mini/parser.mbt`), and the grammar emits each arg's base call
-  // and trailing `.method(…)` calls as FLAT child nodes of `StackCallNode`
-  // delimited by `CommaToken` leaves. `children()` returns only nodes (commas
-  // are tokens), so partition the child nodes by counting how many comma offsets
-  // precede each — keeping every arg's method chain attached to its own base.
-  let comma_starts = stack_call
-    .direct_tokens_of_kind(CommaToken.to_raw())
-    .map(fn(token) { token.start() })
-  let groups : Array[Array[@seam.SyntaxNode]] = []
-  for _ in 0..<(comma_starts.length() + 1) {
-    groups.push([])
-  }
-  for child in stack_call.children() {
-    let start = child.start()
-    let mut index = 0
-    for comma_start in comma_starts {
-      if comma_start < start {
-        index += 1
-      }
-    }
-    groups[index].push(child)
-  }
+  // production `mini/parser.mbt`): the grammar emits each arg's base call and
+  // trailing `.method(…)` calls as FLAT child nodes of `StackCallNode`
+  // delimited by `CommaToken` leaves. `direct_element_groups_by` partitions the
+  // direct children into N+1 slots at each comma — the same
+  // RepeatGroup-transparent walk `children()` uses — so every arg's method
+  // chain stays attached to its own base. A slot's argument nodes are its
+  // `Node` elements; an empty slot (defensive leading/trailing/doubled
+  // separator) contributes no nodes and is skipped, matching the prior
+  // comma-offset count.
   let children : Array[LoomMiniExpr] = []
   let atoms : Array[LoomMiniRawAtom] = []
-  for group in groups {
-    if group.length() == 0 {
+  for group in stack_call.direct_element_groups_by(CommaToken.to_raw()) {
+    let nodes : Array[@seam.SyntaxNode] = group
+      .elements()
+      .iter()
+      .filter_map(elem => match elem {
+        @seam.SyntaxElement::Node(node) => Some(node)
+        @seam.SyntaxElement::Token(_) => None
+      })
+      .collect()
+    if nodes.length() == 0 {
       continue
     }
-    match loom_mini_collect_stack_arg_expr(group) {
+    match loom_mini_collect_stack_arg_expr(nodes) {
       Ok(projection) => {
         children.push(projection.expr)
         for atom in projection.atoms {
