@@ -456,7 +456,7 @@ fn loom_mini_collect_method_call(
   } else if name == "jux" {
     loom_mini_collect_jux_method_call(names, numbers, commas)
   } else if name == "every" {
-    loom_mini_collect_every_method_call(names, numbers, commas)
+    loom_mini_collect_every_method_call(call)
   } else {
     Err(loom_mini_supported_method_error())
   }
@@ -545,32 +545,57 @@ fn loom_mini_collect_jux_method_call(
 
 ///|
 fn loom_mini_collect_every_method_call(
-  names : Array[@seam.SyntaxToken],
-  numbers : Array[@seam.SyntaxToken],
-  commas : Array[@seam.SyntaxToken],
+  call : @seam.SyntaxNode,
 ) -> Result[LoomMiniMethodCall, String] {
-  if commas.length() != 1 {
-    return Err("loom atom projection expected every(n, callback)")
+  let shape_error = "loom atom projection expected every(n, callback)"
+  let groups = call.direct_element_groups_by(
+    CommaToken.to_raw(),
+    trivia_kind=Some(WhitespaceToken.to_raw()),
+  )
+  guard groups is [n_group, callback_group] else { return Err(shape_error) }
+  guard n_group.required_token_of_kind(
+      MethodNameToken.to_raw(),
+      message=shape_error,
+    )
+    is Ok(_) else {
+    return Err(shape_error)
   }
-  let comma_start = commas[0].start()
-  if names.length() != 2 || names[1].start() <= comma_start {
-    return Err("loom atom projection expected every(n, callback)")
+  guard callback_group.required_token_of_kind(
+      MethodNameToken.to_raw(),
+      message=shape_error,
+    )
+    is Ok(callback_name) else {
+    return Err(shape_error)
   }
-  let n_numbers = numbers.filter(fn(token) { token.start() < comma_start })
-  let callback_numbers = numbers.filter(fn(token) {
-    token.start() > comma_start
-  })
-  let n_text = match n_numbers {
-    [token] => token.text()
-    _ => return Err("loom atom projection expected every(n, callback)")
+  guard n_group.required_token_of_kind(
+      NumberToken.to_raw(),
+      message=shape_error,
+    )
+    is Ok(n_token) else {
+    return Err(shape_error)
   }
-  let n = match loom_mini_parse_positive_int(n_text) {
+  let n = match loom_mini_parse_positive_int(n_token.text()) {
     Ok(n) => n
     Err(msg) => return Err(msg)
   }
+  let callback_numbers = callback_group
+    .elements()
+    .iter()
+    .filter_map(elem => {
+      match elem {
+        @seam.SyntaxElement::Token(token) =>
+          if token.kind() == NumberToken.to_raw() {
+            Some(token)
+          } else {
+            None
+          }
+        @seam.SyntaxElement::Node(_) => None
+      }
+    })
+    .collect()
   let callback = match
     loom_mini_collect_method_callback(
-      names[1].text(),
+      callback_name.text(),
       callback_numbers,
       "every",
     ) {

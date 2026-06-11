@@ -1751,6 +1751,39 @@ test "loom atom projection rejects fast method with callback argument" {
 }
 
 ///|
+test "loom atom projection rejects every method without comma" {
+  let projection = LoomMiniAtomProjection::new("s(\"bd\").every(2)")
+  match projection.parse_doc() {
+    Err(msg) =>
+      inspect(msg, content="loom atom projection expected every(n, callback)")
+    Ok(_) => abort("expected comma-less every projection to fail")
+  }
+  projection.dispose()
+}
+
+///|
+test "loom atom projection rejects every method with swapped arguments" {
+  let projection = LoomMiniAtomProjection::new("s(\"bd\").every(rev, 2)")
+  match projection.parse_doc() {
+    Err(msg) =>
+      inspect(msg, content="loom atom projection expected every(n, callback)")
+    Ok(_) => abort("expected swapped every arguments projection to fail")
+  }
+  projection.dispose()
+}
+
+///|
+test "loom atom projection rejects every method with extra argument" {
+  let projection = LoomMiniAtomProjection::new("s(\"bd\").every(2, rev, 3)")
+  match projection.parse_doc() {
+    Err(msg) =>
+      inspect(msg, content="loom atom projection expected every(n, callback)")
+    Ok(_) => abort("expected three-argument every projection to fail")
+  }
+  projection.dispose()
+}
+
+///|
 test "loom atom projection rejects nested stack instead of dropping it" {
   let projection = LoomMiniAtomProjection::new(
     "stack(stack(s(\"bd\"), note(\"60\")), s(\"sd\"))",
