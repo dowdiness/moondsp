@@ -1,64 +1,15 @@
 ///|
-/// Internal voice-runtime provenance stored with a scheduler-owned active note.
-pub struct EventSource {
-  priv pattern_nodes : Array[@identity.PatternNodeId]
-  priv section : @identity.SectionId?
-  priv layer : @identity.SectionLayerId?
-  priv occurrence : @identity.OccurrenceId?
-}
-
-///|
-/// Internal no-copy constructor for scheduler-owned provenance arrays.
-pub fn EventSource::from_trusted_parts(
-  pattern_nodes~ : Array[@identity.PatternNodeId],
-  section~ : @identity.SectionId?,
-  layer~ : @identity.SectionLayerId?,
-  occurrence~ : @identity.OccurrenceId?,
-) -> EventSource {
-  { pattern_nodes, section, layer, occurrence }
-}
-
-///|
-pub fn EventSource::pattern_nodes(
-  self : EventSource,
-) -> Array[@identity.PatternNodeId] {
-  self.pattern_nodes.copy()
-}
-
-///|
-pub fn EventSource::borrow_pattern_nodes(
-  self : EventSource,
-) -> Array[@identity.PatternNodeId] {
-  self.pattern_nodes
-}
-
-///|
-pub fn EventSource::section(self : EventSource) -> @identity.SectionId? {
-  self.section
-}
-
-///|
-pub fn EventSource::layer(self : EventSource) -> @identity.SectionLayerId? {
-  self.layer
-}
-
-///|
-pub fn EventSource::occurrence(self : EventSource) -> @identity.OccurrenceId? {
-  self.occurrence
-}
-
-///|
 /// Scheduler-owned active voice with its performance-sample gate-off time.
 pub struct ActiveNote {
   priv handle : @voice.VoiceHandle
-  priv source : EventSource
+  priv source : @model.EventSource
   priv end_sample : Int64
 }
 
 ///|
 pub fn ActiveNote::ActiveNote(
   handle~ : @voice.VoiceHandle,
-  source~ : EventSource,
+  source~ : @model.EventSource,
   end_sample~ : Int64,
 ) -> ActiveNote {
   { handle, source, end_sample }
@@ -70,8 +21,23 @@ pub fn ActiveNote::handle(self : ActiveNote) -> @voice.VoiceHandle {
 }
 
 ///|
-pub fn ActiveNote::source(self : ActiveNote) -> EventSource {
+pub fn ActiveNote::source(self : ActiveNote) -> @model.EventSource {
   self.source
+}
+
+///|
+pub fn ActiveNote::matches_edit_policy(
+  self : ActiveNote,
+  target : @edit_policy.AffectedVoiceTarget,
+) -> Bool {
+  let source = self.source
+  @edit_policy.source_parts_match_target(
+    pattern_nodes=source.borrow_pattern_nodes(),
+    section=source.section(),
+    layer=source.layer(),
+    occurrence=source.occurrence(),
+    target,
+  )
 }
 
 ///|
