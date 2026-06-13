@@ -27,33 +27,8 @@ pub fn PerformanceTime::PerformanceTime(sample : Int64) -> PerformanceTime {
 /// This intentionally lives in `scheduler/` instead of `pattern.Event` so the
 /// pattern engine stays payload-polymorphic and independent of authoring IDs.
 pub struct EventSource {
-  priv pattern_node : @identity.PatternNodeId?
-  priv pattern_nodes : Array[@identity.PatternNodeId]
-  priv section : @identity.SectionId?
-  priv layer : @identity.SectionLayerId?
-  priv occurrence : @identity.OccurrenceId?
+  priv raw : @model.EventSource
 } derive(Eq, Debug)
-
-///|
-fn pattern_node_path_from_primary(
-  pattern_node : @identity.PatternNodeId?,
-) -> Array[@identity.PatternNodeId] {
-  match pattern_node {
-    Some(id) => [id]
-    None => []
-  }
-}
-
-///|
-fn primary_pattern_node(
-  pattern_nodes : Array[@identity.PatternNodeId],
-) -> @identity.PatternNodeId? {
-  if pattern_nodes.is_empty() {
-    None
-  } else {
-    Some(pattern_nodes[pattern_nodes.length() - 1])
-  }
-}
 
 ///|
 pub fn EventSource::EventSource(
@@ -62,13 +37,7 @@ pub fn EventSource::EventSource(
   layer~ : @identity.SectionLayerId?,
   occurrence~ : @identity.OccurrenceId?,
 ) -> EventSource {
-  {
-    pattern_node,
-    pattern_nodes: pattern_node_path_from_primary(pattern_node),
-    section,
-    layer,
-    occurrence,
-  }
+  { raw: @model.EventSource(pattern_node~, section~, layer~, occurrence~) }
 }
 
 ///|
@@ -78,70 +47,69 @@ pub fn EventSource::from_pattern_nodes(
   layer~ : @identity.SectionLayerId?,
   occurrence~ : @identity.OccurrenceId?,
 ) -> EventSource {
-  let nodes = pattern_nodes.copy()
   {
-    pattern_node: primary_pattern_node(nodes),
-    pattern_nodes: nodes,
-    section,
-    layer,
-    occurrence,
+    raw: @model.EventSource::from_pattern_nodes(
+      pattern_nodes~,
+      section~,
+      layer~,
+      occurrence~,
+    ),
   }
 }
 
 ///|
 pub fn EventSource::none() -> EventSource {
-  {
-    pattern_node: None,
-    pattern_nodes: [],
-    section: None,
-    layer: None,
-    occurrence: None,
-  }
+  { raw: @model.EventSource::none() }
+}
+
+///|
+fn EventSource::from_model(source : @model.EventSource) -> EventSource {
+  { raw: source }
+}
+
+///|
+fn EventSource::to_model(self : EventSource) -> @model.EventSource {
+  self.raw
 }
 
 ///|
 pub fn EventSource::pattern_node(
   self : EventSource,
 ) -> @identity.PatternNodeId? {
-  self.pattern_node
+  self.raw.pattern_node()
 }
 
 ///|
 pub fn EventSource::pattern_nodes(
   self : EventSource,
 ) -> Array[@identity.PatternNodeId] {
-  self.pattern_nodes.copy()
+  self.raw.pattern_nodes()
 }
 
 ///|
 pub fn EventSource::section(self : EventSource) -> @identity.SectionId? {
-  self.section
+  self.raw.section()
 }
 
 ///|
 pub fn EventSource::layer(self : EventSource) -> @identity.SectionLayerId? {
-  self.layer
+  self.raw.layer()
 }
 
 ///|
 pub fn EventSource::occurrence(self : EventSource) -> @identity.OccurrenceId? {
-  self.occurrence
+  self.raw.occurrence()
 }
 
 ///|
 pub fn EventSource::is_empty(self : EventSource) -> Bool {
-  self.pattern_node is None &&
-  self.pattern_nodes.is_empty() &&
-  self.section is None &&
-  self.layer is None &&
-  self.occurrence is None
+  self.raw.is_empty()
 }
 
 ///|
 /// Scheduler-local event wrapper that keeps provenance out of `pattern.Event`.
 pub struct PlaybackEvent {
-  priv event : @pattern.Event[@pattern.ControlMap]
-  priv source : EventSource
+  priv raw : @model.PlaybackEvent
 }
 
 ///|
@@ -149,19 +117,19 @@ pub fn PlaybackEvent::PlaybackEvent(
   event~ : @pattern.Event[@pattern.ControlMap],
   source~ : EventSource,
 ) -> PlaybackEvent {
-  { event, source }
+  { raw: @model.PlaybackEvent(event~, source=source.to_model()) }
 }
 
 ///|
 pub fn PlaybackEvent::event(
   self : PlaybackEvent,
 ) -> @pattern.Event[@pattern.ControlMap] {
-  self.event
+  self.raw.event()
 }
 
 ///|
 pub fn PlaybackEvent::source(self : PlaybackEvent) -> EventSource {
-  self.source
+  EventSource::from_model(self.raw.source())
 }
 
 ///|
@@ -181,10 +149,10 @@ fn EventSource::to_voice_runtime(
   self : EventSource,
 ) -> @voice_runtime.EventSource {
   @voice_runtime.EventSource::from_trusted_parts(
-    pattern_nodes=self.pattern_nodes,
-    section=self.section,
-    layer=self.layer,
-    occurrence=self.occurrence,
+    pattern_nodes=self.raw.borrow_pattern_nodes(),
+    section=self.raw.section(),
+    layer=self.raw.layer(),
+    occurrence=self.raw.occurrence(),
   )
 }
 
