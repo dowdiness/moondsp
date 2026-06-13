@@ -46,6 +46,15 @@ token-level incremental parsing: every text edit still reparses the whole mini
 source string. The first reuse benefit is stable-subtree identity plus
 lowering-cache reuse after parsing.
 
+## Boundary note
+
+`mini/moon.pkg` is the intentional production package that imports the full
+`dowdiness/incr` facade: `MiniAuthoringPipeline` owns `Scope`, `Signal`, `Memo`,
+and persistent `Observer` cells. Packages that only need `BackdateEq`,
+`HasChangedAt`, or `Revision` vocabulary should import `dowdiness/incr/types`
+instead. `scripts/check-incr-import-boundaries.sh` keeps the full-facade
+carve-out list explicit and ADR-referenced.
+
 ## Consequences
 
 **Positive**

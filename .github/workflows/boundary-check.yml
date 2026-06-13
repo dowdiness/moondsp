@@ -31,5 +31,8 @@ jobs:
       - name: Run architecture boundary check
         run: ./scripts/check-architecture-boundaries.sh
 
+      - name: Run incr import boundary check
+        run: ./scripts/check-incr-import-boundaries.sh
+
       - name: Run browser ABI check
         run: ./scripts/check-browser-abi.sh
