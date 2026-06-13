@@ -3,6 +3,7 @@ _build/
 .mooncakes/
 .moonagent/
 .slopless/
+graphify-out/
 node_modules/
 playwright-report/
 test-results/

@@ -54,6 +54,9 @@ collapsed into the root package once consumers had migrated.
 - Each layer has its own test suite that runs in isolation.
 - `mini/` and `pattern/` have zero dependency on the DSP layers, so they can
   be reused by future non-audio consumers (e.g. a structural editor).
+- `pattern/` may import `dowdiness/incr/types` for stable-edit trait
+  vocabulary, but it must not import the full `dowdiness/incr` reactive runtime
+  facade. `scripts/check-incr-import-boundaries.sh` enforces that split.
 - Single facade path (`@moondsp.X`) means consumers see one stable import.
 
 **Negative**
