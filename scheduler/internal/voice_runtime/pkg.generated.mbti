@@ -18,16 +18,21 @@ pub fn midi_to_hz(Double) -> Double
 // Errors
 
 // Types and methods
-pub struct ActiveNote {
+pub struct ActiveNotes {
   // private fields
 }
-pub fn ActiveNote::ActiveNote(handle~ : @voice.VoiceHandle, source~ : @model.EventSource, end_sample~ : Int64) -> Self
-pub fn ActiveNote::expires_at(Self, Int64) -> Bool
-pub fn ActiveNote::handle(Self) -> @voice.VoiceHandle
-pub fn ActiveNote::kill(Self, @voice.BoundVoicePool) -> Unit
-pub fn ActiveNote::matches_edit_policy(Self, @edit_policy.AffectedVoiceTarget) -> Bool
-pub fn ActiveNote::note_off(Self, @voice.BoundVoicePool) -> Unit
-pub fn ActiveNote::source(Self) -> @model.EventSource
+pub fn ActiveNotes::ActiveNotes() -> Self
+pub fn ActiveNotes::affected_count(Self, @edit_policy.AffectedVoiceTarget) -> Int
+pub fn ActiveNotes::clear(Self) -> Unit
+pub fn ActiveNotes::expire_at_sample(Self, @voice.BoundVoicePool, Int64) -> Unit
+pub fn ActiveNotes::kill_all(Self, @voice.BoundVoicePool) -> Unit
+pub fn ActiveNotes::length(Self) -> Int
+pub fn ActiveNotes::matches_edit_policy(Self, Int, @edit_policy.AffectedVoiceTarget) -> Bool?
+pub fn ActiveNotes::push_note(Self, handle~ : @voice.VoiceHandle, source~ : @model.EventSource, end_sample~ : Int64) -> Unit
+pub fn ActiveNotes::remove_affected(Self, @edit_policy.AffectedVoiceTarget, @voice.BoundVoicePool, stop~ : @edit_policy.AffectedVoiceStop) -> Int
+pub fn ActiveNotes::source(Self, Int) -> @model.EventSource?
+pub fn[E] ActiveNotes::try_count_matching_handles(Self, @edit_policy.AffectedVoiceTarget, (@voice.VoiceHandle) -> Result[Unit, E]) -> Result[Int, E]
+pub fn[E] ActiveNotes::try_each_matching_handle(Self, @edit_policy.AffectedVoiceTarget, (@voice.VoiceHandle) -> Result[Unit, E]) -> Result[Unit, E]
 
 // Type aliases
 

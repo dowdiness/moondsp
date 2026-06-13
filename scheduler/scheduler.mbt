@@ -145,65 +145,12 @@ fn copy_playback_events(events : Array[PlaybackEvent]) -> Array[PlaybackEvent] {
 }
 
 ///|
-/// Tracks a sounding voice for gate-off scheduling.
-struct ActiveNote {
-  raw : @voice_runtime.ActiveNote
-}
+/// Legacy opaque scheduler-package active-note marker.
+struct ActiveNote {}
 
 ///|
-fn ActiveNote::ActiveNote(
-  handle~ : @moondsp.VoiceHandle,
-  source~ : EventSource,
-  end_sample~ : Int64,
-) -> ActiveNote {
-  // WHY end_sample from whole.end_: In the Strudel/Tidal model, `whole` is the
-  // event's full intended duration in cycle time, while `part` is just the
-  // fragment visible within the queried arc. The scheduler converts
-  // `whole.end_` to performance time at note-on so future groove/rubato layers
-  // can expire voices against audio time rather than logical time.
-  {
-    raw: @voice_runtime.ActiveNote(
-      handle~,
-      source=source.to_model(),
-      end_sample~,
-    ),
-  }
-}
-
-///|
-fn ActiveNote::handle(self : ActiveNote) -> @moondsp.VoiceHandle {
-  self.raw.handle()
-}
-
-///|
-fn ActiveNote::source(self : ActiveNote) -> EventSource {
-  EventSource::from_model(self.raw.source())
-}
-
-///|
-fn ActiveNote::matches_edit_policy(
-  self : ActiveNote,
-  target : @edit_policy.AffectedVoiceTarget,
-) -> Bool {
-  self.raw.matches_edit_policy(target)
-}
-
-///|
-fn ActiveNote::expires_at(self : ActiveNote, sample : Int64) -> Bool {
-  self.raw.expires_at(sample)
-}
-
-///|
-fn ActiveNote::note_off(
-  self : ActiveNote,
-  pool : @moondsp.BoundVoicePool,
-) -> Unit {
-  self.raw.note_off(pool)
-}
-
-///|
-fn ActiveNote::kill(self : ActiveNote, pool : @moondsp.BoundVoicePool) -> Unit {
-  self.raw.kill(pool)
+fn ActiveNote::ActiveNote() -> ActiveNote {
+  ActiveNote::{  }
 }
 
 ///|
@@ -357,7 +304,10 @@ pub struct PatternScheduler {
   priv mut bpm : Double
   priv mut sample_counter : Int64
   priv ctx : @moondsp.DspContext
-  priv active_notes : Array[ActiveNote]
+  // Preserve the historical opaque ActiveNote entry in scheduler/pkg.generated.mbti
+  // while scheduler/internal/voice_runtime owns the concrete collection.
+  priv active_note_interface_anchor : ActiveNote?
+  priv active_notes : @voice_runtime.ActiveNotes
   priv mapper : ControlMapper
   priv playback_state : @playback.PlaybackState
 }
@@ -379,7 +329,8 @@ pub fn PatternScheduler::PatternScheduler(
     bpm: sanitize_bpm(bpm),
     sample_counter: 0L,
     ctx,
-    active_notes: [],
+    active_note_interface_anchor: Some(ActiveNote()),
+    active_notes: @voice_runtime.ActiveNotes(),
     mapper: mapper.unwrap_or(default_control_mapper()),
     playback_state: @playback.PlaybackState(),
   }
@@ -399,6 +350,7 @@ pub fn PatternScheduler::bpm(self : PatternScheduler) -> Double {
 
 ///|
 pub fn PatternScheduler::active_note_count(self : PatternScheduler) -> Int {
+  ignore(self.active_note_interface_anchor)
   self.active_notes.length()
 }
 
@@ -407,8 +359,8 @@ pub fn PatternScheduler::active_note_source(
   self : PatternScheduler,
   index : Int,
 ) -> EventSource? {
-  match self.active_notes.get(index) {
-    Some(note) => Some(note.source())
+  match self.active_notes.source(index) {
+    Some(source) => Some(EventSource::from_model(source))
     None => None
   }
 }
@@ -453,9 +405,7 @@ pub fn PatternScheduler::reset_transport_and_kill_notes(
   self : PatternScheduler,
   pool : @moondsp.BoundVoicePool,
 ) -> Unit {
-  for note in self.active_notes {
-    note.kill(pool)
-  }
+  self.active_notes.kill_all(pool)
   self.reset_transport()
 }
 
@@ -596,12 +546,10 @@ fn PatternScheduler::push_active_note_with_source(
   end_time : @pattern.Rational,
   source : EventSource,
 ) -> Unit {
-  self.active_notes.push(
-    ActiveNote(
-      handle~,
-      source~,
-      end_sample=cycle_to_sample(end_time, self.bpm, self.ctx),
-    ),
+  self.active_notes.push_note(
+    handle~,
+    source=source.to_model(),
+    end_sample=cycle_to_sample(end_time, self.bpm, self.ctx),
   )
 }
 
@@ -614,22 +562,7 @@ pub fn PatternScheduler::expire_notes_at(
   pool : @moondsp.BoundVoicePool,
   time : PerformanceTime,
 ) -> Unit {
-  let mut i = 0
-  while i < self.active_notes.length() {
-    if self.active_notes[i].expires_at(time.sample) {
-      self.active_notes[i].note_off(pool)
-      // WHY swap-remove: Array::remove shifts all later elements O(n).
-      // Swap with last + pop is O(1). Order of active_notes doesn't matter
-      // because gate-off correctness depends only on end_sample, not position.
-      let last = self.active_notes.length() - 1
-      if i < last {
-        self.active_notes[i] = self.active_notes[last]
-      }
-      ignore(self.active_notes.pop())
-    } else {
-      i = i + 1
-    }
-  }
+  self.active_notes.expire_at_sample(pool, time.sample)
 }
 
 ///|
@@ -701,12 +634,16 @@ fn PatternScheduler::process_single_event(
         match pool.note_on_controls(map) {
           None => ()
           Some(handle) => {
-            self.active_notes.push(
-              ActiveNote(
-                handle~,
-                source~,
-                end_sample=cycle_to_sample(whole.end_, self.bpm, self.ctx),
-              ),
+            // WHY end_sample from whole.end_: In the Strudel/Tidal model,
+            // `whole` is the event's full intended duration in cycle time,
+            // while `part` is only the fragment visible within the queried
+            // arc. The scheduler converts `whole.end_` to performance time at
+            // note-on so future groove/rubato layers can expire voices against
+            // audio time rather than logical time.
+            self.active_notes.push_note(
+              handle~,
+              source=source.to_model(),
+              end_sample=cycle_to_sample(whole.end_, self.bpm, self.ctx),
             )
             for action in actions {
               match action {
