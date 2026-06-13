@@ -131,7 +131,7 @@ check_manifest "graph/internal/authoring/moon.pkg" '^(dowdiness/moondsp/(identit
 check_manifest "scheduler/internal/model/moon.pkg" '^(dowdiness/moondsp/(identity|pattern))$'
 check_manifest "scheduler/internal/transport/moon.pkg" '^(dowdiness/moondsp/(dsp|pattern))$'
 check_manifest "scheduler/internal/playback/moon.pkg" '^(dowdiness/moondsp/(identity|pattern|song))$'
-check_manifest "scheduler/internal/voice_runtime/moon.pkg" '^(dowdiness/moondsp/(identity|pattern|voice))$'
+check_manifest "scheduler/internal/voice_runtime/moon.pkg" '^(dowdiness/moondsp/(pattern|scheduler/internal/(edit_policy|model)|voice))$'
 check_manifest "scheduler/internal/edit_policy/moon.pkg" '^(dowdiness/moondsp/identity)$'
 check_manifest "browser/internal/slot/moon.pkg" '^(dowdiness/moondsp)$'
 check_manifest "browser/internal/demo_templates/moon.pkg" '^(dowdiness/moondsp)$'

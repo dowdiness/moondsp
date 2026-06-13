@@ -145,30 +145,6 @@ fn copy_playback_events(events : Array[PlaybackEvent]) -> Array[PlaybackEvent] {
 }
 
 ///|
-fn EventSource::to_voice_runtime(
-  self : EventSource,
-) -> @voice_runtime.EventSource {
-  @voice_runtime.EventSource::from_trusted_parts(
-    pattern_nodes=self.raw.borrow_pattern_nodes(),
-    section=self.raw.section(),
-    layer=self.raw.layer(),
-    occurrence=self.raw.occurrence(),
-  )
-}
-
-///|
-fn event_source_from_voice_runtime(
-  source : @voice_runtime.EventSource,
-) -> EventSource {
-  EventSource::from_pattern_nodes(
-    pattern_nodes=source.pattern_nodes(),
-    section=source.section(),
-    layer=source.layer(),
-    occurrence=source.occurrence(),
-  )
-}
-
-///|
 /// Tracks a sounding voice for gate-off scheduling.
 struct ActiveNote {
   raw : @voice_runtime.ActiveNote
@@ -188,7 +164,7 @@ fn ActiveNote::ActiveNote(
   {
     raw: @voice_runtime.ActiveNote(
       handle~,
-      source=source.to_voice_runtime(),
+      source=source.to_model(),
       end_sample~,
     ),
   }
@@ -201,7 +177,7 @@ fn ActiveNote::handle(self : ActiveNote) -> @moondsp.VoiceHandle {
 
 ///|
 fn ActiveNote::source(self : ActiveNote) -> EventSource {
-  event_source_from_voice_runtime(self.raw.source())
+  EventSource::from_model(self.raw.source())
 }
 
 ///|
@@ -209,14 +185,7 @@ fn ActiveNote::matches_edit_policy(
   self : ActiveNote,
   target : @edit_policy.AffectedVoiceTarget,
 ) -> Bool {
-  let source = self.raw.source()
-  @edit_policy.source_parts_match_target(
-    pattern_nodes=source.borrow_pattern_nodes(),
-    section=source.section(),
-    layer=source.layer(),
-    occurrence=source.occurrence(),
-    target,
-  )
+  self.raw.matches_edit_policy(target)
 }
 
 ///|

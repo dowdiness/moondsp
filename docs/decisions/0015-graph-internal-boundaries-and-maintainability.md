@@ -109,6 +109,9 @@ Additional boundary rules:
   to authoring indices, but runtime processing must not depend on it.
 - `scheduler/internal/*` packages may depend on lower-level domain/runtime
   packages they explicitly bridge, but they must not depend on `browser/`.
+- `scheduler/internal/voice_runtime` stores active-note provenance with
+  `scheduler/internal/model` value backing and delegates affected-voice matching
+  to `scheduler/internal/edit_policy`.
 - `browser/internal/*` packages may depend on the public runtime, scheduler,
   Mini, pattern, and song surfaces needed by the host, but those packages must
   not depend back on `browser/`.
