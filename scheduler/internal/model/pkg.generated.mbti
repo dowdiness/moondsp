@@ -1,0 +1,62 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp/scheduler/internal/model"
+
+import {
+  "dowdiness/moondsp/identity",
+  "dowdiness/moondsp/pattern",
+  "moonbitlang/core/debug",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct AffectedVoiceEditScope {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn AffectedVoiceEditScope::pattern_node(@identity.PatternNodeId) -> Self
+pub fn AffectedVoiceEditScope::song_layer(section~ : @identity.SectionId, layer~ : @identity.SectionLayerId) -> Self
+pub fn AffectedVoiceEditScope::song_occurrence(@identity.OccurrenceId) -> Self
+pub fn AffectedVoiceEditScope::song_section(@identity.SectionId) -> Self
+pub fn AffectedVoiceEditScope::target(Self) -> AffectedVoiceTarget
+
+pub struct AffectedVoiceTarget {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn AffectedVoiceTarget::AffectedVoiceTarget(pattern_node~ : @identity.PatternNodeId?, section~ : @identity.SectionId?, layer~ : @identity.SectionLayerId?, occurrence~ : @identity.OccurrenceId?) -> Self
+pub fn AffectedVoiceTarget::from_layer(@identity.SectionLayerId) -> Self
+pub fn AffectedVoiceTarget::from_occurrence(@identity.OccurrenceId) -> Self
+pub fn AffectedVoiceTarget::from_pattern_node(@identity.PatternNodeId) -> Self
+pub fn AffectedVoiceTarget::from_section(@identity.SectionId) -> Self
+pub fn AffectedVoiceTarget::is_empty(Self) -> Bool
+pub fn AffectedVoiceTarget::layer(Self) -> @identity.SectionLayerId?
+pub fn AffectedVoiceTarget::occurrence(Self) -> @identity.OccurrenceId?
+pub fn AffectedVoiceTarget::pattern_node(Self) -> @identity.PatternNodeId?
+pub fn AffectedVoiceTarget::section(Self) -> @identity.SectionId?
+
+pub struct EventSource {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn EventSource::EventSource(pattern_node~ : @identity.PatternNodeId?, section~ : @identity.SectionId?, layer~ : @identity.SectionLayerId?, occurrence~ : @identity.OccurrenceId?) -> Self
+pub fn EventSource::borrow_pattern_nodes(Self) -> Array[@identity.PatternNodeId]
+pub fn EventSource::from_pattern_nodes(pattern_nodes~ : Array[@identity.PatternNodeId], section~ : @identity.SectionId?, layer~ : @identity.SectionLayerId?, occurrence~ : @identity.OccurrenceId?) -> Self
+pub fn EventSource::is_empty(Self) -> Bool
+pub fn EventSource::layer(Self) -> @identity.SectionLayerId?
+pub fn EventSource::none() -> Self
+pub fn EventSource::occurrence(Self) -> @identity.OccurrenceId?
+pub fn EventSource::pattern_node(Self) -> @identity.PatternNodeId?
+pub fn EventSource::pattern_nodes(Self) -> Array[@identity.PatternNodeId]
+pub fn EventSource::section(Self) -> @identity.SectionId?
+
+pub struct PlaybackEvent {
+  // private fields
+}
+pub fn PlaybackEvent::PlaybackEvent(event~ : @pattern.Event[@pattern.ControlMap], source~ : EventSource) -> Self
+pub fn PlaybackEvent::event(Self) -> @pattern.Event[@pattern.ControlMap]
+pub fn PlaybackEvent::source(Self) -> EventSource
+
+// Type aliases
+
+// Traits
+

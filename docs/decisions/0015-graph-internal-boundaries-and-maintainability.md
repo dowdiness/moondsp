@@ -73,6 +73,7 @@ The shipped scheduler shape is:
 
 ```text
 scheduler/                         public facade; preserves scheduler API
+scheduler/internal/model/           event provenance, playback-event, and edit-scope value backing
 scheduler/internal/transport/       sample/cycle transport helpers
 scheduler/internal/playback/        pattern/song playback snapshots
 scheduler/internal/voice_runtime/   active-note and voice-side runtime helpers
@@ -134,9 +135,10 @@ The migration shipped incrementally rather than by replacement:
 3. **Graph internals were extracted.** Model, template, binding, runtime,
    staging, and authoring responsibilities moved behind `graph/internal/*` while
    `graph/` preserved the public source-facing API.
-4. **Scheduler internals were extracted.** Transport, playback snapshots,
-   active-note/voice-runtime helpers, and edit-policy matching moved behind
-   `scheduler/internal/*` while `scheduler/` preserved its public facade.
+4. **Scheduler internals were extracted.** Event/provenance and edit-scope
+   value backing, transport, playback snapshots, active-note/voice-runtime
+   helpers, and edit-policy matching moved behind `scheduler/internal/*` while
+   `scheduler/` preserved its public facade.
 5. **Browser internals were extracted and tightened.** Graph slots, demo
    templates, and playback-host routing moved behind `browser/internal/*`.
    The package path and JS/wasm-gc worklet export ABI stayed stable, but the

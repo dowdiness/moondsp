@@ -5,10 +5,7 @@
 /// all-notes controls for broad emergency stops; this target is for precise
 /// provenance-bound edit policies.
 pub struct AffectedVoiceTarget {
-  priv pattern_node : @identity.PatternNodeId?
-  priv section : @identity.SectionId?
-  priv layer : @identity.SectionLayerId?
-  priv occurrence : @identity.OccurrenceId?
+  priv raw : @model.AffectedVoiceTarget
 } derive(Eq, Debug)
 
 ///|
@@ -18,81 +15,82 @@ pub fn AffectedVoiceTarget::AffectedVoiceTarget(
   layer~ : @identity.SectionLayerId?,
   occurrence~ : @identity.OccurrenceId?,
 ) -> AffectedVoiceTarget {
-  { pattern_node, section, layer, occurrence }
+  {
+    raw: @model.AffectedVoiceTarget(
+      pattern_node~,
+      section~,
+      layer~,
+      occurrence~,
+    ),
+  }
 }
 
 ///|
 pub fn AffectedVoiceTarget::from_pattern_node(
   pattern_node : @identity.PatternNodeId,
 ) -> AffectedVoiceTarget {
-  {
-    pattern_node: Some(pattern_node),
-    section: None,
-    layer: None,
-    occurrence: None,
-  }
+  { raw: @model.AffectedVoiceTarget::from_pattern_node(pattern_node) }
 }
 
 ///|
 pub fn AffectedVoiceTarget::from_section(
   section : @identity.SectionId,
 ) -> AffectedVoiceTarget {
-  { pattern_node: None, section: Some(section), layer: None, occurrence: None }
+  { raw: @model.AffectedVoiceTarget::from_section(section) }
 }
 
 ///|
 pub fn AffectedVoiceTarget::from_layer(
   layer : @identity.SectionLayerId,
 ) -> AffectedVoiceTarget {
-  { pattern_node: None, section: None, layer: Some(layer), occurrence: None }
+  { raw: @model.AffectedVoiceTarget::from_layer(layer) }
 }
 
 ///|
 pub fn AffectedVoiceTarget::from_occurrence(
   occurrence : @identity.OccurrenceId,
 ) -> AffectedVoiceTarget {
-  {
-    pattern_node: None,
-    section: None,
-    layer: None,
-    occurrence: Some(occurrence),
-  }
+  { raw: @model.AffectedVoiceTarget::from_occurrence(occurrence) }
+}
+
+///|
+fn AffectedVoiceTarget::from_model(
+  target : @model.AffectedVoiceTarget,
+) -> AffectedVoiceTarget {
+  { raw: target }
 }
 
 ///|
 pub fn AffectedVoiceTarget::pattern_node(
   self : AffectedVoiceTarget,
 ) -> @identity.PatternNodeId? {
-  self.pattern_node
+  self.raw.pattern_node()
 }
 
 ///|
 pub fn AffectedVoiceTarget::section(
   self : AffectedVoiceTarget,
 ) -> @identity.SectionId? {
-  self.section
+  self.raw.section()
 }
 
 ///|
 pub fn AffectedVoiceTarget::layer(
   self : AffectedVoiceTarget,
 ) -> @identity.SectionLayerId? {
-  self.layer
+  self.raw.layer()
 }
 
 ///|
 pub fn AffectedVoiceTarget::occurrence(
   self : AffectedVoiceTarget,
 ) -> @identity.OccurrenceId? {
-  self.occurrence
+  self.raw.occurrence()
 }
 
 ///|
 pub fn AffectedVoiceTarget::is_empty(self : AffectedVoiceTarget) -> Bool {
-  self.pattern_node is None &&
-  self.section is None &&
-  self.layer is None &&
-  self.occurrence is None
+  self.raw.is_empty()
 }
 
 ///|
@@ -100,10 +98,10 @@ fn AffectedVoiceTarget::to_edit_policy(
   self : AffectedVoiceTarget,
 ) -> @edit_policy.AffectedVoiceTarget {
   @edit_policy.AffectedVoiceTarget(
-    pattern_node=self.pattern_node,
-    section=self.section,
-    layer=self.layer,
-    occurrence=self.occurrence,
+    pattern_node=self.raw.pattern_node(),
+    section=self.raw.section(),
+    layer=self.raw.layer(),
+    occurrence=self.raw.occurrence(),
   )
 }
 
@@ -112,11 +110,12 @@ pub fn AffectedVoiceTarget::matches(
   self : AffectedVoiceTarget,
   source : EventSource,
 ) -> Bool {
+  let raw_source = source.to_model()
   @edit_policy.source_parts_match_target(
-    pattern_nodes=source.pattern_nodes,
-    section=source.section,
-    layer=source.layer,
-    occurrence=source.occurrence,
+    pattern_nodes=raw_source.borrow_pattern_nodes(),
+    section=raw_source.section(),
+    layer=raw_source.layer(),
+    occurrence=raw_source.occurrence(),
     self.to_edit_policy(),
   )
 }
@@ -135,28 +134,28 @@ pub fn EventSource::matches(
 /// This does not choose a stop policy. Callers still choose whether matching
 /// voices preserve, release, or stop immediately.
 pub struct AffectedVoiceEditScope {
-  priv target : AffectedVoiceTarget
+  priv raw : @model.AffectedVoiceEditScope
 } derive(Eq, Debug)
 
 ///|
 pub fn AffectedVoiceEditScope::pattern_node(
   pattern_node : @identity.PatternNodeId,
 ) -> AffectedVoiceEditScope {
-  { target: AffectedVoiceTarget::from_pattern_node(pattern_node) }
+  { raw: @model.AffectedVoiceEditScope::pattern_node(pattern_node) }
 }
 
 ///|
 pub fn AffectedVoiceEditScope::song_occurrence(
   occurrence : @identity.OccurrenceId,
 ) -> AffectedVoiceEditScope {
-  { target: AffectedVoiceTarget::from_occurrence(occurrence) }
+  { raw: @model.AffectedVoiceEditScope::song_occurrence(occurrence) }
 }
 
 ///|
 pub fn AffectedVoiceEditScope::song_section(
   section : @identity.SectionId,
 ) -> AffectedVoiceEditScope {
-  { target: AffectedVoiceTarget::from_section(section) }
+  { raw: @model.AffectedVoiceEditScope::song_section(section) }
 }
 
 ///|
@@ -164,21 +163,14 @@ pub fn AffectedVoiceEditScope::song_layer(
   section~ : @identity.SectionId,
   layer~ : @identity.SectionLayerId,
 ) -> AffectedVoiceEditScope {
-  {
-    target: AffectedVoiceTarget(
-      pattern_node=None,
-      section=Some(section),
-      layer=Some(layer),
-      occurrence=None,
-    ),
-  }
+  { raw: @model.AffectedVoiceEditScope::song_layer(section~, layer~) }
 }
 
 ///|
 pub fn AffectedVoiceEditScope::target(
   self : AffectedVoiceEditScope,
 ) -> AffectedVoiceTarget {
-  self.target
+  AffectedVoiceTarget::from_model(self.raw.target())
 }
 
 ///|

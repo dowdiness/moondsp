@@ -110,7 +110,7 @@ check_manifest "song/moon.pkg" '^(dowdiness/moondsp/(identity|pattern))$'
 check_manifest "mini/moon.pkg" '^(dowdiness/moondsp/(identity|pattern|song))$'
 check_manifest "graph/moon.pkg" '^(dowdiness/moondsp/(dsp|identity|graph/internal/(model|template|binding|runtime|staging|authoring)))$'
 check_manifest "voice/moon.pkg" '^(dowdiness/moondsp/(dsp|graph))$'
-check_manifest "scheduler/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(identity|pattern|song|scheduler/internal/(transport|playback|voice_runtime|edit_policy)))$'
+check_manifest "scheduler/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(identity|pattern|song|scheduler/internal/(model|transport|playback|voice_runtime|edit_policy)))$'
 check_manifest "browser/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(scheduler|browser/internal/(slot|demo_templates|playback_host)))$'
 check_manifest "browser_test/moon.pkg" '^(dowdiness/moondsp)$'
 check_manifest "cmd/main/moon.pkg" '^$'
@@ -128,6 +128,7 @@ check_manifest "graph/internal/authoring/moon.pkg" '^(dowdiness/moondsp/(identit
 # Scheduler and browser internals are intentionally looser for now than the
 # graph rules. They document the facade-plus-internals direction without
 # blocking current production code paths.
+check_manifest "scheduler/internal/model/moon.pkg" '^(dowdiness/moondsp/(identity|pattern))$'
 check_manifest "scheduler/internal/transport/moon.pkg" '^(dowdiness/moondsp/(dsp|pattern))$'
 check_manifest "scheduler/internal/playback/moon.pkg" '^(dowdiness/moondsp/(identity|pattern|song))$'
 check_manifest "scheduler/internal/voice_runtime/moon.pkg" '^(dowdiness/moondsp/(identity|pattern|voice))$'
