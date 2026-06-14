@@ -53,3 +53,34 @@ pub fn cycle_to_sample(
 ) -> Int64 {
   @transport.cycle_to_sample(cycle, bpm, ctx)
 }
+
+///|
+pub fn PatternScheduler::sample_counter(self : PatternScheduler) -> Int64 {
+  self.sample_counter
+}
+
+///|
+/// Current tempo in beats per minute. The value is always sanitized:
+/// construction and `set_bpm` reject NaN/Inf and clamp to a minimum of 1.0.
+pub fn PatternScheduler::bpm(self : PatternScheduler) -> Double {
+  self.bpm
+}
+
+///|
+/// Current block frame without advancing the scheduler clock.
+pub fn PatternScheduler::current_block(self : PatternScheduler) -> BlockFrame {
+  let sample_begin = self.sample_counter
+  let sample_end = @transport.block_sample_end(sample_begin, self.ctx)
+  {
+    sample_begin,
+    sample_end,
+    logical_arc: compute_arc(sample_begin, self.bpm, self.ctx),
+  }
+}
+
+///|
+/// Update tempo in-place. Newly scheduled notes use the updated tempo. Active
+/// notes keep their already-computed performance-time gate-off sample.
+pub fn PatternScheduler::set_bpm(self : PatternScheduler, bpm : Double) -> Unit {
+  self.bpm = sanitize_bpm(bpm)
+}
