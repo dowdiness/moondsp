@@ -93,31 +93,6 @@ pub fn PatternScheduler::PatternScheduler(
 }
 
 ///|
-fn PatternScheduler::advance_block(self : PatternScheduler) -> Unit {
-  self.sample_counter = @transport.advance_block_sample(
-    self.sample_counter,
-    self.ctx,
-  )
-}
-
-///|
-/// Reset the transport to the beginning and forget tracked active notes.
-pub fn PatternScheduler::reset_transport(self : PatternScheduler) -> Unit {
-  self.sample_counter = 0L
-  self.active_notes.clear()
-}
-
-///|
-/// Reset the transport and immediately kill tracked active voices in `pool`.
-pub fn PatternScheduler::reset_transport_and_kill_notes(
-  self : PatternScheduler,
-  pool : @moondsp.BoundVoicePool,
-) -> Unit {
-  self.active_notes.kill_all(pool)
-  self.reset_transport()
-}
-
-///|
 /// Gate-off all notes whose end sample has been reached, then remove them.
 /// Block-quantized: notes ending mid-block stay active until the next block
 /// (~2.7ms at 48kHz/128 samples — inaudible for musical purposes).
