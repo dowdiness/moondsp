@@ -202,11 +202,7 @@ pub fn PatternScheduler::active_note_matches(
   index : Int,
   target : AffectedVoiceTarget,
 ) -> Bool? {
-  let raw_target = target.to_edit_policy()
-  match self.active_notes.get(index) {
-    Some(note) => Some(note.matches_edit_policy(raw_target))
-    None => None
-  }
+  self.active_notes.matches_edit_policy(index, target.to_edit_policy())
 }
 
 ///|
@@ -214,16 +210,7 @@ pub fn PatternScheduler::affected_active_note_count(
   self : PatternScheduler,
   target : AffectedVoiceTarget,
 ) -> Int {
-  let raw_target = target.to_edit_policy()
-  let count = for note in self.active_notes; total = 0 {
-    if note.matches_edit_policy(raw_target) {
-      continue total + 1
-    }
-    continue total
-  } nobreak {
-    total
-  }
-  count
+  self.active_notes.affected_count(target.to_edit_policy())
 }
 
 ///|
@@ -242,7 +229,7 @@ pub fn PatternScheduler::apply_affected_voice_policy(
   let raw_target = target.to_edit_policy()
   match @edit_policy.stop_for_policy(policy.to_edit_policy(), raw_target) {
     None => 0
-    Some(stop) => self.remove_affected_notes(raw_target, pool, stop~)
+    Some(stop) => self.active_notes.remove_affected(raw_target, pool, stop~)
   }
 }
 
@@ -255,42 +242,4 @@ pub fn PatternScheduler::apply_affected_voice_policy_for_edit(
   pool : @moondsp.BoundVoicePool,
 ) -> Int {
   self.apply_affected_voice_policy(policy, edit.target(), pool)
-}
-
-///|
-fn stop_affected_note(
-  handle : @moondsp.VoiceHandle,
-  pool : @moondsp.BoundVoicePool,
-  stop : @edit_policy.AffectedVoiceStop,
-) -> Unit {
-  match stop {
-    @edit_policy.AffectedVoiceStop::GateOff =>
-      ignore(pool.note_off_result(handle))
-    @edit_policy.AffectedVoiceStop::Kill => ignore(pool.kill_result(handle))
-  }
-}
-
-///|
-fn PatternScheduler::remove_affected_notes(
-  self : PatternScheduler,
-  target : @edit_policy.AffectedVoiceTarget,
-  pool : @moondsp.BoundVoicePool,
-  stop~ : @edit_policy.AffectedVoiceStop,
-) -> Int {
-  let mut count = 0
-  let mut i = 0
-  while i < self.active_notes.length() {
-    if self.active_notes[i].matches_edit_policy(target) {
-      stop_affected_note(self.active_notes[i].handle(), pool, stop)
-      let last = self.active_notes.length() - 1
-      if i < last {
-        self.active_notes[i] = self.active_notes[last]
-      }
-      ignore(self.active_notes.pop())
-      count = count + 1
-    } else {
-      i = i + 1
-    }
-  }
-  count
 }
