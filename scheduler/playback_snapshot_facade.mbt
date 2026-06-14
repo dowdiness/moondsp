@@ -107,3 +107,30 @@ fn PatternScheduler::commit_pending_playback_snapshot(
 ) -> Unit {
   self.playback_state.commit_pending()
 }
+
+///|
+/// Snapshot entry point kept for existing pattern-snapshot callers. It now
+/// processes the unified prepared playback snapshot slot, so song snapshots
+/// staged through `queue_song_snapshot` observe the same block-boundary
+/// semantics.
+pub fn PatternScheduler::process_snapshot_block(
+  self : PatternScheduler,
+  pool : @moondsp.BoundVoicePool,
+  left : @moondsp.AudioBuffer,
+  right : @moondsp.AudioBuffer,
+) -> Unit {
+  self.process_playback_snapshot_block(pool, left, right)
+}
+
+///|
+/// Song snapshot entry point for authoring-time song edits. Pending snapshots
+/// are swapped in at the start of the audio block, so layout revisions become
+/// visible on the same stable boundary as pattern snapshots.
+pub fn PatternScheduler::process_song_snapshot_block(
+  self : PatternScheduler,
+  pool : @moondsp.BoundVoicePool,
+  left : @moondsp.AudioBuffer,
+  right : @moondsp.AudioBuffer,
+) -> Unit {
+  self.process_playback_snapshot_block(pool, left, right)
+}

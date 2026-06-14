@@ -11,15 +11,6 @@ fn copy_playback_events(events : Array[PlaybackEvent]) -> Array[PlaybackEvent] {
 }
 
 ///|
-/// Legacy opaque scheduler-package active-note marker.
-struct ActiveNote {}
-
-///|
-fn ActiveNote::ActiveNote() -> ActiveNote {
-  ActiveNote::{  }
-}
-
-///|
 /// Per-voice side-effect extracted from a control map entry.
 /// The scheduler applies these after note-on, outside the control binding path.
 pub enum VoiceAction {
@@ -102,59 +93,11 @@ pub fn PatternScheduler::PatternScheduler(
 }
 
 ///|
-pub fn PatternScheduler::sample_counter(self : PatternScheduler) -> Int64 {
-  self.sample_counter
-}
-
-///|
-/// Current tempo in beats per minute. The value is always sanitized:
-/// construction and `set_bpm` reject NaN/Inf and clamp to a minimum of 1.0.
-pub fn PatternScheduler::bpm(self : PatternScheduler) -> Double {
-  self.bpm
-}
-
-///|
-pub fn PatternScheduler::active_note_count(self : PatternScheduler) -> Int {
-  ignore(self.active_note_interface_anchor)
-  self.active_notes.length()
-}
-
-///|
-pub fn PatternScheduler::active_note_source(
-  self : PatternScheduler,
-  index : Int,
-) -> EventSource? {
-  match self.active_notes.source(index) {
-    Some(source) => Some(EventSource::from_model(source))
-    None => None
-  }
-}
-
-///|
-/// Current block frame without advancing the scheduler clock.
-pub fn PatternScheduler::current_block(self : PatternScheduler) -> BlockFrame {
-  let sample_begin = self.sample_counter
-  let sample_end = @transport.block_sample_end(sample_begin, self.ctx)
-  {
-    sample_begin,
-    sample_end,
-    logical_arc: compute_arc(sample_begin, self.bpm, self.ctx),
-  }
-}
-
-///|
 fn PatternScheduler::advance_block(self : PatternScheduler) -> Unit {
   self.sample_counter = @transport.advance_block_sample(
     self.sample_counter,
     self.ctx,
   )
-}
-
-///|
-/// Update tempo in-place. Newly scheduled notes use the updated tempo. Active
-/// notes keep their already-computed performance-time gate-off sample.
-pub fn PatternScheduler::set_bpm(self : PatternScheduler, bpm : Double) -> Unit {
-  self.bpm = sanitize_bpm(bpm)
 }
 
 ///|
@@ -172,40 +115,6 @@ pub fn PatternScheduler::reset_transport_and_kill_notes(
 ) -> Unit {
   self.active_notes.kill_all(pool)
   self.reset_transport()
-}
-
-///|
-/// Convert MIDI note number to frequency in Hz.
-/// Uses equal temperament: A4 (MIDI 69) = 440 Hz, each semitone is 2^(1/12).
-pub fn midi_to_hz(midi : Double) -> Double {
-  @voice_runtime.midi_to_hz(midi)
-}
-
-///|
-/// Test helper: inject an active note for testing gate-off logic.
-/// The caller must ensure the VoiceHandle is currently active in the pool,
-/// or gate-off at expiry will silently no-op (note_off returns false).
-pub fn PatternScheduler::push_active_note(
-  self : PatternScheduler,
-  handle : @moondsp.VoiceHandle,
-  end_time : @pattern.Rational,
-) -> Unit {
-  self.push_active_note_with_source(handle, end_time, EventSource::none())
-}
-
-///|
-/// Future-policy helper: inject an active note with explicit provenance.
-fn PatternScheduler::push_active_note_with_source(
-  self : PatternScheduler,
-  handle : @moondsp.VoiceHandle,
-  end_time : @pattern.Rational,
-  source : EventSource,
-) -> Unit {
-  self.active_notes.push_note(
-    handle~,
-    source=source.to_model(),
-    end_sample=cycle_to_sample(end_time, self.bpm, self.ctx),
-  )
 }
 
 ///|
@@ -434,20 +343,6 @@ pub fn PatternScheduler::process_block(
 }
 
 ///|
-/// Snapshot entry point kept for existing pattern-snapshot callers. It now
-/// processes the unified prepared playback snapshot slot, so song snapshots
-/// staged through `queue_song_snapshot` observe the same block-boundary
-/// semantics.
-pub fn PatternScheduler::process_snapshot_block(
-  self : PatternScheduler,
-  pool : @moondsp.BoundVoicePool,
-  left : @moondsp.AudioBuffer,
-  right : @moondsp.AudioBuffer,
-) -> Unit {
-  self.process_playback_snapshot_block(pool, left, right)
-}
-
-///|
 /// Unified snapshot entry point for prepared pattern or song playback edits.
 /// Pending snapshots are swapped in once at block start; note expiry and event
 /// queries then observe the same committed playback state for the whole block.
@@ -469,19 +364,6 @@ pub fn PatternScheduler::process_playback_snapshot_block(
     left,
     right,
   )
-}
-
-///|
-/// Song snapshot entry point for authoring-time song edits. Pending snapshots
-/// are swapped in at the start of the audio block, so layout revisions become
-/// visible on the same stable boundary as pattern snapshots.
-pub fn PatternScheduler::process_song_snapshot_block(
-  self : PatternScheduler,
-  pool : @moondsp.BoundVoicePool,
-  left : @moondsp.AudioBuffer,
-  right : @moondsp.AudioBuffer,
-) -> Unit {
-  self.process_playback_snapshot_block(pool, left, right)
 }
 
 ///|
