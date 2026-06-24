@@ -1,7 +1,7 @@
 ///|
 /// Active playback source parsed from the explicit browser protocol.
 priv enum SchedulerActivePlayback {
-  ActivePattern(@pattern.Pat[@pattern.ControlMap])
+  ActivePattern(Array[@pattern.Pat[@pattern.ControlMap]])
   ActiveSong(Array[@song.Song[@pattern.ControlMap]])
 }
 
@@ -39,7 +39,7 @@ let sched_left : @ref.Ref[@moondsp.AudioBuffer?] = @ref.new(None)
 let sched_right : @ref.Ref[@moondsp.AudioBuffer?] = @ref.new(None)
 
 ///|
-let sched_gain : @ref.Ref[Double] = @ref.new(0.3)
+let sched_gain : @ref.Ref[Double] = @ref.new(0.5)
 
 ///|
 /// Create a SoundPool for a drum template (no control bindings needed).
@@ -87,10 +87,12 @@ fn make_synth_pool(
       ctx,
       @moondsp.ControlBindingBuilder::new().bind(
         key="note",
-        node_index=0,
+        node_index=0,  // oscillator(Value0) frequency placeholder
         slot=@moondsp.GraphParamSlot::Value0,
       ),
-      max_voices=16,
+      // 24 voices for chords: a 5-note chord × 4 layers of jux/stereo
+      // needs up to 20 voices. Fewer steals → fewer clicks.
+      max_voices=24,
     ) {
     Err(_) => None
     Ok(pool) => {
@@ -167,7 +169,7 @@ pub fn init_scheduler_graph_with_templates(
   sched_routes.val = routes
   sched_left.val = Some(@moondsp.AudioBuffer::filled(block_size))
   sched_right.val = Some(@moondsp.AudioBuffer::filled(block_size))
-  sched_gain.val = 0.3
+  sched_gain.val = 0.5
   sched_active_playback.val = None
   true
 }
@@ -177,7 +179,7 @@ pub fn reset_scheduler_graph() -> Unit {
   sched_routes.val = []
   sched_left.val = None
   sched_right.val = None
-  sched_gain.val = 0.3
+  sched_gain.val = 0.5
   sched_active_playback.val = None
 }
 
@@ -331,6 +333,17 @@ fn filter_song_for_route(
 }
 
 ///|
+fn route_patterns_for_current_routes(
+  pat : @pattern.Pat[@pattern.ControlMap],
+) -> Array[@pattern.Pat[@pattern.ControlMap]] {
+  let route_patterns : Array[@pattern.Pat[@pattern.ControlMap]] = []
+  for route in sched_routes.val {
+    route_patterns.push(filter_pat_for_route(route.selector, pat))
+  }
+  route_patterns
+}
+
+///|
 fn route_songs_for_current_routes(
   song : @song.Song[@pattern.ControlMap],
 ) -> Result[Array[@song.Song[@pattern.ControlMap]], String] {
@@ -345,7 +358,7 @@ fn route_songs_for_current_routes(
 }
 
 ///|
-fn reset_route_transports_for_song_start() -> Unit {
+fn reset_route_transports_for_playback_start() -> Unit {
   for route in sched_routes.val {
     route.pool.scheduler.reset_transport_and_kill_notes(route.pool.pool)
   }
@@ -353,13 +366,15 @@ fn reset_route_transports_for_song_start() -> Unit {
 
 ///|
 fn process_pattern_routes(
-  pat : @pattern.Pat[@pattern.ControlMap],
+  route_patterns : Array[@pattern.Pat[@pattern.ControlMap]],
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
 ) -> Unit {
-  for route in sched_routes.val {
-    let sub = filter_pat_for_route(route.selector, pat)
-    process_sub_pool(route.pool, sub, left, right)
+  for i in 0..<sched_routes.val.length() {
+    match route_patterns.get(i) {
+      Some(pat) => process_sub_pool(sched_routes.val[i].pool, pat, left, right)
+      None => ()
+    }
   }
 }
 
@@ -448,7 +463,9 @@ fn input_chars_to_string(chars : Array[Int]) -> String {
 fn set_active_pattern_text(text : String) -> Int {
   match @mini.parse(text) {
     Ok(pat) => {
-      sched_active_playback.val = Some(ActivePattern(pat))
+      let route_patterns = route_patterns_for_current_routes(pat)
+      reset_route_transports_for_playback_start()
+      sched_active_playback.val = Some(ActivePattern(route_patterns))
       set_scheduler_parse_success()
     }
     Err(msg) => set_scheduler_parse_error(msg)
@@ -465,7 +482,7 @@ fn set_active_song_text(text : String) -> Int {
             Some(bpm) => set_scheduler_bpm(bpm)
             None => ()
           }
-          reset_route_transports_for_song_start()
+          reset_route_transports_for_playback_start()
           sched_active_playback.val = Some(ActiveSong(route_songs))
           set_scheduler_parse_success()
         }
@@ -569,7 +586,9 @@ pub fn set_scheduler_bpm(bpm : Double) -> Unit {
 
 ///|
 pub fn set_scheduler_gain(gain : Double) -> Unit {
-  sched_gain.val = if gain < 0.0 {
+  sched_gain.val = if gain.is_nan() || gain.is_inf() {
+    0.5
+  } else if gain < 0.0 {
     0.0
   } else if gain > 1.0 {
     1.0

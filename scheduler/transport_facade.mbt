@@ -101,11 +101,16 @@ pub fn PatternScheduler::reset_transport(self : PatternScheduler) -> Unit {
 }
 
 ///|
-/// Reset the transport and immediately kill tracked active voices in `pool`.
+/// Reset the transport and immediately kill every voice in `pool`.
+///
+/// WHY whole-pool kill: active-note tracking removes a note as soon as
+/// gate-off is sent, while the voice may keep releasing for a few blocks.
+/// Browser pattern swaps need a hard boundary so old releases or templates
+/// cannot leak into the next pattern.
 pub fn PatternScheduler::reset_transport_and_kill_notes(
   self : PatternScheduler,
   pool : @moondsp.BoundVoicePool,
 ) -> Unit {
-  self.active_notes.kill_all(pool)
+  pool.kill_all()
   self.reset_transport()
 }
