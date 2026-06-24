@@ -314,15 +314,15 @@ test "MiniDocBuilder::note_atom rejects invalid note text" {
   let builder = @mini.MiniDocBuilder::with_previous(None)
   assert_builder_result_error(
     builder.note_atom(pid("mini:note:bad:0"), ""),
-    "invalid note number ''",
+    "invalid note: '' is not a number or note name",
   )
   assert_builder_result_error(
     builder.note_atom(pid("mini:note:bad:1"), "-"),
-    "invalid note number '-'",
+    "invalid note: '-' is not a number or note name",
   )
   assert_builder_result_error(
     builder.note_atom(pid("mini:note:bad:2"), "60abc"),
-    "invalid note number '60abc'",
+    "invalid note: '60abc' is not a number or note name",
   )
 }
 
@@ -654,6 +654,159 @@ test "MiniAuthoringPipeline source edit preserves duplicate note provenance" {
   assert_snapshot_event_has_node(events[1], "mini:note:62:0")
   assert_snapshot_event_has_node(events[2], "mini:note:60:2")
   assert_snapshot_event_has_node(events[3], "mini:note:60:1")
+}
+
+///|
+test "MiniAuthoringPipeline source edit preserves duplicate note-name provenance" {
+  let pipeline = @mini.MiniAuthoringPipeline::new("note(\"C4 E4 C4\")")
+  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
+  pipeline.reset_lowering_stats()
+  pipeline.set_input_with_source_edit(
+    "note(\"C4 E4 C4 C4\")",
+    old_start=12,
+    old_end=12,
+    new_end=15,
+  )
+  let snapshot = unwrap_mini_snapshot(pipeline.parse_snapshot())
+  assert_true(pipeline.lowering_cache_hits() >= 3)
+  let events = snapshot.query_sourced_events(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+    ),
+  )
+  inspect(events.length(), content="4")
+  assert_snapshot_event_has_node(events[0], "mini:note:C4:0")
+  assert_snapshot_event_has_node(events[1], "mini:note:E4:0")
+  assert_snapshot_event_has_node(events[2], "mini:note:C4:2")
+  assert_snapshot_event_has_node(events[3], "mini:note:C4:1")
+}
+
+///|
+test "MiniAuthoringPipeline source edit preserves duplicate sharp note-name provenance" {
+  let pipeline = @mini.MiniAuthoringPipeline::new("note(\"C#4 E4 C#4\")")
+  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
+  pipeline.reset_lowering_stats()
+  pipeline.set_input_with_source_edit(
+    "note(\"C#4 E4 C#4 C#4\")",
+    old_start=13,
+    old_end=13,
+    new_end=17,
+  )
+  let snapshot = unwrap_mini_snapshot(pipeline.parse_snapshot())
+  assert_true(pipeline.lowering_cache_hits() >= 3)
+  let events = snapshot.query_sourced_events(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+    ),
+  )
+  inspect(events.length(), content="4")
+  assert_snapshot_event_has_node(events[0], "mini:note:C_x35_4:0")
+  assert_snapshot_event_has_node(events[1], "mini:note:E4:0")
+  assert_snapshot_event_has_node(events[2], "mini:note:C_x35_4:2")
+  assert_snapshot_event_has_node(events[3], "mini:note:C_x35_4:1")
+}
+
+///|
+test "MiniAuthoringPipeline source edit preserves duplicate chord provenance" {
+  let pipeline = @mini.MiniAuthoringPipeline::new("chord(\"C C\")")
+  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
+  pipeline.set_input_with_source_edit(
+    "chord(\"C C C\")",
+    old_start=9,
+    old_end=9,
+    new_end=11,
+  )
+  let snapshot = unwrap_mini_snapshot(pipeline.parse_snapshot())
+  let events = snapshot.query_sourced_events(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+    ),
+  )
+  inspect(events.length(), content="9")
+  assert_snapshot_event_has_node(events[0], "mini:chord:C:0")
+  assert_snapshot_event_has_node(events[3], "mini:chord:C:2")
+  assert_snapshot_event_has_node(events[6], "mini:chord:C:1")
+}
+
+///|
+test "MiniAuthoringPipeline source edit preserves duplicate sharp-quality chord provenance" {
+  let pipeline = @mini.MiniAuthoringPipeline::new("chord(\"F#m7 F#m7\")")
+  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
+  pipeline.set_input_with_source_edit(
+    "chord(\"F#m7 F#m7 F#m7\")",
+    old_start=12,
+    old_end=12,
+    new_end=17,
+  )
+  let snapshot = unwrap_mini_snapshot(pipeline.parse_snapshot())
+  let events = snapshot.query_sourced_events(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+    ),
+  )
+  inspect(events.length(), content="12")
+  assert_snapshot_event_has_node(events[0], "mini:chord:F_x35_m7:0")
+  assert_snapshot_event_has_node(events[4], "mini:chord:F_x35_m7:2")
+  assert_snapshot_event_has_node(events[8], "mini:chord:F_x35_m7:1")
+}
+
+///|
+test "MiniAuthoringPipeline source edit preserves duplicate plus chord provenance" {
+  let pipeline = @mini.MiniAuthoringPipeline::new("chord(\"C+7 C+7\")")
+  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
+  pipeline.set_input_with_source_edit(
+    "chord(\"C+7 C+7 C+7\")",
+    old_start=11,
+    old_end=11,
+    new_end=15,
+  )
+  let snapshot = unwrap_mini_snapshot(pipeline.parse_snapshot())
+  let events = snapshot.query_sourced_events(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+    ),
+  )
+  inspect(events.length(), content="12")
+  assert_snapshot_event_has_node(events[0], "mini:chord:C_x43_7:0")
+  assert_snapshot_event_has_node(events[4], "mini:chord:C_x43_7:2")
+  assert_snapshot_event_has_node(events[8], "mini:chord:C_x43_7:1")
+}
+
+///|
+test "MiniAuthoringPipeline source edit preserves duplicate half-dim chord provenance" {
+  let pipeline = @mini.MiniAuthoringPipeline::new("chord(\"Cø7 Cø7\")")
+  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
+  pipeline.set_input_with_source_edit(
+    "chord(\"Cø7 Cø7 Cø7\")",
+    old_start=11,
+    old_end=11,
+    new_end=15,
+  )
+  let snapshot = unwrap_mini_snapshot(pipeline.parse_snapshot())
+  let events = snapshot.query_sourced_events(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+    ),
+  )
+  inspect(events.length(), content="12")
+  assert_snapshot_event_has_node(events[0], "mini:chord:C_x248_7:0")
+  assert_snapshot_event_has_node(events[4], "mini:chord:C_x248_7:2")
+  assert_snapshot_event_has_node(events[8], "mini:chord:C_x248_7:1")
+}
+
+///|
+test "parse_doc stack chord and numeric note has disjoint node ids" {
+  let doc = unwrap_doc(@mini.parse_doc("stack(chord(\"C\"), note(\"60\"))"))
+  assert_true(doc.contains_node(pid("mini:chord-tone:mini:chord:C:0:0:60")))
+  assert_true(doc.contains_node(pid("mini:chord-tone:mini:chord:C:0:1:64")))
+  assert_true(doc.contains_node(pid("mini:chord-tone:mini:chord:C:0:2:67")))
+  assert_true(doc.contains_node(pid("mini:note:60:0")))
 }
 
 ///|
@@ -1242,5 +1395,259 @@ test "parse stack with trailing comma returns error" {
   match @mini.parse("stack(s(\"bd\"),)") {
     Err(_) => () // expected
     Ok(_) => fail("expected Err for stack with trailing comma")
+  }
+}
+
+///|
+test "chord(C) parses C major as 3 stacked notes" {
+  let pat = unwrap_ok(@mini.parse("chord(\"C\")"))
+  let events = query_one_cycle(pat)
+  inspect(events.length(), content="3")
+  let notes = events.map(ev => ev.value.get("note"))
+  assert_true(notes.contains(Some(60.0)))
+  assert_true(notes.contains(Some(64.0)))
+  assert_true(notes.contains(Some(67.0)))
+}
+
+///|
+test "chord(Dm G7) sequences two chords" {
+  let pat = unwrap_ok(@mini.parse("chord(\"Dm G7\")"))
+  let events = query_one_cycle(pat)
+  // Dm = 3 notes, G7 = 4 notes = 7 total (sequenced)
+  inspect(events.length(), content="7")
+}
+
+///|
+test "chord with unknown name returns error" {
+  match @mini.parse("chord(\"X\")") {
+    Err(_) => ()
+    Ok(_) => fail("expected Err for unknown chord")
+  }
+}
+
+///|
+test "note notation rejects adjacent note names without separator" {
+  match @mini.parse("note(\"C4E4\")") {
+    Err(_) => ()
+    Ok(_) => fail("expected Err for adjacent note names without separator")
+  }
+}
+
+///|
+test "note notation rejects numeric note followed by letters without separator" {
+  match @mini.parse("note(\"60abc\")") {
+    Err(_) => ()
+    Ok(_) =>
+      fail("expected Err for adjacent number and letters without separator")
+  }
+}
+
+///|
+test "parse_doc rejects adjacent note names without separator" {
+  match @mini.parse_doc("note(\"C4E4\")") {
+    Err(_) => ()
+    Ok(_) => fail("expected Err for adjacent note names without separator")
+  }
+}
+
+///|
+test "note(C4 E4 G4) parses note names into MIDI numbers" {
+  let pat = unwrap_ok(@mini.parse("note(\"C4 E4 G4\")"))
+  let events = query_one_cycle(pat)
+  inspect(events.length(), content="3")
+  inspect(
+    events[0].value,
+    content=(
+      #|ControlMap({ "note": 60 })
+    ),
+  )
+  inspect(
+    events[1].value,
+    content=(
+      #|ControlMap({ "note": 64 })
+    ),
+  )
+  inspect(
+    events[2].value,
+    content=(
+      #|ControlMap({ "note": 67 })
+    ),
+  )
+}
+
+///|
+test "note(C D E F G) defaults octave to 4" {
+  let pat = unwrap_ok(@mini.parse("note(\"C D E F G\")"))
+  let events = query_one_cycle(pat)
+  inspect(events.length(), content="5")
+  @debug.assert_eq(events[0].value.get("note"), Some(60.0))
+  @debug.assert_eq(events[1].value.get("note"), Some(62.0))
+  @debug.assert_eq(events[2].value.get("note"), Some(64.0))
+  @debug.assert_eq(events[3].value.get("note"), Some(65.0))
+  @debug.assert_eq(events[4].value.get("note"), Some(67.0))
+}
+
+///|
+test "note(C-1) parses negative octave note name" {
+  let pat = unwrap_ok(@mini.parse("note(\"C-1\")"))
+  let events = query_one_cycle(pat)
+  inspect(events.length(), content="1")
+  @debug.assert_eq(events[0].value.get("note"), Some(0.0))
+}
+
+///|
+test "parse_doc note(C-1) preserves full negative octave token" {
+  let doc = unwrap_doc(@mini.parse_doc("note(\"C-1\")"))
+  assert_true(doc.contains_node(pid("mini:note:C-1:0")))
+}
+
+///|
+test "note(name).jux(rev) works with note names" {
+  let pat = unwrap_ok(@mini.parse("note(\"C4 E4\").jux(rev)"))
+  let events = query_one_cycle(pat)
+  // 2 events left + 2 events right = 4
+  inspect(events.length(), content="4")
+}
+
+///|
+test "stack(chord, s) combines chord and drum primaries" {
+  let pat = unwrap_ok(@mini.parse("stack(chord(\"C\"), s(\"bd\"))"))
+  let events = query_one_cycle(pat)
+  // 3 chord notes + 1 drum = 4
+  inspect(events.length(), content="4")
+}
+
+///|
+test "chord method chain .gain(0.5).pan(-0.5)" {
+  let pat = unwrap_ok(@mini.parse("chord(\"C\").gain(0.5).pan(-0.5)"))
+  let events = query_one_cycle(pat)
+  inspect(events.length(), content="3")
+  for event in events {
+    assert_true(event.value.get("gain") == Some(0.5))
+    assert_true(event.value.get("pan") == Some(-0.5))
+  }
+}
+
+///|
+test "note(F#3) parses single note with sharp" {
+  let pat = unwrap_ok(@mini.parse("note(\"F#3\")"))
+  let events = query_one_cycle(pat)
+  inspect(events.length(), content="1")
+  @debug.assert_eq(events[0].value.get("note"), Some(54.0))
+}
+
+///|
+test "note(C#4 Bb3 D#5) parses various accidentals" {
+  let pat = unwrap_ok(@mini.parse("note(\"C#4 Bb3 D#5\")"))
+  let events = query_one_cycle(pat)
+  inspect(events.length(), content="3")
+  let notes = events.map(ev => ev.value.get("note"))
+  assert_true(notes.contains(Some(61.0))) // C#4
+  assert_true(notes.contains(Some(58.0))) // Bb3
+  assert_true(notes.contains(Some(75.0))) // D#5
+}
+
+///|
+test "note notation rejects mixed accidentals" {
+  match @mini.parse("note(\"C#b Cb# C#b4\")") {
+    Err(_) => ()
+    Ok(_) => fail("expected Err for mixed accidentals")
+  }
+}
+
+///|
+test "parse_doc rejects mixed accidentals" {
+  match @mini.parse_doc("note(\"C#b\")") {
+    Err(_) => ()
+    Ok(_) => fail("expected Err for mixed accidentals")
+  }
+}
+
+///|
+test "note(C#4) parses note with sharp and octave" {
+  let pat = unwrap_ok(@mini.parse("note(\"C#4\")"))
+  let events = query_one_cycle(pat)
+  inspect(events.length(), content="1")
+  @debug.assert_eq(events[0].value.get("note"), Some(61.0))
+}
+
+///|
+test "chord(C#) parses C-sharp major" {
+  let pat = unwrap_ok(@mini.parse("chord(\"C#\")"))
+  let events = query_one_cycle(pat)
+  inspect(events.length(), content="3")
+  let notes = events.map(ev => ev.value.get("note"))
+  assert_true(notes.contains(Some(61.0))) // C#4
+  assert_true(notes.contains(Some(65.0))) // F4
+  assert_true(notes.contains(Some(68.0))) // G#4
+}
+
+///|
+test "chord(F#m7) parses F-sharp minor 7" {
+  let pat = unwrap_ok(@mini.parse("chord(\"F#m7\")"))
+  let events = query_one_cycle(pat)
+  inspect(events.length(), content="4")
+  let notes = events.map(ev => ev.value.get("note"))
+  assert_true(notes.contains(Some(66.0))) // F#4
+  assert_true(notes.contains(Some(69.0))) // A4
+  assert_true(notes.contains(Some(73.0))) // C#5
+  assert_true(notes.contains(Some(76.0))) // E5
+}
+
+///|
+test "chord(Bb) parses B-flat major" {
+  let pat = unwrap_ok(@mini.parse("chord(\"Bb\")"))
+  let events = query_one_cycle(pat)
+  inspect(events.length(), content="3")
+  let notes = events.map(ev => ev.value.get("note"))
+  assert_true(notes.contains(Some(70.0))) // Bb4
+  assert_true(notes.contains(Some(74.0))) // D5
+  assert_true(notes.contains(Some(77.0))) // F5
+}
+
+///|
+test "chord(C) produces same events each cycle" {
+  let pat = unwrap_ok(@mini.parse("chord(\"C\")"))
+  let arc1 = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::from_int(1),
+  )
+  let arc2 = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(1),
+    @pattern.Rational::from_int(2),
+  )
+  let events1 = pat.query(arc1)
+  let events2 = pat.query(arc2)
+  inspect(events1.length(), content="3")
+  inspect(events2.length(), content="3")
+  // Verify events in both cycles have the same note values
+  for ev in events1 {
+    let note = ev.value.get("note")
+    assert_true(note == Some(60.0) || note == Some(64.0) || note == Some(67.0))
+  }
+  for ev in events2 {
+    let note = ev.value.get("note")
+    assert_true(note == Some(60.0) || note == Some(64.0) || note == Some(67.0))
+  }
+}
+
+///|
+test "chord(C) and note(60 64 67) produce identical events" {
+  let pat1 = unwrap_ok(@mini.parse("chord(\"C\")"))
+  let pat2 = unwrap_ok(@mini.parse("note(\"60 64 67\")"))
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::from_int(1),
+  )
+  let events1 = pat1.query(arc)
+  let events2 = pat2.query(arc)
+  inspect(events1.length(), content="3")
+  inspect(events2.length(), content="3")
+  // Same notes (order may differ since chord uses stack and note uses sequence)
+  let notes1 = events1.map(ev => ev.value.get("note"))
+  let notes2 = events2.map(ev => ev.value.get("note"))
+  for n in [Some(60.0), Some(64.0), Some(67.0)] {
+    assert_true(notes1.contains(n))
+    assert_true(notes2.contains(n))
   }
 }

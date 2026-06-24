@@ -335,7 +335,14 @@ fn Parser::parse_primary(
     self.expect_char(')')
     return parse_note_notation(content)
   }
-  raise ParseError("position \{self.pos}: expected 's(', 'note(', or 'stack('")
+  if self.match_keyword("chord(") {
+    let content = self.read_quoted_string()
+    self.expect_char(')')
+    return parse_chord_notation(content)
+  }
+  raise ParseError(
+    "position \{self.pos}: expected 's(', 'note(', 'chord(', or 'stack('",
+  )
 }
 
 ///|

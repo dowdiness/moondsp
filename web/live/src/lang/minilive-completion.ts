@@ -6,7 +6,7 @@
 //   3. Inside `Args` of a `MemberCall` whose method is `jux` (any
 //      position) or `every` (past the first comma) → callback names
 //      (`fast`, `slow`, `rev`).
-//   4. Top-level prefix → `$:`, `s`, `note`, `stack`.
+//   4. Top-level prefix → `$:`, `s`, `note`, `chord`, `stack`.
 
 import type { CompletionContext, CompletionResult, Completion } from "@codemirror/autocomplete";
 import { snippetCompletion } from "@codemirror/autocomplete";
@@ -16,7 +16,8 @@ import type { SyntaxNode } from "@lezer/common";
 const TOP_LEVEL: Completion[] = [
   snippetCompletion('$: ${}', { label: "$:", type: "keyword", detail: "stack line" }),
   snippetCompletion('s("${}")', { label: "s", type: "function", detail: "drum sounds" }),
-  snippetCompletion('note("${}")', { label: "note", type: "function", detail: "MIDI numbers" }),
+  snippetCompletion('note("${}")', { label: "note", type: "function", detail: "MIDI numbers or note names" }),
+  snippetCompletion('chord("${}")', { label: "chord", type: "function", detail: "chord names" }),
   snippetCompletion("stack(${})", { label: "stack", type: "function", detail: "combine layers" }),
 ];
 

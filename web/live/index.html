@@ -423,14 +423,15 @@
         <h2>Layers</h2>
         <dl>
           <dt>s("…")</dt><dd>drum sounds</dd>
-          <dt>note("…")</dt><dd>MIDI numbers</dd>
+          <dt>note("…")</dt><dd>MIDI numbers <em>or</em> note names (e.g. <code>C4</code>, <code>F#3</code>, <code>Bb</code>)</dd>
+          <dt>chord("…")</dt><dd>chord names (e.g. <code>C</code>, <code>Dm</code>, <code>G7</code>, <code>F#m7</code>)</dd>
           <dt>$: p<br>$: q</dt><dd>combine top-level layers</dd>
         </dl>
 
         <h2>Inside the string</h2>
         <dl>
           <dt>a b c</dt><dd>sequence in 1 cycle</dd>
-          <dt>newlines</dt><dd>separators like spaces inside <code>s("…")</code> / <code>note("…")</code></dd>
+          <dt>newlines</dt><dd>separators like spaces inside <code>s("…")</code> / <code>note("…")</code> / <code>chord("…")</code></dd>
           <dt>[a b]</dt><dd>group (subdivide)</dd>
           <dt>l1, l2</dt><dd>stack layers</dd>
           <dt>a*4</dt><dd>repeat 4× faster</dd>
@@ -447,6 +448,37 @@
           <li><code>oh</code></li>
           <li><code>cp</code></li>
         </ul>
+
+        <h2>Chord qualities</h2>
+        <dl>
+          <dt><code>C</code></dt><dd>major (C E G)</dd>
+          <dt><code>Cm</code></dt><dd>minor (C E♭ G)</dd>
+          <dt><code>C7</code></dt><dd>dominant 7th (C E G B♭)</dd>
+          <dt><code>Cmaj7</code></dt><dd>major 7th (C E G B)</dd>
+          <dt><code>Cm7</code></dt><dd>minor 7th (C E♭ G B♭)</dd>
+          <dt><code>Cdim</code></dt><dd>diminished (C E♭ G♭)</dd>
+          <dt><code>Caug</code></dt><dd>augmented (C E G♯)</dd>
+          <dt><code>Csus4</code></dt><dd>suspended 4th (C F G)</dd>
+          <dt><code>C6</code></dt><dd>major 6th (C E G A)</dd>
+          <dt><code>Cadd9</code></dt><dd>add 9 (C E G D)</dd>
+          <dt><code>Cmaj9</code></dt><dd>major 9th</dd>
+          <dt><code>Cm9</code></dt><dd>minor 9th</dd>
+        </dl>
+        <p class="cheat-note">
+          Append octave: <code>C4</code> = middle C. Default: 4.
+          Accidentals: <code>#</code> <code>b</code> (also <code>s</code> <code>f</code>).
+        </p>
+
+        <h2>Note names</h2>
+        <p class="cheat-note">
+          In <code>note("…")</code> you can now use note names instead of raw MIDI numbers:
+        </p>
+        <dl>
+          <dt><code>C4</code></dt><dd>MIDI 60 (middle C)</dd>
+          <dt><code>F#3</code></dt><dd>MIDI 54</dd>
+          <dt><code>Bb5</code></dt><dd>MIDI 82</dd>
+          <dt><code>C</code></dt><dd>no octave → defaults to 4</dd>
+        </dl>
 
         <h2>Methods</h2>
         <dl>
@@ -474,14 +506,19 @@
 
         <h2>Try it</h2>
         <button type="button" class="example" data-mode="song" data-song-example="ode" data-bpm="72" data-example='song(&#10;  section(&#10;    "ode",&#10;    256,&#10;    stack(&#10;      s("bd").slow(4),&#10;      note("64 64 65 67&#10;67 65 64 62&#10;60 60 62 64&#10;64 62 62 62").slow(16)&#10;    )&#10;  ),&#10;  part("ode1", "ode")&#10;)'>song("ode" — multiline melody + kick, sets BPM 72)</button>
+        <button type="button" class="example" data-example='chord("C")'>chord("C") — C major triad</button>
+        <button type="button" class="example" data-example='chord("C Dm G7 C").slow(2)'>chord("C Dm G7 C").slow(2) — chord progression</button>
+        <button type="button" class="example" data-example='chord("Cmaj7").gain(0.4)'>chord("Cmaj7").gain(0.4) — major 7th chord</button>
+        <button type="button" class="example" data-example='note("C4 E4 G4 C5").slow(2)'>note("C4 E4 G4 C5").slow(2) — note names instead of numbers</button>
+        <button type="button" class="example" data-example='note("C D E F G A B C5").slow(2)'>note("C D E F G A B C5").slow(2) — C major scale with note names</button>
         <button type="button" class="example" data-example='s("bd sd hh sd")'>s("bd sd hh sd")</button>
         <button type="button" class="example" data-example='s("bd(3,8), hh*16?, sd(2,8,2)").jux(rev)'>s("bd(3,8), hh*16?, sd(2,8,2)").jux(rev)</button>
         <button type="button" class="example" data-example='s("bd*4").every(3, fast(2))'>s("bd*4").every(3, fast(2))</button>
-        <button type="button" class="example" data-example='note("60 64 67 72").jux(rev)'>note("60 64 67 72").jux(rev)</button>
+        <button type="button" class="example" data-example='note("C4 E4 G4").jux(rev)'>note("C4 E4 G4").jux(rev)</button>
         <button type="button" class="example" data-example='s("[bd sd, hh*8]").degradeBy(0.3)'>s("[bd sd, hh*8]").degradeBy(0.3)</button>
-        <button type="button" class="example" data-example='$: s("bd sd hh sd")&#10;$: note("60 64 67 72")'>$: s("bd sd hh sd") / $: note("60 64 67 72")</button>
+        <button type="button" class="example" data-example='$: s("bd sd hh sd")&#10;$: chord("C Dm G7")'>$: s("bd sd hh sd") / $: chord("C Dm G7")</button>
         <button type="button" class="example" data-example='note("60(3,8) 64(2,8,2) 67(3,8) 64(2,8) 60(3,8) 62(2,8,3) 64(3,8) 67(2,8)").slow(4).every(4, rev)'>note("60(3,8) 64(2,8,2) 67(3,8) 64(2,8) 60(3,8) 62(2,8,3) 64(3,8) 67(2,8)").slow(4).every(4, rev)</button>
-        <button type="button" class="example" data-example='$: s("bd(3,8), hh(5,16)?, sd(2,8,4)").slow(2)&#10;$: note("48(3,8) 60(2,8,2) 67(3,8) 60(2,8,3) 48(3,8)").slow(3)'>$: s("bd(3,8), hh(5,16)?, sd(2,8,4)").slow(2) / $: note("48…").slow(3)</button>
+        <button type="button" class="example" data-example='$: s("bd(3,8), hh(5,16)?, sd(2,8,4)").slow(2)&#10;$: note("C4(3,8) E4(2,8,2) G4(3,8) E4(2,8,3) C4(3,8)").slow(3)'>$: s("bd(3,8), hh(5,16)?, sd(2,8,4)").slow(2) / $: note("C4…").slow(3)</button>
         <button type="button" class="example" data-example='note("48(3,8) 55(2,8,2) 60(3,8) 64(2,8) 67(3,8) 72(1,8)? 67(2,8,2) 60(3,8)").slow(4).jux(rev)'>note("48(3,8) 55(2,8,2) 60(3,8) 64(2,8) 67(3,8) 72(1,8)? 67(2,8,2) 60(3,8)").slow(4).jux(rev)</button>
         <button type="button" class="example" data-example='$: s("bd(1,4), sd(1,4,2)").slow(2).jux(slow(2))&#10;$: note("46*4 60*8, 40*16 192(1,16)?").slow(2).jux(slow(2))'>$: s("bd…").slow(2).jux(slow(2)) / $: note("46…").slow(2).jux(slow(2))</button>
       </aside>

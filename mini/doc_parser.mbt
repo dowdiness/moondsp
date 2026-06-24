@@ -6,6 +6,129 @@ pub struct MiniDocBuilder {
 }
 
 ///|
+fn mini_doc_is_note_letter_text(text : String) -> Bool {
+  if text.length() != 1 {
+    return false
+  }
+  match text[0] {
+    'a'
+    | 'A'
+    | 'b'
+    | 'B'
+    | 'c'
+    | 'C'
+    | 'd'
+    | 'D'
+    | 'e'
+    | 'E'
+    | 'f'
+    | 'F'
+    | 'g'
+    | 'G' => true
+    _ => false
+  }
+}
+
+///|
+fn mini_doc_id_fragment_char_allowed(c : UInt16) -> Bool {
+  (c >= 'a' && c <= 'z') ||
+  (c >= 'A' && c <= 'Z') ||
+  (c >= '0' && c <= '9') ||
+  c == '_' ||
+  c == '-' ||
+  c == '.' ||
+  c == ':'
+}
+
+///|
+fn mini_doc_id_fragment(value : String) -> String {
+  let mut result = ""
+  for i in 0..<value.length() {
+    let c = value[i]
+    if mini_doc_id_fragment_char_allowed(c) {
+      result = "\{result}\{value[i:i + 1].to_owned()}"
+    } else {
+      result = "\{result}_x\{c.to_int()}_"
+    }
+  }
+  result
+}
+
+///|
+fn mini_doc_can_continue_composite_chord_token(token : MiniToken) -> Bool {
+  mini_token_kind_equal(token.kind, Identifier) ||
+  mini_token_kind_equal(token.kind, Number) ||
+  token.text == "#" ||
+  token.text == "+" ||
+  token.text == "ø"
+}
+
+///|
+fn mini_doc_index_composite_note_names(
+  index : Map[String, String],
+  tokens : Array[MiniToken],
+) -> Unit {
+  for i in 0..<tokens.length() {
+    let root = tokens[i]
+    if mini_token_kind_equal(root.kind, Identifier) &&
+      mini_doc_is_note_letter_text(root.text) {
+      let mut accidental_value = root.text
+      let mut accidental_end = root.end
+      let mut j = i + 1
+      let mut accidental_count = 0
+      while j < tokens.length() &&
+            tokens[j].start == accidental_end &&
+            tokens[j].text == "#" {
+        accidental_value = "\{accidental_value}#"
+        accidental_end = tokens[j].end
+        j += 1
+        accidental_count += 1
+      }
+      let suffix = mini_token_identity_occurrence_suffix(root)
+      if accidental_count > 0 {
+        let mut note_value = accidental_value
+        let mut note_end = accidental_end
+        if j < tokens.length() &&
+          tokens[j].start == note_end &&
+          mini_token_kind_equal(tokens[j].kind, Number) {
+          note_value = "\{note_value}\{tokens[j].text}"
+          note_end = tokens[j].end
+        }
+        let note_key = mini_doc_token_id_key(
+          "note",
+          note_value,
+          root.start,
+          note_end,
+        )
+        let note_fragment = mini_doc_id_fragment(note_value)
+        index[note_key] = "mini:note:\{note_fragment}:\{suffix}"
+      }
+
+      let mut chord_value = root.text
+      let mut chord_end = root.end
+      let mut k = i + 1
+      while k < tokens.length() &&
+            tokens[k].start == chord_end &&
+            mini_doc_can_continue_composite_chord_token(tokens[k]) {
+        chord_value = "\{chord_value}\{tokens[k].text}"
+        chord_end = tokens[k].end
+        k += 1
+      }
+      if chord_end > root.end && @pattern.parse_chord(chord_value) is Some(_) {
+        let chord_key = mini_doc_token_id_key(
+          "chord",
+          chord_value,
+          root.start,
+          chord_end,
+        )
+        let chord_fragment = mini_doc_id_fragment(chord_value)
+        index[chord_key] = "mini:chord:\{chord_fragment}:\{suffix}"
+      }
+    }
+  }
+}
+
+///|
 #alias(new)
 fn MiniDocBuilder::MiniDocBuilder(
   previous~ : @pattern.PatternDoc[@pattern.ControlMap]?,
@@ -21,14 +144,28 @@ fn MiniDocBuilder::MiniDocBuilder(
         for token in tokens {
           if mini_token_kind_equal(token.kind, Identifier) {
             let suffix = mini_token_identity_occurrence_suffix(token)
-            let key = mini_doc_token_id_key(
+            let sound_key = mini_doc_token_id_key(
               "sound",
               token.text,
               token.start,
               token.end,
             )
-            let id = "mini:sound:\{token.text}:\{suffix}"
-            index[key] = id
+            index[sound_key] = "mini:sound:\{mini_doc_id_fragment(token.text)}:\{suffix}"
+            let note_key = mini_doc_token_id_key(
+              "note",
+              token.text,
+              token.start,
+              token.end,
+            )
+            let fragment = mini_doc_id_fragment(token.text)
+            index[note_key] = "mini:note:\{fragment}:\{suffix}"
+            let chord_key = mini_doc_token_id_key(
+              "chord",
+              token.text,
+              token.start,
+              token.end,
+            )
+            index[chord_key] = "mini:chord:\{fragment}:\{suffix}"
           } else if mini_token_kind_equal(token.kind, Number) {
             let suffix = mini_token_identity_occurrence_suffix(token)
             let key = mini_doc_token_id_key(
@@ -37,10 +174,11 @@ fn MiniDocBuilder::MiniDocBuilder(
               token.start,
               token.end,
             )
-            let id = "mini:note:\{token.text}:\{suffix}"
+            let id = "mini:note:\{mini_doc_id_fragment(token.text)}:\{suffix}"
             index[key] = id
           }
         }
+        mini_doc_index_composite_note_names(index, tokens)
         Some(index)
       }
     },
@@ -91,7 +229,65 @@ pub fn MiniDocBuilder::note_atom(
 }
 
 ///|
+fn MiniDocBuilder::chord_tone_id(
+  self : MiniDocBuilder,
+  chord_id : @identity.PatternNodeId,
+  tone_index : Int,
+  midi : Int,
+) -> @identity.PatternNodeId raise ParseError {
+  self.id("mini:chord-tone:\{chord_id.value()}:\{tone_index}:\{midi}")
+}
+
+///|
+fn MiniDocBuilder::chord_doc_from_notes(
+  self : MiniDocBuilder,
+  id : @identity.PatternNodeId,
+  notes : Array[Int],
+) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
+  match self.reuse_doc(id) {
+    Some(doc) => doc
+    None => {
+      let note_docs : Array[@pattern.PatternDoc[@pattern.ControlMap]] = []
+      let mut tone_index = 0
+      for midi in notes {
+        let note_id = self.chord_tone_id(id, tone_index, midi)
+        note_docs.push(
+          self.pure_doc(
+            note_id,
+            @pattern.ControlMap::single("note", midi.to_double()),
+          ),
+        )
+        tone_index += 1
+      }
+      @pattern.PatternDoc::stack(id~, docs=note_docs) catch {
+        _ => raise ParseError("internal mini PatternDoc construction failed")
+      }
+    }
+  }
+}
+
+///|
+/// Build a chord atom with a caller-supplied stable node ID.
+/// Expands the chord name into a stack of note docs.
+pub fn MiniDocBuilder::chord_atom(
+  self : MiniDocBuilder,
+  id : @identity.PatternNodeId,
+  name : String,
+) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
+  match @pattern.parse_chord(name) {
+    Some(notes) => {
+      let doc = self.chord_doc_from_notes(id, notes) catch {
+        ParseError(msg) => return Err(msg)
+      }
+      Ok(doc)
+    }
+    None => Err("unknown chord name '\{name}'")
+  }
+}
+
+///|
 fn parse_mini_doc_builder_note_text(text : String) -> Result[Double, String] {
+  // Try parsing as a number first
   let mut pos = 0
   if pos < text.length() && text[pos] == '-' {
     pos += 1
@@ -108,10 +304,13 @@ fn parse_mini_doc_builder_note_text(text : String) -> Result[Double, String] {
       has_digit = true
     }
   }
-  if !has_digit || pos != text.length() {
-    Err("invalid note number '\{text}'")
-  } else {
-    Ok(parse_double_manual(text, 0, text.length()))
+  if has_digit && pos == text.length() {
+    return Ok(parse_double_manual(text, 0, text.length()))
+  }
+  // Not a valid number — try note name (e.g., "C4", "F#3", "Bb")
+  match @pattern.note_name_to_midi(text) {
+    Some(midi) => Ok(midi)
+    None => Err("invalid note: '\{text}' is not a number or note name")
   }
 }
 
@@ -240,7 +439,7 @@ fn MiniDocBuilder::atom_id(
 ) -> @identity.PatternNodeId raise ParseError {
   let key = "\{kind}:\{value}"
   let occurrence = self.next_occurrence(key)
-  self.id("mini:\{kind}:\{value}:\{occurrence}")
+  self.id("mini:\{kind}:\{mini_doc_id_fragment(value)}:\{occurrence}")
 }
 
 ///|
@@ -676,7 +875,18 @@ fn Parser::parse_doc_primary(
       source_offset=content_start,
     )
   }
-  raise ParseError("position \{self.pos}: expected 's(', 'note(', or 'stack('")
+  if self.match_keyword("chord(") {
+    let (content, content_start) = self.read_quoted_string_with_start()
+    self.expect_char(')')
+    return parse_chord_doc_notation(
+      content,
+      builder,
+      source_offset=content_start,
+    )
+  }
+  raise ParseError(
+    "position \{self.pos}: expected 's(', 'note(', 'chord(', or 'stack('",
+  )
 }
 
 ///|
@@ -870,6 +1080,24 @@ fn parse_note_doc_notation(
 }
 
 ///|
+fn parse_chord_doc_notation(
+  content : String,
+  builder : MiniDocBuilder,
+  source_offset~ : Int,
+) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
+  guard !content.is_empty() else {
+    raise ParseError("position 0: empty notation")
+  }
+  let sub = NotationParser::new(
+    content,
+    sound=false,
+    chord=true,
+    source_offset~,
+  )
+  sub.parse_doc_notation(builder)
+}
+
+///|
 fn NotationParser::parse_doc_notation(
   self : NotationParser,
   builder : MiniDocBuilder,
@@ -895,6 +1123,7 @@ fn NotationParser::parse_doc_layer(
         self.input[self.pos] != ',' &&
         self.input[self.pos] != ']' {
     elements.push(self.parse_doc_element(builder))
+    self.require_element_boundary()
     self.skip_spaces()
   }
   guard !elements.is_empty() else {
@@ -1046,17 +1275,69 @@ fn NotationParser::parse_doc_atom(
       }
       None => raise ParseError("position \{start}: unknown drum name '\{name}'")
     }
+  } else if self.chord {
+    // Read chord name (including accidentals like #, b) → stack of note docs
+    let name_start = self.pos
+    let name = self.read_chord_name_text()
+    guard !name.is_empty() else {
+      raise ParseError("position \{start}: expected chord name")
+    }
+    match @pattern.parse_chord(name) {
+      Some(notes) => {
+        let id = builder.atom_id_at(
+          "chord",
+          name,
+          self.source_offset + name_start,
+          self.source_offset + self.pos,
+        )
+        builder.chord_doc_from_notes(id, notes)
+      }
+      None => raise ParseError("position \{start}: unknown chord '\{name}'")
+    }
   } else {
-    let (note, token, token_start, token_end) = self.read_note_number_value(
-      start,
-    )
-    let id = builder.atom_id_at(
-      "note",
-      token,
-      self.source_offset + token_start,
-      self.source_offset + token_end,
-    )
-    builder.pure_doc(id, @pattern.ControlMap::single("note", note))
+    // Try number first, then note name
+    try {
+      let (note, token, token_start, token_end) = self.read_note_number_value(
+        start,
+      )
+      let id = builder.atom_id_at(
+        "note",
+        token,
+        self.source_offset + token_start,
+        self.source_offset + token_end,
+      )
+      builder.pure_doc(id, @pattern.ControlMap::single("note", note))
+    } catch {
+      ParseError(_) => self.parse_doc_note_name_atom(builder, start)
+    } noraise {
+      doc => doc
+    }
+  }
+}
+
+///|
+/// Parse a note name atom (e.g., "C4", "F#3") in the doc parser.
+fn NotationParser::parse_doc_note_name_atom(
+  self : NotationParser,
+  builder : MiniDocBuilder,
+  start : Int,
+) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
+  let name_start = self.pos
+  let name = self.read_note_name_text()
+  guard !name.is_empty() else {
+    raise ParseError("position \{start}: expected note name or number")
+  }
+  match @pattern.note_name_to_midi(name) {
+    Some(midi) => {
+      let id = builder.atom_id_at(
+        "note",
+        name,
+        self.source_offset + name_start,
+        self.source_offset + self.pos,
+      )
+      builder.pure_doc(id, @pattern.ControlMap::single("note", midi))
+    }
+    None => raise ParseError("position \{start}: unknown note name '\{name}'")
   }
 }
 

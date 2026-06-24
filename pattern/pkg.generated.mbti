@@ -8,6 +8,10 @@ import {
 }
 
 // Values
+pub fn chord(String, octave? : Int) -> Pat[ControlMap]
+
+pub fn chord_notes(String, octave? : Int) -> Array[Double]?
+
 pub fn[A] every(Int, (Pat[A]) -> Pat[A], Pat[A]) -> Pat[A]
 
 pub fn merge_control(Pat[ControlMap], Pat[ControlMap]) -> Pat[ControlMap]
@@ -15,6 +19,10 @@ pub fn merge_control(Pat[ControlMap], Pat[ControlMap]) -> Pat[ControlMap]
 pub fn note(Double) -> Pat[ControlMap]
 
 pub fn note_name(String) -> Pat[ControlMap]
+
+pub fn note_name_to_midi(String) -> Double?
+
+pub fn parse_chord(String) -> Array[Int]?
 
 pub fn s_cutoff(Double) -> Pat[ControlMap]
 

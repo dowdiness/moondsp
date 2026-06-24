@@ -10,11 +10,14 @@ path under `specs/loom-mini-cst/`.
 
 ## Top-level forms
 
-Use `s("...")` for drum sounds and `note("...")` for MIDI note numbers:
+Use `s("...")` for drum sounds, `note("...")` for MIDI note numbers or
+note names, and `chord("...")` for chord names:
 
 ```text
 s("bd sd hh sd")
 note("60 64 67 72")
+note("C4 E4 G4 C5")
+chord("C Am F G7")
 ```
 
 To combine multiple top-level patterns, prefer Strudel-style `$:` stack lines:
@@ -39,7 +42,7 @@ Blank lines are ignored.
 
 ## Inside quoted notation
 
-Within `s("...")` and `note("...")`:
+Within `s("...")`, `note("...")`, and `chord("...")`:
 
 - Spaces make a sequence within one cycle: `bd sd hh sd`.
 - Commas stack layers inside the same source: `bd sd, hh hh hh`.
@@ -56,7 +59,23 @@ Examples:
 s("bd(3,8), hh*16?, sd(2,8,2)")
 s("[bd sd]*2 hh")
 note("60(3,8) 64(2,8,2) 67(3,8)").slow(4)
+note("C4(3,8) E4(2,8,2) G4(3,8)").slow(4)
+chord("C Am F G7").slow(2)
 ```
+
+`note(...)` accepts names such as `C4`, `F#3`, and `Bb`; omitted octaves
+default to 4. `chord(...)` accepts common chord names such as `C`, `Dm`,
+`G7`, `F#m7`, `Bb`, `Cmaj7`, `C+`, `Cø7`, and `Esus4`. Each chord atom lowers
+to a stack of note events at the same time position; space-separated chord
+names are sequenced like other quoted mini atoms.
+
+Chord quality compatibility is intentionally conservative. The stable spellings
+are the plain triad (`C`), `m`, `7`, `maj7`, `m7`, `dim`, `dim7`, `aug`, `sus2`,
+`sus4`, `7sus4`, `6`, `m6`, `9`, `maj9`, `m9`, `add9`, and `m7b5`. Convenience
+aliases such as `min`, `min7`, `min9`, `M7`, `M9`, `+`, `+7`, `ø`, `ø7`,
+`mMaj7`, and `mM7` are supported for authoring ergonomics but should be treated
+as aliases rather than separate semantic forms. Unsupported qualities are parse
+errors instead of guessed chord names.
 
 ## Method chains
 
@@ -66,6 +85,7 @@ Methods apply to any top-level expression or `$:` line expression:
 s("bd sd").fast(2).rev()
 $: s("bd(3,8)").jux(rev)
 $: note("48 60 67").slow(3)
+$: chord("C Am F G7").slow(4)
 ```
 
 Supported methods include:
@@ -85,4 +105,5 @@ layered shape of Strudel sessions:
 ```text
 $: s("bd(3,8), hh(5,16)?, sd(2,8,4)").slow(2)
 $: note("48(3,8) 60(2,8,2) 67(3,8) 60(2,8,3)").slow(3)
+$: chord("C Am F G7").slow(4)
 ```
