@@ -44,6 +44,7 @@ pub fn MiniAuthoringPipeline::snapshot_compute_count(Self) -> Int
 pub struct MiniDocBuilder {
   // private fields
 }
+pub fn MiniDocBuilder::chord_atom(Self, @identity.PatternNodeId, String) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
 pub fn MiniDocBuilder::degrade(Self, @pattern.PatternDoc[@pattern.ControlMap], Double) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
 pub fn MiniDocBuilder::euclid(Self, @pattern.PatternDoc[@pattern.ControlMap], Int, Int, Int) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
 pub fn MiniDocBuilder::fast(Self, @pattern.PatternDoc[@pattern.ControlMap], @pattern.Rational) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]

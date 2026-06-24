@@ -23,11 +23,25 @@ fn parse_note_notation(
 }
 
 ///|
+/// Parse chord notation string into Pat[ControlMap].
+/// Space-separated chord names are sequenced; each chord is a stacked pattern.
+fn parse_chord_notation(
+  content : String,
+) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
+  guard !content.is_empty() else {
+    raise ParseError("position 0: empty notation")
+  }
+  let sub = NotationParser::new(content, sound=false, chord=true)
+  sub.parse_notation()
+}
+
+///|
 /// Sub-parser for the notation content inside quotes.
 priv struct NotationParser {
   input : String
   mut pos : Int
   sound : Bool // true = drum names, false = note numbers
+  chord : Bool // true = chord names (stacked notes per name)
   source_offset : Int
 }
 
@@ -36,9 +50,10 @@ priv struct NotationParser {
 fn NotationParser::NotationParser(
   input : String,
   sound~ : Bool,
+  chord? : Bool = false,
   source_offset? : Int = 0,
 ) -> NotationParser {
-  { input, pos: 0, sound, source_offset }
+  { input, pos: 0, sound, chord, source_offset }
 }
 
 ///|
@@ -83,6 +98,7 @@ fn NotationParser::parse_layer(
         self.input[self.pos] != ',' &&
         self.input[self.pos] != ']' {
     elements.push(self.parse_element())
+    self.require_element_boundary()
     self.skip_spaces()
   }
   guard !elements.is_empty() else {
@@ -147,6 +163,20 @@ fn NotationParser::parse_element(
     }
   }
   pat
+}
+
+///|
+fn NotationParser::require_element_boundary(
+  self : NotationParser,
+) -> Unit raise ParseError {
+  if self.at_end() {
+    return
+  }
+  let c = self.input[self.pos]
+  if mini_is_space(c) || c == ',' || c == ']' {
+    return
+  }
+  raise ParseError("position \{self.pos}: expected separator between elements")
 }
 
 ///|
@@ -257,7 +287,8 @@ fn NotationParser::read_int_signed(
 }
 
 ///|
-/// Parse an atom: identifier (for sound mode) or number (for note mode).
+/// Parse an atom: identifier (for sound mode), number or note name (for note mode),
+/// or chord name (for chord mode).
 fn NotationParser::parse_atom(
   self : NotationParser,
 ) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
@@ -272,10 +303,120 @@ fn NotationParser::parse_atom(
       Some(midi) => @pattern.sound(midi.to_double())
       None => raise ParseError("position \{start}: unknown drum name '\{name}'")
     }
+  } else if self.chord {
+    // Read chord name (including accidentals like #, b)
+    let name = self.read_chord_name_text()
+    guard !name.is_empty() else {
+      raise ParseError("position \{start}: expected chord name")
+    }
+    match @pattern.parse_chord(name) {
+      Some(notes) => {
+        let note_pats = notes.map(fn(midi) { @pattern.note(midi.to_double()) })
+        @pattern.stack(note_pats)
+      }
+      None => raise ParseError("position \{start}: unknown chord '\{name}'")
+    }
   } else {
-    // Read number
-    self.read_note_number(start)
+    // Read number or note name (e.g., "60" or "C4")
+    try self.read_note_number(start) catch {
+      ParseError(_) => self.read_note_name_atom(start)
+    } noraise {
+      pat => pat
+    }
   }
+}
+
+///|
+/// In note mode, try to read a note name (e.g., "C4", "F#3", "Bb5") and
+/// return a note pattern. Called when number parsing fails.
+/// Reads the full note name including accidentals (#, s, b, f) and octave digits.
+fn NotationParser::read_note_name_atom(
+  self : NotationParser,
+  start : Int,
+) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
+  let name = self.read_note_name_text()
+  guard !name.is_empty() else {
+    raise ParseError("position \{start}: expected note name or number")
+  }
+  match @pattern.note_name_to_midi(name) {
+    Some(midi) => @pattern.note(midi)
+    None => raise ParseError("position \{start}: unknown note name '\{name}'")
+  }
+}
+
+///|
+/// Read a note name text: letter (A-G) + optional accidental (#/s/b/f) + optional octave digits.
+/// Unlike read_ident(), this includes accidentals which are not alphanumeric.
+fn NotationParser::read_note_name_text(self : NotationParser) -> String {
+  let start = self.pos
+  // Read root note letter (must start with A-G)
+  if !self.at_end() {
+    let c = self.input[self.pos]
+    if (c >= 'a' && c <= 'g') || (c >= 'A' && c <= 'G') {
+      self.pos += 1
+    } else {
+      return self.input[start:self.pos].to_owned()
+    }
+  }
+  // Read optional accidental(s)
+  while !self.at_end() {
+    let c = self.input[self.pos]
+    if c == '#' || c == 's' || c == 'b' || c == 'f' {
+      self.pos += 1
+    } else {
+      break
+    }
+  }
+  // Read optional octave digits
+  while !self.at_end() {
+    let c = self.input[self.pos]
+    if c >= '0' && c <= '9' {
+      self.pos += 1
+    } else {
+      break
+    }
+  }
+  self.input[start:self.pos].to_owned()
+}
+
+///|
+/// Read a chord name text: letter (A-G) + optional accidental (#/s/b/f)
+/// + quality suffix (alphanumeric, +, ø) + optional octave digits.
+/// Unlike read_ident(), this includes accidentals which are not alphanumeric.
+fn NotationParser::read_chord_name_text(self : NotationParser) -> String {
+  let start = self.pos
+  // Read root note letter (must start with A-G)
+  if !self.at_end() {
+    let c = self.input[self.pos]
+    if (c >= 'a' && c <= 'g') || (c >= 'A' && c <= 'G') {
+      self.pos += 1
+    } else {
+      return self.input[start:self.pos].to_owned()
+    }
+  }
+  // Read optional accidental(s)
+  while !self.at_end() {
+    let c = self.input[self.pos]
+    if c == '#' || c == 's' || c == 'b' || c == 'f' {
+      self.pos += 1
+    } else {
+      break
+    }
+  }
+  // Read quality suffix and octave
+  while !self.at_end() {
+    let c = self.input[self.pos]
+    if (c >= 'a' && c <= 'z') ||
+      (c >= 'A' && c <= 'Z') ||
+      (c >= '0' && c <= '9') ||
+      c == '+' ||
+      c == 'ø' {
+      self.pos += 1
+    } else {
+      break
+    }
+  }
+  self.input[start:self.pos].to_owned()
 }
 
 ///|

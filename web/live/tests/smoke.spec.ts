@@ -167,6 +167,7 @@ test.describe("UI smoke (no audio)", () => {
     await expect(tooltip).not.toContainText("rev");
     // But top-level expression completions should be available.
     await expect(tooltip).toContainText("stack");
+    await expect(tooltip).toContainText("chord");
   });
 
   test("autocomplete offers drum names inside s(\"…\")", async ({ page }) => {
@@ -188,12 +189,12 @@ test.describe("UI smoke (no audio)", () => {
     // Strudel-style `$:` lines are the discoverable path for combining
     // s(...) drum patterns with note(...) melodies in one live buffer.
     const layersDl = page.locator("#cheat dl").first();
-    await expect(layersDl.locator("dt")).toContainText(["s(", "note(", "$:"]);
+    await expect(layersDl.locator("dt")).toContainText(["s(", "note(", "chord(", "$:"]);
   });
 
   test("cheatsheet explains multiline songs and global BPM", async ({ page }) => {
     const cheat = page.locator("#cheat");
-    await expect(cheat).toContainText('separators like spaces inside s("…") / note("…")');
+    await expect(cheat).toContainText('separators like spaces inside s("…") / note("…") / chord("…")');
     await expect(cheat).toContainText("paste multiline blocks");
     await expect(cheat).toContainText("Line breaks between section/part calls are OK");
     await expect(cheat).toContainText("header control sets global tempo; clicking examples may set it");
