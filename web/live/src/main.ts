@@ -15,7 +15,7 @@ import { minilive } from "./lang/minilive";
 import { CM6Adapter } from "./canopy";
 import type { Diagnostic, UserIntent } from "./canopy";
 import { AudioEngine } from "./audio";
-import type { AudioStatus, WorkletReply } from "./audio";
+import type { AudioEngineMode, AudioStatus, WorkletReply } from "./audio";
 
 type PlaybackMode = "pattern" | "song";
 
@@ -78,7 +78,53 @@ view.dispatch({
 
 // ── Engine ──────────────────────────────────────────────────
 
-const engine = new AudioEngine();
+const urlParams = new URLSearchParams(window.location.search);
+const schedulerTimingEnabled = urlParams.get("schedulerTiming") === "1" ||
+  urlParams.get("schedulerTiming") === "true";
+const telemetryEnabled = urlParams.get("telemetry") === "1" ||
+  urlParams.get("telemetry") === "true";
+const schedulerTimingBatchParam = Number.parseInt(
+  urlParams.get("schedulerTimingBatch") ?? "128",
+  10,
+);
+const schedulerTimingBatchSize = Number.isFinite(schedulerTimingBatchParam) &&
+  schedulerTimingBatchParam > 0
+  ? schedulerTimingBatchParam
+  : undefined;
+const nativeSampleRate = urlParams.get("nativeSampleRate") === "1" ||
+  urlParams.get("nativeSampleRate") === "true";
+const sampleRateParam = Number.parseInt(urlParams.get("sampleRate") ?? "48000", 10);
+const audioSampleRate = nativeSampleRate
+  ? undefined
+  : Number.isFinite(sampleRateParam) && sampleRateParam > 0
+    ? sampleRateParam
+    : 48000;
+const latencyHintParam = urlParams.get("latencyHint");
+const latencyHint = latencyHintParam === "interactive" ||
+  latencyHintParam === "balanced" ||
+  latencyHintParam === "playback"
+  ? latencyHintParam
+  : undefined;
+const modeParam = urlParams.get("audioMode");
+const audioMode: AudioEngineMode = modeParam === "compiled" ? "compiled" : "scheduler";
+const engine = new AudioEngine("/processor.js", "/moonbit_dsp.wasm", {
+  enableTelemetry: telemetryEnabled,
+  enableSchedulerTiming: schedulerTimingEnabled,
+  schedulerTimingBatchSize,
+  sampleRate: audioSampleRate,
+  latencyHint,
+  mode: audioMode,
+});
+
+if (audioMode !== "scheduler") {
+  console.info(`[moondsp/live] audioMode=${audioMode}; pattern editor updates are ignored in this mode`);
+}
+
+if (schedulerTimingEnabled) {
+  console.info(
+    "[moondsp/live] scheduler timing enabled; inspect scheduler-timing messages in DevTools",
+  );
+}
 
 // Empty sentinels — nothing has been sent to the worklet yet, so the first
 // evalNow call must go through even if the doc still equals INITIAL.
@@ -96,6 +142,7 @@ let revCounter = 0;
 let latestSentRev = 0;
 let latestSentMode: PlaybackMode = "pattern";
 let latestSentText = "";
+let fadeInAfterNextUpdate = false;
 
 function setLog(message: string, kind: "ok" | "error" | "info" = "info"): void {
   logEl.textContent = message;
@@ -252,9 +299,17 @@ engine.onReply((reply: WorkletReply) => {
       const bpm = embeddedBpm(latestSentText);
       if (bpm !== null) setGlobalBpm(bpm, false);
     }
+    if (fadeInAfterNextUpdate) {
+      fadeInAfterNextUpdate = false;
+      engine.fadeIn();
+    }
     setLog(`✓ ${modeLabel(mode)} updated`, "ok");
     adapter.applyPatches([{ type: "SetDiagnostics", diagnostics: [] }]);
   } else if (reply.type === "pattern-error" || reply.type === "song-error") {
+    if (fadeInAfterNextUpdate) {
+      fadeInAfterNextUpdate = false;
+      engine.fadeIn();
+    }
     const msg = String(reply.message ?? "parse error");
     setLog(`✗ ${msg} (kept last good)`, "error");
     const diag = diagnosticFromError(msg, view.state.doc.length);
@@ -274,7 +329,14 @@ function evalNow(text: string): void {
     // leaving the user with a footer error and no inline marker.
     // Treat as a soft no-op: clear any existing diagnostic, surface a
     // hint, and let the worklet keep playing the last good graph.
-    latestSentText = "";
+    const rev = ++revCounter;
+    latestSentRev = rev;
+    latestSentMode = mode;
+    latestSentText = text;
+    if (fadeInAfterNextUpdate) {
+      fadeInAfterNextUpdate = false;
+      engine.fadeIn();
+    }
     adapter.applyPatches([{ type: "SetDiagnostics", diagnostics: [] }]);
     setLog("(empty — keeping previous playback)", "info");
     return;
@@ -317,6 +379,11 @@ startBtn.addEventListener("click", async () => {
         window.clearTimeout(pending);
         pending = null;
       }
+      fadeInAfterNextUpdate = false;
+      // Normal Stop suspends the existing AudioContext/Worklet graph after
+      // a short fade-out. Reset dedupe so the next Start re-sends the current
+      // document and retriggers immediately instead of waiting for the next
+      // musical event in a long `.slow(...)` pattern.
       resetPlaybackDedupe();
       setLog("stopped", "info");
     } catch (err) {
@@ -330,8 +397,15 @@ startBtn.addEventListener("click", async () => {
     await engine.start();
     engine.setBpm(globalBpm);
     engine.setGain(DEFAULT_GAIN);
-    // Send the current document to bring up the initial pattern.
-    evalNow(view.state.doc.toString());
+    // Send the current document to bring up the initial pattern. Keep master
+    // output muted until the worklet confirms the pattern swap so transport
+    // resets/retriggers cannot click at full amplitude.
+    const startText = view.state.doc.toString();
+    fadeInAfterNextUpdate = audioMode === "scheduler" && startText.trim() !== "";
+    evalNow(startText);
+    if (!fadeInAfterNextUpdate) {
+      engine.fadeIn();
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     setLog(`✗ start failed: ${msg}`, "error");

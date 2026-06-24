@@ -12,7 +12,7 @@ const liveDir = resolve(here, "..");
 const webDir = resolve(liveDir, "..");
 const publicDir = resolve(liveDir, "public");
 
-const ASSETS = ["processor.js", "moonbit_dsp.wasm"];
+const ASSETS = ["processor.js", "scheduler-processor.js", "moonbit_dsp.wasm"];
 
 mkdirSync(publicDir, { recursive: true });
 

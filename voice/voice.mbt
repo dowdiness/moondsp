@@ -483,6 +483,11 @@ pub fn BoundVoicePool::note_off_all(self : BoundVoicePool) -> Unit {
 }
 
 ///|
+pub fn BoundVoicePool::kill_all(self : BoundVoicePool) -> Unit {
+  self.pool.kill_all()
+}
+
+///|
 /// Deprecated compatibility wrapper. Use `set_voice_pan_result` to observe
 /// stale or invalid handles as `VoiceControlError` values.
 #deprecated("Use BoundVoicePool::set_voice_pan_result(handle, pan) to observe VoiceControlError")
@@ -882,6 +887,21 @@ pub fn VoicePool::note_off_all(self : VoicePool) -> Unit {
 }
 
 ///|
+pub fn VoicePool::kill_all(self : VoicePool) -> Unit {
+  for i = 0; i < self.max_voices; i = i + 1 {
+    let slot = self.slots[i]
+    if slot.state is VoiceState::Idle {
+      continue i + 1
+    }
+    match slot.compiled {
+      Some(compiled) => compiled.reset_runtime_state()
+      None => ()
+    }
+    slot.state = VoiceState::Idle
+  }
+}
+
+///|
 /// Deprecated compatibility wrapper. Use `set_voice_pan_result` to observe
 /// stale or invalid handles as `VoiceControlError` values.
 #deprecated("Use VoicePool::set_voice_pan_result(handle, pan) to observe VoiceControlError")
@@ -1044,7 +1064,10 @@ pub fn VoicePool::process(
           left_output.set(s, left_output.get(s) + mono * left_gain)
           right_output.set(s, right_output.get(s) + mono * right_gain)
         }
-        if slot.state is VoiceState::Releasing && compiled.is_voice_finished() {
+        // Reclaim voices whose envelope has finished, whether in Release
+        // or Active (e.g. sustain=0 decay completed). Without this check,
+        // silent voices accumulate as zombies and force audible steals.
+        if compiled.is_voice_finished() {
           slot.state = VoiceState::Idle
         }
       }
