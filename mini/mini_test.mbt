@@ -1488,6 +1488,20 @@ test "note(C D E F G) defaults octave to 4" {
 }
 
 ///|
+test "note(C-1) parses negative octave note name" {
+  let pat = unwrap_ok(@mini.parse("note(\"C-1\")"))
+  let events = query_one_cycle(pat)
+  inspect(events.length(), content="1")
+  @debug.assert_eq(events[0].value.get("note"), Some(0.0))
+}
+
+///|
+test "parse_doc note(C-1) preserves full negative octave token" {
+  let doc = unwrap_doc(@mini.parse_doc("note(\"C-1\")"))
+  assert_true(doc.contains_node(pid("mini:note:C-1:0")))
+}
+
+///|
 test "note(name).jux(rev) works with note names" {
   let pat = unwrap_ok(@mini.parse("note(\"C4 E4\").jux(rev)"))
   let events = query_one_cycle(pat)
@@ -1531,6 +1545,22 @@ test "note(C#4 Bb3 D#5) parses various accidentals" {
   assert_true(notes.contains(Some(61.0))) // C#4
   assert_true(notes.contains(Some(58.0))) // Bb3
   assert_true(notes.contains(Some(75.0))) // D#5
+}
+
+///|
+test "note notation rejects mixed accidentals" {
+  match @mini.parse("note(\"C#b Cb# C#b4\")") {
+    Err(_) => ()
+    Ok(_) => fail("expected Err for mixed accidentals")
+  }
+}
+
+///|
+test "parse_doc rejects mixed accidentals" {
+  match @mini.parse_doc("note(\"C#b\")") {
+    Err(_) => ()
+    Ok(_) => fail("expected Err for mixed accidentals")
+  }
 }
 
 ///|

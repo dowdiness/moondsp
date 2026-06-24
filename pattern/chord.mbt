@@ -131,6 +131,15 @@ fn parse_root_note(letter : UInt16) -> Int? {
 }
 
 ///|
+fn accidental_delta(c : UInt16) -> Int? {
+  match c {
+    '#' | 's' => Some(1)
+    'b' | 'f' => Some(-1)
+    _ => None
+  }
+}
+
+///|
 /// Try to parse a one-digit chord octave suffix.
 fn parse_octave_digits(s : String) -> Int? {
   if s.length() != 1 {
@@ -191,25 +200,26 @@ fn parse_accidental_then_quality(
     return None
   }
   let c = name[start_pos]
-  // Only proceed if it looks like an accidental
-  let is_std = c == '#' || c == 'b'
-  let is_alt = c == 's' || c == 'f'
-  if !is_std && !is_alt {
-    return None
+  let first_delta = match accidental_delta(c) {
+    Some(delta) => delta
+    None => return None
   }
 
-  let mut accidental = if c == '#' || c == 's' { 1 } else { -1 }
+  let mut accidental = first_delta
   let mut new_pos = start_pos + 1
 
-  // Double accidental?
+  // Double accidental? Same-direction spellings such as ##, ss, bf, or fb are
+  // accepted; mixed sharp/flat spellings such as #b and b# are rejected.
   if new_pos < len {
-    let d = name[new_pos]
-    if d == '#' || d == 's' {
-      accidental = accidental + 1
-      new_pos += 1
-    } else if d == 'b' || d == 'f' {
-      accidental = accidental - 1
-      new_pos += 1
+    match accidental_delta(name[new_pos]) {
+      Some(second_delta) => {
+        if first_delta != second_delta {
+          return None
+        }
+        accidental = accidental + second_delta
+        new_pos += 1
+      }
+      None => ()
     }
   }
 
@@ -368,32 +378,26 @@ pub fn note_name_to_midi(name : String) -> Double? {
   let mut pos = 1
   let mut modifier = 0
   // Parse accidental (#, s, b, f)
-  if pos < len {
-    match name[pos] {
-      '#' | 's' => {
-        modifier = 1
-        pos += 1
+  match accidental_delta(name[pos]) {
+    Some(first_delta) => {
+      modifier = first_delta
+      pos += 1
+      // Double accidental? Same-direction spellings such as ##, ss, bf, or fb
+      // are accepted; mixed sharp/flat spellings such as #b and b# fail.
+      if pos < len {
+        match accidental_delta(name[pos]) {
+          Some(second_delta) => {
+            if first_delta != second_delta {
+              return None
+            }
+            modifier = modifier + second_delta
+            pos += 1
+          }
+          None => ()
+        }
       }
-      'b' | 'f' => {
-        modifier = -1
-        pos += 1
-      }
-      _ => ()
     }
-  }
-  // Double accidental?
-  if pos < len {
-    match name[pos] {
-      '#' | 's' => {
-        modifier = modifier + 1
-        pos += 1
-      }
-      'b' | 'f' => {
-        modifier = modifier - 1
-        pos += 1
-      }
-      _ => ()
-    }
+    None => ()
   }
   // Parse octave
   let mut octave = 4 // default octave

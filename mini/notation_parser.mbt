@@ -345,7 +345,7 @@ fn NotationParser::read_note_name_atom(
 }
 
 ///|
-/// Read a note name text: letter (A-G) + optional accidental (#/s/b/f) + optional octave digits.
+/// Read a note name text: letter (A-G) + optional accidental (#/s/b/f) + optional signed octave digits.
 /// Unlike read_ident(), this includes accidentals which are not alphanumeric.
 fn NotationParser::read_note_name_text(self : NotationParser) -> String {
   let start = self.pos
@@ -367,7 +367,10 @@ fn NotationParser::read_note_name_text(self : NotationParser) -> String {
       break
     }
   }
-  // Read optional octave digits
+  // Read optional signed octave digits
+  if !self.at_end() && self.input[self.pos] == '-' {
+    self.pos += 1
+  }
   while !self.at_end() {
     let c = self.input[self.pos]
     if c >= '0' && c <= '9' {

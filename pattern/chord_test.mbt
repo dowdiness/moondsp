@@ -144,6 +144,22 @@ test "chord returns None for unsupported extension instead of octave carry" {
 }
 
 ///|
+test "chord returns None for mixed accidentals" {
+  match parse_chord("C#b") {
+    None => ()
+    Some(_) => fail("expected None for C#b")
+  }
+  match parse_chord("Cb#") {
+    None => ()
+    Some(_) => fail("expected None for Cb#")
+  }
+  match parse_chord("C#b4") {
+    None => ()
+    Some(_) => fail("expected None for C#b4")
+  }
+}
+
+///|
 test "chord parse with octave override" {
   let notes = parse_chord("C5")
   match notes {
@@ -481,6 +497,22 @@ test "note_name_to_midi returns None for trailing garbage" {
   match note_name_to_midi("Cfoo") {
     None => ()
     Some(_) => fail("expected None for trailing garbage")
+  }
+}
+
+///|
+test "note_name_to_midi returns None for mixed accidentals" {
+  match note_name_to_midi("C#b") {
+    None => ()
+    Some(_) => fail("expected None for C#b")
+  }
+  match note_name_to_midi("Cb#") {
+    None => ()
+    Some(_) => fail("expected None for Cb#")
+  }
+  match note_name_to_midi("C#b4") {
+    None => ()
+    Some(_) => fail("expected None for C#b4")
   }
 }
 
