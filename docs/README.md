@@ -33,6 +33,9 @@ for `dowdiness/moondsp`. Read order below goes roughly from "new user" to
 - **[`mini-notation.md`](mini-notation.md)** — current text-pattern syntax,
   including Strudel-style `$:` stack lines, quoted notation, postfixes, and
   method chains.
+- **[`pattern-algebra.md`](pattern-algebra.md)** — design note for `Pat`
+  overlay/stack, value mapping, and Applicative-like candidates. Read this
+  before adding pattern combinator APIs or mini overlay sugar.
 - **[`mini-graph-authoring-boundary.md`](mini-graph-authoring-boundary.md)** —
   contract for bridging Mini `ControlMap` events into graph-template selection
   and validated runtime controls without mixing pattern and topology layers.
