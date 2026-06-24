@@ -69,6 +69,14 @@ default to 4. `chord(...)` accepts common chord names such as `C`, `Dm`,
 to a stack of note events at the same time position; space-separated chord
 names are sequenced like other quoted mini atoms.
 
+Chord quality compatibility is intentionally conservative. The stable spellings
+are the plain triad (`C`), `m`, `7`, `maj7`, `m7`, `dim`, `dim7`, `aug`, `sus2`,
+`sus4`, `7sus4`, `6`, `m6`, `9`, `maj9`, `m9`, `add9`, and `m7b5`. Convenience
+aliases such as `min`, `min7`, `min9`, `M7`, `M9`, `+`, `+7`, `ø`, `ø7`,
+`mMaj7`, and `mM7` are supported for authoring ergonomics but should be treated
+as aliases rather than separate semantic forms. Unsupported qualities are parse
+errors instead of guessed chord names.
+
 ## Method chains
 
 Methods apply to any top-level expression or `$:` line expression:
