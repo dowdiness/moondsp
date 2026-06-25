@@ -40,6 +40,7 @@ class MoonDspSchedulerProbeProcessor extends AudioWorkletProcessor {
     this.absoluteFrame = 0;
     this.previousSamples = { left: 0, right: 0 };
     this.patternText = String(processorOptions.patternText ?? '');
+    this.initExportName = String(processorOptions.initExportName ?? 'init_scheduler_graph');
     this.initialBpm = this.numberOption(processorOptions.initialBpm, SCHEDULER_PROBE_DEFAULT_BPM);
     this.initialGain = this.numberOption(processorOptions.initialGain, SCHEDULER_PROBE_DEFAULT_GAIN);
     this.maxBlocks = Math.min(
@@ -70,7 +71,10 @@ class MoonDspSchedulerProbeProcessor extends AudioWorkletProcessor {
         },
       });
       this.wasm = instance.exports;
-      const missingExports = this.missingExports(SCHEDULER_PROBE_REQUIRED_EXPORTS);
+      const requiredExports = SCHEDULER_PROBE_REQUIRED_EXPORTS.includes(this.initExportName)
+        ? SCHEDULER_PROBE_REQUIRED_EXPORTS
+        : [...SCHEDULER_PROBE_REQUIRED_EXPORTS, this.initExportName];
+      const missingExports = this.missingExports(requiredExports);
       if (missingExports.length > 0) {
         throw new Error(`Scheduler probe exports not found: ${missingExports.join(', ')}`);
       }
@@ -147,7 +151,7 @@ class MoonDspSchedulerProbeProcessor extends AudioWorkletProcessor {
     if (this.graphInitialized) {
       return true;
     }
-    const ok = this.wasm.init_scheduler_graph(sampleRate, blockSize);
+    const ok = this.wasm[this.initExportName](sampleRate, blockSize);
     if (!ok) {
       this.postError(this.browserErrorMessage('Scheduler graph initialization failed'));
       return false;
@@ -161,6 +165,7 @@ class MoonDspSchedulerProbeProcessor extends AudioWorkletProcessor {
       blockSize,
       bpm: this.initialBpm,
       gain: this.initialGain,
+      initExportName: this.initExportName,
     });
     return true;
   }

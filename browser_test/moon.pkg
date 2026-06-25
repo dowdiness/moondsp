@@ -3,6 +3,10 @@ import {
   "moonbitlang/core/ref",
 }
 
+import {
+  "moonbitlang/core/debug",
+} for "wbtest"
+
 options(
   "is-main": true,
   link: {
@@ -19,6 +23,20 @@ options(
         "compiled_stereo_left_sample",
         "compiled_stereo_right_sample",
         "mul_adsr_peak",
+        "init_scheduler_graph",
+        "init_scheduler_sine_graph",
+        "process_scheduler_block",
+        "scheduler_left_sample",
+        "scheduler_right_sample",
+        "clear_pattern_input",
+        "push_pattern_char",
+        "eval_pattern_input",
+        "get_pattern_error_length",
+        "get_pattern_error_char",
+        "get_browser_error_length",
+        "get_browser_error_char",
+        "set_scheduler_bpm",
+        "set_scheduler_gain",
         "crackle_probe_reset",
         "crackle_probe_run",
         "crackle_probe_stream_init",
@@ -42,6 +60,20 @@ options(
         "compiled_stereo_left_sample",
         "compiled_stereo_right_sample",
         "mul_adsr_peak",
+        "init_scheduler_graph",
+        "init_scheduler_sine_graph",
+        "process_scheduler_block",
+        "scheduler_left_sample",
+        "scheduler_right_sample",
+        "clear_pattern_input",
+        "push_pattern_char",
+        "eval_pattern_input",
+        "get_pattern_error_length",
+        "get_pattern_error_char",
+        "get_browser_error_length",
+        "get_browser_error_char",
+        "set_scheduler_bpm",
+        "set_scheduler_gain",
         "crackle_probe_reset",
         "crackle_probe_run",
         "crackle_probe_stream_init",
