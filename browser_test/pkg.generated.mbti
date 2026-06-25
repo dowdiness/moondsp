@@ -8,6 +8,22 @@ pub fn compiled_stereo_left_sample(Int) -> Double
 
 pub fn compiled_stereo_right_sample(Int) -> Double
 
+pub fn crackle_probe_block_count() -> Int
+
+pub fn crackle_probe_last_error() -> Int
+
+pub fn crackle_probe_metric(Int, Int) -> Double
+
+pub fn crackle_probe_reset() -> Unit
+
+pub fn crackle_probe_run(Int, Int, Double, Double, Int, Int) -> Bool
+
+pub fn crackle_probe_sample(Int, Int) -> Double
+
+pub fn crackle_probe_stream_init(Int, Int, Double, Double, Int) -> Bool
+
+pub fn crackle_probe_stream_process() -> Bool
+
 pub fn init_compiled_graph(Double, Int) -> Bool
 
 pub fn init_compiled_stereo_graph(Double, Int) -> Bool
