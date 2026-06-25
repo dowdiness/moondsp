@@ -2,6 +2,8 @@
 package "dowdiness/moondsp/browser_test"
 
 // Values
+pub fn clear_pattern_input() -> Unit
+
 pub fn compiled_output_sample(Int) -> Double
 
 pub fn compiled_stereo_left_sample(Int) -> Double
@@ -24,9 +26,23 @@ pub fn crackle_probe_stream_init(Int, Int, Double, Double, Int) -> Bool
 
 pub fn crackle_probe_stream_process() -> Bool
 
+pub fn eval_pattern_input() -> Int
+
+pub fn get_browser_error_char(Int) -> Int
+
+pub fn get_browser_error_length() -> Int
+
+pub fn get_pattern_error_char(Int) -> Int
+
+pub fn get_pattern_error_length() -> Int
+
 pub fn init_compiled_graph(Double, Int) -> Bool
 
 pub fn init_compiled_stereo_graph(Double, Int) -> Bool
+
+pub fn init_scheduler_graph(Double, Int) -> Bool
+
+pub fn init_scheduler_sine_graph(Double, Int) -> Bool
 
 pub fn mul_adsr_peak(Double, Int) -> Double
 
@@ -34,7 +50,19 @@ pub fn process_compiled_block(Double, Double, Double, Int) -> Bool
 
 pub fn process_compiled_stereo_block(Double, Double, Double, Double, Double, Double, Int) -> Bool
 
+pub fn process_scheduler_block() -> Bool
+
+pub fn push_pattern_char(Int) -> Unit
+
 pub fn reset_phase() -> Unit
+
+pub fn scheduler_left_sample(Int) -> Double
+
+pub fn scheduler_right_sample(Int) -> Double
+
+pub fn set_scheduler_bpm(Double) -> Unit
+
+pub fn set_scheduler_gain(Double) -> Unit
 
 pub fn tick(freq_hz~ : Double, sample_rate~ : Double) -> Double
 

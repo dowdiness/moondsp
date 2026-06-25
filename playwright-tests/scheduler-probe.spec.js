@@ -56,6 +56,27 @@ const PROBE_CASES = [
   },
 ];
 
+const SINE_COMPARISON_CASES = [
+  {
+    name: 'browser-test-triangle-synth',
+    synthWaveform: 'triangle',
+    initExportName: 'init_scheduler_graph',
+    patternText: 'note("60 64 67")',
+    maxBlocks: 128,
+    expectParseOk: true,
+    expectActiveAudio: true,
+  },
+  {
+    name: 'browser-test-sine-synth',
+    synthWaveform: 'sine',
+    initExportName: 'init_scheduler_sine_graph',
+    patternText: 'note("60 64 67")',
+    maxBlocks: 128,
+    expectParseOk: true,
+    expectActiveAudio: true,
+  },
+];
+
 function expectBaseHealth(summary, label) {
   expect(summary.processorErrors, label).toEqual([]);
   expect(summary.rendered.nanOrInfCount, label).toBe(0);
@@ -110,21 +131,42 @@ test('scheduler probe: AudioWorklet pattern playback telemetry', async ({ page }
     initialBpm,
     initialGain,
     epsilon,
+    sineComparisonCases,
   }) => {
     if (typeof OfflineAudioContext !== 'function' || typeof AudioWorkletNode !== 'function') {
       return { error: 'OfflineAudioContext or AudioWorkletNode unavailable' };
     }
 
-    const response = await fetch('moonbit_dsp.wasm');
-    if (!response.ok) {
-      return { error: `fetch failed: ${response.status}` };
+    const fetchWasmModule = async (url) => {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`${url} fetch failed: ${response.status}`);
+      }
+      const bytes = await response.arrayBuffer();
+      const wasmModule = await WebAssembly.compile(bytes);
+      const exportNames = WebAssembly.Module.exports(wasmModule).map((entry) => entry.name);
+      return { wasmModule, exportNames };
+    };
+
+    let browserWasm;
+    let browserTestWasm;
+    try {
+      browserWasm = await fetchWasmModule('moonbit_dsp.wasm');
+      browserTestWasm = await fetchWasmModule('moonbit_dsp_test.wasm');
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
     }
-    const bytes = await response.arrayBuffer();
-    const wasmModule = await WebAssembly.compile(bytes);
-    const exportNames = WebAssembly.Module.exports(wasmModule).map((entry) => entry.name);
-    const missing = requiredExports.filter((name) => !exportNames.includes(name));
+
+    const missing = requiredExports.filter((name) => !browserWasm.exportNames.includes(name));
     if (missing.length > 0) {
-      return { error: `missing exports: ${missing.join(', ')}`, exportNames };
+      return { error: `moonbit_dsp.wasm missing exports: ${missing.join(', ')}`, exportNames: browserWasm.exportNames };
+    }
+    const testRequiredExports = [...requiredExports, 'init_scheduler_sine_graph'];
+    const testMissing = testRequiredExports.filter(
+      (name) => !browserTestWasm.exportNames.includes(name),
+    );
+    if (testMissing.length > 0) {
+      return { error: `moonbit_dsp_test.wasm missing exports: ${testMissing.join(', ')}`, exportNames: browserTestWasm.exportNames };
     }
 
     const summarizeRendered = (rendered) => {
@@ -182,7 +224,7 @@ test('scheduler probe: AudioWorklet pattern playback telemetry', async ({ page }
       return summary;
     };
 
-    const renderCase = async (probeCase) => {
+    const renderCase = async (probeCase, wasmModule) => {
       const context = new OfflineAudioContext(2, blockSize * probeCase.maxBlocks, sampleRate);
       await context.audioWorklet.addModule('scheduler-probe-processor.js');
       const messages = [];
@@ -200,6 +242,7 @@ test('scheduler probe: AudioWorklet pattern playback telemetry', async ({ page }
           maxBlocks: probeCase.maxBlocks,
           initialBpm,
           initialGain,
+          initExportName: probeCase.initExportName || 'init_scheduler_graph',
         },
       });
       node.port.onmessage = (event) => {
@@ -239,9 +282,15 @@ test('scheduler probe: AudioWorklet pattern playback telemetry', async ({ page }
 
     const summaries = [];
     for (const probeCase of cases) {
-      summaries.push(await renderCase(probeCase));
+      summaries.push(await renderCase(probeCase, browserWasm.wasmModule));
     }
-    return { summaries };
+    const sineComparisonSummaries = [];
+    for (const probeCase of sineComparisonCases) {
+      sineComparisonSummaries.push(
+        await renderCase(probeCase, browserTestWasm.wasmModule),
+      );
+    }
+    return { summaries, sineComparisonSummaries };
   }, {
     cases: PROBE_CASES,
     requiredExports: REQUIRED_EXPORTS,
@@ -250,6 +299,7 @@ test('scheduler probe: AudioWorklet pattern playback telemetry', async ({ page }
     initialBpm: PROBE_INITIAL_BPM,
     initialGain: PROBE_INITIAL_GAIN,
     epsilon: PROBE_EPSILON,
+    sineComparisonCases: SINE_COMPARISON_CASES,
   });
 
   expect(result.error, 'page-level scheduler probe error').toBeFalsy();
@@ -265,5 +315,24 @@ test('scheduler probe: AudioWorklet pattern playback telemetry', async ({ page }
     }
   }
 
+  for (const summary of result.sineComparisonSummaries) {
+    const label = summary.name;
+    expectBaseHealth(summary, label);
+    expectParsedSummary(summary, label);
+    expectAudioActivity(summary, label);
+  }
+  const triangle = result.sineComparisonSummaries.find(
+    (summary) => summary.synthWaveform === 'triangle',
+  );
+  const sine = result.sineComparisonSummaries.find(
+    (summary) => summary.synthWaveform === 'sine',
+  );
+  expect(triangle, 'triangle comparison summary').toBeTruthy();
+  expect(sine, 'sine comparison summary').toBeTruthy();
+  expect(sine.rendered.rms, 'sine and triangle rendered RMS differ').not.toBe(
+    triangle.rendered.rms,
+  );
+
   console.log(`scheduler-probe-report ${JSON.stringify(result.summaries)}`);
+  console.log(`scheduler-sine-comparison-report ${JSON.stringify(result.sineComparisonSummaries)}`);
 });
