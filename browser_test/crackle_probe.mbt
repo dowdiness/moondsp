@@ -1,3 +1,7 @@
+// Test-only diagnostic harness for browser crackle investigation (#211/#212).
+// These exports live in browser_test.wasm for Playwright and are not loaded by
+// production browser playback.
+
 ///|
 const CRACKLE_PROBE_METRIC_COUNT : Int = 14
 

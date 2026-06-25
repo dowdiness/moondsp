@@ -162,6 +162,8 @@ const STREAM_CASES = [
 test('crackle probe: AudioWorklet streaming oscillator route metrics', async ({ page }) => {
   test.setTimeout(30_000);
   await page.goto('/');
+  // OfflineAudioContext gives us real AudioWorklet render-quantum callbacks
+  // without depending on live-device scheduling, permissions, or output state.
   const result = await page.evaluate(async ({ cases }) => {
     if (typeof OfflineAudioContext !== 'function' || typeof AudioWorkletNode !== 'function') {
       return { error: 'OfflineAudioContext or AudioWorkletNode unavailable' };

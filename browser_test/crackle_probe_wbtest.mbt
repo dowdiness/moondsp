@@ -24,6 +24,14 @@ test "crackle probe triangle control routes compile" {
 }
 
 ///|
+test "crackle probe stream rejects process before init" {
+  crackle_probe_reset()
+  assert_true(!crackle_probe_stream_process())
+  assert_true(crackle_probe_last_error() == 10)
+  assert_true(crackle_probe_block_count() == 0)
+}
+
+///|
 test "crackle probe stream advances one block per call" {
   crackle_probe_reset()
   assert_true(crackle_probe_stream_init(3, 0, 440.0, 48000.0, 128))

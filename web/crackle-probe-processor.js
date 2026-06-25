@@ -1,3 +1,6 @@
+// Test-only AudioWorklet diagnostic harness for #211/#212. This file is loaded
+// by Playwright's crackle probe only; production playback uses processor.js or
+// scheduler-processor.js.
 const CRACKLE_PROBE_MAX_BLOCK_COUNT = 4096;
 
 class MoonDspCrackleProbeProcessor extends AudioWorkletProcessor {
