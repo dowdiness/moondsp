@@ -1,6 +1,6 @@
 import {
-  "dowdiness/moondsp" @moondsp,
-  "moonbitlang/core/ref" @ref,
+  "dowdiness/moondsp",
+  "moonbitlang/core/ref",
 }
 
 options(
@@ -19,6 +19,14 @@ options(
         "compiled_stereo_left_sample",
         "compiled_stereo_right_sample",
         "mul_adsr_peak",
+        "crackle_probe_reset",
+        "crackle_probe_run",
+        "crackle_probe_stream_init",
+        "crackle_probe_stream_process",
+        "crackle_probe_metric",
+        "crackle_probe_sample",
+        "crackle_probe_last_error",
+        "crackle_probe_block_count",
       ],
     },
     "wasm-gc": {
@@ -34,6 +42,14 @@ options(
         "compiled_stereo_left_sample",
         "compiled_stereo_right_sample",
         "mul_adsr_peak",
+        "crackle_probe_reset",
+        "crackle_probe_run",
+        "crackle_probe_stream_init",
+        "crackle_probe_stream_process",
+        "crackle_probe_metric",
+        "crackle_probe_sample",
+        "crackle_probe_last_error",
+        "crackle_probe_block_count",
       ],
     },
   },
