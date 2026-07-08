@@ -507,9 +507,67 @@ test "MiniAuthoringPipeline keeps last reusable doc after parse error" {
 }
 
 ///|
+/// The accepted doc's full revision, or `None` when nothing is accepted.
+fn last_good_accepted_revision(
+  pipeline : @mini.MiniAuthoringPipeline,
+) -> @identity.Revision? {
+  pipeline.accepted_doc().map(doc => doc.revision())
+}
+
+///|
+test "MiniAuthoringPipeline accepted_doc retains last good across parse error" {
+  let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd sd\")")
+  let first_rev = unwrap_doc(pipeline.parse_doc()).revision()
+  guard last_good_accepted_revision(pipeline) == Some(first_rev) else {
+    abort("expected accepted doc to capture the first good parse")
+  }
+  // Parse error: current channel fails, accepted channel retains last good.
+  pipeline.set_input("s(\"bd sd")
+  guard pipeline.parse_doc() is Err(_) else {
+    abort("expected malformed source to fail the current parse")
+  }
+  guard last_good_accepted_revision(pipeline) == Some(first_rev) else {
+    abort("expected accepted doc to retain last good on parse error")
+  }
+  // Recovery to content-distinct valid source: accepted advances.
+  pipeline.set_input("s(\"bd sd hh\")")
+  let recovered_rev = unwrap_doc(pipeline.parse_doc()).revision()
+  // Pin the premise: recovered and first revisions collide on value
+  // but differ by fingerprint. Without this guard, a value-only predicate
+  // would wrongly treat the two as equal.
+  guard recovered_rev.value() == first_rev.value() else {
+    abort("expected recovered and first revisions to collide on value")
+  }
+  guard recovered_rev != first_rev else {
+    abort("expected recovered and first revisions to differ by fingerprint")
+  }
+  guard last_good_accepted_revision(pipeline) == Some(recovered_rev) else {
+    abort("expected accepted doc to advance to the recovered doc")
+  }
+  pipeline.dispose()
+}
+
+///|
+test "MiniAuthoringPipeline accepted_doc is None before any successful parse" {
+  let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd sd")
+  guard pipeline.parse_doc() is Err(_) else {
+    abort("expected malformed initial source to fail the first parse")
+  }
+  guard pipeline.accepted_doc().is_none() else {
+    abort("expected accepted_doc to be None before any successful parse")
+  }
+  pipeline.dispose()
+}
+
+///|
 test "MiniAuthoringPipeline exposes whole-document recomputation counts" {
   let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd sd\")")
-  inspect(pipeline.parse_compute_count(), content="0")
+  inspect(
+    pipeline.parse_compute_count(),
+    content=(
+      #|1
+    ),
+  )
   inspect(pipeline.snapshot_compute_count(), content="0")
   ignore(unwrap_doc(pipeline.parse_doc()))
   inspect(pipeline.parse_compute_count(), content="1")

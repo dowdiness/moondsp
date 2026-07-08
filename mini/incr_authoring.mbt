@@ -9,7 +9,13 @@
 ///   `previous` argument to `parse_doc`, preserving stable subtree IDs
 ///   across edits.
 /// - Parse errors are propagated as `Err(String)` and do not replace the last
-///   reusable document.
+///   reusable document. The last successful PatternDoc is separately
+///   accessible via `accepted_doc()` (backed by incr `AcceptedDerived`).
+/// - `new()` eagerly forces the first parse before returning (priming).
+///   Without this, `AcceptedDerived`'s built-in eager fold would trigger
+///   the parse inside a reactive compute context, where the memo's local
+///   state mutations are unsafe. After `new()`, all subsequent parses are
+///   lazy (triggered by `parse_doc()` / `parse_snapshot()` reads).
 /// - Lowering uses one persistent PatternLoweringCache owned by the pipeline,
 ///   so the current reuse win is stable-subtree and lowering-cache reuse after
 ///   parse, not token-level incremental parsing.
@@ -36,6 +42,10 @@ pub struct MiniAuthoringPipeline {
   priv lowering_cache : @pattern.PatternLoweringCache[@pattern.ControlMap]
   priv parse_compute_count_fn : () -> Int
   priv snapshot_compute_count_fn : () -> Int
+  priv accepted : @incr.AcceptedDerived[
+    @pattern.PatternDoc[@pattern.ControlMap],
+    String,
+  ]
 }
 
 ///|
@@ -47,21 +57,13 @@ pub fn MiniAuthoringPipeline::new(input : String) -> MiniAuthoringPipeline {
     None,
     label="mini.source_edit",
   )
-  let source_edit_base : @incr.Signal[String] = scope.signal(
-    input,
-    label="mini.source_edit_base",
-  )
+  // Previous source text for token realignment across edits.
+  // Updated alongside `previous` in the parsed memo's Ok branch.
+  let mut previous_source : String = input
   let token_count = scope.memo(
-    fn() {
+    () => {
       let current = text.get()
-      let baseline = source_edit_base.get()
-      let tokens = match source_edit.get() {
-        Some(span) =>
-          realign_mini_authoring_tokens_with_source_edit(
-            baseline, current, span,
-          )
-        None => realign_mini_authoring_tokens(baseline, current)
-      }
+      let tokens = tokenize_mini_authoring_source(current)
       ignore(mini_authoring_token_fingerprint(tokens))
       tokens.length()
     },
@@ -77,22 +79,21 @@ pub fn MiniAuthoringPipeline::new(input : String) -> MiniAuthoringPipeline {
     fn() {
       parse_compute_count += 1
       let current = text.get()
-      let baseline = source_edit_base.get()
       let tokens = match previous {
         None => tokenize_mini_authoring_source(current)
         Some(_) =>
           match source_edit.get() {
             Some(span) =>
               realign_mini_authoring_tokens_with_source_edit(
-                baseline, current, span,
+                previous_source, current, span,
               )
-            None => realign_mini_authoring_tokens(baseline, current)
+            None => realign_mini_authoring_tokens(previous_source, current)
           }
       }
       let result = parse_doc_with_token_identities(current, previous, tokens)
       match result {
         Ok(doc) => {
-          source_edit_base.set(current)
+          previous_source = current
           previous = Some(doc)
           Ok(doc)
         }
@@ -103,6 +104,18 @@ pub fn MiniAuthoringPipeline::new(input : String) -> MiniAuthoringPipeline {
   )
   scope.add_cell_ids([parsed.id()])
   let parsed_observer = scope.add_observer(parsed.observe())
+  // Prime parsed before accepted_memo's eager fold reads it.
+  // The parsed memo mutates local state (`previous`, `previous_source`),
+  // which must not happen inside a reactive compute context.
+  ignore(parsed_observer.get())
+  // AcceptedDerived for last-good: retains the last successful PatternDoc
+  // across parse errors. Scope::accepted_memo allocates its own child scope
+  // and registers the accepted cell internally — no extra add_cell_ids needed.
+  let accepted = scope.accepted_memo(
+    () => parsed.get(),
+    label="mini.accepted_doc",
+  )
+
   let lowering_cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
   let mut snapshot_compute_count = 0
   let snapshot = @incr.Memo::new_no_backdate(
@@ -134,6 +147,7 @@ pub fn MiniAuthoringPipeline::new(input : String) -> MiniAuthoringPipeline {
     lowering_cache,
     parse_compute_count_fn: fn() { parse_compute_count },
     snapshot_compute_count_fn: fn() { snapshot_compute_count },
+    accepted,
   }
 }
 
@@ -168,6 +182,15 @@ pub fn MiniAuthoringPipeline::parse_doc(
   self : MiniAuthoringPipeline,
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
   self.parsed_observer.get()
+}
+
+///|
+/// The last successfully parsed PatternDoc, retained across parse errors.
+/// Returns `None` until the first successful parse.
+pub fn MiniAuthoringPipeline::accepted_doc(
+  self : MiniAuthoringPipeline,
+) -> @pattern.PatternDoc[@pattern.ControlMap]? {
+  self.accepted.accepted_or_abort()
 }
 
 ///|

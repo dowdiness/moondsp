@@ -26,6 +26,7 @@ pub fn parse_song_with_bpm(String) -> Result[ParsedSong, String]
 pub struct MiniAuthoringPipeline {
   // private fields
 }
+pub fn MiniAuthoringPipeline::accepted_doc(Self) -> @pattern.PatternDoc[@pattern.ControlMap]?
 pub fn MiniAuthoringPipeline::authoring_token_count(Self) -> Int
 pub fn MiniAuthoringPipeline::dispose(Self) -> Unit
 pub fn MiniAuthoringPipeline::input(Self) -> String
