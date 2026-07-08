@@ -9,7 +9,13 @@
 ///   `previous` argument to `parse_doc`, preserving stable subtree IDs
 ///   across edits.
 /// - Parse errors are propagated as `Err(String)` and do not replace the last
-///   reusable document.
+///   reusable document. The last successful PatternDoc is separately
+///   accessible via `accepted_doc()` (backed by incr `AcceptedDerived`).
+/// - `new()` eagerly forces the first parse before returning (priming).
+///   Without this, `AcceptedDerived`'s built-in eager fold would trigger
+///   the parse inside a reactive compute context, where the memo's local
+///   state mutations are unsafe. After `new()`, all subsequent parses are
+///   lazy (triggered by `parse_doc()` / `parse_snapshot()` reads).
 /// - Lowering uses one persistent PatternLoweringCache owned by the pipeline,
 ///   so the current reuse win is stable-subtree and lowering-cache reuse after
 ///   parse, not token-level incremental parsing.

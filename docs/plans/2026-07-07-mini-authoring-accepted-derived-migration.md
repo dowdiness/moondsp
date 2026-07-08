@@ -19,7 +19,7 @@
 
 ## 1. Current architecture
 
-```
+```text
 Signal[text] ──┐
 Signal[edit] ───┤
                 v
@@ -68,7 +68,7 @@ Key: `parsed` memo reads `prev` on every recompute to pass as `previous` to `par
 
 ## 2. Target architecture (Case A)
 
-```
+```text
 Signal[text] ──┐
 Signal[edit] ───┤
                 v
@@ -176,7 +176,7 @@ This creates a `BackdateEq`-tier `AcceptedDerived` whose candidate is the parsed
 
 **Ownership:**
 
-```
+```text
 candidate memo           AcceptedDerived          mut previous
 ─────────────            ───────────────          ───────────
 stores previous          stores accepted          inside candidate
