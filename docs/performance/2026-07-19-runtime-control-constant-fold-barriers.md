@@ -76,3 +76,8 @@ by retaining `Gain` or `Clip`; it does not attribute unrelated whole-engine
 benchmark drift to this change. The cost is bounded to constant-fed
 runtime-control barriers, and unaffected arithmetic subgraphs retain their
 prior folding behavior.
+
+A possible future design that preserves authoring control identity while
+partially evaluating the execution plan is recorded in
+[`../control-aware-partial-evaluation.md`](../control-aware-partial-evaluation.md).
+It remains exploratory and is gated on representative scaling evidence.

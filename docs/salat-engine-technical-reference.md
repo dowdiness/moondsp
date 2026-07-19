@@ -831,6 +831,10 @@ Current limits:
   same protection. Pure arithmetic dependencies such as `Mul` and `Mix` may
   still fold beneath those retained control barriers, and ordinary dead-code
   elimination still removes genuinely unreachable nodes.
+- separating authoring control identity from optimized sample execution remains
+  an exploratory direction, not current behavior. See
+  [`control-aware-partial-evaluation.md`](control-aware-partial-evaluation.md)
+  for its invariants and evidence gates.
 - `DspNode` and `CompiledTemplate` equality are authoring/artifact equality,
   not DSP sample equality: `NaN` compares equal to `NaN`, `+0.0` compares equal
   to `-0.0`, and finite values otherwise compare structurally. This keeps
