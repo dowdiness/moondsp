@@ -822,6 +822,12 @@ Current limits:
   `CompiledTemplate::analyze(...)` via `optimize_graph()`; both optional and
   result-typed mono/stereo compile entry points receive the pre-optimized
   template and do not re-run the optimizer
+- constant folding preserves runtime-control identity: authoring `Gain` and
+  `Clip` nodes remain their original node kinds even when all inputs are
+  constant, so authoring-index controls and bindings continue to target their
+  declared parameters. Pure arithmetic dependencies such as `Mul` and `Mix`
+  may still fold beneath those retained control barriers, and ordinary
+  dead-code elimination still removes genuinely unreachable nodes.
 - `DspNode` and `CompiledTemplate` equality are authoring/artifact equality,
   not DSP sample equality: `NaN` compares equal to `NaN`, `+0.0` compares equal
   to `-0.0`, and finite values otherwise compare structurally. This keeps

@@ -74,6 +74,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   whitebox probes are package-local and the facade compatibility hook no longer
   exposes host-owned pools, schedulers, or buffers.
 
+### Fixed
+
+- Preserved runtime-updatable `Gain` and `Clip` nodes through constant folding
+  so authoring-index controls and bindings retain their original parameter
+  semantics while pure arithmetic subgraphs beneath them can still fold.
+
 ## [0.5.1] - 2026-05-20
 
 ### Added

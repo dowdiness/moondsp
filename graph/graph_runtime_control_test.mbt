@@ -1,32 +1,68 @@
 ///|
-test "compiled dsp runtime param update changes gain output" {
+test "compiled dsp preserves constant-fed gain controls and reset" {
   let context = DspContext::new(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::gain(0, QUARTER_SAMPLE),
+    DspNode::constant(3.0),
+    DspNode::gain(0, 0.5),
     DspNode::output(1),
   ]
   let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)
-  @debug.assert_eq(output.get(0), QUARTER_SAMPLE)
+  @debug.assert_eq(output.get(0), 1.5)
 
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(1, GraphParamSlot::Value0, HALF_GAIN),
+      GraphControl::set_param(1, GraphParamSlot::Value0, 2.0),
     )
     is Ok(_),
   )
   compiled.process(context, output)
 
-  @debug.assert_eq(output.get(0), HALF_GAIN)
-  @debug.assert_eq(output.get(1), HALF_GAIN)
-  @debug.assert_eq(output.get(2), HALF_GAIN)
-  @debug.assert_eq(output.get(3), HALF_GAIN)
+  for index in 0..<SMALL_BLOCK_SIZE {
+    @debug.assert_eq(output.get(index), 6.0)
+  }
+
+  compiled.reset_runtime_state()
+  compiled.process(context, output)
+
+  for index in 0..<SMALL_BLOCK_SIZE {
+    @debug.assert_eq(output.get(index), 1.5)
+  }
+}
+
+///|
+test "compiled dsp preserves constant-fed clip controls" {
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
+  let nodes = [
+    DspNode::constant(10.0),
+    DspNode::clip(0, 3.0),
+    DspNode::output(1),
+  ]
+  let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
+  let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+
+  compiled.process(context, output)
+  @debug.assert_eq(output.get(0), 3.0)
+
+  assert_true(
+    compiled.apply_control(
+      GraphControl::set_param(1, GraphParamSlot::Value0, 7.0),
+    )
+    is Ok(_),
+  )
+  compiled.process(context, output)
+
+  for index in 0..<SMALL_BLOCK_SIZE {
+    @debug.assert_eq(output.get(index), 7.0)
+  }
 }
 
 ///|
@@ -286,7 +322,7 @@ test "compiled dsp apply_controls is transactional" {
     Err(
       GraphControlError::InvalidSlotForNode(
         1,
-        DspNodeKind::Constant,
+        DspNodeKind::Gain,
         GraphParamSlot::DelaySamples
       )
     ) => ()
