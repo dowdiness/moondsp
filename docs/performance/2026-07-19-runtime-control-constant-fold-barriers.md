@@ -1,7 +1,7 @@
 # Performance Snapshot — 2026-07-19: Runtime-control constant-fold barriers
 
-This change preserves authoring `Gain` and `Clip` nodes during constant folding
-so runtime controls and bindings keep targeting the authored parameter kind.
+This change preserves authoring control nodes during constant folding so
+runtime controls and bindings keep targeting the authored parameter kind.
 Pure arithmetic dependencies still fold beneath those nodes.
 
 ## Structural cost
@@ -9,18 +9,19 @@ Pure arithmetic dependencies still fold beneath those nodes.
 The optimizer now retains one additional runtime node in each affected
 constant-fed chain:
 
-| Authoring graph | Optimized graph |
+| Authoring shape | Optimized shape |
 |---|---|
-| `Constant -> Gain -> Output` | `Constant -> Gain -> Output` (3 nodes) |
-| `Constant -> Clip -> Output` | `Constant -> Clip -> Output` (3 nodes) |
-| `Constant, Constant -> Mul -> Gain -> Output` | `Constant(12) -> Gain -> Output` (3 nodes) |
+| constant source → scaling control → output | unchanged (3 nodes) |
+| constant source → limiting control → output | unchanged (3 nodes) |
+| constant sources → pure arithmetic → scaling control → output | folded constant → scaling control → output (3 nodes) |
 
-Before this correction, the first two shapes collapsed to `Constant -> Output`.
-The third shape still folds `Mul`, but the retained `Gain` adds one node
-relative to folding the whole scalar chain. Each affected render therefore
-keeps the control node's dispatch and buffer pass. This bounded cost is the
-intentional tradeoff for preserving runtime-control identity; recomputing
-folded dependency graphs when controls change remains out of scope.
+Before this correction, the first two shapes collapsed to a constant source
+and output. The third shape still folds its pure arithmetic region, but the
+retained control adds one node relative to folding the complete scalar chain.
+Each affected render therefore keeps the control node's dispatch and buffer
+pass. This bounded cost is the intentional tradeoff for preserving
+runtime-control identity; recomputing folded dependency graphs when controls
+change remains out of scope.
 
 ## Environment
 

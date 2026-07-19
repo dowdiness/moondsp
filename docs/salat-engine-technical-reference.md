@@ -822,15 +822,13 @@ Current limits:
   `CompiledTemplate::analyze(...)` via `optimize_graph()`; both optional and
   result-typed mono/stereo compile entry points receive the pre-optimized
   template and do not re-run the optimizer
-- constant folding preserves runtime-control identity: authoring `Gain` and
-  `Clip` nodes remain their original node kinds even when all inputs are
-  constant, so authoring-index controls and bindings continue to target their
-  declared parameters. Barrier eligibility is derived from the canonical
-  runtime-parameter slot policy rather than a separate node-kind list, so a
-  future foldable node that exposes an authored runtime parameter inherits the
-  same protection. Pure arithmetic dependencies such as `Mul` and `Mix` may
-  still fold beneath those retained control barriers, and ordinary dead-code
-  elimination still removes genuinely unreachable nodes.
+- constant folding preserves runtime-control identity: an authoring control
+  remains the same control kind when its dependencies are constant, so
+  authoring-index controls and bindings continue to target their declared
+  parameters. Barrier eligibility follows the canonical runtime-parameter
+  policy rather than a separate list of control kinds. Pure arithmetic
+  dependencies may still fold beneath retained controls, and ordinary
+  dead-code elimination still removes genuinely unreachable nodes.
 - separating authoring control identity from optimized sample execution remains
   an exploratory direction, not current behavior. See
   [`control-aware-partial-evaluation.md`](control-aware-partial-evaluation.md)

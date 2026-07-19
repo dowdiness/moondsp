@@ -25,48 +25,25 @@ does not supersede current runtime-control behavior.
 
 ## Current safe design
 
-Constant folding may eliminate immutable arithmetic such as a multiplication
-or mix whose inputs are all constants. It must not replace a runtime-updatable
-control point with a semantically different constant.
+Constant folding may eliminate a pure constant region. It must not replace a
+runtime-updatable control point with an execution value that no longer
+preserves the authored control contract.
 
-For example:
-
-```text
-Constant(3), Constant(4) -> Mul -> Gain(control=0.5) -> Output
-```
-
-may become:
-
-```text
-Constant(12) -> Gain(control=0.5) -> Output
-```
-
-but not:
-
-```text
-Constant(6) -> Output
-```
-
-The retained control is intentionally conservative. It makes correctness
-local and keeps the existing runtime, binding, reset, hot-swap, and topology
-contracts coherent.
+Dependencies that are independent of runtime control may still fold beneath a
+retained control point. The retained control is intentionally conservative: it
+makes correctness local and keeps runtime updates, bindings, reset, lifecycle,
+and topology contracts coherent.
 
 ## Motivation for revisiting
 
-The isolated 128-sample benchmark measured about 0.41–0.42 microseconds of
-additional work for one retained constant-fed `Gain` or `Clip`. That is about
-0.016% of a 2.67 ms AudioWorklet block budget. The cost is small for one
-barrier but may accumulate across generated graphs or many active voices.
+Retaining a control point also retains its per-sample execution cost. The
+current isolated evidence shows a bounded single-control cost, but generated
+graphs or concurrent processing may accumulate many such costs. See the linked
+performance snapshot for implementation-specific cases and measurements.
 
-A linear estimate reaches roughly 1% of the block budget at about 64 affected
-barriers across all graphs processed in one block. This is a planning estimate,
-not a scaling result: cache behavior, dispatch, buffer reuse, and voice
-composition may make the real curve different.
-
-Most ordinary DSP controls are not affected. A gain fed by an oscillator,
-filter, envelope, or other dynamic signal was never a constant-fold candidate.
-The opportunity is limited to runtime controls inside otherwise constant
-regions.
+Controls whose inputs depend on sample data were never constant-fold
+candidates. The opportunity is limited to runtime-updatable controls inside
+otherwise constant regions.
 
 ## Proposed separation
 
@@ -79,26 +56,9 @@ Treat compilation as producing three conceptual artifacts:
 3. **Optimized execution plan** — contains only the operations required for
    sample processing, including partially evaluated constants.
 
-Under this model, the authoring graph:
-
-```text
-Constant(10) -> Gain(control=0.5) -> Output
-```
-
-could execute as:
-
-```text
-DerivedConstant(5) -> Output
-```
-
-while the control dependency plan retains the recipe:
-
-```text
-derived output = source constant * authored gain
-```
-
-Changing the gain to `2` recomputes the derived value as `20`. The authored
-control remains valid even though no gain operation runs for every sample.
+Under this model, a runtime update recomputes only the derived values that
+depend on the changed authored parameter. The authored control remains valid
+even when its corresponding operation is absent from per-sample execution.
 
 ## Functional core and imperative shell
 
@@ -156,7 +116,7 @@ buffers or mutable DSP state.
 
 Do not specialize a region that contains:
 
-- oscillators, noise, envelopes, filters, delays, or feedback;
+- sample-dependent, stateful, time-dependent, or nondeterministic operations;
 - sample buffers or signal-dependent branches;
 - topology-dependent routing that can change signal shape;
 - invalid parameters whose rejection would otherwise be observable;
@@ -209,37 +169,37 @@ Do not begin here.
 
 ## Evidence required before implementation
 
-Do not implement this design from the single-barrier result alone. First add
-repeatable scaling measurements for:
+Do not implement this design from a single-control result alone. First add
+repeatable scaling measurements across:
 
-- 1, 16, 64, 256, and 1,024 affected barriers;
-- 1, 8, 32, and 64 active voices;
-- `Gain`, `Clip`, and mixed constant dependency chains;
+- low through stress-level counts of affected controls and concurrent work;
+- simple and composed constant dependency regions;
 - sparse and dense control updates;
-- single controls and transactional batches;
-- reset, hot-swap, and topology replacement;
-- wasm-gc and any production-gated native target.
+- individual controls and transactional batches;
+- reset, lifecycle replacement, and topology replacement;
+- every production execution target.
 
-Record absolute block time, percentage of the 2.67 ms budget, update latency,
-allocation behavior, and worst-case variance. Benchmark both retained-node
-processing and a prototype dependency-recompute path at the same graph shapes.
+Record absolute processing time, the share of the real-time budget, update
+latency, allocation behavior, and worst-case variance. Compare retained-control
+processing with a prototype dependency-recompute path under equivalent
+workloads.
 
 ## Revisit criteria
 
 Revisit this design when at least one of these is true:
 
-- representative production or generated graphs spend at least 1% of the
-  audio block budget on affected retained barriers;
+- representative production or generated graphs spend a material, agreed
+  share of the real-time budget on affected retained controls;
 - retained barriers contribute to a reproduced missed-deadline or voice-count
   limit;
-- a real authoring workflow routinely produces dozens of constant-fed runtime
-  controls across active voices;
+- a real authoring workflow routinely produces enough controls in constant
+  regions to create measurable cumulative cost;
 - another feature already requires an explicit authored-control dependency
   plan, making partial evaluation an incremental addition rather than a new
   subsystem.
 
-Do not proceed based only on a large relative percentage against a minimal
-graph whose runtime is below one microsecond.
+Do not proceed based only on a large relative percentage against a trivial
+baseline.
 
 ## Suggested delivery slices
 
@@ -259,9 +219,9 @@ If a revisit criterion is met:
 
 ## Open questions
 
-- Should derived values be stored as scalar control cells, constant buffers,
-  or small immutable execution-plan patches?
-- Which thread owns dependency recomputation in browser and native hosts?
+- Which representation should own derived values without exposing mutable
+  compiler internals?
+- Which host execution context owns dependency recomputation?
 - How should control smoothing interact with a value that would otherwise be
   constant between updates?
 - Can one dependency representation serve reset, hot-swap state inheritance,
