@@ -55,9 +55,9 @@ for `dowdiness/moondsp`. Read order below goes roughly from "new user" to
 - **[`performance/`](performance/)** — dated benchmark snapshots. New
   measurements go in new files (do not edit historical entries in place).
   Latest:
-  [`performance/2026-05-10-post-architecture-redesign-and-jux.md`](performance/2026-05-10-post-architecture-redesign-and-jux.md)
-  covers the post-architecture graph hot paths plus dedicated `.jux`
-  pattern/mini/scheduler benchmarks.
+  [`performance/2026-07-19-runtime-control-constant-fold-barriers.md`](performance/2026-07-19-runtime-control-constant-fold-barriers.md)
+  measures retained runtime-control barriers, including an isolated
+  folded-versus-retained comparison.
 
 ## Reviews
 
@@ -100,6 +100,10 @@ for full context.
 These direction documents describe possible futures. They may diverge from
 current code.
 
+- **[`control-aware-partial-evaluation.md`](control-aware-partial-evaluation.md)**
+  — possible future separation of authoring control identity, control
+  dependencies, and optimized sample execution; includes evidence gates and
+  invariants for revisiting retained runtime-control barriers.
 - **[`dsp-structural-editor-vision.md`](dsp-structural-editor-vision.md)** —
   text-shaped authoring experience for `moondsp` (draft).
 - **[`dsp-structural-editor-architecture.md`](dsp-structural-editor-architecture.md)**

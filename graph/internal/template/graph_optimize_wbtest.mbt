@@ -7,6 +7,15 @@ fn analyzed_optimized_graph(
 }
 
 ///|
+test "fold candidates derive barriers from runtime parameter capability" {
+  assert_false(is_optimizer_fold_candidate(@model.DspNode::constant(1.0)))
+  assert_false(is_optimizer_fold_candidate(@model.DspNode::gain(0, 0.5)))
+  assert_false(is_optimizer_fold_candidate(@model.DspNode::clip(0, 1.0)))
+  assert_true(is_optimizer_fold_candidate(@model.DspNode::mul(0, 1)))
+  assert_true(is_optimizer_fold_candidate(@model.DspNode::mix(0, 1)))
+}
+
+///|
 test "fold constants: Mul(Constant, Constant) -> Constant" {
   let nodes : Array[@model.DspNode] = [
     @model.DspNode::constant(3.0),
@@ -21,16 +30,59 @@ test "fold constants: Mul(Constant, Constant) -> Constant" {
 }
 
 ///|
-test "fold constants: Gain(Constant, amount) -> Constant" {
+test "fold constants: Gain preserves runtime-control identity" {
   let nodes : Array[@model.DspNode] = [
     @model.DspNode::constant(10.0),
     @model.DspNode::gain(0, 0.5),
     @model.DspNode::output(1),
   ]
-  let (optimized, _) = analyzed_optimized_graph(nodes)
-  @debug.assert_eq(optimized.length(), 2) // Constant(5) + Output
+  let (optimized, index_map) = analyzed_optimized_graph(nodes)
+  @debug.assert_eq(optimized.length(), 3)
   assert_true(optimized[0].kind() is @model.DspNodeKind::Constant)
-  @debug.assert_eq(optimized[0].value0(), 5.0)
+  assert_true(optimized[1].kind() is @model.DspNodeKind::Gain)
+  assert_true(optimized[2].kind() is @model.DspNodeKind::Output)
+  @debug.assert_eq(index_map[0], 0)
+  @debug.assert_eq(index_map[1], 1)
+  @debug.assert_eq(index_map[2], 2)
+}
+
+///|
+test "fold constants: Clip preserves runtime-control identity" {
+  let nodes : Array[@model.DspNode] = [
+    @model.DspNode::constant(10.0),
+    @model.DspNode::clip(0, 3.0),
+    @model.DspNode::output(1),
+  ]
+  let (optimized, index_map) = analyzed_optimized_graph(nodes)
+  @debug.assert_eq(optimized.length(), 3)
+  assert_true(optimized[0].kind() is @model.DspNodeKind::Constant)
+  assert_true(optimized[1].kind() is @model.DspNodeKind::Clip)
+  assert_true(optimized[2].kind() is @model.DspNodeKind::Output)
+  @debug.assert_eq(index_map[0], 0)
+  @debug.assert_eq(index_map[1], 1)
+  @debug.assert_eq(index_map[2], 2)
+}
+
+///|
+test "fold constants: pure arithmetic folds beneath retained Gain" {
+  let nodes : Array[@model.DspNode] = [
+    @model.DspNode::constant(3.0),
+    @model.DspNode::constant(4.0),
+    @model.DspNode::mul(0, 1),
+    @model.DspNode::gain(2, 0.5),
+    @model.DspNode::output(3),
+  ]
+  let (optimized, index_map) = analyzed_optimized_graph(nodes)
+  @debug.assert_eq(optimized.length(), 3)
+  assert_true(optimized[0].kind() is @model.DspNodeKind::Constant)
+  @debug.assert_eq(optimized[0].value0(), 12.0)
+  assert_true(optimized[1].kind() is @model.DspNodeKind::Gain)
+  assert_true(optimized[2].kind() is @model.DspNodeKind::Output)
+  @debug.assert_eq(index_map[0], -1)
+  @debug.assert_eq(index_map[1], -1)
+  @debug.assert_eq(index_map[2], 0)
+  @debug.assert_eq(index_map[3], 1)
+  @debug.assert_eq(index_map[4], 2)
 }
 
 ///|

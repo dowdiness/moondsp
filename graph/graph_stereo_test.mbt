@@ -57,6 +57,47 @@ test "compiled stereo dsp applies stereo gain after pan" {
 }
 
 ///|
+test "compiled stereo dsp preserves constant-fed mono gain controls" {
+  let context = DspContext::new(
+    sample_rate=STANDARD_SAMPLE_RATE,
+    block_size=SMALL_BLOCK_SIZE,
+  )
+  let nodes = [
+    DspNode::constant(3.0),
+    DspNode::gain(0, 0.5),
+    DspNode::pan(1, PAN_CENTER),
+    DspNode::stereo_output(2),
+  ]
+  let compiled = CompiledStereoDsp::compile(
+    CompiledTemplate::analyze(nodes),
+    context,
+  ).unwrap()
+  let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+  let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
+
+  compiled.process(context, left_output, right_output)
+  assert_true((left_output.get(0) - 1.5 * PAN_CENTER_GAIN).abs() < 0.000000001)
+  assert_true((right_output.get(0) - 1.5 * PAN_CENTER_GAIN).abs() < 0.000000001)
+
+  assert_true(
+    compiled.apply_control(
+      GraphControl::set_param(1, GraphParamSlot::Value0, 2.0),
+    )
+    is Ok(_),
+  )
+  compiled.process(context, left_output, right_output)
+
+  for index in 0..<SMALL_BLOCK_SIZE {
+    assert_true(
+      (left_output.get(index) - 6.0 * PAN_CENTER_GAIN).abs() < 0.000000001,
+    )
+    assert_true(
+      (right_output.get(index) - 6.0 * PAN_CENTER_GAIN).abs() < 0.000000001,
+    )
+  }
+}
+
+///|
 test "compiled stereo dsp applies stereo clip after pan" {
   let context = DspContext::new(
     sample_rate=STANDARD_SAMPLE_RATE,

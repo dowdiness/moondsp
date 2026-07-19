@@ -1,4 +1,23 @@
 ///|
+/// Does this node expose an authored parameter through the canonical runtime
+/// control policy?
+fn has_runtime_control_identity(node : @model.DspNode) -> Bool {
+  @model.node_accepts_slot(node, @model.GraphParamSlot::Value0) ||
+  @model.node_accepts_slot(node, @model.GraphParamSlot::Value1) ||
+  @model.node_accepts_slot(node, @model.GraphParamSlot::Value2) ||
+  @model.node_accepts_slot(node, @model.GraphParamSlot::Value3) ||
+  @model.node_accepts_slot(node, @model.GraphParamSlot::DelaySamples)
+}
+
+///|
+/// Apply optimizer-specific folding policy without changing the public
+/// NodeFoldable contract. Nodes with authored runtime parameters preserve
+/// their control identity instead of folding to Constant.
+fn is_optimizer_fold_candidate(node : @model.DspNode) -> Bool {
+  @model.node_is_foldable(node) && !has_runtime_control_identity(node)
+}
+
+///|
 /// Constant folding pass: walks nodes in order, replacing foldable nodes
 /// whose inputs are all constants with new Constant nodes.
 /// Returns (folded_nodes, index_map, changed).
@@ -19,8 +38,7 @@ fn fold_constants(
   let mut changed = false
   for i = 0; i < n; i = i + 1 {
     let node = nodes[i]
-    let is_constant = node.kind() is @model.DspNodeKind::Constant
-    if @model.node_is_foldable(node) && !is_constant {
+    if is_optimizer_fold_candidate(node) {
       // Check if all inputs are Constant in the folded array
       let has_input0 = node.input0() >= 0
       let has_input1 = node.input1() >= 0
@@ -37,32 +55,27 @@ fn fold_constants(
         true
       }
       if input0_is_const && input1_is_const {
-        // Skip folding Clip with invalid threshold — let validation reject it
-        if node.kind() is @model.DspNodeKind::Clip && !(node.value0() > 0.0) {
-          // Invalid Clip threshold — fall through to keep as-is
+        // Get input values
+        let v0 = if has_input0 {
+          folded[index_map[node.input0()]].value0()
         } else {
-          // Get input values
-          let v0 = if has_input0 {
-            folded[index_map[node.input0()]].value0()
-          } else {
-            0.0
-          }
-          let v1 = if has_input1 {
-            folded[index_map[node.input1()]].value0()
-          } else {
-            0.0
-          }
-          let result = @model.node_fold_value(node, v0, v1)
-          // Skip folding if result is non-finite
-          if !@dsp.is_finite(result) {
-            // Fall through to keep node as-is
-          } else {
-            let new_index = folded.length()
-            folded.push(@model.DspNode::constant(result))
-            index_map[i] = new_index
-            changed = true
-            continue
-          }
+          0.0
+        }
+        let v1 = if has_input1 {
+          folded[index_map[node.input1()]].value0()
+        } else {
+          0.0
+        }
+        let result = @model.node_fold_value(node, v0, v1)
+        // Skip folding if result is non-finite
+        if !@dsp.is_finite(result) {
+          // Fall through to keep node as-is
+        } else {
+          let new_index = folded.length()
+          folded.push(@model.DspNode::constant(result))
+          index_map[i] = new_index
+          changed = true
+          continue
         }
       }
     }

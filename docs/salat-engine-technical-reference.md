@@ -822,6 +822,17 @@ Current limits:
   `CompiledTemplate::analyze(...)` via `optimize_graph()`; both optional and
   result-typed mono/stereo compile entry points receive the pre-optimized
   template and do not re-run the optimizer
+- constant folding preserves runtime-control identity: an authoring control
+  remains the same control kind when its dependencies are constant, so
+  authoring-index controls and bindings continue to target their declared
+  parameters. Barrier eligibility follows the canonical runtime-parameter
+  policy rather than a separate list of control kinds. Pure arithmetic
+  dependencies may still fold beneath retained controls, and ordinary
+  dead-code elimination still removes genuinely unreachable nodes.
+- separating authoring control identity from optimized sample execution remains
+  an exploratory direction, not current behavior. See
+  [`control-aware-partial-evaluation.md`](control-aware-partial-evaluation.md)
+  for its invariants and evidence gates.
 - `DspNode` and `CompiledTemplate` equality are authoring/artifact equality,
   not DSP sample equality: `NaN` compares equal to `NaN`, `+0.0` compares equal
   to `-0.0`, and finite values otherwise compare structurally. This keeps
