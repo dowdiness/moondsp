@@ -1,13 +1,20 @@
 ///|
+/// Does this node expose an authored parameter through the canonical runtime
+/// control policy?
+fn has_runtime_control_identity(node : @model.DspNode) -> Bool {
+  @model.node_accepts_slot(node, @model.GraphParamSlot::Value0) ||
+  @model.node_accepts_slot(node, @model.GraphParamSlot::Value1) ||
+  @model.node_accepts_slot(node, @model.GraphParamSlot::Value2) ||
+  @model.node_accepts_slot(node, @model.GraphParamSlot::Value3) ||
+  @model.node_accepts_slot(node, @model.GraphParamSlot::DelaySamples)
+}
+
+///|
 /// Apply optimizer-specific folding policy without changing the public
-/// NodeFoldable contract. Constant is already in normal form; Gain and Clip
-/// preserve runtime-control identity instead of folding to Constant.
+/// NodeFoldable contract. Nodes with authored runtime parameters preserve
+/// their control identity instead of folding to Constant.
 fn is_optimizer_fold_candidate(node : @model.DspNode) -> Bool {
-  let kind : @model.DspNodeKind = node.kind()
-  match kind {
-    Constant | Gain | Clip => false
-    _ => @model.node_is_foldable(node)
-  }
+  @model.node_is_foldable(node) && !has_runtime_control_identity(node)
 }
 
 ///|

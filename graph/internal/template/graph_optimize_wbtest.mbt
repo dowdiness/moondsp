@@ -7,6 +7,15 @@ fn analyzed_optimized_graph(
 }
 
 ///|
+test "fold candidates derive barriers from runtime parameter capability" {
+  assert_false(is_optimizer_fold_candidate(@model.DspNode::constant(1.0)))
+  assert_false(is_optimizer_fold_candidate(@model.DspNode::gain(0, 0.5)))
+  assert_false(is_optimizer_fold_candidate(@model.DspNode::clip(0, 1.0)))
+  assert_true(is_optimizer_fold_candidate(@model.DspNode::mul(0, 1)))
+  assert_true(is_optimizer_fold_candidate(@model.DspNode::mix(0, 1)))
+}
+
+///|
 test "fold constants: Mul(Constant, Constant) -> Constant" {
   let nodes : Array[@model.DspNode] = [
     @model.DspNode::constant(3.0),

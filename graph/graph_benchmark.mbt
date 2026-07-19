@@ -16,6 +16,25 @@ fn build_bench_passthrough() -> GraphBuilder {
 }
 
 ///|
+/// Pre-fix optimized shape for a constant-fed runtime control: the derived
+/// scalar was emitted directly through Output.
+fn build_bench_folded_control_equivalent_nodes() -> Array[DspNode] {
+  [DspNode::constant(5.0), DspNode::output(0)]
+}
+
+///|
+/// Corrected shape retaining the authored Gain runtime-control identity.
+fn build_bench_retained_gain_nodes() -> Array[DspNode] {
+  [DspNode::constant(10.0), DspNode::gain(0, 0.5), DspNode::output(1)]
+}
+
+///|
+/// Corrected shape retaining the authored Clip runtime-control identity.
+fn build_bench_retained_clip_nodes() -> Array[DspNode] {
+  [DspNode::constant(10.0), DspNode::clip(0, 5.0), DspNode::output(1)]
+}
+
+///|
 /// Minimal voice: osc → gain → output (~4 nodes).
 fn build_bench_minimal_voice() -> GraphBuilder {
   let freq : GraphBuilder = GraphBuilder::constant(440.0)
@@ -116,6 +135,22 @@ test "bench graph: passthrough compiles" {
 }
 
 ///|
+test "bench graph: runtime-control fold-barrier A/B shapes are equivalent" {
+  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
+  let shapes = [
+    build_bench_folded_control_equivalent_nodes(),
+    build_bench_retained_gain_nodes(),
+    build_bench_retained_clip_nodes(),
+  ]
+  for nodes in shapes {
+    let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), ctx).unwrap()
+    let output = AudioBuffer::filled(128)
+    compiled.process(ctx, output)
+    @debug.assert_eq(output.get(0), 5.0)
+  }
+}
+
+///|
 test "bench graph: minimal voice compiles" {
   let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   let compiled = CompiledDsp::compile(
@@ -187,6 +222,38 @@ test "bench graph: stereo chain hotswap compiles" {
 // capacity is tied to the context's block_size (see compiled_block_size in
 // graph.mbt). Reusing a graph compiled at 128 with a 64-sample context would
 // hit the capacity check and zero the output.
+
+///|
+test "bench/process/runtime_control_fold_barrier_ab" (b : @bench.T) {
+  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
+  let folded = CompiledDsp::compile(
+    CompiledTemplate::analyze(build_bench_folded_control_equivalent_nodes()),
+    ctx,
+  ).unwrap()
+  let retained_gain = CompiledDsp::compile(
+    CompiledTemplate::analyze(build_bench_retained_gain_nodes()),
+    ctx,
+  ).unwrap()
+  let retained_clip = CompiledDsp::compile(
+    CompiledTemplate::analyze(build_bench_retained_clip_nodes()),
+    ctx,
+  ).unwrap()
+  let folded_output = AudioBuffer::filled(128)
+  let gain_output = AudioBuffer::filled(128)
+  let clip_output = AudioBuffer::filled(128)
+  b.bench(name="folded_equivalent/128", fn() {
+    folded.process(ctx, folded_output)
+    b.keep(folded_output)
+  })
+  b.bench(name="retained_gain/128", fn() {
+    retained_gain.process(ctx, gain_output)
+    b.keep(gain_output)
+  })
+  b.bench(name="retained_clip/128", fn() {
+    retained_clip.process(ctx, clip_output)
+    b.keep(clip_output)
+  })
+}
 
 ///|
 test "bench/process/passthrough" (b : @bench.T) {

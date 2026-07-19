@@ -29,30 +29,50 @@ folded dependency graphs when controls change remains out of scope.
 - **MoonBit:** moon 0.1.20260713 (75c7e1f 2026-07-13)
 - **Git base:** fcc167f4666da5a82379c616f75c3890551cc8c6 plus this working tree
 - **Command:** `NEW_MOON_MOD=0 moon bench`
-- **Result:** 58 benchmark groups passed
+- **Result:** 59 benchmark groups passed
 
 ## Selected graph results
 
 | Area | Case | Mean |
 |---|---|---:|
-| process | minimal_voice/128 | 2.57 µs |
-| process | full_voice/128 | 6.22 µs |
-| process | stereo_chain/128 | 11.59 µs |
-| compile | minimal_voice | 2.20 µs |
-| compile | full_voice | 8.54 µs |
-| compile | stereo_chain | 13.58 µs |
-| template analyze | small_10_nodes | 0.448 µs |
-| template analyze | medium_34_nodes | 1.43 µs |
-| template analyze | large_130_nodes | 5.29 µs |
-| realistic template analyze | branch_fanout_11_nodes | 0.546 µs |
-| realistic template analyze | mix_bus_17_nodes | 0.846 µs |
-| realistic template analyze | terminal_stereo_15_nodes | 0.867 µs |
-| realistic template analyze | feedback_loop_6_nodes | 0.275 µs |
+| process | minimal_voice/128 | 2.59 µs |
+| process | full_voice/128 | 6.55 µs |
+| process | stereo_chain/128 | 11.62 µs |
+| compile | minimal_voice | 2.06 µs |
+| compile | full_voice | 9.32 µs |
+| compile | stereo_chain | 14.71 µs |
+| template analyze | small_10_nodes | 0.436 µs |
+| template analyze | medium_34_nodes | 1.39 µs |
+| template analyze | large_130_nodes | 5.12 µs |
+| realistic template analyze | branch_fanout_11_nodes | 0.523 µs |
+| realistic template analyze | mix_bus_17_nodes | 0.848 µs |
+| realistic template analyze | terminal_stereo_15_nodes | 0.655 µs |
+| realistic template analyze | feedback_loop_6_nodes | 0.210 µs |
+
+## Isolated runtime A/B
+
+The graph benchmark now carries a repeatable comparison at the production
+128-sample block size. All three cases produce the same constant output, are
+compiled before timing begins, and benchmark only `CompiledDsp::process`:
+
+| Shape | Mean | Added time | Relative change | 2.67 ms block budget |
+|---|---:|---:|---:|---:|
+| Pre-fix folded equivalent: `Constant(5) -> Output` | 0.856 µs | — | — | 0.032% |
+| Retained `Constant(10) -> Gain(0.5) -> Output` | 1.28 µs | 0.424 µs | +49.6% | 0.048% |
+| Retained `Constant(10) -> Clip(5) -> Output` | 1.27 µs | 0.414 µs | +48.4% | 0.048% |
+
+The percentage increase is large because the folded baseline is only the
+runtime's two-node floor. In absolute terms, preserving a runtime control adds
+about 0.41–0.42 µs per affected 128-sample render, or about 0.016% of
+the AudioWorklet block budget. The benchmark lives in
+`graph/graph_benchmark.mbt` as
+`bench/process/runtime_control_fold_barrier_ab`.
 
 ## Verdict
 
-The standard benchmark suite passes with the corrected optimizer. These
-measurements are a post-change snapshot, not an isolated before/after
-microbenchmark, so they do not support a causal regression percentage. The
-known cost is structural and limited to constant-fed runtime-control barriers;
-unaffected arithmetic subgraphs retain their prior folding behavior.
+The standard benchmark suite passes with the corrected optimizer. The isolated
+A/B quantifies the runtime cost of the exact structural difference introduced
+by retaining `Gain` or `Clip`; it does not attribute unrelated whole-engine
+benchmark drift to this change. The cost is bounded to constant-fed
+runtime-control barriers, and unaffected arithmetic subgraphs retain their
+prior folding behavior.

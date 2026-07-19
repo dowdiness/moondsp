@@ -825,9 +825,12 @@ Current limits:
 - constant folding preserves runtime-control identity: authoring `Gain` and
   `Clip` nodes remain their original node kinds even when all inputs are
   constant, so authoring-index controls and bindings continue to target their
-  declared parameters. Pure arithmetic dependencies such as `Mul` and `Mix`
-  may still fold beneath those retained control barriers, and ordinary
-  dead-code elimination still removes genuinely unreachable nodes.
+  declared parameters. Barrier eligibility is derived from the canonical
+  runtime-parameter slot policy rather than a separate node-kind list, so a
+  future foldable node that exposes an authored runtime parameter inherits the
+  same protection. Pure arithmetic dependencies such as `Mul` and `Mix` may
+  still fold beneath those retained control barriers, and ordinary dead-code
+  elimination still removes genuinely unreachable nodes.
 - `DspNode` and `CompiledTemplate` equality are authoring/artifact equality,
   not DSP sample equality: `NaN` compares equal to `NaN`, `+0.0` compares equal
   to `-0.0`, and finite values otherwise compare structurally. This keeps
