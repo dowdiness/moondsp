@@ -139,16 +139,16 @@ pub fn cp_template() -> Array[@moondsp.DspNode] {
 }
 
 ///|
-pub fn synth_template() -> Array[@moondsp.DspNode] {
+pub fn synth_template_for_waveform(
+  waveform : @moondsp.Waveform,
+) -> Array[@moondsp.DspNode] {
   // Bind `note` directly to oscillator Value0. Avoid constant ->
   // oscillator_from for browser synth playback: sustained notes exposed
-  // crackle in that per-sample frequency-buffer path. Browser synth defaults to
-  // Triangle for now: CompiledDsp Sine still crackles in AudioWorklet probes,
-  // while JS sine and direct wasm tick-block are clean. Follow-ups:
-  // https://github.com/dowdiness/moondsp/issues/211
-  // https://github.com/dowdiness/moondsp/issues/212
+  // crackle in that per-sample frequency-buffer path. The production caller
+  // passes Triangle; the explicit waveform parameter exists so browser_test
+  // can exercise the otherwise identical scheduler route with true Sine.
   [
-    @moondsp.DspNode::oscillator(@moondsp.Waveform::Triangle, 440.0),
+    @moondsp.DspNode::oscillator(waveform, 440.0),
     @moondsp.DspNode::adsr(
       attack_ms=2.0,
       decay_ms=800.0,
@@ -164,4 +164,14 @@ pub fn synth_template() -> Array[@moondsp.DspNode] {
     ),
     @moondsp.DspNode::output(3),
   ]
+}
+
+///|
+pub fn synth_template() -> Array[@moondsp.DspNode] {
+  // Browser synth defaults to Triangle for now: CompiledDsp Sine still
+  // crackles in AudioWorklet probes, while JS sine and direct wasm tick-block
+  // are clean. Follow-ups:
+  // https://github.com/dowdiness/moondsp/issues/211
+  // https://github.com/dowdiness/moondsp/issues/212
+  synth_template_for_waveform(@moondsp.Waveform::Triangle)
 }

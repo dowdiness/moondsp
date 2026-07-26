@@ -2,6 +2,7 @@
 package "dowdiness/moondsp/browser/internal/demo_templates"
 
 import {
+  "dowdiness/moondsp/dsp",
   "dowdiness/moondsp/graph",
 }
 
@@ -17,6 +18,8 @@ pub fn oh_template() -> Array[@graph.DspNode]
 pub fn sd_template() -> Array[@graph.DspNode]
 
 pub fn synth_template() -> Array[@graph.DspNode]
+
+pub fn synth_template_for_waveform(@dsp.Waveform) -> Array[@graph.DspNode]
 
 // Errors
 
