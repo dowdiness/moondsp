@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>moondsp Windows crackle harness</title>
+  <style>
+    :root { color-scheme: dark; font: 16px/1.5 system-ui, sans-serif; }
+    body { max-width: 900px; margin: 40px auto; padding: 0 20px; background: #111; color: #eee; }
+    form { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 16px; }
+    label { display: grid; gap: 6px; }
+    input, select, button, textarea { font: inherit; color: inherit; background: #222; border: 1px solid #555; border-radius: 6px; padding: 9px; }
+    textarea { min-height: 90px; grid-column: 1 / -1; }
+    .actions { display: flex; gap: 12px; grid-column: 1 / -1; }
+    output, pre { display: block; white-space: pre-wrap; background: #181818; border: 1px solid #444; border-radius: 6px; padding: 12px; }
+    code { color: #9ed0ff; }
+  </style>
+</head>
+<body>
+  <h1>Windows crackle A/B harness</h1>
+  <p>
+    Test-only harness for issue #212. Use Chrome 150.0.7871.115 on the affected
+    Windows machine. Wear headphones at a safe level; the 13-note stack can clip.
+  </p>
+  <form id="controls">
+    <label>Route
+      <select name="route">
+        <option value="scheduler">Mini → scheduler → BoundVoicePool</option>
+        <option value="direct">Direct oscillator</option>
+      </select>
+    </label>
+    <label>Waveform
+      <select name="waveform">
+        <option value="triangle">Triangle</option>
+        <option value="sine">Sine</option>
+      </select>
+    </label>
+    <label>Gain
+      <input name="gain" type="number" min="0" max="1" step="0.05" value="0.5">
+    </label>
+    <label>Sample rate
+      <select name="sampleRate">
+        <option value="48000">48 kHz requested</option>
+        <option value="native">Device native/default</option>
+      </select>
+    </label>
+    <label>Latency hint
+      <select name="latencyHint">
+        <option value="interactive">interactive</option>
+        <option value="playback">playback</option>
+      </select>
+    </label>
+    <label>Pattern preset
+      <select name="preset">
+        <option value="note(&quot;60&quot;)">single note</option>
+        <option value="note(&quot;60 64 67&quot;)">triad sequence</option>
+        <option value="note(&quot;60,64,67&quot;).fast(8)">dense triad</option>
+        <option value="note(&quot;48,49,50,51,52,53,54,55,56,57,58,59,60&quot;).fast(8)">13-note stack / voice pressure near event</option>
+        <option value="s(&quot;bd(0,8)&quot;)">silence</option>
+      </select>
+    </label>
+    <label style="grid-column: 1 / -1">Pattern
+      <textarea name="pattern">note("60")</textarea>
+    </label>
+    <div class="actions">
+      <button type="submit">Start A/B run</button>
+      <button id="stop" type="button">Stop</button>
+      <button id="save" type="button">Save JSON result</button>
+    </div>
+  </form>
+  <h2>Status</h2>
+  <output id="status">Idle</output>
+  <h2>Captured result</h2>
+  <pre id="result">No run yet.</pre>
+  <p>Build and serve with <code>NEW_MOON_MOD=0 moon build --target wasm-gc --release</code>, then <code>./serve.sh</code>.</p>
+  <script src="windows-crackle-harness.js"></script>
+</body>
+</html>
