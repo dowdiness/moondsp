@@ -42,6 +42,9 @@ let sched_right : @ref.Ref[@moondsp.AudioBuffer?] = @ref.new(None)
 let sched_gain : @ref.Ref[Double] = @ref.new(0.5)
 
 ///|
+const SCHEDULER_SYNTH_MAX_VOICES : Int = 24
+
+///|
 /// Create a SoundPool for a drum template (no control bindings needed).
 fn make_drum_pool(
   template : Array[@moondsp.DspNode],
@@ -87,12 +90,12 @@ fn make_synth_pool(
       ctx,
       @moondsp.ControlBindingBuilder::new().bind(
         key="note",
-        node_index=0,  // oscillator(Value0) frequency placeholder
+        node_index=0, // oscillator(Value0) frequency placeholder
         slot=@moondsp.GraphParamSlot::Value0,
       ),
       // 24 voices for chords: a 5-note chord × 4 layers of jux/stereo
       // needs up to 20 voices. Fewer steals → fewer clicks.
-      max_voices=24,
+      max_voices=SCHEDULER_SYNTH_MAX_VOICES,
     ) {
     Err(_) => None
     Ok(pool) => {
@@ -595,4 +598,40 @@ pub fn set_scheduler_gain(gain : Double) -> Unit {
   } else {
     gain
   }
+}
+
+///|
+/// Test-boundary diagnostic for the most recently rendered scheduler block.
+/// This is intentionally kept in the internal playback host and is not
+/// forwarded through the production browser ABI.
+pub fn scheduler_last_sanitized_count() -> Int {
+  match sched_active_playback.val {
+    None => 0
+    Some(_) => {
+      let mut count = 0
+      for route in sched_routes.val {
+        count += route.pool.pool.last_sanitized_count()
+      }
+      count
+    }
+  }
+}
+
+///|
+/// Current synth-pool pressure, including releasing voices. Reaching
+/// scheduler_synth_voice_capacity means a subsequent note-on must reuse/steal
+/// a slot. Test-only callers use this to localize discontinuities without
+/// changing the production voice policy.
+pub fn scheduler_synth_active_voice_count() -> Int {
+  for route in sched_routes.val {
+    if route.selector is RouteSynth {
+      return route.pool.pool.active_voice_count()
+    }
+  }
+  0
+}
+
+///|
+pub fn scheduler_synth_voice_capacity() -> Int {
+  SCHEDULER_SYNTH_MAX_VOICES
 }

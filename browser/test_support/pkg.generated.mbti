@@ -1,44 +1,24 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "dowdiness/moondsp/browser/internal/playback_host"
+package "dowdiness/moondsp/browser/test_support"
 
 import {
-  "dowdiness/moondsp/graph",
+  "dowdiness/moondsp/dsp",
 }
 
 // Values
 pub fn clear_pattern_input() -> Unit
 
-pub fn clear_song_input() -> Unit
-
 pub fn eval_pattern_input() -> Int
-
-pub fn eval_song_input() -> Int
 
 pub fn get_pattern_error_char(Int) -> Int
 
 pub fn get_pattern_error_length() -> Int
 
-pub fn get_scheduler_parse_error() -> String
-
-pub fn get_song_error_char(Int) -> Int
-
-pub fn get_song_error_length() -> Int
-
-pub fn get_song_parse_error() -> String
-
-pub fn init_scheduler_graph_with_templates(Double, Int, Array[@graph.DspNode], Array[@graph.DspNode], Array[@graph.DspNode], Array[@graph.DspNode], Array[@graph.DspNode], Array[@graph.DspNode]) -> Bool
-
-pub fn parse_and_set_pattern(String) -> Int
-
-pub fn parse_and_set_song(String) -> Int
+pub fn init_scheduler_graph_with_waveform(Double, Int, @dsp.Waveform) -> Bool
 
 pub fn process_scheduler_block() -> Bool
 
 pub fn push_pattern_char(Int) -> Unit
-
-pub fn push_song_char(Int) -> Unit
-
-pub fn reset_scheduler_graph() -> Unit
 
 pub fn scheduler_last_sanitized_count() -> Int
 

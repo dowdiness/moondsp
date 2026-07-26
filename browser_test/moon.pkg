@@ -1,5 +1,6 @@
 import {
   "dowdiness/moondsp",
+  "dowdiness/moondsp/browser/test_support",
   "moonbitlang/core/ref",
 }
 
@@ -7,8 +8,9 @@ import {
   "moonbitlang/core/debug",
 } for "wbtest"
 
+pkgtype(kind: "executable")
+
 options(
-  "is-main": true,
   link: {
     "js": {
       "exports": [
@@ -37,6 +39,9 @@ options(
         "get_browser_error_char",
         "set_scheduler_bpm",
         "set_scheduler_gain",
+        "scheduler_last_sanitized_count",
+        "scheduler_synth_active_voice_count",
+        "scheduler_synth_voice_capacity",
         "crackle_probe_reset",
         "crackle_probe_run",
         "crackle_probe_stream_init",
@@ -74,6 +79,9 @@ options(
         "get_browser_error_char",
         "set_scheduler_bpm",
         "set_scheduler_gain",
+        "scheduler_last_sanitized_count",
+        "scheduler_synth_active_voice_count",
+        "scheduler_synth_voice_capacity",
         "crackle_probe_reset",
         "crackle_probe_run",
         "crackle_probe_stream_init",

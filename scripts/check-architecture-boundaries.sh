@@ -112,7 +112,10 @@ check_manifest "graph/moon.pkg" '^(dowdiness/moondsp/(dsp|identity|graph/interna
 check_manifest "voice/moon.pkg" '^(dowdiness/moondsp/(dsp|graph))$'
 check_manifest "scheduler/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(identity|pattern|song|scheduler/internal/(model|transport|playback|voice_runtime|edit_policy)))$'
 check_manifest "browser/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(scheduler|browser/internal/(slot|demo_templates|playback_host)))$'
-check_manifest "browser_test/moon.pkg" '^(dowdiness/moondsp)$'
+# browser_test reaches production browser internals only through the explicit
+# browser/test_support facade, keeping the compiler's internal-package
+# visibility intact and avoiding changes to the production browser ABI.
+check_manifest "browser_test/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/browser/test_support)$'
 check_manifest "cmd/main/moon.pkg" '^$'
 
 # Future graph internals. Absent manifests are skipped. These rules are the
@@ -136,6 +139,7 @@ check_manifest "scheduler/internal/edit_policy/moon.pkg" '^(dowdiness/moondsp/id
 check_manifest "browser/internal/slot/moon.pkg" '^(dowdiness/moondsp)$'
 check_manifest "browser/internal/demo_templates/moon.pkg" '^(dowdiness/moondsp)$'
 check_manifest "browser/internal/playback_host/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(mini|scheduler|pattern|song))$'
+check_manifest "browser/test_support/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/browser/internal/(demo_templates|playback_host))$'
 
 # Graph is not a secondary DSP facade. It may expose graph APIs whose signatures
 # mention @dsp types, but it must not publicly re-export DSP package types,

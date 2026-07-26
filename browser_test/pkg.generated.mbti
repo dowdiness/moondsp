@@ -56,9 +56,15 @@ pub fn push_pattern_char(Int) -> Unit
 
 pub fn reset_phase() -> Unit
 
+pub fn scheduler_last_sanitized_count() -> Int
+
 pub fn scheduler_left_sample(Int) -> Double
 
 pub fn scheduler_right_sample(Int) -> Double
+
+pub fn scheduler_synth_active_voice_count() -> Int
+
+pub fn scheduler_synth_voice_capacity() -> Int
 
 pub fn set_scheduler_bpm(Double) -> Unit
 
