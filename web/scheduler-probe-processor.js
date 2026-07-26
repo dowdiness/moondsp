@@ -8,6 +8,7 @@ const SCHEDULER_PROBE_TOP_DISCONTINUITY_COUNT = 8;
 const SCHEDULER_PROBE_EPSILON = 1e-12;
 const SCHEDULER_PROBE_DEFAULT_BPM = 120;
 const SCHEDULER_PROBE_DEFAULT_GAIN = 0.5;
+const SCHEDULER_PROBE_REGION_WINDOW_FRAMES = 128;
 // Keep in sync with REQUIRED_EXPORTS in playwright-tests/scheduler-probe.spec.js.
 const SCHEDULER_PROBE_REQUIRED_EXPORTS = [
   'init_scheduler_graph',
@@ -43,6 +44,13 @@ class MoonDspSchedulerProbeProcessor extends AudioWorkletProcessor {
     this.initExportName = String(processorOptions.initExportName ?? 'init_scheduler_graph');
     this.initialBpm = this.numberOption(processorOptions.initialBpm, SCHEDULER_PROBE_DEFAULT_BPM);
     this.initialGain = this.numberOption(processorOptions.initialGain, SCHEDULER_PROBE_DEFAULT_GAIN);
+    this.eventPeriodFrames = Math.max(
+      0,
+      this.integerOption(processorOptions.eventPeriodFrames, 0),
+    );
+    this.expectVoicePressureNearEvent = Boolean(
+      processorOptions.expectVoicePressureNearEvent,
+    );
     this.maxBlocks = Math.min(
       SCHEDULER_PROBE_MAX_BLOCK_COUNT,
       Math.max(1, this.integerOption(processorOptions.maxBlocks, 512)),
@@ -51,6 +59,16 @@ class MoonDspSchedulerProbeProcessor extends AudioWorkletProcessor {
     this.rendered = {
       left: this.emptyAggregate(),
       right: this.emptyAggregate(),
+    };
+    this.totalSanitizedCount = 0;
+    this.maxActiveVoiceCount = 0;
+    this.voiceCapacity = 0;
+    this.voicePressureBlockCount = 0;
+    this.discontinuityRegions = {
+      onset: this.emptyRegion(),
+      noteOff: this.emptyRegion(),
+      steadyState: this.emptyRegion(),
+      voicePressureNearEvent: this.emptyRegion(),
     };
     this.parseStatus = null;
     this.parseError = '';
@@ -123,17 +141,47 @@ class MoonDspSchedulerProbeProcessor extends AudioWorkletProcessor {
     }
 
     const absoluteFrameStart = this.absoluteFrame;
-    const leftMetrics = this.copyAndMeasureChannel('left', 'scheduler_left_sample', left, absoluteFrameStart);
+    const sanitizedCount = this.optionalExportValue('scheduler_last_sanitized_count');
+    const activeVoiceCount = this.optionalExportValue('scheduler_synth_active_voice_count');
+    const voiceCapacity = this.optionalExportValue('scheduler_synth_voice_capacity');
+    const poolPressure = this.expectVoicePressureNearEvent &&
+      voiceCapacity > 0 &&
+      activeVoiceCount >= voiceCapacity;
+    const voicePressureNearEvent = poolPressure &&
+      this.blockHasNearEvent(absoluteFrameStart, left.length);
+    this.totalSanitizedCount += sanitizedCount;
+    this.maxActiveVoiceCount = Math.max(this.maxActiveVoiceCount, activeVoiceCount);
+    this.voiceCapacity = Math.max(this.voiceCapacity, voiceCapacity);
+    if (poolPressure) {
+      this.voicePressureBlockCount += 1;
+    }
+    const leftMetrics = this.copyAndMeasureChannel(
+      'left',
+      'scheduler_left_sample',
+      left,
+      absoluteFrameStart,
+      poolPressure,
+    );
     // Playwright configures stereo output; keep the guard so a misconfigured
     // probe reports partial telemetry instead of throwing in the worklet.
     const rightMetrics = right
-      ? this.copyAndMeasureChannel('right', 'scheduler_right_sample', right, absoluteFrameStart)
+      ? this.copyAndMeasureChannel(
+        'right',
+        'scheduler_right_sample',
+        right,
+        absoluteFrameStart,
+        poolPressure,
+      )
       : null;
 
     this.port.postMessage({
       type: 'block-metrics',
       blockIndex: this.blockIndex,
       absoluteFrameStart,
+      sanitizedCount,
+      activeVoiceCount,
+      voiceCapacity,
+      voicePressureNearEvent,
       left: leftMetrics,
       right: rightMetrics,
     });
@@ -187,11 +235,18 @@ class MoonDspSchedulerProbeProcessor extends AudioWorkletProcessor {
     return false;
   }
 
-  copyAndMeasureChannel(channel, exportName, output, absoluteFrameStart) {
+  copyAndMeasureChannel(
+    channel,
+    exportName,
+    output,
+    absoluteFrameStart,
+    poolPressure,
+  ) {
     const metrics = {
       peak: 0,
       rms: 0,
       nanOrInfCount: 0,
+      clippedSampleCount: 0,
       maxStep: 0,
       maxStepFrame: absoluteFrameStart,
       maxStepBefore: this.previousSamples[channel],
@@ -224,6 +279,10 @@ class MoonDspSchedulerProbeProcessor extends AudioWorkletProcessor {
       }
 
       const abs = Math.abs(sample);
+      if (abs > 1) {
+        metrics.clippedSampleCount += 1;
+        aggregate.clippedSampleCount += 1;
+      }
       metrics.peak = Math.max(metrics.peak, abs);
       aggregate.peak = Math.max(aggregate.peak, abs);
       if (abs > SCHEDULER_PROBE_EPSILON) {
@@ -259,12 +318,68 @@ class MoonDspSchedulerProbeProcessor extends AudioWorkletProcessor {
         after: sample,
         kind: this.classifyStep(previous, sample, isBoundary),
       });
+      this.recordRegionDiscontinuity(
+        step,
+        frame,
+        channel,
+        previous,
+        sample,
+        poolPressure,
+      );
       previous = sample;
     }
 
     this.previousSamples[channel] = previous;
     metrics.rms = Math.sqrt(sumSquares / Math.max(1, output.length));
     return metrics;
+  }
+
+  recordRegionDiscontinuity(step, frame, channel, before, after, poolPressure) {
+    if (!Number.isFinite(step)) {
+      return;
+    }
+    const nearEvent = this.isNearEvent(frame);
+    const regions = [];
+    if (nearEvent) {
+      regions.push('onset');
+      if (frame >= this.eventPeriodFrames) {
+        regions.push('noteOff');
+      }
+    } else {
+      regions.push('steadyState');
+    }
+    if (poolPressure && nearEvent) {
+      regions.push('voicePressureNearEvent');
+    }
+    for (const name of regions) {
+      const region = this.discontinuityRegions[name];
+      region.sampleStepCount += 1;
+      if (step > region.maxStep) {
+        region.maxStep = step;
+        region.frame = frame;
+        region.channel = channel;
+        region.before = before;
+        region.after = after;
+      }
+    }
+  }
+
+  blockHasNearEvent(frameStart, frameCount) {
+    for (let index = 0; index < frameCount; index += 1) {
+      if (this.isNearEvent(frameStart + index)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  isNearEvent(frame) {
+    if (this.eventPeriodFrames <= 0) {
+      return false;
+    }
+    const remainder = frame % this.eventPeriodFrames;
+    const distance = Math.min(remainder, this.eventPeriodFrames - remainder);
+    return distance < SCHEDULER_PROBE_REGION_WINDOW_FRAMES;
   }
 
   classifyStep(before, after, isBoundary) {
@@ -310,6 +425,11 @@ class MoonDspSchedulerProbeProcessor extends AudioWorkletProcessor {
       maxDiscontinuity,
       maxDiscontinuityKind: maxDiscontinuity?.kind ?? 'none',
       topDiscontinuities: this.topDiscontinuities,
+      totalSanitizedCount: this.totalSanitizedCount,
+      maxActiveVoiceCount: this.maxActiveVoiceCount,
+      voiceCapacity: this.voiceCapacity,
+      voicePressureBlockCount: this.voicePressureBlockCount,
+      discontinuityRegions: this.discontinuityRegions,
       rendered: {
         left: this.aggregateSummary(this.rendered.left),
         right: this.aggregateSummary(this.rendered.right),
@@ -322,6 +442,7 @@ class MoonDspSchedulerProbeProcessor extends AudioWorkletProcessor {
       peak: aggregate.peak,
       rms: Math.sqrt(aggregate.sumSquares / Math.max(1, aggregate.sampleCount)),
       nanOrInfCount: aggregate.nanOrInfCount,
+      clippedSampleCount: aggregate.clippedSampleCount,
       nonZeroSampleCount: aggregate.nonZeroSampleCount,
       firstActiveFrame: aggregate.firstActiveFrame,
     };
@@ -333,9 +454,27 @@ class MoonDspSchedulerProbeProcessor extends AudioWorkletProcessor {
       sumSquares: 0,
       sampleCount: 0,
       nanOrInfCount: 0,
+      clippedSampleCount: 0,
       nonZeroSampleCount: 0,
       firstActiveFrame: null,
     };
+  }
+
+  emptyRegion() {
+    return {
+      maxStep: 0,
+      frame: null,
+      channel: null,
+      before: 0,
+      after: 0,
+      sampleStepCount: 0,
+    };
+  }
+
+  optionalExportValue(name) {
+    return this.wasm && typeof this.wasm[name] === 'function'
+      ? this.wasm[name]()
+      : 0;
   }
 
   missingExports(names) {
