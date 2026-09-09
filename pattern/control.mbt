@@ -60,13 +60,13 @@ pub fn ControlMap::merge(self : ControlMap, other : ControlMap) -> ControlMap {
 
 ///|
 pub fn note(n : Double) -> Pat[ControlMap] {
-  Pat::pure(ControlMap::single("note", n))
+  control("note", n)
 }
 
 ///|
 /// Create a sound control pattern from a MIDI drum number.
 pub fn sound(midi : Double) -> Pat[ControlMap] {
-  Pat::pure(ControlMap::single("sound", midi))
+  control("sound", midi)
 }
 
 ///|
@@ -129,17 +129,17 @@ fn parse_note_name(name : String) -> Double {
 
 ///|
 pub fn s_cutoff(f : Double) -> Pat[ControlMap] {
-  Pat::pure(ControlMap::single("cutoff", f))
+  control("cutoff", f)
 }
 
 ///|
 pub fn s_gain(g : Double) -> Pat[ControlMap] {
-  Pat::pure(ControlMap::single("gain", g))
+  control("gain", g)
 }
 
 ///|
 pub fn s_pan(p : Double) -> Pat[ControlMap] {
-  Pat::pure(ControlMap::single("pan", p))
+  control("pan", p)
 }
 
 ///|
@@ -154,12 +154,19 @@ pub fn s_pan(p : Double) -> Pat[ControlMap] {
 /// slot t and right's hh at slot 1-t). For sparse multi-sound
 /// patterns like `s("bd sd hh sd").jux(rev)` the per-pool pressure
 /// stays at 1.
-/// Unidentified callbacks invalidate content identity. A compiler may supply a
-/// signature covering the callback and its captured configuration.
+/// Arbitrary callback content is unknown. Use TimeTransform for known operations.
 pub fn Pat::jux(
   self : Pat[ControlMap],
   f : (Pat[ControlMap]) -> Pat[ControlMap],
-  signature? : String = "",
+) -> Pat[ControlMap] {
+  self.jux_known(f, "")
+}
+
+///|
+fn Pat::jux_known(
+  self : Pat[ControlMap],
+  f : (Pat[ControlMap]) -> Pat[ControlMap],
+  signature : String,
 ) -> Pat[ControlMap] {
   let left = merge_control(self, s_pan(-1.0))
   let right = merge_control(f(self), s_pan(1.0))
@@ -219,4 +226,38 @@ pub fn merge_control(
       })
     },
   }
+}
+
+///|
+/// A scalar control source whose content is tracked automatically.
+pub fn control(key : String, value : Double) -> Pat[ControlMap] {
+  let pat = Pat::pure(ControlMap::single(key, value))
+  { ..pat, signature: "control:\{key.length()}:\{key}:\{value}" }
+}
+
+///|
+/// Select events carrying a control; optionally require an exact value.
+pub fn Pat::select_control(
+  self : Pat[ControlMap],
+  key : String,
+  value? : Double,
+) -> Pat[ControlMap] {
+  let condition = match value {
+    Some(v) => "equals:\{v}"
+    None => "present"
+  }
+  self.filter_map_known(
+    cm => {
+      match cm.get(key) {
+        None => None
+        Some(v) =>
+          if value is Some(expected) && v != expected {
+            None
+          } else {
+            Some(cm)
+          }
+      }
+    },
+    "select:\{key.length()}:\{key}:" + condition,
+  )
 }

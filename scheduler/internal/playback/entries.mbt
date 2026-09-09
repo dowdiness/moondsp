@@ -80,11 +80,7 @@ fn next_entry(
 
 ///|
 fn same_material(a : EntrySpec, b : EntrySpec) -> Bool {
-  a.body.entry_signature() != "" &&
-  a.body.entry_signature() == b.body.entry_signature() &&
-  a.body.entry_period() == b.body.entry_period() &&
-  a.start == b.start &&
-  a.end_ == b.end_
+  a.body.same_content(b.body) && a.start == b.start && a.end_ == b.end_
 }
 
 ///|
@@ -104,13 +100,13 @@ fn reconcile_entries(
     let replacement = remaining.get(entry.active.id)
     remaining.remove(entry.active.id)
     if replacement is Some(spec) && same_material(entry.active, spec) {
-      result.push({ ..entry, edit: None, })
+      result.push({ ..entry, edit: None })
     } else {
       let due = match entry.edit {
         Some(edit) => edit.due
         None => next_entry(entry, now)
       }
-      result.push({ ..entry, edit: Some({ due, replacement, }), })
+      result.push({ ..entry, edit: Some({ due, replacement }) })
     }
   }
   for spec in next {
@@ -122,11 +118,11 @@ fn reconcile_entries(
         ..spec,
         body: @pattern.Pat::silence().slow(spec.body.entry_period()),
       }
-      let entry = EntryState::{ active: spec, origin: spec.start, edit: None, }
+      let entry = EntryState::{ active: spec, origin: spec.start, edit: None }
       result.push({
         active: silent,
         origin: spec.start,
-        edit: Some({ due: next_entry(entry, now), replacement: Some(spec), }),
+        edit: Some({ due: next_entry(entry, now), replacement: Some(spec) }),
       })
     }
   }
@@ -143,7 +139,7 @@ fn settle_entries(
       return None
     }
     match entry.edit {
-      Some({ due: Some(due), replacement, }) if due <= now =>
+      Some({ due: Some(due), replacement }) if due <= now =>
         replacement.map(spec => {
           active: spec,
           origin: replacement_origin(entry, spec, due),
@@ -181,7 +177,7 @@ fn query_entries(
   .iter()
   .flat_map(entry => {
     match entry.edit {
-      Some({ due: Some(due), replacement, }) if due < arc.end_ => {
+      Some({ due: Some(due), replacement }) if due < arc.end_ => {
         let old = if due > arc.begin {
           query_entry(
             entry.active,

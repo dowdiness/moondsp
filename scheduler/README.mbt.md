@@ -77,18 +77,26 @@ inside the same stack. Anonymous members use positions; repeated uses of the
 same name use occurrence order. Restructuring a stack can therefore create new
 addresses. This is not semantic identity inference from text similarity.
 
-Library callers can construct a custom source with `Pat::from_query`; it has
-one-cycle entries without requiring periodic event values. They can use `named_entry` for an address and `material(signature)`
-to declare indivisible source content. A source signature must identify its
-content. Built-in time transforms, reverse, and degradation update that identity
-automatically. Control merging includes both inputs when they are identifiable.
-Arbitrary callbacks invalidate it by default, so public API edits cannot be
-silently skipped. Applying another known transform keeps unknown content unknown.
+Library callers can use `named_entry` to name a material and `material()` to
+make an expression indivisible. Names address edits; content comparison does
+not depend on those names. Scalar notes, sounds, controls, silence, and their
+combinations track content automatically. `same_content` answers whether two
+patterns have known equal content without exposing the representation.
 
-The compiler and fixed routing adapters can supply a callback signature covering
-its code and captured configuration. Ordinary callers need no signature to make
-edits work; unknown content is conservatively replaced. Entry metadata describes
-replacement, not event generation.
+`TimeTransform` describes a known Fast, Slow, or Reverse operation. It can apply
+the operation, repeat it with `every`, or create a stereo `jux` expression.
+Its execution and identity are owned together. `select_control` selects events
+by control presence or exact value; routing adapters need no identity strings.
+
+Arbitrary queries from `Pat::from_query` and ordinary callback-based `filter_map`,
+`every`, and `jux` remain supported. Their content is unknown, so edits are
+conservatively replaced. Grouping or applying a known transform cannot turn
+unknown content into known content. Callers cannot attach a content identifier
+to arbitrary code. Generic `Pat::pure` also remains unknown; use the scalar
+control constructors for automatically tracked control sources.
+
+These changes require no additional authoring syntax or UI settings. Content
+comparison, entry addressing, and event generation remain separate concerns.
 
 Revision accessors report the accepted authored score. They do not assert that
 all its materials are already audible. Pending accessors also include materials

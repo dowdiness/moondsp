@@ -5,12 +5,19 @@ pub fn[A] Pat::named_entry(self : Pat[A], name : String) -> Pat[A] {
 }
 
 ///|
-/// Mark one compiled expression as an indivisible authored material.
-/// The signature identifies this source content. Built-in transforms update it;
-/// unidentified callbacks invalidate it. An empty signature makes replacement
-/// conservative. Callers defining a source must change its signature with content.
-pub fn[A] Pat::material(self : Pat[A], signature : String) -> Pat[A] {
-  { ..self, members: [], signature }
+/// Group this expression as one authored material without changing its content.
+pub fn[A] Pat::material(self : Pat[A]) -> Pat[A] {
+  { ..self, members: [], signature: self.entry_signature() }
+}
+
+///|
+/// True only when both sources are identifiable and have the same content.
+/// Names and placement are separate. Arbitrary queries/callbacks return false.
+pub fn[A] Pat::same_content(self : Pat[A], other : Pat[A]) -> Bool {
+  let signature = self.entry_signature()
+  signature != "" &&
+  signature == other.entry_signature() &&
+  self.period == other.period
 }
 
 ///|
@@ -29,7 +36,7 @@ pub fn[A] Pat::entry_period(self : Pat[A]) -> Rational {
 }
 
 ///|
-pub fn[A] Pat::entry_signature(self : Pat[A]) -> String {
+fn[A] Pat::entry_signature(self : Pat[A]) -> String {
   let mut text = self.signature
   for p in self.members {
     let part = p.entry_signature()
@@ -37,8 +44,7 @@ pub fn[A] Pat::entry_signature(self : Pat[A]) -> String {
     if part == "" {
       return ""
     }
-    text = text +
-      "/\{p.entry_key.length()}:\{p.entry_key}:\{part.length()}:\{part}"
+    text = text + "/\{part.length()}:\{part}"
   }
   text
 }

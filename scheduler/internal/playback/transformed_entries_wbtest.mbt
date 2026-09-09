@@ -1,13 +1,14 @@
 ///|
 test "public transformations of identified material reach playback" {
-  let source = @pattern.sequence([@pattern.note(60.0), @pattern.note(72.0)]).material(
-    "source",
-  )
+  let source = @pattern.sequence([@pattern.note(60.0), @pattern.note(72.0)]).material()
   let cases = [
     (source.filter_map(_ => None), []),
     (@pattern.merge_control(source, @pattern.note(80.0)), [80, 80]),
     (
-      @pattern.merge_control(source, @pattern.note(80.0).material("control:80")),
+      @pattern.merge_control(
+        source,
+        @pattern.Pat::from_query(@pattern.note(80.0).query),
+      ),
       [80, 80],
     ),
     (source.rev(), [72, 60]),

@@ -145,14 +145,8 @@ test "bench/entries/prepared_playback" (b : @bench.T) {
   let snapshot = try! @pattern.PatternDoc::from_pattern(
     id~,
     pat=@pattern.stack([
-      source
-      .slow(@pattern.Rational::from_int(3))
-      .material("three")
-      .named_entry("a"),
-      source
-      .slow(@pattern.Rational::from_int(4))
-      .material("four")
-      .named_entry("b"),
+      source.slow(@pattern.Rational::from_int(3)).material().named_entry("a"),
+      source.slow(@pattern.Rational::from_int(4)).material().named_entry("b"),
     ]),
   ).lower()
   let left = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)

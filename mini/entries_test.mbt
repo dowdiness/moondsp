@@ -11,9 +11,9 @@ test "named entry identities survive reordering and unchanged material stays unc
     .unwrap()
     .entries()
   assert_eq(a[0].entry_key(), b[1].entry_key())
-  assert_eq(a[0].entry_signature(), b[1].entry_signature())
+  assert_true(a[0].same_content(b[1]))
   assert_eq(a[1].entry_key(), b[0].entry_key())
-  assert_true(a[1].entry_signature() != b[0].entry_signature())
+  assert_false(a[1].same_content(b[0]))
   assert_true(a[0].entry_period() == @pattern.Rational::from_int(3))
   assert_true(a[1].entry_period() == @pattern.Rational::from_int(4))
 }
@@ -26,7 +26,7 @@ test "silent, filtered and transformed materials retain their entry period" {
   let a = @mini.parse("stack(note(\"60\"),note(\"72\")).jux(rev)").unwrap()
   let b = @mini.parse("stack(note(\"61\"),note(\"72\")).jux(rev)").unwrap()
   assert_eq(a.entries().length(), 1)
-  assert_true(a.entry_signature() != b.entry_signature())
+  assert_false(a.same_content(b))
 }
 
 ///|
@@ -41,11 +41,10 @@ test "compiled transforms keep stable identities and distinguish their parameter
   for pair in pairs {
     let (first, second) = pair
     let text = "stack(note(\"60\"), note(\"72\"))"
-    let a = @mini.parse(text + first).unwrap().entry_signature()
-    let same = @mini.parse(text + first).unwrap().entry_signature()
-    let changed = @mini.parse(text + second).unwrap().entry_signature()
-    assert_true(a != "")
-    assert_eq(a, same)
-    assert_true(a != changed)
+    let a = @mini.parse(text + first).unwrap()
+    let same = @mini.parse(text + first).unwrap()
+    let changed = @mini.parse(text + second).unwrap()
+    assert_true(a.same_content(same))
+    assert_false(a.same_content(changed))
   }
 }

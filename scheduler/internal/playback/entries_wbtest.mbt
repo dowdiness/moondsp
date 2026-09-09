@@ -9,7 +9,7 @@ fn material(
     @pattern.note((note + 1).to_double()),
   ])
   .slow(@pattern.Rational::from_int(period))
-  .material("\{note}")
+  .material()
   .named_entry(name)
 }
 

@@ -30,7 +30,7 @@ pub fn[A] Pat::silence() -> Pat[A] {
     period: Rational::from_int(1),
     members: [],
     entry_key: "",
-    signature: "",
+    signature: "silence",
   }
 }
 

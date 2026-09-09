@@ -45,11 +45,8 @@ fn resolve_mini_expr(
 
 ///|
 fn MiniCallback::runtime(self : MiniCallback) -> Callback {
-  match self {
-    Fast(n) => make_fast(@pattern.Rational::from_int(n))
-    Slow(n) => make_slow(@pattern.Rational::from_int(n))
-    Rev => make_rev()
-  }
+  let operation = self.operation()
+  fn(pat) { operation.apply(pat) }
 }
 
 ///|
@@ -73,12 +70,7 @@ fn compile_mini_pattern(
         Note => parse_note_notation(content)
         Chord => parse_chord_notation(content)
       }
-      let tag = match kind {
-        Sound => "s"
-        Note => "n"
-        Chord => "c"
-      }
-      pat.material("literal:\{content.length()}:\{content}:" + tag)
+      pat.material()
     }
     Stack(children) => {
       let pats = children.map(child => compile_mini_pattern(child, definitions))
@@ -101,21 +93,9 @@ fn compile_mini_pattern(
         Rev => pat.rev()
         Degrade(p) => pat.degrade_by(p)
         Control(key, value) =>
-          @pattern.merge_control(
-            pat,
-            @pattern.Pat::pure(@pattern.ControlMap::single(key, value)).material(
-              "control:\{key}:\{value}",
-            ),
-          )
-        Every(n, callback) =>
-          @pattern.every(
-            n,
-            callback.runtime(),
-            pat,
-            signature=callback.signature(),
-          )
-        Jux(callback) =>
-          pat.jux(callback.runtime(), signature=callback.signature())
+          @pattern.merge_control(pat, @pattern.control(key, value))
+        Every(n, callback) => callback.operation().every(n, pat)
+        Jux(callback) => callback.operation().jux(pat)
       }
     }
   }
@@ -166,11 +146,18 @@ fn compile_mini_doc(
         Degrade(p) =>
           builder.degrade_doc(doc, p, stable_seed(doc.root().value()))
         Control(key, value) => builder.scalar_control_doc(doc, key, value)
-        Every(n, callback) =>
-          builder.every_doc(doc, n, callback.runtime(), callback.signature())
-        Jux(callback) =>
-          builder.jux_doc(doc, callback.runtime(), callback.signature())
+        Every(n, callback) => builder.every_doc(doc, n, callback)
+        Jux(callback) => builder.jux_doc(doc, callback)
       }
     }
+  }
+}
+
+///|
+fn MiniCallback::operation(self : MiniCallback) -> @pattern.TimeTransform {
+  match self {
+    Fast(n) => @pattern.TimeTransform::Fast(@pattern.Rational::from_int(n))
+    Slow(n) => @pattern.TimeTransform::Slow(@pattern.Rational::from_int(n))
+    Rev => @pattern.TimeTransform::Reverse
   }
 }

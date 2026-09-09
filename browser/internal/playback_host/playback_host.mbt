@@ -215,46 +215,14 @@ fn accumulate_sub_pool(
 }
 
 ///|
-fn route_matches(
-  selector : SchedulerRouteSelector,
-  cm : @pattern.ControlMap,
-) -> Bool {
-  match selector {
-    RouteSound(sound_code) =>
-      match cm.get("sound") {
-        Some(v) => v == sound_code
-        None => false
-      }
-    RouteSynth =>
-      match cm.get("note") {
-        Some(_) => true
-        None => false
-      }
-  }
-}
-
-///|
-fn control_map_for_route(
-  selector : SchedulerRouteSelector,
-  cm : @pattern.ControlMap,
-) -> @pattern.ControlMap? {
-  if route_matches(selector, cm) {
-    Some(cm)
-  } else {
-    None
-  }
-}
-
-///|
 fn filter_pat_for_route(
   selector : SchedulerRouteSelector,
   pat : @pattern.Pat[@pattern.ControlMap],
 ) -> @pattern.Pat[@pattern.ControlMap] {
-  let signature = match selector {
-    RouteSynth => "route:synth"
-    RouteSound(code) => "route:sound:\{code}"
+  match selector {
+    RouteSynth => pat.select_control("note")
+    RouteSound(code) => pat.select_control("sound", value=code)
   }
-  pat.filter_map(fn(cm) { control_map_for_route(selector, cm) }, signature~)
 }
 
 ///|
