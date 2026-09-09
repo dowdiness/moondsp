@@ -59,7 +59,7 @@ fn bench_pool(
 
 ///|
 fn bench_scheduler(ctx : @moondsp.DspContext) -> PatternScheduler {
-  PatternScheduler::new(bpm=120.0, ctx~)
+  PatternScheduler::new(bpm=120.0, ctx~).unwrap()
 }
 
 ///|
@@ -96,7 +96,7 @@ test "bench/jux/scheduler_dispatch" (b : @bench.T) {
   let events = bench_jux_pattern().query(arc)
   b.bench(name="process_events_8_jux_events", fn() {
     scheduler.process_events(events.copy(), arc, pool)
-    scheduler.expire_notes(pool, expire_arc)
+    scheduler.expire_notes(pool, expire_arc).unwrap()
     b.keep(pool.active_voice_count())
   })
 }

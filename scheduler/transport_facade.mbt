@@ -1,9 +1,11 @@
 ///|
+pub using @transport {type TransportError}
+
+///|
 /// Audio-block frame derived from the scheduler clock.
 ///
-/// `logical_arc` keeps the existing rational-cycle semantics; the sample range
-/// gives the future song layer a stable audio-time anchor without changing the
-/// current pattern scheduler behavior.
+/// `logical_arc` is the rational musical span on the current anchored clock;
+/// the sample range identifies where its output will be rendered.
 pub struct BlockFrame {
   sample_begin : Int64
   sample_end : Int64
@@ -22,81 +24,115 @@ pub fn PerformanceTime::PerformanceTime(sample : Int64) -> PerformanceTime {
 }
 
 ///|
-/// Reject NaN/Inf and clamp to minimum 1.0 BPM.
-fn sanitize_bpm(bpm : Double) -> Double {
-  @transport.sanitize_bpm(bpm)
-}
-
-///|
-/// Derive the cycle-time arc for a block from the integer sample counter.
-///
-/// At BPM, one cycle lasts 60/BPM seconds. The formula
-/// `sample_counter * bpm / (sample_rate * 60)` gives the cycle position —
-/// how many cycles have elapsed since playback started. Using Rational
-/// arithmetic keeps this exact (no floating-point drift). Denominators are
-/// bounded by `sample_rate * 60` (e.g. 2,880,000 for 48kHz).
-pub fn compute_arc(
-  sample_counter : Int64,
-  bpm : Double,
-  ctx : @moondsp.DspContext,
-) -> @pattern.TimeSpan {
-  @transport.compute_arc(sample_counter, bpm, ctx)
-}
-
-///|
-/// Convert an absolute logical cycle position into the first sample at or after
-/// that cycle position for the scheduler's BPM scaling convention.
-pub fn cycle_to_sample(
-  cycle : @pattern.Rational,
-  bpm : Double,
-  ctx : @moondsp.DspContext,
-) -> Int64 {
-  @transport.cycle_to_sample(cycle, bpm, ctx)
+/// Validate and normalize external tempo input before preparing playback.
+pub fn normalize_bpm(bpm : Double) -> Result[Double, TransportError] {
+  @transport.Tempo::from_bpm(bpm).map(tempo => tempo.bpm())
 }
 
 ///|
 pub fn PatternScheduler::sample_counter(self : PatternScheduler) -> Int64 {
-  self.sample_counter
+  self.clock.sample()
 }
 
 ///|
-/// Current tempo in beats per minute. The value is always sanitized:
-/// construction and `set_bpm` reject NaN/Inf and clamp to a minimum of 1.0.
+/// Current accepted tempo, rounded to the nearest 0.001 BPM.
 pub fn PatternScheduler::bpm(self : PatternScheduler) -> Double {
-  self.bpm
+  self.clock.tempo().bpm()
 }
 
 ///|
 /// Current block frame without advancing the scheduler clock.
-pub fn PatternScheduler::current_block(self : PatternScheduler) -> BlockFrame {
-  let sample_begin = self.sample_counter
-  let sample_end = @transport.block_sample_end(sample_begin, self.ctx)
-  {
-    sample_begin,
-    sample_end,
-    logical_arc: compute_arc(sample_begin, self.bpm, self.ctx),
+pub fn PatternScheduler::current_block(
+  self : PatternScheduler,
+) -> Result[BlockFrame, TransportError] {
+  let next = match self.clock.advance(self.ctx.block_size()) {
+    Ok(next) => next
+    Err(e) => return Err(e)
+  }
+  Ok({
+    sample_begin: self.clock.sample(),
+    sample_end: next.sample(),
+    logical_arc: @pattern.TimeSpan::new(
+      self.clock.position(self.clock.sample()).unwrap(),
+      next.position(next.sample()).unwrap(),
+    ),
+  })
+}
+
+///|
+fn PatternScheduler::render_frame(
+  self : PatternScheduler,
+  pool : @moondsp.BoundVoicePool,
+  left : @moondsp.AudioBuffer,
+  right : @moondsp.AudioBuffer,
+) -> BlockFrame? {
+  match self.current_block() {
+    Ok(frame) => Some(frame)
+    Err(e) => {
+      self.last_error = Some(e)
+      left.fill(0.0)
+      right.fill(0.0)
+      pool.kill_all()
+      self.active_notes.clear()
+      None
+    }
   }
 }
 
 ///|
-/// Update tempo in-place. Newly scheduled notes use the updated tempo. Active
-/// notes keep their already-computed performance-time gate-off sample.
-pub fn PatternScheduler::set_bpm(self : PatternScheduler, bpm : Double) -> Unit {
-  self.bpm = sanitize_bpm(bpm)
+/// Change tempo at the next unrendered sample, retaining musical position.
+/// Invalid input or unrepresentable active endpoints leave all state unchanged.
+pub fn PatternScheduler::set_bpm(
+  self : PatternScheduler,
+  bpm : Double,
+) -> Result[Unit, TransportError] {
+  let tempo = match @transport.Tempo::from_bpm(bpm) {
+    Ok(tempo) => tempo
+    Err(e) => return Err(e)
+  }
+  let next = self.clock.with_tempo(tempo)
+  match next.advance(self.ctx.block_size()) {
+    Err(e) => return Err(e)
+    Ok(_) => ()
+  }
+  match self.active_notes.retime(end_ => next.sample_at(end_)) {
+    Err(e) => return Err(e)
+    Ok(_) => ()
+  }
+  self.clock = next
+  Ok(())
+}
+
+///|
+pub fn PatternScheduler::last_transport_error(
+  self : PatternScheduler,
+) -> TransportError? {
+  self.last_error
+}
+
+///|
+pub fn PatternScheduler::sample_at(
+  self : PatternScheduler,
+  position : @pattern.Rational,
+) -> Result[Int64, TransportError] {
+  self.clock.sample_at(position)
 }
 
 ///|
 fn PatternScheduler::advance_block(self : PatternScheduler) -> Unit {
-  self.sample_counter = @transport.advance_block_sample(
-    self.sample_counter,
-    self.ctx,
-  )
+  match self.clock.advance(self.ctx.block_size()) {
+    Ok(clock) => self.clock = clock
+    Err(e) => self.last_error = Some(e)
+  }
 }
 
 ///|
 /// Reset the transport to the beginning and forget tracked active notes.
 pub fn PatternScheduler::reset_transport(self : PatternScheduler) -> Unit {
-  self.sample_counter = 0L
+  self.clock = self.clock.reset()
+  self.previous_clock = self.clock
+  self.previous_events = []
+  self.last_error = None
   self.active_notes.clear()
 }
 
@@ -113,4 +149,21 @@ pub fn PatternScheduler::reset_transport_and_kill_notes(
 ) -> Unit {
   pool.kill_all()
   self.reset_transport()
+}
+
+///|
+/// Read-only admission for coordinating an edit across sound routes.
+pub fn PatternScheduler::validate_bpm(
+  self : PatternScheduler,
+  bpm : Double,
+) -> Result[Unit, TransportError] {
+  let tempo = match @transport.Tempo::from_bpm(bpm) {
+    Ok(tempo) => tempo
+    Err(e) => return Err(e)
+  }
+  let next = self.clock.with_tempo(tempo)
+  match next.advance(self.ctx.block_size()) {
+    Err(e) => return Err(e)
+    Ok(_) => self.active_notes.validate_retime(end_ => next.sample_at(end_))
+  }
 }

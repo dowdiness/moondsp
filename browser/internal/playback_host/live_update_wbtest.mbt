@@ -88,17 +88,15 @@ test "replacement and reset apply atomically and kill previous voices" {
 }
 
 ///|
-test "continuing a song rejects layout and tempo changes independently" {
+test "continuing a song rejects layout changes" {
   assert_true(init_scheduler_graph_for_test())
   assert_eq(submit_for_test(test_song(length=8, bpm=120), song=true), 0)
   render_for_test(4)
-  for changed in [test_song(length=9, bpm=120), test_song(length=8, bpm=90)] {
-    let token = prepare_for_test(changed, song=true)
-    assert_true(token > 0)
-    assert_eq(apply_prepared_playback(token, false), 1)
-    assert_position(512)
-    assert_tempo(120.0)
-  }
+  let token = prepare_for_test(test_song(length=9, bpm=120), song=true)
+  assert_true(token > 0)
+  assert_eq(apply_prepared_playback(token, false), 1)
+  assert_position(512)
+  assert_tempo(120.0)
 }
 
 ///|
@@ -199,4 +197,28 @@ test "finite playback ends and restart returns to the first onset" {
   render_for_test(2)
   assert_position(256)
   assert_true(output_energy() > 0.01)
+}
+
+///|
+test "song tempo commits on all routes without restarting or moving the anchor" {
+  assert_true(init_scheduler_graph_for_test())
+  assert_eq(submit_for_test(test_song(length=8, bpm=120), song=true), 0)
+  render_for_test(4)
+  let token = prepare_for_test(test_song(length=8, bpm=90), song=true)
+  assert_eq(apply_prepared_playback(token, false), 0)
+  assert_position(512)
+  assert_tempo(120.0)
+  render_for_test(1)
+  assert_position(640)
+  assert_tempo(90.0)
+  for route in sched_routes.val {
+    let frame = route.pool.scheduler.current_block().unwrap()
+    assert_true(
+      frame.logical_arc.begin ==
+      @pattern.Rational::new(512L * 120L + 128L * 90L, 2880000L),
+    )
+  }
+  set_scheduler_bpm(0.0)
+  assert_tempo(90.0)
+  assert_position(640)
 }

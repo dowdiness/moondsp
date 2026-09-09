@@ -25,7 +25,7 @@ test "midi_to_hz: MIDI 127" {
 ///|
 test "PatternScheduler::new initializes with zero position" {
   let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
-  let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~)
+  let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~).unwrap()
   @debug.assert_eq(sched.sample_counter(), 0L)
   @debug.assert_eq(sched.active_note_count(), 0)
 }
@@ -33,84 +33,23 @@ test "PatternScheduler::new initializes with zero position" {
 ///|
 test "PatternScheduler::bpm round-trips construction and set_bpm" {
   let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
-  let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~)
+  let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~).unwrap()
   @debug.assert_eq(sched.bpm(), 120.0)
-  sched.set_bpm(174.0)
+  sched.set_bpm(174.0).unwrap()
   @debug.assert_eq(sched.bpm(), 174.0)
-  // sanitization is preserved through the reader: <1.0 clamps to 1.0.
-  sched.set_bpm(0.0)
-  @debug.assert_eq(sched.bpm(), 1.0)
-}
-
-///|
-test "compute_arc: first block at 120 BPM" {
-  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
-  let arc = @scheduler.compute_arc(0L, 120.0, ctx)
-  let zero = @pattern.Rational::from_int(0)
-  assert_true(arc.begin == zero)
-  let expected_end = @pattern.Rational::new(15360L, 2880000L)
-  assert_true(arc.end_ == expected_end)
-}
-
-///|
-test "compute_arc: second block at 120 BPM" {
-  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
-  let arc = @scheduler.compute_arc(128L, 120.0, ctx)
-  let expected_start = @pattern.Rational::new(15360L, 2880000L)
-  let expected_end = @pattern.Rational::new(30720L, 2880000L)
-  assert_true(arc.begin == expected_start)
-  assert_true(arc.end_ == expected_end)
-}
-
-///|
-test "compute_arc: fractional BPM 120.5 preserves precision" {
-  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
-  // 120.5 BPM → bpm_scaled = 1205, denominator = 48000 * 600 = 28800000
-  // arc_end = 128 * 1205 / 28800000 = 154240 / 28800000
-  let arc = @scheduler.compute_arc(0L, 120.5, ctx)
-  let expected_end = @pattern.Rational::new(154240L, 28800000L)
-  assert_true(arc.end_ == expected_end)
-  // Verify 120.5 and 120.0 produce different arcs
-  let arc_120 = @scheduler.compute_arc(0L, 120.0, ctx)
-  assert_true(arc.end_ != arc_120.end_)
-}
-
-///|
-test "cycle_to_sample: one cycle at 120 BPM is 24000 samples" {
-  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
-  let sample = @scheduler.cycle_to_sample(
-    @pattern.Rational::from_int(1),
-    120.0,
-    ctx,
-  )
-  @debug.assert_eq(sample, 24000L)
-}
-
-///|
-test "cycle_to_sample: rounds up to the first sample at or after cycle" {
-  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
-  let sample = @scheduler.cycle_to_sample(
-    @pattern.Rational::new(1L, 3L),
-    120.0,
-    ctx,
-  )
-  @debug.assert_eq(sample, 8000L)
-  let rounded = @scheduler.cycle_to_sample(
-    @pattern.Rational::new(1L, 7L),
-    120.0,
-    ctx,
-  )
-  @debug.assert_eq(rounded, 3429L)
+  assert_true(sched.set_bpm(0.0) is Err(_))
+  @debug.assert_eq(sched.bpm(), 174.0)
 }
 
 ///|
 test "current_block exposes sample range and logical arc" {
   let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
-  let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~)
-  let frame = sched.current_block()
+  let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~).unwrap()
+  let frame = sched.current_block().unwrap()
   @debug.assert_eq(frame.sample_begin, 0L)
   @debug.assert_eq(frame.sample_end, 128L)
-  assert_true(frame.logical_arc == @scheduler.compute_arc(0L, 120.0, ctx))
+  assert_true(frame.logical_arc.begin == @pattern.Rational::from_int(0))
+  assert_true(frame.logical_arc.end_ == @pattern.Rational::new(128L, 24000L))
 }
 
 ///|
@@ -160,7 +99,7 @@ fn make_test_sched() -> (
   @moondsp.AudioBuffer,
 ) {
   let (pool, _, ctx) = make_test_pool()
-  let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~)
+  let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~).unwrap()
   let left = @moondsp.AudioBuffer::filled(128)
   let right = @moondsp.AudioBuffer::filled(128)
   (pool, sched, left, right)
@@ -619,18 +558,18 @@ test "PlaybackSnapshot::query_playback_events tags song layer provenance" {
 ///|
 test "expire_notes: removes notes past their end_time" {
   let (pool, _, ctx) = make_test_pool()
-  let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~)
+  let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~).unwrap()
   let handle = pool.note_on_controls({ "note": 440.0 })
   match handle {
     None => assert_true(false)
     Some(h) => {
-      sched.push_active_note(h, @pattern.Rational::from_int(0))
+      sched.push_active_note(h, @pattern.Rational::from_int(0)).unwrap()
       @debug.assert_eq(sched.active_note_count(), 1)
       let arc = @pattern.TimeSpan::new(
         @pattern.Rational::from_int(1),
         @pattern.Rational::from_int(2),
       )
-      sched.expire_notes(pool, arc)
+      sched.expire_notes(pool, arc).unwrap()
       @debug.assert_eq(sched.active_note_count(), 0)
     }
   }
@@ -639,12 +578,12 @@ test "expire_notes: removes notes past their end_time" {
 ///|
 test "expire_notes_at: expires on performance sample boundary" {
   let (pool, _, ctx) = make_test_pool()
-  let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~)
+  let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~).unwrap()
   let handle = pool.note_on_controls({ "note": 440.0 })
   match handle {
     None => assert_true(false)
     Some(h) => {
-      sched.push_active_note(h, @pattern.Rational::from_int(1))
+      sched.push_active_note(h, @pattern.Rational::from_int(1)).unwrap()
       sched.expire_notes_at(pool, @scheduler.PerformanceTime(23999L))
       @debug.assert_eq(sched.active_note_count(), 1)
       sched.expire_notes_at(pool, @scheduler.PerformanceTime(24000L))
@@ -2162,7 +2101,7 @@ test "process_block: gate-off fires after note ends" {
 }
 
 ///|
-test "process_block: sample-time expiry stays block-quantized" {
+test "process_block: gate-off is sent within the block containing the endpoint" {
   let (pool, sched, left, right) = make_test_sched()
   let note_pat = @pattern.note(60.0)
   let silence_pat : @pattern.Pat[@pattern.ControlMap] = @pattern.Pat::silence()
@@ -2171,8 +2110,6 @@ test "process_block: sample-time expiry stays block-quantized" {
     sched.process_block(silence_pat, pool, left, right)
   }
   @debug.assert_eq(sched.sample_counter(), 24064L)
-  @debug.assert_eq(sched.active_note_count(), 1)
-  sched.process_block(silence_pat, pool, left, right)
   @debug.assert_eq(sched.active_note_count(), 0)
 }
 
@@ -2220,7 +2157,7 @@ test "process_block: stolen voice gate-off is harmless" {
   match pool {
     Err(_) => assert_true(false)
     Ok(pool) => {
-      let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~)
+      let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~).unwrap()
       let pat = @pattern.note(60.0).fast(@pattern.Rational::from_int(2))
       let left = @moondsp.AudioBuffer::filled(128)
       let right = @moondsp.AudioBuffer::filled(128)

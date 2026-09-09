@@ -1,15 +1,5 @@
 ///|
-/// Legacy opaque scheduler-package active-note marker.
-struct ActiveNote {}
-
-///|
-fn ActiveNote::ActiveNote() -> ActiveNote {
-  ActiveNote::{  }
-}
-
-///|
 pub fn PatternScheduler::active_note_count(self : PatternScheduler) -> Int {
-  ignore(self.active_note_interface_anchor)
   self.active_notes.length()
 }
 
@@ -32,28 +22,36 @@ pub fn midi_to_hz(midi : Double) -> Double {
 }
 
 ///|
-/// Test helper: inject an active note for testing gate-off logic.
-/// The caller must ensure the VoiceHandle is currently active in the pool,
-/// or gate-off at expiry will silently no-op (note_off returns false).
+/// Track an externally triggered voice with a musical gate-off deadline.
 pub fn PatternScheduler::push_active_note(
   self : PatternScheduler,
   handle : @moondsp.VoiceHandle,
   end_time : @pattern.Rational,
-) -> Unit {
-  self.push_active_note_with_source(handle, end_time, EventSource::none())
+) -> Result[Unit, TransportError] {
+  let end_sample = match self.clock.sample_at(end_time) {
+    Ok(sample) => sample
+    Err(e) => return Err(e)
+  }
+  self.active_notes.push_note(
+    handle~,
+    source=EventSource::none().to_model(),
+    end_sample~,
+    musical_end=end_time,
+  )
+  Ok(())
 }
 
 ///|
-/// Future-policy helper: inject an active note with explicit provenance.
-fn PatternScheduler::push_active_note_with_source(
+/// Track an externally triggered voice with a physical gate-off deadline.
+/// Tempo changes leave this deadline unchanged.
+pub fn PatternScheduler::push_active_note_until(
   self : PatternScheduler,
   handle : @moondsp.VoiceHandle,
-  end_time : @pattern.Rational,
-  source : EventSource,
+  end_time : PerformanceTime,
 ) -> Unit {
   self.active_notes.push_note(
     handle~,
-    source=source.to_model(),
-    end_sample=cycle_to_sample(end_time, self.bpm, self.ctx),
+    source=EventSource::none().to_model(),
+    end_sample=end_time.sample,
   )
 }

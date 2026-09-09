@@ -38,7 +38,7 @@ pub fn ControlMapper::ControlMapper(
   transform~ : (String, Double) -> (String, Double)?,
   voice_action~ : (String, Double) -> VoiceAction?,
 ) -> ControlMapper {
-  { transform, voice_action }
+  { transform, voice_action, }
 }
 
 ///|
@@ -63,39 +63,56 @@ pub fn default_control_mapper() -> ControlMapper {
 
 ///|
 pub struct PatternScheduler {
-  priv mut bpm : Double
-  priv mut sample_counter : Int64
+  priv mut clock : @transport.Clock
+  priv mut last_error : @transport.TransportError?
+  priv contexts : Array[@moondsp.DspContext]
+  priv scratch_left : @moondsp.AudioBuffer
+  priv scratch_right : @moondsp.AudioBuffer
+  priv mut previous_events : Array[@pattern.Event[@pattern.ControlMap]]
+  priv mut previous_clock : @transport.Clock
   priv ctx : @moondsp.DspContext
-  // Preserve the historical opaque ActiveNote entry in scheduler/pkg.generated.mbti
-  // while scheduler/internal/voice_runtime owns the concrete collection.
-  priv active_note_interface_anchor : ActiveNote?
   priv active_notes : @voice_runtime.ActiveNotes
   priv mapper : ControlMapper
   priv playback_state : @playback.PlaybackState
 }
 
 ///|
-#alias(new)
-pub fn PatternScheduler::PatternScheduler(
+pub fn PatternScheduler::new(
   bpm~ : Double,
   ctx~ : @moondsp.DspContext,
   mapper? : ControlMapper,
-) -> PatternScheduler {
-  {
-    bpm: sanitize_bpm(bpm),
-    sample_counter: 0L,
+) -> Result[PatternScheduler, @transport.TransportError] {
+  let tempo = match @transport.Tempo::from_bpm(bpm) {
+    Ok(tempo) => tempo
+    Err(e) => return Err(e)
+  }
+  let clock = match @transport.Clock::at_start(tempo, ctx.sample_rate()) {
+    Ok(clock) => clock
+    Err(e) => return Err(e)
+  }
+  if ctx.block_size() <= 0 || ctx.block_size() > 65536 {
+    return Err(@transport.TransportError::TimeOutOfRange)
+  }
+  Ok({
+    clock,
+    last_error: None,
+    contexts: Array::makei(ctx.block_size() + 1, n => {
+      @moondsp.DspContext(sample_rate=ctx.sample_rate(), block_size=n)
+    }),
+    scratch_left: ctx.make_buffer(),
+    scratch_right: ctx.make_buffer(),
+    previous_events: [],
+    previous_clock: clock,
     ctx,
-    active_note_interface_anchor: Some(ActiveNote()),
     active_notes: @voice_runtime.ActiveNotes(),
     mapper: mapper.unwrap_or(default_control_mapper()),
     playback_state: @playback.PlaybackState(),
-  }
+  })
 }
 
 ///|
 /// Gate-off all notes whose end sample has been reached, then remove them.
-/// Block-quantized: notes ending mid-block stay active until the next block
-/// (~2.7ms at 48kHz/128 samples — inaudible for musical purposes).
+/// Block rendering calls this at each event boundary, including note endings.
 pub fn PatternScheduler::expire_notes_at(
   self : PatternScheduler,
   pool : @moondsp.BoundVoicePool,
@@ -105,16 +122,18 @@ pub fn PatternScheduler::expire_notes_at(
 }
 
 ///|
-/// Compatibility wrapper for callers that still expire against a logical arc.
+/// Expire at a musical position on the current clock.
 pub fn PatternScheduler::expire_notes(
   self : PatternScheduler,
   pool : @moondsp.BoundVoicePool,
   arc : @pattern.TimeSpan,
-) -> Unit {
-  self.expire_notes_at(
-    pool,
-    PerformanceTime(cycle_to_sample(arc.begin, self.bpm, self.ctx)),
-  )
+) -> Result[Unit, TransportError] {
+  let sample = match self.clock.sample_at(arc.begin) {
+    Ok(sample) => sample
+    Err(e) => return Err(e)
+  }
+  self.expire_notes_at(pool, PerformanceTime(sample))
+  Ok(())
 }
 
 ///|
@@ -170,19 +189,21 @@ fn PatternScheduler::process_single_event(
             None => ()
           }
         })
+        let end_sample = match self.clock.sample_at(whole.end_) {
+          Ok(sample) => sample
+          Err(e) => {
+            self.last_error = Some(e)
+            return
+          }
+        }
         match pool.note_on_controls(map) {
           None => ()
           Some(handle) => {
-            // WHY end_sample from whole.end_: In the Strudel/Tidal model,
-            // `whole` is the event's full intended duration in cycle time,
-            // while `part` is only the fragment visible within the queried
-            // arc. The scheduler converts `whole.end_` to performance time at
-            // note-on so future groove/rubato layers can expire voices against
-            // audio time rather than logical time.
             self.active_notes.push_note(
               handle~,
               source=source.to_model(),
-              end_sample=cycle_to_sample(whole.end_, self.bpm, self.ctx),
+              end_sample~,
+              musical_end=whole.end_,
             )
             for action in actions {
               match action {
@@ -267,15 +288,35 @@ fn PatternScheduler::query_snapshot_block(
 }
 
 ///|
-fn PatternScheduler::render_block(
+/// Render to an event boundary using preallocated buffers and contexts.
+fn PatternScheduler::render_until(
   self : PatternScheduler,
+  cursor : Int64,
+  stop : Int64,
+  frame : BlockFrame,
   pool : @moondsp.BoundVoicePool,
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
-) -> Unit {
-  left.fill(0.0)
-  right.fill(0.0)
-  pool.process(self.ctx, left, right)
+) -> Int64 {
+  let mut cursor = cursor
+  while cursor < stop {
+    self.active_notes.expire_at_sample(pool, cursor)
+    let next = self.active_notes.next_end_sample(stop)
+    let count = (next - cursor).to_int()
+    for i in 0..<count {
+      self.scratch_left.set(i, 0.0)
+      self.scratch_right.set(i, 0.0)
+    }
+    pool.process(self.contexts[count], self.scratch_left, self.scratch_right)
+    let offset = (cursor - frame.sample_begin).to_int()
+    for i in 0..<count {
+      left.set(offset + i, self.scratch_left.get(i))
+      right.set(offset + i, self.scratch_right.get(i))
+    }
+    cursor = next
+  }
+  self.active_notes.expire_at_sample(pool, cursor)
+  cursor
 }
 
 ///|
@@ -288,9 +329,51 @@ fn PatternScheduler::process_block_events(
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
 ) -> Unit {
-  self.process_events_with_source(events, frame.logical_arc, pool, source)
+  left.fill(0.0)
+  right.fill(0.0)
+  // Ceil may put a preceding block's final fractional onset at this block's
+  // first sample. Retain that query result for one block; never query history.
+  for event in self.previous_events {
+    if event.whole is Some(whole) {
+      match self.previous_clock.sample_at(whole.begin) {
+        Ok(sample) if sample == frame.sample_begin =>
+          self.process_single_event(
+            event,
+            source,
+            @pattern.TimeSpan::new(whole.begin, whole.end_),
+            pool,
+          )
+        _ => ()
+      }
+    }
+  }
+  if events.length() > 1 {
+    events.sort_by(fn(a, b) { @voice_runtime.compare_event_onset(a, b) })
+  }
+  let mut cursor = frame.sample_begin
+  for event in events {
+    if event.whole is Some(whole) {
+      if !frame.logical_arc.contains(whole.begin) {
+        continue
+      }
+      let start = match self.clock.sample_at(whole.begin) {
+        Ok(sample) => sample
+        Err(e) => {
+          self.last_error = Some(e)
+          continue
+        }
+      }
+      if start < cursor || start >= frame.sample_end {
+        continue
+      }
+      cursor = self.render_until(cursor, start, frame, pool, left, right)
+      self.process_single_event(event, source, frame.logical_arc, pool)
+    }
+  }
+  ignore(self.render_until(cursor, frame.sample_end, frame, pool, left, right))
+  self.previous_events = events
+  self.previous_clock = self.clock
   self.advance_block()
-  self.render_block(pool, left, right)
 }
 
 ///|
@@ -304,7 +387,10 @@ pub fn PatternScheduler::process_block(
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
 ) -> Unit {
-  let frame = self.current_block()
+  let frame = match self.render_frame(pool, left, right) {
+    Some(frame) => frame
+    None => return
+  }
   self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
   let events = self.query_pattern_block(pat, frame)
   self.process_block_events(
@@ -327,7 +413,10 @@ pub fn PatternScheduler::process_playback_snapshot_block(
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
 ) -> Unit {
-  let frame = self.current_block()
+  let frame = match self.render_frame(pool, left, right) {
+    Some(frame) => frame
+    None => return
+  }
   self.commit_pending_playback_snapshot()
   self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
   let events = self.query_snapshot_block(frame)
@@ -354,7 +443,10 @@ pub fn PatternScheduler::process_section_block(
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
 ) -> Unit {
-  let frame = self.current_block()
+  let frame = match self.render_frame(pool, left, right) {
+    Some(frame) => frame
+    None => return
+  }
   self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
   let events = section.query(frame.logical_arc)
   self.process_block_events(
@@ -379,7 +471,10 @@ pub fn PatternScheduler::process_song_block(
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
 ) -> Unit {
-  let frame = self.current_block()
+  let frame = match self.render_frame(pool, left, right) {
+    Some(frame) => frame
+    None => return
+  }
   self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
   let events = song.query(frame.logical_arc)
   self.process_block_events(

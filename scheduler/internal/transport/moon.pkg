@@ -1,4 +1,3 @@
 import {
-  "dowdiness/moondsp/dsp",
   "dowdiness/moondsp/pattern",
 }

@@ -88,6 +88,15 @@ test("song content edits continue, and Stop then Play applies a new layout", asy
   });
 });
 
+test("editing song tempo continues playback without requiring Stop", async ({ page }) => {
+  await page.locator("#mode-song").click();
+  await start(page, 'song(bpm(120),section("a",8,note("60").slow(8)),part("a1","a"))');
+  const updated = await edit(page, 'song(bpm(90.125),section("a",8,note("60").slow(8)),part("a1","a"))');
+  expect(updated).toMatchObject({ type: "song-updated", operation: "update" });
+  expect(updated.appliedAtSample).toBeGreaterThan(0);
+  await expect(page.getByRole("button", { name: "Stop", exact: true })).toBeEnabled();
+});
+
 test("named song definitions update in place and a bad reference preserves the applied score", async ({ page }) => {
   await page.locator("#mode-song").click();
   const song = 'song(section("a",8,groove),section("b",8,groove),part("a1","a"),part("b1","b"))';

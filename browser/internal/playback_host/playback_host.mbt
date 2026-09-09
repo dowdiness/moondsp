@@ -38,6 +38,10 @@ fn make_drum_pool(
   ctx : @moondsp.DspContext,
   block_size : Int,
 ) -> SoundPool? {
+  let scheduler = match @scheduler.PatternScheduler::new(bpm=120.0, ctx~) {
+    Ok(scheduler) => scheduler
+    Err(_) => return None
+  }
   // 8 voices = defensive headroom for .jux(f) patterns where f causes
   // same-sound overlap (e.g. the demo's hh*16? layer puts left's hh at
   // slot t and right's hh at slot 1-t — frequent coincidence at fine
@@ -51,15 +55,13 @@ fn make_drum_pool(
       max_voices=8,
     ) {
     Err(_) => None
-    Ok(pool) => {
-      let scheduler = @scheduler.PatternScheduler::new(bpm=120.0, ctx~)
+    Ok(pool) =>
       Some({
         pool,
         scheduler,
         tmp_left: @moondsp.AudioBuffer::filled(block_size),
         tmp_right: @moondsp.AudioBuffer::filled(block_size),
       })
-    }
   }
 }
 
@@ -70,6 +72,10 @@ fn make_synth_pool(
   ctx : @moondsp.DspContext,
   block_size : Int,
 ) -> SoundPool? {
+  let scheduler = match @scheduler.PatternScheduler::new(bpm=120.0, ctx~) {
+    Ok(scheduler) => scheduler
+    Err(_) => return None
+  }
   // See make_drum_pool for the .jux headroom rationale.
   match
     @moondsp.BoundVoicePool::new(
@@ -85,15 +91,13 @@ fn make_synth_pool(
       max_voices=24,
     ) {
     Err(_) => None
-    Ok(pool) => {
-      let scheduler = @scheduler.PatternScheduler::new(bpm=120.0, ctx~)
+    Ok(pool) =>
       Some({
         pool,
         scheduler,
         tmp_left: @moondsp.AudioBuffer::filled(block_size),
         tmp_right: @moondsp.AudioBuffer::filled(block_size),
       })
-    }
   }
 }
 
@@ -417,7 +421,21 @@ pub fn get_playback_error_char(i : Int) -> Int {
 ///|
 pub fn set_scheduler_bpm(bpm : Double) -> Unit {
   for route in sched_routes.val {
-    route.pool.scheduler.set_bpm(bpm)
+    match route.pool.scheduler.validate_bpm(bpm) {
+      Err(_) => {
+        ignore(
+          set_scheduler_parse_error(
+            "tempo must be 0.001..1000 BPM and representable",
+          ),
+        )
+        return
+      }
+      Ok(_) => ()
+    }
+  }
+  for route in sched_routes.val {
+    // Same audio-owner turn as preflight; no route can advance in between.
+    route.pool.scheduler.set_bpm(bpm).unwrap()
   }
 }
 

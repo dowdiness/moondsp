@@ -1,64 +1,45 @@
-# ADR-0006: Scheduler note expiry uses performance time
+# ADR-0006: Scheduler note deadlines preserve their time domain
 
 - **Status:** Accepted
-- **Date:** 2026-05-11
-- **Source:** [PR #29](https://github.com/dowdiness/moondsp/pull/29) design discussion and implementation
+- **Updated:** 2026-09-09
 
 ## Context
 
-Before this decision, `PatternScheduler` tracked active note expiry as a
-logical `Rational` cycle position. That matched the pattern engine's query
-model, but it mixed two responsibilities:
-
-- logical time: the compositional time seen by pattern combinators
-- performance/audio time: the block/sample timeline used by the voice pool
-
-Future groove, nudge, and rubato semantics all need note lifetimes to be
-resolved against performance time. If active notes continue to expire in
-logical time, a note whose start or end is shifted by a section time scope would
-be difficult to reason about and could release at the wrong audio block.
+Pattern composition uses rational musical time. Voice rendering uses integer
+sample positions. A tempo edit must preserve the music already played while
+changing how much physical time remains until a musical boundary. A deadline
+expressed in seconds must stay fixed instead.
 
 ## Decision
 
-Track active-note expiry internally as absolute sample time.
+Keep a sounding note's musical endpoint when its duration belongs to musical
+time. Cache the corresponding sample deadline for rendering. Recompute that
+cache when tempo changes. Notes with physical deadlines retain their samples.
+A released note is no longer eligible for retiming.
 
-The scheduler now exposes:
+Use one clock conversion anchored at the next unrendered sample and the
+musical position reached there. Tempo changes preserve the anchor and affect
+only subsequent progression. Conversion decisions are deterministic; the
+scheduler owns voice mutation and audio rendering.
 
-- `BlockFrame` with `sample_begin`, `sample_end`, and `logical_arc`
-- `PerformanceTime(sample)`
-- `cycle_to_sample(cycle, bpm, ctx)`
-- `PatternScheduler::expire_notes_at(pool, PerformanceTime)`
+Preflight a tempo change before changing the clock or any active deadline.
+Browser routes sharing the transport must accept or reject it together.
 
-`PatternScheduler::expire_notes(pool, arc)` remains as a compatibility wrapper
-for callers and tests that still speak logical arcs. `process_block(...)` and
-`process_section_block(...)` expire notes against `frame.sample_begin`.
-
-Pattern combinators still operate only on logical time. This decision changes
-only the scheduler's active-note bookkeeping and boundary conversion.
+Render note starts and gate-offs at their sample boundaries inside each block.
+Round a fractional boundary upward to the first sample at or after it. Retain
+an onset rounded into the next block so querying half-open musical spans does
+not lose it. Changing tempo does not retrigger or retune a sounding voice.
 
 ## Consequences
 
-**Positive**
+- Musical and physical durations respond differently to tempo edits by design.
+- The render loop uses sample deadlines while composition retains musical time.
+- Segment buffers are allocated before rendering. Pattern queries and dispatch
+  still require a separate allocation audit.
+- Numeric conversion has explicit precision and range limits. It reports
+  unrepresentable input instead of wrapping integers.
+- Pattern-entry edit boundaries, nested clock domains, groove, and rubato
+  remain separate work. They must preserve endpoint ownership when added.
 
-- The scheduler boundary now has an explicit performance-time representation
-  before groove/rubato are introduced.
-- Existing pattern playback remains block-quantized and keeps the same public
-  `process_block(pat, ...)` entry point.
-- `cycle_to_sample(...)` centralizes the inverse of the existing BPM scaling
-  convention used by `compute_arc(...)`.
-
-**Negative**
-
-- Active notes keep their computed end sample when `set_bpm(...)` is called.
-  This is a behavior clarification: newly scheduled notes use the new tempo,
-  but already-active note releases do not move with later tempo changes.
-- Sample conversion currently uses the scheduler's existing one-decimal BPM
-  scaling convention. If tempo precision changes, `compute_arc(...)` and
-  `cycle_to_sample(...)` must change together.
-
-**Deferred**
-
-- Sub-block note starts are not implemented here. Events whose onset falls
-  inside a block still trigger at the start of that block. A future
-  sample-accurate scheduler would need delayed note-on or sub-block voice
-  rendering support.
+The current API, numeric limits, and render error behavior are documented in
+[the scheduler guide](../../scheduler/README.mbt.md#transport).

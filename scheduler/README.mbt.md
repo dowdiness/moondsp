@@ -6,6 +6,45 @@ snapshot, choose how already-sounding voices should be reconciled, and
 optionally apply live graph-control changes to matching active voices before the
 replacement commits at the next block boundary.
 
+## Transport
+
+`PatternScheduler::new` validates the tempo and DSP context and returns a
+`Result`. Use `current_block()` to read the next block's sample range and
+rational musical span. Use `sample_at(position)` for conversion against the
+current clock; an absolute sample count and a BPM alone cannot describe an
+edited transport.
+
+A tempo edit takes effect at the next unrendered sample. It preserves the
+musical position already reached. Only the remaining distance to musical
+onsets and note endings uses the new tempo. A physical deadline registered
+with `push_active_note_until` stays at its original sample. Tempo edits neither
+retrigger voices nor change their pitch, timbre, or release envelope.
+
+Block rendering splits DSP processing at each onset and gate-off. Boundaries
+round upward to the first sample at or after the musical time. A fractional
+onset just before a block ends is retained for the next block, including when
+a tempo edit occurs there. Scratch buffers and segment contexts are allocated
+at scheduler construction. Pattern queries and voice dispatch still allocate;
+this change does not establish an allocation-free audio callback.
+
+The clock accepts 0.001–1000 BPM and rounds to the nearest 0.001 BPM (ties
+upward). Sample rates must be integral, from 1 through 384000 Hz; block sizes
+must be 1–65536. These are numeric implementation bounds, not musical units.
+One source cycle advances at BPM cycles per minute under the existing API;
+a cycle has no intrinsic meter or quarter-note meaning.
+
+Conversions use checked Int64 arithmetic and can return `TimeOutOfRange`,
+including when an intermediate rational conversion cannot be represented.
+An invalid tempo edit leaves the clock and active deadlines unchanged. Render
+conversion errors are available from `last_transport_error()` until transport
+reset. An unrepresentable event is skipped; exhaustion of the clock range
+silences the block and kills its voices without advancing the clock.
+
+Song tempo edits can continue on the browser's existing playback path. A song
+layout change still requires Stop then Play. Per-pattern entry boundaries,
+group defaults, explicit seconds in the language, and independent clocks are
+separate implementation stages.
+
 ```mbt check
 ///|
 test "edit orchestration stages a replacement and reconciles active voices" {
@@ -30,7 +69,7 @@ test "edit orchestration stages a replacement and reconciles active voices" {
     ),
     max_voices=4,
   ).unwrap()
-  let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~)
+  let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~).unwrap()
   let edited = try! @identity.PatternNodeId::from_string("docs:lead")
   let replacement_root = try! @identity.PatternNodeId::from_string(
     "docs:replacement",

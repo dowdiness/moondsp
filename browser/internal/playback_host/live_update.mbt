@@ -92,7 +92,12 @@ fn prepare_song(
 ) -> Result[PreparedPlayback, String] {
   match @mini.parse_song_with_bpm(text) {
     Err(msg) => Err(msg)
-    Ok(parsed) =>
+    Ok(parsed) => {
+      if parsed.bpm() is Some(bpm) {
+        if @scheduler.normalize_bpm(bpm) is Err(_) {
+          return Err("tempo must be 0.001..1000 BPM")
+        }
+      }
       match route_songs(parsed.song(), selectors) {
         Err(msg) => Err(msg)
         Ok(songs) => {
@@ -108,6 +113,7 @@ fn prepare_song(
           })
         }
       }
+    }
   }
 }
 
@@ -136,34 +142,20 @@ fn queue_playback(
   state : PlaybackState,
   next : PreparedPlayback,
   policy : ApplyPolicy,
-  bpm : Double,
 ) -> Result[PlaybackState, String] {
   match policy {
-    Continue => {
+    Continue =>
       match state.active {
         None => return Err("start playback before updating")
         Some(active) if active.layout != next.layout =>
           return Err("playback mode or song layout changed; restart required")
         Some(_) => ()
       }
-      match next.bpm {
-        Some(tempo) if tempo != bpm =>
-          return Err("song tempo changed; restart required")
-        _ => ()
-      }
-    }
     Restart => ()
   }
   Ok({
     active: state.active,
-    pending: Some({
-      playback: next,
-      policy,
-      tempo: match policy {
-        Continue => None
-        Restart => next.bpm
-      },
-    }),
+    pending: Some({ playback: next, policy, tempo: next.bpm, }),
   })
 }
 
@@ -253,13 +245,7 @@ pub fn apply_prepared_playback(token : Int, restart : Bool) -> Int {
   match prepared_slot.val {
     Some((id, prepared)) if id == token => {
       let policy = if restart { Restart } else { Continue }
-      match
-        queue_playback(
-          playback_state.val,
-          prepared,
-          policy,
-          sched_routes.val[0].pool.scheduler.bpm(),
-        ) {
+      match queue_playback(playback_state.val, prepared, policy) {
         Err(message) => set_scheduler_parse_error(message)
         Ok(next) => {
           playback_state.val = next
@@ -302,6 +288,24 @@ fn commit_playback_request() -> Unit {
   match playback_state.val.pending {
     None => ()
     Some(request) => {
+      if request.tempo is Some(bpm) {
+        if request.policy is Continue {
+          for route in sched_routes.val {
+            if route.pool.scheduler.validate_bpm(bpm) is Err(_) {
+              playback_state.val = {
+                active: playback_state.val.active,
+                pending: None,
+              }
+              ignore(
+                set_scheduler_parse_error(
+                  "tempo change exceeds transport range",
+                ),
+              )
+              return
+            }
+          }
+        }
+      }
       match request.policy {
         Restart =>
           for route in sched_routes.val {
