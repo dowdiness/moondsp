@@ -154,9 +154,12 @@ pub fn s_pan(p : Double) -> Pat[ControlMap] {
 /// slot t and right's hh at slot 1-t). For sparse multi-sound
 /// patterns like `s("bd sd hh sd").jux(rev)` the per-pool pressure
 /// stays at 1.
+/// Unidentified callbacks invalidate content identity. A compiler may supply a
+/// signature covering the callback and its captured configuration.
 pub fn Pat::jux(
   self : Pat[ControlMap],
   f : (Pat[ControlMap]) -> Pat[ControlMap],
+  signature? : String = "",
 ) -> Pat[ControlMap] {
   let left = merge_control(self, s_pan(-1.0))
   let right = merge_control(f(self), s_pan(1.0))
@@ -166,7 +169,14 @@ pub fn Pat::jux(
     period: self.period,
     members: [],
     entry_key: self.entry_key,
-    signature: self.entry_signature(),
+    signature: transformed_signature(
+      self.entry_signature(),
+      if signature == "" {
+        ""
+      } else {
+        "jux:" + signature
+      },
+    ),
   }
 }
 
@@ -185,7 +195,14 @@ pub fn merge_control(
     period: a.period,
     members: a.members.map(p => merge_control(p, b)),
     entry_key: a.entry_key,
-    signature: a.signature,
+    signature: transformed_signature(
+      a.signature,
+      if b.entry_signature() == "" {
+        ""
+      } else {
+        "merge:" + b.entry_signature()
+      },
+    ),
     query: fn(arc) {
       let b_events = b.query(arc)
       a
@@ -198,7 +215,7 @@ pub fn merge_control(
             merged
           }
         })
-        { whole: ae.whole, part: ae.part, value: merged, }
+        { whole: ae.whole, part: ae.part, value: merged }
       })
     },
   }

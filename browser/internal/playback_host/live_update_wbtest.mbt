@@ -254,3 +254,20 @@ test "a pending pattern entry follows tempo without choosing another entry" {
     assert_false(route.pool.scheduler.has_pending_playback_snapshot())
   }
 }
+
+///|
+test "reverting a routed edit cancels its pending material replacement" {
+  assert_true(init_scheduler_graph_for_test())
+  assert_eq(submit_for_test("note(\"60\").slow(3)"), 0)
+  render_for_test(1)
+  assert_eq(submit_for_test("note(\"72\").slow(3)", restart=false), 0)
+  render_for_test(1)
+  for route in sched_routes.val {
+    assert_true(route.pool.scheduler.has_pending_playback_snapshot())
+  }
+  assert_eq(submit_for_test("note(\"60\").slow(3)", restart=false), 0)
+  render_for_test(1)
+  for route in sched_routes.val {
+    assert_false(route.pool.scheduler.has_pending_playback_snapshot())
+  }
+}

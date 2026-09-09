@@ -64,7 +64,7 @@ pub fn[A] sequence(pats : Array[Pat[A]]) -> Pat[A] {
               }
               None => None
             }
-            result.push({ whole: new_whole, part: new_part, value: ev.value, })
+            result.push({ whole: new_whole, part: new_part, value: ev.value })
           }
         }
       }
@@ -93,13 +93,26 @@ pub fn[A] stack(pats : Array[Pat[A]]) -> Pat[A] {
 ///|
 /// Keep events where `f(value)` returns `Some(new_value)`, discard the rest.
 /// Preserves event timing (whole and part spans unchanged).
-pub fn[A] Pat::filter_map(self : Pat[A], f : (A) -> A?) -> Pat[A] {
+/// Callback content is unknown by default, so live edits are never skipped.
+/// A compiler may supply a signature covering the callback and captured values.
+pub fn[A] Pat::filter_map(
+  self : Pat[A],
+  f : (A) -> A?,
+  signature? : String = "",
+) -> Pat[A] {
   let inner = self
   {
     period: self.period,
-    members: self.members.map(p => p.filter_map(f)),
+    members: self.members.map(p => p.filter_map(f, signature~)),
     entry_key: self.entry_key,
-    signature: self.signature,
+    signature: transformed_signature(
+      self.signature,
+      if signature == "" {
+        ""
+      } else {
+        "filter:" + signature
+      },
+    ),
     query: fn(arc) {
       inner
       .query(arc)
@@ -219,14 +232,14 @@ pub fn[A] Pat::degrade_by(
     return self
   }
   if prob >= 1.0 {
-    return self.filter_map(_ => None)
+    return self.filter_map(_ => None, signature="silence")
   }
   let inner = self
   {
     period: self.period,
     members: self.members.map(member => member.degrade_by(p, seed~)),
     entry_key: self.entry_key,
-    signature: self.signature,
+    signature: transformed_signature(self.signature, "degrade:\{prob}:\{seed}"),
     query: fn(arc) {
       inner
       .query(arc)
@@ -242,7 +255,14 @@ pub fn[A] Pat::degrade_by(
 }
 
 ///|
-pub fn[A] every(n : Int, f : (Pat[A]) -> Pat[A], pat : Pat[A]) -> Pat[A] {
+/// Unidentified callbacks invalidate content identity. A compiler may supply a
+/// signature covering the callback and its captured configuration.
+pub fn[A] every(
+  n : Int,
+  f : (Pat[A]) -> Pat[A],
+  pat : Pat[A],
+  signature? : String = "",
+) -> Pat[A] {
   if n <= 0 {
     return pat
   }
@@ -252,7 +272,14 @@ pub fn[A] every(n : Int, f : (Pat[A]) -> Pat[A], pat : Pat[A]) -> Pat[A] {
     period: pat.period,
     members: [],
     entry_key: pat.entry_key,
-    signature: pat.entry_signature(),
+    signature: transformed_signature(
+      pat.entry_signature(),
+      if signature == "" {
+        ""
+      } else {
+        "every:\{n}:" + signature
+      },
+    ),
     query: fn(arc) {
       arc
       .whole_cycles()

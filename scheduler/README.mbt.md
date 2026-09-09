@@ -79,9 +79,16 @@ addresses. This is not semantic identity inference from text similarity.
 
 Library callers can construct a custom source with `Pat::from_query`; it has
 one-cycle entries without requiring periodic event values. They can use `named_entry` for an address and `material(signature)`
-to declare indivisible content. A nonempty signature must change with content.
-Without one, edits conservatively replace the material even if its query is
-unchanged. Entry metadata describes replacement, not event generation.
+to declare indivisible source content. A source signature must identify its
+content. Built-in time transforms, reverse, and degradation update that identity
+automatically. Control merging includes both inputs when they are identifiable.
+Arbitrary callbacks invalidate it by default, so public API edits cannot be
+silently skipped. Applying another known transform keeps unknown content unknown.
+
+The compiler and fixed routing adapters can supply a callback signature covering
+its code and captured configuration. Ordinary callers need no signature to make
+edits work; unknown content is conservatively replaced. Entry metadata describes
+replacement, not event generation.
 
 Revision accessors report the accepted authored score. They do not assert that
 all its materials are already audible. Pending accessors also include materials

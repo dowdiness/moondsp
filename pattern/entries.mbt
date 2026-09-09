@@ -1,29 +1,26 @@
 ///|
 /// Give an authored material a stable address. The name is not a clock group.
 pub fn[A] Pat::named_entry(self : Pat[A], name : String) -> Pat[A] {
-  { ..self, entry_key: name, }
+  { ..self, entry_key: name }
 }
 
 ///|
 /// Mark one compiled expression as an indivisible authored material.
-/// The caller must change the signature whenever its content changes. An empty
-/// signature makes replacement conservative: the content is always rechecked.
+/// The signature identifies this source content. Built-in transforms update it;
+/// unidentified callbacks invalidate it. An empty signature makes replacement
+/// conservative. Callers defining a source must change its signature with content.
 pub fn[A] Pat::material(self : Pat[A], signature : String) -> Pat[A] {
-  { ..self, members: [], signature, }
+  { ..self, members: [], signature }
 }
 
 ///|
-/// Record an outer transformation independently on each stack member.
-pub fn[A] Pat::entry_transform(self : Pat[A], signature : String) -> Pat[A] {
-  {
-    ..self,
-    signature: if self.signature == "" {
-      ""
-    } else {
-      self.signature + signature
-    },
-    members: self.members.map(p => p.entry_transform(signature)),
+// A missing source or callback identity stays unknown. Length framing prevents
+// unrelated transformation chains from sharing an identity.
+fn transformed_signature(source : String, change : String) -> String {
+  if source == "" || change == "" {
+    return ""
   }
+  "\{source.length()}:\{source}/\{change.length()}:\{change}"
 }
 
 ///|
@@ -57,7 +54,7 @@ pub fn[A] Pat::entries(self : Pat[A]) -> Array[Pat[A]] {
   let result = []
   fn visit(pat : Pat[A], path : String) -> Unit {
     if pat.members.is_empty() {
-      result.push({ ..pat, entry_key: path, })
+      result.push({ ..pat, entry_key: path })
     } else {
       let seen : Map[String, Int] = Map([])
       for i, child in pat.members {

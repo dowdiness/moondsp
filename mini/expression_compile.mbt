@@ -40,7 +40,7 @@ fn resolve_mini_expr(
           )
       }
   }
-  { span: expr.span, node, }
+  { span: expr.span, node }
 }
 
 ///|
@@ -95,7 +95,7 @@ fn compile_mini_pattern(
       }
     Apply(child, transform) => {
       let pat = compile_mini_pattern(child, definitions)
-      let transformed = match transform {
+      match transform {
         Fast(n) => pat.fast(n)
         Slow(n) => pat.slow(n)
         Rev => pat.rev()
@@ -103,12 +103,20 @@ fn compile_mini_pattern(
         Control(key, value) =>
           @pattern.merge_control(
             pat,
-            @pattern.Pat::pure(@pattern.ControlMap::single(key, value)),
+            @pattern.Pat::pure(@pattern.ControlMap::single(key, value)).material(
+              "control:\{key}:\{value}",
+            ),
           )
-        Every(n, callback) => @pattern.every(n, callback.runtime(), pat)
-        Jux(callback) => pat.jux(callback.runtime())
+        Every(n, callback) =>
+          @pattern.every(
+            n,
+            callback.runtime(),
+            pat,
+            signature=callback.signature(),
+          )
+        Jux(callback) =>
+          pat.jux(callback.runtime(), signature=callback.signature())
       }
-      transformed.entry_transform(transform.entry_signature())
     }
   }
 }
@@ -164,18 +172,5 @@ fn compile_mini_doc(
           builder.jux_doc(doc, callback.runtime(), callback.signature())
       }
     }
-  }
-}
-
-///|
-fn MiniTransform::entry_signature(self : MiniTransform) -> String {
-  match self {
-    Fast(n) => "/fast:\{n.num}:\{n.den}"
-    Slow(n) => "/slow:\{n.num}:\{n.den}"
-    Rev => "/rev"
-    Degrade(p) => "/degrade:\{p}"
-    Control(key, value) => "/control:\{key}:\{value}"
-    Every(n, callback) => "/every:\{n}:" + callback.signature()
-    Jux(callback) => "/jux:" + callback.signature()
   }
 }

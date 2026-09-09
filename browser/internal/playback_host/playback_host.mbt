@@ -109,7 +109,7 @@ fn make_drum_route(
   block_size : Int,
 ) -> SchedulerRoute? {
   match make_drum_pool(template, ctx, block_size) {
-    Some(pool) => Some({ selector: RouteSound(sound_code), pool, })
+    Some(pool) => Some({ selector: RouteSound(sound_code), pool })
     None => None
   }
 }
@@ -121,7 +121,7 @@ fn make_synth_route(
   block_size : Int,
 ) -> SchedulerRoute? {
   match make_synth_pool(template, ctx, block_size) {
-    Some(pool) => Some({ selector: RouteSynth, pool, })
+    Some(pool) => Some({ selector: RouteSynth, pool })
     None => None
   }
 }
@@ -250,7 +250,11 @@ fn filter_pat_for_route(
   selector : SchedulerRouteSelector,
   pat : @pattern.Pat[@pattern.ControlMap],
 ) -> @pattern.Pat[@pattern.ControlMap] {
-  pat.filter_map(fn(cm) { control_map_for_route(selector, cm) })
+  let signature = match selector {
+    RouteSynth => "route:synth"
+    RouteSound(code) => "route:sound:\{code}"
+  }
+  pat.filter_map(fn(cm) { control_map_for_route(selector, cm) }, signature~)
 }
 
 ///|

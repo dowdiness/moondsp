@@ -28,3 +28,24 @@ test "silent, filtered and transformed materials retain their entry period" {
   assert_eq(a.entries().length(), 1)
   assert_true(a.entry_signature() != b.entry_signature())
 }
+
+///|
+test "compiled transforms keep stable identities and distinguish their parameters" {
+  let pairs = [
+    (".gain(0.2)", ".gain(0.3)"),
+    (".every(2, rev)", ".every(3, rev)"),
+    (".jux(rev)", ".jux(fast(2))"),
+    (".degradeBy(0.2)", ".degradeBy(0.3)"),
+    (".fast(2)", ".fast(3)"),
+  ]
+  for pair in pairs {
+    let (first, second) = pair
+    let text = "stack(note(\"60\"), note(\"72\"))"
+    let a = @mini.parse(text + first).unwrap().entry_signature()
+    let same = @mini.parse(text + first).unwrap().entry_signature()
+    let changed = @mini.parse(text + second).unwrap().entry_signature()
+    assert_true(a != "")
+    assert_eq(a, same)
+    assert_true(a != changed)
+  }
+}
