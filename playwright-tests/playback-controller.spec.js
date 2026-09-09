@@ -39,7 +39,7 @@ test('initial application is acknowledged only after rendering, despite a reject
     return { before, after: p.receipts() };
   });
   expect(before).toEqual([expect.objectContaining({ type: 'playback-error', phase: 'restart', revision: 2 })]);
-  expect(after).toEqual([expect.objectContaining({ type: 'pattern-updated', revision: 1, scoreRevision: 1, appliedAtSample: 0, samplePosition: 128 })]);
+  expect(after).toEqual([expect.objectContaining({ type: 'pattern-updated', revision: 1, scoreRevision: 1, acceptedAtSample: 0, samplePosition: 128 })]);
 });
 
 test('failed preparation preserves the accepted update and its receipt', async ({ page }) => {
@@ -53,7 +53,7 @@ test('failed preparation preserves the accepted update and its receipt', async (
     return { before, after: p.receipts() };
   });
   expect(before).toEqual([expect.objectContaining({ type: 'pattern-error', phase: 'prepare', revision: 3 })]);
-  expect(after).toEqual([expect.objectContaining({ type: 'pattern-updated', revision: 2, scoreRevision: 2, appliedAtSample: 128, samplePosition: 256 })]);
+  expect(after).toEqual([expect.objectContaining({ type: 'pattern-updated', revision: 2, scoreRevision: 2, acceptedAtSample: 128, samplePosition: 256 })]);
 });
 
 test('restart supersedes replacements and acknowledges the applied score', async ({ page }) => {
@@ -71,5 +71,5 @@ test('restart supersedes replacements and acknowledges the applied score', async
     { type: 'playback-superseded', revision: 2 },
     { type: 'playback-superseded', revision: 3 },
   ]);
-  expect(after).toEqual([expect.objectContaining({ type: 'playback-restarted', revision: 4, scoreRevision: 1, appliedAtSample: 0, samplePosition: 128 })]);
+  expect(after).toEqual([expect.objectContaining({ type: 'playback-restarted', revision: 4, scoreRevision: 1, acceptedAtSample: 0, samplePosition: 128 })]);
 });

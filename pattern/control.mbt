@@ -160,7 +160,14 @@ pub fn Pat::jux(
 ) -> Pat[ControlMap] {
   let left = merge_control(self, s_pan(-1.0))
   let right = merge_control(f(self), s_pan(1.0))
-  stack([left, right])
+  let combined = stack([left, right])
+  {
+    ..combined,
+    period: self.period,
+    members: [],
+    entry_key: self.entry_key,
+    signature: self.entry_signature(),
+  }
 }
 
 ///|
@@ -175,6 +182,10 @@ pub fn merge_control(
   b : Pat[ControlMap],
 ) -> Pat[ControlMap] {
   {
+    period: a.period,
+    members: a.members.map(p => merge_control(p, b)),
+    entry_key: a.entry_key,
+    signature: a.signature,
     query: fn(arc) {
       let b_events = b.query(arc)
       a
@@ -187,7 +198,7 @@ pub fn merge_control(
             merged
           }
         })
-        { whole: ae.whole, part: ae.part, value: merged }
+        { whole: ae.whole, part: ae.part, value: merged, }
       })
     },
   }

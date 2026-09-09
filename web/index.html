@@ -960,7 +960,9 @@
           } else if (event.data?.type === "pattern-updated") {
             const statusEl = document.getElementById('patternStatus');
             if (statusEl) {
-              statusEl.textContent = "Pattern updated";
+              statusEl.textContent = event.data.operation === "update"
+                ? "Pattern updated — edit queued for the next pattern starts"
+                : "Pattern updated";
               statusEl.classList.remove("pattern-status-err");
               statusEl.classList.add("pattern-status-ok");
             }

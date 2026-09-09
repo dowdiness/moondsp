@@ -4,7 +4,9 @@ The scheduler bridges identity-bearing pattern/song snapshots to a bound voice
 pool. Edit orchestration helpers let UI or authoring code stage a replacement
 snapshot, choose how already-sounding voices should be reconciled, and
 optionally apply live graph-control changes to matching active voices before the
-replacement commits at the next block boundary.
+replacement is accepted at the next block boundary. Normal browser edits keep
+sounding voices and defer changed material until its next entry. The explicit
+voice-control helpers below are separate operations.
 
 ## Transport
 
@@ -41,9 +43,55 @@ reset. An unrepresentable event is skipped; exhaustion of the clock range
 silences the block and kills its voices without advancing the clock.
 
 Song tempo edits can continue on the browser's existing playback path. A song
-layout change still requires Stop then Play. Per-pattern entry boundaries,
-group defaults, explicit seconds in the language, and independent clocks are
-separate implementation stages.
+layout change still requires Stop then Play. Group defaults, explicit seconds
+in the language, and independent clocks are separate implementation stages.
+
+## Pattern edits
+
+An edit is accepted at the next render block. Each material finishes its current
+source cycle, including notes that have not started yet. The edited material
+starts at its next entry. A 3-cycle melody and a 4-cycle melody switch at their
+own boundaries; neither waits for a common multiple. DSP rendering splits at
+the exact boundary, rounded up to a sample, even inside an audio block.
+
+Later edits replace the reserved content without moving its boundary. Invalid
+input leaves the last valid reservation intact. Reverting to the active content
+cancels that material's reservation. Deletion stops future events at the reserved
+entry. Already sounding voices retain their deadlines and release tails.
+
+Changing a material's period starts its new cycle at the reserved old entry.
+Content-only edits preserve its origin and cycle count. Tempo changes preserve
+the musical reservation; its physical sample position follows the transport.
+A finite occurrence with no later entry keeps its current phrase. The latest
+accepted score is used after Stop then Play. New materials join at the next
+entry of their own source grid, without backfilling earlier notes.
+
+The runtime mini compiler records authored periods rather than trying to infer
+repetition from generated events. Literals have a one-cycle entry period;
+`slow` and `fast` scale it. Ordinary stacks keep independent members, including
+when gain or filtering wraps the stack. `every` and `jux` form one material with
+the input's entry period: their changing values need not repeat every entry.
+
+Named references keep addresses when uniquely named siblings are reordered
+inside the same stack. Anonymous members use positions; repeated uses of the
+same name use occurrence order. Restructuring a stack can therefore create new
+addresses. This is not semantic identity inference from text similarity.
+
+Library callers can construct a custom source with `Pat::from_query`; it has
+one-cycle entries without requiring periodic event values. They can use `named_entry` for an address and `material(signature)`
+to declare indivisible content. A nonempty signature must change with content.
+Without one, edits conservatively replace the material even if its query is
+unchanged. Entry metadata describes replacement, not event generation.
+
+Revision accessors report the accepted authored score. They do not assert that
+all its materials are already audible. Pending accessors also include materials
+waiting for an entry. Worklet receipts use `acceptedAtSample`, replacing the
+misleading `appliedAtSample`. The UI reports queued edits and keeps Play / Stop
+as its only transport control.
+
+Reconciliation and event selection are deterministic functions. The playback
+owner installs their returned states; the scheduler owns clocks and voice
+lifetimes. Parsing, metadata construction, and event queries still allocate.
 
 ```mbt check
 ///|

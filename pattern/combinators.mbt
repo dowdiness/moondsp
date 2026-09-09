@@ -5,6 +5,10 @@ pub fn[A] sequence(pats : Array[Pat[A]]) -> Pat[A] {
     return Pat::silence()
   }
   {
+    period: Rational::from_int(1),
+    members: [],
+    entry_key: "",
+    signature: "",
     query: fn(arc) {
       let n_rat = Rational::from_int(n)
       let one = Rational::from_int(1)
@@ -60,7 +64,7 @@ pub fn[A] sequence(pats : Array[Pat[A]]) -> Pat[A] {
               }
               None => None
             }
-            result.push({ whole: new_whole, part: new_part, value: ev.value })
+            result.push({ whole: new_whole, part: new_part, value: ev.value, })
           }
         }
       }
@@ -74,7 +78,12 @@ pub fn[A] stack(pats : Array[Pat[A]]) -> Pat[A] {
   if pats.is_empty() {
     return Pat::silence()
   }
+  let pats = pats.copy()
   {
+    period: Rational::from_int(1),
+    members: pats,
+    entry_key: "",
+    signature: "",
     query: fn(arc) {
       pats.iter().flat_map(pat => pat.query(arc).iter()).collect()
     },
@@ -87,6 +96,10 @@ pub fn[A] stack(pats : Array[Pat[A]]) -> Pat[A] {
 pub fn[A] Pat::filter_map(self : Pat[A], f : (A) -> A?) -> Pat[A] {
   let inner = self
   {
+    period: self.period,
+    members: self.members.map(p => p.filter_map(f)),
+    entry_key: self.entry_key,
+    signature: self.signature,
     query: fn(arc) {
       inner
       .query(arc)
@@ -206,10 +219,14 @@ pub fn[A] Pat::degrade_by(
     return self
   }
   if prob >= 1.0 {
-    return Pat::silence()
+    return self.filter_map(_ => None)
   }
   let inner = self
   {
+    period: self.period,
+    members: self.members.map(member => member.degrade_by(p, seed~)),
+    entry_key: self.entry_key,
+    signature: self.signature,
     query: fn(arc) {
       inner
       .query(arc)
@@ -232,6 +249,10 @@ pub fn[A] every(n : Int, f : (Pat[A]) -> Pat[A], pat : Pat[A]) -> Pat[A] {
   let n64 = Int64::from_int(n)
   let inner = pat
   {
+    period: pat.period,
+    members: [],
+    entry_key: pat.entry_key,
+    signature: pat.entry_signature(),
     query: fn(arc) {
       arc
       .whole_cycles()

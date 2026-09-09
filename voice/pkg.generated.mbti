@@ -21,6 +21,7 @@ pub fn BoundVoicePool::apply_voice_controls_result(Self, VoiceHandle, Array[@gra
 pub fn BoundVoicePool::apply_voice_param_bool(Self, VoiceHandle, Int, @graph.GraphParamSlot, Double) -> Bool
 #deprecated
 pub fn BoundVoicePool::kill(Self, VoiceHandle) -> Bool
+pub fn BoundVoicePool::kill_all(Self) -> Unit
 pub fn BoundVoicePool::kill_result(Self, VoiceHandle) -> Result[Unit, VoiceControlError]
 pub fn BoundVoicePool::last_sanitized_count(Self) -> Int
 pub fn BoundVoicePool::new(@graph.CompiledTemplate, @dsp.DspContext, @graph.ControlBindingBuilder, max_voices? : Int) -> Result[Self, BoundVoicePoolError]
@@ -69,6 +70,7 @@ pub struct VoicePool {
   // private fields
 }
 pub fn VoicePool::active_voice_count(Self) -> Int
+pub fn VoicePool::kill_all(Self) -> Unit
 pub fn VoicePool::last_sanitized_count(Self) -> Int
 pub fn VoicePool::new(@graph.CompiledTemplate, @dsp.DspContext, max_voices? : Int) -> Result[Self, VoicePoolError]
 #deprecated
@@ -100,4 +102,3 @@ pub impl Show for VoiceState
 // Type aliases
 
 // Traits
-

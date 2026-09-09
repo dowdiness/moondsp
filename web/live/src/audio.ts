@@ -17,9 +17,9 @@ export type AudioStatus =
   | { kind: "error"; message: string };
 
 export type WorkletReply =
-  | { type: "pattern-updated"; revision?: number; operation?: "update" | "restart"; samplePosition?: number }
+  | { type: "pattern-updated"; revision?: number; operation?: "update" | "restart"; samplePosition?: number; acceptedAtSample?: number }
   | { type: "pattern-error"; message: string; revision?: number }
-  | { type: "song-updated"; revision?: number; operation?: "update" | "restart"; samplePosition?: number }
+  | { type: "song-updated"; revision?: number; operation?: "update" | "restart"; samplePosition?: number; acceptedAtSample?: number }
   | { type: "song-error"; message: string; revision?: number }
   | { type: "error"; message: string; code?: number }
   | { type: string; [key: string]: unknown };

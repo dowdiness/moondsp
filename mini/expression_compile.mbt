@@ -67,32 +67,35 @@ fn compile_mini_pattern(
   definitions : Map[String, @pattern.Pat[@pattern.ControlMap]],
 ) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
   match expr.node {
-    Literal(kind, content, _) =>
-      match kind {
+    Literal(kind, content, _) => {
+      let pat = match kind {
         Sound => parse_sound_notation(content)
         Note => parse_note_notation(content)
         Chord => parse_chord_notation(content)
       }
+      let tag = match kind {
+        Sound => "s"
+        Note => "n"
+        Chord => "c"
+      }
+      pat.material("literal:\{content.length()}:\{content}:" + tag)
+    }
     Stack(children) => {
       let pats = children.map(child => compile_mini_pattern(child, definitions))
-      if pats.length() == 1 {
-        pats[0]
-      } else {
-        @pattern.stack(pats)
-      }
+      @pattern.stack(pats)
     }
     Reference(definition) =>
       match definitions.get(definition.id) {
-        Some(pat) => pat
+        Some(pat) => pat.named_entry(definition.id)
         None => {
           let pat = compile_mini_pattern(definition.body, definitions)
           definitions[definition.id] = pat
-          pat
+          pat.named_entry(definition.id)
         }
       }
     Apply(child, transform) => {
       let pat = compile_mini_pattern(child, definitions)
-      match transform {
+      let transformed = match transform {
         Fast(n) => pat.fast(n)
         Slow(n) => pat.slow(n)
         Rev => pat.rev()
@@ -105,6 +108,7 @@ fn compile_mini_pattern(
         Every(n, callback) => @pattern.every(n, callback.runtime(), pat)
         Jux(callback) => pat.jux(callback.runtime())
       }
+      transformed.entry_transform(transform.entry_signature())
     }
   }
 }
@@ -160,5 +164,18 @@ fn compile_mini_doc(
           builder.jux_doc(doc, callback.runtime(), callback.signature())
       }
     }
+  }
+}
+
+///|
+fn MiniTransform::entry_signature(self : MiniTransform) -> String {
+  match self {
+    Fast(n) => "/fast:\{n.num}:\{n.den}"
+    Slow(n) => "/slow:\{n.num}:\{n.den}"
+    Rev => "/rev"
+    Degrade(p) => "/degrade:\{p}"
+    Control(key, value) => "/control:\{key}:\{value}"
+    Every(n, callback) => "/every:\{n}:" + callback.signature()
+    Jux(callback) => "/jux:" + callback.signature()
   }
 }

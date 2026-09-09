@@ -38,6 +38,10 @@ test "failed preparation preserves active and accepted pending state" {
   assert_position(128)
   render_for_test(1)
   assert_position(256)
+  assert_eq(output_energy(), 0.0)
+  // The silent material's current cycle finishes before the accepted edit.
+  render_for_test(186)
+  assert_position(24064)
   assert_true(output_energy() > 0.01)
 }
 
@@ -221,4 +225,32 @@ test "song tempo commits on all routes without restarting or moving the anchor" 
   set_scheduler_bpm(0.0)
   assert_tempo(90.0)
   assert_position(640)
+}
+
+///|
+test "a pending pattern entry follows tempo without choosing another entry" {
+  assert_true(init_scheduler_graph_for_test())
+  assert_eq(submit_for_test("note(\"60\")"), 0)
+  render_for_test(1)
+  assert_eq(submit_for_test("note(\"72\")", restart=false), 0)
+  render_for_test(1)
+  for route in sched_routes.val {
+    assert_true(route.pool.scheduler.has_pending_playback_snapshot())
+  }
+  set_scheduler_bpm(60.0)
+  assert_eq(
+    sched_routes.val[0].pool.scheduler
+    .sample_at(@pattern.Rational::from_int(1))
+    .unwrap(),
+    47744L,
+  )
+  render_for_test(371)
+  assert_position(47744)
+  for route in sched_routes.val {
+    assert_true(route.pool.scheduler.has_pending_playback_snapshot())
+  }
+  render_for_test(1)
+  for route in sched_routes.val {
+    assert_false(route.pool.scheduler.has_pending_playback_snapshot())
+  }
 }

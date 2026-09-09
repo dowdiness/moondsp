@@ -44,7 +44,7 @@ pub fn PlaybackState::PlaybackState() -> Self
 pub fn PlaybackState::active_revision(Self) -> @identity.Revision?
 pub fn PlaybackState::active_song_layout_revision(Self) -> @identity.Revision?
 pub fn PlaybackState::active_song_revision(Self) -> @identity.Revision?
-pub fn PlaybackState::commit_pending(Self) -> Unit
+pub fn PlaybackState::commit_pending(Self, @pattern.Rational) -> Unit
 pub fn PlaybackState::has_active(Self) -> Bool
 pub fn PlaybackState::has_active_pattern(Self) -> Bool
 pub fn PlaybackState::has_active_song(Self) -> Bool
@@ -53,8 +53,8 @@ pub fn PlaybackState::has_pending_pattern(Self) -> Bool
 pub fn PlaybackState::has_pending_song(Self) -> Bool
 pub fn PlaybackState::query_active_events(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@pattern.ControlMap]]
 pub fn PlaybackState::queue(Self, PlaybackSnapshot) -> Unit
+pub fn PlaybackState::reset(Self) -> Unit
 
 // Type aliases
 
 // Traits
-

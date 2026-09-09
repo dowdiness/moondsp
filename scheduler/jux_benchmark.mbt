@@ -134,3 +134,38 @@ test "bench/jux/process_block" (b : @bench.T) {
     b.keep(right)
   })
 }
+
+///|
+test "bench/entries/prepared_playback" (b : @bench.T) {
+  let ctx = bench_ctx()
+  let scheduler = bench_scheduler(ctx)
+  let pool = bench_pool(bench_template(), ctx)
+  let source = bench_jux_pattern()
+  let id = try! @identity.PatternNodeId::from_string("bench:entries")
+  let snapshot = try! @pattern.PatternDoc::from_pattern(
+    id~,
+    pat=@pattern.stack([
+      source
+      .slow(@pattern.Rational::from_int(3))
+      .material("three")
+      .named_entry("a"),
+      source
+      .slow(@pattern.Rational::from_int(4))
+      .material("four")
+      .named_entry("b"),
+    ]),
+  ).lower()
+  let left = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)
+  let right = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)
+  scheduler.queue_pattern_snapshot(snapshot)
+  scheduler.process_playback_snapshot_block(pool, left, right)
+  b.bench(name="prepared_two_materials_render", fn() {
+    scheduler.process_playback_snapshot_block(pool, left, right)
+    b.keep(left)
+  })
+  b.bench(name="prepared_two_materials_accept_and_render", fn() {
+    scheduler.queue_pattern_snapshot(snapshot)
+    scheduler.process_playback_snapshot_block(pool, left, right)
+    b.keep(left)
+  })
+}

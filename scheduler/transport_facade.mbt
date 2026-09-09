@@ -134,6 +134,7 @@ pub fn PatternScheduler::reset_transport(self : PatternScheduler) -> Unit {
   self.previous_events = []
   self.last_error = None
   self.active_notes.clear()
+  self.playback_state.reset()
 }
 
 ///|
