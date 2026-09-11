@@ -2,35 +2,35 @@
 test "note_name c3 = 48" {
   let pat = note_name("c3")
   let events = pat.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.0.get("note"), Some(48.0))
+  @debug.assert_eq(events[0].value.get("note"), Some(48.0))
 }
 
 ///|
 test "note_name e3 = 52" {
   let pat = note_name("e3")
   let events = pat.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.0.get("note"), Some(52.0))
+  @debug.assert_eq(events[0].value.get("note"), Some(52.0))
 }
 
 ///|
 test "note_name g3 = 55" {
   let pat = note_name("g3")
   let events = pat.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.0.get("note"), Some(55.0))
+  @debug.assert_eq(events[0].value.get("note"), Some(55.0))
 }
 
 ///|
 test "note_name fs4 = 66" {
   let pat = note_name("fs4")
   let events = pat.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.0.get("note"), Some(66.0))
+  @debug.assert_eq(events[0].value.get("note"), Some(66.0))
 }
 
 ///|
 test "note_name a4 = 69" {
   let pat = note_name("a4")
   let events = pat.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.0.get("note"), Some(69.0))
+  @debug.assert_eq(events[0].value.get("note"), Some(69.0))
 }
 
 ///|
@@ -38,8 +38,8 @@ test "merge_control combines note and cutoff" {
   let merged = merge_control(note(60.0), s_cutoff(800.0))
   let events = merged.query(span(0, 1, 1, 1))
   @debug.assert_eq(events.length(), 1)
-  @debug.assert_eq(events[0].value.0.get("note"), Some(60.0))
-  @debug.assert_eq(events[0].value.0.get("cutoff"), Some(800.0))
+  @debug.assert_eq(events[0].value.get("note"), Some(60.0))
+  @debug.assert_eq(events[0].value.get("cutoff"), Some(800.0))
 }
 
 ///|
@@ -48,7 +48,7 @@ test "merge_control right-biased on conflict" {
   let b = note(72.0)
   let merged = merge_control(a, b)
   let events = merged.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.0.get("note"), Some(72.0))
+  @debug.assert_eq(events[0].value.get("note"), Some(72.0))
 }
 
 ///|
@@ -73,7 +73,7 @@ test "jux(rev): event count and pan keys" {
   let events = result.query(span(0, 1, 1, 1))
   @debug.assert_eq(events.length(), 4)
   let (pan_neg1, pan_pos1) = for ev in events; neg = 0, pos = 0 {
-    match ev.value.0.get("pan") {
+    match ev.value.get("pan") {
       Some(-1.0) => continue neg + 1, pos
       Some(1.0) => continue neg, pos + 1
       _ => continue neg, pos
@@ -100,7 +100,7 @@ test "jux(rev): channel identity (pan=-1 matches self, pan=+1 matches f(self))" 
   let left : Array[Event[ControlMap]] = []
   let right : Array[Event[ControlMap]] = []
   for ev in combined {
-    match ev.value.0.get("pan") {
+    match ev.value.get("pan") {
       Some(-1.0) => left.push(ev)
       Some(1.0) => right.push(ev)
       _ => ()
@@ -112,24 +112,24 @@ test "jux(rev): channel identity (pan=-1 matches self, pan=+1 matches f(self))" 
   for i in 0..<left.length() {
     @debug.assert_eq(left[i].part, self_events[i].part)
     @debug.assert_eq(
-      left[i].value.0.get("sound"),
-      self_events[i].value.0.get("sound"),
+      left[i].value.get("sound"),
+      self_events[i].value.get("sound"),
     )
     @debug.assert_eq(
-      left[i].value.0.get("cutoff"),
-      self_events[i].value.0.get("cutoff"),
+      left[i].value.get("cutoff"),
+      self_events[i].value.get("cutoff"),
     )
   }
   @debug.assert_eq(right.length(), f_events.length())
   for i in 0..<right.length() {
     @debug.assert_eq(right[i].part, f_events[i].part)
     @debug.assert_eq(
-      right[i].value.0.get("sound"),
-      f_events[i].value.0.get("sound"),
+      right[i].value.get("sound"),
+      f_events[i].value.get("sound"),
     )
     @debug.assert_eq(
-      right[i].value.0.get("cutoff"),
-      f_events[i].value.0.get("cutoff"),
+      right[i].value.get("cutoff"),
+      f_events[i].value.get("cutoff"),
     )
   }
 }
@@ -143,7 +143,7 @@ test "jux: overrides pre-existing pan" {
   // Guard against a vacuously-passing empty result.
   @debug.assert_eq(events.length(), 2)
   for ev in events {
-    let p = ev.value.0.get("pan")
+    let p = ev.value.get("pan")
     let is_pm1 = p == Some(-1.0) || p == Some(1.0)
     assert_true(is_pm1)
   }
@@ -162,28 +162,28 @@ test "jux(fast(2)): right channel doubles event count" {
 test "note_name bf4 = 70 (B-flat)" {
   let pat = note_name("bf4")
   let events = pat.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.0.get("note"), Some(70.0))
+  @debug.assert_eq(events[0].value.get("note"), Some(70.0))
 }
 
 ///|
 test "note_name ef3 = 51 (E-flat)" {
   let pat = note_name("ef3")
   let events = pat.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.0.get("note"), Some(51.0))
+  @debug.assert_eq(events[0].value.get("note"), Some(51.0))
 }
 
 ///|
 test "note_name f4 = 65 (F natural, not flat)" {
   let pat = note_name("f4")
   let events = pat.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.0.get("note"), Some(65.0))
+  @debug.assert_eq(events[0].value.get("note"), Some(65.0))
 }
 
 ///|
 test "note_name cs3 = 49 (C-sharp)" {
   let pat = note_name("cs3")
   let events = pat.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.0.get("note"), Some(49.0))
+  @debug.assert_eq(events[0].value.get("note"), Some(49.0))
 }
 
 ///|
@@ -194,13 +194,13 @@ test "deliverable: sequence c3 e3 g3 fast 2 produces 6 events" {
   let events = pat.query(span(0, 1, 1, 1))
   @debug.assert_eq(events.length(), 6)
   // First half: c3 e3 g3 in [0, 1/2)
-  @debug.assert_eq(events[0].value.0.get("note"), Some(48.0))
-  @debug.assert_eq(events[1].value.0.get("note"), Some(52.0))
-  @debug.assert_eq(events[2].value.0.get("note"), Some(55.0))
+  @debug.assert_eq(events[0].value.get("note"), Some(48.0))
+  @debug.assert_eq(events[1].value.get("note"), Some(52.0))
+  @debug.assert_eq(events[2].value.get("note"), Some(55.0))
   // Second half: c3 e3 g3 in [1/2, 1)
-  @debug.assert_eq(events[3].value.0.get("note"), Some(48.0))
-  @debug.assert_eq(events[4].value.0.get("note"), Some(52.0))
-  @debug.assert_eq(events[5].value.0.get("note"), Some(55.0))
+  @debug.assert_eq(events[3].value.get("note"), Some(48.0))
+  @debug.assert_eq(events[4].value.get("note"), Some(52.0))
+  @debug.assert_eq(events[5].value.get("note"), Some(55.0))
   // Verify rational time boundaries
   @debug.assert_eq(events[0].part.begin, Rational::new(0L, 1L))
   @debug.assert_eq(events[0].part.end_, Rational::new(1L, 6L))

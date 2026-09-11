@@ -82,6 +82,9 @@ make an expression indivisible. Names address edits; content comparison does
 not depend on those names. Scalar notes, sounds, controls, silence, and their
 combinations track content automatically. `same_content` answers whether two
 patterns have known equal content without exposing the representation.
+Control values do not expose mutable storage: `set` and `merge` return new
+values, and `entries` returns an owned copy. Editing an event's exported controls
+cannot change its source pattern or invalidate content comparison.
 
 `TimeTransform` describes a known Fast, Slow, or Reverse operation. It can apply
 the operation, repeat it with `every`, or create a stereo `jux` expression.

@@ -12,18 +12,8 @@ test "parse s(\"cp oh\") cross-pool drum sequence" {
   let pat = unwrap_ok(@mini.parse("s(\"cp oh\")"))
   let events = query_one_cycle(pat)
   inspect(events.length(), content="2")
-  inspect(
-    events[0].value,
-    content=(
-      #|ControlMap({ "sound": 39 })
-    ),
-  )
-  inspect(
-    events[1].value,
-    content=(
-      #|ControlMap({ "sound": 46 })
-    ),
-  )
+  assert_eq(events[0].value.entries(), { "sound": 39 })
+  assert_eq(events[1].value.entries(), { "sound": 46 })
 }
 
 ///|
@@ -147,12 +137,7 @@ test "parse single drum sound" {
   let pat = unwrap_ok(@mini.parse("s(\"bd\")"))
   let events = query_one_cycle(pat)
   inspect(events.length(), content="1")
-  inspect(
-    events[0].value,
-    content=(
-      #|ControlMap({ "sound": 36 })
-    ),
-  )
+  assert_eq(events[0].value.entries(), { "sound": 36 })
 }
 
 ///|
@@ -160,12 +145,7 @@ test "parse cutoff method merges sound control" {
   let pat = unwrap_ok(@mini.parse("s(\"bd\").cutoff(200)"))
   let events = query_one_cycle(pat)
   inspect(events.length(), content="1")
-  inspect(
-    events[0].value,
-    content=(
-      #|ControlMap({ "sound": 36, "cutoff": 200 })
-    ),
-  )
+  assert_eq(events[0].value.entries(), { "sound": 36, "cutoff": 200 })
 }
 
 ///|
@@ -210,12 +190,7 @@ test "parse_snapshot lowers cutoff method through PatternDoc" {
     ),
   )
   inspect(events.length(), content="1")
-  inspect(
-    events[0].value,
-    content=(
-      #|ControlMap({ "sound": 36, "cutoff": 200 })
-    ),
-  )
+  assert_eq(events[0].value.entries(), { "sound": 36, "cutoff": 200 })
 }
 
 ///|
@@ -916,24 +891,9 @@ test "parse note sequence" {
   let pat = unwrap_ok(@mini.parse("note(\"60 64 67\")"))
   let events = query_one_cycle(pat)
   inspect(events.length(), content="3")
-  inspect(
-    events[0].value,
-    content=(
-      #|ControlMap({ "note": 60 })
-    ),
-  )
-  inspect(
-    events[1].value,
-    content=(
-      #|ControlMap({ "note": 64 })
-    ),
-  )
-  inspect(
-    events[2].value,
-    content=(
-      #|ControlMap({ "note": 67 })
-    ),
-  )
+  assert_eq(events[0].value.entries(), { "note": 60 })
+  assert_eq(events[1].value.entries(), { "note": 64 })
+  assert_eq(events[2].value.entries(), { "note": 67 })
 }
 
 ///|
@@ -1013,12 +973,7 @@ test "parse euclid bd(3,8) tresillo" {
   let pat = unwrap_ok(@mini.parse("s(\"bd(3,8)\")"))
   let events = query_one_cycle(pat)
   inspect(events.length(), content="3")
-  inspect(
-    events[0].value,
-    content=(
-      #|ControlMap({ "sound": 36 })
-    ),
-  )
+  assert_eq(events[0].value.entries(), { "sound": 36 })
 }
 
 ///|
@@ -1051,12 +1006,7 @@ test "parse euclid k=0 produces silence for that element" {
   let events = query_one_cycle(pat)
   // bd(0,8) is silent, only sd plays in second half
   inspect(events.length(), content="1")
-  inspect(
-    events[0].value,
-    content=(
-      #|ControlMap({ "sound": 38 })
-    ),
-  )
+  assert_eq(events[0].value.entries(), { "sound": 38 })
 }
 
 ///|
@@ -1256,24 +1206,9 @@ test "parse with rev method" {
   let events = query_one_cycle(pat)
   inspect(events.length(), content="3")
   // Reversed: hh, sd, bd
-  inspect(
-    events[0].value,
-    content=(
-      #|ControlMap({ "sound": 36 })
-    ),
-  )
-  inspect(
-    events[1].value,
-    content=(
-      #|ControlMap({ "sound": 38 })
-    ),
-  )
-  inspect(
-    events[2].value,
-    content=(
-      #|ControlMap({ "sound": 42 })
-    ),
-  )
+  assert_eq(events[0].value.entries(), { "sound": 36 })
+  assert_eq(events[1].value.entries(), { "sound": 38 })
+  assert_eq(events[2].value.entries(), { "sound": 42 })
 }
 
 ///|
@@ -1513,24 +1448,9 @@ test "note(C4 E4 G4) parses note names into MIDI numbers" {
   let pat = unwrap_ok(@mini.parse("note(\"C4 E4 G4\")"))
   let events = query_one_cycle(pat)
   inspect(events.length(), content="3")
-  inspect(
-    events[0].value,
-    content=(
-      #|ControlMap({ "note": 60 })
-    ),
-  )
-  inspect(
-    events[1].value,
-    content=(
-      #|ControlMap({ "note": 64 })
-    ),
-  )
-  inspect(
-    events[2].value,
-    content=(
-      #|ControlMap({ "note": 67 })
-    ),
-  )
+  assert_eq(events[0].value.entries(), { "note": 60 })
+  assert_eq(events[1].value.entries(), { "note": 64 })
+  assert_eq(events[2].value.entries(), { "note": 67 })
 }
 
 ///|

@@ -46,7 +46,9 @@ pub(all) suberror PatternDocError {
 } derive(Eq, @debug.Debug)
 
 // Types and methods
-pub struct ControlMap(Map[String, Double]) derive(@debug.Debug)
+pub struct ControlMap {
+  // private fields
+} derive(@debug.Debug)
 pub fn ControlMap::each(Self, (String, Double) -> Unit) -> Unit
 pub fn ControlMap::empty() -> Self
 pub fn ControlMap::entries(Self) -> Map[String, Double]

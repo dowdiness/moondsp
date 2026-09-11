@@ -1,6 +1,9 @@
 ///|
 /// Numeric control map — the contract between Pattern and DSP engines.
-pub struct ControlMap(Map[String, Double]) derive(Debug)
+/// Values are immutable to callers; entries() returns an owned copy.
+pub struct ControlMap {
+  priv values : Map[String, Double]
+} derive(Debug)
 
 ///|
 pub impl Show for ControlMap with fn output(self, logger) {
@@ -9,19 +12,19 @@ pub impl Show for ControlMap with fn output(self, logger) {
 
 ///|
 pub fn ControlMap::empty() -> ControlMap {
-  ControlMap({})
+  { values: Map([]) }
 }
 
 ///|
 pub fn ControlMap::single(key : String, value : Double) -> ControlMap {
   let m : Map[String, Double] = {}
   m[key] = value
-  ControlMap(m)
+  { values: m }
 }
 
 ///|
 pub fn ControlMap::get(self : ControlMap, key : String) -> Double? {
-  self.0.get(key)
+  self.values.get(key)
 }
 
 ///|
@@ -29,18 +32,19 @@ pub fn ControlMap::each(
   self : ControlMap,
   f : (String, Double) -> Unit,
 ) -> Unit {
-  self.0.each(f)
+  self.values.each(f)
 }
 
 ///|
 /// Return a fresh map snapshot of this control map.
 pub fn ControlMap::entries(self : ControlMap) -> Map[String, Double] {
   let result : Map[String, Double] = {}
-  self.0.each(fn(k, v) { result[k] = v })
+  self.values.each(fn(k, v) { result[k] = v })
   result
 }
 
 ///|
+/// Return a new control map with this value replaced; leave self unchanged.
 pub fn ControlMap::set(
   self : ControlMap,
   key : String,
@@ -48,14 +52,15 @@ pub fn ControlMap::set(
 ) -> ControlMap {
   let result = self.entries()
   result[key] = value
-  ControlMap(result)
+  { values: result }
 }
 
 ///|
+/// Return a new control map with the other values overriding self.
 pub fn ControlMap::merge(self : ControlMap, other : ControlMap) -> ControlMap {
   let result = self.entries()
-  other.0.each(fn(k, v) { result[k] = v })
-  ControlMap(result)
+  other.values.each(fn(k, v) { result[k] = v })
+  { values: result }
 }
 
 ///|

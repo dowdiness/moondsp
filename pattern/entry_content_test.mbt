@@ -1,4 +1,22 @@
 ///|
+test "event control edits do not mutate identified source content" {
+  let source = @pattern.note(60.0)
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::from_int(1),
+  )
+  let value = source.query(arc)[0].value
+  let exported = value.entries()
+  exported["note"] = 12.0
+  let changed = value.set("note", 72.0)
+  let merged = value.merge(@pattern.ControlMap::single("note", 84.0))
+  assert_eq(changed.get("note"), Some(72.0))
+  assert_eq(merged.get("note"), Some(84.0))
+  assert_eq(source.query(arc)[0].value.get("note"), Some(60.0))
+  assert_true(source.same_content(@pattern.note(60.0)))
+}
+
+///|
 test "content comparison follows source values, selections and time operations" {
   let a = @pattern.stack([@pattern.note(60.0), @pattern.sound(36.0)])
   let b = @pattern.stack([@pattern.note(60.0), @pattern.sound(36.0)])
