@@ -50,6 +50,6 @@ Rational arithmetic remains bounded by Int64. Cancellation avoids unnecessary
 intermediate overflow; it does not validate every possible nested pattern
 transformation or provide arbitrary-precision arithmetic.
 
-Per-pattern entry edits, group defaults, seconds in the authoring language,
+Per-pattern entry edits, seconds in the authoring language,
 and independent clocks are separate stages. This change supplies their
 position-continuous, sample-accurate transport foundation.

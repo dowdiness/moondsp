@@ -67,6 +67,6 @@ arbitrary-precision guarantee. Named siblings are stable within a stack;
 anonymous members and repeated uses of the same name depend on position.
 
 This implementation adds entry-based replacement to the existing language.
-First-material group defaults, explicit physical-time syntax, independent
-clocks, transport-position UI, and new effects remain separate work. It does not
+Explicit physical-time syntax, independent clocks, transport-position UI,
+and new effects remain separate work. It does not
 claim listening approval for a complete composition or CLAP host readiness.
