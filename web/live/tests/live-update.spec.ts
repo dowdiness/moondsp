@@ -201,17 +201,18 @@ test("the envelope example accepts edits and rejects negative seconds", async ({
   await stop(page);
 });
 
-for (const name of ["envelope-compare", "room-of-light"]) {
+for (const { name, file, bpm } of [
+  { name: "envelope-compare", file: "envelope-comparison.mini", bpm: "60" },
+  { name: "room-of-light", file: "room-of-light.mini", bpm: "112" },
+]) {
   test(`the ${name} song is available without opening More examples`, async ({ page }) => {
     const example = page.locator(`[data-live-example="${name}"]`);
     await expect(example).toBeVisible();
-    if (name === "room-of-light") {
-      const score = readFileSync(new URL("../../../examples/room-of-light.mini", import.meta.url), "utf8");
-      await expect(example).toHaveAttribute("data-example", score);
-    }
+    const score = readFileSync(new URL(`../../../examples/${file}`, import.meta.url), "utf8");
+    await expect(example).toHaveAttribute("data-example", score);
     await example.click();
     await expect(page.locator("#mode-song")).toHaveAttribute("aria-pressed", "true");
-    await expect(page.locator("#global-bpm")).toHaveValue(name === "room-of-light" ? "112" : "60");
+    await expect(page.locator("#global-bpm")).toHaveValue(bpm);
     expect(await play(page)).toMatchObject({ type: "song-updated", operation: "restart" });
     await stop(page);
   });

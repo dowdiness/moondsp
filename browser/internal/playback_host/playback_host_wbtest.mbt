@@ -106,33 +106,45 @@ fn assert_tempo(bpm : Double) -> Unit raise {
 }
 
 ///|
-test "hold uses the instrument attack default and release survives a live edit" {
-  assert_true(init_scheduler_graph_for_test())
-  let text = "note(\"60\").slow(40).hold(0.1).release(0.2)"
-  assert_eq(submit_for_test(text), 0)
-  render_for_test(41) // 5248 samples, before the 5280-sample gate-off.
-  for route in sched_routes.val {
-    if route.selector is RouteSynth {
-      assert_eq(route.pool.scheduler.active_note_count(), 1)
+test "live edits preserve the sounding envelope" {
+  fn render(edit : Bool) -> Array[Double] raise {
+    assert_true(init_scheduler_graph_for_test())
+    assert_eq(
+      submit_for_test("note(\"60\").slow(40).hold(0.1).release(0.2)"),
+      0,
+    )
+    let samples : Array[Double] = []
+    for block in 0..<120 {
+      // Edit just before the original note enters its release.
+      if edit && block == 41 {
+        assert_eq(
+          submit_for_test(
+            "note(\"60\").slow(40).hold(0).release(0)",
+            restart=false,
+          ),
+          0,
+        )
+      }
+      render_for_test(1)
+      for i in 0..<128 {
+        samples.push(scheduler_left_sample(i))
+      }
     }
+    samples
   }
-  // Updating the next phrase cannot shorten the sounding voice's release.
-  assert_eq(
-    submit_for_test("note(\"60\").slow(40).hold(0).release(0)", restart=false),
-    0,
+  let uninterrupted = render(false)
+  assert_eq(render(true), uninterrupted)
+  // The release is audible at 0.2s and has finished by the end of the render.
+  assert_true(
+    uninterrupted[9600:9728]
+    .to_array()
+    .any(fn(sample) { sample.abs() > 0.0001 }),
   )
-  render_for_test(1)
-  for route in sched_routes.val {
-    if route.selector is RouteSynth {
-      assert_eq(route.pool.scheduler.active_note_count(), 0)
-    }
-  }
-  assert_true(output_energy() > 0.01)
-  assert_eq(prepare_for_test("note(\"60\").attack(-1)"), 0)
-  render_for_test(40)
-  assert_true(output_energy() > 0.01)
-  render_for_test(40)
-  assert_eq(output_energy(), 0.0)
+  assert_false(
+    uninterrupted[uninterrupted.length() - 128:]
+    .to_array()
+    .any(fn(sample) { sample != 0.0 }),
+  )
 }
 
 ///|
