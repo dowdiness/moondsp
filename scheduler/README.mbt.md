@@ -43,8 +43,8 @@ reset. An unrepresentable event is skipped; exhaustion of the clock range
 silences the block and kills its voices without advancing the clock.
 
 Song tempo edits can continue on the browser's existing playback path. A song
-layout change still requires Stop then Play. Group defaults, explicit seconds
-in the language, and independent clocks are separate implementation stages.
+layout change still requires Stop then Play. Explicit seconds in the language
+and independent clocks are separate implementation stages.
 
 ## Pattern edits
 

@@ -44,5 +44,5 @@ This is automated event and audio comparison, not subjective listening approval.
 Only the early two-melody section was rendered for the edit comparison; the
 whole-score equivalence check queries events without rendering the entire song.
 UI receipts acknowledge acceptance, not the instant every material becomes
-audible. Layout changes still require Stop then Play. Effects, first-material
-group defaults, and transport-position UI are separate work.
+audible. Layout changes still require Stop then Play. Effects and
+transport-position UI are separate work.
