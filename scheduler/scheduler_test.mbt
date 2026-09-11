@@ -2262,3 +2262,28 @@ test "process_block multi-block note expiry" {
   }
   inspect(sched.active_note_count(), content="0")
 }
+
+///|
+test "playback snapshot routes room into the shared send only" {
+  let (pool, sched, left, right) = make_test_sched()
+  let pat = @pattern.merge_control(
+    @pattern.note(60.0),
+    @pattern.control("room", 0.5),
+  )
+  let doc = @pattern.PatternDoc::from_pattern(
+    id=pid("scheduler:room-send"),
+    pat~,
+  )
+  sched.queue_pattern_snapshot(doc.lower())
+  let send_left = @moondsp.AudioBuffer::filled(128)
+  let send_right = @moondsp.AudioBuffer::filled(128)
+  for _ in 0..<4 {
+    sched.process_playback_snapshot_block_with_send(
+      pool, left, right, send_left, send_right,
+    )
+  }
+  let dry_energy = buffer_abs_sum(left) + buffer_abs_sum(right)
+  let send_energy = buffer_abs_sum(send_left) + buffer_abs_sum(send_right)
+  assert_true(dry_energy > 0.0)
+  assert_true((send_energy - dry_energy * 0.5).abs() < 0.0001)
+}

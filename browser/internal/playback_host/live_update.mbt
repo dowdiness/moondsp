@@ -301,10 +301,15 @@ fn commit_playback_request() -> Unit {
     None => ()
     Some(request) => {
       match request.policy {
-        Restart =>
+        Restart => {
+          match sched_reverb.val {
+            Some(reverb) => reverb.reset()
+            None => ()
+          }
           for route in sched_routes.val {
             route.pool.scheduler.reset_transport_and_kill_notes(route.pool.pool)
           }
+        }
         Continue => ()
       }
       match request.tempo {
@@ -331,15 +336,31 @@ fn process_snapshot_routes(
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
 ) -> Unit {
+  let send_left = match sched_send_left.val {
+    Some(buffer) => buffer
+    None => return
+  }
+  let send_right = match sched_send_right.val {
+    Some(buffer) => buffer
+    None => return
+  }
   for route in sched_routes.val {
     let sp = route.pool
     sp.tmp_left.fill(0.0)
     sp.tmp_right.fill(0.0)
-    sp.scheduler.process_playback_snapshot_block(
+    sp.tmp_send_left.fill(0.0)
+    sp.tmp_send_right.fill(0.0)
+    sp.scheduler.process_playback_snapshot_block_with_send(
       sp.pool,
       sp.tmp_left,
       sp.tmp_right,
+      sp.tmp_send_left,
+      sp.tmp_send_right,
     )
+    for i in 0..<send_left.length() {
+      send_left.set(i, send_left.get(i) + sp.tmp_send_left.get(i))
+      send_right.set(i, send_right.get(i) + sp.tmp_send_right.get(i))
+    }
     accumulate_sub_pool(sp, left, right)
   }
 }

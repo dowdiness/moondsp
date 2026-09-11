@@ -950,7 +950,10 @@ Current semantics:
 - `PatternScheduler::process_block(...)` takes a `BoundVoicePool`, expires old
   notes, queries the pattern for the current block arc, converts raw control
   maps through the scheduler's mapper, calls `note_on_controls(...)`, applies
-  per-voice side effects such as pan, then renders through the bound pool
+  per-voice side effects such as pan and the single shared-send gain, then
+  renders through the bound pool. The default mapper consumes `room` as a
+  normalized `0..1` send; it is not a graph control and does not add reverb
+  nodes to each voice.
 - Phase 6 incremental authoring adds a snapshot-swap layer over the same
   block-processing loop. `queue_pattern_snapshot` / `queue_song_snapshot`
   stage a lowered `PlaybackSnapshot` without changing playback immediately;
@@ -1399,11 +1402,11 @@ and pending playback and leaves the token available for retry or discard.
 or consulting the input/prepared slots. It cancels a pending replacement, keeps
 the current global BPM and fails without mutation if no score has been applied.
 The last accepted operation wins; preparation alone never supersedes one.
-Playing a finite score beyond its end renders existing release tails and then
-silence, until an explicit restart or another valid application. Continuing
-updates do not backfill past onsets. Suspending browser audio pauses rendering;
-queued operations are accepted on the next rendered block after resumption.
-Material replacements then wait for their own entries.
+Playing a finite score beyond its end renders existing voice releases and the
+shared reverb tail, then silence, until an explicit restart or another valid
+application. Continuing updates do not backfill past onsets. Suspending browser
+audio pauses rendering; queued operations are accepted on the next rendered
+block after resumption. Material replacements then wait for their own entries.
 
 Both browser worklets accept `apply-score` with mode, text, revision and an
 explicit `continue` or `restart` policy; `restart-playback` carries only a request
@@ -1421,6 +1424,19 @@ The playback host imports dependency-free identity types for snapshot IDs.
 Preparation/routing decisions use explicit route selectors; mutable prepared and
 pending slots, transport resets and voice lifecycle belong to the audio-owner
 shell. Snapshots remain inside WASM and are never transferred as JS objects.
+
+The browser audio owner also owns exactly one stereo room reverb, outside all
+routed voice pools. Each voice keeps one normalized send gain; every route
+renders dry stereo plus a send pair, the host sums all sends, and the reverb is
+processed once per block with fixed room settings. This is a dedicated shared
+bus, not a generic effect graph: there are no per-part reverb instances,
+multiple rooms, or event-controlled decay and damping. Its state is independent
+of voice and authored-material identity, so tails survive note release, section
+boundaries, and continuing live edits even when one contributing part is
+replaced or stopped. Restart application clears the room state together with
+transport and voices. The UI Stop remains immediate because it suspends browser
+output; the restart queued by the next Play clears the paused tail before audio
+resumes.
 Parsing, lowering, and pattern queries still allocate in that owner. This
 contract does not promise freedom from underruns. Global BPM edits preserve
 musical position and retime musical deadlines; physical deadlines stay fixed.

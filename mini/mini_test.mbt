@@ -159,6 +159,29 @@ test "parse gain and pan methods merge sound controls" {
 }
 
 ///|
+test "parse room method adds a shared reverb send" {
+  let pat = unwrap_ok(@mini.parse("s(\"bd\").room(0.625)"))
+  let events = query_one_cycle(pat)
+  inspect(events.length(), content="1")
+  assert_true(events[0].value.get("sound") == Some(36.0))
+  guard events[0].value.get("room") is Some(send) else {
+    abort("expected room send")
+  }
+  assert_true((send - 0.625).abs() < 0.000001)
+}
+
+///|
+test "room send must stay between zero and one" {
+  for source in ["s(\"bd\").room(-0.01)", "s(\"bd\").room(1.01)"] {
+    match @mini.parse(source) {
+      Ok(_) => abort("expected invalid room send to fail")
+      Err(message) =>
+        assert_true(message.contains("room() expects a send between 0 and 1"))
+    }
+  }
+}
+
+///|
 test "parse_snapshot lowers mini output through PatternDoc" {
   let snapshot = unwrap_mini_snapshot(@mini.parse_snapshot("s(\"bd sd\")"))
   inspect(

@@ -110,6 +110,7 @@ pub fn PatternScheduler::process_block(Self, @pattern.Pat[@pattern.ControlMap], 
 pub fn PatternScheduler::process_events(Self, Array[@pattern.Event[@pattern.ControlMap]], @pattern.TimeSpan, @voice.BoundVoicePool) -> Unit
 pub fn PatternScheduler::process_playback_events(Self, Array[PlaybackEvent], @pattern.TimeSpan, @voice.BoundVoicePool) -> Unit
 pub fn PatternScheduler::process_playback_snapshot_block(Self, @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
+pub fn PatternScheduler::process_playback_snapshot_block_with_send(Self, @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::process_section_block(Self, @song.Section[@pattern.ControlMap], @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::process_snapshot_block(Self, @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::process_song_block(Self, @song.Song[@pattern.ControlMap], @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
@@ -162,6 +163,7 @@ pub fn PlaybackSnapshot::song_layout_revision(Self) -> @identity.Revision?
 
 pub enum VoiceAction {
   SetPan(Double)
+  SetSend(Double)
 }
 
 // Type aliases

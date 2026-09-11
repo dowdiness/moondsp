@@ -140,6 +140,7 @@ priv struct VoiceSlot {
   /// gain pair — no separate pan field needed.
   mut pan_left_gain : Double
   mut pan_right_gain : Double
+  mut send_gain : Double
   mono_buffer : AudioBuffer
 }
 
@@ -156,6 +157,7 @@ fn VoiceSlot::VoiceSlot(block_size : Int) -> VoiceSlot {
     // Center pan: cos(π/4) = sin(π/4) ≈ 0.7071
     pan_left_gain: @dsp.pan_left_gain(0.0),
     pan_right_gain: @dsp.pan_right_gain(0.0),
+    send_gain: 0.0,
     mono_buffer: AudioBuffer::filled(block_size),
   }
 }
@@ -170,6 +172,15 @@ fn VoiceSlot::update_pan(self : VoiceSlot, pan : Double) -> Unit {
   let clamped = pan.clamp(min=-1.0, max=1.0)
   self.pan_left_gain = @dsp.pan_left_gain(clamped)
   self.pan_right_gain = @dsp.pan_right_gain(clamped)
+}
+
+///|
+fn VoiceSlot::update_send(self : VoiceSlot, gain : Double) -> Unit {
+  self.send_gain = if !@dsp.is_finite(gain) {
+    0.0
+  } else {
+    gain.clamp(min=0.0, max=1.0)
+  }
 }
 
 ///|
@@ -530,6 +541,16 @@ pub fn BoundVoicePool::set_voice_pan_result(
 }
 
 ///|
+/// Set this voice's gain into the pool's single stereo send output.
+pub fn BoundVoicePool::set_voice_send_result(
+  self : BoundVoicePool,
+  handle : VoiceHandle,
+  gain : Double,
+) -> Result[Unit, VoiceControlError] {
+  self.pool.set_voice_send_result(handle, gain)
+}
+
+///|
 /// Validate a live control batch against an active voice without mutating it.
 pub fn BoundVoicePool::validate_voice_controls_result(
   self : BoundVoicePool,
@@ -597,6 +618,19 @@ pub fn BoundVoicePool::process(
   right : AudioBuffer,
 ) -> Unit {
   self.pool.process(context, left, right)
+}
+
+///|
+/// Render dry stereo and the pool's single post-pan stereo send in one pass.
+pub fn BoundVoicePool::process_with_send(
+  self : BoundVoicePool,
+  context : DspContext,
+  left : AudioBuffer,
+  right : AudioBuffer,
+  send_left : AudioBuffer,
+  send_right : AudioBuffer,
+) -> Unit {
+  self.pool.process_with_send(context, left, right, send_left, send_right)
 }
 
 ///|
@@ -697,6 +731,7 @@ fn VoicePool::activate_slot(
   if update_pan {
     slot.update_pan(pan)
   }
+  slot.send_gain = 0.0
   slot.state = VoiceState::Active
   // WHY overflow guard on generation: after 2^31 increments the counter
   // wraps negative, which could revalidate stale VoiceHandles. Resetting
@@ -956,6 +991,21 @@ pub fn VoicePool::set_voice_pan_result(
 }
 
 ///|
+pub fn VoicePool::set_voice_send_result(
+  self : VoicePool,
+  handle : VoiceHandle,
+  gain : Double,
+) -> Result[Unit, VoiceControlError] {
+  match self.resolve_slot(handle) {
+    None => Err(VoiceControlError::InvalidVoiceHandle(handle))
+    Some(slot) => {
+      slot.update_send(gain)
+      Ok(())
+    }
+  }
+}
+
+///|
 fn VoicePool::compiled_voice_result(
   self : VoicePool,
   handle : VoiceHandle,
@@ -1042,16 +1092,29 @@ pub fn VoicePool::voice_state(
 }
 
 ///|
-pub fn VoicePool::process(
+fn VoicePool::process_outputs(
   self : VoicePool,
   context : DspContext,
   left_output : AudioBuffer,
   right_output : AudioBuffer,
+  send_left : AudioBuffer,
+  send_right : AudioBuffer,
+  write_send : Bool,
 ) -> Unit {
-  let sample_count = if context.block_size() < left_output.length() {
-    context.block_size()
-  } else {
-    left_output.length()
+  let mut sample_count = context.block_size()
+  if left_output.length() < sample_count {
+    sample_count = left_output.length()
+  }
+  if right_output.length() < sample_count {
+    sample_count = right_output.length()
+  }
+  if write_send {
+    if send_left.length() < sample_count {
+      sample_count = send_left.length()
+    }
+    if send_right.length() < sample_count {
+      sample_count = send_right.length()
+    }
   }
   for i = 0; i < self.max_voices; i = i + 1 {
     let slot = self.slots[i]
@@ -1070,10 +1133,23 @@ pub fn VoicePool::process(
         // This avoids 2 trig calls per voice per block.
         let left_gain = slot.pan_left_gain
         let right_gain = slot.pan_right_gain
-        for s = 0; s < sample_count; s = s + 1 {
-          let mono = slot.mono_buffer.get(s)
-          left_output.set(s, left_output.get(s) + mono * left_gain)
-          right_output.set(s, right_output.get(s) + mono * right_gain)
+        if write_send {
+          let send_gain = slot.send_gain
+          for s = 0; s < sample_count; s = s + 1 {
+            let mono = slot.mono_buffer.get(s)
+            let left = mono * left_gain
+            let right = mono * right_gain
+            left_output.set(s, left_output.get(s) + left)
+            right_output.set(s, right_output.get(s) + right)
+            send_left.set(s, send_left.get(s) + left * send_gain)
+            send_right.set(s, send_right.get(s) + right * send_gain)
+          }
+        } else {
+          for s = 0; s < sample_count; s = s + 1 {
+            let mono = slot.mono_buffer.get(s)
+            left_output.set(s, left_output.get(s) + mono * left_gain)
+            right_output.set(s, right_output.get(s) + mono * right_gain)
+          }
         }
         // Reclaim voices whose envelope has finished, whether in Release
         // or Active (e.g. sustain=0 decay completed). Without this check,
@@ -1086,6 +1162,37 @@ pub fn VoicePool::process(
   }
   self.last_sanitized_count = @dsp.sanitize_buffer(left_output, sample_count) +
     @dsp.sanitize_buffer(right_output, sample_count)
+  if write_send {
+    ignore(@dsp.sanitize_buffer(send_left, sample_count))
+    ignore(@dsp.sanitize_buffer(send_right, sample_count))
+  }
+}
+
+///|
+pub fn VoicePool::process(
+  self : VoicePool,
+  context : DspContext,
+  left_output : AudioBuffer,
+  right_output : AudioBuffer,
+) -> Unit {
+  self.process_outputs(
+    context, left_output, right_output, left_output, right_output, false,
+  )
+}
+
+///|
+/// Render dry stereo and the pool's single post-pan stereo send in one pass.
+pub fn VoicePool::process_with_send(
+  self : VoicePool,
+  context : DspContext,
+  left_output : AudioBuffer,
+  right_output : AudioBuffer,
+  send_left : AudioBuffer,
+  send_right : AudioBuffer,
+) -> Unit {
+  self.process_outputs(
+    context, left_output, right_output, send_left, send_right, true,
+  )
 }
 
 ///|

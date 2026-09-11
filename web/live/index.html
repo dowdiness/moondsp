@@ -436,6 +436,8 @@
         <p class="cheat-note">Same E4: short → swell → drift. 23 seconds.</p>
         <button type="button" class="example" id="room-of-light-example" data-live-example="room-of-light" data-mode="song" data-bpm="112">Room of Light — pop sketch</button>
         <p class="cheat-note">Short bass, soft chords, and a singing lead. 39 seconds.</p>
+        <button type="button" class="example" id="shared-room-example" data-live-example="shared-room" data-mode="song" data-bpm="60">Dry → shared room comparison</button>
+        <p class="cheat-note">Same groove dry, then drums and chords send into one room. 16 seconds.</p>
           <button type="button" class="example" data-live-example="envelope" data-bpm="60" data-example='note("E4 G4 D4").slow(21).attack(2).hold(3).release(8)'>Drifting notes — long envelopes</button>
           <p class="cheat-note">Each note lasts 13 seconds. Try changing release(8).</p>
         <details>
@@ -482,6 +484,7 @@
           <dl>
             <dt>.gain(n)</dt><dd>scale volume</dd>
             <dt>.pan(n)</dt><dd>left −1, center 0, right 1</dd>
+            <dt>.room(n)</dt><dd>send 0–1 into the shared room reverb</dd>
             <dt>.attack(s)</dt><dd>fade in over s seconds</dd>
             <dt>.hold(s)</dt><dd>stay at peak volume for s seconds</dd>
             <dt>.release(s)</dt><dd>fade out over s seconds</dd>
@@ -489,6 +492,7 @@
           <p class="cheat-note">Envelopes apply to notes and chords. Times are seconds.</p>
           <p><code>note("E4")<br>&nbsp;&nbsp;.attack(0.01).hold(0.1)<br>&nbsp;&nbsp;.release(0.2)</code></p>
           <p class="cheat-note">0.31 seconds total, independent of tempo. Omit hold to follow the pattern's note length. Omitted attack/release use the sound's defaults; release starts from the current level.</p>
+          <p class="cheat-note">Room is one shared stereo space for every part. Its tail continues across note endings, section changes, and live edits; Stop remains immediate.</p>
 
           <h2>Rhythm</h2>
           <p class="cheat-note">BPM sets cycles per minute: at 60, one cycle is one second. A cycle has no fixed meter.</p>

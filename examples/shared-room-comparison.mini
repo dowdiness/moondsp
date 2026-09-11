@@ -1,0 +1,16 @@
+let dry = stack(
+  s("bd sd hh sd").slow(4).gain(0.22),
+  chord("Cmaj9 Am7 Fmaj9 G6").slow(8).gain(0.08)
+);
+let shared = stack(
+  s("bd sd hh sd").slow(4).gain(0.22).room(0.25),
+  chord("Cmaj9 Am7 Fmaj9 G6").slow(8).gain(0.08).room(0.7)
+);
+
+song(
+  bpm(60),
+  section("dry", 8, dry),
+  section("shared_room", 8, shared),
+  part("a", "dry"),
+  part("b", "shared_room")
+)
