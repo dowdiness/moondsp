@@ -205,6 +205,7 @@ for (const { name, file, bpm } of [
   { name: "envelope-compare", file: "envelope-comparison.mini", bpm: "60" },
   { name: "room-of-light", file: "room-of-light.mini", bpm: "112" },
   { name: "shared-room", file: "shared-room-comparison.mini", bpm: "60" },
+  { name: "shared-room-afterglow", file: "shared-room-afterglow.mini", bpm: "72" },
 ]) {
   test(`the ${name} song is available without opening More examples`, async ({ page }) => {
     const example = page.locator(`[data-live-example="${name}"]`);
