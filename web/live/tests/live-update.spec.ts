@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { readFileSync } from "node:fs";
 
 async function replaceText(page: Page, text: string) {
   await page.locator(".cm-content").fill(text);
@@ -71,6 +72,21 @@ test("editing and recovering from a parse error preserve transport", async ({ pa
   const recovered = await edit(page, 'note("67").slow(8)');
   expect(recovered).toMatchObject({ type: "pattern-updated", operation: "update" });
   expect(recovered.acceptedAtSample).toBeGreaterThan(updated.acceptedAtSample);
+});
+
+test("Light Orbit accepts shared-material edits and reverts through a parse error", async ({ page }) => {
+  const score = readFileSync(new URL("../../../examples/light-orbit.mini", import.meta.url), "utf8");
+  await page.locator("#mode-song").click();
+  await start(page, score);
+  const changed = score.replace('E4 G4 A4', 'F#4 G4 A4').replace('D5 A4 G4 E5', 'Eb5 Bb4 Ab4 F5');
+  const updated = await edit(page, changed);
+  expect(updated).toMatchObject({ type: "song-updated", operation: "update" });
+  expect(updated.acceptedAtSample).toBeGreaterThan(0);
+  expect(await edit(page, "song(")).toMatchObject({ type: "song-error" });
+  const reverted = await edit(page, score);
+  expect(reverted).toMatchObject({ type: "song-updated", operation: "update" });
+  expect(reverted.acceptedAtSample).toBeGreaterThan(updated.acceptedAtSample);
+  await stop(page);
 });
 
 test("song content edits continue, and Stop then Play applies a new layout", async ({ page }) => {
