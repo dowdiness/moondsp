@@ -117,6 +117,10 @@ test("the tempo example can change tempo while playing", async ({ page }) => {
   expect(updated).toMatchObject({ type: "song-updated", operation: "update" });
   expect(updated.acceptedAtSample).toBeGreaterThan(0);
   await expect(page.locator("#global-bpm")).toHaveValue("72");
+  const fractional = await edit(page, score.replace("bpm(60)", "bpm(90.125)"));
+  expect(fractional).toMatchObject({ type: "song-updated", operation: "update" });
+  expect(fractional.acceptedAtSample).toBeGreaterThan(updated.acceptedAtSample);
+  await expect(page.locator("#global-bpm")).toHaveValue("90.125");
   await stop(page);
 });
 

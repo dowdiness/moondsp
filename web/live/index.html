@@ -431,7 +431,7 @@
       <div id="editor"></div>
       <aside id="cheat" aria-label="mini-notation cheatsheet">
         <h2>Examples</h2>
-        <p class="cheat-note">Choose a starting point, then Play. Replaces your code.</p>
+        <p class="cheat-note">Replaces your code. Press Play if stopped.</p>
         <button type="button" class="example" data-live-example="entries" data-bpm="60" data-example='let melody = note("E4 G4 A4").slow(3).gain(0.12);&#10;let response = note("D5 A4 G4 E5").slow(4).gain(0.08);&#10;stack(melody, response)'>Independent entries — 3 and 4 cycles</button>
         <p class="cheat-note">Change E4 to F4 and D5 to C5 while playing.</p>
         <button type="button" class="example" data-live-example="tempo" data-mode="song" data-bpm="60" data-example='let melody = note("E4 G4 A4").slow(3).gain(0.12);&#10;let beat = s("bd hh sd hh").slow(4).gain(0.2);&#10;song(&#10;  bpm(60),&#10;  section("opening", 12, melody),&#10;  section("groove", 24, stack(melody, beat)),&#10;  part("first", "opening"),&#10;  part("second", "groove")&#10;)'>Shared melody + live tempo</button>
