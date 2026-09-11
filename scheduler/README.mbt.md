@@ -66,6 +66,8 @@ A finite occurrence with no later entry keeps its current phrase. The latest
 accepted score is used after Stop then Play. New materials join at the next
 entry of their own source grid, without backfilling earlier notes.
 
+### Material periods and addresses
+
 The runtime mini compiler records authored periods rather than trying to infer
 repetition from generated events. Literals have a one-cycle entry period;
 `slow` and `fast` scale it. Ordinary stacks keep independent members, including
@@ -77,6 +79,8 @@ inside the same stack. Anonymous members use positions; repeated uses of the
 same name use occurrence order. Restructuring a stack can therefore create new
 addresses. This is not semantic identity inference from text similarity.
 
+### Content comparison
+
 Library callers can use `named_entry` to name a material and `material()` to
 make an expression indivisible. Names address edits; content comparison does
 not depend on those names. Scalar notes, sounds, controls, silence, and their
@@ -85,13 +89,6 @@ patterns have known equal content without exposing the representation.
 Control values do not expose mutable storage: `set` and `merge` return new
 values, and `entries` returns an owned copy. Editing an event's exported controls
 cannot change its source pattern or invalidate content comparison.
-
-The browser host validates a continuing tempo change before replacing its
-pending request. Rejection preserves the previous request and receipt. The
-host commits before advancing time or adding notes, so the validation remains
-valid until commit; direct BPM edits preserve the anchor and musical endpoints.
-Reset clears pending requests. Adding another state-mutating path must preserve
-this invariant or introduce an explicit commit result.
 
 `TimeTransform` describes a known Fast, Slow, or Reverse operation. It can apply
 the operation, repeat it with `every`, or create a stereo `jux` expression.
@@ -108,6 +105,14 @@ control constructors for automatically tracked control sources.
 These changes require no additional authoring syntax or UI settings. Content
 comparison, entry addressing, and event generation remain separate concerns.
 
+### Acceptance and receipts
+
+The browser host validates continuing tempo changes before replacing a pending
+request. Rejection preserves the previous request and receipt. The host's
+[admission invariant](../docs/plans/2026-09-11-playback-admission.md#why-admission-remains-valid)
+explains why commit can apply the accepted request without a recoverable rejection
+and which future changes require revisiting that design.
+
 Revision accessors report the accepted authored score. They do not assert that
 all its materials are already audible. Pending accessors also include materials
 waiting for an entry. Worklet receipts use `acceptedAtSample`, replacing the
@@ -117,6 +122,8 @@ as its only transport control.
 Reconciliation and event selection are deterministic functions. The playback
 owner installs their returned states; the scheduler owns clocks and voice
 lifetimes. Parsing, metadata construction, and event queries still allocate.
+
+## Explicit voice control
 
 ```mbt check
 ///|

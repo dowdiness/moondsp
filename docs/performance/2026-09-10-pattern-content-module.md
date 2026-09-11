@@ -7,30 +7,9 @@ preserving its entry address and timing. The pattern module owns this comparison
 Callers supply musical operations, not strings that claim to identify their
 implementation.
 
-## Interface
-
-- Notes, sounds, scalar controls, silence, and their combinations track content
-  automatically. `same_content` returns true only for known equal content and
-  entry periods. Names and song placement are separate.
-- `material()` groups an expression into one editable material. It cannot claim
-  that unknown content is known.
-- `TimeTransform` owns both execution and comparison for Fast, Slow, and Reverse,
-  including their use through `every` and `jux`.
-- `select_control` owns selection by control presence or exact value. Browser
-  routing selects musical controls without defining comparison metadata.
-- Arbitrary queries and callbacks remain supported. Their content is unknown,
-  so playback conservatively schedules replacement. Known transforms cannot
-  make an opaque source identifiable.
-
-The compiler no longer fingerprints literal text or scalar controls for playback.
-The scheduler compares content through the pattern interface. Private mini
-document-cache identifiers still describe authoring nodes; their callback input
-is now one operation instead of a separately supplied function and identifier.
-
-This is an intentional library interface change: `material(signature)` becomes
-`material()`, content-string access is private, and callbacks no longer accept
-identity overrides. It adds no authoring syntax or UI settings. Existing
-per-material entry timing and active-voice behavior remain the playback contract.
+The current interface and ownership contract are documented in the
+[scheduler guide](../../scheduler/README.mbt.md#content-comparison).
+This record describes validation at the base revision above.
 
 ## Verification
 

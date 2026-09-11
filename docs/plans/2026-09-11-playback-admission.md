@@ -95,14 +95,6 @@ do not rely on stale validation or duplicate a recoverable check silently.
 4. Preserve delayed receipts and existing supersession semantics. Receipt success
    means the edit reservation is accepted, not that every material is audible.
 
-A temporary prototype moved only the preflight location. It checked rejection
-of the expression above, preservation of a prior valid request, a subsequent
-parse error, an intervening direct BPM change, and successful commit of the
-prior request. Existing host tests additionally cover reset, restart, layout
-rejection, tempo edits, and invalid tokens. No public ABI or JS protocol change
-was needed. All 19 host tests, including the probe, passed on JS, wasm-gc, and
-native with moon 0.1.20260814. Prototype source was restored after testing.
-
 The implementation retains one host regression for admission and reservation
 preservation and one real-WASM controller regression checking that the rejected
 revision gets an error while the valid pending revision gets its receipt.
