@@ -76,8 +76,11 @@ test("editing and recovering from a parse error preserve transport", async ({ pa
 
 test("Light Orbit accepts shared-material edits and reverts through a parse error", async ({ page }) => {
   const score = readFileSync(new URL("../../../examples/light-orbit.mini", import.meta.url), "utf8");
-  await page.locator("#mode-song").click();
-  await start(page, score);
+  await page.locator("#light-orbit-example").click();
+  await expect(page.locator("#mode-song")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#global-bpm")).toHaveValue("120");
+  await expect(page.locator("#light-orbit-example")).toHaveAttribute("data-example", score);
+  expect(await play(page)).toMatchObject({ type: "song-updated", operation: "restart", acceptedAtSample: 0 });
   const changed = score.replace('E4 G4 A4', 'F#4 G4 A4').replace('D5 A4 G4 E5', 'Eb5 Bb4 Ab4 F5');
   const updated = await edit(page, changed);
   expect(updated).toMatchObject({ type: "song-updated", operation: "update" });
@@ -105,13 +108,32 @@ test("song content edits continue, and Stop then Play applies a new layout", asy
   });
 });
 
-test("editing song tempo continues playback without requiring Stop", async ({ page }) => {
-  await page.locator("#mode-song").click();
-  await start(page, 'song(bpm(120),section("a",8,note("60").slow(8)),part("a1","a"))');
-  const updated = await edit(page, 'song(bpm(90.125),section("a",8,note("60").slow(8)),part("a1","a"))');
+test("the tempo example can change tempo while playing", async ({ page }) => {
+  const example = page.locator('[data-live-example="tempo"]');
+  const score = (await example.getAttribute("data-example"))!;
+  await example.click();
+  expect(await play(page)).toMatchObject({ type: "song-updated", operation: "restart" });
+  const updated = await edit(page, score.replace("bpm(60)", "bpm(72)"));
   expect(updated).toMatchObject({ type: "song-updated", operation: "update" });
   expect(updated.acceptedAtSample).toBeGreaterThan(0);
-  await expect(page.getByRole("button", { name: "Stop", exact: true })).toBeEnabled();
+  await expect(page.locator("#global-bpm")).toHaveValue("72");
+  const fractional = await edit(page, score.replace("bpm(60)", "bpm(90.125)"));
+  expect(fractional).toMatchObject({ type: "song-updated", operation: "update" });
+  expect(fractional.acceptedAtSample).toBeGreaterThan(updated.acceptedAtSample);
+  await expect(page.locator("#global-bpm")).toHaveValue("90.125");
+  await stop(page);
+});
+
+test("the independent entries example accepts the suggested note edits", async ({ page }) => {
+  const example = page.locator('[data-live-example="entries"]');
+  const score = (await example.getAttribute("data-example"))!;
+  await example.click();
+  expect(await play(page)).toMatchObject({ type: "pattern-updated", operation: "restart" });
+  const updated = await edit(page, score.replace("E4", "F4").replace("D5", "C5"));
+  expect(updated).toMatchObject({ type: "pattern-updated", operation: "update" });
+  expect(updated.acceptedAtSample).toBeGreaterThan(0);
+  await expect(page.locator("#log")).toContainText("edit queued");
+  await stop(page);
 });
 
 test("named song definitions update in place and a bad reference preserves the applied score", async ({ page }) => {

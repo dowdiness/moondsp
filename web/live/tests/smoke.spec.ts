@@ -199,11 +199,13 @@ test.describe("UI smoke (no audio)", () => {
   test("cheatsheet advertises dollar stack lines under Layers", async ({ page }) => {
     // Strudel-style `$:` lines are the discoverable path for combining
     // s(...) drum patterns with note(...) melodies in one live buffer.
+    await page.getByText("Syntax reference", { exact: true }).click();
     const layersDl = page.locator("#cheat dl").first();
     await expect(layersDl.locator("dt")).toContainText(["s(", "note(", "chord(", "$:"]);
   });
 
   test("cheatsheet explains multiline songs and global BPM", async ({ page }) => {
+    await page.getByText("Syntax reference", { exact: true }).click();
     const cheat = page.locator("#cheat");
     await expect(cheat).toContainText('separators like spaces inside s("…") / note("…") / chord("…")');
     await expect(cheat).toContainText("paste multiline blocks");
@@ -212,6 +214,7 @@ test.describe("UI smoke (no audio)", () => {
   });
 
   test("cheatsheet includes a song-mode example", async ({ page }) => {
+    await page.getByText("More examples", { exact: true }).click();
     const songExample = page.locator(ODE_SONG_EXAMPLE);
     await expect(songExample).toBeVisible();
     await expect(songExample).toHaveAttribute("data-example", SONG_EXAMPLE);
@@ -314,6 +317,7 @@ test.describe("Audio path", () => {
     await expect(page.locator("#status")).toContainText("running", { timeout: 10_000 });
     await expect(page.locator("#log")).toContainText("pattern updated", { timeout: 5_000 });
 
+    await page.getByText("More examples", { exact: true }).click();
     await page.locator(ODE_SONG_EXAMPLE).click();
 
     await expect(page.locator("#mode-song")).toHaveAttribute("aria-pressed", "true");
@@ -329,6 +333,7 @@ test.describe("Audio path", () => {
     await expect(page.locator("#status")).toContainText("running", { timeout: 10_000 });
     await expect(page.locator("#log")).toContainText("pattern updated", { timeout: 5_000 });
 
+    await page.getByText("More examples", { exact: true }).click();
     await page.locator(ODE_SONG_EXAMPLE).click();
     await expect(page.locator("#log")).toContainText("song updated", { timeout: 3_000 });
 
