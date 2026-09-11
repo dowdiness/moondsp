@@ -156,3 +156,13 @@ pub impl Show for ControlBindingBuilder with fn output(self, logger) {
 pub impl Show for ControlBindingMap with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
+
+///|
+/// Read a bound parameter's default from the template used to build this map.
+pub fn ControlBindingMap::default_value(
+  self : ControlBindingMap,
+  key : String,
+  template : CompiledTemplate,
+) -> Double? {
+  self.raw.default_value(key, template.raw)
+}

@@ -11,10 +11,10 @@ pub enum EnvStage {
 ///|
 /// Stateful ADSR envelope generator.
 pub struct Adsr {
-  priv attack_ms : Double
-  priv decay_ms : Double
-  priv sustain : Double
-  priv release_ms : Double
+  priv mut attack_ms : Double
+  priv mut decay_ms : Double
+  priv mut sustain : Double
+  priv mut release_ms : Double
   priv mut stage : EnvStage
   priv mut level : Double
   priv mut level_at_release : Double
@@ -197,4 +197,19 @@ fn normalize_sustain(value : Double) -> Double {
   } else {
     value.clamp(min=0.0, max=1.0)
   }
+}
+
+///|
+/// Update envelope parameters without restarting its stage or level.
+pub fn Adsr::set_parameters(
+  self : Adsr,
+  attack_ms~ : Double,
+  decay_ms~ : Double,
+  sustain~ : Double,
+  release_ms~ : Double,
+) -> Unit {
+  self.attack_ms = normalize_time_ms(attack_ms)
+  self.decay_ms = normalize_time_ms(decay_ms)
+  self.sustain = normalize_sustain(sustain)
+  self.release_ms = normalize_time_ms(release_ms)
 }

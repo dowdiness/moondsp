@@ -1,0 +1,25 @@
+let beat = s("bd hh sd hh").slow(4);
+let bass = note("A2 A2 F2 F2 C3 C3 G2 G2").slow(16).attack(0.005).hold(0.12).release(0.12);
+let chords = chord("Am F C G").slow(16).attack(0.15).hold(0.06).release(0.18);
+let verse = note("E4 G4 A4 G4 E4 D4 E4 G4").slow(8).attack(0.02).hold(0.12).release(0.18);
+let chorus = note("C5 B4 A4 G4 A4 C5 D5 B4").slow(8).attack(0.04).hold(0.15).release(0.35);
+let answer = note("C5 B4 A4 G4 E5 D5 C5 A4").slow(8).attack(0.04).hold(0.15).release(0.35);
+let intro = note("E4 G4 A4 G4").slow(8).attack(0.005).hold(0.04).release(0.15);
+let bridge = note("E4 G4 A4 E4").slow(8).attack(0.25).hold(0.1).release(0.8);
+let ending = chord("Am").slow(8).attack(0.02).hold(0.4).release(2);
+
+song(
+  bpm(112),
+  section("intro", 8, stack(intro, beat)),
+  section("verse", 16, stack(verse, bass, beat)),
+  section("chorus", 16, stack(chorus, chords, bass, beat)),
+  section("bridge", 8, bridge),
+  section("return", 16, stack(answer, chords, bass, beat)),
+  section("ending", 8, ending),
+  part("a", "intro"),
+  part("b", "verse"),
+  part("c", "chorus"),
+  part("d", "bridge"),
+  part("e", "return"),
+  part("f", "ending")
+)

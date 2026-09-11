@@ -142,6 +142,7 @@ pub impl Show for ControlBindingError
 pub struct ControlBindingMap {
   // private fields
 } derive(Eq, @debug.Debug)
+pub fn ControlBindingMap::default_value(Self, String, CompiledTemplate) -> Double?
 pub fn ControlBindingMap::length(Self) -> Int
 pub fn ControlBindingMap::resolve_controls(Self, Map[String, Double]) -> Array[GraphControl]
 pub impl Show for ControlBindingMap

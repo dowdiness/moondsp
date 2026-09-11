@@ -117,8 +117,8 @@ pub struct DspNode {
   priv input1 : Int
   priv mut value0 : Double
   priv mut value1 : Double
-  priv value2 : Double
-  priv value3 : Double
+  priv mut value2 : Double
+  priv mut value3 : Double
   priv waveform : Waveform
   priv filter_mode : BiquadMode
   priv delay_max_samples : Int
@@ -293,6 +293,8 @@ pub fn set_node_delay_samples(node : DspNode, value : Int) -> Unit {
 pub fn restore_node_runtime_params(node : DspNode, defaults : DspNode) -> Unit {
   node.value0 = defaults.value0()
   node.value1 = defaults.value1()
+  node.value2 = defaults.value2()
+  node.value3 = defaults.value3()
   node.delay_samples = defaults.delay_samples()
 }
 
@@ -873,7 +875,7 @@ pub fn node_accepts_slot(node : DspNode, slot : GraphParamSlot) -> Bool {
     Constant => slot is Value0
     Oscillator => node.input0 < 0 && slot is Value0
     Noise => false
-    Adsr => false
+    Adsr => slot is Value0 || slot is Value1 || slot is Value2 || slot is Value3
     Biquad => slot is Value0 || slot is Value1
     Delay => slot is Value0 || slot is DelaySamples
     Gain => slot is Value0
@@ -907,4 +909,28 @@ fn remapped_input(input : Int, remap : FixedArray[Int]) -> Int {
   } else {
     -1
   }
+}
+
+///|
+pub fn set_node_value2(node : DspNode, value : Double) -> Unit {
+  node.value2 = value
+}
+
+///|
+pub fn node_with_value2(node : DspNode, value : Double) -> DspNode {
+  let copy = node_with_value0(node, node.value0)
+  copy.value2 = value
+  copy
+}
+
+///|
+pub fn set_node_value3(node : DspNode, value : Double) -> Unit {
+  node.value3 = value
+}
+
+///|
+pub fn node_with_value3(node : DspNode, value : Double) -> DspNode {
+  let copy = node_with_value0(node, node.value0)
+  copy.value3 = value
+  copy
 }

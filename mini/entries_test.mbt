@@ -48,3 +48,30 @@ test "compiled transforms keep stable identities and distinguish their parameter
     assert_false(a.same_content(changed))
   }
 }
+
+///|
+test "envelope seconds change content without stretching the source period" {
+  let text = "note(\"60 64\").slow(3)"
+  let base = @mini.parse(text).unwrap()
+  let shaped = @mini.parse(text + ".attack(2).hold(3).release(8)").unwrap()
+  assert_true(base.entry_period() == shaped.entry_period())
+  assert_false(base.same_content(shaped))
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::from_int(3),
+  )
+  let original = base.query(arc)
+  let events = shaped.query(arc)
+  assert_eq(events.length(), original.length())
+  for i in 0..<events.length() {
+    assert_true(events[i].whole == original[i].whole)
+    assert_eq(events[i].value.get("attack"), Some(2.0))
+    assert_eq(events[i].value.get("hold"), Some(3.0))
+    assert_eq(events[i].value.get("release"), Some(8.0))
+  }
+  for method in ["attack", "hold", "release"] {
+    assert_true(@mini.parse(text + ".\{method}(0)") is Ok(_))
+    assert_true(@mini.parse(text + ".\{method}(-1)") is Err(_))
+    assert_true(@mini.parse(text + ".\{method}(86401)") is Err(_))
+  }
+}

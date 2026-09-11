@@ -39,6 +39,10 @@ pub fn node_with_value0(DspNode, Double) -> DspNode
 
 pub fn node_with_value1(DspNode, Double) -> DspNode
 
+pub fn node_with_value2(DspNode, Double) -> DspNode
+
+pub fn node_with_value3(DspNode, Double) -> DspNode
+
 pub fn remap_node_inputs(DspNode, FixedArray[Int]) -> DspNode
 
 pub fn restore_node_runtime_params(DspNode, DspNode) -> Unit
@@ -48,6 +52,10 @@ pub fn set_node_delay_samples(DspNode, Int) -> Unit
 pub fn set_node_value0(DspNode, Double) -> Unit
 
 pub fn set_node_value1(DspNode, Double) -> Unit
+
+pub fn set_node_value2(DspNode, Double) -> Unit
+
+pub fn set_node_value3(DspNode, Double) -> Unit
 
 pub fn valid_biquad_graph_params(Double, Double, Double) -> Bool
 

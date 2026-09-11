@@ -104,3 +104,63 @@ fn assert_tempo(bpm : Double) -> Unit raise {
     assert_eq(route.pool.scheduler.bpm(), bpm)
   }
 }
+
+///|
+test "hold uses the instrument attack default and release survives a live edit" {
+  assert_true(init_scheduler_graph_for_test())
+  let text = "note(\"60\").slow(40).hold(0.1).release(0.2)"
+  assert_eq(submit_for_test(text), 0)
+  render_for_test(41) // 5248 samples, before the 5280-sample gate-off.
+  for route in sched_routes.val {
+    if route.selector is RouteSynth {
+      assert_eq(route.pool.scheduler.active_note_count(), 1)
+    }
+  }
+  // Updating the next phrase cannot shorten the sounding voice's release.
+  assert_eq(
+    submit_for_test("note(\"60\").slow(40).hold(0).release(0)", restart=false),
+    0,
+  )
+  render_for_test(1)
+  for route in sched_routes.val {
+    if route.selector is RouteSynth {
+      assert_eq(route.pool.scheduler.active_note_count(), 0)
+    }
+  }
+  assert_true(output_energy() > 0.01)
+  assert_eq(prepare_for_test("note(\"60\").attack(-1)"), 0)
+  render_for_test(40)
+  assert_true(output_energy() > 0.01)
+  render_for_test(40)
+  assert_eq(output_energy(), 0.0)
+}
+
+///|
+test "envelope controls on a mixed stack leave drum voices unchanged" {
+  fn render(text : String) -> Array[Double] raise {
+    assert_true(init_scheduler_graph_for_test())
+    assert_eq(submit_for_test(text), 0)
+    let samples : Array[Double] = []
+    for _ in 0..<80 {
+      render_for_test(1)
+      for i in 0..<128 {
+        samples.push(scheduler_left_sample(i))
+        samples.push(scheduler_right_sample(i))
+      }
+    }
+    samples
+  }
+
+  let drums = render("s(\"bd\").slow(8)")
+  assert_true(drums.any(fn(sample) { sample.abs() > 0.01 }))
+  assert_eq(render("s(\"bd\").slow(8).hold(0)"), drums)
+  assert_eq(render("s(\"bd\").slow(8).hold(3)"), drums)
+  assert_eq(
+    render(
+      "stack(note(\"60\"), s(\"bd\")).attack(0.01).hold(0.02).release(0.03)",
+    ),
+    render(
+      "stack(note(\"60\").attack(0.01).hold(0.02).release(0.03), s(\"bd\"))",
+    ),
+  )
+}

@@ -38,7 +38,7 @@ pub fn ControlMapper::ControlMapper(
   transform~ : (String, Double) -> (String, Double)?,
   voice_action~ : (String, Double) -> VoiceAction?,
 ) -> ControlMapper {
-  { transform, voice_action, }
+  { transform, voice_action }
 }
 
 ///|
@@ -51,6 +51,8 @@ pub fn default_control_mapper() -> ControlMapper {
     transform=fn(k, v) {
       if k == "pan" {
         None
+      } else if k == "attack" || k == "release" {
+        Some((k, v * 1000.0))
       } else if k == "note" {
         Some(("note", midi_to_hz(v)))
       } else {
@@ -189,7 +191,38 @@ fn PatternScheduler::process_single_event(
             None => ()
           }
         })
-        let end_sample = match self.clock.sample_at(whole.end_) {
+        // Resolve physical hold against the actual instrument's attack default.
+        // Hold has no decay stage: keep the attack peak until gate-off.
+        // Instruments without the envelope bindings keep their musical gate.
+        // This also makes envelope controls safe on mixed instrument stacks.
+        let hold = match event.value.get("hold") {
+          Some(seconds) if pool.default_control("attack") is Some(_) &&
+            pool.default_control("envelope_decay") is Some(_) &&
+            pool.default_control("envelope_sustain") is Some(_) &&
+            pool.default_control("release") is Some(_) => Some(seconds)
+          _ => None
+        }
+        let attack_ms = map
+          .get("attack")
+          .unwrap_or(pool.default_control("attack").unwrap_or(0.0))
+        let endpoint = match hold {
+          Some(seconds) if seconds.is_nan() ||
+            seconds.is_inf() ||
+            seconds < 0.0 ||
+            seconds > 86400.0 => Err(@transport.TransportError::TimeOutOfRange)
+          Some(seconds) => {
+            map["envelope_decay"] = 0.0
+            map["envelope_sustain"] = 1.0
+            physical_gate_end(
+              self.clock,
+              whole.begin,
+              attack_ms / 1000.0 + seconds,
+              self.ctx.sample_rate(),
+            )
+          }
+          None => self.clock.sample_at(whole.end_)
+        }
+        let end_sample = match endpoint {
           Ok(sample) => sample
           Err(e) => {
             self.last_error = Some(e)
@@ -199,11 +232,16 @@ fn PatternScheduler::process_single_event(
         match pool.note_on_controls(map) {
           None => ()
           Some(handle) => {
+            let musical_end = if hold is Some(_) {
+              None
+            } else {
+              Some(whole.end_)
+            }
             self.active_notes.push_note(
               handle~,
               source=source.to_model(),
               end_sample~,
-              musical_end=whole.end_,
+              musical_end?,
             )
             for action in actions {
               match action {
@@ -485,4 +523,32 @@ pub fn PatternScheduler::process_song_block(
     left,
     right,
   )
+}
+
+///|
+/// Convert a note-local physical duration without attaching it to musical tempo.
+fn physical_gate_end(
+  clock : @transport.Clock,
+  onset : @pattern.Rational,
+  seconds : Double,
+  sample_rate : Double,
+) -> Result[Int64, @transport.TransportError] {
+  if seconds.is_nan() || seconds.is_inf() || seconds < 0.0 || seconds > 172800.0 {
+    return Err(@transport.TransportError::TimeOutOfRange)
+  }
+  let start = match clock.sample_at(onset) {
+    Ok(sample) => sample
+    Err(error) => return Err(error)
+  }
+  let exact = seconds * sample_rate
+  let truncated = exact.to_int64()
+  let samples = if truncated.to_double() < exact {
+    truncated + 1L
+  } else {
+    truncated
+  }
+  if start > 9223372036854775807L - samples {
+    return Err(@transport.TransportError::TimeOutOfRange)
+  }
+  Ok(start + samples)
 }

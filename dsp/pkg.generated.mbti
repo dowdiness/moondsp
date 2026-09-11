@@ -39,6 +39,7 @@ pub fn Adsr::gate_on(Self) -> Unit
 pub fn Adsr::level(Self) -> Double
 pub fn Adsr::process(Self, DspContext, AudioBuffer) -> Unit
 pub fn Adsr::reset(Self) -> Unit
+pub fn Adsr::set_parameters(Self, attack_ms~ : Double, decay_ms~ : Double, sustain~ : Double, release_ms~ : Double) -> Unit
 pub fn Adsr::stage(Self) -> EnvStage
 pub fn Adsr::tick(Self, DspContext) -> Double
 

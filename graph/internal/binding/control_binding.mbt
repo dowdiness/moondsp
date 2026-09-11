@@ -141,3 +141,27 @@ pub fn ControlBindingMap::resolve_controls(
   }
   result
 }
+
+///|
+/// Read a bound parameter's default from the template used to build this map.
+pub fn ControlBindingMap::default_value(
+  self : ControlBindingMap,
+  key : String,
+  template : @template.CompiledTemplate,
+) -> Double? {
+  for binding in self.bindings {
+    if binding.key == key {
+      let node = template.node_at(binding.node_index)
+      return Some(
+        match binding.slot {
+          Value0 => node.value0()
+          Value1 => node.value1()
+          Value2 => node.value2()
+          Value3 => node.value3()
+          DelaySamples => node.delay_samples().to_double()
+        },
+      )
+    }
+  }
+  None
+}

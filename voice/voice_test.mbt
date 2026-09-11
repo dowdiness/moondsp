@@ -969,3 +969,56 @@ test "B7: VoicePool::new with missing Output returns CompileRejected" {
     Ok(_) => fail("expected Err(CompileRejected), got Ok")
   }
 }
+
+///|
+test "per-note envelope controls preserve older voices and reset on reuse" {
+  let ctx = DspContext::new(sample_rate=128.0, block_size=128)
+  let template = CompiledTemplate::analyze([
+    DspNode::constant(1.0),
+    DspNode::adsr(attack_ms=0.0, decay_ms=0.0, sustain=1.0, release_ms=0.0),
+    DspNode::envelope_gain(input=0, envelope=1, amount=1.0),
+    DspNode::output(2),
+  ])
+  let bindings = ControlBindingBuilder::new()
+    .bind(key="attack", node_index=1, slot=GraphParamSlot::Value0)
+    .bind(key="decay", node_index=1, slot=GraphParamSlot::Value1)
+    .bind(key="sustain", node_index=1, slot=GraphParamSlot::Value2)
+    .bind(key="release", node_index=1, slot=GraphParamSlot::Value3)
+  let pool = BoundVoicePool::new(template, ctx, bindings, max_voices=2).unwrap()
+  let left = ctx.make_buffer()
+  let right = ctx.make_buffer()
+  let old = pool.note_on_controls({ "release": 2000.0 }).unwrap()
+  left.fill(0.0)
+  right.fill(0.0)
+  pool.process(ctx, left, right)
+  pool.note_off_result(old).unwrap()
+  let newer = pool
+    .note_on_controls({ "attack": 2000.0, "sustain": 0.5 })
+    .unwrap()
+  left.fill(0.0)
+  right.fill(0.0)
+  pool.process(ctx, left, right)
+  // Old voice fades from 1 to .5 while new voice rises from 0 to .5.
+  for i in 0..<128 {
+    assert_true((left.get(i) - 0.7071067811865476).abs() < 0.000001)
+  }
+  pool.note_off_result(newer).unwrap()
+  left.fill(0.0)
+  right.fill(0.0)
+  pool.process(ctx, left, right)
+  left.fill(0.0)
+  right.fill(0.0)
+  pool.process(ctx, left, right)
+  let reused = pool.note_on_controls({}).unwrap()
+  left.fill(0.0)
+  right.fill(0.0)
+  pool.process(ctx, left, right)
+  assert_true((left.get(0) - 0.7071067811865476).abs() < 0.000001)
+  pool.note_off_result(reused).unwrap()
+  left.fill(0.0)
+  right.fill(0.0)
+  pool.process(ctx, left, right)
+  assert_eq(left.get(0), 0.0)
+  assert_true(pool.note_on_controls({ "sustain": 2.0 }) is None)
+  assert_true(pool.note_on_controls({ "release": -1.0 }) is None)
+}

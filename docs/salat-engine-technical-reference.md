@@ -790,7 +790,7 @@ Current `set_param(node_index, slot, value)` support matrix:
 | `Oscillator` | `Value0` | Finite frequency values only |
 | `Oscillator` (FM mode) | none | FM mode: frequency comes from input buffer, no runtime freq param |
 | `Noise` | none | No runtime seed update yet |
-| `Adsr` | none | Runtime control is `gate_on` / `gate_off` only |
+| `Adsr` | `Value0`–`Value3` | Attack ms, decay ms, sustain level, release ms. Times must be finite and nonnegative; sustain is in `[0, 1]`. Parameter changes preserve stage and level; note-on applies settings before opening the gate. |
 | `Biquad` | `Value0`, `Value1` | `Value0 = cutoff`, `Value1 = q`; validated against the compile-time sample rate |
 | `Delay` | `Value0`, `DelaySamples` | `Value0 = feedback`; finite values in `[-0.99, 0.99]` only. `DelaySamples` requires exact integer values. Both are applied to the live `DelayLine` state |
 | `Gain` | `Value0` | Finite gain only |

@@ -23,6 +23,9 @@ const TOP_LEVEL: Completion[] = [
 ];
 
 const METHODS: Completion[] = [
+  snippetCompletion("attack(${seconds})", { label: "attack", type: "method", detail: "note fade-in, seconds" }),
+  snippetCompletion("hold(${seconds})", { label: "hold", type: "method", detail: "hold after attack, seconds" }),
+  snippetCompletion("release(${seconds})", { label: "release", type: "method", detail: "note fade-out, seconds" }),
   snippetCompletion("fast(${n})", { label: "fast", type: "method", detail: "n× faster" }),
   snippetCompletion("slow(${n})", { label: "slow", type: "method", detail: "n× slower" }),
   snippetCompletion("rev()", { label: "rev", type: "method", detail: "reverse" }),

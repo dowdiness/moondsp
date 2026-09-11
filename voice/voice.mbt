@@ -1076,3 +1076,12 @@ pub fn VoicePool::process(
   self.last_sanitized_count = @dsp.sanitize_buffer(left_output, sample_count) +
     @dsp.sanitize_buffer(right_output, sample_count)
 }
+
+///|
+/// Default value of a named control in the current voice template.
+pub fn BoundVoicePool::default_control(
+  self : BoundVoicePool,
+  key : String,
+) -> Double? {
+  self.bindings.default_value(key, self.pool.compiled_template)
+}
