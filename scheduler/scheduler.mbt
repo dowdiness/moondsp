@@ -191,36 +191,17 @@ fn PatternScheduler::process_single_event(
             None => ()
           }
         })
-        // Resolve physical hold against the actual instrument's attack default.
-        // Hold has no decay stage: keep the attack peak until gate-off.
-        // Instruments without the envelope bindings keep their musical gate.
-        // This also makes envelope controls safe on mixed instrument stacks.
-        let hold = match event.value.get("hold") {
-          Some(seconds) if pool.default_control("attack") is Some(_) &&
-            pool.default_control("envelope_decay") is Some(_) &&
-            pool.default_control("envelope_sustain") is Some(_) &&
-            pool.default_control("release") is Some(_) => Some(seconds)
-          _ => None
-        }
-        let attack_ms = map
-          .get("attack")
-          .unwrap_or(pool.default_control("attack").unwrap_or(0.0))
-        let endpoint = match hold {
-          Some(seconds) if seconds.is_nan() ||
-            seconds.is_inf() ||
-            seconds < 0.0 ||
-            seconds > 86400.0 => Err(@transport.TransportError::TimeOutOfRange)
-          Some(seconds) => {
-            map["envelope_decay"] = 0.0
-            map["envelope_sustain"] = 1.0
+        let gate = pool.note_gate(map)
+        let endpoint = match gate {
+          EventEnd => self.clock.sample_at(whole.end_)
+          AfterSeconds(seconds) =>
             physical_gate_end(
               self.clock,
               whole.begin,
-              attack_ms / 1000.0 + seconds,
+              seconds,
               self.ctx.sample_rate(),
             )
-          }
-          None => self.clock.sample_at(whole.end_)
+          InvalidDuration => Err(@transport.TransportError::TimeOutOfRange)
         }
         let end_sample = match endpoint {
           Ok(sample) => sample
@@ -232,7 +213,7 @@ fn PatternScheduler::process_single_event(
         match pool.note_on_controls(map) {
           None => ()
           Some(handle) => {
-            let musical_end = if hold is Some(_) {
+            let musical_end = if gate is AfterSeconds(_) {
               None
             } else {
               Some(whole.end_)

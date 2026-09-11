@@ -30,7 +30,7 @@ pub enum ControlBindingError {
 pub struct ControlBindingMap {
   // private fields
 } derive(Eq, @debug.Debug)
-pub fn ControlBindingMap::default_value(Self, String, @template.CompiledTemplate) -> Double?
+pub fn ControlBindingMap::default_value(Self, String) -> Double?
 pub fn ControlBindingMap::length(Self) -> Int
 pub fn ControlBindingMap::resolve_controls(Self, Map[String, Double]) -> Array[@model.GraphControl]
 

@@ -1022,3 +1022,43 @@ test "per-note envelope controls preserve older voices and reset on reuse" {
   assert_true(pool.note_on_controls({ "sustain": 2.0 }) is None)
   assert_true(pool.note_on_controls({ "release": -1.0 }) is None)
 }
+
+///|
+test "instrument gate follows template changes without mutating note controls" {
+  fn template(attack_ms : Double) -> CompiledTemplate {
+    CompiledTemplate::analyze([
+      DspNode::constant(1.0),
+      DspNode::adsr(attack_ms~, decay_ms=100.0, sustain=0.5, release_ms=100.0),
+      DspNode::envelope_gain(input=0, envelope=1, amount=1.0),
+      DspNode::output(2),
+    ])
+  }
+  fn bindings() -> ControlBindingBuilder {
+    ControlBindingBuilder::new()
+    .bind(key="attack", node_index=1, slot=GraphParamSlot::Value0)
+    .bind(key="envelope_decay", node_index=1, slot=GraphParamSlot::Value1)
+    .bind(key="envelope_sustain", node_index=1, slot=GraphParamSlot::Value2)
+    .bind(key="release", node_index=1, slot=GraphParamSlot::Value3)
+  }
+  let ctx = DspContext::new(sample_rate=128.0, block_size=128)
+  let pool = BoundVoicePool::new(template(1000.0), ctx, bindings()).unwrap()
+  let controls : Map[String, Double] = { "hold": 2.0 }
+  assert_eq(pool.note_gate(controls), NoteGate::AfterSeconds(3.0))
+  assert_true(pool.note_on_controls(controls) is Some(_))
+  assert_eq(controls.length(), 1)
+  assert_eq(controls.get("hold"), Some(2.0))
+  assert_eq(pool.note_gate({}), NoteGate::EventEnd)
+  assert_eq(pool.note_gate({ "hold": -1.0 }), NoteGate::InvalidDuration)
+  assert_true(pool.note_on_controls({ "hold": -1.0 }) is None)
+  pool.set_template(template(2000.0), bindings()).unwrap()
+  assert_eq(pool.note_gate(controls), NoteGate::AfterSeconds(4.0))
+  let invalid = ControlBindingBuilder::new().bind(
+    key="attack",
+    node_index=99,
+    slot=GraphParamSlot::Value0,
+  )
+  assert_true(pool.set_template(template(0.0), invalid) is Err(_))
+  assert_eq(pool.note_gate(controls), NoteGate::AfterSeconds(4.0))
+  pool.set_template(template(0.0), ControlBindingBuilder::new()).unwrap()
+  assert_eq(pool.note_gate(controls), NoteGate::EventEnd)
+}

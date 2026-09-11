@@ -19,13 +19,13 @@ pub fn BoundVoicePool::active_voice_count(Self) -> Int
 pub fn BoundVoicePool::apply_voice_control_result(Self, VoiceHandle, @graph.GraphControl) -> Result[Unit, VoiceControlError]
 pub fn BoundVoicePool::apply_voice_controls_result(Self, VoiceHandle, Array[@graph.GraphControl]) -> Result[Unit, VoiceControlError]
 pub fn BoundVoicePool::apply_voice_param_bool(Self, VoiceHandle, Int, @graph.GraphParamSlot, Double) -> Bool
-pub fn BoundVoicePool::default_control(Self, String) -> Double?
 #deprecated
 pub fn BoundVoicePool::kill(Self, VoiceHandle) -> Bool
 pub fn BoundVoicePool::kill_all(Self) -> Unit
 pub fn BoundVoicePool::kill_result(Self, VoiceHandle) -> Result[Unit, VoiceControlError]
 pub fn BoundVoicePool::last_sanitized_count(Self) -> Int
 pub fn BoundVoicePool::new(@graph.CompiledTemplate, @dsp.DspContext, @graph.ControlBindingBuilder, max_voices? : Int) -> Result[Self, BoundVoicePoolError]
+pub fn BoundVoicePool::note_gate(Self, Map[String, Double]) -> NoteGate
 #deprecated
 pub fn BoundVoicePool::note_off(Self, VoiceHandle) -> Bool
 pub fn BoundVoicePool::note_off_all(Self) -> Unit
@@ -51,6 +51,12 @@ pub(all) enum BoundVoicePoolError {
 } derive(Eq, @debug.Debug)
 pub fn BoundVoicePoolError::from_voice_pool(VoicePoolError) -> Self
 pub impl Show for BoundVoicePoolError
+
+pub(all) enum NoteGate {
+  EventEnd
+  AfterSeconds(Double)
+  InvalidDuration
+} derive(Eq, @debug.Debug)
 
 pub(all) enum VoiceControlError {
   InvalidVoiceHandle(VoiceHandle)
