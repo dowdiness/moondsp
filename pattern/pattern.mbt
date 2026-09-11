@@ -1,25 +1,46 @@
 ///|
-/// A pattern is a query function from time arcs to events.
-///
-/// WHY function, not data: Strudel's core insight. Patterns are infinite
-/// repeating streams — representing them as data would require materializing
-/// infinity. As functions, they are lazy: only the queried arc is computed.
-/// Combinators compose functions naturally (no interpreter needed).
-///
-/// WHY concrete struct, not trait: Phase 4 uses concrete composition.
-/// A PatternSym trait layer can wrap this in Phase 6 for incr memoization.
+/// A musical-time query with authored entry metadata. An entry cycle does not
+/// imply that event values repeat: transformations can vary between cycles.
+/// Stacks retain independent members without inspecting generated events.
 pub struct Pat[A] {
   query : (TimeSpan) -> Array[Event[A]]
+  priv period : Rational
+  priv members : Array[Pat[A]]
+  priv entry_key : String
+  priv signature : String
+}
+
+///|
+/// Construct a custom musical-time source with one-cycle entries. The query
+/// must be deterministic for a given span. Use slow/fast to scale source time.
+pub fn[A] Pat::from_query(query : (TimeSpan) -> Array[Event[A]]) -> Pat[A] {
+  {
+    query,
+    period: Rational::from_int(1),
+    members: [],
+    entry_key: "",
+    signature: "",
+  }
 }
 
 ///|
 pub fn[A] Pat::silence() -> Pat[A] {
-  { query: fn(_arc) { [] } }
+  {
+    query: fn(_arc) { [] },
+    period: Rational::from_int(1),
+    members: [],
+    entry_key: "",
+    signature: "silence",
+  }
 }
 
 ///|
 pub fn[A] Pat::pure(value : A) -> Pat[A] {
   {
+    period: Rational::from_int(1),
+    members: [],
+    entry_key: "",
+    signature: "",
     query: fn(arc) {
       arc
       .whole_cycles()
@@ -52,6 +73,13 @@ pub fn[A] Pat::fast(self : Pat[A], factor : Rational) -> Pat[A] {
   }
   let inner = self
   {
+    period: self.period / factor,
+    members: self.members.map(p => p.fast(factor)),
+    entry_key: self.entry_key,
+    signature: transformed_signature(
+      self.signature,
+      "fast:\{factor.num}:\{factor.den}",
+    ),
     query: fn(arc) {
       // Scale the query arc forward in time by factor (compress)
       let scaled_begin = arc.begin * factor
@@ -85,6 +113,10 @@ pub fn[A] Pat::slow(self : Pat[A], factor : Rational) -> Pat[A] {
 pub fn[A] Pat::rev(self : Pat[A]) -> Pat[A] {
   let inner = self
   {
+    period: self.period,
+    members: self.members.map(p => p.rev()),
+    entry_key: self.entry_key,
+    signature: transformed_signature(self.signature, "rev"),
     query: fn(arc) {
       let one = Rational::from_int(1)
       arc

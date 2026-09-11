@@ -2,26 +2,38 @@
 package "dowdiness/moondsp/scheduler/internal/transport"
 
 import {
-  "dowdiness/moondsp/dsp",
   "dowdiness/moondsp/pattern",
+  "moonbitlang/core/debug",
 }
 
 // Values
-pub fn advance_block_sample(Int64, @dsp.DspContext) -> Int64
-
-pub fn block_sample_end(Int64, @dsp.DspContext) -> Int64
-
-pub fn compute_arc(Int64, Double, @dsp.DspContext) -> @pattern.TimeSpan
-
-pub fn cycle_to_sample(@pattern.Rational, Double, @dsp.DspContext) -> Int64
-
-pub fn sanitize_bpm(Double) -> Double
 
 // Errors
+pub(all) suberror TransportError {
+  InvalidTempo
+  InvalidSampleRate
+  TimeOutOfRange
+} derive(Eq, @debug.Debug)
 
 // Types and methods
+pub struct Clock {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn Clock::advance(Self, Int) -> Result[Self, TransportError]
+pub fn Clock::at_start(Tempo, Double) -> Result[Self, TransportError]
+pub fn Clock::position(Self, Int64) -> Result[@pattern.Rational, TransportError]
+pub fn Clock::reset(Self) -> Self
+pub fn Clock::sample(Self) -> Int64
+pub fn Clock::sample_at(Self, @pattern.Rational) -> Result[Int64, TransportError]
+pub fn Clock::tempo(Self) -> Tempo
+pub fn Clock::with_tempo(Self, Tempo) -> Self
+
+pub struct Tempo {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn Tempo::bpm(Self) -> Double
+pub fn Tempo::from_bpm(Double) -> Result[Self, TransportError]
 
 // Type aliases
 
 // Traits
-

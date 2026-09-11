@@ -40,16 +40,13 @@ fn resolve_mini_expr(
           )
       }
   }
-  { span: expr.span, node, }
+  { span: expr.span, node }
 }
 
 ///|
 fn MiniCallback::runtime(self : MiniCallback) -> Callback {
-  match self {
-    Fast(n) => make_fast(@pattern.Rational::from_int(n))
-    Slow(n) => make_slow(@pattern.Rational::from_int(n))
-    Rev => make_rev()
-  }
+  let operation = self.operation()
+  fn(pat) { operation.apply(pat) }
 }
 
 ///|
@@ -67,27 +64,25 @@ fn compile_mini_pattern(
   definitions : Map[String, @pattern.Pat[@pattern.ControlMap]],
 ) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
   match expr.node {
-    Literal(kind, content, _) =>
-      match kind {
+    Literal(kind, content, _) => {
+      let pat = match kind {
         Sound => parse_sound_notation(content)
         Note => parse_note_notation(content)
         Chord => parse_chord_notation(content)
       }
+      pat.material()
+    }
     Stack(children) => {
       let pats = children.map(child => compile_mini_pattern(child, definitions))
-      if pats.length() == 1 {
-        pats[0]
-      } else {
-        @pattern.stack(pats)
-      }
+      @pattern.stack(pats)
     }
     Reference(definition) =>
       match definitions.get(definition.id) {
-        Some(pat) => pat
+        Some(pat) => pat.named_entry(definition.id)
         None => {
           let pat = compile_mini_pattern(definition.body, definitions)
           definitions[definition.id] = pat
-          pat
+          pat.named_entry(definition.id)
         }
       }
     Apply(child, transform) => {
@@ -98,12 +93,9 @@ fn compile_mini_pattern(
         Rev => pat.rev()
         Degrade(p) => pat.degrade_by(p)
         Control(key, value) =>
-          @pattern.merge_control(
-            pat,
-            @pattern.Pat::pure(@pattern.ControlMap::single(key, value)),
-          )
-        Every(n, callback) => @pattern.every(n, callback.runtime(), pat)
-        Jux(callback) => pat.jux(callback.runtime())
+          @pattern.merge_control(pat, @pattern.control(key, value))
+        Every(n, callback) => callback.operation().every(n, pat)
+        Jux(callback) => callback.operation().jux(pat)
       }
     }
   }
@@ -154,11 +146,18 @@ fn compile_mini_doc(
         Degrade(p) =>
           builder.degrade_doc(doc, p, stable_seed(doc.root().value()))
         Control(key, value) => builder.scalar_control_doc(doc, key, value)
-        Every(n, callback) =>
-          builder.every_doc(doc, n, callback.runtime(), callback.signature())
-        Jux(callback) =>
-          builder.jux_doc(doc, callback.runtime(), callback.signature())
+        Every(n, callback) => builder.every_doc(doc, n, callback)
+        Jux(callback) => builder.jux_doc(doc, callback)
       }
     }
+  }
+}
+
+///|
+fn MiniCallback::operation(self : MiniCallback) -> @pattern.TimeTransform {
+  match self {
+    Fast(n) => @pattern.TimeTransform::Fast(@pattern.Rational::from_int(n))
+    Slow(n) => @pattern.TimeTransform::Slow(@pattern.Rational::from_int(n))
+    Rev => @pattern.TimeTransform::Reverse
   }
 }

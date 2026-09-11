@@ -641,16 +641,16 @@ fn MiniDocBuilder::every_doc(
   self : MiniDocBuilder,
   doc : @pattern.PatternDoc[@pattern.ControlMap],
   n : Int,
-  f : Callback,
-  callback_signature : String,
+  callback : MiniCallback,
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
+  let callback_signature = callback.signature()
   let id = self.node_id(
     "every",
     "\{doc.root().value()}:\{n}:\{callback_signature}",
   )
   match self.reuse_doc(id) {
     Some(doc) => doc
-    None => unwrap_doc_result(try? doc.every(id~, n~, f~))
+    None => unwrap_doc_result(try? doc.every(id~, n~, f=callback.runtime()))
   }
 }
 
@@ -658,13 +658,13 @@ fn MiniDocBuilder::every_doc(
 fn MiniDocBuilder::jux_doc(
   self : MiniDocBuilder,
   doc : @pattern.PatternDoc[@pattern.ControlMap],
-  f : Callback,
-  callback_signature : String,
+  callback : MiniCallback,
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
+  let callback_signature = callback.signature()
   let id = self.node_id("jux", "\{doc.root().value()}:\{callback_signature}")
   match self.reuse_doc(id) {
     Some(doc) => doc
-    None => unwrap_doc_result(try? doc.jux(id~, f~))
+    None => unwrap_doc_result(try? doc.jux(id~, f=callback.runtime()))
   }
 }
 

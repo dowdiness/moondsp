@@ -28,13 +28,15 @@ pub fn ActiveNotes::expire_at_sample(Self, @voice.BoundVoicePool, Int64) -> Unit
 pub fn ActiveNotes::kill_all(Self, @voice.BoundVoicePool) -> Unit
 pub fn ActiveNotes::length(Self) -> Int
 pub fn ActiveNotes::matches_edit_policy(Self, Int, @edit_policy.AffectedVoiceTarget) -> Bool?
-pub fn ActiveNotes::push_note(Self, handle~ : @voice.VoiceHandle, source~ : @model.EventSource, end_sample~ : Int64) -> Unit
+pub fn ActiveNotes::next_end_sample(Self, Int64) -> Int64
+pub fn ActiveNotes::push_note(Self, handle~ : @voice.VoiceHandle, source~ : @model.EventSource, end_sample~ : Int64, musical_end? : @pattern.Rational) -> Unit
 pub fn ActiveNotes::remove_affected(Self, @edit_policy.AffectedVoiceTarget, @voice.BoundVoicePool, stop~ : @edit_policy.AffectedVoiceStop) -> Int
+pub fn[E] ActiveNotes::retime(Self, (@pattern.Rational) -> Result[Int64, E]) -> Result[Unit, E]
 pub fn ActiveNotes::source(Self, Int) -> @model.EventSource?
 pub fn[E] ActiveNotes::try_count_matching_handles(Self, @edit_policy.AffectedVoiceTarget, (@voice.VoiceHandle) -> Result[Unit, E]) -> Result[Int, E]
 pub fn[E] ActiveNotes::try_each_matching_handle(Self, @edit_policy.AffectedVoiceTarget, (@voice.VoiceHandle) -> Result[Unit, E]) -> Result[Unit, E]
+pub fn[E] ActiveNotes::validate_retime(Self, (@pattern.Rational) -> Result[Int64, E]) -> Result[Unit, E]
 
 // Type aliases
 
 // Traits
-

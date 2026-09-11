@@ -955,8 +955,9 @@ Current semantics:
   block-processing loop. `queue_pattern_snapshot` / `queue_song_snapshot`
   stage a lowered `PlaybackSnapshot` without changing playback immediately;
   `process_snapshot_block` (and the pattern/song/playback variants) commits
-  the pending snapshot at block start before note expiry and event query,
-  giving callers a stable block boundary for pattern edits during playback.
+  the authored snapshot at block start. Each changed material finishes its
+  current source cycle before replacement; sounding voices retain deadlines.
+  See [scheduler guide](../scheduler/README.mbt.md) for entry and identity rules.
   Multiple staged snapshots coalesce so the latest staged state wins
 - `apply_affected_voice_policy(...)` and `apply_affected_voice_policy_for_edit(...)`
   preserve, release, or immediately stop scheduler-owned active voices whose
@@ -1388,8 +1389,8 @@ on successful application and can be discarded explicitly. Resetting the graph
 invalidates prepared tokens; token generations are not reused across resets.
 
 `apply_prepared_playback(token, restart)` queues the prepared score for the next
-block. Continuing application requires an applied score, identical mode/layout,
-and matching embedded BPM. Resetting application accepts mode/layout/tempo
+block. Continuing application requires an accepted score and identical mode/layout.
+Embedded tempo edits preserve musical position. Resetting application accepts mode/layout/tempo
 changes and atomically replaces all route snapshots, resets their clocks and
 kills old voices before querying any route. Failed application preserves active
 and pending playback and leaves the token available for retry or discard.
@@ -1401,23 +1402,26 @@ The last accepted operation wins; preparation alone never supersedes one.
 Playing a finite score beyond its end renders existing release tails and then
 silence, until an explicit restart or another valid application. Continuing
 updates do not backfill past onsets. Suspending browser audio pauses rendering;
-queued operations apply on the next rendered block after resumption.
+queued operations are accepted on the next rendered block after resumption.
+Material replacements then wait for their own entries.
 
 Both browser worklets accept `apply-score` with mode, text, revision and an
 explicit `continue` or `restart` policy; `restart-playback` carries only a request
 revision. They share one controller. Replaced requests receive
 `playback-superseded`. Success receipts are emitted after the first block renders
-and contain request/score revisions, `appliedAtSample` (the start of that block)
+and contain request/score revisions, `acceptedAtSample` (the start of that block)
 and `samplePosition` (the next block). Errors preserve the pending receipt and
 identify their `phase`: `prepare`, `apply`, `restart`, or `protocol`.
-The normal UI offers **Restart current** separately from **Apply from beginning**.
+The normal UI offers **Play / Stop**. Continuing edit receipts acknowledge the
+authored score, not simultaneous audible replacement: individual materials
+change at their next source-cycle entry. The UI reports that the edit is queued.
 Old eval/parse-and-set/update APIs and their messages are removed, not wrapped.
 
 The playback host imports dependency-free identity types for snapshot IDs.
 Preparation/routing decisions use explicit route selectors; mutable prepared and
 pending slots, transport resets and voice lifecycle belong to the audio-owner
 shell. Snapshots remain inside WASM and are never transferred as JS objects.
-Parsing and lowering still allocate in that owner. Audio-block application is
-not bar quantization, and this contract does not promise freedom from underruns.
-The independent global BPM control retains its current non-phase-continuous
-behavior; continuous tempo changes and arbitrary seeks are outside this API.
+Parsing, lowering, and pattern queries still allocate in that owner. This
+contract does not promise freedom from underruns. Global BPM edits preserve
+musical position and retime musical deadlines; physical deadlines stay fixed.
+Arbitrary seeks are outside this API.

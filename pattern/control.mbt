@@ -1,6 +1,9 @@
 ///|
 /// Numeric control map — the contract between Pattern and DSP engines.
-pub struct ControlMap(Map[String, Double]) derive(Debug)
+/// Values are immutable to callers; entries() returns an owned copy.
+pub struct ControlMap {
+  priv values : Map[String, Double]
+} derive(Debug)
 
 ///|
 pub impl Show for ControlMap with fn output(self, logger) {
@@ -9,19 +12,19 @@ pub impl Show for ControlMap with fn output(self, logger) {
 
 ///|
 pub fn ControlMap::empty() -> ControlMap {
-  ControlMap({})
+  { values: Map([]) }
 }
 
 ///|
 pub fn ControlMap::single(key : String, value : Double) -> ControlMap {
   let m : Map[String, Double] = {}
   m[key] = value
-  ControlMap(m)
+  { values: m }
 }
 
 ///|
 pub fn ControlMap::get(self : ControlMap, key : String) -> Double? {
-  self.0.get(key)
+  self.values.get(key)
 }
 
 ///|
@@ -29,18 +32,19 @@ pub fn ControlMap::each(
   self : ControlMap,
   f : (String, Double) -> Unit,
 ) -> Unit {
-  self.0.each(f)
+  self.values.each(f)
 }
 
 ///|
 /// Return a fresh map snapshot of this control map.
 pub fn ControlMap::entries(self : ControlMap) -> Map[String, Double] {
   let result : Map[String, Double] = {}
-  self.0.each(fn(k, v) { result[k] = v })
+  self.values.each(fn(k, v) { result[k] = v })
   result
 }
 
 ///|
+/// Return a new control map with this value replaced; leave self unchanged.
 pub fn ControlMap::set(
   self : ControlMap,
   key : String,
@@ -48,25 +52,26 @@ pub fn ControlMap::set(
 ) -> ControlMap {
   let result = self.entries()
   result[key] = value
-  ControlMap(result)
+  { values: result }
 }
 
 ///|
+/// Return a new control map with the other values overriding self.
 pub fn ControlMap::merge(self : ControlMap, other : ControlMap) -> ControlMap {
   let result = self.entries()
-  other.0.each(fn(k, v) { result[k] = v })
-  ControlMap(result)
+  other.values.each(fn(k, v) { result[k] = v })
+  { values: result }
 }
 
 ///|
 pub fn note(n : Double) -> Pat[ControlMap] {
-  Pat::pure(ControlMap::single("note", n))
+  control("note", n)
 }
 
 ///|
 /// Create a sound control pattern from a MIDI drum number.
 pub fn sound(midi : Double) -> Pat[ControlMap] {
-  Pat::pure(ControlMap::single("sound", midi))
+  control("sound", midi)
 }
 
 ///|
@@ -129,17 +134,17 @@ fn parse_note_name(name : String) -> Double {
 
 ///|
 pub fn s_cutoff(f : Double) -> Pat[ControlMap] {
-  Pat::pure(ControlMap::single("cutoff", f))
+  control("cutoff", f)
 }
 
 ///|
 pub fn s_gain(g : Double) -> Pat[ControlMap] {
-  Pat::pure(ControlMap::single("gain", g))
+  control("gain", g)
 }
 
 ///|
 pub fn s_pan(p : Double) -> Pat[ControlMap] {
-  Pat::pure(ControlMap::single("pan", p))
+  control("pan", p)
 }
 
 ///|
@@ -154,13 +159,37 @@ pub fn s_pan(p : Double) -> Pat[ControlMap] {
 /// slot t and right's hh at slot 1-t). For sparse multi-sound
 /// patterns like `s("bd sd hh sd").jux(rev)` the per-pool pressure
 /// stays at 1.
+/// Arbitrary callback content is unknown. Use TimeTransform for known operations.
 pub fn Pat::jux(
   self : Pat[ControlMap],
   f : (Pat[ControlMap]) -> Pat[ControlMap],
 ) -> Pat[ControlMap] {
+  self.jux_known(f, "")
+}
+
+///|
+fn Pat::jux_known(
+  self : Pat[ControlMap],
+  f : (Pat[ControlMap]) -> Pat[ControlMap],
+  signature : String,
+) -> Pat[ControlMap] {
   let left = merge_control(self, s_pan(-1.0))
   let right = merge_control(f(self), s_pan(1.0))
-  stack([left, right])
+  let combined = stack([left, right])
+  {
+    ..combined,
+    period: self.period,
+    members: [],
+    entry_key: self.entry_key,
+    signature: transformed_signature(
+      self.entry_signature(),
+      if signature == "" {
+        ""
+      } else {
+        "jux:" + signature
+      },
+    ),
+  }
 }
 
 ///|
@@ -175,6 +204,17 @@ pub fn merge_control(
   b : Pat[ControlMap],
 ) -> Pat[ControlMap] {
   {
+    period: a.period,
+    members: a.members.map(p => merge_control(p, b)),
+    entry_key: a.entry_key,
+    signature: transformed_signature(
+      a.signature,
+      if b.entry_signature() == "" {
+        ""
+      } else {
+        "merge:" + b.entry_signature()
+      },
+    ),
     query: fn(arc) {
       let b_events = b.query(arc)
       a
@@ -191,4 +231,38 @@ pub fn merge_control(
       })
     },
   }
+}
+
+///|
+/// A scalar control source whose content is tracked automatically.
+pub fn control(key : String, value : Double) -> Pat[ControlMap] {
+  let pat = Pat::pure(ControlMap::single(key, value))
+  { ..pat, signature: "control:\{key.length()}:\{key}:\{value}" }
+}
+
+///|
+/// Select events carrying a control; optionally require an exact value.
+pub fn Pat::select_control(
+  self : Pat[ControlMap],
+  key : String,
+  value? : Double,
+) -> Pat[ControlMap] {
+  let condition = match value {
+    Some(v) => "equals:\{v}"
+    None => "present"
+  }
+  self.filter_map_known(
+    cm => {
+      match cm.get(key) {
+        None => None
+        Some(v) =>
+          if value is Some(expected) && v != expected {
+            None
+          } else {
+            Some(cm)
+          }
+      }
+    },
+    "select:\{key.length()}:\{key}:" + condition,
+  )
 }

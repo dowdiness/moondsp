@@ -152,3 +152,24 @@ test "to_double: 1/4 = 0.25" {
 test "panic zero denominator" {
   ignore(Rational::new(1L, 0L))
 }
+
+///|
+test "large clock fractions cancel shared factors before arithmetic" {
+  let n = 1234567890121L
+  let d = 22500000L
+  let a = Rational::new(n, d)
+  assert_true(a + a == Rational::new(n * 2L, d))
+  assert_true(a - Rational::new(-n, d) == Rational::new(n * 2L, d))
+  assert_true(a * Rational::new(d, 7L) == Rational::new(n, 7L))
+  assert_true(a / Rational::new(1L, d) == Rational::new(n, 1L))
+}
+
+///|
+test "comparison and floor do not overflow intermediate products" {
+  let n = 9223372036854775807L
+  let a = Rational::new(n, 3L)
+  let b = Rational::new(n, 4L)
+  assert_true(a > b)
+  assert_true(Rational::new(-n, 3L) < Rational::new(-n, 4L))
+  assert_eq(Rational::new(-n, 3L).floor(), -3074457345618258603L)
+}

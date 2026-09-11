@@ -6,25 +6,22 @@ import {
   "dowdiness/moondsp/graph",
   "dowdiness/moondsp/identity",
   "dowdiness/moondsp/pattern",
+  "dowdiness/moondsp/scheduler/internal/transport",
   "dowdiness/moondsp/song",
   "dowdiness/moondsp/voice",
   "moonbitlang/core/debug",
 }
 
 // Values
-pub fn compute_arc(Int64, Double, @dsp.DspContext) -> @pattern.TimeSpan
-
-pub fn cycle_to_sample(@pattern.Rational, Double, @dsp.DspContext) -> Int64
-
 pub fn default_control_mapper() -> ControlMapper
 
 pub fn midi_to_hz(Double) -> Double
 
+pub fn normalize_bpm(Double) -> Result[Double, @transport.TransportError]
+
 // Errors
 
 // Types and methods
-type ActiveNote
-
 pub struct AffectedVoiceEditScope {
   // private fields
 } derive(Eq, @debug.Debug)
@@ -85,8 +82,6 @@ pub fn EventSource::section(Self) -> @identity.SectionId?
 pub struct PatternScheduler {
   // private fields
 }
-#alias(new)
-pub fn PatternScheduler::PatternScheduler(bpm~ : Double, ctx~ : @dsp.DspContext, mapper? : ControlMapper) -> Self
 pub fn PatternScheduler::active_note_count(Self) -> Int
 pub fn PatternScheduler::active_note_matches(Self, Int, AffectedVoiceTarget) -> Bool?
 pub fn PatternScheduler::active_note_source(Self, Int) -> EventSource?
@@ -100,8 +95,8 @@ pub fn PatternScheduler::apply_affected_voice_policy_for_edit(Self, AffectedVoic
 pub fn PatternScheduler::apply_voice_control_for_edit_result(Self, edit~ : AffectedVoiceEditScope, control~ : @graph.GraphControl, pool~ : @voice.BoundVoicePool) -> Result[Int, @voice.VoiceControlError]
 pub fn PatternScheduler::apply_voice_controls_for_edit_result(Self, edit~ : AffectedVoiceEditScope, controls~ : Array[@graph.GraphControl], pool~ : @voice.BoundVoicePool) -> Result[Int, @voice.VoiceControlError]
 pub fn PatternScheduler::bpm(Self) -> Double
-pub fn PatternScheduler::current_block(Self) -> BlockFrame
-pub fn PatternScheduler::expire_notes(Self, @voice.BoundVoicePool, @pattern.TimeSpan) -> Unit
+pub fn PatternScheduler::current_block(Self) -> Result[BlockFrame, @transport.TransportError]
+pub fn PatternScheduler::expire_notes(Self, @voice.BoundVoicePool, @pattern.TimeSpan) -> Result[Unit, @transport.TransportError]
 pub fn PatternScheduler::expire_notes_at(Self, @voice.BoundVoicePool, PerformanceTime) -> Unit
 pub fn PatternScheduler::has_active_pattern_snapshot(Self) -> Bool
 pub fn PatternScheduler::has_active_playback_snapshot(Self) -> Bool
@@ -109,6 +104,8 @@ pub fn PatternScheduler::has_active_song_snapshot(Self) -> Bool
 pub fn PatternScheduler::has_pending_pattern_snapshot(Self) -> Bool
 pub fn PatternScheduler::has_pending_playback_snapshot(Self) -> Bool
 pub fn PatternScheduler::has_pending_song_snapshot(Self) -> Bool
+pub fn PatternScheduler::last_transport_error(Self) -> @transport.TransportError?
+pub fn PatternScheduler::new(bpm~ : Double, ctx~ : @dsp.DspContext, mapper? : ControlMapper) -> Result[Self, @transport.TransportError]
 pub fn PatternScheduler::process_block(Self, @pattern.Pat[@pattern.ControlMap], @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::process_events(Self, Array[@pattern.Event[@pattern.ControlMap]], @pattern.TimeSpan, @voice.BoundVoicePool) -> Unit
 pub fn PatternScheduler::process_playback_events(Self, Array[PlaybackEvent], @pattern.TimeSpan, @voice.BoundVoicePool) -> Unit
@@ -117,7 +114,8 @@ pub fn PatternScheduler::process_section_block(Self, @song.Section[@pattern.Cont
 pub fn PatternScheduler::process_snapshot_block(Self, @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::process_song_block(Self, @song.Song[@pattern.ControlMap], @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::process_song_snapshot_block(Self, @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
-pub fn PatternScheduler::push_active_note(Self, @voice.VoiceHandle, @pattern.Rational) -> Unit
+pub fn PatternScheduler::push_active_note(Self, @voice.VoiceHandle, @pattern.Rational) -> Result[Unit, @transport.TransportError]
+pub fn PatternScheduler::push_active_note_until(Self, @voice.VoiceHandle, PerformanceTime) -> Unit
 pub fn PatternScheduler::queue_pattern_snapshot(Self, @pattern.PatternSnapshot[@pattern.ControlMap]) -> Unit
 pub fn PatternScheduler::queue_pattern_snapshot_edit(Self, snapshot~ : @pattern.PatternSnapshot[@pattern.ControlMap], policy~ : AffectedVoicePolicy, edit~ : AffectedVoiceEditScope, pool~ : @voice.BoundVoicePool) -> Int
 pub fn PatternScheduler::queue_pattern_snapshot_live_control_edit_result(Self, snapshot~ : @pattern.PatternSnapshot[@pattern.ControlMap], policy~ : AffectedVoicePolicy, edit~ : AffectedVoiceEditScope, controls~ : Array[@graph.GraphControl], pool~ : @voice.BoundVoicePool) -> Result[PlaybackEditOutcome, @voice.VoiceControlError]
@@ -129,8 +127,10 @@ pub fn PatternScheduler::queue_song_snapshot_edit(Self, snapshot~ : @song.SongSn
 pub fn PatternScheduler::queue_song_snapshot_live_control_edit_result(Self, snapshot~ : @song.SongSnapshot[@pattern.ControlMap], policy~ : AffectedVoicePolicy, edit~ : AffectedVoiceEditScope, controls~ : Array[@graph.GraphControl], pool~ : @voice.BoundVoicePool) -> Result[PlaybackEditOutcome, @voice.VoiceControlError]
 pub fn PatternScheduler::reset_transport(Self) -> Unit
 pub fn PatternScheduler::reset_transport_and_kill_notes(Self, @voice.BoundVoicePool) -> Unit
+pub fn PatternScheduler::sample_at(Self, @pattern.Rational) -> Result[Int64, @transport.TransportError]
 pub fn PatternScheduler::sample_counter(Self) -> Int64
-pub fn PatternScheduler::set_bpm(Self, Double) -> Unit
+pub fn PatternScheduler::set_bpm(Self, Double) -> Result[Unit, @transport.TransportError]
+pub fn PatternScheduler::validate_bpm(Self, Double) -> Result[Unit, @transport.TransportError]
 
 pub struct PerformanceTime {
   sample : Int64
@@ -165,6 +165,6 @@ pub enum VoiceAction {
 }
 
 // Type aliases
+pub using @transport {type TransportError}
 
 // Traits
-

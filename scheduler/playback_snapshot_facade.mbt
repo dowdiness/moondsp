@@ -1,7 +1,6 @@
 ///|
-/// Stage a lowered authoring snapshot for playback. The staged snapshot becomes
-/// active at the start of the next `process_snapshot_block` call, giving callers
-/// a stable block boundary for pattern edits during playback.
+/// Stage an authored snapshot for acceptance at the next render block. Each
+/// edited material keeps its current interval until its next source entry.
 pub fn PatternScheduler::queue_pattern_snapshot(
   self : PatternScheduler,
   snapshot : @pattern.PatternSnapshot[@pattern.ControlMap],
@@ -12,7 +11,7 @@ pub fn PatternScheduler::queue_pattern_snapshot(
 ///|
 /// Stage a lowered song snapshot for playback. The snapshot carries both the
 /// authoring revision and the narrower layout revision; both become observable
-/// only when the snapshot commits at the next song snapshot block boundary.
+/// at acceptance in the next block, before all material edits may be audible.
 pub fn PatternScheduler::queue_song_snapshot(
   self : PatternScheduler,
   snapshot : @song.SongSnapshot[@pattern.ControlMap],
@@ -74,6 +73,7 @@ pub fn PatternScheduler::has_pending_playback_snapshot(
 }
 
 ///|
+/// Latest accepted authored revision, not a simultaneous audible revision.
 pub fn PatternScheduler::active_playback_revision(
   self : PatternScheduler,
 ) -> @identity.Revision? {
@@ -105,14 +105,13 @@ pub fn PatternScheduler::active_song_layout_revision(
 fn PatternScheduler::commit_pending_playback_snapshot(
   self : PatternScheduler,
 ) -> Unit {
-  self.playback_state.commit_pending()
+  self.playback_state.commit_pending(
+    self.clock.position(self.clock.sample()).unwrap(),
+  )
 }
 
 ///|
-/// Snapshot entry point kept for existing pattern-snapshot callers. It now
-/// processes the unified prepared playback snapshot slot, so song snapshots
-/// staged through `queue_song_snapshot` observe the same block-boundary
-/// semantics.
+/// Render prepared playback with the same per-material entry rules as songs.
 pub fn PatternScheduler::process_snapshot_block(
   self : PatternScheduler,
   pool : @moondsp.BoundVoicePool,
@@ -123,9 +122,8 @@ pub fn PatternScheduler::process_snapshot_block(
 }
 
 ///|
-/// Song snapshot entry point for authoring-time song edits. Pending snapshots
-/// are swapped in at the start of the audio block, so layout revisions become
-/// visible on the same stable boundary as pattern snapshots.
+/// Render prepared song playback. Acceptance occurs at block start; audible
+/// edits use each material's next entry within its occurrence.
 pub fn PatternScheduler::process_song_snapshot_block(
   self : PatternScheduler,
   pool : @moondsp.BoundVoicePool,

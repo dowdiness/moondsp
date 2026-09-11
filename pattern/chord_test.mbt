@@ -321,7 +321,7 @@ test "chord pattern C major has correct note values" {
     @pattern.Rational::from_int(1),
   )
   let events = pat.query(arc)
-  let notes = events.map(ev => ev.value.0.get("note"))
+  let notes = events.map(ev => ev.value.get("note"))
   // Stack order: the order from chord intervals [0, 4, 7]
   assert_true(notes.contains(Some(60.0)))
   assert_true(notes.contains(Some(64.0)))
@@ -337,7 +337,7 @@ test "chord pattern Dm produces 3 note events" {
   )
   let events = pat.query(arc)
   @debug.assert_eq(events.length(), 3)
-  let notes = events.map(ev => ev.value.0.get("note"))
+  let notes = events.map(ev => ev.value.get("note"))
   assert_true(notes.contains(Some(62.0)))
   assert_true(notes.contains(Some(65.0)))
   assert_true(notes.contains(Some(69.0)))

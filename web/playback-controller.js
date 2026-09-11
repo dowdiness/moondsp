@@ -53,8 +53,8 @@ export class PlaybackController {
     this.pending = next;
   }
 
-  // Call after a successful render. The applied interval begins at zero after
-  // a reset, or at the previous sample counter for a continuing update.
+  // A receipt acknowledges acceptance. Continuing edits can have different
+  // future entry points, so there is no single audio application timestamp.
   didRender(blockSize) {
     if (!this.pending) return;
     const { score, ...reply } = this.pending;
@@ -62,6 +62,6 @@ export class PlaybackController {
     this.pending = null;
     const samplePosition = this.wasm.scheduler_sample_position();
     this.post({ ...reply, mode: score?.mode, scoreRevision: score?.revision,
-      samplePosition, appliedAtSample: samplePosition - blockSize });
+      samplePosition, acceptedAtSample: samplePosition - blockSize });
   }
 }

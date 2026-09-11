@@ -25,7 +25,7 @@ fn PlaybackEventSource::song(
   layer~ : @identity.SectionLayerId?,
   occurrence~ : @identity.OccurrenceId,
 ) -> PlaybackEventSource {
-  { pattern_nodes: [], section, layer, occurrence: Some(occurrence) }
+  { pattern_nodes: [], section, layer, occurrence: Some(occurrence), }
 }
 
 ///|
@@ -68,7 +68,7 @@ fn PlaybackEventRecord::PlaybackEventRecord(
   event~ : @pattern.Event[@pattern.ControlMap],
   source~ : PlaybackEventSource,
 ) -> PlaybackEventRecord {
-  { event, source }
+  { event, source, }
 }
 
 ///|
@@ -165,16 +165,18 @@ pub fn PlaybackSnapshot::query_playback_events(
 }
 
 ///|
-/// Internal active/pending playback snapshot queue. Pending commits are explicit
-/// so the scheduler facade can preserve block-boundary commit semantics.
+/// Audio-owner shell: accepts authored snapshots at block start and owns the
+/// per-material states returned by deterministic entry reconciliation.
+/// The accepted revision can precede some audible material replacements.
 pub struct PlaybackState {
   priv mut active : PlaybackSnapshot?
   priv mut pending : PlaybackSnapshot?
+  priv mut entries : Array[EntryState]
 }
 
 ///|
 pub fn PlaybackState::PlaybackState() -> PlaybackState {
-  { active: None, pending: None }
+  { active: None, pending: None, entries: [], }
 }
 
 ///|
@@ -186,14 +188,33 @@ pub fn PlaybackState::queue(
 }
 
 ///|
-pub fn PlaybackState::commit_pending(self : PlaybackState) -> Unit {
-  match self.pending {
-    Some(snapshot) => {
-      self.active = Some(snapshot)
-      self.pending = None
+pub fn PlaybackState::commit_pending(
+  self : PlaybackState,
+  now : @pattern.Rational,
+) -> Unit {
+  self.entries = settle_entries(self.entries, now)
+  if self.pending is Some(snapshot) {
+    let specs = snapshot.entries()
+    if self.active is None {
+      self.entries = specs.map(spec => {
+        active: spec,
+        origin: spec.start,
+        edit: None,
+      })
+    } else {
+      self.entries = reconcile_entries(self.entries, specs, now)
     }
-    None => ()
+    self.active = Some(snapshot)
+    self.pending = None
+    self.entries = settle_entries(self.entries, now)
   }
+}
+
+///|
+pub fn PlaybackState::reset(self : PlaybackState) -> Unit {
+  self.active = None
+  self.pending = None
+  self.entries = []
 }
 
 ///|
@@ -208,7 +229,11 @@ pub fn PlaybackState::has_active_pattern(self : PlaybackState) -> Bool {
 pub fn PlaybackState::has_pending_pattern(self : PlaybackState) -> Bool {
   match self.pending {
     Some(snapshot) => snapshot.is_pattern()
-    None => false
+    None =>
+      match self.active {
+        Some(snapshot) => self.has_pending() && snapshot.is_pattern()
+        None => false
+      }
   }
 }
 
@@ -224,7 +249,11 @@ pub fn PlaybackState::has_active_song(self : PlaybackState) -> Bool {
 pub fn PlaybackState::has_pending_song(self : PlaybackState) -> Bool {
   match self.pending {
     Some(snapshot) => snapshot.is_song()
-    None => false
+    None =>
+      match self.active {
+        Some(snapshot) => self.has_pending() && snapshot.is_song()
+        None => false
+      }
   }
 }
 
@@ -238,10 +267,7 @@ pub fn PlaybackState::has_active(self : PlaybackState) -> Bool {
 
 ///|
 pub fn PlaybackState::has_pending(self : PlaybackState) -> Bool {
-  match self.pending {
-    Some(_) => true
-    None => false
-  }
+  self.pending is Some(_) || self.entries.any(entry => entry.edit is Some(_))
 }
 
 ///|
@@ -280,10 +306,7 @@ pub fn PlaybackState::query_active_events(
   self : PlaybackState,
   arc : @pattern.TimeSpan,
 ) -> Array[@pattern.Event[@pattern.ControlMap]] {
-  match self.active {
-    Some(snapshot) => snapshot.query_events(arc)
-    None => []
-  }
+  query_entries(self.entries, arc)
 }
 
 ///|

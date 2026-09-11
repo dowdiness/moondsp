@@ -265,7 +265,7 @@ test.describe("Audio path", () => {
     await page.keyboard.type(".rev()");
 
     // Debounce is 200ms; allow generous margin for eval + worklet round-trip.
-    await expect(page.locator("#log")).toContainText("pattern updated", { timeout: 3_000 });
+    await expect(page.locator("#log")).toContainText("pattern edit queued", { timeout: 3_000 });
   });
 
   test("invalid pattern surfaces error and keeps last good", async ({ page }) => {
@@ -304,7 +304,7 @@ test.describe("Audio path", () => {
     // Recovery clears the diagnostic.
     await page.keyboard.press("Control+A");
     await page.keyboard.type(`s("bd sd")`);
-    await expect(log).toContainText("pattern updated", { timeout: 3_000 });
+    await expect(log).toContainText("pattern edit queued", { timeout: 3_000 });
     await expect(page.locator(".cm-diagnostic-error")).toHaveCount(0);
   });
 
@@ -374,7 +374,7 @@ test.describe("Audio path", () => {
 
     // Typing again resumes normal eval.
     await page.keyboard.type(`s("bd")`);
-    await expect(log).toContainText("pattern updated", { timeout: 3_000 });
+    await expect(log).toContainText("pattern edit queued", { timeout: 3_000 });
   });
 
   test("re-typing the same invalid pattern after clear re-paints the squiggle", async ({ page }) => {
@@ -472,7 +472,7 @@ test.describe("Audio path", () => {
     await page.keyboard.press("Control+A");
     await page.keyboard.type(`s("cp oh")`);
 
-    await expect(page.locator("#log")).toContainText("pattern updated", { timeout: 3_000 });
+    await expect(page.locator("#log")).toContainText("pattern edit queued", { timeout: 3_000 });
     await expect(page.locator(".cm-diagnostic-error")).toHaveCount(0);
     await expect(page.locator("#status")).toContainText("running");
   });
@@ -496,7 +496,7 @@ test.describe("Audio path", () => {
 
     // pattern updated re-fires after debounce → proves the worklet's parse
     // accepted `$:` stack lines and the engine swapped patterns successfully.
-    await expect(page.locator("#log")).toContainText("pattern updated", { timeout: 3_000 });
+    await expect(page.locator("#log")).toContainText("pattern edit queued", { timeout: 3_000 });
     // No diagnostic squiggle: the new grammar must parse cleanly.
     await expect(page.locator(".cm-diagnostic-error")).toHaveCount(0);
     // Status stays running through the swap.

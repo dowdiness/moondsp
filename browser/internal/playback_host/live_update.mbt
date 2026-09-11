@@ -80,7 +80,7 @@ fn prepare_pattern(
       }) catch {
         _ => return Err("could not prepare pattern update")
       }
-      Ok({ snapshots, layout: PatternLayout, bpm: None, })
+      Ok({ snapshots, layout: PatternLayout, bpm: None })
     }
   }
 }
@@ -92,7 +92,12 @@ fn prepare_song(
 ) -> Result[PreparedPlayback, String] {
   match @mini.parse_song_with_bpm(text) {
     Err(msg) => Err(msg)
-    Ok(parsed) =>
+    Ok(parsed) => {
+      if parsed.bpm() is Some(bpm) {
+        if @scheduler.normalize_bpm(bpm) is Err(_) {
+          return Err("tempo must be 0.001..1000 BPM")
+        }
+      }
       match route_songs(parsed.song(), selectors) {
         Err(msg) => Err(msg)
         Ok(songs) => {
@@ -108,6 +113,7 @@ fn prepare_song(
           })
         }
       }
+    }
   }
 }
 
@@ -136,34 +142,20 @@ fn queue_playback(
   state : PlaybackState,
   next : PreparedPlayback,
   policy : ApplyPolicy,
-  bpm : Double,
 ) -> Result[PlaybackState, String] {
   match policy {
-    Continue => {
+    Continue =>
       match state.active {
         None => return Err("start playback before updating")
         Some(active) if active.layout != next.layout =>
           return Err("playback mode or song layout changed; restart required")
         Some(_) => ()
       }
-      match next.bpm {
-        Some(tempo) if tempo != bpm =>
-          return Err("song tempo changed; restart required")
-        _ => ()
-      }
-    }
     Restart => ()
   }
   Ok({
     active: state.active,
-    pending: Some({
-      playback: next,
-      policy,
-      tempo: match policy {
-        Continue => None
-        Restart => next.bpm
-      },
-    }),
+    pending: Some({ playback: next, policy, tempo: next.bpm }),
   })
 }
 
@@ -175,7 +167,7 @@ fn restart_current(state : PlaybackState) -> Result[PlaybackState, String] {
     Some(active) =>
       Ok({
         active: state.active,
-        pending: Some({ playback: active, policy: Restart, tempo: None, }),
+        pending: Some({ playback: active, policy: Restart, tempo: None }),
       })
   }
 }
@@ -195,7 +187,7 @@ let prepared_sequence : @ref.Ref[Int] = @ref.new(0)
 
 ///|
 fn reset_playback_state() -> Unit {
-  playback_state.val = { active: None, pending: None, }
+  playback_state.val = { active: None, pending: None }
   prepared_slot.val = None
   playback_input_chars.clear()
 }
@@ -253,15 +245,21 @@ pub fn apply_prepared_playback(token : Int, restart : Bool) -> Int {
   match prepared_slot.val {
     Some((id, prepared)) if id == token => {
       let policy = if restart { Restart } else { Continue }
-      match
-        queue_playback(
-          playback_state.val,
-          prepared,
-          policy,
-          sched_routes.val[0].pool.scheduler.bpm(),
-        ) {
+      match queue_playback(playback_state.val, prepared, policy) {
         Err(message) => set_scheduler_parse_error(message)
         Ok(next) => {
+          // Admission owns the representability check. Until commit, no public
+          // host operation advances the clock or adds musical note endpoints.
+          // Direct BPM edits preserve those inputs; reset clears this request.
+          if policy is Continue && prepared.bpm is Some(bpm) {
+            for route in sched_routes.val {
+              if route.pool.scheduler.validate_bpm(bpm) is Err(_) {
+                return set_scheduler_parse_error(
+                  "tempo change exceeds transport range",
+                )
+              }
+            }
+          }
           playback_state.val = next
           prepared_slot.val = None
           set_scheduler_parse_success()
@@ -310,7 +308,12 @@ fn commit_playback_request() -> Unit {
         Continue => ()
       }
       match request.tempo {
-        Some(bpm) => set_scheduler_bpm(bpm)
+        Some(bpm) =>
+          for route in sched_routes.val {
+            // Admission proved this for the unchanged anchor and endpoints.
+            // Restart instead uses a fresh clock with no active notes.
+            route.pool.scheduler.set_bpm(bpm).unwrap()
+          }
         None => ()
       }
       for i in 0..<sched_routes.val.length() {
@@ -318,7 +321,7 @@ fn commit_playback_request() -> Unit {
           request.playback.snapshots[i],
         )
       }
-      playback_state.val = { active: Some(request.playback), pending: None, }
+      playback_state.val = { active: Some(request.playback), pending: None }
     }
   }
 }

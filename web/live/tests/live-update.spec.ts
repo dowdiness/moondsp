@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { readFileSync } from "node:fs";
 
 async function replaceText(page: Page, text: string) {
   await page.locator(".cm-content").fill(text);
@@ -27,7 +28,7 @@ async function play(page: Page) {
 async function start(page: Page, text: string) {
   await replaceText(page, text);
   const reply = await play(page);
-  expect(reply).toMatchObject({ operation: "restart", appliedAtSample: 0 });
+  expect(reply).toMatchObject({ operation: "restart", acceptedAtSample: 0 });
   return reply;
 }
 
@@ -65,11 +66,27 @@ test("editing and recovering from a parse error preserve transport", async ({ pa
   await start(page, 'note("60").slow(8)');
   const updated = await edit(page, 'note("72").slow(8)');
   expect(updated).toMatchObject({ type: "pattern-updated", operation: "update" });
-  expect(updated.appliedAtSample).toBeGreaterThan(0);
+  expect(updated.acceptedAtSample).toBeGreaterThan(0);
+  await expect(page.locator("#log")).toContainText("edit queued");
   expect(await edit(page, 'note(')).toMatchObject({ type: "pattern-error" });
   const recovered = await edit(page, 'note("67").slow(8)');
   expect(recovered).toMatchObject({ type: "pattern-updated", operation: "update" });
-  expect(recovered.appliedAtSample).toBeGreaterThan(updated.appliedAtSample);
+  expect(recovered.acceptedAtSample).toBeGreaterThan(updated.acceptedAtSample);
+});
+
+test("Light Orbit accepts shared-material edits and reverts through a parse error", async ({ page }) => {
+  const score = readFileSync(new URL("../../../examples/light-orbit.mini", import.meta.url), "utf8");
+  await page.locator("#mode-song").click();
+  await start(page, score);
+  const changed = score.replace('E4 G4 A4', 'F#4 G4 A4').replace('D5 A4 G4 E5', 'Eb5 Bb4 Ab4 F5');
+  const updated = await edit(page, changed);
+  expect(updated).toMatchObject({ type: "song-updated", operation: "update" });
+  expect(updated.acceptedAtSample).toBeGreaterThan(0);
+  expect(await edit(page, "song(")).toMatchObject({ type: "song-error" });
+  const reverted = await edit(page, score);
+  expect(reverted).toMatchObject({ type: "song-updated", operation: "update" });
+  expect(reverted.acceptedAtSample).toBeGreaterThan(updated.acceptedAtSample);
+  await stop(page);
 });
 
 test("song content edits continue, and Stop then Play applies a new layout", async ({ page }) => {
@@ -77,15 +94,24 @@ test("song content edits continue, and Stop then Play applies a new layout", asy
   await start(page, 'song(section("a",8,note("60")),part("a1","a"))');
   const updated = await edit(page, 'song(section("a",8,note("72")),part("a1","a"))');
   expect(updated).toMatchObject({ type: "song-updated", operation: "update" });
-  expect(updated.appliedAtSample).toBeGreaterThan(0);
+  expect(updated.acceptedAtSample).toBeGreaterThan(0);
   const rejected = await edit(page, 'song(section("a",9,note("72")),part("a1","a"))');
   expect(rejected).toMatchObject({ type: "song-error" });
   expect(rejected.message).toContain("restart required");
   await expect(page.locator("#log")).toContainText("Press Stop, then Play");
   await stop(page);
   expect(await play(page)).toMatchObject({
-    type: "song-updated", operation: "restart", appliedAtSample: 0,
+    type: "song-updated", operation: "restart", acceptedAtSample: 0,
   });
+});
+
+test("editing song tempo continues playback without requiring Stop", async ({ page }) => {
+  await page.locator("#mode-song").click();
+  await start(page, 'song(bpm(120),section("a",8,note("60").slow(8)),part("a1","a"))');
+  const updated = await edit(page, 'song(bpm(90.125),section("a",8,note("60").slow(8)),part("a1","a"))');
+  expect(updated).toMatchObject({ type: "song-updated", operation: "update" });
+  expect(updated.acceptedAtSample).toBeGreaterThan(0);
+  await expect(page.getByRole("button", { name: "Stop", exact: true })).toBeEnabled();
 });
 
 test("named song definitions update in place and a bad reference preserves the applied score", async ({ page }) => {
@@ -95,13 +121,13 @@ test("named song definitions update in place and a bad reference preserves the a
   await start(page, source("60"));
   const updated = await edit(page, source("72"));
   expect(updated).toMatchObject({ type: "song-updated", operation: "update" });
-  expect(updated.appliedAtSample).toBeGreaterThan(0);
+  expect(updated.acceptedAtSample).toBeGreaterThan(0);
   const error = await edit(page, 'let groove = missing; ' + song);
   expect(error).toMatchObject({ type: "song-error", phase: "prepare" });
   expect(error.message).toContain("undefined pattern 'missing'");
   const recovered = await edit(page, source("67"));
   expect(recovered).toMatchObject({ type: "song-updated", operation: "update" });
-  expect(recovered.appliedAtSample).toBeGreaterThan(updated.appliedAtSample);
+  expect(recovered.acceptedAtSample).toBeGreaterThan(updated.acceptedAtSample);
 });
 
 test("failed first Play stays stopped and explains how to retry", async ({ page }) => {

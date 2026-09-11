@@ -12,6 +12,8 @@ pub fn chord(String, octave? : Int) -> Pat[ControlMap]
 
 pub fn chord_notes(String, octave? : Int) -> Array[Double]?
 
+pub fn control(String, Double) -> Pat[ControlMap]
+
 pub fn[A] every(Int, (Pat[A]) -> Pat[A], Pat[A]) -> Pat[A]
 
 pub fn merge_control(Pat[ControlMap], Pat[ControlMap]) -> Pat[ControlMap]
@@ -44,7 +46,9 @@ pub(all) suberror PatternDocError {
 } derive(Eq, @debug.Debug)
 
 // Types and methods
-pub struct ControlMap(Map[String, Double]) derive(@debug.Debug)
+pub struct ControlMap {
+  // private fields
+} derive(@debug.Debug)
 pub fn ControlMap::each(Self, (String, Double) -> Unit) -> Unit
 pub fn ControlMap::empty() -> Self
 pub fn ControlMap::entries(Self) -> Map[String, Double]
@@ -64,15 +68,24 @@ pub impl[A : @debug.Debug] Show for Event[A]
 
 pub struct Pat[A] {
   query : (TimeSpan) -> Array[Event[A]]
+  // private fields
 }
 pub fn[A] Pat::degrade_by(Self[A], Double, seed? : Int) -> Self[A]
+pub fn[A] Pat::entries(Self[A]) -> Array[Self[A]]
+pub fn[A] Pat::entry_key(Self[A]) -> String
+pub fn[A] Pat::entry_period(Self[A]) -> Rational
 pub fn[A] Pat::euclid(Self[A], Int, Int, rotation? : Int) -> Self[A]
 pub fn[A] Pat::fast(Self[A], Rational) -> Self[A]
 pub fn[A] Pat::filter_map(Self[A], (A) -> A?) -> Self[A]
+pub fn[A] Pat::from_query((TimeSpan) -> Array[Event[A]]) -> Self[A]
 pub fn Pat::jux(Self[ControlMap], (Self[ControlMap]) -> Self[ControlMap]) -> Self[ControlMap]
+pub fn[A] Pat::material(Self[A]) -> Self[A]
+pub fn[A] Pat::named_entry(Self[A], String) -> Self[A]
 pub fn[A] Pat::pure(A) -> Self[A]
 pub fn[A] Pat::query(Self[A], TimeSpan) -> Array[Event[A]]
 pub fn[A] Pat::rev(Self[A]) -> Self[A]
+pub fn[A] Pat::same_content(Self[A], Self[A]) -> Bool
+pub fn Pat::select_control(Self[ControlMap], String, value? : Double) -> Self[ControlMap]
 pub fn[A] Pat::silence() -> Self[A]
 pub fn[A] Pat::slow(Self[A], Rational) -> Self[A]
 
@@ -164,6 +177,15 @@ pub fn TimeSpan::intersect(Self, Self) -> Self?
 pub fn TimeSpan::shift(Self, Rational) -> Self
 pub fn TimeSpan::whole_cycles(Self) -> Array[Self]
 pub impl Show for TimeSpan
+
+pub(all) enum TimeTransform {
+  Fast(Rational)
+  Slow(Rational)
+  Reverse
+}
+pub fn[A] TimeTransform::apply(Self, Pat[A]) -> Pat[A]
+pub fn[A] TimeTransform::every(Self, Int, Pat[A]) -> Pat[A]
+pub fn TimeTransform::jux(Self, Pat[ControlMap]) -> Pat[ControlMap]
 
 // Type aliases
 

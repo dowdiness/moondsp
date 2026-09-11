@@ -3,7 +3,8 @@
 priv struct ActiveNote {
   handle : @voice.VoiceHandle
   source : @model.EventSource
-  end_sample : Int64
+  mut end_sample : Int64
+  musical_end : @pattern.Rational?
 }
 
 ///|
@@ -11,8 +12,9 @@ fn ActiveNote::ActiveNote(
   handle~ : @voice.VoiceHandle,
   source~ : @model.EventSource,
   end_sample~ : Int64,
+  musical_end~ : @pattern.Rational?,
 ) -> ActiveNote {
-  { handle, source, end_sample }
+  { handle, source, end_sample, musical_end, }
 }
 
 ///|
@@ -66,7 +68,7 @@ pub struct ActiveNotes {
 
 ///|
 pub fn ActiveNotes::ActiveNotes() -> ActiveNotes {
-  { notes: [] }
+  { notes: [], }
 }
 
 ///|
@@ -91,8 +93,16 @@ pub fn ActiveNotes::push_note(
   handle~ : @voice.VoiceHandle,
   source~ : @model.EventSource,
   end_sample~ : Int64,
+  musical_end? : @pattern.Rational,
 ) -> Unit {
-  self.notes.push(ActiveNote(handle~, source~, end_sample~))
+  // A stolen voice's old endpoint must not retain another record for its slot.
+  for i in 0..<self.notes.length() {
+    if self.notes[i].handle.slot == handle.slot {
+      self.notes[i] = ActiveNote(handle~, source~, end_sample~, musical_end~)
+      return
+    }
+  }
+  self.notes.push(ActiveNote(handle~, source~, end_sample~, musical_end~))
 }
 
 ///|
@@ -234,4 +244,50 @@ pub fn[E] ActiveNotes::try_count_matching_handles(
     count
   }
   Ok(count)
+}
+
+///|
+pub fn ActiveNotes::next_end_sample(self : ActiveNotes, limit : Int64) -> Int64 {
+  for note in self.notes; next = limit {
+    continue if note.end_sample < next { note.end_sample } else { next }
+  } nobreak {
+    next
+  }
+}
+
+///|
+/// Preflight every musical endpoint before changing any cached deadline.
+pub fn[E] ActiveNotes::retime(
+  self : ActiveNotes,
+  convert : (@pattern.Rational) -> Result[Int64, E],
+) -> Result[Unit, E] {
+  match self.validate_retime(convert) {
+    Err(e) => return Err(e)
+    Ok(_) => ()
+  }
+  for note in self.notes {
+    if note.musical_end is Some(end_) {
+      match convert(end_) {
+        Ok(sample) => note.end_sample = sample
+        Err(e) => return Err(e)
+      }
+    }
+  }
+  Ok(())
+}
+
+///|
+pub fn[E] ActiveNotes::validate_retime(
+  self : ActiveNotes,
+  convert : (@pattern.Rational) -> Result[Int64, E],
+) -> Result[Unit, E] {
+  for note in self.notes {
+    if note.musical_end is Some(end_) {
+      match convert(end_) {
+        Err(e) => return Err(e)
+        Ok(_) => ()
+      }
+    }
+  }
+  Ok(())
 }

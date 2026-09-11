@@ -323,7 +323,9 @@ engine.onReply((reply: WorkletReply) => {
 
   if (reply.type === "pattern-updated" || reply.type === "song-updated") {
     const mode: PlaybackMode = reply.type === "pattern-updated" ? "pattern" : "song";
-    setLog(`✓ ${modeLabel(mode)} updated`, "ok");
+    setLog(reply.operation === "update"
+      ? `✓ ${modeLabel(mode)} edit queued for the next pattern starts`
+      : `✓ ${modeLabel(mode)} updated`, "ok");
     adapter.applyPatches([{ type: "SetDiagnostics", diagnostics: [] }]);
   } else if (reply.type === "pattern-error" || reply.type === "song-error") {
     const msg = String(reply.message ?? "parse error");
