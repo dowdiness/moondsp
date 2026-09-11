@@ -1,0 +1,16 @@
+import {
+  "dowdiness/moondsp/mini",
+  "dowdiness/moondsp/pattern",
+  "moonbitlang/core/ref",
+}
+
+pkgtype(kind: "executable")
+
+options(
+  link: {
+    "js": {
+      "exports": [ "prepare", "length", "value", "error_text" ],
+      "format": "esm",
+    },
+  },
+)

@@ -6,7 +6,8 @@
     "test:browser": "moon build --target wasm-gc --release && ./playwright-sync-wasm.sh && playwright test",
     "test:browser:headed": "moon build --target wasm-gc --release && ./playwright-sync-wasm.sh && playwright test --headed",
     "deploy": "wrangler deploy",
-    "preview": "wrangler dev"
+    "preview": "wrangler dev",
+    "verify:composition-authoring": "NEW_MOON_MOD=0 moon build cmd/composition_prepare --target js --release && node scripts/composition-definition-check.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",

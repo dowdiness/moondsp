@@ -1,0 +1,31 @@
+import assert from 'node:assert/strict';
+import {readFile,writeFile,mkdir} from 'node:fs/promises';
+import * as compiler from '../_build/js/release/build/cmd/composition_prepare/composition_prepare.js';
+import {prepare,prepareDefinitions,compileRows} from '../web/composition-prototype/prepare.mjs';
+import {preparationQueue} from '../web/composition-prototype/preparation-queue.mjs';
+const doc=JSON.parse(await readFile('examples/light-orbit/named.json'));let cache=[],revision=0;const results=[];
+assert.deepEqual(prepare(compiler,doc,1).score,compileRows(compiler,await readFile('examples/light-orbit/original.song','utf8')));
+const edited=structuredClone(doc);edited.patterns.orbit=edited.patterns.orbit.replace('0.105','0.075');
+const shifted=structuredClone(edited);shifted.song=[...shifted.song.slice(1),shifted.song[0]];
+const resized=structuredClone(shifted);resized.song.find(r=>r[0]==='seed')[1]={bars:4};
+const rhythm=structuredClone(resized);rhythm.patterns.hats='s("hh(5,8)").slow(4).every(3, rev).degradeBy(0.4).gain(0.065)';
+for(const [name,d] of [['initial',doc],['orbit-edit',edited],['unchanged',edited],['placement',shifted],['duration',resized],['random-pattern',rhythm]]){
+  const id=++revision,begin=performance.now(),reference=prepare(compiler,d,id),referenceMs=performance.now()-begin;
+  const start=performance.now(),result=prepareDefinitions(compiler,d,id,cache),incrementalMs=performance.now()-start;cache=result.cache;
+  assert.deepEqual(result.bundle,reference);
+  if(name==='orbit-edit')assert.equal(result.stats.compiled,3);
+  if(name==='unchanged'||name==='placement')assert.equal(result.stats.compiled,0);
+  results.push({name,referenceMs,incrementalMs,...result.stats,events:reference.score.length});
+}
+const messages=[],worker={postMessage:m=>messages.push(m)},q=preparationQueue(worker);
+const a=q.submit(doc,1),b=q.submit(doc,2),c=q.submit(doc,3);
+assert.equal((await a).kind,'retired');assert.equal((await b).kind,'retired');assert.equal(messages.length,1);
+worker.onmessage({data:{kind:'prepared',revision:1,bundle:{revision:1}}});assert.equal(messages[1].revision,3);
+q.cancel();assert.equal((await c).kind,'retired');
+worker.onmessage({data:{kind:'prepared',revision:3,bundle:{revision:3}}});
+const d=q.submit(doc,4);worker.onmessage({data:{kind:'prepared',revision:3,bundle:{revision:3}}});
+worker.onmessage({data:{kind:'prepared',revision:4,bundle:{revision:4}}});assert.equal((await d).revision,4);
+const e=q.submit(doc,5);q.close();assert.equal((await e).kind,'retired');
+const output={passed:true,results,latestOnly:true,cancelledResultsRetired:true};
+await mkdir('artifacts/composition-prototype',{recursive:true});
+await writeFile('artifacts/composition-prototype/definition-check.json',JSON.stringify(output,null,2)+'\n');console.log(JSON.stringify(output,null,2));

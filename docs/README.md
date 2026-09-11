@@ -123,3 +123,5 @@ context. These documents describe past work and will not match current code.
   - `archive/phase2-*-design-brief.md` — Phase 2 stereo-graph design briefs.
   - `archive/step0-instruction.md` — original bootstrap instructions.
   - `archive/RESULTS.md` — early Phase 0/1/2 status log.
+
+- [共有定義による作曲準備の試作](../web/composition-prototype/README.md) — 元曲との一致、定義単位の再利用、編集準備の取消し。
