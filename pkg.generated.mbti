@@ -142,6 +142,8 @@ pub using @identity {type StableIdError}
 
 pub using @dsp {type Stereo}
 
+pub using @dsp {type StereoReverb}
+
 pub using @voice {type VoiceControlError}
 
 pub using @voice {type VoiceHandle}
@@ -175,4 +177,3 @@ pub using @dsp {trait StereoFilterSym}
 pub using @dsp {trait StereoSym}
 
 // Traits
-

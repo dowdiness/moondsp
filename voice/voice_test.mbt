@@ -704,6 +704,34 @@ test "set_voice_pan_result pans hard right" {
 }
 
 ///|
+test "shared send follows post-pan voice output and resets per note" {
+  let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
+  let nodes = [DspNode::constant(1.0), DspNode::output(0)]
+  let pool = VoicePool::new(CompiledTemplate::analyze(nodes), ctx, max_voices=1).unwrap()
+  let handle = pool.note_on([]).unwrap()
+  assert_true(pool.set_voice_pan_result(handle, -1.0) is Ok(_))
+  assert_true(pool.set_voice_send_result(handle, 0.5) is Ok(_))
+  let left = AudioBuffer::filled(4)
+  let right = AudioBuffer::filled(4)
+  let send_left = AudioBuffer::filled(4)
+  let send_right = AudioBuffer::filled(4)
+  pool.process_with_send(ctx, left, right, send_left, send_right)
+  for i in 0..<4 {
+    assert_true((send_left.get(i) - left.get(i) * 0.5).abs() < 0.0001)
+    assert_true(send_right.get(i).abs() < 0.0001)
+  }
+  pool.kill_all()
+  ignore(pool.note_on([]))
+  send_left.fill(0.0)
+  send_right.fill(0.0)
+  pool.process_with_send(ctx, left, right, send_left, send_right)
+  for i in 0..<4 {
+    assert_true(send_left.get(i).abs() < 0.0001)
+    assert_true(send_right.get(i).abs() < 0.0001)
+  }
+}
+
+///|
 test "process reclaims finished releasing voices" {
   let ctx = DspContext::new(sample_rate=1000.0, block_size=8)
   let nodes = [

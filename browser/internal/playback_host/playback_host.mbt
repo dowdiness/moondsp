@@ -5,6 +5,8 @@ priv struct SoundPool {
   scheduler : @scheduler.PatternScheduler
   tmp_left : @moondsp.AudioBuffer
   tmp_right : @moondsp.AudioBuffer
+  tmp_send_left : @moondsp.AudioBuffer
+  tmp_send_right : @moondsp.AudioBuffer
 }
 
 ///|
@@ -27,6 +29,24 @@ let sched_left : @ref.Ref[@moondsp.AudioBuffer?] = @ref.new(None)
 
 ///|
 let sched_right : @ref.Ref[@moondsp.AudioBuffer?] = @ref.new(None)
+
+///|
+let sched_context : @ref.Ref[@moondsp.DspContext?] = @ref.new(None)
+
+///|
+let sched_reverb : @ref.Ref[@moondsp.StereoReverb?] = @ref.new(None)
+
+///|
+let sched_send_left : @ref.Ref[@moondsp.AudioBuffer?] = @ref.new(None)
+
+///|
+let sched_send_right : @ref.Ref[@moondsp.AudioBuffer?] = @ref.new(None)
+
+///|
+let sched_wet_left : @ref.Ref[@moondsp.AudioBuffer?] = @ref.new(None)
+
+///|
+let sched_wet_right : @ref.Ref[@moondsp.AudioBuffer?] = @ref.new(None)
 
 ///|
 let sched_gain : @ref.Ref[Double] = @ref.new(0.5)
@@ -61,6 +81,8 @@ fn make_drum_pool(
         scheduler,
         tmp_left: @moondsp.AudioBuffer::filled(block_size),
         tmp_right: @moondsp.AudioBuffer::filled(block_size),
+        tmp_send_left: @moondsp.AudioBuffer::filled(block_size),
+        tmp_send_right: @moondsp.AudioBuffer::filled(block_size),
       })
   }
 }
@@ -110,6 +132,8 @@ fn make_synth_pool(
         scheduler,
         tmp_left: @moondsp.AudioBuffer::filled(block_size),
         tmp_right: @moondsp.AudioBuffer::filled(block_size),
+        tmp_send_left: @moondsp.AudioBuffer::filled(block_size),
+        tmp_send_right: @moondsp.AudioBuffer::filled(block_size),
       })
   }
 }
@@ -176,6 +200,12 @@ pub fn init_scheduler_graph_with_templates(
   sched_routes.val = routes
   sched_left.val = Some(@moondsp.AudioBuffer::filled(block_size))
   sched_right.val = Some(@moondsp.AudioBuffer::filled(block_size))
+  sched_context.val = Some(ctx)
+  sched_reverb.val = Some(@moondsp.StereoReverb::StereoReverb(sample_rate))
+  sched_send_left.val = Some(@moondsp.AudioBuffer::filled(block_size))
+  sched_send_right.val = Some(@moondsp.AudioBuffer::filled(block_size))
+  sched_wet_left.val = Some(@moondsp.AudioBuffer::filled(block_size))
+  sched_wet_right.val = Some(@moondsp.AudioBuffer::filled(block_size))
   sched_gain.val = 0.5
   reset_playback_state()
   true
@@ -186,6 +216,12 @@ pub fn reset_scheduler_graph() -> Unit {
   sched_routes.val = []
   sched_left.val = None
   sched_right.val = None
+  sched_context.val = None
+  sched_reverb.val = None
+  sched_send_left.val = None
+  sched_send_right.val = None
+  sched_wet_left.val = None
+  sched_wet_right.val = None
   sched_gain.val = 0.5
   reset_playback_state()
 }
@@ -315,27 +351,52 @@ fn route_songs(
 ///|
 pub fn process_scheduler_block() -> Bool {
   let left = match sched_left.val {
-    Some(b) => b
+    Some(buffer) => buffer
     None => return false
   }
   let right = match sched_right.val {
-    Some(b) => b
+    Some(buffer) => buffer
+    None => return false
+  }
+  let context = match sched_context.val {
+    Some(context) => context
+    None => return false
+  }
+  let reverb = match sched_reverb.val {
+    Some(reverb) => reverb
+    None => return false
+  }
+  let send_left = match sched_send_left.val {
+    Some(buffer) => buffer
+    None => return false
+  }
+  let send_right = match sched_send_right.val {
+    Some(buffer) => buffer
+    None => return false
+  }
+  let wet_left = match sched_wet_left.val {
+    Some(buffer) => buffer
+    None => return false
+  }
+  let wet_right = match sched_wet_right.val {
+    Some(buffer) => buffer
     None => return false
   }
   commit_playback_request()
-  // Clear main output buffers
   left.fill(0.0)
   right.fill(0.0)
+  send_left.fill(0.0)
+  send_right.fill(0.0)
   if playback_state.val.active is None {
     return true
   }
   process_snapshot_routes(left, right)
-  // Apply master gain
+  reverb.process(context, send_left, send_right, wet_left, wet_right)
   let gain = sched_gain.val
   let len = left.length()
   for i = 0; i < len; i = i + 1 {
-    left.set(i, left.get(i) * gain)
-    right.set(i, right.get(i) * gain)
+    left.set(i, (left.get(i) + wet_left.get(i)) * gain)
+    right.set(i, (right.get(i) + wet_right.get(i)) * gain)
   }
   true
 }

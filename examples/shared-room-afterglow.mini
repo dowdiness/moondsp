@@ -1,0 +1,30 @@
+let kick = s("bd(3,8)").slow(4).gain(0.30);
+let snare = s("sd(2,8,1)").slow(4).gain(0.12).room(0.24);
+let hats = s("hh(5,8)").slow(4).every(4, rev).degradeBy(0.14).gain(0.04).room(0.42);
+let air = s("oh(2,8,3)").slow(4).degradeBy(0.3).gain(0.035).pan(0.35).room(0.70);
+let pulse = stack(kick, snare, hats);
+let lifted_pulse = stack(kick, snare, hats, air);
+let bass_a = note("C2(3,8) A1(3,8,1) F2(3,8) G2(3,8,1)").slow(16).attack(0.005).hold(0.1).release(0.16).gain(0.18);
+let bass_b = note("A1(3,8) F2(3,8,1) C2(5,8) G2(3,8,2)").slow(16).attack(0.005).hold(0.1).release(0.18).gain(0.18);
+let left_glass = note("E4 G4 C5 B4 D5").slow(10).attack(0.02).hold(0.08).release(0.55).gain(0.065).pan(-0.55).room(0.72);
+let right_glass = note("G4 B4 E5 D5 A4 F5").slow(12).attack(0.02).hold(0.08).release(0.55).gain(0.055).pan(0.55).room(0.72);
+let answer = note("C6 G5 E5 B5").slow(7).every(3, rev).degradeBy(0.18).attack(0.01).hold(0.04).release(0.4).gain(0.035).pan(0.2).room(0.92);
+let cloud = chord("Cmaj9 Am7 Fmaj9 G6").slow(16).attack(0.4).hold(0.2).release(1.8).gain(0.055).room(0.82);
+let warm_cloud = chord("Am7 Fmaj9 Cmaj9 G6").slow(16).attack(0.35).hold(0.2).release(2).gain(0.06).room(0.86);
+let bell = note("C5 G5 E5 B4").slow(8).attack(0.01).hold(0.04).release(0.3).gain(0.045).room(0.96);
+
+song(
+  bpm(72),
+  section("threshold", 8, stack(cloud, bell)),
+  section("arrival", 16, stack(pulse, bass_a, left_glass)),
+  section("parallax", 16, stack(lifted_pulse, bass_a, left_glass, right_glass, cloud, answer)),
+  section("empty_room", 8, stack(bell, chord("Fmaj9").slow(8).attack(0.25).hold(0.15).release(2).gain(0.05).room(0.9))),
+  section("return", 16, stack(lifted_pulse, bass_b, left_glass, right_glass, warm_cloud, answer)),
+  section("afterglow", 8, stack(bell, chord("Cmaj9").slow(8).attack(0.3).hold(0.2).release(2.4).gain(0.055).room(0.9))),
+  part("a", "threshold"),
+  part("b", "arrival"),
+  part("c", "parallax"),
+  part("d", "empty_room"),
+  part("e", "return"),
+  part("f", "afterglow")
+)

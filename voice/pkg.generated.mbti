@@ -35,11 +35,13 @@ pub fn BoundVoicePool::note_on_controls(Self, Map[String, Double]) -> VoiceHandl
 pub fn BoundVoicePool::note_on_graph_controls(Self, Array[@graph.GraphControl]) -> VoiceHandle?
 pub fn BoundVoicePool::note_on_prevalidated_params4_id(Self, Int, @graph.GraphParamSlot, Double, Int, @graph.GraphParamSlot, Double, Int, @graph.GraphParamSlot, Double, Int, @graph.GraphParamSlot, Double, Double) -> Int64
 pub fn BoundVoicePool::process(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
+pub fn BoundVoicePool::process_with_send(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuffer, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn BoundVoicePool::set_template(Self, @graph.CompiledTemplate, @graph.ControlBindingBuilder) -> Result[Unit, BoundVoicePoolError]
 #deprecated
 pub fn BoundVoicePool::set_voice_pan(Self, VoiceHandle, Double) -> Bool
 pub fn BoundVoicePool::set_voice_pan_bool(Self, VoiceHandle, Double) -> Bool
 pub fn BoundVoicePool::set_voice_pan_result(Self, VoiceHandle, Double) -> Result[Unit, VoiceControlError]
+pub fn BoundVoicePool::set_voice_send_result(Self, VoiceHandle, Double) -> Result[Unit, VoiceControlError]
 pub fn BoundVoicePool::validate_voice_controls_result(Self, VoiceHandle, Array[@graph.GraphControl]) -> Result[Unit, VoiceControlError]
 pub fn BoundVoicePool::voice_state(Self, VoiceHandle) -> VoiceState
 
@@ -86,10 +88,12 @@ pub fn VoicePool::note_off_all(Self) -> Unit
 pub fn VoicePool::note_off_result(Self, VoiceHandle) -> Result[Unit, VoiceControlError]
 pub fn VoicePool::note_on(Self, Array[@graph.GraphControl]) -> VoiceHandle?
 pub fn VoicePool::process(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
+pub fn VoicePool::process_with_send(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuffer, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn VoicePool::set_template(Self, @graph.CompiledTemplate) -> Result[Unit, VoicePoolError]
 #deprecated
 pub fn VoicePool::set_voice_pan(Self, VoiceHandle, Double) -> Bool
 pub fn VoicePool::set_voice_pan_result(Self, VoiceHandle, Double) -> Result[Unit, VoiceControlError]
+pub fn VoicePool::set_voice_send_result(Self, VoiceHandle, Double) -> Result[Unit, VoiceControlError]
 pub fn VoicePool::voice_state(Self, VoiceHandle) -> VoiceState
 
 pub(all) enum VoicePoolError {

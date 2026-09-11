@@ -107,7 +107,7 @@ test.describe("UI smoke (no audio)", () => {
     await page.keyboard.type(".");
     const tooltip = page.locator(".cm-tooltip-autocomplete");
     await expect(tooltip).toBeVisible({ timeout: 2_000 });
-    for (const m of ["fast", "slow", "rev", "degradeBy", "every", "jux"]) {
+    for (const m of ["room", "fast", "slow", "rev", "degradeBy", "every", "jux"]) {
       await expect(tooltip).toContainText(m);
     }
     // The completion-list item carrying the label `fast` (exact match
@@ -202,6 +202,7 @@ test.describe("UI smoke (no audio)", () => {
     await expect(reference.getByText(".attack(s)", { exact: true })).toBeVisible();
     await expect(reference.getByText(".hold(s)", { exact: true })).toBeVisible();
     await expect(reference.getByText(".release(s)", { exact: true })).toBeVisible();
+    await expect(reference.getByText(".room(n)", { exact: true })).toBeVisible();
     await expect(reference.locator("dt")).toContainText(["$: a", 'section("a", n, p)', "bpm(n)"]);
   });
 

@@ -15,18 +15,19 @@ fn copy_playback_events(events : Array[PlaybackEvent]) -> Array[PlaybackEvent] {
 /// The scheduler applies these after note-on, outside the control binding path.
 pub enum VoiceAction {
   SetPan(Double)
+  SetSend(Double)
 }
 
 ///|
 /// Decouples control key routing from the scheduler's event loop.
 ///
 /// `transform` maps a raw (key, value) pair to an optional (key, value) for the
-/// control binding map. Return `None` to drop the entry (e.g. "pan" is consumed
-/// as a side-effect, not a DSP control). Return `Some((key, transformed_value))`
-/// to include it.
+/// control binding map. Return `None` to drop entries consumed as per-voice
+/// side effects, currently `pan` and `room`. Return
+/// `Some((key, transformed_value))` to include an entry.
 ///
 /// `voice_action` inspects a raw (key, value) pair and optionally returns a
-/// `VoiceAction` to apply after note-on (e.g. `SetPan`).
+/// `VoiceAction` to apply after note-on.
 pub struct ControlMapper {
   transform : (String, Double) -> (String, Double)?
   voice_action : (String, Double) -> VoiceAction?
@@ -42,14 +43,15 @@ pub fn ControlMapper::ControlMapper(
 }
 
 ///|
-/// Default mapper that preserves the original hardcoded behavior:
+/// Default mapper:
 /// - "note" values are converted from MIDI note numbers to Hz
-/// - "pan" values are extracted as `SetPan` voice actions (not passed to controls)
+/// - "pan" values become `SetPan` voice actions
+/// - "room" values become `SetSend` voice actions
 /// - All other keys pass through unchanged
 pub fn default_control_mapper() -> ControlMapper {
   ControlMapper(
     transform=fn(k, v) {
-      if k == "pan" {
+      if k == "pan" || k == "room" {
         None
       } else if k == "attack" || k == "release" {
         Some((k, v * 1000.0))
@@ -59,7 +61,15 @@ pub fn default_control_mapper() -> ControlMapper {
         Some((k, v))
       }
     },
-    voice_action=fn(k, v) { if k == "pan" { Some(SetPan(v)) } else { None } },
+    voice_action=fn(k, v) {
+      if k == "pan" {
+        Some(SetPan(v))
+      } else if k == "room" {
+        Some(SetSend(v))
+      } else {
+        None
+      }
+    },
   )
 }
 
@@ -70,6 +80,8 @@ pub struct PatternScheduler {
   priv contexts : Array[@moondsp.DspContext]
   priv scratch_left : @moondsp.AudioBuffer
   priv scratch_right : @moondsp.AudioBuffer
+  priv scratch_send_left : @moondsp.AudioBuffer
+  priv scratch_send_right : @moondsp.AudioBuffer
   priv mut previous_events : Array[@pattern.Event[@pattern.ControlMap]]
   priv mut previous_clock : @transport.Clock
   priv ctx : @moondsp.DspContext
@@ -103,6 +115,8 @@ pub fn PatternScheduler::new(
     }),
     scratch_left: ctx.make_buffer(),
     scratch_right: ctx.make_buffer(),
+    scratch_send_left: ctx.make_buffer(),
+    scratch_send_right: ctx.make_buffer(),
     previous_events: [],
     previous_clock: clock,
     ctx,
@@ -227,6 +241,8 @@ fn PatternScheduler::process_single_event(
             for action in actions {
               match action {
                 SetPan(pan) => ignore(pool.set_voice_pan_result(handle, pan))
+                SetSend(gain) =>
+                  ignore(pool.set_voice_send_result(handle, gain))
               }
             }
           }
@@ -316,6 +332,9 @@ fn PatternScheduler::render_until(
   pool : @moondsp.BoundVoicePool,
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
+  send_left : @moondsp.AudioBuffer,
+  send_right : @moondsp.AudioBuffer,
+  write_send : Bool,
 ) -> Int64 {
   let mut cursor = cursor
   while cursor < stop {
@@ -325,12 +344,30 @@ fn PatternScheduler::render_until(
     for i in 0..<count {
       self.scratch_left.set(i, 0.0)
       self.scratch_right.set(i, 0.0)
+      if write_send {
+        self.scratch_send_left.set(i, 0.0)
+        self.scratch_send_right.set(i, 0.0)
+      }
     }
-    pool.process(self.contexts[count], self.scratch_left, self.scratch_right)
+    if write_send {
+      pool.process_with_send(
+        self.contexts[count],
+        self.scratch_left,
+        self.scratch_right,
+        self.scratch_send_left,
+        self.scratch_send_right,
+      )
+    } else {
+      pool.process(self.contexts[count], self.scratch_left, self.scratch_right)
+    }
     let offset = (cursor - frame.sample_begin).to_int()
     for i in 0..<count {
       left.set(offset + i, self.scratch_left.get(i))
       right.set(offset + i, self.scratch_right.get(i))
+      if write_send {
+        send_left.set(offset + i, self.scratch_send_left.get(i))
+        send_right.set(offset + i, self.scratch_send_right.get(i))
+      }
     }
     cursor = next
   }
@@ -347,9 +384,16 @@ fn PatternScheduler::process_block_events(
   pool : @moondsp.BoundVoicePool,
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
+  send_left : @moondsp.AudioBuffer,
+  send_right : @moondsp.AudioBuffer,
+  write_send : Bool,
 ) -> Unit {
   left.fill(0.0)
   right.fill(0.0)
+  if write_send {
+    send_left.fill(0.0)
+    send_right.fill(0.0)
+  }
   // Ceil may put a preceding block's final fractional onset at this block's
   // first sample. Retain that query result for one block; never query history.
   for event in self.previous_events {
@@ -385,11 +429,25 @@ fn PatternScheduler::process_block_events(
       if start < cursor || start >= frame.sample_end {
         continue
       }
-      cursor = self.render_until(cursor, start, frame, pool, left, right)
+      cursor = self.render_until(
+        cursor, start, frame, pool, left, right, send_left, send_right, write_send,
+      )
       self.process_single_event(event, source, frame.logical_arc, pool)
     }
   }
-  ignore(self.render_until(cursor, frame.sample_end, frame, pool, left, right))
+  ignore(
+    self.render_until(
+      cursor,
+      frame.sample_end,
+      frame,
+      pool,
+      left,
+      right,
+      send_left,
+      send_right,
+      write_send,
+    ),
+  )
   self.previous_events = events
   self.previous_clock = self.clock
   self.advance_block()
@@ -419,6 +477,9 @@ pub fn PatternScheduler::process_block(
     pool,
     left,
     right,
+    left,
+    right,
+    false,
   )
 }
 
@@ -446,6 +507,43 @@ pub fn PatternScheduler::process_playback_snapshot_block(
     pool,
     left,
     right,
+    left,
+    right,
+    false,
+  )
+}
+
+///|
+/// Render a playback snapshot into dry stereo plus the scheduler's single
+/// post-pan stereo send. The send is pre-fader with respect to browser master
+/// gain and is intended for one playback-session shared effect.
+pub fn PatternScheduler::process_playback_snapshot_block_with_send(
+  self : PatternScheduler,
+  pool : @moondsp.BoundVoicePool,
+  left : @moondsp.AudioBuffer,
+  right : @moondsp.AudioBuffer,
+  send_left : @moondsp.AudioBuffer,
+  send_right : @moondsp.AudioBuffer,
+) -> Unit {
+  send_left.fill(0.0)
+  send_right.fill(0.0)
+  let frame = match self.render_frame(pool, left, right) {
+    Some(frame) => frame
+    None => return
+  }
+  self.commit_pending_playback_snapshot()
+  self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
+  let events = self.query_snapshot_block(frame)
+  self.process_block_events(
+    events,
+    EventSource::none(),
+    frame,
+    pool,
+    left,
+    right,
+    send_left,
+    send_right,
+    true,
   )
 }
 
@@ -475,6 +573,9 @@ pub fn PatternScheduler::process_section_block(
     pool,
     left,
     right,
+    left,
+    right,
+    false,
   )
 }
 
@@ -503,6 +604,9 @@ pub fn PatternScheduler::process_song_block(
     pool,
     left,
     right,
+    left,
+    right,
+    false,
   )
 }
 

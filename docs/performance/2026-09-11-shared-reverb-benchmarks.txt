@@ -1,0 +1,23 @@
+Shared stereo room reverb, 128 frames at 48 kHz
+Commands:
+  NEW_MOON_MOD=0 moon bench dsp/reverb_benchmark.mbt --target wasm-gc
+  NEW_MOON_MOD=0 moon bench dsp/reverb_benchmark.mbt --target js
+  NEW_MOON_MOD=0 moon bench dsp/reverb_benchmark.mbt --target native
+Local focused snapshot; not a worst-case AudioWorklet deadline guarantee.
+
+wasm-gc
+  dry_stereo_copy_128     626.03 ns ±   3.72 ns
+  shared_stereo_128        26.05 µs ± 187.90 ns
+  fraction of 2.667 ms render quantum: 0.98%
+
+js
+  dry_stereo_copy_128     723.19 ns ±   6.88 ns
+  shared_stereo_128        23.71 µs ± 375.44 ns
+  fraction of 2.667 ms render quantum: 0.89%
+
+native
+  dry_stereo_copy_128     609.46 ns ±   2.52 ns
+  shared_stereo_128        19.58 µs ± 178.79 ns
+  fraction of 2.667 ms render quantum: 0.73%
+
+The room is processed once per browser playback block, independent of voice or part count. The measured shared return stays below 1% of the 128-frame quantum on all three focused targets.

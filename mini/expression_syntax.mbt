@@ -179,6 +179,15 @@ fn Parser::parse_transform(self : Parser) -> MiniTransform raise ParseError {
       let pan = self.read_method_number_argument()
       Control("pan", pan)
     }
+    "room" => {
+      let send = self.read_method_number_argument()
+      if send.is_nan() || send.is_inf() || send < 0.0 || send > 1.0 {
+        raise ParseError(
+          "position \{method_start}: room() expects a send between 0 and 1",
+        )
+      }
+      Control("room", send)
+    }
     "every" => {
       self.expect_char('(')
       self.skip_whitespace()

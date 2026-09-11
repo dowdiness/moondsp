@@ -19,6 +19,7 @@ pub using @dsp {
   type Adsr,
   type Biquad,
   type DelayLine,
+  type StereoReverb,
   type ParamSmoother,
 
   // DSP primitives — stateless
