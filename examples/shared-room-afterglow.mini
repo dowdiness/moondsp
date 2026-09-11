@@ -1,0 +1,20 @@
+let pulse = stack(
+  s("bd(3,8)").slow(4).gain(0.32),
+  s("sd(2,8,1)").slow(4).gain(0.12).room(0.22),
+  s("hh(5,8)").slow(4).degradeBy(0.18).gain(0.045).room(0.48)
+);
+let bass = note("C2(3,8) A1(3,8,1) F2(3,8) G2(3,8,1)").slow(16).gain(0.20);
+let left_glass = note("E4 G4 C5 B4").slow(8).attack(0.02).hold(0.08).release(0.45).gain(0.075).pan(-0.55).room(0.72);
+let right_glass = note("G4 B4 E5 D5").slow(8).attack(0.02).hold(0.08).release(0.45).gain(0.065).pan(0.55).room(0.72);
+let cloud = chord("Cmaj9 Am7 Fmaj9 G6").slow(16).attack(0.4).hold(0.2).release(1.8).gain(0.07).room(0.82);
+let bell = note("C5 G5 E5 B4").slow(8).attack(0.01).hold(0.04).release(0.25).gain(0.05).room(0.95);
+
+song(
+  bpm(72),
+  section("arrival", 8, stack(pulse, bass, left_glass)),
+  section("wide_room", 16, stack(pulse, bass, left_glass, right_glass, cloud)),
+  section("afterglow", 8, stack(bell, chord("Cmaj9").slow(8).attack(0.25).hold(0.15).release(2).gain(0.06).room(0.88))),
+  part("a", "arrival"),
+  part("b", "wide_room"),
+  part("c", "afterglow")
+)
