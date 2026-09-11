@@ -43,8 +43,20 @@ reset. An unrepresentable event is skipped; exhaustion of the clock range
 silences the block and kills its voices without advancing the clock.
 
 Song tempo edits can continue on the browser's existing playback path. A song
-layout change still requires Stop then Play. Explicit seconds in the language
-and independent clocks are separate implementation stages.
+layout change still requires Stop then Play. Independent clocks are a separate implementation stage.
+
+## Note envelopes
+
+Browser `note()` and `chord()` support `.attack(s)`, `.hold(s)`, and
+`.release(s)`. Values are seconds, from 0 to 86400. Omitted attack and release
+use the instrument defaults. Without hold, the event end closes the gate,
+including during attack. Release starts from the current level.
+
+With hold, the note reaches its peak during attack, stays there for hold,
+and fades out during release. Its lifetime is attack + hold + release,
+independent of `.slow()` and subsequent tempo changes. Notes overlap within
+the voice pool's capacity. Live edits preserve settings on sounding notes;
+Stop still stops playback. Drum envelopes are unchanged.
 
 ## Pattern edits
 

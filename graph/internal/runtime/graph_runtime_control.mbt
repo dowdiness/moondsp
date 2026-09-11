@@ -432,7 +432,14 @@ fn model_node_param_valid(
   match node.kind() {
     Constant => slot is Value0 && @dsp.is_finite(value)
     Oscillator => node.input0() < 0 && slot is Value0 && @dsp.is_finite(value)
-    Adsr => false
+    Adsr =>
+      @dsp.is_finite(value) &&
+      value >= 0.0 &&
+      (match slot {
+        Value0 | Value1 | Value3 => true
+        Value2 => value <= 1.0
+        _ => false
+      })
     Noise => false
     Biquad =>
       match slot {
@@ -487,6 +494,7 @@ fn runtime_param_state_available(
   slot : GraphParamSlot,
 ) -> Bool {
   match node.kind() {
+    Adsr => graph.env_states[compiled_index] is Some(_)
     Delay =>
       match slot {
         Value0 | DelaySamples => graph.delay_states[compiled_index] is Some(_)
@@ -540,7 +548,19 @@ fn set_model_node_param_in_place(
           _ => false
         }
       }
-    Adsr => false
+    Adsr => {
+      if !model_node_param_valid(node, slot, value, sample_rate) {
+        return false
+      }
+      match slot {
+        Value0 => @model.set_node_value0(node, value)
+        Value1 => @model.set_node_value1(node, value)
+        Value2 => @model.set_node_value2(node, value)
+        Value3 => @model.set_node_value3(node, value)
+        _ => return false
+      }
+      true
+    }
     Noise => false
     Biquad =>
       match slot {
@@ -672,7 +692,18 @@ fn updated_model_node_param(
           _ => None
         }
       }
-    Adsr => None
+    Adsr => {
+      if !model_node_param_valid(node, slot, value, sample_rate) {
+        return None
+      }
+      match slot {
+        Value0 => Some(@model.node_with_value0(node, value))
+        Value1 => Some(@model.node_with_value1(node, value))
+        Value2 => Some(@model.node_with_value2(node, value))
+        Value3 => Some(@model.node_with_value3(node, value))
+        _ => None
+      }
+    }
     Noise => None
     Biquad =>
       match slot {
@@ -760,6 +791,19 @@ fn apply_runtime_param_side_effect(
   slot : GraphParamSlot,
 ) -> Bool {
   match node.kind() {
+    Adsr =>
+      match graph.env_states[compiled_index] {
+        Some(env) => {
+          env.set_parameters(
+            attack_ms=node.value0(),
+            decay_ms=node.value1(),
+            sustain=node.value2(),
+            release_ms=node.value3(),
+          )
+          true
+        }
+        None => false
+      }
     Delay =>
       match slot {
         Value0 =>

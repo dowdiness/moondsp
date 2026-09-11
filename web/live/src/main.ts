@@ -11,6 +11,8 @@ import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { bracketMatching } from "@codemirror/language";
 import { closeBrackets, closeBracketsKeymap, acceptCompletion } from "@codemirror/autocomplete";
 
+import envelopeComparison from "../../../examples/envelope-comparison.mini?raw";
+import roomOfLight from "../../../examples/room-of-light.mini?raw";
 import lightOrbit from "../../../examples/light-orbit.mini?raw";
 
 import { minilive } from "./lang/minilive";
@@ -439,6 +441,8 @@ startBtn.addEventListener("click", async () => {
 
 // Share the score with parser fixtures and acceptance tests.
 (document.getElementById("light-orbit-example") as HTMLButtonElement).dataset.example = lightOrbit;
+(document.getElementById("room-of-light-example") as HTMLButtonElement).dataset.example = roomOfLight;
+(document.getElementById("envelope-compare-example") as HTMLButtonElement).dataset.example = envelopeComparison;
 
 cheatToggle.addEventListener("click", () => {
   const collapsed = workspaceEl.classList.toggle("cheat-collapsed");

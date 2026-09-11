@@ -81,11 +81,24 @@ fn make_synth_pool(
     @moondsp.BoundVoicePool::new(
       @moondsp.CompiledTemplate::analyze(template),
       ctx,
-      @moondsp.ControlBindingBuilder::new().bind(
+      @moondsp.ControlBindingBuilder::new()
+      .bind(
         key="note",
         node_index=0, // oscillator(Value0) frequency placeholder
         slot=@moondsp.GraphParamSlot::Value0,
-      ),
+      )
+      .bind(key="attack", node_index=1, slot=@moondsp.GraphParamSlot::Value0)
+      .bind(
+        key="envelope_decay",
+        node_index=1,
+        slot=@moondsp.GraphParamSlot::Value1,
+      )
+      .bind(
+        key="envelope_sustain",
+        node_index=1,
+        slot=@moondsp.GraphParamSlot::Value2,
+      )
+      .bind(key="release", node_index=1, slot=@moondsp.GraphParamSlot::Value3),
       // 24 voices for chords: a 5-note chord × 4 layers of jux/stereo
       // needs up to 20 voices. Fewer steals → fewer clicks.
       max_voices=24,

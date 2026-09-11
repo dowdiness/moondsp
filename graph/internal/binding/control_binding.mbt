@@ -63,6 +63,7 @@ pub fn ControlBindingBuilder::bind(
 /// detection is tracked as a follow-up.
 pub struct ControlBindingMap {
   priv bindings : Array[ControlBinding]
+  priv defaults : Array[Double]
 } derive(Debug, Eq)
 
 ///|
@@ -81,6 +82,7 @@ pub fn ControlBindingBuilder::build(
   self : ControlBindingBuilder,
   compiled_template : @template.CompiledTemplate,
 ) -> Result[ControlBindingMap, ControlBindingError] {
+  let defaults : Array[Double] = []
   let seen_keys : Map[String, Bool] = {}
   for i in 0..<self.bindings.length() {
     let binding = self.bindings[i]
@@ -108,11 +110,21 @@ pub fn ControlBindingBuilder::build(
       return Err(ControlBindingError::DuplicateKey(binding.key))
     }
     seen_keys[binding.key] = true
+    let node = compiled_template.node_at(binding.node_index)
+    defaults.push(
+      match binding.slot {
+        Value0 => node.value0()
+        Value1 => node.value1()
+        Value2 => node.value2()
+        Value3 => node.value3()
+        DelaySamples => node.delay_samples().to_double()
+      },
+    )
   }
   // WHY copy: self.bindings is a mutable Array shared with the builder.
   // Without copying, post-build bind() calls would mutate the validated map,
   // breaking the proven-valid invariant.
-  Ok({ bindings: self.bindings.copy() })
+  Ok({ bindings: self.bindings.copy(), defaults })
 }
 
 ///|
@@ -140,4 +152,18 @@ pub fn ControlBindingMap::resolve_controls(
     }
   }
   result
+}
+
+///|
+/// Read the default captured when these bindings were validated.
+pub fn ControlBindingMap::default_value(
+  self : ControlBindingMap,
+  key : String,
+) -> Double? {
+  for i in 0..<self.bindings.length() {
+    if self.bindings[i].key == key {
+      return Some(self.defaults[i])
+    }
+  }
+  None
 }

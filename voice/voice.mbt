@@ -388,7 +388,18 @@ pub fn BoundVoicePool::note_on_controls(
   self : BoundVoicePool,
   controls : Map[String, Double],
 ) -> VoiceHandle? {
-  self.pool.note_on(self.bindings.resolve_controls(controls))
+  let resolved = match self.note_gate(controls) {
+    InvalidDuration => return None
+    EventEnd => self.bindings.resolve_controls(controls)
+    AfterSeconds(_) => {
+      // Resolve a private copy so callers can reuse their control map.
+      let held = controls.copy()
+      held["envelope_decay"] = 0.0
+      held["envelope_sustain"] = 1.0
+      self.bindings.resolve_controls(held)
+    }
+  }
+  self.pool.note_on(resolved)
 }
 
 ///|
@@ -1075,4 +1086,45 @@ pub fn VoicePool::process(
   }
   self.last_sanitized_count = @dsp.sanitize_buffer(left_output, sample_count) +
     @dsp.sanitize_buffer(right_output, sample_count)
+}
+
+///|
+/// Gate timing selected by the instrument. Release continues after gate-off.
+pub(all) enum NoteGate {
+  EventEnd
+  AfterSeconds(Double)
+  InvalidDuration
+} derive(Debug, Eq)
+
+///|
+/// Resolve gate timing without starting a voice or changing the input controls.
+/// Attack/release controls use graph milliseconds; hold uses seconds.
+/// Instruments without all four envelope bindings retain their event gate.
+pub fn BoundVoicePool::note_gate(
+  self : BoundVoicePool,
+  controls : Map[String, Double],
+) -> NoteGate {
+  let hold = match controls.get("hold") {
+    Some(seconds) => seconds
+    None => return EventEnd
+  }
+  let default_attack = match self.bindings.default_value("attack") {
+    Some(attack) if self.bindings.default_value("envelope_decay") is Some(_) &&
+      self.bindings.default_value("envelope_sustain") is Some(_) &&
+      self.bindings.default_value("release") is Some(_) => attack
+    _ => return EventEnd
+  }
+  let attack = controls.get("attack").unwrap_or(default_attack) / 1000.0
+  if hold.is_nan() ||
+    hold.is_inf() ||
+    hold < 0.0 ||
+    hold > 86400.0 ||
+    attack.is_nan() ||
+    attack.is_inf() ||
+    attack < 0.0 ||
+    attack + hold > 172800.0 {
+    InvalidDuration
+  } else {
+    AfterSeconds(attack + hold)
+  }
 }

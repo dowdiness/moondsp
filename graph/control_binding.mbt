@@ -156,3 +156,12 @@ pub impl Show for ControlBindingBuilder with fn output(self, logger) {
 pub impl Show for ControlBindingMap with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
+
+///|
+/// Read the default captured when these bindings were validated.
+pub fn ControlBindingMap::default_value(
+  self : ControlBindingMap,
+  key : String,
+) -> Double? {
+  self.raw.default_value(key)
+}

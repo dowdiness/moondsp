@@ -318,3 +318,31 @@ test "build: constant-fed source and Gain bindings remain valid" {
     .unwrap()
   @debug.assert_eq(bindings.length(), 2)
 }
+
+///|
+test "binding defaults belong to each validated template" {
+  let builder = ControlBindingBuilder::new().bind(
+    key="note",
+    node_index=0,
+    slot=GraphParamSlot::Value0,
+  )
+  let original = builder
+    .build(
+      CompiledTemplate::analyze([
+        DspNode::oscillator(Waveform::Sine, 440.0),
+        DspNode::output(0),
+      ]),
+    )
+    .unwrap()
+  let changed = builder
+    .build(
+      CompiledTemplate::analyze([
+        DspNode::oscillator(Waveform::Sine, 880.0),
+        DspNode::output(0),
+      ]),
+    )
+    .unwrap()
+  assert_eq(original.default_value("note"), Some(440.0))
+  assert_eq(changed.default_value("note"), Some(880.0))
+  assert_eq(original.default_value("missing"), None)
+}

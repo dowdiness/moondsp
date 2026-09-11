@@ -12,7 +12,18 @@ fn CompiledGraph::reset_runtime_state(self : CompiledGraph) -> Unit {
   clear_compiled_buffers(self.right_buffers)
   reset_graph_osc_states(self.osc_states)
   reset_graph_noise_states(self.noise_states, self.nodes)
-  reset_graph_env_states(self.env_states)
+  for index in 0..<self.env_states.length() {
+    if self.env_states[index] is Some(env) {
+      let node = self.nodes[index]
+      env.set_parameters(
+        attack_ms=node.value0(),
+        decay_ms=node.value1(),
+        sustain=node.value2(),
+        release_ms=node.value3(),
+      )
+      env.reset()
+    }
+  }
   reset_graph_biquad_states(self.biquad_states)
   reset_graph_biquad_states(self.stereo_biquad_left_states)
   reset_graph_biquad_states(self.stereo_biquad_right_states)

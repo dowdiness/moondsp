@@ -196,21 +196,13 @@ test.describe("UI smoke (no audio)", () => {
     await expect(tooltip).not.toContainText("degradeBy");
   });
 
-  test("cheatsheet advertises dollar stack lines under Layers", async ({ page }) => {
-    // Strudel-style `$:` lines are the discoverable path for combining
-    // s(...) drum patterns with note(...) melodies in one live buffer.
+  test("one syntax reference exposes envelopes, layering, and song structure", async ({ page }) => {
     await page.getByText("Syntax reference", { exact: true }).click();
-    const layersDl = page.locator("#cheat dl").first();
-    await expect(layersDl.locator("dt")).toContainText(["s(", "note(", "chord(", "$:"]);
-  });
-
-  test("cheatsheet explains multiline songs and global BPM", async ({ page }) => {
-    await page.getByText("Syntax reference", { exact: true }).click();
-    const cheat = page.locator("#cheat");
-    await expect(cheat).toContainText('separators like spaces inside s("…") / note("…") / chord("…")');
-    await expect(cheat).toContainText("paste multiline blocks");
-    await expect(cheat).toContainText("Line breaks between section/part calls are OK");
-    await expect(cheat).toContainText("header control sets global tempo; clicking examples may set it");
+    const reference = page.locator("#syntax-reference");
+    await expect(reference.getByText(".attack(s)", { exact: true })).toBeVisible();
+    await expect(reference.getByText(".hold(s)", { exact: true })).toBeVisible();
+    await expect(reference.getByText(".release(s)", { exact: true })).toBeVisible();
+    await expect(reference.locator("dt")).toContainText(["$: a", 'section("a", n, p)', "bpm(n)"]);
   });
 
   test("cheatsheet includes a song-mode example", async ({ page }) => {

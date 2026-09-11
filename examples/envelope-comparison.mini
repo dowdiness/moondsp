@@ -1,0 +1,13 @@
+let short = note("E4").slow(3).attack(0.01).hold(0.1).release(0.2);
+let swell = note("E4").slow(6).attack(1).hold(1).release(3);
+let drift = note("E4").slow(14).attack(2).hold(3).release(8);
+
+song(
+  bpm(60),
+  section("short", 3, short),
+  section("swell", 6, swell),
+  section("drift", 14, drift),
+  part("a", "short"),
+  part("b", "swell"),
+  part("c", "drift")
+)

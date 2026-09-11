@@ -432,14 +432,20 @@
       <aside id="cheat" aria-label="mini-notation cheatsheet">
         <h2>Examples</h2>
         <p class="cheat-note">Replaces your code. Press Play if stopped.</p>
+        <button type="button" class="example" id="envelope-compare-example" data-live-example="envelope-compare" data-mode="song" data-bpm="60">One note, three envelopes</button>
+        <p class="cheat-note">Same E4: short → swell → drift. 23 seconds.</p>
+        <button type="button" class="example" id="room-of-light-example" data-live-example="room-of-light" data-mode="song" data-bpm="112">Room of Light — pop sketch</button>
+        <p class="cheat-note">Short bass, soft chords, and a singing lead. 39 seconds.</p>
+          <button type="button" class="example" data-live-example="envelope" data-bpm="60" data-example='note("E4 G4 D4").slow(21).attack(2).hold(3).release(8)'>Drifting notes — long envelopes</button>
+          <p class="cheat-note">Each note lasts 13 seconds. Try changing release(8).</p>
+        <details>
+          <summary>More examples</summary>
         <button type="button" class="example" data-live-example="entries" data-bpm="60" data-example='let melody = note("E4 G4 A4").slow(3).gain(0.12);&#10;let response = note("D5 A4 G4 E5").slow(4).gain(0.08);&#10;stack(melody, response)'>Independent entries — 3 and 4 cycles</button>
         <p class="cheat-note">Change E4 to F4 and D5 to C5 while playing.</p>
         <button type="button" class="example" data-live-example="tempo" data-mode="song" data-bpm="60" data-example='let melody = note("E4 G4 A4").slow(3).gain(0.12);&#10;let beat = s("bd hh sd hh").slow(4).gain(0.2);&#10;song(&#10;  bpm(60),&#10;  section("opening", 12, melody),&#10;  section("groove", 24, stack(melody, beat)),&#10;  part("first", "opening"),&#10;  part("second", "groove")&#10;)'>Shared melody + live tempo</button>
         <p class="cheat-note">Change bpm(60) to bpm(72) while playing.</p>
         <button type="button" class="example" id="light-orbit-example" data-live-example="light-orbit" data-mode="song" data-bpm="120">Light Orbit — full song, sets BPM 120</button>
         <p class="cheat-note">Edit motif or orbit near the top.</p>
-        <details>
-          <summary>More examples</summary>
         <button type="button" class="example" data-example='let motif = note("E4 G4 A4").slow(3);&#10;let groove = stack(motif, s("bd").gain(0.3));&#10;groove'>Named motif + groove</button>
         <button type="button" class="example" data-mode="song" data-song-example="ode" data-bpm="72" data-example='song(&#10;  section(&#10;    "ode",&#10;    256,&#10;    stack(&#10;      s("bd").slow(4),&#10;      note("64 64 65 67&#10;67 65 64 62&#10;60 60 62 64&#10;64 62 62 62").slow(16)&#10;    )&#10;  ),&#10;  part("ode1", "ode")&#10;)'>song("ode" — multiline melody + kick, sets BPM 72)</button>
         <button type="button" class="example" data-example='chord("C")'>chord("C") — C major triad</button>
@@ -461,105 +467,66 @@
         <h2>While playing</h2>
         <p>Edits take effect at each phrase's next start. <strong>Queued</strong> means waiting for that start. Invalid code keeps the last accepted version.</p>
         <p>Tempo changes work live. For song structure changes, <strong>Stop</strong>, then <strong>Play</strong>.</p>
-        <details>
+        <details id="syntax-reference">
           <summary>Syntax reference</summary>
-        <h2>Layers</h2>
-        <dl>
-          <dt>s("…")</dt><dd>drum sounds</dd>
-          <dt>note("…")</dt><dd>MIDI numbers <em>or</em> note names (e.g. <code>C4</code>, <code>F#3</code>, <code>Bb</code>)</dd>
-          <dt>chord("…")</dt><dd>chord names (e.g. <code>C</code>, <code>Dm</code>, <code>G7</code>, <code>F#m7</code>)</dd>
-          <dt>$: p<br>$: q</dt><dd>combine top-level layers</dd>
-        </dl>
+          <h2>Sounds</h2>
+          <dl>
+            <dt>note("E4 G4")</dt><dd>note names or MIDI numbers</dd>
+            <dt>chord("Am G")</dt><dd>chords</dd>
+            <dt>s("bd hh sd hh")</dt><dd>drums: bd kick, sd snare, hh closed hat, oh open hat, cp clap</dd>
+          </dl>
+          <p class="cheat-note">Notes: <code>C4</code> = MIDI 60. Use <code>#</code> or <code>b</code> for accidentals; octave defaults to 4.</p>
+          <p class="cheat-note">Chords: <code>C</code> major, <code>Cm</code> minor; also <code>7</code>, <code>maj7</code>, <code>m7</code>, <code>dim</code>, <code>aug</code>, <code>sus4</code>, <code>6</code>, <code>add9</code>, <code>maj9</code>, <code>m9</code>.</p>
 
-        <h2>Cycles and tempo</h2>
-        <p>At BPM 60, one cycle lasts one second. <code>.slow(3)</code> spans three cycles. A cycle has no fixed meter.</p>
+          <h2>Sound shape</h2>
+          <dl>
+            <dt>.gain(n)</dt><dd>scale volume</dd>
+            <dt>.pan(n)</dt><dd>left −1, center 0, right 1</dd>
+            <dt>.attack(s)</dt><dd>fade in over s seconds</dd>
+            <dt>.hold(s)</dt><dd>stay at peak volume for s seconds</dd>
+            <dt>.release(s)</dt><dd>fade out over s seconds</dd>
+          </dl>
+          <p class="cheat-note">Envelopes apply to notes and chords. Times are seconds.</p>
+          <p><code>note("E4")<br>&nbsp;&nbsp;.attack(0.01).hold(0.1)<br>&nbsp;&nbsp;.release(0.2)</code></p>
+          <p class="cheat-note">0.31 seconds total, independent of tempo. Omit hold to follow the pattern's note length. Omitted attack/release use the sound's defaults; release starts from the current level.</p>
 
-        <h2>Inside the string</h2>
-        <dl>
-          <dt>a b c</dt><dd>sequence in 1 cycle</dd>
-          <dt>newlines</dt><dd>separators like spaces inside <code>s("…")</code> / <code>note("…")</code> / <code>chord("…")</code></dd>
-          <dt>[a b]</dt><dd>group (subdivide)</dd>
-          <dt>l1, l2</dt><dd>stack layers</dd>
-          <dt>a*4</dt><dd>repeat 4× faster</dd>
-          <dt>a/2</dt><dd>stretch 2× slower</dd>
-          <dt>a?</dt><dd>50% drop (random)</dd>
-          <dt>a(3,8)</dt><dd>Euclidean (3 hits / 8 steps)</dd>
-        </dl>
+          <h2>Rhythm</h2>
+          <p class="cheat-note">BPM sets cycles per minute: at 60, one cycle is one second. A cycle has no fixed meter.</p>
+          <dl>
+            <dt>.fast(n)</dt><dd>n× faster</dd>
+            <dt>.slow(n)</dt><dd>n× slower; explicit envelope seconds stay unchanged</dd>
+            <dt>.rev()</dt><dd>reverse</dd>
+            <dt>.degradeBy(p)</dt><dd>drop events with probability p (0–1)</dd>
+            <dt>.every(n, f)</dt><dd>apply f every nth cycle</dd>
+          </dl>
+          <p class="cheat-note">Inside strings:</p>
+          <dl>
+            <dt>a b c</dt><dd>sequence in one cycle; newlines also separate items</dd>
+            <dt>[a b]</dt><dd>subdivide a step</dd>
+            <dt>a, b</dt><dd>play together</dd>
+            <dt>a*4</dt><dd>repeat 4× faster</dd>
+            <dt>a/2</dt><dd>stretch 2× slower</dd>
+            <dt>a?</dt><dd>50% chance to drop</dd>
+            <dt>a(3,8)</dt><dd>3 hits across 8 steps; a(3,8,1) adds rotation</dd>
+          </dl>
 
-        <h2>Drum names</h2>
-        <ul class="chips">
-          <li><code>bd</code></li>
-          <li><code>sd</code></li>
-          <li><code>hh</code></li>
-          <li><code>oh</code></li>
-          <li><code>cp</code></li>
-        </ul>
+          <h2>Combine patterns</h2>
+          <dl>
+            <dt>let a = p;</dt><dd>name a reusable pattern; define it before use</dd>
+            <dt>stack(a, b)</dt><dd>play patterns together</dd>
+            <dt>$: a<br>$: b</dt><dd>combine top-level layers on separate lines</dd>
+            <dt>.jux(f)</dt><dd>original left, transformed copy right</dd>
+          </dl>
+          <p class="cheat-note"><code>f</code> = <code>fast(n)</code>, <code>slow(n)</code>, or <code>rev</code>. Keep pattern names stable during live edits.</p>
 
-        <h2>Chord qualities</h2>
-        <dl>
-          <dt><code>C</code></dt><dd>major (C E G)</dd>
-          <dt><code>Cm</code></dt><dd>minor (C E♭ G)</dd>
-          <dt><code>C7</code></dt><dd>dominant 7th (C E G B♭)</dd>
-          <dt><code>Cmaj7</code></dt><dd>major 7th (C E G B)</dd>
-          <dt><code>Cm7</code></dt><dd>minor 7th (C E♭ G B♭)</dd>
-          <dt><code>Cdim</code></dt><dd>diminished (C E♭ G♭)</dd>
-          <dt><code>Caug</code></dt><dd>augmented (C E G♯)</dd>
-          <dt><code>Csus4</code></dt><dd>suspended 4th (C F G)</dd>
-          <dt><code>C6</code></dt><dd>major 6th (C E G A)</dd>
-          <dt><code>Cadd9</code></dt><dd>add 9 (C E G D)</dd>
-          <dt><code>Cmaj9</code></dt><dd>major 9th</dd>
-          <dt><code>Cm9</code></dt><dd>minor 9th</dd>
-        </dl>
-        <p class="cheat-note">
-          Append octave: <code>C4</code> = middle C. Default: 4.
-          Accidentals: <code>#</code> <code>b</code> (also <code>s</code> <code>f</code>).
-        </p>
-
-        <h2>Note names</h2>
-        <p class="cheat-note">
-          In <code>note("…")</code> you can use note names instead of raw MIDI numbers:
-        </p>
-        <dl>
-          <dt><code>C4</code></dt><dd>MIDI 60 (middle C)</dd>
-          <dt><code>F#3</code></dt><dd>MIDI 54</dd>
-          <dt><code>Bb5</code></dt><dd>MIDI 82</dd>
-          <dt><code>C</code></dt><dd>no octave → defaults to 4</dd>
-        </dl>
-
-        <h2>Methods</h2>
-        <dl>
-          <dt>.fast(n)</dt><dd>n× faster</dd>
-          <dt>.slow(n)</dt><dd>n× slower</dd>
-          <dt>.gain(n)</dt><dd>scale volume (e.g. 0.2 for a quieter layer)</dd>
-          <dt>.rev()</dt><dd>reverse</dd>
-          <dt>.degradeBy(p)</dt><dd>drop each step with probability p (0–1)</dd>
-          <dt>.every(n, f)</dt><dd>apply f every nth cycle</dd>
-          <dt>.jux(f)</dt><dd>original on the left, f(original) on the right</dd>
-        </dl>
-        <p class="cheat-note">
-          <em>f</em> = <code>fast(k)</code> | <code>slow(k)</code> | <code>rev</code>
-        </p>
-
-        <h2>Named patterns</h2>
-        <p class="cheat-note"><code>let motif = note("E4 G4 A4").slow(3);</code><br>
-          Define patterns before use, ending each definition with a semicolon.
-          Use <code>stack(motif, s("bd"))</code> to group them.
-          Definitions work in both modes and before <code>$:</code> lines.
-          Changing a definition updates its uses at their next entries. Keep names stable when editing. Duplicate names and recursive references are errors.
-        </p>
-
-        <h2>Song mode</h2>
-        <dl>
-          <dt>song(…)</dt><dd>long-form sections; paste multiline blocks</dd>
-          <dt>BPM</dt><dd>header control sets global tempo; clicking examples may set it</dd>
-          <dt>bpm(n)</dt><dd>set tempo inside <code>song(...)</code>; editable while playing</dd>
-          <dt>section</dt><dd><code>section("name", cycles, pattern)</code></dd>
-          <dt>part</dt><dd><code>part("id", "section")</code></dd>
-        </dl>
-        <p class="cheat-note">
-          Line breaks between section/part calls are OK; write or paste full <code>song(...)</code> blocks.
-        </p>
-
+          <h2>Song structure</h2>
+          <dl>
+            <dt>song(…)</dt><dd>sections and their playback order</dd>
+            <dt>section("a", n, p)</dt><dd>name a section lasting n cycles</dd>
+            <dt>part("id", "a")</dt><dd>play section a; use a unique part id</dd>
+            <dt>bpm(n)</dt><dd>tempo inside song(); editable while playing</dd>
+          </dl>
+          <p class="cheat-note">Separate calls with commas; multiline songs are supported. The header BPM control sets global tempo. Examples may set it too.</p>
         </details>
       </aside>
     </main>

@@ -50,7 +50,7 @@ fn Parser::parse_syntax_expr(self : Parser) -> MiniExpr raise ParseError {
   self.skip_whitespace()
   let start = self.pos
   let node = self.parse_syntax_primary()
-  let mut expr = MiniExpr::{ span: { start, end: self.pos, }, node, }
+  let mut expr = MiniExpr::{ span: { start, end: self.pos }, node }
   while true {
     let before_ws = self.pos
     self.skip_whitespace()
@@ -60,7 +60,7 @@ fn Parser::parse_syntax_expr(self : Parser) -> MiniExpr raise ParseError {
     }
     self.pos += 1
     let transform = self.parse_transform()
-    expr = { span: { start, end: self.pos, }, node: Apply(expr, transform), }
+    expr = { span: { start, end: self.pos }, node: Apply(expr, transform) }
   }
   expr
 }
@@ -158,6 +158,18 @@ fn Parser::parse_transform(self : Parser) -> MiniTransform raise ParseError {
     "cutoff" => {
       let cutoff = self.read_method_number_argument()
       Control("cutoff", cutoff)
+    }
+    "attack" | "hold" | "release" => {
+      let seconds = self.read_method_number_argument()
+      if seconds.is_nan() ||
+        seconds.is_inf() ||
+        seconds < 0.0 ||
+        seconds > 86400.0 {
+        raise ParseError(
+          "position \{method_start}: \{name}() expects seconds between 0 and 86400",
+        )
+      }
+      Control(name, seconds)
     }
     "gain" => {
       let gain = self.read_method_number_argument()

@@ -76,6 +76,7 @@ test("editing and recovering from a parse error preserve transport", async ({ pa
 
 test("Light Orbit accepts shared-material edits and reverts through a parse error", async ({ page }) => {
   const score = readFileSync(new URL("../../../examples/light-orbit.mini", import.meta.url), "utf8");
+  await page.getByText("More examples", { exact: true }).click();
   await page.locator("#light-orbit-example").click();
   await expect(page.locator("#mode-song")).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("#global-bpm")).toHaveValue("120");
@@ -109,6 +110,7 @@ test("song content edits continue, and Stop then Play applies a new layout", asy
 });
 
 test("the tempo example can change tempo while playing", async ({ page }) => {
+  await page.getByText("More examples", { exact: true }).click();
   const example = page.locator('[data-live-example="tempo"]');
   const score = (await example.getAttribute("data-example"))!;
   await example.click();
@@ -125,6 +127,7 @@ test("the tempo example can change tempo while playing", async ({ page }) => {
 });
 
 test("the independent entries example accepts the suggested note edits", async ({ page }) => {
+  await page.getByText("More examples", { exact: true }).click();
   const example = page.locator('[data-live-example="entries"]');
   const score = (await example.getAttribute("data-example"))!;
   await example.click();
@@ -183,5 +186,34 @@ for (const { mode, valid, invalid } of [
       await expect(page.locator("#log")).toContainText("Enter code, then press Play");
       await expectStopped(page);
     });
+  });
+}
+
+test("the envelope example accepts edits and rejects negative seconds", async ({ page }) => {
+  const example = page.locator('[data-live-example="envelope"]');
+  const score = (await example.getAttribute("data-example"))!;
+  await example.click();
+  expect(await play(page)).toMatchObject({ type: "pattern-updated", operation: "restart" });
+  expect(await edit(page, score.replace("release(8)", "release(4)")))
+    .toMatchObject({ type: "pattern-updated", operation: "update" });
+  expect(await edit(page, score.replace("attack(2)", "attack(-1)")))
+    .toMatchObject({ type: "pattern-error" });
+  await stop(page);
+});
+
+for (const { name, file, bpm } of [
+  { name: "envelope-compare", file: "envelope-comparison.mini", bpm: "60" },
+  { name: "room-of-light", file: "room-of-light.mini", bpm: "112" },
+]) {
+  test(`the ${name} song is available without opening More examples`, async ({ page }) => {
+    const example = page.locator(`[data-live-example="${name}"]`);
+    await expect(example).toBeVisible();
+    const score = readFileSync(new URL(`../../../examples/${file}`, import.meta.url), "utf8");
+    await expect(example).toHaveAttribute("data-example", score);
+    await example.click();
+    await expect(page.locator("#mode-song")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("#global-bpm")).toHaveValue(bpm);
+    expect(await play(page)).toMatchObject({ type: "song-updated", operation: "restart" });
+    await stop(page);
   });
 }
