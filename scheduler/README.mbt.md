@@ -86,6 +86,13 @@ Control values do not expose mutable storage: `set` and `merge` return new
 values, and `entries` returns an owned copy. Editing an event's exported controls
 cannot change its source pattern or invalidate content comparison.
 
+The browser host validates a continuing tempo change before replacing its
+pending request. Rejection preserves the previous request and receipt. The
+host commits before advancing time or adding notes, so the validation remains
+valid until commit; direct BPM edits preserve the anchor and musical endpoints.
+Reset clears pending requests. Adding another state-mutating path must preserve
+this invariant or introduce an explicit commit result.
+
 `TimeTransform` describes a known Fast, Slow, or Reverse operation. It can apply
 the operation, repeat it with `every`, or create a stereo `jux` expression.
 Its execution and identity are owned together. `select_control` selects events

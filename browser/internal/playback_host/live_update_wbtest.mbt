@@ -271,3 +271,27 @@ test "reverting a routed edit cancels its pending material replacement" {
     assert_false(route.pool.scheduler.has_pending_playback_snapshot())
   }
 }
+
+///|
+test "tempo rejection preserves an accepted request across intervening messages" {
+  assert_true(init_scheduler_graph_for_test())
+  // The gate lasts about 288 samples at 0.001 BPM; its denominator makes
+  // retiming to 1000 BPM exceed the checked conversion range.
+  let body = "section(\"a\",1,note(\"60\").fast(10000019).fast(100000003).slow(100000000)),part(\"r\",\"a\"))"
+  let original = "song(bpm(0.001)," + body
+  assert_eq(submit_for_test(original, song=true), 0)
+  render_for_test(1)
+  assert_true(
+    sched_routes.val.any(route => route.pool.scheduler.active_note_count() > 0),
+  )
+  assert_eq(submit_for_test(original, song=true, restart=false), 0)
+  assert_true(
+    submit_for_test("song(bpm(1000)," + body, song=true, restart=false) != 0,
+  )
+  assert_eq(get_playback_error(), "tempo change exceeds transport range")
+  assert_eq(prepare_for_test("song(", song=true), 0)
+  set_scheduler_bpm(0.002)
+  assert_tempo(0.002)
+  render_for_test(1)
+  assert_tempo(0.001)
+}

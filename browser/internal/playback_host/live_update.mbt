@@ -80,7 +80,7 @@ fn prepare_pattern(
       }) catch {
         _ => return Err("could not prepare pattern update")
       }
-      Ok({ snapshots, layout: PatternLayout, bpm: None, })
+      Ok({ snapshots, layout: PatternLayout, bpm: None })
     }
   }
 }
@@ -155,7 +155,7 @@ fn queue_playback(
   }
   Ok({
     active: state.active,
-    pending: Some({ playback: next, policy, tempo: next.bpm, }),
+    pending: Some({ playback: next, policy, tempo: next.bpm }),
   })
 }
 
@@ -167,7 +167,7 @@ fn restart_current(state : PlaybackState) -> Result[PlaybackState, String] {
     Some(active) =>
       Ok({
         active: state.active,
-        pending: Some({ playback: active, policy: Restart, tempo: None, }),
+        pending: Some({ playback: active, policy: Restart, tempo: None }),
       })
   }
 }
@@ -187,7 +187,7 @@ let prepared_sequence : @ref.Ref[Int] = @ref.new(0)
 
 ///|
 fn reset_playback_state() -> Unit {
-  playback_state.val = { active: None, pending: None, }
+  playback_state.val = { active: None, pending: None }
   prepared_slot.val = None
   playback_input_chars.clear()
 }
@@ -248,6 +248,18 @@ pub fn apply_prepared_playback(token : Int, restart : Bool) -> Int {
       match queue_playback(playback_state.val, prepared, policy) {
         Err(message) => set_scheduler_parse_error(message)
         Ok(next) => {
+          // Admission owns the representability check. Until commit, no public
+          // host operation advances the clock or adds musical note endpoints.
+          // Direct BPM edits preserve those inputs; reset clears this request.
+          if policy is Continue && prepared.bpm is Some(bpm) {
+            for route in sched_routes.val {
+              if route.pool.scheduler.validate_bpm(bpm) is Err(_) {
+                return set_scheduler_parse_error(
+                  "tempo change exceeds transport range",
+                )
+              }
+            }
+          }
           playback_state.val = next
           prepared_slot.val = None
           set_scheduler_parse_success()
@@ -288,24 +300,6 @@ fn commit_playback_request() -> Unit {
   match playback_state.val.pending {
     None => ()
     Some(request) => {
-      if request.tempo is Some(bpm) {
-        if request.policy is Continue {
-          for route in sched_routes.val {
-            if route.pool.scheduler.validate_bpm(bpm) is Err(_) {
-              playback_state.val = {
-                active: playback_state.val.active,
-                pending: None,
-              }
-              ignore(
-                set_scheduler_parse_error(
-                  "tempo change exceeds transport range",
-                ),
-              )
-              return
-            }
-          }
-        }
-      }
       match request.policy {
         Restart =>
           for route in sched_routes.val {
@@ -314,7 +308,12 @@ fn commit_playback_request() -> Unit {
         Continue => ()
       }
       match request.tempo {
-        Some(bpm) => set_scheduler_bpm(bpm)
+        Some(bpm) =>
+          for route in sched_routes.val {
+            // Admission proved this for the unchanged anchor and endpoints.
+            // Restart instead uses a fresh clock with no active notes.
+            route.pool.scheduler.set_bpm(bpm).unwrap()
+          }
         None => ()
       }
       for i in 0..<sched_routes.val.length() {
@@ -322,7 +321,7 @@ fn commit_playback_request() -> Unit {
           request.playback.snapshots[i],
         )
       }
-      playback_state.val = { active: Some(request.playback), pending: None, }
+      playback_state.val = { active: Some(request.playback), pending: None }
     }
   }
 }
