@@ -111,6 +111,11 @@ Additional boundary rules:
 - `scheduler/internal/playback` uses `scheduler/internal/model` to attach complete
   voice origins to entry queries; the retained snapshot supplies provenance
   while entry reconciliation controls audible timing.
+  Prepared materials own their source binding, so reconciliation never pairs
+  content with provenance from a separate pending snapshot. Waiting materials
+  are represented explicitly rather than by synthetic silence. Raw and sourced
+  queries share reservation splitting and lifetime clipping while retaining
+  separate event production; raw queries do not compute unused provenance.
 - `scheduler/internal/voice_runtime` stores complete active-note provenance with
   `scheduler/internal/model` value backing and matches typed scopes before
   applying active-voice effects.

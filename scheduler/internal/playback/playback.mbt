@@ -13,23 +13,6 @@ pub fn PlaybackSourcedEvent::anonymous(
 }
 
 ///|
-fn PlaybackSourcedEvent::from_pattern(
-  event : @pattern.PatternSnapshotEvent[@pattern.ControlMap],
-) -> PlaybackSourcedEvent {
-  {
-    event: event.event(),
-    origin: @model.VoiceOrigin::Pattern(event.pattern_node_path()),
-  }
-}
-
-///|
-fn PlaybackSourcedEvent::from_song(
-  event : @song.SongSnapshotEvent[@pattern.ControlMap],
-) -> PlaybackSourcedEvent {
-  { event: event.event(), origin: @model.VoiceOrigin::Song(event.origin()), }
-}
-
-///|
 pub fn PlaybackSourcedEvent::event(
   self : PlaybackSourcedEvent,
 ) -> @pattern.Event[@pattern.ControlMap] {
@@ -112,24 +95,6 @@ pub fn PlaybackSnapshot::query_events(
 }
 
 ///|
-fn PlaybackSnapshot::query_sourced_events_for_entry(
-  self : PlaybackSnapshot,
-  source_index : Int,
-  arc : @pattern.TimeSpan,
-) -> Array[PlaybackSourcedEvent] {
-  match self {
-    Pattern(snapshot) =>
-      snapshot
-      .query_sourced_events_for_entry(source_index, arc)
-      .map(event => PlaybackSourcedEvent::from_pattern(event))
-    Song(snapshot) =>
-      snapshot
-      .query_sourced_events_for_entry(source_index, arc)
-      .map(event => PlaybackSourcedEvent::from_song(event))
-  }
-}
-
-///|
 /// Internal active/pending playback snapshot queue. Pending commits are explicit
 /// so the scheduler facade can preserve block-boundary commit semantics.
 pub struct PlaybackState {
@@ -158,16 +123,10 @@ pub fn PlaybackState::commit_pending(
 ) -> Unit {
   self.entries = settle_entries(self.entries, now)
   if self.pending is Some(snapshot) {
-    let specs = snapshot.entries()
-    if self.active is None {
-      self.entries = specs.map(spec => {
-        active: spec,
-        origin: spec.start,
-        edit: None,
-        source_snapshot: snapshot,
-      })
+    self.entries = if self.active is None {
+      snapshot.start_entries()
     } else {
-      self.entries = reconcile_entries(self.entries, specs, now, snapshot)
+      snapshot.reconcile_entries(self.entries, now)
     }
     self.active = Some(snapshot)
     self.pending = None
@@ -232,7 +191,7 @@ pub fn PlaybackState::has_active(self : PlaybackState) -> Bool {
 
 ///|
 pub fn PlaybackState::has_pending(self : PlaybackState) -> Bool {
-  self.pending is Some(_) || self.entries.any(entry => entry.edit is Some(_))
+  self.pending is Some(_) || self.entries.any(entry => entry.has_pending())
 }
 
 ///|
@@ -275,79 +234,9 @@ pub fn PlaybackState::query_active_events(
 }
 
 ///|
-fn query_sourced_entry(
-  snapshot : PlaybackSnapshot,
-  spec : EntrySpec,
-  origin : @pattern.Rational,
-  arc : @pattern.TimeSpan,
-) -> Array[PlaybackSourcedEvent] {
-  if spec.silent {
-    return []
-  }
-  let begin = if arc.begin < spec.start { spec.start } else { arc.begin }
-  let end_ = match spec.end_ {
-    Some(end_) if end_ < arc.end_ => end_
-    _ => arc.end_
-  }
-  if begin >= end_ {
-    return []
-  }
-  let delta = origin - spec.start
-  let source_arc = @pattern.TimeSpan::new(begin - delta, end_ - delta)
-  snapshot
-  .query_sourced_events_for_entry(spec.source_index, source_arc)
-  .map(event => { event: event.event().shift(delta), origin: event.origin(), })
-}
-
-///|
 pub fn PlaybackState::query_active_sourced_events(
   self : PlaybackState,
   arc : @pattern.TimeSpan,
 ) -> Array[PlaybackSourcedEvent] {
-  let result : Array[PlaybackSourcedEvent] = []
-  for entry in self.entries {
-    match entry.edit {
-      Some({ due: Some(due), replacement, source_snapshot, }) if due < arc.end_ => {
-        if due > arc.begin {
-          for
-            event in query_sourced_entry(
-              entry.source_snapshot,
-              entry.active,
-              entry.origin,
-              @pattern.TimeSpan::new(arc.begin, due),
-            ) {
-            result.push(event)
-          }
-        }
-        match replacement {
-          None => ()
-          Some(spec) => {
-            let source = source_snapshot.unwrap_or(entry.source_snapshot)
-            let origin = replacement_origin(entry, spec, due)
-            let begin = if due > arc.begin { due } else { arc.begin }
-            for
-              event in query_sourced_entry(
-                source,
-                spec,
-                origin,
-                @pattern.TimeSpan::new(begin, arc.end_),
-              ) {
-              result.push(event)
-            }
-          }
-        }
-      }
-      _ =>
-        for
-          event in query_sourced_entry(
-            entry.source_snapshot,
-            entry.active,
-            entry.origin,
-            arc,
-          ) {
-          result.push(event)
-        }
-    }
-  }
-  result
+  query_sourced_entries(self.entries, arc)
 }

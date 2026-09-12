@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated `PatternDoc`'s incr integration to use the closed monotonic
   `Revision` API while preserving full identity-revision comparison for
   backdating and fingerprint-collision safety.
+- Simplified playback internals with source-bound materials, explicit waiting
+  and transition states, and shared raw/sourced entry traversal. Public
+  interfaces, reserved replacement timing, and event output are unchanged.
 
 ## [0.6.0] - 2026-09-12
 
