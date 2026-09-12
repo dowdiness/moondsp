@@ -282,11 +282,12 @@ test('scheduler probe: Triangle/Sine page and AudioWorklet Float32 PCM match', a
     };
 
     const setPattern = (wasm, text) => {
-      wasm.clear_pattern_input();
+      wasm.clear_playback_input();
       for (let index = 0; index < text.length; index += 1) {
-        wasm.push_pattern_char(text.charCodeAt(index));
+        wasm.push_playback_char(text.charCodeAt(index));
       }
-      return wasm.eval_pattern_input();
+      const token = wasm.prepare_pattern_input();
+      return token === 0 ? 1 : wasm.apply_prepared_playback(token, true);
     };
 
     const emptyPcmSummary = () => ({
