@@ -297,6 +297,7 @@ NEW_MOON_MOD=0 moon test --release
    )
    // No extra add_cell_ids needed — Scope::accepted_memo allocates its own
    // child scope and registers the accepted cell internally. Matches spike.
+   ```
 3. Add `accepted_doc()` method:
    ```moonbit
    pub fn accepted_doc(self) -> PatternDoc[ControlMap]? {
