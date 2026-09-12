@@ -25,15 +25,13 @@ fn make_section(
   length : @pattern.Rational,
   midi : Double,
 ) -> @song.Section[@pattern.ControlMap] {
-  let result = try? @song.Section(
+  @song.Section(
     name~,
     length_cycles=length,
     scope=@song.TimeScope::identity(),
     body=@song.SectionBody::single(@pattern.note(midi)),
-  )
-  match result {
-    Ok(section) => section
-    Err(_) => abort("section creation failed")
+  ) catch {
+    _ => abort("section creation failed")
   }
 }
 
@@ -44,24 +42,20 @@ fn make_scoped_section(
   scope : @song.TimeScope,
   midi : Double,
 ) -> @song.Section[@pattern.ControlMap] {
-  let result = try? @song.Section(
+  @song.Section(
     name~,
     length_cycles=length,
     scope~,
     body=@song.SectionBody::single(@pattern.note(midi)),
-  )
-  match result {
-    Ok(section) => section
-    Err(_) => abort("section creation failed")
+  ) catch {
+    _ => abort("section creation failed")
   }
 }
 
 ///|
 fn fast_scope(n : Int) -> @song.TimeScope {
-  let result = try? @song.TimeScope::fast(factor=@pattern.Rational::from_int(n))
-  match result {
-    Ok(scope) => scope
-    Err(_) => abort("time scope creation failed")
+  @song.TimeScope::fast(factor=@pattern.Rational::from_int(n)) catch {
+    _ => abort("time scope creation failed")
   }
 }
 
@@ -69,19 +63,15 @@ fn fast_scope(n : Int) -> @song.TimeScope {
 fn make_song(
   parts : Array[SongPart[@pattern.ControlMap]],
 ) -> Song[@pattern.ControlMap] {
-  let result = try? Song(parts~)
-  match result {
-    Ok(song) => song
-    Err(_) => abort("song creation failed")
+  Song(parts~) catch {
+    _ => abort("song creation failed")
   }
 }
 
 ///|
 fn occurrence_id(value : String) -> OccurrenceId {
-  let result = try? OccurrenceId::from_string(value)
-  match result {
-    Ok(id) => id
-    Err(_) => abort("occurrence id creation failed")
+  OccurrenceId::from_string(value) catch {
+    _ => abort("occurrence id creation failed")
   }
 }
 
@@ -109,9 +99,10 @@ test "Song constructor computes contiguous duration and occurrences" {
 ///|
 test "Song constructor rejects empty layout" {
   let parts : Array[SongPart[@pattern.ControlMap]] = []
-  let result = try? Song(parts~)
-  match result {
-    Err(SongBuildError::EmptySong) => ()
+  try Song(parts~) catch {
+    SongBuildError::EmptySong => ()
+    _ => assert_true(false)
+  } noraise {
     _ => assert_true(false)
   }
 }
@@ -119,12 +110,15 @@ test "Song constructor rejects empty layout" {
 ///|
 test "Song constructor rejects duplicate occurrence names" {
   let section = make_section("verse", @pattern.Rational::from_int(1), 60.0)
-  let result = try? Song(parts=[
-    SongPart(name="verse1", section~),
-    SongPart(name="verse1", section~),
-  ])
-  match result {
-    Err(SongBuildError::DuplicateOccurrence("verse1")) => ()
+  try
+    Song(parts=[
+      SongPart(name="verse1", section~),
+      SongPart(name="verse1", section~),
+    ])
+  catch {
+    SongBuildError::DuplicateOccurrence("verse1") => ()
+    _ => assert_true(false)
+  } noraise {
     _ => assert_true(false)
   }
 }
@@ -132,9 +126,10 @@ test "Song constructor rejects duplicate occurrence names" {
 ///|
 test "Song constructor rejects occurrence names that cannot seed IDs" {
   let section = make_section("verse", @pattern.Rational::from_int(1), 60.0)
-  let result = try? Song(parts=[SongPart(name="verse one", section~)])
-  match result {
-    Err(SongBuildError::InvalidOccurrenceId("verse one")) => ()
+  try Song(parts=[SongPart(name="verse one", section~)]) catch {
+    SongBuildError::InvalidOccurrenceId("verse one") => ()
+    _ => assert_true(false)
+  } noraise {
     _ => assert_true(false)
   }
 }
@@ -143,12 +138,15 @@ test "Song constructor rejects occurrence names that cannot seed IDs" {
 test "Song constructor rejects duplicate explicit occurrence IDs" {
   let section = make_section("verse", @pattern.Rational::from_int(1), 60.0)
   let id = occurrence_id("verse:shared")
-  let result = try? Song(parts=[
-    SongPart::with_id(id~, name="verse one", section~),
-    SongPart::with_id(id~, name="verse two", section~),
-  ])
-  match result {
-    Err(SongBuildError::DuplicateOccurrenceId("verse:shared")) => ()
+  try
+    Song(parts=[
+      SongPart::with_id(id~, name="verse one", section~),
+      SongPart::with_id(id~, name="verse two", section~),
+    ])
+  catch {
+    SongBuildError::DuplicateOccurrenceId("verse:shared") => ()
+    _ => assert_true(false)
+  } noraise {
     _ => assert_true(false)
   }
 }
@@ -157,10 +155,8 @@ test "Song constructor rejects duplicate explicit occurrence IDs" {
 test "Song::from_sections uses section names as occurrence names" {
   let intro = make_section("intro", @pattern.Rational::from_int(1), 60.0)
   let chorus = make_section("chorus", @pattern.Rational::from_int(1), 64.0)
-  let result = try? Song::from_sections([intro, chorus])
-  let song = match result {
-    Ok(song) => song
-    Err(_) => abort("song creation failed")
+  let song = Song::from_sections([intro, chorus]) catch {
+    _ => abort("song creation failed")
   }
   assert_true(song.duration() == @pattern.Rational::from_int(2))
   assert_true(song.get_occurrence("intro") is Some(_))
@@ -342,10 +338,8 @@ test "Song::fill_gaps inserts sized fill occurrences in uncovered ranges" {
     SongPart(name="a1", section=a),
     SongPart::at(start=@pattern.Rational::from_int(3), name="b1", section=b),
   ])
-  let result = try? song.fill_gaps(prefix="fill", section=fill)
-  let filled = match result {
-    Ok(song) => song
-    Err(_) => abort("expected filled song")
+  let filled = song.fill_gaps(prefix="fill", section=fill) catch {
+    _ => abort("expected filled song")
   }
   @debug.assert_eq(filled.occurrence_count(), 3)
   match filled.get_occurrence("fill:0") {
@@ -393,10 +387,8 @@ test "Song::fill_gaps preserves existing IDs and ignores covered overlap" {
   let gaps = song.gap_spans()
   @debug.assert_eq(gaps.length(), 1)
   assert_true(gaps[0] == span(3L, 1L, 4L, 1L))
-  let result = try? song.fill_gaps(prefix="fill", section=fill)
-  let filled = match result {
-    Ok(song) => song
-    Err(_) => abort("expected filled song")
+  let filled = song.fill_gaps(prefix="fill", section=fill) catch {
+    _ => abort("expected filled song")
   }
   @debug.assert_eq(filled.occurrence_count(), 4)
   assert_true(filled.get_occurrence_by_id(a_id) is Some(_))
@@ -428,10 +420,8 @@ test "Song::fill_gaps preserves authoring order for out-of-order overlaps" {
       section=early,
     ),
   ])
-  let result = try? song.fill_gaps(prefix="fill", section=fill)
-  let filled = match result {
-    Ok(song) => song
-    Err(_) => abort("expected filled song")
+  let filled = song.fill_gaps(prefix="fill", section=fill) catch {
+    _ => abort("expected filled song")
   }
   @debug.assert_eq(filled.occurrence_count(), 2)
   let overlap_hits = filled.occurrences_at(rat(3L, 2L))
@@ -461,9 +451,10 @@ test "Song::fill_gaps rejects generated occurrence name collisions" {
       section=existing_fill,
     ),
   ])
-  let result = try? song.fill_gaps(prefix="fill", section=fill)
-  match result {
-    Err(SongBuildError::DuplicateOccurrence("fill:0")) => ()
+  try song.fill_gaps(prefix="fill", section=fill) catch {
+    SongBuildError::DuplicateOccurrence("fill:0") => ()
+    _ => assert_true(false)
+  } noraise {
     _ => assert_true(false)
   }
 }

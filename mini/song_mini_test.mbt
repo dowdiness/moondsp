@@ -28,10 +28,8 @@ fn song_span(
 
 ///|
 fn song_occurrence_id(value : String) -> @identity.OccurrenceId {
-  let result = try? @identity.OccurrenceId::from_string(value)
-  match result {
-    Ok(id) => id
-    Err(_) => abort("expected valid occurrence id")
+  @identity.OccurrenceId::from_string(value) catch {
+    _ => abort("expected valid occurrence id")
   }
 }
 

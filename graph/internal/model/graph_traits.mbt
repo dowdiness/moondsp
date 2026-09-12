@@ -84,12 +84,12 @@ pub impl NodeEditable for DspNode with fn can_delete(self) -> Bool {
 
 ///|
 pub fn node_signal_shape(node : DspNode) -> Int {
-  node.signal_shape()
+  NodeSpanning::signal_shape(node)
 }
 
 ///|
 pub fn node_is_foldable(node : DspNode) -> Bool {
-  node.is_foldable()
+  NodeFoldable::is_foldable(node)
 }
 
 ///|
@@ -98,20 +98,20 @@ pub fn node_fold_value(
   input0 : Double,
   input1 : Double,
 ) -> Double {
-  node.fold_value(input0, input1)
+  NodeFoldable::fold_value(node, input0, input1)
 }
 
 ///|
 pub fn node_is_stateful(node : DspNode) -> Bool {
-  node.is_stateful()
+  NodeStateful::is_stateful(node)
 }
 
 ///|
 pub fn node_can_insert_after(node : DspNode) -> Bool {
-  node.can_insert_after()
+  NodeEditable::can_insert_after(node)
 }
 
 ///|
 pub fn node_can_delete(node : DspNode) -> Bool {
-  node.can_delete()
+  NodeEditable::can_delete(node)
 }

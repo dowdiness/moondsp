@@ -140,7 +140,7 @@ fn MiniDocBuilder::MiniDocBuilder(
     token_id_by_location: match tokens {
       None => None
       Some(tokens) => {
-        let index : Map[String, String] = {}
+        let index : Map[String, String] = Map([])
         for token in tokens {
           if mini_token_kind_equal(token.kind, Identifier) {
             let suffix = mini_token_identity_occurrence_suffix(token)
@@ -414,10 +414,8 @@ fn MiniDocBuilder::id(
   value : String,
 ) -> @identity.PatternNodeId raise ParseError {
   ignore(self)
-  let result = try? @identity.PatternNodeId::from_string(value)
-  match result {
-    Ok(id) => id
-    Err(_) => raise ParseError("internal mini id was invalid: \{value}")
+  @identity.PatternNodeId::from_string(value) catch {
+    _ => raise ParseError("internal mini id was invalid: \{value}")
   }
 }
 
@@ -494,30 +492,16 @@ fn MiniDocBuilder::reuse_doc(
     None => None
     Some(previous) =>
       if previous.contains_node(id) {
-        let result = try? previous.subdoc(root=id)
-        match result {
-          Ok(doc) => Some(doc)
-          Err(_) =>
+        let doc = previous.subdoc(root=id) catch {
+          _ =>
             raise ParseError(
               "internal mini id could not be reused: \{id.value()}",
             )
         }
+        Some(doc)
       } else {
         None
       }
-  }
-}
-
-///|
-fn unwrap_doc_result(
-  result : Result[
-    @pattern.PatternDoc[@pattern.ControlMap],
-    @pattern.PatternDocError,
-  ],
-) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
-  match result {
-    Ok(doc) => doc
-    Err(_) => raise ParseError("internal mini PatternDoc construction failed")
   }
 }
 
@@ -544,7 +528,10 @@ fn MiniDocBuilder::sequence_doc(
   let id = self.node_id("seq", doc_root_signature(docs))
   match self.reuse_doc(id) {
     Some(doc) => doc
-    None => unwrap_doc_result(try? @pattern.PatternDoc::sequence(id~, docs~))
+    None =>
+      @pattern.PatternDoc::sequence(id~, docs~) catch {
+        _ => raise ParseError("internal mini PatternDoc construction failed")
+      }
   }
 }
 
@@ -559,7 +546,10 @@ fn MiniDocBuilder::stack_doc(
   let id = self.node_id("stack", doc_root_signature(docs))
   match self.reuse_doc(id) {
     Some(doc) => doc
-    None => unwrap_doc_result(try? @pattern.PatternDoc::stack(id~, docs~))
+    None =>
+      @pattern.PatternDoc::stack(id~, docs~) catch {
+        _ => raise ParseError("internal mini PatternDoc construction failed")
+      }
   }
 }
 
@@ -575,7 +565,10 @@ fn MiniDocBuilder::fast_doc(
   )
   match self.reuse_doc(id) {
     Some(doc) => doc
-    None => unwrap_doc_result(try? doc.fast(id~, factor~))
+    None =>
+      doc.fast(id~, factor~) catch {
+        _ => raise ParseError("internal mini PatternDoc construction failed")
+      }
   }
 }
 
@@ -591,7 +584,10 @@ fn MiniDocBuilder::slow_doc(
   )
   match self.reuse_doc(id) {
     Some(doc) => doc
-    None => unwrap_doc_result(try? doc.slow(id~, factor~))
+    None =>
+      doc.slow(id~, factor~) catch {
+        _ => raise ParseError("internal mini PatternDoc construction failed")
+      }
   }
 }
 
@@ -603,7 +599,10 @@ fn MiniDocBuilder::rev_doc(
   let id = self.node_id("rev", doc.root().value())
   match self.reuse_doc(id) {
     Some(doc) => doc
-    None => unwrap_doc_result(try? doc.rev(id~))
+    None =>
+      doc.rev(id~) catch {
+        _ => raise ParseError("internal mini PatternDoc construction failed")
+      }
   }
 }
 
@@ -618,7 +617,10 @@ fn MiniDocBuilder::euclid_doc(
   let id = self.node_id("euclid", "\{doc.root().value()}:\{k}:\{n}:\{rotation}")
   match self.reuse_doc(id) {
     Some(doc) => doc
-    None => unwrap_doc_result(try? doc.euclid(id~, k~, n~, rotation~))
+    None =>
+      doc.euclid(id~, k~, n~, rotation~) catch {
+        _ => raise ParseError("internal mini PatternDoc construction failed")
+      }
   }
 }
 
@@ -632,7 +634,10 @@ fn MiniDocBuilder::degrade_doc(
   let id = self.node_id("degrade", "\{doc.root().value()}:\{p}:\{seed}")
   match self.reuse_doc(id) {
     Some(doc) => doc
-    None => unwrap_doc_result(try? doc.degrade_by(id~, p~, seed~))
+    None =>
+      doc.degrade_by(id~, p~, seed~) catch {
+        _ => raise ParseError("internal mini PatternDoc construction failed")
+      }
   }
 }
 
@@ -650,7 +655,10 @@ fn MiniDocBuilder::every_doc(
   )
   match self.reuse_doc(id) {
     Some(doc) => doc
-    None => unwrap_doc_result(try? doc.every(id~, n~, f=callback.runtime()))
+    None =>
+      doc.every(id~, n~, f=callback.runtime()) catch {
+        _ => raise ParseError("internal mini PatternDoc construction failed")
+      }
   }
 }
 
@@ -664,7 +672,10 @@ fn MiniDocBuilder::jux_doc(
   let id = self.node_id("jux", "\{doc.root().value()}:\{callback_signature}")
   match self.reuse_doc(id) {
     Some(doc) => doc
-    None => unwrap_doc_result(try? doc.jux(id~, f=callback.runtime()))
+    None =>
+      doc.jux(id~, f=callback.runtime()) catch {
+        _ => raise ParseError("internal mini PatternDoc construction failed")
+      }
   }
 }
 
@@ -690,13 +701,9 @@ fn MiniDocBuilder::scalar_control_doc(
   match self.reuse_doc(id) {
     Some(doc) => doc
     None =>
-      unwrap_doc_result(
-        try? @pattern.PatternDoc::merge_control(
-          id~,
-          left=doc,
-          right=control_doc,
-        ),
-      )
+      @pattern.PatternDoc::merge_control(id~, left=doc, right=control_doc) catch {
+        _ => raise ParseError("internal mini PatternDoc construction failed")
+      }
   }
 }
 
@@ -806,11 +813,10 @@ pub fn parse_snapshot(
   match parse_doc(input, previous~) {
     Err(msg) => Err(msg)
     Ok(doc) => {
-      let result = try? doc.lower()
-      match result {
-        Ok(snapshot) => Ok(snapshot)
-        Err(_) => Err("internal mini PatternDoc lowering failed")
+      let snapshot = doc.lower() catch {
+        _ => return Err("internal mini PatternDoc lowering failed")
       }
+      Ok(snapshot)
     }
   }
 }

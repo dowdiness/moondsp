@@ -138,7 +138,7 @@ impl StereoDelaySym for Eval with fn stereo_delay(
 
 ///|
 fn[T : FilterSym] exercise_filter() -> T {
-  T::constant(1.0)
+  @dsp.ArithSym::constant(1.0)
 }
 
 ///|

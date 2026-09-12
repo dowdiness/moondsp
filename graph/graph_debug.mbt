@@ -28,7 +28,8 @@ fn graph_validation_error_from_runtime(
 fn graph_validation_errors_from_runtime(
   errors : Array[@runtime.GraphValidationError],
 ) -> Array[GraphValidationError] {
-  let facade_errors = Array::new(capacity=errors.length())
+  let facade_errors : Array[GraphValidationError] = []
+  facade_errors.reserve_capacity(errors.length())
   for error in errors {
     facade_errors.push(graph_validation_error_from_runtime(error))
   }

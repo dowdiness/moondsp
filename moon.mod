@@ -16,29 +16,3 @@ license = "Apache-2.0"
 keywords = [ "moonbit", "audio" ]
 
 description = "MoonBit DSP audio engine"
-
-options(
-  exclude: [
-    "AGENTS.md",
-    "CLAUDE.md",
-    "TASK_TEMPLATE.md",
-    "playwright-tests/",
-    "playwright.config.js",
-    "playwright-sync-wasm.sh",
-    "playwright-serve.sh",
-    "package.json",
-    "package-lock.json",
-    "serve.sh",
-    "wrangler.jsonc",
-    "scripts/",
-    "specs/",
-    "web/",
-    "docs/moonbit-base.md",
-    "docs/api-design-review-2026-04-21.md",
-    "docs/dsp-structural-editor-vision.md",
-    "docs/dsp-structural-editor-architecture.md",
-    "docs/next-actions.md",
-    "docs/superpowers/",
-    "docs/archive/",
-  ],
-)

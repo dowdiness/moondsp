@@ -9,7 +9,7 @@ fn token_keys(tokens : Array[MiniToken]) -> Array[String] {
 
 ///|
 fn token_key_set(tokens : Array[MiniToken]) -> Map[String, Bool] {
-  let keys : Map[String, Bool] = {}
+  let keys : Map[String, Bool] = Map([])
   for token in tokens {
     keys[token.identity_key] = true
   }

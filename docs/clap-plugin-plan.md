@@ -75,9 +75,9 @@ CLAP shared object exporting `clap_entry`.
 Validation:
 
 ```bash
-moon check --target all
-moon test clap_engine --target native
-moon test clap_host --target native
+NEW_MOON_MOD=0 moon check --target all --deny-warn
+NEW_MOON_MOD=0 moon test clap_engine --target native --deny-warn
+NEW_MOON_MOD=0 moon test clap_host --target native --deny-warn
 scripts/build-clap-prototype.sh
 scripts/build-clap-prototype-windows.sh
 scripts/smoke-clap-prototype.sh

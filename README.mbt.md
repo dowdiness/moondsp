@@ -7,13 +7,15 @@ moondsp combines a Strudel/TidalCycles-inspired pattern algebra with a compiled 
 ## Quick start
 
 ```bash
-moon check && moon test       # type-check + run the full test suite
-moon build --target wasm-gc   # build for browser
-moon run cmd/main             # run CLI entry point
+NEW_MOON_MOD=0 moon check && NEW_MOON_MOD=0 moon test  # type-check + run tests
+NEW_MOON_MOD=0 moon build --target wasm-gc            # build for browser
+NEW_MOON_MOD=0 moon run cmd/main                       # run CLI entry point
 scripts/build-clap-prototype.sh     # build Linux CLAP prototype shared object
 scripts/smoke-clap-prototype.sh     # dlopen/process smoke test for the prototype
 scripts/validate-clap-prototype.sh  # build + run clap-validator for the prototype
 ```
+
+`NEW_MOON_MOD=0` keeps Moon from auto-migrating the repository's hand-maintained `moon.mod`.
 
 To hear it in the browser, open `web/index.html` after building. The AudioWorklet loads the compiled wasm-gc module and drives the DSP graph in real time.
 
@@ -28,11 +30,11 @@ To hear it in the browser, open `web/index.html` after building. The AudioWorkle
 ```moonbit nocheck
 ///|
 fn[T : FilterSym] exit_deliverable() -> T {
-  let lfo = T::oscillator(T::constant(2.0), Waveform::Sine)
+  let lfo = DspSym::oscillator(ArithSym::constant(2.0), Waveform::Sine)
   let freq = range(lfo, 200.0, 400.0)
-  let carrier = T::oscillator(freq, Waveform::Sine)
+  let carrier = DspSym::oscillator(freq, Waveform::Sine)
   let filtered = T::biquad(carrier, BiquadMode::LowPass, 800.0, 1.0)
-  T::output(T::gain(filtered, 0.3))
+  DspSym::output(DspSym::gain(filtered, 0.3))
 }
 ```
 
@@ -119,16 +121,16 @@ over time).
 ## Development
 
 ```bash
-moon check            # type-check
-moon test             # run the full test suite
-moon test -p dowdiness/moondsp  # run integration tests against the facade (root package only)
-moon test -p pattern  # run pattern-engine tests only
-moon info && moon fmt # regenerate interfaces + format (run before committing)
-moon bench --release -p dowdiness/moondsp/graph -f graph_benchmark.mbt  # run performance benchmarks
+NEW_MOON_MOD=0 moon check --target all --deny-warn  # type-check all targets, fail on warnings
+NEW_MOON_MOD=0 moon test --target all --deny-warn   # run all tests on all targets
+NEW_MOON_MOD=0 moon test -p dowdiness/moondsp       # root facade integration tests
+NEW_MOON_MOD=0 moon test -p pattern                  # pattern-engine tests
+NEW_MOON_MOD=0 moon info && NEW_MOON_MOD=0 moon fmt  # regenerate interfaces + format
+NEW_MOON_MOD=0 moon bench --release -p dowdiness/moondsp/graph -f graph_benchmark.mbt
 npm run test:browser  # Playwright browser-integration tests (builds wasm-gc first)
 ```
 
-The project follows an incremental edit rule: run `moon check` after every file edit, fix errors before proceeding.
+The project follows an incremental edit rule: run `NEW_MOON_MOD=0 moon check` after every file edit and fix errors before proceeding.
 
 ## Documentation
 

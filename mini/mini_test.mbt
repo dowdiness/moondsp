@@ -67,24 +67,9 @@ fn unwrap_mini_snapshot(
 }
 
 ///|
-fn unwrap_lowered_snapshot(
-  result : Result[
-    @pattern.PatternSnapshot[@pattern.ControlMap],
-    @pattern.PatternDocError,
-  ],
-) -> @pattern.PatternSnapshot[@pattern.ControlMap] {
-  match result {
-    Ok(snapshot) => snapshot
-    Err(_) => abort("expected lowered pattern snapshot")
-  }
-}
-
-///|
 fn pid(value : String) -> @identity.PatternNodeId {
-  let result = try? @identity.PatternNodeId::from_string(value)
-  match result {
-    Ok(id) => id
-    Err(_) => abort("expected valid pattern node id")
+  @identity.PatternNodeId::from_string(value) catch {
+    _ => abort("expected valid pattern node id")
   }
 }
 
@@ -334,9 +319,9 @@ test "parse_doc_reusing preserves ids across whitespace edits" {
   assert_true(edited.contains_node(pid("mini:sound:bd:0")))
   assert_true(edited.contains_node(pid("mini:sound:sd:0")))
   let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
-  ignore(unwrap_lowered_snapshot(try? doc.lower_with_cache(cache)))
+  ignore(doc.lower_with_cache(cache))
   cache.reset_stats()
-  ignore(unwrap_lowered_snapshot(try? edited.lower_with_cache(cache)))
+  ignore(edited.lower_with_cache(cache))
   inspect(cache.hit_count(), content="1")
   inspect(cache.miss_count(), content="0")
 }
@@ -355,9 +340,9 @@ test "parse_doc_reusing cutoff edit preserves sound atom id" {
     !edited.contains_node(pid("mini:merge_control:mini:sound:bd:0:cutoff:200")),
   )
   let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
-  ignore(unwrap_lowered_snapshot(try? doc.lower_with_cache(cache)))
+  ignore(doc.lower_with_cache(cache))
   cache.reset_stats()
-  let snapshot = unwrap_lowered_snapshot(try? edited.lower_with_cache(cache))
+  let snapshot = edited.lower_with_cache(cache)
   assert_true(cache.hit_count() >= 1)
   let events = snapshot.query(
     @pattern.TimeSpan::new(
@@ -383,12 +368,14 @@ test "parse_doc_reusing gain edit preserves sound atom id" {
   assert_true(
     !edited.contains_node(pid("mini:merge_control:mini:sound:bd:0:gain:1")),
   )
-  let events = unwrap_lowered_snapshot(try? edited.lower()).query(
-    @pattern.TimeSpan::new(
-      @pattern.Rational::from_int(0),
-      @pattern.Rational::from_int(1),
-    ),
-  )
+  let events = edited
+    .lower()
+    .query(
+      @pattern.TimeSpan::new(
+        @pattern.Rational::from_int(0),
+        @pattern.Rational::from_int(1),
+      ),
+    )
   inspect(events.length(), content="1")
   assert_true(events[0].value.get("sound") == Some(36.0))
   assert_true(events[0].value.get("gain") == Some(2.0))
@@ -407,12 +394,14 @@ test "parse_doc_reusing pan edit preserves sound atom id" {
   assert_true(
     !edited.contains_node(pid("mini:merge_control:mini:sound:bd:0:pan:-1")),
   )
-  let events = unwrap_lowered_snapshot(try? edited.lower()).query(
-    @pattern.TimeSpan::new(
-      @pattern.Rational::from_int(0),
-      @pattern.Rational::from_int(1),
-    ),
-  )
+  let events = edited
+    .lower()
+    .query(
+      @pattern.TimeSpan::new(
+        @pattern.Rational::from_int(0),
+        @pattern.Rational::from_int(1),
+      ),
+    )
   inspect(events.length(), content="1")
   assert_true(events[0].value.get("sound") == Some(36.0))
   assert_true(events[0].value.get("pan") == Some(0.0))
@@ -429,9 +418,9 @@ test "parse_doc_reusing token replacement preserves unaffected token ids" {
   assert_true(edited.contains_node(pid("mini:sound:cp:0")))
   assert_true(edited.contains_node(pid("mini:sound:hh:0")))
   let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
-  ignore(unwrap_lowered_snapshot(try? doc.lower_with_cache(cache)))
+  ignore(doc.lower_with_cache(cache))
   cache.reset_stats()
-  let snapshot = unwrap_lowered_snapshot(try? edited.lower_with_cache(cache))
+  let snapshot = edited.lower_with_cache(cache)
   assert_true(cache.hit_count() >= 2)
   assert_true(cache.miss_count() >= 1)
   let events = snapshot.query(
@@ -551,7 +540,7 @@ test "MiniAuthoringPipeline accepted_doc is None before any successful parse" {
   guard pipeline.parse_doc() is Err(_) else {
     abort("expected malformed initial source to fail the first parse")
   }
-  guard pipeline.accepted_doc().is_none() else {
+  guard pipeline.accepted_doc() is None else {
     abort("expected accepted_doc to be None before any successful parse")
   }
   pipeline.dispose()

@@ -161,12 +161,12 @@ test "live edits preserve the sounding envelope" {
   // The release is audible at 0.2s and has finished by the end of the render.
   assert_true(
     uninterrupted[9600:9728]
-    .to_array()
+    .to_owned()
     .any(fn(sample) { sample.abs() > 0.0001 }),
   )
   assert_false(
     uninterrupted[uninterrupted.length() - 128:]
-    .to_array()
+    .to_owned()
     .any(fn(sample) { sample != 0.0 }),
   )
 }

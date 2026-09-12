@@ -33,16 +33,6 @@ fn graph_template_doc_error_from_authoring(
 }
 
 ///|
-fn graph_template_doc_from_authoring_result(
-  result : Result[@authoring.GraphTemplateDoc, @authoring.GraphTemplateDocError],
-) -> GraphTemplateDoc raise GraphTemplateDocError {
-  match result {
-    Ok(raw) => GraphTemplateDoc::from_internal(raw)
-    Err(error) => raise graph_template_doc_error_from_authoring(error)
-  }
-}
-
-///|
 /// Identity-bearing authoring wrapper for graph templates.
 ///
 /// Runtime graph compilation remains index-based. `GraphTemplateDoc` owns the
@@ -81,12 +71,13 @@ pub fn GraphTemplateDoc::from_nodes(
   ids~ : Array[@identity.GraphNodeId],
   nodes~ : Array[DspNode],
 ) -> GraphTemplateDoc raise GraphTemplateDocError {
-  graph_template_doc_from_authoring_result(
-    try? @authoring.GraphTemplateDoc::from_nodes(
-      ids~,
-      nodes=dsp_nodes_to_model(nodes),
-    ),
-  )
+  let raw = @authoring.GraphTemplateDoc::from_nodes(
+    ids~,
+    nodes=dsp_nodes_to_model(nodes),
+  ) catch {
+    error => raise graph_template_doc_error_from_authoring(error)
+  }
+  GraphTemplateDoc::from_internal(raw)
 }
 
 ///|
@@ -182,9 +173,10 @@ pub fn GraphTemplateDoc::replace_node(
   id : @identity.GraphNodeId,
   replacement : DspNode,
 ) -> GraphTemplateDoc raise GraphTemplateDocError {
-  graph_template_doc_from_authoring_result(
-    try? self.raw.replace_node(id, replacement.raw()),
-  )
+  let raw = self.raw.replace_node(id, replacement.raw()) catch {
+    error => raise graph_template_doc_error_from_authoring(error)
+  }
+  GraphTemplateDoc::from_internal(raw)
 }
 
 ///|
@@ -194,9 +186,10 @@ pub fn GraphTemplateDoc::rewire_input(
   input_slot : GraphTopologyInputSlot,
   source_id : @identity.GraphNodeId,
 ) -> GraphTemplateDoc raise GraphTemplateDocError {
-  graph_template_doc_from_authoring_result(
-    try? self.raw.rewire_input(id, input_slot.to_staging(), source_id),
-  )
+  let raw = self.raw.rewire_input(id, input_slot.to_staging(), source_id) catch {
+    error => raise graph_template_doc_error_from_authoring(error)
+  }
+  GraphTemplateDoc::from_internal(raw)
 }
 
 ///|
@@ -207,14 +200,15 @@ pub fn GraphTemplateDoc::insert_node(
   input_slot : GraphTopologyInputSlot,
   inserted_node : DspNode,
 ) -> GraphTemplateDoc raise GraphTemplateDocError {
-  graph_template_doc_from_authoring_result(
-    try? self.raw.insert_node(
-      inserted_id,
-      retarget_id,
-      input_slot.to_staging(),
-      inserted_node.raw(),
-    ),
-  )
+  let raw = self.raw.insert_node(
+    inserted_id,
+    retarget_id,
+    input_slot.to_staging(),
+    inserted_node.raw(),
+  ) catch {
+    error => raise graph_template_doc_error_from_authoring(error)
+  }
+  GraphTemplateDoc::from_internal(raw)
 }
 
 ///|
@@ -225,14 +219,15 @@ pub fn GraphTemplateDoc::insert_chain(
   input_slot : GraphTopologyInputSlot,
   chain_nodes : Array[DspNode],
 ) -> GraphTemplateDoc raise GraphTemplateDocError {
-  graph_template_doc_from_authoring_result(
-    try? self.raw.insert_chain(
-      inserted_ids,
-      retarget_id,
-      input_slot.to_staging(),
-      dsp_nodes_to_model(chain_nodes),
-    ),
-  )
+  let raw = self.raw.insert_chain(
+    inserted_ids,
+    retarget_id,
+    input_slot.to_staging(),
+    dsp_nodes_to_model(chain_nodes),
+  ) catch {
+    error => raise graph_template_doc_error_from_authoring(error)
+  }
+  GraphTemplateDoc::from_internal(raw)
 }
 
 ///|
@@ -243,14 +238,15 @@ pub fn GraphTemplateDoc::delete_node(
   input_slot : GraphTopologyInputSlot,
   replacement_source_id : @identity.GraphNodeId,
 ) -> GraphTemplateDoc raise GraphTemplateDocError {
-  graph_template_doc_from_authoring_result(
-    try? self.raw.delete_node(
-      delete_id,
-      retarget_id,
-      input_slot.to_staging(),
-      replacement_source_id,
-    ),
-  )
+  let raw = self.raw.delete_node(
+    delete_id,
+    retarget_id,
+    input_slot.to_staging(),
+    replacement_source_id,
+  ) catch {
+    error => raise graph_template_doc_error_from_authoring(error)
+  }
+  GraphTemplateDoc::from_internal(raw)
 }
 
 ///|
@@ -262,15 +258,16 @@ pub fn GraphTemplateDoc::delete_chain(
   input_slot : GraphTopologyInputSlot,
   replacement_source_id : @identity.GraphNodeId,
 ) -> GraphTemplateDoc raise GraphTemplateDocError {
-  graph_template_doc_from_authoring_result(
-    try? self.raw.delete_chain(
-      start_id,
-      end_id,
-      retarget_id,
-      input_slot.to_staging(),
-      replacement_source_id,
-    ),
-  )
+  let raw = self.raw.delete_chain(
+    start_id,
+    end_id,
+    retarget_id,
+    input_slot.to_staging(),
+    replacement_source_id,
+  ) catch {
+    error => raise graph_template_doc_error_from_authoring(error)
+  }
+  GraphTemplateDoc::from_internal(raw)
 }
 
 ///|

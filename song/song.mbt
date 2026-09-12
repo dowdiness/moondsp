@@ -150,13 +150,10 @@ fn[A] occurrence_id_for_part(
 ) -> @identity.OccurrenceId raise SongBuildError {
   match part.id {
     Some(id) => id
-    None => {
-      let result = try? @identity.OccurrenceId::from_string(part.name)
-      match result {
-        Ok(id) => id
-        Err(_) => raise InvalidOccurrenceId(part.name)
+    None =>
+      @identity.OccurrenceId::from_string(part.name) catch {
+        _ => raise InvalidOccurrenceId(part.name)
       }
-    }
   }
 }
 
@@ -385,8 +382,8 @@ pub fn[A] Song::Song(
     raise EmptySong
   }
   let occurrences : Array[SectionOccurrence[A]] = []
-  let by_id : Map[String, Int] = {}
-  let by_name : Map[String, Int] = {}
+  let by_id : Map[String, Int] = Map([])
+  let by_name : Map[String, Int] = Map([])
   let mut cursor = @pattern.Rational::from_int(0)
   for part in parts {
     if by_name.contains(part.name) {

@@ -130,7 +130,8 @@ pub fn ControlBindingMap::resolve_controls(
   controls : Map[String, Double],
 ) -> Array[GraphControl] {
   let raw_controls = self.raw.resolve_controls(controls)
-  let result = Array::new(capacity=raw_controls.length())
+  let result : Array[GraphControl] = []
+  result.reserve_capacity(raw_controls.length())
   for control in raw_controls {
     result.push(GraphControl::from_model(control))
   }

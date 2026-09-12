@@ -478,7 +478,7 @@ pub fn CompiledStereoDspTopologyController::apply_controls(
 fn graph_controls_to_model(
   controls : Array[GraphControl],
 ) -> Array[@model.GraphControl] {
-  let raw_controls = Array::new(capacity=controls.length())
+  let raw_controls = Array(capacity=controls.length())
   for control in controls {
     raw_controls.push(control.raw())
   }

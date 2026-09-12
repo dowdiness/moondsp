@@ -454,8 +454,8 @@ fn stereo_compile_plan(
   }
 
   let marks = FixedArray::make(nodes.length(), 0)
-  let order = Array::new()
-  let feedback_edges = Array::new()
+  let order : Array[Int] = []
+  let feedback_edges : Array[(Int, Int, Int)] = []
   visit_graph_node_with_feedback(
     output_index, nodes, marks, order, feedback_edges,
   )
@@ -524,8 +524,8 @@ fn mono_compile_plan(
   }
 
   let marks = FixedArray::make(nodes.length(), 0)
-  let order = Array::new()
-  let feedback_edges = Array::new()
+  let order : Array[Int] = []
+  let feedback_edges : Array[(Int, Int, Int)] = []
   visit_graph_node_with_feedback(
     output_index, nodes, marks, order, feedback_edges,
   )

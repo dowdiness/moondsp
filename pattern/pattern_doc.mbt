@@ -80,7 +80,7 @@ fn[A] PatternDocEntry::snapshot(
 fn[A] copy_pattern_nodes(
   nodes : Map[String, PatternDocEntry[A]],
 ) -> Map[String, PatternDocEntry[A]] {
-  let result : Map[String, PatternDocEntry[A]] = {}
+  let result : Map[String, PatternDocEntry[A]] = Map([])
   nodes.each(fn(id, entry) { result[id] = entry.snapshot() })
   result
 }
@@ -90,7 +90,7 @@ fn[A] singleton_pattern_nodes(
   id : @identity.PatternNodeId,
   node : PatternDocNode[A],
 ) -> Map[String, PatternDocEntry[A]] {
-  let nodes : Map[String, PatternDocEntry[A]] = {}
+  let nodes : Map[String, PatternDocEntry[A]] = Map([])
   nodes[id.value()] = {
     generation: next_pattern_node_generation(),
     revision: @identity.Revision::zero(),
@@ -245,7 +245,7 @@ fn[A] pattern_node_revision(
   nodes : Map[String, PatternDocEntry[A]],
   id : @identity.PatternNodeId,
 ) -> @identity.Revision raise PatternDocError {
-  let memo : Map[String, @identity.Revision] = {}
+  let memo : Map[String, @identity.Revision] = Map([])
   pattern_node_revision_memoized(nodes, id, memo)
 }
 
@@ -463,7 +463,7 @@ fn[A] pattern_source_path_for_opaque_children(
   children : Array[@identity.PatternNodeId],
 ) -> Array[@identity.PatternNodeId] raise PatternDocError {
   let result : Array[@identity.PatternNodeId] = [id]
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   seen[id.value()] = true
   for child in children {
     append_reachable_pattern_source_ids(nodes, child, result, seen)
@@ -1202,7 +1202,7 @@ pub fn[A] PatternDoc::subdoc(
   self : PatternDoc[A],
   root~ : @identity.PatternNodeId,
 ) -> PatternDoc[A] raise PatternDocError {
-  let nodes : Map[String, PatternDocEntry[A]] = {}
+  let nodes : Map[String, PatternDocEntry[A]] = Map([])
   copy_reachable_pattern_nodes(self.nodes, root, nodes)
   { root, revision: pattern_node_revision(nodes, root), nodes, }
 }
@@ -1416,7 +1416,7 @@ pub fn PatternDoc::merge_control(
   right~ : PatternDoc[ControlMap],
 ) -> PatternDoc[ControlMap] raise PatternDocError {
   let docs = [left, right]
-  let nodes : Map[String, PatternDocEntry[ControlMap]] = {}
+  let nodes : Map[String, PatternDocEntry[ControlMap]] = Map([])
   merge_pattern_nodes(nodes, left.nodes)
   merge_pattern_nodes(nodes, right.nodes)
   let revision = aggregate_pattern_revision(docs)
@@ -1437,7 +1437,7 @@ pub fn[A] PatternDoc::sequence(
   if docs.is_empty() {
     raise EmptyPatternDocs
   }
-  let nodes : Map[String, PatternDocEntry[A]] = {}
+  let nodes : Map[String, PatternDocEntry[A]] = Map([])
   for doc in docs {
     merge_pattern_nodes(nodes, doc.nodes)
   }
@@ -1455,7 +1455,7 @@ pub fn[A] PatternDoc::stack(
   if docs.is_empty() {
     raise EmptyPatternDocs
   }
-  let nodes : Map[String, PatternDocEntry[A]] = {}
+  let nodes : Map[String, PatternDocEntry[A]] = Map([])
   for doc in docs {
     merge_pattern_nodes(nodes, doc.nodes)
   }

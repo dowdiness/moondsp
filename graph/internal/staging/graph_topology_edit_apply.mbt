@@ -184,7 +184,8 @@ fn apply_topology_delete_node(
     Ok(_) => ()
     Err(error) => return Err(error)
   }
-  let compacted = Array::new(capacity=nodes.length() - 1)
+  let compacted : Array[DspNode] = []
+  compacted.reserve_capacity(nodes.length() - 1)
   for index in 0..<nodes.length() {
     if index != delete_node_index {
       compacted.push(
@@ -363,7 +364,8 @@ fn apply_topology_delete_chain(
   // Build compacted array excluding all chain nodes, adjusting indices
   // We need to delete nodes from start_node_index to end_node_index inclusive
   let chain_count = end_node_index - start_node_index + 1
-  let compacted = Array::new(capacity=nodes.length() - chain_count)
+  let compacted : Array[DspNode] = []
+  compacted.reserve_capacity(nodes.length() - chain_count)
   for index in 0..<nodes.length() {
     if index < start_node_index || index > end_node_index {
       let node = topology_chain_compacted_node_inputs(

@@ -159,8 +159,8 @@ fn graph_compile_error(
     None => return Some(GraphCompileError::MissingOutput(output_kind))
   }
   let marks = FixedArray::make(nodes.length(), 0)
-  let order = Array::new()
-  let raw_feedback_edges = Array::new()
+  let order : Array[Int] = []
+  let raw_feedback_edges : Array[(Int, Int, Int)] = []
   visit_graph_node_with_feedback(
     output_index, nodes, marks, order, raw_feedback_edges,
   )

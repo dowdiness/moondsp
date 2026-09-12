@@ -107,23 +107,8 @@ fn make_test_sched() -> (
 
 ///|
 fn pid(value : String) -> @identity.PatternNodeId {
-  let result = try? @identity.PatternNodeId::from_string(value)
-  match result {
-    Ok(id) => id
-    Err(_) => abort("expected valid pattern node id")
-  }
-}
-
-///|
-fn unwrap_control_snapshot(
-  result : Result[
-    @pattern.PatternSnapshot[@pattern.ControlMap],
-    @pattern.PatternDocError,
-  ],
-) -> @pattern.PatternSnapshot[@pattern.ControlMap] {
-  match result {
-    Ok(snapshot) => snapshot
-    Err(_) => abort("expected pattern snapshot")
+  @identity.PatternNodeId::from_string(value) catch {
+    _ => abort("expected valid pattern node id")
   }
 }
 
@@ -136,7 +121,9 @@ fn note_snapshot(
     id=pid(id_value),
     pat=@pattern.note(note_value),
   )
-  unwrap_control_snapshot(try? doc.lower())
+  doc.lower() catch {
+    _ => abort("expected pattern snapshot")
+  }
 }
 
 ///|
@@ -146,33 +133,29 @@ fn silence_snapshot(
   let doc : @pattern.PatternDoc[@pattern.ControlMap] = @pattern.PatternDoc::silence(
     id=pid(id_value),
   )
-  unwrap_control_snapshot(try? doc.lower())
+  doc.lower() catch {
+    _ => abort("expected pattern snapshot")
+  }
 }
 
 ///|
 fn oid(value : String) -> @identity.OccurrenceId {
-  let result = try? @identity.OccurrenceId::from_string(value)
-  match result {
-    Ok(id) => id
-    Err(_) => abort("expected valid occurrence id")
+  @identity.OccurrenceId::from_string(value) catch {
+    _ => abort("expected valid occurrence id")
   }
 }
 
 ///|
 fn sid(value : String) -> @identity.SectionId {
-  let result = try? @identity.SectionId::from_string(value)
-  match result {
-    Ok(id) => id
-    Err(_) => abort("expected valid section id")
+  @identity.SectionId::from_string(value) catch {
+    _ => abort("expected valid section id")
   }
 }
 
 ///|
 fn lid(value : String) -> @identity.SectionLayerId {
-  let result = try? @identity.SectionLayerId::from_string(value)
-  match result {
-    Ok(id) => id
-    Err(_) => abort("expected valid section layer id")
+  @identity.SectionLayerId::from_string(value) catch {
+    _ => abort("expected valid section layer id")
   }
 }
 
@@ -182,17 +165,15 @@ fn scheduler_section_doc(
   name : String,
   midi : Double,
 ) -> @song.SectionDoc[@pattern.ControlMap] {
-  let result = try? @song.SectionDoc::single(
+  @song.SectionDoc::single(
     id=sid(id_value),
     name~,
     length_cycles=@pattern.Rational::from_int(1),
     scope=@song.TimeScope::identity(),
     layer_id=lid("\{id_value}:main"),
     body=@pattern.note(midi),
-  )
-  match result {
-    Ok(section) => section
-    Err(_) => abort("expected section doc")
+  ) catch {
+    _ => abort("expected section doc")
   }
 }
 
@@ -200,20 +181,8 @@ fn scheduler_section_doc(
 fn scheduler_song_doc(
   occurrences : Array[@song.SongOccurrenceDoc[@pattern.ControlMap]],
 ) -> @song.SongDoc[@pattern.ControlMap] {
-  let result = try? @song.SongDoc(parts=occurrences)
-  match result {
-    Ok(doc) => doc
-    Err(_) => abort("expected song doc")
-  }
-}
-
-///|
-fn unwrap_song_snapshot(
-  result : Result[@song.SongSnapshot[@pattern.ControlMap], @song.SongBuildError],
-) -> @song.SongSnapshot[@pattern.ControlMap] {
-  match result {
-    Ok(snapshot) => snapshot
-    Err(_) => abort("expected song snapshot")
+  @song.SongDoc(parts=occurrences) catch {
+    _ => abort("expected song doc")
   }
 }
 
@@ -221,7 +190,9 @@ fn unwrap_song_snapshot(
 fn song_snapshot(
   doc : @song.SongDoc[@pattern.ControlMap],
 ) -> @song.SongSnapshot[@pattern.ControlMap] {
-  unwrap_song_snapshot(try? doc.lower())
+  doc.lower() catch {
+    _ => abort("expected song snapshot")
+  }
 }
 
 ///|
@@ -404,17 +375,11 @@ test "PlaybackSnapshot::query_playback_events tags pattern root provenance" {
 ///|
 test "PlaybackSnapshot::query_playback_events tags pattern sub-node path" {
   let (pool, sched, _, _) = make_test_sched()
-  let doc_result = try? @pattern.PatternDoc::from_pattern(
+  let doc = @pattern.PatternDoc::from_pattern(
     id=pid("playback-events:leaf"),
     pat=@pattern.note(60.0),
   ).fast(id=pid("playback-events:fast"), factor=@pattern.Rational::from_int(2))
-  let doc = match doc_result {
-    Ok(doc) => doc
-    Err(_) => abort("expected pattern doc")
-  }
-  let snapshot = @scheduler.PlaybackSnapshot::pattern(
-    unwrap_control_snapshot(try? doc.lower()),
-  )
+  let snapshot = @scheduler.PlaybackSnapshot::pattern(doc.lower())
   let arc = @pattern.TimeSpan::new(
     @pattern.Rational::from_int(0),
     @pattern.Rational::new(1L, 100L),
@@ -493,7 +458,7 @@ test "PlaybackSnapshot::query_playback_events tags song layer provenance" {
   let section_id = sid("section:playback-events-layered")
   let lead_id = lid("layer:playback-events-lead")
   let pad_id = lid("layer:playback-events-pad")
-  let section_result = try? @song.SectionDoc::SectionDoc(
+  let section = @song.SectionDoc::SectionDoc(
     id=section_id,
     name="Layered",
     length_cycles=@pattern.Rational::from_int(1),
@@ -503,10 +468,6 @@ test "PlaybackSnapshot::query_playback_events tags song layer provenance" {
       @song.SectionLayerDoc(id=pad_id, name="Pad", body=@pattern.note(67.0)),
     ]),
   )
-  let section = match section_result {
-    Ok(section) => section
-    Err(_) => abort("expected layered section doc")
-  }
   let doc = scheduler_song_doc([
     @song.SongOccurrenceDoc(id=occurrence_id, name="Layered", section~),
   ])
@@ -843,17 +804,11 @@ test "affected voice policy gates only matching pattern-node active notes" {
 ///|
 test "affected voice policy kills matching pattern leaf and ancestor notes" {
   let (pool, sched, _, _) = make_test_sched()
-  let doc_result = try? @pattern.PatternDoc::from_pattern(
+  let doc = @pattern.PatternDoc::from_pattern(
     id=pid("kill:leaf"),
     pat=@pattern.note(60.0),
   ).fast(id=pid("kill:fast"), factor=@pattern.Rational::from_int(2))
-  let doc = match doc_result {
-    Ok(doc) => doc
-    Err(_) => abort("expected pattern doc")
-  }
-  let snapshot = @scheduler.PlaybackSnapshot::pattern(
-    unwrap_control_snapshot(try? doc.lower()),
-  )
+  let snapshot = @scheduler.PlaybackSnapshot::pattern(doc.lower())
   let arc = @pattern.TimeSpan::new(
     @pattern.Rational::from_int(0),
     @pattern.Rational::new(1L, 100L),
@@ -884,26 +839,14 @@ test "affected voice policy kills matching pattern leaf and ancestor notes" {
 ///|
 test "affected voice policy kills callback subtree pattern notes" {
   let (pool, sched, _, _) = make_test_sched()
-  let child_result = try? @pattern.PatternDoc::from_pattern(
+  let child = @pattern.PatternDoc::from_pattern(
     id=pid("kill:callback-leaf"),
     pat=@pattern.note(60.0),
   ).fast(id=pid("kill:callback-child"), factor=@pattern.Rational::from_int(2))
-  let child = match child_result {
-    Ok(doc) => doc
-    Err(_) => abort("expected callback child doc")
-  }
-  let doc_result = try? child.every(id=pid("kill:callback-every"), n=1, f=fn(
-    p,
-  ) {
+  let doc = child.every(id=pid("kill:callback-every"), n=1, f=fn(p) {
     p.fast(@pattern.Rational::from_int(2))
   })
-  let doc = match doc_result {
-    Ok(doc) => doc
-    Err(_) => abort("expected callback doc")
-  }
-  let snapshot = @scheduler.PlaybackSnapshot::pattern(
-    unwrap_control_snapshot(try? doc.lower()),
-  )
+  let snapshot = @scheduler.PlaybackSnapshot::pattern(doc.lower())
   let arc = @pattern.TimeSpan::new(
     @pattern.Rational::from_int(0),
     @pattern.Rational::new(1L, 100L),
@@ -1854,22 +1797,11 @@ test "process_song_snapshot_block: same-layout song edit commits without layout 
   ])
   sched.queue_song_snapshot(song_snapshot(doc))
   sched.process_song_snapshot_block(pool, left, right)
-  let edited_section_result = try? section.replace_layer_body(
+  let edited_section = section.replace_layer_body(
     layer_id,
     body=@pattern.note(62.0),
   )
-  let edited_section = match edited_section_result {
-    Ok(section) => section
-    Err(_) => abort("expected section body edit")
-  }
-  let edited_result = try? doc.replace_occurrence_section(
-    main_id,
-    section=edited_section,
-  )
-  let edited = match edited_result {
-    Ok(doc) => doc
-    Err(_) => abort("expected song body edit")
-  }
+  let edited = doc.replace_occurrence_section(main_id, section=edited_section)
   assert_true(edited.revision() != doc.revision())
   assert_true(edited.layout_revision() == doc.layout_revision())
   sched.queue_song_snapshot(song_snapshot(edited))
@@ -1897,14 +1829,10 @@ test "process_song_snapshot_block: layout edit does not backfill past onsets" {
   sched.queue_song_snapshot(song_snapshot(doc))
   sched.process_song_snapshot_block(pool, left, right)
   @debug.assert_eq(pool.active_voice_count(), 0)
-  let edited_result = try? doc.set_occurrence_start(
+  let edited = doc.set_occurrence_start(
     main_id,
     start=@pattern.Rational::from_int(0),
   )
-  let edited = match edited_result {
-    Ok(doc) => doc
-    Err(_) => abort("expected layout edit")
-  }
   assert_true(edited.layout_revision() != doc.layout_revision())
   sched.queue_song_snapshot(song_snapshot(edited))
   sched.process_song_snapshot_block(pool, left, right)
@@ -1928,14 +1856,10 @@ test "process_song_snapshot_block: layout replacement lets active note ring" {
   sched.process_song_snapshot_block(pool, left, right)
   @debug.assert_eq(pool.active_voice_count(), 1)
   @debug.assert_eq(sched.active_note_count(), 1)
-  let edited_result = try? doc.set_occurrence_start(
+  let edited = doc.set_occurrence_start(
     main_id,
     start=@pattern.Rational::from_int(2),
   )
-  let edited = match edited_result {
-    Ok(doc) => doc
-    Err(_) => abort("expected layout edit")
-  }
   sched.queue_song_snapshot(song_snapshot(edited))
   sched.process_song_snapshot_block(pool, left, right)
   assert_true(
@@ -1953,14 +1877,10 @@ test "process_song_snapshot_block: multiple pending song snapshots keep the late
   let first = scheduler_song_doc([
     @song.SongOccurrenceDoc(id=main_id, name="Main", section~),
   ])
-  let latest_result = try? first.set_occurrence_start(
+  let latest = first.set_occurrence_start(
     main_id,
     start=@pattern.Rational::from_int(2),
   )
-  let latest = match latest_result {
-    Ok(doc) => doc
-    Err(_) => abort("expected layout edit")
-  }
   sched.queue_song_snapshot(song_snapshot(first))
   sched.queue_song_snapshot(song_snapshot(latest))
   sched.process_song_snapshot_block(pool, left, right)
@@ -2042,11 +1962,7 @@ test "process_song_block: one-section song matches section scheduling" {
   let (song_pool, song_sched, song_left, song_right) = make_test_sched()
   let pat = @pattern.note(60.0)
   let section = @song.Section::from_pattern(name="main", body=pat)
-  let result = try? @song.Song(parts=[@song.SongPart(name="main", section~)])
-  let song = match result {
-    Ok(song) => song
-    Err(_) => abort("song creation failed")
-  }
+  let song = @song.Song(parts=[@song.SongPart(name="main", section~)])
   section_sched.process_section_block(
     section, section_pool, section_left, section_right,
   )

@@ -285,17 +285,29 @@ test "graph facade node slot and trait behavior delegates to internal model" {
         @model.node_accepts_slot(node.raw(), raw_slot),
       )
     }
-    @debug.assert_eq(node.signal_shape(), @model.node_signal_shape(node.raw()))
-    @debug.assert_eq(node.is_foldable(), @model.node_is_foldable(node.raw()))
     @debug.assert_eq(
-      node.fold_value(2.0, 3.0),
+      NodeSpanning::signal_shape(node),
+      @model.node_signal_shape(node.raw()),
+    )
+    @debug.assert_eq(
+      NodeFoldable::is_foldable(node),
+      @model.node_is_foldable(node.raw()),
+    )
+    @debug.assert_eq(
+      NodeFoldable::fold_value(node, 2.0, 3.0),
       @model.node_fold_value(node.raw(), 2.0, 3.0),
     )
-    @debug.assert_eq(node.is_stateful(), @model.node_is_stateful(node.raw()))
     @debug.assert_eq(
-      node.can_insert_after(),
+      NodeStateful::is_stateful(node),
+      @model.node_is_stateful(node.raw()),
+    )
+    @debug.assert_eq(
+      NodeEditable::can_insert_after(node),
       @model.node_can_insert_after(node.raw()),
     )
-    @debug.assert_eq(node.can_delete(), @model.node_can_delete(node.raw()))
+    @debug.assert_eq(
+      NodeEditable::can_delete(node),
+      @model.node_can_delete(node.raw()),
+    )
   }
 }

@@ -162,9 +162,9 @@ fn bjorklund(k : Int, n : Int) -> Array[Bool] {
     }
     let new_front = Array::makei(pairs, i => front[i] + back[i])
     let new_back = if front.length() > pairs {
-      front[pairs:].to_array()
+      front[pairs:].to_owned()
     } else {
-      back[pairs:].to_array()
+      back[pairs:].to_owned()
     }
     front = new_front
     back = new_back
@@ -242,7 +242,9 @@ pub fn[A] Pat::degrade_by(
   let inner = self
   {
     period: self.period,
-    members: self.members.map(member => member.degrade_by(p, seed~)),
+    members: self.members.map(pattern_member => {
+      pattern_member.degrade_by(p, seed~)
+    }),
     entry_key: self.entry_key,
     signature: transformed_signature(self.signature, "degrade:\{prob}:\{seed}"),
     query: fn(arc) {

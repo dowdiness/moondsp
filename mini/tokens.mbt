@@ -248,11 +248,11 @@ fn mini_realign_token_identities_with_span(
   new_tokens : Array[MiniToken],
   span : MiniTokenEditSpan,
 ) -> Array[MiniToken] {
-  let used : Map[String, Bool] = {}
+  let used : Map[String, Bool] = Map([])
   for index in 0..<old_tokens.length() {
     mini_mark_old_identity(used, old_tokens, index)
   }
-  let counters : Map[String, Int] = {}
+  let counters : Map[String, Int] = Map([])
   let aligned : Array[MiniToken] = []
   for index in 0..<new_tokens.length() {
     let identity_key = if index < span.old_start && index < span.new_start {
@@ -357,7 +357,7 @@ fn mini_token_kind_for_single(c : UInt16) -> MiniTokenKind {
 
 ///|
 fn tokenize_mini_authoring_source(input : String) -> Array[MiniToken] {
-  let counters : Map[String, Int] = {}
+  let counters : Map[String, Int] = Map([])
   let tokens : Array[MiniToken] = []
   let mut pos = 0
   while pos < input.length() {
