@@ -16,6 +16,13 @@ test WASM only and delegates to the same `browser/internal/demo_templates` and
 template builder accepts a waveform, while the production wrapper continues to
 pass Triangle.
 
+The diagnostic branch is ported to main's prepared-playback API:
+`clear_playback_input` / `push_playback_char` → `prepare_pattern_input` →
+`apply_prepared_playback(token, true)`. It retains main's production transport,
+snapshot-entry reconciliation, and shared-send rendering. On the ported branch,
+all four scheduler/crackle Playwright scenarios pass in Linux headless Chromium;
+this does not establish affected-Windows real-time playback quality.
+
 ## Automated matrix
 
 The Playwright probe renders each pattern independently in two instances of the
