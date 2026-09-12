@@ -19,43 +19,43 @@ through a sibling `canopy` checkout under `github.com/dowdiness/`:
 
 | Dep | Path (from `specs/loom-mini-cst/`) | Resolves to |
 |-----|-------------------------------------|-------------|
-| `dowdiness/diagnostic` | `../../../canopy/deps/loom/diagnostic` | `github.com/dowdiness/canopy/deps/loom/diagnostic` |
 | `dowdiness/loom` | `../../../canopy/deps/loom/loom` | `github.com/dowdiness/canopy/deps/loom/loom` |
 | `dowdiness/seam` | `../../../canopy/deps/loom/seam` | `…/canopy/deps/loom/seam` |
 | `dowdiness/pretty` | `../../../canopy/deps/loom/pretty` | `…/canopy/deps/loom/pretty` |
 | `dowdiness/incr` | `../../../canopy/deps/loom/incr/incr` | `…/canopy/deps/loom/incr/incr` |
-| `dowdiness/moji` | `../../../canopy/deps/loom/moji` | `…/canopy/deps/loom/moji` |
 | `dowdiness/text_change` | `../../../canopy/deps/loom/text-change` | `…/canopy/deps/loom/text-change` |
 | `dowdiness/moondsp` | `../..` | this repo |
 
-The seven `loom` dependencies live in the sibling `canopy` checkout under
-`deps/loom/`; they remain local path dependencies and are not published inputs
-to this spike.
+The five direct `loom` dependencies live in the sibling `canopy` checkout
+under `deps/loom/`; they remain local path dependencies and are not published
+inputs to this spike.
 
 ### 2. Current local dependency state
 
 The sibling `canopy/deps/loom/incr/incr` module is `0.15.1` and includes incr
 #233's diamond-dependency fix (`518305d`). The spike source still targets older
 Loom parser and incr APIs, so it does not compile against the current sibling
-checkout. The 2026-09-12 smoke check reached source compilation and reported
-the expected independent drift: Loom's new `SourceId` / parser-context
-contracts plus the removed incr `Signal`, `Memo`, and `Observer` APIs.
+checkout.
+
+A standalone `moon check` from this directory stops during dependency
+resolution: current Loom modules obtain additional local modules through
+Canopy's workspace. The 2026-09-12 investigation used a temporary cross-repo
+workspace containing this spike, `moondsp`, and the Canopy Loom modules to
+reach source compilation. Source compilation then reported the expected
+independent drift: Loom's new `SourceId` / parser-context contracts plus the
+removed incr `Signal`, `Memo`, and `Observer` APIs.
 
 Issue #226 keeps this spike on local path dependencies; it does not promote or
 migrate the non-production Loom parser. That broader work remains under #184
 and #185.
 
-### 3. `moon clean` after switching incr branches
+### 3. Smoke-check status
 
-After changing sibling checkouts, clean and rebuild this spike to measure its
-current drift. Keep `NEW_MOON_MOD=0` because this local-path fixture
-intentionally retains its legacy `moon.mod.json`.
-
-```bash
-# from specs/loom-mini-cst/
-NEW_MOON_MOD=0 moon clean
-NEW_MOON_MOD=0 moon check
-```
+There is currently no supported standalone smoke command for this fixture.
+Do not treat `NEW_MOON_MOD=0 moon check` from this directory as a
+source-compatibility check: it fails at dependency resolution before checking
+the spike source. A reproducible workspace-backed smoke command remains part
+of the rot-prevention work tracked by #185.
 
 ## Why this isn't in CI
 
