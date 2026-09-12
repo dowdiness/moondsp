@@ -247,32 +247,49 @@ pub fn[
   for i = 0; i < len; i = i + 1 {
     let node = nodes[i]
     let value : T? = match node.kind() {
-      Constant => Some(T::constant(node.value0()))
+      Constant => Some(@dsp.ArithSym::constant(node.value0()))
       Oscillator =>
         if node.input0() >= 0 {
           match replay_get_result(results, node.input0()) {
-            Some(v) => Some(T::oscillator(v, node.waveform()))
+            Some(v) => Some(@dsp.DspSym::oscillator(v, node.waveform()))
             None => None
           }
         } else {
-          Some(T::oscillator(T::constant(node.value0()), node.waveform()))
+          Some(
+            @dsp.DspSym::oscillator(
+              @dsp.ArithSym::constant(node.value0()),
+              node.waveform(),
+            ),
+          )
         }
-      Noise => Some(T::noise(node.seed()))
+      Noise => Some(@dsp.DspSym::noise(node.seed()))
       Adsr =>
         Some(
-          T::adsr(node.value0(), node.value1(), node.value2(), node.value3()),
+          @dsp.DspSym::adsr(
+            node.value0(),
+            node.value1(),
+            node.value2(),
+            node.value3(),
+          ),
         )
       Biquad =>
         match replay_get_result(results, node.input0()) {
           Some(v) =>
-            Some(T::biquad(v, node.filter_mode(), node.value0(), node.value1()))
+            Some(
+              @dsp.FilterSym::biquad(
+                v,
+                node.filter_mode(),
+                node.value0(),
+                node.value1(),
+              ),
+            )
           None => None
         }
       Delay =>
         match replay_get_result(results, node.input0()) {
           Some(v) =>
             Some(
-              T::delay(
+              @dsp.DelaySym::delay(
                 v,
                 node.delay_max_samples(),
                 node.delay_samples(),
@@ -283,7 +300,7 @@ pub fn[
         }
       Gain =>
         match replay_get_result(results, node.input0()) {
-          Some(v) => Some(T::gain(v, node.value0()))
+          Some(v) => Some(@dsp.DspSym::gain(v, node.value0()))
           None => None
         }
       Mul =>
@@ -292,7 +309,7 @@ pub fn[
             replay_get_result(results, node.input0()),
             replay_get_result(results, node.input1()),
           ) {
-          (Some(a), Some(b)) => Some(T::mul(a, b))
+          (Some(a), Some(b)) => Some(@dsp.ArithSym::mul(a, b))
           _ => None
         }
       Mix =>
@@ -301,39 +318,39 @@ pub fn[
             replay_get_result(results, node.input0()),
             replay_get_result(results, node.input1()),
           ) {
-          (Some(a), Some(b)) => Some(T::mix(a, b))
+          (Some(a), Some(b)) => Some(@dsp.ArithSym::mix(a, b))
           _ => None
         }
       Clip =>
         match replay_get_result(results, node.input0()) {
-          Some(v) => Some(T::clip(v, node.value0()))
+          Some(v) => Some(@dsp.ArithSym::clip(v, node.value0()))
           None => None
         }
       Output =>
         match replay_get_result(results, node.input0()) {
-          Some(v) => Some(T::output(v))
+          Some(v) => Some(@dsp.DspSym::output(v))
           None => None
         }
       Pan =>
         match replay_get_result(results, node.input0()) {
-          Some(v) => Some(T::pan(v, node.value0()))
+          Some(v) => Some(@dsp.StereoSym::pan(v, node.value0()))
           None => None
         }
       StereoGain =>
         match replay_get_result(results, node.input0()) {
-          Some(v) => Some(T::stereo_gain(v, node.value0()))
+          Some(v) => Some(@dsp.StereoSym::stereo_gain(v, node.value0()))
           None => None
         }
       StereoClip =>
         match replay_get_result(results, node.input0()) {
-          Some(v) => Some(T::stereo_clip(v, node.value0()))
+          Some(v) => Some(@dsp.StereoSym::stereo_clip(v, node.value0()))
           None => None
         }
       StereoBiquad =>
         match replay_get_result(results, node.input0()) {
           Some(v) =>
             Some(
-              T::stereo_biquad(
+              @dsp.StereoFilterSym::stereo_biquad(
                 v,
                 node.filter_mode(),
                 node.value0(),
@@ -346,7 +363,7 @@ pub fn[
         match replay_get_result(results, node.input0()) {
           Some(v) =>
             Some(
-              T::stereo_delay(
+              @dsp.StereoDelaySym::stereo_delay(
                 v,
                 node.delay_max_samples(),
                 node.delay_samples(),
@@ -357,12 +374,12 @@ pub fn[
         }
       StereoMixDown =>
         match replay_get_result(results, node.input0()) {
-          Some(v) => Some(T::stereo_mixdown(v))
+          Some(v) => Some(@dsp.StereoSym::stereo_mixdown(v))
           None => None
         }
       StereoOutput =>
         match replay_get_result(results, node.input0()) {
-          Some(v) => Some(T::stereo_output(v))
+          Some(v) => Some(@dsp.StereoSym::stereo_output(v))
           None => None
         }
     }

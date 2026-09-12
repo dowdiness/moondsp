@@ -34,7 +34,7 @@ pub struct GraphIndexMap {
 
 ///|
 fn copy_retired_graph_ids(source : Map[String, Bool]) -> Map[String, Bool] {
-  let result : Map[String, Bool] = {}
+  let result : Map[String, Bool] = Map([])
   source.each(fn(id, retired) { result[id] = retired })
   result
 }
@@ -60,7 +60,7 @@ fn validate_graph_template_ids(
   if ids.length() != expected_length {
     raise LengthMismatch(ids.length(), expected_length)
   }
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   for id in ids {
     let key = id.value()
     if seen.contains(key) {
@@ -91,7 +91,7 @@ fn validate_new_graph_ids(
   retired_ids : Map[String, Bool],
   ids : Array[@identity.GraphNodeId],
 ) -> Unit raise GraphTemplateDocError {
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   for id in ids {
     let key = id.value()
     if seen.contains(key) {
@@ -227,7 +227,7 @@ pub fn GraphTemplateDoc::contains_retired_node(
 
 ///|
 pub fn GraphTemplateDoc::index_map(self : GraphTemplateDoc) -> GraphIndexMap {
-  let indices : Map[String, Int] = {}
+  let indices : Map[String, Int] = Map([])
   for index in 0..<self.ids.length() {
     indices[self.ids[index].value()] = index
   }

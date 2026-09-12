@@ -153,7 +153,7 @@ pub fn init_scheduler_sine_graph(
 
 ///|
 fn scheduler_probe_input_chars_to_string(chars : Array[Int]) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for c in chars {
     buf.write_char(c.unsafe_to_char())
   }

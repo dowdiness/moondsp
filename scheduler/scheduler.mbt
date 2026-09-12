@@ -192,7 +192,7 @@ fn PatternScheduler::process_single_event(
         // reuse event arrays across calls. Building a fresh map avoids
         // mutating the original ControlMap. The ControlMapper transforms
         // values (e.g. MIDI→Hz) and extracts per-voice actions (e.g. pan).
-        let map : Map[String, Double] = {}
+        let map : Map[String, Double] = Map([])
         let actions : Array[VoiceAction] = []
         let mapper = self.mapper
         event.value.each(fn(k, v) {

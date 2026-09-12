@@ -84,7 +84,7 @@ fn Parser::parse_song_expr(self : Parser) -> ParsedSong raise ParseError {
       "position \{song_start}: song() requires at least one item",
     )
   }
-  let sections : Map[String, @song.Section[@pattern.ControlMap]] = {}
+  let sections : Map[String, @song.Section[@pattern.ControlMap]] = Map([])
   let part_specs : Array[SongPartSpec] = []
   let fill_specs : Array[SongFillSpec] = []
   let bpm_values : Array[Double] = []
@@ -104,11 +104,8 @@ fn Parser::parse_song_expr(self : Parser) -> ParsedSong raise ParseError {
   )
   for fill in fill_specs {
     let section = resolve_song_section(sections, fill.section_name)
-    let result = try? song.fill_gaps(prefix=fill.prefix, section~)
-    song = match result {
-      Ok(filled) => filled
-      Err(_) =>
-        raise ParseError("song fill '\{fill.prefix}' could not be applied")
+    song = song.fill_gaps(prefix=fill.prefix, section~) catch {
+      _ => raise ParseError("song fill '\{fill.prefix}' could not be applied")
     }
   }
   let bpm = match bpm_values.get(0) {
@@ -184,15 +181,13 @@ fn Parser::parse_song_section(
   let body = self.parse_expr()
   self.skip_whitespace()
   self.expect_char(')')
-  let result = try? @song.Section(
+  @song.Section(
     name~,
     length_cycles~,
     scope=@song.TimeScope::identity(),
     body=@song.SectionBody::single(body),
-  )
-  match result {
-    Ok(section) => section
-    Err(_) =>
+  ) catch {
+    _ =>
       raise ParseError(
         "position \{item_start}: section '\{name}' requires a positive length",
       )
@@ -328,11 +323,8 @@ fn parse_occurrence_id(
   value : String,
   pos : Int,
 ) -> @identity.OccurrenceId raise ParseError {
-  let result = try? @identity.OccurrenceId::from_string(value)
-  match result {
-    Ok(id) => id
-    Err(_) =>
-      raise ParseError("position \{pos}: invalid occurrence id '\{value}'")
+  @identity.OccurrenceId::from_string(value) catch {
+    _ => raise ParseError("position \{pos}: invalid occurrence id '\{value}'")
   }
 }
 
@@ -366,9 +358,7 @@ fn SongPartSpec::to_part(
 fn build_song(
   parts : Array[@song.SongPart[@pattern.ControlMap]],
 ) -> @song.Song[@pattern.ControlMap] raise ParseError {
-  let result = try? @song.Song(parts~)
-  match result {
-    Ok(song) => song
-    Err(_) => raise ParseError("song construction failed")
+  @song.Song(parts~) catch {
+    _ => raise ParseError("song construction failed")
   }
 }

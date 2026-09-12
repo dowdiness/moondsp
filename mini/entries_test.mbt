@@ -69,9 +69,9 @@ test "envelope seconds change content without stretching the source period" {
     assert_eq(events[i].value.get("hold"), Some(3.0))
     assert_eq(events[i].value.get("release"), Some(8.0))
   }
-  for method in ["attack", "hold", "release"] {
-    assert_true(@mini.parse(text + ".\{method}(0)") is Ok(_))
-    assert_true(@mini.parse(text + ".\{method}(-1)") is Err(_))
-    assert_true(@mini.parse(text + ".\{method}(86401)") is Err(_))
+  for method_name in ["attack", "hold", "release"] {
+    assert_true(@mini.parse(text + ".\{method_name}(0)") is Ok(_))
+    assert_true(@mini.parse(text + ".\{method_name}(-1)") is Err(_))
+    assert_true(@mini.parse(text + ".\{method_name}(86401)") is Err(_))
   }
 }

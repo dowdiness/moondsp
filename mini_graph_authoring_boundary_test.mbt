@@ -100,7 +100,7 @@ fn resolve_mini_graph_controls(
     Some(entry) => entry
     None => return Err(MiniGraphBridgeError::MissingTemplate(template_name))
   }
-  let graph_controls : Map[String, Double] = {}
+  let graph_controls : Map[String, Double] = Map([])
   controls.each(fn(key, value) {
     match key {
       "sound" => () // selector, not a graph parameter

@@ -154,7 +154,7 @@ test "resolve: empty map produces empty controls" {
     .bind(key="freq", node_index=0, slot=GraphParamSlot::Value0)
     .build(CompiledTemplate::analyze(template))
     .unwrap()
-  let controls : Map[String, Double] = {}
+  let controls : Map[String, Double] = Map([])
   let result = map.resolve_controls(controls)
   @debug.assert_eq(result.length(), 0)
 }

@@ -11,8 +11,8 @@ let bench_block_sizes : FixedArray[Int] = [64, 128, 256]
 /// WHY: establishes the absolute floor for process() overhead — any time above
 /// this is attributable to actual DSP math, not graph traversal bookkeeping.
 fn build_bench_passthrough() -> GraphBuilder {
-  let signal : GraphBuilder = GraphBuilder::constant(0.5)
-  GraphBuilder::output(signal)
+  let signal : GraphBuilder = @dsp.ArithSym::constant(0.5)
+  @dsp.DspSym::output(signal)
 }
 
 ///|
@@ -37,10 +37,10 @@ fn build_bench_retained_clip_nodes() -> Array[DspNode] {
 ///|
 /// Minimal voice: osc → gain → output (~4 nodes).
 fn build_bench_minimal_voice() -> GraphBuilder {
-  let freq : GraphBuilder = GraphBuilder::constant(440.0)
-  let osc = freq.oscillator(Waveform::Saw)
-  let gained = osc.gain(0.5)
-  GraphBuilder::output(gained)
+  let freq : GraphBuilder = @dsp.ArithSym::constant(440.0)
+  let osc = @dsp.DspSym::oscillator(freq, Waveform::Saw)
+  let gained = @dsp.DspSym::gain(osc, 0.5)
+  @dsp.DspSym::output(gained)
 }
 
 ///|
@@ -54,18 +54,23 @@ fn build_bench_fm_voice() -> GraphBuilder {
 ///|
 /// Full voice: osc + noise → ADSR → filter → gain → delay → clip → output.
 fn build_bench_full_voice() -> GraphBuilder {
-  let freq : GraphBuilder = GraphBuilder::constant(220.0)
-  let osc = freq.oscillator(Waveform::Saw)
-  let noise : GraphBuilder = GraphBuilder::noise(42U)
-  let noise_gained = noise.gain(0.2)
-  let mixed = osc.mix(noise_gained)
-  let env : GraphBuilder = GraphBuilder::adsr(5.0, 10.0, 0.6, 50.0)
-  let modulated = mixed.mul(env)
-  let filtered = modulated.biquad(BiquadMode::LowPass, 1200.0, 0.707)
-  let gained = filtered.gain(0.7)
-  let delayed = gained.delay(4800, 2400, 0.3)
-  let clipped = delayed.clip(0.9)
-  GraphBuilder::output(clipped)
+  let freq : GraphBuilder = @dsp.ArithSym::constant(220.0)
+  let osc = @dsp.DspSym::oscillator(freq, Waveform::Saw)
+  let noise : GraphBuilder = @dsp.DspSym::noise(42U)
+  let noise_gained = @dsp.DspSym::gain(noise, 0.2)
+  let mixed = @dsp.ArithSym::mix(osc, noise_gained)
+  let env : GraphBuilder = @dsp.DspSym::adsr(5.0, 10.0, 0.6, 50.0)
+  let modulated = @dsp.ArithSym::mul(mixed, env)
+  let filtered = @dsp.FilterSym::biquad(
+    modulated,
+    BiquadMode::LowPass,
+    1200.0,
+    0.707,
+  )
+  let gained = @dsp.DspSym::gain(filtered, 0.7)
+  let delayed = @dsp.DelaySym::delay(gained, 4800, 2400, 0.3)
+  let clipped = @dsp.ArithSym::clip(delayed, 0.9)
+  @dsp.DspSym::output(clipped)
 }
 
 ///|
@@ -102,21 +107,33 @@ fn build_bench_feedback_voice_nodes() -> Array[DspNode] {
 /// Stereo chain: full voice → pan → stereo filter → stereo delay →
 /// stereo gain → stereo clip → stereo output.
 fn build_bench_stereo_chain() -> GraphBuilder {
-  let freq : GraphBuilder = GraphBuilder::constant(220.0)
-  let osc = freq.oscillator(Waveform::Saw)
-  let noise : GraphBuilder = GraphBuilder::noise(42U)
-  let noise_gained = noise.gain(0.2)
-  let mixed = osc.mix(noise_gained)
-  let env : GraphBuilder = GraphBuilder::adsr(5.0, 10.0, 0.6, 50.0)
-  let modulated = mixed.mul(env)
-  let filtered = modulated.biquad(BiquadMode::LowPass, 1200.0, 0.707)
-  let gained = filtered.gain(0.7)
-  let panned = gained.pan(0.0)
-  let stereo_filtered = panned.stereo_biquad(BiquadMode::LowPass, 2000.0, 0.707)
-  let stereo_delayed = stereo_filtered.stereo_delay(4800, 2400, 0.3)
-  let stereo_gained = stereo_delayed.stereo_gain(0.8)
-  let stereo_clipped = stereo_gained.stereo_clip(0.9)
-  GraphBuilder::stereo_output(stereo_clipped)
+  let freq : GraphBuilder = @dsp.ArithSym::constant(220.0)
+  let osc = @dsp.DspSym::oscillator(freq, Waveform::Saw)
+  let noise : GraphBuilder = @dsp.DspSym::noise(42U)
+  let noise_gained = @dsp.DspSym::gain(noise, 0.2)
+  let mixed = @dsp.ArithSym::mix(osc, noise_gained)
+  let env : GraphBuilder = @dsp.DspSym::adsr(5.0, 10.0, 0.6, 50.0)
+  let modulated = @dsp.ArithSym::mul(mixed, env)
+  let filtered = @dsp.FilterSym::biquad(
+    modulated,
+    BiquadMode::LowPass,
+    1200.0,
+    0.707,
+  )
+  let gained = @dsp.DspSym::gain(filtered, 0.7)
+  let panned = @dsp.StereoSym::pan(gained, 0.0)
+  let stereo_filtered = @dsp.StereoFilterSym::stereo_biquad(
+    panned,
+    BiquadMode::LowPass,
+    2000.0,
+    0.707,
+  )
+  let stereo_delayed = @dsp.StereoDelaySym::stereo_delay(
+    stereo_filtered, 4800, 2400, 0.3,
+  )
+  let stereo_gained = @dsp.StereoSym::stereo_gain(stereo_delayed, 0.8)
+  let stereo_clipped = @dsp.StereoSym::stereo_clip(stereo_gained, 0.9)
+  @dsp.StereoSym::stereo_output(stereo_clipped)
 }
 
 // ---- Validation tests ----
@@ -413,10 +430,10 @@ test "bench/compile/stereo_chain" (b : @bench.T) {
 /// freq/gain) ensures the crossfade codepath is exercised with genuinely
 /// different sample values rather than blending a graph with itself.
 fn build_bench_minimal_voice_alt() -> GraphBuilder {
-  let freq : GraphBuilder = GraphBuilder::constant(880.0)
-  let osc = freq.oscillator(Waveform::Sine)
-  let gained = osc.gain(0.3)
-  GraphBuilder::output(gained)
+  let freq : GraphBuilder = @dsp.ArithSym::constant(880.0)
+  let osc = @dsp.DspSym::oscillator(freq, Waveform::Sine)
+  let gained = @dsp.DspSym::gain(osc, 0.3)
+  @dsp.DspSym::output(gained)
 }
 
 ///|
@@ -424,12 +441,12 @@ fn build_bench_minimal_voice_alt() -> GraphBuilder {
 /// hot-swap crossfade blends graphs of different sizes, which is the common
 /// real-world case (user edits simplify or expand the graph).
 fn build_bench_stereo_chain_alt() -> GraphBuilder {
-  let freq : GraphBuilder = GraphBuilder::constant(330.0)
-  let osc = freq.oscillator(Waveform::Sine)
-  let gained = osc.gain(0.5)
-  let panned = gained.pan(0.3)
-  let stereo_gained = panned.stereo_gain(0.7)
-  GraphBuilder::stereo_output(stereo_gained)
+  let freq : GraphBuilder = @dsp.ArithSym::constant(330.0)
+  let osc = @dsp.DspSym::oscillator(freq, Waveform::Sine)
+  let gained = @dsp.DspSym::gain(osc, 0.5)
+  let panned = @dsp.StereoSym::pan(gained, 0.3)
+  let stereo_gained = @dsp.StereoSym::stereo_gain(panned, 0.7)
+  @dsp.StereoSym::stereo_output(stereo_gained)
 }
 
 // ---- Hot-swap benchmarks ----

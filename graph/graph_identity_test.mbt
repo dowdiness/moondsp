@@ -1,19 +1,7 @@
 ///|
 fn gid(value : String) -> @identity.GraphNodeId {
-  let result = try? @identity.GraphNodeId::from_string(value)
-  match result {
-    Ok(id) => id
-    Err(_) => abort("expected valid graph node id")
-  }
-}
-
-///|
-fn unwrap_graph_doc(
-  result : Result[GraphTemplateDoc, GraphTemplateDocError],
-) -> GraphTemplateDoc {
-  match result {
-    Ok(doc) => doc
-    Err(error) => abort("expected graph template doc, got \{error}")
+  @identity.GraphNodeId::from_string(value) catch {
+    _ => abort("expected valid graph node id")
   }
 }
 
@@ -59,12 +47,12 @@ fn identity_graph_ids() -> Array[@identity.GraphNodeId] {
 
 ///|
 fn identity_graph_doc() -> GraphTemplateDoc {
-  unwrap_graph_doc(
-    try? GraphTemplateDoc::from_nodes(
-      ids=identity_graph_ids(),
-      nodes=identity_graph_nodes(),
-    ),
-  )
+  GraphTemplateDoc::from_nodes(
+    ids=identity_graph_ids(),
+    nodes=identity_graph_nodes(),
+  ) catch {
+    error => abort("expected graph template doc, got \{error}")
+  }
 }
 
 ///|
@@ -100,12 +88,15 @@ test "GraphTemplateDoc maps stable ids to controls, bindings, and compile" {
 
 ///|
 test "GraphTemplateDoc rejects duplicate ids" {
-  let result = try? GraphTemplateDoc::from_nodes(ids=[gid("dup"), gid("dup")], nodes=[
-    DspNode::constant(1.0),
-    DspNode::output(0),
-  ])
-  match result {
-    Err(DuplicateNodeId(value)) => inspect(value, content="dup")
+  try
+    GraphTemplateDoc::from_nodes(ids=[gid("dup"), gid("dup")], nodes=[
+      DspNode::constant(1.0),
+      DspNode::output(0),
+    ])
+  catch {
+    DuplicateNodeId(value) => inspect(value, content="dup")
+    _ => fail("expected duplicate id error")
+  } noraise {
     _ => fail("expected duplicate id error")
   }
 }
@@ -113,9 +104,7 @@ test "GraphTemplateDoc rejects duplicate ids" {
 ///|
 test "GraphTemplateDoc replace and rewire preserve stable ids" {
   let doc = identity_graph_doc()
-  let replaced = unwrap_graph_doc(
-    try? doc.replace_node(gid("gain"), DspNode::gain(0, 0.25)),
-  )
+  let replaced = doc.replace_node(gid("gain"), DspNode::gain(0, 0.25))
   inspect(replaced.revision().value(), content="1")
   match replaced.node_index(gid("gain")) {
     Some(index) => inspect(index, content="1")
@@ -123,12 +112,10 @@ test "GraphTemplateDoc replace and rewire preserve stable ids" {
   }
   let gain = unwrap_graph_node(replaced.node_at(gid("gain")))
   inspect(gain.value0(), content="0.25")
-  let rewired = unwrap_graph_doc(
-    try? replaced.rewire_input(
-      gid("out"),
-      GraphTopologyInputSlot::Input0,
-      gid("osc"),
-    ),
+  let rewired = replaced.rewire_input(
+    gid("out"),
+    GraphTopologyInputSlot::Input0,
+    gid("osc"),
   )
   let output = unwrap_graph_node(rewired.node_at(gid("out")))
   inspect(output.input0(), content="0")
@@ -140,19 +127,15 @@ test "GraphTemplateDoc replace and rewire preserve stable ids" {
 
 ///|
 test "GraphTemplateDoc insert and delete compact ids without reuse" {
-  let base = unwrap_graph_doc(
-    try? GraphTemplateDoc::from_nodes(ids=[gid("osc"), gid("out")], nodes=[
-      DspNode::oscillator(Waveform::Sine, 440.0),
-      DspNode::output(0),
-    ]),
-  )
-  let inserted = unwrap_graph_doc(
-    try? base.insert_node(
-      gid("gain"),
-      gid("out"),
-      GraphTopologyInputSlot::Input0,
-      DspNode::gain(0, 0.5),
-    ),
+  let base = GraphTemplateDoc::from_nodes(ids=[gid("osc"), gid("out")], nodes=[
+    DspNode::oscillator(Waveform::Sine, 440.0),
+    DspNode::output(0),
+  ])
+  let inserted = base.insert_node(
+    gid("gain"),
+    gid("out"),
+    GraphTopologyInputSlot::Input0,
+    DspNode::gain(0, 0.5),
   )
   inspect(inserted.length(), content="3")
   match inserted.node_index(gid("out")) {
@@ -165,46 +148,43 @@ test "GraphTemplateDoc insert and delete compact ids without reuse" {
   }
   let inserted_output = unwrap_graph_node(inserted.node_at(gid("out")))
   inspect(inserted_output.input0(), content="2")
-  let deleted = unwrap_graph_doc(
-    try? inserted.delete_node(
-      gid("gain"),
-      gid("out"),
-      GraphTopologyInputSlot::Input0,
-      gid("gain"),
-    ),
+  let deleted = inserted.delete_node(
+    gid("gain"),
+    gid("out"),
+    GraphTopologyInputSlot::Input0,
+    gid("gain"),
   )
   inspect(deleted.length(), content="2")
   assert_true(deleted.node_index(gid("gain")) is None)
   assert_true(deleted.contains_retired_node(gid("gain")))
   let deleted_output = unwrap_graph_node(deleted.node_at(gid("out")))
   inspect(deleted_output.input0(), content="0")
-  let reuse_result = try? deleted.insert_node(
-    gid("gain"),
-    gid("out"),
-    GraphTopologyInputSlot::Input0,
-    DspNode::gain(0, 0.75),
-  )
-  match reuse_result {
-    Err(RetiredNodeId(value)) => inspect(value, content="gain")
+  try
+    deleted.insert_node(
+      gid("gain"),
+      gid("out"),
+      GraphTopologyInputSlot::Input0,
+      DspNode::gain(0, 0.75),
+    )
+  catch {
+    RetiredNodeId(value) => inspect(value, content="gain")
+    _ => fail("expected retired id rejection")
+  } noraise {
     _ => fail("expected retired id rejection")
   }
 }
 
 ///|
 test "GraphTemplateDoc insert and delete chain round trips stable ids" {
-  let base = unwrap_graph_doc(
-    try? GraphTemplateDoc::from_nodes(ids=[gid("osc"), gid("out")], nodes=[
-      DspNode::oscillator(Waveform::Sine, 440.0),
-      DspNode::output(0),
-    ]),
-  )
-  let inserted = unwrap_graph_doc(
-    try? base.insert_chain(
-      [gid("gain-a"), gid("gain-b")],
-      gid("out"),
-      GraphTopologyInputSlot::Input0,
-      [DspNode::gain(0, 0.5), DspNode::gain(0, 0.8)],
-    ),
+  let base = GraphTemplateDoc::from_nodes(ids=[gid("osc"), gid("out")], nodes=[
+    DspNode::oscillator(Waveform::Sine, 440.0),
+    DspNode::output(0),
+  ])
+  let inserted = base.insert_chain(
+    [gid("gain-a"), gid("gain-b")],
+    gid("out"),
+    GraphTopologyInputSlot::Input0,
+    [DspNode::gain(0, 0.5), DspNode::gain(0, 0.8)],
   )
   inspect(inserted.length(), content="4")
   match inserted.node_index(gid("out")) {
@@ -225,14 +205,12 @@ test "GraphTemplateDoc insert and delete chain round trips stable ids" {
   inspect(first_gain.input0(), content="0")
   inspect(second_gain.input0(), content="2")
   inspect(inserted_output.input0(), content="3")
-  let deleted = unwrap_graph_doc(
-    try? inserted.delete_chain(
-      gid("gain-a"),
-      gid("gain-b"),
-      gid("out"),
-      GraphTopologyInputSlot::Input0,
-      gid("osc"),
-    ),
+  let deleted = inserted.delete_chain(
+    gid("gain-a"),
+    gid("gain-b"),
+    gid("out"),
+    GraphTopologyInputSlot::Input0,
+    gid("osc"),
   )
   inspect(deleted.length(), content="2")
   match deleted.node_index(gid("out")) {
@@ -245,14 +223,17 @@ test "GraphTemplateDoc insert and delete chain round trips stable ids" {
   assert_true(deleted.contains_retired_node(gid("gain-b")))
   let deleted_output = unwrap_graph_node(deleted.node_at(gid("out")))
   inspect(deleted_output.input0(), content="0")
-  let reuse_result = try? deleted.insert_chain(
-    [gid("gain-a"), gid("gain-c")],
-    gid("out"),
-    GraphTopologyInputSlot::Input0,
-    [DspNode::gain(0, 0.5), DspNode::gain(0, 0.8)],
-  )
-  match reuse_result {
-    Err(RetiredNodeId(value)) => inspect(value, content="gain-a")
+  try
+    deleted.insert_chain(
+      [gid("gain-a"), gid("gain-c")],
+      gid("out"),
+      GraphTopologyInputSlot::Input0,
+      [DspNode::gain(0, 0.5), DspNode::gain(0, 0.8)],
+    )
+  catch {
+    RetiredNodeId(value) => inspect(value, content="gain-a")
+    _ => fail("expected retired chain id rejection")
+  } noraise {
     _ => fail("expected retired chain id rejection")
   }
 }

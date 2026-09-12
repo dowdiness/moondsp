@@ -128,7 +128,7 @@ fn graph_topology_queue_result_from_staging(
 fn graph_topology_edits_to_staging(
   edits : Array[GraphTopologyEdit],
 ) -> Array[@staging.GraphTopologyEdit] {
-  let raw_edits = Array::new(capacity=edits.length())
+  let raw_edits = Array(capacity=edits.length())
   for edit in edits {
     raw_edits.push(edit.to_staging())
   }

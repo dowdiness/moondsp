@@ -58,14 +58,19 @@ fn BenchExternalFixtureBuilder::BenchExternalFixtureBuilder(
   node_capacity~ : Int,
   control_capacity~ : Int,
 ) -> BenchExternalFixtureBuilder {
-  {
-    nodes: Array::new(capacity=node_capacity),
-    ids: Array::new(capacity=node_capacity),
-    control_keys: Array::new(capacity=control_capacity),
-    control_ids: Array::new(capacity=control_capacity),
-    control_indices: Array::new(capacity=control_capacity),
-    control_slots: Array::new(capacity=control_capacity),
-  }
+  let nodes : Array[DspNode] = []
+  nodes.reserve_capacity(node_capacity)
+  let ids : Array[@identity.GraphNodeId] = []
+  ids.reserve_capacity(node_capacity)
+  let control_keys : Array[String] = []
+  control_keys.reserve_capacity(control_capacity)
+  let control_ids : Array[@identity.GraphNodeId] = []
+  control_ids.reserve_capacity(control_capacity)
+  let control_indices : Array[Int] = []
+  control_indices.reserve_capacity(control_capacity)
+  let control_slots : Array[GraphParamSlot] = []
+  control_slots.reserve_capacity(control_capacity)
+  { nodes, ids, control_keys, control_ids, control_indices, control_slots, }
 }
 
 ///|
@@ -459,7 +464,7 @@ fn bench_external_control_values(
   fixture : BenchExternalAuthoringFixture,
   offset : Double,
 ) -> Map[String, Double] {
-  let controls : Map[String, Double] = {}
+  let controls : Map[String, Double] = Map([])
   for i in 0..<fixture.control_keys.length() {
     controls[fixture.control_keys[i]] = 0.5 +
       offset +
@@ -473,9 +478,8 @@ fn bench_external_control_batch(
   fixture : BenchExternalAuthoringFixture,
   offset : Double,
 ) -> Array[GraphControl] {
-  let controls : Array[GraphControl] = Array::new(
-    capacity=fixture.control_ids.length(),
-  )
+  let controls : Array[GraphControl] = []
+  controls.reserve_capacity(fixture.control_ids.length())
   for i in 0..<fixture.control_ids.length() {
     controls.push(
       GraphControl::set_param(

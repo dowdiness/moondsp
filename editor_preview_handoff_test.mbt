@@ -1,38 +1,26 @@
 ///|
 fn editor_preview_gid(value : String) -> GraphNodeId {
-  let result = try? GraphNodeId::from_string(value)
-  match result {
-    Ok(id) => id
-    Err(_) => abort("expected valid graph node id")
-  }
-}
-
-///|
-fn editor_preview_unwrap_doc(
-  result : Result[GraphTemplateDoc, GraphTemplateDocError],
-) -> GraphTemplateDoc {
-  match result {
-    Ok(doc) => doc
-    Err(error) => abort("expected graph template doc, got \{error}")
+  GraphNodeId::from_string(value) catch {
+    _ => abort("expected valid graph node id")
   }
 }
 
 ///|
 fn editor_preview_base_doc() -> GraphTemplateDoc {
-  editor_preview_unwrap_doc(
-    try? GraphTemplateDoc::from_nodes(
-      ids=[
-        editor_preview_gid("osc"),
-        editor_preview_gid("gain"),
-        editor_preview_gid("out"),
-      ],
-      nodes=[
-        DspNode::oscillator(Waveform::Sine, 440.0),
-        DspNode::gain(0, 0.3),
-        DspNode::output(1),
-      ],
-    ),
-  )
+  GraphTemplateDoc::from_nodes(
+    ids=[
+      editor_preview_gid("osc"),
+      editor_preview_gid("gain"),
+      editor_preview_gid("out"),
+    ],
+    nodes=[
+      DspNode::oscillator(Waveform::Sine, 440.0),
+      DspNode::gain(0, 0.3),
+      DspNode::output(1),
+    ],
+  ) catch {
+    error => abort("expected graph template doc, got \{error}")
+  }
 }
 
 ///|
@@ -45,13 +33,11 @@ test "editor preview handoff: stages topology replacement and parameter update" 
     crossfade_samples=16,
   )
 
-  let replacement_doc = editor_preview_unwrap_doc(
-    try? active_doc.insert_node(
-      editor_preview_gid("clip"),
-      editor_preview_gid("out"),
-      GraphTopologyInputSlot::Input0,
-      DspNode::clip(1, 0.75),
-    ),
+  let replacement_doc = active_doc.insert_node(
+    editor_preview_gid("clip"),
+    editor_preview_gid("out"),
+    GraphTopologyInputSlot::Input0,
+    DspNode::clip(1, 0.75),
   )
   let replacement_template = replacement_doc.analyze()
   let replacement_index = replacement_doc.index_map()
@@ -99,11 +85,9 @@ test "editor preview handoff: failed candidate maps diagnostics to stable ids" {
     CompiledTemplate::analyze([DspNode::constant(0.25), DspNode::output(0)]),
     ctx,
   ).unwrap()
-  let candidate = editor_preview_unwrap_doc(
-    try? GraphTemplateDoc::from_nodes(
-      ids=[editor_preview_gid("gain"), editor_preview_gid("out")],
-      nodes=[DspNode::gain(99, 0.5), DspNode::output(0)],
-    ),
+  let candidate = GraphTemplateDoc::from_nodes(
+    ids=[editor_preview_gid("gain"), editor_preview_gid("out")],
+    nodes=[DspNode::gain(99, 0.5), DspNode::output(0)],
   )
 
   match CompiledDsp::compile_result(candidate.analyze(), ctx) {

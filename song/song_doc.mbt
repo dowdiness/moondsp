@@ -230,8 +230,8 @@ fn[A] validate_song_doc_parts(
   if parts.is_empty() {
     raise EmptySongDoc
   }
-  let ids : Map[String, Bool] = {}
-  let names : Map[String, Bool] = {}
+  let ids : Map[String, Bool] = Map([])
+  let names : Map[String, Bool] = Map([])
   for part in parts {
     let id_value = part.id().value()
     if ids.contains(id_value) {
@@ -303,7 +303,7 @@ priv struct SongSnapshotOccurrenceSource {
 fn[A] song_snapshot_layer_source(
   section : SectionDoc[A],
 ) -> SongSnapshotLayerSource {
-  let named : Map[String, @identity.SectionLayerId] = {}
+  let named : Map[String, @identity.SectionLayerId] = Map([])
   match section.body() {
     Single(layer) => {
       named[layer.name()] = layer.id()
@@ -322,7 +322,7 @@ fn[A] song_snapshot_layer_source(
 fn[A] song_snapshot_sources(
   parts : Array[SongOccurrenceDoc[A]],
 ) -> Map[String, SongSnapshotOccurrenceSource] {
-  let result : Map[String, SongSnapshotOccurrenceSource] = {}
+  let result : Map[String, SongSnapshotOccurrenceSource] = Map([])
   for part in parts {
     let section = part.section()
     result[part.id().value()] = {

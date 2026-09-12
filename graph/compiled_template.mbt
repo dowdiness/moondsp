@@ -31,7 +31,8 @@ fn CompiledTemplate::raw(self : CompiledTemplate) -> @template.CompiledTemplate 
 
 ///|
 fn dsp_nodes_to_model(nodes : Array[DspNode]) -> Array[@model.DspNode] {
-  let raw_nodes = Array::new(capacity=nodes.length())
+  let raw_nodes : Array[@model.DspNode] = []
+  raw_nodes.reserve_capacity(nodes.length())
   for node in nodes {
     raw_nodes.push(node.raw())
   }
@@ -40,7 +41,8 @@ fn dsp_nodes_to_model(nodes : Array[DspNode]) -> Array[@model.DspNode] {
 
 ///|
 fn dsp_nodes_from_model(nodes : Array[@model.DspNode]) -> Array[DspNode] {
-  let facade_nodes = Array::new(capacity=nodes.length())
+  let facade_nodes : Array[DspNode] = []
+  facade_nodes.reserve_capacity(nodes.length())
   for node in nodes {
     facade_nodes.push(DspNode::from_model(node))
   }

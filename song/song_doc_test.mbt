@@ -1,27 +1,21 @@
 ///|
 fn song_doc_test_occurrence_id(value : String) -> @identity.OccurrenceId {
-  let result = try? @identity.OccurrenceId::from_string(value)
-  match result {
-    Ok(id) => id
-    Err(_) => abort("occurrence id creation failed")
+  @identity.OccurrenceId::from_string(value) catch {
+    _ => abort("occurrence id creation failed")
   }
 }
 
 ///|
 fn song_doc_test_section_id(value : String) -> @identity.SectionId {
-  let result = try? @identity.SectionId::from_string(value)
-  match result {
-    Ok(id) => id
-    Err(_) => abort("section id creation failed")
+  @identity.SectionId::from_string(value) catch {
+    _ => abort("section id creation failed")
   }
 }
 
 ///|
 fn song_doc_test_layer_id(value : String) -> @identity.SectionLayerId {
-  let result = try? @identity.SectionLayerId::from_string(value)
-  match result {
-    Ok(id) => id
-    Err(_) => abort("layer id creation failed")
+  @identity.SectionLayerId::from_string(value) catch {
+    _ => abort("layer id creation failed")
   }
 }
 
@@ -32,17 +26,15 @@ fn song_doc_test_section(
   length : @pattern.Rational,
   midi : Double,
 ) -> @song.SectionDoc[@pattern.ControlMap] {
-  let result = try? @song.SectionDoc::single(
+  @song.SectionDoc::single(
     id=song_doc_test_section_id(id),
     name~,
     length_cycles=length,
     scope=@song.TimeScope::identity(),
     layer_id=song_doc_test_layer_id("\{id}:main"),
     body=@pattern.note(midi),
-  )
-  match result {
-    Ok(section) => section
-    Err(_) => abort("section doc creation failed")
+  ) catch {
+    _ => abort("section doc creation failed")
   }
 }
 
@@ -50,10 +42,8 @@ fn song_doc_test_section(
 fn song_doc_test_doc(
   occurrences : Array[@song.SongOccurrenceDoc[@pattern.ControlMap]],
 ) -> @song.SongDoc[@pattern.ControlMap] {
-  let result = try? @song.SongDoc(parts=occurrences)
-  match result {
-    Ok(doc) => doc
-    Err(_) => abort("song doc creation failed")
+  @song.SongDoc(parts=occurrences) catch {
+    _ => abort("song doc creation failed")
   }
 }
 
@@ -61,10 +51,8 @@ fn song_doc_test_doc(
 fn song_doc_test_song(
   doc : @song.SongDoc[@pattern.ControlMap],
 ) -> @song.Song[@pattern.ControlMap] {
-  let result = try? doc.to_song()
-  match result {
-    Ok(song) => song
-    Err(_) => abort("song lowering failed")
+  doc.to_song() catch {
+    _ => abort("song lowering failed")
   }
 }
 
@@ -72,10 +60,8 @@ fn song_doc_test_song(
 fn song_doc_test_snapshot(
   doc : @song.SongDoc[@pattern.ControlMap],
 ) -> @song.SongSnapshot[@pattern.ControlMap] {
-  let result = try? doc.lower()
-  match result {
-    Ok(snapshot) => snapshot
-    Err(_) => abort("song snapshot lowering failed")
+  doc.lower() catch {
+    _ => abort("song snapshot lowering failed")
   }
 }
 
@@ -85,7 +71,7 @@ test "SongSnapshot::query_sourced_events tags occurrence section and layer IDs" 
   let section_id = song_doc_test_section_id("section:sourced-layer")
   let lead_id = song_doc_test_layer_id("layer:sourced-lead")
   let pad_id = song_doc_test_layer_id("layer:sourced-pad")
-  let section_result = try? @song.SectionDoc::SectionDoc(
+  let section = @song.SectionDoc::SectionDoc(
     id=section_id,
     name="Sourced",
     length_cycles=@pattern.Rational::from_int(1),
@@ -94,10 +80,8 @@ test "SongSnapshot::query_sourced_events tags occurrence section and layer IDs" 
       @song.SectionLayerDoc(id=lead_id, name="Lead", body=@pattern.note(60.0)),
       @song.SectionLayerDoc(id=pad_id, name="Pad", body=@pattern.note(67.0)),
     ]),
-  )
-  let section = match section_result {
-    Ok(section) => section
-    Err(_) => abort("section doc creation failed")
+  ) catch {
+    _ => abort("section doc creation failed")
   }
   let doc = song_doc_test_doc([
     @song.SongOccurrenceDoc(id=occurrence_id, name="Sourced", section~),
@@ -145,10 +129,8 @@ test "SongDoc occurrence renames preserve identity and layout revision" {
     Some(occurrence) => occurrence
     None => abort("expected verse occurrence doc")
   }
-  let renamed_result = try? doc.rename_occurrence(verse_id, name="Verse Intro")
-  let renamed = match renamed_result {
-    Ok(doc) => doc
-    Err(_) => abort("rename failed")
+  let renamed = doc.rename_occurrence(verse_id, name="Verse Intro") catch {
+    _ => abort("rename failed")
   }
   let renamed_occurrence = match renamed.get_occurrence(verse_id) {
     Some(occurrence) => occurrence
@@ -202,13 +184,11 @@ test "SongDoc insertion and removal preserve surviving occurrence identities" {
     @song.SongOccurrenceDoc(id=intro_id, name="Intro", section=intro),
     @song.SongOccurrenceDoc(id=chorus_id, name="Chorus", section=chorus),
   ])
-  let inserted_result = try? doc.insert_occurrence(
+  let inserted = doc.insert_occurrence(
     index=1,
     occurrence=@song.SongOccurrenceDoc(id=verse_id, name="Verse", section=verse),
-  )
-  let inserted = match inserted_result {
-    Ok(doc) => doc
-    Err(_) => abort("insert failed")
+  ) catch {
+    _ => abort("insert failed")
   }
   assert_true(inserted.layout_revision() != doc.layout_revision())
   let inserted_song = song_doc_test_song(inserted)
@@ -220,10 +200,8 @@ test "SongDoc insertion and removal preserve surviving occurrence identities" {
     }
     None => abort("expected chorus after insertion")
   }
-  let removed_result = try? inserted.remove_occurrence(intro_id)
-  let removed = match removed_result {
-    Ok(doc) => doc
-    Err(_) => abort("remove failed")
+  let removed = inserted.remove_occurrence(intro_id) catch {
+    _ => abort("remove failed")
   }
   assert_true(removed.layout_revision() != inserted.layout_revision())
   assert_true(removed.get_occurrence(verse_id) is Some(_))
@@ -265,10 +243,8 @@ test "SongDoc reorder preserves IDs while recomputing implicit spans" {
     @song.SongOccurrenceDoc(id=b_id, name="B", section=b),
     @song.SongOccurrenceDoc(id=c_id, name="C", section=c),
   ])
-  let moved_result = try? doc.move_occurrence(c_id, index=0)
-  let moved = match moved_result {
-    Ok(doc) => doc
-    Err(_) => abort("move failed")
+  let moved = doc.move_occurrence(c_id, index=0) catch {
+    _ => abort("move failed")
   }
   assert_true(moved.layout_revision() != doc.layout_revision())
   let moved_song = song_doc_test_song(moved)
@@ -300,12 +276,10 @@ test "SongDoc section length edits shift downstream spans and preserve IDs" {
     @pattern.Rational::from_int(1),
     60.0,
   )
-  let longer_result = try? verse.with_length(
+  let longer_verse = verse.with_length(
     length_cycles=@pattern.Rational::from_int(2),
-  )
-  let longer_verse = match longer_result {
-    Ok(section) => section
-    Err(_) => abort("length edit failed")
+  ) catch {
+    _ => abort("length edit failed")
   }
   let chorus = song_doc_test_section(
     "section:chorus-length-doc",
@@ -317,13 +291,8 @@ test "SongDoc section length edits shift downstream spans and preserve IDs" {
     @song.SongOccurrenceDoc(id=verse_id, name="Verse", section=verse),
     @song.SongOccurrenceDoc(id=chorus_id, name="Chorus", section=chorus),
   ])
-  let edited_result = try? doc.replace_occurrence_section(
-    verse_id,
-    section=longer_verse,
-  )
-  let edited = match edited_result {
-    Ok(doc) => doc
-    Err(_) => abort("replace section failed")
+  let edited = doc.replace_occurrence_section(verse_id, section=longer_verse) catch {
+    _ => abort("replace section failed")
   }
   assert_true(edited.layout_revision() != doc.layout_revision())
   let edited_song = song_doc_test_song(edited)
@@ -347,13 +316,11 @@ test "SongDoc same-length section edits reuse layout and unchanged sections" {
     @pattern.Rational::from_int(1),
     60.0,
   )
-  let edited_verse_result = try? verse.replace_layer_body(
+  let edited_verse = verse.replace_layer_body(
     layer_id,
     body=@pattern.note(61.0),
-  )
-  let edited_verse = match edited_verse_result {
-    Ok(section) => section
-    Err(_) => abort("body edit failed")
+  ) catch {
+    _ => abort("body edit failed")
   }
   let chorus = song_doc_test_section(
     "section:chorus-reuse",
@@ -369,13 +336,8 @@ test "SongDoc same-length section edits reuse layout and unchanged sections" {
     Some(occurrence) => occurrence.section()
     None => abort("expected original chorus")
   }
-  let edited_result = try? doc.replace_occurrence_section(
-    verse_id,
-    section=edited_verse,
-  )
-  let edited = match edited_result {
-    Ok(doc) => doc
-    Err(_) => abort("replace section failed")
+  let edited = doc.replace_occurrence_section(verse_id, section=edited_verse) catch {
+    _ => abort("replace section failed")
   }
   assert_true(edited.revision() != doc.revision())
   assert_true(edited.layout_revision() == doc.layout_revision())
@@ -422,10 +384,10 @@ test "SongDoc rename reports missing occurrence before duplicate display name" {
     @song.SongOccurrenceDoc(id=verse_id, name="Verse", section=verse),
     @song.SongOccurrenceDoc(id=chorus_id, name="Chorus", section=chorus),
   ])
-  let result = try? doc.rename_occurrence(missing_id, name="Chorus")
-  match result {
-    Err(@song.SongDocEditError::MissingSongDocOccurrenceId("missing:missing")) =>
-      ()
+  try doc.rename_occurrence(missing_id, name="Chorus") catch {
+    @song.SongDocEditError::MissingSongDocOccurrenceId("missing:missing") => ()
+    _ => assert_true(false)
+  } noraise {
     _ => assert_true(false)
   }
 }

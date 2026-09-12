@@ -306,8 +306,8 @@ fn[A] validate_section_doc_body(
       if layers.is_empty() {
         raise EmptyLayers
       }
-      let ids : Map[String, Bool] = {}
-      let names : Map[String, Bool] = {}
+      let ids : Map[String, Bool] = Map([])
+      let names : Map[String, Bool] = Map([])
       for layer in layers {
         let id_value = layer.id().value()
         if ids.contains(id_value) {

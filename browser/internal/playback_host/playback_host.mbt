@@ -282,16 +282,15 @@ fn filter_section_for_route(
   let body = @song.SectionBody::single(
     filter_pat_for_route(selector, section.body()),
   )
-  let result = try? @song.Section(
+  let filtered = @song.Section(
     name=section.name(),
     length_cycles=section.length_cycles(),
     scope=section.scope(),
     body~,
-  )
-  match result {
-    Ok(filtered) => Ok(filtered)
-    Err(_) => Err("internal song routing error: invalid section length")
+  ) catch {
+    _ => return Err("internal song routing error: invalid section length")
   }
+  Ok(filtered)
 }
 
 ///|
@@ -314,11 +313,10 @@ fn filter_song_for_route(
       Err(msg) => return Err(msg)
     }
   }
-  let result = try? @song.Song(parts~)
-  match result {
-    Ok(filtered) => Ok(filtered)
-    Err(_) => Err("internal song routing error: invalid song layout")
+  let filtered = @song.Song(parts~) catch {
+    _ => return Err("internal song routing error: invalid song layout")
   }
+  Ok(filtered)
 }
 
 ///|

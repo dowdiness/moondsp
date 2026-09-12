@@ -411,9 +411,7 @@ fn run_mono(compiled : CompiledDsp, num_blocks : Int) -> Array[Double] {
     block_size=PROP_BLOCK_SIZE,
   )
   let output = AudioBuffer::filled(PROP_BLOCK_SIZE)
-  let samples : Array[Double] = Array::new(
-    capacity=num_blocks * PROP_BLOCK_SIZE,
-  )
+  let samples : Array[Double] = Array(capacity=num_blocks * PROP_BLOCK_SIZE)
   for _block = 0; _block < num_blocks; _block = _block + 1 {
     compiled.process(context, output)
     for s = 0; s < PROP_BLOCK_SIZE; s = s + 1 {
@@ -435,10 +433,10 @@ fn run_stereo(
   )
   let left = AudioBuffer::filled(PROP_BLOCK_SIZE)
   let right = AudioBuffer::filled(PROP_BLOCK_SIZE)
-  let left_samples : Array[Double] = Array::new(
+  let left_samples : Array[Double] = Array(
     capacity=num_blocks * PROP_BLOCK_SIZE,
   )
-  let right_samples : Array[Double] = Array::new(
+  let right_samples : Array[Double] = Array(
     capacity=num_blocks * PROP_BLOCK_SIZE,
   )
   for _block = 0; _block < num_blocks; _block = _block + 1 {

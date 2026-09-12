@@ -17,7 +17,7 @@ pub fn ControlMap::empty() -> ControlMap {
 
 ///|
 pub fn ControlMap::single(key : String, value : Double) -> ControlMap {
-  let m : Map[String, Double] = {}
+  let m : Map[String, Double] = Map([])
   m[key] = value
   { values: m, }
 }
@@ -38,7 +38,7 @@ pub fn ControlMap::each(
 ///|
 /// Return a fresh map snapshot of this control map.
 pub fn ControlMap::entries(self : ControlMap) -> Map[String, Double] {
-  let result : Map[String, Double] = {}
+  let result : Map[String, Double] = Map([])
   self.values.each(fn(k, v) { result[k] = v })
   result
 }

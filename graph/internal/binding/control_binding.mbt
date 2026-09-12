@@ -83,7 +83,7 @@ pub fn ControlBindingBuilder::build(
   compiled_template : @template.CompiledTemplate,
 ) -> Result[ControlBindingMap, ControlBindingError] {
   let defaults : Array[Double] = []
-  let seen_keys : Map[String, Bool] = {}
+  let seen_keys : Map[String, Bool] = Map([])
   for i in 0..<self.bindings.length() {
     let binding = self.bindings[i]
     if binding.node_index < 0 ||
@@ -136,7 +136,8 @@ pub fn ControlBindingMap::resolve_controls(
   self : ControlBindingMap,
   controls : Map[String, Double],
 ) -> Array[@model.GraphControl] {
-  let result = Array::new(capacity=self.bindings.length())
+  let result : Array[@model.GraphControl] = []
+  result.reserve_capacity(self.bindings.length())
   for i in 0..<self.bindings.length() {
     let binding = self.bindings[i]
     match controls.get(binding.key) {

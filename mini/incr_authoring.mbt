@@ -125,11 +125,10 @@ pub fn MiniAuthoringPipeline::new(input : String) -> MiniAuthoringPipeline {
       match parsed.get() {
         Err(msg) => Err(msg)
         Ok(doc) => {
-          let result = try? doc.lower_with_cache(lowering_cache)
-          match result {
-            Ok(snapshot) => Ok(snapshot)
-            Err(_) => Err("internal mini PatternDoc lowering failed")
+          let snapshot = doc.lower_with_cache(lowering_cache) catch {
+            _ => return Err("internal mini PatternDoc lowering failed")
           }
+          Ok(snapshot)
         }
       }
     },

@@ -9,11 +9,11 @@ import {
   "dowdiness/moondsp/graph/internal/authoring",
   "moonbitlang/core/bench",
   "moonbitlang/core/debug",
-  "moonbitlang/core/math",
   "moonbitlang/core/ref",
 }
 
 import {
   "moonbitlang/core/double",
+  "moonbitlang/core/math",
   "moonbitlang/quickcheck" @qc,
 } for "test"
