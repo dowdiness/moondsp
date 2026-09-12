@@ -4,12 +4,15 @@ priv struct EntrySpec {
   body : @pattern.Pat[@pattern.ControlMap]
   start : @pattern.Rational
   end_ : @pattern.Rational?
+  source_index : Int
+  silent : Bool
 }
 
 ///|
 priv struct EntryEdit {
   due : @pattern.Rational?
   replacement : EntrySpec?
+  source_snapshot : PlaybackSnapshot?
 }
 
 ///|
@@ -17,41 +20,51 @@ priv struct EntryState {
   active : EntrySpec
   origin : @pattern.Rational
   edit : EntryEdit?
+  source_snapshot : PlaybackSnapshot
 }
 
 ///|
 fn PlaybackSnapshot::entries(self : PlaybackSnapshot) -> Array[EntrySpec] {
   match self {
-    Pattern(snapshot) =>
-      snapshot
-      .pat()
-      .entries()
-      .map(body => {
-        id: body.entry_key(),
-        body,
-        start: @pattern.Rational::from_int(0),
-        end_: None,
-      })
-    Song(snapshot) =>
-      snapshot
-      .song()
-      .occurrences()
-      .iter()
-      .flat_map(o => {
-        o
-        .section()
-        .body()
-        .fast(o.section().scope().rate())
-        .entries()
-        .map(body => {
-          id: "\{o.id().value().length()}:\{o.id().value()}/" + body.entry_key(),
+    Pattern(snapshot) => {
+      let result : Array[EntrySpec] = []
+      for i, body in snapshot.pat().entries() {
+        result.push({
+          id: body.entry_key(),
           body,
-          start: o.start(),
-          end_: Some(o.end_()),
+          start: @pattern.Rational::from_int(0),
+          end_: None,
+          source_index: i,
+          silent: false,
         })
-        .iter()
-      })
-      .collect()
+      }
+      result
+    }
+    Song(snapshot) => {
+      let result : Array[EntrySpec] = []
+      let mut source_index = 0
+      for o in snapshot.song().occurrences() {
+        let occurrence = o
+        let bodies = occurrence
+          .section()
+          .body()
+          .fast(occurrence.section().scope().rate())
+          .entries()
+        for body in bodies {
+          result.push({
+            id: "\{occurrence.id().value().length()}:\{occurrence.id().value()}/" +
+            body.entry_key(),
+            body,
+            start: occurrence.start(),
+            end_: Some(occurrence.end_()),
+            source_index,
+            silent: false,
+          })
+          source_index += 1
+        }
+      }
+      result
+    }
   }
 }
 
@@ -90,6 +103,7 @@ fn reconcile_entries(
   current : Array[EntryState],
   next : Array[EntrySpec],
   now : @pattern.Rational,
+  source_snapshot : PlaybackSnapshot,
 ) -> Array[EntryState] {
   let remaining : Map[String, EntrySpec] = Map([])
   for spec in next {
@@ -106,7 +120,10 @@ fn reconcile_entries(
         Some(edit) => edit.due
         None => next_entry(entry, now)
       }
-      result.push({ ..entry, edit: Some({ due, replacement, }), })
+      result.push({
+        ..entry,
+        edit: Some({ due, replacement, source_snapshot: Some(source_snapshot), }),
+      })
     }
   }
   for spec in next {
@@ -116,13 +133,24 @@ fn reconcile_entries(
       }
       let silent = {
         ..spec,
+        silent: true,
         body: @pattern.Pat::silence().slow(spec.body.entry_period()),
       }
-      let entry = EntryState::{ active: spec, origin: spec.start, edit: None, }
+      let entry = EntryState::{
+        active: spec,
+        origin: spec.start,
+        edit: None,
+        source_snapshot,
+      }
       result.push({
         active: silent,
         origin: spec.start,
-        edit: Some({ due: next_entry(entry, now), replacement: Some(spec), }),
+        edit: Some({
+          due: next_entry(entry, now),
+          replacement: Some(spec),
+          source_snapshot: Some(source_snapshot),
+        }),
+        source_snapshot,
       })
     }
   }
@@ -139,11 +167,15 @@ fn settle_entries(
       return None
     }
     match entry.edit {
-      Some({ due: Some(due), replacement, }) if due <= now =>
+      Some({ due: Some(due), replacement, source_snapshot, }) if due <= now =>
         replacement.map(spec => {
-          active: spec,
-          origin: replacement_origin(entry, spec, due),
-          edit: None,
+          let source = source_snapshot.unwrap_or(entry.source_snapshot)
+          {
+            active: spec,
+            origin: replacement_origin(entry, spec, due),
+            edit: None,
+            source_snapshot: source,
+          }
         })
       _ => Some(entry)
     }
@@ -177,7 +209,7 @@ fn query_entries(
   .iter()
   .flat_map(entry => {
     match entry.edit {
-      Some({ due: Some(due), replacement, }) if due < arc.end_ => {
+      Some({ due: Some(due), replacement, .. }) if due < arc.end_ => {
         let old = if due > arc.begin {
           query_entry(
             entry.active,

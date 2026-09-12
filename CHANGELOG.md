@@ -43,6 +43,16 @@ hardens the graph, scheduler, browser, and incremental-authoring boundaries.
 - Removed the graph package's accidental DSP facade re-exports. Import DSP
   types, traits, and helpers from `dowdiness/moondsp/dsp` or the root
   `dowdiness/moondsp` facade instead of `dowdiness/moondsp/graph`.
+- Replaced scheduler `AffectedVoiceTarget`, `AffectedVoicePolicy`, and
+  `AffectedVoiceEditScope` with separate `PatternVoiceScope` /
+  `SongVoiceScope` selectors and explicit `ActiveVoiceEffect` operations.
+  Retune now requires a non-empty `VoiceControlBatch`; preserve behavior is
+  snapshot queuing without an active-voice effect.
+- Renamed scheduler `PlaybackEditOutcome` to `ActiveVoiceEffectOutcome`,
+  `controlled_voice_count` to `retuned_voice_count`, and
+  `removed_active_note_count` to `detached_note_count`. Detachment counts
+  scheduler note records, not destroyed pool voices; Release tails may continue
+  sounding. Effect behavior is unchanged; no compatibility aliases remain.
 
 ### Added
 
@@ -95,6 +105,10 @@ hardens the graph, scheduler, browser, and incremental-authoring boundaries.
   longer leak host-owned pools, schedulers, or buffers.
 - Simplified the live editor to one Play/Stop transport and moved complete,
   playable examples ahead of concise reference help.
+- Unified scheduler provenance and edit execution around typed voice origins.
+  Pattern origins carry a non-empty authored path; song origins carry
+  occurrence, section, and layer identity. Snapshot effect calls preflight all
+  retunes and queue replacement only after the effect succeeds.
 
 ### Deprecated
 

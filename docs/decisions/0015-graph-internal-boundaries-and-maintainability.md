@@ -73,11 +73,10 @@ The shipped scheduler shape is:
 
 ```text
 scheduler/                         public facade; preserves scheduler API
-scheduler/internal/model/           event provenance, playback-event, and edit-scope value backing
+scheduler/internal/model/           complete voice origins and typed voice scopes
 scheduler/internal/transport/       sample/cycle transport helpers
 scheduler/internal/playback/        pattern/song playback snapshots
 scheduler/internal/voice_runtime/   active-note and voice-side runtime helpers
-scheduler/internal/edit_policy/     affected-voice edit policy matching
 ```
 
 The shipped browser shape is:
@@ -109,9 +108,12 @@ Additional boundary rules:
   to authoring indices, but runtime processing must not depend on it.
 - `scheduler/internal/*` packages may depend on lower-level domain/runtime
   packages they explicitly bridge, but they must not depend on `browser/`.
-- `scheduler/internal/voice_runtime` stores active-note provenance with
-  `scheduler/internal/model` value backing and delegates affected-voice matching
-  to `scheduler/internal/edit_policy`.
+- `scheduler/internal/playback` uses `scheduler/internal/model` to attach complete
+  voice origins to entry queries; the retained snapshot supplies provenance
+  while entry reconciliation controls audible timing.
+- `scheduler/internal/voice_runtime` stores complete active-note provenance with
+  `scheduler/internal/model` value backing and matches typed scopes before
+  applying active-voice effects.
 - `browser/internal/*` packages may depend on the public runtime, scheduler,
   Mini, pattern, and song surfaces needed by the host, but those packages must
   not depend back on `browser/`.

@@ -941,12 +941,13 @@ Current semantics:
   graph and ADSR snapshot. The prevalidated scalar note-on path instead requires
   a matching prepared slot and fails closed with a negative packed handle id if
   the slot is stale.
-- `PatternScheduler` stores tempo, sample position, a `DspContext`, active note
-  handles, a `ControlMapper`, and an optional active + pending
-  `PlaybackSnapshot` pair; it no longer stores a separate `ControlBindingMap`.
-  All struct fields are `priv` as of v0.3.0 — public observation goes through
-  named methods (`bpm`, `sample_counter`, `current_block`, `active_note_count`,
-  `active_note_source`, `active_note_matches`)
+- `PatternScheduler` stores tempo, sample position, a `DspContext`, and active
+  notes that pair each live `VoiceHandle` with a typed `VoiceOrigin`. Pattern
+  origins carry a non-empty `PatternNodePath`; song origins always carry
+  occurrence, section, and layer identity. Anonymous origins exist only for
+  direct unsourced playback. The scheduler also owns optional active and pending
+  `PlaybackSnapshot` values; it does not duplicate the pool's voice state or
+  control bindings.
 - `PatternScheduler::process_block(...)` takes a `BoundVoicePool`, expires old
   notes, queries the pattern for the current block arc, converts raw control
   maps through the scheduler's mapper, calls `note_on_controls(...)`, applies
@@ -962,13 +963,25 @@ Current semantics:
   current source cycle before replacement; sounding voices retain deadlines.
   See [scheduler guide](../scheduler/README.mbt.md) for entry and identity rules.
   Multiple staged snapshots coalesce so the latest staged state wins
-- `apply_affected_voice_policy(...)` and `apply_affected_voice_policy_for_edit(...)`
-  preserve, release, or immediately stop scheduler-owned active voices whose
-  authored provenance matches a selector, while
-  `queue_playback_snapshot_edit(...)` (and the pattern/song-specific wrappers)
-  combines staged replacement with an affected-voice policy and optional
-  validated live-control changes in one atomic call. See
-  `scheduler/README.mbt.md` for a checked end-to-end edit orchestration example
+- Sourced snapshot queries retain native pattern and song provenance through
+  voice dispatch without converting records through a second wrapper array.
+  Pattern and song selectors are separate types: `PatternVoiceScope` selects a
+  pattern node, while `SongVoiceScope` selects an occurrence, section, or
+  section-bounded layer.
+- `ActiveVoiceEffect` makes active-note mutation explicit: `Release` gates off
+  and detaches matching notes, `Kill` stops and detaches them immediately, and
+  `Retune(VoiceControlBatch)` applies a statically non-empty control batch.
+  Retune preflights every matching handle before changing any voice.
+  `queue_pattern_snapshot_effect_result(...)` and
+  `queue_song_snapshot_effect_result(...)` stage replacement only after the
+  selected effect succeeds, so invalid controls leave both voices and queued
+  snapshot state unchanged. See `scheduler/README.mbt.md` for a checked
+  end-to-end example.
+- Effect calls return `ActiveVoiceEffectOutcome`. `retuned_voice_count` counts
+  voices successfully controlled by Retune. `detached_note_count` counts note
+  records removed from scheduler tracking by Release or Kill, not voices
+  destroyed in the pool: a Release tail may still sound after detachment.
+  Each effect leaves the other counter at zero.
 
 This prevents a stale scheduler-owned binding map from being paired with a
 voice pool after a template swap, and it removes the previous double

@@ -186,6 +186,13 @@ pub fn[A] SongDoc::revision(Self[A]) -> @identity.Revision
 pub fn[A] SongDoc::set_occurrence_start(Self[A], @identity.OccurrenceId, start~ : @pattern.Rational) -> Self[A] raise SongDocEditError
 pub fn[A] SongDoc::to_song(Self[A]) -> Song[A] raise SongBuildError
 
+pub struct SongEventOrigin {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn SongEventOrigin::layer(Self) -> @identity.SectionLayerId
+pub fn SongEventOrigin::occurrence(Self) -> @identity.OccurrenceId
+pub fn SongEventOrigin::section(Self) -> @identity.SectionId
+
 pub struct SongOccurrenceDoc[A] {
   // private fields
 }
@@ -220,6 +227,7 @@ pub struct SongSnapshot[A] {
 pub fn[A] SongSnapshot::layout_revision(Self[A]) -> @identity.Revision
 pub fn[A] SongSnapshot::query(Self[A], @pattern.TimeSpan) -> Array[@pattern.Event[A]]
 pub fn[A] SongSnapshot::query_sourced_events(Self[A], @pattern.TimeSpan) -> Array[SongSnapshotEvent[A]]
+pub fn[A] SongSnapshot::query_sourced_events_for_entry(Self[A], Int, @pattern.TimeSpan) -> Array[SongSnapshotEvent[A]]
 pub fn[A] SongSnapshot::revision(Self[A]) -> @identity.Revision
 pub fn[A] SongSnapshot::section_id_for_occurrence(Self[A], @identity.OccurrenceId) -> @identity.SectionId?
 pub fn[A] SongSnapshot::song(Self[A]) -> Song[A]
@@ -228,9 +236,10 @@ pub struct SongSnapshotEvent[A] {
   // private fields
 }
 pub fn[A] SongSnapshotEvent::event(Self[A]) -> @pattern.Event[A]
-pub fn[A] SongSnapshotEvent::layer(Self[A]) -> @identity.SectionLayerId?
+pub fn[A] SongSnapshotEvent::layer(Self[A]) -> @identity.SectionLayerId
 pub fn[A] SongSnapshotEvent::occurrence(Self[A]) -> @identity.OccurrenceId
-pub fn[A] SongSnapshotEvent::section(Self[A]) -> @identity.SectionId?
+pub fn[A] SongSnapshotEvent::origin(Self[A]) -> SongEventOrigin
+pub fn[A] SongSnapshotEvent::section(Self[A]) -> @identity.SectionId
 
 pub struct TimeScope {
   // private fields

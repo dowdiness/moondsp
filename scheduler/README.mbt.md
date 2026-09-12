@@ -171,39 +171,27 @@ test "edit orchestration stages a replacement and reconciles active voices" {
     pat=@pattern.note(60.0),
   )
   let active_snapshot = try! active_doc.lower()
-  let arc = @pattern.TimeSpan::new(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::new(1L, 100L),
-  )
-  let active_playback = @scheduler.PlaybackSnapshot::pattern(active_snapshot)
-  let active_events = active_playback.query_playback_events(arc)
-  sched.process_playback_events(active_events, arc, pool)
 
   let replacement_doc = @pattern.PatternDoc::from_pattern(
     id=replacement_root,
     pat=@pattern.note(67.0),
   )
   let replacement = try! replacement_doc.lower()
+  let left = @moondsp.AudioBuffer::filled(128)
+  let right = @moondsp.AudioBuffer::filled(128)
+  sched.queue_pattern_snapshot(active_snapshot)
+  sched.process_snapshot_block(pool, left, right)
   let outcome = sched
-    .queue_pattern_snapshot_live_control_edit_result(
-      snapshot=replacement,
-      policy=@scheduler.AffectedVoicePolicy::GateOffAffected,
-      edit=@scheduler.AffectedVoiceEditScope::pattern_node(edited),
-      controls=[
-        // Pattern notes use the "note" binding's MIDI-to-Hz mapping; direct
-        // graph controls write the target slot's raw value.
-        @moondsp.GraphControl::set_param(
-          0,
-          @moondsp.GraphParamSlot::Value0,
-          330.0,
-        ),
-      ],
-      pool~,
+    .queue_pattern_snapshot_effect_result(
+      replacement,
+      @scheduler.PatternVoiceScope::node(edited),
+      @scheduler.ActiveVoiceEffect::Release,
+      pool,
     )
     .unwrap()
 
-  assert_eq(outcome.controlled_voice_count, 1)
-  assert_eq(outcome.removed_active_note_count, 1)
+  assert_eq(outcome.retuned_voice_count, 0)
+  assert_eq(outcome.detached_note_count, 1)
   assert_true(sched.has_pending_pattern_snapshot())
   assert_eq(sched.active_note_count(), 0)
 }
