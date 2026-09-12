@@ -7,8 +7,8 @@ behavior belongs in `CHANGELOG.md`.
 
 ## Current State
 
-- `main` includes PR #241 (`ca940d7`), which adds one shared stereo room-reverb
-  bus across synth and drum routes.
+- Release `v0.6.0` is published from `main`; it includes PR #241's shared
+  stereo room-reverb bus across synth and drum routes.
 - Browser live playback supports pattern and song inputs, immutable named
   pattern definitions, prepared score updates, playback-position preservation,
   next-material-entry edit application, independent synth-note envelopes, and
@@ -24,18 +24,16 @@ behavior belongs in `CHANGELOG.md`.
   `MiniAuthoringPipeline` have separate promotion boundaries; do not move the
   authoring path to Loom without a new decision satisfying ADR-0013's remaining
   gates.
-- PR #86 prepares release `v0.6.0`. It updates release metadata only; do not tag
-  or publish until the release checks and PR review complete.
+- `dowdiness/incr` is pinned to `0.15.1` under issue #226. The authoring
+  pipeline uses `Input`, `Derived`, `AcceptedDerived`, and persistent `Watch`
+  ownership without changing Mini syntax or parser selection.
 
 ## Recommended Next Slice
 
-After `v0.6.0`, migrate `dowdiness/incr` from `0.9.0` to `0.14.0` under issue
-#226.
-
-Keep the migration bounded to the published API changes recorded by that issue:
-`Signal` → `Input`, `Memo` → `Derived`, scope constructor updates, and
-`PatternDoc` revision tracking. Do not combine it with Mini syntax, Loom
-promotion, or a new incremental-parser design.
+Implement Mini `+` overlay sugar under issue #217 by lowering directly to the
+existing `stack` algebra. Keep numeric addition and `ControlMap` merging out of
+scope; this is the smallest independent authoring feature after the dependency
+migration.
 
 ## Conditional Reliability Slice
 
@@ -50,8 +48,6 @@ new feature work:
 
 ## Alternative Slices
 
-- **Mini `+` overlay sugar (#217)** — lower directly to the existing `stack`
-  algebra. Keep numeric addition and `ControlMap` merging out of scope.
 - **Browser protocol/status (#156, #216)** — document the compiled-demo versus
   live-scheduler worklet split, then add only status or room controls justified
   by a concrete live UI consumer.

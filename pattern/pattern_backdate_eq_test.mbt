@@ -1,8 +1,7 @@
 // Unit tests for PatternDoc's incr `BackdateEq` participation. The trait
 // methods (`changed_at` / `backdate_equal`) are exercised here against the
 // published incr pin; the full `accepted_memo` last-good round-trip lives in
-// the loom-mini-cst spike (which resolves the unreleased `AcceptedDerived`
-// via its working-tree incr path-dep). `PatternDoc[Int]` stands in as the
+// the mini authoring pipeline tests. `PatternDoc[Int]` stands in as the
 // non-`Eq`, revision-bearing candidate value.
 
 ///|
@@ -27,9 +26,12 @@ fn bd_doc1(value : Int) -> PatternDoc[Int] {
 }
 
 ///|
-test "patterndoc backdate: changed_at projects the identity revision value" {
-  inspect(bd_doc0(1).changed_at().value, content="0")
-  inspect(bd_doc1(1).changed_at().value, content="1")
+test "patterndoc backdate: changed_at advances monotonically" {
+  let initial = bd_doc0(1)
+  let transformed = initial.rev(id=bd_pid("changed-at-rev")) catch {
+    _ => abort("rev should not fail on a fresh pure doc")
+  }
+  assert_true(transformed.changed_at() > initial.changed_at())
 }
 
 ///|

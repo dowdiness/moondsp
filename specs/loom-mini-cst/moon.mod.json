@@ -3,12 +3,12 @@
   "version": "0.0.0",
   "source": "src",
   "deps": {
-    "dowdiness/loom": { "path": "../../../canopy/loom/loom" },
+    "dowdiness/loom": { "path": "../../../canopy/deps/loom/loom" },
     "dowdiness/moondsp": { "path": "../.." },
-    "dowdiness/seam": { "path": "../../../canopy/loom/seam" },
-    "dowdiness/pretty": { "path": "../../../canopy/loom/pretty" },
-    "dowdiness/incr": { "path": "../../../canopy/loom/incr/incr" },
-    "dowdiness/text_change": { "path": "../../../canopy/loom/text-change" }
+    "dowdiness/seam": { "path": "../../../canopy/deps/loom/seam" },
+    "dowdiness/pretty": { "path": "../../../canopy/deps/loom/pretty" },
+    "dowdiness/incr": { "path": "../../../canopy/deps/loom/incr/incr" },
+    "dowdiness/text_change": { "path": "../../../canopy/deps/loom/text-change" }
   },
   "readme": "README.md",
   "repository": "https://github.com/dowdiness/moondsp",

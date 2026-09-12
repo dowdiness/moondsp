@@ -1,9 +1,10 @@
 # Mini authoring `AcceptedDerived` migration
 
 **Status:** Completed (2026-07-08; implementation PR #227; decision ADR-0017)  
+**Current API refresh:** 2026-09-12; issue #226; incr `0.15.1`
 **Date:** 2026-07-07  
 **Campaign parent:** #184 (mini authoring loom promotion)  
-**Depends on:** incr `#233` (diamond fix) — already in incr `0.9.0` (current pin)
+**Depends on:** incr `#233` (diamond fix), included in current pin `0.15.1`
 
 ## Outcome
 
@@ -27,36 +28,35 @@ acceptance model.
 
 ---
 
-## 1. Pre-migration architecture
+## 1. Pre-acceptance architecture (current incr vocabulary)
 
 ```text
-Signal[text] ──┐
-Signal[edit] ───┤
-                v
-        Memo[parsed candidate]   ──→ Observer[Result[Doc, String]]
-                │                     ↑ parse_doc()
-                │  mut previous
-                │  (last Ok Doc,
-                │   UNCHANGED on Err)
-                v
-        Memo[snapshot candidate] ──→ Observer[Result[Snap, String]]
-                                      ↑ parse_snapshot()
+Input[text] ──┐
+Input[edit] ───┤
+               v
+      Derived[parsed candidate] ──→ Watch[Result[Doc, String]]
+               │                     ↑ parse_doc()
+               │  mut previous
+               │  (last Ok Doc,
+               │   UNCHANGED on Err)
+               v
+      Derived[lazy snapshot reader] ──→ Watch[() -> Result[Snap, String]]
+                                        ↑ parse_snapshot()
 ```
 
 ```mermaid
 flowchart LR
-    subgraph Signals
-        text[Signal text]
-        edit[Signal source_edit]
-        base[Signal source_edit_base]
+    subgraph Inputs
+        text[Input text]
+        edit[Input source_edit]
     end
     subgraph Candidates
-        parsed["Memo[parsed]<br/>Result[Doc, String]"]
-        snapshot["Memo[snapshot]<br/>Result[Snap, String]"]
+        parsed["Derived[parsed]<br/>Result[Doc, String]"]
+        snapshot["Derived[snapshot reader]<br/>() → Result[Snap, String]"]
     end
-    subgraph Observers
-        p_obs[Observer parse_doc]
-        s_obs[Observer parse_snapshot]
+    subgraph Watches
+        p_watch[Watch parse_doc]
+        s_watch[Watch parse_snapshot]
     end
     subgraph Mutable
         prev["mut previous: Doc?"]
@@ -64,51 +64,55 @@ flowchart LR
     end
     text --> parsed
     edit --> parsed
-    base --> parsed
     parsed --> snapshot
     prev -.-> parsed
     lc -.-> snapshot
-    parsed --> p_obs
-    snapshot --> s_obs
+    parsed --> p_watch
+    snapshot --> s_watch
 ```
 
-Key: `parsed` memo reads `prev` on every recompute to pass as `previous` to `parse_doc_with_token_identities`. On `Ok`, it sets `prev = Some(doc)`. On `Err`, `prev` is untouched. This is two concerns in one mutable cell.
+Key: the parsed derived reads `prev` on every recompute to pass as `previous`
+to `parse_doc_with_token_identities`. On `Ok`, it sets `prev = Some(doc)`. On
+`Err`, `prev` is untouched. This is two concerns in one mutable cell.
 
 ---
 
 ## 2. Target architecture (Case A)
 
 ```text
-Signal[text] ──┐
-Signal[edit] ───┤
-                v
-        Memo[parsed candidate]   ──→ Observer[Result[Doc, String]]
-                │                     ↑ parse_doc() — current channel
-     ┌──────────┤
-     v          │
-AcceptedDerived │
-  (BackdateEq)  │
-     │          │
-     v          v
-  accepted    id-reuse
-  channel     previous (Kept inside
-  (advisory)  candidate only)
+Input[text] ──┐
+Input[edit] ───┤
+               v
+      Derived[parsed candidate] ──→ Watch[Result[Doc, String]]
+               │                     ↑ parse_doc() — current channel
+     ┌─────────┤
+     v         │
+AcceptedDerived│
+  (BackdateEq) │
+     │         │
+     v         v
+  accepted   id-reuse
+  channel    previous (kept inside
+  (advisory) candidate only)
 ```
 
 ```mermaid
 flowchart LR
-    subgraph Signals
-        text[Signal text]
-        edit[Signal source_edit]
-        base[Signal source_edit_base]
+    subgraph Inputs
+        text[Input text]
+        edit[Input source_edit]
     end
     subgraph Candidates
-        parsed["Memo[parsed]<br/>Result[Doc, String]"]
-        snapshot["Memo[snapshot]<br/>Result[Snap, String]"]
+        parsed["Derived[parsed]<br/>Result[Doc, String]"]
+        snapshot["Derived[snapshot reader]<br/>() → Result[Snap, String]"]
     end
     subgraph Accepted
         ac["AcceptedDerived[Doc, String]<br/>(scope.accepted_memo)"]
         ac_doc["accepted_doc(): Doc?"]
+    end
+    subgraph Watches
+        p_watch[Watch parse_doc]
+        s_watch[Watch parse_snapshot]
     end
     subgraph Mutable
         prev["mut previous: Doc?"]
@@ -116,22 +120,24 @@ flowchart LR
     end
     text --> parsed
     edit --> parsed
-    base --> parsed
     prev -.-> parsed
     parsed --> snapshot
     parsed -->|"candidate"| ac
-    parsed --> p_obs
+    parsed --> p_watch
     ac -->|"advisory"| ac_doc
-    snapshot --> s_obs
+    snapshot --> s_watch
     lc -.-> snapshot
 ```
 
 Changes:
-- `mut previous` stays inside the candidate memo for **ID reuse only** — it's still needed by `parse_doc_with_token_identities(..., previous=Some(...))`.
-- A new `AcceptedDerived[PatternDoc, String]` (BackdateEq tier via `scope.accepted_memo`) wraps `parsed.get()` as its candidate.
+- `mut previous` stays inside the candidate derived for **ID reuse only** — it
+  is still needed by `parse_doc_with_token_identities(..., previous=Some(...))`.
+- `AcceptedDerived[PatternDoc, String]` (BackdateEq tier via
+  `scope.accepted_memo`) wraps `parsed.read_or_abort()` as its candidate.
 - `accepted_doc()` exposes the last-good doc as `PatternDoc?`.
-- `parse_doc()` stays the current channel (same `Observer`).
-- `parse_snapshot()` stays unchanged — it reads from `parsed` (current channel).
+- `parse_doc()` stays the current channel through its persistent `Watch`.
+- `parse_snapshot()` stays on the current channel; its watched derived returns
+  a per-revision lazy reader so Watch priming does not perform lowering.
 
 ---
 
@@ -156,12 +162,12 @@ Changes:
 
 | Path | Operation | Summary | Dependencies |
 |------|-----------|---------|-------------|
-| `mini/incr_authoring.mbt` | Modify | Add `AcceptedDerived` field, wire `scope.accepted_memo()`, add `accepted_doc()` method. `mut previous` stays in candidate for ID reuse. | `mini/moon.pkg` (no change needed — already imports full `@incr`) |
-| `mini/mini_test.mbt` | Modify | Add tests for `accepted_doc()` channel. Existing tests: all pass unchanged. | Tests in same file |
-| `docs/decisions/0017-mini-authoring-accepted-derived.md` | Add | New ADR for `AcceptedDerived` adoption in authoring path | Cross-references ADR-0011, ADR-0013 |
+| `mini/incr_authoring.mbt` | Modify | Add `AcceptedDerived` field, wire `scope.accepted_memo()`, add `accepted_doc()` method. `mut previous` stays in the candidate derived for ID reuse. | `mini/moon.pkg` already imports full `@incr` |
+| `mini/mini_test.mbt` | Modify | Add tests for `accepted_doc()` channel. Existing tests pass unchanged. | Tests in same file |
+| `docs/decisions/0017-mini-authoring-accepted-derived.md` | Add | Record `AcceptedDerived` adoption in the authoring path | Cross-references ADR-0011, ADR-0013 |
 | `CHANGELOG.md` | Modify | Add `MiniAuthoringPipeline::accepted_doc()` under [Added] | — |
-| `scripts/check-incr-import-boundaries.sh` | (None) | No change — `mini/` already on the full-facade carve-out list (ADR-0011) | — |
-| `moon.mod` | (None) | No change — incr `0.9.0` already has `AcceptedDerived.accepted_memo` + `Scope::accepted_memo` | — |
+| `scripts/check-incr-import-boundaries.sh` | Current follow-up | Keep `mini/` as the explicit full-facade carve-out for `Input`, `Derived`, `AcceptedDerived`, and `Watch` ownership. | ADR-0011 |
+| `moon.mod` | Current follow-up | incr is now pinned to `0.15.1`; the accepted-channel contract is unchanged. | Issue #226 |
 
 ---
 
@@ -170,31 +176,31 @@ Changes:
 **Last-good → `AcceptedDerived`:**
 
 ```moonbit
-// In MiniAuthoringPipeline::new(...):
-// AFTER the `parsed` memo is constructed:
-let parsed_accepted = scope.accepted_memo(
-  () => parsed.get(),
+// In MiniAuthoringPipeline::new(...), after the parsed derived is constructed:
+let accepted = scope.accepted_memo(
+  () => parsed.read_or_abort(),
   label="mini.accepted_doc",
 )
 ```
 
-This creates a `BackdateEq`-tier `AcceptedDerived` whose candidate is the parsed memo's current value. `backdate_equal(PatternDoc)` uses full revision identity (value + fingerprint) — the same predicate the spike proved correct.
+This creates a `BackdateEq`-tier `AcceptedDerived` whose candidate is the parsed derived's current value. `backdate_equal(PatternDoc)` uses full revision identity (value + fingerprint) — the same predicate the spike proved correct.
 
 **ID reuse — stays in candidate:**
 
-`mut previous` remains in the parsed candidate memo body. It is only read by `parse_doc_with_token_identities(..., previous=Some(prev))`. On `Ok`, `previous = Some(doc)`. On `Err`, untouched. This is the ID reuse concern ONLY — the last-good concern is now served by `AcceptedDerived`.
+`mut previous` remains in the parsed candidate derived body. It is only read by `parse_doc_with_token_identities(..., previous=Some(prev))`. On `Ok`, `previous = Some(doc)`. On `Err`, untouched. This is the ID reuse concern ONLY — the last-good concern is now served by `AcceptedDerived`.
 
 **Ownership:**
 
 ```text
-candidate memo           AcceptedDerived          mut previous
-─────────────            ───────────────          ───────────
+candidate derived        AcceptedDerived          mut previous
+─────────────────        ───────────────          ───────────
 stores previous          stores accepted          inside candidate
 for ID reuse             (via incr slot)          body only
                          read-only advisory
 ```
 
-`source_edit` / `source_edit_base` / token realignment — no change. The `source_edit_base.set(current)` on successful parse still happens inside the candidate body.
+`source_edit` / token realignment — no change. `previous_source` advances only
+after a successful parse.
 
 ---
 
@@ -202,7 +208,8 @@ for ID reuse             (via incr slot)          body only
 
 ### Existing tests — all pass unchanged
 
-All `MiniAuthoringPipeline` tests exercise the current channel (`parse_doc()` / `parse_snapshot()`). No change to any assertion:
+All `MiniAuthoringPipeline` tests exercise the current channel through
+`parse_doc()` / `parse_snapshot()`. No assertion changes:
 
 | Test | Behavior | Passes? |
 |------|----------|---------|
@@ -289,14 +296,14 @@ NEW_MOON_MOD=0 moon test --release
 
 **Changes:**
 1. Add `priv accepted : @incr.AcceptedDerived[PatternDoc[ControlMap], String]` field to struct
-2. In `MiniAuthoringPipeline::new(...)`, after `parsed` memo construction:
+2. In `MiniAuthoringPipeline::new(...)`, after parsed-derived construction:
    ```moonbit
    let accepted = scope.accepted_memo(
-     () => parsed.get(),
+     () => parsed.read_or_abort(),
      label="mini.accepted_doc",
    )
-   // No extra add_cell_ids needed — Scope::accepted_memo allocates its own
-   // child scope and registers the accepted cell internally. Matches spike.
+   // No manual root registration: Scope owns the accepted graph and persistent
+   // Watch values own outside-graph read roots.
    ```
 3. Add `accepted_doc()` method:
    ```moonbit
@@ -330,7 +337,7 @@ records the architectural decision.
 | Risk | Severity | Mitigation |
 |------|----------|------------|
 | **`parse_doc()` returns `Err` but `accepted_doc()` returns `Some(doc)`** — caller confusion about which channel to use | Medium | Document clearly: current vs accepted. The pattern is standard incr vocabulary. |
-| **`AcceptedDerived` eager fold + dynamic diamond dependency** — incr #233 fix is in 0.9.0, which is already pinned. Verified by spike. | None | Already mitigated by pin. |
+| **`AcceptedDerived` eager fold + dynamic diamond dependency** — incr #233 is included in the current 0.15.1 pin. | None | Already mitigated and covered by production tests. |
 | **`accepted_doc()` returns `None` before first successful parse** (not `Err`) | Low | Correct per incr spec. Callers must handle `Option`. |
 | **`BackdateEq` tier requires `PatternDoc : BackdateEq`** — already implemented (line 1259 of `pattern/pattern_doc.mbt`) | None | Already satisfied. |
 
@@ -339,8 +346,8 @@ records the architectural decision.
 1. **Return shape:** `PatternDoc?`, making the pre-first-success state explicit.
 2. **Naming:** `accepted_doc()`, matching the incremental runtime vocabulary.
 3. **Revision timestamp:** not exposed; no editor requirement justified it.
-4. **Accepted observer:** not exposed; add observation only for a concrete
-   editor integration.
+4. **Accepted Watch:** not exposed; add a separate accepted-value `Watch` only
+   for a concrete editor integration.
 5. **Accepted snapshot:** not added; the accepted document is the value
    boundary and lowering already benefits from cache reuse.
 6. **Campaign dependency:** retained as a rehearsal for #184 Phase 4. The
@@ -388,19 +395,20 @@ remains responsible for identity reuse.
 
 ### `docs/next-actions.md`
 
-No separate entry is needed. Ongoing #184 authoring work remains captured by
-the Phase 6 current-state and deferred-promotion notes.
+The current forward-looking status is maintained in `docs/next-actions.md`;
+the completed acceptance decision remains unchanged.
 
 ---
 
 ## Appendix: Spike proof summary
 
-The `specs/loom-mini-cst/` spike already demonstrates the exact pattern at the incr level:
+The `specs/loom-mini-cst/` spike proved the behavior against its local incr
+dependency. The equivalent public call shape in incr `0.15.1` is:
 
 ```moonbit
-// projection.mbt line 192-195
+// projection.mbt
 let accepted = scope.accepted_memo(
-  () => projected.get(),
+  () => projected.read_or_abort(),
   label="loom-mini-atom-projection.accepted",
 )
 ```
@@ -418,32 +426,30 @@ These tests prove the `AcceptedDerived` wiring is correct for `PatternDoc` with 
 ## Appendix: Implementation sketch for `MiniAuthoringPipeline::new`
 
 ```moonbit
-// Inside existing `new` function, AFTER the parsed memo (line 103):
-
+// Inside `new`, after creating and watching the parsed derived:
+let parsed_watch = scope.watch(parsed)
 let accepted = scope.accepted_memo(
-  () => parsed.get(),
+  () => parsed.read_or_abort(),
   label="mini.accepted_doc",
 )
 
-// Update field list (line 127-137):
 {
   scope,
   text,
   source_edit,
-  parsed_observer,
-  snapshot_observer,
-  token_count_observer,
+  parsed_watch,
+  snapshot_watch,
+  token_count_watch,
   lowering_cache,
   parse_compute_count_fn: fn() { parse_compute_count },
   snapshot_compute_count_fn: fn() { snapshot_compute_count },
-  accepted,  // new field
+  accepted,
 }
 ```
 
-`Scope::accepted_memo` internally allocates a child scope and calls
-`add_cell_ids` on it — the parent scope does NOT need an extra
-`add_cell_ids` call. This matches the spike (`projection.mbt:190-196`),
-which only registers the candidate cell ID with the parent scope.
+`Scope::accepted_memo` owns its internal accepted graph. The parent scope owns
+the candidate derived, and persistent `Watch` values root outside-graph reads;
+no manual `add_cell_ids` registration is required.
 
 Struct field addition:
 ```moonbit

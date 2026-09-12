@@ -22,10 +22,10 @@ declare -A VOCABULARY_ONLY_PACKAGES=(
 )
 
 # Packages allowed to import the full dowdiness/incr facade. Each entry must name
-# the ADR/design note that justifies owning Scope/Signal/Memo/Observer runtime
+# the ADR/design note that justifies owning Scope/Input/Derived/Watch runtime
 # cells instead of only importing dowdiness/incr/types.
 declare -A FULL_FACADE_CARVEOUTS=(
-  ["mini/moon.pkg"]="ADR-0011: MiniAuthoringPipeline owns incr Scope, Signal, Memo, and Observer cells."
+  ["mini/moon.pkg"]="ADR-0011: MiniAuthoringPipeline owns incr Scope, Input, Derived, AcceptedDerived, and Watch cells."
 )
 
 manifest_imports() {

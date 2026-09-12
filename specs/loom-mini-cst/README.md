@@ -8,62 +8,65 @@ authoring path (production still uses `MiniAuthoringPipeline` /
 
 ## Build prerequisites
 
-This spike compiles green **nowhere in CI** — by design. It `path`-deps five
-sibling repos that live outside the `moondsp` checkout, so a fresh `moondsp`
-clone alone cannot build it. See `moon.mod.json`.
+This spike is not compiled in CI by design. It path-depends on modules from a
+sibling `canopy` checkout, so a fresh `moondsp` clone alone cannot build it.
+See `moon.mod.json`.
 
-### 1. Local sibling checkouts
+### 1. Local sibling checkout
 
-The path-deps in `moon.mod.json` resolve, relative to this directory, to repos
-checked out as siblings of `moondsp` under `github.com/dowdiness/`:
+The path dependencies in `moon.mod.json` resolve relative to this directory
+through a sibling `canopy` checkout under `github.com/dowdiness/`:
 
 | Dep | Path (from `specs/loom-mini-cst/`) | Resolves to |
 |-----|-------------------------------------|-------------|
-| `dowdiness/loom` | `../../../canopy/loom/loom` | `github.com/dowdiness/canopy/loom/loom` |
-| `dowdiness/seam` | `../../../canopy/loom/seam` | `…/canopy/loom/seam` |
-| `dowdiness/pretty` | `../../../canopy/loom/pretty` | `…/canopy/loom/pretty` |
-| `dowdiness/incr` | `../../../canopy/loom/incr/incr` | `…/canopy/loom/incr/incr` |
-| `dowdiness/text_change` | `../../../canopy/loom/text-change` | `…/canopy/loom/text-change` |
+| `dowdiness/loom` | `../../../canopy/deps/loom/loom` | `github.com/dowdiness/canopy/deps/loom/loom` |
+| `dowdiness/seam` | `../../../canopy/deps/loom/seam` | `…/canopy/deps/loom/seam` |
+| `dowdiness/pretty` | `../../../canopy/deps/loom/pretty` | `…/canopy/deps/loom/pretty` |
+| `dowdiness/incr` | `../../../canopy/deps/loom/incr/incr` | `…/canopy/deps/loom/incr/incr` |
+| `dowdiness/text_change` | `../../../canopy/deps/loom/text-change` | `…/canopy/deps/loom/text-change` |
 | `dowdiness/moondsp` | `../..` | this repo |
 
-All five `canopy/loom/*` repos are **independent working repos**, not git
-submodules of `moondsp`. You must clone them yourself.
+The five direct `loom` dependencies live in the sibling `canopy` checkout
+under `deps/loom/`; they remain local path dependencies and are not published
+inputs to this spike.
 
-### 2. Required `canopy/loom/incr` checkout state
+### 2. Current local dependency state
 
-The spike builds correctly **only** when the sibling `canopy/loom/incr` repo is
-on `main` (or any commit containing incr #233's fix, commit `518305d`,
-`fix(incr): correct push_reachable_count for diamond dependencies`).
+The sibling `canopy/deps/loom/incr/incr` module is `0.15.1` and includes incr
+#233's diamond-dependency fix (`518305d`). The spike source still targets older
+Loom parser and incr APIs, so it does not compile against the current sibling
+checkout.
 
-If `incr` has drifted to an older branch/tag that predates `518305d`, the spike
-fails with the **diamond-freeze symptom**: the stage-5 accepted-derived eager
-fold silently stops updating because a candidate has dynamic diamond deps. This
-is not a spike bug — it is the missing #233 fix.
+A standalone `moon check` from this directory stops during dependency
+resolution: current Loom modules obtain additional local modules through
+Canopy's workspace. The 2026-09-12 investigation used a temporary cross-repo
+workspace containing this spike, `moondsp`, and the Canopy Loom modules to
+reach source compilation. Source compilation then reported the expected
+independent drift: Loom's new `SourceId` / parser-context contracts plus the
+removed incr `Signal`, `Memo`, and `Observer` APIs.
 
-### 3. `moon clean` after switching incr branches
+Issue #226 keeps this spike on local path dependencies; it does not promote or
+migrate the non-production Loom parser. That broader work remains under #184
+and #185.
 
-After checking out a different `incr` branch/commit, run `moon clean` in this
-directory before rebuilding. Stale build artifacts survive the branch switch and
-reproduce the old behavior otherwise.
+### 3. Smoke-check status
 
-```bash
-# from specs/loom-mini-cst/
-git -C ../../../canopy/loom/incr switch main   # ensure #233 fix is present
-moon clean
-moon check && moon test
-```
+There is currently no supported standalone smoke command for this fixture.
+Do not treat `NEW_MOON_MOD=0 moon check` from this directory as a
+source-compatibility check: it fails at dependency resolution before checking
+the spike source. A reproducible workspace-backed smoke command remains part
+of the rot-prevention work tracked by #185.
 
 ## Why this isn't in CI
 
 CI builds only what lives in the `moondsp` checkout (see `.github/workflows/`:
 boundary-check, browser-smoke, clap-prototype). The spike's local-path deps to
-`canopy/loom/*` are deliberately outside that boundary, so CI stays green by
-never building the spike.
+`canopy/deps/loom/*` are deliberately outside that boundary, so CI stays green
+by never building the spike.
 
 Closing that gap is tracked separately:
 
-- **#184** — promote the spike to the published registry `dowdiness/incr` so it
-  becomes CI-buildable. **Blocked** on incr #233 reaching mooncakes.
-- **#185** — this rot-prevention work (these build prerequisites + an optional
-  lightweight "spike still parses" CI guard).
+- **#184** — decide whether to promote this local-path spike into the
+  production authoring path under ADR-0013's remaining gates.
+- **#185** — rot prevention for these local build prerequisites.
 - **#187** — import-narrowness CI guard.

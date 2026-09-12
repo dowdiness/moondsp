@@ -3,6 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-05-20
 - **Source:** Phase 6+ incremental reparsing design slice
+- **Updated:** 2026-09-12 for `dowdiness/incr` `0.15.1`
 
 ## Context
 
@@ -10,10 +11,10 @@
 
 - `parse(input) -> Result[Pat[ControlMap], String]`, the runtime parser entry
   point used by playback-oriented callers.
-- `parse_doc(input)` and `parse_doc_reusing(input, previous)`, the
-  identity-bearing `PatternDoc` parser entry points used by authoring flows.
+- `parse_doc(input, previous?)`, the identity-bearing `PatternDoc` parser entry
+  point used by authoring flows.
 
-`parse_doc_reusing` already gives deterministic stable IDs and can preserve
+The optional `previous` argument gives deterministic stable IDs and can preserve
 unchanged subtrees when an edited string still produces the same
 `PatternNodeId`s. `PatternLoweringCache` can then reuse lowered pattern
 subtrees by stable identity and the complete dependency identity, including
@@ -32,21 +33,23 @@ existing `PatternDoc` parser before replacing any parser code.
 
 The pipeline contract is:
 
-- The source text is the only mutable input signal.
-- Parsing is a derived incr memo that calls `parse_doc` for the first parse and
-  `parse_doc_reusing` after the first successful `PatternDoc`.
+- The source text is the only mutable `Input`.
+- Parsing is a no-backdate `Derived` that calls `parse_doc`, passing the last
+  successful `PatternDoc` as `previous`.
 - Parser-local previous-document state is updated only after successful parses
   and exists solely to preserve stable identity on later valid edits.
 - An accepted derived tracks the parsed candidate and retains the latest
   successful document. It has no value before the first successful parse.
 - Parse errors remain visible on the current channel and update neither the
   parser reuse baseline nor the accepted channel.
-- Construction primes the initial candidate before the eager accepted fold so
-  parser-local mutation does not occur inside a reactive compute context.
-- Lowering is a second derived memo over the parsed document and uses one
-  persistent `PatternLoweringCache`.
-- A `Scope` owns the long-lived incr cells, and persistent `Observer` handles
-  anchor the parsed and lowered reads for the pipeline lifetime.
+- A persistent parsed `Watch` primes the initial candidate exactly once before
+  the eager accepted fold, so parser-local mutation does not occur inside that
+  fold's reactive compute context.
+- Lowering is a watched no-backdate `Derived` that produces a per-revision lazy
+  reader over the parsed document and one persistent `PatternLoweringCache`.
+  Creating the `Watch` anchors the cell without eagerly lowering a snapshot.
+- A `Scope` owns the long-lived incr cells, and persistent `Watch` handles
+  anchor parsed, snapshot, and diagnostic reads for the pipeline lifetime.
 
 This is incremental recomputation around whole-document parsing. It is not yet
 token-level incremental parsing: every text edit still reparses the whole mini
@@ -56,11 +59,11 @@ lowering-cache reuse after parsing.
 ## Boundary note
 
 `mini/moon.pkg` is the intentional production package that imports the full
-`dowdiness/incr` facade: `MiniAuthoringPipeline` owns `Scope`, `Signal`, `Memo`,
-and persistent `Observer` cells. Packages that only need `BackdateEq`,
-`HasChangedAt`, or `Revision` vocabulary should import `dowdiness/incr/types`
-instead. `scripts/check-incr-import-boundaries.sh` keeps the full-facade
-carve-out list explicit and ADR-referenced.
+`dowdiness/incr` facade: `MiniAuthoringPipeline` owns `Scope`, `Input`,
+`Derived`, `AcceptedDerived`, and persistent `Watch` cells. Packages that only
+need `BackdateEq`, `HasChangedAt`, or `Revision` vocabulary should import
+`dowdiness/incr/types` instead. `scripts/check-incr-import-boundaries.sh` keeps
+the full-facade carve-out list explicit and ADR-referenced.
 
 ## Consequences
 
@@ -73,8 +76,8 @@ carve-out list explicit and ADR-referenced.
   channel, the accepted channel retains the last valid document, and the next
   valid edit can still reuse its identity baseline.
 - The pipeline uses incr's lifecycle model directly (`Scope` plus persistent
-  `Observer` anchors), so later authoring UI code has a concrete ownership
-  pattern to follow.
+  `Watch` anchors), so later authoring UI code has a concrete ownership pattern
+  to follow.
 - The mini token layer now has an internal contiguous token edit-span helper.
   It preserves unchanged prefix/suffix token identity and allocates fresh keys
   inside the changed window, including duplicate-token insertion/deletion
@@ -90,12 +93,12 @@ carve-out list explicit and ADR-referenced.
 
 - The pipeline does not reduce parse cost yet; it only reduces downstream
   lowering work when stable IDs survive an edit.
-- The parsed memo closes over mutable previous-document state for identity
+- The parsed derived closes over mutable previous-document state for identity
   reuse. That state must not be updated on parse errors and must not become a
   second consumer-facing acceptance policy.
 - Token-aware atom IDs are currently attached inside `MiniAuthoringPipeline`;
-  direct `parse_doc` / `parse_doc_reusing` calls keep deterministic structural
-  occurrence IDs unless they are routed through a token-aware internal path.
+  direct `parse_doc` calls keep deterministic structural occurrence IDs unless
+  they are routed through a token-aware internal path.
   This keeps the public one-shot parser API stable and avoids accepting partial
   editor state without a clear owner for source edit spans.
 - Public API surface grows with an experimental authoring type before there is
