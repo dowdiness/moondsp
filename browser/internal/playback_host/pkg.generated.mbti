@@ -32,13 +32,15 @@ pub fn reset_scheduler_graph() -> Unit
 
 pub fn restart_playback() -> Int
 
+pub fn scheduler_bpm() -> Double
+
 pub fn scheduler_left_sample(Int) -> Double
 
 pub fn scheduler_right_sample(Int) -> Double
 
 pub fn scheduler_sample_position() -> Double
 
-pub fn set_scheduler_bpm(Double) -> Unit
+pub fn set_scheduler_bpm(Double) -> Int
 
 pub fn set_scheduler_gain(Double) -> Unit
 

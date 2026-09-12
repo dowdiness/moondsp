@@ -100,9 +100,7 @@ test("song content edits continue, and Stop then Play applies a new layout", asy
   expect(updated).toMatchObject({ type: "song-updated", operation: "update" });
   expect(updated.acceptedAtSample).toBeGreaterThan(0);
   const rejected = await edit(page, 'song(section("a",9,note("72")),part("a1","a"))');
-  expect(rejected).toMatchObject({ type: "song-error" });
-  expect(rejected.message).toContain("restart required");
-  await expect(page.locator("#log")).toContainText("Press Stop, then Play");
+  expect(rejected).toMatchObject({ type: "song-error", recovery: "restart" });
   await stop(page);
   expect(await play(page)).toMatchObject({
     type: "song-updated", operation: "restart", acceptedAtSample: 0,
@@ -148,18 +146,16 @@ test("named song definitions update in place and a bad reference preserves the a
   expect(updated).toMatchObject({ type: "song-updated", operation: "update" });
   expect(updated.acceptedAtSample).toBeGreaterThan(0);
   const error = await edit(page, 'let groove = missing; ' + song);
-  expect(error).toMatchObject({ type: "song-error", phase: "prepare" });
-  expect(error.message).toContain("undefined pattern 'missing'");
+  expect(error).toMatchObject({ type: "song-error", phase: "prepare", recovery: "edit" });
   const recovered = await edit(page, source("67"));
   expect(recovered).toMatchObject({ type: "song-updated", operation: "update" });
   expect(recovered.acceptedAtSample).toBeGreaterThan(updated.acceptedAtSample);
 });
 
-test("failed first Play stays stopped and explains how to retry", async ({ page }) => {
+test("failed first Play stays stopped and reports editable input", async ({ page }) => {
   await replaceText(page, "note(");
-  expect(await play(page)).toMatchObject({ type: "pattern-error" });
+  expect(await play(page)).toMatchObject({ type: "pattern-error", recovery: "edit" });
   await expectStopped(page);
-  await expect(page.locator("#log")).toContainText("Fix the code, then press Play");
 });
 
 for (const { mode, valid, invalid } of [

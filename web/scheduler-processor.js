@@ -8,7 +8,7 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
     this.reportedRuntimeError = false;
     this.reportedInitError = false;
     this.gain = this.sanitizeGain(options?.processorOptions?.initialGain ?? 0.3);
-    this.bpm = null;
+    this.pendingTempo = null;
     this.pendingPlayback = null;
     this.playback = null;
     this.graphInitialized = false;
@@ -31,8 +31,12 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
           this.playback?.handle(data);
         }
       } else if (data.type === "set-scheduler-bpm") {
-        this.bpm = Number(data.bpm);
-        this.applyBpm();
+        if (!this.graphInitialized) {
+          if (this.pendingTempo) this.port.postMessage({ type: "playback-superseded", revision: this.pendingTempo.revision });
+          this.pendingTempo = data;
+        } else {
+          this.playback.setTempo(data);
+        }
       } else if (data.type === "set-scheduler-gain") {
         this.gain = this.sanitizeGain(data.gain);
         this.applyGain();
@@ -66,6 +70,7 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
         "scheduler_right_sample",
         "set_scheduler_bpm",
         "set_scheduler_gain",
+        "scheduler_bpm",
         "clear_playback_input", "push_playback_char",
         "prepare_pattern_input", "prepare_song_input",
         "apply_prepared_playback", "discard_prepared_playback", "restart_playback",
@@ -111,7 +116,10 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
   }
 
   applySchedulerState() {
-    this.applyBpm();
+    if (this.pendingTempo) {
+      this.playback.setTempo(this.pendingTempo);
+      this.pendingTempo = null;
+    }
     this.applyGain();
     if (!this.pendingPlayback) {
       return;
@@ -121,11 +129,6 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
     this.playback.handle(request);
   }
 
-  applyBpm() {
-    if (this.graphInitialized && Number.isFinite(this.bpm) && typeof this.wasm.set_scheduler_bpm === "function") {
-      this.wasm.set_scheduler_bpm(this.bpm);
-    }
-  }
 
   applyGain() {
     if (this.graphInitialized && typeof this.wasm.set_scheduler_gain === "function") {

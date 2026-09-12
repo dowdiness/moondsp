@@ -19,9 +19,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplified playback internals with source-bound materials, explicit waiting
   and transition states, and shared raw/sourced entry traversal. Public
   interfaces, reserved replacement timing, and event output are unchanged.
+- Redesigned live editor playback around parsed tempo/source/request values,
+  a closed lifecycle state union, and scheduler/compiled session capabilities.
+  DOM callbacks submit intent and render a projection; one wire decoder reports
+  malformed messages explicitly. Stop/Retry invalidate retired-session replies.
+- Named live audio session operations explicitly: `openSession`, `submitScore`,
+  `requestTempoChange`, and `fadeIn`. `SessionCommandResult` distinguishes
+  `issued` from `session-expired`; issuing a command does not acknowledge DSP
+  acceptance. Session opening and closing return `OpenSessionResult` and
+  `CloseSessionResult`.
+- Changed `set_scheduler_bpm` to return success/rejection status and added
+  `scheduler_bpm` for authoritative effective tempo. Worklet tempo commands now
+  require a revision and return correlated success/error acknowledgements;
+  score receipts include effective tempo and the processed tempo revision.
+  MoonBit rendering and next-entry timing remain unchanged.
+- Application admission now returns `2` when starting/restarting is required,
+  distinct from ordinary rejection (`1`). Playback error receipts carry
+  structured `recovery`; editor behavior no longer depends on diagnostic wording.
+  The nonediting tempo field state is named `displaying`, not `synced`.
 
 ### Fixed
 
+- Preserved uncommitted live-editor BPM input across unrelated playback replies,
+  while retaining normalization on Enter or blur.
+- Prevented stale tempo acknowledgements from undoing newer edits. Runtime
+  rounding and song tempo below the manual input minimum are reflected in the
+  editor; contextual tempo rejection restores the effective BPM and reports
+  the error without stopping playback.
+- Kept graph failure handling active through Stop, suspension, and resume.
+  Faulty graphs are discarded, interrupted opens complete with failure, and
+  delayed close/resume completions cannot overwrite failure or Retry.
+  Retired audio session commands now return `session-expired` without changing output
+  or posting commands to a later playback run.
 - Fixed authored Euclid playback dropping notes from stacked child patterns.
   Its sourced query now follows the single canonical Euclid entry while
   preserving every child's note timing and authored path.

@@ -21,15 +21,13 @@ import { minilive } from "./lang/minilive";
 import { CM6Adapter } from "./canopy";
 import type { Diagnostic, UserIntent } from "./canopy";
 import { AudioEngine } from "./audio";
-import type { AudioEngineMode, AudioStatus, WorkletReply } from "./audio";
-
-type PlaybackMode = "pattern" | "song";
+import type { AudioEngineMode, AudioStatus } from "./audio";
+import { LivePlayback } from "./playback";
+import type { PlaybackView } from "./playback";
+import type { PlaybackMode } from "./playback-protocol";
 
 const INITIAL = `$: s("bd(3,8), hh*16?, sd(2,8,2)").jux(rev)
 $: note("48(3,8) 60(2,8,2) 67(3,8) 60(2,8,3)").slow(3)`;
-const DEBOUNCE_MS = 200;
-const DEFAULT_BPM = 60;
-const DEFAULT_GAIN = 0.6;
 
 // ── DOM ─────────────────────────────────────────────────────
 
@@ -132,24 +130,6 @@ if (schedulerTimingEnabled) {
   );
 }
 
-// Empty sentinels — nothing has been sent to the worklet yet, so the first
-// evalNow call must go through even if the doc still equals INITIAL.
-let playbackMode: PlaybackMode = "pattern";
-const submittedScores = new Map<number, { mode: PlaybackMode; text: string }>();
-let activeMode: PlaybackMode | null = null;
-let lastGoodByMode: Record<PlaybackMode, string> = { pattern: "", song: "" };
-let globalBpm = DEFAULT_BPM;
-let pending: number | null = null;
-
-// Revision tagging guards diagnostic application against stale worklet
-// replies: if the user has typed since we sent text v=N, the v=N reply
-// is silently discarded so we don't paint a squiggle at positions that
-// no longer line up with the current document.
-let revCounter = 0;
-let latestSentRev = 0;
-let latestSentMode: PlaybackMode = "pattern";
-let latestSentText = "";
-let fadeInAfterNextUpdate = false;
 
 function setLog(message: string, kind: "ok" | "error" | "info" = "info"): void {
   logEl.textContent = message;
@@ -157,58 +137,11 @@ function setLog(message: string, kind: "ok" | "error" | "info" = "info"): void {
   logEl.classList.toggle("ok", kind === "ok");
 }
 
-function modeLabel(mode: PlaybackMode): string {
-  return mode === "pattern" ? "pattern" : "song";
-}
-
-function sanitizeBpm(value: number): number {
-  if (!Number.isFinite(value) || value < 1.0) return 1.0;
-  return value;
-}
-
-function setGlobalBpm(value: number, sendToEngine = true): void {
-  globalBpm = sanitizeBpm(value);
-  bpmInput.value = String(globalBpm);
-  if (sendToEngine && engine.getStatus().kind === "running") {
-    engine.setBpm(globalBpm);
-  }
-}
 
 function applyBpmInput(): void {
-  const parsed = Number.parseFloat(bpmInput.value);
-  if (!Number.isFinite(parsed)) {
-    bpmInput.value = String(globalBpm);
-    return;
-  }
-  setGlobalBpm(parsed);
-  setLog(`BPM ${globalBpm}`, "info");
+  playback.commitBpm(bpmInput.value);
 }
 
-function embeddedBpm(text: string): number | null {
-  const match = /\bbpm\s*\(\s*([0-9]+(?:\.[0-9]+)?)\s*\)/.exec(text);
-  if (!match) return null;
-  const value = Number.parseFloat(match[1]);
-  return Number.isFinite(value) ? value : null;
-}
-
-function setPlaybackMode(mode: PlaybackMode, evaluateCurrent = true): void {
-  playbackMode = mode;
-  modePatternBtn.classList.toggle("active", mode === "pattern");
-  modeSongBtn.classList.toggle("active", mode === "song");
-  modePatternBtn.setAttribute("aria-pressed", String(mode === "pattern"));
-  modeSongBtn.setAttribute("aria-pressed", String(mode === "song"));
-  if (evaluateCurrent) {
-    setLog(`${modeLabel(mode)} mode selected`, "info");
-    evalNow(view.state.doc.toString());
-  }
-}
-
-function resetPlaybackDedupe(): void {
-  submittedScores.clear();
-  activeMode = null;
-  lastGoodByMode = { pattern: "", song: "" };
-  latestSentText = "";
-}
 
 function applyStatus(s: AudioStatus): void {
   switch (s.kind) {
@@ -240,24 +173,41 @@ function applyStatus(s: AudioStatus): void {
       startBtn.disabled = false;
       startBtn.textContent = "Retry";
       startBtn.dataset.action = "start";
-      // Engine torn itself down — drop any in-flight debounce and reset
-      // last-good so Retry will re-send the current document.
-      if (pending !== null) {
-        window.clearTimeout(pending);
-        pending = null;
-      }
-      resetPlaybackDedupe();
-      adapter.applyPatches([{ type: "SetDiagnostics", diagnostics: [] }]);
       break;
   }
 }
 
-engine.onStatus(applyStatus);
+let renderedPlayback: PlaybackView | undefined;
 
-setPlaybackMode("pattern", false);
-setGlobalBpm(DEFAULT_BPM, false);
-modePatternBtn.addEventListener("click", () => setPlaybackMode("pattern"));
-modeSongBtn.addEventListener("click", () => setPlaybackMode("song"));
+function renderPlayback(state: PlaybackView): void {
+  applyStatus(state.status);
+  modePatternBtn.classList.toggle("active", state.mode === "pattern");
+  modeSongBtn.classList.toggle("active", state.mode === "song");
+  modePatternBtn.setAttribute("aria-pressed", String(state.mode === "pattern"));
+  modeSongBtn.setAttribute("aria-pressed", String(state.mode === "song"));
+  if (bpmInput.value !== state.tempoText) bpmInput.value = state.tempoText;
+  if (state.feedback && state.feedback !== renderedPlayback?.feedback) {
+    setLog(state.feedback.message, state.feedback.kind);
+  }
+  if (state.diagnostic !== renderedPlayback?.diagnostic) {
+    const diagnostic = state.diagnostic;
+    adapter.applyPatches([{
+      type: "SetDiagnostics",
+      diagnostics: diagnostic
+        ? [diagnosticFromError(diagnostic.message, diagnostic.documentLength)]
+        : [],
+    }]);
+  }
+  renderedPlayback = state;
+}
+
+const playback = new LivePlayback(
+  engine, { text: view.state.doc.toString() }, renderPlayback,
+);
+
+modePatternBtn.addEventListener("click", () => playback.selectMode("pattern"));
+modeSongBtn.addEventListener("click", () => playback.selectMode("song"));
+bpmInput.addEventListener("input", () => playback.editBpm(bpmInput.value));
 bpmInput.addEventListener("change", applyBpmInput);
 bpmInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
@@ -280,163 +230,15 @@ function diagnosticFromError(raw: string, docLength: number): Diagnostic {
   return { from, to, severity: "error", message: m[2] || raw };
 }
 
-function replyPlaybackMode(reply: WorkletReply): PlaybackMode | null {
-  if (reply.type === "pattern-updated" || reply.type === "pattern-error") return "pattern";
-  if (reply.type === "song-updated" || reply.type === "song-error") return "song";
-  return null;
-}
-
-engine.onReply((reply: WorkletReply) => {
-  if (reply.type === "playback-superseded") {
-    if (typeof reply.revision === "number") submittedScores.delete(reply.revision);
-    return;
-  }
-  // Output belongs to playback, even when the editor has advanced to another
-  // revision. A stale diagnostic must not leave successfully started audio muted.
-  if (fadeInAfterNextUpdate && (reply.type === "pattern-updated" ||
-      reply.type === "song-updated")) {
-    fadeInAfterNextUpdate = false;
-    engine.fadeIn();
-  }
-  // Track applied state independently of whether the editor has moved on.
-  // UI diagnostics below still belong only to the current editor revision.
-  if ("revision" in reply && typeof reply.revision === "number") {
-    const submitted = submittedScores.get(reply.revision);
-    if (submitted && (reply.type === "pattern-updated" || reply.type === "song-updated")) {
-      activeMode = submitted.mode;
-      lastGoodByMode[submitted.mode] = submitted.text;
-      const bpm = submitted.mode === "song" ? embeddedBpm(submitted.text) : null;
-      if (bpm !== null) setGlobalBpm(bpm, false);
-    }
-    if (reply.type === "pattern-updated" || reply.type === "song-updated" ||
-        reply.type === "pattern-error" || reply.type === "song-error") {
-      submittedScores.delete(reply.revision);
-    }
-  }
-
-  const replyMode = replyPlaybackMode(reply);
-  if (replyMode !== null) {
-    // Drop replies for older submissions — a newer eval is in flight
-    // (or already landed) and its reply will carry the right state.
-    const rev = "revision" in reply && typeof reply.revision === "number" ? reply.revision : undefined;
-    if (rev !== undefined && rev !== latestSentRev) return;
-    if (replyMode !== latestSentMode) return;
-    // Drop replies whose submitted text no longer matches the current
-    // document. The user typed during the in-flight eval; the next
-    // debounced send will produce a reply that does match.
-    if (latestSentText !== view.state.doc.toString()) return;
-  }
-
-  if (reply.type === "pattern-updated" || reply.type === "song-updated") {
-    const mode: PlaybackMode = reply.type === "pattern-updated" ? "pattern" : "song";
-    setLog(reply.operation === "update"
-      ? `✓ ${modeLabel(mode)} edit queued for the next pattern starts`
-      : `✓ ${modeLabel(mode)} updated`, "ok");
-    adapter.applyPatches([{ type: "SetDiagnostics", diagnostics: [] }]);
-  } else if (reply.type === "pattern-error" || reply.type === "song-error") {
-    const msg = String(reply.message ?? "parse error");
-    const recovery = activeMode === null
-      ? "Nothing is playing yet. Fix the code, then press Play."
-      : "Your edit was not applied. The last working version keeps playing.";
-    const restartHint = msg.includes("restart required")
-      ? " Press Stop, then Play to apply this change from the beginning."
-      : "";
-    setLog(`✗ ${msg} — ${recovery}${restartHint}`, "error");
-    const diag = diagnosticFromError(msg, view.state.doc.length);
-    adapter.applyPatches([{ type: "SetDiagnostics", diagnostics: [diag] }]);
-    if (fadeInAfterNextUpdate) void stopPlayback();
-  }
-  // Ignore other worklet messages (telemetry, hot-swap acks, etc.) for now.
-});
-
-function evalNow(text: string, restart = false): void {
-  if (engine.getStatus().kind !== "running") return;
-  const mode = playbackMode;
-  if (!restart && submittedScores.size === 0 && mode === activeMode && text === lastGoodByMode[mode]) return;
-  if (text.trim() === "") {
-    // Empty input: skip the wasm round trip entirely. The parser would
-    // synthesize an "empty input" error with no position, which the
-    // adapter would clamp to a 0..0 range and drop on an empty doc —
-    // leaving the user with a footer error and no inline marker.
-    // Treat as a soft no-op: clear any existing diagnostic, surface a
-    // hint, and let the worklet keep playing the last good graph.
-    const rev = ++revCounter;
-    latestSentRev = rev;
-    latestSentMode = mode;
-    latestSentText = text;
-    const waitingForPlayback = fadeInAfterNextUpdate;
-    if (waitingForPlayback) void stopPlayback();
-    adapter.applyPatches([{ type: "SetDiagnostics", diagnostics: [] }]);
-    setLog(waitingForPlayback ? "Enter code, then press Play." : "(empty — keeping previous playback)", "info");
-    return;
-  }
-  const rev = ++revCounter;
-  latestSentRev = rev;
-  latestSentMode = mode;
-  latestSentText = text;
-  submittedScores.set(rev, { mode, text });
-  engine.applyScore(mode, text, restart || mode !== activeMode ? "restart" : "continue", rev);
-  // lastGood is committed by the *-updated reply handler — not here —
-  // so an in-flight parse error doesn't poison the dedupe.
-}
-
-function scheduleEval(text: string): void {
-  if (pending !== null) window.clearTimeout(pending);
-  pending = window.setTimeout(() => {
-    pending = null;
-    evalNow(text);
-  }, DEBOUNCE_MS);
-}
 
 adapter.onIntent((intent: UserIntent) => {
   if (intent.type === "TextEdit") {
-    scheduleEval(view.state.doc.toString());
+    playback.edit(view.state.doc.toString());
   }
 });
 
-// ── Start handler ───────────────────────────────────────────
-
-async function stopPlayback(): Promise<void> {
-  if (pending !== null) window.clearTimeout(pending);
-  pending = null;
-  fadeInAfterNextUpdate = false;
-  resetPlaybackDedupe();
-  await engine.stop();
-}
-
-startBtn.addEventListener("click", async () => {
-  if (startBtn.dataset.action === "stop") {
-    await stopPlayback();
-    setLog("stopped", "info");
-    return;
-  }
-  if (audioMode === "scheduler" && view.state.doc.toString().trim() === "") {
-    setLog("Enter code, then press Play.", "info");
-    return;
-  }
-
-  try {
-    await engine.start();
-    engine.setBpm(globalBpm);
-    engine.setGain(DEFAULT_GAIN);
-    // Send the current document to bring up the initial pattern. Keep master
-    // output muted until the worklet confirms the pattern swap so transport
-    // resets/retriggers cannot click at full amplitude.
-    const startText = view.state.doc.toString();
-    if (audioMode === "scheduler" && startText.trim() === "") {
-      await stopPlayback();
-      setLog("Enter code, then press Play.", "info");
-      return;
-    }
-    fadeInAfterNextUpdate = audioMode === "scheduler" && startText.trim() !== "";
-    evalNow(startText);
-    if (!fadeInAfterNextUpdate) {
-      engine.fadeIn();
-    }
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    setLog(`✗ start failed: ${msg}`, "error");
-  }
+startBtn.addEventListener("click", () => {
+  void playback.toggle();
 });
 
 // ── Cheatsheet ──────────────────────────────────────────────
@@ -462,14 +264,10 @@ cheatEl.addEventListener("click", (ev) => {
   if (!text) return;
   const mode: PlaybackMode = example.dataset.mode === "song" ? "song" : "pattern";
   const bpm = example.dataset.bpm;
-  if (bpm) setGlobalBpm(Number.parseFloat(bpm));
-  setPlaybackMode(mode, false);
   view.dispatch({
     changes: { from: 0, to: view.state.doc.length, insert: text },
   });
-  if (pending !== null) window.clearTimeout(pending);
-  pending = null;
-  evalNow(text, true);
+  playback.useExample({ mode, text, bpm });
   view.focus();
 });
 
