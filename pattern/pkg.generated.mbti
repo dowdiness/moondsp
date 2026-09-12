@@ -133,12 +133,19 @@ pub fn[A] PatternLoweringCache::miss_count(Self[A]) -> Int
 pub fn[A] PatternLoweringCache::new() -> Self[A]
 pub fn[A] PatternLoweringCache::reset_stats(Self[A]) -> Unit
 
+pub struct PatternNodePath {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn PatternNodePath::leaf(Self) -> @identity.PatternNodeId
+pub fn PatternNodePath::nodes(Self) -> Array[@identity.PatternNodeId]
+
 pub struct PatternSnapshot[A] {
   // private fields
 }
 pub fn[A] PatternSnapshot::pat(Self[A]) -> Pat[A]
 pub fn[A] PatternSnapshot::query(Self[A], TimeSpan) -> Array[Event[A]]
 pub fn[A] PatternSnapshot::query_sourced_events(Self[A], TimeSpan) -> Array[PatternSnapshotEvent[A]]
+pub fn[A] PatternSnapshot::query_sourced_events_for_entry(Self[A], Int, TimeSpan) -> Array[PatternSnapshotEvent[A]]
 pub fn[A] PatternSnapshot::revision(Self[A]) -> @identity.Revision
 pub fn[A] PatternSnapshot::root(Self[A]) -> @identity.PatternNodeId
 
@@ -146,7 +153,8 @@ pub struct PatternSnapshotEvent[A] {
   // private fields
 }
 pub fn[A] PatternSnapshotEvent::event(Self[A]) -> Event[A]
-pub fn[A] PatternSnapshotEvent::pattern_node(Self[A]) -> @identity.PatternNodeId?
+pub fn[A] PatternSnapshotEvent::pattern_node(Self[A]) -> @identity.PatternNodeId
+pub fn[A] PatternSnapshotEvent::pattern_node_path(Self[A]) -> PatternNodePath
 pub fn[A] PatternSnapshotEvent::pattern_nodes(Self[A]) -> Array[@identity.PatternNodeId]
 
 pub struct Rational {

@@ -36,14 +36,21 @@ fn accept(
 }
 
 ///|
-fn notes(state : PlaybackState, begin : Int, end_ : Int) -> Array[Int] {
+fn notes(state : PlaybackState, begin : Int, end_ : Int) -> Array[Int] raise {
   let arc = @pattern.TimeSpan::new(
     @pattern.Rational::from_int(begin),
     @pattern.Rational::from_int(end_),
   )
-  let events = state
-    .query_active_events(arc)
-    .filter(e => e.whole is Some(w) && arc.contains(w.begin))
+  let raw = state.query_active_events(arc)
+  let sourced = state.query_active_sourced_events(arc)
+  assert_eq(raw.length(), sourced.length())
+  for i, event in raw {
+    let actual = sourced[i].event()
+    assert_true(event.whole == actual.whole)
+    assert_true(event.part == actual.part)
+    assert_true(event.value.entries() == actual.value.entries())
+  }
+  let events = raw.filter(e => e.whole is Some(w) && arc.contains(w.begin))
   events.sort_by((a, b) => {
     a.whole.unwrap().begin.compare(b.whole.unwrap().begin)
   })
@@ -91,7 +98,8 @@ test "reordering named entries preserves pending targets and deletion finishes t
   accept(state, [material("b", 80, 4)], 2)
   assert_eq(notes(state, 2, 5), [81, 80])
   state.commit_pending(@pattern.Rational::from_int(4))
-  assert_eq(state.entries.length(), 1)
+  assert_eq(notes(state, 4, 5), [80])
+  assert_false(state.has_pending())
 }
 
 ///|
@@ -170,4 +178,40 @@ test "combined custom content without signatures is conservatively replaced" {
   accept(state, [combined(60)], 0)
   accept(state, [combined(70)], 1)
   assert_eq(notes(state, 1, 2), [70, 71, 70, 71])
+}
+
+///|
+test "pending additions retain their reservation through replacement and cancellation" {
+  let replaced = PlaybackState()
+  accept(replaced, [], 0)
+  accept(replaced, [material("a", 60, 3)], 1)
+  accept(replaced, [material("a", 70, 4)], 2)
+  assert_eq(notes(replaced, 2, 8), [70, 71, 70])
+  replaced.commit_pending(@pattern.Rational::from_int(3))
+  assert_eq(notes(replaced, 3, 8), [70, 71, 70])
+  assert_false(replaced.has_pending())
+  let cancelled = PlaybackState()
+  accept(cancelled, [], 0)
+  accept(cancelled, [material("a", 60, 3)], 1)
+  accept(cancelled, [], 2)
+  assert_eq(notes(cancelled, 2, 5), [])
+  assert_true(cancelled.has_pending())
+  cancelled.commit_pending(@pattern.Rational::from_int(3))
+  assert_eq(notes(cancelled, 3, 5), [])
+  assert_false(cancelled.has_pending())
+}
+
+///|
+test "silence cancels a waiting addition without starting its old material" {
+  let state = PlaybackState()
+  accept(state, [], 0)
+  accept(state, [material("a", 60, 3)], 1)
+  let silence : @pattern.Pat[@pattern.ControlMap] = @pattern.Pat::silence()
+    .slow(@pattern.Rational::from_int(3))
+    .named_entry("a")
+  accept(state, [silence], 2)
+  assert_false(state.has_pending())
+  assert_eq(notes(state, 2, 5), [])
+  accept(state, [material("a", 70, 3)], 2)
+  assert_eq(notes(state, 2, 5), [70, 71])
 }

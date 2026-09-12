@@ -1,88 +1,29 @@
 ///|
-/// Internal provenance payload for an event queried from a playback snapshot.
-pub struct PlaybackEventSource {
-  priv pattern_nodes : Array[@identity.PatternNodeId]
-  priv section : @identity.SectionId?
-  priv layer : @identity.SectionLayerId?
-  priv occurrence : @identity.OccurrenceId?
-}
-
-///|
-fn PlaybackEventSource::pattern(
-  pattern_nodes~ : Array[@identity.PatternNodeId],
-) -> PlaybackEventSource {
-  {
-    pattern_nodes: pattern_nodes.copy(),
-    section: None,
-    layer: None,
-    occurrence: None,
-  }
-}
-
-///|
-fn PlaybackEventSource::song(
-  section~ : @identity.SectionId?,
-  layer~ : @identity.SectionLayerId?,
-  occurrence~ : @identity.OccurrenceId,
-) -> PlaybackEventSource {
-  { pattern_nodes: [], section, layer, occurrence: Some(occurrence), }
-}
-
-///|
-pub fn PlaybackEventSource::pattern_nodes(
-  self : PlaybackEventSource,
-) -> Array[@identity.PatternNodeId] {
-  self.pattern_nodes.copy()
-}
-
-///|
-pub fn PlaybackEventSource::section(
-  self : PlaybackEventSource,
-) -> @identity.SectionId? {
-  self.section
-}
-
-///|
-pub fn PlaybackEventSource::layer(
-  self : PlaybackEventSource,
-) -> @identity.SectionLayerId? {
-  self.layer
-}
-
-///|
-pub fn PlaybackEventSource::occurrence(
-  self : PlaybackEventSource,
-) -> @identity.OccurrenceId? {
-  self.occurrence
-}
-
-///|
-/// Internal event wrapper returned by playback snapshot queries.
-pub struct PlaybackEventRecord {
+/// A playback event paired with its authored voice origin.
+pub struct PlaybackSourcedEvent {
   priv event : @pattern.Event[@pattern.ControlMap]
-  priv source : PlaybackEventSource
+  priv origin : @model.VoiceOrigin
 }
 
 ///|
-fn PlaybackEventRecord::PlaybackEventRecord(
-  event~ : @pattern.Event[@pattern.ControlMap],
-  source~ : PlaybackEventSource,
-) -> PlaybackEventRecord {
-  { event, source, }
+pub fn PlaybackSourcedEvent::anonymous(
+  event : @pattern.Event[@pattern.ControlMap],
+) -> PlaybackSourcedEvent {
+  { event, origin: @model.VoiceOrigin::Anonymous, }
 }
 
 ///|
-pub fn PlaybackEventRecord::event(
-  self : PlaybackEventRecord,
+pub fn PlaybackSourcedEvent::event(
+  self : PlaybackSourcedEvent,
 ) -> @pattern.Event[@pattern.ControlMap] {
   self.event
 }
 
 ///|
-pub fn PlaybackEventRecord::source(
-  self : PlaybackEventRecord,
-) -> PlaybackEventSource {
-  self.source
+pub fn PlaybackSourcedEvent::origin(
+  self : PlaybackSourcedEvent,
+) -> @model.VoiceOrigin {
+  self.origin
 }
 
 ///|
@@ -148,26 +89,14 @@ pub fn PlaybackSnapshot::query_events(
   arc : @pattern.TimeSpan,
 ) -> Array[@pattern.Event[@pattern.ControlMap]] {
   match self {
-    Pattern(snapshot) => query_pattern_events(snapshot, arc)
-    Song(snapshot) => query_song_events(snapshot, arc)
+    Pattern(snapshot) => snapshot.query(arc)
+    Song(snapshot) => snapshot.query(arc)
   }
 }
 
 ///|
-pub fn PlaybackSnapshot::query_playback_events(
-  self : PlaybackSnapshot,
-  arc : @pattern.TimeSpan,
-) -> Array[PlaybackEventRecord] {
-  match self {
-    Pattern(snapshot) => query_pattern_playback_events(snapshot, arc)
-    Song(snapshot) => query_song_playback_events(snapshot, arc)
-  }
-}
-
-///|
-/// Audio-owner shell: accepts authored snapshots at block start and owns the
-/// per-material states returned by deterministic entry reconciliation.
-/// The accepted revision can precede some audible material replacements.
+/// Internal active/pending playback snapshot queue. Pending commits are explicit
+/// so the scheduler facade can preserve block-boundary commit semantics.
 pub struct PlaybackState {
   priv mut active : PlaybackSnapshot?
   priv mut pending : PlaybackSnapshot?
@@ -194,15 +123,10 @@ pub fn PlaybackState::commit_pending(
 ) -> Unit {
   self.entries = settle_entries(self.entries, now)
   if self.pending is Some(snapshot) {
-    let specs = snapshot.entries()
-    if self.active is None {
-      self.entries = specs.map(spec => {
-        active: spec,
-        origin: spec.start,
-        edit: None,
-      })
+    self.entries = if self.active is None {
+      snapshot.start_entries()
     } else {
-      self.entries = reconcile_entries(self.entries, specs, now)
+      snapshot.reconcile_entries(self.entries, now)
     }
     self.active = Some(snapshot)
     self.pending = None
@@ -267,7 +191,7 @@ pub fn PlaybackState::has_active(self : PlaybackState) -> Bool {
 
 ///|
 pub fn PlaybackState::has_pending(self : PlaybackState) -> Bool {
-  self.pending is Some(_) || self.entries.any(entry => entry.edit is Some(_))
+  self.pending is Some(_) || self.entries.any(entry => entry.has_pending())
 }
 
 ///|
@@ -310,51 +234,9 @@ pub fn PlaybackState::query_active_events(
 }
 
 ///|
-fn query_pattern_events(
-  snapshot : @pattern.PatternSnapshot[@pattern.ControlMap],
+pub fn PlaybackState::query_active_sourced_events(
+  self : PlaybackState,
   arc : @pattern.TimeSpan,
-) -> Array[@pattern.Event[@pattern.ControlMap]] {
-  snapshot.query(arc)
-}
-
-///|
-fn query_song_events(
-  snapshot : @song.SongSnapshot[@pattern.ControlMap],
-  arc : @pattern.TimeSpan,
-) -> Array[@pattern.Event[@pattern.ControlMap]] {
-  snapshot.query(arc)
-}
-
-///|
-fn query_pattern_playback_events(
-  snapshot : @pattern.PatternSnapshot[@pattern.ControlMap],
-  arc : @pattern.TimeSpan,
-) -> Array[PlaybackEventRecord] {
-  snapshot
-  .query_sourced_events(arc)
-  .map(event => {
-    PlaybackEventRecord(
-      event=event.event(),
-      source=PlaybackEventSource::pattern(pattern_nodes=event.pattern_nodes()),
-    )
-  })
-}
-
-///|
-fn query_song_playback_events(
-  snapshot : @song.SongSnapshot[@pattern.ControlMap],
-  arc : @pattern.TimeSpan,
-) -> Array[PlaybackEventRecord] {
-  snapshot
-  .query_sourced_events(arc)
-  .map(event => {
-    PlaybackEventRecord(
-      event=event.event(),
-      source=PlaybackEventSource::song(
-        section=event.section(),
-        layer=event.layer(),
-        occurrence=event.occurrence(),
-      ),
-    )
-  })
+) -> Array[PlaybackSourcedEvent] {
+  query_sourced_entries(self.entries, arc)
 }

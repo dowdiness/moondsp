@@ -128,11 +128,10 @@ check_manifest "graph/internal/authoring/moon.pkg" '^(dowdiness/moondsp/(identit
 # Scheduler and browser internals are intentionally looser for now than the
 # graph rules. They document the facade-plus-internals direction without
 # blocking current production code paths.
-check_manifest "scheduler/internal/model/moon.pkg" '^(dowdiness/moondsp/(identity|pattern))$'
+check_manifest "scheduler/internal/model/moon.pkg" '^(dowdiness/moondsp/(identity|pattern|song))$'
 check_manifest "scheduler/internal/transport/moon.pkg" '^(dowdiness/moondsp/(dsp|pattern))$'
-check_manifest "scheduler/internal/playback/moon.pkg" '^(dowdiness/moondsp/(identity|pattern|song))$'
-check_manifest "scheduler/internal/voice_runtime/moon.pkg" '^(dowdiness/moondsp/(pattern|scheduler/internal/(edit_policy|model)|voice))$'
-check_manifest "scheduler/internal/edit_policy/moon.pkg" '^(dowdiness/moondsp/identity)$'
+check_manifest "scheduler/internal/playback/moon.pkg" '^(dowdiness/moondsp/(identity|pattern|song|scheduler/internal/model))$'
+check_manifest "scheduler/internal/voice_runtime/moon.pkg" '^(dowdiness/moondsp/(pattern|scheduler/internal/model|voice))$'
 check_manifest "browser/internal/slot/moon.pkg" '^(dowdiness/moondsp)$'
 check_manifest "browser/internal/demo_templates/moon.pkg" '^(dowdiness/moondsp)$'
 # Playback preparation assigns IDs to routed snapshots (technical reference: Browser live updates).

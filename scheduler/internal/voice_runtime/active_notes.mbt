@@ -2,7 +2,7 @@
 /// Scheduler-owned active voice with its performance-sample gate-off time.
 priv struct ActiveNote {
   handle : @voice.VoiceHandle
-  source : @model.EventSource
+  origin : @model.VoiceOrigin
   mut end_sample : Int64
   musical_end : @pattern.Rational?
 }
@@ -10,11 +10,11 @@ priv struct ActiveNote {
 ///|
 fn ActiveNote::ActiveNote(
   handle~ : @voice.VoiceHandle,
-  source~ : @model.EventSource,
+  origin? : @model.VoiceOrigin = @model.VoiceOrigin::Anonymous,
   end_sample~ : Int64,
   musical_end~ : @pattern.Rational?,
 ) -> ActiveNote {
-  { handle, source, end_sample, musical_end, }
+  { handle, origin, end_sample, musical_end, }
 }
 
 ///|
@@ -23,23 +23,8 @@ fn ActiveNote::handle(self : ActiveNote) -> @voice.VoiceHandle {
 }
 
 ///|
-fn ActiveNote::source(self : ActiveNote) -> @model.EventSource {
-  self.source
-}
-
-///|
-fn ActiveNote::matches_edit_policy(
-  self : ActiveNote,
-  target : @edit_policy.AffectedVoiceTarget,
-) -> Bool {
-  let source = self.source
-  @edit_policy.source_parts_match_target(
-    pattern_nodes=source.borrow_pattern_nodes(),
-    section=source.section(),
-    layer=source.layer(),
-    occurrence=source.occurrence(),
-    target,
-  )
+fn ActiveNote::origin(self : ActiveNote) -> @model.VoiceOrigin {
+  self.origin
 }
 
 ///|
@@ -77,32 +62,21 @@ pub fn ActiveNotes::length(self : ActiveNotes) -> Int {
 }
 
 ///|
-pub fn ActiveNotes::source(
-  self : ActiveNotes,
-  index : Int,
-) -> @model.EventSource? {
-  match self.notes.get(index) {
-    Some(note) => Some(note.source())
-    None => None
-  }
-}
-
-///|
 pub fn ActiveNotes::push_note(
   self : ActiveNotes,
   handle~ : @voice.VoiceHandle,
-  source~ : @model.EventSource,
+  origin? : @model.VoiceOrigin = @model.VoiceOrigin::Anonymous,
   end_sample~ : Int64,
   musical_end? : @pattern.Rational,
 ) -> Unit {
   // A stolen voice's old endpoint must not retain another record for its slot.
   for i in 0..<self.notes.length() {
     if self.notes[i].handle.slot == handle.slot {
-      self.notes[i] = ActiveNote(handle~, source~, end_sample~, musical_end~)
+      self.notes[i] = ActiveNote(handle~, origin~, end_sample~, musical_end~)
       return
     }
   }
-  self.notes.push(ActiveNote(handle~, source~, end_sample~, musical_end~))
+  self.notes.push(ActiveNote(handle~, origin~, end_sample~, musical_end~))
 }
 
 ///|
@@ -145,78 +119,54 @@ pub fn ActiveNotes::expire_at_sample(
 }
 
 ///|
-pub fn ActiveNotes::matches_edit_policy(
+pub fn ActiveNotes::matching_count(
   self : ActiveNotes,
-  index : Int,
-  target : @edit_policy.AffectedVoiceTarget,
-) -> Bool? {
-  match self.notes.get(index) {
-    Some(note) => Some(note.matches_edit_policy(target))
-    None => None
-  }
-}
-
-///|
-pub fn ActiveNotes::affected_count(
-  self : ActiveNotes,
-  target : @edit_policy.AffectedVoiceTarget,
+  matches : (@model.VoiceOrigin) -> Bool,
 ) -> Int {
   for note in self.notes; total = 0 {
-    if note.matches_edit_policy(target) {
-      continue total + 1
-    }
-    continue total
+    continue total + (if matches(note.origin()) { 1 } else { 0 })
   } nobreak {
     total
   }
 }
 
 ///|
-fn stop_affected_note(
-  handle : @voice.VoiceHandle,
-  pool : @voice.BoundVoicePool,
-  stop : @edit_policy.AffectedVoiceStop,
-) -> Unit {
-  match stop {
-    @edit_policy.AffectedVoiceStop::GateOff =>
-      ignore(pool.note_off_result(handle))
-    @edit_policy.AffectedVoiceStop::Kill => ignore(pool.kill_result(handle))
-  }
-}
-
-///|
-pub fn ActiveNotes::remove_affected(
+pub fn ActiveNotes::remove_matching(
   self : ActiveNotes,
-  target : @edit_policy.AffectedVoiceTarget,
+  matches : (@model.VoiceOrigin) -> Bool,
   pool : @voice.BoundVoicePool,
-  stop~ : @edit_policy.AffectedVoiceStop,
+  kill~ : Bool,
 ) -> Int {
   let mut count = 0
   let mut i = 0
   while i < self.notes.length() {
-    if self.notes[i].matches_edit_policy(target) {
-      stop_affected_note(self.notes[i].handle(), pool, stop)
+    if matches(self.notes[i].origin()) {
+      if kill {
+        self.notes[i].kill(pool)
+      } else {
+        self.notes[i].note_off(pool)
+      }
       let last = self.notes.length() - 1
       if i < last {
         self.notes[i] = self.notes[last]
       }
       ignore(self.notes.pop())
-      count = count + 1
+      count += 1
     } else {
-      i = i + 1
+      i += 1
     }
   }
   count
 }
 
 ///|
-pub fn[E] ActiveNotes::try_each_matching_handle(
+pub fn[E] ActiveNotes::try_each_matching(
   self : ActiveNotes,
-  target : @edit_policy.AffectedVoiceTarget,
+  matches : (@model.VoiceOrigin) -> Bool,
   f : (@voice.VoiceHandle) -> Result[Unit, E],
 ) -> Result[Unit, E] {
   for note in self.notes {
-    if note.matches_edit_policy(target) {
+    if matches(note.origin()) {
       match f(note.handle()) {
         Ok(_) => ()
         Err(error) => return Err(error)
@@ -227,13 +177,13 @@ pub fn[E] ActiveNotes::try_each_matching_handle(
 }
 
 ///|
-pub fn[E] ActiveNotes::try_count_matching_handles(
+pub fn[E] ActiveNotes::try_count_matching(
   self : ActiveNotes,
-  target : @edit_policy.AffectedVoiceTarget,
+  matches : (@model.VoiceOrigin) -> Bool,
   f : (@voice.VoiceHandle) -> Result[Unit, E],
 ) -> Result[Int, E] {
-  let count = for note in self.notes; count = 0 {
-    if note.matches_edit_policy(target) {
+  for note in self.notes; count = 0 {
+    if matches(note.origin()) {
       match f(note.handle()) {
         Ok(_) => continue count + 1
         Err(error) => return Err(error)
@@ -241,9 +191,8 @@ pub fn[E] ActiveNotes::try_count_matching_handles(
     }
     continue count
   } nobreak {
-    count
+    Ok(count)
   }
-  Ok(count)
 }
 
 ///|

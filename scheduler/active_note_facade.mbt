@@ -4,17 +4,6 @@ pub fn PatternScheduler::active_note_count(self : PatternScheduler) -> Int {
 }
 
 ///|
-pub fn PatternScheduler::active_note_source(
-  self : PatternScheduler,
-  index : Int,
-) -> EventSource? {
-  match self.active_notes.source(index) {
-    Some(source) => Some(EventSource::from_model(source))
-    None => None
-  }
-}
-
-///|
 /// Convert MIDI note number to frequency in Hz.
 /// Uses equal temperament: A4 (MIDI 69) = 440 Hz, each semitone is 2^(1/12).
 pub fn midi_to_hz(midi : Double) -> Double {
@@ -34,7 +23,7 @@ pub fn PatternScheduler::push_active_note(
   }
   self.active_notes.push_note(
     handle~,
-    source=EventSource::none().to_model(),
+    origin=@model.VoiceOrigin::Anonymous,
     end_sample~,
     musical_end=end_time,
   )
@@ -51,7 +40,7 @@ pub fn PatternScheduler::push_active_note_until(
 ) -> Unit {
   self.active_notes.push_note(
     handle~,
-    source=EventSource::none().to_model(),
+    origin=@model.VoiceOrigin::Anonymous,
     end_sample=end_time.sample,
   )
 }

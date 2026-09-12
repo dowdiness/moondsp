@@ -6,11 +6,6 @@ fn copy_control_events(
 }
 
 ///|
-fn copy_playback_events(events : Array[PlaybackEvent]) -> Array[PlaybackEvent] {
-  events.copy()
-}
-
-///|
 /// Per-voice side-effect extracted from a control map entry.
 /// The scheduler applies these after note-on, outside the control binding path.
 pub enum VoiceAction {
@@ -82,7 +77,7 @@ pub struct PatternScheduler {
   priv scratch_right : @moondsp.AudioBuffer
   priv scratch_send_left : @moondsp.AudioBuffer
   priv scratch_send_right : @moondsp.AudioBuffer
-  priv mut previous_events : Array[@pattern.Event[@pattern.ControlMap]]
+  priv mut previous_events : Array[@playback.PlaybackSourcedEvent]
   priv mut previous_clock : @transport.Clock
   priv ctx : @moondsp.DspContext
   priv active_notes : @voice_runtime.ActiveNotes
@@ -166,11 +161,11 @@ pub fn PatternScheduler::process_events(
   arc : @pattern.TimeSpan,
   pool : @moondsp.BoundVoicePool,
 ) -> Unit {
-  self.process_events_with_source(
+  self.process_events_with_origin(
     copy_control_events(events),
     arc,
     pool,
-    EventSource::none(),
+    @model.VoiceOrigin::Anonymous,
   )
 }
 
@@ -178,7 +173,7 @@ pub fn PatternScheduler::process_events(
 fn PatternScheduler::process_single_event(
   self : PatternScheduler,
   event : @pattern.Event[@pattern.ControlMap],
-  source : EventSource,
+  origin : @model.VoiceOrigin,
   arc : @pattern.TimeSpan,
   pool : @moondsp.BoundVoicePool,
 ) -> Unit {
@@ -234,7 +229,7 @@ fn PatternScheduler::process_single_event(
             }
             self.active_notes.push_note(
               handle~,
-              source=source.to_model(),
+              origin~,
               end_sample~,
               musical_end?,
             )
@@ -252,55 +247,18 @@ fn PatternScheduler::process_single_event(
 }
 
 ///|
-fn PatternScheduler::process_events_with_source(
+fn PatternScheduler::process_events_with_origin(
   self : PatternScheduler,
   events : Array[@pattern.Event[@pattern.ControlMap]],
   arc : @pattern.TimeSpan,
   pool : @moondsp.BoundVoicePool,
-  source : EventSource,
+  origin : @model.VoiceOrigin,
 ) -> Unit {
-  // Sort by onset for deterministic voice allocation.
-  // None-whole events sort last but are always skipped below.
   if events.length() > 1 {
     events.sort_by(fn(a, b) { @voice_runtime.compare_event_onset(a, b) })
   }
-  for i in 0..<events.length() {
-    self.process_single_event(events[i], source, arc, pool)
-  }
-}
-
-///|
-pub fn PatternScheduler::process_playback_events(
-  self : PatternScheduler,
-  events : Array[PlaybackEvent],
-  arc : @pattern.TimeSpan,
-  pool : @moondsp.BoundVoicePool,
-) -> Unit {
-  self.process_owned_playback_events(copy_playback_events(events), arc, pool)
-}
-
-///|
-fn PatternScheduler::process_owned_playback_events(
-  self : PatternScheduler,
-  events : Array[PlaybackEvent],
-  arc : @pattern.TimeSpan,
-  pool : @moondsp.BoundVoicePool,
-) -> Unit {
-  // Sort by onset for deterministic voice allocation.
-  // None-whole events sort last but are always skipped below.
-  if events.length() > 1 {
-    events.sort_by(fn(a, b) {
-      @voice_runtime.compare_event_onset(a.event(), b.event())
-    })
-  }
-  for i in 0..<events.length() {
-    let playback_event = events[i]
-    self.process_single_event(
-      playback_event.event(),
-      playback_event.source(),
-      arc,
-      pool,
-    )
+  for event in events {
+    self.process_single_event(event, origin, arc, pool)
   }
 }
 
@@ -315,11 +273,10 @@ fn PatternScheduler::query_pattern_block(
 }
 
 ///|
-fn PatternScheduler::query_snapshot_block(
-  self : PatternScheduler,
-  frame : BlockFrame,
-) -> Array[@pattern.Event[@pattern.ControlMap]] {
-  self.playback_state.query_active_events(frame.logical_arc)
+fn anonymous_playback_events(
+  events : Array[@pattern.Event[@pattern.ControlMap]],
+) -> Array[@playback.PlaybackSourcedEvent] {
+  events.map(event => @playback.PlaybackSourcedEvent::anonymous(event))
 }
 
 ///|
@@ -378,8 +335,7 @@ fn PatternScheduler::render_until(
 ///|
 fn PatternScheduler::process_block_events(
   self : PatternScheduler,
-  events : Array[@pattern.Event[@pattern.ControlMap]],
-  source : EventSource,
+  events : Array[@playback.PlaybackSourcedEvent],
   frame : BlockFrame,
   pool : @moondsp.BoundVoicePool,
   left : @moondsp.AudioBuffer,
@@ -396,13 +352,14 @@ fn PatternScheduler::process_block_events(
   }
   // Ceil may put a preceding block's final fractional onset at this block's
   // first sample. Retain that query result for one block; never query history.
-  for event in self.previous_events {
+  for sourced in self.previous_events {
+    let event = sourced.event()
     if event.whole is Some(whole) {
       match self.previous_clock.sample_at(whole.begin) {
         Ok(sample) if sample == frame.sample_begin =>
           self.process_single_event(
             event,
-            source,
+            sourced.origin(),
             @pattern.TimeSpan::new(whole.begin, whole.end_),
             pool,
           )
@@ -411,10 +368,13 @@ fn PatternScheduler::process_block_events(
     }
   }
   if events.length() > 1 {
-    events.sort_by(fn(a, b) { @voice_runtime.compare_event_onset(a, b) })
+    events.sort_by(fn(a, b) {
+      @voice_runtime.compare_event_onset(a.event(), b.event())
+    })
   }
   let mut cursor = frame.sample_begin
-  for event in events {
+  for sourced in events {
+    let event = sourced.event()
     if event.whole is Some(whole) {
       if !frame.logical_arc.contains(whole.begin) {
         continue
@@ -432,7 +392,12 @@ fn PatternScheduler::process_block_events(
       cursor = self.render_until(
         cursor, start, frame, pool, left, right, send_left, send_right, write_send,
       )
-      self.process_single_event(event, source, frame.logical_arc, pool)
+      self.process_single_event(
+        event,
+        sourced.origin(),
+        frame.logical_arc,
+        pool,
+      )
     }
   }
   ignore(
@@ -471,8 +436,7 @@ pub fn PatternScheduler::process_block(
   self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
   let events = self.query_pattern_block(pat, frame)
   self.process_block_events(
-    events,
-    EventSource::none(),
+    anonymous_playback_events(events),
     frame,
     pool,
     left,
@@ -499,17 +463,11 @@ pub fn PatternScheduler::process_playback_snapshot_block(
   }
   self.commit_pending_playback_snapshot()
   self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
-  let events = self.query_snapshot_block(frame)
+  let events = self.playback_state.query_active_sourced_events(
+    frame.logical_arc,
+  )
   self.process_block_events(
-    events,
-    EventSource::none(),
-    frame,
-    pool,
-    left,
-    right,
-    left,
-    right,
-    false,
+    events, frame, pool, left, right, left, right, false,
   )
 }
 
@@ -533,17 +491,11 @@ pub fn PatternScheduler::process_playback_snapshot_block_with_send(
   }
   self.commit_pending_playback_snapshot()
   self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
-  let events = self.query_snapshot_block(frame)
+  let events = self.playback_state.query_active_sourced_events(
+    frame.logical_arc,
+  )
   self.process_block_events(
-    events,
-    EventSource::none(),
-    frame,
-    pool,
-    left,
-    right,
-    send_left,
-    send_right,
-    true,
+    events, frame, pool, left, right, send_left, send_right, true,
   )
 }
 
@@ -567,8 +519,7 @@ pub fn PatternScheduler::process_section_block(
   self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
   let events = section.query(frame.logical_arc)
   self.process_block_events(
-    events,
-    EventSource::none(),
+    anonymous_playback_events(events),
     frame,
     pool,
     left,
@@ -598,8 +549,7 @@ pub fn PatternScheduler::process_song_block(
   self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
   let events = song.query(frame.logical_arc)
   self.process_block_events(
-    events,
-    EventSource::none(),
+    anonymous_playback_events(events),
     frame,
     pool,
     left,

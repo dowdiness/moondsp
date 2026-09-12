@@ -1,0 +1,23 @@
+Date: 2026-09-12
+Change: internal playback refactor on ee27782 (PR #247)
+Environment: Linux WSL2, AMD Ryzen 7 6800H
+Full suite: NEW_MOON_MOD=0 MOON_WORK=off moon bench --release --no-parallelize
+Full suite result: 62 passed, 0 failed before the final idle-content equivalence correction.
+Final scheduler rerun: NEW_MOON_MOD=0 MOON_WORK=off moon bench scheduler --release --no-parallelize
+The results below are from the finalized scheduler implementation.
+This is a post-change snapshot, not a before/after speedup claim or an allocation audit.
+
+[dowdiness/moondsp] bench scheduler/jux_benchmark.mbt:86 ("bench/jux/scheduler_dispatch") ok
+name                        time (mean ± σ)         range (min … max)
+process_events_8_jux_events   71.25 µs ±   1.13 µs    69.65 µs …  73.28 µs  in 10 ×   1343 runs
+[dowdiness/moondsp] bench scheduler/jux_benchmark.mbt:105 ("bench/jux/stereo_routing") ok
+name                                  time (mean ± σ)         range (min … max)
+voicepool_process_8_panned_jux_voices  127.66 µs ±   3.87 µs   123.91 µs … 137.28 µs  in 10 ×    740 runs
+[dowdiness/moondsp] bench scheduler/jux_benchmark.mbt:123 ("bench/jux/process_block") ok
+name                  time (mean ± σ)         range (min … max)
+process_block_jux_rev   61.53 µs ±   1.37 µs    59.43 µs …  63.79 µs  in 10 ×   1598 runs
+[dowdiness/moondsp] bench scheduler/jux_benchmark.mbt:139 ("bench/entries/prepared_playback") ok
+name                                     time (mean ± σ)         range (min … max)
+prepared_two_materials_render             117.22 µs ±   1.63 µs   114.78 µs … 119.20 µs  in 10 ×    785 runs
+prepared_two_materials_accept_and_render  124.07 µs ±   1.42 µs   122.59 µs … 127.39 µs  in 10 ×    821 runs
+Total tests: 4, passed: 4, failed: 0.
