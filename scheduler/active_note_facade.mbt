@@ -1,27 +1,16 @@
 ///|
-/// Legacy opaque scheduler-package active-note marker.
+/// Opaque scheduler-package active-note marker.
 struct ActiveNote {}
 
 ///|
 fn ActiveNote::ActiveNote() -> ActiveNote {
-  ActiveNote::{  }
+  ActiveNote::{ }
 }
 
 ///|
 pub fn PatternScheduler::active_note_count(self : PatternScheduler) -> Int {
   ignore(self.active_note_interface_anchor)
   self.active_notes.length()
-}
-
-///|
-pub fn PatternScheduler::active_note_source(
-  self : PatternScheduler,
-  index : Int,
-) -> EventSource? {
-  match self.active_notes.source(index) {
-    Some(source) => Some(EventSource::from_model(source))
-    None => None
-  }
 }
 
 ///|
@@ -40,20 +29,8 @@ pub fn PatternScheduler::push_active_note(
   handle : @moondsp.VoiceHandle,
   end_time : @pattern.Rational,
 ) -> Unit {
-  self.push_active_note_with_source(handle, end_time, EventSource::none())
-}
-
-///|
-/// Future-policy helper: inject an active note with explicit provenance.
-fn PatternScheduler::push_active_note_with_source(
-  self : PatternScheduler,
-  handle : @moondsp.VoiceHandle,
-  end_time : @pattern.Rational,
-  source : EventSource,
-) -> Unit {
   self.active_notes.push_note(
     handle~,
-    source=source.to_model(),
     end_sample=cycle_to_sample(end_time, self.bpm, self.ctx),
   )
 }

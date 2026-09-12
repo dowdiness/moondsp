@@ -130,7 +130,7 @@ test "PatternSnapshot::query_sourced_events tags fast ancestor and leaf path" {
   @debug.assert_eq(events.length(), 2)
   assert_pattern_event_path(events[0], ["fast", "leaf"])
   assert_pattern_event_path(events[1], ["fast", "leaf"])
-  assert_true(events[0].pattern_node() == Some(pid("leaf")))
+  assert_true(events[0].pattern_node() == pid("leaf"))
   assert_true(events[0].event().value == raw_events[0].value)
   assert_true(events[1].event().part.begin == raw_events[1].part.begin)
 }

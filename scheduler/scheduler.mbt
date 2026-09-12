@@ -6,11 +6,6 @@ fn copy_control_events(
 }
 
 ///|
-fn copy_playback_events(events : Array[PlaybackEvent]) -> Array[PlaybackEvent] {
-  events.copy()
-}
-
-///|
 /// Per-voice side-effect extracted from a control map entry.
 /// The scheduler applies these after note-on, outside the control binding path.
 pub enum VoiceAction {
@@ -38,7 +33,7 @@ pub fn ControlMapper::ControlMapper(
   transform~ : (String, Double) -> (String, Double)?,
   voice_action~ : (String, Double) -> VoiceAction?,
 ) -> ControlMapper {
-  { transform, voice_action }
+  { transform, voice_action, }
 }
 
 ///|
@@ -131,11 +126,11 @@ pub fn PatternScheduler::process_events(
   arc : @pattern.TimeSpan,
   pool : @moondsp.BoundVoicePool,
 ) -> Unit {
-  self.process_events_with_source(
+  self.process_events_with_origin(
     copy_control_events(events),
     arc,
     pool,
-    EventSource::none(),
+    @model.VoiceOrigin::Anonymous,
   )
 }
 
@@ -143,7 +138,7 @@ pub fn PatternScheduler::process_events(
 fn PatternScheduler::process_single_event(
   self : PatternScheduler,
   event : @pattern.Event[@pattern.ControlMap],
-  source : EventSource,
+  origin : @model.VoiceOrigin,
   arc : @pattern.TimeSpan,
   pool : @moondsp.BoundVoicePool,
 ) -> Unit {
@@ -153,10 +148,6 @@ fn PatternScheduler::process_single_event(
       if !arc.contains(whole.begin) {
         ()
       } else {
-        // WHY fresh map: process_events takes Array[Event] so callers may
-        // reuse event arrays across calls. Building a fresh map avoids
-        // mutating the original ControlMap. The ControlMapper transforms
-        // values (e.g. MIDI→Hz) and extracts per-voice actions (e.g. pan).
         let map : Map[String, Double] = {}
         let actions : Array[VoiceAction] = []
         let mapper = self.mapper
@@ -173,15 +164,9 @@ fn PatternScheduler::process_single_event(
         match pool.note_on_controls(map) {
           None => ()
           Some(handle) => {
-            // WHY end_sample from whole.end_: In the Strudel/Tidal model,
-            // `whole` is the event's full intended duration in cycle time,
-            // while `part` is only the fragment visible within the queried
-            // arc. The scheduler converts `whole.end_` to performance time at
-            // note-on so future groove/rubato layers can expire voices against
-            // audio time rather than logical time.
             self.active_notes.push_note(
               handle~,
-              source=source.to_model(),
+              origin~,
               end_sample=cycle_to_sample(whole.end_, self.bpm, self.ctx),
             )
             for action in actions {
@@ -196,55 +181,85 @@ fn PatternScheduler::process_single_event(
 }
 
 ///|
-fn PatternScheduler::process_events_with_source(
+fn PatternScheduler::process_events_with_origin(
   self : PatternScheduler,
   events : Array[@pattern.Event[@pattern.ControlMap]],
   arc : @pattern.TimeSpan,
   pool : @moondsp.BoundVoicePool,
-  source : EventSource,
+  origin : @model.VoiceOrigin,
 ) -> Unit {
-  // Sort by onset for deterministic voice allocation.
-  // None-whole events sort last but are always skipped below.
   if events.length() > 1 {
     events.sort_by(fn(a, b) { @voice_runtime.compare_event_onset(a, b) })
   }
-  for i in 0..<events.length() {
-    self.process_single_event(events[i], source, arc, pool)
+  for event in events {
+    self.process_single_event(event, origin, arc, pool)
   }
 }
 
 ///|
-pub fn PatternScheduler::process_playback_events(
+fn PatternScheduler::process_pattern_snapshot_events(
   self : PatternScheduler,
-  events : Array[PlaybackEvent],
+  events : Array[@pattern.PatternSnapshotEvent[@pattern.ControlMap]],
   arc : @pattern.TimeSpan,
   pool : @moondsp.BoundVoicePool,
 ) -> Unit {
-  self.process_owned_playback_events(copy_playback_events(events), arc, pool)
-}
-
-///|
-fn PatternScheduler::process_owned_playback_events(
-  self : PatternScheduler,
-  events : Array[PlaybackEvent],
-  arc : @pattern.TimeSpan,
-  pool : @moondsp.BoundVoicePool,
-) -> Unit {
-  // Sort by onset for deterministic voice allocation.
-  // None-whole events sort last but are always skipped below.
   if events.length() > 1 {
     events.sort_by(fn(a, b) {
       @voice_runtime.compare_event_onset(a.event(), b.event())
     })
   }
-  for i in 0..<events.length() {
-    let playback_event = events[i]
+  for sourced in events {
     self.process_single_event(
-      playback_event.event(),
-      playback_event.source(),
+      sourced.event(),
+      @model.VoiceOrigin::Pattern(sourced.pattern_node_path()),
       arc,
       pool,
     )
+  }
+}
+
+///|
+fn PatternScheduler::process_song_snapshot_events(
+  self : PatternScheduler,
+  events : Array[@song.SongSnapshotEvent[@pattern.ControlMap]],
+  arc : @pattern.TimeSpan,
+  pool : @moondsp.BoundVoicePool,
+) -> Unit {
+  if events.length() > 1 {
+    events.sort_by(fn(a, b) {
+      @voice_runtime.compare_event_onset(a.event(), b.event())
+    })
+  }
+  for sourced in events {
+    self.process_single_event(
+      sourced.event(),
+      @model.VoiceOrigin::Song(sourced.origin()),
+      arc,
+      pool,
+    )
+  }
+}
+
+///|
+fn PatternScheduler::process_active_snapshot(
+  self : PatternScheduler,
+  arc : @pattern.TimeSpan,
+  pool : @moondsp.BoundVoicePool,
+) -> Unit {
+  match self.playback_state.active_snapshot() {
+    Some(@playback.PlaybackSnapshot::Pattern(snapshot)) =>
+      self.process_pattern_snapshot_events(
+        snapshot.query_sourced_events(arc),
+        arc,
+        pool,
+      )
+    Some(@playback.PlaybackSnapshot::Song(snapshot)) =>
+      self.process_song_snapshot_events(
+        snapshot.query_sourced_events(arc),
+        arc,
+        pool,
+      )
+    None => ()
   }
 }
 
@@ -256,14 +271,6 @@ fn PatternScheduler::query_pattern_block(
 ) -> Array[@pattern.Event[@pattern.ControlMap]] {
   ignore(self)
   pat.query(frame.logical_arc)
-}
-
-///|
-fn PatternScheduler::query_snapshot_block(
-  self : PatternScheduler,
-  frame : BlockFrame,
-) -> Array[@pattern.Event[@pattern.ControlMap]] {
-  self.playback_state.query_active_events(frame.logical_arc)
 }
 
 ///|
@@ -282,13 +289,13 @@ fn PatternScheduler::render_block(
 fn PatternScheduler::process_block_events(
   self : PatternScheduler,
   events : Array[@pattern.Event[@pattern.ControlMap]],
-  source : EventSource,
+  source : @model.VoiceOrigin,
   frame : BlockFrame,
   pool : @moondsp.BoundVoicePool,
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
 ) -> Unit {
-  self.process_events_with_source(events, frame.logical_arc, pool, source)
+  self.process_events_with_origin(events, frame.logical_arc, pool, source)
   self.advance_block()
   self.render_block(pool, left, right)
 }
@@ -309,7 +316,7 @@ pub fn PatternScheduler::process_block(
   let events = self.query_pattern_block(pat, frame)
   self.process_block_events(
     events,
-    EventSource::none(),
+    @model.VoiceOrigin::Anonymous,
     frame,
     pool,
     left,
@@ -330,15 +337,9 @@ pub fn PatternScheduler::process_playback_snapshot_block(
   let frame = self.current_block()
   self.commit_pending_playback_snapshot()
   self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
-  let events = self.query_snapshot_block(frame)
-  self.process_block_events(
-    events,
-    EventSource::none(),
-    frame,
-    pool,
-    left,
-    right,
-  )
+  self.process_active_snapshot(frame.logical_arc, pool)
+  self.advance_block()
+  self.render_block(pool, left, right)
 }
 
 ///|
@@ -359,7 +360,7 @@ pub fn PatternScheduler::process_section_block(
   let events = section.query(frame.logical_arc)
   self.process_block_events(
     events,
-    EventSource::none(),
+    @model.VoiceOrigin::Anonymous,
     frame,
     pool,
     left,
@@ -384,7 +385,7 @@ pub fn PatternScheduler::process_song_block(
   let events = song.query(frame.logical_arc)
   self.process_block_events(
     events,
-    EventSource::none(),
+    @model.VoiceOrigin::Anonymous,
     frame,
     pool,
     left,

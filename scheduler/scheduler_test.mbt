@@ -118,6 +118,9 @@ test "current_block exposes sample range and logical arc" {
 /// template. Envelope_gain wires the ADSR at index 1 into the signal path so
 /// `VoicePool::new`'s orphan-ADSR gate accepts it; swapping to bare `gain(0)`
 /// would orphan the ADSR and be rejected.
+/// The 0.3 ms release at 48 kHz lasts about 14 samples: the first 128-sample
+/// block after gate-off contains a tail, and the following block is silent.
+/// Release/Kill tests deliberately use this timing to distinguish their effects.
 fn make_test_pool() -> (
   @moondsp.BoundVoicePool,
   Array[@moondsp.DspNode],
@@ -297,326 +300,6 @@ fn note_event(
 }
 
 ///|
-fn playback_note_event(
-  note_value : Double,
-  source : @scheduler.EventSource,
-  arc : @pattern.TimeSpan,
-) -> @scheduler.PlaybackEvent {
-  @scheduler.PlaybackEvent(event=note_event(note_value, arc), source~)
-}
-
-///|
-test "EventSource records optional authoring IDs" {
-  let pattern_id = pid("source:pattern")
-  let section_id = sid("source:section")
-  let layer_id = lid("source:layer")
-  let occurrence_id = oid("source:occurrence")
-  let empty = @scheduler.EventSource::none()
-  assert_true(empty.is_empty())
-  assert_true(empty.pattern_node() is None)
-  @debug.assert_eq(empty.pattern_nodes().length(), 0)
-  assert_true(empty.section() is None)
-  assert_true(empty.layer() is None)
-  assert_true(empty.occurrence() is None)
-  let source = @scheduler.EventSource(
-    pattern_node=Some(pattern_id),
-    section=Some(section_id),
-    layer=Some(layer_id),
-    occurrence=Some(occurrence_id),
-  )
-  assert_true(!source.is_empty())
-  assert_true(source.pattern_node() == Some(pattern_id))
-  let pattern_nodes = source.pattern_nodes()
-  @debug.assert_eq(pattern_nodes.length(), 1)
-  assert_true(pattern_nodes[0] == pattern_id)
-  assert_true(source.section() == Some(section_id))
-  assert_true(source.layer() == Some(layer_id))
-  assert_true(source.occurrence() == Some(occurrence_id))
-}
-
-///|
-test "EventSource pattern-node path matches ancestors and primary leaf" {
-  let root_id = pid("source:root")
-  let leaf_id = pid("source:leaf")
-  let source = @scheduler.EventSource::from_pattern_nodes(
-    pattern_nodes=[root_id, leaf_id],
-    section=None,
-    layer=None,
-    occurrence=None,
-  )
-  assert_true(source.pattern_node() == Some(leaf_id))
-  assert_true(
-    source.matches(@scheduler.AffectedVoiceTarget::from_pattern_node(root_id)),
-  )
-  assert_true(
-    source.matches(@scheduler.AffectedVoiceTarget::from_pattern_node(leaf_id)),
-  )
-}
-
-///|
-test "AffectedVoiceTarget matches explicit provenance and ignores empty targets" {
-  let pattern_id = pid("target:pattern")
-  let section_id = sid("target:section")
-  let layer_id = lid("target:layer")
-  let occurrence_id = oid("target:occurrence")
-  let source = @scheduler.EventSource(
-    pattern_node=Some(pattern_id),
-    section=Some(section_id),
-    layer=Some(layer_id),
-    occurrence=Some(occurrence_id),
-  )
-  let empty_target = @scheduler.AffectedVoiceTarget(
-    pattern_node=None,
-    section=None,
-    layer=None,
-    occurrence=None,
-  )
-  assert_true(empty_target.is_empty())
-  assert_true(!source.matches(empty_target))
-  assert_true(
-    source.matches(
-      @scheduler.AffectedVoiceTarget::from_pattern_node(pattern_id),
-    ),
-  )
-  assert_true(
-    source.matches(@scheduler.AffectedVoiceTarget::from_section(section_id)),
-  )
-  assert_true(
-    source.matches(@scheduler.AffectedVoiceTarget::from_layer(layer_id)),
-  )
-  assert_true(
-    source.matches(
-      @scheduler.AffectedVoiceTarget::from_occurrence(occurrence_id),
-    ),
-  )
-  let combined = @scheduler.AffectedVoiceTarget(
-    pattern_node=Some(pattern_id),
-    section=Some(section_id),
-    layer=None,
-    occurrence=Some(occurrence_id),
-  )
-  assert_true(source.matches(combined))
-  let wrong_occurrence = @scheduler.AffectedVoiceTarget(
-    pattern_node=Some(pattern_id),
-    section=Some(section_id),
-    layer=None,
-    occurrence=Some(oid("target:other-occurrence")),
-  )
-  assert_true(!source.matches(wrong_occurrence))
-  assert_true(
-    !@scheduler.EventSource::none().matches(
-      @scheduler.AffectedVoiceTarget::from_pattern_node(pattern_id),
-    ),
-  )
-}
-
-///|
-test "AffectedVoiceEditScope maps concrete edit boundaries to targets" {
-  let pattern_id = pid("edit-scope:pattern")
-  let occurrence_id = oid("edit-scope:occurrence")
-  let section_id = sid("edit-scope:section")
-  let layer_id = lid("edit-scope:layer")
-  let pattern_target = @scheduler.AffectedVoiceEditScope::pattern_node(
-    pattern_id,
-  ).target()
-  assert_true(pattern_target.pattern_node() == Some(pattern_id))
-  assert_true(pattern_target.section() is None)
-  let occurrence_target = @scheduler.AffectedVoiceEditScope::song_occurrence(
-    occurrence_id,
-  ).target()
-  assert_true(occurrence_target.occurrence() == Some(occurrence_id))
-  assert_true(occurrence_target.pattern_node() is None)
-  let section_target = @scheduler.AffectedVoiceEditScope::song_section(
-    section_id,
-  ).target()
-  assert_true(section_target.section() == Some(section_id))
-  assert_true(section_target.layer() is None)
-  let layer_target = @scheduler.AffectedVoiceEditScope::song_layer(
-    section=section_id,
-    layer=layer_id,
-  ).target()
-  assert_true(layer_target.section() == Some(section_id))
-  assert_true(layer_target.layer() == Some(layer_id))
-  assert_true(layer_target.occurrence() is None)
-}
-
-///|
-test "PlaybackSnapshot::query_playback_events tags pattern root provenance" {
-  let root_id = "playback-events:pattern"
-  let snapshot = @scheduler.PlaybackSnapshot::pattern(
-    note_snapshot(root_id, 60.0),
-  )
-  let events = snapshot.query_playback_events(
-    @pattern.TimeSpan::new(
-      @pattern.Rational::from_int(0),
-      @pattern.Rational::new(1L, 100L),
-    ),
-  )
-  @debug.assert_eq(events.length(), 1)
-  assert_true(events[0].source().pattern_node() == Some(pid(root_id)))
-  let pattern_nodes = events[0].source().pattern_nodes()
-  @debug.assert_eq(pattern_nodes.length(), 1)
-  assert_true(pattern_nodes[0] == pid(root_id))
-  assert_true(events[0].source().section() is None)
-  assert_true(events[0].source().occurrence() is None)
-  assert_true(events[0].event().value.get("note") == Some(60.0))
-}
-
-///|
-test "PlaybackSnapshot::query_playback_events tags pattern sub-node path" {
-  let (pool, sched, _, _) = make_test_sched()
-  let doc_result = try? @pattern.PatternDoc::from_pattern(
-    id=pid("playback-events:leaf"),
-    pat=@pattern.note(60.0),
-  ).fast(id=pid("playback-events:fast"), factor=@pattern.Rational::from_int(2))
-  let doc = match doc_result {
-    Ok(doc) => doc
-    Err(_) => abort("expected pattern doc")
-  }
-  let snapshot = @scheduler.PlaybackSnapshot::pattern(
-    unwrap_control_snapshot(try? doc.lower()),
-  )
-  let arc = @pattern.TimeSpan::new(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::new(1L, 100L),
-  )
-  let events = snapshot.query_playback_events(arc)
-  @debug.assert_eq(events.length(), 1)
-  let pattern_nodes = events[0].source().pattern_nodes()
-  @debug.assert_eq(pattern_nodes.length(), 2)
-  assert_true(pattern_nodes[0] == pid("playback-events:fast"))
-  assert_true(pattern_nodes[1] == pid("playback-events:leaf"))
-  assert_true(
-    events[0].source().pattern_node() == Some(pid("playback-events:leaf")),
-  )
-  sched.process_playback_events(events, arc, pool)
-  @debug.assert_eq(
-    sched.affected_active_note_count(
-      @scheduler.AffectedVoiceTarget::from_pattern_node(
-        pid("playback-events:fast"),
-      ),
-    ),
-    1,
-  )
-  @debug.assert_eq(
-    sched.affected_active_note_count(
-      @scheduler.AffectedVoiceTarget::from_pattern_node(
-        pid("playback-events:leaf"),
-      ),
-    ),
-    1,
-  )
-}
-
-///|
-test "PlaybackSnapshot::query_playback_events tags song occurrence provenance" {
-  let (pool, sched, _, _) = make_test_sched()
-  let occurrence_id = oid("playback-events:song-occurrence")
-  let section_id_value = "section:playback-events-song"
-  let section = scheduler_section_doc(section_id_value, "Main", 60.0)
-  let doc = scheduler_song_doc([
-    @song.SongOccurrenceDoc(id=occurrence_id, name="Main", section~),
-  ])
-  let snapshot = @scheduler.PlaybackSnapshot::song(song_snapshot(doc))
-  let arc = @pattern.TimeSpan::new(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::new(1L, 100L),
-  )
-  let events = snapshot.query_playback_events(arc)
-  @debug.assert_eq(events.length(), 1)
-  assert_true(events[0].source().pattern_node() is None)
-  assert_true(events[0].source().section() == Some(sid(section_id_value)))
-  assert_true(
-    events[0].source().layer() == Some(lid("\{section_id_value}:main")),
-  )
-  assert_true(events[0].source().occurrence() == Some(occurrence_id))
-  assert_true(events[0].event().value.get("note") == Some(60.0))
-  sched.process_playback_events(events, arc, pool)
-  let target = @scheduler.AffectedVoiceTarget::from_section(
-    sid(section_id_value),
-  )
-  @debug.assert_eq(sched.affected_active_note_count(target), 1)
-  @debug.assert_eq(
-    sched.apply_affected_voice_policy(
-      @scheduler.AffectedVoicePolicy::GateOffAffected,
-      target,
-      pool,
-    ),
-    1,
-  )
-  @debug.assert_eq(sched.active_note_count(), 0)
-}
-
-///|
-test "PlaybackSnapshot::query_playback_events tags song layer provenance" {
-  let (pool, sched, _, _) = make_test_sched()
-  let occurrence_id = oid("playback-events:layered-occurrence")
-  let section_id = sid("section:playback-events-layered")
-  let lead_id = lid("layer:playback-events-lead")
-  let pad_id = lid("layer:playback-events-pad")
-  let section_result = try? @song.SectionDoc::SectionDoc(
-    id=section_id,
-    name="Layered",
-    length_cycles=@pattern.Rational::from_int(1),
-    scope=@song.TimeScope::identity(),
-    body=@song.SectionDocBody::layers([
-      @song.SectionLayerDoc(id=lead_id, name="Lead", body=@pattern.note(60.0)),
-      @song.SectionLayerDoc(id=pad_id, name="Pad", body=@pattern.note(67.0)),
-    ]),
-  )
-  let section = match section_result {
-    Ok(section) => section
-    Err(_) => abort("expected layered section doc")
-  }
-  let doc = scheduler_song_doc([
-    @song.SongOccurrenceDoc(id=occurrence_id, name="Layered", section~),
-  ])
-  let snapshot = @scheduler.PlaybackSnapshot::song(song_snapshot(doc))
-  let arc = @pattern.TimeSpan::new(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::new(1L, 100L),
-  )
-  let events = snapshot.query_playback_events(arc)
-  @debug.assert_eq(events.length(), 2)
-  assert_true(events[0].source().section() == Some(section_id))
-  assert_true(events[0].source().layer() == Some(lead_id))
-  assert_true(events[0].source().occurrence() == Some(occurrence_id))
-  assert_true(events[0].event().value.get("note") == Some(60.0))
-  assert_true(events[1].source().section() == Some(section_id))
-  assert_true(events[1].source().layer() == Some(pad_id))
-  assert_true(events[1].source().occurrence() == Some(occurrence_id))
-  assert_true(events[1].event().value.get("note") == Some(67.0))
-  sched.process_playback_events(events, arc, pool)
-  @debug.assert_eq(
-    sched.affected_active_note_count(
-      @scheduler.AffectedVoiceTarget::from_layer(lead_id),
-    ),
-    1,
-  )
-  @debug.assert_eq(
-    sched.affected_active_note_count(
-      @scheduler.AffectedVoiceTarget::from_layer(pad_id),
-    ),
-    1,
-  )
-  @debug.assert_eq(
-    sched.apply_affected_voice_policy(
-      @scheduler.AffectedVoicePolicy::GateOffAffected,
-      @scheduler.AffectedVoiceTarget::from_layer(lead_id),
-      pool,
-    ),
-    1,
-  )
-  @debug.assert_eq(sched.active_note_count(), 1)
-  @debug.assert_eq(
-    sched.affected_active_note_count(
-      @scheduler.AffectedVoiceTarget::from_layer(pad_id),
-    ),
-    1,
-  )
-}
-
-///|
 test "expire_notes: removes notes past their end_time" {
   let (pool, _, ctx) = make_test_pool()
   let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~)
@@ -664,10 +347,6 @@ test "process_events: single note-on creates active voice" {
   sched.process_events(events, arc, pool)
   @debug.assert_eq(sched.active_note_count(), 1)
   @debug.assert_eq(pool.active_voice_count(), 1)
-  match sched.active_note_source(0) {
-    Some(source) => assert_true(source.is_empty())
-    None => assert_true(false)
-  }
 }
 
 ///|
@@ -689,1128 +368,6 @@ test "process_events: preserves caller-owned event order" {
     }
     _ => assert_true(false)
   }
-}
-
-///|
-test "process_playback_events: active note keeps explicit event source" {
-  let (pool, sched, _, _) = make_test_sched()
-  let arc = @pattern.TimeSpan::new(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::new(1L, 100L),
-  )
-  let events = @pattern.note(60.0).query(arc)
-  let event = match events.get(0) {
-    Some(event) => event
-    None => abort("expected note event")
-  }
-  let source = @scheduler.EventSource(
-    pattern_node=Some(pid("source:active-pattern")),
-    section=Some(sid("source:active-section")),
-    layer=Some(lid("source:active-layer")),
-    occurrence=Some(oid("source:active-occurrence")),
-  )
-  sched.process_playback_events(
-    [@scheduler.PlaybackEvent(event~, source~)],
-    arc,
-    pool,
-  )
-  @debug.assert_eq(sched.active_note_count(), 1)
-  match sched.active_note_source(0) {
-    Some(active_source) => assert_true(active_source == source)
-    None => assert_true(false)
-  }
-}
-
-///|
-test "affected voice policy preserves empty-source voices and let-ring policy" {
-  let (pool, sched, _, _) = make_test_sched()
-  let arc = @pattern.TimeSpan::new(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::new(1L, 100L),
-  )
-  let pattern_id = pid("affected:ring-pattern")
-  let target = @scheduler.AffectedVoiceTarget::from_pattern_node(pattern_id)
-  let source = @scheduler.EventSource(
-    pattern_node=Some(pattern_id),
-    section=None,
-    layer=None,
-    occurrence=None,
-  )
-  sched.process_playback_events(
-    [playback_note_event(60.0, source, arc)],
-    arc,
-    pool,
-  )
-  sched.process_events(@pattern.note(62.0).query(arc), arc, pool)
-  @debug.assert_eq(sched.active_note_count(), 2)
-  @debug.assert_eq(sched.affected_active_note_count(target), 1)
-  @debug.assert_eq(
-    sched.apply_affected_voice_policy(
-      @scheduler.AffectedVoicePolicy::LetRing,
-      target,
-      pool,
-    ),
-    0,
-  )
-  @debug.assert_eq(sched.active_note_count(), 2)
-  assert_true(sched.active_note_matches(0, target) == Some(true))
-  assert_true(sched.active_note_matches(99, target) is None)
-  @debug.assert_eq(
-    sched.apply_affected_voice_policy(
-      @scheduler.AffectedVoicePolicy::GateOffAffected,
-      @scheduler.AffectedVoiceTarget(
-        pattern_node=None,
-        section=None,
-        layer=None,
-        occurrence=None,
-      ),
-      pool,
-    ),
-    0,
-  )
-  @debug.assert_eq(sched.active_note_count(), 2)
-  @debug.assert_eq(
-    sched.apply_affected_voice_policy(
-      @scheduler.AffectedVoicePolicy::GateOffAffected,
-      target,
-      pool,
-    ),
-    1,
-  )
-  @debug.assert_eq(sched.active_note_count(), 1)
-  match sched.active_note_source(0) {
-    Some(active_source) => assert_true(active_source.is_empty())
-    None => assert_true(false)
-  }
-}
-
-///|
-test "edit orchestration helper gates pattern edits and preserves empty sources" {
-  let (pool, sched, _, _) = make_test_sched()
-  let arc = @pattern.TimeSpan::new(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::new(1L, 100L),
-  )
-  let edited_pattern = pid("edit-policy:pattern")
-  let other_pattern = pid("edit-policy:other")
-  let edited_source = @scheduler.EventSource(
-    pattern_node=Some(edited_pattern),
-    section=None,
-    layer=None,
-    occurrence=None,
-  )
-  let other_source = @scheduler.EventSource(
-    pattern_node=Some(other_pattern),
-    section=None,
-    layer=None,
-    occurrence=None,
-  )
-  sched.process_playback_events(
-    [
-      playback_note_event(60.0, edited_source, arc),
-      playback_note_event(62.0, other_source, arc),
-    ],
-    arc,
-    pool,
-  )
-  sched.process_events(@pattern.note(64.0).query(arc), arc, pool)
-  let edit = @scheduler.AffectedVoiceEditScope::pattern_node(edited_pattern)
-  let edited_target = edit.target()
-  let other_target = @scheduler.AffectedVoiceEditScope::pattern_node(
-    other_pattern,
-  ).target()
-  @debug.assert_eq(sched.active_note_count(), 3)
-  @debug.assert_eq(sched.affected_active_note_count(edited_target), 1)
-  @debug.assert_eq(
-    sched.apply_affected_voice_policy_for_edit(
-      @scheduler.AffectedVoicePolicy::LetRing,
-      edit,
-      pool,
-    ),
-    0,
-  )
-  @debug.assert_eq(sched.active_note_count(), 3)
-  @debug.assert_eq(
-    sched.apply_affected_voice_policy_for_edit(
-      @scheduler.AffectedVoicePolicy::GateOffAffected,
-      edit,
-      pool,
-    ),
-    1,
-  )
-  @debug.assert_eq(sched.active_note_count(), 2)
-  @debug.assert_eq(sched.affected_active_note_count(edited_target), 0)
-  @debug.assert_eq(sched.affected_active_note_count(other_target), 1)
-  let empty_source_count = for i in 0..<sched.active_note_count(); count = 0 {
-    match sched.active_note_source(i) {
-      Some(source) if source.is_empty() => continue count + 1
-      _ => continue count
-    }
-  } nobreak {
-    count
-  }
-  @debug.assert_eq(empty_source_count, 1)
-}
-
-///|
-test "affected voice policy gates only matching pattern-node active notes" {
-  let (pool, sched, _, _) = make_test_sched()
-  let arc = @pattern.TimeSpan::new(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::new(1L, 100L),
-  )
-  let first_id = pid("affected:first-pattern")
-  let second_id = pid("affected:second-pattern")
-  let first_source = @scheduler.EventSource(
-    pattern_node=Some(first_id),
-    section=None,
-    layer=None,
-    occurrence=None,
-  )
-  let second_source = @scheduler.EventSource(
-    pattern_node=Some(second_id),
-    section=None,
-    layer=None,
-    occurrence=None,
-  )
-  sched.process_playback_events(
-    [
-      playback_note_event(60.0, first_source, arc),
-      playback_note_event(62.0, second_source, arc),
-    ],
-    arc,
-    pool,
-  )
-  let first_target = @scheduler.AffectedVoiceTarget::from_pattern_node(first_id)
-  let second_target = @scheduler.AffectedVoiceTarget::from_pattern_node(
-    second_id,
-  )
-  @debug.assert_eq(sched.active_note_count(), 2)
-  @debug.assert_eq(sched.affected_active_note_count(first_target), 1)
-  @debug.assert_eq(sched.affected_active_note_count(second_target), 1)
-  @debug.assert_eq(
-    sched.apply_affected_voice_policy(
-      @scheduler.AffectedVoicePolicy::GateOffAffected,
-      first_target,
-      pool,
-    ),
-    1,
-  )
-  @debug.assert_eq(sched.active_note_count(), 1)
-  @debug.assert_eq(sched.affected_active_note_count(first_target), 0)
-  @debug.assert_eq(sched.affected_active_note_count(second_target), 1)
-}
-
-///|
-test "affected voice policy kills matching pattern leaf and ancestor notes" {
-  let (pool, sched, _, _) = make_test_sched()
-  let doc_result = try? @pattern.PatternDoc::from_pattern(
-    id=pid("kill:leaf"),
-    pat=@pattern.note(60.0),
-  ).fast(id=pid("kill:fast"), factor=@pattern.Rational::from_int(2))
-  let doc = match doc_result {
-    Ok(doc) => doc
-    Err(_) => abort("expected pattern doc")
-  }
-  let snapshot = @scheduler.PlaybackSnapshot::pattern(
-    unwrap_control_snapshot(try? doc.lower()),
-  )
-  let arc = @pattern.TimeSpan::new(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::new(1L, 100L),
-  )
-  sched.process_playback_events(snapshot.query_playback_events(arc), arc, pool)
-  let leaf_target = @scheduler.AffectedVoiceTarget::from_pattern_node(
-    pid("kill:leaf"),
-  )
-  let ancestor_target = @scheduler.AffectedVoiceTarget::from_pattern_node(
-    pid("kill:fast"),
-  )
-  @debug.assert_eq(sched.active_note_count(), 1)
-  @debug.assert_eq(pool.active_voice_count(), 1)
-  @debug.assert_eq(sched.affected_active_note_count(leaf_target), 1)
-  @debug.assert_eq(sched.affected_active_note_count(ancestor_target), 1)
-  @debug.assert_eq(
-    sched.apply_affected_voice_policy(
-      @scheduler.AffectedVoicePolicy::KillAffected,
-      ancestor_target,
-      pool,
-    ),
-    1,
-  )
-  @debug.assert_eq(sched.active_note_count(), 0)
-  @debug.assert_eq(pool.active_voice_count(), 0)
-}
-
-///|
-test "affected voice policy kills callback subtree pattern notes" {
-  let (pool, sched, _, _) = make_test_sched()
-  let child_result = try? @pattern.PatternDoc::from_pattern(
-    id=pid("kill:callback-leaf"),
-    pat=@pattern.note(60.0),
-  ).fast(id=pid("kill:callback-child"), factor=@pattern.Rational::from_int(2))
-  let child = match child_result {
-    Ok(doc) => doc
-    Err(_) => abort("expected callback child doc")
-  }
-  let doc_result = try? child.every(id=pid("kill:callback-every"), n=1, f=fn(
-    p,
-  ) {
-    p.fast(@pattern.Rational::from_int(2))
-  })
-  let doc = match doc_result {
-    Ok(doc) => doc
-    Err(_) => abort("expected callback doc")
-  }
-  let snapshot = @scheduler.PlaybackSnapshot::pattern(
-    unwrap_control_snapshot(try? doc.lower()),
-  )
-  let arc = @pattern.TimeSpan::new(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::new(1L, 100L),
-  )
-  sched.process_playback_events(snapshot.query_playback_events(arc), arc, pool)
-  let leaf_target = @scheduler.AffectedVoiceTarget::from_pattern_node(
-    pid("kill:callback-leaf"),
-  )
-  @debug.assert_eq(sched.active_note_count(), 1)
-  @debug.assert_eq(pool.active_voice_count(), 1)
-  @debug.assert_eq(sched.affected_active_note_count(leaf_target), 1)
-  @debug.assert_eq(
-    sched.apply_affected_voice_policy(
-      @scheduler.AffectedVoicePolicy::KillAffected,
-      leaf_target,
-      pool,
-    ),
-    1,
-  )
-  @debug.assert_eq(sched.active_note_count(), 0)
-  @debug.assert_eq(pool.active_voice_count(), 0)
-}
-
-///|
-test "affected voice policy can target section and occurrence boundaries" {
-  let (pool, sched, _, _) = make_test_sched()
-  let arc = @pattern.TimeSpan::new(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::new(1L, 100L),
-  )
-  let main_section = sid("affected:main-section")
-  let other_section = sid("affected:other-section")
-  let layer = lid("affected:main-layer")
-  let first_occurrence = oid("affected:first-occurrence")
-  let second_occurrence = oid("affected:second-occurrence")
-  let other_occurrence = oid("affected:other-occurrence")
-  let first_source = @scheduler.EventSource(
-    pattern_node=None,
-    section=Some(main_section),
-    layer=Some(layer),
-    occurrence=Some(first_occurrence),
-  )
-  let second_source = @scheduler.EventSource(
-    pattern_node=None,
-    section=Some(main_section),
-    layer=Some(layer),
-    occurrence=Some(second_occurrence),
-  )
-  let other_source = @scheduler.EventSource(
-    pattern_node=None,
-    section=Some(other_section),
-    layer=None,
-    occurrence=Some(other_occurrence),
-  )
-  sched.process_playback_events(
-    [
-      playback_note_event(60.0, first_source, arc),
-      playback_note_event(62.0, second_source, arc),
-      playback_note_event(64.0, other_source, arc),
-    ],
-    arc,
-    pool,
-  )
-  let section_target = @scheduler.AffectedVoiceTarget::from_section(
-    main_section,
-  )
-  let first_occurrence_target = @scheduler.AffectedVoiceTarget::from_occurrence(
-    first_occurrence,
-  )
-  let combined_target = @scheduler.AffectedVoiceTarget(
-    pattern_node=None,
-    section=Some(main_section),
-    layer=None,
-    occurrence=Some(first_occurrence),
-  )
-  @debug.assert_eq(sched.active_note_count(), 3)
-  @debug.assert_eq(sched.affected_active_note_count(section_target), 2)
-  @debug.assert_eq(sched.affected_active_note_count(first_occurrence_target), 1)
-  @debug.assert_eq(sched.affected_active_note_count(combined_target), 1)
-  @debug.assert_eq(
-    sched.apply_affected_voice_policy(
-      @scheduler.AffectedVoicePolicy::GateOffAffected,
-      first_occurrence_target,
-      pool,
-    ),
-    1,
-  )
-  @debug.assert_eq(sched.active_note_count(), 2)
-  @debug.assert_eq(sched.affected_active_note_count(section_target), 1)
-  @debug.assert_eq(
-    sched.apply_affected_voice_policy(
-      @scheduler.AffectedVoicePolicy::GateOffAffected,
-      section_target,
-      pool,
-    ),
-    1,
-  )
-  @debug.assert_eq(sched.active_note_count(), 1)
-  @debug.assert_eq(
-    sched.affected_active_note_count(
-      @scheduler.AffectedVoiceTarget::from_section(other_section),
-    ),
-    1,
-  )
-}
-
-///|
-test "affected voice policy kills section layer and occurrence targets" {
-  let (pool, sched, _, _) = make_test_sched()
-  let arc = @pattern.TimeSpan::new(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::new(1L, 100L),
-  )
-  let section = sid("kill:section")
-  let layer = lid("kill:layer")
-  let first_occurrence = oid("kill:first-occurrence")
-  let second_occurrence = oid("kill:second-occurrence")
-  let first_source = @scheduler.EventSource(
-    pattern_node=None,
-    section=Some(section),
-    layer=Some(layer),
-    occurrence=Some(first_occurrence),
-  )
-  let second_source = @scheduler.EventSource(
-    pattern_node=None,
-    section=Some(section),
-    layer=Some(layer),
-    occurrence=Some(second_occurrence),
-  )
-  sched.process_playback_events(
-    [
-      playback_note_event(60.0, first_source, arc),
-      playback_note_event(62.0, second_source, arc),
-    ],
-    arc,
-    pool,
-  )
-  let first_occurrence_target = @scheduler.AffectedVoiceTarget::from_occurrence(
-    first_occurrence,
-  )
-  let layer_target = @scheduler.AffectedVoiceTarget::from_layer(layer)
-  @debug.assert_eq(sched.active_note_count(), 2)
-  @debug.assert_eq(pool.active_voice_count(), 2)
-  @debug.assert_eq(
-    sched.apply_affected_voice_policy(
-      @scheduler.AffectedVoicePolicy::KillAffected,
-      first_occurrence_target,
-      pool,
-    ),
-    1,
-  )
-  @debug.assert_eq(sched.active_note_count(), 1)
-  @debug.assert_eq(pool.active_voice_count(), 1)
-  @debug.assert_eq(sched.affected_active_note_count(layer_target), 1)
-  @debug.assert_eq(
-    sched.apply_affected_voice_policy(
-      @scheduler.AffectedVoicePolicy::KillAffected,
-      layer_target,
-      pool,
-    ),
-    1,
-  )
-  @debug.assert_eq(sched.active_note_count(), 0)
-  @debug.assert_eq(pool.active_voice_count(), 0)
-}
-
-///|
-test "edit orchestration helper applies explicit policy to song scopes" {
-  let (pool, sched, _, _) = make_test_sched()
-  let arc = @pattern.TimeSpan::new(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::new(1L, 100L),
-  )
-  let section = sid("edit-policy:section")
-  let other_section = sid("edit-policy:other-section")
-  let lead_layer = lid("edit-policy:lead-layer")
-  let pad_layer = lid("edit-policy:pad-layer")
-  let first_occurrence = oid("edit-policy:first-occurrence")
-  let second_occurrence = oid("edit-policy:second-occurrence")
-  let other_occurrence = oid("edit-policy:other-occurrence")
-  sched.process_playback_events(
-    [
-      playback_note_event(
-        60.0,
-        @scheduler.EventSource(
-          pattern_node=None,
-          section=Some(section),
-          layer=Some(lead_layer),
-          occurrence=Some(first_occurrence),
-        ),
-        arc,
-      ),
-      playback_note_event(
-        62.0,
-        @scheduler.EventSource(
-          pattern_node=None,
-          section=Some(section),
-          layer=Some(pad_layer),
-          occurrence=Some(second_occurrence),
-        ),
-        arc,
-      ),
-      playback_note_event(
-        64.0,
-        @scheduler.EventSource(
-          pattern_node=None,
-          section=Some(other_section),
-          layer=None,
-          occurrence=Some(other_occurrence),
-        ),
-        arc,
-      ),
-    ],
-    arc,
-    pool,
-  )
-  @debug.assert_eq(sched.active_note_count(), 3)
-  @debug.assert_eq(
-    sched.apply_affected_voice_policy_for_edit(
-      @scheduler.AffectedVoicePolicy::GateOffAffected,
-      @scheduler.AffectedVoiceEditScope::song_occurrence(first_occurrence),
-      pool,
-    ),
-    1,
-  )
-  @debug.assert_eq(sched.active_note_count(), 2)
-  @debug.assert_eq(
-    sched.apply_affected_voice_policy_for_edit(
-      @scheduler.AffectedVoicePolicy::LetRing,
-      @scheduler.AffectedVoiceEditScope::song_section(section),
-      pool,
-    ),
-    0,
-  )
-  @debug.assert_eq(sched.active_note_count(), 2)
-  @debug.assert_eq(
-    sched.apply_affected_voice_policy_for_edit(
-      @scheduler.AffectedVoicePolicy::KillAffected,
-      @scheduler.AffectedVoiceEditScope::song_layer(section~, layer=pad_layer),
-      pool,
-    ),
-    1,
-  )
-  @debug.assert_eq(sched.active_note_count(), 1)
-  @debug.assert_eq(
-    sched.apply_affected_voice_policy_for_edit(
-      @scheduler.AffectedVoicePolicy::GateOffAffected,
-      @scheduler.AffectedVoiceEditScope::song_section(other_section),
-      pool,
-    ),
-    1,
-  )
-  @debug.assert_eq(sched.active_note_count(), 0)
-}
-
-///|
-test "edit orchestration song layer scope is bounded by section" {
-  let (pool, sched, _, _) = make_test_sched()
-  let arc = @pattern.TimeSpan::new(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::new(1L, 100L),
-  )
-  let edited_section = sid("edit-policy:shared-layer-section")
-  let other_section = sid("edit-policy:shared-layer-other-section")
-  let shared_layer = lid("edit-policy:shared-layer")
-  let edited_occurrence = oid("edit-policy:shared-layer-occurrence")
-  let other_occurrence = oid("edit-policy:shared-layer-other-occurrence")
-  sched.process_playback_events(
-    [
-      playback_note_event(
-        60.0,
-        @scheduler.EventSource(
-          pattern_node=None,
-          section=Some(edited_section),
-          layer=Some(shared_layer),
-          occurrence=Some(edited_occurrence),
-        ),
-        arc,
-      ),
-      playback_note_event(
-        62.0,
-        @scheduler.EventSource(
-          pattern_node=None,
-          section=Some(other_section),
-          layer=Some(shared_layer),
-          occurrence=Some(other_occurrence),
-        ),
-        arc,
-      ),
-    ],
-    arc,
-    pool,
-  )
-  @debug.assert_eq(sched.active_note_count(), 2)
-  @debug.assert_eq(
-    sched.affected_active_note_count(
-      @scheduler.AffectedVoiceTarget::from_layer(shared_layer),
-    ),
-    2,
-  )
-  @debug.assert_eq(
-    sched.apply_affected_voice_policy_for_edit(
-      @scheduler.AffectedVoicePolicy::KillAffected,
-      @scheduler.AffectedVoiceEditScope::song_layer(
-        section=edited_section,
-        layer=shared_layer,
-      ),
-      pool,
-    ),
-    1,
-  )
-  @debug.assert_eq(sched.active_note_count(), 1)
-  @debug.assert_eq(pool.active_voice_count(), 1)
-  @debug.assert_eq(
-    sched.affected_active_note_count(
-      @scheduler.AffectedVoiceTarget(
-        pattern_node=None,
-        section=Some(other_section),
-        layer=Some(shared_layer),
-        occurrence=None,
-      ),
-    ),
-    1,
-  )
-}
-
-///|
-test "queue_pattern_snapshot_edit preserves affected notes and stages replacement" {
-  let (pool, sched, left, right) = make_test_sched()
-  let arc = @pattern.TimeSpan::new(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::new(1L, 100L),
-  )
-  let edited_pattern = pid("edit-application:pattern-preserve")
-  sched.process_playback_events(
-    [
-      playback_note_event(
-        60.0,
-        @scheduler.EventSource(
-          pattern_node=Some(edited_pattern),
-          section=None,
-          layer=None,
-          occurrence=None,
-        ),
-        arc,
-      ),
-    ],
-    arc,
-    pool,
-  )
-  let replacement = silence_snapshot("edit-application:pattern-silence")
-  @debug.assert_eq(
-    sched.queue_pattern_snapshot_edit(
-      snapshot=replacement,
-      policy=@scheduler.AffectedVoicePolicy::LetRing,
-      edit=@scheduler.AffectedVoiceEditScope::pattern_node(edited_pattern),
-      pool~,
-    ),
-    0,
-  )
-  assert_true(sched.has_pending_pattern_snapshot())
-  assert_true(!sched.has_active_pattern_snapshot())
-  @debug.assert_eq(sched.active_note_count(), 1)
-  @debug.assert_eq(pool.active_voice_count(), 1)
-  sched.process_snapshot_block(pool, left, right)
-  assert_true(!sched.has_pending_pattern_snapshot())
-  assert_true(sched.has_active_pattern_snapshot())
-  assert_true(sched.active_playback_revision() == Some(replacement.revision()))
-  @debug.assert_eq(sched.active_note_count(), 1)
-  @debug.assert_eq(pool.active_voice_count(), 1)
-}
-
-///|
-test "queue_pattern_snapshot_edit gates only affected pattern notes" {
-  let (pool, sched, _, _) = make_test_sched()
-  let arc = @pattern.TimeSpan::new(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::new(1L, 100L),
-  )
-  let edited_pattern = pid("edit-application:pattern-gate")
-  let other_pattern = pid("edit-application:pattern-other")
-  sched.process_playback_events(
-    [
-      playback_note_event(
-        60.0,
-        @scheduler.EventSource(
-          pattern_node=Some(edited_pattern),
-          section=None,
-          layer=None,
-          occurrence=None,
-        ),
-        arc,
-      ),
-      playback_note_event(
-        62.0,
-        @scheduler.EventSource(
-          pattern_node=Some(other_pattern),
-          section=None,
-          layer=None,
-          occurrence=None,
-        ),
-        arc,
-      ),
-    ],
-    arc,
-    pool,
-  )
-  let edited_target = @scheduler.AffectedVoiceEditScope::pattern_node(
-    edited_pattern,
-  ).target()
-  let other_target = @scheduler.AffectedVoiceEditScope::pattern_node(
-    other_pattern,
-  ).target()
-  @debug.assert_eq(sched.active_note_count(), 2)
-  @debug.assert_eq(pool.active_voice_count(), 2)
-  @debug.assert_eq(
-    sched.queue_pattern_snapshot_edit(
-      snapshot=silence_snapshot("edit-application:pattern-gate-silence"),
-      policy=@scheduler.AffectedVoicePolicy::GateOffAffected,
-      edit=@scheduler.AffectedVoiceEditScope::pattern_node(edited_pattern),
-      pool~,
-    ),
-    1,
-  )
-  assert_true(sched.has_pending_pattern_snapshot())
-  @debug.assert_eq(sched.active_note_count(), 1)
-  @debug.assert_eq(pool.active_voice_count(), 2)
-  @debug.assert_eq(sched.affected_active_note_count(edited_target), 0)
-  @debug.assert_eq(sched.affected_active_note_count(other_target), 1)
-}
-
-///|
-test "queue_song_snapshot_edit applies occurrence section and layer edit policies" {
-  let (pool, sched, left, right) = make_test_sched()
-  let arc = @pattern.TimeSpan::new(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::new(1L, 100L),
-  )
-  let section = sid("edit-application:song-section")
-  let other_section = sid("edit-application:song-other-section")
-  let lead_layer = lid("edit-application:song-lead-layer")
-  let pad_layer = lid("edit-application:song-pad-layer")
-  let first_occurrence = oid("edit-application:song-first-occurrence")
-  let second_occurrence = oid("edit-application:song-second-occurrence")
-  let other_occurrence = oid("edit-application:song-other-occurrence")
-  sched.process_playback_events(
-    [
-      playback_note_event(
-        60.0,
-        @scheduler.EventSource(
-          pattern_node=None,
-          section=Some(section),
-          layer=Some(lead_layer),
-          occurrence=Some(first_occurrence),
-        ),
-        arc,
-      ),
-      playback_note_event(
-        62.0,
-        @scheduler.EventSource(
-          pattern_node=None,
-          section=Some(section),
-          layer=Some(pad_layer),
-          occurrence=Some(second_occurrence),
-        ),
-        arc,
-      ),
-      playback_note_event(
-        64.0,
-        @scheduler.EventSource(
-          pattern_node=None,
-          section=Some(other_section),
-          layer=None,
-          occurrence=Some(other_occurrence),
-        ),
-        arc,
-      ),
-    ],
-    arc,
-    pool,
-  )
-  let replacement_section = scheduler_section_doc(
-    "edit-application:song-replacement-section", "Replacement", 67.0,
-  )
-  let replacement_doc = scheduler_song_doc([
-    @song.SongOccurrenceDoc::at(
-      id=oid("edit-application:song-replacement-occurrence"),
-      start=@pattern.Rational::from_int(1),
-      name="Replacement",
-      section=replacement_section,
-    ),
-  ])
-  let replacement = song_snapshot(replacement_doc)
-  @debug.assert_eq(sched.active_note_count(), 3)
-  @debug.assert_eq(pool.active_voice_count(), 3)
-  @debug.assert_eq(
-    sched.queue_song_snapshot_edit(
-      snapshot=replacement,
-      policy=@scheduler.AffectedVoicePolicy::GateOffAffected,
-      edit=@scheduler.AffectedVoiceEditScope::song_occurrence(first_occurrence),
-      pool~,
-    ),
-    1,
-  )
-  assert_true(sched.has_pending_song_snapshot())
-  @debug.assert_eq(sched.active_note_count(), 2)
-  @debug.assert_eq(pool.active_voice_count(), 3)
-  @debug.assert_eq(
-    sched.queue_song_snapshot_edit(
-      snapshot=replacement,
-      policy=@scheduler.AffectedVoicePolicy::LetRing,
-      edit=@scheduler.AffectedVoiceEditScope::song_section(section),
-      pool~,
-    ),
-    0,
-  )
-  @debug.assert_eq(sched.active_note_count(), 2)
-  @debug.assert_eq(
-    sched.queue_song_snapshot_edit(
-      snapshot=replacement,
-      policy=@scheduler.AffectedVoicePolicy::KillAffected,
-      edit=@scheduler.AffectedVoiceEditScope::song_layer(
-        section~,
-        layer=pad_layer,
-      ),
-      pool~,
-    ),
-    1,
-  )
-  @debug.assert_eq(sched.active_note_count(), 1)
-  @debug.assert_eq(pool.active_voice_count(), 2)
-  @debug.assert_eq(
-    sched.affected_active_note_count(
-      @scheduler.AffectedVoiceEditScope::song_occurrence(other_occurrence).target(),
-    ),
-    1,
-  )
-  sched.process_song_snapshot_block(pool, left, right)
-  assert_true(!sched.has_pending_song_snapshot())
-  assert_true(sched.has_active_song_snapshot())
-  assert_true(sched.active_song_revision() == Some(replacement_doc.revision()))
-  @debug.assert_eq(sched.active_note_count(), 1)
-}
-
-///|
-test "queue_pattern_snapshot_live_control_edit_result controls voices and stages replacement" {
-  let (pool, sched, left, right) = make_test_sched()
-  let arc = @pattern.TimeSpan::new(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::new(1L, 100L),
-  )
-  let edited_pattern = pid("edit-application:live-control-pattern")
-  sched.process_playback_events(
-    [
-      playback_note_event(
-        60.0,
-        @scheduler.EventSource(
-          pattern_node=Some(edited_pattern),
-          section=None,
-          layer=None,
-          occurrence=None,
-        ),
-        arc,
-      ),
-    ],
-    arc,
-    pool,
-  )
-  let replacement = silence_snapshot("edit-application:live-control-silence")
-  match
-    sched.queue_pattern_snapshot_live_control_edit_result(
-      snapshot=replacement,
-      policy=@scheduler.AffectedVoicePolicy::LetRing,
-      edit=@scheduler.AffectedVoiceEditScope::pattern_node(edited_pattern),
-      controls=[
-        @moondsp.GraphControl::set_param(
-          0,
-          @moondsp.GraphParamSlot::Value0,
-          330.0,
-        ),
-      ],
-      pool~,
-    ) {
-    Ok(result) => {
-      @debug.assert_eq(result.controlled_voice_count, 1)
-      @debug.assert_eq(result.removed_active_note_count, 0)
-    }
-    Err(_) => assert_true(false)
-  }
-  assert_true(sched.has_pending_pattern_snapshot())
-  @debug.assert_eq(sched.active_note_count(), 1)
-  @debug.assert_eq(pool.active_voice_count(), 1)
-  sched.process_snapshot_block(pool, left, right)
-  assert_true(!sched.has_pending_pattern_snapshot())
-  assert_true(sched.has_active_pattern_snapshot())
-  assert_true(sched.active_playback_revision() == Some(replacement.revision()))
-}
-
-///|
-test "queue_pattern_snapshot_live_control_edit_result rejects invalid controls without staging or policy" {
-  let (pool, sched, _, _) = make_test_sched()
-  let arc = @pattern.TimeSpan::new(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::new(1L, 100L),
-  )
-  let edited_pattern = pid("edit-application:live-control-invalid")
-  sched.process_playback_events(
-    [
-      playback_note_event(
-        60.0,
-        @scheduler.EventSource(
-          pattern_node=Some(edited_pattern),
-          section=None,
-          layer=None,
-          occurrence=None,
-        ),
-        arc,
-      ),
-    ],
-    arc,
-    pool,
-  )
-  let target = @scheduler.AffectedVoiceEditScope::pattern_node(edited_pattern).target()
-  match
-    sched.queue_pattern_snapshot_live_control_edit_result(
-      snapshot=silence_snapshot("edit-application:live-control-invalid-silence"),
-      policy=@scheduler.AffectedVoicePolicy::GateOffAffected,
-      edit=@scheduler.AffectedVoiceEditScope::pattern_node(edited_pattern),
-      controls=[
-        @moondsp.GraphControl::set_param(
-          99,
-          @moondsp.GraphParamSlot::Value0,
-          330.0,
-        ),
-      ],
-      pool~,
-    ) {
-    Err(
-      @moondsp.VoiceControlError::Graph(
-        @moondsp.GraphControlError::InvalidNodeIndex(99)
-      )
-    ) => ()
-    _ => assert_true(false)
-  }
-  assert_true(!sched.has_pending_pattern_snapshot())
-  @debug.assert_eq(sched.active_note_count(), 1)
-  @debug.assert_eq(pool.active_voice_count(), 1)
-  @debug.assert_eq(sched.affected_active_note_count(target), 1)
-}
-
-///|
-test "queue_song_snapshot_live_control_edit_result supports policy-only edits" {
-  let (pool, sched, _, _) = make_test_sched()
-  let arc = @pattern.TimeSpan::new(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::new(1L, 100L),
-  )
-  let section = sid("edit-application:live-song-section")
-  let occurrence = oid("edit-application:live-song-occurrence")
-  sched.process_playback_events(
-    [
-      playback_note_event(
-        60.0,
-        @scheduler.EventSource(
-          pattern_node=None,
-          section=Some(section),
-          layer=None,
-          occurrence=Some(occurrence),
-        ),
-        arc,
-      ),
-    ],
-    arc,
-    pool,
-  )
-  let replacement_section = scheduler_section_doc(
-    "edit-application:live-song-replacement-section", "Replacement", 67.0,
-  )
-  let replacement_doc = scheduler_song_doc([
-    @song.SongOccurrenceDoc::at(
-      id=oid("edit-application:live-song-replacement-occurrence"),
-      start=@pattern.Rational::from_int(1),
-      name="Replacement",
-      section=replacement_section,
-    ),
-  ])
-  match
-    sched.queue_song_snapshot_live_control_edit_result(
-      snapshot=song_snapshot(replacement_doc),
-      policy=@scheduler.AffectedVoicePolicy::GateOffAffected,
-      edit=@scheduler.AffectedVoiceEditScope::song_occurrence(occurrence),
-      controls=[],
-      pool~,
-    ) {
-    Ok(result) => {
-      @debug.assert_eq(result.controlled_voice_count, 0)
-      @debug.assert_eq(result.removed_active_note_count, 1)
-    }
-    Err(_) => assert_true(false)
-  }
-  assert_true(sched.has_pending_song_snapshot())
-  @debug.assert_eq(sched.active_note_count(), 0)
-  @debug.assert_eq(pool.active_voice_count(), 1)
-}
-
-///|
-test "active voice live controls apply only matching edit-scope voices" {
-  let (pool, sched, _, _) = make_test_sched()
-  let arc = @pattern.TimeSpan::new(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::new(1L, 100L),
-  )
-  let edited_pattern = pid("live-control:pattern")
-  let other_pattern = pid("live-control:other")
-  sched.process_playback_events(
-    [
-      playback_note_event(
-        60.0,
-        @scheduler.EventSource(
-          pattern_node=Some(edited_pattern),
-          section=None,
-          layer=None,
-          occurrence=None,
-        ),
-        arc,
-      ),
-      playback_note_event(
-        62.0,
-        @scheduler.EventSource(
-          pattern_node=Some(other_pattern),
-          section=None,
-          layer=None,
-          occurrence=None,
-        ),
-        arc,
-      ),
-    ],
-    arc,
-    pool,
-  )
-  let edited_target = @scheduler.AffectedVoiceEditScope::pattern_node(
-    edited_pattern,
-  ).target()
-  let other_target = @scheduler.AffectedVoiceEditScope::pattern_node(
-    other_pattern,
-  ).target()
-  @debug.assert_eq(sched.active_note_count(), 2)
-  match
-    sched.apply_voice_control_for_edit_result(
-      edit=@scheduler.AffectedVoiceEditScope::pattern_node(edited_pattern),
-      control=@moondsp.GraphControl::set_param(
-        0,
-        @moondsp.GraphParamSlot::Value0,
-        330.0,
-      ),
-      pool~,
-    ) {
-    Ok(count) => @debug.assert_eq(count, 1)
-    Err(_) => assert_true(false)
-  }
-  @debug.assert_eq(sched.active_note_count(), 2)
-  @debug.assert_eq(pool.active_voice_count(), 2)
-  @debug.assert_eq(sched.affected_active_note_count(edited_target), 1)
-  @debug.assert_eq(sched.affected_active_note_count(other_target), 1)
-}
-
-///|
-test "active voice live controls reject invalid controls without dropping notes" {
-  let (pool, sched, _, _) = make_test_sched()
-  let arc = @pattern.TimeSpan::new(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::new(1L, 100L),
-  )
-  let edited_pattern = pid("live-control:invalid-pattern")
-  sched.process_playback_events(
-    [
-      playback_note_event(
-        60.0,
-        @scheduler.EventSource(
-          pattern_node=Some(edited_pattern),
-          section=None,
-          layer=None,
-          occurrence=None,
-        ),
-        arc,
-      ),
-    ],
-    arc,
-    pool,
-  )
-  match
-    sched.apply_voice_control_for_edit_result(
-      edit=@scheduler.AffectedVoiceEditScope::pattern_node(edited_pattern),
-      control=@moondsp.GraphControl::set_param(
-        99,
-        @moondsp.GraphParamSlot::Value0,
-        330.0,
-      ),
-      pool~,
-    ) {
-    Err(
-      @moondsp.VoiceControlError::Graph(
-        @moondsp.GraphControlError::InvalidNodeIndex(99)
-      )
-    ) => ()
-    _ => assert_true(false)
-  }
-  @debug.assert_eq(sched.active_note_count(), 1)
-  @debug.assert_eq(pool.active_voice_count(), 1)
-}
-
-///|
-test "active voice live controls ignore empty batches" {
-  let (pool, sched, _, _) = make_test_sched()
-  let arc = @pattern.TimeSpan::new(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::new(1L, 100L),
-  )
-  let edited_pattern = pid("live-control:empty-batch")
-  sched.process_playback_events(
-    [
-      playback_note_event(
-        60.0,
-        @scheduler.EventSource(
-          pattern_node=Some(edited_pattern),
-          section=None,
-          layer=None,
-          occurrence=None,
-        ),
-        arc,
-      ),
-    ],
-    arc,
-    pool,
-  )
-  match
-    sched.apply_voice_controls_for_edit_result(
-      edit=@scheduler.AffectedVoiceEditScope::pattern_node(edited_pattern),
-      controls=[],
-      pool~,
-    ) {
-    Ok(count) => @debug.assert_eq(count, 0)
-    Err(_) => assert_true(false)
-  }
-  @debug.assert_eq(sched.active_note_count(), 1)
-  @debug.assert_eq(pool.active_voice_count(), 1)
 }
 
 ///|
@@ -1836,6 +393,277 @@ test "process_snapshot_block: pending snapshot commits at block boundary" {
   @debug.assert_eq(pool.active_voice_count(), 1)
   @debug.assert_eq(sched.active_note_count(), 1)
   @debug.assert_eq(sched.sample_counter(), 128L)
+}
+
+///|
+test "Release detaches the note while its tail finishes sounding" {
+  let (pool, sched, left, right) = make_test_sched()
+  let root = pid("release")
+  sched.queue_pattern_snapshot(note_snapshot(root.value(), 60.0))
+  sched.process_snapshot_block(pool, left, right)
+  let outcome = sched
+    .apply_pattern_voice_effect_result(
+      @scheduler.PatternVoiceScope::node(root),
+      @scheduler.ActiveVoiceEffect::Release,
+      pool,
+    )
+    .unwrap()
+  @debug.assert_eq(outcome.detached_note_count, 1)
+  @debug.assert_eq(sched.active_note_count(), 0)
+  sched.process_snapshot_block(pool, left, right)
+  assert_true(buffer_abs_sum(left) > 0.0)
+  sched.process_snapshot_block(pool, left, right)
+  @debug.assert_eq(buffer_abs_sum(left) + buffer_abs_sum(right), 0.0)
+}
+
+///|
+test "Kill detaches the note and silences it immediately" {
+  let (pool, sched, left, right) = make_test_sched()
+  let root = pid("kill")
+  sched.queue_pattern_snapshot(note_snapshot(root.value(), 60.0))
+  sched.process_snapshot_block(pool, left, right)
+  let outcome = sched
+    .apply_pattern_voice_effect_result(
+      @scheduler.PatternVoiceScope::node(root),
+      @scheduler.ActiveVoiceEffect::Kill,
+      pool,
+    )
+    .unwrap()
+  @debug.assert_eq(outcome.detached_note_count, 1)
+  @debug.assert_eq(sched.active_note_count(), 0)
+  sched.process_snapshot_block(pool, left, right)
+  @debug.assert_eq(buffer_abs_sum(left) + buffer_abs_sum(right), 0.0)
+}
+
+///|
+test "Retune changes the sounding voice without detaching its note" {
+  let (pool, sched, left, right) = make_test_sched()
+  let root = pid("retune")
+  sched.queue_pattern_snapshot(note_snapshot(root.value(), 60.0))
+  sched.process_snapshot_block(pool, left, right)
+  assert_true(buffer_abs_sum(left) > 0.0)
+  // Mute the envelope gain rather than asserting oscillator sample values.
+  let mute = @scheduler.VoiceControlBatch(
+    @moondsp.GraphControl::set_param(2, @moondsp.GraphParamSlot::Value0, 0.0),
+  )
+  let outcome = sched
+    .apply_pattern_voice_effect_result(
+      @scheduler.PatternVoiceScope::node(root),
+      @scheduler.ActiveVoiceEffect::Retune(mute),
+      pool,
+    )
+    .unwrap()
+  @debug.assert_eq(outcome.retuned_voice_count, 1)
+  @debug.assert_eq(outcome.detached_note_count, 0)
+  @debug.assert_eq(sched.active_note_count(), 1)
+  @debug.assert_eq(pool.active_voice_count(), 1)
+  sched.process_snapshot_block(pool, left, right)
+  @debug.assert_eq(buffer_abs_sum(left) + buffer_abs_sum(right), 0.0)
+}
+
+///|
+test "Rejected retune preserves audio and the previously queued snapshot" {
+  let (pool, sched, left, right) = make_test_sched()
+  let (reference_pool, reference, expected_left, expected_right) = make_test_sched()
+  let root = pid("rejected-retune")
+  let playing = note_snapshot(root.value(), 60.0)
+  sched.queue_pattern_snapshot(playing)
+  reference.queue_pattern_snapshot(playing)
+  sched.process_snapshot_block(pool, left, right)
+  reference.process_snapshot_block(
+    reference_pool, expected_left, expected_right,
+  )
+  let pending = silence_snapshot("already-queued")
+  sched.queue_pattern_snapshot(pending)
+  reference.queue_pattern_snapshot(pending)
+  // A valid mutation followed by an invalid one must not partially apply.
+  let invalid = @scheduler.VoiceControlBatch(
+    @moondsp.GraphControl::set_param(2, @moondsp.GraphParamSlot::Value0, 0.0),
+    rest=[
+      @moondsp.GraphControl::set_param(
+        99,
+        @moondsp.GraphParamSlot::Value0,
+        880.0,
+      ),
+    ],
+  )
+  assert_true(
+    sched.queue_pattern_snapshot_effect_result(
+      note_snapshot("rejected-replacement", 72.0),
+      @scheduler.PatternVoiceScope::node(root),
+      @scheduler.ActiveVoiceEffect::Retune(invalid),
+      pool,
+    )
+    is Err(_),
+  )
+  assert_true(sched.has_pending_pattern_snapshot())
+  sched.process_snapshot_block(pool, left, right)
+  reference.process_snapshot_block(
+    reference_pool, expected_left, expected_right,
+  )
+  for i in 0..<left.length() {
+    @debug.assert_eq(left.get(i), expected_left.get(i))
+    @debug.assert_eq(right.get(i), expected_right.get(i))
+  }
+  // Cross the next cycle onset and the old note's release tail.
+  for _ in 0..<200 {
+    sched.process_snapshot_block(pool, left, right)
+  }
+  @debug.assert_eq(sched.active_note_count(), 0)
+  @debug.assert_eq(buffer_abs_sum(left) + buffer_abs_sum(right), 0.0)
+}
+
+///|
+test "Pattern selection kills the selected child but leaves its sibling sounding" {
+  let (pool, sched, left, right) = make_test_sched()
+  let (reference_pool, reference, expected_left, expected_right) = make_test_sched()
+  reference.queue_pattern_snapshot(note_snapshot("sibling", 72.0))
+  reference.process_snapshot_block(
+    reference_pool, expected_left, expected_right,
+  )
+  let doc = @pattern.PatternDoc::stack(id=pid("mix"), docs=[
+    @pattern.PatternDoc::from_pattern(
+      id=pid("selected"),
+      pat=@pattern.note(60.0),
+    ),
+    @pattern.PatternDoc::from_pattern(
+      id=pid("sibling"),
+      pat=@pattern.note(72.0),
+    ),
+  ])
+  sched.queue_pattern_snapshot(doc.lower())
+  sched.process_snapshot_block(pool, left, right)
+  let outcome = sched
+    .apply_pattern_voice_effect_result(
+      @scheduler.PatternVoiceScope::node(pid("selected")),
+      @scheduler.ActiveVoiceEffect::Kill,
+      pool,
+    )
+    .unwrap()
+  @debug.assert_eq(outcome.detached_note_count, 1)
+  @debug.assert_eq(sched.active_note_count(), 1)
+  sched.process_snapshot_block(pool, left, right)
+  reference.process_snapshot_block(
+    reference_pool, expected_left, expected_right,
+  )
+  assert_true(buffer_abs_sum(expected_left) > 0.0)
+  for i in 0..<left.length() {
+    @debug.assert_eq(left.get(i), expected_left.get(i))
+    @debug.assert_eq(right.get(i), expected_right.get(i))
+  }
+}
+
+///|
+test "Song layer selection does not cross section boundaries" {
+  let (pool, sched, left, right) = make_test_sched()
+  let (reference_pool, reference, expected_left, expected_right) = make_test_sched()
+  reference.queue_pattern_snapshot(note_snapshot("unrelated", 72.0))
+  reference.process_snapshot_block(
+    reference_pool, expected_left, expected_right,
+  )
+  let layer = lid("shared-layer")
+  let sections = ["selected", "unrelated"].map(name => {
+    @song.SectionDoc::single(
+      id=sid(name),
+      name~,
+      layer_id=layer,
+      length_cycles=@pattern.Rational::from_int(1),
+      scope=@song.TimeScope::identity(),
+      body=@pattern.note(if name == "selected" { 60.0 } else { 72.0 }),
+    )
+  })
+  let doc = scheduler_song_doc(
+    sections.map(section => {
+      @song.SongOccurrenceDoc::at(
+        id=oid(section.name()),
+        name=section.name(),
+        section~,
+        start=@pattern.Rational::from_int(0),
+      )
+    }),
+  )
+  sched.queue_song_snapshot(song_snapshot(doc))
+  sched.process_snapshot_block(pool, left, right)
+  let outcome = sched
+    .apply_song_voice_effect_result(
+      @scheduler.SongVoiceScope::layer(sid("selected"), layer),
+      @scheduler.ActiveVoiceEffect::Kill,
+      pool,
+    )
+    .unwrap()
+  @debug.assert_eq(outcome.detached_note_count, 1)
+  @debug.assert_eq(sched.active_note_count(), 1)
+  sched.process_snapshot_block(pool, left, right)
+  reference.process_snapshot_block(
+    reference_pool, expected_left, expected_right,
+  )
+  assert_true(buffer_abs_sum(expected_left) > 0.0)
+  for i in 0..<left.length() {
+    @debug.assert_eq(left.get(i), expected_left.get(i))
+    @debug.assert_eq(right.get(i), expected_right.get(i))
+  }
+}
+
+///|
+test "Retune preflights later voices before mutating the first voice" {
+  let (pool, sched, left, right) = make_test_sched()
+  let (reference_pool, reference, expected_left, expected_right) = make_test_sched()
+  let root = pid("mixed-templates")
+  for pair in [(pool, sched), (reference_pool, reference)] {
+    let (p, s) = pair
+    s.queue_pattern_snapshot(note_snapshot(root.value(), 60.0))
+    s.process_snapshot_block(p, left, right)
+    // Old voices keep ADSR at index 1; new voices have an oscillator there.
+    p
+    .set_template(
+      @moondsp.CompiledTemplate::analyze([
+        @moondsp.DspNode::adsr(
+          attack_ms=0.01,
+          decay_ms=0.1,
+          sustain=0.7,
+          release_ms=0.3,
+        ),
+        @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 440.0),
+        @moondsp.DspNode::envelope_gain(input=1, envelope=0, amount=1.0),
+        @moondsp.DspNode::output(2),
+      ]),
+      @moondsp.ControlBindingBuilder::new().bind(
+        key="note",
+        node_index=1,
+        slot=@moondsp.GraphParamSlot::Value0,
+      ),
+    )
+    .unwrap()
+    let quick = @pattern.PatternDoc::from_pattern(
+      id=root,
+      pat=@pattern.note(60.0).fast(@pattern.Rational::from_int(100)),
+    )
+    s.queue_pattern_snapshot(quick.lower())
+    s.process_snapshot_block(p, left, right)
+  }
+  @debug.assert_eq(sched.active_note_count(), 2)
+  let controls = @scheduler.VoiceControlBatch(
+    @moondsp.GraphControl::set_param(2, @moondsp.GraphParamSlot::Value0, 0.0),
+    rest=[
+      @moondsp.GraphControl::set_param(1, @moondsp.GraphParamSlot::Value2, 0.0),
+    ],
+  )
+  assert_true(
+    sched.apply_pattern_voice_effect_result(
+      @scheduler.PatternVoiceScope::node(root),
+      @scheduler.ActiveVoiceEffect::Retune(controls),
+      pool,
+    )
+    is Err(_),
+  )
+  sched.process_snapshot_block(pool, left, right)
+  reference.process_snapshot_block(
+    reference_pool, expected_left, expected_right,
+  )
+  for i in 0..<left.length() {
+    @debug.assert_eq(left.get(i), expected_left.get(i))
+    @debug.assert_eq(right.get(i), expected_right.get(i))
+  }
 }
 
 ///|
@@ -1891,15 +719,15 @@ test "process_song_snapshot_block: pending song snapshot commits at block bounda
   assert_true(!sched.has_pending_song_snapshot())
   assert_true(sched.has_active_song_snapshot())
   assert_true(sched.active_song_revision() == Some(doc.revision()))
-  assert_true(
-    sched.active_song_layout_revision() == Some(doc.layout_revision()),
-  )
-  @debug.assert_eq(pool.active_voice_count(), 1)
-  @debug.assert_eq(sched.active_note_count(), 1)
-  match sched.active_note_source(0) {
-    Some(source) => assert_true(source.is_empty())
-    None => assert_true(false)
-  }
+  let outcome = sched
+    .apply_song_voice_effect_result(
+      @scheduler.SongVoiceScope::occurrence(main_id),
+      @scheduler.ActiveVoiceEffect::Release,
+      pool,
+    )
+    .unwrap()
+  @debug.assert_eq(outcome.detached_note_count, 1)
+  @debug.assert_eq(sched.active_note_count(), 0)
   @debug.assert_eq(sched.sample_counter(), 128L)
 }
 

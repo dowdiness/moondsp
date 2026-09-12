@@ -1,91 +1,4 @@
 ///|
-/// Internal provenance payload for an event queried from a playback snapshot.
-pub struct PlaybackEventSource {
-  priv pattern_nodes : Array[@identity.PatternNodeId]
-  priv section : @identity.SectionId?
-  priv layer : @identity.SectionLayerId?
-  priv occurrence : @identity.OccurrenceId?
-}
-
-///|
-fn PlaybackEventSource::pattern(
-  pattern_nodes~ : Array[@identity.PatternNodeId],
-) -> PlaybackEventSource {
-  {
-    pattern_nodes: pattern_nodes.copy(),
-    section: None,
-    layer: None,
-    occurrence: None,
-  }
-}
-
-///|
-fn PlaybackEventSource::song(
-  section~ : @identity.SectionId?,
-  layer~ : @identity.SectionLayerId?,
-  occurrence~ : @identity.OccurrenceId,
-) -> PlaybackEventSource {
-  { pattern_nodes: [], section, layer, occurrence: Some(occurrence) }
-}
-
-///|
-pub fn PlaybackEventSource::pattern_nodes(
-  self : PlaybackEventSource,
-) -> Array[@identity.PatternNodeId] {
-  self.pattern_nodes.copy()
-}
-
-///|
-pub fn PlaybackEventSource::section(
-  self : PlaybackEventSource,
-) -> @identity.SectionId? {
-  self.section
-}
-
-///|
-pub fn PlaybackEventSource::layer(
-  self : PlaybackEventSource,
-) -> @identity.SectionLayerId? {
-  self.layer
-}
-
-///|
-pub fn PlaybackEventSource::occurrence(
-  self : PlaybackEventSource,
-) -> @identity.OccurrenceId? {
-  self.occurrence
-}
-
-///|
-/// Internal event wrapper returned by playback snapshot queries.
-pub struct PlaybackEventRecord {
-  priv event : @pattern.Event[@pattern.ControlMap]
-  priv source : PlaybackEventSource
-}
-
-///|
-fn PlaybackEventRecord::PlaybackEventRecord(
-  event~ : @pattern.Event[@pattern.ControlMap],
-  source~ : PlaybackEventSource,
-) -> PlaybackEventRecord {
-  { event, source }
-}
-
-///|
-pub fn PlaybackEventRecord::event(
-  self : PlaybackEventRecord,
-) -> @pattern.Event[@pattern.ControlMap] {
-  self.event
-}
-
-///|
-pub fn PlaybackEventRecord::source(
-  self : PlaybackEventRecord,
-) -> PlaybackEventSource {
-  self.source
-}
-
-///|
 /// Internal prepared scheduler input for active/pending playback state.
 pub enum PlaybackSnapshot {
   Pattern(@pattern.PatternSnapshot[@pattern.ControlMap])
@@ -154,17 +67,6 @@ pub fn PlaybackSnapshot::query_events(
 }
 
 ///|
-pub fn PlaybackSnapshot::query_playback_events(
-  self : PlaybackSnapshot,
-  arc : @pattern.TimeSpan,
-) -> Array[PlaybackEventRecord] {
-  match self {
-    Pattern(snapshot) => query_pattern_playback_events(snapshot, arc)
-    Song(snapshot) => query_song_playback_events(snapshot, arc)
-  }
-}
-
-///|
 /// Internal active/pending playback snapshot queue. Pending commits are explicit
 /// so the scheduler facade can preserve block-boundary commit semantics.
 pub struct PlaybackState {
@@ -174,7 +76,7 @@ pub struct PlaybackState {
 
 ///|
 pub fn PlaybackState::PlaybackState() -> PlaybackState {
-  { active: None, pending: None }
+  { active: None, pending: None, }
 }
 
 ///|
@@ -276,14 +178,10 @@ pub fn PlaybackState::active_song_layout_revision(
 }
 
 ///|
-pub fn PlaybackState::query_active_events(
+pub fn PlaybackState::active_snapshot(
   self : PlaybackState,
-  arc : @pattern.TimeSpan,
-) -> Array[@pattern.Event[@pattern.ControlMap]] {
-  match self.active {
-    Some(snapshot) => snapshot.query_events(arc)
-    None => []
-  }
+) -> PlaybackSnapshot? {
+  self.active
 }
 
 ///|
@@ -300,38 +198,4 @@ fn query_song_events(
   arc : @pattern.TimeSpan,
 ) -> Array[@pattern.Event[@pattern.ControlMap]] {
   snapshot.query(arc)
-}
-
-///|
-fn query_pattern_playback_events(
-  snapshot : @pattern.PatternSnapshot[@pattern.ControlMap],
-  arc : @pattern.TimeSpan,
-) -> Array[PlaybackEventRecord] {
-  snapshot
-  .query_sourced_events(arc)
-  .map(event => {
-    PlaybackEventRecord(
-      event=event.event(),
-      source=PlaybackEventSource::pattern(pattern_nodes=event.pattern_nodes()),
-    )
-  })
-}
-
-///|
-fn query_song_playback_events(
-  snapshot : @song.SongSnapshot[@pattern.ControlMap],
-  arc : @pattern.TimeSpan,
-) -> Array[PlaybackEventRecord] {
-  snapshot
-  .query_sourced_events(arc)
-  .map(event => {
-    PlaybackEventRecord(
-      event=event.event(),
-      source=PlaybackEventSource::song(
-        section=event.section(),
-        layer=event.layer(),
-        occurrence=event.occurrence(),
-      ),
-    )
-  })
 }

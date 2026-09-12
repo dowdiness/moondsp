@@ -111,12 +111,12 @@ test "SongSnapshot::query_sourced_events tags occurrence section and layer IDs" 
   )
   @debug.assert_eq(events.length(), 2)
   assert_true(events[0].occurrence() == occurrence_id)
-  assert_true(events[0].section() == Some(section_id))
-  assert_true(events[0].layer() == Some(lead_id))
+  assert_true(events[0].section() == section_id)
+  assert_true(events[0].layer() == lead_id)
   assert_true(events[0].event().value.get("note") == Some(60.0))
   assert_true(events[1].occurrence() == occurrence_id)
-  assert_true(events[1].section() == Some(section_id))
-  assert_true(events[1].layer() == Some(pad_id))
+  assert_true(events[1].section() == section_id)
+  assert_true(events[1].layer() == pad_id)
   assert_true(events[1].event().value.get("note") == Some(67.0))
 }
 

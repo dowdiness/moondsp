@@ -325,17 +325,54 @@ fn[A] pattern_node_revision_memoized(
 }
 
 ///|
+pub struct PatternNodePath {
+  priv root : @identity.PatternNodeId
+  priv descendants : Array[@identity.PatternNodeId]
+} derive(Eq, Debug)
+
+///|
+fn PatternNodePath::PatternNodePath(
+  root : @identity.PatternNodeId,
+  descendants? : Array[@identity.PatternNodeId] = [],
+) -> PatternNodePath {
+  { root, descendants: descendants.copy(), }
+}
+
+///|
+pub fn PatternNodePath::leaf(self : PatternNodePath) -> @identity.PatternNodeId {
+  match self.descendants.last() {
+    Some(id) => id
+    None => self.root
+  }
+}
+
+///|
+pub fn PatternNodePath::nodes(
+  self : PatternNodePath,
+) -> Array[@identity.PatternNodeId] {
+  [self.root, ..self.descendants]
+}
+
+///|
+fn PatternNodePath::prepend(
+  self : PatternNodePath,
+  parent : @identity.PatternNodeId,
+) -> PatternNodePath {
+  PatternNodePath(parent, descendants=self.nodes())
+}
+
+///|
 pub struct PatternSnapshotEvent[A] {
   priv event : Event[A]
-  priv pattern_nodes : Array[@identity.PatternNodeId]
+  priv path : PatternNodePath
 }
 
 ///|
 fn[A] PatternSnapshotEvent::PatternSnapshotEvent(
   event~ : Event[A],
-  pattern_nodes~ : Array[@identity.PatternNodeId],
+  path~ : PatternNodePath,
 ) -> PatternSnapshotEvent[A] {
-  { event, pattern_nodes: pattern_nodes.copy() }
+  { event, path, }
 }
 
 ///|
@@ -348,19 +385,22 @@ pub fn[A] PatternSnapshotEvent::event(
 ///|
 pub fn[A] PatternSnapshotEvent::pattern_node(
   self : PatternSnapshotEvent[A],
-) -> @identity.PatternNodeId? {
-  if self.pattern_nodes.is_empty() {
-    None
-  } else {
-    Some(self.pattern_nodes[self.pattern_nodes.length() - 1])
-  }
+) -> @identity.PatternNodeId {
+  self.path.leaf()
 }
 
 ///|
 pub fn[A] PatternSnapshotEvent::pattern_nodes(
   self : PatternSnapshotEvent[A],
 ) -> Array[@identity.PatternNodeId] {
-  self.pattern_nodes.copy()
+  self.path.nodes()
+}
+
+///|
+pub fn[A] PatternSnapshotEvent::pattern_node_path(
+  self : PatternSnapshotEvent[A],
+) -> PatternNodePath {
+  self.path
 }
 
 ///|
@@ -377,22 +417,16 @@ fn[A] SourcedPat::query(
 }
 
 ///|
-fn pattern_source_path(
-  id : @identity.PatternNodeId,
-) -> Array[@identity.PatternNodeId] {
-  [id]
+fn pattern_source_path(id : @identity.PatternNodeId) -> PatternNodePath {
+  PatternNodePath(id)
 }
 
 ///|
 fn pattern_source_path_with_parent(
   id : @identity.PatternNodeId,
-  child_path : Array[@identity.PatternNodeId],
-) -> Array[@identity.PatternNodeId] {
-  let result : Array[@identity.PatternNodeId] = [id]
-  for child in child_path {
-    result.push(child)
-  }
-  result
+  child_path : PatternNodePath,
+) -> PatternNodePath {
+  child_path.prepend(id)
 }
 
 ///|
@@ -440,14 +474,14 @@ fn[A] pattern_source_path_for_opaque_children(
   nodes : Map[String, PatternDocEntry[A]],
   id : @identity.PatternNodeId,
   children : Array[@identity.PatternNodeId],
-) -> Array[@identity.PatternNodeId] raise PatternDocError {
-  let result : Array[@identity.PatternNodeId] = [id]
+) -> PatternNodePath raise PatternDocError {
+  let descendants : Array[@identity.PatternNodeId] = []
   let seen : Map[String, Bool] = {}
   seen[id.value()] = true
   for child in children {
-    append_reachable_pattern_source_ids(nodes, child, result, seen)
+    append_reachable_pattern_source_ids(nodes, child, descendants, seen)
   }
-  result
+  PatternNodePath(id, descendants~)
 }
 
 ///|
@@ -455,7 +489,7 @@ fn[A] tag_pattern_event(
   event : Event[A],
   id : @identity.PatternNodeId,
 ) -> PatternSnapshotEvent[A] {
-  PatternSnapshotEvent(event~, pattern_nodes=pattern_source_path(id))
+  PatternSnapshotEvent(event~, path=pattern_source_path(id))
 }
 
 ///|
@@ -465,7 +499,7 @@ fn[A] prepend_pattern_source(
 ) -> PatternSnapshotEvent[A] {
   PatternSnapshotEvent(
     event=event.event(),
-    pattern_nodes=pattern_source_path_with_parent(id, event.pattern_nodes()),
+    path=pattern_source_path_with_parent(id, event.pattern_node_path()),
   )
 }
 
@@ -477,8 +511,8 @@ fn[A] retime_pattern_snapshot_event(
 ) -> PatternSnapshotEvent[A] {
   let event = source.event()
   PatternSnapshotEvent(
-    event={ whole, part, value: event.value },
-    pattern_nodes=source.pattern_nodes(),
+    event={ whole, part, value: event.value, },
+    path=source.pattern_node_path(),
   )
 }
 
@@ -698,10 +732,10 @@ fn[A] query_sourced_euclid(
 ///|
 fn[A] query_opaque_pattern_source(
   pat : Pat[A],
-  path : Array[@identity.PatternNodeId],
+  path : PatternNodePath,
   arc : TimeSpan,
 ) -> Array[PatternSnapshotEvent[A]] {
-  pat.query(arc).map(event => PatternSnapshotEvent(event~, pattern_nodes=path))
+  pat.query(arc).map(event => PatternSnapshotEvent(event~, path~))
 }
 
 ///|
@@ -715,9 +749,9 @@ fn[A] lower_sourced_pattern_node(
       match entry.node {
         Runtime(pat) => {
           let path = pattern_source_path(id)
-          { query: fn(arc) { query_opaque_pattern_source(pat, path, arc) } }
+          { query: fn(arc) { query_opaque_pattern_source(pat, path, arc) }, }
         }
-        Silence => { query: fn(_arc) { [] } }
+        Silence => { query: fn(_arc) { [] }, }
         Pure(value) =>
           {
             query: fn(arc) {
@@ -728,20 +762,20 @@ fn[A] lower_sourced_pattern_node(
           }
         Fast(child, factor) => {
           let child_pat = lower_sourced_pattern_node(nodes, child)
-          { query: fn(arc) { query_sourced_fast(child_pat, id, arc, factor) } }
+          { query: fn(arc) { query_sourced_fast(child_pat, id, arc, factor) }, }
         }
         Slow(child, factor) => {
           let child_pat = lower_sourced_pattern_node(nodes, child)
           if factor.num <= 0L {
-            { query: fn(_arc) { [] } }
+            { query: fn(_arc) { [] }, }
           } else {
             let inv = Rational::new(1L, 1L) / factor
-            { query: fn(arc) { query_sourced_fast(child_pat, id, arc, inv) } }
+            { query: fn(arc) { query_sourced_fast(child_pat, id, arc, inv) }, }
           }
         }
         Rev(child) => {
           let child_pat = lower_sourced_pattern_node(nodes, child)
-          { query: fn(arc) { query_sourced_rev(child_pat, id, arc) } }
+          { query: fn(arc) { query_sourced_rev(child_pat, id, arc) }, }
         }
         FilterMap(child, f) => {
           let child_pat = lower_sourced_pattern_node(nodes, child)
@@ -754,8 +788,8 @@ fn[A] lower_sourced_pattern_node(
                 f(raw.value).map(value => {
                   prepend_pattern_source(
                     PatternSnapshotEvent(
-                      event={ whole: raw.whole, part: raw.part, value },
-                      pattern_nodes=event.pattern_nodes(),
+                      event={ whole: raw.whole, part: raw.part, value, },
+                      path=event.pattern_node_path(),
                     ),
                     id,
                   )
@@ -820,9 +854,7 @@ fn[A] lower_sourced_pattern_node(
                   f(raw_child)
                   .query(cycle_arc)
                   .iter()
-                  .map(event => {
-                    PatternSnapshotEvent(event~, pattern_nodes=fallback_path)
-                  })
+                  .map(event => PatternSnapshotEvent(event~, path=fallback_path))
                 } else {
                   child_pat
                   .query(cycle_arc)
@@ -952,7 +984,7 @@ pub struct PatternLoweringCache[A] {
 
 ///|
 pub fn[A] PatternLoweringCache::new() -> PatternLoweringCache[A] {
-  { entries: {}, hits: 0, misses: 0 }
+  { entries: {}, hits: 0, misses: 0, }
 }
 
 ///|
@@ -991,16 +1023,16 @@ fn[A] PatternLoweringCache::store(
 ) -> Unit {
   let key = id.value()
   match self.entries.get(key) {
-    None => self.entries[key] = [{ token: token.copy(), revision, pat }]
+    None => self.entries[key] = [{ token: token.copy(), revision, pat, }]
     Some(entries) => {
       for index in 0..<entries.length() {
         if pattern_cache_token_equal(entries[index].token, token) &&
           entries[index].revision == revision {
-          entries[index] = { token: token.copy(), revision, pat }
+          entries[index] = { token: token.copy(), revision, pat, }
           return
         }
       }
-      entries.push({ token: token.copy(), revision, pat })
+      entries.push({ token: token.copy(), revision, pat, })
     }
   }
 }
@@ -1247,7 +1279,7 @@ pub fn[A] PatternDoc::revision(self : PatternDoc[A]) -> @identity.Revision {
 /// `fingerprint`); it is NOT load-bearing because `backdate_equal` is
 /// overridden below to drive the acceptance decision directly.
 pub impl[A] @types.HasChangedAt for PatternDoc[A] with fn changed_at(self) -> @types.Revision {
-  @types.Revision::{ value: self.revision.value().to_int() }
+  @types.Revision::{ value: self.revision.value().to_int(), }
 }
 
 ///|
@@ -1283,7 +1315,7 @@ pub fn[A] PatternDoc::subdoc(
 ) -> PatternDoc[A] raise PatternDocError {
   let nodes : Map[String, PatternDocEntry[A]] = {}
   copy_reachable_pattern_nodes(self.nodes, root, nodes)
-  { root, revision: pattern_node_revision(nodes, root), nodes }
+  { root, revision: pattern_node_revision(nodes, root), nodes, }
 }
 
 ///|
@@ -1350,7 +1382,7 @@ pub fn[A] PatternDoc::replace_with_pattern(
 ) -> PatternDoc[A] raise PatternDocError {
   let nodes = copy_pattern_nodes(self.nodes)
   replace_pattern_node(nodes, id, Runtime(pat))
-  { root: self.root, revision: self.revision.next(), nodes }
+  { root: self.root, revision: self.revision.next(), nodes, }
 }
 
 ///|
@@ -1360,7 +1392,7 @@ pub fn[A] PatternDoc::replace_with_silence(
 ) -> PatternDoc[A] raise PatternDocError {
   let nodes = copy_pattern_nodes(self.nodes)
   replace_pattern_node(nodes, id, Silence)
-  { root: self.root, revision: self.revision.next(), nodes }
+  { root: self.root, revision: self.revision.next(), nodes, }
 }
 
 ///|
@@ -1371,7 +1403,7 @@ pub fn[A] PatternDoc::replace_with_pure(
 ) -> PatternDoc[A] raise PatternDocError {
   let nodes = copy_pattern_nodes(self.nodes)
   replace_pattern_node(nodes, id, Pure(value))
-  { root: self.root, revision: self.revision.next(), nodes }
+  { root: self.root, revision: self.revision.next(), nodes, }
 }
 
 ///|
@@ -1387,7 +1419,7 @@ pub fn[A] PatternDoc::fast(
     Fast(self.root, factor),
     revision=self.revision.next(),
   )
-  { root: id, revision: self.revision.next(), nodes }
+  { root: id, revision: self.revision.next(), nodes, }
 }
 
 ///|
@@ -1403,7 +1435,7 @@ pub fn[A] PatternDoc::slow(
     Slow(self.root, factor),
     revision=self.revision.next(),
   )
-  { root: id, revision: self.revision.next(), nodes }
+  { root: id, revision: self.revision.next(), nodes, }
 }
 
 ///|
@@ -1413,7 +1445,7 @@ pub fn[A] PatternDoc::rev(
 ) -> PatternDoc[A] raise PatternDocError {
   let nodes = copy_pattern_nodes(self.nodes)
   insert_pattern_node(nodes, id, Rev(self.root), revision=self.revision.next())
-  { root: id, revision: self.revision.next(), nodes }
+  { root: id, revision: self.revision.next(), nodes, }
 }
 
 ///|
@@ -1429,7 +1461,7 @@ pub fn[A] PatternDoc::filter_map(
     FilterMap(self.root, f),
     revision=self.revision.next(),
   )
-  { root: id, revision: self.revision.next(), nodes }
+  { root: id, revision: self.revision.next(), nodes, }
 }
 
 ///|
@@ -1447,7 +1479,7 @@ pub fn[A] PatternDoc::euclid(
     Euclid(self.root, k, n, rotation),
     revision=self.revision.next(),
   )
-  { root: id, revision: self.revision.next(), nodes }
+  { root: id, revision: self.revision.next(), nodes, }
 }
 
 ///|
@@ -1464,7 +1496,7 @@ pub fn[A] PatternDoc::degrade_by(
     DegradeBy(self.root, p, seed),
     revision=self.revision.next(),
   )
-  { root: id, revision: self.revision.next(), nodes }
+  { root: id, revision: self.revision.next(), nodes, }
 }
 
 ///|
@@ -1481,7 +1513,7 @@ pub fn[A] PatternDoc::every(
     Every(self.root, n, f),
     revision=self.revision.next(),
   )
-  { root: id, revision: self.revision.next(), nodes }
+  { root: id, revision: self.revision.next(), nodes, }
 }
 
 ///|
@@ -1497,7 +1529,7 @@ pub fn PatternDoc::jux(
     Jux(self.root, fn(p) { p.jux(f) }),
     revision=self.revision.next(),
   )
-  { root: id, revision: self.revision.next(), nodes }
+  { root: id, revision: self.revision.next(), nodes, }
 }
 
 ///|
@@ -1517,7 +1549,7 @@ pub fn PatternDoc::merge_control(
     MergeControl(left.root, right.root, merge_control),
     revision~,
   )
-  { root: id, revision, nodes }
+  { root: id, revision, nodes, }
 }
 
 ///|
@@ -1535,7 +1567,7 @@ pub fn[A] PatternDoc::sequence(
   let children = docs.map(doc => doc.root)
   let revision = aggregate_pattern_revision(docs)
   insert_pattern_node(nodes, id, Sequence(children), revision~)
-  { root: id, revision, nodes }
+  { root: id, revision, nodes, }
 }
 
 ///|
@@ -1553,5 +1585,5 @@ pub fn[A] PatternDoc::stack(
   let children = docs.map(doc => doc.root)
   let revision = aggregate_pattern_revision(docs)
   insert_pattern_node(nodes, id, Stack(children), revision~)
-  { root: id, revision, nodes }
+  { root: id, revision, nodes, }
 }

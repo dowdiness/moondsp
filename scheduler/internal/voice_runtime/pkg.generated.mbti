@@ -3,7 +3,6 @@ package "dowdiness/moondsp/scheduler/internal/voice_runtime"
 
 import {
   "dowdiness/moondsp/pattern",
-  "dowdiness/moondsp/scheduler/internal/edit_policy",
   "dowdiness/moondsp/scheduler/internal/model",
   "dowdiness/moondsp/voice",
 }
@@ -22,19 +21,16 @@ pub struct ActiveNotes {
   // private fields
 }
 pub fn ActiveNotes::ActiveNotes() -> Self
-pub fn ActiveNotes::affected_count(Self, @edit_policy.AffectedVoiceTarget) -> Int
 pub fn ActiveNotes::clear(Self) -> Unit
 pub fn ActiveNotes::expire_at_sample(Self, @voice.BoundVoicePool, Int64) -> Unit
 pub fn ActiveNotes::kill_all(Self, @voice.BoundVoicePool) -> Unit
 pub fn ActiveNotes::length(Self) -> Int
-pub fn ActiveNotes::matches_edit_policy(Self, Int, @edit_policy.AffectedVoiceTarget) -> Bool?
-pub fn ActiveNotes::push_note(Self, handle~ : @voice.VoiceHandle, source~ : @model.EventSource, end_sample~ : Int64) -> Unit
-pub fn ActiveNotes::remove_affected(Self, @edit_policy.AffectedVoiceTarget, @voice.BoundVoicePool, stop~ : @edit_policy.AffectedVoiceStop) -> Int
-pub fn ActiveNotes::source(Self, Int) -> @model.EventSource?
-pub fn[E] ActiveNotes::try_count_matching_handles(Self, @edit_policy.AffectedVoiceTarget, (@voice.VoiceHandle) -> Result[Unit, E]) -> Result[Int, E]
-pub fn[E] ActiveNotes::try_each_matching_handle(Self, @edit_policy.AffectedVoiceTarget, (@voice.VoiceHandle) -> Result[Unit, E]) -> Result[Unit, E]
+pub fn ActiveNotes::matching_count(Self, (@model.VoiceOrigin) -> Bool) -> Int
+pub fn ActiveNotes::push_note(Self, handle~ : @voice.VoiceHandle, origin? : @model.VoiceOrigin, end_sample~ : Int64) -> Unit
+pub fn ActiveNotes::remove_matching(Self, (@model.VoiceOrigin) -> Bool, @voice.BoundVoicePool, kill~ : Bool) -> Int
+pub fn[E] ActiveNotes::try_count_matching(Self, (@model.VoiceOrigin) -> Bool, (@voice.VoiceHandle) -> Result[Unit, E]) -> Result[Int, E]
+pub fn[E] ActiveNotes::try_each_matching(Self, (@model.VoiceOrigin) -> Bool, (@voice.VoiceHandle) -> Result[Unit, E]) -> Result[Unit, E]
 
 // Type aliases
 
 // Traits
-

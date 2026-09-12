@@ -25,35 +25,16 @@ pub fn midi_to_hz(Double) -> Double
 // Types and methods
 type ActiveNote
 
-pub struct AffectedVoiceEditScope {
-  // private fields
-} derive(Eq, @debug.Debug)
-pub fn AffectedVoiceEditScope::pattern_node(@identity.PatternNodeId) -> Self
-pub fn AffectedVoiceEditScope::song_layer(section~ : @identity.SectionId, layer~ : @identity.SectionLayerId) -> Self
-pub fn AffectedVoiceEditScope::song_occurrence(@identity.OccurrenceId) -> Self
-pub fn AffectedVoiceEditScope::song_section(@identity.SectionId) -> Self
-pub fn AffectedVoiceEditScope::target(Self) -> AffectedVoiceTarget
+pub(all) enum ActiveVoiceEffect {
+  Release
+  Kill
+  Retune(VoiceControlBatch)
+}
 
-pub(all) enum AffectedVoicePolicy {
-  LetRing
-  GateOffAffected
-  KillAffected
+pub struct ActiveVoiceEffectOutcome {
+  retuned_voice_count : Int
+  detached_note_count : Int
 } derive(Eq, @debug.Debug)
-
-pub struct AffectedVoiceTarget {
-  // private fields
-} derive(Eq, @debug.Debug)
-pub fn AffectedVoiceTarget::AffectedVoiceTarget(pattern_node~ : @identity.PatternNodeId?, section~ : @identity.SectionId?, layer~ : @identity.SectionLayerId?, occurrence~ : @identity.OccurrenceId?) -> Self
-pub fn AffectedVoiceTarget::from_layer(@identity.SectionLayerId) -> Self
-pub fn AffectedVoiceTarget::from_occurrence(@identity.OccurrenceId) -> Self
-pub fn AffectedVoiceTarget::from_pattern_node(@identity.PatternNodeId) -> Self
-pub fn AffectedVoiceTarget::from_section(@identity.SectionId) -> Self
-pub fn AffectedVoiceTarget::is_empty(Self) -> Bool
-pub fn AffectedVoiceTarget::layer(Self) -> @identity.SectionLayerId?
-pub fn AffectedVoiceTarget::matches(Self, EventSource) -> Bool
-pub fn AffectedVoiceTarget::occurrence(Self) -> @identity.OccurrenceId?
-pub fn AffectedVoiceTarget::pattern_node(Self) -> @identity.PatternNodeId?
-pub fn AffectedVoiceTarget::section(Self) -> @identity.SectionId?
 
 pub struct BlockFrame {
   sample_begin : Int64
@@ -68,37 +49,18 @@ pub struct ControlMapper {
 #alias(new)
 pub fn ControlMapper::ControlMapper(transform~ : (String, Double) -> (String, Double)?, voice_action~ : (String, Double) -> VoiceAction?) -> Self
 
-pub struct EventSource {
-  // private fields
-} derive(Eq, @debug.Debug)
-pub fn EventSource::EventSource(pattern_node~ : @identity.PatternNodeId?, section~ : @identity.SectionId?, layer~ : @identity.SectionLayerId?, occurrence~ : @identity.OccurrenceId?) -> Self
-pub fn EventSource::from_pattern_nodes(pattern_nodes~ : Array[@identity.PatternNodeId], section~ : @identity.SectionId?, layer~ : @identity.SectionLayerId?, occurrence~ : @identity.OccurrenceId?) -> Self
-pub fn EventSource::is_empty(Self) -> Bool
-pub fn EventSource::layer(Self) -> @identity.SectionLayerId?
-pub fn EventSource::matches(Self, AffectedVoiceTarget) -> Bool
-pub fn EventSource::none() -> Self
-pub fn EventSource::occurrence(Self) -> @identity.OccurrenceId?
-pub fn EventSource::pattern_node(Self) -> @identity.PatternNodeId?
-pub fn EventSource::pattern_nodes(Self) -> Array[@identity.PatternNodeId]
-pub fn EventSource::section(Self) -> @identity.SectionId?
-
 pub struct PatternScheduler {
   // private fields
 }
 #alias(new)
 pub fn PatternScheduler::PatternScheduler(bpm~ : Double, ctx~ : @dsp.DspContext, mapper? : ControlMapper) -> Self
 pub fn PatternScheduler::active_note_count(Self) -> Int
-pub fn PatternScheduler::active_note_matches(Self, Int, AffectedVoiceTarget) -> Bool?
-pub fn PatternScheduler::active_note_source(Self, Int) -> EventSource?
 pub fn PatternScheduler::active_playback_revision(Self) -> @identity.Revision?
 pub fn PatternScheduler::active_playback_song_layout_revision(Self) -> @identity.Revision?
 pub fn PatternScheduler::active_song_layout_revision(Self) -> @identity.Revision?
 pub fn PatternScheduler::active_song_revision(Self) -> @identity.Revision?
-pub fn PatternScheduler::affected_active_note_count(Self, AffectedVoiceTarget) -> Int
-pub fn PatternScheduler::apply_affected_voice_policy(Self, AffectedVoicePolicy, AffectedVoiceTarget, @voice.BoundVoicePool) -> Int
-pub fn PatternScheduler::apply_affected_voice_policy_for_edit(Self, AffectedVoicePolicy, AffectedVoiceEditScope, @voice.BoundVoicePool) -> Int
-pub fn PatternScheduler::apply_voice_control_for_edit_result(Self, edit~ : AffectedVoiceEditScope, control~ : @graph.GraphControl, pool~ : @voice.BoundVoicePool) -> Result[Int, @voice.VoiceControlError]
-pub fn PatternScheduler::apply_voice_controls_for_edit_result(Self, edit~ : AffectedVoiceEditScope, controls~ : Array[@graph.GraphControl], pool~ : @voice.BoundVoicePool) -> Result[Int, @voice.VoiceControlError]
+pub fn PatternScheduler::apply_pattern_voice_effect_result(Self, PatternVoiceScope, ActiveVoiceEffect, @voice.BoundVoicePool) -> Result[ActiveVoiceEffectOutcome, @voice.VoiceControlError]
+pub fn PatternScheduler::apply_song_voice_effect_result(Self, SongVoiceScope, ActiveVoiceEffect, @voice.BoundVoicePool) -> Result[ActiveVoiceEffectOutcome, @voice.VoiceControlError]
 pub fn PatternScheduler::bpm(Self) -> Double
 pub fn PatternScheduler::current_block(Self) -> BlockFrame
 pub fn PatternScheduler::expire_notes(Self, @voice.BoundVoicePool, @pattern.TimeSpan) -> Unit
@@ -111,7 +73,6 @@ pub fn PatternScheduler::has_pending_playback_snapshot(Self) -> Bool
 pub fn PatternScheduler::has_pending_song_snapshot(Self) -> Bool
 pub fn PatternScheduler::process_block(Self, @pattern.Pat[@pattern.ControlMap], @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::process_events(Self, Array[@pattern.Event[@pattern.ControlMap]], @pattern.TimeSpan, @voice.BoundVoicePool) -> Unit
-pub fn PatternScheduler::process_playback_events(Self, Array[PlaybackEvent], @pattern.TimeSpan, @voice.BoundVoicePool) -> Unit
 pub fn PatternScheduler::process_playback_snapshot_block(Self, @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::process_section_block(Self, @song.Section[@pattern.ControlMap], @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::process_snapshot_block(Self, @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
@@ -119,35 +80,24 @@ pub fn PatternScheduler::process_song_block(Self, @song.Song[@pattern.ControlMap
 pub fn PatternScheduler::process_song_snapshot_block(Self, @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::push_active_note(Self, @voice.VoiceHandle, @pattern.Rational) -> Unit
 pub fn PatternScheduler::queue_pattern_snapshot(Self, @pattern.PatternSnapshot[@pattern.ControlMap]) -> Unit
-pub fn PatternScheduler::queue_pattern_snapshot_edit(Self, snapshot~ : @pattern.PatternSnapshot[@pattern.ControlMap], policy~ : AffectedVoicePolicy, edit~ : AffectedVoiceEditScope, pool~ : @voice.BoundVoicePool) -> Int
-pub fn PatternScheduler::queue_pattern_snapshot_live_control_edit_result(Self, snapshot~ : @pattern.PatternSnapshot[@pattern.ControlMap], policy~ : AffectedVoicePolicy, edit~ : AffectedVoiceEditScope, controls~ : Array[@graph.GraphControl], pool~ : @voice.BoundVoicePool) -> Result[PlaybackEditOutcome, @voice.VoiceControlError]
+pub fn PatternScheduler::queue_pattern_snapshot_effect_result(Self, @pattern.PatternSnapshot[@pattern.ControlMap], PatternVoiceScope, ActiveVoiceEffect, @voice.BoundVoicePool) -> Result[ActiveVoiceEffectOutcome, @voice.VoiceControlError]
 pub fn PatternScheduler::queue_playback_snapshot(Self, PlaybackSnapshot) -> Unit
-pub fn PatternScheduler::queue_playback_snapshot_edit(Self, snapshot~ : PlaybackSnapshot, policy~ : AffectedVoicePolicy, edit~ : AffectedVoiceEditScope, pool~ : @voice.BoundVoicePool) -> Int
-pub fn PatternScheduler::queue_playback_snapshot_live_control_edit_result(Self, snapshot~ : PlaybackSnapshot, policy~ : AffectedVoicePolicy, edit~ : AffectedVoiceEditScope, controls~ : Array[@graph.GraphControl], pool~ : @voice.BoundVoicePool) -> Result[PlaybackEditOutcome, @voice.VoiceControlError]
 pub fn PatternScheduler::queue_song_snapshot(Self, @song.SongSnapshot[@pattern.ControlMap]) -> Unit
-pub fn PatternScheduler::queue_song_snapshot_edit(Self, snapshot~ : @song.SongSnapshot[@pattern.ControlMap], policy~ : AffectedVoicePolicy, edit~ : AffectedVoiceEditScope, pool~ : @voice.BoundVoicePool) -> Int
-pub fn PatternScheduler::queue_song_snapshot_live_control_edit_result(Self, snapshot~ : @song.SongSnapshot[@pattern.ControlMap], policy~ : AffectedVoicePolicy, edit~ : AffectedVoiceEditScope, controls~ : Array[@graph.GraphControl], pool~ : @voice.BoundVoicePool) -> Result[PlaybackEditOutcome, @voice.VoiceControlError]
+pub fn PatternScheduler::queue_song_snapshot_effect_result(Self, @song.SongSnapshot[@pattern.ControlMap], SongVoiceScope, ActiveVoiceEffect, @voice.BoundVoicePool) -> Result[ActiveVoiceEffectOutcome, @voice.VoiceControlError]
 pub fn PatternScheduler::reset_transport(Self) -> Unit
 pub fn PatternScheduler::reset_transport_and_kill_notes(Self, @voice.BoundVoicePool) -> Unit
 pub fn PatternScheduler::sample_counter(Self) -> Int64
 pub fn PatternScheduler::set_bpm(Self, Double) -> Unit
 
+pub struct PatternVoiceScope {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn PatternVoiceScope::node(@identity.PatternNodeId) -> Self
+
 pub struct PerformanceTime {
   sample : Int64
 }
 pub fn PerformanceTime::PerformanceTime(Int64) -> Self
-
-pub struct PlaybackEditOutcome {
-  controlled_voice_count : Int
-  removed_active_note_count : Int
-} derive(Eq, @debug.Debug)
-
-pub struct PlaybackEvent {
-  // private fields
-}
-pub fn PlaybackEvent::PlaybackEvent(event~ : @pattern.Event[@pattern.ControlMap], source~ : EventSource) -> Self
-pub fn PlaybackEvent::event(Self) -> @pattern.Event[@pattern.ControlMap]
-pub fn PlaybackEvent::source(Self) -> EventSource
 
 pub enum PlaybackSnapshot {
   Pattern(@pattern.PatternSnapshot[@pattern.ControlMap])
@@ -155,16 +105,26 @@ pub enum PlaybackSnapshot {
 }
 pub fn PlaybackSnapshot::pattern(@pattern.PatternSnapshot[@pattern.ControlMap]) -> Self
 pub fn PlaybackSnapshot::query(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@pattern.ControlMap]]
-pub fn PlaybackSnapshot::query_playback_events(Self, @pattern.TimeSpan) -> Array[PlaybackEvent]
 pub fn PlaybackSnapshot::revision(Self) -> @identity.Revision
 pub fn PlaybackSnapshot::song(@song.SongSnapshot[@pattern.ControlMap]) -> Self
 pub fn PlaybackSnapshot::song_layout_revision(Self) -> @identity.Revision?
+
+pub struct SongVoiceScope {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn SongVoiceScope::layer(@identity.SectionId, @identity.SectionLayerId) -> Self
+pub fn SongVoiceScope::occurrence(@identity.OccurrenceId) -> Self
+pub fn SongVoiceScope::section(@identity.SectionId) -> Self
 
 pub enum VoiceAction {
   SetPan(Double)
 }
 
+pub struct VoiceControlBatch {
+  // private fields
+}
+pub fn VoiceControlBatch::VoiceControlBatch(@graph.GraphControl, rest? : Array[@graph.GraphControl]) -> Self
+
 // Type aliases
 
 // Traits
-
