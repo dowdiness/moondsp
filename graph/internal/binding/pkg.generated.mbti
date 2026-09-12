@@ -37,4 +37,3 @@ pub fn ControlBindingMap::resolve_controls(Self, Map[String, Double]) -> Array[@
 // Type aliases
 
 // Traits
-

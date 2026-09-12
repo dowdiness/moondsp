@@ -39,7 +39,7 @@ priv struct Parser {
 ///|
 #alias(new)
 fn Parser::Parser(input : String) -> Parser {
-  { input, pos: 0, definitions: {}, bindings: {}, doc_bindings: {} }
+  { input, pos: 0, definitions: {}, bindings: {}, doc_bindings: {}, }
 }
 
 ///|
@@ -83,7 +83,7 @@ fn mini_collect_dollar_stack_lines(
         if expr_first == content_end {
           return Err("position \{first}: $: requires an expression")
         }
-        lines.push({ start: expr_start, end: content_end })
+        lines.push({ start: expr_start, end: content_end, })
       } else if saw_program {
         return Err("position \{first}: expected '$:' stack line")
       } else {
@@ -358,7 +358,7 @@ fn Parser::parse_bindings(
           self.doc_bindings,
         )
     }
-    self.definitions[name] = { id: name, body }
+    self.definitions[name] = { id: name, body, }
   }
 }
 

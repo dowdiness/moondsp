@@ -87,7 +87,7 @@ priv struct ReverbAllpass {
 
 ///|
 fn ReverbAllpass::ReverbAllpass(size : Int) -> ReverbAllpass {
-  { buffer: FixedArray::make(size, 0.0), position: 0 }
+  { buffer: FixedArray::make(size, 0.0), position: 0, }
 }
 
 ///|

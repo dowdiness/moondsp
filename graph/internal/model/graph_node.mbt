@@ -71,7 +71,7 @@ fn GraphControl::GraphControl(
   slot : GraphParamSlot,
   value : Double,
 ) -> GraphControl {
-  { kind, node_index, slot, value }
+  { kind, node_index, slot, value, }
 }
 
 ///|

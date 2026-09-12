@@ -14,7 +14,7 @@ pub fn AffectedVoiceTarget::AffectedVoiceTarget(
   layer~ : @identity.SectionLayerId?,
   occurrence~ : @identity.OccurrenceId?,
 ) -> AffectedVoiceTarget {
-  { pattern_node, section, layer, occurrence }
+  { pattern_node, section, layer, occurrence, }
 }
 
 ///|

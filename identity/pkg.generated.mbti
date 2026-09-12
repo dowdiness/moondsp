@@ -46,4 +46,3 @@ pub fn SectionLayerId::value(Self) -> String
 // Type aliases
 
 // Traits
-

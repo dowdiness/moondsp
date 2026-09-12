@@ -11,7 +11,7 @@ fn ControlBinding::ControlBinding(
   node_index~ : Int,
   slot~ : @model.GraphParamSlot,
 ) -> ControlBinding {
-  { key, node_index, slot }
+  { key, node_index, slot, }
 }
 
 ///|
@@ -32,7 +32,7 @@ pub struct ControlBindingBuilder {
 ///|
 #alias(new)
 pub fn ControlBindingBuilder::ControlBindingBuilder() -> ControlBindingBuilder {
-  { bindings: [] }
+  { bindings: [], }
 }
 
 ///|
@@ -124,7 +124,7 @@ pub fn ControlBindingBuilder::build(
   // WHY copy: self.bindings is a mutable Array shared with the builder.
   // Without copying, post-build bind() calls would mutate the validated map,
   // breaking the proven-valid invariant.
-  Ok({ bindings: self.bindings.copy(), defaults })
+  Ok({ bindings: self.bindings.copy(), defaults, })
 }
 
 ///|

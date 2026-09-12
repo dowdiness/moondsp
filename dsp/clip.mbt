@@ -6,7 +6,7 @@ pub struct Clip {}
 /// Create a clip processor.
 #alias(new)
 pub fn Clip::Clip() -> Clip {
-  Clip::{  }
+  Clip::{ }
 }
 
 ///|

@@ -173,7 +173,7 @@ pub fn MiniAuthoringPipeline::set_input_with_source_edit(
   old_end~ : Int,
   new_end~ : Int,
 ) -> Unit {
-  self.source_edit.set(Some({ old_start, old_end, new_end }))
+  self.source_edit.set(Some({ old_start, old_end, new_end, }))
   self.text.set(input)
 }
 

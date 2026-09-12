@@ -146,7 +146,7 @@ fn make_drum_route(
   block_size : Int,
 ) -> SchedulerRoute? {
   match make_drum_pool(template, ctx, block_size) {
-    Some(pool) => Some({ selector: RouteSound(sound_code), pool })
+    Some(pool) => Some({ selector: RouteSound(sound_code), pool, })
     None => None
   }
 }
@@ -158,7 +158,7 @@ fn make_synth_route(
   block_size : Int,
 ) -> SchedulerRoute? {
   match make_synth_pool(template, ctx, block_size) {
-    Some(pool) => Some({ selector: RouteSynth, pool })
+    Some(pool) => Some({ selector: RouteSynth, pool, })
     None => None
   }
 }

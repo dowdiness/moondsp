@@ -29,35 +29,35 @@ pub fn AffectedVoiceTarget::AffectedVoiceTarget(
 pub fn AffectedVoiceTarget::from_pattern_node(
   pattern_node : @identity.PatternNodeId,
 ) -> AffectedVoiceTarget {
-  { raw: @model.AffectedVoiceTarget::from_pattern_node(pattern_node) }
+  { raw: @model.AffectedVoiceTarget::from_pattern_node(pattern_node), }
 }
 
 ///|
 pub fn AffectedVoiceTarget::from_section(
   section : @identity.SectionId,
 ) -> AffectedVoiceTarget {
-  { raw: @model.AffectedVoiceTarget::from_section(section) }
+  { raw: @model.AffectedVoiceTarget::from_section(section), }
 }
 
 ///|
 pub fn AffectedVoiceTarget::from_layer(
   layer : @identity.SectionLayerId,
 ) -> AffectedVoiceTarget {
-  { raw: @model.AffectedVoiceTarget::from_layer(layer) }
+  { raw: @model.AffectedVoiceTarget::from_layer(layer), }
 }
 
 ///|
 pub fn AffectedVoiceTarget::from_occurrence(
   occurrence : @identity.OccurrenceId,
 ) -> AffectedVoiceTarget {
-  { raw: @model.AffectedVoiceTarget::from_occurrence(occurrence) }
+  { raw: @model.AffectedVoiceTarget::from_occurrence(occurrence), }
 }
 
 ///|
 fn AffectedVoiceTarget::from_model(
   target : @model.AffectedVoiceTarget,
 ) -> AffectedVoiceTarget {
-  { raw: target }
+  { raw: target, }
 }
 
 ///|
@@ -141,21 +141,21 @@ pub struct AffectedVoiceEditScope {
 pub fn AffectedVoiceEditScope::pattern_node(
   pattern_node : @identity.PatternNodeId,
 ) -> AffectedVoiceEditScope {
-  { raw: @model.AffectedVoiceEditScope::pattern_node(pattern_node) }
+  { raw: @model.AffectedVoiceEditScope::pattern_node(pattern_node), }
 }
 
 ///|
 pub fn AffectedVoiceEditScope::song_occurrence(
   occurrence : @identity.OccurrenceId,
 ) -> AffectedVoiceEditScope {
-  { raw: @model.AffectedVoiceEditScope::song_occurrence(occurrence) }
+  { raw: @model.AffectedVoiceEditScope::song_occurrence(occurrence), }
 }
 
 ///|
 pub fn AffectedVoiceEditScope::song_section(
   section : @identity.SectionId,
 ) -> AffectedVoiceEditScope {
-  { raw: @model.AffectedVoiceEditScope::song_section(section) }
+  { raw: @model.AffectedVoiceEditScope::song_section(section), }
 }
 
 ///|
@@ -163,7 +163,7 @@ pub fn AffectedVoiceEditScope::song_layer(
   section~ : @identity.SectionId,
   layer~ : @identity.SectionLayerId,
 ) -> AffectedVoiceEditScope {
-  { raw: @model.AffectedVoiceEditScope::song_layer(section~, layer~) }
+  { raw: @model.AffectedVoiceEditScope::song_layer(section~, layer~), }
 }
 
 ///|

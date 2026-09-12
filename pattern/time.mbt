@@ -12,14 +12,14 @@ pub struct TimeSpan {
 } derive(Eq, Debug)
 
 ///|
-pub impl Show for TimeSpan with output(self, logger) {
+pub impl Show for TimeSpan with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
 
 ///|
 #alias(new)
 pub fn TimeSpan::TimeSpan(begin : Rational, end_ : Rational) -> TimeSpan {
-  { begin, end_ }
+  { begin, end_, }
 }
 
 ///|
@@ -42,7 +42,7 @@ pub fn TimeSpan::intersect(self : TimeSpan, other : TimeSpan) -> TimeSpan? {
   let begin = if self.begin > other.begin { self.begin } else { other.begin }
   let end_ = if self.end_ < other.end_ { self.end_ } else { other.end_ }
   if begin < end_ {
-    Some({ begin, end_ })
+    Some({ begin, end_, })
   } else {
     None
   }

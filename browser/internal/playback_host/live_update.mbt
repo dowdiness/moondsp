@@ -80,7 +80,7 @@ fn prepare_pattern(
       }) catch {
         _ => return Err("could not prepare pattern update")
       }
-      Ok({ snapshots, layout: PatternLayout, bpm: None })
+      Ok({ snapshots, layout: PatternLayout, bpm: None, })
     }
   }
 }
@@ -155,7 +155,7 @@ fn queue_playback(
   }
   Ok({
     active: state.active,
-    pending: Some({ playback: next, policy, tempo: next.bpm }),
+    pending: Some({ playback: next, policy, tempo: next.bpm, }),
   })
 }
 
@@ -167,7 +167,7 @@ fn restart_current(state : PlaybackState) -> Result[PlaybackState, String] {
     Some(active) =>
       Ok({
         active: state.active,
-        pending: Some({ playback: active, policy: Restart, tempo: None }),
+        pending: Some({ playback: active, policy: Restart, tempo: None, }),
       })
   }
 }
@@ -187,7 +187,7 @@ let prepared_sequence : @ref.Ref[Int] = @ref.new(0)
 
 ///|
 fn reset_playback_state() -> Unit {
-  playback_state.val = { active: None, pending: None }
+  playback_state.val = { active: None, pending: None, }
   prepared_slot.val = None
   playback_input_chars.clear()
 }
@@ -326,7 +326,7 @@ fn commit_playback_request() -> Unit {
           request.playback.snapshots[i],
         )
       }
-      playback_state.val = { active: Some(request.playback), pending: None }
+      playback_state.val = { active: Some(request.playback), pending: None, }
     }
   }
 }

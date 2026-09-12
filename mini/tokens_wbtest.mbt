@@ -73,7 +73,7 @@ fn source_edit(
   old_end~ : Int,
   new_end~ : Int,
 ) -> MiniSourceEditSpan {
-  { old_start, old_end, new_end }
+  { old_start, old_end, new_end, }
 }
 
 ///|

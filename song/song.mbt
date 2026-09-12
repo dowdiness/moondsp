@@ -25,7 +25,7 @@ pub fn[A] SongPart::SongPart(
   name~ : String,
   section~ : Section[A],
 ) -> SongPart[A] {
-  { id: None, start: None, name, section }
+  { id: None, start: None, name, section, }
 }
 
 ///|
@@ -34,7 +34,7 @@ pub fn[A] SongPart::with_id(
   name~ : String,
   section~ : Section[A],
 ) -> SongPart[A] {
-  { id: Some(id), start: None, name, section }
+  { id: Some(id), start: None, name, section, }
 }
 
 ///|
@@ -43,7 +43,7 @@ pub fn[A] SongPart::at(
   name~ : String,
   section~ : Section[A],
 ) -> SongPart[A] {
-  { id: None, start: Some(start), name, section }
+  { id: None, start: Some(start), name, section, }
 }
 
 ///|
@@ -53,7 +53,7 @@ pub fn[A] SongPart::with_id_at(
   name~ : String,
   section~ : Section[A],
 ) -> SongPart[A] {
-  { id: Some(id), start: Some(start), name, section }
+  { id: Some(id), start: Some(start), name, section, }
 }
 
 ///|
@@ -89,7 +89,7 @@ pub struct SectionOccurrence[A] {
 fn[A] SectionOccurrence::snapshot(
   self : SectionOccurrence[A],
 ) -> SectionOccurrence[A] {
-  { id: self.id, name: self.name, section: self.section, span: self.span }
+  { id: self.id, name: self.name, section: self.section, span: self.span, }
 }
 
 ///|

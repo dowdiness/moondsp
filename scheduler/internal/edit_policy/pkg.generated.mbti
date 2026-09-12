@@ -32,4 +32,3 @@ pub fn AffectedVoiceTarget::AffectedVoiceTarget(pattern_node~ : @identity.Patter
 // Type aliases
 
 // Traits
-

@@ -50,7 +50,7 @@ pub fn PatternScheduler::queue_playback_snapshot_live_control_edit_result(
     edit~,
     pool~,
   )
-  Ok({ controlled_voice_count, removed_active_note_count })
+  Ok({ controlled_voice_count, removed_active_note_count, })
 }
 
 ///|

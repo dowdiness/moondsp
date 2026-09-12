@@ -28,7 +28,7 @@ fn prepared_bd_graph_template(ctx : DspContext) -> MiniGraphPreparedTemplate {
     .build(template)
     .unwrap()
   let runtime = CompiledDsp::compile_result(template, ctx).unwrap()
-  { name: "bd", bindings, runtime }
+  { name: "bd", bindings, runtime, }
 }
 
 ///|

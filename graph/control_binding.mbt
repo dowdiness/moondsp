@@ -12,7 +12,7 @@ pub fn ControlBinding::ControlBinding(
   node_index~ : Int,
   slot~ : GraphParamSlot,
 ) -> ControlBinding {
-  { key, node_index, slot }
+  { key, node_index, slot, }
 }
 
 ///|
@@ -52,7 +52,7 @@ pub struct ControlBindingBuilder {
 ///|
 #alias(new)
 pub fn ControlBindingBuilder::ControlBindingBuilder() -> ControlBindingBuilder {
-  { raw: @binding.ControlBindingBuilder::new() }
+  { raw: @binding.ControlBindingBuilder::new(), }
 }
 
 ///|
@@ -70,7 +70,7 @@ pub fn ControlBindingBuilder::bind(
   node_index~ : Int,
   slot~ : GraphParamSlot,
 ) -> ControlBindingBuilder {
-  { raw: self.raw.bind(key~, node_index~, slot=slot.to_model()) }
+  { raw: self.raw.bind(key~, node_index~, slot=slot.to_model()), }
 }
 
 ///|

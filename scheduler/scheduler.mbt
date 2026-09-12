@@ -39,7 +39,7 @@ pub fn ControlMapper::ControlMapper(
   transform~ : (String, Double) -> (String, Double)?,
   voice_action~ : (String, Double) -> VoiceAction?,
 ) -> ControlMapper {
-  { transform, voice_action }
+  { transform, voice_action, }
 }
 
 ///|

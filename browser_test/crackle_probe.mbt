@@ -610,7 +610,7 @@ fn crackle_probe_validate_inputs(
     }
     None => ()
   }
-  Some({ route_id, waveform, freq_hz, sample_rate, block_size })
+  Some({ route_id, waveform, freq_hz, sample_rate, block_size, })
 }
 
 ///|

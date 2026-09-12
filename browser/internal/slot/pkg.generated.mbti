@@ -51,4 +51,3 @@ pub trait Output {
   fn reset(Self) -> Unit
   fn allocate(Self, Int) -> Unit
 }
-

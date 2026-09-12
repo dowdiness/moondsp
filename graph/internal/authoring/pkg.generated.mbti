@@ -65,4 +65,3 @@ pub fn GraphTemplateDoc::rewire_input(Self, @identity.GraphNodeId, @staging.Grap
 // Type aliases
 
 // Traits
-

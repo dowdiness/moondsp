@@ -37,4 +37,3 @@ pub fn engine_voice_gain(Int) -> Double
 // Type aliases
 
 // Traits
-

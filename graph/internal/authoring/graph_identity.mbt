@@ -231,7 +231,7 @@ pub fn GraphTemplateDoc::index_map(self : GraphTemplateDoc) -> GraphIndexMap {
   for index in 0..<self.ids.length() {
     indices[self.ids[index].value()] = index
   }
-  { revision: self.revision, ids: self.ids.copy(), indices }
+  { revision: self.revision, ids: self.ids.copy(), indices, }
 }
 
 ///|

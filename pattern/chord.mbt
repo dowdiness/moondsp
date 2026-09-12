@@ -14,64 +14,64 @@ priv struct ChordQuality {
 }
 
 ///|
-let major : ChordQuality = { intervals: [0, 4, 7] }
+let major : ChordQuality = { intervals: [0, 4, 7], }
 
 ///|
-let minor : ChordQuality = { intervals: [0, 3, 7] }
+let minor : ChordQuality = { intervals: [0, 3, 7], }
 
 ///|
-let dim : ChordQuality = { intervals: [0, 3, 6] }
+let dim : ChordQuality = { intervals: [0, 3, 6], }
 
 ///|
-let aug : ChordQuality = { intervals: [0, 4, 8] }
+let aug : ChordQuality = { intervals: [0, 4, 8], }
 
 ///|
-let dom7 : ChordQuality = { intervals: [0, 4, 7, 10] }
+let dom7 : ChordQuality = { intervals: [0, 4, 7, 10], }
 
 ///|
-let maj7 : ChordQuality = { intervals: [0, 4, 7, 11] }
+let maj7 : ChordQuality = { intervals: [0, 4, 7, 11], }
 
 ///|
-let min7 : ChordQuality = { intervals: [0, 3, 7, 10] }
+let min7 : ChordQuality = { intervals: [0, 3, 7, 10], }
 
 ///|
-let dim7 : ChordQuality = { intervals: [0, 3, 6, 9] }
+let dim7 : ChordQuality = { intervals: [0, 3, 6, 9], }
 
 ///|
-let half_dim7 : ChordQuality = { intervals: [0, 3, 6, 10] }
+let half_dim7 : ChordQuality = { intervals: [0, 3, 6, 10], }
 
 ///|
-let min_maj7 : ChordQuality = { intervals: [0, 3, 7, 11] }
+let min_maj7 : ChordQuality = { intervals: [0, 3, 7, 11], }
 
 ///|
-let sus2 : ChordQuality = { intervals: [0, 2, 7] }
+let sus2 : ChordQuality = { intervals: [0, 2, 7], }
 
 ///|
-let sus4 : ChordQuality = { intervals: [0, 5, 7] }
+let sus4 : ChordQuality = { intervals: [0, 5, 7], }
 
 ///|
-let sixth : ChordQuality = { intervals: [0, 4, 7, 9] }
+let sixth : ChordQuality = { intervals: [0, 4, 7, 9], }
 
 ///|
-let min6 : ChordQuality = { intervals: [0, 3, 7, 9] }
+let min6 : ChordQuality = { intervals: [0, 3, 7, 9], }
 
 ///|
-let nine : ChordQuality = { intervals: [0, 4, 7, 10, 14] }
+let nine : ChordQuality = { intervals: [0, 4, 7, 10, 14], }
 
 ///|
-let maj9 : ChordQuality = { intervals: [0, 4, 7, 11, 14] }
+let maj9 : ChordQuality = { intervals: [0, 4, 7, 11, 14], }
 
 ///|
-let min9 : ChordQuality = { intervals: [0, 3, 7, 10, 14] }
+let min9 : ChordQuality = { intervals: [0, 3, 7, 10, 14], }
 
 ///|
-let add9 : ChordQuality = { intervals: [0, 4, 7, 14] }
+let add9 : ChordQuality = { intervals: [0, 4, 7, 14], }
 
 ///|
-let seven_sus4 : ChordQuality = { intervals: [0, 5, 7, 10] }
+let seven_sus4 : ChordQuality = { intervals: [0, 5, 7, 10], }
 
 ///|
-let aug7 : ChordQuality = { intervals: [0, 4, 8, 10] }
+let aug7 : ChordQuality = { intervals: [0, 4, 8, 10], }
 
 ///|
 /// Quality keys sorted by length descending for longest-prefix matching.
@@ -227,7 +227,7 @@ fn parse_accidental_then_quality(
   let rest = name[new_pos:].to_owned()
   if rest.is_empty() {
     // Just root + accidental, no quality → major triad
-    return Some({ accidental, quality: major, octave: default_octave })
+    return Some({ accidental, quality: major, octave: default_octave, })
   }
 
   match match_quality(rest) {
@@ -236,12 +236,12 @@ fn parse_accidental_then_quality(
         Some(oct) => oct
         None => default_octave
       }
-      return Some({ accidental, quality, octave })
+      return Some({ accidental, quality, octave, })
     }
     None =>
       // Not a recognized quality — try to parse rest as octave number
       match parse_octave_digits(rest) {
-        Some(oct) => return Some({ accidental, quality: major, octave: oct })
+        Some(oct) => return Some({ accidental, quality: major, octave: oct, })
         None => return None
       }
   }

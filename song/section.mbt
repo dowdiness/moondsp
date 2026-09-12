@@ -41,7 +41,7 @@ pub fn[A] SectionLayer::SectionLayer(
   name~ : String,
   body~ : @pattern.Pat[A],
 ) -> SectionLayer[A] {
-  { name, body }
+  { name, body, }
 }
 
 ///|
@@ -73,7 +73,7 @@ pub fn[A] SectionLayerDoc::SectionLayerDoc(
   name~ : String,
   body~ : @pattern.Pat[A],
 ) -> SectionLayerDoc[A] {
-  { id, name, revision: @identity.Revision::zero(), body }
+  { id, name, revision: @identity.Revision::zero(), body, }
 }
 
 ///|
@@ -105,7 +105,7 @@ pub fn[A] SectionLayerDoc::rename(
   self : SectionLayerDoc[A],
   name~ : String,
 ) -> SectionLayerDoc[A] {
-  { id: self.id, name, revision: self.revision, body: self.body }
+  { id: self.id, name, revision: self.revision, body: self.body, }
 }
 
 ///|
@@ -113,7 +113,7 @@ pub fn[A] SectionLayerDoc::replace_body(
   self : SectionLayerDoc[A],
   body~ : @pattern.Pat[A],
 ) -> SectionLayerDoc[A] {
-  { id: self.id, name: self.name, revision: self.revision.next(), body }
+  { id: self.id, name: self.name, revision: self.revision.next(), body, }
 }
 
 ///|
@@ -426,7 +426,7 @@ pub fn[A] Section::Section(
   if length_cycles.num <= 0L {
     raise NonPositiveLength
   } else {
-    { name, length_cycles, scope, body: body.snapshot() }
+    { name, length_cycles, scope, body: body.snapshot(), }
   }
 }
 

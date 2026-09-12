@@ -14,7 +14,7 @@ pub fn EventSource::EventSource(
   layer~ : @identity.SectionLayerId?,
   occurrence~ : @identity.OccurrenceId?,
 ) -> EventSource {
-  { raw: @model.EventSource(pattern_node~, section~, layer~, occurrence~) }
+  { raw: @model.EventSource(pattern_node~, section~, layer~, occurrence~), }
 }
 
 ///|
@@ -36,12 +36,12 @@ pub fn EventSource::from_pattern_nodes(
 
 ///|
 pub fn EventSource::none() -> EventSource {
-  { raw: @model.EventSource::none() }
+  { raw: @model.EventSource::none(), }
 }
 
 ///|
 fn EventSource::from_model(source : @model.EventSource) -> EventSource {
-  { raw: source }
+  { raw: source, }
 }
 
 ///|
@@ -94,7 +94,7 @@ pub fn PlaybackEvent::PlaybackEvent(
   event~ : @pattern.Event[@pattern.ControlMap],
   source~ : EventSource,
 ) -> PlaybackEvent {
-  { raw: @model.PlaybackEvent(event~, source=source.to_model()) }
+  { raw: @model.PlaybackEvent(event~, source=source.to_model()), }
 }
 
 ///|

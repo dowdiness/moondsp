@@ -21,7 +21,7 @@ pub struct MonoOut {
 ///|
 #alias(new)
 pub fn MonoOut::MonoOut() -> MonoOut {
-  { buffer: @ref.new(None) }
+  { buffer: @ref.new(None), }
 }
 
 ///|
@@ -55,7 +55,7 @@ pub struct StereoOut {
 ///|
 #alias(new)
 pub fn StereoOut::StereoOut() -> StereoOut {
-  { left: @ref.new(None), right: @ref.new(None) }
+  { left: @ref.new(None), right: @ref.new(None), }
 }
 
 ///|
