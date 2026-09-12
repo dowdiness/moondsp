@@ -87,6 +87,7 @@ browser/                         function-only browser/worklet facade
 browser/internal/slot/            reusable graph-slot lifecycle wrapper
 browser/internal/demo_templates/  fixed demo graph templates
 browser/internal/playback_host/   scheduler playback host and routing internals
+browser/test_support/             non-production facade for browser integration tests
 ```
 
 The runtime boundary from ADR-0010 remains unchanged:
@@ -124,6 +125,11 @@ Additional boundary rules:
 - `browser/` remains a function-only facade. Browser route/pool/scheduler state
   objects are implementation details unless a future API decision explicitly
   promotes them.
+- `browser/test_support` is an explicit non-production, test-only facade
+  exception. It may reach selected `browser/internal` packages so browser
+  integration tests retain compiler-enforced internal visibility, but it is not
+  part of the production browser ABI. External consumers must not depend on
+  this package or its functions.
 
 ## Migration record
 
@@ -148,6 +154,11 @@ The migration shipped incrementally rather than by replacement:
    MoonBit source facade was intentionally narrowed in a breaking cleanup that
    removed the legacy leaked browser route shell types. Follow-up work added
    `scripts/check-browser-abi.sh` plus the browser ABI baseline.
+6. **Browser test support stayed outside production.** The
+   `browser/test_support` facade preserves the browser-test package's visibility
+   into selected `browser/internal/*` packages without widening the production
+   browser facade or ABI. It is test-only and not an external consumer
+   contract.
 
 ## Consequences
 

@@ -16,6 +16,10 @@ class MoonDspCrackleProbeProcessor extends AudioWorkletProcessor {
     this.routeId = this.integerOption(processorOptions.routeId, 3);
     this.waveformId = this.integerOption(processorOptions.waveformId, 0);
     this.freqHz = this.numberOption(processorOptions.freqHz, 440);
+    this.outputGain = Math.max(
+      0,
+      Math.min(1, this.numberOption(processorOptions.outputGain, 1)),
+    );
     this.maxBlocks = Math.min(
       CRACKLE_PROBE_MAX_BLOCK_COUNT,
       Math.max(1, this.integerOption(processorOptions.blockCount, 512)),
@@ -95,6 +99,7 @@ class MoonDspCrackleProbeProcessor extends AudioWorkletProcessor {
         blockSize: left.length,
         routeId: this.routeId,
         waveformId: this.waveformId,
+        outputGain: this.outputGain,
       });
     }
 
@@ -111,7 +116,7 @@ class MoonDspCrackleProbeProcessor extends AudioWorkletProcessor {
     }
 
     for (let index = 0; index < left.length; index += 1) {
-      const sample = this.wasm.crackle_probe_sample(0, index);
+      const sample = this.wasm.crackle_probe_sample(0, index) * this.outputGain;
       left[index] = sample;
       if (right) {
         right[index] = sample;
@@ -124,6 +129,7 @@ class MoonDspCrackleProbeProcessor extends AudioWorkletProcessor {
       blockIndex: this.blockIndex,
       wasmBlockIndex,
       metrics: this.readMetrics(wasmBlockIndex),
+      outputGain: this.outputGain,
       lastError: this.wasm.crackle_probe_last_error(),
     });
 
@@ -140,19 +146,20 @@ class MoonDspCrackleProbeProcessor extends AudioWorkletProcessor {
   }
 
   readMetrics(blockIndex) {
+    const gain = this.outputGain;
     return {
-      peak: this.wasm.crackle_probe_metric(blockIndex, 0),
-      rms: this.wasm.crackle_probe_metric(blockIndex, 1),
-      mean: this.wasm.crackle_probe_metric(blockIndex, 2),
+      peak: this.wasm.crackle_probe_metric(blockIndex, 0) * gain,
+      rms: this.wasm.crackle_probe_metric(blockIndex, 1) * gain,
+      mean: this.wasm.crackle_probe_metric(blockIndex, 2) * gain,
       nanOrInfCount: this.wasm.crackle_probe_metric(blockIndex, 3),
       sanitizedCount: this.wasm.crackle_probe_metric(blockIndex, 4),
-      maxStep: this.wasm.crackle_probe_metric(blockIndex, 5),
-      boundaryStep: this.wasm.crackle_probe_metric(blockIndex, 6),
-      maxResidual: this.wasm.crackle_probe_metric(blockIndex, 7),
-      rmsResidual: this.wasm.crackle_probe_metric(blockIndex, 8),
-      firstSample: this.wasm.crackle_probe_metric(blockIndex, 9),
-      lastSample: this.wasm.crackle_probe_metric(blockIndex, 10),
-      boundaryStepDifference: this.wasm.crackle_probe_metric(blockIndex, 11),
+      maxStep: this.wasm.crackle_probe_metric(blockIndex, 5) * gain,
+      boundaryStep: this.wasm.crackle_probe_metric(blockIndex, 6) * gain,
+      maxResidual: this.wasm.crackle_probe_metric(blockIndex, 7) * gain,
+      rmsResidual: this.wasm.crackle_probe_metric(blockIndex, 8) * gain,
+      firstSample: this.wasm.crackle_probe_metric(blockIndex, 9) * gain,
+      lastSample: this.wasm.crackle_probe_metric(blockIndex, 10) * gain,
+      boundaryStepDifference: this.wasm.crackle_probe_metric(blockIndex, 11) * gain,
       maxStepIndex: this.wasm.crackle_probe_metric(blockIndex, 12),
       maxResidualIndex: this.wasm.crackle_probe_metric(blockIndex, 13),
     };

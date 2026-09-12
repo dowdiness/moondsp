@@ -55,3 +55,6 @@ and pattern playback in the real browser route, not oscillator or graph math.
 
 This does **not** close #211: real playback still intentionally keeps the
 Triangle fallback until true-Sine note playback is proven stable end-to-end.
+
+The scheduler-level follow-up is recorded in
+`2026-07-19-browser-scheduler-crackle-investigation.md`.
