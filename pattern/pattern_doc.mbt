@@ -996,16 +996,8 @@ fn[A] compile_pattern_node(
           query_sourced_euclid(child.sourced, id, arc, k, n, rotation)
         },
       }
-      let entry_sourced = if n <= 0 || k <= 0 {
-        [sourced]
-      } else {
-        child.entry_sourced.map(source => {
-          query: fn(arc) {
-            query_sourced_euclid(source, id, arc, k, n, rotation)
-          },
-        })
-      }
-      { pat, sourced, entry_sourced, }
+      // Euclid lowers through sequence: one entry must retain all child events.
+      { pat, sourced, entry_sourced: [sourced], }
     }
     DegradeBy(child, p, seed) => {
       let child = lower_pattern_node_cached(nodes, child, cache, token_memo)

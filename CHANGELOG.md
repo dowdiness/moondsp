@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and transition states, and shared raw/sourced entry traversal. Public
   interfaces, reserved replacement timing, and event output are unchanged.
 
+### Fixed
+
+- Fixed authored Euclid playback dropping notes from stacked child patterns.
+  Its sourced query now follows the single canonical Euclid entry while
+  preserving every child's note timing and authored path.
+
 ## [0.6.0] - 2026-09-12
 
 This release advances moondsp from its browser audio proof into a live
