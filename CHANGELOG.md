@@ -7,73 +7,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+## [0.6.0] - 2026-09-12
 
-- Define reusable patterns with `let name = expression;` and combine them with `stack` in pattern and song inputs.
-- Add editor highlighting, completion, help, and the Light Orbit example. Definitions are immutable and ordered; invalid references preserve current playback.
-- Parse pattern expressions through shared syntax and name resolution. Document references retain definition structure and event provenance, with shared lowering and dependency-aware cache invalidation.
+This release advances moondsp from its browser audio proof into a live
+pattern-and-song authoring environment, adds the native CLAP prototype, and
+hardens the graph, scheduler, browser, and incremental-authoring boundaries.
 
 ### Breaking changes
 
-- Replaced browser eval/parse-and-set/update playback entry points and separate
-  pattern/song input/error buffers with a shared input buffer, token-returning
-  `prepare_pattern_input` / `prepare_song_input`, `apply_prepared_playback`,
-  `discard_prepared_playback`, and `restart_playback`. Worklet hosts must use
-  `apply-score` with an explicit continue/restart policy or `restart-playback`.
-  Success is acknowledged after rendering the committed block. Both shipped
-  browser hosts and the audio comparison fixture use the new contract; no
-  compatibility aliases remain. Treat this as a breaking browser source API
-  and worklet ABI change when choosing the next release version.
-- Removed legacy browser facade route shell types `SoundPool`,
-  `SchedulerRouteSelector`, and `SchedulerRoute`. They existed only to keep an
-  older leaked browser interface shape alive; runtime routing remains behind the
-  browser worklet exports.
+- Consolidated the Mini `PatternDoc` reuse helpers into optional arguments:
+  replace `parse_doc_reusing(input, previous)` with
+  `parse_doc(input, previous=Some(previous))`, and replace
+  `parse_snapshot_reusing(input, previous)` with
+  `parse_snapshot(input, previous=Some(previous))`.
+- Replaced the browser eval/parse-and-set/update playback entry points and
+  separate pattern/song input and error buffers with a shared input buffer,
+  token-returning `prepare_pattern_input` / `prepare_song_input`,
+  `apply_prepared_playback`, `discard_prepared_playback`, and
+  `restart_playback`. Worklet hosts now use `apply-score` with an explicit
+  continue/restart policy or `restart-playback`; no compatibility aliases
+  remain.
+- Removed the legacy browser facade route shell types `SoundPool`,
+  `SchedulerRouteSelector`, and `SchedulerRoute`. Runtime routing remains
+  behind the browser worklet exports.
 - Removed the graph package's accidental DSP facade re-exports. Import DSP
   types, traits, and helpers from `dowdiness/moondsp/dsp` or the root
   `dowdiness/moondsp` facade instead of `dowdiness/moondsp/graph`.
 
 ### Added
 
-- Added generated verification for the CLAP prototype's MoonBit native bridge
-  header, mapping stable `mb_engine_*` C aliases to the current generated
-  `clap_host` symbols.
-- Formalized the browser parse/control result-code and error-message transport
-  contract, with stable documentation names for scheduler parse results and
-  browser graph error codes.
-- Added a browser facade/worklet ABI contract guide covering supported exports,
-  internal boundaries, semver policy, and the ABI baseline review workflow.
-- Added an automated browser facade/export ABI baseline check for
-  `browser/pkg.generated.mbti` and the JS/wasm-gc export lists in
-  `browser/moon.pkg`.
-- Added an external DSL lowering contract guide and regression fixtures for
-  `Array[DspNode]` → `CompiledTemplate` → compile/control binding flows.
-- Added `DspNode` / `CompiledTemplate` authoring equality and result-typed
-  `CompiledDsp::compile_result` / `CompiledStereoDsp::compile_result` graph
-  diagnostics for external reactive authoring flows.
-- Added internal mini authoring token edit-span realignment coverage so
-  unchanged prefix/suffix tokens preserve identity while changed duplicate
-  tokens receive fresh keys.
-- Added `MiniAuthoringPipeline::set_input_with_source_edit(...)` so editor
-  integrations can provide the concrete source edit span for ambiguous
-  identical-token edits.
-- Mini authoring now feeds aligned token identities into `PatternDoc` atom IDs
-  inside the pipeline, preserving duplicate sound/note provenance across
-  source-span edits while retaining the existing `mini:sound:bd:N` ID shape.
-- Added source-span regression coverage for duplicate note provenance and parse
-  error recovery in the mini authoring pipeline.
-- Updated the nested loom mini-CST spike to use Loom's stable projection identity
-  helpers for atom provenance, with `set_source` source-diff fallback coverage.
-- Added ADR-0012 to scope a loom/CST mini authoring evaluation before any
-  runtime parser migration.
-- Added a nested `specs/loom-mini-cst/` spike module with a tiny loom grammar
-  for duplicate mini atom span evaluation.
-- Extended the loom/CST spike with `apply_edit` insertion/deletion
-  characterization tests, including current deletion no-reuse behavior.
-- Added typed voice mutation APIs for handle-based controls:
+- Added browser live song playback with explicit Pattern/Song modes, global
+  BPM handling, multiline song authoring, inline parse diagnostics, and
+  last-good playback on invalid edits.
+- Added immutable named pattern definitions with `let name = expression;` for
+  reuse from both pattern and song inputs. Name resolution preserves authoring
+  structure, event provenance, and dependency-aware lowering-cache reuse.
+- Added prepared live edits that preserve playback position by default, apply
+  changed material at its next entry, acknowledge success after the committed
+  block renders, and provide an explicit restart path.
+- Added independent synth-note envelopes, expanded musical examples, and a
+  shared stereo room-reverb bus across synth and drum routes.
+- Added Strudel-style `$:` stack lines, note-name and chord parsing, and editor
+  highlighting, completion, and help for the new Mini notation.
+- Added `MiniAuthoringPipeline`, an `incr`-backed text → `PatternDoc` →
+  snapshot pipeline with stable token and node identities, persistent lowering
+  reuse, source-edit-span realignment, compute diagnostics, and an
+  `AcceptedDerived` last-good document channel across parse failures.
+- Added `MiniDocBuilder` as the semantic `PatternDoc` construction surface used
+  by Loom/CST evaluation, plus ADRs and parity evidence for a future
+  production authoring-parser decision. The shipping authoring path remains
+  whole-source `MiniAuthoringPipeline`.
+- Added structural equality for `DspNode` and `CompiledTemplate`, result-typed
+  `CompiledDsp::compile_result` / `CompiledStereoDsp::compile_result`
+  diagnostics, and documented external DSL lowering and editor-preview
+  boundaries.
+- Added typed voice mutation APIs:
   `VoicePool::note_off_result`, `VoicePool::set_voice_pan_result`,
   `BoundVoicePool::note_off_result`, `BoundVoicePool::kill_result`, and
-  `BoundVoicePool::set_voice_pan_result`. Existing Bool-returning wrappers
-  remain and delegate to the result path.
+  `BoundVoicePool::set_voice_pan_result`.
+- Added browser facade/worklet ABI documentation, generated ABI baseline
+  checks, and stable parse/control result-code and error-message transport.
+- Added a native CLAP synth prototype with official CLAP 1.2.8 headers, Linux
+  and Windows builds, validator and dlopen/process smoke tests, a generated
+  MoonBit bridge-symbol guard, timestamped note/parameter processing, and a
+  verified Bitwig Studio 6.0.6 load on Windows 11. CLAP support remains
+  prototype-only pending broader real-host coverage.
+
+### Changed
+
+- Migrated the root manifest from `moon.mod.json` to `moon.mod`, updated
+  `moonbitlang/quickcheck` to `0.14.0`, and advanced `dowdiness/incr` to
+  `0.9.0`.
+- Extracted graph, scheduler, and browser implementation packages behind their
+  existing facades. The canonical graph boundary remains
+  `Array[DspNode]` → `CompiledTemplate::analyze` → runtime compilation.
+- Tightened browser playback-host helper exposure so package-local probes no
+  longer leak host-owned pools, schedulers, or buffers.
+- Simplified the live editor to one Play/Stop transport and moved complete,
+  playable examples ahead of concise reference help.
 
 ### Deprecated
 
@@ -81,19 +92,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `VoicePool::note_off`, `VoicePool::set_voice_pan`,
   `BoundVoicePool::note_off`, `BoundVoicePool::kill`, and
   `BoundVoicePool::set_voice_pan`. Use the corresponding `*_result` methods to
-  observe `VoiceControlError` instead of collapsing rejections to `false`.
-
-### Changed
-
-- Tightened `browser/internal/playback_host` helper exposure so browser
-  whitebox probes are package-local and the facade compatibility hook no longer
-  exposes host-owned pools, schedulers, or buffers.
+  preserve `VoiceControlError` rejection details.
 
 ### Fixed
 
+- Stabilized browser synth playback and added page-thread/AudioWorklet
+  comparison probes for scheduler, voice-pool, and waveform paths. Production
+  playback retains the Triangle fallback while issue #212's affected-Windows
+  real-time A/B investigation remains open.
+- Preserved current playback through valid live score edits and invalid
+  intermediate text instead of implicitly restarting or tearing down audio.
 - Preserved runtime-updatable `Gain` and `Clip` nodes through constant folding
-  so authoring-index controls and bindings retain their original parameter
-  semantics while pure arithmetic subgraphs beneath them can still fold.
+  so authoring-index controls and bindings retain their parameter semantics
+  while pure arithmetic subgraphs can still fold.
+
+### Performance
+
+- Added cross-target external-authoring benchmarks and dated snapshots for
+  valid, diagnostic, and realistic graph shapes; the measurements did not
+  justify an early-cutoff optimization.
+- Measured AudioWorklet preparation separately from render-quantum processing
+  and kept parsing, projection, and snapshot preparation outside the audio
+  callback.
+- Eliminated audited allocations from steady CLAP render, note/release, MIDI,
+  transport, all-notes-off, and active-parameter event paths.
 
 ## [0.5.1] - 2026-05-20
 
@@ -686,7 +708,8 @@ scheduler with mini-notation support.
 - The `moondsp-browser-tools` npm workspace is `private: true` and exists
   only to host Playwright tests for the browser demo.
 
-[Unreleased]: https://github.com/dowdiness/moondsp/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/dowdiness/moondsp/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/dowdiness/moondsp/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/dowdiness/moondsp/releases/tag/v0.5.1
 [0.5.0]: https://github.com/dowdiness/moondsp/releases/tag/v0.5.0
 [0.4.0]: https://github.com/dowdiness/moondsp/releases/tag/v0.4.0

@@ -152,7 +152,7 @@ Start at the **[docs index](docs/README.md)**, which groups material by audience
 | 4 — Pattern engine | Complete | Rational time, 8 combinators, ControlMap output |
 | 5 — Pattern × DSP | Complete | `scheduler/` + `mini/` wire pattern events to voice allocation |
 | 6 — incr integration | In progress | Stable identity plus initial pattern/song authoring groundwork |
-| 7+ — UI, native, collab | Planned | REPL, CLAP plugins, CRDT multi-user |
+| 7+ — UI, native, collab | Prototype | Browser live UI and CLAP prototype available; collaboration planned |
 
 ## License
 

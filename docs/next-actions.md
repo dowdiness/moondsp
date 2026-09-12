@@ -1,259 +1,84 @@
 # Next Actions
 
-Updated: 2026-06-05
+Updated: 2026-09-12
 
-Forward-looking handoff for the next session. Keep this short and actionable;
-per-PR verification logs and merged-PR lists live in `git log` and
-`CHANGELOG.md`, not here.
+Forward-looking handoff only. Per-PR history belongs in `git log`; released
+behavior belongs in `CHANGELOG.md`.
 
 ## Current State
 
-- `main` includes PR #160 (`529dd63`), which formalized browser parse/control
-  result-code and error transport after PR #159 (`9b6c2dc`) documented the
-  browser facade/worklet ABI contract. Both preserved the JS/wasm-gc worklet
-  exports.
-- ADR-0015 graph, scheduler, and browser internal-boundary extraction slices
-  (#135–#140) have shipped, as have browser safety/helper follow-ups #152,
-  #151, and #150. The browser facade/export ABI is now guarded by
-  `scripts/check-browser-abi.sh`; `browser/pkg.generated.mbti` exposes values
-  only, with no browser-specific public route/pool/scheduler types.
-- Latest release: **v0.5.1** (tagged and published 2026-05-20).
-- The next release should be **v0.6.0** if it includes the current
-  `Unreleased` entries, because public API has been added since v0.5.1.
-- Keep release prep, parser/runtime changes, and browser API idealization
-  issues separate. PR #86 (`release/v0.6.0`) remains release prep; do not tag or
-  publish v0.6.0 as part of unrelated docs, benchmark, or browser API-contract
-  work.
-- Open PRs: PR #86 (`release/v0.6.0`) is release prep and intentionally
-  remains open until an explicit release pass.
-- ADR-0013 defines loom mini promotion criteria, but it does not approve a
-  production parser switch. Production mini parsing still uses the hand-written
-  parser and `mini/incr_authoring.mbt::MiniAuthoringPipeline`; loom remains an
-  authoring-only evaluation path under `specs/loom-mini-cst`.
-- `moon.mod` is now the root manifest. `moon.mod.json` remains only in the
-  nested `specs/loom-mini-cst` spike module.
-
-For the broader backlog, read
-`~/.claude/projects/-home-antisatori-ghq-github-com-dowdiness-moondsp/memory/project_backlog.md`.
+- `main` includes PR #241 (`ca940d7`), which adds one shared stereo room-reverb
+  bus across synth and drum routes.
+- Browser live playback supports pattern and song inputs, immutable named
+  pattern definitions, prepared score updates, playback-position preservation,
+  next-material-entry edit application, independent synth-note envelopes, and
+  a single Play/Stop transport.
+- Production browser playback still selects Triangle while issue #212's
+  affected-Windows real-time Sine crackle matrix remains unresolved. The local
+  page-thread and offline AudioWorklet probes produce identical PCM; do not
+  change DSP behavior without the missing real-time evidence.
+- The native CLAP path remains a prototype. Validator, allocation audit, bridge
+  guard, and one Bitwig/Windows load are complete; broader real-host coverage is
+  tracked by issue #180.
+- Phase 6 incremental authoring remains in progress. Runtime Mini parsing and
+  `MiniAuthoringPipeline` have separate promotion boundaries; do not move the
+  authoring path to Loom without a new decision satisfying ADR-0013's remaining
+  gates.
+- PR #86 prepares release `v0.6.0`. It updates release metadata only; do not tag
+  or publish until the release checks and PR review complete.
 
 ## Recommended Next Slice
 
-**No further Voice API cleanup by default.**
+After `v0.6.0`, migrate `dowdiness/incr` from `0.9.0` to `0.14.0` under issue
+#226.
 
-The post-#158 inventory found no production `VoicePool` Bool-wrapper callers and
-only scheduler-owned `BoundVoicePool` Bool-wrapper calls that intentionally
-ignored the collapsed result. The selected path is additive deprecation: keep the
-wrappers for source compatibility, mark them deprecated, and move in-repo callers
-to the typed `*_result` methods.
+Keep the migration bounded to the published API changes recorded by that issue:
+`Signal` → `Input`, `Memo` → `Derived`, scope constructor updates, and
+`PatternDoc` revision tracking. Do not combine it with Mini syntax, Loom
+promotion, or a new incremental-parser design.
 
-Do not remove wrappers or rename voice methods to graph-style unsuffixed
-`Result` methods without an explicit breaking API-cleanup scope. Keep scheduler
-status/introspection (#156) separate unless concrete host use cases justify it.
+## Conditional Reliability Slice
+
+If the affected Windows/Chrome environment is available, issue #212 outranks
+new feature work:
+
+1. Run the existing real-time harness across scheduler/direct, Triangle/Sine,
+   gain, sample-rate, and latency-hint variants.
+2. Save the JSON telemetry and a human audible verdict for each run.
+3. Change production behavior only if that evidence isolates a source-level
+   mitigation.
 
 ## Alternative Slices
 
-- **Loom upstream attachment / production-shaped boundary** — PRs #109–#112
-  moved spec-local identity realignment, optional-edit handling, source-diff
-  fallback, and failed-edit composition onto Loom helpers while preserving the
-  recovery evidence. Further Loom work should either happen upstream
-  (`dowdiness/loom#162`, `dowdiness/loom#163`, `dowdiness/loom#164`,
-  `dowdiness/seam#2`) or become a production-shaped authoring-boundary
-  prototype. Keep any moondsp work under `specs/loom-mini-cst`; do not add
-  loom/seam to root `moon.mod` and do not route production parsing through
-  loom.
+- **Mini `+` overlay sugar (#217)** — lower directly to the existing `stack`
+  algebra. Keep numeric addition and `ControlMap` merging out of scope.
+- **Browser protocol/status (#156, #216)** — document the compiled-demo versus
+  live-scheduler worklet split, then add only status or room controls justified
+  by a concrete live UI consumer.
+- **CLAP real-host coverage (#180)** — record two additional hash-verified
+  host/OS results before changing the prototype status.
 
-- **Voice API breaking cleanup (deferred)** — after a migration window, decide
-  whether to remove the deprecated Bool wrappers and rename voice `*_result`
-  methods to graph-style unsuffixed `Result` methods. Do not start by migrating
-  `CompiledDsp::compile` away from `Self?` unless the slice is explicitly scoped
-  as a broader graph API cleanup.
+## Deferred
 
-- **Incr early-cutoff use of DspNode/CompiledTemplate Eq** — structural Eq and
-  typed compile diagnostics shipped in PR #122. Do not wire Eq into an
-  incr/Salsa-style early-cutoff path until a benchmark reproduces meaningful
-  authoring-side cost.
-
-## Closed since previous update
-
-- ~~**Issue #150 / PR #155 — legacy browser route shell cleanup**~~ — SHIPPED
-  2026-06-05 (`79e7d24`). Removed the accidental browser facade route shell
-  types `SoundPool`, `SchedulerRouteSelector`, and `SchedulerRoute` while
-  preserving the JS/wasm-gc worklet export lists. `CHANGELOG.md` records the
-  breaking source API cleanup, and `browser/pkg.generated.mbti` now has no
-  browser-specific public types under `Types and methods`.
-
-- ~~**Issue #151 / PR #154 — playback-host helper API tightening**~~ — SHIPPED
-  2026-06-05 (`1b844a1`). Moved browser scheduler whitebox probes into
-  `browser/internal/playback_host` package-local tests, removed broad
-  test-only public helpers, made the route selector private, and narrowed the
-  facade compatibility hook so it no longer exposes host-owned pools,
-  schedulers, or buffers. Browser facade/worklet ABI stayed unchanged.
-
-- ~~**Issue #152 / PR #153 — browser ABI/facade stability checks**~~ — SHIPPED
-  2026-06-05 (`2b41a87`). Added `scripts/check-browser-abi.sh`, a checked-in
-  `browser/browser_abi.baseline`, and CI wiring so unexpected
-  `browser/pkg.generated.mbti` or JS/wasm-gc export-list drift fails unless the
-  baseline is intentionally reviewed and updated.
-
-- ~~**Issue #140 / PR #149 — browser internal extraction**~~ — SHIPPED
-  2026-06-05 (`cbdce35`). Extracted browser slot, demo-template, and
-  playback-host internals behind the public browser facade while preserving
-  `browser/pkg.generated.mbti`, root `pkg.generated.mbti`, and the exported
-  JS/wasm-gc worklet ABI. Follow-ups opened from review caveats: #150, #151,
-  and #152; all three have since shipped.
-
-- ~~**Issue #139 / PR #148 — scheduler internal extraction**~~ — SHIPPED
-  2026-06-05 (`a01c72a`). Extracted scheduler transport, playback,
-  voice-runtime, and edit-policy internals behind the public scheduler facade,
-  preserving block-boundary playback snapshot commits and performance-sample
-  active-note expiry behavior.
-
-- ~~**Issue #138 / PR #147 — graph staging+authoring extraction**~~ — SHIPPED
-  2026-06-05 (`3eeaf5b`). Extracted `graph/internal/staging` and
-  `graph/internal/authoring` behind the public graph facade, preserving the
-  ADR-0010 `Array[DspNode]` authoring exchange, `CompiledTemplate` runtime
-  exchange, and `CompiledTemplate::analyze` crossing.
-
-- ~~**Issue #129 / PR #132 — cross-target external-authoring snapshots**~~ —
-  SHIPPED 2026-06-03 (`44a1335`). Added a dated performance snapshot comparing
-  wasm-gc, native, and JS target runs for valid paths, diagnostic/failure paths,
-  and realistic graph shapes. Verdict: no bottleneck demonstrated; keep results
-  target-qualified and preserve the audio block-boundary vs UI/control-thread
-  budget split.
-
-- ~~**External-authoring boundary and benchmark sequence**~~ — SHIPPED
-  2026-06-02/03 (`89da733`, `c067cf5`, `87142af`, `f361bc3`, `37e6558`,
-  `bc55c43`). Added the external DSL lowering contract, Mini pattern DSL ↔
-  graph DSL boundary, editor audio-preview handoff, valid-path benchmarks,
-  diagnostic/failure-path benchmarks, and realistic graph-shape benchmarks.
-  Parser/projection/lowering/template preparation remains off the audio
-  callback.
-
-- ~~**Issue #119 / PR #122 — authoring Eq and compile diagnostics**~~ — SHIPPED
-  2026-06-02 (`1fb2615`). Added ADR-0014, structural authoring equality for
-  `DspNode`/`CompiledTemplate`, and additive typed `compile_result` diagnostics
-  while preserving the compatibility `compile(...) -> Self?` APIs.
-
-- ~~**Issue #114 / PRs #115–#116 — browser song playback and UI docs**~~ —
-  SHIPPED 2026-05-31 (`47b163c`, `3a64b1d`). Added browser/live song playback,
-  Pattern/Song mode UI, global BPM behavior, and multiline song-syntax help.
-  Production parsing remains hand-written.
-
-- ~~**PR #113 — loom promotion notes refresh**~~ — SHIPPED 2026-05-31
-  (`24e150d`). Aligned ADR-0013, Loom upstream requirements, and this handoff
-  with the PR #112 tracker cleanup. Production parsing remains hand-written.
-
-- ~~**PR #112 — loom tracker failed-edit composition cleanup**~~ — SHIPPED
-  2026-05-31 (`1f54c54`). Removed the spec-local `pending_source_edit` shim;
-  the spec projection now delegates optional-edit and failed-recovery
-  composition to Loom's `ProjectionIdentityTracker`. Production parsing remains
-  hand-written.
-
-- ~~**PRs #109–#111 — loom projection helper adoption**~~ — SHIPPED
-  2026-05-29/31 (`dbfd781`, `98df144`, `32601d7`). Adopted Loom identity,
-  string-ID, optional-edit, and source-diff fallback helpers in the nested
-  mini-CST spike. Production parsing remains hand-written.
-
-- ~~**PR #107 — loom recovery evidence expansion**~~ — SHIPPED 2026-05-28
-  (`07a4451`). Expanded the spec-local recovery matrix for `$:` stack-line
-  syntax, direct and `$:` callback syntax, control-method syntax, and
-  projection-only semantic failures; recovered states now compare Loom and
-  `MiniAuthoringPipeline` root IDs as well as lowered event IDs. Production
-  parsing remains hand-written.
-
-- ~~**PR #106 — loom upstream requirements extraction**~~ — SHIPPED
-  2026-05-28 (`49d1fe5`). Added `docs/loom-upstream-requirements.md`, linked
-  it from ADR-0013, and opened upstream follow-up issues in Loom/seam for
-  stable identity, projection ergonomics, diagnostics plus last-good semantic
-  documents, and authoring-only dependency boundaries.
-
-- ~~**PR #104 — loom control-method projection parity**~~ — SHIPPED
-  2026-05-28 (`f1759c6`). Added spec-local projection/lowering support for
-  `.cutoff(...)`, `.gain(...)`, and `.pan(...)`, with parity against
-  `@mini.parse_doc`, lowered control-map checks, and a lowering-cache reuse
-  regression. Production parsing remains hand-written.
-
-- ~~**PR #101 — loom full-grammar provenance matrix**~~ — SHIPPED
-  2026-05-27 (`787e23a`). Added the matrix helper and representative rows under
-  `specs/loom-mini-cst/src/projection_test.mbt` for duplicate-token edits,
-  `$:` lines, layers, postfixes, callback/root method edits, recovery,
-  source-edit spans, and lowered event IDs. Production parsing remains
-  hand-written.
-
-- ~~**PR #100 — loom mode-incompatible atom rejection**~~ — SHIPPED
-  2026-05-27 (`cc268e4`). Hardened the spec-local Loom projection so numeric
-  atoms in `s(...)` and identifier atoms in `note(...)` reject instead of being
-  silently dropped; production parsing remains hand-written.
-
-- ~~**PR #99 — loom known edge-case characterization**~~ — SHIPPED
-  2026-05-27 (`0c7f5fb`). Characterized permissive empty notation,
-  trailing-comma layers, unterminated-bracket recovery, and digit-start atom
-  lexing under `specs/loom-mini-cst`; no production parser routing changed.
-
-- ~~**PR #97 — loom `$:` callback parity**~~ — SHIPPED 2026-05-27
-  (`fceb86b`). Added Loom mini-CST projection parity for callback methods inside
-  `$:` stack-line programs, callback variants, and callback edit/reuse parity
-  against `MiniAuthoringPipeline`; production parsing remains hand-written.
-
-- ~~**PR #96 — loom callback variant and edit parity**~~ — SHIPPED
-  2026-05-27 (`57ff069`). Added direct `.jux(...)` / `.every(...)` callback
-  variants and direct callback edit/reuse parity; no `$:` stack-line coverage.
-
-- ~~**PR #95 — loom callback-method projection parity**~~ — SHIPPED
-  2026-05-26 (`6d3d439`). Added callback-method projection/lowering for
-  `.jux(...)` and `.every(...)`, with initial `rev` parity tests against
-  `@mini.parse_doc`; production parsing remains hand-written.
-
-- ~~**PR #94 — `$:` docs refresh**~~ — SHIPPED 2026-05-26 (`cc95e75`).
-  Refreshed mini-notation docs, ADR/backlog pointers, and `$:` syntax summary;
-  no production parser switch.
-
-- ~~**PR #93 — loom `$:` stack-program parity**~~ — SHIPPED 2026-05-26
-  (`3b566d6`). Added loom mini-CST projection parity for top-level `$:` stack
-  programs against `@mini.parse_doc`; no callback-method projection yet.
-
-- ~~**PR #92 — Strudel-style `$:` stack lines**~~ — SHIPPED 2026-05-26
-  (`2ce2930`). Added top-level `$:` stack syntax to the production mini parser,
-  PatternDoc parser, browser live examples, CodeMirror grammar/completion, and
-  smoke tests. Existing `stack(...)` remains supported.
-
-- ~~**PR #91 — loom mini-CST sub-notation/group postfix parity**~~ — SHIPPED
-  2026-05-26 (`0d14e5a`). Added recursive notation projection for atom/group
-  elements and group postfix parity for `*`, `?`, and Euclid; no production
-  parser routing changed.
-
-- ~~**PR #85 — loom mini-CST apply-edit authoring parity**~~ — SHIPPED
-  2026-05-25 (`cddb6e9`). Added replacement, whitespace, method-replacement,
-  duplicate-note, and parse-error recovery parity against
-  `MiniAuthoringPipeline`; no production parser routing changed.
-
-- ~~**PR #77 — root manifest migration**~~ — SHIPPED 2026-05-25 (`6229659`).
-  Migrated root `moon.mod.json` to `moon.mod`, preserving release metadata,
-  dependencies, and publish excludes.
-
-- ~~**Issue #82 / PR #84 — loop-expression refactor**~~ — SHIPPED 2026-05-24
-  (`17c59ad`) with style guidance in `9e72655`. Stop broad loop-expression
-  sweeps; only convert loops when a targeted change already has local context
-  and the loop naturally computes a value.
-
-- ~~**Quickcheck warning sweep**~~ — SHIPPED 2026-05-24 in PR #75 (`c5db26c`).
-  `moonbitlang/quickcheck` is now `0.14.0`; the previous dependency-bound
-  Show-vs-Debug warnings are gone under `rtk moon check --deny-warn`.
+- Implicit top-level newline overlay (#219) until song-mode, comment, blank-line,
+  and coexistence semantics are specified.
+- Broad `browser/internal/playback_host` cleanup (#214) without a concrete
+  defect or measured maintenance problem.
+- Loom-backed authoring-parser promotion without the remaining ADR-0013 gates.
+- Offline rendering until it has a tracking issue, boundary, and acceptance
+  criteria.
 
 ## Acceptance Checks
 
 - Normal code/docs slices: `NEW_MOON_MOD=0 moon check --deny-warn` and
   `NEW_MOON_MOD=0 moon test --release`.
-- Architecture boundary checks: `./scripts/check-public-boundary.sh` and
+- Architecture boundary changes:
+  `./scripts/check-public-boundary.sh` and
   `./scripts/check-architecture-boundaries.sh`.
-- Browser facade/export slices: `./scripts/check-browser-abi.sh`; update
-  `browser/browser_abi.baseline` only for reviewed intentional facade/export
-  changes.
-- `specs/loom-mini-cst` slices: also run
-  `NEW_MOON_MOD=0 moon -C specs/loom-mini-cst check --deny-warn` and
-  `NEW_MOON_MOD=0 moon -C specs/loom-mini-cst test`.
-- Release prep: also run `NEW_MOON_MOD=0 moon fmt`,
-  `NEW_MOON_MOD=0 moon info`, and `NEW_MOON_MOD=0 moon package --list`, then
-  inspect the generated zip contents.
+- Browser facade/export changes: `./scripts/check-browser-abi.sh`; update
+  `browser/browser_abi.baseline` only for reviewed intentional ABI changes.
+- Release prep: also run `NEW_MOON_MOD=0 moon info`,
+  `NEW_MOON_MOD=0 moon fmt`, and `NEW_MOON_MOD=0 moon package --list`, then
+  inspect the generated package contents.
 - Graph runtime-control behavior changes: update
   `docs/salat-engine-technical-reference.md` first.
