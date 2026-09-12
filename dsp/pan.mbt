@@ -6,7 +6,7 @@ pub struct Pan {}
 /// Create a pan processor.
 #alias(new)
 pub fn Pan::Pan() -> Pan {
-  Pan::{  }
+  Pan::{ }
 }
 
 ///|

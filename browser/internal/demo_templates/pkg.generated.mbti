@@ -25,4 +25,3 @@ pub fn synth_template() -> Array[@graph.DspNode]
 // Type aliases
 
 // Traits
-

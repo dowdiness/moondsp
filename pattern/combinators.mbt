@@ -65,7 +65,7 @@ pub fn[A] sequence(pats : Array[Pat[A]]) -> Pat[A] {
               }
               None => None
             }
-            result.push({ whole: new_whole, part: new_part, value: ev.value })
+            result.push({ whole: new_whole, part: new_part, value: ev.value, })
           }
         }
       }

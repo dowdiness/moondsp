@@ -131,7 +131,7 @@ pub fn PlaybackEvent::PlaybackEvent(
   event~ : @pattern.Event[@pattern.ControlMap],
   source~ : EventSource,
 ) -> PlaybackEvent {
-  { event, source }
+  { event, source, }
 }
 
 ///|
@@ -162,7 +162,7 @@ pub fn AffectedVoiceTarget::AffectedVoiceTarget(
   layer~ : @identity.SectionLayerId?,
   occurrence~ : @identity.OccurrenceId?,
 ) -> AffectedVoiceTarget {
-  { pattern_node, section, layer, occurrence }
+  { pattern_node, section, layer, occurrence, }
 }
 
 ///|
@@ -181,14 +181,14 @@ pub fn AffectedVoiceTarget::from_pattern_node(
 pub fn AffectedVoiceTarget::from_section(
   section : @identity.SectionId,
 ) -> AffectedVoiceTarget {
-  { pattern_node: None, section: Some(section), layer: None, occurrence: None }
+  { pattern_node: None, section: Some(section), layer: None, occurrence: None, }
 }
 
 ///|
 pub fn AffectedVoiceTarget::from_layer(
   layer : @identity.SectionLayerId,
 ) -> AffectedVoiceTarget {
-  { pattern_node: None, section: None, layer: Some(layer), occurrence: None }
+  { pattern_node: None, section: None, layer: Some(layer), occurrence: None, }
 }
 
 ///|
@@ -249,21 +249,21 @@ pub struct AffectedVoiceEditScope {
 pub fn AffectedVoiceEditScope::pattern_node(
   pattern_node : @identity.PatternNodeId,
 ) -> AffectedVoiceEditScope {
-  { target: AffectedVoiceTarget::from_pattern_node(pattern_node) }
+  { target: AffectedVoiceTarget::from_pattern_node(pattern_node), }
 }
 
 ///|
 pub fn AffectedVoiceEditScope::song_occurrence(
   occurrence : @identity.OccurrenceId,
 ) -> AffectedVoiceEditScope {
-  { target: AffectedVoiceTarget::from_occurrence(occurrence) }
+  { target: AffectedVoiceTarget::from_occurrence(occurrence), }
 }
 
 ///|
 pub fn AffectedVoiceEditScope::song_section(
   section : @identity.SectionId,
 ) -> AffectedVoiceEditScope {
-  { target: AffectedVoiceTarget::from_section(section) }
+  { target: AffectedVoiceTarget::from_section(section), }
 }
 
 ///|

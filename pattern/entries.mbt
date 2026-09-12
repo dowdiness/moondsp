@@ -1,13 +1,13 @@
 ///|
 /// Give an authored material a stable address. The name is not a clock group.
 pub fn[A] Pat::named_entry(self : Pat[A], name : String) -> Pat[A] {
-  { ..self, entry_key: name }
+  { ..self, entry_key: name, }
 }
 
 ///|
 /// Group this expression as one authored material without changing its content.
 pub fn[A] Pat::material(self : Pat[A]) -> Pat[A] {
-  { ..self, members: [], signature: self.entry_signature() }
+  { ..self, members: [], signature: self.entry_signature(), }
 }
 
 ///|
@@ -60,7 +60,7 @@ pub fn[A] Pat::entries(self : Pat[A]) -> Array[Pat[A]] {
   let result = []
   fn visit(pat : Pat[A], path : String) -> Unit {
     if pat.members.is_empty() {
-      result.push({ ..pat, entry_key: path })
+      result.push({ ..pat, entry_key: path, })
     } else {
       let seen : Map[String, Int] = Map([])
       for i, child in pat.members {

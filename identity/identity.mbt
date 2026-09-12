@@ -12,7 +12,7 @@ pub struct Revision {
 
 ///|
 pub fn Revision::zero() -> Revision {
-  { value: 0L, fingerprint: 0L }
+  { value: 0L, fingerprint: 0L, }
 }
 
 ///|

@@ -1,8 +1,8 @@
 import {
-  "dowdiness/moondsp/identity" @identity,
-  "dowdiness/moondsp/pattern" @pattern,
+  "dowdiness/moondsp/identity",
+  "dowdiness/moondsp/pattern",
 }
 
 import {
-  "moonbitlang/core/debug" @debug,
+  "moonbitlang/core/debug",
 } for "test"

@@ -53,7 +53,7 @@ fn NotationParser::NotationParser(
   chord? : Bool = false,
   source_offset? : Int = 0,
 ) -> NotationParser {
-  { input, pos: 0, sound, chord, source_offset }
+  { input, pos: 0, sound, chord, source_offset, }
 }
 
 ///|

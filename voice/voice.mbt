@@ -49,7 +49,7 @@ pub impl Show for VoiceHandle with fn output(self, logger) {
 ///|
 /// Construct a handle from primitive parts for host-side fixed storage.
 pub fn VoiceHandle::from_parts(slot~ : Int, generation~ : Int) -> VoiceHandle {
-  { slot, generation }
+  { slot, generation, }
 }
 
 ///|
@@ -367,7 +367,7 @@ pub fn BoundVoicePool::new(
     Err(error) => return Err(BoundVoicePoolError::from_voice_pool(error))
   }
   match bindings.build(compiled_template) {
-    Ok(bindings) => Ok({ pool, bindings })
+    Ok(bindings) => Ok({ pool, bindings, })
     Err(error) => Err(BoundVoicePoolError::Binding(error))
   }
 }

@@ -51,7 +51,7 @@ pub fn[A] Pat::pure(value : A) -> Pat[A] {
         let whole_end = Rational::new(cycle_n + 1L, 1L)
         let whole = TimeSpan::new(whole_begin, whole_end)
         // part is the intersection of whole with the original query arc
-        whole.intersect(arc).map(part => { whole: Some(whole), part, value })
+        whole.intersect(arc).map(part => { whole: Some(whole), part, value, })
       })
     },
   }
@@ -94,7 +94,7 @@ pub fn[A] Pat::fast(self : Pat[A], factor : Rational) -> Pat[A] {
         let new_whole = ev.whole.map(w => {
           TimeSpan::new(w.begin * inv, w.end_ * inv)
         })
-        { whole: new_whole, part: new_part, value: ev.value }
+        { whole: new_whole, part: new_part, value: ev.value, }
       })
     },
   }
@@ -144,7 +144,7 @@ pub fn[A] Pat::rev(self : Pat[A]) -> Pat[A] {
           let new_whole = ev.whole.map(w => {
             TimeSpan::new(cycle_end - w.end_, cycle_end - w.begin)
           })
-          { whole: new_whole, part: new_part, value: ev.value }
+          { whole: new_whole, part: new_part, value: ev.value, }
         })
       })
       .collect()

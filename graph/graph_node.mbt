@@ -334,13 +334,13 @@ pub fn DspNode::stereo_output(input : Int) -> DspNode {
 ///|
 /// Create a runtime gate-on control targeting an original authoring index.
 pub fn GraphControl::gate_on(node_index : Int) -> GraphControl {
-  { raw: @model.GraphControl::gate_on(node_index) }
+  { raw: @model.GraphControl::gate_on(node_index), }
 }
 
 ///|
 /// Create a runtime gate-off control targeting an original authoring index.
 pub fn GraphControl::gate_off(node_index : Int) -> GraphControl {
-  { raw: @model.GraphControl::gate_off(node_index) }
+  { raw: @model.GraphControl::gate_off(node_index), }
 }
 
 ///|
@@ -351,7 +351,7 @@ pub fn GraphControl::set_param(
   slot : GraphParamSlot,
   value : Double,
 ) -> GraphControl {
-  { raw: @model.GraphControl::set_param(node_index, slot.to_model(), value) }
+  { raw: @model.GraphControl::set_param(node_index, slot.to_model(), value), }
 }
 
 ///|

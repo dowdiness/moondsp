@@ -1,11 +1,11 @@
 import {
-  "dowdiness/incr" @incr,
-  "dowdiness/moondsp/identity" @identity,
-  "dowdiness/moondsp/pattern" @pattern,
-  "dowdiness/moondsp/song" @song,
-  "moonbitlang/core/bench" @bench,
+  "dowdiness/incr",
+  "dowdiness/moondsp/identity",
+  "dowdiness/moondsp/pattern",
+  "dowdiness/moondsp/song",
+  "moonbitlang/core/bench",
 }
 
 import {
-  "moonbitlang/core/debug" @debug,
+  "moonbitlang/core/debug",
 } for "test"

@@ -4,25 +4,25 @@ struct Eval {
 } derive(Eq)
 
 ///|
-pub impl ArithSym for Eval with constant(v) -> Eval {
-  { value: v }
+pub impl ArithSym for Eval with fn constant(v) -> Eval {
+  { value: v, }
 }
 
 ///|
-pub impl ArithSym for Eval with mul(a, b) -> Eval {
-  { value: a.value * b.value }
+pub impl ArithSym for Eval with fn mul(a, b) -> Eval {
+  { value: a.value * b.value, }
 }
 
 ///|
-pub impl ArithSym for Eval with mix(a, b) -> Eval {
-  { value: a.value + b.value }
+pub impl ArithSym for Eval with fn mix(a, b) -> Eval {
+  { value: a.value + b.value, }
 }
 
 ///|
-pub impl ArithSym for Eval with clip(a, t) -> Eval {
+pub impl ArithSym for Eval with fn clip(a, t) -> Eval {
   let v = a.value
   let clamped = if v > t { t } else if v < -t { -t } else { v }
-  { value: clamped }
+  { value: clamped, }
 }
 
 ///|
@@ -62,72 +62,77 @@ test "ArithSym Eval: clip negative" {
 }
 
 ///|
-impl DspSym for Eval with oscillator(self, _waveform) {
-  { value: self.value }
+impl DspSym for Eval with fn oscillator(self, _waveform) {
+  { value: self.value, }
 }
 
 ///|
-impl DspSym for Eval with noise(_seed) {
-  { value: 0.0 }
+impl DspSym for Eval with fn noise(_seed) {
+  { value: 0.0, }
 }
 
 ///|
-impl DspSym for Eval with adsr(_a, _d, _s, _r) {
-  { value: 0.0 }
+impl DspSym for Eval with fn adsr(_a, _d, _s, _r) {
+  { value: 0.0, }
 }
 
 ///|
-impl DspSym for Eval with gain(self, amount) {
-  { value: self.value * amount }
+impl DspSym for Eval with fn gain(self, amount) {
+  { value: self.value * amount, }
 }
 
 ///|
-impl DspSym for Eval with output(self) {
+impl DspSym for Eval with fn output(self) {
   self
 }
 
 ///|
-impl FilterSym for Eval with biquad(self, _mode, _cutoff, _q) {
+impl FilterSym for Eval with fn biquad(self, _mode, _cutoff, _q) {
   self
 }
 
 ///|
-impl DelaySym for Eval with delay(self, _max, _samples, _feedback) {
+impl DelaySym for Eval with fn delay(self, _max, _samples, _feedback) {
   self
 }
 
 ///|
-impl StereoSym for Eval with pan(self, _pos) {
+impl StereoSym for Eval with fn pan(self, _pos) {
   self
 }
 
 ///|
-impl StereoSym for Eval with stereo_gain(self, _amount) {
+impl StereoSym for Eval with fn stereo_gain(self, _amount) {
   self
 }
 
 ///|
-impl StereoSym for Eval with stereo_clip(self, _threshold) {
+impl StereoSym for Eval with fn stereo_clip(self, _threshold) {
   self
 }
 
 ///|
-impl StereoSym for Eval with stereo_mixdown(a) {
+impl StereoSym for Eval with fn stereo_mixdown(a) {
   a
 }
 
 ///|
-impl StereoSym for Eval with stereo_output(a) {
+impl StereoSym for Eval with fn stereo_output(a) {
   a
 }
 
 ///|
-impl StereoFilterSym for Eval with stereo_biquad(self, _mode, _cutoff, _q) {
+impl StereoFilterSym for Eval with fn stereo_biquad(self, _mode, _cutoff, _q) {
   self
 }
 
 ///|
-impl StereoDelaySym for Eval with stereo_delay(self, _max, _samples, _feedback) {
+impl StereoDelaySym for Eval with fn stereo_delay(
+  self,
+  _max,
+  _samples,
+  _feedback,
+) {
   self
 }
 

@@ -174,4 +174,3 @@ pub trait NodeSpanning {
 pub trait NodeStateful : NodeSpanning {
   fn is_stateful(Self) -> Bool
 }
-

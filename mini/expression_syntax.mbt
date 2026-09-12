@@ -50,7 +50,7 @@ fn Parser::parse_syntax_expr(self : Parser) -> MiniExpr raise ParseError {
   self.skip_whitespace()
   let start = self.pos
   let node = self.parse_syntax_primary()
-  let mut expr = MiniExpr::{ span: { start, end: self.pos }, node }
+  let mut expr = MiniExpr::{ span: { start, end: self.pos, }, node, }
   while true {
     let before_ws = self.pos
     self.skip_whitespace()
@@ -60,7 +60,7 @@ fn Parser::parse_syntax_expr(self : Parser) -> MiniExpr raise ParseError {
     }
     self.pos += 1
     let transform = self.parse_transform()
-    expr = { span: { start, end: self.pos }, node: Apply(expr, transform) }
+    expr = { span: { start, end: self.pos, }, node: Apply(expr, transform), }
   }
   expr
 }

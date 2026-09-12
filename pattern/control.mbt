@@ -12,14 +12,14 @@ pub impl Show for ControlMap with fn output(self, logger) {
 
 ///|
 pub fn ControlMap::empty() -> ControlMap {
-  { values: Map([]) }
+  { values: Map([]), }
 }
 
 ///|
 pub fn ControlMap::single(key : String, value : Double) -> ControlMap {
   let m : Map[String, Double] = {}
   m[key] = value
-  { values: m }
+  { values: m, }
 }
 
 ///|
@@ -52,7 +52,7 @@ pub fn ControlMap::set(
 ) -> ControlMap {
   let result = self.entries()
   result[key] = value
-  { values: result }
+  { values: result, }
 }
 
 ///|
@@ -60,7 +60,7 @@ pub fn ControlMap::set(
 pub fn ControlMap::merge(self : ControlMap, other : ControlMap) -> ControlMap {
   let result = self.entries()
   other.values.each(fn(k, v) { result[k] = v })
-  { values: result }
+  { values: result, }
 }
 
 ///|
@@ -227,7 +227,7 @@ pub fn merge_control(
             merged
           }
         })
-        { whole: ae.whole, part: ae.part, value: merged }
+        { whole: ae.whole, part: ae.part, value: merged, }
       })
     },
   }
@@ -237,7 +237,7 @@ pub fn merge_control(
 /// A scalar control source whose content is tracked automatically.
 pub fn control(key : String, value : Double) -> Pat[ControlMap] {
   let pat = Pat::pure(ControlMap::single(key, value))
-  { ..pat, signature: "control:\{key.length()}:\{key}:\{value}" }
+  { ..pat, signature: "control:\{key.length()}:\{key}:\{value}", }
 }
 
 ///|

@@ -56,4 +56,3 @@ pub fn ClapSynthEngine::voice_gain(Self) -> Double
 // Type aliases
 
 // Traits
-

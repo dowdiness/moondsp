@@ -44,7 +44,7 @@ fn remap_node_by_offset(node : DspNode, offset : Int) -> DspNode {
 
 ///|
 pub impl ArithSym for GraphBuilder with fn constant(v) -> GraphBuilder {
-  { nodes_: [DspNode::constant(v)], index: 0 }
+  { nodes_: [DspNode::constant(v)], index: 0, }
 }
 
 ///|
@@ -53,7 +53,7 @@ pub impl ArithSym for GraphBuilder with fn mul(a, b) -> GraphBuilder {
   let b_index = b.index + b_offset
   let idx = a.nodes_.length()
   a.nodes_.push(DspNode::mul(a.index, b_index))
-  { nodes_: a.nodes_, index: idx }
+  { nodes_: a.nodes_, index: idx, }
 }
 
 ///|
@@ -62,14 +62,14 @@ pub impl ArithSym for GraphBuilder with fn mix(a, b) -> GraphBuilder {
   let b_index = b.index + b_offset
   let idx = a.nodes_.length()
   a.nodes_.push(DspNode::mix(a.index, b_index))
-  { nodes_: a.nodes_, index: idx }
+  { nodes_: a.nodes_, index: idx, }
 }
 
 ///|
 pub impl ArithSym for GraphBuilder with fn clip(self, threshold) -> GraphBuilder {
   let idx = self.nodes_.length()
   self.nodes_.push(DspNode::clip(self.index, threshold))
-  { nodes_: self.nodes_, index: idx }
+  { nodes_: self.nodes_, index: idx, }
 }
 
 // ---------------------------------------------------------------------------
@@ -80,12 +80,12 @@ pub impl ArithSym for GraphBuilder with fn clip(self, threshold) -> GraphBuilder
 pub impl DspSym for GraphBuilder with fn oscillator(freq, waveform) -> GraphBuilder {
   let idx = freq.nodes_.length()
   freq.nodes_.push(DspNode::oscillator_from(freq.index, waveform))
-  { nodes_: freq.nodes_, index: idx }
+  { nodes_: freq.nodes_, index: idx, }
 }
 
 ///|
 pub impl DspSym for GraphBuilder with fn noise(seed) -> GraphBuilder {
-  { nodes_: [DspNode::noise(seed)], index: 0 }
+  { nodes_: [DspNode::noise(seed)], index: 0, }
 }
 
 ///|
@@ -100,14 +100,14 @@ pub impl DspSym for GraphBuilder with fn adsr(a, d, s, r) -> GraphBuilder {
 pub impl DspSym for GraphBuilder with fn gain(self, amount) -> GraphBuilder {
   let idx = self.nodes_.length()
   self.nodes_.push(DspNode::gain(self.index, amount))
-  { nodes_: self.nodes_, index: idx }
+  { nodes_: self.nodes_, index: idx, }
 }
 
 ///|
 pub impl DspSym for GraphBuilder with fn output(self) -> GraphBuilder {
   let idx = self.nodes_.length()
   self.nodes_.push(DspNode::output(self.index))
-  { nodes_: self.nodes_, index: idx }
+  { nodes_: self.nodes_, index: idx, }
 }
 
 // ---------------------------------------------------------------------------
@@ -120,7 +120,7 @@ pub impl FilterSym for GraphBuilder with fn biquad(self, mode, cutoff, q) -> Gra
   self.nodes_.push(
     DspNode::biquad(input=self.index, mode~, cutoff_hz=cutoff, q~),
   )
-  { nodes_: self.nodes_, index: idx }
+  { nodes_: self.nodes_, index: idx, }
 }
 
 // ---------------------------------------------------------------------------
@@ -143,7 +143,7 @@ pub impl DelaySym for GraphBuilder with fn delay(
       feedback~,
     ),
   )
-  { nodes_: self.nodes_, index: idx }
+  { nodes_: self.nodes_, index: idx, }
 }
 
 // ---------------------------------------------------------------------------
@@ -154,35 +154,35 @@ pub impl DelaySym for GraphBuilder with fn delay(
 pub impl StereoSym for GraphBuilder with fn pan(self, position) -> GraphBuilder {
   let idx = self.nodes_.length()
   self.nodes_.push(DspNode::pan(self.index, position))
-  { nodes_: self.nodes_, index: idx }
+  { nodes_: self.nodes_, index: idx, }
 }
 
 ///|
 pub impl StereoSym for GraphBuilder with fn stereo_gain(self, amount) -> GraphBuilder {
   let idx = self.nodes_.length()
   self.nodes_.push(DspNode::stereo_gain(input=self.index, amount~))
-  { nodes_: self.nodes_, index: idx }
+  { nodes_: self.nodes_, index: idx, }
 }
 
 ///|
 pub impl StereoSym for GraphBuilder with fn stereo_clip(self, threshold) -> GraphBuilder {
   let idx = self.nodes_.length()
   self.nodes_.push(DspNode::stereo_clip(input=self.index, threshold~))
-  { nodes_: self.nodes_, index: idx }
+  { nodes_: self.nodes_, index: idx, }
 }
 
 ///|
 pub impl StereoSym for GraphBuilder with fn stereo_mixdown(a) -> GraphBuilder {
   let idx = a.nodes_.length()
   a.nodes_.push(DspNode::stereo_mixdown(a.index))
-  { nodes_: a.nodes_, index: idx }
+  { nodes_: a.nodes_, index: idx, }
 }
 
 ///|
 pub impl StereoSym for GraphBuilder with fn stereo_output(a) -> GraphBuilder {
   let idx = a.nodes_.length()
   a.nodes_.push(DspNode::stereo_output(a.index))
-  { nodes_: a.nodes_, index: idx }
+  { nodes_: a.nodes_, index: idx, }
 }
 
 // ---------------------------------------------------------------------------
@@ -200,7 +200,7 @@ pub impl StereoFilterSym for GraphBuilder with fn stereo_biquad(
   self.nodes_.push(
     DspNode::stereo_biquad(input=self.index, mode~, cutoff_hz=cutoff, q~),
   )
-  { nodes_: self.nodes_, index: idx }
+  { nodes_: self.nodes_, index: idx, }
 }
 
 // ---------------------------------------------------------------------------
@@ -223,7 +223,7 @@ pub impl StereoDelaySym for GraphBuilder with fn stereo_delay(
       feedback~,
     ),
   )
-  { nodes_: self.nodes_, index: idx }
+  { nodes_: self.nodes_, index: idx, }
 }
 
 // ---------------------------------------------------------------------------

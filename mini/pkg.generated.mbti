@@ -67,4 +67,3 @@ pub fn ParsedSong::song(Self) -> @song.Song[@pattern.ControlMap]
 // Type aliases
 
 // Traits
-

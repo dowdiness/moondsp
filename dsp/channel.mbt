@@ -1,6 +1,6 @@
 ///|
 pub trait ChannelSpec {
-  channel_count(Self) -> Int
+  fn channel_count(Self) -> Int
 }
 
 ///|
@@ -9,11 +9,11 @@ pub struct Mono {}
 ///|
 #alias(new)
 pub fn Mono::Mono() -> Mono {
-  Mono::{  }
+  Mono::{ }
 }
 
 ///|
-pub impl ChannelSpec for Mono with channel_count(_self) {
+pub impl ChannelSpec for Mono with fn channel_count(_self) {
   1
 }
 
@@ -23,11 +23,11 @@ pub struct Stereo {}
 ///|
 #alias(new)
 pub fn Stereo::Stereo() -> Stereo {
-  Stereo::{  }
+  Stereo::{ }
 }
 
 ///|
-pub impl ChannelSpec for Stereo with channel_count(_self) {
+pub impl ChannelSpec for Stereo with fn channel_count(_self) {
   2
 }
 

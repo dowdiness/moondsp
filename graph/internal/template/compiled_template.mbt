@@ -73,7 +73,7 @@ pub fn CompiledTemplate::analyze(
 ) -> CompiledTemplate {
   let snapshot = template.map(node => @model.clone_node(node))
   let (optimized, index_map) = optimize_graph(snapshot)
-  { template: snapshot, optimized, index_map }
+  { template: snapshot, optimized, index_map, }
 }
 
 ///|

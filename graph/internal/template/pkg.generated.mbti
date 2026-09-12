@@ -26,4 +26,3 @@ pub impl Eq for CompiledTemplate
 // Type aliases
 
 // Traits
-

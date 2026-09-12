@@ -28,6 +28,6 @@ pub fn[A] Event::shift(self : Event[A], offset : Rational) -> Event[A] {
 }
 
 ///|
-pub impl[A : Debug] Show for Event[A] with output(self, logger) {
+pub impl[A : Debug] Show for Event[A] with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }

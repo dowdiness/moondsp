@@ -307,13 +307,13 @@ fn[A] song_snapshot_layer_source(
   match section.body() {
     Single(layer) => {
       named[layer.name()] = layer.id()
-      { single: Some(layer.id()), named }
+      { single: Some(layer.id()), named, }
     }
     Layers(layers) => {
       for layer in layers {
         named[layer.name()] = layer.id()
       }
-      { single: None, named }
+      { single: None, named, }
     }
   }
 }

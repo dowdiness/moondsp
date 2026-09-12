@@ -17,7 +17,7 @@ pub struct TimeScope {
 
 ///|
 pub fn TimeScope::TimeScope() -> TimeScope {
-  { rate: @pattern.Rational::from_int(1) }
+  { rate: @pattern.Rational::from_int(1), }
 }
 
 ///|

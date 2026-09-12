@@ -59,4 +59,3 @@ pub fn PlaybackEvent::source(Self) -> EventSource
 // Type aliases
 
 // Traits
-

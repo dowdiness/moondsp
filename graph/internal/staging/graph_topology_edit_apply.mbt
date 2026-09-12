@@ -13,7 +13,7 @@ fn apply_topology_edits_result(
     let edit = edits[index]
     match apply_topology_edit_result(nodes, edit) {
       Ok(_) => ()
-      Err(reason) => return Err({ edit_index: index, reason })
+      Err(reason) => return Err({ edit_index: index, reason, })
     }
   }
   Ok(())

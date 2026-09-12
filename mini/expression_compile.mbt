@@ -40,7 +40,7 @@ fn resolve_mini_expr(
           )
       }
   }
-  { span: expr.span, node }
+  { span: expr.span, node, }
 }
 
 ///|
