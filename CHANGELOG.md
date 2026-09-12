@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Updated `dowdiness/incr` from `0.9.0` to `0.15.1`, migrated
+  `MiniAuthoringPipeline` from `Signal` / `Memo` / `Observer` to
+  `Input` / `Derived` / `Watch`, and retained lazy snapshot lowering,
+  last-good acceptance, stable authoring identities, and lifecycle ownership.
+- Updated `PatternDoc`'s incr integration to use the closed monotonic
+  `Revision` API while preserving full identity-revision comparison for
+  backdating and fingerprint-collision safety.
+
 ## [0.6.0] - 2026-09-12
 
 This release advances moondsp from its browser audio proof into a live

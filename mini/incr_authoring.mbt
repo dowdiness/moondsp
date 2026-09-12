@@ -2,7 +2,7 @@
 /// Experimental incr-backed authoring pipeline for mini notation.
 ///
 /// Contract for the Phase 6+ design slice:
-/// - The input text is the only mutable authoring signal.
+/// - The input text is the only mutable authoring input.
 /// - Parsing remains delegated to the handwritten PatternDoc parser and still
 ///   reparses the whole source string on each text change.
 /// - Successful reparses pass the last successful PatternDoc as the
@@ -13,14 +13,14 @@
 ///   accessible via `accepted_doc()` (backed by incr `AcceptedDerived`).
 /// - `new()` eagerly forces the first parse before returning (priming).
 ///   Without this, `AcceptedDerived`'s built-in eager fold would trigger
-///   the parse inside a reactive compute context, where the memo's local
+///   the parse inside a reactive compute context, where the derived's local
 ///   state mutations are unsafe. After `new()`, all subsequent parses are
 ///   lazy (triggered by `parse_doc()` / `parse_snapshot()` reads).
 /// - Lowering uses one persistent PatternLoweringCache owned by the pipeline,
 ///   so the current reuse win is stable-subtree and lowering-cache reuse after
 ///   parse, not token-level incremental parsing.
-/// - Scope owns the long-lived cells, and persistent Observer handles anchor
-///   the public parsed/snapshot reads for the pipeline lifetime.
+/// - Scope owns the long-lived cells, and persistent Watch handles anchor
+///   parsed, snapshot, and diagnostic reads for the pipeline lifetime.
 /// - Compute counters are exposed for tests and diagnostics so callers can
 ///   distinguish whole-document recomputation from lowering-cache reuse.
 ///
@@ -30,15 +30,15 @@
 /// for now.
 pub struct MiniAuthoringPipeline {
   priv scope : @incr.Scope
-  priv text : @incr.Signal[String]
-  priv source_edit : @incr.Signal[MiniSourceEditSpan?]
-  priv parsed_observer : @incr.Observer[
+  priv text : @incr.Input[String]
+  priv source_edit : @incr.Input[MiniSourceEditSpan?]
+  priv parsed_watch : @incr.Watch[
     Result[@pattern.PatternDoc[@pattern.ControlMap], String],
   ]
-  priv snapshot_observer : @incr.Observer[
-    Result[@pattern.PatternSnapshot[@pattern.ControlMap], String],
+  priv snapshot_watch : @incr.Watch[
+    () -> Result[@pattern.PatternSnapshot[@pattern.ControlMap], String],
   ]
-  priv token_count_observer : @incr.Observer[Int]
+  priv token_count_watch : @incr.Watch[() -> Int]
   priv lowering_cache : @pattern.PatternLoweringCache[@pattern.ControlMap]
   priv parse_compute_count_fn : () -> Int
   priv snapshot_compute_count_fn : () -> Int
@@ -50,32 +50,41 @@ pub struct MiniAuthoringPipeline {
 
 ///|
 pub fn MiniAuthoringPipeline::new(input : String) -> MiniAuthoringPipeline {
-  let rt = @incr.Runtime::new()
+  let rt = @incr.Runtime()
   let scope = @incr.Scope::new(rt)
-  let text = scope.signal(input, label="mini.text")
-  let source_edit : @incr.Signal[MiniSourceEditSpan?] = scope.signal(
+  let text = scope.input(input, label="mini.text")
+  let source_edit : @incr.Input[MiniSourceEditSpan?] = scope.input(
     None,
     label="mini.source_edit",
   )
   // Previous source text for token realignment across edits.
-  // Updated alongside `previous` in the parsed memo's Ok branch.
+  // Updated alongside `previous` in the parsed derived's Ok branch.
   let mut previous_source : String = input
-  let token_count = scope.memo(
+  let token_count = scope.derived_no_backdate(
     () => {
       let current = text.get()
-      let tokens = tokenize_mini_authoring_source(current)
-      ignore(mini_authoring_token_fingerprint(tokens))
-      tokens.length()
+      let cached : Ref[Int?] = Ref(None)
+      fn() {
+        match cached.val {
+          Some(count) => count
+          None => {
+            let tokens = tokenize_mini_authoring_source(current)
+            ignore(mini_authoring_token_fingerprint(tokens))
+            let count = tokens.length()
+            cached.val = Some(count)
+            count
+          }
+        }
+      }
     },
     label="mini.token_count",
   )
-  let token_count_observer = scope.add_observer(token_count.observe())
+  let token_count_watch = scope.watch(token_count)
   // Last successful parse is intentional mutable state: errors should surface
   // to callers without discarding the previous reusable PatternDoc.
   let mut previous : @pattern.PatternDoc[@pattern.ControlMap]? = None
   let mut parse_compute_count = 0
-  let parsed = @incr.Memo::new_no_backdate(
-    rt,
+  let parsed = scope.derived_no_backdate(
     fn() {
       parse_compute_count += 1
       let current = text.get()
@@ -102,47 +111,58 @@ pub fn MiniAuthoringPipeline::new(input : String) -> MiniAuthoringPipeline {
     },
     label="mini.parsed_doc",
   )
-  scope.add_cell_ids([parsed.id()])
-  let parsed_observer = scope.add_observer(parsed.observe())
-  // Prime parsed before accepted_memo's eager fold reads it.
-  // The parsed memo mutates local state (`previous`, `previous_source`),
-  // which must not happen inside a reactive compute context.
-  ignore(parsed_observer.get())
+  // Scope::watch registers and primes the persistent parsed root exactly once.
+  // Priming happens before accepted_memo's eager fold reads parsed, because the
+  // parse closure mutates local reuse state.
+  let parsed_watch = scope.watch(parsed)
   // AcceptedDerived for last-good: retains the last successful PatternDoc
   // across parse errors. Scope::accepted_memo allocates its own child scope
-  // and registers the accepted cell internally — no extra add_cell_ids needed.
+  // and registers the accepted cell internally.
   let accepted = scope.accepted_memo(
-    () => parsed.get(),
+    () => parsed.read_or_abort(),
     label="mini.accepted_doc",
   )
 
   let lowering_cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
   let mut snapshot_compute_count = 0
-  let snapshot = @incr.Memo::new_no_backdate(
-    rt,
+  // Watch creation primes only this cheap reader-producing derived. Actual
+  // lowering stays lazy until parse_snapshot() invokes the returned reader.
+  let snapshot_reader = scope.derived_no_backdate(
     fn() {
-      snapshot_compute_count += 1
-      match parsed.get() {
-        Err(msg) => Err(msg)
-        Ok(doc) => {
-          let snapshot = doc.lower_with_cache(lowering_cache) catch {
-            _ => return Err("internal mini PatternDoc lowering failed")
+      let current = parsed.read_or_abort()
+      let cached : Ref[
+        Result[@pattern.PatternSnapshot[@pattern.ControlMap], String]?,
+      ] = Ref(None)
+      fn() {
+        match cached.val {
+          Some(result) => result
+          None => {
+            snapshot_compute_count += 1
+            let result = match current {
+              Err(msg) => Err(msg)
+              Ok(doc) => {
+                let snapshot = doc.lower_with_cache(lowering_cache) catch {
+                  _ => return Err("internal mini PatternDoc lowering failed")
+                }
+                Ok(snapshot)
+              }
+            }
+            cached.val = Some(result)
+            result
           }
-          Ok(snapshot)
         }
       }
     },
     label="mini.snapshot",
   )
-  scope.add_cell_ids([snapshot.id()])
-  let snapshot_observer = scope.add_observer(snapshot.observe())
+  let snapshot_watch = scope.watch(snapshot_reader)
   {
     scope,
     text,
     source_edit,
-    parsed_observer,
-    snapshot_observer,
-    token_count_observer,
+    parsed_watch,
+    snapshot_watch,
+    token_count_watch,
     lowering_cache,
     parse_compute_count_fn: fn() { parse_compute_count },
     snapshot_compute_count_fn: fn() { snapshot_compute_count },
@@ -180,7 +200,7 @@ pub fn MiniAuthoringPipeline::set_input_with_source_edit(
 pub fn MiniAuthoringPipeline::parse_doc(
   self : MiniAuthoringPipeline,
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
-  self.parsed_observer.get()
+  self.parsed_watch.read_or_abort()
 }
 
 ///|
@@ -196,7 +216,7 @@ pub fn MiniAuthoringPipeline::accepted_doc(
 pub fn MiniAuthoringPipeline::parse_snapshot(
   self : MiniAuthoringPipeline,
 ) -> Result[@pattern.PatternSnapshot[@pattern.ControlMap], String] {
-  self.snapshot_observer.get()
+  self.snapshot_watch.read_or_abort()()
 }
 
 ///|
@@ -250,5 +270,5 @@ pub fn MiniAuthoringPipeline::snapshot_compute_count(
 pub fn MiniAuthoringPipeline::authoring_token_count(
   self : MiniAuthoringPipeline,
 ) -> Int {
-  self.token_count_observer.get()
+  self.token_count_watch.read_or_abort()()
 }

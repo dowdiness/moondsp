@@ -1111,7 +1111,29 @@ pub fn[A] PatternSnapshot::query_sourced_events(
 pub struct PatternDoc[A] {
   priv root : @identity.PatternNodeId
   priv revision : @identity.Revision
+  priv incr_revision : @types.Revision
   priv nodes : Map[String, PatternDocEntry[A]]
+}
+
+///|
+let pattern_doc_incr_revision : Ref[@types.Revision] = Ref(
+  @types.Revision::initial(),
+)
+
+///|
+fn next_pattern_doc_incr_revision() -> @types.Revision {
+  let next = pattern_doc_incr_revision.val.next()
+  pattern_doc_incr_revision.val = next
+  next
+}
+
+///|
+fn[A] PatternDoc::PatternDoc(
+  root~ : @identity.PatternNodeId,
+  revision~ : @identity.Revision,
+  nodes~ : Map[String, PatternDocEntry[A]],
+) -> PatternDoc[A] {
+  { root, revision, incr_revision: next_pattern_doc_incr_revision(), nodes, }
 }
 
 ///|
@@ -1119,20 +1141,20 @@ pub fn[A] PatternDoc::from_pattern(
   id~ : @identity.PatternNodeId,
   pat~ : Pat[A],
 ) -> PatternDoc[A] {
-  {
-    root: id,
-    revision: @identity.Revision::zero(),
-    nodes: singleton_pattern_nodes(id, Runtime(pat)),
-  }
+  PatternDoc(
+    root=id,
+    revision=@identity.Revision::zero(),
+    nodes=singleton_pattern_nodes(id, Runtime(pat)),
+  )
 }
 
 ///|
 pub fn[A] PatternDoc::silence(id~ : @identity.PatternNodeId) -> PatternDoc[A] {
-  {
-    root: id,
-    revision: @identity.Revision::zero(),
-    nodes: singleton_pattern_nodes(id, Silence),
-  }
+  PatternDoc(
+    root=id,
+    revision=@identity.Revision::zero(),
+    nodes=singleton_pattern_nodes(id, Silence),
+  )
 }
 
 ///|
@@ -1140,11 +1162,11 @@ pub fn[A] PatternDoc::pure(
   id~ : @identity.PatternNodeId,
   value~ : A,
 ) -> PatternDoc[A] {
-  {
-    root: id,
-    revision: @identity.Revision::zero(),
-    nodes: singleton_pattern_nodes(id, Pure(value)),
-  }
+  PatternDoc(
+    root=id,
+    revision=@identity.Revision::zero(),
+    nodes=singleton_pattern_nodes(id, Pure(value)),
+  )
 }
 
 ///|
@@ -1159,24 +1181,22 @@ pub fn[A] PatternDoc::revision(self : PatternDoc[A]) -> @identity.Revision {
 
 ///|
 /// `PatternDoc` participates in incr's backdate-aware acceptance
-/// (`@incr.AcceptedDerived::accepted_memo`) through its `@identity.Revision`
-/// content stamp. `PatternDoc` is not `Eq` (it carries closure fields), so it
-/// qualifies via the revision identity rather than structural equality.
+/// (`@incr.AcceptedDerived::accepted_memo`) through its
+/// `@identity.Revision` content stamp. `PatternDoc` is not `Eq` (it carries
+/// closure fields), so `backdate_equal` below compares that full stamp.
 ///
-/// `changed_at` projects the revision's primary `value` into incr's 1-D
-/// `Revision`. This projection is intentionally lossy (it drops the
-/// `fingerprint`); it is NOT load-bearing because `backdate_equal` is
-/// overridden below to drive the acceptance decision directly.
+/// incr's closed `Revision` is an independent monotonic creation stamp.
+/// Semantic equality remains governed by `backdate_equal`, so reparsing an
+/// unchanged document can backdate to the previously accepted value.
 pub impl[A] @types.HasChangedAt for PatternDoc[A] with fn changed_at(self) -> @types.Revision {
-  @types.Revision::{ value: self.revision.value().to_int(), }
+  self.incr_revision
 }
 
 ///|
-/// Override the default `backdate_equal` (which would compare only the lossy
-/// 1-D `changed_at` projection): compare the full 2-D `@identity.Revision`
-/// (`value` AND `fingerprint`) via its derived `Eq`, so two content-distinct
-/// docs that happen to collide on `value` are still treated as changed. This
-/// is the load-bearing acceptance predicate used by `accepted_memo`.
+/// Compare the full 2-D `@identity.Revision` (`value` AND `fingerprint`) via
+/// its derived `Eq`, so two content-distinct docs that happen to collide on
+/// `value` are still treated as changed. This is the load-bearing acceptance
+/// predicate used by `accepted_memo`.
 pub impl[A] @types.BackdateEq for PatternDoc[A] with fn backdate_equal(
   self,
   other,
@@ -1204,7 +1224,7 @@ pub fn[A] PatternDoc::subdoc(
 ) -> PatternDoc[A] raise PatternDocError {
   let nodes : Map[String, PatternDocEntry[A]] = Map([])
   copy_reachable_pattern_nodes(self.nodes, root, nodes)
-  { root, revision: pattern_node_revision(nodes, root), nodes, }
+  PatternDoc(root~, revision=pattern_node_revision(nodes, root), nodes~)
 }
 
 ///|
@@ -1244,11 +1264,11 @@ pub fn[A] PatternDoc::with_root(
   if !self.nodes.contains(root.value()) {
     raise MissingNode(root.value())
   }
-  {
-    root,
-    revision: self.revision.next(),
-    nodes: copy_pattern_nodes(self.nodes),
-  }
+  PatternDoc(
+    root~,
+    revision=self.revision.next(),
+    nodes=copy_pattern_nodes(self.nodes),
+  )
 }
 
 ///|
@@ -1259,7 +1279,7 @@ pub fn[A] PatternDoc::replace_with_pattern(
 ) -> PatternDoc[A] raise PatternDocError {
   let nodes = copy_pattern_nodes(self.nodes)
   replace_pattern_node(nodes, id, Runtime(pat))
-  { root: self.root, revision: self.revision.next(), nodes, }
+  PatternDoc(root=self.root, revision=self.revision.next(), nodes~)
 }
 
 ///|
@@ -1269,7 +1289,7 @@ pub fn[A] PatternDoc::replace_with_silence(
 ) -> PatternDoc[A] raise PatternDocError {
   let nodes = copy_pattern_nodes(self.nodes)
   replace_pattern_node(nodes, id, Silence)
-  { root: self.root, revision: self.revision.next(), nodes, }
+  PatternDoc(root=self.root, revision=self.revision.next(), nodes~)
 }
 
 ///|
@@ -1280,7 +1300,7 @@ pub fn[A] PatternDoc::replace_with_pure(
 ) -> PatternDoc[A] raise PatternDocError {
   let nodes = copy_pattern_nodes(self.nodes)
   replace_pattern_node(nodes, id, Pure(value))
-  { root: self.root, revision: self.revision.next(), nodes, }
+  PatternDoc(root=self.root, revision=self.revision.next(), nodes~)
 }
 
 ///|
@@ -1296,7 +1316,7 @@ pub fn[A] PatternDoc::fast(
     Fast(self.root, factor),
     revision=self.revision.next(),
   )
-  { root: id, revision: self.revision.next(), nodes, }
+  PatternDoc(root=id, revision=self.revision.next(), nodes~)
 }
 
 ///|
@@ -1312,7 +1332,7 @@ pub fn[A] PatternDoc::slow(
     Slow(self.root, factor),
     revision=self.revision.next(),
   )
-  { root: id, revision: self.revision.next(), nodes, }
+  PatternDoc(root=id, revision=self.revision.next(), nodes~)
 }
 
 ///|
@@ -1322,7 +1342,7 @@ pub fn[A] PatternDoc::rev(
 ) -> PatternDoc[A] raise PatternDocError {
   let nodes = copy_pattern_nodes(self.nodes)
   insert_pattern_node(nodes, id, Rev(self.root), revision=self.revision.next())
-  { root: id, revision: self.revision.next(), nodes, }
+  PatternDoc(root=id, revision=self.revision.next(), nodes~)
 }
 
 ///|
@@ -1338,7 +1358,7 @@ pub fn[A] PatternDoc::filter_map(
     FilterMap(self.root, f),
     revision=self.revision.next(),
   )
-  { root: id, revision: self.revision.next(), nodes, }
+  PatternDoc(root=id, revision=self.revision.next(), nodes~)
 }
 
 ///|
@@ -1356,7 +1376,7 @@ pub fn[A] PatternDoc::euclid(
     Euclid(self.root, k, n, rotation),
     revision=self.revision.next(),
   )
-  { root: id, revision: self.revision.next(), nodes, }
+  PatternDoc(root=id, revision=self.revision.next(), nodes~)
 }
 
 ///|
@@ -1373,7 +1393,7 @@ pub fn[A] PatternDoc::degrade_by(
     DegradeBy(self.root, p, seed),
     revision=self.revision.next(),
   )
-  { root: id, revision: self.revision.next(), nodes, }
+  PatternDoc(root=id, revision=self.revision.next(), nodes~)
 }
 
 ///|
@@ -1390,7 +1410,7 @@ pub fn[A] PatternDoc::every(
     Every(self.root, n, f),
     revision=self.revision.next(),
   )
-  { root: id, revision: self.revision.next(), nodes, }
+  PatternDoc(root=id, revision=self.revision.next(), nodes~)
 }
 
 ///|
@@ -1406,7 +1426,7 @@ pub fn PatternDoc::jux(
     Jux(self.root, fn(p) { p.jux(f) }),
     revision=self.revision.next(),
   )
-  { root: id, revision: self.revision.next(), nodes, }
+  PatternDoc(root=id, revision=self.revision.next(), nodes~)
 }
 
 ///|
@@ -1426,7 +1446,7 @@ pub fn PatternDoc::merge_control(
     MergeControl(left.root, right.root, merge_control),
     revision~,
   )
-  { root: id, revision, nodes, }
+  PatternDoc(root=id, revision~, nodes~)
 }
 
 ///|
@@ -1444,7 +1464,7 @@ pub fn[A] PatternDoc::sequence(
   let children = docs.map(doc => doc.root)
   let revision = aggregate_pattern_revision(docs)
   insert_pattern_node(nodes, id, Sequence(children), revision~)
-  { root: id, revision, nodes, }
+  PatternDoc(root=id, revision~, nodes~)
 }
 
 ///|
@@ -1462,7 +1482,7 @@ pub fn[A] PatternDoc::stack(
   let children = docs.map(doc => doc.root)
   let revision = aggregate_pattern_revision(docs)
   insert_pattern_node(nodes, id, Stack(children), revision~)
-  { root: id, revision, nodes, }
+  PatternDoc(root=id, revision~, nodes~)
 }
 
 ///|
@@ -1474,11 +1494,11 @@ pub fn[A] PatternDoc::reference(
   id~ : @identity.PatternNodeId,
   definition~ : PatternDoc[A],
 ) -> PatternDoc[A] {
-  {
-    root: id,
-    revision: definition.revision,
-    nodes: singleton_pattern_nodes(id, Reference(definition)),
-  }
+  PatternDoc(
+    root=id,
+    revision=definition.revision,
+    nodes=singleton_pattern_nodes(id, Reference(definition)),
+  )
 }
 
 ///|
