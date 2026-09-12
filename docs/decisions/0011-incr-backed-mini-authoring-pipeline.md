@@ -35,9 +35,14 @@ The pipeline contract is:
 - The source text is the only mutable input signal.
 - Parsing is a derived incr memo that calls `parse_doc` for the first parse and
   `parse_doc_reusing` after the first successful `PatternDoc`.
-- Successful parses update the last reusable `PatternDoc`.
-- Parse errors are returned as `Err(String)` and do not replace the last
-  successful reusable document.
+- Parser-local previous-document state is updated only after successful parses
+  and exists solely to preserve stable identity on later valid edits.
+- An accepted derived tracks the parsed candidate and retains the latest
+  successful document. It has no value before the first successful parse.
+- Parse errors remain visible on the current channel and update neither the
+  parser reuse baseline nor the accepted channel.
+- Construction primes the initial candidate before the eager accepted fold so
+  parser-local mutation does not occur inside a reactive compute context.
 - Lowering is a second derived memo over the parsed document and uses one
   persistent `PatternLoweringCache`.
 - A `Scope` owns the long-lived incr cells, and persistent `Observer` handles
@@ -64,8 +69,9 @@ carve-out list explicit and ADR-referenced.
 - The stable-ID/cache-reuse contract is tested without changing the parser.
 - Runtime parser behavior remains separate from the authoring `PatternDoc`
   parser behavior.
-- Parse-error recovery is explicit: a bad edit reports an error, while the next
-  valid edit can still reuse the previous successful document.
+- Parse-error recovery is explicit: a bad edit reports an error on the current
+  channel, the accepted channel retains the last valid document, and the next
+  valid edit can still reuse its identity baseline.
 - The pipeline uses incr's lifecycle model directly (`Scope` plus persistent
   `Observer` anchors), so later authoring UI code has a concrete ownership
   pattern to follow.
@@ -84,8 +90,9 @@ carve-out list explicit and ADR-referenced.
 
 - The pipeline does not reduce parse cost yet; it only reduces downstream
   lowering work when stable IDs survive an edit.
-- The parsed memo closes over mutable `previous` state. That state is part of
-  the contract and must not be updated on parse errors.
+- The parsed memo closes over mutable previous-document state for identity
+  reuse. That state must not be updated on parse errors and must not become a
+  second consumer-facing acceptance policy.
 - Token-aware atom IDs are currently attached inside `MiniAuthoringPipeline`;
   direct `parse_doc` / `parse_doc_reusing` calls keep deterministic structural
   occurrence IDs unless they are routed through a token-aware internal path.

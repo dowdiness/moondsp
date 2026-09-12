@@ -1,23 +1,33 @@
 # Mini authoring `AcceptedDerived` migration
 
-**Status:** Proposed  
+**Status:** Completed (2026-07-08; implementation PR #227; decision ADR-0017)  
 **Date:** 2026-07-07  
 **Campaign parent:** #184 (mini authoring loom promotion)  
 **Depends on:** incr `#233` (diamond fix) — already in incr `0.9.0` (current pin)
+
+## Outcome
+
+PR #227 shipped Case A: the current parse channel remains unchanged, a
+separate accepted channel retains the last valid document, and parser-local
+state remains responsible for stable identity reuse. ADR-0017 records the
+accepted decision. The v0.6.0 changelog includes the resulting behavior.
 
 ---
 
 ## Executive summary
 
-**Recommendation: Case A — minimum invasiveness (`AcceptedDerived` only, hand-written parser stays).**
+**Decision: Case A — minimum invasiveness (`AcceptedDerived` only,
+hand-written authoring parser stays).**
 
-`MiniAuthoringPipeline`'s `mut previous` is two responsibilities coupled. PR1 extracts last-good into `AcceptedDerived`, keeping ID reuse in the hand-written parser. This is ~3 files changed, zero new dependencies, zero parser changes, and passes all existing tests.
-
-**Value thesis: this PR is a rehearsal, not a feature.** No caller is waiting for `accepted_doc()` — the value is proving `AcceptedDerived` wiring on a simple path before #184 Phase 4 (loom authoring swap) depends on it. If loom swap does not use `AcceptedDerived`, this PR is YAGNI and should be reverted.
+The migration extracted last-good retention into `AcceptedDerived` while
+keeping ID reuse in the hand-written authoring parser. It added no dependency
+or parser replacement. Its remaining value is as a rehearsal for #184 Phase 4;
+the retirement conditions below apply if that campaign chooses a different
+acceptance model.
 
 ---
 
-## 1. Current architecture
+## 1. Pre-migration architecture
 
 ```text
 Signal[text] ──┐
@@ -269,13 +279,13 @@ NEW_MOON_MOD=0 moon test --release
 ### PR0 — Design document only (this file)
 
 **Files:** `docs/plans/2026-07-07-mini-authoring-accepted-derived-migration.md`  
-**Status:** Proposed  
+**Status:** Completed  
 
 ### PR1 — `AcceptedDerived` integration (core change)
 
-**Title:** `feat(mini): add AcceptedDerived last-good channel to MiniAuthoringPipeline`  
-**Scope:** `mini/incr_authoring.mbt`, `mini/mini_test.mbt`, `docs/decisions/ADR-0017`  
-**Files changed:** 3-4
+**Merged as:** PR #227,
+`feat(mini): add AcceptedDerived last-good channel to MiniAuthoringPipeline`  
+**Scope shipped:** `mini/incr_authoring.mbt`, `mini/mini_test.mbt`
 
 **Changes:**
 1. Add `priv accepted : @incr.AcceptedDerived[PatternDoc[ControlMap], String]` field to struct
@@ -294,7 +304,7 @@ NEW_MOON_MOD=0 moon test --release
    }
    ```
 4. Add new tests (port from spike + fingerprint collision)
-5. New ADR-0017
+5. Record the decision in ADR-0017 (completed in the documentation closeout)
 
 **Rollback ease:** Trivial — revert one file. All existing behavior unchanged.  
 **Completion criteria:**
@@ -306,13 +316,15 @@ NEW_MOON_MOD=0 moon test --release
 
 ### PR2 — Documentation and CHANGELOG
 
-**Title:** `docs: document AcceptedDerived adoption in mini authoring path`  
-**Files:** `CHANGELOG.md`, ADR-0017 finalization  
+**Status:** Completed
+
+**Outcome:** The v0.6.0 changelog records the accepted channel, and ADR-0017
+records the architectural decision.
 **Rollback ease:** Docs only.
 
 ---
 
-## 8. Risks and open questions
+## 8. Risks and resolved design choices
 
 | Risk | Severity | Mitigation |
 |------|----------|------------|
@@ -321,19 +333,18 @@ NEW_MOON_MOD=0 moon test --release
 | **`accepted_doc()` returns `None` before first successful parse** (not `Err`) | Low | Correct per incr spec. Callers must handle `Option`. |
 | **`BackdateEq` tier requires `PatternDoc : BackdateEq`** — already implemented (line 1259 of `pattern/pattern_doc.mbt`) | None | Already satisfied. |
 
-### Open questions for design owner
+### Resolved design choices
 
-1. **`accepted_doc()` return shape:** `PatternDoc?` (like spike) vs `Result[PatternDoc, NoAcceptError]` vs `PatternDoc` (abort if no accepted). Spike uses `?` (`accepted_or_abort` variant). Recommended: `PatternDoc?` — matches spike, explicit about pre-first-success state.
-
-2. **`accepted_doc()` naming:** `accepted_doc()` mirrors the spike. Could also be `last_good_doc()` or `last_successful_doc()`. The incr vocabulary uses "accepted", so `accepted_doc()` is preferred for consistency.
-
-3. **`accepted_changed_at()` exposure:** Should `MiniAuthorizingPipeline` expose the `AcceptedDerived`'s `accepted_changed_at()` revision timestamp? Defer — only needed if an editor asks "has the accepted doc changed since last check?"
-
-4. **Observer for accepted channel:** `AcceptedDerived` has `watch_accepted`. Should `MiniAuthorizingPipeline` expose this? Probably not — callers who want to observe accepted changes can call `accepted_doc()` periodically. Wire it when an editor integration needs it.
-
-5. **`PatternSnapshot` accepted channel:** Should there be an `accepted_snapshot()` too? No — snapshot lowering is cheap (cache hit after doc reuse), so the perf benefit of skipping it is negligible. The accepted doc is the value boundary.
-
-**0. Does #184 Phase 4 plan to use `AcceptedDerived`?** — Yes means this PR's value thesis holds. No means this PR is unnecessary. Must be answered before launch.
+1. **Return shape:** `PatternDoc?`, making the pre-first-success state explicit.
+2. **Naming:** `accepted_doc()`, matching the incremental runtime vocabulary.
+3. **Revision timestamp:** not exposed; no editor requirement justified it.
+4. **Accepted observer:** not exposed; add observation only for a concrete
+   editor integration.
+5. **Accepted snapshot:** not added; the accepted document is the value
+   boundary and lowering already benefits from cache reuse.
+6. **Campaign dependency:** retained as a rehearsal for #184 Phase 4. The
+   retirement conditions below require removal or redesign if that campaign
+   chooses a different acceptance primitive.
 
 ---
 
@@ -357,24 +368,27 @@ This change's value depends on **#184 Phase 4 (loom authoring swap) using `Accep
 
 ### New ADR-0017
 
-Status: Proposed. Title: "Mini authoring AcceptedDerived adoption." Content:
-- Context: `mut previous` dual responsibility, spike evidence, incr `AcceptedDerived` readiness.
-- Decision: Adopt `AcceptedDerived` (BackdateEq tier) for last-good, keep hand-written parser for ID reuse.
-- Non-goals: Loom authoring swap, error shape changes, snapshot deferred acceptance.
-- Consequences: `accept_doc()` API — additive, no breaking changes. ID reuse remains `mut previous` inside candidate.
-- Revisit when: #184 campaign advances and loom authoring swap is ready.
+Status: Accepted (2026-07-08, PR #227). Title: "Mini authoring
+AcceptedDerived adoption." The decision records the separation between the
+current and accepted channels, keeps parser-local state for identity reuse,
+and leaves the Loom authoring promotion gates unchanged.
 
 ### ADR-0013 status update
 
-Add a note: PR1 does not change ADR-0013 status. The authoring promotion gates (full `PatternDoc` provenance through a production-shaped boundary) remain open. This PR is an incremental improvement on the existing hand-written path, not a loom switch.
+PR #227 does not change ADR-0013's status. The authoring promotion gates
+remain open because this migration improves the existing hand-written
+authoring path rather than switching it to loom.
 
 ### ADR-0011 status
 
-Still reflects the current architecture. Update: note that `AcceptedDerived` now serves the last-good role, but `mut previous` remains for ID reuse.
+ADR-0011 still reflects the current architecture. Its decision text now notes
+that `AcceptedDerived` serves the last-good role while parser-local state
+remains responsible for identity reuse.
 
 ### `docs/next-actions.md`
 
-Add: "PR #184 campaign: Phase 0 — AcceptedDerived integration in MiniAuthoringPipeline."
+No separate entry is needed. Ongoing #184 authoring work remains captured by
+the Phase 6 current-state and deferred-promotion notes.
 
 ---
 
