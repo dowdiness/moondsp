@@ -53,8 +53,10 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
       } else if (data.type === "apply-score" || data.type === "restart-playback") {
         if (this.usesScheduler) this.playback.handle(data);
       } else if (data.type === "set-scheduler-bpm") {
-        if (this.usesScheduler && this.wasm && typeof this.wasm.set_scheduler_bpm === "function") {
-          this.wasm.set_scheduler_bpm(Number(data.bpm));
+        if (this.usesScheduler) {
+          this.playback.setTempo(data);
+        } else {
+          this.port.postMessage({ type: "error", message: "Tempo requires scheduler playback" });
         }
       } else if (data.type === "set-scheduler-gain") {
         if (this.usesScheduler && this.wasm && typeof this.wasm.set_scheduler_gain === "function") {
@@ -254,7 +256,8 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
         typeof this.wasm.init_scheduler_graph === "function" &&
         typeof this.wasm.process_scheduler_block === "function" &&
         typeof this.wasm.scheduler_left_sample === "function" &&
-        typeof this.wasm.scheduler_right_sample === "function";
+        typeof this.wasm.scheduler_right_sample === "function" &&
+        typeof this.wasm.scheduler_bpm === "function";
 
       if (
         !this.usesCompiledHotSwap &&

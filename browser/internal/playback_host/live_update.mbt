@@ -124,6 +124,15 @@ priv enum ApplyPolicy {
 }
 
 ///|
+priv enum RestartReason {
+  PlaybackNotStarted
+  LayoutChanged
+}
+
+///|
+const PLAYBACK_APPLY_RESTART_REQUIRED : Int = 2
+
+///|
 priv struct PendingPlayback {
   playback : PreparedPlayback
   policy : ApplyPolicy
@@ -142,13 +151,13 @@ fn queue_playback(
   state : PlaybackState,
   next : PreparedPlayback,
   policy : ApplyPolicy,
-) -> Result[PlaybackState, String] {
+) -> Result[PlaybackState, RestartReason] {
   match policy {
     Continue =>
       match state.active {
-        None => return Err("start playback before updating")
+        None => return Err(PlaybackNotStarted)
         Some(active) if active.layout != next.layout =>
-          return Err("playback mode or song layout changed; restart required")
+          return Err(LayoutChanged)
         Some(_) => ()
       }
     Restart => ()
@@ -241,12 +250,21 @@ pub fn prepare_song_input() -> Int {
 
 ///|
 /// Successful application consumes the token and queues an atomic operation.
+/// Return 0 when queued, 1 for an invalid/unrepresentable request, or 2 when
+/// starting/restarting is required. A rejected valid token is not consumed.
 pub fn apply_prepared_playback(token : Int, restart : Bool) -> Int {
   match prepared_slot.val {
     Some((id, prepared)) if id == token => {
       let policy = if restart { Restart } else { Continue }
       match queue_playback(playback_state.val, prepared, policy) {
-        Err(message) => set_scheduler_parse_error(message)
+        Err(reason) => {
+          sched_last_error.val = match reason {
+            PlaybackNotStarted => "start playback before updating"
+            LayoutChanged =>
+              "playback mode or song layout changed; restart required"
+          }
+          PLAYBACK_APPLY_RESTART_REQUIRED
+        }
         Ok(next) => {
           // Admission owns the representability check. Until commit, no public
           // host operation advances the clock or adds musical note endpoints.
@@ -362,6 +380,15 @@ fn process_snapshot_routes(
       send_right.set(i, send_right.get(i) + sp.tmp_send_right.get(i))
     }
     accumulate_sub_pool(sp, left, right)
+  }
+}
+
+///|
+/// Current effective BPM across the synchronized scheduler routes.
+pub fn scheduler_bpm() -> Double {
+  match sched_routes.val.get(0) {
+    Some(route) => route.pool.scheduler.bpm()
+    None => 0.0
   }
 }
 

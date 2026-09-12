@@ -98,7 +98,7 @@ test "continuing a song rejects layout changes" {
   render_for_test(4)
   let token = prepare_for_test(test_song(length=9, bpm=120), song=true)
   assert_true(token > 0)
-  assert_eq(apply_prepared_playback(token, false), 1)
+  assert_eq(apply_prepared_playback(token, false), 2)
   assert_position(512)
   assert_tempo(120.0)
 }
@@ -109,7 +109,7 @@ test "reset applies song layout and tempo together at the next block" {
   assert_eq(submit_for_test(test_song(length=8, bpm=120), song=true), 0)
   render_for_test(4)
   let token = prepare_for_test(test_song(length=9, bpm=90), song=true)
-  assert_eq(apply_prepared_playback(token, false), 1)
+  assert_eq(apply_prepared_playback(token, false), 2)
   // Rejection leaves the token available for an explicit reset.
   assert_eq(apply_prepared_playback(token, true), 0)
   assert_position(512)
@@ -124,7 +124,7 @@ test "restart preserves the current global tempo" {
   assert_true(init_scheduler_graph_for_test())
   assert_eq(submit_for_test(test_song(length=8, bpm=90), song=true), 0)
   render_for_test(4)
-  set_scheduler_bpm(100.0)
+  assert_eq(set_scheduler_bpm(100.0), 0)
   assert_eq(restart_playback(), 0)
   render_for_test(1)
   assert_tempo(100.0)
@@ -145,7 +145,7 @@ test "before first application continue and restart fail without cancelling star
   assert_true(init_scheduler_graph_for_test())
   assert_true(restart_playback() != 0)
   let token = prepare_for_test("note(\"60\")")
-  assert_true(apply_prepared_playback(token, false) != 0)
+  assert_eq(apply_prepared_playback(token, false), 2)
   assert_eq(apply_prepared_playback(token, true), 0)
   assert_true(restart_playback() != 0)
   render_for_test(1)
@@ -222,7 +222,7 @@ test "song tempo commits on all routes without restarting or moving the anchor" 
       @pattern.Rational::new(512L * 120L + 128L * 90L, 2880000L),
     )
   }
-  set_scheduler_bpm(0.0)
+  assert_eq(set_scheduler_bpm(0.0), 1)
   assert_tempo(90.0)
   assert_position(640)
 }
@@ -237,7 +237,7 @@ test "a pending pattern entry follows tempo without choosing another entry" {
   for route in sched_routes.val {
     assert_true(route.pool.scheduler.has_pending_playback_snapshot())
   }
-  set_scheduler_bpm(60.0)
+  assert_eq(set_scheduler_bpm(60.0), 0)
   assert_eq(
     sched_routes.val[0].pool.scheduler
     .sample_at(@pattern.Rational::from_int(1))
@@ -285,12 +285,12 @@ test "tempo rejection preserves an accepted request across intervening messages"
     sched_routes.val.any(route => route.pool.scheduler.active_note_count() > 0),
   )
   assert_eq(submit_for_test(original, song=true, restart=false), 0)
-  assert_true(
-    submit_for_test("song(bpm(1000)," + body, song=true, restart=false) != 0,
+  assert_eq(
+    submit_for_test("song(bpm(1000)," + body, song=true, restart=false),
+    1,
   )
-  assert_eq(get_playback_error(), "tempo change exceeds transport range")
   assert_eq(prepare_for_test("song(", song=true), 0)
-  set_scheduler_bpm(0.002)
+  assert_eq(set_scheduler_bpm(0.002), 0)
   assert_tempo(0.002)
   render_for_test(1)
   assert_tempo(0.001)

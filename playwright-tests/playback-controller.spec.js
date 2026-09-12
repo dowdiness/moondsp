@@ -25,6 +25,10 @@ test.beforeEach(async ({ page }) => {
         controller.didRender(128);
       },
       receipts() { return replies.splice(0); },
+      setBpm(bpm) {
+        if (wasm.set_scheduler_bpm(bpm) !== 0) throw new Error('tempo fixture rejected');
+      },
+      setTempo(revision, bpm) { controller.setTempo({ revision, bpm }); },
     };
   });
 });
@@ -70,11 +74,28 @@ test('unrepresentable tempo is rejected without superseding the accepted receipt
   });
   expect(before).toEqual([expect.objectContaining({
     type: 'song-error', phase: 'apply', revision: 3,
-    message: 'tempo change exceeds transport range',
   })]);
   expect(after).toEqual([expect.objectContaining({
-    type: 'song-updated', revision: 2, scoreRevision: 2, acceptedAtSample: 128,
+    type: 'song-updated', revision: 2, scoreRevision: 2, tempo: 0.001, acceptedAtSample: 128,
   })]);
+});
+
+test('song receipt reports explicit tempo and no-bpm song retains global tempo', async ({ page }) => {
+  const { explicit, retained } = await page.evaluate(() => {
+    const p = window.playback;
+    const body = 'section("a",1,note("60")),part("r","a")';
+    p.setBpm(120);
+    p.apply(1, 'restart', 'song(bpm(90),' + body + ')', 'song');
+    p.render();
+    const explicit = p.receipts()[0];
+    p.setBpm(120);
+    p.apply(2, 'continue', 'song(' + body + ')', 'song');
+    p.render();
+    const retained = p.receipts()[0];
+    return { explicit, retained };
+  });
+  expect(explicit).toEqual(expect.objectContaining({ type: 'song-updated', tempo: 90 }));
+  expect(retained).toEqual(expect.objectContaining({ type: 'song-updated', tempo: 120 }));
 });
 
 test('restart supersedes replacements and acknowledges the applied score', async ({ page }) => {
@@ -93,4 +114,19 @@ test('restart supersedes replacements and acknowledges the applied score', async
     { type: 'playback-superseded', revision: 3 },
   ]);
   expect(after).toEqual([expect.objectContaining({ type: 'playback-restarted', revision: 4, scoreRevision: 1, acceptedAtSample: 0, samplePosition: 128 })]);
+});
+
+test('tempo acknowledgement distinguishes accepted rounding from rejection', async ({ page }) => {
+  const { tempo, score } = await page.evaluate(() => {
+    const p = window.playback;
+    p.setTempo(1, 72.12345);
+    const tempo = p.receipts();
+    p.apply(2, 'restart');
+    p.render();
+    return { tempo, score: p.receipts() };
+  });
+  expect(tempo).toEqual([{ type: 'tempo-updated', revision: 1, tempo: 72.123 }]);
+  expect(score).toEqual([expect.objectContaining({
+    type: 'pattern-updated', tempo: 72.123, tempoRevision: 1,
+  })]);
 });

@@ -75,7 +75,7 @@ scheduler pattern/song playback:
   push_playback_char, prepare_pattern_input, prepare_song_input,
   apply_prepared_playback, discard_prepared_playback, restart_playback,
   get_playback_error, get_playback_error_length, get_playback_error_char,
-  set_scheduler_bpm, set_scheduler_gain
+  set_scheduler_bpm, scheduler_bpm, set_scheduler_gain
 
 browser graph-error transport:
   get_browser_last_error, get_browser_error_code, get_browser_error_length,
@@ -130,9 +130,12 @@ browser-error update.
 ## Pattern/song parse protocol
 
 Preparation returns a positive token on success and zero on failure.
-Application and restart return `0` when accepted for the next block and `1`
-when rejected. Acceptance is not an application receipt. Errors update the
-shared playback diagnostic buffer while retaining applied and pending playback.
+Application returns `0` when accepted for the next block, `1` for an invalid
+token or unrepresentable change, and `2` when starting/restarting is required
+because there is no active score or its mode/layout differs. Restart returns
+`0` on acceptance and `1` on rejection. Acceptance is not an application
+receipt. Errors update the shared playback diagnostic buffer while retaining
+applied and pending playback.
 `discard_prepared_playback` returns whether the supplied token was released.
 
 Preparation and application are separate. Fill the shared input buffer and call
@@ -148,8 +151,107 @@ transport and voices; `restart=true` replaces and resets atomically.
 cancels pending replacements. Preparation results are audio-owner objects and
 are not transferable snapshots. Only one prepared token is retained at a time.
 
+`set_scheduler_bpm` returns `0` after changing all routes, or `1` on rejection
+with a playback diagnostic. Rejection preserves the current transport and tempo.
+Range-valid numbers can still be unrepresentable at the current transport
+position; hosts must consume the result rather than assume success.
+`scheduler_bpm` returns the effective BPM rounded to 0.001, or zero before
+scheduler initialization. Do not compare it to the requested double to infer
+success: rounding is part of an accepted change.
+
 See the technical reference's browser playback section for admission rules,
 error preservation, block receipts and the shared worklet protocol.
+
+## Live editor playback ownership
+
+The live editor sends draft edits, mode selection, example selection, tempo
+changes, and Play/Stop intent through `LivePlayback` in
+`web/live/src/playback.ts`. The module owns submission revisions, accepted-score
+deduplication, debounce cancellation, and the decision to reveal audio after a
+successful receipt. `main.ts` renders its `PlaybackView`; it does not handle
+worklet replies or reset playback bookkeeping.
+
+`Tempo` parses manual input once: the complete decimal must be finite and at
+most 1000 BPM, with values below the manual minimum clamped to 1. Incoming
+runtime tempo is decoded separately over its full 0.001–1000 range; a valid
+song tempo below the manual minimum must not be clamped. `ScoreSource` parses
+empty versus nonempty drafts, not score syntax. `RequestId` admits only
+positive safe integers and does not wrap. These values have private constructors.
+
+The BPM field explicitly separates editing text from the committed UI value.
+Enter or blur commits and normalizes it; empty or invalid input restores the
+committed value, with invalid input reported. Same-value receipts preserve
+unfinished text. Correlated tempo acknowledgements supply the runtime's
+effective value, including after rejection or rounding. Score receipts carry
+effective tempo after render and the most recently processed tempo revision;
+an older acknowledgement cannot overwrite a newer tempo commit.
+The field variants are `editing` and `displaying`. Displaying the committed UI
+value does not claim that the runtime has acknowledged it.
+
+Playback acceptance and diagnostic freshness are separate. A successful
+submission can reveal audio even after the draft has changed, but its reply
+must not repaint diagnostics for a different draft. Stop and audio failure
+invalidate outstanding submissions without reusing their revision numbers, so
+late replies cannot reveal a subsequent Play or affect its diagnostics. Retry
+submits the latest draft, including edits made while audio was unavailable.
+
+The playback lifecycle is a closed union: stopped, opening,
+awaiting-acceptance, playing, compiled, closing, or failed. Only scheduler
+states own pending score requests and a scheduler session; playing also owns
+an accepted score. `PlaybackView` is a projection, not another mutable state
+store. Intent methods return named outcomes instead of validate-and-no-op.
+
+`AudioEngine.openSession` returns `OpenSessionResult`: an opened scheduler or
+compiled session, a failure, or busy. An opened session starts muted.
+The adapter owns AudioContext, AudioWorklet, suspension, teardown, and output
+gain; it does not expose nullable-node command methods.
+
+| Session method | Meaning | Completion |
+|---|---|---|
+| `submitScore(request)` | Submit a score to the scheduler worklet | A playback receipt reports acceptance or rejection |
+| `requestTempoChange(tempo, id)` | Request a scheduler tempo change | A tempo receipt reports the result and effective BPM |
+| `fadeIn()` | Schedule an 80ms output fade-in | Does not acknowledge a score or confirm audible output |
+| `close()` | Expire the session, then fade out and suspend its graph | Returns `Promise<CloseSessionResult>`; a healthy graph may be reused |
+
+Only scheduler sessions expose `submitScore` and `requestTempoChange`.
+The first three methods return `SessionCommandResult`: `issued` means the
+command was posted to the worklet or scheduled locally, **not** that the DSP
+accepted or finished it. `session-expired` means nothing was issued because the
+session is no longer active. Obtain a new session with `openSession` after
+closing completes or a fault permits Retry.
+
+Session commands share one ownership check. Once closing begins, every command
+from that session is rejected as `session-expired`, including after a later run
+reuses the healthy graph. `CloseSessionResult` is `closed` or `session-expired`;
+an expired close cannot stop a new run.
+
+Graph health and playback-run freshness are distinct. Graph-bound listeners
+continue handling runtime/protocol failures during closing, suspension, and
+resumption; failures dispose the graph and prevent its reuse. Score/tempo
+receipts are delivered only to an active run. Async close/resume completions
+check their operation identity before changing state, so a failure or immediate
+Retry cannot be overwritten. The resuming state also owns completion of the
+open request: it returns failure even if closing the faulty context leaves the
+browser's native resume promise pending.
+
+`decodeWorkletMessage` is the single live-editor wire decoder. It turns
+`unknown` into complete typed events or an explicit protocol failure, which
+tears down the graph and enables Retry. Rejections require an explicit
+`recovery: "edit" | "restart"` field. The shared worklet controller derives it
+from native admission status before posting the diagnostic; neither the
+controller nor the editor interprets diagnostic wording as a recovery code.
+The controller still owns prepared-token transport and render receipts;
+next-entry timing is unchanged. Tempo commands require a revision and report
+`tempo-updated` or `tempo-error`; score receipts include `tempo` and `tempoRevision`.
+
+Controlled tests cover receipt ordering, retired sessions, and stale tempo
+acknowledgements through the same interface as the editor. Real-browser tests
+cover startup, parse recovery, Play/Stop, Retry, tempo drafts, protocol failure,
+song tempo below the manual minimum, and contextual tempo rejection. The
+real-WASM controller tests also distinguish accepted rounding from rejection.
+`audio-lifecycle.spec.ts` exercises real Web Audio close/resume operations with
+injected failure notifications, including failure during Stop, failure while
+suspended/resuming, immediate Retry, and obsolete capability commands.
 
 ## Browser graph-error protocol
 

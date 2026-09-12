@@ -1410,6 +1410,10 @@ Embedded tempo edits preserve musical position. Resetting application accepts mo
 changes and atomically replaces all route snapshots, resets their clocks and
 kills old voices before querying any route. Failed application preserves active
 and pending playback and leaves the token available for retry or discard.
+The application result is `0` for acceptance, `1` for an invalid token or
+unrepresentable change, and `2` when starting/restarting is required (no active
+score, or a changed mode/layout). Admission classifies these reasons before
+formatting a diagnostic; hosts must not infer recovery from diagnostic wording.
 
 `restart_playback` queues the applied snapshot at the beginning, without parsing
 or consulting the input/prepared slots. It cancels a pending replacement, keeps
@@ -1425,13 +1429,31 @@ Both browser worklets accept `apply-score` with mode, text, revision and an
 explicit `continue` or `restart` policy; `restart-playback` carries only a request
 revision. They share one controller. Replaced requests receive
 `playback-superseded`. Success receipts are emitted after the first block renders
-and contain request/score revisions, `acceptedAtSample` (the start of that block)
-and `samplePosition` (the next block). Errors preserve the pending receipt and
-identify their `phase`: `prepare`, `apply`, `restart`, or `protocol`.
+and contain request/score revisions, `acceptedAtSample` (the start of that block),
+`samplePosition` (the next block), and the effective `tempo` after that render.
+`scheduler_bpm()` reads the accepted scheduler tempo, rounded to 0.001 BPM
+(zero before scheduler initialization). Deferred song tempo changes are read
+after commitment, never inferred from source text by the host.
+Errors preserve the pending receipt and identify their `phase`: `prepare`,
+`apply`, `restart`, or `protocol`. Rejections also carry `recovery: "edit"` or
+`"restart"`, derived from the native admission result rather than message text.
 The normal UI offers **Play / Stop**. Continuing edit receipts acknowledge the
 authored score, not simultaneous audible replacement: individual materials
 change at their next source-cycle entry. The UI reports that the edit is queued.
 Old eval/parse-and-set/update APIs and their messages are removed, not wrapped.
+
+`set_scheduler_bpm(bpm)` now returns `0` on success and `1` on rejection,
+including an uninitialized scheduler. It retains the existing all-route
+preflight: invalid or unrepresentable tempo changes leave playback unchanged
+and populate the playback diagnostic. A successful request may be rounded to
+the runtime's 0.001-BPM precision; that is not a rejection.
+The worklet command `set-scheduler-bpm` requires a positive safe-integer
+`revision`. Its `tempo-updated` or `tempo-error` reply carries that revision
+and the effective `tempo`; a rejection also carries `message`.
+Score receipts carry `tempoRevision`, the most recently processed tempo-command
+revision, or `null` before any such command. This prevents a delayed score
+receipt from overwriting a newer tempo edit while still reflecting song tempo
+changes committed after a tempo command.
 
 The playback host imports dependency-free identity types for snapshot IDs.
 Preparation/routing decisions use explicit route selectors; mutable prepared and

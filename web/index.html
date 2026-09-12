@@ -966,6 +966,17 @@
               statusEl.classList.remove("pattern-status-err");
               statusEl.classList.add("pattern-status-ok");
             }
+          } else if (event.data?.type === "tempo-updated" || event.data?.type === "tempo-error") {
+            if (event.data.revision === tempoRevision) {
+              document.getElementById('bpmValue').textContent = String(event.data.tempo);
+              document.getElementById('bpmSlider').value = String(event.data.tempo);
+              if (event.data.type === "tempo-error") {
+                const statusEl = document.getElementById('patternStatus');
+                statusEl.textContent = event.data.message;
+                statusEl.classList.remove("pattern-status-ok");
+                statusEl.classList.add("pattern-status-err");
+              }
+            }
           } else if (event.data?.type === "pattern-error") {
             const statusEl = document.getElementById('patternStatus');
             if (statusEl) {
@@ -1087,10 +1098,12 @@
       }
     }
 
+    let tempoRevision = 0;
+
     function setSchedulerBpm(bpm) {
       document.getElementById('bpmValue').textContent = bpm;
       if (node) {
-        node.port.postMessage({ type: 'set-scheduler-bpm', bpm: Number(bpm) });
+        node.port.postMessage({ type: 'set-scheduler-bpm', bpm: Number(bpm), revision: ++tempoRevision });
       }
     }
 

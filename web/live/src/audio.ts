@@ -1,31 +1,13 @@
-// AudioContext + AudioWorklet bootstrap for moondsp's live REPL.
-//
-// Wraps the browser worklet protocol:
-//   apply-score prepares and applies with an explicit continue/restart policy.
-//   restart-playback restarts the applied snapshot without parsing text.
-//   reply { type: "pattern-updated" } | { type: "pattern-error", message }
-//       | { type: "song-updated" }    | { type: "song-error", message }
-//
-// Does NOT own playback-string state — main.ts decides which explicit mode
-// to send and how to handle replies. This module is the transport boundary only.
+// Audio resource owner. Opening produces a capability tied to one playback run;
+// score/tempo operations do not exist on a stopped engine or compiled session.
+import { decodeWorkletMessage } from "./playback-protocol";
+import type { PlaybackMode, PlaybackReceipt, ScoreRequest, RequestId, TempoReceipt } from "./playback-protocol";
+import type { Tempo } from "./tempo";
 
 export type AudioStatus =
-  | { kind: "idle" }
-  | { kind: "starting" }
-  | { kind: "stopping" }
-  | { kind: "running" }
-  | { kind: "error"; message: string };
-
-export type WorkletReply =
-  | { type: "pattern-updated"; revision?: number; operation?: "update" | "restart"; samplePosition?: number; acceptedAtSample?: number }
-  | { type: "pattern-error"; message: string; revision?: number }
-  | { type: "song-updated"; revision?: number; operation?: "update" | "restart"; samplePosition?: number; acceptedAtSample?: number }
-  | { type: "song-error"; message: string; revision?: number }
-  | { type: "error"; message: string; code?: number }
-  | { type: string; [key: string]: unknown };
-
+  | { kind: "idle" } | { kind: "starting" } | { kind: "stopping" }
+  | { kind: "running" } | { kind: "error"; message: string };
 export type AudioEngineMode = "scheduler" | "compiled";
-
 export type AudioEngineOptions = {
   enableTelemetry?: boolean;
   enableSchedulerTiming?: boolean;
@@ -35,344 +17,285 @@ export type AudioEngineOptions = {
   mode?: AudioEngineMode;
 };
 
-const LEGACY_PROCESSOR_NAME = "moonbit-dsp";
-const SCHEDULER_PROCESSOR_URL = "/scheduler-processor.js";
-const SCHEDULER_PROCESSOR_NAME = "moondsp-scheduler";
+export type AudioEvent =
+  | { kind: "receipt"; receipt: PlaybackReceipt }
+  | { kind: "tempo"; receipt: TempoReceipt }
+  | { kind: "failed"; message: string };
+export type CloseSessionResult = { kind: "closed" } | { kind: "session-expired" };
+/** Issued means posted to the worklet or scheduled locally, not accepted by DSP.
+ * A session-expired command has no effect; obtain a new session to issue it. */
+export type SessionCommandResult = "issued" | "session-expired";
+
+type SessionControls = Readonly<{
+  /** Schedule an 80ms output fade-in; this does not confirm score acceptance. */
+  fadeIn(): SessionCommandResult;
+  /** Expire this session immediately, then fade out and suspend its audio graph. */
+  close(): Promise<CloseSessionResult>;
+}>;
+export type SchedulerSession = SessionControls & Readonly<{
+  kind: "scheduler";
+  /** Submit a score; a playback receipt reports acceptance or rejection. */
+  submitScore(request: ScoreRequest): SessionCommandResult;
+  /** Request a tempo change; a tempo receipt reports the effective BPM. */
+  requestTempoChange(tempo: Tempo, id: RequestId): SessionCommandResult;
+}>;
+export type CompiledSession = SessionControls & Readonly<{ kind: "compiled" }>;
+export type AudioSession = SchedulerSession | CompiledSession;
+export type OpenSessionResult =
+  | { kind: "opened"; session: AudioSession }
+  | { kind: "failed"; message: string }
+  | { kind: "busy" };
+
+type Graph = Readonly<{
+  ctx: AudioContext;
+  node: AudioWorkletNode;
+  gain: GainNode;
+}>;
+type GraphRun = Readonly<{
+  run: symbol;
+  graph: Graph;
+  deliver: (event: AudioEvent) => void;
+}>;
+type SessionCommand = "fade-in"
+  | Readonly<{ type: "apply-score"; mode: PlaybackMode; text: string;
+      policy: "continue" | "restart"; revision: number }>
+  | Readonly<{ type: "set-scheduler-bpm"; bpm: number; revision: number }>;
+type EngineState =
+  | { kind: "idle" }
+  | { kind: "suspended"; graph: Graph }
+  | { kind: "opening"; run: symbol }
+  | (GraphRun & { kind: "active" | "closing" })
+  | (GraphRun & { kind: "resuming"; interrupted: (message: string) => void })
+  | { kind: "failed"; message: string };
 
 export class AudioEngine {
-  private ctx: AudioContext | null = null;
-  private node: AudioWorkletNode | null = null;
-  private masterGain: GainNode | null = null;
-  private currentMode: AudioEngineMode | null = null;
-  private replyHandlers: ((r: WorkletReply) => void)[] = [];
-  private statusHandlers: ((s: AudioStatus) => void)[] = [];
-  private status: AudioStatus = { kind: "idle" };
-
-  /** Exposed for diagnostics. */
-  readonly _wasmModule?: WebAssembly.Module;
+  private state: EngineState = { kind: "idle" };
+  readonly mode: AudioEngineMode;
 
   constructor(
     private readonly processorUrl = "/processor.js",
     private readonly wasmUrl = "/moonbit_dsp.wasm",
     private readonly options: AudioEngineOptions = {},
-  ) {}
+  ) {
+    this.mode = options.mode ?? "scheduler";
+  }
 
   getStatus(): AudioStatus {
-    return this.status;
+    switch (this.state.kind) {
+      case "idle": case "suspended": return { kind: "idle" };
+      case "opening": case "resuming": return { kind: "starting" };
+      case "active": return { kind: "running" };
+      case "closing": return { kind: "stopping" };
+      case "failed": return { kind: "error", message: this.state.message };
+    }
   }
 
-  onReply(handler: (r: WorkletReply) => void): () => void {
-    this.replyHandlers.push(handler);
-    return () => {
-      this.replyHandlers = this.replyHandlers.filter((h) => h !== handler);
-    };
-  }
-
-  onStatus(handler: (s: AudioStatus) => void): () => void {
-    this.statusHandlers.push(handler);
-    handler(this.status);
-    return () => {
-      this.statusHandlers = this.statusHandlers.filter((h) => h !== handler);
-    };
-  }
-
-  private setStatus(s: AudioStatus): void {
-    this.status = s;
-    for (const h of this.statusHandlers) h(s);
-  }
-
-  /** Must be called from a user gesture handler (click, keypress). */
-  async start(): Promise<void> {
-    if (this.status.kind === "running" || this.status.kind === "starting") return;
-    this.setStatus({ kind: "starting" });
-
+  /** Open a muted session, creating or resuming a healthy graph.
+   * Call from a user gesture so AudioContext.resume retains activation. */
+  async openSession(deliver: (event: AudioEvent) => void): Promise<OpenSessionResult> {
+    const previous = this.state;
+    switch (previous.kind) {
+      case "opening": case "resuming": case "active": case "closing": return { kind: "busy" };
+      case "idle": case "suspended": case "failed": break;
+    }
+    const run = Symbol("audio run");
+    if (previous.kind === "suspended" && previous.graph.ctx.state !== "closed") {
+      return this.resume(previous.graph, run, deliver);
+    }
+    const opening = { kind: "opening" as const, run };
+    this.state = opening;
+    let graph: Graph;
     try {
-      const mode = this.options.mode ?? "scheduler";
-      if (this.canResumeExistingGraph(mode)) {
-        this.setMasterGainImmediate(0);
-        await this.ctx!.resume();
-        console.info(`[moondsp/live] audioMode=${mode}; resumed existing AudioContext`);
-        this.setStatus({ kind: "running" });
-        return;
+      if (previous.kind === "suspended") this.dispose(previous.graph);
+      graph = await this.createGraph();
+      // These handlers follow the graph's lifetime, not a playback run.
+      graph.node.port.onmessage = event => { this.dispatch(event.data, graph); };
+      graph.node.onprocessorerror = () => {
+        this.dispatch({ type: "error", message: "AudioWorklet processor failed" }, graph);
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (this.state === opening) {
+        this.state = { kind: "failed", message };
       }
+      return { kind: "failed", message };
+    }
+    return this.activate(graph, run, deliver);
+  }
 
-      this.currentMode = mode;
-      await this.openContext();
-
-      switch (mode) {
-        case "scheduler":
-          await this.startSchedulerWorklet();
-          break;
-        case "compiled":
-          await this.startLegacyCompiledWorklet();
-          break;
+  private resume(graph: Graph, run: symbol, deliver: (event: AudioEvent) => void): Promise<OpenSessionResult> {
+    return new Promise(resolve => {
+      // Closing a context can leave its native resume promise pending. The
+      // graph owner therefore settles this operation directly on a fault.
+      const resuming = { kind: "resuming" as const, graph, run, deliver,
+        interrupted: (message: string) => resolve({ kind: "failed", message }) };
+      this.state = resuming;
+      const failed = (error: unknown) => {
+        if (this.state === resuming) {
+          this.fail(resuming, error instanceof Error ? error.message : String(error));
+        }
+      };
+      try {
+        this.ramp(graph, 0, 0);
+        void graph.ctx.resume().then(() => {
+          if (this.state === resuming) resolve(this.activate(graph, run, deliver));
+        }, failed);
+      } catch (error) {
+        failed(error);
       }
-
-      this.setStatus({ kind: "running" });
-    } catch (err) {
-      // Tear down any partial graph (ctx/node may have been created above)
-      // before transitioning to error so a Retry click rebuilds cleanly.
-      this.teardownGraph();
-      const message = err instanceof Error ? err.message : String(err);
-      this.setStatus({ kind: "error", message });
-      throw err;
-    }
-  }
-
-  private canResumeExistingGraph(mode: AudioEngineMode): boolean {
-    if (!this.ctx || this.ctx.state === "closed" || this.currentMode !== mode) {
-      return false;
-    }
-    return this.node !== null;
-  }
-
-  private async openContext(): Promise<AudioContext> {
-    // Assign to instance field before async work so teardownGraph() can close
-    // partially-created contexts if resume/addModule/wasm compile fails.
-    const contextOptions: AudioContextOptions = {};
-    if (typeof this.options.sampleRate === "number") {
-      contextOptions.sampleRate = this.options.sampleRate;
-    }
-    if (this.options.latencyHint !== undefined) {
-      contextOptions.latencyHint = this.options.latencyHint;
-    }
-
-    const ctx = new AudioContext(contextOptions);
-    this.ctx = ctx;
-    this.masterGain = new GainNode(ctx, { gain: 0 });
-    this.masterGain.connect(ctx.destination);
-    console.info("[moondsp/live] AudioContext", {
-      requestedSampleRate: this.options.sampleRate ?? "device-default",
-      actualSampleRate: ctx.sampleRate,
-      latencyHint: this.options.latencyHint ?? "browser-default",
-      baseLatency: ctx.baseLatency,
-      outputLatency: ctx.outputLatency,
     });
-    await ctx.resume();
-    return ctx;
   }
 
-  private requireContext(): AudioContext {
-    if (!this.ctx) {
-      throw new Error("AudioContext not initialized");
-    }
-    return this.ctx;
+  private activate(graph: Graph, run: symbol, deliver: (event: AudioEvent) => void): OpenSessionResult {
+    this.state = { kind: "active", run, graph, deliver };
+    graph.node.port.postMessage(this.mode === "scheduler"
+      ? { type: "set-scheduler-gain", gain: 0.6 }
+      : { type: "set-gain", value: 0.6 });
+    const controls: SessionControls = {
+      fadeIn: () => this.command(run, "fade-in"),
+      close: () => this.close(run),
+    };
+    const session: AudioSession = this.mode === "scheduler" ? {
+      ...controls, kind: "scheduler",
+      submitScore: ({ id, score, policy }) => this.command(run, {
+        type: "apply-score", mode: score.mode, text: score.text, policy, revision: id.value,
+      }),
+      requestTempoChange: (tempo, id) => this.command(run, {
+        type: "set-scheduler-bpm", bpm: tempo.value, revision: id.value,
+      }),
+    } : { ...controls, kind: "compiled" };
+    return { kind: "opened", session };
   }
 
-  private async startSchedulerWorklet(): Promise<void> {
-    const wasmModule = await this.compileWasmModule();
-    const node = await this.createReadyWorkletNode({
-      moduleUrl: SCHEDULER_PROCESSOR_URL,
-      processorName: SCHEDULER_PROCESSOR_NAME,
-      readyLabel: "scheduler worklet",
-      options: {
-        numberOfInputs: 0,
-        numberOfOutputs: 1,
-        outputChannelCount: [2],
-        processorOptions: { wasmModule },
-      },
-    });
-    this.node = node;
-    console.info("[moondsp/live] audioMode=scheduler; dedicated scheduler processor");
-  }
-
-  private async startLegacyCompiledWorklet(): Promise<void> {
-    const wasmModule = await this.compileWasmModule();
-    const node = await this.createReadyWorkletNode({
-      moduleUrl: this.processorUrl,
-      processorName: LEGACY_PROCESSOR_NAME,
-      readyLabel: "worklet",
-      options: {
-        numberOfInputs: 0,
-        numberOfOutputs: 1,
-        outputChannelCount: [2],
-        processorOptions: {
-          wasmModule,
-          useScheduler: false,
-          useProbeSine: false,
+  private async createGraph(): Promise<Graph> {
+    const ctx = new AudioContext({ sampleRate: this.options.sampleRate, latencyHint: this.options.latencyHint });
+    let node: AudioWorkletNode | undefined;
+    let gain: GainNode | undefined;
+    try {
+      gain = new GainNode(ctx, { gain: 0 });
+      gain.connect(ctx.destination);
+      await ctx.resume();
+      const response = await fetch(this.wasmUrl);
+      if (!response.ok) throw new Error(`fetch ${this.wasmUrl}: ${response.status}`);
+      const wasmModule = await WebAssembly.compile(await response.arrayBuffer());
+      const scheduler = this.mode === "scheduler";
+      await ctx.audioWorklet.addModule(scheduler ? "/scheduler-processor.js" : this.processorUrl);
+      node = new AudioWorkletNode(ctx, scheduler ? "moondsp-scheduler" : "moonbit-dsp", {
+        numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2],
+        processorOptions: scheduler ? { wasmModule } : {
+          wasmModule, useScheduler: false, useProbeSine: false,
           enableTelemetry: this.options.enableTelemetry === true,
           enableSchedulerTiming: this.options.enableSchedulerTiming === true,
           schedulerTimingBatchSize: this.options.schedulerTimingBatchSize ?? 128,
         },
-      },
-    });
-    this.node = node;
-  }
-
-  private async compileWasmModule(): Promise<WebAssembly.Module> {
-    const wasmResponse = await fetch(this.wasmUrl);
-    if (!wasmResponse.ok) {
-      throw new Error(`fetch ${this.wasmUrl}: ${wasmResponse.status}`);
+      });
+      const ready = this.waitForReady(node);
+      node.connect(gain);
+      await ready;
+      return { ctx, node, gain };
+    } catch (error) {
+      if (node) { node.port.onmessage = null; node.onprocessorerror = null; node.disconnect(); }
+      gain?.disconnect();
+      if (ctx.state !== "closed") void ctx.close().catch(error => console.warn("Audio close failed", error));
+      throw error;
     }
-    const wasmBytes = await wasmResponse.arrayBuffer();
-    return WebAssembly.compile(wasmBytes);
   }
 
-  private async createReadyWorkletNode(args: {
-    moduleUrl: string;
-    processorName: string;
-    readyLabel: string;
-    options: AudioWorkletNodeOptions;
-  }): Promise<AudioWorkletNode> {
-    const ctx = this.requireContext();
-    await ctx.audioWorklet.addModule(args.moduleUrl);
-    const node = new AudioWorkletNode(ctx, args.processorName, args.options);
-    const ready = this.waitForWorkletReady(node, args.readyLabel);
-    node.connect(this.outputDestination());
-    await ready;
-    return node;
-  }
-
-  private outputDestination(): AudioNode {
-    if (!this.masterGain) {
-      throw new Error("Audio output gain not initialized");
-    }
-    return this.masterGain;
-  }
-
-  private waitForWorkletReady(node: AudioWorkletNode, label: string): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      const timeoutId = window.setTimeout(() => {
-        reject(new Error(`${label} ready timeout (5s)`));
-      }, 5000);
-
-      node.port.onmessage = (event) => {
-        const data = event.data as WorkletReply;
-        if (!data || typeof data !== "object") return;
-        if (data.type === "ready") {
-          window.clearTimeout(timeoutId);
-          node.port.onmessage = (e) => this.dispatchReply(e.data as WorkletReply);
-          resolve();
-          return;
+  private waitForReady(node: AudioWorkletNode): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const fail = (message: string) => {
+        window.clearTimeout(timeout);
+        reject(new Error(message));
+      };
+      const timeout = window.setTimeout(() => fail("AudioWorklet ready timeout (5s)"), 5000);
+      node.onprocessorerror = () => fail("AudioWorklet processor failed during startup");
+      node.port.onmessage = event => {
+        const message = decodeWorkletMessage(event.data);
+        switch (message.kind) {
+          case "ready": window.clearTimeout(timeout); resolve(); break;
+          case "runtime-error": case "protocol-error": fail(message.message); break;
+          case "notice": console.debug("[moondsp/live]", message.data); break;
+          case "receipt": case "tempo": fail("Playback receipt arrived before worklet readiness"); break;
         }
-        if (data.type === "error") {
-          window.clearTimeout(timeoutId);
-          reject(new Error(String(data.message ?? `${label} error`)));
-          return;
-        }
-        this.dispatchReply(data);
       };
     });
   }
 
-  private dispatchReply(data: WorkletReply): void {
-    if (!data || typeof data !== "object") return;
-    for (const h of this.replyHandlers) h(data);
-    if (data.type === "error") {
-      // Tear down the live audio graph so a Retry click rebuilds a fresh
-      // context. Without this we'd leak the old AudioContext and stack a
-      // second one on top of it.
-      this.teardownGraph();
-      this.setStatus({ kind: "error", message: String(data.message ?? "worklet error") });
+  private dispatch(raw: unknown, graph: Graph): "delivered" | "notice" | "obsolete-session" {
+    const state = this.state;
+    if (!("graph" in state) || state.graph !== graph) return "obsolete-session";
+    const message = decodeWorkletMessage(raw);
+    switch (message.kind) {
+      case "receipt": case "tempo":
+        if (state.kind !== "active") return "obsolete-session";
+        state.deliver(message);
+        return "delivered";
+      case "notice": console.debug("[moondsp/live]", message.data); return "notice";
+      case "ready":
+        this.fail(state, "Worklet announced readiness twice");
+        return "delivered";
+      case "protocol-error": case "runtime-error":
+        this.fail(state, message.message);
+        return "delivered";
     }
-    if (data.type === "debug" || data.type === "scheduler-timing") {
-      console.debug("[moondsp/live]", data);
-    }
   }
 
-  /**
-   * Test-only: inject a synthetic worklet reply through the dispatch
-   * pipeline. Used by smoke tests to exercise the runtime-error path
-   * without crashing the actual wasm graph. Do not call from app code.
-   */
-  _testInjectReply(reply: WorkletReply): void {
-    this.dispatchReply(reply);
+  private fail(state: Extract<EngineState, { graph: Graph }>, message: string): void {
+    this.dispose(state.graph);
+    this.state = { kind: "failed", message };
+    if (state.kind === "resuming") state.interrupted(message);
+    if (state.kind !== "suspended") state.deliver({ kind: "failed", message });
   }
 
-  fadeIn(durationMs = 80): void {
-    this.rampMasterGain(1, durationMs);
+  /** Test injection crosses the same unknown-message decoder as MessagePort. */
+  _testInjectReply(raw: unknown): "delivered" | "notice" | "obsolete-session" {
+    return "graph" in this.state ? this.dispatch(raw, this.state.graph) : "obsolete-session";
   }
 
-  private async fadeOut(durationMs = 60): Promise<void> {
-    this.rampMasterGain(0, durationMs);
-    await this.sleep(durationMs);
+  /** One authority check for every command issued by a session capability. */
+  private command(run: symbol, command: SessionCommand): SessionCommandResult {
+    const state = this.state;
+    if (state.kind !== "active" || state.run !== run) return "session-expired";
+    if (command === "fade-in") this.ramp(state.graph, 1, 80);
+    else state.graph.node.port.postMessage(command);
+    return "issued";
   }
 
-  private rampMasterGain(value: number, durationMs: number): void {
-    if (!this.ctx || !this.masterGain) return;
-    const now = this.ctx.currentTime;
-    const gain = this.masterGain.gain;
+  private ramp(graph: Graph, value: number, durationMs: number): void {
+    const now = graph.ctx.currentTime;
+    const gain = graph.gain.gain;
     gain.cancelScheduledValues(now);
     gain.setValueAtTime(gain.value, now);
     gain.linearRampToValueAtTime(value, now + durationMs / 1000);
   }
 
-  private setMasterGainImmediate(value: number): void {
-    if (!this.ctx || !this.masterGain) return;
-    const now = this.ctx.currentTime;
-    const gain = this.masterGain.gain;
-    gain.cancelScheduledValues(now);
-    gain.setValueAtTime(value, now);
-  }
-
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => window.setTimeout(resolve, ms));
-  }
-
-  private disconnectOutputNodes(): void {
-    if (this.node) {
-      try {
-        this.node.disconnect();
-      } catch {
-        /* already disconnected */
-      }
-      this.node = null;
+  private async close(run: symbol): Promise<CloseSessionResult> {
+    const active = this.state;
+    if (active.kind !== "active" || active.run !== run) return { kind: "session-expired" };
+    const closing = { ...active, kind: "closing" as const };
+    const graph = active.graph;
+    this.state = closing;
+    try {
+      this.ramp(graph, 0, 60);
+      await new Promise<void>(resolve => window.setTimeout(resolve, 60));
+      if (this.state !== closing) return { kind: "session-expired" };
+      await graph.ctx.suspend();
+    } catch {
+      if (this.state !== closing) return { kind: "session-expired" };
+      this.dispose(graph);
+      this.state = { kind: "idle" };
+      return { kind: "closed" };
     }
-    if (this.masterGain) {
-      try {
-        this.masterGain.disconnect();
-      } catch {
-        /* already disconnected */
-      }
-      this.masterGain = null;
-    }
+    if (this.state !== closing) return { kind: "session-expired" };
+    this.state = { kind: "suspended", graph };
+    return { kind: "closed" };
   }
 
-  private teardownGraph(): void {
-    this.disconnectOutputNodes();
-    if (this.ctx) {
-      // Fire-and-forget; close() returns a Promise but we don't need to await
-      // it for the host to begin a fresh start().
-      void this.ctx.close().catch(() => undefined);
-      this.ctx = null;
-    }
-    this.currentMode = null;
-  }
-
-  applyScore(mode: "pattern" | "song", text: string, policy: "continue" | "restart", revision: number): void {
-    if (!this.node || !this.usesSchedulerProtocol()) return;
-    this.node.port.postMessage({ type: "apply-score", mode, text, policy, revision });
-  }
-
-  setBpm(bpm: number): void {
-    if (!this.node || !this.usesSchedulerProtocol()) return;
-    this.node.port.postMessage({ type: "set-scheduler-bpm", bpm });
-  }
-
-  private usesSchedulerProtocol(): boolean {
-    return this.currentMode === "scheduler";
-  }
-
-  setGain(gain: number): void {
-    if (!this.node) return;
-    if (this.usesSchedulerProtocol()) {
-      this.node.port.postMessage({ type: "set-scheduler-gain", gain });
-    } else {
-      this.node.port.postMessage({ type: "set-gain", value: gain });
-    }
-  }
-
-  async stop(): Promise<void> {
-    this.setStatus({ kind: "stopping" });
-    if (this.ctx && this.ctx.state !== "closed") {
-      try {
-        await this.fadeOut();
-        await this.ctx.suspend();
-      } catch {
-        // If suspend is unavailable or fails, fall back to full teardown.
-        this.teardownGraph();
-      }
-    }
-    this.setStatus({ kind: "idle" });
+  private dispose(graph: Graph): void {
+    graph.node.port.onmessage = null;
+    graph.node.onprocessorerror = null;
+    graph.node.disconnect();
+    graph.gain.disconnect();
+    if (graph.ctx.state !== "closed") void graph.ctx.close().catch(error => console.warn("Audio close failed", error));
   }
 }

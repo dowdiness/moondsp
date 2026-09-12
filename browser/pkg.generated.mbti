@@ -94,6 +94,8 @@ pub fn reset_phase() -> Unit
 
 pub fn restart_playback() -> Int
 
+pub fn scheduler_bpm() -> Double
+
 pub fn scheduler_left_sample(Int) -> Double
 
 pub fn scheduler_right_sample(Int) -> Double
@@ -110,7 +112,7 @@ pub fn set_exit_deliverable_gain(Double) -> Bool
 
 pub fn set_exit_deliverable_lfo_rate(Double) -> Bool
 
-pub fn set_scheduler_bpm(Double) -> Unit
+pub fn set_scheduler_bpm(Double) -> Int
 
 pub fn set_scheduler_gain(Double) -> Unit
 

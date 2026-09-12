@@ -53,6 +53,8 @@ pub fn prepare_song_input() -> Int {
 }
 
 ///|
+/// Return 0 when queued, 1 for an invalid/unrepresentable request, or 2 when
+/// starting/restarting is required. A rejected valid token is not consumed.
 pub fn apply_prepared_playback(token : Int, restart : Bool) -> Int {
   @playback_host.apply_prepared_playback(token, restart)
 }
@@ -83,13 +85,19 @@ pub fn get_playback_error_char(i : Int) -> Int {
 }
 
 ///|
-pub fn set_scheduler_bpm(bpm : Double) -> Unit {
+/// Return 0 after an accepted tempo change, or 1 with a playback diagnostic.
+pub fn set_scheduler_bpm(bpm : Double) -> Int {
   @playback_host.set_scheduler_bpm(bpm)
 }
 
 ///|
 pub fn set_scheduler_gain(gain : Double) -> Unit {
   @playback_host.set_scheduler_gain(gain)
+}
+
+///|
+pub fn scheduler_bpm() -> Double {
+  @playback_host.scheduler_bpm()
 }
 
 ///|

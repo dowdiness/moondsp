@@ -463,17 +463,16 @@ pub fn get_playback_error_char(i : Int) -> Int {
 }
 
 ///|
-pub fn set_scheduler_bpm(bpm : Double) -> Unit {
+pub fn set_scheduler_bpm(bpm : Double) -> Int {
+  guard sched_routes.val is [_, ..] else {
+    return set_scheduler_parse_error("scheduler is not initialized")
+  }
   for route in sched_routes.val {
     match route.pool.scheduler.validate_bpm(bpm) {
-      Err(_) => {
-        ignore(
-          set_scheduler_parse_error(
-            "tempo must be 0.001..1000 BPM and representable",
-          ),
+      Err(_) =>
+        return set_scheduler_parse_error(
+          "tempo must be 0.001..1000 BPM and representable",
         )
-        return
-      }
       Ok(_) => ()
     }
   }
@@ -481,6 +480,7 @@ pub fn set_scheduler_bpm(bpm : Double) -> Unit {
     // Same audio-owner turn as preflight; no route can advance in between.
     route.pool.scheduler.set_bpm(bpm).unwrap()
   }
+  SCHEDULER_PARSE_STATUS_OK
 }
 
 ///|
