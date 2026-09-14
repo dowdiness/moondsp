@@ -59,6 +59,14 @@ source ancestry still reflects the authored grouping. Quoted `+` remains part
 of the notation, for example `chord("C+7")`. Ordinary newlines alone do not
 combine expressions.
 
+In the live app's **Examples** panel, select an example and press **Play**:
+
+- [Overlay groove](../examples/overlay-groove.mini) layers drums, bass, and
+  stereo melodies with `+`; a parenthesized `.slow(2)` affects both melodies.
+- [Grouping A/B](../examples/overlay-grouping.mini) plays `kick + hats.fast(2)`
+  followed by `(kick + hats).fast(2)`: hear only the hats speed up, then both
+  layers. The two sections last 20 seconds in total at BPM 96.
+
 ## Inside quoted notation
 
 Within `s("...")`, `note("...")`, and `chord("...")`:

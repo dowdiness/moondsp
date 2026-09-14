@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added live Examples for an overlay groove and a 20-second grouping comparison,
+  demonstrating `+` layers and parenthesized transforms with playable Mini scores.
 - Added a host-independent MoonBit `GraphEngine` with typed `MountedGraph`
   capabilities, checked errors, independent engine instances, and mono mixing.
   It consumes canonical `Array[DspNode]` values through the existing compiler.
