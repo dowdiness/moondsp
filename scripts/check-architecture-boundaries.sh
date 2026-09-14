@@ -101,7 +101,7 @@ check_manifest() {
 # architecture plus the facade exceptions documented in ADR-0001 and ADR-0015.
 check_manifest \
   "moon.pkg" \
-  '^(dowdiness/moondsp/(dsp|graph|identity|voice))$' \
+  '^(dowdiness/moondsp/(dsp|graph|identity|voice|engine))$' \
   '^(dowdiness/moondsp/(mini|pattern))$'
 check_manifest "dsp/moon.pkg" '^$'
 check_manifest "identity/moon.pkg" '^$'
@@ -110,6 +110,8 @@ check_manifest "song/moon.pkg" '^(dowdiness/moondsp/(identity|pattern))$'
 check_manifest "mini/moon.pkg" '^(dowdiness/moondsp/(identity|pattern|song))$'
 check_manifest "graph/moon.pkg" '^(dowdiness/moondsp/(dsp|identity|graph/internal/(model|template|binding|runtime|staging|authoring)))$'
 check_manifest "voice/moon.pkg" '^(dowdiness/moondsp/(dsp|graph))$'
+# Host-independent lifecycle; see technical reference section 3.5.4.
+check_manifest "engine/moon.pkg" '^(dowdiness/moondsp/(dsp|graph))$'
 check_manifest "scheduler/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(identity|pattern|song|scheduler/internal/(model|transport|playback|voice_runtime|edit_policy)))$'
 check_manifest "browser/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(scheduler|browser/internal/(slot|demo_templates|playback_host)))$'
 check_manifest "browser_test/moon.pkg" '^(dowdiness/moondsp)$'
