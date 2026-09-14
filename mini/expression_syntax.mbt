@@ -201,7 +201,7 @@ fn Parser::parse_transform(self : Parser) -> MiniTransform raise ParseError {
       let value_end = self.pos
       self.skip_whitespace()
       self.expect_char(')')
-      guard !value.is_nan() && !value.is_inf() else {
+      guard !value.is_nan() && !value.is_inf() && value >= 0.0 && value <= 1.0 else {
         raise ParseError(
           "position \{method_start}: gate() expects a fraction between 0 and 1",
         )

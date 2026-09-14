@@ -83,6 +83,7 @@ test "gate rejects fractions outside zero through one" {
   for
     source in [
       "note(\"C4\").gate(-0.01)", "note(\"C4\").gate(1.01)", "note(\"C4\").gate(1.000000000000000001)",
+      "note(\"C4\").gate(18446744073709551616)",
     ] {
     match @mini.parse(source) {
       Ok(_) => abort("expected invalid gate fraction to fail")
