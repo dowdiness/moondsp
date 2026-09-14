@@ -1,6 +1,6 @@
 # moondsp — MoonBit DSP Audio Engine
 
-`moondsp` is a MoonBit DSP audio engine library in the Salat Engine project.
+`moondsp` is a live-codable, portable DSP audio and pattern engine written in MoonBit.
 
 The browser audio path is complete: AudioWorklet proof, DSP primitives, compiled
 graph runtime with hot-swap and stereo, voice pool with priority stealing,
@@ -45,7 +45,7 @@ from DAW-ready.
 - **Audio constants:** 48000 Hz sample rate, 128 samples per buffer
 - **Graph boundary types:** `Array[DspNode]` is the authoring exchange type; `CompiledTemplate` is the runtime exchange type. One canonical crossing: `CompiledTemplate::analyze`. See ADR-0010 for the contract and `scripts/check-public-boundary.sh` for enforcement.
 
-**Source of truth:** `docs/salat-engine-technical-reference.md` is authoritative for graph runtime-control behavior. Update it first whenever these change.
+**Source of truth:** `docs/technical-reference.md` is authoritative for graph runtime-control behavior. Update it first whenever these change.
 
 ## Native ABI and CLAP Policy
 
@@ -109,7 +109,7 @@ Browse `docs/` for architecture, decisions, development guides, and performance 
 
 - Architecture docs = principles only, never reference specific types/fields/lines
 - Code is the source of truth — if a doc and the code disagree, the doc is wrong
-- `docs/salat-engine-technical-reference.md` is authoritative for graph runtime-control
+- `docs/technical-reference.md` is authoritative for graph runtime-control
 - `docs/archive/` = completed work. Do not search here unless asked for historical context.
 
 ## Package Map

@@ -9,7 +9,7 @@ The `dowdiness/moondsp/browser` package has two reviewed public surfaces:
 
 Use this guide when writing host code or reviewing browser API PRs. Keep
 architecture rationale in ADRs, and keep graph runtime-control behavior in
-[`salat-engine-technical-reference.md`](salat-engine-technical-reference.md).
+[`technical-reference.md`](technical-reference.md).
 
 ## Contract summary
 
@@ -39,7 +39,7 @@ The implementation is MoonBit-first: `engine/` owns `GraphEngine`,
 Native MoonBit callers use `engine.mount(Array[DspNode])`, handle methods,
 and `engine.process(AudioBuffer)` directly. See the checked example in
 [`README.mbt.md`](../README.mbt.md) and the authoritative
-[engine contract](salat-engine-technical-reference.md#354-host-independent-graph-engine).
+[engine contract](technical-reference.md#354-host-independent-graph-engine).
 JavaScript manages browser resources and asynchronous transport, not DSP
 state or compilation.
 

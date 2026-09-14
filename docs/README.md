@@ -1,125 +1,46 @@
-# moondsp documentation
+# moondsp Documentation
 
-This directory holds architecture, reference, performance, and design material
-for `dowdiness/moondsp`. Read order below goes roughly from "new user" to
-"contributor" to "historical".
+This directory contains architecture blueprints, technical references, integration contracts, performance benchmarks, and design records for `dowdiness/moondsp`.
 
-## Start here
+---
 
-- **[`../README.md`](../README.md)** — package landing page: quick start, what
-  the library does, repository layout, project status.
-- **[`../CLAUDE.md`](../CLAUDE.md)** — one-page project map and MoonBit/workflow
-  conventions. Useful before editing code.
+## 1. Guides & Language (Authoring & Live Coding)
 
-## Concepts & architecture
+- **[`mini-notation.md`](mini-notation.md)** — Concise pattern syntax: quoted notation, sub-groups, Euclidean rhythms (`bd(3,8)`), polyphonic layers (`$:`), and method chains (`.fast()`, `.jux()`).
+- **[`pattern-algebra.md`](pattern-algebra.md)** — Rational-time pattern engine design: queryable arcs, events, combinators, and value mapping.
+- **[`mini-graph-authoring-boundary.md`](mini-graph-authoring-boundary.md)** — Boundary contract for bridging mini-notation events into DSP graph templates without mixing layers.
 
-- **[`salat-engine-blueprint.md`](salat-engine-blueprint.md)** — full
-  architecture vision, design principles, and multi-phase roadmap. Describes
-  both what is implemented and what is planned — treat phase labels in the
-  blueprint as the roadmap view, and the root README's project-status table as
-  the authoritative current-state view.
+---
 
-## Reference (current behavior)
+## 2. Target Profiles (Platform Integration)
 
-- **[`salat-engine-technical-reference.md`](salat-engine-technical-reference.md)**
-  — **authoritative** for graph runtime-control behavior: node types,
-  parameter slots, control-binding surface, topology editing, hot-swap. If
-  code and any other doc disagree, this document and the code take priority.
-- **[`browser-api-contract.md`](browser-api-contract.md)** — supported browser
-  facade and AudioWorklet export ABI, including semver and ABI-guard review
-  rules.
-- **[`clap-plugin-plan.md`](clap-plugin-plan.md)** — native CLAP bring-up plan
-  and current `clap_engine/` host-facing engine slice.
-- **[`mini-notation.md`](mini-notation.md)** — current text-pattern syntax,
-  including Strudel-style `$:` stack lines, quoted notation, postfixes, and
-  method chains.
-- **[`pattern-algebra.md`](pattern-algebra.md)** — design note for `Pat`
-  overlay/stack, value mapping, and Applicative-like candidates. Read this
-  before adding pattern combinator APIs or mini overlay sugar.
-- **[`mini-graph-authoring-boundary.md`](mini-graph-authoring-boundary.md)** —
-  contract for bridging Mini `ControlMap` events into graph-template selection
-  and validated runtime controls without mixing pattern and topology layers.
-- **[`external-dsl-lowering.md`](external-dsl-lowering.md)** — contract for
-  external editors/DSLs that lower validated authoring graphs into
-  `Array[DspNode]`, analyze them into `CompiledTemplate`, and compile or
-  hot-swap on the control side.
-- **[`editor-audio-preview-handoff.md`](editor-audio-preview-handoff.md)** —
-  editor-visible preview state machine and ownership contract for staging graph
-  topology replacements and parameter-only control edits.
-- **[`next-actions.md`](next-actions.md)** — active handoff list for future
-  sessions. Keep this short and update it when priorities change.
-- **[`development/graph-facade-model-parity.md`](development/graph-facade-model-parity.md)**
-  — contributor guardrails for keeping the public graph facade mirrored with
-  `graph/internal/model` without exposing the internal package as a supported
-  import path.
-- **[`performance/`](performance/)** — dated benchmark snapshots. New
-  measurements go in new files (do not edit historical entries in place).
-  Latest:
-  [`performance/2026-07-19-runtime-control-constant-fold-barriers.md`](performance/2026-07-19-runtime-control-constant-fold-barriers.md)
-  measures retained runtime-control barriers, including an isolated
-  folded-versus-retained comparison.
+`moondsp` is platform-agnostic. Core audio and pattern computation are strictly decoupled from host platform drivers:
 
-## Reviews
+- 🌐 **Browser Target**: **[`browser-api-contract.md`](browser-api-contract.md)** — Web AudioWorklet export ABI (`wasm-gc`), JS/TS bindings, and browser integration review rules.
+- 🎛️ **Native DAW Target**: **[`clap-plugin-guide.md`](clap-plugin-guide.md)** — Native CLAP plugin architecture, C ABI bridge (`clap_host`), Linux/Windows builds, and zero-allocation audit.
+- 🖥️ **Host-Independent MoonBit Target**: Direct programmatic API via `GraphEngine` (see [Root README](../README.md#host-independent-moonbit-api)).
 
-Point-in-time analyses. Each review is dated and should be moved to
-`archive/` once its recommendations have shipped or been rejected, rather
-than edited in place.
+---
 
-Currently empty; completed reviews live under [`archive/`](archive/).
+## 3. Core Architecture & Specifications
 
-## Decisions
+- **[`technical-reference.md`](technical-reference.md)** — **Authoritative** reference for graph runtime-control behavior: node types, parameter slots, topological compiler, and zero-allocation execution. If code and any other doc disagree, this document and the code take precedence.
+- **[`blueprint.md`](blueprint.md)** — Complete architectural vision, design principles, and multi-target roadmap.
+- **[`decisions/`](decisions/README.md)** — Architecture Decision Records (ADRs 0001 through 0017) capturing *why* key architectural choices were made.
+- **[`external-dsl-lowering.md`](external-dsl-lowering.md)** — Contract for external editors and DSLs lowering graphs into `Array[DspNode]` and `CompiledTemplate`.
+- **[`editor-audio-preview-handoff.md`](editor-audio-preview-handoff.md)** — State machine and ownership contract for live graph staging and parameter preview.
 
-- **[`decisions/`](decisions/)** — Architecture Decision Records. Short,
-  durable summaries of *why* the codebase looks the way it does. Read these
-  before re-litigating a settled architectural choice; the source plan/spec
-  for each decision lives under `superpowers/{plans,specs}/archive/`.
+---
 
-## Contributor design docs
+## 4. Evidences & Contributor Resources
 
-Per-feature design briefs and task-level plans. "Current" is what has not
-shipped yet; once a feature is merged its design/plan is moved under
-`archive/` and should not be read as a description of live behavior.
+- **[`performance/`](performance/)** — Dated real-time audio benchmark snapshots and allocation audits.
+- **[`development/`](development/README.md)** — Hardware probes, zero-allocation audits, DAW compatibility records, and boundary inventories.
+- **[`next-actions.md`](next-actions.md)** — Active handoff list for upcoming priorities.
+- **[`../CLAUDE.md`](../CLAUDE.md)** — Project conventions and contributor quick reference.
 
-For the durable architectural rationale behind shipped work, prefer the
-ADRs under [`decisions/`](decisions/) — those distill *why* the codebase
-looks the way it does, and link back to the specific archived plan/spec
-for full context.
+---
 
-- **[`superpowers/specs/`](superpowers/specs/)** — design specs for
-  in-flight work. Current:
-  [`2026-05-12-phase6-incremental-playback-design.md`](superpowers/specs/2026-05-12-phase6-incremental-playback-design.md).
-  Shipped specs live under `archive/`.
-- **[`superpowers/plans/`](superpowers/plans/)** — implementation plans
-  for in-flight work. Currently empty; shipped plans live under `archive/`.
-- `superpowers/specs/archive/` and `superpowers/plans/archive/` — shipped
-  features. Historical context only. The `.jux(f)` stereo-split spec and
-  implementation plan shipped and now live there.
+## Historical Archive
 
-## Exploratory / vision (not implemented)
-
-These direction documents describe possible futures. They may diverge from
-current code.
-
-- **[`control-aware-partial-evaluation.md`](control-aware-partial-evaluation.md)**
-  — possible future separation of authoring control identity, control
-  dependencies, and optimized sample execution; includes evidence gates and
-  invariants for revisiting retained runtime-control barriers.
-- **[`dsp-structural-editor-vision.md`](dsp-structural-editor-vision.md)** —
-  text-shaped authoring experience for `moondsp` (draft).
-- **[`dsp-structural-editor-architecture.md`](dsp-structural-editor-architecture.md)**
-  — architectural sketch for the same.
-
-## Historical
-
-Do not read files in this section unless user explicitly asks for historical
-context. These documents describe past work and will not match current code.
-
-- [`archive/`](archive/) — shipped phase design briefs, the early audit, the
-  original bootstrap instructions, and the Phase 0/1/2 status log:
-  - `archive/api-design-review-2026-04-21.md` — public-API design review
-    whose prioritized recommendations have shipped.
-  - `archive/audit-2026-04-02.md` — deep technical audit snapshot.
-  - `archive/phase1-*-long-stretch.md` — Phase 1 DSP-primitive design briefs.
-  - `archive/phase2-*-design-brief.md` — Phase 2 stereo-graph design briefs.
-  - `archive/step0-instruction.md` — original bootstrap instructions.
-  - `archive/RESULTS.md` — early Phase 0/1/2 status log.
+Historical design briefs, bootstrap instructions, and completed phase logs live under **[`archive/`](archive/)**. Do not search or modify archived files unless historical context is explicitly requested.

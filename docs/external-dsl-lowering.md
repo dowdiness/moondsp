@@ -50,7 +50,7 @@ It should satisfy these invariants:
   `CompiledDsp`, or one `StereoOutput` for terminal-stereo
   `CompiledStereoDsp`.
 - Numeric parameters should satisfy the domains in
-  `docs/salat-engine-technical-reference.md` (finite frequencies/gains, valid
+  `docs/technical-reference.md` (finite frequencies/gains, valid
   filter cutoffs, valid delay lengths and feedback, positive clip thresholds,
   and so on). If they do not, `compile_result` returns a typed
   `GraphCompileError`.
