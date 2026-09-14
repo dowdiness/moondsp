@@ -10,8 +10,11 @@ export default defineConfig({
     baseURL: "http://127.0.0.1:5181",
     browserName: "chromium",
     headless: true,
-    // AudioWorklet + cross-origin isolation: not strictly needed for the
-    // smoke pass (no SharedArrayBuffer), but harmless if added.
+    // Virtual output keeps real AudioWorklet/WASM rendering without a device.
+    // Opt in for automation; leave unset for hardware/listening checks.
+    launchOptions: {
+      args: process.env.MOONDSP_VIRTUAL_AUDIO === "1" ? ["--disable-audio-output"] : [],
+    },
   },
   webServer: {
     // `vite preview` serves the production build deterministically.

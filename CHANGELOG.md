@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Documented the dedicated live scheduler and compiled/demo worklet roles,
+  asset synchronization, and separate automated-rendering/listening workflows.
+  Live Playwright tests can opt into Chromium virtual audio output with
+  `MOONDSP_VIRTUAL_AUDIO=1`; default device selection and runtime ABI are unchanged.
 - Updated `dowdiness/incr` from `0.9.0` to `0.15.1`, migrated
   `MiniAuthoringPipeline` from `Signal` / `Memo` / `Observer` to
   `Input` / `Derived` / `Watch`, and retained lazy snapshot lowering,

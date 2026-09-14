@@ -280,6 +280,123 @@ return the message as UTF-16 code units, and out-of-range indices return `0`.
 `get_browser_last_error()` remains a string-returning facade/worklet export for
 compatibility; direct string crossing is not the canonical JS/wasm-gc transport.
 
+## Worklet selection and ownership
+
+| Entry point | Worklet module / registered processor | Purpose |
+|---|---|---|
+| Live editor, default or `?audioMode=scheduler` | `web/scheduler-processor.js` / `moondsp-scheduler` | Pattern/song playback |
+| Live editor, `?audioMode=compiled` | `web/processor.js` / `moonbit-dsp` | Compiled demo graph; editor score updates are not submitted |
+| Demos and probe modes implemented in `processor.js` | `web/processor.js` / `moonbit-dsp` | Graph controls, hot swaps, topology edits, and optional scheduler/probe modes selected through processor options |
+| Dedicated scheduler probes (`playwright-tests/scheduler-probe.spec.js`) | `web/scheduler-probe-processor.js` / `moondsp-scheduler-probe` | Isolated scheduler-path rendering probes |
+| Dedicated crackle probes (`playwright-tests/crackle-probe.spec.js`) | `web/crackle-probe-processor.js` / `moondsp-crackle-probe` | Isolated crackle-investigation rendering probes |
+
+The live page selects compiled mode only for the exact `audioMode=compiled`
+value; other values use scheduler mode. Its compiled session passes
+`useScheduler: false` and `useProbeSine: false`. Do not infer the registered
+processor's mode from its filename alone: `processor.js` also retains a
+scheduler path selected through `useScheduler` and available WASM exports.
+
+The dedicated probe tests load their own modules into `OfflineAudioContext`;
+they do not select a live-editor mode. These two probe modules are separate
+from the three JS assets copied into the live app (`playback-controller.js`,
+`processor.js`, and `scheduler-processor.js`). Running the live suite does not
+run these dedicated probe suites.
+
+Message responsibilities:
+
+- Both scheduler paths use `PlaybackController` in `web/playback-controller.js`
+  for `apply-score`, `restart-playback`, and revisioned `set-scheduler-bpm`.
+  It owns prepared-token submission, supersession, effective-tempo replies, and
+  score receipts after rendering. See the playback protocol above for fields.
+- Each worklet owns WASM initialization, graph initialization, sample copying,
+  readiness and runtime errors. The dedicated scheduler queues initial restart
+  and tempo requests until its first render initializes the graph. `ready`
+  announces WASM readiness, not completion of an initial score render.
+- `set-scheduler-gain` is handled by the worklets, not the shared controller.
+- `processor.js` additionally handles demo controls such as `set-freq`,
+  `set-gain`, `set-pan`, `set-delay-samples`, `set-cutoff`, and graph queue
+  messages. These are not the dedicated live scheduler's protocol.
+
+Keep demo/probe behavior out of the dedicated scheduler. This division does not
+require removing the existing scheduler mode from the demo worklet or duplicating
+the shared playback protocol.
+
+## Building and verifying the actual worklet assets
+
+Run the following from the repository root. Install live dependencies once per
+checkout with `npm ci --prefix web/live`.
+
+| Changed source | Preparation before testing |
+|---|---|
+| Live TypeScript, HTML, or CSS | `npm --prefix web/live run build` |
+| Worklet JS or shared playback controller | `npm --prefix web/live run build` |
+| MoonBit code or WASM export manifest | Build WASM and copy it first, then build the live app as below |
+
+```bash
+NEW_MOON_MOD=0 moon build browser --target wasm-gc --release
+./playwright-sync-wasm.sh
+npm --prefix web/live run build
+```
+
+The artifact chain is:
+`_build/wasm-gc/release/build/browser/browser.wasm`
+→ `web/moonbit_dsp.wasm`
+→ `web/live/public/moonbit_dsp.wasm`
+→ `web/live/dist/moonbit_dsp.wasm`.
+`playwright-sync-wasm.sh` performs the first copy.
+The live `prebuild`/`predev` hook runs `scripts/sync-assets.mjs`, copying the
+WASM and all three worklet/controller JS modules from `web/` into `public/`.
+Vite's production build copies those public assets into `dist/`.
+
+`sync:assets` does not compile MoonBit, and `preview` does not rebuild anything.
+Missing assets currently produce sync warnings rather than a failing exit;
+read the output and do not treat an old public/dist copy as a successful build.
+When using an already-running dev server after a worklet/WASM edit, rerun
+`npm --prefix web/live run sync:assets` and reload the page to create a fresh
+worklet. For production-preview verification, stop an older preview server
+on port 5181 before testing, so Playwright cannot reuse a different checkout.
+
+### Automated rendering without an audio device
+
+```bash
+MOONDSP_VIRTUAL_AUDIO=1 npm --prefix web/live test -- --retries=0
+```
+
+The live Playwright configuration adds Chromium's `--disable-audio-output`
+only when `MOONDSP_VIRTUAL_AUDIO=1`. Chromium supplies virtual output timing;
+AudioContext, AudioWorklet, and WASM processing remain real. This avoids
+depending on an OS audio sink, including a stalled WSLg/RDP output path.
+It is not a mock of playback messages or DSP.
+
+This suite covers UI behavior, score/tempo acceptance and rejection, Stop/Retry,
+and expired-session commands. A focused iteration can use:
+
+```bash
+MOONDSP_VIRTUAL_AUDIO=1 npm --prefix web/live test -- tests/audio-lifecycle.spec.ts tests/bpm.spec.ts --retries=0
+```
+
+After facade/export changes, also run `scripts/check-browser-abi.sh` and the
+MoonBit checks/tests; virtual output does not replace the ABI guard.
+
+### Physical output and listening
+
+```bash
+npm --prefix web/live run dev -- --host 127.0.0.1
+```
+
+Open the printed URL in a normal browser connected to the intended output
+device. Use the default URL for live scheduler playback and
+`?audioMode=compiled` for the compiled demo. The environment switch above
+affects only Playwright, not the application or the dev server.
+
+Check sound onset, sustained playback, edits, Stop and Play again. Listen for
+clicks, gaps, and distortion. Record browser/version, OS, output device,
+selected mode, score, and any sample-rate/latency URL overrides. Report these
+observations separately from automated test results: virtual-output success
+does not prove physical sound quality or behavior in other browsers.
+Likewise, an AudioContext whose clock stalls even without moondsp is output
+environment evidence, not by itself evidence of a DSP regression.
+
 ## Source facade versus worklet exports
 
 The MoonBit source facade and the worklet export ABI are reviewed together, but
