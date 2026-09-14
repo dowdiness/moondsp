@@ -51,7 +51,7 @@ in the browser bundle.
 <p class="cheat-note">Envelopes apply to notes and chords. Each time is in seconds, from 0 to 86400.</p>
 <p><code>note("E4")<br>&nbsp;&nbsp;.attack(0.01).hold(0.1)<br>&nbsp;&nbsp;.release(0.2)</code></p>
 <p class="cheat-note">0.31 seconds total, independent of tempo. Omit hold to follow the pattern's note length. Omitted attack/release use the sound's defaults; release starts from the current level.</p>
-<p class="cheat-note"><code>.gate(0.4)</code> keeps every onset in place but shortens each note to 40% of its step, leaving the rest silent. The gate follows tempo. Factors finer than one billionth are rounded to keep long-running timelines representable. An explicit <code>.hold(s)</code> instead uses physical seconds and overrides the event-derived ending.</p>
+<p class="cheat-note"><code>.gate(0.4)</code> keeps every onset in place but shortens each note to 40% of its step, leaving the rest silent. <code>.gate(0)</code> is silent; <code>.gate(1)</code> keeps the full step. The gate follows tempo. Factors finer than one billionth are rounded to keep long-running timelines representable. An explicit <code>.hold(s)</code> instead uses physical seconds and overrides the event-derived ending.</p>
 <p class="cheat-note">Room is one shared stereo space for every part. Its tail continues across note endings, section changes, and live edits; Stop remains immediate.</p>
 <p class="cheat-note"><strong>Browser limitation:</strong> <code>.gain(n)</code> and <code>.cutoff(hz)</code> are parsed as control values, but the current browser instruments do not connect them to volume or filter controls. They do not change the sound here.</p>
 
@@ -76,6 +76,8 @@ in the browser bundle.
   <dt>a?</dt><dd>50% chance to drop</dd>
   <dt>a(3,8)</dt><dd>3 hits across 8 steps; a(3,8,1) adds rotation</dd>
 </dl>
+<p><code>$: s("bd ~ sd ~")<br>$: note("C3 ~ Eb3 ~").gate(0.35)</code></p>
+<p class="cheat-note">Each <code>~</code> occupies the same share of the cycle as a sounding atom. Gate shortens only the sounding part; neither feature moves the following onset. Hear both in <strong>Space in the groove</strong>.</p>
 
 <h2>Combine patterns</h2>
 <dl>

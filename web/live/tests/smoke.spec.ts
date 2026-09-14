@@ -208,7 +208,7 @@ test.describe("UI smoke (no audio)", () => {
     await expect(tooltip).not.toContainText("degradeBy");
   });
 
-  test("one syntax reference exposes envelopes, layering, and song structure", async ({ page }) => {
+  test("one syntax reference exposes rests, gates, envelopes, layering, and songs", async ({ page }) => {
     await page.getByText("Syntax reference", { exact: true }).click();
     const reference = page.locator("#syntax-reference");
     await expect(reference.locator("dt").filter({ hasText: /^\.attack\(s\)$/ })).toBeVisible();
@@ -218,6 +218,9 @@ test.describe("UI smoke (no audio)", () => {
     await expect(reference.locator("dt").filter({ hasText: /^\.gate\(n\)$/ })).toBeVisible();
     await expect(reference.locator("dt").filter({ hasText: /^~$/ })).toBeVisible();
     await expect(reference.locator("dt")).toContainText(["$: a", 'section("a", n, p)', "bpm(n)"]);
+    await expect(
+      reference.locator("code").filter({ hasText: 'note("C3 ~ Eb3 ~").gate(0.35)' }),
+    ).toBeVisible();
   });
 
   test("cheatsheet includes a song-mode example", async ({ page }) => {
