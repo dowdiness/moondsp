@@ -18,6 +18,7 @@ pub suberror GraphEngineError {
   InvalidHandle
   InvalidGraph(@graph.GraphCompileError)
   BufferSizeMismatch(expected~ : Int, actual~ : Int)
+  ControlRejected(@graph.GraphControlError)
 } derive(@debug.Debug)
 
 // Types and methods
@@ -32,6 +33,7 @@ pub fn GraphEngine::process(Self, @dsp.AudioBuffer) -> Unit raise GraphEngineErr
 pub struct MountedGraph {
   // private fields
 }
+pub fn MountedGraph::apply_controls(Self, Array[@graph.GraphControl]) -> Unit raise GraphEngineError
 pub fn MountedGraph::pause(Self) -> Unit raise GraphEngineError
 pub fn MountedGraph::play(Self) -> Unit raise GraphEngineError
 pub fn MountedGraph::unmount(Self) -> Unit raise GraphEngineError

@@ -11,6 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added live Examples for an overlay groove and a 20-second grouping comparison,
   demonstrating `+` layers and parenthesized transforms with playable Mini scores.
+- Added `examples/basic-synth`, a standalone TypeScript/Vite consumer with a
+  monophonic C4–C5 keyboard, volume and low-pass cutoff controls, release tails,
+  explicit audio start/disposal, and asset-error recovery. It imports only the
+  public browser package and does not implement its own Worklet. Its compact
+  piano layout distinguishes active and held notes, shows the active pitch,
+  labels power/start/stop states, and exposes bounded left/right navigation
+  alongside touch scrolling and desktop keycaps. Public audio API calls remain
+  in `main.ts`, separate from transport presentation and keyboard interaction,
+  with a source-reading guide in the example README.
+- Added `npm run pack:browser` to build a local `@moondsp/browser` tarball
+  containing matching JS, TypeScript declarations, Worklet, Wasm, and license.
+  Consumers can build and deploy the example without a MoonBit toolchain.
+- Added transactional `MountedGraph::apply_controls` and browser
+  `applyControls`, plus ADSR, biquad, and multiply browser node descriptions.
+  Invalid batches reject without partial mutation; gate-off releases an
+  envelope without pausing its graph.
 - Added a host-independent MoonBit `GraphEngine` with typed `MountedGraph`
   capabilities, checked errors, independent engine instances, and mono mixing.
   It consumes canonical `Array[DspNode]` values through the existing compiler.

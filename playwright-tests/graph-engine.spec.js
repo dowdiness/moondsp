@@ -72,6 +72,97 @@ test('invalid graphs return reasons without damaging a mounted graph', async ({ 
   expect(result.residual).toBeLessThan(1e-6);
 });
 
+test('external controls apply atomically and gate release keeps the graph playable', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const { GraphEngine } = await import('/graph-engine.js')
+    const context = new OfflineAudioContext(1, 4096, 48000);
+    const engine = await GraphEngine({ context });
+    const source = await engine.mount({ nodes: [
+      { type: 'oscillator', waveform: 'sine', frequency: 440 },
+      { type: 'biquad', input: 0, mode: 'lowpass', cutoff: 2000, q: 0.7 },
+      { type: 'adsr', attackMs: 0, decayMs: 0, sustain: 1, releaseMs: 1 },
+      { type: 'mul', input0: 1, input1: 2 },
+      { type: 'gain', input: 3, gain: 0.2 },
+      { type: 'output', input: 4 },
+    ] });
+    let rejected;
+    try {
+      await source.applyControls([
+        { type: 'setParam', node: 4, slot: 'value0', value: 0.4 },
+        { type: 'setParam', node: 4, slot: 'delaySamples', value: 1 },
+      ]);
+    } catch (error) {
+      rejected = { code: error.code, nodeIndex: error.nodeIndex };
+    }
+    let decodedRejection;
+    try {
+      await source.applyControls([
+        { type: 'setParam', node: 0, slot: 'value0', value: 880 },
+        { type: 'setParam', node: 4, slot: 'unknown', value: 0.4 },
+      ]);
+    } catch (error) {
+      decodedRejection = { code: error.code, nodeIndex: error.nodeIndex };
+    }
+    await source.applyControls([{ type: 'gateOn', node: 2 }]);
+    engine.output.connect(context.destination);
+    await source.play();
+    const suspended = context.suspend(2048 / 48000);
+    const rendering = context.startRendering();
+    await suspended;
+    await source.applyControls([{ type: 'gateOff', node: 2 }]);
+    await context.resume();
+    const buffer = await rendering;
+    let beforeReleasePeak = 0;
+    let afterReleasePeak = 0;
+    for (let i = 0; i < buffer.length; i++) {
+      const sample = Math.abs(buffer.getChannelData(0)[i]);
+      if (i < 2048) beforeReleasePeak = Math.max(beforeReleasePeak, sample);
+      if (i >= 3072) afterReleasePeak = Math.max(afterReleasePeak, sample);
+    }
+    await engine.close();
+    return { rejected, decodedRejection, beforeReleasePeak, afterReleasePeak };
+  });
+  expect(result.rejected.code).toBe('INVALID_CONTROL');
+  expect(result.rejected.nodeIndex).toBe(4);
+  expect(result.decodedRejection).toEqual({ code: 'INVALID_CONTROL', nodeIndex: 4 });
+  // The rejected batch did not partially change the gain from 0.2 to 0.4.
+  expect(result.beforeReleasePeak).toBeGreaterThan(0.08);
+  expect(result.beforeReleasePeak).toBeLessThan(0.3);
+  expect(result.afterReleasePeak).toBeLessThan(0.03);
+});
+
+test('controls reject after unmount and engine close without reviving a graph', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const { GraphEngine } = await import('/graph-engine.js')
+    const context = new OfflineAudioContext(1, 128, 48000);
+    const engine = await GraphEngine({ context });
+    const graph = { nodes: [
+      { type: 'oscillator', waveform: 'triangle', frequency: 440 },
+      { type: 'output', input: 0 },
+    ] };
+    const retired = await engine.mount(graph);
+    await retired.unmount();
+    let afterUnmount;
+    try {
+      await retired.applyControls([{ type: 'gateOn', node: 0 }]);
+    } catch (error) {
+      afterUnmount = error.code;
+    }
+    const replacement = await engine.mount(graph);
+    await replacement.play();
+    const closing = engine.close();
+    let afterClose;
+    try {
+      await replacement.applyControls([{ type: 'setParam', node: 0, slot: 'value0', value: 1 }]);
+    } catch (error) {
+      afterClose = error.code;
+    }
+    await closing;
+    return { afterUnmount, afterClose };
+  });
+  expect(result).toEqual({ afterUnmount: 'INVALID_HANDLE', afterClose: 'ENGINE_CLOSED' });
+});
+
 test('unmounting one playing graph preserves the other graph and its phase', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const { GraphEngine } = await import('/graph-engine.js')

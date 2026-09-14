@@ -1,0 +1,23 @@
+{
+  "name": "@moondsp/browser",
+  "version": "0.6.0",
+  "description": "MoonBit DSP graphs for browser AudioWorklets, with prebuilt WebAssembly and TypeScript declarations",
+  "type": "module",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dowdiness/moondsp.git",
+    "directory": "packages/browser"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/graph-engine.d.ts",
+      "import": "./dist/graph-engine.js"
+    }
+  },
+  "types": "./dist/graph-engine.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "prepack": "node ../../scripts/build-browser-package.mjs"
+  }
+}

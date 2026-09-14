@@ -21,12 +21,52 @@ export interface OutputNode {
 }
 
 /** Authoring data, not a Web Audio AudioNode or a compiled DSP node. */
-export type GraphNode = OscillatorNode | GainNode | OutputNode;
+export interface AdsrNode {
+  readonly type: 'adsr';
+  readonly attackMs: number;
+  readonly decayMs: number;
+  readonly sustain: number;
+  readonly releaseMs: number;
+}
+
+export type BiquadMode = 'lowpass' | 'highpass' | 'bandpass';
+
+export interface BiquadNode {
+  readonly type: 'biquad';
+  /** Index of the input node in GraphDescription.nodes. */
+  readonly input: number;
+  readonly mode: BiquadMode;
+  readonly cutoff: number;
+  readonly q: number;
+}
+
+export interface MulNode {
+  readonly type: 'mul';
+  /** Index of the first input node in GraphDescription.nodes. */
+  readonly input0: number;
+  /** Index of the second input node in GraphDescription.nodes. */
+  readonly input1: number;
+}
+
+/** Authoring data, not a Web Audio AudioNode or a compiled DSP node. */
+export type GraphNode = OscillatorNode | AdsrNode | BiquadNode | MulNode | GainNode | OutputNode;
 
 /** Reusable description. Bounds, finite values and graph topology are checked at runtime. */
 export interface GraphDescription {
   readonly nodes: readonly GraphNode[];
 }
+
+export type GraphControl =
+  | {
+      readonly type: 'setParam';
+      readonly node: number;
+      readonly slot: 'value0' | 'value1' | 'value2' | 'value3' | 'delaySamples';
+      readonly value: number;
+    }
+  | {
+      readonly type: 'gateOn' | 'gateOff';
+      readonly node: number;
+    };
 
 /** A paused, independent graph returned by GraphEngine.mount; not a constructor. */
 export interface MountedGraph {
@@ -34,6 +74,8 @@ export interface MountedGraph {
   readonly play: () => Promise<void>;
   /** Freeze processing and oscillator phase. */
   readonly pause: () => Promise<void>;
+  /** Apply a non-empty, atomically validated batch at a render boundary. */
+  readonly applyControls: (controls: readonly GraphControl[]) => Promise<void>;
   /** Permanently detach. Concurrent/repeated calls share the same completion. */
   readonly unmount: () => Promise<void>;
 }
@@ -66,6 +108,7 @@ export type GraphEngineErrorCode =
   | 'MOUNT_CLOSED'
   | 'MOUNT_REJECTED'
   | 'INVALID_GRAPH'
+  | 'INVALID_CONTROL'
   | 'INVALID_HANDLE'
   | 'INVALID_REQUEST'
   | 'HOST_ERROR';

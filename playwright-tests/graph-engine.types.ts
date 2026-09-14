@@ -1,6 +1,7 @@
 import {
   GraphEngine,
   GraphEngineError,
+  type GraphControl,
   type GraphDescription,
   type GraphEngineErrorCode,
   type GraphNode,
@@ -15,15 +16,32 @@ const graph = {
   ],
 } as const satisfies GraphDescription;
 
+const extendedGraph = {
+  nodes: [
+    { type: 'oscillator', waveform: 'triangle', frequency: 220 },
+    { type: 'biquad', input: 0, mode: 'lowpass', cutoff: 2000, q: 0.7 },
+    { type: 'adsr', attackMs: 10, decayMs: 80, sustain: 0.7, releaseMs: 180 },
+    { type: 'mul', input0: 1, input1: 2 },
+    { type: 'gain', input: 3, gain: 0.15 },
+    { type: 'output', input: 4 },
+  ],
+} as const satisfies GraphDescription;
+
+const controls = [
+  { type: 'setParam', node: 1, slot: 'value0', value: 0.25 },
+  { type: 'gateOn', node: 2 },
+] as const satisfies readonly GraphControl[];
+
 async function consume(context: AudioContext | OfflineAudioContext, signal: AbortSignal) {
   const engine: GraphEngine = await GraphEngine({
     context, signal, wasmUrl: new URL('engine.wasm', import.meta.url), processorUrl: './processor.js',
   });
-  const sound: MountedGraph = await engine.mount(graph);
+  const sound: MountedGraph = await engine.mount(extendedGraph);
   engine.output.connect(context.destination);
   const playing: Promise<void> = sound.play();
   await playing;
   await sound.pause();
+  await sound.applyControls(controls);
   await sound.unmount();
   await engine.close();
 
@@ -43,6 +61,9 @@ function describe(node: GraphNode): number {
       // @ts-expect-error Oscillators do not have graph inputs.
       node.input;
       return node.frequency;
+    case 'adsr': return node.sustain;
+    case 'biquad': return node.cutoff;
+    case 'mul': return node.input0 + node.input1;
     case 'gain': return node.gain;
     case 'output': return node.input;
   }
@@ -52,6 +73,8 @@ function describe(node: GraphNode): number {
 const badWaveform: GraphNode = { type: 'oscillator', waveform: 'noise', frequency: 440 };
 // @ts-expect-error A gain requires an input index.
 const missingInput: GraphNode = { type: 'gain', gain: 0.1 };
+// @ts-expect-error Runtime controls only accept the canonical parameter slots.
+const badControl: GraphControl = { type: 'setParam', node: 1, slot: 'frequency', value: 440 };
 // @ts-expect-error Frequencies are numeric, not strings.
 const stringFrequency: GraphNode = { type: 'oscillator', waveform: 'sine', frequency: '440' };
 // @ts-expect-error A context is required.

@@ -6,6 +6,29 @@ moondsp combines a Strudel/TidalCycles-inspired pattern algebra with a compiled 
 
 ## Quick start
 
+### Play the basic synth in a browser
+
+[`examples/basic-synth`](examples/basic-synth/README.md) uses only the public
+`@moondsp/browser` package: a C4–C5 keyboard, volume, low-pass cutoff, and
+explicit start/stop/dispose actions. It is monophonic, with last-held-note
+priority, and contains no custom Worklet.
+
+To build a local distribution and run its consumer:
+
+```sh
+npm run pack:browser
+cd examples/basic-synth
+npm install ../../packages/browser/moondsp-browser-0.6.0.tgz
+npm run dev
+```
+
+Building the tarball requires MoonBit. Consuming that tarball elsewhere does
+not: it includes the matching Wasm, Worklet, JS API, and TypeScript declarations.
+The package is not yet published to npm. See the example README for external
+installation and production builds.
+
+### Engine development
+
 ```bash
 NEW_MOON_MOD=0 moon check && NEW_MOON_MOD=0 moon test  # type-check + run tests
 NEW_MOON_MOD=0 moon build --target wasm-gc            # build for browser
@@ -54,9 +77,10 @@ and calls must be serialized. Compilation happens during mount, not process.
 The same API is available from `dowdiness/moondsp/engine` directly.
 
 For browser use, `web/graph-engine.js` adapts this engine to AudioWorklet and
-Promise-based methods. Its JSON subset currently accepts oscillator, gain,
-and output nodes; the MoonBit API accepts canonical graphs supported by the
-mono compiler. See [the browser contract](docs/browser-api-contract.md).
+Promise-based methods. Its JSON subset accepts oscillator, gain, output, ADSR,
+biquad, and multiply nodes; `applyControls` exposes atomic parameter and gate
+updates. The MoonBit API accepts canonical graphs supported by the mono
+compiler. See [the browser contract](docs/browser-api-contract.md).
 
 ## What moondsp can do today
 

@@ -41,6 +41,27 @@ fn graph_host_reject(
 }
 
 ///|
+fn graph_control_error_node_index(error : @moondsp.GraphControlError) -> Int {
+  match error {
+    InvalidNodeIndex(index) => index
+    OrphanNode(index) => index
+    InvalidGateNode(index, _) => index
+    InvalidSlotForNode(index, _, _) => index
+    InvalidParamValue(index, _, _, _) => index
+    MissingRuntimeState(index, _) => index
+  }
+}
+
+///|
+fn graph_host_control_error(error : @moondsp.GraphControlError) -> Bool {
+  graph_host_reject(
+    "INVALID_CONTROL",
+    @debug.to_string(error),
+    node_index=graph_control_error_node_index(error),
+  )
+}
+
+///|
 fn graph_host_engine_error(error : @moondsp.GraphEngineError) -> Bool {
   let code = match error {
     InvalidConfiguration => "INVALID_STATE"
@@ -50,6 +71,8 @@ fn graph_host_engine_error(error : @moondsp.GraphEngineError) -> Bool {
     InvalidHandle => "INVALID_HANDLE"
     InvalidGraph(_) => "INVALID_GRAPH"
     BufferSizeMismatch(..) => "PROCESSOR_FAILED"
+    ControlRejected(control_error) =>
+      return graph_host_control_error(control_error)
   }
   graph_host_reject(code, @debug.to_string(error))
 }
@@ -116,6 +139,26 @@ pub fn graph_host_mount() -> Int {
       let _ = graph_host_engine_error(error)
       0
     }
+  }
+}
+
+///|
+/// Decode and apply a control batch before the next render boundary.
+pub fn graph_host_apply_controls(handle : Int) -> Bool {
+  guard graph_host_handles.get(handle) is Some(sound) else {
+    return graph_host_reject("INVALID_HANDLE", "Invalid graph handle")
+  }
+  let text = graph_host_input.to_string()
+  graph_host_input.reset()
+  let controls = decode_browser_controls(text) catch {
+    InvalidDescription(message, node_index) =>
+      return graph_host_reject("INVALID_CONTROL", message, node_index~)
+  }
+  try {
+    sound.apply_controls(controls)
+    true
+  } catch {
+    error => graph_host_engine_error(error)
   }
 }
 

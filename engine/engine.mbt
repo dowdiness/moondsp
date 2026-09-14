@@ -8,6 +8,7 @@ pub suberror GraphEngineError {
   InvalidHandle
   InvalidGraph(@graph.GraphCompileError)
   BufferSizeMismatch(expected~ : Int, actual~ : Int)
+  ControlRejected(@graph.GraphControlError)
 } derive(Debug)
 
 ///|
@@ -136,6 +137,20 @@ pub fn MountedGraph::play(self : MountedGraph) -> Unit raise GraphEngineError {
 pub fn MountedGraph::pause(self : MountedGraph) -> Unit raise GraphEngineError {
   let _ = self.graph()
   self.instance.playing = false
+}
+
+///|
+/// Apply a validated runtime control batch atomically at the next render
+/// boundary. The controls target original authoring node indices.
+pub fn MountedGraph::apply_controls(
+  self : MountedGraph,
+  controls : Array[@graph.GraphControl],
+) -> Unit raise GraphEngineError {
+  let graph = self.graph()
+  match graph.apply_controls(controls) {
+    Ok(_) => ()
+    Err(error) => raise ControlRejected(error)
+  }
 }
 
 ///|

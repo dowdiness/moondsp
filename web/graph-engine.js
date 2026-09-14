@@ -11,9 +11,9 @@ export class GraphEngineError extends Error {
 /**
  * Create a mono graph engine in a caller-owned, suspended AudioContext.
  * OfflineAudioContext is also supported for deterministic host verification.
- * Mount all graphs before playing any graph or resuming the context.
- * A MountedGraph is an opaque handle: play(), pause(), and unmount() return promises.
- * pause() preserves oscillator phase. unmount() permanently invalidates the handle.
+ * A MountedGraph is an opaque handle: play(), pause(), applyControls(), and unmount() return promises.
+ * pause() preserves oscillator phase. applyControls() validates atomically at a render boundary.
+ * unmount() permanently invalidates the handle.
  * signal cancels creation only; successful engines are ended with close().
  */
 export async function GraphEngine({
@@ -164,6 +164,11 @@ export async function GraphEngine({
       return Object.freeze({
         play() { return command(0); },
         pause() { return command(1); },
+        applyControls(controls) {
+          return unmounting
+            ? Promise.reject(new GraphEngineError('INVALID_HANDLE', 'The graph has been unmounted'))
+            : request('applyControls', { handle, controls });
+        },
         unmount() {
           if (!unmounting) unmounting = request('command', { handle, command: 2 });
           return unmounting;

@@ -42,6 +42,8 @@ pub fn get_playback_error_char(Int) -> Int
 
 pub fn get_playback_error_length() -> Int
 
+pub fn graph_host_apply_controls(Int) -> Bool
+
 pub fn graph_host_clear_input() -> Unit
 
 pub fn graph_host_close() -> Unit

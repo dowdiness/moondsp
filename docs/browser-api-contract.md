@@ -77,6 +77,12 @@ await context.close(); // Only the application closes its context.
   and finite numeric `frequency` in Hz.
 - `gain`: required integer `input` referencing a node and finite numeric
   `gain` (linear multiplier, not dB).
+- `adsr`: required `attackMs`, `decayMs`, `sustain`, and `releaseMs`. Times
+  are milliseconds and sustain is a linear level. It starts with a closed gate.
+- `biquad`: required integer `input`, `mode` (`lowpass`, `highpass`, or
+  `bandpass`), `cutoff` in Hz, and `q`.
+- `mul`: required integer `input0` and `input1`; multiply an audio source by
+  an ADSR source to form a playable voice.
 - `output`: required integer `input`. The existing compiler validates the
   output structure and graph semantics; exactly one mono output is required.
 - The Worklet serializes the description as JSON. MoonBit decodes the browser
@@ -99,7 +105,7 @@ await context.close(); // Only the application closes its context.
 ### Rendering and lifecycle
 
 - `engine.mount(description)` resolves to a `MountedGraph` handle with
-  asynchronous `play()`, `pause()`, and `unmount()` methods. `MountedGraph`
+  asynchronous `play()`, `pause()`, `unmount()`, and `applyControls()` methods. `MountedGraph`
   is an exported TypeScript type, not a runtime constructor.
   Mounting creates independent DSP state and registers it with the engine's
   output, but does not start playback. The input description is reusable:
@@ -107,7 +113,7 @@ await context.close(); // Only the application closes its context.
 - `play` starts or resumes processing; `pause` freezes oscillator phase.
   Repeated play/pause operations are allowed.
 - `unmount()` permanently removes that graph. Concurrent and repeated calls
-  share one completion promise. Once unmounting begins, play and pause reject
+  share one completion promise. Once unmounting begins, play, pause, and controls reject
   with `GraphEngineError.code === "INVALID_HANDLE"`. Repeated unmount cannot
   affect another graph that reuses the underlying slot.
   An invalid command does not change another graph or close mount admission.
@@ -118,7 +124,7 @@ await context.close(); // Only the application closes its context.
   128-frame render quanta. A different quantum produces a processor failure,
   rather than silently truncating audio.
 - Graph commands take effect between render callbacks. This entry point
-  does not provide timestamped scheduling, parameter automation, live graph
+  does not provide timestamped scheduling or automation, live graph
   replacement, or polyphonic note allocation.
 - `engine.close()` ends the engine and all remaining graphs. It is idempotent,
   including concurrent calls: all callers share one completion promise.
@@ -139,7 +145,7 @@ await context.close(); // Only the application closes its context.
 - For new engine requests, `ENGINE_CLOSED` takes precedence over processor
   failure and mount admission when the engine is closing/closed or the context
   is closed. Otherwise, processor failure takes precedence over mount admission.
-  A graph whose unmount has begun still rejects play/pause with `INVALID_HANDLE`
+  A graph whose unmount has begun still rejects play/pause/controls with `INVALID_HANDLE`
   and returns its original promise for repeated unmount.
 - Creation requires a suspended context (`INVALID_STATE`). An unsuccessful
   HTTP response uses `LOAD_FAILED`. Native failures during fetch, WASM
@@ -164,10 +170,32 @@ await context.close(); // Only the application closes its context.
   the first observed interruption settles creation. There is no built-in
   timeout or automatic retry; a caller can supply a deadline through its signal.
 
+### Live controls
+
+`sound.applyControls(controls)` accepts an ordered batch of 1–64 controls:
+
+- `{ type: "setParam", node, slot, value }` sets a finite numeric parameter.
+  Slots are `value0`, `value1`, `value2`, `value3`, or `delaySamples`.
+- `{ type: "gateOn", node }` and `{ type: "gateOff", node }` control an ADSR.
+
+`node` is the original authoring index, not the optimized execution index.
+For the synth example, oscillator frequency, biquad cutoff, and gain amount
+each use `value0` on their respective nodes. See the runtime-control slot
+matrix in the [technical reference](salat-engine-technical-reference.md).
+
+MoonBit validates the whole batch before changing runtime state. A bad node,
+slot, value, or gate target rejects the batch with `INVALID_CONTROL`; preceding
+controls in the batch do not take effect. Lifecycle errors take precedence.
+These are between-render-callback updates, not sample-timestamped events.
+Gate-off starts the release tail; keep the graph playing until it finishes.
+`pause()` freezes the envelope and is not a substitute for gate-off.
+Control decoding and transactional validation are not an allocation-free
+audio-thread contract; a real-time allocation/GC audit remains a separate gate.
+
 The dedicated processor is `web/graph-processor.js`. It instantiates the same
 browser WASM artifact as the existing browser paths, in its own WASM instance.
 Its primitive ABI is `graph_host_init`, `graph_host_clear_input`,
-`graph_host_push_char`, `graph_host_mount`, `graph_host_command`,
+`graph_host_push_char`, `graph_host_mount`, `graph_host_command`, `graph_host_apply_controls`,
 `graph_host_process`, `graph_host_sample`, `graph_host_close`,
 `graph_host_error_length`, and `graph_host_error_char`.
 Input is JSON transmitted as Unicode scalar values; errors are MoonBit-generated
@@ -176,7 +204,7 @@ Integer handles exist only in this adapter; MoonBit callers receive typed,
 engine-owned handles. `graph_host_close` delegates to the MoonBit engine.
 Existing scheduler/demo behavior and exports are unchanged. The earlier
 graph builder ABI is replaced, not retained as aliases; deploy the matching
-Worklet and WASM together. Application code uses only the JS lifecycle.
+Worklet and WASM together. Application code uses only the public JS methods.
 
 ### TypeScript and JavaScript editor support
 
@@ -201,7 +229,8 @@ const sound = await engine.mount(graph);
 ```
 
 The declaration exports `GraphDescription`, the discriminated `GraphNode` union
-and its `OscillatorNode`, `GainNode`, and `OutputNode` variants, `Waveform`,
+and its `OscillatorNode`, `AdsrNode`, `BiquadNode`, `MulNode`, `GainNode`, and
+`OutputNode` variants, `Waveform`, `BiquadMode`, `GraphControl`,
 `GraphEngineOptions`, `GraphEngine`, `MountedGraph`, and `GraphEngineErrorCode`.
 These node types describe authoring data, not Web Audio nodes. Only
 `GraphEngine` and `GraphEngineError` are runtime exports. `GraphEngine` is also
@@ -247,6 +276,25 @@ render boundary. They also exercise the visible controls using Chromium's
 virtual audio output. This is automated PCM/lifecycle evidence, not a
 hardware listening verdict or a hard-real-time allocation/GC audit.
 `OfflineAudioContext` here is a verification host, not a file-rendering API.
+
+### Standalone basic synth and local distribution
+
+[`examples/basic-synth`](../examples/basic-synth/README.md) consumes the package
+root `@moondsp/browser` only. It provides a monophonic keyboard, volume and
+filter controls, and explicit audio/resource lifecycle actions; it does not
+implement a Worklet or reach into the browser ABI.
+
+`npm run pack:browser` builds release Wasm and packs
+`packages/browser/moondsp-browser-0.6.0.tgz`. The tarball contains the matching
+JS adapter, declarations, Worklet, Wasm, and Apache-2.0 license. This is a local
+distribution artifact, not a claim that the package is published to npm.
+Consumers install the tarball without MoonBit; only maintainers building the
+tarball need the MoonBit toolchain.
+
+The Vite example excludes the ESM package from development pre-bundling so
+relative asset URLs remain attached to their module. Production builds emit
+Wasm and Worklet files separately, with a relative base for subdirectory
+deployment. No application-side asset copy script is required.
 
 ## Supported facade groups
 
