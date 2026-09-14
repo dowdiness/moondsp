@@ -2,8 +2,6 @@
 
 This directory contains architecture blueprints, technical references, integration contracts, performance benchmarks, and design records for `dowdiness/moondsp`.
 
-> **Note on Naming**: *Salat Engine* was the early development working title (a nod to Felix Roos's [kabelsalat](https://codeberg.org/froos/kabelsalat)). The project shipped and is maintained as **`moondsp`**.
-
 ---
 
 ## 1. Guides & Language (Authoring & Live Coding)

@@ -244,7 +244,7 @@ Start at the **[docs index](docs/README.md)**, which categorizes materials by ro
 
 `moondsp` builds upon concepts pioneered by several remarkable open-source projects in computer music, live coding, and audio synthesis:
 
-- **[kabelsalat](https://codeberg.org/froos/kabelsalat)** by Felix Roos (`froos`) — Demonstrated high-performance DSP graph compilation and real-time execution in Web AudioWorklet. The project's early working title *Salat Engine* was a nod to this work.
+- **[kabelsalat](https://codeberg.org/froos/kabelsalat)** by Felix Roos (`froos`) — Demonstrated high-performance DSP graph compilation and real-time execution in Web AudioWorklet.
 - **[Noisecraft](https://noisecraft.app/)** by Maxime Chevalier-Boisvert — Pioneer in topological DSP graph flattening and in-browser visual synthesis.
 - **[Strudel](https://strudel.cc/)** & **[TidalCycles](https://tidalcycles.org/)** by Alex McLean, Felix Roos, and the live coding community — Foundational models for rational-time queryable pattern algebra, cyclic arcs, and mini-notation.
 - **[FAUST](https://faust.grame.fr/)** & **[mimium](https://mimium.org/)** — Inspiration for functional audio signal processing and tagless DSP algebra.
