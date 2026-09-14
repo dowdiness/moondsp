@@ -350,7 +350,7 @@ fn mini_token_kind_for_single(c : UInt16, quoted : Bool) -> MiniTokenKind {
   match c {
     '"' => StringDelimiter
     '(' | ')' | '[' | ']' | ',' | '.' => Punctuation
-    '*' | '/' | '?' => Operator
+    '*' | '/' | '?' | '~' => Operator
     '+' => if quoted { Unknown } else { Operator }
     _ => Unknown
   }

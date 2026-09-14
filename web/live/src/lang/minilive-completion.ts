@@ -26,6 +26,7 @@ const METHODS: Completion[] = [
   snippetCompletion("attack(${seconds})", { label: "attack", type: "method", detail: "note fade-in, seconds" }),
   snippetCompletion("hold(${seconds})", { label: "hold", type: "method", detail: "hold after attack, seconds" }),
   snippetCompletion("release(${seconds})", { label: "release", type: "method", detail: "note fade-out, seconds" }),
+  snippetCompletion("gate(${fraction})", { label: "gate", type: "method", detail: "audible fraction of each step (0–1)" }),
   snippetCompletion("room(${send})", { label: "room", type: "method", detail: "send to shared room (0–1)" }),
   snippetCompletion("fast(${n})", { label: "fast", type: "method", detail: "n× faster" }),
   snippetCompletion("slow(${n})", { label: "slow", type: "method", detail: "n× slower" }),

@@ -287,12 +287,16 @@ fn NotationParser::read_int_signed(
 }
 
 ///|
-/// Parse an atom: identifier (for sound mode), number or note name (for note mode),
-/// or chord name (for chord mode).
+/// Parse an atom: `~` for a rest; otherwise an identifier in sound mode, a
+/// number or note name in note mode, or a chord name in chord mode.
 fn NotationParser::parse_atom(
   self : NotationParser,
 ) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
   let start = self.pos
+  if self.input[self.pos] == '~' {
+    self.pos += 1
+    return @pattern.Pat::silence()
+  }
   if self.sound {
     // Read identifier
     let name = self.read_ident()

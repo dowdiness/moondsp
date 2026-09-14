@@ -878,6 +878,22 @@ test "process_block: gate-off is sent within the block containing the endpoint" 
 }
 
 ///|
+test "process_block: gate fraction ends a note before its next onset" {
+  let (pool, sched, left, right) = make_test_sched()
+  let pat = @pattern.note(60.0).gate(@pattern.Rational::new(1L, 2L))
+  let silence : @pattern.Pat[@pattern.ControlMap] = @pattern.Pat::silence()
+  sched.process_block(pat, pool, left, right)
+  for _ in 0..<92 {
+    sched.process_block(silence, pool, left, right)
+  }
+  @debug.assert_eq(sched.sample_counter(), 11904L)
+  @debug.assert_eq(sched.active_note_count(), 1)
+  sched.process_block(silence, pool, left, right)
+  @debug.assert_eq(sched.sample_counter(), 12032L)
+  @debug.assert_eq(sched.active_note_count(), 0)
+}
+
+///|
 test "process_block: pan key applies per-voice pan" {
   let (pool, sched, left, right) = make_test_sched()
   let pat = @pattern.merge_control(@pattern.note(60.0), @pattern.s_pan(-1.0))

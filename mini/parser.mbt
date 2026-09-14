@@ -264,6 +264,59 @@ fn parse_double_manual(s : String, start : Int, end : Int) -> Double {
 }
 
 ///|
+/// Convert the parser's plain decimal syntax to exact musical time.
+fn parse_decimal_rational(
+  input : String,
+  start : Int,
+  end_ : Int,
+  error_position : Int,
+) -> @pattern.Rational raise ParseError {
+  let negative = input[start] == '-'
+  let digits_start = if negative { start + 1 } else { start }
+  let mut point = end_
+  for index in digits_start..<end_ {
+    if input[index] == '.' {
+      point = index
+      break
+    }
+  }
+  let mut whole = 0L
+  for index in digits_start..<point {
+    whole = whole * 10L + Int64::from_int(input[index].to_int() - '0'.to_int())
+  }
+  let mut fractional_end = end_
+  while fractional_end > point + 1 && input[fractional_end - 1] == '0' {
+    fractional_end -= 1
+  }
+  let fractional_digits = if point < end_ {
+    fractional_end - point - 1
+  } else {
+    0
+  }
+  guard fractional_digits <= 18 else {
+    raise ParseError(
+      "position \{error_position}: gate() accepts at most 18 decimal places",
+    )
+  }
+  let mut denominator = 1L
+  let mut fractional = 0L
+  for index in (point + 1)..<fractional_end {
+    denominator *= 10L
+    fractional = fractional * 10L +
+      Int64::from_int(input[index].to_int() - '0'.to_int())
+  }
+  let numerator = whole * denominator + fractional
+  @pattern.Rational::new(
+    if negative {
+      -numerator
+    } else {
+      numerator
+    },
+    denominator,
+  )
+}
+
+///|
 /// Read the quoted string contents between double quotes.
 fn Parser::read_quoted_string(self : Parser) -> String raise ParseError {
   self.expect_char('"')

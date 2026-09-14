@@ -13,6 +13,7 @@ priv enum PatternDocNode[A] {
   Pure(A)
   Fast(@identity.PatternNodeId, Rational)
   Slow(@identity.PatternNodeId, Rational)
+  Gate(@identity.PatternNodeId, Rational)
   Rev(@identity.PatternNodeId)
   FilterMap(@identity.PatternNodeId, (A) -> A?)
   Euclid(@identity.PatternNodeId, Int, Int, Int)
@@ -53,6 +54,7 @@ fn[A] PatternDocNode::snapshot(self : PatternDocNode[A]) -> PatternDocNode[A] {
     Pure(value) => Pure(value)
     Fast(child, factor) => Fast(child, factor)
     Slow(child, factor) => Slow(child, factor)
+    Gate(child, factor) => Gate(child, factor)
     Rev(child) => Rev(child)
     FilterMap(child, f) => FilterMap(child, f)
     Euclid(child, k, n, rotation) => Euclid(child, k, n, rotation)
@@ -205,6 +207,7 @@ fn[A] pattern_node_cache_token_memoized(
             Runtime(_) | Silence | Pure(_) => ()
             Fast(child, _)
             | Slow(child, _)
+            | Gate(child, _)
             | Rev(child)
             | FilterMap(child, _)
             | Euclid(child, _, _, _)
@@ -268,6 +271,7 @@ fn[A] copy_reachable_pattern_nodes(
         Runtime(_) | Silence | Pure(_) => ()
         Fast(child, _)
         | Slow(child, _)
+        | Gate(child, _)
         | Rev(child)
         | FilterMap(child, _)
         | Euclid(child, _, _, _)
@@ -307,6 +311,7 @@ fn[A] pattern_node_revision_memoized(
             Runtime(_) | Silence | Pure(_) => ()
             Fast(child, _)
             | Slow(child, _)
+            | Gate(child, _)
             | Rev(child)
             | FilterMap(child, _)
             | Euclid(child, _, _, _)
@@ -470,6 +475,7 @@ fn[A] append_reachable_pattern_source_ids(
         Runtime(_) | Silence | Pure(_) => ()
         Fast(child, _)
         | Slow(child, _)
+        | Gate(child, _)
         | Rev(child)
         | FilterMap(child, _)
         | Euclid(child, _, _, _)
@@ -554,6 +560,26 @@ fn[A] query_sourced_filter_map(
           event={ whole: raw.whole, part: raw.part, value, },
           path=event.pattern_node_path(),
         ),
+        id,
+      )
+    })
+  })
+}
+
+///|
+fn[A] query_sourced_gate(
+  source : SourcedPat[A],
+  id : @identity.PatternNodeId,
+  arc : TimeSpan,
+  factor : Rational,
+) -> Array[PatternSnapshotEvent[A]] {
+  let factor = normalize_gate_factor(factor)
+  source
+  .query(arc)
+  .filter_map(event => {
+    gate_event(event.event(), factor).map(gated => {
+      prepend_pattern_source(
+        PatternSnapshotEvent(event=gated, path=event.pattern_node_path()),
         id,
       )
     })
@@ -1007,6 +1033,20 @@ fn[A] compile_pattern_node(
         })
       }
       { pat, sourced, entry_sourced, }
+    }
+    Gate(child, factor) => {
+      let child = lower_pattern_node_cached(nodes, child, cache, token_memo)
+      let pat = child.pat.gate(factor)
+      let entry_sourced = child.entry_sourced.map(entry => {
+        SourcedEntry(entry.key, {
+          query: fn(arc) { query_sourced_gate(entry.source, id, arc, factor) },
+        })
+      })
+      CompiledPattern::with_entries(
+        pat,
+        fn(arc) { query_sourced_gate(child.sourced, id, arc, factor) },
+        entry_sourced,
+      )
     }
     Rev(child) => {
       let child = lower_pattern_node_cached(nodes, child, cache, token_memo)
@@ -1578,6 +1618,22 @@ pub fn[A] PatternDoc::slow(
     nodes,
     id,
     Slow(self.root, factor),
+    revision=self.revision.next(),
+  )
+  PatternDoc(root=id, revision=self.revision.next(), nodes~)
+}
+
+///|
+pub fn[A] PatternDoc::gate(
+  self : PatternDoc[A],
+  id~ : @identity.PatternNodeId,
+  factor~ : Rational,
+) -> PatternDoc[A] raise PatternDocError {
+  let nodes = copy_pattern_nodes(self.nodes)
+  insert_pattern_node(
+    nodes,
+    id,
+    Gate(self.root, factor),
     revision=self.revision.next(),
   )
   PatternDoc(root=id, revision=self.revision.next(), nodes~)

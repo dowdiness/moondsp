@@ -42,12 +42,14 @@ in the browser bundle.
   <dt>.attack(s)</dt><dd>fade in over s seconds</dd>
   <dt>.hold(s)</dt><dd>stay at peak volume for s seconds</dd>
   <dt>.release(s)</dt><dd>fade out over s seconds</dd>
+  <dt>.gate(n)</dt><dd>sound for n of each step, from 0 to 1</dd>
 </dl>
 <p><code>s("bd hh").slow(2) +<br>note("E4").slow(4).room(0.35)</code></p>
 <p class="cheat-note"><code>.room(0)</code> is dry and is the default; <code>.room(1)</code> is the maximum send. Here the drums stay dry and the note sends at 0.35. Both keep their dry signal.</p>
 <p class="cheat-note">Envelopes apply to notes and chords. Each time is in seconds, from 0 to 86400.</p>
 <p><code>note("E4")<br>&nbsp;&nbsp;.attack(0.01).hold(0.1)<br>&nbsp;&nbsp;.release(0.2)</code></p>
 <p class="cheat-note">0.31 seconds total, independent of tempo. Omit hold to follow the pattern's note length. Omitted attack/release use the sound's defaults; release starts from the current level.</p>
+<p class="cheat-note"><code>.gate(0.4)</code> keeps every onset in place but shortens each note to 40% of its step, leaving the rest silent. The gate follows tempo. Factors finer than one billionth are rounded to keep long-running timelines representable. An explicit <code>.hold(s)</code> instead uses physical seconds and overrides the event-derived ending.</p>
 <p class="cheat-note">Room is one shared stereo space for every part. Its tail continues across note endings, section changes, and live edits; Stop remains immediate.</p>
 <p class="cheat-note"><strong>Browser limitation:</strong> <code>.gain(n)</code> and <code>.cutoff(hz)</code> are parsed as control values, but the current browser instruments do not connect them to volume or filter controls. They do not change the sound here.</p>
 
@@ -64,6 +66,7 @@ in the browser bundle.
 <h2 id="inside-quoted-notation">Inside quoted notation</h2>
 <dl>
   <dt>a b c</dt><dd>sequence in one cycle; newlines also separate items</dd>
+  <dt>~</dt><dd>rest: reserve one sequence step without emitting an event</dd>
   <dt>[a b]</dt><dd>subdivide a step</dd>
   <dt>a, b</dt><dd>play together</dd>
   <dt>a*4</dt><dd>repeat 4× faster</dd>

@@ -510,6 +510,17 @@ fn MiniDocBuilder::reuse_doc(
 }
 
 ///|
+fn MiniDocBuilder::rest_doc(
+  self : MiniDocBuilder,
+  id : @identity.PatternNodeId,
+) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
+  match self.reuse_doc(id) {
+    Some(doc) => doc
+    None => @pattern.PatternDoc::silence(id~)
+  }
+}
+
+///|
 fn MiniDocBuilder::control_doc(
   self : MiniDocBuilder,
   id : @identity.PatternNodeId,
@@ -592,6 +603,25 @@ fn MiniDocBuilder::slow_doc(
     Some(doc) => doc
     None =>
       doc.slow(id~, factor~) catch {
+        _ => raise ParseError("internal mini PatternDoc construction failed")
+      }
+  }
+}
+
+///|
+fn MiniDocBuilder::gate_doc(
+  self : MiniDocBuilder,
+  doc : @pattern.PatternDoc[@pattern.ControlMap],
+  factor : @pattern.Rational,
+) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
+  let id = self.node_id(
+    "gate",
+    "\{doc.root().value()}:\{factor.num}:\{factor.den}",
+  )
+  match self.reuse_doc(id, inputs=[doc]) {
+    Some(doc) => doc
+    None =>
+      doc.gate(id~, factor~) catch {
         _ => raise ParseError("internal mini PatternDoc construction failed")
       }
   }
@@ -1050,6 +1080,16 @@ fn NotationParser::parse_doc_atom(
   builder : MiniDocBuilder,
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
   let start = self.pos
+  if self.input[self.pos] == '~' {
+    self.pos += 1
+    let id = builder.atom_id_at(
+      "rest",
+      "~",
+      self.source_offset + start,
+      self.source_offset + self.pos,
+    )
+    return builder.rest_doc(id)
+  }
   if self.sound {
     let name = self.read_ident()
     guard !name.is_empty() else {
