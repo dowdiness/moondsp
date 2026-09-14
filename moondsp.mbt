@@ -2,7 +2,7 @@
 /// Public API facade for the `dowdiness/moondsp` library.
 ///
 /// This file re-exports the library surface directly from `@dsp`, `@graph`,
-/// and `@voice`. External consumers and internal sub-packages both import
+/// `@engine`, and `@voice`. External consumers and internal sub-packages import
 /// `dowdiness/moondsp` and access types as `@moondsp.X`.
 
 ///|
@@ -122,3 +122,7 @@ pub using @voice {
   type VoicePoolError,
   type VoiceState,
 }
+
+///|
+// Host-independent graph lifecycle and mixing.
+pub using @engine {type GraphEngine, type MountedGraph, type GraphEngineError}

@@ -497,7 +497,7 @@ fn[A] pattern_source_path_for_opaque_children(
   children : Array[@identity.PatternNodeId],
 ) -> PatternNodePath raise PatternDocError {
   let descendants : Array[@identity.PatternNodeId] = []
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   seen[id.value()] = true
   for child in children {
     append_reachable_pattern_source_ids(nodes, child, descendants, seen)

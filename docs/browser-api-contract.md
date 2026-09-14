@@ -22,9 +22,231 @@ architecture rationale in ADRs, and keep graph runtime-control behavior in
 - `browser/browser_abi.baseline` records the reviewed facade/export shape.
   Update it only for an intentional public API or worklet ABI change.
 
-Use the root, `graph`, `scheduler`, `voice`, `mini`, and `song` packages for
-general graph authoring, voice pools, scheduler extension, and Mini parsing. The
-browser package is a host/demo ABI, not the general library authoring API.
+Use the root, `engine`, `graph`, `scheduler`, `voice`, `mini`, and `song` packages
+for general graph lifecycle/authoring, voice pools, scheduling, and Mini parsing. The
+browser package is a low-level host ABI. Web applications can use the external
+graph entry point below without calling its exports directly.
+
+## External graph entry point
+
+`web/graph-engine.js` exports `GraphEngine` and `GraphEngineError`.
+`web/graph-example.html` is an independent consumer: it defines its graph and
+imports only the public JS module, not the scheduler, demo exports, or private
+worklet messages.
+
+The implementation is MoonBit-first: `engine/` owns `GraphEngine`,
+`MountedGraph`, and checked domain errors, re-exported from the root package.
+Native MoonBit callers use `engine.mount(Array[DspNode])`, handle methods,
+and `engine.process(AudioBuffer)` directly. See the checked example in
+[`README.mbt.md`](../README.mbt.md) and the authoritative
+[engine contract](salat-engine-technical-reference.md#354-host-independent-graph-engine).
+JavaScript manages browser resources and asynchronous transport, not DSP
+state or compilation.
+
+```js
+import { GraphEngine } from "./graph-engine.js";
+
+// The application owns this context. Mount graphs before resuming it.
+const context = new AudioContext();
+await context.suspend();
+const engine = await GraphEngine({ context });
+const sound = await engine.mount({
+  nodes: [
+    { type: "oscillator", waveform: "triangle", frequency: 220 },
+    { type: "gain", input: 0, gain: 0.1 },
+    { type: "output", input: 1 },
+  ],
+});
+engine.output.connect(context.destination);
+
+// Run these operations from a user gesture, such as a Play button.
+await context.resume();
+await sound.play();
+// Later:
+await sound.pause();
+await sound.unmount();
+await engine.close();
+await context.close(); // Only the application closes its context.
+```
+
+### Description and mounting
+
+- A description contains `nodes`, an array of 1–64 node objects. Array indices
+  identify connections. The caller supplies the graph; it is not a demo preset.
+- `oscillator`: required `waveform` (`sine`, `saw`, `square`, or `triangle`)
+  and finite numeric `frequency` in Hz.
+- `gain`: required integer `input` referencing a node and finite numeric
+  `gain` (linear multiplier, not dB).
+- `output`: required integer `input`. The existing compiler validates the
+  output structure and graph semantics; exactly one mono output is required.
+- The Worklet serializes the description as JSON. MoonBit decodes the browser
+  node subset into `DspNode`, then `GraphEngine::mount` uses the existing
+  `CompiledTemplate::analyze` and `CompiledDsp::compile_result` path.
+  There is no JS node validator, DSP implementation, or second compiler.
+  The browser's 64-node description limit is an adapter constraint; the
+  direct MoonBit API accepts canonical nodes supported by the mono compiler.
+- At most 16 graph handles may be mounted in one engine. Slots can be reused
+  before playback, but unmounted handle numbers never recur within an engine.
+- Both engine creation and mounting require a suspended context. Mount all
+  graphs before the first successful `play`. Mount admission remains closed
+  after pausing or unmounting every graph; neither operation reopens admission.
+  A new engine is required to mount additional graphs after playback.
+- Do not concurrently resume the caller-owned context while creation or
+  mounting is pending. Mounting allocates and compiles inside the AudioWorklet
+  realm while the caller keeps the context suspended; it is **not**
+  background-worker compilation and is not supported during playback.
+
+### Rendering and lifecycle
+
+- `engine.mount(description)` resolves to a `MountedGraph` handle with
+  asynchronous `play()`, `pause()`, and `unmount()` methods. `MountedGraph`
+  is an exported TypeScript type, not a runtime constructor.
+  Mounting creates independent DSP state and registers it with the engine's
+  output, but does not start playback. The input description is reusable:
+  mounting it twice creates two independent graphs.
+- `play` starts or resumes processing; `pause` freezes oscillator phase.
+  Repeated play/pause operations are allowed.
+- `unmount()` permanently removes that graph. Concurrent and repeated calls
+  share one completion promise. Once unmounting begins, play and pause reject
+  with `GraphEngineError.code === "INVALID_HANDLE"`. Repeated unmount cannot
+  affect another graph that reuses the underlying slot.
+  An invalid command does not change another graph or close mount admission.
+- All playing graphs sum into `engine.output`, a mono `AudioWorkletNode`.
+  Connect it to any compatible Web Audio destination. There is no automatic
+  master limiter; callers must choose gains appropriate for the sum.
+- Rendering uses the actual context sample rate and currently supports
+  128-frame render quanta. A different quantum produces a processor failure,
+  rather than silently truncating audio.
+- Graph commands take effect between render callbacks. This entry point
+  does not provide timestamped scheduling, parameter automation, live graph
+  replacement, or polyphonic note allocation.
+- `engine.close()` ends the engine and all remaining graphs. It is idempotent,
+  including concurrent calls: all callers share one completion promise.
+  Closing immediately rejects new requests. It disconnects output and closes
+  the message port, but never suspends or closes the caller's context.
+  Prefer closing the engine before closing its context. If the context closes
+  first, its state-change notification rejects unacknowledged graph commands
+  with `ENGINE_CLOSED` and releases local resources. An in-flight `engine.close()`
+  then completes without requiring a worklet acknowledgement; repeated close
+  calls still share completion. Already-acknowledged commands retain their result.
+  Operations on remaining graph handles reject with `ENGINE_CLOSED`; a graph's
+  already-issued unmount retains its shared result.
+- `GraphEngineError` carries `code`, `message`, and, for node decoding errors,
+  `nodeIndex`. Invalid descriptions use `INVALID_GRAPH`; mounting after
+  playback uses `MOUNT_CLOSED`, enforced by the MoonBit engine and exposed
+  through JS. Capacity exhaustion uses `MOUNT_REJECTED`. Processor failures reject pending
+  requests with `PROCESSOR_FAILED`.
+- For new engine requests, `ENGINE_CLOSED` takes precedence over processor
+  failure and mount admission when the engine is closing/closed or the context
+  is closed. Otherwise, processor failure takes precedence over mount admission.
+  A graph whose unmount has begun still rejects play/pause with `INVALID_HANDLE`
+  and returns its original promise for repeated unmount.
+- Creation requires a suspended context (`INVALID_STATE`). An unsuccessful
+  HTTP response uses `LOAD_FAILED`. Native failures during fetch, WASM
+  compilation, worklet module loading, or node construction are wrapped in
+  `GraphEngineError` with code `INITIALIZATION_FAILED` and the original exception
+  in `cause`. Worklet initialization failures reported after node construction
+  use `PROCESSOR_FAILED`. None of these failures closes the caller's context.
+- `GraphEngine({ context, signal })` accepts an optional `AbortSignal`
+  that owns **creation only**. An already-aborted signal prevents loading.
+  Aborting during fetch, compilation, module loading, or worklet readiness
+  rejects creation with `GraphEngineError.code === "ABORTED"` and preserves
+  `signal.reason` as `cause`. The engine aborts its fetch, disconnects any node,
+  retires its processor, closes its port, and removes its listeners. It never
+  closes the caller's context.
+- WASM compilation and worklet module loading cannot themselves be cancelled.
+  Their late completion cannot resume abandoned initialization or publish an
+  engine. A module already registered in the context is not unloaded.
+  After successful creation the abort listener is removed: use `engine.close()`
+  to end the returned engine, not the creation signal.
+- Closing the context during creation also interrupts outstanding waits and
+  rejects creation with `ENGINE_CLOSED`. When abort and context closure race,
+  the first observed interruption settles creation. There is no built-in
+  timeout or automatic retry; a caller can supply a deadline through its signal.
+
+The dedicated processor is `web/graph-processor.js`. It instantiates the same
+browser WASM artifact as the existing browser paths, in its own WASM instance.
+Its primitive ABI is `graph_host_init`, `graph_host_clear_input`,
+`graph_host_push_char`, `graph_host_mount`, `graph_host_command`,
+`graph_host_process`, `graph_host_sample`, `graph_host_close`,
+`graph_host_error_length`, and `graph_host_error_char`.
+Input is JSON transmitted as Unicode scalar values; errors are MoonBit-generated
+JSON envelopes containing `code`, `message`, and optional `nodeIndex`.
+Integer handles exist only in this adapter; MoonBit callers receive typed,
+engine-owned handles. `graph_host_close` delegates to the MoonBit engine.
+Existing scheduler/demo behavior and exports are unchanged. The earlier
+graph builder ABI is replaced, not retained as aliases; deploy the matching
+Worklet and WASM together. Application code uses only the JS lifecycle.
+
+### TypeScript and JavaScript editor support
+
+Keep `web/graph-engine.d.ts` beside `graph-engine.js` when distributing the
+module to TypeScript consumers. Imports retain the `.js` extension; TypeScript
+resolves the adjacent declaration automatically. No runtime wrapper is required.
+
+```ts
+import { GraphEngine, type GraphDescription } from "./graph-engine.js";
+
+const graph = {
+  nodes: [
+    { type: "oscillator", waveform: "triangle", frequency: 220 },
+    { type: "gain", input: 0, gain: 0.1 },
+    { type: "output", input: 1 },
+  ],
+} as const satisfies GraphDescription;
+
+// context is a caller-owned, suspended AudioContext or OfflineAudioContext.
+const engine = await GraphEngine({ context });
+const sound = await engine.mount(graph);
+```
+
+The declaration exports `GraphDescription`, the discriminated `GraphNode` union
+and its `OscillatorNode`, `GainNode`, and `OutputNode` variants, `Waveform`,
+`GraphEngineOptions`, `GraphEngine`, `MountedGraph`, and `GraphEngineErrorCode`.
+These node types describe authoring data, not Web Audio nodes. Only
+`GraphEngine` and `GraphEngineError` are runtime exports. `GraphEngine` is also
+the returned engine's TypeScript type; import the remaining names with `import type`.
+
+Readonly descriptions (including `as const` arrays) are accepted without
+requiring a mutable copy. Returned handle properties are readonly, matching
+their frozen runtime objects. Bounds, finite numbers, topology, and lifecycle
+state remain runtime checks; the declarations do not claim to prove them.
+Catch values still require narrowing with `instanceof GraphEngineError`;
+`nodeIndex` is optional and `cause` is `unknown`, including arbitrary abort reasons.
+
+JavaScript consumers can annotate descriptions with
+`/** @type {import('./graph-engine.js').GraphDescription} */` and enable
+`// @ts-check` for diagnostics as well as editor completion.
+
+From the repository root, run `npm run typecheck:graph` to check positive
+consumer examples and expected failures for invalid nodes and obsolete APIs.
+This uses the existing TypeScript development dependency in `web/live`;
+install that project's dependencies with `npm --prefix web/live ci` if needed.
+The browser CI `live-smoke` job runs the same command after installing those
+dependencies; type failures fail the job independently of browser runtime tests.
+
+### Running the external example and acceptance tests
+
+```sh
+NEW_MOON_MOD=0 moon build --target wasm-gc --release
+./playwright-serve.sh 8090
+# Open http://127.0.0.1:8090/graph-example.html
+# In a second terminal:
+NEW_MOON_MOD=0 npx --no-install playwright test \
+  playwright-tests/graph-engine.spec.js --workers=1 --retries=0
+```
+
+The server script synchronizes WASM assets. Keep `graph-engine.js`,
+`graph-processor.js`, and `moonbit_dsp.wasm` together, or supply `wasmUrl` and
+`processorUrl` to `GraphEngine`. Serve them over HTTPS or localhost;
+deployments must permit their fetch/worklet execution under their CSP.
+
+The tests compare every rendered frame against analytic waveforms using a
+real AudioWorklet in `OfflineAudioContext`, including release at a known
+render boundary. They also exercise the visible controls using Chromium's
+virtual audio output. This is automated PCM/lifecycle evidence, not a
+hardware listening verdict or a hard-real-time allocation/GC audit.
+`OfflineAudioContext` here is a verification host, not a file-rendering API.
 
 ## Supported facade groups
 

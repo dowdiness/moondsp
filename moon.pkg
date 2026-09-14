@@ -1,6 +1,7 @@
 import {
   "dowdiness/moondsp/dsp",
   "dowdiness/moondsp/graph",
+  "dowdiness/moondsp/engine",
   "dowdiness/moondsp/identity",
   "dowdiness/moondsp/voice",
 }

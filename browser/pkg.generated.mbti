@@ -42,6 +42,26 @@ pub fn get_playback_error_char(Int) -> Int
 
 pub fn get_playback_error_length() -> Int
 
+pub fn graph_host_clear_input() -> Unit
+
+pub fn graph_host_close() -> Unit
+
+pub fn graph_host_command(Int, Int) -> Bool
+
+pub fn graph_host_error_char(Int) -> Int
+
+pub fn graph_host_error_length() -> Int
+
+pub fn graph_host_init(Double) -> Bool
+
+pub fn graph_host_mount() -> Int
+
+pub fn graph_host_process(Int) -> Bool
+
+pub fn graph_host_push_char(Int) -> Unit
+
+pub fn graph_host_sample(Int) -> Double
+
 pub fn init_compiled_graph(Double, Int) -> Bool
 
 pub fn init_compiled_hot_swap_graph(Double, Int) -> Bool

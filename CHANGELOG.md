@@ -7,7 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added a host-independent MoonBit `GraphEngine` with typed `MountedGraph`
+  capabilities, checked errors, independent engine instances, and mono mixing.
+  It consumes canonical `Array[DspNode]` values through the existing compiler.
+  The browser graph API and standalone `web/graph-example.html` use this engine
+  through a thin WASM adapter; graph decoding and lifecycle policy live in MoonBit.
+- Added creation-only `AbortSignal` support to the external graph engine.
+  Cancellation preserves the caller's context and reports `ABORTED` with the
+  original reason. Late initialization cannot publish an abandoned engine.
+  Context closure now settles pending initialization and graph commands, releases
+  local resources, and lets an in-flight engine close finish without a reply.
+- Added adjacent TypeScript declarations for the public graph engine, including
+  readonly graph descriptions, discriminated node variants, lifecycle handles,
+  creation options, and structured error codes. Added `npm run typecheck:graph`
+  to validate consumer usage and rejected API shapes without changing runtime behavior.
+
 ### Changed
+
+- Named the asynchronous JavaScript/TypeScript engine factory `GraphEngine`,
+  matching the MoonBit public type. Call it as `await GraphEngine({ context })`;
+  the same import also names the returned engine's TypeScript type.
+
+- Changed the external graph lifecycle to `engine.mount(graph)`,
+  mounted-graph `play()` / `pause()` / `unmount()`, and `engine.close()`,
+  without legacy aliases. Concurrent and repeated unmount calls share a
+  result; unmounting rejects playback immediately. The browser adapter's
+  builder ABI is replaced with JSON input/error transport and explicit engine
+  initialization/close. The pre-playback-only mounting restriction remains.
 
 - Resolved Mini named references directly to compiled pattern/document values,
   removing retained definition bodies and compiler-side memo handling while
@@ -46,6 +74,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The nonediting tempo field state is named `displaying`, not `synced`.
 
 ### Fixed
+
+- Fixed the external graph example getting stuck after unmount failure. Cleanup
+  now attempts each resource independently, preserves the original error, and
+  restores the controls so another graph can be mounted.
+- Added public graph API type checking to browser CI after the existing
+  web/live dependency installation.
+
+- Unified external graph-engine error precedence: closing/closed engines and
+  closed contexts reject new requests with `ENGINE_CLOSED`, even after playback.
+  Native initialization failures now use `INITIALIZATION_FAILED` and preserve
+  the original exception as `cause`. Added browser regressions for these errors,
+  pause/resume phase preservation, and immediate rejection during unmount.
+
+- Made concurrent browser graph-engine close calls share one completion promise,
+  preventing spurious `ENGINE_CLOSED` rejections and closing admission as soon
+  as shutdown starts.
 
 - Preserved uncommitted live-editor BPM input across unrelated playback replies,
   while retaining normalization on Enter or blur.

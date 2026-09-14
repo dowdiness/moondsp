@@ -5,6 +5,7 @@ import {
   "dowdiness/moondsp/browser/internal/playback_host",
   "moonbitlang/core/debug",
   "moonbitlang/core/ref",
+  "moonbitlang/core/json",
 }
 
 pkgtype(kind: "executable")
@@ -13,6 +14,16 @@ options(
   link: {
     "js": {
       "exports": [
+        "graph_host_init",
+        "graph_host_clear_input",
+        "graph_host_push_char",
+        "graph_host_mount",
+        "graph_host_command",
+        "graph_host_process",
+        "graph_host_sample",
+        "graph_host_close",
+        "graph_host_error_length",
+        "graph_host_error_char",
         "tick",
         "tick_source",
         "reset_phase",
@@ -76,6 +87,16 @@ options(
     },
     "wasm-gc": {
       "exports": [
+        "graph_host_init",
+        "graph_host_clear_input",
+        "graph_host_push_char",
+        "graph_host_mount",
+        "graph_host_command",
+        "graph_host_process",
+        "graph_host_sample",
+        "graph_host_close",
+        "graph_host_error_length",
+        "graph_host_error_char",
         "tick",
         "tick_source",
         "reset_phase",
