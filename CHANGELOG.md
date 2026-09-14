@@ -37,6 +37,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   builder ABI is replaced with JSON input/error transport and explicit engine
   initialization/close. The pre-playback-only mounting restriction remains.
 
+- Added native `Pat[A] + Pat[A]` and Mini `+` overlays with transparent grouping
+  parentheses and method-chain precedence, including live editor grammar and
+  highlighting.
+- Normalized raw overlays in the pattern core while preserving event order,
+  duplicates, and opaque transform queries. Separated content identity from
+  playback occurrence metadata and authored source ancestry.
+- Preserved known material clocks across overlay regrouping while refreshing
+  source provenance. Mini references now keep use-site identity across
+  definition edits; document reuse checks input revisions instead of assuming
+  stable IDs imply unchanged content.
 - Resolved Mini named references directly to compiled pattern/document values,
   removing retained definition bodies and compiler-side memo handling while
   preserving declaration validation, diagnostic precedence, and source identities.
@@ -91,6 +101,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   preventing spurious `ENGINE_CLOSED` rejections and closing admission as soon
   as shutdown starts.
 
+- Fixed overlay content comparison depending on subgroup names, nested material
+  boundaries, or named silence. Content normalization is now independent of
+  playback scopes, without flattening opaque queries or removing playback
+  placeholders.
 - Preserved uncommitted live-editor BPM input across unrelated playback replies,
   while retaining normalization on Enter or blur.
 - Prevented stale tempo acknowledgements from undoing newer edits. Runtime

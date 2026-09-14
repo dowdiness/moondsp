@@ -49,8 +49,43 @@ priv enum MiniExprNode {
 fn Parser::parse_syntax_expr(self : Parser) -> MiniExpr raise ParseError {
   self.skip_whitespace()
   let start = self.pos
-  let node = self.parse_syntax_primary()
-  let mut expr = MiniExpr::{ span: { start, end: self.pos, }, node, }
+  let first = self.parse_syntax_chain()
+  let operands = [first]
+  while true {
+    let before_ws = self.pos
+    self.skip_whitespace()
+    if self.at_end() || self.input[self.pos] != '+' {
+      self.pos = before_ws
+      break
+    }
+    self.pos += 1
+    self.skip_whitespace()
+    guard !self.at_end() else {
+      raise ParseError("position \{self.pos}: expected an expression after '+'")
+    }
+    match self.input[self.pos] {
+      '+' | ')' | ',' | ';' =>
+        raise ParseError(
+          "position \{self.pos}: expected an expression after '+'",
+        )
+      _ => ()
+    }
+    operands.push(self.parse_syntax_chain())
+  }
+  if operands.length() == 1 {
+    first
+  } else {
+    let end = operands[operands.length() - 1].span.end
+    { span: { start, end, }, node: Stack(operands), }
+  }
+}
+
+///|
+/// Parse one primary and its left-to-right transform chain.
+fn Parser::parse_syntax_chain(self : Parser) -> MiniExpr raise ParseError {
+  self.skip_whitespace()
+  let start = self.pos
+  let mut expr = self.parse_syntax_primary()
   while true {
     let before_ws = self.pos
     self.skip_whitespace()
@@ -59,6 +94,7 @@ fn Parser::parse_syntax_expr(self : Parser) -> MiniExpr raise ParseError {
       break
     }
     self.pos += 1
+    self.skip_whitespace()
     let transform = self.parse_transform()
     expr = { span: { start, end: self.pos, }, node: Apply(expr, transform), }
   }
@@ -66,7 +102,10 @@ fn Parser::parse_syntax_expr(self : Parser) -> MiniExpr raise ParseError {
 }
 
 ///|
-fn Parser::parse_syntax_primary(self : Parser) -> MiniExprNode raise ParseError {
+/// Parentheses group an expression without introducing a runtime or document
+/// node. Returning the inner expression also keeps reference spans anchored
+/// at the name inside the parentheses.
+fn Parser::parse_syntax_primary(self : Parser) -> MiniExpr raise ParseError {
   guard !self.at_end() else {
     raise ParseError("position \{self.pos}: unexpected end of input")
   }
@@ -86,7 +125,15 @@ fn Parser::parse_syntax_primary(self : Parser) -> MiniExprNode raise ParseError 
       self.skip_whitespace()
     }
     self.expect_char(')')
-    return Stack(args)
+    return { span: { start, end: self.pos, }, node: Stack(args), }
+  }
+  if self.input[self.pos] == '(' {
+    self.pos += 1
+    self.skip_whitespace()
+    let inner = self.parse_syntax_expr()
+    self.skip_whitespace()
+    self.expect_char(')')
+    return inner
   }
   let kind = if self.match_keyword("s(") {
     Some(Sound)
@@ -100,14 +147,17 @@ fn Parser::parse_syntax_primary(self : Parser) -> MiniExprNode raise ParseError 
   if kind is Some(kind) {
     let (content, content_start) = self.read_quoted_string_with_start()
     self.expect_char(')')
-    return Literal(kind, content, content_start)
+    return {
+      span: { start, end: self.pos, },
+      node: Literal(kind, content, content_start),
+    }
   }
   let name = self.read_ident()
   if !name.is_empty() {
-    return Reference(name)
+    return { span: { start, end: self.pos, }, node: Reference(name), }
   }
   raise ParseError(
-    "position \{self.pos}: expected 's(', 'note(', 'chord(', or 'stack('",
+    "position \{self.pos}: expected 's(', 'note(', 'chord(', 'stack(', or '('",
   )
 }
 

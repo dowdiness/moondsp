@@ -1,0 +1,75 @@
+Date: 2026-09-14
+Change: normalized ordered overlay, Mini + and grouping, independent playback/source identity
+Base: 54b30b7606d224a8dfe900aed6d6981ff025a202 (PR #250)
+Environment: Linux WSL2, AMD Ryzen 7 6800H
+Full suite: NEW_MOON_MOD=0 moon bench --release
+Full suite result: 62 passed, 0 failed before the final extracted-material scope correction.
+Final affected-package comparison: NEW_MOON_MOD=0 moon bench mini pattern scheduler --release --no-parallelize
+Baseline and final comparison results: 6 passed, 0 failed each, run sequentially on the same host.
+
+Interpretation: construction benchmarks increased by 3.80-7.75 us (15.8-23.8%).
+Prepared two-material rendering measured 130.22 -> 130.19 us. These are observations,
+not a causal speedup claim or an audio-thread allocation audit. An earlier non-serial
+rerun had visibly higher variance; use the matched serial results below for comparison.
+
+Mean comparison:
+s_rev: 22.12 -> 26.48 us (+19.7%)
+s_fast: 24.10 -> 27.90 us (+15.8%)
+stack_rev: 32.58 -> 40.33 us (+23.8%)
+rev_4step: 43.67 -> 44.68 us (+2.3%)
+fast_4step: 61.80 -> 59.44 us (-3.8%)
+process_events_8_jux_events: 80.65 -> 73.49 us (-8.9%)
+voicepool_process_8_panned_jux_voices: 138.46 -> 137.31 us (-0.8%)
+process_block_jux_rev: 67.44 -> 65.96 us (-2.2%)
+prepared_two_materials_render: 130.22 -> 130.19 us (-0.0%)
+prepared_two_materials_accept_and_render: 141.35 -> 133.95 us (-5.2%)
+
+Baseline raw output:
+[dowdiness/moondsp] bench mini/jux_benchmark.mbt:11 ("bench/jux/parse") ok
+name      time (mean ± σ)         range (min … max) 
+s_rev       22.12 µs ± 461.77 ns    21.31 µs …  22.76 µs  in 10 ×   4681 runs
+s_fast      24.10 µs ± 936.08 ns    22.90 µs …  25.66 µs  in 10 ×   4102 runs
+stack_rev   32.58 µs ±   1.18 µs    31.02 µs …  34.44 µs  in 10 ×   3154 runs
+[dowdiness/moondsp] bench pattern/jux_benchmark.mbt:22 ("bench/jux/query") ok
+name       time (mean ± σ)         range (min … max) 
+rev_4step    43.67 µs ±   1.45 µs    41.68 µs …  45.24 µs  in 10 ×   2191 runs
+fast_4step   61.80 µs ±   2.48 µs    59.22 µs …  67.23 µs  in 10 ×   1603 runs
+[dowdiness/moondsp] bench scheduler/jux_benchmark.mbt:86 ("bench/jux/scheduler_dispatch") ok
+name                        time (mean ± σ)         range (min … max) 
+process_events_8_jux_events   80.65 µs ±   5.54 µs    74.68 µs …  89.97 µs  in 10 ×    968 runs
+[dowdiness/moondsp] bench scheduler/jux_benchmark.mbt:105 ("bench/jux/stereo_routing") ok
+name                                  time (mean ± σ)         range (min … max) 
+voicepool_process_8_panned_jux_voices  138.46 µs ±   3.11 µs   134.46 µs … 142.32 µs  in 10 ×    707 runs
+[dowdiness/moondsp] bench scheduler/jux_benchmark.mbt:123 ("bench/jux/process_block") ok
+name                  time (mean ± σ)         range (min … max) 
+process_block_jux_rev   67.44 µs ±   1.86 µs    64.74 µs …  70.66 µs  in 10 ×   1413 runs
+[dowdiness/moondsp] bench scheduler/jux_benchmark.mbt:139 ("bench/entries/prepared_playback") ok
+name                                     time (mean ± σ)         range (min … max) 
+prepared_two_materials_render             130.22 µs ±   5.01 µs   122.74 µs … 139.04 µs  in 10 ×    746 runs
+prepared_two_materials_accept_and_render  141.35 µs ±   7.72 µs   131.33 µs … 154.65 µs  in 10 ×    690 runs
+Total tests: 6, passed: 6, failed: 0.
+
+Final raw output:
+[dowdiness/moondsp] bench mini/jux_benchmark.mbt:11 ("bench/jux/parse") ok
+name      time (mean ± σ)         range (min … max) 
+s_rev       26.48 µs ± 958.15 ns    25.41 µs …  27.92 µs  in 10 ×   3700 runs
+s_fast      27.90 µs ±   1.26 µs    26.49 µs …  29.81 µs  in 10 ×   3535 runs
+stack_rev   40.33 µs ±   1.49 µs    38.26 µs …  43.59 µs  in 10 ×   2583 runs
+[dowdiness/moondsp] bench pattern/jux_benchmark.mbt:22 ("bench/jux/query") ok
+name       time (mean ± σ)         range (min … max) 
+rev_4step    44.68 µs ±   1.95 µs    42.22 µs …  48.42 µs  in 10 ×   2219 runs
+fast_4step   59.44 µs ±   1.15 µs    58.14 µs …  61.74 µs  in 10 ×   1640 runs
+[dowdiness/moondsp] bench scheduler/jux_benchmark.mbt:86 ("bench/jux/scheduler_dispatch") ok
+name                        time (mean ± σ)         range (min … max) 
+process_events_8_jux_events   73.49 µs ±   3.11 µs    69.71 µs …  80.08 µs  in 10 ×   1217 runs
+[dowdiness/moondsp] bench scheduler/jux_benchmark.mbt:105 ("bench/jux/stereo_routing") ok
+name                                  time (mean ± σ)         range (min … max) 
+voicepool_process_8_panned_jux_voices  137.31 µs ±   5.97 µs   129.36 µs … 148.52 µs  in 10 ×    695 runs
+[dowdiness/moondsp] bench scheduler/jux_benchmark.mbt:123 ("bench/jux/process_block") ok
+name                  time (mean ± σ)         range (min … max) 
+process_block_jux_rev   65.96 µs ±   1.74 µs    63.40 µs …  68.65 µs  in 10 ×   1500 runs
+[dowdiness/moondsp] bench scheduler/jux_benchmark.mbt:139 ("bench/entries/prepared_playback") ok
+name                                     time (mean ± σ)         range (min … max) 
+prepared_two_materials_render             130.19 µs ±   4.96 µs   122.94 µs … 138.49 µs  in 10 ×    758 runs
+prepared_two_materials_accept_and_render  133.95 µs ±   3.82 µs   127.89 µs … 139.05 µs  in 10 ×    717 runs
+Total tests: 6, passed: 6, failed: 0.

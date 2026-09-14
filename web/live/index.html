@@ -522,6 +522,8 @@
           <dl>
             <dt>let a = p;</dt><dd>name a reusable pattern; define it before use</dd>
             <dt>stack(a, b)</dt><dd>play patterns together</dd>
+            <dt>a + b</dt><dd>ordered overlay; same as stack(a, b)</dd>
+            <dt>(a + b).fast(n)</dt><dd>transform both layers; without parentheses, .fast(n) applies only to b</dd>
             <dt>$: a<br>$: b</dt><dd>combine top-level layers on separate lines</dd>
             <dt>.jux(f)</dt><dd>original left, transformed copy right</dd>
           </dl>

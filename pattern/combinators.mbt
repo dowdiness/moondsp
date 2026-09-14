@@ -5,12 +5,8 @@ pub fn[A] sequence(pats : Array[Pat[A]]) -> Pat[A] {
     return Pat::silence()
   }
   let pats = pats.copy()
-  {
-    period: Rational::from_int(1),
-    members: [],
-    entry_key: "",
-    signature: transformed_signature(stack(pats).entry_signature(), "sequence"),
-    query: fn(arc) {
+  make_pat(
+    fn(arc) {
       let n_rat = Rational::from_int(n)
       let one = Rational::from_int(1)
       let result : Array[Event[A]] = []
@@ -71,24 +67,59 @@ pub fn[A] sequence(pats : Array[Pat[A]]) -> Pat[A] {
       }
       result
     },
+    Rational::from_int(1),
+    Opaque([]),
+    Anonymous,
+    combine_signature("sequence", pats),
+  )
+}
+
+///|
+fn[A] append_overlay(pat : Pat[A], result : Array[Pat[A]]) -> Unit {
+  match pat.body {
+    Silence =>
+      match pat.metadata.scope {
+        Anonymous => ()
+        Named(_) | Material | NamedMaterial(_) => result.push(pat)
+      }
+    Overlay(children) =>
+      match pat.metadata.scope {
+        Anonymous =>
+          for child in children {
+            append_overlay(child, result)
+          }
+        Named(_) | Material | NamedMaterial(_) => result.push(pat)
+      }
+    Opaque(_) => result.push(pat)
   }
 }
 
 ///|
 pub fn[A] stack(pats : Array[Pat[A]]) -> Pat[A] {
-  if pats.is_empty() {
+  let normalized : Array[Pat[A]] = []
+  for pat in pats {
+    append_overlay(pat, normalized)
+  }
+  if normalized.is_empty() {
     return Pat::silence()
   }
-  let pats = pats.copy()
-  {
-    period: Rational::from_int(1),
-    members: pats,
-    entry_key: "",
-    signature: "",
-    query: fn(arc) {
-      pats.iter().flat_map(pat => pat.query(arc).iter()).collect()
-    },
+  if normalized.length() == 1 {
+    return normalized[0]
   }
+  make_pat(
+    fn(arc) {
+      normalized.iter().flat_map(pat => pat.query(arc).iter()).collect()
+    },
+    Rational::from_int(1),
+    Overlay(normalized),
+    Anonymous,
+    overlay_signature(normalized),
+  )
+}
+
+///|
+pub impl[A] Add for Pat[A] with fn add(self : Pat[A], other : Pat[A]) -> Pat[A] {
+  stack([self, other])
 }
 
 ///|
@@ -105,20 +136,14 @@ fn[A] Pat::filter_map_known(
   f : (A) -> A?,
   signature : String,
 ) -> Pat[A] {
+  if self.body is Silence {
+    return self
+  }
   let inner = self
-  {
-    period: self.period,
-    members: self.members.map(p => p.filter_map_known(f, signature)),
-    entry_key: self.entry_key,
-    signature: transformed_signature(
-      self.signature,
-      if signature == "" {
-        ""
-      } else {
-        "filter:" + signature
-      },
-    ),
-    query: fn(arc) {
+  let children = self.transform_children(p => p.filter_map_known(f, signature))
+  let change = if signature == "" { "" } else { "filter:" + signature }
+  make_pat(
+    fn(arc) {
       inner
       .query(arc)
       .filter_map(ev => {
@@ -129,7 +154,11 @@ fn[A] Pat::filter_map_known(
         })
       })
     },
-  }
+    self.metadata.period,
+    Opaque(children),
+    self.metadata.scope,
+    transformed_signature(self.entry_signature(), change),
+  )
 }
 
 ///|
@@ -233,21 +262,17 @@ pub fn[A] Pat::degrade_by(
   seed? : Int = 42,
 ) -> Pat[A] {
   let prob = if p < 0.0 { 0.0 } else if p > 1.0 { 1.0 } else { p }
-  if prob <= 0.0 {
-    return self
-  }
+  guard !(prob <= 0.0) else { return self }
   if prob >= 1.0 {
     return self.filter_map_known(_ => None, "silence")
   }
+  guard !(self.body is Silence) else { return self }
   let inner = self
-  {
-    period: self.period,
-    members: self.members.map(pattern_member => {
-      pattern_member.degrade_by(p, seed~)
-    }),
-    entry_key: self.entry_key,
-    signature: transformed_signature(self.signature, "degrade:\{prob}:\{seed}"),
-    query: fn(arc) {
+  let children = self.transform_children(pattern_member => {
+    pattern_member.degrade_by(p, seed~)
+  })
+  make_pat(
+    fn(arc) {
       inner
       .query(arc)
       .filter(ev => {
@@ -258,7 +283,11 @@ pub fn[A] Pat::degrade_by(
         hash_unit(key.num, key.den, seed) >= prob
       })
     },
-  }
+    self.metadata.period,
+    Opaque(children),
+    self.metadata.scope,
+    transformed_signature(self.entry_signature(), "degrade:\{prob}:\{seed}"),
+  )
 }
 
 ///|
@@ -277,21 +306,13 @@ fn[A] every_known(
   if n <= 0 {
     return pat
   }
+  if signature != "" && pat.body is Silence {
+    return pat
+  }
   let n64 = Int64::from_int(n)
   let inner = pat
-  {
-    period: pat.period,
-    members: [],
-    entry_key: pat.entry_key,
-    signature: transformed_signature(
-      pat.entry_signature(),
-      if signature == "" {
-        ""
-      } else {
-        "every:\{n}:" + signature
-      },
-    ),
-    query: fn(arc) {
+  make_pat(
+    fn(arc) {
       arc
       .whole_cycles()
       .iter()
@@ -307,5 +328,16 @@ fn[A] every_known(
       })
       .collect()
     },
-  }
+    pat.metadata.period,
+    Opaque([]),
+    pat.metadata.scope,
+    transformed_signature(
+      pat.entry_signature(),
+      if signature == "" {
+        ""
+      } else {
+        "every:\{n}:" + signature
+      },
+    ),
+  )
 }

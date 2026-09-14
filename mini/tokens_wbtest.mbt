@@ -207,3 +207,10 @@ test "mini tokens keep spans for malformed syntax" {
   inspect(tokens[tokens.length() - 1].start, content="8")
   inspect(tokens[tokens.length() - 1].end, content="9")
 }
+
+///|
+test "plus token is an operator only outside quoted notation" {
+  let tokens = tokenize_mini_authoring_source("chord(\"C+7\") + s(\"bd\")")
+  assert_eq(mini_token_kind_label(tokens[4].kind), "unknown")
+  assert_eq(mini_token_kind_label(tokens[8].kind), "op")
+}

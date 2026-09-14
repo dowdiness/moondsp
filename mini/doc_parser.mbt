@@ -203,7 +203,7 @@ pub fn MiniDocBuilder::sound_atom(
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
   let doc = match drum_midi(name) {
     Some(midi) =>
-      self.pure_doc(id, @pattern.ControlMap::single("sound", midi.to_double())) catch {
+      self.control_doc(id, "sound", midi.to_double()) catch {
         ParseError(msg) => return Err(msg)
       }
     None => return Err("unknown drum name '\{name}'")
@@ -222,7 +222,7 @@ pub fn MiniDocBuilder::note_atom(
     Ok(note) => note
     Err(msg) => return Err(msg)
   }
-  let doc = self.pure_doc(id, @pattern.ControlMap::single("note", note)) catch {
+  let doc = self.control_doc(id, "note", note) catch {
     ParseError(msg) => return Err(msg)
   }
   Ok(doc)
@@ -251,12 +251,7 @@ fn MiniDocBuilder::chord_doc_from_notes(
       let mut tone_index = 0
       for midi in notes {
         let note_id = self.chord_tone_id(id, tone_index, midi)
-        note_docs.push(
-          self.pure_doc(
-            note_id,
-            @pattern.ControlMap::single("note", midi.to_double()),
-          ),
-        )
+        note_docs.push(self.control_doc(note_id, "note", midi.to_double()))
         tone_index += 1
       }
       @pattern.PatternDoc::stack(id~, docs=note_docs) catch {
@@ -487,11 +482,20 @@ fn MiniDocBuilder::node_id(
 fn MiniDocBuilder::reuse_doc(
   self : MiniDocBuilder,
   id : @identity.PatternNodeId,
+  inputs? : Array[@pattern.PatternDoc[@pattern.ControlMap]] = [],
 ) -> @pattern.PatternDoc[@pattern.ControlMap]? raise ParseError {
   match self.previous {
     None => None
     Some(previous) =>
       if previous.contains_node(id) {
+        // Stable use-site IDs do not imply unchanged referenced content.
+        for input in inputs {
+          guard previous.contains_node(input.root()) else { return None }
+          let old_input = previous.subdoc(root=input.root()) catch {
+            _ => raise ParseError("internal mini input could not be reused")
+          }
+          guard old_input.revision() == input.revision() else { return None }
+        }
         let doc = previous.subdoc(root=id) catch {
           _ =>
             raise ParseError(
@@ -506,14 +510,16 @@ fn MiniDocBuilder::reuse_doc(
 }
 
 ///|
-fn MiniDocBuilder::pure_doc(
+fn MiniDocBuilder::control_doc(
   self : MiniDocBuilder,
   id : @identity.PatternNodeId,
-  value : @pattern.ControlMap,
+  key : String,
+  value : Double,
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
   match self.reuse_doc(id) {
     Some(doc) => doc
-    None => @pattern.PatternDoc::pure(id~, value~)
+    None =>
+      @pattern.PatternDoc::from_pattern(id~, pat=@pattern.control(key, value))
   }
 }
 
@@ -526,7 +532,7 @@ fn MiniDocBuilder::sequence_doc(
     return docs[0]
   }
   let id = self.node_id("seq", doc_root_signature(docs))
-  match self.reuse_doc(id) {
+  match self.reuse_doc(id, inputs=docs) {
     Some(doc) => doc
     None =>
       @pattern.PatternDoc::sequence(id~, docs~) catch {
@@ -544,7 +550,7 @@ fn MiniDocBuilder::stack_doc(
     return docs[0]
   }
   let id = self.node_id("stack", doc_root_signature(docs))
-  match self.reuse_doc(id) {
+  match self.reuse_doc(id, inputs=docs) {
     Some(doc) => doc
     None =>
       @pattern.PatternDoc::stack(id~, docs~) catch {
@@ -563,7 +569,7 @@ fn MiniDocBuilder::fast_doc(
     "fast",
     "\{doc.root().value()}:\{factor.num}:\{factor.den}",
   )
-  match self.reuse_doc(id) {
+  match self.reuse_doc(id, inputs=[doc]) {
     Some(doc) => doc
     None =>
       doc.fast(id~, factor~) catch {
@@ -582,7 +588,7 @@ fn MiniDocBuilder::slow_doc(
     "slow",
     "\{doc.root().value()}:\{factor.num}:\{factor.den}",
   )
-  match self.reuse_doc(id) {
+  match self.reuse_doc(id, inputs=[doc]) {
     Some(doc) => doc
     None =>
       doc.slow(id~, factor~) catch {
@@ -597,7 +603,7 @@ fn MiniDocBuilder::rev_doc(
   doc : @pattern.PatternDoc[@pattern.ControlMap],
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
   let id = self.node_id("rev", doc.root().value())
-  match self.reuse_doc(id) {
+  match self.reuse_doc(id, inputs=[doc]) {
     Some(doc) => doc
     None =>
       doc.rev(id~) catch {
@@ -615,7 +621,7 @@ fn MiniDocBuilder::euclid_doc(
   rotation : Int,
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
   let id = self.node_id("euclid", "\{doc.root().value()}:\{k}:\{n}:\{rotation}")
-  match self.reuse_doc(id) {
+  match self.reuse_doc(id, inputs=[doc]) {
     Some(doc) => doc
     None =>
       doc.euclid(id~, k~, n~, rotation~) catch {
@@ -632,7 +638,7 @@ fn MiniDocBuilder::degrade_doc(
   seed : Int,
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
   let id = self.node_id("degrade", "\{doc.root().value()}:\{p}:\{seed}")
-  match self.reuse_doc(id) {
+  match self.reuse_doc(id, inputs=[doc]) {
     Some(doc) => doc
     None =>
       doc.degrade_by(id~, p~, seed~) catch {
@@ -653,7 +659,7 @@ fn MiniDocBuilder::every_doc(
     "every",
     "\{doc.root().value()}:\{n}:\{callback_signature}",
   )
-  match self.reuse_doc(id) {
+  match self.reuse_doc(id, inputs=[doc]) {
     Some(doc) => doc
     None =>
       doc.every(id~, n~, f=callback.runtime()) catch {
@@ -670,7 +676,7 @@ fn MiniDocBuilder::jux_doc(
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
   let callback_signature = callback.signature()
   let id = self.node_id("jux", "\{doc.root().value()}:\{callback_signature}")
-  match self.reuse_doc(id) {
+  match self.reuse_doc(id, inputs=[doc]) {
     Some(doc) => doc
     None =>
       doc.jux(id~, f=callback.runtime()) catch {
@@ -690,15 +696,12 @@ fn MiniDocBuilder::scalar_control_doc(
     "control",
     "\{doc.root().value()}:\{key}:\{value}",
   )
-  let control_doc = self.pure_doc(
-    control_id,
-    @pattern.ControlMap::single(key, value),
-  )
+  let control_doc = self.control_doc(control_id, key, value)
   let id = self.node_id(
     "merge_control",
     "\{doc.root().value()}:\{key}:\{value}",
   )
-  match self.reuse_doc(id) {
+  match self.reuse_doc(id, inputs=[doc, control_doc]) {
     Some(doc) => doc
     None =>
       @pattern.PatternDoc::merge_control(id~, left=doc, right=control_doc) catch {
@@ -1060,10 +1063,7 @@ fn NotationParser::parse_doc_atom(
           self.source_offset + start,
           self.source_offset + self.pos,
         )
-        builder.pure_doc(
-          id,
-          @pattern.ControlMap::single("sound", midi.to_double()),
-        )
+        builder.control_doc(id, "sound", midi.to_double())
       }
       None => raise ParseError("position \{start}: unknown drum name '\{name}'")
     }
@@ -1098,7 +1098,7 @@ fn NotationParser::parse_doc_atom(
         self.source_offset + token_start,
         self.source_offset + token_end,
       )
-      builder.pure_doc(id, @pattern.ControlMap::single("note", note))
+      builder.control_doc(id, "note", note)
     } catch {
       ParseError(_) => self.parse_doc_note_name_atom(builder, start)
     } noraise {
@@ -1127,7 +1127,7 @@ fn NotationParser::parse_doc_note_name_atom(
         self.source_offset + name_start,
         self.source_offset + self.pos,
       )
-      builder.pure_doc(id, @pattern.ControlMap::single("note", midi))
+      builder.control_doc(id, "note", midi)
     }
     None => raise ParseError("position \{start}: unknown note name '\{name}'")
   }

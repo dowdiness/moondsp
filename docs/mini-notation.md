@@ -31,7 +31,7 @@ This is equivalent to stacking the two patterns. `$:` is a top-level program
 form, not syntax inside the quoted mini string. A single `$:` line is accepted
 and behaves like the contained expression.
 
-The older function form remains supported:
+The explicit function form is also supported:
 
 ```text
 stack(s("bd sd hh sd"), note("60 64 67 72"))
@@ -39,6 +39,25 @@ stack(s("bd sd hh sd"), note("60 64 67 72"))
 
 Once a program uses `$:` lines, each non-empty line must start with `$:`.
 Blank lines are ignored.
+
+Use `+` for an ordered overlay inside any expression:
+
+```text
+note("60 64") + s("bd sd")
+s("bd") + s("hh").fast(2)
+(s("bd") + s("hh")).fast(2)
+```
+
+Method chains bind more tightly than `+`: the second example speeds up only
+the hats, while the third speeds up both layers. Parentheses group expressions
+without adding a source node. `+` preserves left-to-right event order and
+duplicates; it does not merge control maps.
+
+The same syntax works in named definitions, `$:` lines, and song sections.
+Regrouping a raw overlay preserves known material content and playback clocks;
+source ancestry still reflects the authored grouping. Quoted `+` remains part
+of the notation, for example `chord("C+7")`. Ordinary newlines alone do not
+combine expressions.
 
 ## Inside quoted notation
 

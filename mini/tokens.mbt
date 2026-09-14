@@ -346,11 +346,12 @@ fn mini_can_start_negative_number(input : String, pos : Int) -> Bool {
 }
 
 ///|
-fn mini_token_kind_for_single(c : UInt16) -> MiniTokenKind {
+fn mini_token_kind_for_single(c : UInt16, quoted : Bool) -> MiniTokenKind {
   match c {
     '"' => StringDelimiter
     '(' | ')' | '[' | ']' | ',' | '.' => Punctuation
     '*' | '/' | '?' => Operator
+    '+' => if quoted { Unknown } else { Operator }
     _ => Unknown
   }
 }
@@ -360,6 +361,7 @@ fn tokenize_mini_authoring_source(input : String) -> Array[MiniToken] {
   let counters : Map[String, Int] = Map([])
   let tokens : Array[MiniToken] = []
   let mut pos = 0
+  let mut quoted = false
   while pos < input.length() {
     let c = input[pos]
     if mini_is_space(c) {
@@ -380,12 +382,15 @@ fn tokenize_mini_authoring_source(input : String) -> Array[MiniToken] {
       tokens.push(
         mini_token(
           counters,
-          mini_token_kind_for_single(c),
+          mini_token_kind_for_single(c, quoted),
           input[pos:pos + 1].to_owned(),
           pos,
           pos + 1,
         ),
       )
+      if c == '"' {
+        quoted = !quoted
+      }
       pos += 1
     }
   }
