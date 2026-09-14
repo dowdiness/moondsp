@@ -10,24 +10,39 @@ The keyboard uses last-held-note priority. There is one voice: pressing a new no
 
 ## Reading the source
 
-Start with [`src/main.ts`](src/main.ts). It keeps the public moondsp calls visible
-instead of hiding them behind an example-specific audio wrapper:
+Start with [`src/main.ts`](src/main.ts), the composition root. Initialization
+follows an explicit success/failure path:
 
-1. `SYNTH_GRAPH` describes the signal path.
-2. `GraphEngine()` and `mount()` create the suspended instrument; `startAudioFromGesture()` resumes it and calls `play()`.
-3. `playNote()` and `releaseNote()` translate keyboard actions into `applyControls()` batches.
-4. `cleanupResources()` releases the graph, engine, and app-owned audio context.
-5. The lifecycle helpers serialize operations and reject stale work after power-off or retry.
+```ts
+const started = andThen(readPage(document), startApplication);
+if (!started.ok) reportStartupFailure(document, started.error);
+```
+
+`readPage` acquires all required DOM nodes before any event registration or audio
+creation. A failed acquisition skips `startApplication`. On success, the
+application connects the DOM and audio actions, then initializes the instrument.
 
 | File | Responsibility |
 | --- | --- |
-| [`src/main.ts`](src/main.ts) | Graph definition, public audio API calls, resource ownership, and lifecycle safety |
-| [`src/controls.ts`](src/controls.ts) | Transport labels, status/error presentation, and volume/filter sliders |
-| [`src/keyboard.ts`](src/keyboard.ts) | Pointer/computer-key input, last-held-note priority, key feedback, and horizontal navigation |
-| [`src/dom.ts`](src/dom.ts) | Shared required-element lookup |
+| [`src/main.ts`](src/main.ts) | Connects the outer actions and handles startup failure |
+| [`src/controls.ts`](src/controls.ts) | Pure transport presentation, slider conversion, and error-message calculation |
+| [`src/keyboard.ts`](src/keyboard.ts) | Pure held-note transitions, note-action decisions, and keyboard/navigation projections |
+| [`src/synth.ts`](src/synth.ts) | Graph description and pure construction of parameter/gate control batches |
+| [`src/dom.ts`](src/dom.ts) | Acquires DOM nodes, reads gestures, applies projections, and registers browser events |
+| [`src/audio.ts`](src/audio.ts) | Owns audio resources and calls the public moondsp API, with serialized operations and stale-work rejection |
+| [`src/result.ts`](src/result.ts) | Explicit success/failure values, short-circuit composition, and exception capture at action boundaries |
 
-The UI modules do not import moondsp. They report user actions to `main.ts`,
-which remains the place to learn or change the audio behavior.
+The pure modules need no browser globals. Keyboard transitions return a new
+state and an optional note action; they neither modify their input nor play
+audio. The DOM edge interprets that action. Audio receives settings as values
+instead of reading slider elements.
+
+To follow the sound path, read `SYNTH_GRAPH` in `synth.ts`, then `GraphEngine()`,
+`mount()`, and `applyControls()` in `audio.ts`. The audio queue returns a
+`Result` for each operation and routes failures to lifecycle error handling.
+`resume()` still runs directly in the Start gesture, before the first await.
+Cleanup is intentionally different from the short-circuit success path: it
+attempts every owned resource and retains the first failure.
 
 ## Maintainer setup
 
@@ -78,6 +93,12 @@ server and production files served under `/synth/`.
 Visual-state checks additionally cover loading and power labels, active versus
 held notes against measured pitch, overlapping pointer/keyboard holds of the
 same pitch, and mobile navigation buttons, swiping, and resize boundaries.
+
+The effect-separated version was also checked for missing-DOM startup
+short-circuiting (no audio context or Wasm download), cancellation during page
+exit, context-suspension recovery, and pure note transitions without browser
+globals. The refactored source passed the development and production consumer
+checks above.
 
 These checks do not replace hardware listening, Safari/Firefox compatibility
 testing, or an audio-thread allocation/GC audit. No hard-real-time or
