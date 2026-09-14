@@ -6,6 +6,7 @@ This directory contains architecture blueprints, technical references, integrati
 
 ## 1. Guides & Language (Authoring & Live Coding)
 
+- **[`guides/live-coding-cookbook.md`](guides/live-coding-cookbook.md)** — Hands-on recipes that build from a drum pulse to Euclidean polyrhythms, layered harmony, stereo and room effects, and an arranged song.
 - **[`mini-notation.md`](mini-notation.md)** — Concise pattern syntax: quoted notation, sub-groups, Euclidean rhythms (`bd(3,8)`), polyphonic layers (`$:`), and method chains (`.fast()`, `.jux()`).
 - **[`pattern-algebra.md`](pattern-algebra.md)** — Rational-time pattern engine design: queryable arcs, events, combinators, and value mapping.
 - **[`mini-graph-authoring-boundary.md`](mini-graph-authoring-boundary.md)** — Boundary contract for bridging mini-notation events into DSP graph templates without mixing layers.
