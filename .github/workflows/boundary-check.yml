@@ -25,6 +25,9 @@ jobs:
       - name: Install MoonBit deps
         run: moon install
 
+      - name: Parse cookbook Mini examples
+        run: ./scripts/check-cookbook-mini.py
+
       - name: Run public boundary check
         run: ./scripts/check-public-boundary.sh
 

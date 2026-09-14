@@ -28,19 +28,19 @@ A cycle is a unit of time, not a fixed bar or beat.
 
 One kick per cycle:
 
-```text
+```mini
 s("bd")
 ```
 
 Four kicks per cycle:
 
-```text
+```mini
 s("bd*4")
 ```
 
 A simple drum pattern:
 
-```text
+```mini
 s("bd hh sd hh")
 ```
 
@@ -56,57 +56,57 @@ Available drums:
 
 Square brackets split one step into smaller steps:
 
-```text
+```mini
 s("bd sd [hh hh] sd")
 ```
 
 A comma plays patterns together:
 
-```text
+```mini
 s("bd sd, hh*8")
 ```
 
 `?` gives an event a 50% chance to play:
 
-```text
+```mini
 s("bd sd, hh*8?")
 ```
 
 Use `.degradeBy(p)` for another drop rate:
 
-```text
+```mini
 s("bd sd, hh*8").degradeBy(0.2)
 ```
 
 ## Change the speed
 
-```text
+```mini
 s("bd hh sd hh").fast(2)
 ```
 
-```text
+```mini
 s("bd hh sd hh").slow(4)
 ```
 
 Inside the quotes, `*n` repeats one item and `/n` stretches one item:
 
-```text
+```mini
 s("bd*4 sd/2")
 ```
 
 Apply a change every few cycles:
 
-```text
+```mini
 s("bd*4").every(3, fast(2))
 ```
 
-```text
+```mini
 s("bd hh sd hh").every(4, rev)
 ```
 
 Use `.rev()` to reverse every cycle:
 
-```text
+```mini
 s("bd hh sd hh").rev()
 ```
 
@@ -114,25 +114,25 @@ s("bd hh sd hh").rev()
 
 `sound(k,n)` spreads `k` hits across `n` steps:
 
-```text
+```mini
 s("bd(3,8)")
 ```
 
 A third number rotates the rhythm:
 
-```text
+```mini
 s("sd(2,8,2)")
 ```
 
 Combine several rhythms:
 
-```text
+```mini
 s("bd(3,8), hh(5,8), sd(2,8,2)")
 ```
 
 For longer independent cycles, name each layer:
 
-```text
+```mini
 let three = s("bd(3,8)").slow(3);
 let five = s("hh(5,8)").slow(5);
 three + five
@@ -144,23 +144,23 @@ The two layers keep their own clocks.
 
 `note()` accepts note names or MIDI numbers:
 
-```text
+```mini
 note("C4 E4 G4 C5")
 ```
 
-```text
+```mini
 note("60 64 67 72")
 ```
 
 `chord()` accepts common chord names:
 
-```text
+```mini
 chord("C Am F G7").slow(4)
 ```
 
 Layer drums, bass, and chords with `+`:
 
-```text
+```mini
 let drums = s("bd hh sd hh").slow(4);
 let bass = note("C2 C2 A1 G1").slow(4);
 let chords = chord("C Am F G7").slow(4);
@@ -171,13 +171,13 @@ drums + bass + chords
 
 Method calls bind before `+`:
 
-```text
+```mini
 s("bd") + s("hh").fast(2)
 ```
 
 This speeds up only the hi-hat. Add parentheses to speed up both layers:
 
-```text
+```mini
 (s("bd") + s("hh")).fast(2)
 ```
 
@@ -188,7 +188,7 @@ Hear the difference in
 
 Envelope times are seconds. They do not change with tempo.
 
-```text
+```mini
 note("E4 G4 D4")
   .slow(21)
   .attack(2)
@@ -198,20 +198,20 @@ note("E4 G4 D4")
 
 Pan from left (`-1`) to right (`1`):
 
-```text
+```mini
 let melody = note("E4 G4 A4 C5").slow(4);
 melody.pan(-0.45) + melody.rev().pan(0.45)
 ```
 
 `.jux(f)` puts the original on the left and a changed copy on the right:
 
-```text
+```mini
 note("C4 E4 G4").jux(rev)
 ```
 
 Send sound to the shared room reverb. `0` is dry and `1` is the largest send:
 
-```text
+```mini
 let drums = s("bd sd hh sd").slow(4).room(0.2);
 let chords = chord("Cmaj9 Am7 Fmaj9 G6").slow(8).room(0.7);
 drums + chords
@@ -224,7 +224,7 @@ Compare dry and wet versions in
 
 Switch the editor to **Song** mode:
 
-```text
+```mini-song
 let beat = s("bd hh sd hh").slow(4);
 let bass = note("C2 C2 A1 G1").slow(4);
 let chords = chord("C Am F G7").slow(4);
