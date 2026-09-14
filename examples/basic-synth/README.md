@@ -42,7 +42,7 @@ npm run dev
 
 Use `npm run build` for a production bundle and `npm run preview` to serve that bundle locally. The Vite configuration keeps the package's AudioWorklet processor and WebAssembly file as separate production assets and uses relative URLs for subpath deploys.
 
-The first page pass prepares and mounts the graph in a suspended `AudioContext`. The play icon and **Start** button perform the actual resume from the button gesture, then start the mounted graph. This two-step flow is intentional: graph mounting must happen while the context is suspended, while browser audio admission must come from a real user gesture.
+On page load, the example initializes the audio engine and mounts the graph in a suspended `AudioContext`. The play icon and **Start** button perform the actual resume from the button gesture, then start the mounted graph. This two-step flow is intentional: graph mounting must happen while the context is suspended, while browser audio admission must come from a real user gesture.
 
 ## Using a packed package elsewhere
 

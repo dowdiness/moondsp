@@ -20,4 +20,4 @@ await Promise.all([
     new URL('moonbit_dsp.wasm', destination)),
   copyFile(new URL('LICENSE', root), new URL('LICENSE', destination)),
 ]);
-console.log('Prepared @moondsp/browser: JS, declarations, Worklet, Wasm, and license.');
+console.log('Built @moondsp/browser: JS, declarations, Worklet, Wasm, and license.');

@@ -173,8 +173,8 @@ input[type="range"]:disabled { opacity: 0.5; cursor: default; }
 .button-primary[data-state="running"] { background: var(--paper); border-color: var(--line); color: var(--accent-dark); opacity: 1; }
 .button-primary[data-state="running"] .icon-play { display: none; }
 .button-primary[data-state="running"] .icon-running { display: block; }
-.button-primary:is([data-state="idle"], [data-state="preparing"], [data-state="disposed"], [data-state="disposing"], [data-state="error"]) .icon-play { display: none; }
-.button-primary:is([data-state="idle"], [data-state="preparing"], [data-state="disposed"], [data-state="disposing"], [data-state="error"]) .icon-power { display: block; }
+.button-primary:is([data-state="idle"], [data-state="loading"], [data-state="disposed"], [data-state="disposing"], [data-state="error"]) .icon-play { display: none; }
+.button-primary:is([data-state="idle"], [data-state="loading"], [data-state="disposed"], [data-state="disposing"], [data-state="error"]) .icon-power { display: block; }
 .button-primary[aria-busy="true"] { border-style: dashed; }
 .button-quiet { background: transparent; border-color: transparent; color: var(--ink-muted); }
 

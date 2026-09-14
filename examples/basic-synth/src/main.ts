@@ -43,7 +43,7 @@ let serialOperations: Promise<void> = Promise.resolve();
 // The UI translates browser gestures into these audio operations.
 const controls = createControls({ volume: DEFAULT_VOLUME, cutoff: DEFAULT_CUTOFF_HZ }, {
   start: startAudioFromGesture,
-  retry: requestPrepare,
+  retry: requestInitializeAudio,
   stopNotes,
   powerOff: requestDispose,
   volumeChanged(value) {
@@ -61,7 +61,7 @@ function render(): void {
 }
 
 // Mount while suspended; resume only in the Start button's user gesture.
-async function prepare(token: number, signal: AbortSignal): Promise<void> {
+async function initializeAudio(token: number, signal: AbortSignal): Promise<void> {
   const resources: AudioResources = { context: null, engine: null, graph: null, stateChangeListener: null };
   try {
     if (!isCurrent(token)) return;
@@ -112,7 +112,7 @@ async function prepare(token: number, signal: AbortSignal): Promise<void> {
 
 function startAudioFromGesture(): void {
   if (phase === "error" || phase === "idle" || phase === "disposed") {
-    requestPrepare();
+    requestInitializeAudio();
     return;
   }
   if (phase !== "suspended" || !context || !mounted) return;
@@ -262,7 +262,7 @@ function canControl(): boolean {
   return mounted !== null && (phase === "suspended" || phase === "running");
 }
 
-function requestPrepare(): void {
+function requestInitializeAudio(): void {
   lifecycleToken += 1;
   noteEpoch += 1;
   initializationAbort?.abort();
@@ -270,10 +270,10 @@ function requestPrepare(): void {
   const controller = new AbortController();
   initializationAbort = controller;
   clearHeldNotes();
-  phase = "preparing";
+  phase = "loading";
   errorText = "";
   render();
-  void enqueue(() => prepare(token, controller.signal));
+  void enqueue(() => initializeAudio(token, controller.signal));
 }
 
 function requestDispose(): void {
@@ -345,4 +345,4 @@ document.addEventListener("visibilitychange", () => {
   if (document.hidden) stopNotes();
 });
 window.addEventListener("pagehide", requestDispose);
-requestPrepare();
+requestInitializeAudio();

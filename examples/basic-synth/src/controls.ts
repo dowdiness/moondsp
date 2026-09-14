@@ -1,6 +1,6 @@
 import { required } from "./dom";
 
-export type Phase = "idle" | "preparing" | "suspended" | "resuming" | "running" | "error" | "disposing" | "disposed";
+export type Phase = "idle" | "loading" | "suspended" | "resuming" | "running" | "error" | "disposing" | "disposed";
 
 interface ControlActions {
   start(): void;
@@ -22,7 +22,7 @@ const CUTOFF_MIN_HZ = 120;
 const CUTOFF_MAX_HZ = 12_000;
 const PHASE_TEXT: Record<Phase, { status: string; label: string; name: string }> = {
   idle: { status: "Loading…", label: "Power on", name: "Power on audio" },
-  preparing: { status: "Loading…", label: "Loading…", name: "Loading audio" },
+  loading: { status: "Loading…", label: "Loading…", name: "Loading audio" },
   suspended: { status: "Ready", label: "Start", name: "Start audio" },
   resuming: { status: "Starting…", label: "Starting…", name: "Starting audio" },
   running: { status: "Audio on", label: "On", name: "Audio on" },
@@ -79,7 +79,7 @@ export function createControls(defaults: { volume: number; cutoff: number }, act
   function render(state: ControlState): void {
     phase = state.phase;
     const text = PHASE_TEXT[phase];
-    const busy = phase === "preparing" || phase === "resuming" || phase === "disposing";
+    const busy = phase === "loading" || phase === "resuming" || phase === "disposing";
     statusElement.textContent = text.status;
     statusElement.dataset.state = phase;
     errorPanel.hidden = phase !== "error";
