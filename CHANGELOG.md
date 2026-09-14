@@ -87,9 +87,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Refreshed the live syntax reference for overlay precedence, grouping, and song
-  placement. Corrected the browser help: gain and cutoff controls are parsed but
-  are not connected to the current browser instruments.
+- The live syntax reference is embedded from `docs/mini-notation.md` at build time,
+  with automatic reloads during development and stacked syntax/description pairs
+  that remain readable in the narrow help sidebar.
+- Corrected implicit song placement help to use the latest end of all preceding
+  parts, with regression coverage for out-of-order explicit placements.
+- Corrected the browser help: gain and cutoff controls are parsed but are not
+  connected to the current browser instruments.
 - Fixed the external graph example getting stuck after unmount failure. Cleanup
   now attempts each resource independently, preserves the original error, and
   restores the controls so another graph can be mounted.
