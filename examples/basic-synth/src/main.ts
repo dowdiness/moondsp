@@ -1,12 +1,50 @@
 import { createAudio } from "./audio";
-import { readPage, createDomConnection, reportStartupFailure, type PageElements } from "./dom";
+import { readPage, createDomConnection, reportStartupFailure, type PageElements, type PageBindings } from "./dom";
 import { andThen, attempt, type Result } from "./result";
 import { DEFAULT_SETTINGS } from "./synth";
 import "./style.css";
 
-function startApplication(elements: PageElements): Result<void> {
+// Page-specific names live at the composition root, not inside DOM actions.
+const PAGE_BINDINGS: PageBindings = {
+  selectors: {
+    startButton: "#start-audio",
+    startLabel: "#start-label",
+    stopButton: "#stop-notes",
+    disposeButton: "#dispose-audio",
+    retryButton: "#retry-audio",
+    status: "#audio-status",
+    errorPanel: "#audio-error",
+    errorMessage: "#error-message",
+    volumeInput: "#volume",
+    volumeValue: "#volume-value",
+    cutoffInput: "#cutoff",
+    cutoffValue: "#cutoff-value",
+    activeNoteDisplay: "#active-note-display",
+    activeNoteOutput: "#active-note",
+    keyboardScroll: "#piano-scroll",
+    keyboardNavigation: "#keyboard-navigation",
+    lowerNotesButton: "#lower-notes",
+    higherNotesButton: "#higher-notes",
+    keyboard: ".keyboard",
+    noteButtons: ".key[data-midi]",
+    noteName: ".note-name",
+    editable: "input, select, textarea, [contenteditable=\"true\"]",
+  },
+  classes: {
+    heldNote: "is-held",
+    activeNote: "is-active",
+  },
+  data: {
+    midi: "midi",
+    computerKey: "computerKey",
+    phase: "state",
+    activeNote: "active",
+  },
+};
+
+function startApplication(elements: PageElements, bindings: PageBindings): Result<void> {
   return attempt(() => {
-    const dom = createDomConnection(elements, DEFAULT_SETTINGS);
+    const dom = createDomConnection(elements, DEFAULT_SETTINGS, bindings);
     const audio = createAudio(dom.view, dom.settings);
     dom.connect(audio);
     audio.initialize();
@@ -14,5 +52,5 @@ function startApplication(elements: PageElements): Result<void> {
 }
 
 // A failed acquisition skips every subsequent action, including audio creation.
-const started = andThen(readPage(document), startApplication);
-if (!started.ok) reportStartupFailure(document, started.error);
+const started = andThen(readPage(document, PAGE_BINDINGS), elements => startApplication(elements, PAGE_BINDINGS));
+if (!started.ok) reportStartupFailure(document, started.error, PAGE_BINDINGS.selectors);

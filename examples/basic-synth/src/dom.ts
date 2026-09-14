@@ -11,9 +11,7 @@ interface NoteElement {
   readonly name: string;
 }
 
-export interface PageElements {
-  readonly document: Document;
-  readonly window: Window;
+interface RequiredElements {
   readonly startButton: HTMLButtonElement;
   readonly startLabel: HTMLSpanElement;
   readonly stopButton: HTMLButtonElement;
@@ -33,13 +31,40 @@ export interface PageElements {
   readonly lowerNotesButton: HTMLButtonElement;
   readonly higherNotesButton: HTMLButtonElement;
   readonly keyboard: HTMLElement;
+}
+
+export interface PageElements extends RequiredElements {
+  readonly document: Document;
+  readonly window: Window;
   readonly buttons: readonly HTMLButtonElement[];
   readonly notes: readonly NoteElement[];
 }
 
+export type PageSelectors = { readonly [Key in keyof RequiredElements]: string } & {
+  readonly noteButtons: string;
+  readonly noteName: string;
+  readonly editable: string;
+};
+
+export interface PageBindings {
+  readonly selectors: PageSelectors;
+  readonly classes: {
+    readonly heldNote: string;
+    readonly activeNote: string;
+  };
+  /** DOMStringMap keys, e.g. computerKey for data-computer-key. */
+  readonly data: {
+    readonly midi: string;
+    readonly computerKey: string;
+    readonly phase: string;
+    readonly activeNote: string;
+  };
+}
+
 /** Acquire every required node before registering events or creating audio. */
-export function readPage(document: Document): Result<PageElements> {
+export function readPage(document: Document, bindings: PageBindings): Result<PageElements> {
   return attempt(() => {
+    const { selectors, data } = bindings;
     function required<T extends Element>(selector: string): T {
       const element = document.querySelector<T>(selector);
       if (!element) throw new Error(`Missing required element: ${selector}`);
@@ -47,37 +72,37 @@ export function readPage(document: Document): Result<PageElements> {
     }
     const window = document.defaultView;
     if (!window) throw new Error("The synth document has no browser window");
-    const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>(".key[data-midi]"));
+    const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>(selectors.noteButtons));
     const notes = buttons.flatMap(button => {
-      const midi = Number(button.dataset.midi);
+      const midi = Number(button.dataset[data.midi]);
       return Number.isInteger(midi) ? [{
         button,
         midi,
-        computerKey: button.dataset.computerKey?.toLowerCase() ?? null,
-        name: button.querySelector(".note-name")?.textContent ?? "—",
+        computerKey: button.dataset[data.computerKey]?.toLowerCase() ?? null,
+        name: button.querySelector(selectors.noteName)?.textContent ?? "—",
       }] : [];
     });
     return {
       document, window, buttons, notes,
-      startButton: required<HTMLButtonElement>("#start-audio"),
-      startLabel: required<HTMLSpanElement>("#start-label"),
-      stopButton: required<HTMLButtonElement>("#stop-notes"),
-      disposeButton: required<HTMLButtonElement>("#dispose-audio"),
-      retryButton: required<HTMLButtonElement>("#retry-audio"),
-      status: required<HTMLParagraphElement>("#audio-status"),
-      errorPanel: required<HTMLElement>("#audio-error"),
-      errorMessage: required<HTMLParagraphElement>("#error-message"),
-      volumeInput: required<HTMLInputElement>("#volume"),
-      volumeValue: required<HTMLOutputElement>("#volume-value"),
-      cutoffInput: required<HTMLInputElement>("#cutoff"),
-      cutoffValue: required<HTMLOutputElement>("#cutoff-value"),
-      activeNoteDisplay: required<HTMLElement>("#active-note-display"),
-      activeNoteOutput: required<HTMLOutputElement>("#active-note"),
-      keyboardScroll: required<HTMLElement>("#piano-scroll"),
-      keyboardNavigation: required<HTMLElement>("#keyboard-navigation"),
-      lowerNotesButton: required<HTMLButtonElement>("#lower-notes"),
-      higherNotesButton: required<HTMLButtonElement>("#higher-notes"),
-      keyboard: required<HTMLElement>(".keyboard"),
+      startButton: required<HTMLButtonElement>(selectors.startButton),
+      startLabel: required<HTMLSpanElement>(selectors.startLabel),
+      stopButton: required<HTMLButtonElement>(selectors.stopButton),
+      disposeButton: required<HTMLButtonElement>(selectors.disposeButton),
+      retryButton: required<HTMLButtonElement>(selectors.retryButton),
+      status: required<HTMLParagraphElement>(selectors.status),
+      errorPanel: required<HTMLElement>(selectors.errorPanel),
+      errorMessage: required<HTMLParagraphElement>(selectors.errorMessage),
+      volumeInput: required<HTMLInputElement>(selectors.volumeInput),
+      volumeValue: required<HTMLOutputElement>(selectors.volumeValue),
+      cutoffInput: required<HTMLInputElement>(selectors.cutoffInput),
+      cutoffValue: required<HTMLOutputElement>(selectors.cutoffValue),
+      activeNoteDisplay: required<HTMLElement>(selectors.activeNoteDisplay),
+      activeNoteOutput: required<HTMLOutputElement>(selectors.activeNoteOutput),
+      keyboardScroll: required<HTMLElement>(selectors.keyboardScroll),
+      keyboardNavigation: required<HTMLElement>(selectors.keyboardNavigation),
+      lowerNotesButton: required<HTMLButtonElement>(selectors.lowerNotesButton),
+      higherNotesButton: required<HTMLButtonElement>(selectors.higherNotesButton),
+      keyboard: required<HTMLElement>(selectors.keyboard),
     };
   });
 }
@@ -89,8 +114,9 @@ export interface DomConnection {
 }
 
 /** Interpret projections and gestures; all DOM reads, writes, and listeners stay here. */
-export function createDomConnection(elements: PageElements, defaults: Settings): DomConnection {
+export function createDomConnection(elements: PageElements, defaults: Settings, bindings: PageBindings): DomConnection {
   const e = elements;
+  const { selectors, classes, data } = bindings;
   const noteElements = new Map(e.notes.map(note => [note.midi, note]));
   const keyToMidi = new Map(e.notes.flatMap(note => note.computerKey ? [[note.computerKey, note.midi] as const] : []));
   const pointerNotes = new Map<number, { readonly id: string; readonly button: HTMLButtonElement }>();
@@ -101,11 +127,11 @@ export function createDomConnection(elements: PageElements, defaults: Settings):
   function renderControls(): void {
     const text = controlView(controls, notesHeld);
     e.status.textContent = text.status;
-    e.status.dataset.state = controls.phase;
+    e.status.dataset[data.phase] = controls.phase;
     e.errorPanel.hidden = !text.errorVisible;
     e.errorMessage.textContent = controls.errorText;
     e.startButton.disabled = text.startDisabled;
-    e.startButton.dataset.state = controls.phase;
+    e.startButton.dataset[data.phase] = controls.phase;
     e.startLabel.textContent = text.label;
     e.startButton.setAttribute("aria-label", text.name);
     e.startButton.setAttribute("aria-busy", String(text.busy));
@@ -121,12 +147,12 @@ export function createDomConnection(elements: PageElements, defaults: Settings):
     for (const [midi, { button }] of noteElements) {
       const held = state.heldMidis.has(midi);
       const active = state.activeMidi === midi;
-      button.classList.toggle("is-held", held);
-      button.classList.toggle("is-active", active);
+      button.classList.toggle(classes.heldNote, held);
+      button.classList.toggle(classes.activeNote, active);
       button.setAttribute("aria-pressed", String(held));
       button.setAttribute("aria-description", active ? "Active note" : held ? "Held; another note is active" : "Hold to play");
     }
-    e.activeNoteDisplay.dataset.active = String(state.activeMidi !== null);
+    e.activeNoteDisplay.dataset[data.activeNote] = String(state.activeMidi !== null);
     e.activeNoteOutput.textContent = state.activeMidi === null ? "—" : noteElements.get(state.activeMidi)?.name ?? "—";
   }
 
@@ -207,7 +233,7 @@ export function createDomConnection(elements: PageElements, defaults: Settings):
 
       e.window.addEventListener("keydown", event => {
         if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
-        if (event.target instanceof HTMLElement && event.target.closest("input, select, textarea, [contenteditable=\"true\"]")) return;
+        if (event.target instanceof HTMLElement && event.target.closest(selectors.editable)) return;
         const key = event.key.toLowerCase();
         const midi = keyToMidi.get(key);
         if (midi === undefined || !keyboard.enabled) return;
@@ -282,9 +308,13 @@ export function createDomConnection(elements: PageElements, defaults: Settings):
 }
 
 /** Last-resort startup reporting also stays at the DOM edge. */
-export function reportStartupFailure(document: Document, error: Error): void {
-  const panel = document.querySelector<HTMLElement>("#audio-error");
-  const message = document.querySelector<HTMLElement>("#error-message");
+export function reportStartupFailure(
+  document: Document,
+  error: Error,
+  selectors: Pick<PageSelectors, "errorPanel" | "errorMessage">,
+): void {
+  const panel = document.querySelector<HTMLElement>(selectors.errorPanel);
+  const message = document.querySelector<HTMLElement>(selectors.errorMessage);
   if (panel && message) {
     panel.hidden = false;
     message.textContent = error.message;

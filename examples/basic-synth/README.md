@@ -14,8 +14,8 @@ Start with [`src/main.ts`](src/main.ts), the composition root. Initialization
 follows an explicit success/failure path:
 
 ```ts
-const started = andThen(readPage(document), startApplication);
-if (!started.ok) reportStartupFailure(document, started.error);
+const started = andThen(readPage(document, PAGE_BINDINGS), elements => startApplication(elements, PAGE_BINDINGS));
+if (!started.ok) reportStartupFailure(document, started.error, PAGE_BINDINGS.selectors);
 ```
 
 `readPage` acquires all required DOM nodes before any event registration or audio
@@ -43,6 +43,20 @@ To follow the sound path, read `SYNTH_GRAPH` in `synth.ts`, then `GraphEngine()`
 `resume()` still runs directly in the Start gesture, before the first await.
 Cleanup is intentionally different from the short-circuit success path: it
 attempts every owned resource and retains the first failure.
+
+### Changing the page markup
+
+`PAGE_BINDINGS` in `main.ts` supplies the page-specific names to the DOM actions:
+
+- `selectors`: CSS selectors for required controls, note buttons and labels, and editable targets that should not play computer-key notes.
+- `classes`: single class-name tokens for held/active note feedback, without a leading `.`.
+- `data`: `dataset` keys for note pitch, computer-key bindings, transport phase, and active-note feedback. Use camelCase (`computerKey` corresponds to `data-computer-key`).
+
+When changing IDs, classes, or data attributes, update this configuration and the
+matching HTML/CSS together. `readPage`, `createDomConnection`, and startup-error
+reporting receive their bindings as arguments; they have no built-in page-name
+defaults. Standard event names and ARIA attributes remain browser contracts,
+not page configuration.
 
 ## Maintainer setup
 
@@ -99,6 +113,11 @@ short-circuiting (no audio context or Wasm download), cancellation during page
 exit, context-suspension recovery, and pure note transitions without browser
 globals. The refactored source passed the development and production consumer
 checks above.
+
+DOM binding injection was exercised with 18 renamed control IDs, five renamed
+classes, and four renamed data keys. The alternate markup passed desktop/mobile
+input, actual audio measurement, power cycling, and startup-error reporting
+through the configured error target.
 
 These checks do not replace hardware listening, Safari/Firefox compatibility
 testing, or an audio-thread allocation/GC audit. No hard-real-time or
