@@ -19,7 +19,7 @@ This directory contains architecture blueprints, technical references, integrati
 `moondsp` is platform-agnostic. Core audio and pattern computation are strictly decoupled from host platform drivers:
 
 - 🌐 **Browser Target**: **[`browser-api-contract.md`](browser-api-contract.md)** — Web AudioWorklet export ABI (`wasm-gc`), JS/TS bindings, and browser integration review rules.
-- 🎛️ **Native DAW Target**: **[`clap-plugin-plan.md`](clap-plugin-plan.md)** — Native CLAP plugin architecture, C ABI bridge (`clap_host`), Linux/Windows builds, and zero-allocation audit.
+- 🎛️ **Native DAW Target**: **[`clap-plugin-guide.md`](clap-plugin-guide.md)** — Native CLAP plugin architecture, C ABI bridge (`clap_host`), Linux/Windows builds, and zero-allocation audit.
 - 🖥️ **Host-Independent MoonBit Target**: Direct programmatic API via `GraphEngine` (see [Root README](../README.md#host-independent-moonbit-api)).
 
 ---
@@ -37,7 +37,7 @@ This directory contains architecture blueprints, technical references, integrati
 ## 4. Evidences & Contributor Resources
 
 - **[`performance/`](performance/)** — Dated real-time audio benchmark snapshots and allocation audits.
-- **[`development/`](development/)** — Platform probes, bridge symbol investigations, and boundary inventories.
+- **[`development/`](development/README.md)** — Hardware probes, zero-allocation audits, DAW compatibility records, and boundary inventories.
 - **[`next-actions.md`](next-actions.md)** — Active handoff list for upcoming priorities.
 - **[`../CLAUDE.md`](../CLAUDE.md)** — Project conventions and contributor quick reference.
 

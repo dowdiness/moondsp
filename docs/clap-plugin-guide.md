@@ -1,7 +1,8 @@
-# CLAP plugin bring-up plan
+# CLAP Plugin Architecture & Integration Guide
 
-This is the native-plugin path for moondsp. The current prototype has three
-layers:
+This guide documents the native CLAP plugin path for `moondsp`. It details the C ABI bridge, native build workflows for Linux and Windows, zero-allocation verification, and host integration status.
+
+The plugin path has three layers:
 
 ```text
 DAW / CLAP host
