@@ -42,6 +42,18 @@ pub fn get_playback_error_char(Int) -> Int
 
 pub fn get_playback_error_length() -> Int
 
+pub fn graph_host_begin(Double) -> Bool
+
+pub fn graph_host_command(Int, Int) -> Bool
+
+pub fn graph_host_prepare() -> Int
+
+pub fn graph_host_process(Int) -> Bool
+
+pub fn graph_host_push(Int, Int, Double, Int) -> Bool
+
+pub fn graph_host_sample(Int) -> Double
+
 pub fn init_compiled_graph(Double, Int) -> Bool
 
 pub fn init_compiled_hot_swap_graph(Double, Int) -> Bool

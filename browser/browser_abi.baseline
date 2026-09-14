@@ -47,6 +47,18 @@ pub fn get_playback_error_char(Int) -> Int
 
 pub fn get_playback_error_length() -> Int
 
+pub fn graph_host_begin(Double) -> Bool
+
+pub fn graph_host_command(Int, Int) -> Bool
+
+pub fn graph_host_prepare() -> Int
+
+pub fn graph_host_process(Int) -> Bool
+
+pub fn graph_host_push(Int, Int, Double, Int) -> Bool
+
+pub fn graph_host_sample(Int) -> Double
+
 pub fn init_compiled_graph(Double, Int) -> Bool
 
 pub fn init_compiled_hot_swap_graph(Double, Int) -> Bool
@@ -134,6 +146,12 @@ pub fn tick_source(source_id~ : Int, freq_hz~ : Double, sample_rate~ : Double) -
 // Traits
 
 ## browser/moon.pkg js exports
+graph_host_begin
+graph_host_push
+graph_host_prepare
+graph_host_command
+graph_host_process
+graph_host_sample
 tick
 tick_source
 reset_phase
@@ -195,6 +213,12 @@ set_scheduler_bpm
 set_scheduler_gain
 
 ## browser/moon.pkg wasm-gc exports
+graph_host_begin
+graph_host_push
+graph_host_prepare
+graph_host_command
+graph_host_process
+graph_host_sample
 tick
 tick_source
 reset_phase

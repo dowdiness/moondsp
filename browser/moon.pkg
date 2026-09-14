@@ -13,6 +13,12 @@ options(
   link: {
     "js": {
       "exports": [
+        "graph_host_begin",
+        "graph_host_push",
+        "graph_host_prepare",
+        "graph_host_command",
+        "graph_host_process",
+        "graph_host_sample",
         "tick",
         "tick_source",
         "reset_phase",
@@ -76,6 +82,12 @@ options(
     },
     "wasm-gc": {
       "exports": [
+        "graph_host_begin",
+        "graph_host_push",
+        "graph_host_prepare",
+        "graph_host_command",
+        "graph_host_process",
+        "graph_host_sample",
         "tick",
         "tick_source",
         "reset_phase",
