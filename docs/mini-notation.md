@@ -17,6 +17,8 @@ In the live app's **Examples** panel, select an example and press **Play**:
 - [Grouping A/B](../examples/overlay-grouping.mini) plays `kick + hats.fast(2)`
   followed by `(kick + hats).fast(2)`: hear only the hats speed up, then both
   layers. The two sections last 20 seconds in total at BPM 96.
+- [Space in the groove](../examples/rests-and-gates.mini) combines `~` rests
+  with two gate lengths so the pulse stays fixed while notes leave audible room.
 
 ## Syntax reference
 
@@ -113,6 +115,8 @@ s("[bd sd]*2 hh")
 note("60(3,8) 64(2,8,2) 67(3,8)").slow(4)
 note("C4(3,8) E4(2,8,2) G4(3,8)").slow(4)
 chord("C Am F G7").slow(2)
+s("bd ~ sd ~")
+note("C3 ~ C3 Eb3 ~ G2 Bb2 ~").gate(0.35)
 ```
 
 `note(...)` accepts names such as `C4`, `F#3`, and `Bb`; omitted octaves

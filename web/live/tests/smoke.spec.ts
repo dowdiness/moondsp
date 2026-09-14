@@ -8,7 +8,7 @@
 //     UI layer.
 
 import { test, expect } from "@playwright/test";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -50,6 +50,18 @@ test.describe("UI smoke (no audio)", () => {
     const content = page.locator(".cm-content");
     await expect(content).toBeVisible();
     await expect(content).toContainText(INITIAL_PATTERN_RENDERED);
+  });
+
+  test("rests and gates example loads its authored score", async ({ page }) => {
+    const score = readFileSync(new URL("../../../examples/rests-and-gates.mini", import.meta.url), "utf8");
+    const example = page.locator('[data-live-example="rests-and-gates"]');
+    await expect(example).toBeVisible();
+    await expect(example).toHaveAttribute("data-example", score);
+    await example.click();
+    await expect(page.locator("#global-bpm")).toHaveValue("96");
+    await expect(page.locator(".cm-content")).toContainText('s("bd ~ sd ~ bd bd ~ sd")');
+    await expect(page.locator(".cm-content")).toContainText(".gate(0.35)");
+    await expect(page.locator(".cm-content")).toContainText(".gate(0.6)");
   });
 
   test("editor accepts keyboard input", async ({ page }) => {

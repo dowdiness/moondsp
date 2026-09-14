@@ -18,6 +18,7 @@ import sharedRoomComparison from "../../../examples/shared-room-comparison.mini?
 import sharedRoomAfterglow from "../../../examples/shared-room-afterglow.mini?raw";
 import overlayGroove from "../../../examples/overlay-groove.mini?raw";
 import overlayGrouping from "../../../examples/overlay-grouping.mini?raw";
+import restsAndGates from "../../../examples/rests-and-gates.mini?raw";
 
 import { minilive } from "./lang/minilive";
 import { CM6Adapter } from "./canopy";
@@ -253,6 +254,7 @@ startBtn.addEventListener("click", () => {
 (document.getElementById("shared-room-afterglow-example") as HTMLButtonElement).dataset.example = sharedRoomAfterglow;
 (document.getElementById("overlay-groove-example") as HTMLButtonElement).dataset.example = overlayGroove;
 (document.getElementById("overlay-grouping-example") as HTMLButtonElement).dataset.example = overlayGrouping;
+(document.getElementById("rests-and-gates-example") as HTMLButtonElement).dataset.example = restsAndGates;
 
 cheatToggle.addEventListener("click", () => {
   const collapsed = workspaceEl.classList.toggle("cheat-collapsed");
