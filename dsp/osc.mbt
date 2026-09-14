@@ -120,7 +120,7 @@ pub fn Oscillator::process(
 ///|
 fn sample_for_phase(waveform : Waveform, phase : Double) -> Double {
   match waveform {
-    Sine => @math.sin(phase * 2.0 * @math.PI)
+    Sine => sine_for_phase(phase)
     Saw => 2.0 * phase - 1.0
     Square => if phase < 0.5 { 1.0 } else { -1.0 }
     Triangle => if phase < 0.5 { 4.0 * phase - 1.0 } else { 3.0 - 4.0 * phase }

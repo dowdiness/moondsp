@@ -94,6 +94,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   parts, with regression coverage for out-of-order explicit placements.
 - Corrected the browser help: gain and cutoff controls are parsed but are not
   connected to the current browser instruments.
+- Removed per-sample scratch allocations from Wasm-GC sine oscillators while
+  preserving the existing coefficients, floating-point evaluation order, and
+  phase-wrap behavior. Public DSP APIs and other target implementations are unchanged.
 - Fixed the external graph example getting stuck after unmount failure. Cleanup
   now attempts each resource independently, preserves the original error, and
   restores the controls so another graph can be mounted.

@@ -8,3 +8,10 @@ import {
   "moonbitlang/core/double",
   "moonbitlang/quickcheck" @qc,
 } for "test"
+
+options(
+  targets: {
+    "osc_sine_wasm_gc.mbt": [ "wasm-gc" ],
+    "osc_sine_other.mbt": [ "not", "wasm-gc" ],
+  },
+)
