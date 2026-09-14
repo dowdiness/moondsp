@@ -87,6 +87,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Refreshed the live syntax reference for overlay precedence, grouping, and song
+  placement. Corrected the browser help: gain and cutoff controls are parsed but
+  are not connected to the current browser instruments.
 - Fixed the external graph example getting stuck after unmount failure. Cleanup
   now attempts each resource independently, preserves the original error, and
   restores the controls so another graph can be mounted.

@@ -115,22 +115,47 @@ $: note("48 60 67").slow(3)
 $: chord("C Am F G7").slow(4)
 ```
 
-Supported methods include:
+Supported methods:
 
-- `.fast(n)` / `.slow(n)`
-- `.rev()`
-- `.degradeBy(p)`
-- `.cutoff(f)`, `.gain(g)`, `.pan(p)`
-- `.every(n, fast(k)|slow(k)|rev)`
-- `.jux(fast(k)|slow(k)|rev)`
+- `.fast(n)` / `.slow(n)`: speed up or slow down; use positive integer factors.
+- `.rev()`: reverse events within each cycle.
+- `.degradeBy(p)`: deterministic event dropping, with probability from 0 to 1.
+- `.pan(p)`: stereo position from -1 (left) to 1 (right).
+- `.room(p)`: send from 0 to 1 into the browser's shared reverb; the dry signal remains.
+- `.attack(s)`, `.hold(s)`, `.release(s)`: note/chord envelope times in seconds,
+  from 0 to 86400. Explicit times do not scale with tempo or `.fast`/`.slow`.
+  Omit `.hold` to use the pattern's note length.
+- `.every(n, fast(k)|slow(k)|rev)`: transform every nth cycle; `n` is a positive integer.
+- `.jux(fast(k)|slow(k)|rev)`: original left, transformed copy right.
+- `.gain(g)`, `.cutoff(hz)`: parsed control values. The current browser instruments
+  have no bindings for these keys, so they do not affect volume or filtering there.
+
+Method chains bind more tightly than `+`. Compare `a + b.fast(2)` (only `b`)
+with `(a + b).fast(2)` (both layers). The **Grouping A/B** live example plays
+this comparison.
 
 ## Browser live examples
 
-The live browser UI uses `$:` for cross-source examples because it mirrors the
-layered shape of Strudel sessions:
+The live browser UI supports both `+` expressions and explicit `$:` layers.
+`$:` mirrors the layered shape of Strudel sessions:
 
 ```text
 $: s("bd(3,8), hh(5,16)?, sd(2,8,4)").slow(2)
 $: note("48(3,8) 60(2,8,2) 67(3,8) 60(2,8,3)").slow(3)
 $: chord("C Am F G7").slow(4)
 ```
+
+## Song placement
+
+Use Song mode for `song(...)`, with comma-separated items:
+
+- `section("name", length, expression)`: define a positive-length section;
+  its expression can use `+`, grouping, and named patterns.
+- `part("id", "section")`: append a section occurrence.
+- `part("id", "section", start)`: place it at an absolute cycle; overlaps play together.
+- `part_id("id", "label", "section"[, start])`: separate stable identity from display name.
+- `fill("prefix", "section")`: fill uncovered time between occurrences.
+- `bpm(n)`: set the song tempo; this remains editable during playback.
+
+Section lengths and explicit starts accept integers or fractions such as `3/2`.
+Use unique occurrence IDs. Examples select their mode and tempo automatically.

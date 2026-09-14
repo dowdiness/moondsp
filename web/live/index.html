@@ -484,33 +484,34 @@
             <dt>s("bd hh sd hh")</dt><dd>drums: bd kick, sd snare, hh closed hat, oh open hat, cp clap</dd>
           </dl>
           <p class="cheat-note">Notes: <code>C4</code> = MIDI 60. Use <code>#</code> or <code>b</code> for accidentals; octave defaults to 4.</p>
-          <p class="cheat-note">Chords: <code>C</code> major, <code>Cm</code> minor; also <code>7</code>, <code>maj7</code>, <code>m7</code>, <code>dim</code>, <code>aug</code>, <code>sus4</code>, <code>6</code>, <code>add9</code>, <code>maj9</code>, <code>m9</code>.</p>
+          <p class="cheat-note">Chords: <code>C</code> major, <code>Cm</code> minor; also <code>7</code>, <code>maj7</code>, <code>m7</code>, <code>dim</code>, <code>aug</code>, <code>sus2</code>, <code>sus4</code>, <code>6</code>, <code>add9</code>, <code>maj9</code>, <code>m9</code>. In <code>chord("C+7")</code>, the quoted <code>+</code> is part of the chord name, not an overlay.</p>
 
           <h2>Sound shape</h2>
           <dl>
-            <dt>.gain(n)</dt><dd>scale volume</dd>
             <dt>.pan(n)</dt><dd>left −1, center 0, right 1</dd>
             <dt>.room(n)</dt><dd>send 0–1 into the shared room reverb</dd>
             <dt>.attack(s)</dt><dd>fade in over s seconds</dd>
             <dt>.hold(s)</dt><dd>stay at peak volume for s seconds</dd>
             <dt>.release(s)</dt><dd>fade out over s seconds</dd>
           </dl>
-          <p><code>stack(<br>&nbsp;&nbsp;s("bd sd").gain(0.25),<br>&nbsp;&nbsp;chord("Cmaj7").gain(0.08).room(0.7)<br>)</code></p>
-          <p class="cheat-note"><code>.room(0)</code> is dry and is the default. <code>.room(1)</code> is the maximum send. The example keeps the drums dry while the chord sends at 0.7; every part still keeps its dry signal.</p>
-          <p class="cheat-note">Envelopes apply to notes and chords. Times are seconds.</p>
+          <p><code>s("bd hh").slow(2) +<br>note("E4").slow(4).room(0.35)</code></p>
+          <p class="cheat-note"><code>.room(0)</code> is dry and is the default; <code>.room(1)</code> is the maximum send. Here the drums stay dry and the note sends at 0.35. Both keep their dry signal.</p>
+          <p class="cheat-note">Envelopes apply to notes and chords. Each time is in seconds, from 0 to 86400.</p>
           <p><code>note("E4")<br>&nbsp;&nbsp;.attack(0.01).hold(0.1)<br>&nbsp;&nbsp;.release(0.2)</code></p>
           <p class="cheat-note">0.31 seconds total, independent of tempo. Omit hold to follow the pattern's note length. Omitted attack/release use the sound's defaults; release starts from the current level.</p>
           <p class="cheat-note">Room is one shared stereo space for every part. Its tail continues across note endings, section changes, and live edits; Stop remains immediate.</p>
+          <p class="cheat-note"><strong>Browser limitation:</strong> <code>.gain(n)</code> and <code>.cutoff(hz)</code> are parsed as control values, but the current browser instruments do not connect them to volume or filter controls. They do not change the sound here.</p>
 
           <h2>Rhythm</h2>
           <p class="cheat-note">BPM sets cycles per minute: at 60, one cycle is one second. A cycle has no fixed meter.</p>
           <dl>
             <dt>.fast(n)</dt><dd>n× faster</dd>
             <dt>.slow(n)</dt><dd>n× slower; explicit envelope seconds stay unchanged</dd>
-            <dt>.rev()</dt><dd>reverse</dd>
+            <dt>.rev()</dt><dd>reverse events within each cycle</dd>
             <dt>.degradeBy(p)</dt><dd>drop events with probability p (0–1)</dd>
             <dt>.every(n, f)</dt><dd>apply f every nth cycle</dd>
           </dl>
+          <p class="cheat-note">Use positive integers for fast, slow, and every. Callback <code>f</code> is <code>fast(n)</code>, <code>slow(n)</code>, or <code>rev</code> without parentheses.</p>
           <p class="cheat-note">Inside strings:</p>
           <dl>
             <dt>a b c</dt><dd>sequence in one cycle; newlines also separate items</dd>
@@ -525,22 +526,31 @@
           <h2>Combine patterns</h2>
           <dl>
             <dt>let a = p;</dt><dd>name a reusable pattern; define it before use</dd>
-            <dt>stack(a, b)</dt><dd>play patterns together</dd>
-            <dt>a + b</dt><dd>ordered overlay; same as stack(a, b)</dd>
-            <dt>(a + b).fast(n)</dt><dd>transform both layers; without parentheses, .fast(n) applies only to b</dd>
+            <dt>a + b + c</dt><dd>overlay layers in left-to-right order; duplicates are preserved</dd>
+            <dt>stack(a, b)</dt><dd>the explicit form of a + b</dd>
+            <dt>a + b.fast(2)</dt><dd>speed up only b; method chains bind before +</dd>
+            <dt>(a + b).fast(2)</dt><dd>speed up both layers; parentheses group the expression</dd>
             <dt>$: a<br>$: b</dt><dd>combine top-level layers on separate lines</dd>
             <dt>.jux(f)</dt><dd>original left, transformed copy right</dd>
           </dl>
-          <p class="cheat-note"><code>f</code> = <code>fast(n)</code>, <code>slow(n)</code>, or <code>rev</code>. Keep pattern names stable during live edits.</p>
+          <p><code>s("bd") + s("hh").fast(2)</code></p>
+          <p><code>(s("bd") + s("hh")).fast(2)</code></p>
+          <p class="cheat-note">Hear the difference in the <strong>Grouping A/B</strong> example. Grouping also works with slow, rev, and other method chains.</p>
+          <p class="cheat-note"><code>+</code> works in named definitions, <code>$:</code> lines, and song sections. Ordinary newlines do not combine expressions: use <code>+</code>, <code>stack</code>, or a <code>$:</code> prefix on each top-level layer. Inside quoted notation, use commas to overlay items.</p>
+          <p class="cheat-note">Define names with <code>let</code> before using them and keep them stable during live edits. Overlay adds events, not their control values.</p>
 
           <h2>Song structure</h2>
           <dl>
             <dt>song(…)</dt><dd>sections and their playback order</dd>
             <dt>section("a", n, p)</dt><dd>name a section lasting n cycles</dd>
-            <dt>part("id", "a")</dt><dd>play section a; use a unique part id</dd>
+            <dt>part("id", "a")</dt><dd>append section a after the previous part; use a unique part id</dd>
+            <dt>part("id", "a", 8)</dt><dd>place the part at absolute cycle 8; overlapping parts play together</dd>
+            <dt>part_id("id", "label", "a")</dt><dd>keep a stable id separate from its display label; optional start as the fourth argument</dd>
+            <dt>fill("gap", "a")</dt><dd>fill uncovered time between parts with section a</dd>
             <dt>bpm(n)</dt><dd>tempo inside song(); editable while playing</dd>
           </dl>
-          <p class="cheat-note">Separate calls with commas; multiline songs are supported. The header BPM control sets global tempo. Examples may set it too.</p>
+          <p class="cheat-note">Separate calls with commas. Section lengths and explicit starts accept integers or fractions such as <code>3/2</code>; section lengths must be positive. Pattern expressions inside sections support <code>+</code> and parentheses.</p>
+          <p class="cheat-note">Select <strong>Song</strong> mode to play a song. The header BPM control sets global tempo; <code>bpm(n)</code> sets it from the score. Examples select their mode and tempo for you.</p>
         </details>
       </aside>
     </main>
