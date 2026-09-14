@@ -990,6 +990,39 @@ makes single-optimize a static guarantee, not just a dynamic property —
 `optimize_graph` is package-private and runs exactly once inside
 `CompiledTemplate::analyze`.
 
+### 3.5.4 Host-independent graph engine
+
+`engine/` owns the graph lifecycle API, re-exported by the root facade:
+`GraphEngine`, `MountedGraph`, and the checked `GraphEngineError` type.
+It depends on `graph/` and `dsp/`, not on browser APIs or global registries.
+
+- Construct each engine with a `DspContext` and an optional positive capacity
+  (default 16). Sample rate must be finite and positive; block size must be
+  positive. Context and capacity failures raise `InvalidConfiguration`.
+- `mount(Array[DspNode])` uses the canonical `CompiledTemplate::analyze` /
+  `CompiledDsp::compile_result` crossing and returns a paused, typed handle.
+  Compilation failure retains the underlying `GraphCompileError` in
+  `GraphEngineError::InvalidGraph` and does not consume a slot.
+- `MountedGraph::play` seals mount admission on its owning engine only.
+  `pause` preserves DSP state; `unmount` detaches permanently and is idempotent.
+  A retired handle cannot control a replacement that reuses its slot.
+- `process(output)` replaces the caller's buffer with the mono sum. Buffer
+  length must match the context; mismatch is rejected before any state advance
+  or buffer write. Successful processing reuses preallocated graph buffers.
+- `close` drops compiled graphs and invalidates remaining handles with
+  `EngineClosed`. Already-unmounted handles remain safely unmounted. There is
+  no implicit relationship between the lifetimes of separate engines.
+- Mounting, compilation, and lifecycle mutation occur outside processing.
+  Calls are serialized by the caller; this is not a concurrent engine API.
+  Live graph replacement, parameter automation, and scheduler integration are
+  not added by this layer.
+
+The browser adapter decodes its oscillator/gain/output JSON subset into
+canonical nodes in MoonBit, maps typed errors to a JSON error envelope, and
+keeps integer handles only at the WASM boundary. JavaScript owns browser
+resources, serialization, pending promises, and creation cancellation; it
+does not compile graphs or decide the engine's mount/playing state.
+
 ### 3.6 Graph Hot-Swap
 
 The current implementation provides narrow mono and terminal-stereo hot-swap

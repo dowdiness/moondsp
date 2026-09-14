@@ -19,11 +19,12 @@ class MoonDspGraphProcessor extends AudioWorkletProcessor {
       });
       if (this.closed) return;
       this.wasm = instance.exports;
-      for (const name of ['graph_host_begin', 'graph_host_push', 'graph_host_prepare',
-        'graph_host_command', 'graph_host_process', 'graph_host_sample',
-        'get_browser_error_length', 'get_browser_error_char']) {
+      for (const name of ['graph_host_init', 'graph_host_clear_input', 'graph_host_push_char', 'graph_host_mount',
+        'graph_host_command', 'graph_host_process', 'graph_host_sample', 'graph_host_close',
+        'graph_host_error_length', 'graph_host_error_char']) {
         if (typeof this.wasm[name] !== 'function') throw new Error(`Missing export: ${name}`);
       }
+      if (!this.wasm.graph_host_init(sampleRate)) throw this.hostError();
       this.port.postMessage({ type: 'ready' });
     } catch (error) {
       if (this.closed) return;
@@ -32,51 +33,24 @@ class MoonDspGraphProcessor extends AudioWorkletProcessor {
     }
   }
 
-  hostError(code, nodeIndex) {
-    let message = '';
-    for (let i = 0; i < this.wasm.get_browser_error_length(); i++) {
-      message += String.fromCharCode(this.wasm.get_browser_error_char(i));
+  hostError() {
+    let encoded = '';
+    for (let i = 0; i < this.wasm.graph_host_error_length(); i++) {
+      encoded += String.fromCharCode(this.wasm.graph_host_error_char(i));
     }
-    return Object.assign(new Error(message), { code, nodeIndex });
+    const detail = JSON.parse(encoded);
+    return Object.assign(new Error(detail.message), detail);
   }
 
   mount(graph) {
-    const reject = (message, nodeIndex) => {
-      throw Object.assign(new Error(message), { code: 'INVALID_GRAPH', nodeIndex });
-    };
-    if (!graph || !Array.isArray(graph.nodes) || graph.nodes.length === 0 || graph.nodes.length > 64) {
-      reject('A graph must contain 1 to 64 nodes');
+    // Only serialization lives here; MoonBit decodes, validates, and mounts.
+    const encoded = JSON.stringify(graph);
+    this.wasm.graph_host_clear_input();
+    if (encoded !== undefined) {
+      for (const char of encoded) this.wasm.graph_host_push_char(char.codePointAt(0));
     }
-    if (!this.wasm.graph_host_begin(sampleRate)) throw this.hostError('MOUNT_REJECTED');
-    const waveforms = ['sine', 'saw', 'square', 'triangle'];
-    for (let i = 0; i < graph.nodes.length; i++) {
-      const node = graph.nodes[i];
-      if (!node || typeof node !== 'object') reject('Expected a node object', i);
-      let kind, value = 0, input = 0, waveform = 0;
-      switch (node.type) {
-        case 'oscillator':
-          kind = 0;
-          value = node.frequency;
-          waveform = waveforms.indexOf(node.waveform);
-          if (waveform < 0) reject('Unknown oscillator waveform', i);
-          break;
-        case 'gain':
-          kind = 1;
-          value = node.gain;
-          input = node.input;
-          break;
-        case 'output':
-          kind = 2;
-          input = node.input;
-          break;
-        default: reject('Unknown node type', i);
-      }
-      if (typeof value !== 'number' || !Number.isFinite(value)) reject('Node value must be finite', i);
-      if (!Number.isInteger(input) || input < 0 || input >= graph.nodes.length) reject('Input index is outside the graph', i);
-      if (!this.wasm.graph_host_push(kind, input, value, waveform)) throw this.hostError('INVALID_GRAPH', i);
-    }
-    const handle = this.wasm.graph_host_prepare();
-    if (handle === 0) throw this.hostError('INVALID_GRAPH');
+    const handle = this.wasm.graph_host_mount();
+    if (handle === 0) throw this.hostError();
     return handle;
   }
 
@@ -85,6 +59,7 @@ class MoonDspGraphProcessor extends AudioWorkletProcessor {
     // Cancellation can arrive before WASM instantiation has completed.
     if (data.type === 'close') {
       this.closed = true;
+      this.wasm?.graph_host_close?.();
       this.wasm = null;
       this.port.postMessage({ id: data.id, ok: true });
       return;
@@ -99,7 +74,7 @@ class MoonDspGraphProcessor extends AudioWorkletProcessor {
               !Number.isInteger(data.command) || data.command < 0 || data.command > 2) {
             throw Object.assign(new Error('Invalid graph command'), { code: 'INVALID_HANDLE' });
           }
-          if (!this.wasm.graph_host_command(data.handle, data.command)) throw this.hostError('INVALID_HANDLE');
+          if (!this.wasm.graph_host_command(data.handle, data.command)) throw this.hostError();
           break;
         default: throw Object.assign(new Error('Unknown request'), { code: 'INVALID_REQUEST' });
       }
@@ -117,7 +92,7 @@ class MoonDspGraphProcessor extends AudioWorkletProcessor {
     if (!channel || !this.wasm) return true;
     if (!this.wasm.graph_host_process(channel.length)) {
       this.failed = true;
-      this.port.postMessage({ type: 'fatal', message: 'Unsupported render quantum: expected 128 frames' });
+      this.port.postMessage({ type: 'fatal', message: this.hostError().message });
       return false;
     }
     for (let i = 0; i < channel.length; i++) channel[i] = this.wasm.graph_host_sample(i);

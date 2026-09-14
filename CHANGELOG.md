@@ -9,11 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added a browser graph engine for caller-defined oscillator/gain graphs,
-  with pre-playback mounting, independent graph handles, mono mixing,
-  and acknowledged play/pause/unmount operations. The standalone
-  `web/graph-example.html` uses the public JS entry point; dedicated browser
-  tests cover PCM, rejection, independent unmount, and stale handles.
+- Added a host-independent MoonBit `GraphEngine` with typed `MountedGraph`
+  capabilities, checked errors, independent engine instances, and mono mixing.
+  It consumes canonical `Array[DspNode]` values through the existing compiler.
+  The browser graph API and standalone `web/graph-example.html` use this engine
+  through a thin WASM adapter; graph decoding and lifecycle policy live in MoonBit.
 - Added creation-only `AbortSignal` support to the external graph engine.
   Cancellation preserves the caller's context and reports `ABORTED` with the
   original reason. Late initialization cannot publish an abandoned engine.
@@ -29,8 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed the external graph lifecycle to `engine.mount(graph)`,
   mounted-graph `play()` / `pause()` / `unmount()`, and `engine.close()`,
   without legacy aliases. Concurrent and repeated unmount calls share a
-  result; unmounting rejects playback immediately. Low-level WASM ABI names
-  and the pre-playback-only mounting restriction remain unchanged.
+  result; unmounting rejects playback immediately. The browser adapter's
+  builder ABI is replaced with JSON input/error transport and explicit engine
+  initialization/close. The pre-playback-only mounting restriction remains.
 
 - Resolved Mini named references directly to compiled pattern/document values,
   removing retained definition bodies and compiler-side memo handling while

@@ -47,15 +47,23 @@ pub fn get_playback_error_char(Int) -> Int
 
 pub fn get_playback_error_length() -> Int
 
-pub fn graph_host_begin(Double) -> Bool
+pub fn graph_host_clear_input() -> Unit
+
+pub fn graph_host_close() -> Unit
 
 pub fn graph_host_command(Int, Int) -> Bool
 
-pub fn graph_host_prepare() -> Int
+pub fn graph_host_error_char(Int) -> Int
+
+pub fn graph_host_error_length() -> Int
+
+pub fn graph_host_init(Double) -> Bool
+
+pub fn graph_host_mount() -> Int
 
 pub fn graph_host_process(Int) -> Bool
 
-pub fn graph_host_push(Int, Int, Double, Int) -> Bool
+pub fn graph_host_push_char(Int) -> Unit
 
 pub fn graph_host_sample(Int) -> Double
 
@@ -146,12 +154,16 @@ pub fn tick_source(source_id~ : Int, freq_hz~ : Double, sample_rate~ : Double) -
 // Traits
 
 ## browser/moon.pkg js exports
-graph_host_begin
-graph_host_push
-graph_host_prepare
+graph_host_init
+graph_host_clear_input
+graph_host_push_char
+graph_host_mount
 graph_host_command
 graph_host_process
 graph_host_sample
+graph_host_close
+graph_host_error_length
+graph_host_error_char
 tick
 tick_source
 reset_phase
@@ -213,12 +225,16 @@ set_scheduler_bpm
 set_scheduler_gain
 
 ## browser/moon.pkg wasm-gc exports
-graph_host_begin
-graph_host_push
-graph_host_prepare
+graph_host_init
+graph_host_clear_input
+graph_host_push_char
+graph_host_mount
 graph_host_command
 graph_host_process
 graph_host_sample
+graph_host_close
+graph_host_error_length
+graph_host_error_char
 tick
 tick_source
 reset_phase

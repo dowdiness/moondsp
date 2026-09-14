@@ -19,6 +19,45 @@ scripts/validate-clap-prototype.sh  # build + run clap-validator for the prototy
 
 To hear it in the browser, open `web/index.html` after building. The AudioWorklet loads the compiled wasm-gc module and drives the DSP graph in real time.
 
+## Use the engine directly from MoonBit
+
+`GraphEngine` is a host-independent MoonBit API, not a JavaScript wrapper.
+Each instance owns its mounted graphs and render context. Use canonical
+`DspNode` values; no JSON, integer handles, or browser globals are required.
+
+```mbt check
+///|
+test {
+  let context = @moondsp.DspContext::DspContext(
+    sample_rate=48000.0,
+    block_size=128,
+  )
+  let engine = @moondsp.GraphEngine::GraphEngine(context)
+  let sound = engine.mount([
+    @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 375.0),
+    @moondsp.DspNode::gain(0, 0.1),
+    @moondsp.DspNode::output(1),
+  ])
+  let output = context.make_buffer()
+  sound.play()
+  engine.process(output)
+  assert_true((output.get(32) - 0.1).abs() < 0.000001)
+  sound.pause()
+  sound.unmount()
+  engine.close()
+}
+```
+
+Operations raise the checked `GraphEngineError` type. The first successful
+play closes mount admission; pause preserves phase. Engines are independent
+and calls must be serialized. Compilation happens during mount, not process.
+The same API is available from `dowdiness/moondsp/engine` directly.
+
+For browser use, `web/graph-engine.js` adapts this engine to AudioWorklet and
+Promise-based methods. Its JSON subset currently accepts oscillator, gain,
+and output nodes; the MoonBit API accepts canonical graphs supported by the
+mono compiler. See [the browser contract](docs/browser-api-contract.md).
+
 ## What moondsp can do today
 
 **DSP primitives** — sine/saw/square/triangle oscillators, white noise, ADSR envelopes, biquad filters (LPF/HPF/BPF), delay lines with feedback, gain, mix, hard clip, equal-power pan, and parameter smoothing. All zero-allocation in the audio thread.
@@ -83,9 +122,10 @@ Pattern Engine                    DSP Engine
 ## Repository layout
 
 ```
-./              Library public API facade (`moondsp.mbt` re-exports from dsp/, graph/, voice/, identity/)
+./              Library public API facade (dsp/, graph/, engine/, voice/, identity/)
 dsp/            DSP primitives, tagless algebra, pan math
 graph/          Compiled graph runtime, topology editing, hot-swap, control binding
+engine/         Host-independent graph lifecycle, typed handles, mono mixing
 voice/          Polyphonic voice pool with priority stealing
 identity/       Stable ID wrappers and revision tokens for incremental editing
 pattern/        Pattern engine: rational time, combinators, control maps, authoring docs

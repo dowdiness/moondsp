@@ -1,0 +1,41 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp/engine"
+
+import {
+  "dowdiness/moondsp/dsp",
+  "dowdiness/moondsp/graph",
+  "moonbitlang/core/debug",
+}
+
+// Values
+
+// Errors
+pub suberror GraphEngineError {
+  InvalidConfiguration
+  EngineClosed
+  MountClosed
+  CapacityExceeded
+  InvalidHandle
+  InvalidGraph(@graph.GraphCompileError)
+  BufferSizeMismatch(expected~ : Int, actual~ : Int)
+} derive(@debug.Debug)
+
+// Types and methods
+pub struct GraphEngine {
+  // private fields
+}
+pub fn GraphEngine::GraphEngine(@dsp.DspContext, capacity? : Int) -> Self raise GraphEngineError
+pub fn GraphEngine::close(Self) -> Unit
+pub fn GraphEngine::mount(Self, Array[@graph.DspNode]) -> MountedGraph raise GraphEngineError
+pub fn GraphEngine::process(Self, @dsp.AudioBuffer) -> Unit raise GraphEngineError
+
+pub struct MountedGraph {
+  // private fields
+}
+pub fn MountedGraph::pause(Self) -> Unit raise GraphEngineError
+pub fn MountedGraph::play(Self) -> Unit raise GraphEngineError
+pub fn MountedGraph::unmount(Self) -> Unit raise GraphEngineError
+
+// Type aliases
+
+// Traits

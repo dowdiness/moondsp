@@ -22,8 +22,8 @@ architecture rationale in ADRs, and keep graph runtime-control behavior in
 - `browser/browser_abi.baseline` records the reviewed facade/export shape.
   Update it only for an intentional public API or worklet ABI change.
 
-Use the root, `graph`, `scheduler`, `voice`, `mini`, and `song` packages for
-general graph authoring, voice pools, scheduler extension, and Mini parsing. The
+Use the root, `engine`, `graph`, `scheduler`, `voice`, `mini`, and `song` packages
+for general graph lifecycle/authoring, voice pools, scheduling, and Mini parsing. The
 browser package is a low-level host ABI. Web applications can use the external
 graph entry point below without calling its exports directly.
 
@@ -33,6 +33,15 @@ graph entry point below without calling its exports directly.
 `web/graph-example.html` is an independent consumer: it defines its graph and
 imports only the public JS module, not the scheduler, demo exports, or private
 worklet messages.
+
+The implementation is MoonBit-first: `engine/` owns `GraphEngine`,
+`MountedGraph`, and checked domain errors, re-exported from the root package.
+Native MoonBit callers use `engine.mount(Array[DspNode])`, handle methods,
+and `engine.process(AudioBuffer)` directly. See the checked example in
+[`README.mbt.md`](../README.mbt.md) and the authoritative
+[engine contract](salat-engine-technical-reference.md#354-host-independent-graph-engine).
+JavaScript manages browser resources and asynchronous transport, not DSP
+state or compilation.
 
 ```js
 import { createGraphEngine } from "./graph-engine.js";
@@ -70,9 +79,12 @@ await context.close(); // Only the application closes its context.
   `gain` (linear multiplier, not dB).
 - `output`: required integer `input`. The existing compiler validates the
   output structure and graph semantics; exactly one mono output is required.
-- Node descriptions lower to `DspNode`, then use the existing
+- The Worklet serializes the description as JSON. MoonBit decodes the browser
+  node subset into `DspNode`, then `GraphEngine::mount` uses the existing
   `CompiledTemplate::analyze` and `CompiledDsp::compile_result` path.
-  There is no JS DSP implementation or second compiler.
+  There is no JS node validator, DSP implementation, or second compiler.
+  The browser's 64-node description limit is an adapter constraint; the
+  direct MoonBit API accepts canonical nodes supported by the mono compiler.
 - At most 16 graph handles may be mounted in one engine. Slots can be reused
   before playback, but unmounted handle numbers never recur within an engine.
 - Both engine creation and mounting require a suspended context. Mount all
@@ -121,8 +133,8 @@ await context.close(); // Only the application closes its context.
   already-issued unmount retains its shared result.
 - `GraphEngineError` carries `code`, `message`, and, for node decoding errors,
   `nodeIndex`. Invalid descriptions use `INVALID_GRAPH`; mounting after
-  playback uses `MOUNT_CLOSED` at the JS boundary. Host-side admission
-  failures use `MOUNT_REJECTED`. Processor failures reject pending
+  playback uses `MOUNT_CLOSED`, enforced by the MoonBit engine and exposed
+  through JS. Capacity exhaustion uses `MOUNT_REJECTED`. Processor failures reject pending
   requests with `PROCESSOR_FAILED`.
 - For new engine requests, `ENGINE_CLOSED` takes precedence over processor
   failure and mount admission when the engine is closing/closed or the context
@@ -154,13 +166,17 @@ await context.close(); // Only the application closes its context.
 
 The dedicated processor is `web/graph-processor.js`. It instantiates the same
 browser WASM artifact as the existing browser paths, in its own WASM instance.
-Its primitive ABI additions are `graph_host_begin`, `graph_host_push`,
-`graph_host_prepare`, `graph_host_command`, `graph_host_process`, and
-`graph_host_sample`; they reuse the existing browser error transport.
-Existing scheduler/demo behavior and exports are unchanged.
-The JavaScript lifecycle uses mount/play/pause/unmount/close only; it has no
-legacy lifecycle aliases. The low-level MoonBit/WASM ABI names above remain
-unchanged and are not called by application code.
+Its primitive ABI is `graph_host_init`, `graph_host_clear_input`,
+`graph_host_push_char`, `graph_host_mount`, `graph_host_command`,
+`graph_host_process`, `graph_host_sample`, `graph_host_close`,
+`graph_host_error_length`, and `graph_host_error_char`.
+Input is JSON transmitted as Unicode scalar values; errors are MoonBit-generated
+JSON envelopes containing `code`, `message`, and optional `nodeIndex`.
+Integer handles exist only in this adapter; MoonBit callers receive typed,
+engine-owned handles. `graph_host_close` delegates to the MoonBit engine.
+Existing scheduler/demo behavior and exports are unchanged. The earlier
+graph builder ABI is replaced, not retained as aliases; deploy the matching
+Worklet and WASM together. Application code uses only the JS lifecycle.
 
 ### TypeScript and JavaScript editor support
 

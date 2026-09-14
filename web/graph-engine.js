@@ -27,7 +27,6 @@ export async function createGraphEngine({
   }
   let node;
   let nextId = 1;
-  let sealed = false;
   let closed = false;
   let closure = null;
   let failure = null;
@@ -154,7 +153,7 @@ export async function createGraphEngine({
     async mount(graph) {
       const error = unavailable();
       if (error) throw error;
-      if (sealed || context.state !== 'suspended') {
+      if (context.state !== 'suspended') {
         throw new GraphEngineError('MOUNT_CLOSED', 'Mount graphs before playback or resuming the context');
       }
       const handle = await request('mount', { graph });
@@ -163,10 +162,7 @@ export async function createGraphEngine({
         ? Promise.reject(new GraphEngineError('INVALID_HANDLE', 'The graph has been unmounted'))
         : request('command', { handle, command: action });
       return Object.freeze({
-        async play() {
-          await command(0);
-          sealed = true;
-        },
+        play() { return command(0); },
         pause() { return command(1); },
         unmount() {
           if (!unmounting) unmounting = request('command', { handle, command: 2 });
