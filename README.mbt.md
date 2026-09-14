@@ -216,9 +216,9 @@ The project follows an incremental edit discipline: run `NEW_MOON_MOD=0 moon che
 
 Start at the **[docs index](docs/README.md)**, which categorizes materials by role:
 
-- **[Technical reference](docs/salat-engine-technical-reference.md)** — Node types, parameter slots, runtime control surface (authoritative for graph runtime-control behavior)
+- **[Technical reference](docs/technical-reference.md)** — Node types, parameter slots, runtime control surface (authoritative for graph runtime-control behavior)
 - **[Mini-notation guide](docs/mini-notation.md)** — Pattern syntax, grouping, and method chaining
-- **[Blueprint](docs/salat-engine-blueprint.md)** — Complete architectural vision, design principles, and multi-target roadmap
+- **[Blueprint](docs/blueprint.md)** — Complete architectural vision, design principles, and multi-target roadmap
 - **[Architecture decisions (ADRs)](docs/decisions/)** — Short records explaining why key architectural choices were made
 - **[Next actions](docs/next-actions.md)** — Active handoff list for upcoming priorities
 - **[`CLAUDE.md`](CLAUDE.md)** — Project conventions and contributor cheat sheet
@@ -237,6 +237,18 @@ Start at the **[docs index](docs/README.md)**, which categorizes materials by ro
 | **5 — Pattern × DSP** | Complete | `scheduler/` + `mini/` wire pattern events to voice allocation |
 | **6 — incr integration**| In progress | Stable identity plus initial pattern/song authoring groundwork |
 | **7+ — Native & Frontends**| Prototype | Browser live UI & CLAP plugin prototype available; DAW production gates underway |
+
+---
+
+## Acknowledgments & Prior Art
+
+`moondsp` builds upon concepts pioneered by several remarkable open-source projects in computer music, live coding, and audio synthesis:
+
+- **[kabelsalat](https://codeberg.org/froos/kabelsalat)** by Felix Roos (`froos`) — Demonstrated high-performance DSP graph compilation and real-time execution in Web AudioWorklet. The project's early working title *Salat Engine* was a nod to this work.
+- **[Noisecraft](https://noisecraft.app/)** by Maxime Chevalier-Boisvert — Pioneer in topological DSP graph flattening and in-browser visual synthesis.
+- **[Strudel](https://strudel.cc/)** & **[TidalCycles](https://tidalcycles.org/)** by Alex McLean, Felix Roos, and the live coding community — Foundational models for rational-time queryable pattern algebra, cyclic arcs, and mini-notation.
+- **[FAUST](https://faust.grame.fr/)** & **[mimium](https://mimium.org/)** — Inspiration for functional audio signal processing and tagless DSP algebra.
+- **[CLAP](https://cleveraudio.org/)** (Clever Audio Plug-in) — The modern, open native audio plugin standard enabling DAW integration beyond the browser.
 
 ---
 

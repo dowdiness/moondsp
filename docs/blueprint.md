@@ -1,6 +1,6 @@
-# Salat Engine — Project Blueprint
+# moondsp — Project Blueprint
 
-**A live-codable DSP audio engine in MoonBit, targeting browser and native.**
+**A portable, live-codable DSP audio and pattern engine in MoonBit, targeting browser and native.**
 
 Version: 0.1 (draft)
 Date: 2026-03-10
@@ -241,7 +241,7 @@ Current implemented surface:
   graph paths
 - Integration coverage for compiled mono voice paths, runtime retuning, and the
   first compiled stereo voice path
-- See `docs/salat-engine-technical-reference.md` for the current node set,
+- See `docs/technical-reference.md` for the current node set,
   `set_param(...)` slot matrix, and exact runtime-control surface
 
 Completed in Phase 2:
@@ -507,6 +507,6 @@ Planned:
 | FAUST | Custom DSL | FIR → C/LLVM/Wasm | — | No (full recompile) | No |
 | Cmajor | Custom DSL | LLVM JIT | — | Hot reload | No |
 | Elementary Audio | JS | Graph diff/reconcile | — | Yes (React-style) | No |
-| **Salat Engine** | **MoonBit** | **Topo-sort + compile** | **Yes (built-in)** | **Yes (incr)** | **Yes (CRDT, future)** |
+| **moondsp** | **MoonBit** | **Topo-sort + compile** | **Yes (built-in)** | **Yes (incr)** | **Yes (CRDT, future)** |
 
 The unique combination is: **type-safe MoonBit + integrated pattern engine + incremental computation + CRDT collaboration**, all from a single codebase targeting both browser and native.

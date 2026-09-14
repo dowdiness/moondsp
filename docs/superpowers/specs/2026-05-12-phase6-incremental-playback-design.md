@@ -5,7 +5,7 @@
 pattern authoring slice implemented 2026-05-12
 **Related:**
 `docs/next-actions.md`,
-`docs/salat-engine-blueprint.md`,
+`docs/blueprint.md`,
 `docs/decisions/0003-compiled-template-topology-artifact.md`,
 `docs/decisions/0005-song-section-layer.md`,
 `docs/decisions/0006-scheduler-performance-time-expiry.md`,
@@ -55,7 +55,7 @@ those snapshots to `Pat`, `Song`, `BoundVoicePool`, `GraphControl`, and
   dependency can back the implementation later, but public boundaries should be
   snapshots, revisions, IDs, and edit results.
 - Do not change graph runtime-control behavior without first updating
-  `docs/salat-engine-technical-reference.md`.
+  `docs/technical-reference.md`.
 
 ## Design Principles
 

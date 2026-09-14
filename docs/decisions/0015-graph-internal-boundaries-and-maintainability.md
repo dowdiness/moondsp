@@ -218,6 +218,6 @@ scripts/check-browser-abi.sh
 ```
 
 For graph runtime-control changes, update
-`docs/salat-engine-technical-reference.md` first. For runtime extraction or
+`docs/technical-reference.md` first. For runtime extraction or
 hot-path changes, also run `moon build --target wasm-gc` and the relevant
 benchmarks or browser integration checks when feasible.

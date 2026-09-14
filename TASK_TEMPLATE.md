@@ -68,8 +68,8 @@ Goal:
 
 Source of truth:
 - AGENTS.md
-- docs/salat-engine-technical-reference.md
-- docs/salat-engine-blueprint.md
+- docs/technical-reference.md
+- docs/blueprint.md
 - <issue text or additional doc if relevant>
 
 Success criteria:

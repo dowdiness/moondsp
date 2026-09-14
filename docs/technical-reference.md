@@ -1,6 +1,6 @@
-# Salat Engine — Technical Reference
+# moondsp Technical Reference
 
-Companion to `salat-engine-blueprint.md` (historical bootstrap notes live in `archive/step0-instruction.md`).
+Companion to `blueprint.md` (historical bootstrap notes live in `archive/step0-instruction.md`).
 This document provides the implementation-level knowledge a coding agent needs.
 
 ---
@@ -651,7 +651,7 @@ Advantages: buffer-based processing enables SIMD optimization, better cache beha
 
 This section is the authoritative description of the current compiled-graph
 runtime-control surface. Update it first when Phase 2 runtime behavior changes;
-keep `docs/salat-engine-blueprint.md` as a summary-level pointer back to this
+keep `docs/blueprint.md` as a summary-level pointer back to this
 section (the early Phase 0/1/2 status log lives at `docs/archive/RESULTS.md`
 for historical context).
 
@@ -1322,12 +1322,12 @@ For the DSP module, we only export numeric functions (no strings), so the import
 | AudioNode class with `update()` method | Each node type encapsulates its DSP + state | Yes. Use MoonBit structs with `process()` method. |
 | Method chaining as DSL | Natural expression syntax, reduces parenthesis nesting | Possible in MoonBit with extension methods, but not the priority. |
 
-### 5.3 kabelsalat Limitations That Salat Addresses
+### 5.3 kabelsalat Limitations That moondsp Addresses
 
-| Limitation | kabelsalat | Salat Engine |
+| Limitation | kabelsalat | moondsp |
 |------------|-----------|--------------|
 | Type safety | None (JS dynamic types) | MoonBit static types, enums, pattern matching |
-| Pattern engine | External (Strudel) | Built-in (`salat-pattern`) |
+| Pattern engine | External (Strudel) | Built-in (`pattern/`) |
 | Incremental updates | Full recompilation on every change | `incr` memoizes unchanged subgraphs |
 | Collaboration | Not supported | CRDT-based (future) |
 | Native target | C codegen (experimental) | MoonBit C/LLVM backend (first-class) |
