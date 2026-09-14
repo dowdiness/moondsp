@@ -1,29 +1,55 @@
 # moondsp
 
-A live-codable DSP audio engine written in [MoonBit](https://www.moonbitlang.com/), targeting browser AudioWorklet via wasm-gc. Patterns describe *what* plays *when*; DSP graphs describe *how* it sounds.
+A portable, live-codable DSP audio and pattern engine written in [MoonBit](https://www.moonbitlang.com/).
 
-moondsp combines a Strudel/TidalCycles-inspired pattern algebra with a compiled signal-processing graph, a polyphonic voice pool, and a browser AudioWorklet runtime — all in one codebase, all in MoonBit.
+> **Patterns describe *what* plays *when*; DSP graphs describe *how* it sounds.**  
+> moondsp combines a Strudel/TidalCycles-inspired pattern algebra with a compiled, zero-allocation signal-processing graph and a polyphonic voice pool — designed to target **browser (Web AudioWorklet via `wasm-gc`)**, **native DAWs (CLAP via C ABI)**, and **headless CLI / host-independent embedded execution** from a single unified codebase.
+
+---
+
+## Target Platforms
+
+`moondsp`'s core DSP, graph compilation, and pattern scheduling are completely platform-agnostic and free of browser or host globals. The engine compiles to multiple targets:
+
+- 🌐 **Browser (Web AudioWorklet)**: Compiled via `wasm-gc` for high-performance, glitch-free in-browser live coding and synthesis.
+- 🎛️ **Native DAWs (CLAP Plugin Prototype)**: Native shared library via MoonBit's C ABI shim, compatible with modern DAWs (passes `clap-validator`).
+- 🖥️ **Host-Independent MoonBit API**: Direct programmatic audio synthesis in pure MoonBit via `GraphEngine` — embeddable into games, tools, or custom runtimes.
+- 💻 **CLI & Offline Rendering**: Headless command-line entry point for audio rendering, batch synthesis, and automated tests.
+
+---
 
 ## Quick start
 
 ```bash
-NEW_MOON_MOD=0 moon check && NEW_MOON_MOD=0 moon test  # type-check + run tests
-NEW_MOON_MOD=0 moon build --target wasm-gc            # build for browser
-NEW_MOON_MOD=0 moon run cmd/main                       # run CLI entry point
-scripts/build-clap-prototype.sh     # build Linux CLAP prototype shared object
-scripts/smoke-clap-prototype.sh     # dlopen/process smoke test for the prototype
-scripts/validate-clap-prototype.sh  # build + run clap-validator for the prototype
+# Verify & test the core engine across targets
+NEW_MOON_MOD=0 moon check && NEW_MOON_MOD=0 moon test
+
+# Run CLI entry point
+NEW_MOON_MOD=0 moon run cmd/main
 ```
 
-`NEW_MOON_MOD=0` keeps Moon from auto-migrating the repository's hand-maintained `moon.mod`.
+*(Note: `NEW_MOON_MOD=0` preserves the repository's hand-maintained `moon.mod`)*
 
-To hear it in the browser, open `web/index.html` after building. The AudioWorklet loads the compiled wasm-gc module and drives the DSP graph in real time.
+### 1. Run in Browser (Web AudioWorklet via `wasm-gc`)
+```bash
+NEW_MOON_MOD=0 moon build --target wasm-gc
+# Start any local HTTP server (AudioWorklet requires an HTTP origin)
+python3 -m http.server 8000
+# Open http://localhost:8000/web/ in your browser
+```
 
-## Use the engine directly from MoonBit
+### 2. Build Native CLAP Plugin Prototype
+```bash
+scripts/build-clap-prototype.sh     # Build Linux CLAP prototype shared object
+scripts/smoke-clap-prototype.sh     # dlopen / process smoke test
+scripts/validate-clap-prototype.sh  # Run clap-validator against the build
+```
 
-`GraphEngine` is a host-independent MoonBit API, not a JavaScript wrapper.
-Each instance owns its mounted graphs and render context. Use canonical
-`DspNode` values; no JSON, integer handles, or browser globals are required.
+---
+
+## Host-Independent MoonBit API
+
+`GraphEngine` is a platform-independent MoonBit API, requiring no JavaScript wrappers, JSON serialization, or browser globals. Each engine instance manages its mounted graphs and render context directly using canonical `DspNode` values:
 
 ```mbt check
 ///|
@@ -48,27 +74,55 @@ test {
 }
 ```
 
-Operations raise the checked `GraphEngineError` type. The first successful
-play closes mount admission; pause preserves phase. Engines are independent
-and calls must be serialized. Compilation happens during mount, not process.
-The same API is available from `dowdiness/moondsp/engine` directly.
+Operations raise the checked `GraphEngineError` type. Compilation happens ahead of time during mount, guaranteeing **zero allocation** during `process()`.
 
-For browser use, `web/graph-engine.js` adapts this engine to AudioWorklet and
-Promise-based methods. Its JSON subset currently accepts oscillator, gain,
-and output nodes; the MoonBit API accepts canonical graphs supported by the
-mono compiler. See [the browser contract](docs/browser-api-contract.md).
+For browser integration, `web/graph-engine.js` adapts this engine to AudioWorklet and Promise-based JavaScript APIs. See [the browser contract](docs/browser-api-contract.md).
 
-## What moondsp can do today
+---
 
-**DSP primitives** — sine/saw/square/triangle oscillators, white noise, ADSR envelopes, biquad filters (LPF/HPF/BPF), delay lines with feedback, gain, mix, hard clip, equal-power pan, and parameter smoothing. All zero-allocation in the audio thread.
+## How it works
 
-**Compiled graph runtime** — declare a signal graph as an array of `DspNode` values, compile it into a topologically sorted execution plan, and process 128 samples per block at 48 kHz. Supports hot-swap (equal-power crossfade between graphs), topology editing (insert/delete/replace nodes at runtime), and mono-to-stereo routing.
+The engine bridges high-level musical structure to low-level audio signals through an exact rational-time control bridge:
 
-**Finally Tagless DSP algebra** — the same graph definition works as both a concrete AST for optimization and a trait-driven interpretation for extensibility:
+```text
+Pattern Engine (Human Time)           DSP Engine (Audio Time)
+  Pat.query(arc)                        CompiledDsp.process(ctx, buf)
+       |                                      |
+       v                                      v
+  Array[Event[ControlMap]]             BoundVoicePool.process(ctx, L, R)
+       |                                      ^
+       +-- { note: 60, cutoff: 800 } ---------+
+           PatternScheduler.process_block (48 kHz / 128 samples per block)
+```
+
+- **Pattern layer**: Operates in musical cycles using exact fractions (`Rational`) — zero floating-point timing drift. Combinators like `fast`, `slow`, `rev`, `sequence`, `stack`, and `every` compose complex polyrhythms.
+- **DSP layer**: Declarative signal graphs compile into flat topological execution plans. Hard real-time: **zero allocations** in the audio thread (2.67 ms budget per block at 48 kHz / 128 samples).
+- **Bridge**: `scheduler/` queries pattern events per audio block and dispatches note lifecycles and parameter updates to the voice pool through validated template bindings.
+
+---
+
+## Features & Code Examples
+
+### 1. Mini-notation Parser (`mini/`)
+Write expressive polyrhythmic patterns in a concise DSL ([Syntax Reference](docs/mini-notation.md)):
+
+```moonbit nocheck
+// Mini-notation with Euclidean rhythms, polyphonic layers ($:), and method chains
+let pat = parse_mini!(r#"
+  $: s("bd(3,8) [~ sd] [hh*2] sd").fast(2).gain(0.8)
+  $: note("c3 e3 g3 b3").cutoff(1200)
+"#)
+```
+
+Supports sub-groups (`[a b]`), step replication/stretching (`*n`, `/n`), Euclidean rhythms (`bd(3,8)`), and chained modifiers (`.fast()`, `.slow()`, `.rev()`, `.degradeBy()`, `.cutoff()`, `.gain()`, `.pan()`, `.every()`, `.jux()`).
+
+### 2. Finally Tagless DSP Algebra (`dsp/`, `graph/`)
+The DSP graph definition functions both as an extensible trait-driven algebra and as an optimizable concrete AST:
 
 ```moonbit nocheck
 ///|
-fn[T : FilterSym] exit_deliverable() -> T {
+/// FM Synthesis patch: LFO sweeps carrier frequency through a low-pass filter
+fn[T : FilterSym] fm_synth() -> T {
   let lfo = DspSym::oscillator(ArithSym::constant(2.0), Waveform::Sine)
   let freq = range(lfo, 200.0, 400.0)
   let carrier = DspSym::oscillator(freq, Waveform::Sine)
@@ -77,125 +131,115 @@ fn[T : FilterSym] exit_deliverable() -> T {
 }
 ```
 
-This compiles into an FM synthesis patch: a 2 Hz LFO sweeps a carrier between 200–400 Hz through a low-pass filter.
+- **DSP Primitives**: Sine/saw/square/triangle oscillators, white noise, ADSR envelopes, biquad filters (LPF/HPF/BPF), delay lines with feedback, gain, mix, hard clip, and equal-power pan.
+- **Runtime Graph Hot-Swap & Topology Editing**: Equal-power crossfades between different graphs on the fly; insert, replace, and remove nodes without audio dropouts.
 
-**Polyphonic voice pool** — 32+ simultaneous voices with priority-based stealing (idle > oldest releasing > oldest active), generation-tagged handles for safe note control, two-stage silence detection (ADSR idle AND output buffer silent), and per-voice equal-power pan mixed to stereo. No allocation during `process()`.
+### 3. Polyphonic Voice Pool (`voice/`)
+- 32+ simultaneous voices with deterministic priority stealing (`idle` > `oldest releasing` > `oldest active`).
+- Generation-tagged handles prevent stale note control across voice reuse.
+- Two-stage silence detection (ADSR idle AND output buffer silent).
+- Per-voice equal-power stereo panning.
 
-**Pattern engine** — a standalone `pattern/` package implementing Strudel's core model: patterns are query functions over rational-time arcs, producing events with control maps. Combinators such as `silence`, `pure`, `fast`, `slow`, `rev`, `sequence`, `stack`, and `every` compose into expressive rhythmic structures:
-
-```moonbit nocheck
-// C major triad played twice per cycle
-sequence([note_name("c3"), note_name("e3"), note_name("g3")]).fast(Rational::from_int(2))
-```
-
-Querying this over one cycle produces 6 events with exact rational time boundaries — no floating-point drift.
-
-For incremental editing, the pattern package also includes an identity-bearing
-authoring document that tracks stable node identities and revisions, then
-lowers back to the same runtime query model.
-
-**Mini-notation parser** — the `mini/` package turns a short text string into a `Pat[ControlMap]`, so you can write `s("bd sd hh sd")` or `note("60 64 67")`, combine sources with Strudel-style `$:` stack lines (`$: s("bd sd")` / `$: note("60 64")`) or the older `stack(s("bd sd"), note("60 64"))` form, and chain methods like `.fast(n)`, `.slow(n)`, `.rev()`, `.degradeBy(p)`, `.cutoff(f)`, `.gain(g)`, `.pan(p)`, `.every(n, f)`, and `.jux(f)`. Inside the string, sequences support sub-groups (`[a b]`), comma-stacked layers, Euclidean rhythms (`bd(3,8)`), step replicate/stretch (`*n`, `/n`), and 50%-drop (`?`). Authoring callers can use `MiniAuthoringPipeline` for an incr-backed text → `PatternDoc` → lowered snapshot pipeline; this currently wraps whole-document parsing and reuses stable subtrees/lowering-cache entries after parse, rather than doing token-level incremental parsing. See [`docs/mini-notation.md`](docs/mini-notation.md) for the current syntax summary.
-
-**Pattern → DSP scheduler** — the `scheduler/` package drives a `BoundVoicePool` from a `Pat[ControlMap]`: it converts the pattern's event stream into note on/off calls while the pool owns the `ControlBindingMap` proven against its current template. `PatternScheduler::process_block` is the one call that turns patterns into audio.
-
-## How it works
-
-The engine has two independent layers connected by a control map:
-
-```
-Pattern Engine                    DSP Engine
-  Pat.query(arc)                    CompiledDsp.process(ctx, buf)
-       |                                  |
-       v                                  v
-  Array[Event[ControlMap]]         BoundVoicePool.process(ctx, L, R)
-       |                                  ^
-       +-- { note: 60, cutoff: 800 } -----+
-           PatternScheduler.process_block
-```
-
-**Pattern layer** operates at "human time" — rational fractions of musical cycles. It produces events describing what should happen.
-
-**DSP layer** operates at "audio time" — 128 samples per callback at 48 kHz (2.67 ms budget). It compiles declarative node graphs into flat execution plans and runs them without allocation.
-
-**Bridge** — `scheduler/` connects the two: `PatternScheduler::process_block` queries a `Pat[ControlMap]` over the current block's time arc, turns events into bound-pool note on/off calls, and lets `BoundVoicePool` resolve control-map entries through the binding map attached to its current template.
+---
 
 ## Repository layout
 
-```
-./              Library public API facade (dsp/, graph/, engine/, voice/, identity/)
-dsp/            DSP primitives, tagless algebra, pan math
-graph/          Compiled graph runtime, topology editing, hot-swap, control binding
-engine/         Host-independent graph lifecycle, typed handles, mono mixing
-voice/          Polyphonic voice pool with priority stealing
-identity/       Stable ID wrappers and revision tokens for incremental editing
-pattern/        Pattern engine: rational time, combinators, control maps, authoring docs
-mini/           Mini-notation parser: text → Pat[ControlMap]
-song/           Long-form section scaffold with identity TimeScope
-scheduler/      Pattern scheduler: bridges pattern events to voice pool
-browser/        AudioWorklet integration (wasm-gc/js exports)
-browser_test/   Browser-integration test wrapper
-clap_engine/    Native CLAP synth engine core (MoonBit host-facing wrapper)
-clap_host/      Primitive handle bridge for the C CLAP shim
-clap_plugin/    CLAP prototype payload package and C ABI shim
-web/            Browser demo UI (HTML + AudioWorklet processor)
-cmd/main/       CLI entry point
-docs/           Architecture blueprint, technical reference, performance snapshots
+The codebase strictly decouples platform-agnostic core engines from platform-specific host adapters:
+
+```text
+├── dowdiness/moondsp   Library public API facade (re-exports dsp, graph, engine, voice, identity)
+│
+├── Core Engine (Platform-Agnostic)
+│   ├── dsp/            DSP primitives, filters, oscillators, Finally Tagless algebra
+│   ├── graph/          Compiled graph runtime, topology editing, hot-swap, control binding
+│   ├── engine/         Host-independent graph lifecycle, typed handles, mono mixing
+│   ├── voice/          Polyphonic voice pool with priority stealing and stereo mixdown
+│   ├── identity/       Stable ID wrappers and revision tokens for incremental editing
+│   ├── pattern/        Pattern engine: rational time, combinators, and control maps (zero DSP dep)
+│   ├── mini/           Mini-notation parser: text expressions to Pat[ControlMap]
+│   ├── song/           Long-form section scaffolding with identity TimeScope
+│   └── scheduler/      Bridges pattern events to voice pool and DSP parameter binding
+│
+├── Platform Adapters & Frontends
+│   ├── browser/        AudioWorklet export wrapper and multi-pool routing (wasm-gc)
+│   ├── web/            Browser demo UI and AudioWorklet processor
+│   ├── browser_test/   Browser integration test wrapper (Playwright)
+│   ├── clap_engine/    Native CLAP synth engine core around graph + voice pool
+│   ├── clap_host/      Primitive integer-handle bridge for C CLAP shims
+│   ├── clap_plugin/    Native CLAP prototype payload and C ABI shim (passes clap-validator)
+│   └── cmd/main/       CLI entry point and offline experiments
+│
+└── docs/               Architecture blueprint, technical reference, ADRs, performance snapshots
 ```
 
-The `pattern/` package has zero dependency on the DSP layers — it compiles and tests independently.
+---
 
 ## Performance
 
-The audio budget at 128 samples / 48 kHz is 2.67 ms per block. The graph
-runtime is designed around that budget: a single compiled voice (oscillator
-+ filter + delay + ADSR) processes in the low-microsecond range, and 32
-simultaneous FM voices comfortably fit inside the block. Compilation and
-hot-swap crossfades are also microsecond-scale, so graphs can be rebuilt or
-swapped between blocks without audible glitches.
+The audio callback budget at 128 samples / 48 kHz is **2.67 ms per block**. `moondsp` is engineered around strict real-time constraints:
+- A single compiled voice (oscillator + filter + delay + ADSR) processes in the **low-microsecond range**.
+- 32 simultaneous FM voices process comfortably within a fraction of the block budget.
+- Graph compilation and hot-swap crossfades are microsecond-scale, enabling glitch-free live graph reconfiguration.
 
-For measured numbers, see the dated snapshots under
-[`docs/performance/`](docs/performance/) (new measurements go in new files —
-older snapshots are preserved rather than overwritten, so you can see drift
-over time).
+Historical and current benchmark records are preserved under [`docs/performance/`](docs/performance/).
+
+---
 
 ## Development
 
 ```bash
-NEW_MOON_MOD=0 moon check --target all --deny-warn  # type-check all targets, fail on warnings
-NEW_MOON_MOD=0 moon test --target all --deny-warn   # run all tests on all targets
-NEW_MOON_MOD=0 moon test -p dowdiness/moondsp       # root facade integration tests
-NEW_MOON_MOD=0 moon test -p pattern                  # pattern-engine tests
-NEW_MOON_MOD=0 moon info && NEW_MOON_MOD=0 moon fmt  # regenerate interfaces + format
+# Type-check all targets with warnings denied
+NEW_MOON_MOD=0 moon check --target all --deny-warn
+
+# Run the test suite on all targets
+NEW_MOON_MOD=0 moon test --target all --deny-warn
+
+# Test specific packages
+NEW_MOON_MOD=0 moon test -p dowdiness/moondsp
+NEW_MOON_MOD=0 moon test -p pattern
+
+# Format code and regenerate interfaces
+NEW_MOON_MOD=0 moon info && NEW_MOON_MOD=0 moon fmt
+
+# Run microbenchmarks
 NEW_MOON_MOD=0 moon bench --release -p dowdiness/moondsp/graph -f graph_benchmark.mbt
-npm run test:browser  # Playwright browser-integration tests (builds wasm-gc first)
+
+# Run Playwright browser integration tests (builds wasm-gc first)
+npm run test:browser
 ```
 
-The project follows an incremental edit rule: run `NEW_MOON_MOD=0 moon check` after every file edit and fix errors before proceeding.
+The project follows an incremental edit discipline: run `NEW_MOON_MOD=0 moon check` after edits and resolve errors before proceeding.
+
+---
 
 ## Documentation
 
-Start at the **[docs index](docs/README.md)**, which groups material by audience:
+Start at the **[docs index](docs/README.md)**, which categorizes materials by role:
 
-- **[Technical reference](docs/salat-engine-technical-reference.md)** — node types, parameter slots, runtime control surface (authoritative for graph runtime-control behavior)
-- **[Next actions](docs/next-actions.md)** — active handoff list for future sessions and API-hardening priorities
-- **[Blueprint](docs/salat-engine-blueprint.md)** — full architecture vision, design principles, roadmap
-- **[Performance snapshots](docs/performance/)** — dated benchmark results (new measurements go in new files)
-- **[Architecture decisions](docs/decisions/)** — short ADRs distilling *why* the codebase looks the way it does (each links to the archived plan/spec)
-- **[`CLAUDE.md`](CLAUDE.md)** — project map and conventions for contributors
+- **[Technical reference](docs/salat-engine-technical-reference.md)** — Node types, parameter slots, runtime control surface (authoritative for graph runtime-control behavior)
+- **[Mini-notation guide](docs/mini-notation.md)** — Pattern syntax, grouping, and method chaining
+- **[Blueprint](docs/salat-engine-blueprint.md)** — Complete architectural vision, design principles, and multi-target roadmap
+- **[Architecture decisions (ADRs)](docs/decisions/)** — Short records explaining why key architectural choices were made
+- **[Next actions](docs/next-actions.md)** — Active handoff list for upcoming priorities
+- **[`CLAUDE.md`](CLAUDE.md)** — Project conventions and contributor cheat sheet
+
+---
 
 ## Project status
 
 | Phase | Status | Summary |
-|-------|--------|---------|
-| 0 — Platform proof | Complete | MoonBit wasm-gc runs in browser AudioWorklet |
-| 1 — DSP primitives | Complete | Oscillators, filters, envelopes, delay, gain, mix, clip, pan |
-| 2 — Graph compiler | Complete | Compiled graphs, hot-swap, topology editing, stereo |
-| 3 — Voice management | Complete | 32+ voice pool with priority stealing and stereo mixdown |
-| 4 — Pattern engine | Complete | Rational time, 8 combinators, ControlMap output |
-| 5 — Pattern × DSP | Complete | `scheduler/` + `mini/` wire pattern events to voice allocation |
-| 6 — incr integration | In progress | Stable identity plus initial pattern/song authoring groundwork |
-| 7+ — UI, native, collab | Prototype | Browser live UI and CLAP prototype available; collaboration planned |
+|:---|:---|:---|
+| **0 — Platform proof** | Complete | MoonBit `wasm-gc` runs in browser AudioWorklet |
+| **1 — DSP primitives** | Complete | Oscillators, filters, envelopes, delay, pan, clip |
+| **2 — Graph compiler** | Complete | Compiled graphs, hot-swap, topology editing, stereo |
+| **3 — Voice management** | Complete | 32+ voice pool with priority stealing & stereo mix |
+| **4 — Pattern engine** | Complete | Rational time, combinators, ControlMap |
+| **5 — Pattern × DSP** | Complete | `scheduler/` + `mini/` wire pattern events to voice allocation |
+| **6 — incr integration**| In progress | Stable identity plus initial pattern/song authoring groundwork |
+| **7+ — Native & Frontends**| Prototype | Browser live UI & CLAP plugin prototype available; DAW production gates underway |
+
+---
 
 ## License
 
-Apache-2.0
+[Apache-2.0](LICENSE)
