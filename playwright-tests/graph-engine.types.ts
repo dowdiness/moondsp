@@ -1,8 +1,7 @@
 import {
-  createGraphEngine,
+  GraphEngine,
   GraphEngineError,
   type GraphDescription,
-  type GraphEngine,
   type GraphEngineErrorCode,
   type GraphNode,
   type MountedGraph,
@@ -17,7 +16,7 @@ const graph = {
 } as const satisfies GraphDescription;
 
 async function consume(context: AudioContext | OfflineAudioContext, signal: AbortSignal) {
-  const engine: GraphEngine = await createGraphEngine({
+  const engine: GraphEngine = await GraphEngine({
     context, signal, wasmUrl: new URL('engine.wasm', import.meta.url), processorUrl: './processor.js',
   });
   const sound: MountedGraph = await engine.mount(graph);
@@ -56,7 +55,7 @@ const missingInput: GraphNode = { type: 'gain', gain: 0.1 };
 // @ts-expect-error Frequencies are numeric, not strings.
 const stringFrequency: GraphNode = { type: 'oscillator', waveform: 'sine', frequency: '440' };
 // @ts-expect-error A context is required.
-createGraphEngine({});
+GraphEngine({});
 
 function handle(error: unknown) {
   if (error instanceof GraphEngineError) {

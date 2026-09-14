@@ -81,4 +81,4 @@ export class GraphEngineError extends Error {
 }
 
 /** Create a mono engine in a caller-owned context. Graph handles start paused. */
-export function createGraphEngine(options: GraphEngineOptions): Promise<GraphEngine>;
+export function GraphEngine(options: GraphEngineOptions): Promise<GraphEngine>;

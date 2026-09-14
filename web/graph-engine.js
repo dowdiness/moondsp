@@ -16,7 +16,7 @@ export class GraphEngineError extends Error {
  * pause() preserves oscillator phase. unmount() permanently invalidates the handle.
  * signal cancels creation only; successful engines are ended with close().
  */
-export async function createGraphEngine({
+export async function GraphEngine({
   context,
   wasmUrl = new URL('./moonbit_dsp.wasm', import.meta.url),
   processorUrl = new URL('./graph-processor.js', import.meta.url),

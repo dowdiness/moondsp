@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Named the asynchronous JavaScript/TypeScript engine factory `GraphEngine`,
+  matching the MoonBit public type. Call it as `await GraphEngine({ context })`;
+  the same import also names the returned engine's TypeScript type.
+
 - Changed the external graph lifecycle to `engine.mount(graph)`,
   mounted-graph `play()` / `pause()` / `unmount()`, and `engine.close()`,
   without legacy aliases. Concurrent and repeated unmount calls share a

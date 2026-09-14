@@ -29,7 +29,7 @@ graph entry point below without calling its exports directly.
 
 ## External graph entry point
 
-`web/graph-engine.js` exports `createGraphEngine` and `GraphEngineError`.
+`web/graph-engine.js` exports `GraphEngine` and `GraphEngineError`.
 `web/graph-example.html` is an independent consumer: it defines its graph and
 imports only the public JS module, not the scheduler, demo exports, or private
 worklet messages.
@@ -44,12 +44,12 @@ JavaScript manages browser resources and asynchronous transport, not DSP
 state or compilation.
 
 ```js
-import { createGraphEngine } from "./graph-engine.js";
+import { GraphEngine } from "./graph-engine.js";
 
 // The application owns this context. Mount graphs before resuming it.
 const context = new AudioContext();
 await context.suspend();
-const engine = await createGraphEngine({ context });
+const engine = await GraphEngine({ context });
 const sound = await engine.mount({
   nodes: [
     { type: "oscillator", waveform: "triangle", frequency: 220 },
@@ -147,7 +147,7 @@ await context.close(); // Only the application closes its context.
   `GraphEngineError` with code `INITIALIZATION_FAILED` and the original exception
   in `cause`. Worklet initialization failures reported after node construction
   use `PROCESSOR_FAILED`. None of these failures closes the caller's context.
-- `createGraphEngine({ context, signal })` accepts an optional `AbortSignal`
+- `GraphEngine({ context, signal })` accepts an optional `AbortSignal`
   that owns **creation only**. An already-aborted signal prevents loading.
   Aborting during fetch, compilation, module loading, or worklet readiness
   rejects creation with `GraphEngineError.code === "ABORTED"` and preserves
@@ -185,7 +185,7 @@ module to TypeScript consumers. Imports retain the `.js` extension; TypeScript
 resolves the adjacent declaration automatically. No runtime wrapper is required.
 
 ```ts
-import { createGraphEngine, type GraphDescription } from "./graph-engine.js";
+import { GraphEngine, type GraphDescription } from "./graph-engine.js";
 
 const graph = {
   nodes: [
@@ -196,7 +196,7 @@ const graph = {
 } as const satisfies GraphDescription;
 
 // context is a caller-owned, suspended AudioContext or OfflineAudioContext.
-const engine = await createGraphEngine({ context });
+const engine = await GraphEngine({ context });
 const sound = await engine.mount(graph);
 ```
 
@@ -204,8 +204,8 @@ The declaration exports `GraphDescription`, the discriminated `GraphNode` union
 and its `OscillatorNode`, `GainNode`, and `OutputNode` variants, `Waveform`,
 `GraphEngineOptions`, `GraphEngine`, `MountedGraph`, and `GraphEngineErrorCode`.
 These node types describe authoring data, not Web Audio nodes. Only
-`createGraphEngine` and `GraphEngineError` are runtime exports; import the
-other names with `import type`.
+`GraphEngine` and `GraphEngineError` are runtime exports. `GraphEngine` is also
+the returned engine's TypeScript type; import the remaining names with `import type`.
 
 Readonly descriptions (including `as const` arrays) are accepted without
 requiring a mutable copy. Returned handle properties are readonly, matching
@@ -238,7 +238,7 @@ NEW_MOON_MOD=0 npx --no-install playwright test \
 
 The server script synchronizes WASM assets. Keep `graph-engine.js`,
 `graph-processor.js`, and `moonbit_dsp.wasm` together, or supply `wasmUrl` and
-`processorUrl` to `createGraphEngine`. Serve them over HTTPS or localhost;
+`processorUrl` to `GraphEngine`. Serve them over HTTPS or localhost;
 deployments must permit their fetch/worklet execution under their CSP.
 
 The tests compare every rendered frame against analytic waveforms using a

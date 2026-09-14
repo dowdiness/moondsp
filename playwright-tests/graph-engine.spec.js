@@ -9,9 +9,9 @@ test.beforeEach(async ({ page }) => { await page.goto('/graph-example.html'); })
 
 test('external graph produces the requested oscillator and chained gains', async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { createGraphEngine } = await import('/graph-engine.js');
+    const { GraphEngine } = await import('/graph-engine.js')
     const context = new OfflineAudioContext(1, 4096, 48000);
-    const engine = await createGraphEngine({ context });
+    const engine = await GraphEngine({ context });
     const source = await engine.mount({ nodes: [
       { type: 'oscillator', waveform: 'sine', frequency: 375 },
       { type: 'gain', input: 0, gain: 0.4 },
@@ -33,9 +33,9 @@ test('external graph produces the requested oscillator and chained gains', async
 
 test('invalid graphs return reasons without damaging a mounted graph', async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { createGraphEngine } = await import('/graph-engine.js');
+    const { GraphEngine } = await import('/graph-engine.js')
     const context = new OfflineAudioContext(1, 1024, 48000);
-    const engine = await createGraphEngine({ context });
+    const engine = await GraphEngine({ context });
     const source = await engine.mount({ nodes: [
       { type: 'oscillator', waveform: 'square', frequency: 750 },
       { type: 'gain', input: 0, gain: 0.125 },
@@ -74,9 +74,9 @@ test('invalid graphs return reasons without damaging a mounted graph', async ({ 
 
 test('unmounting one playing graph preserves the other graph and its phase', async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { createGraphEngine } = await import('/graph-engine.js');
+    const { GraphEngine } = await import('/graph-engine.js')
     const context = new OfflineAudioContext(1, 4096, 48000);
-    const engine = await createGraphEngine({ context });
+    const engine = await GraphEngine({ context });
     const patch = (frequency, gain) => ({ nodes: [
       { type: 'oscillator', waveform: 'sine', frequency },
       { type: 'gain', input: 0, gain },
@@ -118,9 +118,9 @@ test('unmounting one playing graph preserves the other graph and its phase', asy
 
 test('unmounted handles cannot control a replacement graph in a reused slot', async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { createGraphEngine } = await import('/graph-engine.js');
+    const { GraphEngine } = await import('/graph-engine.js')
     const context = new OfflineAudioContext(1, 1024, 48000);
-    const engine = await createGraphEngine({ context });
+    const engine = await GraphEngine({ context });
     const patch = { nodes: [
       { type: 'oscillator', waveform: 'triangle', frequency: 375 },
       { type: 'gain', input: 0, gain: 0.2 },
@@ -165,10 +165,10 @@ test('external page mounts, plays, pauses and unmounts through public controls',
   await expect(page.getByRole('button', { name: 'Mount graph', exact: true })).toBeEnabled();
   await expect(page.getByRole('textbox', { name: 'Graph description' })).toBeEnabled();
   const ownership = await page.evaluate(async () => {
-    const { createGraphEngine } = await import('/graph-engine.js');
+    const { GraphEngine } = await import('/graph-engine.js')
     const context = new AudioContext();
     await context.suspend();
-    const engine = await createGraphEngine({ context });
+    const engine = await GraphEngine({ context });
     await engine.close();
     const state = context.state;
     await context.close();
@@ -209,9 +209,9 @@ test('example releases a failed engine and allows mounting again', async ({ page
 
 test('concurrent engine close shares completion and closes admission immediately', async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { createGraphEngine } = await import('/graph-engine.js');
+    const { GraphEngine } = await import('/graph-engine.js')
     const context = new OfflineAudioContext(1, 128, 48000);
-    const engine = await createGraphEngine({ context });
+    const engine = await GraphEngine({ context });
     const graph = { nodes: [
       { type: 'oscillator', waveform: 'sine', frequency: 440 },
       { type: 'gain', input: 0, gain: 0.1 },
@@ -239,10 +239,10 @@ test('concurrent engine close shares completion and closes admission immediately
 
 test('closed engine takes precedence over playback admission and closed context', async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { createGraphEngine } = await import('/graph-engine.js');
+    const { GraphEngine } = await import('/graph-engine.js')
     const context = new AudioContext();
     await context.suspend();
-    const engine = await createGraphEngine({ context });
+    const engine = await GraphEngine({ context });
     const graph = { nodes: [
       { type: 'oscillator', waveform: 'sine', frequency: 440 },
       { type: 'output', input: 0 },
@@ -266,7 +266,7 @@ test('native initialization failures expose structured errors with original caus
     contentType: 'text/javascript', body: 'throw new Error("processor initialization rejected");',
   }));
   const result = await page.evaluate(async () => {
-    const { createGraphEngine, GraphEngineError } = await import('/graph-engine.js');
+    const { GraphEngine, GraphEngineError } = await import('/graph-engine.js')
     const errors = [];
     for (const options of [
       { wasmUrl: '/broken.wasm' },
@@ -275,7 +275,7 @@ test('native initialization failures expose structured errors with original caus
     ]) {
       const context = new AudioContext();
       await context.suspend();
-      try { await createGraphEngine({ context, ...options }); errors.push(null); }
+      try { await GraphEngine({ context, ...options }); errors.push(null); }
       catch (error) {
         errors.push({ structured: error instanceof GraphEngineError, code: error.code,
           hasCause: error.cause instanceof Error, state: context.state });
@@ -290,9 +290,9 @@ test('native initialization failures expose structured errors with original caus
 
 test('pause freezes phase while another graph continues rendering', async ({ page }) => {
   const residual = await page.evaluate(async () => {
-    const { createGraphEngine } = await import('/graph-engine.js');
+    const { GraphEngine } = await import('/graph-engine.js')
     const context = new OfflineAudioContext(1, 4096, 48000);
-    const engine = await createGraphEngine({ context });
+    const engine = await GraphEngine({ context });
     const patch = frequency => ({ nodes: [
       { type: 'oscillator', waveform: 'sine', frequency },
       { type: 'gain', input: 0, gain: 0.1 },
@@ -331,12 +331,12 @@ test('creation aborts before starting and while fetching without closing the con
   const started = new Promise(resolve => { requestStarted = resolve; });
   await page.route('**/held.wasm', () => { requestStarted(); });
   await page.evaluate(async () => {
-    const { createGraphEngine } = await import('/graph-engine.js');
+    const { GraphEngine } = await import('/graph-engine.js')
     window.cancelContext = new AudioContext();
     await cancelContext.suspend();
     window.cancelController = new AbortController();
     window.cancelOutcome = null;
-    window.cancelCreation = createGraphEngine({
+    window.cancelCreation = GraphEngine({
       context: cancelContext, signal: cancelController.signal, wasmUrl: '/held.wasm',
     }).then(engine => { window.cancelOutcome = 'unexpected success'; return engine.close(); },
       error => { window.cancelOutcome = { code: error.code, cause: error.cause }; });
@@ -345,11 +345,11 @@ test('creation aborts before starting and while fetching without closing the con
   await page.evaluate(() => cancelController.abort('navigation'));
   await expect.poll(() => page.evaluate(() => cancelOutcome)).toEqual({ code: 'ABORTED', cause: 'navigation' });
   const result = await page.evaluate(async () => {
-    const { createGraphEngine } = await import('/graph-engine.js');
+    const { GraphEngine } = await import('/graph-engine.js')
     const errors = await Promise.allSettled([
-      createGraphEngine({ context: cancelContext, signal: cancelController.signal }),
+      GraphEngine({ context: cancelContext, signal: cancelController.signal }),
     ]);
-    const engine = await createGraphEngine({ context: cancelContext });
+    const engine = await GraphEngine({ context: cancelContext });
     await engine.close();
     const state = cancelContext.state;
     await cancelContext.close();
@@ -374,7 +374,7 @@ test('aborting ready wait retires the worklet and ignores late readiness', async
       process() { return !this.stopped; }
     });`;
   await page.evaluate(async processorSource => {
-    const { createGraphEngine } = await import('/graph-engine.js');
+    const { GraphEngine } = await import('/graph-engine.js')
     window.readyContext = new AudioContext();
     await readyContext.suspend();
     window.readyController = new AbortController();
@@ -391,7 +391,7 @@ test('aborting ready wait retires the worklet and ignores late readiness', async
       }
     };
     const processorUrl = URL.createObjectURL(new Blob([processorSource], { type: 'text/javascript' }));
-    createGraphEngine({ context: readyContext, processorUrl,
+    GraphEngine({ context: readyContext, processorUrl,
       signal: readyController.signal }).then(
       engine => { window.readyOutcome = 'unexpected success'; return engine.close(); },
       error => { window.readyOutcome = error.code; }).finally(() => URL.revokeObjectURL(processorUrl));
@@ -415,11 +415,11 @@ test('context closure settles commands whose worklet never replies', async ({ pa
       process() { return true; }
     });`;
   await page.evaluate(async processorSource => {
-    const { createGraphEngine } = await import('/graph-engine.js');
+    const { GraphEngine } = await import('/graph-engine.js')
     window.shutdownContext = new AudioContext();
     await shutdownContext.suspend();
     const processorUrl = URL.createObjectURL(new Blob([processorSource], { type: 'text/javascript' }));
-    window.shutdownEngine = await createGraphEngine({
+    window.shutdownEngine = await GraphEngine({
       context: shutdownContext, processorUrl,
     });
     URL.revokeObjectURL(processorUrl);
@@ -442,10 +442,10 @@ test('context closure settles commands whose worklet never replies', async ({ pa
 
 test('abort signal stops owning the engine after successful creation', async ({ page }) => {
   const peak = await page.evaluate(async () => {
-    const { createGraphEngine } = await import('/graph-engine.js');
+    const { GraphEngine } = await import('/graph-engine.js')
     const context = new OfflineAudioContext(1, 256, 48000);
     const controller = new AbortController();
-    const engine = await createGraphEngine({ context, signal: controller.signal });
+    const engine = await GraphEngine({ context, signal: controller.signal });
     controller.abort();
     const sound = await engine.mount({ nodes: [
       { type: 'oscillator', waveform: 'square', frequency: 440 },
@@ -465,11 +465,11 @@ test('closing the context interrupts creation while the download is pending', as
   const started = new Promise(resolve => { requestStarted = resolve; });
   await page.route('**/closing-download.wasm', () => { requestStarted(); });
   await page.evaluate(async () => {
-    const { createGraphEngine } = await import('/graph-engine.js');
+    const { GraphEngine } = await import('/graph-engine.js')
     window.downloadContext = new AudioContext();
     await downloadContext.suspend();
     window.downloadOutcome = null;
-    createGraphEngine({ context: downloadContext, wasmUrl: '/closing-download.wasm' }).then(
+    GraphEngine({ context: downloadContext, wasmUrl: '/closing-download.wasm' }).then(
       engine => { window.downloadOutcome = 'unexpected success'; return engine.close(); },
       error => { window.downloadOutcome = error.code; });
   });
@@ -480,7 +480,7 @@ test('closing the context interrupts creation while the download is pending', as
 
 test('late module loading cannot allocate a node after creation is aborted', async ({ page }) => {
   await page.evaluate(async () => {
-    const { createGraphEngine } = await import('/graph-engine.js');
+    const { GraphEngine } = await import('/graph-engine.js')
     window.moduleContext = new AudioContext();
     await moduleContext.suspend();
     window.moduleController = new AbortController();
@@ -501,7 +501,7 @@ test('late module loading cannot allocate a node after creation is aborted', asy
       window.AudioWorkletNode = NativeNode;
       moduleContext.audioWorklet.addModule = addModule;
     };
-    createGraphEngine({ context: moduleContext, signal: moduleController.signal }).then(
+    GraphEngine({ context: moduleContext, signal: moduleController.signal }).then(
       engine => { window.moduleOutcome = 'unexpected success'; return engine.close(); },
       error => { window.moduleOutcome = error.code; });
   });
@@ -510,9 +510,9 @@ test('late module loading cannot allocate a node after creation is aborted', asy
   await expect.poll(() => page.evaluate(() => moduleOutcome)).toBe('ABORTED');
   await page.evaluate(() => releaseModule());
   const result = await page.evaluate(async () => {
-    const { createGraphEngine } = await import('/graph-engine.js');
+    const { GraphEngine } = await import('/graph-engine.js')
     restoreModuleHost();
-    const engine = await createGraphEngine({ context: moduleContext });
+    const engine = await GraphEngine({ context: moduleContext });
     await engine.close();
     const result = { abandonedNodes: allocatedNodes, outcome: moduleOutcome, state: moduleContext.state };
     await moduleContext.close();
