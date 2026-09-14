@@ -7,11 +7,8 @@ import "./style.css";
 // Page-specific names live at the composition root, not inside DOM actions.
 const PAGE_BINDINGS: PageBindings = {
   selectors: {
-    startButton: "#start-audio",
-    startLabel: "#start-label",
-    stopButton: "#stop-notes",
-    disposeButton: "#dispose-audio",
-    retryButton: "#retry-audio",
+    powerButton: "#power-audio",
+    powerLabel: "#power-label",
     status: "#audio-status",
     errorPanel: "#audio-error",
     errorMessage: "#error-message",
@@ -47,7 +44,6 @@ function startApplication(elements: PageElements, bindings: PageBindings): Resul
     const dom = createDomConnection(elements, DEFAULT_SETTINGS, bindings);
     const audio = createAudio(dom.view, dom.settings);
     dom.connect(audio);
-    audio.initialize();
   });
 }
 

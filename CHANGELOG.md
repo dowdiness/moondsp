@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added retained browser `EngineExit` results and independently cancellable
+  `engine.wait({ signal })` observers. Fatal processor errors notify observers
+  without another command; normal shutdown and cleanup cannot erase an earlier
+  failure. Close acknowledgement has a configurable 5000ms default deadline
+  with forced local release on timeout.
+- Added the separate JS-target MoonBit `dowdiness/moondsp-browser-host` module,
+  pinned to `async@0.21.3`, with `EngineLifetime`, cancellable waits, protected
+  close results, and native error/cause identity preservation. DSP/Wasm imports
+  and render callbacks are unchanged. Browser tests exercise real Worklet
+  lifetime, cancellation, structured errors, and task-group cleanup ordering.
 - Added live Examples for an overlay groove and a 20-second grouping comparison,
   demonstrating `+` layers and parenthesized transforms with playable Mini scores.
 - Added `examples/basic-synth`, a standalone TypeScript/Vite consumer with a
@@ -16,9 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   explicit audio start/disposal, and asset-error recovery. It imports only the
   public browser package and does not implement its own Worklet. Its compact
   piano layout distinguishes active and held notes, shows the active pitch,
-  labels power/start/stop states, and exposes bounded left/right navigation
+  labels power states, and exposes bounded left/right navigation
   alongside touch scrolling and desktop keycaps. Public audio API calls remain
-  in `main.ts`, separate from transport presentation and keyboard interaction,
+  in `audio.ts`, separate from transport presentation and keyboard interaction,
   with a source-reading guide in the example README.
 - Added `npm run pack:browser` to build a local `@moondsp/browser` tarball
   containing matching JS, TypeScript declarations, Worklet, Wasm, and license.
@@ -43,6 +53,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to validate consumer usage and rejected API shapes without changing runtime behavior.
 
 ### Changed
+
+- Basic synth observes engine termination, reports processor failure immediately,
+  and treats caller context closure as normal shutdown. Cleanup closes the
+  engine as a whole instead of issuing commands to a potentially dead Worklet.
+- Basic synth now uses a discriminated lifecycle state and one resource owner
+  across partial initialization, a complete session, and retirement. Commands
+  serialize per session; cleanup bypasses pending commands, and stale work
+  cannot publish into a replacement session.
+- Basic synth now has one Power on / Power off button, with no separate Start,
+  Stop notes, or Retry controls. Power on admits audio in the user gesture and
+  completes suspended mounting and playback automatically. Power off cancels
+  startup or releases the active session; automatic note-release safety remains.
 
 - Named the asynchronous JavaScript/TypeScript engine factory `GraphEngine`,
   matching the MoonBit public type. Call it as `await GraphEngine({ context })`;

@@ -3,30 +3,30 @@ export type Phase = "idle" | "loading" | "suspended" | "resuming" | "running" | 
 export interface ControlState {
   readonly phase: Phase;
   readonly errorText: string;
-  readonly hasContext: boolean;
-  readonly canControl: boolean;
 }
 
 const PHASE_TEXT = {
-  idle: { status: "Loading…", label: "Power on", name: "Power on audio" },
-  loading: { status: "Loading…", label: "Loading…", name: "Loading audio" },
-  suspended: { status: "Ready", label: "Start", name: "Start audio" },
-  resuming: { status: "Starting…", label: "Starting…", name: "Starting audio" },
-  running: { status: "Audio on", label: "On", name: "Audio on" },
-  error: { status: "Unavailable", label: "Retry", name: "Retry audio" },
-  disposing: { status: "Turning off…", label: "Turning off…", name: "Turning off audio" },
-  disposed: { status: "Audio off", label: "Power on", name: "Power on audio" },
-} satisfies Record<Phase, { status: string; label: string; name: string }>;
+  idle: "Audio off",
+  loading: "Loading…",
+  suspended: "Audio paused",
+  resuming: "Resuming…",
+  running: "Audio on",
+  error: "Unavailable",
+  disposing: "Turning off…",
+  disposed: "Audio off",
+} satisfies Record<Phase, string>;
 
-export function controlView(state: ControlState, notesHeld: boolean) {
+export function controlView(state: ControlState) {
   const busy = state.phase === "loading" || state.phase === "resuming" || state.phase === "disposing";
+  const powered = busy || state.phase === "running";
   return {
-    ...PHASE_TEXT[state.phase],
+    status: PHASE_TEXT[state.phase],
+    label: powered ? "Power off" : "Power on",
+    name: powered ? "Power off audio" : "Power on audio",
+    powerAction: powered ? "off" : "on",
     busy,
-    startDisabled: busy || state.phase === "running",
-    powerOffDisabled: !state.hasContext || state.phase === "disposing" || state.phase === "disposed",
-    stopDisabled: state.phase !== "running" || !notesHeld,
-    inputsDisabled: !state.canControl,
+    powerDisabled: state.phase === "disposing",
+    inputsDisabled: state.phase !== "running",
     errorVisible: state.phase === "error",
   };
 }
@@ -48,6 +48,6 @@ export function cutoffPosition(value: number): number {
 
 export function errorMessage(detail: string): string {
   return /AudioContext|AudioWorklet|Wasm|wasm/i.test(detail)
-    ? `${detail} Use a browser with AudioWorklet and WebAssembly support, then retry.`
-    : `${detail} Check that this example is served by Vite with its package assets, then retry.`;
+    ? `${detail} Use a browser with AudioWorklet and WebAssembly support, then choose Power on to retry.`
+    : `${detail} Check that this example is served by Vite with its package assets, then choose Power on to retry.`;
 }

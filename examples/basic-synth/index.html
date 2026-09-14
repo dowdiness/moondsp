@@ -17,48 +17,33 @@
         <div class="panel-heading">
           <div class="status-cluster">
             <span class="status-mark" aria-hidden="true"></span>
-            <p id="audio-status" class="status" role="status" aria-live="polite" aria-atomic="true">Loading…</p>
+            <p id="audio-status" class="status" role="status" aria-live="polite" aria-atomic="true">Audio off</p>
           </div>
-          <button id="dispose-audio" class="button button-quiet" type="button" aria-label="Power off audio" disabled>
+          <button id="power-audio" class="button button-primary" type="button" aria-label="Power on audio">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v9M6.4 5.6a8 8 0 1 0 11.2 0" /></svg>
-            <span>Power off</span>
+            <span id="power-label">Power on</span>
           </button>
         </div>
 
         <div id="audio-error" class="error-panel" role="alert" aria-live="assertive" hidden>
           <p id="error-message"></p>
-          <button id="retry-audio" class="button" type="button">Retry</button>
         </div>
 
-        <div class="control-row" aria-label="Synth controls">
-          <div class="transport-controls">
-            <button id="start-audio" class="button button-primary" type="button" aria-label="Start audio">
-              <svg class="icon icon-play" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 11 7-11 7Z" /></svg>
-              <svg class="icon icon-power" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v9M6.4 5.6a8 8 0 1 0 11.2 0" /></svg>
-              <svg class="icon icon-running" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10h4l5-4v12l-5-4H4ZM17 8a6 6 0 0 1 0 8M20 5a10 10 0 0 1 0 14" /></svg>
-              <span id="start-label">Start</span>
-            </button>
-            <button id="stop-notes" class="button" type="button" aria-label="Stop notes" disabled>
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1" /></svg>
-              <span>Stop notes</span>
-            </button>
-          </div>
-          <div class="parameter-controls">
-            <label class="parameter" for="volume">
-              <span class="parameter-label">
-                <span class="parameter-name"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10h4l5-4v12l-5-4H4ZM17 8a6 6 0 0 1 0 8" /></svg>Volume</span>
-                <output id="volume-value" for="volume">15%</output>
-              </span>
-              <input id="volume" type="range" min="0" max="1" step="0.01" value="0.15" />
-            </label>
-            <label class="parameter" for="cutoff">
-              <span class="parameter-label">
-                <span class="parameter-name"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h7c6 0 3 12 11 12M3 21h18" /></svg>Filter</span>
-                <output id="cutoff-value" for="cutoff">2,000 Hz</output>
-              </span>
-              <input id="cutoff" type="range" min="0" max="1" step="0.001" value="0.613" />
-            </label>
-          </div>
+        <div class="parameter-controls" role="group" aria-label="Synth controls">
+          <label class="parameter" for="volume">
+            <span class="parameter-label">
+              <span class="parameter-name"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10h4l5-4v12l-5-4H4ZM17 8a6 6 0 0 1 0 8" /></svg>Volume</span>
+              <output id="volume-value" for="volume">15%</output>
+            </span>
+            <input id="volume" type="range" min="0" max="1" step="0.01" value="0.15" disabled />
+          </label>
+          <label class="parameter" for="cutoff">
+            <span class="parameter-label">
+              <span class="parameter-name"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h7c6 0 3 12 11 12M3 21h18" /></svg>Filter</span>
+              <output id="cutoff-value" for="cutoff">2,000 Hz</output>
+            </span>
+            <input id="cutoff" type="range" min="0" max="1" step="0.001" value="0.613" disabled />
+          </label>
         </div>
 
         <div class="keyboard-toolbar">

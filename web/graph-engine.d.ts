@@ -80,12 +80,23 @@ export interface MountedGraph {
   readonly unmount: () => Promise<void>;
 }
 
+export type EngineExit =
+  | { readonly type: 'closed' }
+  | { readonly type: 'failed'; readonly error: GraphEngineError };
+
+export interface GraphEngineWaitOptions {
+  /** Cancels only this wait with AbortError; the engine and other waiters continue. */
+  readonly signal?: AbortSignal;
+}
+
 export interface GraphEngine {
   /** Mono output; connecting it is the caller's responsibility. */
   readonly output: AudioWorkletNode;
   /** Compile and register a paused graph, before playback in a suspended context. */
   readonly mount: (graph: GraphDescription) => Promise<MountedGraph>;
-  /** Idempotent shutdown; never closes the caller-owned context. */
+  /** Observe retained exit without stopping the engine. Pre-aborted signals reject even after exit. */
+  readonly wait: (options?: GraphEngineWaitOptions) => Promise<EngineExit>;
+  /** Idempotent bounded shutdown; never closes the caller-owned context. */
   readonly close: () => Promise<void>;
 }
 
@@ -96,6 +107,8 @@ export interface GraphEngineOptions {
   readonly processorUrl?: string | URL;
   /** Cancels creation only; aborting after success does not close the engine. */
   readonly signal?: AbortSignal;
+  /** Close acknowledgement deadline in ms: >0 and <=2147483647; defaults to 5000. */
+  readonly closeTimeoutMs?: number;
 }
 
 export type GraphEngineErrorCode =
@@ -119,7 +132,7 @@ export class GraphEngineError extends Error {
   code: GraphEngineErrorCode;
   /** Present when a decoding failure identifies a node. */
   nodeIndex?: number;
-  /** Original initialization exception or arbitrary AbortSignal.reason. */
+  /** Original initialization/cleanup exception or arbitrary AbortSignal.reason. */
   cause?: unknown;
 }
 

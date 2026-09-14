@@ -1,9 +1,11 @@
 import {
   GraphEngine,
   GraphEngineError,
+  type EngineExit,
   type GraphControl,
   type GraphDescription,
   type GraphEngineErrorCode,
+  type GraphEngineWaitOptions,
   type GraphNode,
   type MountedGraph,
 } from '../web/graph-engine.js';
@@ -44,6 +46,12 @@ async function consume(context: AudioContext | OfflineAudioContext, signal: Abor
   await sound.applyControls(controls);
   await sound.unmount();
   await engine.close();
+  const waitOptions: GraphEngineWaitOptions = {};
+  const exit: EngineExit = await engine.wait(waitOptions);
+  if (exit.type === 'failed') {
+    const failureCode: GraphEngineErrorCode = exit.error.code;
+    void failureCode;
+  }
 
   // @ts-expect-error The old lifecycle is not a public alias.
   engine.prepare(graph);

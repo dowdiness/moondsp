@@ -137,6 +137,24 @@ await context.close(); // Only the application closes its context.
   calls still share completion. Already-acknowledged commands retain their result.
   Operations on remaining graph handles reject with `ENGINE_CLOSED`; a graph's
   already-issued unmount retains its shared result.
+  The close acknowledgement has a deadline (`closeTimeoutMs`, default 5000ms;
+  a positive finite number no greater than 2147483647). A missed deadline rejects
+  close with `HOST_ERROR`, rejects pending commands, and attempts local processor
+  retirement, output disconnection, and port closure. It does not close the context.
+- `engine.wait({ signal }?)` observes one retained `EngineExit`:
+  `{ type: "closed" }` or `{ type: "failed", error: GraphEngineError }`.
+  It does not request shutdown. Multiple and late waiters receive the same result.
+  Processor failure is published immediately, without waiting for another command
+  or for cleanup. Normal close publishes `closed` after local cleanup; a cleanup
+  error publishes `failed`. Caller context closure is normal termination unless
+  a failure was already retained. Cleanup never replaces an earlier failure.
+- The wait signal owns only that observer, not the engine or other observers.
+  Cancellation rejects with `AbortError`, retains `signal.reason` as `cause`,
+  and removes the observer and its abort listener. A signal already aborted at
+  entry rejects even if an exit is cached. After registration, whichever settles
+  the JS Promise first wins. Task cancellation at a MoonBit suspension boundary
+  follows the async runtime's rules; the engine's retained result is unaffected.
+  Pause, silence, unmounting a graph, and rejected controls do not end an engine.
 - `GraphEngineError` carries `code`, `message`, and, for node decoding errors,
   `nodeIndex`. Invalid descriptions use `INVALID_GRAPH`; mounting after
   playback uses `MOUNT_CLOSED`, enforced by the MoonBit engine and exposed
@@ -169,6 +187,56 @@ await context.close(); // Only the application closes its context.
   rejects creation with `ENGINE_CLOSED`. When abort and context closure race,
   the first observed interruption settles creation. There is no built-in
   timeout or automatic retry; a caller can supply a deadline through its signal.
+
+### MoonBit lifetime observation on the JS host
+
+[`packages/browser/host`](../packages/browser/host/) is the separate MoonBit
+source module `dowdiness/moondsp-browser-host`, with preferred target `js` and
+`moonbitlang/async@0.21.3`. It is not imported by the DSP/Wasm module, and its
+test driver is not shipped in the `@moondsp/browser` npm tarball.
+
+Wrap the existing JavaScript engine handle in `EngineLifetime::EngineLifetime`.
+This is a lifetime view, not another graph constructor or terminal-state owner:
+
+```moonbit
+pub async fn observe(native : @host.NativeEngine) -> @host.EngineExit {
+  let lifetime = @host.EngineLifetime::EngineLifetime(native)
+  lifetime.wait()
+}
+```
+
+`wait()` uses `js_async.run_promise` to give each native wait its own cancellation
+signal. `EngineExit::Failed(RuntimeFailure)` is a returned value, not a raised
+task-group failure. `RuntimeFailure` exposes `code()`, `message()`, `node_index()`,
+`cause()`, and `native()`. The native error and its arbitrary cause retain their
+identity; absent, explicit `null`, and explicit `undefined` causes remain distinct.
+
+`close()` returns `Result[Unit, RuntimeFailure]` and protects the bounded native
+cleanup from task cancellation. It invokes native close when entered, without
+deferring it through a JS `.then()`. The JS engine owns close idempotence and its
+deadline. The binding does not promise bounded cleanup for arbitrary objects
+masquerading as a `NativeEngine`, and it never closes the caller's context.
+
+For a session task group, let the body wait for engine exit and run command
+workers with `no_wait=true`. On exit, those workers are cancelled and joined
+before group defers run. A defer may then close the engine. Do not make an
+ordinary child wait for an engine whose close is performed only by that defer:
+the group would wait for the child before it could close the engine.
+
+The executable [`browser_test/driver.mbt`](../packages/browser/host/browser_test/driver.mbt)
+demonstrates this ownership and the JS export boundary. In `async 0.21.3`,
+`Promise::from_async(abort_signal=...)` can leave an externally-cancelled,
+otherwise idle Promise waiter queued without rescheduling the JS event loop.
+The driver instead delivers abort through a cancellable Promise and completes
+its owning task group from inside the async event loop. This requires no
+polling, private scheduler API, or patched dependency. Its cancelled JS exports
+reject with `AbortError` only after their tasks and cleanup finish.
+Known host errors cross that export boundary as structured values, not raised
+errors that `from_async` would stringify.
+
+From the repository root, `npm run test:browser-host` runs the isolated MoonBit
+tests and real Chromium/AudioWorklet lifetime tests. The Playwright suite builds
+the test-only JS driver. `npm run typecheck:graph` checks the public TS surface.
 
 ### Live controls
 

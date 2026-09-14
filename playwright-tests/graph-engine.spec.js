@@ -611,3 +611,42 @@ test('late module loading cannot allocate a node after creation is aborted', asy
   });
   expect(result).toEqual({ abandonedNodes: 0, outcome: 'ABORTED', state: 'suspended' });
 });
+
+test('wait retains processor failure and independently cancels waiters', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const { GraphEngine } = await import('/graph-engine.js');
+    const context = new AudioContext();
+    await context.suspend();
+    let worklet;
+    const NativeNode = window.AudioWorkletNode;
+    window.AudioWorkletNode = class extends NativeNode {
+      constructor(...args) { super(...args); worklet = this; window.AudioWorkletNode = NativeNode; }
+    };
+    const engine = await GraphEngine({ context });
+    const controller = new AbortController();
+    const cancelled = engine.wait({ signal: controller.signal }).then(() => 'wrong', error => error.name);
+    const survivor = engine.wait();
+    controller.abort('not the engine');
+    worklet.onprocessorerror(new Event('processorerror'));
+    const exit = await survivor;
+    const late = await engine.wait();
+    await engine.close();
+    await context.close();
+    return { exit: { type: exit.type, code: exit.error.code }, late: { type: late.type, code: late.error.code }, cancelled: await cancelled };
+  });
+  expect(result).toEqual({ exit: { type: 'failed', code: 'PROCESSOR_FAILED' }, late: { type: 'failed', code: 'PROCESSOR_FAILED' }, cancelled: 'AbortError' });
+});
+
+test('pre-aborted wait rejects without changing engine lifetime', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const { GraphEngine } = await import('/graph-engine.js');
+    const context = new OfflineAudioContext(1, 32, 48000);
+    const engine = await GraphEngine({ context });
+    const controller = new AbortController();
+    controller.abort('already gone');
+    const outcome = await engine.wait({ signal: controller.signal }).then(() => 'wrong', error => ({ name: error.name, cause: error.cause }));
+    await engine.close();
+    return { outcome, state: context.state, exit: await engine.wait() };
+  });
+  expect(result).toEqual({ outcome: { name: 'AbortError', cause: 'already gone' }, state: 'suspended', exit: { type: 'closed' } });
+});

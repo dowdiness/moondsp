@@ -12,11 +12,8 @@ interface NoteElement {
 }
 
 interface RequiredElements {
-  readonly startButton: HTMLButtonElement;
-  readonly startLabel: HTMLSpanElement;
-  readonly stopButton: HTMLButtonElement;
-  readonly disposeButton: HTMLButtonElement;
-  readonly retryButton: HTMLButtonElement;
+  readonly powerButton: HTMLButtonElement;
+  readonly powerLabel: HTMLSpanElement;
   readonly status: HTMLParagraphElement;
   readonly errorPanel: HTMLElement;
   readonly errorMessage: HTMLParagraphElement;
@@ -84,11 +81,8 @@ export function readPage(document: Document, bindings: PageBindings): Result<Pag
     });
     return {
       document, window, buttons, notes,
-      startButton: required<HTMLButtonElement>(selectors.startButton),
-      startLabel: required<HTMLSpanElement>(selectors.startLabel),
-      stopButton: required<HTMLButtonElement>(selectors.stopButton),
-      disposeButton: required<HTMLButtonElement>(selectors.disposeButton),
-      retryButton: required<HTMLButtonElement>(selectors.retryButton),
+      powerButton: required<HTMLButtonElement>(selectors.powerButton),
+      powerLabel: required<HTMLSpanElement>(selectors.powerLabel),
       status: required<HTMLParagraphElement>(selectors.status),
       errorPanel: required<HTMLElement>(selectors.errorPanel),
       errorMessage: required<HTMLParagraphElement>(selectors.errorMessage),
@@ -121,24 +115,21 @@ export function createDomConnection(elements: PageElements, defaults: Settings, 
   const keyToMidi = new Map(e.notes.flatMap(note => note.computerKey ? [[note.computerKey, note.midi] as const] : []));
   const pointerNotes = new Map<number, { readonly id: string; readonly button: HTMLButtonElement }>();
   let keyboard = EMPTY_KEYBOARD;
-  let controls: ControlState = { phase: "idle", errorText: "", hasContext: false, canControl: false };
-  let notesHeld = false;
+  let controls: ControlState = { phase: "idle", errorText: "" };
 
   function renderControls(): void {
-    const text = controlView(controls, notesHeld);
+    const text = controlView(controls);
     e.status.textContent = text.status;
     e.status.dataset[data.phase] = controls.phase;
     e.errorPanel.hidden = !text.errorVisible;
     e.errorMessage.textContent = controls.errorText;
-    e.startButton.disabled = text.startDisabled;
-    e.startButton.dataset[data.phase] = controls.phase;
-    e.startLabel.textContent = text.label;
-    e.startButton.setAttribute("aria-label", text.name);
-    e.startButton.setAttribute("aria-busy", String(text.busy));
-    e.disposeButton.disabled = text.powerOffDisabled;
+    e.powerButton.disabled = text.powerDisabled;
+    e.powerButton.dataset[data.phase] = controls.phase;
+    e.powerLabel.textContent = text.label;
+    e.powerButton.setAttribute("aria-label", text.name);
+    e.powerButton.setAttribute("aria-busy", String(text.busy));
     e.volumeInput.disabled = text.inputsDisabled;
     e.cutoffInput.disabled = text.inputsDisabled;
-    e.stopButton.disabled = text.stopDisabled;
   }
 
   function renderKeyboard(): void {
@@ -202,11 +193,7 @@ export function createDomConnection(elements: PageElements, defaults: Settings, 
       render(state) {
         controls = state;
         renderControls();
-        transition({ type: "enable", enabled: state.phase === "running" && state.canControl });
-      },
-      setNotesHeld(held) {
-        notesHeld = held;
-        renderControls();
+        transition({ type: "enable", enabled: state.phase === "running" });
       },
       clearNotes() {
         for (const [pointerId, note] of pointerNotes) releaseCapture(note.button, pointerId);
@@ -226,10 +213,10 @@ export function createDomConnection(elements: PageElements, defaults: Settings, 
 
       e.volumeInput.addEventListener("input", () => actions.volumeChanged(updateVolume()));
       e.cutoffInput.addEventListener("input", () => actions.cutoffChanged(updateCutoff()));
-      e.startButton.addEventListener("click", actions.start);
-      e.retryButton.addEventListener("click", actions.initialize);
-      e.stopButton.addEventListener("click", actions.stopNotes);
-      e.disposeButton.addEventListener("click", actions.powerOff);
+      e.powerButton.addEventListener("click", () => {
+        if (controlView(controls).powerAction === "on") actions.powerOn();
+        else actions.powerOff();
+      });
 
       e.window.addEventListener("keydown", event => {
         if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
