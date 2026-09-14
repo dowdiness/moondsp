@@ -141,16 +141,43 @@ test "named document events retain distinct references and their shared definiti
 }
 
 ///|
-test "both compilation paths report the original unresolved use position" {
-  let source = "let tone = note(\"60\");\nstack(tone, missing)"
-  let expected = "position 35: undefined pattern 'missing'; define it before use"
-  for
-    result in [
-      @mini.parse(source).map(_ => ()),
-      @mini.parse_doc(source).map(_ => ()),
-    ] {
-    @debug.assert_eq(result, Err(expected))
-  }
+fn[T] assert_undefined_pattern_at(
+  result : Result[T, String],
+  name : String,
+  position : Int,
+) -> Unit raise {
+  guard result is Err(error) else { fail("expected an undefined pattern") }
+  assert_true(error.contains("undefined pattern '\{name}'"))
+  assert_true(error.has_prefix("position \{position}:"))
+}
+
+///|
+test "undefined names are reported before invalid notes" {
+  let prefix = "stack(note(\"NotANote\"), "
+  let source = prefix + "missing)"
+  assert_undefined_pattern_at(@mini.parse(source), "missing", prefix.length())
+  assert_undefined_pattern_at(
+    @mini.parse_doc(source),
+    "missing",
+    prefix.length(),
+  )
+}
+
+///|
+test "undefined names are reported before missing declaration terminators" {
+  let prefix = "let a = "
+  let source = prefix + "missing note(\"60\")"
+  assert_undefined_pattern_at(@mini.parse(source), "missing", prefix.length())
+  assert_undefined_pattern_at(
+    @mini.parse_doc(source),
+    "missing",
+    prefix.length(),
+  )
+  assert_undefined_pattern_at(
+    @mini.parse_song(source),
+    "missing",
+    prefix.length(),
+  )
 }
 
 ///|

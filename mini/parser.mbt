@@ -31,7 +31,6 @@ priv suberror ParseError {
 priv struct Parser {
   input : String
   mut pos : Int
-  definitions : Map[String, MiniDefinition]
   bindings : Map[String, @pattern.Pat[@pattern.ControlMap]]
   doc_bindings : Map[String, @pattern.PatternDoc[@pattern.ControlMap]]
 }
@@ -39,7 +38,7 @@ priv struct Parser {
 ///|
 #alias(new)
 fn Parser::Parser(input : String) -> Parser {
-  { input, pos: 0, definitions: {}, bindings: {}, doc_bindings: {}, }
+  { input, pos: 0, bindings: {}, doc_bindings: {}, }
 }
 
 ///|
@@ -283,8 +282,8 @@ fn Parser::parse_expr(
   self : Parser,
 ) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
   let syntax = self.parse_syntax_expr()
-  let resolved = resolve_mini_expr(syntax, self.definitions)
-  compile_mini_pattern(resolved, self.bindings)
+  let resolved = resolve_mini_expr(syntax, self.bindings)
+  compile_mini_pattern(resolved)
 }
 
 ///|
@@ -327,7 +326,7 @@ fn Parser::read_binding_name(self : Parser) -> String? raise ParseError {
       )
     _ => ()
   }
-  if self.definitions.contains(name) {
+  if self.bindings.contains(name) || self.doc_bindings.contains(name) {
     raise ParseError("position \{name_start}: duplicate pattern '\{name}'")
   }
   self.skip_whitespace()
@@ -344,21 +343,22 @@ fn Parser::parse_bindings(
     self.skip_whitespace()
     guard self.read_binding_name() is Some(name) else { break }
     let syntax = self.parse_syntax_expr()
-    let body = resolve_mini_expr(syntax, self.definitions)
-    self.skip_whitespace()
-    self.expect_char(';')
-    // Compile every definition, including unused ones, exactly once per input.
-    // Both backends receive the same resolved syntax and lexical scope.
+    // Resolve before checking the terminator to preserve diagnostic precedence.
+    // Compile unused declarations too; publish a name only after success.
     match builder {
-      None => self.bindings[name] = compile_mini_pattern(body, self.bindings)
-      Some(builder) =>
-        self.doc_bindings[name] = compile_mini_doc(
-          body,
-          builder,
-          self.doc_bindings,
-        )
+      None => {
+        let body = resolve_mini_expr(syntax, self.bindings)
+        self.skip_whitespace()
+        self.expect_char(';')
+        self.bindings[name] = compile_mini_pattern(body)
+      }
+      Some(builder) => {
+        let body = resolve_mini_expr(syntax, self.doc_bindings)
+        self.skip_whitespace()
+        self.expect_char(';')
+        self.doc_bindings[name] = compile_mini_doc(body, builder)
+      }
     }
-    self.definitions[name] = { id: name, body, }
   }
 }
 

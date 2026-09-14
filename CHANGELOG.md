@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Resolved Mini named references directly to compiled pattern/document values,
+  removing retained definition bodies and compiler-side memo handling while
+  preserving declaration validation, diagnostic precedence, and source identities.
 - Documented the dedicated live scheduler and compiled/demo worklet roles,
   asset synchronization, and separate automated-rendering/listening workflows.
   Live Playwright tests can opt into Chromium virtual audio output with

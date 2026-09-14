@@ -827,8 +827,8 @@ fn Parser::parse_doc_expr(
   builder : MiniDocBuilder,
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
   let syntax = self.parse_syntax_expr()
-  let resolved = resolve_mini_expr(syntax, self.definitions)
-  compile_mini_doc(resolved, builder, self.doc_bindings)
+  let resolved = resolve_mini_expr(syntax, self.doc_bindings)
+  compile_mini_doc(resolved, builder)
 }
 
 ///|

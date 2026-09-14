@@ -1,49 +1,4 @@
 ///|
-priv struct MiniDefinition {
-  id : String
-  body : ResolvedMiniExpr
-}
-
-///|
-priv struct ResolvedMiniExpr {
-  span : MiniSpan
-  node : ResolvedMiniExprNode
-}
-
-///|
-priv enum ResolvedMiniExprNode {
-  Literal(MiniLiteral, String, Int)
-  Stack(Array[ResolvedMiniExpr])
-  Reference(MiniDefinition)
-  Apply(ResolvedMiniExpr, MiniTransform)
-}
-
-///|
-/// Pure name resolution. A definition sees only previously accepted definitions,
-/// so forward/self/mutual references cannot enter the validated expression graph.
-fn resolve_mini_expr(
-  expr : MiniExpr,
-  definitions : Map[String, MiniDefinition],
-) -> ResolvedMiniExpr raise ParseError {
-  let node : ResolvedMiniExprNode = match expr.node {
-    Literal(kind, content, offset) => Literal(kind, content, offset)
-    Stack(children) =>
-      Stack(children.map(child => resolve_mini_expr(child, definitions)))
-    Apply(child, transform) =>
-      Apply(resolve_mini_expr(child, definitions), transform)
-    Reference(name) =>
-      match definitions.get(name) {
-        Some(definition) => Reference(definition)
-        None =>
-          raise ParseError(
-            "position \{expr.span.start}: undefined pattern '\{name}'; define it before use",
-          )
-      }
-  }
-  { span: expr.span, node, }
-}
-
-///|
 fn MiniCallback::runtime(self : MiniCallback) -> Callback {
   let operation = self.operation()
   fn(pat) { operation.apply(pat) }
@@ -59,9 +14,64 @@ fn MiniCallback::signature(self : MiniCallback) -> String {
 }
 
 ///|
+fn MiniCallback::operation(self : MiniCallback) -> @pattern.TimeTransform {
+  match self {
+    Fast(n) => @pattern.TimeTransform::Fast(@pattern.Rational::from_int(n))
+    Slow(n) => @pattern.TimeTransform::Slow(@pattern.Rational::from_int(n))
+    Rev => @pattern.TimeTransform::Reverse
+  }
+}
+
+///|
+priv struct ResolvedMiniExpr[A] {
+  span : MiniSpan
+  node : ResolvedMiniExprNode[A]
+}
+
+///|
+priv enum ResolvedMiniExprNode[A] {
+  Literal(MiniLiteral, String, Int)
+  Stack(Array[ResolvedMiniExpr[A]])
+  Reference(String, A)
+  Apply(ResolvedMiniExpr[A], MiniTransform)
+}
+
+///|
+/// Resolve only previously compiled declarations. References retain their values
+/// and use-site spans, so compilation needs no name table or definition bodies.
+fn[A] resolve_mini_expr(
+  expr : MiniExpr,
+  definitions : Map[String, A],
+) -> ResolvedMiniExpr[A] raise ParseError {
+  let node : ResolvedMiniExprNode[A] = match expr.node {
+    Literal(kind, content, offset) => Literal(kind, content, offset)
+    Stack(children) =>
+      Stack(children.map(child => resolve_mini_expr(child, definitions)))
+    Apply(child, transform) =>
+      Apply(resolve_mini_expr(child, definitions), transform)
+    Reference(name) =>
+      match definitions.get(name) {
+        Some(definition) => Reference(name, definition)
+        None =>
+          raise ParseError(
+            "position \{expr.span.start}: undefined pattern '\{name}'; define it before use",
+          )
+      }
+  }
+  ResolvedMiniExpr(expr.span, node)
+}
+
+///|
+fn[A] ResolvedMiniExpr::ResolvedMiniExpr(
+  span : MiniSpan,
+  node : ResolvedMiniExprNode[A],
+) -> ResolvedMiniExpr[A] {
+  { span, node, }
+}
+
+///|
 fn compile_mini_pattern(
-  expr : ResolvedMiniExpr,
-  definitions : Map[String, @pattern.Pat[@pattern.ControlMap]],
+  expr : ResolvedMiniExpr[@pattern.Pat[@pattern.ControlMap]],
 ) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
   match expr.node {
     Literal(kind, content, _) => {
@@ -73,20 +83,12 @@ fn compile_mini_pattern(
       pat.material()
     }
     Stack(children) => {
-      let pats = children.map(child => compile_mini_pattern(child, definitions))
+      let pats = children.map(child => compile_mini_pattern(child))
       @pattern.stack(pats)
     }
-    Reference(definition) =>
-      match definitions.get(definition.id) {
-        Some(pat) => pat.named_entry(definition.id)
-        None => {
-          let pat = compile_mini_pattern(definition.body, definitions)
-          definitions[definition.id] = pat
-          pat.named_entry(definition.id)
-        }
-      }
+    Reference(name, pat) => pat.named_entry(name)
     Apply(child, transform) => {
-      let pat = compile_mini_pattern(child, definitions)
+      let pat = compile_mini_pattern(child)
       match transform {
         Fast(n) => pat.fast(n)
         Slow(n) => pat.slow(n)
@@ -103,9 +105,8 @@ fn compile_mini_pattern(
 
 ///|
 fn compile_mini_doc(
-  expr : ResolvedMiniExpr,
+  expr : ResolvedMiniExpr[@pattern.PatternDoc[@pattern.ControlMap]],
   builder : MiniDocBuilder,
-  definitions : Map[String, @pattern.PatternDoc[@pattern.ControlMap]],
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
   match expr.node {
     Literal(kind, content, offset) =>
@@ -117,28 +118,18 @@ fn compile_mini_doc(
           parse_chord_doc_notation(content, builder, source_offset=offset)
       }
     Stack(children) =>
-      builder.stack_doc(
-        children.map(child => compile_mini_doc(child, builder, definitions)),
-      )
-    Reference(definition) => {
-      let doc = match definitions.get(definition.id) {
-        Some(doc) => doc
-        None => {
-          let doc = compile_mini_doc(definition.body, builder, definitions)
-          definitions[definition.id] = doc
-          doc
-        }
-      }
+      builder.stack_doc(children.map(child => compile_mini_doc(child, builder)))
+    Reference(name, doc) => {
       let id = builder.atom_id_at(
         "binding",
-        "\{definition.id}:\{doc.root().value()}",
+        "\{name}:\{doc.root().value()}",
         expr.span.start,
         expr.span.end,
       )
       @pattern.PatternDoc::reference(id~, definition=doc)
     }
     Apply(child, transform) => {
-      let doc = compile_mini_doc(child, builder, definitions)
+      let doc = compile_mini_doc(child, builder)
       match transform {
         Fast(n) => builder.fast_doc(doc, n)
         Slow(n) => builder.slow_doc(doc, n)
@@ -150,14 +141,5 @@ fn compile_mini_doc(
         Jux(callback) => builder.jux_doc(doc, callback)
       }
     }
-  }
-}
-
-///|
-fn MiniCallback::operation(self : MiniCallback) -> @pattern.TimeTransform {
-  match self {
-    Fast(n) => @pattern.TimeTransform::Fast(@pattern.Rational::from_int(n))
-    Slow(n) => @pattern.TimeTransform::Slow(@pattern.Rational::from_int(n))
-    Rev => @pattern.TimeTransform::Reverse
   }
 }
