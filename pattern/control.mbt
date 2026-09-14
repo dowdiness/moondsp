@@ -173,15 +173,18 @@ fn Pat::jux_known(
   f : (Pat[ControlMap]) -> Pat[ControlMap],
   signature : String,
 ) -> Pat[ControlMap] {
+  if signature != "" && self.body is Silence {
+    return self
+  }
   let left = merge_control(self, s_pan(-1.0))
   let right = merge_control(f(self), s_pan(1.0))
   let combined = stack([left, right])
-  {
-    ..combined,
-    period: self.period,
-    members: [],
-    entry_key: self.entry_key,
-    signature: transformed_signature(
+  make_pat(
+    combined.query,
+    self.metadata.period,
+    Opaque([]),
+    self.metadata.scope,
+    transformed_signature(
       self.entry_signature(),
       if signature == "" {
         ""
@@ -189,7 +192,7 @@ fn Pat::jux_known(
         "jux:" + signature
       },
     ),
-  }
+  )
 }
 
 ///|
@@ -203,21 +206,20 @@ pub fn merge_control(
   a : Pat[ControlMap],
   b : Pat[ControlMap],
 ) -> Pat[ControlMap] {
-  {
-    period: a.period,
-    members: a.members.map(p => merge_control(p, b)),
-    entry_key: a.entry_key,
-    signature: transformed_signature(
-      a.signature,
-      if b.entry_signature() == "" {
-        ""
-      } else {
-        "merge:" + b.entry_signature()
-      },
-    ),
-    query: fn(arc) {
+  if a.body is Silence {
+    return a
+  }
+  let left = a
+  let children = a.transform_children(p => merge_control(p, b))
+  let change = if b.entry_signature() == "" {
+    ""
+  } else {
+    "merge:" + b.entry_signature()
+  }
+  make_pat(
+    fn(arc) {
       let b_events = b.query(arc)
-      a
+      left
       .query(arc)
       .map(ae => {
         let merged = b_events.fold(init=ae.value, (merged, be) => {
@@ -230,14 +232,24 @@ pub fn merge_control(
         { whole: ae.whole, part: ae.part, value: merged, }
       })
     },
-  }
+    a.metadata.period,
+    Opaque(children),
+    a.metadata.scope,
+    transformed_signature(a.entry_signature(), change),
+  )
 }
 
 ///|
 /// A scalar control source whose content is tracked automatically.
 pub fn control(key : String, value : Double) -> Pat[ControlMap] {
   let pat = Pat::pure(ControlMap::single(key, value))
-  { ..pat, signature: "control:\{key.length()}:\{key}:\{value}", }
+  make_pat(
+    pat.query,
+    pat.metadata.period,
+    pat.body,
+    pat.metadata.scope,
+    "control:\{key.length()}:\{key}:\{value}",
+  )
 }
 
 ///|

@@ -284,15 +284,15 @@ test "implicit parts continue after latest explicit occurrence end" {
   let b = make_section("b", @pattern.Rational::from_int(1), 62.0)
   let c = make_section("c", @pattern.Rational::from_int(1), 64.0)
   let song = make_song([
-    SongPart(name="a1", section=a),
+    SongPart::at(start=rat(1L, 1L), name="a1", section=a),
     SongPart::at(start=rat(1L, 2L), name="b1", section=b),
     SongPart(name="c1", section=c),
   ])
-  assert_true(song.duration() == rat(5L, 2L))
+  assert_true(song.duration() == rat(3L, 1L))
   match song.get_occurrence("c1") {
     Some(occurrence) => {
-      assert_true(occurrence.start() == rat(3L, 2L))
-      assert_true(occurrence.end_() == rat(5L, 2L))
+      assert_true(occurrence.start() == rat(2L, 1L))
+      assert_true(occurrence.end_() == rat(3L, 1L))
     }
     None => abort("expected implicit occurrence after overlap")
   }

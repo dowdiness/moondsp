@@ -16,6 +16,8 @@ import roomOfLight from "../../../examples/room-of-light.mini?raw";
 import lightOrbit from "../../../examples/light-orbit.mini?raw";
 import sharedRoomComparison from "../../../examples/shared-room-comparison.mini?raw";
 import sharedRoomAfterglow from "../../../examples/shared-room-afterglow.mini?raw";
+import overlayGroove from "../../../examples/overlay-groove.mini?raw";
+import overlayGrouping from "../../../examples/overlay-grouping.mini?raw";
 
 import { minilive } from "./lang/minilive";
 import { CM6Adapter } from "./canopy";
@@ -249,6 +251,8 @@ startBtn.addEventListener("click", () => {
 (document.getElementById("envelope-compare-example") as HTMLButtonElement).dataset.example = envelopeComparison;
 (document.getElementById("shared-room-example") as HTMLButtonElement).dataset.example = sharedRoomComparison;
 (document.getElementById("shared-room-afterglow-example") as HTMLButtonElement).dataset.example = sharedRoomAfterglow;
+(document.getElementById("overlay-groove-example") as HTMLButtonElement).dataset.example = overlayGroove;
+(document.getElementById("overlay-grouping-example") as HTMLButtonElement).dataset.example = overlayGrouping;
 
 cheatToggle.addEventListener("click", () => {
   const collapsed = workspaceEl.classList.toggle("cheat-collapsed");

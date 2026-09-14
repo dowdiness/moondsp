@@ -88,6 +88,7 @@ pub fn[A] Pat::same_content(Self[A], Self[A]) -> Bool
 pub fn Pat::select_control(Self[ControlMap], String, value? : Double) -> Self[ControlMap]
 pub fn[A] Pat::silence() -> Self[A]
 pub fn[A] Pat::slow(Self[A], Rational) -> Self[A]
+pub impl[A] Add for Pat[A]
 
 pub struct PatternDoc[A] {
   // private fields
@@ -142,6 +143,7 @@ pub fn PatternNodePath::nodes(Self) -> Array[@identity.PatternNodeId]
 pub struct PatternSnapshot[A] {
   // private fields
 }
+pub fn[A] PatternSnapshot::entry_key(Self[A], Int) -> String?
 pub fn[A] PatternSnapshot::pat(Self[A]) -> Pat[A]
 pub fn[A] PatternSnapshot::query(Self[A], TimeSpan) -> Array[Event[A]]
 pub fn[A] PatternSnapshot::query_sourced_events(Self[A], TimeSpan) -> Array[PatternSnapshotEvent[A]]

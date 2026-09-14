@@ -29,12 +29,12 @@ Semantics:
   concatenates their events;
 - event `whole`, `part`, and `value` are preserved exactly from each child;
 - `stack([])` is `Pat::silence()`;
-- `stack([p])` should behave like `p`;
-- nested stacks are expected to be semantically associative modulo event array
-  ordering.
+- `stack([p])` returns `p`;
+- raw anonymous nested stacks normalize to one ordered overlay;
+- regrouping preserves event array order and duplicates, not just event sets.
 
-Therefore `Pat::silence()` is the identity for overlay, and `stack([...])` is
-the array form of a Monoid-like `overlay` over `Pat[A]`:
+Therefore `Pat::silence()` is the identity for ordered overlay. Native MoonBit
+`p + q` uses `Add for Pat[A]` and delegates to the same constructor:
 
 ```text
 overlay(p, q) = stack([p, q])
@@ -45,14 +45,40 @@ Do not overload overlay to merge payloads. For `Pat[ControlMap]`, overlay means
 multiple events may occur at the same time; it does not mean their control maps
 are combined into one event.
 
+Normalization only traverses raw overlays. A transformed query is not rebuilt
+from its playback entries: for example, reversing an overlay can produce a
+different cross-cycle event order from overlaying individually reversed entries.
+Named scopes retain their address boundary; `.material()` explicitly groups
+an expression into one playback material. Naming alone does not group clocks.
+
+### Content, playback identity, and source ancestry
+
+These are separate contracts:
+
+- Known content compares equally after raw overlay regrouping, including after
+  `.material()` and known transforms. Content normalization traverses raw overlays
+  independently of named/material boundaries, removes silence, and reduces a
+  single remaining operand to its own content identity. Playback boundaries and
+  silent placeholders remain intact. Opaque queries stay atomic; arbitrary
+  queries and callbacks remain unknown and cannot suppress a live replacement.
+- Playback occurrence keys exclude raw overlay ancestry. Document references
+  own their member slots independently of their definition's content IDs.
+  Anonymous silence has no playback entry; explicitly named/material silence
+  retains a placeholder for playback transitions.
+- `PatternDoc` retains the authored source tree. `PatternSnapshot::entry_key`
+  identifies the playback occurrence; sourced queries still report its source
+  ancestry. Regrouping unchanged known content preserves the material clock
+  while publishing the latest source view.
+
 ### Mini-notation consequences
 
-Future mini sugar such as `p + q` or implicit top-level newline overlay should
-lower to the same overlay algebra as `stack(p, q)` and `$:` lines. The operator
-should not be numeric addition, and it should not perform `ControlMap` merging.
+Mini `p + q`, `stack(p, q)`, and `$:` lines lower to the same ordered overlay.
+The operator is neither numeric addition nor `ControlMap` merging. Method
+chains bind more tightly than `+`; `(p + q).rev()` transforms the whole group.
+Parentheses do not add a source node.
 
-`$:` should remain the explicit top-level stack-line syntax even if other sugar
-is added.
+`$:` remains the explicit top-level stack-line syntax. Ordinary newlines are
+whitespace, not an implicit overlay.
 
 ## Value mapping
 
@@ -137,9 +163,7 @@ all `Pat[A]`.
 
 1. Add `Pat::map` as the first value-only mapping API, with tests that event
    timing is preserved.
-2. Add mini `+` overlay sugar by lowering to `stack`, not to numeric addition
-   or `merge_control` (tracked by #217).
-3. Add implicit top-level newline overlay only after it is specified as the
+2. Add implicit top-level newline overlay only after it is specified as the
    same overlay operation as `stack` and `$:` lines (tracked by #219).
-4. Defer `zip_with`, `lift2`, and `ap` until one time-combination rule is chosen
+3. Defer `zip_with`, `lift2`, and `ap` until one time-combination rule is chosen
    and documented with examples.

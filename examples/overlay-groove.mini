@@ -1,0 +1,5 @@
+let drums = s("bd hh bd hh").slow(4);
+let bass = note("A2 A2 C3 G2").slow(4).attack(0.005).hold(0.12).release(0.16);
+let melody = note("E4 G4 A4 C5 B4 G4 E4 D4").slow(4).attack(0.01).hold(0.08).release(0.25);
+
+drums + bass + (melody.pan(-0.45) + melody.rev().pan(0.45)).slow(2)

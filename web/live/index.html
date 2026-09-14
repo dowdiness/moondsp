@@ -219,6 +219,17 @@
         margin: 0;
         color: var(--ink-muted);
       }
+      #syntax-reference dl {
+        grid-template-columns: minmax(0, 1fr);
+        row-gap: 0.125rem;
+      }
+      #syntax-reference dt {
+        white-space: normal;
+        overflow-wrap: anywhere;
+      }
+      #syntax-reference dd {
+        margin-bottom: 0.65rem;
+      }
       #cheat code {
         font-family: var(--font-mono);
         font-size: var(--text-code);
@@ -432,6 +443,10 @@
       <aside id="cheat" aria-label="mini-notation cheatsheet">
         <h2>Examples</h2>
         <p class="cheat-note">Replaces your code. Press Play if stopped.</p>
+        <button type="button" class="example" id="overlay-groove-example" data-live-example="overlay-groove" data-bpm="96">Overlay groove: + layers</button>
+        <p class="cheat-note">Drums, bass, and a stereo melody loop. The final .slow(2) slows both melodies inside parentheses.</p>
+        <button type="button" class="example" id="overlay-grouping-example" data-live-example="overlay-grouping" data-mode="song" data-bpm="96">Grouping A/B: hear the parentheses</button>
+        <p class="cheat-note">20 seconds: fast hats first, then fast kick and hats. Compare kick + hats.fast(2) with (kick + hats).fast(2).</p>
         <button type="button" class="example" id="envelope-compare-example" data-live-example="envelope-compare" data-mode="song" data-bpm="60">One note, three envelopes</button>
         <p class="cheat-note">Same E4: short → swell → drift. 23 seconds.</p>
         <button type="button" class="example" id="room-of-light-example" data-live-example="room-of-light" data-mode="song" data-bpm="112">Room of Light — pop sketch</button>
@@ -473,68 +488,7 @@
         <p>Tempo changes work live. For song structure changes, <strong>Stop</strong>, then <strong>Play</strong>.</p>
         <details id="syntax-reference">
           <summary>Syntax reference</summary>
-          <h2>Sounds</h2>
-          <dl>
-            <dt>note("E4 G4")</dt><dd>note names or MIDI numbers</dd>
-            <dt>chord("Am G")</dt><dd>chords</dd>
-            <dt>s("bd hh sd hh")</dt><dd>drums: bd kick, sd snare, hh closed hat, oh open hat, cp clap</dd>
-          </dl>
-          <p class="cheat-note">Notes: <code>C4</code> = MIDI 60. Use <code>#</code> or <code>b</code> for accidentals; octave defaults to 4.</p>
-          <p class="cheat-note">Chords: <code>C</code> major, <code>Cm</code> minor; also <code>7</code>, <code>maj7</code>, <code>m7</code>, <code>dim</code>, <code>aug</code>, <code>sus4</code>, <code>6</code>, <code>add9</code>, <code>maj9</code>, <code>m9</code>.</p>
-
-          <h2>Sound shape</h2>
-          <dl>
-            <dt>.gain(n)</dt><dd>scale volume</dd>
-            <dt>.pan(n)</dt><dd>left −1, center 0, right 1</dd>
-            <dt>.room(n)</dt><dd>send 0–1 into the shared room reverb</dd>
-            <dt>.attack(s)</dt><dd>fade in over s seconds</dd>
-            <dt>.hold(s)</dt><dd>stay at peak volume for s seconds</dd>
-            <dt>.release(s)</dt><dd>fade out over s seconds</dd>
-          </dl>
-          <p><code>stack(<br>&nbsp;&nbsp;s("bd sd").gain(0.25),<br>&nbsp;&nbsp;chord("Cmaj7").gain(0.08).room(0.7)<br>)</code></p>
-          <p class="cheat-note"><code>.room(0)</code> is dry and is the default. <code>.room(1)</code> is the maximum send. The example keeps the drums dry while the chord sends at 0.7; every part still keeps its dry signal.</p>
-          <p class="cheat-note">Envelopes apply to notes and chords. Times are seconds.</p>
-          <p><code>note("E4")<br>&nbsp;&nbsp;.attack(0.01).hold(0.1)<br>&nbsp;&nbsp;.release(0.2)</code></p>
-          <p class="cheat-note">0.31 seconds total, independent of tempo. Omit hold to follow the pattern's note length. Omitted attack/release use the sound's defaults; release starts from the current level.</p>
-          <p class="cheat-note">Room is one shared stereo space for every part. Its tail continues across note endings, section changes, and live edits; Stop remains immediate.</p>
-
-          <h2>Rhythm</h2>
-          <p class="cheat-note">BPM sets cycles per minute: at 60, one cycle is one second. A cycle has no fixed meter.</p>
-          <dl>
-            <dt>.fast(n)</dt><dd>n× faster</dd>
-            <dt>.slow(n)</dt><dd>n× slower; explicit envelope seconds stay unchanged</dd>
-            <dt>.rev()</dt><dd>reverse</dd>
-            <dt>.degradeBy(p)</dt><dd>drop events with probability p (0–1)</dd>
-            <dt>.every(n, f)</dt><dd>apply f every nth cycle</dd>
-          </dl>
-          <p class="cheat-note">Inside strings:</p>
-          <dl>
-            <dt>a b c</dt><dd>sequence in one cycle; newlines also separate items</dd>
-            <dt>[a b]</dt><dd>subdivide a step</dd>
-            <dt>a, b</dt><dd>play together</dd>
-            <dt>a*4</dt><dd>repeat 4× faster</dd>
-            <dt>a/2</dt><dd>stretch 2× slower</dd>
-            <dt>a?</dt><dd>50% chance to drop</dd>
-            <dt>a(3,8)</dt><dd>3 hits across 8 steps; a(3,8,1) adds rotation</dd>
-          </dl>
-
-          <h2>Combine patterns</h2>
-          <dl>
-            <dt>let a = p;</dt><dd>name a reusable pattern; define it before use</dd>
-            <dt>stack(a, b)</dt><dd>play patterns together</dd>
-            <dt>$: a<br>$: b</dt><dd>combine top-level layers on separate lines</dd>
-            <dt>.jux(f)</dt><dd>original left, transformed copy right</dd>
-          </dl>
-          <p class="cheat-note"><code>f</code> = <code>fast(n)</code>, <code>slow(n)</code>, or <code>rev</code>. Keep pattern names stable during live edits.</p>
-
-          <h2>Song structure</h2>
-          <dl>
-            <dt>song(…)</dt><dd>sections and their playback order</dd>
-            <dt>section("a", n, p)</dt><dd>name a section lasting n cycles</dd>
-            <dt>part("id", "a")</dt><dd>play section a; use a unique part id</dd>
-            <dt>bpm(n)</dt><dd>tempo inside song(); editable while playing</dd>
-          </dl>
-          <p class="cheat-note">Separate calls with commas; multiline songs are supported. The header BPM control sets global tempo. Examples may set it too.</p>
+          <!-- MINI_SYNTAX_REFERENCE -->
         </details>
       </aside>
     </main>

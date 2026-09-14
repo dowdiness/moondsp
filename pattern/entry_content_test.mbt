@@ -66,3 +66,51 @@ test "grouping and known transforms cannot identify arbitrary code" {
   let combined = @pattern.stack([@pattern.note(60.0), unknown]).material()
   assert_false(combined.same_content(combined))
 }
+
+///|
+test "overlay content ignores subgroup names and material boundaries" {
+  let a = @pattern.note(60.0)
+  let b = @pattern.note(64.0)
+  let c = @pattern.note(67.0)
+  let plain = (a + b + c).material()
+  let arc = span(0, 1, 2, 1)
+  for subgroup in [(a + b).named_entry("phrase"), (a + b).material()] {
+    let annotated = (subgroup + c).material()
+    assert_eq(
+      annotated.query(arc).map(e => (e.whole, e.part, e.value.entries())),
+      plain.query(arc).map(e => (e.whole, e.part, e.value.entries())),
+    )
+    assert_true(annotated.same_content(plain))
+    assert_true(annotated.rev().same_content(plain.rev()))
+  }
+}
+
+///|
+test "silent playback placeholders do not change overlay content" {
+  let a = @pattern.note(60.0)
+  let silent = @pattern.Pat::silence().named_entry("rest")
+  let annotated = a + silent
+  assert_eq(annotated.entries().length(), 2)
+  assert_true(annotated.material().same_content(a.material()))
+  assert_true(
+    (silent + silent)
+    .material()
+    .same_content(@pattern.Pat::silence().material()),
+  )
+}
+
+///|
+test "content normalization preserves opaque queries order and unknown callbacks" {
+  let a = @pattern.note(60.0)
+  let b = @pattern.note(64.0)
+  let c = @pattern.note(67.0)
+  let wrapped = (a + b).rev().named_entry("reversed")
+  assert_false(
+    (wrapped + c).material().same_content((a.rev() + b.rev() + c).material()),
+  )
+  assert_false((a + b).material().same_content((b + a).material()))
+  assert_false((a + a).material().same_content(a.material()))
+  let unknown = (a + b).filter_map(v => Some(v)).named_entry("unknown")
+  let combined = (unknown + c).material()
+  assert_false(combined.same_content(combined))
+}

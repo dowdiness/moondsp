@@ -2,12 +2,12 @@
 /// Recursive descent parser for mini-notation.
 ///
 /// Grammar:
-///   program  = binding* (expr | dollar_stack)
 ///   binding  = "let" identifier "=" expr ";"
 ///   dollar_stack = ( "$:" expr newline? )+
-///   expr     = primary ( "." method )*
+///   expr     = chain ( "+" chain )*
+///   chain    = primary ( "." method )*
 ///   primary  = "s(" string ")" | "note(" string ")"
-///            | "stack(" expr ( "," expr )* ")" | identifier
+///            | "stack(" expr ( "," expr )* ")" | "(" expr ")" | identifier
 ///   method   = "fast(" number ")" | "slow(" number ")" | "rev()"
 ///            | "degradeBy(" number ")"
 ///            | "every(" int "," callback ")"

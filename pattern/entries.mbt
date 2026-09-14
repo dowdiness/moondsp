@@ -1,23 +1,43 @@
 ///|
 /// Give an authored material a stable address. The name is not a clock group.
 pub fn[A] Pat::named_entry(self : Pat[A], name : String) -> Pat[A] {
-  { ..self, entry_key: name, }
+  let scope = match self.metadata.scope {
+    Material | NamedMaterial(_) => NamedMaterial(name)
+    Anonymous | Named(_) => Named(name)
+  }
+  make_pat(
+    self.query,
+    self.metadata.period,
+    self.body,
+    scope,
+    self.metadata.content,
+  )
 }
 
 ///|
 /// Group this expression as one authored material without changing its content.
 pub fn[A] Pat::material(self : Pat[A]) -> Pat[A] {
-  { ..self, members: [], signature: self.entry_signature(), }
+  let scope = match self.metadata.scope {
+    Named(name) | NamedMaterial(name) => NamedMaterial(name)
+    Anonymous | Material => Material
+  }
+  make_pat(
+    self.query,
+    self.metadata.period,
+    self.body,
+    scope,
+    self.metadata.content,
+  )
 }
 
 ///|
 /// True only when both sources are identifiable and have the same content.
 /// Names and placement are separate. Arbitrary queries/callbacks return false.
 pub fn[A] Pat::same_content(self : Pat[A], other : Pat[A]) -> Bool {
-  let signature = self.entry_signature()
-  signature != "" &&
-  signature == other.entry_signature() &&
-  self.period == other.period
+  let content = self.entry_signature()
+  content != "" &&
+  content == other.entry_signature() &&
+  self.metadata.period == other.metadata.period
 }
 
 ///|
@@ -31,57 +51,131 @@ fn transformed_signature(source : String, change : String) -> String {
 }
 
 ///|
+fn[A] combine_signature(prefix : String, pats : Array[Pat[A]]) -> String {
+  let mut content = prefix + ":\{pats.length()}"
+  for pat in pats {
+    let signature = pat.entry_signature()
+    if signature == "" {
+      return ""
+    }
+    content = content + ":\{signature.length()}:\{signature}"
+  }
+  content
+}
+
+///|
+fn[A] overlay_signature(pats : Array[Pat[A]]) -> String {
+  let signatures : Array[String] = []
+  // Content traverses raw overlays regardless of playback scopes. Opaque
+  // queries remain atomic: their entry projections are not their query.
+  fn collect_content(pat : Pat[A]) -> Bool {
+    match pat.body {
+      Silence => true
+      Overlay(children) => {
+        for child in children {
+          guard collect_content(child) else { return false }
+        }
+        true
+      }
+      Opaque(_) => {
+        let signature = pat.entry_signature()
+        guard signature != "" else { return false }
+        signatures.push(signature)
+        true
+      }
+    }
+  }
+  for pat in pats {
+    guard collect_content(pat) else { return "" }
+  }
+  match signatures {
+    [] => "silence"
+    [signature] => signature
+    _ => {
+      let mut content = "overlay:\{signatures.length()}:"
+      for signature in signatures {
+        content += ":\{signature.length()}:\{signature}"
+      }
+      content
+    }
+  }
+}
+
+///|
 pub fn[A] Pat::entry_period(self : Pat[A]) -> Rational {
-  self.period
+  self.metadata.period
 }
 
 ///|
 fn[A] Pat::entry_signature(self : Pat[A]) -> String {
-  let mut text = self.signature
-  for p in self.members {
-    let part = p.entry_signature()
-    // Unknown content must stay unknown when a stack becomes one material.
-    if part == "" {
-      return ""
-    }
-    text = text + "/\{part.length()}:\{part}"
-  }
-  text
+  self.metadata.content
 }
 
 ///|
 pub fn[A] Pat::entry_key(self : Pat[A]) -> String {
-  self.entry_key
+  match self.metadata.scope {
+    Anonymous | Material => ""
+    Named(name) | NamedMaterial(name) => name
+  }
+}
+
+///|
+fn scope_path_key(scope : EntryScope, index : Int) -> String {
+  match scope {
+    Named(name) | NamedMaterial(name) => "name:\{name}"
+    Anonymous | Material => "slot:\{index}"
+  }
+}
+
+///|
+fn[A] Pat::entry_at_path(self : Pat[A], path : String) -> Pat[A] {
+  make_pat(
+    self.query,
+    self.metadata.period,
+    self.body,
+    match self.metadata.scope {
+      Material | NamedMaterial(_) => NamedMaterial(path)
+      Anonymous | Named(_) => Named(path)
+    },
+    self.metadata.content,
+  )
 }
 
 ///|
 /// Return independent authored members, with owned address metadata.
+///
+/// Only raw anonymous overlays are traversed structurally. A transformed
+/// query may retain child projections for entry consumers, but it is never
+/// treated as an overlay during normalization.
 pub fn[A] Pat::entries(self : Pat[A]) -> Array[Pat[A]] {
   let result = []
   fn visit(pat : Pat[A], path : String) -> Unit {
-    if pat.members.is_empty() {
-      result.push({ ..pat, entry_key: path, })
-    } else {
-      let seen : Map[String, Int] = Map([])
-      for i, child in pat.members {
-        let key = if child.entry_key == "" {
-          "slot:\{i}"
-        } else {
-          "name:\{child.entry_key}"
+    match pat.metadata.scope {
+      Material | NamedMaterial(_) => result.push(pat.entry_at_path(path))
+      Anonymous | Named(_) =>
+        match pat.body {
+          Opaque([]) => result.push(pat.entry_at_path(path))
+          Overlay(children) | Opaque(children) => {
+            let seen : Map[String, Int] = Map([])
+            for i, child in children {
+              let key = scope_path_key(child.metadata.scope, i)
+              let count = seen.get(key).unwrap_or(0)
+              seen[key] = count + 1
+              visit(child, path + "/\{key.length()}:\{key}:\{count}")
+            }
+          }
+          Silence =>
+            match pat.metadata.scope {
+              Named(_) => result.push(pat.entry_at_path(path))
+              _ => ()
+            }
         }
-        let count = seen.get(key).unwrap_or(0)
-        seen[key] = count + 1
-        visit(child, path + "/\{key.length()}:\{key}:\{count}")
-      }
     }
   }
-  visit(
-    self,
-    if self.entry_key == "" {
-      "root"
-    } else {
-      "name:" + self.entry_key
-    },
-  )
+  let root_path = match self.metadata.scope {
+    Named(name) | NamedMaterial(name) => "name:" + name
+    Anonymous | Material => "root"
+  }
+  visit(self, root_path)
   result
 }

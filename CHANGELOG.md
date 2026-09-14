@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added live Examples for an overlay groove and a 20-second grouping comparison,
+  demonstrating `+` layers and parenthesized transforms with playable Mini scores.
 - Added a host-independent MoonBit `GraphEngine` with typed `MountedGraph`
   capabilities, checked errors, independent engine instances, and mono mixing.
   It consumes canonical `Array[DspNode]` values through the existing compiler.
@@ -37,6 +39,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   builder ABI is replaced with JSON input/error transport and explicit engine
   initialization/close. The pre-playback-only mounting restriction remains.
 
+- Added native `Pat[A] + Pat[A]` and Mini `+` overlays with transparent grouping
+  parentheses and method-chain precedence, including live editor grammar and
+  highlighting.
+- Normalized raw overlays in the pattern core while preserving event order,
+  duplicates, and opaque transform queries. Separated content identity from
+  playback occurrence metadata and authored source ancestry.
+- Preserved known material clocks across overlay regrouping while refreshing
+  source provenance. Mini references now keep use-site identity across
+  definition edits; document reuse checks input revisions instead of assuming
+  stable IDs imply unchanged content.
 - Resolved Mini named references directly to compiled pattern/document values,
   removing retained definition bodies and compiler-side memo handling while
   preserving declaration validation, diagnostic precedence, and source identities.
@@ -75,6 +87,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The live syntax reference is embedded from `docs/mini-notation.md` at build time,
+  with automatic reloads during development and stacked syntax/description pairs
+  that remain readable in the narrow help sidebar.
+- Corrected implicit song placement help to use the latest end of all preceding
+  parts, with regression coverage for out-of-order explicit placements.
+- Corrected the browser help: gain and cutoff controls are parsed but are not
+  connected to the current browser instruments.
 - Fixed the external graph example getting stuck after unmount failure. Cleanup
   now attempts each resource independently, preserves the original error, and
   restores the controls so another graph can be mounted.
@@ -91,6 +110,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   preventing spurious `ENGINE_CLOSED` rejections and closing admission as soon
   as shutdown starts.
 
+- Fixed overlay content comparison depending on subgroup names, nested material
+  boundaries, or named silence. Content normalization is now independent of
+  playback scopes, without flattening opaque queries or removing playback
+  placeholders.
 - Preserved uncommitted live-editor BPM input across unrelated playback replies,
   while retaining normalization on Enter or blur.
 - Prevented stale tempo acknowledgements from undoing newer edits. Runtime

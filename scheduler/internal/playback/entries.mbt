@@ -70,7 +70,7 @@ fn PlaybackSnapshot::entries(self : PlaybackSnapshot) -> Array[EntrySpec] {
       for index, body in snapshot.pat().entries() {
         result.push(
           EntrySpec(
-            id=body.entry_key(),
+            id=snapshot.entry_key(index).unwrap(),
             body~,
             start=@pattern.Rational::from_int(0),
             end_=None,
@@ -173,12 +173,8 @@ fn PlaybackSnapshot::reconcile_entries(
     let replacement = remaining.get(entry.material.id)
     remaining.remove(entry.material.id)
     if replacement is Some(spec) && entry.retains_content(spec) {
-      let retained = if entry.phase is Waiting(_) {
-        spec
-      } else {
-        entry.material
-      }
-      result.push(EntryState(retained, entry.origin, Playing))
+      // Keep the material clock, but publish the latest source/provenance view.
+      result.push(EntryState(spec, entry.origin, Playing))
       continue
     }
     let due = match entry.phase {

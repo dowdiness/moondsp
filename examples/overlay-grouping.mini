@@ -1,0 +1,10 @@
+let kick = s("bd");
+let hats = s("hh");
+
+song(
+  bpm(96),
+  section("fast-hats", 16, kick + hats.fast(2)),
+  section("fast-both", 16, (kick + hats).fast(2)),
+  part("a", "fast-hats"),
+  part("b", "fast-both")
+)

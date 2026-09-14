@@ -122,7 +122,7 @@ fn compile_mini_doc(
     Reference(name, doc) => {
       let id = builder.atom_id_at(
         "binding",
-        "\{name}:\{doc.root().value()}",
+        name,
         expr.span.start,
         expr.span.end,
       )

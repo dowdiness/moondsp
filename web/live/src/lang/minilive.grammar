@@ -1,6 +1,6 @@
 // Outer surface for the moondsp live REPL: Strudel-style `$:` stack
-// lines or identifier-headed calls (`s(...)`, `note(...)`, `stack(...)`)
-// followed by zero or more dotted method calls (`.fast(2)`, `.jux(rev)`). The mini-notation
+// lines, ordered `+` overlays, and parenthesized groups. Dotted method
+// calls (`.fast(2)`, `.jux(rev)`) bind more tightly than `+`. The mini-notation
 // itself stays opaque inside String tokens — completion handles
 // "we're inside a string whose enclosing call is s()" by walking the
 // syntax tree and the source between cursor and the surrounding
@@ -16,7 +16,9 @@ DollarLine { "$:" Expression }
 
 @skip { space }
 
-Expression { Call MemberCall* }
+Expression { Chain ("+" Chain)* }
+Chain { (Call | Group) MemberCall* }
+Group { "(" Expression ")" }
 
 Call       { CallName Args? }
 MemberCall { "." MethodName Args? }
@@ -33,7 +35,7 @@ MethodName { identifier }
   Number     { $[0-9]+ ("." $[0-9]+)? }
   String     { '"' (![\\\n"] | "\\" _)* '"'? }
   space      { $[ \t\n\r]+ }
-  "(" ")" "." "," "$:"
+  "(" ")" "." "," "$:" "+"
 }
 
 @detectDelim

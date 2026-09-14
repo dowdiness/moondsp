@@ -8,52 +8,101 @@ contract that bridges Mini events into graph templates. Production parsing is
 still the hand-written MoonBit parser; the loom CST work remains an evaluation
 path under `specs/loom-mini-cst/`.
 
-## Top-level forms
+## Browser live examples
 
-Use `s("...")` for drum sounds, `note("...")` for MIDI note numbers or
-note names, and `chord("...")` for chord names:
+In the live app's **Examples** panel, select an example and press **Play**:
 
-```text
-s("bd sd hh sd")
-note("60 64 67 72")
-note("C4 E4 G4 C5")
-chord("C Am F G7")
-```
+- [Overlay groove](../examples/overlay-groove.mini) layers drums, bass, and
+  stereo melodies with `+`; a parenthesized `.slow(2)` affects both melodies.
+- [Grouping A/B](../examples/overlay-grouping.mini) plays `kick + hats.fast(2)`
+  followed by `(kick + hats).fast(2)`: hear only the hats speed up, then both
+  layers. The two sections last 20 seconds in total at BPM 96.
 
-To combine multiple top-level patterns, prefer Strudel-style `$:` stack lines:
+## Syntax reference
 
-```text
-$: s("bd sd hh sd")
-$: note("60 64 67 72").slow(2)
-```
+This is the canonical syntax reference. The live app embeds the HTML block below
+at build time; edit it here rather than maintaining a second copy in the app.
+The HTML also renders directly in Markdown viewers without a Markdown parser
+in the browser bundle.
 
-This is equivalent to stacking the two patterns. `$:` is a top-level program
-form, not syntax inside the quoted mini string. A single `$:` line is accepted
-and behaves like the contained expression.
+<!-- LIVE_SYNTAX_REFERENCE_START -->
+<h2 id="top-level-forms">Sounds</h2>
+<dl>
+  <dt>note("E4 G4")</dt><dd>note names or MIDI numbers</dd>
+  <dt>chord("Am G")</dt><dd>chords</dd>
+  <dt>s("bd hh sd hh")</dt><dd>drums: bd kick, sd snare, hh closed hat, oh open hat, cp clap</dd>
+</dl>
+<p class="cheat-note">Notes: <code>C4</code> = MIDI 60. Use <code>#</code> or <code>b</code> for accidentals; octave defaults to 4.</p>
+<p class="cheat-note">Chords: <code>C</code> major, <code>Cm</code> minor; also <code>7</code>, <code>maj7</code>, <code>m7</code>, <code>dim</code>, <code>aug</code>, <code>sus2</code>, <code>sus4</code>, <code>6</code>, <code>add9</code>, <code>maj9</code>, <code>m9</code>. In <code>chord("C+7")</code>, the quoted <code>+</code> is part of the chord name, not an overlay.</p>
 
-The older function form remains supported:
+<h2 id="method-chains">Sound shape</h2>
+<dl>
+  <dt>.pan(n)</dt><dd>left −1, center 0, right 1</dd>
+  <dt>.room(n)</dt><dd>send 0–1 into the shared room reverb</dd>
+  <dt>.attack(s)</dt><dd>fade in over s seconds</dd>
+  <dt>.hold(s)</dt><dd>stay at peak volume for s seconds</dd>
+  <dt>.release(s)</dt><dd>fade out over s seconds</dd>
+</dl>
+<p><code>s("bd hh").slow(2) +<br>note("E4").slow(4).room(0.35)</code></p>
+<p class="cheat-note"><code>.room(0)</code> is dry and is the default; <code>.room(1)</code> is the maximum send. Here the drums stay dry and the note sends at 0.35. Both keep their dry signal.</p>
+<p class="cheat-note">Envelopes apply to notes and chords. Each time is in seconds, from 0 to 86400.</p>
+<p><code>note("E4")<br>&nbsp;&nbsp;.attack(0.01).hold(0.1)<br>&nbsp;&nbsp;.release(0.2)</code></p>
+<p class="cheat-note">0.31 seconds total, independent of tempo. Omit hold to follow the pattern's note length. Omitted attack/release use the sound's defaults; release starts from the current level.</p>
+<p class="cheat-note">Room is one shared stereo space for every part. Its tail continues across note endings, section changes, and live edits; Stop remains immediate.</p>
+<p class="cheat-note"><strong>Browser limitation:</strong> <code>.gain(n)</code> and <code>.cutoff(hz)</code> are parsed as control values, but the current browser instruments do not connect them to volume or filter controls. They do not change the sound here.</p>
 
-```text
-stack(s("bd sd hh sd"), note("60 64 67 72"))
-```
+<h2>Rhythm</h2>
+<p class="cheat-note">BPM sets cycles per minute: at 60, one cycle is one second. A cycle has no fixed meter.</p>
+<dl>
+  <dt>.fast(n)</dt><dd>n× faster</dd>
+  <dt>.slow(n)</dt><dd>n× slower; explicit envelope seconds stay unchanged</dd>
+  <dt>.rev()</dt><dd>reverse events within each cycle</dd>
+  <dt>.degradeBy(p)</dt><dd>drop events with probability p (0–1)</dd>
+  <dt>.every(n, f)</dt><dd>apply f every nth cycle</dd>
+</dl>
+<p class="cheat-note">Use positive integers for fast, slow, and every. Callback <code>f</code> is <code>fast(n)</code>, <code>slow(n)</code>, or <code>rev</code> without parentheses.</p>
+<h2 id="inside-quoted-notation">Inside quoted notation</h2>
+<dl>
+  <dt>a b c</dt><dd>sequence in one cycle; newlines also separate items</dd>
+  <dt>[a b]</dt><dd>subdivide a step</dd>
+  <dt>a, b</dt><dd>play together</dd>
+  <dt>a*4</dt><dd>repeat 4× faster</dd>
+  <dt>a/2</dt><dd>stretch 2× slower</dd>
+  <dt>a?</dt><dd>50% chance to drop</dd>
+  <dt>a(3,8)</dt><dd>3 hits across 8 steps; a(3,8,1) adds rotation</dd>
+</dl>
 
-Once a program uses `$:` lines, each non-empty line must start with `$:`.
-Blank lines are ignored.
+<h2>Combine patterns</h2>
+<dl>
+  <dt>let a = p;</dt><dd>name a reusable pattern; define it before use</dd>
+  <dt>a + b + c</dt><dd>overlay layers in left-to-right order; duplicates are preserved</dd>
+  <dt>stack(a, b)</dt><dd>the explicit form of a + b</dd>
+  <dt>a + b.fast(2)</dt><dd>speed up only b; method chains bind before +</dd>
+  <dt>(a + b).fast(2)</dt><dd>speed up both layers; parentheses group the expression</dd>
+  <dt>$: a<br>$: b</dt><dd>combine top-level layers on separate lines</dd>
+  <dt>.jux(f)</dt><dd>original left, transformed copy right</dd>
+</dl>
+<p><code>s("bd") + s("hh").fast(2)</code></p>
+<p><code>(s("bd") + s("hh")).fast(2)</code></p>
+<p class="cheat-note">Hear the difference in the <strong>Grouping A/B</strong> example. Grouping also works with slow, rev, and other method chains.</p>
+<p class="cheat-note"><code>+</code> works in named definitions, <code>$:</code> lines, and song sections. Ordinary newlines do not combine expressions: use <code>+</code>, <code>stack</code>, or a <code>$:</code> prefix on each top-level layer. Inside quoted notation, use commas to overlay items.</p>
+<p class="cheat-note">Define names with <code>let</code> before using them and keep them stable during live edits. Overlay adds events, not their control values.</p>
 
-## Inside quoted notation
+<h2 id="song-placement">Song structure</h2>
+<dl>
+  <dt>song(…)</dt><dd>sections and their playback order</dd>
+  <dt>section("a", n, p)</dt><dd>name a section lasting n cycles</dd>
+  <dt>part("id", "a")</dt><dd>append after the latest end of all preceding parts; use a unique part id</dd>
+  <dt>part("id", "a", 8)</dt><dd>place the part at absolute cycle 8; overlapping parts play together</dd>
+  <dt>part_id("id", "label", "a")</dt><dd>keep a stable id separate from its display label; optional start as the fourth argument</dd>
+  <dt>fill("gap", "a")</dt><dd>fill uncovered time between parts with section a</dd>
+  <dt>bpm(n)</dt><dd>tempo inside song(); editable while playing</dd>
+</dl>
+<p class="cheat-note">Separate calls with commas. Section lengths and explicit starts accept integers or fractions such as <code>3/2</code>; section lengths must be positive. Pattern expressions inside sections support <code>+</code> and parentheses.</p>
+<p class="cheat-note">Select <strong>Song</strong> mode to play a song. The header BPM control sets global tempo; <code>bpm(n)</code> sets it from the score. Examples select their mode and tempo for you.</p>
+<!-- LIVE_SYNTAX_REFERENCE_END -->
 
-Within `s("...")`, `note("...")`, and `chord("...")`:
-
-- Spaces make a sequence within one cycle: `bd sd hh sd`.
-- Commas stack layers inside the same source: `bd sd, hh hh hh`.
-- Brackets group sub-notation: `bd [sd hh]`.
-- Postfixes apply left-to-right to atoms or groups:
-  - `*n` repeats faster inside the slot: `bd*4`.
-  - `/n` stretches slower inside the slot: `bd/2`.
-  - `?` applies deterministic 50% drop: `bd?`.
-  - `(k,n[,rotation])` applies Euclidean rhythm: `bd(3,8)`.
-
-Examples:
+## Additional notation examples
 
 ```text
 s("bd(3,8), hh*16?, sd(2,8,2)")
@@ -77,33 +126,9 @@ aliases such as `min`, `min7`, `min9`, `M7`, `M9`, `+`, `+7`, `ø`, `ø7`,
 as aliases rather than separate semantic forms. Unsupported qualities are parse
 errors instead of guessed chord names.
 
-## Method chains
+## Source identity
 
-Methods apply to any top-level expression or `$:` line expression:
-
-```text
-s("bd sd").fast(2).rev()
-$: s("bd(3,8)").jux(rev)
-$: note("48 60 67").slow(3)
-$: chord("C Am F G7").slow(4)
-```
-
-Supported methods include:
-
-- `.fast(n)` / `.slow(n)`
-- `.rev()`
-- `.degradeBy(p)`
-- `.cutoff(f)`, `.gain(g)`, `.pan(p)`
-- `.every(n, fast(k)|slow(k)|rev)`
-- `.jux(fast(k)|slow(k)|rev)`
-
-## Browser live examples
-
-The live browser UI uses `$:` for cross-source examples because it mirrors the
-layered shape of Strudel sessions:
-
-```text
-$: s("bd(3,8), hh(5,16)?, sd(2,8,4)").slow(2)
-$: note("48(3,8) 60(2,8,2) 67(3,8) 60(2,8,3)").slow(3)
-$: chord("C Am F G7").slow(4)
-```
+Parentheses group expressions without adding a source node. Regrouping a raw
+overlay preserves known material content and playback clocks; source ancestry
+still reflects the authored grouping. See [Pattern algebra](pattern-algebra.md)
+for the distinction between material content and source identity.
