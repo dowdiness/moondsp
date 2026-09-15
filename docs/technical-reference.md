@@ -955,6 +955,16 @@ Current semantics:
   renders through the bound pool. The default mapper consumes `room` as a
   normalized `0..1` send; it is not a graph control and does not add reverb
   nodes to each voice.
+- Quoted Mini notation lowers `~` to a silent sequence member: it emits no event
+  but still occupies one equal subdivision of its containing layer. `Pat::gate`
+  shortens each discrete event's `whole` and `part` spans to a rational
+  `0..1` fraction while preserving onset and pattern period. Gate factors with
+  a denominator above one billion are rounded to the nearest billionth before
+  event arithmetic so later-cycle endpoints remain representable in the
+  `Int64` rational timeline. The scheduler therefore closes the gate at that
+  musical endpoint, and tempo edits retime the remaining deadline. An explicit
+  `.hold(s)` remains a physical-duration envelope override and does not use the
+  event-derived gate endpoint.
 - Phase 6 incremental authoring adds a snapshot-swap layer over the same
   block-processing loop. `queue_pattern_snapshot` / `queue_song_snapshot`
   stage a lowered `PlaybackSnapshot` without changing playback immediately;

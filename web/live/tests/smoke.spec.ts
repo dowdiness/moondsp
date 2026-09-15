@@ -8,7 +8,7 @@
 //     UI layer.
 
 import { test, expect } from "@playwright/test";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -50,6 +50,18 @@ test.describe("UI smoke (no audio)", () => {
     const content = page.locator(".cm-content");
     await expect(content).toBeVisible();
     await expect(content).toContainText(INITIAL_PATTERN_RENDERED);
+  });
+
+  test("rests and gates example loads its authored score", async ({ page }) => {
+    const score = readFileSync(new URL("../../../examples/rests-and-gates.mini", import.meta.url), "utf8");
+    const example = page.locator('[data-live-example="rests-and-gates"]');
+    await expect(example).toBeVisible();
+    await expect(example).toHaveAttribute("data-example", score);
+    await example.click();
+    await expect(page.locator("#global-bpm")).toHaveValue("96");
+    await expect(page.locator(".cm-content")).toContainText('s("bd ~ sd ~ bd bd ~ sd")');
+    await expect(page.locator(".cm-content")).toContainText(".gate(0.35)");
+    await expect(page.locator(".cm-content")).toContainText(".gate(0.6)");
   });
 
   test("editor accepts keyboard input", async ({ page }) => {
@@ -107,7 +119,7 @@ test.describe("UI smoke (no audio)", () => {
     await page.keyboard.type(".");
     const tooltip = page.locator(".cm-tooltip-autocomplete");
     await expect(tooltip).toBeVisible({ timeout: 2_000 });
-    for (const m of ["room", "fast", "slow", "rev", "degradeBy", "every", "jux"]) {
+    for (const m of ["gate", "room", "fast", "slow", "rev", "degradeBy", "every", "jux"]) {
       await expect(tooltip).toContainText(m);
     }
     // The completion-list item carrying the label `fast` (exact match
@@ -196,14 +208,19 @@ test.describe("UI smoke (no audio)", () => {
     await expect(tooltip).not.toContainText("degradeBy");
   });
 
-  test("one syntax reference exposes envelopes, layering, and song structure", async ({ page }) => {
+  test("one syntax reference exposes rests, gates, envelopes, layering, and songs", async ({ page }) => {
     await page.getByText("Syntax reference", { exact: true }).click();
     const reference = page.locator("#syntax-reference");
-    await expect(reference.getByText(".attack(s)", { exact: true })).toBeVisible();
-    await expect(reference.getByText(".hold(s)", { exact: true })).toBeVisible();
-    await expect(reference.getByText(".release(s)", { exact: true })).toBeVisible();
-    await expect(reference.getByText(".room(n)", { exact: true })).toBeVisible();
+    await expect(reference.locator("dt").filter({ hasText: /^\.attack\(s\)$/ })).toBeVisible();
+    await expect(reference.locator("dt").filter({ hasText: /^\.hold\(s\)$/ })).toBeVisible();
+    await expect(reference.locator("dt").filter({ hasText: /^\.release\(s\)$/ })).toBeVisible();
+    await expect(reference.locator("dt").filter({ hasText: /^\.room\(n\)$/ })).toBeVisible();
+    await expect(reference.locator("dt").filter({ hasText: /^\.gate\(n\)$/ })).toBeVisible();
+    await expect(reference.locator("dt").filter({ hasText: /^~$/ })).toBeVisible();
     await expect(reference.locator("dt")).toContainText(["$: a", 'section("a", n, p)', "bpm(n)"]);
+    await expect(
+      reference.locator("code").filter({ hasText: 'note("C3 ~ Eb3 ~").gate(0.35)' }),
+    ).toBeVisible();
   });
 
   test("cheatsheet includes a song-mode example", async ({ page }) => {

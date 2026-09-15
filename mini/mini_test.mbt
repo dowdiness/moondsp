@@ -17,6 +17,85 @@ test "parse s(\"cp oh\") cross-pool drum sequence" {
 }
 
 ///|
+test "rest atoms reserve their notation slots without emitting events" {
+  let sound_events = query_one_cycle(unwrap_ok(@mini.parse("s(\"bd ~ sd ~\")")))
+  assert_eq(sound_events.length(), 2)
+  assert_eq(
+    sound_events[0].whole.unwrap().begin,
+    @pattern.Rational::new(0L, 1L),
+  )
+  assert_eq(
+    sound_events[1].whole.unwrap().begin,
+    @pattern.Rational::new(1L, 2L),
+  )
+  let note_events = query_one_cycle(
+    unwrap_ok(@mini.parse("note(\"C4 ~ E4 ~\")")),
+  )
+  assert_eq(note_events.length(), 2)
+  assert_eq(note_events[1].whole.unwrap().begin, @pattern.Rational::new(1L, 2L))
+  let chord_events = query_one_cycle(unwrap_ok(@mini.parse("chord(\"C ~ G\")")))
+  assert_eq(chord_events.length(), 6)
+  assert_eq(
+    chord_events[3].whole.unwrap().begin,
+    @pattern.Rational::new(2L, 3L),
+  )
+  let doc = unwrap_doc(@mini.parse_doc("note(\"C4 ~ E4 ~\")"))
+  assert_true(doc.contains_node(pid("mini:rest:_x126_:0")))
+  assert_true(doc.contains_node(pid("mini:rest:_x126_:1")))
+}
+
+///|
+test "parse_snapshot preserves rest timing and source identity" {
+  let snapshot = unwrap_mini_snapshot(
+    @mini.parse_snapshot("note(\"C4 ~ E4 ~\")"),
+  )
+  assert_true(snapshot.pat().entry_period() == @pattern.Rational::from_int(1))
+  let events = snapshot.query(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+    ),
+  )
+  assert_eq(events.length(), 2)
+  assert_eq(events[1].whole.unwrap().begin, @pattern.Rational::new(1L, 2L))
+}
+
+///|
+test "gate uses an exact fraction and leaves note onsets unchanged" {
+  let source = "note(\"C4 D4 E4 G4\").gate(0.4)"
+  let runtime_events = query_one_cycle(unwrap_ok(@mini.parse(source)))
+  let snapshot_events = unwrap_mini_snapshot(@mini.parse_snapshot(source)).query(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+    ),
+  )
+  for events in [runtime_events, snapshot_events] {
+    assert_eq(events.length(), 4)
+    assert_eq(events[0].whole.unwrap().end_, @pattern.Rational::new(1L, 10L))
+    assert_eq(events[1].whole.unwrap().begin, @pattern.Rational::new(1L, 4L))
+    assert_eq(events[1].whole.unwrap().end_, @pattern.Rational::new(7L, 20L))
+  }
+}
+
+///|
+test "gate rejects fractions outside zero through one" {
+  for
+    source in [
+      "note(\"C4\").gate(-0.01)", "note(\"C4\").gate(1.01)", "note(\"C4\").gate(1.000000000000000001)",
+      "note(\"C4\").gate(18446744073709551616)",
+    ] {
+    match @mini.parse(source) {
+      Ok(_) => abort("expected invalid gate fraction to fail")
+      Err(message) =>
+        assert_true(
+          message.contains("gate() expects a fraction between 0 and 1"),
+        )
+    }
+  }
+}
+
+///|
 test "drum_midi returns None for unknown names" {
   debug_inspect(@mini.drum_midi("snare"), content="None")
   debug_inspect(@mini.drum_midi(""), content="None")

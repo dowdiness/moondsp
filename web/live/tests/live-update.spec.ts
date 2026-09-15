@@ -124,6 +124,15 @@ test("the tempo example can change tempo while playing", async ({ page }) => {
   await stop(page);
 });
 
+test("the rests and gates example plays", async ({ page }) => {
+  await page.locator('[data-live-example="rests-and-gates"]').click();
+  expect(await play(page)).toMatchObject({
+    type: "pattern-updated",
+    operation: "restart",
+  });
+  await stop(page);
+});
+
 test("the independent entries example accepts the suggested note edits", async ({ page }) => {
   await page.getByText("More examples", { exact: true }).click();
   const example = page.locator('[data-live-example="entries"]');

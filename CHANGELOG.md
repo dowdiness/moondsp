@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   close results, and native error/cause identity preservation. DSP/Wasm imports
   and render callbacks are unchanged. Browser tests exercise real Worklet
   lifetime, cancellation, structured errors, and task-group cleanup ordering.
+- Added `~` rests to quoted sound, note, and chord notation, plus `.gate(n)`
+  for tempo-relative note lengths from 0 through 1 without moving onsets.
 - Added live Examples for an overlay groove and a 20-second grouping comparison,
   demonstrating `+` layers and parenthesized transforms with playable Mini scores.
 - Added `examples/basic-synth`, a standalone TypeScript/Vite consumer with a
