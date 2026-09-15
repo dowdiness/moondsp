@@ -4,6 +4,42 @@
 It validates topology, optimizes the graph once, compiles preallocated runtime
 state, applies live controls, and supports block-boundary replacement.
 
+## Architecture context
+
+In moondsp's layered design, `graph` sits between authoring/voice orchestration
+and low-level sample processing:
+
+```text
+[ mini ] (text notation)
+   ↓
+[ pattern / song ] (musical time & event streams)
+   ↓
+[ scheduler ] (event-to-voice scheduling)
+   ↓
+[ voice ] / [ engine ] (voice allocation & mixing)
+   ↓
+[ graph ] ← (topology validation, optimization, compilation, hot-swap)
+   ↓
+[ dsp ] (primitive state & buffer processing)
+```
+
+- **Upstream consumers**: [`voice/`](../voice/) compiles templates into voice
+  slots and applies pitch/gate controls; [`engine/`](../engine/) mounts and
+  mixes independent graphs; live editors use `GraphTemplateDoc` and hot-swap.
+- **Downstream dependencies**: [`dsp/`](../dsp/) executes individual sample
+  operations; [`identity/`](../identity/) provides stable node IDs and
+  revisions across edits.
+
+## API quick reference
+
+| Category | Types | Key operations |
+|---|---|---|
+| **Authoring** | `DspNode`, `DspNodeKind`, `GraphBuilder` | `DspNode::constant`, `DspNode::oscillator`, `DspNode::gain`, `DspNode::biquad`, `DspNode::adsr`, `DspNode::delay`, `DspNode::pan`, `DspNode::output`, `DspNode::stereo_output`, `GraphBuilder::analyze` |
+| **Compilation** | `CompiledTemplate`, `CompiledDsp`, `CompiledStereoDsp` | `CompiledTemplate::analyze`, `CompiledDsp::compile_result`, `CompiledDsp::compile`, `CompiledDsp::process`, `CompiledStereoDsp::compile_result`, `CompiledStereoDsp::process` |
+| **Runtime Control** | `GraphControl`, `GraphParamSlot`, `ControlBindingMap` | `GraphControl::set_param`, `GraphControl::gate_on`, `GraphControl::gate_off`, `CompiledDsp::apply_control`, `CompiledDsp::apply_controls`, `ControlBindingMap::resolve_controls` |
+| **Hot-Swap & Topology** | `CompiledDspHotSwap`, `CompiledDspTopologyController`, `GraphTemplateDoc`, `GraphIndexMap` | `CompiledDspHotSwap::queue_swap`, `CompiledDspTopologyController::queue_topology_edit`, `CompiledDspTopologyController::queue_topology_edits`, `GraphTemplateDoc::from_nodes`, `GraphTemplateDoc::index_map`, `GraphTemplateDoc::replace_node` |
+| **Diagnostics & Errors** | `GraphCompileError`, `GraphControlError`, `GraphTopologyQueueError`, `GraphTopologyEditError` | Structured rejection reporting for cycles, invalid slots, input mismatches, or hot-swap capacity differences |
+
 ## Analyze, compile, process
 
 The canonical boundary is:

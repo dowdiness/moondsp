@@ -9,6 +9,43 @@ Most applications should not call these exports directly. Use
 JavaScript, or use the dedicated scheduler worklet protocol for live pattern
 and song playback.
 
+## Architecture context
+
+In moondsp's layered design, `browser` acts as the low-level WASM/Wasm-GC and
+AudioWorklet transport adapter:
+
+```text
+[ Web Page / UI / Web Audio API ] (AudioContext, AudioWorkletNode)
+   ↓ MessagePort / Typed JS API
+[ @moondsp/browser / web/graph-engine.js ] (JS lifecycle wrapper)
+   ↓ primitive C/WASM export ABI
+[ browser ] ← (flat exports: graph_host_*, scheduler_*, demo families)
+   ↓ MoonBit memory & engine objects
+[ engine ] / [ scheduler ]
+   ↓
+[ voice ] / [ graph ]
+   ↓
+[ dsp ]
+```
+
+- **Upstream consumers**: `web/graph-engine.js`, `web/graph-processor.js`,
+  `web/live/`, and the `@moondsp/browser` package.
+- **Downstream dependencies**: Delegates graph compilation and mounting to
+  [`engine/`](../engine/) (`GraphEngine`); delegates pattern/song playback to
+  [`scheduler/`](../scheduler/) via `browser/internal/playback_host`; uses
+  [`dsp/`](../dsp/) and [`graph/`](../graph/) for demo and probe templates.
+
+## API quick reference
+
+| ABI family | Key exports | Purpose |
+|---|---|---|
+| **Graph Host (Lifecycle)** | `graph_host_init`, `graph_host_mount`, `graph_host_command`, `graph_host_close` | Initialize engine (128-frame quantum), mount JSON graph description, transport play/pause/unmount, close engine |
+| **Graph Host (Input & Controls)** | `graph_host_clear_input`, `graph_host_push_char`, `graph_host_apply_controls`, `graph_host_set_params` | Push Unicode scalar JSON, apply raw transactional `GraphControl` batches, or atomically update named parameter sets |
+| **Graph Host (Render & Errors)** | `graph_host_process`, `graph_host_sample`, `graph_host_error_length`, `graph_host_error_char` | Render 128-sample block, retrieve output samples, read structured JSON error envelopes |
+| **Scheduler Playback** | `init_scheduler_graph`, `clear_playback_input`, `push_playback_char`, `prepare_pattern_input`, `prepare_song_input`, `apply_prepared_playback`, `discard_prepared_playback`, `restart_playback`, `process_scheduler_block`, `scheduler_left_sample`, `scheduler_right_sample`, `set_scheduler_bpm`, `set_scheduler_gain` | Staged pattern/song parsing, non-destructive token preparation, render-boundary snapshot swap, and stereo playback |
+| **Diagnostics & Error Inspection** | `get_browser_last_error`, `get_browser_error_code`, `get_browser_error_length`, `get_browser_error_char`, `get_playback_error` | Numeric error codes (`BROWSER_ERROR_*`) and diagnostic messages for host inspection |
+| **Compiled & Demo Probes** | `init_compiled_*`, `process_compiled_*`, `queue_compiled_*`, `init_exit_deliverable_graph`, `tick`, `tick_source`, `reset_phase` | Deterministic integration probes and fixed demo graph verification |
+
 ## Public surfaces
 
 The package has two reviewed surfaces:
@@ -64,13 +101,30 @@ The supported browser description is deliberately narrow:
 
 - 1–64 nodes;
 - `oscillator` with `sine`, `saw`, `square`, or `triangle` and a finite
-  frequency;
-- `gain` with an input index and finite linear gain;
-- one terminal `output` node.
+  frequency (or parameter reference);
+- `adsr` with `attackMs`, `decayMs`, `sustain`, `releaseMs` (or parameter references);
+- `biquad` with `input`, `mode` (`lowpass`, `highpass`, `bandpass`), `cutoff`, `q` (or parameter references);
+- `mul` with `input0` and `input1`;
+- `gain` with an input index and finite linear gain (or parameter reference);
+- one terminal `output` node with an input index;
+- optional `params` mapping declaring up to 256 named parameters with finite initial values, referenced by nodes via `{ "param": "name" }`.
 
 MoonBit decodes this data and delegates to the canonical `GraphEngine` compile
 path. JavaScript does not contain a second graph compiler or DSP
 implementation.
+
+### Live parameter updates
+
+Once mounted, applications can control graphs in two ways:
+
+1. **Named parameter updates (`sound.setParams({ cutoff: 1200, volume: 0.2 })`)**:
+   Updates parameters declared in `params` across all referencing nodes. The update
+   is validated atomically before applying; unknown names or non-finite values reject
+   with `INVALID_CONTROL`. Uses `graph_host_set_params`.
+2. **Raw control batches (`sound.applyControls(controls)`)**:
+   Sends an ordered batch of 1–64 raw `{ type: "setParam", node, slot, value }`,
+   `{ type: "gateOn", node }`, or `{ type: "gateOff", node }` operations targeting
+   original authoring node indices. Uses `graph_host_apply_controls`.
 
 See the [browser API contract](../docs/browser-api-contract.md) for lifecycle,
 error precedence, cancellation, TypeScript declarations, and deployment.
@@ -84,7 +138,7 @@ AudioWorklet glue uses these exports:
 | Initialize | `graph_host_init` |
 | Transfer JSON | `graph_host_clear_input`, `graph_host_push_char` |
 | Mount | `graph_host_mount` |
-| Control | `graph_host_command` |
+| Control | `graph_host_command`, `graph_host_apply_controls`, `graph_host_set_params` |
 | Render | `graph_host_process`, `graph_host_sample` |
 | Diagnose | `graph_host_error_length`, `graph_host_error_char` |
 | Close | `graph_host_close` |

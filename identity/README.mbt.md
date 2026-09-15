@@ -8,6 +8,36 @@ IDs identify authoring intent rather than array position. Reordering, formatting
 or rebuilding an object should preserve its ID when it still represents the
 same authored object.
 
+## Architecture context
+
+In moondsp's layered design, `identity` is a foundational leaf package
+providing identity types for structural live editing:
+
+```text
+[ graph ] (GraphTemplateDoc, GraphIndexMap)
+   ↓ uses GraphNodeId, Revision
+[ identity ] ← (stable node identities & revision tokens)
+   ↑ uses PatternNodeId, Revision
+[ pattern ] (PatternDoc, PatternSnapshot)
+```
+
+- **Upstream consumers**: [`graph/`](../graph/) uses `GraphNodeId` and
+  `Revision` for template document editing and hot-swap; [`pattern/`](../pattern/)
+  uses `PatternNodeId` and `Revision` for incremental pattern tree lowering;
+  [`song/`](../song/) uses `SectionId`, `SectionLayerId`, and `OccurrenceId`.
+- **Downstream dependencies**: None. `identity` is a pure leaf package with no
+  external dependencies.
+
+## API quick reference
+
+| Category | Types | Key operations |
+|---|---|---|
+| **Graph Identity** | `GraphNodeId` | `GraphNodeId::from_string`, `GraphNodeId::value` |
+| **Pattern Identity** | `PatternNodeId` | `PatternNodeId::from_string`, `PatternNodeId::value` |
+| **Song & Section Identity** | `SectionId`, `SectionLayerId`, `OccurrenceId` | `SectionId::from_string`, `SectionLayerId::from_string`, `OccurrenceId::from_string` |
+| **Revisions** | `Revision` | `Revision::zero`, `Revision::next`, `Revision::value`, `Revision::combine`, `Revision::max` |
+| **Errors** | `StableIdError` | `StableIdError::EmptyId`, `StableIdError::InvalidId` |
+
 ## Choose the ID type by role
 
 The wrappers prevent IDs from unrelated domains from being mixed accidentally.

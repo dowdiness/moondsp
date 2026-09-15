@@ -188,6 +188,51 @@ fn[T : FilterSym] fm_synth() -> T {
 
 ---
 
+## Package Map & Architecture
+
+moondsp is structured as a stack of decoupled, platform-independent core packages, complemented by platform-specific adapters and frontends:
+
+```text
+Musical authoring and playback:
+[ mini ] → [ pattern / song ] → [ scheduler ] → [ voice ] → [ graph ] → [ dsp ]
+
+Host-controlled graph playback:
+[ browser / custom host ] → [ engine ] → [ graph ] → [ dsp ]
+
+Shared authoring identity:
+[ identity ] → [ pattern ]
+             → [ song ]
+             → [ graph ]
+```
+
+### Core Engine (Platform-Agnostic)
+
+| Package | Role & Responsibility | Key Types / Entry Points |
+|---|---|---|
+| [`dsp/`](dsp/README.mbt.md) | Sample buffers, oscillators, envelopes, biquad filters, delay lines, gain, clip, pan, and tagless DSP traits | `DspContext`, `AudioBuffer`, `Oscillator`, `Adsr`, `Biquad`, `DelayLine`, `Pan`, `ArithSym`, `DspSym` |
+| [`graph/`](graph/README.mbt.md) | DAG compilation, topological sorting, runtime controls, block-boundary hot-swap, and topology editing | `DspNode`, `CompiledTemplate`, `CompiledDsp`, `CompiledStereoDsp`, `GraphControl`, `CompiledDspHotSwap`, `GraphTemplateDoc` |
+| [`engine/`](engine/README.mbt.md) | Host-independent graph lifecycle management, typed mount handles, and multi-graph mono buffer mixing | `GraphEngine`, `MountedGraph`, `GraphEngineError` |
+| [`voice/`](voice/README.mbt.md) | Polyphonic voice pool with priority voice stealing, generation handles, ADSR lifecycle, and equal-power stereo panning | `VoicePool`, `BoundVoicePool`, `VoiceHandle`, `VoiceState`, `NoteGate` |
+| [`identity/`](identity/README.mbt.md) | Type-safe stable node identifiers and monotonic revision tokens for structural live-editing trees | `GraphNodeId`, `PatternNodeId`, `SectionId`, `SectionLayerId`, `OccurrenceId`, `Revision` |
+| [`pattern/`](pattern/README.mbt.md) | Queryable musical pattern algebra with exact `Rational` time, polyrhythmic combinators, and `ControlMap` events | `Pat[A]`, `Rational`, `TimeSpan`, `Event[A]`, `ControlMap`, `sequence`, `stack`, `merge_control`, `PatternDoc` |
+| [`mini/`](mini/README.mbt.md) | Mini-notation parser turning concise live-coding text into `Pat[ControlMap]`, `Song[ControlMap]`, or incremental documents | `parse`, `parse_song`, `parse_song_with_bpm`, `parse_doc`, `parse_snapshot`, `MiniAuthoringPipeline` |
+| [`song/`](song/README.mbt.md) | Macro-level musical structure arranging patterns into length-bounded sections, layers, parts, and local `TimeScope` | `Song[A]`, `Section[A]`, `SongPart[A]`, `TimeScope`, `SongDoc[A]`, `SongSnapshot[A]` |
+| [`scheduler/`](scheduler/README.mbt.md) | Audio block quantization, tempo clock, note lifecycle tracking, and voice-scope reconciliation | `PatternScheduler`, `PlaybackSnapshot`, `BlockFrame`, `PatternVoiceScope`, `SongVoiceScope` |
+
+### Platform Adapters & Native Scaffolding
+
+| Package / Directory | Role & Responsibility | Key Files / Entry Points |
+|---|---|---|
+| [`browser/`](browser/README.md) | AudioWorklet export ABI and WASM-to-JS transport adapter (128-frame quantum, JSON decoding, named params) | `graph_host_*`, `scheduler_*`, `get_browser_*`, `browser_abi.baseline` |
+| [`packages/browser/`](packages/browser/README.md) | Local distribution bundle for `@moondsp/browser` (TypeScript declarations, JS API wrapper, processor, release Wasm) | `GraphEngine`, `GraphDescription`, `GraphControl` |
+| [`examples/basic-synth/`](examples/basic-synth/README.md) | Standalone monophonic synth demo consuming `@moondsp/browser` with keyboard priority and reactive UI | `SYNTH_GRAPH`, `noteOn`, `noteOff`, `startApplication` |
+| [`clap_engine/`](clap_engine/README.mbt.md) | Polyphonic subtractive synth engine core tailored for CLAP plugins (preallocated voices, note ID / wildcard matching) | `ClapSynthEngine`, `CLAP_PARAM_*`, `default_synth_template` |
+| [`clap_host/`](clap_host/README.mbt.md) | Flat primitive integer-handle C-ABI bridge exposing scalar getters/setters without object leaking | `engine_create`, `engine_destroy`, `engine_note_on`, `engine_process`, `engine_set_param` |
+| [`clap_plugin/`](clap_plugin/README.md) | Native CLAP plugin payload, C ABI shim, build scripts, and `clap-validator` automation | `moondsp_clap.c`, `moondsp_clap_moonbit.h`, `clap_payload.mbt` |
+| [`cmd/main/`](cmd/main/) | Headless CLI entry point for testing, batch rendering, and offline experiments | `cmd/main/main.mbt` |
+
+---
+
 ## Repository layout
 
 The codebase strictly decouples platform-agnostic core engines from platform-specific host adapters:

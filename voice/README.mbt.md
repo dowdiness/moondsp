@@ -5,6 +5,42 @@ instrument. Each slot owns its DSP runtime state. The pool starts notes, gates
 envelopes, steals voices under load, pans and mixes active voices to stereo,
 and reclaims finished releases.
 
+## Architecture context
+
+In moondsp's layered design, `voice` bridges musical note/event scheduling with
+compiled DSP graph execution:
+
+```text
+[ mini ] (text notation)
+   ↓
+[ pattern / song ] (musical time & event streams)
+   ↓
+[ scheduler ] (event-to-voice scheduling)
+   ↓
+[ voice ] ← (polyphonic allocation, stealing, envelope lifecycle, pan/mix)
+   ↓
+[ graph ] (topology validation & compilation)
+   ↓
+[ dsp ] (primitive state & buffer processing)
+```
+
+- **Upstream consumers**: [`scheduler/`](../scheduler/) routes pattern note
+  events to voice slots and coordinates gate durations via `BoundVoicePool::note_gate`;
+  [`clap_engine/`](../clap_engine/) uses `BoundVoicePool` for polyphonic native synthesis.
+- **Downstream dependencies**: [`graph/`](../graph/) provides the compiled
+  synth templates and runtime controls; [`dsp/`](../dsp/) performs sample-level
+  processing and stereo buffer mixing.
+
+## API quick reference
+
+| Category | Types | Key operations |
+|---|---|---|
+| **Voice Pools** | `VoicePool`, `BoundVoicePool` | `VoicePool::new`, `BoundVoicePool::new`, `BoundVoicePool::set_template`, `VoicePool::process`, `BoundVoicePool::process_with_send` |
+| **Note Lifecycle** | `VoiceHandle`, `VoiceState`, `NoteGate` | `VoicePool::note_on`, `BoundVoicePool::note_on_controls`, `BoundVoicePool::note_on_graph_controls`, `VoicePool::note_off_result`, `BoundVoicePool::kill_result`, `BoundVoicePool::note_gate` |
+| **Voice Control & Pan** | `BoundVoicePool`, `VoicePool` | `VoicePool::set_voice_pan_result`, `BoundVoicePool::set_voice_send_result`, `BoundVoicePool::apply_voice_control_result`, `BoundVoicePool::apply_voice_controls_result` |
+| **Inspection & Safety** | `BoundVoicePool`, `VoicePool` | `VoicePool::active_voice_count`, `VoicePool::voice_state`, `VoicePool::last_sanitized_count` |
+| **Errors** | `VoicePoolError`, `BoundVoicePoolError`, `VoiceControlError` | Rejection reporting for invalid max voices, orphan ADSR envelopes, compile failures, or stale `VoiceHandle` values |
+
 ## Create a voice pool
 
 A voice template may contain any valid mono graph. Every authored `Adsr` must be
