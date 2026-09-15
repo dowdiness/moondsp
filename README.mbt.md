@@ -288,7 +288,7 @@ Start at the **[docs index](docs/README.md)**, which categorizes materials by ro
 - **[Mini-notation guide](docs/mini-notation.md)** — Pattern syntax, grouping, and method chaining
 - **[Blueprint](docs/blueprint.md)** — Complete architectural vision, design principles, and multi-target roadmap
 - **[Architecture decisions (ADRs)](docs/decisions/)** — Short records explaining why key architectural choices were made
-- **[Next actions](docs/next-actions.md)** — Active handoff list for upcoming priorities
+- **[GitHub Issues](https://github.com/dowdiness/moondsp/issues)** — Open issues are the source of truth for upcoming work; released behavior belongs in `CHANGELOG.md`
 - **[`CLAUDE.md`](CLAUDE.md)** — Project conventions and contributor cheat sheet
 
 ---

@@ -70,7 +70,8 @@ Source of truth:
 - AGENTS.md
 - docs/technical-reference.md
 - docs/blueprint.md
-- <issue text or additional doc if relevant>
+- The relevant open GitHub issue (open issues are the priority source of truth)
+- <additional doc if relevant>
 
 Success criteria:
 - The requested implementation is complete
