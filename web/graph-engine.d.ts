@@ -1,18 +1,24 @@
 /** Waveforms accepted by oscillator nodes. */
 export type Waveform = 'sine' | 'saw' | 'square' | 'triangle';
 
-export interface OscillatorNode {
+export interface ParamRef<Name extends string> {
+  readonly param: Name;
+}
+
+type Scalar<Name extends string> = [Name] extends [never] ? number : number | ParamRef<Name>;
+
+export interface OscillatorNode<Name extends string = never> {
   readonly type: 'oscillator';
   readonly waveform: Waveform;
   /** Finite frequency in Hz; validated by the host. */
-  readonly frequency: number;
+  readonly frequency: Scalar<Name>;
 }
 
-export interface GainNode {
+export interface GainNode<Name extends string = never> {
   readonly type: 'gain';
   /** Index of the input node in GraphDescription.nodes. */
   readonly input: number;
-  readonly gain: number;
+  readonly gain: Scalar<Name>;
 }
 
 export interface OutputNode {
@@ -21,23 +27,23 @@ export interface OutputNode {
 }
 
 /** Authoring data, not a Web Audio AudioNode or a compiled DSP node. */
-export interface AdsrNode {
+export interface AdsrNode<Name extends string = never> {
   readonly type: 'adsr';
-  readonly attackMs: number;
-  readonly decayMs: number;
-  readonly sustain: number;
-  readonly releaseMs: number;
+  readonly attackMs: Scalar<Name>;
+  readonly decayMs: Scalar<Name>;
+  readonly sustain: Scalar<Name>;
+  readonly releaseMs: Scalar<Name>;
 }
 
 export type BiquadMode = 'lowpass' | 'highpass' | 'bandpass';
 
-export interface BiquadNode {
+export interface BiquadNode<Name extends string = never> {
   readonly type: 'biquad';
   /** Index of the input node in GraphDescription.nodes. */
   readonly input: number;
   readonly mode: BiquadMode;
-  readonly cutoff: number;
-  readonly q: number;
+  readonly cutoff: Scalar<Name>;
+  readonly q: Scalar<Name>;
 }
 
 export interface MulNode {
@@ -49,11 +55,13 @@ export interface MulNode {
 }
 
 /** Authoring data, not a Web Audio AudioNode or a compiled DSP node. */
-export type GraphNode = OscillatorNode | AdsrNode | BiquadNode | MulNode | GainNode | OutputNode;
+export type GraphNode<Name extends string = never> =
+  | OscillatorNode<Name> | AdsrNode<Name> | BiquadNode<Name> | MulNode | GainNode<Name> | OutputNode;
 
 /** Reusable description. Bounds, finite values and graph topology are checked at runtime. */
-export interface GraphDescription {
-  readonly nodes: readonly GraphNode[];
+export interface GraphDescription<Name extends string = never> {
+  readonly nodes: readonly GraphNode<Name>[];
+  readonly params?: Readonly<Record<Name, number>>;
 }
 
 export type GraphControl =
@@ -69,13 +77,17 @@ export type GraphControl =
     };
 
 /** A paused, independent graph returned by GraphEngine.mount; not a constructor. */
-export interface MountedGraph {
+export interface MountedGraph<Name extends string = never> {
   /** Start/resume playback. The first successful play seals mount admission. */
   readonly play: () => Promise<void>;
   /** Freeze processing and oscillator phase. */
   readonly pause: () => Promise<void>;
   /** Apply a non-empty, atomically validated batch at a render boundary. */
   readonly applyControls: (controls: readonly GraphControl[]) => Promise<void>;
+  /** Apply declared named parameters atomically at a render boundary. */
+  readonly setParams: <Values extends Partial<Record<Name, number>>>(
+    values: Values & Record<Exclude<keyof Values, Name>, never>,
+  ) => Promise<void>;
   /** Permanently detach. Concurrent/repeated calls share the same completion. */
   readonly unmount: () => Promise<void>;
 }
@@ -93,7 +105,9 @@ export interface GraphEngine {
   /** Mono output; connecting it is the caller's responsibility. */
   readonly output: AudioWorkletNode;
   /** Compile and register a paused graph, before playback in a suspended context. */
-  readonly mount: (graph: GraphDescription) => Promise<MountedGraph>;
+  readonly mount: <Name extends string = never>(
+    graph: GraphDescription<NoInfer<Name>> & { readonly params?: Readonly<Record<Name, number>> },
+  ) => Promise<MountedGraph<Name>>;
   /** Observe retained exit without stopping the engine. Pre-aborted signals reject even after exit. */
   readonly wait: (options?: GraphEngineWaitOptions) => Promise<EngineExit>;
   /** Idempotent bounded shutdown; never closes the caller-owned context. */

@@ -27,12 +27,7 @@ if (!started.ok) reportStartupFailure(document, started.error, PAGE_BINDINGS.sel
 creation. A failed acquisition skips `startApplication`. On success, the
 application connects the DOM and audio actions. Audio stays off until Power on.
 
-| File | Responsibility |
-| --- | --- |
-| [`src/main.ts`](src/main.ts) | Connects the outer actions and handles startup failure |
-| [`src/controls.ts`](src/controls.ts) | Pure transport presentation, slider conversion, and error-message calculation |
-| [`src/keyboard.ts`](src/keyboard.ts) | Pure held-note transitions, note-action decisions, and keyboard/navigation projections |
-| [`src/synth.ts`](src/synth.ts) | Graph description and pure construction of parameter/gate control batches |
+| [`src/synth.ts`](src/synth.ts) | Named graph parameter declarations/references and pure raw note-control batches |
 | [`src/dom.ts`](src/dom.ts) | Acquires DOM nodes, reads gestures, applies projections, and registers browser events |
 | [`src/audio.ts`](src/audio.ts) | Owns audio resources and calls the public moondsp API, with serialized operations and stale-work rejection |
 | [`src/result.ts`](src/result.ts) | Explicit success/failure values, short-circuit composition, and exception capture at action boundaries |
@@ -44,11 +39,13 @@ instead of reading slider elements.
 
 To follow the sound path, read `SYNTH_GRAPH` in `synth.ts`, then
 `createAudioOwner().open()` in `audio.ts`: admit the context in the Power on
-gesture, suspend it for mounting, initialize `GraphEngine()`, `mount()`, apply
-initial controls, call `play()`, resume the context, and connect output.
-`AudioState` distinguishes loading, a complete session, disposal, and failure.
-The UI derives its phase and error text from that state rather than keeping
-separate copies. Settings survive session replacement.
+gesture, suspend it for mounting, initialize `GraphEngine()`, mount the graph,
+apply the current UI settings through `setParams({ volume, cutoff })`, call
+`play()`, resume the context, and connect output. The graph declares those two
+names with `DEFAULT_SETTINGS` as initial values; the settings record is kept by
+the UI across power cycles. Note frequency and gate remain one raw,
+atomic `applyControls` batch so note epoch cancellation and keyboard policy
+stay unchanged.
 
 One `AudioOwner` releases both partially acquired resources and the complete
 session. Its idempotent `close()` cancels initialization and observation,
@@ -129,6 +126,13 @@ Consumers use the prebuilt package only; they do not need MoonBit or the moondsp
 - **Power off** clears held notes, disconnects output, closes the engine and all its graphs, and closes the app-owned `AudioContext`. It also cancels startup while loading.
 - Releasing a key sends gate-off and lets the 180 ms envelope release finish. Window blur, hidden-page transitions, pointer cancellation/capture loss, and context suspension also release notes automatically; there is no Stop notes button.
 - Page disposal closes audio resources. Processor failures immediately disable controls and show an error; **Power on** retries through the same button. External context closure is normal termination, not an error.
+- The graph's `volume` and `cutoff` names are shared parameter targets. Their
+  declared values are mount-time initial values; `setParams` writes the current
+  UI value to every matching target and does not maintain a hidden current-value
+  cache. Named updates are serialized with lifecycle and note commands. Raw
+  `applyControls` remains available alongside them: this synth deliberately
+  keeps frequency plus gate-on/off in one raw batch, rather than splitting
+  notes into parameter and gate calls.
 - The piano layout shows computer-key shortcuts on desktop. The active note is orange with a filled marker; other held notes are pale with an outlined marker. The **Mono** readout identifies the active note, not an audio level; releasing a key can leave a short envelope tail after the readout clears.
 - Focus a note and hold **Space** or **Enter** to play it without a mouse. At narrow widths, use the left/right buttons or swipe the keyboard to reach more notes. Navigation buttons disable at the corresponding end and disappear when the full keyboard fits. Starting a swipe releases the touched note.
 - Power cycling preserves the displayed volume and cutoff. After a browser suspends an active context, the status reads **Audio paused** and **Power on** resumes the existing session.

@@ -29,6 +29,16 @@ const extendedGraph = {
   ],
 } as const satisfies GraphDescription;
 
+const parameterizedGraph = {
+  params: { volume: 0.2, cutoff: 1800 },
+  nodes: [
+    { type: 'oscillator', waveform: 'sine', frequency: 220 },
+    { type: 'biquad', input: 0, mode: 'lowpass', cutoff: { param: 'cutoff' }, q: 0.7 },
+    { type: 'gain', input: 1, gain: { param: 'volume' } },
+    { type: 'output', input: 2 },
+  ],
+} as const satisfies GraphDescription<'volume' | 'cutoff'>;
+
 const controls = [
   { type: 'setParam', node: 1, slot: 'value0', value: 0.25 },
   { type: 'gateOn', node: 2 },
@@ -39,12 +49,43 @@ async function consume(context: AudioContext | OfflineAudioContext, signal: Abor
     context, signal, wasmUrl: new URL('engine.wasm', import.meta.url), processorUrl: './processor.js',
   });
   const sound: MountedGraph = await engine.mount(extendedGraph);
+  const parameterized = await engine.mount(parameterizedGraph);
+  await parameterized.setParams({ volume: 0.3 });
+  await parameterized.setParams({});
+  // @ts-expect-error Named parameter values must be numbers.
+  await parameterized.setParams({ volume: 'loud' });
+  // @ts-expect-error Fresh extra parameter keys are rejected.
+  await parameterized.setParams({ unknown: 1 });
+  const knownValues: { volume: number } = { volume: 0.4 };
+  await parameterized.setParams(knownValues);
+  const extraValues = { volume: 0.4, typo: 1 };
+  // @ts-expect-error Prebound records must not bypass exact parameter keys.
+  await parameterized.setParams(extraValues);
+  // @ts-expect-error Omission is supported; explicit undefined is not.
+  await parameterized.setParams({ volume: undefined });
+  const plain = await engine.mount(graph);
+  await plain.setParams({});
+  // @ts-expect-error Numeric-only graphs do not acquire parameter names.
+  await plain.setParams({ volume: 0.2 });
+  const wrongReference = {
+    params: { volume: 0.2 },
+    nodes: [{ type: 'gain', input: 0, gain: { param: 'typo' } }],
+  } as const;
+  // @ts-expect-error References must not widen the keys inferred from defaults.
+  await engine.mount(wrongReference);
+  const undeclaredReference = { nodes: [{ type: 'gain', input: 0, gain: { param: 'volume' } }] } as const;
+  // @ts-expect-error References alone cannot declare parameters.
+  await engine.mount(undeclaredReference);
+  const dynamic: GraphDescription<string> = parameterizedGraph;
+  const dynamicValues: Record<string, number> = { volume: 0.2 };
+  await (await engine.mount(dynamic)).setParams(dynamicValues);
   engine.output.connect(context.destination);
   const playing: Promise<void> = sound.play();
   await playing;
   await sound.pause();
   await sound.applyControls(controls);
   await sound.unmount();
+  await parameterized.unmount();
   await engine.close();
   const waitOptions: GraphEngineWaitOptions = {};
   const exit: EngineExit = await engine.wait(waitOptions);
@@ -99,6 +140,11 @@ function handle(error: unknown) {
   }
   throw error;
 }
+const missingParameterRef = {
+  params: { volume: 0.2 },
+  // @ts-expect-error Parameter references must use a declared name.
+  nodes: [{ type: 'gain', input: 0, gain: { param: 'loudness' } }],
+} as const satisfies GraphDescription<'volume'>;
 
 // @ts-expect-error Error codes form a closed public vocabulary.
 new GraphEngineError('NOT_AN_ENGINE_ERROR', 'invalid');

@@ -69,6 +69,8 @@ pub fn graph_host_push_char(Int) -> Unit
 
 pub fn graph_host_sample(Int) -> Double
 
+pub fn graph_host_set_params(Int) -> Bool
+
 pub fn init_compiled_graph(Double, Int) -> Bool
 
 pub fn init_compiled_hot_swap_graph(Double, Int) -> Bool
@@ -162,6 +164,7 @@ graph_host_push_char
 graph_host_mount
 graph_host_command
 graph_host_apply_controls
+graph_host_set_params
 graph_host_process
 graph_host_sample
 graph_host_close
@@ -234,6 +237,7 @@ graph_host_push_char
 graph_host_mount
 graph_host_command
 graph_host_apply_controls
+graph_host_set_params
 graph_host_process
 graph_host_sample
 graph_host_close

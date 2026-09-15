@@ -2,7 +2,7 @@ import { GraphEngine, GraphEngineError } from "@moondsp/browser";
 import type { GraphEngine as EngineHandle, GraphControl, MountedGraph } from "@moondsp/browser";
 import { errorMessage, type ControlState } from "./controls";
 import { attempt, attemptAsync, type Result } from "./result";
-import { SYNTH_GRAPH, volumeControl, cutoffControl, noteOn, noteOff, type Settings } from "./synth";
+import { SYNTH_GRAPH, noteOn, noteOff, type Settings } from "./synth";
 
 export interface AudioView {
   render(state: ControlState): void;
@@ -35,7 +35,7 @@ interface AudioSession {
   readonly owner: AudioOwner;
   readonly context: AudioContext;
   readonly engine: EngineHandle;
-  readonly graph: MountedGraph;
+  readonly graph: MountedGraph<keyof Settings>;
   operations: Promise<void>;
   noteEpoch: number;
 }
@@ -85,7 +85,7 @@ function createAudioOwner(previous?: AudioOwner): AudioOwner {
         const graph = await engine.mount(SYNTH_GRAPH);
         signal.throwIfAborted();
         const settings = readSettings();
-        await graph.applyControls([volumeControl(settings.volume), cutoffControl(settings.cutoff)]);
+        await graph.setParams(settings);
         signal.throwIfAborted();
         await graph.play();
         signal.throwIfAborted();
@@ -226,7 +226,7 @@ export function createAudio(view: AudioView, initialSettings: Settings): AudioAc
     const session = currentSession();
     if (session) session.noteEpoch += 1;
     view.clearNotes();
-    queueControls(noteOff(), true);
+    queueControls(noteOff());
   }
 
   // Commands serialize within a session, never across retired and new sessions.
@@ -239,13 +239,22 @@ export function createAudio(view: AudioView, initialSettings: Settings): AudioAc
     });
   }
 
-  function queueControls(changes: readonly GraphControl[], note = false): void {
+  function queueControls(changes: readonly GraphControl[]): void {
     const session = currentSession();
     if (!session) return;
     const epoch = session.noteEpoch;
     enqueue(session, async () => {
-      if (!canControl() || (note && epoch !== session.noteEpoch)) return;
+      if (!canControl() || epoch !== session.noteEpoch) return;
       await session.graph.applyControls(changes);
+    });
+  }
+
+  function queueParams(values: Partial<Settings>): void {
+    const session = currentSession();
+    if (!session) return;
+    enqueue(session, async () => {
+      if (!canControl()) return;
+      await session.graph.setParams(values);
     });
   }
 
@@ -288,18 +297,18 @@ export function createAudio(view: AudioView, initialSettings: Settings): AudioAc
     stopNotes,
     powerOff: requestDispose,
     press(midi: number) {
-      queueControls(noteOn(midi), true);
+      queueControls(noteOn(midi));
     },
     release(nextMidi: number | null) {
-      queueControls(noteOff(nextMidi), true);
+      queueControls(noteOff(nextMidi));
     },
     volumeChanged(value: number) {
       settings = { ...settings, volume: value };
-      queueControls([volumeControl(value)]);
+      queueParams({ volume: value });
     },
     cutoffChanged(value: number) {
       settings = { ...settings, cutoff: value };
-      queueControls([cutoffControl(value)]);
+      queueParams({ cutoff: value });
     },
   };
 }

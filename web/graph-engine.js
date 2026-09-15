@@ -8,6 +8,23 @@ export class GraphEngineError extends Error {
   }
 }
 
+const invalidParams = code => new GraphEngineError(code, 'Graph parameters must be a record of finite numbers');
+const snapshotParams = (values, code = 'INVALID_CONTROL') => {
+  if (values === null || typeof values !== 'object' || Array.isArray(values)) throw invalidParams(code);
+  const snapshot = Object.create(null);
+  try {
+    for (const name of Object.keys(values)) {
+      const value = values[name];
+      if (typeof value !== 'number' || !Number.isFinite(value)) throw invalidParams(code);
+      snapshot[name] = value;
+    }
+  } catch (error) {
+    if (error instanceof GraphEngineError) throw error;
+    throw invalidParams(code);
+  }
+  return snapshot;
+};
+
 const hostError = (message, cause) => {
   if (cause instanceof GraphEngineError) return cause;
   const error = new GraphEngineError('HOST_ERROR', message);
@@ -200,6 +217,10 @@ export async function GraphEngine({
       if (context.state !== 'suspended') {
         throw new GraphEngineError('MOUNT_CLOSED', 'Mount graphs before playback or resuming the context');
       }
+      if (graph !== null && typeof graph === 'object' && !Array.isArray(graph) &&
+          Object.hasOwn(graph, 'params')) {
+        graph = { ...graph, params: snapshotParams(graph.params, 'INVALID_GRAPH') };
+      }
       const handle = await request('mount', { graph });
       let unmounting = null;
       const command = action => unmounting
@@ -212,6 +233,15 @@ export async function GraphEngine({
           return unmounting
             ? Promise.reject(new GraphEngineError('INVALID_HANDLE', 'The graph has been unmounted'))
             : request('applyControls', { handle, controls });
+        },
+        setParams(values) {
+          if (unmounting) return Promise.reject(new GraphEngineError('INVALID_HANDLE', 'The graph has been unmounted'));
+          const error = unavailable();
+          if (error) return Promise.reject(error);
+          let snapshot;
+          try { snapshot = snapshotParams(values); }
+          catch (error) { return Promise.reject(error); }
+          return request('setParams', { handle, values: snapshot });
         },
         unmount() {
           if (!unmounting) unmounting = request('command', { handle, command: 2 });

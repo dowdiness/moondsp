@@ -64,6 +64,8 @@ pub fn graph_host_push_char(Int) -> Unit
 
 pub fn graph_host_sample(Int) -> Double
 
+pub fn graph_host_set_params(Int) -> Bool
+
 pub fn init_compiled_graph(Double, Int) -> Bool
 
 pub fn init_compiled_hot_swap_graph(Double, Int) -> Bool

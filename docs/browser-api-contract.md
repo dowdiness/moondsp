@@ -88,8 +88,18 @@ and cleanup on failure. The engine itself does not perform browser admission.
 
 ### Description and mounting
 
-- A description contains `nodes`, an array of 1–64 node objects. Array indices
-  identify connections. The caller supplies the graph; it is not a demo preset.
+- A description contains `nodes`, an array of 1–64 node objects. It may also
+  contain `params`, a record of at most 256 exact string names mapped to finite
+  numeric initial values. Array indices identify connections. The caller
+  supplies the graph; it is not a demo preset.
+- A scalar field may be a finite number or an exact reference
+  `{ param: "name" }`. References are supported for oscillator `frequency`,
+  gain `gain`, biquad `cutoff`/`q`, and ADSR `attackMs`/`decayMs`/`sustain`/
+  `releaseMs`. Every declared name must be referenced by at least one supported
+  scalar field, every reference must name a declared parameter, and malformed,
+  unknown, unused, or orphan declarations reject mounting with
+  `INVALID_GRAPH` (including `nodeIndex` when a node is known). References may
+  intentionally fan out to multiple fields.
 - `oscillator`: required `waveform` (`sine`, `saw`, `square`, or `triangle`)
   and finite numeric `frequency` in Hz.
 - `gain`: required integer `input` referencing a node and finite numeric
@@ -98,16 +108,20 @@ and cleanup on failure. The engine itself does not perform browser admission.
   are milliseconds and sustain is a linear level. It starts with a closed gate.
 - `biquad`: required integer `input`, `mode` (`lowpass`, `highpass`, or
   `bandpass`), `cutoff` in Hz, and `q`.
-- `mul`: required integer `input0` and `input1`; multiply an audio source by
-  an ADSR source to form a playable voice.
+- `mul`: required integer `input0` and `input1`; multiply an audio source by an
+  ADSR source to form a playable voice.
 - `output`: required integer `input`. The existing compiler validates the
   output structure and graph semantics; exactly one mono output is required.
+- The `params` values are initial values only. They do not form a current-value
+  cache: raw controls and named updates can subsequently change the same
+  runtime targets independently.
 - The Worklet serializes the description as JSON. MoonBit decodes the browser
-  node subset into `DspNode`, then `GraphEngine::mount` uses the existing
-  `CompiledTemplate::analyze` and `CompiledDsp::compile_result` path.
-  There is no JS node validator, DSP implementation, or second compiler.
-  The browser's 64-node description limit is an adapter constraint; the
-  direct MoonBit API accepts canonical nodes supported by the mono compiler.
+  node and parameter subset, then `GraphEngine::mount` uses the existing
+  `CompiledTemplate::analyze` and `CompiledDsp::compile_result` path. There is
+  no JS node validator, DSP implementation, or second compiler.
+- The browser's 64-node description and 256-parameter limits are adapter
+  constraints; the direct MoonBit API accepts canonical nodes supported by the
+  mono compiler.
 - At most 16 graph handles may be mounted in one engine. Slots can be reused
   before playback, but unmounted handle numbers never recur within an engine.
 - Both engine creation and mounting require a suspended context. Mount all
@@ -116,23 +130,26 @@ and cleanup on failure. The engine itself does not perform browser admission.
   A new engine is required to mount additional graphs after playback.
 - Do not concurrently resume the caller-owned context while creation or
   mounting is pending. Mounting allocates and compiles inside the AudioWorklet
-  realm while the caller keeps the context suspended; it is **not**
-  background-worker compilation and is not supported during playback.
+  realm while the context remains suspended; it is not background-worker
+  compilation and is not supported during playback.
 
 ### Rendering and lifecycle
 
 - `engine.mount(description)` resolves to a `MountedGraph` handle with
-  asynchronous `play()`, `pause()`, `unmount()`, and `applyControls()` methods. `MountedGraph`
-  is an exported TypeScript type, not a runtime constructor.
-  Mounting creates independent DSP state and registers it with the engine's
+  asynchronous `play()`, `pause()`, `unmount()`, `applyControls()`, and
+  `setParams(values)` methods. `MountedGraph` is an exported TypeScript type,
+  not a runtime constructor. `setParams` accepts a partial record of declared
+  names and finite numeric values, and writes every target referring to each
+  supplied name.
+- Mounting creates independent DSP state and registers it with the engine's
   output, but does not start playback. The input description is reusable:
   mounting it twice creates two independent graphs.
 - `play` starts or resumes processing; `pause` freezes oscillator phase.
   Repeated play/pause operations are allowed.
 - `unmount()` permanently removes that graph. Concurrent and repeated calls
-  share one completion promise. Once unmounting begins, play, pause, and controls reject
-  with `GraphEngineError.code === "INVALID_HANDLE"`. Repeated unmount cannot
-  affect another graph that reuses the underlying slot.
+  share one completion promise. Once unmounting begins, play, pause, controls,
+  and `setParams` reject with `GraphEngineError.code === "INVALID_HANDLE"`.
+  Repeated unmount cannot affect another graph that reuses the underlying slot.
   An invalid command does not change another graph or close mount admission.
 - All playing graphs sum into `engine.output`, a mono `AudioWorkletNode`.
   Connect it to any compatible Web Audio destination. There is no automatic
@@ -140,24 +157,26 @@ and cleanup on failure. The engine itself does not perform browser admission.
 - Rendering uses the actual context sample rate and currently supports
   128-frame render quanta. A different quantum produces a processor failure,
   rather than silently truncating audio.
-- Graph commands take effect between render callbacks. This entry point
-  does not provide timestamped scheduling or automation, live graph
-  replacement, or polyphonic note allocation.
+- Graph commands take effect between render callbacks. This entry point does
+  not provide timestamped scheduling or automation, live graph replacement, or
+  polyphonic note allocation.
 - `engine.close()` ends the engine and all remaining graphs. It is idempotent,
   including concurrent calls: all callers share one completion promise.
   Closing immediately rejects new requests. It disconnects output and closes
   the message port, but never suspends or closes the caller's context.
   Prefer closing the engine before closing its context. If the context closes
   first, its state-change notification rejects unacknowledged graph commands
-  with `ENGINE_CLOSED` and releases local resources. An in-flight `engine.close()`
-  then completes without requiring a worklet acknowledgement; repeated close
-  calls still share completion. Already-acknowledged commands retain their result.
-  Operations on remaining graph handles reject with `ENGINE_CLOSED`; a graph's
+  with `ENGINE_CLOSED` and releases local resources. An in-flight
+  `engine.close()` then completes without requiring a worklet acknowledgement;
+  repeated close calls still share completion. Already-acknowledged commands
+  retain their result.
+- Operations on remaining graph handles reject with `ENGINE_CLOSED`; a graph's
   already-issued unmount retains its shared result.
-  The close acknowledgement has a deadline (`closeTimeoutMs`, default 5000ms;
-  a positive finite number no greater than 2147483647). A missed deadline rejects
-  close with `HOST_ERROR`, rejects pending commands, and attempts local processor
-  retirement, output disconnection, and port closure. It does not close the context.
+- The close acknowledgement has a deadline (`closeTimeoutMs`, default 5000ms;
+  a positive finite number no greater than 2147483647). A missed deadline
+  rejects close with `HOST_ERROR`, rejects pending commands, and attempts local
+  processor retirement, output disconnection, and port closure. It does not
+  close the context.
 - `engine.wait({ signal }?)` observes one retained `EngineExit`:
   `{ type: "closed" }` or `{ type: "failed", error: GraphEngineError }`.
   It does not request shutdown. Multiple and late waiters receive the same result.
@@ -240,23 +259,6 @@ before group defers run. A defer may then close the engine. Do not make an
 ordinary child wait for an engine whose close is performed only by that defer:
 the group would wait for the child before it could close the engine.
 
-The executable [`browser_test/driver.mbt`](../packages/browser/host/browser_test/driver.mbt)
-demonstrates this ownership and the JS export boundary. In `async 0.21.3`,
-`Promise::from_async(abort_signal=...)` can leave an externally-cancelled,
-otherwise idle Promise waiter queued without rescheduling the JS event loop.
-The driver instead delivers abort through a cancellable Promise and completes
-its owning task group from inside the async event loop. This requires no
-polling, private scheduler API, or patched dependency. Its cancelled JS exports
-reject with `AbortError` only after their tasks and cleanup finish.
-Known host errors cross that export boundary as structured values, not raised
-errors that `from_async` would stringify.
-
-From the repository root, `NEW_MOON_MOD=0 npm run test:browser-host` runs the
-isolated MoonBit tests and real Chromium/AudioWorklet lifetime tests. The
-environment variable also covers the Playwright server's MoonBit build. The
-suite builds the test-only JS driver. `npm run typecheck:graph` checks the
-public TS surface.
-
 ### Live controls
 
 `sound.applyControls(controls)` accepts an ordered batch of 1–64 controls:
@@ -265,26 +267,34 @@ public TS surface.
   Slots are `value0`, `value1`, `value2`, `value3`, or `delaySamples`.
 - `{ type: "gateOn", node }` and `{ type: "gateOff", node }` control an ADSR.
 
+`sound.setParams(values)` accepts a partial record of names declared by the
+graph. The object must be non-null, non-array, and contain only own enumerable
+string keys whose values are finite numbers. Unknown names, malformed records,
+and non-finite values reject atomically with `INVALID_CONTROL`; an empty record
+is a successful no-op on a valid handle. `setParams` has no current-value cache,
+and it does not make raw controls unavailable: applications may use named
+updates for shared knobs and raw batches for controls such as notes.
+
 `node` is the original authoring index, not the optimized execution index.
-For the synth example, oscillator frequency, biquad cutoff, and gain amount
-each use `value0` on their respective nodes. See the runtime-control slot
-matrix in the [technical reference](technical-reference.md).
+Named references and raw slots can coexist and can update the same target.
+These operations take effect between render callbacks, not at sample timestamps.
 
 MoonBit validates the whole batch before changing runtime state. A bad node,
-slot, value, or gate target rejects the batch with `INVALID_CONTROL`; preceding
-controls in the batch do not take effect. Lifecycle errors take precedence.
-These are between-render-callback updates, not sample-timestamped events.
-Gate-off starts the release tail; keep the graph playing until it finishes.
-`pause()` freezes the envelope and is not a substitute for gate-off.
+slot, value, or gate target rejects the batch with `INVALID_CONTROL`;
+preceding controls in the batch do not take effect. Named update errors use
+`INVALID_CONTROL` for unknown names or invalid values. Lifecycle errors take
+precedence. Gate-off starts the release tail; keep the graph playing until it
+finishes. `pause()` freezes the envelope and is not a substitute for gate-off.
 Control decoding and transactional validation are not an allocation-free
 audio-thread contract; a real-time allocation/GC audit remains a separate gate.
 
 The dedicated processor is `web/graph-processor.js`. It instantiates the same
 browser WASM artifact as the existing browser paths, in its own WASM instance.
 Its primitive ABI is `graph_host_init`, `graph_host_clear_input`,
-`graph_host_push_char`, `graph_host_mount`, `graph_host_command`, `graph_host_apply_controls`,
-`graph_host_process`, `graph_host_sample`, `graph_host_close`,
-`graph_host_error_length`, and `graph_host_error_char`.
+`graph_host_push_char`, `graph_host_mount`, `graph_host_command`,
+`graph_host_apply_controls`, `graph_host_set_params`, `graph_host_process`,
+`graph_host_sample`, `graph_host_close`, `graph_host_error_length`, and
+`graph_host_error_char`.
 Input is JSON transmitted as Unicode scalar values; errors are MoonBit-generated
 JSON envelopes containing `code`, `message`, and optional `nodeIndex`.
 Integer handles exist only in this adapter; MoonBit callers receive typed,
@@ -298,31 +308,34 @@ Worklet and WASM together. Application code uses only the public JS methods.
 Keep `web/graph-engine.d.ts` beside `graph-engine.js` when distributing the
 module to TypeScript consumers. Imports retain the `.js` extension; TypeScript
 resolves the adjacent declaration automatically. No runtime wrapper is required.
+The declarations require TypeScript 5.4 or newer (`NoInfer` keeps references
+from widening the names declared in `params`).
 
 ```ts
 import { GraphEngine, type GraphDescription } from "./graph-engine.js";
 
 const graph = {
+  params: { volume: 0.1, cutoff: 2_000 },
   nodes: [
     { type: "oscillator", waveform: "triangle", frequency: 220 },
-    { type: "gain", input: 0, gain: 0.1 },
-    { type: "output", input: 1 },
+    { type: "biquad", input: 0, mode: "lowpass", cutoff: { param: "cutoff" }, q: 0.7 },
+    { type: "gain", input: 1, gain: { param: "volume" } },
+    { type: "output", input: 2 },
   ],
-} as const satisfies GraphDescription;
+} as const satisfies GraphDescription<"volume" | "cutoff">;
 
-// context is a caller-owned, suspended AudioContext or OfflineAudioContext.
 const engine = await GraphEngine({ context });
 const sound = await engine.mount(graph);
+await sound.setParams({ volume: 0.2 }); // updates every volume target
 ```
-
-The declaration exports `GraphDescription`, the discriminated `GraphNode` union
-and its `OscillatorNode`, `AdsrNode`, `BiquadNode`, `MulNode`, `GainNode`, and
-`OutputNode` variants, `Waveform`, `BiquadMode`, `GraphControl`,
+The declaration exports `GraphDescription<Name>`, the discriminated
+`GraphNode<Name>` union and its node variants, `ParamRef<Name>`, `GraphControl`,
 `GraphEngineOptions`, `GraphEngineWaitOptions`, `EngineExit`, `GraphEngine`,
-`MountedGraph`, and `GraphEngineErrorCode`.
-These node types describe authoring data, not Web Audio nodes. Only
-`GraphEngine` and `GraphEngineError` are runtime exports. `GraphEngine` is also
-the returned engine's TypeScript type; import the remaining names with `import type`.
+`MountedGraph<Name>`, and `GraphEngineErrorCode`. `Name` is inferred from
+`params` keys when mounting; an explicit union such as
+`GraphDescription<"volume" | "cutoff">` enables exact ref and update-key
+checking. A no-parameter graph does not admit typed nonempty `setParams`
+updates. Runtime validation remains authoritative for broadened dynamic data.
 
 Readonly descriptions (including `as const` arrays) are accepted without
 requiring a mutable copy. Returned handle properties are readonly, matching

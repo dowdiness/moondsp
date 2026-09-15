@@ -68,6 +68,20 @@ class MoonDspGraphProcessor extends AudioWorkletProcessor {
     if (!this.wasm.graph_host_apply_controls(handle)) throw this.hostError();
   }
 
+  setParams(handle, values) {
+    let encoded;
+    try {
+      encoded = JSON.stringify(values);
+    } catch (_) {
+      throw Object.assign(new Error('Invalid graph parameters'), { code: 'INVALID_CONTROL' });
+    }
+    this.wasm.graph_host_clear_input();
+    if (encoded !== undefined) {
+      for (const char of encoded) this.wasm.graph_host_push_char(char.codePointAt(0));
+    }
+    if (!this.wasm.graph_host_set_params(handle)) throw this.hostError();
+  }
+
   receive(data) {
     if (this.closed) return;
     // Cancellation can arrive before WASM instantiation has completed.
@@ -95,6 +109,12 @@ class MoonDspGraphProcessor extends AudioWorkletProcessor {
             throw Object.assign(new Error('Invalid graph handle'), { code: 'INVALID_HANDLE' });
           }
           value = this.applyControls(data.handle, data.controls);
+          break;
+        case 'setParams':
+          if (!Number.isInteger(data.handle) || data.handle <= 0 || data.handle >= 2147483647) {
+            throw Object.assign(new Error('Invalid graph handle'), { code: 'INVALID_HANDLE' });
+          }
+          value = this.setParams(data.handle, data.values);
           break;
         default: throw Object.assign(new Error('Unknown request'), { code: 'INVALID_REQUEST' });
       }
