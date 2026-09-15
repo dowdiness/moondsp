@@ -53,17 +53,76 @@ fn graph_json_node_index(
 }
 
 ///|
+// References are browser authoring metadata, not additional DSP nodes.
+// Each stored control identifies a target and its declared initial value.
+fn graph_json_param(
+  node : Json,
+  key : String,
+  index : Int,
+  slot : @moondsp.GraphParamSlot,
+  defaults : Map[String, Double],
+  bindings : Map[String, Array[@moondsp.GraphControl]],
+) -> Double raise GraphDecodeError {
+  guard node is Object(fields) else {
+    raise InvalidDescription("Expected node object", index)
+  }
+  match fields.get(key) {
+    Some(Object(reference)) => {
+      guard reference.length() == 1 &&
+        reference.get("param") is Some(String(name)) else {
+        raise InvalidDescription(
+          "Expected a parameter reference for \{key}",
+          index,
+        )
+      }
+      guard defaults.get(name) is Some(value) &&
+        bindings.get(name) is Some(targets) else {
+        raise InvalidDescription("Unknown parameter \{name}", index)
+      }
+      targets.push(@moondsp.GraphControl::set_param(index, slot, value))
+      value
+    }
+    _ => graph_json_number(node, key, index)
+  }
+}
+
+///|
 /// Browser representation only: canonical authoring remains Array[DspNode].
 fn decode_browser_graph(
   text : String,
+  bindings~ : Map[String, Array[@moondsp.GraphControl]],
 ) -> Array[@moondsp.DspNode] raise GraphDecodeError {
   let json = @json.parse(text) catch {
     _ => raise InvalidDescription("Invalid graph JSON", -1)
   }
-  guard json is { "nodes": Array(nodes), .. } &&
+  guard json is Object(fields) &&
+    fields.get("nodes") is Some(Array(nodes)) &&
     nodes.length() > 0 &&
     nodes.length() <= 64 else {
     raise InvalidDescription("A graph must contain 1 to 64 nodes", -1)
+  }
+  let defaults : Map[String, Double] = Map([])
+  match fields.get("params") {
+    None => ()
+    Some(Object(params)) => {
+      guard params.length() <= 256 else {
+        raise InvalidDescription(
+          "A graph may declare at most 256 parameters", -1,
+        )
+      }
+      for name, initial in params {
+        guard initial is Number(value, ..) && @moondsp.is_finite(value) else {
+          raise InvalidDescription(
+            "Expected finite initial value for \{name}",
+            -1,
+          )
+        }
+        defaults[name] = value
+        bindings[name] = []
+      }
+    }
+    Some(_) =>
+      raise InvalidDescription("Expected parameter declarations object", -1)
   }
   let decoded = []
   for index, node in nodes {
@@ -78,15 +137,43 @@ fn decode_browser_graph(
         }
         @moondsp.DspNode::oscillator(
           waveform,
-          graph_json_number(node, "frequency", index),
+          graph_json_param(node, "frequency", index, Value0, defaults, bindings),
         )
       }
       { "type": String("adsr"), .. } =>
         @moondsp.DspNode::adsr(
-          attack_ms=graph_json_number(node, "attackMs", index),
-          decay_ms=graph_json_number(node, "decayMs", index),
-          sustain=graph_json_number(node, "sustain", index),
-          release_ms=graph_json_number(node, "releaseMs", index),
+          attack_ms=graph_json_param(
+            node,
+            "attackMs",
+            index,
+            Value0,
+            defaults,
+            bindings,
+          ),
+          decay_ms=graph_json_param(
+            node,
+            "decayMs",
+            index,
+            Value1,
+            defaults,
+            bindings,
+          ),
+          sustain=graph_json_param(
+            node,
+            "sustain",
+            index,
+            Value2,
+            defaults,
+            bindings,
+          ),
+          release_ms=graph_json_param(
+            node,
+            "releaseMs",
+            index,
+            Value3,
+            defaults,
+            bindings,
+          ),
         )
       { "type": String("biquad"), .. } => {
         let mode = match node {
@@ -102,14 +189,21 @@ fn decode_browser_graph(
         @moondsp.DspNode::biquad(
           input=graph_json_input(node, nodes.length(), index),
           mode~,
-          cutoff_hz=graph_json_number(node, "cutoff", index),
-          q=graph_json_number(node, "q", index),
+          cutoff_hz=graph_json_param(
+            node,
+            "cutoff",
+            index,
+            Value0,
+            defaults,
+            bindings,
+          ),
+          q=graph_json_param(node, "q", index, Value1, defaults, bindings),
         )
       }
       { "type": String("gain"), .. } =>
         @moondsp.DspNode::gain(
           graph_json_input(node, nodes.length(), index),
-          graph_json_number(node, "gain", index),
+          graph_json_param(node, "gain", index, Value0, defaults, bindings),
         )
       { "type": String("mul"), .. } =>
         @moondsp.DspNode::mul(
@@ -124,6 +218,11 @@ fn decode_browser_graph(
         )
     }
     decoded.push(graph_node)
+  }
+  for name, targets in bindings {
+    guard !targets.is_empty() else {
+      raise InvalidDescription("Unused parameter \{name}", -1)
+    }
   }
   decoded
 }
@@ -177,4 +276,36 @@ fn decode_browser_controls(
     decoded.push(graph_control)
   }
   decoded
+}
+
+///|
+fn decode_browser_params(
+  text : String,
+  bindings : Map[String, Array[@moondsp.GraphControl]],
+) -> Array[@moondsp.GraphControl] raise GraphDecodeError {
+  let json = @json.parse(text) catch {
+    _ => raise InvalidDescription("Invalid parameter update JSON", -1)
+  }
+  guard json is Object(values) else {
+    raise InvalidDescription("Expected parameter update object", -1)
+  }
+  let controls : Array[@moondsp.GraphControl] = []
+  for name, updated in values {
+    guard bindings.get(name) is Some(targets) else {
+      raise InvalidDescription("Unknown parameter \{name}", -1)
+    }
+    guard updated is Number(value, ..) && @moondsp.is_finite(value) else {
+      raise InvalidDescription("Expected finite value for \{name}", -1)
+    }
+    for target in targets {
+      controls.push(
+        @moondsp.GraphControl::set_param(
+          target.node_index(),
+          target.slot(),
+          value,
+        ),
+      )
+    }
+  }
+  controls
 }

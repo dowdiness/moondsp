@@ -4,10 +4,24 @@
 const GRAPH_HOST_BLOCK_SIZE : Int = 128
 
 ///|
+priv struct BrowserMountedGraph {
+  graph : @moondsp.MountedGraph
+  params : Map[String, Array[@moondsp.GraphControl]]
+}
+
+///|
+fn BrowserMountedGraph::BrowserMountedGraph(
+  graph : @moondsp.MountedGraph,
+  params : Map[String, Array[@moondsp.GraphControl]],
+) -> BrowserMountedGraph {
+  { graph, params, }
+}
+
+///|
 let graph_host_engine : @ref.Ref[@moondsp.GraphEngine?] = @ref.new(None)
 
 ///|
-let graph_host_handles : Map[Int, @moondsp.MountedGraph] = Map([])
+let graph_host_handles : Map[Int, BrowserMountedGraph] = Map([])
 
 ///|
 let graph_host_next_handle : @ref.Ref[Int] = @ref.new(1)
@@ -122,7 +136,8 @@ pub fn graph_host_mount() -> Int {
   }
   let text = graph_host_input.to_string()
   graph_host_input.reset()
-  let nodes = decode_browser_graph(text) catch {
+  let bindings : Map[String, Array[@moondsp.GraphControl]] = Map([])
+  let nodes = decode_browser_graph(text, bindings~) catch {
     InvalidDescription(message, node_index) => {
       let _ = graph_host_reject("INVALID_GRAPH", message, node_index~)
       return 0
@@ -130,9 +145,33 @@ pub fn graph_host_mount() -> Int {
   }
   try {
     let sound = engine.mount(nodes)
+    // Validate all named targets against this exact mounted graph, including
+    // optimized-away nodes. Nothing is published or playing until this succeeds.
+    let initial_controls = bindings
+      .values()
+      .flat_map(targets => targets.iter())
+      .to_array()
+    sound.apply_controls(initial_controls) catch {
+      error => {
+        sound.unmount()
+        match error {
+          ControlRejected(control_error) => {
+            let _ = graph_host_reject(
+              "INVALID_GRAPH",
+              @debug.to_string(control_error),
+              node_index=graph_control_error_node_index(control_error),
+            )
+          }
+          _ => {
+            let _ = graph_host_engine_error(error)
+          }
+        }
+        return 0
+      }
+    }
     let handle = graph_host_next_handle.val
     graph_host_next_handle.val += 1
-    graph_host_handles[handle] = sound
+    graph_host_handles[handle] = BrowserMountedGraph(sound, bindings)
     handle
   } catch {
     error => {
@@ -155,7 +194,27 @@ pub fn graph_host_apply_controls(handle : Int) -> Bool {
       return graph_host_reject("INVALID_CONTROL", message, node_index~)
   }
   try {
-    sound.apply_controls(controls)
+    sound.graph.apply_controls(controls)
+    true
+  } catch {
+    error => graph_host_engine_error(error)
+  }
+}
+
+///|
+/// Resolve a partial named update and atomically validate every target.
+pub fn graph_host_set_params(handle : Int) -> Bool {
+  guard graph_host_handles.get(handle) is Some(sound) else {
+    return graph_host_reject("INVALID_HANDLE", "Invalid graph handle")
+  }
+  let text = graph_host_input.to_string()
+  graph_host_input.reset()
+  let controls = decode_browser_params(text, sound.params) catch {
+    InvalidDescription(message, node_index) =>
+      return graph_host_reject("INVALID_CONTROL", message, node_index~)
+  }
+  try {
+    sound.graph.apply_controls(controls)
     true
   } catch {
     error => graph_host_engine_error(error)
@@ -170,10 +229,10 @@ pub fn graph_host_command(handle : Int, command : Int) -> Bool {
   }
   try {
     match command {
-      0 => sound.play()
-      1 => sound.pause()
+      0 => sound.graph.play()
+      1 => sound.graph.pause()
       2 => {
-        sound.unmount()
+        sound.graph.unmount()
         graph_host_handles.remove(handle)
       }
       _ =>

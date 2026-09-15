@@ -32,6 +32,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   alongside touch scrolling and desktop keycaps. Public audio API calls remain
   in `audio.ts`, separate from transport presentation and keyboard interaction,
   with a source-reading guide in the example README.
+- Added named graph parameters to the browser facade: descriptions can declare
+  finite initial values and supported scalar fields can reference them;
+  `MountedGraph.setParams()` updates shared targets atomically. The basic synth
+  now uses named `volume` and `cutoff` updates while retaining raw atomic note
+  frequency/gate batches.
 - Added `npm run pack:browser` to build a local `@moondsp/browser` tarball
   containing matching JS, TypeScript declarations, Worklet, Wasm, and license.
   Consumers can build and deploy the example without a MoonBit toolchain.
