@@ -1,0 +1,12 @@
+members = [
+  ".",
+  "../..",
+  "../../../canopy/deps/graphviz",
+  "../../../canopy/deps/loom/diagnostic",
+  "../../../canopy/deps/loom/incr/incr",
+  "../../../canopy/deps/loom/loom",
+  "../../../canopy/deps/loom/moji",
+  "../../../canopy/deps/loom/pretty",
+  "../../../canopy/deps/loom/seam",
+  "../../../canopy/deps/loom/text-change",
+]

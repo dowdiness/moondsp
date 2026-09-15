@@ -13,16 +13,16 @@ The current evidence is intentionally spec-local:
   last successful `PatternDoc`, accepts editor source-edit spans, and reuses one
   lowering cache across reparses.
 - The Loom comparison lives under `specs/loom-mini-cst/` and constructs a
-  parser with `@loom.new_parser(input, mini_grammar)`, shares
-  `parser.runtime()` with the projection memo, and exposes the result through a
-  long-lived observer.
+  parser with `@loom.new_parser(source_id, input, mini_grammar)`, shares
+  `parser.runtime()` with a scope-owned `Derived` projection, and roots that
+  projection through a long-lived `Watch`.
 - `specs/loom-mini-cst/src/projection.mbt::LoomMiniAtomProjection::new` now
   uses Loom's `ProjectionIdentityTracker` and `ProjectionStringIdAllocator` for
   last-good atom identity, optional editor-edit handling, failed-input edit
   composition across recovery, source-diff fallback, and fresh ID allocation.
   The spec-local `pending_source_edit` shim has been removed; the projection
-  records the current edit/source-before-edit signals and delegates baseline
-  selection to Loom.
+  records the current edit/source-before-edit `Input` values and delegates
+  baseline selection to Loom.
 - `specs/loom-mini-cst/src/projection_test.mbt` contains the provenance matrix,
   recovery matrix helper, and PR #104 control-method cache-reuse helper that
   define the current regression evidence.
@@ -68,9 +68,9 @@ able to choose its public ID shape; in `moondsp` that shape is
 `LoomMiniAtomProjection` delegates prefix/suffix ID realignment, optional
 editor-edit handling, failed-input edit composition, source-diff fallback, and
 fresh string-ID allocation to Loom's projection identity helpers. The remaining
-local logic only stores the current editor edit/source-before-edit signals and
-passes them to `ProjectionIdentityTracker`; it no longer keeps a separate
-pending edit shim.
+local logic only stores the current editor edit/source-before-edit `Input`
+values and passes them to `ProjectionIdentityTracker`; it no longer keeps a
+separate pending edit shim.
 
 ### Acceptance evidence to preserve
 

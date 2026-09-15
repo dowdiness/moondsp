@@ -38,7 +38,7 @@ fn parse_dollar_stack_program(
     parse_dollar_stack_line(ctx)
     while ctx.peek() == DollarColon &&
           dollar_colon_starts_new_line(ctx) &&
-          ctx.error_count < MAX_ERRORS {
+          !ctx.too_many_errors(MAX_ERRORS) {
       parse_dollar_stack_line(ctx)
     }
   })
@@ -48,23 +48,25 @@ fn parse_dollar_stack_program(
 fn dollar_colon_starts_new_line(
   ctx : @core.ParserContext[MiniToken, MiniSyntaxKind],
 ) -> Bool {
-  let mut pos = ctx.position
-  let mut saw_newline = false
-  while pos < ctx.token_count {
-    let token = (ctx.get_token)(pos)
+  letrec scan = fn(offset : Int, saw_newline : Bool) -> Bool {
+    let token = ctx.peek_index(offset)
+    if token == EOF {
+      return false
+    }
     if token.is_trivia() {
-      let text = ctx.token_text_at(pos)
+      let text = ctx.token_text_at(ctx.cursor_position() + offset)
+      let mut has_newline = saw_newline
       for ch in text {
         if ch == '\n' || ch == '\r' {
-          saw_newline = true
+          has_newline = true
         }
       }
-      pos += 1
+      scan(offset + 1, has_newline)
     } else {
-      return token == DollarColon && saw_newline
+      token == DollarColon && saw_newline
     }
   }
-  false
+  scan(0, false)
 }
 
 ///|
@@ -84,7 +86,7 @@ fn parse_dollar_stack_line(
 /// `parse_stack_call` for parity.
 fn parse_expr(ctx : @core.ParserContext[MiniToken, MiniSyntaxKind]) -> Unit {
   parse_primary_call(ctx)
-  while ctx.peek() == Dot && ctx.error_count < MAX_ERRORS {
+  while ctx.peek() == Dot && !ctx.too_many_errors(MAX_ERRORS) {
     parse_method_call(ctx)
   }
 }
@@ -110,7 +112,7 @@ fn parse_method_args(
     return
   }
   parse_method_arg(ctx)
-  while ctx.peek() == Comma && ctx.error_count < MAX_ERRORS {
+  while ctx.peek() == Comma && !ctx.too_many_errors(MAX_ERRORS) {
     expect(ctx, Comma, CommaToken) |> ignore
     parse_method_arg(ctx)
   }
@@ -183,7 +185,7 @@ fn parse_stack_call(
     expect(ctx, StackKeyword, StackKeywordToken) |> ignore
     expect(ctx, LParen, LParenToken) |> ignore
     parse_expr(ctx)
-    while ctx.peek() == Comma && ctx.error_count < MAX_ERRORS {
+    while ctx.peek() == Comma && !ctx.too_many_errors(MAX_ERRORS) {
       expect(ctx, Comma, CommaToken) |> ignore
       parse_expr(ctx)
     }
@@ -206,7 +208,7 @@ fn parse_notation_body(
   stop_token~ : MiniToken,
 ) -> Unit {
   parse_layer(ctx, stop_token~)
-  while ctx.peek() == Comma && ctx.error_count < MAX_ERRORS {
+  while ctx.peek() == Comma && !ctx.too_many_errors(MAX_ERRORS) {
     expect(ctx, Comma, CommaToken) |> ignore
     parse_layer(ctx, stop_token~)
   }
@@ -221,7 +223,7 @@ fn parse_layer(
     while ctx.peek() != stop_token &&
           ctx.peek() != Comma &&
           ctx.peek() != EOF &&
-          ctx.error_count < MAX_ERRORS {
+          !ctx.too_many_errors(MAX_ERRORS) {
       match ctx.peek() {
         Whitespace => ctx.emit_token(WhitespaceToken)
         LBracket => parse_sub_notation(ctx)
@@ -263,7 +265,7 @@ fn parse_sub_notation(
 fn parse_postfix_loop(
   ctx : @core.ParserContext[MiniToken, MiniSyntaxKind],
 ) -> Unit {
-  while is_postfix_start(ctx.peek()) && ctx.error_count < MAX_ERRORS {
+  while is_postfix_start(ctx.peek()) && !ctx.too_many_errors(MAX_ERRORS) {
     parse_postfix(ctx)
   }
 }
@@ -349,17 +351,26 @@ pub fn mini_fold_node(
 ///|
 pub let mini_grammar : @loom.Grammar[MiniToken, MiniSyntaxKind, MiniAst] = @loom.Grammar::new(
   spec=mini_spec,
-  lex~,
+  lex=lex_with_source_id,
   fold_node=mini_fold_node,
   incremental_relex_enabled=false,
   block_reparse_spec=None,
 )
 
 ///|
+/// Recoverable syntax problems are returned in `DiagnosticSet`. A remaining
+/// Loom `Failure` means lexing or parser-engine construction failed before a
+/// usable CST was produced. This spec retains its historical `LexError`
+/// facade, so that fatal channel is deliberately normalized below; callers
+/// must not infer that the underlying cause was necessarily lexical.
 pub fn parse_cst(
   source : String,
 ) -> (@seam.CstNode, @core.DiagnosticSet) raise @core.LexError {
-  mini_grammar.parse_cst(source)
+  try {
+    mini_grammar.parse_cst(loom_mini_source_id("pattern"), source)
+  } catch {
+    _ => raise @core.LexError("Loom Mini parser failed")
+  }
 }
 
 ///|
@@ -419,7 +430,7 @@ pub let song_spec : @core.LanguageSpec[MiniToken, MiniSyntaxKind] = @core.Langua
 ///|
 pub let song_grammar : @loom.Grammar[MiniToken, MiniSyntaxKind, MiniAst] = @loom.Grammar::new(
   spec=song_spec,
-  lex~,
+  lex=lex_with_source_id,
   fold_node=mini_fold_node,
   incremental_relex_enabled=false,
   block_reparse_spec=None,
@@ -436,7 +447,7 @@ fn parse_song_root(
       ctx.error("song() requires at least one item")
     } else {
       parse_song_item(ctx)
-      while ctx.peek() == Comma && ctx.error_count < MAX_ERRORS {
+      while ctx.peek() == Comma && !ctx.too_many_errors(MAX_ERRORS) {
         expect(ctx, Comma, CommaToken) |> ignore
         parse_song_item(ctx)
       }
@@ -458,7 +469,7 @@ fn parse_song_item(
     ctx.bump_error()
     return
   }
-  match ctx.current_token_text().to_string() {
+  match ctx.current_token_text().to_owned() {
     "section" => parse_song_section_item(ctx)
     "bpm" => parse_song_bpm_item(ctx)
     "part_id" => parse_song_part_id_item(ctx)
@@ -563,7 +574,7 @@ fn parse_song_string(
     expect(ctx, Quote, QuoteToken) |> ignore
     while ctx.peek() != Quote &&
           ctx.peek() != EOF &&
-          ctx.error_count < MAX_ERRORS {
+          !ctx.too_many_errors(MAX_ERRORS) {
       ctx.emit_token(StringContentToken)
     }
     expect(ctx, Quote, QuoteToken) |> ignore
@@ -591,7 +602,7 @@ fn expect_song_keyword(
   ctx : @core.ParserContext[MiniToken, MiniSyntaxKind],
   word : String,
 ) -> Bool {
-  if ctx.peek() == Ident && ctx.current_token_text().to_string() == word {
+  if ctx.peek() == Ident && ctx.current_token_text().to_owned() == word {
     // The oracle matches `keyword(` as one contiguous literal, so it rejects a
     // space before the paren. Reproduce that: require `(` immediately adjacent
     // to the keyword (no intervening trivia) before consuming.
@@ -609,8 +620,15 @@ fn expect_song_keyword(
 }
 
 ///|
+/// Uses the same fatal-failure policy as `parse_cst`: recoverable syntax stays
+/// in `DiagnosticSet`, while an unrecoverable Loom `Failure` is normalized to
+/// the spec's historical `LexError` facade.
 pub fn parse_song_cst(
   source : String,
 ) -> (@seam.CstNode, @core.DiagnosticSet) raise @core.LexError {
-  song_grammar.parse_cst(source)
+  try {
+    song_grammar.parse_cst(loom_mini_source_id("song"), source)
+  } catch {
+    _ => raise @core.LexError("Loom Mini song parser failed")
+  }
 }
