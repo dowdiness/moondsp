@@ -298,5 +298,76 @@ NEW_MOON_MOD=0 moon check --target all --deny-warn
 NEW_MOON_MOD=0 moon test --target all --deny-warn
 
 # Test specific packages
+NEW_MOON_MOD=0 moon test .
+NEW_MOON_MOD=0 moon test pattern
 
-[Showing lines 1-300 of 350. Use :301 to continue]
+# Format code and regenerate interfaces
+NEW_MOON_MOD=0 moon info && NEW_MOON_MOD=0 moon fmt
+
+# Run microbenchmarks
+NEW_MOON_MOD=0 moon bench graph/graph_benchmark.mbt --release
+
+# Install browser verification tools and Chromium
+npm ci
+npm --prefix web/live ci
+npx playwright install chromium
+
+# Check public JS/TS usage, then run browser tests (builds wasm-gc first)
+npm run typecheck:graph
+NEW_MOON_MOD=0 npm run test:browser
+```
+
+The project follows an incremental edit discipline: run `NEW_MOON_MOD=0 moon check` after edits and resolve errors before proceeding.
+The synth has a separate suite: build and install its tarball using the quick
+start above, then run `npm run test:basic-synth` from the repository root.
+The JS-target MoonBit module is verified separately with
+`NEW_MOON_MOD=0 npm run test:browser-host`; it is not included in root-module
+MoonBit tests.
+
+---
+
+## Documentation
+
+Start at the **[docs index](docs/README.md)**, which categorizes materials by role:
+
+- **[Technical reference](docs/technical-reference.md)** — Node types, parameter slots, runtime control surface (authoritative for graph runtime-control behavior)
+- **[Browser API contract](docs/browser-api-contract.md)** — Graph descriptions, atomic controls, engine lifetime, cancellation, and distribution
+- **[Basic synth guide](examples/basic-synth/README.md)** — Power lifecycle, resource ownership, setup, and verification
+- **[Mini-notation guide](docs/mini-notation.md)** — Pattern syntax, grouping, and method chaining
+- **[Blueprint](docs/blueprint.md)** — Complete architectural vision, design principles, and multi-target roadmap
+- **[Architecture decisions (ADRs)](docs/decisions/)** — Short records explaining why key architectural choices were made
+- **[GitHub Issues](https://github.com/dowdiness/moondsp/issues)** — Open issues are the source of truth for upcoming work; released behavior belongs in `CHANGELOG.md`
+- **[`CLAUDE.md`](CLAUDE.md)** — Project conventions and contributor cheat sheet
+
+---
+
+## Project status
+
+| Phase | Status | Summary |
+|:---|:---|:---|
+| **0 — Platform proof** | Complete | MoonBit `wasm-gc` runs in browser AudioWorklet |
+| **1 — DSP primitives** | Complete | Oscillators, filters, envelopes, delay, pan, clip |
+| **2 — Graph compiler** | Complete | Compiled graphs, hot-swap, topology editing, stereo |
+| **3 — Voice management** | Complete | 32+ voice pool with priority stealing & stereo mix |
+| **4 — Pattern engine** | Complete | Rational time, combinators, ControlMap |
+| **5 — Pattern × DSP** | Complete | `scheduler/` + `mini/` wire pattern events to voice allocation |
+| **6 — incr integration**| In progress | Stable identity plus initial pattern/song authoring groundwork |
+| **7+ — Native & Frontends**| Prototype | Browser live UI & CLAP plugin prototype available; DAW production gates underway |
+
+---
+
+## Acknowledgments & Prior Art
+
+`moondsp` builds upon concepts pioneered by several remarkable open-source projects in computer music, live coding, and audio synthesis:
+
+- **[kabelsalat](https://codeberg.org/froos/kabelsalat)** by Felix Roos (`froos`) — Demonstrated high-performance DSP graph compilation and real-time execution in Web AudioWorklet.
+- **[Noisecraft](https://noisecraft.app/)** by Maxime Chevalier-Boisvert — Pioneer in topological DSP graph flattening and in-browser visual synthesis.
+- **[Strudel](https://strudel.cc/)** & **[TidalCycles](https://tidalcycles.org/)** by Alex McLean, Felix Roos, and the live coding community — Foundational models for rational-time queryable pattern algebra, cyclic arcs, and mini-notation.
+- **[FAUST](https://faust.grame.fr/)** & **[mimium](https://mimium.org/)** — Inspiration for functional audio signal processing and tagless DSP algebra.
+- **[CLAP](https://cleveraudio.org/)** (Clever Audio Plug-in) — The modern, open native audio plugin standard enabling DAW integration beyond the browser.
+
+---
+
+## License
+
+[Apache-2.0](LICENSE)

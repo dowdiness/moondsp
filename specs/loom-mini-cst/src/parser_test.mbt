@@ -7,6 +7,29 @@
 // splits/merges, full reparses, or AST/domain projections.
 
 ///|
+fn parser_test_source_id(kind : String) -> @loom.SourceId {
+  @loom.SourceId("loom-mini-cst." + kind)
+}
+
+///|
+fn parser_test_new_parser(source : String) -> @loom.Parser[MiniAst] {
+  try! @loom.new_parser(
+    parser_test_source_id("parser-test"),
+    source,
+    mini_grammar,
+  )
+}
+
+///|
+fn parser_test_apply_edit(
+  parser : @loom.Parser[MiniAst],
+  edit : @core.Edit,
+  source : String,
+) -> Unit {
+  try! parser.apply_edit(edit, source)
+}
+
+///|
 test "SPIKE step 1: note() primary parses with zero diagnostics" {
   let (_cst, diagnostics) = try! parse_cst("note(\"c4 e4 g4\")")
   inspect(diagnostics.length(), content="0")
@@ -217,11 +240,11 @@ fn first_atom_node_or_abort(root : @seam.SyntaxNode) -> @seam.SyntaxNode {
 
 ///|
 test "apply_edit insertion updates duplicate atom spans through parser CST" {
-  let parser = @loom.new_parser("s(\"bd sd bd\")", mini_grammar)
+  let parser = parser_test_new_parser("s(\"bd sd bd\")")
   let before =
     #|["bd@[3,5)", "sd@[6,8)", "bd@[9,11)"]
   debug_inspect(parser_ident_token_spans(parser), content=before)
-  parser.apply_edit(@core.Edit::insert(8, 3), "s(\"bd sd cp bd\")")
+  parser_test_apply_edit(parser, @core.Edit::insert(8, 3), "s(\"bd sd cp bd\")")
   let after =
     #|["bd@[3,5)", "sd@[6,8)", "cp@[9,11)", "bd@[12,14)"]
   debug_inspect(parser_ident_token_spans(parser), content=after)
@@ -231,8 +254,8 @@ test "apply_edit insertion updates duplicate atom spans through parser CST" {
 
 ///|
 test "apply_edit deletion updates duplicate atom spans and reuses unchanged nodes" {
-  let parser = @loom.new_parser("s(\"bd sd bd\")", mini_grammar)
-  parser.apply_edit(@core.Edit::delete(5, 8), "s(\"bd bd\")")
+  let parser = parser_test_new_parser("s(\"bd sd bd\")")
+  parser_test_apply_edit(parser, @core.Edit::delete(5, 8), "s(\"bd bd\")")
   let after =
     #|["bd@[3,5)", "bd@[6,8)"]
   debug_inspect(parser_ident_token_spans(parser), content=after)
@@ -242,8 +265,8 @@ test "apply_edit deletion updates duplicate atom spans and reuses unchanged node
 
 ///|
 test "parser pure deletion preserves left-adjacent mini atom reuse" {
-  let parser = @loom.new_parser("s(\"bd \")", mini_grammar)
-  parser.apply_edit(@core.Edit::delete(5, 6), "s(\"bd\")")
+  let parser = parser_test_new_parser("s(\"bd \")")
+  parser_test_apply_edit(parser, @core.Edit::delete(5, 6), "s(\"bd\")")
   let after_snapshot = parser.snapshot().read_or_abort()
   let after =
     #|["bd@[3,5)"]
@@ -254,8 +277,8 @@ test "parser pure deletion preserves left-adjacent mini atom reuse" {
 
 ///|
 test "parser adjacent insertion does not claim deletion-style mini atom reuse" {
-  let parser = @loom.new_parser("s(\"bd\")", mini_grammar)
-  parser.apply_edit(@core.Edit::insert(5, 1), "s(\"bd \")")
+  let parser = parser_test_new_parser("s(\"bd\")")
+  parser_test_apply_edit(parser, @core.Edit::insert(5, 1), "s(\"bd \")")
   let after_snapshot = parser.snapshot().read_or_abort()
   let after =
     #|["bd@[3,5)"]
@@ -266,8 +289,8 @@ test "parser adjacent insertion does not claim deletion-style mini atom reuse" {
 
 ///|
 test "parser deletion that merges mini atoms stays conservative" {
-  let parser = @loom.new_parser("s(\"bd sd\")", mini_grammar)
-  parser.apply_edit(@core.Edit::delete(5, 6), "s(\"bdsd\")")
+  let parser = parser_test_new_parser("s(\"bd sd\")")
+  parser_test_apply_edit(parser, @core.Edit::delete(5, 6), "s(\"bdsd\")")
   let after_snapshot = parser.snapshot().read_or_abort()
   let after =
     #|["bdsd@[3,7)"]
@@ -396,6 +419,7 @@ test "parse_tokens_indexed reproduces mini deletion without parser wrapper reuse
     old_token_cache=cache,
   )
   let (_, _new_diagnostics, reuse_count) = @core.parse_tokens_indexed(
+    parser_test_source_id("parser-test.direct-middle-deletion"),
     new_source,
     new_tokens.length(),
     fn(i) { new_tokens[i].token },
@@ -434,6 +458,7 @@ test "parse_tokens_indexed reproduces mini prefix deletion reuse" {
     old_token_cache=cache,
   )
   let (_, _new_diagnostics, reuse_count) = @core.parse_tokens_indexed(
+    parser_test_source_id("parser-test.direct-prefix-deletion"),
     new_source,
     new_tokens.length(),
     fn(i) { new_tokens[i].token },
@@ -472,6 +497,7 @@ test "parse_tokens_indexed reproduces mini suffix deletion reuse" {
     old_token_cache=cache,
   )
   let (_, _new_diagnostics, reuse_count) = @core.parse_tokens_indexed(
+    parser_test_source_id("parser-test.direct-suffix-deletion"),
     new_source,
     new_tokens.length(),
     fn(i) { new_tokens[i].token },
@@ -487,10 +513,10 @@ test "parse_tokens_indexed reproduces mini suffix deletion reuse" {
 test "parser apply_edit path uses direct parse_tokens_indexed-like cursor inputs" {
   let old_source = "s(\"bd sd bd\")"
   let new_source = "s(\"bd bd\")"
-  let parser = @loom.new_parser(old_source, mini_grammar)
+  let parser = parser_test_new_parser(old_source)
   let before = parser.snapshot().read_or_abort()
   let edit = @core.Edit::delete(5, 8)
-  parser.apply_edit(edit, new_source)
+  parser_test_apply_edit(parser, edit, new_source)
   let after = parser.snapshot().read_or_abort()
   let new_tokens = tokenize(new_source)
   let new_starts = @core.build_starts(new_tokens)
@@ -512,6 +538,7 @@ test "parser apply_edit path uses direct parse_tokens_indexed-like cursor inputs
     old_token_cache=cache,
   )
   let (_, _, direct_reuse_count) = @core.parse_tokens_indexed(
+    parser_test_source_id("parser-test.direct-parser-comparison"),
     new_source,
     new_tokens.length(),
     fn(i) { new_tokens[i].token },
@@ -529,11 +556,12 @@ test "parser reuse count compares against direct TokenBuffer parse path" {
   let old_source = "s(\"bd sd bd\")"
   let new_source = "s(\"bd bd\")"
   let edit = @core.Edit::delete(5, 8)
-  let parser = @loom.new_parser(old_source, mini_grammar)
-  parser.apply_edit(edit, new_source)
+  let parser = parser_test_new_parser(old_source)
+  parser_test_apply_edit(parser, edit, new_source)
   let after = parser.snapshot().read_or_abort()
 
   let buffer = @core.TokenBuffer::new_from_lex(
+    parser_test_source_id("parser-test.token-buffer"),
     new_source,
     lex_fn=lex,
     eof_token=EOF,
@@ -556,6 +584,7 @@ test "parser reuse count compares against direct TokenBuffer parse path" {
     old_token_cache=cache,
   )
   let (_, _, direct_reuse_count) = @core.parse_tokens_indexed(
+    parser_test_source_id("parser-test.direct-buffer-comparison"),
     new_source,
     buffer.token_count(),
     fn(i) { buffer.get_token(i) },
@@ -573,7 +602,11 @@ test "parser reuse count compares against direct TokenBuffer parse path" {
 
 ///|
 test "imperative parser reuse path matches direct deletion expectations" {
-  let parser = @loom.new_imperative_parser("s(\"bd sd bd\")", mini_grammar)
+  let parser = @loom.new_imperative_parser(
+    parser_test_source_id("parser-test.imperative"),
+    "s(\"bd sd bd\")",
+    mini_grammar,
+  )
   let _ = parser.parse()
   ignore(parser.edit(@core.Edit::delete(5, 8), "s(\"bd bd\")"))
   inspect(parser.get_last_reuse_count() > 0, content="true")
@@ -588,9 +621,13 @@ test "imperative parser reuse path matches direct deletion expectations" {
 
 ///|
 test "apply_edit inside method name still parses with zero diagnostics" {
-  let parser = @loom.new_parser("s(\"bd sd\").fast(2)", mini_grammar)
+  let parser = parser_test_new_parser("s(\"bd sd\").fast(2)")
   // Insert "er" between "fast" and "(" to produce ".faster(2)"
-  parser.apply_edit(@core.Edit::insert(15, 2), "s(\"bd sd\").faster(2)")
+  parser_test_apply_edit(
+    parser,
+    @core.Edit::insert(15, 2),
+    "s(\"bd sd\").faster(2)",
+  )
   inspect(parser.diagnostics().read_or_abort().length(), content="0")
   let after =
     #|["bd@[3,5)", "sd@[6,8)"]
@@ -602,9 +639,9 @@ test "apply_edit inside method name still parses with zero diagnostics" {
 
 ///|
 test "apply_edit deletion of postfix preserves zero diagnostics" {
-  let parser = @loom.new_parser("s(\"bd*2 sd\")", mini_grammar)
+  let parser = parser_test_new_parser("s(\"bd*2 sd\")")
   // Delete "*2" leaving `s("bd sd")`
-  parser.apply_edit(@core.Edit::delete(5, 7), "s(\"bd sd\")")
+  parser_test_apply_edit(parser, @core.Edit::delete(5, 7), "s(\"bd sd\")")
   inspect(parser.diagnostics().read_or_abort().length(), content="0")
   let after =
     #|["bd@[3,5)", "sd@[6,8)"]
@@ -614,9 +651,13 @@ test "apply_edit deletion of postfix preserves zero diagnostics" {
 
 ///|
 test "apply_edit insertion inside sub-notation brackets parses cleanly" {
-  let parser = @loom.new_parser("s(\"[bd sd]\")", mini_grammar)
+  let parser = parser_test_new_parser("s(\"[bd sd]\")")
   // Insert " hh" before the closing bracket to produce `s("[bd sd hh]")`
-  parser.apply_edit(@core.Edit::insert(9, 3), "s(\"[bd sd hh]\")")
+  parser_test_apply_edit(
+    parser,
+    @core.Edit::insert(9, 3),
+    "s(\"[bd sd hh]\")",
+  )
   inspect(parser.diagnostics().read_or_abort().length(), content="0")
   let after =
     #|["bd@[4,6)", "sd@[7,9)", "hh@[10,12)"]
@@ -626,9 +667,13 @@ test "apply_edit insertion inside sub-notation brackets parses cleanly" {
 
 ///|
 test "apply_edit across layer-comma keeps both layers parsing cleanly" {
-  let parser = @loom.new_parser("s(\"bd, sd\")", mini_grammar)
+  let parser = parser_test_new_parser("s(\"bd, sd\")")
   // Insert " hh" before the comma to produce `s("bd hh, sd")`
-  parser.apply_edit(@core.Edit::insert(5, 3), "s(\"bd hh, sd\")")
+  parser_test_apply_edit(
+    parser,
+    @core.Edit::insert(5, 3),
+    "s(\"bd hh, sd\")",
+  )
   inspect(parser.diagnostics().read_or_abort().length(), content="0")
   let after =
     #|["bd@[3,5)", "hh@[6,8)", "sd@[10,12)"]
