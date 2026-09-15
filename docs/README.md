@@ -22,7 +22,8 @@ This directory contains architecture blueprints, technical references, integrati
 - 🖥️ **Host-Independent MoonBit Target**: Direct programmatic API via `GraphEngine` (see [Root README](../README.md#host-independent-moonbit-api)).
 
 For a browser instrument, start with the
-[basic synth guide](../examples/basic-synth/README.md), then use the browser
+[basic synth guide](../examples/basic-synth/README.md), which provides Svelte
+and framework-free adapters over one shared core. Then use the browser
 contract's [graph lifecycle](browser-api-contract.md#rendering-and-lifecycle)
 and [live controls](browser-api-contract.md#live-controls) sections.
 MoonBit applications observing an existing JavaScript engine can use the

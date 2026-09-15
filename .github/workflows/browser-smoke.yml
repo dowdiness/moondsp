@@ -43,10 +43,10 @@ jobs:
       - name: Pack browser library
         run: npm run pack:browser
 
-      - name: Install fresh tarball and build standalone synth
+      - name: Install fresh tarball and build basic synth adapters
         working-directory: examples/basic-synth
         # Regenerated Wasm can differ between MoonBit toolchain versions.
-        # Refresh the local tarball's integrity before building its consumer.
+        # Refresh the local tarball's integrity before building its consumers.
         run: |
           npm install ../../packages/browser/moondsp-browser-0.6.0.tgz
           npm run build
@@ -54,8 +54,10 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Run standalone synth lifetime tests
-        run: npm run test:basic-synth
+      - name: Run synth lifetime tests
+        run: |
+          npm run test:vanilla-synth
+          npm run test:svelte-synth
 
       - name: Run browser smoke test
         run: npm run test:browser

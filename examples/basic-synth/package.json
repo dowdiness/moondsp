@@ -3,17 +3,24 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A small monophonic moondsp browser synth example.",
+  "description": "Framework-free and Svelte implementations of a monophonic moondsp browser synth.",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "dev:vanilla": "vite vanilla --config vanilla/vite.config.ts",
+    "dev:svelte": "vite svelte --config svelte/vite.config.ts",
+    "build": "npm run build:vanilla && npm run build:svelte",
+    "build:vanilla": "tsc --noEmit -p vanilla/tsconfig.json && vite build vanilla --config vanilla/vite.config.ts",
+    "build:svelte": "svelte-check --tsconfig ./svelte/tsconfig.json && vite build svelte --config svelte/vite.config.ts",
+    "preview:vanilla": "vite preview vanilla --config vanilla/vite.config.ts",
+    "preview:svelte": "vite preview svelte --config svelte/vite.config.ts"
   },
   "dependencies": {
     "@moondsp/browser": "file:../../packages/browser/moondsp-browser-0.6.0.tgz"
   },
   "devDependencies": {
-    "typescript": "^5.6.0",
-    "vite": "^5.4.0"
+    "@sveltejs/vite-plugin-svelte": "^7.3.0",
+    "svelte": "^5.57.0",
+    "svelte-check": "^4.7.6",
+    "typescript": "^6.0.3",
+    "vite": "^8.3.0"
   }
 }

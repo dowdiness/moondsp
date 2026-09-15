@@ -1,8 +1,8 @@
-import type { AudioActions, AudioView } from "./audio";
-import { controlView, cutoffFromInput, cutoffPosition, volumeFromInput, type ControlState } from "./controls";
-import { EMPTY_KEYBOARD, updateKeyboard, keyboardView, navigationView, type KeyboardEvent, type NoteAction } from "./keyboard";
-import { attempt, type Result } from "./result";
-import type { Settings } from "./synth";
+import type { AudioActions, AudioView } from "../../core/audio";
+import { controlView, cutoffFromInput, cutoffPosition, volumeFromInput, type ControlState } from "../../core/controls";
+import { EMPTY_KEYBOARD, updateKeyboard, keyboardView, navigationView, type KeyboardEvent, type NoteAction } from "../../core/keyboard";
+import { attempt, type Result } from "../../core/result";
+import type { Settings } from "../../core/synth";
 
 interface NoteElement {
   readonly button: HTMLButtonElement;
