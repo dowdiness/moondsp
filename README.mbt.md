@@ -188,6 +188,54 @@ fn[T : FilterSym] fm_synth() -> T {
 
 ---
 
+## Package Map & Architecture
+
+moondsp is structured as a stack of decoupled, platform-independent core packages, complemented by platform-specific adapters and frontends:
+
+```text
+[ mini ] (text notation & document parsing)
+   ↓
+[ pattern / song ] (exact rational time, event queries, arrangement)
+   ↓
+[ scheduler ] (event-to-voice scheduling & block quantization)
+   ↓
+[ voice ] / [ engine ] (polyphonic pools & host-independent graph engine)
+   ↓
+[ graph ] (topology validation, DAG compilation, hot-swap)
+   ↓
+[ dsp ] (primitives: buffers, oscillators, filters, envelopes)
+   ↑
+[ identity ] (stable node IDs & monotonic revisions for live editing)
+```
+
+### Core Engine (Platform-Agnostic)
+
+| Package | Role & Responsibility | Key Types / Entry Points |
+|---|---|---|
+| [`dsp/`](dsp/README.mbt.md) | Sample buffers, oscillators, envelopes, biquad filters, delay lines, gain, clip, pan, and tagless DSP traits | `DspContext`, `AudioBuffer`, `Oscillator`, `Adsr`, `Biquad`, `DelayLine`, `Pan`, `ArithSym`, `DspSym` |
+| [`graph/`](graph/README.mbt.md) | DAG compilation, topological sorting, runtime controls, block-boundary hot-swap, and topology editing | `DspNode`, `CompiledTemplate`, `CompiledDsp`, `CompiledStereoDsp`, `GraphControl`, `CompiledDspHotSwap`, `GraphTemplateDoc` |
+| [`engine/`](engine/README.mbt.md) | Host-independent graph lifecycle management, typed mount handles, and multi-graph mono buffer mixing | `GraphEngine`, `MountedGraph`, `GraphEngineError` |
+| [`voice/`](voice/README.mbt.md) | Polyphonic voice pool with priority voice stealing, generation handles, ADSR lifecycle, and equal-power stereo panning | `VoicePool`, `BoundVoicePool`, `VoiceHandle`, `VoiceState`, `NoteGate` |
+| [`identity/`](identity/README.mbt.md) | Type-safe stable node identifiers and monotonic revision tokens for structural live-editing trees | `GraphNodeId`, `PatternNodeId`, `SectionId`, `SectionLayerId`, `OccurrenceId`, `Revision` |
+| [`pattern/`](pattern/README.mbt.md) | Queryable musical pattern algebra with exact `Rational` time, polyrhythmic combinators, and `ControlMap` events | `Pat[A]`, `Rational`, `TimeSpan`, `Event[A]`, `ControlMap`, `sequence`, `stack`, `merge_control`, `PatternDoc` |
+| [`mini/`](mini/README.mbt.md) | Mini-notation parser turning concise live-coding text into `Pat[ControlMap]`, `Song[ControlMap]`, or incremental documents | `parse`, `parse_song`, `parse_song_with_bpm`, `parse_doc`, `parse_snapshot`, `MiniAuthoringPipeline` |
+| [`song/`](song/README.mbt.md) | Macro-level musical structure arranging patterns into length-bounded sections, layers, parts, and local `TimeScope` | `Song[A]`, `Section[A]`, `SongPart[A]`, `TimeScope`, `SongDoc[A]`, `SongSnapshot[A]` |
+| [`scheduler/`](scheduler/README.mbt.md) | Audio block quantization, tempo clock, note lifecycle tracking, and voice-scope reconciliation | `PatternScheduler`, `PlaybackSnapshot`, `BlockFrame`, `PatternVoiceScope`, `SongVoiceScope` |
+
+### Platform Adapters & Native Scaffolding
+
+| Package / Directory | Role & Responsibility | Key Files / Entry Points |
+|---|---|---|
+| [`browser/`](browser/README.md) | AudioWorklet export ABI and WASM-to-JS transport adapter (128-frame quantum, JSON decoding, named params) | `graph_host_*`, `scheduler_*`, `get_browser_*`, `browser_abi.baseline` |
+| [`packages/browser/`](packages/browser/README.md) | Local distribution bundle for `@moondsp/browser` (TypeScript declarations, JS API wrapper, processor, release Wasm) | `GraphEngine`, `GraphDescription`, `GraphControl` |
+| [`examples/basic-synth/`](examples/basic-synth/README.md) | Standalone monophonic synth demo consuming `@moondsp/browser` with keyboard priority and reactive UI | `SYNTH_GRAPH`, `noteOn`, `noteOff`, `startApplication` |
+| [`clap_engine/`](clap_engine/README.mbt.md) | Polyphonic subtractive synth engine core tailored for CLAP plugins (preallocated voices, note ID / wildcard matching) | `ClapSynthEngine`, `CLAP_PARAM_*`, `default_synth_template` |
+| [`clap_host/`](clap_host/README.mbt.md) | Flat primitive integer-handle C-ABI bridge exposing scalar getters/setters without object leaking | `engine_create`, `engine_destroy`, `engine_note_on`, `engine_process`, `engine_set_param` |
+| [`clap_plugin/`](clap_plugin/README.md) | Native CLAP plugin payload, C ABI shim, build scripts, and `clap-validator` automation | `moondsp_clap.c`, `moondsp_clap_moonbit.h`, `clap_payload.mbt` |
+| [`cmd/main/`](cmd/main/) | Headless CLI entry point for testing, batch rendering, and offline experiments | `cmd/main/main.mbt` |
+
+---
+
 ## Repository layout
 
 The codebase strictly decouples platform-agnostic core engines from platform-specific host adapters:
@@ -250,76 +298,5 @@ NEW_MOON_MOD=0 moon check --target all --deny-warn
 NEW_MOON_MOD=0 moon test --target all --deny-warn
 
 # Test specific packages
-NEW_MOON_MOD=0 moon test .
-NEW_MOON_MOD=0 moon test pattern
 
-# Format code and regenerate interfaces
-NEW_MOON_MOD=0 moon info && NEW_MOON_MOD=0 moon fmt
-
-# Run microbenchmarks
-NEW_MOON_MOD=0 moon bench graph/graph_benchmark.mbt --release
-
-# Install browser verification tools and Chromium
-npm ci
-npm --prefix web/live ci
-npx playwright install chromium
-
-# Check public JS/TS usage, then run browser tests (builds wasm-gc first)
-npm run typecheck:graph
-NEW_MOON_MOD=0 npm run test:browser
-```
-
-The project follows an incremental edit discipline: run `NEW_MOON_MOD=0 moon check` after edits and resolve errors before proceeding.
-The synth has a separate suite: build and install its tarball using the quick
-start above, then run `npm run test:basic-synth` from the repository root.
-The JS-target MoonBit module is verified separately with
-`NEW_MOON_MOD=0 npm run test:browser-host`; it is not included in root-module
-MoonBit tests.
-
----
-
-## Documentation
-
-Start at the **[docs index](docs/README.md)**, which categorizes materials by role:
-
-- **[Technical reference](docs/technical-reference.md)** — Node types, parameter slots, runtime control surface (authoritative for graph runtime-control behavior)
-- **[Browser API contract](docs/browser-api-contract.md)** — Graph descriptions, atomic controls, engine lifetime, cancellation, and distribution
-- **[Basic synth guide](examples/basic-synth/README.md)** — Power lifecycle, resource ownership, setup, and verification
-- **[Mini-notation guide](docs/mini-notation.md)** — Pattern syntax, grouping, and method chaining
-- **[Blueprint](docs/blueprint.md)** — Complete architectural vision, design principles, and multi-target roadmap
-- **[Architecture decisions (ADRs)](docs/decisions/)** — Short records explaining why key architectural choices were made
-- **[Next actions](docs/next-actions.md)** — Active handoff list for upcoming priorities
-- **[`CLAUDE.md`](CLAUDE.md)** — Project conventions and contributor cheat sheet
-
----
-
-## Project status
-
-| Phase | Status | Summary |
-|:---|:---|:---|
-| **0 — Platform proof** | Complete | MoonBit `wasm-gc` runs in browser AudioWorklet |
-| **1 — DSP primitives** | Complete | Oscillators, filters, envelopes, delay, pan, clip |
-| **2 — Graph compiler** | Complete | Compiled graphs, hot-swap, topology editing, stereo |
-| **3 — Voice management** | Complete | 32+ voice pool with priority stealing & stereo mix |
-| **4 — Pattern engine** | Complete | Rational time, combinators, ControlMap |
-| **5 — Pattern × DSP** | Complete | `scheduler/` + `mini/` wire pattern events to voice allocation |
-| **6 — incr integration**| In progress | Stable identity plus initial pattern/song authoring groundwork |
-| **7+ — Native & Frontends**| Prototype | Browser live UI & CLAP plugin prototype available; DAW production gates underway |
-
----
-
-## Acknowledgments & Prior Art
-
-`moondsp` builds upon concepts pioneered by several remarkable open-source projects in computer music, live coding, and audio synthesis:
-
-- **[kabelsalat](https://codeberg.org/froos/kabelsalat)** by Felix Roos (`froos`) — Demonstrated high-performance DSP graph compilation and real-time execution in Web AudioWorklet.
-- **[Noisecraft](https://noisecraft.app/)** by Maxime Chevalier-Boisvert — Pioneer in topological DSP graph flattening and in-browser visual synthesis.
-- **[Strudel](https://strudel.cc/)** & **[TidalCycles](https://tidalcycles.org/)** by Alex McLean, Felix Roos, and the live coding community — Foundational models for rational-time queryable pattern algebra, cyclic arcs, and mini-notation.
-- **[FAUST](https://faust.grame.fr/)** & **[mimium](https://mimium.org/)** — Inspiration for functional audio signal processing and tagless DSP algebra.
-- **[CLAP](https://cleveraudio.org/)** (Clever Audio Plug-in) — The modern, open native audio plugin standard enabling DAW integration beyond the browser.
-
----
-
-## License
-
-[Apache-2.0](LICENSE)
+[Showing lines 1-300 of 350. Use :301 to continue]

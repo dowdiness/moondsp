@@ -4,6 +4,42 @@
 It owns sample buffers, oscillators, envelopes, filters, delays, mixing, pan,
 and parameter smoothing. Graph compilation belongs to the `graph` package.
 
+## Architecture context
+
+In moondsp's layered design, `dsp` is the foundational, platform-independent
+signal processing leaf layer:
+
+```text
+[ mini ] (text notation)
+   ↓
+[ pattern / song ] (musical time & event streams)
+   ↓
+[ scheduler ] (event-to-voice scheduling)
+   ↓
+[ voice ] / [ engine ] (voice allocation & mixing)
+   ↓
+[ graph ] (topology validation & compilation)
+   ↓
+[ dsp ] ← (primitives: buffers, oscillators, filters, envelopes)
+```
+
+- **Upstream consumers**: [`graph/`](../graph/) compiles DAG nodes down to
+  reusable `dsp` primitives; [`voice/`](../voice/) and [`engine/`](../engine/)
+  orchestrate block-level processing across preallocated buffers.
+- **Downstream dependencies**: None. `dsp` is a pure leaf package with no
+  dependencies on graph topologies, voices, timing, or host platforms.
+
+## API quick reference
+
+| Category | Types / Primitives | Key operations |
+|---|---|---|
+| **Context & Buffers** | `DspContext`, `AudioBuffer` | `DspContext::make_buffer`, `AudioBuffer::filled`, `AudioBuffer::adopt`, `AudioBuffer::fill`, `AudioBuffer::set`, `AudioBuffer::get`, `AudioBuffer::all`, `AudioBuffer::any`, `sanitize_buffer` |
+| **Generators** | `Oscillator`, `Noise`, `Waveform` | `Oscillator::process_waveform`, `Oscillator::process`, `Oscillator::tick`, `Noise::process`, `Noise::tick`, `Noise::reset` |
+| **Envelopes & Modulation** | `Adsr`, `ParamSmoother`, `EnvStage` | `Adsr::gate_on`, `Adsr::gate_off`, `Adsr::process`, `Adsr::tick`, `Adsr::set_parameters`, `ParamSmoother::set_target`, `ParamSmoother::tick`, `ParamSmoother::current` |
+| **Filters & Space** | `Biquad`, `BiquadMode`, `Pan`, `StereoReverb` | `Biquad::update`, `Biquad::process`, `Biquad::tick`, `Pan::process`, `pan_left_gain`, `pan_right_gain`, `StereoReverb::process` |
+| **Dynamics & Routing** | `Gain`, `Mix`, `Clip`, `DelayLine` | `Gain::process`, `Mix::process`, `Clip::process`, `DelayLine::process`, `DelayLine::tick`, `DelayLine::set_feedback`, `max_feedback_amount` |
+| **Algebraic Patching** | `ArithSym`, `DspSym`, `FilterSym`, `DelaySym`, `StereoSym` | Finally-tagless traits: `constant`, `oscillator`, `adsr`, `biquad`, `delay`, `pan`, `output` |
+
 ## Process one block
 
 `DspContext` carries the sample rate and block size. `AudioBuffer` wraps a

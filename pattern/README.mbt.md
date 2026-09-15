@@ -3,6 +3,45 @@
 `pattern` describes what happens in musical time. It has no dependency on DSP
 graphs, voices, schedulers, or browser APIs.
 
+## Architecture context
+
+In moondsp's layered design, `pattern` represents pure musical time and event
+streams, situated between text notation and audio-rate scheduling:
+
+```text
+[ mini ] (text notation & document parsing)
+   ↓
+[ pattern ] ← (exact rational time, event queries, combinators, docs)
+   ↓
+[ song ] (structural section layout & arrangement)
+   ↓
+[ scheduler ] (event-to-voice scheduling & block quantization)
+   ↓
+[ voice ] / [ engine ] (voice allocation & mixing)
+   ↓
+[ graph ] (topology validation & compilation)
+   ↓
+[ dsp ] (primitives: buffers, oscillators, filters, envelopes)
+```
+
+- **Upstream consumers**: [`mini/`](../mini/) parses mini notation strings
+  into `Pat[ControlMap]` or `PatternDoc[ControlMap]`.
+- **Downstream dependencies**: [`identity/`](../identity/) provides stable node
+  identifiers and revisions for `PatternDoc`. [`song/`](../song/) and
+  [`scheduler/`](../scheduler/) consume patterns over time spans. `pattern` has
+  zero dependencies on DSP, audio buffers, voices, or host runtimes.
+
+## API quick reference
+
+| Category | Types | Key operations |
+|---|---|---|
+| **Musical Time** | `Rational`, `TimeSpan`, `TimeTransform` | `Rational::from_int`, `Rational::to_double`, `TimeSpan::duration`, `TimeSpan::contains`, `TimeSpan::intersect`, `TimeSpan::shift`, `TimeTransform::apply` |
+| **Core Query & Events** | `Pat[A]`, `Event[A]` | `Pat::pure`, `Pat::silence`, `Pat::from_query`, `Pat::query`, `Pat::same_content`, `Event::shift` |
+| **Combinators** | `sequence`, `stack`, `merge_control`, `+` | `sequence`, `stack`, `merge_control`, `Pat::entries`, `Pat::named_entry`, `Pat::select_control` |
+| **Time Transforms** | `Pat[A]` methods | `Pat::fast`, `Pat::slow`, `Pat::rev`, `Pat::euclid`, `Pat::degrade_by`, `every`, `Pat::gate`, `Pat::jux`, `Pat::filter_map` |
+| **Control Helpers** | `ControlMap`, helper functions | `note`, `note_name`, `chord`, `sound`, `control`, `s_gain`, `s_cutoff`, `s_pan`, `ControlMap::get`, `ControlMap::set`, `ControlMap::merge` |
+| **Document & Identity** | `PatternDoc[A]`, `PatternSnapshot[A]`, `PatternLoweringCache[A]` | `PatternDoc::from_pattern`, `PatternDoc::pure`, `PatternDoc::sequence`, `PatternDoc::stack`, `PatternDoc::lower`, `PatternDoc::lower_with_cache`, `PatternSnapshot::query` |
+
 A pattern is a query:
 
 ```text

@@ -10,6 +10,42 @@ The package owns parsing and source identity. It does not choose DSP graphs or
 instruments. Parsed events contain controls such as `sound`, `note`, `pan`, and
 `room`; the scheduler and host decide how those controls affect audio.
 
+## Architecture context
+
+In moondsp's layered design, `mini` is the top-level text-to-pattern authoring
+surface:
+
+```text
+[ mini ] ← (text notation, document parsing, lowering cache)
+   ↓
+[ pattern / song ] (exact rational time, event queries, combinators)
+   ↓
+[ scheduler ] (event-to-voice scheduling & block quantization)
+   ↓
+[ voice ] / [ engine ] (voice allocation & mixing)
+   ↓
+[ graph ] (topology validation & compilation)
+   ↓
+[ dsp ] (primitives: buffers, oscillators, filters, envelopes)
+```
+
+- **Upstream consumers**: Web editors (e.g. `web/live/`), REPLs, and live-coding
+  interfaces pass text code directly to `mini`.
+- **Downstream dependencies**: [`pattern/`](../pattern/) provides `Pat[ControlMap]`,
+  `Rational`, and `PatternDoc`; [`song/`](../song/) provides `Song[ControlMap]`
+  layouts; [`identity/`](../identity/) supplies node IDs for live-editing trees.
+  `mini` has zero dependencies on audio buffers, DSP, or voice pools.
+
+## API quick reference
+
+| Category | Types / Functions | Key operations |
+|---|---|---|
+| **Text Parsing** | `parse`, `parse_song`, `parse_song_with_bpm` | Parse string into `Pat[ControlMap]`, `Song[ControlMap]`, or `ParsedSong` |
+| **Document & Live Editing** | `parse_doc`, `parse_snapshot`, `MiniAuthoringPipeline` | Parse identity-bearing `PatternDoc`, lower snapshots, or drive incremental live-update authoring |
+| **Incremental Pipeline** | `MiniAuthoringPipeline` | `MiniAuthoringPipeline::new`, `MiniAuthoringPipeline::set_input`, `MiniAuthoringPipeline::set_input_with_source_edit`, `MiniAuthoringPipeline::parse_doc`, `MiniAuthoringPipeline::parse_snapshot`, `MiniAuthoringPipeline::dispose` |
+| **Programmatic Doc Building** | `MiniDocBuilder` | `MiniDocBuilder::with_previous`, `MiniDocBuilder::sound_atom`, `MiniDocBuilder::note_atom`, `MiniDocBuilder::sequence`, `MiniDocBuilder::fast` |
+| **Song & Utilities** | `ParsedSong`, `drum_midi` | `ParsedSong::song`, `ParsedSong::bpm`, `drum_midi` |
+
 ## Choose an entry point
 
 | Function | Use it when you need |

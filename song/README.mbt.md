@@ -4,6 +4,42 @@
 sections on a long-form timeline. It remains generic in the event payload and
 does not depend on DSP, voices, or browser code.
 
+## Architecture context
+
+In moondsp's layered design, `song` models macro-level musical structure
+between pattern queries and the scheduler:
+
+```text
+[ mini ] (text notation: song(section(...), part(...)))
+   ↓
+[ song ] ← (sections, parts, time scopes, macro arrangements)
+   ↓
+[ scheduler ] (event-to-voice scheduling & block quantization)
+   ↓
+[ voice ] / [ engine ] (voice allocation & mixing)
+   ↓
+[ graph ] (topology validation & compilation)
+   ↓
+[ dsp ] (primitives: buffers, oscillators, filters, envelopes)
+```
+
+- **Upstream consumers**: [`mini/`](../mini/) parses `parse_song` and
+  `parse_song_with_bpm` expressions into `Song[ControlMap]` layouts.
+- **Downstream dependencies**: [`pattern/`](../pattern/) provides the underlying
+  `Pat[A]`, `Rational`, and `TimeSpan` query types. `song` has zero dependencies
+  on DSP buffers, synthesis graphs, or audio hardware.
+
+## API quick reference
+
+| Category | Types | Key operations |
+|---|---|---|
+| **Song Composition** | `Song[A]`, `Section[A]`, `SongPart[A]` | `Song::Song`, `Song::from_sections`, `Section::Section`, `Section::from_pattern`, `SongPart::SongPart`, `SongPart::at` |
+| **Section & Layers** | `Section[A]`, `SectionBody[A]`, `SectionLayer[A]` | `Section::layer`, `Section::get_layer`, `Section::body`, `Section::query`, `Section::apply_patch` |
+| **Timeline & Occurrence** | `Song[A]`, `SectionOccurrence[A]` | `Song::duration`, `Song::occurrences`, `Song::occurrence_at`, `Song::query`, `SectionOccurrence::span` |
+| **Time Scopes** | `TimeScope` | `TimeScope::TimeScope`, `TimeScope::identity`, `TimeScope::at_rate`, `TimeScope::fast`, `TimeScope::slow` |
+| **Live Editing & Documents** | `SongDoc[A]`, `SectionDoc[A]`, `SongSnapshot[A]` | `SongDoc::SongDoc`, `SongDoc::to_song`, `SongDoc::lower`, `SectionDoc::to_section`, `SongSnapshot::query` |
+| **Errors** | `SongBuildError`, `SongDocEditError`, `SectionDocBuildError` | `SongBuildError::EmptySong`, `DuplicateOccurrence`, `DuplicateOccurrenceId`, `InvalidOccurrenceId` |
+
 ## Build a section
 
 `Section[A]` gives a pattern a name, duration in cycles, and local `TimeScope`.

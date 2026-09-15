@@ -8,6 +8,43 @@ replacement is accepted at the next block boundary. Normal browser edits keep
 sounding voices and defer changed material until its next entry. The explicit
 voice-control helpers below are separate operations.
 
+## Architecture context
+
+In moondsp's layered design, `scheduler` translates musical events into
+sample-accurate audio voice triggers across block boundaries:
+
+```text
+[ mini ] (text notation)
+   ↓
+[ pattern / song ] (musical time & event streams)
+   ↓
+[ scheduler ] ← (event-to-voice scheduling & block quantization)
+   ↓
+[ voice ] (polyphonic voice allocation & mixing)
+   ↓
+[ graph ] (topology validation & compilation)
+   ↓
+[ dsp ] (primitive state & buffer processing)
+```
+
+- **Upstream consumers**: `browser/internal/playback_host` drives live browser
+  playback through staged snapshots; custom hosts feed `Pat[ControlMap]` or
+  `Song[ControlMap]` instances into the scheduler.
+- **Downstream dependencies**: [`voice/`](../voice/) receives dispatched note
+  events, gates, and controls; [`pattern/`](../pattern/) and [`song/`](../song/)
+  supply time intervals and queryable event streams; [`dsp/`](../dsp/) defines
+  the sample rate and block capacity.
+
+## API quick reference
+
+| Category | Types | Key operations |
+|---|---|---|
+| **Scheduler Engine** | `PatternScheduler` | `PatternScheduler::new`, `PatternScheduler::process_block`, `PatternScheduler::process_song_block`, `PatternScheduler::process_playback_snapshot_block` |
+| **Playback & Snapshots** | `PatternScheduler`, `PlaybackSnapshot` | `PatternScheduler::queue_playback_snapshot`, `PatternScheduler::queue_pattern_snapshot`, `PatternScheduler::queue_song_snapshot`, `PlaybackSnapshot::pattern`, `PlaybackSnapshot::song`, `PlaybackSnapshot::query` |
+| **Timing & Transport** | `PatternScheduler`, `BlockFrame`, `PerformanceTime` | `PatternScheduler::set_bpm`, `PatternScheduler::bpm`, `PatternScheduler::current_block`, `PatternScheduler::sample_at`, `PatternScheduler::sample_counter`, `PatternScheduler::reset_transport` |
+| **Voice Scopes & Reconciliation** | `PatternVoiceScope`, `SongVoiceScope`, `ActiveVoiceEffect` | `PatternVoiceScope::node`, `SongVoiceScope::section`, `SongVoiceScope::occurrence`, `PatternScheduler::apply_pattern_voice_effect_result`, `PatternScheduler::apply_song_voice_effect_result` |
+| **Controls & Notes** | `ControlMapper`, `VoiceControlBatch` | `default_control_mapper`, `ControlMapper::new`, `PatternScheduler::push_active_note`, `PatternScheduler::expire_notes`, `PatternScheduler::active_note_count` |
+
 ## Transport
 
 `PatternScheduler::new` validates the tempo and DSP context and returns a

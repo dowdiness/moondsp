@@ -4,6 +4,36 @@
 JSON, or a host registry. It mounts canonical `DspNode` arrays, returns typed
 handles, and mixes every playing graph into one caller-owned `AudioBuffer`.
 
+## Architecture context
+
+In moondsp's layered design, `engine` sits alongside `voice` as an orchestrator
+of compiled graphs, providing host-independent mounting and buffer mixing:
+
+```text
+[ Browser Worklet / Native CLI / Game Runtime ]
+   ↓
+[ engine ] ← (host-independent graph lifecycle, mounts, mixing)
+   ↓
+[ graph ] (topology validation & compilation)
+   ↓
+[ dsp ] (primitive state & buffer processing)
+```
+
+- **Upstream consumers**: `browser/` uses `GraphEngine` to fulfill browser
+  mount requests; CLI tools and standalone MoonBit applications embed
+  `GraphEngine` directly for headless audio rendering.
+- **Downstream dependencies**: [`graph/`](../graph/) compiles DAG templates and
+  provides `CompiledDsp` runtimes; [`dsp/`](../dsp/) supplies `DspContext` and
+  `AudioBuffer`. `engine` has zero dependencies on browser globals or JSON.
+
+## API quick reference
+
+| Category | Types | Key operations |
+|---|---|---|
+| **Lifecycle & Mixing** | `GraphEngine` | `GraphEngine::new`, `GraphEngine::mount`, `GraphEngine::process`, `GraphEngine::close` |
+| **Mounted Sound** | `MountedGraph` | `MountedGraph::play`, `MountedGraph::pause`, `MountedGraph::unmount`, `MountedGraph::apply_controls` |
+| **Errors** | `GraphEngineError` | `InvalidConfiguration`, `EngineClosed`, `MountClosed`, `CapacityExceeded`, `InvalidHandle`, `InvalidGraph`, `BufferSizeMismatch`, `ControlRejected` |
+
 ## Mount and play a graph
 
 Construct an engine with a `DspContext`. Mounting validates and compiles the
