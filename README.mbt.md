@@ -193,19 +193,16 @@ fn[T : FilterSym] fm_synth() -> T {
 moondsp is structured as a stack of decoupled, platform-independent core packages, complemented by platform-specific adapters and frontends:
 
 ```text
-[ mini ] (text notation & document parsing)
-   ↓
-[ pattern / song ] (exact rational time, event queries, arrangement)
-   ↓
-[ scheduler ] (event-to-voice scheduling & block quantization)
-   ↓
-[ voice ] / [ engine ] (polyphonic pools & host-independent graph engine)
-   ↓
-[ graph ] (topology validation, DAG compilation, hot-swap)
-   ↓
-[ dsp ] (primitives: buffers, oscillators, filters, envelopes)
-   ↑
-[ identity ] (stable node IDs & monotonic revisions for live editing)
+Musical authoring and playback:
+[ mini ] → [ pattern / song ] → [ scheduler ] → [ voice ] → [ graph ] → [ dsp ]
+
+Host-controlled graph playback:
+[ browser / custom host ] → [ engine ] → [ graph ] → [ dsp ]
+
+Shared authoring identity:
+[ identity ] → [ pattern ]
+             → [ song ]
+             → [ graph ]
 ```
 
 ### Core Engine (Platform-Agnostic)

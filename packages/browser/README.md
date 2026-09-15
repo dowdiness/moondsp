@@ -23,7 +23,7 @@ In moondsp's web integration architecture, `@moondsp/browser` acts as the primar
 ```
 
 - **Upstream applications**: Web synthesizers, interactive music tools, or live-coding playgrounds (e.g. [`examples/basic-synth/`](../../examples/basic-synth/README.md)).
-- **Host wrapper (`dist/graph-engine.js`)**: Manages `AudioContext` lifecycles, AudioWorklet module registration, asynchronous message posting, promise-based admissions, typed error translation (`GraphEngineError`), and cancellation.
+- **Host wrapper (`dist/graph-engine.js`)**: Validates and observes the caller-owned `AudioContext`, registers the AudioWorklet module, posts asynchronous messages, tracks promise-based admissions, translates typed errors (`GraphEngineError`), and handles cancellation.
 - **AudioWorklet (`dist/graph-processor.js`)**: Executes the audio render loop on the browser's dedicated high-priority audio thread.
 - **WebAssembly payload (`dist/moonbit_dsp.wasm`)**: Standalone `wasm-gc` binary compiled from `browser/`, containing the full DSP and graph engine.
 - **MoonBit host bindings**: A companion MoonBit JS-target lifetime binding is available in [`packages/browser/host/`](host/) (`dowdiness/moondsp-browser-host`) for MoonBit applications observing a JavaScript engine.
@@ -158,7 +158,7 @@ if (exit.type === "failed") {
 
 ## Requirements & Environment
 
-- **Browser**: Modern browser supporting WebAssembly Garbage Collection (**Wasm-GC**) and **AudioWorklet** (Chrome/Chromium 119+, Firefox 120+, Safari 17.4+).
+- **Browser**: A modern browser supporting WebAssembly Garbage Collection (**Wasm-GC**) and **AudioWorklet** (Chrome/Chromium 119+, Firefox 120+, Safari 18.2+).
 - **Context**: Must be served in a secure context (`https://` or `http://localhost`). `file://` execution is not supported.
 - **CSP**: Content Security Policy must allow WebAssembly compilation (`'wasm-unsafe-eval'` or `'unsafe-eval'`).
 
