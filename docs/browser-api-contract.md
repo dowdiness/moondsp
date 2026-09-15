@@ -732,14 +732,21 @@ Missing assets currently produce sync warnings rather than a failing exit;
 read the output and do not treat an old public/dist copy as a successful build.
 When using an already-running dev server after a worklet/WASM edit, rerun
 `npm --prefix web/live run sync:assets` and reload the page to create a fresh
-worklet. For production-preview verification, stop an older preview server
-on port 5181 before testing, so Playwright cannot reuse a different checkout.
+worklet. Playwright never reuses an existing preview server, because that could
+silently test assets from another checkout. Override the default port when it is
+already occupied:
+
+```bash
+MOONDSP_LIVE_PLAYWRIGHT_PORT=5191 \
+  MOONDSP_VIRTUAL_AUDIO=1 npm --prefix web/live test -- --retries=0
+```
+
+The root graph suite similarly accepts `MOONDSP_PLAYWRIGHT_PORT`; the basic
+synth suite accepts `MOONDSP_BASIC_SYNTH_PLAYWRIGHT_PORT`.
 
 ### Automated rendering without an audio device
 
-```bash
-MOONDSP_VIRTUAL_AUDIO=1 npm --prefix web/live test -- --retries=0
-```
+The command above enables virtual audio output for the live suite.
 
 The live Playwright configuration adds Chromium's `--disable-audio-output`
 only when `MOONDSP_VIRTUAL_AUDIO=1`. Chromium supplies virtual output timing;
