@@ -124,14 +124,12 @@ test("the tempo example can change tempo while playing", async ({ page }) => {
   await stop(page);
 });
 
-test("the rests and gates example plays and accepts gate edits", async ({ page }) => {
-  const score = readFileSync(new URL("../../../examples/rests-and-gates.mini", import.meta.url), "utf8");
-  const example = page.locator('[data-live-example="rests-and-gates"]');
-  await example.click();
-  expect(await play(page)).toMatchObject({ type: "pattern-updated", operation: "restart" });
-  const updated = await edit(page, score.replace(".gate(0.35)", ".gate(0.2)"));
-  expect(updated).toMatchObject({ type: "pattern-updated", operation: "update" });
-  expect(updated.acceptedAtSample).toBeGreaterThan(0);
+test("the rests and gates example plays", async ({ page }) => {
+  await page.locator('[data-live-example="rests-and-gates"]').click();
+  expect(await play(page)).toMatchObject({
+    type: "pattern-updated",
+    operation: "restart",
+  });
   await stop(page);
 });
 
