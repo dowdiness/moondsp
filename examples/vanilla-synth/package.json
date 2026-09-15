@@ -1,9 +1,9 @@
 {
-  "name": "@moondsp/basic-synth-example",
+  "name": "@moondsp/vanilla-synth-example",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A small monophonic moondsp browser synth example.",
+  "description": "A small monophonic moondsp browser synth example in vanilla TypeScript.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

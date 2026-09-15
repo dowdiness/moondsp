@@ -15,7 +15,7 @@ For a new application, choose the public entry point rather than the raw ABI:
 
 | Application | Entry point |
 | --- | --- |
-| JavaScript or TypeScript instrument | `@moondsp/browser`; see [local distribution](#standalone-basic-synth-and-local-distribution) |
+| JavaScript or TypeScript instrument | `@moondsp/browser`; see [local distribution](#standalone-synth-examples-and-local-distribution) |
 | Repository-hosted browser integration | `web/graph-engine.js`; see [the external graph API](#external-graph-entry-point) |
 | MoonBit code observing an existing JS engine | The separate [JS-host lifetime module](#moonbit-lifetime-observation-on-the-js-host) |
 | Host-independent MoonBit rendering | Root-package `GraphEngine`; see [the engine contract](technical-reference.md#354-host-independent-graph-engine) |
@@ -82,7 +82,7 @@ This example separates mounting from the later Play gesture. For a single
 Power on gesture, call `context.resume()` before the first asynchronous wait
 so loading cannot consume the user activation. After admission, suspend the
 context again before creating the engine and mounting; start the graph, then
-resume and connect output. The [basic synth owner](../examples/basic-synth/src/audio.ts)
+resume and connect output. The [vanilla synth owner](../examples/vanilla-synth/src/audio.ts)
 implements that sequence, including cancellation during partial initialization
 and cleanup on failure. The engine itself does not perform browser admission.
 
@@ -388,16 +388,17 @@ virtual audio output. This is automated PCM/lifecycle evidence, not a
 hardware listening verdict or a hard-real-time allocation/GC audit.
 `OfflineAudioContext` here is a verification host, not a file-rendering API.
 
-### Standalone basic synth and local distribution
+### Standalone synth examples and local distribution
 
-[`examples/basic-synth`](../examples/basic-synth/README.md) consumes the package
-root `@moondsp/browser` only. It provides a monophonic keyboard, volume and
-filter controls, and one Power on / Power off button. It starts without an
-`AudioContext`; Power on performs admission, loading, and playback. Power off
-cancels partial initialization or closes the full app-owned session. Processor
-failure is observed immediately through `engine.wait()`; the same Power on
-button starts a fresh session. The example does not implement a Worklet or
-reach into the browser ABI.
+[`examples/vanilla-synth`](../examples/vanilla-synth/README.md) and
+[`examples/svelte-synth`](../examples/svelte-synth/README.md) consume only the
+package root `@moondsp/browser`. They provide the same monophonic keyboard,
+volume and filter controls, and single Power on / Power off button. The vanilla
+example exposes the framework-free DOM boundary; the Svelte example renders the
+same state and gestures declaratively. Both start without an `AudioContext`,
+cancel partial initialization on Power off, close the full app-owned session,
+observe processor failure immediately through `engine.wait()`, and retry with a
+fresh session. Neither implements a Worklet nor reaches into the browser ABI.
 
 `npm run pack:browser` builds release Wasm and packs
 `packages/browser/moondsp-browser-0.6.0.tgz`. The tarball contains the matching
@@ -406,17 +407,18 @@ distribution artifact, not a claim that the package is published to npm.
 Consumers install the tarball without MoonBit; only maintainers building the
 tarball need the MoonBit toolchain.
 
-The Vite example excludes the ESM package from development pre-bundling so
+Both Vite examples exclude the ESM package from development pre-bundling so
 relative asset URLs remain attached to their module. Production builds emit
 Wasm and Worklet files separately, with a relative base for subdirectory
 deployment. No application-side asset copy script is required.
 
-After rebuilding the tarball, reinstall it in `examples/basic-synth` and restart
-the development server so it serves the new package. Do not combine an old
-installed package with freshly built loose Worklet or Wasm files. The
-[example guide](../examples/basic-synth/README.md#maintainer-setup) includes
-installation commands; its [verification section](../examples/basic-synth/README.md#verification)
-covers failure recovery, cancellation, delayed activation, and release tails.
+After rebuilding the tarball, reinstall it in the example directory you are
+running and restart the development server so it serves the new package. Do not
+combine an old installed package with freshly built loose Worklet or Wasm files.
+The [vanilla guide](../examples/vanilla-synth/README.md#maintainer-setup) and
+[Svelte guide](../examples/svelte-synth/README.md#maintainer-setup) include
+installation commands and verification coverage for failure recovery,
+cancellation, delayed activation, and release tails.
 
 ## Supported facade groups
 
@@ -754,8 +756,9 @@ MOONDSP_LIVE_PLAYWRIGHT_PORT=5191 \
   MOONDSP_VIRTUAL_AUDIO=1 npm --prefix web/live test -- --retries=0
 ```
 
-The root graph suite similarly accepts `MOONDSP_PLAYWRIGHT_PORT`; the basic
-synth suite accepts `MOONDSP_BASIC_SYNTH_PLAYWRIGHT_PORT`.
+The root graph suite similarly accepts `MOONDSP_PLAYWRIGHT_PORT`; the vanilla
+and Svelte synth suites accept `MOONDSP_VANILLA_SYNTH_PLAYWRIGHT_PORT` and
+`MOONDSP_SVELTE_SYNTH_PLAYWRIGHT_PORT`, respectively.
 
 ### Automated rendering without an audio device
 

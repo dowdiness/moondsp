@@ -30,8 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for tempo-relative note lengths from 0 through 1 without moving onsets.
 - Added live Examples for an overlay groove and a 20-second grouping comparison,
   demonstrating `+` layers and parenthesized transforms with playable Mini scores.
-- Added `examples/basic-synth`, a standalone TypeScript/Vite consumer with a
-  monophonic C4–C5 keyboard, volume and low-pass cutoff controls, release tails,
+- Added `examples/vanilla-synth`, a standalone framework-free TypeScript/Vite
+  consumer with a monophonic C4–C5 keyboard, volume and low-pass cutoff
+  controls, release tails,
   a single Power on / Power off control, and asset-error recovery. It imports
   only the public browser package and does not implement its own Worklet. Its compact
   piano layout distinguishes active and held notes, shows the active pitch,
@@ -39,14 +40,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   alongside touch scrolling and desktop keycaps. Public audio API calls remain
   in `audio.ts`, separate from transport presentation and keyboard interaction,
   with a source-reading guide in the example README.
+- Added `examples/svelte-synth`, a Svelte 5/Vite implementation of the same
+  instrument and lifecycle contract. Declarative state, attributes, global
+  listeners, and data-driven piano markup replace selector configuration and
+  manual DOM projection; browser lifetime regressions run against both examples.
 - Added named graph parameters to the browser facade: descriptions can declare
   finite initial values and supported scalar fields can reference them;
-  `MountedGraph.setParams()` updates shared targets atomically. The basic synth
-  now uses named `volume` and `cutoff` updates while retaining raw atomic note
+  `MountedGraph.setParams()` updates shared targets atomically. Both synth
+  examples use named `volume` and `cutoff` updates while retaining raw atomic note
   frequency/gate batches.
 - Added `npm run pack:browser` to build a local `@moondsp/browser` tarball
   containing matching JS, TypeScript declarations, Worklet, Wasm, and license.
-  Consumers can build and deploy the example without a MoonBit toolchain.
+  Consumers can build and deploy either example without a MoonBit toolchain.
 - Added transactional `MountedGraph::apply_controls` and browser
   `applyControls`, plus ADSR, biquad, and multiply browser node descriptions.
   Invalid batches reject without partial mutation; gate-off releases an
@@ -68,14 +73,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Basic synth observes engine termination, reports processor failure immediately,
-  and treats caller context closure as normal shutdown. Cleanup closes the
-  engine as a whole instead of issuing commands to a potentially dead Worklet.
-- Basic synth now uses a discriminated lifecycle state and one resource owner
+- Both synth examples observe engine termination, report processor failure
+  immediately, and treat caller context closure as normal shutdown. Cleanup
+  closes the engine as a whole instead of issuing commands to a potentially dead Worklet.
+- Both synth examples use a discriminated lifecycle state and one resource owner
   across partial initialization, a complete session, and retirement. Commands
   serialize per session; cleanup bypasses pending commands, and stale work
   cannot publish into a replacement session.
-- Basic synth now has one Power on / Power off button, with no separate Start,
+- Both synth examples have one Power on / Power off button, with no separate Start,
   Stop notes, or Retry controls. Power on admits audio in the user gesture and
   completes suspended mounting and playback automatically. Power off cancels
   startup or releases the active session; automatic note-release safety remains.

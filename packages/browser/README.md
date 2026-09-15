@@ -22,7 +22,7 @@ In moondsp's web integration architecture, `@moondsp/browser` acts as the primar
 [ graph ] / [ dsp ] (topological graph execution & DSP primitives)
 ```
 
-- **Upstream applications**: Web synthesizers, interactive music tools, or live-coding playgrounds (e.g. [`examples/basic-synth/`](../../examples/basic-synth/README.md)).
+- **Upstream applications**: Web synthesizers, interactive music tools, or live-coding playgrounds (e.g. the [Svelte](../../examples/svelte-synth/README.md) and [vanilla](../../examples/vanilla-synth/README.md) synth examples).
 - **Host wrapper (`dist/graph-engine.js`)**: Validates and observes the caller-owned `AudioContext`, registers the AudioWorklet module, posts asynchronous messages, tracks promise-based admissions, translates typed errors (`GraphEngineError`), and handles cancellation.
 - **AudioWorklet (`dist/graph-processor.js`)**: Executes the audio render loop on the browser's dedicated high-priority audio thread.
 - **WebAssembly payload (`dist/moonbit_dsp.wasm`)**: Standalone `wasm-gc` binary compiled from `browser/`, containing the full DSP and graph engine.
@@ -166,5 +166,6 @@ if (exit.type === "failed") {
 
 - [Browser API Contract](../../docs/browser-api-contract.md) — Exhaustive contract on admission, error codes, and thread protocols.
 - [Technical Reference](../../docs/technical-reference.md) — Node definitions, slot mappings, and DSP constraints.
-- [Basic Synth Example](../../examples/basic-synth/README.md) — Complete Vite + TypeScript instrument implementation.
+- [Svelte Synth Example](../../examples/svelte-synth/README.md) — Declarative Svelte 5 instrument implementation.
+- [Vanilla Synth Example](../../examples/vanilla-synth/README.md) — Complete framework-free Vite + TypeScript implementation.
 - [Host Lifetime Module](host/) — Companion MoonBit `js` target module for engine lifetime tracking.

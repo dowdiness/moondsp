@@ -1,6 +1,6 @@
-# moondsp basic synth
+# moondsp vanilla synth
 
-This standalone Vite page is a small, monophonic instrument built against the public `@moondsp/browser` package. It authors one graph:
+This framework-free Vite page is a small, monophonic instrument built against the public `@moondsp/browser` package. It authors one graph:
 
 ```text
 triangle oscillator → low-pass biquad → ADSR × signal → gain → output
@@ -88,7 +88,7 @@ From the repository root, build and pack the browser package first:
 
 ```sh
 npm run pack:browser
-cd examples/basic-synth
+cd examples/vanilla-synth
 npm install ../../packages/browser/moondsp-browser-0.6.0.tgz
 npm run dev
 ```
@@ -145,7 +145,7 @@ repository root:
 ```sh
 npm ci
 npx playwright install chromium
-npm run test:basic-synth
+npm run test:vanilla-synth
 ```
 
 The command starts a Vite server on port 4187 and runs Chromium regressions
