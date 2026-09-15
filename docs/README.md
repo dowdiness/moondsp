@@ -45,7 +45,7 @@ this module is not part of the DSP/Wasm dependency graph.
 
 - **[`performance/`](performance/)** — Dated benchmark snapshots and allocation investigations, including the [Wasm-GC sine fix](performance/2026-09-14-wasm-gc-sine-allocation-fix.txt). Each record states its measured scope; it is not a whole-engine or hard-real-time guarantee.
 - **[`development/`](development/README.md)** — Hardware probes, zero-allocation audits, DAW compatibility records, and boundary inventories.
-- **[`next-actions.md`](next-actions.md)** — Active handoff list for upcoming priorities.
+- **[GitHub Issues](https://github.com/dowdiness/moondsp/issues)** — Open issues are the source of truth for upcoming work. Per-PR history belongs in `git log`; released behavior belongs in [`CHANGELOG.md`](../CHANGELOG.md).
 - **[`../CLAUDE.md`](../CLAUDE.md)** — Project conventions and contributor quick reference.
 
 ---
