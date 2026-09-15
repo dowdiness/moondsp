@@ -20,9 +20,11 @@ Open <http://localhost:5180>, choose **Pattern** or **Song**, then press
 At 60 BPM, one cycle lasts one second. At 120 BPM, it lasts half a second.
 A cycle is a unit of time, not a fixed bar or beat.
 
-> `.pan()`, `.room()`, `.attack()`, `.hold()`, and `.release()` work with the
-> browser instruments. `.gain()` and `.cutoff()` are parsed, but they do not
-> change the browser sound yet.
+> `.pan()`, `.room()`, `.attack()`, `.hold()`, `.release()`, and `.gate()` work
+> with the browser instruments. `.gain()`, `.lpf(hz, resonance?)`, and
+> `.hpf(hz, resonance?)` shape note and chord voices; each optional resonance
+> value controls that filter's Q. Drum templates keep their authored level and
+> filter shape.
 
 ## Make a beat
 

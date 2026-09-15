@@ -34,12 +34,18 @@ test "note_name a4 = 69" {
 }
 
 ///|
-test "merge_control combines note and cutoff" {
-  let merged = merge_control(note(60.0), s_cutoff(800.0))
+test "merge_control combines note and explicit filters" {
+  let merged = merge_control(
+    merge_control(note(60.0), s_lpf(800.0, resonance=2.0)),
+    s_hpf(120.0, resonance=0.5),
+  )
   let events = merged.query(span(0, 1, 1, 1))
   @debug.assert_eq(events.length(), 1)
   @debug.assert_eq(events[0].value.get("note"), Some(60.0))
-  @debug.assert_eq(events[0].value.get("cutoff"), Some(800.0))
+  @debug.assert_eq(events[0].value.get("lpf"), Some(800.0))
+  @debug.assert_eq(events[0].value.get("lpf_resonance"), Some(2.0))
+  @debug.assert_eq(events[0].value.get("hpf"), Some(120.0))
+  @debug.assert_eq(events[0].value.get("hpf_resonance"), Some(0.5))
 }
 
 ///|
@@ -75,7 +81,7 @@ test "jux(rev): channel identity (pan=-1 matches self, pan=+1 matches f(self))" 
   // Use a multi-key pattern so the comparison loop catches any bug that
   // drops a control key while routing through merge_control. Without
   // a non-pan secondary key, the test only proves part+sound parity.
-  let pat = merge_control(sequence([sound(36.0), sound(38.0)]), s_cutoff(800.0))
+  let pat = merge_control(sequence([sound(36.0), sound(38.0)]), s_lpf(800.0))
   let result = pat.jux(fn(p) { p.rev() })
   let arc = span(0, 1, 1, 1)
   let combined = result.query(arc)
@@ -91,8 +97,8 @@ test "jux(rev): channel identity (pan=-1 matches self, pan=+1 matches f(self))" 
       _ => ()
     }
   }
-  // Compare key-by-key for sound and cutoff (every non-pan key from
-  // the input). If jux drops or mangles any of them, this fails.
+  // Compare key-by-key for sound and lpf (every non-pan key from
+  // the input). If jux drops or mangles either one, this fails.
   @debug.assert_eq(left.length(), self_events.length())
   for i in 0..<left.length() {
     @debug.assert_eq(left[i].part, self_events[i].part)
@@ -100,10 +106,7 @@ test "jux(rev): channel identity (pan=-1 matches self, pan=+1 matches f(self))" 
       left[i].value.get("sound"),
       self_events[i].value.get("sound"),
     )
-    @debug.assert_eq(
-      left[i].value.get("cutoff"),
-      self_events[i].value.get("cutoff"),
-    )
+    @debug.assert_eq(left[i].value.get("lpf"), self_events[i].value.get("lpf"))
   }
   @debug.assert_eq(right.length(), f_events.length())
   for i in 0..<right.length() {
@@ -112,10 +115,7 @@ test "jux(rev): channel identity (pan=-1 matches self, pan=+1 matches f(self))" 
       right[i].value.get("sound"),
       f_events[i].value.get("sound"),
     )
-    @debug.assert_eq(
-      right[i].value.get("cutoff"),
-      f_events[i].value.get("cutoff"),
-    )
+    @debug.assert_eq(right[i].value.get("lpf"), f_events[i].value.get("lpf"))
   }
 }
 

@@ -114,4 +114,4 @@ resolution 3. All 18 both-Err inputs diverge in text. Two structural findings:
 | `stack()` | loom mini syntax has diagnostics | position 0: stack() requires at least one argument |
 | `stack(s("bd")` | loom mini syntax has diagnostics | position 13: expected ')', got end of input |
 | `$: s("bd") $: note("60")` | loom mini syntax has diagnostics | position 11: unexpected trailing input '$: note("60")' |
-| `s("bd").unknown(1)` | loom atom projection only supports .fast(N), .slow(N), .rev(), .cutoff(N), .gain(N), .pan(N), .jux(...), or .every(...) methods | position 8: unknown method 'unknown' |
+| `s("bd").unknown(1)` | loom mini syntax has diagnostics | position 8: unknown method 'unknown' |

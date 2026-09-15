@@ -451,6 +451,8 @@
         <p class="cheat-note">20 seconds: fast hats first, then fast kick and hats. Compare kick + hats.fast(2) with (kick + hats).fast(2).</p>
         <button type="button" class="example" id="envelope-compare-example" data-live-example="envelope-compare" data-mode="song" data-bpm="60">One note, three envelopes</button>
         <p class="cheat-note">Same E4: short → swell → drift. 23 seconds.</p>
+        <button type="button" class="example" data-live-example="filter-shaping" data-bpm="84" data-example='let warm = chord("Cmaj7 Fmaj7").slow(4).gain(0.45).lpf(900, 2.5).hpf(60);&#10;let air = note("G5 E5 D5 B4").slow(4).gain(0.2).lpf(5000).hpf(1200, 1.4);&#10;stack(warm, air)'>Carve the mix: cutoff + resonance</button>
+        <p class="cheat-note">LPF warms the chords; HPF clears lows from the lead. The second argument adds emphasis at each cutoff.</p>
         <button type="button" class="example" id="room-of-light-example" data-live-example="room-of-light" data-mode="song" data-bpm="112">Room of Light — pop sketch</button>
         <p class="cheat-note">Short bass, soft chords, and a singing lead. 39 seconds.</p>
         <button type="button" class="example" id="shared-room-example" data-live-example="shared-room" data-mode="song" data-bpm="60">Dry → shared room comparison</button>

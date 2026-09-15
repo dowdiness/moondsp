@@ -133,8 +133,21 @@ fn parse_note_name(name : String) -> Double {
 }
 
 ///|
-pub fn s_cutoff(f : Double) -> Pat[ControlMap] {
-  control("cutoff", f)
+pub fn s_lpf(frequency_hz : Double, resonance? : Double) -> Pat[ControlMap] {
+  let cutoff = control("lpf", frequency_hz)
+  match resonance {
+    None => cutoff
+    Some(q) => merge_control(cutoff, control("lpf_resonance", q))
+  }
+}
+
+///|
+pub fn s_hpf(frequency_hz : Double, resonance? : Double) -> Pat[ControlMap] {
+  let cutoff = control("hpf", frequency_hz)
+  match resonance {
+    None => cutoff
+    Some(q) => merge_control(cutoff, control("hpf_resonance", q))
+  }
 }
 
 ///|

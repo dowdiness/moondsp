@@ -955,6 +955,12 @@ Current semantics:
   renders through the bound pool. The default mapper consumes `room` as a
   normalized `0..1` send; it is not a graph control and does not add reverb
   nodes to each voice.
+- The browser note/chord template binds Mini `lpf` and `hpf` controls to each
+  biquad's `Value0` cutoff slot. When `.lpf(hz, resonance)` or
+  `.hpf(hz, resonance)` includes its optional second argument, the corresponding
+  `lpf_resonance` or `hpf_resonance` control targets that filter's `Value1` Q
+  slot. Omitting resonance preserves the template default Q of `0.707`; drum
+  templates remain unbound and retain their authored filter shape.
 - Quoted Mini notation lowers `~` to a silent sequence member: it emits no event
   but still occupies one equal subdivision of its containing layer. `Pat::gate`
   shortens each discrete event's `whole` and `part` spans to a rational

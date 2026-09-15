@@ -202,10 +202,7 @@ test "PatternSnapshot::query_sourced_events covers jux callback subtrees" {
 ///|
 test "PatternSnapshot::query_sourced_events covers merge_control inputs" {
   let left = PatternDoc::from_pattern(id=pid("merge-left"), pat=note(60.0))
-  let right = PatternDoc::from_pattern(
-    id=pid("merge-right"),
-    pat=s_cutoff(800.0),
-  )
+  let right = PatternDoc::from_pattern(id=pid("merge-right"), pat=s_lpf(800.0))
   let doc = unwrap_doc(() => {
     PatternDoc::merge_control(id=pid("merge"), left~, right~)
   })
@@ -215,7 +212,7 @@ test "PatternSnapshot::query_sourced_events covers merge_control inputs" {
   @debug.assert_eq(events.length(), 1)
   assert_pattern_event_path(events[0], ["merge", "merge-left", "merge-right"])
   assert_true(events[0].event().value.get("note") == Some(60.0))
-  assert_true(events[0].event().value.get("cutoff") == Some(800.0))
+  assert_true(events[0].event().value.get("lpf") == Some(800.0))
 }
 
 ///|

@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added explicit Mini `.lpf(hz, resonance?)` and `.hpf(hz, resonance?)`
+  controls and connected them, together with `.gain(n)`, to browser note and
+  chord voices. Each filter accepts an optional independent resonance/Q value;
+  omitting it keeps the `0.707` template default. Low-pass and high-pass filters
+  run before the envelope so release completion still reaches exact silence;
+  drum templates retain their authored level and filter shape.
+
 - Added retained browser `EngineExit` results and independently cancellable
   `engine.wait({ signal })` observers. Fatal processor errors notify observers
   without another command; normal shutdown and cleanup cannot erase an earlier
@@ -134,6 +141,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   distinct from ordinary rejection (`1`). Playback error receipts carry
   structured `recovery`; editor behavior no longer depends on diagnostic wording.
   The nonediting tempo field state is named `displaying`, not `synced`.
+
+### Removed
+
+- Removed the ambiguous Mini `.cutoff(hz)` method and pattern `s_cutoff`
+  constructor. Use `.lpf(hz, resonance?)` / `s_lpf` for low-pass control or
+  `.hpf(hz, resonance?)` / `s_hpf` for high-pass control.
 
 ### Fixed
 

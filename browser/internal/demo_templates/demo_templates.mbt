@@ -155,13 +155,20 @@ pub fn synth_template() -> Array[@moondsp.DspNode] {
       sustain=0.08,
       release_ms=20.0,
     ),
-    @moondsp.DspNode::envelope_gain(input=0, envelope=1, amount=0.5),
     @moondsp.DspNode::biquad(
-      input=2,
+      input=0,
       mode=@moondsp.BiquadMode::LowPass,
       cutoff_hz=8000.0,
       q=0.707,
     ),
-    @moondsp.DspNode::output(3),
+    @moondsp.DspNode::biquad(
+      input=2,
+      mode=@moondsp.BiquadMode::HighPass,
+      cutoff_hz=20.0,
+      q=0.707,
+    ),
+    @moondsp.DspNode::envelope_gain(input=3, envelope=1, amount=0.5),
+    @moondsp.DspNode::gain(4, 1.0),
+    @moondsp.DspNode::output(5),
   ]
 }

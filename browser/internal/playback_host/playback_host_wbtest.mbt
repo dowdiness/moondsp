@@ -23,8 +23,21 @@ fn test_synth_template() -> Array[@moondsp.DspNode] {
       sustain=0.7,
       release_ms=300.0,
     ),
-    @moondsp.DspNode::envelope_gain(input=0, envelope=1, amount=1.0),
-    @moondsp.DspNode::output(2),
+    @moondsp.DspNode::biquad(
+      input=0,
+      mode=@moondsp.BiquadMode::LowPass,
+      cutoff_hz=8000.0,
+      q=0.707,
+    ),
+    @moondsp.DspNode::biquad(
+      input=2,
+      mode=@moondsp.BiquadMode::HighPass,
+      cutoff_hz=20.0,
+      q=0.707,
+    ),
+    @moondsp.DspNode::envelope_gain(input=3, envelope=1, amount=1.0),
+    @moondsp.DspNode::gain(4, 1.0),
+    @moondsp.DspNode::output(5),
   ]
 }
 
@@ -83,6 +96,36 @@ fn output_energy() -> Double {
     energy = energy + scheduler_left_sample(i).abs()
   }
   energy
+}
+
+///|
+fn rendered_synth_energy(text : String) -> Double raise {
+  assert_true(init_scheduler_graph_for_test())
+  assert_eq(submit_for_test(text), 0)
+  let mut energy = 0.0
+  for _ in 0..<48 {
+    render_for_test(1)
+    energy = energy + output_energy()
+  }
+  energy
+}
+
+///|
+test "live synth applies gain, cutoff, and independent filter resonance" {
+  let baseline = rendered_synth_energy("note(\"69\").slow(40)")
+  let quieter = rendered_synth_energy("note(\"69\").slow(40).gain(0.25)")
+  let low_passed = rendered_synth_energy("note(\"69\").slow(40).lpf(100)")
+  let high_passed = rendered_synth_energy("note(\"69\").slow(40).hpf(4000)")
+  let low_q_lpf = rendered_synth_energy("note(\"69\").slow(40).lpf(440, 0.5)")
+  let resonant_lpf = rendered_synth_energy("note(\"69\").slow(40).lpf(440, 4)")
+  let low_q_hpf = rendered_synth_energy("note(\"69\").slow(40).hpf(440, 0.5)")
+  let resonant_hpf = rendered_synth_energy("note(\"69\").slow(40).hpf(440, 4)")
+  assert_true(baseline > 0.0)
+  assert_true(quieter > 0.0 && quieter < baseline * 0.35)
+  assert_true(low_passed > 0.0 && low_passed < baseline * 0.35)
+  assert_true(high_passed > 0.0 && high_passed < baseline * 0.35)
+  assert_true(resonant_lpf > low_q_lpf * 2.0)
+  assert_true(resonant_hpf > low_q_hpf * 2.0)
 }
 
 ///|

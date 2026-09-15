@@ -205,11 +205,33 @@ test "parse single drum sound" {
 }
 
 ///|
-test "parse cutoff method merges sound control" {
-  let pat = unwrap_ok(@mini.parse("s(\"bd\").cutoff(200)"))
+test "parse lpf and hpf methods merges cutoff and optional resonance controls" {
+  let pat = unwrap_ok(@mini.parse("s(\"bd\").lpf(200, 2).hpf(40, 0.5)"))
   let events = query_one_cycle(pat)
   inspect(events.length(), content="1")
-  assert_eq(events[0].value.entries(), { "sound": 36, "cutoff": 200 })
+  assert_eq(events[0].value.entries(), {
+    "sound": 36,
+    "lpf": 200,
+    "lpf_resonance": 2,
+    "hpf": 40,
+    "hpf_resonance": 0.5,
+  })
+}
+
+///|
+test "filter resonance accepts any finite positive value" {
+  let high_q = query_one_cycle(
+    unwrap_ok(@mini.parse("note(\"C4\").lpf(800, 64).hpf(80, 128)")),
+  )
+  assert_eq(high_q[0].value.get("lpf_resonance"), Some(64.0))
+  assert_eq(high_q[0].value.get("hpf_resonance"), Some(128.0))
+  for source in ["note(\"C4\").lpf(800, 0)", "note(\"C4\").hpf(80, -1)"] {
+    match @mini.parse(source) {
+      Ok(_) => abort("expected invalid filter resonance to fail")
+      Err(message) =>
+        assert_true(message.contains("expects finite resonance above 0"))
+    }
+  }
 }
 
 ///|
@@ -262,13 +284,13 @@ test "parse_snapshot lowers mini output through PatternDoc" {
 }
 
 ///|
-test "parse_snapshot lowers cutoff method through PatternDoc" {
+test "parse_snapshot lowers filter resonance through PatternDoc" {
   let snapshot = unwrap_mini_snapshot(
-    @mini.parse_snapshot("s(\"bd\").cutoff(200)"),
+    @mini.parse_snapshot("s(\"bd\").lpf(200, 2).hpf(40, 0.5)"),
   )
   inspect(
     snapshot.root().value(),
-    content="mini:merge_control:mini:sound:bd:0:cutoff:200",
+    content="mini:merge_control:mini:merge_control:mini:merge_control:mini:merge_control:mini:sound:bd:0:lpf:200:lpf_resonance:2:hpf:40:hpf_resonance:0.5",
   )
   let events = snapshot.query(
     @pattern.TimeSpan::new(
@@ -277,7 +299,13 @@ test "parse_snapshot lowers cutoff method through PatternDoc" {
     ),
   )
   inspect(events.length(), content="1")
-  assert_eq(events[0].value.entries(), { "sound": 36, "cutoff": 200 })
+  assert_eq(events[0].value.entries(), {
+    "sound": 36,
+    "lpf": 200,
+    "lpf_resonance": 2,
+    "hpf": 40,
+    "hpf_resonance": 0.5,
+  })
 }
 
 ///|
@@ -302,9 +330,9 @@ test "parse_snapshot lowers gain and pan methods through PatternDoc" {
 }
 
 ///|
-test "parse_snapshot supports repeated cutoff values in PatternDoc" {
+test "parse_snapshot supports repeated lpf values in PatternDoc" {
   let snapshot = unwrap_mini_snapshot(
-    @mini.parse_snapshot("stack(s(\"bd\").cutoff(200), s(\"sd\").cutoff(200))"),
+    @mini.parse_snapshot("stack(s(\"bd\").lpf(200), s(\"sd\").lpf(200))"),
   )
   let events = snapshot.query(
     @pattern.TimeSpan::new(
@@ -313,14 +341,14 @@ test "parse_snapshot supports repeated cutoff values in PatternDoc" {
     ),
   )
   inspect(events.length(), content="2")
-  assert_true(events[0].value.get("cutoff") == Some(200.0))
-  assert_true(events[1].value.get("cutoff") == Some(200.0))
+  assert_true(events[0].value.get("lpf") == Some(200.0))
+  assert_true(events[1].value.get("lpf") == Some(200.0))
 }
 
 ///|
-test "parse_snapshot supports repeated cutoff chain in PatternDoc" {
+test "parse_snapshot supports repeated hpf chain in PatternDoc" {
   let snapshot = unwrap_mini_snapshot(
-    @mini.parse_snapshot("s(\"bd\").cutoff(200).cutoff(200)"),
+    @mini.parse_snapshot("s(\"bd\").hpf(200).hpf(200)"),
   )
   let events = snapshot.query(
     @pattern.TimeSpan::new(
@@ -330,7 +358,7 @@ test "parse_snapshot supports repeated cutoff chain in PatternDoc" {
   )
   inspect(events.length(), content="1")
   assert_true(events[0].value.get("sound") == Some(36.0))
-  assert_true(events[0].value.get("cutoff") == Some(200.0))
+  assert_true(events[0].value.get("hpf") == Some(200.0))
 }
 
 ///|
@@ -406,17 +434,17 @@ test "parse_doc_reusing preserves ids across whitespace edits" {
 }
 
 ///|
-test "parse_doc_reusing cutoff edit preserves sound atom id" {
-  let doc = unwrap_doc(@mini.parse_doc("s(\"bd\").cutoff(200)"))
+test "parse_doc_reusing lpf edit preserves sound atom id" {
+  let doc = unwrap_doc(@mini.parse_doc("s(\"bd\").lpf(200)"))
   let edited = unwrap_doc(
-    @mini.parse_doc("s(\"bd\").cutoff(300)", previous=Some(doc)),
+    @mini.parse_doc("s(\"bd\").lpf(300)", previous=Some(doc)),
   )
   assert_true(edited.contains_node(pid("mini:sound:bd:0")))
   assert_true(
-    edited.contains_node(pid("mini:merge_control:mini:sound:bd:0:cutoff:300")),
+    edited.contains_node(pid("mini:merge_control:mini:sound:bd:0:lpf:300")),
   )
   assert_true(
-    !edited.contains_node(pid("mini:merge_control:mini:sound:bd:0:cutoff:200")),
+    !edited.contains_node(pid("mini:merge_control:mini:sound:bd:0:lpf:200")),
   )
   let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
   ignore(doc.lower_with_cache(cache))
@@ -431,7 +459,7 @@ test "parse_doc_reusing cutoff edit preserves sound atom id" {
   )
   inspect(events.length(), content="1")
   assert_true(events[0].value.get("sound") == Some(36.0))
-  assert_true(events[0].value.get("cutoff") == Some(300.0))
+  assert_true(events[0].value.get("lpf") == Some(300.0))
 }
 
 ///|

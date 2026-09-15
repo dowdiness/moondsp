@@ -3,12 +3,12 @@ test "editing event controls leaves source content unchanged" {
   let source = @pattern.note(60.0)
   let arc = span(0, 1, 1, 1)
   let value = source.query(arc)[0].value
-  let with_cutoff = value.set("cutoff", 800.0)
-  let replaced = with_cutoff.merge(@pattern.ControlMap::single("note", 72.0))
+  let with_lpf = value.set("lpf", 800.0)
+  let replaced = with_lpf.merge(@pattern.ControlMap::single("note", 72.0))
   let exported = replaced.entries()
   exported["note"] = 12.0
-  assert_eq(with_cutoff.entries(), { "note": 60.0, "cutoff": 800.0 })
-  assert_eq(replaced.entries(), { "note": 72.0, "cutoff": 800.0 })
+  assert_eq(with_lpf.entries(), { "note": 60.0, "lpf": 800.0 })
+  assert_eq(replaced.entries(), { "note": 72.0, "lpf": 800.0 })
   assert_eq(source.query(arc)[0].value.entries(), { "note": 60.0 })
   assert_true(source.same_content(@pattern.note(60.0)))
 }

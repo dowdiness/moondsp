@@ -26,9 +26,11 @@ pub fn note_name_to_midi(String) -> Double?
 
 pub fn parse_chord(String) -> Array[Int]?
 
-pub fn s_cutoff(Double) -> Pat[ControlMap]
-
 pub fn s_gain(Double) -> Pat[ControlMap]
+
+pub fn s_hpf(Double, resonance? : Double) -> Pat[ControlMap]
+
+pub fn s_lpf(Double, resonance? : Double) -> Pat[ControlMap]
 
 pub fn s_pan(Double) -> Pat[ControlMap]
 
