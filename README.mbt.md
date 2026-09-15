@@ -137,7 +137,7 @@ Pattern Engine (Human Time)           DSP Engine (Audio Time)
        v                                      v
   Array[Event[ControlMap]]             BoundVoicePool.process(ctx, L, R)
        |                                      ^
-       +-- { note: 60, cutoff: 800 } ---------+
+       +-- { note: 60, lpf: 1800, hpf: 80 } --+
            PatternScheduler.process_block (48 kHz / 128 samples per block)
 ```
 
@@ -156,11 +156,11 @@ Write expressive polyrhythmic patterns in a concise DSL ([Syntax Reference](docs
 // Mini-notation with Euclidean rhythms, polyphonic layers ($:), and method chains
 let pat = parse_mini!(r#"
   $: s("bd(3,8) [~ sd] [hh*2] sd").fast(2).gain(0.8)
-  $: note("c3 e3 g3 b3").cutoff(1200)
+  $: note("c3 e3 g3 b3").gain(0.6).lpf(1800, 2).hpf(80)
 "#)
 ```
 
-Supports sub-groups (`[a b]`), step replication/stretching (`*n`, `/n`), Euclidean rhythms (`bd(3,8)`), and chained modifiers (`.fast()`, `.slow()`, `.rev()`, `.degradeBy()`, `.cutoff()`, `.gain()`, `.pan()`, `.every()`, `.jux()`).
+Supports sub-groups (`[a b]`), step replication/stretching (`*n`, `/n`), Euclidean rhythms (`bd(3,8)`), and chained modifiers (`.fast()`, `.slow()`, `.rev()`, `.degradeBy()`, `.lpf(hz, resonance?)`, `.hpf(hz, resonance?)`, `.gain()`, `.pan()`, `.every()`, `.jux()`).
 
 ### 2. Finally Tagless DSP Algebra (`dsp/`, `graph/`)
 The DSP graph definition functions both as an extensible trait-driven algebra and as an optimizable concrete AST:

@@ -38,6 +38,7 @@ in the browser bundle.
 <p class="cheat-note">Chords: <code>C</code> major, <code>Cm</code> minor; also <code>7</code>, <code>maj7</code>, <code>m7</code>, <code>dim</code>, <code>aug</code>, <code>sus2</code>, <code>sus4</code>, <code>6</code>, <code>add9</code>, <code>maj9</code>, <code>m9</code>. In <code>chord("C+7")</code>, the quoted <code>+</code> is part of the chord name, not an overlay.</p>
 
 <h2 id="method-chains">Sound shape</h2>
+<p class="cheat-note">Shape browser notes and chords with filters: LPF softens high frequencies, while HPF clears low frequencies. Add the optional second argument to emphasize the cutoff frequency.</p>
 <dl>
   <dt>.pan(n)</dt><dd>left −1, center 0, right 1</dd>
   <dt>.room(n)</dt><dd>send 0–1 into the shared room reverb</dd>
@@ -45,15 +46,19 @@ in the browser bundle.
   <dt>.hold(s)</dt><dd>stay at peak volume for s seconds</dd>
   <dt>.release(s)</dt><dd>fade out over s seconds</dd>
   <dt>.gate(n)</dt><dd>sound for n of each step, from 0 to 1</dd>
+  <dt>.gain(n)</dt><dd>note/chord level; 0 is silent, 1 keeps the template level</dd>
+  <dt>.lpf(hz, resonance?)</dt><dd>reduce frequencies above hz; resonance/Q must be finite and greater than 0 (default 0.707)</dd>
+  <dt>.hpf(hz, resonance?)</dt><dd>reduce frequencies below hz; resonance/Q must be finite and greater than 0 (default 0.707)</dd>
 </dl>
-<p><code>s("bd hh").slow(2) +<br>note("E4").slow(4).room(0.35)</code></p>
+<p><code>s("bd hh").slow(2) +<br>note("E4").slow(4).gain(0.6).lpf(1800, 2).hpf(80).room(0.35)</code></p>
+<p class="cheat-note">Resonance is the filter Q: it defaults to <code>0.707</code> when omitted and must be finite and above 0. Higher values create a stronger peak around the cutoff frequency.</p>
 <p class="cheat-note"><code>.room(0)</code> is dry and is the default; <code>.room(1)</code> is the maximum send. Here the drums stay dry and the note sends at 0.35. Both keep their dry signal.</p>
 <p class="cheat-note">Envelopes apply to notes and chords. Each time is in seconds, from 0 to 86400.</p>
 <p><code>note("E4")<br>&nbsp;&nbsp;.attack(0.01).hold(0.1)<br>&nbsp;&nbsp;.release(0.2)</code></p>
 <p class="cheat-note">0.31 seconds total, independent of tempo. Omit hold to follow the pattern's note length. Omitted attack/release use the sound's defaults; release starts from the current level.</p>
 <p class="cheat-note"><code>.gate(0.4)</code> keeps every onset in place but shortens each note to 40% of its step, leaving the rest silent. <code>.gate(0)</code> is silent; <code>.gate(1)</code> keeps the full step. The gate follows tempo. Factors finer than one billionth are rounded to keep long-running timelines representable. An explicit <code>.hold(s)</code> instead uses physical seconds and overrides the event-derived ending.</p>
 <p class="cheat-note">Room is one shared stereo space for every part. Its tail continues across note endings, section changes, and live edits; Stop remains immediate.</p>
-<p class="cheat-note"><strong>Browser limitation:</strong> <code>.gain(n)</code> and <code>.cutoff(hz)</code> are parsed as control values, but the current browser instruments do not connect them to volume or filter controls. They do not change the sound here.</p>
+<p class="cheat-note"><code>.gain(n)</code>, <code>.lpf(hz, resonance?)</code>, and <code>.hpf(hz, resonance?)</code> control note and chord voices in the browser. Drum templates keep their authored level and filter shape; applying these controls to <code>s("...")</code> leaves the drum sound unchanged.</p>
 
 <h2>Rhythm</h2>
 <p class="cheat-note">BPM sets cycles per minute: at 60, one cycle is one second. A cycle has no fixed meter.</p>
@@ -119,6 +124,7 @@ note("C4(3,8) E4(2,8,2) G4(3,8)").slow(4)
 chord("C Am F G7").slow(2)
 s("bd ~ sd ~")
 note("C3 ~ C3 Eb3 ~ G2 Bb2 ~").gate(0.35)
+note("C3 E3 G3").gain(0.6).lpf(1800, 2).hpf(80)
 ```
 
 `note(...)` accepts names such as `C4`, `F#3`, and `Bb`; omitted octaves

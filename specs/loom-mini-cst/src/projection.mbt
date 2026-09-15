@@ -58,11 +58,36 @@ priv enum LoomMiniMethodCallback {
 }
 
 ///|
+priv enum LoomMiniFilterKind {
+  LowPass
+  HighPass
+}
+
+///|
+fn LoomMiniFilterKind::control_key(self : LoomMiniFilterKind) -> String {
+  match self {
+    LowPass => "lpf"
+    HighPass => "hpf"
+  }
+}
+
+///|
+fn LoomMiniFilterKind::resonance_control_key(
+  self : LoomMiniFilterKind,
+) -> String {
+  match self {
+    LowPass => "lpf_resonance"
+    HighPass => "hpf_resonance"
+  }
+}
+
+///|
 priv enum LoomMiniMethodCall {
   FastMethod(Int)
   SlowMethod(Int)
   RevMethod
   ControlMethod(String, Double)
+  FilterMethod(LoomMiniFilterKind, Double, Double?)
   JuxMethod(LoomMiniMethodCallback)
   EveryMethod(Int, LoomMiniMethodCallback)
 }
@@ -462,7 +487,10 @@ fn loom_mini_collect_method_call(
     loom_mini_collect_rate_method_call(name, names, numbers, commas)
   } else if name == "rev" {
     loom_mini_collect_rev_method_call(names, numbers, commas)
-  } else if name == "cutoff" || name == "gain" || name == "pan" {
+  } else if name == "lpf" || name == "hpf" {
+    let kind : LoomMiniFilterKind = if name == "lpf" { LowPass } else { HighPass }
+    loom_mini_collect_filter_method_call(kind, names, numbers, commas)
+  } else if name == "gain" || name == "pan" {
     loom_mini_collect_control_method_call(name, names, numbers, commas)
   } else if name == "jux" {
     loom_mini_collect_jux_method_call(names, numbers, commas)
@@ -535,6 +563,42 @@ fn loom_mini_collect_control_method_call(
     Err(msg) => return Err(msg)
   }
   Ok(ControlMethod(name, value))
+}
+
+///|
+fn loom_mini_collect_filter_method_call(
+  kind : LoomMiniFilterKind,
+  names : Array[@seam.SyntaxToken],
+  numbers : Array[@seam.SyntaxToken],
+  commas : Array[@seam.SyntaxToken],
+) -> Result[LoomMiniMethodCall, String] {
+  if names.length() != 1 {
+    return Err("loom atom projection expected filter method arguments")
+  }
+  let (frequency_text, resonance_text) = match numbers {
+    [frequency] if commas.length() == 0 => (frequency.text(), None)
+    [frequency, resonance] if commas.length() == 1 =>
+      (frequency.text(), Some(resonance.text()))
+    _ =>
+      return Err(
+        "loom atom projection expected .\{kind.control_key()}(frequency[, resonance])",
+      )
+  }
+  let frequency_hz = match loom_mini_parse_double(frequency_text) {
+    Ok(value) => value
+    Err(msg) => return Err(msg)
+  }
+  let resonance = match resonance_text {
+    None => None
+    Some(text) =>
+      match loom_mini_parse_double(text) {
+        Ok(q) if !q.is_nan() && !q.is_inf() && q > 0.0 => Some(q)
+        Ok(_) =>
+          return Err("loom atom projection expects finite resonance above 0")
+        Err(msg) => return Err(msg)
+      }
+  }
+  Ok(FilterMethod(kind, frequency_hz, resonance))
 }
 
 ///|
@@ -655,7 +719,7 @@ fn loom_mini_collect_method_callback(
 
 ///|
 fn loom_mini_supported_method_error() -> String {
-  "loom atom projection only supports .fast(N), .slow(N), .rev(), .cutoff(N), .gain(N), .pan(N), .jux(...), or .every(...) methods"
+  "loom atom projection only supports .fast(N), .slow(N), .rev(), .lpf(N[, Q]), .hpf(N[, Q]), .gain(N), .pan(N), .jux(...), or .every(...) methods"
 }
 
 ///|
@@ -1110,6 +1174,32 @@ fn loom_mini_apply_method_chain(
           Ok(next) => continue next
           Err(msg) => return Err(msg)
         }
+      FilterMethod(kind, frequency_hz, resonance) => {
+        let filtered = match
+          loom_mini_apply_control_method(
+            previous_doc,
+            doc,
+            kind.control_key(),
+            frequency_hz,
+          ) {
+          Ok(next) => next
+          Err(msg) => return Err(msg)
+        }
+        match resonance {
+          None => continue filtered
+          Some(q) =>
+            match
+              loom_mini_apply_control_method(
+                previous_doc,
+                filtered,
+                kind.resonance_control_key(),
+                q,
+              ) {
+              Ok(next) => continue next
+              Err(msg) => return Err(msg)
+            }
+        }
+      }
       JuxMethod(callback) =>
         match loom_mini_apply_jux_method(doc, callback) {
           Ok(next) => continue next

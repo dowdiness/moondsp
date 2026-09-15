@@ -208,7 +208,18 @@ test.describe("UI smoke (no audio)", () => {
     await expect(tooltip).not.toContainText("degradeBy");
   });
 
-  test("one syntax reference exposes rests, gates, envelopes, layering, and songs", async ({ page }) => {
+  test("filter-shaping example loads both filter controls", async ({ page }) => {
+    const example = page.locator('[data-live-example="filter-shaping"]');
+    await expect(example).toBeVisible();
+    await example.click();
+    await expect(page.locator("#global-bpm")).toHaveValue("84");
+    const editor = page.locator(".cm-content");
+    await expect(editor).toContainText('chord("Cmaj7 Fmaj7")');
+    await expect(editor).toContainText(".lpf(900, 2.5).hpf(60)");
+    await expect(editor).toContainText(".lpf(5000).hpf(1200, 1.4)");
+  });
+
+  test("one syntax reference exposes sound shaping, rhythm, layering, and songs", async ({ page }) => {
     await page.getByText("Syntax reference", { exact: true }).click();
     const reference = page.locator("#syntax-reference");
     await expect(reference.locator("dt").filter({ hasText: /^\.attack\(s\)$/ })).toBeVisible();
@@ -216,6 +227,8 @@ test.describe("UI smoke (no audio)", () => {
     await expect(reference.locator("dt").filter({ hasText: /^\.release\(s\)$/ })).toBeVisible();
     await expect(reference.locator("dt").filter({ hasText: /^\.room\(n\)$/ })).toBeVisible();
     await expect(reference.locator("dt").filter({ hasText: /^\.gate\(n\)$/ })).toBeVisible();
+    await expect(reference.locator("dt").filter({ hasText: /^\.lpf\(hz, resonance\?\)$/ })).toBeVisible();
+    await expect(reference.locator("dt").filter({ hasText: /^\.hpf\(hz, resonance\?\)$/ })).toBeVisible();
     await expect(reference.locator("dt").filter({ hasText: /^~$/ })).toBeVisible();
     await expect(reference.locator("dt")).toContainText(["$: a", 'section("a", n, p)', "bpm(n)"]);
     await expect(
@@ -265,6 +278,18 @@ test.describe("Audio path", () => {
     await expect(status).toContainText("idle");
     await expect(btn).toHaveText("Play");
     await expect(btn).toHaveAttribute("data-action", "start");
+  });
+
+  test("resonant filter example is accepted by the scheduler WASM", async ({ page }) => {
+    await page.goto("/");
+    const example = page.locator('[data-live-example="filter-shaping"]');
+    const source = await example.getAttribute("data-example");
+    expect(source).not.toBeNull();
+    await page.locator(".cm-content").fill(source!);
+    await page.locator("#start").click();
+    await expect(page.locator("#status")).toContainText("running", { timeout: 10_000 });
+    await expect(page.locator("#log")).toContainText("pattern updated", { timeout: 5_000 });
+    await expect(page.locator(".cm-diagnostic-error")).toHaveCount(0);
   });
 
   test("editing the pattern triggers debounced eval", async ({ page }) => {

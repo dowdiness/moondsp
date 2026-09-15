@@ -21,6 +21,28 @@ priv enum MiniCallback {
 }
 
 ///|
+priv enum MiniFilterKind {
+  LowPass
+  HighPass
+}
+
+///|
+fn MiniFilterKind::control_key(self : MiniFilterKind) -> String {
+  match self {
+    LowPass => "lpf"
+    HighPass => "hpf"
+  }
+}
+
+///|
+fn MiniFilterKind::resonance_control_key(self : MiniFilterKind) -> String {
+  match self {
+    LowPass => "lpf_resonance"
+    HighPass => "hpf_resonance"
+  }
+}
+
+///|
 priv enum MiniTransform {
   Fast(@pattern.Rational)
   Slow(@pattern.Rational)
@@ -28,6 +50,7 @@ priv enum MiniTransform {
   Rev
   Degrade(Double)
   Control(String, Double)
+  Filter(MiniFilterKind, Double, Double?)
   Every(Int, MiniCallback)
   Jux(MiniCallback)
 }
@@ -233,9 +256,30 @@ fn Parser::parse_transform(self : Parser) -> MiniTransform raise ParseError {
       self.expect_char(')')
       Degrade(p)
     }
-    "cutoff" => {
-      let cutoff = self.read_method_number_argument()
-      Control("cutoff", cutoff)
+    "lpf" | "hpf" => {
+      self.expect_char('(')
+      self.skip_whitespace()
+      let frequency_hz = self.read_number()
+      self.skip_whitespace()
+      let resonance = if !self.at_end() && self.input[self.pos] == ',' {
+        self.pos += 1
+        self.skip_whitespace()
+        let q = self.read_number()
+        self.skip_whitespace()
+        Some(q)
+      } else {
+        None
+      }
+      self.expect_char(')')
+      match resonance {
+        Some(q) if q.is_nan() || q.is_inf() || q <= 0.0 =>
+          raise ParseError(
+            "position \{method_start}: \{name}() expects finite resonance above 0",
+          )
+        _ => ()
+      }
+      let kind : MiniFilterKind = if name == "lpf" { LowPass } else { HighPass }
+      Filter(kind, frequency_hz, resonance)
     }
     "attack" | "hold" | "release" => {
       let seconds = self.read_method_number_argument()

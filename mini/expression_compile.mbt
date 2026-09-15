@@ -97,6 +97,20 @@ fn compile_mini_pattern(
         Degrade(p) => pat.degrade_by(p)
         Control(key, value) =>
           @pattern.merge_control(pat, @pattern.control(key, value))
+        Filter(kind, frequency_hz, resonance) => {
+          let filtered = @pattern.merge_control(
+            pat,
+            @pattern.control(kind.control_key(), frequency_hz),
+          )
+          match resonance {
+            None => filtered
+            Some(q) =>
+              @pattern.merge_control(
+                filtered,
+                @pattern.control(kind.resonance_control_key(), q),
+              )
+          }
+        }
         Every(n, callback) => callback.operation().every(n, pat)
         Jux(callback) => callback.operation().jux(pat)
       }
@@ -139,6 +153,22 @@ fn compile_mini_doc(
         Degrade(p) =>
           builder.degrade_doc(doc, p, stable_seed(doc.root().value()))
         Control(key, value) => builder.scalar_control_doc(doc, key, value)
+        Filter(kind, frequency_hz, resonance) => {
+          let filtered = builder.scalar_control_doc(
+            doc,
+            kind.control_key(),
+            frequency_hz,
+          )
+          match resonance {
+            None => filtered
+            Some(q) =>
+              builder.scalar_control_doc(
+                filtered,
+                kind.resonance_control_key(),
+                q,
+              )
+          }
+        }
         Every(n, callback) => builder.every_doc(doc, n, callback)
         Jux(callback) => builder.jux_doc(doc, callback)
       }

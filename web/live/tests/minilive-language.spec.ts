@@ -81,3 +81,17 @@ test("MiniLive keeps number highlighting while the sign is edited", async ({ pag
   await expect(editor).toHaveText(source);
   await expect.poll(numberTokens).toEqual(initialTokens);
 });
+
+test("MiniLive completes filters with cutoff and resonance arguments", async ({ page }) => {
+  await page.goto("/");
+  const editor = page.locator(".cm-content");
+  await editor.fill('note("C4").');
+  await editor.press("Control+Space");
+
+  const labels = page.locator(".cm-completionLabel");
+  await expect(labels.filter({ hasText: /^gain$/ })).toBeVisible();
+  await expect(labels.filter({ hasText: /^lpf$/ })).toBeVisible();
+  await expect(labels.filter({ hasText: /^hpf$/ })).toBeVisible();
+  await labels.filter({ hasText: /^lpf$/ }).click();
+  await expect(editor).toHaveText('note("C4").lpf(hz, resonance)');
+});

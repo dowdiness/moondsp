@@ -1580,11 +1580,17 @@ test "loom atom projection matches mini PatternDoc for rev method" {
 }
 
 ///|
-test "loom atom projection matches mini PatternDoc and events for cutoff method" {
+test "loom atom projection matches mini PatternDoc for unbounded positive filter Q" {
   projection_boundary_assert_control_method_matches_mini(
-    "s(\"bd\").cutoff(200)",
-    "mini:merge_control:mini:sound:bd:0:cutoff:200",
-    [("sound", 36.0), ("cutoff", 200.0)],
+    "s(\"bd\").lpf(200, 64).hpf(40, 128)",
+    "mini:merge_control:mini:merge_control:mini:merge_control:mini:merge_control:mini:sound:bd:0:lpf:200:lpf_resonance:64:hpf:40:hpf_resonance:128",
+    [
+      ("sound", 36.0),
+      ("lpf", 200.0),
+      ("lpf_resonance", 64.0),
+      ("hpf", 40.0),
+      ("hpf_resonance", 128.0),
+    ],
   )
 }
 
@@ -2336,7 +2342,7 @@ fn projection_boundary_doc_corpus() -> Array[String] {
     "s(\"[bd sd]*2 hh\")", "s(\"bd(3,8) sd\")", "s(\"bd(3,8,1) sd\")",
     "s(\"bd(3,8,-1) sd\")", "s(\"bd? sd\")", "s(\"[bd sd]? hh\")",
     "s(\"[bd sd](5,8) hh\")", "s(\"bd\").gain(0.5)",
-    "s(\"bd\").gain(0.5).pan(-0.25)", "s(\"bd\").cutoff(200)",
+    "s(\"bd\").gain(0.5).pan(-0.25)", "s(\"bd\").lpf(200).hpf(40)",
     "s(\"bd sd\").jux(rev)", "s(\"bd sd\").jux(fast(2))",
     "s(\"bd sd\").jux(slow(2))", "s(\"bd sd\").every(2, rev)",
     "s(\"bd sd\").every(2, fast(2))", "s(\"bd sd\").every(2, slow(2))",

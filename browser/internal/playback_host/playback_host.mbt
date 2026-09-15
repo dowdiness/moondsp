@@ -120,7 +120,20 @@ fn make_synth_pool(
         node_index=1,
         slot=@moondsp.GraphParamSlot::Value2,
       )
-      .bind(key="release", node_index=1, slot=@moondsp.GraphParamSlot::Value3),
+      .bind(key="release", node_index=1, slot=@moondsp.GraphParamSlot::Value3)
+      .bind(key="lpf", node_index=2, slot=@moondsp.GraphParamSlot::Value0)
+      .bind(
+        key="lpf_resonance",
+        node_index=2,
+        slot=@moondsp.GraphParamSlot::Value1,
+      )
+      .bind(key="hpf", node_index=3, slot=@moondsp.GraphParamSlot::Value0)
+      .bind(
+        key="hpf_resonance",
+        node_index=3,
+        slot=@moondsp.GraphParamSlot::Value1,
+      )
+      .bind(key="gain", node_index=5, slot=@moondsp.GraphParamSlot::Value0),
       // 24 voices for chords: a 5-note chord × 4 layers of jux/stereo
       // needs up to 20 voices. Fewer steals → fewer clicks.
       max_voices=24,

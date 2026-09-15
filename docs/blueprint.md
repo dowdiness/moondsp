@@ -324,8 +324,8 @@ Pattern Engine                          DSP Engine
      ▼
   Array[Event[ControlMap]]
      │
-     ├─ { note: 60, cutoff: 800, ... }
-     ├─ { note: 64, cutoff: 1200, ... }
+     ├─ { note: 60, lpf: 800, hpf: 80, ... }
+     ├─ { note: 64, lpf: 1200, hpf: 120, ... }
      │
      ▼
   event_to_dsp()  ←── ControlMap catamorphism

@@ -151,7 +151,7 @@ Audio-facing helpers produce `Pat[ControlMap]` values:
 - `chord` overlays several note events;
 - `sound` sets `sound`;
 - `control` creates any scalar control;
-- `s_gain`, `s_cutoff`, and `s_pan` create common control patterns.
+- `s_gain`, `s_lpf`, `s_hpf`, and `s_pan` create common control patterns.
 
 The pattern package only carries these values. A scheduler or host decides how
 a control maps to an instrument or DSP parameter.

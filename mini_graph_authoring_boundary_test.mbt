@@ -18,13 +18,15 @@ fn prepared_bd_graph_template(ctx : DspContext) -> MiniGraphPreparedTemplate {
   let nodes = [
     DspNode::oscillator(Waveform::Sine, 110.0),
     DspNode::biquad(input=0, mode=BiquadMode::LowPass, cutoff_hz=800.0, q=0.707),
-    DspNode::gain(1, 0.2),
-    DspNode::output(2),
+    DspNode::biquad(input=1, mode=BiquadMode::HighPass, cutoff_hz=20.0, q=0.707),
+    DspNode::gain(2, 0.2),
+    DspNode::output(3),
   ]
   let template = CompiledTemplate::analyze(nodes)
   let bindings = ControlBindingBuilder::new()
-    .bind(key="cutoff", node_index=1, slot=GraphParamSlot::Value0)
-    .bind(key="gain", node_index=2, slot=GraphParamSlot::Value0)
+    .bind(key="lpf", node_index=1, slot=GraphParamSlot::Value0)
+    .bind(key="hpf", node_index=2, slot=GraphParamSlot::Value0)
+    .bind(key="gain", node_index=3, slot=GraphParamSlot::Value0)
     .build(template)
     .unwrap()
   let runtime = CompiledDsp::compile_result(template, ctx).unwrap()
@@ -116,17 +118,20 @@ test "Mini graph boundary: sound selects template and controls resolve" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
   let bd = prepared_bd_graph_template(ctx)
   let controls = first_mini_control_map(
-    "s(\"bd\").cutoff(1200).gain(0.5).pan(-0.25)",
+    "s(\"bd\").lpf(1200).hpf(80).gain(0.5).pan(-0.25)",
   )
   let resolved = resolve_mini_graph_controls(controls, [bd]).unwrap()
 
-  @debug.assert_eq(resolved.length(), 2)
+  @debug.assert_eq(resolved.length(), 3)
   @debug.assert_eq(resolved[0].node_index(), 1)
   @debug.assert_eq(resolved[0].slot(), GraphParamSlot::Value0)
   @debug.assert_eq(resolved[0].value(), 1200.0)
   @debug.assert_eq(resolved[1].node_index(), 2)
   @debug.assert_eq(resolved[1].slot(), GraphParamSlot::Value0)
-  @debug.assert_eq(resolved[1].value(), 0.5)
+  @debug.assert_eq(resolved[1].value(), 80.0)
+  @debug.assert_eq(resolved[2].node_index(), 3)
+  @debug.assert_eq(resolved[2].slot(), GraphParamSlot::Value0)
+  @debug.assert_eq(resolved[2].value(), 0.5)
 
   bd.runtime.apply_controls(resolved).unwrap()
   let output = AudioBuffer::filled(16)
