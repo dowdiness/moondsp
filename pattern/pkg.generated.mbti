@@ -78,6 +78,7 @@ pub fn[A] Pat::euclid(Self[A], Int, Int, rotation? : Int) -> Self[A]
 pub fn[A] Pat::fast(Self[A], Rational) -> Self[A]
 pub fn[A] Pat::filter_map(Self[A], (A) -> A?) -> Self[A]
 pub fn[A] Pat::from_query((TimeSpan) -> Array[Event[A]]) -> Self[A]
+pub fn[A] Pat::gate(Self[A], Rational) -> Self[A]
 pub fn Pat::jux(Self[ControlMap], (Self[ControlMap]) -> Self[ControlMap]) -> Self[ControlMap]
 pub fn[A] Pat::material(Self[A]) -> Self[A]
 pub fn[A] Pat::named_entry(Self[A], String) -> Self[A]
@@ -100,6 +101,7 @@ pub fn[A] PatternDoc::every(Self[A], id~ : @identity.PatternNodeId, n~ : Int, f~
 pub fn[A] PatternDoc::fast(Self[A], id~ : @identity.PatternNodeId, factor~ : Rational) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::filter_map(Self[A], id~ : @identity.PatternNodeId, f~ : (A) -> A?) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::from_pattern(id~ : @identity.PatternNodeId, pat~ : Pat[A]) -> Self[A]
+pub fn[A] PatternDoc::gate(Self[A], id~ : @identity.PatternNodeId, factor~ : Rational) -> Self[A] raise PatternDocError
 pub fn PatternDoc::jux(Self[ControlMap], id~ : @identity.PatternNodeId, f~ : (Pat[ControlMap]) -> Pat[ControlMap]) -> Self[ControlMap] raise PatternDocError
 pub fn[A] PatternDoc::lower(Self[A]) -> PatternSnapshot[A] raise PatternDocError
 pub fn[A] PatternDoc::lower_with_cache(Self[A], PatternLoweringCache[A]) -> PatternSnapshot[A] raise PatternDocError

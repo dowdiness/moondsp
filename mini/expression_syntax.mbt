@@ -24,6 +24,7 @@ priv enum MiniCallback {
 priv enum MiniTransform {
   Fast(@pattern.Rational)
   Slow(@pattern.Rational)
+  Gate(@pattern.Rational)
   Rev
   Degrade(Double)
   Control(String, Double)
@@ -191,6 +192,33 @@ fn Parser::parse_transform(self : Parser) -> MiniTransform raise ParseError {
         )
       }
       Slow(@pattern.Rational::from_int(n.to_int()))
+    }
+    "gate" => {
+      self.expect_char('(')
+      self.skip_whitespace()
+      let value_start = self.pos
+      let value = self.read_number()
+      let value_end = self.pos
+      self.skip_whitespace()
+      self.expect_char(')')
+      guard !value.is_nan() && !value.is_inf() && value >= 0.0 && value <= 1.0 else {
+        raise ParseError(
+          "position \{method_start}: gate() expects a fraction between 0 and 1",
+        )
+      }
+      let factor = parse_decimal_rational(
+        self.input,
+        value_start,
+        value_end,
+        method_start,
+      )
+      guard factor >= @pattern.Rational::from_int(0) &&
+        factor <= @pattern.Rational::from_int(1) else {
+        raise ParseError(
+          "position \{method_start}: gate() expects a fraction between 0 and 1",
+        )
+      }
+      Gate(factor)
     }
     "rev" => {
       self.expect_char('(')

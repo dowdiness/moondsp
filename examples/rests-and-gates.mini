@@ -1,0 +1,6 @@
+let drums = s("bd ~ sd ~ bd bd ~ sd");
+let hats = s("hh ~ hh hh ~ hh hh ~").pan(0.35);
+let bass = note("C3 ~ C3 Eb3 ~ G2 Bb2 ~").gate(0.35);
+let answer = note("~ G4 ~ Eb4 ~ D4 F4 ~").gate(0.6).pan(-0.3).room(0.2);
+
+drums + hats + bass + answer

@@ -92,6 +92,7 @@ fn compile_mini_pattern(
       match transform {
         Fast(n) => pat.fast(n)
         Slow(n) => pat.slow(n)
+        Gate(factor) => pat.gate(factor)
         Rev => pat.rev()
         Degrade(p) => pat.degrade_by(p)
         Control(key, value) =>
@@ -133,6 +134,7 @@ fn compile_mini_doc(
       match transform {
         Fast(n) => builder.fast_doc(doc, n)
         Slow(n) => builder.slow_doc(doc, n)
+        Gate(factor) => builder.gate_doc(doc, factor)
         Rev => builder.rev_doc(doc)
         Degrade(p) =>
           builder.degrade_doc(doc, p, stable_seed(doc.root().value()))

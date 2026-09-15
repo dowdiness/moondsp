@@ -58,6 +58,13 @@ independent of `.slow()` and subsequent tempo changes. Notes overlap within
 the voice pool's capacity. Live edits preserve settings on sounding notes;
 Stop still stops playback. Drum envelopes are unchanged.
 
+`.gate(n)` shortens each event to a musical fraction from 0 through 1 without
+moving its onset or changing the pattern period. Factors finer than one
+billionth are rounded before event arithmetic to keep later-cycle endpoints
+representable. The shortened endpoint follows tempo edits. An explicit
+`.hold(s)` keeps its physical-seconds behavior and overrides the event-derived
+endpoint.
+
 ## Pattern edits
 
 An edit is accepted at the next render block. Each material finishes its current
