@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#fffaf5" />
+    <title>moondsp · Basic synth</title>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="page-header">
+        <h1 id="instrument-title">Basic synth</h1>
+        <span class="brand">moondsp</span>
+      </header>
+
+      <section class="instrument-panel" aria-labelledby="instrument-title">
+        <div class="panel-heading">
+          <div class="status-cluster">
+            <span class="status-mark" aria-hidden="true"></span>
+            <p id="audio-status" class="status" role="status" aria-live="polite" aria-atomic="true">Audio off</p>
+          </div>
+          <button id="power-audio" class="button button-primary" type="button" aria-label="Power on audio">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v9M6.4 5.6a8 8 0 1 0 11.2 0" /></svg>
+            <span id="power-label">Power on</span>
+          </button>
+        </div>
+
+        <div id="audio-error" class="error-panel" role="alert" aria-live="assertive" hidden>
+          <p id="error-message"></p>
+        </div>
+
+        <div class="parameter-controls" role="group" aria-label="Synth controls">
+          <label class="parameter" for="volume">
+            <span class="parameter-label">
+              <span class="parameter-name"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10h4l5-4v12l-5-4H4ZM17 8a6 6 0 0 1 0 8" /></svg>Volume</span>
+              <output id="volume-value" for="volume">15%</output>
+            </span>
+            <input id="volume" type="range" min="0" max="1" step="0.01" value="0.15" disabled />
+          </label>
+          <label class="parameter" for="cutoff">
+            <span class="parameter-label">
+              <span class="parameter-name"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h7c6 0 3 12 11 12M3 21h18" /></svg>Filter</span>
+              <output id="cutoff-value" for="cutoff">2,000 Hz</output>
+            </span>
+            <input id="cutoff" type="range" min="0" max="1" step="0.001" value="0.613" disabled />
+          </label>
+        </div>
+
+        <div class="keyboard-toolbar">
+          <div class="note-readout">
+            <span class="voice-mode">Mono</span>
+            <span id="active-note-display" class="active-note-display">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10h4l5-4v12l-5-4H4ZM17 8a6 6 0 0 1 0 8" /></svg>
+              <output id="active-note" aria-label="Active note" aria-live="off">—</output>
+            </span>
+          </div>
+          <div id="keyboard-navigation" class="keyboard-navigation" role="group" aria-label="Keyboard range" hidden>
+            <button id="lower-notes" class="button button-icon" type="button" aria-label="Lower notes" aria-controls="piano-scroll" disabled>
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6" /></svg>
+            </button>
+            <button id="higher-notes" class="button button-icon" type="button" aria-label="Higher notes" aria-controls="piano-scroll" disabled>
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m10 6 6 6-6 6" /></svg>
+            </button>
+          </div>
+        </div>
+        <div id="piano-scroll" class="keyboard-scroll" tabindex="0" aria-label="Piano keyboard. Hold a note or use its letter key. Scroll for higher notes.">
+          <div class="keyboard" role="group" aria-label="C4 through C5">
+            <button class="key is-natural" type="button" data-midi="60" data-computer-key="A" aria-label="C4, computer key A" aria-pressed="false">
+              <span class="note-name">C4</span><kbd>A</kbd>
+            </button>
+            <button class="key is-black" type="button" data-midi="61" data-computer-key="W" aria-label="C sharp 4, computer key W" aria-pressed="false">
+              <span class="note-name">C♯4</span><kbd>W</kbd>
+            </button>
+            <button class="key is-natural" type="button" data-midi="62" data-computer-key="S" aria-label="D4, computer key S" aria-pressed="false">
+              <span class="note-name">D4</span><kbd>S</kbd>
+            </button>
+            <button class="key is-black" type="button" data-midi="63" data-computer-key="E" aria-label="D sharp 4, computer key E" aria-pressed="false">
+              <span class="note-name">D♯4</span><kbd>E</kbd>
+            </button>
+            <button class="key is-natural" type="button" data-midi="64" data-computer-key="D" aria-label="E4, computer key D" aria-pressed="false">
+              <span class="note-name">E4</span><kbd>D</kbd>
+            </button>
+            <button class="key is-natural" type="button" data-midi="65" data-computer-key="F" aria-label="F4, computer key F" aria-pressed="false">
+              <span class="note-name">F4</span><kbd>F</kbd>
+            </button>
+            <button class="key is-black" type="button" data-midi="66" data-computer-key="T" aria-label="F sharp 4, computer key T" aria-pressed="false">
+              <span class="note-name">F♯4</span><kbd>T</kbd>
+            </button>
+            <button class="key is-natural" type="button" data-midi="67" data-computer-key="G" aria-label="G4, computer key G" aria-pressed="false">
+              <span class="note-name">G4</span><kbd>G</kbd>
+            </button>
+            <button class="key is-black" type="button" data-midi="68" data-computer-key="Y" aria-label="G sharp 4, computer key Y" aria-pressed="false">
+              <span class="note-name">G♯4</span><kbd>Y</kbd>
+            </button>
+            <button class="key is-natural" type="button" data-midi="69" data-computer-key="H" aria-label="A4, computer key H" aria-pressed="false">
+              <span class="note-name">A4</span><kbd>H</kbd>
+            </button>
+            <button class="key is-black" type="button" data-midi="70" data-computer-key="U" aria-label="A sharp 4, computer key U" aria-pressed="false">
+              <span class="note-name">A♯4</span><kbd>U</kbd>
+            </button>
+            <button class="key is-natural" type="button" data-midi="71" data-computer-key="J" aria-label="B4, computer key J" aria-pressed="false">
+              <span class="note-name">B4</span><kbd>J</kbd>
+            </button>
+            <button class="key is-natural" type="button" data-midi="72" data-computer-key="K" aria-label="C5, computer key K" aria-pressed="false">
+              <span class="note-name">C5</span><kbd>K</kbd>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <footer class="page-footer">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14v-2a8 8 0 0 1 16 0v2" /><rect x="3" y="12" width="4" height="8" rx="2" /><rect x="17" y="12" width="4" height="8" rx="2" /></svg>
+        <p>Keep device volume low.</p>
+      </footer>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

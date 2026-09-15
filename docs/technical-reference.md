@@ -1016,19 +1016,26 @@ It depends on `graph/` and `dsp/`, not on browser APIs or global registries.
 - `MountedGraph::play` seals mount admission on its owning engine only.
   `pause` preserves DSP state; `unmount` detaches permanently and is idempotent.
   A retired handle cannot control a replacement that reuses its slot.
+- `MountedGraph::apply_controls(Array[GraphControl])` applies the existing
+  transactional compiled-graph control contract to that handle. Node indices
+  are original authoring indices. A rejected batch leaves all controls
+  unapplied and raises `GraphEngineError::ControlRejected` with the underlying
+  `GraphControlError`. Handle lifecycle errors take precedence.
+  Gate-off releases an ADSR envelope while processing continues; `pause` is
+  not note-off because it freezes the release along with other DSP state.
 - `process(output)` replaces the caller's buffer with the mono sum. Buffer
   length must match the context; mismatch is rejected before any state advance
   or buffer write. Successful processing reuses preallocated graph buffers.
 - `close` drops compiled graphs and invalidates remaining handles with
   `EngineClosed`. Already-unmounted handles remain safely unmounted. There is
   no implicit relationship between the lifetimes of separate engines.
-- Mounting, compilation, and lifecycle mutation occur outside processing.
-  Calls are serialized by the caller; this is not a concurrent engine API.
-  Live graph replacement, parameter automation, and scheduler integration are
-  not added by this layer.
+- Mounting, compilation, lifecycle mutation, and control batches occur outside
+  processing. Calls are serialized by the caller; this is not a concurrent
+  engine API. Live graph replacement, timestamped parameter automation, and
+  scheduler integration are not added by this layer.
 
-The browser adapter decodes its oscillator/gain/output JSON subset into
-canonical nodes in MoonBit, maps typed errors to a JSON error envelope, and
+The browser adapter decodes its oscillator/gain/output/ADSR/biquad/multiply
+JSON subset into canonical nodes in MoonBit, maps typed errors to a JSON error envelope, and
 keeps integer handles only at the WASM boundary. JavaScript owns browser
 resources, serialization, pending promises, and creation cancellation; it
 does not compile graphs or decide the engine's mount/playing state.

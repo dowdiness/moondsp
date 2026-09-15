@@ -1,0 +1,8 @@
+import {
+  "moonbitlang/async/js_async",
+  "moonbitlang/async",
+}
+
+import {
+  "dowdiness/moondsp-browser-host" @host,
+} for "test"

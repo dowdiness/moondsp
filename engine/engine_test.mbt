@@ -144,6 +144,68 @@ test "invalid compilation and capacity rejection leave the engine usable" {
 }
 
 ///|
+test "mounted control batches are atomic and lifecycle-aware" {
+  let ctx = @dsp.DspContext::DspContext(sample_rate=48000.0, block_size=128)
+  let engine = @engine.GraphEngine::GraphEngine(ctx)
+  let sound = engine.mount(patch(440.0))
+  let rejected = try {
+    sound.apply_controls([
+      @graph.GraphControl::set_param(1, @graph.GraphParamSlot::Value0, 0.2),
+      @graph.GraphControl::set_param(
+        1,
+        @graph.GraphParamSlot::DelaySamples,
+        1.0,
+      ),
+    ])
+    None
+  } catch {
+    error => Some(error)
+  }
+  guard rejected
+    is Some(
+      @engine.GraphEngineError::ControlRejected(
+        @graph.GraphControlError::InvalidSlotForNode(
+          1,
+          @graph.DspNodeKind::Gain,
+          @graph.GraphParamSlot::DelaySamples
+        )
+      )
+    ) else {
+    fail("expected atomic control rejection")
+  }
+  let other = engine.mount(patch(220.0))
+  sound.play()
+  let out = ctx.make_buffer()
+  engine.process(out)
+  assert_true(
+    (out.get(32) - 0.1 * @math.sin(2.0 * @math.PI * 440.0 * 32.0 / 48000.0)).abs() <
+    0.000001,
+  )
+  sound.unmount()
+  let after_unmount = try {
+    sound.apply_controls([@graph.GraphControl::gate_on(0)])
+    None
+  } catch {
+    error => Some(error)
+  }
+  guard after_unmount is Some(@engine.GraphEngineError::InvalidHandle) else {
+    fail("expected unmounted handle rejection")
+  }
+  engine.close()
+  let after_close = try {
+    other.apply_controls([
+      @graph.GraphControl::set_param(0, @graph.GraphParamSlot::Value0, 440.0),
+    ])
+    None
+  } catch {
+    error => Some(error)
+  }
+  guard after_close is Some(@engine.GraphEngineError::EngineClosed) else {
+    fail("expected closed engine rejection")
+  }
+}
+
+///|
 test "close is idempotent and invalidates remaining handles with typed errors" {
   let ctx = @dsp.DspContext::DspContext(sample_rate=48000.0, block_size=128)
   let engine = @engine.GraphEngine::GraphEngine(ctx)

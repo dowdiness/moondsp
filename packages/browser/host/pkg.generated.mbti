@@ -1,0 +1,38 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp-browser-host"
+
+// Values
+
+// Errors
+
+// Types and methods
+pub enum EngineExit {
+  Closed
+  Failed(RuntimeFailure)
+}
+
+pub struct EngineLifetime {
+  // private fields
+}
+pub fn EngineLifetime::EngineLifetime(NativeEngine) -> Self
+pub async fn EngineLifetime::close(Self) -> Result[Unit, RuntimeFailure]
+pub async fn EngineLifetime::wait(Self) -> EngineExit
+
+#external
+pub type NativeEngine
+
+#external
+pub type NativeError
+
+pub struct RuntimeFailure {
+  // private fields
+}
+pub fn RuntimeFailure::cause(Self) -> NativeError?
+pub fn RuntimeFailure::code(Self) -> String
+pub fn RuntimeFailure::message(Self) -> String
+pub fn RuntimeFailure::native(Self) -> NativeError
+pub fn RuntimeFailure::node_index(Self) -> Int?
+
+// Type aliases
+
+// Traits

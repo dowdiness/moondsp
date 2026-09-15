@@ -6,6 +6,9 @@ on:
       - main
   pull_request:
 
+env:
+  NEW_MOON_MOD: '0'
+
 jobs:
   browser-smoke:
     runs-on: ubuntu-latest
@@ -29,11 +32,30 @@ jobs:
       - name: Fetch MoonBit dependencies
         run: moon update
 
+      - name: Check JS host lifetime module
+        run: |
+          moon -C packages/browser/host check --target js
+          moon -C packages/browser/host test --target js
+
       - name: Install npm dependencies
         run: npm ci
 
+      - name: Pack browser library
+        run: npm run pack:browser
+
+      - name: Install fresh tarball and build standalone synth
+        working-directory: examples/basic-synth
+        # Regenerated Wasm can differ between MoonBit toolchain versions.
+        # Refresh the local tarball's integrity before building its consumer.
+        run: |
+          npm install ../../packages/browser/moondsp-browser-0.6.0.tgz
+          npm run build
+
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
+
+      - name: Run standalone synth lifetime tests
+        run: npm run test:basic-synth
 
       - name: Run browser smoke test
         run: npm run test:browser

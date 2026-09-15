@@ -3,7 +3,7 @@
 A portable, live-codable DSP audio and pattern engine written in [MoonBit](https://www.moonbitlang.com/).
 
 > **Patterns describe *what* plays *when*; DSP graphs describe *how* it sounds.**  
-> moondsp combines a Strudel/TidalCycles-inspired pattern algebra with a compiled, zero-allocation signal-processing graph and a polyphonic voice pool — designed to target **browser (Web AudioWorklet via `wasm-gc`)**, **native DAWs (CLAP via C ABI)**, and **headless CLI / host-independent embedded execution** from a single unified codebase.
+> moondsp combines a Strudel/TidalCycles-inspired pattern algebra with a compiled signal-processing graph and a polyphonic voice pool, targeting **browser (Web AudioWorklet via `wasm-gc`)**, **native DAWs (CLAP prototype via C ABI)**, and **host-independent MoonBit execution**.
 
 ---
 
@@ -11,8 +11,8 @@ A portable, live-codable DSP audio and pattern engine written in [MoonBit](https
 
 `moondsp`'s core DSP, graph compilation, and pattern scheduling are completely platform-agnostic and free of browser or host globals. The engine compiles to multiple targets:
 
-- 🌐 **Browser (Web AudioWorklet)**: Compiled via `wasm-gc` for high-performance, glitch-free in-browser live coding and synthesis.
-- 🎛️ **Native DAWs (CLAP Plugin Prototype)**: Native shared library via MoonBit's C ABI shim, compatible with modern DAWs (passes `clap-validator`).
+- **Browser (Web AudioWorklet)**: Compiled via `wasm-gc` for in-browser live coding and synthesis. Automated checks cover rendered PCM and resource lifecycle; they do not establish glitch-free playback on every device.
+- **Native DAWs (CLAP Plugin Prototype)**: Native shared library via MoonBit's C ABI shim. It passes `clap-validator`; real host/DAW loading, stable bridge symbols, and an audio-thread allocation audit remain production gates.
 - 🖥️ **Host-Independent MoonBit API**: Direct programmatic audio synthesis in pure MoonBit via `GraphEngine` — embeddable into games, tools, or custom runtimes.
 - 💻 **CLI & Offline Rendering**: Headless command-line entry point for audio rendering, batch synthesis, and automated tests.
 
@@ -20,9 +20,36 @@ A portable, live-codable DSP audio and pattern engine written in [MoonBit](https
 
 ## Quick start
 
+### Play the basic synth in a browser
+
+[`examples/basic-synth`](examples/basic-synth/README.md) uses only the public
+`@moondsp/browser` package: a C4–C5 keyboard, volume, low-pass cutoff, and
+a single Power on / Power off control. It is monophonic, with last-held-note
+priority, and contains no custom Worklet.
+
+Audio starts off, without an `AudioContext`. Power on handles browser admission,
+loading, and playback; Power off cancels loading or releases the entire session.
+Processor failure is reported immediately, and the same Power on button retries.
+
+To build a local distribution and run its consumer:
+
+```sh
+npm run pack:browser
+cd examples/basic-synth
+npm install ../../packages/browser/moondsp-browser-0.6.0.tgz
+npm run dev
+```
+
+Building the tarball requires MoonBit. Consuming that tarball elsewhere does
+not: it includes the matching Wasm, Worklet, JS API, and TypeScript declarations.
+The package is not yet published to npm. See the example README for external
+installation and production builds.
+
+### Engine development
+
 ```bash
 # Verify & test the core engine across targets
-NEW_MOON_MOD=0 moon check && NEW_MOON_MOD=0 moon test
+NEW_MOON_MOD=0 moon check --target all && NEW_MOON_MOD=0 moon test --target all
 
 # Run CLI entry point
 NEW_MOON_MOD=0 moon run cmd/main
@@ -32,11 +59,16 @@ NEW_MOON_MOD=0 moon run cmd/main
 
 ### 1. Run in Browser (Web AudioWorklet via `wasm-gc`)
 ```bash
-NEW_MOON_MOD=0 moon build --target wasm-gc
-# Start any local HTTP server (AudioWorklet requires an HTTP origin)
-python3 -m http.server 8000
-# Open http://localhost:8000/web/ in your browser
+NEW_MOON_MOD=0 moon build --target wasm-gc --release
+./playwright-serve.sh 8000
+# Open http://127.0.0.1:8000/ for the demo
+# Open http://127.0.0.1:8000/graph-example.html for the public graph API
 ```
+
+The server script copies the release Wasm into `web/` before serving it.
+Use localhost for development and HTTPS for deployment; AudioWorklet requires
+a secure context, not merely an HTTP origin. Rebuild and restart the script
+after changing MoonBit sources to avoid serving stale Wasm.
 
 ### 2. Build Native CLAP Plugin Prototype
 ```bash
@@ -74,9 +106,23 @@ test {
 }
 ```
 
-Operations raise the checked `GraphEngineError` type. Compilation happens ahead of time during mount, guaranteeing **zero allocation** during `process()`.
+Operations raise the checked `GraphEngineError` type. Mount compiles the graph
+and prepares its buffers before `process()` renders it. This separation does
+not establish an allocation-free contract for every backend or host operation;
+see [Performance](#performance) for measured scope.
 
-For browser integration, `web/graph-engine.js` adapts this engine to AudioWorklet and Promise-based JavaScript APIs. See [the browser contract](docs/browser-api-contract.md).
+For browser use, `web/graph-engine.js` adapts this engine to AudioWorklet and
+Promise-based methods. Its JSON subset accepts oscillator, gain, output, ADSR,
+biquad, and multiply nodes; `applyControls` exposes atomic parameter and gate
+updates. The MoonBit API accepts canonical graphs supported by the mono
+compiler. See [the browser contract](docs/browser-api-contract.md).
+
+Browser applications observe termination through `engine.wait({ signal })`;
+cancelling a wait does not close the engine. `engine.close()` releases its graphs
+and Worklet but leaves the caller-owned `AudioContext` open. The optional
+JS-target MoonBit module at [`packages/browser/host`](packages/browser/host/)
+adds cancellable lifetime observation and protected cleanup without importing
+the async runtime into DSP/Wasm. See [host lifetime observation](docs/browser-api-contract.md#moonbit-lifetime-observation-on-the-js-host).
 
 ---
 
@@ -96,7 +142,7 @@ Pattern Engine (Human Time)           DSP Engine (Audio Time)
 ```
 
 - **Pattern layer**: Operates in musical cycles using exact fractions (`Rational`) — zero floating-point timing drift. Combinators like `fast`, `slow`, `rev`, `sequence`, `stack`, and `every` compose complex polyrhythms.
-- **DSP layer**: Declarative signal graphs compile into flat topological execution plans. Hard real-time: **zero allocations** in the audio thread (2.67 ms budget per block at 48 kHz / 128 samples).
+- **DSP layer**: Declarative signal graphs compile into flat topological execution plans with preallocated render buffers. At 48 kHz / 128 samples, the callback budget is 2.67 ms; meeting it is a measured deployment property, not a hard-real-time guarantee.
 - **Bridge**: `scheduler/` queries pattern events per audio block and dispatches note lifecycles and parameter updates to the voice pool through validated template bindings.
 
 ---
@@ -164,6 +210,9 @@ The codebase strictly decouples platform-agnostic core engines from platform-spe
 │   ├── browser/        AudioWorklet export wrapper and multi-pool routing (wasm-gc)
 │   ├── web/            Browser demo UI and AudioWorklet processor
 │   ├── browser_test/   Browser integration test wrapper (Playwright)
+│   ├── packages/browser/       Packaged JS/TS API, Worklet, and release Wasm
+│   ├── packages/browser/host/  Separate JS-target MoonBit lifetime binding
+│   ├── examples/basic-synth/   Standalone public-package consumer
 │   ├── clap_engine/    Native CLAP synth engine core around graph + voice pool
 │   ├── clap_host/      Primitive integer-handle bridge for C CLAP shims
 │   ├── clap_plugin/    Native CLAP prototype payload and C ABI shim (passes clap-validator)
@@ -176,12 +225,18 @@ The codebase strictly decouples platform-agnostic core engines from platform-spe
 
 ## Performance
 
-The audio callback budget at 128 samples / 48 kHz is **2.67 ms per block**. `moondsp` is engineered around strict real-time constraints:
-- A single compiled voice (oscillator + filter + delay + ADSR) processes in the **low-microsecond range**.
-- 32 simultaneous FM voices process comfortably within a fraction of the block budget.
-- Graph compilation and hot-swap crossfades are microsecond-scale, enabling glitch-free live graph reconfiguration.
+The audio callback budget at 128 samples / 48 kHz is **2.67 ms per block**.
+Graph compilation and buffer preparation happen before playback. Benchmark
+results depend on the graph, target, toolchain, host, and measurement method;
+dated records are under [`docs/performance/`](docs/performance/).
 
-Historical and current benchmark records are preserved under [`docs/performance/`](docs/performance/).
+The [Wasm-GC sine allocation investigation](docs/performance/2026-09-14-wasm-gc-sine-allocation-fix.txt)
+verified removal of the oscillator's scratch allocation and observed no GC in
+the measured fixed AudioWorklet windows. It also recorded an output underrun:
+these results do not prove zero allocation for the whole engine or glitch-free
+playback. Browser control decoding and transactional validation allocate
+outside the sample loop; a whole-audio-thread allocation/GC audit remains a
+separate gate.
 
 ---
 
@@ -195,20 +250,31 @@ NEW_MOON_MOD=0 moon check --target all --deny-warn
 NEW_MOON_MOD=0 moon test --target all --deny-warn
 
 # Test specific packages
-NEW_MOON_MOD=0 moon test -p dowdiness/moondsp
-NEW_MOON_MOD=0 moon test -p pattern
+NEW_MOON_MOD=0 moon test .
+NEW_MOON_MOD=0 moon test pattern
 
 # Format code and regenerate interfaces
 NEW_MOON_MOD=0 moon info && NEW_MOON_MOD=0 moon fmt
 
 # Run microbenchmarks
-NEW_MOON_MOD=0 moon bench --release -p dowdiness/moondsp/graph -f graph_benchmark.mbt
+NEW_MOON_MOD=0 moon bench graph/graph_benchmark.mbt --release
 
-# Run Playwright browser integration tests (builds wasm-gc first)
-npm run test:browser
+# Install browser verification tools and Chromium
+npm ci
+npm --prefix web/live ci
+npx playwright install chromium
+
+# Check public JS/TS usage, then run browser tests (builds wasm-gc first)
+npm run typecheck:graph
+NEW_MOON_MOD=0 npm run test:browser
 ```
 
 The project follows an incremental edit discipline: run `NEW_MOON_MOD=0 moon check` after edits and resolve errors before proceeding.
+The synth has a separate suite: build and install its tarball using the quick
+start above, then run `npm run test:basic-synth` from the repository root.
+The JS-target MoonBit module is verified separately with
+`NEW_MOON_MOD=0 npm run test:browser-host`; it is not included in root-module
+MoonBit tests.
 
 ---
 
@@ -217,6 +283,8 @@ The project follows an incremental edit discipline: run `NEW_MOON_MOD=0 moon che
 Start at the **[docs index](docs/README.md)**, which categorizes materials by role:
 
 - **[Technical reference](docs/technical-reference.md)** — Node types, parameter slots, runtime control surface (authoritative for graph runtime-control behavior)
+- **[Browser API contract](docs/browser-api-contract.md)** — Graph descriptions, atomic controls, engine lifetime, cancellation, and distribution
+- **[Basic synth guide](examples/basic-synth/README.md)** — Power lifecycle, resource ownership, setup, and verification
 - **[Mini-notation guide](docs/mini-notation.md)** — Pattern syntax, grouping, and method chaining
 - **[Blueprint](docs/blueprint.md)** — Complete architectural vision, design principles, and multi-target roadmap
 - **[Architecture decisions (ADRs)](docs/decisions/)** — Short records explaining why key architectural choices were made

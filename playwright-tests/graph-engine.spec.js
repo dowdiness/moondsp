@@ -72,6 +72,97 @@ test('invalid graphs return reasons without damaging a mounted graph', async ({ 
   expect(result.residual).toBeLessThan(1e-6);
 });
 
+test('external controls apply atomically and gate release keeps the graph playable', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const { GraphEngine } = await import('/graph-engine.js')
+    const context = new OfflineAudioContext(1, 4096, 48000);
+    const engine = await GraphEngine({ context });
+    const source = await engine.mount({ nodes: [
+      { type: 'oscillator', waveform: 'sine', frequency: 440 },
+      { type: 'biquad', input: 0, mode: 'lowpass', cutoff: 2000, q: 0.7 },
+      { type: 'adsr', attackMs: 0, decayMs: 0, sustain: 1, releaseMs: 1 },
+      { type: 'mul', input0: 1, input1: 2 },
+      { type: 'gain', input: 3, gain: 0.2 },
+      { type: 'output', input: 4 },
+    ] });
+    let rejected;
+    try {
+      await source.applyControls([
+        { type: 'setParam', node: 4, slot: 'value0', value: 0.4 },
+        { type: 'setParam', node: 4, slot: 'delaySamples', value: 1 },
+      ]);
+    } catch (error) {
+      rejected = { code: error.code, nodeIndex: error.nodeIndex };
+    }
+    let decodedRejection;
+    try {
+      await source.applyControls([
+        { type: 'setParam', node: 0, slot: 'value0', value: 880 },
+        { type: 'setParam', node: 4, slot: 'unknown', value: 0.4 },
+      ]);
+    } catch (error) {
+      decodedRejection = { code: error.code, nodeIndex: error.nodeIndex };
+    }
+    await source.applyControls([{ type: 'gateOn', node: 2 }]);
+    engine.output.connect(context.destination);
+    await source.play();
+    const suspended = context.suspend(2048 / 48000);
+    const rendering = context.startRendering();
+    await suspended;
+    await source.applyControls([{ type: 'gateOff', node: 2 }]);
+    await context.resume();
+    const buffer = await rendering;
+    let beforeReleasePeak = 0;
+    let afterReleasePeak = 0;
+    for (let i = 0; i < buffer.length; i++) {
+      const sample = Math.abs(buffer.getChannelData(0)[i]);
+      if (i < 2048) beforeReleasePeak = Math.max(beforeReleasePeak, sample);
+      if (i >= 3072) afterReleasePeak = Math.max(afterReleasePeak, sample);
+    }
+    await engine.close();
+    return { rejected, decodedRejection, beforeReleasePeak, afterReleasePeak };
+  });
+  expect(result.rejected.code).toBe('INVALID_CONTROL');
+  expect(result.rejected.nodeIndex).toBe(4);
+  expect(result.decodedRejection).toEqual({ code: 'INVALID_CONTROL', nodeIndex: 4 });
+  // The rejected batch did not partially change the gain from 0.2 to 0.4.
+  expect(result.beforeReleasePeak).toBeGreaterThan(0.08);
+  expect(result.beforeReleasePeak).toBeLessThan(0.3);
+  expect(result.afterReleasePeak).toBeLessThan(0.03);
+});
+
+test('controls reject after unmount and engine close without reviving a graph', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const { GraphEngine } = await import('/graph-engine.js')
+    const context = new OfflineAudioContext(1, 128, 48000);
+    const engine = await GraphEngine({ context });
+    const graph = { nodes: [
+      { type: 'oscillator', waveform: 'triangle', frequency: 440 },
+      { type: 'output', input: 0 },
+    ] };
+    const retired = await engine.mount(graph);
+    await retired.unmount();
+    let afterUnmount;
+    try {
+      await retired.applyControls([{ type: 'gateOn', node: 0 }]);
+    } catch (error) {
+      afterUnmount = error.code;
+    }
+    const replacement = await engine.mount(graph);
+    await replacement.play();
+    const closing = engine.close();
+    let afterClose;
+    try {
+      await replacement.applyControls([{ type: 'setParam', node: 0, slot: 'value0', value: 1 }]);
+    } catch (error) {
+      afterClose = error.code;
+    }
+    await closing;
+    return { afterUnmount, afterClose };
+  });
+  expect(result).toEqual({ afterUnmount: 'INVALID_HANDLE', afterClose: 'ENGINE_CLOSED' });
+});
+
 test('unmounting one playing graph preserves the other graph and its phase', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const { GraphEngine } = await import('/graph-engine.js')
@@ -519,4 +610,43 @@ test('late module loading cannot allocate a node after creation is aborted', asy
     return result;
   });
   expect(result).toEqual({ abandonedNodes: 0, outcome: 'ABORTED', state: 'suspended' });
+});
+
+test('wait retains processor failure and independently cancels waiters', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const { GraphEngine } = await import('/graph-engine.js');
+    const context = new AudioContext();
+    await context.suspend();
+    let worklet;
+    const NativeNode = window.AudioWorkletNode;
+    window.AudioWorkletNode = class extends NativeNode {
+      constructor(...args) { super(...args); worklet = this; window.AudioWorkletNode = NativeNode; }
+    };
+    const engine = await GraphEngine({ context });
+    const controller = new AbortController();
+    const cancelled = engine.wait({ signal: controller.signal }).then(() => 'wrong', error => error.name);
+    const survivor = engine.wait();
+    controller.abort('not the engine');
+    worklet.onprocessorerror(new Event('processorerror'));
+    const exit = await survivor;
+    const late = await engine.wait();
+    await engine.close();
+    await context.close();
+    return { exit: { type: exit.type, code: exit.error.code }, late: { type: late.type, code: late.error.code }, cancelled: await cancelled };
+  });
+  expect(result).toEqual({ exit: { type: 'failed', code: 'PROCESSOR_FAILED' }, late: { type: 'failed', code: 'PROCESSOR_FAILED' }, cancelled: 'AbortError' });
+});
+
+test('pre-aborted wait rejects without changing engine lifetime', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const { GraphEngine } = await import('/graph-engine.js');
+    const context = new OfflineAudioContext(1, 32, 48000);
+    const engine = await GraphEngine({ context });
+    const controller = new AbortController();
+    controller.abort('already gone');
+    const outcome = await engine.wait({ signal: controller.signal }).then(() => 'wrong', error => ({ name: error.name, cause: error.cause }));
+    await engine.close();
+    return { outcome, state: context.state, exit: await engine.wait() };
+  });
+  expect(result).toEqual({ outcome: { name: 'AbortError', cause: 'already gone' }, state: 'suspended', exit: { type: 'closed' } });
 });

@@ -20,7 +20,7 @@ class MoonDspGraphProcessor extends AudioWorkletProcessor {
       if (this.closed) return;
       this.wasm = instance.exports;
       for (const name of ['graph_host_init', 'graph_host_clear_input', 'graph_host_push_char', 'graph_host_mount',
-        'graph_host_command', 'graph_host_process', 'graph_host_sample', 'graph_host_close',
+        'graph_host_command', 'graph_host_apply_controls', 'graph_host_process', 'graph_host_sample', 'graph_host_close',
         'graph_host_error_length', 'graph_host_error_char']) {
         if (typeof this.wasm[name] !== 'function') throw new Error(`Missing export: ${name}`);
       }
@@ -54,6 +54,20 @@ class MoonDspGraphProcessor extends AudioWorkletProcessor {
     return handle;
   }
 
+  applyControls(handle, controls) {
+    let encoded;
+    try {
+      encoded = JSON.stringify(controls);
+    } catch (_) {
+      throw Object.assign(new Error('Invalid graph controls'), { code: 'INVALID_CONTROL' });
+    }
+    this.wasm.graph_host_clear_input();
+    if (encoded !== undefined) {
+      for (const char of encoded) this.wasm.graph_host_push_char(char.codePointAt(0));
+    }
+    if (!this.wasm.graph_host_apply_controls(handle)) throw this.hostError();
+  }
+
   receive(data) {
     if (this.closed) return;
     // Cancellation can arrive before WASM instantiation has completed.
@@ -75,6 +89,12 @@ class MoonDspGraphProcessor extends AudioWorkletProcessor {
             throw Object.assign(new Error('Invalid graph command'), { code: 'INVALID_HANDLE' });
           }
           if (!this.wasm.graph_host_command(data.handle, data.command)) throw this.hostError();
+          break;
+        case 'applyControls':
+          if (!Number.isInteger(data.handle) || data.handle <= 0 || data.handle >= 2147483647) {
+            throw Object.assign(new Error('Invalid graph handle'), { code: 'INVALID_HANDLE' });
+          }
+          value = this.applyControls(data.handle, data.controls);
           break;
         default: throw Object.assign(new Error('Unknown request'), { code: 'INVALID_REQUEST' });
       }
