@@ -19,9 +19,10 @@ pass Triangle.
 The diagnostic branch is ported to main's prepared-playback API:
 `clear_playback_input` / `push_playback_char` → `prepare_pattern_input` →
 `apply_prepared_playback(token, true)`. It retains main's production transport,
-snapshot-entry reconciliation, and shared-send rendering. On the ported branch,
-all four scheduler/crackle Playwright scenarios pass in Linux headless Chromium;
-this does not establish affected-Windows real-time playback quality.
+snapshot-entry reconciliation, and shared-send rendering. After reconstruction
+onto `main` on 2026-09-15, all four scheduler/crackle Playwright scenarios pass
+in Linux headless Chromium; this does not establish affected-Windows real-time
+playback quality.
 
 ## Automated matrix
 
@@ -68,8 +69,8 @@ passed:
 - single-note, sequence, and dense-triad cases stayed below unity;
 - the 13-note repeated stack reached all 24 synth voices and produced
   clipping:
-  - Triangle: peak `1.9344473`, 750 samples above unity;
-  - Sine: peak `2.2354193`, 1,184 samples above unity.
+  - Triangle: peak `1.4565184`, 730 samples above unity;
+  - Sine: peak `1.6223258`, 1,306 samples above unity.
 
 The voice-pressure case also localized its largest discontinuities to
 voice-pressure/onset blocks. This is expected diagnostic evidence, not a new
