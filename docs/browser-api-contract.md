@@ -9,7 +9,7 @@ The `dowdiness/moondsp/browser` package has two reviewed public surfaces:
 
 Use this guide when writing host code or reviewing browser API PRs. Keep
 architecture rationale in ADRs, and keep graph runtime-control behavior in
-[`salat-engine-technical-reference.md`](salat-engine-technical-reference.md).
+[`technical-reference.md`](technical-reference.md).
 
 ## Contract summary
 
@@ -39,7 +39,7 @@ The implementation is MoonBit-first: `engine/` owns `GraphEngine`,
 Native MoonBit callers use `engine.mount(Array[DspNode])`, handle methods,
 and `engine.process(AudioBuffer)` directly. See the checked example in
 [`README.mbt.md`](../README.mbt.md) and the authoritative
-[engine contract](salat-engine-technical-reference.md#354-host-independent-graph-engine).
+[engine contract](technical-reference.md#354-host-independent-graph-engine).
 JavaScript manages browser resources and asynchronous transport, not DSP
 state or compilation.
 
@@ -249,7 +249,7 @@ the test-only JS driver. `npm run typecheck:graph` checks the public TS surface.
 `node` is the original authoring index, not the optimized execution index.
 For the synth example, oscillator frequency, biquad cutoff, and gain amount
 each use `value0` on their respective nodes. See the runtime-control slot
-matrix in the [technical reference](salat-engine-technical-reference.md).
+matrix in the [technical reference](technical-reference.md).
 
 MoonBit validates the whole batch before changing runtime state. A bad node,
 slot, value, or gate target rejects the batch with `INVALID_CONTROL`; preceding

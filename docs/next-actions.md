@@ -77,4 +77,4 @@ new feature work:
   `NEW_MOON_MOD=0 moon fmt`, and `NEW_MOON_MOD=0 moon package --list`, then
   inspect the generated package contents.
 - Graph runtime-control behavior changes: update
-  `docs/salat-engine-technical-reference.md` first.
+  `docs/technical-reference.md` first.
