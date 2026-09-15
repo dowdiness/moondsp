@@ -358,6 +358,11 @@ pub let mini_grammar : @loom.Grammar[MiniToken, MiniSyntaxKind, MiniAst] = @loom
 )
 
 ///|
+/// Recoverable syntax problems are returned in `DiagnosticSet`. A remaining
+/// Loom `Failure` means lexing or parser-engine construction failed before a
+/// usable CST was produced. This spec retains its historical `LexError`
+/// facade, so that fatal channel is deliberately normalized below; callers
+/// must not infer that the underlying cause was necessarily lexical.
 pub fn parse_cst(
   source : String,
 ) -> (@seam.CstNode, @core.DiagnosticSet) raise @core.LexError {
@@ -615,6 +620,9 @@ fn expect_song_keyword(
 }
 
 ///|
+/// Uses the same fatal-failure policy as `parse_cst`: recoverable syntax stays
+/// in `DiagnosticSet`, while an unrecoverable Loom `Failure` is normalized to
+/// the spec's historical `LexError` facade.
 pub fn parse_song_cst(
   source : String,
 ) -> (@seam.CstNode, @core.DiagnosticSet) raise @core.LexError {

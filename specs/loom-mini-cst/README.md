@@ -52,7 +52,25 @@ and `moon.work`.
 This compatibility setup remains spec-local. It does not promote the Loom
 parser or add Loom-stack dependencies to published `moondsp` packages.
 
-### 3. Smoke-check status
+### 3. Failure policy
+
+Recoverable mini-notation syntax problems remain values: CST entry points return
+them in `DiagnosticSet`, while semantic projection entry points return `Err(String)`.
+They do not use Loom's raising channel.
+
+The CST helpers retain their historical `raise LexError` surface. A fatal Loom
+`Failure` is therefore normalized to `LexError`; that adapter preserves the
+spec API but does not claim the underlying failure was lexical.
+
+`LoomMiniAtomProjection` also retains its historical non-raising constructor
+and mutation methods. Its edit evidence is staged before the parser snapshot is
+updated, so a raised parser-engine failure can leave those two inputs
+inconsistent. The `try!` calls deliberately treat that state as unsafe to
+continue rather than disguising it as a recoverable syntax error. The one-shot
+song projection has no escaped mutable state and safely converts parser
+initialization failure to its existing `Err(String)` boundary.
+
+### 4. Smoke-check status
 
 With the sibling checkout in place, run the supported source-compatibility
 checks from this directory:

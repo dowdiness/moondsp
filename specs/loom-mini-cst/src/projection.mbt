@@ -107,6 +107,10 @@ pub struct LoomMiniAtomProjection {
 }
 
 ///|
+/// Syntax problems are represented by parser diagnostics, not by the raising
+/// channel. `new_parser` raises only when it cannot produce the initial parser
+/// snapshot; no projection state exists to recover in that case, so this
+/// spec-only non-raising facade deliberately asserts success with `try!`.
 pub fn LoomMiniAtomProjection::new(input : String) -> LoomMiniAtomProjection {
   let parser = try! @loom.new_parser(
     loom_mini_source_id("atom-projection"),
@@ -215,6 +219,12 @@ pub fn LoomMiniAtomProjection::parse_doc(
 }
 
 ///|
+/// `edit` and `new_source` must satisfy Loom's trusted edit-transition
+/// contract. The projection stages identity evidence before updating the
+/// parser so the derived projection observes one logical transition. If the
+/// parser raises, that evidence may no longer match its snapshot; continuing
+/// with this projection would be unsafe, so `try!` deliberately treats the
+/// failure as a defect rather than hiding it as a syntax diagnostic.
 pub fn LoomMiniAtomProjection::apply_edit(
   self : LoomMiniAtomProjection,
   edit : @core.Edit,
@@ -226,6 +236,10 @@ pub fn LoomMiniAtomProjection::apply_edit(
 }
 
 ///|
+/// Syntax errors in `source` remain recoverable parser diagnostics. A raised
+/// reset failure means the cleared edit evidence may no longer correspond to
+/// the parser snapshot, so this non-raising facade deliberately asserts
+/// success with `try!` instead of allowing the projection to continue.
 pub fn LoomMiniAtomProjection::set_source(
   self : LoomMiniAtomProjection,
   source : String,
@@ -1417,6 +1431,10 @@ pub fn LoomMiniParsedSong::bpm(self : LoomMiniParsedSong) -> Double? {
 /// song, apply fills, and take the first bpm. Returns `Err` on any parser
 /// diagnostic or semantic violation (the authoring contract is `Result[_,
 /// String]`; message text is not contractual).
+/// Parser construction is different from the stateful projection facade
+/// above: no mutable projection state has escaped yet, so an initialization
+/// `Failure` is safely converted to this one-shot boundary's non-contractual
+/// `Err(String)`.
 pub fn loom_mini_parse_song(
   input : String,
 ) -> Result[LoomMiniParsedSong, String] {
