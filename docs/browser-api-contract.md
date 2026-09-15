@@ -82,7 +82,7 @@ This example separates mounting from the later Play gesture. For a single
 Power on gesture, call `context.resume()` before the first asynchronous wait
 so loading cannot consume the user activation. After admission, suspend the
 context again before creating the engine and mounting; start the graph, then
-resume and connect output. The [vanilla synth owner](../examples/vanilla-synth/src/audio.ts)
+resume and connect output. The [shared synth owner](../examples/basic-synth/core/audio.ts)
 implements that sequence, including cancellation during partial initialization
 and cleanup on failure. The engine itself does not perform browser admission.
 
@@ -390,12 +390,12 @@ hardware listening verdict or a hard-real-time allocation/GC audit.
 
 ### Standalone synth examples and local distribution
 
-[`examples/vanilla-synth`](../examples/vanilla-synth/README.md) and
-[`examples/svelte-synth`](../examples/svelte-synth/README.md) consume only the
-package root `@moondsp/browser`. They provide the same monophonic keyboard,
-volume and filter controls, and single Power on / Power off button. The vanilla
-example exposes the framework-free DOM boundary; the Svelte example renders the
-same state and gestures declaratively. Both start without an `AudioContext`,
+[`examples/basic-synth`](../examples/basic-synth/README.md) contains
+framework-free TypeScript and Svelte adapters over one shared core. Both consume
+only the package root `@moondsp/browser` and provide the same monophonic
+keyboard, volume and filter controls, and single Power on / Power off button.
+The vanilla adapter exposes the explicit DOM seam; the Svelte adapter renders
+the same state and gestures declaratively. Both start without an `AudioContext`,
 cancel partial initialization on Power off, close the full app-owned session,
 observe processor failure immediately through `engine.wait()`, and retry with a
 fresh session. Neither implements a Worklet nor reaches into the browser ABI.
@@ -412,12 +412,11 @@ relative asset URLs remain attached to their module. Production builds emit
 Wasm and Worklet files separately, with a relative base for subdirectory
 deployment. No application-side asset copy script is required.
 
-After rebuilding the tarball, reinstall it in the example directory you are
-running and restart the development server so it serves the new package. Do not
+After rebuilding the tarball, reinstall it in `examples/basic-synth` and restart
+the selected adapter's development server so it serves the new package. Do not
 combine an old installed package with freshly built loose Worklet or Wasm files.
-The [vanilla guide](../examples/vanilla-synth/README.md#maintainer-setup) and
-[Svelte guide](../examples/svelte-synth/README.md#maintainer-setup) include
-installation commands and verification coverage for failure recovery,
+The [example guide](../examples/basic-synth/README.md#maintainer-setup) includes
+installation commands and shared verification coverage for failure recovery,
 cancellation, delayed activation, and release tails.
 
 ## Supported facade groups

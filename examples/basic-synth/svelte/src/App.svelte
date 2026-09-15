@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
-  import { createAudio, type AudioActions } from "./audio";
-  import { controlView, cutoffFromInput, cutoffPosition, volumeFromInput, type ControlState } from "./controls";
+  import { createAudio, type AudioActions } from "../../core/audio";
+  import { controlView, cutoffFromInput, cutoffPosition, volumeFromInput, type ControlState } from "../../core/controls";
   import {
     EMPTY_KEYBOARD,
     keyboardView,
@@ -10,8 +10,8 @@
     type KeyboardEvent as KeyboardTransition,
     type KeyboardState,
     type NoteAction,
-  } from "./keyboard";
-  import { DEFAULT_SETTINGS } from "./synth";
+  } from "../../core/keyboard";
+  import { DEFAULT_SETTINGS } from "../../core/synth";
 
   interface Note {
     readonly midi: number;

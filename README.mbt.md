@@ -22,11 +22,10 @@ A portable, live-codable DSP audio and pattern engine written in [MoonBit](https
 
 ### Play the browser synth examples
 
-[`examples/svelte-synth`](examples/svelte-synth/README.md) uses Svelte 5 for
-declarative controls and keyboard markup. The matching
-[`examples/vanilla-synth`](examples/vanilla-synth/README.md) uses framework-free
-TypeScript. Both consume only the public `@moondsp/browser` package and provide
-the same monophonic C4–C5 instrument.
+[`examples/basic-synth`](examples/basic-synth/README.md) contains Svelte 5 and
+framework-free TypeScript adapters for the same monophonic C4–C5 instrument.
+Both consume a shared framework-independent core and only import the public
+`@moondsp/browser` package.
 
 Audio starts off, without an `AudioContext`. Power on handles browser admission,
 loading, and playback; Power off cancels loading or releases the entire session.
@@ -36,16 +35,15 @@ To build a local distribution and run its consumer:
 
 ```sh
 npm run pack:browser
-cd examples/svelte-synth
+cd examples/basic-synth
 npm install ../../packages/browser/moondsp-browser-0.6.0.tgz
-npm run dev
+npm run dev:svelte
 ```
 
 Building the tarball requires MoonBit. Consuming that tarball elsewhere does
 not: it includes the matching Wasm, Worklet, JS API, and TypeScript declarations.
-The package is not yet published to npm. See either example README for external
-installation and production builds; use the vanilla example when integrating
-without a UI framework or comparing the DOM boundary.
+The package is not yet published to npm. The example guide covers both adapters,
+external installation, production builds, and the shared DOM/audio seam.
 
 ### Engine development
 
@@ -227,8 +225,7 @@ Shared authoring identity:
 |---|---|---|
 | [`browser/`](browser/README.md) | AudioWorklet export ABI and WASM-to-JS transport adapter (128-frame quantum, JSON decoding, named params) | `graph_host_*`, `scheduler_*`, `get_browser_*`, `browser_abi.baseline` |
 | [`packages/browser/`](packages/browser/README.md) | Local distribution bundle for `@moondsp/browser` (TypeScript declarations, JS API wrapper, processor, release Wasm) | `GraphEngine`, `GraphDescription`, `GraphControl` |
-| [`examples/vanilla-synth/`](examples/vanilla-synth/README.md) | Framework-free monophonic synth consuming `@moondsp/browser` | `SYNTH_GRAPH`, `noteOn`, `noteOff`, `startApplication` |
-| [`examples/svelte-synth/`](examples/svelte-synth/README.md) | Svelte 5 implementation of the same synth with declarative UI state | `App.svelte`, `SYNTH_GRAPH`, `noteOn`, `noteOff` |
+| [`examples/basic-synth/`](examples/basic-synth/README.md) | Shared synth core with framework-free TypeScript and Svelte 5 UI adapters | `AudioView`, `AudioActions`, `App.svelte`, `startApplication` |
 | [`clap_engine/`](clap_engine/README.mbt.md) | Polyphonic subtractive synth engine core tailored for CLAP plugins (preallocated voices, note ID / wildcard matching) | `ClapSynthEngine`, `CLAP_PARAM_*`, `default_synth_template` |
 | [`clap_host/`](clap_host/README.mbt.md) | Flat primitive integer-handle C-ABI bridge exposing scalar getters/setters without object leaking | `engine_create`, `engine_destroy`, `engine_note_on`, `engine_process`, `engine_set_param` |
 | [`clap_plugin/`](clap_plugin/README.md) | Native CLAP plugin payload, C ABI shim, build scripts, and `clap-validator` automation | `moondsp_clap.c`, `moondsp_clap_moonbit.h`, `clap_payload.mbt` |
@@ -260,8 +257,7 @@ The codebase strictly decouples platform-agnostic core engines from platform-spe
 │   ├── browser_test/   Browser integration test wrapper (Playwright)
 │   ├── packages/browser/       Packaged JS/TS API, Worklet, and release Wasm
 │   ├── packages/browser/host/  Separate JS-target MoonBit lifetime binding
-│   ├── examples/vanilla-synth/ Framework-free public-package consumer
-│   ├── examples/svelte-synth/  Svelte public-package consumer
+│   ├── examples/basic-synth/   Shared core with vanilla and Svelte adapters
 │   ├── clap_engine/    Native CLAP synth engine core around graph + voice pool
 │   ├── clap_host/      Primitive integer-handle bridge for C CLAP shims
 │   ├── clap_plugin/    Native CLAP prototype payload and C ABI shim (passes clap-validator)
@@ -319,9 +315,9 @@ NEW_MOON_MOD=0 npm run test:browser
 ```
 
 The project follows an incremental edit discipline: run `NEW_MOON_MOD=0 moon check` after edits and resolve errors before proceeding.
-The synth examples have separate suites: build and install the tarball using the
-quick start above, then run `npm run test:vanilla-synth` and
-`npm run test:svelte-synth` from the repository root.
+The basic synth has separate adapter suites over one shared lifetime contract:
+build and install its tarball using the quick start above, then run
+`npm run test:vanilla-synth` and `npm run test:svelte-synth`.
 The JS-target MoonBit module is verified separately with
 `NEW_MOON_MOD=0 npm run test:browser-host`; it is not included in root-module
 MoonBit tests.
@@ -334,8 +330,7 @@ Start at the **[docs index](docs/README.md)**, which categorizes materials by ro
 
 - **[Technical reference](docs/technical-reference.md)** — Node types, parameter slots, runtime control surface (authoritative for graph runtime-control behavior)
 - **[Browser API contract](docs/browser-api-contract.md)** — Graph descriptions, atomic controls, engine lifetime, cancellation, and distribution
-- **[Vanilla synth guide](examples/vanilla-synth/README.md)** — Framework-free power lifecycle, resource ownership, setup, and verification
-- **[Svelte synth guide](examples/svelte-synth/README.md)** — Declarative UI implementation of the same lifecycle and controls
+- **[Basic synth guide](examples/basic-synth/README.md)** — Shared audio lifecycle with framework-free and Svelte UI adapters
 - **[Mini-notation guide](docs/mini-notation.md)** — Pattern syntax, grouping, and method chaining
 - **[Blueprint](docs/blueprint.md)** — Complete architectural vision, design principles, and multi-target roadmap
 - **[Architecture decisions (ADRs)](docs/decisions/)** — Short records explaining why key architectural choices were made

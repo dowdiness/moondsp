@@ -1,8 +1,8 @@
-import { createAudio } from "./audio";
+import { createAudio } from "../../core/audio";
 import { readPage, createDomConnection, reportStartupFailure, type PageElements, type PageBindings } from "./dom";
-import { andThen, attempt, type Result } from "./result";
-import { DEFAULT_SETTINGS } from "./synth";
-import "./style.css";
+import { andThen, attempt, type Result } from "../../core/result";
+import { DEFAULT_SETTINGS } from "../../core/synth";
+import "../../core/style.css";
 
 // Page-specific names live at the composition root, not inside DOM actions.
 const PAGE_BINDINGS: PageBindings = {
