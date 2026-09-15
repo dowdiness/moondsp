@@ -193,6 +193,7 @@ test('crackle probe: AudioWorklet streaming oscillator route metrics', async ({ 
       const blockSize = 128;
       const blockCount = 512;
       const sampleRate = 48000;
+      const outputGain = 0.5;
       const context = new OfflineAudioContext(2, blockSize * blockCount, sampleRate);
       await context.audioWorklet.addModule('crackle-probe-processor.js');
       const messages = [];
@@ -205,6 +206,7 @@ test('crackle probe: AudioWorklet streaming oscillator route metrics', async ({ 
           routeId: config.routeId,
           waveformId: config.waveformId,
           freqHz: 440,
+          outputGain,
           blockCount,
         },
       });
@@ -226,6 +228,7 @@ test('crackle probe: AudioWorklet streaming oscillator route metrics', async ({ 
         sequential: blocks.every(
           (message, index) => message.blockIndex === index && message.wasmBlockIndex === index,
         ),
+        outputGainReported: blocks.every((message) => message.outputGain === outputGain),
         lastError: error?.message || '',
         maxLastErrorCode: 0,
         maxPeak: 0,
@@ -286,9 +289,13 @@ test('crackle probe: AudioWorklet streaming oscillator route metrics', async ({ 
     expect(summary.doneBlockCount, label).toBe(512);
     expect(summary.doneWasmBlockCount, label).toBe(512);
     expect(summary.sequential, label).toBe(true);
+    expect(summary.outputGainReported, label).toBe(true);
     expect(summary.renderedPeak, label).toBeGreaterThan(0.001);
     expect(summary.renderedNanOrInfCount, label).toBe(0);
     expect(summary.maxPeak, label).toBeGreaterThan(0.001);
+    expect(Math.abs(summary.maxPeak - summary.renderedPeak), `${label} post-gain peak`).toBeLessThan(
+      1e-6,
+    );
     expect(summary.maxLastErrorCode, label).toBe(0);
     expect(summary.maxNanOrInfCount, label).toBe(0);
     expect(summary.maxSanitizedCount, label).toBe(0);
