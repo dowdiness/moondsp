@@ -3,10 +3,13 @@
   "version": "0.0.0",
   "source": "src",
   "deps": {
+    "dowdiness/diagnostic": { "path": "../../../canopy/deps/loom/diagnostic" },
+    "dowdiness/graphviz": { "path": "../../../canopy/deps/graphviz" },
     "dowdiness/loom": { "path": "../../../canopy/deps/loom/loom" },
     "dowdiness/moondsp": { "path": "../.." },
     "dowdiness/seam": { "path": "../../../canopy/deps/loom/seam" },
     "dowdiness/pretty": { "path": "../../../canopy/deps/loom/pretty" },
+    "dowdiness/moji": { "path": "../../../canopy/deps/loom/moji" },
     "dowdiness/incr": { "path": "../../../canopy/deps/loom/incr/incr" },
     "dowdiness/text_change": { "path": "../../../canopy/deps/loom/text-change" }
   },

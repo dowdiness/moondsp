@@ -143,8 +143,17 @@ pub fn mini_step_lexer(
 }
 
 ///|
-pub fn lex(source : String) -> @core.LexResult[MiniToken] {
+fn loom_mini_source_id(kind : String) -> @core.SourceId {
+  @core.SourceId("loom-mini-cst." + kind)
+}
+
+///|
+fn lex_with_source_id(
+  source_id : @core.SourceId,
+  source : String,
+) -> @core.LexResult[MiniToken] {
   let buffer = @core.TokenBuffer::new_from_steps(
+    source_id,
     source,
     @core.PrefixLexer::new(lex_step=mini_step_lexer),
     eof_token=EOF,
@@ -156,6 +165,11 @@ pub fn lex(source : String) -> @core.LexResult[MiniToken] {
     buffer.get_starts(),
     diagnostics=buffer.get_diagnostics(),
   )
+}
+
+///|
+pub fn lex(source : String) -> @core.LexResult[MiniToken] {
+  lex_with_source_id(loom_mini_source_id("lex"), source)
 }
 
 ///|

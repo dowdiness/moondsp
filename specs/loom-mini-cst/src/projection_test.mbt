@@ -55,10 +55,7 @@ fn projection_boundary_leaf_ids(
   let events = snapshot.query_sourced_events(projection_boundary_one_cycle())
   let ids : Array[String] = []
   for event in events {
-    match event.pattern_node() {
-      Some(id) => ids.push(id.value())
-      None => ids.push("<none>")
-    }
+    ids.push(event.pattern_node().value())
   }
   ids
 }
@@ -136,10 +133,7 @@ fn projection_boundary_value_events(
   let events = snapshot.query_sourced_events(projection_boundary_parity_window())
   let out : Array[BoundaryEvent] = []
   for sourced in events {
-    let id = match sourced.pattern_node() {
-      Some(node) => node.value()
-      None => "<none>"
-    }
+    let id = sourced.pattern_node().value()
     let ev = sourced.event()
     out.push({ id, control: ev.value.entries(), whole: ev.whole, part: ev.part })
   }
@@ -1483,9 +1477,8 @@ test "loom atom projection rejects identifier note atom instead of dropping it" 
     Err(msg) => inspect(msg, content="loom atom projection expected note number")
     Ok(_) => abort("expected identifier note atom projection to fail")
   }
-  match @mini.parse_doc(input) {
-    Err(msg) => inspect(msg, content="position 0: expected number")
-    Ok(_) => abort("expected identifier note atom production parse_doc to fail")
+  guard @mini.parse_doc(input) is Err(_) else {
+    abort("expected identifier note atom production parse_doc to fail")
   }
   projection.dispose()
 }

@@ -95,9 +95,9 @@ priv struct LoomMiniProjectedCursor {
 pub struct LoomMiniAtomProjection {
   priv parser : @loom.Parser[MiniAst]
   priv scope : @incr.Scope
-  priv edit : @incr.Signal[@core.Edit?]
-  priv source_before_edit : @incr.Signal[String?]
-  priv observer : @incr.Observer[
+  priv edit : @incr.Input[@core.Edit?]
+  priv source_before_edit : @incr.Input[String?]
+  priv watch : @incr.Watch[
     Result[@pattern.PatternDoc[@pattern.ControlMap], String],
   ]
   priv accepted : @incr.AcceptedDerived[
@@ -108,23 +108,26 @@ pub struct LoomMiniAtomProjection {
 
 ///|
 pub fn LoomMiniAtomProjection::new(input : String) -> LoomMiniAtomProjection {
-  let parser = @loom.new_parser(input, mini_grammar)
+  let parser = try! @loom.new_parser(
+    loom_mini_source_id("atom-projection"),
+    input,
+    mini_grammar,
+  )
   let rt = parser.runtime()
   let scope = @incr.Scope::new(rt)
-  let edit : @incr.Signal[@core.Edit?] = @incr.Signal::new(
+  let edit : @incr.Input[@core.Edit?] = @incr.Input(
     rt,
     None,
     label="loom-mini-atom-projection.edit",
   )
-  let source_before_edit : @incr.Signal[String?] = @incr.Signal::new(
+  let source_before_edit : @incr.Input[String?] = @incr.Input(
     rt,
     None,
     label="loom-mini-atom-projection.source-before-edit",
   )
   let mut previous_doc : @pattern.PatternDoc[@pattern.ControlMap]? = None
-  let identity_tracker : @loom.ProjectionIdentityTracker[String] = @loom.ProjectionIdentityTracker::new()
-  let projected = @incr.Memo::new_no_backdate(
-    rt,
+  let identity_tracker : @loom.ProjectionIdentityTracker[String] = @loom.ProjectionIdentityTracker()
+  let projected = scope.derived_no_backdate(
     fn() {
       let current_edit = edit.get()
       let edit_source = source_before_edit.get()
@@ -187,13 +190,12 @@ pub fn LoomMiniAtomProjection::new(input : String) -> LoomMiniAtomProjection {
     },
     label="loom-mini-atom-projection.doc",
   )
-  scope.add_cell_ids([projected.id()])
-  let observer = scope.add_observer(projected.observe())
+  let watch = scope.add_watch(projected.watch())
   let accepted = scope.accepted_memo(
-    () => projected.get(),
+    () => projected.get_or_abort(),
     label="loom-mini-atom-projection.accepted",
   )
-  { parser, scope, edit, source_before_edit, observer, accepted }
+  { parser, scope, edit, source_before_edit, watch, accepted }
 }
 
 ///|
@@ -209,7 +211,7 @@ pub fn LoomMiniAtomProjection::accepted_doc(
 pub fn LoomMiniAtomProjection::parse_doc(
   self : LoomMiniAtomProjection,
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
-  self.observer.get()
+  self.watch.read_or_abort()
 }
 
 ///|
@@ -220,7 +222,7 @@ pub fn LoomMiniAtomProjection::apply_edit(
 ) -> Unit {
   self.source_before_edit.set(Some(self.parser.source().read_or_abort()))
   self.edit.set(Some(edit))
-  self.parser.apply_edit(edit, new_source)
+  try! self.parser.apply_edit(edit, new_source)
 }
 
 ///|
@@ -230,7 +232,7 @@ pub fn LoomMiniAtomProjection::set_source(
 ) -> Unit {
   self.source_before_edit.set(None)
   self.edit.set(None)
-  self.parser.set_source(source)
+  try! self.parser.set_source(source)
 }
 
 ///|
@@ -1418,7 +1420,11 @@ pub fn LoomMiniParsedSong::bpm(self : LoomMiniParsedSong) -> Double? {
 pub fn loom_mini_parse_song(
   input : String,
 ) -> Result[LoomMiniParsedSong, String] {
-  let parser = @loom.new_parser(input, song_grammar)
+  let parser = try {
+    @loom.new_parser(loom_mini_source_id("song-projection"), input, song_grammar)
+  } catch {
+    _ => return Err("loom song parser initialization failed")
+  }
   let diagnostics = parser.diagnostics().read_or_abort()
   if diagnostics.length() > 0 {
     return Err("loom song syntax has diagnostics")
