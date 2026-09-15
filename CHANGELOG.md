@@ -23,8 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   demonstrating `+` layers and parenthesized transforms with playable Mini scores.
 - Added `examples/basic-synth`, a standalone TypeScript/Vite consumer with a
   monophonic C4–C5 keyboard, volume and low-pass cutoff controls, release tails,
-  explicit audio start/disposal, and asset-error recovery. It imports only the
-  public browser package and does not implement its own Worklet. Its compact
+  a single Power on / Power off control, and asset-error recovery. It imports
+  only the public browser package and does not implement its own Worklet. Its compact
   piano layout distinguishes active and held notes, shows the active pitch,
   labels power states, and exposes bounded left/right navigation
   alongside touch scrolling and desktop keycaps. Public audio API calls remain
@@ -65,6 +65,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Stop notes, or Retry controls. Power on admits audio in the user gesture and
   completes suspended mounting and playback automatically. Power off cancels
   startup or releases the active session; automatic note-release safety remains.
+- Updated browser documentation with Wasm synchronization in the demo startup
+  commands, packed-package reinstall steps, JS-host lifetime navigation, and
+  the public `EngineExit` and `GraphEngineWaitOptions` types. README performance
+  claims now distinguish measured sine-kernel allocation removal from
+  whole-audio-thread and hard-real-time guarantees.
 
 - Named the asynchronous JavaScript/TypeScript engine factory `GraphEngine`,
   matching the MoonBit public type. Call it as `await GraphEngine({ context })`;

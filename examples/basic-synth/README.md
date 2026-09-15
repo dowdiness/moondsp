@@ -8,6 +8,11 @@ triangle oscillator → low-pass biquad → ADSR × signal → gain → output
 
 The keyboard uses last-held-note priority. There is one voice: pressing a new note changes frequency and gates the envelope; releasing it returns to the most recently held pointer or computer-key note. The 13 notes run from C4 through C5 and use `A W S E D F T G Y H U J K`. Click and hold the on-screen keys, or hold their computer-key equivalents.
 
+For the underlying graph descriptions, atomic control batches, cancellation,
+and engine termination contract, see the
+[browser API guide](../../docs/browser-api-contract.md). Applications written
+in JavaScript or TypeScript do not need the separate MoonBit host binding.
+
 ## Reading the source
 
 Start with [`src/main.ts`](src/main.ts), the composition root. Initialization
@@ -79,6 +84,9 @@ not page configuration.
 
 ## Maintainer setup
 
+This requires Node.js/npm and the MoonBit toolchain. The build wrapper keeps
+`NEW_MOON_MOD=0` set for its MoonBit invocation.
+
 From the repository root, build and pack the browser package first:
 
 ```sh
@@ -95,6 +103,11 @@ performs admission, loading, and playback startup; no separate Start action is
 needed. During loading, the same button becomes **Power off** so startup can be
 cancelled. The existing suspended-mount restriction is preserved inside this
 flow rather than exposed as another user step.
+
+When engine sources change, stop the example development server, run
+`npm run pack:browser` from the repository root again, then repeat the tarball
+installation and restart `npm run dev` in this directory. Rebuilding the
+tarball alone does not replace the copy already installed in `node_modules`.
 
 ## Using a packed package elsewhere
 
@@ -122,8 +135,17 @@ Consumers use the prebuilt package only; they do not need MoonBit or the moondsp
 
 ## Verification
 
-From the repository root, `npm run test:basic-synth` runs six Chromium
-regressions against the packed and installed package:
+Build and install the tarball with the maintainer setup above. Then, from the
+repository root:
+
+```sh
+npm ci
+npx playwright install chromium
+npm run test:basic-synth
+```
+
+The command starts a Vite server on port 4187 and runs Chromium regressions
+against the packed and installed package:
 
 - Processor failure notification and fresh-engine recovery through Power on.
 - Normal context closure and isolation from a retired engine's late failure.
@@ -136,11 +158,14 @@ The activation test reads through CDP without granting another user gesture;
 ordinary Playwright evaluation would renew activation and invalidate the check.
 Chromium runs with `--autoplay-policy=user-gesture-required`.
 
-Manual browser checks also covered keyboard activation of Power on, gain-zero
-silence, automatic note release on blur, settings retention across power cycles,
-and desktop/mobile layout with touch input. No horizontal page overflow was
-observed at 1365px desktop and 390px mobile widths. TypeScript checking and the
-Vite production build passed.
+For a manual check, activate Power on with the keyboard, hold and release a
+note, set volume to zero, and move focus away while holding a note. Confirm
+silence after release or blur, and confirm that volume and cutoff survive a
+power cycle. Check touch input and keyboard scrolling on a narrow viewport.
+
+Run `npm run build` in this example directory for TypeScript checking and a
+production bundle. Use `npm run preview` to check the emitted Worklet and Wasm
+assets, not just the development server.
 
 These checks do not replace hardware listening, Safari/Firefox compatibility
 testing, or an audio-thread allocation/GC audit. No hard-real-time or

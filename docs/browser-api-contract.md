@@ -11,6 +11,15 @@ Use this guide when writing host code or reviewing browser API PRs. Keep
 architecture rationale in ADRs, and keep graph runtime-control behavior in
 [`technical-reference.md`](technical-reference.md).
 
+For a new application, choose the public entry point rather than the raw ABI:
+
+| Application | Entry point |
+| --- | --- |
+| JavaScript or TypeScript instrument | `@moondsp/browser`; see [local distribution](#standalone-basic-synth-and-local-distribution) |
+| Repository-hosted browser integration | `web/graph-engine.js`; see [the external graph API](#external-graph-entry-point) |
+| MoonBit code observing an existing JS engine | The separate [JS-host lifetime module](#moonbit-lifetime-observation-on-the-js-host) |
+| Host-independent MoonBit rendering | Root-package `GraphEngine`; see [the engine contract](technical-reference.md#354-host-independent-graph-engine) |
+
 ## Contract summary
 
 - `browser/pkg.generated.mbti` defines the supported MoonBit source facade.
@@ -68,6 +77,14 @@ await sound.unmount();
 await engine.close();
 await context.close(); // Only the application closes its context.
 ```
+
+This example separates mounting from the later Play gesture. For a single
+Power on gesture, call `context.resume()` before the first asynchronous wait
+so loading cannot consume the user activation. After admission, suspend the
+context again before creating the engine and mounting; start the graph, then
+resume and connect output. The [basic synth owner](../examples/basic-synth/src/audio.ts)
+implements that sequence, including cancellation during partial initialization
+and cleanup on failure. The engine itself does not perform browser admission.
 
 ### Description and mounting
 
@@ -234,9 +251,11 @@ reject with `AbortError` only after their tasks and cleanup finish.
 Known host errors cross that export boundary as structured values, not raised
 errors that `from_async` would stringify.
 
-From the repository root, `npm run test:browser-host` runs the isolated MoonBit
-tests and real Chromium/AudioWorklet lifetime tests. The Playwright suite builds
-the test-only JS driver. `npm run typecheck:graph` checks the public TS surface.
+From the repository root, `NEW_MOON_MOD=0 npm run test:browser-host` runs the
+isolated MoonBit tests and real Chromium/AudioWorklet lifetime tests. The
+environment variable also covers the Playwright server's MoonBit build. The
+suite builds the test-only JS driver. `npm run typecheck:graph` checks the
+public TS surface.
 
 ### Live controls
 
@@ -299,7 +318,8 @@ const sound = await engine.mount(graph);
 The declaration exports `GraphDescription`, the discriminated `GraphNode` union
 and its `OscillatorNode`, `AdsrNode`, `BiquadNode`, `MulNode`, `GainNode`, and
 `OutputNode` variants, `Waveform`, `BiquadMode`, `GraphControl`,
-`GraphEngineOptions`, `GraphEngine`, `MountedGraph`, and `GraphEngineErrorCode`.
+`GraphEngineOptions`, `GraphEngineWaitOptions`, `EngineExit`, `GraphEngine`,
+`MountedGraph`, and `GraphEngineErrorCode`.
 These node types describe authoring data, not Web Audio nodes. Only
 `GraphEngine` and `GraphEngineError` are runtime exports. `GraphEngine` is also
 the returned engine's TypeScript type; import the remaining names with `import type`.
@@ -324,13 +344,23 @@ dependencies; type failures fail the job independently of browser runtime tests.
 
 ### Running the external example and acceptance tests
 
+Install the root npm development dependencies and Chromium first:
+
+```sh
+npm ci
+npx playwright install chromium
+```
+
+Then build and serve matching artifacts:
+
 ```sh
 NEW_MOON_MOD=0 moon build --target wasm-gc --release
 ./playwright-serve.sh 8090
 # Open http://127.0.0.1:8090/graph-example.html
 # In a second terminal:
 NEW_MOON_MOD=0 npx --no-install playwright test \
-  playwright-tests/graph-engine.spec.js --workers=1 --retries=0
+  playwright-tests/graph-engine.spec.js \
+  playwright-tests/graph-engine-lifetime.spec.js --workers=1 --retries=0
 ```
 
 The server script synchronizes WASM assets. Keep `graph-engine.js`,
@@ -349,8 +379,12 @@ hardware listening verdict or a hard-real-time allocation/GC audit.
 
 [`examples/basic-synth`](../examples/basic-synth/README.md) consumes the package
 root `@moondsp/browser` only. It provides a monophonic keyboard, volume and
-filter controls, and explicit audio/resource lifecycle actions; it does not
-implement a Worklet or reach into the browser ABI.
+filter controls, and one Power on / Power off button. It starts without an
+`AudioContext`; Power on performs admission, loading, and playback. Power off
+cancels partial initialization or closes the full app-owned session. Processor
+failure is observed immediately through `engine.wait()`; the same Power on
+button starts a fresh session. The example does not implement a Worklet or
+reach into the browser ABI.
 
 `npm run pack:browser` builds release Wasm and packs
 `packages/browser/moondsp-browser-0.6.0.tgz`. The tarball contains the matching
@@ -363,6 +397,13 @@ The Vite example excludes the ESM package from development pre-bundling so
 relative asset URLs remain attached to their module. Production builds emit
 Wasm and Worklet files separately, with a relative base for subdirectory
 deployment. No application-side asset copy script is required.
+
+After rebuilding the tarball, reinstall it in `examples/basic-synth` and restart
+the development server so it serves the new package. Do not combine an old
+installed package with freshly built loose Worklet or Wasm files. The
+[example guide](../examples/basic-synth/README.md#maintainer-setup) includes
+installation commands; its [verification section](../examples/basic-synth/README.md#verification)
+covers failure recovery, cancellation, delayed activation, and release tails.
 
 ## Supported facade groups
 

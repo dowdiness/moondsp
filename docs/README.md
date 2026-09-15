@@ -21,11 +21,19 @@ This directory contains architecture blueprints, technical references, integrati
 - 🎛️ **Native DAW Target**: **[`clap-plugin-guide.md`](clap-plugin-guide.md)** — Native CLAP plugin architecture, C ABI bridge (`clap_host`), Linux/Windows builds, and zero-allocation audit.
 - 🖥️ **Host-Independent MoonBit Target**: Direct programmatic API via `GraphEngine` (see [Root README](../README.md#host-independent-moonbit-api)).
 
+For a browser instrument, start with the
+[basic synth guide](../examples/basic-synth/README.md), then use the browser
+contract's [graph lifecycle](browser-api-contract.md#rendering-and-lifecycle)
+and [live controls](browser-api-contract.md#live-controls) sections.
+MoonBit applications observing an existing JavaScript engine can use the
+separate [JS-host lifetime binding](browser-api-contract.md#moonbit-lifetime-observation-on-the-js-host);
+this module is not part of the DSP/Wasm dependency graph.
+
 ---
 
 ## 3. Core Architecture & Specifications
 
-- **[`technical-reference.md`](technical-reference.md)** — **Authoritative** reference for graph runtime-control behavior: node types, parameter slots, topological compiler, and zero-allocation execution. If code and any other doc disagree, this document and the code take precedence.
+- **[`technical-reference.md`](technical-reference.md)** — **Authoritative** reference for graph runtime-control behavior: node types, parameter slots, compilation, and rendering. Update it first when that contract changes; code remains the source of truth.
 - **[`blueprint.md`](blueprint.md)** — Complete architectural vision, design principles, and multi-target roadmap.
 - **[`decisions/`](decisions/README.md)** — Architecture Decision Records (ADRs 0001 through 0017) capturing *why* key architectural choices were made.
 - **[`external-dsl-lowering.md`](external-dsl-lowering.md)** — Contract for external editors and DSLs lowering graphs into `Array[DspNode]` and `CompiledTemplate`.
@@ -35,7 +43,7 @@ This directory contains architecture blueprints, technical references, integrati
 
 ## 4. Evidences & Contributor Resources
 
-- **[`performance/`](performance/)** — Dated real-time audio benchmark snapshots and allocation audits.
+- **[`performance/`](performance/)** — Dated benchmark snapshots and allocation investigations, including the [Wasm-GC sine fix](performance/2026-09-14-wasm-gc-sine-allocation-fix.txt). Each record states its measured scope; it is not a whole-engine or hard-real-time guarantee.
 - **[`development/`](development/README.md)** — Hardware probes, zero-allocation audits, DAW compatibility records, and boundary inventories.
 - **[`next-actions.md`](next-actions.md)** — Active handoff list for upcoming priorities.
 - **[`../CLAUDE.md`](../CLAUDE.md)** — Project conventions and contributor quick reference.
