@@ -30,14 +30,14 @@ The seam between `core/` and each UI adapter is `AudioView` / `AudioActions` in 
 | File | Responsibility |
 |---|---|
 | [`core/synth.ts`](core/synth.ts) | Named graph parameters and pure raw note-control batches |
+| [`core/notes.ts`](core/notes.ts) | Shared C4–C5 note table, key maps, and accessible labels |
 | [`core/keyboard.ts`](core/keyboard.ts) | Pure last-held-note transitions and keyboard projections |
+| [`core/input.ts`](core/input.ts) | Gesture interpretation, pointer-session tracking, note-input controller, and [`input.test.ts`](core/input.test.ts) |
 | [`core/audio.ts`](core/audio.ts) | Package-owned power handles, application state projection, serialized commands, and note epochs |
 | [`core/controls.ts`](core/controls.ts) | Pure transport projection and slider conversions |
 | [`core/result.ts`](core/result.ts) | Explicit success/failure values and exception capture |
-| [`vanilla/src/dom.ts`](vanilla/src/dom.ts) | Required-element acquisition, DOM rendering, and browser gestures |
-| [`svelte/src/App.svelte`](svelte/src/App.svelte) | Declarative rendering, browser gestures, and the Svelte adapter |
-
-The Svelte adapter generates all piano keys from one keyed note table. It uses `$state.raw` for immutable reducer snapshots, `$derived` for pure projections, current event attributes, and `<svelte:window>` / `<svelte:document>` for global listeners. Range handlers read `valueAsNumber` directly and update UI and audio state together.
+| [`vanilla/src/dom.ts`](vanilla/src/dom.ts) | Required-element acquisition, DOM rendering, and browser event wiring |
+| [`svelte/src/App.svelte`](svelte/src/App.svelte) | Declarative rendering and Svelte event wiring over the shared core |
 
 ## Maintainer setup
 
@@ -79,11 +79,12 @@ After installing the packed dependency, run from the repository root:
 ```sh
 npm ci
 npx playwright install chromium
+npm --prefix examples/basic-synth run test:unit
 npm run test:vanilla-synth
 npm run test:svelte-synth
 ```
 
-Both commands execute [`tests/lifetime.spec.js`](tests/lifetime.spec.js) against their adapter. The scenarios cover processor failure recovery, normal context closure, cancellation during loading and mounting, stale resume completion, one-gesture startup, measured output, and release-to-silence.
+`test:unit` covers the shared notes table and gesture helpers. The Playwright commands execute [`tests/lifetime.spec.js`](tests/lifetime.spec.js) against each adapter. The scenarios cover processor failure recovery, normal context closure, cancellation during loading and mounting, stale resume completion, one-gesture startup, measured output, and release-to-silence.
 
 For a manual check, activate Power on with the keyboard, hold and release a note, set volume to zero, and move focus away while holding a note. Confirm silence after release or blur and confirm that volume and cutoff survive a power cycle. Check touch input and keyboard scrolling on a narrow viewport.
 

@@ -11,7 +11,8 @@
     "build:vanilla": "tsc --noEmit -p vanilla/tsconfig.json && vite build vanilla --config vanilla/vite.config.ts",
     "build:svelte": "svelte-check --tsconfig ./svelte/tsconfig.json && vite build svelte --config svelte/vite.config.ts",
     "preview:vanilla": "vite preview vanilla --config vanilla/vite.config.ts",
-    "preview:svelte": "vite preview svelte --config svelte/vite.config.ts"
+    "preview:svelte": "vite preview svelte --config svelte/vite.config.ts",
+    "test:unit": "node --import tsx --test core/input.test.ts"
   },
   "dependencies": {
     "@moondsp/browser": "file:../../packages/browser/moondsp-browser-0.6.0.tgz"
@@ -20,6 +21,7 @@
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
     "svelte": "^5.57.0",
     "svelte-check": "^4.7.6",
+    "tsx": "^4.23.13",
     "typescript": "^6.0.3",
     "vite": "^8.3.0"
   }
