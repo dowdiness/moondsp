@@ -407,3 +407,33 @@ test('12. concurrent resume shares promise and retirement rejects stale completi
   });
   expect(result).toEqual({ same: true, resume: 'AbortError', running: 'running', staleOffState: 'running', hasEngine: 'function' });
 });
+
+for (const legacy of [false, true]) {
+  for (const kind of ['Error', 'DOMException']) {
+    test(`cross-realm ${kind} retains identity and cause (${legacy ? 'legacy recognition' : 'native brand check'})`, async ({ page }) => {
+      await open(page);
+      const result = await page.evaluate(async ({ legacy, kind }) => {
+        if (legacy) Error.isError = undefined;
+        else if (typeof Error.isError !== 'function') throw new Error('Native brand check unavailable');
+        const iframe = document.createElement('iframe');
+        document.body.append(iframe);
+        const cause = { detail: 'original cause' };
+        const sentinel = new iframe.contentWindow[kind]('cross-realm sentinel');
+        sentinel.cause = cause;
+        const power = window.__AudioPower();
+        const audio = power.turnOn(async () => { throw sentinel; });
+        const error = await audio.ready.catch(error => error);
+        const end = await audio.ended;
+        await audio.turnOff();
+        iframe.remove();
+        return {
+          readyIdentity: error === sentinel,
+          endedIdentity: end.reason === 'failed' && end.error === sentinel,
+          causeIdentity: error.cause === cause,
+          closed: audio.context.state === 'closed',
+        };
+      }, { legacy, kind });
+      expect(result).toEqual({ readyIdentity: true, endedIdentity: true, causeIdentity: true, closed: true });
+    });
+  }
+}

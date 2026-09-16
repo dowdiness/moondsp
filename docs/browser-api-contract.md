@@ -376,8 +376,9 @@ cannot replace it in `ended`. The two results therefore answer different questio
   error. Avoid reporting it twice.
 - No failure: `ended` is turnedOff; `turnOff()` fulfills.
 
-Native `Error` identity and cause survive the MoonBit boundary; non-Error throws
-are normalized. Clean turn-off before readiness, including external context
+Native `Error` and `DOMException` identity and cause survive the MoonBit boundary,
+including errors from another realm such as an iframe. Non-Error throws are
+normalized. Clean turn-off before readiness, including external context
 closure, rejects `ready` with `AbortError`. The close-acknowledgement deadline
 (`closeTimeoutMs`, default 5000ms) belongs to the engine; it does not bound setup,
 the browser's `AudioContext.close()`, or total retirement time.
@@ -435,11 +436,13 @@ Resuming → Ready. Ready may enter Restoring for one retained resume task.
 Any live state can enter Retiring, then Ended. No optional-resource bag sits
 beside a phase enum. Ready resolves only at Resuming → Ready.
 
-The owner holds an admission slot and a cumulative retirement tail independently.
-Retirement vacates the slot and replaces the tail with join(old tail, cleanup).
-Cleanup starts immediately; cleanup operations may overlap. New context admission
-is gesture-synchronous, but new engine creation waits for every captured cleanup,
-even when predecessor cleanup failed.
+The owner holds an admission slot and a persistent list of typed cleanup
+completions independently. Retirement vacates the slot and prepends its completion
+before aborting the signal, so reentrant admission captures every pending
+predecessor. Completed prefixes are discarded; no JS join task is needed.
+Cleanup operations may overlap. New context admission is gesture-synchronous,
+but new engine creation waits for every captured completion, even when predecessor
+cleanup failed.
 
 Retirement progresses through ResolvingEngineAcquisition, Disconnecting,
 ClosingEngine, ClosingContext, and Complete, skipping unacquired resources.
@@ -447,13 +450,27 @@ Engine acquisition must yield a bounded ownership disposition before context
 close: either cancellation proves no engine can publish, or a late engine is
 closed and joined. Arbitrary setup completion is detached, not awaited by cleanup.
 
-All live-generation awaits use one arbiter. It registers late-result ownership
-before racing retirement, re-reads browser liveness after suspension, and commits
-the transition without another suspension. A closed context retires cleanly;
-operation failures otherwise retain the first error. Resource-owning race losers
-are disposed and joined, not dropped. Duplicate terminal signals return retained
-results; incompatible internal transitions use catchable failure, never abort.
-Native outcomes and context disposition are parsed once at the adapter boundary.
+A generation supervisor owns setup, processor observation, and acquisition tasks
+in one MoonBit task group. Retirement cancels and joins non-owning observers.
+The acquisition child is protected until it publishes a typed ownership outcome;
+only then does protected cleanup dispose any late engine and close the context.
+Internal `Completion[T]` values retain outcomes for cancellable `CondVar` waiters,
+without casting a JS deferred between user values and native result records.
+
+All live-generation awaits use one post-await arbiter. It re-reads browser
+liveness and commits the transition without another suspension. A closed context
+retires cleanly; operation failures otherwise retain the first error. Duplicate
+terminal signals return retained results; incompatible internal transitions use
+catchable failure, never abort. Native outcomes and context disposition are
+parsed once at the adapter boundary.
+
+JS promises remain at public and browser-effect boundaries. `Promise::from_async`
+starts only the generation supervisor and public resume operation; resume has its
+own scoped retirement observer. Browser-operation observation uses
+`js_async.run_promise` with an AbortSignal that actually detaches the observer,
+without pretending to cancel the underlying effect. The retirement signal also
+crosses this bridge: a bare JS callback broadcasting a MoonBit `CondVar` would
+not restart the pinned async runtime's JS scheduler.
 
 Normative transitions (public temporal misuse is rejected before dispatch):
 

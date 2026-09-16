@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   admission, cancellation, retained cleanup, processor failure observation,
   and replacement ordering; the root `GraphEngine` API remains caller-owned.
   The browser tarball includes the generated JS-target ownership core.
+  Generation tasks use MoonBit structured concurrency and typed internal
+  completions; JS promises remain at public/browser boundaries. Native error
+  identity and cause are preserved across realms, including iframe errors.
 
 - Added explicit Mini `.lpf(hz, resonance?)` and `.hpf(hz, resonance?)`
   controls and connected them, together with `.gain(n)`, to browser note and

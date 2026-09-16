@@ -11,6 +11,7 @@ priv type NativeContext
 priv type NativeResult
 
 ///|
+// Retained JS-facing promises only. Internal completions remain typed in MoonBit.
 #external
 priv type NativeDeferred
 
@@ -31,7 +32,21 @@ extern "js" fn native_result_value(result : NativeResult) -> NativeValue =
 
 ///|
 extern "js" fn native_result_error(result : NativeResult) -> @host.NativeError =
-  #| result => result.error instanceof Error ? result.error : new Error(String(result.error))
+  #| result => {
+  #|   const error = result.error;
+  #|   try {
+  #|     if (typeof Error.isError === 'function') {
+  #|       if (Error.isError(error)) return error;
+  #|     } else {
+  #|       // Older browsers lack the realm-independent branded check.
+  #|       const tag = Object.prototype.toString.call(error);
+  #|       if (error instanceof Error || tag === '[object Error]' || tag === '[object DOMException]') return error;
+  #|     }
+  #|     return new Error(String(error));
+  #|   } catch {
+  #|     return new Error('Non-Error exception');
+  #|   }
+  #| }
 
 ///|
 fn parse_outcome(result : NativeResult) -> NativeOutcome {
@@ -165,12 +180,6 @@ extern "js" fn native_promise(
   #| deferred => deferred.promise
 
 ///|
-extern "js" fn native_result_promise(
-  deferred : NativeDeferred,
-) -> @js_async.Promise[NativeResult] =
-  #| deferred => deferred.promise
-
-///|
 extern "js" fn native_resolve(
   deferred : NativeDeferred,
   value : NativeValue,
@@ -203,12 +212,6 @@ extern "js" fn native_unit() -> NativeValue =
 ///|
 extern "js" fn native_resolved() -> @js_async.Promise[NativeValue] =
   #| () => Promise.resolve(undefined)
-
-///|
-extern "js" fn native_as_outcome(
-  promise : @js_async.Promise[NativeValue],
-) -> @js_async.Promise[NativeResult] =
-  #| promise => promise.then(value => ({ ok: true, value }), error => ({ ok: false, error }))
 
 ///|
 extern "js" fn native_clean_end() -> NativeValue =
@@ -244,8 +247,56 @@ extern "js" fn started_error(error : @host.NativeError) -> NativeValue =
   #| error => ({ ok: false, error })
 
 ///|
-extern "js" fn native_forward_result(
-  promise : @js_async.Promise[NativeResult],
-  sink : NativeDeferred,
-) -> Unit =
-  #| (promise, sink) => { promise.then(sink.resolve); }
+// Cancel observation, not the underlying browser operation. Resource acquisition
+// instead uses an uncancellable wait held by its structured owner.
+extern "js" fn native_observe_operation(
+  operation : @js_async.Promise[NativeResult],
+  signal : @js_async.AbortSignal,
+) -> @js_async.Promise[NativeResult] =
+  #| (operation, signal) => new Promise((resolve, reject) => {
+  #|   const cancel = () => { signal.removeEventListener('abort', cancel); reject(signal.reason); };
+  #|   if (signal.aborted) { cancel(); return; }
+  #|   signal.addEventListener('abort', cancel, { once: true });
+  #|   operation.then(
+  #|     value => { signal.removeEventListener('abort', cancel); resolve(value); },
+  #|     error => { signal.removeEventListener('abort', cancel); reject(error); },
+  #|   );
+  #| })
+
+///|
+// The Promise bridge also wakes MoonBit's JS scheduler when retirement originates
+// in a synchronous JS call or browser event, outside a running MoonBit task.
+extern "js" fn native_wait_for_abort(
+  lifetime : @js_async.AbortSignal,
+  observer : @js_async.AbortSignal,
+) -> @js_async.Promise[NativeValue] =
+  #| (lifetime, observer) => new Promise((resolve, reject) => {
+  #|   const detach = () => {
+  #|     lifetime.removeEventListener('abort', ended);
+  #|     observer.removeEventListener('abort', cancelled);
+  #|   };
+  #|   const ended = () => { detach(); resolve(undefined); };
+  #|   const cancelled = () => { detach(); reject(observer.reason); };
+  #|   if (lifetime.aborted) { ended(); return; }
+  #|   if (observer.aborted) { cancelled(); return; }
+  #|   lifetime.addEventListener('abort', ended, { once: true });
+  #|   observer.addEventListener('abort', cancelled, { once: true });
+  #| })
+
+///|
+async fn observe_operation(
+  operation : @js_async.Promise[NativeResult],
+) -> NativeOutcome {
+  parse_outcome(
+    @js_async.run_promise(signal => native_observe_operation(operation, signal)),
+  )
+}
+
+///|
+async fn wait_for_retirement(gen : Generation) -> Unit {
+  ignore(
+    @js_async.run_promise(signal => {
+      native_wait_for_abort(gen.controller.signal(), signal)
+    }),
+  )
+}

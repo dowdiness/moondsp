@@ -2,6 +2,7 @@ import {
   "dowdiness/moondsp-browser-host" @host,
   "moonbitlang/async",
   "moonbitlang/async/js_async",
+  "moonbitlang/core/list",
 }
 
 pkgtype(kind: "executable")

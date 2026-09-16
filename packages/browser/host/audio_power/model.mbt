@@ -18,9 +18,39 @@ priv enum CurrentSlot {
 }
 
 ///|
+// Sticky, typed completion shared by cancellable MoonBit waiters. Producers run
+// in MoonBit tasks; browser callbacks enter through js_async's scheduler bridge.
+priv struct Completion[T] {
+  mut value : T?
+  changed : @async.CondVar
+}
+
+///|
+fn[T] Completion::Completion() -> Completion[T] {
+  { value: None, changed: @async.CondVar::Cond(), }
+}
+
+///|
+fn[T] Completion::complete(self : Completion[T], value : T) -> Unit {
+  guard self.value is None else { return }
+  self.value = Some(value)
+  self.changed.broadcast()
+}
+
+///|
+async fn[T] Completion::wait(self : Completion[T]) -> T {
+  for ;; {
+    match self.value {
+      Some(value) => return value
+      None => self.changed.wait()
+    }
+  }
+}
+
+///|
 priv struct OwnerState {
   mut current : CurrentSlot
-  mut retirement_tail : @js_async.Promise[NativeValue]
+  mut retirement_tail : @list.List[Completion[Unit]]
   options : NativeValue
   factory : NativeValue
 }
@@ -30,7 +60,7 @@ fn OwnerState::OwnerState(
   options : NativeValue,
   factory : NativeValue,
 ) -> OwnerState {
-  { current: Vacant, retirement_tail: native_resolved(), options, factory, }
+  { current: Vacant, retirement_tail: @list.List::List([]), options, factory, }
 }
 
 ///|
@@ -53,7 +83,7 @@ priv enum GenerationState {
   Admitting(NativeContext)
   Suspending(NativeContext)
   WaitingForEngineGate(NativeContext)
-  CreatingEngine(NativeContext, NativeDeferred)
+  CreatingEngine(NativeContext, Completion[NativeOutcome])
   SettingUp(OwnedEngine)
   Resuming(OwnedEngine, NativeValue)
   Ready(OwnedEngine)
@@ -64,7 +94,7 @@ priv enum GenerationState {
 
 ///|
 priv enum RetirementStage {
-  ResolvingEngineAcquisition(NativeContext, NativeDeferred)
+  ResolvingEngineAcquisition(NativeContext, Completion[NativeOutcome])
   Disconnecting(OwnedEngine)
   ClosingEngine(OwnedEngine)
   ClosingContext(NativeContext)
@@ -108,8 +138,7 @@ priv struct Generation {
   ready : NativeDeferred
   ended : NativeDeferred
   off : NativeDeferred
-  stopped : NativeDeferred
-  retired : NativeDeferred
+  stopped : Completion[Unit]
   mut readiness : ReadySettlement
   mut publication : EndPublication
   mut state : GenerationState
@@ -127,8 +156,7 @@ fn Generation::Generation(
     ready: native_deferred(),
     ended: native_deferred(),
     off: native_deferred(),
-    stopped: native_deferred(),
-    retired: native_deferred(),
+    stopped: Completion(),
     readiness: Pending,
     publication: Unpublished,
     state: Admitting(context),
@@ -187,6 +215,6 @@ fn remember_cleanup(retirement : Retirement, error : @host.NativeError) -> Unit 
 
 ///|
 priv enum AwaitOutcome {
-  Completed(NativeOutcome)
+  Completed(NativeValue)
   Retired
 }

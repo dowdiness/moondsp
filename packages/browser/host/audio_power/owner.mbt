@@ -1,41 +1,23 @@
 ///|
-// This is the only post-await liveness arbitration path. CreatingEngine installs
-// its pending-result owner in the state before invoking the factory, so cleanup
-// already owns any losing acquisition. Non-resource results can be detached.
+// The single post-await liveness check. Retirement cancels observation through
+// the surrounding task group; resource acquisition has a protected child owner.
 async fn await_owned(
   gen : Generation,
-  operation : @js_async.Promise[NativeResult],
+  operation : async () -> NativeOutcome,
 ) -> AwaitOutcome {
   guard is_live(gen) else { return Retired }
-  let completion = @async.with_task_group(group => {
-    group.spawn_bg(no_wait=true, () => {
-      ignore(
-        native_promise(gen.retired).wait(
-          abort_controller=@js_async.AbortController::new(),
-        ),
-      )
-      group.return_immediately(Retired)
-    })
-    // This controller cancels only the waiter, not the underlying operation.
-    // Engine acquisition is retained by CreatingEngine/Retirement independently.
-    Completed(
-      parse_outcome(
-        operation.wait(abort_controller=@js_async.AbortController::new()),
-      ),
-    )
-  })
+  let completion = operation()
   guard is_live(gen) else { return Retired }
   if disposition(gen.context) is Closed {
     begin_retirement(gen, None)
     return Retired
   }
   match completion {
-    Completed(Failed(error)) => {
+    Failed(error) => {
       begin_retirement(gen, Some(error))
       Retired
     }
-    Completed(Succeeded(_)) => completion
-    Retired => Retired
+    Succeeded(value) => Completed(value)
   }
 }
 
@@ -61,13 +43,11 @@ fn begin_retirement(gen : Generation, primary : @host.NativeError?) -> Unit {
   let retirement = Retirement(stage, primary)
   gen.state = Retiring(retirement)
   gen.owner.current = Vacant
-  let previous = gen.owner.retirement_tail
-  // Register the cumulative barrier BEFORE abort invokes arbitrary user listeners.
-  gen.owner.retirement_tail = @js_async.Promise::from_async(() => {
-    ignore(previous.wait())
-    ignore(native_promise(gen.stopped).wait())
-    native_unit()
-  })
+  // Capture every pending predecessor BEFORE abort invokes arbitrary listeners.
+  // Persistent snapshots keep reentrant replacements gated without a join task.
+  gen.owner.retirement_tail = gen.owner.retirement_tail
+    .drop_while(completion => completion.value is Some(_))
+    .prepend(gen.stopped)
   match primary {
     Some(error) => {
       reject_ready(gen, error)
@@ -76,21 +56,7 @@ fn begin_retirement(gen : Generation, primary : @host.NativeError?) -> Unit {
     None =>
       reject_ready(gen, native_error("Audio setup was aborted", "AbortError"))
   }
-  native_resolve(gen.retired, native_unit())
   gen.controller.abort()
-  ignore(
-    @js_async.Promise::from_async(() => {
-      @async.protect_from_cancel(() => {
-        cleanup_generation(gen, retirement) catch {
-          error => {
-            remember_cleanup(retirement, native_defect(error.to_string()))
-            // Native failures are values; this catch quarantines only MoonBit defects.
-            finish_retirement(gen, retirement)
-          }
-        }
-      })
-    }),
-  )
 }
 
 ///|
@@ -100,7 +66,7 @@ async fn cleanup_generation(gen : Generation, retirement : Retirement) -> Unit {
       ResolvingEngineAcquisition(context, pending) =>
         // GraphEngine abort settles creation without waiting for fetch/compile.
         // A success already in flight is handed to this sole disposing owner.
-        match parse_outcome(native_result_promise(pending).wait()) {
+        match pending.wait() {
           Succeeded(value) =>
             retirement.stage = ClosingEngine(
               OwnedEngine(context, native_engine_from_value(value)),
@@ -154,7 +120,7 @@ fn finish_retirement(gen : Generation, retirement : Retirement) -> Unit {
     Some(error) => native_reject(gen.off, error)
     None => native_resolve(gen.off, native_unit())
   }
-  native_resolve(gen.stopped, native_unit())
+  gen.stopped.complete(())
 }
 
 ///|
@@ -162,18 +128,26 @@ async fn setup_flow(
   gen : Generation,
   setup : NativeValue,
   admission : @js_async.Promise[NativeResult],
-  gate : @js_async.Promise[NativeValue],
+  group : @async.TaskGroup[Unit],
+  gate : @list.List[Completion[Unit]],
 ) -> Unit {
-  guard await_owned(gen, admission) is Completed(Succeeded(_)) else { return }
+  guard await_owned(gen, () => observe_operation(admission)) is Completed(_) else {
+    return
+  }
   gen.state = Suspending(gen.context)
-  guard await_owned(gen, native_suspend(gen.context)) is Completed(Succeeded(_)) else {
+  guard await_owned(gen, () => observe_operation(native_suspend(gen.context)))
+    is Completed(_) else {
     return
   }
   gen.state = WaitingForEngineGate(gen.context)
-  guard await_owned(gen, native_as_outcome(gate)) is Completed(Succeeded(_)) else {
+  guard await_owned(gen, () => {
+      wait_for_gate(gate)
+      Succeeded(native_unit())
+    })
+    is Completed(_) else {
     return
   }
-  let pending = native_deferred()
+  let pending : Completion[NativeOutcome] = Completion()
   gen.state = CreatingEngine(gen.context, pending)
   let creation = native_graph_engine(
     gen.owner.factory,
@@ -181,23 +155,28 @@ async fn setup_flow(
     gen.owner.options,
     gen.controller.signal(),
   )
-  native_forward_result(creation, pending)
-  guard await_owned(gen, native_result_promise(pending))
-    is Completed(Succeeded(value)) else {
+  group.spawn_bg(no_wait=true, () => {
+    @async.protect_from_cancel(() => {
+      pending.complete(parse_outcome(creation.wait()))
+    })
+  })
+  guard await_owned(gen, () => pending.wait()) is Completed(value) else {
     return
   }
   let engine = OwnedEngine(gen.context, native_engine_from_value(value))
   gen.state = SettingUp(engine)
-  watch_processor(gen, engine)
-  guard await_owned(
-      gen,
-      native_setup(setup, gen.context, engine.native, gen.controller.signal()),
-    )
-    is Completed(Succeeded(value)) else {
+  group.spawn_bg(no_wait=true, () => watch_processor(gen, engine))
+  guard await_owned(gen, () => {
+      observe_operation(
+        native_setup(setup, gen.context, engine.native, gen.controller.signal()),
+      )
+    })
+    is Completed(value) else {
     return
   }
   gen.state = Resuming(engine, value)
-  guard await_owned(gen, native_resume(gen.context)) is Completed(Succeeded(_)) else {
+  guard await_owned(gen, () => observe_operation(native_resume(gen.context)))
+    is Completed(_) else {
     return
   }
   // Treat connection as potentially partially effective: retirement must attempt
@@ -214,30 +193,48 @@ async fn setup_flow(
 }
 
 ///|
-fn watch_processor(gen : Generation, engine : OwnedEngine) -> Unit {
+async fn watch_processor(gen : Generation, engine : OwnedEngine) -> Unit {
+  match engine.lifetime.wait() {
+    @host.EngineExit::Failed(error) =>
+      begin_retirement(gen, Some(error.native()))
+    @host.EngineExit::Closed => begin_retirement(gen, None)
+  }
+}
+
+///|
+async fn wait_for_gate(gate : @list.List[Completion[Unit]]) -> Unit {
+  for completion in gate.iter() {
+    completion.wait()
+  }
+}
+
+///|
+// One JS entry task owns setup, processor observation, and late acquisition.
+// Cancel/join its children first, then complete resource cleanup without cancellation.
+fn supervise(
+  gen : Generation,
+  run : async (@async.TaskGroup[Unit]) -> Unit,
+) -> Unit {
   ignore(
     @js_async.Promise::from_async(() => {
-      try {
-        let exit = @async.with_task_group(group => {
-          group.spawn_bg(no_wait=true, () => {
-            ignore(
-              native_promise(gen.retired).wait(
-                abort_controller=@js_async.AbortController::new(),
-              ),
-            )
-            group.return_immediately(None)
-          })
-          Some(engine.lifetime.wait())
-        })
-        match exit {
-          Some(@host.EngineExit::Failed(error)) =>
-            begin_retirement(gen, Some(error.native()))
-          Some(@host.EngineExit::Closed) => begin_retirement(gen, None)
-          None => () // Retirement cancelled and joined the observation, not cleanup.
-        }
-      } catch {
+      @async.with_task_group(group => {
+        group.spawn_bg(no_wait=true, () => run(group))
+        wait_for_retirement(gen)
+      }) catch {
         error => begin_retirement(gen, Some(native_defect(error.to_string())))
       }
+      guard gen.state is Retiring(retirement) else {
+        fail("retirement signal without a retiring generation")
+      }
+      @async.protect_from_cancel(() => {
+        cleanup_generation(gen, retirement) catch {
+          error => {
+            remember_cleanup(retirement, native_defect(error.to_string()))
+            // Native failures are values; only MoonBit defects reach this catch.
+            finish_retirement(gen, retirement)
+          }
+        }
+      })
     }),
   )
 }
@@ -247,15 +244,9 @@ fn launch_setup(
   gen : Generation,
   setup : NativeValue,
   admission : @js_async.Promise[NativeResult],
-  gate : @js_async.Promise[NativeValue],
+  gate : @list.List[Completion[Unit]],
 ) -> Unit {
-  ignore(
-    @js_async.Promise::from_async(() => {
-      setup_flow(gen, setup, admission, gate) catch {
-        error => begin_retirement(gen, Some(native_defect(error.to_string())))
-      }
-    }),
-  )
+  supervise(gen, group => setup_flow(gen, setup, admission, group, gate))
 }
 
 ///|
@@ -268,16 +259,16 @@ fn restore(
   let operation = native_resume(gen.context)
   ignore(
     @js_async.Promise::from_async(() => {
-      try {
-        match await_owned(gen, operation) {
-          Completed(Succeeded(_)) => {
-            gen.state = Ready(engine)
-            native_resolve(pending_resume, native_unit())
-          }
-          Completed(Failed(_)) => fail("unhandled native failure")
-          Retired => () // begin_retirement rejected the retained resume promise.
+      @async.with_task_group(group => {
+        group.spawn_bg(no_wait=true, () => {
+          wait_for_retirement(gen)
+          group.return_immediately(())
+        })
+        if await_owned(gen, () => observe_operation(operation)) is Completed(_) {
+          gen.state = Ready(engine)
+          native_resolve(pending_resume, native_unit())
         }
-      } catch {
+      }) catch {
         error => begin_retirement(gen, Some(native_defect(error.to_string())))
       }
     }),
