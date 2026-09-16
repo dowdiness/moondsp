@@ -1,9 +1,11 @@
 ///|
-extern "js" fn test_context() -> NativeContext =
-  #| () => Object.assign(new EventTarget(), {
+extern "js" fn test_context(
+  suspended? : () -> Unit = () => (),
+) -> NativeContext =
+  #| suspended => Object.assign(new EventTarget(), {
   #|   state: 'suspended', closes: 0,
   #|   resume() { this.state = 'running'; return Promise.resolve(); },
-  #|   suspend() { this.state = 'suspended'; return Promise.resolve(); },
+  #|   suspend() { this.state = 'suspended'; suspended(); return Promise.resolve(); },
   #|   close() { this.closes++; this.state = 'closed'; return Promise.resolve(); }
   #| })
 
@@ -63,19 +65,23 @@ extern "js" fn test_value() -> NativeValue =
 extern "js" fn test_delay_close(
   context : NativeContext,
   completion : NativeDeferred,
+  closing? : () -> Unit = () => (),
 ) -> Unit =
-  #| (context, completion) => { context.close = () => { context.closes++; context.state = 'closed'; return completion.promise; }; }
+  #| (context, completion, closing) => { context.close = () => { context.closes++; context.state = 'closed'; closing(); return completion.promise; }; }
 
 ///|
 extern "js" fn test_context_closed(context : NativeContext) -> Unit =
   #| context => { context.state = 'closed'; }
 
 ///|
-extern "js" fn test_engine(completion : NativeDeferred) -> @host.NativeEngine =
-  #| completion => {
+extern "js" fn test_engine(
+  completion : NativeDeferred,
+  closing? : () -> Unit = () => (),
+) -> @host.NativeEngine =
+  #| (completion, closing) => {
   #|   const engine = { closes: 0 };
   #|   engine.output = { connect() {}, disconnect() {} };
-  #|   engine.close = () => { engine.closes++; return completion.promise; };
+  #|   engine.close = () => { engine.closes++; closing(); return completion.promise; };
   #|   engine.wait = ({ signal }) => new Promise((resolve, reject) => {
   #|     const cancel = () => reject(new DOMException('cancelled', 'AbortError'));
   #|     if (signal.aborted) { cancel(); return; }
@@ -138,6 +144,13 @@ extern "js" fn test_pending(
 ///|
 extern "js" fn test_is_pending(status : NativeValue) -> Bool =
   #| status => status.pending
+
+///|
+// These fakes use immediate promises or explicit gates, not timers. A Node
+// check-phase callback lets their promise reactions and MoonBit resumptions drain
+// before a negative assertion; no elapsed-time assumption is involved.
+extern "js" fn test_checkpoint() -> @js_async.Promise[NativeValue] =
+  #| () => new Promise(resolve => setImmediate(resolve))
 
 ///|
 extern "js" fn test_outcome(
@@ -220,7 +233,8 @@ async test "duplicate admission rejects before allocating another context" {
 ///|
 async test "reentrant turn-on waits for the retiring generation's cleanup" {
   let first_context = test_context()
-  let second_context = test_context()
+  let suspended : Completion[Unit] = Completion()
+  let second_context = test_context(suspended=() => suspended.complete(()))
   let first_close = NativeDeferred::new()
   let second_close = NativeDeferred::new()
   let owner = test_owner([first_context, second_context], [
@@ -248,7 +262,8 @@ async test "reentrant turn-on waits for the retiring generation's cleanup" {
     fail("reentrant admission failed")
   }
   observe_rejection(second.ready())
-  @async.sleep(1)
+  suspended.wait()
+  ignore(test_checkpoint().wait())
   assert_false(replacement_setup)
   first_close.resolve(native_unit())
   ignore(stopped.wait())
@@ -261,7 +276,12 @@ async test "reentrant turn-on waits for the retiring generation's cleanup" {
 
 ///|
 async test "rapid replacements retain every predecessor cleanup" {
-  let contexts = [test_context(), test_context(), test_context()]
+  let suspended : Completion[Unit] = Completion()
+  let contexts = [
+    test_context(),
+    test_context(),
+    test_context(suspended=() => suspended.complete(())),
+  ]
   let first_close = NativeDeferred::new()
   let last_close = NativeDeferred::new()
   let owner = test_owner(contexts, [
@@ -275,7 +295,8 @@ async test "rapid replacements retain every predecessor cleanup" {
   ignore(middle.turn_off().wait())
   let last = test_start(owner, test_setup(native_unit()))
   let pending = test_pending(last.ready())
-  @async.sleep(1)
+  suspended.wait()
+  ignore(test_checkpoint().wait())
   assert_true(test_is_pending(pending))
   first_close.resolve(native_unit())
   ignore(first_stopped.wait())
@@ -290,7 +311,8 @@ async test "rapid replacements retain every predecessor cleanup" {
 ///|
 async test "turn-off while waiting for predecessors does not wait for them" {
   let first_context = test_context()
-  let second_context = test_context()
+  let suspended : Completion[Unit] = Completion()
+  let second_context = test_context(suspended=() => suspended.complete(()))
   let first_close = NativeDeferred::new()
   test_delay_close(first_context, first_close)
   let owner = test_owner([first_context, second_context], [])
@@ -298,7 +320,8 @@ async test "turn-off while waiting for predecessors does not wait for them" {
   let first_stopped = first.turn_off()
   let pending = test_pending(first_stopped)
   let second = test_start(owner, test_setup(native_unit()))
-  @async.sleep(1)
+  suspended.wait()
+  ignore(test_checkpoint().wait())
   ignore(second.turn_off().wait())
   assert_eq(test_close_count(second_context), 1)
   assert_eq(test_end_reason(second.ended().wait()), "turnedOff")
@@ -327,6 +350,47 @@ async test "primary failure survives cleanup failure and cleanup still closes co
 }
 
 ///|
+async test "cleanup-only failure retains the first error after all cleanup steps" {
+  let context = test_context()
+  let engine_close = NativeDeferred::new()
+  let engine_closing : Completion[Unit] = Completion()
+  let engine = test_engine(engine_close, closing=() => {
+    engine_closing.complete(())
+  })
+  let context_close = NativeDeferred::new()
+  let context_closing : Completion[Unit] = Completion()
+  test_delay_close(context, context_close, closing=() => {
+    context_closing.complete(())
+  })
+  let owner = test_owner([context], [engine])
+  let value = test_value()
+  let generation = test_start(owner, test_setup(value))
+  assert_true(test_same_value(generation.ready().wait(), value))
+  let end_pending = test_pending(generation.ended())
+  let stopped = generation.turn_off()
+  let stop_pending = test_pending(stopped)
+  engine_closing.wait()
+  let first_error = test_error()
+  engine_close.reject(first_error)
+  context_closing.wait()
+  ignore(test_checkpoint().wait())
+  assert_true(test_is_pending(end_pending))
+  assert_true(test_is_pending(stop_pending))
+  context_close.reject(test_error())
+  guard test_outcome(stopped).wait().decode() is Failed(error) else {
+    fail("cleanup succeeded unexpectedly")
+  }
+  assert_true(test_same_error(error, first_error))
+  let end = generation.ended().wait()
+  assert_true(test_failed_identity(end, first_error))
+  assert_true(test_same_promise(stopped, generation.turn_off()))
+  assert_true(test_same_value(end, generation.ended().wait()))
+  assert_true(test_same_value(generation.ready().wait(), value))
+  assert_eq(test_engine_closes(engine), 1)
+  assert_eq(test_close_count(context), 1)
+}
+
+///|
 async test "late acquired engine is closed once before its context without running setup" {
   let context = test_context()
   let acquisition = NativeDeferred::new()
@@ -338,7 +402,8 @@ async test "late acquired engine is closed once before its context without runni
   )
   let mut setup_called = false
   let close = NativeDeferred::new()
-  let engine = test_engine(close)
+  let closing : Completion[Unit] = Completion()
+  let engine = test_engine(close, closing=() => closing.complete(()))
   let generation = test_start(
     owner,
     test_callback(() => {
@@ -348,10 +413,10 @@ async test "late acquired engine is closed once before its context without runni
   )
   entered.wait()
   let stopped = generation.turn_off()
-  @async.sleep(1)
+  ignore(test_checkpoint().wait())
   assert_eq(test_close_count(context), 0)
   acquisition.resolve(test_engine_value(engine))
-  @async.sleep(1)
+  closing.wait()
   assert_eq(test_engine_closes(engine), 1)
   assert_eq(test_close_count(context), 0)
   close.resolve(native_unit())
@@ -404,7 +469,7 @@ async test "ready waits for final resume and concurrent resume retains one promi
   )
   let pending = test_pending(generation.ready())
   entered.wait()
-  @async.sleep(1)
+  ignore(test_checkpoint().wait())
   assert_true(test_is_pending(pending))
   final_resume.resolve(native_unit())
   assert_true(test_same_value(generation.ready().wait(), setup_value))
