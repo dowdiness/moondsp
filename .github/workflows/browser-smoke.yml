@@ -95,8 +95,8 @@ jobs:
         working-directory: web/live
         run: npm ci
 
-      - name: Check public graph API types
-        run: npm run typecheck:graph
+      - name: Check public browser API types
+        run: npm run typecheck:browser
 
       - name: Install Playwright Chromium
         working-directory: web/live

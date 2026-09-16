@@ -16,8 +16,9 @@ For a new application, choose the public entry point rather than the raw ABI:
 | Application | Entry point |
 | --- | --- |
 | JavaScript or TypeScript instrument | `@moondsp/browser`; see [local distribution](#standalone-synth-examples-and-local-distribution) |
+| Realtime instrument with package-owned context | `@moondsp/browser/audio`; see [owned audio power](#owned-audio-power) |
 | Repository-hosted browser integration | `web/graph-engine.js`; see [the external graph API](#external-graph-entry-point) |
-| MoonBit code observing an existing JS engine | The separate [JS-host lifetime module](#moonbit-lifetime-observation-on-the-js-host) |
+| MoonBit code observing an existing JS engine | The separate [JS-host lifetime module](#moonbit-lifetime-observation-and-ownership-on-the-js-host) |
 | Host-independent MoonBit rendering | Root-package `GraphEngine`; see [the engine contract](technical-reference.md#354-host-independent-graph-engine) |
 
 ## Contract summary
@@ -82,9 +83,9 @@ This example separates mounting from the later Play gesture. For a single
 Power on gesture, call `context.resume()` before the first asynchronous wait
 so loading cannot consume the user activation. After admission, suspend the
 context again before creating the engine and mounting; start the graph, then
-resume and connect output. The [shared synth owner](../examples/basic-synth/core/audio.ts)
-implements that sequence, including cancellation during partial initialization
-and cleanup on failure. The engine itself does not perform browser admission.
+resume and connect output. The owned audio-power entry point implements that
+sequence, including cancellation and cleanup. The root engine itself does not
+perform browser admission.
 
 ### Description and mounting
 
@@ -224,7 +225,7 @@ and cleanup on failure. The engine itself does not perform browser admission.
   the first observed interruption settles creation. There is no built-in
   timeout or automatic retry; a caller can supply a deadline through its signal.
 
-### MoonBit lifetime observation on the JS host
+### MoonBit lifetime observation and ownership on the JS host
 
 [`packages/browser/host`](../packages/browser/host/) is the separate MoonBit
 source module `dowdiness/moondsp-browser-host`, with preferred target `js` and
@@ -258,6 +259,257 @@ workers with `no_wait=true`. On exit, those workers are cancelled and joined
 before group defers run. A defer may then close the engine. Do not make an
 ordinary child wait for an engine whose close is performed only by that defer:
 the group would wait for the child before it could close the engine.
+
+### Owned audio power
+
+`@moondsp/browser/audio` owns a realtime context and its engine. The root
+`@moondsp/browser` entry point remains unchanged and caller-owned: use it for
+adopted contexts, OfflineAudioContext, and custom destinations.
+
+- Audio power (`AudioPower`) is an application-scoped owner of repeated cycles.
+- Powered audio (`PoweredAudio<Value>`) is one generation's capability.
+- Audio setup (`AudioSetup`) supplies the suspended context, engine, and power-off signal.
+- Audio end (`AudioEnd`) distinguishes clean turn-off from failure.
+
+The declarations below show the public shape. IDE-facing ownership and error
+comments live in [`web/audio-power.d.ts`](../web/audio-power.d.ts); a complete
+gesture-handler example is in the [package guide](../packages/browser/README.md#package-owned-realtime-audio).
+
+```ts
+import type { GraphEngine } from "./graph-engine.js";
+
+export interface AudioPowerOptions {
+  readonly contextOptions?: AudioContextOptions;
+  readonly wasmUrl?: string | URL;
+  readonly processorUrl?: string | URL;
+  readonly closeTimeoutMs?: number;
+}
+
+export interface AudioSetup {
+  readonly context: AudioContext;
+  readonly engine: GraphEngine;
+  readonly powerOff: AbortSignal;
+}
+
+export type AudioEnd =
+  | { readonly reason: "turnedOff" }
+  | { readonly reason: "failed"; readonly error: Error };
+
+export interface PoweredAudio<Value> {
+  readonly context: AudioContext;
+  readonly ready: Promise<Value>;
+  readonly ended: Promise<AudioEnd>;
+  readonly resume: () => Promise<void>;
+  readonly turnOff: () => Promise<void>;
+}
+
+export interface AudioPower {
+  readonly turnOn: <Value>(
+    setupAudio: (audio: AudioSetup) => Promise<Value>,
+  ) => PoweredAudio<Value>;
+}
+
+export function AudioPower(
+  options?: AudioPowerOptions,
+): AudioPower;
+```
+
+#### Admission and readiness
+
+`AudioPower()` stores options only. It creates no context, engine, or listener.
+Keep the owner across power cycles. Owners are independent; one owner admits only
+one generation that has not started retiring.
+
+Call `turnOn()` directly from the user gesture, before any await. It validates
+the callback and current slot before allocating a context:
+
+- A non-callable callback throws `TypeError`.
+- An occupied owner throws `InvalidStateError` without creating another context.
+- A native context construction error is thrown synchronously.
+
+Those failures return no handle, so a `ready.catch(...)` cannot handle them:
+wrap `turnOn()` itself in `try`/`catch`. Once a context is acquired, the owner
+attaches its listener and invokes native `resume()` in the same gesture stack,
+before returning a frozen handle. Subsequent startup failures, including a
+synchronous exception from that first native resume, reject `ready`, publish
+failed `ended`, and trigger cleanup rather than escaping from `turnOn()`.
+
+Setup order: await admission, suspend, await the captured cumulative retirement
+tail, create GraphEngine, call setup while suspended, resume, connect destination,
+then resolve `ready` with the exact setup value. Setup mounts/configures graphs
+and calls `play()` itself; mount every graph before the first play. Context and
+engine options are validated by AudioContext and GraphEngine, respectively.
+
+#### Failure observation versus cleanup completion
+
+| Observation | Settlement | What it does not imply |
+|---|---|---|
+| `ready` fulfills | Setup's exact return value, after final resume and connection | That the engine cannot fail later |
+| `ready` rejects | Primary startup failure, or `AbortError` for clean retirement before readiness | That cleanup has finished |
+| `ended` resolves with `failed` | Primary failure immediately; otherwise the first cleanup error after cleanup | That cleanup has finished when a primary failure was published |
+| `ended` resolves with `turnedOff` | Clean retirement after package-owned cleanup | That arbitrary application setup work has stopped |
+| `turnOff()` settles | All applicable package-owned cleanup steps have been attempted | That cleanup succeeded if the promise rejected |
+
+Observe `ready` rejection even when `ended` is the single source of user-facing
+failure reporting. An already-settled `ready` never changes: processor failure
+after readiness is observed through `ended`. Multiple and late `ended` observers
+receive the same frozen result; `ended` never rejects.
+
+`turnOff()` synchronously retires its own generation, releases admission, and
+aborts the setup signal. Concurrent and later calls return one retained cleanup
+promise. Call and await it to join cleanup even after receiving failed `ended`;
+doing so on an old handle cannot retire a replacement.
+
+Cleanup bypasses arbitrary pending setup and attempts every applicable step:
+disconnect output, close engine, close context, in that order. The first cleanup
+error rejects `turnOff()`, but later steps are still attempted. A pending engine
+acquisition is joined: any late acquired engine is closed exactly once.
+
+Setup, admission, suspension, engine creation, final resume, connection, and
+processor failures can supply the retained primary error. A later cleanup error
+cannot replace it in `ended`. The two results therefore answer different questions:
+
+- Primary failure, successful cleanup: `ended` is failed; `turnOff()` fulfills.
+- Primary failure and cleanup failure: `ended` retains the primary error;
+  `turnOff()` rejects with the first cleanup error.
+- Cleanup failure only: failed `ended` and rejected `turnOff()` carry the same
+  error. Avoid reporting it twice.
+- No failure: `ended` is turnedOff; `turnOff()` fulfills.
+
+Native `Error` and `DOMException` identity and cause survive the MoonBit boundary,
+including errors from another realm such as an iframe. Non-Error throws are
+normalized. Clean turn-off before readiness, including external context
+closure, rejects `ready` with `AbortError`. The close-acknowledgement deadline
+(`closeTimeoutMs`, default 5000ms) belongs to the engine; it does not bound setup,
+the browser's `AudioContext.close()`, or total retirement time.
+
+#### Borrowed resources and cooperative cancellation
+
+The exposed context and setup engine are borrowed, not transferred to the
+application. Observe context state and control graphs; use `PoweredAudio` for
+resume and shutdown. Do not directly resume/suspend/close the owned context or
+connect/close the engine during managed setup. `readonly` prevents replacing the
+context property, not invoking native mutators. External context closure is
+supported as clean retirement unless a failure was already retained, not as the
+recommended shutdown API. Use the root GraphEngine for caller-owned lifecycles.
+
+Retirement aborts `powerOff` and prevents late setup results from publishing
+readiness. It cannot forcibly stop a JavaScript callback or undo application
+side effects. Pass `powerOff` to cancellable operations such as
+`fetch(url, { signal: powerOff })`; after an uncancellable await, check
+`powerOff.throwIfAborted()` before further application work. Attach setup
+listeners with `{ signal: powerOff }` to detach them on retirement. Application
+timers, subscriptions, and other resources remain the caller's responsibility.
+
+Replacement context admission starts in its new gesture, while replacement
+engine creation waits for all earlier retirement barriers on that owner,
+regardless of their cleanup result. Do not await predecessor cleanup before
+calling `turnOn()` and lose activation. The package protects its resources from
+stale completions; application callbacks must still check that their generation
+is current before updating UI. It does not implement automatic retry.
+
+#### Resuming a ready generation
+
+Call `resume()` directly from a gesture, not after an await or through an
+application command queue. It rejects `InvalidStateError` before readiness,
+during/after retirement, or when observing a closed context. When already running
+it resolves without calling native resume. Otherwise it invokes native resume
+synchronously, including for interrupted contexts; concurrent calls during that
+restore share one promise.
+
+Clean retirement during restore rejects the pending restore with `AbortError`
+without reviving the generation. A native resume failure rejects the restore,
+publishes failed `ended`, and starts cleanup. Handle the method rejection for
+the gesture's outcome; it is not a second independent engine failure.
+Starting again after failure requires a new `turnOn()`, not `resume()`.
+
+#### Host ownership state and arbitration
+
+The production `audio_power` executable in the JS-host module owns lifecycle
+policy. Its generated ESM ships privately in the npm package. Handwritten JS
+only adapts Web APIs and frozen public objects; it contains no lifecycle races.
+The existing EngineLifetime supplies processor observation and engine close.
+
+The internal ownership interface is `Owner::turn_on(setup)` plus
+`Generation::resume_audio()` and `turn_off()`, with `ready()`, `ended()`, and
+the borrowed context for observation. The JS exports only translate handles and
+results. They do not inspect lifecycle states, invoke native resume themselves,
+or arrange task groups and predecessor cleanup. `resume_audio` is the internal
+MoonBit name because `resume` is reserved; the public JS method remains `resume()`.
+
+Startup and its supervisor are one implementation, not a callback-based
+interface callers must coordinate. Ownership regressions exercise this same
+interface using per-owner context and engine factories; they do not construct
+partial generations or mutate lifecycle states. Production context creation
+defaults to the browser's `AudioContext`, and the factory seam stays private.
+
+Each generation variant carries only resources valid at that phase:
+Admitting → Suspending → WaitingForEngineGate → CreatingEngine → SettingUp →
+Resuming → Ready. Ready may enter Restoring for one retained resume task.
+Any live state can enter Retiring, then Ended. No optional-resource bag sits
+beside a phase enum. Ready resolves only at Resuming → Ready.
+
+The owner holds an admission slot and a persistent list of typed cleanup
+completions independently. Retirement vacates the slot and prepends its completion
+before aborting the signal, so reentrant admission captures every pending
+predecessor. Completed prefixes are discarded; no JS join task is needed.
+Cleanup operations may overlap. New context admission is gesture-synchronous,
+but new engine creation waits for every captured completion, even when predecessor
+cleanup failed.
+
+Retirement progresses through ResolvingEngineAcquisition, Disconnecting,
+ClosingEngine, ClosingContext, and Complete, skipping unacquired resources.
+Engine acquisition must yield a bounded ownership disposition before context
+close: either cancellation proves no engine can publish, or a late engine is
+closed and joined. Arbitrary setup completion is detached, not awaited by cleanup.
+
+A generation supervisor owns setup, processor observation, and acquisition tasks
+in one MoonBit task group. Retirement cancels and joins non-owning observers.
+The acquisition child is protected until it publishes a typed ownership outcome;
+only then does protected cleanup dispose any late engine and close the context.
+Internal `Completion[T]` values retain outcomes for cancellable `CondVar` waiters,
+without casting a JS deferred between user values and native result records.
+
+All live-generation awaits use one post-await arbiter. It re-reads browser
+liveness and commits the transition without another suspension. A closed context
+retires cleanly; operation failures otherwise retain the first error. Duplicate
+terminal signals return retained results; incompatible internal transitions use
+catchable failure, never abort. Native outcomes and context disposition are
+parsed once at the adapter boundary.
+
+JS promises remain at public and browser-effect boundaries. `Promise::from_async`
+starts only the generation supervisor and public resume operation; resume has its
+own scoped retirement observer. Browser-operation observation uses
+`js_async.run_promise` with an AbortSignal that actually detaches the observer,
+without pretending to cancel the underlying effect. The retirement signal also
+crosses this bridge: a bare JS callback broadcasting a MoonBit `CondVar` would
+not restart the pinned async runtime's JS scheduler.
+
+Normative transitions (public temporal misuse is rejected before dispatch):
+
+| Current state | Input | Next state | Required effect |
+|---|---|---|---|
+| `Admitting` | admission succeeded while live | `Suspending` | suspend owned context |
+| `Suspending` | suspension succeeded while live | `WaitingForEngineGate` | await the captured cumulative gate |
+| `WaitingForEngineGate` | captured gate settled, regardless of predecessor cleanup result | `CreatingEngine` | start engine creation |
+| `CreatingEngine` | engine succeeded while live | `SettingUp` | transfer engine ownership and invoke setup |
+| `SettingUp` | setup succeeded while live | `Resuming` | retain setup value and start final resume |
+| `Resuming` | final resume and connection succeeded while live | `Ready` | settle `ready` with the setup value |
+| `Ready` | resume requested while playing | `Ready` | return an already-resolved promise |
+| `Ready` | resume requested while temporarily unavailable | `Restoring` | invoke native resume synchronously and retain its promise |
+| `Restoring` | resume succeeded while context remains live | `Ready` | settle the retained resume promise |
+| `Ready` | resume requested while context is closed | `Retiring` | reject `InvalidStateError` and begin clean external-close retirement |
+| `Restoring` | concurrent resume requested | `Restoring` | return the retained resume promise |
+| any live operation state | native admission/suspend/engine/setup/resume/connect failure | `Retiring` | retain primary failure and begin cleanup |
+| any live state except `CreatingEngine` | `TurnOff` | first applicable `RetirementStage` | abort setup, release current slot, start cleanup, join cleanup into retirement tail |
+| `CreatingEngine` | `TurnOff` | `ResolvingEngineAcquisition` | abort creation, release current slot, register ownership disposition in retirement tail |
+| `ResolvingEngineAcquisition` | no engine can publish | `ClosingContext` | continue context cleanup |
+| `ResolvingEngineAcquisition` | late engine success | `ClosingEngine` | transfer engine to cleanup and close exactly once |
+| any live state | context closed | `Retiring` | classify as clean external turn-off and begin cleanup |
+| any engine-owning live state | processor failed | `Retiring` | retain processor failure and begin cleanup |
+| any retirement stage | cleanup outcome | next retirement stage | preserve first failure |
+| `Retiring` or `Ended` | duplicate turn-off/terminal signal | same state | return retained cleanup/end result |
+
 
 ### Live controls
 
@@ -348,7 +600,7 @@ JavaScript consumers can annotate descriptions with
 `/** @type {import('./graph-engine.js').GraphDescription} */` and enable
 `// @ts-check` for diagnostics as well as editor completion.
 
-From the repository root, run `npm run typecheck:graph` to check positive
+From the repository root, run `npm run typecheck:browser` to check positive
 consumer examples and expected failures for invalid nodes and obsolete APIs.
 This uses the existing TypeScript development dependency in `web/live`;
 install that project's dependencies with `npm --prefix web/live ci` if needed.
