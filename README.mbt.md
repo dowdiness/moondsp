@@ -122,7 +122,9 @@ cancelling a wait does not close the engine. `engine.close()` releases its graph
 and Worklet but leaves the caller-owned `AudioContext` open. The optional
 JS-target MoonBit module at [`packages/browser/host`](packages/browser/host/)
 adds cancellable lifetime observation and protected cleanup without importing
-the async runtime into DSP/Wasm. See [host lifetime observation](docs/browser-api-contract.md#moonbit-lifetime-observation-on-the-js-host).
+the async runtime into DSP/Wasm. The opt-in `@moondsp/browser/audio` entry point
+owns realtime context admission and cleanup with `AudioPower`. See
+[host lifetime and ownership](docs/browser-api-contract.md#moonbit-lifetime-observation-and-ownership-on-the-js-host).
 
 ---
 
@@ -310,7 +312,7 @@ npm --prefix web/live ci
 npx playwright install chromium
 
 # Check public JS/TS usage, then run browser tests (builds wasm-gc first)
-npm run typecheck:graph
+npm run typecheck:browser
 NEW_MOON_MOD=0 npm run test:browser
 ```
 

@@ -25,13 +25,13 @@ basic-synth/
 └── package-lock.json     One resolved browser payload and frontend toolchain
 ```
 
-The seam between `core/` and each UI adapter is `AudioView` / `AudioActions` in [`core/audio.ts`](core/audio.ts). UI adapters render lifecycle state and translate gestures into actions. Core code owns partial and complete audio resources, serializes graph operations per session, and rejects stale asynchronous completions.
+The seam between `core/` and each UI adapter is `AudioView` / `AudioActions` in [`core/audio.ts`](core/audio.ts). UI adapters render lifecycle state and translate gestures into actions. `@moondsp/browser/audio` owns context admission, engine lifetime, and cleanup. Core code retains application UI state, serializes graph operations per session, and rejects stale command and note completions.
 
 | File | Responsibility |
 |---|---|
 | [`core/synth.ts`](core/synth.ts) | Named graph parameters and pure raw note-control batches |
 | [`core/keyboard.ts`](core/keyboard.ts) | Pure last-held-note transitions and keyboard projections |
-| [`core/audio.ts`](core/audio.ts) | Audio resource ownership, serialized operations, and stale-work rejection |
+| [`core/audio.ts`](core/audio.ts) | Package-owned power handles, application state projection, serialized commands, and note epochs |
 | [`core/controls.ts`](core/controls.ts) | Pure transport projection and slider conversions |
 | [`core/result.ts`](core/result.ts) | Explicit success/failure values and exception capture |
 | [`vanilla/src/dom.ts`](vanilla/src/dom.ts) | Required-element acquisition, DOM rendering, and browser gestures |
@@ -67,7 +67,7 @@ Consumers use the prebuilt package only; they do not need MoonBit or the moondsp
 - **Volume** is linear gain from `0%` to `100%`; the graph starts at `15%`.
 - **Filter** adjusts low-pass cutoff logarithmically from `120–12,000 Hz` and starts at `2,000 Hz`.
 - **Power on** admits audio, loads the engine, mounts the graph, and enables playing. The same button becomes **Power off** while loading or running.
-- **Power off** cancels startup or clears notes and closes the graph, engine, and app-owned `AudioContext`.
+- **Power off** clears notes and retires that package-owned context/engine generation, even during startup.
 - Processor failure is shown immediately. **Power on** retries with a fresh session.
 - Releasing the active key returns to the most recently held pointer or computer key. Blur, hidden-page transitions, context suspension, pointer cancellation, and capture loss release notes.
 - Power cycling preserves the displayed volume and cutoff.

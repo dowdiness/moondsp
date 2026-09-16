@@ -1,0 +1,25 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp-browser-host/audio_power"
+
+import {
+  "moonbitlang/async/js_async",
+}
+
+// Values
+pub fn audio_power_new(NativeValue, NativeValue) -> NativeValue
+
+pub fn audio_power_turn_on(NativeValue, NativeValue) -> NativeValue
+
+pub fn powered_audio_resume(NativeValue) -> @js_async.Promise[NativeValue]
+
+pub fn powered_audio_turn_off(NativeValue) -> @js_async.Promise[NativeValue]
+
+// Errors
+
+// Types and methods
+#external
+pub type NativeValue
+
+// Type aliases
+
+// Traits

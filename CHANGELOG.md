@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added exact `Tempo::span_for_samples` conversion through the scheduler clock;
   browser repeat admission no longer reconstructs tempo arithmetic.
+- Added the opt-in `@moondsp/browser/audio` entry point with `AudioPower`,
+  `PoweredAudio`, and typed setup/end results. MoonBit owns gesture-time
+  admission, cancellation, retained cleanup, processor failure observation,
+  and replacement ordering; the root `GraphEngine` API remains caller-owned.
+  The browser tarball includes the generated JS-target ownership core.
+  Generation tasks use MoonBit structured concurrency and typed internal
+  completions; JS promises remain at public/browser boundaries. Native error
+  identity and cause are preserved across realms, including iframe errors.
 
 - Added explicit Mini `.lpf(hz, resonance?)` and `.hpf(hz, resonance?)`
   controls and connected them, together with `.gain(n)`, to browser note and
@@ -80,6 +88,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   across resume, WASM loading, compilation, module loading, and readiness.
   Startup Pause and close abort pending work and await partial-resource cleanup;
   late native completions cannot activate an obsolete graph or replace a newer run.
+- Migrated both basic-synth adapters to `AudioPower`; their shared core retains
+  only UI state, graph commands, settings, and stale-note protection. Package
+  lifecycle assertions now live in direct public-API browser tests.
 
 - Both synth adapters observe engine termination, report processor failure
   immediately, and treat caller context closure as normal shutdown. Cleanup
