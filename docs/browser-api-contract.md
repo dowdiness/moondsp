@@ -430,6 +430,19 @@ policy. Its generated ESM ships privately in the npm package. Handwritten JS
 only adapts Web APIs and frozen public objects; it contains no lifecycle races.
 The existing EngineLifetime supplies processor observation and engine close.
 
+The internal ownership interface is `Owner::turn_on(setup)` plus
+`Generation::resume_audio()` and `turn_off()`, with `ready()`, `ended()`, and
+the borrowed context for observation. The JS exports only translate handles and
+results. They do not inspect lifecycle states, invoke native resume themselves,
+or arrange task groups and predecessor cleanup. `resume_audio` is the internal
+MoonBit name because `resume` is reserved; the public JS method remains `resume()`.
+
+Startup and its supervisor are one implementation, not a callback-based
+interface callers must coordinate. Ownership regressions exercise this same
+interface using per-owner context and engine factories; they do not construct
+partial generations or mutate lifecycle states. Production context creation
+defaults to the browser's `AudioContext`, and the factory seam stays private.
+
 Each generation variant carries only resources valid at that phase:
 Admitting → Suspending → WaitingForEngineGate → CreatingEngine → SettingUp →
 Resuming → Ready. Ready may enter Restoring for one retained resume task.

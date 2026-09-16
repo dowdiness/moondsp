@@ -8,12 +8,24 @@ extern "js" fn test_context() -> NativeContext =
   #| })
 
 ///|
+extern "js" fn test_context_result(context : NativeContext) -> NativeResult =
+  #| context => ({ ok: true, value: context })
+
+///|
 extern "js" fn test_error() -> @host.NativeError =
   #| () => new Error('sentinel')
 
 ///|
+extern "js" fn test_error_name(error : @host.NativeError) -> String =
+  #| error => error.name
+
+///|
 extern "js" fn test_close_count(context : NativeContext) -> Int =
   #| context => context.closes
+
+///|
+extern "js" fn test_end_reason(result : NativeValue) -> String =
+  #| result => result.reason
 
 ///|
 extern "js" fn test_failed_identity(
@@ -24,87 +36,51 @@ extern "js" fn test_failed_identity(
 
 ///|
 extern "js" fn test_same_promise(
-  a : @js_async.Promise[NativeValue],
-  b : @js_async.Promise[NativeValue],
+  first : @js_async.Promise[NativeValue],
+  second : @js_async.Promise[NativeValue],
 ) -> Bool =
-  #| (a, b) => a === b
+  #| (first, second) => first === second
 
 ///|
-extern "js" fn test_same_value(a : NativeValue, b : NativeValue) -> Bool =
-  #| (a, b) => a === b
+extern "js" fn test_same_value(
+  first : NativeValue,
+  second : NativeValue,
+) -> Bool =
+  #| (first, second) => first === second
 
 ///|
-extern "js" fn test_export_generation_handle(
-  generation : Generation,
-) -> NativeValue =
-  #| generation => generation
+extern "js" fn test_same_error(
+  first : @host.NativeError,
+  second : @host.NativeError,
+) -> Bool =
+  #| (first, second) => first === second
 
 ///|
-fn test_start_supervised_generation(
-  owner : OwnerState,
+extern "js" fn test_value() -> NativeValue =
+  #| () => ({ tag: 'setup-value' })
+
+///|
+extern "js" fn test_delay_close(
   context : NativeContext,
-) -> Generation {
-  let generation = Generation(owner, context)
-  start_generation_supervisor(generation, _ => ())
-  generation
-}
-
-///|
-async test "repeated retirement closes context once and retains terminal identity" {
-  let owner = OwnerState(native_unit(), native_unit())
-  let context = test_context()
-  let generation = test_start_supervised_generation(owner, context)
-  owner.current = Occupied
-  native_mark_rejection_observed(native_promise(generation.ready))
-  let first = powered_audio_turn_off(test_export_generation_handle(generation))
-  let second = powered_audio_turn_off(test_export_generation_handle(generation))
-  assert_true(test_same_promise(first, second))
-  ignore(first.wait())
-  assert_eq(test_close_count(context), 1)
-  let early = native_promise(generation.ended).wait()
-  let late = native_promise(generation.ended).wait()
-  assert_true(test_same_value(early, late))
-  assert_true(owner.current is Vacant)
-}
-
-///|
-extern "js" fn test_callable() -> NativeValue =
-  #| () => async () => undefined
-
-///|
-extern "js" fn test_start_error(value : NativeValue) -> String =
-  #| value => value.error?.name
-
-///|
-extern "js" fn test_on_abort(
-  signal : @js_async.AbortSignal,
-  action : () -> Unit,
+  completion : NativeDeferred,
 ) -> Unit =
-  #| (signal, action) => signal.addEventListener('abort', action, { once: true })
-
-///|
-extern "js" fn test_delay_context_close(
-  context : NativeContext,
-  close_completion : NativeDeferred,
-) -> Unit =
-  #| (context, closeCompletion) => { context.close = () => { context.closes++; context.state = 'closed'; return closeCompletion.promise; }; }
+  #| (context, completion) => { context.close = () => { context.closes++; context.state = 'closed'; return completion.promise; }; }
 
 ///|
 extern "js" fn test_context_closed(context : NativeContext) -> Unit =
   #| context => { context.state = 'closed'; }
 
 ///|
-extern "js" fn test_engine(
-  close_completion : NativeDeferred,
-) -> @host.NativeEngine =
-  #| closeCompletion => {
-  #|   const engine = { closes: 0, disconnects: 0 };
-  #|   engine.output = { connect() {}, disconnect() { engine.disconnects++; } };
-  #|   engine.close = () => { engine.closes++; return closeCompletion.promise; };
+extern "js" fn test_engine(completion : NativeDeferred) -> @host.NativeEngine =
+  #| completion => {
+  #|   const engine = { closes: 0 };
+  #|   engine.output = { connect() {}, disconnect() {} };
+  #|   engine.close = () => { engine.closes++; return completion.promise; };
   #|   engine.wait = ({ signal }) => new Promise((resolve, reject) => {
   #|     const cancel = () => reject(new DOMException('cancelled', 'AbortError'));
+  #|     if (signal.aborted) { cancel(); return; }
   #|     signal.addEventListener('abort', cancel, { once: true });
-  #|     closeCompletion.promise.then(() => { signal.removeEventListener('abort', cancel); resolve({ type: 'closed' }); },
+  #|     completion.promise.then(() => { signal.removeEventListener('abort', cancel); resolve({ type: 'closed' }); },
   #|       error => { signal.removeEventListener('abort', cancel); resolve({ type: 'failed', error }); });
   #|   });
   #|   return engine;
@@ -119,236 +95,328 @@ extern "js" fn test_engine_closes(engine : @host.NativeEngine) -> Int =
   #| engine => engine.closes
 
 ///|
-extern "js" fn test_factory(engine : @host.NativeEngine) -> NativeValue =
-  #| engine => async () => engine
+extern "js" fn test_factory(create : () -> @host.NativeEngine) -> NativeValue =
+  #| create => async () => create()
 
 ///|
-extern "js" fn test_delayed_engine_factory(
-  acquisition_completion : NativeDeferred,
+extern "js" fn test_delayed_factory(
+  completion : NativeDeferred,
   entered : () -> Unit,
 ) -> NativeValue =
-  #| (acquisitionCompletion, entered) => () => { entered(); return acquisitionCompletion.promise; }
-
-///|
-extern "js" fn test_setup_callback(action : () -> Unit) -> NativeValue =
-  #| action => async () => action()
+  #| (completion, entered) => () => { entered(); return completion.promise; }
 
 ///|
 extern "js" fn test_setup(value : NativeValue) -> NativeValue =
   #| value => async () => value
 
 ///|
-extern "js" fn test_delay_context_resume(
+extern "js" fn test_callback(action : () -> NativeValue) -> NativeValue =
+  #| action => async () => action()
+
+///|
+extern "js" fn test_abort_setup(on_abort : () -> Unit) -> NativeValue =
+  #| onAbort => async ({ powerOff }) => { powerOff.addEventListener('abort', onAbort, { once: true }); }
+
+///|
+extern "js" fn test_failed_setup(error : @host.NativeError) -> NativeValue =
+  #| error => async () => { throw error; }
+
+///|
+extern "js" fn test_delay_resume(
   context : NativeContext,
-  resume_completion : NativeDeferred,
+  completion : NativeDeferred,
+  entered : () -> Unit,
 ) -> Unit =
-  #| (context, resumeCompletion) => { context.resume = () => { context.state = 'running'; return resumeCompletion.promise; }; }
+  #| (context, completion, entered) => { context.resume = () => { context.state = 'running'; entered(); return completion.promise; }; }
 
 ///|
-extern "js" fn test_error_same(
-  result : NativeResult,
-  error : @host.NativeError,
-) -> Bool =
-  #| (result, error) => !result.ok && result.error === error
+extern "js" fn test_pending(
+  promise : @js_async.Promise[NativeValue],
+) -> NativeValue =
+  #| promise => { const status = { pending: true }; promise.then(() => { status.pending = false; }, () => { status.pending = false; }); return status; }
 
 ///|
-test "occupied owner rejects before allocating a context" {
-  let owner = OwnerState(native_unit(), native_unit())
-  owner.current = Occupied
-  let result = audio_power_turn_on(export_owner_handle(owner), test_callable())
-  assert_eq(test_start_error(result), "InvalidStateError")
-  // Node has no AudioContext: missing admission checks would yield ReferenceError.
+extern "js" fn test_is_pending(status : NativeValue) -> Bool =
+  #| status => status.pending
+
+///|
+extern "js" fn test_outcome(
+  promise : @js_async.Promise[NativeValue],
+) -> @js_async.Promise[NativeResult] =
+  #| promise => promise.then(value => ({ ok: true, value }), error => ({ ok: false, error }))
+
+///|
+fn test_owner(
+  contexts : Array[NativeContext],
+  engines : Array[@host.NativeEngine],
+) -> Owner {
+  let mut context_index = 0
+  let mut engine_index = 0
+  Owner(
+    native_unit(),
+    test_factory(() => {
+      let engine = engines[engine_index]
+      engine_index += 1
+      engine
+    }),
+    create_context=_ => {
+      let context = contexts[context_index]
+      context_index += 1
+      test_context_result(context)
+    },
+  )
 }
 
 ///|
-async test "reentrant admission inherits unfinished retirement before abort listeners run" {
-  let owner = OwnerState(native_unit(), native_unit())
-  let generation = test_start_supervised_generation(owner, test_context())
-  let close_gate = native_create_deferred()
-  test_delay_context_close(generation.context, close_gate)
-  owner.current = Occupied
-  let mut admitted = false
-  let mut replacement_gate = owner.pending_retirements
-  test_on_abort(generation.retirement_controller.signal(), () => {
-    admitted = owner.current is Vacant
-    replacement_gate = owner.pending_retirements
-    owner.current = Occupied
-  })
-  native_mark_rejection_observed(native_promise(generation.ready))
-  begin_generation_retirement(generation, None)
-  @async.with_task_group(group => {
-    let mut passed = false
-    group.spawn_bg(() => {
-      wait_for_predecessor_cleanup(replacement_gate)
-      passed = true
-    })
-    @async.sleep(1)
-    assert_false(passed)
-    native_resolve(close_gate, native_unit())
-  })
-  assert_true(admitted)
-  assert_true(owner.current is Occupied)
+fn test_start(owner : Owner, setup : NativeValue) -> Generation raise {
+  guard owner.turn_on(setup) is Ok(generation) else {
+    fail("unexpected admission failure")
+  }
+  observe_rejection(generation.ready())
+  generation
 }
 
 ///|
-async test "rapid retirements retain every earlier cleanup in the engine gate" {
-  let owner = OwnerState(native_unit(), native_unit())
-  let a = test_start_supervised_generation(owner, test_context())
-  let release_a = native_create_deferred()
-  test_delay_context_close(a.context, release_a)
-  native_mark_rejection_observed(native_promise(a.ready))
-  begin_generation_retirement(a, None)
-  let b = test_start_supervised_generation(owner, test_context())
-  native_mark_rejection_observed(native_promise(b.ready))
-  begin_generation_retirement(b, None)
-  ignore(native_promise(b.turn_off_result).wait())
-  let c_gate = owner.pending_retirements
-  @async.with_task_group(group => {
-    let mut passed = false
-    group.spawn_bg(() => {
-      wait_for_predecessor_cleanup(c_gate)
-      passed = true
-    })
-    @async.sleep(1)
-    assert_false(passed)
-    native_resolve(release_a, native_unit())
-  })
-  assert_eq(test_close_count(a.context), 1)
-  assert_eq(test_close_count(b.context), 1)
+async test "repeated turn-off closes resources once and retains terminal identity" {
+  let context = test_context()
+  let close = NativeDeferred::new()
+  let engine = test_engine(close)
+  let owner = test_owner([context], [engine])
+  let generation = test_start(owner, test_setup(native_unit()))
+  ignore(generation.ready().wait())
+  let first = generation.turn_off()
+  let second = generation.turn_off()
+  assert_true(test_same_promise(first, second))
+  close.resolve(native_unit())
+  ignore(first.wait())
+  assert_eq(test_close_count(context), 1)
+  assert_eq(test_engine_closes(engine), 1)
+  let early = generation.ended().wait()
+  assert_true(test_same_value(early, generation.ended().wait()))
+  assert_eq(test_end_reason(early), "turnedOff")
 }
 
 ///|
-async test "pre-engine retirement bypasses unfinished setup and later gates" {
-  let owner = OwnerState(native_unit(), native_unit())
-  let generation = Generation(owner, test_context())
-  let blocked = native_create_deferred()
-  generation.state = WaitingForEngineGate(generation.context)
-  native_mark_rejection_observed(native_promise(generation.ready))
-  start_generation_supervisor(generation, _ => {
-    ignore(
-      await_success_or_retire(generation, () => {
-        await_browser_operation(native_as_outcome(native_promise(blocked)))
-      }),
-    )
+async test "duplicate admission rejects before allocating another context" {
+  let context = test_context()
+  let close = NativeDeferred::new()
+  let engine = test_engine(close)
+  let mut allocations = 0
+  let owner = Owner(native_unit(), test_factory(() => engine), create_context=_ => {
+    allocations += 1
+    test_context_result(context)
   })
+  let generation = test_start(owner, test_setup(native_unit()))
+  guard owner.turn_on(test_setup(native_unit())) is Err(error) else {
+    fail("duplicate admission succeeded")
+  }
+  assert_eq(test_error_name(error), "InvalidStateError")
+  assert_eq(allocations, 1)
+  let stopped = generation.turn_off()
+  close.resolve(native_unit())
+  ignore(stopped.wait())
+}
+
+///|
+async test "reentrant turn-on waits for the retiring generation's cleanup" {
+  let first_context = test_context()
+  let second_context = test_context()
+  let first_close = NativeDeferred::new()
+  let second_close = NativeDeferred::new()
+  let owner = test_owner([first_context, second_context], [
+    test_engine(first_close),
+    test_engine(second_close),
+  ])
+  let replacement : Completion[Result[Generation, @host.NativeError]] = Completion()
+  let mut replacement_setup = false
+  let first = test_start(
+    owner,
+    test_abort_setup(() => {
+      replacement.complete(
+        owner.turn_on(
+          test_callback(() => {
+            replacement_setup = true
+            native_unit()
+          }),
+        ),
+      )
+    }),
+  )
+  ignore(first.ready().wait())
+  let stopped = first.turn_off()
+  guard replacement.wait() is Ok(second) else {
+    fail("reentrant admission failed")
+  }
+  observe_rejection(second.ready())
   @async.sleep(1)
-  begin_generation_retirement(generation, None)
-  ignore(native_promise(generation.turn_off_result).wait())
-  assert_eq(test_close_count(generation.context), 1)
-  native_resolve(blocked, native_unit())
+  assert_false(replacement_setup)
+  first_close.resolve(native_unit())
+  ignore(stopped.wait())
+  ignore(second.ready().wait())
+  assert_true(replacement_setup)
+  let second_stopped = second.turn_off()
+  second_close.resolve(native_unit())
+  ignore(second_stopped.wait())
 }
 
 ///|
-async test "primary failure remains identical while cleanup failure rejects turn-off" {
-  let owner = OwnerState(native_unit(), native_unit())
-  let generation = test_start_supervised_generation(owner, test_context())
-  let close_gate = native_create_deferred()
-  let engine = test_engine(close_gate)
-  generation.state = SettingUp(OwnedEngine(generation.context, engine))
+async test "rapid replacements retain every predecessor cleanup" {
+  let contexts = [test_context(), test_context(), test_context()]
+  let first_close = NativeDeferred::new()
+  let last_close = NativeDeferred::new()
+  let owner = test_owner(contexts, [
+    test_engine(first_close),
+    test_engine(last_close),
+  ])
+  let first = test_start(owner, test_setup(native_unit()))
+  ignore(first.ready().wait())
+  let first_stopped = first.turn_off()
+  let middle = test_start(owner, test_setup(native_unit()))
+  ignore(middle.turn_off().wait())
+  let last = test_start(owner, test_setup(native_unit()))
+  let pending = test_pending(last.ready())
+  @async.sleep(1)
+  assert_true(test_is_pending(pending))
+  first_close.resolve(native_unit())
+  ignore(first_stopped.wait())
+  ignore(last.ready().wait())
+  assert_eq(test_close_count(contexts[0]), 1)
+  assert_eq(test_close_count(contexts[1]), 1)
+  let last_stopped = last.turn_off()
+  last_close.resolve(native_unit())
+  ignore(last_stopped.wait())
+}
+
+///|
+async test "turn-off while waiting for predecessors does not wait for them" {
+  let first_context = test_context()
+  let second_context = test_context()
+  let first_close = NativeDeferred::new()
+  test_delay_close(first_context, first_close)
+  let owner = test_owner([first_context, second_context], [])
+  let first = test_start(owner, test_setup(native_unit()))
+  let first_stopped = first.turn_off()
+  let pending = test_pending(first_stopped)
+  let second = test_start(owner, test_setup(native_unit()))
+  @async.sleep(1)
+  ignore(second.turn_off().wait())
+  assert_eq(test_close_count(second_context), 1)
+  assert_eq(test_end_reason(second.ended().wait()), "turnedOff")
+  assert_true(test_is_pending(pending))
+  first_close.resolve(native_unit())
+  ignore(first_stopped.wait())
+}
+
+///|
+async test "primary failure survives cleanup failure and cleanup still closes context" {
+  let context = test_context()
+  let close = NativeDeferred::new()
+  let owner = test_owner([context], [test_engine(close)])
   let primary = test_error()
   let cleanup = test_error()
-  native_mark_rejection_observed(native_promise(generation.ready))
-  begin_generation_retirement(generation, Some(primary))
-  let early = native_promise(generation.ended).wait()
+  let generation = test_start(owner, test_failed_setup(primary))
+  let early = generation.ended().wait()
   assert_true(test_failed_identity(early, primary))
-  native_reject(close_gate, cleanup)
-  let off = native_as_outcome(native_promise(generation.turn_off_result)).wait()
-  assert_true(test_error_same(off, cleanup))
-  assert_true(test_same_value(early, native_promise(generation.ended).wait()))
-  assert_eq(test_close_count(generation.context), 1)
+  close.reject(cleanup)
+  guard test_outcome(generation.turn_off()).wait().decode() is Failed(error) else {
+    fail("cleanup succeeded unexpectedly")
+  }
+  assert_true(test_same_error(error, cleanup))
+  assert_true(test_same_value(early, generation.ended().wait()))
+  assert_eq(test_close_count(context), 1)
 }
 
 ///|
-async test "late acquired engine is closed exactly once and joined before context release" {
-  let acquisition = native_create_deferred()
+async test "late acquired engine is closed once before its context without running setup" {
+  let context = test_context()
+  let acquisition = NativeDeferred::new()
   let entered : Completion[Unit] = Completion()
-  let owner = OwnerState(
+  let owner = Owner(
     native_unit(),
-    test_delayed_engine_factory(acquisition, () => entered.complete(())),
+    test_delayed_factory(acquisition, () => entered.complete(())),
+    create_context=_ => test_context_result(context),
   )
-  let generation = Generation(owner, test_context())
   let mut setup_called = false
-  let close_gate = native_create_deferred()
-  let engine = test_engine(close_gate)
-  start_audio_generation(
-    generation,
-    test_setup_callback(() => setup_called = true),
-    native_as_outcome(native_resolved()),
-    owner.pending_retirements,
+  let close = NativeDeferred::new()
+  let engine = test_engine(close)
+  let generation = test_start(
+    owner,
+    test_callback(() => {
+      setup_called = true
+      native_unit()
+    }),
   )
-  native_mark_rejection_observed(native_promise(generation.ready))
   entered.wait()
-  begin_generation_retirement(generation, None)
+  let stopped = generation.turn_off()
   @async.sleep(1)
-  assert_eq(test_close_count(generation.context), 0)
-  native_resolve(acquisition, test_engine_value(engine))
+  assert_eq(test_close_count(context), 0)
+  acquisition.resolve(test_engine_value(engine))
   @async.sleep(1)
   assert_eq(test_engine_closes(engine), 1)
-  assert_eq(test_close_count(generation.context), 0)
-  native_resolve(close_gate, native_unit())
-  ignore(native_promise(generation.turn_off_result).wait())
-  assert_eq(test_close_count(generation.context), 1)
-  begin_generation_retirement(generation, None)
+  assert_eq(test_close_count(context), 0)
+  close.resolve(native_unit())
+  ignore(stopped.wait())
+  assert_eq(test_close_count(context), 1)
+  ignore(generation.turn_off().wait())
   assert_eq(test_engine_closes(engine), 1)
   assert_false(setup_called)
 }
 
 ///|
-async test "closed browser state after await retires instead of advancing" {
-  let generation = test_start_supervised_generation(
-    OwnerState(native_unit(), native_unit()),
-    test_context(),
-  )
-  let operation : Completion[NativeOutcome] = Completion()
-  native_mark_rejection_observed(native_promise(generation.ready))
-  let waiting = @js_async.Promise::from_async(() => {
-    await_success_or_retire(generation, () => operation.wait())
-  })
-  test_context_closed(generation.context)
-  operation.complete(Succeeded(native_unit()))
-  assert_true(waiting.wait() is Retired)
-  ignore(native_promise(generation.turn_off_result).wait())
-  assert_true(generation.readiness is Rejected)
-}
-
-///|
-async test "ready retains setup value only after final resume and restore shares its promise" {
-  let close_gate = native_create_deferred()
-  let engine = test_engine(close_gate)
+async test "closed context after admission aborts setup without another browser event" {
   let context = test_context()
-  let owner = OwnerState(native_unit(), test_factory(engine))
-  let generation = Generation(owner, context)
-  let final_resume = native_create_deferred()
-  test_delay_context_resume(context, final_resume)
-  let admission = native_as_outcome(native_resolved())
-  let setup_value = native_create_turned_off_result()
-  start_audio_generation(
-    generation,
-    test_setup(setup_value),
-    admission,
-    owner.pending_retirements,
+  let admission = NativeDeferred::new()
+  test_delay_resume(context, admission, () => ())
+  let owner = test_owner([context], [])
+  let mut setup_called = false
+  let generation = test_start(
+    owner,
+    test_callback(() => {
+      setup_called = true
+      native_unit()
+    }),
   )
-  @async.sleep(1)
-  assert_true(generation.readiness is Pending)
-  native_resolve(final_resume, native_unit())
-  assert_true(
-    test_same_value(native_promise(generation.ready).wait(), setup_value),
-  )
-  ignore(native_suspend(context).wait())
-  let restore_gate = native_create_deferred()
-  test_delay_context_resume(context, restore_gate)
-  let a = powered_audio_resume(test_export_generation_handle(generation))
-  let b = powered_audio_resume(test_export_generation_handle(generation))
-  assert_true(test_same_promise(a, b))
-  native_resolve(restore_gate, native_unit())
-  ignore(a.wait())
-  begin_generation_retirement(generation, None)
-  native_resolve(close_gate, native_unit())
-  ignore(native_promise(generation.turn_off_result).wait())
+  test_context_closed(context)
+  admission.resolve(native_unit())
+  guard test_outcome(generation.ready()).wait().decode() is Failed(error) else {
+    fail("closed context became ready")
+  }
+  assert_eq(test_error_name(error), "AbortError")
+  ignore(generation.turn_off().wait())
+  assert_eq(test_end_reason(generation.ended().wait()), "turnedOff")
+  assert_false(setup_called)
 }
 
 ///|
-extern "js" fn native_as_outcome(
-  promise : @js_async.Promise[NativeValue],
-) -> @js_async.Promise[NativeResult] =
-  #| promise => promise.then(value => ({ ok: true, value }), error => ({ ok: false, error }))
+async test "ready waits for final resume and concurrent resume retains one promise" {
+  let context = test_context()
+  let close = NativeDeferred::new()
+  let owner = test_owner([context], [test_engine(close)])
+  let final_resume = NativeDeferred::new()
+  let entered : Completion[Unit] = Completion()
+  let setup_value = test_value()
+  let generation = test_start(
+    owner,
+    test_callback(() => {
+      test_delay_resume(context, final_resume, () => entered.complete(()))
+      setup_value
+    }),
+  )
+  let pending = test_pending(generation.ready())
+  entered.wait()
+  @async.sleep(1)
+  assert_true(test_is_pending(pending))
+  final_resume.resolve(native_unit())
+  assert_true(test_same_value(generation.ready().wait(), setup_value))
+  ignore(context.suspend().wait())
+  let restore = NativeDeferred::new()
+  test_delay_resume(context, restore, () => ())
+  let first = generation.resume_audio()
+  let second = generation.resume_audio()
+  assert_true(test_same_promise(first, second))
+  restore.resolve(native_unit())
+  ignore(first.wait())
+  let stopped = generation.turn_off()
+  close.resolve(native_unit())
+  ignore(stopped.wait())
+}

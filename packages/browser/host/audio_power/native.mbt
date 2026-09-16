@@ -16,7 +16,7 @@ priv type NativeResult
 priv type NativeDeferred
 
 ///|
-extern "js" fn native_create_context(options : NativeValue) -> NativeResult =
+extern "js" fn NativeContext::create(options : NativeValue) -> NativeResult =
   #| options => {
   #|   try { return { ok: true, value: new AudioContext(options?.contextOptions) }; }
   #|   catch (error) { return { ok: false, error }; }
@@ -51,7 +51,7 @@ extern "js" fn native_normalize_result_error(
   #| }
 
 ///|
-fn decode_native_result(result : NativeResult) -> NativeOutcome {
+fn NativeResult::decode(result : NativeResult) -> NativeOutcome {
   if native_result_ok(result) {
     Succeeded(native_result_value(result))
   } else {
@@ -60,7 +60,7 @@ fn decode_native_result(result : NativeResult) -> NativeOutcome {
 }
 
 ///|
-extern "js" fn native_context_from_value(value : NativeValue) -> NativeContext =
+extern "js" fn NativeContext::from_js(value : NativeValue) -> NativeContext =
   #| value => value
 
 ///|
@@ -74,7 +74,7 @@ extern "js" fn native_context_state(context : NativeContext) -> Int =
   #| context => context.state === "running" ? 0 : context.state === "closed" ? 2 : 1
 
 ///|
-fn read_context_playback_state(context : NativeContext) -> ContextDisposition {
+fn NativeContext::state(context : NativeContext) -> ContextDisposition {
   match native_context_state(context) {
     0 => Playing
     2 => Closed
@@ -83,20 +83,15 @@ fn read_context_playback_state(context : NativeContext) -> ContextDisposition {
 }
 
 ///|
-extern "js" fn native_create_dom_exception(
-  message : String,
-  name : String,
-) -> @host.NativeError =
+extern "js" fn dom_error(message : String, name : String) -> @host.NativeError =
   #| (message, name) => new DOMException(message, name)
 
 ///|
-extern "js" fn native_create_internal_error(
-  message : String,
-) -> @host.NativeError =
+extern "js" fn internal_error(message : String) -> @host.NativeError =
   #| message => new Error(message)
 
 ///|
-extern "js" fn native_is_callable(value : NativeValue) -> Bool =
+extern "js" fn NativeValue::is_callable(value : NativeValue) -> Bool =
   #| value => typeof value === "function"
 
 ///|
@@ -104,7 +99,7 @@ extern "js" fn native_invalid_setup_error() -> @host.NativeError =
   #| () => new TypeError("setupAudio must be a function")
 
 ///|
-extern "js" fn native_resume(
+extern "js" fn NativeContext::resume_audio(
   context : NativeContext,
 ) -> @js_async.Promise[NativeResult] =
   #| context => {
@@ -113,7 +108,7 @@ extern "js" fn native_resume(
   #| }
 
 ///|
-extern "js" fn native_suspend(
+extern "js" fn NativeContext::suspend(
   context : NativeContext,
 ) -> @js_async.Promise[NativeResult] =
   #| context => {
@@ -122,7 +117,7 @@ extern "js" fn native_suspend(
   #| }
 
 ///|
-extern "js" fn native_close_context(
+extern "js" fn NativeContext::close(
   context : NativeContext,
 ) -> @js_async.Promise[NativeResult] =
   #| context => {
@@ -131,7 +126,7 @@ extern "js" fn native_close_context(
   #| }
 
 ///|
-extern "js" fn native_listen_for_context_state_changes(
+extern "js" fn NativeContext::on_change(
   context : NativeContext,
   remove_listener_on_abort : @js_async.AbortSignal,
   on_state_change : () -> Unit,
@@ -139,7 +134,7 @@ extern "js" fn native_listen_for_context_state_changes(
   #| (context, removeListenerOnAbort, onStateChange) => context.addEventListener("statechange", onStateChange, { signal: removeListenerOnAbort })
 
 ///|
-extern "js" fn native_create_graph_engine(
+extern "js" fn create_engine(
   graph_engine_factory : NativeValue,
   context : NativeContext,
   options : NativeValue,
@@ -151,20 +146,18 @@ extern "js" fn native_create_graph_engine(
   #| }
 
 ///|
-extern "js" fn native_connect_output_to_destination(
+extern "js" fn connect_output(
   engine : @host.NativeEngine,
   context : NativeContext,
 ) -> NativeResult =
   #| (engine, context) => { try { engine.output.connect(context.destination); return { ok: true }; } catch (error) { return { ok: false, error }; } }
 
 ///|
-extern "js" fn native_disconnect_output(
-  engine : @host.NativeEngine,
-) -> NativeResult =
+extern "js" fn disconnect_output(engine : @host.NativeEngine) -> NativeResult =
   #| engine => { try { engine.output.disconnect(); return { ok: true }; } catch (error) { return { ok: false, error }; } }
 
 ///|
-extern "js" fn native_call_setup_audio(
+extern "js" fn call_setup(
   setup_audio : NativeValue,
   context : NativeContext,
   engine : @host.NativeEngine,
@@ -176,24 +169,24 @@ extern "js" fn native_call_setup_audio(
   #| }
 
 ///|
-extern "js" fn native_create_deferred() -> NativeDeferred =
+extern "js" fn NativeDeferred::new() -> NativeDeferred =
   #| () => { let resolve, reject; const promise = new Promise((a,b) => { resolve=a; reject=b; }); return { promise, resolve, reject }; }
 
 ///|
-extern "js" fn native_promise(
+extern "js" fn NativeDeferred::promise(
   deferred : NativeDeferred,
 ) -> @js_async.Promise[NativeValue] =
   #| deferred => deferred.promise
 
 ///|
-extern "js" fn native_resolve(
+extern "js" fn NativeDeferred::resolve(
   deferred : NativeDeferred,
   value : NativeValue,
 ) -> Unit =
   #| (deferred, value) => deferred.resolve(value)
 
 ///|
-extern "js" fn native_reject(
+extern "js" fn NativeDeferred::reject(
   deferred : NativeDeferred,
   error : @host.NativeError,
 ) -> Unit =
@@ -206,7 +199,7 @@ extern "js" fn native_rejected(
   #| error => Promise.reject(error)
 
 ///|
-extern "js" fn native_mark_rejection_observed(
+extern "js" fn observe_rejection(
   promise : @js_async.Promise[NativeValue],
 ) -> Unit =
   #| promise => { promise.catch(() => {}); }
@@ -220,29 +213,27 @@ extern "js" fn native_resolved() -> @js_async.Promise[NativeValue] =
   #| () => Promise.resolve(undefined)
 
 ///|
-extern "js" fn native_create_turned_off_result() -> NativeValue =
+extern "js" fn turned_off() -> NativeValue =
   #| () => Object.freeze({ reason: "turnedOff" })
 
 ///|
-extern "js" fn native_create_failed_end_result(
-  error : @host.NativeError,
-) -> NativeValue =
+extern "js" fn failed_end(error : @host.NativeError) -> NativeValue =
   #| error => Object.freeze({ reason: "failed", error })
 
 ///|
-extern "js" fn export_owner_handle(owner : OwnerState) -> NativeValue =
+extern "js" fn Owner::to_js(owner : Owner) -> NativeValue =
   #| value => value
 
 ///|
-extern "js" fn import_owner_handle(value : NativeValue) -> OwnerState =
+extern "js" fn Owner::from_js(value : NativeValue) -> Owner =
   #| value => value
 
 ///|
-extern "js" fn import_generation_handle(value : NativeValue) -> Generation =
+extern "js" fn Generation::from_js(value : NativeValue) -> Generation =
   #| value => value
 
 ///|
-extern "js" fn encode_started_generation(
+extern "js" fn started_result(
   generation : Generation,
   context : NativeContext,
   ready : @js_async.Promise[NativeValue],
@@ -251,7 +242,7 @@ extern "js" fn encode_started_generation(
   #| (generation, context, ready, ended) => ({ ok: true, generation, context, ready, ended })
 
 ///|
-extern "js" fn encode_start_failure(error : @host.NativeError) -> NativeValue =
+extern "js" fn start_error(error : @host.NativeError) -> NativeValue =
   #| error => ({ ok: false, error })
 
 ///|
@@ -295,13 +286,13 @@ extern "js" fn native_wait_for_abort(
 async fn await_browser_operation(
   operation : @js_async.Promise[NativeResult],
 ) -> NativeOutcome {
-  decode_native_result(
+  NativeResult::decode(
     @js_async.run_promise(signal => native_observe_operation(operation, signal)),
   )
 }
 
 ///|
-async fn wait_for_retirement_request(generation : Generation) -> Unit {
+async fn Generation::wait_for_stop(generation : Generation) -> Unit {
   ignore(
     @js_async.run_promise(signal => {
       native_wait_for_abort(generation.retirement_controller.signal(), signal)

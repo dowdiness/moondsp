@@ -48,23 +48,26 @@ async fn[T] Completion::wait(self : Completion[T]) -> T {
 }
 
 ///|
-priv struct OwnerState {
+priv struct Owner {
   mut current : CurrentSlot
   mut pending_retirements : @list.List[Completion[Unit]]
   options : NativeValue
   graph_engine_factory : NativeValue
+  create_context : (NativeValue) -> NativeResult
 }
 
 ///|
-fn OwnerState::OwnerState(
+fn Owner::Owner(
   options : NativeValue,
   graph_engine_factory : NativeValue,
-) -> OwnerState {
+  create_context? : (NativeValue) -> NativeResult = NativeContext::create,
+) -> Owner {
   {
     current: Vacant,
     pending_retirements: @list.List::List([]),
     options,
     graph_engine_factory,
+    create_context,
   }
 }
 
@@ -136,12 +139,12 @@ priv enum EndPublication {
 
 ///|
 priv struct Generation {
-  owner : OwnerState
+  owner : Owner
   // Public observation borrows this reference; state variants govern ownership.
   context : NativeContext
   retirement_controller : @js_async.AbortController
-  ready : NativeDeferred
-  ended : NativeDeferred
+  ready_result : NativeDeferred
+  end_result : NativeDeferred
   turn_off_result : NativeDeferred
   cleanup_finished : Completion[Unit]
   mut readiness : ReadySettlement
@@ -150,17 +153,14 @@ priv struct Generation {
 }
 
 ///|
-fn Generation::Generation(
-  owner : OwnerState,
-  context : NativeContext,
-) -> Generation {
+fn Generation::Generation(owner : Owner, context : NativeContext) -> Generation {
   let generation = {
     owner,
     context,
     retirement_controller: @js_async.AbortController::new(),
-    ready: native_create_deferred(),
-    ended: native_create_deferred(),
-    turn_off_result: native_create_deferred(),
+    ready_result: NativeDeferred::new(),
+    end_result: NativeDeferred::new(),
+    turn_off_result: NativeDeferred::new(),
     cleanup_finished: Completion(),
     readiness: Pending,
     publication: Unpublished,
@@ -168,13 +168,13 @@ fn Generation::Generation(
   }
   // Internal retirement can fail without a caller requesting turnOff. Mark the
   // retained promise observed, while still returning that same rejecting promise.
-  native_mark_rejection_observed(native_promise(generation.turn_off_result))
+  observe_rejection(NativeDeferred::promise(generation.turn_off_result))
   generation
 }
 
 ///|
-fn is_generation_live(generation : Generation) -> Bool {
-  match generation.state {
+fn Generation::is_live(self : Generation) -> Bool {
+  match self.state {
     Admitting(_)
     | Suspending(_)
     | WaitingForEngineGate(_)
@@ -188,28 +188,28 @@ fn is_generation_live(generation : Generation) -> Bool {
 }
 
 ///|
-fn reject_pending_readiness(
-  generation : Generation,
+fn Generation::reject_ready(
+  self : Generation,
   error : @host.NativeError,
 ) -> Unit {
-  match generation.readiness {
+  match self.readiness {
     Pending => {
-      generation.readiness = Rejected
-      native_reject(generation.ready, error)
+      self.readiness = Rejected
+      self.ready_result.reject(error)
     }
     Resolved | Rejected => ()
   }
 }
 
 ///|
-fn publish_end_once(
-  generation : Generation,
+fn Generation::publish_end(
+  self : Generation,
   result : NativeValue,
 ) -> NativeValue {
-  match generation.publication {
+  match self.publication {
     Unpublished => {
-      generation.publication = Published(result)
-      native_resolve(generation.ended, result)
+      self.publication = Published(result)
+      self.end_result.resolve(result)
       result
     }
     Published(retained) => retained
@@ -217,12 +217,9 @@ fn publish_end_once(
 }
 
 ///|
-fn retain_first_cleanup_error(
-  retirement : Retirement,
-  error : @host.NativeError,
-) -> Unit {
-  match retirement.cleanup_error {
-    None => retirement.cleanup_error = Some(error)
+fn Retirement::record(self : Retirement, error : @host.NativeError) -> Unit {
+  match self.cleanup_error {
+    None => self.cleanup_error = Some(error)
     Some(_) => ()
   }
 }
@@ -231,4 +228,14 @@ fn retain_first_cleanup_error(
 priv enum AwaitOutcome {
   Completed(NativeValue)
   Retired
+}
+
+///|
+fn Generation::ready(self : Generation) -> @js_async.Promise[NativeValue] {
+  self.ready_result.promise()
+}
+
+///|
+fn Generation::ended(self : Generation) -> @js_async.Promise[NativeValue] {
+  self.end_result.promise()
 }
