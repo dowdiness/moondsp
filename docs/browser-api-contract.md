@@ -810,6 +810,36 @@ success: rounding is part of an accepted change.
 See the technical reference's browser Player section for retained-material
 timing and the complete state/receipt contract.
 
+### Migrating prepared-playback clients
+
+This is a breaking cutover for the scheduler/player facade, not a change to
+`GraphEngine` or `AudioPower`. Remove token storage and split prepare/apply
+transactions; the old symbols and wire aliases are not retained.
+
+| Removed API/protocol | Replacement |
+|---|---|
+| `prepare_pattern_input()` / `prepare_song_input()` | Fill the same UTF-16 buffer, then call `player_update_input()` or `player_restart_input()`; the source grammar selects Pattern versus arrangement |
+| `apply_prepared_playback(token, false)` | `player_update_input()` performs preparation and acceptance together |
+| `apply_prepared_playback(token, true)` | `player_restart_input()` preflights, resets, and starts atomically |
+| `discard_prepared_playback(token)` | Delete token bookkeeping. Cancel an unsent editor update locally; an accepted command is not a deferred preparation that can be discarded |
+| `restart_playback()` | Fill the input buffer with the desired source and call `player_restart_input()`. To rewind Current song rather than the draft, retain and resubmit the last accepted text |
+| `apply-score` with `policy: "continue"` / `"restart"` | `player-update` / `player-restart`, each with `{ id, text }`; omit the old `mode`, `policy`, and `revision` fields |
+| `restart-playback` | `player-restart` with `{ id, text }` |
+| `pattern-updated`, `song-updated`, `playback-restarted`, and their old error replies | Correlate immediate `player-receipt` messages by `id`; handle `accepted`, `restartRequired`, and `message` |
+| `playback-superseded` / render-triggered `didRender()` acknowledgement | No replacement notification. Coalesce unsent edits in the host; accepted commands receive their own immediate receipts |
+| `PlaybackController.setTempo(data)` | `PlaybackController.handle({ type: "set-scheduler-bpm", bpm, revision })` for the separate legacy demo control |
+
+Request IDs are positive safe integers. A receipt's `samplePosition` is the
+owner's next unrendered sample, not the removed `acceptedAtSample` or a promise
+that every material is audible. `pendingCount` and `skippedCount` describe that
+distinction. `player-play` starts Ready/Ended, resumes Paused, and leaves Playing
+unchanged; it is not an unconditional replacement for the old rewind call.
+
+MoonBit scheduler consumers must also migrate the removed tempo validators and
+`active_*` / `has_pending_*` snapshot observations; the
+[scheduler migration table](../scheduler/README.mbt.md#migrating-tempo-and-snapshot-observation)
+lists each replacement.
+
 ## Live editor playback ownership
 
 The live editor routes draft edits and Play/Pause/Restart through `Player` in
@@ -849,9 +879,14 @@ gain; it does not expose nullable-node command methods.
 Player sources are subject to the
 [structural admission limits](technical-reference.md#browser-player-ownership-and-source-updates):
 8,192 code units, bounded syntax/query-plan depth, 128-step Euclidean rhythms,
-128 occurrences, and conservative event/work expansion bounds at 1000 BPM.
+128 occurrences, 256 source/retained material entries per route, and conservative
+event/work expansion bounds at 1000 BPM.
 Admission checks future callback branches and full-cycle sequence queries,
 not just a sample of the opening blocks. Rejection preserves Current song.
+Material admission includes accumulated entries waiting for replacement/removal
+and future occurrences, not just the latest source. It checks all route clocks
+and proposed material states before installing any route. Waiting for removal
+boundaries or explicitly restarting can recover retained capacity.
 The low-level Mini library does not impose browser limits by default.
 
 | Session method | Meaning | Completion |

@@ -75,6 +75,26 @@ pub fn PlaybackSnapshot::song_layout_revision(
 }
 
 ///|
+/// Count source entries independently of the current play position.
+pub fn PlaybackSnapshot::material_count(self : PlaybackSnapshot) -> Int {
+  match self {
+    Pattern(snapshot) => snapshot.pat().entries().length()
+    Song(snapshot) | RepeatSong(snapshot) =>
+      for occurrence in snapshot.song().occurrences(); count = 0 {
+        continue count +
+          occurrence
+          .section()
+          .body()
+          .fast(occurrence.section().scope().rate())
+          .entries()
+          .length()
+      } nobreak {
+        count
+      }
+  }
+}
+
+///|
 fn PlaybackSnapshot::cycle_at(
   self : PlaybackSnapshot,
   now : @pattern.Rational,
@@ -174,6 +194,37 @@ pub fn PlaybackState::commit_pending(
     }
   }
   self.pending = None
+}
+
+///|
+/// Build a bounded owner update without changing the live state. The snapshot
+/// limit also covers entries rebuilt by a future song repetition.
+pub fn PlaybackState::prepare_acceptance(
+  self : PlaybackState,
+  snapshot : PlaybackSnapshot,
+  now : @pattern.Rational,
+  material_limit~ : Int,
+  restart~ : Bool,
+) -> PlaybackState? {
+  guard snapshot.material_count() <= material_limit else { return None }
+  let proposed = PlaybackState()
+  proposed.running = if restart { None } else { self.running }
+  proposed.pending = Some(snapshot)
+  proposed.commit_pending(now)
+  guard proposed.running is Some(run) && run.entries.length() <= material_limit else {
+    return None
+  }
+  Some(proposed)
+}
+
+///|
+/// Install an already-checked state in the same serialized owner operation.
+pub fn PlaybackState::install_acceptance(
+  self : PlaybackState,
+  proposed : PlaybackState,
+) -> Unit {
+  self.running = proposed.running
+  self.pending = proposed.pending
 }
 
 ///|

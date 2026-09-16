@@ -129,31 +129,40 @@ fn Parser::at_end(self : Parser) -> Bool {
 }
 
 ///|
+/// Return the end of a complete comment. An unterminated block is left at its
+/// opening delimiter so normal parsing rejects it instead of accepting a prefix.
+fn mini_comment_end(input : String, start : Int) -> Int? {
+  guard start + 1 < input.length() && input[start] == '/' else { return None }
+  let mut end_ = start + 2
+  match input[start + 1] {
+    '/' => {
+      while end_ < input.length() && input[end_] != '\n' {
+        end_ += 1
+      }
+      Some(end_)
+    }
+    '*' => {
+      while end_ + 1 < input.length() {
+        if input[end_] == '*' && input[end_ + 1] == '/' {
+          return Some(end_ + 2)
+        }
+        end_ += 1
+      }
+      None
+    }
+    _ => None
+  }
+}
+
+///|
 fn Parser::skip_whitespace(self : Parser) -> Unit {
   while true {
     while !self.at_end() && mini_is_space(self.input[self.pos]) {
       self.pos += 1
     }
-    if self.pos + 1 < self.input.length() &&
-      self.input[self.pos] == '/' &&
-      self.input[self.pos + 1] == '/' {
-      self.pos += 2
-      while !self.at_end() && self.input[self.pos] != '\n' {
-        self.pos += 1
-      }
-    } else if self.pos + 1 < self.input.length() &&
-      self.input[self.pos] == '/' &&
-      self.input[self.pos + 1] == '*' {
-      self.pos += 2
-      while self.pos + 1 < self.input.length() &&
-            !(self.input[self.pos] == '*' && self.input[self.pos + 1] == '/') {
-        self.pos += 1
-      }
-      if self.pos + 1 < self.input.length() {
-        self.pos += 2
-      }
-    } else {
-      break
+    match mini_comment_end(self.input, self.pos) {
+      Some(end_) => self.pos = end_
+      None => break
     }
   }
 }

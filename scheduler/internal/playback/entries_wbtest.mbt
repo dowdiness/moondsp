@@ -414,3 +414,43 @@ test "another update cannot drop material awaiting removal" {
   assert_false(state.has_pending())
   assert_eq(notes(state, 4, 5), [60])
 }
+
+///|
+test "retained entry budget preserves music and recovers at removal boundaries" {
+  let state = PlaybackState()
+  accept(state, [material("a", 60, 1000), material("b", 80, 1000)], 0)
+  let next = score([material("c", 90, 1000)])
+  assert_true(
+    state.prepare_acceptance(
+      next,
+      @pattern.Rational::from_int(1),
+      material_limit=2,
+      restart=false,
+    )
+    is None,
+  )
+  assert_eq(notes(state, 0, 1000), [60, 80, 61, 81])
+  assert_false(state.has_pending())
+  let removing = state
+    .prepare_acceptance(
+      score([]),
+      @pattern.Rational::from_int(1),
+      material_limit=2,
+      restart=false,
+    )
+    .unwrap()
+  state.install_acceptance(removing)
+  assert_true(state.has_pending())
+  assert_eq(notes(state, 1, 1000), [61, 81])
+  let recovered = state
+    .prepare_acceptance(
+      next,
+      @pattern.Rational::from_int(1000),
+      material_limit=2,
+      restart=false,
+    )
+    .unwrap()
+  state.install_acceptance(recovered)
+  assert_eq(notes(state, 1000, 1001), [90])
+  assert_false(state.has_pending())
+}

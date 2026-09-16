@@ -55,7 +55,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
         if (this.usesScheduler) this.playback.handle(data);
       } else if (data.type === "set-scheduler-bpm") {
         if (this.usesScheduler) {
-          this.playback.setTempo(data);
+          this.playback.handle(data);
         } else {
           this.port.postMessage({ type: "error", message: "Tempo requires scheduler playback" });
         }

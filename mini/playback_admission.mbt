@@ -138,40 +138,40 @@ fn check_playback_source_size(input : String) -> Unit raise ParseError {
   let mut depth = 0
   let mut quoted_depth = 0
   let mut quoted = false
-  let mut comment = false
-  for index in 0..<input.length() {
+  let mut index = 0
+  while index < input.length() {
     let unit = input[index]
-    if comment {
-      if unit == '\n' {
-        comment = false
+    if !quoted && unit == '/' {
+      match mini_comment_end(input, index) {
+        Some(end_) => {
+          index = end_
+          continue
+        }
+        None =>
+          if index + 1 < input.length() && input[index + 1] == '*' {
+            raise ParseError("position \{index}: unterminated block comment")
+          }
       }
-      continue
     }
     if unit == '"' {
       quoted = !quoted
       quoted_depth = 0
-      continue
-    }
-    if !quoted &&
-      unit == '/' &&
-      index + 1 < input.length() &&
-      input[index + 1] == '/' {
-      comment = true
-      continue
-    }
-    match unit {
-      '(' | '[' => if quoted { quoted_depth += 1 } else { depth += 1 }
-      ')' | ']' =>
-        if quoted {
-          quoted_depth = (quoted_depth - 1).max(0)
-        } else {
-          depth = (depth - 1).max(0)
-        }
-      _ => ()
+    } else {
+      match unit {
+        '(' | '[' => if quoted { quoted_depth += 1 } else { depth += 1 }
+        ')' | ']' =>
+          if quoted {
+            quoted_depth = (quoted_depth - 1).max(0)
+          } else {
+            depth = (depth - 1).max(0)
+          }
+        _ => ()
+      }
     }
     guard depth + quoted_depth <= 32 else {
       raise ParseError("playback source exceeds nesting depth 32")
     }
+    index += 1
   }
 }
 

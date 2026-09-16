@@ -1,4 +1,7 @@
 ///|
+const PLAYBACK_MATERIAL_LIMIT = 256
+
+///|
 priv struct PlaybackLayoutRow {
   id : String
   name : String
@@ -195,7 +198,7 @@ fn Player::prepare(
     Ok(tempo) => tempo
     Err(_) => return Err(InvalidSource("tempo must be 0.001..1000 BPM"))
   }
-  match parsed.body() {
+  let prepared = match parsed.body() {
     Pattern(doc) => {
       let snapshot = doc.lower() catch {
         error =>
@@ -261,6 +264,16 @@ fn Player::prepare(
       })
     }
   }
+  let song = match prepared {
+    Err(error) => return Err(error)
+    Ok(song) => song
+  }
+  guard song.routes.all(route => {
+    route.snapshot.material_count() <= PLAYBACK_MATERIAL_LIMIT
+  }) else {
+    return Err(InvalidSource("playback source exceeds 256 material entries"))
+  }
+  Ok(song)
 }
 
 ///|
@@ -272,13 +285,20 @@ fn Player::install(
   restart : Bool,
 ) -> Result[Unit, PlayerError] {
   match
-    @scheduler.set_tempo_all(
-      self.schedulers,
+    @scheduler.accept_playback_all(
+      song.routes.map(route => (route.target.scheduler, route.snapshot)),
       song.tempo,
+      material_limit=PLAYBACK_MATERIAL_LIMIT,
       restart~,
       end_?=song.finite_end(),
     ) {
-    Err(_) => return Err(TransportRange)
+    Err(MaterialLimit) =>
+      return Err(
+        InvalidSource(
+          "playback would retain more than 256 material entries; wait for their boundaries or Restart",
+        ),
+      )
+    Err(Transport(_)) => return Err(TransportRange)
     Ok(_) => ()
   }
   if restart {
@@ -286,9 +306,6 @@ fn Player::install(
     for route in song.routes {
       route.target.pool.kill_all()
     }
-  }
-  for route in song.routes {
-    route.target.scheduler.accept_playback_snapshot(route.snapshot)
   }
   Ok(())
 }

@@ -1548,12 +1548,16 @@ not the sum of every sequential section as though all played simultaneously.
 | Lexical nesting / expanded query plan | 32 / 64 levels |
 | Euclidean rhythm | 128 steps |
 | Arrangement | 128 occurrences, including fills |
+| Source and retained material entries | 256 per routed scheduler, including future occurrences and material awaiting replacement/removal |
 | Candidate events | Conservative bound of 256 per source query window |
 | Query work | 65,536 structural expansion/control-fold units |
 | Composed exact-time factors | Numerator/denominator magnitude product at most 1,000,000,000 |
 
 `PlaybackController` rejects oversized strings before its per-character WASM
 transfer; MoonBit checks the same bound independently for direct callers.
+Mini's whitespace parser and admission pre-scan share line/block comment scanning.
+Unterminated block comments reject rather than accepting a valid source prefix;
+bounded recursive descent also checks its own depth before descending.
 
 The window comes from `Tempo::span_for_samples` at the actual sample rate and
 block size, using the maximum supported tempo (1000 BPM). Demo tempo changes
@@ -1562,6 +1566,16 @@ periods without reconstructing millibpm in the browser host. Limits also apply
 to intermediate expressions and can reject sources whose final transform would
 reduce their cost. Direct Mini parsers remain unrestricted unless
 `parse_play_source(..., max_query_span=Some(span))` is requested.
+
+Source entry counts are checked even while Ready, before publication. For a live
+Update, `accept_playback_all` prepares every route's proposed tempo, deadlines,
+and reconciled material state before installing any of them. The 256-entry cap
+covers the incoming snapshot as well as accumulated retained entries, not merely
+the latest source or pending count. A rejected edit cannot partially retime an
+earlier route. Capacity returns when retained entries reach their removal
+boundaries; Restart checks the new source against an empty material state.
+`PlaybackSnapshot::material_count` exposes the source count without consulting
+the current play position. Lower-level unbounded scheduler APIs remain available.
 
 Rejection retains the accepted source, voices, tempo, and position. The
 [bounded-player measurements](performance/2026-09-16-player-bounds.json) record
@@ -1582,6 +1596,17 @@ repeat against release WASM. The
 [post-fix benchmark snapshot](performance/2026-09-16-player-reliability-benchmarks.txt)
 records the full suite separately; accepting a source still does not establish
 a real-time deadline guarantee.
+
+The [2026-09-17 review-fix measurements](performance/2026-09-17-player-review.json)
+also run the actual scheduler AudioWorklet. With 40 alternating tempo edits of
+the 12-section score, owner Update p95 was 11 ms against a 2.667 ms quantum.
+Instrumented render p95 was 1 ms, but the worklet clock resolves only integer
+milliseconds. Callback interarrival gaps reached 24 ms both with and without
+edits because this headless configuration batches callbacks; those gaps do not
+establish audible dropouts. The command timings still exceed one quantum: source
+admission and retained-state bounds are not a hard-real-time guarantee.
+The companion [62-group benchmark snapshot](performance/2026-09-17-player-review-benchmarks.txt)
+records the full suite after the review fixes.
 
 MoonBit async remains at the JS host lifetime boundary, not in the synchronous
 AudioWorklet renderer. `packages/browser/host` already uses async 0.21.3:

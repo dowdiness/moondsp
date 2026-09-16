@@ -524,9 +524,9 @@
       <div class="slider-card">
         <div class="slider-row">
           <label for="bpmSlider"><strong>BPM</strong></label>
-          <span id="bpmValue">120</span>
+          <span id="bpmValue">60</span>
         </div>
-        <input type="range" id="bpmSlider" min="60" max="240" value="120"
+        <input type="range" id="bpmSlider" min="0.001" max="1000" step="0.001" value="60"
                oninput="setSchedulerBpm(this.value)">
       </div>
 
@@ -967,8 +967,9 @@
               statusEl.classList.toggle("pattern-status-ok", event.data.accepted);
             }
             window.__moondspPlayerReceipt = event.data;
+            reflectSchedulerBpm(event.data.tempo);
           } else if (event.data?.type === "tempo-updated" || event.data?.type === "tempo-error") {
-            document.getElementById('bpmValue').textContent = String(event.data.tempo);
+            reflectSchedulerBpm(event.data.tempo);
             if (event.data.type === "tempo-error") {
               const statusEl = document.getElementById('patternStatus');
               statusEl.textContent = event.data.message;
@@ -1090,8 +1091,13 @@
 
     let tempoRevision = 0;
 
+    function reflectSchedulerBpm(bpm) {
+      const value = String(bpm);
+      document.getElementById('bpmValue').textContent = value;
+      document.getElementById('bpmSlider').value = value;
+    }
+
     function setSchedulerBpm(bpm) {
-      document.getElementById('bpmValue').textContent = bpm;
       if (node) {
         node.port.postMessage({ type: 'set-scheduler-bpm', bpm: Number(bpm), revision: ++tempoRevision });
       }

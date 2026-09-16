@@ -290,3 +290,34 @@ test "one-block repeat is valid but faster source and demo tempos reject" {
   assert_position(1024)
   assert_eq(player_state(), 2)
 }
+
+///|
+test "unterminated comments cannot publish source tempo or stop sounding voices" {
+  assert_true(init_scheduler_graph_for_test())
+  let original = "bpm(90); " + HELD_NOTE
+  assert_eq(submit_for_test(original), 0)
+  render_for_test(8)
+  assert_eq(submit_for_test("bpm(120); note(\"64\") /*", restart=false), 1)
+  assert_eq(player.val.unwrap().view().source, Some(original))
+  assert_tempo(90.0)
+  assert_position(1024)
+  render_for_test(1)
+  assert_true(output_energy() > 0.01)
+}
+
+///|
+test "source material budget rejects future occurrences before publishing Ready" {
+  assert_true(init_scheduler_graph_for_test())
+  assert_eq(submit_for_test(HELD_NOTE, restart=false), 0)
+  let parts = [ for i in 0..<100 => "part(\"p\{i}\",\"a\")" ]
+  let oversized = "song(section(\"a\",1,stack(note(\"~\"),note(\"~\"),note(\"~\")))," +
+    parts.join(",") +
+    ")"
+  assert_eq(submit_for_test(oversized, restart=false), 1)
+  assert_eq(player.val.unwrap().view().source, Some(HELD_NOTE))
+  assert_eq(player_state(), 1)
+  assert_position(0)
+  assert_eq(player_play(), 0)
+  render_for_test(1)
+  assert_true(output_energy() > 0.01)
+}

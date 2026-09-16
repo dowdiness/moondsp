@@ -258,3 +258,58 @@ test "tempo sample spans reject invalid sample counts and rates" {
     assert_true(tempo.span_for_samples(128, sample_rate~) is Err(_))
   }
 }
+
+///|
+test "material admission rejects all routes before retiming and restart recovers capacity" {
+  fn snapshot(
+    name : String,
+    note : Double,
+  ) -> @scheduler.PlaybackSnapshot raise {
+    @scheduler.PlaybackSnapshot::pattern(
+      @pattern.PatternDoc::from_pattern(
+        id=@identity.PatternNodeId::from_string(name),
+        pat=@pattern.note(note)
+          .slow(@pattern.Rational::from_int(1000))
+          .material()
+          .named_entry(name),
+      ).lower(),
+    )
+  }
+  let (first, _, _, _) = transport_fixture(sample_rate=128.0)
+  let (second, pool, left, right) = transport_fixture(sample_rate=128.0)
+  second.accept_playback_snapshot(snapshot("old", 60.0))
+  second.process_playback_snapshot_block(pool, left, right)
+  let before = second.current_block().unwrap().logical_arc
+  let next = snapshot("new", 80.0)
+  let targets = [(first, next), (second, next)]
+  let tempo = @scheduler.Tempo::from_bpm(60.0).unwrap()
+  assert_true(
+    @scheduler.accept_playback_all(targets, tempo, material_limit=1)
+    is Err(MaterialLimit),
+  )
+  assert_eq(first.bpm(), 120.0)
+  assert_eq(second.bpm(), 120.0)
+  assert_true(first.accepted_snapshot() is None)
+  assert_true(second.current_block().unwrap().logical_arc == before)
+  assert_eq(second.active_note_count(), 1)
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::from_int(1),
+  )
+  assert_eq(
+    second.accepted_snapshot().unwrap().query(arc)[0].value.get("note"),
+    Some(60.0),
+  )
+  second.process_playback_snapshot_block(pool, left, right)
+  assert_true(left.get(0) > 0.0)
+  @scheduler.accept_playback_all(targets, tempo, material_limit=1, restart=true).unwrap()
+  for scheduler in [first, second] {
+    assert_eq(scheduler.bpm(), 60.0)
+    assert_eq(scheduler.sample_counter(), 0L)
+    assert_eq(scheduler.pending_material_change_count(), 0)
+    assert_eq(
+      scheduler.accepted_snapshot().unwrap().query(arc)[0].value.get("note"),
+      Some(80.0),
+    )
+  }
+}

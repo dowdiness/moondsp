@@ -174,6 +174,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Reject unterminated Mini block comments without publishing a valid prefix, and
+  share comment scanning between parsing and playback admission so `/* // */`
+  cannot hide excessive nesting. Bounded recursive descent now checks depth
+  before descending as well.
+- Route the legacy demo BPM slider through the current Player controller and
+  reflect accepted tempo in both its label and range input, including fractional
+  source tempos.
+- Reject source or accumulated retained material state above 256 entries per
+  browser route. All route clocks, deadlines, and reconciled states are checked
+  before installation; rejection preserves playback and Restart can recover
+  retained capacity. Source counts include future song occurrences.
+- Document the removed scheduler validators/snapshot queries and browser
+  prepare/apply tokens with explicit migration paths. Add generated admission
+  consistency coverage and opt-in actual-AudioWorklet measurements; measured
+  owner updates can still exceed one audio quantum.
+
 - Player now rejects repeated arrangements shorter than one audio block at the
   accepted tempo, including source and demo tempo edits, instead of allowing
   unbounded repetition splitting during rendering. Finite song endpoints are

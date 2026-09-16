@@ -13,6 +13,8 @@ import {
 }
 
 // Values
+pub fn accept_playback_all(Array[(PatternScheduler, PlaybackSnapshot)], Tempo, material_limit~ : Int, restart? : Bool, end_? : @pattern.Rational) -> Result[Unit, PlaybackAdmissionError]
+
 pub fn default_control_mapper() -> ControlMapper
 
 pub fn midi_to_hz(Double) -> Double
@@ -94,11 +96,17 @@ pub struct PerformanceTime {
 }
 pub fn PerformanceTime::PerformanceTime(Int64) -> Self
 
+pub(all) enum PlaybackAdmissionError {
+  MaterialLimit
+  Transport(@transport.TransportError)
+}
+
 pub enum PlaybackSnapshot {
   Pattern(@pattern.PatternSnapshot[@pattern.ControlMap])
   Song(@song.SongSnapshot[@pattern.ControlMap])
   RepeatSong(@song.SongSnapshot[@pattern.ControlMap])
 }
+pub fn PlaybackSnapshot::material_count(Self) -> Int
 pub fn PlaybackSnapshot::pattern(@pattern.PatternSnapshot[@pattern.ControlMap]) -> Self
 pub fn PlaybackSnapshot::query(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@pattern.ControlMap]]
 pub fn PlaybackSnapshot::repeat_song(@song.SongSnapshot[@pattern.ControlMap]) -> Self

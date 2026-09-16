@@ -231,6 +231,54 @@ pub fn set_tempo_all(
 }
 
 ///|
+pub(all) enum PlaybackAdmissionError {
+  MaterialLimit
+  Transport(TransportError)
+}
+
+///|
+/// Atomically accept bounded material state and tempo across all routes.
+/// Rejection leaves every clock, accepted snapshot, and note deadline intact.
+/// The limit covers both retained entries and a future repetition's entries.
+pub fn accept_playback_all(
+  targets : Array[(PatternScheduler, PlaybackSnapshot)],
+  tempo : Tempo,
+  material_limit~ : Int,
+  restart? : Bool = false,
+  end_? : @pattern.Rational,
+) -> Result[Unit, PlaybackAdmissionError] {
+  let plans : Array[(TempoPlan, @playback.PlaybackState)] = []
+  for target in targets {
+    let (scheduler, snapshot) = target
+    let plan = match scheduler.tempo_plan(tempo, restart, end_?) {
+      Err(error) => return Err(Transport(error))
+      Ok(plan) => plan
+    }
+    let now = match plan.clock.position(plan.clock.sample()) {
+      Err(error) => return Err(Transport(error))
+      Ok(now) => now
+    }
+    guard scheduler.playback_state.prepare_acceptance(
+        snapshot.raw(),
+        now,
+        material_limit~,
+        restart~,
+      )
+      is Some(state) else {
+      return Err(MaterialLimit)
+    }
+    plans.push((plan, state))
+  }
+  for index in 0..<targets.length() {
+    let scheduler = targets[index].0
+    let (tempo_plan, playback) = plans[index]
+    scheduler.apply_tempo_plan(tempo_plan)
+    scheduler.playback_state.install_acceptance(playback)
+  }
+  Ok(())
+}
+
+///|
 pub fn PatternScheduler::last_transport_error(
   self : PatternScheduler,
 ) -> TransportError? {
