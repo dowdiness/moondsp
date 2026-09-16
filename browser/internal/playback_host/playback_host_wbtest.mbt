@@ -56,29 +56,15 @@ fn init_scheduler_graph_for_test() -> Bool {
 }
 
 ///|
-fn prepare_for_test(text : String, song? : Bool = false) -> Int {
+fn submit_for_test(text : String, restart? : Bool = true) -> Int {
   clear_playback_input()
   for i in 0..<text.length() {
     push_playback_char(text[i].to_int())
   }
-  if song {
-    prepare_song_input()
+  if restart {
+    player_restart_input()
   } else {
-    prepare_pattern_input()
-  }
-}
-
-///|
-fn submit_for_test(
-  text : String,
-  song? : Bool = false,
-  restart? : Bool = true,
-) -> Int {
-  let token = prepare_for_test(text, song~)
-  if token == 0 {
-    1
-  } else {
-    apply_prepared_playback(token, restart)
+    player_update_input()
   }
 }
 
@@ -130,21 +116,17 @@ test "live synth applies gain, cutoff, and independent filter resonance" {
 
 ///|
 fn wet_energy() -> Double {
-  match (sched_wet_left.val, sched_wet_right.val) {
-    (Some(left), Some(right)) => {
-      let mut energy = 0.0
-      for i in 0..<128 {
-        energy = energy + left.get(i).abs() + right.get(i).abs()
-      }
-      energy
-    }
-    _ => 0.0
+  let owner = player.val.unwrap()
+  let mut energy = 0.0
+  for i in 0..<128 {
+    energy += owner.wet_left.get(i).abs() + owner.wet_right.get(i).abs()
   }
+  energy
 }
 
 ///|
 fn sound_route_active_notes(sound : Double) -> Int {
-  for route in sched_routes.val {
+  for route in player.val.unwrap().routes {
     if route.selector is RouteSound(code) && code == sound {
       return route.pool.scheduler.active_note_count()
     }
@@ -154,7 +136,7 @@ fn sound_route_active_notes(sound : Double) -> Int {
 
 ///|
 fn assert_position(position : Int) -> Unit raise {
-  for route in sched_routes.val {
+  for route in player.val.unwrap().routes {
     assert_eq(route.pool.scheduler.sample_counter(), position.to_int64())
   }
 }
@@ -167,7 +149,7 @@ fn test_song(length~ : Int, bpm~ : Int) -> String {
 ///|
 // All routes must observe the same tempo at the commit boundary.
 fn assert_tempo(bpm : Double) -> Unit raise {
-  for route in sched_routes.val {
+  for route in player.val.unwrap().routes {
     assert_eq(route.pool.scheduler.bpm(), bpm)
   }
 }
@@ -249,15 +231,15 @@ test "shared room tail survives a two-part continue edit and restart clears it" 
   let before = "song(section(\"a\",4,s(\"bd\").slow(8).room(1)),section(\"b\",4,s(\"sd\").slow(8)),part(\"a1\",\"a\",0),part(\"b1\",\"b\",0))"
   let after = "song(section(\"a\",4,s(\"bd\").slow(8).gain(0)),section(\"b\",4,s(\"sd\").slow(8)),part(\"a1\",\"a\",0),part(\"b1\",\"b\",0))"
   assert_true(init_scheduler_graph_for_test())
-  assert_eq(submit_for_test(before, song=true), 0)
+  assert_eq(submit_for_test(before), 0)
   render_for_test(30)
   assert_true(wet_energy() > 0.0)
-  assert_eq(submit_for_test(after, song=true, restart=false), 0)
+  assert_eq(submit_for_test(after, restart=false), 0)
   render_for_test(1)
   assert_true(wet_energy() > 0.0)
   assert_true(sound_route_active_notes(38.0) > 0)
   assert_true(output_energy() > 0.0)
-  assert_eq(submit_for_test(after, song=true, restart=true), 0)
+  assert_eq(submit_for_test(after), 0)
   render_for_test(1)
   assert_eq(wet_energy(), 0.0)
   assert_true(sound_route_active_notes(38.0) > 0)

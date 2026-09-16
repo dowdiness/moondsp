@@ -1,345 +1,286 @@
-import type { AudioEngine, AudioEvent, AudioSession, AudioStatus, SchedulerSession } from "./audio";
-import { RequestId, ScoreSource } from "./playback-protocol";
-import type { Draft, PlaybackMode, PlaybackReceipt, ScoreRequest } from "./playback-protocol";
-import { Tempo, committedTempo, tempoText, editTempo, commitTempo, receiveTempo } from "./tempo";
-import type { TempoField } from "./tempo";
+import type { AudioEngine, AudioEvent, AudioStatus, OpenSessionResult, SchedulerSession } from "./audio";
+import { RequestId } from "./playback-protocol";
+import type { PlayerOperation, PlayerReceipt, PlayerSnapshot } from "./playback-protocol";
 
-type Feedback = Readonly<{ message: string; kind: "ok" | "error" | "info" }>;
+type Feedback = Readonly<{ message: string; kind: "error" | "info" }>;
 type Diagnostic = Readonly<{ message: string; documentLength: number }>;
 export type PlaybackView = Readonly<{
   status: AudioStatus;
-  mode: PlaybackMode;
+  state: PlayerSnapshot["state"] | "Starting";
+  currentSource: string | null;
   tempoText: string;
+  samplePosition: number;
+  pendingCount: number;
+  skippedCount: number;
   feedback: Feedback | null;
   diagnostic: Diagnostic | null;
 }>;
-
-type Scheduled = { kind: "none" } | { kind: "queued"; timer: ReturnType<typeof setTimeout> };
-type SchedulerRun = {
-  run: symbol;
-  session: SchedulerSession;
-  requests: Map<number, ScoreRequest>;
-  latest: RequestId | null;
-  tempoRequest: RequestId;
-  scheduled: Scheduled;
+type Pending = {
+  operation: PlayerOperation;
+  source: string | undefined;
+  edit: number;
+  resolve: (receipt: PlayerReceipt) => void;
+  reject: (error: Error) => void;
 };
-type SchedulerState =
-  | (SchedulerRun & { kind: "awaiting-acceptance" })
-  | (SchedulerRun & { kind: "playing"; accepted: ScoreSource });
-type PlaybackState =
-  | { kind: "stopped" }
-  | { kind: "opening"; run: symbol }
-  | SchedulerState
-  | { kind: "compiled"; run: symbol; session: Extract<AudioSession, { kind: "compiled" }> }
-  | { kind: "closing"; run: symbol; session: AudioSession }
-  | { kind: "failed"; message: string };
-
-type SubmissionOutcome = "submitted" | "unchanged" | "empty" | "stored";
-type ReceiptOutcome = "accepted-current" | "accepted-stale" | "rejected-current" |
-  "rejected-stale" | "superseded" | "untracked-request" | "obsolete-session" | "failed" |
-  "tempo-accepted" | "tempo-rejected";
-type ToggleOutcome = "started" | "stopped" | "busy" | "empty" | "failed" | "obsolete";
-
-const DEBOUNCE_MS = 200;
-
-/** The page's playback owner. Views are projections, never writable domain state. */
-export class LivePlayback {
-  private state: PlaybackState = { kind: "stopped" };
-  private draft: Draft;
-  private tempo: TempoField = { kind: "displaying", tempo: Tempo.DEFAULT };
+type Connection =
+  | { kind: "closed" }
+  | { kind: "opening"; promise: Promise<SchedulerSession>; retirement: () => Promise<void>; controller: AbortController }
+  | { kind: "open"; session: SchedulerSession };
+/** Owns musical commands and their receipts, not AudioContext power policy. */
+export class Player {
+  private connection: Connection = { kind: "closed" };
+  private snapshot: PlayerSnapshot = { state: "Empty", tempo: 60, samplePosition: 0, pendingCount: 0, skippedCount: 0 };
+  private source: string;
+  private currentSource: string | null = null;
   private feedback: Feedback | null = null;
   private diagnostic: Diagnostic | null = null;
-  private nextRequest = RequestId.first();
+  private next = RequestId.first();
+  private epoch = 0;
+  private intent = 0;
+  private editVersion = 0;
+  private lastReceipt = 0;
+  private pending = new Map<number, Pending>();
+  private retirement: Promise<void> | undefined;
+  private debounce: ReturnType<typeof setTimeout> | undefined;
 
   constructor(
-    private readonly engine: Pick<AudioEngine, "mode" | "openSession">,
+    private readonly engine: Pick<AudioEngine, "openSession">,
     initial: { text: string },
-    private readonly present: (state: PlaybackView) => void,
+    private readonly present: (view: PlaybackView) => void,
   ) {
-    this.draft = ScoreSource.parse("pattern", initial.text);
+    this.source = initial.text;
     this.render();
   }
 
-  private mode(): PlaybackMode {
-    return this.draft.kind === "score" ? this.draft.score.mode : this.draft.mode;
+  view(): PlaybackView {
+    const state = this.connection.kind === "opening" ? "Starting" : this.snapshot.state;
+    const status: AudioStatus = state === "Starting" ? { kind: "starting" }
+      : state === "Fault" ? { kind: "error", message: this.feedback?.message ?? "Audio failed" }
+      : this.connection.kind === "open" ? { kind: "running" } : { kind: "idle" };
+    return { ...this.snapshot, state, status, currentSource: this.currentSource,
+      tempoText: String(this.snapshot.tempo), feedback: this.feedback, diagnostic: this.diagnostic };
   }
 
-  private text(): string {
-    return this.draft.kind === "score" ? this.draft.score.text : this.draft.text;
-  }
-
-  private status(): AudioStatus {
-    switch (this.state.kind) {
-      case "stopped": return { kind: "idle" };
-      case "opening": return { kind: "starting" };
-      case "awaiting-acceptance": case "playing": case "compiled": return { kind: "running" };
-      case "closing": return { kind: "stopping" };
-      case "failed": return { kind: "error", message: this.state.message };
+  private render(): void { this.present(this.view()); }
+  private cancelDebounce(): void { clearTimeout(this.debounce); this.debounce = undefined; }
+  private setSource(source: string): void {
+    if (source !== this.source) {
+      this.source = source;
+      this.editVersion++;
+      this.diagnostic = null;
+      this.feedback = null;
     }
   }
 
-  private render(): void {
-    this.present({ status: this.status(), mode: this.mode(), tempoText: tempoText(this.tempo),
-      feedback: this.feedback, diagnostic: this.diagnostic });
+  /** Editor convenience: incomplete input never replaces Current song. */
+  edit(source: string): void {
+    this.setSource(source);
+    this.cancelDebounce();
+    if (this.connection.kind === "open") {
+      this.debounce = setTimeout(() => {
+        this.debounce = undefined;
+        void this.update(this.source).catch(error => this.report(error));
+      }, 200);
+    }
+    this.render();
   }
 
-  edit(text: string): "stored" | "scheduled" {
-    this.draft = ScoreSource.parse(this.mode(), text);
-    switch (this.state.kind) {
-      case "awaiting-acceptance": case "playing": {
-        const state = this.state;
-        this.cancelScheduled(state);
-        state.scheduled = { kind: "queued", timer: setTimeout(() => {
-          state.scheduled = { kind: "none" };
-          this.submitCurrent();
-        }, DEBOUNCE_MS) };
-        return "scheduled";
+  update(source: string): Promise<PlayerReceipt> {
+    this.setSource(source);
+    this.cancelDebounce();
+    return this.send("update", source);
+  }
+
+  async restart(source: string): Promise<PlayerReceipt> {
+    this.setSource(source);
+    this.cancelDebounce();
+    const intent = ++this.intent;
+    const session = await this.open();
+    if (intent !== this.intent) throw new DOMException("Restart cancelled", "AbortError");
+    const result = await this.send("restart", source);
+    if (result.kind === "accepted" && intent === this.intent) session.fadeIn();
+    return result;
+  }
+
+  async play(): Promise<PlayerReceipt> {
+    const intent = ++this.intent;
+    const session = await this.open();
+    if (intent !== this.intent) throw new DOMException("Play cancelled", "AbortError");
+    // Only bootstrap needs editor input. Resume/Ended Play uses Current song,
+    // even when the editor currently contains a syntax error.
+    const result = this.currentSource === null
+      ? await this.send("restart", this.source)
+      : await this.send("play");
+    if (result.kind === "accepted" && intent === this.intent) session.fadeIn();
+    return result;
+  }
+
+  async pause(): Promise<PlayerReceipt> {
+    // While opening, cancel initialization and reclaim its resources. Pause
+    // is a local cancellation, not a command to an Empty session.
+    if (this.connection.kind === "opening") {
+      ++this.intent;
+      ++this.epoch;
+      const opening = this.connection;
+      this.connection = { kind: "closed" };
+      opening.controller.abort();
+      const retirement = this.retire(opening);
+      this.render();
+      await retirement;
+      throw new DOMException("Pause cancelled startup", "AbortError");
+    }
+    ++this.intent;
+    return this.send("pause");
+  }
+
+  async close(): Promise<void> {
+    ++this.epoch;
+    ++this.intent;
+    this.cancelDebounce();
+    const previous = this.connection;
+    this.connection = { kind: "closed" };
+    if (previous.kind === "opening") previous.controller.abort();
+    this.rejectPending(new DOMException("Player closed", "AbortError"));
+    this.currentSource = null;
+    this.snapshot = { state: "Empty", tempo: 60, samplePosition: 0, pendingCount: 0, skippedCount: 0 };
+    this.feedback = null;
+    this.diagnostic = null;
+    const retirement = this.retire(previous);
+    this.render();
+    await retirement;
+  }
+
+  private retire(previous: Connection): Promise<void> {
+    if (this.retirement !== undefined) return this.retirement;
+    const closing = previous.kind === "open" ? previous.session.close()
+      : previous.kind === "opening" ? previous.retirement() : Promise.resolve();
+    let retirement: Promise<void>;
+    retirement = Promise.resolve(closing).then(() => undefined).finally(() => {
+      if (this.retirement === retirement) this.retirement = undefined;
+    });
+    this.retirement = retirement;
+    return retirement;
+  }
+  private open(): Promise<SchedulerSession> {
+    if (this.connection.kind === "open") return Promise.resolve(this.connection.session);
+    if (this.connection.kind === "opening") return this.connection.promise;
+    const epoch = ++this.epoch;
+    const controller = new AbortController();
+    const raw = (async (): Promise<OpenSessionResult> => {
+      if (this.retirement !== undefined) await this.retirement;
+      if (epoch !== this.epoch) throw new DOMException("Player closed during startup", "AbortError");
+      return this.engine.openSession(event => {
+        if (epoch === this.epoch) this.receive(event);
+      }, controller.signal);
+    })();
+    let retirement: Promise<void> | undefined;
+    const retireOpening = (): Promise<void> => {
+      if (retirement !== undefined) return retirement;
+      retirement = raw.then(async opened => {
+        if (opened.kind === "opened") await opened.session.close();
+      }, () => undefined);
+      return retirement;
+    };
+    const promise = raw.then(async opened => {
+      if (epoch !== this.epoch) throw new DOMException("Player closed during startup", "AbortError");
+      if (opened.kind !== "opened") {
+        throw new Error(opened.kind === "failed" ? opened.message : "Audio owner is busy");
       }
-      case "stopped": case "opening": case "closing": case "failed": case "compiled":
-        return "stored";
-    }
-  }
-
-  selectMode(mode: PlaybackMode): SubmissionOutcome {
-    this.draft = ScoreSource.parse(mode, this.text());
-    this.feedback = { message: `${mode} mode selected`, kind: "info" };
-    this.render();
-    return this.submitCurrent();
-  }
-
-  useExample(score: { mode: PlaybackMode; text: string; bpm?: string }): SubmissionOutcome {
-    this.draft = ScoreSource.parse(score.mode, score.text);
-    if (score.bpm !== undefined) this.commitBpm(score.bpm);
-    this.render();
-    return this.submitCurrent(true);
-  }
-
-  editBpm(text: string): void {
-    this.tempo = editTempo(this.tempo, text);
-    this.render();
-  }
-
-  commitBpm(text: string): "committed" | "restored" {
-    const result = commitTempo(editTempo(this.tempo, text));
-    this.tempo = result.field;
-    switch (result.kind) {
-      case "committed":
-        this.applyTempo(result.tempo);
-        this.feedback = { message: `Requested BPM ${result.tempo.value}`, kind: "info" };
-        break;
-      case "restored":
-        this.feedback = { message: `${result.message} Restored BPM ${committedTempo(this.tempo).value}.`, kind: "info" };
-        break;
-    }
-    this.render();
-    return result.kind;
-  }
-
-  private applyTempo(tempo: Tempo): "sent" | "stored" {
-    switch (this.state.kind) {
-      case "awaiting-acceptance": case "playing":
-        this.state.tempoRequest = this.allocateRequest();
-        this.state.session.requestTempoChange(tempo, this.state.tempoRequest);
-        return "sent";
-      case "stopped": case "opening": case "closing": case "failed": case "compiled": return "stored";
-    }
-  }
-
-  /** Call from a user gesture; openSession() begins browser audio activation synchronously. */
-  async toggle(): Promise<ToggleOutcome> {
-    switch (this.state.kind) {
-      case "awaiting-acceptance": case "playing": case "compiled": {
-        const outcome = await this.close(this.state);
-        if (outcome === "stopped") {
-          this.feedback = { message: "stopped", kind: "info" };
-          this.render();
-        }
-        return outcome;
+      if (opened.session.kind !== "scheduler") {
+        await opened.session.close();
+        throw new Error("Player requires the scheduler audio engine");
       }
-      case "opening": case "closing": return "busy";
-      case "stopped": case "failed": break;
-    }
-    if (this.engine.mode === "scheduler" && this.draft.kind === "empty") {
-      this.emptyFeedback();
-      return "empty";
-    }
-    const opening = { kind: "opening" as const, run: Symbol("playback run") };
-    this.state = opening;
-    this.render();
-    const opened = await this.engine.openSession(event => this.receive(event, opening.run));
-    if (this.state !== opening) {
-      if (opened.kind === "opened") await opened.session.close();
-      return "obsolete";
-    }
-    switch (opened.kind) {
-      case "busy":
-        this.fail("Audio owner is already in use");
-        return "failed";
-      case "failed": this.fail(opened.message); return "failed";
-      case "opened": break;
-    }
-    const session = opened.session;
-    switch (session.kind) {
-      case "compiled":
-        this.state = { kind: "compiled", run: opening.run, session };
-        session.fadeIn();
+      this.connection = { kind: "open", session: opened.session };
+      this.render();
+      return opened.session;
+    }).catch(error => {
+      if (epoch === this.epoch && !(error instanceof DOMException && error.name === "AbortError")) {
+        this.fail(error instanceof Error ? error.message : String(error));
+      } else if (epoch === this.epoch && this.connection.kind === "opening") {
+        this.connection = { kind: "closed" };
         this.render();
-        return "started";
-      case "scheduler": {
-        // The current draft, not the source captured before async startup, wins.
-        if (this.draft.kind === "empty") {
-          await this.close({ run: opening.run, session });
-          this.emptyFeedback();
-          return "empty";
-        }
-        const state: SchedulerState = { kind: "awaiting-acceptance", run: opening.run,
-          session, requests: new Map(), latest: null, tempoRequest: this.allocateRequest(),
-          scheduled: { kind: "none" } };
-        this.state = state;
-        session.requestTempoChange(committedTempo(this.tempo), state.tempoRequest);
-        this.submit(state, this.draft.score, true);
-        this.render();
-        return "started";
       }
-    }
+      throw error;
+    });
+    this.connection = { kind: "opening", promise, retirement: retireOpening, controller };
+    this.render();
+    return promise;
+  }
+  private send(operation: PlayerOperation, source?: string): Promise<PlayerReceipt> {
+    if (this.connection.kind !== "open") return Promise.reject(new Error("Player is not open"));
+    const session = this.connection.session;
+    const id = this.next;
+    this.next = id.next();
+    return new Promise((resolve, reject) => {
+      this.pending.set(id.value, { operation, source, edit: this.editVersion, resolve, reject });
+      try {
+        const result = operation === "update" ? session.update(id, source!)
+          : operation === "restart" ? session.restart(id, source!)
+          : operation === "play" ? session.play(id) : session.pause(id);
+        if (result === "session-expired") {
+          this.pending.delete(id.value);
+          reject(new Error("Player session expired"));
+        }
+      } catch (error) {
+        this.pending.delete(id.value);
+        reject(error);
+      }
+    });
+  }
+
+  report(error: unknown): void {
+    if (error instanceof Error && error.name === "AbortError") return;
+    this.feedback = { kind: "error", message: error instanceof Error ? error.message : String(error) };
+    this.render();
+  }
+
+  private rejectPending(error: Error): void {
+    for (const pending of this.pending.values()) pending.reject(error);
+    this.pending.clear();
   }
 
   private fail(message: string): void {
-    if (this.state.kind === "awaiting-acceptance" || this.state.kind === "playing") {
-      this.cancelScheduled(this.state);
-    }
-    this.state = { kind: "failed", message };
-    this.diagnostic = null;
-    this.feedback = { kind: "error", message: `Audio failed: ${message}` };
+    ++this.epoch;
+    ++this.intent;
+    this.cancelDebounce();
+    const previous = this.connection;
+    if (previous.kind === "opening") previous.controller.abort();
+    this.connection = { kind: "closed" };
+    this.currentSource = null;
+    this.snapshot = { ...this.snapshot, state: "Fault" };
+    this.feedback = { kind: "error", message };
+    this.rejectPending(new Error(message));
+    const retirement = this.retire(previous);
     this.render();
+    void retirement.catch(error => this.report(error));
   }
 
-  private cancelScheduled(state: SchedulerState): void {
-    switch (state.scheduled.kind) {
-      case "none": break;
-      case "queued": clearTimeout(state.scheduled.timer); state.scheduled = { kind: "none" }; break;
+  private receive(event: AudioEvent): void {
+    if (event.kind === "failed") { this.fail(event.message); return; }
+    if (event.kind === "status") { this.snapshot = event; this.render(); return; }
+    const receipt = event.receipt;
+    const pending = this.pending.get(receipt.id.value);
+    if (!pending) return; // Reply belongs to an already-retired request.
+    this.pending.delete(receipt.id.value);
+    if (receipt.operation !== pending.operation) {
+      pending.reject(new Error("Player receipt operation mismatch"));
+      this.fail("Player receipt operation mismatch");
+      return;
     }
-  }
-
-  private async close(active: { run: symbol; session: AudioSession }): Promise<"stopped" | "obsolete"> {
-    if (this.state.kind === "awaiting-acceptance" || this.state.kind === "playing") {
-      this.cancelScheduled(this.state);
-    }
-    const closing = { kind: "closing" as const, run: active.run, session: active.session };
-    this.state = closing;
-    this.render();
-    await active.session.close();
-    if (this.state !== closing) return "obsolete";
-    this.state = { kind: "stopped" };
-    this.render();
-    return "stopped";
-  }
-
-  private emptyFeedback(): void {
-    this.feedback = { message: "Enter code, then press Play.", kind: "info" };
-    this.render();
-  }
-
-  private submitCurrent(restart = false): SubmissionOutcome {
-    switch (this.state.kind) {
-      case "stopped": case "opening": case "closing": case "failed": case "compiled": return "stored";
-      case "awaiting-acceptance": case "playing": break;
-    }
-    const state = this.state;
-    this.cancelScheduled(state);
-    switch (this.draft.kind) {
-      case "empty":
-        state.latest = null;
-        this.diagnostic = null;
-        if (state.kind === "awaiting-acceptance") {
-          void this.close(state);
-          this.emptyFeedback();
-        } else {
-          this.feedback = { kind: "info", message: "(empty — keeping previous playback)" };
-          this.render();
+    if (receipt.id.value > this.lastReceipt) {
+      this.lastReceipt = receipt.id.value;
+      this.snapshot = receipt;
+      if (pending.source !== undefined) {
+        if (receipt.kind === "accepted") this.currentSource = pending.source;
+        if (pending.edit === this.editVersion) {
+          this.diagnostic = receipt.kind === "rejected" ? { message: receipt.message, documentLength: pending.source.length } : null;
+          this.feedback = receipt.kind === "rejected" ? { kind: "error", message: receipt.message } : null;
         }
-        return "empty";
-      case "score": return this.submit(state, this.draft.score, restart);
-    }
-  }
-
-  private allocateRequest(): RequestId {
-    const id = this.nextRequest;
-    this.nextRequest = id.next();
-    return id;
-  }
-
-  private submit(state: SchedulerState, score: ScoreSource, restart: boolean): SubmissionOutcome {
-    if (!restart && state.kind === "playing" && state.requests.size === 0 &&
-        state.accepted.mode === score.mode && state.accepted.text === score.text) return "unchanged";
-    const id = this.allocateRequest();
-    const request: ScoreRequest = { id, score, policy: restart || state.kind === "awaiting-acceptance" ||
-      state.accepted.mode !== score.mode ? "restart" : "continue" };
-    state.latest = id;
-    state.requests.set(id.value, request);
-    state.session.submitScore(request);
-    return "submitted";
-  }
-
-  private receive(event: AudioEvent, run: symbol): ReceiptOutcome {
-    const state = this.state;
-    switch (state.kind) {
-      case "stopped": case "failed": return "obsolete-session";
-      case "opening": case "closing": case "compiled":
-        if (state.run !== run) return "obsolete-session";
-        if (event.kind === "failed") { this.fail(event.message); return "failed"; }
-        return "obsolete-session";
-      case "awaiting-acceptance": case "playing": break;
-    }
-    if (state.run !== run) return "obsolete-session";
-    if (event.kind === "failed") { this.fail(event.message); return "failed"; }
-    if (event.kind === "tempo") {
-      const receipt = event.receipt;
-      if (receipt.id.value !== state.tempoRequest.value) return "untracked-request";
-      this.tempo = receiveTempo(this.tempo, receipt.tempo);
-      if (receipt.kind === "rejected") {
-        this.feedback = { kind: "error", message: `${receipt.message} — keeping BPM ${receipt.tempo.value}.` };
+      } else if (receipt.kind === "rejected") {
+        this.feedback = { kind: "error", message: receipt.message };
       }
-      this.render();
-      return receipt.kind === "accepted" ? "tempo-accepted" : "tempo-rejected";
     }
-    return this.settle(state, event.receipt);
-  }
-
-  private settle(state: SchedulerState, receipt: PlaybackReceipt): ReceiptOutcome {
-    const request = state.requests.get(receipt.id.value);
-    if (request === undefined) return "untracked-request";
-    state.requests.delete(receipt.id.value);
-    if (receipt.kind === "superseded") return "superseded";
-    const score = request.score;
-    const current = state.latest?.value === receipt.id.value && this.draft.kind === "score" &&
-      score.mode === this.draft.score.mode && score.text === this.draft.score.text;
-    switch (receipt.kind) {
-      case "accepted":
-        // Acceptance advances playback even when the editor's diagnostic is stale.
-        this.state = { ...state, kind: "playing", accepted: score };
-        if (state.kind === "awaiting-acceptance") state.session.fadeIn();
-        // A score receipt cannot undo a tempo command issued after that render.
-        if (receipt.tempoRevision?.value === state.tempoRequest.value) {
-          this.tempo = receiveTempo(this.tempo, receipt.tempo);
-        }
-        if (current) {
-          this.diagnostic = null;
-          this.feedback = { kind: "ok", message: receipt.operation === "update"
-            ? `✓ ${score.mode} edit queued for the next pattern starts` : `✓ ${score.mode} updated` };
-        }
-        this.render();
-        return current ? "accepted-current" : "accepted-stale";
-      case "rejected":
-        if (!current) return "rejected-stale";
-        this.diagnostic = { message: receipt.message, documentLength: score.text.length };
-        this.feedback = { kind: "error", message: `✗ ${receipt.message} — ${state.kind === "playing"
-          ? "Your edit was not applied. The last working version keeps playing."
-          : "Nothing is playing yet. Fix the code, then press Play."}${receipt.recovery === "restart"
-          ? " Press Stop, then Play to apply this change from the beginning." : ""}` };
-        this.render();
-        if (state.kind === "awaiting-acceptance") void this.close(state);
-        return "rejected-current";
-    }
+    pending.resolve(receipt);
+    this.render();
   }
 }

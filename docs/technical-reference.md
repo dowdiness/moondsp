@@ -979,6 +979,28 @@ Current semantics:
   current source cycle before replacement; sounding voices retain deadlines.
   See [scheduler guide](../scheduler/README.mbt.md) for entry and identity rules.
   Multiple staged snapshots coalesce so the latest staged state wins
+- Reconciliation consumes already-lowered snapshots and classifies every
+  material into an exclusive runtime state: current, waiting at a proven entry,
+  changing at a proven entry, finishing current material with a skipped incoming
+  occurrence, or skipped for this Play. Waiting/changing/finishing states always
+  contain a concrete rational exit or entry boundary; absence of a boundary is
+  not a pending transition and is never represented by a nullable due time.
+- A newly added finite occurrence whose start is before the current transport
+  position is skipped for the rest of that Play, even when one of its internal
+  material-grid entries remains ahead. It never joins an occurrence midway.
+  Resetting playback constructs fresh current states from the accepted snapshot.
+- A later edit preserves a reserved boundary only while that boundary remains
+  eligible for the replacement placement. Moving a waiting finite occurrence
+  behind the transport reclassifies it as skipped. When current material must
+  first reach its reserved exit, it finishes at that boundary while the moved
+  incoming occurrence remains explicitly skipped; settlement cannot install it.
+- `accepted_snapshot()` exposes the Pattern or Song selected at the most recent
+  render-block boundary, while `queued_snapshot()` exposes the latest snapshot
+  waiting for the next boundary. Both can be present simultaneously.
+  `pending_material_change_count()` counts accepted changes waiting for a
+  reserved entry; `skipped_material_change_count()` counts accepted finite
+  changes that cannot enter during this Play. These facts do not imply transport
+  activity or audio audibility.
 - Sourced snapshot queries retain native pattern and song provenance through
   voice dispatch without converting records through a second wrapper array.
   Pattern and song selectors are separate types: `PatternVoiceScope` selects a
@@ -1398,72 +1420,103 @@ Minimum set needed for a useful synthesizer:
 | **`incr`** | MoonBit library for incremental computation (Signal/Memo). Salsa-inspired. |
 | **CLAP** | Clever Audio Plugin format — modern alternative to VST3, designed for open-source |
 
-### Browser playback preparation and application
+### Browser Player ownership and source updates
 
-Playback uses a single routed snapshot render path. Preparation is separate from
-application: `clear_playback_input` / `push_playback_char` fill one UTF-16 input
-buffer, then `prepare_pattern_input` or `prepare_song_input` returns a positive
-opaque token (zero on failure). Preparation never changes active playback,
-transport, sounding voices, or an accepted pending operation. It replaces the
-single prepared-result slot; failures invalidate that slot. Tokens are consumed
-on successful application and can be discarded explicitly. Resetting the graph
-invalidates prepared tokens; token generations are not reused across resets.
+The browser Player owns Current song, transport, routed material versions,
+voices, output buffers, and the shared room. Clients submit source or transport
+intent; they do not sequence public preparation tokens or mutate route state.
+The resource owner still manages AudioContext creation and shutdown separately.
 
-`apply_prepared_playback(token, restart)` queues the prepared score for the next
-block. Continuing application requires an accepted score and identical mode/layout.
-Embedded tempo edits preserve musical position. Resetting application accepts mode/layout/tempo
-changes and atomically replaces all route snapshots, resets their clocks and
-kills old voices before querying any route. Failed application preserves active
-and pending playback and leaves the token available for retry or discard.
-The application result is `0` for acceptance, `1` for an invalid token or
-unrepresentable change, and `2` when starting/restarting is required (no active
-score, or a changed mode/layout). Admission classifies these reasons before
-formatting a diagnostic; hosts must not infer recovery from diagnostic wording.
+`clear_playback_input` / `push_playback_char` fill one UTF-16 input buffer.
+Both `player_update_input()` and `player_restart_input()` consume it through the
+same parser. A source may contain bindings, comments, an optional `bpm(number);`
+declaration, and either a Pattern or `song(...)`. The source default is 60 BPM.
+An arrangement may retain its embedded `bpm(...)` item, but declaring tempo
+twice is an error. Patterns repeat; arrangements end unless followed by
+`.repeat()`. `silence()` is an explicit silent Pattern.
 
-`restart_playback` queues the applied snapshot at the beginning, without parsing
-or consulting the input/prepared slots. It cancels a pending replacement, keeps
-the current global BPM and fails without mutation if no score has been applied.
-The last accepted operation wins; preparation alone never supersedes one.
-Playing a finite score beyond its end renders existing voice releases and the
-shared reverb tail, then silence, until an explicit restart or another valid
-application. Continuing updates do not backfill past onsets. Suspending browser
-audio pauses rendering; queued operations are accepted on the next rendered
-block after resumption. Material replacements then wait for their own entries.
+Repeated arrangements must span at least one audio block at the accepted tempo
+and sample rate. This bounds repetition splitting to at most two slices per
+rendered block; shorter periods are rejected, not truncated or silently muted.
+This is a bound on repetition overhead, not on arbitrary pattern/event density.
+The same admission rule applies to source edits and the demo tempo control.
 
-Both browser worklets accept `apply-score` with mode, text, revision and an
-explicit `continue` or `restart` policy; `restart-playback` carries only a request
-revision. They share one controller. Replaced requests receive
-`playback-superseded`. Success receipts are emitted after the first block renders
-and contain request/score revisions, `acceptedAtSample` (the start of that block),
-`samplePosition` (the next block), and the effective `tempo` after that render.
-`scheduler_bpm()` reads the accepted scheduler tempo, rounded to 0.001 BPM
-(zero before scheduler initialization). Deferred song tempo changes are read
-after commitment, never inferred from source text by the host.
-Errors preserve the pending receipt and identify their `phase`: `prepare`,
-`apply`, `restart`, or `protocol`. Rejections also carry `recovery: "edit"` or
-`"restart"`, derived from the native admission result rather than message text.
-The normal UI offers **Play / Stop**. Continuing edit receipts acknowledge the
-authored score, not simultaneous audible replacement: individual materials
-change at their next source-cycle entry. The UI reports that the edit is queued.
-Old eval/parse-and-set/update APIs and their messages are removed, not wrapped.
+| Operation | Accepted behavior |
+|---|---|
+| Update | Replace Current song immediately, without rewinding. Changed materials enter at their safe boundaries. |
+| Restart | Parse the submitted editor source first, then replace Current song, reset transport/voices/room, and start from zero. |
+| Play | Start Ready or Ended Current song from zero; resume Paused from its frozen state; leave Playing unchanged. |
+| Pause | Freeze transport, voices, effects, and material transitions while outputting silence. |
 
-`set_scheduler_bpm(bpm)` now returns `0` on success and `1` on rejection,
-including an uninitialized scheduler. It retains the existing all-route
-preflight: invalid or unrepresentable tempo changes leave playback unchanged
-and populate the playback diagnostic. A successful request may be rounded to
-the runtime's 0.001-BPM precision; that is not a rejection.
-The worklet command `set-scheduler-bpm` requires a positive safe-integer
-`revision`. Its `tempo-updated` or `tempo-error` reply carries that revision
-and the effective `tempo`; a rejection also carries `message`.
-Score receipts carry `tempoRevision`, the most recently processed tempo-command
-revision, or `null` before any such command. This prevents a delayed score
-receipt from overwriting a newer tempo edit while still reflecting song tempo
-changes committed after a tempo command.
+Update before the first Play produces Ready. Ended accepts a newer Current song
+without starting or replacing the old release/effect tails; the next Play uses
+the newer song. Play without a Current song fails. Invalid Update or Restart
+leaves Current song, position, sounding state, and existing material reservations
+unchanged. In particular, invalid editor text does not prevent Play from
+resuming an already accepted song.
 
-The playback host imports dependency-free identity types for snapshot IDs.
-Preparation/routing decisions use explicit route selectors; mutable prepared and
-pending slots, transport resets and voice lifecycle belong to the audio-owner
-shell. Snapshots remain inside WASM and are never transferred as JS objects.
+Operations return `0` for acceptance, `1` for an invalid/unrepresentable request,
+and `2` when a Playing/Paused layout change requires Restart. The diagnostic is
+available through `get_playback_error` and its length/character exports. Clients
+use the status code, not diagnostic wording, to identify RestartRequired.
+Owner acceptance completes during the command, including while Paused; it does
+not wait for a rendered block.
+
+Material transitions carry the retained source and a proven entry boundary.
+Entering has no fictional current material. Later updates replace waiting
+payloads without moving a still-valid reservation. Removing an unentered
+addition cancels it immediately. Finite additions already underway or over are
+Skipped, not Pending, and cannot join through a later material-grid entry.
+Current song can therefore be newer than some sounding material versions.
+Source identity and event origins remain attached to the actual retained
+version. At a repetition boundary the latest song begins its next local cycle;
+transport, voice releases, and the shared room are not reset.
+
+Tempo parsing produces a validated `Tempo`. The owner calculates each proposed
+clock and every musical note deadline once, before mutating any route. If any
+route is unrepresentable, none changes. Applying the retained plans preserves
+musical position; physical note deadlines stay fixed. Restart plans use a zero
+anchor and clear voices after every route has accepted the plan.
+The finite song endpoint is checked on the proposed clock before commit,
+including Restart. Ready/Ended source updates check the future zero-anchored
+clock without touching the old performance or tails.
+
+Both worklets share `PlaybackController`. Commands are `player-update` and
+`player-restart` with `{ id, text }`, or `player-play` and `player-pause` with
+`{ id }`. IDs are positive safe integers. An immediate `player-receipt` reports
+the ID, operation, acceptance, and complete owner projection: state,
+`samplePosition`, `tempo`, `pendingCount`, and `skippedCount`. Rejections also
+carry `message` and `restartRequired`. The dedicated scheduler worklet refreshes
+the projection with `player-status` every 32 rendered quanta; the editor does
+not poll it per sample. That worklet reports Ready only after graph initialization.
+
+Numeric ABI states are 0 Empty, 1 Ready, 2 Playing, 3 Paused, 4 Ended, and 5
+Fault. The live UI displays Empty as Ready and adds Starting only while opening
+resources. Play/Pause and Restart are separate controls. Tempo belongs to the
+source, not an independent UI input. Request receipts retain the submitted
+source version so a delayed rejection cannot annotate newer editor text.
+Pause during initial Starting cancels the pending start locally; no Pause command
+is sent to an Empty Player and no accepted receipt is fabricated. Cancellation
+uses `AbortError`, which the UI does not display as a playback failure.
+Closing or failing the connection settles outstanding requests and retires
+late replies. Startup Pause and `Player.close()` abort the opening capability:
+fetch is cancelled, non-abortable native completions are observed but cannot
+publish a graph, and owned partial resources are disconnected and closed.
+Opening has one five-second deadline covering resume, fetch/body, compilation,
+module loading, and readiness. Cancellation is `AbortError`; deadline expiry is
+a visible initialization failure. Concurrent closes share retirement and a
+subsequent Play waits for cleanup. Cleanup awaits the browser's native
+`AudioContext.close()` promise; a browser that never settles that promise is
+not given a false cleanup acknowledgement. The opening signal has no authority
+over a session after successful activation.
+
+`set_scheduler_bpm` remains a lower-level demo/probe control, returning 0 on
+success and 1 on rejection. Its `set-scheduler-bpm` worklet message reports a
+`tempo-updated` or `tempo-error` receipt with a request revision. It uses the same
+all-route tempo plan, but is not part of the live Player command API.
+`scheduler_bpm()` reports accepted tempo at the runtime's 0.001-BPM precision;
+source updates replace a previous demo tempo, including the omission default.
+Snapshots and preparation plans stay inside WASM.
 
 The browser audio owner also owns exactly one stereo room reverb, outside all
 routed voice pools. Each voice keeps one normalized send gain; every route
@@ -1474,10 +1527,72 @@ multiple rooms, or event-controlled decay and damping. Its state is independent
 of voice and authored-material identity, so tails survive note release, section
 boundaries, and continuing live edits even when one contributing part is
 replaced or stopped. Restart application clears the room state together with
-transport and voices. The UI Stop remains immediate because it suspends browser
-output; the restart queued by the next Play clears the paused tail before audio
-resumes.
-Parsing, lowering, and pattern queries still allocate in that owner. This
-contract does not promise freedom from underruns. Global BPM edits preserve
-musical position and retime musical deadlines; physical deadlines stay fixed.
-Arbitrary seeks are outside this API.
+transport and voices. Pause instead freezes the room without suspending the
+AudioContext; Play resumes that same tail. Ended schedules no new finite-song
+events while existing releases and room energy continue to render.
+Parsing, lowering, and pattern queries still allocate in the audio owner.
+The ownership contract does not promise glitch-free live editing or freedom
+from underruns. Arbitrary seeks are outside this API.
+
+Player admission bounds source construction and query expansion before accepting
+a new performance. It evaluates the shared mini syntax and notation grammar,
+including referenced bindings, future conditional transforms, scalar-control
+cross-products, and the full-cycle child queries used by sequence. Arrangement
+bounds account for overlap, minimum section length, and repeat-boundary splitting,
+not the sum of every sequential section as though all played simultaneously.
+
+| Admission resource | Limit |
+|---|---|
+| Source text | 8,192 UTF-16 code units |
+| Expression AST | 512 nodes; nesting depth 32 |
+| Lexical nesting / expanded query plan | 32 / 64 levels |
+| Euclidean rhythm | 128 steps |
+| Arrangement | 128 occurrences, including fills |
+| Candidate events | Conservative bound of 256 per source query window |
+| Query work | 65,536 structural expansion/control-fold units |
+| Composed exact-time factors | Numerator/denominator magnitude product at most 1,000,000,000 |
+
+`PlaybackController` rejects oversized strings before its per-character WASM
+transfer; MoonBit checks the same bound independently for direct callers.
+
+The window comes from `Tempo::span_for_samples` at the actual sample rate and
+block size, using the maximum supported tempo (1000 BPM). Demo tempo changes
+therefore cannot bypass admission. The same canonical conversion checks repeat
+periods without reconstructing millibpm in the browser host. Limits also apply
+to intermediate expressions and can reject sources whose final transform would
+reduce their cost. Direct Mini parsers remain unrestricted unless
+`parse_play_source(..., max_query_span=Some(span))` is requested.
+
+Rejection retains the accepted source, voices, tempo, and position. The
+[bounded-player measurements](performance/2026-09-16-player-bounds.json) record
+the high-density reproduction, retained-state checks, and all 30 shipped source
+examples. These limits bound supported workloads; they are not an AudioWorklet
+deadline or allocation-free rendering guarantee.
+
+The [2026-09-16 acceptance measurements](performance/2026-09-16-player-owner.json)
+record page-local WASM Update and Restart p95 of 2.8 ms and 2.9 ms, respectively,
+against a 2.667 ms audio quantum. They are not AudioWorklet deadline measurements.
+The [62-group benchmark snapshot](performance/2026-09-16-player-owner-benchmarks.txt)
+records the toolchain and shared-workstation conditions; neither run establishes
+a speedup, regression, or glitch-free guarantee.
+
+The [post-fix admission smoke](performance/2026-09-16-player-reliability.json)
+checks rejected tiny repeats, rejected finite endpoints, and an exact one-block
+repeat against release WASM. The
+[post-fix benchmark snapshot](performance/2026-09-16-player-reliability-benchmarks.txt)
+records the full suite separately; accepting a source still does not establish
+a real-time deadline guarantee.
+
+MoonBit async remains at the JS host lifetime boundary, not in the synchronous
+AudioWorklet renderer. `packages/browser/host` already uses async 0.21.3:
+`EngineLifetime.wait` bridges a cancellable Promise, while `close` uses
+`protect_from_cancel` to finish cleanup. On 2026-09-16, an isolated async 0.22.1
+task-group probe on moon 0.1.20260904 completed both children with the JS target;
+the same program failed to build for wasm-gc with missing `run_async_main`.
+The [upstream support table](https://github.com/moonbitlang/async#features)
+also leaves wasm-gc unchecked. Compiler async syntax does not imply an available
+embedding runtime. The runtime's
+[cooperative scheduling model](https://github.com/moonbitlang/async#caveats)
+does not move CPU work to another thread. Moving parse/lower work off the audio
+thread requires a worker and an explicit transfer/commit boundary, not merely
+marking the current methods async.

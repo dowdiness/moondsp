@@ -50,7 +50,8 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
         this.delaySamples = Number(data.value);
       } else if (data.type === "set-cutoff") {
         this.cutoff = Number(data.value);
-      } else if (data.type === "apply-score" || data.type === "restart-playback") {
+      } else if (data.type === "player-update" || data.type === "player-restart" ||
+                 data.type === "player-play" || data.type === "player-pause") {
         if (this.usesScheduler) this.playback.handle(data);
       } else if (data.type === "set-scheduler-bpm") {
         if (this.usesScheduler) {
@@ -257,7 +258,14 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
         typeof this.wasm.process_scheduler_block === "function" &&
         typeof this.wasm.scheduler_left_sample === "function" &&
         typeof this.wasm.scheduler_right_sample === "function" &&
-        typeof this.wasm.scheduler_bpm === "function";
+        typeof this.wasm.scheduler_bpm === "function" &&
+        typeof this.wasm.player_update_input === "function" &&
+        typeof this.wasm.player_restart_input === "function" &&
+        typeof this.wasm.player_play === "function" &&
+        typeof this.wasm.player_pause === "function" &&
+        typeof this.wasm.player_state === "function" &&
+        typeof this.wasm.player_pending_count === "function" &&
+        typeof this.wasm.player_skipped_count === "function";
 
       if (
         !this.usesCompiledHotSwap &&
@@ -552,7 +560,6 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
         return true;
       }
 
-      this.playback.didRender(left.length);
 
       for (let index = 0; index < left.length; index += 1) {
         left[index] = this.wasm.scheduler_left_sample(index);

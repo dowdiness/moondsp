@@ -14,6 +14,8 @@ pub fn parse(String) -> Result[@pattern.Pat[@pattern.ControlMap], String]
 
 pub fn parse_doc(String, previous? : @pattern.PatternDoc[@pattern.ControlMap]?) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
 
+pub fn parse_play_source(String, previous? : @pattern.PatternDoc[@pattern.ControlMap]?, max_query_span? : @pattern.Rational?) -> Result[PlaySource, String]
+
 pub fn parse_snapshot(String, previous? : @pattern.PatternDoc[@pattern.ControlMap]?) -> Result[@pattern.PatternSnapshot[@pattern.ControlMap], String]
 
 pub fn parse_song(String) -> Result[@song.Song[@pattern.ControlMap], String]
@@ -63,6 +65,17 @@ pub struct ParsedSong {
 }
 pub fn ParsedSong::bpm(Self) -> Double?
 pub fn ParsedSong::song(Self) -> @song.Song[@pattern.ControlMap]
+
+pub enum PlayBody {
+  Pattern(@pattern.PatternDoc[@pattern.ControlMap])
+  Arrangement(@song.Song[@pattern.ControlMap], Bool)
+}
+
+pub struct PlaySource {
+  // private fields
+}
+pub fn PlaySource::body(Self) -> PlayBody
+pub fn PlaySource::bpm(Self) -> Double
 
 // Type aliases
 

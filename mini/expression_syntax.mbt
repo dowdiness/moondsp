@@ -11,6 +11,7 @@ priv enum MiniLiteral {
   Sound
   Note
   Chord
+  Silence
 }
 
 ///|
@@ -165,10 +166,18 @@ fn Parser::parse_syntax_primary(self : Parser) -> MiniExpr raise ParseError {
     Some(Note)
   } else if self.match_keyword("chord(") {
     Some(Chord)
+  } else if self.match_keyword("silence()") {
+    Some(Silence)
   } else {
     None
   }
   if kind is Some(kind) {
+    if kind is Silence {
+      return {
+        span: { start, end: self.pos, },
+        node: Literal(kind, "", start),
+      }
+    }
     let (content, content_start) = self.read_quoted_string_with_start()
     self.expect_char(')')
     return {
@@ -181,7 +190,7 @@ fn Parser::parse_syntax_primary(self : Parser) -> MiniExpr raise ParseError {
     return { span: { start, end: self.pos, }, node: Reference(name), }
   }
   raise ParseError(
-    "position \{self.pos}: expected 's(', 'note(', 'chord(', 'stack(', or '('",
+    "position \{self.pos}: expected 's(', 'note(', 'chord(', 'silence()', 'stack(', or '('",
   )
 }
 

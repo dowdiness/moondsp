@@ -33,12 +33,16 @@ priv struct Parser {
   mut pos : Int
   bindings : Map[String, @pattern.Pat[@pattern.ControlMap]]
   doc_bindings : Map[String, @pattern.PatternDoc[@pattern.ControlMap]]
+  admission : PlaybackAdmission?
 }
 
 ///|
 #alias(new)
-fn Parser::Parser(input : String) -> Parser {
-  { input, pos: 0, bindings: {}, doc_bindings: {}, }
+fn Parser::Parser(
+  input : String,
+  admission? : PlaybackAdmission? = None,
+) -> Parser {
+  { input, pos: 0, bindings: {}, doc_bindings: {}, admission, }
 }
 
 ///|
@@ -126,8 +130,31 @@ fn Parser::at_end(self : Parser) -> Bool {
 
 ///|
 fn Parser::skip_whitespace(self : Parser) -> Unit {
-  while !self.at_end() && mini_is_space(self.input[self.pos]) {
-    self.pos += 1
+  while true {
+    while !self.at_end() && mini_is_space(self.input[self.pos]) {
+      self.pos += 1
+    }
+    if self.pos + 1 < self.input.length() &&
+      self.input[self.pos] == '/' &&
+      self.input[self.pos + 1] == '/' {
+      self.pos += 2
+      while !self.at_end() && self.input[self.pos] != '\n' {
+        self.pos += 1
+      }
+    } else if self.pos + 1 < self.input.length() &&
+      self.input[self.pos] == '/' &&
+      self.input[self.pos + 1] == '*' {
+      self.pos += 2
+      while self.pos + 1 < self.input.length() &&
+            !(self.input[self.pos] == '*' && self.input[self.pos + 1] == '/') {
+        self.pos += 1
+      }
+      if self.pos + 1 < self.input.length() {
+        self.pos += 2
+      }
+    } else {
+      break
+    }
   }
 }
 
@@ -335,6 +362,9 @@ fn Parser::parse_expr(
   self : Parser,
 ) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
   let syntax = self.parse_syntax_expr()
+  if self.admission is Some(admission) {
+    ignore(admission.expression(syntax))
+  }
   let resolved = resolve_mini_expr(syntax, self.bindings)
   compile_mini_pattern(resolved)
 }
@@ -396,6 +426,9 @@ fn Parser::parse_bindings(
     self.skip_whitespace()
     guard self.read_binding_name() is Some(name) else { break }
     let syntax = self.parse_syntax_expr()
+    if self.admission is Some(admission) {
+      admission.definitions[name] = admission.expression(syntax)
+    }
     // Resolve before checking the terminator to preserve diagnostic precedence.
     // Compile unused declarations too; publish a name only after success.
     match builder {

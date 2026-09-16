@@ -1,226 +1,36 @@
-import { test, expect, type Page } from "@playwright/test";
-import { readFileSync } from "node:fs";
+import { expect, test } from "@playwright/test";
 
-async function replaceText(page: Page, text: string) {
-  await page.locator(".cm-content").fill(text);
-}
-
-async function lastReply(page: Page) {
-  return page.evaluate(() => (window as any).__liveReplies.at(-1));
-}
-
-// Waiting for a new revision prevents the previous edit's reply from passing
-// the next assertion while its debounced evaluation is still pending.
-async function edit(page: Page, text: string) {
-  const previous = (await lastReply(page)).revision;
-  await replaceText(page, text);
-  await expect.poll(async () => (await lastReply(page)).revision).toBeGreaterThan(previous);
-  return lastReply(page);
-}
-
-async function play(page: Page) {
-  const previous = (await lastReply(page))?.revision ?? 0;
-  await page.getByRole("button", { name: "Play", exact: true }).click();
-  await expect.poll(async () => (await lastReply(page))?.revision ?? 0).toBeGreaterThan(previous);
-  return lastReply(page);
-}
-
-async function start(page: Page, text: string) {
-  await replaceText(page, text);
-  const reply = await play(page);
-  expect(reply).toMatchObject({ operation: "restart", acceptedAtSample: 0 });
-  return reply;
-}
-
-async function expectStopped(page: Page) {
-  await expect(page.getByRole("button", { name: "Play", exact: true })).toBeEnabled();
-  expect(await page.evaluate(() => (window as any).__audioContext.state)).toBe("suspended");
-}
-
-async function stop(page: Page) {
-  await page.getByRole("button", { name: "Stop", exact: true }).click();
-  await expectStopped(page);
-}
-
-test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => {
-    (window as any).__liveReplies = [];
-    const Original = window.AudioWorkletNode;
-    window.AudioWorkletNode = class extends Original {
-      constructor(context: BaseAudioContext, name: string, options?: AudioWorkletNodeOptions) {
-        super(context, name, options);
-        (window as any).__audioContext = context;
-        this.port.addEventListener("message", ({ data }) => {
-          if (/^((pattern|song)-(updated|error)|playback-(restarted|error))$/.test(data.type)) {
-            (window as any).__liveReplies.push(data);
-          }
-        });
-        this.port.start();
-      }
-    };
-  });
+test("invalid Restart preserves a paused song, and Play resumes it without compiling the editor", async ({ page }) => {
   await page.goto("/");
+  await page.locator(".cm-content").fill('note("60").slow(8).room(0.5)');
+  await page.locator("#start").click();
+  await expect(page.locator("#status")).toHaveText("Playing");
+  await page.locator("#start").click();
+  await expect(page.locator("#status")).toHaveText("Paused");
+  const position = await page.locator("#status").getAttribute("data-sample-position");
+  await page.locator(".cm-content").fill("note(");
+  await expect(page.locator("#log")).toHaveClass(/error/);
+  await page.locator("#restart").click();
+  await expect(page.locator("#status")).toHaveText("Paused");
+  await expect(page.locator("#status")).toHaveAttribute("data-sample-position", position!);
+  await page.locator("#start").click();
+  await expect(page.locator("#status")).toHaveText("Playing");
+  await expect(page.locator("#log")).toHaveClass(/error/);
+  await page.locator(".cm-content").fill('note("67").slow(8)');
+  await expect(page.locator("#log")).not.toHaveClass(/error/);
 });
 
-test("editing and recovering from a parse error preserve transport", async ({ page }) => {
-  await start(page, 'note("60").slow(8)');
-  const updated = await edit(page, 'note("72").slow(8)');
-  expect(updated).toMatchObject({ type: "pattern-updated", operation: "update" });
-  expect(updated.acceptedAtSample).toBeGreaterThan(0);
-  await expect(page.locator("#log")).toContainText("edit queued");
-  expect(await edit(page, 'note(')).toMatchObject({ type: "pattern-error" });
-  const recovered = await edit(page, 'note("67").slow(8)');
-  expect(recovered).toMatchObject({ type: "pattern-updated", operation: "update" });
-  expect(recovered.acceptedAtSample).toBeGreaterThan(updated.acceptedAtSample);
+test("Ended accepts a different song without starting; Play begins its latest version", async ({ page }) => {
+  await page.goto("/");
+  await page.locator(".cm-content").fill('bpm(1000); song(section("a",1,silence()),part("first","a"))');
+  await page.locator("#start").click();
+  await expect(page.locator("#status")).toHaveText("Ended");
+  const endedPosition = await page.locator("#status").getAttribute("data-sample-position");
+  await page.locator(".cm-content").fill('bpm(30); note("67").slow(8)');
+  await expect(page.locator("#status")).toHaveAttribute("data-tempo", "30");
+  await expect(page.locator("#status")).toHaveText("Ended");
+  await expect(page.locator("#status")).toHaveAttribute("data-sample-position", endedPosition!);
+  await page.locator("#start").click();
+  await expect(page.locator("#status")).toHaveText("Playing");
+  await expect(page.locator("#status")).toHaveAttribute("data-tempo", "30");
 });
-
-test("Light Orbit accepts shared-material edits and reverts through a parse error", async ({ page }) => {
-  const score = readFileSync(new URL("../../../examples/light-orbit.mini", import.meta.url), "utf8");
-  await page.getByText("More examples", { exact: true }).click();
-  await page.locator("#light-orbit-example").click();
-  await expect(page.locator("#mode-song")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator("#global-bpm")).toHaveValue("120");
-  await expect(page.locator("#light-orbit-example")).toHaveAttribute("data-example", score);
-  expect(await play(page)).toMatchObject({ type: "song-updated", operation: "restart", acceptedAtSample: 0 });
-  const changed = score.replace('E4 G4 A4', 'F#4 G4 A4').replace('D5 A4 G4 E5', 'Eb5 Bb4 Ab4 F5');
-  const updated = await edit(page, changed);
-  expect(updated).toMatchObject({ type: "song-updated", operation: "update" });
-  expect(updated.acceptedAtSample).toBeGreaterThan(0);
-  expect(await edit(page, "song(")).toMatchObject({ type: "song-error" });
-  const reverted = await edit(page, score);
-  expect(reverted).toMatchObject({ type: "song-updated", operation: "update" });
-  expect(reverted.acceptedAtSample).toBeGreaterThan(updated.acceptedAtSample);
-  await stop(page);
-});
-
-test("song content edits continue, and Stop then Play applies a new layout", async ({ page }) => {
-  await page.locator("#mode-song").click();
-  await start(page, 'song(section("a",8,note("60")),part("a1","a"))');
-  const updated = await edit(page, 'song(section("a",8,note("72")),part("a1","a"))');
-  expect(updated).toMatchObject({ type: "song-updated", operation: "update" });
-  expect(updated.acceptedAtSample).toBeGreaterThan(0);
-  const rejected = await edit(page, 'song(section("a",9,note("72")),part("a1","a"))');
-  expect(rejected).toMatchObject({ type: "song-error", recovery: "restart" });
-  await stop(page);
-  expect(await play(page)).toMatchObject({
-    type: "song-updated", operation: "restart", acceptedAtSample: 0,
-  });
-});
-
-test("the tempo example can change tempo while playing", async ({ page }) => {
-  await page.getByText("More examples", { exact: true }).click();
-  const example = page.locator('[data-live-example="tempo"]');
-  const score = (await example.getAttribute("data-example"))!;
-  await example.click();
-  expect(await play(page)).toMatchObject({ type: "song-updated", operation: "restart" });
-  const updated = await edit(page, score.replace("bpm(60)", "bpm(72)"));
-  expect(updated).toMatchObject({ type: "song-updated", operation: "update" });
-  expect(updated.acceptedAtSample).toBeGreaterThan(0);
-  await expect(page.locator("#global-bpm")).toHaveValue("72");
-  const fractional = await edit(page, score.replace("bpm(60)", "bpm(90.125)"));
-  expect(fractional).toMatchObject({ type: "song-updated", operation: "update" });
-  expect(fractional.acceptedAtSample).toBeGreaterThan(updated.acceptedAtSample);
-  await expect(page.locator("#global-bpm")).toHaveValue("90.125");
-  await stop(page);
-});
-
-test("the rests and gates example plays", async ({ page }) => {
-  await page.locator('[data-live-example="rests-and-gates"]').click();
-  expect(await play(page)).toMatchObject({
-    type: "pattern-updated",
-    operation: "restart",
-  });
-  await stop(page);
-});
-
-test("the independent entries example accepts the suggested note edits", async ({ page }) => {
-  await page.getByText("More examples", { exact: true }).click();
-  const example = page.locator('[data-live-example="entries"]');
-  const score = (await example.getAttribute("data-example"))!;
-  await example.click();
-  expect(await play(page)).toMatchObject({ type: "pattern-updated", operation: "restart" });
-  const updated = await edit(page, score.replace("E4", "F4").replace("D5", "C5"));
-  expect(updated).toMatchObject({ type: "pattern-updated", operation: "update" });
-  expect(updated.acceptedAtSample).toBeGreaterThan(0);
-  await expect(page.locator("#log")).toContainText("edit queued");
-  await stop(page);
-});
-
-test("named song definitions update in place and a bad reference preserves the applied score", async ({ page }) => {
-  await page.locator("#mode-song").click();
-  const song = 'song(section("a",8,groove),section("b",8,groove),part("a1","a"),part("b1","b"))';
-  const source = (note: string) => `let melody = note("${note}"); let groove = stack(melody,s("bd")); ${song}`;
-  await start(page, source("60"));
-  const updated = await edit(page, source("72"));
-  expect(updated).toMatchObject({ type: "song-updated", operation: "update" });
-  expect(updated.acceptedAtSample).toBeGreaterThan(0);
-  const error = await edit(page, 'let groove = missing; ' + song);
-  expect(error).toMatchObject({ type: "song-error", phase: "prepare", recovery: "edit" });
-  const recovered = await edit(page, source("67"));
-  expect(recovered).toMatchObject({ type: "song-updated", operation: "update" });
-  expect(recovered.acceptedAtSample).toBeGreaterThan(updated.acceptedAtSample);
-});
-
-test("failed first Play stays stopped and reports editable input", async ({ page }) => {
-  await replaceText(page, "note(");
-  expect(await play(page)).toMatchObject({ type: "pattern-error", recovery: "edit" });
-  await expectStopped(page);
-});
-
-for (const { mode, valid, invalid } of [
-  { mode: "pattern", valid: 'note("60*16")', invalid: "note(" },
-  { mode: "song", valid: 'song(section("a",8,note("60*16")),part("a1","a"))', invalid: "song(" },
-]) {
-  test.describe(mode, () => {
-    test.beforeEach(async ({ page }) => {
-      await page.locator(`#mode-${mode}`).click();
-      await start(page, valid);
-      await stop(page);
-    });
-
-    test("failed Play keeps the previous score stopped; a valid retry starts at zero", async ({ page }) => {
-      await replaceText(page, invalid);
-      expect(await play(page)).toMatchObject({ type: `${mode}-error` });
-      await expectStopped(page);
-      await start(page, valid);
-    });
-
-    test("empty Play keeps the previous score stopped", async ({ page }) => {
-      await replaceText(page, "");
-      await page.getByRole("button", { name: "Play", exact: true }).click();
-      await expect(page.locator("#log")).toContainText("Enter code, then press Play");
-      await expectStopped(page);
-    });
-  });
-}
-
-test("the envelope example accepts edits and rejects negative seconds", async ({ page }) => {
-  const example = page.locator('[data-live-example="envelope"]');
-  const score = (await example.getAttribute("data-example"))!;
-  await example.click();
-  expect(await play(page)).toMatchObject({ type: "pattern-updated", operation: "restart" });
-  expect(await edit(page, score.replace("release(8)", "release(4)")))
-    .toMatchObject({ type: "pattern-updated", operation: "update" });
-  expect(await edit(page, score.replace("attack(2)", "attack(-1)")))
-    .toMatchObject({ type: "pattern-error" });
-  await stop(page);
-});
-
-for (const { name, file, bpm } of [
-  { name: "envelope-compare", file: "envelope-comparison.mini", bpm: "60" },
-  { name: "room-of-light", file: "room-of-light.mini", bpm: "112" },
-  { name: "shared-room", file: "shared-room-comparison.mini", bpm: "60" },
-  { name: "shared-room-afterglow", file: "shared-room-afterglow.mini", bpm: "72" },
-]) {
-  test(`the ${name} song is available without opening More examples`, async ({ page }) => {
-    const example = page.locator(`[data-live-example="${name}"]`);
-    await expect(example).toBeVisible();
-    const score = readFileSync(new URL(`../../../examples/${file}`, import.meta.url), "utf8");
-    await expect(example).toHaveAttribute("data-example", score);
-    await example.click();
-    await expect(page.locator("#mode-song")).toHaveAttribute("aria-pressed", "true");
-    await expect(page.locator("#global-bpm")).toHaveValue(bpm);
-    expect(await play(page)).toMatchObject({ type: "song-updated", operation: "restart" });
-    await stop(page);
-  });
-}

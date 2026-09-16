@@ -1,9 +1,5 @@
-// moondsp · live · phase A
-//
-// CodeMirror 6 + Canopy CM6Adapter wired to the AudioWorklet engine.
-// TextEdit intents → explicit pattern/song mode → debounced wasm parse.
-// Parse failures keep the last good playback source running; the error
-// message surfaces in the footer panel.
+// Editor intents feed the Player's debounced source updates.
+// Current song and sounding material versions remain owned by the audio engine.
 
 import { Compartment, EditorState, Prec } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers, highlightActiveLine } from "@codemirror/view";
@@ -22,12 +18,11 @@ import restsAndGates from "../../../examples/rests-and-gates.mini?raw";
 
 import { minilive } from "./lang/minilive";
 import { CM6Adapter } from "./canopy";
-import type { Diagnostic, UserIntent } from "./canopy";
+import type { UserIntent, Diagnostic } from "./canopy";
 import { AudioEngine } from "./audio";
-import type { AudioEngineMode, AudioStatus } from "./audio";
-import { LivePlayback } from "./playback";
+import type { AudioEngineMode, CompiledSession } from "./audio";
+import { Player } from "./playback";
 import type { PlaybackView } from "./playback";
-import type { PlaybackMode } from "./playback-protocol";
 
 const INITIAL = `$: s("bd(3,8), hh*16?, sd(2,8,2)").jux(rev)
 $: note("48(3,8) 60(2,8,2) 67(3,8) 60(2,8,3)").slow(3)`;
@@ -40,9 +35,6 @@ const statusEl = document.getElementById("status") as HTMLElement;
 const startBtn = document.getElementById("start") as HTMLButtonElement;
 const cheatEl = document.getElementById("cheat") as HTMLElement;
 const cheatToggle = document.getElementById("cheat-toggle") as HTMLButtonElement;
-const modePatternBtn = document.getElementById("mode-pattern") as HTMLButtonElement;
-const modeSongBtn = document.getElementById("mode-song") as HTMLButtonElement;
-const bpmInput = document.getElementById("global-bpm") as HTMLInputElement;
 const workspaceEl = document.querySelector("main.workspace") as HTMLElement;
 
 // ── Editor ──────────────────────────────────────────────────
@@ -141,120 +133,95 @@ function setLog(message: string, kind: "ok" | "error" | "info" = "info"): void {
 }
 
 
-function applyBpmInput(): void {
-  playback.commitBpm(bpmInput.value);
+function applyStatus(state: PlaybackView): void {
+  const stateName = state.state === "Empty" ? "Ready" : state.state;
+  const pending = state.pendingCount ? ` · ${state.pendingCount} pending` : "";
+  const skipped = state.skippedCount ? ` · ${state.skippedCount} skipped` : "";
+  statusEl.textContent = `${stateName}${pending}${skipped}`;
+  statusEl.dataset.samplePosition = String(state.samplePosition);
+  statusEl.dataset.tempo = state.tempoText;
+  startBtn.disabled = false;
+  startBtn.textContent = state.state === "Playing" || state.state === "Starting" ? "Pause" : "Play";
+  startBtn.dataset.action = state.state === "Playing" || state.state === "Starting" ? "pause" : "play";
 }
-
-
-function applyStatus(s: AudioStatus): void {
-  switch (s.kind) {
-    case "idle":
-      statusEl.textContent = "idle — click Play";
-      startBtn.disabled = false;
-      startBtn.textContent = "Play";
-      startBtn.dataset.action = "start";
-      break;
-    case "starting":
-      statusEl.textContent = "starting…";
-      startBtn.disabled = true;
-      startBtn.textContent = "Starting…";
-      startBtn.dataset.action = "start";
-      break;
-    case "stopping":
-      statusEl.textContent = "stopping…";
-      startBtn.disabled = true;
-      startBtn.textContent = "Stopping…";
-      break;
-    case "running":
-      statusEl.textContent = "running · 48 kHz · 128 frames";
-      startBtn.disabled = false;
-      startBtn.textContent = "Stop";
-      startBtn.dataset.action = "stop";
-      break;
-    case "error":
-      statusEl.textContent = `error: ${s.message}`;
-      startBtn.disabled = false;
-      startBtn.textContent = "Retry";
-      startBtn.dataset.action = "start";
-      break;
-  }
+function diagnosticFromError(raw: string, docLength: number): Diagnostic {
+  const match = /^position (\d+):\s*(.*)$/.exec(raw);
+  const position = match ? Math.min(Number.parseInt(match[1], 10), docLength) : 0;
+  return { from: Math.max(0, position - (position === docLength ? 1 : 0)), to: Math.max(1, Math.min(docLength, position + 1)), severity: "error", message: match?.[2] || raw };
 }
-
 let renderedPlayback: PlaybackView | undefined;
 
 function renderPlayback(state: PlaybackView): void {
-  applyStatus(state.status);
-  modePatternBtn.classList.toggle("active", state.mode === "pattern");
-  modeSongBtn.classList.toggle("active", state.mode === "song");
-  modePatternBtn.setAttribute("aria-pressed", String(state.mode === "pattern"));
-  modeSongBtn.setAttribute("aria-pressed", String(state.mode === "song"));
-  if (bpmInput.value !== state.tempoText) bpmInput.value = state.tempoText;
-  if (state.feedback && state.feedback !== renderedPlayback?.feedback) {
-    setLog(state.feedback.message, state.feedback.kind);
+  applyStatus(state);
+  if (state.feedback !== renderedPlayback?.feedback) {
+    setLog(state.feedback?.message ?? "", state.feedback?.kind ?? "info");
   }
   if (state.diagnostic !== renderedPlayback?.diagnostic) {
     const diagnostic = state.diagnostic;
-    adapter.applyPatches([{
-      type: "SetDiagnostics",
-      diagnostics: diagnostic
-        ? [diagnosticFromError(diagnostic.message, diagnostic.documentLength)]
-        : [],
-    }]);
+    adapter.applyPatches([{ type: "SetDiagnostics", diagnostics: diagnostic ? [diagnosticFromError(diagnostic.message, diagnostic.documentLength)] : [] }]);
   }
   renderedPlayback = state;
 }
-
-const playback = new LivePlayback(
-  engine, { text: view.state.doc.toString() }, renderPlayback,
-);
-
-modePatternBtn.addEventListener("click", () => playback.selectMode("pattern"));
-modeSongBtn.addEventListener("click", () => playback.selectMode("song"));
-bpmInput.addEventListener("input", () => playback.editBpm(bpmInput.value));
-bpmInput.addEventListener("change", applyBpmInput);
-bpmInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") {
-    applyBpmInput();
-    bpmInput.blur();
+const playback = new Player(engine, { text: view.state.doc.toString() }, renderPlayback);
+let compiledSession: CompiledSession | undefined;
+async function toggleCompiled(): Promise<void> {
+  startBtn.disabled = true;
+  try {
+    if (compiledSession) {
+      await compiledSession.close();
+      compiledSession = undefined;
+      statusEl.textContent = "Ready";
+      startBtn.textContent = "Play";
+    } else {
+      const opened = await engine.openSession(event => {
+        if (event.kind === "failed") {
+          compiledSession = undefined;
+          statusEl.textContent = "Fault";
+          startBtn.textContent = "Play";
+          setLog(event.message, "error");
+        }
+      });
+      if (opened.kind !== "opened") throw new Error(opened.kind === "failed" ? opened.message : "Audio owner is busy");
+      if (opened.session.kind !== "compiled") throw new Error("Expected compiled audio session");
+      compiledSession = opened.session;
+      compiledSession.fadeIn();
+      statusEl.textContent = "Playing";
+      startBtn.textContent = "Stop";
+    }
+  } catch (error) {
+    setLog(error instanceof Error ? error.message : String(error), "error");
+  } finally {
+    startBtn.disabled = false;
   }
-});
-
-// Parses "position N: message" → { from, to, message }. Spans one
-// character at the position; if the position is at or past EOF, anchors
-// to the last char so the squiggly is always visible.
-function diagnosticFromError(raw: string, docLength: number): Diagnostic {
-  const m = /^position (\d+):\s*(.*)$/.exec(raw);
-  if (!m) {
-    return { from: 0, to: Math.max(1, docLength), severity: "error", message: raw };
-  }
-  const pos = Math.min(Math.max(0, Number.parseInt(m[1], 10)), docLength);
-  const from = pos >= docLength ? Math.max(0, docLength - 1) : pos;
-  const to = Math.min(docLength, from + 1);
-  return { from, to, severity: "error", message: m[2] || raw };
 }
+if (audioMode === "compiled") document.getElementById("restart")!.hidden = true;
 
 
 adapter.onIntent((intent: UserIntent) => {
-  if (intent.type === "TextEdit") {
+  if (intent.type === "TextEdit" && audioMode === "scheduler") {
     playback.edit(view.state.doc.toString());
   }
 });
 
 startBtn.addEventListener("click", () => {
-  void playback.toggle();
+  if (audioMode === "compiled") { void toggleCompiled(); return; }
+  const state = playback.view().state;
+  void (state === "Playing" || state === "Starting" ? playback.pause() : playback.play()).catch(error => playback.report(error));
+});
+
+document.getElementById("restart")!.addEventListener("click", () => {
+  void playback.restart(view.state.doc.toString()).catch(error => playback.report(error));
 });
 
 // ── Cheatsheet ──────────────────────────────────────────────
-
-// Share the score with parser fixtures and acceptance tests.
-(document.getElementById("light-orbit-example") as HTMLButtonElement).dataset.example = lightOrbit;
 (document.getElementById("room-of-light-example") as HTMLButtonElement).dataset.example = roomOfLight;
 (document.getElementById("envelope-compare-example") as HTMLButtonElement).dataset.example = envelopeComparison;
 (document.getElementById("shared-room-example") as HTMLButtonElement).dataset.example = sharedRoomComparison;
 (document.getElementById("shared-room-afterglow-example") as HTMLButtonElement).dataset.example = sharedRoomAfterglow;
-(document.getElementById("overlay-groove-example") as HTMLButtonElement).dataset.example = overlayGroove;
+(document.getElementById("overlay-groove-example") as HTMLButtonElement).dataset.example = `bpm(96);\n${overlayGroove}`;
+(document.getElementById("light-orbit-example") as HTMLButtonElement).dataset.example = `bpm(120);\n${lightOrbit}`;
 (document.getElementById("overlay-grouping-example") as HTMLButtonElement).dataset.example = overlayGrouping;
-(document.getElementById("rests-and-gates-example") as HTMLButtonElement).dataset.example = restsAndGates;
+(document.getElementById("rests-and-gates-example") as HTMLButtonElement).dataset.example = `bpm(96);\n${restsAndGates}`;
 
 cheatToggle.addEventListener("click", () => {
   const collapsed = workspaceEl.classList.toggle("cheat-collapsed");
@@ -268,12 +235,9 @@ cheatEl.addEventListener("click", (ev) => {
   if (!example) return;
   const text = example.dataset.example;
   if (!text) return;
-  const mode: PlaybackMode = example.dataset.mode === "song" ? "song" : "pattern";
-  const bpm = example.dataset.bpm;
   view.dispatch({
     changes: { from: 0, to: view.state.doc.length, insert: text },
   });
-  playback.useExample({ mode, text, bpm });
   view.focus();
 });
 
@@ -289,4 +253,4 @@ declare global {
 window.__moondspEngine = engine;
 
 // eslint-disable-next-line no-console
-console.info("[moondsp/live] ready — click Start to bring up audio");
+console.info("[moondsp/live] ready — click Play to bring up audio");

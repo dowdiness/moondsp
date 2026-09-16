@@ -205,38 +205,51 @@ pub fn ActiveNotes::next_end_sample(self : ActiveNotes, limit : Int64) -> Int64 
 }
 
 ///|
-/// Preflight every musical endpoint before changing any cached deadline.
+/// Compute every musical endpoint against a proposed clock without mutating
+/// the retained physical deadlines.
+pub fn[E] ActiveNotes::compute_retime(
+  self : ActiveNotes,
+  convert : (@pattern.Rational) -> Result[Int64, E],
+) -> Result[Array[Int64?], E] {
+  let deadlines : Array[Int64?] = []
+  for note in self.notes {
+    match note.musical_end {
+      None => deadlines.push(None)
+      Some(end_) =>
+        match convert(end_) {
+          Err(e) => return Err(e)
+          Ok(sample) => deadlines.push(Some(sample))
+        }
+    }
+  }
+  Ok(deadlines)
+}
+
+///|
+/// Apply a previously computed endpoint plan. This method intentionally does
+/// no conversion or validation; callers must preflight every scheduler first.
+pub fn ActiveNotes::apply_retime(
+  self : ActiveNotes,
+  deadlines : Array[Int64?],
+) -> Unit {
+  for i in 0..<self.notes.length() {
+    match deadlines[i] {
+      None => ()
+      Some(sample) => self.notes[i].end_sample = sample
+    }
+  }
+}
+
+///|
+/// Recompute and apply all musical endpoints.
 pub fn[E] ActiveNotes::retime(
   self : ActiveNotes,
   convert : (@pattern.Rational) -> Result[Int64, E],
 ) -> Result[Unit, E] {
-  match self.validate_retime(convert) {
+  let deadlines = match self.compute_retime(convert) {
     Err(e) => return Err(e)
-    Ok(_) => ()
+    Ok(deadlines) => deadlines
   }
-  for note in self.notes {
-    if note.musical_end is Some(end_) {
-      match convert(end_) {
-        Ok(sample) => note.end_sample = sample
-        Err(e) => return Err(e)
-      }
-    }
-  }
-  Ok(())
-}
-
-///|
-pub fn[E] ActiveNotes::validate_retime(
-  self : ActiveNotes,
-  convert : (@pattern.Rational) -> Result[Int64, E],
-) -> Result[Unit, E] {
-  for note in self.notes {
-    if note.musical_end is Some(end_) {
-      match convert(end_) {
-        Err(e) => return Err(e)
-        Ok(_) => ()
-      }
-    }
-  }
+  self.apply_retime(deadlines)
   Ok(())
 }

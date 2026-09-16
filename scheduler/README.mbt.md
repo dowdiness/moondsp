@@ -41,6 +41,7 @@ sample-accurate audio voice triggers across block boundaries:
 |---|---|---|
 | **Scheduler Engine** | `PatternScheduler` | `PatternScheduler::new`, `PatternScheduler::process_block`, `PatternScheduler::process_song_block`, `PatternScheduler::process_playback_snapshot_block` |
 | **Playback & Snapshots** | `PatternScheduler`, `PlaybackSnapshot` | `PatternScheduler::queue_playback_snapshot`, `PatternScheduler::queue_pattern_snapshot`, `PatternScheduler::queue_song_snapshot`, `PlaybackSnapshot::pattern`, `PlaybackSnapshot::song`, `PlaybackSnapshot::query` |
+| **Snapshot Observation** | `PatternScheduler`, `PlaybackSnapshot` | `PatternScheduler::accepted_snapshot`, `PatternScheduler::queued_snapshot`, `PatternScheduler::pending_material_change_count`, `PatternScheduler::skipped_material_change_count` |
 | **Timing & Transport** | `PatternScheduler`, `BlockFrame`, `PerformanceTime` | `PatternScheduler::set_bpm`, `PatternScheduler::bpm`, `PatternScheduler::current_block`, `PatternScheduler::sample_at`, `PatternScheduler::sample_counter`, `PatternScheduler::reset_transport` |
 | **Voice Scopes & Reconciliation** | `PatternVoiceScope`, `SongVoiceScope`, `ActiveVoiceEffect` | `PatternVoiceScope::node`, `SongVoiceScope::section`, `SongVoiceScope::occurrence`, `PatternScheduler::apply_pattern_voice_effect_result`, `PatternScheduler::apply_song_voice_effect_result` |
 | **Controls & Notes** | `ControlMapper`, `VoiceControlBatch` | `default_control_mapper`, `ControlMapper::new`, `PatternScheduler::push_active_note`, `PatternScheduler::expire_notes`, `PatternScheduler::active_note_count` |
@@ -110,16 +111,23 @@ starts at its next entry. A 3-cycle melody and a 4-cycle melody switch at their
 own boundaries; neither waits for a common multiple. DSP rendering splits at
 the exact boundary, rounded up to a sample, even inside an audio block.
 
-Later edits replace the reserved content without moving its boundary. Invalid
-input leaves the last valid reservation intact. Reverting to the active content
-cancels that material's reservation. Deletion stops future events at the reserved
-entry. Already sounding voices retain their deadlines and release tails.
+Later content edits keep their reserved boundary while it remains eligible for
+the replacement placement. Moving a waiting finite occurrence behind the
+transport invalidates that reservation and classifies the occurrence as skipped.
+If current material still has to reach its reserved exit, it finishes there
+without installing the skipped incoming occurrence. Invalid input leaves the
+last accepted reservation intact. Reverting to active content cancels that
+material's reservation. Deletion stops future events at the reserved entry.
+Already sounding voices retain their deadlines and release tails.
 
 Changing a material's period starts its new cycle at the reserved old entry.
 Content-only edits preserve its origin and cycle count. Tempo changes preserve
 the musical reservation; its physical sample position follows the transport.
-A finite occurrence with no later entry keeps its current phrase. The latest
-accepted score is used after Stop then Play. New materials join at the next
+A changed finite occurrence with no later entry keeps its current phrase. A
+newly added finite occurrence whose authored start has already passed is skipped
+for the rest of that Play; an internal material-grid entry must not make it join
+mid-occurrence. The latest accepted score becomes eligible from the beginning
+after Stop then Play. New unbounded Pattern materials still wait for the next
 entry of their own source grid, without backfilling earlier notes.
 
 ### Material periods and addresses
@@ -163,21 +171,37 @@ comparison, entry addressing, and event generation remain separate concerns.
 
 ### Acceptance and receipts
 
-The browser host validates continuing tempo changes before replacing a pending
-request. Rejection preserves the previous request and receipt. The host's
-[admission invariant](../docs/plans/2026-09-11-playback-admission.md#why-admission-remains-valid)
-explains why commit can apply the accepted request without a recoverable rejection
-and which future changes require revisiting that design.
+The browser Player prepares a complete source and all route tempo/deadline plans
+before changing Current song. Rejection preserves the previous song, transport,
+and material reservations. Accepted plans are installed once; the owner does
+not expose preparation tokens to its clients. See the
+[Player contract](../docs/technical-reference.md#browser-player-ownership-and-source-updates).
 
-Revision accessors report the accepted authored score. They do not assert that
-all its materials are already audible. Pending accessors also include materials
-waiting for an entry. Worklet receipts use `acceptedAtSample`, replacing the
-misleading `appliedAtSample`. The UI reports queued edits and keeps Play / Stop
-as its only transport control.
+`accepted_snapshot()` returns the Pattern or Song selected by an explicit
+`accept_playback_snapshot()` call or a render-block commit. Independent scheduler
+clients may use `queue_playback_snapshot()` instead; `queued_snapshot()` exposes
+that snapshot until commitment. Player operations accept immediately, including
+while Paused. In the lower-level queued API both observations can be present at once.
+An accepted snapshot's revision does not imply that all changed materials are audible:
+`pending_material_change_count()` reports changes waiting for a reserved entry,
+and `skipped_material_change_count()` reports finite changes that cannot enter
+during this Play. These queries do not describe transport activity or whether
+audio is audible.
+
+Worklet receipts report command acceptance and an owner projection immediately,
+not after a rendered block. The UI shows Play/Pause, a separate Restart command,
+and nonzero Pending/Skipped material counts. Owner acceptance is distinct from
+audible material replacement.
 
 Reconciliation and event selection are deterministic functions. The playback
 owner installs their returned states; the scheduler owns clocks and voice
 lifetimes. Parsing, metadata construction, and event queries still allocate.
+
+Lowering constructs prepared snapshots whose timing, identity, and source
+metadata are already valid. Reconciliation parses each prepared entry and the
+transport position into one exclusive runtime state. Rendering consumes that
+state directly: it does not repeat validation, interpret a missing boundary, or
+turn a rejected combination into a no-op.
 
 ## Explicit voice control
 
@@ -236,7 +260,10 @@ test "edit orchestration stages a replacement and reconciles active voices" {
 
   assert_eq(outcome.retuned_voice_count, 0)
   assert_eq(outcome.detached_note_count, 1)
-  assert_true(sched.has_pending_pattern_snapshot())
+  assert_true(sched.accepted_snapshot() is Some(_))
+  assert_true(
+    sched.queued_snapshot() is Some(@scheduler.PlaybackSnapshot::Pattern(_)),
+  )
   assert_eq(sched.active_note_count(), 0)
 }
 ```

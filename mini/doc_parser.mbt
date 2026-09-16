@@ -860,6 +860,10 @@ fn Parser::parse_doc_expr(
   builder : MiniDocBuilder,
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
   let syntax = self.parse_syntax_expr()
+  if self.admission is Some(admission) {
+    admission.roots.push(admission.expression(syntax))
+    Overlay(admission.roots).check(admission.width)
+  }
   let resolved = resolve_mini_expr(syntax, self.doc_bindings)
   compile_mini_doc(resolved, builder)
 }

@@ -6,15 +6,17 @@
 // syntax tree and the source between cursor and the surrounding
 // String node.
 
-@top Program { Binding* (DollarStack | Expression?) }
+@top Program { (Binding | Declaration)* (DollarStack | Expression?) }
 
 Binding { @specialize<identifier, "let"> BindingName "=" Expression ";" }
 BindingName { identifier }
+// The source compiler restricts declarations to bpm(number).
+Declaration { Call ";" }
 
 DollarStack { DollarLine+ }
 DollarLine { "$:" Expression }
 
-@skip { space }
+@skip { space | LineComment | BlockComment }
 
 Expression { Chain ("+" Chain)* }
 Chain { (Call | Group) MemberCall* }
@@ -25,7 +27,7 @@ MemberCall { "." MethodName Args? }
 
 Args { "(" (arg ("," arg)*)? ")" }
 
-arg { String | Number | Expression }
+arg { String | Number ("/" Number)? | Expression }
 
 CallName   { identifier }
 MethodName { identifier }
@@ -35,6 +37,9 @@ MethodName { identifier }
   Number     { "-"? $[0-9]+ ("." $[0-9]+)? }
   String     { '"' (![\\\n"] | "\\" _)* '"'? }
   space      { $[ \t\n\r]+ }
+  LineComment { "//" ![\n]* }
+  BlockComment { "/*" (![*] | "*" ![/])* "*/" }
+  @precedence { LineComment, BlockComment, "/" }
   "(" ")" "." "," "$:" "+"
 }
 

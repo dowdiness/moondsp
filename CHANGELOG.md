@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added exact `Tempo::span_for_samples` conversion through the scheduler clock;
+  browser repeat admission no longer reconstructs tempo arithmetic.
+
 - Added explicit Mini `.lpf(hz, resonance?)` and `.hpf(hz, resonance?)`
   controls and connected them, together with `.gain(n)`, to browser note and
   chord voices. Each filter accepts an optional independent resonance/Q value;
@@ -67,6 +70,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to validate consumer usage and rejected API shapes without changing runtime behavior.
 
 ### Changed
+
+- Bounded live Player source admission by text size, syntax depth, Euclidean
+  steps, arrangement occurrences, and conservative event/work expansion.
+  Admission covers future callback branches and full-cycle sequence queries;
+  over-budget edits preserve the accepted song and transport. The shipped
+  musical examples remain supported; these limits are not a real-time guarantee.
+- Made live audio initialization cancellable, with one five-second deadline
+  across resume, WASM loading, compilation, module loading, and readiness.
+  Startup Pause and close abort pending work and await partial-resource cleanup;
+  late native completions cannot activate an obsolete graph or replace a newer run.
 
 - Both synth adapters observe engine termination, report processor failure
   immediately, and treat caller context closure as normal shutdown. Cleanup
@@ -149,6 +162,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.hpf(hz, resonance?)` / `s_hpf` for high-pass control.
 
 ### Fixed
+
+- Player now rejects repeated arrangements shorter than one audio block at the
+  accepted tempo, including source and demo tempo edits, instead of allowing
+  unbounded repetition splitting during rendering. Finite song endpoints are
+  checked before source publication or transport/voice reset.
+- Canceling initial Player startup no longer sends Pause to an Empty song or
+  displays a false error. Closing waits for pending initialization and session
+  cleanup, and reopening waits for that retirement to complete.
 
 - The live syntax reference is embedded from `docs/mini-notation.md` at build time,
   with automatic reloads during development and stacked syntax/description pairs

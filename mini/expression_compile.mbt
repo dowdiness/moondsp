@@ -79,6 +79,7 @@ fn compile_mini_pattern(
         Sound => parse_sound_notation(content)
         Note => parse_note_notation(content)
         Chord => parse_chord_notation(content)
+        Silence => @pattern.Pat::silence()
       }
       pat.material()
     }
@@ -131,6 +132,10 @@ fn compile_mini_doc(
         Note => parse_note_doc_notation(content, builder, source_offset=offset)
         Chord =>
           parse_chord_doc_notation(content, builder, source_offset=offset)
+        Silence => {
+          let id = builder.atom_id_at("silence", "~", offset, offset + 9)
+          @pattern.PatternDoc::silence(id~)
+        }
       }
     Stack(children) =>
       builder.stack_doc(children.map(child => compile_mini_doc(child, builder)))

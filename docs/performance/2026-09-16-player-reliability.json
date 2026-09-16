@@ -1,0 +1,52 @@
+{
+  "date": "2026-09-16",
+  "toolchain": "moon 0.1.20260904",
+  "method": "Release WASM in Chromium page; 16 per-block observations after 2 warmups; shared workstation, no AudioWorklet deadline/GC guarantee",
+  "block_budget_ms": 2.6666666666666665,
+  "finite": {
+    "status": 1,
+    "after": {
+      "state": 2,
+      "position": 1024,
+      "tempo": 60,
+      "error": "tempo change exceeds transport range"
+    },
+    "after_render": {
+      "state": 2,
+      "position": 1152,
+      "tempo": 60,
+      "error": "tempo change exceeds transport range"
+    }
+  },
+  "repeat": {
+    "status": 1,
+    "rejection_ms": 0,
+    "after": {
+      "state": 2,
+      "position": 1024,
+      "tempo": 60,
+      "error": "repeated song must span at least one audio block"
+    },
+    "continued_render_mean_ms": 0.14375000004656613,
+    "continued_render_max_ms": 0.2000000011175871
+  },
+  "exact_block_repeat": {
+    "state": 2,
+    "position": 2048,
+    "tempo": 60,
+    "error": ""
+  },
+  "async_probe": {
+    "version": "0.22.1",
+    "js": "completed children: 2",
+    "wasm_gc": "Error [4021]: Value run_async_main not found in package moonbitlang/async"
+  },
+  "verification": {
+    "moon_tests": 1216,
+    "live_tests": 23,
+    "controller_tests": 5,
+    "js_host_tests": 2,
+    "benchmark_groups": 62
+  },
+  "test_environment": "Unused loopback ports time out on this WSL host; Playwright used temporary config overrides against the verified managed production preview. Assertions, test set, and production assets unchanged."
+}

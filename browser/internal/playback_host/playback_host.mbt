@@ -22,34 +22,45 @@ priv struct SchedulerRoute {
 }
 
 ///|
-let sched_routes : @ref.Ref[Array[SchedulerRoute]] = @ref.new([])
+pub struct Player {
+  priv routes : Array[SchedulerRoute]
+  priv schedulers : Array[@scheduler.PatternScheduler]
+  priv context : @moondsp.DspContext
+  priv left : @moondsp.AudioBuffer
+  priv right : @moondsp.AudioBuffer
+  priv reverb : @moondsp.StereoReverb
+  priv send_left : @moondsp.AudioBuffer
+  priv send_right : @moondsp.AudioBuffer
+  priv wet_left : @moondsp.AudioBuffer
+  priv wet_right : @moondsp.AudioBuffer
+  priv mut gain : Double
+  priv mut session : Session
+}
 
 ///|
-let sched_left : @ref.Ref[@moondsp.AudioBuffer?] = @ref.new(None)
+fn Player::Player(
+  routes : Array[SchedulerRoute],
+  context : @moondsp.DspContext,
+) -> Player {
+  let size = context.block_size()
+  {
+    routes,
+    schedulers: routes.map(route => route.pool.scheduler),
+    context,
+    left: @moondsp.AudioBuffer::filled(size),
+    right: @moondsp.AudioBuffer::filled(size),
+    reverb: @moondsp.StereoReverb::StereoReverb(context.sample_rate()),
+    send_left: @moondsp.AudioBuffer::filled(size),
+    send_right: @moondsp.AudioBuffer::filled(size),
+    wet_left: @moondsp.AudioBuffer::filled(size),
+    wet_right: @moondsp.AudioBuffer::filled(size),
+    gain: 0.5,
+    session: Empty,
+  }
+}
 
 ///|
-let sched_right : @ref.Ref[@moondsp.AudioBuffer?] = @ref.new(None)
-
-///|
-let sched_context : @ref.Ref[@moondsp.DspContext?] = @ref.new(None)
-
-///|
-let sched_reverb : @ref.Ref[@moondsp.StereoReverb?] = @ref.new(None)
-
-///|
-let sched_send_left : @ref.Ref[@moondsp.AudioBuffer?] = @ref.new(None)
-
-///|
-let sched_send_right : @ref.Ref[@moondsp.AudioBuffer?] = @ref.new(None)
-
-///|
-let sched_wet_left : @ref.Ref[@moondsp.AudioBuffer?] = @ref.new(None)
-
-///|
-let sched_wet_right : @ref.Ref[@moondsp.AudioBuffer?] = @ref.new(None)
-
-///|
-let sched_gain : @ref.Ref[Double] = @ref.new(0.5)
+let player : @ref.Ref[Player?] = @ref.new(None)
 
 ///|
 /// Create a SoundPool for a drum template (no control bindings needed).
@@ -58,7 +69,7 @@ fn make_drum_pool(
   ctx : @moondsp.DspContext,
   block_size : Int,
 ) -> SoundPool? {
-  let scheduler = match @scheduler.PatternScheduler::new(bpm=120.0, ctx~) {
+  let scheduler = match @scheduler.PatternScheduler::new(bpm=60.0, ctx~) {
     Ok(scheduler) => scheduler
     Err(_) => return None
   }
@@ -94,7 +105,7 @@ fn make_synth_pool(
   ctx : @moondsp.DspContext,
   block_size : Int,
 ) -> SoundPool? {
-  let scheduler = match @scheduler.PatternScheduler::new(bpm=120.0, ctx~) {
+  let scheduler = match @scheduler.PatternScheduler::new(bpm=60.0, ctx~) {
     Ok(scheduler) => scheduler
     Err(_) => return None
   }
@@ -210,56 +221,37 @@ pub fn init_scheduler_graph_with_templates(
       }
     }
   }
-  sched_routes.val = routes
-  sched_left.val = Some(@moondsp.AudioBuffer::filled(block_size))
-  sched_right.val = Some(@moondsp.AudioBuffer::filled(block_size))
-  sched_context.val = Some(ctx)
-  sched_reverb.val = Some(@moondsp.StereoReverb::StereoReverb(sample_rate))
-  sched_send_left.val = Some(@moondsp.AudioBuffer::filled(block_size))
-  sched_send_right.val = Some(@moondsp.AudioBuffer::filled(block_size))
-  sched_wet_left.val = Some(@moondsp.AudioBuffer::filled(block_size))
-  sched_wet_right.val = Some(@moondsp.AudioBuffer::filled(block_size))
-  sched_gain.val = 0.5
-  reset_playback_state()
+  player.val = Some(Player(routes, ctx))
+  playback_input_chars.clear()
   true
 }
 
 ///|
 pub fn reset_scheduler_graph() -> Unit {
-  sched_routes.val = []
-  sched_left.val = None
-  sched_right.val = None
-  sched_context.val = None
-  sched_reverb.val = None
-  sched_send_left.val = None
-  sched_send_right.val = None
-  sched_wet_left.val = None
-  sched_wet_right.val = None
-  sched_gain.val = 0.5
-  reset_playback_state()
+  player.val = None
+  playback_input_chars.clear()
 }
 
 ///|
-fn checked_sample(index : Int, output : @moondsp.AudioBuffer?) -> Double {
-  match output {
-    Some(buffer) =>
-      if index >= 0 && index < buffer.length() {
-        buffer.get(index)
-      } else {
-        0.0
-      }
+fn checked_sample(index : Int, buffer : @moondsp.AudioBuffer) -> Double {
+  guard index >= 0 && index < buffer.length() else { return 0.0 }
+  buffer.get(index)
+}
+
+///|
+pub fn scheduler_left_sample(index : Int) -> Double {
+  match player.val {
+    Some(owner) => checked_sample(index, owner.left)
     None => 0.0
   }
 }
 
 ///|
-pub fn scheduler_left_sample(index : Int) -> Double {
-  checked_sample(index, sched_left.val)
-}
-
-///|
 pub fn scheduler_right_sample(index : Int) -> Double {
-  checked_sample(index, sched_right.val)
+  match player.val {
+    Some(owner) => checked_sample(index, owner.right)
+    None => 0.0
+  }
 }
 
 ///|
@@ -333,81 +325,80 @@ fn filter_song_for_route(
 }
 
 ///|
-fn route_patterns(
-  pat : @pattern.Pat[@pattern.ControlMap],
-  selectors : Array[SchedulerRouteSelector],
-) -> Array[@pattern.Pat[@pattern.ControlMap]] {
-  let route_patterns : Array[@pattern.Pat[@pattern.ControlMap]] = []
-  for selector in selectors {
-    route_patterns.push(filter_pat_for_route(selector, pat))
-  }
-  route_patterns
-}
-
-///|
-fn route_songs(
-  song : @song.Song[@pattern.ControlMap],
-  selectors : Array[SchedulerRouteSelector],
-) -> Result[Array[@song.Song[@pattern.ControlMap]], String] {
-  let route_songs : Array[@song.Song[@pattern.ControlMap]] = []
-  for selector in selectors {
-    match filter_song_for_route(selector, song) {
-      Ok(route_song) => route_songs.push(route_song)
-      Err(msg) => return Err(msg)
-    }
-  }
-  Ok(route_songs)
-}
-
-///|
 pub fn process_scheduler_block() -> Bool {
-  let left = match sched_left.val {
-    Some(buffer) => buffer
-    None => return false
+  guard player.val is Some(owner) else {
+    ignore(set_scheduler_parse_error("Player is not initialized"))
+    return false
   }
-  let right = match sched_right.val {
-    Some(buffer) => buffer
-    None => return false
+  owner.process()
+}
+
+///|
+fn Player::process(self : Player) -> Bool {
+  self.left.fill(0.0)
+  self.right.fill(0.0)
+  match self.session {
+    Empty | Ready(_) | Paused(_) => return true
+    Fault(message) => {
+      ignore(set_scheduler_parse_error(message))
+      return false
+    }
+    Playing(_) | Ended(_, _) => ()
   }
-  let context = match sched_context.val {
-    Some(context) => context
-    None => return false
+  self.send_left.fill(0.0)
+  self.send_right.fill(0.0)
+  for route in self.routes {
+    let sp = route.pool
+    sp.tmp_left.fill(0.0)
+    sp.tmp_right.fill(0.0)
+    sp.tmp_send_left.fill(0.0)
+    sp.tmp_send_right.fill(0.0)
+    sp.scheduler.process_playback_snapshot_block_with_send(
+      sp.pool,
+      sp.tmp_left,
+      sp.tmp_right,
+      sp.tmp_send_left,
+      sp.tmp_send_right,
+    )
+    if sp.scheduler.last_transport_error() is Some(_) {
+      self.session = Fault("transport range exhausted")
+      self.left.fill(0.0)
+      self.right.fill(0.0)
+      for route in self.routes {
+        route.pool.pool.kill_all()
+      }
+      ignore(set_scheduler_parse_error("transport range exhausted"))
+      return false
+    }
+    for i in 0..<self.context.block_size() {
+      self.send_left.set(i, self.send_left.get(i) + sp.tmp_send_left.get(i))
+      self.send_right.set(i, self.send_right.get(i) + sp.tmp_send_right.get(i))
+    }
+    accumulate_sub_pool(sp, self.left, self.right)
   }
-  let reverb = match sched_reverb.val {
-    Some(reverb) => reverb
-    None => return false
+  self.reverb.process(
+    self.context,
+    self.send_left,
+    self.send_right,
+    self.wet_left,
+    self.wet_right,
+  )
+  for i in 0..<self.context.block_size() {
+    self.left.set(i, (self.left.get(i) + self.wet_left.get(i)) * self.gain)
+    self.right.set(i, (self.right.get(i) + self.wet_right.get(i)) * self.gain)
   }
-  let send_left = match sched_send_left.val {
-    Some(buffer) => buffer
-    None => return false
-  }
-  let send_right = match sched_send_right.val {
-    Some(buffer) => buffer
-    None => return false
-  }
-  let wet_left = match sched_wet_left.val {
-    Some(buffer) => buffer
-    None => return false
-  }
-  let wet_right = match sched_wet_right.val {
-    Some(buffer) => buffer
-    None => return false
-  }
-  commit_playback_request()
-  left.fill(0.0)
-  right.fill(0.0)
-  send_left.fill(0.0)
-  send_right.fill(0.0)
-  if playback_state.val.active is None {
-    return true
-  }
-  process_snapshot_routes(left, right)
-  reverb.process(context, send_left, send_right, wet_left, wet_right)
-  let gain = sched_gain.val
-  let len = left.length()
-  for i = 0; i < len; i = i + 1 {
-    left.set(i, (left.get(i) + wet_left.get(i)) * gain)
-    right.set(i, (right.get(i) + wet_right.get(i)) * gain)
+  if self.session is Playing(song) && song.finite_end() is Some(end_) {
+    let scheduler = self.schedulers[0]
+    match scheduler.sample_at(end_) {
+      Ok(end_sample) if scheduler.sample_counter() >= end_sample =>
+        self.session = Ended(song, end_sample)
+      Ok(_) => ()
+      Err(_) => {
+        self.session = Fault("song end exceeds transport range")
+        ignore(set_scheduler_parse_error("song end exceeds transport range"))
+        return false
+      }
+    }
   }
   true
 }
@@ -477,34 +468,56 @@ pub fn get_playback_error_char(i : Int) -> Int {
 
 ///|
 pub fn set_scheduler_bpm(bpm : Double) -> Int {
-  guard sched_routes.val is [_, ..] else {
-    return set_scheduler_parse_error("scheduler is not initialized")
+  guard player.val is Some(owner) else {
+    return set_scheduler_parse_error("Player is not initialized")
   }
-  for route in sched_routes.val {
-    match route.pool.scheduler.validate_bpm(bpm) {
-      Err(_) =>
-        return set_scheduler_parse_error(
-          "tempo must be 0.001..1000 BPM and representable",
-        )
+  let tempo = match @scheduler.Tempo::from_bpm(bpm) {
+    Ok(tempo) => tempo
+    Err(_) => return set_scheduler_parse_error("tempo must be 0.001..1000 BPM")
+  }
+  if owner.session.song() is Some(song) {
+    match owner.check_repeat_span(song.span, tempo) {
+      Err(error) => return set_scheduler_parse_error(error.message())
       Ok(_) => ()
     }
+    if song.finite_end() is Some(end_) {
+      match
+        tempo.sample_at_start(end_, sample_rate=owner.context.sample_rate()) {
+        Err(_) =>
+          return set_scheduler_parse_error("song end exceeds transport range")
+        Ok(_) => ()
+      }
+    }
   }
-  for route in sched_routes.val {
-    // Same audio-owner turn as preflight; no route can advance in between.
-    route.pool.scheduler.set_bpm(bpm).unwrap()
+  let end_ = match owner.session.song() {
+    Some(song) => song.finite_end()
+    None => None
   }
-  SCHEDULER_PARSE_STATUS_OK
+  match @scheduler.set_tempo_all(owner.schedulers, tempo, end_?) {
+    Err(_) => set_scheduler_parse_error("tempo change exceeds transport range")
+    Ok(_) => {
+      if owner.session.song() is Some(song) {
+        let next = { ..song, tempo, }
+        owner.session = match owner.session {
+          Ready(_) => Ready(next)
+          Playing(_) => Playing(next)
+          Paused(_) => Paused(next)
+          Ended(_, position) => Ended(next, position)
+          other => other
+        }
+      }
+      set_scheduler_parse_success()
+    }
+  }
 }
 
 ///|
 pub fn set_scheduler_gain(gain : Double) -> Unit {
-  sched_gain.val = if gain.is_nan() || gain.is_inf() {
-    0.5
-  } else if gain < 0.0 {
-    0.0
-  } else if gain > 1.0 {
-    1.0
-  } else {
-    gain
+  if player.val is Some(owner) {
+    owner.gain = if gain.is_nan() || gain.is_inf() {
+      0.5
+    } else {
+      Double::min(1.0, Double::max(0.0, gain))
+    }
   }
 }

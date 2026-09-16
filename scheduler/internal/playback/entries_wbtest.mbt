@@ -137,11 +137,45 @@ test "finite phrase keeps its current content until a new playback" {
 }
 
 ///|
+test "settling after an old finite end retains its already entered replacement" {
+  fn finite(note : Int, length : Int) -> PlaybackSnapshot raise {
+    let section = @song.SectionDoc::single(
+      id=@identity.SectionId::from_string("section"),
+      name="phrase",
+      length_cycles=@pattern.Rational::from_int(length),
+      scope=@song.TimeScope::identity(),
+      layer_id=@identity.SectionLayerId::from_string("body"),
+      body=material("a", note, 3),
+    )
+    PlaybackSnapshot::song(
+      @song.SongDoc(parts=[
+        @song.SongOccurrenceDoc::at(
+          id=@identity.OccurrenceId::from_string("once"),
+          start=@pattern.Rational::from_int(0),
+          name="phrase",
+          section~,
+        ),
+      ]).lower(),
+    )
+  }
+  let state = PlaybackState()
+  state.queue(finite(60, 5))
+  state.commit_pending(@pattern.Rational::from_int(0))
+  state.queue(finite(70, 10))
+  state.commit_pending(@pattern.Rational::from_int(1))
+  assert_eq(notes(state, 1, 6), [61, 70, 71])
+  state.commit_pending(@pattern.Rational::from_int(6))
+  assert_eq(notes(state, 6, 8), [70, 71])
+}
+
+///|
 test "reverting cancels a reservation while a new material waits for its entry" {
   let state = PlaybackState()
   accept(state, [material("a", 60, 3)], 0)
   accept(state, [material("a", 70, 3)], 1)
   accept(state, [material("a", 60, 3), material("b", 80, 4)], 2)
+  assert_eq(state.skipped_entry_count(), 0)
+  assert_true(state.has_pending())
   assert_eq(notes(state, 2, 5), [60, 80, 61])
   state.commit_pending(@pattern.Rational::from_int(5))
   assert_false(state.has_pending())
@@ -181,7 +215,7 @@ test "combined custom content without signatures is conservatively replaced" {
 }
 
 ///|
-test "pending additions retain their reservation through replacement and cancellation" {
+test "pending additions retain valid boundaries and cancel immediately" {
   let replaced = PlaybackState()
   accept(replaced, [], 0)
   accept(replaced, [material("a", 60, 3)], 1)
@@ -195,7 +229,7 @@ test "pending additions retain their reservation through replacement and cancell
   accept(cancelled, [material("a", 60, 3)], 1)
   accept(cancelled, [], 2)
   assert_eq(notes(cancelled, 2, 5), [])
-  assert_true(cancelled.has_pending())
+  assert_false(cancelled.has_pending())
   cancelled.commit_pending(@pattern.Rational::from_int(3))
   assert_eq(notes(cancelled, 3, 5), [])
   assert_false(cancelled.has_pending())
@@ -214,4 +248,169 @@ test "silence cancels a waiting addition without starting its old material" {
   assert_eq(notes(state, 2, 5), [])
   accept(state, [material("a", 70, 3)], 2)
   assert_eq(notes(state, 2, 5), [70, 71])
+}
+
+///|
+fn finite_occurrence_score(lead_start : Int?) -> PlaybackSnapshot raise {
+  let base = @song.SectionDoc::single(
+    id=@identity.SectionId::from_string("base-section"),
+    name="base",
+    length_cycles=@pattern.Rational::from_int(8),
+    scope=@song.TimeScope::identity(),
+    layer_id=@identity.SectionLayerId::from_string("base-layer"),
+    body=material("base", 40, 1),
+  )
+  let parts = [
+    @song.SongOccurrenceDoc::at(
+      id=@identity.OccurrenceId::from_string("base-occurrence"),
+      start=@pattern.Rational::from_int(0),
+      name="base",
+      section=base,
+    ),
+  ]
+  if lead_start is Some(start) {
+    let lead = @song.SectionDoc::single(
+      id=@identity.SectionId::from_string("lead-section"),
+      name="lead",
+      length_cycles=@pattern.Rational::from_int(8 - start),
+      scope=@song.TimeScope::identity(),
+      layer_id=@identity.SectionLayerId::from_string("lead-layer"),
+      body=material("lead", 80, 1),
+    )
+    parts.push(
+      @song.SongOccurrenceDoc::at(
+        id=@identity.OccurrenceId::from_string("lead-occurrence"),
+        start=@pattern.Rational::from_int(start),
+        name="lead",
+        section=lead,
+      ),
+    )
+  }
+  PlaybackSnapshot::song(@song.SongDoc(parts~).lower())
+}
+
+///|
+test "finite occurrence added midway is skipped until a new Play" {
+  let state = PlaybackState()
+  state.queue(finite_occurrence_score(None))
+  state.commit_pending(@pattern.Rational::from_int(0))
+  state.queue(finite_occurrence_score(Some(2)))
+  state.commit_pending(@pattern.Rational::from_int(3))
+
+  assert_eq(state.skipped_entry_count(), 1)
+  assert_false(state.has_pending())
+  assert_false(notes(state, 3, 6).any(note => note == 80 || note == 81))
+  state.commit_pending(@pattern.Rational::from_int(5))
+  assert_eq(state.skipped_entry_count(), 1)
+  assert_false(notes(state, 5, 6).any(note => note == 80 || note == 81))
+
+  state.reset()
+  state.queue(finite_occurrence_score(Some(2)))
+  state.commit_pending(@pattern.Rational::from_int(0))
+  assert_eq(state.skipped_entry_count(), 0)
+  assert_true(notes(state, 2, 3).any(note => note == 80 || note == 81))
+}
+
+///|
+test "moving a waiting finite occurrence invalidates its reserved entry" {
+  let state = PlaybackState()
+  state.queue(finite_occurrence_score(None))
+  state.commit_pending(@pattern.Rational::from_int(0))
+  state.queue(finite_occurrence_score(Some(6)))
+  state.commit_pending(@pattern.Rational::from_int(3))
+  assert_true(state.has_pending())
+
+  state.queue(finite_occurrence_score(Some(2)))
+  state.commit_pending(@pattern.Rational::from_int(4))
+  assert_false(state.has_pending())
+  assert_eq(state.skipped_entry_count(), 1)
+  assert_false(notes(state, 6, 8).any(note => note == 80 || note == 81))
+}
+
+///|
+fn finite_single_score(start : Int, note : Int) -> PlaybackSnapshot raise {
+  let section = @song.SectionDoc::single(
+    id=@identity.SectionId::from_string("moving-section"),
+    name="moving",
+    length_cycles=@pattern.Rational::from_int(8 - start),
+    scope=@song.TimeScope::identity(),
+    layer_id=@identity.SectionLayerId::from_string("moving-layer"),
+    body=material("moving", note, 3),
+  )
+  PlaybackSnapshot::song(
+    @song.SongDoc(parts=[
+      @song.SongOccurrenceDoc::at(
+        id=@identity.OccurrenceId::from_string("moving-occurrence"),
+        start=@pattern.Rational::from_int(start),
+        name="moving",
+        section~,
+      ),
+    ]).lower(),
+  )
+}
+
+///|
+test "moving current material finishes old content and skips incoming occurrence" {
+  let state = PlaybackState()
+  state.queue(finite_single_score(0, 60))
+  state.commit_pending(@pattern.Rational::from_int(0))
+  state.queue(finite_single_score(2, 80))
+  state.commit_pending(@pattern.Rational::from_int(4))
+
+  assert_true(state.has_pending())
+  assert_eq(state.skipped_entry_count(), 1)
+  assert_false(notes(state, 4, 6).any(note => note == 80 || note == 81))
+
+  state.commit_pending(@pattern.Rational::from_int(6))
+  assert_false(state.has_pending())
+  assert_eq(state.skipped_entry_count(), 1)
+  assert_false(notes(state, 6, 8).any(note => note == 80 || note == 81))
+}
+
+///|
+fn repeated(snapshot : PlaybackSnapshot) -> PlaybackSnapshot {
+  match snapshot {
+    Song(song) => PlaybackSnapshot::repeat_song(song)
+    other => other
+  }
+}
+
+///|
+test "repeating updates preserve old phrase and rebuild within a queried block" {
+  let state = PlaybackState()
+  state.queue(repeated(finite_single_score(0, 60)))
+  state.commit_pending(@pattern.Rational::from_int(0))
+  state.queue(repeated(finite_single_score(0, 70)))
+  state.commit_pending(@pattern.Rational::from_int(1))
+  assert_eq(notes(state, 1, 10), [61, 70, 71, 70, 71, 70, 71])
+  state.commit_pending(@pattern.Rational::from_int(9))
+  assert_eq(notes(state, 9, 12), [71, 70])
+  assert_false(state.has_pending())
+}
+
+///|
+test "skipped occurrence enters next repetition including a boundary-crossing query" {
+  let state = PlaybackState()
+  state.queue(repeated(finite_occurrence_score(None)))
+  state.commit_pending(@pattern.Rational::from_int(0))
+  state.queue(repeated(finite_occurrence_score(Some(2))))
+  state.commit_pending(@pattern.Rational::from_int(3))
+  assert_eq(state.skipped_entry_count(), 1)
+  assert_false(notes(state, 3, 8).any(note => note == 80 || note == 81))
+  assert_true(notes(state, 7, 11).any(note => note == 80))
+  state.commit_pending(@pattern.Rational::from_int(9))
+  assert_eq(state.skipped_entry_count(), 0)
+  assert_true(notes(state, 10, 11).any(note => note == 80))
+}
+
+///|
+test "another update cannot drop material awaiting removal" {
+  let state = PlaybackState()
+  accept(state, [material("a", 60, 4)], 0)
+  accept(state, [], 1)
+  accept(state, [], 2)
+  assert_eq(notes(state, 2, 5), [61])
+  accept(state, [material("a", 60, 4)], 3)
+  assert_false(state.has_pending())
+  assert_eq(notes(state, 4, 5), [60])
 }

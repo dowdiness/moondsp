@@ -31,74 +31,48 @@ pub fn PatternScheduler::queue_playback_snapshot(
 }
 
 ///|
-pub fn PatternScheduler::has_active_pattern_snapshot(
+/// Accept at the next unrendered sample without advancing the clock. Owners
+/// call this between blocks, including while the performance is paused.
+pub fn PatternScheduler::accept_playback_snapshot(
   self : PatternScheduler,
-) -> Bool {
-  self.playback_state.has_active_pattern()
+  snapshot : PlaybackSnapshot,
+) -> Unit {
+  self.queue_playback_snapshot(snapshot)
+  self.commit_pending_playback_snapshot()
 }
 
 ///|
-pub fn PatternScheduler::has_pending_pattern_snapshot(
+/// The snapshot accepted by an explicit owner operation or render-block commit.
+///
+/// Its changed materials may still be waiting for their own entry boundaries.
+pub fn PatternScheduler::accepted_snapshot(
   self : PatternScheduler,
-) -> Bool {
-  self.playback_state.has_pending_pattern()
+) -> PlaybackSnapshot? {
+  self.playback_state.inspect().current.map(PlaybackSnapshot::from_raw)
 }
 
 ///|
-pub fn PatternScheduler::has_active_song_snapshot(
+/// The latest snapshot queued for acceptance at the next render-block boundary.
+pub fn PatternScheduler::queued_snapshot(
   self : PatternScheduler,
-) -> Bool {
-  self.playback_state.has_active_song()
+) -> PlaybackSnapshot? {
+  self.playback_state.inspect().staged.map(PlaybackSnapshot::from_raw)
 }
 
 ///|
-pub fn PatternScheduler::has_pending_song_snapshot(
+/// Accepted material changes still waiting for a reserved entry boundary.
+pub fn PatternScheduler::pending_material_change_count(
   self : PatternScheduler,
-) -> Bool {
-  self.playback_state.has_pending_song()
+) -> Int {
+  self.playback_state.inspect().pending_materials
 }
 
 ///|
-pub fn PatternScheduler::has_active_playback_snapshot(
+/// Accepted finite material changes that cannot enter during this Play.
+pub fn PatternScheduler::skipped_material_change_count(
   self : PatternScheduler,
-) -> Bool {
-  self.playback_state.has_active()
-}
-
-///|
-pub fn PatternScheduler::has_pending_playback_snapshot(
-  self : PatternScheduler,
-) -> Bool {
-  self.playback_state.has_pending()
-}
-
-///|
-/// Latest accepted authored revision, not a simultaneous audible revision.
-pub fn PatternScheduler::active_playback_revision(
-  self : PatternScheduler,
-) -> @identity.Revision? {
-  self.playback_state.active_revision()
-}
-
-///|
-pub fn PatternScheduler::active_song_revision(
-  self : PatternScheduler,
-) -> @identity.Revision? {
-  self.playback_state.active_song_revision()
-}
-
-///|
-pub fn PatternScheduler::active_playback_song_layout_revision(
-  self : PatternScheduler,
-) -> @identity.Revision? {
-  self.playback_state.active_song_layout_revision()
-}
-
-///|
-pub fn PatternScheduler::active_song_layout_revision(
-  self : PatternScheduler,
-) -> @identity.Revision? {
-  self.active_playback_song_layout_revision()
+) -> Int {
+  self.playback_state.inspect().skipped_materials
 }
 
 ///|

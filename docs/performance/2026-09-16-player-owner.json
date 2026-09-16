@@ -1,0 +1,47 @@
+{
+  "date": "2026-09-16",
+  "toolchain": "moon 0.1.20260904 (94521db 2026-09-04)",
+  "command": "node scripts/measure-playback-api.cjs http://127.0.0.1:5196",
+  "method": "Release production WASM instantiated in a Chromium page. Input character transfer excluded. Steady-render statistics are distributions of 750-block batch means, not per-block latency percentiles. Shared workstation; no paired baseline. These measurements do not establish AudioWorklet deadline or GC behavior.",
+  "workload": "orbit-like 12-section score",
+  "sections": 12,
+  "cycles": 240,
+  "characters": 2851,
+  "sample_rate": 48000,
+  "block_size": 128,
+  "block_budget_ms": 2.6666666666666665,
+  "iterations": 60,
+  "warmup_operations_per_kind": 10,
+  "steady_blocks_per_batch": 750,
+  "update_acceptance": {
+    "mean_ms": 1.9816666667660077,
+    "p50_ms": 1.8999999985098839,
+    "p95_ms": 2.800000000745058,
+    "max_ms": 3.099999999627471
+  },
+  "following_update_render": {
+    "mean_ms": 0.28333333330228927,
+    "p50_ms": 0.2999999988824129,
+    "p95_ms": 0.40000000037252903,
+    "max_ms": 0.599999999627471
+  },
+  "steady_render": {
+    "mean_ms": 0.2269666666665838,
+    "p50_ms": 0.22333333333333333,
+    "p95_ms": 0.2563999999985099,
+    "max_ms": 0.27613333333283663
+  },
+  "restart_acceptance": {
+    "mean_ms": 1.7300000000434617,
+    "p50_ms": 1.5,
+    "p95_ms": 2.900000000372529,
+    "max_ms": 3
+  },
+  "following_restart_render": {
+    "mean_ms": 0.3333333333333333,
+    "p50_ms": 0.30000000074505806,
+    "p95_ms": 0.5,
+    "max_ms": 0.599999999627471
+  },
+  "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+}

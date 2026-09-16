@@ -957,31 +957,21 @@
             window.__moondspStereoHotSwapQueued = event.data;
           } else if (event.data?.type === "stereo-topology-edit-queued") {
             window.__moondspStereoTopologyEditQueued = event.data;
-          } else if (event.data?.type === "pattern-updated") {
+          } else if (event.data?.type === "player-receipt") {
             const statusEl = document.getElementById('patternStatus');
             if (statusEl) {
-              statusEl.textContent = event.data.operation === "update"
-                ? "Pattern updated — edit queued for the next pattern starts"
-                : "Pattern updated";
-              statusEl.classList.remove("pattern-status-err");
-              statusEl.classList.add("pattern-status-ok");
+              statusEl.textContent = event.data.accepted
+                ? `${event.data.operation} accepted · ${event.data.pendingCount} pending · ${event.data.skippedCount} skipped`
+                : event.data.message;
+              statusEl.classList.toggle("pattern-status-err", !event.data.accepted);
+              statusEl.classList.toggle("pattern-status-ok", event.data.accepted);
             }
+            window.__moondspPlayerReceipt = event.data;
           } else if (event.data?.type === "tempo-updated" || event.data?.type === "tempo-error") {
-            if (event.data.revision === tempoRevision) {
-              document.getElementById('bpmValue').textContent = String(event.data.tempo);
-              document.getElementById('bpmSlider').value = String(event.data.tempo);
-              if (event.data.type === "tempo-error") {
-                const statusEl = document.getElementById('patternStatus');
-                statusEl.textContent = event.data.message;
-                statusEl.classList.remove("pattern-status-ok");
-                statusEl.classList.add("pattern-status-err");
-              }
-            }
-          } else if (event.data?.type === "pattern-error") {
-            const statusEl = document.getElementById('patternStatus');
-            if (statusEl) {
+            document.getElementById('bpmValue').textContent = String(event.data.tempo);
+            if (event.data.type === "tempo-error") {
+              const statusEl = document.getElementById('patternStatus');
               statusEl.textContent = event.data.message;
-              statusEl.classList.remove("pattern-status-ok");
               statusEl.classList.add("pattern-status-err");
             }
           }
@@ -1094,7 +1084,7 @@
     function evalPattern() {
       const text = document.getElementById('patternInput').value;
       if (node) {
-        node.port.postMessage({ type: 'apply-score', mode: 'pattern', policy: 'restart', text });
+        node.port.postMessage({ type: 'player-restart', id: ++tempoRevision, text });
       }
     }
 

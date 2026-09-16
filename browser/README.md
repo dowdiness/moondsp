@@ -42,7 +42,7 @@ AudioWorklet transport adapter:
 | **Graph Host (Lifecycle)** | `graph_host_init`, `graph_host_mount`, `graph_host_command`, `graph_host_close` | Initialize engine (128-frame quantum), mount JSON graph description, transport play/pause/unmount, close engine |
 | **Graph Host (Input & Controls)** | `graph_host_clear_input`, `graph_host_push_char`, `graph_host_apply_controls`, `graph_host_set_params` | Push Unicode scalar JSON, apply raw transactional `GraphControl` batches, or atomically update named parameter sets |
 | **Graph Host (Render & Errors)** | `graph_host_process`, `graph_host_sample`, `graph_host_error_length`, `graph_host_error_char` | Render 128-sample block, retrieve output samples, read structured JSON error envelopes |
-| **Scheduler Playback** | `init_scheduler_graph`, `clear_playback_input`, `push_playback_char`, `prepare_pattern_input`, `prepare_song_input`, `apply_prepared_playback`, `discard_prepared_playback`, `restart_playback`, `process_scheduler_block`, `scheduler_left_sample`, `scheduler_right_sample`, `set_scheduler_bpm`, `set_scheduler_gain` | Staged pattern/song parsing, non-destructive token preparation, render-boundary snapshot swap, and stereo playback |
+| **Scheduler Playback** | `init_scheduler_graph`, `clear_playback_input`, `push_playback_char`, `player_update_input`, `player_restart_input`, `player_play`, `player_pause`, `player_state`, `player_pending_count`, `player_skipped_count`, `process_scheduler_block`, `scheduler_left_sample`, `scheduler_right_sample` | Owning Player with unified source parsing, immediate acceptance, material-boundary updates, frozen Pause, and stereo rendering |
 | **Diagnostics & Error Inspection** | `get_browser_last_error`, `get_browser_error_code`, `get_browser_error_length`, `get_browser_error_char`, `get_playback_error` | Numeric error codes (`BROWSER_ERROR_*`) and diagnostic messages for host inspection |
 | **Compiled & Demo Probes** | `init_compiled_*`, `process_compiled_*`, `queue_compiled_*`, `init_exit_deliverable_graph`, `tick`, `tick_source`, `reset_phase` | Deterministic integration probes and fixed demo graph verification |
 
@@ -176,31 +176,36 @@ to `GraphEngineError` values.
 
 ## Scheduler playback ABI
 
-The scheduler exports support Mini pattern and song text in an AudioWorklet:
+The Player accepts both Pattern and arranged Song source through one parser:
 
-1. Call `init_scheduler_graph(sample_rate, block_size)` before rendering.
-2. Clear the text buffer, then send Unicode scalar values with
-   `push_playback_char`.
-3. Call `prepare_pattern_input` or `prepare_song_input`.
-4. Apply the returned token with `apply_prepared_playback(token, restart)`.
+1. Call `init_scheduler_graph(sample_rate, block_size)`.
+2. Call `clear_playback_input`, then send UTF-16 code units with `push_playback_char`.
+3. Call `player_update_input()` to accept Current song without rewinding, or
+   `player_restart_input()` to parse and start the submitted source from zero.
+4. Use `player_play()` to start/resume Current song and `player_pause()` to freeze it.
 5. Call `process_scheduler_block`, then read left and right samples.
 
-Preparation parses and stages data without changing current playback. Applying
-a token queues the accepted snapshot for the next render boundary. Prepared
-tokens can be discarded. `restart_playback` returns the current accepted score
-to its beginning.
+Owner acceptance is immediate, not tied to a render boundary. Changed materials
+may remain Pending until their next entry. Invalid source leaves accepted music
+unchanged. A paused render emits silence without advancing voices, effects, or
+transport; the worklet remains active. Finite songs reach Ended and retain their
+tails. Updating Ended changes the song that the next Play starts.
 
-`apply_prepared_playback` returns:
-
-| Status | Meaning |
+| Result | Meaning |
 |---|---|
-| `0` | Snapshot queued |
-| `1` | Invalid or unrepresentable request |
-| `2` | Starting or restarting is required |
+| `0` | Operation accepted |
+| `1` | Invalid source, unavailable song, or unrepresentable request |
+| `2` | Playing/Paused layout change requires Restart |
 
-Read diagnostics through `get_playback_error`, or through its length/character
-pair when the host cannot consume MoonBit strings directly. Tempo changes use
-`set_scheduler_bpm`; gain changes use `set_scheduler_gain`.
+Read errors through `get_playback_error` or its length/character pair.
+`player_state` reports 0 Empty, 1 Ready, 2 Playing, 3 Paused, 4 Ended, or 5 Fault.
+`player_pending_count` and `player_skipped_count` distinguish waiting material
+changes from finite additions that cannot enter during the current occurrence.
+
+Author `bpm(90);` in source; omission means 60 BPM. Patterns repeat, arrangements
+are finite unless suffixed with `.repeat()`. Repetition preserves release and
+effect tails. Restart clears them only after the new source has been accepted.
+`set_scheduler_bpm` and `set_scheduler_gain` remain lower-level demo/probe controls.
 
 ## Demo and compiled export families
 

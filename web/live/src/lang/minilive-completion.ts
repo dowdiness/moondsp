@@ -16,6 +16,9 @@ import type { SyntaxNode } from "@lezer/common";
 const TOP_LEVEL: Completion[] = [
   snippetCompletion('let ${name} = ${pattern};', { label: "let", type: "keyword", detail: "define a reusable pattern" }),
   snippetCompletion('$: ${}', { label: "$:", type: "keyword", detail: "stack line" }),
+  snippetCompletion('bpm(${60});', { label: "bpm", type: "function", detail: "source tempo; default 60 BPM" }),
+  snippetCompletion("silence()", { label: "silence", type: "function", detail: "silent pattern" }),
+  snippetCompletion('song(section("${name}", ${4}, ${pattern}), part("${occurrence}", "${name}"))', { label: "song", type: "function", detail: "finite arrangement" }),
   snippetCompletion('s("${}")', { label: "s", type: "function", detail: "drum sounds" }),
   snippetCompletion('note("${}")', { label: "note", type: "function", detail: "MIDI numbers or note names" }),
   snippetCompletion('chord("${}")', { label: "chord", type: "function", detail: "chord names" }),
@@ -23,6 +26,7 @@ const TOP_LEVEL: Completion[] = [
 ];
 
 const METHODS: Completion[] = [
+  snippetCompletion("repeat()", { label: "repeat", type: "method", detail: "repeat an arranged song" }),
   snippetCompletion("attack(${seconds})", { label: "attack", type: "method", detail: "note fade-in, seconds" }),
   snippetCompletion("hold(${seconds})", { label: "hold", type: "method", detail: "hold after attack, seconds" }),
   snippetCompletion("release(${seconds})", { label: "release", type: "method", detail: "note fade-out, seconds" }),
