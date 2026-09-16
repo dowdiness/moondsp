@@ -50,17 +50,22 @@ async fn[T] Completion::wait(self : Completion[T]) -> T {
 ///|
 priv struct OwnerState {
   mut current : CurrentSlot
-  mut retirement_tail : @list.List[Completion[Unit]]
+  mut pending_retirements : @list.List[Completion[Unit]]
   options : NativeValue
-  factory : NativeValue
+  graph_engine_factory : NativeValue
 }
 
 ///|
 fn OwnerState::OwnerState(
   options : NativeValue,
-  factory : NativeValue,
+  graph_engine_factory : NativeValue,
 ) -> OwnerState {
-  { current: Vacant, retirement_tail: @list.List::List([]), options, factory, }
+  {
+    current: Vacant,
+    pending_retirements: @list.List::List([]),
+    options,
+    graph_engine_factory,
+  }
 }
 
 ///|
@@ -104,16 +109,16 @@ priv enum RetirementStage {
 ///|
 priv struct Retirement {
   mut stage : RetirementStage
-  primary : @host.NativeError?
+  primary_error : @host.NativeError?
   mut cleanup_error : @host.NativeError?
 }
 
 ///|
 fn Retirement::Retirement(
   stage : RetirementStage,
-  primary : @host.NativeError?,
+  primary_error : @host.NativeError?,
 ) -> Retirement {
-  { stage, primary, cleanup_error: None, }
+  { stage, primary_error, cleanup_error: None, }
 }
 
 ///|
@@ -134,11 +139,11 @@ priv struct Generation {
   owner : OwnerState
   // Public observation borrows this reference; state variants govern ownership.
   context : NativeContext
-  controller : @js_async.AbortController
+  retirement_controller : @js_async.AbortController
   ready : NativeDeferred
   ended : NativeDeferred
-  off : NativeDeferred
-  stopped : Completion[Unit]
+  turn_off_result : NativeDeferred
+  cleanup_finished : Completion[Unit]
   mut readiness : ReadySettlement
   mut publication : EndPublication
   mut state : GenerationState
@@ -149,27 +154,27 @@ fn Generation::Generation(
   owner : OwnerState,
   context : NativeContext,
 ) -> Generation {
-  let gen = {
+  let generation = {
     owner,
     context,
-    controller: @js_async.AbortController::new(),
-    ready: native_deferred(),
-    ended: native_deferred(),
-    off: native_deferred(),
-    stopped: Completion(),
+    retirement_controller: @js_async.AbortController::new(),
+    ready: native_create_deferred(),
+    ended: native_create_deferred(),
+    turn_off_result: native_create_deferred(),
+    cleanup_finished: Completion(),
     readiness: Pending,
     publication: Unpublished,
     state: Admitting(context),
   }
   // Internal retirement can fail without a caller requesting turnOff. Mark the
   // retained promise observed, while still returning that same rejecting promise.
-  native_observe_rejection(native_promise(gen.off))
-  gen
+  native_mark_rejection_observed(native_promise(generation.turn_off_result))
+  generation
 }
 
 ///|
-fn is_live(gen : Generation) -> Bool {
-  match gen.state {
+fn is_generation_live(generation : Generation) -> Bool {
+  match generation.state {
     Admitting(_)
     | Suspending(_)
     | WaitingForEngineGate(_)
@@ -183,22 +188,28 @@ fn is_live(gen : Generation) -> Bool {
 }
 
 ///|
-fn reject_ready(gen : Generation, error : @host.NativeError) -> Unit {
-  match gen.readiness {
+fn reject_pending_readiness(
+  generation : Generation,
+  error : @host.NativeError,
+) -> Unit {
+  match generation.readiness {
     Pending => {
-      gen.readiness = Rejected
-      native_reject(gen.ready, error)
+      generation.readiness = Rejected
+      native_reject(generation.ready, error)
     }
     Resolved | Rejected => ()
   }
 }
 
 ///|
-fn publish_end(gen : Generation, result : NativeValue) -> NativeValue {
-  match gen.publication {
+fn publish_end_once(
+  generation : Generation,
+  result : NativeValue,
+) -> NativeValue {
+  match generation.publication {
     Unpublished => {
-      gen.publication = Published(result)
-      native_resolve(gen.ended, result)
+      generation.publication = Published(result)
+      native_resolve(generation.ended, result)
       result
     }
     Published(retained) => retained
@@ -206,7 +217,10 @@ fn publish_end(gen : Generation, result : NativeValue) -> NativeValue {
 }
 
 ///|
-fn remember_cleanup(retirement : Retirement, error : @host.NativeError) -> Unit {
+fn retain_first_cleanup_error(
+  retirement : Retirement,
+  error : @host.NativeError,
+) -> Unit {
   match retirement.cleanup_error {
     None => retirement.cleanup_error = Some(error)
     Some(_) => ()

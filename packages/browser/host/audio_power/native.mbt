@@ -16,7 +16,7 @@ priv type NativeResult
 priv type NativeDeferred
 
 ///|
-extern "js" fn native_context(options : NativeValue) -> NativeResult =
+extern "js" fn native_create_context(options : NativeValue) -> NativeResult =
   #| options => {
   #|   try { return { ok: true, value: new AudioContext(options?.contextOptions) }; }
   #|   catch (error) { return { ok: false, error }; }
@@ -31,7 +31,9 @@ extern "js" fn native_result_value(result : NativeResult) -> NativeValue =
   #| result => result.value
 
 ///|
-extern "js" fn native_result_error(result : NativeResult) -> @host.NativeError =
+extern "js" fn native_normalize_result_error(
+  result : NativeResult,
+) -> @host.NativeError =
   #| result => {
   #|   const error = result.error;
   #|   try {
@@ -49,11 +51,11 @@ extern "js" fn native_result_error(result : NativeResult) -> @host.NativeError =
   #| }
 
 ///|
-fn parse_outcome(result : NativeResult) -> NativeOutcome {
+fn decode_native_result(result : NativeResult) -> NativeOutcome {
   if native_result_ok(result) {
     Succeeded(native_result_value(result))
   } else {
-    Failed(native_result_error(result))
+    Failed(native_normalize_result_error(result))
   }
 }
 
@@ -72,7 +74,7 @@ extern "js" fn native_context_state(context : NativeContext) -> Int =
   #| context => context.state === "running" ? 0 : context.state === "closed" ? 2 : 1
 
 ///|
-fn disposition(context : NativeContext) -> ContextDisposition {
+fn read_context_playback_state(context : NativeContext) -> ContextDisposition {
   match native_context_state(context) {
     0 => Playing
     2 => Closed
@@ -81,22 +83,24 @@ fn disposition(context : NativeContext) -> ContextDisposition {
 }
 
 ///|
-extern "js" fn native_error(
+extern "js" fn native_create_dom_exception(
   message : String,
   name : String,
 ) -> @host.NativeError =
   #| (message, name) => new DOMException(message, name)
 
 ///|
-extern "js" fn native_defect(message : String) -> @host.NativeError =
+extern "js" fn native_create_internal_error(
+  message : String,
+) -> @host.NativeError =
   #| message => new Error(message)
 
 ///|
-extern "js" fn native_callable(value : NativeValue) -> Bool =
+extern "js" fn native_is_callable(value : NativeValue) -> Bool =
   #| value => typeof value === "function"
 
 ///|
-extern "js" fn native_type_error() -> @host.NativeError =
+extern "js" fn native_invalid_setup_error() -> @host.NativeError =
   #| () => new TypeError("setupAudio must be a function")
 
 ///|
@@ -127,50 +131,52 @@ extern "js" fn native_close_context(
   #| }
 
 ///|
-extern "js" fn native_listen(
+extern "js" fn native_listen_for_context_state_changes(
   context : NativeContext,
-  signal : @js_async.AbortSignal,
-  callback : () -> Unit,
+  remove_listener_on_abort : @js_async.AbortSignal,
+  on_state_change : () -> Unit,
 ) -> Unit =
-  #| (context, signal, callback) => context.addEventListener("statechange", callback, { signal })
+  #| (context, removeListenerOnAbort, onStateChange) => context.addEventListener("statechange", onStateChange, { signal: removeListenerOnAbort })
 
 ///|
-extern "js" fn native_graph_engine(
-  factory : NativeValue,
+extern "js" fn native_create_graph_engine(
+  graph_engine_factory : NativeValue,
   context : NativeContext,
   options : NativeValue,
-  signal : @js_async.AbortSignal,
+  cancel_creation : @js_async.AbortSignal,
 ) -> @js_async.Promise[NativeResult] =
-  #| (factory, context, options, signal) => {
-  #|   try { return Promise.resolve(factory({ context, wasmUrl: options?.wasmUrl, processorUrl: options?.processorUrl, closeTimeoutMs: options?.closeTimeoutMs, signal })).then(value => ({ ok: true, value }), error => ({ ok: false, error })); }
+  #| (graphEngineFactory, context, options, cancelCreation) => {
+  #|   try { return Promise.resolve(graphEngineFactory({ context, wasmUrl: options?.wasmUrl, processorUrl: options?.processorUrl, closeTimeoutMs: options?.closeTimeoutMs, signal: cancelCreation })).then(value => ({ ok: true, value }), error => ({ ok: false, error })); }
   #|   catch (error) { return Promise.resolve({ ok: false, error }); }
   #| }
 
 ///|
-extern "js" fn native_connect(
+extern "js" fn native_connect_output_to_destination(
   engine : @host.NativeEngine,
   context : NativeContext,
 ) -> NativeResult =
   #| (engine, context) => { try { engine.output.connect(context.destination); return { ok: true }; } catch (error) { return { ok: false, error }; } }
 
 ///|
-extern "js" fn native_disconnect(engine : @host.NativeEngine) -> NativeResult =
+extern "js" fn native_disconnect_output(
+  engine : @host.NativeEngine,
+) -> NativeResult =
   #| engine => { try { engine.output.disconnect(); return { ok: true }; } catch (error) { return { ok: false, error }; } }
 
 ///|
-extern "js" fn native_setup(
-  callback : NativeValue,
+extern "js" fn native_call_setup_audio(
+  setup_audio : NativeValue,
   context : NativeContext,
   engine : @host.NativeEngine,
-  signal : @js_async.AbortSignal,
+  power_off : @js_async.AbortSignal,
 ) -> @js_async.Promise[NativeResult] =
-  #| (callback, context, engine, signal) => {
-  #|   try { return Promise.resolve(callback(Object.freeze({ context, engine, powerOff: signal }))).then(value => ({ ok: true, value }), error => ({ ok: false, error })); }
+  #| (setupAudio, context, engine, powerOff) => {
+  #|   try { return Promise.resolve(setupAudio(Object.freeze({ context, engine, powerOff }))).then(value => ({ ok: true, value }), error => ({ ok: false, error })); }
   #|   catch (error) { return Promise.resolve({ ok: false, error }); }
   #| }
 
 ///|
-extern "js" fn native_deferred() -> NativeDeferred =
+extern "js" fn native_create_deferred() -> NativeDeferred =
   #| () => { let resolve, reject; const promise = new Promise((a,b) => { resolve=a; reject=b; }); return { promise, resolve, reject }; }
 
 ///|
@@ -200,7 +206,7 @@ extern "js" fn native_rejected(
   #| error => Promise.reject(error)
 
 ///|
-extern "js" fn native_observe_rejection(
+extern "js" fn native_mark_rejection_observed(
   promise : @js_async.Promise[NativeValue],
 ) -> Unit =
   #| promise => { promise.catch(() => {}); }
@@ -214,28 +220,30 @@ extern "js" fn native_resolved() -> @js_async.Promise[NativeValue] =
   #| () => Promise.resolve(undefined)
 
 ///|
-extern "js" fn native_clean_end() -> NativeValue =
+extern "js" fn native_create_turned_off_result() -> NativeValue =
   #| () => Object.freeze({ reason: "turnedOff" })
 
 ///|
-extern "js" fn native_failed_end(error : @host.NativeError) -> NativeValue =
+extern "js" fn native_create_failed_end_result(
+  error : @host.NativeError,
+) -> NativeValue =
   #| error => Object.freeze({ reason: "failed", error })
 
 ///|
-extern "js" fn owner_value(owner : OwnerState) -> NativeValue =
+extern "js" fn export_owner_handle(owner : OwnerState) -> NativeValue =
   #| value => value
 
 ///|
-extern "js" fn owner_from_value(value : NativeValue) -> OwnerState =
+extern "js" fn import_owner_handle(value : NativeValue) -> OwnerState =
   #| value => value
 
 ///|
-extern "js" fn generation_from_value(value : NativeValue) -> Generation =
+extern "js" fn import_generation_handle(value : NativeValue) -> Generation =
   #| value => value
 
 ///|
-extern "js" fn started_ok(
-  gen : Generation,
+extern "js" fn encode_started_generation(
+  generation : Generation,
   context : NativeContext,
   ready : @js_async.Promise[NativeValue],
   ended : @js_async.Promise[NativeValue],
@@ -243,7 +251,7 @@ extern "js" fn started_ok(
   #| (generation, context, ready, ended) => ({ ok: true, generation, context, ready, ended })
 
 ///|
-extern "js" fn started_error(error : @host.NativeError) -> NativeValue =
+extern "js" fn encode_start_failure(error : @host.NativeError) -> NativeValue =
   #| error => ({ ok: false, error })
 
 ///|
@@ -251,15 +259,15 @@ extern "js" fn started_error(error : @host.NativeError) -> NativeValue =
 // instead uses an uncancellable wait held by its structured owner.
 extern "js" fn native_observe_operation(
   operation : @js_async.Promise[NativeResult],
-  signal : @js_async.AbortSignal,
+  cancel_observation : @js_async.AbortSignal,
 ) -> @js_async.Promise[NativeResult] =
-  #| (operation, signal) => new Promise((resolve, reject) => {
-  #|   const cancel = () => { signal.removeEventListener('abort', cancel); reject(signal.reason); };
-  #|   if (signal.aborted) { cancel(); return; }
-  #|   signal.addEventListener('abort', cancel, { once: true });
+  #| (operation, cancelObservation) => new Promise((resolve, reject) => {
+  #|   const cancel = () => { cancelObservation.removeEventListener('abort', cancel); reject(cancelObservation.reason); };
+  #|   if (cancelObservation.aborted) { cancel(); return; }
+  #|   cancelObservation.addEventListener('abort', cancel, { once: true });
   #|   operation.then(
-  #|     value => { signal.removeEventListener('abort', cancel); resolve(value); },
-  #|     error => { signal.removeEventListener('abort', cancel); reject(error); },
+  #|     value => { cancelObservation.removeEventListener('abort', cancel); resolve(value); },
+  #|     error => { cancelObservation.removeEventListener('abort', cancel); reject(error); },
   #|   );
   #| })
 
@@ -267,36 +275,36 @@ extern "js" fn native_observe_operation(
 // The Promise bridge also wakes MoonBit's JS scheduler when retirement originates
 // in a synchronous JS call or browser event, outside a running MoonBit task.
 extern "js" fn native_wait_for_abort(
-  lifetime : @js_async.AbortSignal,
-  observer : @js_async.AbortSignal,
+  abort_to_observe : @js_async.AbortSignal,
+  cancel_observation : @js_async.AbortSignal,
 ) -> @js_async.Promise[NativeValue] =
-  #| (lifetime, observer) => new Promise((resolve, reject) => {
+  #| (abortToObserve, cancelObservation) => new Promise((resolve, reject) => {
   #|   const detach = () => {
-  #|     lifetime.removeEventListener('abort', ended);
-  #|     observer.removeEventListener('abort', cancelled);
+  #|     abortToObserve.removeEventListener('abort', ended);
+  #|     cancelObservation.removeEventListener('abort', cancelled);
   #|   };
   #|   const ended = () => { detach(); resolve(undefined); };
-  #|   const cancelled = () => { detach(); reject(observer.reason); };
-  #|   if (lifetime.aborted) { ended(); return; }
-  #|   if (observer.aborted) { cancelled(); return; }
-  #|   lifetime.addEventListener('abort', ended, { once: true });
-  #|   observer.addEventListener('abort', cancelled, { once: true });
+  #|   const cancelled = () => { detach(); reject(cancelObservation.reason); };
+  #|   if (abortToObserve.aborted) { ended(); return; }
+  #|   if (cancelObservation.aborted) { cancelled(); return; }
+  #|   abortToObserve.addEventListener('abort', ended, { once: true });
+  #|   cancelObservation.addEventListener('abort', cancelled, { once: true });
   #| })
 
 ///|
-async fn observe_operation(
+async fn await_browser_operation(
   operation : @js_async.Promise[NativeResult],
 ) -> NativeOutcome {
-  parse_outcome(
+  decode_native_result(
     @js_async.run_promise(signal => native_observe_operation(operation, signal)),
   )
 }
 
 ///|
-async fn wait_for_retirement(gen : Generation) -> Unit {
+async fn wait_for_retirement_request(generation : Generation) -> Unit {
   ignore(
     @js_async.run_promise(signal => {
-      native_wait_for_abort(gen.controller.signal(), signal)
+      native_wait_for_abort(generation.retirement_controller.signal(), signal)
     }),
   )
 }

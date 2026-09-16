@@ -1,20 +1,20 @@
 ///|
 // The single post-await liveness check. Retirement cancels observation through
 // the surrounding task group; resource acquisition has a protected child owner.
-async fn await_owned(
-  gen : Generation,
-  operation : async () -> NativeOutcome,
+async fn await_success_or_retire(
+  generation : Generation,
+  perform_operation : async () -> NativeOutcome,
 ) -> AwaitOutcome {
-  guard is_live(gen) else { return Retired }
-  let completion = operation()
-  guard is_live(gen) else { return Retired }
-  if disposition(gen.context) is Closed {
-    begin_retirement(gen, None)
+  guard is_generation_live(generation) else { return Retired }
+  let completion = perform_operation()
+  guard is_generation_live(generation) else { return Retired }
+  if read_context_playback_state(generation.context) is Closed {
+    begin_generation_retirement(generation, None)
     return Retired
   }
   match completion {
     Failed(error) => {
-      begin_retirement(gen, Some(error))
+      begin_generation_retirement(generation, Some(error))
       Retired
     }
     Succeeded(value) => Completed(value)
@@ -22,8 +22,11 @@ async fn await_owned(
 }
 
 ///|
-fn begin_retirement(gen : Generation, primary : @host.NativeError?) -> Unit {
-  let stage = match gen.state {
+fn begin_generation_retirement(
+  generation : Generation,
+  primary_error : @host.NativeError?,
+) -> Unit {
+  let stage = match generation.state {
     Admitting(context) | Suspending(context) | WaitingForEngineGate(context) =>
       ClosingContext(context)
     CreatingEngine(context, pending) =>
@@ -31,36 +34,45 @@ fn begin_retirement(gen : Generation, primary : @host.NativeError?) -> Unit {
     SettingUp(engine) | Resuming(engine, _) => Disconnecting(engine)
     Ready(engine) => Disconnecting(engine)
     Restoring(engine, pending_resume) => {
-      let error = match primary {
+      let error = match primary_error {
         Some(error) => error
-        None => native_error("Audio was turned off", "AbortError")
+        None =>
+          native_create_dom_exception("Audio was turned off", "AbortError")
       }
       native_reject(pending_resume, error)
       Disconnecting(engine)
     }
     Retiring(_) | Ended(_) => return
   }
-  let retirement = Retirement(stage, primary)
-  gen.state = Retiring(retirement)
-  gen.owner.current = Vacant
+  let retirement = Retirement(stage, primary_error)
+  generation.state = Retiring(retirement)
+  generation.owner.current = Vacant
   // Capture every pending predecessor BEFORE abort invokes arbitrary listeners.
   // Persistent snapshots keep reentrant replacements gated without a join task.
-  gen.owner.retirement_tail = gen.owner.retirement_tail
+  generation.owner.pending_retirements = generation.owner.pending_retirements
     .drop_while(completion => completion.value is Some(_))
-    .prepend(gen.stopped)
-  match primary {
+    .prepend(generation.cleanup_finished)
+  match primary_error {
     Some(error) => {
-      reject_ready(gen, error)
-      ignore(publish_end(gen, native_failed_end(error)))
+      reject_pending_readiness(generation, error)
+      ignore(
+        publish_end_once(generation, native_create_failed_end_result(error)),
+      )
     }
     None =>
-      reject_ready(gen, native_error("Audio setup was aborted", "AbortError"))
+      reject_pending_readiness(
+        generation,
+        native_create_dom_exception("Audio setup was aborted", "AbortError"),
+      )
   }
-  gen.controller.abort()
+  generation.retirement_controller.abort()
 }
 
 ///|
-async fn cleanup_generation(gen : Generation, retirement : Retirement) -> Unit {
+async fn close_generation_resources(
+  generation : Generation,
+  retirement : Retirement,
+) -> Unit {
   for ;; {
     match retirement.stage {
       ResolvingEngineAcquisition(context, pending) =>
@@ -74,30 +86,30 @@ async fn cleanup_generation(gen : Generation, retirement : Retirement) -> Unit {
           Failed(_) => retirement.stage = ClosingContext(context)
         }
       Disconnecting(engine) => {
-        match parse_outcome(native_disconnect(engine.native)) {
-          Failed(error) => remember_cleanup(retirement, error)
+        match decode_native_result(native_disconnect_output(engine.native)) {
+          Failed(error) => retain_first_cleanup_error(retirement, error)
           Succeeded(_) => ()
         }
         retirement.stage = ClosingEngine(engine)
       }
       ClosingEngine(engine) => {
         match engine.lifetime.close() {
-          Err(error) => remember_cleanup(retirement, error.native())
+          Err(error) => retain_first_cleanup_error(retirement, error.native())
           Ok(_) => ()
         }
         retirement.stage = ClosingContext(engine.context)
       }
       ClosingContext(context) => {
-        if !(disposition(context) is Closed) {
-          match parse_outcome(native_close_context(context).wait()) {
-            Failed(error) => remember_cleanup(retirement, error)
+        if !(read_context_playback_state(context) is Closed) {
+          match decode_native_result(native_close_context(context).wait()) {
+            Failed(error) => retain_first_cleanup_error(retirement, error)
             Succeeded(_) => ()
           }
         }
         retirement.stage = Complete
       }
       Complete => {
-        finish_retirement(gen, retirement)
+        complete_generation_retirement(generation, retirement)
         break
       }
     }
@@ -105,105 +117,134 @@ async fn cleanup_generation(gen : Generation, retirement : Retirement) -> Unit {
 }
 
 ///|
-fn finish_retirement(gen : Generation, retirement : Retirement) -> Unit {
-  let result = match retirement.primary {
-    Some(error) => native_failed_end(error)
+fn complete_generation_retirement(
+  generation : Generation,
+  retirement : Retirement,
+) -> Unit {
+  let result = match retirement.primary_error {
+    Some(error) => native_create_failed_end_result(error)
     None =>
       match retirement.cleanup_error {
-        Some(error) => native_failed_end(error)
-        None => native_clean_end()
+        Some(error) => native_create_failed_end_result(error)
+        None => native_create_turned_off_result()
       }
   }
-  let retained = publish_end(gen, result)
-  gen.state = Ended(retained)
+  let retained = publish_end_once(generation, result)
+  generation.state = Ended(retained)
   match retirement.cleanup_error {
-    Some(error) => native_reject(gen.off, error)
-    None => native_resolve(gen.off, native_unit())
+    Some(error) => native_reject(generation.turn_off_result, error)
+    None => native_resolve(generation.turn_off_result, native_unit())
   }
-  gen.stopped.complete(())
+  generation.cleanup_finished.complete(())
 }
 
 ///|
-async fn setup_flow(
-  gen : Generation,
-  setup : NativeValue,
-  admission : @js_async.Promise[NativeResult],
-  group : @async.TaskGroup[Unit],
-  gate : @list.List[Completion[Unit]],
+async fn initialize_generation_audio(
+  generation : Generation,
+  setup_audio : NativeValue,
+  admission_resume : @js_async.Promise[NativeResult],
+  lifetime_tasks : @async.TaskGroup[Unit],
+  predecessor_cleanups : @list.List[Completion[Unit]],
 ) -> Unit {
-  guard await_owned(gen, () => observe_operation(admission)) is Completed(_) else {
-    return
-  }
-  gen.state = Suspending(gen.context)
-  guard await_owned(gen, () => observe_operation(native_suspend(gen.context)))
+  guard await_success_or_retire(generation, () => {
+      await_browser_operation(admission_resume)
+    })
     is Completed(_) else {
     return
   }
-  gen.state = WaitingForEngineGate(gen.context)
-  guard await_owned(gen, () => {
-      wait_for_gate(gate)
+  generation.state = Suspending(generation.context)
+  guard await_success_or_retire(generation, () => {
+      await_browser_operation(native_suspend(generation.context))
+    })
+    is Completed(_) else {
+    return
+  }
+  generation.state = WaitingForEngineGate(generation.context)
+  guard await_success_or_retire(generation, () => {
+      wait_for_predecessor_cleanup(predecessor_cleanups)
       Succeeded(native_unit())
     })
     is Completed(_) else {
     return
   }
-  let pending : Completion[NativeOutcome] = Completion()
-  gen.state = CreatingEngine(gen.context, pending)
-  let creation = native_graph_engine(
-    gen.owner.factory,
-    gen.context,
-    gen.owner.options,
-    gen.controller.signal(),
+  let engine_acquisition : Completion[NativeOutcome] = Completion()
+  generation.state = CreatingEngine(generation.context, engine_acquisition)
+  let engine_creation = native_create_graph_engine(
+    generation.owner.graph_engine_factory,
+    generation.context,
+    generation.owner.options,
+    generation.retirement_controller.signal(),
   )
-  group.spawn_bg(no_wait=true, () => {
+  lifetime_tasks.spawn_bg(no_wait=true, () => {
     @async.protect_from_cancel(() => {
-      pending.complete(parse_outcome(creation.wait()))
+      engine_acquisition.complete(decode_native_result(engine_creation.wait()))
     })
   })
-  guard await_owned(gen, () => pending.wait()) is Completed(value) else {
+  guard await_success_or_retire(generation, () => engine_acquisition.wait())
+    is Completed(engine_value) else {
     return
   }
-  let engine = OwnedEngine(gen.context, native_engine_from_value(value))
-  gen.state = SettingUp(engine)
-  group.spawn_bg(no_wait=true, () => watch_processor(gen, engine))
-  guard await_owned(gen, () => {
-      observe_operation(
-        native_setup(setup, gen.context, engine.native, gen.controller.signal()),
+  let engine = OwnedEngine(
+    generation.context,
+    native_engine_from_value(engine_value),
+  )
+  generation.state = SettingUp(engine)
+  lifetime_tasks.spawn_bg(no_wait=true, () => {
+    retire_when_engine_exits(generation, engine)
+  })
+  guard await_success_or_retire(generation, () => {
+      await_browser_operation(
+        native_call_setup_audio(
+          setup_audio,
+          generation.context,
+          engine.native,
+          generation.retirement_controller.signal(),
+        ),
       )
     })
-    is Completed(value) else {
+    is Completed(setup_value) else {
     return
   }
-  gen.state = Resuming(engine, value)
-  guard await_owned(gen, () => observe_operation(native_resume(gen.context)))
+  generation.state = Resuming(engine, setup_value)
+  guard await_success_or_retire(generation, () => {
+      await_browser_operation(native_resume(generation.context))
+    })
     is Completed(_) else {
     return
   }
   // Treat connection as potentially partially effective: retirement must attempt
   // disconnect even if native connect throws after making the connection.
-  match parse_outcome(native_connect(engine.native, gen.context)) {
-    Failed(error) => begin_retirement(gen, Some(error))
+  match
+    decode_native_result(
+      native_connect_output_to_destination(engine.native, generation.context),
+    ) {
+    Failed(error) => begin_generation_retirement(generation, Some(error))
     Succeeded(_) =>
-      if is_live(gen) {
-        gen.state = Ready(engine)
-        gen.readiness = Resolved
-        native_resolve(gen.ready, value)
+      if is_generation_live(generation) {
+        generation.state = Ready(engine)
+        generation.readiness = Resolved
+        native_resolve(generation.ready, setup_value)
       }
   }
 }
 
 ///|
-async fn watch_processor(gen : Generation, engine : OwnedEngine) -> Unit {
+async fn retire_when_engine_exits(
+  generation : Generation,
+  engine : OwnedEngine,
+) -> Unit {
   match engine.lifetime.wait() {
     @host.EngineExit::Failed(error) =>
-      begin_retirement(gen, Some(error.native()))
-    @host.EngineExit::Closed => begin_retirement(gen, None)
+      begin_generation_retirement(generation, Some(error.native()))
+    @host.EngineExit::Closed => begin_generation_retirement(generation, None)
   }
 }
 
 ///|
-async fn wait_for_gate(gate : @list.List[Completion[Unit]]) -> Unit {
-  for completion in gate.iter() {
+async fn wait_for_predecessor_cleanup(
+  predecessor_cleanups : @list.List[Completion[Unit]],
+) -> Unit {
+  for completion in predecessor_cleanups.iter() {
     completion.wait()
   }
 }
@@ -211,27 +252,34 @@ async fn wait_for_gate(gate : @list.List[Completion[Unit]]) -> Unit {
 ///|
 // One JS entry task owns setup, processor observation, and late acquisition.
 // Cancel/join its children first, then complete resource cleanup without cancellation.
-fn supervise(
-  gen : Generation,
-  run : async (@async.TaskGroup[Unit]) -> Unit,
+fn start_generation_supervisor(
+  generation : Generation,
+  run_startup : async (@async.TaskGroup[Unit]) -> Unit,
 ) -> Unit {
   ignore(
     @js_async.Promise::from_async(() => {
       @async.with_task_group(group => {
-        group.spawn_bg(no_wait=true, () => run(group))
-        wait_for_retirement(gen)
+        group.spawn_bg(no_wait=true, () => run_startup(group))
+        wait_for_retirement_request(generation)
       }) catch {
-        error => begin_retirement(gen, Some(native_defect(error.to_string())))
+        error =>
+          begin_generation_retirement(
+            generation,
+            Some(native_create_internal_error(error.to_string())),
+          )
       }
-      guard gen.state is Retiring(retirement) else {
+      guard generation.state is Retiring(retirement) else {
         fail("retirement signal without a retiring generation")
       }
       @async.protect_from_cancel(() => {
-        cleanup_generation(gen, retirement) catch {
+        close_generation_resources(generation, retirement) catch {
           error => {
-            remember_cleanup(retirement, native_defect(error.to_string()))
+            retain_first_cleanup_error(
+              retirement,
+              native_create_internal_error(error.to_string()),
+            )
             // Native failures are values; only MoonBit defects reach this catch.
-            finish_retirement(gen, retirement)
+            complete_generation_retirement(generation, retirement)
           }
         }
       })
@@ -240,36 +288,47 @@ fn supervise(
 }
 
 ///|
-fn launch_setup(
-  gen : Generation,
-  setup : NativeValue,
-  admission : @js_async.Promise[NativeResult],
-  gate : @list.List[Completion[Unit]],
+fn start_audio_generation(
+  generation : Generation,
+  setup_audio : NativeValue,
+  admission_resume : @js_async.Promise[NativeResult],
+  predecessor_cleanups : @list.List[Completion[Unit]],
 ) -> Unit {
-  supervise(gen, group => setup_flow(gen, setup, admission, group, gate))
+  start_generation_supervisor(generation, group => {
+    initialize_generation_audio(
+      generation, setup_audio, admission_resume, group, predecessor_cleanups,
+    )
+  })
 }
 
 ///|
-fn restore(
-  gen : Generation,
+fn start_context_resume(
+  generation : Generation,
   engine : OwnedEngine,
 ) -> @js_async.Promise[NativeValue] {
-  let pending_resume = native_deferred()
-  gen.state = Restoring(engine, pending_resume)
-  let operation = native_resume(gen.context)
+  let pending_resume = native_create_deferred()
+  generation.state = Restoring(engine, pending_resume)
+  let resume_operation = native_resume(generation.context)
   ignore(
     @js_async.Promise::from_async(() => {
       @async.with_task_group(group => {
         group.spawn_bg(no_wait=true, () => {
-          wait_for_retirement(gen)
+          wait_for_retirement_request(generation)
           group.return_immediately(())
         })
-        if await_owned(gen, () => observe_operation(operation)) is Completed(_) {
-          gen.state = Ready(engine)
+        if await_success_or_retire(generation, () => {
+            await_browser_operation(resume_operation)
+          })
+          is Completed(_) {
+          generation.state = Ready(engine)
           native_resolve(pending_resume, native_unit())
         }
       }) catch {
-        error => begin_retirement(gen, Some(native_defect(error.to_string())))
+        error =>
+          begin_generation_retirement(
+            generation,
+            Some(native_create_internal_error(error.to_string())),
+          )
       }
     }),
   )
