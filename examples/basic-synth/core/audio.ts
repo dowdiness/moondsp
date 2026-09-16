@@ -1,5 +1,6 @@
-import { GraphEngine, GraphEngineError } from "@moondsp/browser";
-import type { GraphEngine as EngineHandle, GraphControl, MountedGraph } from "@moondsp/browser";
+import { GraphEngineError } from "@moondsp/browser";
+import type { GraphControl, MountedGraph } from "@moondsp/browser";
+import { AudioPower, type PoweredAudio } from "@moondsp/browser/audio";
 import { errorMessage, type ControlState } from "./controls";
 import { attempt, attemptAsync, type Result } from "./result";
 import { SYNTH_GRAPH, noteOn, noteOff, type Settings } from "./synth";
@@ -19,22 +20,11 @@ export interface AudioActions {
   cutoffChanged(value: number): void;
 }
 
-type OwnedResources =
-  | { stage: "empty" }
-  | { stage: "context"; context: AudioContext }
-  | { stage: "engine"; context: AudioContext; engine: EngineHandle };
+type SynthPower = PoweredAudio<MountedGraph<keyof Settings>>;
 
-interface AudioOwner {
-  readonly signal: AbortSignal;
-  open(settings: () => Settings, onContext: (context: AudioContext) => void): Promise<AudioSession>;
-  close(): Promise<Result<void>>;
-}
-
-// Handles are usable together only after initialization. Only owner may release them.
+// The application owns command ordering and note epochs, not audio resources.
 interface AudioSession {
-  readonly owner: AudioOwner;
-  readonly context: AudioContext;
-  readonly engine: EngineHandle;
+  readonly powered: SynthPower;
   readonly graph: MountedGraph<keyof Settings>;
   operations: Promise<void>;
   noteEpoch: number;
@@ -42,102 +32,19 @@ interface AudioSession {
 
 type AudioState =
   | { phase: "idle" | "disposed" }
-  | { phase: "loading" | "disposing"; owner: AudioOwner }
+  | { phase: "loading" | "disposing"; powered: SynthPower }
   | { phase: "suspended" | "resuming" | "running"; session: AudioSession }
-  | { phase: "error"; owner: AudioOwner; error: Error };
-
-// One owner spans partial acquisition, the published session, and retirement.
-// Retirement bypasses the command queue: a pending command must not prevent close.
-function createAudioOwner(previous?: AudioOwner): AudioOwner {
-  const predecessor = previous?.close();
-  const cancellation = new AbortController();
-  const { signal } = cancellation;
-  let resources: OwnedResources = { stage: "empty" };
-  let closure: Promise<Result<void>> | undefined;
-  const owner: AudioOwner = {
-    signal,
-    async open(readSettings, onContext) {
-      try {
-        // Admit this context in the Power on gesture, before any await.
-        // Loading may outlast transient user activation.
-        signal.throwIfAborted();
-        if (typeof AudioContext === "undefined") throw new Error("AudioContext is unavailable");
-        const context = new AudioContext();
-        resources = { stage: "context", context };
-        const admission = attemptAsync(() => context.resume());
-        onContext(context);
-        const admitted = await admission;
-        if (!admitted.ok) throw admitted.error;
-        signal.throwIfAborted();
-        // The graph API requires suspended mounting, even after admission.
-        await context.suspend();
-        if (predecessor) await predecessor;
-        signal.throwIfAborted();
-        if (!context.audioWorklet) throw new Error("AudioWorklet is unavailable");
-        const engine = await GraphEngine({ context, signal });
-        // The factory may have resolved immediately before retirement. Do not adopt
-        // that late handle into resources already handed to cleanup.
-        if (signal.aborted) {
-          await attemptAsync(() => engine.close());
-          signal.throwIfAborted();
-        }
-        resources = { stage: "engine", context, engine };
-        const graph = await engine.mount(SYNTH_GRAPH);
-        signal.throwIfAborted();
-        const settings = readSettings();
-        await graph.setParams(settings);
-        signal.throwIfAborted();
-        await graph.play();
-        signal.throwIfAborted();
-        await context.resume();
-        signal.throwIfAborted();
-        engine.output.connect(context.destination);
-        return { owner, context, engine, graph, operations: Promise.resolve(), noteEpoch: 0 };
-      } catch (error) {
-        await owner.close();
-        throw error;
-      }
-    },
-    close() {
-      if (closure) return closure;
-      cancellation.abort(); // Detach the context listener and the lifetime observer now.
-      const owned = resources;
-      closure = (async () => {
-        const result = await cleanupResources(owned);
-        resources = { stage: "empty" };
-        if (predecessor) await predecessor;
-        return result;
-      })();
-      return closure;
-    },
-  };
-  return owner;
-}
-
-// Attempt every release, preserving the first cleanup failure. The app owns context.
-async function cleanupResources(resources: OwnedResources): Promise<Result<void>> {
-  let result: Result<void> = { ok: true, value: undefined };
-  const remember = (step: Result<unknown>) => {
-    if (result.ok && !step.ok) result = step;
-  };
-  if (resources.stage === "engine") {
-    remember(attempt(() => resources.engine.output.disconnect()));
-    remember(await attemptAsync(() => resources.engine.close()));
-  }
-  if (resources.stage !== "empty" && resources.context.state !== "closed") {
-    remember(await attemptAsync(() => resources.context.close()));
-  }
-  return result;
-}
+  | { phase: "error"; powered: SynthPower | undefined; error: Error };
 
 /** Audio effects only. Values and commands arrive as data; no DOM reads occur here. */
 export function createAudio(view: AudioView, initialSettings: Settings): AudioActions {
+  const audioPower = AudioPower();
   let settings = initialSettings;
   let state: AudioState = { phase: "idle" };
 
-  function currentOwner(): AudioOwner | undefined {
-    if ("owner" in state) return state.owner;
-    if ("session" in state) return state.session.owner;
+  function currentPower(): SynthPower | undefined {
+    if ("powered" in state) return state.powered;
+    if ("session" in state) return state.session.powered;
     return undefined;
   }
 
@@ -159,43 +66,54 @@ export function createAudio(view: AudioView, initialSettings: Settings): AudioAc
     view.render({ phase: state.phase, errorText });
   }
 
-  // Only this transition publishes a complete session. Stale work cannot publish.
+  // Only readiness publishes a complete session. Retired work cannot publish.
   function requestInitializeAudio(): void {
-    const owner = createAudioOwner(currentOwner());
-    state = { phase: "loading", owner };
-    view.clearNotes();
-    render();
-    void attemptAsync(() => owner.open(() => settings, context => {
+    const started: Result<SynthPower> = attempt(() => audioPower.turnOn(async ({ context, engine, powerOff }) => {
       context.addEventListener("statechange", () => {
-        if (currentOwner() !== owner) return;
+        if (!started.ok || currentPower() !== started.value) return;
         if (context.state === "closed") requestDispose();
-        else if (context.state === "suspended" && state.phase === "running") {
+        else if (context.state !== "running" && state.phase === "running") {
           state = { phase: "suspended", session: state.session };
           stopNotes();
           render();
         }
-      }, { signal: owner.signal });
+      }, { signal: powerOff });
+      powerOff.throwIfAborted();
+      const graph = await engine.mount(SYNTH_GRAPH);
+      powerOff.throwIfAborted();
+      await graph.setParams(settings);
+      powerOff.throwIfAborted();
+      await graph.play();
+      powerOff.throwIfAborted();
+      return graph;
+    }));
+    view.clearNotes();
+    if (!started.ok) {
+      state = { phase: "error", powered: undefined, error: started.error };
       render();
-    })).then(result => {
-      if (state.phase !== "loading" || state.owner !== owner) return;
+      return;
+    }
+    const powered = started.value;
+    state = { phase: "loading", powered };
+    render();
+    void attemptAsync(() => powered.ready).then(result => {
+      if (state.phase !== "loading" || state.powered !== powered) return;
       if (!result.ok) {
-        failAudio(result.error, owner);
+        if (result.error.name === "AbortError") requestDispose();
+        else failAudio(result.error, powered);
         return;
       }
-      const session = result.value;
-      state = { phase: session.context.state === "running" ? "running" : "suspended", session };
-      void observeEngine(session);
+      const session: AudioSession = {
+        powered, graph: result.value, operations: Promise.resolve(), noteEpoch: 0,
+      };
+      state = { phase: powered.context.state === "running" ? "running" : "suspended", session };
       render();
     });
-  }
-
-  async function observeEngine(session: AudioSession): Promise<void> {
-    const { owner, engine } = session;
-    const result = await attemptAsync(() => engine.wait({ signal: owner.signal }));
-    if (owner.signal.aborted || currentSession() !== session) return;
-    if (!result.ok) failAudio(result.error, owner);
-    else if (result.value.type === "failed") failAudio(result.value.error, owner);
-    else requestDispose();
+    void powered.ended.then(end => {
+      if (currentPower() !== powered) return;
+      if (end.reason === "failed") failAudio(end.error, powered);
+      else if (state.phase !== "disposing" && state.phase !== "error") requestDispose();
+    });
   }
 
   function powerOnFromGesture(): void {
@@ -205,19 +123,18 @@ export function createAudio(view: AudioView, initialSettings: Settings): AudioAc
     }
     if (state.phase !== "suspended") return;
     const { session } = state;
-    const { context, graph } = session;
+    const { powered, graph } = session;
     state = { phase: "resuming", session };
     render();
-    // attemptAsync invokes its action immediately, before its first await.
-    // Never defer resume to the serialized queue: admission needs this gesture.
-    const resume = attemptAsync(() => context.state === "suspended" ? context.resume() : Promise.resolve());
+    // Invoke immediately: native resume must stay in this gesture, not the queue.
+    const resume = attemptAsync(() => powered.resume());
     enqueue(session, async () => {
       const resumed = await resume;
       if (!resumed.ok) throw resumed.error;
       if (currentSession() !== session) return;
       await graph.play();
       if (currentSession() !== session) return;
-      state = { phase: context.state === "suspended" ? "suspended" : "running", session };
+      state = { phase: powered.context.state === "running" ? "running" : "suspended", session };
       render();
     });
   }
@@ -235,7 +152,7 @@ export function createAudio(view: AudioView, initialSettings: Settings): AudioAc
       if (currentSession() === session) await operation();
     }));
     session.operations = run.then(result => {
-      if (!result.ok && currentSession() === session) failAudio(result.error, session.owner);
+      if (!result.ok && currentSession() === session) failAudio(result.error, session.powered);
     });
   }
 
@@ -259,20 +176,20 @@ export function createAudio(view: AudioView, initialSettings: Settings): AudioAc
   }
 
   function requestDispose(): void {
-    const owner = currentOwner();
+    const powered = currentPower();
     view.clearNotes();
-    if (!owner) {
+    if (!powered) {
       state = { phase: "disposed" };
       render();
       return;
     }
-    const disposing: AudioState = { phase: "disposing", owner };
+    const disposing: AudioState = { phase: "disposing", powered };
     state = disposing;
-    const closing = owner.close();
+    const closing = attemptAsync(() => powered.turnOff());
     render();
     void closing.then(result => {
       if (state !== disposing) return;
-      if (!result.ok) failAudio(result.error, owner);
+      if (!result.ok) failAudio(result.error, powered);
       else {
         state = { phase: "disposed" };
         render();
@@ -280,12 +197,12 @@ export function createAudio(view: AudioView, initialSettings: Settings): AudioAc
     });
   }
 
-  function failAudio(error: Error, owner: AudioOwner): void {
-    if (currentOwner() !== owner) return;
-    const failed: AudioState = { phase: "error", owner, error };
+  function failAudio(error: Error, powered: SynthPower): void {
+    if (currentPower() !== powered || state.phase === "error") return;
+    const failed: AudioState = { phase: "error", powered, error };
     state = failed;
     view.clearNotes();
-    const closing = owner.close();
+    const closing = attemptAsync(() => powered.turnOff());
     render(); // Publish the primary failure without waiting for cleanup.
     void closing.then(() => {
       if (state === failed) render();

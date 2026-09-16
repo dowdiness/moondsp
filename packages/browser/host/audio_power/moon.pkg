@@ -1,0 +1,21 @@
+import {
+  "dowdiness/moondsp-browser-host" @host,
+  "moonbitlang/async",
+  "moonbitlang/async/js_async",
+}
+
+pkgtype(kind: "executable")
+
+options(
+  link: {
+    "js": {
+      "format": "esm",
+      "exports": [
+        "audio_power_new",
+        "audio_power_turn_on",
+        "powered_audio_resume",
+        "powered_audio_turn_off",
+      ],
+    },
+  },
+)

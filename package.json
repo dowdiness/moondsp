@@ -2,7 +2,7 @@
   "name": "moondsp-browser-tools",
   "private": true,
   "scripts": {
-    "typecheck:graph": "node web/live/node_modules/typescript/bin/tsc --noEmit --strict --exactOptionalPropertyTypes --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM playwright-tests/graph-engine.types.ts",
+    "typecheck:browser": "node web/live/node_modules/typescript/bin/tsc --noEmit --strict --exactOptionalPropertyTypes --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM playwright-tests/graph-engine.types.ts playwright-tests/audio-power.types.ts",
     "build:browser": "moon build browser --target wasm-gc --release",
     "pack:browser": "npm pack ./packages/browser --pack-destination ./packages/browser",
     "test:vanilla-synth": "playwright test --config playwright.basic-synth-vanilla.config.js",

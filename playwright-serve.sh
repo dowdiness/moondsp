@@ -7,6 +7,7 @@ web_dir="$root_dir/web"
 port="${1:-8090}"
 
 "$root_dir/playwright-sync-wasm.sh"
+node "$root_dir/scripts/build-audio-power-core.mjs" "$web_dir/audio-power-core.js"
 
 cd "$web_dir"
 python3 -m http.server "$port" --bind 127.0.0.1

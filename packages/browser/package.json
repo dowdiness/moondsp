@@ -13,6 +13,10 @@
     ".": {
       "types": "./dist/graph-engine.d.ts",
       "import": "./dist/graph-engine.js"
+    },
+    "./audio": {
+      "types": "./dist/audio-power.d.ts",
+      "import": "./dist/audio-power.js"
     }
   },
   "types": "./dist/graph-engine.d.ts",
