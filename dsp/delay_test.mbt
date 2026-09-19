@@ -110,3 +110,114 @@ test "delay reset blocks feedback from stale samples" {
   // Without valid-range guarding, feedback would recirculate the old impulse.
   assert_true(delay.tick(0.0) == 0.0)
 }
+
+///|
+enum DelayOperation {
+  Tick(Double)
+  Reset
+  SetDelay(Int)
+}
+
+///|
+struct PhysicalDelayReference {
+  buffer : FixedArray[Double]
+  mut write_pos : Int
+  mut delay_samples : Int
+  feedback : Double
+}
+
+///|
+fn new_physical_delay_reference(
+  capacity : Int,
+  delay_samples : Int,
+  feedback : Double,
+) -> PhysicalDelayReference {
+  {
+    buffer: FixedArray::make(capacity, 0.0),
+    write_pos: 0,
+    delay_samples,
+    feedback,
+  }
+}
+
+///|
+fn physical_reference_tick(
+  reference : PhysicalDelayReference,
+  input : Double,
+) -> Double {
+  if reference.delay_samples == 0 {
+    reference.buffer[reference.write_pos] = input
+    reference.write_pos += 1
+    if reference.write_pos >= reference.buffer.length() {
+      reference.write_pos = 0
+    }
+    input
+  } else {
+    let read_pos = {
+      let raw_read_pos = reference.write_pos - reference.delay_samples
+      if raw_read_pos < 0 {
+        raw_read_pos + reference.buffer.length()
+      } else {
+        raw_read_pos
+      }
+    }
+    let output = reference.buffer[read_pos]
+    reference.buffer[reference.write_pos] = input + output * reference.feedback
+    reference.write_pos += 1
+    if reference.write_pos >= reference.buffer.length() {
+      reference.write_pos = 0
+    }
+    output
+  }
+}
+
+///|
+fn physical_reference_reset(reference : PhysicalDelayReference) -> Unit {
+  reference.buffer.fill(0.0)
+  reference.write_pos = 0
+}
+
+///|
+test "delay reset matches physical reference across state transitions" {
+  let actual = DelayLine::new(5, delay_samples=2, feedback=0.5)
+  let reference = new_physical_delay_reference(5, 2, 0.5)
+  let operations : Array[DelayOperation] = [
+    Tick(1.0),
+    Tick(0.0),
+    Tick(2.0),
+    Tick(0.0),
+    Tick(0.0),
+    Tick(0.0),
+    Reset,
+    SetDelay(4),
+    Tick(0.5),
+    Tick(0.0),
+    Tick(0.0),
+    Tick(0.0),
+    Tick(0.0),
+    SetDelay(0),
+    Tick(0.75),
+    Tick(-0.25),
+    Reset,
+    SetDelay(1),
+    Tick(0.25),
+    Tick(0.0),
+  ]
+  for operation in operations {
+    match operation {
+      Tick(input) => {
+        let actual_output = actual.tick(input)
+        let reference_output = physical_reference_tick(reference, input)
+        assert_true((actual_output - reference_output).abs() < 0.000000000001)
+      }
+      Reset => {
+        actual.reset()
+        physical_reference_reset(reference)
+      }
+      SetDelay(delay_samples) => {
+        actual.set_delay_samples(delay_samples)
+        reference.delay_samples = delay_samples
+      }
+    }
+  }
+}

@@ -1,9 +1,9 @@
 ///|
 /// Measure DelayLine::reset across capacities.
 ///
-/// The interesting claim is that reset cost stays constant while capacity
-/// grows. Fill one sample before each measured reset so the call is not
-/// measuring a brand-new empty line.
+/// Prime once before timing. Repeated reset-only batches mostly measure an
+/// already-reset line; use reset-plus-ticks and prepared stealing as the
+/// primary evidence for active-use cost.
 fn delay_reset_fixture(capacity : Int) -> DelayLine {
   let delay = DelayLine::new(capacity, delay_samples=1, feedback=0.3)
   ignore(delay.tick(1.0))
@@ -68,8 +68,8 @@ test "bench/dsp/delay_reset_plus_tick16" (b : @bench.T) {
 test "bench/dsp/delay_tick16_steady" (b : @bench.T) {
   let medium = delay_tick_fixture(4800)
   let large = delay_tick_fixture(480000)
-  warm_delay_ticks(medium, 9600)
-  warm_delay_ticks(large, 9600)
+  warm_delay_ticks(medium, medium.max_delay_samples() * 2)
+  warm_delay_ticks(large, large.max_delay_samples() * 2)
   b.bench(name="tick16_steady_cap_4800", fn() { tick16(medium) })
   b.bench(name="tick16_steady_cap_480000", fn() { tick16(large) })
 }

@@ -17,58 +17,65 @@ that DSP is out of scope.
 - Target: **wasm-gc** (release). The module declares no preferred target;
   bare `moon bench --release` defaults to **wasm** (WASI). Browser/AudioWorklet
   claims below use an explicit `--target wasm-gc`.
-- Commands:
-  - `NEW_MOON_MOD=0 moon bench --release --target wasm-gc`
-  - `NEW_MOON_MOD=0 moon bench --release --target wasm-gc dsp/delay_benchmark.mbt`
-  - `NEW_MOON_MOD=0 moon bench --release --target wasm-gc voice/delay_reset_benchmark.mbt`
+- Full-suite command:
+  `NEW_MOON_MOD=0 moon bench --release --target wasm-gc`
+- Focused comparison command:
+  `OUTPUT=/tmp/result.txt scripts/bench-delayline-reset-ab.sh`
 - Result: 66 benchmark groups passed, zero failures
 - Dry-run confirmation: builds under `_build/wasm-gc/release/bench/`
-- Raw output: [2026-09-19-delayline-valid-range-reset-benchmarks.txt](2026-09-19-delayline-valid-range-reset-benchmarks.txt)
+- Full-suite raw output: [2026-09-19-delayline-valid-range-reset-benchmarks.txt](2026-09-19-delayline-valid-range-reset-benchmarks.txt)
+- Candidate/baseline raw output: [2026-09-19-delayline-valid-range-reset-ab.txt](2026-09-19-delayline-valid-range-reset-ab.txt)
+- Reproducible runner: [`scripts/bench-delayline-reset-ab.sh`](../../scripts/bench-delayline-reset-ab.sh)
 
 ## Focused results (wasm-gc)
 
-Product columns come from the full-suite raw output above
-(`--target wasm-gc`). Physical-fill baseline columns use the same
-`dsp/delay_benchmark.mbt` harness on a temporary copy with the old
-`buffer.fill(0.0)` reset and no `has_wrapped` branch, also run with
-`--target wasm-gc`.
+Product columns come from the refreshed full-suite raw output above
+(`--target wasm-gc`). Physical-fill baseline columns come from the pinned
+comparison runner. It archives the current tree, replaces only `dsp/delay.mbt`
+with the exact baseline source from commit
+`c62774961895f2b2fd7b96adf448672df93527ad`, and runs the same benchmark harness
+and target. The baseline therefore isolates the physical reset implementation
+while keeping the surrounding benchmark and integration code identical.
 
 | Case | Valid-range (product) | Physical-fill baseline |
 |---|---:|---:|
-| `DelayLine::reset`, capacity 8 | 1.26 ns | 3.65 ns |
-| `DelayLine::reset`, capacity 4,800 | 4.60 ns | 326.40 ns |
-| `DelayLine::reset`, capacity 480,000 | 5.00 ns | 42.82 µs |
-| reset + 16 ticks, capacity 4,800 | 48.77 ns | 390.67 ns |
-| reset + 16 ticks, capacity 480,000 | 56.99 ns | 42.84 µs |
-| warmed steady 16 ticks, capacity 4,800 | 48.45 ns | 45.85 ns |
-| warmed steady 16 ticks, capacity 480,000 | 50.39 ns | 72.80 ns |
-| prepared params4 active steal, capacity 4,800 | 800.93 ns | — |
-| prepared params4 active steal, capacity 48,000 | 775.94 ns | — |
-| prepared params4 active steal, capacity 480,000 | 781.72 ns | — |
+| `DelayLine::reset`, capacity 8 | 1.12 ns | 3.88 ns |
+| `DelayLine::reset`, capacity 4,800 | 4.79 ns | 325.91 ns |
+| `DelayLine::reset`, capacity 480,000 | 4.70 ns | 42.45 µs |
+| reset + 16 ticks, capacity 4,800 | 47.88 ns | 384.72 ns |
+| reset + 16 ticks, capacity 480,000 | 55.28 ns | 42.67 µs |
+| warmed steady 16 ticks, capacity 4,800 | 50.10 ns | 45.86 ns |
+| warmed steady 16 ticks, capacity 480,000 | 50.82 ns | 66.51 ns |
+| prepared params4 active steal, capacity 4,800 | 761.96 ns | — |
+| prepared params4 active steal, capacity 48,000 | 759.25 ns | — |
+| prepared params4 active steal, capacity 480,000 | 744.79 ns | — |
 
 Measurement notes:
 
+- The reset-only fixture primes the line once. Repeated reset-only batches are
+  useful for checking capacity scaling, but `reset + 16 ticks` and prepared
+  stealing are the primary active-use measurements.
 - `reset + 16 ticks` resets inside each measured batch, so every iteration stays
   on the post-reset valid-range branch instead of wrapping into steady state.
-- `warmed steady 16 ticks` warms past one full wrap and times ticks with no
-  reset in the batch, isolating the always-on read-guard cost.
-- The physical-fill baseline is comparison-only evidence, not committed product
-  code. Candidate and baseline for the delay tick rows were both measured with
-  `--target wasm-gc`.
-- On wasm-gc, steady-state tick throughput did not show an unacceptable
-  per-sample overhead versus the matched physical baseline (≈48 ns vs ≈46 ns
-  at capacity 4,800; ≈50 ns vs ≈73 ns at capacity 480,000).
+- The steady-state fixture warms each line for `max_delay_samples() * 2` ticks
+  before timing, so both capacities have completed at least one full ring wrap.
+  The timed batch contains no reset and isolates the always-on `has_wrapped`
+  read overhead.
+- On wasm-gc, steady-state tick throughput did not show a capacity-dependent
+  regression versus the matched physical baseline (≈50 ns vs ≈46 ns at
+  capacity 4,800; ≈51 ns vs ≈67 ns at capacity 480,000). These are local
+  microbenchmark results, not an AudioWorklet deadline guarantee.
 - An earlier default-target suite (no `--target`, resolving to **wasm**/WASI)
   is not used for the browser tick-overhead claim.
 
 ## Verification
 
+- `NEW_MOON_MOD=0 moon update`: passed
 - `NEW_MOON_MOD=0 moon check --deny-warn`: passed
-- `NEW_MOON_MOD=0 moon test --release dsp`: 160 passed
-- `NEW_MOON_MOD=0 moon test --release voice`: 73 passed
-- `NEW_MOON_MOD=0 moon test --release graph`: 244 passed
-- Contract tests cover post-reset silence, wrap-around stale content, feedback
-  isolation, and delay-length changes after reset
+- `NEW_MOON_MOD=0 moon test --release --target wasm-gc dsp`: 161 passed
+- The transition contract compares the valid-range implementation with a
+  physical-clear reference across ticks, reset, wrap, delay-length changes,
+  zero-delay passthrough, feedback, and negative input.
 
 ## Measurement limits
 
