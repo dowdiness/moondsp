@@ -10,9 +10,8 @@ RELEVANT_PATHS=(
   moon.mod
   moon.lock
   moon.pkg
-  dsp/moon.pkg
-  dsp/delay.mbt
-  dsp/delay_benchmark.mbt
+  dsp
+  scripts/bench-delayline-reset-ab.sh
 )
 DIRTY_RELEVANT=$(git -C "$ROOT" status --short --untracked-files=all -- "${RELEVANT_PATHS[@]}")
 if [ -n "$DIRTY_RELEVANT" ]; then

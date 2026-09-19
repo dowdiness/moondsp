@@ -120,24 +120,17 @@ enum DelayOperation {
 
 ///|
 struct PhysicalDelayReference {
-  buffer : FixedArray[Double]
-  mut write_pos : Int
+  mut history : Array[Double]
   mut delay_samples : Int
   feedback : Double
 }
 
 ///|
 fn new_physical_delay_reference(
-  capacity : Int,
   delay_samples : Int,
   feedback : Double,
 ) -> PhysicalDelayReference {
-  {
-    buffer: FixedArray::make(capacity, 0.0),
-    write_pos: 0,
-    delay_samples,
-    feedback,
-  }
+  { history: [], delay_samples, feedback, }
 }
 
 ///|
@@ -146,41 +139,54 @@ fn physical_reference_tick(
   input : Double,
 ) -> Double {
   if reference.delay_samples == 0 {
-    reference.buffer[reference.write_pos] = input
-    reference.write_pos += 1
-    if reference.write_pos >= reference.buffer.length() {
-      reference.write_pos = 0
-    }
+    reference.history.push(input)
     input
   } else {
-    let read_pos = {
-      let raw_read_pos = reference.write_pos - reference.delay_samples
-      if raw_read_pos < 0 {
-        raw_read_pos + reference.buffer.length()
-      } else {
-        raw_read_pos
-      }
+    let history_length = reference.history.length()
+    let output = if history_length >= reference.delay_samples {
+      reference.history[history_length - reference.delay_samples]
+    } else {
+      0.0
     }
-    let output = reference.buffer[read_pos]
-    reference.buffer[reference.write_pos] = input + output * reference.feedback
-    reference.write_pos += 1
-    if reference.write_pos >= reference.buffer.length() {
-      reference.write_pos = 0
-    }
+    reference.history.push(input + output * reference.feedback)
     output
   }
 }
 
 ///|
 fn physical_reference_reset(reference : PhysicalDelayReference) -> Unit {
-  reference.buffer.fill(0.0)
-  reference.write_pos = 0
+  reference.history = []
+}
+
+///|
+fn assert_delay_operations(
+  actual : DelayLine,
+  reference : PhysicalDelayReference,
+  operations : Array[DelayOperation],
+) -> Unit raise {
+  for operation in operations {
+    match operation {
+      Tick(input) => {
+        let actual_output = actual.tick(input)
+        let reference_output = physical_reference_tick(reference, input)
+        assert_true((actual_output - reference_output).abs() < 0.000000000001)
+      }
+      Reset => {
+        actual.reset()
+        physical_reference_reset(reference)
+      }
+      SetDelay(delay_samples) => {
+        actual.set_delay_samples(delay_samples)
+        reference.delay_samples = delay_samples
+      }
+    }
+  }
 }
 
 ///|
 test "delay reset matches physical reference across state transitions" {
   let actual = DelayLine::new(5, delay_samples=2, feedback=0.5)
-  let reference = new_physical_delay_reference(5, 2, 0.5)
+  let reference = new_physical_delay_reference(2, 0.5)
   let operations : Array[DelayOperation] = [
     Tick(1.0),
     Tick(0.0),
@@ -203,21 +209,26 @@ test "delay reset matches physical reference across state transitions" {
     Tick(0.25),
     Tick(0.0),
   ]
-  for operation in operations {
-    match operation {
-      Tick(input) => {
-        let actual_output = actual.tick(input)
-        let reference_output = physical_reference_tick(reference, input)
-        assert_true((actual_output - reference_output).abs() < 0.000000000001)
-      }
-      Reset => {
-        actual.reset()
-        physical_reference_reset(reference)
-      }
-      SetDelay(delay_samples) => {
-        actual.set_delay_samples(delay_samples)
-        reference.delay_samples = delay_samples
-      }
-    }
-  }
+  assert_delay_operations(actual, reference, operations)
+}
+
+///|
+test "delay reset matches physical reference at capacity one" {
+  let actual = DelayLine::new(1, delay_samples=1, feedback=0.25)
+  let reference = new_physical_delay_reference(1, 0.25)
+  let operations : Array[DelayOperation] = [
+    Tick(1.0),
+    Tick(0.0),
+    Reset,
+    Tick(0.0),
+    Reset,
+    Tick(0.5),
+    SetDelay(0),
+    Tick(-0.25),
+    SetDelay(1),
+    Tick(0.0),
+    Reset,
+    Tick(0.0),
+  ]
+  assert_delay_operations(actual, reference, operations)
 }
