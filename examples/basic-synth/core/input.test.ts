@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   ACTIVATION_RELEASE_MS,
+  createDeferredReleases,
   createNoteInput,
   createPointerSessions,
   interpretActivationClick,
@@ -128,4 +129,74 @@ test("note input routes last-held actions and pointer session replacement", () =
   assert.deepEqual(actions.at(-1), { type: "release", nextMidi: 60 });
   assert.deepEqual(captures, [["button-a", 7], ["button-b", 7]]);
   assert.deepEqual(releases, [["button-b", 7]]);
+});
+
+test("clearing deferred releases cancels stale activation timers before id reuse", () => {
+  type Queued = { readonly id: number; readonly due: number; readonly fn: () => void };
+  const queue: Queued[] = [];
+  let nextHandle = 1;
+  let now = 0;
+  const deferred = createDeferredReleases({
+    setTimeout(handler, ms) {
+      const id = nextHandle++;
+      queue.push({ id, due: now + Number(ms), fn: handler });
+      return id;
+    },
+    clearTimeout(handle) {
+      const index = queue.findIndex(entry => entry.id === handle);
+      if (index >= 0) queue.splice(index, 1);
+    },
+  });
+
+  const actions: NoteAction[] = [];
+  const input = createNoteInput({
+    onChange() {},
+    onAction(action) {
+      actions.push(action);
+    },
+  });
+  input.setEnabled(true);
+
+  function activate(midi: number): { readonly id: string; readonly stale: () => void } {
+    const gesture = interpretActivationClick(0, midi);
+    assert.ok(gesture);
+    const press = gesture.events[0];
+    assert.equal(press?.type, "press");
+    assert.equal(gesture.releaseAfterMs, ACTIVATION_RELEASE_MS);
+    input.handle(gesture);
+    deferred.after(press.id, gesture.releaseAfterMs!, () => {
+      input.apply({ type: "release", id: press.id });
+    });
+    const scheduled = queue.at(-1);
+    assert.ok(scheduled);
+    return { id: press.id, stale: scheduled.fn };
+  }
+
+  const first = activate(60);
+  assert.equal(input.view.activeMidi, 60);
+  assert.equal(first.id, "activation:60");
+  assert.equal(queue.length, 1);
+
+  deferred.clear();
+  input.clear();
+  assert.equal(queue.length, 0);
+  assert.equal(input.view.activeMidi, null);
+  actions.length = 0;
+
+  activate(60);
+  assert.equal(input.view.activeMidi, 60);
+  assert.equal(queue.length, 1);
+  actions.length = 0;
+
+  // A cancelled first-generation callback must not release the reused activation id.
+  first.stale();
+  assert.equal(actions.length, 0);
+  assert.equal(input.view.activeMidi, 60);
+
+  now += ACTIVATION_RELEASE_MS;
+  const due = queue.splice(0);
+  assert.equal(due.length, 1);
+  due[0]!.fn();
+  assert.deepEqual(actions.at(-1), { type: "release", nextMidi: null });
+  assert.equal(input.view.activeMidi, null);
 });

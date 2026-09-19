@@ -4,6 +4,7 @@
   import { controlView, cutoffFromInput, cutoffPosition, volumeFromInput, type ControlState } from "../../core/controls";
   import {
     EDITABLE_SELECTOR,
+    createDeferredReleases,
     createNoteInput,
     createPointerSessions,
     interpretActivationClick,
@@ -55,6 +56,8 @@
     releaseCapture: releasePointerCapture,
   });
 
+  const deferredReleases = createDeferredReleases();
+
   const audioBridge = {
     press(_midi: number): void {},
     release(_nextMidi: number | null): void {},
@@ -75,7 +78,9 @@
     if (gesture?.releaseAfterMs !== undefined) {
       const release = gesture.events[0];
       if (release?.type === "press") {
-        window.setTimeout(() => notes.apply({ type: "release", id: release.id }), gesture.releaseAfterMs);
+        deferredReleases.after(release.id, gesture.releaseAfterMs, () => {
+          notes.apply({ type: "release", id: release.id });
+        });
       }
     }
   }
@@ -87,6 +92,7 @@
         notes.setEnabled(state.phase === "running");
       },
       clearNotes() {
+        deferredReleases.clear();
         pointers.clear();
         notes.clear();
       },
@@ -164,7 +170,10 @@
     return () => observer.disconnect();
   });
 
-  onDestroy(() => audio.powerOff());
+  onDestroy(() => {
+    deferredReleases.clear();
+    audio.powerOff();
+  });
 </script>
 
 <svelte:window

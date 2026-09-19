@@ -120,6 +120,40 @@ export function createPointerSessions<TTarget>(hooks: {
   };
 }
 
+export type DeferredReleaseClock = {
+  setTimeout(handler: () => void, ms: number): unknown;
+  clearTimeout(handle: unknown): void;
+};
+
+/** Schedules id-keyed delayed releases; clear cancels pending work before ids are reused. */
+export function createDeferredReleases(clock: DeferredReleaseClock = globalThis) {
+  const pending = new Map<string, { handle: unknown; cancelled: boolean }>();
+
+  return {
+    after(id: string, ms: number, release: () => void): void {
+      const existing = pending.get(id);
+      if (existing) {
+        existing.cancelled = true;
+        clock.clearTimeout(existing.handle);
+      }
+      const entry = { handle: undefined as unknown, cancelled: false };
+      entry.handle = clock.setTimeout(() => {
+        pending.delete(id);
+        if (entry.cancelled) return;
+        release();
+      }, ms);
+      pending.set(id, entry);
+    },
+    clear(): void {
+      for (const entry of pending.values()) {
+        entry.cancelled = true;
+        clock.clearTimeout(entry.handle);
+      }
+      pending.clear();
+    },
+  };
+}
+
 export interface NoteInput {
   readonly state: KeyboardState;
   readonly view: ReturnType<typeof keyboardView>;

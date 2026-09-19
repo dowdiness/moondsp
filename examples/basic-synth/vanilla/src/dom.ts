@@ -2,6 +2,7 @@ import type { AudioActions, AudioView } from "../../core/audio";
 import { controlView, cutoffFromInput, cutoffPosition, volumeFromInput, type ControlState } from "../../core/controls";
 import {
   EDITABLE_SELECTOR,
+  createDeferredReleases,
   createNoteInput,
   createPointerSessions,
   interpretActivationClick,
@@ -156,6 +157,11 @@ export function createDomConnection(elements: PageElements, defaults: Settings, 
     releaseCapture: releasePointerCapture,
   });
 
+  const deferredReleases = createDeferredReleases({
+    setTimeout: (handler, ms) => e.window.setTimeout(handler, ms),
+    clearTimeout: handle => e.window.clearTimeout(handle as number),
+  });
+
   const notes = createNoteInput({
     onChange() {
       renderKeyboard();
@@ -204,7 +210,9 @@ export function createDomConnection(elements: PageElements, defaults: Settings, 
     if (gesture?.releaseAfterMs !== undefined) {
       const release = gesture.events[0];
       if (release?.type === "press") {
-        e.window.setTimeout(() => notes.apply({ type: "release", id: release.id }), gesture.releaseAfterMs);
+        deferredReleases.after(release.id, gesture.releaseAfterMs, () => {
+          notes.apply({ type: "release", id: release.id });
+        });
       }
     }
   }
@@ -243,6 +251,7 @@ export function createDomConnection(elements: PageElements, defaults: Settings, 
         notes.setEnabled(state.phase === "running");
       },
       clearNotes() {
+        deferredReleases.clear();
         pointers.clear();
         notes.clear();
       },
