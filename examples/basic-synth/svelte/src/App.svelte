@@ -121,7 +121,7 @@
       ctrlKey: event.ctrlKey,
       metaKey: event.metaKey,
       targetIsEditable: event.target instanceof HTMLElement && !!event.target.closest(EDITABLE_SELECTOR),
-      enabled: notes.state.enabled,
+      enabled: keyboard.enabled,
     }), event);
   }
 
@@ -134,7 +134,7 @@
   }
 
   function handlePointerDown(event: PointerEvent, midi: number): void {
-    if (event.button !== 0 || !notes.state.enabled) return;
+    if (event.button !== 0 || !keyboard.enabled) return;
     event.preventDefault();
     const button = event.currentTarget as HTMLButtonElement;
     const { replaceId, pressId } = pointers.begin(event.pointerId, button);
