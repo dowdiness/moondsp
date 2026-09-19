@@ -162,4 +162,11 @@ test "bench/entries/prepared_playback" (b : @bench.T) {
     scheduler.render_block(pool, left, right)
     b.keep(left)
   })
+  let send_left = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)
+  let send_right = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)
+  b.bench(name="prepared_two_materials_render_with_send", fn() {
+    scheduler.render_block_with_send(pool, left, right, send_left, send_right)
+    b.keep(left)
+    b.keep(send_left)
+  })
 }

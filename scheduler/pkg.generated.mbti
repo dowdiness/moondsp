@@ -75,7 +75,8 @@ pub fn PatternScheduler::queue_playback_snapshot(Self, PlaybackSnapshot) -> Unit
 pub fn PatternScheduler::queue_song_snapshot(Self, @song.SongSnapshot[@pattern.ControlMap]) -> Unit
 pub fn PatternScheduler::queue_song_snapshot_effect_result(Self, @song.SongSnapshot[@pattern.ControlMap], SongVoiceScope, ActiveVoiceEffect, @voice.BoundVoicePool) -> Result[ActiveVoiceEffectOutcome, @voice.VoiceControlError]
 pub fn PatternScheduler::queued_snapshot(Self) -> PlaybackSnapshot?
-pub fn PatternScheduler::render_block(Self, @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer, send? : (@dsp.AudioBuffer, @dsp.AudioBuffer)) -> Unit
+pub fn PatternScheduler::render_block(Self, @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
+pub fn PatternScheduler::render_block_with_send(Self, @voice.BoundVoicePool, @dsp.AudioBuffer, @dsp.AudioBuffer, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::reset_transport(Self) -> Unit
 pub fn PatternScheduler::reset_transport_and_kill_notes(Self, @voice.BoundVoicePool) -> Unit
 pub fn PatternScheduler::sample_at(Self, @pattern.Rational) -> Result[Int64, @transport.TransportError]

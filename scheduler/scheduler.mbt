@@ -448,23 +448,53 @@ pub fn PatternScheduler::process_block(
 }
 
 ///|
-/// Render one stereo block from the current playback snapshot.
+/// Render one dry stereo block from the current playback snapshot.
 /// A queued replacement is accepted at block start before note expiry and
-/// event query. An optional stereo send is written before master gain.
+/// event query. Each successful call advances the transport by one block.
+/// Buffers must have at least the configured block size and non-overlapping
+/// storage; no caller-side clearing is required. If the next transport frame
+/// is unrepresentable, both outputs are silenced, the queued snapshot stays
+/// staged, and `last_transport_error()` is set.
 pub fn PatternScheduler::render_block(
   self : PatternScheduler,
   pool : @moondsp.BoundVoicePool,
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
-  send? : (@moondsp.AudioBuffer, @moondsp.AudioBuffer),
 ) -> Unit {
-  let (send_left, send_right, write_send) = match send {
-    Some((send_left, send_right)) => {
-      send_left.fill(0.0)
-      send_right.fill(0.0)
-      (send_left, send_right, true)
-    }
-    None => (left, right, false)
+  self.render_snapshot_outputs(pool, left, right, left, right, false)
+}
+
+///|
+/// Render one snapshot block into dry stereo and a post-pan, pre-master-gain
+/// stereo send. Output buffers must have at least the configured block size
+/// and non-overlapping storage. No caller-side clearing is required.
+/// If the next transport frame is unrepresentable, all outputs are silenced,
+/// the queued snapshot stays staged, and `last_transport_error()` is set.
+pub fn PatternScheduler::render_block_with_send(
+  self : PatternScheduler,
+  pool : @moondsp.BoundVoicePool,
+  left : @moondsp.AudioBuffer,
+  right : @moondsp.AudioBuffer,
+  send_left : @moondsp.AudioBuffer,
+  send_right : @moondsp.AudioBuffer,
+) -> Unit {
+  self.render_snapshot_outputs(pool, left, right, send_left, send_right, true)
+}
+
+///|
+fn PatternScheduler::render_snapshot_outputs(
+  self : PatternScheduler,
+  pool : @moondsp.BoundVoicePool,
+  left : @moondsp.AudioBuffer,
+  right : @moondsp.AudioBuffer,
+  send_left : @moondsp.AudioBuffer,
+  send_right : @moondsp.AudioBuffer,
+  write_send : Bool,
+) -> Unit {
+  // Clear sends before frame validation so early failure cannot leak old audio.
+  if write_send {
+    send_left.fill(0.0)
+    send_right.fill(0.0)
   }
   let frame = match self.render_frame(pool, left, right) {
     Some(frame) => frame

@@ -39,16 +39,29 @@ sample-accurate audio voice triggers across block boundaries:
 
 | Category | Types | Key operations |
 |---|---|---|
-| **Scheduler Engine** | `PatternScheduler` | `PatternScheduler::new`, `PatternScheduler::process_block`, `PatternScheduler::process_song_block`, `PatternScheduler::render_block` |
+| **Scheduler Engine** | `PatternScheduler` | `PatternScheduler::new`, `PatternScheduler::process_block`, `PatternScheduler::process_song_block`, `PatternScheduler::render_block`, `PatternScheduler::render_block_with_send` |
 | **Playback & Snapshots** | `PatternScheduler`, `PlaybackSnapshot` | `PatternScheduler::queue_playback_snapshot`, `PatternScheduler::queue_pattern_snapshot`, `PatternScheduler::queue_song_snapshot`, `PlaybackSnapshot::pattern`, `PlaybackSnapshot::song`, `PlaybackSnapshot::query` |
 | **Snapshot Observation** | `PatternScheduler`, `PlaybackSnapshot` | `PatternScheduler::accepted_snapshot`, `PatternScheduler::queued_snapshot`, `PatternScheduler::pending_material_change_count`, `PatternScheduler::skipped_material_change_count` |
 | **Timing & Transport** | `PatternScheduler`, `BlockFrame`, `PerformanceTime` | `PatternScheduler::set_bpm`, `PatternScheduler::bpm`, `PatternScheduler::current_block`, `PatternScheduler::sample_at`, `PatternScheduler::sample_counter`, `PatternScheduler::reset_transport` |
 | **Voice Scopes & Reconciliation** | `PatternVoiceScope`, `SongVoiceScope`, `ActiveVoiceEffect` | `PatternVoiceScope::node`, `SongVoiceScope::section`, `SongVoiceScope::occurrence`, `PatternScheduler::apply_pattern_voice_effect_result`, `PatternScheduler::apply_song_voice_effect_result` |
 | **Controls & Notes** | `ControlMapper`, `VoiceControlBatch` | `default_control_mapper`, `ControlMapper::new`, `PatternScheduler::push_active_note`, `PatternScheduler::expire_notes`, `PatternScheduler::active_note_count` |
 
-`render_block(pool, left, right)` renders the current snapshot and accepts any
-queued replacement at block start. Pass `send=(send_left, send_right)` to also
-write the post-pan stereo effect send. Omitting `send` renders dry audio only.
+`render_block(pool, left, right)` renders dry stereo from the current snapshot.
+`render_block_with_send(pool, left, right, send_left, send_right)` also writes
+the post-pan, pre-master-gain stereo effect send. Both accept any queued
+replacement at block start through the same implementation and advance one
+block on success. Switching between them does not change dry playback.
+
+The caller owns the buffers. Each must hold at least the configured block size,
+and their backing storage must not overlap. Neither entry requires pre-cleared
+buffers. If the next transport frame cannot be represented, all supplied
+outputs are silenced, the queued snapshot remains staged, and
+`last_transport_error()` reports the failure.
+
+Migrate `process_snapshot_block`, `process_song_snapshot_block`, and
+`process_playback_snapshot_block` calls to `render_block`.
+Migrate `process_playback_snapshot_block_with_send` calls to
+`render_block_with_send`, keeping the separate buffer arguments.
 
 ## Transport
 

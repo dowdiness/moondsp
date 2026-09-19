@@ -980,10 +980,16 @@ Current semantics:
 - Phase 6 incremental authoring adds a snapshot-swap layer over the same
   block-processing loop. `queue_pattern_snapshot` / `queue_song_snapshot`
   stage a lowered `PlaybackSnapshot` without changing playback immediately;
-  `render_block` accepts the latest queued snapshot at block start, then
-  renders dry stereo and optionally a post-pan stereo send. Each changed
-  material finishes its current source cycle before replacement; sounding
-  voices retain deadlines. See [scheduler guide](../scheduler/README.mbt.md)
+  `render_block` and `render_block_with_send` accept the latest queued snapshot
+  at block start through one shared implementation. The former writes dry
+  stereo; the latter also writes a post-pan, pre-master-gain stereo send using
+  separate buffer arguments. Both advance the same transport once per successful
+  block. Output buffers are overwritten without caller-side clearing and must
+  have at least the configured block size and non-overlapping storage. If the
+  next transport frame is unrepresentable, outputs are silenced and the queued
+  snapshot remains staged; `last_transport_error()` reports the failure.
+  Each changed material finishes its current source cycle before replacement;
+  sounding voices retain deadlines. See [scheduler guide](../scheduler/README.mbt.md)
   for entry and identity rules. Multiple staged snapshots coalesce so the
   latest staged state wins.
 - Reconciliation consumes already-lowered snapshots and classifies every

@@ -1101,26 +1101,58 @@ test "process_block multi-block note expiry" {
 }
 
 ///|
-test "render_block writes room into the optional stereo send" {
+test "Switching send output leaves dry playback and transport unchanged" {
   let (pool, sched, left, right) = make_test_sched()
-  let pat = @pattern.merge_control(
-    @pattern.note(60.0),
-    @pattern.control("room", 0.5),
-  )
-  let doc = @pattern.PatternDoc::from_pattern(
-    id=pid("scheduler:room-send"),
-    pat~,
-  )
-  sched.queue_pattern_snapshot(doc.lower())
-  let send_left = @moondsp.AudioBuffer::filled(128, init=1.0)
-  let send_right = @moondsp.AudioBuffer::filled(128, init=-1.0)
-  for _ in 0..<4 {
-    sched.render_block(pool, left, right, send=(send_left, send_right))
+  let (dry_pool, dry_sched, dry_left, dry_right) = make_test_sched()
+  let snapshot = @pattern.PatternDoc::from_pattern(
+    id=pid("send-toggle"),
+    pat=@pattern.merge_control(
+      @pattern.note(60.0),
+      @pattern.control("room", 0.5),
+    ),
+  ).lower()
+  sched.queue_pattern_snapshot(snapshot)
+  dry_sched.queue_pattern_snapshot(snapshot)
+  let send_left = @moondsp.AudioBuffer::filled(left.length())
+  let send_right = @moondsp.AudioBuffer::filled(right.length())
+  for enabled in [true, false, true] {
+    left.fill(1.0)
+    right.fill(-1.0)
+    if enabled {
+      sched.render_block_with_send(pool, left, right, send_left, send_right)
+    } else {
+      sched.render_block(pool, left, right)
+    }
+    dry_sched.render_block(dry_pool, dry_left, dry_right)
+    assert_true(dry_left.any(sample => sample != 0.0))
+    @debug.assert_eq(sched.sample_counter(), dry_sched.sample_counter())
+    for i in 0..<left.length() {
+      @debug.assert_eq(left.get(i), dry_left.get(i))
+      @debug.assert_eq(right.get(i), dry_right.get(i))
+    }
   }
-  let dry_energy = buffer_abs_sum(left) + buffer_abs_sum(right)
-  let send_energy = buffer_abs_sum(send_left) + buffer_abs_sum(send_right)
-  assert_true(dry_energy > 0.0)
-  assert_true((send_energy - dry_energy * 0.5).abs() < 0.0001)
+}
+
+///|
+test "Room scales each post-pan send channel and overwrites previous audio" {
+  let (pool, sched, left, right) = make_test_sched()
+  let snapshot = @pattern.PatternDoc::from_pattern(
+    id=pid("room-send"),
+    pat=@pattern.merge_control(
+      @pattern.merge_control(@pattern.note(60.0), @pattern.s_pan(-0.4)),
+      @pattern.control("room", 0.5),
+    ),
+  ).lower()
+  sched.queue_pattern_snapshot(snapshot)
+  let send_left = @moondsp.AudioBuffer::filled(left.length(), init=1.0)
+  let send_right = @moondsp.AudioBuffer::filled(right.length(), init=-1.0)
+  sched.render_block_with_send(pool, left, right, send_left, send_right)
+  assert_true(buffer_abs_sum(left) > buffer_abs_sum(right))
+  assert_true(buffer_abs_sum(right) > 0.0)
+  for i in 0..<left.length() {
+    assert_true((send_left.get(i) - left.get(i) * 0.5).abs() < 0.000001)
+    assert_true((send_right.get(i) - right.get(i) * 0.5).abs() < 0.000001)
+  }
 }
 
 ///|
