@@ -3,14 +3,11 @@ package "dowdiness/moondsp/browser/internal/playback_host"
 
 import {
   "dowdiness/moondsp/graph",
+  "moonbitlang/core/debug",
 }
 
 // Values
-pub fn apply_prepared_playback(Int, Bool) -> Int
-
 pub fn clear_playback_input() -> Unit
-
-pub fn discard_prepared_playback(Int) -> Bool
 
 pub fn get_playback_error() -> String
 
@@ -20,17 +17,25 @@ pub fn get_playback_error_length() -> Int
 
 pub fn init_scheduler_graph_with_templates(Double, Int, Array[@graph.DspNode], Array[@graph.DspNode], Array[@graph.DspNode], Array[@graph.DspNode], Array[@graph.DspNode], Array[@graph.DspNode]) -> Bool
 
-pub fn prepare_pattern_input() -> Int
+pub fn player_pause() -> Int
 
-pub fn prepare_song_input() -> Int
+pub fn player_pending_count() -> Int
+
+pub fn player_play() -> Int
+
+pub fn player_restart_input() -> Int
+
+pub fn player_skipped_count() -> Int
+
+pub fn player_state() -> Int
+
+pub fn player_update_input() -> Int
 
 pub fn process_scheduler_block() -> Bool
 
 pub fn push_playback_char(Int) -> Unit
 
 pub fn reset_scheduler_graph() -> Unit
-
-pub fn restart_playback() -> Int
 
 pub fn scheduler_bpm() -> Double
 
@@ -47,6 +52,40 @@ pub fn set_scheduler_gain(Double) -> Unit
 // Errors
 
 // Types and methods
+pub(all) enum PlayState {
+  Empty
+  Ready
+  Playing
+  Paused
+  Ended
+  Fault
+} derive(Eq, @debug.Debug)
+
+pub struct Player {
+  // private fields
+}
+pub fn Player::pause(Self) -> Result[Unit, PlayerError]
+pub fn Player::play(Self) -> Result[Unit, PlayerError]
+pub fn Player::restart(Self, String) -> Result[Unit, PlayerError]
+pub fn Player::update(Self, String) -> Result[Unit, PlayerError]
+pub fn Player::view(Self) -> PlayerView
+
+pub(all) enum PlayerError {
+  InvalidSource(String)
+  RestartRequired
+  NoSong
+  TransportRange
+  Failed(String)
+} derive(Eq, @debug.Debug)
+
+pub struct PlayerView {
+  state : PlayState
+  source : String?
+  bpm : Double
+  sample_position : Double
+  pending_materials : Int
+  skipped_materials : Int
+}
 
 // Type aliases
 

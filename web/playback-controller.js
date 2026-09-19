@@ -1,30 +1,14 @@
-// Audio-owner adapter. Snapshots stay in WASM; only text, tokens and receipts
-// cross boundaries. Both browser worklets use the same playback protocol.
-const APPLY_RESTART_REQUIRED = 2;
+// Audio-owner adapter for the unified source/player ABI. All replies are
+// immediate owner receipts; render is only used to refresh diagnostics.
+const RESTART_REQUIRED = 2;
+// Mirror Mini's admission bound at transport ingress, before per-character FFI.
+// MoonBit still enforces the same limit for callers that bypass this adapter.
+const MAX_SOURCE_CODE_UNITS = 8192;
 
 export class PlaybackController {
   constructor(wasm, post) {
     this.wasm = wasm;
     this.post = post;
-    this.pending = null;
-    this.active = null;
-    this.tempoRevision = null;
-  }
-
-  // Numeric range alone cannot prove transport representability. Report the
-  // runtime's result instead of letting its primitive setter fail silently.
-  setTempo({ bpm, revision }) {
-    if (typeof bpm !== "number" || !Number.isFinite(bpm) ||
-        !Number.isSafeInteger(revision) || revision <= 0) {
-      this.post({ type: "playback-error", phase: "protocol", revision, recovery: "edit", message: "invalid tempo request" });
-      return;
-    }
-    const status = this.wasm.set_scheduler_bpm(bpm);
-    this.tempoRevision = revision;
-    const tempo = this.wasm.scheduler_bpm();
-    this.post(status === 0
-      ? { type: "tempo-updated", revision, tempo }
-      : { type: "tempo-error", revision, tempo, message: this.errorMessage() });
   }
 
   errorMessage() {
@@ -35,56 +19,63 @@ export class PlaybackController {
     return codes.map(code => String.fromCharCode(code)).join("") || "playback request failed";
   }
 
-  handle(data) {
-    if (data.type === "restart-playback") {
-      if (this.wasm.restart_playback() !== 0) {
-        this.post({ type: "playback-error", phase: "restart", revision: data.revision, recovery: "edit", message: this.errorMessage() });
-      } else {
-        this.replacePending({ type: "playback-restarted", revision: data.revision,
-          operation: "restart", score: this.active });
-      }
-      return;
-    }
-    if (data.type !== "apply-score") return;
-    const { mode, policy, revision, text } = data;
-    if ((mode !== "pattern" && mode !== "song") ||
-        (policy !== "continue" && policy !== "restart") || typeof text !== "string") {
-      this.post({ type: "playback-error", phase: "protocol", revision, recovery: "edit", message: "invalid playback request" });
+  snapshot() {
+    return {
+      state: this.wasm.player_state(),
+      samplePosition: this.wasm.scheduler_sample_position(),
+      tempo: this.wasm.scheduler_bpm(),
+      pendingCount: this.wasm.player_pending_count(),
+      skippedCount: this.wasm.player_skipped_count(),
+    };
+  }
+
+  receipt(id, operation, status, message) {
+    const snapshot = this.snapshot();
+    this.post({ type: "player-receipt", id, operation, accepted: status === 0,
+      restartRequired: status === RESTART_REQUIRED, message, ...snapshot });
+  }
+
+  update(data, restart) {
+    if (typeof data.text !== "string" || data.text.length > MAX_SOURCE_CODE_UNITS) {
+      this.receipt(data.id, restart ? "restart" : "update", 1,
+        typeof data.text !== "string" ? "invalid source payload" : "playback source exceeds 8192 characters");
       return;
     }
     this.wasm.clear_playback_input();
-    for (let i = 0; i < text.length; i++) this.wasm.push_playback_char(text.charCodeAt(i));
-    const token = this.wasm[`prepare_${mode}_input`]();
-    const status = token === 0 ? 1 : this.wasm.apply_prepared_playback(token, policy === "restart");
-    if (status !== 0) {
-      const message = this.errorMessage();
-      if (token !== 0) this.wasm.discard_prepared_playback(token);
-      this.post({ type: `${mode}-error`, phase: token === 0 ? "prepare" : "apply", revision, message,
-        recovery: status === APPLY_RESTART_REQUIRED ? "restart" : "edit" });
+    for (let i = 0; i < data.text.length; i++) this.wasm.push_playback_char(data.text.charCodeAt(i));
+    const status = this.wasm[restart ? "player_restart_input" : "player_update_input"]();
+    this.receipt(data.id, restart ? "restart" : "update", status, status === 0 ? "" : this.errorMessage());
+  }
+
+  handle(data) {
+    if (!data || typeof data !== "object") return;
+    if ((data.type === "player-update" || data.type === "player-restart" ||
+         data.type === "player-play" || data.type === "player-pause") &&
+        (!Number.isSafeInteger(data.id) || data.id <= 0)) {
+      this.post({ type: "error", message: "invalid Player request id" });
       return;
     }
-    this.replacePending({ type: `${mode}-updated`, revision,
-      operation: policy === "continue" ? "update" : "restart", score: { mode, revision } });
-  }
-
-  replacePending(next) {
-    if (this.pending) {
-      this.post({ type: "playback-superseded", revision: this.pending.revision });
+    switch (data.type) {
+      case "player-update": this.update(data, false); break;
+      case "player-restart": this.update(data, true); break;
+      case "player-play": {
+        const status = this.wasm.player_play();
+        this.receipt(data.id, "play", status, status === 0 ? "" : this.errorMessage());
+        break;
+      }
+      case "player-pause": {
+        const status = this.wasm.player_pause();
+        this.receipt(data.id, "pause", status, status === 0 ? "" : this.errorMessage());
+        break;
+      }
+      case "set-scheduler-bpm": {
+        const status = this.wasm.set_scheduler_bpm(data.bpm);
+        this.post(status === 0
+          ? { type: "tempo-updated", revision: data.revision, tempo: this.wasm.scheduler_bpm() }
+          : { type: "tempo-error", revision: data.revision, tempo: this.wasm.scheduler_bpm(), message: this.errorMessage() });
+        break;
+      }
     }
-    this.pending = next;
   }
 
-  // A receipt acknowledges the request committed by the render at the
-  // acceptance boundary. Read tempo after rendering so deferred song BPM
-  // changes are reflected by the authoritative scheduler.
-  didRender(blockSize) {
-    if (!this.pending) return;
-    const { score, ...reply } = this.pending;
-    this.active = score;
-    this.pending = null;
-    const samplePosition = this.wasm.scheduler_sample_position();
-    const tempo = this.wasm.scheduler_bpm();
-    this.post({ ...reply, mode: score?.mode, scoreRevision: score?.revision,
-      tempo, tempoRevision: this.tempoRevision, samplePosition, acceptedAtSample: samplePosition - blockSize });
-  }
 }

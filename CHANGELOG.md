@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added exact `Tempo::span_for_samples` conversion through the scheduler clock;
+  browser repeat admission no longer reconstructs tempo arithmetic.
 - Added the opt-in `@moondsp/browser/audio` entry point with `AudioPower`,
   `PoweredAudio`, and typed setup/end results. MoonBit owns gesture-time
   admission, cancellation, retained cleanup, processor failure observation,
@@ -77,6 +79,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Bounded live Player source admission by text size, syntax depth, Euclidean
+  steps, arrangement occurrences, and conservative event/work expansion.
+  Admission covers future callback branches and full-cycle sequence queries;
+  over-budget edits preserve the accepted song and transport. The shipped
+  musical examples remain supported; these limits are not a real-time guarantee.
+- Made live audio initialization cancellable, with one five-second deadline
+  across resume, WASM loading, compilation, module loading, and readiness.
+  Startup Pause and close abort pending work and await partial-resource cleanup;
+  late native completions cannot activate an obsolete graph or replace a newer run.
 - Migrated both basic-synth adapters to `AudioPower`; their shared core retains
   only UI state, graph commands, settings, and stale-note protection. Package
   lifecycle assertions now live in direct public-API browser tests.
@@ -162,6 +173,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.hpf(hz, resonance?)` / `s_hpf` for high-pass control.
 
 ### Fixed
+
+- Reject unterminated Mini block comments without publishing a valid prefix, and
+  share comment scanning between parsing and playback admission so `/* // */`
+  cannot hide excessive nesting. Bounded recursive descent now checks depth
+  before descending as well.
+- Route the legacy demo BPM slider through the current Player controller and
+  reflect accepted tempo in both its label and range input, including fractional
+  source tempos.
+- Reject source or accumulated retained material state above 256 entries per
+  browser route. All route clocks, deadlines, and reconciled states are checked
+  before installation; rejection preserves playback and Restart can recover
+  retained capacity. Source counts include future song occurrences.
+- Document the removed scheduler validators/snapshot queries and browser
+  prepare/apply tokens with explicit migration paths. Add generated admission
+  consistency coverage and opt-in actual-AudioWorklet measurements; measured
+  owner updates can still exceed one audio quantum.
+
+- Player now rejects repeated arrangements shorter than one audio block at the
+  accepted tempo, including source and demo tempo edits, instead of allowing
+  unbounded repetition splitting during rendering. Finite song endpoints are
+  checked before source publication or transport/voice reset.
+- Canceling initial Player startup no longer sends Pause to an Empty song or
+  displays a false error. Closing waits for pending initialization and session
+  cleanup, and reopening waits for that retirement to complete.
 
 - The live syntax reference is embedded from `docs/mini-notation.md` at build time,
   with automatic reloads during development and stacked syntax/description pairs

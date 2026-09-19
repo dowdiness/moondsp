@@ -21,6 +21,8 @@ const parserWithMetadata = parser.configure({
       MethodName: t.propertyName,
       String: t.string,
       Number: t.number,
+      LineComment: t.lineComment,
+      BlockComment: t.blockComment,
       "( )": t.paren,
       ".": t.derefOperator,
       ",": t.separator,
@@ -32,7 +34,7 @@ const parserWithMetadata = parser.configure({
 export const miniliveLanguage = LRLanguage.define({
   parser: parserWithMetadata,
   languageData: {
-    commentTokens: {},
+    commentTokens: { line: "//", block: { open: "/*", close: "*/" } },
     closeBrackets: { brackets: ["(", "[", '"'] },
     autocomplete: miniliveCompletion,
   },

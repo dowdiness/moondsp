@@ -44,6 +44,11 @@ test("MiniLive parses signed numbers without weakening malformed-sign errors", (
   }
 });
 
+test("MiniLive accepts source declarations, comments, and repeated arrangements", () => {
+  const source = '// tempo belongs to source\nbpm(72); let pad = note("E4");\n/* section */ song(section("a",1/100,pad),part("first","a")).repeat()';
+  expect(parseFacts(source)).toMatchObject({ numbers: ["72", "1", "100"], errors: 0 });
+});
+
 test("MiniLive keeps number highlighting while the sign is edited", async ({ page }) => {
   const source = 'note("E4").pan(-0.45) + note("G4").pan(0.45)';
   await page.goto("/");

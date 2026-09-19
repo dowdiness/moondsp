@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 
-// The fixture only boots real WASM and exposes the public playback protocol.
-// Each test owns its requests, render boundary and expected receipts.
+// The fixture boots real WASM and exercises the public owner protocol.
+// Receipts are immediate; rendering only advances the underlying transport.
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
   await page.evaluate(async () => {
@@ -15,118 +15,129 @@ test.beforeEach(async ({ page }) => {
     if (!wasm.init_scheduler_graph(48000, 128)) throw new Error('init failed');
     const replies = [];
     const controller = new PlaybackController(wasm, reply => replies.push(reply));
+    function send(data) { controller.handle(data); }
     window.playback = {
-      apply(revision, policy, text = 'note("60")', mode = 'pattern') {
-        controller.handle({ type: 'apply-score', mode, revision, policy, text });
-      },
-      restart(revision) { controller.handle({ type: 'restart-playback', revision }); },
-      render() {
-        if (!wasm.process_scheduler_block()) throw new Error('render failed');
-        controller.didRender(128);
+      update(id, text) { send({ type: 'player-update', id, text }); },
+      restart(id, text) { send({ type: 'player-restart', id, text }); },
+      play(id = 1) { send({ type: 'player-play', id }); },
+      pause(id = 1) { send({ type: 'player-pause', id }); },
+      render(blocks = 1) {
+        for (let i = 0; i < blocks; i++) {
+          if (!wasm.process_scheduler_block()) throw new Error('render failed');
+        }
       },
       receipts() { return replies.splice(0); },
-      setBpm(bpm) {
-        if (wasm.set_scheduler_bpm(bpm) !== 0) throw new Error('tempo fixture rejected');
+      snapshot() {
+        return { state: wasm.player_state(), samplePosition: wasm.scheduler_sample_position(), tempo: wasm.scheduler_bpm() };
       },
-      setTempo(revision, bpm) { controller.setTempo({ revision, bpm }); },
+      setTempo(revision, bpm) { controller.handle({ type: 'set-scheduler-bpm', revision, bpm }); },
     };
   });
 });
 
-test('initial application is acknowledged only after rendering, despite a rejected restart', async ({ page }) => {
-  const { before, after } = await page.evaluate(() => {
+test('paused update is accepted immediately and commits source tempo without advancing', async ({ page }) => {
+  const result = await page.evaluate(() => {
     const p = window.playback;
-    p.apply(1, 'restart');
-    p.restart(2);
-    const before = p.receipts();
-    p.render();
-    return { before, after: p.receipts() };
+    p.update(1, 'note("60").slow(8)'); p.play(2); p.render(8); p.pause(3);
+    p.receipts();
+    p.update(4, 'bpm(90); note("72").slow(8)');
+    const update = p.receipts()[0];
+    const beforeRender = p.snapshot();
+    p.render(10);
+    return { update, beforeRender, afterRender: p.snapshot() };
   });
-  expect(before).toEqual([expect.objectContaining({ type: 'playback-error', phase: 'restart', revision: 2 })]);
-  expect(after).toEqual([expect.objectContaining({ type: 'pattern-updated', revision: 1, scoreRevision: 1, acceptedAtSample: 0, samplePosition: 128 })]);
+  expect(result.update).toEqual(expect.objectContaining({
+    type: 'player-receipt', id: 4, operation: 'update', accepted: true,
+    state: 3, samplePosition: 1024, tempo: 90,
+  }));
+  expect(result.afterRender).toEqual(result.beforeRender);
 });
 
-test('failed preparation preserves the accepted update and its receipt', async ({ page }) => {
-  const { before, after } = await page.evaluate(() => {
+test('invalid restart preserves the current song and transport position', async ({ page }) => {
+  const result = await page.evaluate(() => {
     const p = window.playback;
-    p.apply(1, 'restart'); p.render(); p.receipts();
-    p.apply(2, 'continue', 'note("64")');
-    p.apply(3, 'continue', 'note(');
-    const before = p.receipts();
+    p.update(1, 'note("60").slow(8)'); p.play(); p.render(8); p.receipts();
+    p.restart(2, 'note(');
+    const rejected = p.receipts()[0];
+    const after = p.snapshot();
     p.render();
-    return { before, after: p.receipts() };
+    return { rejected, after, advanced: p.snapshot() };
   });
-  expect(before).toEqual([expect.objectContaining({ type: 'pattern-error', phase: 'prepare', revision: 3 })]);
-  expect(after).toEqual([expect.objectContaining({ type: 'pattern-updated', revision: 2, scoreRevision: 2, acceptedAtSample: 128, samplePosition: 256 })]);
+  expect(result.rejected).toEqual(expect.objectContaining({
+    type: 'player-receipt', id: 2, operation: 'restart', accepted: false,
+    restartRequired: false, state: 2, samplePosition: 1024,
+  }));
+  expect(result.after).toEqual(expect.objectContaining({ state: 2, samplePosition: 1024 }));
+  expect(result.advanced.samplePosition).toBe(1152);
 });
 
-test('unrepresentable tempo is rejected without superseding the accepted receipt', async ({ page }) => {
-  const { before, after } = await page.evaluate(() => {
+test('ended update keeps tails while Play replays the newest song', async ({ page }) => {
+  const result = await page.evaluate(() => {
     const p = window.playback;
-    const body = 'section("a",1,note("60").fast(10000019).fast(100000003).slow(100000000)),part("r","a"))';
-    const score = 'song(bpm(0.001),' + body;
-    p.apply(1, 'restart', score, 'song'); p.render(); p.receipts();
-    p.apply(2, 'continue', score, 'song');
-    p.apply(3, 'continue', 'song(bpm(1000),' + body, 'song');
-    const before = p.receipts();
+    const finite = 'song(section("a",1/100,note("60").release(1).room(1)),part("a1","a"))';
+    p.update(1, finite); p.play(); p.receipts(); p.render(4);
+    const ended = p.snapshot();
+    p.update(2, 'note("72")');
+    const update = p.receipts()[0];
+    p.play(3);
+    const replay = p.receipts()[0];
     p.render();
-    return { before, after: p.receipts() };
+    return { ended, update, replay, after: p.snapshot() };
   });
-  expect(before).toEqual([expect.objectContaining({
-    type: 'song-error', phase: 'apply', revision: 3,
-  })]);
-  expect(after).toEqual([expect.objectContaining({
-    type: 'song-updated', revision: 2, scoreRevision: 2, tempo: 0.001, acceptedAtSample: 128,
-  })]);
+  expect(result.ended).toEqual(expect.objectContaining({ state: 4, samplePosition: 480 }));
+  expect(result.update).toEqual(expect.objectContaining({
+    id: 2, operation: 'update', accepted: true, state: 4, samplePosition: 480,
+  }));
+  expect(result.replay).toEqual(expect.objectContaining({ id: 3, operation: 'play', accepted: true, state: 2, samplePosition: 0 }));
+  expect(result.after).toEqual(expect.objectContaining({ state: 2, samplePosition: 128 }));
 });
 
-test('song receipt reports explicit tempo and no-bpm song retains global tempo', async ({ page }) => {
-  const { explicit, retained } = await page.evaluate(() => {
+test('Pause freezes transport until Play resumes it', async ({ page }) => {
+  const result = await page.evaluate(() => {
     const p = window.playback;
-    const body = 'section("a",1,note("60")),part("r","a")';
-    p.setBpm(120);
-    p.apply(1, 'restart', 'song(bpm(90),' + body + ')', 'song');
+    p.update(1, 'note("60").slow(8)'); p.play(2); p.render(20); p.pause(3); p.receipts();
+    const paused = p.snapshot();
+    p.render(100);
+    const frozen = p.snapshot();
+    p.play(4);
+    const resumed = p.receipts()[0];
     p.render();
-    const explicit = p.receipts()[0];
-    p.setBpm(120);
-    p.apply(2, 'continue', 'song(' + body + ')', 'song');
-    p.render();
-    const retained = p.receipts()[0];
-    return { explicit, retained };
+    return { paused, frozen, resumed, after: p.snapshot() };
   });
-  expect(explicit).toEqual(expect.objectContaining({ type: 'song-updated', tempo: 90 }));
-  expect(retained).toEqual(expect.objectContaining({ type: 'song-updated', tempo: 120 }));
+  expect(result.frozen).toEqual(result.paused);
+  expect(result.resumed).toEqual(expect.objectContaining({ id: 4, operation: 'play', accepted: true, state: 2 }));
+  expect(result.after.samplePosition).toBe(result.paused.samplePosition + 128);
 });
 
-test('restart supersedes replacements and acknowledges the applied score', async ({ page }) => {
-  const { before, after } = await page.evaluate(() => {
-    const p = window.playback;
-    p.apply(1, 'restart'); p.render(); p.receipts();
-    p.apply(2, 'continue', 'note("67")');
-    p.apply(3, 'continue', 'note("72")');
-    p.restart(4);
-    const before = p.receipts();
-    p.render();
-    return { before, after: p.receipts() };
-  });
-  expect(before).toEqual([
-    { type: 'playback-superseded', revision: 2 },
-    { type: 'playback-superseded', revision: 3 },
-  ]);
-  expect(after).toEqual([expect.objectContaining({ type: 'playback-restarted', revision: 4, scoreRevision: 1, acceptedAtSample: 0, samplePosition: 128 })]);
-});
-
-test('tempo acknowledgement distinguishes accepted rounding from rejection', async ({ page }) => {
-  const { tempo, score } = await page.evaluate(() => {
+test('source tempo replaces the legacy tempo setting, including omission default', async ({ page }) => {
+  const result = await page.evaluate(() => {
     const p = window.playback;
     p.setTempo(1, 72.12345);
-    const tempo = p.receipts();
-    p.apply(2, 'restart');
-    p.render();
-    return { tempo, score: p.receipts() };
+    const tempo = p.receipts()[0];
+    p.update(2, 'note("60")');
+    return { tempo, update: p.receipts()[0] };
   });
-  expect(tempo).toEqual([{ type: 'tempo-updated', revision: 1, tempo: 72.123 }]);
-  expect(score).toEqual([expect.objectContaining({
-    type: 'pattern-updated', tempo: 72.123, tempoRevision: 1,
-  })]);
+  expect(result.tempo).toEqual({ type: 'tempo-updated', revision: 1, tempo: 72.123 });
+  expect(result.update).toEqual(expect.objectContaining({ operation: 'update', accepted: true, tempo: 60 }));
+});
+
+test('source size boundary preserves playback for rejected Update and Restart', async ({ page }) => {
+  const result = await page.evaluate(() => {
+    const p = window.playback;
+    p.restart(1, 'bpm(80); note("60").slow(8)'.padEnd(8192, ' '));
+    const accepted = p.receipts()[0];
+    p.render(8);
+    const tooLarge = 'bpm(96); note("72")'.padEnd(8193, ' ');
+    p.update(2, tooLarge);
+    p.restart(3, tooLarge);
+    const rejected = p.receipts();
+    p.render();
+    return { accepted, rejected, after: p.snapshot() };
+  });
+  expect(result.accepted).toMatchObject({ accepted: true, state: 2, tempo: 80 });
+  expect(result.rejected).toEqual([
+    expect.objectContaining({ id: 2, operation: 'update', accepted: false, state: 2, tempo: 80, samplePosition: 1024 }),
+    expect.objectContaining({ id: 3, operation: 'restart', accepted: false, state: 2, tempo: 80, samplePosition: 1024 }),
+  ]);
+  expect(result.after).toEqual({ state: 2, tempo: 80, samplePosition: 1152 });
 });

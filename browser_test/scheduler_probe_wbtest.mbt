@@ -4,12 +4,7 @@ fn scheduler_probe_eval_pattern_for_test(text : String) -> Int {
   for i in 0..<text.length() {
     push_playback_char(text[i].to_int())
   }
-  let token = prepare_pattern_input()
-  if token == 0 {
-    1
-  } else {
-    apply_prepared_playback(token, true)
-  }
+  player_restart_input()
 }
 
 ///|

@@ -2,8 +2,6 @@
 package "dowdiness/moondsp/browser_test"
 
 // Values
-pub fn apply_prepared_playback(Int, Bool) -> Int
-
 pub fn clear_playback_input() -> Unit
 
 pub fn compiled_output_sample(Int) -> Double
@@ -46,7 +44,7 @@ pub fn init_scheduler_sine_graph(Double, Int) -> Bool
 
 pub fn mul_adsr_peak(Double, Int) -> Double
 
-pub fn prepare_pattern_input() -> Int
+pub fn player_restart_input() -> Int
 
 pub fn process_compiled_block(Double, Double, Double, Int) -> Bool
 

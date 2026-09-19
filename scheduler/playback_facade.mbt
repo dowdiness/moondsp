@@ -9,6 +9,7 @@
 pub enum PlaybackSnapshot {
   Pattern(@pattern.PatternSnapshot[@pattern.ControlMap])
   Song(@song.SongSnapshot[@pattern.ControlMap])
+  RepeatSong(@song.SongSnapshot[@pattern.ControlMap])
 }
 
 ///|
@@ -26,10 +27,30 @@ pub fn PlaybackSnapshot::song(
 }
 
 ///|
+/// Repeat an arranged song without resetting the transport or releasing voices.
+pub fn PlaybackSnapshot::repeat_song(
+  snapshot : @song.SongSnapshot[@pattern.ControlMap],
+) -> PlaybackSnapshot {
+  RepeatSong(snapshot)
+}
+
+///|
 fn PlaybackSnapshot::raw(self : PlaybackSnapshot) -> @playback.PlaybackSnapshot {
   match self {
     Pattern(snapshot) => @playback.PlaybackSnapshot::pattern(snapshot)
     Song(snapshot) => @playback.PlaybackSnapshot::song(snapshot)
+    RepeatSong(snapshot) => @playback.PlaybackSnapshot::repeat_song(snapshot)
+  }
+}
+
+///|
+fn PlaybackSnapshot::from_raw(
+  snapshot : @playback.PlaybackSnapshot,
+) -> PlaybackSnapshot {
+  match snapshot {
+    @playback.PlaybackSnapshot::Pattern(pattern) => Pattern(pattern)
+    @playback.PlaybackSnapshot::Song(song) => Song(song)
+    @playback.PlaybackSnapshot::RepeatSong(song) => RepeatSong(song)
   }
 }
 
@@ -45,6 +66,12 @@ pub fn PlaybackSnapshot::song_layout_revision(
   self : PlaybackSnapshot,
 ) -> @identity.Revision? {
   self.raw().song_layout_revision()
+}
+
+///|
+/// Number of source entries, including occurrences outside the current cycle.
+pub fn PlaybackSnapshot::material_count(self : PlaybackSnapshot) -> Int {
+  self.raw().material_count()
 }
 
 ///|

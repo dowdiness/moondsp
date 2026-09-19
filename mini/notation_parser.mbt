@@ -43,6 +43,7 @@ priv struct NotationParser {
   sound : Bool // true = drum names, false = note numbers
   chord : Bool // true = chord names (stacked notes per name)
   source_offset : Int
+  mut query_work : MiniQueryWork?
 }
 
 ///|
@@ -52,8 +53,20 @@ fn NotationParser::NotationParser(
   sound~ : Bool,
   chord? : Bool = false,
   source_offset? : Int = 0,
+  assess? : Bool = false,
 ) -> NotationParser {
-  { input, pos: 0, sound, chord, source_offset, }
+  {
+    input,
+    pos: 0,
+    sound,
+    chord,
+    source_offset,
+    query_work: if assess {
+      Some(Atom)
+    } else {
+      None
+    },
+  }
 }
 
 ///|
@@ -75,10 +88,27 @@ fn NotationParser::parse_notation(
 ) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
   let first = self.parse_layer()
   let layers : Array[@pattern.Pat[@pattern.ControlMap]] = [first]
+  let costs : Array[MiniQueryWork]? = self.query_work.map(_ => [])
+  if self.query_work is Some(cost) {
+    costs.unwrap().push(cost)
+  }
   while !self.at_end() && self.input[self.pos] == ',' {
     self.pos += 1 // consume ','
     self.skip_spaces()
     layers.push(self.parse_layer())
+    if self.query_work is Some(cost) {
+      costs.unwrap().push(cost)
+    }
+  }
+  if costs is Some(costs) {
+    self.query_work = Some(
+      if costs.length() == 1 {
+        costs[0]
+      } else {
+        Overlay(costs)
+      },
+    )
+    return @pattern.Pat::silence()
   }
   if layers.length() == 1 {
     layers[0]
@@ -94,10 +124,14 @@ fn NotationParser::parse_layer(
 ) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
   self.skip_spaces()
   let elements : Array[@pattern.Pat[@pattern.ControlMap]] = []
+  let costs : Array[MiniQueryWork]? = self.query_work.map(_ => [])
   while !self.at_end() &&
         self.input[self.pos] != ',' &&
         self.input[self.pos] != ']' {
     elements.push(self.parse_element())
+    if self.query_work is Some(cost) {
+      costs.unwrap().push(cost)
+    }
     self.require_element_boundary()
     self.skip_spaces()
   }
@@ -105,6 +139,16 @@ fn NotationParser::parse_layer(
     raise ParseError(
       "position \{self.pos}: expected at least one element in layer",
     )
+  }
+  if costs is Some(costs) {
+    self.query_work = Some(
+      if costs.length() == 1 {
+        costs[0]
+      } else {
+        Slots(costs)
+      },
+    )
+    return @pattern.Pat::silence()
   }
   if elements.length() == 1 {
     elements[0]
@@ -157,9 +201,18 @@ fn NotationParser::parse_element(
         // same local arc, so a fixed seed would drop them in lockstep.
         let salt = self.pos
         self.pos += 1 // consume '?'
-        pat = pat.degrade_by(0.5, seed=salt)
+        if self.query_work is Some(cost) {
+          self.query_work = Some(MapEvents(cost))
+        } else {
+          pat = pat.degrade_by(0.5, seed=salt)
+        }
         applied = true
       }
+    }
+    // Validate construction prefixes too: a later silent Euclid must not hide
+    // an overflowing time factor or an excessively deep modifier chain.
+    if self.query_work is Some(cost) {
+      cost.check(0.0)
     }
   }
   pat
@@ -193,6 +246,12 @@ fn NotationParser::apply_replicate(
       "position \{op_pos}: '*' requires a positive integer, got \{n}",
     )
   }
+  if self.query_work is Some(cost) {
+    self.query_work = Some(
+      Precision(Accelerate(cost, n.to_double()), n.to_double()),
+    )
+    return pat
+  }
   pat.fast(@pattern.Rational::from_int(n))
 }
 
@@ -209,6 +268,12 @@ fn NotationParser::apply_step_slow(
     raise ParseError(
       "position \{op_pos}: '/' requires a positive integer, got \{n}",
     )
+  }
+  if self.query_work is Some(cost) {
+    self.query_work = Some(
+      Precision(Accelerate(cost, 1.0 / n.to_double()), n.to_double()),
+    )
+    return pat
   }
   pat.slow(@pattern.Rational::from_int(n))
 }
@@ -245,6 +310,19 @@ fn NotationParser::maybe_apply_euclid(
     raise ParseError("position \{self.pos}: expected ')' to close euclid")
   }
   self.pos += 1 // consume ')'
+  if self.query_work is Some(cost) {
+    guard n <= 128 else {
+      raise ParseError("playback Euclidean rhythm exceeds 128 steps")
+    }
+    self.query_work = Some(
+      if n <= 0 || k <= 0 {
+        Quiet
+      } else {
+        Slots(Array::make(n, cost))
+      },
+    )
+    return pat
+  }
   pat.euclid(k, n, rotation~)
 }
 
@@ -293,8 +371,14 @@ fn NotationParser::parse_atom(
   self : NotationParser,
 ) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
   let start = self.pos
+  if self.query_work is Some(_) {
+    self.query_work = Some(Atom)
+  }
   if self.input[self.pos] == '~' {
     self.pos += 1
+    if self.query_work is Some(_) {
+      self.query_work = Some(Quiet)
+    }
     return @pattern.Pat::silence()
   }
   if self.sound {
@@ -315,6 +399,10 @@ fn NotationParser::parse_atom(
     }
     match @pattern.parse_chord(name) {
       Some(notes) => {
+        if self.query_work is Some(_) {
+          self.query_work = Some(Overlay(Array::make(notes.length(), Atom)))
+          return @pattern.Pat::silence()
+        }
         let note_pats = notes.map(fn(midi) { @pattern.note(midi.to_double()) })
         @pattern.stack(note_pats)
       }

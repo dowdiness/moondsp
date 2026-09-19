@@ -1,228 +1,178 @@
-import { test as base, expect } from "@playwright/test";
-import { setTimeout as delay } from "node:timers/promises";
-import type { AudioEvent, AudioStatus, OpenSessionResult } from "../src/audio";
-import { LivePlayback } from "../src/playback";
-import type { PlaybackView } from "../src/playback";
-import { decodeWorkletMessage } from "../src/playback-protocol";
-import type { PlaybackMode } from "../src/playback-protocol";
+import { expect, test } from "@playwright/test";
+import { Player } from "../src/playback";
+import type { AudioEvent, OpenSessionResult, SchedulerSession } from "../src/audio";
+import { RequestId } from "../src/playback-protocol";
+import type { PlayerOperation, PlayState } from "../src/playback-protocol";
 
-type Submission = {
-  mode: PlaybackMode;
-  text: string;
-  policy: "continue" | "restart";
-  revision: number;
-};
-
-// Controls external audio timing only. All submission, acceptance, freshness,
-// dedupe and reveal decisions run through the same LivePlayback as the editor.
-class ControlledAudio {
-  readonly mode = "scheduler" as const;
-  status: AudioStatus = { kind: "idle" };
-  audible = false;
-  bpm = 60;
-  readonly submissions: Submission[] = [];
-  readonly tempoCommands: { revision: number; bpm: number }[] = [];
-  readonly sessions: ((event: AudioEvent) => void)[] = [];
-  private deliver: (event: AudioEvent) => void = () => {
-    throw new Error("No audio session has been opened");
+type Command = { id: number; operation: PlayerOperation; text?: string };
+function harness(deferred = false, delayedClose = false, cancellable = false) {
+  let deliver: (event: AudioEvent) => void = () => {};
+  const opening = Promise.withResolvers<OpenSessionResult>();
+  const closingStarted = Promise.withResolvers<void>();
+  let busy = false;
+  let firstOpening = true;
+  const commands: Command[] = [];
+  const issue = (id: RequestId, operation: PlayerOperation, text?: string) => {
+    commands.push({ id: id.value, operation, text });
+    return "issued" as const;
   };
-
-  async openSession(deliver: (event: AudioEvent) => void): Promise<OpenSessionResult> {
-    this.deliver = deliver;
-    this.sessions.push(deliver);
-    this.audible = false;
-    this.status = { kind: "starting" };
-    await Promise.resolve();
-    this.status = { kind: "running" };
-    return { kind: "opened", session: {
-      kind: "scheduler",
-      fadeIn: () => { this.audible = true; return "issued"; },
-      requestTempoChange: (tempo, id) => {
-        this.bpm = tempo.value;
-        this.tempoCommands.push({ revision: id.value, bpm: tempo.value });
-        return "issued";
-      },
-      submitScore: ({ id, score, policy }) => {
-        this.submissions.push({ mode: score.mode, text: score.text, policy, revision: id.value });
-        return "issued";
-      },
-      close: async () => {
-        this.audible = false;
-        this.status = { kind: "idle" };
-        return { kind: "closed" };
-      },
-    } };
-  }
-  fail() {
-    this.audible = false;
-    this.status = { kind: "error", message: "audio owner failed" };
-    this.deliver({ kind: "failed", message: "audio owner failed" });
-  }
-  reply(raw: unknown) {
-    const message = decodeWorkletMessage(raw);
-    switch (message.kind) {
-      case "receipt": case "tempo": this.deliver(message); break;
-      case "runtime-error": case "protocol-error": throw new Error(message.message);
-      case "ready": case "notice": throw new Error("Unexpected test receipt");
-    }
-  }
-  accept(submission: Submission, tempo = this.bpm, tempoRevision = this.tempoCommands.at(-1)!.revision) {
-    this.reply({ type: `${submission.mode}-updated`, revision: submission.revision,
-      operation: submission.policy === "continue" ? "update" : "restart",
-      tempo, tempoRevision, samplePosition: 128, acceptedAtSample: 0 });
-  }
+  const closing = Promise.withResolvers<{ kind: "closed" }>();
+  const session: SchedulerSession = {
+    kind: "scheduler", fadeIn: () => "issued",
+    close: async () => {
+      closingStarted.resolve();
+      if (delayedClose) await closing.promise;
+      busy = false;
+      return { kind: "closed" } as const;
+    },
+    update: (id, text) => issue(id, "update", text),
+    restart: (id, text) => issue(id, "restart", text),
+    play: id => issue(id, "play"), pause: id => issue(id, "pause"),
+  };
+  const engine = { openSession: async (next: (event: AudioEvent) => void, signal?: AbortSignal): Promise<OpenSessionResult> => {
+    if (busy) return { kind: "busy" };
+    busy = true;
+    deliver = next;
+    const shouldDefer = deferred && firstOpening;
+    firstOpening = false;
+    if (!shouldDefer) return { kind: "opened", session };
+    if (!cancellable) return opening.promise;
+    return new Promise<OpenSessionResult>((resolve, reject) => {
+      const abort = () => {
+        busy = false;
+        reject(new DOMException("Opening cancelled", "AbortError"));
+      };
+      signal?.addEventListener("abort", abort, { once: true });
+      void opening.promise.then(result => {
+        signal?.removeEventListener("abort", abort);
+        resolve(result);
+      });
+    });
+  } };
+  const player = new Player(engine, { text: 'note("60")' }, () => {});
+  const reply = (command: Command, accepted = true, state: PlayState = "Playing") => {
+    const snapshot = { id: RequestId.decode(command.id)!, operation: command.operation, state,
+      samplePosition: 128, tempo: 60, pendingCount: 0, skippedCount: 0 };
+    deliver({ kind: "receipt", receipt: accepted ? { ...snapshot, kind: "accepted" }
+      : { ...snapshot, kind: "rejected", restartRequired: false, message: "invalid source" } });
+  };
+  const command = async (index: number) => {
+    await expect.poll(() => commands.length).toBeGreaterThan(index);
+    return commands[index];
+  };
+  const start = async () => {
+    const pending = player.play(); reply(await command(0)); await pending;
+  };
+  return { player, commands, reply, command, start,
+    open: () => opening.resolve({ kind: "opened", session }),
+    releaseClose: () => closing.resolve({ kind: "closed" }),
+    whenClosing: closingStarted.promise,
+    fail: () => deliver({ kind: "failed", message: "worklet failed" }) };
 }
 
-type Session = { audio: ControlledAudio; playback: LivePlayback; view: () => PlaybackView };
-const test = base.extend<{ session: Session }>({
-  session: async ({}, use) => {
-    const audio = new ControlledAudio();
-    let view: PlaybackView;
-    const playback = new LivePlayback(audio, { text: 'note("60")' },
-      state => { view = state; });
-    await use({ audio, playback, view: () => view });
-    if (audio.status.kind === "running") await playback.toggle();
-  },
+test("resuming uses Current song even when the editor contains invalid source", async () => {
+  const h = harness(); await h.start();
+  const paused = h.player.pause(); h.reply(await h.command(1), true, "Paused"); await paused;
+  const update = h.player.update("note("); h.reply(await h.command(2), false, "Paused"); await update;
+  const resumed = h.player.play(); h.reply(await h.command(3)); await resumed;
+  expect(h.commands[3]).toMatchObject({ operation: "play", text: undefined });
+  expect(h.player.view().currentSource).toBe('note("60")');
+  expect(h.player.view().diagnostic?.message).toBe("invalid source");
+  await h.player.close();
 });
 
-test("stale acceptance reveals audio without painting over the draft", async ({ session }) => {
-  const { audio, playback, view } = session;
-  await playback.toggle();
-  const first = audio.submissions[0];
-  expect(audio.audible).toBe(false);
-  playback.edit("note(");
-  const feedbackBeforeAcceptance = view().feedback;
-  audio.accept(first);
-  expect(audio.audible).toBe(true);
-  expect(view().feedback).toEqual(feedbackBeforeAcceptance);
-  expect(view().diagnostic).toBeNull();
-
-  await expect.poll(() => audio.submissions.length).toBe(2);
-  const edit = audio.submissions[1];
-  expect(edit.policy).toBe("continue");
-  audio.reply({ type: "pattern-error", revision: edit.revision, message: "position 5: expected note", recovery: "edit" });
-  expect(view().diagnostic).toEqual({ message: "position 5: expected note", documentLength: 5 });
-  expect(audio.audible).toBe(true);
-  audio.accept(first);
-  expect(view().diagnostic?.message).toBe("position 5: expected note");
+test("a late source error cannot annotate a newer editor version", async () => {
+  const h = harness(); await h.start();
+  const pending = h.player.update("note("); const old = await h.command(1);
+  h.player.edit('note("67")'); h.reply(old, false); await pending;
+  expect(h.player.view().diagnostic).toBeNull();
+  expect(h.player.view().feedback).toBeNull();
+  expect(h.player.view().currentSource).toBe('note("60")');
+  await h.player.close();
 });
 
-test("superseded first submission cannot reveal its replacement", async ({ session }) => {
-  const { audio, playback, view } = session;
-  await playback.toggle();
-  const first = audio.submissions[0];
-  playback.useExample({ mode: "song", text: 'song(section("a",1,note("72")),part("a","a"))' });
-  const replacement = audio.submissions[1];
-  audio.reply({ type: "playback-superseded", revision: first.revision });
-  audio.accept(first);
-  expect(audio.audible).toBe(false);
-  expect(view().feedback).toBeNull();
-  audio.accept(replacement);
-  expect(audio.audible).toBe(true);
-  expect(view().mode).toBe("song");
-  expect(view().diagnostic).toBeNull();
+test("Pause during startup cancels Play without sending a command or showing an error", async () => {
+  const h = harness(true);
+  const starting = h.player.play();
+  const cancelled = expect(starting).rejects.toMatchObject({ name: "AbortError" });
+  const pausing = h.player.pause();
+  h.open();
+  await expect(pausing).rejects.toMatchObject({ name: "AbortError" });
+  await cancelled;
+  expect(h.commands).toEqual([]);
+  expect(h.player.view().currentSource).toBeNull();
+  expect(h.player.view().feedback).toBeNull();
+  await h.player.close();
 });
 
-test("Stop invalidates receipts before the next Play", async ({ session }) => {
-  const { audio, playback, view } = session;
-  await playback.toggle();
-  const old = audio.submissions[0];
-  await playback.toggle();
-  await playback.toggle();
-  const next = audio.submissions[1];
-  expect(next.revision).toBeGreaterThan(old.revision);
-  expect(next.policy).toBe("restart");
-  audio.accept(old);
-  audio.reply({ type: "pattern-error", revision: old.revision, message: "old error", recovery: "edit" });
-  expect(audio.audible).toBe(false);
-  expect(view().diagnostic).toBeNull();
-  audio.accept(next);
-  expect(audio.audible).toBe(true);
+test("close cancels unresolved initialization and an immediate Play opens afresh", async () => {
+  const h = harness(true, false, true);
+  const cancelled = expect(h.player.play()).rejects.toMatchObject({ name: "AbortError" });
+  const closing = h.player.close();
+  const playing = h.player.play();
+  await closing;
+  await cancelled;
+  h.reply(await h.command(0));
+  expect((await playing).kind).toBe("accepted");
+  expect(h.player.view().state).toBe("Playing");
+  await h.player.close();
 });
 
-test("Retry drops pending edits and resubmits the latest draft", async ({ session }) => {
-  const { audio, playback, view } = session;
-  await playback.toggle();
-  const old = audio.submissions[0];
-  playback.edit('note("67")');
-  audio.fail();
-  expect(view().status.kind).toBe("error");
-  await playback.toggle();
-  const next = audio.submissions[1];
-  expect(next.text).toBe('note("67")');
-  expect(next.policy).toBe("restart");
-  audio.accept(old);
-  expect(audio.audible).toBe(false);
-  audio.accept(next);
-  expect(audio.audible).toBe(true);
-  // A pre-failure debounce must not submit again after the Retry.
-  await delay(250);
-  expect(audio.submissions).toHaveLength(2);
+test("Play Pause Play replaces the cancelled initialization without a Pause command", async () => {
+  const h = harness(true, false, true);
+  const cancelled = expect(h.player.play()).rejects.toMatchObject({ name: "AbortError" });
+  const pausing = expect(h.player.pause()).rejects.toMatchObject({ name: "AbortError" });
+  const playing = h.player.play();
+  await cancelled;
+  await pausing;
+  h.reply(await h.command(0));
+  expect((await playing).kind).toBe("accepted");
+  expect(h.commands.map(command => command.operation)).toEqual(["restart"]);
+  expect(h.player.view().feedback).toBeNull();
+  await h.player.close();
 });
 
-test("reverting while a replacement is pending still submits the accepted text", async ({ session }) => {
-  const { audio, playback, view } = session;
-  await playback.toggle();
-  audio.accept(audio.submissions[0]);
-  playback.edit('note("72")');
-  await expect.poll(() => audio.submissions.length).toBe(2);
-  const replacement = audio.submissions[1];
-  playback.edit('note("60")');
-  await expect.poll(() => audio.submissions.length).toBe(3);
-  const revert = audio.submissions[2];
-  expect(revert.text).toBe('note("60")');
-  expect(revert.policy).toBe("continue");
-  audio.reply({ type: "playback-superseded", revision: replacement.revision });
-  audio.accept(revert);
-  playback.edit('note("60")');
-  await delay(250);
-  expect(audio.submissions).toHaveLength(3);
-  expect(view().diagnostic).toBeNull();
+for (const duringOpen of [true, false]) {
+  test(`close waits for ${duringOpen ? "opening" : "open"} session cleanup before reuse`, async () => {
+    const h = harness(duringOpen, true);
+    let cancelled: Promise<void> | undefined;
+    if (duringOpen) {
+      cancelled = expect(h.player.play()).rejects.toMatchObject({ name: "AbortError" });
+    } else {
+      await h.start();
+    }
+    const nextCommand = h.commands.length;
+    let closed = false;
+    const closing = Promise.all([h.player.close(), h.player.close()]).then(() => { closed = true; });
+    if (duringOpen) h.open();
+    await h.whenClosing;
+    await cancelled;
+    expect(closed).toBe(false);
+    const reopening = h.player.play();
+    h.releaseClose();
+    await closing;
+    h.reply(await h.command(nextCommand));
+    expect((await reopening).kind).toBe("accepted");
+    expect(h.player.view().state).toBe("Playing");
+    await h.player.close();
+  });
+}
+
+test("closing settles an outstanding command and quarantines its late receipt", async () => {
+  const h = harness(); await h.start();
+  const updating = h.player.update('note("67")'); const command = await h.command(1);
+  const cancelled = expect(updating).rejects.toMatchObject({ name: "AbortError" });
+  await h.player.close(); await cancelled;
+  h.reply(command);
+  expect(h.player.view().state).toBe("Empty");
+  expect(h.player.view().currentSource).toBeNull();
 });
 
-test("Play uses edits made during asynchronous audio startup", async ({ session }) => {
-  const { audio, playback } = session;
-  const starting = playback.toggle();
-  playback.edit('note("72")');
-  await starting;
-  expect(audio.submissions).toMatchObject([{ mode: "pattern", text: 'note("72")', policy: "restart" }]);
-  expect(audio.audible).toBe(false);
-  audio.accept(audio.submissions[0]);
-  expect(audio.audible).toBe(true);
-});
-
-test("clearing the draft during startup leaves playback stopped", async ({ session }) => {
-  const { audio, playback, view } = session;
-  const starting = playback.toggle();
-  playback.edit("");
-  await starting;
-  expect(view().status.kind).toBe("idle");
-  expect(audio.audible).toBe(false);
-  expect(audio.submissions).toHaveLength(0);
-});
-
-test("a retired audio session cannot fail a later Play", async ({ session }) => {
-  const { audio, playback, view } = session;
-  await playback.toggle();
-  const retired = audio.sessions[0];
-  await playback.toggle();
-  await playback.toggle();
-  audio.accept(audio.submissions[1]);
-  retired({ kind: "failed", message: "late failure from retired session" });
-  expect(view().status.kind).toBe("running");
-  expect(audio.audible).toBe(true);
-});
-
-test("older render and tempo acknowledgements cannot undo a newer tempo commit", async ({ session }) => {
-  const { audio, playback, view } = session;
-  await playback.toggle();
-  const initialTempo = audio.tempoCommands[0];
-  playback.commitBpm("120");
-  const changedTempo = audio.tempoCommands[1];
-  audio.accept(audio.submissions[0], 60, initialTempo.revision);
-  expect(view().tempoText).toBe("120");
-  expect(audio.audible).toBe(true);
-  audio.reply({ type: "tempo-updated", revision: changedTempo.revision, tempo: 120 });
-  audio.reply({ type: "tempo-updated", revision: initialTempo.revision, tempo: 60 });
-  expect(view().tempoText).toBe("120");
+test("a worklet fault rejects outstanding commands and retires late receipts", async () => {
+  const h = harness(); await h.start();
+  const updating = h.player.update('note("67")'); const command = await h.command(1);
+  const rejected = expect(updating).rejects.toThrow("worklet failed");
+  h.fail(); await rejected; h.reply(command);
+  expect(h.player.view().state).toBe("Fault");
+  expect(h.player.view().currentSource).toBeNull();
 });

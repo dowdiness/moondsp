@@ -289,39 +289,6 @@
         background: var(--panel);
         opacity: 1;
       }
-      .mode-toggle,
-      .bpm-control {
-        display: flex;
-        gap: 0.35rem;
-        align-items: center;
-      }
-      .mode-toggle .toggle {
-        padding-inline: 0.7rem;
-      }
-      .mode-toggle .toggle.active {
-        background: var(--accent);
-        color: var(--text-on-accent);
-        border-color: color-mix(in srgb, var(--accent) 70%, var(--border));
-      }
-      .bpm-control {
-        color: var(--ink-muted);
-        font-size: var(--text-sm);
-        font-weight: 700;
-      }
-      .bpm-control input {
-        width: 6rem;
-        padding: 0.35rem 0.45rem;
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        background: var(--panel);
-        color: var(--ink);
-        font: inherit;
-        font-variant-numeric: tabular-nums;
-      }
-      .bpm-control input:focus-visible {
-        outline: 2px solid var(--accent);
-        outline-offset: 2px;
-      }
       .cm-editor { height: 100%; }
       .cm-content {
         font-family: var(--font-mono);
@@ -425,52 +392,45 @@
     <header>
       <h1>moondsp · live</h1>
       <div class="controls">
-        <div class="mode-toggle" role="group" aria-label="Playback mode">
-          <button id="mode-pattern" type="button" class="toggle active" aria-pressed="true">Pattern</button>
-          <button id="mode-song" type="button" class="toggle" aria-pressed="false">Song</button>
-        </div>
-        <label class="bpm-control" for="global-bpm">
-          <span>BPM</span>
-          <input id="global-bpm" type="number" min="1" step="0.1" value="60" inputmode="decimal" aria-label="Global BPM" />
-        </label>
-        <span class="status" id="status" aria-live="polite">idle — click Play</span>
+        <span class="status" id="status" aria-live="polite">Ready</span>
         <button id="cheat-toggle" type="button" class="toggle" aria-controls="cheat" aria-expanded="true">Hide help</button>
         <button id="start" type="button">Play</button>
+        <button id="restart" type="button" class="toggle">Restart</button>
       </div>
     </header>
     <main class="workspace">
       <div id="editor"></div>
       <aside id="cheat" aria-label="mini-notation cheatsheet">
         <h2>Examples</h2>
-        <p class="cheat-note">Replaces your code. Press Play if stopped.</p>
-        <button type="button" class="example" id="overlay-groove-example" data-live-example="overlay-groove" data-bpm="96">Overlay groove: + layers</button>
+        <p class="cheat-note">Replaces your code. Play resumes Current song; Restart starts the editor source from the beginning.</p>
+        <button type="button" class="example" id="overlay-groove-example" data-live-example="overlay-groove">Overlay groove: + layers</button>
         <p class="cheat-note">Drums, bass, and a stereo melody loop. The final .slow(2) slows both melodies inside parentheses.</p>
-        <button type="button" class="example" id="rests-and-gates-example" data-live-example="rests-and-gates" data-bpm="96">Space in the groove: rests + gate</button>
+        <button type="button" class="example" id="rests-and-gates-example" data-live-example="rests-and-gates">Space in the groove: rests + gate</button>
         <p class="cheat-note">Rests keep every step in place; gate(0.35) shortens the bass without moving its attacks.</p>
-        <button type="button" class="example" id="overlay-grouping-example" data-live-example="overlay-grouping" data-mode="song" data-bpm="96">Grouping A/B: hear the parentheses</button>
+        <button type="button" class="example" id="overlay-grouping-example" data-live-example="overlay-grouping">Grouping A/B: hear the parentheses</button>
         <p class="cheat-note">20 seconds: fast hats first, then fast kick and hats. Compare kick + hats.fast(2) with (kick + hats).fast(2).</p>
-        <button type="button" class="example" id="envelope-compare-example" data-live-example="envelope-compare" data-mode="song" data-bpm="60">One note, three envelopes</button>
+        <button type="button" class="example" id="envelope-compare-example" data-live-example="envelope-compare">One note, three envelopes</button>
         <p class="cheat-note">Same E4: short → swell → drift. 23 seconds.</p>
-        <button type="button" class="example" data-live-example="filter-shaping" data-bpm="84" data-example='let warm = chord("Cmaj7 Fmaj7").slow(4).gain(0.45).lpf(900, 2.5).hpf(60);&#10;let air = note("G5 E5 D5 B4").slow(4).gain(0.2).lpf(5000).hpf(1200, 1.4);&#10;stack(warm, air)'>Carve the mix: cutoff + resonance</button>
+        <button type="button" class="example" data-live-example="filter-shaping" data-example='bpm(84);&#10;let warm = chord("Cmaj7 Fmaj7").slow(4).gain(0.45).lpf(900, 2.5).hpf(60);&#10;let air = note("G5 E5 D5 B4").slow(4).gain(0.2).lpf(5000).hpf(1200, 1.4);&#10;stack(warm, air)'>Carve the mix: cutoff + resonance</button>
         <p class="cheat-note">LPF warms the chords; HPF clears lows from the lead. The second argument adds emphasis at each cutoff.</p>
-        <button type="button" class="example" id="room-of-light-example" data-live-example="room-of-light" data-mode="song" data-bpm="112">Room of Light — pop sketch</button>
+        <button type="button" class="example" id="room-of-light-example" data-live-example="room-of-light">Room of Light — pop sketch</button>
         <p class="cheat-note">Short bass, soft chords, and a singing lead. 39 seconds.</p>
-        <button type="button" class="example" id="shared-room-example" data-live-example="shared-room" data-mode="song" data-bpm="60">Dry → shared room comparison</button>
+        <button type="button" class="example" id="shared-room-example" data-live-example="shared-room">Dry → shared room comparison</button>
         <p class="cheat-note">Same groove dry, then drums and chords send into one room. 16 seconds.</p>
-        <button type="button" class="example" id="shared-room-afterglow-example" data-live-example="shared-room-afterglow" data-mode="song" data-bpm="72">Shared Room Afterglow</button>
+        <button type="button" class="example" id="shared-room-afterglow-example" data-live-example="shared-room-afterglow">Shared Room Afterglow</button>
         <p class="cheat-note">Dry low end, drifting polyrhythms, a sparse room break, and one shared tail. 60 seconds.</p>
-          <button type="button" class="example" data-live-example="envelope" data-bpm="60" data-example='note("E4 G4 D4").slow(21).attack(2).hold(3).release(8)'>Drifting notes — long envelopes</button>
+          <button type="button" class="example" data-live-example="envelope" data-example='note("E4 G4 D4").slow(21).attack(2).hold(3).release(8)'>Drifting notes — long envelopes</button>
           <p class="cheat-note">Each note lasts 13 seconds. Try changing release(8).</p>
         <details>
           <summary>More examples</summary>
-        <button type="button" class="example" data-live-example="entries" data-bpm="60" data-example='let melody = note("E4 G4 A4").slow(3).gain(0.12);&#10;let response = note("D5 A4 G4 E5").slow(4).gain(0.08);&#10;stack(melody, response)'>Independent entries — 3 and 4 cycles</button>
+        <button type="button" class="example" data-live-example="entries" data-example='let melody = note("E4 G4 A4").slow(3).gain(0.12);&#10;let response = note("D5 A4 G4 E5").slow(4).gain(0.08);&#10;stack(melody, response)'>Independent entries — 3 and 4 cycles</button>
         <p class="cheat-note">Change E4 to F4 and D5 to C5 while playing.</p>
-        <button type="button" class="example" data-live-example="tempo" data-mode="song" data-bpm="60" data-example='let melody = note("E4 G4 A4").slow(3).gain(0.12);&#10;let beat = s("bd hh sd hh").slow(4).gain(0.2);&#10;song(&#10;  bpm(60),&#10;  section("opening", 12, melody),&#10;  section("groove", 24, stack(melody, beat)),&#10;  part("first", "opening"),&#10;  part("second", "groove")&#10;)'>Shared melody + live tempo</button>
+        <button type="button" class="example" data-live-example="tempo" data-example='let melody = note("E4 G4 A4").slow(3).gain(0.12);&#10;let beat = s("bd hh sd hh").slow(4).gain(0.2);&#10;song(&#10;  bpm(60),&#10;  section("opening", 12, melody),&#10;  section("groove", 24, stack(melody, beat)),&#10;  part("first", "opening"),&#10;  part("second", "groove")&#10;)'>Shared melody + live tempo</button>
         <p class="cheat-note">Change bpm(60) to bpm(72) while playing.</p>
-        <button type="button" class="example" id="light-orbit-example" data-live-example="light-orbit" data-mode="song" data-bpm="120">Light Orbit — full song, sets BPM 120</button>
+        <button type="button" class="example" id="light-orbit-example" data-live-example="light-orbit">Light Orbit — full song, sets BPM 120</button>
         <p class="cheat-note">Edit motif or orbit near the top.</p>
         <button type="button" class="example" data-example='let motif = note("E4 G4 A4").slow(3);&#10;let groove = stack(motif, s("bd").gain(0.3));&#10;groove'>Named motif + groove</button>
-        <button type="button" class="example" data-mode="song" data-song-example="ode" data-bpm="72" data-example='song(&#10;  section(&#10;    "ode",&#10;    256,&#10;    stack(&#10;      s("bd").slow(4),&#10;      note("64 64 65 67&#10;67 65 64 62&#10;60 60 62 64&#10;64 62 62 62").slow(16)&#10;    )&#10;  ),&#10;  part("ode1", "ode")&#10;)'>song("ode" — multiline melody + kick, sets BPM 72)</button>
+        <button type="button" class="example" data-song-example="ode" data-example='bpm(72);&#10;song(&#10;  section(&#10;    "ode",&#10;    256,&#10;    stack(&#10;      s("bd").slow(4),&#10;      note("64 64 65 67&#10;67 65 64 62&#10;60 60 62 64&#10;64 62 62 62").slow(16)&#10;    )&#10;  ),&#10;  part("ode1", "ode")&#10;)'>song("ode" — multiline melody + kick, sets BPM 72)</button>
         <button type="button" class="example" data-example='chord("C")'>chord("C") — C major triad</button>
         <button type="button" class="example" data-example='chord("C Dm G7 C").slow(2)'>chord("C Dm G7 C").slow(2) — chord progression</button>
         <button type="button" class="example" data-example='chord("Cmaj7").gain(0.4)'>chord("Cmaj7").gain(0.4) — major 7th chord</button>
@@ -488,8 +448,8 @@
         <button type="button" class="example" data-example='$: s("bd(1,4), sd(1,4,2)").slow(2).jux(slow(2))&#10;$: note("46*4 60*8, 40*16 192(1,16)?").slow(2).jux(slow(2))'>$: s("bd…").slow(2).jux(slow(2)) / $: note("46…").slow(2).jux(slow(2))</button>
         </details>
         <h2>While playing</h2>
-        <p>Edits take effect at each phrase's next start. <strong>Queued</strong> means waiting for that start. Invalid code keeps the last accepted version.</p>
-        <p>Tempo changes work live. For song structure changes, <strong>Stop</strong>, then <strong>Play</strong>.</p>
+        <p>Updates take effect at each material's next entry. Pending changes wait while the current phrase finishes. Invalid code leaves Current song unchanged.</p>
+        <p>Pause freezes the performance. Resume with Play, or use Restart to apply a new song structure from the beginning. Author tempo with <code>bpm(90);</code>; omitted tempo is 60 BPM.</p>
         <details id="syntax-reference">
           <summary>Syntax reference</summary>
           <!-- MINI_SYNTAX_REFERENCE -->
@@ -497,7 +457,7 @@
       </aside>
     </main>
     <footer>
-      <div class="panel" id="log" aria-live="polite">edit the pattern, or switch to song mode</div>
+      <div class="panel" id="log" aria-live="polite">Edit a pattern or an arranged song. Valid updates keep your place.</div>
     </footer>
     <script>
       // Synchronously collapse the cheat panel on narrow viewports before the

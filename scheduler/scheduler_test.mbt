@@ -109,6 +109,58 @@ fn make_test_sched() -> (
 }
 
 ///|
+fn accepted_snapshot(
+  sched : @scheduler.PatternScheduler,
+) -> @scheduler.PlaybackSnapshot raise {
+  guard sched.accepted_snapshot() is Some(snapshot) else {
+    fail("expected an accepted snapshot")
+  }
+  snapshot
+}
+
+///|
+fn queued_snapshot(
+  sched : @scheduler.PatternScheduler,
+) -> @scheduler.PlaybackSnapshot raise {
+  guard sched.queued_snapshot() is Some(snapshot) else {
+    fail("expected a queued snapshot")
+  }
+  snapshot
+}
+
+///|
+fn assert_first_pattern_queued(
+  sched : @scheduler.PatternScheduler,
+) -> Unit raise {
+  assert_true(sched.accepted_snapshot() is None)
+  guard queued_snapshot(sched) is @scheduler.PlaybackSnapshot::Pattern(_) else {
+    fail("expected a queued first Pattern snapshot")
+  }
+}
+
+///|
+fn assert_first_song_queued(sched : @scheduler.PatternScheduler) -> Unit raise {
+  assert_true(sched.accepted_snapshot() is None)
+  guard queued_snapshot(sched) is @scheduler.PlaybackSnapshot::Song(_) else {
+    fail("expected a queued first Song snapshot")
+  }
+}
+
+///|
+fn assert_pattern_accepted(sched : @scheduler.PatternScheduler) -> Unit raise {
+  guard accepted_snapshot(sched) is @scheduler.PlaybackSnapshot::Pattern(_) else {
+    fail("expected an accepted Pattern snapshot")
+  }
+}
+
+///|
+fn assert_song_accepted(sched : @scheduler.PatternScheduler) -> Unit raise {
+  guard accepted_snapshot(sched) is @scheduler.PlaybackSnapshot::Song(_) else {
+    fail("expected an accepted Song snapshot")
+  }
+}
+
+///|
 fn pid(value : String) -> @identity.PatternNodeId {
   @identity.PatternNodeId::from_string(value) catch {
     _ => abort("expected valid pattern node id")
@@ -283,12 +335,10 @@ test "process_block: note(60) triggers one voice" {
 test "process_snapshot_block: pending snapshot commits at block boundary" {
   let (pool, sched, left, right) = make_test_sched()
   sched.queue_pattern_snapshot(note_snapshot("snapshot_note", 60.0))
-  assert_true(sched.has_pending_pattern_snapshot())
-  assert_true(!sched.has_active_pattern_snapshot())
+  assert_first_pattern_queued(sched)
   @debug.assert_eq(pool.active_voice_count(), 0)
   sched.process_snapshot_block(pool, left, right)
-  assert_true(!sched.has_pending_pattern_snapshot())
-  assert_true(sched.has_active_pattern_snapshot())
+  assert_pattern_accepted(sched)
   @debug.assert_eq(pool.active_voice_count(), 1)
   @debug.assert_eq(sched.active_note_count(), 1)
   @debug.assert_eq(sched.sample_counter(), 128L)
@@ -395,7 +445,12 @@ test "Rejected retune preserves audio and the previously queued snapshot" {
     )
     is Err(_),
   )
-  assert_true(sched.has_pending_pattern_snapshot())
+  assert_pattern_accepted(sched)
+  assert_true(accepted_snapshot(sched).revision() == playing.revision())
+  guard queued_snapshot(sched) is @scheduler.PlaybackSnapshot::Pattern(_) else {
+    fail("expected the previously queued Pattern snapshot")
+  }
+  assert_true(queued_snapshot(sched).revision() == pending.revision())
   sched.process_snapshot_block(pool, left, right)
   reference.process_snapshot_block(
     reference_pool, expected_left, expected_right,
@@ -601,8 +656,8 @@ test "process_snapshot_block: multiple pending snapshots keep the latest" {
   sched.process_snapshot_block(pool, left, right)
   @debug.assert_eq(pool.active_voice_count(), 0)
   @debug.assert_eq(sched.active_note_count(), 0)
-  assert_true(sched.has_active_pattern_snapshot())
-  assert_true(!sched.has_pending_pattern_snapshot())
+  assert_pattern_accepted(sched)
+  assert_true(sched.queued_snapshot() is None)
 }
 
 ///|
@@ -614,13 +669,14 @@ test "process_song_snapshot_block: pending song snapshot commits at block bounda
     @song.SongOccurrenceDoc(id=main_id, name="Main", section~),
   ])
   sched.queue_song_snapshot(song_snapshot(doc))
-  assert_true(sched.has_pending_song_snapshot())
-  assert_true(!sched.has_active_song_snapshot())
-  assert_true(sched.active_song_revision() is None)
+  assert_first_song_queued(sched)
   sched.process_song_snapshot_block(pool, left, right)
-  assert_true(!sched.has_pending_song_snapshot())
-  assert_true(sched.has_active_song_snapshot())
-  assert_true(sched.active_song_revision() == Some(doc.revision()))
+  assert_song_accepted(sched)
+  assert_true(accepted_snapshot(sched).revision() == doc.revision())
+  assert_true(
+    accepted_snapshot(sched).song_layout_revision() ==
+    Some(doc.layout_revision()),
+  )
   let outcome = sched
     .apply_song_voice_effect_result(
       @scheduler.SongVoiceScope::occurrence(main_id),
@@ -654,9 +710,10 @@ test "process_song_snapshot_block: same-layout song edit commits without layout 
   assert_true(edited.layout_revision() == doc.layout_revision())
   sched.queue_song_snapshot(song_snapshot(edited))
   sched.process_song_snapshot_block(pool, left, right)
-  assert_true(sched.active_song_revision() == Some(edited.revision()))
+  assert_true(accepted_snapshot(sched).revision() == edited.revision())
   assert_true(
-    sched.active_song_layout_revision() == Some(doc.layout_revision()),
+    accepted_snapshot(sched).song_layout_revision() ==
+    Some(doc.layout_revision()),
   )
   @debug.assert_eq(sched.sample_counter(), 256L)
 }
@@ -684,8 +741,10 @@ test "process_song_snapshot_block: layout edit does not backfill past onsets" {
   assert_true(edited.layout_revision() != doc.layout_revision())
   sched.queue_song_snapshot(song_snapshot(edited))
   sched.process_song_snapshot_block(pool, left, right)
+  assert_true(accepted_snapshot(sched).revision() == edited.revision())
   assert_true(
-    sched.active_song_layout_revision() == Some(edited.layout_revision()),
+    accepted_snapshot(sched).song_layout_revision() ==
+    Some(edited.layout_revision()),
   )
   @debug.assert_eq(pool.active_voice_count(), 0)
   @debug.assert_eq(sched.active_note_count(), 0)
@@ -710,8 +769,10 @@ test "process_song_snapshot_block: layout replacement lets active note ring" {
   )
   sched.queue_song_snapshot(song_snapshot(edited))
   sched.process_song_snapshot_block(pool, left, right)
+  assert_true(accepted_snapshot(sched).revision() == edited.revision())
   assert_true(
-    sched.active_song_layout_revision() == Some(edited.layout_revision()),
+    accepted_snapshot(sched).song_layout_revision() ==
+    Some(edited.layout_revision()),
   )
   @debug.assert_eq(pool.active_voice_count(), 1)
   @debug.assert_eq(sched.active_note_count(), 1)
@@ -732,10 +793,11 @@ test "process_song_snapshot_block: multiple pending song snapshots keep the late
   sched.queue_song_snapshot(song_snapshot(first))
   sched.queue_song_snapshot(song_snapshot(latest))
   sched.process_song_snapshot_block(pool, left, right)
-  assert_true(!sched.has_pending_song_snapshot())
-  assert_true(sched.has_active_song_snapshot())
+  assert_song_accepted(sched)
+  assert_true(accepted_snapshot(sched).revision() == latest.revision())
   assert_true(
-    sched.active_song_layout_revision() == Some(latest.layout_revision()),
+    accepted_snapshot(sched).song_layout_revision() ==
+    Some(latest.layout_revision()),
   )
   @debug.assert_eq(pool.active_voice_count(), 0)
   @debug.assert_eq(sched.active_note_count(), 0)
@@ -759,25 +821,34 @@ test "process_playback_snapshot_block: pattern and song snapshots share one pend
   sched.queue_playback_snapshot(
     @scheduler.PlaybackSnapshot::song(song_snapshot(song_doc)),
   )
-  assert_true(sched.has_pending_playback_snapshot())
-  assert_true(!sched.has_pending_pattern_snapshot())
-  assert_true(sched.has_pending_song_snapshot())
-  sched.process_playback_snapshot_block(pool, left, right)
-  assert_true(sched.has_active_playback_snapshot())
-  assert_true(!sched.has_active_pattern_snapshot())
-  assert_true(sched.has_active_song_snapshot())
-  assert_true(sched.active_playback_revision() == Some(song_doc.revision()))
+  assert_true(sched.accepted_snapshot() is None)
+  guard queued_snapshot(sched) is @scheduler.PlaybackSnapshot::Song(_) else {
+    fail("expected the latest queued Song snapshot")
+  }
+  assert_true(queued_snapshot(sched).revision() == song_doc.revision())
   assert_true(
-    sched.active_playback_song_layout_revision() ==
+    queued_snapshot(sched).song_layout_revision() ==
     Some(song_doc.layout_revision()),
   )
+  sched.process_playback_snapshot_block(pool, left, right)
+  assert_song_accepted(sched)
+  assert_true(accepted_snapshot(sched).revision() == song_doc.revision())
+  assert_true(
+    accepted_snapshot(sched).song_layout_revision() ==
+    Some(song_doc.layout_revision()),
+  )
+  assert_true(sched.queued_snapshot() is None)
   @debug.assert_eq(pool.active_voice_count(), 0)
   sched.queue_playback_snapshot(@scheduler.PlaybackSnapshot::pattern(pattern))
+  assert_song_accepted(sched)
+  guard queued_snapshot(sched) is @scheduler.PlaybackSnapshot::Pattern(_) else {
+    fail("expected a queued Pattern replacement")
+  }
+  assert_true(queued_snapshot(sched).revision() == pattern.revision())
   sched.process_playback_snapshot_block(pool, left, right)
-  assert_true(sched.has_active_pattern_snapshot())
-  assert_true(!sched.has_active_song_snapshot())
-  assert_true(sched.active_playback_revision() == Some(pattern.revision()))
-  assert_true(sched.active_playback_song_layout_revision() is None)
+  assert_pattern_accepted(sched)
+  assert_true(accepted_snapshot(sched).revision() == pattern.revision())
+  assert_true(sched.queued_snapshot() is None)
 }
 
 ///|

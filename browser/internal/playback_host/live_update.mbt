@@ -1,4 +1,7 @@
 ///|
+const PLAYBACK_MATERIAL_LIMIT = 256
+
+///|
 priv struct PlaybackLayoutRow {
   id : String
   name : String
@@ -11,18 +14,115 @@ priv struct PlaybackLayoutRow {
 ///|
 priv enum PlaybackLayout {
   PatternLayout
-  SongLayout(Array[PlaybackLayoutRow])
+  SongLayout(Array[PlaybackLayoutRow], Bool)
 } derive(Eq)
 
 ///|
-priv struct PreparedPlayback {
-  snapshots : Array[@scheduler.PlaybackSnapshot]
-  layout : PlaybackLayout
-  bpm : Double?
+priv struct PreparedRoute {
+  target : SoundPool
+  snapshot : @scheduler.PlaybackSnapshot
 }
 
 ///|
-fn song_layout(song : @song.Song[@pattern.ControlMap]) -> PlaybackLayout {
+priv enum PlaybackSpan {
+  Continuous
+  Finite(@pattern.Rational)
+  Repeating(@pattern.Rational)
+}
+
+///|
+priv struct PreparedSong {
+  source : String
+  tempo : @scheduler.Tempo
+  layout : PlaybackLayout
+  doc : @pattern.PatternDoc[@pattern.ControlMap]?
+  routes : Array[PreparedRoute]
+  span : PlaybackSpan
+}
+
+///|
+priv enum Session {
+  Empty
+  Ready(PreparedSong)
+  Playing(PreparedSong)
+  Paused(PreparedSong)
+  Ended(PreparedSong, Int64)
+  Fault(String)
+}
+
+///|
+pub(all) enum PlayState {
+  Empty
+  Ready
+  Playing
+  Paused
+  Ended
+  Fault
+} derive(Eq, Debug)
+
+///|
+pub(all) enum PlayerError {
+  InvalidSource(String)
+  RestartRequired
+  NoSong
+  TransportRange
+  Failed(String)
+} derive(Eq, Debug)
+
+///|
+pub struct PlayerView {
+  state : PlayState
+  source : String?
+  bpm : Double
+  sample_position : Double
+  pending_materials : Int
+  skipped_materials : Int
+}
+
+///|
+fn Session::song(self : Session) -> PreparedSong? {
+  match self {
+    Empty | Fault(_) => None
+    Ready(song) | Playing(song) | Paused(song) | Ended(song, _) => Some(song)
+  }
+}
+
+///|
+fn PreparedSong::finite_end(self : PreparedSong) -> @pattern.Rational? {
+  match self.span {
+    Finite(end_) => Some(end_)
+    Continuous | Repeating(_) => None
+  }
+}
+
+///|
+fn Player::check_repeat_span(
+  self : Player,
+  span : PlaybackSpan,
+  tempo : @scheduler.Tempo,
+) -> Result[Unit, PlayerError] {
+  guard span is Repeating(period) else { return Ok(()) }
+  let block_span = match
+    tempo.span_for_samples(
+      self.context.block_size(),
+      sample_rate=self.context.sample_rate(),
+    ) {
+    Ok(span) => span
+    Err(_) => return Err(TransportRange)
+  }
+  guard period >= block_span else {
+    return Err(
+      InvalidSource("repeated song must span at least one audio block"),
+    )
+  }
+  Ok(())
+}
+
+///|
+fn song_layout(
+  song : @song.Song[@pattern.ControlMap],
+  repeated : Bool,
+) -> PlaybackLayout {
   SongLayout(
     song
     .occurrences()
@@ -34,6 +134,7 @@ fn song_layout(song : @song.Song[@pattern.ControlMap]) -> PlaybackLayout {
       length: o.section().length_cycles(),
       rate: o.section().scope().rate(),
     }),
+    repeated,
   )
 }
 
@@ -63,340 +164,392 @@ fn song_update_snapshot(
 }
 
 ///|
-fn prepare_pattern(
-  text : String,
-  selectors : Array[SchedulerRouteSelector],
-) -> Result[PreparedPlayback, String] {
-  match @mini.parse(text) {
-    Err(msg) => Err(msg)
-    Ok(pat) => {
-      let snapshots = route_patterns(pat, selectors).map(pat => {
-        @scheduler.PlaybackSnapshot::pattern(
-          @pattern.PatternDoc::from_pattern(
-            id=@identity.PatternNodeId::from_string("live:pattern"),
-            pat~,
-          ).lower(),
-        )
-      }) catch {
-        _ => return Err("could not prepare pattern update")
-      }
-      Ok({ snapshots, layout: PatternLayout, bpm: None, })
-    }
+fn Player::prepare(
+  self : Player,
+  source : String,
+) -> Result[PreparedSong, PlayerError] {
+  let previous = match self.session.song() {
+    Some(song) => song.doc
+    None => None
   }
-}
-
-///|
-fn prepare_song(
-  text : String,
-  selectors : Array[SchedulerRouteSelector],
-) -> Result[PreparedPlayback, String] {
-  match @mini.parse_song_with_bpm(text) {
-    Err(msg) => Err(msg)
-    Ok(parsed) => {
-      if parsed.bpm() is Some(bpm) {
-        if @scheduler.normalize_bpm(bpm) is Err(_) {
-          return Err("tempo must be 0.001..1000 BPM")
+  // Admission covers every supported future tempo, including the demo control.
+  let maximum_tempo = match @scheduler.Tempo::from_bpm(1000.0) {
+    Ok(tempo) => tempo
+    Err(_) => return Err(TransportRange)
+  }
+  let max_query_span = match
+    maximum_tempo.span_for_samples(
+      self.context.block_size(),
+      sample_rate=self.context.sample_rate(),
+    ) {
+    Ok(span) => span
+    Err(_) => return Err(TransportRange)
+  }
+  let parsed = match
+    @mini.parse_play_source(
+      source,
+      previous~,
+      max_query_span=Some(max_query_span),
+    ) {
+    Ok(parsed) => parsed
+    Err(message) => return Err(InvalidSource(message))
+  }
+  let tempo = match @scheduler.Tempo::from_bpm(parsed.bpm()) {
+    Ok(tempo) => tempo
+    Err(_) => return Err(InvalidSource("tempo must be 0.001..1000 BPM"))
+  }
+  let prepared = match parsed.body() {
+    Pattern(doc) => {
+      let snapshot = doc.lower() catch {
+        error =>
+          return Err(InvalidSource("could not lower source: \{Repr(error)}"))
+      }
+      let routes = self.routes.map(route => {
+        let selected = match route.selector {
+          RouteSynth => snapshot.select_control("note")
+          RouteSound(code) => snapshot.select_control("sound", value=code)
         }
-      }
-      match route_songs(parsed.song(), selectors) {
-        Err(msg) => Err(msg)
-        Ok(songs) => {
-          let snapshots = songs.map(song => {
-            @scheduler.PlaybackSnapshot::song(song_update_snapshot(song))
-          }) catch {
-            _ => return Err("could not prepare song update")
-          }
-          Ok({
-            snapshots,
-            layout: song_layout(parsed.song()),
-            bpm: parsed.bpm(),
-          })
+        {
+          target: route.pool,
+          snapshot: @scheduler.PlaybackSnapshot::pattern(selected),
         }
-      }
-    }
-  }
-}
-
-///|
-priv enum ApplyPolicy {
-  Continue
-  Restart
-}
-
-///|
-priv enum RestartReason {
-  PlaybackNotStarted
-  LayoutChanged
-}
-
-///|
-const PLAYBACK_APPLY_RESTART_REQUIRED : Int = 2
-
-///|
-priv struct PendingPlayback {
-  playback : PreparedPlayback
-  policy : ApplyPolicy
-  tempo : Double?
-}
-
-///|
-priv struct PlaybackState {
-  active : PreparedPlayback?
-  pending : PendingPlayback?
-}
-
-///|
-/// Pure admission and transition; transport/voices are changed only by commit.
-fn queue_playback(
-  state : PlaybackState,
-  next : PreparedPlayback,
-  policy : ApplyPolicy,
-) -> Result[PlaybackState, RestartReason] {
-  match policy {
-    Continue =>
-      match state.active {
-        None => return Err(PlaybackNotStarted)
-        Some(active) if active.layout != next.layout =>
-          return Err(LayoutChanged)
-        Some(_) => ()
-      }
-    Restart => ()
-  }
-  Ok({
-    active: state.active,
-    pending: Some({ playback: next, policy, tempo: next.bpm, }),
-  })
-}
-
-///|
-/// Restart uses the applied score, cancelling any pending replacement.
-fn restart_current(state : PlaybackState) -> Result[PlaybackState, String] {
-  match state.active {
-    None => Err("no applied playback to restart")
-    Some(active) =>
-      Ok({
-        active: state.active,
-        pending: Some({ playback: active, policy: Restart, tempo: None, }),
       })
-  }
-}
-
-///|
-/// Audio-owner shell. Prepared tokens never cross the audio owner as objects.
-let playback_state : @ref.Ref[PlaybackState] = @ref.new({
-  active: None,
-  pending: None,
-})
-
-///|
-let prepared_slot : @ref.Ref[(Int, PreparedPlayback)?] = @ref.new(None)
-
-///|
-let prepared_sequence : @ref.Ref[Int] = @ref.new(0)
-
-///|
-fn reset_playback_state() -> Unit {
-  playback_state.val = { active: None, pending: None, }
-  prepared_slot.val = None
-  playback_input_chars.clear()
-}
-
-///|
-/// Retain at most one prepared result. Tokens prevent stale/failed preparation
-/// from applying an unrelated score. Zero signals preparation failure.
-fn retain_prepared(result : Result[PreparedPlayback, String]) -> Int {
-  prepared_slot.val = None
-  match result {
-    Err(message) => {
-      ignore(set_scheduler_parse_error(message))
-      0
+      Ok({
+        source,
+        tempo,
+        layout: PatternLayout,
+        doc: Some(doc),
+        routes,
+        span: Continuous,
+      })
     }
-    Ok(prepared) => {
-      if prepared_sequence.val == 2147483647 {
-        ignore(set_scheduler_parse_error("prepared token space exhausted"))
-        return 0
+    Arrangement(song, repeated) => {
+      guard song.duration() > @pattern.Rational::from_int(0) else {
+        return Err(InvalidSource("song must end after its beginning"))
       }
-      prepared_sequence.val = prepared_sequence.val + 1
-      prepared_slot.val = Some((prepared_sequence.val, prepared))
-      ignore(set_scheduler_parse_success())
-      prepared_sequence.val
-    }
-  }
-}
-
-///|
-pub fn prepare_pattern_input() -> Int {
-  let text = input_chars_to_string(playback_input_chars)
-  playback_input_chars.clear()
-  if sched_routes.val.is_empty() {
-    return retain_prepared(Err("initialize playback before preparing"))
-  }
-  retain_prepared(
-    prepare_pattern(text, sched_routes.val.map(route => route.selector)),
-  )
-}
-
-///|
-pub fn prepare_song_input() -> Int {
-  let text = input_chars_to_string(playback_input_chars)
-  playback_input_chars.clear()
-  if sched_routes.val.is_empty() {
-    return retain_prepared(Err("initialize playback before preparing"))
-  }
-  retain_prepared(
-    prepare_song(text, sched_routes.val.map(route => route.selector)),
-  )
-}
-
-///|
-/// Successful application consumes the token and queues an atomic operation.
-/// Return 0 when queued, 1 for an invalid/unrepresentable request, or 2 when
-/// starting/restarting is required. A rejected valid token is not consumed.
-pub fn apply_prepared_playback(token : Int, restart : Bool) -> Int {
-  match prepared_slot.val {
-    Some((id, prepared)) if id == token => {
-      let policy = if restart { Restart } else { Continue }
-      match queue_playback(playback_state.val, prepared, policy) {
-        Err(reason) => {
-          sched_last_error.val = match reason {
-            PlaybackNotStarted => "start playback before updating"
-            LayoutChanged =>
-              "playback mode or song layout changed; restart required"
-          }
-          PLAYBACK_APPLY_RESTART_REQUIRED
+      let span = if repeated {
+        Repeating(song.duration())
+      } else {
+        Finite(song.duration())
+      }
+      match self.check_repeat_span(span, tempo) {
+        Err(error) => return Err(error)
+        Ok(_) => ()
+      }
+      let routes : Array[PreparedRoute] = []
+      for route in self.routes {
+        let routed = match filter_song_for_route(route.selector, song) {
+          Ok(song) => song
+          Err(message) => return Err(InvalidSource(message))
         }
-        Ok(next) => {
-          // Admission owns the representability check. Until commit, no public
-          // host operation advances the clock or adds musical note endpoints.
-          // Direct BPM edits preserve those inputs; reset clears this request.
-          if policy is Continue && prepared.bpm is Some(bpm) {
-            for route in sched_routes.val {
-              if route.pool.scheduler.validate_bpm(bpm) is Err(_) {
-                return set_scheduler_parse_error(
-                  "tempo change exceeds transport range",
-                )
-              }
-            }
-          }
-          playback_state.val = next
-          prepared_slot.val = None
-          set_scheduler_parse_success()
+        let snapshot = song_update_snapshot(routed) catch {
+          error => return Err(InvalidSource(error.to_string()))
+        }
+        routes.push({
+          target: route.pool,
+          snapshot: if repeated {
+            @scheduler.PlaybackSnapshot::repeat_song(snapshot)
+          } else {
+            @scheduler.PlaybackSnapshot::song(snapshot)
+          },
+        })
+      }
+      Ok({
+        source,
+        tempo,
+        layout: song_layout(song, repeated),
+        doc: None,
+        routes,
+        span,
+      })
+    }
+  }
+  let song = match prepared {
+    Err(error) => return Err(error)
+    Ok(song) => song
+  }
+  guard song.routes.all(route => {
+    route.snapshot.material_count() <= PLAYBACK_MATERIAL_LIMIT
+  }) else {
+    return Err(InvalidSource("playback source exceeds 256 material entries"))
+  }
+  Ok(song)
+}
+
+///|
+/// All state-dependent planning and installation happen in this owner turn.
+/// No prepared handle or execution plan can survive an intervening render.
+fn Player::install(
+  self : Player,
+  song : PreparedSong,
+  restart : Bool,
+) -> Result[Unit, PlayerError] {
+  match
+    @scheduler.accept_playback_all(
+      song.routes.map(route => (route.target.scheduler, route.snapshot)),
+      song.tempo,
+      material_limit=PLAYBACK_MATERIAL_LIMIT,
+      restart~,
+      end_?=song.finite_end(),
+    ) {
+    Err(MaterialLimit) =>
+      return Err(
+        InvalidSource(
+          "playback would retain more than 256 material entries; wait for their boundaries or Restart",
+        ),
+      )
+    Err(Transport(_)) => return Err(TransportRange)
+    Ok(_) => ()
+  }
+  if restart {
+    self.reverb.reset()
+    for route in song.routes {
+      route.target.pool.kill_all()
+    }
+  }
+  Ok(())
+}
+
+///|
+/// Accept source without starting or rewinding the performance.
+pub fn Player::update(
+  self : Player,
+  source : String,
+) -> Result[Unit, PlayerError] {
+  if self.session is Fault(message) {
+    return Err(Failed(message))
+  }
+  let next = match self.prepare(source) {
+    Ok(song) => song
+    Err(error) => return Err(error)
+  }
+  match self.session {
+    Empty | Ready(_) | Ended(_, _) =>
+      if next.finite_end() is Some(end_) {
+        match
+          next.tempo.sample_at_start(
+            end_,
+            sample_rate=self.context.sample_rate(),
+          ) {
+          Err(_) => return Err(TransportRange)
+          Ok(_) => ()
         }
       }
+    Playing(_) | Paused(_) | Fault(_) => ()
+  }
+  match self.session {
+    Playing(current) | Paused(current) => {
+      guard current.layout == next.layout else { return Err(RestartRequired) }
+      match self.install(next, false) {
+        Err(error) => return Err(error)
+        Ok(_) => ()
+      }
+      self.session = match self.session {
+        Paused(_) => Paused(next)
+        _ => Playing(next)
+      }
     }
-    _ =>
-      set_scheduler_parse_error("invalid or consumed prepared playback token")
+    Ended(_, position) => self.session = Ended(next, position)
+    Empty | Ready(_) => self.session = Ready(next)
+    Fault(message) => return Err(Failed(message))
+  }
+  Ok(())
+}
+
+///|
+/// Parse current editor source first; invalid input cannot reset a voice or clock.
+pub fn Player::restart(
+  self : Player,
+  source : String,
+) -> Result[Unit, PlayerError] {
+  if self.session is Fault(message) {
+    return Err(Failed(message))
+  }
+  let song = match self.prepare(source) {
+    Ok(song) => song
+    Err(error) => return Err(error)
+  }
+  match self.install(song, true) {
+    Err(error) => Err(error)
+    Ok(_) => {
+      self.session = Playing(song)
+      Ok(())
+    }
   }
 }
 
 ///|
-pub fn discard_prepared_playback(token : Int) -> Bool {
-  match prepared_slot.val {
-    Some((id, _)) if id == token => {
-      prepared_slot.val = None
-      true
+pub fn Player::play(self : Player) -> Result[Unit, PlayerError] {
+  match self.session {
+    Empty => Err(NoSong)
+    Fault(message) => Err(Failed(message))
+    Playing(_) => Ok(())
+    Paused(song) => {
+      self.session = Playing(song)
+      Ok(())
     }
-    _ => false
-  }
-}
-
-///|
-pub fn restart_playback() -> Int {
-  match restart_current(playback_state.val) {
-    Err(message) => set_scheduler_parse_error(message)
-    Ok(next) => {
-      playback_state.val = next
-      set_scheduler_parse_success()
-    }
-  }
-}
-
-///|
-/// The only playback commit/render entry. Reset and replacement precede
-/// every route's query, so no block can observe a partly reset score.
-fn commit_playback_request() -> Unit {
-  match playback_state.val.pending {
-    None => ()
-    Some(request) => {
-      match request.policy {
-        Restart => {
-          match sched_reverb.val {
-            Some(reverb) => reverb.reset()
-            None => ()
-          }
-          for route in sched_routes.val {
-            route.pool.scheduler.reset_transport_and_kill_notes(route.pool.pool)
-          }
+    Ready(song) | Ended(song, _) =>
+      match self.install(song, true) {
+        Err(error) => Err(error)
+        Ok(_) => {
+          self.session = Playing(song)
+          Ok(())
         }
-        Continue => ()
       }
-      match request.tempo {
-        Some(bpm) =>
-          for route in sched_routes.val {
-            // Admission proved this for the unchanged anchor and endpoints.
-            // Restart instead uses a fresh clock with no active notes.
-            route.pool.scheduler.set_bpm(bpm).unwrap()
-          }
-        None => ()
+  }
+}
+
+///|
+pub fn Player::pause(self : Player) -> Result[Unit, PlayerError] {
+  match self.session {
+    Empty => Err(NoSong)
+    Fault(message) => Err(Failed(message))
+    Playing(song) => {
+      self.session = Paused(song)
+      Ok(())
+    }
+    Ready(_) | Paused(_) | Ended(_, _) => Ok(())
+  }
+}
+
+///|
+pub fn Player::view(self : Player) -> PlayerView {
+  let state = match self.session {
+    Empty => PlayState::Empty
+    Ready(_) => Ready
+    Playing(_) => Playing
+    Paused(_) => Paused
+    Ended(_, _) => Ended
+    Fault(_) => Fault
+  }
+  let song = self.session.song()
+  // Every route projects the same material identities; do not count six copies.
+  let mut pending = 0
+  let mut skipped = 0
+  if self.session is Playing(_) || self.session is Paused(_) {
+    for scheduler in self.schedulers {
+      pending = Int::max(pending, scheduler.pending_material_change_count())
+      skipped = Int::max(skipped, scheduler.skipped_material_change_count())
+    }
+  }
+  {
+    state,
+    source: song.map(song => song.source),
+    bpm: match song {
+      Some(song) => song.tempo.bpm()
+      None => self.schedulers[0].bpm()
+    },
+    sample_position: match self.session {
+      Ended(_, position) => position.to_double()
+      Empty | Ready(_) => 0.0
+      _ => self.schedulers[0].sample_counter().to_double()
+    },
+    pending_materials: pending,
+    skipped_materials: skipped,
+  }
+}
+
+///|
+fn PlayerError::message(self : PlayerError) -> String {
+  match self {
+    InvalidSource(message) | Failed(message) => message
+    RestartRequired => "song layout changed; restart required"
+    NoSong => "no Current song; update source before Play"
+    TransportRange => "tempo change exceeds transport range"
+  }
+}
+
+///|
+fn player_command(command : (Player) -> Result[Unit, PlayerError]) -> Int {
+  guard player.val is Some(owner) else {
+    return set_scheduler_parse_error("Player is not initialized")
+  }
+  match command(owner) {
+    Ok(_) => set_scheduler_parse_success()
+    Err(error) => {
+      ignore(set_scheduler_parse_error(error.message()))
+      if error is RestartRequired {
+        2
+      } else {
+        1
       }
-      for i in 0..<sched_routes.val.length() {
-        sched_routes.val[i].pool.scheduler.queue_playback_snapshot(
-          request.playback.snapshots[i],
-        )
-      }
-      playback_state.val = { active: Some(request.playback), pending: None, }
     }
   }
 }
 
 ///|
-fn process_snapshot_routes(
-  left : @moondsp.AudioBuffer,
-  right : @moondsp.AudioBuffer,
-) -> Unit {
-  let send_left = match sched_send_left.val {
-    Some(buffer) => buffer
-    None => return
-  }
-  let send_right = match sched_send_right.val {
-    Some(buffer) => buffer
-    None => return
-  }
-  for route in sched_routes.val {
-    let sp = route.pool
-    sp.tmp_left.fill(0.0)
-    sp.tmp_right.fill(0.0)
-    sp.tmp_send_left.fill(0.0)
-    sp.tmp_send_right.fill(0.0)
-    sp.scheduler.process_playback_snapshot_block_with_send(
-      sp.pool,
-      sp.tmp_left,
-      sp.tmp_right,
-      sp.tmp_send_left,
-      sp.tmp_send_right,
-    )
-    for i in 0..<send_left.length() {
-      send_left.set(i, send_left.get(i) + sp.tmp_send_left.get(i))
-      send_right.set(i, send_right.get(i) + sp.tmp_send_right.get(i))
-    }
-    accumulate_sub_pool(sp, left, right)
+fn take_playback_input() -> String {
+  let source = input_chars_to_string(playback_input_chars)
+  playback_input_chars.clear()
+  source
+}
+
+///|
+pub fn player_update_input() -> Int {
+  let source = take_playback_input()
+  player_command(owner => owner.update(source))
+}
+
+///|
+pub fn player_restart_input() -> Int {
+  let source = take_playback_input()
+  player_command(owner => owner.restart(source))
+}
+
+///|
+pub fn player_play() -> Int {
+  player_command(owner => owner.play())
+}
+
+///|
+pub fn player_pause() -> Int {
+  player_command(owner => owner.pause())
+}
+
+///|
+pub fn player_state() -> Int {
+  match player.val {
+    None => 0
+    Some(owner) =>
+      match owner.session {
+        Empty => 0
+        Ready(_) => 1
+        Playing(_) => 2
+        Paused(_) => 3
+        Ended(_, _) => 4
+        Fault(_) => 5
+      }
   }
 }
 
 ///|
-/// Current effective BPM across the synchronized scheduler routes.
+pub fn player_pending_count() -> Int {
+  match player.val {
+    Some(owner) => owner.view().pending_materials
+    None => 0
+  }
+}
+
+///|
+pub fn player_skipped_count() -> Int {
+  match player.val {
+    Some(owner) => owner.view().skipped_materials
+    None => 0
+  }
+}
+
+///|
 pub fn scheduler_bpm() -> Double {
-  match sched_routes.val.get(0) {
-    Some(route) => route.pool.scheduler.bpm()
-    None => 0.0
+  match player.val {
+    Some(owner) => owner.view().bpm
+    None => 60.0
   }
 }
 
 ///|
-/// Position of the next block, also used in application acknowledgements.
 pub fn scheduler_sample_position() -> Double {
-  match sched_routes.val.get(0) {
-    Some(route) => route.pool.scheduler.sample_counter().to_double()
+  match player.val {
+    Some(owner) => owner.view().sample_position
     None => 0.0
   }
 }

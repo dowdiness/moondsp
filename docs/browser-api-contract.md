@@ -717,8 +717,9 @@ exit-deliverable graph:
 scheduler pattern/song playback:
   init_scheduler_graph, process_scheduler_block, scheduler_left_sample,
   scheduler_right_sample, scheduler_sample_position, clear_playback_input,
-  push_playback_char, prepare_pattern_input, prepare_song_input,
-  apply_prepared_playback, discard_prepared_playback, restart_playback,
+  push_playback_char, player_update_input, player_restart_input,
+  player_play, player_pause, player_state, player_pending_count,
+  player_skipped_count,
   get_playback_error, get_playback_error_length, get_playback_error_char,
   set_scheduler_bpm, scheduler_bpm, set_scheduler_gain
 
@@ -774,27 +775,29 @@ browser-error update.
 
 ## Pattern/song parse protocol
 
-Preparation returns a positive token on success and zero on failure.
-Application returns `0` when accepted for the next block, `1` for an invalid
-token or unrepresentable change, and `2` when starting/restarting is required
-because there is no active score or its mode/layout differs. Restart returns
-`0` on acceptance and `1` on rejection. Acceptance is not an application
-receipt. Errors update the shared playback diagnostic buffer while retaining
-applied and pending playback.
-`discard_prepared_playback` returns whether the supplied token was released.
+Fill the shared UTF-16 input buffer, then consume it with `player_update_input`
+or `player_restart_input`. Both accept the same source grammar: optional
+bindings and `bpm(number);`, followed by a Pattern or arrangement. Omitted tempo
+is 60 BPM. Patterns repeat; finite arrangements end unless followed by `.repeat()`.
+There are no public preparation tokens.
 
-Preparation and application are separate. Fill the shared input buffer and call
-`prepare_pattern_input` or `prepare_song_input` to obtain an opaque positive
-token. Zero means failure; the unified playback-error accessors expose the
-message. Preparation never resets or replaces the active score.
+Commands return `0` for acceptance, `1` for invalid/unrepresentable input, and
+`2` when a Playing/Paused layout change requires Restart. Acceptance is immediate,
+including while Paused; it does not wait for a rendered block. Diagnostics use
+the shared playback-error buffer. Rejection preserves Current song, transport,
+voices, room, and pending material reservations.
 
-`apply_prepared_playback(token, restart)` consumes a valid token on success
-and queues one operation at the next audio block. `restart=false` preserves
-transport and voices; `restart=true` replaces and resets atomically.
-`discard_prepared_playback(token)` releases an unused prepared result.
-`restart_playback()` restarts the applied snapshot without parsing text and
-cancels pending replacements. Preparation results are audio-owner objects and
-are not transferable snapshots. Only one prepared token is retained at a time.
+Update replaces Current song without starting or rewinding. Changed material
+enters at safe boundaries. Restart parses and preflights before resetting and
+starting from zero. Play starts Ready/Ended Current song, resumes Paused, or
+leaves Playing unchanged. Pause freezes musical state and outputs silence
+without suspending the AudioContext. Play without a Current song rejects.
+
+Repeated arrangements must span at least one audio block at the accepted tempo
+and sample rate; this limits repetition splitting to two slices per block, not
+arbitrary pattern/event density. Finite endpoints are checked on the proposed
+clock before mutation. Ready/Ended updates check their future zero-anchored
+clock, preserving the old performance and tails on rejection.
 
 `set_scheduler_bpm` returns `0` after changing all routes, or `1` on rejection
 with a playback diagnostic. Rejection preserves the current transport and tempo.
@@ -804,66 +807,101 @@ position; hosts must consume the result rather than assume success.
 scheduler initialization. Do not compare it to the requested double to infer
 success: rounding is part of an accepted change.
 
-See the technical reference's browser playback section for admission rules,
-error preservation, block receipts and the shared worklet protocol.
+See the technical reference's browser Player section for retained-material
+timing and the complete state/receipt contract.
+
+### Migrating prepared-playback clients
+
+This is a breaking cutover for the scheduler/player facade, not a change to
+`GraphEngine` or `AudioPower`. Remove token storage and split prepare/apply
+transactions; the old symbols and wire aliases are not retained.
+
+| Removed API/protocol | Replacement |
+|---|---|
+| `prepare_pattern_input()` / `prepare_song_input()` | Fill the same UTF-16 buffer, then call `player_update_input()` or `player_restart_input()`; the source grammar selects Pattern versus arrangement |
+| `apply_prepared_playback(token, false)` | `player_update_input()` performs preparation and acceptance together |
+| `apply_prepared_playback(token, true)` | `player_restart_input()` preflights, resets, and starts atomically |
+| `discard_prepared_playback(token)` | Delete token bookkeeping. Cancel an unsent editor update locally; an accepted command is not a deferred preparation that can be discarded |
+| `restart_playback()` | Fill the input buffer with the desired source and call `player_restart_input()`. To rewind Current song rather than the draft, retain and resubmit the last accepted text |
+| `apply-score` with `policy: "continue"` / `"restart"` | `player-update` / `player-restart`, each with `{ id, text }`; omit the old `mode`, `policy`, and `revision` fields |
+| `restart-playback` | `player-restart` with `{ id, text }` |
+| `pattern-updated`, `song-updated`, `playback-restarted`, and their old error replies | Correlate immediate `player-receipt` messages by `id`; handle `accepted`, `restartRequired`, and `message` |
+| `playback-superseded` / render-triggered `didRender()` acknowledgement | No replacement notification. Coalesce unsent edits in the host; accepted commands receive their own immediate receipts |
+| `PlaybackController.setTempo(data)` | `PlaybackController.handle({ type: "set-scheduler-bpm", bpm, revision })` for the separate legacy demo control |
+
+Request IDs are positive safe integers. A receipt's `samplePosition` is the
+owner's next unrendered sample, not the removed `acceptedAtSample` or a promise
+that every material is audible. `pendingCount` and `skippedCount` describe that
+distinction. `player-play` starts Ready/Ended, resumes Paused, and leaves Playing
+unchanged; it is not an unconditional replacement for the old rewind call.
+
+MoonBit scheduler consumers must also migrate the removed tempo validators and
+`active_*` / `has_pending_*` snapshot observations; the
+[scheduler migration table](../scheduler/README.mbt.md#migrating-tempo-and-snapshot-observation)
+lists each replacement.
 
 ## Live editor playback ownership
 
-The live editor sends draft edits, mode selection, example selection, tempo
-changes, and Play/Stop intent through `LivePlayback` in
-`web/live/src/playback.ts`. The module owns submission revisions, accepted-score
-deduplication, debounce cancellation, and the decision to reveal audio after a
-successful receipt. `main.ts` renders its `PlaybackView`; it does not handle
-worklet replies or reset playback bookkeeping.
+The live editor routes draft edits and Play/Pause/Restart through `Player` in
+`web/live/src/playback.ts`. MoonBit owns Current song and musical state; the
+TypeScript adapter owns session capabilities, command correlation, edit-version
+diagnostics, debounce cancellation, and revealing audio after acceptance.
+`main.ts` renders `PlaybackView` rather than handling worklet replies.
 
-`Tempo` parses manual input once: the complete decimal must be finite and at
-most 1000 BPM, with values below the manual minimum clamped to 1. Incoming
-runtime tempo is decoded separately over its full 0.001–1000 range; a valid
-song tempo below the manual minimum must not be clamped. `ScoreSource` parses
-empty versus nonempty drafts, not score syntax. `RequestId` admits only
-positive safe integers and does not wrap. These values have private constructors.
+Tempo and Pattern/arrangement selection belong to source, not separate UI
+fields. Tempo is accepted over 0.001–1000 BPM and rounded to 0.001 BPM.
+`RequestId` admits positive safe integers and never wraps.
 
-The BPM field explicitly separates editing text from the committed UI value.
-Enter or blur commits and normalizes it; empty or invalid input restores the
-committed value, with invalid input reported. Same-value receipts preserve
-unfinished text. Correlated tempo acknowledgements supply the runtime's
-effective value, including after rejection or rounding. Score receipts carry
-effective tempo after render and the most recently processed tempo revision;
-an older acknowledgement cannot overwrite a newer tempo commit.
-The field variants are `editing` and `displaying`. Displaying the committed UI
-value does not claim that the runtime has acknowledged it.
+An accepted source remains Current song even if the draft later becomes invalid.
+Play resumes that accepted song; Restart explicitly submits editor text.
+A delayed rejection cannot annotate a newer draft. Connection epochs quarantine
+retired replies and failures so they cannot mutate a subsequent run.
 
-Playback acceptance and diagnostic freshness are separate. A successful
-submission can reveal audio even after the draft has changed, but its reply
-must not repaint diagnostics for a different draft. Stop and audio failure
-invalidate outstanding submissions without reusing their revision numbers, so
-late replies cannot reveal a subsequent Play or affect its diagnostics. Retry
-submits the latest draft, including edits made while audio was unavailable.
+Numeric musical states are Empty, Ready, Playing, Paused, Ended, and Fault
+(0 through 5). The UI displays Empty as Ready and adds Starting during opening.
+Pause during initial Starting cancels that start locally with `AbortError`;
+it does not send Pause to an Empty owner or fabricate an accepted receipt.
+Startup Pause and `Player.close()` abort initialization, disconnect partial
+resources, and await owned context cleanup. Concurrent closes share retirement,
+and an immediate Play waits for that retirement before opening afresh.
 
-The playback lifecycle is a closed union: stopped, opening,
-awaiting-acceptance, playing, compiled, closing, or failed. Only scheduler
-states own pending score requests and a scheduler session; playing also owns
-an accepted score. `PlaybackView` is a projection, not another mutable state
-store. Intent methods return named outcomes instead of validate-and-no-op.
-
-`AudioEngine.openSession` returns `OpenSessionResult`: an opened scheduler or
-compiled session, a failure, or busy. An opened session starts muted.
+`AudioEngine.openSession(deliver, signal?)` returns `OpenSessionResult`: an
+opened scheduler or compiled session, a failure, or busy. Cancellation rejects
+with `AbortError`. One five-second deadline covers all initialization stages,
+including suspended-context resume and the WASM request; timeout is a failure,
+not cancellation. Non-abortable native completions cannot activate a retired
+graph. Native context-close completion is still required before retirement
+finishes. The signal is detached after opening and cannot cancel an active
+session. An opened session starts muted.
 The adapter owns AudioContext, AudioWorklet, suspension, teardown, and output
 gain; it does not expose nullable-node command methods.
 
+Player sources are subject to the
+[structural admission limits](technical-reference.md#browser-player-ownership-and-source-updates):
+8,192 code units, bounded syntax/query-plan depth, 128-step Euclidean rhythms,
+128 occurrences, 256 source/retained material entries per route, and conservative
+event/work expansion bounds at 1000 BPM.
+Admission checks future callback branches and full-cycle sequence queries,
+not just a sample of the opening blocks. Rejection preserves Current song.
+Material admission includes accumulated entries waiting for replacement/removal
+and future occurrences, not just the latest source. It checks all route clocks
+and proposed material states before installing any route. Waiting for removal
+boundaries or explicitly restarting can recover retained capacity.
+The low-level Mini library does not impose browser limits by default.
+
 | Session method | Meaning | Completion |
 |---|---|---|
-| `submitScore(request)` | Submit a score to the scheduler worklet | A playback receipt reports acceptance or rejection |
-| `requestTempoChange(tempo, id)` | Request a scheduler tempo change | A tempo receipt reports the result and effective BPM |
+| `update(id, text)` | Accept new Current song without rewinding | Immediate Player receipt |
+| `restart(id, text)` | Accept editor source, reset and start | Immediate Player receipt |
+| `play(id)` / `pause(id)` | Submit musical transport intent | Immediate Player receipt |
 | `fadeIn()` | Schedule an 80ms output fade-in | Does not acknowledge a score or confirm audible output |
 | `close()` | Expire the session, then fade out and suspend its graph | Returns `Promise<CloseSessionResult>`; a healthy graph may be reused |
 
-Only scheduler sessions expose `submitScore` and `requestTempoChange`.
-The first three methods return `SessionCommandResult`: `issued` means the
-command was posted to the worklet or scheduled locally, **not** that the DSP
-accepted or finished it. `session-expired` means nothing was issued because the
-session is no longer active. Obtain a new session with `openSession` after
-closing completes or a fault permits Retry.
+Only scheduler sessions expose the four musical commands. These commands and
+`fadeIn` return `SessionCommandResult`: `issued` means posted or locally
+scheduled, not that DSP accepted the command or produced audible output.
+`session-expired` means nothing was issued. Obtain a new session with
+`openSession` only after retirement completes.
 
 Session commands share one ownership check. Once closing begins, every command
 from that session is rejected as `session-expired`, including after a later run
@@ -872,8 +910,8 @@ an expired close cannot stop a new run.
 
 Graph health and playback-run freshness are distinct. Graph-bound listeners
 continue handling runtime/protocol failures during closing, suspension, and
-resumption; failures dispose the graph and prevent its reuse. Score/tempo
-receipts are delivered only to an active run. Async close/resume completions
+resumption; failures dispose the graph and prevent its reuse. Player receipts
+are delivered only to an active run. Async close/resume completions
 check their operation identity before changing state, so a failure or immediate
 Retry cannot be overwritten. The resuming state also owns completion of the
 open request: it returns failure even if closing the faulty context leaves the
@@ -881,22 +919,21 @@ browser's native resume promise pending.
 
 `decodeWorkletMessage` is the single live-editor wire decoder. It turns
 `unknown` into complete typed events or an explicit protocol failure, which
-tears down the graph and enables Retry. Rejections require an explicit
-`recovery: "edit" | "restart"` field. The shared worklet controller derives it
-from native admission status before posting the diagnostic; neither the
-controller nor the editor interprets diagnostic wording as a recovery code.
-The controller still owns prepared-token transport and render receipts;
-next-entry timing is unchanged. Tempo commands require a revision and report
-`tempo-updated` or `tempo-error`; score receipts include `tempo` and `tempoRevision`.
+tears down the graph and enables Retry. `player-receipt` includes the request
+ID, operation, acceptance, and full state projection: `state`, `samplePosition`,
+`tempo`, `pendingCount`, and `skippedCount`. Rejections require a boolean
+`restartRequired` and diagnostic `message`; clients do not infer recovery from
+message wording. `player-status` refreshes the state projection between commands.
+The legacy demo tempo command remains separate from the live editor protocol.
 
-Controlled tests cover receipt ordering, retired sessions, and stale tempo
-acknowledgements through the same interface as the editor. Real-browser tests
-cover startup, parse recovery, Play/Stop, Retry, tempo drafts, protocol failure,
-song tempo below the manual minimum, and contextual tempo rejection. The
-real-WASM controller tests also distinguish accepted rounding from rejection.
+Controlled tests cover startup cancellation, cleanup barriers, receipt ordering,
+retired sessions, and stale edit diagnostics. Browser and real-WASM tests cover
+paused updates, invalid Restart preservation, Ended replay, source tempo, and
+transport freezes.
 `audio-lifecycle.spec.ts` exercises real Web Audio close/resume operations with
-injected failure notifications, including failure during Stop, failure while
-suspended/resuming, immediate Retry, and obsolete capability commands.
+injected failures and stalled loading stages: Stop/suspended/resuming failures,
+cancelled fetch/resume, late body completion, total initialization timeout,
+immediate Retry, and obsolete capability commands.
 
 ## Browser graph-error protocol
 
@@ -950,13 +987,12 @@ run these dedicated probe suites.
 Message responsibilities:
 
 - Both scheduler paths use `PlaybackController` in `web/playback-controller.js`
-  for `apply-score`, `restart-playback`, and revisioned `set-scheduler-bpm`.
-  It owns prepared-token submission, supersession, effective-tempo replies, and
-  score receipts after rendering. See the playback protocol above for fields.
+  for `player-update`, `player-restart`, `player-play`, `player-pause`, and the
+  separate revisioned demo `set-scheduler-bpm`. It returns immediate owner
+  receipts; it does not retain public tokens or wait for rendering.
 - Each worklet owns WASM initialization, graph initialization, sample copying,
-  readiness and runtime errors. The dedicated scheduler queues initial restart
-  and tempo requests until its first render initializes the graph. `ready`
-  announces WASM readiness, not completion of an initial score render.
+  readiness and runtime errors. The dedicated scheduler reports `ready` after
+  graph initialization and refreshes Player status every 32 rendered quanta.
 - `set-scheduler-gain` is handled by the worklets, not the shared controller.
 - `processor.js` additionally handles demo controls such as `set-freq`,
   `set-gain`, `set-pan`, `set-delay-samples`, `set-cutoff`, and graph queue

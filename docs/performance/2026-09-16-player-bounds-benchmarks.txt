@@ -1,0 +1,312 @@
+Player bounded-startup and source-admission benchmark snapshot
+Date: 2026-09-16
+Command: NEW_MOON_MOD=0 moon bench --release
+Toolchain: moon 0.1.20260904 (94521db 2026-09-04)
+Host: AMD Ryzen 7 6800H, Linux WSL2
+Conditions: shared workstation; browser released and preview stopped before benchmarks. No paired baseline; do not infer speedup or regression.
+
+[dowdiness/moondsp] bench dsp/reverb_benchmark.mbt:8 ("bench/reverb/dry_stereo_copy_128") ok
+time (mean ± σ)         range (min … max) 
+   1.41 µs ±  40.13 ns     1.35 µs …   1.47 µs  in 10 ×  74707 runs
+[dowdiness/moondsp] bench dsp/reverb_benchmark.mbt:32 ("bench/reverb/shared_stereo_128") ok
+time (mean ± σ)         range (min … max) 
+  48.72 µs ± 606.01 ns    47.88 µs …  49.45 µs  in 10 ×   1972 runs
+[dowdiness/moondsp] bench graph/graph_benchmark.mbt:244 ("bench/process/runtime_control_fold_barrier_ab") ok
+name                  time (mean ± σ)         range (min … max) 
+folded_equivalent/128    1.91 µs ±  13.70 ns     1.89 µs …   1.92 µs  in 10 ×  52542 runs
+retained_gain/128        2.79 µs ±  60.51 ns     2.74 µs …   2.89 µs  in 10 ×  36706 runs
+retained_clip/128        2.81 µs ±  23.44 ns     2.77 µs …   2.86 µs  in 10 ×  35161 runs
+[dowdiness/moondsp] bench graph/graph_benchmark.mbt:276 ("bench/process/passthrough") ok
+name            time (mean ± σ)         range (min … max) 
+passthrough/64     1.03 µs ±  14.31 ns     1.01 µs …   1.05 µs  in 10 ×  97702 runs
+passthrough/128    1.90 µs ±  10.36 ns     1.88 µs …   1.92 µs  in 10 ×  53291 runs
+passthrough/256    3.81 µs ± 137.22 ns     3.67 µs …   4.04 µs  in 10 ×  27128 runs
+[dowdiness/moondsp] bench graph/graph_benchmark.mbt:290 ("bench/process/minimal_voice") ok
+name              time (mean ± σ)         range (min … max) 
+minimal_voice/64     2.49 µs ±  53.56 ns     2.43 µs …   2.61 µs  in 10 ×  40264 runs
+minimal_voice/128    4.58 µs ±  61.23 ns     4.49 µs …   4.71 µs  in 10 ×  21605 runs
+minimal_voice/256    8.99 µs ± 192.17 ns     8.76 µs …   9.40 µs  in 10 ×  11174 runs
+[dowdiness/moondsp] bench graph/graph_benchmark.mbt:304 ("bench/process/fm_voice") ok
+name         time (mean ± σ)         range (min … max) 
+fm_voice/64    15.94 µs ± 282.88 ns    15.70 µs …  16.58 µs  in 10 ×   6922 runs
+fm_voice/128   30.57 µs ± 114.29 ns    30.40 µs …  30.75 µs  in 10 ×   3851 runs
+fm_voice/256   53.80 µs ± 846.20 ns    53.15 µs …  56.01 µs  in 10 ×   2041 runs
+[dowdiness/moondsp] bench graph/graph_benchmark.mbt:318 ("bench/process/full_voice") ok
+name           time (mean ± σ)         range (min … max) 
+full_voice/64     7.43 µs ± 215.26 ns     7.20 µs …   7.80 µs  in 10 ×  12977 runs
+full_voice/128   13.71 µs ± 368.02 ns    13.34 µs …  14.31 µs  in 10 ×   7405 runs
+full_voice/256   25.84 µs ± 212.36 ns    25.55 µs …  26.10 µs  in 10 ×   3888 runs
+[dowdiness/moondsp] bench graph/graph_benchmark.mbt:332 ("bench/process/feedback_voice") ok
+name               time (mean ± σ)         range (min … max) 
+feedback_voice/64    16.56 µs ± 115.56 ns    16.41 µs …  16.68 µs  in 10 ×   6013 runs
+feedback_voice/128   32.88 µs ± 323.12 ns    32.62 µs …  33.62 µs  in 10 ×   3094 runs
+feedback_voice/256   66.74 µs ±   1.11 µs    65.20 µs …  68.25 µs  in 10 ×   1497 runs
+[dowdiness/moondsp] bench graph/graph_benchmark.mbt:346 ("bench/process/stereo_chain") ok
+name             time (mean ± σ)         range (min … max) 
+stereo_chain/64    14.97 µs ±   1.82 µs    13.65 µs …  19.48 µs  in 10 ×   7390 runs
+stereo_chain/128   25.50 µs ±   2.80 µs    24.27 µs …  33.23 µs  in 10 ×   4029 runs
+stereo_chain/256   47.08 µs ±   1.18 µs    45.90 µs …  49.51 µs  in 10 ×   2111 runs
+[dowdiness/moondsp] bench graph/graph_benchmark.mbt:365 ("bench/compile/passthrough") ok
+name        time (mean ± σ)         range (min … max) 
+passthrough    4.51 µs ±  95.16 ns     4.36 µs …   4.66 µs  in 10 ×  22568 runs
+[dowdiness/moondsp] bench graph/graph_benchmark.mbt:375 ("bench/compile/minimal_voice") ok
+name          time (mean ± σ)         range (min … max) 
+minimal_voice    6.28 µs ± 120.27 ns     6.13 µs …   6.50 µs  in 10 ×  14817 runs
+[dowdiness/moondsp] bench graph/graph_benchmark.mbt:385 ("bench/compile/fm_voice") ok
+name     time (mean ± σ)         range (min … max) 
+fm_voice   13.27 µs ±  98.68 ns    13.16 µs …  13.42 µs  in 10 ×   7481 runs
+[dowdiness/moondsp] bench graph/graph_benchmark.mbt:395 ("bench/compile/full_voice") ok
+name       time (mean ± σ)         range (min … max) 
+full_voice   16.01 µs ± 504.94 ns    15.52 µs …  17.21 µs  in 10 ×   6333 runs
+[dowdiness/moondsp] bench graph/graph_benchmark.mbt:405 ("bench/compile/feedback_voice") ok
+name           time (mean ± σ)         range (min … max) 
+feedback_voice   11.33 µs ± 244.57 ns    11.00 µs …  11.78 µs  in 10 ×   8970 runs
+[dowdiness/moondsp] bench graph/graph_benchmark.mbt:415 ("bench/compile/stereo_chain") ok
+name         time (mean ± σ)         range (min … max) 
+stereo_chain   22.83 µs ±   1.01 µs    21.44 µs …  24.41 µs  in 10 ×   3300 runs
+[dowdiness/moondsp] bench graph/graph_benchmark.mbt:460 ("bench/hotswap/minimal_voice") ok
+name              time (mean ± σ)         range (min … max) 
+minimal_voice/64    20.88 µs ± 274.25 ns    20.45 µs …  21.21 µs  in 10 ×   5414 runs
+minimal_voice/128   42.84 µs ±   1.34 µs    41.25 µs …  45.33 µs  in 10 ×   2583 runs
+minimal_voice/256   81.02 µs ±   2.80 µs    76.99 µs …  84.24 µs  in 10 ×   1553 runs
+[dowdiness/moondsp] bench graph/graph_benchmark.mbt:490 ("bench/hotswap/fm_voice") ok
+name         time (mean ± σ)         range (min … max) 
+fm_voice/64    29.79 µs ± 486.48 ns    29.26 µs …  30.68 µs  in 10 ×   3694 runs
+fm_voice/128   55.97 µs ± 752.27 ns    54.96 µs …  57.21 µs  in 10 ×   2017 runs
+fm_voice/256   92.17 µs ±   1.27 µs    90.73 µs …  94.76 µs  in 10 ×   1086 runs
+[dowdiness/moondsp] bench graph/graph_benchmark.mbt:520 ("bench/hotswap/full_voice") ok
+name           time (mean ± σ)         range (min … max) 
+full_voice/64    30.48 µs ± 274.44 ns    30.05 µs …  30.91 µs  in 10 ×   3188 runs
+full_voice/128   64.65 µs ± 570.02 ns    63.79 µs …  65.35 µs  in 10 ×   1698 runs
+full_voice/256  109.05 µs ±   6.11 µs   105.12 µs … 125.13 µs  in 10 ×    878 runs
+[dowdiness/moondsp] bench graph/graph_benchmark.mbt:550 ("bench/hotswap/stereo_chain") ok
+name             time (mean ± σ)         range (min … max) 
+stereo_chain/64    34.16 µs ± 341.01 ns    33.46 µs …  34.69 µs  in 10 ×   2934 runs
+stereo_chain/128   59.74 µs ± 872.92 ns    58.68 µs …  61.38 µs  in 10 ×   1588 runs
+stereo_chain/256  120.77 µs ±   1.24 µs   119.30 µs … 122.93 µs  in 10 ×    790 runs
+[dowdiness/moondsp] bench graph/graph_benchmark.mbt:592 ("bench/topology/replace_node") ok
+name             time (mean ± σ)         range (min … max) 
+replace_node/64    53.46 µs ±   1.27 µs    51.31 µs …  54.92 µs  in 10 ×   1899 runs
+replace_node/128   83.39 µs ±   7.73 µs    75.88 µs …  92.52 µs  in 10 ×   1063 runs
+replace_node/256  140.76 µs ±   1.11 µs   139.51 µs … 143.22 µs  in 10 ×    704 runs
+[dowdiness/moondsp] bench graph/graph_benchmark.mbt:618 ("bench/topology/insert_delete_roundtrip") ok
+name                        time (mean ± σ)         range (min … max) 
+insert_delete_roundtrip/64    87.00 µs ± 719.32 ns    86.05 µs …  88.35 µs  in 10 ×   1127 runs
+insert_delete_roundtrip/128  147.78 µs ±   3.25 µs   144.11 µs … 153.58 µs  in 10 ×    691 runs
+insert_delete_roundtrip/256  264.61 µs ±   3.71 µs   258.63 µs … 271.40 µs  in 10 ×    377 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1092 ("bench/external_authoring/template_analyze") ok
+name            time (mean ± σ)         range (min … max) 
+small_10_nodes     2.04 µs ±  13.30 ns     2.03 µs …   2.07 µs  in 10 ×  48243 runs
+medium_34_nodes    5.07 µs ±  79.89 ns     5.00 µs …   5.27 µs  in 10 ×  19860 runs
+large_130_nodes   16.61 µs ± 150.24 ns    16.37 µs …  16.80 µs  in 10 ×   5987 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1097 ("bench/external_authoring/control_binding_generation") ok
+name            time (mean ± σ)         range (min … max) 
+small_10_nodes     1.46 µs ±  21.13 ns     1.44 µs …   1.50 µs  in 10 ×  67796 runs
+medium_34_nodes    5.56 µs ±  76.61 ns     5.47 µs …   5.66 µs  in 10 ×  18128 runs
+large_130_nodes   22.13 µs ± 526.75 ns    21.75 µs …  23.54 µs  in 10 ×   4412 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1105 ("bench/external_authoring/control_binding_validation") ok
+name            time (mean ± σ)         range (min … max) 
+small_10_nodes     1.55 µs ± 122.47 ns     1.46 µs …   1.87 µs  in 10 ×  65985 runs
+medium_34_nodes    5.84 µs ± 316.18 ns     5.59 µs …   6.44 µs  in 10 ×  16231 runs
+large_130_nodes   23.18 µs ± 478.50 ns    22.54 µs …  23.86 µs  in 10 ×   4235 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1113 ("bench/external_authoring/string_control_resolution") ok
+name            time (mean ± σ)         range (min … max) 
+small_10_nodes   977.58 ns ±  10.64 ns   960.55 ns … 993.39 ns  in 10 × 100000 runs
+medium_34_nodes    2.99 µs ±  66.22 ns     2.93 µs …   3.12 µs  in 10 ×  33869 runs
+large_130_nodes   10.89 µs ± 128.74 ns    10.72 µs …  11.16 µs  in 10 ×   9226 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1121 ("bench/external_control/apply_param_batch_compiled") ok
+name            time (mean ± σ)         range (min … max) 
+small_10_nodes     2.66 µs ±  41.04 ns     2.61 µs …   2.73 µs  in 10 ×  38433 runs
+medium_34_nodes    8.98 µs ± 166.09 ns     8.73 µs …   9.15 µs  in 10 ×  11056 runs
+large_130_nodes   38.14 µs ± 650.08 ns    37.41 µs …  39.69 µs  in 10 ×   2616 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1141 ("bench/external_control/apply_param_batch_topology_controller") ok
+name            time (mean ± σ)         range (min … max) 
+small_10_nodes     3.93 µs ± 118.77 ns     3.77 µs …   4.08 µs  in 10 ×  25958 runs
+medium_34_nodes   13.97 µs ± 266.90 ns    13.59 µs …  14.36 µs  in 10 ×   6961 runs
+large_130_nodes   53.25 µs ±   1.13 µs    52.01 µs …  54.95 µs  in 10 ×   1862 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1164 ("bench/external_authoring/topology_doc_roundtrips") ok
+name                           time (mean ± σ)         range (min … max) 
+replace_node/small_10_nodes       1.10 µs ±  32.25 ns     1.07 µs …   1.16 µs  in 10 ×  92062 runs
+add_node/small_10_nodes           3.27 µs ± 104.77 ns     3.17 µs …   3.49 µs  in 10 ×  30901 runs
+remove_node/small_10_nodes        3.26 µs ± 118.99 ns     3.14 µs …   3.53 µs  in 10 ×  32441 runs
+reconnect_edge/small_10_nodes     1.34 µs ±  23.42 ns     1.31 µs …   1.40 µs  in 10 ×  74921 runs
+replace_node/medium_34_nodes      1.56 µs ±  30.34 ns     1.51 µs …   1.61 µs  in 10 ×  63179 runs
+add_node/medium_34_nodes          7.06 µs ± 645.19 ns     6.50 µs …   8.45 µs  in 10 ×  15333 runs
+remove_node/medium_34_nodes       6.04 µs ± 503.54 ns     5.61 µs …   7.00 µs  in 10 ×  14877 runs
+reconnect_edge/medium_34_nodes    2.13 µs ±  38.91 ns     2.08 µs …   2.19 µs  in 10 ×  45254 runs
+replace_node/large_130_nodes      3.35 µs ±  38.83 ns     3.28 µs …   3.39 µs  in 10 ×  29959 runs
+add_node/large_130_nodes         16.69 µs ± 179.45 ns    16.45 µs …  16.93 µs  in 10 ×   5983 runs
+remove_node/large_130_nodes      16.92 µs ± 200.29 ns    16.67 µs …  17.26 µs  in 10 ×   5930 runs
+reconnect_edge/large_130_nodes    5.04 µs ±  51.84 ns     4.96 µs …   5.10 µs  in 10 ×  18035 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1188 ("bench/external_authoring/compile_prepared_template_change") ok
+name            time (mean ± σ)         range (min … max) 
+small_10_nodes    11.74 µs ± 232.21 ns    11.41 µs …  12.10 µs  in 10 ×   8136 runs
+medium_34_nodes   33.37 µs ±   2.02 µs    31.60 µs …  37.01 µs  in 10 ×   3130 runs
+large_130_nodes  120.12 µs ±   2.15 µs   117.07 µs … 123.87 µs  in 10 ×    835 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1212 ("bench/external_authoring/queue_prepared_hotswap_setup") ok
+name            time (mean ± σ)         range (min … max) 
+small_10_nodes   779.35 ns ±   5.86 ns   772.56 ns … 788.02 ns  in 10 × 100000 runs
+medium_34_nodes  702.67 ns ±  19.78 ns   692.28 ns … 756.86 ns  in 10 × 100000 runs
+large_130_nodes  649.28 ns ±   8.93 ns   641.45 ns … 671.42 ns  in 10 × 100000 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1243 ("bench/external_authoring_diagnostics/control_binding_invalid_index") ok
+name            time (mean ± σ)         range (min … max) 
+small_10_nodes     1.27 µs ±  24.32 ns     1.23 µs …   1.32 µs  in 10 ×  75056 runs
+medium_34_nodes    5.23 µs ±  31.26 ns     5.17 µs …   5.27 µs  in 10 ×  19563 runs
+large_130_nodes   21.35 µs ± 235.39 ns    20.96 µs …  21.66 µs  in 10 ×   4682 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1252 ("bench/external_authoring_diagnostics/control_binding_invalid_slot") ok
+name            time (mean ± σ)         range (min … max) 
+small_10_nodes     1.30 µs ±  13.45 ns     1.28 µs …   1.32 µs  in 10 ×  78095 runs
+medium_34_nodes    5.05 µs ±  90.06 ns     4.93 µs …   5.23 µs  in 10 ×  20465 runs
+large_130_nodes   20.81 µs ± 294.69 ns    20.42 µs …  21.37 µs  in 10 ×   4837 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1261 ("bench/external_authoring_diagnostics/control_binding_duplicate_key") ok
+name            time (mean ± σ)         range (min … max) 
+small_10_nodes     1.29 µs ±  19.09 ns     1.28 µs …   1.33 µs  in 10 ×  72567 runs
+medium_34_nodes    5.30 µs ±  83.44 ns     5.22 µs …   5.47 µs  in 10 ×  18901 runs
+large_130_nodes   22.35 µs ± 469.02 ns    21.87 µs …  23.34 µs  in 10 ×   4450 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1270 ("bench/external_control_diagnostics/apply_invalid_param_batch_compiled") ok
+name            time (mean ± σ)         range (min … max) 
+small_10_nodes     1.66 µs ±  59.13 ns     1.60 µs …   1.77 µs  in 10 ×  61997 runs
+medium_34_nodes    5.24 µs ± 133.69 ns     5.12 µs …   5.57 µs  in 10 ×  19216 runs
+large_130_nodes   19.54 µs ±  82.83 ns    19.46 µs …  19.67 µs  in 10 ×   5116 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1295 ("bench/external_control_diagnostics/apply_invalid_param_batch_topology_controller") ok
+name            time (mean ± σ)         range (min … max) 
+small_10_nodes     1.87 µs ±  34.76 ns     1.83 µs …   1.92 µs  in 10 ×  52413 runs
+medium_34_nodes    5.74 µs ±  56.37 ns     5.66 µs …   5.84 µs  in 10 ×  17596 runs
+large_130_nodes   20.31 µs ± 282.88 ns    19.86 µs …  20.74 µs  in 10 ×   4687 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1321 ("bench/external_authoring_diagnostics/topology_doc_invalid_rewire") ok
+name            time (mean ± σ)         range (min … max) 
+small_10_nodes   404.21 ns ±   8.79 ns   395.43 ns … 417.97 ns  in 10 × 100000 runs
+medium_34_nodes  488.15 ns ±   7.10 ns   476.47 ns … 498.15 ns  in 10 × 100000 runs
+large_130_nodes  931.38 ns ±  58.84 ns   896.74 ns …   1.07 µs  in 10 × 100000 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1334 ("bench/external_authoring_diagnostics/queue_invalid_topology_edit") ok
+name            time (mean ± σ)         range (min … max) 
+small_10_nodes   651.23 ns ±  41.07 ns   611.81 ns … 723.70 ns  in 10 × 100000 runs
+medium_34_nodes  696.86 ns ±  23.55 ns   677.54 ns … 749.97 ns  in 10 × 100000 runs
+large_130_nodes    1.14 µs ±  41.86 ns     1.09 µs …   1.20 µs  in 10 ×  88003 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1356 ("bench/external_authoring_diagnostics/queue_invalid_topology_edit_batch") ok
+name            time (mean ± σ)         range (min … max) 
+small_10_nodes   678.25 ns ±  11.19 ns   668.22 ns … 704.42 ns  in 10 × 100000 runs
+medium_34_nodes  777.15 ns ±  15.85 ns   759.26 ns … 807.84 ns  in 10 × 100000 runs
+large_130_nodes    1.15 µs ±  19.11 ns     1.14 µs …   1.19 µs  in 10 ×  86514 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1378 ("bench/external_authoring_diagnostics/queue_topology_recompile_rejected") ok
+name            time (mean ± σ)         range (min … max) 
+small_10_nodes   580.42 ns ±   8.62 ns   570.68 ns … 600.68 ns  in 10 × 100000 runs
+medium_34_nodes  775.13 ns ±  11.23 ns   764.40 ns … 802.83 ns  in 10 × 100000 runs
+large_130_nodes    1.42 µs ±   5.79 ns     1.40 µs …   1.42 µs  in 10 ×  69547 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1400 ("bench/external_authoring_diagnostics/queue_topology_pending_rejection") ok
+name            time (mean ± σ)         range (min … max) 
+small_10_nodes   285.62 ns ±   3.77 ns   280.19 ns … 291.87 ns  in 10 × 100000 runs
+medium_34_nodes  289.87 ns ±   5.76 ns   282.22 ns … 299.08 ns  in 10 × 100000 runs
+large_130_nodes  326.24 ns ±   8.78 ns   312.45 ns … 337.57 ns  in 10 × 100000 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1424 ("bench/external_authoring_diagnostics/compile_result_missing_output") ok
+name            time (mean ± σ)         range (min … max) 
+small_10_nodes   202.69 ns ±   5.66 ns   196.37 ns … 212.36 ns  in 10 × 100000 runs
+medium_34_nodes  308.98 ns ±   5.77 ns   301.02 ns … 317.15 ns  in 10 × 100000 runs
+large_130_nodes    1.05 µs ±  13.50 ns     1.04 µs …   1.07 µs  in 10 ×  97084 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1433 ("bench/external_authoring_diagnostics/compile_result_multiple_outputs") ok
+name            time (mean ± σ)         range (min … max) 
+small_10_nodes   255.52 ns ±   4.59 ns   250.81 ns … 262.57 ns  in 10 × 100000 runs
+medium_34_nodes  465.72 ns ±  15.97 ns   449.89 ns … 491.00 ns  in 10 × 100000 runs
+large_130_nodes    2.30 µs ±  73.44 ns     2.24 µs …   2.47 µs  in 10 ×  42079 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1442 ("bench/external_authoring_diagnostics/compile_result_invalid_input") ok
+name            time (mean ± σ)         range (min … max) 
+small_10_nodes   352.16 ns ±   3.60 ns   348.45 ns … 359.26 ns  in 10 × 100000 runs
+medium_34_nodes  575.23 ns ±   9.95 ns   567.44 ns … 601.74 ns  in 10 × 100000 runs
+large_130_nodes    1.46 µs ±  39.18 ns     1.41 µs …   1.51 µs  in 10 ×  68066 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1451 ("bench/external_authoring_diagnostics/compile_result_invalid_param") ok
+name            time (mean ± σ)         range (min … max) 
+small_10_nodes   460.89 ns ±   4.39 ns   455.46 ns … 469.25 ns  in 10 × 100000 runs
+medium_34_nodes  875.42 ns ±  24.99 ns   852.95 ns … 936.74 ns  in 10 × 100000 runs
+large_130_nodes    2.41 µs ±  28.42 ns     2.37 µs …   2.45 µs  in 10 ×  41556 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1465 ("bench/external_authoring/realistic_template_analyze") ok
+name                     time (mean ± σ)         range (min … max) 
+branch_fanout_11_nodes      2.26 µs ±  21.64 ns     2.23 µs …   2.30 µs  in 10 ×  42201 runs
+mix_bus_17_nodes            3.21 µs ±  71.20 ns     3.13 µs …   3.32 µs  in 10 ×  31096 runs
+terminal_stereo_15_nodes    2.76 µs ±  39.67 ns     2.72 µs …   2.85 µs  in 10 ×  36634 runs
+feedback_loop_6_nodes       1.07 µs ±  19.02 ns     1.04 µs …   1.10 µs  in 10 ×  91302 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1473 ("bench/external_authoring/realistic_control_binding_generation") ok
+name                     time (mean ± σ)         range (min … max) 
+branch_fanout_11_nodes      1.08 µs ±  17.62 ns     1.06 µs …   1.11 µs  in 10 ×  93346 runs
+mix_bus_17_nodes            1.36 µs ±  28.06 ns     1.33 µs …   1.42 µs  in 10 ×  74919 runs
+terminal_stereo_15_nodes    1.67 µs ±  22.26 ns     1.64 µs …   1.71 µs  in 10 ×  61645 runs
+feedback_loop_6_nodes     623.00 ns ±  17.29 ns   608.68 ns … 658.60 ns  in 10 × 100000 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1483 ("bench/external_authoring/realistic_control_binding_validation") ok
+name                     time (mean ± σ)         range (min … max) 
+branch_fanout_11_nodes      1.34 µs ±  21.98 ns     1.31 µs …   1.38 µs  in 10 ×  77062 runs
+mix_bus_17_nodes            1.61 µs ±  30.33 ns     1.58 µs …   1.68 µs  in 10 ×  62545 runs
+terminal_stereo_15_nodes    1.92 µs ±  17.82 ns     1.90 µs …   1.96 µs  in 10 ×  52288 runs
+feedback_loop_6_nodes     816.11 ns ±   8.89 ns   806.92 ns … 829.55 ns  in 10 × 100000 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1493 ("bench/external_authoring/realistic_string_control_resolution") ok
+name                     time (mean ± σ)         range (min … max) 
+branch_fanout_11_nodes    856.72 ns ±  24.64 ns   835.10 ns … 913.71 ns  in 10 × 100000 runs
+mix_bus_17_nodes            1.02 µs ±  21.53 ns   999.64 ns …   1.07 µs  in 10 × 100000 runs
+terminal_stereo_15_nodes    1.08 µs ±  11.28 ns     1.06 µs …   1.10 µs  in 10 ×  94341 runs
+feedback_loop_6_nodes     482.10 ns ±   9.94 ns   473.25 ns … 504.29 ns  in 10 × 100000 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1503 ("bench/external_control/realistic_apply_param_batch_compiled") ok
+name                     time (mean ± σ)         range (min … max) 
+branch_fanout_11_nodes      2.07 µs ±  15.14 ns     2.05 µs …   2.10 µs  in 10 ×  47444 runs
+mix_bus_17_nodes            2.64 µs ±  30.73 ns     2.60 µs …   2.70 µs  in 10 ×  37086 runs
+terminal_stereo_15_nodes    3.02 µs ±  30.02 ns     2.96 µs …   3.05 µs  in 10 ×  33569 runs
+feedback_loop_6_nodes       1.04 µs ±   6.57 ns     1.03 µs …   1.05 µs  in 10 ×  92311 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1541 ("bench/external_control/realistic_apply_param_batch_topology_controller") ok
+name                     time (mean ± σ)         range (min … max) 
+branch_fanout_11_nodes      3.08 µs ±  58.24 ns     2.99 µs …   3.17 µs  in 10 ×  33114 runs
+mix_bus_17_nodes            3.94 µs ±  58.06 ns     3.86 µs …   4.02 µs  in 10 ×  24592 runs
+terminal_stereo_15_nodes    4.20 µs ±  17.08 ns     4.18 µs …   4.24 µs  in 10 ×  23870 runs
+feedback_loop_6_nodes       1.66 µs ±  15.59 ns     1.63 µs …   1.68 µs  in 10 ×  60258 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1602 ("bench/external_authoring/realistic_shape_rewire_roundtrip") ok
+name                     time (mean ± σ)         range (min … max) 
+branch_fanout_11_nodes      1.24 µs ±   9.18 ns     1.23 µs …   1.25 µs  in 10 ×  80836 runs
+mix_bus_17_nodes            1.46 µs ±  19.50 ns     1.43 µs …   1.49 µs  in 10 ×  67827 runs
+terminal_stereo_15_nodes    1.54 µs ±  16.24 ns     1.52 µs …   1.57 µs  in 10 ×  63960 runs
+feedback_loop_6_nodes       1.21 µs ±  18.21 ns     1.19 µs …   1.25 µs  in 10 ×  82893 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1613 ("bench/external_authoring/realistic_compile_prepared_shape_change") ok
+name                     time (mean ± σ)         range (min … max) 
+branch_fanout_11_nodes     14.65 µs ± 223.50 ns    14.35 µs …  14.98 µs  in 10 ×   6567 runs
+mix_bus_17_nodes           23.64 µs ±   3.35 µs    20.81 µs …  30.04 µs  in 10 ×   4767 runs
+terminal_stereo_15_nodes   27.50 µs ± 513.15 ns    27.02 µs …  28.55 µs  in 10 ×   3687 runs
+feedback_loop_6_nodes      10.42 µs ± 405.45 ns     9.94 µs …  11.20 µs  in 10 ×   9533 runs
+[dowdiness/moondsp] bench graph/external_authoring_benchmark.mbt:1643 ("bench/external_authoring/realistic_queue_prepared_hotswap_setup") ok
+name                     time (mean ± σ)         range (min … max) 
+branch_fanout_11_nodes    773.64 ns ±   7.73 ns   762.25 ns … 784.43 ns  in 10 × 100000 runs
+mix_bus_17_nodes          753.74 ns ±   9.27 ns   745.25 ns … 776.39 ns  in 10 × 100000 runs
+terminal_stereo_15_nodes  827.86 ns ±   6.19 ns   822.70 ns … 840.25 ns  in 10 × 100000 runs
+feedback_loop_6_nodes     628.56 ns ±   5.50 ns   622.32 ns … 636.66 ns  in 10 × 100000 runs
+[dowdiness/moondsp] bench mini/jux_benchmark.mbt:11 ("bench/jux/parse") ok
+name      time (mean ± σ)         range (min … max) 
+s_rev       19.27 µs ± 160.16 ns    19.04 µs …  19.49 µs  in 10 ×   4987 runs
+s_fast      21.06 µs ± 446.85 ns    20.56 µs …  21.78 µs  in 10 ×   4668 runs
+stack_rev   30.55 µs ± 339.51 ns    29.97 µs …  31.13 µs  in 10 ×   3296 runs
+[dowdiness/moondsp] bench pattern/jux_benchmark.mbt:22 ("bench/jux/query") ok
+name       time (mean ± σ)         range (min … max) 
+rev_4step    32.83 µs ± 549.94 ns    32.28 µs …  33.97 µs  in 10 ×   3023 runs
+fast_4step   46.25 µs ± 912.35 ns    45.31 µs …  48.00 µs  in 10 ×   2194 runs
+[dowdiness/moondsp] bench scheduler/jux_benchmark.mbt:86 ("bench/jux/scheduler_dispatch") ok
+name                        time (mean ± σ)         range (min … max) 
+process_events_8_jux_events   57.10 µs ±   1.27 µs    55.30 µs …  59.19 µs  in 10 ×   1689 runs
+[dowdiness/moondsp] bench scheduler/jux_benchmark.mbt:105 ("bench/jux/stereo_routing") ok
+name                                  time (mean ± σ)         range (min … max) 
+voicepool_process_8_panned_jux_voices  101.44 µs ±   1.99 µs    99.08 µs … 104.80 µs  in 10 ×    968 runs
+[dowdiness/moondsp] bench scheduler/jux_benchmark.mbt:123 ("bench/jux/process_block") ok
+name                  time (mean ± σ)         range (min … max) 
+process_block_jux_rev   48.98 µs ± 945.52 ns    47.71 µs …  50.27 µs  in 10 ×   2005 runs
+[dowdiness/moondsp] bench scheduler/jux_benchmark.mbt:139 ("bench/entries/prepared_playback") ok
+name                                     time (mean ± σ)         range (min … max) 
+prepared_two_materials_render              98.60 µs ±   4.41 µs    95.77 µs … 110.38 µs  in 10 ×    983 runs
+prepared_two_materials_accept_and_render  104.93 µs ±   5.44 µs    97.77 µs … 113.31 µs  in 10 ×    939 runs
+[dowdiness/moondsp] bench voice/voice_benchmark.mbt:164 ("bench/voice/set_template") ok
+name          time (mean ± σ)         range (min … max) 
+minimal_voice    5.27 µs ±  42.71 ns     5.21 µs …   5.33 µs  in 10 ×  18548 runs
+fm_voice        10.80 µs ± 172.35 ns    10.64 µs …  11.25 µs  in 10 ×   9197 runs
+full_voice      12.38 µs ± 285.20 ns    12.13 µs …  12.95 µs  in 10 ×   8049 runs
+[dowdiness/moondsp] bench voice/voice_benchmark.mbt:198 ("bench/voice/note_on") ok
+name          time (mean ± σ)         range (min … max) 
+minimal_voice  584.19 ns ±   3.22 ns   579.97 ns … 590.00 ns  in 10 × 100000 runs
+fm_voice         1.31 µs ±  51.41 ns     1.27 µs …   1.44 µs  in 10 ×  78047 runs
+full_voice       1.63 µs ±  24.12 ns     1.61 µs …   1.68 µs  in 10 ×  61188 runs
+[dowdiness/moondsp] bench voice/voice_benchmark.mbt:235 ("bench/voice/voicepool_new") ok
+name          time (mean ± σ)         range (min … max) 
+minimal_voice  181.39 µs ±   3.06 µs   177.89 µs … 186.48 µs  in 10 ×    550 runs
+fm_voice       357.84 µs ±   5.76 µs   350.39 µs … 366.34 µs  in 10 ×    287 runs
+full_voice     430.01 µs ±  21.08 µs   405.52 µs … 469.69 µs  in 10 ×    225 runs
+Total tests: 62, passed: 62, failed: 0.

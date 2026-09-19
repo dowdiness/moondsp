@@ -11,6 +11,7 @@ priv enum MiniLiteral {
   Sound
   Note
   Chord
+  Silence
 }
 
 ///|
@@ -70,10 +71,16 @@ priv enum MiniExprNode {
 }
 
 ///|
-fn Parser::parse_syntax_expr(self : Parser) -> MiniExpr raise ParseError {
+fn Parser::parse_syntax_expr(
+  self : Parser,
+  depth? : Int = 0,
+) -> MiniExpr raise ParseError {
+  guard self.admission is None || depth < 32 else {
+    raise ParseError("playback source exceeds nesting depth 32")
+  }
   self.skip_whitespace()
   let start = self.pos
-  let first = self.parse_syntax_chain()
+  let first = self.parse_syntax_chain(depth)
   let operands = [first]
   while true {
     let before_ws = self.pos
@@ -94,7 +101,7 @@ fn Parser::parse_syntax_expr(self : Parser) -> MiniExpr raise ParseError {
         )
       _ => ()
     }
-    operands.push(self.parse_syntax_chain())
+    operands.push(self.parse_syntax_chain(depth))
   }
   if operands.length() == 1 {
     first
@@ -106,10 +113,13 @@ fn Parser::parse_syntax_expr(self : Parser) -> MiniExpr raise ParseError {
 
 ///|
 /// Parse one primary and its left-to-right transform chain.
-fn Parser::parse_syntax_chain(self : Parser) -> MiniExpr raise ParseError {
+fn Parser::parse_syntax_chain(
+  self : Parser,
+  depth : Int,
+) -> MiniExpr raise ParseError {
   self.skip_whitespace()
   let start = self.pos
-  let mut expr = self.parse_syntax_primary()
+  let mut expr = self.parse_syntax_primary(depth)
   while true {
     let before_ws = self.pos
     self.skip_whitespace()
@@ -129,7 +139,10 @@ fn Parser::parse_syntax_chain(self : Parser) -> MiniExpr raise ParseError {
 /// Parentheses group an expression without introducing a runtime or document
 /// node. Returning the inner expression also keeps reference spans anchored
 /// at the name inside the parentheses.
-fn Parser::parse_syntax_primary(self : Parser) -> MiniExpr raise ParseError {
+fn Parser::parse_syntax_primary(
+  self : Parser,
+  depth : Int,
+) -> MiniExpr raise ParseError {
   guard !self.at_end() else {
     raise ParseError("position \{self.pos}: unexpected end of input")
   }
@@ -141,11 +154,11 @@ fn Parser::parse_syntax_primary(self : Parser) -> MiniExpr raise ParseError {
         "position \{start}: stack() requires at least one argument",
       )
     }
-    let args = [self.parse_syntax_expr()]
+    let args = [self.parse_syntax_expr(depth=depth + 1)]
     self.skip_whitespace()
     while !self.at_end() && self.input[self.pos] == ',' {
       self.pos += 1
-      args.push(self.parse_syntax_expr())
+      args.push(self.parse_syntax_expr(depth=depth + 1))
       self.skip_whitespace()
     }
     self.expect_char(')')
@@ -154,7 +167,7 @@ fn Parser::parse_syntax_primary(self : Parser) -> MiniExpr raise ParseError {
   if self.input[self.pos] == '(' {
     self.pos += 1
     self.skip_whitespace()
-    let inner = self.parse_syntax_expr()
+    let inner = self.parse_syntax_expr(depth=depth + 1)
     self.skip_whitespace()
     self.expect_char(')')
     return inner
@@ -165,10 +178,18 @@ fn Parser::parse_syntax_primary(self : Parser) -> MiniExpr raise ParseError {
     Some(Note)
   } else if self.match_keyword("chord(") {
     Some(Chord)
+  } else if self.match_keyword("silence()") {
+    Some(Silence)
   } else {
     None
   }
   if kind is Some(kind) {
+    if kind is Silence {
+      return {
+        span: { start, end: self.pos, },
+        node: Literal(kind, "", start),
+      }
+    }
     let (content, content_start) = self.read_quoted_string_with_start()
     self.expect_char(')')
     return {
@@ -181,7 +202,7 @@ fn Parser::parse_syntax_primary(self : Parser) -> MiniExpr raise ParseError {
     return { span: { start, end: self.pos, }, node: Reference(name), }
   }
   raise ParseError(
-    "position \{self.pos}: expected 's(', 'note(', 'chord(', 'stack(', or '('",
+    "position \{self.pos}: expected 's(', 'note(', 'chord(', 'silence()', 'stack(', or '('",
   )
 }
 

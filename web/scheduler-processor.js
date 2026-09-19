@@ -8,39 +8,20 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
     this.reportedRuntimeError = false;
     this.reportedInitError = false;
     this.gain = this.sanitizeGain(options?.processorOptions?.initialGain ?? 0.3);
-    this.pendingTempo = null;
-    this.pendingPlayback = null;
+    this.pendingCommands = [];
     this.playback = null;
     this.graphInitialized = false;
     this.graphBlockSize = 0;
+    this.statusCountdown = 0;
 
     this.port.onmessage = (event) => {
       const data = event.data;
-      if (!data || typeof data !== "object") {
+      if (!data || typeof data !== "object") return;
+      if (!this.wasm || !this.graphInitialized) {
+        this.pendingCommands.push(data);
         return;
       }
-
-      if (!this.wasm) {
-        return;
-      }
-      if (data.type === "apply-score" || data.type === "restart-playback") {
-        if (!this.graphInitialized && data.type === "apply-score" && data.policy === "restart") {
-          if (this.pendingPlayback) this.port.postMessage({ type: "playback-superseded", revision: this.pendingPlayback.revision });
-          this.pendingPlayback = data;
-        } else {
-          this.playback?.handle(data);
-        }
-      } else if (data.type === "set-scheduler-bpm") {
-        if (!this.graphInitialized) {
-          if (this.pendingTempo) this.port.postMessage({ type: "playback-superseded", revision: this.pendingTempo.revision });
-          this.pendingTempo = data;
-        } else {
-          this.playback.setTempo(data);
-        }
-      } else if (data.type === "set-scheduler-gain") {
-        this.gain = this.sanitizeGain(data.gain);
-        this.applyGain();
-      }
+      this.dispatchCommand(data);
     };
 
     const wasmModule = options?.processorOptions?.wasmModule;
@@ -48,6 +29,16 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
       this.initWasm(wasmModule);
     } else {
       this.port.postMessage({ type: "error", message: "Missing wasm module" });
+    }
+  }
+  dispatchCommand(data) {
+    if (data.type === "player-update" || data.type === "player-restart" ||
+        data.type === "player-play" || data.type === "player-pause" ||
+        data.type === "set-scheduler-bpm") {
+      this.playback.handle(data);
+    } else if (data.type === "set-scheduler-gain") {
+      this.gain = this.sanitizeGain(data.gain);
+      this.applyGain();
     }
   }
 
@@ -64,16 +55,12 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
       this.wasm = instance.exports;
 
       const missingExports = this.missingExports([
-        "init_scheduler_graph",
-        "process_scheduler_block",
-        "scheduler_left_sample",
-        "scheduler_right_sample",
-        "set_scheduler_bpm",
-        "set_scheduler_gain",
-        "scheduler_bpm",
+        "init_scheduler_graph", "process_scheduler_block",
+        "scheduler_left_sample", "scheduler_right_sample",
+        "set_scheduler_bpm", "set_scheduler_gain", "scheduler_bpm",
         "clear_playback_input", "push_playback_char",
-        "prepare_pattern_input", "prepare_song_input",
-        "apply_prepared_playback", "discard_prepared_playback", "restart_playback",
+        "player_update_input", "player_restart_input", "player_play", "player_pause",
+        "player_state", "player_pending_count", "player_skipped_count",
         "scheduler_sample_position", "get_playback_error_length", "get_playback_error_char",
       ]);
       if (missingExports.length > 0) {
@@ -82,7 +69,6 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
 
       this.playback = new PlaybackController(this.wasm, reply => this.port.postMessage(reply));
       this.ready = true;
-      this.port.postMessage({ type: "ready", mode: "scheduler-dsp" });
     } catch (error) {
       this.ready = false;
       this.port.postMessage({
@@ -107,6 +93,7 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
     this.graphInitialized = ok;
     this.graphBlockSize = ok ? blockSize : 0;
     if (ok) {
+      this.port.postMessage({ type: "ready", mode: "scheduler-dsp" });
       this.applySchedulerState();
     } else if (!this.reportedInitError) {
       this.reportedInitError = true;
@@ -116,17 +103,10 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
   }
 
   applySchedulerState() {
-    if (this.pendingTempo) {
-      this.playback.setTempo(this.pendingTempo);
-      this.pendingTempo = null;
-    }
     this.applyGain();
-    if (!this.pendingPlayback) {
-      return;
-    }
-    const request = this.pendingPlayback;
-    this.pendingPlayback = null;
-    this.playback.handle(request);
+    const pending = this.pendingCommands;
+    this.pendingCommands = [];
+    for (const command of pending) this.dispatchCommand(command);
   }
 
 
@@ -159,12 +139,16 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
       this.fillSilence(left, right);
       if (!this.reportedRuntimeError) {
         this.reportedRuntimeError = true;
-        this.postError(this.browserErrorMessage("Scheduler block processing failed"));
+        this.postError(this.playback.errorMessage());
       }
       return true;
     }
 
-    this.playback.didRender(left.length);
+    this.statusCountdown -= 1;
+    if (this.statusCountdown <= 0) {
+      this.statusCountdown = 32;
+      this.port.postMessage({ type: "player-status", ...this.playback.snapshot() });
+    }
 
     for (let index = 0; index < left.length; index += 1) {
       left[index] = this.wasm.scheduler_left_sample(index);

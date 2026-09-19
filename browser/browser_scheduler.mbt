@@ -43,30 +43,38 @@ pub fn push_playback_char(code : Int) -> Unit {
 }
 
 ///|
-pub fn prepare_pattern_input() -> Int {
-  @playback_host.prepare_pattern_input()
+pub fn player_update_input() -> Int {
+  @playback_host.player_update_input()
 }
 
 ///|
-pub fn prepare_song_input() -> Int {
-  @playback_host.prepare_song_input()
+pub fn player_restart_input() -> Int {
+  @playback_host.player_restart_input()
 }
 
 ///|
-/// Return 0 when queued, 1 for an invalid/unrepresentable request, or 2 when
-/// starting/restarting is required. A rejected valid token is not consumed.
-pub fn apply_prepared_playback(token : Int, restart : Bool) -> Int {
-  @playback_host.apply_prepared_playback(token, restart)
+pub fn player_play() -> Int {
+  @playback_host.player_play()
 }
 
 ///|
-pub fn discard_prepared_playback(token : Int) -> Bool {
-  @playback_host.discard_prepared_playback(token)
+pub fn player_pause() -> Int {
+  @playback_host.player_pause()
 }
 
 ///|
-pub fn restart_playback() -> Int {
-  @playback_host.restart_playback()
+pub fn player_state() -> Int {
+  @playback_host.player_state()
+}
+
+///|
+pub fn player_pending_count() -> Int {
+  @playback_host.player_pending_count()
+}
+
+///|
+pub fn player_skipped_count() -> Int {
+  @playback_host.player_skipped_count()
 }
 
 ///|

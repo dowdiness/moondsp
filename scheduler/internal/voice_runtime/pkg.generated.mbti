@@ -21,7 +21,9 @@ pub struct ActiveNotes {
   // private fields
 }
 pub fn ActiveNotes::ActiveNotes() -> Self
+pub fn ActiveNotes::apply_retime(Self, Array[Int64?]) -> Unit
 pub fn ActiveNotes::clear(Self) -> Unit
+pub fn[E] ActiveNotes::compute_retime(Self, (@pattern.Rational) -> Result[Int64, E]) -> Result[Array[Int64?], E]
 pub fn ActiveNotes::expire_at_sample(Self, @voice.BoundVoicePool, Int64) -> Unit
 pub fn ActiveNotes::kill_all(Self, @voice.BoundVoicePool) -> Unit
 pub fn ActiveNotes::length(Self) -> Int
@@ -32,7 +34,6 @@ pub fn ActiveNotes::remove_matching(Self, (@model.VoiceOrigin) -> Bool, @voice.B
 pub fn[E] ActiveNotes::retime(Self, (@pattern.Rational) -> Result[Int64, E]) -> Result[Unit, E]
 pub fn[E] ActiveNotes::try_count_matching(Self, (@model.VoiceOrigin) -> Bool, (@voice.VoiceHandle) -> Result[Unit, E]) -> Result[Int, E]
 pub fn[E] ActiveNotes::try_each_matching(Self, (@model.VoiceOrigin) -> Bool, (@voice.VoiceHandle) -> Result[Unit, E]) -> Result[Unit, E]
-pub fn[E] ActiveNotes::validate_retime(Self, (@pattern.Rational) -> Result[Int64, E]) -> Result[Unit, E]
 
 // Type aliases
 

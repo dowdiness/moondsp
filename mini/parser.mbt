@@ -33,12 +33,16 @@ priv struct Parser {
   mut pos : Int
   bindings : Map[String, @pattern.Pat[@pattern.ControlMap]]
   doc_bindings : Map[String, @pattern.PatternDoc[@pattern.ControlMap]]
+  admission : PlaybackAdmission?
 }
 
 ///|
 #alias(new)
-fn Parser::Parser(input : String) -> Parser {
-  { input, pos: 0, bindings: {}, doc_bindings: {}, }
+fn Parser::Parser(
+  input : String,
+  admission? : PlaybackAdmission? = None,
+) -> Parser {
+  { input, pos: 0, bindings: {}, doc_bindings: {}, admission, }
 }
 
 ///|
@@ -125,9 +129,41 @@ fn Parser::at_end(self : Parser) -> Bool {
 }
 
 ///|
+/// Return the end of a complete comment. An unterminated block is left at its
+/// opening delimiter so normal parsing rejects it instead of accepting a prefix.
+fn mini_comment_end(input : String, start : Int) -> Int? {
+  guard start + 1 < input.length() && input[start] == '/' else { return None }
+  let mut end_ = start + 2
+  match input[start + 1] {
+    '/' => {
+      while end_ < input.length() && input[end_] != '\n' {
+        end_ += 1
+      }
+      Some(end_)
+    }
+    '*' => {
+      while end_ + 1 < input.length() {
+        if input[end_] == '*' && input[end_ + 1] == '/' {
+          return Some(end_ + 2)
+        }
+        end_ += 1
+      }
+      None
+    }
+    _ => None
+  }
+}
+
+///|
 fn Parser::skip_whitespace(self : Parser) -> Unit {
-  while !self.at_end() && mini_is_space(self.input[self.pos]) {
-    self.pos += 1
+  while true {
+    while !self.at_end() && mini_is_space(self.input[self.pos]) {
+      self.pos += 1
+    }
+    match mini_comment_end(self.input, self.pos) {
+      Some(end_) => self.pos = end_
+      None => break
+    }
   }
 }
 
@@ -335,6 +371,9 @@ fn Parser::parse_expr(
   self : Parser,
 ) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
   let syntax = self.parse_syntax_expr()
+  if self.admission is Some(admission) {
+    ignore(admission.expression(syntax))
+  }
   let resolved = resolve_mini_expr(syntax, self.bindings)
   compile_mini_pattern(resolved)
 }
@@ -396,6 +435,9 @@ fn Parser::parse_bindings(
     self.skip_whitespace()
     guard self.read_binding_name() is Some(name) else { break }
     let syntax = self.parse_syntax_expr()
+    if self.admission is Some(admission) {
+      admission.definitions[name] = admission.expression(syntax)
+    }
     // Resolve before checking the terminator to preserve diagnostic precedence.
     // Compile unused declarations too; publish a name only after success.
     match builder {

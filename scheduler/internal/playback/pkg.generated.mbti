@@ -13,12 +13,22 @@ import {
 // Errors
 
 // Types and methods
+pub(all) struct PlaybackInspection {
+  current : PlaybackSnapshot?
+  staged : PlaybackSnapshot?
+  pending_materials : Int
+  skipped_materials : Int
+}
+
 pub enum PlaybackSnapshot {
   Pattern(@pattern.PatternSnapshot[@pattern.ControlMap])
   Song(@song.SongSnapshot[@pattern.ControlMap])
+  RepeatSong(@song.SongSnapshot[@pattern.ControlMap])
 }
+pub fn PlaybackSnapshot::material_count(Self) -> Int
 pub fn PlaybackSnapshot::pattern(@pattern.PatternSnapshot[@pattern.ControlMap]) -> Self
 pub fn PlaybackSnapshot::query_events(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@pattern.ControlMap]]
+pub fn PlaybackSnapshot::repeat_song(@song.SongSnapshot[@pattern.ControlMap]) -> Self
 pub fn PlaybackSnapshot::revision(Self) -> @identity.Revision
 pub fn PlaybackSnapshot::song(@song.SongSnapshot[@pattern.ControlMap]) -> Self
 pub fn PlaybackSnapshot::song_layout_revision(Self) -> @identity.Revision?
@@ -34,20 +44,16 @@ pub struct PlaybackState {
   // private fields
 }
 pub fn PlaybackState::PlaybackState() -> Self
-pub fn PlaybackState::active_revision(Self) -> @identity.Revision?
-pub fn PlaybackState::active_song_layout_revision(Self) -> @identity.Revision?
-pub fn PlaybackState::active_song_revision(Self) -> @identity.Revision?
 pub fn PlaybackState::commit_pending(Self, @pattern.Rational) -> Unit
-pub fn PlaybackState::has_active(Self) -> Bool
-pub fn PlaybackState::has_active_pattern(Self) -> Bool
-pub fn PlaybackState::has_active_song(Self) -> Bool
 pub fn PlaybackState::has_pending(Self) -> Bool
-pub fn PlaybackState::has_pending_pattern(Self) -> Bool
-pub fn PlaybackState::has_pending_song(Self) -> Bool
+pub fn PlaybackState::inspect(Self) -> PlaybackInspection
+pub fn PlaybackState::install_acceptance(Self, Self) -> Unit
+pub fn PlaybackState::prepare_acceptance(Self, PlaybackSnapshot, @pattern.Rational, material_limit~ : Int, restart~ : Bool) -> Self?
 pub fn PlaybackState::query_active_events(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@pattern.ControlMap]]
 pub fn PlaybackState::query_active_sourced_events(Self, @pattern.TimeSpan) -> Array[PlaybackSourcedEvent]
 pub fn PlaybackState::queue(Self, PlaybackSnapshot) -> Unit
 pub fn PlaybackState::reset(Self) -> Unit
+pub fn PlaybackState::skipped_entry_count(Self) -> Int
 
 // Type aliases
 

@@ -104,6 +104,10 @@ fn Parser::parse_song_expr(self : Parser) -> ParsedSong raise ParseError {
   )
   for fill in fill_specs {
     let section = resolve_song_section(sections, fill.section_name)
+    if self.admission is Some(_) &&
+      song.occurrences().length() + song.gap_spans().length() > 128 {
+      raise ParseError("playback arrangement exceeds 128 occurrences")
+    }
     song = song.fill_gaps(prefix=fill.prefix, section~) catch {
       _ => raise ParseError("song fill '\{fill.prefix}' could not be applied")
     }
@@ -149,6 +153,9 @@ fn Parser::parse_song_item(
       "position \{item_start}: expected bpm(...), section(...), part(...), part_id(...), or fill(...)",
     )
   }
+  if self.admission is Some(_) && part_specs.length() > 128 {
+    raise ParseError("playback arrangement exceeds 128 occurrences")
+  }
 }
 
 ///|
@@ -179,6 +186,9 @@ fn Parser::parse_song_section(
   let length_cycles = self.read_song_rational("section length")
   self.expect_comma()
   let body = self.parse_expr()
+  if self.admission is Some(admission) {
+    admission.sections[name] = admission.last
+  }
   self.skip_whitespace()
   self.expect_char(')')
   @song.Section(

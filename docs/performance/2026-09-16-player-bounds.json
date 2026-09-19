@@ -1,0 +1,516 @@
+{
+  "date": "2026-09-16",
+  "toolchain": "moon 0.1.20260904 (94521db 2026-09-04)",
+  "environment": "AMD Ryzen 7 6800H / Linux WSL2 / release wasm-gc in page-local Chromium",
+  "sample_rate": 48000,
+  "block_size": 128,
+  "quantum_ms": 2.6666666666666665,
+  "baseline": {
+    "conditions": "Before admission implementation: one warmup block, eight measured blocks per fresh WASM instance, BPM 60.",
+    "rows": [
+      {
+        "factor": 1,
+        "accepted": 0,
+        "acceptance_ms": 3.699999999254942,
+        "render_mean_ms": 0.5499999998137355,
+        "render_max_ms": 1.8999999985098839
+      },
+      {
+        "factor": 1000,
+        "accepted": 0,
+        "acceptance_ms": 0.09999999776482582,
+        "render_mean_ms": 0.625,
+        "render_max_ms": 1
+      },
+      {
+        "factor": 10000,
+        "accepted": 0,
+        "acceptance_ms": 0.10000000149011612,
+        "render_mean_ms": 2.0625,
+        "render_max_ms": 2.699999999254942
+      },
+      {
+        "factor": 100000,
+        "accepted": 0,
+        "acceptance_ms": 0.10000000149011612,
+        "render_mean_ms": 7.800000000279397,
+        "render_max_ms": 9
+      }
+    ]
+  },
+  "final": {
+    "examples": [
+      {
+        "name": "Initial editor",
+        "length": 98,
+        "code": 0,
+        "error": "",
+        "ms": 7,
+        "state": 2,
+        "position": 0,
+        "bpm": 60,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "Overlay groove: + layers",
+        "length": 287,
+        "code": 0,
+        "error": "",
+        "ms": 2.599999997764826,
+        "state": 2,
+        "position": 0,
+        "bpm": 96,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "Space in the groove: rests + gate",
+        "length": 253,
+        "code": 0,
+        "error": "",
+        "ms": 1.2999999970197678,
+        "state": 2,
+        "position": 0,
+        "bpm": 96,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "Grouping A/B: hear the parentheses",
+        "length": 211,
+        "code": 0,
+        "error": "",
+        "ms": 3.699999999254942,
+        "state": 2,
+        "position": 0,
+        "bpm": 96,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "One note, three envelopes",
+        "length": 367,
+        "code": 0,
+        "error": "",
+        "ms": 0.8000000007450581,
+        "state": 2,
+        "position": 0,
+        "bpm": 60,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "Carve the mix: cutoff + resonance",
+        "length": 173,
+        "code": 0,
+        "error": "",
+        "ms": 1.300000000745058,
+        "state": 2,
+        "position": 0,
+        "bpm": 84,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "Room of Light — pop sketch",
+        "length": 1142,
+        "code": 0,
+        "error": "",
+        "ms": 3.599999997764826,
+        "state": 2,
+        "position": 0,
+        "bpm": 112,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "Dry → shared room comparison",
+        "length": 370,
+        "code": 0,
+        "error": "",
+        "ms": 1.699999999254942,
+        "state": 2,
+        "position": 0,
+        "bpm": 60,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "Shared Room Afterglow",
+        "length": 2010,
+        "code": 0,
+        "error": "",
+        "ms": 7,
+        "state": 2,
+        "position": 0,
+        "bpm": 72,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "Drifting notes — long envelopes",
+        "length": 54,
+        "code": 0,
+        "error": "",
+        "ms": 0.19999999925494194,
+        "state": 2,
+        "position": 0,
+        "bpm": 60,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "Independent entries — 3 and 4 cycles",
+        "length": 128,
+        "code": 0,
+        "error": "",
+        "ms": 0.5,
+        "state": 2,
+        "position": 0,
+        "bpm": 60,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "Shared melody + live tempo",
+        "length": 250,
+        "code": 0,
+        "error": "",
+        "ms": 0.4000000022351742,
+        "state": 2,
+        "position": 0,
+        "bpm": 60,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "Light Orbit — full song, sets BPM 120",
+        "length": 2201,
+        "code": 0,
+        "error": "",
+        "ms": 3.699999999254942,
+        "state": 2,
+        "position": 0,
+        "bpm": 120,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "Named motif + groove",
+        "length": 90,
+        "code": 0,
+        "error": "",
+        "ms": 0.4000000022351742,
+        "state": 2,
+        "position": 0,
+        "bpm": 60,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "song(\"ode\" — multiline melody + kick, sets BPM 72)",
+        "length": 185,
+        "code": 0,
+        "error": "",
+        "ms": 0.19999999925494194,
+        "state": 2,
+        "position": 0,
+        "bpm": 72,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "chord(\"C\") — C major triad",
+        "length": 10,
+        "code": 0,
+        "error": "",
+        "ms": 0,
+        "state": 2,
+        "position": 0,
+        "bpm": 60,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "chord(\"C Dm G7 C\").slow(2) — chord progression",
+        "length": 26,
+        "code": 0,
+        "error": "",
+        "ms": 1,
+        "state": 2,
+        "position": 0,
+        "bpm": 60,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "chord(\"Cmaj7\").gain(0.4) — major 7th chord",
+        "length": 24,
+        "code": 0,
+        "error": "",
+        "ms": 0.09999999776482582,
+        "state": 2,
+        "position": 0,
+        "bpm": 60,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "note(\"C4 E4 G4 C5\").slow(2) — note names instead of numbers",
+        "length": 27,
+        "code": 0,
+        "error": "",
+        "ms": 0,
+        "state": 2,
+        "position": 0,
+        "bpm": 60,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "note(\"C D E F G A B C5\").slow(2) — C major scale with note names",
+        "length": 32,
+        "code": 0,
+        "error": "",
+        "ms": 0.19999999925494194,
+        "state": 2,
+        "position": 0,
+        "bpm": 60,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "s(\"bd sd hh sd\")",
+        "length": 16,
+        "code": 0,
+        "error": "",
+        "ms": 0.10000000149011612,
+        "state": 2,
+        "position": 0,
+        "bpm": 60,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "s(\"bd(3,8), hh*16?, sd(2,8,2)\").jux(rev)",
+        "length": 40,
+        "code": 0,
+        "error": "",
+        "ms": 0.09999999776482582,
+        "state": 2,
+        "position": 0,
+        "bpm": 60,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "s(\"bd*4\").every(3, fast(2))",
+        "length": 27,
+        "code": 0,
+        "error": "",
+        "ms": 0.09999999776482582,
+        "state": 2,
+        "position": 0,
+        "bpm": 60,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "note(\"C4 E4 G4\").jux(rev)",
+        "length": 25,
+        "code": 0,
+        "error": "",
+        "ms": 0,
+        "state": 2,
+        "position": 0,
+        "bpm": 60,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "s(\"[bd sd, hh*8]\").degradeBy(0.3)",
+        "length": 33,
+        "code": 0,
+        "error": "",
+        "ms": 0.30000000074505806,
+        "state": 2,
+        "position": 0,
+        "bpm": 60,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "$: s(\"bd sd hh sd\") / $: chord(\"C Dm G7\")",
+        "length": 39,
+        "code": 0,
+        "error": "",
+        "ms": 0.5,
+        "state": 2,
+        "position": 0,
+        "bpm": 60,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "note(\"60(3,8) 64(2,8,2) 67(3,8) 64(2,8) 60(3,8) 62(2,8,3) 64(3,8) 67(2,8)\").slow(4).every(4, rev)",
+        "length": 97,
+        "code": 0,
+        "error": "",
+        "ms": 0.20000000298023224,
+        "state": 2,
+        "position": 0,
+        "bpm": 60,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "$: s(\"bd(3,8), hh(5,16)?, sd(2,8,4)\").slow(2) / $: note(\"C4…\").slow(3)",
+        "length": 108,
+        "code": 0,
+        "error": "",
+        "ms": 0.3999999985098839,
+        "state": 2,
+        "position": 0,
+        "bpm": 60,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "note(\"48(3,8) 55(2,8,2) 60(3,8) 64(2,8) 67(3,8) 72(1,8)? 67(2,8,2) 60(3,8)\").slow(4).jux(rev)",
+        "length": 93,
+        "code": 0,
+        "error": "",
+        "ms": 1.199999999254942,
+        "state": 2,
+        "position": 0,
+        "bpm": 60,
+        "rendered": true,
+        "position_after": 512
+      },
+      {
+        "name": "$: s(\"bd…\").slow(2).jux(slow(2)) / $: note(\"46…\").slow(2).jux(slow(2))",
+        "length": 107,
+        "code": 0,
+        "error": "",
+        "ms": 0.5,
+        "state": 2,
+        "position": 0,
+        "bpm": 60,
+        "rendered": true,
+        "position_after": 512
+      }
+    ],
+    "rejected": [
+      {
+        "text": "note(\"60\").fast(100000)",
+        "code": 1,
+        "error": "playback source exceeds the query expansion limit",
+        "ms": 0.30000000074505806,
+        "state": 2,
+        "position": 1024,
+        "bpm": 60
+      },
+      {
+        "text": "note(\"60*1000 ~\")",
+        "code": 1,
+        "error": "playback source exceeds the query expansion limit",
+        "ms": 0,
+        "state": 2,
+        "position": 1024,
+        "bpm": 60
+      },
+      {
+        "text": "note(\"60\").every(1000000,fast(100000))",
+        "code": 1,
+        "error": "playback source exceeds the query expansion limit",
+        "ms": 0,
+        "state": 2,
+        "position": 1024,
+        "bpm": 60
+      },
+      {
+        "text": "song(section(\"a\",1,s(\"bd(1,100000)\")),part(\"a1\",\"a\"))",
+        "code": 1,
+        "error": "playback Euclidean rhythm exceeds 128 steps",
+        "ms": 0,
+        "state": 2,
+        "position": 1024,
+        "bpm": 60
+      },
+      {
+        "text": "note(\"60*1000000000*1000000000*1000000000*1000000000*1000000000*1000000000*1000000000*1000000000(0,1)\")",
+        "code": 1,
+        "error": "playback source exceeds the query expansion limit",
+        "ms": 0,
+        "state": 2,
+        "position": 1024,
+        "bpm": 60
+      }
+    ],
+    "before": 1024,
+    "after": 1152,
+    "accepted": {
+      "code": 0,
+      "error": "",
+      "ms": 0.10000000149011612,
+      "state": 2,
+      "position": 0,
+      "bpm": 60
+    },
+    "render": {
+      "warmup": 16,
+      "samples": 64,
+      "mean_ms": 0.6484375,
+      "p95_ms": 0.9000000022351742,
+      "max_ms": 1.199999999254942
+    },
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
+  },
+  "interpretation": [
+    "The pathological source is rejected, not rendered faster.",
+    "Page-local timing is not an AudioWorklet deadline or physical-output measurement.",
+    "Restart timings include first-use compilation/JIT effects and do exceed one audio quantum for some accepted examples.",
+    "Structural admission bounds do not guarantee allocation-free or underrun-free playback."
+  ],
+  "ingress": {
+    "rows": [
+      {
+        "length": 8193,
+        "ms": 0.10000000149011612,
+        "receipt": {
+          "type": "player-receipt",
+          "id": 8193,
+          "operation": "update",
+          "accepted": false,
+          "restartRequired": false,
+          "message": "playback source exceeds 8192 characters",
+          "state": 2,
+          "samplePosition": 128,
+          "tempo": 80,
+          "pendingCount": 0,
+          "skippedCount": 0
+        }
+      },
+      {
+        "length": 1048576,
+        "ms": 1.2000000029802322,
+        "receipt": {
+          "type": "player-receipt",
+          "id": 1048576,
+          "operation": "update",
+          "accepted": false,
+          "restartRequired": false,
+          "message": "playback source exceeds 8192 characters",
+          "state": 2,
+          "samplePosition": 128,
+          "tempo": 80,
+          "pendingCount": 0,
+          "skippedCount": 0
+        }
+      }
+    ],
+    "position_after": 256,
+    "tempo_after": 80
+  }
+}

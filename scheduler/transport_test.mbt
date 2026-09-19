@@ -152,6 +152,31 @@ test "invalid tempo leaves the position and sounding note unchanged" {
 }
 
 ///|
+test "set_tempo_all updates every scheduler from one accepted tempo" {
+  let (first, _, _, _) = transport_fixture()
+  let (second, _, _, _) = transport_fixture(sample_rate=128.0)
+  let tempo = @scheduler.Tempo::from_bpm(60.0).unwrap()
+  @scheduler.set_tempo_all([first, second], tempo).unwrap()
+  @debug.assert_eq(first.bpm(), 60.0)
+  @debug.assert_eq(second.bpm(), 60.0)
+}
+
+///|
+test "set_tempo_all rejects atomically when a later endpoint is unrepresentable" {
+  let (first, _, _, _) = transport_fixture()
+  let (second, second_pool, left, right) = transport_fixture()
+  second.set_bpm(0.001).unwrap()
+  let handle = second_pool.note_on_controls({}).unwrap()
+  let endpoint = @pattern.Rational::new(100000000L, 10000019L * 100000003L)
+  second.push_active_note(handle, endpoint).unwrap()
+  second.process_block(@pattern.Pat::silence(), second_pool, left, right)
+  let tempo = @scheduler.Tempo::from_bpm(1000.0).unwrap()
+  assert_true(@scheduler.set_tempo_all([first, second], tempo) is Err(_))
+  @debug.assert_eq(first.bpm(), 120.0)
+  @debug.assert_eq(second.bpm(), 0.001)
+}
+
+///|
 test "physical envelope lasts thirteen seconds across a tempo change" {
   let (sched, pool, left, right) = transport_fixture(sample_rate=128.0)
   sched.set_bpm(60.0).unwrap()
@@ -206,4 +231,85 @@ test "without hold the event end releases an unfinished attack" {
   sched.process_song_block(song, pool, left, right)
   assert_true(left.get(63) > 0.0)
   assert_true(left.get(127) < left.get(63))
+}
+
+///|
+test "tempo sample spans preserve exact millibpm arithmetic" {
+  let tempo = @scheduler.Tempo::from_bpm(120.1234).unwrap()
+  let span = tempo.span_for_samples(128, sample_rate=48000.0).unwrap()
+  assert_true(span == @pattern.Rational::new(128L * 120123L, 2880000000L))
+  // The exact block boundary maps back to its final sample without drift.
+  assert_eq(tempo.sample_at_start(span, sample_rate=48000.0).unwrap(), 128L)
+  assert_true(
+    tempo.span_for_samples(128, sample_rate=128.0).unwrap() ==
+    @pattern.Rational::new(128L * 120123L, 128L * 60000L),
+  )
+  assert_true(
+    tempo.span_for_samples(0, sample_rate=48000.0).unwrap() ==
+    @pattern.Rational::from_int(0),
+  )
+}
+
+///|
+test "tempo sample spans reject invalid sample counts and rates" {
+  let tempo = @scheduler.Tempo::from_bpm(120.0).unwrap()
+  assert_true(tempo.span_for_samples(-1, sample_rate=48000.0) is Err(_))
+  for sample_rate in [0.0, 48000.5, 384001.0, 0.0 / 0.0, 1.0 / 0.0] {
+    assert_true(tempo.span_for_samples(128, sample_rate~) is Err(_))
+  }
+}
+
+///|
+test "material admission rejects all routes before retiming and restart recovers capacity" {
+  fn snapshot(
+    name : String,
+    note : Double,
+  ) -> @scheduler.PlaybackSnapshot raise {
+    @scheduler.PlaybackSnapshot::pattern(
+      @pattern.PatternDoc::from_pattern(
+        id=@identity.PatternNodeId::from_string(name),
+        pat=@pattern.note(note)
+          .slow(@pattern.Rational::from_int(1000))
+          .material()
+          .named_entry(name),
+      ).lower(),
+    )
+  }
+  let (first, _, _, _) = transport_fixture(sample_rate=128.0)
+  let (second, pool, left, right) = transport_fixture(sample_rate=128.0)
+  second.accept_playback_snapshot(snapshot("old", 60.0))
+  second.process_playback_snapshot_block(pool, left, right)
+  let before = second.current_block().unwrap().logical_arc
+  let next = snapshot("new", 80.0)
+  let targets = [(first, next), (second, next)]
+  let tempo = @scheduler.Tempo::from_bpm(60.0).unwrap()
+  assert_true(
+    @scheduler.accept_playback_all(targets, tempo, material_limit=1)
+    is Err(MaterialLimit),
+  )
+  assert_eq(first.bpm(), 120.0)
+  assert_eq(second.bpm(), 120.0)
+  assert_true(first.accepted_snapshot() is None)
+  assert_true(second.current_block().unwrap().logical_arc == before)
+  assert_eq(second.active_note_count(), 1)
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::from_int(1),
+  )
+  assert_eq(
+    second.accepted_snapshot().unwrap().query(arc)[0].value.get("note"),
+    Some(60.0),
+  )
+  second.process_playback_snapshot_block(pool, left, right)
+  assert_true(left.get(0) > 0.0)
+  @scheduler.accept_playback_all(targets, tempo, material_limit=1, restart=true).unwrap()
+  for scheduler in [first, second] {
+    assert_eq(scheduler.bpm(), 60.0)
+    assert_eq(scheduler.sample_counter(), 0L)
+    assert_eq(scheduler.pending_material_change_count(), 0)
+    assert_eq(
+      scheduler.accepted_snapshot().unwrap().query(arc)[0].value.get("note"),
+      Some(80.0),
+    )
+  }
 }

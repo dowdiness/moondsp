@@ -16,8 +16,7 @@ const SCHEDULER_PROBE_REQUIRED_EXPORTS = [
   'scheduler_right_sample',
   'clear_playback_input',
   'push_playback_char',
-  'prepare_pattern_input',
-  'apply_prepared_playback',
+  'player_restart_input',
   'get_playback_error_length',
   'get_playback_error_char',
   'get_browser_error_length',
@@ -176,8 +175,8 @@ class MoonDspSchedulerProbeProcessor extends AudioWorkletProcessor {
     for (let index = 0; index < text.length; index += 1) {
       this.wasm.push_playback_char(text.charCodeAt(index));
     }
-    const token = this.wasm.prepare_pattern_input();
-    const status = token === 0 ? 1 : this.wasm.apply_prepared_playback(token, true);
+    const status = this.wasm.player_restart_input();
+    if (status === 0) this.wasm.set_scheduler_bpm(this.initialBpm);
     this.parseStatus = status;
     this.parseError = status === 0 ? '' : this.patternErrorMessage();
     if (status === 0) {
