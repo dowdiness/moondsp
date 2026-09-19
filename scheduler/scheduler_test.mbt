@@ -1129,6 +1129,12 @@ test "Switching send output leaves dry playback and transport unchanged" {
     for i in 0..<left.length() {
       @debug.assert_eq(left.get(i), dry_left.get(i))
       @debug.assert_eq(right.get(i), dry_right.get(i))
+      if enabled {
+        assert_true((send_left.get(i) - dry_left.get(i) * 0.5).abs() < 0.000001)
+        assert_true(
+          (send_right.get(i) - dry_right.get(i) * 0.5).abs() < 0.000001,
+        )
+      }
     }
   }
 }

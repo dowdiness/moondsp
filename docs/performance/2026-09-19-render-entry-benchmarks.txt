@@ -5,9 +5,13 @@ Full suite: NEW_MOON_MOD=0 MOON_WORK=off moon bench --release --no-parallelize
 Full suite result: 66 passed, 0 failed
 
 This is a post-change snapshot, not a before/after speedup claim or a complete
-allocation audit. The send entry passes existing buffers directly. Separately,
-release browser Wasm-GC inspection found no struct.new in the arguments to
-render_block_with_send; this does not establish an allocation-free scheduler.
+allocation audit. The PR base already passed send buffers as separate arguments.
+The final API preserves that approach; it avoids the send-pair allocation
+introduced by the intermediate optional-tuple design, not an allocation present
+in the base. No base-versus-head timing comparison was measured.
+Separately, release browser Wasm-GC inspection found no struct.new in the
+arguments to render_block_with_send; this does not establish an allocation-free
+scheduler.
 
 Scheduler excerpts from the full suite:
 
