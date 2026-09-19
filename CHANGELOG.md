@@ -79,6 +79,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Consolidated snapshot playback behind `PatternScheduler::render_block` with
+  optional `send=(send_left, send_right)` stereo effect output. Removed the
+  separate snapshot and send rendering entry points and migrated callers.
+
 - Bounded live Player source admission by text size, syntax depth, Euclidean
   steps, arrangement occurrences, and conservative event/work expansion.
   Admission covers future callback branches and full-cycle sequence queries;

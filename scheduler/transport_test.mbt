@@ -278,7 +278,7 @@ test "material admission rejects all routes before retiming and restart recovers
   let (first, _, _, _) = transport_fixture(sample_rate=128.0)
   let (second, pool, left, right) = transport_fixture(sample_rate=128.0)
   second.accept_playback_snapshot(snapshot("old", 60.0))
-  second.process_playback_snapshot_block(pool, left, right)
+  second.render_block(pool, left, right)
   let before = second.current_block().unwrap().logical_arc
   let next = snapshot("new", 80.0)
   let targets = [(first, next), (second, next)]
@@ -300,7 +300,7 @@ test "material admission rejects all routes before retiming and restart recovers
     second.accepted_snapshot().unwrap().query(arc)[0].value.get("note"),
     Some(60.0),
   )
-  second.process_playback_snapshot_block(pool, left, right)
+  second.render_block(pool, left, right)
   assert_true(left.get(0) > 0.0)
   @scheduler.accept_playback_all(targets, tempo, material_limit=1, restart=true).unwrap()
   for scheduler in [first, second] {

@@ -83,26 +83,3 @@ fn PatternScheduler::commit_pending_playback_snapshot(
     self.clock.position(self.clock.sample()).unwrap(),
   )
 }
-
-///|
-/// Render prepared playback with the same per-material entry rules as songs.
-pub fn PatternScheduler::process_snapshot_block(
-  self : PatternScheduler,
-  pool : @moondsp.BoundVoicePool,
-  left : @moondsp.AudioBuffer,
-  right : @moondsp.AudioBuffer,
-) -> Unit {
-  self.process_playback_snapshot_block(pool, left, right)
-}
-
-///|
-/// Render prepared song playback. Acceptance occurs at block start; audible
-/// edits use each material's next entry within its occurrence.
-pub fn PatternScheduler::process_song_snapshot_block(
-  self : PatternScheduler,
-  pool : @moondsp.BoundVoicePool,
-  left : @moondsp.AudioBuffer,
-  right : @moondsp.AudioBuffer,
-) -> Unit {
-  self.process_playback_snapshot_block(pool, left, right)
-}

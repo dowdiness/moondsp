@@ -353,12 +353,11 @@ fn Player::process(self : Player) -> Bool {
     sp.tmp_right.fill(0.0)
     sp.tmp_send_left.fill(0.0)
     sp.tmp_send_right.fill(0.0)
-    sp.scheduler.process_playback_snapshot_block_with_send(
+    sp.scheduler.render_block(
       sp.pool,
       sp.tmp_left,
       sp.tmp_right,
-      sp.tmp_send_left,
-      sp.tmp_send_right,
+      send=(sp.tmp_send_left, sp.tmp_send_right),
     )
     if sp.scheduler.last_transport_error() is Some(_) {
       self.session = Fault("transport range exhausted")

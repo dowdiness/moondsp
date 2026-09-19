@@ -980,11 +980,12 @@ Current semantics:
 - Phase 6 incremental authoring adds a snapshot-swap layer over the same
   block-processing loop. `queue_pattern_snapshot` / `queue_song_snapshot`
   stage a lowered `PlaybackSnapshot` without changing playback immediately;
-  `process_snapshot_block` (and the pattern/song/playback variants) commits
-  the authored snapshot at block start. Each changed material finishes its
-  current source cycle before replacement; sounding voices retain deadlines.
-  See [scheduler guide](../scheduler/README.mbt.md) for entry and identity rules.
-  Multiple staged snapshots coalesce so the latest staged state wins
+  `render_block` accepts the latest queued snapshot at block start, then
+  renders dry stereo and optionally a post-pan stereo send. Each changed
+  material finishes its current source cycle before replacement; sounding
+  voices retain deadlines. See [scheduler guide](../scheduler/README.mbt.md)
+  for entry and identity rules. Multiple staged snapshots coalesce so the
+  latest staged state wins.
 - Reconciliation consumes already-lowered snapshots and classifies every
   material into an exclusive runtime state: current, waiting at a proven entry,
   changing at a proven entry, finishing current material with a skipped incoming
