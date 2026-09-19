@@ -1,5 +1,7 @@
 # MoonBit Base Conventions
 
+Use this reference when writing or reviewing MoonBit. Verification scope and command policy are defined in [the project guide](../CLAUDE.md#commands-and-verification); this document adds MoonBit-specific syntax and tooling cautions.
+
 ## Quick Reference
 
 | When...                    | Use...                              | Not...                        |
@@ -32,11 +34,11 @@
 Prefer `moon ide` over grep/glob for MoonBit-specific code search. These commands use compiler semantics instead of text matching.
 
 ```bash
-moon ide peek-def SyncEditor              # Go-to-definition with context
-moon ide peek-def -loc editor/foo.mbt:5   # Definition at cursor position
-moon ide find-references SyncEditor       # All usages across codebase
-moon ide outline editor/                  # Package structure overview
-moon ide doc "String::*rev*"              # API discovery with wildcards
+NEW_MOON_MOD=0 moon ide peek-def SyncEditor              # Go-to-definition with context
+NEW_MOON_MOD=0 moon ide peek-def -loc editor/foo.mbt:5   # Definition at cursor position
+NEW_MOON_MOD=0 moon ide find-references SyncEditor       # All usages across codebase
+NEW_MOON_MOD=0 moon ide outline editor/                  # Package structure overview
+NEW_MOON_MOD=0 moon ide doc "String::*rev*"              # API discovery with wildcards
 ```
 
 Common symbol forms:
@@ -56,12 +58,12 @@ When to use: finding definitions, tracing usages, understanding package APIs, di
 
 ```bash
 # Semantic audits (moon ide)
-moon ide analyze <pkg> | grep "can be removed"       # Over-exposed pub(all)
-moon ide analyze <pkg> | grep "usage: 0"             # Unused public APIs
-moon ide outline <pkg> | grep ' | let '              # Top-level let → review if should be const
-moon ide outline <pkg> | grep 'const'                # Verify const usage exists
-moon ide find-references abort --loc <file:line>      # abort sites → potential guard candidates
-moon ide doc --dump /tmp/symbols.jsonl                # Full symbol dump (NEVER pass a source file path — it overwrites!)
+NEW_MOON_MOD=0 moon ide analyze <pkg> | grep "can be removed"       # Over-exposed pub(all)
+NEW_MOON_MOD=0 moon ide analyze <pkg> | grep "usage: 0"             # Unused public APIs
+NEW_MOON_MOD=0 moon ide outline <pkg> | grep ' | let '              # Top-level let → review if should be const
+NEW_MOON_MOD=0 moon ide outline <pkg> | grep 'const'                # Verify const usage exists
+NEW_MOON_MOD=0 moon ide find-references abort --loc <file:line>      # abort sites → potential guard candidates
+NEW_MOON_MOD=0 moon ide doc --dump /tmp/symbols.jsonl                # Full symbol dump (NEVER pass a source file path — it overwrites!)
 
 # Stylistic audits (grep — moon ide can't see keywords like return/if/guard)
 grep -rn 'if .* { return' <pkg>/*.mbt                # guard candidates (early return)
@@ -141,6 +143,7 @@ grep -rn '() => {}' <pkg>/*.mbt                      # Empty callback anti-patte
   let mut acc = 0
   for i in 0..<n { acc += xs[i] }
   ```
+- **Loop expressions:** Prefer them for loops that naturally compute a value: sums, counts, folds, any/all scans, min/max/peak searches, and small tuple accumulators. Do not mechanically rewrite procedural loops; keep parser state machines, buffer-filling loops, hot DSP paths, and side-effect-heavy graph/edit code imperative when that is clearer.
 - **Destructuring tuple-element arrays:** `for (a, b) in xs` is a parse error `[3002]` — `for .. in` binds identifiers, not patterns. For an `Array[(A, B)]`, both `for a, b in xs` and `xs.iter2()` yield **(index, element)** (`a : Int`, `b : (A, B)` — `Array::iter2() -> Iter2[Int, A]`), NOT the tuple components. To destructure the components, wrap the iterator in `Iter2` (a newtype over `Iter[(X, Y)]`, in prelude) — its two-binder `for` / `.each` yield `(X, Y)`. Otherwise destructure in the body. Tuple-pattern lambda params (`.each(((a, b)) => ...)`) are also a parse error.
   ```moonbit
   for a, b in Iter2(xs.iter()) { ... }       // a : A, b : B
@@ -237,7 +240,9 @@ grep -rn '() => {}' <pkg>/*.mbt                      # Empty callback anti-patte
 - **Panic tests:** name starts with `"panic "` — test runner expects `abort()`
 - **Blackbox tests** cannot construct internal structs — use whitebox tests or expose constructors
 - **Block-style:** Code organized in `///|` separated blocks
-- **Format:** Always `moon info && moon fmt` before committing
+- **File-scoped tests:** Pass the positional file path, for example `NEW_MOON_MOD=0 moon test mini/mini_test.mbt`. The `-f/--filter` option matches test names, not filenames. A filename used as a filter can report `Total tests: 0` with exit 0; that is not successful verification. Check that the intended tests actually ran.
+- **Snapshots:** Use `NEW_MOON_MOD=0 moon test --update` only for intentional behavior changes, and review the updated expectations rather than accepting failures automatically.
+- **Proof-enabled packages:** Run `NEW_MOON_MOD=0 moon prove` when changing `proof_ensure` properties in a package with `proof-enabled: true`.
 
 ## Pitfalls
 
@@ -263,40 +268,23 @@ grep -rn '() => {}' <pkg>/*.mbt                      # Empty callback anti-patte
 
 ## Development Workflow
 
-### Performance Optimization Rule
-
-Before designing any performance optimization, write a microbenchmark that **reproduces the claimed bottleneck** in isolation. If the benchmark can't demonstrate the problem, stop and re-evaluate. Stale profiling data and O(bad) complexity are not proof of a real problem.
-
-### Incremental Edit Rule
-
-**CRITICAL:** After every file edit, run `moon check` before proceeding to the next file. If there are errors, fix them immediately before continuing with the plan.
-
-### Standard Workflow
-
-1. Make edits
-2. `moon check` — Lint
-3. `moon test` — Run tests
-4. `moon test --update` — Update snapshots (if behavior changed)
-5. `moon prove` — Verify `proof_ensure` properties (if `proof-enabled: true` in moon.pkg)
-6. `moon info` — Update `.mbti` interfaces
-7. Check `git diff *.mbti` — Verify API changes
-8. `moon fmt` — Format
+Follow [Commands and verification](../CLAUDE.md#commands-and-verification) for check timing, test scope, formatting, interface updates, and performance evidence. Check coherent changes and fix their failures before building on them; there is no separate per-file check or unconditional full-suite requirement here.
 
 ### Workspace Commands
 
 For multi-project workspaces (monorepos with multiple `moon.mod.json`):
-- `moon work init` — Initialize a workspace
-- `moon work use <path>` — Add a project to the workspace
-- `moon work sync` — Sync dependencies across workspace members
+- `NEW_MOON_MOD=0 moon work init` — Initialize a workspace
+- `NEW_MOON_MOD=0 moon work use <path>` — Add a project to a workspace
+- `NEW_MOON_MOD=0 moon work sync` — Sync dependencies across workspace members
 
 ### v0.9.2 Toolchain Updates
 
 - **Per-member preferred-target:** Workspace builds (`moon build`, `moon test`) now respect each member's declared `preferred-target`, so mixed frontend/backend projects can build in a single command.
-- **`moon run -c '<script>'`:** Execute a snippet without creating a file. Useful for one-off probes inside a project.
-- **Path-based `moon run`:** `moon run path/to/project` resolves the project from the given path; no longer requires running from the project root or passing `--manifest-path`.
-- **Native LSP:** `moon lsp` ships an OCaml-based LSP binary. Enable in VS Code with `"moonbit.nativeLsp": true`.
+- **`NEW_MOON_MOD=0 moon run -c '<script>'`:** Execute a snippet without creating a file. Useful for one-off probes inside a project.
+- **Path-based `NEW_MOON_MOD=0 moon run`:** Execute a project by path without changing directories or passing `--manifest-path`.
+- **Native LSP:** `NEW_MOON_MOD=0 moon lsp` ships an OCaml-based LSP binary. Enable in VS Code with `"moonbit.nativeLsp": true`.
 - **`MOON_WORK` env var:** Override the `moon.work` location, or set `MOON_WORK=off` to disable workspace behavior for a single invocation.
-- **Experimental `moon.mod`:** A new configuration file format replacing `moon.mod.json`. Set `NEW_MOON_MOD=1` to migrate automatically. Build rules move from `options("pre-build": ...)` in `moon.pkg` to structured `rule()` / `dev_build()` declarations in `moon.mod`, reusable across packages.
+- **Manifest migration:** This repository already maintains `moon.mod` by hand. Do not enable automatic manifest migration; follow the `NEW_MOON_MOD=0` policy in [the project guide](../CLAUDE.md#commands-and-verification).
 
 ## Git & PR Workflow
 

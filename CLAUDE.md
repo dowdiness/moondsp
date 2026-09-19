@@ -1,117 +1,60 @@
 # moondsp — MoonBit DSP Audio Engine
 
-`moondsp` is a live-codable, portable DSP audio and pattern engine written in MoonBit.
+`moondsp` is a live-codable, portable DSP audio and pattern engine written in MoonBit. The browser path is complete; the native CLAP path is a prototype, not DAW-ready.
 
-The browser audio path is complete: AudioWorklet proof, DSP primitives, compiled
-graph runtime with hot-swap and stereo, voice pool with priority stealing,
-pattern engine with rational time, pattern scheduler, and text-to-audio
-pipeline with mini-notation parser and synthesized drum sounds.
+## Non-negotiable boundaries
 
-A native CLAP plugin path exists in prototype form (`clap_engine`, `clap_host`,
-`clap_plugin`) and passes clap-validator, but is **not** production-gated — see
-the Native ABI and CLAP Policy section for the gates that separate prototype
-from DAW-ready.
+- Compile DSP graphs; do not interpret them on the render path.
+- **No audio-thread allocation: pre-allocated buffers only.**
+- Keep CLAP C ABI details in `clap_plugin/`, primitive handles in `clap_host/`, synth state in `clap_engine/`, and reusable DSP below them.
+- Do not let CLAP host/plugin details leak into graph, voice, pattern, scheduler, or browser packages.
+- Never call the CLAP prototype DAW-ready without stable bridge symbols, a real host/DAW load, and an audio-thread allocation audit.
+- `Array[DspNode]` is the authoring exchange type; `CompiledTemplate` is the runtime exchange type. The canonical crossing is `CompiledTemplate::analyze`. See ADR-0010 and `scripts/check-public-boundary.sh` when changing this boundary.
+- Code is the implementation source of truth. `docs/technical-reference.md` is authoritative for the documented graph runtime-control contract.
 
-@docs/moonbit-base.md
+## Working policy
 
-## Project Structure
+- Continue until the requested done criteria are met or a real blocker is reached. Do not stop for ordinary implementation choices.
+- Safe local checks may run without asking. Fix failures caused by the requested change and rerun the affected checks.
+- Ask only when missing credentials or access block progress, source requirements genuinely conflict, or an action exceeds the approved task scope or granted permissions. This includes unapproved destructive actions and public API or architecture changes; changes explicitly requested by the user may proceed.
+- Read public documentation and public source code needed for the task without separate approval. Do not send private repository data or secrets to external services without authorization. Commit, push, publish, or change external state only when authorized.
+- Prefer the smallest change that satisfies the goal. Do not add a broad skill or preload unrelated documentation.
+- Use `moon ide` for MoonBit symbol definitions, references, outlines, and API discovery. Use text search for non-MoonBit files and stylistic checks.
 
-**Module:** `dowdiness/moondsp`
+## Commands and verification
 
-| Package | Path | Purpose |
-|---------|------|---------|
-| `dowdiness/moondsp` | `./` | Library public API facade — re-exports the full library surface from `@dsp`, `@graph`, `@voice`, and `@identity` so external consumers and internal sub-packages both write `@moondsp.X` |
-| `dowdiness/moondsp/dsp` | `dsp/` | DSP primitives (oscillators, filters, tagless algebra, pan math) |
-| `dowdiness/moondsp/graph` | `graph/` | Compiled graph runtime (compile, optimize, topology edit, hot-swap, control binding) |
-| `dowdiness/moondsp/voice` | `voice/` | Polyphonic voice pool with priority stealing |
-| `dowdiness/moondsp/identity` | `identity/` | Dependency-free stable ID wrappers and revision tokens for incremental editing |
-| `dowdiness/moondsp/pattern` | `pattern/` | Standalone pattern engine (rational time, combinators, control maps, authoring docs) — zero dep on the DSP layers |
-| `dowdiness/moondsp/mini` | `mini/` | Mini-notation parser: text → `Pat[ControlMap]` (e.g. `s("bd sd hh sd").fast(2)`) |
-| `dowdiness/moondsp/song` | `song/` | Long-form section scaffold with identity `TimeScope`, between pattern and scheduler |
-| `dowdiness/moondsp/scheduler` | `scheduler/` | Pattern scheduler — bridges pattern engine to DSP voice pool |
-| `dowdiness/moondsp/browser` | `browser/` | AudioWorklet export wrapper with multi-pool drum routing |
-| `dowdiness/moondsp/browser_test` | `browser_test/` | Browser integration test wrapper |
-| `dowdiness/moondsp/clap_engine` | `clap_engine/` | Native CLAP synth engine core around graph + voice pool |
-| `dowdiness/moondsp/clap_host` | `clap_host/` | Primitive integer-handle bridge for C CLAP shims |
-| `dowdiness/moondsp/clap_plugin` | `clap_plugin/` | Native payload package plus prototype CLAP C ABI shim |
-| `dowdiness/moondsp/cmd/main` | `cmd/main/` | CLI entry point |
+Prefix every direct Moon command with `NEW_MOON_MOD=0`; this prevents the experimental manifest migration from modifying the hand-maintained manifests. Wrapper scripts already handle their own invocation.
 
-## Architecture
-
-- **Finally Tagless two-layer:** traits for extensibility, enums for concrete ASTs
-- **Compiled graph:** compile the DSP graph, do not interpret it
-- **No audio-thread allocation:** pre-allocated buffers only
-- **Incremental computation:** memoized DSP graph updates
-- **Audio constants:** 48000 Hz sample rate, 128 samples per buffer
-- **Graph boundary types:** `Array[DspNode]` is the authoring exchange type; `CompiledTemplate` is the runtime exchange type. One canonical crossing: `CompiledTemplate::analyze`. See ADR-0010 for the contract and `scripts/check-public-boundary.sh` for enforcement.
-
-**Source of truth:** `docs/technical-reference.md` is authoritative for graph runtime-control behavior. Update it first whenever these change.
-
-## Native ABI and CLAP Policy
-
-- Keep host/plugin ABI details at the outer boundary: CLAP C ABI in
-  `clap_plugin/`, primitive MoonBit handles in `clap_host/`, synth state in
-  `clap_engine/`, reusable DSP below.
-- Prefer official vendored headers or repeatable verification over handwritten
-  native ABI subsets.
-- Vendored native headers must record upstream version, source URL, checksum,
-  and license.
-- Do not let CLAP host/plugin details leak into graph, voice, pattern,
-  scheduler, or browser packages.
-- Validator success is necessary evidence, not DAW-readiness. Do not claim
-  DAW-ready until a real CLAP host/DAW has loaded the plugin.
-- Keep the production gates explicit: stable MoonBit bridge symbols, real
-  host/DAW load, and audio-thread allocation audit.
-
-## MoonBit Style Notes
-
-- Loop expressions are best for loops that naturally compute a value: sums,
-  counts, folds, `any`/`all` scans, min/max/peak searches, and small tuple
-  accumulators. Do not mechanically rewrite procedural loops; keep parser
-  state machines, buffer-filling loops, hot DSP paths, and side-effect-heavy
-  graph/edit code imperative when that is clearer.
-
-## Commands
-
-Prefix every direct `moon` invocation with `NEW_MOON_MOD=0`. The variable
-disables the experimental `moon.mod` auto-migration, which has corrupted
-generated manifests; the repo already ships a hand-maintained `moon.mod`.
-(Wrapper scripts below invoke `moon` internally and need no prefix.)
+Choose checks by the changed surface instead of running every command for every task:
 
 ```bash
-NEW_MOON_MOD=0 moon check && NEW_MOON_MOD=0 moon test  # full test suite
-NEW_MOON_MOD=0 moon build --target wasm-gc             # Browser WASM build
-NEW_MOON_MOD=0 moon run cmd/main                       # CLI entry point
-NEW_MOON_MOD=0 moon bench                              # microbenchmarks (per package)
-scripts/build-clap-prototype.sh    # Linux CLAP prototype shared object
-scripts/smoke-clap-prototype.sh    # Local CLAP dlopen/process smoke test
-scripts/validate-clap-prototype.sh # Build + clap-validator prototype check
-```
-
-Before every commit:
-```bash
+NEW_MOON_MOD=0 moon check
+NEW_MOON_MOD=0 moon test path/to/affected_test.mbt
+NEW_MOON_MOD=0 moon test
 NEW_MOON_MOD=0 moon info && NEW_MOON_MOD=0 moon fmt
+NEW_MOON_MOD=0 moon build --target wasm-gc
+scripts/smoke-clap-prototype.sh
 ```
 
-**Scoping tests to one file:** pass the positional path
-(`NEW_MOON_MOD=0 moon test mini/mini_test.mbt`), not `-f`. The `-f/--filter`
-flag matches test *names* by glob, so a filename matches nothing and reports
-`Total tests: 0` with exit 0 — a silent no-op, not a failure.
+- MoonBit behavior changes: check coherent changes with `NEW_MOON_MOD=0 moon check` and run the affected test file or package, including sibling tests; use the full suite when shared behavior or public APIs change. Fix failures before building on the change, not by running checks after every individual file edit.
+- Public API changes: run `NEW_MOON_MOD=0 moon info` and inspect `.mbti` diffs. Before committing MoonBit source changes, run `NEW_MOON_MOD=0 moon info && NEW_MOON_MOD=0 moon fmt`; investigate unexpected generated changes.
+- Browser changes: build the relevant target and exercise the actual browser surface when available.
+- CLAP/native changes: use the relevant build, smoke, validator, host-load, and allocation evidence; validator success alone is insufficient.
+- Performance changes: reproduce the claimed bottleneck with an isolated benchmark before changing the implementation, then save a dated record under `docs/performance/`.
+- Documentation/configuration-only changes: validate the changed format and links; do not run MoonBit tests solely because prose changed.
 
-**Benchmarks:** the engine carries `*_benchmark.mbt` suites across `graph`,
-`mini`, `pattern`, `scheduler`, and `voice`. After any perf-relevant change,
-run `NEW_MOON_MOD=0 moon bench` and save a dated snapshot under
-`docs/performance/` (match the format of the existing snapshots).
+## Read when relevant
 
-## Documentation
+| Task | Read or run |
+|---|---|
+| Writing or reviewing MoonBit | `docs/moonbit-base.md` |
+| Graph runtime-control | `docs/technical-reference.md` and the applicable graph ADR |
+| Editor, Song, Update, identity, or playback-origin semantics | `CONTEXT.md` and the applicable ADR |
+| Browser ABI or AudioWorklet lifecycle | `docs/browser-api-contract.md` |
+| Mini notation or DSL lowering | `docs/mini-notation.md` and the applicable boundary document |
+| CLAP/native ABI | `docs/clap-plugin-guide.md` and relevant `docs/development/` evidence |
+| Architecture rationale | `docs/decisions/`; use `docs/archive/` only for explicit historical work |
+| Package/API discovery | `moon ide outline <path>`; use `scripts/package-overview.sh` only for broad package work |
+| Task prompt authoring | `TASK_TEMPLATE.md` |
 
-Browse `docs/` for architecture, decisions, development guides, and performance snapshots. Key rules:
-
-- Architecture docs = principles only, never reference specific types/fields/lines
-- Code is the source of truth — if a doc and the code disagree, the doc is wrong
-- `docs/technical-reference.md` is authoritative for graph runtime-control
-- `docs/archive/` = completed work. Do not search here unless asked for historical context.
-
-## Package Map
-
-The SessionStart hook runs `scripts/package-overview.sh` which provides a live package map at the start of every session. Use `moon ide outline <path>` to explore any package's public API before modifying it. Read `moon.mod` for module dependencies.
+`docs/README.md` is the documentation router. Do not read the entire documentation tree by default. The archive contains completed work and is not an active source of truth.
