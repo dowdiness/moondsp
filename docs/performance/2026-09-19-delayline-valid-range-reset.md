@@ -31,21 +31,22 @@ that DSP is out of scope.
 
 Product columns come from the refreshed full-suite raw output above
 (`--target wasm-gc`). Physical-fill baseline columns come from the pinned
-comparison runner. It archives the current tree, replaces only `dsp/delay.mbt`
-with the exact baseline source from commit
-`c62774961895f2b2fd7b96adf448672df93527ad`, and runs the same benchmark harness
-and target. The baseline therefore isolates the physical reset implementation
-while keeping the surrounding benchmark and integration code identical.
+comparison runner. Before running, the runner rejects uncommitted changes in
+the relevant manifests and DSP sources. It archives `HEAD` once, extracts that
+same archive for both sides, and replaces only `dsp/delay.mbt` in the baseline
+copy with the exact source from commit
+`c62774961895f2b2fd7b96adf448672df93527ad`. Both sides therefore use the same
+benchmark harness and surrounding integration code.
 
 | Case | Valid-range (product) | Physical-fill baseline |
 |---|---:|---:|
-| `DelayLine::reset`, capacity 8 | 1.12 ns | 4.14 ns |
-| `DelayLine::reset`, capacity 4,800 | 4.79 ns | 342.73 ns |
-| `DelayLine::reset`, capacity 480,000 | 4.70 ns | 43.40 µs |
-| reset + 16 ticks, capacity 4,800 | 47.88 ns | 396.45 ns |
-| reset + 16 ticks, capacity 480,000 | 55.28 ns | 43.37 µs |
-| warmed steady 16 ticks, capacity 4,800 | 50.10 ns | 45.58 ns |
-| warmed steady 16 ticks, capacity 480,000 | 50.82 ns | 64.77 ns |
+| `DelayLine::reset`, capacity 8 | 1.12 ns | 3.94 ns |
+| `DelayLine::reset`, capacity 4,800 | 4.79 ns | 319.66 ns |
+| `DelayLine::reset`, capacity 480,000 | 4.70 ns | 43.64 µs |
+| reset + 16 ticks, capacity 4,800 | 47.88 ns | 388.14 ns |
+| reset + 16 ticks, capacity 480,000 | 55.28 ns | 45.19 µs |
+| warmed steady 16 ticks, capacity 4,800 | 50.10 ns | 52.50 ns |
+| warmed steady 16 ticks, capacity 480,000 | 50.82 ns | 65.12 ns |
 | prepared params4 active steal, capacity 4,800 | 761.96 ns | — |
 | prepared params4 active steal, capacity 48,000 | 759.25 ns | — |
 | prepared params4 active steal, capacity 480,000 | 744.79 ns | — |

@@ -1,42 +1,42 @@
 DelayLine focused candidate/baseline comparison
 target: wasm-gc
 command: NEW_MOON_MOD=0 moon bench --release --target wasm-gc dsp/delay_benchmark.mbt
-candidate: HEAD 70df7030d22f2ee76137d1f1fc8cbb28e3a69f05
-baseline: c62774961895f2b2fd7b96adf448672df93527ad (physical buffer reset)
-benchmark: current HEAD dsp/delay_benchmark.mbt, including capacity-scaled warmup
+candidate: HEAD 8de3d751396d208837c2a2a37f4c2d9399d8a340 (shared archive)
+baseline: c62774961895f2b2fd7b96adf448672df93527ad (physical buffer reset, shared archive)
+benchmark: identical HEAD archive; baseline replaces only dsp/delay.mbt
 
 ===== candidate =====
-directory: /home/antisatori/ghq/github.com/dowdiness/moondsp/.worktrees/delayline-logical-reset
+directory: /tmp/moondsp-delayline-reset-baseline.rgAv6d/candidate
 source delay.mbt: candidate
 [dowdiness/moondsp] bench dsp/delay_benchmark.mbt:33 ("bench/dsp/delay_reset") ok
 name             time (mean ± σ)         range (min … max)
-reset_cap_8         1.17 ns ±   0.10 ns     1.10 ns …   1.44 ns  in 10 × 100000 runs
-reset_cap_4800      4.62 ns ±   0.04 ns     4.56 ns …   4.69 ns  in 10 × 100000 runs
-reset_cap_480000    4.66 ns ±   0.23 ns     4.00 ns …   4.80 ns  in 10 × 100000 runs
+reset_cap_8         1.16 ns ±   0.06 ns     1.09 ns …   1.31 ns  in 10 × 100000 runs
+reset_cap_4800      4.65 ns ±   0.09 ns     4.57 ns …   4.83 ns  in 10 × 100000 runs
+reset_cap_480000    4.62 ns ±   0.06 ns     4.55 ns …   4.76 ns  in 10 × 100000 runs
 [dowdiness/moondsp] bench dsp/delay_benchmark.mbt:48 ("bench/dsp/delay_reset_plus_tick16") ok
 name                         time (mean ± σ)         range (min … max)
-reset_plus_tick16_cap_4800     49.96 ns ±   3.22 ns    46.91 ns …  55.99 ns  in 10 × 100000 runs
-reset_plus_tick16_cap_480000   57.29 ns ±   3.98 ns    51.70 ns …  62.49 ns  in 10 × 100000 runs
+reset_plus_tick16_cap_4800     47.90 ns ±   1.41 ns    45.99 ns …  50.63 ns  in 10 × 100000 runs
+reset_plus_tick16_cap_480000   80.57 ns ±   0.92 ns    79.35 ns …  81.89 ns  in 10 × 100000 runs
 [dowdiness/moondsp] bench dsp/delay_benchmark.mbt:68 ("bench/dsp/delay_tick16_steady") ok
 name                     time (mean ± σ)         range (min … max)
-tick16_steady_cap_4800     52.48 ns ±   1.10 ns    51.70 ns …  54.92 ns  in 10 × 100000 runs
-tick16_steady_cap_480000   50.90 ns ±   1.34 ns    49.48 ns …  54.13 ns  in 10 × 100000 runs
+tick16_steady_cap_4800     47.80 ns ±   0.41 ns    46.99 ns …  48.32 ns  in 10 × 100000 runs
+tick16_steady_cap_480000   48.81 ns ±   0.90 ns    48.19 ns …  51.28 ns  in 10 × 100000 runs
 Total tests: 3, passed: 3, failed: 0.
 
 ===== baseline =====
-directory: /tmp/moondsp-delayline-reset-baseline.VBQPRy/baseline
+directory: /tmp/moondsp-delayline-reset-baseline.rgAv6d/baseline
 source delay.mbt: baseline
 [dowdiness/moondsp] bench dsp/delay_benchmark.mbt:33 ("bench/dsp/delay_reset") ok
 name             time (mean ± σ)         range (min … max)
-reset_cap_8         4.14 ns ±   1.39 ns     3.37 ns …   7.29 ns  in 10 × 100000 runs
-reset_cap_4800    342.73 ns ±  29.72 ns   326.08 ns … 407.06 ns  in 10 × 100000 runs
-reset_cap_480000   43.40 µs ± 320.70 ns    42.98 µs …  43.95 µs  in 10 ×   2305 runs
+reset_cap_8         3.94 ns ±   0.63 ns     3.42 ns …   4.98 ns  in 10 × 100000 runs
+reset_cap_4800    319.66 ns ±   1.98 ns   317.73 ns … 323.99 ns  in 10 × 100000 runs
+reset_cap_480000   43.64 µs ± 646.79 ns    43.03 µs …  45.00 µs  in 10 ×   2236 runs
 [dowdiness/moondsp] bench dsp/delay_benchmark.mbt:48 ("bench/dsp/delay_reset_plus_tick16") ok
 name                         time (mean ± σ)         range (min … max)
-reset_plus_tick16_cap_4800    396.45 ns ±  16.62 ns   388.10 ns … 443.27 ns  in 10 × 100000 runs
-reset_plus_tick16_cap_480000   43.37 µs ± 594.64 ns    42.83 µs …  44.80 µs  in 10 ×   2300 runs
+reset_plus_tick16_cap_4800    388.14 ns ±   4.00 ns   384.78 ns … 398.16 ns  in 10 × 100000 runs
+reset_plus_tick16_cap_480000   45.19 µs ±   2.85 µs    43.31 µs …  51.98 µs  in 10 ×   2325 runs
 [dowdiness/moondsp] bench dsp/delay_benchmark.mbt:68 ("bench/dsp/delay_tick16_steady") ok
 name                     time (mean ± σ)         range (min … max)
-tick16_steady_cap_4800     45.58 ns ±   1.07 ns    44.42 ns …  47.49 ns  in 10 × 100000 runs
-tick16_steady_cap_480000   64.77 ns ±   5.20 ns    54.31 ns …  72.06 ns  in 10 × 100000 runs
+tick16_steady_cap_4800     52.50 ns ±   9.79 ns    46.37 ns …  77.74 ns  in 10 × 100000 runs
+tick16_steady_cap_480000   65.12 ns ±   5.86 ns    56.64 ns …  73.84 ns  in 10 × 100000 runs
 Total tests: 3, passed: 3, failed: 0.
