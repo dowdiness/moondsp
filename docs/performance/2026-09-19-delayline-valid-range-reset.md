@@ -39,13 +39,13 @@ while keeping the surrounding benchmark and integration code identical.
 
 | Case | Valid-range (product) | Physical-fill baseline |
 |---|---:|---:|
-| `DelayLine::reset`, capacity 8 | 1.12 ns | 3.88 ns |
-| `DelayLine::reset`, capacity 4,800 | 4.79 ns | 325.91 ns |
-| `DelayLine::reset`, capacity 480,000 | 4.70 ns | 42.45 µs |
-| reset + 16 ticks, capacity 4,800 | 47.88 ns | 384.72 ns |
-| reset + 16 ticks, capacity 480,000 | 55.28 ns | 42.67 µs |
-| warmed steady 16 ticks, capacity 4,800 | 50.10 ns | 45.86 ns |
-| warmed steady 16 ticks, capacity 480,000 | 50.82 ns | 66.51 ns |
+| `DelayLine::reset`, capacity 8 | 1.12 ns | 4.14 ns |
+| `DelayLine::reset`, capacity 4,800 | 4.79 ns | 342.73 ns |
+| `DelayLine::reset`, capacity 480,000 | 4.70 ns | 43.40 µs |
+| reset + 16 ticks, capacity 4,800 | 47.88 ns | 396.45 ns |
+| reset + 16 ticks, capacity 480,000 | 55.28 ns | 43.37 µs |
+| warmed steady 16 ticks, capacity 4,800 | 50.10 ns | 45.58 ns |
+| warmed steady 16 ticks, capacity 480,000 | 50.82 ns | 64.77 ns |
 | prepared params4 active steal, capacity 4,800 | 761.96 ns | — |
 | prepared params4 active steal, capacity 48,000 | 759.25 ns | — |
 | prepared params4 active steal, capacity 480,000 | 744.79 ns | — |
