@@ -1,155 +1,58 @@
 # Task Template
 
-Use this template when you want Codex to work autonomously for a long stretch
-without stopping for avoidable clarification.
-
-## Copy-Paste Template
+Use this template for autonomous work that has a concrete outcome. Give the agent the sources and checks relevant to this task; do not list every repository document by default.
 
 ```md
 Goal:
-<One concrete outcome. Keep it singular and testable.>
+<One concrete, testable outcome.>
 
-Source of truth:
-- AGENTS.md
-- <primary spec or issue>
-- <secondary doc if needed>
+Read when relevant:
+- <primary issue, spec, or source-of-truth document>
+- <additional document only if this task crosses that boundary>
 
-Success criteria:
-- <measurable result 1>
-- <measurable result 2>
+Done when:
+- <observable result 1>
+- <observable result 2>
 - <verification result or artifact>
 
-Non-goals:
-- <explicitly out of scope item 1>
-- <explicitly out of scope item 2>
+Boundaries:
+- In scope: <files, package, or behavior>
+- Out of scope: <unrelated refactors or behavior>
+- Preserve existing public APIs, layer boundaries, and performance constraints unless the goal explicitly changes them.
 
-Constraints:
-- Preserve existing repo patterns unless there is a strong reason not to
-- Prefer minimal, targeted diffs
-- <any API, performance, compatibility, or style constraint>
-
-Autonomy policy:
-- Keep going until the success criteria are met or a real blocker is reached
-- Do not stop for minor implementation choices
-- Stop only for:
-  - secrets, credentials, or external accounts
-  - destructive actions not already requested
-  - contradictory source documents
-  - choices that materially change public API or architecture
-- If multiple valid approaches exist, prefer <simplest / lowest-risk / fastest>
+Autonomy:
+- Continue until the done criteria are met or a real blocker is reached.
+- Make ordinary implementation choices without asking for approval.
+- Run safe local checks, fix failures caused by this task, and rerun the affected checks.
+- Ask only when missing credentials or access block progress, source requirements genuinely conflict, or an action exceeds the approved task scope or granted permissions. This includes unapproved destructive actions and public API or architecture changes; changes explicitly requested by the user may proceed.
+- Prefer the simplest low-risk approach and the repository's existing patterns.
 
 Verification:
-- Run: <command 1>
-- Run: <command 2>
-- If a command fails, fix what is feasible and summarize the remaining issue
+- Follow CLAUDE.md, “Commands and verification,” for repository check scope and command policy.
+- Run: <task-specific commands or scenarios, with expected results>
+- If a check fails, fix what is feasible and report any remaining failure with its evidence.
 
-Artifacts:
-- Update or create: <docs, dated snapshots under docs/performance/, design specs under docs/superpowers/specs/, etc.>
-
-Git:
-- Commit when done with a sensible message
-- <Do not push / Push when done>
+External actions:
+- Commit: <only if requested by this task>
+- Read public documentation and public source code needed for this task without separate approval.
+- Push, publish, change external state, or send private repository data to external services: <only within explicit authorization>
 
 Final report:
 - What changed
 - Verification results
-- Remaining risks or unknowns
+- Remaining risks or blockers
 - Recommended next step
 ```
 
-## Repo-Specific Default
+## Selecting verification
 
-Use this variant when the task is in this repository and you do not want to
-rewrite the common parts every time.
+[Commands and verification](CLAUDE.md#commands-and-verification) is the canonical repository policy. Fill the template's verification field with concrete checks and expected outcomes for the changed surface, rather than copying a second policy table here.
 
-```md
-Goal:
-<Concrete task in moondsp>
+For MoonBit test-file selection, snapshot updates, and proof-enabled packages, use the [MoonBit testing cautions](docs/moonbit-base.md#testing). Use [the documentation router](docs/README.md#read-when-changing) for browser, native, and other task-specific contracts.
 
-Source of truth:
-- AGENTS.md
-- docs/technical-reference.md
-- docs/blueprint.md
-- The relevant open GitHub issue (open issues are the priority source of truth)
-- <additional doc if relevant>
+## Repository boundaries worth repeating in implementation tasks
 
-Success criteria:
-- The requested implementation is complete
-- `moon check` passes
-- `moon test` passes, or any absence/failures are explained clearly
-- Required docs or generated files are updated if needed
-
-Non-goals:
-- Unrelated refactors
-- Style-only churn
-- Expanding scope beyond the named task
-
-Constraints:
-- Follow MoonBit block style with `///|`
-- Prefer explicit error handling when MoonBit shorthand is unclear
-- Avoid allocation in audio-thread code
-- Keep public API changes intentional and review `.mbti` diffs when applicable
-
-Autonomy policy:
-- Keep going without asking unless blocked by secrets, approvals, destructive
-  actions, or conflicting instructions
-- Prefer the simplest approach that satisfies the documented goal
-- Use existing project structure and conventions instead of inventing new ones
-
-Verification:
-- Run `moon check`
-- Run `moon test`
-- Run `moon info` if public APIs may have changed
-- Run `moon fmt` after edits
-
-Artifacts:
-- Update docs when behavior, workflow, or findings change
-- For benchmark or platform-validation tasks, add a dated snapshot under
-  `docs/performance/` instead of editing earlier snapshots in place
-
-Git:
-- Commit at the end with a sensible message
-- Do not push unless explicitly asked
-
-Final report:
-- Brief summary of implementation
-- Verification status
-- Open risks, blockers, or follow-up work
-```
-
-## Good Prompt Example
-
-```md
-Read `docs/archive/step0-instruction.md` and implement the minimal browser
-AudioWorklet prototype in this repo.
-
-Success criteria:
-- MoonBit exports a `tick(freq, sample_rate)` sine oscillator
-- `web/index.html` and `web/processor.js` exist
-- `docs/archive/RESULTS.md` records what worked, what failed, and any wasm-gc findings
-- `moon check` passes
-
-Non-goals:
-- No architecture refactor
-- No extra DSP features
-- No UI polish beyond what is needed for the demo
-
-Autonomy policy:
-- Keep going until complete
-- Stop only if browser/manual interaction is required, network approval is
-  needed, or the docs conflict
-
-Git:
-- Commit when done
-- Do not push
-```
-
-## Practical Notes
-
-- A strong long-running task starts with one primary goal, not a wishlist.
-- Success criteria matter more than detailed implementation instructions.
-- Non-goals prevent scope drift.
-- If the repo depends on external services, make access and approval policy
-  explicit up front.
-- If you want checkpoints, say so explicitly, for example: "Commit at logical
-  milestones and continue."
+- **No audio-thread allocation: pre-allocated buffers only.**
+- Keep CLAP ABI details at the outer boundary; do not leak them into reusable DSP, graph, voice, pattern, scheduler, or browser packages.
+- `docs/technical-reference.md` is authoritative for the documented graph runtime-control contract. Code remains the implementation source of truth.
+- Read `docs/moonbit-base.md` for MoonBit syntax and package conventions, `CONTEXT.md` for editor/Song/playback vocabulary, and the relevant document in `docs/README.md` for other task-specific contracts.

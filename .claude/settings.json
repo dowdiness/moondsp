@@ -1,47 +1,5 @@
 {
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
-  },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash(git commit*)",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "moon check && moon test",
-            "timeout": 120
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Edit|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "moon check 2>&1 | head -20"
-          }
-        ]
-      }
-    ],
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "moon update",
-            "timeout": 30
-          },
-          {
-            "type": "command",
-            "command": "bash scripts/package-overview.sh",
-            "timeout": 30,
-            "statusMessage": "Discovering package structure..."
-          }
-        ]
-      }
-    ]
   }
 }

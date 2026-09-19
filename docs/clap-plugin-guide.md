@@ -43,6 +43,10 @@ functions so C does not need to understand MoonBit objects, `Result`, or
 `third_party/clap/` vendors the official CLAP 1.2.8 C headers used by the
 prototype build and smoke test.
 
+Prefer official vendored headers or repeatable verification over handwritten
+native ABI subsets. When adding or updating vendored native headers, record
+the upstream version, source URL, checksum, and license alongside them.
+
 Build the Linux prototype shared object with:
 
 ```bash
