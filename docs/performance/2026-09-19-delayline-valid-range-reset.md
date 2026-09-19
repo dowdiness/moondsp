@@ -40,13 +40,13 @@ benchmark harness and surrounding integration code.
 
 | Case | Valid-range (product) | Physical-fill baseline |
 |---|---:|---:|
-| `DelayLine::reset`, capacity 8 | 1.16 ns | 3.94 ns |
-| `DelayLine::reset`, capacity 4,800 | 4.65 ns | 319.66 ns |
-| `DelayLine::reset`, capacity 480,000 | 4.62 ns | 43.64 µs |
-| reset + 16 ticks, capacity 4,800 | 47.90 ns | 388.14 ns |
-| reset + 16 ticks, capacity 480,000 | 80.57 ns | 45.19 µs |
-| warmed steady 16 ticks, capacity 4,800 | 47.80 ns | 52.50 ns |
-| warmed steady 16 ticks, capacity 480,000 | 48.81 ns | 65.12 ns |
+| `DelayLine::reset`, capacity 8 | 1.25 ns | 4.10 ns |
+| `DelayLine::reset`, capacity 4,800 | 5.23 ns | 350.83 ns |
+| `DelayLine::reset`, capacity 480,000 | 5.28 ns | 46.03 µs |
+| reset + 16 ticks, capacity 4,800 | 55.51 ns | 423.47 ns |
+| reset + 16 ticks, capacity 480,000 | 63.80 ns | 46.29 µs |
+| warmed steady 16 ticks, capacity 4,800 | 67.36 ns | 52.29 ns |
+| warmed steady 16 ticks, capacity 480,000 | 58.07 ns | 71.24 ns |
 
 ### Prepared steal (separate full-suite run)
 
