@@ -23,19 +23,12 @@ const PAGE_BINDINGS: PageBindings = {
     lowerNotesButton: "#lower-notes",
     higherNotesButton: "#higher-notes",
     keyboard: ".keyboard",
-    noteButtons: ".key[data-midi]",
-    noteName: ".note-name",
-    editable: "input, select, textarea, [contenteditable=\"true\"]",
+    phase: "state",
+    activeNote: "active",
   },
   classes: {
     heldNote: "is-held",
     activeNote: "is-active",
-  },
-  data: {
-    midi: "midi",
-    computerKey: "computerKey",
-    phase: "state",
-    activeNote: "active",
   },
 };
 

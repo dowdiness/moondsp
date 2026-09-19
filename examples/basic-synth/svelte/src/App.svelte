@@ -1,46 +1,31 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
-  import { createAudio, type AudioActions } from "../../core/audio";
+  import { createAudio } from "../../core/audio";
   import { controlView, cutoffFromInput, cutoffPosition, volumeFromInput, type ControlState } from "../../core/controls";
   import {
-    EMPTY_KEYBOARD,
-    keyboardView,
-    navigationView,
-    updateKeyboard,
-    type KeyboardEvent as KeyboardTransition,
-    type KeyboardState,
-    type NoteAction,
-  } from "../../core/keyboard";
+    EDITABLE_SELECTOR,
+    createDeferredReleases,
+    createNoteInput,
+    createPointerSessions,
+    interpretActivationClick,
+    interpretComputerKeyDown,
+    interpretComputerKeyUp,
+    interpretFocusedBlur,
+    interpretFocusedKeyDown,
+    interpretFocusedKeyUp,
+    type Gesture,
+  } from "../../core/input";
+  import { EMPTY_KEYBOARD, keyboardView, navigationView } from "../../core/keyboard";
+  import {
+    NOTES,
+    activeNoteName,
+    noteAriaLabel,
+    noteDescription,
+  } from "../../core/notes";
   import { DEFAULT_SETTINGS } from "../../core/synth";
 
-  interface Note {
-    readonly midi: number;
-    readonly name: string;
-    readonly computerKey: string;
-    readonly black: boolean;
-  }
-
-  const NOTES: readonly Note[] = [
-    { midi: 60, name: "C4", computerKey: "A", black: false },
-    { midi: 61, name: "C♯4", computerKey: "W", black: true },
-    { midi: 62, name: "D4", computerKey: "S", black: false },
-    { midi: 63, name: "D♯4", computerKey: "E", black: true },
-    { midi: 64, name: "E4", computerKey: "D", black: false },
-    { midi: 65, name: "F4", computerKey: "F", black: false },
-    { midi: 66, name: "F♯4", computerKey: "T", black: true },
-    { midi: 67, name: "G4", computerKey: "G", black: false },
-    { midi: 68, name: "G♯4", computerKey: "Y", black: true },
-    { midi: 69, name: "A4", computerKey: "H", black: false },
-    { midi: 70, name: "A♯4", computerKey: "U", black: true },
-    { midi: 71, name: "B4", computerKey: "J", black: false },
-    { midi: 72, name: "C5", computerKey: "K", black: false },
-  ];
-
-  const NOTE_BY_MIDI = new Map(NOTES.map((note) => [note.midi, note]));
-  const MIDI_BY_KEY = new Map(NOTES.map((note) => [note.computerKey.toLowerCase(), note.midi]));
-
   let controls = $state.raw<ControlState>({ phase: "idle", errorText: "" });
-  let keyboard = $state.raw<KeyboardState>(EMPTY_KEYBOARD);
+  let keyboard = $state.raw(EMPTY_KEYBOARD);
   let volume = $state<number>(DEFAULT_SETTINGS.volume);
   let cutoff = $state<number>(DEFAULT_SETTINGS.cutoff);
   let keyboardScroll: HTMLElement | undefined;
@@ -49,25 +34,16 @@
 
   const control = $derived(controlView(controls));
   const keyboardState = $derived(keyboardView(keyboard));
-  const pointerNotes = new Map<number, { readonly id: string; readonly button: HTMLButtonElement }>();
 
-  function transition(event: KeyboardTransition): NoteAction | null {
-    const next = updateKeyboard(keyboard, event);
-    keyboard = next.state;
-    return next.action;
+  function tryPointerCapture(button: HTMLButtonElement, pointerId: number): void {
+    try {
+      button.setPointerCapture(pointerId);
+    } catch {
+      // Browsers without capture still deliver pointerup/cancel.
+    }
   }
 
-  function dispatch(event: KeyboardTransition): void {
-    const action = transition(event);
-    if (action?.type === "press") audio.press(action.midi);
-    else if (action?.type === "release") audio.release(action.nextMidi);
-  }
-
-  function release(id: string): void {
-    dispatch({ type: "release", id });
-  }
-
-  function releaseCapture(button: HTMLButtonElement, pointerId: number): void {
+  function releasePointerCapture(button: HTMLButtonElement, pointerId: number): void {
     try {
       if (button.hasPointerCapture(pointerId)) button.releasePointerCapture(pointerId);
     } catch {
@@ -75,22 +51,56 @@
     }
   }
 
-  function clearNotes(): void {
-    for (const [pointerId, note] of pointerNotes) releaseCapture(note.button, pointerId);
-    pointerNotes.clear();
-    transition({ type: "clear" });
+  const pointers = createPointerSessions<HTMLButtonElement>({
+    capture: tryPointerCapture,
+    releaseCapture: releasePointerCapture,
+  });
+
+  const deferredReleases = createDeferredReleases();
+
+  const audioBridge = {
+    press(_midi: number): void {},
+    release(_nextMidi: number | null): void {},
+  };
+
+  const notes = createNoteInput({
+    onChange(state) {
+      keyboard = state;
+    },
+    onAction(action) {
+      if (action.type === "press") audioBridge.press(action.midi);
+      else audioBridge.release(action.nextMidi);
+    },
+  });
+
+  function handle(gesture: Gesture | null, event?: Event): void {
+    if (notes.handle(gesture) && event && "preventDefault" in event) event.preventDefault();
+    if (gesture?.releaseAfterMs !== undefined) {
+      const release = gesture.events[0];
+      if (release?.type === "press") {
+        deferredReleases.after(release.id, gesture.releaseAfterMs, () => {
+          notes.apply({ type: "release", id: release.id });
+        });
+      }
+    }
   }
 
-  const audio: AudioActions = createAudio(
+  const audio = createAudio(
     {
       render(state) {
         controls = state;
-        transition({ type: "enable", enabled: state.phase === "running" });
+        notes.setEnabled(state.phase === "running");
       },
-      clearNotes,
+      clearNotes() {
+        deferredReleases.clear();
+        pointers.clear();
+        notes.clear();
+      },
     },
     DEFAULT_SETTINGS,
   );
+  audioBridge.press = midi => audio.press(midi);
+  audioBridge.release = nextMidi => audio.release(nextMidi);
 
   function handlePower(): void {
     if (control.powerAction === "on") audio.powerOn();
@@ -110,65 +120,37 @@
   }
 
   function handleWindowKeyDown(event: KeyboardEvent): void {
-    if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
-    if (event.target instanceof HTMLElement && event.target.closest("input, select, textarea, [contenteditable=\"true\"]")) return;
-    const key = event.key.toLowerCase();
-    const midi = MIDI_BY_KEY.get(key);
-    if (midi === undefined || !keyboard.enabled) return;
-    event.preventDefault();
-    dispatch({ type: "press", id: `keyboard:${key}`, midi });
+    handle(interpretComputerKeyDown({
+      key: event.key,
+      repeat: event.repeat,
+      altKey: event.altKey,
+      ctrlKey: event.ctrlKey,
+      metaKey: event.metaKey,
+      targetIsEditable: event.target instanceof HTMLElement && !!event.target.closest(EDITABLE_SELECTOR),
+      enabled: keyboard.enabled,
+    }), event);
   }
 
   function handleWindowKeyUp(event: KeyboardEvent): void {
-    const key = event.key.toLowerCase();
-    if (MIDI_BY_KEY.has(key)) release(`keyboard:${key}`);
+    handle(interpretComputerKeyUp(event.key));
   }
 
   function handleVisibilityChange(): void {
     if (document.hidden) audio.stopNotes();
   }
 
-  function handleFocusedKeyDown(event: KeyboardEvent, midi: number): void {
-    if (event.key !== " " && event.key !== "Enter") return;
-    event.preventDefault();
-    if (!event.repeat) dispatch({ type: "press", id: `focus:${midi}`, midi });
-  }
-
-  function handleFocusedKeyUp(event: KeyboardEvent, midi: number): void {
-    if (event.key !== " " && event.key !== "Enter") return;
-    event.preventDefault();
-    release(`focus:${midi}`);
-  }
-
-  function handleKeyboardActivation(event: MouseEvent, midi: number): void {
-    if (event.detail !== 0) return;
-    const id = `activation:${midi}`;
-    dispatch({ type: "press", id, midi });
-    window.setTimeout(() => release(id), 150);
-  }
-
   function handlePointerDown(event: PointerEvent, midi: number): void {
     if (event.button !== 0 || !keyboard.enabled) return;
     event.preventDefault();
     const button = event.currentTarget as HTMLButtonElement;
-    const existing = pointerNotes.get(event.pointerId);
-    if (existing) release(existing.id);
-    const id = `pointer:${event.pointerId}`;
-    pointerNotes.set(event.pointerId, { id, button });
-    try {
-      button.setPointerCapture(event.pointerId);
-    } catch {
-      // Browsers without capture still deliver pointerup/cancel.
-    }
-    dispatch({ type: "press", id, midi });
+    const { replaceId, pressId } = pointers.begin(event.pointerId, button);
+    if (replaceId) notes.apply({ type: "release", id: replaceId });
+    notes.apply({ type: "press", id: pressId, midi });
   }
 
   function finishPointer(event: PointerEvent): void {
-    const note = pointerNotes.get(event.pointerId);
-    if (!note) return;
-    pointerNotes.delete(event.pointerId);
-    releaseCapture(note.button, event.pointerId);
-    release(note.id);
+    const id = pointers.end(event.pointerId);
+    if (id) notes.apply({ type: "release", id });
   }
 
   function updateNavigation(): void {
@@ -180,11 +162,6 @@
     keyboardScroll?.scrollBy({ left: direction * keyboardScroll.clientWidth * 0.8, behavior: "auto" });
   }
 
-  function noteDescription(midi: number): string {
-    if (keyboardState.activeMidi === midi) return "Active note";
-    return keyboardState.heldMidis.has(midi) ? "Held; another note is active" : "Hold to play";
-  }
-
   onMount(() => {
     updateNavigation();
     const observer = new ResizeObserver(updateNavigation);
@@ -193,7 +170,10 @@
     return () => observer.disconnect();
   });
 
-  onDestroy(() => audio.powerOff());
+  onDestroy(() => {
+    deferredReleases.clear();
+    audio.powerOff();
+  });
 </script>
 
 <svelte:window
@@ -284,7 +264,7 @@
         <span class="active-note-display" data-active={keyboardState.activeMidi !== null}>
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10h4l5-4v12l-5-4H4ZM17 8a6 6 0 0 1 0 8" /></svg>
           <output aria-label="Active note" aria-live="off">
-            {keyboardState.activeMidi === null ? "—" : NOTE_BY_MIDI.get(keyboardState.activeMidi)?.name ?? "—"}
+            {activeNoteName(keyboardState.activeMidi)}
           </output>
         </span>
       </div>
@@ -339,21 +319,21 @@
             type="button"
             data-midi={note.midi}
             data-computer-key={note.computerKey}
-            aria-label={`${note.name.replace("♯", " sharp ")}, computer key ${note.computerKey}`}
+            aria-label={noteAriaLabel(note)}
             aria-pressed={keyboardState.heldMidis.has(note.midi)}
             aria-describedby={`note-description-${note.midi}`}
             disabled={!keyboard.enabled}
-            onkeydown={(event) => handleFocusedKeyDown(event, note.midi)}
-            onkeyup={(event) => handleFocusedKeyUp(event, note.midi)}
-            onblur={() => release(`focus:${note.midi}`)}
-            onclick={(event) => handleKeyboardActivation(event, note.midi)}
+            onkeydown={(event) => handle(interpretFocusedKeyDown(event.key, note.midi, event.repeat), event)}
+            onkeyup={(event) => handle(interpretFocusedKeyUp(event.key, note.midi), event)}
+            onblur={() => handle(interpretFocusedBlur(note.midi))}
+            onclick={(event) => handle(interpretActivationClick(event.detail, note.midi))}
             onpointerdown={(event) => handlePointerDown(event, note.midi)}
             onpointerup={finishPointer}
             onpointercancel={finishPointer}
             onlostpointercapture={finishPointer}
           >
             <span class="note-name">{note.name}</span><kbd>{note.computerKey}</kbd>
-            <span id={`note-description-${note.midi}`} class="sr-only">{noteDescription(note.midi)}</span>
+            <span id={`note-description-${note.midi}`} class="sr-only">{noteDescription(note.midi, keyboardState.activeMidi, keyboardState.heldMidis)}</span>
           </button>
         {/each}
       </div>
