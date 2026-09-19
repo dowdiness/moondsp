@@ -1,8 +1,15 @@
 ///|
 /// Stateful integer-sample delay line backed by a circular buffer.
+///
+/// After construction or `reset`, only samples written since that point are
+/// audible. Unwritten indices read as silence even if the physical buffer
+/// still holds older values.
 pub struct DelayLine {
   priv buffer : FixedArray[Double]
   priv mut write_pos : Int
+  // Before the first wrap after construction/reset, only indices below
+  // write_pos are valid. Once has_wrapped is true, the whole buffer is valid.
+  priv mut has_wrapped : Bool
   priv mut delay_samples : Int
   priv mut feedback : Double
 }
@@ -19,6 +26,7 @@ pub fn DelayLine::DelayLine(
   {
     buffer: FixedArray::make(capacity, 0.0),
     write_pos: 0,
+    has_wrapped: false,
     delay_samples: normalize_delay_samples(delay_samples, capacity),
     feedback: normalize_feedback(feedback),
   }
@@ -61,9 +69,13 @@ pub fn DelayLine::set_feedback(self : DelayLine, feedback : Double) -> Unit {
 }
 
 ///|
-/// Clear the circular buffer state without changing the configured delay.
+/// Clear audible delay state without changing the configured delay.
+///
+/// This is a constant-time valid-range reset: subsequent reads treat
+/// unwritten samples as silence. The physical buffer contents may remain
+/// until overwritten.
 pub fn DelayLine::reset(self : DelayLine) -> Unit {
-  self.buffer.fill(0.0)
+  self.has_wrapped = false
   self.write_pos = 0
 }
 
@@ -80,7 +92,11 @@ pub fn DelayLine::tick(self : DelayLine, input : Double) -> Double {
       self.delay_samples,
       self.buffer.length(),
     )
-    let output = self.buffer[read_pos]
+    let output = if self.has_wrapped || read_pos < self.write_pos {
+      self.buffer[read_pos]
+    } else {
+      0.0
+    }
     self.buffer[self.write_pos] = input + output * self.feedback
     self.advance_write_pos()
     output
@@ -120,6 +136,7 @@ fn DelayLine::advance_write_pos(self : DelayLine) -> Unit {
   self.write_pos = self.write_pos + 1
   if self.write_pos >= self.buffer.length() {
     self.write_pos = 0
+    self.has_wrapped = true
   }
 }
 

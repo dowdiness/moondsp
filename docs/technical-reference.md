@@ -390,6 +390,12 @@ fn DelayLine::process(self : DelayLine, input : Double) -> Double {
 
 For fractional delay (sub-sample precision), use linear interpolation between adjacent samples.
 
+`DelayLine::reset` is a constant-time valid-range clear, not a physical
+`buffer.fill(0.0)`. After reset (and after construction), reads from samples
+that have not been written yet return silence. Physical buffer contents may
+remain until overwritten. `StereoReverb` keeps its own hard zero-fill reset
+because its comb/allpass read model is different.
+
 ### 2.5 Parameter Smoothing (One-Pole Filter)
 
 Prevents clicks/pops when parameters change abruptly.
