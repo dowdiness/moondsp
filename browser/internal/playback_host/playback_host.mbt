@@ -349,11 +349,7 @@ fn Player::process(self : Player) -> Bool {
   self.send_right.fill(0.0)
   for route in self.routes {
     let sp = route.pool
-    sp.tmp_left.fill(0.0)
-    sp.tmp_right.fill(0.0)
-    sp.tmp_send_left.fill(0.0)
-    sp.tmp_send_right.fill(0.0)
-    sp.scheduler.process_playback_snapshot_block_with_send(
+    sp.scheduler.render_block_with_send(
       sp.pool,
       sp.tmp_left,
       sp.tmp_right,

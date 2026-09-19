@@ -152,14 +152,21 @@ test "bench/entries/prepared_playback" (b : @bench.T) {
   let left = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)
   let right = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)
   scheduler.queue_pattern_snapshot(snapshot)
-  scheduler.process_playback_snapshot_block(pool, left, right)
+  scheduler.render_block(pool, left, right)
   b.bench(name="prepared_two_materials_render", fn() {
-    scheduler.process_playback_snapshot_block(pool, left, right)
+    scheduler.render_block(pool, left, right)
     b.keep(left)
   })
   b.bench(name="prepared_two_materials_accept_and_render", fn() {
     scheduler.queue_pattern_snapshot(snapshot)
-    scheduler.process_playback_snapshot_block(pool, left, right)
+    scheduler.render_block(pool, left, right)
     b.keep(left)
+  })
+  let send_left = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)
+  let send_right = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)
+  b.bench(name="prepared_two_materials_render_with_send", fn() {
+    scheduler.render_block_with_send(pool, left, right, send_left, send_right)
+    b.keep(left)
+    b.keep(send_left)
   })
 }

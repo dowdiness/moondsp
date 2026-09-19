@@ -448,34 +448,29 @@ pub fn PatternScheduler::process_block(
 }
 
 ///|
-/// Unified snapshot entry point for prepared pattern or song playback edits.
-/// Pending snapshots are swapped in once at block start; note expiry and event
-/// queries then observe the same committed playback state for the whole block.
-pub fn PatternScheduler::process_playback_snapshot_block(
+/// Render one dry stereo block from the current playback snapshot.
+/// A queued replacement is accepted at block start before note expiry and
+/// event query. Each successful call advances the transport by one block.
+/// Buffers must have at least the configured block size and non-overlapping
+/// storage; no caller-side clearing is required. If the next transport frame
+/// is unrepresentable, both outputs are silenced, the queued snapshot stays
+/// staged, and `last_transport_error()` is set.
+pub fn PatternScheduler::render_block(
   self : PatternScheduler,
   pool : @moondsp.BoundVoicePool,
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
 ) -> Unit {
-  let frame = match self.render_frame(pool, left, right) {
-    Some(frame) => frame
-    None => return
-  }
-  self.commit_pending_playback_snapshot()
-  self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
-  let events = self.playback_state.query_active_sourced_events(
-    frame.logical_arc,
-  )
-  self.process_block_events(
-    events, frame, pool, left, right, left, right, false,
-  )
+  self.render_snapshot_outputs(pool, left, right, left, right, false)
 }
 
 ///|
-/// Render a playback snapshot into dry stereo plus the scheduler's single
-/// post-pan stereo send. The send is pre-fader with respect to browser master
-/// gain and is intended for one playback-session shared effect.
-pub fn PatternScheduler::process_playback_snapshot_block_with_send(
+/// Render one snapshot block into dry stereo and a post-pan, pre-master-gain
+/// stereo send. Output buffers must have at least the configured block size
+/// and non-overlapping storage. No caller-side clearing is required.
+/// If the next transport frame is unrepresentable, all outputs are silenced,
+/// the queued snapshot stays staged, and `last_transport_error()` is set.
+pub fn PatternScheduler::render_block_with_send(
   self : PatternScheduler,
   pool : @moondsp.BoundVoicePool,
   left : @moondsp.AudioBuffer,
@@ -483,8 +478,24 @@ pub fn PatternScheduler::process_playback_snapshot_block_with_send(
   send_left : @moondsp.AudioBuffer,
   send_right : @moondsp.AudioBuffer,
 ) -> Unit {
-  send_left.fill(0.0)
-  send_right.fill(0.0)
+  self.render_snapshot_outputs(pool, left, right, send_left, send_right, true)
+}
+
+///|
+fn PatternScheduler::render_snapshot_outputs(
+  self : PatternScheduler,
+  pool : @moondsp.BoundVoicePool,
+  left : @moondsp.AudioBuffer,
+  right : @moondsp.AudioBuffer,
+  send_left : @moondsp.AudioBuffer,
+  send_right : @moondsp.AudioBuffer,
+  write_send : Bool,
+) -> Unit {
+  // Clear sends before frame validation so early failure cannot leak old audio.
+  if write_send {
+    send_left.fill(0.0)
+    send_right.fill(0.0)
+  }
   let frame = match self.render_frame(pool, left, right) {
     Some(frame) => frame
     None => return
@@ -495,7 +506,7 @@ pub fn PatternScheduler::process_playback_snapshot_block_with_send(
     frame.logical_arc,
   )
   self.process_block_events(
-    events, frame, pool, left, right, send_left, send_right, true,
+    events, frame, pool, left, right, send_left, send_right, write_send,
   )
 }
 

@@ -45,7 +45,7 @@ for the current API, including `acceptedAtSample`.
 
 ## 所有者と境界
 
-`browser/internal/playback_host/live_update.mbt` に、明示的な入力から準備結果を作る処理と、純粋な受理・遷移判断を置く。準備slot、保留中操作、transport、voice lifecycleはaudio-owner shellが所有する。通常再生も再スタートも `process_playback_snapshot_block` を使う。
+`browser/internal/playback_host/live_update.mbt` に、明示的な入力から準備結果を作る処理と、純粋な受理・遷移判断を置く。準備slot、保留中操作、transport、voice lifecycleはaudio-owner shellが所有する。通常再生も再スタートも `render_block_with_send` を使う。dryのみの利用者には `render_block` があり、どちらも同じブロック処理を共有する。
 
 `web/playback-controller.js` を通常画面用とデモ用の両workletで共有する。`apply-score` はmode、text、revision、continue/restart方針を受け取り、準備と適用を同じハンドラーで行う。`restart-playback` はrequest revisionだけを受け取る。
 

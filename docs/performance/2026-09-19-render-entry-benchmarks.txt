@@ -1,0 +1,34 @@
+Date: 2026-09-19
+Change: dry and send render entries with one shared implementation (PR #275)
+Environment: Linux WSL2, AMD Ryzen 7 6800H
+Full suite: NEW_MOON_MOD=0 MOON_WORK=off moon bench --release --no-parallelize
+Full suite result: 66 passed, 0 failed
+
+This is a post-change snapshot, not a before/after speedup claim or a complete
+allocation audit. The PR base already passed send buffers as separate arguments.
+The final API preserves that approach; it avoids the send-pair allocation
+introduced by the intermediate optional-tuple design, not an allocation present
+in the base. No base-versus-head timing comparison was measured.
+Separately, release browser Wasm-GC inspection found no struct.new in the
+arguments to render_block_with_send; this does not establish an allocation-free
+scheduler.
+
+Scheduler excerpts from the full suite:
+
+bench/jux/scheduler_dispatch
+name                        time (mean ± σ)         range (min … max)
+process_events_8_jux_events   55.51 µs ±   1.13 µs    53.80 µs …  57.05 µs  in 10 × 1689 runs
+
+bench/jux/stereo_routing
+name                                  time (mean ± σ)         range (min … max)
+voicepool_process_8_panned_jux_voices  100.14 µs ±   1.79 µs    98.00 µs … 104.11 µs  in 10 × 973 runs
+
+bench/jux/process_block
+name                  time (mean ± σ)         range (min … max)
+process_block_jux_rev   49.46 µs ± 941.32 ns    48.35 µs …  51.30 µs  in 10 × 1973 runs
+
+bench/entries/prepared_playback
+name                                     time (mean ± σ)         range (min … max)
+prepared_two_materials_render              95.37 µs ±   2.72 µs    92.72 µs … 100.70 µs  in 10 × 991 runs
+prepared_two_materials_accept_and_render   99.13 µs ±   1.30 µs    97.35 µs … 100.88 µs  in 10 × 1002 runs
+prepared_two_materials_render_with_send   102.63 µs ± 693.84 ns   101.88 µs … 104.18 µs  in 10 × 955 runs

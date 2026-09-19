@@ -79,6 +79,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Consolidated snapshot playback into `PatternScheduler::render_block` for dry
+  stereo and `render_block_with_send` for dry stereo plus effect send, backed
+  by one block-processing implementation. Removed the pattern/song-specific
+  rendering aliases and migrated callers. Preserved the base implementation's
+  separate send buffer arguments and removed redundant caller-side route
+  clearing. This is an API simplification, not a measured speedup over the base.
+
 - Bounded live Player source admission by text size, syntax depth, Euclidean
   steps, arrangement occurrences, and conservative event/work expansion.
   Admission covers future callback branches and full-cycle sequence queries;
