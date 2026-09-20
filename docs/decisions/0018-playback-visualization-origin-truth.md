@@ -1,9 +1,10 @@
 # ADR-0018: Playback visualization follows event origins
 
-- **Status:** Proposed — product semantics resolved in the interview; implementation and transport measurements pending
+- **Status:** Proposed — product semantics resolved in the interview; preliminary synthetic transport measurements recorded; production implementation and validation pending
 - **Date:** 2026-09-15
 - **Source:** Domain-modeling interview for [browser status issue #156](https://github.com/dowdiness/moondsp/issues/156) and pattern source highlighting
 - **Related:** [Domain glossary](../../CONTEXT.md), [scheduler edit semantics](../../scheduler/README.mbt.md#pattern-edits), [playback position goal](../plans/2026-09-09-playback-position-ui.md)
+- **Evidence:** [2026-09-19 synthetic transport probe](../performance/2026-09-19-playback-visualization-probe.txt). This is not a real-onset/editor integration proof; allocation and physical-output safety remain inconclusive.
 
 ## Context
 
