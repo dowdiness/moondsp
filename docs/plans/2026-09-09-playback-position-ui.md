@@ -7,16 +7,23 @@ Status: future goal. No implementation is scheduled by this document.
 Make the current playback position visible so composers can understand where
 music is playing and audition a passage without replaying the whole song.
 
-The UI should distinguish playback state, playback position, acceptance of an
-edited score, and pending material transitions. Acceptance does not mean all
-materials are using the new source. A code error must not make the display claim
-that rejected edits are playing.
+The UI must distinguish four separate playback dimensions:
+1. Current playback state (e.g., playing vs. stopped).
+2. Engine-reported playback position.
+3. Acceptance status of edited scores (submitted, accepted, or rejected).
+4. Pending material transitions waiting for their entry boundaries.
 
-[ADR-0018](../decisions/0018-playback-visualization-origin-truth.md) records the
-proposed basic-status and pattern-onset highlighting contract. Its source
-identity rules permit highlighting unchanged atoms during partial transitions
-and unrelated syntax errors. Seeking and song-mode source highlighting remain
-outside that proposal; the broader navigation questions below are still open.
+Accepting a score does not imply that all materials immediately adopt the new
+source, because each material transitions at its own boundary. Conversely, a
+syntax or evaluation error in the draft score must never lead the UI to claim
+that rejected edits are currently playing.
+
+[ADR-0018](../decisions/0018-playback-visualization-origin-truth.md) defines the
+proposed contract for status reporting and pattern-onset source highlighting.
+Under its source-identity model, unchanged tokens can continue highlighting
+during partial material transitions or in the presence of unrelated syntax
+errors. Seeking and song-mode source highlighting remain outside that proposal;
+the broader navigation questions below remain open.
 
 ## Design questions
 

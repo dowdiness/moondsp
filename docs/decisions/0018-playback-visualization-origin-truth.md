@@ -1,155 +1,118 @@
 # ADR-0018: Playback visualization follows event origins
 
-- **Status:** Proposed — product semantics resolved in the interview; preliminary synthetic transport measurements recorded; production implementation and validation pending
+- **Status:** Proposed (domain semantics agreed; preliminary synthetic transport measurements recorded; production implementation and end-to-end validation pending)
 - **Date:** 2026-09-15
 - **Source:** Domain-modeling interview for [browser status issue #156](https://github.com/dowdiness/moondsp/issues/156) and pattern source highlighting
 - **Related:** [Domain glossary](../../CONTEXT.md), [scheduler edit semantics](../../scheduler/README.mbt.md#pattern-edits), [playback position goal](../plans/2026-09-09-playback-position-ui.md)
-- **Evidence:** [2026-09-19 synthetic transport probe](../performance/2026-09-19-playback-visualization-probe.txt). This is not a real-onset/editor integration proof; allocation and physical-output safety remain inconclusive.
+- **Evidence:** [2026-09-19 synthetic transport probe](../performance/2026-09-19-playback-visualization-probe.txt). This probe evaluates transport feasibility only; it does not prove real-onset integration, editor mapping, or audio-thread allocation safety.
 
 ## Context
 
-A score can be accepted while its materials continue generating future onsets
-from older sources until their independent entry boundaries. Acceptance is not
-simultaneous replacement, and the end of all pending transitions is not the end
-of old release tails. A global accepted revision cannot identify which source
-produced a particular event.
+In live coding, music is edited while it is playing. When a newly edited score is accepted, its individual musical parts ("materials", such as patterns or tracks) do not switch immediately: each material transitions independently at its next musical entry boundary (e.g., the start of its cycle).
 
-The desired feedback is a short pulse around the source atom that produced a
-playback onset, not a voice-lifetime display or proof of audible sound. The
-editor must preserve the distinction between the visible draft, the accepted
-score, and the material versions generating events.
+Because transitions occur independently:
+- A new score can be accepted while older material versions continue generating playback events until their entry boundaries arrive.
+- Even after all pending transitions take effect, previous synthesizer voices may continue ringing out during their release tails.
+- Consequently, a single global score version or revision ID cannot determine which authored token produced a given sound event.
+
+Composers need visual feedback showing which parts of their code are currently executing. The desired feedback is a brief visual pulse around the exact source token ("source atom") that triggered a playback onset—not a display of synthesizer voice sustain/release duration, and not a proof of audible sound (since gain may be zero or muted).
+
+To provide accurate feedback without misleading the user, the editor interface must strictly separate three distinct layers of state:
+1. The **visible draft** currently being edited (which may contain uncommitted edits or syntax errors).
+2. The **accepted score** acknowledged by the audio runtime.
+3. The **active material versions** currently producing audio events in the scheduler.
 
 ## Decision
 
-### Origin truth
+### 1. Origin truth: exact identity continuity
 
-Attribute each event to its originating playback run, material snapshot, atom,
-and named-reference use path. Resolve that origin against the visible draft
-using exact identity continuity, never note-value equality, token spelling, or
-nearest-position guesses. Retain origin mappings while old materials can still
-generate events and while their non-expired visualization events remain relevant;
-do not keep unbounded revision history.
+Playback visualization attributes each sound event to its precise origin and maps that origin back to the visible editor draft using persistent token identity.
 
-Highlight eligibility is decided per atom, not per score or whole material
-version. An unchanged atom can remain represented when another material changes,
-when text moves, or when a sibling atom is replaced. Deletion and recreation of
-an equivalent token do not establish identity continuity. If the origin cannot
-be resolved exactly, suppress its indication rather than pointing to new text.
+- **Full event provenance**: Every playback event carries its originating playback run (session), material snapshot, source atom ID, and the path of named-reference use sites leading to it.
+- **Exact identity continuity**: The editor resolves event origins against the visible draft solely through tracked token identity. It must never use heuristic matching, such as note-value equality (e.g. matching "c3" to an arbitrary "c3"), token spelling, or nearest-cursor position.
+- **Deletion and recreation breaks continuity**: If an atom is deleted and retyped with the exact same text, it receives a new identity. It does not inherit the identity of the deleted atom, and events from the older version will not highlight the new token.
+- **Per-atom eligibility**: Highlighting eligibility is determined atom by atom, not globally for the whole score or material. An unchanged atom remains highlightable even if text moves (e.g. inserting whitespace), another material changes, or a neighboring atom is edited. If an origin cannot be resolved exactly, its highlight is suppressed rather than guessed.
+- **Resilience to syntax errors**: An invalid draft does not disable highlighting across the entire score. As long as edit history confirms that an atom and its reference path remain unambiguously represented in the draft, that atom continues to highlight. Ambiguous or broken origins are suppressed. This neither accepts the invalid draft nor affects currently sounding materials.
+- **Path integrity**: Stable atom identity alone is insufficient if the reference path leading to it has changed. If an intermediate named reference is modified such that it no longer resolves to the same definition, its highlight must be suppressed.
+- **Bounded origin retention**: Origin mappings are retained only while older materials can still generate events and unexpired visualization events remain in flight. The engine does not keep an unbounded history of past revisions.
 
-A syntax error does not globally disable highlighting. Continue where edit
-history proves the atom and reference path remain represented, and suppress
-ambiguous or invalidated origins. This neither accepts the invalid draft nor
-changes the last valid material reservations. Stable atom identity alone is not
-proof that an edited reference still denotes the same definition; the origin
-path must remain valid too.
+### 2. Visual meaning: onset pulses, not voice lifecycles
 
-### Visual meaning
+The visual display conveys event triggering, not audio energy or voice lifecycles.
 
-- Highlight pattern-mode sound and note atoms; a chord name is one atom.
-- Use the definition atom as the primary indication and named-reference use
-  sites as secondary context.
-- Indicate dispatched events even at zero gain or under mute. Rests and events
-  excluded by transformations such as degradation do not create pulses.
-- Use a short onset pulse, not musical duration or voice lifetime. Retriggering
-  restarts the pulse. Simultaneous events may indicate several atoms; duplicate
-  simultaneous origins need not create multiple decorations on one range.
-- Align to estimated listener-time using render timing and available output
-  timing information. Do not claim sample-accurate physical audio alignment.
-- Discard expired events. Partially late events use only their remaining pulse
-  interval rather than starting a fresh full-duration pulse on arrival.
-- Invalidate outstanding indications when their playback run ends. Never replay
-  a hidden tab's backlog when it becomes visible again.
-- Preserve cursor, selection, text layout, and scroll position. Reduced-motion
-  rendering uses an immediate indication without a fade.
+- **Target tokens**: Highlighting applies to pattern-mode sound and note atoms. A chord name is treated as a single source atom even though it generates multiple notes.
+- **Primary vs. secondary indication**: The source atom definition is the primary highlight target. Named-reference call sites are highlighted as secondary context to indicate which reference triggered the event.
+- **Dispatched events vs. audible sound**: Visual pulses indicate that an event was dispatched for playback. This includes events rendered with zero gain or under mute. Conversely, rests and events eliminated by pattern transformations (such as `degradeBy`) produce no onset and must not pulse.
+- **Brief onset pulse**: Highlights are brief onset pulses rather than indications of musical duration or synthesizer voice sustain/release. Retriggering an atom restarts its pulse. Simultaneous events can highlight multiple atoms, but duplicate simultaneous onsets for the same atom range do not generate duplicate decorations.
+- **Listener-time alignment**: Pulses are scheduled to match estimated listener time, calculated from audio render timestamps plus available output latency. This is an estimate for visual synchronization, not a claim of sample-accurate physical audio alignment.
+- **Expired and late events**: Observations that arrive after their highlight duration has already elapsed are discarded. Observations that arrive partially late display only their remaining duration, rather than starting a fresh full-duration pulse.
+- **Run boundaries and tab visibility**: Active highlights are cleared immediately when a playback run stops. Observations accumulated while a browser tab was hidden are discarded upon resumption, never replayed as a backlog.
+- **Editor stability**: Visual decorations must never alter editor cursor position, text selection, layout, or scroll offset. Under `prefers-reduced-motion`, highlights appear instantaneously without fade animations.
+- **Core invariant**: A pulse confirms that the represented source atom was executed by the audio engine; it does not claim that all visible draft code, controls, or transforms have taken effect.
 
-A pulse means the represented atom executed. It does not assert that every
-currently visible transform, control, or edit has become active.
+### 3. Status truth: three independent dimensions
 
-### Status truth
+The UI status projection tracks three orthogonal dimensions:
 
-Keep three independent dimensions in the status projection:
+1. **Transport status**: Playback state (playing vs. stopped), active mode (pattern vs. song), effective tempo, and engine-reported musical position.
+2. **Draft and submission status**: The relationship of the visible draft to submitted, accepted, and rejected edits (e.g. uncommitted edits, pending submission, or rejected with diagnostics).
+3. **Material transition status**: The count of pending material transitions (additions, replacements, and removals waiting for their entry boundaries).
 
-1. Playback state, active mode, effective tempo, and engine-reported position.
-2. The visible draft's relationship to submitted, accepted, and rejected edits.
-3. The number of pending independent material additions, replacements, and removals.
+Key operational rules:
+- **Count musical materials**: The pending count tracks distinct musical materials (patterns or tracks), not audio output routes or synthesizer voices.
+- **Replace pending reservations**: A subsequent edit to a material already waiting for an entry boundary replaces that reservation without incrementing the pending material count.
+- **Rejections preserve reservations**: Rejecting an invalid draft leaves existing accepted material reservations intact.
+- **Runtime musical position**: Playback position must be reported directly by the audio runtime. Multiplying elapsed sample counts by the current tempo produces incorrect positions whenever tempo changes occurred during playback.
+- **Do not label receipts "Applied"**: The UI must not label an acceptance receipt as `Applied`. A pending material count of zero indicates that all material entry transitions have completed; it does not mean that a rejected draft is playing, nor that all older voice release tails have finished.
 
-Count musical materials once, not once per output route or voice. A later edit
-can replace a reservation without adding a second pending material. A rejected
-draft does not clear existing reservations. Report runtime musical position;
-absolute sample count multiplied by the latest tempo cannot reconstruct a
-transport that has undergone tempo edits.
+### 4. Bounded observation transport
 
-Do not label an acceptance receipt `Applied`. Zero pending materials means no
-material entry transition remains, not that a rejected draft is playing or that
-all old voices have ended. A countdown or a public list of internal route IDs is
-not required.
+Telemetry from the AudioWorklet audio thread to the UI thread must adhere to strict real-time constraints:
 
-### Bounded observation transport
-
-The first transport candidate uses fixed-capacity onset storage and a bounded
-batch for blocks containing onsets. The audio producer must never wait for the
-UI, grow an unbounded queue, or serialize complete source maps per onset.
-Ordinary low-rate status observations remain separate from onset traffic.
-
-On overflow, discard the oldest buffered onset observations and retain the
-latest. Expose a cumulative drop count for diagnostics and validation, not as a
-normal user-facing warning. Losing an indication must never drop or delay the
-corresponding audio event. Use a bounded handoff as well as a bounded batch:
-limiting each message alone does not bound a stalled consumer's message queue.
-
-This is a candidate, not an allocation-free claim. Before shipping, compare
-visualization off/on in matched dense-pattern AudioWorklet probes, including a
-stalled or hidden UI, repeated triggers, and material transitions. Measure
-allocation, GC, callback timing, observation lag, and underruns separately; zero
-observed GC is not proof of zero allocation. Pin the workload, environment, and
-numerical comparison criteria before interpreting the results.
-
-If the message path shows a material regression, do not merge it as the default.
-Evaluate a fixed shared ring with an explicit cross-origin-isolation deployment
-contract. Shared memory is not selected until needed: the current Live deployment
-does not already establish that requirement. Buffer capacity, batch cadence,
-clock calibration, and the measurement thresholds remain implementation-probe
-outputs rather than unmeasured constants in this ADR.
+- **Audio-thread isolation**: The audio thread must never wait for the UI thread, allocate unbounded memory, or serialize large structures (such as ASTs or source maps) on the render path.
+- **Separate channels**: Low-frequency status updates (tempo, position, pending counts) are sent separately from high-frequency onset telemetry.
+- **Fixed-capacity ring buffer & credit handoff**: The initial transport candidate uses a fixed-capacity ring buffer with bounded messages in flight (e.g. credit-based batching). On buffer overflow, the oldest unread observations are dropped in favor of newer ones.
+- **Audio rendering is independent**: Dropping visualization telemetry must never drop, delay, or glitch the corresponding audio events.
+- **Diagnostic counters**: Cumulative drop counts are tracked for testing and validation, not displayed as user-facing error dialogs.
+- **Pre-production verification gate**: Message-passing is an initial candidate, not a proven allocation-free solution. Before adopting it in production, matched AudioWorklet benchmark probes (comparing visualization on vs. off) must measure GC pause times, callback timing budgets, telemetry lag, and underruns under heavy workloads and stalled UI threads. Zero observed GC pauses does not prove zero allocation.
+- **SharedArrayBuffer fallback**: If the message-passing transport causes audio regressions, evaluate a fixed-capacity `SharedArrayBuffer` ring buffer (under an explicit cross-origin isolation deployment contract). Shared memory will not be adopted unless proven necessary.
 
 ## Discriminating examples
 
-| Scenario | Required observation |
+| Scenario | Expected behavior |
 | --- | --- |
-| Bass changes while drums remain unchanged | Drums continue highlighting; pending status includes bass. |
-| `note("c3 e3")` changes to `note("c3 g3")` while the old material continues | Preserved old `c3` may highlight current `c3`; removed old `e3` must not highlight `g3`. |
-| An unchanged atom shifts because whitespace is inserted | Follow its identity to its new range. |
-| An atom is deleted and an identically spelled atom is created | Old events must not highlight the replacement merely because spelling matches. |
-| Another line becomes syntactically invalid | Exactly traceable origins keep highlighting; the draft remains rejected. |
-| A named definition is reused at two sites | Indicate the source atom and the actual originating reference site, not every same-named use. |
-| Gain is zero | Dispatched onsets still pulse; no claim of audible energy is made. |
-| A rest or degraded event produces no dispatched onset | No pulse. |
-| A tab resumes after the highlight intervals elapsed | No replay of stale pulses. |
-| Playback stops and starts before an old batch arrives | Old-run observations cannot affect the new run. |
-| Telemetry storage overflows | Old observations may be omitted; audio remains independent and drop diagnostics increase. |
+| Bass pattern changes while drum pattern remains unchanged | Drums continue highlighting uninterrupted; pending status indicates 1 material transition (bass). |
+| `note("c3 e3")` is edited to `note("c3 g3")` while the old pattern plays | Preserved `c3` may continue highlighting; removed old `e3` must never highlight the new `g3`. |
+| An unchanged atom shifts because whitespace was inserted | The highlight follows the atom's tracked identity to its new text offset. |
+| An atom is deleted and an identically spelled atom is typed in its place | Old events must not highlight the new atom; deleting and recreating breaks identity continuity. |
+| An unrelated line in the score introduces a syntax error | Exactly traceable atoms in valid lines continue highlighting; the draft status shows rejected. |
+| A named definition is used at two call sites | Highlights indicate the definition atom and the specific call site that triggered the event, not all call sites. |
+| Track gain is set to zero or muted | Dispatched onsets still pulse; no assertion of audible physical sound is made. |
+| A rest or degraded event produces no audio onset | No pulse is displayed. |
+| Browser tab resumes focus after highlight intervals elapsed | Stale events are discarded; no backlog of pulses is replayed. |
+| Playback stops and restarts before previous telemetry arrives | Observations from the previous playback run are discarded and cannot affect the new run. |
+| Telemetry ring buffer overflows under heavy load | Oldest visual observations are dropped while audio renders normally; diagnostic drop count increments. |
 
 ## Alternatives and consequences
 
-Global revision equality is simpler but both hides valid unchanged atoms and
-misattributes old-material events. Mapping by value or spelling is cheaper but
-ambiguous for duplicate notes, references, and edits. A separate old-source view
-would preserve more visual history but expands the interface; it is not selected.
+- **Alternative 1: Global score revision equality**  
+  *Rejected*. Simpler to implement, but disables highlighting for valid unchanged atoms whenever any edit occurs, and misattributes events from older materials to new source code.
+- **Alternative 2: Value- or spelling-based matching**  
+  *Rejected*. Lower tracking overhead, but inherently ambiguous when identical notes, chord names, or identifiers appear repeatedly in a score.
+- **Alternative 3: Dedicated split view for past score versions**  
+  *Rejected*. Preserves historical visual context, but introduces unacceptable interface complexity for live coding.
 
-Exact origin tracking requires preserving source identity through the real
-playback path. Existing authoring provenance is a building block, not evidence
-that every current transform already preserves the atom-level paths this UI
-requires. Transform and reference coverage must be established before claiming
-complete pattern-mode support. Do not implement a second approximate scheduler
-in the UI to avoid that work.
+**Consequences**:
+- Exact origin tracking requires preserving token identity through the entire pipeline: parser, AST, compiler, and scheduler.
+- Authoring provenance in the parser is a necessary foundation, but each pattern transformation and reference resolution must explicitly maintain origin paths.
+- Transform and reference coverage must be systematically verified before claiming full pattern-mode support. An approximate second scheduler must not be created in JavaScript to bypass this requirement.
 
 ## Scope
 
-Deliver basic authoritative playback status and pattern-mode source highlighting.
-Song-mode source highlighting, seeking, waveform/timeline displays, and voice
-lifecycle visualization are excluded. Do not change existing playback entry,
-restart, tempo, or last-good semantics to simplify the display. Public browser
-observations expose only the data required by this feature, not mutable routing
-or voice-pool internals.
+- **In scope**: Authoritative playback status projection and pattern-mode source atom highlighting.
+- **Out of scope**: Song-mode source highlighting, timeline and waveform displays, playback seeking controls, and synthesizer voice lifecycle visualization.
+- **Non-goals**: Existing playback entry, restart, tempo, and last-good score semantics must not be altered to accommodate visualization. Public browser APIs expose only the telemetry required for this feature, never mutable routing or voice-pool internals.
 
-Implementation has not started. The proposed split is a status change under
-#156 and a dependent pattern-origin highlighting change; the latter includes
-source mapping, telemetry, and editor behavior end to end.
+Implementation will proceed in two sequenced steps:
+1. Playback status reporting under [#156](https://github.com/dowdiness/moondsp/issues/156).
+2. Pattern-origin highlighting (encompassing source mapping, AudioWorklet telemetry, and editor decorations end-to-end).

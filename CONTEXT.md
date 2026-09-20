@@ -30,34 +30,37 @@ A committed global tempo change submitted for playback. Being numerically valid 
 The tempo accepted by the audio runtime, at its 0.001-BPM precision. It can come from a global tempo request or an accepted song; rejection retains the previous effective tempo.
 
 **Playback material**:
-An independently cycling musical contribution whose accepted replacement, addition, or removal takes effect at its own entry boundary.
+An independently cycling musical part (such as a pattern or track). When an accepted score adds, replaces, or removes a material, that change takes effect at the material's own entry boundary (e.g., the start of its cycle).
+_Avoid_: Assuming all materials update at the same instant
 
 **Material version**:
-The source content retained for one playback material. Different materials can still use older versions after a newer score has been accepted.
+The specific source content active for one playback material. Because each material transitions at its own boundary, different materials can continue playing older versions after a newer score has been accepted.
 
 **Pending material transition**:
-An accepted addition, replacement, or removal waiting for its material's entry boundary. The pending material count counts affected musical materials, not score submissions or audio routes.
+An accepted addition, replacement, or removal waiting for its material's entry boundary to take effect. The pending count tracks affected musical materials, not score submissions or audio routes.
+_Avoid_: Counting one material multiple times across separate output routes or subsequent draft edits
 
 **Playback onset**:
-The start of a source-attributable musical event dispatched for playback, even when its rendering is silent. Rests and events excluded by pattern transformations have no playback onset.
+The start of a musical event dispatched for playback that can be attributed to a specific source token, even when rendered with zero gain or muted. Rests and events excluded by pattern transformations (such as degradation) do not produce playback onsets.
 
 **Estimated audible onset**:
-The projected listener-time of a rendered event after accounting for output latency. It is a synchronization estimate, not proof that the event produced audible sound.
+The projected listener-time of a rendered event, calculated by adding estimated output latency to the audio render timestamp. This is an estimate for visual synchronization, not proof that the event produced audible sound.
 
 **Source atom**:
-The smallest authored sound, note, or chord token attributable as the origin of a playback event. A chord name is one atom even when it produces several notes.
+The smallest authored sound, note, or chord token attributable as the origin of a playback event. A chord name is treated as a single atom even though it expands into multiple notes.
 
 **Source atom identity**:
-The continuity of one authored atom across position-only edits and unrelated edits. Equivalent spelling after deletion and recreation does not establish continuity.
+The persistent identity of an authored atom across non-destructive edits, such as text movement or edits elsewhere in the document. Deleting an atom and retyping an identically spelled token creates a new identity rather than continuing the old one.
+_Avoid_: Relying on identical spelling or string matching to establish continuity
 
 **Playback origin path**:
-The authored path from a playback material through named-reference use sites to the source atom responsible for an event.
+The authored provenance chain connecting a playback material to the source atom responsible for an event, tracing through any intermediate named-reference use sites.
 
 **Represented playback origin**:
-An event origin whose atom and reference-use identities can be traced exactly into the visible draft. An origin can remain represented across partial material transitions or an unrelated syntax error.
+An event origin whose source atom and reference path can be traced with exact identity into the currently visible draft. An origin remains represented across partial material transitions or when unrelated syntax errors exist in the draft.
 
 **Playback highlight**:
-A brief onset indication on a represented source atom, with named-reference use sites as secondary context. It describes event execution, not adoption of all visible edits, event duration, or voice lifetime.
+A brief onset indication on a represented source atom, with named-reference use sites shown as secondary context. It reflects event execution, not the adoption of all visible draft edits, event duration, or voice lifetime.
 
 **Expired onset**:
-A reported onset whose full highlight interval has already elapsed at the estimated listener-time. It is historical activity, not current playback activity.
+A reported onset whose full highlight duration has already elapsed at the estimated listener-time. It represents historical activity and is dropped rather than displayed late.
