@@ -7,9 +7,16 @@ Status: future goal. No implementation is scheduled by this document.
 Make the current playback position visible so composers can understand where
 music is playing and audition a passage without replaying the whole song.
 
-The UI should distinguish playback state, playback position, and whether the
-latest editor changes have been applied. A code error must not make the display
-claim that rejected edits are playing.
+The UI should distinguish playback state, playback position, acceptance of an
+edited score, and pending material transitions. Acceptance does not mean all
+materials are using the new source. A code error must not make the display claim
+that rejected edits are playing.
+
+[ADR-0018](../decisions/0018-playback-visualization-origin-truth.md) records the
+proposed basic-status and pattern-onset highlighting contract. Its source
+identity rules permit highlighting unchanged atoms during partial transitions
+and unrelated syntax errors. Seeking and song-mode source highlighting remain
+outside that proposal; the broader navigation questions below are still open.
 
 ## Design questions
 

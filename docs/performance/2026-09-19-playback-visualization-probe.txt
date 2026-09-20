@@ -1,0 +1,176 @@
+Playback visualization verification — 2026-09-19
+
+Decision
+========
+Do not connect existing provenance IDs directly to editor highlighting.
+The current identity/provenance representation does not satisfy the proposed
+exact-atom contract. A one-credit bounded batch transport is feasible in this
+local synthetic-record experiment, but it is NOT approved for production:
+allocation attribution, actual onset integration, editor rendering, and real
+output-device/listening verification remain unverified. No SAB comparison was
+run: the predeclared callback-p99 regression gate did not fail.
+
+Scope and environment
+=====================
+Base: 632233f9bb9bc9e463899a1902b02bb5f66c4115.
+Isolated branch/worktree: prototype/playback-visualization-probe,
+.worktrees/playback-visualization-probe.
+No production source changes. Existing main-worktree design edits were retained.
+Chrome CDP version: 148.0.7778.215, V8 14.8.178.28, Linux headless, WSL2 x64,
+AMD Ryzen 7 6800H. The managed browser overrides navigator.userAgent to Windows;
+CDP Browser.getVersion is recorded independently. This is not a Windows-browser
+or physical audio-device test.
+48000 Hz, 128-frame quantum (2.667 ms), fresh AudioContext each run, destination
+connected through gain=0, page visibility=visible, crossOriginIsolated=false.
+Workload: stack(note("c3 e3 g3 c4").fast(8).gate(0.2).lpf(1800,2).hpf(80),s("hh*16"),s("bd*4"))
+The worklet subclasses the real production scheduler processor and runs its
+real WASM DSP. Observation records are SYNTHETIC (including material/version/
+origin fields). No actual scheduler onset extraction, MoonBit enqueue, source
+mapping, CodeMirror decoration, or painted pulse is implemented by the probe.
+The consumer's 'visible' counter records a simulated rAF pulse admission only.
+
+Identity and provenance findings
+===============================
+Executed mini/visualization_probe_wbtest.mbt, 1 diagnostic experiment passed.
+Passing means the experiment ran; it does NOT mean the design contract passed.
+Raw events, paths, source edits, revisions, and token spans: identity.txt.
+Private fresh-token keys/spans are lexical diagnostics, not retained editor IDs.
+
+1. Whitespace insertion: c3/e3 leaf identities survived.
+2. c3 e3 -> c3 g3: c3 leaf stayed mini:note:c3:0; e3 and g3 differed.
+   The aggregate sequence/root ID changed, so whole-path/root equality would
+   wrongly suppress an unchanged c3. Leaf identity alone is also insufficient.
+3. Successful delete/recreate: note("c3 e3") -> note("e3") -> note("c3 e3")
+   reused mini:note:c3:0. This violates 'delete and recreate is a new identity'.
+   The separate invalid-empty intermediate case produced c3:1; that does not
+   repair the successful-deletion failure.
+4. Invalid draft: note("c3 e3" returned Err; accepted_doc remained Some.
+   Recovery retained event IDs. This proves last-good document retention, NOT
+   exact mapping from an old material into an invalid current editor draft.
+5. Two uses of a named phrase carried distinct binding paths (:0 vs :1),
+   while sharing the phrase's note leaf. Useful for secondary reference marks.
+6. fast, slow, rev and the tested Euclidean atom preserved distinguishable
+   note provenance in the printed cases. Rest emitted no event. degradeBy(1)
+   emitted zero events. gain(0) retained events.
+7. every(2,fast(2)) on transformed cycles and jux(rev) produced paths containing
+   both note:60 and note:64, with leaf=64 even on note=60 events. gain(0) paths
+   contained both atoms and ended at a control node. These are not exact
+   per-onset atom origins. Chord leaves were generated tones, requiring a
+   separate association to the source chord token.
+
+Material state regression coverage
+==================================
+Ran existing browser/internal/playback_host/live_update_wbtest.mbt:
+18 passed, 0 failed. Covers invalid updates retaining accepted reservations,
+accepted source preceding the sounding material switch, pause/resume, invalid
+restart, routing revert cancelling pending changes, and owner closure.
+This is host-level automated execution, not a new editor status UI test.
+The probe did not independently prove addition/removal/replacement count
+composition or cross-version source-highlight matching.
+
+Transport experiment and predeclared criteria
+============================================
+Each record: 8 Float64 fields. Producer ring capacity=64; one transferable
+buffer/message in flight; UI returns credit. Overflow discards oldest pending
+records. The producer never waits for the UI. UI pending-time ring=4096.
+1.5 s warmup + 5 s measurement per run, three paired rounds with alternating
+variant order. 18 traced runs (3 scenarios x 2 variants x 3 rounds), plus six
+untraced dense controls. Traced windows contained 33,779 callback events.
+Criteria and source/WASM SHA-256 hashes are in the evidence bundle.
+
+Pre-trial calibration correction: a UI pending queue of only 64 continuously
+lost all future listener-time pulses in the initial dense smoke. Producer queue
+capacity and future-UI queue capacity are different constraints. The UI queue
+was changed to 4096 BEFORE the comparison trials; nonzero simulated visual
+activity was required. Calibration output is preserved and excluded from the
+statistics below. This probe capacity is not a recommended product default.
+
+Scenario                     off p99 ms       batch p99 ms     paired median delta
+sparse, 46.875 records/s      .393/.336/.385   .386/.377/.387   +.002 ms
+dense, 6000 records/s         .362/.360/.365   .461/.432/.446   +.081 ms
+overflow, 48000/s + 600ms UI  .366/.361/.359   .448/.439/.430   +.078 ms
+
+Timing threshold fixed before trials: median paired delta <= max(0.1 ms,
+20% baseline p99). All three scenarios passed this LOCAL timing gate.
+Largest traced callback was 2.210 ms, under one 2.667 ms quantum; this is not a
+proof of device deadline compliance. Trace instrumentation is intrusive.
+Date.now worklet samples have 1 ms resolution and were NOT used for sub-ms p99.
+
+Dense receipt-lag p95: 10.667 ms in every traced and untraced batch run.
+This is lag against AudioContext render-head time, not physical audible latency.
+Sparse lag p95: 2.667–5.333 ms. Audible-time pulse deadlines were estimated with
+getOutputTimestamp (latency fallback provided), not calibrated with loopback.
+
+All 24 runs met measured ring/message bounds, accounting, monotonic sequence,
+settled transport, finite positive DSP energy, and simulated deadline-admission
+checks. Batch runs had nonzero simulated visual activity. In-flight max=1;
+producer pending max=64 (sparse max=1). No zero-allocation claim follows.
+
+Loss matters:
+- Sparse: zero producer drops in all three traced batch runs.
+- Dense: 8.249%, 8.249%, 8.658% dropped without an intentional UI stall.
+  Untraced dense controls also dropped 2480–2528 of about 30,000 records.
+- Overflow+stall: 89.862–89.888% dropped (capacity intentionally exceeded).
+  1024–2176 expired simulated pulse observations were rejected per run.
+  No admitted simulated pulse had lateness >=150 ms.
+These drops are observations only; production DSP continued independently.
+No acceptable visualization-loss threshold was set, so do not call this
+loss rate acceptable. A real-onset workload and an explicit loss budget are
+needed before choosing capacity/cadence or another transport.
+
+GC, output, and limits
+======================
+Each trace identified exactly one processor pid/tid via process FunctionCall
+metadata. That thread had 27–29 MinorGC events in each 5 s window in BOTH
+variants. Dense total GC duration: off 9.596/10.343/10.562 ms versus batch
+11.676/11.659/11.555 ms. GC heap-before/after values and durations are retained.
+They are not cumulative allocation bytes. Transfer envelopes and new typed-
+array views still allocate; preallocated record storage is not zero allocation.
+CDP Target.getTargets with an ACTIVE worklet exposed only a page target.
+No worklet-isolate allocation-byte sampler was obtained; page heap sampling
+would not establish worklet allocation attribution. Allocation gate: INCONCLUSIVE.
+
+Browser playbackStats showed zero underrun-event increments in all 24 windows;
+trace windows had no Glitch/Underrun-named events. Muted, headless WSL execution
+without physical listening/loopback does NOT establish glitch-free audible
+output. Production audio-safety gate: INCONCLUSIVE.
+
+Untested by this probe: actual material-version telemetry; old run/epoch messages
+racing restart; background-tab behavior; retrigger/coalescing semantics in a real
+editor; UTF-16 editor mapping; exact old-material matching during partial updates;
+actual onset provenance cost; target-device audible alignment. Synthetic varying
+IDs in the transport MUST NOT be described as proving these behaviors.
+
+Next implementation constraints from evidence
+============================================
+- Establish lifetime-scoped atom identity that survives non-destructive edits
+  but never revives a deleted token's identity.
+- Carry exact atom and reference-site origin through transforms/control merges;
+  do not interpret an ancestry superset or its last node as a highlight target.
+- Keep editor-range mapping separate from last-good parse acceptance; test old
+  material against the edited/invalid draft before displaying its observation.
+- Re-run transport with real dispatch density, define a loss budget, and obtain
+  allocation and real-output evidence. This measurement alone neither requires
+  SAB nor justifies permanently selecting the one-credit batch implementation.
+
+Reproduction and evidence
+=========================
+Adjacent archive: 2026-09-19-playback-visualization-probe.tar.gz.
+Contains criteria, source probe, browser harness, contract snapshot, raw MoonBit
+output, host test output, raw timing arrays, 18 compressed CDP traces, paired JSON
+results, summary, calibration output, active-worklet target discovery, screenshot.
+
+Use the base commit in an isolated checkout and overlay harness/ from the archive.
+From checkout root:
+  env NEW_MOON_MOD=0 moon check
+  env NEW_MOON_MOD=0 moon test mini/visualization_probe_wbtest.mbt
+  env NEW_MOON_MOD=0 moon test browser/internal/playback_host/live_update_wbtest.mbt
+  env NEW_MOON_MOD=0 moon build browser --target wasm-gc --release
+Serve checkout root over localhost (e.g. Python http.server on port 5294).
+Open /scripts/visualization-probe/ in Chromium. The button runs a dense smoke.
+For paired measurement, import scripts/visualization-probe/run-session.mjs and
+call runSession(puppeteerPage, absoluteCheckoutPath). It writes _build evidence.
+Pass {trace:false,scenario:'dense'} as third argument for untraced controls.
+The executed driver used OMP browser.open followed by tab.run with its real
+Puppeteer page; no external Puppeteer dependency is vendored in this harness.
+Do not run builds/tests concurrently with timing measurements.
