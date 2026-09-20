@@ -12,35 +12,56 @@ pub(all) suberror StableIdError {
   EmptyId
   InvalidId(String)
 } derive(Eq, @debug.Debug)
+pub fn StableIdError::equal(Self, Self) -> Bool
+pub fn StableIdError::not_equal(Self, Self) -> Bool
+pub fn StableIdError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
 pub struct GraphNodeId(String) derive(Eq, @debug.Debug)
+pub fn GraphNodeId::equal(Self, Self) -> Bool
 pub fn GraphNodeId::from_string(String) -> Self raise StableIdError
+pub fn GraphNodeId::not_equal(Self, Self) -> Bool
+pub fn GraphNodeId::to_repr(Self) -> @debug.Repr
 pub fn GraphNodeId::value(Self) -> String
 
 pub struct OccurrenceId(String) derive(Eq, @debug.Debug)
+pub fn OccurrenceId::equal(Self, Self) -> Bool
 pub fn OccurrenceId::from_string(String) -> Self raise StableIdError
+pub fn OccurrenceId::not_equal(Self, Self) -> Bool
+pub fn OccurrenceId::to_repr(Self) -> @debug.Repr
 pub fn OccurrenceId::value(Self) -> String
 
 pub struct PatternNodeId(String) derive(Eq, @debug.Debug)
+pub fn PatternNodeId::equal(Self, Self) -> Bool
 pub fn PatternNodeId::from_string(String) -> Self raise StableIdError
+pub fn PatternNodeId::not_equal(Self, Self) -> Bool
+pub fn PatternNodeId::to_repr(Self) -> @debug.Repr
 pub fn PatternNodeId::value(Self) -> String
 
 pub struct Revision {
   // private fields
 } derive(Eq, @debug.Debug)
 pub fn Revision::combine(Self, Self) -> Self
+pub fn Revision::equal(Self, Self) -> Bool
 pub fn Revision::max(Self, Self) -> Self
 pub fn Revision::next(Self) -> Self
+pub fn Revision::not_equal(Self, Self) -> Bool
+pub fn Revision::to_repr(Self) -> @debug.Repr
 pub fn Revision::value(Self) -> Int64
 pub fn Revision::zero() -> Self
 
 pub struct SectionId(String) derive(Eq, @debug.Debug)
+pub fn SectionId::equal(Self, Self) -> Bool
 pub fn SectionId::from_string(String) -> Self raise StableIdError
+pub fn SectionId::not_equal(Self, Self) -> Bool
+pub fn SectionId::to_repr(Self) -> @debug.Repr
 pub fn SectionId::value(Self) -> String
 
 pub struct SectionLayerId(String) derive(Eq, @debug.Debug)
+pub fn SectionLayerId::equal(Self, Self) -> Bool
 pub fn SectionLayerId::from_string(String) -> Self raise StableIdError
+pub fn SectionLayerId::not_equal(Self, Self) -> Bool
+pub fn SectionLayerId::to_repr(Self) -> @debug.Repr
 pub fn SectionLayerId::value(Self) -> String
 
 // Type aliases

@@ -65,3 +65,12 @@ pub fn TimeSpan::whole_cycles(self : TimeSpan) -> Array[TimeSpan] {
   }
   result
 }
+
+///|
+pub extend TimeSpan with Debug::{to_repr}
+
+///|
+pub extend TimeSpan with Eq::{not_equal, equal}
+
+///|
+pub extend TimeSpan with Show::{to_string, output}

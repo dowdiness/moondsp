@@ -1816,3 +1816,21 @@ pub fn[A] PatternDoc::referenced_definition(
     _ => None
   }
 }
+
+///|
+pub extend PatternDoc with @types.BackdateEq::{backdate_equal}
+
+///|
+pub extend PatternDoc with @types.HasChangedAt::{changed_at}
+
+///|
+pub extend PatternDocError with Debug::{to_repr}
+
+///|
+pub extend PatternDocError with Eq::{not_equal, equal}
+
+///|
+pub extend PatternNodePath with Debug::{to_repr}
+
+///|
+pub extend PatternNodePath with Eq::{not_equal, equal}

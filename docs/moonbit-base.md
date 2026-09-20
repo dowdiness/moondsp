@@ -286,6 +286,16 @@ For multi-project workspaces (monorepos with multiple `moon.mod.json`):
 - **`MOON_WORK` env var:** Override the `moon.work` location, or set `MOON_WORK=off` to disable workspace behavior for a single invocation.
 - **Manifest migration:** This repository already maintains `moon.mod` by hand. Do not enable automatic manifest migration; follow the `NEW_MOON_MOD=0` policy in [the project guide](../CLAUDE.md#commands-and-verification).
 
+### Explicit trait methods
+
+MoonBit v0.10.14 warns when trait methods are promoted implicitly. Preserve
+an intended method-call API with explicit declarations such as
+`pub extend Revision with Eq::{equal, not_equal}` and
+`pub extend Revision with Debug::{to_repr}`; the trait implementations remain
+the source of behavior. The cookbook parser's identity, pattern, and song
+dependencies use this form so its `--deny-warn` check stays strict.
+Black-box tests must qualify package calls, for example `@mini.parse_play_source`.
+
 ## Git & PR Workflow
 
 - Always check if git is initialized before running git commands

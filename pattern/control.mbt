@@ -291,3 +291,9 @@ pub fn Pat::select_control(
     "select:\{key.length()}:\{key}:" + condition,
   )
 }
+
+///|
+pub extend ControlMap with Debug::{to_repr}
+
+///|
+pub extend ControlMap with Show::{to_string, output}

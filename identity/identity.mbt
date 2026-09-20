@@ -152,3 +152,45 @@ pub fn GraphNodeId::from_string(
 pub fn GraphNodeId::value(self : GraphNodeId) -> String {
   self.0
 }
+
+///|
+pub extend StableIdError with Eq::{equal, not_equal}
+
+///|
+pub extend StableIdError with Debug::{to_repr}
+
+///|
+pub extend Revision with Eq::{equal, not_equal}
+
+///|
+pub extend Revision with Debug::{to_repr}
+
+///|
+pub extend PatternNodeId with Eq::{equal, not_equal}
+
+///|
+pub extend PatternNodeId with Debug::{to_repr}
+
+///|
+pub extend SectionId with Eq::{equal, not_equal}
+
+///|
+pub extend SectionId with Debug::{to_repr}
+
+///|
+pub extend SectionLayerId with Eq::{equal, not_equal}
+
+///|
+pub extend SectionLayerId with Debug::{to_repr}
+
+///|
+pub extend OccurrenceId with Eq::{equal, not_equal}
+
+///|
+pub extend OccurrenceId with Debug::{to_repr}
+
+///|
+pub extend GraphNodeId with Eq::{equal, not_equal}
+
+///|
+pub extend GraphNodeId with Debug::{to_repr}

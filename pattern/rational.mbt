@@ -139,3 +139,27 @@ pub fn Rational::floor(self : Rational) -> Int64 {
     quotient
   }
 }
+
+///|
+pub extend Rational with Add::{add}
+
+///|
+pub extend Rational with Compare::{op_lt, op_le, op_ge, compare, op_gt}
+
+///|
+pub extend Rational with Debug::{to_repr}
+
+///|
+pub extend Rational with Div::{div}
+
+///|
+pub extend Rational with Eq::{not_equal, equal}
+
+///|
+pub extend Rational with Mul::{mul}
+
+///|
+pub extend Rational with Show::{to_string, output}
+
+///|
+pub extend Rational with Sub::{sub}

@@ -63,3 +63,9 @@ pub fn TimeScope::slow(
     TimeScope::at_rate(rate=@pattern.Rational::new(1L, 1L) / factor)
   }
 }
+
+///|
+pub extend TimeScopeBuildError with Debug::{to_repr}
+
+///|
+pub extend TimeScopeBuildError with Eq::{not_equal, equal}
