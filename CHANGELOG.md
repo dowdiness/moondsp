@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added origin-preserving pattern snapshots with checked epoch-qualified source
+  IDs, explicit atom and resolved-reference constructors, immutable event origins,
+  and exact-preserving control routing. General and exact document lowering now
+  share the `Pat` kernels instead of separate provenance time calculations.
+  Missing atom/reference attribution fails during exact lowering; voice scopes,
+  material keys, periods, musical content policy, and random seeds are retained.
+  This adds the compiler API, not editor highlighting or playback telemetry.
+- Added `mini.Draft` with versioned atomic UTF-16 edit transactions, checked
+  source lifetimes, partial atom/reference recognition through invalid drafts,
+  and complete-path `locate_origin`. Same-text replacement, deletion/recreation,
+  and broken-then-restored bindings never revive old identities. A missing
+  declaration terminator makes later reference bindings unavailable when it
+  hides another declaration, even beyond the partial parser's depth limit.
+- Added immutable `PlaybackInput` and `PreparedPlayback`: tracked patterns
+  compile with exact origins; songs and explicit text inputs retain runtime-only
+  capability. Source tracking is bounded to 8192 UTF-16 code units and current
+  live facts, without per-spelling lifetime history. Browser/worklet integration
+  and playback-onset visualization remain separate work.
 - Added exact `Tempo::span_for_samples` conversion through the scheduler clock;
   browser repeat admission no longer reconstructs tempo arithmetic.
 - Added the opt-in `@moondsp/browser/audio` entry point with `AudioPower`,
@@ -79,6 +97,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** replaced `MiniAuthoringPipeline` with `mini.Draft`. Use
+  `edit(EditTransaction)` or explicit `reset`, not full-text setters or
+  separately supplied text/edit spans. The public accepted-document channel,
+  reactive recomputation counters, and lowering-cache counters are removed;
+  preparation is not playback acceptance. `Draft::new` can raise identity
+  exhaustion, and `edit`/`reset` return explicit errors atomically.
+- **Breaking:** `PatternDoc::every` and `PatternDoc::jux` now take
+  `transform~ : TimeTransform` instead of `f~` pattern callbacks. Raw `Pat`
+  callbacks remain supported. Removed `PatternSnapshotEvent::pattern_node`;
+  scope consumers use `pattern_node_path()`, while exact source consumers use
+  `EventWithOrigin::origin()`.
 - Renamed graph lifecycle types to `GraphDocument`, `GraphDocumentError`,
   `AnalyzedGraph`, `Dsp`, and `StereoDsp`, including their hot-swap and topology
   controller wrappers. Removed the obsolete `GraphCompileError::InternalRejected`
@@ -160,17 +189,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   source provenance. Mini references now keep use-site identity across
   definition edits; document reuse checks input revisions instead of assuming
   stable IDs imply unchanged content.
-- Resolved Mini named references directly to compiled pattern/document values,
-  removing retained definition bodies and compiler-side memo handling while
-  preserving declaration validation, diagnostic precedence, and source identities.
+- Resolved Mini references retain declaration witnesses (compiled bodies and
+  binding-name spans), preserving strict declaration validation and diagnostic
+  precedence while exact lowering checks source binding endpoints.
 - Documented the dedicated live scheduler and compiled/demo worklet roles,
   asset synchronization, and separate automated-rendering/listening workflows.
   Live Playwright tests can opt into Chromium virtual audio output with
   `MOONDSP_VIRTUAL_AUDIO=1`; default device selection and runtime ABI are unchanged.
-- Updated `dowdiness/incr` from `0.9.0` to `0.15.1`, migrated
-  `MiniAuthoringPipeline` from `Signal` / `Memo` / `Observer` to
-  `Input` / `Derived` / `Watch`, and retained lazy snapshot lowering,
-  last-good acceptance, stable authoring identities, and lifecycle ownership.
+- Updated `dowdiness/incr` from `0.9.0` to `0.15.1`. Mini authoring now uses
+  explicit Draft transactions instead of reactive text backdating; the
+  incremental value-trait integration remains in `pattern`.
 - Updated `PatternDoc`'s incr integration to use the closed monotonic
   `Revision` API while preserving full identity-revision comparison for
   backdating and fingerprint-collision safety.
@@ -224,12 +252,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and deletion batches retain their existing fresh-state policy.
 - Topology edits now carry their old-to-new node correspondence with the result;
   rewiring a gain's signal input preserves its envelope input.
-- Fixed `MiniAuthoringPipeline` token identity lifetime across successfully parsed
-  deletion and recreation: surviving tokens retain their IDs, while recreated
-  atoms cannot reuse IDs from retained snapshots. Rejected drafts do not advance
-  the identity baseline; this is not visible-draft identity tracking. Text and
-  source-edit spans now publish atomically, preventing eager reparses from
-  changing unaffected identities.
+- Kept source lifetimes independent from parsing success: surviving atoms and
+  uniquely proven references remain locatable through unrelated syntax errors,
+  while retained playback inputs keep their original immutable witnesses.
+  Exact and general atom lowering now retain identical material entry keys.
 - Reject unterminated Mini block comments without publishing a valid prefix, and
   share comment scanning between parsing and playback admission so `/* // */`
   cannot hide excessive nesting. Bounded recursive descent now checks depth

@@ -57,7 +57,29 @@ pub fn parse_play_source(
   previous? : @pattern.PatternDoc[@pattern.ControlMap]? = None,
   max_query_span? : @pattern.Rational? = None,
 ) -> Result[PlaySource, String] {
+  parse_play_source_with_origins(
+    input,
+    previous,
+    max_query_span,
+    origins=None,
+    syntax_depth_limit=None,
+  )
+}
+
+///|
+fn parse_play_source_with_origins(
+  input : String,
+  previous : @pattern.PatternDoc[@pattern.ControlMap]?,
+  max_query_span : @pattern.Rational?,
+  origins? : SourceMap? = None,
+  syntax_depth_limit? : Int? = None,
+) -> Result[PlaySource, String] {
   guard !input.is_empty() else { return Err("empty input") }
+  if syntax_depth_limit is Some(_) {
+    check_playback_source_size(input) catch {
+      ParseError(message) => return Err(message)
+    }
+  }
   let admission = match max_query_span {
     None => None
     Some(span) => {
@@ -68,8 +90,8 @@ pub fn parse_play_source(
       Some(PlaybackAdmission(span.to_double()))
     }
   }
-  let parser = Parser::new(input, admission~)
-  let builder = MiniDocBuilder::new(previous~)
+  let parser = Parser::new(input, admission~, syntax_depth_limit~)
+  let builder = MiniDocBuilder::new(previous~, origins~)
   let mut authored_bpm : Double? = None
   while true {
     parser.parse_bindings(builder=Some(builder)) catch {
@@ -87,11 +109,14 @@ pub fn parse_play_source(
   }
   if parser.match_keyword("song(") {
     parser.pos -= 5
-    for name, doc in parser.doc_bindings {
-      let lowered = doc.lower() catch {
+    for name, definition in parser.doc_bindings {
+      let lowered = definition.body.lower() catch {
         _ => return Err("could not lower section binding '\{name}'")
       }
-      parser.bindings[name] = lowered.pat()
+      parser.bindings[name] = MiniDefinition(
+        lowered.pat(),
+        definition.name_span,
+      )
     }
     let parsed = parser.parse_song_expr() catch {
       ParseError(msg) => return Err(msg)

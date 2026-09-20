@@ -37,9 +37,7 @@ test "SPIKE step 1: note() primary parses with zero diagnostics" {
 
 ///|
 test "SPIKE step 1: dollar stack program parses with zero diagnostics" {
-  let (_cst, diagnostics) = try! parse_cst(
-    "$: s(\"bd\")\n$: note(\"60\")",
-  )
+  let (_cst, diagnostics) = try! parse_cst("$: s(\"bd\")\n$: note(\"60\")")
   inspect(diagnostics.length(), content="0")
 }
 
@@ -653,11 +651,7 @@ test "apply_edit deletion of postfix preserves zero diagnostics" {
 test "apply_edit insertion inside sub-notation brackets parses cleanly" {
   let parser = parser_test_new_parser("s(\"[bd sd]\")")
   // Insert " hh" before the closing bracket to produce `s("[bd sd hh]")`
-  parser_test_apply_edit(
-    parser,
-    @core.Edit::insert(9, 3),
-    "s(\"[bd sd hh]\")",
-  )
+  parser_test_apply_edit(parser, @core.Edit::insert(9, 3), "s(\"[bd sd hh]\")")
   inspect(parser.diagnostics().read_or_abort().length(), content="0")
   let after =
     #|["bd@[4,6)", "sd@[7,9)", "hh@[10,12)"]
@@ -669,11 +663,7 @@ test "apply_edit insertion inside sub-notation brackets parses cleanly" {
 test "apply_edit across layer-comma keeps both layers parsing cleanly" {
   let parser = parser_test_new_parser("s(\"bd, sd\")")
   // Insert " hh" before the comma to produce `s("bd hh, sd")`
-  parser_test_apply_edit(
-    parser,
-    @core.Edit::insert(5, 3),
-    "s(\"bd hh, sd\")",
-  )
+  parser_test_apply_edit(parser, @core.Edit::insert(5, 3), "s(\"bd hh, sd\")")
   inspect(parser.diagnostics().read_or_abort().length(), content="0")
   let after =
     #|["bd@[3,5)", "hh@[6,8)", "sd@[10,12)"]

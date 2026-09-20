@@ -31,13 +31,63 @@ fn projection_boundary_snapshot(
 }
 
 ///|
-fn projection_boundary_mini_snapshot(
-  result : Result[@pattern.PatternSnapshot[@pattern.ControlMap], String],
+fn projection_boundary_draft_snapshot(
+  draft : @mini.Draft,
 ) -> @pattern.PatternSnapshot[@pattern.ControlMap] {
-  match result {
-    Ok(snapshot) => snapshot
-    Err(msg) => abort("expected mini snapshot, got " + msg)
+  match draft.prepare_playback() {
+    Ok(input) =>
+      match input.compile() {
+        Ok(@mini.PreparedPlayback::Pattern(snapshot, _)) =>
+          snapshot.as_snapshot()
+        _ => abort("expected Mini pattern playback")
+      }
+    Err(diagnostic) => abort(diagnostic.message())
   }
+}
+
+///|
+fn projection_boundary_edit_draft(
+  draft : @mini.Draft,
+  edited : String,
+  edit : @core.Edit,
+) -> Unit {
+  let inserted = Show::to_string(edited[edit.start():edit.new_end()])
+  match
+    draft.edit(
+      @mini.EditTransaction::EditTransaction(base=draft.state().version(), edits=[
+        @mini.TextEdit::TextEdit(
+          from=edit.start(),
+          to=edit.old_end(),
+          inserted~,
+        ),
+      ]),
+    ) {
+    Ok(state) => {
+      guard state.text() == edited else {
+        abort("Draft transaction does not produce the fixture source")
+      }
+    }
+    Err(_) => abort("expected Mini draft edit to succeed")
+  }
+}
+
+///|
+fn projection_boundary_mini_draft_snapshot(
+  input : String,
+  edited : String,
+  old_start~ : Int,
+  old_end~ : Int,
+  new_end~ : Int,
+) -> @pattern.PatternSnapshot[@pattern.ControlMap] {
+  let draft = try! @mini.Draft::new(input)
+  projection_boundary_edit_draft(
+    draft,
+    edited,
+    @core.Edit::replace(old_start, old_end, new_end),
+  )
+  let snapshot = projection_boundary_draft_snapshot(draft)
+  draft.dispose()
+  snapshot
 }
 
 ///|
@@ -55,7 +105,7 @@ fn projection_boundary_leaf_ids(
   let events = snapshot.query_sourced_events(projection_boundary_one_cycle())
   let ids : Array[String] = []
   for event in events {
-    ids.push(event.pattern_node().value())
+    ids.push(event.pattern_node_path().leaf().value())
   }
   ids
 }
@@ -113,10 +163,7 @@ fn projection_boundary_parity_window() -> @pattern.TimeSpan {
 }
 
 ///|
-/// Value-level canonical event: node id (or "<none>"), the ControlMap payload as
-/// an order-independent `Map[String, Double]` (ControlMap has NO derived `Eq`,
-/// so compare entries maps structurally), and both ideal/actual `TimeSpan`s
-/// (which derive `Eq`).
+/// Canonical musical event, independent of graph IDs and source origins.
 priv struct BoundaryEvent {
   id : String
   control : Map[String, Double]
@@ -130,12 +177,19 @@ priv struct BoundaryEvent {
 fn projection_boundary_value_events(
   snapshot : @pattern.PatternSnapshot[@pattern.ControlMap],
 ) -> Array[BoundaryEvent] {
-  let events = snapshot.query_sourced_events(projection_boundary_parity_window())
+  let events = snapshot.query_sourced_events(
+    projection_boundary_parity_window(),
+  )
   let out : Array[BoundaryEvent] = []
   for sourced in events {
-    let id = sourced.pattern_node().value()
+    let id = sourced.pattern_node_path().leaf().value()
     let ev = sourced.event()
-    out.push({ id, control: ev.value.entries(), whole: ev.whole, part: ev.part })
+    out.push({
+      id,
+      control: ev.value.entries(),
+      whole: ev.whole,
+      part: ev.part,
+    })
   }
   out
 }
@@ -150,9 +204,8 @@ fn projection_boundary_value_events_from_doc(
 }
 
 ///|
-/// Value-level event parity (strengthens the id-only
-/// `projection_boundary_assert_ids_equal`): equal counts, ordered node ids,
-/// ControlMap payloads (order-independent Map equality), and both TimeSpans.
+/// Value-level event parity compares observable controls and timing; source
+/// origins are causal and deliberately differ from Loom graph identities.
 fn projection_boundary_assert_value_events_equal(
   left : Array[BoundaryEvent],
   right : Array[BoundaryEvent],
@@ -165,9 +218,6 @@ fn projection_boundary_assert_value_events_equal(
   for index in 0..<left.length() {
     let l = left[index]
     let r = right[index]
-    if l.id != r.id {
-      abort("event[\{index}] id mismatch: '\{l.id}' vs '\{r.id}'")
-    }
     if l.control != r.control {
       abort("event[\{index}] control mismatch: \{l.control} vs \{r.control}")
     }
@@ -254,20 +304,15 @@ fn projection_boundary_assert_control_method_cache_reused_after_edit(
 ) -> Unit {
   let projection = LoomMiniAtomProjection::new(input)
   let initial_doc = projection_boundary_doc(projection.parse_doc())
-  let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] =
-    @pattern.PatternLoweringCache::new()
-  ignore(
-    projection_boundary_snapshot(try? initial_doc.lower_with_cache(cache)),
-  )
+  let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
+  ignore(projection_boundary_snapshot(try? initial_doc.lower_with_cache(cache)))
   cache.reset_stats()
   projection.apply_edit(edit, edited)
   let edited_doc = projection_boundary_doc(projection.parse_doc())
   if edited_doc.root().value() != initial_doc.root().value() {
     abort("expected control-method edit to preserve root ID")
   }
-  ignore(
-    projection_boundary_snapshot(try? edited_doc.lower_with_cache(cache)),
-  )
+  ignore(projection_boundary_snapshot(try? edited_doc.lower_with_cache(cache)))
   if cache.hit_count() != 1 {
     abort("expected one control-method lowering-cache hit")
   }
@@ -285,22 +330,25 @@ fn projection_boundary_ids_after_edit(
   old_start~ : Int,
   old_end~ : Int,
   new_end~ : Int,
-) -> (Array[String], Array[String]) {
+) -> Array[String] {
   let projection = LoomMiniAtomProjection::new(input)
   ignore(projection_boundary_doc(projection.parse_doc()))
-  let pipeline = @mini.MiniAuthoringPipeline::new(input)
-  ignore(projection_boundary_mini_snapshot(pipeline.parse_snapshot()))
   projection.apply_edit(edit, edited)
-  pipeline.set_input_with_source_edit(edited, old_start~, old_end~, new_end~)
-  let loom_ids = projection_boundary_leaf_ids_from_doc(
-    projection_boundary_doc(projection.parse_doc()),
+  let loom_doc = projection_boundary_doc(projection.parse_doc())
+  let mini_snapshot = projection_boundary_mini_draft_snapshot(
+    input,
+    edited,
+    old_start~,
+    old_end~,
+    new_end~,
   )
-  let mini_ids = projection_boundary_leaf_ids(
-    projection_boundary_mini_snapshot(pipeline.parse_snapshot()),
+  projection_boundary_assert_value_events_equal(
+    projection_boundary_value_events_from_doc(loom_doc),
+    projection_boundary_value_events(mini_snapshot),
   )
+  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
   projection.dispose()
-  pipeline.dispose()
-  (loom_ids, mini_ids)
+  loom_ids
 }
 
 ///|
@@ -335,7 +383,7 @@ fn ProjectionProvenanceEditSpan::ProjectionProvenanceEditSpan(
   old_end~ : Int,
   new_end~ : Int,
 ) -> ProjectionProvenanceEditSpan {
-  { old_start, old_end, new_end }
+  { old_start, old_end, new_end, }
 }
 
 ///|
@@ -402,28 +450,22 @@ fn projection_boundary_assert_provenance_matrix_row(
   )
   let projection = LoomMiniAtomProjection::new(row.initial)
   ignore(projection_boundary_doc(projection.parse_doc()))
-  let pipeline = @mini.MiniAuthoringPipeline::new(row.initial)
-  ignore(projection_boundary_mini_snapshot(pipeline.parse_snapshot()))
   projection.apply_edit(row.edit, row.edited)
-  pipeline.set_input_with_source_edit(
+  let loom_doc = projection_boundary_doc(projection.parse_doc())
+  let mini_snapshot = projection_boundary_mini_draft_snapshot(
+    row.initial,
     row.edited,
     old_start=row.span.old_start,
     old_end=row.span.old_end,
     new_end=row.span.new_end,
   )
-  let loom_doc = projection_boundary_doc(projection.parse_doc())
-  let mini_doc = projection_boundary_doc(pipeline.parse_doc())
-  if loom_doc.root().value() != mini_doc.root().value() {
-    abort("expected \{row.family} loom and mini root IDs to match")
-  }
-  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
-  let mini_ids = projection_boundary_leaf_ids(
-    projection_boundary_mini_snapshot(pipeline.parse_snapshot()),
+  projection_boundary_assert_value_events_equal(
+    projection_boundary_value_events_from_doc(loom_doc),
+    projection_boundary_value_events(mini_snapshot),
   )
-  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
+  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
   projection_boundary_assert_ids_equal(row.expected_lowered_event_ids, loom_ids)
   projection.dispose()
-  pipeline.dispose()
   loom_ids
 }
 
@@ -435,7 +477,7 @@ struct ProjectionProvenanceRecoveryMatrixRow {
   recovered : String
   malformed_edit : @core.Edit
   recovery_edit : @core.Edit
-  span : ProjectionProvenanceEditSpan
+  draft_edits : Array[@mini.TextEdit]
   expected_loom_error : String
   expected_lowered_event_ids : Array[String]
 }
@@ -448,7 +490,7 @@ fn ProjectionProvenanceRecoveryMatrixRow::ProjectionProvenanceRecoveryMatrixRow(
   recovered~ : String,
   malformed_edit~ : @core.Edit,
   recovery_edit~ : @core.Edit,
-  span~ : ProjectionProvenanceEditSpan,
+  draft_edits~ : Array[@mini.TextEdit],
   expected_loom_error~ : String,
   expected_lowered_event_ids~ : Array[String],
 ) -> ProjectionProvenanceRecoveryMatrixRow {
@@ -459,7 +501,7 @@ fn ProjectionProvenanceRecoveryMatrixRow::ProjectionProvenanceRecoveryMatrixRow(
     recovered,
     malformed_edit,
     recovery_edit,
-    span,
+    draft_edits,
     expected_loom_error,
     expected_lowered_event_ids,
   }
@@ -487,15 +529,7 @@ fn projection_boundary_assert_recovery_matrix_row(
   )
   let projection = LoomMiniAtomProjection::new(row.initial)
   ignore(projection_boundary_doc(projection.parse_doc()))
-  let pipeline = @mini.MiniAuthoringPipeline::new(row.initial)
-  ignore(projection_boundary_mini_snapshot(pipeline.parse_snapshot()))
   projection.apply_edit(row.malformed_edit, row.malformed)
-  pipeline.set_input_with_source_edit(
-    row.malformed,
-    old_start=row.span.old_start,
-    old_end=row.span.old_end,
-    new_end=row.span.new_end,
-  )
   match projection.parse_doc() {
     Err(msg) =>
       if msg != row.expected_loom_error {
@@ -503,30 +537,36 @@ fn projection_boundary_assert_recovery_matrix_row(
       }
     Ok(_) => abort("expected \{row.family} loom projection to fail")
   }
-  match pipeline.parse_doc() {
-    Err(_) => ()
-    Ok(_) => abort("expected \{row.family} mini authoring parse to fail")
+  let draft = try! @mini.Draft::new(row.initial)
+  match
+    draft.edit(
+      @mini.EditTransaction::EditTransaction(
+        base=draft.state().version(),
+        edits=row.draft_edits,
+      ),
+    ) {
+    Ok(state) => {
+      guard state.text() == row.malformed else {
+        abort("malformed transaction does not produce fixture source")
+      }
+    }
+    Err(_) => abort("expected malformed transaction to apply")
   }
+  if draft.prepare_playback() is Ok(_) {
+    abort("expected \{row.family} mini draft to reject malformed input")
+  }
+  projection_boundary_edit_draft(draft, row.recovered, row.recovery_edit)
   projection.apply_edit(row.recovery_edit, row.recovered)
-  pipeline.set_input_with_source_edit(
-    row.recovered,
-    old_start=row.span.old_start,
-    old_end=row.span.old_end,
-    new_end=row.span.new_end,
-  )
   let loom_doc = projection_boundary_doc(projection.parse_doc())
-  let mini_doc = projection_boundary_doc(pipeline.parse_doc())
-  if loom_doc.root().value() != mini_doc.root().value() {
-    abort("expected \{row.family} loom and mini recovered root IDs to match")
-  }
-  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
-  let mini_ids = projection_boundary_leaf_ids(
-    projection_boundary_mini_snapshot(pipeline.parse_snapshot()),
+  let mini_snapshot = projection_boundary_draft_snapshot(draft)
+  projection_boundary_assert_value_events_equal(
+    projection_boundary_value_events_from_doc(loom_doc),
+    projection_boundary_value_events(mini_snapshot),
   )
-  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
+  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
   projection_boundary_assert_ids_equal(row.expected_lowered_event_ids, loom_ids)
+  draft.dispose()
   projection.dispose()
-  pipeline.dispose()
   loom_ids
 }
 
@@ -538,8 +578,6 @@ struct ProjectionProvenanceSemanticRecoveryMatrixRow {
   recovered : String
   malformed_edit : @core.Edit
   recovery_edit : @core.Edit
-  malformed_span : ProjectionProvenanceEditSpan
-  recovered_span : ProjectionProvenanceEditSpan
   expected_loom_error : String
   expected_lowered_event_ids : Array[String]
 }
@@ -552,8 +590,6 @@ fn ProjectionProvenanceSemanticRecoveryMatrixRow::ProjectionProvenanceSemanticRe
   recovered~ : String,
   malformed_edit~ : @core.Edit,
   recovery_edit~ : @core.Edit,
-  malformed_span~ : ProjectionProvenanceEditSpan,
-  recovered_span~ : ProjectionProvenanceEditSpan,
   expected_loom_error~ : String,
   expected_lowered_event_ids~ : Array[String],
 ) -> ProjectionProvenanceSemanticRecoveryMatrixRow {
@@ -564,8 +600,6 @@ fn ProjectionProvenanceSemanticRecoveryMatrixRow::ProjectionProvenanceSemanticRe
     recovered,
     malformed_edit,
     recovery_edit,
-    malformed_span,
-    recovered_span,
     expected_loom_error,
     expected_lowered_event_ids,
   }
@@ -595,15 +629,7 @@ fn projection_boundary_assert_semantic_recovery_matrix_row(
   )
   let projection = LoomMiniAtomProjection::new(row.initial)
   ignore(projection_boundary_doc(projection.parse_doc()))
-  let pipeline = @mini.MiniAuthoringPipeline::new(row.initial)
-  ignore(projection_boundary_mini_snapshot(pipeline.parse_snapshot()))
   projection.apply_edit(row.malformed_edit, row.malformed)
-  pipeline.set_input_with_source_edit(
-    row.malformed,
-    old_start=row.malformed_span.old_start,
-    old_end=row.malformed_span.old_end,
-    new_end=row.malformed_span.new_end,
-  )
   match projection.parse_doc() {
     Err(msg) =>
       if msg != row.expected_loom_error {
@@ -611,30 +637,23 @@ fn projection_boundary_assert_semantic_recovery_matrix_row(
       }
     Ok(_) => abort("expected \{row.family} loom projection to fail")
   }
-  match pipeline.parse_doc() {
-    Err(_) => ()
-    Ok(_) => abort("expected \{row.family} mini authoring parse to fail")
+  let draft = try! @mini.Draft::new(row.initial)
+  projection_boundary_edit_draft(draft, row.malformed, row.malformed_edit)
+  if draft.prepare_playback() is Ok(_) {
+    abort("expected malformed mini draft")
   }
+  projection_boundary_edit_draft(draft, row.recovered, row.recovery_edit)
   projection.apply_edit(row.recovery_edit, row.recovered)
-  pipeline.set_input_with_source_edit(
-    row.recovered,
-    old_start=row.recovered_span.old_start,
-    old_end=row.recovered_span.old_end,
-    new_end=row.recovered_span.new_end,
-  )
   let loom_doc = projection_boundary_doc(projection.parse_doc())
-  let mini_doc = projection_boundary_doc(pipeline.parse_doc())
-  if loom_doc.root().value() != mini_doc.root().value() {
-    abort("expected \{row.family} loom and mini recovered root IDs to match")
-  }
-  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
-  let mini_ids = projection_boundary_leaf_ids(
-    projection_boundary_mini_snapshot(pipeline.parse_snapshot()),
+  let mini_snapshot = projection_boundary_draft_snapshot(draft)
+  projection_boundary_assert_value_events_equal(
+    projection_boundary_value_events_from_doc(loom_doc),
+    projection_boundary_value_events(mini_snapshot),
   )
-  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
+  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
   projection_boundary_assert_ids_equal(row.expected_lowered_event_ids, loom_ids)
+  draft.dispose()
   projection.dispose()
-  pipeline.dispose()
   loom_ids
 }
 
@@ -646,18 +665,11 @@ test "loom provenance matrix row covers duplicate sound insertion" {
       initial="s(\"bd sd bd\")",
       edited="s(\"bd sd bd bd\")",
       edit=@core.Edit::insert(9, 3),
-      span=ProjectionProvenanceEditSpan(
-        old_start=9,
-        old_end=9,
-        new_end=12,
-      ),
+      span=ProjectionProvenanceEditSpan(old_start=9, old_end=9, new_end=12),
       initial_diagnostics=0,
       edited_diagnostics=0,
       expected_lowered_event_ids=[
-        "mini:sound:bd:0",
-        "mini:sound:sd:0",
-        "mini:sound:bd:2",
-        "mini:sound:bd:1",
+        "mini:sound:bd:0", "mini:sound:sd:0", "mini:sound:bd:2", "mini:sound:bd:1",
       ],
     ),
   )
@@ -679,18 +691,11 @@ test "loom provenance matrix row covers duplicate note insertion" {
       initial="note(\"60 62 60\")",
       edited="note(\"60 62 60 60\")",
       edit=@core.Edit::insert(12, 3),
-      span=ProjectionProvenanceEditSpan(
-        old_start=12,
-        old_end=12,
-        new_end=15,
-      ),
+      span=ProjectionProvenanceEditSpan(old_start=12, old_end=12, new_end=15),
       initial_diagnostics=0,
       edited_diagnostics=0,
       expected_lowered_event_ids=[
-        "mini:note:60:0",
-        "mini:note:62:0",
-        "mini:note:60:2",
-        "mini:note:60:1",
+        "mini:note:60:0", "mini:note:62:0", "mini:note:60:2", "mini:note:60:1",
       ],
     ),
   )
@@ -712,17 +717,10 @@ test "loom provenance matrix row covers duplicate sound deletion" {
       initial="s(\"bd sd bd\")",
       edited="s(\"bd bd\")",
       edit=@core.Edit::delete(5, 8),
-      span=ProjectionProvenanceEditSpan(
-        old_start=5,
-        old_end=8,
-        new_end=5,
-      ),
+      span=ProjectionProvenanceEditSpan(old_start=5, old_end=8, new_end=5),
       initial_diagnostics=0,
       edited_diagnostics=0,
-      expected_lowered_event_ids=[
-        "mini:sound:bd:0",
-        "mini:sound:bd:1",
-      ],
+      expected_lowered_event_ids=["mini:sound:bd:0", "mini:sound:bd:1"],
     ),
   )
   let expected =
@@ -738,17 +736,10 @@ test "loom provenance matrix row covers duplicate note deletion" {
       initial="note(\"60 62 60\")",
       edited="note(\"60 60\")",
       edit=@core.Edit::delete(8, 11),
-      span=ProjectionProvenanceEditSpan(
-        old_start=8,
-        old_end=11,
-        new_end=8,
-      ),
+      span=ProjectionProvenanceEditSpan(old_start=8, old_end=11, new_end=8),
       initial_diagnostics=0,
       edited_diagnostics=0,
-      expected_lowered_event_ids=[
-        "mini:note:60:0",
-        "mini:note:60:1",
-      ],
+      expected_lowered_event_ids=["mini:note:60:0", "mini:note:60:1"],
     ),
   )
   let expected =
@@ -764,17 +755,11 @@ test "loom provenance matrix row covers sound atom replacement" {
       initial="s(\"bd sd hh\")",
       edited="s(\"bd cp hh\")",
       edit=@core.Edit::replace(6, 8, 8),
-      span=ProjectionProvenanceEditSpan(
-        old_start=6,
-        old_end=8,
-        new_end=8,
-      ),
+      span=ProjectionProvenanceEditSpan(old_start=6, old_end=8, new_end=8),
       initial_diagnostics=0,
       edited_diagnostics=0,
       expected_lowered_event_ids=[
-        "mini:sound:bd:0",
-        "mini:sound:cp:0",
-        "mini:sound:hh:0",
+        "mini:sound:bd:0", "mini:sound:cp:0", "mini:sound:hh:0",
       ],
     ),
   )
@@ -791,17 +776,10 @@ test "loom provenance matrix row covers whitespace-only edit" {
       initial="s(\"bd sd\")",
       edited="s(\"bd   sd\")",
       edit=@core.Edit::insert(6, 2),
-      span=ProjectionProvenanceEditSpan(
-        old_start=6,
-        old_end=6,
-        new_end=8,
-      ),
+      span=ProjectionProvenanceEditSpan(old_start=6, old_end=6, new_end=8),
       initial_diagnostics=0,
       edited_diagnostics=0,
-      expected_lowered_event_ids=[
-        "mini:sound:bd:0",
-        "mini:sound:sd:0",
-      ],
+      expected_lowered_event_ids=["mini:sound:bd:0", "mini:sound:sd:0"],
     ),
   )
   let expected =
@@ -817,17 +795,10 @@ test "loom provenance matrix row covers dollar stack line insertion" {
       initial="$: s(\"bd\")",
       edited="$: s(\"bd\")\n$: note(\"60\")",
       edit=@core.Edit::insert(10, 14),
-      span=ProjectionProvenanceEditSpan(
-        old_start=10,
-        old_end=10,
-        new_end=24,
-      ),
+      span=ProjectionProvenanceEditSpan(old_start=10, old_end=10, new_end=24),
       initial_diagnostics=0,
       edited_diagnostics=0,
-      expected_lowered_event_ids=[
-        "mini:sound:bd:0",
-        "mini:note:60:0",
-      ],
+      expected_lowered_event_ids=["mini:sound:bd:0", "mini:note:60:0"],
     ),
   )
   let expected =
@@ -843,17 +814,10 @@ test "loom provenance matrix row covers layer comma insertion" {
       initial="s(\"bd sd\")",
       edited="s(\"bd, sd\")",
       edit=@core.Edit::insert(5, 1),
-      span=ProjectionProvenanceEditSpan(
-        old_start=5,
-        old_end=5,
-        new_end=6,
-      ),
+      span=ProjectionProvenanceEditSpan(old_start=5, old_end=5, new_end=6),
       initial_diagnostics=0,
       edited_diagnostics=0,
-      expected_lowered_event_ids=[
-        "mini:sound:bd:0",
-        "mini:sound:sd:0",
-      ],
+      expected_lowered_event_ids=["mini:sound:bd:0", "mini:sound:sd:0"],
     ),
   )
   let expected =
@@ -869,17 +833,10 @@ test "loom provenance matrix row covers slow postfix insertion" {
       initial="s(\"bd sd\")",
       edited="s(\"bd/2 sd\")",
       edit=@core.Edit::insert(5, 2),
-      span=ProjectionProvenanceEditSpan(
-        old_start=5,
-        old_end=5,
-        new_end=7,
-      ),
+      span=ProjectionProvenanceEditSpan(old_start=5, old_end=5, new_end=7),
       initial_diagnostics=0,
       edited_diagnostics=0,
-      expected_lowered_event_ids=[
-        "mini:sound:bd:0",
-        "mini:sound:sd:0",
-      ],
+      expected_lowered_event_ids=["mini:sound:bd:0", "mini:sound:sd:0"],
     ),
   )
   let expected =
@@ -895,18 +852,11 @@ test "loom provenance matrix row covers euclid postfix insertion" {
       initial="s(\"bd sd\")",
       edited="s(\"bd(3,8) sd\")",
       edit=@core.Edit::insert(5, 5),
-      span=ProjectionProvenanceEditSpan(
-        old_start=5,
-        old_end=5,
-        new_end=10,
-      ),
+      span=ProjectionProvenanceEditSpan(old_start=5, old_end=5, new_end=10),
       initial_diagnostics=0,
       edited_diagnostics=0,
       expected_lowered_event_ids=[
-        "mini:sound:bd:0",
-        "mini:sound:bd:0",
-        "mini:sound:bd:0",
-        "mini:sound:sd:0",
+        "mini:sound:bd:0", "mini:sound:bd:0", "mini:sound:bd:0", "mini:sound:sd:0",
       ],
     ),
   )
@@ -928,18 +878,11 @@ test "loom provenance matrix row covers sub-notation postfix insertion" {
       initial="s(\"[bd sd] hh\")",
       edited="s(\"[bd sd]*2 hh\")",
       edit=@core.Edit::insert(10, 2),
-      span=ProjectionProvenanceEditSpan(
-        old_start=10,
-        old_end=10,
-        new_end=12,
-      ),
+      span=ProjectionProvenanceEditSpan(old_start=10, old_end=10, new_end=12),
       initial_diagnostics=0,
       edited_diagnostics=0,
       expected_lowered_event_ids=[
-        "mini:sound:bd:0",
-        "mini:sound:sd:0",
-        "mini:sound:bd:0",
-        "mini:sound:sd:0",
+        "mini:sound:bd:0", "mini:sound:sd:0", "mini:sound:bd:0", "mini:sound:sd:0",
         "mini:sound:hh:0",
       ],
     ),
@@ -963,11 +906,7 @@ test "loom provenance matrix row covers root method replacement" {
       initial="s(\"bd sd\").fast(2)",
       edited="s(\"bd sd\").slow(2)",
       edit=@core.Edit::replace(11, 15, 15),
-      span=ProjectionProvenanceEditSpan(
-        old_start=11,
-        old_end=15,
-        new_end=15,
-      ),
+      span=ProjectionProvenanceEditSpan(old_start=11, old_end=15, new_end=15),
       initial_diagnostics=0,
       edited_diagnostics=0,
       expected_lowered_event_ids=["mini:sound:bd:0"],
@@ -986,20 +925,12 @@ test "loom provenance matrix row covers jux callback replacement" {
       initial="s(\"bd sd\").jux(rev)",
       edited="s(\"bd sd\").jux(fast(2))",
       edit=@core.Edit::replace(15, 18, 22),
-      span=ProjectionProvenanceEditSpan(
-        old_start=15,
-        old_end=18,
-        new_end=22,
-      ),
+      span=ProjectionProvenanceEditSpan(old_start=15, old_end=18, new_end=22),
       initial_diagnostics=0,
       edited_diagnostics=0,
       expected_lowered_event_ids=[
-        "mini:sound:sd:0",
-        "mini:sound:sd:0",
-        "mini:sound:sd:0",
-        "mini:sound:sd:0",
-        "mini:sound:sd:0",
-        "mini:sound:sd:0",
+        "mini:sound:sd:0", "mini:sound:sd:0", "mini:sound:sd:0", "mini:sound:sd:0",
+        "mini:sound:sd:0", "mini:sound:sd:0",
       ],
     ),
   )
@@ -1023,18 +954,11 @@ test "loom provenance matrix row covers every callback replacement" {
       initial="s(\"bd sd\").every(2, rev)",
       edited="s(\"bd sd\").every(2, fast(2))",
       edit=@core.Edit::replace(20, 23, 27),
-      span=ProjectionProvenanceEditSpan(
-        old_start=20,
-        old_end=23,
-        new_end=27,
-      ),
+      span=ProjectionProvenanceEditSpan(old_start=20, old_end=23, new_end=27),
       initial_diagnostics=0,
       edited_diagnostics=0,
       expected_lowered_event_ids=[
-        "mini:sound:sd:0",
-        "mini:sound:sd:0",
-        "mini:sound:sd:0",
-        "mini:sound:sd:0",
+        "mini:sound:sd:0", "mini:sound:sd:0", "mini:sound:sd:0", "mini:sound:sd:0",
       ],
     ),
   )
@@ -1058,17 +982,13 @@ test "loom provenance matrix row covers parse-error recovery" {
       recovered="s(\"bd sd bd bd\")",
       malformed_edit=@core.Edit::insert(9, 3),
       recovery_edit=@core.Edit::insert(15, 1),
-      span=ProjectionProvenanceEditSpan(
-        old_start=9,
-        old_end=9,
-        new_end=12,
-      ),
+      draft_edits=[
+        @mini.TextEdit::TextEdit(from=9, to=9, inserted="bd "),
+        @mini.TextEdit::TextEdit(from=12, to=13, inserted=""),
+      ],
       expected_loom_error="loom mini syntax has diagnostics",
       expected_lowered_event_ids=[
-        "mini:sound:bd:0",
-        "mini:sound:sd:0",
-        "mini:sound:bd:2",
-        "mini:sound:bd:1",
+        "mini:sound:bd:0", "mini:sound:sd:0", "mini:sound:bd:2", "mini:sound:bd:1",
       ],
     ),
   )
@@ -1092,16 +1012,11 @@ test "loom recovery matrix row covers dollar stack line recovery" {
       recovered="$: s(\"bd\")\n$: note(\"60\")",
       malformed_edit=@core.Edit::insert(10, 14),
       recovery_edit=@core.Edit::insert(23, 1),
-      span=ProjectionProvenanceEditSpan(
-        old_start=10,
-        old_end=10,
-        new_end=24,
-      ),
-      expected_loom_error="loom mini syntax has diagnostics",
-      expected_lowered_event_ids=[
-        "mini:sound:bd:0",
-        "mini:note:60:0",
+      draft_edits=[
+        @mini.TextEdit::TextEdit(from=10, to=10, inserted="\n$: note(\"60\""),
       ],
+      expected_loom_error="loom mini syntax has diagnostics",
+      expected_lowered_event_ids=["mini:sound:bd:0", "mini:note:60:0"],
     ),
   )
   let expected =
@@ -1119,19 +1034,11 @@ test "loom recovery matrix row covers direct callback recovery" {
       recovered="s(\"bd sd\").jux(fast(2))",
       malformed_edit=@core.Edit::replace(15, 18, 22),
       recovery_edit=@core.Edit::insert(22, 1),
-      span=ProjectionProvenanceEditSpan(
-        old_start=15,
-        old_end=18,
-        new_end=22,
-      ),
+      draft_edits=[@mini.TextEdit::TextEdit(from=15, to=19, inserted="fast(2)")],
       expected_loom_error="loom mini syntax has diagnostics",
       expected_lowered_event_ids=[
-        "mini:sound:sd:0",
-        "mini:sound:sd:0",
-        "mini:sound:sd:0",
-        "mini:sound:sd:0",
-        "mini:sound:sd:0",
-        "mini:sound:sd:0",
+        "mini:sound:sd:0", "mini:sound:sd:0", "mini:sound:sd:0", "mini:sound:sd:0",
+        "mini:sound:sd:0", "mini:sound:sd:0",
       ],
     ),
   )
@@ -1157,19 +1064,11 @@ test "loom recovery matrix row covers dollar stack callback recovery" {
       recovered="$: s(\"bd sd\").jux(fast(2))",
       malformed_edit=@core.Edit::replace(18, 21, 25),
       recovery_edit=@core.Edit::insert(25, 1),
-      span=ProjectionProvenanceEditSpan(
-        old_start=18,
-        old_end=21,
-        new_end=25,
-      ),
+      draft_edits=[@mini.TextEdit::TextEdit(from=18, to=22, inserted="fast(2)")],
       expected_loom_error="loom mini syntax has diagnostics",
       expected_lowered_event_ids=[
-        "mini:sound:sd:0",
-        "mini:sound:sd:0",
-        "mini:sound:sd:0",
-        "mini:sound:sd:0",
-        "mini:sound:sd:0",
-        "mini:sound:sd:0",
+        "mini:sound:sd:0", "mini:sound:sd:0", "mini:sound:sd:0", "mini:sound:sd:0",
+        "mini:sound:sd:0", "mini:sound:sd:0",
       ],
     ),
   )
@@ -1195,11 +1094,9 @@ test "loom recovery matrix row covers control method recovery" {
       recovered="s(\"bd\").gain(0.5).pan(-0.25)",
       malformed_edit=@core.Edit::insert(17, 11),
       recovery_edit=@core.Edit::insert(27, 1),
-      span=ProjectionProvenanceEditSpan(
-        old_start=17,
-        old_end=17,
-        new_end=28,
-      ),
+      draft_edits=[
+        @mini.TextEdit::TextEdit(from=17, to=17, inserted=".pan(-0.25"),
+      ],
       expected_loom_error="loom mini syntax has diagnostics",
       expected_lowered_event_ids=[
         "mini:control:mini:merge_control:mini:sound:bd:0:gain:0.5:pan:-0.25",
@@ -1221,21 +1118,9 @@ test "loom semantic recovery matrix row covers projection-only failure" {
       recovered="s(\"cp bd sd\")",
       malformed_edit=@core.Edit::insert(3, 2),
       recovery_edit=@core.Edit::replace(3, 4, 5),
-      malformed_span=ProjectionProvenanceEditSpan(
-        old_start=3,
-        old_end=3,
-        new_end=5,
-      ),
-      recovered_span=ProjectionProvenanceEditSpan(
-        old_start=3,
-        old_end=3,
-        new_end=6,
-      ),
       expected_loom_error="loom atom projection expected sound name",
       expected_lowered_event_ids=[
-        "mini:sound:cp:0",
-        "mini:sound:bd:0",
-        "mini:sound:sd:0",
+        "mini:sound:cp:0", "mini:sound:bd:0", "mini:sound:sd:0",
       ],
     ),
   )
@@ -1312,7 +1197,9 @@ test "loom atom projection matches mini PatternDoc and events for method-chained
 // non-empty. Pins value-level parity so the helper swap preserves per-arg
 // partitioning.
 test "loom atom projection matches mini for three-argument stack" {
-  projection_boundary_assert_matches_mini_doc("stack(s(\"bd\"), s(\"sd\"), s(\"hh\"))")
+  projection_boundary_assert_matches_mini_doc(
+    "stack(s(\"bd\"), s(\"sd\"), s(\"hh\"))",
+  )
 }
 
 ///|
@@ -1474,7 +1361,8 @@ test "loom atom projection rejects identifier note atom instead of dropping it" 
   inspect(diagnostics.length(), content="0")
   let projection = LoomMiniAtomProjection::new(input)
   match projection.parse_doc() {
-    Err(msg) => inspect(msg, content="loom atom projection expected note number")
+    Err(msg) =>
+      inspect(msg, content="loom atom projection expected note number")
     Ok(_) => abort("expected identifier note atom projection to fail")
   }
   guard @mini.parse_doc(input) is Err(_) else {
@@ -1485,9 +1373,7 @@ test "loom atom projection rejects identifier note atom instead of dropping it" 
 
 ///|
 test "loom atom projection matches mini PatternDoc for dollar stack" {
-  projection_boundary_assert_matches_mini_doc(
-    "$: s(\"bd\")\n$: note(\"60\")",
-  )
+  projection_boundary_assert_matches_mini_doc("$: s(\"bd\")\n$: note(\"60\")")
 }
 
 ///|
@@ -1526,7 +1412,7 @@ test "loom atom projection rejects same-line dollar stack marker like mini" {
 test "loom atom projection matches mini PatternDoc after dollar stack line insertion" {
   let input = "$: s(\"bd\")"
   let edited = "$: s(\"bd\")\n$: note(\"60\")"
-  let (loom_ids, mini_ids) = projection_boundary_ids_after_edit(
+  let loom_ids = projection_boundary_ids_after_edit(
     input,
     edited,
     @core.Edit::insert(10, 14),
@@ -1534,7 +1420,6 @@ test "loom atom projection matches mini PatternDoc after dollar stack line inser
     old_end=10,
     new_end=24,
   )
-  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
   let expected =
     #|["mini:sound:bd:0", "mini:note:60:0"]
   debug_inspect(loom_ids, content=expected)
@@ -1634,16 +1519,12 @@ test "loom atom projection matches mini PatternDoc for every rev method" {
 
 ///|
 test "loom atom projection matches mini PatternDoc for every fast callback method" {
-  projection_boundary_assert_matches_mini_doc(
-    "s(\"bd sd\").every(2, fast(2))",
-  )
+  projection_boundary_assert_matches_mini_doc("s(\"bd sd\").every(2, fast(2))")
 }
 
 ///|
 test "loom atom projection matches mini PatternDoc for every slow callback method" {
-  projection_boundary_assert_matches_mini_doc(
-    "s(\"bd sd\").every(2, slow(2))",
-  )
+  projection_boundary_assert_matches_mini_doc("s(\"bd sd\").every(2, slow(2))")
 }
 
 ///|
@@ -1859,7 +1740,7 @@ test "loom atom projection rejects nested stack instead of dropping it" {
 test "loom atom projection preserves duplicate sound provenance across insertion" {
   let input = "s(\"bd sd bd\")"
   let edited = "s(\"bd sd bd bd\")"
-  let (loom_ids, mini_ids) = projection_boundary_ids_after_edit(
+  let loom_ids = projection_boundary_ids_after_edit(
     input,
     edited,
     @core.Edit::insert(9, 3),
@@ -1867,7 +1748,6 @@ test "loom atom projection preserves duplicate sound provenance across insertion
     old_end=9,
     new_end=12,
   )
-  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
   let expected =
     #|[
     #|  "mini:sound:bd:0",
@@ -1882,7 +1762,7 @@ test "loom atom projection preserves duplicate sound provenance across insertion
 test "loom atom projection preserves duplicate sound provenance across deletion" {
   let input = "s(\"bd sd bd\")"
   let edited = "s(\"bd bd\")"
-  let (loom_ids, mini_ids) = projection_boundary_ids_after_edit(
+  let loom_ids = projection_boundary_ids_after_edit(
     input,
     edited,
     @core.Edit::delete(5, 8),
@@ -1890,7 +1770,6 @@ test "loom atom projection preserves duplicate sound provenance across deletion"
     old_end=8,
     new_end=5,
   )
-  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
   let expected =
     #|["mini:sound:bd:0", "mini:sound:bd:1"]
   debug_inspect(loom_ids, content=expected)
@@ -1928,7 +1807,7 @@ test "loom atom projection matches mini PatternDoc for duplicate note atoms" {
 test "loom atom projection preserves duplicate note provenance across insertion" {
   let input = "note(\"60 62 60\")"
   let edited = "note(\"60 62 60 60\")"
-  let (loom_ids, mini_ids) = projection_boundary_ids_after_edit(
+  let loom_ids = projection_boundary_ids_after_edit(
     input,
     edited,
     @core.Edit::insert(12, 3),
@@ -1936,7 +1815,6 @@ test "loom atom projection preserves duplicate note provenance across insertion"
     old_end=12,
     new_end=15,
   )
-  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
   let expected =
     #|[
     #|  "mini:note:60:0",
@@ -1951,7 +1829,7 @@ test "loom atom projection preserves duplicate note provenance across insertion"
 test "loom atom projection preserves duplicate note provenance across deletion" {
   let input = "note(\"60 62 60\")"
   let edited = "note(\"60 60\")"
-  let (loom_ids, mini_ids) = projection_boundary_ids_after_edit(
+  let loom_ids = projection_boundary_ids_after_edit(
     input,
     edited,
     @core.Edit::delete(8, 11),
@@ -1959,7 +1837,6 @@ test "loom atom projection preserves duplicate note provenance across deletion" 
     old_end=11,
     new_end=8,
   )
-  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
   let expected =
     #|["mini:note:60:0", "mini:note:60:1"]
   debug_inspect(loom_ids, content=expected)
@@ -1969,7 +1846,7 @@ test "loom atom projection preserves duplicate note provenance across deletion" 
 test "loom atom projection preserves unaffected sound provenance across replacement" {
   let input = "s(\"bd sd hh\")"
   let edited = "s(\"bd cp hh\")"
-  let (loom_ids, mini_ids) = projection_boundary_ids_after_edit(
+  let loom_ids = projection_boundary_ids_after_edit(
     input,
     edited,
     @core.Edit::replace(6, 8, 8),
@@ -1977,7 +1854,6 @@ test "loom atom projection preserves unaffected sound provenance across replacem
     old_end=8,
     new_end=8,
   )
-  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
   let expected =
     #|["mini:sound:bd:0", "mini:sound:cp:0", "mini:sound:hh:0"]
   debug_inspect(loom_ids, content=expected)
@@ -1987,7 +1863,7 @@ test "loom atom projection preserves unaffected sound provenance across replacem
 test "loom atom projection preserves unaffected note provenance across replacement" {
   let input = "note(\"60 62 60\")"
   let edited = "note(\"60 64 60\")"
-  let (loom_ids, mini_ids) = projection_boundary_ids_after_edit(
+  let loom_ids = projection_boundary_ids_after_edit(
     input,
     edited,
     @core.Edit::replace(9, 11, 11),
@@ -1995,7 +1871,6 @@ test "loom atom projection preserves unaffected note provenance across replaceme
     old_end=11,
     new_end=11,
   )
-  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
   let expected =
     #|["mini:note:60:0", "mini:note:64:0", "mini:note:60:1"]
   debug_inspect(loom_ids, content=expected)
@@ -2005,7 +1880,7 @@ test "loom atom projection preserves unaffected note provenance across replaceme
 test "loom atom projection preserves atom provenance across whitespace insertion" {
   let input = "s(\"bd sd\")"
   let edited = "s(\"bd   sd\")"
-  let (loom_ids, mini_ids) = projection_boundary_ids_after_edit(
+  let loom_ids = projection_boundary_ids_after_edit(
     input,
     edited,
     @core.Edit::insert(6, 2),
@@ -2013,310 +1888,104 @@ test "loom atom projection preserves atom provenance across whitespace insertion
     old_end=6,
     new_end=8,
   )
-  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
   let expected =
     #|["mini:sound:bd:0", "mini:sound:sd:0"]
   debug_inspect(loom_ids, content=expected)
 }
 
 ///|
-test "loom atom projection matches mini PatternDoc after slow postfix insertion" {
-  let input = "s(\"bd sd\")"
-  let edited = "s(\"bd/2 sd\")"
+fn projection_boundary_assert_draft_edit_parity(
+  input : String,
+  edited : String,
+  edit : @core.Edit,
+  old_start~ : Int,
+  old_end~ : Int,
+  new_end~ : Int,
+) -> Unit {
   let projection = LoomMiniAtomProjection::new(input)
   ignore(projection_boundary_doc(projection.parse_doc()))
-  let pipeline = @mini.MiniAuthoringPipeline::new(input)
-  ignore(projection_boundary_mini_snapshot(pipeline.parse_snapshot()))
-  projection.apply_edit(@core.Edit::insert(5, 2), edited)
-  pipeline.set_input_with_source_edit(
+  projection.apply_edit(edit, edited)
+  let loom_doc = projection_boundary_doc(projection.parse_doc())
+  let mini_snapshot = projection_boundary_mini_draft_snapshot(
+    input,
     edited,
+    old_start~,
+    old_end~,
+    new_end~,
+  )
+  projection_boundary_assert_value_events_equal(
+    projection_boundary_value_events_from_doc(loom_doc),
+    projection_boundary_value_events(mini_snapshot),
+  )
+  projection.dispose()
+}
+
+///|
+test "loom atom projection edits compile through Draft" {
+  projection_boundary_assert_draft_edit_parity(
+    "s(\"bd sd\")",
+    "s(\"bd/2 sd\")",
+    @core.Edit::insert(5, 2),
     old_start=5,
     old_end=5,
     new_end=7,
   )
-  let loom_doc = projection_boundary_doc(projection.parse_doc())
-  let mini_doc = projection_boundary_doc(pipeline.parse_doc())
-  @debug.assert_eq(loom_doc.root().value(), mini_doc.root().value())
-  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
-  let mini_ids = projection_boundary_leaf_ids_from_doc(mini_doc)
-  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
-  projection.dispose()
-  pipeline.dispose()
-}
-
-///|
-test "loom atom projection matches mini PatternDoc after degrade postfix insertion" {
-  let input = "s(\"bd sd\")"
-  let edited = "s(\"bd? sd\")"
-  let projection = LoomMiniAtomProjection::new(input)
-  ignore(projection_boundary_doc(projection.parse_doc()))
-  let pipeline = @mini.MiniAuthoringPipeline::new(input)
-  ignore(projection_boundary_mini_snapshot(pipeline.parse_snapshot()))
-  projection.apply_edit(@core.Edit::insert(5, 1), edited)
-  pipeline.set_input_with_source_edit(
-    edited,
+  projection_boundary_assert_draft_edit_parity(
+    "s(\"bd sd\")",
+    "s(\"bd? sd\")",
+    @core.Edit::insert(5, 1),
     old_start=5,
     old_end=5,
     new_end=6,
   )
-  let loom_doc = projection_boundary_doc(projection.parse_doc())
-  let mini_doc = projection_boundary_doc(pipeline.parse_doc())
-  @debug.assert_eq(loom_doc.root().value(), mini_doc.root().value())
-  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
-  let mini_ids = projection_boundary_leaf_ids_from_doc(mini_doc)
-  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
-  projection.dispose()
-  pipeline.dispose()
-}
-
-///|
-test "loom atom projection matches mini PatternDoc after euclid postfix insertion" {
-  let input = "s(\"bd sd\")"
-  let edited = "s(\"bd(3,8) sd\")"
-  let projection = LoomMiniAtomProjection::new(input)
-  ignore(projection_boundary_doc(projection.parse_doc()))
-  let pipeline = @mini.MiniAuthoringPipeline::new(input)
-  ignore(projection_boundary_mini_snapshot(pipeline.parse_snapshot()))
-  projection.apply_edit(@core.Edit::insert(5, 5), edited)
-  pipeline.set_input_with_source_edit(
-    edited,
+  projection_boundary_assert_draft_edit_parity(
+    "s(\"bd sd\")",
+    "s(\"bd(3,8) sd\")",
+    @core.Edit::insert(5, 5),
     old_start=5,
     old_end=5,
     new_end=10,
   )
-  let loom_doc = projection_boundary_doc(projection.parse_doc())
-  let mini_doc = projection_boundary_doc(pipeline.parse_doc())
-  @debug.assert_eq(loom_doc.root().value(), mini_doc.root().value())
-  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
-  let mini_ids = projection_boundary_leaf_ids_from_doc(mini_doc)
-  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
-  projection.dispose()
-  pipeline.dispose()
-}
-
-///|
-test "loom atom projection matches mini PatternDoc after sub-notation postfix insertion" {
-  let input = "s(\"[bd sd] hh\")"
-  let edited = "s(\"[bd sd]*2 hh\")"
-  let projection = LoomMiniAtomProjection::new(input)
-  ignore(projection_boundary_doc(projection.parse_doc()))
-  let pipeline = @mini.MiniAuthoringPipeline::new(input)
-  ignore(projection_boundary_mini_snapshot(pipeline.parse_snapshot()))
-  projection.apply_edit(@core.Edit::insert(10, 2), edited)
-  pipeline.set_input_with_source_edit(
-    edited,
+  projection_boundary_assert_draft_edit_parity(
+    "s(\"[bd sd] hh\")",
+    "s(\"[bd sd]*2 hh\")",
+    @core.Edit::insert(10, 2),
     old_start=10,
     old_end=10,
     new_end=12,
   )
-  let loom_doc = projection_boundary_doc(projection.parse_doc())
-  let mini_doc = projection_boundary_doc(pipeline.parse_doc())
-  @debug.assert_eq(loom_doc.root().value(), mini_doc.root().value())
-  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
-  let mini_ids = projection_boundary_leaf_ids_from_doc(mini_doc)
-  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
-  projection.dispose()
-  pipeline.dispose()
-}
-
-///|
-test "loom atom projection matches mini PatternDoc after sub-notation postfix removal" {
-  let input = "s(\"[bd sd]*2 hh\")"
-  let edited = "s(\"[bd sd] hh\")"
-  let projection = LoomMiniAtomProjection::new(input)
-  ignore(projection_boundary_doc(projection.parse_doc()))
-  let pipeline = @mini.MiniAuthoringPipeline::new(input)
-  ignore(projection_boundary_mini_snapshot(pipeline.parse_snapshot()))
-  projection.apply_edit(@core.Edit::delete(10, 12), edited)
-  pipeline.set_input_with_source_edit(
-    edited,
+  projection_boundary_assert_draft_edit_parity(
+    "s(\"[bd sd]*2 hh\")",
+    "s(\"[bd sd] hh\")",
+    @core.Edit::delete(10, 12),
     old_start=10,
     old_end=12,
     new_end=10,
   )
-  let loom_doc = projection_boundary_doc(projection.parse_doc())
-  let mini_doc = projection_boundary_doc(pipeline.parse_doc())
-  @debug.assert_eq(loom_doc.root().value(), mini_doc.root().value())
-  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
-  let mini_ids = projection_boundary_leaf_ids_from_doc(mini_doc)
-  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
-  projection.dispose()
-  pipeline.dispose()
-}
-
-///|
-test "loom atom projection preserves atom provenance across method replacement" {
-  let input = "s(\"bd sd\").fast(2)"
-  let edited = "s(\"bd sd\").slow(2)"
-  let projection = LoomMiniAtomProjection::new(input)
-  ignore(projection_boundary_doc(projection.parse_doc()))
-  let pipeline = @mini.MiniAuthoringPipeline::new(input)
-  ignore(projection_boundary_mini_snapshot(pipeline.parse_snapshot()))
-  projection.apply_edit(@core.Edit::replace(11, 15, 15), edited)
-  pipeline.set_input_with_source_edit(
-    edited,
+  projection_boundary_assert_draft_edit_parity(
+    "s(\"bd sd\").fast(2)",
+    "s(\"bd sd\").slow(2)",
+    @core.Edit::replace(11, 15, 15),
     old_start=11,
     old_end=15,
     new_end=15,
   )
-  let loom_doc = projection_boundary_doc(projection.parse_doc())
-  let mini_doc = projection_boundary_doc(pipeline.parse_doc())
-  @debug.assert_eq(loom_doc.root().value(), mini_doc.root().value())
-  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
-  let mini_ids = projection_boundary_leaf_ids_from_doc(mini_doc)
-  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
-  projection.dispose()
-  pipeline.dispose()
-}
-
-///|
-test "loom atom projection preserves atom provenance across jux callback replacement" {
-  let input = "s(\"bd sd\").jux(rev)"
-  let edited = "s(\"bd sd\").jux(fast(2))"
-  let projection = LoomMiniAtomProjection::new(input)
-  ignore(projection_boundary_doc(projection.parse_doc()))
-  let pipeline = @mini.MiniAuthoringPipeline::new(input)
-  ignore(projection_boundary_mini_snapshot(pipeline.parse_snapshot()))
-  projection.apply_edit(@core.Edit::replace(15, 18, 22), edited)
-  pipeline.set_input_with_source_edit(
-    edited,
+  projection_boundary_assert_draft_edit_parity(
+    "s(\"bd sd\").jux(rev)",
+    "s(\"bd sd\").jux(fast(2))",
+    @core.Edit::replace(15, 18, 22),
     old_start=15,
     old_end=18,
     new_end=22,
   )
-  let loom_doc = projection_boundary_doc(projection.parse_doc())
-  let mini_doc = projection_boundary_doc(pipeline.parse_doc())
-  @debug.assert_eq(loom_doc.root().value(), mini_doc.root().value())
-  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
-  let mini_ids = projection_boundary_leaf_ids_from_doc(mini_doc)
-  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
-  projection.dispose()
-  pipeline.dispose()
-}
-
-///|
-test "loom atom projection preserves atom provenance across every callback replacement" {
-  let input = "s(\"bd sd\").every(2, rev)"
-  let edited = "s(\"bd sd\").every(2, fast(2))"
-  let projection = LoomMiniAtomProjection::new(input)
-  ignore(projection_boundary_doc(projection.parse_doc()))
-  let pipeline = @mini.MiniAuthoringPipeline::new(input)
-  ignore(projection_boundary_mini_snapshot(pipeline.parse_snapshot()))
-  projection.apply_edit(@core.Edit::replace(20, 23, 27), edited)
-  pipeline.set_input_with_source_edit(
-    edited,
+  projection_boundary_assert_draft_edit_parity(
+    "s(\"bd sd\").every(2, rev)",
+    "s(\"bd sd\").every(2, fast(2))",
+    @core.Edit::replace(20, 23, 27),
     old_start=20,
     old_end=23,
     new_end=27,
   )
-  let loom_doc = projection_boundary_doc(projection.parse_doc())
-  let mini_doc = projection_boundary_doc(pipeline.parse_doc())
-  @debug.assert_eq(loom_doc.root().value(), mini_doc.root().value())
-  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
-  let mini_ids = projection_boundary_leaf_ids_from_doc(mini_doc)
-  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
-  projection.dispose()
-  pipeline.dispose()
-}
-
-///|
-test "loom atom projection preserves atom provenance across dollar stack jux callback replacement" {
-  let input = "$: s(\"bd sd\").jux(rev)\n$: note(\"60 64\")"
-  let edited = "$: s(\"bd sd\").jux(fast(2))\n$: note(\"60 64\")"
-  let projection = LoomMiniAtomProjection::new(input)
-  ignore(projection_boundary_doc(projection.parse_doc()))
-  let pipeline = @mini.MiniAuthoringPipeline::new(input)
-  ignore(projection_boundary_mini_snapshot(pipeline.parse_snapshot()))
-  projection.apply_edit(@core.Edit::replace(18, 21, 25), edited)
-  pipeline.set_input_with_source_edit(
-    edited,
-    old_start=18,
-    old_end=21,
-    new_end=25,
-  )
-  let loom_doc = projection_boundary_doc(projection.parse_doc())
-  let mini_doc = projection_boundary_doc(pipeline.parse_doc())
-  @debug.assert_eq(loom_doc.root().value(), mini_doc.root().value())
-  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
-  let mini_ids = projection_boundary_leaf_ids_from_doc(mini_doc)
-  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
-  projection.dispose()
-  pipeline.dispose()
-}
-
-///|
-test "loom atom projection preserves atom provenance across dollar stack every callback replacement" {
-  let input = "$: s(\"bd sd\")\n$: note(\"60 64\").every(2, rev)"
-  let edited = "$: s(\"bd sd\")\n$: note(\"60 64\").every(2, fast(2))"
-  let projection = LoomMiniAtomProjection::new(input)
-  ignore(projection_boundary_doc(projection.parse_doc()))
-  let pipeline = @mini.MiniAuthoringPipeline::new(input)
-  ignore(projection_boundary_mini_snapshot(pipeline.parse_snapshot()))
-  projection.apply_edit(@core.Edit::replace(40, 43, 47), edited)
-  pipeline.set_input_with_source_edit(
-    edited,
-    old_start=40,
-    old_end=43,
-    new_end=47,
-  )
-  let loom_doc = projection_boundary_doc(projection.parse_doc())
-  let mini_doc = projection_boundary_doc(pipeline.parse_doc())
-  @debug.assert_eq(loom_doc.root().value(), mini_doc.root().value())
-  let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
-  let mini_ids = projection_boundary_leaf_ids_from_doc(mini_doc)
-  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
-  projection.dispose()
-  pipeline.dispose()
-}
-
-///|
-test "loom atom projection reports diagnostics and recovers with previous provenance" {
-  let input = "s(\"bd sd bd\")"
-  let malformed = "s(\"bd sd bd bd\""
-  let recovered = "s(\"bd sd bd bd\")"
-  let projection = LoomMiniAtomProjection::new(input)
-  ignore(projection_boundary_doc(projection.parse_doc()))
-  let pipeline = @mini.MiniAuthoringPipeline::new(input)
-  ignore(projection_boundary_mini_snapshot(pipeline.parse_snapshot()))
-  projection.apply_edit(@core.Edit::insert(9, 3), malformed)
-  pipeline.set_input_with_source_edit(
-    malformed,
-    old_start=9,
-    old_end=9,
-    new_end=12,
-  )
-  match projection.parse_doc() {
-    Err(msg) => inspect(msg, content="loom mini syntax has diagnostics")
-    Ok(_) => abort("expected malformed loom projection to fail")
-  }
-  match pipeline.parse_doc() {
-    Err(_) => ()
-    Ok(_) => abort("expected malformed mini authoring parse to fail")
-  }
-  projection.apply_edit(@core.Edit::insert(15, 1), recovered)
-  pipeline.set_input_with_source_edit(
-    recovered,
-    old_start=9,
-    old_end=9,
-    new_end=12,
-  )
-  let loom_ids = projection_boundary_leaf_ids_from_doc(
-    projection_boundary_doc(projection.parse_doc()),
-  )
-  let mini_ids = projection_boundary_leaf_ids(
-    projection_boundary_mini_snapshot(pipeline.parse_snapshot()),
-  )
-  projection_boundary_assert_ids_equal(loom_ids, mini_ids)
-  let expected =
-    #|[
-    #|  "mini:sound:bd:0",
-    #|  "mini:sound:sd:0",
-    #|  "mini:sound:bd:2",
-    #|  "mini:sound:bd:1",
-    #|]
-  debug_inspect(loom_ids, content=expected)
-  projection.dispose()
-  pipeline.dispose()
 }
 
 ///|
@@ -2333,54 +2002,45 @@ test "loom atom projection reports diagnostics and recovers with previous proven
 fn projection_boundary_doc_corpus() -> Array[String] {
   [
     // valid
-    "s(\"bd\")", "s(\"bd sd\")", "s(\"bd sd bd\")", "s(\"bd sd hh\")",
-    "s(\"bd cp hh\")", "s(\"cp bd sd\")", "s(\"bd bd\")", "s(\"bd   sd\")",
-    "note(\"60 60\")", "note(\"60 62 60\")", "note(\"60 64 60\")",
-    "s(\"bd sd\").fast(2)", "s(\"bd sd\").slow(2)", "s(\"bd sd hh\").rev()",
-    "s(\"bd sd\").fast(2).rev().slow(3)", "s(\"bd*2 sd\")", "s(\"bd/2 sd\")",
-    "s(\"bd*2/3 sd\")", "s(\"bd/2*3 sd\")", "s(\"[bd sd] hh\")",
-    "s(\"[bd sd]*2 hh\")", "s(\"bd(3,8) sd\")", "s(\"bd(3,8,1) sd\")",
-    "s(\"bd(3,8,-1) sd\")", "s(\"bd? sd\")", "s(\"[bd sd]? hh\")",
-    "s(\"[bd sd](5,8) hh\")", "s(\"bd\").gain(0.5)",
-    "s(\"bd\").gain(0.5).pan(-0.25)", "s(\"bd\").lpf(200).hpf(40)",
-    "s(\"bd sd\").jux(rev)", "s(\"bd sd\").jux(fast(2))",
-    "s(\"bd sd\").jux(slow(2))", "s(\"bd sd\").every(2, rev)",
-    "s(\"bd sd\").every(2, fast(2))", "s(\"bd sd\").every(2, slow(2))",
+    "s(\"bd\")", "s(\"bd sd\")", "s(\"bd sd bd\")", "s(\"bd sd hh\")", "s(\"bd cp hh\")",
+    "s(\"cp bd sd\")", "s(\"bd bd\")", "s(\"bd   sd\")", "note(\"60 60\")", "note(\"60 62 60\")",
+    "note(\"60 64 60\")", "s(\"bd sd\").fast(2)", "s(\"bd sd\").slow(2)", "s(\"bd sd hh\").rev()",
+    "s(\"bd sd\").fast(2).rev().slow(3)", "s(\"bd*2 sd\")", "s(\"bd/2 sd\")", "s(\"bd*2/3 sd\")",
+    "s(\"bd/2*3 sd\")", "s(\"[bd sd] hh\")", "s(\"[bd sd]*2 hh\")", "s(\"bd(3,8) sd\")",
+    "s(\"bd(3,8,1) sd\")", "s(\"bd(3,8,-1) sd\")", "s(\"bd? sd\")", "s(\"[bd sd]? hh\")",
+    "s(\"[bd sd](5,8) hh\")", "s(\"bd\").gain(0.5)", "s(\"bd\").gain(0.5).pan(-0.25)",
+    "s(\"bd\").lpf(200).hpf(40)", "s(\"bd sd\").jux(rev)", "s(\"bd sd\").jux(fast(2))",
+    "s(\"bd sd\").jux(slow(2))", "s(\"bd sd\").every(2, rev)", "s(\"bd sd\").every(2, fast(2))",
+    "s(\"bd sd\").every(2, slow(2))",
     // valid — Step 6 widening: comma stack layers (notation-level stack)
-    "s(\"bd, hh\")", "s(\"bd sd, hh hh\")", "s(\"[bd, hh] sd\")",
-    "note(\"60, 64\")", "s(\"bd, sd, hh\")",
+     "s(\"bd, hh\")", "s(\"bd sd, hh hh\")", "s(\"[bd, hh] sd\")", "note(\"60, 64\")",
+    "s(\"bd, sd, hh\")",
     // valid — Step 6 widening: stack(...) roots
-    "stack(s(\"bd\"), note(\"60\"))",
-    "stack(s(\"bd\").fast(2), note(\"60\").rev())",
+     "stack(s(\"bd\"), note(\"60\"))", "stack(s(\"bd\").fast(2), note(\"60\").rev())",
     "stack(s(\"bd\"), s(\"sd\"), s(\"hh\"))",
     // valid — Step 6 widening: multiline `$:` stack programs
-    "$: s(\"bd\")\n$: note(\"60\")",
-    "$: s(\"bd sd\").jux(rev)\n$: note(\"60 64\").every(2, fast(2))",
+     "$: s(\"bd\")\n$: note(\"60\")", "$: s(\"bd sd\").jux(rev)\n$: note(\"60 64\").every(2, fast(2))",
     "$: s(\"bd sd\").fast(2)\n$: s(\"hh hh\")\n$: note(\"60\")",
     // valid — Step 6 widening: negative/decimal note atoms
-    "note(\"-12 60\")", "note(\"60.5 61.25\")", "note(\"-0.5\")",
+     "note(\"-12 60\")", "note(\"60.5 61.25\")", "note(\"-0.5\")",
     // valid — Step 6 widening: postfix combinations + position-seeded degrade
-    "s(\"bd(3,8)*2 sd\")", "s(\"bd(3,8)? sd\")", "s(\"bd*2? sd\")",
-    "s(\"bd?/2 sd\")", "s(\"bd? sd? hh?\")", "s(\"[bd sd?]? hh\")",
-    "s(\"[bd? sd]*2 hh\")",
+     "s(\"bd(3,8)*2 sd\")", "s(\"bd(3,8)? sd\")", "s(\"bd*2? sd\")", "s(\"bd?/2 sd\")",
+    "s(\"bd? sd? hh?\")", "s(\"[bd sd?]? hh\")", "s(\"[bd? sd]*2 hh\")",
     // valid — Step 6 widening: nested sub-notation + whitespace probes
-    "s(\"[[bd sd] hh] cp\")", "s(\"[bd [sd hh]] cp\")",
-    "s(\"bd( 3 , 8 ) sd\")", "s(\"bd\tsd\")",
+     "s(\"[[bd sd] hh] cp\")", "s(\"[bd [sd hh]] cp\")", "s(\"bd( 3 , 8 ) sd\")",
+    "s(\"bd\tsd\")",
     // valid — Step 6 widening: repeated/overriding control methods
-    "s(\"bd\").fast(2).fast(2)", "s(\"bd\").gain(0.5).gain(0.7)",
-    "s(\"bd sd\").every(3, rev)", "s(\"bd sd hh sd\").fast(4)",
-    "s(\"bd sd\").slow(8)",
+     "s(\"bd\").fast(2).fast(2)", "s(\"bd\").gain(0.5).gain(0.7)", "s(\"bd sd\").every(3, rev)",
+    "s(\"bd sd hh sd\").fast(4)", "s(\"bd sd\").slow(8)",
     // malformed — runner asserts both parsers AGREE on rejection
     // (`fast(slow(2))` sat in the valid section since Piece 1, but patterned
     // tempo arguments are rejected by BOTH parsers — the Step 13 matrix's
     // pinned ok/err split surfaced the mislabel)
-    "s(\"bd\").fast(slow(2))",
-    "s(\"[bd\")", "s(\"bd sd\").jux(fast(2)", "s(\"bd\").gain(0.5).pan(-0.25",
+     "s(\"bd\").fast(slow(2))", "s(\"[bd\")", "s(\"bd sd\").jux(fast(2)", "s(\"bd\").gain(0.5).pan(-0.25",
     // malformed — Step 6 widening
-    "s(\"xyz\")", "s(\"\")", "note(\"bd\")", "s(\"2bd\")", "s(\"bd*0 sd\")",
-    "s(\"bd/0 sd\")", "s(\"bd*-1 sd\")", "s(\"bd(3) sd\")", "s(\"bd(3,8 sd\")",
-    "s(\"bd,\")", "stack()", "stack(s(\"bd\")",
-    "$: s(\"bd\") $: note(\"60\")", "s(\"bd\").unknown(1)",
+     "s(\"xyz\")", "s(\"\")", "note(\"bd\")", "s(\"2bd\")", "s(\"bd*0 sd\")", "s(\"bd/0 sd\")",
+    "s(\"bd*-1 sd\")", "s(\"bd(3) sd\")", "s(\"bd(3,8 sd\")", "s(\"bd,\")", "stack()",
+    "stack(s(\"bd\")", "$: s(\"bd\") $: note(\"60\")", "s(\"bd\").unknown(1)",
   ]
 }
 
@@ -2434,15 +2094,20 @@ test "panic phase2 piece1 value parity catches control-only divergence" {
       let bumped : Map[String, Double] = {}
       e.control.each(fn(k, v) { bumped[k] = v })
       bumped["__divergence__"] = 1.0
-      perturbed.push({ id: e.id, control: bumped, whole: e.whole, part: e.part })
+      perturbed.push({
+        id: e.id,
+        control: bumped,
+        whole: e.whole,
+        part: e.part,
+      })
     } else {
       perturbed.push(e)
     }
   }
   // Divergence is value-only: id sequences still match, so the id-only check
   // would pass (this must NOT abort) ...
-  let base_ids = [for e in base => e.id]
-  let perturbed_ids = [for e in perturbed => e.id]
+  let base_ids = [ for e in base => e.id ]
+  let perturbed_ids = [ for e in perturbed => e.id ]
   projection_boundary_assert_ids_equal(base_ids, perturbed_ids)
   // ... but the value-level helper MUST abort on the control delta:
   projection_boundary_assert_value_events_equal(base, perturbed)

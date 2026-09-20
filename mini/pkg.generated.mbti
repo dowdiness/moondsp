@@ -5,6 +5,7 @@ import {
   "dowdiness/moondsp/identity",
   "dowdiness/moondsp/pattern",
   "dowdiness/moondsp/song",
+  "moonbitlang/core/debug",
 }
 
 // Values
@@ -23,26 +24,65 @@ pub fn parse_song(String) -> Result[@song.Song[@pattern.ControlMap], String]
 pub fn parse_song_with_bpm(String) -> Result[ParsedSong, String]
 
 // Errors
+pub(all) suberror DraftEditError {
+  WrongBase
+  InvalidEdit(String)
+  IdentityExhausted
+  Disposed
+} derive(Eq, @debug.Debug)
 
 // Types and methods
-pub struct MiniAuthoringPipeline {
+pub struct Draft {
   // private fields
 }
-pub fn MiniAuthoringPipeline::accepted_doc(Self) -> @pattern.PatternDoc[@pattern.ControlMap]?
-pub fn MiniAuthoringPipeline::authoring_token_count(Self) -> Int
-pub fn MiniAuthoringPipeline::dispose(Self) -> Unit
-pub fn MiniAuthoringPipeline::input(Self) -> String
-pub fn MiniAuthoringPipeline::lowering_cache_entries(Self) -> Int
-pub fn MiniAuthoringPipeline::lowering_cache_hits(Self) -> Int
-pub fn MiniAuthoringPipeline::lowering_cache_misses(Self) -> Int
-pub fn MiniAuthoringPipeline::new(String) -> Self
-pub fn MiniAuthoringPipeline::parse_compute_count(Self) -> Int
-pub fn MiniAuthoringPipeline::parse_doc(Self) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
-pub fn MiniAuthoringPipeline::parse_snapshot(Self) -> Result[@pattern.PatternSnapshot[@pattern.ControlMap], String]
-pub fn MiniAuthoringPipeline::reset_lowering_stats(Self) -> Unit
-pub fn MiniAuthoringPipeline::set_input(Self, String) -> Unit
-pub fn MiniAuthoringPipeline::set_input_with_source_edit(Self, String, old_start~ : Int, old_end~ : Int, new_end~ : Int) -> Unit
-pub fn MiniAuthoringPipeline::snapshot_compute_count(Self) -> Int
+pub fn Draft::dispose(Self) -> Unit
+pub fn Draft::edit(Self, EditTransaction) -> Result[DraftState, DraftEditError]
+pub fn Draft::locate_origin(Self, @pattern.EventOrigin) -> OriginLocation
+pub fn Draft::new(String) -> Self raise DraftEditError
+pub fn Draft::prepare_playback(Self) -> Result[PlaybackInput, DraftDiagnostic]
+pub fn Draft::reset(Self, String) -> Result[DraftState, DraftEditError]
+pub fn Draft::state(Self) -> DraftState
+
+pub struct DraftDiagnostic {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn DraftDiagnostic::kind(Self) -> DraftDiagnosticKind
+pub fn DraftDiagnostic::message(Self) -> String
+pub fn DraftDiagnostic::version(Self) -> DraftVersion
+
+pub(all) enum DraftDiagnosticKind {
+  Syntax
+  TrackingUnavailable
+  CompilerContract
+  Disposed
+} derive(Eq, @debug.Debug)
+
+pub struct DraftState {
+  // private fields
+}
+pub fn DraftState::diagnostic(Self) -> DraftDiagnostic?
+pub fn DraftState::text(Self) -> String
+pub fn DraftState::tracking(Self) -> DraftTracking
+pub fn DraftState::version(Self) -> DraftVersion
+
+pub(all) enum DraftTracking {
+  Pattern
+  Song
+  TrackingUnavailable
+  Disposed
+} derive(Eq, @debug.Debug)
+
+pub struct DraftVersion {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn DraftVersion::equal(Self, Self) -> Bool
+pub fn DraftVersion::not_equal(Self, Self) -> Bool
+pub fn DraftVersion::to_repr(Self) -> @debug.Repr
+
+pub struct EditTransaction {
+  // private fields
+}
+pub fn EditTransaction::EditTransaction(base~ : DraftVersion, edits~ : Array[TextEdit]) -> Self
 
 pub struct MiniDocBuilder {
   // private fields
@@ -58,6 +98,17 @@ pub fn MiniDocBuilder::slow(Self, @pattern.PatternDoc[@pattern.ControlMap], @pat
 pub fn MiniDocBuilder::sound_atom(Self, @identity.PatternNodeId, String) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
 pub fn MiniDocBuilder::stack(Self, Array[@pattern.PatternDoc[@pattern.ControlMap]]) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
 pub fn MiniDocBuilder::with_previous(@pattern.PatternDoc[@pattern.ControlMap]?) -> Self
+
+pub(all) enum OriginLocation {
+  Located(SourceRange, Array[SourceRange])
+  Unavailable(OriginUnavailable)
+} derive(Eq, @debug.Debug)
+
+pub(all) enum OriginUnavailable {
+  SourceReset
+  AtomRetired
+  BrokenReference
+} derive(Eq, @debug.Debug)
 
 pub struct ParsedSong {
   song : @song.Song[@pattern.ControlMap]
@@ -76,6 +127,33 @@ pub struct PlaySource {
 }
 pub fn PlaySource::body(Self) -> PlayBody
 pub fn PlaySource::bpm(Self) -> Double
+
+pub struct PlaybackInput {
+  // private fields
+}
+pub fn PlaybackInput::compile(Self) -> Result[PreparedPlayback, String]
+pub fn PlaybackInput::source(Self) -> String
+pub fn PlaybackInput::text(String) -> Self
+pub fn PlaybackInput::version(Self) -> DraftVersion?
+
+pub(all) enum PreparedPlayback {
+  Pattern(@pattern.PatternSnapshotWithOrigins[@pattern.ControlMap], Double)
+  Runtime(PlaySource)
+}
+
+pub struct SourceRange {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn SourceRange::end(Self) -> Int
+pub fn SourceRange::equal(Self, Self) -> Bool
+pub fn SourceRange::not_equal(Self, Self) -> Bool
+pub fn SourceRange::start(Self) -> Int
+pub fn SourceRange::to_repr(Self) -> @debug.Repr
+
+pub struct TextEdit {
+  // private fields
+}
+pub fn TextEdit::TextEdit(from~ : Int, to~ : Int, inserted~ : String) -> Self
 
 // Type aliases
 

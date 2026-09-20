@@ -186,19 +186,29 @@ fn Pat::jux_known(
   f : (Pat[ControlMap]) -> Pat[ControlMap],
   signature : String,
 ) -> Pat[ControlMap] {
-  if signature != "" && self.body is Silence {
-    return self
+  jux_kernel(self, f, (value, pan) => merge_maps(value, pan), signature)
+}
+
+///|
+fn[A] jux_kernel(
+  pat : Pat[A],
+  f : (Pat[A]) -> Pat[A],
+  merge : (A, ControlMap) -> A,
+  signature : String,
+) -> Pat[A] {
+  if signature != "" && pat.body is Silence {
+    return pat
   }
-  let left = merge_control(self, s_pan(-1.0))
-  let right = merge_control(f(self), s_pan(1.0))
+  let left = merge_control_kernel(pat, s_pan(-1.0), merge)
+  let right = merge_control_kernel(f(pat), s_pan(1.0), merge)
   let combined = stack([left, right])
   make_pat(
     combined.query,
-    self.metadata.period,
+    pat.metadata.period,
     Opaque([]),
-    self.metadata.scope,
+    pat.metadata.scope,
     transformed_signature(
-      self.entry_signature(),
+      pat.entry_signature(),
       if signature == "" {
         ""
       } else {
@@ -214,16 +224,17 @@ fn merge_maps(a : ControlMap, b : ControlMap) -> ControlMap {
 }
 
 ///|
-/// Merge controls: for each event in pattern a, merge all overlapping b events.
-pub fn merge_control(
-  a : Pat[ControlMap],
-  b : Pat[ControlMap],
-) -> Pat[ControlMap] {
+/// Merge overlapping right-hand payloads into each left-hand event.
+fn[A, B] merge_control_kernel(
+  a : Pat[A],
+  b : Pat[B],
+  merge : (A, B) -> A,
+) -> Pat[A] {
   if a.body is Silence {
     return a
   }
   let left = a
-  let children = a.transform_children(p => merge_control(p, b))
+  let children = a.transform_children(p => merge_control_kernel(p, b, merge))
   let change = if b.entry_signature() == "" {
     ""
   } else {
@@ -237,7 +248,7 @@ pub fn merge_control(
       .map(ae => {
         let merged = b_events.fold(init=ae.value, (merged, be) => {
           if ae.part.intersect(be.part) is Some(_) {
-            merge_maps(merged, be.value)
+            merge(merged, be.value)
           } else {
             merged
           }
@@ -250,6 +261,15 @@ pub fn merge_control(
     a.metadata.scope,
     transformed_signature(a.entry_signature(), change),
   )
+}
+
+///|
+/// Merge controls: for each event in pattern a, merge all overlapping b events.
+pub fn merge_control(
+  a : Pat[ControlMap],
+  b : Pat[ControlMap],
+) -> Pat[ControlMap] {
+  merge_control_kernel(a, b, merge_maps)
 }
 
 ///|
@@ -272,19 +292,29 @@ pub fn Pat::select_control(
   key : String,
   value? : Double,
 ) -> Pat[ControlMap] {
+  select_control_kernel(self, cm => cm, key, value)
+}
+
+///|
+fn[A] select_control_kernel(
+  pat : Pat[A],
+  controls : (A) -> ControlMap,
+  key : String,
+  value : Double?,
+) -> Pat[A] {
   let condition = match value {
     Some(v) => "equals:\{v}"
     None => "present"
   }
-  self.filter_map_known(
-    cm => {
-      match cm.get(key) {
+  pat.filter_map_payload(
+    payload => {
+      match controls(payload).get(key) {
         None => None
         Some(v) =>
           if value is Some(expected) && v != expected {
             None
           } else {
-            Some(cm)
+            Some(payload)
           }
       }
     },

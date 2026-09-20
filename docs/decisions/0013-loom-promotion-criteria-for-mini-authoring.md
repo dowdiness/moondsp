@@ -11,6 +11,13 @@
   PR #85 apply-edit parity evidence and PR #91–#112 projection, parity,
   recovery, and identity-helper work
 
+**Authoring update (2026-09-20):** the pipeline, token-ID, accepted-channel, and
+lowering-cache ownership described below are historical. The
+[Draft contract](../plans/2026-09-09-playback-position-ui.md) supersedes that
+production owner. Promotion still requires independent evidence; compare
+musical output and causal lifetime behavior, not Loom/Draft ID-string equality.
+No Loom authoring promotion follows from this cutover.
+
 ## Context
 
 ADR-0004 chose the hand-written mini parser because Phase 5 needed parsing

@@ -5,6 +5,11 @@
 - **Source:** [`docs/superpowers/specs/archive/2026-04-15-phase5-text-pattern-design.md`](../superpowers/specs/archive/2026-04-15-phase5-text-pattern-design.md)
   §2 ("Risk: loom wasm-gc compatibility")
 
+**Authoring update (2026-09-20):** the file map below records the earlier owner.
+`incr_authoring.mbt` and `tokens.mbt` have been replaced by the
+[Draft causal owner](../plans/2026-09-09-playback-position-ui.md), which reuses
+the hand-written grammar. This does not promote the Loom spike.
+
 ## Context
 
 Phase 5 needed a mini-notation parser to take a TidalCycles-style pattern

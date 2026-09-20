@@ -58,8 +58,7 @@ fn assert_song_parity(input : String) -> Unit {
   let loom_result = loom_mini_parse_song(input)
   let oracle_result = @mini.parse_song_with_bpm(input)
   match (loom_result, oracle_result) {
-    (Ok(loom), Ok(oracle)) =>
-      assert_song_parity_equal(input, loom, oracle)
+    (Ok(loom), Ok(oracle)) => assert_song_parity_equal(input, loom, oracle)
     (Err(_), Err(_)) => ()
     (Ok(_), Err(msg)) =>
       abort("input '\{input}': loom accepted but oracle rejected (\{msg})")
@@ -167,19 +166,19 @@ fn song_parity_valid_corpus() -> Array[String] {
     // implicit parts across two sections
     "song(section(\"intro\",1,s(\"bd\")),section(\"verse\",2,note(\"60\")),part(\"intro1\",\"intro\"),part(\"verse1\",\"verse\"))",
     // bpm metadata
-    "song(bpm(72),section(\"intro\",1,s(\"bd\")),part(\"intro1\",\"intro\"))",
+     "song(bpm(72),section(\"intro\",1,s(\"bd\")),part(\"intro1\",\"intro\"))",
     // multiline whitespace + notation newlines + method chains
-    multiline,
+     multiline,
     // explicit rational starts and gaps
-    "song(section(\"a\",1,s(\"bd\")),section(\"b\",1,s(\"sd\")),part(\"a1\",\"a\"),part(\"b1\",\"b\",3/2))",
+     "song(section(\"a\",1,s(\"bd\")),section(\"b\",1,s(\"sd\")),part(\"a1\",\"a\"),part(\"b1\",\"b\",3/2))",
     // authoring order preserved for explicit overlaps
-    "song(section(\"late\",2,s(\"bd\")),section(\"early\",2,s(\"sd\")),part(\"late1\",\"late\",1),part(\"early1\",\"early\",0))",
+     "song(section(\"late\",2,s(\"bd\")),section(\"early\",2,s(\"sd\")),part(\"late1\",\"late\",1),part(\"early1\",\"early\",0))",
     // boundary fill directive
-    "song(section(\"a\",1,s(\"bd\")),section(\"b\",1,s(\"sd\")),section(\"fill\",1,s(\"hh\")),part(\"a1\",\"a\"),part(\"b1\",\"b\",3),fill(\"fill\",\"fill\"))",
+     "song(section(\"a\",1,s(\"bd\")),section(\"b\",1,s(\"sd\")),section(\"fill\",1,s(\"hh\")),part(\"a1\",\"a\"),part(\"b1\",\"b\",3),fill(\"fill\",\"fill\"))",
     // explicit occurrence id (with ':') and display name (with ' ')
-    "song(section(\"verse\",1,s(\"bd\")),part_id(\"verse:1\",\"Verse 1\",\"verse\"))",
+     "song(section(\"verse\",1,s(\"bd\")),part_id(\"verse:1\",\"Verse 1\",\"verse\"))",
     // control method on a section body
-    "song(section(\"a\",1,s(\"bd\").gain(0.5)),part(\"a1\",\"a\"))",
+     "song(section(\"a\",1,s(\"bd\").gain(0.5)),part(\"a1\",\"a\"))",
   ]
 }
 
@@ -189,28 +188,27 @@ fn song_parity_malformed_corpus() -> Array[String] {
     // unknown section reference
     "song(part(\"a1\",\"missing\"))",
     // empty song()
-    "song()",
+     "song()",
     // duplicate section name
-    "song(section(\"a\",1,s(\"bd\")),section(\"a\",1,s(\"sd\")),part(\"a1\",\"a\"))",
+     "song(section(\"a\",1,s(\"bd\")),section(\"a\",1,s(\"sd\")),part(\"a1\",\"a\"))",
     // duplicate bpm
-    "song(bpm(72),bpm(80),section(\"a\",1,s(\"bd\")),part(\"a1\",\"a\"))",
+     "song(bpm(72),bpm(80),section(\"a\",1,s(\"bd\")),part(\"a1\",\"a\"))",
     // non-positive bpm
-    "song(bpm(-1),section(\"a\",1,s(\"bd\")),part(\"a1\",\"a\"))",
+     "song(bpm(-1),section(\"a\",1,s(\"bd\")),part(\"a1\",\"a\"))",
     // non-positive section length
-    "song(section(\"a\",0,s(\"bd\")),part(\"a1\",\"a\"))",
+     "song(section(\"a\",0,s(\"bd\")),part(\"a1\",\"a\"))",
     // empty occurrence id
-    "song(section(\"a\",1,s(\"bd\")),part_id(\"\",\"x\",\"a\"))",
+     "song(section(\"a\",1,s(\"bd\")),part_id(\"\",\"x\",\"a\"))",
     // duplicate occurrence name
-    "song(section(\"a\",1,s(\"bd\")),part(\"x\",\"a\"),part(\"x\",\"a\"))",
+     "song(section(\"a\",1,s(\"bd\")),part(\"x\",\"a\"),part(\"x\",\"a\"))",
     // trailing input after song()
-    "song(section(\"a\",1,s(\"bd\")),part(\"a1\",\"a\")) extra",
+     "song(section(\"a\",1,s(\"bd\")),part(\"a1\",\"a\")) extra",
     // missing close paren
-    "song(section(\"a\",1,s(\"bd\")),part(\"a1\",\"a\")",
+     "song(section(\"a\",1,s(\"bd\")),part(\"a1\",\"a\")",
     // unknown item keyword
-    "song(verse(\"a\",1,s(\"bd\")))",
+     "song(verse(\"a\",1,s(\"bd\")))",
     // whitespace before keyword paren (oracle match_keyword is contiguous)
-    "song (section(\"a\",1,s(\"bd\")),part(\"a1\",\"a\"))",
-    "song(section (\"a\",1,s(\"bd\")),part(\"a1\",\"a\"))",
+     "song (section(\"a\",1,s(\"bd\")),part(\"a1\",\"a\"))", "song(section (\"a\",1,s(\"bd\")),part(\"a1\",\"a\"))",
   ]
 }
 

@@ -4,6 +4,12 @@
 - **Date:** 2026-05-21
 - **Source:** Phase 6+ mini notation editing reliability spike
 
+**Authoring update (2026-09-20):** references below to the former pipeline and
+token realignment describe historical evaluation evidence. Production now uses
+the [Draft contract](../plans/2026-09-09-playback-position-ui.md). Loom graph IDs
+and Draft source IDs are separate; future comparison must verify musical output
+and each owner's lifetimes, not cross-owner ID-string equality.
+
 ## Context
 
 ADR-0004 chose the hand-written mini parser because Phase 5 needed runtime

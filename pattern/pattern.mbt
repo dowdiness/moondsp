@@ -51,15 +51,37 @@ fn[A] make_pat(
 }
 
 ///|
-fn[A] Pat::transform_children(
+fn[A, B] Pat::transform_children(
   self : Pat[A],
-  f : (Pat[A]) -> Pat[A],
-) -> Array[Pat[A]] {
+  f : (Pat[A]) -> Pat[B],
+) -> Array[Pat[B]] {
   match self.body {
     Silence => []
     Opaque(children) => children.map(f)
     Overlay(children) => children.map(f)
   }
+}
+
+///|
+/// Map event payloads without changing query spans or authored metadata.
+/// Child bodies are mapped recursively while preserving their shape.
+fn[A, B] Pat::map_payload(self : Pat[A], f : (A) -> B) -> Pat[B] {
+  let body : PatBody[B] = match self.body {
+    Silence => Silence
+    Opaque(children) => Opaque(children.map(child => child.map_payload(f)))
+    Overlay(children) => Overlay(children.map(child => child.map_payload(f)))
+  }
+  make_pat(
+    fn(arc) {
+      self
+      .query(arc)
+      .map(ev => { whole: ev.whole, part: ev.part, value: f(ev.value), })
+    },
+    self.metadata.period,
+    body,
+    self.metadata.scope,
+    self.metadata.content,
+  )
 }
 
 ///|

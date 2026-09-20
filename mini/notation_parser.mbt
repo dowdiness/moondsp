@@ -44,6 +44,8 @@ priv struct NotationParser {
   chord : Bool // true = chord names (stacked notes per name)
   source_offset : Int
   mut query_work : MiniQueryWork?
+  recognized_atoms : Array[RecognizedAtom]?
+  mut depth : Int
 }
 
 ///|
@@ -54,6 +56,7 @@ fn NotationParser::NotationParser(
   chord? : Bool = false,
   source_offset? : Int = 0,
   assess? : Bool = false,
+  recognized_atoms? : Array[RecognizedAtom]? = None,
 ) -> NotationParser {
   {
     input,
@@ -61,6 +64,8 @@ fn NotationParser::NotationParser(
     sound,
     chord,
     source_offset,
+    recognized_atoms,
+    depth: 0,
     query_work: if assess {
       Some(Atom)
     } else {
@@ -164,13 +169,18 @@ fn NotationParser::parse_layer(
 fn NotationParser::parse_element(
   self : NotationParser,
 ) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
+  guard self.recognized_atoms is None || self.depth < 32 else {
+    raise ParseError("source exceeds notation nesting depth 32")
+  }
   self.skip_spaces()
   guard !self.at_end() else {
     raise ParseError("position \{self.pos}: unexpected end of notation")
   }
   let base = if self.input[self.pos] == '[' {
     self.pos += 1 // consume '['
+    self.depth += 1
     let inner = self.parse_notation()
+    self.depth -= 1
     guard !self.at_end() && self.input[self.pos] == ']' else {
       raise ParseError("position \{self.pos}: expected ']'")
     }
@@ -368,6 +378,40 @@ fn NotationParser::read_int_signed(
 /// Parse an atom: `~` for a rest; otherwise an identifier in sound mode, a
 /// number or note name in note mode, or a chord name in chord mode.
 fn NotationParser::parse_atom(
+  self : NotationParser,
+) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
+  let start = self.pos
+  let pat = self.parse_atom_value()
+  if self.recognized_atoms is Some(atoms) && self.input[start] != '~' {
+    let complete = self.at_end() ||
+      mini_is_space(self.input[self.pos]) ||
+      (match self.input[self.pos] {
+        ',' | ']' | '(' | '*' | '/' | '?' => true
+        _ => false
+      })
+    if complete {
+      atoms.push(
+        RecognizedAtom(
+          if self.sound {
+            "sound"
+          } else if self.chord {
+            "chord"
+          } else {
+            "note"
+          },
+          {
+            start: self.source_offset + start,
+            end: self.source_offset + self.pos,
+          },
+        ),
+      )
+    }
+  }
+  pat
+}
+
+///|
+fn NotationParser::parse_atom_value(
   self : NotationParser,
 ) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
   let start = self.pos

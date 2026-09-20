@@ -19,38 +19,6 @@ test "references retain distinct use-site paths into the same definition" {
 }
 
 ///|
-test "playback and provenance reuse one compiled shared definition" {
-  let compilations = Ref(0)
-  let definition = PatternDoc::pure(
-    id=pid("note"),
-    value=ControlMap::single("note", 60.0),
-  ).jux(id=pid("stereo"), f=fn(pat) {
-    // Observe construction, without changing the transformation's result.
-    compilations.val += 1
-    pat.rev()
-  })
-  let doc = PatternDoc::stack(id=pid("mix"), docs=[
-    PatternDoc::reference(id=pid("left"), definition~),
-    PatternDoc::reference(id=pid("right"), definition~),
-  ])
-  let cache : PatternLoweringCache[ControlMap] = PatternLoweringCache::new()
-  for _ in 0..<2 {
-    let snapshot = doc.lower_with_cache(cache)
-    let span = doc_span(0, 1, 1, 1)
-    let raw = snapshot.query(span)
-    let sourced = snapshot
-      .query_sourced_events(span)
-      .map(event => event.event())
-    @debug.assert_eq(raw.length(), 4)
-    @debug.assert_eq(
-      sourced.map(event => (event.whole, event.part, event.value.entries())),
-      raw.map(event => (event.whole, event.part, event.value.entries())),
-    )
-    @debug.assert_eq(compilations.val, 1)
-  }
-}
-
-///|
 test "references to divergent definition revisions never share stale values" {
   let original = PatternDoc::pure(id=pid("note"), value=60).slow(
     id=pid("phrase"),

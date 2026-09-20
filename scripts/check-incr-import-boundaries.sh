@@ -9,7 +9,7 @@
 # Additions must update this script together with the design rationale.
 #
 # See docs/decisions/0001-layered-package-architecture.md and
-# docs/decisions/0011-incr-backed-mini-authoring-pipeline.md.
+# docs/plans/2026-09-09-playback-position-ui.md.
 
 set -euo pipefail
 
@@ -24,9 +24,7 @@ declare -A VOCABULARY_ONLY_PACKAGES=(
 # Packages allowed to import the full dowdiness/incr facade. Each entry must name
 # the ADR/design note that justifies owning Scope/Input/Derived/Watch runtime
 # cells instead of only importing dowdiness/incr/types.
-declare -A FULL_FACADE_CARVEOUTS=(
-  ["mini/moon.pkg"]="ADR-0011: MiniAuthoringPipeline owns incr Scope, Input, Derived, AcceptedDerived, and Watch cells."
-)
+declare -A FULL_FACADE_CARVEOUTS=()
 
 manifest_imports() {
   local manifest=$1
@@ -44,7 +42,7 @@ manifest_imports() {
 
 production_manifests() {
   find . \
-    \( -path './.git' -o -path './.mooncakes' -o -path './_build' -o -path './.worktrees' -o -path './specs' -o -path './node_modules' \) -prune \
+    \( -path './.git' -o -path './.mooncakes' -o -path './_build' -o -path './.worktrees' -o -path './.claude' -o -path './specs' -o -path './node_modules' \) -prune \
     -o -name moon.pkg -type f -print \
     | sed 's#^./##' \
     | sort

@@ -104,22 +104,21 @@ fn assert_named_compiles_like(
 }
 
 ///|
-test "cached authoring sees definition edits through nested named groups" {
+test "Draft definition edits update nested named groups without stale playback" {
   let tail = "let group = stack(tone,tone.gain(0.2)); group.slow(3)"
-  let pipeline = @mini.MiniAuthoringPipeline::new(
-    "let tone = note(\"60\"); " + tail,
-  )
+  let prefix = "let tone = note(\""
+  let draft = @mini.Draft::new(prefix + "60\"); " + tail)
   let span = song_span(0L, 1L, 3L, 1L)
   for note in [60, 72, 67] {
-    pipeline.set_input("let tone = note(\"\{note}\"); " + tail)
-    let snapshot = unwrap_mini_snapshot(pipeline.parse_snapshot())
+    edit_draft(draft, prefix.length(), prefix.length() + 2, note.to_string())
+    let snapshot = draft_snapshot(draft)
     let inline = "stack(note(\"\{note}\"),note(\"\{note}\").gain(0.2)).slow(3)"
     assert_named_events(
-      snapshot.query(span),
+      snapshot.query(span).map(event => event.event()),
       unwrap_ok(@mini.parse(inline)).query(span),
     )
   }
-  pipeline.dispose()
+  draft.dispose()
 }
 
 ///|

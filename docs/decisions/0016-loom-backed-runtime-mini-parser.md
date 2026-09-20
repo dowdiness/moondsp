@@ -9,6 +9,12 @@
   and its merged evidence (PR #190, #192, #194), and the Phase 2 provenance
   notes (`specs/loom-mini-cst/docs/phase2-provenance-notes.md`).
 
+**Authoring update (2026-09-20):** mentions of `MiniAuthoringPipeline` below refer
+to the former owner. The current [Draft contract](../plans/2026-09-09-playback-position-ui.md)
+uses explicit causal transactions and frozen playback inputs with the existing
+grammar. This owner replacement is not a Loom parser promotion or browser
+transport change; the original runtime decision is retained below.
+
 ## Context
 
 ADR-0004 shipped the hand-written recursive-descent runtime parser because

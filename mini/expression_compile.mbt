@@ -1,10 +1,4 @@
 ///|
-fn MiniCallback::runtime(self : MiniCallback) -> Callback {
-  let operation = self.operation()
-  fn(pat) { operation.apply(pat) }
-}
-
-///|
 fn MiniCallback::signature(self : MiniCallback) -> String {
   match self {
     Fast(n) => "fast:\{n}"
@@ -23,6 +17,20 @@ fn MiniCallback::operation(self : MiniCallback) -> @pattern.TimeTransform {
 }
 
 ///|
+priv struct MiniDefinition[A] {
+  body : A
+  name_span : MiniSpan
+}
+
+///|
+fn[A] MiniDefinition::MiniDefinition(
+  body : A,
+  name_span : MiniSpan,
+) -> MiniDefinition[A] {
+  { body, name_span, }
+}
+
+///|
 priv struct ResolvedMiniExpr[A] {
   span : MiniSpan
   node : ResolvedMiniExprNode[A]
@@ -32,16 +40,14 @@ priv struct ResolvedMiniExpr[A] {
 priv enum ResolvedMiniExprNode[A] {
   Literal(MiniLiteral, String, Int)
   Stack(Array[ResolvedMiniExpr[A]])
-  Reference(String, A)
+  Reference(String, MiniDefinition[A])
   Apply(ResolvedMiniExpr[A], MiniTransform)
 }
 
 ///|
-/// Resolve only previously compiled declarations. References retain their values
-/// and use-site spans, so compilation needs no name table or definition bodies.
 fn[A] resolve_mini_expr(
   expr : MiniExpr,
-  definitions : Map[String, A],
+  definitions : Map[String, MiniDefinition[A]],
 ) -> ResolvedMiniExpr[A] raise ParseError {
   let node : ResolvedMiniExprNode[A] = match expr.node {
     Literal(kind, content, offset) => Literal(kind, content, offset)
@@ -50,9 +56,9 @@ fn[A] resolve_mini_expr(
     Apply(child, transform) =>
       Apply(resolve_mini_expr(child, definitions), transform)
     Reference(name) =>
-      match definitions.get(name) {
-        Some(definition) => Reference(name, definition)
-        None =>
+      match unique_definition(definitions.get(name).iter(), false) {
+        Ok(definition) => Reference(name, definition)
+        Err(_) =>
           raise ParseError(
             "position \{expr.span.start}: undefined pattern '\{name}'; define it before use",
           )
@@ -87,7 +93,7 @@ fn compile_mini_pattern(
       let pats = children.map(child => compile_mini_pattern(child))
       @pattern.stack(pats)
     }
-    Reference(name, pat) => pat.named_entry(name)
+    Reference(name, definition) => definition.body.named_entry(name)
     Apply(child, transform) => {
       let pat = compile_mini_pattern(child)
       match transform {
@@ -139,14 +145,20 @@ fn compile_mini_doc(
       }
     Stack(children) =>
       builder.stack_doc(children.map(child => compile_mini_doc(child, builder)))
-    Reference(name, doc) => {
+    Reference(name, definition) => {
       let id = builder.atom_id_at(
         "binding",
         name,
         expr.span.start,
         expr.span.end,
       )
-      @pattern.PatternDoc::reference(id~, definition=doc)
+      builder.reference_doc(
+        id,
+        expr.span.start,
+        expr.span.end,
+        definition.name_span,
+        definition.body,
+      )
     }
     Apply(child, transform) => {
       let doc = compile_mini_doc(child, builder)

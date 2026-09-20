@@ -1,9 +1,13 @@
 # ADR-0017: Mini authoring AcceptedDerived adoption
 
-- **Status:** Accepted (2026-07-08, PR #227)
+- **Status:** Superseded by the [Draft contract](../plans/2026-09-09-playback-position-ui.md) (2026-09-20); originally accepted in PR #227.
 - **Date:** 2026-07-08
 - **Source:**
   [Mini authoring AcceptedDerived migration plan](../plans/2026-07-07-mini-authoring-accepted-derived-migration.md)
+
+The historical accepted-document channel below has been removed. Draft retains
+last-valid parser state privately; preparing immutable playback input does not
+accept playback or replace the current version's diagnostic.
 
 ## Context
 

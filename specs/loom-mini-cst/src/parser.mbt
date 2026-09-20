@@ -366,9 +366,7 @@ pub let mini_grammar : @loom.Grammar[MiniToken, MiniSyntaxKind, MiniAst] = @loom
 pub fn parse_cst(
   source : String,
 ) -> (@seam.CstNode, @core.DiagnosticSet) raise @core.LexError {
-  try {
-    mini_grammar.parse_cst(loom_mini_source_id("pattern"), source)
-  } catch {
+  mini_grammar.parse_cst(loom_mini_source_id("pattern"), source) catch {
     _ => raise @core.LexError("Loom Mini parser failed")
   }
 }
@@ -465,7 +463,9 @@ fn parse_song_item(
   ctx : @core.ParserContext[MiniToken, MiniSyntaxKind],
 ) -> Unit {
   if ctx.peek() != Ident {
-    ctx.error("Expected song item: section(...), bpm(...), part(...), part_id(...), or fill(...)")
+    ctx.error(
+      "Expected song item: section(...), bpm(...), part(...), part_id(...), or fill(...)",
+    )
     ctx.bump_error()
     return
   }
@@ -476,7 +476,9 @@ fn parse_song_item(
     "part" => parse_song_part_item(ctx)
     "fill" => parse_song_fill_item(ctx)
     _ => {
-      ctx.error("Expected song item: section(...), bpm(...), part(...), part_id(...), or fill(...)")
+      ctx.error(
+        "Expected song item: section(...), bpm(...), part(...), part_id(...), or fill(...)",
+      )
       ctx.bump_error()
     }
   }
@@ -626,9 +628,7 @@ fn expect_song_keyword(
 pub fn parse_song_cst(
   source : String,
 ) -> (@seam.CstNode, @core.DiagnosticSet) raise @core.LexError {
-  try {
-    song_grammar.parse_cst(loom_mini_source_id("song"), source)
-  } catch {
+  song_grammar.parse_cst(loom_mini_source_id("song"), source) catch {
     _ => raise @core.LexError("Loom Mini song parser failed")
   }
 }

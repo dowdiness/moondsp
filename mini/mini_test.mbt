@@ -167,36 +167,6 @@ fn assert_builder_result_error(
 }
 
 ///|
-fn assert_snapshot_event_has_node(
-  event : @pattern.PatternSnapshotEvent[@pattern.ControlMap],
-  id : String,
-) -> Unit {
-  let expected = pid(id)
-  for node in event.pattern_nodes() {
-    if node == expected {
-      return
-    }
-  }
-  abort("expected event to include pattern node \{id}")
-}
-
-///|
-fn snapshot_events_contain_node(
-  events : Array[@pattern.PatternSnapshotEvent[@pattern.ControlMap]],
-  id : String,
-) -> Unit {
-  let expected = pid(id)
-  for event in events {
-    for node in event.pattern_nodes() {
-      if node == expected {
-        return
-      }
-    }
-  }
-  abort("expected events to include pattern node \{id}")
-}
-
-///|
 test "parse single drum sound" {
   let pat = unwrap_ok(@mini.parse("s(\"bd\")"))
   let events = query_one_cycle(pat)
@@ -565,488 +535,554 @@ test "parse_doc_reusing insertion and removal keep surviving token ids" {
 }
 
 ///|
-test "MiniAuthoringPipeline reuses stable ids and lowering cache across text edits" {
-  let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd sd\")")
-  let doc = unwrap_doc(pipeline.parse_doc())
-  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
-  pipeline.reset_lowering_stats()
-  pipeline.set_input("s(\"  bd   sd  \")")
-  let edited = unwrap_doc(pipeline.parse_doc())
-  @debug.assert_eq(doc.root().value(), edited.root().value())
-  assert_true(edited.contains_node(pid("mini:sound:bd:0")))
-  assert_true(edited.contains_node(pid("mini:sound:sd:0")))
-  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
-  inspect(pipeline.lowering_cache_hits(), content="1")
-  inspect(pipeline.lowering_cache_misses(), content="0")
-}
-
-///|
-test "MiniAuthoringPipeline keeps last reusable doc after parse error" {
-  let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd sd\")")
-  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
-  pipeline.set_input("s(\"bd sd\"")
-  match pipeline.parse_doc() {
-    Ok(_) => abort("expected parse error")
-    Err(msg) =>
-      inspect(msg, content="position 9: expected ')', got end of input")
+fn draft_snapshot(
+  draft : @mini.Draft,
+) -> @pattern.PatternSnapshotWithOrigins[@pattern.ControlMap] raise {
+  let input = match draft.prepare_playback() {
+    Ok(input) => input
+    Err(error) => fail(error.message())
   }
-  pipeline.reset_lowering_stats()
-  pipeline.set_input("s(\"  bd   sd  \")")
-  let recovered = unwrap_doc(pipeline.parse_doc())
-  assert_true(recovered.contains_node(pid("mini:sound:bd:0")))
-  assert_true(recovered.contains_node(pid("mini:sound:sd:0")))
-  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
-  inspect(pipeline.lowering_cache_hits(), content="1")
-  inspect(pipeline.lowering_cache_misses(), content="0")
-}
-
-///|
-/// The accepted doc's full revision, or `None` when nothing is accepted.
-fn last_good_accepted_revision(
-  pipeline : @mini.MiniAuthoringPipeline,
-) -> @identity.Revision? {
-  pipeline.accepted_doc().map(doc => doc.revision())
-}
-
-///|
-test "MiniAuthoringPipeline accepted_doc retains last good across parse error" {
-  let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd sd\")")
-  let first_rev = unwrap_doc(pipeline.parse_doc()).revision()
-  guard last_good_accepted_revision(pipeline) == Some(first_rev) else {
-    abort("expected accepted doc to capture the first good parse")
+  match input.compile() {
+    Ok(@mini.PreparedPlayback::Pattern(snapshot, _)) => snapshot
+    Ok(_) => fail("expected exact pattern")
+    Err(message) => fail(message)
   }
-  // Parse error: current channel fails, accepted channel retains last good.
-  pipeline.set_input("s(\"bd sd")
-  guard pipeline.parse_doc() is Err(_) else {
-    abort("expected malformed source to fail the current parse")
-  }
-  guard last_good_accepted_revision(pipeline) == Some(first_rev) else {
-    abort("expected accepted doc to retain last good on parse error")
-  }
-  // Recovery to content-distinct valid source: accepted advances.
-  pipeline.set_input("s(\"bd sd hh\")")
-  let recovered_rev = unwrap_doc(pipeline.parse_doc()).revision()
-  // Pin the premise: recovered and first revisions collide on value
-  // but differ by fingerprint. Without this guard, a value-only predicate
-  // would wrongly treat the two as equal.
-  guard recovered_rev.value() == first_rev.value() else {
-    abort("expected recovered and first revisions to collide on value")
-  }
-  guard recovered_rev != first_rev else {
-    abort("expected recovered and first revisions to differ by fingerprint")
-  }
-  guard last_good_accepted_revision(pipeline) == Some(recovered_rev) else {
-    abort("expected accepted doc to advance to the recovered doc")
-  }
-  pipeline.dispose()
 }
 
 ///|
-test "MiniAuthoringPipeline accepted_doc is None before any successful parse" {
-  let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd sd")
-  guard pipeline.parse_doc() is Err(_) else {
-    abort("expected malformed initial source to fail the first parse")
-  }
-  guard pipeline.accepted_doc() is None else {
-    abort("expected accepted_doc to be None before any successful parse")
-  }
-  pipeline.dispose()
-}
-
-///|
-test "MiniAuthoringPipeline exposes whole-document recomputation counts" {
-  let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd sd\")")
-  inspect(
-    pipeline.parse_compute_count(),
-    content=(
-      #|1
-    ),
-  )
-  inspect(pipeline.snapshot_compute_count(), content="0")
-  ignore(unwrap_doc(pipeline.parse_doc()))
-  inspect(pipeline.parse_compute_count(), content="1")
-  inspect(pipeline.snapshot_compute_count(), content="0")
-  ignore(unwrap_doc(pipeline.parse_doc()))
-  inspect(pipeline.parse_compute_count(), content="1")
-  pipeline.set_input("s(\"bd sd\")")
-  ignore(unwrap_doc(pipeline.parse_doc()))
-  inspect(pipeline.parse_compute_count(), content="1")
-  pipeline.set_input("s(\"  bd sd\")")
-  ignore(unwrap_doc(pipeline.parse_doc()))
-  inspect(pipeline.parse_compute_count(), content="2")
-  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
-  inspect(pipeline.snapshot_compute_count(), content="1")
-}
-
-///|
-test "MiniAuthoringPipeline token replacement reuses unaffected lowered subtrees" {
-  let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd sd hh oh\")")
-  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
-  pipeline.reset_lowering_stats()
-  pipeline.set_input("s(\"bd cp hh oh\")")
-  let edited = unwrap_doc(pipeline.parse_doc())
-  assert_true(edited.contains_node(pid("mini:sound:bd:0")))
-  assert_true(!edited.contains_node(pid("mini:sound:sd:0")))
-  assert_true(edited.contains_node(pid("mini:sound:cp:0")))
-  assert_true(edited.contains_node(pid("mini:sound:hh:0")))
-  assert_true(edited.contains_node(pid("mini:sound:oh:0")))
-  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
-  assert_true(pipeline.lowering_cache_hits() >= 3)
-  assert_true(pipeline.lowering_cache_misses() >= 1)
-}
-
-///|
-test "MiniAuthoringPipeline tracks internal authoring token count" {
-  let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd sd\")")
-  inspect(pipeline.authoring_token_count(), content="7")
-  pipeline.set_input("s( \"  bd   sd  \" )")
-  inspect(pipeline.authoring_token_count(), content="7")
-  pipeline.set_input("s(\"hh bd sd\")")
-  inspect(pipeline.authoring_token_count(), content="8")
-}
-
-///|
-test "MiniAuthoringPipeline accepts source edit span updates" {
-  let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd bd bd\")")
-  inspect(pipeline.authoring_token_count(), content="8")
-  pipeline.set_input_with_source_edit(
-    "s(\"bd bd bd bd\")",
-    old_start=6,
-    old_end=6,
-    new_end=9,
-  )
-  inspect(pipeline.authoring_token_count(), content="9")
-  let edited = unwrap_doc(pipeline.parse_doc())
-  assert_true(edited.contains_node(pid("mini:sound:bd:0")))
-  assert_true(edited.contains_node(pid("mini:sound:bd:1")))
-  assert_true(edited.contains_node(pid("mini:sound:bd:2")))
-  assert_true(edited.contains_node(pid("mini:sound:bd:3")))
-}
-
-///|
-test "MiniAuthoringPipeline source edit preserves duplicate atom provenance" {
-  let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd sd bd\")")
-  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
-  pipeline.reset_lowering_stats()
-  pipeline.set_input_with_source_edit(
-    "s(\"bd sd bd bd\")",
-    old_start=9,
-    old_end=9,
-    new_end=12,
-  )
-  let snapshot = unwrap_mini_snapshot(pipeline.parse_snapshot())
-  assert_true(pipeline.lowering_cache_hits() >= 3)
-  let events = snapshot.query_sourced_events(
-    @pattern.TimeSpan::new(
-      @pattern.Rational::from_int(0),
-      @pattern.Rational::from_int(1),
-    ),
-  )
-  inspect(events.length(), content="4")
-  assert_snapshot_event_has_node(events[0], "mini:sound:bd:0")
-  assert_snapshot_event_has_node(events[1], "mini:sound:sd:0")
-  assert_snapshot_event_has_node(events[2], "mini:sound:bd:2")
-  assert_snapshot_event_has_node(events[3], "mini:sound:bd:1")
-}
-
-///|
-test "MiniAuthoringPipeline consecutive source-edit updates reuse stable identities" {
-  let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd sd bd\")")
-  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
-  let intermediate = "s(\"bd sd cp bd\")"
-  let final_state = "s(\"bd sd hh bd\")"
-  pipeline.set_input_with_source_edit(
-    intermediate,
-    old_start=8,
-    old_end=8,
-    new_end=11,
-  )
-  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
-  pipeline.set_input_with_source_edit(
-    final_state,
-    old_start=9,
-    old_end=11,
-    new_end=11,
-  )
-  let snapshot = unwrap_mini_snapshot(pipeline.parse_snapshot())
-  let events = snapshot.query_sourced_events(
-    @pattern.TimeSpan::new(
-      @pattern.Rational::from_int(0),
-      @pattern.Rational::from_int(1),
-    ),
-  )
-  inspect(events.length(), content="4")
-  snapshot_events_contain_node(events, "mini:sound:bd:0")
-  snapshot_events_contain_node(events, "mini:sound:hh:0")
-  snapshot_events_contain_node(events, "mini:sound:sd:0")
-  snapshot_events_contain_node(events, "mini:sound:bd:1")
-}
-
-///|
-test "MiniAuthoringPipeline recreated atom does not match retained snapshot origin" {
-  let original = "note(\"c3 e3\")"
-  let pipeline = @mini.MiniAuthoringPipeline::new(original)
-  let arc = @pattern.TimeSpan::new(
+fn draft_arc() -> @pattern.TimeSpan {
+  @pattern.TimeSpan::new(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
-  // Keep the old material's snapshot alive across both accepted edits.
-  let retained = unwrap_mini_snapshot(pipeline.parse_snapshot())
-  guard retained.query_sourced_events(arc) is [old_c3, old_e3] else {
-    fail("expected c3 and e3 in the retained snapshot")
-  }
-  pipeline.set_input_with_source_edit(
-    "note(\"e3\")",
-    old_start=6,
-    old_end=9,
-    new_end=6,
-  )
-  let deleted = unwrap_mini_snapshot(pipeline.parse_snapshot())
-  guard deleted.query_sourced_events(arc) is [surviving_e3] else {
-    fail("expected only e3 after deleting c3")
-  }
-  assert_eq(surviving_e3.event().value.get("note"), Some(52.0))
-  assert_eq(surviving_e3.pattern_node(), old_e3.pattern_node())
-  pipeline.set_input_with_source_edit(
-    original,
-    old_start=6,
-    old_end=6,
-    new_end=9,
-  )
-  let recreated = unwrap_mini_snapshot(pipeline.parse_snapshot())
-  pipeline.dispose()
-  guard recreated.query_sourced_events(arc) is [new_c3, new_e3] else {
-    fail("expected c3 and e3 after recreating c3")
-  }
-  assert_eq(new_c3.event().value.get("note"), Some(48.0))
-  assert_eq(new_e3.event().value.get("note"), Some(52.0))
-  assert_eq(new_e3.pattern_node(), old_e3.pattern_node())
-  guard retained.query_sourced_events(arc) is [retained_c3, retained_e3] else {
-    fail("expected the old material to retain both events")
-  }
-  assert_eq(retained_c3.pattern_node(), old_c3.pattern_node())
-  assert_eq(retained_e3.pattern_node(), old_e3.pattern_node())
-  // Identical spelling and position do not revive a deleted atom's identity.
-  assert_true(new_c3.pattern_node() != retained_c3.pattern_node())
 }
 
 ///|
-test "MiniAuthoringPipeline atom identities survive recovery without reviving earlier generations" {
-  let original = "note(\"c3 e3\")"
-  let pipeline = @mini.MiniAuthoringPipeline::new(original)
-  fn read_snapshot(
-    stage : String,
-  ) -> @pattern.PatternSnapshot[@pattern.ControlMap] raise {
-    match pipeline.parse_snapshot() {
-      Ok(snapshot) => snapshot
-      Err(message) => fail("\{stage}: \{message}")
+fn apply_draft_edits(
+  draft : @mini.Draft,
+  edits : Array[@mini.TextEdit],
+) -> Unit raise {
+  guard draft.edit(
+      @mini.EditTransaction::EditTransaction(
+        base=draft.state().version(),
+        edits~,
+      ),
+    )
+    is Ok(_) else {
+    fail("transaction rejected")
+  }
+}
+
+///|
+fn edit_draft(
+  draft : @mini.Draft,
+  from : Int,
+  to : Int,
+  inserted : String,
+) -> Unit raise {
+  apply_draft_edits(draft, [@mini.TextEdit::TextEdit(from~, to~, inserted~)])
+}
+
+///|
+test "Draft same-text replacement is causal and frozen input is immutable" {
+  let draft = @mini.Draft::new("note(\"60 60\")")
+  let version = draft.state().version()
+  guard draft.prepare_playback() is Ok(input) else {
+    fail("expected prepared input")
+  }
+  let old = draft_snapshot(draft).query(draft_arc())
+  edit_draft(draft, 6, 8, "60")
+  let fresh = draft_snapshot(draft).query(draft_arc())
+  assert_true(draft.state().version() != version)
+  assert_true(old[0].origin().atom() != fresh[0].origin().atom())
+  assert_eq(old[1].origin(), fresh[1].origin())
+  assert_true(draft.locate_origin(old[0].origin()) is Unavailable(AtomRetired))
+  assert_eq(input.version(), Some(version))
+  guard input.compile() is Ok(@mini.PreparedPlayback::Pattern(retained, _)) else {
+    fail("frozen compilation failed")
+  }
+  assert_eq(retained.query(draft_arc())[0].origin(), old[0].origin())
+}
+
+///|
+test "Draft separate inverse edits do not resurrect an atom" {
+  let draft = @mini.Draft::new("note(\"60 62\")")
+  let old = draft_snapshot(draft).query(draft_arc())
+  edit_draft(draft, 7, 7, "1")
+  edit_draft(draft, 7, 8, "")
+  let fresh = draft_snapshot(draft).query(draft_arc())
+  assert_eq(draft.state().text(), "note(\"60 62\")")
+  assert_true(old[0].origin().atom() != fresh[0].origin().atom())
+  assert_eq(old[1].origin(), fresh[1].origin())
+}
+
+///|
+test "Draft multi-range transaction preserves the untouched middle atom" {
+  let draft = @mini.Draft::new("note(\"60 62 64\")")
+  let old = draft_snapshot(draft).query(draft_arc())
+  let edits = [
+    @mini.TextEdit::TextEdit(from=6, to=8, inserted="67"),
+    @mini.TextEdit::TextEdit(from=12, to=14, inserted="69"),
+  ]
+  let tx = @mini.EditTransaction::EditTransaction(
+    base=draft.state().version(),
+    edits~,
+  )
+  edits[0] = @mini.TextEdit::TextEdit(from=0, to=100, inserted="")
+  assert_true(draft.edit(tx) is Ok(_))
+  let fresh = draft_snapshot(draft).query(draft_arc())
+  assert_eq(draft.state().text(), "note(\"67 62 69\")")
+  assert_eq(old[1].origin(), fresh[1].origin())
+  assert_true(old[0].origin() != fresh[0].origin())
+  assert_true(old[2].origin() != fresh[2].origin())
+}
+
+///|
+test "Draft duplicate insertion uses lexical extents for every atom reader" {
+  for
+    sample in [
+      ("s(\"bd sd bd\")", 9, "bd ", 1),
+      ("note(\"60 62 60\")", 12, "60 ", 1),
+      ("note(\"C#4 E4 C#4\")", 13, "C#4 ", 1),
+      ("note(\"C-1 E4 C-1\")", 13, "C-1 ", 1),
+      ("chord(\"F#m7 F#m7\")", 12, "F#m7 ", 4),
+      ("chord(\"C+7 C+7\")", 11, "C+7 ", 4),
+      ("chord(\"Cø7 Cø7\")", 11, "Cø7 ", 4),
+    ] {
+    let (text, position, inserted, tones) = sample
+    let draft = @mini.Draft::new(text)
+    let old = draft_snapshot(draft).query(draft_arc())
+    edit_draft(draft, position, position, inserted)
+    let fresh = draft_snapshot(draft).query(draft_arc())
+    assert_eq(fresh.length(), old.length() + tones)
+    assert_eq(fresh[0].origin(), old[0].origin())
+    assert_eq(
+      fresh[fresh.length() - 1].origin(),
+      old[old.length() - 1].origin(),
+    )
+    let added = fresh[fresh.length() - tones * 2].origin()
+    for event in old {
+      assert_true(event.origin().atom() != added.atom())
     }
   }
-  let arc = @pattern.TimeSpan::new(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::from_int(1),
+}
+
+///|
+test "Draft endpoint whitespace preserves while lexical merge and split retire" {
+  let draft = @mini.Draft::new("note(\"C4 E4\")")
+  let old = draft_snapshot(draft).query(draft_arc())
+  edit_draft(draft, 8, 8, " ")
+  assert_eq(
+    draft_snapshot(draft).query(draft_arc())[0].origin(),
+    old[0].origin(),
   )
-  let initial = read_snapshot("initial")
-  guard initial.query_sourced_events(arc) is [first_c3, first_e3] else {
-    fail("expected two initial note events")
+  edit_draft(draft, 7, 7, " ")
+  assert_true(draft.locate_origin(old[0].origin()) is Unavailable(AtomRetired))
+  edit_draft(draft, 7, 8, "")
+  assert_true(
+    draft_snapshot(draft).query(draft_arc())[0].origin() != old[0].origin(),
+  )
+  assert_true(draft.locate_origin(old[1].origin()) is Located(_, _))
+  let merged = draft_snapshot(draft).query(draft_arc())[0].origin()
+  edit_draft(draft, 8, 8, "x")
+  assert_true(draft.locate_origin(merged) is Unavailable(AtomRetired))
+}
+
+///|
+test "Draft changing literal role retires an untouched spelling" {
+  let draft = @mini.Draft::new("note(\"E4\")")
+  let old = draft_snapshot(draft).query(draft_arc())[0].origin()
+  edit_draft(draft, 0, 4, "s")
+  assert_true(draft.locate_origin(old) is Unavailable(AtomRetired))
+  edit_draft(draft, 0, 1, "note")
+  assert_true(draft_snapshot(draft).query(draft_arc())[0].origin() != old)
+}
+
+///|
+test "Draft missing outer delimiter retains live atoms but not deleted generations" {
+  let draft = @mini.Draft::new("note(\"c3 e3\")")
+  let old = draft_snapshot(draft).query(draft_arc())
+  edit_draft(draft, 12, 13, "")
+  guard draft.prepare_playback() is Err(diagnostic) else {
+    fail("expected invalid draft")
   }
-  let issued = [first_c3.pattern_node()]
-  for _ in 0..<2 {
-    pipeline.set_input("note(\"e3\")")
-    let deleted = read_snapshot("deleted")
-    guard deleted.query_sourced_events(arc) is [remaining] else {
-      fail("expected only e3 after deletion")
-    }
-    assert_eq(remaining.pattern_node(), first_e3.pattern_node())
-    pipeline.set_input(original)
-    let recreated = read_snapshot("recreated")
-    guard recreated.query_sourced_events(arc) is [c3, e3] else {
-      fail("expected two events after recreation")
-    }
-    assert_true(!issued.contains(c3.pattern_node()))
-    issued.push(c3.pattern_node())
-    assert_eq(e3.pattern_node(), first_e3.pattern_node())
-    pipeline.set_input("note(\"c3 e3\"")
-    assert_true(pipeline.parse_doc() is Err(_))
-    pipeline.set_input("note(\" c3 e3\")")
-    let recovered = read_snapshot("recovered")
-    guard recovered.query_sourced_events(arc) is [moved_c3, moved_e3] else {
-      fail("expected two events after syntax recovery and whitespace movement")
-    }
-    assert_eq(moved_c3.pattern_node(), c3.pattern_node())
-    assert_eq(moved_e3.pattern_node(), first_e3.pattern_node())
+  assert_eq(diagnostic.version(), draft.state().version())
+  assert_true(draft.locate_origin(old[0].origin()) is Located(_, _))
+  edit_draft(draft, 6, 9, "")
+  edit_draft(draft, 6, 6, "c3 ")
+  edit_draft(draft, 12, 12, ")")
+  let fresh = draft_snapshot(draft).query(draft_arc())
+  assert_true(old[0].origin() != fresh[0].origin())
+  assert_eq(old[1].origin(), fresh[1].origin())
+  assert_true(diagnostic.version() != draft.state().version())
+}
+
+///|
+test "Draft semicolon recovery preserves references across another invalid body" {
+  let prefix = "let tone = note(\"60\"); "
+  let middle = "let broken = stack(s(\"bd\")); "
+  let draft = @mini.Draft::new(prefix + middle + "tone")
+  let origin = draft_snapshot(draft).query(draft_arc())[0].origin()
+  let close = prefix.length() + middle.length() - 3
+  edit_draft(draft, close, close + 1, "")
+  assert_true(draft.prepare_playback() is Err(_))
+  assert_true(draft.locate_origin(origin) is Located(_, _))
+  edit_draft(draft, close, close, ")")
+  assert_eq(draft_snapshot(draft).query(draft_arc())[0].origin(), origin)
+}
+
+///|
+test "Draft opaque suffix keeps an independent prefix without guessing reference edges" {
+  let prefix = "let tone = note(\"60\"); stack(tone,"
+  let draft = @mini.Draft::new(prefix + "tone)")
+  let old = draft_snapshot(draft).query(draft_arc())
+  edit_draft(draft, prefix.length(), prefix.length(), "/*")
+  assert_true(draft.prepare_playback() is Err(_))
+  assert_true(draft.locate_origin(old[0].origin()) is Located(_, _))
+  assert_true(
+    draft.locate_origin(old[1].origin()) is Unavailable(BrokenReference),
+  )
+  edit_draft(draft, prefix.length(), prefix.length() + 2, "")
+  let fresh = draft_snapshot(draft).query(draft_arc())
+  assert_eq(old[0].origin(), fresh[0].origin())
+  assert_true(old[1].origin() != fresh[1].origin())
+}
+
+///|
+test "Draft duplicate target and undo end a binding even when endpoints survive" {
+  let prefix = "let tone = note(\"60\"); "
+  let duplicate = "let tone = note(\"62\"); "
+  let draft = @mini.Draft::new(prefix + "tone")
+  let old = draft_snapshot(draft).query(draft_arc())[0].origin()
+  edit_draft(draft, prefix.length(), prefix.length(), duplicate)
+  assert_true(draft.prepare_playback() is Err(_))
+  assert_true(draft.locate_origin(old) is Unavailable(BrokenReference))
+  edit_draft(draft, prefix.length(), prefix.length() + duplicate.length(), "")
+  let fresh = draft_snapshot(draft).query(draft_arc())[0].origin()
+  assert_eq(old.atom(), fresh.atom())
+  assert_eq(old.bindings()[0].reference(), fresh.bindings()[0].reference())
+  assert_eq(old.bindings()[0].definition(), fresh.bindings()[0].definition())
+  assert_true(old.bindings()[0].id() != fresh.bindings()[0].id())
+  assert_true(draft.locate_origin(old) is Unavailable(BrokenReference))
+}
+
+///|
+test "Draft missing terminators cannot hide declarations and revive bindings" {
+  for prefix in ["let tone = note(\"60\")", "let tone = note(\"60\"); bpm(120)"] {
+    let draft = @mini.Draft::new(prefix + "; tone")
+    let old = draft_snapshot(draft).query(draft_arc())[0].origin()
+    let hidden = " let tone = note(\"62\");"
+    edit_draft(draft, prefix.length(), prefix.length() + 1, hidden)
+    assert_true(draft.prepare_playback() is Err(_))
+    assert_true(draft.locate_origin(old) is Unavailable(BrokenReference))
+    edit_draft(draft, prefix.length(), prefix.length() + hidden.length(), ";")
+    let fresh = draft_snapshot(draft).query(draft_arc())[0].origin()
+    assert_eq(old.atom(), fresh.atom())
+    assert_eq(old.bindings()[0].reference(), fresh.bindings()[0].reference())
+    assert_eq(old.bindings()[0].definition(), fresh.bindings()[0].definition())
+    assert_true(old.bindings()[0].id() != fresh.bindings()[0].id())
+    assert_true(draft.locate_origin(old) is Unavailable(BrokenReference))
   }
-  pipeline.dispose()
 }
 
 ///|
-test "MiniAuthoringPipeline source edit preserves duplicate note provenance" {
-  let pipeline = @mini.MiniAuthoringPipeline::new("note(\"60 62 60\")")
-  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
-  pipeline.reset_lowering_stats()
-  pipeline.set_input_with_source_edit(
-    "note(\"60 62 60 60\")",
-    old_start=12,
-    old_end=12,
-    new_end=15,
-  )
-  let snapshot = unwrap_mini_snapshot(pipeline.parse_snapshot())
-  assert_true(pipeline.lowering_cache_hits() >= 3)
-  let events = snapshot.query_sourced_events(
-    @pattern.TimeSpan::new(
-      @pattern.Rational::from_int(0),
-      @pattern.Rational::from_int(1),
-    ),
-  )
-  inspect(events.length(), content="4")
-  assert_snapshot_event_has_node(events[0], "mini:note:60:0")
-  assert_snapshot_event_has_node(events[1], "mini:note:62:0")
-  assert_snapshot_event_has_node(events[2], "mini:note:60:2")
-  assert_snapshot_event_has_node(events[3], "mini:note:60:1")
+test "Draft declaration certainty respects lexical boundaries" {
+  let prefix = "let tone = note(\"60\"); "
+  for
+    body in [
+      "s(\"let tone = x;\")", "s(\"bd\") /* let tone = x; */", "s(\"bd\") // let tone = x;\n",
+      "palette", "tone. /* member name, not a declaration */ let()",
+    ] {
+    let draft = @mini.Draft::new(prefix + "tone")
+    let old = draft_snapshot(draft).query(draft_arc())[0].origin()
+    edit_draft(
+      draft,
+      prefix.length(),
+      prefix.length(),
+      "let other = " + body + "; ",
+    )
+    assert_true(draft.locate_origin(old) is Located(_, _))
+  }
 }
 
 ///|
-test "MiniAuthoringPipeline source edit preserves duplicate note-name provenance" {
-  let pipeline = @mini.MiniAuthoringPipeline::new("note(\"C4 E4 C4\")")
-  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
-  pipeline.reset_lowering_stats()
-  pipeline.set_input_with_source_edit(
-    "note(\"C4 E4 C4 C4\")",
-    old_start=12,
-    old_end=12,
-    new_end=15,
+test "Draft decimal dots cannot conceal ambiguous declarations" {
+  let prefix = "let tone = note(\"60\"); "
+  let draft = @mini.Draft::new(prefix + "tone")
+  let old = draft_snapshot(draft).query(draft_arc())[0].origin()
+  edit_draft(
+    draft,
+    prefix.length(),
+    prefix.length(),
+    "let other = note(\"62\").fast(1. let tone = note(\"64\"); ",
   )
-  let snapshot = unwrap_mini_snapshot(pipeline.parse_snapshot())
-  assert_true(pipeline.lowering_cache_hits() >= 3)
-  let events = snapshot.query_sourced_events(
-    @pattern.TimeSpan::new(
-      @pattern.Rational::from_int(0),
-      @pattern.Rational::from_int(1),
-    ),
-  )
-  inspect(events.length(), content="4")
-  assert_snapshot_event_has_node(events[0], "mini:note:C4:0")
-  assert_snapshot_event_has_node(events[1], "mini:note:E4:0")
-  assert_snapshot_event_has_node(events[2], "mini:note:C4:2")
-  assert_snapshot_event_has_node(events[3], "mini:note:C4:1")
+  assert_true(draft.prepare_playback() is Err(_))
+  assert_true(draft.locate_origin(old) is Unavailable(BrokenReference))
 }
 
 ///|
-test "MiniAuthoringPipeline source edit preserves duplicate sharp note-name provenance" {
-  let pipeline = @mini.MiniAuthoringPipeline::new("note(\"C#4 E4 C#4\")")
-  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
-  pipeline.reset_lowering_stats()
-  pipeline.set_input_with_source_edit(
-    "note(\"C#4 E4 C#4 C#4\")",
-    old_start=13,
-    old_end=13,
-    new_end=17,
+test "Draft undefined target and restoration never revive an old binding" {
+  let draft = @mini.Draft::new("let tone = note(\"60\"); tone")
+  let old = draft_snapshot(draft).query(draft_arc())[0].origin()
+  edit_draft(draft, 4, 8, "other")
+  assert_true(draft.locate_origin(old) is Unavailable(BrokenReference))
+  edit_draft(draft, 4, 9, "tone")
+  let fresh = draft_snapshot(draft).query(draft_arc())[0].origin()
+  assert_eq(old.atom(), fresh.atom())
+  assert_true(
+    old.bindings()[0].definition() != fresh.bindings()[0].definition(),
   )
-  let snapshot = unwrap_mini_snapshot(pipeline.parse_snapshot())
-  assert_true(pipeline.lowering_cache_hits() >= 3)
-  let events = snapshot.query_sourced_events(
-    @pattern.TimeSpan::new(
-      @pattern.Rational::from_int(0),
-      @pattern.Rational::from_int(1),
-    ),
-  )
-  inspect(events.length(), content="4")
-  assert_snapshot_event_has_node(events[0], "mini:note:C_x35_4:0")
-  assert_snapshot_event_has_node(events[1], "mini:note:E4:0")
-  assert_snapshot_event_has_node(events[2], "mini:note:C_x35_4:2")
-  assert_snapshot_event_has_node(events[3], "mini:note:C_x35_4:1")
+  assert_true(old.bindings()[0].id() != fresh.bindings()[0].id())
 }
 
 ///|
-test "MiniAuthoringPipeline source edit preserves duplicate chord provenance" {
-  let pipeline = @mini.MiniAuthoringPipeline::new("chord(\"C C\")")
-  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
-  pipeline.set_input_with_source_edit(
-    "chord(\"C C C\")",
-    old_start=9,
-    old_end=9,
-    new_end=11,
+test "Draft nested uses share primary atoms but locate every outer-to-inner reference" {
+  let prefix = "let tone = note(\"60\"); let group = tone; "
+  let draft = @mini.Draft::new(prefix + "stack(group,group)")
+  let events = draft_snapshot(draft).query(draft_arc())
+  assert_eq(events[0].origin().atom(), events[1].origin().atom())
+  assert_true(
+    events[0].origin().bindings()[0].id() !=
+    events[1].origin().bindings()[0].id(),
   )
-  let snapshot = unwrap_mini_snapshot(pipeline.parse_snapshot())
-  let events = snapshot.query_sourced_events(
-    @pattern.TimeSpan::new(
-      @pattern.Rational::from_int(0),
-      @pattern.Rational::from_int(1),
-    ),
+  guard draft.locate_origin(events[0].origin()) is Located(atom, [outer, inner]) else {
+    fail("expected complete two-edge location")
+  }
+  assert_eq(draft.state().text()[atom.start():atom.end()].to_owned(), "60")
+  assert_eq(outer.start(), prefix.length() + 6)
+  assert_eq(draft.state().text()[inner.start():inner.end()].to_owned(), "tone")
+  edit_draft(draft, inner.start(), inner.end(), "tone")
+  assert_true(
+    draft.locate_origin(events[0].origin()) is Unavailable(BrokenReference),
   )
-  inspect(events.length(), content="9")
-  assert_snapshot_event_has_node(events[0], "mini:chord:C:0")
-  assert_snapshot_event_has_node(events[3], "mini:chord:C:2")
-  assert_snapshot_event_has_node(events[6], "mini:chord:C:1")
+  assert_true(
+    draft.locate_origin(events[1].origin()) is Unavailable(BrokenReference),
+  )
 }
 
 ///|
-test "MiniAuthoringPipeline source edit preserves duplicate sharp-quality chord provenance" {
-  let pipeline = @mini.MiniAuthoringPipeline::new("chord(\"F#m7 F#m7\")")
-  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
-  pipeline.set_input_with_source_edit(
-    "chord(\"F#m7 F#m7 F#m7\")",
-    old_start=12,
-    old_end=12,
-    new_end=17,
-  )
-  let snapshot = unwrap_mini_snapshot(pipeline.parse_snapshot())
-  let events = snapshot.query_sourced_events(
-    @pattern.TimeSpan::new(
-      @pattern.Rational::from_int(0),
-      @pattern.Rational::from_int(1),
-    ),
-  )
-  inspect(events.length(), content="12")
-  assert_snapshot_event_has_node(events[0], "mini:chord:F_x35_m7:0")
-  assert_snapshot_event_has_node(events[4], "mini:chord:F_x35_m7:2")
-  assert_snapshot_event_has_node(events[8], "mini:chord:F_x35_m7:1")
+test "Draft control changes preserve live source paths including zero gain" {
+  let prefix = "let tone = note(\"60\").gain("
+  let draft = @mini.Draft::new(prefix + "1); tone")
+  let old = draft_snapshot(draft).query(draft_arc())[0].origin()
+  edit_draft(draft, prefix.length(), prefix.length() + 1, "0")
+  let event = draft_snapshot(draft).query(draft_arc())[0]
+  assert_eq(event.origin(), old)
+  assert_eq(event.event().value.get("gain"), Some(0.0))
 }
 
 ///|
-test "MiniAuthoringPipeline source edit preserves duplicate plus chord provenance" {
-  let pipeline = @mini.MiniAuthoringPipeline::new("chord(\"C+7 C+7\")")
-  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
-  pipeline.set_input_with_source_edit(
-    "chord(\"C+7 C+7 C+7\")",
-    old_start=11,
-    old_end=11,
-    new_end=15,
-  )
-  let snapshot = unwrap_mini_snapshot(pipeline.parse_snapshot())
-  let events = snapshot.query_sourced_events(
-    @pattern.TimeSpan::new(
-      @pattern.Rational::from_int(0),
-      @pattern.Rational::from_int(1),
-    ),
-  )
-  inspect(events.length(), content="12")
-  assert_snapshot_event_has_node(events[0], "mini:chord:C_x43_7:0")
-  assert_snapshot_event_has_node(events[4], "mini:chord:C_x43_7:2")
-  assert_snapshot_event_has_node(events[8], "mini:chord:C_x43_7:1")
+test "Draft exact lowering preserves music material and graph scopes" {
+  for
+    text in [
+      "note(\"60 [62 64] ~\").every(2, rev()).jux(fast(2)).gain(0)", "chord(\"C+7 F#m7 Cø7\").rev().slow(2).gate(0.5)",
+      "s(\"bd(3,8) sd*2 hh/2?\").degradeBy(0.3).lpf(800).pan(0.2)", "/* 𝄞 */ let tone = note(\"C-1 F#3\"); bpm(120); let group = tone; stack(group,group.rev())",
+      "let tone = note(\"60\");\n$: tone\n$: chord(\"C\")", "silence() + s(\"~ bd\")",
+    ] {
+    let draft = @mini.Draft::new(text)
+    let exact = draft_snapshot(draft)
+    guard @mini.parse_play_source(text) is Ok(source) else {
+      fail("general parse failed")
+    }
+    guard source.body() is Pattern(doc) else { fail("expected pattern") }
+    let general = doc.lower()
+    let span = song_span(0L, 1L, 4L, 1L)
+    let actual = exact.query(span)
+    let expected = general.query_sourced_events(span)
+    assert_named_events(
+      actual.map(e => e.event()),
+      expected.map(e => e.event()),
+    )
+    let actual_entries = exact.pat().entries()
+    let expected_entries = general.pat().entries()
+    assert_eq(actual_entries.length(), expected_entries.length())
+    for index in 0..<actual.length() {
+      assert_eq(
+        actual[index].pattern_node_path(),
+        expected[index].pattern_node_path(),
+      )
+      assert_true(draft.locate_origin(actual[index].origin()) is Located(_, _))
+    }
+    for index in 0..<actual_entries.length() {
+      assert_eq(exact.entry_key(index), general.entry_key(index))
+      assert_eq(
+        actual_entries[index].entry_period(),
+        expected_entries[index].entry_period(),
+      )
+      assert_eq(
+        actual_entries[index].same_content(expected_entries[index]),
+        expected_entries[index].same_content(expected_entries[index]),
+      )
+    }
+  }
 }
 
 ///|
-test "MiniAuthoringPipeline source edit preserves duplicate half-dim chord provenance" {
-  let pipeline = @mini.MiniAuthoringPipeline::new("chord(\"Cø7 Cø7\")")
-  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
-  pipeline.set_input_with_source_edit(
-    "chord(\"Cø7 Cø7 Cø7\")",
-    old_start=11,
-    old_end=11,
-    new_end=15,
+test "Draft invalid transactions are atomic including UTF-16 boundaries" {
+  let draft = @mini.Draft::new("// 𝄞\nnote(\"60\")")
+  let before = draft.state()
+  let origin = draft_snapshot(draft).query(draft_arc())[0].origin()
+  let edits = [
+    @mini.TextEdit::TextEdit(from=0, to=0, inserted=" "),
+    @mini.TextEdit::TextEdit(from=4, to=4, inserted="x"),
+  ]
+  assert_true(
+    draft.edit(
+      @mini.EditTransaction::EditTransaction(base=before.version(), edits~),
+    )
+    is Err(InvalidEdit(_)),
   )
-  let snapshot = unwrap_mini_snapshot(pipeline.parse_snapshot())
-  let events = snapshot.query_sourced_events(
-    @pattern.TimeSpan::new(
-      @pattern.Rational::from_int(0),
-      @pattern.Rational::from_int(1),
+  assert_eq(draft.state().text(), before.text())
+  assert_eq(draft.state().version(), before.version())
+  assert_true(draft.locate_origin(origin) is Located(_, _))
+  apply_draft_edits(draft, [])
+  assert_eq(draft.state().version(), before.version())
+  edit_draft(draft, 0, 0, " ")
+  assert_true(
+    draft.edit(
+      @mini.EditTransaction::EditTransaction(base=before.version(), edits=[]),
+    )
+    is Err(WrongBase),
+  )
+  assert_true(
+    draft.edit(
+      @mini.EditTransaction::EditTransaction(base=draft.state().version(), edits=[
+        @mini.TextEdit::TextEdit(from=5, to=7, inserted=""),
+        @mini.TextEdit::TextEdit(from=6, to=8, inserted=""),
+      ]),
+    )
+    is Err(InvalidEdit(_)),
+  )
+}
+
+///|
+test "Draft tracking limit and reset each establish fresh source epochs" {
+  let draft = @mini.Draft::new("note(\"60\")")
+  let old = draft_snapshot(draft).query(draft_arc())[0].origin()
+  let padding = " ".repeat(8192)
+  edit_draft(draft, 0, 0, padding)
+  assert_true(draft.state().tracking() is TrackingUnavailable)
+  assert_true(draft.prepare_playback() is Err(_))
+  assert_true(draft.locate_origin(old) is Unavailable(SourceReset))
+  edit_draft(draft, 0, padding.length(), "")
+  let recovered = draft_snapshot(draft).query(draft_arc())[0].origin()
+  assert_true(old.atom().epoch() != recovered.atom().epoch())
+  assert_true(draft.reset("note(\"60\")") is Ok(_))
+  assert_true(draft.locate_origin(recovered) is Unavailable(SourceReset))
+}
+
+///|
+test "Draft disposal does not invalidate a separately frozen playback input" {
+  let draft = @mini.Draft::new("note(\"60\")")
+  guard draft.prepare_playback() is Ok(input) else { fail("expected input") }
+  let origin = draft_snapshot(draft).query(draft_arc())[0].origin()
+  draft.dispose()
+  assert_true(draft.prepare_playback() is Err(_))
+  assert_true(draft.reset("note(\"62\")") is Err(Disposed))
+  assert_true(
+    draft.edit(
+      @mini.EditTransaction::EditTransaction(base=draft.state().version(), edits=[]),
+    )
+    is Err(Disposed),
+  )
+  assert_true(draft.locate_origin(origin) is Unavailable(SourceReset))
+  guard input.compile() is Ok(@mini.PreparedPlayback::Pattern(snapshot, _)) else {
+    fail("frozen input was invalidated")
+  }
+  assert_eq(snapshot.query(draft_arc())[0].origin(), origin)
+}
+
+///|
+test "Draft confirmed song mode and explicit text input remain valid runtime sources" {
+  let draft = @mini.Draft::new("note(\"60\")")
+  let old = draft_snapshot(draft).query(draft_arc())[0].origin()
+  let text = "bpm(72); song(section(\"intro\",1,s(\"bd\")),part(\"intro1\",\"intro\")).repeat()"
+  edit_draft(draft, 0, draft.state().text().length(), text)
+  assert_true(draft.state().tracking() is Song)
+  guard draft.prepare_playback() is Ok(input) else {
+    fail("valid song preparation failed")
+  }
+  guard input.compile() is Ok(@mini.PreparedPlayback::Runtime(source)) else {
+    fail("song must use runtime capability")
+  }
+  assert_eq(source.bpm(), 72.0)
+  guard source.body() is Arrangement(song, repeating) else {
+    fail("expected arrangement")
+  }
+  assert_true(repeating)
+  assert_eq(song.query(draft_arc())[0].value.get("sound"), Some(36.0))
+  assert_true(draft.locate_origin(old) is Unavailable(SourceReset))
+  edit_draft(draft, 0, text.length(), "/*")
+  assert_true(draft.state().tracking() is Song)
+  assert_true(draft.prepare_playback() is Err(_))
+  edit_draft(draft, 0, 2, "note(\"60\")")
+  assert_true(
+    draft_snapshot(draft).query(draft_arc())[0].origin().atom().epoch() !=
+    old.atom().epoch(),
+  )
+  let untracked = @mini.PlaybackInput::text("note(\"62\")")
+  assert_true(untracked.version() is None)
+  guard untracked.compile() is Ok(@mini.PreparedPlayback::Runtime(raw)) else {
+    fail("text input must be explicitly untracked")
+  }
+  guard raw.body() is Pattern(doc) else { fail("expected runtime pattern") }
+  assert_eq(doc.lower().query(draft_arc())[0].value.get("note"), Some(62.0))
+}
+
+///|
+test "Draft opaque preceding scope retires a binding without retiring its endpoints" {
+  let prefix = "let tone = note(\"60\"); "
+  let draft = @mini.Draft::new(prefix + "tone")
+  let old = draft_snapshot(draft).query(draft_arc())[0].origin()
+  edit_draft(draft, prefix.length(), prefix.length(), "unknown(;")
+  assert_true(draft.locate_origin(old) is Unavailable(BrokenReference))
+  edit_draft(draft, prefix.length(), prefix.length() + 9, "")
+  let fresh = draft_snapshot(draft).query(draft_arc())[0].origin()
+  assert_eq(old.atom(), fresh.atom())
+  assert_eq(old.bindings()[0].reference(), fresh.bindings()[0].reference())
+  assert_eq(old.bindings()[0].definition(), fresh.bindings()[0].definition())
+  assert_true(old.bindings()[0].id() != fresh.bindings()[0].id())
+}
+
+///|
+test "Draft local depth failure preserves independent reference proofs" {
+  let prefix = "let tone = note(\"60\"); let other = "
+  let body = "s(\"bd\")"
+  let draft = @mini.Draft::new(prefix + body + "; tone")
+  let old = draft_snapshot(draft).query(draft_arc())[0].origin()
+  apply_draft_edits(draft, [
+    @mini.TextEdit::TextEdit(
+      from=prefix.length(),
+      to=prefix.length(),
+      inserted="(".repeat(40),
     ),
-  )
-  inspect(events.length(), content="12")
-  assert_snapshot_event_has_node(events[0], "mini:chord:C_x248_7:0")
-  assert_snapshot_event_has_node(events[4], "mini:chord:C_x248_7:2")
-  assert_snapshot_event_has_node(events[8], "mini:chord:C_x248_7:1")
+    @mini.TextEdit::TextEdit(
+      from=prefix.length() + body.length(),
+      to=prefix.length() + body.length(),
+      inserted=")".repeat(40),
+    ),
+  ])
+  assert_true(draft.prepare_playback() is Err(_))
+  assert_true(draft.locate_origin(old) is Located(_, _))
+  let boundary = draft.state().text().length() - "; tone".length()
+  edit_draft(draft, boundary, boundary, " let tone = note(\"62\")")
+  assert_true(draft.locate_origin(old) is Unavailable(BrokenReference))
+}
+
+///|
+test "Draft chord tones share one atom and retain separate voice scopes" {
+  let draft = @mini.Draft::new("chord(\"C\")")
+  guard draft_snapshot(draft).query(draft_arc()) is [root, third, fifth] else {
+    fail("expected major chord")
+  }
+  assert_eq(root.origin(), third.origin())
+  assert_eq(root.origin(), fifth.origin())
+  assert_true(root.pattern_node_path() != third.pattern_node_path())
+  assert_true(third.pattern_node_path() != fifth.pattern_node_path())
+  guard draft.locate_origin(root.origin()) is Located(atom, []) else {
+    fail("expected chord source atom")
+  }
+  assert_eq(draft.state().text()[atom.start():atom.end()].to_owned(), "C")
 }
 
 ///|
@@ -1056,45 +1092,6 @@ test "parse_doc stack chord and numeric note has disjoint node ids" {
   assert_true(doc.contains_node(pid("mini:chord-tone:mini:chord:C:0:1:64")))
   assert_true(doc.contains_node(pid("mini:chord-tone:mini:chord:C:0:2:67")))
   assert_true(doc.contains_node(pid("mini:note:60:0")))
-}
-
-///|
-test "MiniAuthoringPipeline source edit recovery preserves surviving atom origins" {
-  let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd sd bd\")")
-  let arc = @pattern.TimeSpan::new(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::from_int(1),
-  )
-  let retained = unwrap_mini_snapshot(pipeline.parse_snapshot())
-  guard retained.query_sourced_events(arc) is [first_bd, sd, last_bd] else {
-    fail("expected three original drum events")
-  }
-  pipeline.set_input_with_source_edit(
-    "s(\"bd sd bd bd\"",
-    old_start=9,
-    old_end=9,
-    new_end=12,
-  )
-  assert_true(pipeline.parse_doc() is Err(_))
-  // Recovery spans are relative to the last successfully parsed source.
-  pipeline.set_input_with_source_edit(
-    "s(\"bd sd bd bd\")",
-    old_start=9,
-    old_end=9,
-    new_end=12,
-  )
-  let recovered = unwrap_mini_snapshot(pipeline.parse_snapshot())
-  pipeline.dispose()
-  guard recovered.query_sourced_events(arc) is [first, middle, inserted, last] else {
-    fail("expected the inserted drum and all three surviving drums")
-  }
-  assert_eq(first.pattern_node(), first_bd.pattern_node())
-  assert_eq(middle.pattern_node(), sd.pattern_node())
-  assert_eq(last.pattern_node(), last_bd.pattern_node())
-  assert_eq(inserted.event().value.get("sound"), Some(36.0))
-  for old in retained.query_sourced_events(arc) {
-    assert_true(inserted.pattern_node() != old.pattern_node())
-  }
 }
 
 ///|
@@ -1546,17 +1543,14 @@ test "parse_doc lowers Strudel-style dollar stack lines" {
 }
 
 ///|
-test "MiniAuthoringPipeline accepts Strudel-style dollar stack lines" {
-  let pipeline = @mini.MiniAuthoringPipeline::new("$: s(\"bd\")\n$: s(\"hh\")")
-  let snapshot = unwrap_mini_snapshot(pipeline.parse_snapshot())
-  let events = snapshot.query(
-    @pattern.TimeSpan::new(
-      @pattern.Rational::from_int(0),
-      @pattern.Rational::from_int(1),
-    ),
+test "Draft accepts dollar stack lines with independent exact origins" {
+  let draft = @mini.Draft::new("$: s(\"bd\")\n$: s(\"hh\")")
+  let events = draft_snapshot(draft).query(draft_arc())
+  assert_named_events(
+    events.map(e => e.event()),
+    query_one_cycle(unwrap_ok(@mini.parse("stack(s(\"bd\"),s(\"hh\"))"))),
   )
-  inspect(events.length(), content="2")
-  pipeline.dispose()
+  assert_true(events[0].origin().atom() != events[1].origin().atom())
 }
 
 ///|
