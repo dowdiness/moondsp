@@ -221,6 +221,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and deletion batches retain their existing fresh-state policy.
 - Topology edits now carry their old-to-new node correspondence with the result;
   rewiring a gain's signal input preserves its envelope input.
+- Fixed `MiniAuthoringPipeline` token identity lifetime across deletion and
+  recreation: surviving tokens retain their IDs, while recreated atoms cannot
+  reuse IDs from retained snapshots. Text and source-edit spans now publish
+  atomically, preventing eager reparses from changing unaffected identities.
 - Reject unterminated Mini block comments without publishing a valid prefix, and
   share comment scanning between parsing and playback admission so `/* // */`
   cannot hide excessive nesting. Bounded recursive descent now checks depth

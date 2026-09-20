@@ -82,6 +82,9 @@ fn mini_token_occurrence(
     Some(value) => value
     None => 0
   }
+  guard occurrence < 0x7FFF_FFFF else {
+    abort("mini token identity space exhausted")
+  }
   counters[base] = occurrence + 1
   occurrence
 }
@@ -215,31 +218,20 @@ fn mini_allocate_changed_identity(
   used : Map[String, Bool],
   token : MiniToken,
 ) -> String {
-  let base = mini_token_base_key(token.kind, token.text)
-  let mut occurrence = match counters.get(base) {
-    Some(value) => value
-    None => 0
-  }
-  let mut key = mini_token_identity_key(token.kind, token.text, occurrence)
+  let mut key = mini_token_identity_key(
+    token.kind,
+    token.text,
+    mini_token_occurrence(counters, token.kind, token.text),
+  )
   while used.contains(key) {
-    occurrence += 1
-    key = mini_token_identity_key(token.kind, token.text, occurrence)
+    key = mini_token_identity_key(
+      token.kind,
+      token.text,
+      mini_token_occurrence(counters, token.kind, token.text),
+    )
   }
-  counters[base] = occurrence + 1
   used[key] = true
   key
-}
-
-///|
-fn mini_realign_token_identities(
-  old_tokens : Array[MiniToken],
-  new_tokens : Array[MiniToken],
-) -> Array[MiniToken] {
-  mini_realign_token_identities_with_span(
-    old_tokens,
-    new_tokens,
-    mini_token_edit_span(old_tokens, new_tokens),
-  )
 }
 
 ///|
@@ -247,12 +239,12 @@ fn mini_realign_token_identities_with_span(
   old_tokens : Array[MiniToken],
   new_tokens : Array[MiniToken],
   span : MiniTokenEditSpan,
+  counters? : Map[String, Int] = Map([]),
 ) -> Array[MiniToken] {
   let used : Map[String, Bool] = Map([])
   for index in 0..<old_tokens.length() {
     mini_mark_old_identity(used, old_tokens, index)
   }
-  let counters : Map[String, Int] = Map([])
   let aligned : Array[MiniToken] = []
   for index in 0..<new_tokens.length() {
     let identity_key = if index < span.old_start && index < span.new_start {
@@ -265,32 +257,6 @@ fn mini_realign_token_identities_with_span(
     aligned.push(mini_token_with_identity(new_tokens[index], identity_key))
   }
   aligned
-}
-
-///|
-fn realign_mini_authoring_tokens(
-  old_input : String,
-  new_input : String,
-) -> Array[MiniToken] {
-  mini_realign_token_identities(
-    tokenize_mini_authoring_source(old_input),
-    tokenize_mini_authoring_source(new_input),
-  )
-}
-
-///|
-fn realign_mini_authoring_tokens_with_source_edit(
-  old_input : String,
-  new_input : String,
-  source_edit : MiniSourceEditSpan,
-) -> Array[MiniToken] {
-  let old_tokens = tokenize_mini_authoring_source(old_input)
-  let new_tokens = tokenize_mini_authoring_source(new_input)
-  mini_realign_token_identities_with_span(
-    old_tokens,
-    new_tokens,
-    mini_token_edit_span_from_source(old_tokens, new_tokens, source_edit),
-  )
 }
 
 ///|
@@ -357,8 +323,10 @@ fn mini_token_kind_for_single(c : UInt16, quoted : Bool) -> MiniTokenKind {
 }
 
 ///|
-fn tokenize_mini_authoring_source(input : String) -> Array[MiniToken] {
-  let counters : Map[String, Int] = Map([])
+fn tokenize_mini_authoring_source(
+  input : String,
+  counters? : Map[String, Int] = Map([]),
+) -> Array[MiniToken] {
   let tokens : Array[MiniToken] = []
   let mut pos = 0
   let mut quoted = false
