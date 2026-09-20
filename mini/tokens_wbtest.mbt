@@ -1,4 +1,42 @@
 ///|
+fn mini_realign_token_identities(
+  old_tokens : Array[MiniToken],
+  new_tokens : Array[MiniToken],
+) -> Array[MiniToken] {
+  mini_realign_token_identities_with_span(
+    old_tokens,
+    new_tokens,
+    mini_token_edit_span(old_tokens, new_tokens),
+  )
+}
+
+///|
+fn realign_mini_authoring_tokens(
+  old_input : String,
+  new_input : String,
+) -> Array[MiniToken] {
+  mini_realign_token_identities(
+    tokenize_mini_authoring_source(old_input),
+    tokenize_mini_authoring_source(new_input),
+  )
+}
+
+///|
+fn realign_mini_authoring_tokens_with_source_edit(
+  old_input : String,
+  new_input : String,
+  source_edit : MiniSourceEditSpan,
+) -> Array[MiniToken] {
+  let old_tokens = tokenize_mini_authoring_source(old_input)
+  let new_tokens = tokenize_mini_authoring_source(new_input)
+  mini_realign_token_identities_with_span(
+    old_tokens,
+    new_tokens,
+    mini_token_edit_span_from_source(old_tokens, new_tokens, source_edit),
+  )
+}
+
+///|
 fn token_keys(tokens : Array[MiniToken]) -> Array[String] {
   let keys : Array[String] = []
   for token in tokens {

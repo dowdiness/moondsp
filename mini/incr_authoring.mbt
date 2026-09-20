@@ -2,20 +2,18 @@
 /// Experimental incr-backed authoring pipeline for mini notation.
 ///
 /// Contract for the Phase 6+ design slice:
-/// - The input text is the only mutable authoring input.
+/// - Text and its optional source edit span are published atomically.
 /// - Parsing remains delegated to the handwritten PatternDoc parser and still
 ///   reparses the whole source string on each text change.
-/// - Successful reparses pass the last successful PatternDoc as the
-///   `previous` argument to `parse_doc`, preserving stable subtree IDs
-///   across edits.
+/// - Successful reparses retain their aligned tokens as well as the last
+///   successful PatternDoc. Unchanged tokens keep their identities, while
+///   lifetime-scoped occurrence counters prevent deleted identities being reused.
 /// - Parse errors are propagated as `Err(String)` and do not replace the last
 ///   reusable document. The last successful PatternDoc is separately
 ///   accessible via `accepted_doc()` (backed by incr `AcceptedDerived`).
-/// - `new()` eagerly forces the first parse before returning (priming).
-///   Without this, `AcceptedDerived`'s built-in eager fold would trigger
-///   the parse inside a reactive compute context, where the derived's local
-///   state mutations are unsafe. After `new()`, all subsequent parses are
-///   lazy (triggered by `parse_doc()` / `parse_snapshot()` reads).
+/// - `new()` primes the first parse before attaching the accepted projection.
+///   That projection can eagerly reparse when an input update is published;
+///   snapshot lowering remains lazy until `parse_snapshot()` is read.
 /// - Lowering uses one persistent PatternLoweringCache owned by the pipeline,
 ///   so the current reuse win is stable-subtree and lowering-cache reuse after
 ///   parse, not token-level incremental parsing.
@@ -30,6 +28,7 @@
 /// for now.
 pub struct MiniAuthoringPipeline {
   priv scope : @incr.Scope
+  priv runtime : @incr.Runtime
   priv text : @incr.Input[String]
   priv source_edit : @incr.Input[MiniSourceEditSpan?]
   priv parsed_watch : @incr.Watch[
@@ -57,9 +56,10 @@ pub fn MiniAuthoringPipeline::new(input : String) -> MiniAuthoringPipeline {
     None,
     label="mini.source_edit",
   )
-  // Previous source text for token realignment across edits.
-  // Updated alongside `previous` in the parsed derived's Ok branch.
-  let mut previous_source : String = input
+  // The token baseline follows the last successful parse; allocation counters
+  // live for the entire pipeline, including failed parse attempts.
+  let mut previous_tokens : Array[MiniToken]? = None
+  let identity_counters : Map[String, Int] = Map([])
   let token_count = scope.derived_no_backdate(
     () => {
       let current = text.get()
@@ -88,21 +88,28 @@ pub fn MiniAuthoringPipeline::new(input : String) -> MiniAuthoringPipeline {
     fn() {
       parse_compute_count += 1
       let current = text.get()
-      let tokens = match previous {
-        None => tokenize_mini_authoring_source(current)
-        Some(_) =>
-          match source_edit.get() {
-            Some(span) =>
-              realign_mini_authoring_tokens_with_source_edit(
-                previous_source, current, span,
-              )
-            None => realign_mini_authoring_tokens(previous_source, current)
+      let tokens = match previous_tokens {
+        None =>
+          tokenize_mini_authoring_source(current, counters=identity_counters)
+        Some(old_tokens) => {
+          let new_tokens = tokenize_mini_authoring_source(current)
+          let span = match source_edit.get() {
+            Some(edit) =>
+              mini_token_edit_span_from_source(old_tokens, new_tokens, edit)
+            None => mini_token_edit_span(old_tokens, new_tokens)
           }
+          mini_realign_token_identities_with_span(
+            old_tokens,
+            new_tokens,
+            span,
+            counters=identity_counters,
+          )
+        }
       }
       let result = parse_doc_with_token_identities(current, previous, tokens)
       match result {
         Ok(doc) => {
-          previous_source = current
+          previous_tokens = Some(tokens)
           previous = Some(doc)
           Ok(doc)
         }
@@ -158,6 +165,7 @@ pub fn MiniAuthoringPipeline::new(input : String) -> MiniAuthoringPipeline {
   let snapshot_watch = scope.watch(snapshot_reader)
   {
     scope,
+    runtime: rt,
     text,
     source_edit,
     parsed_watch,
@@ -180,11 +188,15 @@ pub fn MiniAuthoringPipeline::set_input(
   self : MiniAuthoringPipeline,
   input : String,
 ) -> Unit {
-  self.source_edit.set(None)
-  self.text.set(input)
+  self.runtime.batch(() => {
+    self.source_edit.set(None)
+    self.text.set(input)
+  })
 }
 
 ///|
+/// Applies an edit relative to the last successfully parsed source. A rejected
+/// draft does not advance that token baseline or replace the accepted document.
 pub fn MiniAuthoringPipeline::set_input_with_source_edit(
   self : MiniAuthoringPipeline,
   input : String,
@@ -192,8 +204,12 @@ pub fn MiniAuthoringPipeline::set_input_with_source_edit(
   old_end~ : Int,
   new_end~ : Int,
 ) -> Unit {
-  self.source_edit.set(Some({ old_start, old_end, new_end, }))
-  self.text.set(input)
+  // Publish text and its edit span together: eager readers must not realign
+  // the old text using the new edit span.
+  self.runtime.batch(() => {
+    self.source_edit.set(Some({ old_start, old_end, new_end, }))
+    self.text.set(input)
+  })
 }
 
 ///|

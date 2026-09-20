@@ -783,6 +783,103 @@ test "MiniAuthoringPipeline consecutive source-edit updates reuse stable identit
 }
 
 ///|
+test "MiniAuthoringPipeline recreated atom does not match retained snapshot origin" {
+  let original = "note(\"c3 e3\")"
+  let pipeline = @mini.MiniAuthoringPipeline::new(original)
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::from_int(1),
+  )
+  // Keep the old material's snapshot alive across both accepted edits.
+  let retained = unwrap_mini_snapshot(pipeline.parse_snapshot())
+  guard retained.query_sourced_events(arc) is [old_c3, old_e3] else {
+    fail("expected c3 and e3 in the retained snapshot")
+  }
+  pipeline.set_input_with_source_edit(
+    "note(\"e3\")",
+    old_start=6,
+    old_end=9,
+    new_end=6,
+  )
+  let deleted = unwrap_mini_snapshot(pipeline.parse_snapshot())
+  guard deleted.query_sourced_events(arc) is [surviving_e3] else {
+    fail("expected only e3 after deleting c3")
+  }
+  assert_eq(surviving_e3.event().value.get("note"), Some(52.0))
+  assert_eq(surviving_e3.pattern_node(), old_e3.pattern_node())
+  pipeline.set_input_with_source_edit(
+    original,
+    old_start=6,
+    old_end=6,
+    new_end=9,
+  )
+  let recreated = unwrap_mini_snapshot(pipeline.parse_snapshot())
+  pipeline.dispose()
+  guard recreated.query_sourced_events(arc) is [new_c3, new_e3] else {
+    fail("expected c3 and e3 after recreating c3")
+  }
+  assert_eq(new_c3.event().value.get("note"), Some(48.0))
+  assert_eq(new_e3.event().value.get("note"), Some(52.0))
+  assert_eq(new_e3.pattern_node(), old_e3.pattern_node())
+  guard retained.query_sourced_events(arc) is [retained_c3, retained_e3] else {
+    fail("expected the old material to retain both events")
+  }
+  assert_eq(retained_c3.pattern_node(), old_c3.pattern_node())
+  assert_eq(retained_e3.pattern_node(), old_e3.pattern_node())
+  // Identical spelling and position do not revive a deleted atom's identity.
+  assert_true(new_c3.pattern_node() != retained_c3.pattern_node())
+}
+
+///|
+test "MiniAuthoringPipeline atom identities survive recovery without reviving earlier generations" {
+  let original = "note(\"c3 e3\")"
+  let pipeline = @mini.MiniAuthoringPipeline::new(original)
+  fn read_snapshot(
+    stage : String,
+  ) -> @pattern.PatternSnapshot[@pattern.ControlMap] raise {
+    match pipeline.parse_snapshot() {
+      Ok(snapshot) => snapshot
+      Err(message) => fail("\{stage}: \{message}")
+    }
+  }
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::from_int(1),
+  )
+  let initial = read_snapshot("initial")
+  guard initial.query_sourced_events(arc) is [first_c3, first_e3] else {
+    fail("expected two initial note events")
+  }
+  let issued = [first_c3.pattern_node()]
+  for _ in 0..<2 {
+    pipeline.set_input("note(\"e3\")")
+    let deleted = read_snapshot("deleted")
+    guard deleted.query_sourced_events(arc) is [remaining] else {
+      fail("expected only e3 after deletion")
+    }
+    assert_eq(remaining.pattern_node(), first_e3.pattern_node())
+    pipeline.set_input(original)
+    let recreated = read_snapshot("recreated")
+    guard recreated.query_sourced_events(arc) is [c3, e3] else {
+      fail("expected two events after recreation")
+    }
+    assert_true(!issued.contains(c3.pattern_node()))
+    issued.push(c3.pattern_node())
+    assert_eq(e3.pattern_node(), first_e3.pattern_node())
+    pipeline.set_input("note(\"c3 e3\"")
+    assert_true(pipeline.parse_doc() is Err(_))
+    pipeline.set_input("note(\" c3 e3\")")
+    let recovered = read_snapshot("recovered")
+    guard recovered.query_sourced_events(arc) is [moved_c3, moved_e3] else {
+      fail("expected two events after syntax recovery and whitespace movement")
+    }
+    assert_eq(moved_c3.pattern_node(), c3.pattern_node())
+    assert_eq(moved_e3.pattern_node(), first_e3.pattern_node())
+  }
+  pipeline.dispose()
+}
+
+///|
 test "MiniAuthoringPipeline source edit preserves duplicate note provenance" {
   let pipeline = @mini.MiniAuthoringPipeline::new("note(\"60 62 60\")")
   ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
@@ -962,40 +1059,42 @@ test "parse_doc stack chord and numeric note has disjoint node ids" {
 }
 
 ///|
-test "MiniAuthoringPipeline source edit parse error preserves previous token baseline" {
+test "MiniAuthoringPipeline source edit recovery preserves surviving atom origins" {
   let pipeline = @mini.MiniAuthoringPipeline::new("s(\"bd sd bd\")")
-  ignore(unwrap_mini_snapshot(pipeline.parse_snapshot()))
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::from_int(1),
+  )
+  let retained = unwrap_mini_snapshot(pipeline.parse_snapshot())
+  guard retained.query_sourced_events(arc) is [first_bd, sd, last_bd] else {
+    fail("expected three original drum events")
+  }
   pipeline.set_input_with_source_edit(
     "s(\"bd sd bd bd\"",
     old_start=9,
     old_end=9,
     new_end=12,
   )
-  match pipeline.parse_doc() {
-    Ok(_) => abort("expected parse error")
-    Err(msg) =>
-      inspect(msg, content="position 15: expected ')', got end of input")
-  }
-  pipeline.reset_lowering_stats()
+  assert_true(pipeline.parse_doc() is Err(_))
+  // Recovery spans are relative to the last successfully parsed source.
   pipeline.set_input_with_source_edit(
     "s(\"bd sd bd bd\")",
     old_start=9,
     old_end=9,
     new_end=12,
   )
-  let snapshot = unwrap_mini_snapshot(pipeline.parse_snapshot())
-  assert_true(pipeline.lowering_cache_hits() >= 3)
-  let events = snapshot.query_sourced_events(
-    @pattern.TimeSpan::new(
-      @pattern.Rational::from_int(0),
-      @pattern.Rational::from_int(1),
-    ),
-  )
-  inspect(events.length(), content="4")
-  assert_snapshot_event_has_node(events[0], "mini:sound:bd:0")
-  assert_snapshot_event_has_node(events[1], "mini:sound:sd:0")
-  assert_snapshot_event_has_node(events[2], "mini:sound:bd:2")
-  assert_snapshot_event_has_node(events[3], "mini:sound:bd:1")
+  let recovered = unwrap_mini_snapshot(pipeline.parse_snapshot())
+  pipeline.dispose()
+  guard recovered.query_sourced_events(arc) is [first, middle, inserted, last] else {
+    fail("expected the inserted drum and all three surviving drums")
+  }
+  assert_eq(first.pattern_node(), first_bd.pattern_node())
+  assert_eq(middle.pattern_node(), sd.pattern_node())
+  assert_eq(last.pattern_node(), last_bd.pattern_node())
+  assert_eq(inserted.event().value.get("sound"), Some(36.0))
+  for old in retained.query_sourced_events(arc) {
+    assert_true(inserted.pattern_node() != old.pattern_node())
+  }
 }
 
 ///|
