@@ -404,7 +404,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
       if (right) {
         right.fill(0);
       }
-      this.reportBlockTelemetry(left, right);
+      // Reserve first-block telemetry for the first initialized DSP render.
       return true;
     }
 

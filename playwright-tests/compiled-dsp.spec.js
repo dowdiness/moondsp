@@ -189,20 +189,86 @@ test('browser demo first render proves StereoDsp feedback recurrence', async ({ 
 });
 
 test('browser demo first render proves StereoDelay startup offset on feedback graph', async ({ page }) => {
-  await startAudio(page, '/?delaySamples=0');
-  await expect
-    .poll(async () => (await firstTelemetry(page))?.sequence || 0, { timeout: 10_000 })
-    .toBeGreaterThan(0);
-  const zeroDelayTelemetry = await firstTelemetry(page);
-  const zeroDelayEnergy = previewEnergy(zeroDelayTelemetry.leftPreview);
-
-  await startAudio(page, '/?delaySamples=24');
-  await expect
-    .poll(async () => (await firstTelemetry(page))?.sequence || 0, { timeout: 10_000 })
-    .toBeGreaterThan(0);
-  const delayedTelemetry = await firstTelemetry(page);
-  const delayedLeftEnergy = previewEnergy(delayedTelemetry.leftPreview);
-  const delayedRightEnergy = previewEnergy(delayedTelemetry.rightPreview);
+  // Hold real Wasm initialization until one silent render has completed.
+  // Install the wrapper before loading the production processor; its DSP and
+  // telemetry implementations are unchanged.
+  await page.addInitScript(() => {
+    const addModule = AudioWorklet.prototype.addModule;
+    AudioWorklet.prototype.addModule = async function (url, options) {
+      const wrapper = URL.createObjectURL(new Blob([`
+        const register = globalThis.registerProcessor;
+        globalThis.registerProcessor = (name, Processor) => {
+          register(name, class extends Processor {
+            async initWasm(module) {
+              await new Promise(resolve => { this.releaseInitialization = resolve; });
+              return super.initWasm(module);
+            }
+            process(...args) {
+              const initialized = this.ready;
+              const result = super.process(...args);
+              if (this.releaseInitialization) {
+                this.port.postMessage({ type: 'test-initialization-delayed' });
+                this.releaseInitialization();
+                this.releaseInitialization = null;
+              }
+              if (initialized && !this.capturedFirstRender) {
+                this.capturedFirstRender = true;
+                this.port.postMessage({
+                  type: 'test-first-render',
+                  leftPreview: Array.from(args[1][0][0].subarray(0, 8)),
+                  rightPreview: Array.from(args[1][0][1].subarray(0, 8)),
+                });
+              }
+              return result;
+            }
+          });
+        };
+      `], { type: 'application/javascript' }));
+      try {
+        await addModule.call(this, wrapper);
+      } finally {
+        URL.revokeObjectURL(wrapper);
+      }
+      return addModule.call(this, url, options);
+    };
+    window.__startupOrder = [];
+    window.__initializationDelayed = false;
+    window.__firstDspRender = null;
+    const NativeNode = window.AudioWorkletNode;
+    window.AudioWorkletNode = class extends NativeNode {
+      constructor(...args) {
+        super(...args);
+        this.port.addEventListener('message', ({ data }) => {
+          if (data.type === 'ready' || (data.type === 'telemetry' && data.sequence === 1)) {
+            window.__startupOrder.push(data.type);
+          } else if (data.type === 'test-initialization-delayed') {
+            window.__initializationDelayed = true;
+          } else if (data.type === 'test-first-render') {
+            window.__firstDspRender = data;
+          }
+        });
+      }
+    };
+  });
+  const initialBlocks = [];
+  for (const delaySamples of [0, 24]) {
+    await startAudio(page, `/?delaySamples=${delaySamples}`);
+    await expect.poll(() => page.evaluate(() => window.__firstDspRender !== null)).toBe(true);
+    const observed = await page.evaluate(() => ({
+      delayed: window.__initializationDelayed,
+      order: window.__startupOrder,
+      rendered: window.__firstDspRender,
+      telemetry: window.__moondspFirstTelemetry,
+    }));
+    expect(observed.delayed).toBe(true);
+    expect(observed.order).toEqual(['ready', 'telemetry']);
+    expect(observed.telemetry.leftPreview).toEqual(observed.rendered.leftPreview);
+    expect(observed.telemetry.rightPreview).toEqual(observed.rendered.rightPreview);
+    initialBlocks.push(observed.telemetry);
+  }
+  const zeroDelayEnergy = previewEnergy(initialBlocks[0].leftPreview);
+  const delayedLeftEnergy = previewEnergy(initialBlocks[1].leftPreview);
+  const delayedRightEnergy = previewEnergy(initialBlocks[1].rightPreview);
 
   expect(zeroDelayEnergy).toBeGreaterThan(0.001);
   expect(delayedLeftEnergy).toBeLessThan(0.000000001);
