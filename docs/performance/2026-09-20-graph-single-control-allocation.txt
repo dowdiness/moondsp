@@ -1,0 +1,85 @@
+Graph single-control allocation regression fix — 2026-09-20
+
+Scope
+-----
+Before: e2c3fd707091b46180f79109e6c14bcecbb5b4ce (PR276–279 stack).
+After: the same source with Dsp::apply_control and StereoDsp::apply_control
+routing directly to CompiledGraph::apply_control_impl, rather than creating
+one-element batches for apply_controls_impl.
+
+Both paths still share prepare_control and commit_prepared_controls. The fix
+changes neither validation rules nor transactional batch semantics.
+
+Environment
+-----------
+Linux x64 / WSL2, AMD Ryzen 7 6800H.
+moon 0.1.20260904 (94521db 2026-09-04), rr_moon_pkg enabled.
+NEW_MOON_MOD=0 moon run allocation_probe --target native --release
+
+Method
+------
+Isolated source export, not a Git worktree. GNU linker wrappers count malloc,
+calloc, realloc, and mi_malloc calls only while the counter is enabled.
+An AudioBuffer allocation is a positive control (2 counted calls).
+Graph construction, control construction, retained batch construction, warmup,
+printing, and rendering are outside the counted loops.
+
+Mono: oscillator -> gain -> output (3 nodes).
+Stereo: oscillator -> gain -> pan -> stereo output (4 nodes).
+Each case applies the same prebuilt gain control 1,000 times, then applies the
+same prebuilt one-control batch 1,000 times. Context: 48 kHz, 128 samples.
+The two revisions use identical probe code and controls.
+
+Results: counted allocations per 1,000 calls
+------------------------------------------
+                                    Before       After
+Mono apply_control                    7000        4000
+Mono apply_controls, retained batch   7000        7000
+Stereo apply_control                  7000        4000
+Stereo apply_controls, retained batch 7000        7000
+Positive control                         2           2
+
+Rendered sample at index 32, identical before/after:
+Mono: 0.4815812833988292
+Stereo left: 0.3405293911838327
+Stereo right: 0.34052939118383263
+
+The earlier review measured the PR276 parent (632233f) at 5,000 allocations
+for mono apply_control and 14,000 for its retained-batch apply_controls.
+The fix removes the single-control regression without undoing the batch gain.
+This historical parent comparison was not repeated with the stereo extension.
+
+Limits
+------
+This measures allocation calls, not allocated bytes, elapsed time, GC pauses,
+or audible glitches. Repeating one control is appropriate for the allocation
+count comparison; it is not a realistic latency workload. The sampled PCM is
+a smoke observation, not an exhaustive signal-equivalence proof. The full
+1,252-test suite passed separately on JS, wasm-gc, and native.
+
+The checked Result-returning API still allocates (4 calls per update in this
+probe). This is NOT an allocation-free control API or native host readiness
+claim. Crossfade completion and render-loop allocation audits are separate.
+
+Reproduction
+------------
+Companion archive:
+2026-09-20-graph-single-control-allocation-probe.tar.gz
+SHA256: 421d20285e2c93011da502170eec18d7bd5735470845d6debca6941a1fdc5026
+
+The archive contains allocation_probe/main.mbt, moon.pkg, audit.c, and the
+single-control.patch. It contains no build products or third-party sources.
+
+1. Export commit e2c3fd707091b46180f79109e6c14bcecbb5b4ce into a disposable
+   directory. Extract the companion archive into that module root.
+2. Run NEW_MOON_MOD=0 moon update, then the native release command above.
+   This records the before row.
+3. Apply single-control.patch with patch -p1 and rerun the same command.
+   This records the after row.
+4. Remove the probe package before any JS/wasm-gc checks: its extern C counter
+   is native-only. Never copy this probe into an audio callback or ship it.
+
+The live checkout's existing .claude/worktrees subtree caused the recursive
+incr-import boundary scan to inspect unrelated nested worktree packages.
+That check was therefore run against the clean exported source instead;
+no nested worktrees were modified or removed.

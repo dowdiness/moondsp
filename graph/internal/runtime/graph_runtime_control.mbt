@@ -21,7 +21,7 @@ pub fn Dsp::apply_control(
   self : Dsp,
   control : GraphControl,
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_controls_impl([control])
+  self.0.apply_control_impl(control)
 }
 
 ///|
@@ -114,7 +114,7 @@ pub fn StereoDsp::apply_control(
   self : StereoDsp,
   control : GraphControl,
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_controls_impl([control])
+  self.0.apply_control_impl(control)
 }
 
 ///|

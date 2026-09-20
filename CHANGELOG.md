@@ -84,6 +84,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   controller wrappers. Removed the obsolete `GraphCompileError::InternalRejected`
   case; compilation now retains checked programs before constructing independent
   runtime instances.
+
+  | Previous type | Replacement |
+  |---|---|
+  | `GraphTemplateDoc` | `GraphDocument` |
+  | `GraphTemplateDocError` | `GraphDocumentError` |
+  | `CompiledTemplate` | `AnalyzedGraph` |
+  | `CompiledDsp` | `Dsp` |
+  | `CompiledStereoDsp` | `StereoDsp` |
+  | `CompiledDspHotSwap` | `DspHotSwap` |
+  | `CompiledStereoDspHotSwap` | `StereoDspHotSwap` |
+  | `CompiledDspTopologyController` | `DspTopologyController` |
+  | `CompiledStereoDspTopologyController` | `StereoDspTopologyController` |
+
 - Runtime control batches retain prepared per-node updates and adopt them once.
   `BoundVoicePool::apply_voices_controls_result` replaces the separate voice
   validation operation, preserving all-target atomicity and ordered diagnostics.
@@ -191,6 +204,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Restored the mono/stereo single-control prepare/commit path without creating
+  a one-element batch. The native release probe records 4 allocations per update
+  instead of 7, with retained-batch allocation counts unchanged; this is not an
+  allocation-free control API claim. See the
+  [measurement record](docs/performance/2026-09-20-graph-single-control-allocation.txt).
+- Run MoonBit target-matrix tests and boundary checks for pull requests against
+  any base branch, including stacked PRs and PR base changes.
 - Fixed topology-crossfade state aliasing: old and replacement graphs now own
   independent oscillator, noise, envelope, filter, and delay histories.
   Replacement envelope/delay settings are retained; delay capacity changes
