@@ -51,7 +51,7 @@ all surviving envelopes for each note.
 ///|
 test "start, render, and release a voice" {
   let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=16)
-  let template = @graph.CompiledTemplate::analyze([
+  let template = @graph.AnalyzedGraph::analyze([
     @graph.DspNode::oscillator(@dsp.Waveform::Sine, 440.0),
     @graph.DspNode::adsr(
       attack_ms=0.0,
@@ -91,7 +91,7 @@ ADSR gates open.
 ///|
 test "set oscillator frequency for one voice" {
   let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=8)
-  let template = @graph.CompiledTemplate::analyze([
+  let template = @graph.AnalyzedGraph::analyze([
     @graph.DspNode::oscillator(@dsp.Waveform::Triangle, 220.0),
     @graph.DspNode::output(0),
   ])
@@ -123,7 +123,7 @@ occupant.
 ///|
 test "a stolen handle cannot control its replacement" {
   let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=4)
-  let template = @graph.CompiledTemplate::analyze([
+  let template = @graph.AnalyzedGraph::analyze([
     @graph.DspNode::constant(0.25),
     @graph.DspNode::output(0),
   ])
@@ -147,14 +147,14 @@ reason. The deprecated Boolean wrappers collapse invalid and stale handles into
 ## Bind pattern controls once
 
 `BoundVoicePool` couples a `VoicePool` with a `ControlBindingMap` validated
-against the same `CompiledTemplate`. It converts named pattern controls into
+against the same `AnalyzedGraph`. It converts named pattern controls into
 graph controls without making the pattern layer know graph indices.
 
 ```mbt check
 ///|
 test "resolve a named control at note-on" {
   let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=8)
-  let template = @graph.CompiledTemplate::analyze([
+  let template = @graph.AnalyzedGraph::analyze([
     @graph.DspNode::oscillator(@dsp.Waveform::Saw, 220.0),
     @graph.DspNode::output(0),
   ])
@@ -179,6 +179,10 @@ test "resolve a named control at note-on" {
 `set_template` replaces the template and bindings transactionally. If graph or
 binding validation fails, the previous pair remains active. Notes already
 sounding keep their compiled graph and envelope-index snapshot.
+The graph built for template admission is retained for the next note. Binding
+admission and template adoption do not compile that graph a second time.
+Rejected note controls leave both sounding voices and the retained graph's
+defaults unchanged.
 
 Use `VoicePool` when the caller already produces `GraphControl` values. Use
 `BoundVoicePool` at the pattern-to-audio boundary, where events carry named

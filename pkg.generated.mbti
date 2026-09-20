@@ -45,6 +45,8 @@ pub fn stereo_shape() -> Int
 // Type aliases
 pub using @dsp {type Adsr}
 
+pub using @graph {type AnalyzedGraph}
+
 pub using @dsp {type AudioBuffer}
 
 pub using @dsp {type Biquad}
@@ -56,20 +58,6 @@ pub using @voice {type BoundVoicePool}
 pub using @voice {type BoundVoicePoolError}
 
 pub using @dsp {type Clip}
-
-pub using @graph {type CompiledDsp}
-
-pub using @graph {type CompiledDspHotSwap}
-
-pub using @graph {type CompiledDspTopologyController}
-
-pub using @graph {type CompiledStereoDsp}
-
-pub using @graph {type CompiledStereoDspHotSwap}
-
-pub using @graph {type CompiledStereoDspTopologyController}
-
-pub using @graph {type CompiledTemplate}
 
 pub using @graph {type ControlBinding}
 
@@ -83,11 +71,17 @@ pub using @dsp {type DelayLine}
 
 pub using @dsp {type DemoSource}
 
+pub using @graph {type Dsp}
+
 pub using @dsp {type DspContext}
+
+pub using @graph {type DspHotSwap}
 
 pub using @graph {type DspNode}
 
 pub using @graph {type DspNodeKind}
+
+pub using @graph {type DspTopologyController}
 
 pub using @dsp {type EnvStage}
 
@@ -103,6 +97,10 @@ pub using @graph {type GraphControlError}
 
 pub using @graph {type GraphControlKind}
 
+pub using @graph {type GraphDocument}
+
+pub using @graph {type GraphDocumentError}
+
 pub using @engine {type GraphEngine}
 
 pub using @engine {type GraphEngineError}
@@ -112,10 +110,6 @@ pub using @graph {type GraphIndexMap}
 pub using @identity {type GraphNodeId}
 
 pub using @graph {type GraphParamSlot}
-
-pub using @graph {type GraphTemplateDoc}
-
-pub using @graph {type GraphTemplateDocError}
 
 pub using @graph {type GraphTopologyEdit}
 
@@ -148,6 +142,12 @@ pub using @identity {type Revision}
 pub using @identity {type StableIdError}
 
 pub using @dsp {type Stereo}
+
+pub using @graph {type StereoDsp}
+
+pub using @graph {type StereoDspHotSwap}
+
+pub using @graph {type StereoDspTopologyController}
 
 pub using @dsp {type StereoReverb}
 

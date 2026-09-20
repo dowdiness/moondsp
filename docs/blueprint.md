@@ -51,7 +51,7 @@ The unifying design principle is the **Incremental Hylomorphism Pipeline**: ever
 │                                                               │
 │   DspSym trait (Finally Tagless)                              │
 │   ┌──────────────┐    ┌────────────┐    ┌─────────────────┐  │
-│   │ DspNode enum │───▶│ compile()  │───▶│ CompiledDsp     │  │
+│   │ DspNode enum │───▶│ compile()  │───▶│ Dsp     │  │
 │   │ (declarative │    │ topo-sort  │    │ (process() per  │  │
 │   │  graph)      │    │ + flatten  │    │  128 samples)   │  │
 │   └──────────────┘    └────────────┘    └────────┬────────┘  │
@@ -73,10 +73,10 @@ The unifying design principle is the **Incremental Hylomorphism Pipeline**: ever
 └───────────────────────────────────────────────────────────────┘
 ```
 
-Inside the DSP Engine box above, the `DspNode enum → compile() → CompiledDsp`
+Inside the DSP Engine box above, the `DspNode enum → compile() → Dsp`
 flow has an explicit intermediate stage:
-`DspNode → CompiledTemplate::analyze → CompiledTemplate → CompiledDsp::compile → CompiledDsp`.
-`CompiledTemplate` is the runtime exchange boundary between authoring
+`DspNode → AnalyzedGraph::analyze → AnalyzedGraph → Dsp::compile → Dsp`.
+`AnalyzedGraph` is the runtime exchange boundary between authoring
 and compile. See ADR-0010 for the contract.
 
 ### Key Separation
@@ -198,43 +198,43 @@ processing.
 ```
 DspNode enum  ──(flatten)──▶  Array[FlatNode]
               ──(topo-sort)──▶  sorted execution order
-              ──(compile)──▶   CompiledDsp (process() function)
+              ──(compile)──▶   Dsp (process() function)
 ```
 
 The boundary type makes the pipeline explicit:
-`DspNode → CompiledTemplate::analyze → CompiledTemplate → CompiledDsp::compile → CompiledDsp`.
-`CompiledTemplate` is the runtime exchange boundary between authoring
+`DspNode → AnalyzedGraph::analyze → AnalyzedGraph → Dsp::compile → Dsp`.
+`AnalyzedGraph` is the runtime exchange boundary between authoring
 and compile. See ADR-0010 for the contract.
 
 Current implemented surface:
-- Declarative mono `DspNode` graph compiled into opaque `CompiledDsp`
+- Declarative mono `DspNode` graph compiled into opaque `Dsp`
 - Explicit `Mono -> Stereo -> Mono` graph segments via `Pan` and
-  `StereoMixDown` inside `CompiledDsp`
-- First narrow terminal-stereo graph slice via `CompiledStereoDsp` for
+  `StereoMixDown` inside `Dsp`
+- First narrow terminal-stereo graph slice via `StereoDsp` for
   `Mono -> Pan -> Stereo post-processing -> StereoOutput`, currently including
   `StereoGain`, `StereoClip`, `StereoBiquad`, and `StereoDelay`
 - `Delay` and `StereoDelay` now support internal recirculating feedback
   coefficients
-- `CompiledDsp` now supports a first narrow automatic graph-feedback slice for
+- `Dsp` now supports a first narrow automatic graph-feedback slice for
   mono-only back-edges via implicit `z^-1`, including direct self-feedback and
   runtime retunes on accepted loops
-- `CompiledStereoDsp` now carries that same mono-valued `z^-1` slice into
+- `StereoDsp` now carries that same mono-valued `z^-1` slice into
   terminal-stereo graphs before `Pan`, while stereo-valued back-edges remain
   out of scope
-- `CompiledDspHotSwap` now provides a first mono-only graph replacement layer
+- `DspHotSwap` now provides a first mono-only graph replacement layer
   for already-compiled graphs, with queued swap plus optional equal-power
   crossfade
 - The browser prototype now also proves that mono hot-swap path in the
   AudioWorklet via a dedicated wrapper mode
-- `CompiledStereoDspHotSwap` now brings the same whole-graph swap model to the
+- `StereoDspHotSwap` now brings the same whole-graph swap model to the
   current terminal-stereo slice, including browser proof in the AudioWorklet
-- `CompiledDspTopologyController` now adds a first narrow mono topology-edit
+- `DspTopologyController` now adds a first narrow mono topology-edit
   layer above hot-swap with transactional node replacement, input rewiring, and
   append-only unary node insertion plus mono-only unary deletion
 - The browser prototype now also proves that mono topology-edit path in the
   AudioWorklet via a dedicated wrapper mode with explicit insert and delete
   queue operations
-- `CompiledStereoDspTopologyController` now brings the same narrow
+- `StereoDspTopologyController` now brings the same narrow
   topology-edit model to terminal-stereo graphs, including browser proof in the
   AudioWorklet
 - Topological sorting, graph validation, and runtime control for the current
@@ -278,7 +278,7 @@ browser proof.
 arbitrary control maps need open extensibility.
 
 Implemented:
-- `VoicePool` managing 32+ mono `CompiledDsp` instances with stereo mixdown
+- `VoicePool` managing 32+ mono `Dsp` instances with stereo mixdown
 - Priority-based stealing: idle → oldest releasing → oldest active
 - Generation-tagged `VoiceHandle` preventing stale-handle bugs
 - Two-stage silence detection: ADSR idle AND output buffer silent (catches delay tails)
@@ -334,7 +334,7 @@ Pattern Engine                          DSP Engine
   Voice allocation + DspNode construction
      │
      ▼
-  CompiledDsp.process() → audio
+  Dsp.process() → audio
 ```
 
 **Deliverable**: Text pattern → audible polyphonic output in browser.

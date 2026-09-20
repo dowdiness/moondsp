@@ -79,6 +79,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Renamed graph lifecycle types to `GraphDocument`, `GraphDocumentError`,
+  `AnalyzedGraph`, `Dsp`, and `StereoDsp`, including their hot-swap and topology
+  controller wrappers. Removed the obsolete `GraphCompileError::InternalRejected`
+  case; compilation now retains checked programs before constructing independent
+  runtime instances.
+- Runtime control batches retain prepared per-node updates and adopt them once.
+  `BoundVoicePool::apply_voices_controls_result` replaces the separate voice
+  validation operation, preserving all-target atomicity and ordered diagnostics.
+- Voice template admission retains its compiled graph for a slot or the next
+  note instead of discarding it and compiling again during adoption.
 - Consolidated snapshot playback into `PatternScheduler::render_block` for dry
   stereo and `render_block_with_send` for dry stereo plus effect send, backed
   by one block-processing implementation. Removed the pattern/song-specific
@@ -181,6 +191,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed topology-crossfade state aliasing: old and replacement graphs now own
+  independent oscillator, noise, envelope, filter, and delay histories.
+  Replacement envelope/delay settings are retained; delay capacity changes
+  and deletion batches retain their existing fresh-state policy.
+- Topology edits now carry their old-to-new node correspondence with the result;
+  rewiring a gain's signal input preserves its envelope input.
 - Reject unterminated Mini block comments without publishing a valid prefix, and
   share comment scanning between parsing and playback admission so `/* // */`
   cannot hide excessive nesting. Bounded recursive descent now checks depth

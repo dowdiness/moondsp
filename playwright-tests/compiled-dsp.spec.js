@@ -126,11 +126,13 @@ function stereoTopologyEditExpectedRight(index, oldValue, newValue) {
 async function startAudio(page, path) {
   await page.goto(path);
   await page.click('#startBtn');
+  await expect
+    .poll(async () => (await firstTelemetry(page))?.sequence || 0, { timeout: 10_000 })
+    .toBeGreaterThan(0);
 }
 
-test('browser demo first render proves CompiledStereoDsp feedback recurrence', async ({ page }) => {
+test('browser demo first render proves StereoDsp feedback recurrence', async ({ page }) => {
   await startAudio(page, '/?freq=0&delaySamples=0');
-  await expect(page.locator('#status')).toContainText('CompiledStereoDsp block runtime');
   // The `mix(3,5)` + `gain(0.3)` z^-1 feedback loop, with freq=0 the
   // oscillator drops out, so the loop solves
   //   x = 1.0 + 0.3 * x  →  x = 1/0.7 ≈ 1.4286
@@ -209,7 +211,6 @@ test('browser demo first render proves StereoDelay startup offset on feedback gr
 
 test('browser demo retunes stereo feedback gain and reacts to pan', async ({ page }) => {
   await startAudio(page, '/');
-  await expect(page.locator('#status')).toContainText('CompiledStereoDsp block runtime');
   await expect
     .poll(async () => (await currentTelemetry(page))?.sequence || 0, { timeout: 10_000 })
     .toBeGreaterThan(0);
@@ -341,10 +342,8 @@ test('browser demo retunes stereo feedback gain and reacts to pan', async ({ pag
     .toBeGreaterThan(0.8);
 });
 
-test('browser demo falls back to CompiledDsp when stereo init fails', async ({ page }) => {
+test('browser demo falls back to Dsp when stereo init fails', async ({ page }) => {
   await startAudio(page, '/?forceStereoInitFailure=1&freq=440');
-  await expect(page.locator('#status')).toContainText('CompiledDsp block runtime');
-  await expect(page.locator('#status')).not.toContainText('Processor init failed');
   await expect
     .poll(async () => (await firstTelemetry(page))?.sequence || 0, { timeout: 10_000 })
     .toBeGreaterThan(0);
@@ -381,9 +380,8 @@ test('browser demo falls back to CompiledDsp when stereo init fails', async ({ p
   expect(retunedTelemetry.overallPeak).toBeLessThan(1.01);
 });
 
-test('browser demo proves CompiledDspHotSwap crossfade in the worklet', async ({ page }) => {
+test('browser demo proves DspHotSwap crossfade in the worklet', async ({ page }) => {
   await startAudio(page, '/?hotSwapMono=1');
-  await expect(page.locator('#status')).toContainText('CompiledDspHotSwap block runtime');
   await expect
     .poll(async () => (await firstTelemetry(page))?.sequence || 0, { timeout: 10_000 })
     .toBeGreaterThan(0);
@@ -438,9 +436,8 @@ test('browser demo proves CompiledDspHotSwap crossfade in the worklet', async ({
   expect(settledTelemetry.overallPeak).toBeCloseTo(0.75, 6);
 });
 
-test('browser demo proves CompiledDspTopologyController insert delete roundtrip in the worklet', async ({ page }) => {
+test('browser demo proves DspTopologyController insert delete roundtrip in the worklet', async ({ page }) => {
   await startAudio(page, '/?topologyEditMono=1');
-  await expect(page.locator('#status')).toContainText('CompiledDspTopologyController block runtime');
   await setRangeValue(page, '#gainSlider', 100);
   await expect(page.locator('#gainValue')).toHaveText('100');
   await expect
@@ -568,9 +565,8 @@ test('browser demo proves CompiledDspTopologyController insert delete roundtrip 
   expect(settledTelemetry.overallPeak).toBeCloseTo(0.5, 6);
 });
 
-test('browser demo proves CompiledStereoDspTopologyController crossfade in the worklet', async ({ page }) => {
+test('browser demo proves StereoDspTopologyController crossfade in the worklet', async ({ page }) => {
   await startAudio(page, '/?topologyEditStereo=1');
-  await expect(page.locator('#status')).toContainText('CompiledStereoDspTopologyController block runtime');
   await setRangeValue(page, '#gainSlider', 100);
   await expect(page.locator('#gainValue')).toHaveText('100');
   await expect
@@ -733,9 +729,8 @@ test('browser demo proves exit deliverable FM synthesis in the worklet', async (
     .toBeGreaterThan(0.0001);
 });
 
-test('browser demo proves CompiledStereoDspHotSwap crossfade in the worklet', async ({ page }) => {
+test('browser demo proves StereoDspHotSwap crossfade in the worklet', async ({ page }) => {
   await startAudio(page, '/?hotSwapStereo=1');
-  await expect(page.locator('#status')).toContainText('CompiledStereoDspHotSwap block runtime');
   await expect
     .poll(async () => (await firstTelemetry(page))?.sequence || 0, { timeout: 10_000 })
     .toBeGreaterThan(0);

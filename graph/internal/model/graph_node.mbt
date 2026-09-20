@@ -377,8 +377,8 @@ pub fn DspNode::noise(seed : UInt) -> DspNode {
 ///|
 /// Create an ADSR envelope source node.
 ///
-/// Use `CompiledDsp::apply_control(GraphControl::gate_on(...))` and
-/// `CompiledDsp::apply_control(GraphControl::gate_off(...))` to drive the
+/// Use `Dsp::apply_control(GraphControl::gate_on(...))` and
+/// `Dsp::apply_control(GraphControl::gate_off(...))` to drive the
 /// envelope after compilation.
 pub fn DspNode::adsr(
   attack_ms~ : Double,

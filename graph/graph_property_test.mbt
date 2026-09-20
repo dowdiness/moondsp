@@ -385,27 +385,27 @@ fn samples_identical(a : Array[Double], b : Array[Double]) -> Bool {
 ///|
 /// Compile a mono graph, abort on failure. Generators produce valid graphs,
 /// so compilation failure indicates a generator bug, not expected rejection.
-fn compile_mono(nodes : Array[DspNode]) -> CompiledDsp {
+fn compile_mono(nodes : Array[DspNode]) -> Dsp {
   let context = DspContext::new(
     sample_rate=PROP_SAMPLE_RATE,
     block_size=PROP_BLOCK_SIZE,
   )
-  CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
+  Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
 }
 
 ///|
 /// Compile a stereo graph, abort on failure.
-fn compile_stereo(nodes : Array[DspNode]) -> CompiledStereoDsp {
+fn compile_stereo(nodes : Array[DspNode]) -> StereoDsp {
   let context = DspContext::new(
     sample_rate=PROP_SAMPLE_RATE,
     block_size=PROP_BLOCK_SIZE,
   )
-  CompiledStereoDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
+  StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
 }
 
 ///|
 /// Process a mono compiled graph for N blocks, return all samples.
-fn run_mono(compiled : CompiledDsp, num_blocks : Int) -> Array[Double] {
+fn run_mono(compiled : Dsp, num_blocks : Int) -> Array[Double] {
   let context = DspContext::new(
     sample_rate=PROP_SAMPLE_RATE,
     block_size=PROP_BLOCK_SIZE,
@@ -424,7 +424,7 @@ fn run_mono(compiled : CompiledDsp, num_blocks : Int) -> Array[Double] {
 ///|
 /// Process a stereo compiled graph for N blocks, return (left, right) samples.
 fn run_stereo(
-  compiled : CompiledStereoDsp,
+  compiled : StereoDsp,
   num_blocks : Int,
 ) -> (Array[Double], Array[Double]) {
   let context = DspContext::new(
@@ -488,14 +488,8 @@ test "prop: mono ADSR graph — compile twice, process identically" {
         sample_rate=PROP_SAMPLE_RATE,
         block_size=PROP_BLOCK_SIZE,
       )
-      let compiled_a = CompiledDsp::compile(
-        CompiledTemplate::analyze(nodes),
-        context,
-      ).unwrap()
-      let compiled_b = CompiledDsp::compile(
-        CompiledTemplate::analyze(nodes),
-        context,
-      ).unwrap()
+      let compiled_a = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+      let compiled_b = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
       if compiled_a.gate_on(0) is Err(_) || compiled_b.gate_on(0) is Err(_) {
         return false
       }
@@ -576,14 +570,8 @@ test "prop: mono feedback cycle — runtime retune is deterministic" {
         sample_rate=PROP_SAMPLE_RATE,
         block_size=PROP_BLOCK_SIZE,
       )
-      let compiled_a = CompiledDsp::compile(
-        CompiledTemplate::analyze(nodes),
-        context,
-      ).unwrap()
-      let compiled_b = CompiledDsp::compile(
-        CompiledTemplate::analyze(nodes),
-        context,
-      ).unwrap()
+      let compiled_a = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+      let compiled_b = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
       // The gain node is always the last before Output in our feedback graphs
       let gain_index = nodes.length() - 2
       let new_gain = 0.05 + (s / 13 % 18).to_double() * 0.05
@@ -646,11 +634,11 @@ test "prop: mono hot-swap — same swap sequence produces identical output" {
         block_size=PROP_BLOCK_SIZE,
       )
       let crossfade = 64 + s % 128
-      let hs_a = CompiledDspHotSwap::from_graph(
+      let hs_a = DspHotSwap::from_graph(
         compile_mono(nodes_initial),
         crossfade_samples=crossfade,
       )
-      let hs_b = CompiledDspHotSwap::from_graph(
+      let hs_b = DspHotSwap::from_graph(
         compile_mono(nodes_initial),
         crossfade_samples=crossfade,
       )
@@ -693,11 +681,11 @@ test "prop: stereo hot-swap — same swap sequence produces identical output" {
         block_size=PROP_BLOCK_SIZE,
       )
       let crossfade = 64 + s % 128
-      let hs_a = CompiledStereoDspHotSwap::from_graph(
+      let hs_a = StereoDspHotSwap::from_graph(
         compile_stereo(nodes_initial),
         crossfade_samples=crossfade,
       )
-      let hs_b = CompiledStereoDspHotSwap::from_graph(
+      let hs_b = StereoDspHotSwap::from_graph(
         compile_stereo(nodes_initial),
         crossfade_samples=crossfade,
       )
@@ -753,14 +741,8 @@ test "prop: runtime param update is deterministic across compilations" {
         sample_rate=PROP_SAMPLE_RATE,
         block_size=PROP_BLOCK_SIZE,
       )
-      let compiled_a = CompiledDsp::compile(
-        CompiledTemplate::analyze(nodes),
-        context,
-      ).unwrap()
-      let compiled_b = CompiledDsp::compile(
-        CompiledTemplate::analyze(nodes),
-        context,
-      ).unwrap()
+      let compiled_a = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+      let compiled_b = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
       if compiled_a.apply_control(
           GraphControl::set_param(1, GraphParamSlot::Value0, new_gain),
         )
@@ -812,14 +794,8 @@ test "prop: runtime control variants are deterministic" {
             ),
             DspNode::output(1),
           ]
-          let ca = CompiledDsp::compile(
-            CompiledTemplate::analyze(nodes),
-            context,
-          ).unwrap()
-          let cb = CompiledDsp::compile(
-            CompiledTemplate::analyze(nodes),
-            context,
-          ).unwrap()
+          let ca = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+          let cb = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
           ca.process(context, out_a)
           cb.process(context, out_b)
           if ca.apply_control(
@@ -859,14 +835,8 @@ test "prop: runtime control variants are deterministic" {
             ),
             DspNode::output(1),
           ]
-          let ca = CompiledDsp::compile(
-            CompiledTemplate::analyze(nodes),
-            context,
-          ).unwrap()
-          let cb = CompiledDsp::compile(
-            CompiledTemplate::analyze(nodes),
-            context,
-          ).unwrap()
+          let ca = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+          let cb = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
           ca.process(context, out_a)
           cb.process(context, out_b)
           if ca.apply_control(
@@ -903,14 +873,8 @@ test "prop: runtime control variants are deterministic" {
             DspNode::mul(0, 1),
             DspNode::output(2),
           ]
-          let ca = CompiledDsp::compile(
-            CompiledTemplate::analyze(nodes),
-            context,
-          ).unwrap()
-          let cb = CompiledDsp::compile(
-            CompiledTemplate::analyze(nodes),
-            context,
-          ).unwrap()
+          let ca = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+          let cb = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
           if ca.gate_on(0) is Err(_) || cb.gate_on(0) is Err(_) {
             return false
           }
@@ -1210,18 +1174,15 @@ test "graph generators compile at signed seed boundaries and topology variants" 
         gen_mono_graph, gen_binary_graph, gen_adsr_graph, gen_mono_feedback_graph,
       ] {
       match
-        CompiledDsp::compile_result(
-          CompiledTemplate::analyze(generate(seed)),
-          context,
-        ) {
+        Dsp::compile_result(AnalyzedGraph::analyze(generate(seed)), context) {
         Ok(_) => ()
         Err(error) => fail("mono seed \{seed}: \{error}")
       }
     }
     for generate in [gen_stereo_graph, gen_stereo_feedback_graph] {
       match
-        CompiledStereoDsp::compile_result(
-          CompiledTemplate::analyze(generate(seed)),
+        StereoDsp::compile_result(
+          AnalyzedGraph::analyze(generate(seed)),
           context,
         ) {
         Ok(_) => ()

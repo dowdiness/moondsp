@@ -19,9 +19,9 @@
 /// the graph unchanged on the first error.
 ///
 /// WHY 12 near-identical impl blocks below: MoonBit has no blanket impls or
-/// default trait methods. Each of the 6 wrapper types (CompiledDsp,
-/// CompiledStereoDsp, CompiledDspHotSwap, CompiledStereoDspHotSwap,
-/// CompiledDspTopologyController, CompiledStereoDspTopologyController)
+/// default trait methods. Each of the 6 wrapper types (Dsp,
+/// StereoDsp, DspHotSwap, StereoDspHotSwap,
+/// DspTopologyController, StereoDspTopologyController)
 /// must declare both methods individually. The compiled wrappers delegate to
 /// `graph/internal/runtime`; staging wrappers delegate to their local state.
 /// This is irreducible boilerplate under the current type system.
@@ -34,7 +34,7 @@ pub trait GraphControllable {
 }
 
 ///|
-pub impl GraphControllable for CompiledDsp with fn apply_control(self, control) -> Result[
+pub impl GraphControllable for Dsp with fn apply_control(self, control) -> Result[
   Unit,
   GraphControlError,
 ] {
@@ -42,35 +42,51 @@ pub impl GraphControllable for CompiledDsp with fn apply_control(self, control) 
 }
 
 ///|
-pub impl GraphControllable for CompiledDsp with fn apply_controls(
-  self,
-  controls,
-) -> Result[Unit, GraphControlError] {
+pub impl GraphControllable for Dsp with fn apply_controls(self, controls) -> Result[
+  Unit,
+  GraphControlError,
+] {
   graph_control_result_from_runtime(
     self.raw().apply_controls(graph_controls_to_model(controls)),
   )
 }
 
 ///|
-pub impl GraphControllable for CompiledStereoDsp with fn apply_control(
-  self,
-  control,
-) -> Result[Unit, GraphControlError] {
+pub impl GraphControllable for StereoDsp with fn apply_control(self, control) -> Result[
+  Unit,
+  GraphControlError,
+] {
   graph_control_result_from_runtime(self.raw().apply_control(control.raw()))
 }
 
 ///|
-pub impl GraphControllable for CompiledStereoDsp with fn apply_controls(
-  self,
-  controls,
-) -> Result[Unit, GraphControlError] {
+pub impl GraphControllable for StereoDsp with fn apply_controls(self, controls) -> Result[
+  Unit,
+  GraphControlError,
+] {
   graph_control_result_from_runtime(
     self.raw().apply_controls(graph_controls_to_model(controls)),
   )
 }
 
 ///|
-pub impl GraphControllable for CompiledDspHotSwap with fn apply_control(
+pub impl GraphControllable for DspHotSwap with fn apply_control(self, control) -> Result[
+  Unit,
+  GraphControlError,
+] {
+  self.apply_control(control)
+}
+
+///|
+pub impl GraphControllable for DspHotSwap with fn apply_controls(self, controls) -> Result[
+  Unit,
+  GraphControlError,
+] {
+  self.apply_controls(controls)
+}
+
+///|
+pub impl GraphControllable for StereoDspHotSwap with fn apply_control(
   self,
   control,
 ) -> Result[Unit, GraphControlError] {
@@ -78,7 +94,7 @@ pub impl GraphControllable for CompiledDspHotSwap with fn apply_control(
 }
 
 ///|
-pub impl GraphControllable for CompiledDspHotSwap with fn apply_controls(
+pub impl GraphControllable for StereoDspHotSwap with fn apply_controls(
   self,
   controls,
 ) -> Result[Unit, GraphControlError] {
@@ -86,7 +102,7 @@ pub impl GraphControllable for CompiledDspHotSwap with fn apply_controls(
 }
 
 ///|
-pub impl GraphControllable for CompiledStereoDspHotSwap with fn apply_control(
+pub impl GraphControllable for DspTopologyController with fn apply_control(
   self,
   control,
 ) -> Result[Unit, GraphControlError] {
@@ -94,7 +110,7 @@ pub impl GraphControllable for CompiledStereoDspHotSwap with fn apply_control(
 }
 
 ///|
-pub impl GraphControllable for CompiledStereoDspHotSwap with fn apply_controls(
+pub impl GraphControllable for DspTopologyController with fn apply_controls(
   self,
   controls,
 ) -> Result[Unit, GraphControlError] {
@@ -102,7 +118,7 @@ pub impl GraphControllable for CompiledStereoDspHotSwap with fn apply_controls(
 }
 
 ///|
-pub impl GraphControllable for CompiledDspTopologyController with fn apply_control(
+pub impl GraphControllable for StereoDspTopologyController with fn apply_control(
   self,
   control,
 ) -> Result[Unit, GraphControlError] {
@@ -110,7 +126,7 @@ pub impl GraphControllable for CompiledDspTopologyController with fn apply_contr
 }
 
 ///|
-pub impl GraphControllable for CompiledDspTopologyController with fn apply_controls(
+pub impl GraphControllable for StereoDspTopologyController with fn apply_controls(
   self,
   controls,
 ) -> Result[Unit, GraphControlError] {
@@ -118,17 +134,24 @@ pub impl GraphControllable for CompiledDspTopologyController with fn apply_contr
 }
 
 ///|
-pub impl GraphControllable for CompiledStereoDspTopologyController with fn apply_control(
-  self,
-  control,
-) -> Result[Unit, GraphControlError] {
-  self.apply_control(control)
-}
-
-///|
-pub impl GraphControllable for CompiledStereoDspTopologyController with fn apply_controls(
-  self,
-  controls,
-) -> Result[Unit, GraphControlError] {
-  self.apply_controls(controls)
+/// Apply one control batch atomically to every successful mono target.
+/// All targets are prepared before any target is committed.
+pub fn[T] Dsp::apply_controls_to_all(
+  targets : Array[Result[Dsp, T]],
+  controls : Array[GraphControl],
+  wrap_error : (GraphControlError) -> T,
+) -> Result[Unit, T] {
+  let raw_targets : Array[Result[@runtime.Dsp, T]] = []
+  raw_targets.reserve_capacity(targets.length())
+  for target in targets {
+    match target {
+      Ok(graph) => raw_targets.push(Ok(graph.raw()))
+      Err(error) => raw_targets.push(Err(error))
+    }
+  }
+  @runtime.Dsp::apply_controls_to_all(
+    raw_targets,
+    graph_controls_to_model(controls),
+    error => wrap_error(graph_control_error_from_runtime(error)),
+  )
 }

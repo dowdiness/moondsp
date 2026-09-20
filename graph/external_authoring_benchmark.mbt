@@ -417,10 +417,8 @@ fn bench_external_realistic_authoring_fixtures() -> Array[
 }
 
 ///|
-fn bench_external_doc(
-  fixture : BenchExternalAuthoringFixture,
-) -> GraphTemplateDoc {
-  try GraphTemplateDoc::from_nodes(ids=fixture.ids, nodes=fixture.nodes) catch {
+fn bench_external_doc(fixture : BenchExternalAuthoringFixture) -> GraphDocument {
+  try GraphDocument::from_nodes(ids=fixture.ids, nodes=fixture.nodes) catch {
     error => abort("expected generated graph doc, got \{error}")
   } noraise {
     doc => doc
@@ -494,9 +492,9 @@ fn bench_external_control_batch(
 
 ///|
 fn bench_external_replace_roundtrip(
-  doc : GraphTemplateDoc,
+  doc : GraphDocument,
   fixture : BenchExternalAuthoringFixture,
-) -> GraphTemplateDoc {
+) -> GraphDocument {
   let target_id = fixture.ids[1]
   let replaced = try doc.replace_node(target_id, DspNode::gain(0, 0.55)) catch {
     error => abort("expected replace edit to apply, got \{error}")
@@ -512,9 +510,9 @@ fn bench_external_replace_roundtrip(
 
 ///|
 fn bench_external_add_roundtrip(
-  doc : GraphTemplateDoc,
+  doc : GraphDocument,
   fixture : BenchExternalAuthoringFixture,
-) -> GraphTemplateDoc {
+) -> GraphDocument {
   let output_id = fixture.ids[fixture.nodes.length() - 1]
   let inserted_id = bench_external_inserted_id("add")
   let inserted = try
@@ -545,9 +543,9 @@ fn bench_external_add_roundtrip(
 
 ///|
 fn bench_external_remove_roundtrip(
-  doc : GraphTemplateDoc,
+  doc : GraphDocument,
   fixture : BenchExternalAuthoringFixture,
-) -> GraphTemplateDoc {
+) -> GraphDocument {
   let output_id = fixture.ids[fixture.nodes.length() - 1]
   let delete_index = fixture.nodes.length() - 2
   let delete_id = fixture.ids[delete_index]
@@ -579,9 +577,9 @@ fn bench_external_remove_roundtrip(
 
 ///|
 fn bench_external_rewire_roundtrip(
-  doc : GraphTemplateDoc,
+  doc : GraphDocument,
   fixture : BenchExternalAuthoringFixture,
-) -> GraphTemplateDoc {
+) -> GraphDocument {
   let target_index = fixture.nodes.length() - 2
   let target_id = fixture.ids[target_index]
   let replacement_source_id = fixture.ids[0]
@@ -612,9 +610,9 @@ fn bench_external_rewire_roundtrip(
 
 ///|
 fn bench_external_shape_rewire_doc(
-  doc : GraphTemplateDoc,
+  doc : GraphDocument,
   fixture : BenchExternalAuthoringFixture,
-) -> GraphTemplateDoc {
+) -> GraphDocument {
   try
     doc.rewire_input(
       fixture.shape_rewire_target_id,
@@ -630,9 +628,9 @@ fn bench_external_shape_rewire_doc(
 
 ///|
 fn bench_external_shape_rewire_roundtrip(
-  doc : GraphTemplateDoc,
+  doc : GraphDocument,
   fixture : BenchExternalAuthoringFixture,
-) -> GraphTemplateDoc {
+) -> GraphDocument {
   let rewired = bench_external_shape_rewire_doc(doc, fixture)
   try
     rewired.rewire_input(
@@ -655,7 +653,7 @@ fn bench_external_template_analyze_group(
   for fixture in fixtures {
     let nodes = fixture.nodes
     b.bench(name=fixture.name, fn() {
-      let template = CompiledTemplate::analyze(nodes)
+      let template = AnalyzedGraph::analyze(nodes)
       b.keep(template)
     })
   }
@@ -739,17 +737,14 @@ fn bench_external_control_binding_rejection(
 ///|
 fn bench_external_compile_result_rejection(
   b : @bench.T,
-  make_template : (BenchExternalAuthoringFixture) -> CompiledTemplate,
+  make_template : (BenchExternalAuthoringFixture) -> AnalyzedGraph,
   label : String,
 ) -> Unit {
   let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   for fixture in bench_external_authoring_fixtures() {
     let template = make_template(fixture)
     b.bench(name=fixture.name, fn() {
-      let error = bench_expect_err(
-        CompiledDsp::compile_result(template, ctx),
-        label,
-      )
+      let error = bench_expect_err(Dsp::compile_result(template, ctx), label)
       b.keep(error)
     })
   }
@@ -836,9 +831,9 @@ fn bench_external_recompile_rejected_topology_edit(
 
 ///|
 fn bench_external_invalid_doc_rewire(
-  doc : GraphTemplateDoc,
+  doc : GraphDocument,
   fixture : BenchExternalAuthoringFixture,
-) -> GraphTemplateDocError {
+) -> GraphDocumentError {
   try
     doc.rewire_input(
       fixture.ids[0],
@@ -855,38 +850,38 @@ fn bench_external_invalid_doc_rewire(
 ///|
 fn bench_external_missing_output_template(
   fixture : BenchExternalAuthoringFixture,
-) -> CompiledTemplate {
+) -> AnalyzedGraph {
   let nodes = fixture.nodes.copy()
   ignore(nodes.pop())
-  CompiledTemplate::analyze(nodes)
+  AnalyzedGraph::analyze(nodes)
 }
 
 ///|
 fn bench_external_multiple_outputs_template(
   fixture : BenchExternalAuthoringFixture,
-) -> CompiledTemplate {
+) -> AnalyzedGraph {
   let nodes = fixture.nodes.copy()
   nodes.push(DspNode::output(fixture.nodes.length() - 2))
-  CompiledTemplate::analyze(nodes)
+  AnalyzedGraph::analyze(nodes)
 }
 
 ///|
 fn bench_external_invalid_input_template(
   fixture : BenchExternalAuthoringFixture,
-) -> CompiledTemplate {
+) -> AnalyzedGraph {
   let nodes = fixture.nodes.copy()
   let output_index = nodes.length() - 1
   nodes[output_index] = DspNode::output(nodes.length() + 17)
-  CompiledTemplate::analyze(nodes)
+  AnalyzedGraph::analyze(nodes)
 }
 
 ///|
 fn bench_external_invalid_param_template(
   fixture : BenchExternalAuthoringFixture,
-) -> CompiledTemplate {
+) -> AnalyzedGraph {
   let nodes = fixture.nodes.copy()
   nodes[1] = DspNode::gain(0, 0.0 / 0.0)
-  CompiledTemplate::analyze(nodes)
+  AnalyzedGraph::analyze(nodes)
 }
 
 ///|
@@ -903,7 +898,7 @@ test "bench graph: external authoring fixtures compile, bind, and edit" {
       .build(template)
       .unwrap()
     assert_true(bindings.length() == fixture.control_keys.length())
-    let compiled = CompiledDsp::compile(doc.analyze(), ctx).unwrap()
+    let compiled = Dsp::compile(doc.analyze(), ctx).unwrap()
     compiled
     .apply_controls(bench_external_control_batch(fixture, 0.01))
     .unwrap()
@@ -954,34 +949,25 @@ test "bench graph: external authoring diagnostic fixtures reject safely" {
     ignore(bench_external_invalid_doc_rewire(doc, fixture))
     assert_true(doc.length() == fixture.nodes.length())
     assert_true(
-      CompiledDsp::compile_result(
-        bench_external_missing_output_template(fixture),
-        ctx,
-      )
+      Dsp::compile_result(bench_external_missing_output_template(fixture), ctx)
       is Err(_),
     )
     assert_true(
-      CompiledDsp::compile_result(
+      Dsp::compile_result(
         bench_external_multiple_outputs_template(fixture),
         ctx,
       )
       is Err(_),
     )
     assert_true(
-      CompiledDsp::compile_result(
-        bench_external_invalid_input_template(fixture),
-        ctx,
-      )
+      Dsp::compile_result(bench_external_invalid_input_template(fixture), ctx)
       is Err(_),
     )
     assert_true(
-      CompiledDsp::compile_result(
-        bench_external_invalid_param_template(fixture),
-        ctx,
-      )
+      Dsp::compile_result(bench_external_invalid_param_template(fixture), ctx)
       is Err(_),
     )
-    let compiled = CompiledDsp::compile(template, ctx).unwrap()
+    let compiled = Dsp::compile(template, ctx).unwrap()
     assert_true(
       compiled.apply_controls(bench_external_invalid_param_batch(fixture, 0.01))
       is Err(_),
@@ -990,7 +976,7 @@ test "bench graph: external authoring diagnostic fixtures reject safely" {
       compiled.apply_controls(bench_external_control_batch(fixture, 0.02))
       is Ok(_),
     )
-    let controller = CompiledDspTopologyController::from_nodes(
+    let controller = DspTopologyController::from_nodes(
       fixture.nodes,
       ctx,
       crossfade_samples=128,
@@ -1013,7 +999,7 @@ test "bench graph: external authoring diagnostic fixtures reject safely" {
       controller.queue_topology_edit(bench_external_valid_replace_edit(0.55))
       is Ok(_),
     )
-    let recompile_controller = CompiledDspTopologyController::from_nodes(
+    let recompile_controller = DspTopologyController::from_nodes(
       fixture.nodes,
       ctx,
       crossfade_samples=128,
@@ -1059,18 +1045,15 @@ test "bench graph: realistic external authoring fixtures compile, bind, and edit
     assert_true(edited_bindings.length() == fixture.control_keys.length())
     match fixture.graph_kind {
       MonoExternalGraph => {
-        let compiled = CompiledDsp::compile(doc.analyze(), ctx).unwrap()
+        let compiled = Dsp::compile(doc.analyze(), ctx).unwrap()
         compiled.apply_controls(controls).unwrap()
-        let edited_compiled = CompiledDsp::compile(edited_doc.analyze(), ctx).unwrap()
+        let edited_compiled = Dsp::compile(edited_doc.analyze(), ctx).unwrap()
         edited_compiled.apply_controls(controls).unwrap()
       }
       StereoExternalGraph => {
-        let compiled = CompiledStereoDsp::compile(doc.analyze(), ctx).unwrap()
+        let compiled = StereoDsp::compile(doc.analyze(), ctx).unwrap()
         compiled.apply_controls(controls).unwrap()
-        let edited_compiled = CompiledStereoDsp::compile(
-          edited_doc.analyze(),
-          ctx,
-        ).unwrap()
+        let edited_compiled = StereoDsp::compile(edited_doc.analyze(), ctx).unwrap()
         edited_compiled.apply_controls(controls).unwrap()
       }
     }
@@ -1121,10 +1104,7 @@ test "bench/external_authoring/string_control_resolution" (b : @bench.T) {
 test "bench/external_control/apply_param_batch_compiled" (b : @bench.T) {
   let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   for fixture in bench_external_authoring_fixtures() {
-    let compiled = CompiledDsp::compile(
-      CompiledTemplate::analyze(fixture.nodes),
-      ctx,
-    ).unwrap()
+    let compiled = Dsp::compile(AnalyzedGraph::analyze(fixture.nodes), ctx).unwrap()
     let controls_a = bench_external_control_batch(fixture, 0.01)
     let controls_b = bench_external_control_batch(fixture, 0.02)
     let use_b = @ref.new(false)
@@ -1143,7 +1123,7 @@ test "bench/external_control/apply_param_batch_topology_controller" (
 ) {
   let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   for fixture in bench_external_authoring_fixtures() {
-    let controller = CompiledDspTopologyController::from_nodes(
+    let controller = DspTopologyController::from_nodes(
       fixture.nodes,
       ctx,
       crossfade_samples=128,
@@ -1202,7 +1182,7 @@ test "bench/external_authoring/compile_prepared_template_change" (b : @bench.T) 
     b.bench(name=fixture.name, fn() {
       let template = if use_b.val { template_b } else { template_a }
       use_b.val = !use_b.val
-      let compiled = CompiledDsp::compile_result(template, ctx)
+      let compiled = Dsp::compile_result(template, ctx)
       b.keep(compiled)
     })
   }
@@ -1220,14 +1200,14 @@ test "bench/external_authoring/queue_prepared_hotswap_setup" (b : @bench.T) {
     } noraise {
       next => next
     }
-    let compiled_a = CompiledDsp::compile(doc.analyze(), ctx).unwrap()
-    let compiled_b = CompiledDsp::compile(edited_doc.analyze(), ctx).unwrap()
+    let compiled_a = Dsp::compile(doc.analyze(), ctx).unwrap()
+    let compiled_b = Dsp::compile(edited_doc.analyze(), ctx).unwrap()
     let use_b = @ref.new(false)
     b.bench(name=fixture.name, fn() {
       let active = if use_b.val { compiled_b } else { compiled_a }
       let next = if use_b.val { compiled_a } else { compiled_b }
       use_b.val = !use_b.val
-      let hs = CompiledDspHotSwap::from_graph(active, crossfade_samples=128)
+      let hs = DspHotSwap::from_graph(active, crossfade_samples=128)
       hs.queue_swap(next).unwrap()
       b.keep(hs)
     })
@@ -1272,10 +1252,7 @@ test "bench/external_control_diagnostics/apply_invalid_param_batch_compiled" (
 ) {
   let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   for fixture in bench_external_authoring_fixtures() {
-    let compiled = CompiledDsp::compile(
-      CompiledTemplate::analyze(fixture.nodes),
-      ctx,
-    ).unwrap()
+    let compiled = Dsp::compile(AnalyzedGraph::analyze(fixture.nodes), ctx).unwrap()
     let controls_a = bench_external_invalid_param_batch(fixture, 0.01)
     let controls_b = bench_external_invalid_param_batch(fixture, 0.02)
     let use_b = @ref.new(false)
@@ -1297,7 +1274,7 @@ test "bench/external_control_diagnostics/apply_invalid_param_batch_topology_cont
 ) {
   let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   for fixture in bench_external_authoring_fixtures() {
-    let controller = CompiledDspTopologyController::from_nodes(
+    let controller = DspTopologyController::from_nodes(
       fixture.nodes,
       ctx,
       crossfade_samples=128,
@@ -1336,7 +1313,7 @@ test "bench/external_authoring_diagnostics/queue_invalid_topology_edit" (
 ) {
   let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   for fixture in bench_external_authoring_fixtures() {
-    let controller = CompiledDspTopologyController::from_nodes(
+    let controller = DspTopologyController::from_nodes(
       fixture.nodes,
       ctx,
       crossfade_samples=128,
@@ -1358,7 +1335,7 @@ test "bench/external_authoring_diagnostics/queue_invalid_topology_edit_batch" (
 ) {
   let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   for fixture in bench_external_authoring_fixtures() {
-    let controller = CompiledDspTopologyController::from_nodes(
+    let controller = DspTopologyController::from_nodes(
       fixture.nodes,
       ctx,
       crossfade_samples=128,
@@ -1380,7 +1357,7 @@ test "bench/external_authoring_diagnostics/queue_topology_recompile_rejected" (
 ) {
   let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   for fixture in bench_external_authoring_fixtures() {
-    let controller = CompiledDspTopologyController::from_nodes(
+    let controller = DspTopologyController::from_nodes(
       fixture.nodes,
       ctx,
       crossfade_samples=128,
@@ -1402,7 +1379,7 @@ test "bench/external_authoring_diagnostics/queue_topology_pending_rejection" (
 ) {
   let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   for fixture in bench_external_authoring_fixtures() {
-    let controller = CompiledDspTopologyController::from_nodes(
+    let controller = DspTopologyController::from_nodes(
       fixture.nodes,
       ctx,
       crossfade_samples=128,
@@ -1510,10 +1487,7 @@ test "bench/external_control/realistic_apply_param_batch_compiled" (
     let use_b = @ref.new(false)
     match fixture.graph_kind {
       MonoExternalGraph => {
-        let compiled = CompiledDsp::compile(
-          CompiledTemplate::analyze(fixture.nodes),
-          ctx,
-        ).unwrap()
+        let compiled = Dsp::compile(AnalyzedGraph::analyze(fixture.nodes), ctx).unwrap()
         b.bench(name=fixture.name, fn() {
           let controls = if use_b.val { controls_b } else { controls_a }
           use_b.val = !use_b.val
@@ -1522,8 +1496,8 @@ test "bench/external_control/realistic_apply_param_batch_compiled" (
         })
       }
       StereoExternalGraph => {
-        let compiled = CompiledStereoDsp::compile(
-          CompiledTemplate::analyze(fixture.nodes),
+        let compiled = StereoDsp::compile(
+          AnalyzedGraph::analyze(fixture.nodes),
           ctx,
         ).unwrap()
         b.bench(name=fixture.name, fn() {
@@ -1549,7 +1523,7 @@ test "bench/external_control/realistic_apply_param_batch_topology_controller" (
     match fixture.graph_kind {
       MonoExternalGraph => {
         let controller = match
-          CompiledDspTopologyController::from_nodes(
+          DspTopologyController::from_nodes(
             fixture.nodes,
             ctx,
             crossfade_samples=128,
@@ -1572,7 +1546,7 @@ test "bench/external_control/realistic_apply_param_batch_topology_controller" (
       }
       StereoExternalGraph => {
         let controller = match
-          CompiledStereoDspTopologyController::from_nodes(
+          StereoDspTopologyController::from_nodes(
             fixture.nodes,
             ctx,
             crossfade_samples=128,
@@ -1625,14 +1599,14 @@ test "bench/external_authoring/realistic_compile_prepared_shape_change" (
         b.bench(name=fixture.name, fn() {
           let template = if use_b.val { template_b } else { template_a }
           use_b.val = !use_b.val
-          let compiled = CompiledDsp::compile_result(template, ctx)
+          let compiled = Dsp::compile_result(template, ctx)
           b.keep(compiled)
         })
       StereoExternalGraph =>
         b.bench(name=fixture.name, fn() {
           let template = if use_b.val { template_b } else { template_a }
           use_b.val = !use_b.val
-          let compiled = CompiledStereoDsp::compile_result(template, ctx)
+          let compiled = StereoDsp::compile_result(template, ctx)
           b.keep(compiled)
         })
     }
@@ -1650,28 +1624,25 @@ test "bench/external_authoring/realistic_queue_prepared_hotswap_setup" (
     let use_b = @ref.new(false)
     match fixture.graph_kind {
       MonoExternalGraph => {
-        let compiled_a = CompiledDsp::compile(doc.analyze(), ctx).unwrap()
-        let compiled_b = CompiledDsp::compile(edited_doc.analyze(), ctx).unwrap()
+        let compiled_a = Dsp::compile(doc.analyze(), ctx).unwrap()
+        let compiled_b = Dsp::compile(edited_doc.analyze(), ctx).unwrap()
         b.bench(name=fixture.name, fn() {
           let active = if use_b.val { compiled_b } else { compiled_a }
           let next = if use_b.val { compiled_a } else { compiled_b }
           use_b.val = !use_b.val
-          let hs = CompiledDspHotSwap::from_graph(active, crossfade_samples=128)
+          let hs = DspHotSwap::from_graph(active, crossfade_samples=128)
           hs.queue_swap(next).unwrap()
           b.keep(hs)
         })
       }
       StereoExternalGraph => {
-        let compiled_a = CompiledStereoDsp::compile(doc.analyze(), ctx).unwrap()
-        let compiled_b = CompiledStereoDsp::compile(edited_doc.analyze(), ctx).unwrap()
+        let compiled_a = StereoDsp::compile(doc.analyze(), ctx).unwrap()
+        let compiled_b = StereoDsp::compile(edited_doc.analyze(), ctx).unwrap()
         b.bench(name=fixture.name, fn() {
           let active = if use_b.val { compiled_b } else { compiled_a }
           let next = if use_b.val { compiled_a } else { compiled_b }
           use_b.val = !use_b.val
-          let hs = CompiledStereoDspHotSwap::from_graph(
-            active,
-            crossfade_samples=128,
-          )
+          let hs = StereoDspHotSwap::from_graph(active, crossfade_samples=128)
           hs.queue_swap(next).unwrap()
           b.keep(hs)
         })

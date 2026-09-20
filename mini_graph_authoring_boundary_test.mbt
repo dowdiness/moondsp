@@ -4,7 +4,7 @@
 struct MiniGraphPreparedTemplate {
   name : String
   bindings : ControlBindingMap
-  runtime : CompiledDsp
+  runtime : Dsp
 }
 
 ///|
@@ -22,14 +22,14 @@ fn prepared_bd_graph_template(ctx : DspContext) -> MiniGraphPreparedTemplate {
     DspNode::gain(2, 0.2),
     DspNode::output(3),
   ]
-  let template = CompiledTemplate::analyze(nodes)
+  let template = AnalyzedGraph::analyze(nodes)
   let bindings = ControlBindingBuilder::new()
     .bind(key="lpf", node_index=1, slot=GraphParamSlot::Value0)
     .bind(key="hpf", node_index=2, slot=GraphParamSlot::Value0)
     .bind(key="gain", node_index=3, slot=GraphParamSlot::Value0)
     .build(template)
     .unwrap()
-  let runtime = CompiledDsp::compile_result(template, ctx).unwrap()
+  let runtime = Dsp::compile_result(template, ctx).unwrap()
   { name: "bd", bindings, runtime, }
 }
 

@@ -21,7 +21,6 @@ pub enum GraphCompileError {
   InvalidFeedbackEdge(Int, Int, Int)
   DuplicateFeedbackInput(Int, GraphInputSlot)
   InvalidTerminalShape(DspNodeKind)
-  InternalRejected(DspNodeKind)
 } derive(Debug)
 
 ///|
@@ -32,71 +31,44 @@ pub impl Show for GraphCompileError with fn output(self, logger) {
 ///|
 /// Compile a declarative mono graph and return a typed rejection reason when
 /// compilation fails.
-pub fn CompiledDsp::compile_result(
-  compiled_template : CompiledTemplate,
+pub fn Dsp::compile_result(
+  compiled_template : AnalyzedGraph,
   context : DspContext,
-) -> Result[CompiledDsp, GraphCompileError] {
-  compile_checked_template(compiled_template, context, DspNodeKind::Output, fn(
-    template,
-    context,
-  ) {
-    CompiledDsp::compile_internal(
-      template.optimized_nodes(),
-      context,
-      template.length(),
-      template.index_map(),
-    )
-  })
+) -> Result[Dsp, GraphCompileError] {
+  match
+    build_template_program(compiled_template, context, DspNodeKind::Output) {
+    Ok(program) => Ok(DspProgram(program).instantiate())
+    Err(error) => Err(error)
+  }
 }
 
 ///|
 /// Compile a declarative terminal-stereo graph and return a typed rejection
 /// reason when compilation fails.
-pub fn CompiledStereoDsp::compile_result(
-  compiled_template : CompiledTemplate,
+pub fn StereoDsp::compile_result(
+  compiled_template : AnalyzedGraph,
   context : DspContext,
-) -> Result[CompiledStereoDsp, GraphCompileError] {
-  compile_checked_template(
-    compiled_template,
-    context,
-    DspNodeKind::StereoOutput,
-    fn(template, context) {
-      CompiledStereoDsp::compile_internal(
-        template.optimized_nodes(),
-        context,
-        template.length(),
-        template.index_map(),
-      )
-    },
-  )
-}
-
-///|
-fn[T] compile_checked_template(
-  compiled_template : CompiledTemplate,
-  context : DspContext,
-  output_kind : DspNodeKind,
-  compile : (CompiledTemplate, DspContext) -> T?,
-) -> Result[T, GraphCompileError] {
-  match compile_error_for_template(compiled_template, context, output_kind) {
-    Some(error) => Err(error)
-    None =>
-      match compile(compiled_template, context) {
-        Some(compiled) => Ok(compiled)
-        None => Err(GraphCompileError::InternalRejected(output_kind))
-      }
+) -> Result[StereoDsp, GraphCompileError] {
+  match
+    build_template_program(
+      compiled_template,
+      context,
+      DspNodeKind::StereoOutput,
+    ) {
+    Ok(program) => Ok(StereoDspProgram(program).instantiate())
+    Err(error) => Err(error)
   }
 }
 
 ///|
-fn compile_error_for_template(
-  compiled_template : CompiledTemplate,
+fn build_template_program(
+  compiled_template : AnalyzedGraph,
   context : DspContext,
   output_kind : DspNodeKind,
-) -> GraphCompileError? {
+) -> Result[GraphProgram, GraphCompileError] {
   let sample_rate = context.sample_rate()
   if !@dsp.is_finite_positive(sample_rate) {
-    return Some(GraphCompileError::InvalidSampleRate(sample_rate))
+    return Err(GraphCompileError::InvalidSampleRate(sample_rate))
   }
   match
     authoring_graph_compile_error(
@@ -104,13 +76,13 @@ fn compile_error_for_template(
       sample_rate,
       output_kind,
     ) {
-    Some(error) => return Some(error)
+    Some(error) => return Err(error)
     None => ()
   }
   let optimized = compiled_template.optimized_nodes()
-  match graph_compile_error(optimized, context, output_kind) {
-    Some(error) =>
-      Some(
+  match build_graph_program(optimized, context, output_kind) {
+    Err(error) =>
+      Err(
         remap_graph_compile_error(
           error,
           compile_error_inverse_map(
@@ -119,26 +91,39 @@ fn compile_error_for_template(
           ),
         ),
       )
-    None => None
+    Ok(program) => {
+      let index_map = compiled_template.index_map()
+      Ok({
+        ..program,
+        index_map: FixedArray::makei(compiled_template.length(), i => {
+          let optimized_index = index_map[i]
+          if optimized_index < 0 {
+            -1
+          } else {
+            program.index_map[optimized_index]
+          }
+        }),
+      })
+    }
   }
 }
 
 ///|
-fn graph_compile_error(
+fn build_graph_program(
   nodes : Array[DspNode],
   context : DspContext,
   output_kind : DspNodeKind,
-) -> GraphCompileError? {
+) -> Result[GraphProgram, GraphCompileError] {
   let sample_rate = context.sample_rate()
   if !@dsp.is_finite_positive(sample_rate) {
-    return Some(GraphCompileError::InvalidSampleRate(sample_rate))
+    return Err(GraphCompileError::InvalidSampleRate(sample_rate))
   }
   let output_count = count_output_kind(nodes, output_kind)
   if output_count == 0 {
-    return Some(GraphCompileError::MissingOutput(output_kind))
+    return Err(GraphCompileError::MissingOutput(output_kind))
   }
   if output_count > 1 {
-    return Some(GraphCompileError::MultipleOutputs(output_kind))
+    return Err(GraphCompileError::MultipleOutputs(output_kind))
   }
   for index in 0..<nodes.length() {
     match
@@ -149,14 +134,14 @@ fn graph_compile_error(
         sample_rate,
         output_kind,
       ) {
-      Some(error) => return Some(error)
+      Some(error) => return Err(error)
       None => ()
     }
   }
   let output_index = match
     find_single_output_index_of_kind(nodes, output_kind) {
     Some(index) => index
-    None => return Some(GraphCompileError::MissingOutput(output_kind))
+    None => return Err(GraphCompileError::MissingOutput(output_kind))
   }
   let marks = FixedArray::make(nodes.length(), 0)
   let order : Array[Int] = []
@@ -166,7 +151,7 @@ fn graph_compile_error(
   )
   for index in 0..<nodes.length() {
     if marks[index] == 0 {
-      return Some(GraphCompileError::UnreachableNode(index))
+      return Err(GraphCompileError::UnreachableNode(index))
     }
   }
   let topo_map = FixedArray::make(nodes.length(), -1)
@@ -177,9 +162,10 @@ fn graph_compile_error(
     @model.remap_node_inputs(nodes[order[index]], topo_map)
   })
   let feedback_edges = remapped_feedback_edges(raw_feedback_edges, topo_map)
-  match invalid_feedback_edges(feedback_edges, fixed_nodes.length()) {
-    Some(error) => return Some(error)
-    None => ()
+  let (self_enabled, back_edge_input0_source, back_edge_input1_source) = match
+    build_feedback_inputs(feedback_edges, fixed_nodes.length()) {
+    Err(error) => return Err(error)
+    Ok(inputs) => inputs
   }
   let valid_shape = if output_kind is DspNodeKind::Output {
     if feedback_edges.is_empty() {
@@ -193,9 +179,18 @@ fn graph_compile_error(
     valid_feedback_terminal_stereo_graph(fixed_nodes, feedback_edges)
   }
   if !valid_shape {
-    return Some(GraphCompileError::InvalidTerminalShape(output_kind))
+    return Err(GraphCompileError::InvalidTerminalShape(output_kind))
   }
-  None
+  Ok({
+    sample_rate,
+    block_size: compiled_block_size(context),
+    nodes: fixed_nodes,
+    index_map: topo_map,
+    feedback_edges,
+    self_enabled,
+    back_edge_input0_source,
+    back_edge_input1_source,
+  })
 }
 
 ///|
@@ -673,10 +668,14 @@ fn invalid_delay_params(
 }
 
 ///|
-fn invalid_feedback_edges(
+fn build_feedback_inputs(
   feedback_edges : FixedArray[(Int, Int, Int)],
   node_count : Int,
-) -> GraphCompileError? {
+) -> Result[
+  (FixedArray[Bool], FixedArray[Int], FixedArray[Int]),
+  GraphCompileError,
+] {
+  let self_enabled = FixedArray::make(node_count, false)
   let input0_sources = FixedArray::make(node_count, -1)
   let input1_sources = FixedArray::make(node_count, -1)
   for edge in feedback_edges {
@@ -684,11 +683,11 @@ fn invalid_feedback_edges(
     let target = edge.1
     let slot = edge.2
     if source < 0 || source >= node_count || target < 0 || target >= node_count {
-      return Some(GraphCompileError::InvalidFeedbackEdge(source, target, slot))
+      return Err(GraphCompileError::InvalidFeedbackEdge(source, target, slot))
     }
     if slot == 0 {
       if input0_sources[target] >= 0 {
-        return Some(
+        return Err(
           GraphCompileError::DuplicateFeedbackInput(
             target,
             GraphInputSlot::Input0,
@@ -698,7 +697,7 @@ fn invalid_feedback_edges(
       input0_sources[target] = source
     } else if slot == 1 {
       if input1_sources[target] >= 0 {
-        return Some(
+        return Err(
           GraphCompileError::DuplicateFeedbackInput(
             target,
             GraphInputSlot::Input1,
@@ -707,8 +706,9 @@ fn invalid_feedback_edges(
       }
       input1_sources[target] = source
     } else {
-      return Some(GraphCompileError::InvalidFeedbackEdge(source, target, slot))
+      return Err(GraphCompileError::InvalidFeedbackEdge(source, target, slot))
     }
+    self_enabled[source] = true
   }
-  None
+  Ok((self_enabled, input0_sources, input1_sources))
 }

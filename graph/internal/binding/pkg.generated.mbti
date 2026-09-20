@@ -18,7 +18,7 @@ pub struct ControlBindingBuilder {
 #alias(new)
 pub fn ControlBindingBuilder::ControlBindingBuilder() -> Self
 pub fn ControlBindingBuilder::bind(Self, key~ : String, node_index~ : Int, slot~ : @model.GraphParamSlot) -> Self
-pub fn ControlBindingBuilder::build(Self, @template.CompiledTemplate) -> Result[ControlBindingMap, ControlBindingError]
+pub fn ControlBindingBuilder::build(Self, @template.AnalyzedGraph) -> Result[ControlBindingMap, ControlBindingError]
 
 pub enum ControlBindingError {
   InvalidNodeIndex(Int)

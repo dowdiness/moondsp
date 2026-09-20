@@ -118,7 +118,7 @@ perform browser admission.
   runtime targets independently.
 - The Worklet serializes the description as JSON. MoonBit decodes the browser
   node and parameter subset, then `GraphEngine::mount` uses the existing
-  `CompiledTemplate::analyze` and `CompiledDsp::compile_result` path. There is
+  `AnalyzedGraph::analyze` and `Dsp::compile_result` path. There is
   no JS node validator, DSP implementation, or second compiler.
 - The browser's 64-node description and 256-parameter limits are adapter
   constraints; the direct MoonBit API accepts canonical nodes supported by the

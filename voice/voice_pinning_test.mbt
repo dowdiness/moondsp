@@ -27,7 +27,7 @@ fn pr2_a2_closure(
   ctx : DspContext,
   max_voices : Int,
 ) -> Result[VoicePool, A2Reason] {
-  VoicePool::new(@graph.CompiledTemplate::analyze(nodes), ctx, max_voices~).map_err(fn(
+  VoicePool::new(@graph.AnalyzedGraph::analyze(nodes), ctx, max_voices~).map_err(fn(
       e,
     ) {
       match e {
@@ -45,7 +45,7 @@ fn pr2_a3_closure(
   pool : VoicePool,
   nodes : Array[DspNode],
 ) -> Result[Unit, A3Reason] {
-  match VoicePool::set_template(pool, @graph.CompiledTemplate::analyze(nodes)) {
+  match VoicePool::set_template(pool, @graph.AnalyzedGraph::analyze(nodes)) {
     Ok(_) => Ok(())
     Err(VoicePoolError::OrphanAdsr) => Err(A3Reason::OrphanAdsr)
     Err(VoicePoolError::CompileRejected) => Err(A3Reason::CompileRejected)
@@ -128,7 +128,7 @@ test "A3: well-formed replacement succeeds" {
   ]
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
   let pool = VoicePool::new(
-    @graph.CompiledTemplate::analyze(nodes),
+    @graph.AnalyzedGraph::analyze(nodes),
     ctx,
     max_voices=4,
   ).unwrap()
@@ -148,7 +148,7 @@ test "A3: orphan ADSR replacement fails with OrphanAdsr" {
   ]
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
   let pool = VoicePool::new(
-    @graph.CompiledTemplate::analyze(nodes),
+    @graph.AnalyzedGraph::analyze(nodes),
     ctx,
     max_voices=4,
   ).unwrap()
@@ -169,7 +169,7 @@ test "A3: missing Output replacement fails with CompileRejected" {
   ]
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
   let pool = VoicePool::new(
-    @graph.CompiledTemplate::analyze(nodes),
+    @graph.AnalyzedGraph::analyze(nodes),
     ctx,
     max_voices=4,
   ).unwrap()
@@ -183,19 +183,14 @@ test "A3: missing Output replacement fails with CompileRejected" {
 ///|
 /// PR-2 A4 closure: passes through unchanged. BoundVoicePool already
 /// returns Result[..., BoundVoicePoolError]. PR 3 changes only the
-/// input type (Array → CompiledTemplate).
+/// input type (Array → AnalyzedGraph).
 fn pr2_a4_closure(
   nodes : Array[DspNode],
   ctx : DspContext,
   builder : ControlBindingBuilder,
   max_voices : Int,
 ) -> Result[BoundVoicePool, BoundVoicePoolError] {
-  BoundVoicePool::new(
-    CompiledTemplate::analyze(nodes),
-    ctx,
-    builder,
-    max_voices~,
-  )
+  BoundVoicePool::new(AnalyzedGraph::analyze(nodes), ctx, builder, max_voices~)
 }
 
 ///|

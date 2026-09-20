@@ -1,9 +1,9 @@
 ///|
-let compiled_stereo : GraphSlot[@moondsp.CompiledStereoDsp, StereoOut] = GraphSlot::new(
+let compiled_stereo : GraphSlot[@moondsp.StereoDsp, StereoOut] = GraphSlot::new(
   output=StereoOut::new(),
   compile=fn(ctx) {
-    @moondsp.CompiledStereoDsp::compile(
-      @moondsp.CompiledTemplate::analyze([
+    @moondsp.StereoDsp::compile(
+      @moondsp.AnalyzedGraph::analyze([
         @moondsp.DspNode::constant(1.0),
         @moondsp.DspNode::oscillator(
           @moondsp.Waveform::Sine,
@@ -37,7 +37,7 @@ let compiled_stereo : GraphSlot[@moondsp.CompiledStereoDsp, StereoOut] = GraphSl
 )
 
 ///|
-/// Initialize the browser proof graph that runs through `CompiledStereoDsp`.
+/// Initialize the browser proof graph that runs through `StereoDsp`.
 pub fn init_compiled_stereo_graph(
   sample_rate : Double,
   block_size : Int,
@@ -51,7 +51,7 @@ pub fn init_compiled_stereo_graph(
 }
 
 ///|
-/// Run one render quantum through the browser proof `CompiledStereoDsp` graph.
+/// Run one render quantum through the browser proof `StereoDsp` graph.
 pub fn process_compiled_stereo_block(
   freq : Double,
   gain : Double,

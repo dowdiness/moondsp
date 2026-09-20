@@ -69,6 +69,23 @@ pub fn DelayLine::set_feedback(self : DelayLine, feedback : Double) -> Unit {
 }
 
 ///|
+/// Copy circular-buffer history when capacities match.
+///
+/// Delay configuration remains owned by the destination. Returns `false` when
+/// the capacities differ, leaving the destination history untouched.
+pub fn DelayLine::copy_state_from(self : DelayLine, source : DelayLine) -> Bool {
+  if self.buffer.length() != source.buffer.length() {
+    return false
+  }
+  for index = 0; index < self.buffer.length(); index = index + 1 {
+    self.buffer[index] = source.buffer[index]
+  }
+  self.write_pos = source.write_pos
+  self.has_wrapped = source.has_wrapped
+  true
+}
+
+///|
 /// Clear audible delay state without changing the configured delay.
 ///
 /// This is a constant-time valid-range reset: subsequent reads treat

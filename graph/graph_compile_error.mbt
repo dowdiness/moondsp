@@ -15,7 +15,6 @@ pub(all) enum GraphCompileError {
   InvalidFeedbackEdge(Int, Int, Int)
   DuplicateFeedbackInput(Int, GraphTopologyInputSlot)
   InvalidTerminalShape(DspNodeKind)
-  InternalRejected(DspNodeKind)
 } derive(Debug)
 
 ///|
@@ -83,20 +82,18 @@ fn graph_compile_error_from_runtime(
       )
     @runtime.GraphCompileError::InvalidTerminalShape(kind) =>
       GraphCompileError::InvalidTerminalShape(dsp_node_kind_from_model(kind))
-    @runtime.GraphCompileError::InternalRejected(kind) =>
-      GraphCompileError::InternalRejected(dsp_node_kind_from_model(kind))
   }
 }
 
 ///|
 /// Compile a declarative mono graph and return a typed rejection reason when
 /// compilation fails.
-pub fn CompiledDsp::compile_result(
-  compiled_template : CompiledTemplate,
+pub fn Dsp::compile_result(
+  compiled_template : AnalyzedGraph,
   context : DspContext,
-) -> Result[CompiledDsp, GraphCompileError] {
-  match @runtime.CompiledDsp::compile_result(compiled_template.raw(), context) {
-    Ok(compiled) => Ok(CompiledDsp::from_internal(compiled))
+) -> Result[Dsp, GraphCompileError] {
+  match @runtime.Dsp::compile_result(compiled_template.raw(), context) {
+    Ok(compiled) => Ok(Dsp::from_internal(compiled))
     Err(error) => Err(graph_compile_error_from_runtime(error))
   }
 }
@@ -104,13 +101,12 @@ pub fn CompiledDsp::compile_result(
 ///|
 /// Compile a declarative terminal-stereo graph and return a typed rejection
 /// reason when compilation fails.
-pub fn CompiledStereoDsp::compile_result(
-  compiled_template : CompiledTemplate,
+pub fn StereoDsp::compile_result(
+  compiled_template : AnalyzedGraph,
   context : DspContext,
-) -> Result[CompiledStereoDsp, GraphCompileError] {
-  match
-    @runtime.CompiledStereoDsp::compile_result(compiled_template.raw(), context) {
-    Ok(compiled) => Ok(CompiledStereoDsp::from_internal(compiled))
+) -> Result[StereoDsp, GraphCompileError] {
+  match @runtime.StereoDsp::compile_result(compiled_template.raw(), context) {
+    Ok(compiled) => Ok(StereoDsp::from_internal(compiled))
     Err(error) => Err(graph_compile_error_from_runtime(error))
   }
 }

@@ -40,7 +40,7 @@ For a browser instrument, start with the [basic synth guide](../examples/basic-s
 - **[`technical-reference.md`](technical-reference.md)** — **Authoritative** reference for graph runtime-control behavior: node types, parameter slots, compilation, and rendering. Update it first when that contract changes; code remains the implementation source of truth.
 - **[`blueprint.md`](blueprint.md)** — Architectural vision, design principles, and multi-target roadmap.
 - **[`decisions/`](decisions/README.md)** — Architecture Decision Records capturing why key architectural choices were made.
-- **[`external-dsl-lowering.md`](external-dsl-lowering.md)** — Contract for external editors and DSLs lowering graphs into `Array[DspNode]` and `CompiledTemplate`.
+- **[`external-dsl-lowering.md`](external-dsl-lowering.md)** — Contract for external editors and DSLs lowering graphs into `Array[DspNode]` and `AnalyzedGraph`.
 - **[`editor-audio-preview-handoff.md`](editor-audio-preview-handoff.md)** — State machine and ownership contract for live graph staging and parameter preview.
 
 ## Evidence & Contributor Resources

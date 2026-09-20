@@ -3,10 +3,10 @@ let stereo_topo_edit_level : @ref.Ref[Double] = @ref.new(1.0)
 
 ///|
 let compiled_stereo_topology_edit : GraphSlot[
-  @moondsp.CompiledStereoDspTopologyController,
+  @moondsp.StereoDspTopologyController,
   StereoOut,
 ] = GraphSlot::new(output=StereoOut::new(), compile=fn(ctx) {
-  @moondsp.CompiledStereoDspTopologyController::from_nodes(
+  @moondsp.StereoDspTopologyController::from_nodes(
     [
       @moondsp.DspNode::constant(1.0),
       @moondsp.DspNode::pan(0, BROWSER_STEREO_TOPOLOGY_EDIT_OLD_PAN),
@@ -19,7 +19,7 @@ let compiled_stereo_topology_edit : GraphSlot[
 
 ///|
 /// Initialize the browser proof graph that runs through
-/// `CompiledStereoDspTopologyController`.
+/// `StereoDspTopologyController`.
 pub fn init_compiled_stereo_topology_edit_graph(
   sample_rate : Double,
   block_size : Int,
@@ -75,7 +75,7 @@ pub fn set_compiled_stereo_topology_edit_level(level : Double) -> Bool {
 
 ///|
 /// Run one render quantum through the browser proof
-/// `CompiledStereoDspTopologyController` graph.
+/// `StereoDspTopologyController` graph.
 pub fn process_compiled_stereo_topology_edit_block(
   sample_rate : Double,
   block_size : Int,

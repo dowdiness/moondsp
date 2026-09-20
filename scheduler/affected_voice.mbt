@@ -92,21 +92,11 @@ fn PatternScheduler::apply_matching_voice_effect_result(
         ),
       })
     Retune(batch) => {
-      let controls = batch.borrow()
-      match
-        self.active_notes.try_each_matching(matches, fn(handle) {
-          pool.validate_voice_controls_result(handle, controls)
-        }) {
+      let handles = self.active_notes.matching_handles(matches)
+      match pool.apply_voices_controls_result(handles, batch.borrow()) {
         Err(error) => Err(error)
         Ok(_) =>
-          match
-            self.active_notes.try_count_matching(matches, fn(handle) {
-              pool.apply_voice_controls_result(handle, controls)
-            }) {
-            Err(error) => Err(error)
-            Ok(count) =>
-              Ok({ retuned_voice_count: count, detached_note_count: 0, })
-          }
+          Ok({ retuned_voice_count: handles.length(), detached_note_count: 0, })
       }
     }
   }

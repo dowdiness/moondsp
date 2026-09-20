@@ -480,7 +480,7 @@
     <details id="pageDetails" class="page-details">
       <summary>Runtime details</summary>
       <p>
-        The AudioWorklet calls a fixed MoonBit <code>CompiledStereoDsp</code>
+        The AudioWorklet calls a fixed MoonBit <code>StereoDsp</code>
         graph with a mono <code>z^-1</code> feedback loop before <code>Pan</code>,
         reading left/right blocks back sample-by-sample for metering, recurrence
         checks, and stereo pan verification.
@@ -488,13 +488,13 @@
       <p>Query-param proofs exercise the other runtime variants:</p>
       <dl class="proof-list">
         <dt><code>?hotSwapMono=1</code></dt>
-        <dd>mono <code>CompiledDspHotSwap</code></dd>
+        <dd>mono <code>DspHotSwap</code></dd>
         <dt><code>?topologyEditMono=1</code></dt>
-        <dd>mono <code>CompiledDspTopologyController</code> insert/delete round-trip</dd>
+        <dd>mono <code>DspTopologyController</code> insert/delete round-trip</dd>
         <dt><code>?hotSwapStereo=1</code></dt>
-        <dd>stereo <code>CompiledStereoDspHotSwap</code></dd>
+        <dd>stereo <code>StereoDspHotSwap</code></dd>
         <dt><code>?topologyEditStereo=1</code></dt>
-        <dd>stereo <code>CompiledStereoDspTopologyController</code></dd>
+        <dd>stereo <code>StereoDspTopologyController</code></dd>
         <dt><code>?exitDeliverable=1</code></dt>
         <dd>Phase 2 exit deliverable FM synthesis</dd>
       </dl>
@@ -918,21 +918,21 @@
         node.port.onmessage = (event) => {
           if (event.data?.type === "ready") {
             const modeLabel = event.data.mode === "compiled-hot-swap-dsp"
-              ? "CompiledDspHotSwap block runtime"
+              ? "DspHotSwap block runtime"
               : event.data.mode === "compiled-topology-edit-dsp"
-              ? "CompiledDspTopologyController block runtime"
+              ? "DspTopologyController block runtime"
               : event.data.mode === "compiled-stereo-topology-edit-dsp"
-              ? "CompiledStereoDspTopologyController block runtime"
+              ? "StereoDspTopologyController block runtime"
               : event.data.mode === "compiled-stereo-hot-swap-dsp"
-              ? "CompiledStereoDspHotSwap block runtime"
+              ? "StereoDspHotSwap block runtime"
               : event.data.mode === "exit-deliverable-dsp"
               ? "Exit Deliverable FM Synthesis (Phase 2)"
               : event.data.mode === "scheduler-dsp"
               ? "Pattern Scheduler (Phase 5)"
               : event.data.mode === "compiled-stereo-dsp"
-              ? "CompiledStereoDsp block runtime"
+              ? "StereoDsp block runtime"
               : event.data.mode === "compiled-dsp"
-                ? "CompiledDsp block runtime"
+                ? "Dsp block runtime"
                 : "legacy tick fallback";
             setStatus(`Audio running via ${modeLabel}. Exports: ${event.data.exports.join(", ")}`, "ok");
           } else if (event.data?.type === "error") {

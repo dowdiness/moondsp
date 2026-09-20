@@ -18,6 +18,14 @@ pub fn Noise::seed(self : Noise) -> UInt {
 }
 
 ///|
+/// Copy only the RNG state from another noise generator.
+///
+/// The destination generator remains its own runtime object.
+pub fn Noise::copy_state_from(self : Noise, source : Noise) -> Unit {
+  self.state = source.state
+}
+
+///|
 /// Reset the generator to a new explicit seed.
 pub fn Noise::reset(self : Noise, seed : UInt) -> Unit {
   self.state = normalize_seed(seed)

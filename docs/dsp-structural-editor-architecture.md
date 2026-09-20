@@ -22,7 +22,7 @@ StructuralDoc
   -> Local text edit bridge
   -> NormalizedDslGraph
   -> Array[DspNode]
-  -> CompiledDsp / CompiledStereoDsp
+  -> Dsp / StereoDsp
 ```
 
 The important constraint is that `StructuralDoc`, not raw text, is canonical.

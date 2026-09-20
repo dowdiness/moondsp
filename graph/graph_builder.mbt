@@ -392,12 +392,12 @@ pub fn[
 }
 
 ///|
-/// Produce a CompiledTemplate from the builder's current node list.
-/// Sugar over `CompiledTemplate::analyze(self.nodes())` — exists
+/// Produce a AnalyzedGraph from the builder's current node list.
+/// Sugar over `AnalyzedGraph::analyze(self.nodes())` — exists
 /// because GraphBuilder is the canonical entry point and the runtime
-/// boundary is CompiledTemplate. See ADR-0010.
-pub fn GraphBuilder::analyze(self : GraphBuilder) -> CompiledTemplate {
-  CompiledTemplate::analyze(self.nodes())
+/// boundary is AnalyzedGraph. See ADR-0010.
+pub fn GraphBuilder::analyze(self : GraphBuilder) -> AnalyzedGraph {
+  AnalyzedGraph::analyze(self.nodes())
 }
 
 ///|

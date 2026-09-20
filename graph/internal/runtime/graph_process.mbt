@@ -195,8 +195,8 @@ fn CompiledGraph::run_node_loop(
 ///|
 /// Run the compiled graph for one buffer and write the final output into
 /// `output`.
-pub fn CompiledDsp::process(
-  self : CompiledDsp,
+pub fn Dsp::process(
+  self : Dsp,
   context : DspContext,
   output : AudioBuffer,
 ) -> Unit {
@@ -236,8 +236,8 @@ pub fn CompiledDsp::process(
 ///|
 /// Run the compiled stereo graph for one buffer and write the final output into
 /// explicit left and right buffers.
-pub fn CompiledStereoDsp::process(
-  self : CompiledStereoDsp,
+pub fn StereoDsp::process(
+  self : StereoDsp,
   context : DspContext,
   left_output : AudioBuffer,
   right_output : AudioBuffer,

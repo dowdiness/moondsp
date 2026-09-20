@@ -19,15 +19,15 @@ test "compiled dsp hot swap crossfades equal-power between graphs" {
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let old_graph = CompiledDsp::compile(
-    CompiledTemplate::analyze([DspNode::constant(0.0), DspNode::output(0)]),
+  let old_graph = Dsp::compile(
+    AnalyzedGraph::analyze([DspNode::constant(0.0), DspNode::output(0)]),
     context,
   ).unwrap()
-  let new_graph = CompiledDsp::compile(
-    CompiledTemplate::analyze([DspNode::constant(1.0), DspNode::output(0)]),
+  let new_graph = Dsp::compile(
+    AnalyzedGraph::analyze([DspNode::constant(1.0), DspNode::output(0)]),
     context,
   ).unwrap()
-  let hot_swap = CompiledDspHotSwap::from_graph(
+  let hot_swap = DspHotSwap::from_graph(
     old_graph,
     crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
   )
@@ -71,15 +71,15 @@ test "compiled dsp hot swap can replace instantly" {
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let old_graph = CompiledDsp::compile(
-    CompiledTemplate::analyze([DspNode::constant(0.25), DspNode::output(0)]),
+  let old_graph = Dsp::compile(
+    AnalyzedGraph::analyze([DspNode::constant(0.25), DspNode::output(0)]),
     context,
   ).unwrap()
-  let new_graph = CompiledDsp::compile(
-    CompiledTemplate::analyze([DspNode::constant(0.75), DspNode::output(0)]),
+  let new_graph = Dsp::compile(
+    AnalyzedGraph::analyze([DspNode::constant(0.75), DspNode::output(0)]),
     context,
   ).unwrap()
-  let hot_swap = CompiledDspHotSwap::from_graph(old_graph)
+  let hot_swap = DspHotSwap::from_graph(old_graph)
   let output = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
 
   assert_true(hot_swap.queue_swap(new_graph) is Ok(_))
@@ -98,15 +98,15 @@ test "compiled dsp hot swap rejects incompatible replacement graph" {
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=8,
   )
-  let active = CompiledDsp::compile(
-    CompiledTemplate::analyze([DspNode::constant(0.0), DspNode::output(0)]),
+  let active = Dsp::compile(
+    AnalyzedGraph::analyze([DspNode::constant(0.0), DspNode::output(0)]),
     active_context,
   ).unwrap()
-  let incompatible = CompiledDsp::compile(
-    CompiledTemplate::analyze([DspNode::constant(1.0), DspNode::output(0)]),
+  let incompatible = Dsp::compile(
+    AnalyzedGraph::analyze([DspNode::constant(1.0), DspNode::output(0)]),
     incompatible_context,
   ).unwrap()
-  let hot_swap = CompiledDspHotSwap::from_graph(active)
+  let hot_swap = DspHotSwap::from_graph(active)
   let output = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
 
   assert_true(hot_swap.queue_swap(incompatible) is Err(_))
@@ -125,15 +125,15 @@ test "compiled dsp hot swap result reports sample rate mismatch" {
     sample_rate=HOT_SWAP_SAMPLE_RATE * 2.0,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let active = CompiledDsp::compile(
-    CompiledTemplate::analyze([DspNode::constant(0.0), DspNode::output(0)]),
+  let active = Dsp::compile(
+    AnalyzedGraph::analyze([DspNode::constant(0.0), DspNode::output(0)]),
     active_context,
   ).unwrap()
-  let incompatible = CompiledDsp::compile(
-    CompiledTemplate::analyze([DspNode::constant(1.0), DspNode::output(0)]),
+  let incompatible = Dsp::compile(
+    AnalyzedGraph::analyze([DspNode::constant(1.0), DspNode::output(0)]),
     incompatible_context,
   ).unwrap()
-  let hot_swap = CompiledDspHotSwap::from_graph(active)
+  let hot_swap = DspHotSwap::from_graph(active)
 
   match hot_swap.queue_swap(incompatible) {
     Err(HotSwapQueueError::SampleRateMismatch(active_rate, next_rate)) => {
@@ -154,15 +154,15 @@ test "compiled dsp hot swap result reports block capacity mismatch" {
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE * 2,
   )
-  let active = CompiledDsp::compile(
-    CompiledTemplate::analyze([DspNode::constant(0.0), DspNode::output(0)]),
+  let active = Dsp::compile(
+    AnalyzedGraph::analyze([DspNode::constant(0.0), DspNode::output(0)]),
     active_context,
   ).unwrap()
-  let incompatible = CompiledDsp::compile(
-    CompiledTemplate::analyze([DspNode::constant(1.0), DspNode::output(0)]),
+  let incompatible = Dsp::compile(
+    AnalyzedGraph::analyze([DspNode::constant(1.0), DspNode::output(0)]),
     incompatible_context,
   ).unwrap()
-  let hot_swap = CompiledDspHotSwap::from_graph(active)
+  let hot_swap = DspHotSwap::from_graph(active)
 
   match hot_swap.queue_swap(incompatible) {
     Err(
@@ -182,23 +182,23 @@ test "compiled dsp hot swap mirrors runtime param changes into pending graph" {
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let active = CompiledDsp::compile(
-    CompiledTemplate::analyze([
+  let active = Dsp::compile(
+    AnalyzedGraph::analyze([
       DspNode::constant(1.0),
       DspNode::gain(0, 0.25),
       DspNode::output(1),
     ]),
     context,
   ).unwrap()
-  let replacement = CompiledDsp::compile(
-    CompiledTemplate::analyze([
+  let replacement = Dsp::compile(
+    AnalyzedGraph::analyze([
       DspNode::constant(1.0),
       DspNode::gain(0, 0.75),
       DspNode::output(1),
     ]),
     context,
   ).unwrap()
-  let hot_swap = CompiledDspHotSwap::from_graph(
+  let hot_swap = DspHotSwap::from_graph(
     active,
     crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
   )
@@ -236,19 +236,19 @@ test "compiled dsp hot swap result reports pending graph control rejection" {
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let active = CompiledDsp::compile(
-    CompiledTemplate::analyze([
+  let active = Dsp::compile(
+    AnalyzedGraph::analyze([
       DspNode::constant(1.0),
       DspNode::gain(0, 0.25),
       DspNode::output(1),
     ]),
     context,
   ).unwrap()
-  let replacement = CompiledDsp::compile(
-    CompiledTemplate::analyze([DspNode::constant(1.0), DspNode::output(0)]),
+  let replacement = Dsp::compile(
+    AnalyzedGraph::analyze([DspNode::constant(1.0), DspNode::output(0)]),
     context,
   ).unwrap()
-  let hot_swap = CompiledDspHotSwap::from_graph(
+  let hot_swap = DspHotSwap::from_graph(
     active,
     crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
   )
@@ -279,23 +279,23 @@ test "compiled stereo dsp hot swap crossfades equal-power between graphs" {
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let old_graph = CompiledStereoDsp::compile(
-    CompiledTemplate::analyze([
+  let old_graph = StereoDsp::compile(
+    AnalyzedGraph::analyze([
       DspNode::constant(0.0),
       DspNode::pan(0, 0.0),
       DspNode::stereo_output(1),
     ]),
     context,
   ).unwrap()
-  let new_graph = CompiledStereoDsp::compile(
-    CompiledTemplate::analyze([
+  let new_graph = StereoDsp::compile(
+    AnalyzedGraph::analyze([
       DspNode::constant(1.0),
       DspNode::pan(0, 0.0),
       DspNode::stereo_output(1),
     ]),
     context,
   ).unwrap()
-  let hot_swap = CompiledStereoDspHotSwap::from_graph(
+  let hot_swap = StereoDspHotSwap::from_graph(
     old_graph,
     crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
   )
@@ -368,23 +368,23 @@ test "compiled stereo dsp hot swap result queues compatible graph" {
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let old_graph = CompiledStereoDsp::compile(
-    CompiledTemplate::analyze([
+  let old_graph = StereoDsp::compile(
+    AnalyzedGraph::analyze([
       DspNode::constant(0.0),
       DspNode::pan(0, 0.0),
       DspNode::stereo_output(1),
     ]),
     context,
   ).unwrap()
-  let new_graph = CompiledStereoDsp::compile(
-    CompiledTemplate::analyze([
+  let new_graph = StereoDsp::compile(
+    AnalyzedGraph::analyze([
       DspNode::constant(1.0),
       DspNode::pan(0, 0.0),
       DspNode::stereo_output(1),
     ]),
     context,
   ).unwrap()
-  let hot_swap = CompiledStereoDspHotSwap::from_graph(old_graph)
+  let hot_swap = StereoDspHotSwap::from_graph(old_graph)
   let left = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
   let right = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
 
@@ -409,23 +409,23 @@ test "compiled stereo dsp hot swap mirrors pan changes into pending graph" {
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let active = CompiledStereoDsp::compile(
-    CompiledTemplate::analyze([
+  let active = StereoDsp::compile(
+    AnalyzedGraph::analyze([
       DspNode::constant(0.5),
       DspNode::pan(0, 0.0),
       DspNode::stereo_output(1),
     ]),
     context,
   ).unwrap()
-  let replacement = CompiledStereoDsp::compile(
-    CompiledTemplate::analyze([
+  let replacement = StereoDsp::compile(
+    AnalyzedGraph::analyze([
       DspNode::constant(1.0),
       DspNode::pan(0, 0.0),
       DspNode::stereo_output(1),
     ]),
     context,
   ).unwrap()
-  let hot_swap = CompiledStereoDspHotSwap::from_graph(
+  let hot_swap = StereoDspHotSwap::from_graph(
     active,
     crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
   )
@@ -469,23 +469,23 @@ test "compiled stereo dsp hot swap result reports pending graph control rejectio
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let active = CompiledStereoDsp::compile(
-    CompiledTemplate::analyze([
+  let active = StereoDsp::compile(
+    AnalyzedGraph::analyze([
       DspNode::adsr(attack_ms=0.01, decay_ms=0.1, sustain=0.5, release_ms=0.2),
       DspNode::pan(0, 0.0),
       DspNode::stereo_output(1),
     ]),
     context,
   ).unwrap()
-  let replacement = CompiledStereoDsp::compile(
-    CompiledTemplate::analyze([
+  let replacement = StereoDsp::compile(
+    AnalyzedGraph::analyze([
       DspNode::constant(1.0),
       DspNode::pan(0, 0.0),
       DspNode::stereo_output(1),
     ]),
     context,
   ).unwrap()
-  let hot_swap = CompiledStereoDspHotSwap::from_graph(
+  let hot_swap = StereoDspHotSwap::from_graph(
     active,
     crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
   )

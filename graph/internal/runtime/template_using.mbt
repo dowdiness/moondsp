@@ -1,2 +1,2 @@
 ///|
-using @template {type CompiledTemplate}
+using @template {type AnalyzedGraph}

@@ -1,5 +1,5 @@
 ///|
-pub(all) suberror GraphTemplateDocError {
+pub(all) suberror GraphDocumentError {
   LengthMismatch(Int, Int)
   DuplicateNodeId(String)
   MissingNodeId(String)
@@ -8,17 +8,17 @@ pub(all) suberror GraphTemplateDocError {
 } derive(Debug)
 
 ///|
-pub impl Show for GraphTemplateDocError with fn output(self, logger) {
+pub impl Show for GraphDocumentError with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
 
 ///|
 /// Identity-bearing authoring wrapper for graph templates.
 ///
-/// Runtime graph compilation remains index-based. `GraphTemplateDoc` owns the
+/// Runtime graph compilation remains index-based. `GraphDocument` owns the
 /// stable authoring IDs and exposes `GraphIndexMap` at the boundary where
 /// controls, bindings, and topology edits are translated to existing indices.
-pub struct GraphTemplateDoc {
+pub struct GraphDocument {
   priv revision : @identity.Revision
   priv ids : Array[@identity.GraphNodeId]
   priv nodes : Array[DspNode]
@@ -56,7 +56,7 @@ fn find_graph_id_index(
 fn validate_graph_template_ids(
   ids : Array[@identity.GraphNodeId],
   expected_length : Int,
-) -> Unit raise GraphTemplateDocError {
+) -> Unit raise GraphDocumentError {
   if ids.length() != expected_length {
     raise LengthMismatch(ids.length(), expected_length)
   }
@@ -75,7 +75,7 @@ fn validate_new_graph_id(
   current_ids : Array[@identity.GraphNodeId],
   retired_ids : Map[String, Bool],
   id : @identity.GraphNodeId,
-) -> Unit raise GraphTemplateDocError {
+) -> Unit raise GraphDocumentError {
   let key = id.value()
   if find_graph_id_index(current_ids, id) is Some(_) {
     raise DuplicateNodeId(key)
@@ -90,7 +90,7 @@ fn validate_new_graph_ids(
   current_ids : Array[@identity.GraphNodeId],
   retired_ids : Map[String, Bool],
   ids : Array[@identity.GraphNodeId],
-) -> Unit raise GraphTemplateDocError {
+) -> Unit raise GraphDocumentError {
   let seen : Map[String, Bool] = Map([])
   for id in ids {
     let key = id.value()
@@ -106,7 +106,7 @@ fn validate_new_graph_ids(
 fn graph_id_index_or_raise(
   ids : Array[@identity.GraphNodeId],
   id : @identity.GraphNodeId,
-) -> Int raise GraphTemplateDocError {
+) -> Int raise GraphDocumentError {
   match find_graph_id_index(ids, id) {
     Some(index) => index
     None => raise MissingNodeId(id.value())
@@ -117,41 +117,40 @@ fn graph_id_index_or_raise(
 fn apply_graph_template_edit(
   nodes : Array[DspNode],
   edit : GraphTopologyEdit,
-) -> Unit raise GraphTemplateDocError {
+) -> GraphEditResult raise GraphDocumentError {
   match @staging.apply_topology_edit_result(nodes, edit) {
-    Ok(_) => ()
+    Ok(result) => result
     Err(error) => raise Topology(error)
   }
 }
 
 ///|
-fn compact_graph_ids_after_delete(
+fn graph_ids_after_edit(
   ids : Array[@identity.GraphNodeId],
-  start_index : Int,
-  end_index : Int,
-) -> Array[@identity.GraphNodeId] {
-  [
-    for index, id in ids if index < start_index || index > end_index => id
-  ]
-}
-
-///|
-fn retire_graph_id_range(
+  result : GraphEditResult,
+  inserted_ids : Array[@identity.GraphNodeId],
   retired_ids : Map[String, Bool],
-  ids : Array[@identity.GraphNodeId],
-  start_index : Int,
-  end_index : Int,
-) -> Unit {
-  for index = start_index; index <= end_index; index = index + 1 {
-    retired_ids[ids[index].value()] = true
+) -> Array[@identity.GraphNodeId] {
+  let correspondence = result.old_to_new()
+  let next_ids : Array[@identity.GraphNodeId] = []
+  for index in 0..<ids.length() {
+    if correspondence[index] >= 0 {
+      next_ids.push(ids[index])
+    } else {
+      retired_ids[ids[index].value()] = true
+    }
   }
+  for id in inserted_ids {
+    next_ids.push(id)
+  }
+  next_ids
 }
 
 ///|
-pub fn GraphTemplateDoc::from_nodes(
+pub fn GraphDocument::from_nodes(
   ids~ : Array[@identity.GraphNodeId],
   nodes~ : Array[DspNode],
-) -> GraphTemplateDoc raise GraphTemplateDocError {
+) -> GraphDocument raise GraphDocumentError {
   validate_graph_template_ids(ids, nodes.length())
   {
     revision: @identity.Revision::zero(),
@@ -162,33 +161,31 @@ pub fn GraphTemplateDoc::from_nodes(
 }
 
 ///|
-pub fn GraphTemplateDoc::revision(
-  self : GraphTemplateDoc,
-) -> @identity.Revision {
+pub fn GraphDocument::revision(self : GraphDocument) -> @identity.Revision {
   self.revision
 }
 
 ///|
-pub fn GraphTemplateDoc::length(self : GraphTemplateDoc) -> Int {
+pub fn GraphDocument::length(self : GraphDocument) -> Int {
   self.nodes.length()
 }
 
 ///|
-pub fn GraphTemplateDoc::nodes(self : GraphTemplateDoc) -> Array[DspNode] {
+pub fn GraphDocument::nodes(self : GraphDocument) -> Array[DspNode] {
   self.nodes.copy()
 }
 
 ///|
-pub fn GraphTemplateDoc::node_index(
-  self : GraphTemplateDoc,
+pub fn GraphDocument::node_index(
+  self : GraphDocument,
   id : @identity.GraphNodeId,
 ) -> Int? {
   find_graph_id_index(self.ids, id)
 }
 
 ///|
-pub fn GraphTemplateDoc::node_id_at(
-  self : GraphTemplateDoc,
+pub fn GraphDocument::node_id_at(
+  self : GraphDocument,
   index : Int,
 ) -> @identity.GraphNodeId? {
   if index < 0 || index >= self.ids.length() {
@@ -199,8 +196,8 @@ pub fn GraphTemplateDoc::node_id_at(
 }
 
 ///|
-pub fn GraphTemplateDoc::node_at(
-  self : GraphTemplateDoc,
+pub fn GraphDocument::node_at(
+  self : GraphDocument,
   id : @identity.GraphNodeId,
 ) -> DspNode? {
   match self.node_index(id) {
@@ -210,23 +207,23 @@ pub fn GraphTemplateDoc::node_at(
 }
 
 ///|
-pub fn GraphTemplateDoc::contains_node(
-  self : GraphTemplateDoc,
+pub fn GraphDocument::contains_node(
+  self : GraphDocument,
   id : @identity.GraphNodeId,
 ) -> Bool {
   self.node_index(id) is Some(_)
 }
 
 ///|
-pub fn GraphTemplateDoc::contains_retired_node(
-  self : GraphTemplateDoc,
+pub fn GraphDocument::contains_retired_node(
+  self : GraphDocument,
   id : @identity.GraphNodeId,
 ) -> Bool {
   self.retired_ids.contains(id.value())
 }
 
 ///|
-pub fn GraphTemplateDoc::index_map(self : GraphTemplateDoc) -> GraphIndexMap {
+pub fn GraphDocument::index_map(self : GraphDocument) -> GraphIndexMap {
   let indices : Map[String, Int] = Map([])
   for index in 0..<self.ids.length() {
     indices[self.ids[index].value()] = index
@@ -235,146 +232,125 @@ pub fn GraphTemplateDoc::index_map(self : GraphTemplateDoc) -> GraphIndexMap {
 }
 
 ///|
-pub fn GraphTemplateDoc::analyze(
-  self : GraphTemplateDoc,
-) -> @template.CompiledTemplate {
-  @template.CompiledTemplate::analyze(self.nodes)
-}
-
-///|
-pub fn GraphTemplateDoc::replace_node(
-  self : GraphTemplateDoc,
+pub fn GraphDocument::replace_node(
+  self : GraphDocument,
   id : @identity.GraphNodeId,
   replacement : DspNode,
-) -> GraphTemplateDoc raise GraphTemplateDocError {
+) -> GraphDocument raise GraphDocumentError {
   let index = graph_id_index_or_raise(self.ids, id)
-  let nodes = self.nodes.copy()
-  nodes[index] = replacement
+  let result = apply_graph_template_edit(
+    self.nodes,
+    GraphTopologyEdit::replace_node(index, replacement),
+  )
   {
     revision: self.revision.next(),
     ids: self.ids.copy(),
-    nodes,
+    nodes: result.nodes(),
     retired_ids: copy_retired_graph_ids(self.retired_ids),
   }
 }
 
 ///|
-pub fn GraphTemplateDoc::rewire_input(
-  self : GraphTemplateDoc,
+pub fn GraphDocument::analyze(self : GraphDocument) -> @template.AnalyzedGraph {
+  @template.AnalyzedGraph::analyze(self.nodes)
+}
+
+///|
+pub fn GraphDocument::rewire_input(
+  self : GraphDocument,
   id : @identity.GraphNodeId,
   input_slot : GraphTopologyInputSlot,
   source_id : @identity.GraphNodeId,
-) -> GraphTemplateDoc raise GraphTemplateDocError {
+) -> GraphDocument raise GraphDocumentError {
   let index = graph_id_index_or_raise(self.ids, id)
   let source_index = graph_id_index_or_raise(self.ids, source_id)
-  let nodes = self.nodes.copy()
-  apply_graph_template_edit(
-    nodes,
+  let result = apply_graph_template_edit(
+    self.nodes,
     GraphTopologyEdit::rewire_input(index, input_slot, source_index),
   )
   {
     revision: self.revision.next(),
     ids: self.ids.copy(),
-    nodes,
+    nodes: result.nodes(),
     retired_ids: copy_retired_graph_ids(self.retired_ids),
   }
 }
 
 ///|
-pub fn GraphTemplateDoc::insert_node(
-  self : GraphTemplateDoc,
+pub fn GraphDocument::insert_node(
+  self : GraphDocument,
   inserted_id : @identity.GraphNodeId,
   retarget_id : @identity.GraphNodeId,
   input_slot : GraphTopologyInputSlot,
   inserted_node : DspNode,
-) -> GraphTemplateDoc raise GraphTemplateDocError {
+) -> GraphDocument raise GraphDocumentError {
   validate_new_graph_id(self.ids, self.retired_ids, inserted_id)
   let retarget_index = graph_id_index_or_raise(self.ids, retarget_id)
-  let nodes = self.nodes.copy()
-  apply_graph_template_edit(
-    nodes,
+  let result = apply_graph_template_edit(
+    self.nodes,
     GraphTopologyEdit::insert_node(retarget_index, input_slot, inserted_node),
   )
-  let ids = self.ids.copy()
-  ids.push(inserted_id)
-  {
-    revision: self.revision.next(),
-    ids,
-    nodes,
-    retired_ids: copy_retired_graph_ids(self.retired_ids),
-  }
+  let retired_ids = copy_retired_graph_ids(self.retired_ids)
+  let ids = graph_ids_after_edit(self.ids, result, [inserted_id], retired_ids)
+  { revision: self.revision.next(), ids, nodes: result.nodes(), retired_ids, }
 }
 
 ///|
-pub fn GraphTemplateDoc::insert_chain(
-  self : GraphTemplateDoc,
+pub fn GraphDocument::insert_chain(
+  self : GraphDocument,
   inserted_ids : Array[@identity.GraphNodeId],
   retarget_id : @identity.GraphNodeId,
   input_slot : GraphTopologyInputSlot,
   chain_nodes : Array[DspNode],
-) -> GraphTemplateDoc raise GraphTemplateDocError {
+) -> GraphDocument raise GraphDocumentError {
   validate_new_graph_ids(self.ids, self.retired_ids, inserted_ids)
   if inserted_ids.length() != chain_nodes.length() {
     raise LengthMismatch(inserted_ids.length(), chain_nodes.length())
   }
   let retarget_index = graph_id_index_or_raise(self.ids, retarget_id)
-  let nodes = self.nodes.copy()
-  apply_graph_template_edit(
-    nodes,
+  let result = apply_graph_template_edit(
+    self.nodes,
     GraphTopologyEdit::insert_chain(retarget_index, input_slot, chain_nodes),
   )
-  let ids = self.ids.copy()
-  for id in inserted_ids {
-    ids.push(id)
-  }
-  {
-    revision: self.revision.next(),
-    ids,
-    nodes,
-    retired_ids: copy_retired_graph_ids(self.retired_ids),
-  }
+  let retired_ids = copy_retired_graph_ids(self.retired_ids)
+  let ids = graph_ids_after_edit(self.ids, result, inserted_ids, retired_ids)
+  { revision: self.revision.next(), ids, nodes: result.nodes(), retired_ids, }
 }
 
 ///|
-pub fn GraphTemplateDoc::delete_node(
-  self : GraphTemplateDoc,
+pub fn GraphDocument::delete_node(
+  self : GraphDocument,
   delete_id : @identity.GraphNodeId,
   retarget_id : @identity.GraphNodeId,
   input_slot : GraphTopologyInputSlot,
   replacement_source_id : @identity.GraphNodeId,
-) -> GraphTemplateDoc raise GraphTemplateDocError {
+) -> GraphDocument raise GraphDocumentError {
   let delete_index = graph_id_index_or_raise(self.ids, delete_id)
   let retarget_index = graph_id_index_or_raise(self.ids, retarget_id)
   let replacement_source_index = graph_id_index_or_raise(
     self.ids,
     replacement_source_id,
   )
-  let nodes = self.nodes.copy()
-  apply_graph_template_edit(
-    nodes,
+  let result = apply_graph_template_edit(
+    self.nodes,
     GraphTopologyEdit::delete_node(
       delete_index, retarget_index, input_slot, replacement_source_index,
     ),
   )
   let retired_ids = copy_retired_graph_ids(self.retired_ids)
-  retire_graph_id_range(retired_ids, self.ids, delete_index, delete_index)
-  {
-    revision: self.revision.next(),
-    ids: compact_graph_ids_after_delete(self.ids, delete_index, delete_index),
-    nodes,
-    retired_ids,
-  }
+  let ids = graph_ids_after_edit(self.ids, result, [], retired_ids)
+  { revision: self.revision.next(), ids, nodes: result.nodes(), retired_ids, }
 }
 
 ///|
-pub fn GraphTemplateDoc::delete_chain(
-  self : GraphTemplateDoc,
+pub fn GraphDocument::delete_chain(
+  self : GraphDocument,
   start_id : @identity.GraphNodeId,
   end_id : @identity.GraphNodeId,
   retarget_id : @identity.GraphNodeId,
   input_slot : GraphTopologyInputSlot,
   replacement_source_id : @identity.GraphNodeId,
-) -> GraphTemplateDoc raise GraphTemplateDocError {
+) -> GraphDocument raise GraphDocumentError {
   let start_index = graph_id_index_or_raise(self.ids, start_id)
   let end_index = graph_id_index_or_raise(self.ids, end_id)
   let retarget_index = graph_id_index_or_raise(self.ids, retarget_id)
@@ -382,21 +358,15 @@ pub fn GraphTemplateDoc::delete_chain(
     self.ids,
     replacement_source_id,
   )
-  let nodes = self.nodes.copy()
-  apply_graph_template_edit(
-    nodes,
+  let result = apply_graph_template_edit(
+    self.nodes,
     GraphTopologyEdit::delete_chain(
       start_index, end_index, retarget_index, input_slot, replacement_source_index,
     ),
   )
   let retired_ids = copy_retired_graph_ids(self.retired_ids)
-  retire_graph_id_range(retired_ids, self.ids, start_index, end_index)
-  {
-    revision: self.revision.next(),
-    ids: compact_graph_ids_after_delete(self.ids, start_index, end_index),
-    nodes,
-    retired_ids,
-  }
+  let ids = graph_ids_after_edit(self.ids, result, [], retired_ids)
+  { revision: self.revision.next(), ids, nodes: result.nodes(), retired_ids, }
 }
 
 ///|

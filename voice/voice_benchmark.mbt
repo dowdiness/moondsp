@@ -5,7 +5,7 @@
 // ---------------
 // 1. `set_template`  — exercises `validate_voice_template` in isolation:
 //    pool exists, slots already allocated, so the call cost is dominated
-//    by `CompiledDsp::compile(...)` whose result is discarded plus a
+//    by `Dsp::compile(...)` whose result is discarded plus a
 //    template-reference swap.
 // 2. `note_on`       — the per-voice compile we already pay (max_voices=1
 //    keeps slot stealing stable across iterations so each call recompiles).
@@ -125,8 +125,8 @@ test "bench voice: minimal_voice template compiles + pool accepts" {
     sample_rate=BENCH_SAMPLE_RATE,
     block_size=BENCH_BLOCK_SIZE,
   )
-  let template = @graph.CompiledTemplate::analyze(bench_minimal_voice_nodes())
-  assert_true(@graph.CompiledDsp::compile(template, ctx) is Some(_))
+  let template = @graph.AnalyzedGraph::analyze(bench_minimal_voice_nodes())
+  assert_true(@graph.Dsp::compile(template, ctx) is Some(_))
   assert_true(VoicePool::new(template, ctx) is Ok(_))
 }
 
@@ -136,8 +136,8 @@ test "bench voice: fm_voice template compiles + pool accepts" {
     sample_rate=BENCH_SAMPLE_RATE,
     block_size=BENCH_BLOCK_SIZE,
   )
-  let template = @graph.CompiledTemplate::analyze(bench_fm_voice_nodes())
-  assert_true(@graph.CompiledDsp::compile(template, ctx) is Some(_))
+  let template = @graph.AnalyzedGraph::analyze(bench_fm_voice_nodes())
+  assert_true(@graph.Dsp::compile(template, ctx) is Some(_))
   assert_true(VoicePool::new(template, ctx) is Ok(_))
 }
 
@@ -147,15 +147,15 @@ test "bench voice: full_voice template compiles + pool accepts" {
     sample_rate=BENCH_SAMPLE_RATE,
     block_size=BENCH_BLOCK_SIZE,
   )
-  let template = @graph.CompiledTemplate::analyze(bench_full_voice_nodes())
-  assert_true(@graph.CompiledDsp::compile(template, ctx) is Some(_))
+  let template = @graph.AnalyzedGraph::analyze(bench_full_voice_nodes())
+  assert_true(@graph.Dsp::compile(template, ctx) is Some(_))
   assert_true(VoicePool::new(template, ctx) is Ok(_))
 }
 
 // ---- set_template (isolates the discarded compile) ----
 // WHY this isolates the validator: at iteration time the pool already
 // exists, slots are allocated, so the only work is validate_voice_template
-// (which IS CompiledDsp::compile in the well-formed case) plus one
+// (which IS Dsp::compile in the well-formed case) plus one
 // template-pointer assignment and an adsr_authoring_indices() snapshot.
 // That snapshot is O(node count); a single 4-10-node array scan is far
 // below the compile cost we are measuring.
@@ -166,9 +166,9 @@ test "bench/voice/set_template" (b : @bench.T) {
     sample_rate=BENCH_SAMPLE_RATE,
     block_size=BENCH_BLOCK_SIZE,
   )
-  let minimal = @graph.CompiledTemplate::analyze(bench_minimal_voice_nodes())
-  let fm = @graph.CompiledTemplate::analyze(bench_fm_voice_nodes())
-  let full = @graph.CompiledTemplate::analyze(bench_full_voice_nodes())
+  let minimal = @graph.AnalyzedGraph::analyze(bench_minimal_voice_nodes())
+  let fm = @graph.AnalyzedGraph::analyze(bench_fm_voice_nodes())
+  let full = @graph.AnalyzedGraph::analyze(bench_full_voice_nodes())
   let pool_min = VoicePool::new(minimal, ctx).unwrap()
   let pool_fm = VoicePool::new(fm, ctx).unwrap()
   let pool_full = VoicePool::new(full, ctx).unwrap()
@@ -189,7 +189,7 @@ test "bench/voice/set_template" (b : @bench.T) {
 // ---- note_on (the productive per-voice compile) ----
 // WHY max_voices=1: every iter steals slot 0 and recompiles. This keeps
 // `find_slot` cost constant and bounded, isolating compile cost as the
-// dominant per-call work. The slot's pre-existing CompiledDsp from the
+// dominant per-call work. The slot's pre-existing Dsp from the
 // previous iter is replaced; no leak.
 // WHY params=[]: skips the apply_controls branch so we measure pure compile
 // overhead, not control validation.
@@ -200,9 +200,9 @@ test "bench/voice/note_on" (b : @bench.T) {
     sample_rate=BENCH_SAMPLE_RATE,
     block_size=BENCH_BLOCK_SIZE,
   )
-  let minimal = @graph.CompiledTemplate::analyze(bench_minimal_voice_nodes())
-  let fm = @graph.CompiledTemplate::analyze(bench_fm_voice_nodes())
-  let full = @graph.CompiledTemplate::analyze(bench_full_voice_nodes())
+  let minimal = @graph.AnalyzedGraph::analyze(bench_minimal_voice_nodes())
+  let fm = @graph.AnalyzedGraph::analyze(bench_fm_voice_nodes())
+  let full = @graph.AnalyzedGraph::analyze(bench_full_voice_nodes())
   let pool_min = VoicePool::new(minimal, ctx, max_voices=1).unwrap()
   let pool_fm = VoicePool::new(fm, ctx, max_voices=1).unwrap()
   let pool_full = VoicePool::new(full, ctx, max_voices=1).unwrap()
@@ -223,7 +223,7 @@ test "bench/voice/note_on" (b : @bench.T) {
 
 // ---- voicepool_new (constructor cost, post-analyze) ----
 // WHY: measures validate + 32 × VoiceSlot::new (each allocates a
-// mono_buffer of block_size doubles). `CompiledTemplate::analyze` is
+// mono_buffer of block_size doubles). `AnalyzedGraph::analyze` is
 // hoisted OUT of the bench closure because real authoring re-uses one
 // analyzed template across many pool constructions; the bench therefore
 // reports the steady-state per-call cost, not first-edit cost from raw
@@ -237,9 +237,9 @@ test "bench/voice/voicepool_new" (b : @bench.T) {
     sample_rate=BENCH_SAMPLE_RATE,
     block_size=BENCH_BLOCK_SIZE,
   )
-  let minimal = @graph.CompiledTemplate::analyze(bench_minimal_voice_nodes())
-  let fm = @graph.CompiledTemplate::analyze(bench_fm_voice_nodes())
-  let full = @graph.CompiledTemplate::analyze(bench_full_voice_nodes())
+  let minimal = @graph.AnalyzedGraph::analyze(bench_minimal_voice_nodes())
+  let fm = @graph.AnalyzedGraph::analyze(bench_fm_voice_nodes())
+  let full = @graph.AnalyzedGraph::analyze(bench_full_voice_nodes())
   b.bench(name="minimal_voice", fn() {
     let pool = VoicePool::new(minimal, ctx)
     b.keep(pool)

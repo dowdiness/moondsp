@@ -13,16 +13,37 @@ import {
 // Values
 
 // Errors
-pub(all) suberror GraphTemplateDocError {
+pub(all) suberror GraphDocumentError {
   LengthMismatch(Int, Int)
   DuplicateNodeId(String)
   MissingNodeId(String)
   RetiredNodeId(String)
   Topology(@staging.GraphTopologyEditError)
 } derive(@debug.Debug)
-pub impl Show for GraphTemplateDocError
+pub impl Show for GraphDocumentError
 
 // Types and methods
+pub struct GraphDocument {
+  // private fields
+}
+pub fn GraphDocument::analyze(Self) -> @template.AnalyzedGraph
+pub fn GraphDocument::contains_node(Self, @identity.GraphNodeId) -> Bool
+pub fn GraphDocument::contains_retired_node(Self, @identity.GraphNodeId) -> Bool
+pub fn GraphDocument::delete_chain(Self, @identity.GraphNodeId, @identity.GraphNodeId, @identity.GraphNodeId, @staging.GraphTopologyInputSlot, @identity.GraphNodeId) -> Self raise GraphDocumentError
+pub fn GraphDocument::delete_node(Self, @identity.GraphNodeId, @identity.GraphNodeId, @staging.GraphTopologyInputSlot, @identity.GraphNodeId) -> Self raise GraphDocumentError
+pub fn GraphDocument::from_nodes(ids~ : Array[@identity.GraphNodeId], nodes~ : Array[@model.DspNode]) -> Self raise GraphDocumentError
+pub fn GraphDocument::index_map(Self) -> GraphIndexMap
+pub fn GraphDocument::insert_chain(Self, Array[@identity.GraphNodeId], @identity.GraphNodeId, @staging.GraphTopologyInputSlot, Array[@model.DspNode]) -> Self raise GraphDocumentError
+pub fn GraphDocument::insert_node(Self, @identity.GraphNodeId, @identity.GraphNodeId, @staging.GraphTopologyInputSlot, @model.DspNode) -> Self raise GraphDocumentError
+pub fn GraphDocument::length(Self) -> Int
+pub fn GraphDocument::node_at(Self, @identity.GraphNodeId) -> @model.DspNode?
+pub fn GraphDocument::node_id_at(Self, Int) -> @identity.GraphNodeId?
+pub fn GraphDocument::node_index(Self, @identity.GraphNodeId) -> Int?
+pub fn GraphDocument::nodes(Self) -> Array[@model.DspNode]
+pub fn GraphDocument::replace_node(Self, @identity.GraphNodeId, @model.DspNode) -> Self raise GraphDocumentError
+pub fn GraphDocument::revision(Self) -> @identity.Revision
+pub fn GraphDocument::rewire_input(Self, @identity.GraphNodeId, @staging.GraphTopologyInputSlot, @identity.GraphNodeId) -> Self raise GraphDocumentError
+
 pub struct GraphIndexMap {
   // private fields
 }
@@ -40,27 +61,6 @@ pub fn GraphIndexMap::replace_node(Self, @identity.GraphNodeId, @model.DspNode) 
 pub fn GraphIndexMap::revision(Self) -> @identity.Revision
 pub fn GraphIndexMap::rewire_input(Self, @identity.GraphNodeId, @staging.GraphTopologyInputSlot, @identity.GraphNodeId) -> @staging.GraphTopologyEdit?
 pub fn GraphIndexMap::set_param(Self, @identity.GraphNodeId, @model.GraphParamSlot, Double) -> @model.GraphControl?
-
-pub struct GraphTemplateDoc {
-  // private fields
-}
-pub fn GraphTemplateDoc::analyze(Self) -> @template.CompiledTemplate
-pub fn GraphTemplateDoc::contains_node(Self, @identity.GraphNodeId) -> Bool
-pub fn GraphTemplateDoc::contains_retired_node(Self, @identity.GraphNodeId) -> Bool
-pub fn GraphTemplateDoc::delete_chain(Self, @identity.GraphNodeId, @identity.GraphNodeId, @identity.GraphNodeId, @staging.GraphTopologyInputSlot, @identity.GraphNodeId) -> Self raise GraphTemplateDocError
-pub fn GraphTemplateDoc::delete_node(Self, @identity.GraphNodeId, @identity.GraphNodeId, @staging.GraphTopologyInputSlot, @identity.GraphNodeId) -> Self raise GraphTemplateDocError
-pub fn GraphTemplateDoc::from_nodes(ids~ : Array[@identity.GraphNodeId], nodes~ : Array[@model.DspNode]) -> Self raise GraphTemplateDocError
-pub fn GraphTemplateDoc::index_map(Self) -> GraphIndexMap
-pub fn GraphTemplateDoc::insert_chain(Self, Array[@identity.GraphNodeId], @identity.GraphNodeId, @staging.GraphTopologyInputSlot, Array[@model.DspNode]) -> Self raise GraphTemplateDocError
-pub fn GraphTemplateDoc::insert_node(Self, @identity.GraphNodeId, @identity.GraphNodeId, @staging.GraphTopologyInputSlot, @model.DspNode) -> Self raise GraphTemplateDocError
-pub fn GraphTemplateDoc::length(Self) -> Int
-pub fn GraphTemplateDoc::node_at(Self, @identity.GraphNodeId) -> @model.DspNode?
-pub fn GraphTemplateDoc::node_id_at(Self, Int) -> @identity.GraphNodeId?
-pub fn GraphTemplateDoc::node_index(Self, @identity.GraphNodeId) -> Int?
-pub fn GraphTemplateDoc::nodes(Self) -> Array[@model.DspNode]
-pub fn GraphTemplateDoc::replace_node(Self, @identity.GraphNodeId, @model.DspNode) -> Self raise GraphTemplateDocError
-pub fn GraphTemplateDoc::revision(Self) -> @identity.Revision
-pub fn GraphTemplateDoc::rewire_input(Self, @identity.GraphNodeId, @staging.GraphTopologyInputSlot, @identity.GraphNodeId) -> Self raise GraphTemplateDocError
 
 // Type aliases
 

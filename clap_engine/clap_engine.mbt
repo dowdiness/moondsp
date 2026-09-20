@@ -298,7 +298,7 @@ pub fn ClapSynthEngine::new(
     return Err(ClapEngineError::InvalidMaxVoices)
   }
   let ctx = @moondsp.DspContext::new(sample_rate~, block_size=max_block_size)
-  let template = @moondsp.CompiledTemplate::analyze(default_synth_template())
+  let template = @moondsp.AnalyzedGraph::analyze(default_synth_template())
   match
     @moondsp.BoundVoicePool::new(template, ctx, synth_bindings(), max_voices~) {
     Err(error) => Err(ClapEngineError::PoolInitFailed(error))

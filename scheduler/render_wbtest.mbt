@@ -3,7 +3,7 @@ test "Unrepresentable render frame silences dry and send without accepting queue
   let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
   let sched = PatternScheduler::new(bpm=1000.0, ctx~).unwrap()
   let pool = @moondsp.BoundVoicePool::new(
-    @moondsp.CompiledTemplate::analyze([
+    @moondsp.AnalyzedGraph::analyze([
       @moondsp.DspNode::constant(1.0),
       @moondsp.DspNode::output(0),
     ]),

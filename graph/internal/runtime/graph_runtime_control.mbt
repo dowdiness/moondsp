@@ -17,17 +17,17 @@ pub impl Show for GraphControlError with fn output(self, logger) {
 
 ///|
 /// Apply one runtime control message, returning a specific rejection reason.
-pub fn CompiledDsp::apply_control(
-  self : CompiledDsp,
+pub fn Dsp::apply_control(
+  self : Dsp,
   control : GraphControl,
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_control_impl(control)
+  self.0.apply_controls_impl([control])
 }
 
 ///|
 /// Apply a runtime control batch transactionally.
-pub fn CompiledDsp::apply_controls(
-  self : CompiledDsp,
+pub fn Dsp::apply_controls(
+  self : Dsp,
   controls : Array[GraphControl],
 ) -> Result[Unit, GraphControlError] {
   self.0.apply_controls_impl(controls)
@@ -35,8 +35,8 @@ pub fn CompiledDsp::apply_controls(
 
 ///|
 /// Validate a runtime control batch without mutating the compiled graph.
-pub fn CompiledDsp::validate_controls(
-  self : CompiledDsp,
+pub fn Dsp::validate_controls(
+  self : Dsp,
   controls : Array[GraphControl],
 ) -> Result[Unit, GraphControlError] {
   self.0.validate_controls_impl(controls)
@@ -44,20 +44,20 @@ pub fn CompiledDsp::validate_controls(
 
 ///|
 /// Allocation-conscious gate-on primitive for prevalidated host paths.
-pub fn CompiledDsp::gate_on_bool(self : CompiledDsp, node_index : Int) -> Bool {
+pub fn Dsp::gate_on_bool(self : Dsp, node_index : Int) -> Bool {
   self.0.apply_gate_control_bool_impl(node_index, true)
 }
 
 ///|
 /// Allocation-conscious gate-off primitive for prevalidated host paths.
-pub fn CompiledDsp::gate_off_bool(self : CompiledDsp, node_index : Int) -> Bool {
+pub fn Dsp::gate_off_bool(self : Dsp, node_index : Int) -> Bool {
   self.0.apply_gate_control_bool_impl(node_index, false)
 }
 
 ///|
 /// Allocation-conscious parameter primitive for prevalidated host paths.
-pub fn CompiledDsp::set_param_bool(
-  self : CompiledDsp,
+pub fn Dsp::set_param_bool(
+  self : Dsp,
   node_index : Int,
   slot : GraphParamSlot,
   value : Double,
@@ -67,8 +67,8 @@ pub fn CompiledDsp::set_param_bool(
 
 ///|
 /// Allocation-conscious parameter validation for prevalidated host paths.
-pub fn CompiledDsp::can_set_param_bool(
-  self : CompiledDsp,
+pub fn Dsp::can_set_param_bool(
+  self : Dsp,
   node_index : Int,
   slot : GraphParamSlot,
   value : Double,
@@ -86,7 +86,7 @@ pub fn CompiledDsp::can_set_param_bool(
 /// WHY two stages: ADSR-only detection would cut voices with downstream delay
 /// or feedback tails that are still audible. Energy-only detection would keep
 /// voices alive during sustain (where output is non-zero but expected).
-pub fn CompiledDsp::is_voice_finished(self : CompiledDsp) -> Bool {
+pub fn Dsp::is_voice_finished(self : Dsp) -> Bool {
   let nodes = self.0.nodes
   let env_states = self.0.env_states
   for i = 0; i < nodes.length(); i = i + 1 {
@@ -110,18 +110,17 @@ pub fn CompiledDsp::is_voice_finished(self : CompiledDsp) -> Bool {
 }
 
 ///|
-/// Apply one runtime control message, returning a specific rejection reason.
-pub fn CompiledStereoDsp::apply_control(
-  self : CompiledStereoDsp,
+pub fn StereoDsp::apply_control(
+  self : StereoDsp,
   control : GraphControl,
 ) -> Result[Unit, GraphControlError] {
-  self.0.apply_control_impl(control)
+  self.0.apply_controls_impl([control])
 }
 
 ///|
 /// Apply a runtime control batch transactionally.
-pub fn CompiledStereoDsp::apply_controls(
-  self : CompiledStereoDsp,
+pub fn StereoDsp::apply_controls(
+  self : StereoDsp,
   controls : Array[GraphControl],
 ) -> Result[Unit, GraphControlError] {
   self.0.apply_controls_impl(controls)
@@ -129,8 +128,8 @@ pub fn CompiledStereoDsp::apply_controls(
 
 ///|
 /// Validate a runtime control batch without mutating the compiled graph.
-pub fn CompiledStereoDsp::validate_controls(
-  self : CompiledStereoDsp,
+pub fn StereoDsp::validate_controls(
+  self : StereoDsp,
   controls : Array[GraphControl],
 ) -> Result[Unit, GraphControlError] {
   self.0.validate_controls_impl(controls)
@@ -141,17 +140,13 @@ pub fn CompiledGraph::apply_control_impl(
   self : CompiledGraph,
   control : GraphControl,
 ) -> Result[Unit, GraphControlError] {
-  match control.kind() {
-    GateOn => apply_graph_gate_control_result(self, control.node_index(), true)
-    GateOff =>
-      apply_graph_gate_control_result(self, control.node_index(), false)
-    SetParam =>
-      apply_graph_param_control_result(
-        self,
-        control.node_index(),
-        control.slot(),
-        control.value(),
-      )
+  self.controls.begin(self.nodes)
+  match self.prepare_control(control) {
+    Err(error) => Err(error)
+    Ok(_) => {
+      self.commit_prepared_controls()
+      Ok(())
+    }
   }
 }
 
@@ -160,15 +155,176 @@ pub fn CompiledGraph::apply_controls_impl(
   self : CompiledGraph,
   controls : Array[GraphControl],
 ) -> Result[Unit, GraphControlError] {
-  match self.validate_controls_impl(controls) {
-    Ok(_) => ()
-    Err(error) => return Err(error)
+  match self.prepare_controls(controls) {
+    Ok(_) => {
+      self.commit_prepared_controls()
+      Ok(())
+    }
+    Err(error) => Err(error)
   }
+}
 
-  for index = 0; index < controls.length(); index = index + 1 {
-    match self.apply_control_impl(controls[index]) {
+///|
+pub fn CompiledGraph::apply_controls_to_pair(
+  self : CompiledGraph,
+  other : CompiledGraph,
+  controls : Array[GraphControl],
+) -> Result[Unit, GraphControlError] {
+  match self.prepare_controls(controls) {
+    Err(error) => Err(error)
+    Ok(_) =>
+      match other.prepare_controls(controls) {
+        Err(error) => Err(error)
+        Ok(_) => {
+          self.commit_prepared_controls()
+          other.commit_prepared_controls()
+          Ok(())
+        }
+      }
+  }
+}
+
+///|
+fn CompiledGraph::prepare_controls(
+  self : CompiledGraph,
+  controls : Array[GraphControl],
+) -> Result[Unit, GraphControlError] {
+  self.controls.begin(self.nodes)
+  for control in controls {
+    match self.prepare_control(control) {
       Ok(_) => ()
       Err(error) => return Err(error)
+    }
+  }
+  Ok(())
+}
+
+///|
+fn CompiledGraph::prepare_control(
+  self : CompiledGraph,
+  control : GraphControl,
+) -> Result[Unit, GraphControlError] {
+  let compiled_index = match self.compiled_index_result(control.node_index()) {
+    Ok(index) => index
+    Err(error) => return Err(error)
+  }
+  match control.kind() {
+    GateOn | GateOff => {
+      guard self.controls.targets[compiled_index] is Envelope(target) else {
+        let kind = self.nodes[compiled_index].kind()
+        if kind is Adsr {
+          return Err(
+            GraphControlError::MissingRuntimeState(control.node_index(), kind),
+          )
+        }
+        return Err(
+          GraphControlError::InvalidGateNode(control.node_index(), kind),
+        )
+      }
+      target.gate = fold_gate_state(target.gate, control.kind() is GateOn)
+      Ok(())
+    }
+    SetParam => {
+      let slot = control.slot()
+      let value = control.value()
+      let node = self.controls.nodes[compiled_index]
+      if !@model.node_accepts_slot(node, slot) {
+        return Err(
+          GraphControlError::InvalidSlotForNode(
+            control.node_index(),
+            node.kind(),
+            slot,
+          ),
+        )
+      }
+      if !model_node_param_valid(node, slot, value, self.compile_sample_rate) {
+        return Err(
+          GraphControlError::InvalidParamValue(
+            control.node_index(),
+            node.kind(),
+            slot,
+            value,
+          ),
+        )
+      }
+      match slot {
+        Value0 => @model.set_node_value0(node, value)
+        Value1 => @model.set_node_value1(node, value)
+        Value2 => @model.set_node_value2(node, value)
+        Value3 => @model.set_node_value3(node, value)
+        DelaySamples => @model.set_node_delay_samples(node, value.to_int())
+      }
+      self.controls.touched[compiled_index] = true
+      Ok(())
+    }
+  }
+}
+
+///|
+fn CompiledGraph::commit_prepared_controls(self : CompiledGraph) -> Unit {
+  for i = 0; i < self.nodes.length(); i = i + 1 {
+    if self.controls.touched[i] {
+      let source = self.controls.nodes[i]
+      let target = self.nodes[i]
+      copy_node_parameters(source, target)
+      match self.controls.targets[i] {
+        Plain => ()
+        Envelope(target) =>
+          target.state.set_parameters(
+            attack_ms=source.value0(),
+            decay_ms=source.value1(),
+            sustain=source.value2(),
+            release_ms=source.value3(),
+          )
+        Delay(delay) => {
+          delay.set_feedback(source.value0())
+          delay.set_delay_samples(source.delay_samples())
+        }
+        StereoDelay(left, right) => {
+          left.set_feedback(source.value0())
+          left.set_delay_samples(source.delay_samples())
+          right.set_feedback(source.value0())
+          right.set_delay_samples(source.delay_samples())
+        }
+      }
+    }
+    match self.controls.targets[i] {
+      Envelope(target) =>
+        match target.gate {
+          None => ()
+          On => target.state.gate_on()
+          Off => target.state.gate_off()
+          OnThenOff => {
+            target.state.gate_on()
+            target.state.gate_off()
+          }
+        }
+      _ => ()
+    }
+  }
+}
+
+///|
+pub fn[T] Dsp::apply_controls_to_all(
+  targets : Array[Result[Dsp, T]],
+  controls : Array[GraphControl],
+  wrap_error : (GraphControlError) -> T,
+) -> Result[Unit, T] {
+  for target in targets {
+    match target {
+      Err(error) => return Err(error)
+      Ok(graph) =>
+        match graph.0.prepare_controls(controls) {
+          Ok(_) => ()
+          Err(error) => return Err(wrap_error(error))
+        }
+    }
+  }
+  for target in targets {
+    match target {
+      Ok(graph) => graph.0.commit_prepared_controls()
+      Err(_) =>
+        abort("prepared target list changed during synchronous adoption")
     }
   }
   Ok(())
@@ -179,16 +335,7 @@ pub fn CompiledGraph::validate_controls_impl(
   self : CompiledGraph,
   controls : Array[GraphControl],
 ) -> Result[Unit, GraphControlError] {
-  let simulated_nodes = FixedArray::makei(self.nodes.length(), index => {
-    self.nodes[index]
-  })
-  for index = 0; index < controls.length(); index = index + 1 {
-    match valid_graph_control_result(self, simulated_nodes, controls[index]) {
-      Ok(_) => ()
-      Err(error) => return Err(error)
-    }
-  }
-  Ok(())
+  self.prepare_controls(controls)
 }
 
 ///|
@@ -269,138 +416,6 @@ fn CompiledGraph::can_param_control_bool_impl(
       runtime_param_state_available(self, compiled_index, node, slot)
     }
   }
-}
-
-///|
-fn apply_graph_gate_control_result(
-  graph : CompiledGraph,
-  node_index : Int,
-  gate_on : Bool,
-) -> Result[Unit, GraphControlError] {
-  let compiled_index = match graph.compiled_index_result(node_index) {
-    Ok(index) => index
-    Err(error) => return Err(error)
-  }
-  match graph.env_states[compiled_index] {
-    Some(env) => {
-      if gate_on {
-        env.gate_on()
-      } else {
-        env.gate_off()
-      }
-      Ok(())
-    }
-    None => {
-      let node = graph.nodes[compiled_index]
-      let kind = node.kind()
-      if node.kind() is Adsr {
-        Err(GraphControlError::MissingRuntimeState(node_index, kind))
-      } else {
-        Err(GraphControlError::InvalidGateNode(node_index, kind))
-      }
-    }
-  }
-}
-
-///|
-fn apply_graph_param_control_result(
-  graph : CompiledGraph,
-  node_index : Int,
-  slot : GraphParamSlot,
-  value : Double,
-) -> Result[Unit, GraphControlError] {
-  let compiled_index = match graph.compiled_index_result(node_index) {
-    Ok(index) => index
-    Err(error) => return Err(error)
-  }
-  let node = graph.nodes[compiled_index]
-  let updated = match
-    updated_model_node_param_result(
-      node,
-      node_index,
-      slot,
-      value,
-      graph.compile_sample_rate,
-    ) {
-    Ok(updated) => updated
-    Err(error) => return Err(error)
-  }
-  graph.nodes[compiled_index] = updated
-  if apply_runtime_param_side_effect(graph, compiled_index, updated, slot) {
-    Ok(())
-  } else {
-    Err(GraphControlError::MissingRuntimeState(node_index, node.kind()))
-  }
-}
-
-///|
-fn valid_graph_control_result(
-  graph : CompiledGraph,
-  simulated_nodes : FixedArray[@model.DspNode],
-  control : GraphControl,
-) -> Result[Unit, GraphControlError] {
-  match control.kind() {
-    GateOn => valid_graph_gate_control_result(graph, control.node_index())
-    GateOff => valid_graph_gate_control_result(graph, control.node_index())
-    SetParam =>
-      valid_graph_param_control_result(
-        graph,
-        simulated_nodes,
-        control.node_index(),
-        control.slot(),
-        control.value(),
-      )
-  }
-}
-
-///|
-fn valid_graph_gate_control_result(
-  graph : CompiledGraph,
-  node_index : Int,
-) -> Result[Unit, GraphControlError] {
-  let compiled_index = match graph.compiled_index_result(node_index) {
-    Ok(index) => index
-    Err(error) => return Err(error)
-  }
-  match graph.env_states[compiled_index] {
-    Some(_) => Ok(())
-    None => {
-      let node = graph.nodes[compiled_index]
-      let kind = node.kind()
-      if node.kind() is Adsr {
-        Err(GraphControlError::MissingRuntimeState(node_index, kind))
-      } else {
-        Err(GraphControlError::InvalidGateNode(node_index, kind))
-      }
-    }
-  }
-}
-
-///|
-fn valid_graph_param_control_result(
-  graph : CompiledGraph,
-  simulated_nodes : FixedArray[@model.DspNode],
-  node_index : Int,
-  slot : GraphParamSlot,
-  value : Double,
-) -> Result[Unit, GraphControlError] {
-  let compiled_index = match graph.compiled_index_result(node_index) {
-    Ok(index) => index
-    Err(error) => return Err(error)
-  }
-  let updated = match
-    updated_model_node_param_result(
-      simulated_nodes[compiled_index],
-      node_index,
-      slot,
-      value,
-      graph.compile_sample_rate,
-    ) {
-    Ok(updated) => updated
-    Err(error) => return Err(error)
-  }
-  simulated_nodes[compiled_index] = updated
-  Ok(())
 }
 
 ///|

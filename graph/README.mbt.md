@@ -25,7 +25,7 @@ and low-level sample processing:
 
 - **Upstream consumers**: [`voice/`](../voice/) compiles templates into voice
   slots and applies pitch/gate controls; [`engine/`](../engine/) mounts and
-  mixes independent graphs; live editors use `GraphTemplateDoc` and hot-swap.
+  mixes independent graphs; live editors use `GraphDocument` and hot-swap.
 - **Downstream dependencies**: [`dsp/`](../dsp/) executes individual sample
   operations; [`identity/`](../identity/) provides stable node IDs and
   revisions across edits.
@@ -35,9 +35,9 @@ and low-level sample processing:
 | Category | Types | Key operations |
 |---|---|---|
 | **Authoring** | `DspNode`, `DspNodeKind`, `GraphBuilder` | `DspNode::constant`, `DspNode::oscillator`, `DspNode::gain`, `DspNode::biquad`, `DspNode::adsr`, `DspNode::delay`, `DspNode::pan`, `DspNode::output`, `DspNode::stereo_output`, `GraphBuilder::analyze` |
-| **Compilation** | `CompiledTemplate`, `CompiledDsp`, `CompiledStereoDsp` | `CompiledTemplate::analyze`, `CompiledDsp::compile_result`, `CompiledDsp::compile`, `CompiledDsp::process`, `CompiledStereoDsp::compile_result`, `CompiledStereoDsp::process` |
-| **Runtime Control** | `GraphControl`, `GraphParamSlot`, `ControlBindingMap` | `GraphControl::set_param`, `GraphControl::gate_on`, `GraphControl::gate_off`, `CompiledDsp::apply_control`, `CompiledDsp::apply_controls`, `ControlBindingMap::resolve_controls` |
-| **Hot-Swap & Topology** | `CompiledDspHotSwap`, `CompiledDspTopologyController`, `GraphTemplateDoc`, `GraphIndexMap` | `CompiledDspHotSwap::queue_swap`, `CompiledDspTopologyController::queue_topology_edit`, `CompiledDspTopologyController::queue_topology_edits`, `GraphTemplateDoc::from_nodes`, `GraphTemplateDoc::index_map`, `GraphTemplateDoc::replace_node` |
+| **Compilation** | `AnalyzedGraph`, `Dsp`, `StereoDsp` | `AnalyzedGraph::analyze`, `Dsp::compile_result`, `Dsp::compile`, `Dsp::process`, `StereoDsp::compile_result`, `StereoDsp::process` |
+| **Runtime Control** | `GraphControl`, `GraphParamSlot`, `ControlBindingMap` | `GraphControl::set_param`, `GraphControl::gate_on`, `GraphControl::gate_off`, `Dsp::apply_control`, `Dsp::apply_controls`, `ControlBindingMap::resolve_controls` |
+| **Hot-Swap & Topology** | `DspHotSwap`, `DspTopologyController`, `GraphDocument`, `GraphIndexMap` | `DspHotSwap::queue_swap`, `DspTopologyController::queue_topology_edit`, `DspTopologyController::queue_topology_edits`, `GraphDocument::from_nodes`, `GraphDocument::index_map`, `GraphDocument::replace_node` |
 | **Diagnostics & Errors** | `GraphCompileError`, `GraphControlError`, `GraphTopologyQueueError`, `GraphTopologyEditError` | Structured rejection reporting for cycles, invalid slots, input mismatches, or hot-swap capacity differences |
 
 ## Analyze, compile, process
@@ -46,15 +46,20 @@ The canonical boundary is:
 
 ```text
 Array[DspNode]
-  -> CompiledTemplate::analyze
-  -> CompiledTemplate
-  -> CompiledDsp::compile_result
-  -> CompiledDsp
+  -> AnalyzedGraph::analyze
+  -> AnalyzedGraph
+  -> Dsp::compile_result
+  -> Dsp
 ```
 
-`CompiledTemplate` is the only exchange type between graph authoring and runtime
+`AnalyzedGraph` is the only exchange type between graph authoring and runtime
 compilation. Analyze once and reuse the template when creating multiple runtime
 instances, such as the slots in a voice pool.
+
+Analysis preserves an authoring snapshot, including drafts that cannot execute.
+Compilation builds a checked internal `DspProgram` or `StereoDspProgram` before
+allocating runtime state. The program retains node order, feedback routing and
+compile context; each runtime instance owns its mutable parameters and histories.
 
 ```mbt check
 ///|
@@ -65,8 +70,8 @@ test "compile and process a mono graph" {
     @graph.DspNode::gain(0, 0.4),
     @graph.DspNode::output(1),
   ]
-  let template = @graph.CompiledTemplate::analyze(nodes)
-  let compiled = @graph.CompiledDsp::compile_result(template, context).unwrap()
+  let template = @graph.AnalyzedGraph::analyze(nodes)
+  let compiled = @graph.Dsp::compile_result(template, context).unwrap()
   let output = context.make_buffer()
 
   compiled.process(context, output)
@@ -89,12 +94,12 @@ unreachable nodes, and unsupported feedback cycles.
 ///|
 test "compile_result reports an invalid input" {
   let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=8)
-  let template = @graph.CompiledTemplate::analyze([
+  let template = @graph.AnalyzedGraph::analyze([
     @graph.DspNode::gain(9, 0.5),
     @graph.DspNode::output(0),
   ])
 
-  match @graph.CompiledDsp::compile_result(template, context) {
+  match @graph.Dsp::compile_result(template, context) {
     Err(@graph.GraphCompileError::InvalidInput(index, _, _, source)) => {
       assert_eq(index, 0)
       assert_eq(source, 9)
@@ -104,7 +109,7 @@ test "compile_result reports an invalid input" {
 }
 ```
 
-`CompiledDsp::compile` and `CompiledStereoDsp::compile` return `None` for the
+`Dsp::compile` and `StereoDsp::compile` return `None` for the
 same failures when the reason is not needed.
 
 ## Runtime controls
@@ -117,12 +122,12 @@ applies it in order. An invalid control rejects the complete batch.
 ///|
 test "retune a compiled graph" {
   let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=4)
-  let template = @graph.CompiledTemplate::analyze([
+  let template = @graph.AnalyzedGraph::analyze([
     @graph.DspNode::constant(1.0),
     @graph.DspNode::gain(0, 0.25),
     @graph.DspNode::output(1),
   ])
-  let compiled = @graph.CompiledDsp::compile_result(template, context).unwrap()
+  let compiled = @graph.Dsp::compile_result(template, context).unwrap()
   let output = context.make_buffer()
 
   compiled.process(context, output)
@@ -145,19 +150,19 @@ validation rules.
 
 ## Mono and stereo runtimes
 
-`CompiledDsp` renders one output buffer. `CompiledStereoDsp` renders separate
+`Dsp` renders one output buffer. `StereoDsp` renders separate
 left and right buffers from a terminal `StereoOutput` graph.
 
 ```mbt check
 ///|
 test "compile a terminal stereo graph" {
   let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=4)
-  let template = @graph.CompiledTemplate::analyze([
+  let template = @graph.AnalyzedGraph::analyze([
     @graph.DspNode::constant(1.0),
     @graph.DspNode::pan(0, -1.0),
     @graph.DspNode::stereo_output(1),
   ])
-  let compiled = @graph.CompiledStereoDsp::compile_result(template, context).unwrap()
+  let compiled = @graph.StereoDsp::compile_result(template, context).unwrap()
   let left = context.make_buffer()
   let right = context.make_buffer()
 
@@ -174,7 +179,7 @@ a stereo path down through `StereoMixDown`.
 
 ## Hot-swap
 
-`CompiledDspHotSwap` and `CompiledStereoDspHotSwap` stage one compatible
+`DspHotSwap` and `StereoDspHotSwap` stage one compatible
 replacement for the next `process` call. A positive `crossfade_samples` value
 uses an equal-power transition; the default replaces the graph immediately.
 
@@ -182,21 +187,21 @@ uses an equal-power transition; the default replaces the graph immediately.
 ///|
 test "replace a graph at a block boundary" {
   let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=4)
-  let old_graph = @graph.CompiledDsp::compile_result(
-    @graph.CompiledTemplate::analyze([
+  let old_graph = @graph.Dsp::compile_result(
+    @graph.AnalyzedGraph::analyze([
       @graph.DspNode::constant(0.25),
       @graph.DspNode::output(0),
     ]),
     context,
   ).unwrap()
-  let replacement = @graph.CompiledDsp::compile_result(
-    @graph.CompiledTemplate::analyze([
+  let replacement = @graph.Dsp::compile_result(
+    @graph.AnalyzedGraph::analyze([
       @graph.DspNode::constant(0.75),
       @graph.DspNode::output(0),
     ]),
     context,
   ).unwrap()
-  let hot_swap = @graph.CompiledDspHotSwap::from_graph(old_graph)
+  let hot_swap = @graph.DspHotSwap::from_graph(old_graph)
   let output = context.make_buffer()
 
   assert_true(hot_swap.queue_swap(replacement) is Ok(_))
@@ -210,17 +215,28 @@ Replacement graphs must match the active graph's sample rate and block
 capacity. Compile and queue replacements on the control side, not in the audio
 callback.
 
+Internally a wrapper is either playing one graph or switching between two.
+Queueing prepares the completion state; the render callback only advances fade
+progress and adopts that prebuilt state. Direct requeue replaces the next graph
+and restarts the fade; topology controllers reject another edit until adoption.
+
 ## Topology editing and stable identity
 
-`CompiledDspTopologyController` applies transactional `GraphTopologyEdit`
+`DspTopologyController` applies transactional `GraphTopologyEdit`
 batches, recompiles a replacement, and stages it through an internal hot-swap.
-`GraphTemplateDoc` adds stable `GraphNodeId` values and revisions for editors.
+`GraphDocument` adds stable `GraphNodeId` values and revisions for editors.
 Its `GraphIndexMap` translates stable identities into authoring indices for
 controls, bindings, and topology edits.
 
+Topology edits return their node snapshot and old-to-new index correspondence
+together. Document ID retirement uses that correspondence. Non-deleting edits
+copy compatible DSP histories into independent destination objects, retaining
+the replacement's ADSR and delay settings. Deleting edits still start fresh;
+delay history transfers only when buffer capacities match.
+
 Use these layers for structural live editing:
 
-1. edit a `GraphTemplateDoc` on the control side;
+1. edit a `GraphDocument` on the control side;
 2. derive controls or topology edits through its index map;
 3. queue the validated replacement;
 4. let the next process block adopt it.
@@ -228,7 +244,7 @@ Use these layers for structural live editing:
 ## Real-time boundary
 
 Compilation, analysis, topology editing, and graph replacement may allocate.
-`CompiledDsp::process` and `CompiledStereoDsp::process` operate on preallocated
+`Dsp::process` and `StereoDsp::process` operate on preallocated
 runtime state. If a requested block is larger than the compiled capacity,
 processing fails closed to silence.
 

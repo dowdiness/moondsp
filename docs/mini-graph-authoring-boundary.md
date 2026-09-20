@@ -4,7 +4,7 @@ This contract defines how MoonDsp's Mini pattern/control DSL composes with a
 separate graph/topology DSL. It complements the external DSL lowering contract
 and the editor preview handoff: external graph authoring still lowers validated
 topology to `Array[DspNode]`, crosses into MoonDsp through
-`CompiledTemplate::analyze`, and builds validated control bindings on the
+`AnalyzedGraph::analyze`, and builds validated control bindings on the
 control side.
 
 ## Intended flow
@@ -13,13 +13,13 @@ control side.
 Mini PatternDoc / PatternSnapshot
   -> scheduler events + ControlMap
   -> template registry + ControlMapper
-  -> ControlBindingMap for the selected CompiledTemplate
+  -> ControlBindingMap for the selected AnalyzedGraph
   -> GraphControl batch / BoundVoicePool note-on at block boundary
 
 Graph DSL document
   -> normalized topology + declared named controls
   -> Array[DspNode]
-  -> CompiledTemplate::analyze
+  -> AnalyzedGraph::analyze
   -> ControlBindingBuilder::build + compile/hotswap on the control side
 ```
 
@@ -35,7 +35,7 @@ selected template.
 | --- | --- | --- |
 | Mini DSL | Text pattern syntax, rhythmic structure, event timing, `ControlMap`, pattern snapshots, and block-boundary scheduler delivery. | DSP topology, graph node identity, graph source diagnostics, or graph recompilation policy. |
 | Graph DSL authoring | Template names, topology, stable graph node IDs, declared controls, defaults/requiredness, source diagnostics, and lowering to `Array[DspNode]` plus binding declarations. | Pattern syntax, event-time scheduling, Mini drum/note semantics, or sample-accurate automation. |
-| MoonDsp graph runtime | `DspNode`, `CompiledTemplate`, compile diagnostics, validated `ControlBindingMap`, runtime `GraphControl` validation, hotswap, and audio-safe processing. | Source parsing/projection, external name resolution, or deciding which template a Mini event meant. |
+| MoonDsp graph runtime | `DspNode`, `AnalyzedGraph`, compile diagnostics, validated `ControlBindingMap`, runtime `GraphControl` validation, hotswap, and audio-safe processing. | Source parsing/projection, external name resolution, or deciding which template a Mini event meant. |
 
 ## Canonical control bridge
 
@@ -65,7 +65,7 @@ A bridge maintains a prepared registry entry per playable graph template:
 
 - template name or route key used by the editor;
 - optional Mini `sound` code or track/default selector;
-- analyzed `CompiledTemplate`;
+- analyzed `AnalyzedGraph`;
 - `ControlBindingMap` built against that exact template;
 - compiled runtime, hot-swap target, or `BoundVoicePool` prepared from the same
   template and bindings.
@@ -91,7 +91,7 @@ not in `ControlBindingMap`.
   resolution. A default baked into the `DspNode` array is part of the graph
   template and changes through the template-analysis/compile path.
 - Retargeting a declared control to a different node/slot requires rebuilding
-  the `ControlBindingMap` against the selected `CompiledTemplate`.
+  the `ControlBindingMap` against the selected `AnalyzedGraph`.
 
 ## Recompile vs runtime control
 
@@ -122,7 +122,7 @@ Pattern snapshot updates and graph template updates share the same timing rule:
 prepare everything on the control side, then publish at a block boundary.
 
 - Mini parsing, Mini lowering, graph DSL parsing/projection/lowering,
-  `CompiledTemplate::analyze`, binding validation, compile, and hotswap setup
+  `AnalyzedGraph::analyze`, binding validation, compile, and hotswap setup
   are control-thread/editor work.
 - The scheduler commits queued pattern/song snapshots at block start before
   querying events.
@@ -139,7 +139,7 @@ separately, as issue #118 tracks:
 
 1. Mini parse/lower and pattern snapshot update cost;
 2. per-event bridge control resolution and binding lookup;
-3. graph DSL lowering, `CompiledTemplate::analyze`, binding build, and compile;
+3. graph DSL lowering, `AnalyzedGraph::analyze`, binding build, and compile;
 4. audio block processing with already compiled runtimes and block-boundary
    controls.
 

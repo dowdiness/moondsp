@@ -20,7 +20,7 @@ priv enum EngineState {
 
 ///|
 priv enum GraphState {
-  Live(@graph.CompiledDsp)
+  Live(@graph.Dsp)
   Unmounted
   Closed
 }
@@ -34,7 +34,7 @@ priv struct EngineGraph {
 
 ///|
 fn EngineGraph::EngineGraph(
-  graph : @graph.CompiledDsp,
+  graph : @graph.Dsp,
   ctx : @dsp.DspContext,
 ) -> EngineGraph {
   { state: Live(graph), playing: false, output: ctx.make_buffer(), }
@@ -101,8 +101,8 @@ pub fn GraphEngine::mount(
     raise CapacityExceeded
   }
   let compiled = match
-    @graph.CompiledDsp::compile_result(
-      @graph.CompiledTemplate::analyze(nodes),
+    @graph.Dsp::compile_result(
+      @graph.AnalyzedGraph::analyze(nodes),
       self.context,
     ) {
     Ok(graph) => graph
@@ -116,7 +116,7 @@ pub fn GraphEngine::mount(
 ///|
 fn MountedGraph::graph(
   self : MountedGraph,
-) -> @graph.CompiledDsp raise GraphEngineError {
+) -> @graph.Dsp raise GraphEngineError {
   match self.instance.state {
     Unmounted => raise InvalidHandle
     Closed => raise EngineClosed

@@ -33,6 +33,17 @@ pub fn Oscillator::phase(self : Oscillator) -> Double {
 }
 
 ///|
+/// Copy only the phase accumulator from another oscillator.
+///
+/// The destination oscillator remains its own runtime object.
+pub fn Oscillator::copy_state_from(
+  self : Oscillator,
+  source : Oscillator,
+) -> Unit {
+  self.phase = source.phase
+}
+
+///|
 /// Generate one sample for the selected waveform and advance the oscillator
 /// state.
 pub fn Oscillator::tick_waveform(

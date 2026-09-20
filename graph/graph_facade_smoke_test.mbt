@@ -5,7 +5,7 @@ test "public graph facade smoke test covers source-facing graph API" {
     DspNode::gain(0, 0.25),
     DspNode::output(1),
   ]
-  let template = CompiledTemplate::analyze(nodes)
+  let template = AnalyzedGraph::analyze(nodes)
   @debug.assert_eq(template.orphan_adsr_count(), 0)
 
   let control = GraphControl::set_param(1, GraphParamSlot::Value0, 0.5)

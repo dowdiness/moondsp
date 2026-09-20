@@ -9,7 +9,7 @@
 - Keep CLAP C ABI details in `clap_plugin/`, primitive handles in `clap_host/`, synth state in `clap_engine/`, and reusable DSP below them.
 - Do not let CLAP host/plugin details leak into graph, voice, pattern, scheduler, or browser packages.
 - Never call the CLAP prototype DAW-ready without stable bridge symbols, a real host/DAW load, and an audio-thread allocation audit.
-- `Array[DspNode]` is the authoring exchange type; `CompiledTemplate` is the runtime exchange type. The canonical crossing is `CompiledTemplate::analyze`. See ADR-0010 and `scripts/check-public-boundary.sh` when changing this boundary.
+- `Array[DspNode]` is the authoring exchange type; `AnalyzedGraph` is the runtime exchange type. The canonical crossing is `AnalyzedGraph::analyze`. See ADR-0010 and `scripts/check-public-boundary.sh` when changing this boundary.
 - Code is the implementation source of truth. `docs/technical-reference.md` is authoritative for the documented graph runtime-control contract.
 
 ## Working policy
