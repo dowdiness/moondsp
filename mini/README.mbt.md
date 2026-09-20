@@ -119,7 +119,7 @@ provide spans relative to the last successfully parsed source, not the previous
 rejected draft.
 
 This last-good policy is not the visible-draft identity continuity required by
-[ADR-0018](../docs/decisions/0018-playback-visualization-origin-truth.md).
+[ADR-0018](https://github.com/dowdiness/moondsp/blob/101109416ba8507ce8b917b151408516728041fc/docs/decisions/0018-playback-visualization-origin-truth.md).
 The pipeline also retains allocation counters for distinct token kind/text
 keys for its lifetime, including rejected parse attempts; retained counter
 storage is not bounded by the current document size.
