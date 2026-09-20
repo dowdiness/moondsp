@@ -105,6 +105,25 @@ test "invalid mini input returns an error" {
 The browser editor follows the same rule: invalid text leaves the last accepted
 pattern playing.
 
+### Identity across edits
+
+`MiniAuthoringPipeline` realigns identities against the last successfully parsed
+source. A successfully parsed deletion followed by recreation allocates a new
+identity, even while callers retain an older snapshot. Unchanged surviving
+tokens keep their identities.
+
+A rejected draft does not advance that baseline. For example, changing
+`note("c3 e3")` to the invalid `note("e3"` and then restoring `note("c3 e3")`
+can restore the original `c3` identity. When using `set_input_with_source_edit`,
+provide spans relative to the last successfully parsed source, not the previous
+rejected draft.
+
+This last-good policy is not the visible-draft identity continuity required by
+[ADR-0018](../docs/decisions/0018-playback-visualization-origin-truth.md).
+The pipeline also retains allocation counters for distinct token kind/text
+keys for its lifetime, including rejected parse attempts; retained counter
+storage is not bounded by the current document size.
+
 ## Parse a song
 
 Use `parse_song_with_bpm` when the host needs both the layout and its tempo.
