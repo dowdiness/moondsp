@@ -34,6 +34,7 @@ pub struct Adsr {
 }
 #alias(new)
 pub fn Adsr::Adsr(attack_ms~ : Double, decay_ms~ : Double, sustain~ : Double, release_ms~ : Double) -> Self
+pub fn Adsr::copy_state_from(Self, Self) -> Unit
 pub fn Adsr::gate_off(Self) -> Unit
 pub fn Adsr::gate_on(Self) -> Unit
 pub fn Adsr::level(Self) -> Double
@@ -64,6 +65,7 @@ pub struct Biquad {
 }
 #alias(new)
 pub fn Biquad::Biquad() -> Self
+pub fn Biquad::copy_state_from(Self, Self) -> Unit
 pub fn Biquad::process(Self, DspContext, AudioBuffer) -> Unit
 pub fn Biquad::reset(Self) -> Unit
 pub fn Biquad::tick(Self, Double) -> Double
@@ -86,6 +88,7 @@ pub struct DelayLine {
 }
 #alias(new)
 pub fn DelayLine::DelayLine(Int, delay_samples? : Int, feedback? : Double) -> Self
+pub fn DelayLine::copy_state_from(Self, Self) -> Bool
 pub fn DelayLine::delay_samples(Self) -> Int
 pub fn DelayLine::feedback(Self) -> Double
 pub fn DelayLine::max_delay_samples(Self) -> Int
@@ -143,6 +146,7 @@ pub struct Noise {
 }
 #alias(new)
 pub fn Noise::Noise(UInt) -> Self
+pub fn Noise::copy_state_from(Self, Self) -> Unit
 pub fn Noise::process(Self, DspContext, AudioBuffer) -> Unit
 pub fn Noise::reset(Self, UInt) -> Unit
 pub fn Noise::seed(Self) -> UInt
@@ -153,6 +157,7 @@ pub struct Oscillator {
 }
 #alias(new)
 pub fn Oscillator::Oscillator() -> Self
+pub fn Oscillator::copy_state_from(Self, Self) -> Unit
 pub fn Oscillator::phase(Self) -> Double
 pub fn Oscillator::process(Self, context~ : DspContext, output~ : AudioBuffer, freq_hz~ : Double) -> Unit
 pub fn Oscillator::process_waveform(Self, context~ : DspContext, output~ : AudioBuffer, waveform~ : Waveform, freq_hz~ : Double) -> Unit

@@ -832,3 +832,21 @@ pub fn[A] SongDoc::lower(
     sourced_entries: source_song_snapshot_entries(sourced_occurrences),
   }
 }
+
+///|
+pub extend SongDocBuildError with Debug::{to_repr}
+
+///|
+pub extend SongDocBuildError with Eq::{not_equal, equal}
+
+///|
+pub extend SongDocEditError with Debug::{to_repr}
+
+///|
+pub extend SongDocEditError with Eq::{not_equal, equal}
+
+///|
+pub extend SongEventOrigin with Debug::{to_repr}
+
+///|
+pub extend SongEventOrigin with Eq::{not_equal, equal}

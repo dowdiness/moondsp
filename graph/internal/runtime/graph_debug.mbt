@@ -14,41 +14,35 @@ pub impl Show for GraphValidationError with fn output(self, logger) {
 }
 
 ///|
-pub fn CompiledDsp::enable_debug_validation(self : CompiledDsp) -> Unit {
+pub fn Dsp::enable_debug_validation(self : Dsp) -> Unit {
   self.0.debug_validate = true
 }
 
 ///|
-pub fn CompiledDsp::disable_debug_validation(self : CompiledDsp) -> Unit {
+pub fn Dsp::disable_debug_validation(self : Dsp) -> Unit {
   self.0.debug_validate = false
   self.0.last_validation_errors = []
 }
 
 ///|
-pub fn CompiledDsp::last_validation_errors(
-  self : CompiledDsp,
-) -> Array[GraphValidationError] {
+pub fn Dsp::last_validation_errors(self : Dsp) -> Array[GraphValidationError] {
   self.0.last_validation_errors
 }
 
 ///|
-pub fn CompiledStereoDsp::enable_debug_validation(
-  self : CompiledStereoDsp,
-) -> Unit {
+pub fn StereoDsp::enable_debug_validation(self : StereoDsp) -> Unit {
   self.0.debug_validate = true
 }
 
 ///|
-pub fn CompiledStereoDsp::disable_debug_validation(
-  self : CompiledStereoDsp,
-) -> Unit {
+pub fn StereoDsp::disable_debug_validation(self : StereoDsp) -> Unit {
   self.0.debug_validate = false
   self.0.last_validation_errors = []
 }
 
 ///|
-pub fn CompiledStereoDsp::last_validation_errors(
-  self : CompiledStereoDsp,
+pub fn StereoDsp::last_validation_errors(
+  self : StereoDsp,
 ) -> Array[GraphValidationError] {
   self.0.last_validation_errors
 }
@@ -223,8 +217,8 @@ fn validate_all_nodes(graph : CompiledGraph) -> Bool {
 /// Debug variant of mono process. Validates each node before processing.
 /// For feedback graphs, validates once per block then delegates to the
 /// production per-sample feedback path for bit-identical output.
-fn CompiledDsp::process_mono_debug(
-  self : CompiledDsp,
+fn Dsp::process_mono_debug(
+  self : Dsp,
   context : DspContext,
   output : AudioBuffer,
   sample_count : Int,
@@ -247,8 +241,8 @@ fn CompiledDsp::process_mono_debug(
 /// Debug variant of stereo process. Validates each node before processing.
 /// For feedback graphs, validates once per block then delegates to the
 /// production per-sample feedback path for bit-identical output.
-fn CompiledStereoDsp::process_stereo_debug(
-  self : CompiledStereoDsp,
+fn StereoDsp::process_stereo_debug(
+  self : StereoDsp,
   context : DspContext,
   left_output : AudioBuffer,
   right_output : AudioBuffer,

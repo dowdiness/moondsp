@@ -14,7 +14,7 @@ In moondsp's layered design, `identity` is a foundational leaf package
 providing identity types for structural live editing:
 
 ```text
-[ graph ] (GraphTemplateDoc, GraphIndexMap)
+[ graph ] (GraphDocument, GraphIndexMap)
    ↓ uses GraphNodeId, Revision
 [ identity ] ← (stable node identities & revision tokens)
    ↑ uses PatternNodeId, Revision

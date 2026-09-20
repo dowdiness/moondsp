@@ -93,9 +93,7 @@ fn init_scheduler_probe_graph_with_waveform(
   let ctx = @moondsp.DspContext::new(sample_rate~, block_size~)
   match
     @moondsp.BoundVoicePool::new(
-      @moondsp.CompiledTemplate::analyze(
-        scheduler_probe_synth_template(waveform),
-      ),
+      @moondsp.AnalyzedGraph::analyze(scheduler_probe_synth_template(waveform)),
       ctx,
       @moondsp.ControlBindingBuilder::new().bind(
         key="note",

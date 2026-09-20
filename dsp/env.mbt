@@ -53,6 +53,14 @@ pub fn Adsr::level(self : Adsr) -> Double {
 }
 
 ///|
+/// Copy the running envelope state while retaining destination parameters.
+pub fn Adsr::copy_state_from(self : Adsr, source : Adsr) -> Unit {
+  self.stage = source.stage
+  self.level = source.level
+  self.level_at_release = source.level_at_release
+}
+
+///|
 /// Start a new note and enter the attack stage from silence.
 pub fn Adsr::gate_on(self : Adsr) -> Unit {
   self.level = 0.0

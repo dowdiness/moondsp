@@ -46,8 +46,8 @@ fn identity_graph_ids() -> Array[@identity.GraphNodeId] {
 }
 
 ///|
-fn identity_graph_doc() -> GraphTemplateDoc {
-  GraphTemplateDoc::from_nodes(
+fn identity_graph_doc() -> GraphDocument {
+  GraphDocument::from_nodes(
     ids=identity_graph_ids(),
     nodes=identity_graph_nodes(),
   ) catch {
@@ -56,7 +56,7 @@ fn identity_graph_doc() -> GraphTemplateDoc {
 }
 
 ///|
-test "GraphTemplateDoc maps stable ids to controls, bindings, and compile" {
+test "GraphDocument maps stable ids to controls, bindings, and compile" {
   let doc = identity_graph_doc()
   let index_map = doc.index_map()
   inspect(doc.revision().value(), content="0")
@@ -87,9 +87,9 @@ test "GraphTemplateDoc maps stable ids to controls, bindings, and compile" {
 }
 
 ///|
-test "GraphTemplateDoc rejects duplicate ids" {
+test "GraphDocument rejects duplicate ids" {
   try
-    GraphTemplateDoc::from_nodes(ids=[gid("dup"), gid("dup")], nodes=[
+    GraphDocument::from_nodes(ids=[gid("dup"), gid("dup")], nodes=[
       DspNode::constant(1.0),
       DspNode::output(0),
     ])
@@ -102,7 +102,7 @@ test "GraphTemplateDoc rejects duplicate ids" {
 }
 
 ///|
-test "GraphTemplateDoc replace and rewire preserve stable ids" {
+test "GraphDocument replace and rewire preserve stable ids" {
   let doc = identity_graph_doc()
   let replaced = doc.replace_node(gid("gain"), DspNode::gain(0, 0.25))
   inspect(replaced.revision().value(), content="1")
@@ -126,8 +126,8 @@ test "GraphTemplateDoc replace and rewire preserve stable ids" {
 }
 
 ///|
-test "GraphTemplateDoc insert and delete compact ids without reuse" {
-  let base = GraphTemplateDoc::from_nodes(ids=[gid("osc"), gid("out")], nodes=[
+test "GraphDocument insert and delete compact ids without reuse" {
+  let base = GraphDocument::from_nodes(ids=[gid("osc"), gid("out")], nodes=[
     DspNode::oscillator(Waveform::Sine, 440.0),
     DspNode::output(0),
   ])
@@ -175,8 +175,8 @@ test "GraphTemplateDoc insert and delete compact ids without reuse" {
 }
 
 ///|
-test "GraphTemplateDoc insert and delete chain round trips stable ids" {
-  let base = GraphTemplateDoc::from_nodes(ids=[gid("osc"), gid("out")], nodes=[
+test "GraphDocument insert and delete chain round trips stable ids" {
+  let base = GraphDocument::from_nodes(ids=[gid("osc"), gid("out")], nodes=[
     DspNode::oscillator(Waveform::Sine, 440.0),
     DspNode::output(0),
   ])

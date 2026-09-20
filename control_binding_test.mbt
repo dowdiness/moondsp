@@ -20,7 +20,7 @@ test "build: valid bindings produce Ok" {
   let result = ControlBindingBuilder::new()
     .bind(key="note", node_index=0, slot=GraphParamSlot::Value0)
     .bind(key="gain", node_index=1, slot=GraphParamSlot::Value0)
-    .build(CompiledTemplate::analyze(template))
+    .build(AnalyzedGraph::analyze(template))
   assert_true(result is Ok(_))
 }
 
@@ -29,7 +29,7 @@ test "build: invalid node index returns InvalidNodeIndex" {
   let template = [DspNode::constant(1.0), DspNode::output(0)]
   let result = ControlBindingBuilder::new()
     .bind(key="note", node_index=5, slot=GraphParamSlot::Value0)
-    .build(CompiledTemplate::analyze(template))
+    .build(AnalyzedGraph::analyze(template))
   @debug.assert_eq(result, Err(ControlBindingError::InvalidNodeIndex(5)))
 }
 
@@ -38,7 +38,7 @@ test "build: negative node index returns InvalidNodeIndex" {
   let template = [DspNode::constant(1.0), DspNode::output(0)]
   let result = ControlBindingBuilder::new()
     .bind(key="note", node_index=-1, slot=GraphParamSlot::Value0)
-    .build(CompiledTemplate::analyze(template))
+    .build(AnalyzedGraph::analyze(template))
   @debug.assert_eq(result, Err(ControlBindingError::InvalidNodeIndex(-1)))
 }
 
@@ -47,7 +47,7 @@ test "build: invalid slot for node returns InvalidSlotForNode" {
   let template = [DspNode::constant(1.0), DspNode::output(0)]
   let result = ControlBindingBuilder::new()
     .bind(key="x", node_index=1, slot=GraphParamSlot::Value0)
-    .build(CompiledTemplate::analyze(template))
+    .build(AnalyzedGraph::analyze(template))
   @debug.assert_eq(
     result,
     Err(ControlBindingError::InvalidSlotForNode(1, GraphParamSlot::Value0)),
@@ -66,7 +66,7 @@ test "build: duplicate keys returns DuplicateKey" {
   let result = ControlBindingBuilder::new()
     .bind(key="freq", node_index=0, slot=GraphParamSlot::Value0)
     .bind(key="freq", node_index=1, slot=GraphParamSlot::Value0)
-    .build(CompiledTemplate::analyze(template))
+    .build(AnalyzedGraph::analyze(template))
   @debug.assert_eq(result, Err(ControlBindingError::DuplicateKey("freq")))
 }
 
@@ -79,7 +79,7 @@ test "build: multiple keys mapping to same node and slot are allowed" {
   let result = ControlBindingBuilder::new()
     .bind(key="freq", node_index=0, slot=GraphParamSlot::Value0)
     .bind(key="note", node_index=0, slot=GraphParamSlot::Value0)
-    .build(CompiledTemplate::analyze(template))
+    .build(AnalyzedGraph::analyze(template))
   assert_true(result is Ok(_))
 }
 
@@ -87,7 +87,7 @@ test "build: multiple keys mapping to same node and slot are allowed" {
 test "build: empty builder produces Ok with empty map" {
   let template = [DspNode::constant(1.0), DspNode::output(0)]
   let result = ControlBindingBuilder::new().build(
-    CompiledTemplate::analyze(template),
+    AnalyzedGraph::analyze(template),
   )
   assert_true(result is Ok(_))
 }
@@ -102,7 +102,7 @@ test "resolve: all present keys converted in binding insertion order" {
   let map = ControlBindingBuilder::new()
     .bind(key="note", node_index=0, slot=GraphParamSlot::Value0)
     .bind(key="gain", node_index=1, slot=GraphParamSlot::Value0)
-    .build(CompiledTemplate::analyze(template))
+    .build(AnalyzedGraph::analyze(template))
     .unwrap()
   let controls : Map[String, Double] = { "note": 60.0, "gain": 0.5 }
   let result = map.resolve_controls(controls)
@@ -125,7 +125,7 @@ test "resolve: partial map skips missing keys" {
   let map = ControlBindingBuilder::new()
     .bind(key="note", node_index=0, slot=GraphParamSlot::Value0)
     .bind(key="gain", node_index=1, slot=GraphParamSlot::Value0)
-    .build(CompiledTemplate::analyze(template))
+    .build(AnalyzedGraph::analyze(template))
     .unwrap()
   let controls : Map[String, Double] = { "gain": 0.8 }
   let result = map.resolve_controls(controls)
@@ -139,7 +139,7 @@ test "resolve: extra keys in map are ignored" {
   let template = [DspNode::constant(1.0), DspNode::output(0)]
   let map = ControlBindingBuilder::new()
     .bind(key="freq", node_index=0, slot=GraphParamSlot::Value0)
-    .build(CompiledTemplate::analyze(template))
+    .build(AnalyzedGraph::analyze(template))
     .unwrap()
   let controls : Map[String, Double] = { "freq": 220.0, "unknown": 99.0 }
   let result = map.resolve_controls(controls)
@@ -152,7 +152,7 @@ test "resolve: empty map produces empty controls" {
   let template = [DspNode::constant(1.0), DspNode::output(0)]
   let map = ControlBindingBuilder::new()
     .bind(key="freq", node_index=0, slot=GraphParamSlot::Value0)
-    .build(CompiledTemplate::analyze(template))
+    .build(AnalyzedGraph::analyze(template))
     .unwrap()
   let controls : Map[String, Double] = Map([])
   let result = map.resolve_controls(controls)
@@ -163,7 +163,7 @@ test "resolve: empty map produces empty controls" {
 test "resolve: empty binding map produces empty controls" {
   let template = [DspNode::constant(1.0), DspNode::output(0)]
   let map = ControlBindingBuilder::new()
-    .build(CompiledTemplate::analyze(template))
+    .build(AnalyzedGraph::analyze(template))
     .unwrap()
   let controls : Map[String, Double] = { "freq": 440.0 }
   let result = map.resolve_controls(controls)
@@ -178,15 +178,11 @@ test "integration: resolved controls accepted by VoicePool::note_on" {
     DspNode::gain(0, 0.3),
     DspNode::output(1),
   ]
-  let pool = VoicePool::new(
-    CompiledTemplate::analyze(template),
-    ctx,
-    max_voices=4,
-  ).unwrap()
+  let pool = VoicePool::new(AnalyzedGraph::analyze(template), ctx, max_voices=4).unwrap()
   let bindings = ControlBindingBuilder::new()
     .bind(key="note", node_index=0, slot=GraphParamSlot::Value0)
     .bind(key="gain", node_index=1, slot=GraphParamSlot::Value0)
-    .build(CompiledTemplate::analyze(template))
+    .build(AnalyzedGraph::analyze(template))
     .unwrap()
   let controls : Map[String, Double] = { "note": 880.0, "gain": 0.5 }
   let resolved = bindings.resolve_controls(controls)
@@ -203,7 +199,7 @@ test "build: post-build bind does not mutate validated map" {
     node_index=0,
     slot=GraphParamSlot::Value0,
   )
-  let map = builder.build(CompiledTemplate::analyze(template)).unwrap()
+  let map = builder.build(AnalyzedGraph::analyze(template)).unwrap()
   // Mutate the builder after build — must not affect the validated map
   ignore(builder.bind(key="extra", node_index=0, slot=GraphParamSlot::Value0))
   @debug.assert_eq(map.length(), 1)
@@ -218,7 +214,7 @@ test "build: live binding on surviving node produces Ok" {
   ]
   let result = ControlBindingBuilder::new()
     .bind(key="freq", node_index=0, slot=GraphParamSlot::Value0)
-    .build(CompiledTemplate::analyze(template))
+    .build(AnalyzedGraph::analyze(template))
   assert_true(result is Ok(_))
 }
 
@@ -226,7 +222,7 @@ test "build: live binding on surviving node produces Ok" {
 test "build: orphan binding returns OrphanBinding with key and index" {
   let result = ControlBindingBuilder::new()
     .bind(key="orphan_freq", node_index=1, slot=GraphParamSlot::Value0)
-    .build(CompiledTemplate::analyze(orphan_template()))
+    .build(AnalyzedGraph::analyze(orphan_template()))
   @debug.assert_eq(
     result,
     Err(ControlBindingError::OrphanBinding("orphan_freq", 1)),
@@ -240,7 +236,7 @@ test "build: orphan error carries the specific binding's key" {
   let result = ControlBindingBuilder::new()
     .bind(key="orphan_a", node_index=1, slot=GraphParamSlot::Value0)
     .bind(key="orphan_b", node_index=1, slot=GraphParamSlot::Value0)
-    .build(CompiledTemplate::analyze(orphan_template()))
+    .build(AnalyzedGraph::analyze(orphan_template()))
   @debug.assert_eq(
     result,
     Err(ControlBindingError::OrphanBinding("orphan_a", 1)),
@@ -254,7 +250,7 @@ test "build: slot error preempts orphan check" {
   let template = [DspNode::constant(1.0), DspNode::output(0)]
   let result = ControlBindingBuilder::new()
     .bind(key="x", node_index=1, slot=GraphParamSlot::Value0)
-    .build(CompiledTemplate::analyze(template))
+    .build(AnalyzedGraph::analyze(template))
   @debug.assert_eq(
     result,
     Err(ControlBindingError::InvalidSlotForNode(1, GraphParamSlot::Value0)),
@@ -267,7 +263,7 @@ test "build: bounds error preempts orphan check" {
   // optimization state.
   let result = ControlBindingBuilder::new()
     .bind(key="x", node_index=99, slot=GraphParamSlot::Value0)
-    .build(CompiledTemplate::analyze(orphan_template()))
+    .build(AnalyzedGraph::analyze(orphan_template()))
   @debug.assert_eq(result, Err(ControlBindingError::InvalidNodeIndex(99)))
 }
 
@@ -277,7 +273,7 @@ test "build: orphan preempts duplicate key" {
   let result = ControlBindingBuilder::new()
     .bind(key="dup", node_index=1, slot=GraphParamSlot::Value0)
     .bind(key="dup", node_index=0, slot=GraphParamSlot::Value0)
-    .build(CompiledTemplate::analyze(orphan_template()))
+    .build(AnalyzedGraph::analyze(orphan_template()))
   @debug.assert_eq(result, Err(ControlBindingError::OrphanBinding("dup", 1)))
 }
 
@@ -292,14 +288,14 @@ test "build: duplicate key still reported for live-node bindings" {
   let result = ControlBindingBuilder::new()
     .bind(key="g", node_index=0, slot=GraphParamSlot::Value0)
     .bind(key="g", node_index=1, slot=GraphParamSlot::Value0)
-    .build(CompiledTemplate::analyze(template))
+    .build(AnalyzedGraph::analyze(template))
   @debug.assert_eq(result, Err(ControlBindingError::DuplicateKey("g")))
 }
 
 ///|
 test "build: empty builder still succeeds on any template" {
   let result = ControlBindingBuilder::new().build(
-    CompiledTemplate::analyze(orphan_template()),
+    AnalyzedGraph::analyze(orphan_template()),
   )
   assert_true(result is Ok(_))
 }
@@ -314,7 +310,7 @@ test "build: constant-fed source and Gain bindings remain valid" {
   let bindings = ControlBindingBuilder::new()
     .bind(key="base", node_index=0, slot=GraphParamSlot::Value0)
     .bind(key="gain", node_index=1, slot=GraphParamSlot::Value0)
-    .build(CompiledTemplate::analyze(template))
+    .build(AnalyzedGraph::analyze(template))
     .unwrap()
   @debug.assert_eq(bindings.length(), 2)
 }
@@ -328,7 +324,7 @@ test "binding defaults belong to each validated template" {
   )
   let original = builder
     .build(
-      CompiledTemplate::analyze([
+      AnalyzedGraph::analyze([
         DspNode::oscillator(Waveform::Sine, 440.0),
         DspNode::output(0),
       ]),
@@ -336,7 +332,7 @@ test "binding defaults belong to each validated template" {
     .unwrap()
   let changed = builder
     .build(
-      CompiledTemplate::analyze([
+      AnalyzedGraph::analyze([
         DspNode::oscillator(Waveform::Sine, 880.0),
         DspNode::output(0),
       ]),

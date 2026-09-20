@@ -336,8 +336,8 @@ fn CompiledGraph::process_feedback_graph_impl(
 }
 
 ///|
-fn CompiledDsp::process_feedback_graph(
-  self : CompiledDsp,
+fn Dsp::process_feedback_graph(
+  self : Dsp,
   context : DspContext,
   output : AudioBuffer,
   sample_count : Int,
@@ -350,8 +350,8 @@ fn CompiledDsp::process_feedback_graph(
 }
 
 ///|
-fn CompiledStereoDsp::process_feedback_graph(
-  self : CompiledStereoDsp,
+fn StereoDsp::process_feedback_graph(
+  self : StereoDsp,
   context : DspContext,
   left_output : AudioBuffer,
   right_output : AudioBuffer,

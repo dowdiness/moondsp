@@ -79,6 +79,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Renamed graph lifecycle types to `GraphDocument`, `GraphDocumentError`,
+  `AnalyzedGraph`, `Dsp`, and `StereoDsp`, including their hot-swap and topology
+  controller wrappers. Removed the obsolete `GraphCompileError::InternalRejected`
+  case; compilation now retains checked programs before constructing independent
+  runtime instances.
+
+  | Previous type | Replacement |
+  |---|---|
+  | `GraphTemplateDoc` | `GraphDocument` |
+  | `GraphTemplateDocError` | `GraphDocumentError` |
+  | `CompiledTemplate` | `AnalyzedGraph` |
+  | `CompiledDsp` | `Dsp` |
+  | `CompiledStereoDsp` | `StereoDsp` |
+  | `CompiledDspHotSwap` | `DspHotSwap` |
+  | `CompiledStereoDspHotSwap` | `StereoDspHotSwap` |
+  | `CompiledDspTopologyController` | `DspTopologyController` |
+  | `CompiledStereoDspTopologyController` | `StereoDspTopologyController` |
+
+- Runtime control batches retain prepared per-node updates and adopt them once.
+  `BoundVoicePool::apply_voices_controls_result` replaces the separate voice
+  validation operation, preserving all-target atomicity and ordered diagnostics.
+- Voice template admission retains its compiled graph for a slot or the next
+  note instead of discarding it and compiling again during adoption.
 - Consolidated snapshot playback into `PatternScheduler::render_block` for dry
   stereo and `render_block_with_send` for dry stereo plus effect send, backed
   by one block-processing implementation. Removed the pattern/song-specific
@@ -181,6 +204,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Kept the strict cookbook parser check compatible with MoonBit v0.10.14:
+  identity, pattern, and song types now explicitly expose their existing
+  trait methods, and Mini parser tests use qualified package calls.
+  Validation still rejects warnings; runtime behavior is unchanged.
+- Restored the mono/stereo single-control prepare/commit path without creating
+  a one-element batch. The native release probe records 4 allocations per update
+  instead of 7, with retained-batch allocation counts unchanged; this is not an
+  allocation-free control API claim. See the
+  [measurement record](docs/performance/2026-09-20-graph-single-control-allocation.txt).
+- Run MoonBit target-matrix tests and boundary checks for pull requests against
+  any base branch, including stacked PRs and PR base changes.
+- Fixed topology-crossfade state aliasing: old and replacement graphs now own
+  independent oscillator, noise, envelope, filter, and delay histories.
+  Replacement envelope/delay settings are retained; delay capacity changes
+  and deletion batches retain their existing fresh-state policy.
+- Topology edits now carry their old-to-new node correspondence with the result;
+  rewiring a gain's signal input preserves its envelope input.
 - Reject unterminated Mini block comments without publishing a valid prefix, and
   share comment scanning between parsing and playback admission so `/* // */`
   cannot hide excessive nesting. Bounded recursive descent now checks depth

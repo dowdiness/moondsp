@@ -9,37 +9,31 @@ pub(open) trait GraphDebuggable {
 }
 
 ///|
-pub impl GraphDebuggable for CompiledDsp with fn enable_debug_validation(self) {
+pub impl GraphDebuggable for Dsp with fn enable_debug_validation(self) {
   self.raw().enable_debug_validation()
 }
 
 ///|
-pub impl GraphDebuggable for CompiledDsp with fn disable_debug_validation(self) {
+pub impl GraphDebuggable for Dsp with fn disable_debug_validation(self) {
   self.raw().disable_debug_validation()
 }
 
 ///|
-pub impl GraphDebuggable for CompiledDsp with fn last_validation_errors(self) {
+pub impl GraphDebuggable for Dsp with fn last_validation_errors(self) {
   graph_validation_errors_from_runtime(self.raw().last_validation_errors())
 }
 
 ///|
-pub impl GraphDebuggable for CompiledStereoDsp with fn enable_debug_validation(
-  self,
-) {
+pub impl GraphDebuggable for StereoDsp with fn enable_debug_validation(self) {
   self.raw().enable_debug_validation()
 }
 
 ///|
-pub impl GraphDebuggable for CompiledStereoDsp with fn disable_debug_validation(
-  self,
-) {
+pub impl GraphDebuggable for StereoDsp with fn disable_debug_validation(self) {
   self.raw().disable_debug_validation()
 }
 
 ///|
-pub impl GraphDebuggable for CompiledStereoDsp with fn last_validation_errors(
-  self,
-) {
+pub impl GraphDebuggable for StereoDsp with fn last_validation_errors(self) {
   graph_validation_errors_from_runtime(self.raw().last_validation_errors())
 }

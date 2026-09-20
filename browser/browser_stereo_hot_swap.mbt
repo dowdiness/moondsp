@@ -1,30 +1,30 @@
 ///|
-let compiled_stereo_hot_swap : GraphSlot[
-  @moondsp.CompiledStereoDspHotSwap,
-  StereoOut,
-] = GraphSlot::new(output=StereoOut::new(), compile=fn(ctx) {
-  match
-    @moondsp.CompiledStereoDsp::compile(
-      @moondsp.CompiledTemplate::analyze([
-        @moondsp.DspNode::constant(BROWSER_STEREO_HOT_SWAP_OLD_CONSTANT),
-        @moondsp.DspNode::pan(0, 0.0),
-        @moondsp.DspNode::stereo_output(1),
-      ]),
-      ctx,
-    ) {
-    Some(active) =>
-      Some(
-        @moondsp.CompiledStereoDspHotSwap::from_graph(
-          active,
-          crossfade_samples=BROWSER_STEREO_HOT_SWAP_CROSSFADE_SAMPLES,
-        ),
-      )
-    None => None
-  }
-})
+let compiled_stereo_hot_swap : GraphSlot[@moondsp.StereoDspHotSwap, StereoOut] = GraphSlot::new(
+  output=StereoOut::new(),
+  compile=fn(ctx) {
+    match
+      @moondsp.StereoDsp::compile(
+        @moondsp.AnalyzedGraph::analyze([
+          @moondsp.DspNode::constant(BROWSER_STEREO_HOT_SWAP_OLD_CONSTANT),
+          @moondsp.DspNode::pan(0, 0.0),
+          @moondsp.DspNode::stereo_output(1),
+        ]),
+        ctx,
+      ) {
+      Some(active) =>
+        Some(
+          @moondsp.StereoDspHotSwap::from_graph(
+            active,
+            crossfade_samples=BROWSER_STEREO_HOT_SWAP_CROSSFADE_SAMPLES,
+          ),
+        )
+      None => None
+    }
+  },
+)
 
 ///|
-/// Initialize the browser proof graph that runs through `CompiledStereoDspHotSwap`.
+/// Initialize the browser proof graph that runs through `StereoDspHotSwap`.
 pub fn init_compiled_stereo_hot_swap_graph(
   sample_rate : Double,
   block_size : Int,
@@ -49,8 +49,8 @@ pub fn queue_compiled_stereo_hot_swap() -> Bool {
     None => return set_browser_not_initialized("compiled_stereo_hot_swap.queue")
   }
   let replacement = match
-    @moondsp.CompiledStereoDsp::compile(
-      @moondsp.CompiledTemplate::analyze([
+    @moondsp.StereoDsp::compile(
+      @moondsp.AnalyzedGraph::analyze([
         @moondsp.DspNode::constant(BROWSER_STEREO_HOT_SWAP_NEW_CONSTANT),
         @moondsp.DspNode::pan(0, 0.0),
         @moondsp.DspNode::stereo_output(1),
@@ -71,7 +71,7 @@ pub fn queue_compiled_stereo_hot_swap() -> Bool {
 }
 
 ///|
-/// Run one render quantum through the browser proof `CompiledStereoDspHotSwap` graph.
+/// Run one render quantum through the browser proof `StereoDspHotSwap` graph.
 pub fn process_compiled_stereo_hot_swap_block(
   sample_rate : Double,
   block_size : Int,

@@ -10,18 +10,18 @@ import {
 // Errors
 
 // Types and methods
-pub struct CompiledTemplate {
+pub struct AnalyzedGraph {
   // private fields
 }
-pub fn CompiledTemplate::adsr_authoring_indices(Self) -> FixedArray[Int]
-pub fn CompiledTemplate::analyze(Array[@model.DspNode]) -> Self
-pub fn CompiledTemplate::authoring_nodes(Self) -> Array[@model.DspNode]
-pub fn CompiledTemplate::index_map(Self) -> FixedArray[Int]
-pub fn CompiledTemplate::is_node_live(Self, Int) -> Bool
-pub fn CompiledTemplate::length(Self) -> Int
-pub fn CompiledTemplate::node_at(Self, Int) -> @model.DspNode
-pub fn CompiledTemplate::optimized_nodes(Self) -> Array[@model.DspNode]
-pub impl Eq for CompiledTemplate
+pub fn AnalyzedGraph::adsr_authoring_indices(Self) -> FixedArray[Int]
+pub fn AnalyzedGraph::analyze(Array[@model.DspNode]) -> Self
+pub fn AnalyzedGraph::authoring_nodes(Self) -> Array[@model.DspNode]
+pub fn AnalyzedGraph::index_map(Self) -> FixedArray[Int]
+pub fn AnalyzedGraph::is_node_live(Self, Int) -> Bool
+pub fn AnalyzedGraph::length(Self) -> Int
+pub fn AnalyzedGraph::node_at(Self, Int) -> @model.DspNode
+pub fn AnalyzedGraph::optimized_nodes(Self) -> Array[@model.DspNode]
+pub impl Eq for AnalyzedGraph
 
 // Type aliases
 

@@ -21,14 +21,14 @@ DSPN='Array\[(@graph\.)?DspNode\]'
 ALLOWED_PATTERNS=(
   # Boundary exceptions
   "^pub fn\[T : .*\] replay\(${DSPN}\)"
-  "^pub fn CompiledDspTopologyController::from_nodes\(${DSPN}"
-  "^pub fn CompiledStereoDspTopologyController::from_nodes\(${DSPN}"
+  "^pub fn DspTopologyController::from_nodes\(${DSPN}"
+  "^pub fn StereoDspTopologyController::from_nodes\(${DSPN}"
   # Allowed authoring APIs
-  "^pub fn CompiledTemplate::analyze\(${DSPN}\)"
+  "^pub fn AnalyzedGraph::analyze\(${DSPN}\)"
   "^pub fn GraphBuilder::nodes\(Self\) -> ${DSPN}"
-  "^pub fn GraphTemplateDoc::nodes\(Self\) -> ${DSPN}"
-  "^pub fn GraphTemplateDoc::from_nodes\("
-  "^pub fn GraphTemplateDoc::insert_chain\("
+  "^pub fn GraphDocument::nodes\(Self\) -> ${DSPN}"
+  "^pub fn GraphDocument::from_nodes\("
+  "^pub fn GraphDocument::insert_chain\("
   "^pub fn GraphIndexMap::insert_chain\("
   "^pub fn GraphTopologyEdit::insert_chain\("
   "^  InsertChain\(Int, GraphTopologyInputSlot, ${DSPN}\)"
@@ -74,7 +74,7 @@ if [[ ${#violations[@]} -gt 0 ]]; then
   printf '  %s\n' "${violations[@]}"
   echo ""
   echo "Either:"
-  echo "  1. Migrate the entry to CompiledTemplate (preferred), or"
+  echo "  1. Migrate the entry to AnalyzedGraph (preferred), or"
   echo "  2. Update ALLOWED_PATTERNS in scripts/check-public-boundary.sh"
   echo "     AND add the new exception to ADR-0010 with rationale."
   exit 1

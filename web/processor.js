@@ -73,7 +73,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
               telemetrySequence: this.telemetrySequence,
             });
           } else {
-            this.postBrowserError("CompiledDspHotSwap queue_swap failed");
+            this.postBrowserError("DspHotSwap queue_swap failed");
           }
         }
       } else if (data.type === "queue-stereo-hot-swap") {
@@ -86,7 +86,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
               telemetrySequence: this.telemetrySequence,
             });
           } else {
-            this.postBrowserError("CompiledStereoDspHotSwap queue_swap failed");
+            this.postBrowserError("StereoDspHotSwap queue_swap failed");
           }
         }
       } else if (data.type === "queue-stereo-topology-edit") {
@@ -99,7 +99,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
               telemetrySequence: this.telemetrySequence,
             });
           } else {
-            this.postBrowserError("CompiledStereoDspTopologyController queue_topology_edit failed");
+            this.postBrowserError("StereoDspTopologyController queue_topology_edit failed");
           }
         }
       } else if (data.type === "queue-topology-edit") {
@@ -112,7 +112,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
               telemetrySequence: this.telemetrySequence,
             });
           } else {
-            this.postBrowserError("CompiledDspTopologyController queue_topology_edit failed");
+            this.postBrowserError("DspTopologyController queue_topology_edit failed");
           }
         }
       } else if (data.type === "queue-topology-delete-edit") {
@@ -125,7 +125,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
               telemetrySequence: this.telemetrySequence,
             });
           } else {
-            this.postBrowserError("CompiledDspTopologyController queue_topology_delete_edit failed");
+            this.postBrowserError("DspTopologyController queue_topology_delete_edit failed");
           }
         }
       }
@@ -415,7 +415,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
       );
       if (!processed) {
         this.fillSilence(left, right);
-        this.reportRuntimeFailure("CompiledDspHotSwap browser block processing failed");
+        this.reportRuntimeFailure("DspHotSwap browser block processing failed");
         return true;
       }
 
@@ -436,7 +436,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
         const updated = this.wasm.set_compiled_topology_edit_gain(this.gain);
         if (!updated) {
           this.fillSilence(left, right);
-          this.reportRuntimeFailure("CompiledDspTopologyController browser control update failed");
+          this.reportRuntimeFailure("DspTopologyController browser control update failed");
           return true;
         }
       }
@@ -446,7 +446,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
       );
       if (!processed) {
         this.fillSilence(left, right);
-        this.reportRuntimeFailure("CompiledDspTopologyController browser block processing failed");
+        this.reportRuntimeFailure("DspTopologyController browser block processing failed");
         return true;
       }
 
@@ -467,7 +467,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
         const updated = this.wasm.set_compiled_stereo_topology_edit_level(this.gain);
         if (!updated) {
           this.fillSilence(left, right);
-          this.reportRuntimeFailure("CompiledStereoDspTopologyController browser control update failed");
+          this.reportRuntimeFailure("StereoDspTopologyController browser control update failed");
           return true;
         }
       }
@@ -477,7 +477,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
       );
       if (!processed) {
         this.fillSilence(left, right);
-        this.reportRuntimeFailure("CompiledStereoDspTopologyController browser block processing failed");
+        this.reportRuntimeFailure("StereoDspTopologyController browser block processing failed");
         return true;
       }
 
@@ -531,7 +531,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
       );
       if (!processed) {
         this.fillSilence(left, right);
-        this.reportRuntimeFailure("CompiledStereoDspHotSwap browser block processing failed");
+        this.reportRuntimeFailure("StereoDspHotSwap browser block processing failed");
         return true;
       }
 
@@ -584,7 +584,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
       );
       if (!processed) {
         this.fillSilence(left, right);
-        this.reportRuntimeFailure("CompiledStereoDsp browser block processing failed");
+        this.reportRuntimeFailure("StereoDsp browser block processing failed");
         return true;
       }
 
@@ -608,7 +608,7 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
       );
       if (!processed) {
         this.fillSilence(left, right);
-        this.reportRuntimeFailure("CompiledDsp browser block processing failed");
+        this.reportRuntimeFailure("Dsp browser block processing failed");
         return true;
       }
 

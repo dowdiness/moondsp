@@ -1,6 +1,6 @@
 ///|
 /// Shared internal graph state for both mono and stereo compiled DSP graphs.
-/// Both CompiledDsp and CompiledStereoDsp wrap this struct as newtypes.
+/// Both Dsp and StereoDsp wrap this struct as newtypes.
 ///
 /// All three buffer families (buffers, left_buffers, right_buffers) are allocated
 /// for every node regardless of mono/stereo variant. Mono nodes write only to
@@ -11,6 +11,7 @@ pub struct CompiledGraph {
   priv nodes : FixedArray[@model.DspNode]
   priv default_nodes : FixedArray[@model.DspNode]
   priv index_map : FixedArray[Int]
+  priv controls : ControlScratch
   // Mono signal path buffers — one per node
   priv buffers : FixedArray[AudioBuffer]
   // Stereo signal path buffers — one pair per node (populated only for stereo-aware nodes)
@@ -51,205 +52,96 @@ pub fn CompiledGraph::compile_sample_rate(self : CompiledGraph) -> Double {
 }
 
 ///|
-pub fn CompiledGraph::copy_compatible_runtime_state_from(
-  self : CompiledGraph,
-  old_graph : CompiledGraph,
-) -> Unit {
-  let old_map = old_graph.index_map
-  let new_map = self.index_map
-  let shared_count = if old_map.length() < new_map.length() {
-    old_map.length()
-  } else {
-    new_map.length()
-  }
-  for authoring_idx = 0
-      authoring_idx < shared_count
-      authoring_idx = authoring_idx + 1 {
-    let old_compiled = old_map[authoring_idx]
-    let new_compiled = new_map[authoring_idx]
-    if old_compiled >= 0 &&
-      new_compiled >= 0 &&
-      old_compiled < old_graph.nodes.length() &&
-      new_compiled < self.nodes.length() &&
-      old_graph.nodes[old_compiled].kind() == self.nodes[new_compiled].kind() {
-      self.osc_states[new_compiled] = old_graph.osc_states[old_compiled]
-      self.noise_states[new_compiled] = old_graph.noise_states[old_compiled]
-      self.env_states[new_compiled] = old_graph.env_states[old_compiled]
-      self.biquad_states[new_compiled] = old_graph.biquad_states[old_compiled]
-      self.stereo_biquad_left_states[new_compiled] = old_graph.stereo_biquad_left_states[old_compiled]
-      self.stereo_biquad_right_states[new_compiled] = old_graph.stereo_biquad_right_states[old_compiled]
-      // Only copy delay state if buffer capacity matches
-      match
-        (old_graph.delay_states[old_compiled], self.delay_states[new_compiled]) {
-        (Some(old_delay), Some(new_delay)) =>
-          if old_delay.max_delay_samples() == new_delay.max_delay_samples() {
-            self.delay_states[new_compiled] = old_graph.delay_states[old_compiled]
-          }
-        _ => ()
-      }
-      match
-        (
-          old_graph.stereo_delay_left_states[old_compiled],
-          self.stereo_delay_left_states[new_compiled],
-        ) {
-        (Some(old_delay), Some(new_delay)) =>
-          if old_delay.max_delay_samples() == new_delay.max_delay_samples() {
-            self.stereo_delay_left_states[new_compiled] = old_graph.stereo_delay_left_states[old_compiled]
-          }
-        _ => ()
-      }
-      match
-        (
-          old_graph.stereo_delay_right_states[old_compiled],
-          self.stereo_delay_right_states[new_compiled],
-        ) {
-        (Some(old_delay), Some(new_delay)) =>
-          if old_delay.max_delay_samples() == new_delay.max_delay_samples() {
-            self.stereo_delay_right_states[new_compiled] = old_graph.stereo_delay_right_states[old_compiled]
-          }
-        _ => ()
-      }
-      self.self_values[new_compiled] = old_graph.self_values[old_compiled]
-      self.self_left_values[new_compiled] = old_graph.self_left_values[old_compiled]
-      self.self_right_values[new_compiled] = old_graph.self_right_values[old_compiled]
-    }
-  }
-}
-
-///|
 /// Executable buffer-based DSP graph compiled from `DspNode`s.
-struct CompiledDsp(CompiledGraph)
+struct Dsp(CompiledGraph)
 
 ///|
 /// Executable terminal-stereo graph compiled from `DspNode`s.
-struct CompiledStereoDsp(CompiledGraph)
+struct StereoDsp(CompiledGraph)
 
 ///|
-pub fn CompiledDsp::from_graph(graph : CompiledGraph) -> CompiledDsp {
-  CompiledDsp(graph)
+pub fn Dsp::from_graph(graph : CompiledGraph) -> Dsp {
+  Dsp(graph)
 }
 
 ///|
-pub fn CompiledDsp::raw_graph(self : CompiledDsp) -> CompiledGraph {
+pub fn Dsp::raw_graph(self : Dsp) -> CompiledGraph {
   self.0
 }
 
 ///|
-pub fn CompiledStereoDsp::from_graph(
-  graph : CompiledGraph,
-) -> CompiledStereoDsp {
-  CompiledStereoDsp(graph)
+pub fn StereoDsp::from_graph(graph : CompiledGraph) -> StereoDsp {
+  StereoDsp(graph)
 }
 
 ///|
-pub fn CompiledStereoDsp::raw_graph(self : CompiledStereoDsp) -> CompiledGraph {
+pub fn StereoDsp::raw_graph(self : StereoDsp) -> CompiledGraph {
   self.0
 }
 
 ///|
 /// Number of non-finite samples replaced with 0.0 during the most recent
 /// process() call. Returns 0 if output was clean.
-pub fn CompiledDsp::last_sanitized_count(self : CompiledDsp) -> Int {
+pub fn Dsp::last_sanitized_count(self : Dsp) -> Int {
   self.0.last_sanitized_count
 }
 
 ///|
-pub fn CompiledStereoDsp::last_sanitized_count(self : CompiledStereoDsp) -> Int {
+pub fn StereoDsp::last_sanitized_count(self : StereoDsp) -> Int {
   self.0.last_sanitized_count
 }
 
 ///|
 /// True when the compiled graph contains feedback (back) edges that require
 /// per-sample processing with self-registers.
-pub fn CompiledDsp::has_feedback_edges(self : CompiledDsp) -> Bool {
+pub fn Dsp::has_feedback_edges(self : Dsp) -> Bool {
   !self.0.feedback_edges.is_empty()
 }
 
 ///|
-pub fn CompiledStereoDsp::has_feedback_edges(self : CompiledStereoDsp) -> Bool {
+pub fn StereoDsp::has_feedback_edges(self : StereoDsp) -> Bool {
   !self.0.feedback_edges.is_empty()
 }
 
 ///|
 /// Compile a declarative mono graph into an executable buffer graph.
 ///
-/// Accepts a `CompiledTemplate` (the runtime exchange boundary per
+/// Accepts a `AnalyzedGraph` (the runtime exchange boundary per
 /// ADR-0010) and returns `None` if the template's topology is rejected
 /// (e.g., no reachable `Output`, invalid feedback cycle, missing node
-/// inputs). Produce the input via `CompiledTemplate::analyze(nodes)` or
+/// inputs). Produce the input via `AnalyzedGraph::analyze(nodes)` or
 /// `GraphBuilder::analyze`.
-pub fn CompiledDsp::compile(
-  compiled_template : CompiledTemplate,
+pub fn Dsp::compile(
+  compiled_template : AnalyzedGraph,
   context : DspContext,
-) -> CompiledDsp? {
-  CompiledDsp::compile_internal(
-    compiled_template.optimized_nodes(),
-    context,
-    compiled_template.length(),
-    compiled_template.index_map(),
-  )
+) -> Dsp? {
+  match Dsp::compile_result(compiled_template, context) {
+    Ok(graph) => Some(graph)
+    Err(_) => None
+  }
 }
 
 ///|
 /// Compile without optimization — used by topology controllers where authoring
 /// indices must be preserved for runtime controls.
-pub fn CompiledDsp::compile_raw(
-  nodes : Array[DspNode],
-  context : DspContext,
-) -> CompiledDsp? {
-  let count = nodes.length()
-  let identity_map = FixedArray::makei(count, fn(i) { i })
-  CompiledDsp::compile_internal(nodes, context, count, identity_map)
+pub fn Dsp::compile_raw(nodes : Array[DspNode], context : DspContext) -> Dsp? {
+  match build_graph_program(nodes, context, DspNodeKind::Output) {
+    Ok(program) => Some(DspProgram(program).instantiate())
+    Err(_) => None
+  }
 }
 
 ///|
-/// Shared compilation logic for both mono and stereo graphs.
-///
-/// WHY callbacks instead of an enum: the validation logic differs not just by
-/// mono/stereo but also by presence of feedback edges (simple vs feedback
-/// variant). A `validate` callback lets the caller compose both checks in
-/// one closure without adding a separate parameter for feedback mode.
-/// `compile_plan` selects the mono or stereo topological sort + feedback detection.
-fn compile_graph_impl(
-  nodes : Array[DspNode],
-  context : DspContext,
-  original_count : Int,
-  opt_map : FixedArray[Int],
-  compile_plan : (Array[DspNode], DspContext) -> (
-    Array[Int],
-    Array[(Int, Int, Int)],
-  )?,
-  validate : (FixedArray[@model.DspNode], FixedArray[(Int, Int, Int)]) -> Bool,
-) -> CompiledGraph? {
-  let plan = match compile_plan(nodes, context) {
-    Some(plan) => plan
-    None => return None
-  }
-  let order = plan.0
-  let node_count = nodes.length()
-  let block_size = compiled_block_size(context)
-  let compile_sample_rate = context.sample_rate()
-  let topo_map = FixedArray::make(node_count, -1)
-  for new_index = 0; new_index < order.length(); new_index = new_index + 1 {
-    topo_map[order[new_index]] = new_index
-  }
-  // Compose: original index -> optimized index -> compiled index
-  let index_map = FixedArray::makei(original_count, fn(i) {
-    let opt_i = opt_map[i]
-    if opt_i < 0 {
-      -1
-    } else {
-      topo_map[opt_i]
-    }
+/// Allocate independent execution state from an already checked graph program.
+fn GraphProgram::instantiate(self : GraphProgram) -> CompiledGraph {
+  let node_count = self.nodes.length()
+  let block_size = self.block_size
+  let compile_sample_rate = self.sample_rate
+  let fixed_nodes = FixedArray::makei(node_count, i => {
+    @model.clone_node(self.nodes[i])
   })
-
-  let fixed_nodes = FixedArray::makei(node_count, index => {
-    @model.remap_node_inputs(nodes[order[index]], topo_map)
-  })
-  let feedback_edges = remapped_feedback_edges(plan.1, topo_map)
-  if !validate(fixed_nodes, feedback_edges) {
-    return None
-  }
+  let index_map = self.index_map
+  let feedback_edges = self.feedback_edges
   let buffers = FixedArray::makei(node_count, _ => {
     AudioBuffer::filled(block_size)
   })
@@ -289,39 +181,16 @@ fn compile_graph_impl(
   let self_values = FixedArray::make(node_count, 0.0)
   let self_left_values = FixedArray::make(node_count, 0.0)
   let self_right_values = FixedArray::make(node_count, 0.0)
-  let self_enabled = FixedArray::make(node_count, false)
-  let back_edge_input0_source = FixedArray::make(node_count, -1)
-  let back_edge_input1_source = FixedArray::make(node_count, -1)
-  for edge in feedback_edges {
-    let source_idx = edge.0
-    let target_idx = edge.1
-    let slot = edge.2
-    guard source_idx >= 0 &&
-      source_idx < node_count &&
-      target_idx >= 0 &&
-      target_idx < node_count else {
-      return None
-    }
-    self_enabled[source_idx] = true
-    if slot == 0 {
-      if back_edge_input0_source[target_idx] >= 0 {
-        return None
-      }
-      back_edge_input0_source[target_idx] = source_idx
-    } else {
-      if back_edge_input1_source[target_idx] >= 0 {
-        return None
-      }
-      back_edge_input1_source[target_idx] = source_idx
-    }
-  }
-  Some({
+  {
     compile_sample_rate,
     nodes: fixed_nodes,
     default_nodes: FixedArray::makei(node_count, index => {
       @model.clone_node(fixed_nodes[index])
     }),
     index_map,
+    controls: make_control_scratch(
+      fixed_nodes, env_states, delay_states, stereo_delay_left_states, stereo_delay_right_states,
+    ),
     buffers,
     left_buffers,
     right_buffers,
@@ -338,9 +207,9 @@ fn compile_graph_impl(
     self_values,
     self_left_values,
     self_right_values,
-    self_enabled,
-    back_edge_input0_source,
-    back_edge_input1_source,
+    self_enabled: self.self_enabled,
+    back_edge_input0_source: self.back_edge_input0_source,
+    back_edge_input1_source: self.back_edge_input1_source,
     sample_values: FixedArray::make(node_count, 0.0),
     left_sample_values: FixedArray::make(node_count, 0.0),
     right_sample_values: FixedArray::make(node_count, 0.0),
@@ -349,121 +218,36 @@ fn compile_graph_impl(
     last_sanitized_count: 0,
     debug_validate: false,
     last_validation_errors: [],
-  })
-}
-
-///|
-fn CompiledDsp::compile_internal(
-  nodes : Array[DspNode],
-  context : DspContext,
-  original_count : Int,
-  opt_map : FixedArray[Int],
-) -> CompiledDsp? {
-  compile_graph_impl(
-    nodes,
-    context,
-    original_count,
-    opt_map,
-    mono_compile_plan,
-    fn(fixed_nodes, feedback_edges) {
-      if feedback_edges.is_empty() {
-        valid_terminal_mono_shapes(fixed_nodes)
-      } else {
-        valid_feedback_terminal_mono_graph(fixed_nodes, feedback_edges)
-      }
-    },
-  ).map(fn(graph) { CompiledDsp(graph) })
+  }
 }
 
 ///|
 /// Compile a declarative terminal-stereo graph into an executable
 /// stereo graph.
 ///
-/// Accepts a `CompiledTemplate` (the runtime exchange boundary per
+/// Accepts a `AnalyzedGraph` (the runtime exchange boundary per
 /// ADR-0010) and returns `None` if the template's topology is rejected
 /// — including the stereo-specific requirement of a single reachable
 /// `StereoOutput`.
-pub fn CompiledStereoDsp::compile(
-  compiled_template : CompiledTemplate,
+pub fn StereoDsp::compile(
+  compiled_template : AnalyzedGraph,
   context : DspContext,
-) -> CompiledStereoDsp? {
-  CompiledStereoDsp::compile_internal(
-    compiled_template.optimized_nodes(),
-    context,
-    compiled_template.length(),
-    compiled_template.index_map(),
-  )
+) -> StereoDsp? {
+  match StereoDsp::compile_result(compiled_template, context) {
+    Ok(graph) => Some(graph)
+    Err(_) => None
+  }
 }
 
 ///|
-pub fn CompiledStereoDsp::compile_raw(
+pub fn StereoDsp::compile_raw(
   nodes : Array[DspNode],
   context : DspContext,
-) -> CompiledStereoDsp? {
-  let count = nodes.length()
-  let identity_map = FixedArray::makei(count, fn(i) { i })
-  CompiledStereoDsp::compile_internal(nodes, context, count, identity_map)
-}
-
-///|
-fn CompiledStereoDsp::compile_internal(
-  nodes : Array[DspNode],
-  context : DspContext,
-  original_count : Int,
-  opt_map : FixedArray[Int],
-) -> CompiledStereoDsp? {
-  compile_graph_impl(
-    nodes,
-    context,
-    original_count,
-    opt_map,
-    stereo_compile_plan,
-    fn(fixed_nodes, feedback_edges) {
-      if feedback_edges.is_empty() {
-        valid_terminal_stereo_shapes(fixed_nodes)
-      } else {
-        valid_feedback_terminal_stereo_graph(fixed_nodes, feedback_edges)
-      }
-    },
-  ).map(fn(graph) { CompiledStereoDsp(graph) })
-}
-
-///|
-fn stereo_compile_plan(
-  nodes : Array[DspNode],
-  context : DspContext,
-) -> (Array[Int], Array[(Int, Int, Int)])? {
-  let sample_rate = context.sample_rate()
-  if !@dsp.is_finite_positive(sample_rate) {
-    return None
+) -> StereoDsp? {
+  match build_graph_program(nodes, context, DspNodeKind::StereoOutput) {
+    Ok(program) => Some(StereoDspProgram(program).instantiate())
+    Err(_) => None
   }
-  let output_index = match
-    find_single_output_index_of_kind(nodes, DspNodeKind::StereoOutput) {
-    Some(output_index) => output_index
-    None => return None
-  }
-  if nodes.is_empty() {
-    return None
-  }
-
-  for index = 0; index < nodes.length(); index = index + 1 {
-    let node = nodes[index]
-    if !valid_stereo_node_inputs(node, nodes.length(), sample_rate) {
-      return None
-    }
-  }
-
-  let marks = FixedArray::make(nodes.length(), 0)
-  let order : Array[Int] = []
-  let feedback_edges : Array[(Int, Int, Int)] = []
-  visit_graph_node_with_feedback(
-    output_index, nodes, marks, order, feedback_edges,
-  )
-  if order.length() != nodes.length() {
-    return None
-  }
-
-  Some((order, feedback_edges))
 }
 
 ///|
@@ -493,47 +277,13 @@ fn CompiledGraph::compiled_index_for(
 }
 
 ///|
-pub fn CompiledDsp::compiled_buffer_capacity(self : CompiledDsp) -> Int {
+pub fn Dsp::compiled_buffer_capacity(self : Dsp) -> Int {
   self.0.compiled_buffer_capacity()
 }
 
 ///|
-pub fn CompiledStereoDsp::compiled_buffer_capacity(
-  self : CompiledStereoDsp,
-) -> Int {
+pub fn StereoDsp::compiled_buffer_capacity(self : StereoDsp) -> Int {
   self.0.compiled_buffer_capacity()
-}
-
-///|
-fn mono_compile_plan(
-  nodes : Array[DspNode],
-  context : DspContext,
-) -> (Array[Int], Array[(Int, Int, Int)])? {
-  let sample_rate = context.sample_rate()
-  if !@dsp.is_finite_positive(sample_rate) {
-    return None
-  }
-  let output_index = match find_single_output_index(nodes) {
-    Some(output_index) => output_index
-    None => return None
-  }
-  for index = 0; index < nodes.length(); index = index + 1 {
-    if !valid_node_inputs(nodes[index], nodes.length(), sample_rate) {
-      return None
-    }
-  }
-
-  let marks = FixedArray::make(nodes.length(), 0)
-  let order : Array[Int] = []
-  let feedback_edges : Array[(Int, Int, Int)] = []
-  visit_graph_node_with_feedback(
-    output_index, nodes, marks, order, feedback_edges,
-  )
-  if order.length() != nodes.length() {
-    return None
-  }
-
-  Some((order, feedback_edges))
 }
 
 ///|
@@ -771,11 +521,6 @@ fn visit_graph_input_with_feedback(
     1 => feedback_edges.push((input, target_index, target_slot))
     _ => ()
   }
-}
-
-///|
-fn find_single_output_index(nodes : Array[DspNode]) -> Int? {
-  find_single_output_index_of_kind(nodes, DspNodeKind::Output)
 }
 
 ///|

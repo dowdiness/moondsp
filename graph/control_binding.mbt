@@ -75,7 +75,7 @@ pub fn ControlBindingBuilder::bind(
 
 ///|
 /// Proven-valid control bindings. Validated against a specific
-/// CompiledTemplate at build time (bounds + slot compatibility +
+/// AnalyzedGraph at build time (bounds + slot compatibility +
 /// orphan detection + key uniqueness).
 ///
 /// No public constructor — only reachable through ControlBindingBuilder::build().
@@ -112,7 +112,7 @@ pub fn ControlBindingMap::length(self : ControlBindingMap) -> Int {
 /// optimize_graph), and key uniqueness. Returns the first error found.
 pub fn ControlBindingBuilder::build(
   self : ControlBindingBuilder,
-  compiled_template : CompiledTemplate,
+  compiled_template : AnalyzedGraph,
 ) -> Result[ControlBindingMap, ControlBindingError] {
   match self.raw.build(compiled_template.raw()) {
     Ok(map) => Ok(ControlBindingMap::from_internal(map))

@@ -1,6 +1,6 @@
 ///|
 /// Reset mutable runtime state and restore compile-time node parameters.
-pub fn CompiledDsp::reset_runtime_state(self : CompiledDsp) -> Unit {
+pub fn Dsp::reset_runtime_state(self : Dsp) -> Unit {
   self.0.reset_runtime_state()
 }
 

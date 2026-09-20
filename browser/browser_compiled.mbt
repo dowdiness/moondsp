@@ -1,9 +1,9 @@
 ///|
-let compiled : GraphSlot[@moondsp.CompiledDsp, MonoOut] = GraphSlot::new(
+let compiled : GraphSlot[@moondsp.Dsp, MonoOut] = GraphSlot::new(
   output=MonoOut::new(),
   compile=fn(ctx) {
-    @moondsp.CompiledDsp::compile(
-      @moondsp.CompiledTemplate::analyze([
+    @moondsp.Dsp::compile(
+      @moondsp.AnalyzedGraph::analyze([
         @moondsp.DspNode::oscillator(
           @moondsp.Waveform::Triangle,
           BROWSER_COMPILED_DEFAULT_FREQ,
@@ -18,7 +18,7 @@ let compiled : GraphSlot[@moondsp.CompiledDsp, MonoOut] = GraphSlot::new(
 )
 
 ///|
-/// Initialize the browser proof graph that runs through `CompiledDsp`.
+/// Initialize the browser proof graph that runs through `Dsp`.
 pub fn init_compiled_graph(sample_rate : Double, block_size : Int) -> Bool {
   if compiled.ensure(sample_rate, block_size) {
     clear_browser_error()
@@ -29,7 +29,7 @@ pub fn init_compiled_graph(sample_rate : Double, block_size : Int) -> Bool {
 }
 
 ///|
-/// Run one render quantum through the browser proof `CompiledDsp` graph.
+/// Run one render quantum through the browser proof `Dsp` graph.
 pub fn process_compiled_block(
   freq : Double,
   gain : Double,

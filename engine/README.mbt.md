@@ -23,7 +23,7 @@ of compiled graphs, providing host-independent mounting and buffer mixing:
   mount requests; CLI tools and standalone MoonBit applications embed
   `GraphEngine` directly for headless audio rendering.
 - **Downstream dependencies**: [`graph/`](../graph/) compiles DAG templates and
-  provides `CompiledDsp` runtimes; [`dsp/`](../dsp/) supplies `DspContext` and
+  provides `Dsp` runtimes; [`dsp/`](../dsp/) supplies `DspContext` and
   `AudioBuffer`. `engine` has zero dependencies on browser globals or JSON.
 
 ## API quick reference
@@ -64,7 +64,7 @@ test "mount and play a graph" {
 ```
 
 `mount` follows the canonical graph boundary:
-`CompiledTemplate::analyze` then `CompiledDsp::compile_result`. Invalid graphs
+`AnalyzedGraph::analyze` then `Dsp::compile_result`. Invalid graphs
 raise `GraphEngineError::InvalidGraph` with the underlying compile error and do
 not consume capacity.
 

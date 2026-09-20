@@ -134,7 +134,7 @@ The engine bridges high-level musical structure to low-level audio signals throu
 
 ```text
 Pattern Engine (Human Time)           DSP Engine (Audio Time)
-  Pat.query(arc)                        CompiledDsp.process(ctx, buf)
+  Pat.query(arc)                        Dsp.process(ctx, buf)
        |                                      |
        v                                      v
   Array[Event[ControlMap]]             BoundVoicePool.process(ctx, L, R)
@@ -212,7 +212,7 @@ Shared authoring identity:
 | Package | Role & Responsibility | Key Types / Entry Points |
 |---|---|---|
 | [`dsp/`](dsp/README.mbt.md) | Sample buffers, oscillators, envelopes, biquad filters, delay lines, gain, clip, pan, and tagless DSP traits | `DspContext`, `AudioBuffer`, `Oscillator`, `Adsr`, `Biquad`, `DelayLine`, `Pan`, `ArithSym`, `DspSym` |
-| [`graph/`](graph/README.mbt.md) | DAG compilation, topological sorting, runtime controls, block-boundary hot-swap, and topology editing | `DspNode`, `CompiledTemplate`, `CompiledDsp`, `CompiledStereoDsp`, `GraphControl`, `CompiledDspHotSwap`, `GraphTemplateDoc` |
+| [`graph/`](graph/README.mbt.md) | DAG compilation, topological sorting, runtime controls, block-boundary hot-swap, and topology editing | `DspNode`, `AnalyzedGraph`, `Dsp`, `StereoDsp`, `GraphControl`, `DspHotSwap`, `GraphDocument` |
 | [`engine/`](engine/README.mbt.md) | Host-independent graph lifecycle management, typed mount handles, and multi-graph mono buffer mixing | `GraphEngine`, `MountedGraph`, `GraphEngineError` |
 | [`voice/`](voice/README.mbt.md) | Polyphonic voice pool with priority voice stealing, generation handles, ADSR lifecycle, and equal-power stereo panning | `VoicePool`, `BoundVoicePool`, `VoiceHandle`, `VoiceState`, `NoteGate` |
 | [`identity/`](identity/README.mbt.md) | Type-safe stable node identifiers and monotonic revision tokens for structural live-editing trees | `GraphNodeId`, `PatternNodeId`, `SectionId`, `SectionLayerId`, `OccurrenceId`, `Revision` |

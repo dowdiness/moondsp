@@ -143,7 +143,7 @@ pub fn synth_template() -> Array[@moondsp.DspNode] {
   // Bind `note` directly to oscillator Value0. Avoid constant ->
   // oscillator_from for browser synth playback: sustained notes exposed
   // crackle in that per-sample frequency-buffer path. Browser synth defaults to
-  // Triangle for now: CompiledDsp Sine still crackles in AudioWorklet probes,
+  // Triangle for now: Dsp Sine still crackles in AudioWorklet probes,
   // while JS sine and direct wasm tick-block are clean. Follow-ups:
   // https://github.com/dowdiness/moondsp/issues/211
   // https://github.com/dowdiness/moondsp/issues/212

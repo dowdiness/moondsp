@@ -49,7 +49,7 @@ pub fn ControlBindingBuilder::bind(
 
 ///|
 /// Proven-valid control bindings. Validated against a specific
-/// CompiledTemplate at build time (bounds + slot compatibility +
+/// AnalyzedGraph at build time (bounds + slot compatibility +
 /// orphan detection + key uniqueness).
 ///
 /// No public constructor — only reachable through ControlBindingBuilder::build().
@@ -80,7 +80,7 @@ pub fn ControlBindingMap::length(self : ControlBindingMap) -> Int {
 /// optimize_graph), and key uniqueness. Returns the first error found.
 pub fn ControlBindingBuilder::build(
   self : ControlBindingBuilder,
-  compiled_template : @template.CompiledTemplate,
+  compiled_template : @template.AnalyzedGraph,
 ) -> Result[ControlBindingMap, ControlBindingError] {
   let defaults : Array[Double] = []
   let seen_keys : Map[String, Bool] = Map([])

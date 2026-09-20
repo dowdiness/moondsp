@@ -608,3 +608,9 @@ pub fn[A] Song::query(
   }
   result
 }
+
+///|
+pub extend SongBuildError with Debug::{to_repr}
+
+///|
+pub extend SongBuildError with Eq::{not_equal, equal}

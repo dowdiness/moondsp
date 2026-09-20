@@ -1,11 +1,7 @@
 ///|
 /// Corrupt a compiled node's input0 to an out-of-bounds value.
 /// Whitebox test helper — needs access to private CompiledGraph fields.
-fn corrupt_input0(
-  compiled : CompiledDsp,
-  node_index : Int,
-  value : Int,
-) -> Unit {
+fn corrupt_input0(compiled : Dsp, node_index : Int, value : Int) -> Unit {
   let nodes = compiled.0.nodes
   let node = nodes[node_index]
   nodes[node_index] = @model.node_with_inputs(
@@ -23,7 +19,7 @@ test "debug: invalid input0 produces InvalidInput0 error" {
     DspNode::gain(0, 0.3),
     DspNode::output(1),
   ]
-  let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
+  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
   compiled.enable_debug_validation()
   // Corrupt node 1 (Gain) to reference input0=99 (out of bounds)
   corrupt_input0(compiled, 1, 99)
@@ -43,7 +39,7 @@ test "debug: skipped node outputs silence, downstream processes normally" {
     DspNode::gain(0, 0.5),
     DspNode::output(1),
   ]
-  let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
+  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
   compiled.enable_debug_validation()
   // Corrupt node 1 (Gain) — it should output silence (0.0)
   // Node 2 (Output) reads from node 1, so output should be 0.0
@@ -63,7 +59,7 @@ test "debug: errors reset on next process call" {
     DspNode::gain(0, 0.3),
     DspNode::output(1),
   ]
-  let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
+  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
   compiled.enable_debug_validation()
   // First call: corrupted
   corrupt_input0(compiled, 1, 99)
@@ -87,7 +83,7 @@ test "debug: feedback graph validation failure yields silence and records errors
     DspNode::gain(1, 0.3),
     DspNode::output(2),
   ]
-  let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
+  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
   assert_true(compiled.0.feedback_edges.length() > 0)
   compiled.enable_debug_validation()
   // Corrupt node 1 (Mix) to reference input0=99 (out of bounds)
@@ -114,7 +110,7 @@ test "debug: multiple errors in one block" {
     DspNode::mix(0, 1),
     DspNode::output(2),
   ]
-  let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
+  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
   compiled.enable_debug_validation()
   // Corrupt both Mix inputs
   corrupt_input0(compiled, 2, 99)

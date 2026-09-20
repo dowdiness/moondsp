@@ -1,14 +1,14 @@
 ///|
-/// Block-boundary mono graph hot-swap wrapper for `CompiledDsp`.
+/// Block-boundary mono graph hot-swap wrapper for `Dsp`.
 ///
 /// Public facade wrapper; implementation lives in `graph/internal/staging`.
-struct CompiledDspHotSwap(@staging.CompiledDspHotSwap)
+struct DspHotSwap(@staging.DspHotSwap)
 
 ///|
-/// Block-boundary stereo graph hot-swap wrapper for `CompiledStereoDsp`.
+/// Block-boundary stereo graph hot-swap wrapper for `StereoDsp`.
 ///
 /// Public facade wrapper; implementation lives in `graph/internal/staging`.
-struct CompiledStereoDspHotSwap(@staging.CompiledStereoDspHotSwap)
+struct StereoDspHotSwap(@staging.StereoDspHotSwap)
 
 ///|
 /// Failure reason for result-typed hot-swap queue APIs.
@@ -49,13 +49,11 @@ fn hot_swap_queue_result_from_staging(
 
 ///|
 /// Create a hot-swap wrapper around an active mono compiled graph.
-pub fn CompiledDspHotSwap::from_graph(
-  active : CompiledDsp,
+pub fn DspHotSwap::from_graph(
+  active : Dsp,
   crossfade_samples? : Int = 0,
-) -> CompiledDspHotSwap {
-  CompiledDspHotSwap(
-    @staging.CompiledDspHotSwap::from_graph(active.raw(), crossfade_samples~),
-  )
+) -> DspHotSwap {
+  DspHotSwap(@staging.DspHotSwap::from_graph(active.raw(), crossfade_samples~))
 }
 
 ///|
@@ -63,9 +61,9 @@ pub fn CompiledDspHotSwap::from_graph(
 ///
 /// Returns an error when the replacement graph is incompatible with the active
 /// graph's compile-time sample rate or block capacity.
-pub fn CompiledDspHotSwap::queue_swap(
-  self : CompiledDspHotSwap,
-  next : CompiledDsp,
+pub fn DspHotSwap::queue_swap(
+  self : DspHotSwap,
+  next : Dsp,
 ) -> Result[Unit, HotSwapQueueError] {
   hot_swap_queue_result_from_staging(self.0.queue_swap(next.raw()))
 }
@@ -73,8 +71,8 @@ pub fn CompiledDspHotSwap::queue_swap(
 ///|
 /// Process one block, crossfading between the active and pending graphs when a
 /// swap is in flight.
-pub fn CompiledDspHotSwap::process(
-  self : CompiledDspHotSwap,
+pub fn DspHotSwap::process(
+  self : DspHotSwap,
   context : DspContext,
   output : AudioBuffer,
 ) -> Unit {
@@ -83,15 +81,12 @@ pub fn CompiledDspHotSwap::process(
 
 ///|
 /// Create a hot-swap wrapper around an active stereo compiled graph.
-pub fn CompiledStereoDspHotSwap::from_graph(
-  active : CompiledStereoDsp,
+pub fn StereoDspHotSwap::from_graph(
+  active : StereoDsp,
   crossfade_samples? : Int = 0,
-) -> CompiledStereoDspHotSwap {
-  CompiledStereoDspHotSwap(
-    @staging.CompiledStereoDspHotSwap::from_graph(
-      active.raw(),
-      crossfade_samples~,
-    ),
+) -> StereoDspHotSwap {
+  StereoDspHotSwap(
+    @staging.StereoDspHotSwap::from_graph(active.raw(), crossfade_samples~),
   )
 }
 
@@ -100,9 +95,9 @@ pub fn CompiledStereoDspHotSwap::from_graph(
 ///
 /// Returns an error when the replacement graph is incompatible with the active
 /// graph's compile-time sample rate or block capacity.
-pub fn CompiledStereoDspHotSwap::queue_swap(
-  self : CompiledStereoDspHotSwap,
-  next : CompiledStereoDsp,
+pub fn StereoDspHotSwap::queue_swap(
+  self : StereoDspHotSwap,
+  next : StereoDsp,
 ) -> Result[Unit, HotSwapQueueError] {
   hot_swap_queue_result_from_staging(self.0.queue_swap(next.raw()))
 }
@@ -110,8 +105,8 @@ pub fn CompiledStereoDspHotSwap::queue_swap(
 ///|
 /// Process one block, crossfading between the active and pending stereo graphs
 /// when a swap is in flight.
-pub fn CompiledStereoDspHotSwap::process(
-  self : CompiledStereoDspHotSwap,
+pub fn StereoDspHotSwap::process(
+  self : StereoDspHotSwap,
   context : DspContext,
   left_output : AudioBuffer,
   right_output : AudioBuffer,

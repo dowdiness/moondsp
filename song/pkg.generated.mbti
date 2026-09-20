@@ -13,6 +13,9 @@ import {
 pub(all) suberror SectionBuildError {
   NonPositiveLength
 } derive(Eq, @debug.Debug)
+pub fn SectionBuildError::equal(Self, Self) -> Bool
+pub fn SectionBuildError::not_equal(Self, Self) -> Bool
+pub fn SectionBuildError::to_repr(Self) -> @debug.Repr
 
 pub(all) suberror SectionDocBuildError {
   NonPositiveSectionLength
@@ -20,16 +23,25 @@ pub(all) suberror SectionDocBuildError {
   DuplicateLayerId(String)
   DuplicateLayerName(String)
 } derive(Eq, @debug.Debug)
+pub fn SectionDocBuildError::equal(Self, Self) -> Bool
+pub fn SectionDocBuildError::not_equal(Self, Self) -> Bool
+pub fn SectionDocBuildError::to_repr(Self) -> @debug.Repr
 
 pub(all) suberror SectionDocEditError {
   MissingLayerId(String)
   DuplicateLayerName(String)
 } derive(Eq, @debug.Debug)
+pub fn SectionDocEditError::equal(Self, Self) -> Bool
+pub fn SectionDocEditError::not_equal(Self, Self) -> Bool
+pub fn SectionDocEditError::to_repr(Self) -> @debug.Repr
 
 pub(all) suberror SectionPatchError {
   MissingLayer(String)
   DuplicateLayer(String)
 } derive(Eq, @debug.Debug)
+pub fn SectionPatchError::equal(Self, Self) -> Bool
+pub fn SectionPatchError::not_equal(Self, Self) -> Bool
+pub fn SectionPatchError::to_repr(Self) -> @debug.Repr
 
 pub(all) suberror SongBuildError {
   EmptySong
@@ -37,12 +49,18 @@ pub(all) suberror SongBuildError {
   DuplicateOccurrenceId(String)
   InvalidOccurrenceId(String)
 } derive(Eq, @debug.Debug)
+pub fn SongBuildError::equal(Self, Self) -> Bool
+pub fn SongBuildError::not_equal(Self, Self) -> Bool
+pub fn SongBuildError::to_repr(Self) -> @debug.Repr
 
 pub(all) suberror SongDocBuildError {
   EmptySongDoc
   DuplicateSongDocOccurrenceId(String)
   DuplicateSongDocOccurrenceName(String)
 } derive(Eq, @debug.Debug)
+pub fn SongDocBuildError::equal(Self, Self) -> Bool
+pub fn SongDocBuildError::not_equal(Self, Self) -> Bool
+pub fn SongDocBuildError::to_repr(Self) -> @debug.Repr
 
 pub(all) suberror SongDocEditError {
   MissingSongDocOccurrenceId(String)
@@ -51,10 +69,16 @@ pub(all) suberror SongDocEditError {
   InvalidSongDocOccurrenceIndex(Int)
   CannotRemoveLastSongDocOccurrence
 } derive(Eq, @debug.Debug)
+pub fn SongDocEditError::equal(Self, Self) -> Bool
+pub fn SongDocEditError::not_equal(Self, Self) -> Bool
+pub fn SongDocEditError::to_repr(Self) -> @debug.Repr
 
 pub(all) suberror TimeScopeBuildError {
   NonPositiveRate
 } derive(Eq, @debug.Debug)
+pub fn TimeScopeBuildError::equal(Self, Self) -> Bool
+pub fn TimeScopeBuildError::not_equal(Self, Self) -> Bool
+pub fn TimeScopeBuildError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
 pub struct Section[A] {
@@ -189,9 +213,12 @@ pub fn[A] SongDoc::to_song(Self[A]) -> Song[A] raise SongBuildError
 pub struct SongEventOrigin {
   // private fields
 } derive(Eq, @debug.Debug)
+pub fn SongEventOrigin::equal(Self, Self) -> Bool
 pub fn SongEventOrigin::layer(Self) -> @identity.SectionLayerId
+pub fn SongEventOrigin::not_equal(Self, Self) -> Bool
 pub fn SongEventOrigin::occurrence(Self) -> @identity.OccurrenceId
 pub fn SongEventOrigin::section(Self) -> @identity.SectionId
+pub fn SongEventOrigin::to_repr(Self) -> @debug.Repr
 
 pub struct SongOccurrenceDoc[A] {
   // private fields

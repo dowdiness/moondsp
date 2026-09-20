@@ -10,7 +10,7 @@ test "compiled dsp resolves simple mono feedback cycle via z^-1 insertion" {
     DspNode::gain(1, HALF_GAIN),
     DspNode::output(2),
   ]
-  let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
+  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -33,7 +33,7 @@ test "compiled dsp runtime gain update retunes accepted feedback cycle" {
     DspNode::gain(1, HALF_GAIN),
     DspNode::output(2),
   ]
-  let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
+  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
   let baseline_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let retuned_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
@@ -67,7 +67,7 @@ test "compiled dsp resolves multiple mono feedback edges from one source" {
     DspNode::mix(3, 2),
     DspNode::output(4),
   ]
-  let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
+  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -102,12 +102,12 @@ test "compiled dsp runtime delay update matches fixed feedback loop compile" {
     DspNode::gain(2, HALF_GAIN),
     DspNode::output(3),
   ]
-  let runtime_compiled = CompiledDsp::compile(
-    CompiledTemplate::analyze(runtime_nodes),
+  let runtime_compiled = Dsp::compile(
+    AnalyzedGraph::analyze(runtime_nodes),
     context,
   ).unwrap()
-  let fixed_compiled = CompiledDsp::compile(
-    CompiledTemplate::analyze(fixed_nodes),
+  let fixed_compiled = Dsp::compile(
+    AnalyzedGraph::analyze(fixed_nodes),
     context,
   ).unwrap()
   let runtime_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
@@ -168,12 +168,12 @@ test "compiled dsp runtime biquad update matches fixed feedback loop compile" {
     DspNode::gain(2, HALF_GAIN),
     DspNode::output(3),
   ]
-  let runtime_compiled = CompiledDsp::compile(
-    CompiledTemplate::analyze(runtime_nodes),
+  let runtime_compiled = Dsp::compile(
+    AnalyzedGraph::analyze(runtime_nodes),
     context,
   ).unwrap()
-  let fixed_compiled = CompiledDsp::compile(
-    CompiledTemplate::analyze(fixed_nodes),
+  let fixed_compiled = Dsp::compile(
+    AnalyzedGraph::analyze(fixed_nodes),
     context,
   ).unwrap()
   let runtime_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
@@ -209,10 +209,7 @@ test "compiled stereo dsp resolves mono feedback cycle before pan via z^-1 inser
     DspNode::pan(2, PAN_CENTER),
     DspNode::stereo_output(3),
   ]
-  let compiled = CompiledStereoDsp::compile(
-    CompiledTemplate::analyze(nodes),
-    context,
-  ).unwrap()
+  let compiled = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
   let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
@@ -248,10 +245,7 @@ test "compiled stereo dsp runtime gain update retunes accepted mono feedback cyc
     DspNode::pan(2, PAN_CENTER),
     DspNode::stereo_output(3),
   ]
-  let compiled = CompiledStereoDsp::compile(
-    CompiledTemplate::analyze(nodes),
-    context,
-  ).unwrap()
+  let compiled = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
   let baseline_left = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let baseline_right = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let retuned_left = AudioBuffer::filled(SMALL_BLOCK_SIZE)
@@ -293,7 +287,7 @@ test "compiled dsp accepts direct self-feedback with zero-initialized z^-1 state
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [DspNode::gain(0, HALF_GAIN), DspNode::output(0)]
-  let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
+  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -312,9 +306,7 @@ test "compiled dsp rejects feedback cycles through output nodes" {
   )
   let nodes = [DspNode::output(1), DspNode::gain(0, HALF_GAIN)]
 
-  assert_true(
-    CompiledDsp::compile(CompiledTemplate::analyze(nodes), context) is None,
-  )
+  assert_true(Dsp::compile(AnalyzedGraph::analyze(nodes), context) is None)
 }
 
 ///|
@@ -329,7 +321,7 @@ test "compiled dsp accepts stereo-involved feedback cycles via self-registers" {
     DspNode::stereo_mixdown(1),
     DspNode::output(2),
   ]
-  let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context)
+  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context)
   assert_true(compiled is Some(_))
   let compiled = compiled.unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
@@ -371,10 +363,7 @@ test "compiled stereo dsp accepts stereo-shaped feedback edges via self-register
     DspNode::stereo_mixdown(4),
     DspNode::stereo_output(4),
   ]
-  let compiled = CompiledStereoDsp::compile(
-    CompiledTemplate::analyze(nodes),
-    context,
-  )
+  let compiled = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context)
   assert_true(compiled is Some(_))
   let compiled = compiled.unwrap()
   let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
@@ -397,7 +386,7 @@ test "self-register fields initialized for acyclic graph" {
     DspNode::output(1),
   ]
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
-  let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), ctx).unwrap()
+  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), ctx).unwrap()
   let buf = AudioBuffer::filled(128)
   compiled.process(ctx, buf)
   // Acyclic graph should process normally — oscillator produces non-zero output
@@ -419,7 +408,7 @@ test "self-register: mono self-feedback produces bounded recurrence" {
     DspNode::gain(1, HALF_GAIN),
     DspNode::output(2),
   ]
-  let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
+  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -440,28 +429,8 @@ test "self-register: mono self-feedback produces bounded recurrence" {
 
 ///|
 test "self-register: stereo feedback via self-registers" {
-  // Stereo feedback cycle through Pan and StereoGain.
-  // Graph: Constant(1.0) -> Gain(0, 0.5) -> Pan(1, center) -> StereoGain(2, 0.5) -> StereoOutput(3)
-  // Back-edge: StereoGain is at the end, no feedback here unless we create a cycle.
-  // Better: create a cycle in the stereo domain.
-  // Graph: Constant(1.0) -> Mix(0, 5) -> Gain(1, 0.5) -> Pan(2, center) -> StereoGain(3, 0.5) -> StereoOutput(4)
-  //   + StereoMixDown(3) -> feeds back to Mix slot 1 as node 5
-  // Hmm, let me create: Const -> Mix(0, 5) -> Gain(1, 0.5) -> Pan(2, center) -> StereoGain(3, 0.5) -> StereoOutput(4)
-  // No, StereoOutput won't have back edge. Let me use a direct stereo cycle.
-  // Simpler: Constant -> Pan -> StereoGain -> StereoOutput, with StereoGain feeding back to Pan's input (via StereoMixDown -> mono).
-  // But that requires StereoMixDown in a stereo graph...
-  // Actually for a stereo graph: Const -> Mix(0, 5) -> Gain(1, 0.5) -> Pan(2, center) -> StereoGain(3, 0.5) -> StereoOutput(4)
-  // with node 5 = StereoMixDown(3) feeding back to Mix's input1 on slot 1.
-  // But StereoMixDown is rejected in stereo_compile_plan because valid_stereo_node_inputs returns false for StereoMixDown.
-  // Let me just use a simpler stereo feedback graph.
-  // Simplest stereo cycle: Constant -> Mix(0, 3) -> Gain(1, 0.5) -> Pan(2, center) -> StereoGain(3, 0.5) -> StereoOutput(4)
-  // Back-edge: StereoGain (idx 4 after remap) -> Mix (idx 1 after remap). But StereoGain is stereo, Mix expects mono. Shape mismatch.
-  // We need: Constant -> Mix(0, 4) -> Gain(1, 0.5) -> Pan(2, center) -> StereoGain(3, 0.5) -> StereoOutput(4)
-  // hmm that has StereoGain feeding back. The source is stereo, target expects mono on Mix. Not valid.
-  // The valid pattern is: the feedback source must output mono if the target expects mono.
-  // So: Const -> Mix(0, 2) -> Gain(1, 0.5) -> Pan(2, center) -> StereoOutput(3)
-  // Back-edge: Gain -> Mix slot 1. Source=Gain(mono), target=Mix slot 1(mono). Valid!
-  // This is a mono cycle with stereo output.
+  // Mono Gain -> Mix feedback followed by stereo panning.
+  // The back-edge reads the previous sample's Gain output.
   let context = DspContext::new(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
@@ -473,10 +442,7 @@ test "self-register: stereo feedback via self-registers" {
     DspNode::pan(2, PAN_CENTER),
     DspNode::stereo_output(3),
   ]
-  let compiled = CompiledStereoDsp::compile(
-    CompiledTemplate::analyze(nodes),
-    context,
-  ).unwrap()
+  let compiled = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
   let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
@@ -529,7 +495,7 @@ test "self-register: mixed-shape feedback across mono/stereo boundary" {
     DspNode::gain(3, HALF_GAIN),
     DspNode::output(4),
   ]
-  let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context)
+  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context)
   assert_true(compiled is Some(_))
   let compiled = compiled.unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
@@ -583,7 +549,7 @@ test "feedback clip and mul exercise inline feedback computations" {
     DspNode::clip(3, 0.8),
     DspNode::output(4),
   ]
-  let compiled = CompiledDsp::compile(CompiledTemplate::analyze(nodes), context).unwrap()
+  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)

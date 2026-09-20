@@ -10,7 +10,7 @@ fn transport_fixture(
   @moondsp.AudioBuffer,
 ) {
   let ctx = @moondsp.DspContext::new(sample_rate~, block_size=128)
-  let template = @moondsp.CompiledTemplate::analyze([
+  let template = @moondsp.AnalyzedGraph::analyze([
     @moondsp.DspNode::constant(1.0),
     @moondsp.DspNode::adsr(
       attack_ms=0.0,

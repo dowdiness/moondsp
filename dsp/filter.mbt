@@ -43,6 +43,13 @@ pub fn Biquad::reset(self : Biquad) -> Unit {
 }
 
 ///|
+/// Copy the filter delay state while retaining destination coefficients/configuration.
+pub fn Biquad::copy_state_from(self : Biquad, source : Biquad) -> Unit {
+  self.z1 = source.z1
+  self.z2 = source.z2
+}
+
+///|
 /// Recalculate filter coefficients for the given mode, cutoff, and resonance.
 ///
 /// Returns `false` and disables processing when the parameters are invalid.

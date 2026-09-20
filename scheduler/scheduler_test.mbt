@@ -78,7 +78,7 @@ fn make_test_pool() -> (
   ]
   let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
   let pool = @moondsp.BoundVoicePool::new(
-    @moondsp.CompiledTemplate::analyze(template),
+    @moondsp.AnalyzedGraph::analyze(template),
     ctx,
     @moondsp.ControlBindingBuilder::new().bind(
       key="note",
@@ -558,7 +558,7 @@ test "Retune preflights later voices before mutating the first voice" {
     // Old voices keep ADSR at index 1; new voices have an oscillator there.
     p
     .set_template(
-      @moondsp.CompiledTemplate::analyze([
+      @moondsp.AnalyzedGraph::analyze([
         @moondsp.DspNode::adsr(
           attack_ms=0.01,
           decay_ms=0.1,
@@ -982,7 +982,7 @@ test "process_block: stolen voice gate-off is harmless" {
   ]
   let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
   let pool = @moondsp.BoundVoicePool::new(
-    @moondsp.CompiledTemplate::analyze(template),
+    @moondsp.AnalyzedGraph::analyze(template),
     ctx,
     @moondsp.ControlBindingBuilder::new().bind(
       key="note",

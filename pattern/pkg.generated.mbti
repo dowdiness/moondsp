@@ -46,6 +46,9 @@ pub(all) suberror PatternDocError {
   DuplicateNodeId(String)
   EmptyPatternDocs
 } derive(Eq, @debug.Debug)
+pub fn PatternDocError::equal(Self, Self) -> Bool
+pub fn PatternDocError::not_equal(Self, Self) -> Bool
+pub fn PatternDocError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
 pub struct ControlMap {
@@ -56,8 +59,11 @@ pub fn ControlMap::empty() -> Self
 pub fn ControlMap::entries(Self) -> Map[String, Double]
 pub fn ControlMap::get(Self, String) -> Double?
 pub fn ControlMap::merge(Self, Self) -> Self
+pub fn ControlMap::output(Self, &Logger) -> Unit
 pub fn ControlMap::set(Self, String, Double) -> Self
 pub fn ControlMap::single(String, Double) -> Self
+pub fn ControlMap::to_repr(Self) -> @debug.Repr
+pub fn ControlMap::to_string(Self) -> String
 pub impl Show for ControlMap
 
 pub struct Event[A] {
@@ -65,13 +71,17 @@ pub struct Event[A] {
   part : TimeSpan
   value : A
 } derive(@debug.Debug)
+pub fn[A : @debug.Debug] Event::output(Self[A], &Logger) -> Unit
 pub fn[A] Event::shift(Self[A], Rational) -> Self[A]
+pub fn[A : @debug.Debug] Event::to_repr(Self[A]) -> @debug.Repr
+pub fn[A : @debug.Debug] Event::to_string(Self[A]) -> String
 pub impl[A : @debug.Debug] Show for Event[A]
 
 pub struct Pat[A] {
   query : (TimeSpan) -> Array[Event[A]]
   // private fields
 }
+pub fn[A] Pat::add(Self[A], Self[A]) -> Self[A]
 pub fn[A] Pat::degrade_by(Self[A], Double, seed? : Int) -> Self[A]
 pub fn[A] Pat::entries(Self[A]) -> Array[Self[A]]
 pub fn[A] Pat::entry_key(Self[A]) -> String
@@ -96,6 +106,8 @@ pub impl[A] Add for Pat[A]
 pub struct PatternDoc[A] {
   // private fields
 }
+pub fn[A] PatternDoc::backdate_equal(Self[A], Self[A]) -> Bool
+pub fn[A] PatternDoc::changed_at(Self[A]) -> @types.Revision
 pub fn[A] PatternDoc::contains_node(Self[A], @identity.PatternNodeId) -> Bool
 pub fn[A] PatternDoc::degrade_by(Self[A], id~ : @identity.PatternNodeId, p~ : Double, seed? : Int) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::euclid(Self[A], id~ : @identity.PatternNodeId, k~ : Int, n~ : Int, rotation? : Int) -> Self[A] raise PatternDocError
@@ -141,8 +153,11 @@ pub fn[A] PatternLoweringCache::reset_stats(Self[A]) -> Unit
 pub struct PatternNodePath {
   // private fields
 } derive(Eq, @debug.Debug)
+pub fn PatternNodePath::equal(Self, Self) -> Bool
 pub fn PatternNodePath::leaf(Self) -> @identity.PatternNodeId
 pub fn PatternNodePath::nodes(Self) -> Array[@identity.PatternNodeId]
+pub fn PatternNodePath::not_equal(Self, Self) -> Bool
+pub fn PatternNodePath::to_repr(Self) -> @debug.Repr
 
 pub struct PatternSnapshot[A] {
   // private fields
@@ -170,9 +185,23 @@ pub struct Rational {
 } derive(Eq, @debug.Debug)
 #alias(new)
 pub fn Rational::Rational(Int64, Int64) -> Self
+pub fn Rational::add(Self, Self) -> Self
+pub fn Rational::compare(Self, Self) -> Int
+pub fn Rational::div(Self, Self) -> Self
+pub fn Rational::equal(Self, Self) -> Bool
 pub fn Rational::floor(Self) -> Int64
 pub fn Rational::from_int(Int) -> Self
+pub fn Rational::mul(Self, Self) -> Self
+pub fn Rational::not_equal(Self, Self) -> Bool
+pub fn Rational::op_ge(Self, Self) -> Bool
+pub fn Rational::op_gt(Self, Self) -> Bool
+pub fn Rational::op_le(Self, Self) -> Bool
+pub fn Rational::op_lt(Self, Self) -> Bool
+pub fn Rational::output(Self, &Logger) -> Unit
+pub fn Rational::sub(Self, Self) -> Self
 pub fn Rational::to_double(Self) -> Double
+pub fn Rational::to_repr(Self) -> @debug.Repr
+pub fn Rational::to_string(Self) -> String
 pub impl Add for Rational
 pub impl Compare for Rational
 pub impl Div for Rational
@@ -188,8 +217,13 @@ pub struct TimeSpan {
 pub fn TimeSpan::TimeSpan(Rational, Rational) -> Self
 pub fn TimeSpan::contains(Self, Rational) -> Bool
 pub fn TimeSpan::duration(Self) -> Rational
+pub fn TimeSpan::equal(Self, Self) -> Bool
 pub fn TimeSpan::intersect(Self, Self) -> Self?
+pub fn TimeSpan::not_equal(Self, Self) -> Bool
+pub fn TimeSpan::output(Self, &Logger) -> Unit
 pub fn TimeSpan::shift(Self, Rational) -> Self
+pub fn TimeSpan::to_repr(Self) -> @debug.Repr
+pub fn TimeSpan::to_string(Self) -> String
 pub fn TimeSpan::whole_cycles(Self) -> Array[Self]
 pub impl Show for TimeSpan
 

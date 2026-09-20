@@ -6,8 +6,8 @@ using @graph {
   type ControlBindingBuilder,
   type ControlBindingError,
   type ControlBindingMap,
-  type CompiledDsp,
-  type CompiledTemplate,
+  type Dsp,
+  type AnalyzedGraph,
   type GraphControl,
   type GraphControlError,
   type GraphParamSlot,
@@ -123,7 +123,7 @@ pub impl Show for VoiceControlError with fn output(self, logger) {
 
 ///|
 priv struct VoiceSlot {
-  mut compiled : CompiledDsp?
+  mut compiled : Dsp?
   /// WHY per-slot snapshot: after set_template, the pool's
   /// adsr_authoring_indices changes. note_off must iterate the SAME
   /// indices used at note_on to gate the right ADSRs. Without this,
@@ -185,7 +185,7 @@ fn VoiceSlot::update_send(self : VoiceSlot, gain : Double) -> Unit {
 
 ///|
 /// Gate on or off all surviving ADSR nodes using authoring indices.
-/// WHY authoring indices: CompiledDsp::gate_on/gate_off accept original
+/// WHY authoring indices: Dsp::gate_on/gate_off accept original
 /// authoring indices and internally map through index_map (which
 /// accounts for optimizer elimination + topological reordering).
 /// WHY unwrap: VoicePool construction rejects orphan ADSRs (see
@@ -193,7 +193,7 @@ fn VoiceSlot::update_send(self : VoiceSlot, gain : Double) -> Unit {
 /// surviving ADSR indices only. Gate operations on those indices must
 /// succeed; an Err here means an invariant has been violated.
 fn gate_adsrs_at_bool(
-  compiled : CompiledDsp,
+  compiled : Dsp,
   authoring_indices : FixedArray[Int],
   gate_on : Bool,
 ) -> Bool {
@@ -213,7 +213,7 @@ fn gate_adsrs_at_bool(
 
 ///|
 fn gate_adsrs_at(
-  compiled : CompiledDsp,
+  compiled : Dsp,
   authoring_indices : FixedArray[Int],
   gate_on : Bool,
 ) -> Unit {
@@ -243,7 +243,8 @@ fn VoicePool::resolve_slot(
 pub struct VoicePool {
   priv slots : FixedArray[VoiceSlot]
   priv mut adsr_authoring_indices : FixedArray[Int]
-  priv mut compiled_template : CompiledTemplate
+  priv mut compiled_template : AnalyzedGraph
+  priv mut prepared_graph : Dsp?
   priv compile_context : DspContext
   priv mut next_allocation_order : Int
   priv mut template_generation : Int
@@ -252,55 +253,40 @@ pub struct VoicePool {
 }
 
 ///|
-fn validate_voice_template(
-  compiled_template : CompiledTemplate,
+fn prepare_voice_template(
+  compiled_template : AnalyzedGraph,
   context : DspContext,
-) -> Result[Unit, VoicePoolError] {
+) -> Result[Dsp, VoicePoolError] {
   if compiled_template.orphan_adsr_count() > 0 {
     return Err(VoicePoolError::OrphanAdsr)
   }
-  // Sanity-compile to catch non-orphan problems (feedback cycle validation
-  // etc.). Result discarded — per-voice slots compile their own on note_on.
-  if CompiledDsp::compile(compiled_template, context) is None {
-    return Err(VoicePoolError::CompileRejected)
+  match Dsp::compile(compiled_template, context) {
+    Some(graph) => Ok(graph)
+    None => Err(VoicePoolError::CompileRejected)
   }
-  Ok(())
 }
 
 ///|
-/// WHY test_compile: validates the template structurally (reachable Output
-/// node, no invalid cycles, valid node indices) before accepting it. This
-/// is a correctness gate so that per-voice note_on compiles can assume the
-/// template is well-formed. The compiled result is discarded.
-/// WHY orphan-ADSR reject: `VoicePool::note_on` calls `gate_on` for every
-/// ADSR index in the template. If an ADSR is authored into the template
-/// but not wired to Output, optimize_graph eliminates it and `gate_on`
-/// would now return `Err(OrphanNode)`. Rejecting at pool-construction
-/// time keeps the per-note `gate_adsrs_at(...)` loop infallible (it can
-/// `.unwrap()`) and surfaces the misconfiguration at the earliest
-/// observable point rather than at every note trigger.
-/// WHY adsr_authoring_indices snapshot: the pool's long-lived snapshot
-/// (used by note_on to gate ADSRs, and refreshed by set_template) stores
-/// only the indices needed for gating — not the full template — so the
-/// caller's CompiledTemplate can be freely discarded after VoicePool::new
-/// returns. optimize_graph does not mutate its input, so neither
-/// CompiledTemplate::analyze nor CompiledDsp::compile disturbs the
-/// caller's array.
+/// Reject orphan envelopes before preparing independent runtime slots.
+/// The first compiled graph becomes slot zero rather than a discarded check.
+/// Each sounding voice retains its ADSR index snapshot across template changes.
 pub fn VoicePool::new(
-  compiled_template : CompiledTemplate,
+  compiled_template : AnalyzedGraph,
   context : DspContext,
   max_voices? : Int = 32,
 ) -> Result[VoicePool, VoicePoolError] {
   if max_voices <= 0 {
     return Err(VoicePoolError::InvalidMaxVoices)
   }
-  match validate_voice_template(compiled_template, context) {
+  match prepare_voice_template(compiled_template, context) {
     Err(error) => Err(error)
-    Ok(_) => {
+    Ok(first_graph) => {
       let block_size = context.block_size()
       let slots = FixedArray::makei(max_voices, _ => VoiceSlot::new(block_size))
-      for i in 0..<max_voices {
-        match CompiledDsp::compile(compiled_template, context) {
+      slots[0].compiled = Some(first_graph)
+      slots[0].template_generation = 0
+      for i in 1..<max_voices {
+        match Dsp::compile(compiled_template, context) {
           Some(compiled) => {
             slots[i].compiled = Some(compiled)
             slots[i].template_generation = 0
@@ -312,6 +298,7 @@ pub fn VoicePool::new(
         slots,
         adsr_authoring_indices: compiled_template.adsr_authoring_indices(),
         compiled_template,
+        prepared_graph: None,
         compile_context: context,
         next_allocation_order: 0,
         template_generation: 0,
@@ -325,16 +312,27 @@ pub fn VoicePool::new(
 ///|
 pub fn VoicePool::set_template(
   self : VoicePool,
-  compiled_template : CompiledTemplate,
+  compiled_template : AnalyzedGraph,
 ) -> Result[Unit, VoicePoolError] {
-  match validate_voice_template(compiled_template, self.compile_context) {
+  let prepared = match
+    prepare_voice_template(compiled_template, self.compile_context) {
     Err(error) => return Err(error)
-    Ok(_) => ()
+    Ok(graph) => graph
   }
+  self.adopt_template(compiled_template, prepared)
+  Ok(())
+}
+
+///|
+fn VoicePool::adopt_template(
+  self : VoicePool,
+  compiled_template : AnalyzedGraph,
+  prepared : Dsp,
+) -> Unit {
   self.compiled_template = compiled_template
+  self.prepared_graph = Some(prepared)
   self.adsr_authoring_indices = compiled_template.adsr_authoring_indices()
   self.template_generation = self.next_template_generation()
-  Ok(())
 }
 
 ///|
@@ -357,7 +355,7 @@ pub struct BoundVoicePool {
 
 ///|
 pub fn BoundVoicePool::new(
-  compiled_template : CompiledTemplate,
+  compiled_template : AnalyzedGraph,
   context : DspContext,
   bindings : ControlBindingBuilder,
   max_voices? : Int = 32,
@@ -375,21 +373,19 @@ pub fn BoundVoicePool::new(
 ///|
 pub fn BoundVoicePool::set_template(
   self : BoundVoicePool,
-  compiled_template : CompiledTemplate,
+  compiled_template : AnalyzedGraph,
   bindings : ControlBindingBuilder,
 ) -> Result[Unit, BoundVoicePoolError] {
-  match validate_voice_template(compiled_template, self.pool.compile_context) {
+  let prepared = match
+    prepare_voice_template(compiled_template, self.pool.compile_context) {
     Err(error) => return Err(BoundVoicePoolError::from_voice_pool(error))
-    Ok(_) => ()
+    Ok(graph) => graph
   }
   let next_bindings = match bindings.build(compiled_template) {
     Ok(bindings) => bindings
     Err(error) => return Err(BoundVoicePoolError::Binding(error))
   }
-  match self.pool.set_template(compiled_template) {
-    Err(error) => return Err(BoundVoicePoolError::from_voice_pool(error))
-    Ok(_) => ()
-  }
+  self.pool.adopt_template(compiled_template, prepared)
   self.bindings = next_bindings
   Ok(())
 }
@@ -551,13 +547,18 @@ pub fn BoundVoicePool::set_voice_send_result(
 }
 
 ///|
-/// Validate a live control batch against an active voice without mutating it.
-pub fn BoundVoicePool::validate_voice_controls_result(
+/// Apply a batch atomically to all selected live voices, in selection order.
+pub fn BoundVoicePool::apply_voices_controls_result(
   self : BoundVoicePool,
-  handle : VoiceHandle,
+  handles : Array[VoiceHandle],
   controls : Array[GraphControl],
 ) -> Result[Unit, VoiceControlError] {
-  self.pool.validate_voice_controls_result(handle, controls)
+  // Retain handle failures in place: an earlier graph rejection must win over
+  // a later stale handle. No voice is changed until every target is prepared.
+  let targets = handles.map(handle => self.pool.compiled_voice_result(handle))
+  Dsp::apply_controls_to_all(targets, controls, error => {
+    VoiceControlError::Graph(error)
+  })
 }
 
 ///|
@@ -717,7 +718,7 @@ fn VoicePool::activate_slot(
   self : VoicePool,
   slot : VoiceSlot,
   slot_index : Int,
-  compiled : CompiledDsp,
+  compiled : Dsp,
   update_pan : Bool,
   pan : Double,
 ) -> Int64 {
@@ -805,6 +806,7 @@ pub fn VoicePool::note_on(
   // prepared graph because no old voice can be damaged by a rejected note-on.
   let force_fresh = !(slot.state is VoiceState::Idle) && !params.is_empty()
   let mut reused_prepared = false
+  let mut used_template_preparation = false
   let compiled = match slot.compiled {
     Some(existing) if !force_fresh &&
       slot.template_generation == self.template_generation => {
@@ -812,9 +814,16 @@ pub fn VoicePool::note_on(
       existing
     }
     _ =>
-      match CompiledDsp::compile(self.compiled_template, self.compile_context) {
-        Some(c) => c
-        None => return None
+      match self.prepared_graph {
+        Some(prepared) => {
+          used_template_preparation = true
+          prepared
+        }
+        None =>
+          match Dsp::compile(self.compiled_template, self.compile_context) {
+            Some(c) => c
+            None => return None
+          }
       }
   }
   if reused_prepared {
@@ -826,6 +835,9 @@ pub fn VoicePool::note_on(
     if compiled.apply_controls(params) is Err(_) {
       return None
     }
+  }
+  if used_template_preparation {
+    self.prepared_graph = None
   }
   let handle_id = self.activate_slot(slot, slot_index, compiled, false, 0.0)
   Some(
@@ -1009,7 +1021,7 @@ pub fn VoicePool::set_voice_send_result(
 fn VoicePool::compiled_voice_result(
   self : VoicePool,
   handle : VoiceHandle,
-) -> Result[CompiledDsp, VoiceControlError] {
+) -> Result[Dsp, VoiceControlError] {
   match self.resolve_slot(handle) {
     None => Err(VoiceControlError::InvalidVoiceHandle(handle))
     Some(slot) =>
@@ -1021,22 +1033,6 @@ fn VoicePool::compiled_voice_result(
           None => Err(VoiceControlError::InvalidVoiceHandle(handle))
         }
       }
-  }
-}
-
-///|
-fn VoicePool::validate_voice_controls_result(
-  self : VoicePool,
-  handle : VoiceHandle,
-  controls : Array[GraphControl],
-) -> Result[Unit, VoiceControlError] {
-  let compiled = match self.compiled_voice_result(handle) {
-    Ok(compiled) => compiled
-    Err(error) => return Err(error)
-  }
-  match compiled.validate_controls(controls) {
-    Ok(_) => Ok(())
-    Err(error) => Err(VoiceControlError::Graph(error))
   }
 }
 

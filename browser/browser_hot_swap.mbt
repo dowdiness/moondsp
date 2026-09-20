@@ -1,10 +1,10 @@
 ///|
-let compiled_hot_swap : GraphSlot[@moondsp.CompiledDspHotSwap, MonoOut] = GraphSlot::new(
+let compiled_hot_swap : GraphSlot[@moondsp.DspHotSwap, MonoOut] = GraphSlot::new(
   output=MonoOut::new(),
   compile=fn(ctx) {
     match
-      @moondsp.CompiledDsp::compile(
-        @moondsp.CompiledTemplate::analyze([
+      @moondsp.Dsp::compile(
+        @moondsp.AnalyzedGraph::analyze([
           @moondsp.DspNode::constant(BROWSER_HOT_SWAP_OLD_CONSTANT),
           @moondsp.DspNode::output(0),
         ]),
@@ -12,7 +12,7 @@ let compiled_hot_swap : GraphSlot[@moondsp.CompiledDspHotSwap, MonoOut] = GraphS
       ) {
       Some(active) =>
         Some(
-          @moondsp.CompiledDspHotSwap::from_graph(
+          @moondsp.DspHotSwap::from_graph(
             active,
             crossfade_samples=BROWSER_HOT_SWAP_CROSSFADE_SAMPLES,
           ),
@@ -23,7 +23,7 @@ let compiled_hot_swap : GraphSlot[@moondsp.CompiledDspHotSwap, MonoOut] = GraphS
 )
 
 ///|
-/// Initialize the browser proof graph that runs through `CompiledDspHotSwap`.
+/// Initialize the browser proof graph that runs through `DspHotSwap`.
 pub fn init_compiled_hot_swap_graph(
   sample_rate : Double,
   block_size : Int,
@@ -48,8 +48,8 @@ pub fn queue_compiled_hot_swap() -> Bool {
     None => return set_browser_not_initialized("compiled_hot_swap.queue")
   }
   let replacement = match
-    @moondsp.CompiledDsp::compile(
-      @moondsp.CompiledTemplate::analyze([
+    @moondsp.Dsp::compile(
+      @moondsp.AnalyzedGraph::analyze([
         @moondsp.DspNode::constant(BROWSER_HOT_SWAP_NEW_CONSTANT),
         @moondsp.DspNode::output(0),
       ]),
@@ -69,7 +69,7 @@ pub fn queue_compiled_hot_swap() -> Bool {
 }
 
 ///|
-/// Run one render quantum through the browser proof `CompiledDspHotSwap` graph.
+/// Run one render quantum through the browser proof `DspHotSwap` graph.
 pub fn process_compiled_hot_swap_block(
   sample_rate : Double,
   block_size : Int,

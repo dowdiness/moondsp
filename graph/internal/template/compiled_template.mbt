@@ -4,12 +4,12 @@
 /// questions ("is this node live?", "how many ADSRs were eliminated?")
 /// without allocating runtime buffers or per-voice state.
 ///
-/// WHY a separate artifact from CompiledDsp: CompiledDsp conflates topology
+/// WHY a separate artifact from Dsp: Dsp conflates topology
 /// with runtime state. Binding validation and pool-level orphan gates only
 /// need topology — making that a lightweight standalone type avoids
 /// paying for buffers we never use, and keeps the API mono/stereo-agnostic
-/// (the same CompiledTemplate shape applies to any graph variant).
-pub struct CompiledTemplate {
+/// (the same AnalyzedGraph shape applies to any graph variant).
+pub struct AnalyzedGraph {
   priv template : Array[@model.DspNode]
   priv optimized : Array[@model.DspNode]
   priv index_map : FixedArray[Int]
@@ -49,7 +49,7 @@ fn int_fixed_array_equal(
 
 ///|
 /// Structural equality for analyzed template artifacts.
-pub impl Eq for CompiledTemplate with fn equal(self, other) {
+pub impl Eq for AnalyzedGraph with fn equal(self, other) {
   dsp_node_array_equal(self.template, other.template) &&
   dsp_node_array_equal(self.optimized, other.optimized) &&
   int_fixed_array_equal(self.index_map, other.index_map)
@@ -68,9 +68,9 @@ pub impl Eq for CompiledTemplate with fn equal(self, other) {
 /// sample rate and block size do not affect which nodes survive
 /// dead-code elimination. Omitting the context makes analyze infallible
 /// and cheap.
-pub fn CompiledTemplate::analyze(
+pub fn AnalyzedGraph::analyze(
   template : Array[@model.DspNode],
-) -> CompiledTemplate {
+) -> AnalyzedGraph {
   let snapshot = template.map(node => @model.clone_node(node))
   let (optimized, index_map) = optimize_graph(snapshot)
   { template: snapshot, optimized, index_map, }
@@ -78,15 +78,15 @@ pub fn CompiledTemplate::analyze(
 
 ///|
 /// Length of the authoring template snapshot.
-pub fn CompiledTemplate::length(self : CompiledTemplate) -> Int {
+pub fn AnalyzedGraph::length(self : AnalyzedGraph) -> Int {
   self.template.length()
 }
 
 ///|
 /// Return the authoring node at `index` (panics if out of range; callers
 /// are expected to bounds-check first).
-pub fn CompiledTemplate::node_at(
-  self : CompiledTemplate,
+pub fn AnalyzedGraph::node_at(
+  self : AnalyzedGraph,
   index : Int,
 ) -> @model.DspNode {
   self.template[index]
@@ -94,43 +94,40 @@ pub fn CompiledTemplate::node_at(
 
 ///|
 /// Return the authoring template snapshot.
-pub fn CompiledTemplate::authoring_nodes(
-  self : CompiledTemplate,
+pub fn AnalyzedGraph::authoring_nodes(
+  self : AnalyzedGraph,
 ) -> Array[@model.DspNode] {
   self.template
 }
 
 ///|
 /// Return the optimized template snapshot.
-pub fn CompiledTemplate::optimized_nodes(
-  self : CompiledTemplate,
+pub fn AnalyzedGraph::optimized_nodes(
+  self : AnalyzedGraph,
 ) -> Array[@model.DspNode] {
   self.optimized
 }
 
 ///|
 /// Return the authoring-to-optimized index map.
-pub fn CompiledTemplate::index_map(self : CompiledTemplate) -> FixedArray[Int] {
+pub fn AnalyzedGraph::index_map(self : AnalyzedGraph) -> FixedArray[Int] {
   self.index_map
 }
 
 ///|
 /// Does authoring index `i` survive the optimizer? Returns false for
 /// out-of-range indices (no abort).
-pub fn CompiledTemplate::is_node_live(
-  self : CompiledTemplate,
-  index : Int,
-) -> Bool {
+pub fn AnalyzedGraph::is_node_live(self : AnalyzedGraph, index : Int) -> Bool {
   index >= 0 && index < self.index_map.length() && self.index_map[index] >= 0
 }
 
 ///|
 /// Authoring indices of ADSR nodes that survived optimize_graph,
 /// in authoring order. Used by voice/ to gate the surviving ADSRs
-/// on note_on / note_off — they call CompiledDsp::gate_on/gate_off
+/// on note_on / note_off — they call Dsp::gate_on/gate_off
 /// which take authoring indices and remap through index_map internally.
 ///
-/// WHY authoring indices, not runtime: CompiledDsp::gate_on/gate_off
+/// WHY authoring indices, not runtime: Dsp::gate_on/gate_off
 /// expect the original authoring index; returning runtime indices
 /// would cause voice/ to double-map and target wrong nodes.
 ///
@@ -138,8 +135,8 @@ pub fn CompiledTemplate::is_node_live(
 /// keeps the accessor surface minimal (principle 7). Specific
 /// validation patterns get their own public method; generic
 /// introspection waits for a concrete consumer.
-pub fn CompiledTemplate::adsr_authoring_indices(
-  self : CompiledTemplate,
+pub fn AnalyzedGraph::adsr_authoring_indices(
+  self : AnalyzedGraph,
 ) -> FixedArray[Int] {
   let result = FixedArray::make(self.template.length(), -1)
   let n = for i in 0..<self.template.length(); count = 0 {

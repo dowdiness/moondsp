@@ -18,24 +18,24 @@ An editor or external graph DSL owns the authoring model:
 
 MoonDsp owns runtime artifacts and validation at the graph boundary:
 
-- `CompiledTemplate::analyze(Array[DspNode])` as the single crossing from an
+- `AnalyzedGraph::analyze(Array[DspNode])` as the single crossing from an
   authoring graph snapshot to a template artifact;
 - `ControlBindingBuilder::build(template)` validation against that template;
-- `CompiledDsp::compile_result` / `CompiledStereoDsp::compile_result`
+- `Dsp::compile_result` / `StereoDsp::compile_result`
   diagnostics for MoonDsp graph rejection;
 - `GraphControl` / `ControlBindingMap` runtime-control validation;
-- `CompiledDspHotSwap`, `CompiledStereoDspHotSwap`, topology controllers, and
+- `DspHotSwap`, `StereoDspHotSwap`, topology controllers, and
   `BoundVoicePool::set_template` block-boundary staging.
 
-Parser work, projection, semantic lowering, `CompiledTemplate::analyze`,
+Parser work, projection, semantic lowering, `AnalyzedGraph::analyze`,
 binding validation, compile, hot-swap setup, and voice-pool template replacement
 are editor/control-thread work. The audio callback only processes already
 compiled runtimes and applies already prepared block-boundary controls or swaps.
 
 A `Ready` or last-good preview bundle should contain the authoring revision,
-source maps, the `Array[DspNode]` snapshot, the `CompiledTemplate`, bindings
+source maps, the `Array[DspNode]` snapshot, the `AnalyzedGraph`, bindings
 proven against that template, and the compiled runtime or owning wrapper
-(`CompiledDspHotSwap`, stereo hot-swap, topology controller, or
+(`DspHotSwap`, stereo hot-swap, topology controller, or
 `BoundVoicePool`). The editor owns the metadata and source maps; MoonDsp runtime
 objects own their compiled graph state. Replace the bundle only after every
 piece for the candidate revision validates.
@@ -103,10 +103,10 @@ Topology replacement flow:
 ```text
 normalized authoring graph revision
   -> Array[DspNode]
-  -> CompiledTemplate::analyze
+  -> AnalyzedGraph::analyze
   -> rebuild ControlBindingBuilder from stable declarations
   -> ControlBindingBuilder::build(template)
-  -> CompiledDsp::compile_result / CompiledStereoDsp::compile_result
+  -> Dsp::compile_result / StereoDsp::compile_result
   -> queue hot-swap, queue topology controller edit, or BoundVoicePool::set_template
   -> publish at the next block boundary
 ```
@@ -177,7 +177,7 @@ Use those maps as follows:
   candidate snapshot through `compile_result` for source-mappable details when
   the UI needs a precise diagnostic.
 
-`CompiledTemplate::analyze` itself is infallible and does not validate source
+`AnalyzedGraph::analyze` itself is infallible and does not validate source
 language semantics or numeric parameter domains. Diagnostics shown in the
 `Analyzing` state therefore come from the editor's own analysis/lowering,
 control-binding validation, compile diagnostics, runtime-control validation, or
@@ -203,8 +203,8 @@ A typical external UI edit should follow this shape:
    the control batch at a block boundary without rebuilding the graph.
 
 The checked fixture in `editor_preview_handoff_test.mbt` exercises this pattern:
-it builds a stable-ID `GraphTemplateDoc`, stages an append-only topology
-replacement through `CompiledDspHotSwap::queue_swap`, applies a stable-ID
+it builds a stable-ID `GraphDocument`, stages an append-only topology
+replacement through `DspHotSwap::queue_swap`, applies a stable-ID
 parameter update while the replacement is pending, and verifies that a failed
 candidate maps its compile diagnostic back to the authoring node ID while the
 last-good runtime remains usable.

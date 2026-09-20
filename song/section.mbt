@@ -773,3 +773,27 @@ pub fn[A] Section::apply_patch(
     body,
   }
 }
+
+///|
+pub extend SectionBuildError with Debug::{to_repr}
+
+///|
+pub extend SectionBuildError with Eq::{not_equal, equal}
+
+///|
+pub extend SectionPatchError with Debug::{to_repr}
+
+///|
+pub extend SectionPatchError with Eq::{not_equal, equal}
+
+///|
+pub extend SectionDocBuildError with Debug::{to_repr}
+
+///|
+pub extend SectionDocBuildError with Eq::{not_equal, equal}
+
+///|
+pub extend SectionDocEditError with Debug::{to_repr}
+
+///|
+pub extend SectionDocEditError with Eq::{not_equal, equal}

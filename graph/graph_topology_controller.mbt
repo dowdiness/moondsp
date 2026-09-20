@@ -140,26 +140,26 @@ fn graph_topology_edits_to_staging(
 /// replacement through the internal hot-swap graph.
 ///
 /// Public facade wrapper; implementation lives in `graph/internal/staging`.
-struct CompiledDspTopologyController(@staging.CompiledDspTopologyController)
+struct DspTopologyController(@staging.DspTopologyController)
 
 ///|
 /// Build a topology-edit wrapper from authoring-order mono nodes.
-pub fn CompiledDspTopologyController::from_nodes(
+pub fn DspTopologyController::from_nodes(
   nodes : Array[DspNode],
   context : DspContext,
   crossfade_samples? : Int = 0,
-) -> CompiledDspTopologyController? {
-  @staging.CompiledDspTopologyController::from_nodes(
+) -> DspTopologyController? {
+  @staging.DspTopologyController::from_nodes(
     dsp_nodes_to_model(nodes),
     context,
     crossfade_samples~,
-  ).map(fn(raw) { CompiledDspTopologyController(raw) })
+  ).map(fn(raw) { DspTopologyController(raw) })
 }
 
 ///|
 /// Queue one topology edit for the next hot-swap recompilation.
-pub fn CompiledDspTopologyController::queue_topology_edit(
-  self : CompiledDspTopologyController,
+pub fn DspTopologyController::queue_topology_edit(
+  self : DspTopologyController,
   edit : GraphTopologyEdit,
 ) -> Result[Unit, GraphTopologyQueueError] {
   graph_topology_queue_result_from_staging(
@@ -172,8 +172,8 @@ pub fn CompiledDspTopologyController::queue_topology_edit(
 ///
 /// The batch is transactional: invalid node indices or a recompilation failure
 /// reject the whole edit set and leave the current graph unchanged.
-pub fn CompiledDspTopologyController::queue_topology_edits(
-  self : CompiledDspTopologyController,
+pub fn DspTopologyController::queue_topology_edits(
+  self : DspTopologyController,
   edits : Array[GraphTopologyEdit],
 ) -> Result[Unit, GraphTopologyQueueError] {
   graph_topology_queue_result_from_staging(
@@ -183,8 +183,8 @@ pub fn CompiledDspTopologyController::queue_topology_edits(
 
 ///|
 /// Process one block through the active or crossfading mono graph.
-pub fn CompiledDspTopologyController::process(
-  self : CompiledDspTopologyController,
+pub fn DspTopologyController::process(
+  self : DspTopologyController,
   context : DspContext,
   output : AudioBuffer,
 ) -> Unit {
@@ -196,28 +196,26 @@ pub fn CompiledDspTopologyController::process(
 /// stages the replacement through the internal hot-swap graph.
 ///
 /// Public facade wrapper; implementation lives in `graph/internal/staging`.
-struct CompiledStereoDspTopologyController(
-  @staging.CompiledStereoDspTopologyController
-)
+struct StereoDspTopologyController(@staging.StereoDspTopologyController)
 
 ///|
 /// Build a topology-edit wrapper from authoring-order terminal-stereo nodes.
-pub fn CompiledStereoDspTopologyController::from_nodes(
+pub fn StereoDspTopologyController::from_nodes(
   nodes : Array[DspNode],
   context : DspContext,
   crossfade_samples? : Int = 0,
-) -> CompiledStereoDspTopologyController? {
-  @staging.CompiledStereoDspTopologyController::from_nodes(
+) -> StereoDspTopologyController? {
+  @staging.StereoDspTopologyController::from_nodes(
     dsp_nodes_to_model(nodes),
     context,
     crossfade_samples~,
-  ).map(fn(raw) { CompiledStereoDspTopologyController(raw) })
+  ).map(fn(raw) { StereoDspTopologyController(raw) })
 }
 
 ///|
 /// Queue one topology edit for the next stereo hot-swap recompilation.
-pub fn CompiledStereoDspTopologyController::queue_topology_edit(
-  self : CompiledStereoDspTopologyController,
+pub fn StereoDspTopologyController::queue_topology_edit(
+  self : StereoDspTopologyController,
   edit : GraphTopologyEdit,
 ) -> Result[Unit, GraphTopologyQueueError] {
   graph_topology_queue_result_from_staging(
@@ -230,8 +228,8 @@ pub fn CompiledStereoDspTopologyController::queue_topology_edit(
 ///
 /// The batch is transactional: invalid node indices or a recompilation failure
 /// reject the whole edit set and leave the current graph unchanged.
-pub fn CompiledStereoDspTopologyController::queue_topology_edits(
-  self : CompiledStereoDspTopologyController,
+pub fn StereoDspTopologyController::queue_topology_edits(
+  self : StereoDspTopologyController,
   edits : Array[GraphTopologyEdit],
 ) -> Result[Unit, GraphTopologyQueueError] {
   graph_topology_queue_result_from_staging(
@@ -241,8 +239,8 @@ pub fn CompiledStereoDspTopologyController::queue_topology_edits(
 
 ///|
 /// Process one block through the active or crossfading stereo graph.
-pub fn CompiledStereoDspTopologyController::process(
-  self : CompiledStereoDspTopologyController,
+pub fn StereoDspTopologyController::process(
+  self : StereoDspTopologyController,
   context : DspContext,
   left_output : AudioBuffer,
   right_output : AudioBuffer,

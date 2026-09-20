@@ -341,3 +341,6 @@ fn[A] every_known(
     ),
   )
 }
+
+///|
+pub extend Pat with Add::{add}

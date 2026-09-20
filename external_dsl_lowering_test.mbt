@@ -40,9 +40,9 @@ fn unresolved_external_reference_fixture() -> Result[
 test "external DSL lowering contract: generated graph compiles with bindings" {
   let context = DspContext::new(sample_rate=48000.0, block_size=16)
   let fixture = valid_external_lowering_fixture()
-  let template = CompiledTemplate::analyze(fixture.nodes)
+  let template = AnalyzedGraph::analyze(fixture.nodes)
   let bindings = fixture.bindings.build(template).unwrap()
-  let compiled = CompiledDsp::compile_result(template, context).unwrap()
+  let compiled = Dsp::compile_result(template, context).unwrap()
   let controls : Map[String, Double] = { "freq": 660.0, "gain": 0.25 }
   let resolved = bindings.resolve_controls(controls)
   @debug.assert_eq(resolved.length(), 2)
@@ -64,15 +64,15 @@ test "external DSL lowering contract: unresolved references reject before analyz
 ///|
 test "external DSL lowering contract: compile errors preserve last good runtime" {
   let context = DspContext::new(sample_rate=48000.0, block_size=16)
-  let last_good = CompiledDsp::compile_result(
-    CompiledTemplate::analyze([DspNode::constant(0.25), DspNode::output(0)]),
+  let last_good = Dsp::compile_result(
+    AnalyzedGraph::analyze([DspNode::constant(0.25), DspNode::output(0)]),
     context,
   ).unwrap()
-  let current_template = CompiledTemplate::analyze([
+  let current_template = AnalyzedGraph::analyze([
     DspNode::gain(99, 0.5),
     DspNode::output(0),
   ])
-  match CompiledDsp::compile_result(current_template, context) {
+  match Dsp::compile_result(current_template, context) {
     Err(GraphCompileError::InvalidInput(index, kind, slot, input)) => {
       @debug.assert_eq(index, 0)
       @debug.assert_eq(kind, DspNodeKind::Gain)

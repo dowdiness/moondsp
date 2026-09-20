@@ -1,26 +1,61 @@
 ///|
-priv struct GraphTopologyEditFailure {
+pub(all) struct GraphTopologyEditFailure {
   edit_index : Int
   reason : GraphTopologyEditError
 }
 
 ///|
-fn apply_topology_edits_result(
+pub fn apply_topology_edits(
   nodes : Array[DspNode],
   edits : Array[GraphTopologyEdit],
-) -> Result[Unit, GraphTopologyEditFailure] {
+) -> Result[GraphEditResult, GraphTopologyEditFailure] {
+  let working = nodes.map(@model.clone_node)
+  let correspondence : Array[Int] = [ for index in 0..<nodes.length() => index ]
   for index = 0; index < edits.length(); index = index + 1 {
     let edit = edits[index]
-    match apply_topology_edit_result(nodes, edit) {
-      Ok(_) => ()
+    match apply_topology_edit_mutating(working, edit) {
+      Ok(_) =>
+        match edit {
+          InsertNode(_, _, _) => correspondence.push(-1)
+          InsertChain(_, _, chain_nodes) =>
+            for _ in chain_nodes {
+              correspondence.push(-1)
+            }
+          DeleteNode(delete_index, _, _, _) =>
+            ignore(correspondence.remove(delete_index))
+          DeleteChain(start_index, end_index, _, _, _) =>
+            for _ in start_index..<=end_index {
+              ignore(correspondence.remove(start_index))
+            }
+          _ => ()
+        }
       Err(reason) => return Err({ edit_index: index, reason, })
     }
   }
-  Ok(())
+  let old_to_new = FixedArray::make(nodes.length(), -1)
+  for new_index in 0..<correspondence.length() {
+    let original_index = correspondence[new_index]
+    if original_index >= 0 {
+      old_to_new[original_index] = new_index
+    }
+  }
+  Ok({ final_nodes: working, correspondence: old_to_new, })
 }
 
 ///|
 pub fn apply_topology_edit_result(
+  nodes : Array[DspNode],
+  edit : GraphTopologyEdit,
+) -> Result[GraphEditResult, GraphTopologyEditError] {
+  let result = apply_topology_edits(nodes, [edit])
+  match result {
+    Ok(result) => Ok(result)
+    Err(failure) => Err(failure.reason)
+  }
+}
+
+///|
+fn apply_topology_edit_mutating(
   nodes : Array[DspNode],
   edit : GraphTopologyEdit,
 ) -> Result[Unit, GraphTopologyEditError] {
@@ -29,7 +64,7 @@ pub fn apply_topology_edit_result(
       if node_index < 0 || node_index >= nodes.length() {
         Err(GraphTopologyEditError::InvalidNodeIndex(node_index))
       } else {
-        nodes[node_index] = replacement
+        nodes[node_index] = @model.clone_node(replacement)
         Ok(())
       }
     RewireInput(node_index, input_slot, source_index) =>
@@ -501,52 +536,23 @@ fn topology_node_input(
 ///|
 fn topology_inserted_node(template : DspNode, input_source : Int) -> DspNode? {
   match template.kind() {
-    DspNodeKind::Gain => Some(DspNode::gain(input_source, template.value0()))
-    DspNodeKind::Clip => Some(DspNode::clip(input_source, template.value0()))
-    DspNodeKind::Pan => Some(DspNode::pan(input_source, template.value0()))
-    DspNodeKind::StereoGain =>
-      Some(DspNode::stereo_gain(input=input_source, amount=template.value0()))
-    DspNodeKind::StereoClip =>
+    DspNodeKind::Gain
+    | DspNodeKind::Clip
+    | DspNodeKind::Pan
+    | DspNodeKind::StereoGain
+    | DspNodeKind::StereoClip
+    | DspNodeKind::StereoMixDown
+    | DspNodeKind::Output
+    | DspNodeKind::StereoOutput
+    | DspNodeKind::Biquad
+    | DspNodeKind::Delay
+    | DspNodeKind::StereoBiquad
+    | DspNodeKind::StereoDelay =>
       Some(
-        DspNode::stereo_clip(input=input_source, threshold=template.value0()),
-      )
-    DspNodeKind::StereoMixDown => Some(DspNode::stereo_mixdown(input_source))
-    DspNodeKind::Output => Some(DspNode::output(input_source))
-    DspNodeKind::StereoOutput => Some(DspNode::stereo_output(input_source))
-    DspNodeKind::Biquad =>
-      Some(
-        DspNode::biquad(
-          input=input_source,
-          mode=template.filter_mode(),
-          cutoff_hz=template.value0(),
-          q=template.value1(),
-        ),
-      )
-    DspNodeKind::Delay =>
-      Some(
-        DspNode::delay(
-          input=input_source,
-          max_delay_samples=template.delay_max_samples(),
-          delay_samples=template.delay_samples(),
-          feedback=template.value0(),
-        ),
-      )
-    DspNodeKind::StereoBiquad =>
-      Some(
-        DspNode::stereo_biquad(
-          input=input_source,
-          mode=template.filter_mode(),
-          cutoff_hz=template.value0(),
-          q=template.value1(),
-        ),
-      )
-    DspNodeKind::StereoDelay =>
-      Some(
-        DspNode::stereo_delay(
-          input=input_source,
-          max_delay_samples=template.delay_max_samples(),
-          delay_samples=template.delay_samples(),
-          feedback=template.value0(),
+        @model.node_with_inputs(
+          template,
+          input0=input_source,
+          input1=template.input1(),
         ),
       )
     _ => None
@@ -561,72 +567,17 @@ fn apply_topology_rewire_input_result(
   source_index : Int,
 ) -> Result[Unit, GraphTopologyEditError] {
   let node = nodes[node_index]
-  let rewired = match (node.kind(), input_slot) {
-    (DspNodeKind::Gain, GraphTopologyInputSlot::Input0) =>
-      Some(DspNode::gain(source_index, node.value0()))
-    (DspNodeKind::Mul, GraphTopologyInputSlot::Input0) =>
-      Some(DspNode::mul(source_index, node.input1()))
-    (DspNodeKind::Mul, GraphTopologyInputSlot::Input1) =>
-      Some(DspNode::mul(node.input0(), source_index))
-    (DspNodeKind::Mix, GraphTopologyInputSlot::Input0) =>
-      Some(DspNode::mix(source_index, node.input1()))
-    (DspNodeKind::Mix, GraphTopologyInputSlot::Input1) =>
-      Some(DspNode::mix(node.input0(), source_index))
-    (DspNodeKind::Clip, GraphTopologyInputSlot::Input0) =>
-      Some(DspNode::clip(source_index, node.value0()))
-    (DspNodeKind::Output, GraphTopologyInputSlot::Input0) =>
-      Some(DspNode::output(source_index))
-    (DspNodeKind::Pan, GraphTopologyInputSlot::Input0) =>
-      Some(DspNode::pan(source_index, node.value0()))
-    (DspNodeKind::StereoGain, GraphTopologyInputSlot::Input0) =>
-      Some(DspNode::stereo_gain(input=source_index, amount=node.value0()))
-    (DspNodeKind::StereoClip, GraphTopologyInputSlot::Input0) =>
-      Some(DspNode::stereo_clip(input=source_index, threshold=node.value0()))
-    (DspNodeKind::StereoMixDown, GraphTopologyInputSlot::Input0) =>
-      Some(DspNode::stereo_mixdown(source_index))
-    (DspNodeKind::StereoOutput, GraphTopologyInputSlot::Input0) =>
-      Some(DspNode::stereo_output(source_index))
-    (DspNodeKind::Biquad, GraphTopologyInputSlot::Input0) =>
-      Some(
-        DspNode::biquad(
-          input=source_index,
-          mode=node.filter_mode(),
-          cutoff_hz=node.value0(),
-          q=node.value1(),
-        ),
-      )
-    (DspNodeKind::Delay, GraphTopologyInputSlot::Input0) =>
-      Some(
-        DspNode::delay(
-          input=source_index,
-          max_delay_samples=node.delay_max_samples(),
-          delay_samples=node.delay_samples(),
-          feedback=node.value0(),
-        ),
-      )
-    (DspNodeKind::StereoBiquad, GraphTopologyInputSlot::Input0) =>
-      Some(
-        DspNode::stereo_biquad(
-          input=source_index,
-          mode=node.filter_mode(),
-          cutoff_hz=node.value0(),
-          q=node.value1(),
-        ),
-      )
-    (DspNodeKind::StereoDelay, GraphTopologyInputSlot::Input0) =>
-      Some(
-        DspNode::stereo_delay(
-          input=source_index,
-          max_delay_samples=node.delay_max_samples(),
-          delay_samples=node.delay_samples(),
-          feedback=node.value0(),
-        ),
-      )
-    _ => None
-  }
-  match rewired {
-    Some(rewired) => {
-      nodes[node_index] = rewired
+  match topology_node_input(node, input_slot) {
+    Some(_) => {
+      let input0 = match input_slot {
+        GraphTopologyInputSlot::Input0 => source_index
+        GraphTopologyInputSlot::Input1 => node.input0()
+      }
+      let input1 = match input_slot {
+        GraphTopologyInputSlot::Input0 => node.input1()
+        GraphTopologyInputSlot::Input1 => source_index
+      }
+      nodes[node_index] = @model.node_with_inputs(node, input0~, input1~)
       Ok(())
     }
     None =>

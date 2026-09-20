@@ -160,39 +160,13 @@ pub fn ActiveNotes::remove_matching(
 }
 
 ///|
-pub fn[E] ActiveNotes::try_each_matching(
+pub fn ActiveNotes::matching_handles(
   self : ActiveNotes,
   matches : (@model.VoiceOrigin) -> Bool,
-  f : (@voice.VoiceHandle) -> Result[Unit, E],
-) -> Result[Unit, E] {
-  for note in self.notes {
-    if matches(note.origin()) {
-      match f(note.handle()) {
-        Ok(_) => ()
-        Err(error) => return Err(error)
-      }
-    }
-  }
-  Ok(())
-}
-
-///|
-pub fn[E] ActiveNotes::try_count_matching(
-  self : ActiveNotes,
-  matches : (@model.VoiceOrigin) -> Bool,
-  f : (@voice.VoiceHandle) -> Result[Unit, E],
-) -> Result[Int, E] {
-  for note in self.notes; count = 0 {
-    if matches(note.origin()) {
-      match f(note.handle()) {
-        Ok(_) => continue count + 1
-        Err(error) => return Err(error)
-      }
-    }
-    continue count
-  } nobreak {
-    Ok(count)
-  }
+) -> Array[@voice.VoiceHandle] {
+  [
+    for note in self.notes if matches(note.origin()) => note.handle()
+  ]
 }
 
 ///|

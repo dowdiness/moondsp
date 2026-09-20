@@ -2,7 +2,7 @@
 
 This guide defines the public boundary for editors, text DSLs, or graph DSLs
 that generate MoonDsp graphs. It complements ADR-0010 (the
-`CompiledTemplate` runtime boundary), ADR-0014 (authoring equality and typed
+`AnalyzedGraph` runtime boundary), ADR-0014 (authoring equality and typed
 compile diagnostics), the Mini/graph bridge contract in
 `docs/mini-graph-authoring-boundary.md`, and the editor preview handoff in
 `docs/editor-audio-preview-handoff.md`.
@@ -12,12 +12,12 @@ compile diagnostics), the Mini/graph bridge contract in
 ```text
 validated authoring graph
   -> Array[DspNode]
-  -> CompiledTemplate::analyze
-  -> CompiledDsp::compile_result / CompiledStereoDsp::compile_result
+  -> AnalyzedGraph::analyze
+  -> Dsp::compile_result / StereoDsp::compile_result
   -> compile, hot-swap, or voice-pool replacement on the control side
 ```
 
-Parser, projection, semantic lowering, `CompiledTemplate::analyze`, binding
+Parser, projection, semantic lowering, `AnalyzedGraph::analyze`, binding
 validation, and compile are editor/control-thread work. They are not audio-hot
 path work. The audio thread should only process already compiled graphs and
 apply block-boundary controls or swaps.
@@ -39,7 +39,7 @@ those failures as sentinel graph nodes just to hand them to MoonDsp.
 
 ## Required `DspNode` array contract
 
-The array passed to `CompiledTemplate::analyze` is an authoring graph snapshot.
+The array passed to `AnalyzedGraph::analyze` is an authoring graph snapshot.
 It should satisfy these invariants:
 
 - Build nodes through the public `DspNode` constructors.
@@ -47,22 +47,22 @@ It should satisfy these invariants:
   slots that the node kind uses. The array does not have to be topologically
   sorted; MoonDsp sorts the reachable graph during compile.
 - Choose one terminal shape for the compile path: one `Output` for mono
-  `CompiledDsp`, or one `StereoOutput` for terminal-stereo
-  `CompiledStereoDsp`.
+  `Dsp`, or one `StereoOutput` for terminal-stereo
+  `StereoDsp`.
 - Numeric parameters should satisfy the domains in
   `docs/technical-reference.md` (finite frequencies/gains, valid
   filter cutoffs, valid delay lengths and feedback, positive clip thresholds,
   and so on). If they do not, `compile_result` returns a typed
   `GraphCompileError`.
 - Dead authoring nodes may exist in the snapshot. They remain visible to
-  `CompiledTemplate` equality, but optimization can eliminate them. Do not bind
+  `AnalyzedGraph` equality, but optimization can eliminate them. Do not bind
   controls or voice gates to nodes that the analyzed template eliminates.
 - Runtime controls target original authoring indices, not optimized runtime
   indices.
 
-## What `CompiledTemplate::analyze` does
+## What `AnalyzedGraph::analyze` does
 
-`CompiledTemplate::analyze(Array[DspNode])` is the single canonical crossing
+`AnalyzedGraph::analyze(Array[DspNode])` is the single canonical crossing
 from authoring data to the runtime template artifact. It snapshots the input
 array, runs graph optimization/liveness analysis once, and retains the mapping
 from authoring indices to optimized nodes.
@@ -73,8 +73,8 @@ not a source validator and not a numeric-domain validator. Use
 
 ## Compile and last-good behavior
 
-Use `CompiledDsp::compile_result(template, context)` or
-`CompiledStereoDsp::compile_result(template, context)` when an editor or DSL
+Use `Dsp::compile_result(template, context)` or
+`StereoDsp::compile_result(template, context)` when an editor or DSL
 needs diagnostics. The older `compile(...) -> Self?` APIs remain compatibility
 entry points, but they intentionally do not explain rejections.
 
@@ -93,7 +93,7 @@ snapshot:
 3. current authoring index for that node ID;
 4. target `GraphParamSlot`.
 
-After `CompiledTemplate::analyze`, call `ControlBindingBuilder::build` with the
+After `AnalyzedGraph::analyze`, call `ControlBindingBuilder::build` with the
 same analyzed template. The builder checks authoring-index bounds, slot
 compatibility, post-optimization liveness, and duplicate keys. Rebuild the
 `ControlBindingMap` whenever the template changes; a map is proven only against
@@ -111,13 +111,13 @@ let nodes = [
   DspNode::output(1), // id: "out"
 ]
 
-let template = CompiledTemplate::analyze(nodes)
+let template = AnalyzedGraph::analyze(nodes)
 let bindings = ControlBindingBuilder::new()
   .bind(key="freq", node_index=0, slot=GraphParamSlot::Value0)
   .bind(key="gain", node_index=1, slot=GraphParamSlot::Value0)
   .build(template)
 
-match CompiledDsp::compile_result(template, context) {
+match Dsp::compile_result(template, context) {
   Ok(next_runtime) => {
     // Control side: install `next_runtime` directly, queue it into a hot-swap,
     // or pass the template/runtime pair into a voice-pool replacement flow.

@@ -50,7 +50,7 @@ fn bench_pool(
   ctx : @moondsp.DspContext,
 ) -> @moondsp.BoundVoicePool {
   @moondsp.BoundVoicePool::new(
-    @moondsp.CompiledTemplate::analyze(template),
+    @moondsp.AnalyzedGraph::analyze(template),
     ctx,
     bench_binding_builder(),
     max_voices=16,

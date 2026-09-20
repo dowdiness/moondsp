@@ -494,8 +494,8 @@ Executable form (interpreter loop or generated code)
 ```
 
 In the concrete library API, the pipeline is
-`Array[DspNode] → CompiledTemplate::analyze → CompiledTemplate →
-CompiledDsp::compile → CompiledDsp`. `CompiledTemplate` is the single
+`Array[DspNode] → AnalyzedGraph::analyze → AnalyzedGraph →
+Dsp::compile → Dsp`. `AnalyzedGraph` is the single
 runtime exchange type between authoring and compile. See ADR-0010 for
 the boundary contract, `docs/external-dsl-lowering.md` for the external
 DSL lowering contract, `docs/mini-graph-authoring-boundary.md` for Mini
@@ -550,8 +550,8 @@ kabelsalat's approach: detect back-edges during topological sort. For each back-
 ```
 
 Current status note: the implementation now uses a self-register feedback model
-in both compiled mono graphs and terminal-stereo graphs. `CompiledDsp` and
-`CompiledStereoDsp` detect back-edges and resolve them as zero-initialized
+in both compiled mono graphs and terminal-stereo graphs. `Dsp` and
+`StereoDsp` detect back-edges and resolve them as zero-initialized
 implicit `z^-1` reads during runtime using self-registers rather than
 linked-list infrastructure. Stereo and mixed-shape feedback are now accepted.
 Supported shapes include direct self-feedback, multiple simultaneous
@@ -664,11 +664,11 @@ for historical context).
 The current repository already implements:
 
 - a compiled mono graph path: `DspNode` authoring graphs compile into an opaque
-  `CompiledDsp`, including explicit `Mono -> Stereo -> Mono` subgraphs through
+  `Dsp`, including explicit `Mono -> Stereo -> Mono` subgraphs through
   `Pan` and `StereoMixDown`, plus supported mono feedback cycles through
   automatic `z^-1` back-edge insertion
 - a first stereo graph path: the same `DspNode` authoring language can compile
-  into `CompiledStereoDsp` for `Mono -> Pan -> Stereo post-processing ->
+  into `StereoDsp` for `Mono -> Pan -> Stereo post-processing ->
   StereoOutput`, where the current stereo post-processing node set is
   `StereoGain`, `StereoClip`, `StereoBiquad`, and `StereoDelay`, and where the
   feedback uses a self-register model: stereo, mixed-shape, and mono `z^-1`
@@ -676,19 +676,19 @@ The current repository already implements:
   path
 - input nodes may be declared in authoring order; the compiler topologically
   sorts reachable nodes from a single terminal output node
-- `CompiledDsp::compile(CompiledTemplate, DspContext) -> Self?` remains the
-  compatibility compile entry point; `CompiledDsp::compile_result(...)` returns
-  `Result[CompiledDsp, GraphCompileError]` for callers that need a typed
+- `Dsp::compile(AnalyzedGraph, DspContext) -> Self?` remains the
+  compatibility compile entry point; `Dsp::compile_result(...)` returns
+  `Result[Dsp, GraphCompileError]` for callers that need a typed
   rejection reason, with node errors mapped back to original authoring indices
-  when the analyzed template retains that mapping. `CompiledStereoDsp` has the
-  same optional/result pair. `CompiledTemplate::analyze(Array[DspNode])`
+  when the analyzed template retains that mapping. `StereoDsp` has the
+  same optional/result pair. `AnalyzedGraph::analyze(Array[DspNode])`
   produces the input. See ADR-0010 for the boundary contract and ADR-0014 for
   the equality/diagnostic policy.
-- `CompiledTemplate::analyze(...)` captures the authoring template, the
+- `AnalyzedGraph::analyze(...)` captures the authoring template, the
   optimizer's authoring-index map, and the optimized node array; both mono
   and stereo graphs compile from the same analyzed template via
-  `CompiledDsp::compile(...)` / `compile_result(...)` or
-  `CompiledStereoDsp::compile(...)` / `compile_result(...)`, reusing the
+  `Dsp::compile(...)` / `compile_result(...)` or
+  `StereoDsp::compile(...)` / `compile_result(...)`, reusing the
   optimized nodes without running the graph optimizer a second time
 - compile rejects:
   - unsupported feedback cycles
@@ -701,7 +701,7 @@ The current repository already implements:
   - fixed `Delay` / `StereoDelay` feedback outside the live supported range
 - runtime processing fails closed to silence if the caller requests a block size
   larger than the graph was compiled for
-- `CompiledDsp::reset_runtime_state(...)` restores compile-time node
+- `Dsp::reset_runtime_state(...)` restores compile-time node
   parameters, clears compiled buffers, and resets stateful DSP primitives so a
   preallocated mono voice graph can be reused for a fresh voice without
   recompilation
@@ -741,8 +741,9 @@ Current runtime control support:
   consumer code can be written generically over any controllable graph
 - `apply_controls(Array[GraphControl]) -> Result[Unit, GraphControlError]`
   applies control batches transactionally in batch order while targeting nodes
-  by authoring index; the batch is validated against a simulated copy first
-  and rejected as a unit on the first error
+  by authoring index. Preparation checks each intermediate value in preallocated
+  per-node scratch, retaining final parameters and folded envelope gates.
+  Adoption uses bound runtime targets without reinterpreting the raw batch.
 - per-kind convenience methods on every wrapper:
   - `gate_on(node_index)` / `gate_off(node_index)` for `Adsr`
   - `set_param(node_index, slot, value)` for selected numeric params
@@ -775,15 +776,15 @@ Current runtime control support:
   `StereoMixDown`, including stereo-filtered and stereo-delayed paths through
   `StereoBiquad` and `StereoDelay`
 - mono graph coverage now also includes a bounded `z^-1` feedback recurrence in
-  `CompiledDsp`, direct self-feedback acceptance with zero-initialized state,
+  `Dsp`, direct self-feedback acceptance with zero-initialized state,
   a direct multi-back-edge fanout regression, runtime
   gain/delay/biquad/control-batch retunes on accepted loops, and rejection
   coverage for unsupported output/stereo cycles
-- browser automation now also exercises the mono `CompiledDsp` feedback path
+- browser automation now also exercises the mono `Dsp` feedback path
   through the wasm-side stereo-init-failure fallback route, checking both the
   first-block `z^-1` recurrence preview and a live loop-gain retune in the
   AudioWorklet pipeline
-- browser automation now also exercises the `CompiledStereoDsp` feedback path
+- browser automation now also exercises the `StereoDsp` feedback path
   on the main browser wasm, checking the first-block center-pan recurrence of a
   mono `z^-1` loop before `Pan` plus live loop-gain retuning and directional
   pan behavior in the AudioWorklet pipeline
@@ -821,11 +822,11 @@ Current limits:
   is `StereoBiquad` plus `StereoDelay`, with no broader stereo mix/effect set
   yet
 - feedback-edge insertion now uses a self-register model: stereo and
-  mixed-shape feedback are accepted, and both `CompiledDsp` and
-  `CompiledStereoDsp` process feedback through a unified per-sample loop
+  mixed-shape feedback are accepted, and both `Dsp` and
+  `StereoDsp` process feedback through a unified per-sample loop
   with self-registers rather than a separate linked-list infrastructure
 - constant folding and dead-node elimination run exactly once inside
-  `CompiledTemplate::analyze(...)` via `optimize_graph()`; both optional and
+  `AnalyzedGraph::analyze(...)` via `optimize_graph()`; both optional and
   result-typed mono/stereo compile entry points receive the pre-optimized
   template and do not re-run the optimizer
 - constant folding preserves runtime-control identity: an authoring control
@@ -839,7 +840,7 @@ Current limits:
   an exploratory direction, not current behavior. See
   [`control-aware-partial-evaluation.md`](control-aware-partial-evaluation.md)
   for its invariants and evidence gates.
-- `DspNode` and `CompiledTemplate` equality are authoring/artifact equality,
+- `DspNode` and `AnalyzedGraph` equality are authoring/artifact equality,
   not DSP sample equality: `NaN` compares equal to `NaN`, `+0.0` compares equal
   to `-0.0`, and finite values otherwise compare structurally. This keeps
   invalid-but-unchanged authoring templates stable for future incr-backed
@@ -848,8 +849,8 @@ Current limits:
   subgraph operations with stereo parity
 - state preservation across topology edit recompilation is supported
 - graph hot-swap is now narrow but no longer mono-only:
-  `CompiledDspHotSwap` supports mono `CompiledDsp` replacement and
-  `CompiledStereoDspHotSwap` supports terminal-stereo `CompiledStereoDsp`
+  `DspHotSwap` supports mono `Dsp` replacement and
+  `StereoDspHotSwap` supports terminal-stereo `StereoDsp`
   replacement, both with block-boundary `queue_swap(...)` and optional
   equal-power crossfade
 - runtime parameter updates are partial, not universal across node kinds
@@ -884,9 +885,11 @@ Current semantics:
   - if the batch succeeds, all controls are committed before the next
     `process(...)` call
 - `apply_control(...)` remains the single-message form of the same runtime API
-- control preflight checks verify the same runtime control rules without
-  mutating compiled graph state; live orchestration uses this non-mutating check
-  to keep multi-voice edits all-or-nothing
+- standalone control validation does not mutate audible graph state.
+  Multi-voice effects instead use `BoundVoicePool::apply_voices_controls_result`:
+  each selected handle and graph batch is prepared in selection order, then
+  every target is adopted together. An earlier graph error takes precedence
+  over a later stale handle, and any rejection leaves all voices unchanged.
 
 This is enough for the current compiled mono and terminal-stereo graph paths to
 support per-block parameter and gate updates from a host, UI, or future pattern
@@ -914,7 +917,7 @@ Current semantics:
 - `VoicePool` is the low-level polyphonic mono-voice allocator and mixer
   with priority stealing, per-slot template snapshots, and per-voice pan gains
 - `BoundVoicePool` owns both a `VoicePool` and the `ControlBindingMap` proven
-  against that pool's current `CompiledTemplate`
+  against that pool's current `AnalyzedGraph`
 - `BoundVoicePool::new(...)` analyzes the template once, validates voice-pool
   requirements, and builds bindings against the same analyzed template
 - `BoundVoicePool::set_template(...)` is transactional:
@@ -1022,7 +1025,8 @@ Current semantics:
 - `ActiveVoiceEffect` makes active-note mutation explicit: `Release` gates off
   and detaches matching notes, `Kill` stops and detaches them immediately, and
   `Retune(VoiceControlBatch)` applies a statically non-empty control batch.
-  Retune preflights every matching handle before changing any voice.
+  Retune selects matching handles, then asks the bound pool to prepare all
+  target updates before changing any voice.
   `queue_pattern_snapshot_effect_result(...)` and
   `queue_song_snapshot_effect_result(...)` stage replacement only after the
   selected effect succeeds, so invalid controls leave both voices and queued
@@ -1039,7 +1043,7 @@ voice pool after a template swap, and it removes the previous double
 `optimize_graph(...)` pass from the voice-template path. The boundary type
 makes single-optimize a static guarantee, not just a dynamic property —
 `optimize_graph` is package-private and runs exactly once inside
-`CompiledTemplate::analyze`.
+`AnalyzedGraph::analyze`.
 
 ### 3.5.4 Host-independent graph engine
 
@@ -1050,8 +1054,8 @@ It depends on `graph/` and `dsp/`, not on browser APIs or global registries.
 - Construct each engine with a `DspContext` and an optional positive capacity
   (default 16). Sample rate must be finite and positive; block size must be
   positive. Context and capacity failures raise `InvalidConfiguration`.
-- `mount(Array[DspNode])` uses the canonical `CompiledTemplate::analyze` /
-  `CompiledDsp::compile_result` crossing and returns a paused, typed handle.
+- `mount(Array[DspNode])` uses the canonical `AnalyzedGraph::analyze` /
+  `Dsp::compile_result` crossing and returns a paused, typed handle.
   Compilation failure retains the underlying `GraphCompileError` in
   `GraphEngineError::InvalidGraph` and does not consume a slot.
 - `MountedGraph::play` seals mount admission on its owning engine only.
@@ -1090,11 +1094,11 @@ hot-swap:
 Mono hot-swap example:
 
 ```moonbit
-let old_template = CompiledTemplate::analyze(old_nodes)
-let new_template = CompiledTemplate::analyze(new_nodes)
-let active = CompiledDsp::compile(old_template, context).unwrap()
-let replacement = CompiledDsp::compile(new_template, context).unwrap()
-let hot_swap = CompiledDspHotSwap::from_graph(active, crossfade_samples=128)
+let old_template = AnalyzedGraph::analyze(old_nodes)
+let new_template = AnalyzedGraph::analyze(new_nodes)
+let active = Dsp::compile(old_template, context).unwrap()
+let replacement = Dsp::compile(new_template, context).unwrap()
+let hot_swap = DspHotSwap::from_graph(active, crossfade_samples=128)
 
 hot_swap.queue_swap(replacement).unwrap()
 hot_swap.process(context, output)
@@ -1103,11 +1107,11 @@ hot_swap.process(context, output)
 Stereo hot-swap example:
 
 ```moonbit
-let old_template = CompiledTemplate::analyze(old_nodes)
-let new_template = CompiledTemplate::analyze(new_nodes)
-let active_stereo = CompiledStereoDsp::compile(old_template, context).unwrap()
-let replacement_stereo = CompiledStereoDsp::compile(new_template, context).unwrap()
-let hot_swap_stereo = CompiledStereoDspHotSwap::from_graph(
+let old_template = AnalyzedGraph::analyze(old_nodes)
+let new_template = AnalyzedGraph::analyze(new_nodes)
+let active_stereo = StereoDsp::compile(old_template, context).unwrap()
+let replacement_stereo = StereoDsp::compile(new_template, context).unwrap()
+let hot_swap_stereo = StereoDspHotSwap::from_graph(
   active_stereo,
   crossfade_samples=128,
 )
@@ -1117,7 +1121,7 @@ hot_swap_stereo.process(context, left_output, right_output)
 ```
 
 ```moonbit
-let topology = CompiledDspTopologyController::from_nodes(
+let topology = DspTopologyController::from_nodes(
   old_nodes,
   context,
   crossfade_samples=128,
@@ -1138,10 +1142,10 @@ topology.process(context, output)
 
 Current semantics:
 
-- `CompiledDspHotSwap` owns one active mono `CompiledDsp`
-- `CompiledStereoDspHotSwap` owns one active terminal-stereo `CompiledStereoDsp`
-- `CompiledDspTopologyController` owns authoring-order mono nodes plus an inner
-  `CompiledDspHotSwap`
+- `DspHotSwap` owns one active mono `Dsp`
+- `StereoDspHotSwap` owns one active terminal-stereo `StereoDsp`
+- `DspTopologyController` owns authoring-order mono nodes plus an inner
+  `DspHotSwap`
 - `queue_swap(...) -> Result[Unit, HotSwapQueueError]` stages one replacement
   graph for the next `process(...)` call on direct mono/stereo hot-swap
   wrappers; reports `SampleRateMismatch` or `BlockCapacityMismatch` explicitly
@@ -1173,10 +1177,13 @@ Current semantics:
   - `new_gain = sin(t * π/2)`
 - when `crossfade_samples <= 0`, the swap is instantaneous on the next
   `process(...)` call
+- the internal swap state is `Playing` or `Switching`; queueing constructs the
+  completion state before rendering. Fade progress is mutable preallocated state,
+  so completing either a cut or a crossfade does not allocate on the render path
 - runtime `apply_control(...)` / `apply_controls(...)` target the active graph
   when no swap is pending
-- during an in-flight crossfade, runtime controls are validated against both
-  active and pending graphs and applied to both graphs transactionally
+- during an in-flight crossfade, preparation checks the complete active batch,
+  then the complete pending batch; adoption updates both graphs transactionally
   - if either graph rejects the control batch, nothing is applied
   - result-typed wrapper APIs return that rejection as `GraphControlError`
 - topology controllers also mirror accepted runtime `set_param(...)` updates
@@ -1186,8 +1193,8 @@ Current semantics:
 
 Current limits:
 
-- no state migration between old and new graphs; the replacement graph starts
-  from its own freshly compiled internal state
+- direct `queue_swap(...)` does not migrate history; it adopts the supplied
+  replacement graph's existing state
 - in-flight control mirroring requires both graphs to accept the same
   node-index / slot updates during the crossfade window
 - topology edits support both single-node and multi-node operations:
@@ -1202,14 +1209,16 @@ Current limits:
   - `GraphTopologyEdit::delete_chain(...)` removes a contiguous chain of unary
     nodes and retargets the downstream input to a replacement source
   - all edit variants work for both mono and stereo topology controllers
-  - state preservation across topology-edit recompilation is supported:
-    unchanged nodes (matched by authoring index and kind) inherit runtime state
-    (oscillator phase, filter coefficients, delay buffers, self-register values)
-    from the previous compiled graph
+  - non-deleting edit batches copy compatible state by authoring index and kind:
+    oscillator phase, noise RNG, envelope progress, filter history, delay rings,
+    and feedback registers. Old and replacement graphs own independent histories
+  - destination envelope timing, filter configuration, and delay settings survive
+    the copy. Delay history transfers only between equal-capacity buffers.
+    Batches containing deletion retain the fresh-state policy
   - only one topology replacement may be staged at a time
 - browser/AudioWorklet hot-swap proof is now narrow but present for both paths:
-  the `browser/` wrapper exports dedicated mono `CompiledDspHotSwap` and
-  terminal-stereo `CompiledStereoDspHotSwap` proof paths, and Playwright checks
+  the `browser/` wrapper exports dedicated mono `DspHotSwap` and
+  terminal-stereo `StereoDspHotSwap` proof paths, and Playwright checks
   both the mixed crossfade block and the settled replacement block in the
   AudioWorklet pipeline
 - browser queue/control paths route through the result-typed APIs and retain a
@@ -1220,7 +1229,7 @@ Current limits:
   `HotSwapQueueError`, `GraphTopologyQueueError`, or `GraphControlError`
   summary.
 - browser/AudioWorklet topology-edit proof is now present for the mono slice:
-  the `browser/` wrapper exports a dedicated `CompiledDspTopologyController`
+  the `browser/` wrapper exports a dedicated `DspTopologyController`
   proof path, and Playwright checks an `InsertNode` / `DeleteNode` round-trip:
   - `queue_compiled_topology_edit()` explicitly queues the fixed unary insert
   - `queue_compiled_topology_delete_edit()` explicitly queues the matching
@@ -1232,7 +1241,7 @@ Current limits:
     crossfade is already in flight, and Playwright checks that the mixed block
     reflects the mirrored control on both the active and pending rebuilt graphs
   - terminal-stereo parity now exists through a dedicated
-    `CompiledStereoDspTopologyController` browser proof path, with Playwright
+    `StereoDspTopologyController` browser proof path, with Playwright
     checking the mixed and settled channel-shape transition from a queued
     stereo topology edit
   - the stereo browser proof also applies a live runtime level control while

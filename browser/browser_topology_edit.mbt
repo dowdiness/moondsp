@@ -5,23 +5,23 @@ let topo_edit_gain : @ref.Ref[Double] = @ref.new(BROWSER_COMPILED_DEFAULT_GAIN)
 let topo_edit_inserted : @ref.Ref[Bool] = @ref.new(false)
 
 ///|
-let compiled_topology_edit : GraphSlot[
-  @moondsp.CompiledDspTopologyController,
-  MonoOut,
-] = GraphSlot::new(output=MonoOut::new(), compile=fn(ctx) {
-  @moondsp.CompiledDspTopologyController::from_nodes(
-    [
-      @moondsp.DspNode::constant(BROWSER_COMPILED_DEFAULT_GAIN),
-      @moondsp.DspNode::output(0),
-    ],
-    ctx,
-    crossfade_samples=BROWSER_TOPOLOGY_EDIT_CROSSFADE_SAMPLES,
-  )
-})
+let compiled_topology_edit : GraphSlot[@moondsp.DspTopologyController, MonoOut] = GraphSlot::new(
+  output=MonoOut::new(),
+  compile=fn(ctx) {
+    @moondsp.DspTopologyController::from_nodes(
+      [
+        @moondsp.DspNode::constant(BROWSER_COMPILED_DEFAULT_GAIN),
+        @moondsp.DspNode::output(0),
+      ],
+      ctx,
+      crossfade_samples=BROWSER_TOPOLOGY_EDIT_CROSSFADE_SAMPLES,
+    )
+  },
+)
 
 ///|
 /// Initialize the browser proof graph that runs through
-/// `CompiledDspTopologyController`.
+/// `DspTopologyController`.
 pub fn init_compiled_topology_edit_graph(
   sample_rate : Double,
   block_size : Int,
@@ -114,7 +114,7 @@ pub fn set_compiled_topology_edit_gain(gain : Double) -> Bool {
 
 ///|
 /// Run one render quantum through the browser proof
-/// `CompiledDspTopologyController` graph.
+/// `DspTopologyController` graph.
 pub fn process_compiled_topology_edit_block(
   sample_rate : Double,
   block_size : Int,

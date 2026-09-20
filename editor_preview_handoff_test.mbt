@@ -6,8 +6,8 @@ fn editor_preview_gid(value : String) -> GraphNodeId {
 }
 
 ///|
-fn editor_preview_base_doc() -> GraphTemplateDoc {
-  GraphTemplateDoc::from_nodes(
+fn editor_preview_base_doc() -> GraphDocument {
+  GraphDocument::from_nodes(
     ids=[
       editor_preview_gid("osc"),
       editor_preview_gid("gain"),
@@ -27,11 +27,8 @@ fn editor_preview_base_doc() -> GraphTemplateDoc {
 test "editor preview handoff: stages topology replacement and parameter update" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
   let active_doc = editor_preview_base_doc()
-  let active_runtime = CompiledDsp::compile_result(active_doc.analyze(), ctx).unwrap()
-  let preview = CompiledDspHotSwap::from_graph(
-    active_runtime,
-    crossfade_samples=16,
-  )
+  let active_runtime = Dsp::compile_result(active_doc.analyze(), ctx).unwrap()
+  let preview = DspHotSwap::from_graph(active_runtime, crossfade_samples=16)
 
   let replacement_doc = active_doc.insert_node(
     editor_preview_gid("clip"),
@@ -53,9 +50,7 @@ test "editor preview handoff: stages topology replacement and parameter update" 
   }
   @debug.assert_eq(replacement_bindings.length(), 1)
 
-  let replacement_runtime = CompiledDsp::compile_result(
-    replacement_template, ctx,
-  ).unwrap()
+  let replacement_runtime = Dsp::compile_result(replacement_template, ctx).unwrap()
   preview.queue_swap(replacement_runtime).unwrap()
 
   // Parameter-only UI edits target the current authoring index for the stable
@@ -81,16 +76,16 @@ test "editor preview handoff: stages topology replacement and parameter update" 
 ///|
 test "editor preview handoff: failed candidate maps diagnostics to stable ids" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
-  let last_good = CompiledDsp::compile_result(
-    CompiledTemplate::analyze([DspNode::constant(0.25), DspNode::output(0)]),
+  let last_good = Dsp::compile_result(
+    AnalyzedGraph::analyze([DspNode::constant(0.25), DspNode::output(0)]),
     ctx,
   ).unwrap()
-  let candidate = GraphTemplateDoc::from_nodes(
+  let candidate = GraphDocument::from_nodes(
     ids=[editor_preview_gid("gain"), editor_preview_gid("out")],
     nodes=[DspNode::gain(99, 0.5), DspNode::output(0)],
   )
 
-  match CompiledDsp::compile_result(candidate.analyze(), ctx) {
+  match Dsp::compile_result(candidate.analyze(), ctx) {
     Err(GraphCompileError::InvalidInput(index, kind, slot, input)) => {
       @debug.assert_eq(index, 0)
       @debug.assert_eq(kind, DspNodeKind::Gain)

@@ -99,12 +99,7 @@ priv enum CrackleProbeStreamState {
     @moondsp.Oscillator,
     @moondsp.Oscillator
   )
-  StreamCompiled(
-    @moondsp.Waveform,
-    Double,
-    @moondsp.CompiledDsp,
-    @moondsp.Oscillator
-  )
+  StreamCompiled(@moondsp.Waveform, Double, @moondsp.Dsp, @moondsp.Oscillator)
   StreamVoicePool(
     @moondsp.Waveform,
     Double,
@@ -174,10 +169,10 @@ pub fn crackle_probe_reset() -> Unit {
 ///|
 /// Run a Phase-1 crackle probe. Route ids:
 /// 0 = direct tick_waveform loop; 1 = direct process_waveform;
-/// 2 = CompiledDsp oscillator(waveform, freq);
-/// 3 = CompiledDsp oscillator(waveform, placeholder) + Value0 control;
-/// 4 = CompiledDsp oscillator_from(constant(freq), waveform);
-/// 5 = CompiledDsp oscillator_from(controlled constant, waveform);
+/// 2 = Dsp oscillator(waveform, freq);
+/// 3 = Dsp oscillator(waveform, placeholder) + Value0 control;
+/// 4 = Dsp oscillator_from(constant(freq), waveform);
+/// 5 = Dsp oscillator_from(controlled constant, waveform);
 /// 6 = BoundVoicePool note_on_controls({"note": freq}) binding to Value0;
 /// 7 = BoundVoicePool browser-synth-shape clone with selectable waveform.
 /// Waveform ids: 0=Sine, 1=Saw, 2=Square, 3=Triangle.
@@ -499,7 +494,7 @@ pub fn crackle_probe_stream_process() -> Bool {
 ///|
 /// Read one per-block metric. Metric ids:
 /// 0 peak_abs; 1 rms; 2 mean; 3 nan_or_inf_count after buffer writes;
-/// 4 CompiledDsp sanitized_count; 5 max_step_abs within block;
+/// 4 Dsp sanitized_count; 5 max_step_abs within block;
 /// 6 raw block_boundary_step_abs; 7 max_abs_residual_vs_reference;
 /// 8 rms_residual_vs_reference; 9 first_sample; 10 last_sample;
 /// 11 absolute boundary-step difference vs reference; 12 max_step_index;
@@ -858,11 +853,7 @@ fn crackle_probe_stream_compiled_state(
       ]
     _ => return None
   }
-  match
-    @moondsp.CompiledDsp::compile(
-      @moondsp.CompiledTemplate::analyze(nodes),
-      context,
-    ) {
+  match @moondsp.Dsp::compile(@moondsp.AnalyzedGraph::analyze(nodes), context) {
     Some(graph) => {
       if route_id == 3 || route_id == 5 {
         if graph.apply_controls([
@@ -893,7 +884,7 @@ fn crackle_probe_stream_voice_pool_state(
   context : @moondsp.DspContext,
   block_size : Int,
 ) -> CrackleProbeStreamState? {
-  let template = @moondsp.CompiledTemplate::analyze([
+  let template = @moondsp.AnalyzedGraph::analyze([
     @moondsp.DspNode::oscillator(waveform, 0.0),
     @moondsp.DspNode::output(0),
   ])
@@ -939,7 +930,7 @@ fn crackle_probe_stream_browser_synth_shape_state(
   context : @moondsp.DspContext,
   block_size : Int,
 ) -> CrackleProbeStreamState? {
-  let template = @moondsp.CompiledTemplate::analyze([
+  let template = @moondsp.AnalyzedGraph::analyze([
     @moondsp.DspNode::oscillator(waveform, 0.0),
     @moondsp.DspNode::adsr(
       attack_ms=2.0,

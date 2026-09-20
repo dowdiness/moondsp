@@ -24,7 +24,7 @@ const BROWSER_TEST_FEEDBACK_CLIP_THRESHOLD : Double = 1.0
 const BROWSER_TEST_FEEDBACK_MAX_GAIN : Double = 0.95
 
 ///|
-let compiled_graph : @ref.Ref[@moondsp.CompiledDsp?] = @ref.new(None)
+let compiled_graph : @ref.Ref[@moondsp.Dsp?] = @ref.new(None)
 
 ///|
 let compiled_context : @ref.Ref[@moondsp.DspContext?] = @ref.new(None)
@@ -158,11 +158,7 @@ fn ensure_compiled_graph(sample_rate : Double, block_size : Int) -> Bool {
     @moondsp.DspNode::clip(2, BROWSER_TEST_FEEDBACK_CLIP_THRESHOLD),
     @moondsp.DspNode::output(3),
   ]
-  match
-    @moondsp.CompiledDsp::compile(
-      @moondsp.CompiledTemplate::analyze(nodes),
-      context,
-    ) {
+  match @moondsp.Dsp::compile(@moondsp.AnalyzedGraph::analyze(nodes), context) {
     Some(graph) => {
       compiled_graph.val = Some(graph)
       compiled_context.val = Some(context)
@@ -234,11 +230,7 @@ pub fn mul_adsr_peak(sample_rate : Double, block_size : Int) -> Double {
     @moondsp.DspNode::mul(0, 1),
     @moondsp.DspNode::output(2),
   ]
-  match
-    @moondsp.CompiledDsp::compile(
-      @moondsp.CompiledTemplate::analyze(nodes),
-      ctx,
-    ) {
+  match @moondsp.Dsp::compile(@moondsp.AnalyzedGraph::analyze(nodes), ctx) {
     Some(graph) => {
       ignore(graph.gate_on(1))
       let buf = @moondsp.AudioBuffer::filled(block_size)

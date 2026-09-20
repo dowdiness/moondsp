@@ -2,7 +2,7 @@
 fn analyzed_optimized_graph(
   nodes : Array[@model.DspNode],
 ) -> (Array[@model.DspNode], FixedArray[Int]) {
-  let analyzed = CompiledTemplate::analyze(nodes)
+  let analyzed = AnalyzedGraph::analyze(nodes)
   (analyzed.optimized_nodes(), analyzed.index_map())
 }
 
