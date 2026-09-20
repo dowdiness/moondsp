@@ -215,6 +215,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [measurement record](docs/performance/2026-09-20-graph-single-control-allocation.txt).
 - Run MoonBit target-matrix tests and boundary checks for pull requests against
   any base branch, including stacked PRs and PR base changes.
+- Preserve the browser demo's first DSP telemetry across asynchronous startup:
+  initialization silence no longer consumes the first-block report or its
+  warmup counters, so legitimate delay startup samples remain observable.
 - Fixed topology-crossfade state aliasing: old and replacement graphs now own
   independent oscillator, noise, envelope, filter, and delay histories.
   Replacement envelope/delay settings are retained; delay capacity changes
