@@ -1,7 +1,8 @@
 # Playback position UI
 
-Status: origin-preserving compiler and Mini Draft core implemented. Browser
-ownership/wire adapters, playback observations, and visualization remain future work.
+Status: origin-preserving compiler, Mini Draft, browser ownership/wire adapters,
+and version-correlated admission implemented. Playback observations and
+visualization remain future work.
 
 ## Goal
 
@@ -30,7 +31,9 @@ The pattern-origin implementation contracts below were selected on 2026-09-20.
 The shared kernels, exact snapshots, checked source identity types, typed
 document transforms, causal Draft transactions, partial binding recognition,
 frozen playback inputs, and complete-path origin location are implemented.
-This does not mean browser highlighting or worklet transport is implemented.
+The live editor now submits those frozen inputs through strict wire validation;
+the scheduler retains exact origins across material transitions. This does not
+implement playback observations or browser highlighting.
 
 ## Design questions
 
@@ -53,9 +56,10 @@ These contracts implement ADR-0018's pattern-mode requirements. Status reporting
 under #156 still precedes release of highlighting. Song highlighting, seeking,
 new transport semantics, and wholesale parser migration are excluded.
 
-Interface 1's compiler APIs and Interfaces 2–3's MoonBit authoring core are
-available. Scheduler capability adapters and browser/worklet integration remain
-proposed. The authoring cutover removes the old owner and setters without aliases.
+Interface 1's compiler APIs, Interfaces 2–3's MoonBit authoring core, scheduler
+capability adapters, and browser/worklet submission are available. Observation
+transport and visualization remain proposed. The authoring cutover removes the
+old owner and setters without aliases.
 
 ### Caller interface and vocabulary
 
@@ -293,11 +297,13 @@ identity exhaustion rather than wrapping or partially publishing state.
 Source epochs may rotate within one document epoch after a tracking gap or
 confirmed mode transition. Unknown syntax alone retains the prior mode.
 
-The local consuming API is `PlaybackInput::compile() -> Result[PreparedPlayback,
-String]`: `Pattern(exact_snapshot, bpm)` retains origin capability;
+The local consuming API is `PlaybackInput::compile(previous?, max_query_span?)`:
+`Pattern(exact_snapshot, bpm)` retains origin capability;
 `Runtime(PlaySource)` handles songs and explicit `PlaybackInput::text` inputs.
-This compilation API is implemented; wire encoding/decoding and player submission
-are not. Preparation and compilation do not alter manual command semantics.
+`encode_wire`/`decode_wire` and player submission are implemented. The optional
+previous document applies only to explicit runtime text; exact compilation
+uses the frozen witnesses without reusing an old document. Preparation and
+compilation do not alter manual command semantics.
 
 All edits in one transaction are ordered, nonoverlapping, and relative to its
 single base version. Validate the whole change before mutation, derive the new
@@ -358,6 +364,12 @@ The pattern source map contains bounded tables of:
 - definition ID and declaration-header/name ranges;
 - reference ID and reference range; and
 - reference-binding ID, reference ID, and target definition ID.
+
+Schema-1 encodes these IDs as serials under `sourceMap.epoch`, a checked positive
+safe integer. This source epoch is independent of the document epoch in
+`DraftVersion`: mode changes and tracking-limit recovery rotate source identity
+without resetting the document version. Decoding must preserve both epochs,
+never reconstruct source IDs from the receipt's document epoch.
 
 The input freezes text, version, and source map together. Include facts from
 the submitted program, including declarations that strict compilation checks

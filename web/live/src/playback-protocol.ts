@@ -1,3 +1,5 @@
+import { decodeDraftVersion, type DraftVersion } from "./authoring";
+
 export class RequestId {
   private constructor(readonly value: number) {}
   static first(): RequestId { return new RequestId(1); }
@@ -19,7 +21,7 @@ export type PlayerSnapshot = Readonly<{
   pendingCount: number;
   skippedCount: number;
 }>;
-export type PlayerReceipt = PlayerSnapshot & Readonly<{ id: RequestId; operation: PlayerOperation }> & (
+export type PlayerReceipt = PlayerSnapshot & Readonly<{ id: RequestId; operation: PlayerOperation; draftVersion: DraftVersion | null }> & (
   | Readonly<{ kind: "accepted" }>
   | Readonly<{ kind: "rejected"; restartRequired: boolean; message: string }>
 );
@@ -61,8 +63,13 @@ export function decodeWorkletMessage(value: unknown): WorkletMessage {
   if (value.type === "player-receipt") {
     const id = RequestId.decode(value.id);
     const view = snapshot(value);
-    if (!id || !view || !operation(value.operation) || typeof value.accepted !== "boolean") return { kind: "protocol-error", message: "invalid player receipt" };
-    const base = { ...view, id, operation: value.operation };
+    const version = value.draftVersion === null ? null : decodeDraftVersion(value.draftVersion);
+    if (!id || !view || !operation(value.operation) || typeof value.accepted !== "boolean" ||
+        (value.draftVersion !== null && version === null) ||
+        ((value.operation === "play" || value.operation === "pause") && version !== null)) {
+      return { kind: "protocol-error", message: "invalid player receipt" };
+    }
+    const base = { ...view, id, operation: value.operation, draftVersion: version };
     if (value.accepted) return { kind: "receipt", receipt: { ...base, kind: "accepted" } };
     if (typeof value.restartRequired !== "boolean" || typeof value.message !== "string") return { kind: "protocol-error", message: "invalid rejection receipt" };
     return { kind: "receipt", receipt: { ...base, kind: "rejected", restartRequired: value.restartRequired, message: value.message } };

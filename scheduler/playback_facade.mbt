@@ -8,6 +8,7 @@
 /// next playback state.
 pub enum PlaybackSnapshot {
   Pattern(@pattern.PatternSnapshot[@pattern.ControlMap])
+  PatternWithOrigins(@pattern.PatternSnapshotWithOrigins[@pattern.ControlMap])
   Song(@song.SongSnapshot[@pattern.ControlMap])
   RepeatSong(@song.SongSnapshot[@pattern.ControlMap])
 }
@@ -17,6 +18,13 @@ pub fn PlaybackSnapshot::pattern(
   snapshot : @pattern.PatternSnapshot[@pattern.ControlMap],
 ) -> PlaybackSnapshot {
   Pattern(snapshot)
+}
+
+///|
+pub fn PlaybackSnapshot::pattern_with_origins(
+  snapshot : @pattern.PatternSnapshotWithOrigins[@pattern.ControlMap],
+) -> PlaybackSnapshot {
+  PatternWithOrigins(snapshot)
 }
 
 ///|
@@ -38,6 +46,8 @@ pub fn PlaybackSnapshot::repeat_song(
 fn PlaybackSnapshot::raw(self : PlaybackSnapshot) -> @playback.PlaybackSnapshot {
   match self {
     Pattern(snapshot) => @playback.PlaybackSnapshot::pattern(snapshot)
+    PatternWithOrigins(snapshot) =>
+      @playback.PlaybackSnapshot::pattern_with_origins(snapshot)
     Song(snapshot) => @playback.PlaybackSnapshot::song(snapshot)
     RepeatSong(snapshot) => @playback.PlaybackSnapshot::repeat_song(snapshot)
   }
@@ -49,6 +59,8 @@ fn PlaybackSnapshot::from_raw(
 ) -> PlaybackSnapshot {
   match snapshot {
     @playback.PlaybackSnapshot::Pattern(pattern) => Pattern(pattern)
+    @playback.PlaybackSnapshot::PatternWithOrigins(pattern) =>
+      PatternWithOrigins(pattern)
     @playback.PlaybackSnapshot::Song(song) => Song(song)
     @playback.PlaybackSnapshot::RepeatSong(song) => RepeatSong(song)
   }

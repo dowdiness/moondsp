@@ -1,0 +1,21 @@
+import {
+  "dowdiness/moondsp/mini",
+  "moonbitlang/core/json",
+}
+
+pkgtype(kind: "executable")
+
+options(
+  link: {
+    "js": {
+      "format": "esm",
+      "exports": [
+        "create_draft",
+        "draft_state",
+        "edit_draft",
+        "prepare_playback",
+        "dispose_draft",
+      ],
+    },
+  },
+)

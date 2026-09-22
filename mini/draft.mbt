@@ -531,22 +531,36 @@ pub(all) enum PreparedPlayback {
 /// A failed exact compilation never falls back to runtime-only playback.
 pub fn PlaybackInput::compile(
   self : PlaybackInput,
+  previous? : @pattern.PatternDoc[@pattern.ControlMap]? = None,
+  max_query_span? : @pattern.Rational? = None,
 ) -> Result[PreparedPlayback, String] {
   match self.payload {
-    Text => parse_play_source(self.input).map(source => Runtime(source))
-    Song(_) =>
-      parse_play_source_with_origins(
-        self.input,
-        None,
-        None,
-        syntax_depth_limit=Some(32),
-      ).map(source => Runtime(source))
+    Text =>
+      parse_play_source(self.input, previous~, max_query_span~).map(source => {
+        Runtime(source)
+      })
+    Song(_) => {
+      let source = match
+        parse_play_source_with_origins(
+          self.input,
+          previous,
+          max_query_span,
+          syntax_depth_limit=Some(32),
+        ) {
+        Ok(source) => source
+        Err(message) => return Err(message)
+      }
+      guard source.body() is Arrangement(_, _) else {
+        return Err("song input changed source mode")
+      }
+      Ok(Runtime(source))
+    }
     Pattern(_, origins) => {
       let source = match
         parse_play_source_with_origins(
           self.input,
           None,
-          None,
+          max_query_span,
           origins=Some(origins),
           syntax_depth_limit=Some(32),
         ) {

@@ -176,12 +176,14 @@ to `GraphEngineError` values.
 
 ## Scheduler playback ABI
 
-The Player accepts both Pattern and arranged Song source through one parser:
+The Player accepts immutable `@mini.PlaybackInput` envelopes for Pattern and
+arranged Song source. Raw source strings are no longer accepted by this ABI:
 
 1. Call `init_scheduler_graph(sample_rate, block_size)`.
-2. Call `clear_playback_input`, then send UTF-16 code units with `push_playback_char`.
+2. Call `clear_playback_input`, then send the UTF-16 code units of
+   `PlaybackInput::encode_wire()` with `push_playback_char`.
 3. Call `player_update_input()` to accept Current song without rewinding, or
-   `player_restart_input()` to parse and start the submitted source from zero.
+   `player_restart_input()` to validate and start the submitted input from zero.
 4. Use `player_play()` to start/resume Current song and `player_pause()` to freeze it.
 5. Call `process_scheduler_block`, then read left and right samples.
 
@@ -190,6 +192,27 @@ may remain Pending until their next entry. Invalid source leaves accepted music
 unchanged. A paused render emits silence without advancing voices, effects, or
 transport; the worklet remains active. Finite songs reach Ended and retain their
 tails. Updating Ended changes the song that the next Play starts.
+
+`web/live` keeps one main-thread `Draft` across AudioContext lifetimes. Every
+CodeMirror transaction is applied in order, including same-text replacement;
+`prepare()` freezes source and exact witnesses together. The scheduler preserves
+those origins through pending material boundaries, but does not yet emit source
+highlighting observations.
+
+At the MessagePort boundary, Update/Restart use `{ type, id, input }`, where
+`input` is the schema-1 JSON string. Explicit untracked callers construct
+`{ schema: 1, kind: "text", text }`; tracked callers use Draft preparation rather
+than hand-building witnesses. Play/Pause contain no input. Every receipt has
+`draftVersion: [epoch, revision]` for tracked submissions, otherwise `null`.
+Malformed tracked witnesses are rejected, never retried as plain text.
+
+Source is limited to 8192 UTF-16 code units; the complete wire envelope is limited
+to 2097152. The receiver validates integer IDs, UTF-16 ranges, complete atom and
+binding coverage, and resolved targets before the existing workload admission.
+Rejection preserves accepted source, clocks, voices, and pending material.
+Automatic editor updates allow one in-flight request plus the latest unsent
+input. Manual Update/Restart discard older unsent automatic work without waiting
+for that request.
 
 | Result | Meaning |
 |---|---|

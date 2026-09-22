@@ -86,8 +86,9 @@ async function measureWorklet(page) {
       const ready = waitFor('ready');
       await context.resume();
       await ready;
-      await command('player-restart', { text });
-      for (let i = 0; i < 10; i++) await command('player-update', { text });
+      const input = JSON.stringify({ schema: 1, kind: 'text', text });
+      await command('player-restart', { input });
+      for (let i = 0; i < 10; i++) await command('player-update', { input });
       await delay(300);
       await command('measurement-start', {}, 'measurement-started');
       await delay(1000);
@@ -97,7 +98,7 @@ async function measureWorklet(page) {
       for (let i = 0; i < 40; i++) {
         const started = performance.now();
         await command('player-update', {
-          text: i % 2 ? text : text.replace('bpm(120)', 'bpm(121)'),
+          input: JSON.stringify({ schema: 1, kind: 'text', text: i % 2 ? text : text.replace('bpm(120)', 'bpm(121)') }),
         });
         roundTrips.push(performance.now() - started);
         await delay(20);
@@ -137,9 +138,10 @@ async function measureWorklet(page) {
       });
       const w = instance.exports;
       if (!w.init_scheduler_graph(48000, 128)) throw new Error('graph init failed');
+      const input = JSON.stringify({ schema: 1, kind: 'text', text });
       function fill() {
         w.clear_playback_input();
-        for (let i = 0; i < text.length; i++) w.push_playback_char(text.charCodeAt(i));
+        for (let i = 0; i < input.length; i++) w.push_playback_char(input.charCodeAt(i));
       }
       function update() {
         fill();

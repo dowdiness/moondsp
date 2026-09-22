@@ -454,3 +454,99 @@ test "retained entry budget preserves music and recovers at removal boundaries" 
   assert_eq(notes(state, 1000, 1001), [90])
   assert_false(state.has_pending())
 }
+
+///|
+test "exact pattern origins survive admission and active queries" {
+  let epoch = @identity.SourceEpoch::SourceEpoch(1L)
+  let doc = @pattern.PatternDoc::control_atom(
+    id=@identity.PatternNodeId::from_string("exact-origin"),
+    source_atom=@identity.SourceAtomId::SourceAtomId(epoch, 1L),
+    key="note",
+    value=60.0,
+  )
+  let snapshot = PlaybackSnapshot::pattern_with_origins(
+    doc.lower_with_origins(),
+  )
+  let state = PlaybackState()
+  state.queue(snapshot)
+  state.commit_pending(@pattern.Rational::from_int(0))
+  let events = state.query_active_sourced_events(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+    ),
+  )
+  guard events[0].source_origin() is Some(origin) else {
+    fail("exact source origin was erased during admission")
+  }
+  assert_true(origin.atom() == @identity.SourceAtomId::SourceAtomId(epoch, 1L))
+}
+
+///|
+test "origin-only edits update retained material provenance" {
+  fn exact(serial : Int64) -> PlaybackSnapshot raise {
+    let epoch = @identity.SourceEpoch::SourceEpoch(1L)
+    let doc = @pattern.PatternDoc::control_atom(
+      id=@identity.PatternNodeId::from_string("same-material"),
+      source_atom=@identity.SourceAtomId::SourceAtomId(epoch, serial),
+      key="note",
+      value=60.0,
+    )
+    PlaybackSnapshot::pattern_with_origins(doc.lower_with_origins())
+  }
+  let epoch = @identity.SourceEpoch::SourceEpoch(1L)
+  let state = PlaybackState()
+  state.queue(exact(1L))
+  state.commit_pending(@pattern.Rational::from_int(0))
+  state.queue(exact(2L))
+  state.commit_pending(@pattern.Rational::from_int(0))
+  let events = state.query_active_sourced_events(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+    ),
+  )
+  guard events[0].source_origin() is Some(origin) else {
+    fail("retained exact material lost its source origin")
+  }
+  assert_true(origin.atom() == @identity.SourceAtomId::SourceAtomId(epoch, 2L))
+}
+
+///|
+test "pending material retains old exact origins until its musical boundary" {
+  let epoch = @identity.SourceEpoch::SourceEpoch(1L)
+  fn exact(serial : Int64, note : Double) -> PlaybackSnapshot raise {
+    let doc = @pattern.PatternDoc::control_atom(
+      id=@identity.PatternNodeId::from_string("tone"),
+      source_atom=@identity.SourceAtomId::SourceAtomId(epoch, serial),
+      key="note",
+      value=note,
+    ).slow(
+      id=@identity.PatternNodeId::from_string("phrase"),
+      factor=@pattern.Rational::from_int(3),
+    )
+    PlaybackSnapshot::pattern_with_origins(doc.lower_with_origins())
+  }
+  let state = PlaybackState()
+  state.queue(exact(1L, 60.0))
+  state.commit_pending(@pattern.Rational::from_int(0))
+  state.queue(exact(2L, 72.0))
+  state.commit_pending(@pattern.Rational::from_int(1))
+  assert_true(state.has_pending())
+  let events = state.query_active_sourced_events(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::from_int(1),
+      @pattern.Rational::from_int(4),
+    ),
+  )
+  guard events is [old, next] &&
+    old.source_origin() is Some(old_origin) &&
+    next.source_origin() is Some(next_origin) else {
+    fail("expected old and pending exact material")
+  }
+  assert_eq(old.event().value.get("note"), Some(60.0))
+  assert_eq(next.event().value.get("note"), Some(72.0))
+  assert_eq(old_origin.atom(), @identity.SourceAtomId::SourceAtomId(epoch, 1L))
+  assert_eq(next_origin.atom(), @identity.SourceAtomId::SourceAtomId(epoch, 2L))
+  assert_eq(next.event().whole.unwrap().begin, @pattern.Rational::from_int(3))
+}

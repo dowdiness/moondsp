@@ -1085,7 +1085,8 @@
     function evalPattern() {
       const text = document.getElementById('patternInput').value;
       if (node) {
-        node.port.postMessage({ type: 'player-restart', id: ++tempoRevision, text });
+        const input = JSON.stringify({ schema: 1, kind: 'text', text });
+        node.port.postMessage({ type: 'player-restart', id: ++tempoRevision, input });
       }
     }
 

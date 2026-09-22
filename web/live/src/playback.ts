@@ -1,7 +1,7 @@
 import type { AudioEngine, AudioEvent, AudioStatus, OpenSessionResult, SchedulerSession } from "./audio";
+import { Draft, PlaybackInput, sameDraftVersion } from "./authoring";
 import { RequestId } from "./playback-protocol";
 import type { PlayerOperation, PlayerReceipt, PlayerSnapshot } from "./playback-protocol";
-
 type Feedback = Readonly<{ message: string; kind: "error" | "info" }>;
 type Diagnostic = Readonly<{ message: string; documentLength: number }>;
 export type PlaybackView = Readonly<{
@@ -17,8 +17,7 @@ export type PlaybackView = Readonly<{
 }>;
 type Pending = {
   operation: PlayerOperation;
-  source: string | undefined;
-  edit: number;
+  input: PlaybackInput | undefined;
   resolve: (receipt: PlayerReceipt) => void;
   reject: (error: Error) => void;
 };
@@ -30,25 +29,28 @@ type Connection =
 export class Player {
   private connection: Connection = { kind: "closed" };
   private snapshot: PlayerSnapshot = { state: "Empty", tempo: 60, samplePosition: 0, pendingCount: 0, skippedCount: 0 };
-  private source: string;
+  private readonly draft: Draft;
   private currentSource: string | null = null;
   private feedback: Feedback | null = null;
   private diagnostic: Diagnostic | null = null;
   private next = RequestId.first();
   private epoch = 0;
   private intent = 0;
-  private editVersion = 0;
   private lastReceipt = 0;
   private pending = new Map<number, Pending>();
   private retirement: Promise<void> | undefined;
   private debounce: ReturnType<typeof setTimeout> | undefined;
+  private automaticInFlight: symbol | undefined;
+  private latestUnsent: PlaybackInput | undefined;
 
   constructor(
     private readonly engine: Pick<AudioEngine, "openSession">,
-    initial: { text: string },
+    initial: { draft: Draft },
     private readonly present: (view: PlaybackView) => void,
   ) {
-    this.source = initial.text;
+    this.draft = initial.draft;
+    const state = this.draft.state();
+    this.diagnostic = state.diagnostic === null ? null : { message: state.diagnostic, documentLength: state.text.length };
     this.render();
   }
 
@@ -62,42 +64,56 @@ export class Player {
   }
 
   private render(): void { this.present(this.view()); }
-  private cancelDebounce(): void { clearTimeout(this.debounce); this.debounce = undefined; }
-  private setSource(source: string): void {
-    if (source !== this.source) {
-      this.source = source;
-      this.editVersion++;
-      this.diagnostic = null;
-      this.feedback = null;
-    }
+  private cancelAutomatic(): void {
+    clearTimeout(this.debounce);
+    this.debounce = undefined;
+    this.latestUnsent = undefined;
   }
 
-  /** Editor convenience: incomplete input never replaces Current song. */
-  edit(source: string): void {
-    this.setSource(source);
-    this.cancelDebounce();
-    if (this.connection.kind === "open") {
+  /** Every committed edit invalidates unsent work, even equal-text replacements. */
+  editDraft(): void {
+    this.cancelAutomatic();
+    const state = this.draft.state();
+    this.diagnostic = state.diagnostic === null ? null : { message: state.diagnostic, documentLength: state.text.length };
+    this.feedback = state.diagnostic === null ? null : { kind: "error", message: state.diagnostic };
+    if (state.diagnostic === null && this.connection.kind === "open") {
       this.debounce = setTimeout(() => {
         this.debounce = undefined;
-        void this.update(this.source).catch(error => this.report(error));
+        try {
+          this.latestUnsent = this.draft.prepare();
+          this.flushAutomatic();
+        } catch (error) {
+          this.reportDraftFailure(error);
+        }
       }, 200);
     }
     this.render();
   }
 
-  update(source: string): Promise<PlayerReceipt> {
-    this.setSource(source);
-    this.cancelDebounce();
-    return this.send("update", source);
+  private flushAutomatic(): void {
+    if (this.automaticInFlight !== undefined || this.latestUnsent === undefined || this.connection.kind !== "open") return;
+    const input = this.latestUnsent;
+    this.latestUnsent = undefined;
+    const flight = Symbol();
+    this.automaticInFlight = flight;
+    void this.send("update", input).catch(error => this.report(error)).finally(() => {
+      if (this.automaticInFlight !== flight) return;
+      this.automaticInFlight = undefined;
+      this.flushAutomatic();
+    });
   }
 
-  async restart(source: string): Promise<PlayerReceipt> {
-    this.setSource(source);
-    this.cancelDebounce();
+  update(input: PlaybackInput): Promise<PlayerReceipt> {
+    this.cancelAutomatic();
+    return this.send("update", input);
+  }
+
+  async restart(input: PlaybackInput): Promise<PlayerReceipt> {
+    this.cancelAutomatic();
     const intent = ++this.intent;
     const session = await this.open();
     if (intent !== this.intent) throw new DOMException("Restart cancelled", "AbortError");
-    const result = await this.send("restart", source);
+    const result = await this.send("restart", input);
     if (result.kind === "accepted" && intent === this.intent) session.fadeIn();
     return result;
   }
@@ -106,13 +122,16 @@ export class Player {
     const intent = ++this.intent;
     const session = await this.open();
     if (intent !== this.intent) throw new DOMException("Play cancelled", "AbortError");
-    // Only bootstrap needs editor input. Resume/Ended Play uses Current song,
-    // even when the editor currently contains a syntax error.
-    const result = this.currentSource === null
-      ? await this.send("restart", this.source)
-      : await this.send("play");
-    if (result.kind === "accepted" && intent === this.intent) session.fadeIn();
-    return result;
+    try {
+      const result = this.currentSource === null
+        ? await this.send("restart", this.draft.prepare())
+        : await this.send("play");
+      if (result.kind === "accepted" && intent === this.intent) session.fadeIn();
+      return result;
+    } catch (error) {
+      if (this.draft.state().diagnostic !== null) this.reportDraftFailure(error);
+      throw error;
+    }
   }
 
   async pause(): Promise<PlayerReceipt> {
@@ -136,7 +155,8 @@ export class Player {
   async close(): Promise<void> {
     ++this.epoch;
     ++this.intent;
-    this.cancelDebounce();
+    this.cancelAutomatic();
+    this.automaticInFlight = undefined;
     const previous = this.connection;
     this.connection = { kind: "closed" };
     if (previous.kind === "opening") previous.controller.abort();
@@ -144,7 +164,8 @@ export class Player {
     this.currentSource = null;
     this.snapshot = { state: "Empty", tempo: 60, samplePosition: 0, pendingCount: 0, skippedCount: 0 };
     this.feedback = null;
-    this.diagnostic = null;
+    const state = this.draft.state();
+    this.diagnostic = state.diagnostic === null ? null : { message: state.diagnostic, documentLength: state.text.length };
     const retirement = this.retire(previous);
     this.render();
     await retirement;
@@ -206,16 +227,16 @@ export class Player {
     this.render();
     return promise;
   }
-  private send(operation: PlayerOperation, source?: string): Promise<PlayerReceipt> {
+  private send(operation: PlayerOperation, input?: PlaybackInput): Promise<PlayerReceipt> {
     if (this.connection.kind !== "open") return Promise.reject(new Error("Player is not open"));
     const session = this.connection.session;
     const id = this.next;
     this.next = id.next();
     return new Promise((resolve, reject) => {
-      this.pending.set(id.value, { operation, source, edit: this.editVersion, resolve, reject });
+      this.pending.set(id.value, { operation, input, resolve, reject });
       try {
-        const result = operation === "update" ? session.update(id, source!)
-          : operation === "restart" ? session.restart(id, source!)
+        const result = operation === "update" ? session.update(id, input!)
+          : operation === "restart" ? session.restart(id, input!)
           : operation === "play" ? session.play(id) : session.pause(id);
         if (result === "session-expired") {
           this.pending.delete(id.value);
@@ -233,7 +254,13 @@ export class Player {
     this.feedback = { kind: "error", message: error instanceof Error ? error.message : String(error) };
     this.render();
   }
-
+  reportDraftFailure(error: unknown): void {
+    if (error instanceof Error && error.name === "AbortError") return;
+    const message = error instanceof Error ? error.message : String(error);
+    this.feedback = { kind: "error", message };
+    this.diagnostic = { message, documentLength: this.draft.state().text.length };
+    this.render();
+  }
   private rejectPending(error: Error): void {
     for (const pending of this.pending.values()) pending.reject(error);
     this.pending.clear();
@@ -242,7 +269,8 @@ export class Player {
   private fail(message: string): void {
     ++this.epoch;
     ++this.intent;
-    this.cancelDebounce();
+    this.cancelAutomatic();
+    this.automaticInFlight = undefined;
     const previous = this.connection;
     if (previous.kind === "opening") previous.controller.abort();
     this.connection = { kind: "closed" };
@@ -262,19 +290,23 @@ export class Player {
     const pending = this.pending.get(receipt.id.value);
     if (!pending) return; // Reply belongs to an already-retired request.
     this.pending.delete(receipt.id.value);
-    if (receipt.operation !== pending.operation) {
-      pending.reject(new Error("Player receipt operation mismatch"));
-      this.fail("Player receipt operation mismatch");
+    if (receipt.operation !== pending.operation ||
+        !sameDraftVersion(receipt.draftVersion, pending.input?.draftVersion ?? null)) {
+      const error = new Error("Player receipt operation/version mismatch");
+      pending.reject(error);
+      this.fail(error.message);
       return;
     }
     if (receipt.id.value > this.lastReceipt) {
       this.lastReceipt = receipt.id.value;
       this.snapshot = receipt;
-      if (pending.source !== undefined) {
-        if (receipt.kind === "accepted") this.currentSource = pending.source;
-        if (pending.edit === this.editVersion) {
-          this.diagnostic = receipt.kind === "rejected" ? { message: receipt.message, documentLength: pending.source.length } : null;
+      if (pending.input !== undefined) {
+        if (receipt.kind === "accepted") this.currentSource = pending.input.source;
+        if (sameDraftVersion(pending.input.draftVersion, this.draft.state().version)) {
+          this.diagnostic = receipt.kind === "rejected" ? { message: receipt.message, documentLength: pending.input.source.length } : null;
           this.feedback = receipt.kind === "rejected" ? { kind: "error", message: receipt.message } : null;
+        } else if (pending.input.draftVersion === null && receipt.kind === "rejected") {
+          this.feedback = { kind: "error", message: receipt.message };
         }
       } else if (receipt.kind === "rejected") {
         this.feedback = { kind: "error", message: receipt.message };

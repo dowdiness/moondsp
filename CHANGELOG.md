@@ -25,8 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added immutable `PlaybackInput` and `PreparedPlayback`: tracked patterns
   compile with exact origins; songs and explicit text inputs retain runtime-only
   capability. Source tracking is bounded to 8192 UTF-16 code units and current
-  live facts, without per-spelling lifetime history. Browser/worklet integration
-  and playback-onset visualization remain separate work.
+  live facts, without per-spelling lifetime history.
+- Connected the live editor's persistent Draft to immutable playback submissions.
+  Schema-1 wire validation checks complete source witnesses before admission;
+  malformed tracked inputs never fall back to untracked text. Receipts echo the
+  submitted draft version, and stale replies cannot overwrite newer diagnostics.
+  Automatic updates keep one request in flight and only the latest unsent input;
+  manual Update/Restart remain immediate. Exact origins survive scheduler
+  material transitions. Playback observations and highlighting remain separate.
 - Added exact `Tempo::span_for_samples` conversion through the scheduler clock;
   browser repeat admission no longer reconstructs tempo arithmetic.
 - Added the opt-in `@moondsp/browser/audio` entry point with `AudioPower`,

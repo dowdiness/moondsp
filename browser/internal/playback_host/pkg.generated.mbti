@@ -3,6 +3,7 @@ package "dowdiness/moondsp/browser/internal/playback_host"
 
 import {
   "dowdiness/moondsp/graph",
+  "dowdiness/moondsp/mini",
   "moonbitlang/core/debug",
 }
 
@@ -66,8 +67,8 @@ pub struct Player {
 }
 pub fn Player::pause(Self) -> Result[Unit, PlayerError]
 pub fn Player::play(Self) -> Result[Unit, PlayerError]
-pub fn Player::restart(Self, String) -> Result[Unit, PlayerError]
-pub fn Player::update(Self, String) -> Result[Unit, PlayerError]
+pub fn Player::restart(Self, @mini.PlaybackInput) -> Result[Unit, PlayerError]
+pub fn Player::update(Self, @mini.PlaybackInput) -> Result[Unit, PlayerError]
 pub fn Player::view(Self) -> PlayerView
 
 pub(all) enum PlayerError {

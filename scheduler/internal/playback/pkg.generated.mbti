@@ -22,11 +22,13 @@ pub(all) struct PlaybackInspection {
 
 pub enum PlaybackSnapshot {
   Pattern(@pattern.PatternSnapshot[@pattern.ControlMap])
+  PatternWithOrigins(@pattern.PatternSnapshotWithOrigins[@pattern.ControlMap])
   Song(@song.SongSnapshot[@pattern.ControlMap])
   RepeatSong(@song.SongSnapshot[@pattern.ControlMap])
 }
 pub fn PlaybackSnapshot::material_count(Self) -> Int
 pub fn PlaybackSnapshot::pattern(@pattern.PatternSnapshot[@pattern.ControlMap]) -> Self
+pub fn PlaybackSnapshot::pattern_with_origins(@pattern.PatternSnapshotWithOrigins[@pattern.ControlMap]) -> Self
 pub fn PlaybackSnapshot::query_events(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@pattern.ControlMap]]
 pub fn PlaybackSnapshot::repeat_song(@song.SongSnapshot[@pattern.ControlMap]) -> Self
 pub fn PlaybackSnapshot::revision(Self) -> @identity.Revision
@@ -39,6 +41,7 @@ pub struct PlaybackSourcedEvent {
 pub fn PlaybackSourcedEvent::anonymous(@pattern.Event[@pattern.ControlMap]) -> Self
 pub fn PlaybackSourcedEvent::event(Self) -> @pattern.Event[@pattern.ControlMap]
 pub fn PlaybackSourcedEvent::origin(Self) -> @model.VoiceOrigin
+pub fn PlaybackSourcedEvent::source_origin(Self) -> @pattern.EventOrigin?
 
 pub struct PlaybackState {
   // private fields

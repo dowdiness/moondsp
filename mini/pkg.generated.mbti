@@ -78,6 +78,7 @@ pub struct DraftVersion {
 pub fn DraftVersion::equal(Self, Self) -> Bool
 pub fn DraftVersion::not_equal(Self, Self) -> Bool
 pub fn DraftVersion::to_repr(Self) -> @debug.Repr
+pub impl ToJson for DraftVersion
 
 pub struct EditTransaction {
   // private fields
@@ -131,7 +132,9 @@ pub fn PlaySource::bpm(Self) -> Double
 pub struct PlaybackInput {
   // private fields
 }
-pub fn PlaybackInput::compile(Self) -> Result[PreparedPlayback, String]
+pub fn PlaybackInput::compile(Self, previous? : @pattern.PatternDoc[@pattern.ControlMap]?, max_query_span? : @pattern.Rational?) -> Result[PreparedPlayback, String]
+pub fn PlaybackInput::decode_wire(String) -> Result[Self, String]
+pub fn PlaybackInput::encode_wire(Self) -> String
 pub fn PlaybackInput::source(Self) -> String
 pub fn PlaybackInput::text(String) -> Self
 pub fn PlaybackInput::version(Self) -> DraftVersion?

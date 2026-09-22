@@ -17,8 +17,13 @@ test.beforeEach(async ({ page }) => {
     const controller = new PlaybackController(wasm, reply => replies.push(reply));
     function send(data) { controller.handle(data); }
     window.playback = {
-      update(id, text) { send({ type: 'player-update', id, text }); },
-      restart(id, text) { send({ type: 'player-restart', id, text }); },
+      send,
+      update(id, text) {
+        send({ type: 'player-update', id, input: JSON.stringify({ schema: 1, kind: 'text', text }) });
+      },
+      restart(id, text) {
+        send({ type: 'player-restart', id, input: JSON.stringify({ schema: 1, kind: 'text', text }) });
+      },
       play(id = 1) { send({ type: 'player-play', id }); },
       pause(id = 1) { send({ type: 'player-pause', id }); },
       render(blocks = 1) {
@@ -33,6 +38,32 @@ test.beforeEach(async ({ page }) => {
       setTempo(revision, bpm) { controller.handle({ type: 'set-scheduler-bpm', revision, bpm }); },
     };
   });
+});
+
+test('draft failures retain their version without degrading to text admission', async ({ page }) => {
+  const result = await page.evaluate(() => {
+    const p = window.playback;
+    p.restart(1, 'note("60").slow(8)'); p.render(8); p.receipts();
+    const before = p.snapshot();
+    p.send({ type: 'player-restart', id: 2, input: JSON.stringify({
+      schema: 1, kind: 'pattern', text: 'note("72")', version: [9, 3],
+      sourceMap: { epoch: 9, atoms: [], definitions: [], references: [] },
+    }) });
+    const rejected = p.receipts()[0];
+    const after = p.snapshot();
+    p.send({ type: 'player-restart', id: 3, input: JSON.stringify({
+      schema: 1, kind: 'song', version: [10, 4],
+      text: 'song(section("a",1,note("67")),part("first","a"))',
+    }) });
+    return { before, after, rejected, accepted: p.receipts()[0] };
+  });
+  expect(result.after).toEqual(result.before);
+  expect(result.rejected).toEqual(expect.objectContaining({
+    id: 2, accepted: false, draftVersion: [9, 3], samplePosition: 1024,
+  }));
+  expect(result.accepted).toEqual(expect.objectContaining({
+    id: 3, accepted: true, draftVersion: [10, 4], samplePosition: 0,
+  }));
 });
 
 test('paused update is accepted immediately and commits source tempo without advancing', async ({ page }) => {

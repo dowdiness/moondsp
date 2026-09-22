@@ -1,6 +1,7 @@
 // Audio resource owner. Opening produces a capability tied to one playback run;
 // score/tempo operations do not exist on a stopped engine or compiled session.
 import { decodeWorkletMessage } from "./playback-protocol";
+import type { PlaybackInput } from "./authoring";
 import type { PlayerReceipt, PlayerSnapshot, RequestId } from "./playback-protocol";
 
 function abortError(): DOMException {
@@ -62,8 +63,8 @@ type SessionControls = Readonly<{
 }>;
 export type SchedulerSession = SessionControls & Readonly<{
   kind: "scheduler";
-  update(id: RequestId, text: string): SessionCommandResult;
-  restart(id: RequestId, text: string): SessionCommandResult;
+  update(id: RequestId, input: PlaybackInput): SessionCommandResult;
+  restart(id: RequestId, input: PlaybackInput): SessionCommandResult;
   play(id: RequestId): SessionCommandResult;
   pause(id: RequestId): SessionCommandResult;
 }>;
@@ -85,7 +86,7 @@ type GraphRun = Readonly<{
   deliver: (event: AudioEvent) => void;
 }>;
 type SessionCommand = "fade-in"
-  | Readonly<{ type: "player-update" | "player-restart"; id: number; text: string }>
+  | Readonly<{ type: "player-update" | "player-restart"; id: number; input: string }>
   | Readonly<{ type: "player-play" | "player-pause"; id: number }>;
 type EngineState =
   | { kind: "idle" }
@@ -207,8 +208,8 @@ export class AudioEngine {
     };
     const session: AudioSession = this.mode === "scheduler" ? {
       ...controls, kind: "scheduler",
-      update: (id, text) => this.command(run, { type: "player-update", id: id.value, text }),
-      restart: (id, text) => this.command(run, { type: "player-restart", id: id.value, text }),
+      update: (id, input) => this.command(run, { type: "player-update", id: id.value, input: input.wire }),
+      restart: (id, input) => this.command(run, { type: "player-restart", id: id.value, input: input.wire }),
       play: id => this.command(run, { type: "player-play", id: id.value }),
       pause: id => this.command(run, { type: "player-pause", id: id.value }),
     } : { ...controls, kind: "compiled" };

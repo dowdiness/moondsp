@@ -18,9 +18,10 @@ import restsAndGates from "../../../examples/rests-and-gates.mini?raw";
 
 import { minilive } from "./lang/minilive";
 import { CM6Adapter } from "./canopy";
-import type { UserIntent, Diagnostic } from "./canopy";
+import type { Diagnostic } from "./canopy";
 import { AudioEngine } from "./audio";
 import type { AudioEngineMode, CompiledSession } from "./audio";
+import { Draft } from "./authoring";
 import { Player } from "./playback";
 import type { PlaybackView } from "./playback";
 
@@ -71,9 +72,6 @@ const view = new EditorView({
 
 const adapter = new CM6Adapter(view);
 
-view.dispatch({
-  effects: listenerCompartment.reconfigure(adapter.createUpdateListener()),
-});
 
 // ── Engine ──────────────────────────────────────────────────
 
@@ -162,7 +160,8 @@ function renderPlayback(state: PlaybackView): void {
   }
   renderedPlayback = state;
 }
-const playback = new Player(engine, { text: view.state.doc.toString() }, renderPlayback);
+const draft = new Draft(INITIAL);
+const playback = new Player(engine, { draft }, renderPlayback);
 let compiledSession: CompiledSession | undefined;
 async function toggleCompiled(): Promise<void> {
   startBtn.disabled = true;
@@ -197,10 +196,29 @@ async function toggleCompiled(): Promise<void> {
 if (audioMode === "compiled") document.getElementById("restart")!.hidden = true;
 
 
-adapter.onIntent((intent: UserIntent) => {
-  if (intent.type === "TextEdit" && audioMode === "scheduler") {
-    playback.edit(view.state.doc.toString());
-  }
+view.dispatch({
+  effects: listenerCompartment.reconfigure([
+    adapter.createUpdateListener(),
+    EditorView.updateListener.of(update => {
+      if (!update.docChanged || audioMode !== "scheduler") return;
+      try {
+        // Preserve each transaction's causality; composing a replace and undo
+        // into one text diff would incorrectly revive retired source identities.
+        for (const transaction of update.transactions) {
+          if (!transaction.docChanged) continue;
+          const edits: { from: number; to: number; inserted: string }[] = [];
+          transaction.changes.iterChanges((from, to, _newFrom, _newTo, inserted) => {
+            edits.push({ from, to, inserted: inserted.toString() });
+          }, true);
+          draft.edit({ base: draft.state().version, edits });
+        }
+        // Diagnostic decoration dispatch must happen outside CM's update turn.
+        queueMicrotask(() => playback.editDraft());
+      } catch (error) {
+        queueMicrotask(() => playback.reportDraftFailure(error));
+      }
+    }),
+  ]),
 });
 
 startBtn.addEventListener("click", () => {
@@ -210,7 +228,11 @@ startBtn.addEventListener("click", () => {
 });
 
 document.getElementById("restart")!.addEventListener("click", () => {
-  void playback.restart(view.state.doc.toString()).catch(error => playback.report(error));
+  try {
+    void playback.restart(draft.prepare()).catch(error => playback.report(error));
+  } catch (error) {
+    playback.reportDraftFailure(error);
+  }
 });
 
 // ── Cheatsheet ──────────────────────────────────────────────
