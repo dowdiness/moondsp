@@ -50,17 +50,29 @@ The projected listener-time of a rendered event, calculated by adding estimated 
 The smallest authored sound, note, or chord token attributable as the origin of a playback event. A chord name is treated as a single atom even though it expands into multiple notes.
 
 **Source atom identity**:
-The persistent identity of an authored atom across non-destructive edits, such as text movement or edits elsewhere in the document. Deleting an atom and retyping an identically spelled token creates a new identity rather than continuing the old one.
+The persistent identity of an authored atom across non-destructive edits, including offset shifts caused by edits elsewhere. Deleting and recreating an atom, including undo reinsertion, creates a new identity rather than continuing the old one.
 _Avoid_: Relying on identical spelling or string matching to establish continuity
 
+**Named pattern definition**:
+A particular authored declaration of a reusable pattern. Its identity is distinct from both its name's spelling and the current contents of its body.
+
+**Pattern reference**:
+A particular occurrence of a pattern name used as an expression. Two references to the same definition are distinct occurrences.
+
+**Reference binding**:
+The continuously established relationship between a pattern reference and its definition. A broken or ambiguous relationship does not regain its former identity merely by reconnecting the same reference and definition later.
+
+**Event origin**:
+An event's source atom and route through named pattern references. It exists before playback and does not by itself identify a playback run or material version.
+
 **Playback origin path**:
-The authored provenance chain connecting a playback material to the source atom responsible for an event, tracing through any intermediate named-reference use sites.
+The authored provenance chain connecting a playback material to the source atom responsible for an event, tracing through any intermediate pattern references.
 
 **Represented playback origin**:
 An event origin whose source atom and reference path can be traced with exact identity into the currently visible draft. An origin remains represented across partial material transitions or when unrelated syntax errors exist in the draft.
 
 **Playback highlight**:
-A brief onset indication on a represented source atom, with named-reference use sites shown as secondary context. It reflects event execution, not the adoption of all visible draft edits, event duration, or voice lifetime.
+A brief onset indication on a represented source atom, with the traversed pattern references shown as secondary context. It reflects event execution, not the adoption of all visible draft edits, event duration, or voice lifetime.
 
 **Expired onset**:
 A reported onset whose full highlight duration has already elapsed at the estimated listener-time. It represents historical activity and is dropped rather than displayed late.

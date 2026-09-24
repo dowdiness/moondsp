@@ -46,9 +46,18 @@ priv enum Session {
   Ready(PreparedSong)
   Playing(PreparedSong)
   Paused(PreparedSong)
-  Ended(PreparedSong, Int64)
+  Ended(PreparedSong, Int64, Double)
   Fault(String)
 }
+
+///|
+/// Kind of the latest accepted score, independent of the visible draft.
+/// Internal observation value, projected into the browser's public enum.
+pub enum PlaybackMode {
+  None
+  Pattern
+  Song
+} derive(Eq, Debug)
 
 ///|
 pub(all) enum PlayState {
@@ -83,7 +92,7 @@ pub struct PlayerView {
 fn Session::song(self : Session) -> PreparedSong? {
   match self {
     Empty | Fault(_) => None
-    Ready(song) | Playing(song) | Paused(song) | Ended(song, _) => Some(song)
+    Ready(song) | Playing(song) | Paused(song) | Ended(song, _, _) => Some(song)
   }
 }
 
@@ -166,7 +175,7 @@ fn song_update_snapshot(
 ///|
 fn Player::prepare(
   self : Player,
-  source : String,
+  input : @mini.PlaybackInput,
 ) -> Result[PreparedSong, PlayerError] {
   let previous = match self.session.song() {
     Some(song) => song.doc
@@ -185,24 +194,17 @@ fn Player::prepare(
     Ok(span) => span
     Err(_) => return Err(TransportRange)
   }
-  let parsed = match
-    @mini.parse_play_source(
-      source,
-      previous~,
-      max_query_span=Some(max_query_span),
-    ) {
-    Ok(parsed) => parsed
+  let prepared = match
+    input.compile(max_query_span=Some(max_query_span), previous~) {
+    Ok(prepared) => prepared
     Err(message) => return Err(InvalidSource(message))
   }
-  let tempo = match @scheduler.Tempo::from_bpm(parsed.bpm()) {
-    Ok(tempo) => tempo
-    Err(_) => return Err(InvalidSource("tempo must be 0.001..1000 BPM"))
-  }
-  let prepared = match parsed.body() {
-    Pattern(doc) => {
-      let snapshot = doc.lower() catch {
-        error =>
-          return Err(InvalidSource("could not lower source: \{Repr(error)}"))
+  let source = input.source()
+  let prepared = match prepared {
+    @mini.PreparedPlayback::Pattern(snapshot, bpm) => {
+      let tempo = match @scheduler.Tempo::from_bpm(bpm) {
+        Ok(tempo) => tempo
+        Err(_) => return Err(InvalidSource("tempo must be 0.001..1000 BPM"))
       }
       let routes = self.routes.map(route => {
         let selected = match route.selector {
@@ -211,57 +213,91 @@ fn Player::prepare(
         }
         {
           target: route.pool,
-          snapshot: @scheduler.PlaybackSnapshot::pattern(selected),
+          snapshot: @scheduler.PlaybackSnapshot::pattern_with_origins(selected),
         }
       })
       Ok({
         source,
         tempo,
         layout: PatternLayout,
-        doc: Some(doc),
+        doc: None,
         routes,
         span: Continuous,
       })
     }
-    Arrangement(song, repeated) => {
-      guard song.duration() > @pattern.Rational::from_int(0) else {
-        return Err(InvalidSource("song must end after its beginning"))
+    @mini.PreparedPlayback::Runtime(parsed) => {
+      let tempo = match @scheduler.Tempo::from_bpm(parsed.bpm()) {
+        Ok(tempo) => tempo
+        Err(_) => return Err(InvalidSource("tempo must be 0.001..1000 BPM"))
       }
-      let span = if repeated {
-        Repeating(song.duration())
-      } else {
-        Finite(song.duration())
-      }
-      match self.check_repeat_span(span, tempo) {
-        Err(error) => return Err(error)
-        Ok(_) => ()
-      }
-      let routes : Array[PreparedRoute] = []
-      for route in self.routes {
-        let routed = match filter_song_for_route(route.selector, song) {
-          Ok(song) => song
-          Err(message) => return Err(InvalidSource(message))
+      match parsed.body() {
+        Pattern(doc) => {
+          let snapshot = doc.lower() catch {
+            error =>
+              return Err(
+                InvalidSource("could not lower source: \{Repr(error)}"),
+              )
+          }
+          let routes = self.routes.map(route => {
+            let selected = match route.selector {
+              RouteSynth => snapshot.select_control("note")
+              RouteSound(code) => snapshot.select_control("sound", value=code)
+            }
+            {
+              target: route.pool,
+              snapshot: @scheduler.PlaybackSnapshot::pattern(selected),
+            }
+          })
+          Ok({
+            source,
+            tempo,
+            layout: PatternLayout,
+            doc: Some(doc),
+            routes,
+            span: Continuous,
+          })
         }
-        let snapshot = song_update_snapshot(routed) catch {
-          error => return Err(InvalidSource(error.to_string()))
-        }
-        routes.push({
-          target: route.pool,
-          snapshot: if repeated {
-            @scheduler.PlaybackSnapshot::repeat_song(snapshot)
+        Arrangement(song, repeated) => {
+          guard song.duration() > @pattern.Rational::from_int(0) else {
+            return Err(InvalidSource("song must end after its beginning"))
+          }
+          let span = if repeated {
+            Repeating(song.duration())
           } else {
-            @scheduler.PlaybackSnapshot::song(snapshot)
-          },
-        })
+            Finite(song.duration())
+          }
+          match self.check_repeat_span(span, tempo) {
+            Err(error) => return Err(error)
+            Ok(_) => ()
+          }
+          let routes : Array[PreparedRoute] = []
+          for route in self.routes {
+            let routed = match filter_song_for_route(route.selector, song) {
+              Ok(song) => song
+              Err(message) => return Err(InvalidSource(message))
+            }
+            let snapshot = song_update_snapshot(routed) catch {
+              error => return Err(InvalidSource(error.to_string()))
+            }
+            routes.push({
+              target: route.pool,
+              snapshot: if repeated {
+                @scheduler.PlaybackSnapshot::repeat_song(snapshot)
+              } else {
+                @scheduler.PlaybackSnapshot::song(snapshot)
+              },
+            })
+          }
+          Ok({
+            source,
+            tempo,
+            layout: song_layout(song, repeated),
+            doc: None,
+            routes,
+            span,
+          })
+        }
       }
-      Ok({
-        source,
-        tempo,
-        layout: song_layout(song, repeated),
-        doc: None,
-        routes,
-        span,
-      })
     }
   }
   let song = match prepared {
@@ -314,17 +350,17 @@ fn Player::install(
 /// Accept source without starting or rewinding the performance.
 pub fn Player::update(
   self : Player,
-  source : String,
+  input : @mini.PlaybackInput,
 ) -> Result[Unit, PlayerError] {
   if self.session is Fault(message) {
     return Err(Failed(message))
   }
-  let next = match self.prepare(source) {
+  let next = match self.prepare(input) {
     Ok(song) => song
     Err(error) => return Err(error)
   }
   match self.session {
-    Empty | Ready(_) | Ended(_, _) =>
+    Empty | Ready(_) | Ended(_, _, _) =>
       if next.finite_end() is Some(end_) {
         match
           next.tempo.sample_at_start(
@@ -349,7 +385,7 @@ pub fn Player::update(
         _ => Playing(next)
       }
     }
-    Ended(_, position) => self.session = Ended(next, position)
+    Ended(_, position, cycle) => self.session = Ended(next, position, cycle)
     Empty | Ready(_) => self.session = Ready(next)
     Fault(message) => return Err(Failed(message))
   }
@@ -360,12 +396,12 @@ pub fn Player::update(
 /// Parse current editor source first; invalid input cannot reset a voice or clock.
 pub fn Player::restart(
   self : Player,
-  source : String,
+  input : @mini.PlaybackInput,
 ) -> Result[Unit, PlayerError] {
   if self.session is Fault(message) {
     return Err(Failed(message))
   }
-  let song = match self.prepare(source) {
+  let song = match self.prepare(input) {
     Ok(song) => song
     Err(error) => return Err(error)
   }
@@ -388,7 +424,7 @@ pub fn Player::play(self : Player) -> Result[Unit, PlayerError] {
       self.session = Playing(song)
       Ok(())
     }
-    Ready(song) | Ended(song, _) =>
+    Ready(song) | Ended(song, _, _) =>
       match self.install(song, true) {
         Err(error) => Err(error)
         Ok(_) => {
@@ -408,7 +444,34 @@ pub fn Player::pause(self : Player) -> Result[Unit, PlayerError] {
       self.session = Paused(song)
       Ok(())
     }
-    Ready(_) | Paused(_) | Ended(_, _) => Ok(())
+    Ready(_) | Paused(_) | Ended(_, _, _) => Ok(())
+  }
+}
+
+///|
+/// Return the accepted source kind without constructing a `PlayerView`.
+fn Player::mode(self : Player) -> PlaybackMode {
+  match self.session {
+    Empty | Fault(_) => None
+    Ready(song) | Playing(song) | Paused(song) | Ended(song, _, _) =>
+      match song.layout {
+        PatternLayout => Pattern
+        SongLayout(_, _) => Song
+      }
+  }
+}
+
+///|
+/// Return the zero-based musical cycle position from the route clock.
+///
+/// Ready and Empty are anchored at zero. Paused reads the frozen clock, and
+/// Ended reports the accepted finite song's exact musical endpoint rather than
+/// deriving it from a BPM/sample approximation.
+fn Player::cycle_position(self : Player) -> Double {
+  match self.session {
+    Empty | Ready(_) | Fault(_) => 0.0
+    Playing(_) | Paused(_) => self.schedulers[0].cycle_position()
+    Ended(_, _, cycle) => cycle
   }
 }
 
@@ -419,11 +482,14 @@ pub fn Player::view(self : Player) -> PlayerView {
     Ready(_) => Ready
     Playing(_) => Playing
     Paused(_) => Paused
-    Ended(_, _) => Ended
+    Ended(_, _, _) => Ended
     Fault(_) => Fault
   }
   let song = self.session.song()
-  // Every route projects the same material identities; do not count six copies.
+  // Pattern control projection and song route filtering preserve each
+  // material's source identity, period, and transition boundary. Every route
+  // therefore observes the same transition set (with route-local content);
+  // do not count six copies.
   let mut pending = 0
   let mut skipped = 0
   if self.session is Playing(_) || self.session is Paused(_) {
@@ -440,7 +506,7 @@ pub fn Player::view(self : Player) -> PlayerView {
       None => self.schedulers[0].bpm()
     },
     sample_position: match self.session {
-      Ended(_, position) => position.to_double()
+      Ended(_, position, _) => position.to_double()
       Empty | Ready(_) => 0.0
       _ => self.schedulers[0].sample_counter().to_double()
     },
@@ -478,22 +544,34 @@ fn player_command(command : (Player) -> Result[Unit, PlayerError]) -> Int {
 }
 
 ///|
-fn take_playback_input() -> String {
-  let source = input_chars_to_string(playback_input_chars)
+fn take_playback_input() -> Result[@mini.PlaybackInput, String] {
+  let result = if playback_input_overflow.val {
+    Err("playback input exceeds 2097152 UTF-16 code units")
+  } else {
+    match input_chars_to_string(playback_input_chars) {
+      Err(message) => Err(message)
+      Ok(wire) => @mini.PlaybackInput::decode_wire(wire)
+    }
+  }
   playback_input_chars.clear()
-  source
+  playback_input_overflow.val = false
+  result
 }
 
 ///|
 pub fn player_update_input() -> Int {
-  let source = take_playback_input()
-  player_command(owner => owner.update(source))
+  match take_playback_input() {
+    Err(message) => set_scheduler_parse_error(message)
+    Ok(input) => player_command(owner => owner.update(input))
+  }
 }
 
 ///|
 pub fn player_restart_input() -> Int {
-  let source = take_playback_input()
-  player_command(owner => owner.restart(source))
+  match take_playback_input() {
+    Err(message) => set_scheduler_parse_error(message)
+    Ok(input) => player_command(owner => owner.restart(input))
+  }
 }
 
 ///|
@@ -516,9 +594,25 @@ pub fn player_state() -> Int {
         Ready(_) => 1
         Playing(_) => 2
         Paused(_) => 3
-        Ended(_, _) => 4
+        Ended(_, _, _) => 4
         Fault(_) => 5
       }
+  }
+}
+
+///|
+pub fn player_mode() -> PlaybackMode {
+  match player.val {
+    Some(owner) => owner.mode()
+    None => None
+  }
+}
+
+///|
+pub fn scheduler_cycle_position() -> Double {
+  match player.val {
+    Some(owner) => owner.cycle_position()
+    None => 0.0
   }
 }
 

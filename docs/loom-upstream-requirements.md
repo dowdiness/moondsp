@@ -9,9 +9,11 @@
 
 The current evidence is intentionally spec-local:
 
-- Production mini authoring still uses `mini/incr_authoring.mbt`, which keeps a
-  last successful `PatternDoc`, accepts editor source-edit spans, and reuses one
-  lowering cache across reparses.
+- Production authoring now uses `mini.Draft`: atomic versioned edits, causal
+  source witnesses through invalid drafts, and frozen playback inputs. It has
+  no reactive accepted-document channel or persistent lowering-cache owner.
+  The older pipeline comparisons below are historical evidence, not the
+  current source-identity contract.
 - The Loom comparison lives under `specs/loom-mini-cst/` and constructs a
   parser with `@loom.new_parser(source_id, input, mini_grammar)`, shares
   `parser.runtime()` with a scope-owned `Derived` projection, and roots that
@@ -161,9 +163,10 @@ The recovery matrix helper should remain the minimum regression gate:
 - initial valid input has zero diagnostics;
 - malformed input has parser diagnostics and projection returns the expected
   error;
-- both Loom projection and `MiniAuthoringPipeline` reject the malformed state;
+- both Loom projection and Draft playback preparation reject malformed input;
 - recovered input has zero diagnostics; and
-- recovered sourced event IDs match the current mini authoring pipeline.
+- recovered musical controls and timing agree, with each owner's identity
+  lifetimes checked independently. Draft source IDs are not Loom graph IDs.
 
 A future upstream example should also cover semantic projection failures that
 are not syntax diagnostics, such as mode-incompatible atoms, and state whether

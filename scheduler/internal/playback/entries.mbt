@@ -1,6 +1,10 @@
 ///|
 priv enum EntrySource {
   Pattern(@pattern.PatternSnapshot[@pattern.ControlMap], Int)
+  PatternWithOrigins(
+    @pattern.PatternSnapshotWithOrigins[@pattern.ControlMap],
+    Int
+  )
   Song(@song.SongSnapshot[@pattern.ControlMap], Int)
 }
 
@@ -93,6 +97,21 @@ fn PlaybackSnapshot::entries(self : PlaybackSnapshot) -> Array[EntrySpec] {
             start=@pattern.Rational::from_int(0),
             end_=None,
             source=Pattern(snapshot, index),
+          ),
+        )
+      }
+      result
+    }
+    PatternWithOrigins(snapshot) => {
+      let result : Array[EntrySpec] = []
+      for index, body in snapshot.pat().entries() {
+        result.push(
+          EntrySpec(
+            id=snapshot.entry_key(index).unwrap(),
+            body~,
+            start=@pattern.Rational::from_int(0),
+            end_=None,
+            source=PatternWithOrigins(snapshot, index),
           ),
         )
       }
@@ -444,6 +463,15 @@ fn EntrySpec::query_sourced(
       .map(event => {
         event: event.event().shift(origin),
         origin: @model.VoiceOrigin::Pattern(event.pattern_node_path()),
+        source_origin: None,
+      })
+    PatternWithOrigins(snapshot, index) =>
+      snapshot
+      .query_for_entry(index, arc)
+      .map(event => {
+        event: event.event().shift(origin),
+        origin: @model.VoiceOrigin::Pattern(event.pattern_node_path()),
+        source_origin: Some(event.origin()),
       })
     Song(snapshot, index) => {
       let source_arc = @pattern.TimeSpan::new(
@@ -456,6 +484,7 @@ fn EntrySpec::query_sourced(
       .map(event => {
         event: event.event().shift(delta),
         origin: @model.VoiceOrigin::Song(event.origin()),
+        source_origin: None,
       })
     }
   }

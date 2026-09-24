@@ -21,6 +21,7 @@ pub struct Clock {
 } derive(Eq, @debug.Debug)
 pub fn Clock::advance(Self, Int) -> Result[Self, TransportError]
 pub fn Clock::at_start(Tempo, Double) -> Result[Self, TransportError]
+pub fn Clock::cycle_position(Self) -> Double
 pub fn Clock::position(Self, Int64) -> Result[@pattern.Rational, TransportError]
 pub fn Clock::reset(Self) -> Self
 pub fn Clock::sample(Self) -> Int64

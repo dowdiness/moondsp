@@ -1504,19 +1504,36 @@ including Restart. Ready/Ended source updates check the future zero-anchored
 clock without touching the old performance or tails.
 
 Both worklets share `PlaybackController`. Commands are `player-update` and
-`player-restart` with `{ id, text }`, or `player-play` and `player-pause` with
-`{ id }`. IDs are positive safe integers. An immediate `player-receipt` reports
-the ID, operation, acceptance, and complete owner projection: state,
-`samplePosition`, `tempo`, `pendingCount`, and `skippedCount`. Rejections also
-carry `message` and `restartRequired`. The dedicated scheduler worklet refreshes
+`player-restart` with `{ id, input }`, where `input` is an immutable schema-1
+playback wire string, or `player-play` and `player-pause` with `{ id }`. IDs are
+positive safe integers. An immediate `player-receipt` reports the ID, operation,
+acceptance, submitted `draftVersion` (null for untracked text or Play/Pause), and
+complete owner projection: `state`, `mode`, `cyclePosition`, `samplePosition`,
+`tempo`, `pendingCount`, and `skippedCount`. Rejections also carry `message` and
+`restartRequired`. The dedicated scheduler worklet refreshes
 the projection with `player-status` every 32 rendered quanta; the editor does
 not poll it per sample. That worklet reports Ready only after graph initialization.
 
 Numeric ABI states are 0 Empty, 1 Ready, 2 Playing, 3 Paused, 4 Ended, and 5
-Fault. The live UI displays Empty as Ready and adds Starting only while opening
+Fault. `PlaybackController` translates these into the corresponding state-name
+strings before sending status or receipts. MoonBit `player_mode()` returns the
+public `PlaybackMode` enum; its numeric JS/wasm-gc ABI values 0/1/2 are translated
+there into `none`/`pattern`/`song`. The UI decoder validates those strings and
+rejects legacy numeric messages. The live UI displays Empty as Ready and adds
+Starting only while opening
 resources. Play/Pause and Restart are separate controls. Tempo belongs to the
 source, not an independent UI input. Request receipts retain the submitted
 source version so a delayed rejection cannot annotate newer editor text.
+The UI retains current Draft, in-flight, and accepted versions separately;
+queued/submitting is not accepted, and accepted is not fully transitioned.
+`mode` identifies the latest accepted pattern or song, not the visible Draft.
+`cyclePosition` reads the runtime clock's zero-based absolute musical position,
+preserving tempo-change continuity and Pause freezes. Ended retains the finished
+run's endpoint across later source updates until Play/Restart; repeating songs
+do not wrap this position. It is a render position, not an audible-time estimate.
+Pending counts follow musical material identities across route projections.
+Additions and removals of different identities remain separate; presentation
+does not infer a replacement from equal text or editor location.
 Pause during initial Starting cancels the pending start locally; no Pause command
 is sent to an Empty Player and no accepted receipt is fabricated. Cancellation
 uses `AbortError`, which the UI does not display as a playback failure.

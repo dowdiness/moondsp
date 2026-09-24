@@ -31,18 +31,19 @@ priv suberror ParseError {
 priv struct Parser {
   input : String
   mut pos : Int
-  bindings : Map[String, @pattern.Pat[@pattern.ControlMap]]
-  doc_bindings : Map[String, @pattern.PatternDoc[@pattern.ControlMap]]
+  bindings : Map[String, MiniDefinition[@pattern.Pat[@pattern.ControlMap]]]
+  doc_bindings : Map[
+    String,
+    MiniDefinition[@pattern.PatternDoc[@pattern.ControlMap]],
+  ]
   admission : PlaybackAdmission?
-}
-
-///|
-#alias(new)
-fn Parser::Parser(
-  input : String,
-  admission? : PlaybackAdmission? = None,
-) -> Parser {
-  { input, pos: 0, bindings: {}, doc_bindings: {}, admission, }
+  mut recognition : Bool
+  mut recognized_pattern : Bool
+  recognized_atoms : Array[RecognizedAtom]
+  recognized_references : Array[RecognizedReference]
+  mut last_binding_span : MiniSpan
+  syntax_depth_limit : Int?
+  mut limit : Int
 }
 
 ///|
@@ -52,9 +53,33 @@ priv struct MiniDollarStackLine {
 }
 
 ///|
+#alias(new)
+fn Parser::Parser(
+  input : String,
+  admission? : PlaybackAdmission? = None,
+  syntax_depth_limit? : Int? = None,
+) -> Parser {
+  {
+    input,
+    pos: 0,
+    bindings: Map([]),
+    doc_bindings: Map([]),
+    admission,
+    recognition: false,
+    recognized_pattern: false,
+    recognized_atoms: [],
+    recognized_references: [],
+    last_binding_span: { start: 0, end: 0, },
+    syntax_depth_limit,
+    limit: input.length(),
+  }
+}
+
+///|
 fn mini_collect_dollar_stack_lines(
   input : String,
   start? : Int = 0,
+  partial? : Bool = false,
 ) -> Result[Array[MiniDollarStackLine]?, String] {
   let lines : Array[MiniDollarStackLine] = []
   let mut saw_program = false
@@ -83,11 +108,14 @@ fn mini_collect_dollar_stack_lines(
         while expr_first < content_end && input[expr_first] == ' ' {
           expr_first += 1
         }
-        if expr_first == content_end {
+        if expr_first == content_end && !partial {
           return Err("position \{first}: $: requires an expression")
         }
         lines.push({ start: expr_start, end: content_end, })
       } else if saw_program {
+        if partial {
+          break
+        }
         return Err("position \{first}: expected '$:' stack line")
       } else {
         return Ok(None)
@@ -125,7 +153,7 @@ fn mini_parse_dollar_stack_program(
 
 ///|
 fn Parser::at_end(self : Parser) -> Bool {
-  self.pos >= self.input.length()
+  self.pos >= self.limit
 }
 
 ///|
@@ -161,8 +189,8 @@ fn Parser::skip_whitespace(self : Parser) -> Unit {
       self.pos += 1
     }
     match mini_comment_end(self.input, self.pos) {
-      Some(end_) => self.pos = end_
-      None => break
+      Some(end_) if end_ <= self.limit => self.pos = end_
+      _ => break
     }
   }
 }
@@ -196,7 +224,7 @@ fn Parser::expect_char(self : Parser, c : Char) -> Unit raise ParseError {
 /// require.
 fn Parser::match_keyword(self : Parser, kw : String) -> Bool {
   let len = kw.length()
-  if self.pos + len > self.input.length() {
+  if self.pos + len > self.limit {
     return false
   }
   for i in 0..<len {
@@ -423,6 +451,10 @@ fn Parser::read_binding_name(self : Parser) -> String? raise ParseError {
   }
   self.skip_whitespace()
   self.expect_char('=')
+  self.last_binding_span = {
+    start: name_start,
+    end: name_start + name.length(),
+  }
   Some(name)
 }
 
@@ -445,19 +477,20 @@ fn Parser::parse_bindings(
         let body = resolve_mini_expr(syntax, self.bindings)
         self.skip_whitespace()
         self.expect_char(';')
-        self.bindings[name] = compile_mini_pattern(body)
+        self.bindings[name] = MiniDefinition::MiniDefinition(
+          compile_mini_pattern(body),
+          self.last_binding_span,
+        )
       }
       Some(builder) => {
         let body = resolve_mini_expr(syntax, self.doc_bindings)
         self.skip_whitespace()
         self.expect_char(';')
-        self.doc_bindings[name] = compile_mini_doc(body, builder)
+        self.doc_bindings[name] = MiniDefinition::MiniDefinition(
+          compile_mini_doc(body, builder),
+          self.last_binding_span,
+        )
       }
     }
   }
 }
-
-///|
-type Callback = (@pattern.Pat[@pattern.ControlMap]) -> @pattern.Pat[
-  @pattern.ControlMap,
-]

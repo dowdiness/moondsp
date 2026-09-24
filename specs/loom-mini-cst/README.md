@@ -3,8 +3,13 @@
 Spike proving the `loom`/`incr` CST → projection → `PatternDoc` pipeline against
 the mini-notation grammar, including stage-5 last-good (accepted-derived)
 recovery. **Spike-only:** it is not built in CI and is not the production
-authoring path (production still uses `MiniAuthoringPipeline` /
-`@pattern` against the published `dowdiness/incr`).
+authoring path (production uses `@mini.Draft` with explicit causal transactions;
+only `@pattern` retains the published `dowdiness/incr/types` dependency).
+
+The former `MiniAuthoringPipeline` comparison is historical. Draft source IDs
+and Loom graph IDs are different contracts: compare musical output and test each
+owner's identity lifetimes, rather than requiring cross-owner ID-string equality.
+See the [current authoring contract](../../docs/plans/2026-09-09-playback-position-ui.md).
 
 ## Build prerequisites
 

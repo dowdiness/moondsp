@@ -17,6 +17,16 @@ pub fn StableIdError::not_equal(Self, Self) -> Bool
 pub fn StableIdError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
+pub struct DefinitionId {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn DefinitionId::DefinitionId(SourceEpoch, Int64) -> Self raise StableIdError
+pub fn DefinitionId::epoch(Self) -> SourceEpoch
+pub fn DefinitionId::equal(Self, Self) -> Bool
+pub fn DefinitionId::not_equal(Self, Self) -> Bool
+pub fn DefinitionId::serial(Self) -> Int64
+pub fn DefinitionId::to_repr(Self) -> @debug.Repr
+
 pub struct GraphNodeId(String) derive(Eq, @debug.Debug)
 pub fn GraphNodeId::equal(Self, Self) -> Bool
 pub fn GraphNodeId::from_string(String) -> Self raise StableIdError
@@ -37,6 +47,26 @@ pub fn PatternNodeId::from_string(String) -> Self raise StableIdError
 pub fn PatternNodeId::not_equal(Self, Self) -> Bool
 pub fn PatternNodeId::to_repr(Self) -> @debug.Repr
 pub fn PatternNodeId::value(Self) -> String
+
+pub struct ReferenceBindingId {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn ReferenceBindingId::ReferenceBindingId(SourceEpoch, Int64) -> Self raise StableIdError
+pub fn ReferenceBindingId::epoch(Self) -> SourceEpoch
+pub fn ReferenceBindingId::equal(Self, Self) -> Bool
+pub fn ReferenceBindingId::not_equal(Self, Self) -> Bool
+pub fn ReferenceBindingId::serial(Self) -> Int64
+pub fn ReferenceBindingId::to_repr(Self) -> @debug.Repr
+
+pub struct ReferenceId {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn ReferenceId::ReferenceId(SourceEpoch, Int64) -> Self raise StableIdError
+pub fn ReferenceId::epoch(Self) -> SourceEpoch
+pub fn ReferenceId::equal(Self, Self) -> Bool
+pub fn ReferenceId::not_equal(Self, Self) -> Bool
+pub fn ReferenceId::serial(Self) -> Int64
+pub fn ReferenceId::to_repr(Self) -> @debug.Repr
 
 pub struct Revision {
   // private fields
@@ -63,6 +93,25 @@ pub fn SectionLayerId::from_string(String) -> Self raise StableIdError
 pub fn SectionLayerId::not_equal(Self, Self) -> Bool
 pub fn SectionLayerId::to_repr(Self) -> @debug.Repr
 pub fn SectionLayerId::value(Self) -> String
+
+pub struct SourceAtomId {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn SourceAtomId::SourceAtomId(SourceEpoch, Int64) -> Self raise StableIdError
+pub fn SourceAtomId::epoch(Self) -> SourceEpoch
+pub fn SourceAtomId::equal(Self, Self) -> Bool
+pub fn SourceAtomId::not_equal(Self, Self) -> Bool
+pub fn SourceAtomId::serial(Self) -> Int64
+pub fn SourceAtomId::to_repr(Self) -> @debug.Repr
+
+pub struct SourceEpoch {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn SourceEpoch::SourceEpoch(Int64) -> Self raise StableIdError
+pub fn SourceEpoch::equal(Self, Self) -> Bool
+pub fn SourceEpoch::not_equal(Self, Self) -> Bool
+pub fn SourceEpoch::serial(Self) -> Int64
+pub fn SourceEpoch::to_repr(Self) -> @debug.Repr
 
 // Type aliases
 

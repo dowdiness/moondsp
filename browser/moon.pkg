@@ -9,7 +9,7 @@ import {
   "moonbitlang/core/math",
 }
 
-pkgtype(kind: "executable")
+pkgtype(kind: "foreign_library")
 
 options(
   link: {
@@ -70,6 +70,7 @@ options(
         "scheduler_right_sample",
         "scheduler_bpm",
         "scheduler_sample_position",
+        "scheduler_cycle_position",
         "clear_playback_input",
         "push_playback_char",
         "player_update_input",
@@ -77,6 +78,7 @@ options(
         "player_play",
         "player_pause",
         "player_state",
+        "player_mode",
         "player_pending_count",
         "player_skipped_count",
         "get_playback_error",
@@ -147,6 +149,7 @@ options(
         "scheduler_right_sample",
         "scheduler_bpm",
         "scheduler_sample_position",
+        "scheduler_cycle_position",
         "clear_playback_input",
         "push_playback_char",
         "player_update_input",
@@ -154,6 +157,7 @@ options(
         "player_play",
         "player_pause",
         "player_state",
+        "player_mode",
         "player_pending_count",
         "player_skipped_count",
         "get_playback_error",

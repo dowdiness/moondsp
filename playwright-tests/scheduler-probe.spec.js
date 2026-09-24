@@ -238,7 +238,7 @@ test('scheduler probe: AudioWorklet pattern playback telemetry', async ({ page }
         outputChannelCount: [2],
         processorOptions: {
           wasmModule,
-          patternText: probeCase.patternText,
+          playbackInput: JSON.stringify({ schema: 1, kind: 'text', text: probeCase.patternText }),
           maxBlocks: probeCase.maxBlocks,
           initialBpm,
           initialGain,

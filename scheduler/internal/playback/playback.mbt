@@ -3,13 +3,21 @@
 pub struct PlaybackSourcedEvent {
   priv event : @pattern.Event[@pattern.ControlMap]
   priv origin : @model.VoiceOrigin
+  priv source_origin : @pattern.EventOrigin?
 }
 
 ///|
 pub fn PlaybackSourcedEvent::anonymous(
   event : @pattern.Event[@pattern.ControlMap],
 ) -> PlaybackSourcedEvent {
-  { event, origin: @model.VoiceOrigin::Anonymous, }
+  { event, origin: @model.VoiceOrigin::Anonymous, source_origin: None, }
+}
+
+///|
+pub fn PlaybackSourcedEvent::source_origin(
+  self : PlaybackSourcedEvent,
+) -> @pattern.EventOrigin? {
+  self.source_origin
 }
 
 ///|
@@ -29,8 +37,16 @@ pub fn PlaybackSourcedEvent::origin(
 ///|
 pub enum PlaybackSnapshot {
   Pattern(@pattern.PatternSnapshot[@pattern.ControlMap])
+  PatternWithOrigins(@pattern.PatternSnapshotWithOrigins[@pattern.ControlMap])
   Song(@song.SongSnapshot[@pattern.ControlMap])
   RepeatSong(@song.SongSnapshot[@pattern.ControlMap])
+}
+
+///|
+pub fn PlaybackSnapshot::pattern_with_origins(
+  snapshot : @pattern.PatternSnapshotWithOrigins[@pattern.ControlMap],
+) -> PlaybackSnapshot {
+  PatternWithOrigins(snapshot)
 }
 
 ///|
@@ -60,6 +76,7 @@ pub fn PlaybackSnapshot::revision(
 ) -> @identity.Revision {
   match self {
     Pattern(snapshot) => snapshot.revision()
+    PatternWithOrigins(snapshot) => snapshot.revision()
     Song(snapshot) | RepeatSong(snapshot) => snapshot.revision()
   }
 }
@@ -69,7 +86,7 @@ pub fn PlaybackSnapshot::song_layout_revision(
   self : PlaybackSnapshot,
 ) -> @identity.Revision? {
   match self {
-    Pattern(_) => None
+    Pattern(_) | PatternWithOrigins(_) => None
     Song(snapshot) | RepeatSong(snapshot) => Some(snapshot.layout_revision())
   }
 }
@@ -79,6 +96,7 @@ pub fn PlaybackSnapshot::song_layout_revision(
 pub fn PlaybackSnapshot::material_count(self : PlaybackSnapshot) -> Int {
   match self {
     Pattern(snapshot) => snapshot.pat().entries().length()
+    PatternWithOrigins(snapshot) => snapshot.pat().entries().length()
     Song(snapshot) | RepeatSong(snapshot) =>
       for occurrence in snapshot.song().occurrences(); count = 0 {
         continue count +
@@ -326,6 +344,7 @@ pub fn PlaybackState::query_active_sourced_events(
       run.query(arc, query_sourced_entries, (sourced, offset) => {
         event: sourced.event.shift(offset),
         origin: sourced.origin,
+        source_origin: sourced.source_origin,
       })
   }
 }
@@ -337,6 +356,8 @@ pub fn PlaybackSnapshot::query_events(
 ) -> Array[@pattern.Event[@pattern.ControlMap]] {
   match self {
     Pattern(snapshot) => snapshot.query(arc)
+    PatternWithOrigins(snapshot) =>
+      snapshot.query(arc).map(event => event.event())
     Song(snapshot) => snapshot.query(arc)
     RepeatSong(_) =>
       PlaybackRun(self, self.start_entries(), self.cycle_at(arc.begin)).query(

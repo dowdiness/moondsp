@@ -45,6 +45,8 @@ pub(all) suberror PatternDocError {
   MissingNode(String)
   DuplicateNodeId(String)
   EmptyPatternDocs
+  MissingAtomOrigin(@identity.PatternNodeId)
+  MissingReferenceBinding(@identity.PatternNodeId)
 } derive(Eq, @debug.Debug)
 pub fn PatternDocError::equal(Self, Self) -> Bool
 pub fn PatternDocError::not_equal(Self, Self) -> Bool
@@ -77,6 +79,22 @@ pub fn[A : @debug.Debug] Event::to_repr(Self[A]) -> @debug.Repr
 pub fn[A : @debug.Debug] Event::to_string(Self[A]) -> String
 pub impl[A : @debug.Debug] Show for Event[A]
 
+pub struct EventOrigin {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn EventOrigin::atom(Self) -> @identity.SourceAtomId
+pub fn EventOrigin::bindings(Self) -> Array[ReferenceBinding]
+pub fn EventOrigin::equal(Self, Self) -> Bool
+pub fn EventOrigin::not_equal(Self, Self) -> Bool
+pub fn EventOrigin::to_repr(Self) -> @debug.Repr
+
+pub struct EventWithOrigin[A] {
+  // private fields
+}
+pub fn[A] EventWithOrigin::event(Self[A]) -> Event[A]
+pub fn[A] EventWithOrigin::origin(Self[A]) -> EventOrigin
+pub fn[A] EventWithOrigin::pattern_node_path(Self[A]) -> PatternNodePath
+
 pub struct Pat[A] {
   query : (TimeSpan) -> Array[Event[A]]
   // private fields
@@ -106,24 +124,28 @@ pub impl[A] Add for Pat[A]
 pub struct PatternDoc[A] {
   // private fields
 }
+pub fn[A] PatternDoc::atom(id~ : @identity.PatternNodeId, source_atom~ : @identity.SourceAtomId, value~ : A) -> Self[A]
 pub fn[A] PatternDoc::backdate_equal(Self[A], Self[A]) -> Bool
 pub fn[A] PatternDoc::changed_at(Self[A]) -> @types.Revision
 pub fn[A] PatternDoc::contains_node(Self[A], @identity.PatternNodeId) -> Bool
+pub fn PatternDoc::control_atom(id~ : @identity.PatternNodeId, source_atom~ : @identity.SourceAtomId, key~ : String, value~ : Double) -> Self[ControlMap]
 pub fn[A] PatternDoc::degrade_by(Self[A], id~ : @identity.PatternNodeId, p~ : Double, seed? : Int) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::euclid(Self[A], id~ : @identity.PatternNodeId, k~ : Int, n~ : Int, rotation? : Int) -> Self[A] raise PatternDocError
-pub fn[A] PatternDoc::every(Self[A], id~ : @identity.PatternNodeId, n~ : Int, f~ : (Pat[A]) -> Pat[A]) -> Self[A] raise PatternDocError
+pub fn[A] PatternDoc::every(Self[A], id~ : @identity.PatternNodeId, n~ : Int, transform~ : TimeTransform) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::fast(Self[A], id~ : @identity.PatternNodeId, factor~ : Rational) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::filter_map(Self[A], id~ : @identity.PatternNodeId, f~ : (A) -> A?) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::from_pattern(id~ : @identity.PatternNodeId, pat~ : Pat[A]) -> Self[A]
 pub fn[A] PatternDoc::gate(Self[A], id~ : @identity.PatternNodeId, factor~ : Rational) -> Self[A] raise PatternDocError
-pub fn PatternDoc::jux(Self[ControlMap], id~ : @identity.PatternNodeId, f~ : (Pat[ControlMap]) -> Pat[ControlMap]) -> Self[ControlMap] raise PatternDocError
+pub fn PatternDoc::jux(Self[ControlMap], id~ : @identity.PatternNodeId, transform~ : TimeTransform) -> Self[ControlMap] raise PatternDocError
 pub fn[A] PatternDoc::lower(Self[A]) -> PatternSnapshot[A] raise PatternDocError
 pub fn[A] PatternDoc::lower_with_cache(Self[A], PatternLoweringCache[A]) -> PatternSnapshot[A] raise PatternDocError
+pub fn[A] PatternDoc::lower_with_origins(Self[A], cache? : PatternLoweringCache[A]) -> PatternSnapshotWithOrigins[A] raise PatternDocError
 pub fn PatternDoc::merge_control(id~ : @identity.PatternNodeId, left~ : Self[ControlMap], right~ : Self[ControlMap]) -> Self[ControlMap] raise PatternDocError
 pub fn[A] PatternDoc::node_count(Self[A]) -> Int
 pub fn[A] PatternDoc::node_revision(Self[A], @identity.PatternNodeId) -> @identity.Revision raise PatternDocError
 pub fn[A] PatternDoc::pure(id~ : @identity.PatternNodeId, value~ : A) -> Self[A]
 pub fn[A] PatternDoc::reference(id~ : @identity.PatternNodeId, definition~ : Self[A]) -> Self[A]
+pub fn[A] PatternDoc::reference_with_binding(id~ : @identity.PatternNodeId, resolved_reference~ : ResolvedReference[A]) -> Self[A]
 pub fn[A] PatternDoc::referenced_definition(Self[A], @identity.PatternNodeId) -> Self[A]?
 pub fn[A] PatternDoc::replace_with_pattern(Self[A], id~ : @identity.PatternNodeId, pat~ : Pat[A]) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::replace_with_pure(Self[A], id~ : @identity.PatternNodeId, value~ : A) -> Self[A] raise PatternDocError
@@ -175,9 +197,20 @@ pub struct PatternSnapshotEvent[A] {
   // private fields
 }
 pub fn[A] PatternSnapshotEvent::event(Self[A]) -> Event[A]
-pub fn[A] PatternSnapshotEvent::pattern_node(Self[A]) -> @identity.PatternNodeId
 pub fn[A] PatternSnapshotEvent::pattern_node_path(Self[A]) -> PatternNodePath
 pub fn[A] PatternSnapshotEvent::pattern_nodes(Self[A]) -> Array[@identity.PatternNodeId]
+
+pub struct PatternSnapshotWithOrigins[A] {
+  // private fields
+}
+pub fn[A] PatternSnapshotWithOrigins::as_snapshot(Self[A]) -> PatternSnapshot[A]
+pub fn[A] PatternSnapshotWithOrigins::entry_key(Self[A], Int) -> String?
+pub fn[A] PatternSnapshotWithOrigins::pat(Self[A]) -> Pat[A]
+pub fn[A] PatternSnapshotWithOrigins::query(Self[A], TimeSpan) -> Array[EventWithOrigin[A]]
+pub fn[A] PatternSnapshotWithOrigins::query_for_entry(Self[A], Int, TimeSpan) -> Array[EventWithOrigin[A]]
+pub fn[A] PatternSnapshotWithOrigins::revision(Self[A]) -> @identity.Revision
+pub fn[A] PatternSnapshotWithOrigins::root(Self[A]) -> @identity.PatternNodeId
+pub fn PatternSnapshotWithOrigins::select_control(Self[ControlMap], String, value? : Double) -> Self[ControlMap]
 
 pub struct Rational {
   num : Int64
@@ -208,6 +241,21 @@ pub impl Div for Rational
 pub impl Mul for Rational
 pub impl Show for Rational
 pub impl Sub for Rational
+
+pub struct ReferenceBinding {
+  // private fields
+} derive(Eq, @debug.Debug)
+pub fn ReferenceBinding::definition(Self) -> @identity.DefinitionId
+pub fn ReferenceBinding::equal(Self, Self) -> Bool
+pub fn ReferenceBinding::id(Self) -> @identity.ReferenceBindingId
+pub fn ReferenceBinding::not_equal(Self, Self) -> Bool
+pub fn ReferenceBinding::reference(Self) -> @identity.ReferenceId
+pub fn ReferenceBinding::to_repr(Self) -> @debug.Repr
+
+pub struct ResolvedReference[A] {
+  // private fields
+}
+pub fn[A] ResolvedReference::ResolvedReference(definition~ : PatternDoc[A], definition_id~ : @identity.DefinitionId, reference~ : @identity.ReferenceId, binding~ : @identity.ReferenceBindingId) -> Self[A] raise @identity.StableIdError
 
 pub struct TimeSpan {
   begin : Rational

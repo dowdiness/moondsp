@@ -1,9 +1,14 @@
 # ADR-0011: Incr-backed mini authoring pipeline
 
-- **Status:** Accepted
+- **Status:** Superseded for production authoring by the [Draft contract](../plans/2026-09-09-playback-position-ui.md) (2026-09-20).
 - **Date:** 2026-05-20
 - **Source:** Phase 6+ incremental reparsing design slice
 - **Updated:** 2026-09-12 for `dowdiness/incr` `0.15.1`
+
+The decision below records the former owner. Production now uses explicit Draft
+transactions and frozen playback inputs, not reactive text backdating or an
+accepted-document channel. `mini/` no longer imports the full incr runtime;
+`pattern/` retains only `incr/types`.
 
 ## Context
 

@@ -1,9 +1,9 @@
 import {
-  "dowdiness/incr",
   "dowdiness/moondsp/identity",
   "dowdiness/moondsp/pattern",
   "dowdiness/moondsp/song",
   "moonbitlang/core/bench",
+  "moonbitlang/core/json",
 }
 
 import {

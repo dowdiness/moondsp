@@ -1,0 +1,936 @@
+{
+  "recorded_at": "2026-09-24T09:51:31.757Z",
+  "base_commit": "0ca1f514822213cab90e4f16faa5c040778a7b20",
+  "scope": "Follow-up to cold origin preparation: isolated prototypes, then integration of sparse secondary indexing; no public API change.",
+  "environment": {
+    "platform": "linux",
+    "release": "6.18.33.2-microsoft-standard-WSL2",
+    "architecture": "x64",
+    "cpu": "AMD Ryzen 7 6800H with Radeon Graphics",
+    "node": "v24.14.1",
+    "moon": "moon 0.1.20260904 (94521db 2026-09-04) ~/.moon/bin/moon\nmoonc v0.10.12+1634b282e (2026-09-07) ~/.moon/bin/moonc\nmoonrun 0.1.20260904 (94521db 2026-09-04) ~/.moon/bin/moonrun\n\nFeature flags enabled: rr_moon_pkg"
+  },
+  "baseline_source_sha256": "8533b0f9106103c2dc67d847edfa5e2fd7bda48087cca68ad7baed5ac990dd07",
+  "baseline_source": "///|\npub(all) suberror PatternDocError {\n  MissingNode(String)\n  DuplicateNodeId(String)\n  EmptyPatternDocs\n  MissingAtomOrigin(@identity.PatternNodeId)\n  MissingReferenceBinding(@identity.PatternNodeId)\n} derive(Eq, Debug)\n\n///|\npriv enum PatternDocNode[A] {\n  Runtime(Pat[A])\n  Reference(PatternDoc[A], ReferenceBinding?)\n  Silence\n  Pure(A)\n  Atom(Pat[A], @identity.SourceAtomId)\n  Fast(@identity.PatternNodeId, Rational)\n  Slow(@identity.PatternNodeId, Rational)\n  Gate(@identity.PatternNodeId, Rational)\n  Rev(@identity.PatternNodeId)\n  FilterMap(@identity.PatternNodeId, (A) -> A?)\n  Euclid(@identity.PatternNodeId, Int, Int, Int)\n  DegradeBy(@identity.PatternNodeId, Double, Int)\n  Every(@identity.PatternNodeId, Int, TimeTransform)\n  Jux(@identity.PatternNodeId, TimeTransform, (A, ControlMap) -> A)\n  MergeControl(@identity.PatternNodeId, @identity.PatternNodeId, (A, A) -> A)\n  Sequence(Array[@identity.PatternNodeId])\n  Stack(Array[@identity.PatternNodeId])\n}\n\n///|\npriv struct PatternDocEntry[A] {\n  generation : Int64\n  revision : @identity.Revision\n  node : PatternDocNode[A]\n}\n\n///|\nlet pattern_node_generation_counter : Ref[Int64] = Ref(0L)\n\n///|\nfn next_pattern_node_generation() -> Int64 {\n  pattern_node_generation_counter.val = pattern_node_generation_counter.val + 1L\n  pattern_node_generation_counter.val\n}\n\n///|\nfn[A] PatternDocNode::snapshot(self : PatternDocNode[A]) -> PatternDocNode[A] {\n  match self {\n    Runtime(pat) => Runtime(pat)\n    Reference(definition, binding) => Reference(definition, binding)\n    Silence => Silence\n    Pure(value) => Pure(value)\n    Atom(pat, atom) => Atom(pat, atom)\n    Fast(child, factor) => Fast(child, factor)\n    Slow(child, factor) => Slow(child, factor)\n    Gate(child, factor) => Gate(child, factor)\n    Rev(child) => Rev(child)\n    FilterMap(child, f) => FilterMap(child, f)\n    Euclid(child, k, n, rotation) => Euclid(child, k, n, rotation)\n    DegradeBy(child, p, seed) => DegradeBy(child, p, seed)\n    Every(child, n, f) => Every(child, n, f)\n    Jux(child, transform, merge) => Jux(child, transform, merge)\n    MergeControl(left, right, f) => MergeControl(left, right, f)\n    Sequence(children) => Sequence(children.copy())\n    Stack(children) => Stack(children.copy())\n  }\n}\n\n///|\nfn[A] PatternDocEntry::snapshot(\n  self : PatternDocEntry[A],\n) -> PatternDocEntry[A] {\n  {\n    generation: self.generation,\n    revision: self.revision,\n    node: self.node.snapshot(),\n  }\n}\n\n///|\nfn[A] copy_pattern_nodes(\n  nodes : Map[String, PatternDocEntry[A]],\n) -> Map[String, PatternDocEntry[A]] {\n  let result : Map[String, PatternDocEntry[A]] = Map([])\n  nodes.each(fn(id, entry) { result[id] = entry.snapshot() })\n  result\n}\n\n///|\nfn[A] singleton_pattern_nodes(\n  id : @identity.PatternNodeId,\n  node : PatternDocNode[A],\n) -> Map[String, PatternDocEntry[A]] {\n  let nodes : Map[String, PatternDocEntry[A]] = Map([])\n  nodes[id.value()] = {\n    generation: next_pattern_node_generation(),\n    revision: @identity.Revision::zero(),\n    node: node.snapshot(),\n  }\n  nodes\n}\n\n///|\nfn[A] insert_pattern_node(\n  nodes : Map[String, PatternDocEntry[A]],\n  id : @identity.PatternNodeId,\n  node : PatternDocNode[A],\n  revision~ : @identity.Revision,\n) -> Unit raise PatternDocError {\n  let key = id.value()\n  if nodes.contains(key) {\n    raise DuplicateNodeId(key)\n  }\n  nodes[key] = {\n    generation: next_pattern_node_generation(),\n    revision,\n    node: node.snapshot(),\n  }\n}\n\n///|\nfn[A] merge_pattern_nodes(\n  target : Map[String, PatternDocEntry[A]],\n  source : Map[String, PatternDocEntry[A]],\n) -> Unit raise PatternDocError {\n  source.each((id, entry) => {\n    if target.contains(id) {\n      raise DuplicateNodeId(id)\n    }\n    target[id] = entry.snapshot()\n  })\n}\n\n///|\nfn[A] aggregate_pattern_revision(\n  docs : Array[PatternDoc[A]],\n) -> @identity.Revision {\n  let mut revision = @identity.Revision::zero()\n  for doc in docs {\n    revision = revision.combine(doc.revision)\n  }\n  revision.next()\n}\n\n///|\nfn[A] replace_pattern_node(\n  nodes : Map[String, PatternDocEntry[A]],\n  id : @identity.PatternNodeId,\n  node : PatternDocNode[A],\n) -> Unit raise PatternDocError {\n  let key = id.value()\n  match nodes.get(key) {\n    None => raise MissingNode(key)\n    Some(entry) =>\n      nodes[key] = {\n        generation: next_pattern_node_generation(),\n        revision: entry.revision.next(),\n        node: node.snapshot(),\n      }\n  }\n}\n\n///|\nfn append_pattern_cache_token(\n  target : Array[Int64],\n  source : Array[Int64],\n) -> Unit {\n  for value in source {\n    target.push(value)\n  }\n}\n\n///|\nfn pattern_cache_token_equal(left : Array[Int64], right : Array[Int64]) -> Bool {\n  guard left.length() == right.length() else { return false }\n  for index in 0..<left.length() {\n    guard left[index] == right[index] else { return false }\n  }\n  true\n}\n\n///|\nfn[A] pattern_node_cache_token_memoized(\n  nodes : Map[String, PatternDocEntry[A]],\n  id : @identity.PatternNodeId,\n  memo : Map[String, Array[Int64]],\n) -> Array[Int64] raise PatternDocError {\n  let key = id.value()\n  match memo.get(key) {\n    Some(token) => token\n    None =>\n      match nodes.get(key) {\n        None => raise MissingNode(id.value())\n        Some(entry) => {\n          let token : Array[Int64] = [entry.generation]\n          match entry.node {\n            Reference(definition, _) =>\n              append_pattern_cache_token(\n                token,\n                pattern_node_cache_token_memoized(\n                  definition.nodes,\n                  definition.root,\n                  {},\n                ),\n              )\n            Runtime(_) | Silence | Pure(_) | Atom(_, _) => ()\n            Fast(child, _)\n            | Slow(child, _)\n            | Gate(child, _)\n            | Rev(child)\n            | FilterMap(child, _)\n            | Euclid(child, _, _, _)\n            | DegradeBy(child, _, _)\n            | Every(child, _, _)\n            | Jux(child, _, _) =>\n              append_pattern_cache_token(\n                token,\n                pattern_node_cache_token_memoized(nodes, child, memo),\n              )\n            MergeControl(left, right, _) => {\n              append_pattern_cache_token(\n                token,\n                pattern_node_cache_token_memoized(nodes, left, memo),\n              )\n              append_pattern_cache_token(\n                token,\n                pattern_node_cache_token_memoized(nodes, right, memo),\n              )\n            }\n            Sequence(children) | Stack(children) =>\n              for child in children {\n                append_pattern_cache_token(\n                  token,\n                  pattern_node_cache_token_memoized(nodes, child, memo),\n                )\n              }\n          }\n          memo[key] = token\n          token\n        }\n      }\n  }\n}\n\n///|\nfn[A] pattern_node_revision(\n  nodes : Map[String, PatternDocEntry[A]],\n  id : @identity.PatternNodeId,\n) -> @identity.Revision raise PatternDocError {\n  let memo : Map[String, @identity.Revision] = Map([])\n  pattern_node_revision_memoized(nodes, id, memo)\n}\n\n///|\nfn[A] copy_reachable_pattern_nodes(\n  source : Map[String, PatternDocEntry[A]],\n  id : @identity.PatternNodeId,\n  target : Map[String, PatternDocEntry[A]],\n) -> Unit raise PatternDocError {\n  let key = id.value()\n  if target.contains(key) {\n    return\n  }\n  match source.get(key) {\n    None => raise MissingNode(key)\n    Some(entry) => {\n      target[key] = entry.snapshot()\n      match entry.node {\n        Reference(_, _) => ()\n        Runtime(_) | Silence | Pure(_) | Atom(_, _) => ()\n        Fast(child, _)\n        | Slow(child, _)\n        | Gate(child, _)\n        | Rev(child)\n        | FilterMap(child, _)\n        | Euclid(child, _, _, _)\n        | DegradeBy(child, _, _)\n        | Every(child, _, _)\n        | Jux(child, _, _) =>\n          copy_reachable_pattern_nodes(source, child, target)\n        MergeControl(left, right, _) => {\n          copy_reachable_pattern_nodes(source, left, target)\n          copy_reachable_pattern_nodes(source, right, target)\n        }\n        Sequence(children) | Stack(children) =>\n          for child in children {\n            copy_reachable_pattern_nodes(source, child, target)\n          }\n      }\n    }\n  }\n}\n\n///|\nfn[A] pattern_node_revision_memoized(\n  nodes : Map[String, PatternDocEntry[A]],\n  id : @identity.PatternNodeId,\n  memo : Map[String, @identity.Revision],\n) -> @identity.Revision raise PatternDocError {\n  let key = id.value()\n  match memo.get(key) {\n    Some(revision) => revision\n    None =>\n      match nodes.get(key) {\n        None => raise MissingNode(id.value())\n        Some(entry) => {\n          let mut revision = entry.revision\n          match entry.node {\n            Reference(definition, _) =>\n              revision = revision.combine(definition.revision)\n            Runtime(_) | Silence | Pure(_) | Atom(_, _) => ()\n            Fast(child, _)\n            | Slow(child, _)\n            | Gate(child, _)\n            | Rev(child)\n            | FilterMap(child, _)\n            | Euclid(child, _, _, _)\n            | DegradeBy(child, _, _)\n            | Every(child, _, _)\n            | Jux(child, _, _) =>\n              revision = revision.combine(\n                pattern_node_revision_memoized(nodes, child, memo),\n              )\n            MergeControl(left, right, _) => {\n              revision = revision.combine(\n                pattern_node_revision_memoized(nodes, left, memo),\n              )\n              revision = revision.combine(\n                pattern_node_revision_memoized(nodes, right, memo),\n              )\n            }\n            Sequence(children) | Stack(children) =>\n              for child in children {\n                revision = revision.combine(\n                  pattern_node_revision_memoized(nodes, child, memo),\n                )\n              }\n          }\n          memo[key] = revision\n          revision\n        }\n      }\n  }\n}\n\n///|\npub struct PatternNodePath {\n  priv root : @identity.PatternNodeId\n  priv descendants : Array[@identity.PatternNodeId]\n} derive(Eq, Debug)\n\n///|\nfn PatternNodePath::PatternNodePath(\n  root : @identity.PatternNodeId,\n  descendants? : Array[@identity.PatternNodeId] = [],\n) -> PatternNodePath {\n  { root, descendants: descendants.copy(), }\n}\n\n///|\npub fn PatternNodePath::leaf(self : PatternNodePath) -> @identity.PatternNodeId {\n  match self.descendants.last() {\n    Some(id) => id\n    None => self.root\n  }\n}\n\n///|\npub fn PatternNodePath::nodes(\n  self : PatternNodePath,\n) -> Array[@identity.PatternNodeId] {\n  [self.root, ..self.descendants]\n}\n\n///|\nfn PatternNodePath::prepend(\n  self : PatternNodePath,\n  parent : @identity.PatternNodeId,\n) -> PatternNodePath {\n  PatternNodePath(parent, descendants=self.nodes())\n}\n\n///|\npub struct PatternSnapshotEvent[A] {\n  priv event : Event[A]\n  priv path : PatternNodePath\n}\n\n///|\nfn[A] PatternSnapshotEvent::PatternSnapshotEvent(\n  event~ : Event[A],\n  path~ : PatternNodePath,\n) -> PatternSnapshotEvent[A] {\n  { event, path, }\n}\n\n///|\npub fn[A] PatternSnapshotEvent::event(\n  self : PatternSnapshotEvent[A],\n) -> Event[A] {\n  self.event\n}\n\n///|\npub fn[A] PatternSnapshotEvent::pattern_nodes(\n  self : PatternSnapshotEvent[A],\n) -> Array[@identity.PatternNodeId] {\n  self.path.nodes()\n}\n\n///|\npub fn[A] PatternSnapshotEvent::pattern_node_path(\n  self : PatternSnapshotEvent[A],\n) -> PatternNodePath {\n  self.path\n}\n\n///|\n/// One resolved name-use edge, distinct from graph/voice identity.\npub struct ReferenceBinding {\n  priv id : @identity.ReferenceBindingId\n  priv reference : @identity.ReferenceId\n  priv definition : @identity.DefinitionId\n} derive(Eq, Debug)\n\n///|\nfn ReferenceBinding::ReferenceBinding(\n  id : @identity.ReferenceBindingId,\n  reference : @identity.ReferenceId,\n  definition : @identity.DefinitionId,\n) -> ReferenceBinding {\n  { id, reference, definition, }\n}\n\n///|\npub fn ReferenceBinding::id(\n  self : ReferenceBinding,\n) -> @identity.ReferenceBindingId {\n  self.id\n}\n\n///|\npub fn ReferenceBinding::reference(\n  self : ReferenceBinding,\n) -> @identity.ReferenceId {\n  self.reference\n}\n\n///|\npub fn ReferenceBinding::definition(\n  self : ReferenceBinding,\n) -> @identity.DefinitionId {\n  self.definition\n}\n\n///|\npriv enum OriginBindings {\n  End\n  Link(ReferenceBinding, OriginBindings)\n} derive(Eq, Debug)\n\n///|\n/// Exact source identity. Bindings run from outer use site to inner definition.\npub struct EventOrigin {\n  priv atom : @identity.SourceAtomId\n  priv bindings : OriginBindings\n} derive(Eq, Debug)\n\n///|\nfn EventOrigin::EventOrigin(\n  atom : @identity.SourceAtomId,\n  bindings? : OriginBindings = End,\n) -> EventOrigin {\n  { atom, bindings, }\n}\n\n///|\npub fn EventOrigin::atom(self : EventOrigin) -> @identity.SourceAtomId {\n  self.atom\n}\n\n///|\npub fn EventOrigin::bindings(self : EventOrigin) -> Array[ReferenceBinding] {\n  let result = []\n  for remaining = self.bindings {\n    match remaining {\n      End => break\n      Link(binding, rest) => {\n        result.push(binding)\n        continue rest\n      }\n    }\n  }\n  result\n}\n\n///|\n/// Name resolution supplies this witness; lowering never guesses from spelling.\npub struct ResolvedReference[A] {\n  priv definition : PatternDoc[A]\n  priv binding : ReferenceBinding\n}\n\n///|\npub fn[A] ResolvedReference::ResolvedReference(\n  definition~ : PatternDoc[A],\n  definition_id~ : @identity.DefinitionId,\n  reference~ : @identity.ReferenceId,\n  binding~ : @identity.ReferenceBindingId,\n) -> ResolvedReference[A] raise @identity.StableIdError {\n  guard definition_id.epoch() == reference.epoch() &&\n    reference.epoch() == binding.epoch() else {\n    raise @identity.InvalidId(\"reference binding spans source epochs\")\n  }\n  { definition, binding: ReferenceBinding(binding, reference, definition_id), }\n}\n\n///|\n/// Cold compilation policy. Contexts accumulate inner-to-outer while descending.\n/// Query callbacks only carry the completed origin; they never extend it.\npriv trait DocumentOrigin {\n  fn make_origin(\n    @identity.PatternNodeId,\n    @identity.SourceAtomId?,\n    OriginBindings,\n  ) -> Self raise PatternDocError\n  fn bind_context(@identity.PatternNodeId, ReferenceBinding?, OriginBindings) -> OriginBindings raise PatternDocError\n}\n\n///|\nimpl DocumentOrigin for Unit with fn make_origin(_, _, _) {\n  ()\n}\n\n///|\nimpl DocumentOrigin for Unit with fn bind_context(_, _, _) {\n  End\n}\n\n///|\nimpl DocumentOrigin for EventOrigin with fn make_origin(node, atom, context) {\n  guard atom is Some(atom) else { raise MissingAtomOrigin(node) }\n  let mut bindings = End\n  for remaining = context {\n    match remaining {\n      End => break\n      Link(binding, rest) => {\n        bindings = Link(binding, bindings)\n        continue rest\n      }\n    }\n  }\n  EventOrigin(atom, bindings~)\n}\n\n///|\nimpl DocumentOrigin for EventOrigin with fn bind_context(node, binding, context) {\n  guard binding is Some(binding) else { raise MissingReferenceBinding(node) }\n  Link(binding, context)\n}\n\n///|\npriv struct ScopedValue[A, O] {\n  value : A\n  scope : PatternNodePath\n  origin : O\n}\n\n///|\nfn[A, O] ScopedValue::ScopedValue(\n  value : A,\n  scope : PatternNodePath,\n  origin : O,\n) -> ScopedValue[A, O] {\n  { value, scope, origin, }\n}\n\n///|\nfn[A, O] ScopedValue::prepend(\n  self : ScopedValue[A, O],\n  id : @identity.PatternNodeId,\n) -> ScopedValue[A, O] {\n  ScopedValue(self.value, self.scope.prepend(id), self.origin)\n}\n\n///|\nfn[A, O] scoped_event(\n  event : Event[ScopedValue[A, O]],\n) -> PatternSnapshotEvent[A] {\n  PatternSnapshotEvent(\n    event={ whole: event.whole, part: event.part, value: event.value.value, },\n    path=event.value.scope,\n  )\n}\n\n///|\nfn[A, O] erase_value(event : ScopedValue[A, O]) -> A {\n  event.value\n}\n\n///|\npub struct EventWithOrigin[A] {\n  priv event : Event[A]\n  priv origin : EventOrigin\n  priv scope : PatternNodePath\n}\n\n///|\nfn[A] EventWithOrigin::EventWithOrigin(\n  event : Event[ScopedValue[A, EventOrigin]],\n) -> EventWithOrigin[A] {\n  {\n    event: { whole: event.whole, part: event.part, value: event.value.value, },\n    origin: event.value.origin,\n    scope: event.value.scope,\n  }\n}\n\n///|\npub fn[A] EventWithOrigin::event(self : EventWithOrigin[A]) -> Event[A] {\n  self.event\n}\n\n///|\npub fn[A] EventWithOrigin::origin(self : EventWithOrigin[A]) -> EventOrigin {\n  self.origin\n}\n\n///|\npub fn[A] EventWithOrigin::pattern_node_path(\n  self : EventWithOrigin[A],\n) -> PatternNodePath {\n  self.scope\n}\n\n///|\npub extend EventOrigin with Eq::{equal, not_equal}\n\n///|\npub extend EventOrigin with Debug::{to_repr}\n\n///|\npub extend ReferenceBinding with Eq::{equal, not_equal}\n\n///|\npub extend ReferenceBinding with Debug::{to_repr}\n\n///|\nfn[A] append_reachable_pattern_source_ids(\n  nodes : Map[String, PatternDocEntry[A]],\n  id : @identity.PatternNodeId,\n  result : Array[@identity.PatternNodeId],\n  seen : Map[String, Bool],\n) -> Unit raise PatternDocError {\n  let key = id.value()\n  if seen.contains(key) {\n    return\n  }\n  match nodes.get(key) {\n    None => raise MissingNode(key)\n    Some(entry) => {\n      seen[key] = true\n      result.push(id)\n      match entry.node {\n        Reference(definition, _) =>\n          append_reachable_pattern_source_ids(\n            definition.nodes,\n            definition.root,\n            result,\n            {},\n          )\n        Runtime(_) | Silence | Pure(_) | Atom(_, _) => ()\n        Fast(child, _)\n        | Slow(child, _)\n        | Gate(child, _)\n        | Rev(child)\n        | FilterMap(child, _)\n        | Euclid(child, _, _, _)\n        | DegradeBy(child, _, _)\n        | Every(child, _, _)\n        | Jux(child, _, _) =>\n          append_reachable_pattern_source_ids(nodes, child, result, seen)\n        MergeControl(left, right, _) => {\n          append_reachable_pattern_source_ids(nodes, left, result, seen)\n          append_reachable_pattern_source_ids(nodes, right, result, seen)\n        }\n        Sequence(children) | Stack(children) =>\n          for child in children {\n            append_reachable_pattern_source_ids(nodes, child, result, seen)\n          }\n      }\n    }\n  }\n}\n\n///|\nfn[A] pattern_source_path_for_opaque_children(\n  nodes : Map[String, PatternDocEntry[A]],\n  id : @identity.PatternNodeId,\n  children : Array[@identity.PatternNodeId],\n) -> PatternNodePath raise PatternDocError {\n  let descendants : Array[@identity.PatternNodeId] = []\n  let seen : Map[String, Bool] = Map([])\n  seen[id.value()] = true\n  for child in children {\n    append_reachable_pattern_source_ids(nodes, child, descendants, seen)\n  }\n  PatternNodePath(id, descendants~)\n}\n\n///|\npriv struct CompiledEntry[A, O] {\n  key : String\n  source : Pat[ScopedValue[A, O]]\n}\n\n///|\nfn[A, O] CompiledEntry::CompiledEntry(\n  key : String,\n  source : Pat[ScopedValue[A, O]],\n) -> CompiledEntry[A, O] {\n  { key, source, }\n}\n\n///|\n/// One execution kernel; raw events and scoped/origin views are projections.\npriv struct CompiledPattern[A, O] {\n  pat : Pat[ScopedValue[A, O]]\n  entries : Array[CompiledEntry[A, O]]\n}\n\n///|\nfn[A, O] CompiledPattern::CompiledPattern(\n  pat : Pat[ScopedValue[A, O]],\n  entries : Array[CompiledEntry[A, O]],\n) -> CompiledPattern[A, O] {\n  { pat, entries, }\n}\n\n///|\nfn[A, O] CompiledPattern::single_material(\n  pat : Pat[ScopedValue[A, O]],\n  id : @identity.PatternNodeId,\n) -> CompiledPattern[A, O] {\n  CompiledPattern(\n    pat,\n    pat\n    .entries()\n    .map(_ => CompiledEntry(\"\\{id.value().length()}:\\{id.value()}\", pat)),\n  )\n}\n\n///|\nfn[A, O] CompiledPattern::transform(\n  self : CompiledPattern[A, O],\n  f : (Pat[ScopedValue[A, O]]) -> Pat[ScopedValue[A, O]],\n) -> CompiledPattern[A, O] {\n  CompiledPattern(\n    f(self.pat),\n    self.entries.map(entry => CompiledEntry(entry.key, f(entry.source))),\n  )\n}\n\n///|\nfn[A, O] opaque_compiled_entries(\n  pat : Pat[ScopedValue[A, O]],\n  id : @identity.PatternNodeId,\n) -> Array[CompiledEntry[A, O]] {\n  pat\n  .entries()\n  .map(entry => {\n    CompiledEntry(\n      \"\\{id.value().length()}:\\{id.value()}/\\{entry.entry_key()}\",\n      entry,\n    )\n  })\n}\n\n///|\nfn[A, O : DocumentOrigin] lower_pattern_node_cached(\n  nodes : Map[String, PatternDocEntry[A]],\n  id : @identity.PatternNodeId,\n  cache : CompiledCache[A, O],\n  controls : CompiledCache[A, Unit],\n  token_memo : Map[String, Array[Int64]],\n  context : OriginBindings,\n) -> CompiledPattern[A, O] raise PatternDocError {\n  let token = pattern_node_cache_token_memoized(nodes, id, token_memo)\n  match cache.lookup(id, token, context) {\n    Some(compiled) => compiled\n    None => {\n      let compiled = compile_pattern_node(\n        nodes, id, cache, controls, token_memo, context,\n      )\n      cache.store(id, token, context, compiled)\n      compiled\n    }\n  }\n}\n\n///|\nfn[A, O : DocumentOrigin] compile_pattern_node(\n  nodes : Map[String, PatternDocEntry[A]],\n  id : @identity.PatternNodeId,\n  cache : CompiledCache[A, O],\n  controls : CompiledCache[A, Unit],\n  token_memo : Map[String, Array[Int64]],\n  context : OriginBindings,\n) -> CompiledPattern[A, O] raise PatternDocError {\n  guard nodes.get(id.value()) is Some(entry) else {\n    raise MissingNode(id.value())\n  }\n  fn lower(\n    child : @identity.PatternNodeId,\n  ) -> CompiledPattern[A, O] raise PatternDocError {\n    lower_pattern_node_cached(\n      nodes, child, cache, controls, token_memo, context,\n    )\n  }\n  fn prepend(pat : Pat[ScopedValue[A, O]]) -> Pat[ScopedValue[A, O]] {\n    pat.map_payload(value => value.prepend(id))\n  }\n  match entry.node {\n    Reference(definition, binding) => {\n      let bound_context = O::bind_context(id, binding, context)\n      let target = lower_pattern_node_cached(\n        definition.nodes,\n        definition.root,\n        cache,\n        controls,\n        {},\n        bound_context,\n      )\n      CompiledPattern(\n        prepend(target.pat),\n        Array::makei(target.entries.length(), index => {\n          CompiledEntry(\n            \"\\{id.value().length()}:\\{id.value()}/member:\\{index}\",\n            prepend(target.entries[index].source),\n          )\n        }),\n      )\n    }\n    Runtime(pat) => {\n      let origin : O = O::make_origin(id, None, context)\n      let source = pat.map_payload(value => {\n        ScopedValue(value, PatternNodePath(id), origin)\n      })\n      CompiledPattern(source, opaque_compiled_entries(source, id))\n    }\n    Silence => CompiledPattern::single_material(Pat::silence(), id)\n    Pure(value) => {\n      let origin : O = O::make_origin(id, None, context)\n      CompiledPattern::single_material(\n        Pat::pure(ScopedValue(value, PatternNodePath(id), origin)),\n        id,\n      )\n    }\n    Atom(pat, atom) => {\n      let origin : O = O::make_origin(id, Some(atom), context)\n      let source = pat.map_payload(value => {\n        ScopedValue(value, PatternNodePath(id), origin)\n      })\n      CompiledPattern(source, opaque_compiled_entries(source, id))\n    }\n    Fast(child, factor) => {\n      let child = lower(child)\n      let result = child.transform(pat => prepend(pat.fast(factor)))\n      if factor.num <= 0L {\n        CompiledPattern(result.pat, [])\n      } else {\n        result\n      }\n    }\n    Slow(child, factor) => {\n      let child = lower(child)\n      let result = child.transform(pat => prepend(pat.slow(factor)))\n      if factor.num <= 0L {\n        CompiledPattern(result.pat, [])\n      } else {\n        result\n      }\n    }\n    Gate(child, factor) =>\n      lower(child).transform(pat => prepend(pat.gate(factor)))\n    Rev(child) => lower(child).transform(pat => prepend(pat.rev()))\n    FilterMap(child, f) =>\n      lower(child).transform(pat => {\n        pat.filter_map_payload(\n          value => {\n            f(value.value).map(mapped => {\n              ScopedValue(mapped, value.scope.prepend(id), value.origin)\n            })\n          },\n          \"\",\n        )\n      })\n    Euclid(child, k, n, rotation) =>\n      CompiledPattern::single_material(\n        prepend(lower(child).pat.euclid(k, n, rotation~)),\n        id,\n      )\n    DegradeBy(child, p, seed) =>\n      lower(child).transform(pat => prepend(pat.degrade_by(p, seed~)))\n    Every(child_id, n, transform) => {\n      let child = lower(child_id)\n      let scope = pattern_source_path_for_opaque_children(nodes, id, [child_id])\n      let base = prepend(child.pat)\n      // Keep the old opaque-callback signature policy, despite the typed operation.\n      let pat = every(\n        n,\n        p => {\n          transform\n          .apply(p)\n          .map_payload(value => ScopedValue(value.value, scope, value.origin))\n        },\n        base,\n      )\n      let entries = if n <= 0 {\n        child.entries.map(entry => {\n          CompiledEntry(entry.key, prepend(entry.source))\n        })\n      } else {\n        [CompiledEntry(\"\\{id.value().length()}:\\{id.value()}\", pat)]\n      }\n      CompiledPattern(pat, entries)\n    }\n    Jux(child_id, transform, merge) => {\n      let child = lower(child_id)\n      let scope = pattern_source_path_for_opaque_children(nodes, id, [child_id])\n      let pat = jux_kernel(\n        child.pat,\n        p => transform.apply(p),\n        (value, pan) => {\n          ScopedValue(merge(value.value, pan), value.scope, value.origin)\n        },\n        \"\",\n      ).map_payload(value => ScopedValue(value.value, scope, value.origin))\n      CompiledPattern(pat, opaque_compiled_entries(pat, id))\n    }\n    MergeControl(left_id, right_id, merge) => {\n      let left = lower(left_id)\n      // Control providers need no primary source atom or reference binding.\n      let right : CompiledPattern[A, Unit] = lower_pattern_node_cached(\n        nodes,\n        right_id,\n        controls,\n        controls,\n        token_memo,\n        End,\n      )\n      let scope = pattern_source_path_for_opaque_children(nodes, id, [\n        left_id, right_id,\n      ])\n      let pat = merge_control_kernel(\n        left.pat,\n        right.pat.map_payload(erase_value),\n        (value, control) => {\n          ScopedValue(merge(value.value, control), value.scope, value.origin)\n        },\n      ).map_payload(value => ScopedValue(value.value, scope, value.origin))\n      let entries = pat.entries()\n      CompiledPattern(\n        pat,\n        Array::makei(entries.length(), index => {\n          CompiledEntry(left.entries[index].key, entries[index])\n        }),\n      )\n    }\n    Sequence(children) => {\n      let pats = children.map(child => lower(child).pat)\n      CompiledPattern::single_material(prepend(sequence(pats)), id)\n    }\n    Stack(children) => {\n      let children = children.map(lower)\n      let entries = children\n        .iter()\n        .flat_map(child => {\n          child.entries\n          .iter()\n          .map(entry => CompiledEntry(entry.key, prepend(entry.source)))\n        })\n        .collect()\n      CompiledPattern(prepend(stack(children.map(child => child.pat))), entries)\n    }\n  }\n}\n\n///|\npriv struct CompiledCacheEntry[A, O] {\n  token : Array[Int64]\n  context : OriginBindings\n  compiled : CompiledPattern[A, O]\n}\n\n///|\n/// Cache for compiled playback and provenance of pattern subtrees.\n///\n/// Entries are keyed by stable `PatternNodeId`, a recursive private subtree\n/// token, and the immutable reference context. The context prevents a definition\n/// compiled for one reference use from supplying origins to another use.\n/// The subtree token prevents stale hits\n/// when callers rebuild unrelated docs or fork divergent edits from the same\n/// base with identical stable IDs and revision counters. Every replacement gets\n/// a fresh generation, and the token includes every dependency generation.\n/// Revision is an editing API value; it adds no discrimination to this key.\npriv struct CompiledCache[A, O] {\n  entries : Map[String, Array[CompiledCacheEntry[A, O]]]\n  mut hits : Int\n  mut misses : Int\n}\n\n///|\nfn[A, O] CompiledCache::new() -> CompiledCache[A, O] {\n  { entries: {}, hits: 0, misses: 0, }\n}\n\n///|\nfn[A, O] CompiledCache::lookup(\n  self : CompiledCache[A, O],\n  id : @identity.PatternNodeId,\n  token : Array[Int64],\n  context : OriginBindings,\n) -> CompiledPattern[A, O]? {\n  match self.entries.get(id.value()) {\n    None => {\n      self.misses += 1\n      None\n    }\n    Some(entries) => {\n      for entry in entries {\n        if entry.context == context &&\n          pattern_cache_token_equal(entry.token, token) {\n          self.hits += 1\n          return Some(entry.compiled)\n        }\n      }\n      self.misses += 1\n      None\n    }\n  }\n}\n\n///|\n/// Called only after a cache miss; the immutable dependency key is absent.\nfn[A, O] CompiledCache::store(\n  self : CompiledCache[A, O],\n  id : @identity.PatternNodeId,\n  token : Array[Int64],\n  context : OriginBindings,\n  compiled : CompiledPattern[A, O],\n) -> Unit {\n  let key = id.value()\n  match self.entries.get(key) {\n    None => self.entries[key] = [{ token: token.copy(), context, compiled, }]\n    Some(entries) => entries.push({ token: token.copy(), context, compiled, })\n  }\n}\n\n///|\nfn[A, O] CompiledCache::hit_count(self : CompiledCache[A, O]) -> Int {\n  self.hits\n}\n\n///|\nfn[A, O] CompiledCache::miss_count(self : CompiledCache[A, O]) -> Int {\n  self.misses\n}\n\n///|\nfn[A, O] CompiledCache::entry_count(self : CompiledCache[A, O]) -> Int {\n  let mut count = 0\n  self.entries.each(fn(_, entries) { count += entries.length() })\n  count\n}\n\n///|\nfn[A, O] CompiledCache::reset_stats(self : CompiledCache[A, O]) -> Unit {\n  self.hits = 0\n  self.misses = 0\n}\n\n///|\nfn[A, O] CompiledCache::clear(self : CompiledCache[A, O]) -> Unit {\n  self.entries.clear()\n  self.reset_stats()\n}\n\n///|\n/// Exact and general specializations never exchange cached payloads.\npub struct PatternLoweringCache[A] {\n  priv general : CompiledCache[A, Unit]\n  priv exact : CompiledCache[A, EventOrigin]\n}\n\n///|\npub fn[A] PatternLoweringCache::new() -> PatternLoweringCache[A] {\n  { general: CompiledCache::new(), exact: CompiledCache::new(), }\n}\n\n///|\npub fn[A] PatternLoweringCache::hit_count(\n  self : PatternLoweringCache[A],\n) -> Int {\n  self.general.hit_count() + self.exact.hit_count()\n}\n\n///|\npub fn[A] PatternLoweringCache::miss_count(\n  self : PatternLoweringCache[A],\n) -> Int {\n  self.general.miss_count() + self.exact.miss_count()\n}\n\n///|\npub fn[A] PatternLoweringCache::entry_count(\n  self : PatternLoweringCache[A],\n) -> Int {\n  self.general.entry_count() + self.exact.entry_count()\n}\n\n///|\npub fn[A] PatternLoweringCache::reset_stats(\n  self : PatternLoweringCache[A],\n) -> Unit {\n  self.general.reset_stats()\n  self.exact.reset_stats()\n}\n\n///|\npub fn[A] PatternLoweringCache::clear(self : PatternLoweringCache[A]) -> Unit {\n  self.general.clear()\n  self.exact.clear()\n}\n\n///|\n/// Lowered pattern snapshot for scheduler/runtime consumers.\npub struct PatternSnapshot[A] {\n  priv root : @identity.PatternNodeId\n  priv revision : @identity.Revision\n  priv pat : Pat[A]\n  priv sourced : Pat[ScopedValue[A, Unit]]\n  priv entry_sourced : Array[CompiledEntry[A, Unit]]\n}\n\n///|\npub fn[A] PatternSnapshot::root(\n  self : PatternSnapshot[A],\n) -> @identity.PatternNodeId {\n  self.root\n}\n\n///|\npub fn[A] PatternSnapshot::revision(\n  self : PatternSnapshot[A],\n) -> @identity.Revision {\n  self.revision\n}\n\n///|\n/// Stable playback occurrence key, independent of overlay source ancestry.\n/// Reusing a definition at distinct reference nodes produces distinct keys.\npub fn[A] PatternSnapshot::entry_key(\n  self : PatternSnapshot[A],\n  source_index : Int,\n) -> String? {\n  self.entry_sourced.get(source_index).map(entry => entry.key)\n}\n\n///|\npub fn[A] PatternSnapshot::pat(self : PatternSnapshot[A]) -> Pat[A] {\n  self.pat\n}\n\n///|\npub fn[A] PatternSnapshot::query(\n  self : PatternSnapshot[A],\n  arc : TimeSpan,\n) -> Array[Event[A]] {\n  self.pat.query(arc)\n}\n\n///|\npub fn[A] PatternSnapshot::query_sourced_events(\n  self : PatternSnapshot[A],\n  arc : TimeSpan,\n) -> Array[PatternSnapshotEvent[A]] {\n  self.sourced.query(arc).map(scoped_event)\n}\n\n///|\n/// Query one canonical `Pat::entries()` member with authored provenance.\n/// `source_index` is the member index retained by playback entry state.\n/// Invalid indexes return an empty result.\npub fn[A] PatternSnapshot::query_sourced_events_for_entry(\n  self : PatternSnapshot[A],\n  source_index : Int,\n  arc : TimeSpan,\n) -> Array[PatternSnapshotEvent[A]] {\n  match self.entry_sourced.get(source_index) {\n    Some(entry) => entry.source.query(arc).map(scoped_event)\n    None => []\n  }\n}\n\n///|\n/// A compiled pattern whose every emitted event carries an exact source origin.\npub struct PatternSnapshotWithOrigins[A] {\n  priv root : @identity.PatternNodeId\n  priv revision : @identity.Revision\n  priv pat : Pat[A]\n  priv sourced : Pat[ScopedValue[A, EventOrigin]]\n  priv entry_sourced : Array[CompiledEntry[A, EventOrigin]]\n}\n\n///|\npub fn[A] PatternSnapshotWithOrigins::root(\n  self : PatternSnapshotWithOrigins[A],\n) -> @identity.PatternNodeId {\n  self.root\n}\n\n///|\npub fn[A] PatternSnapshotWithOrigins::revision(\n  self : PatternSnapshotWithOrigins[A],\n) -> @identity.Revision {\n  self.revision\n}\n\n///|\npub fn[A] PatternSnapshotWithOrigins::pat(\n  self : PatternSnapshotWithOrigins[A],\n) -> Pat[A] {\n  self.pat\n}\n\n///|\npub fn[A] PatternSnapshotWithOrigins::entry_key(\n  self : PatternSnapshotWithOrigins[A],\n  index : Int,\n) -> String? {\n  self.entry_sourced.get(index).map(entry => entry.key)\n}\n\n///|\npub fn[A] PatternSnapshotWithOrigins::query(\n  self : PatternSnapshotWithOrigins[A],\n  arc : TimeSpan,\n) -> Array[EventWithOrigin[A]] {\n  self.sourced.query(arc).map(event => EventWithOrigin(event))\n}\n\n///|\n/// Query a canonical material member; invalid indexes produce no events.\npub fn[A] PatternSnapshotWithOrigins::query_for_entry(\n  self : PatternSnapshotWithOrigins[A],\n  index : Int,\n  arc : TimeSpan,\n) -> Array[EventWithOrigin[A]] {\n  match self.entry_sourced.get(index) {\n    None => []\n    Some(entry) => entry.source.query(arc).map(event => EventWithOrigin(event))\n  }\n}\n\n///|\n/// Erase only origin capability, without compiling or interpreting time again.\npub fn[A] PatternSnapshotWithOrigins::as_snapshot(\n  self : PatternSnapshotWithOrigins[A],\n) -> PatternSnapshot[A] {\n  fn erase_origin(value : ScopedValue[A, EventOrigin]) -> ScopedValue[A, Unit] {\n    ScopedValue(value.value, value.scope, ())\n  }\n  {\n    root: self.root,\n    revision: self.revision,\n    pat: self.pat,\n    sourced: self.sourced.map_payload(erase_origin),\n    entry_sourced: self.entry_sourced.map(entry => {\n      CompiledEntry(entry.key, entry.source.map_payload(erase_origin))\n    }),\n  }\n}\n\n///|\npub fn[A] PatternDoc::lower_with_origins(\n  self : PatternDoc[A],\n  cache? : PatternLoweringCache[A] = PatternLoweringCache::new(),\n) -> PatternSnapshotWithOrigins[A] raise PatternDocError {\n  let compiled = lower_pattern_node_cached(\n    self.nodes,\n    self.root,\n    cache.exact,\n    cache.general,\n    {},\n    End,\n  )\n  {\n    root: self.root,\n    revision: self.revision,\n    pat: compiled.pat.map_payload(erase_value),\n    sourced: compiled.pat,\n    entry_sourced: compiled.entries,\n  }\n}\n\n///|\n/// Generic values have unknown musical content, just like Pat::pure.\npub fn[A] PatternDoc::atom(\n  id~ : @identity.PatternNodeId,\n  source_atom~ : @identity.SourceAtomId,\n  value~ : A,\n) -> PatternDoc[A] {\n  PatternDoc(\n    root=id,\n    revision=@identity.Revision::zero(),\n    nodes=singleton_pattern_nodes(id, Atom(Pat::pure(value), source_atom)),\n  )\n}\n\n///|\n/// Use the canonical control constructor's signature; source IDs never enter it.\npub fn PatternDoc::control_atom(\n  id~ : @identity.PatternNodeId,\n  source_atom~ : @identity.SourceAtomId,\n  key~ : String,\n  value~ : Double,\n) -> PatternDoc[ControlMap] {\n  PatternDoc(\n    root=id,\n    revision=@identity.Revision::zero(),\n    nodes=singleton_pattern_nodes(id, Atom(control(key, value), source_atom)),\n  )\n}\n\n///|\npub fn[A] PatternDoc::reference_with_binding(\n  id~ : @identity.PatternNodeId,\n  resolved_reference~ : ResolvedReference[A],\n) -> PatternDoc[A] {\n  PatternDoc(\n    root=id,\n    revision=resolved_reference.definition.revision,\n    nodes=singleton_pattern_nodes(\n      id,\n      Reference(resolved_reference.definition, Some(resolved_reference.binding)),\n    ),\n  )\n}\n\n///|\n/// Identity-bearing pattern authoring document.\n///\n/// `PatternDoc` is an immutable authoring layer above the runtime `Pat`\n/// closure model. Node storage is private so future incremental lowering can\n/// cache by stable node identity and revision without exposing storage shape.\npub struct PatternDoc[A] {\n  priv root : @identity.PatternNodeId\n  priv revision : @identity.Revision\n  priv incr_revision : @types.Revision\n  priv nodes : Map[String, PatternDocEntry[A]]\n}\n\n///|\nlet pattern_doc_incr_revision : Ref[@types.Revision] = Ref(\n  @types.Revision::initial(),\n)\n\n///|\nfn next_pattern_doc_incr_revision() -> @types.Revision {\n  let next = pattern_doc_incr_revision.val.next()\n  pattern_doc_incr_revision.val = next\n  next\n}\n\n///|\nfn[A] PatternDoc::PatternDoc(\n  root~ : @identity.PatternNodeId,\n  revision~ : @identity.Revision,\n  nodes~ : Map[String, PatternDocEntry[A]],\n) -> PatternDoc[A] {\n  { root, revision, incr_revision: next_pattern_doc_incr_revision(), nodes, }\n}\n\n///|\npub fn[A] PatternDoc::from_pattern(\n  id~ : @identity.PatternNodeId,\n  pat~ : Pat[A],\n) -> PatternDoc[A] {\n  PatternDoc(\n    root=id,\n    revision=@identity.Revision::zero(),\n    nodes=singleton_pattern_nodes(id, Runtime(pat)),\n  )\n}\n\n///|\npub fn[A] PatternDoc::silence(id~ : @identity.PatternNodeId) -> PatternDoc[A] {\n  PatternDoc(\n    root=id,\n    revision=@identity.Revision::zero(),\n    nodes=singleton_pattern_nodes(id, Silence),\n  )\n}\n\n///|\npub fn[A] PatternDoc::pure(\n  id~ : @identity.PatternNodeId,\n  value~ : A,\n) -> PatternDoc[A] {\n  PatternDoc(\n    root=id,\n    revision=@identity.Revision::zero(),\n    nodes=singleton_pattern_nodes(id, Pure(value)),\n  )\n}\n\n///|\npub fn[A] PatternDoc::root(self : PatternDoc[A]) -> @identity.PatternNodeId {\n  self.root\n}\n\n///|\npub fn[A] PatternDoc::revision(self : PatternDoc[A]) -> @identity.Revision {\n  self.revision\n}\n\n///|\n/// `PatternDoc` participates in incr's backdate-aware acceptance\n/// (`@incr.AcceptedDerived::accepted_memo`) through its\n/// `@identity.Revision` content stamp. `PatternDoc` is not `Eq` (it carries\n/// closure fields), so `backdate_equal` below compares that full stamp.\n///\n/// incr's closed `Revision` is an independent monotonic creation stamp.\n/// Semantic equality remains governed by `backdate_equal`, so reparsing an\n/// unchanged document can backdate to the previously accepted value.\npub impl[A] @types.HasChangedAt for PatternDoc[A] with fn changed_at(self) -> @types.Revision {\n  self.incr_revision\n}\n\n///|\n/// Compare the full 2-D `@identity.Revision` (`value` AND `fingerprint`) via\n/// its derived `Eq`, so two content-distinct docs that happen to collide on\n/// `value` are still treated as changed. This is the load-bearing acceptance\n/// predicate used by `accepted_memo`.\npub impl[A] @types.BackdateEq for PatternDoc[A] with fn backdate_equal(\n  self,\n  other,\n) -> Bool {\n  self.revision == other.revision\n}\n\n///|\npub fn[A] PatternDoc::node_count(self : PatternDoc[A]) -> Int {\n  self.nodes.length()\n}\n\n///|\npub fn[A] PatternDoc::contains_node(\n  self : PatternDoc[A],\n  id : @identity.PatternNodeId,\n) -> Bool {\n  self.nodes.contains(id.value())\n}\n\n///|\npub fn[A] PatternDoc::subdoc(\n  self : PatternDoc[A],\n  root~ : @identity.PatternNodeId,\n) -> PatternDoc[A] raise PatternDocError {\n  let nodes : Map[String, PatternDocEntry[A]] = Map([])\n  copy_reachable_pattern_nodes(self.nodes, root, nodes)\n  PatternDoc(root~, revision=pattern_node_revision(nodes, root), nodes~)\n}\n\n///|\npub fn[A] PatternDoc::node_revision(\n  self : PatternDoc[A],\n  id : @identity.PatternNodeId,\n) -> @identity.Revision raise PatternDocError {\n  pattern_node_revision(self.nodes, id)\n}\n\n///|\npub fn[A] PatternDoc::lower(\n  self : PatternDoc[A],\n) -> PatternSnapshot[A] raise PatternDocError {\n  self.lower_with_cache(PatternLoweringCache::new())\n}\n\n///|\npub fn[A] PatternDoc::lower_with_cache(\n  self : PatternDoc[A],\n  cache : PatternLoweringCache[A],\n) -> PatternSnapshot[A] raise PatternDocError {\n  let compiled = lower_pattern_node_cached(\n    self.nodes,\n    self.root,\n    cache.general,\n    cache.general,\n    {},\n    End,\n  )\n  {\n    root: self.root,\n    revision: self.revision,\n    pat: compiled.pat.map_payload(erase_value),\n    sourced: compiled.pat,\n    entry_sourced: compiled.entries,\n  }\n}\n\n///|\npub fn[A] PatternDoc::with_root(\n  self : PatternDoc[A],\n  root~ : @identity.PatternNodeId,\n) -> PatternDoc[A] raise PatternDocError {\n  if !self.nodes.contains(root.value()) {\n    raise MissingNode(root.value())\n  }\n  PatternDoc(\n    root~,\n    revision=self.revision.next(),\n    nodes=copy_pattern_nodes(self.nodes),\n  )\n}\n\n///|\npub fn[A] PatternDoc::replace_with_pattern(\n  self : PatternDoc[A],\n  id~ : @identity.PatternNodeId,\n  pat~ : Pat[A],\n) -> PatternDoc[A] raise PatternDocError {\n  let nodes = copy_pattern_nodes(self.nodes)\n  replace_pattern_node(nodes, id, Runtime(pat))\n  PatternDoc(root=self.root, revision=self.revision.next(), nodes~)\n}\n\n///|\npub fn[A] PatternDoc::replace_with_silence(\n  self : PatternDoc[A],\n  id~ : @identity.PatternNodeId,\n) -> PatternDoc[A] raise PatternDocError {\n  let nodes = copy_pattern_nodes(self.nodes)\n  replace_pattern_node(nodes, id, Silence)\n  PatternDoc(root=self.root, revision=self.revision.next(), nodes~)\n}\n\n///|\npub fn[A] PatternDoc::replace_with_pure(\n  self : PatternDoc[A],\n  id~ : @identity.PatternNodeId,\n  value~ : A,\n) -> PatternDoc[A] raise PatternDocError {\n  let nodes = copy_pattern_nodes(self.nodes)\n  replace_pattern_node(nodes, id, Pure(value))\n  PatternDoc(root=self.root, revision=self.revision.next(), nodes~)\n}\n\n///|\npub fn[A] PatternDoc::fast(\n  self : PatternDoc[A],\n  id~ : @identity.PatternNodeId,\n  factor~ : Rational,\n) -> PatternDoc[A] raise PatternDocError {\n  let nodes = copy_pattern_nodes(self.nodes)\n  insert_pattern_node(\n    nodes,\n    id,\n    Fast(self.root, factor),\n    revision=self.revision.next(),\n  )\n  PatternDoc(root=id, revision=self.revision.next(), nodes~)\n}\n\n///|\npub fn[A] PatternDoc::slow(\n  self : PatternDoc[A],\n  id~ : @identity.PatternNodeId,\n  factor~ : Rational,\n) -> PatternDoc[A] raise PatternDocError {\n  let nodes = copy_pattern_nodes(self.nodes)\n  insert_pattern_node(\n    nodes,\n    id,\n    Slow(self.root, factor),\n    revision=self.revision.next(),\n  )\n  PatternDoc(root=id, revision=self.revision.next(), nodes~)\n}\n\n///|\npub fn[A] PatternDoc::gate(\n  self : PatternDoc[A],\n  id~ : @identity.PatternNodeId,\n  factor~ : Rational,\n) -> PatternDoc[A] raise PatternDocError {\n  let nodes = copy_pattern_nodes(self.nodes)\n  insert_pattern_node(\n    nodes,\n    id,\n    Gate(self.root, factor),\n    revision=self.revision.next(),\n  )\n  PatternDoc(root=id, revision=self.revision.next(), nodes~)\n}\n\n///|\npub fn[A] PatternDoc::rev(\n  self : PatternDoc[A],\n  id~ : @identity.PatternNodeId,\n) -> PatternDoc[A] raise PatternDocError {\n  let nodes = copy_pattern_nodes(self.nodes)\n  insert_pattern_node(nodes, id, Rev(self.root), revision=self.revision.next())\n  PatternDoc(root=id, revision=self.revision.next(), nodes~)\n}\n\n///|\npub fn[A] PatternDoc::filter_map(\n  self : PatternDoc[A],\n  id~ : @identity.PatternNodeId,\n  f~ : (A) -> A?,\n) -> PatternDoc[A] raise PatternDocError {\n  let nodes = copy_pattern_nodes(self.nodes)\n  insert_pattern_node(\n    nodes,\n    id,\n    FilterMap(self.root, f),\n    revision=self.revision.next(),\n  )\n  PatternDoc(root=id, revision=self.revision.next(), nodes~)\n}\n\n///|\npub fn[A] PatternDoc::euclid(\n  self : PatternDoc[A],\n  id~ : @identity.PatternNodeId,\n  k~ : Int,\n  n~ : Int,\n  rotation? : Int = 0,\n) -> PatternDoc[A] raise PatternDocError {\n  let nodes = copy_pattern_nodes(self.nodes)\n  insert_pattern_node(\n    nodes,\n    id,\n    Euclid(self.root, k, n, rotation),\n    revision=self.revision.next(),\n  )\n  PatternDoc(root=id, revision=self.revision.next(), nodes~)\n}\n\n///|\npub fn[A] PatternDoc::degrade_by(\n  self : PatternDoc[A],\n  id~ : @identity.PatternNodeId,\n  p~ : Double,\n  seed? : Int = 42,\n) -> PatternDoc[A] raise PatternDocError {\n  let nodes = copy_pattern_nodes(self.nodes)\n  insert_pattern_node(\n    nodes,\n    id,\n    DegradeBy(self.root, p, seed),\n    revision=self.revision.next(),\n  )\n  PatternDoc(root=id, revision=self.revision.next(), nodes~)\n}\n\n///|\npub fn[A] PatternDoc::every(\n  self : PatternDoc[A],\n  id~ : @identity.PatternNodeId,\n  n~ : Int,\n  transform~ : TimeTransform,\n) -> PatternDoc[A] raise PatternDocError {\n  let nodes = copy_pattern_nodes(self.nodes)\n  insert_pattern_node(\n    nodes,\n    id,\n    Every(self.root, n, transform),\n    revision=self.revision.next(),\n  )\n  PatternDoc(root=id, revision=self.revision.next(), nodes~)\n}\n\n///|\npub fn PatternDoc::jux(\n  self : PatternDoc[ControlMap],\n  id~ : @identity.PatternNodeId,\n  transform~ : TimeTransform,\n) -> PatternDoc[ControlMap] raise PatternDocError {\n  let nodes = copy_pattern_nodes(self.nodes)\n  insert_pattern_node(\n    nodes,\n    id,\n    Jux(self.root, transform, merge_maps),\n    revision=self.revision.next(),\n  )\n  PatternDoc(root=id, revision=self.revision.next(), nodes~)\n}\n\n///|\npub fn PatternDoc::merge_control(\n  id~ : @identity.PatternNodeId,\n  left~ : PatternDoc[ControlMap],\n  right~ : PatternDoc[ControlMap],\n) -> PatternDoc[ControlMap] raise PatternDocError {\n  let docs = [left, right]\n  let nodes : Map[String, PatternDocEntry[ControlMap]] = Map([])\n  merge_pattern_nodes(nodes, left.nodes)\n  merge_pattern_nodes(nodes, right.nodes)\n  let revision = aggregate_pattern_revision(docs)\n  insert_pattern_node(\n    nodes,\n    id,\n    MergeControl(left.root, right.root, merge_maps),\n    revision~,\n  )\n  PatternDoc(root=id, revision~, nodes~)\n}\n\n///|\npub fn[A] PatternDoc::sequence(\n  id~ : @identity.PatternNodeId,\n  docs~ : Array[PatternDoc[A]],\n) -> PatternDoc[A] raise PatternDocError {\n  if docs.is_empty() {\n    raise EmptyPatternDocs\n  }\n  let nodes : Map[String, PatternDocEntry[A]] = Map([])\n  for doc in docs {\n    merge_pattern_nodes(nodes, doc.nodes)\n  }\n  let children = docs.map(doc => doc.root)\n  let revision = aggregate_pattern_revision(docs)\n  insert_pattern_node(nodes, id, Sequence(children), revision~)\n  PatternDoc(root=id, revision~, nodes~)\n}\n\n///|\npub fn[A] PatternDoc::stack(\n  id~ : @identity.PatternNodeId,\n  docs~ : Array[PatternDoc[A]],\n) -> PatternDoc[A] raise PatternDocError {\n  if docs.is_empty() {\n    raise EmptyPatternDocs\n  }\n  let nodes : Map[String, PatternDocEntry[A]] = Map([])\n  for doc in docs {\n    merge_pattern_nodes(nodes, doc.nodes)\n  }\n  let children = docs.map(doc => doc.root)\n  let revision = aggregate_pattern_revision(docs)\n  insert_pattern_node(nodes, id, Stack(children), revision~)\n  PatternDoc(root=id, revision~, nodes~)\n}\n\n///|\n/// A use-site node referencing an immutable definition document. The definition\n/// keeps its own node identities; combining uses does not duplicate its nodes.\n/// References cannot form cycles because construction only accepts existing\n/// immutable documents. Runtime closures remain an explicit, separate API.\npub fn[A] PatternDoc::reference(\n  id~ : @identity.PatternNodeId,\n  definition~ : PatternDoc[A],\n) -> PatternDoc[A] {\n  PatternDoc(\n    root=id,\n    revision=definition.revision,\n    nodes=singleton_pattern_nodes(id, Reference(definition, None)),\n  )\n}\n\n///|\n/// Inspect the definition at a reference use site without losing its structure.\npub fn[A] PatternDoc::referenced_definition(\n  self : PatternDoc[A],\n  id : @identity.PatternNodeId,\n) -> PatternDoc[A]? {\n  match self.nodes.get(id.value()) {\n    Some({ node: Reference(definition, _), .. }) => Some(definition)\n    _ => None\n  }\n}\n\n///|\npub extend PatternDoc with @types.BackdateEq::{backdate_equal}\n\n///|\npub extend PatternDoc with @types.HasChangedAt::{changed_at}\n\n///|\npub extend PatternDocError with Debug::{to_repr}\n\n///|\npub extend PatternDocError with Eq::{not_equal, equal}\n\n///|\npub extend PatternNodePath with Debug::{to_repr}\n\n///|\npub extend PatternNodePath with Eq::{not_equal, equal}\n",
+  "module_manifest": "name = \"dowdiness/moondsp\"\n\nversion = \"0.6.0\"\n\nimport {\n  \"dowdiness/incr@0.15.1\",\n  \"moonbitlang/quickcheck@0.14.0\",\n}\n\nreadme = \"README.mbt.md\"\n\nrepository = \"https://github.com/dowdiness/moondsp\"\n\nlicense = \"Apache-2.0\"\n\nkeywords = [ \"moonbit\", \"audio\" ]\n\ndescription = \"MoonBit DSP audio engine\"\n",
+  "variants": {
+    "forward": {
+      "sha256": "99daaabe86e9744532197bf0e4d29763bc27dfc3e4f539908c124a71896f559c",
+      "patch": "--- a/pattern/pattern_doc.mbt\n+++ b/pattern/pattern_doc.mbt\n@@ -517,7 +517,7 @@\n }\n \n ///|\n-/// Cold compilation policy. Contexts accumulate inner-to-outer while descending.\n+/// Cold compilation policy. Contexts are complete outer-to-inner binding paths.\n /// Query callbacks only carry the completed origin; they never extend it.\n priv trait DocumentOrigin {\n   fn make_origin(\n@@ -541,23 +541,21 @@\n ///|\n impl DocumentOrigin for EventOrigin with fn make_origin(node, atom, context) {\n   guard atom is Some(atom) else { raise MissingAtomOrigin(node) }\n-  let mut bindings = End\n-  for remaining = context {\n-    match remaining {\n-      End => break\n-      Link(binding, rest) => {\n-        bindings = Link(binding, bindings)\n-        continue rest\n-      }\n-    }\n-  }\n-  EventOrigin(atom, bindings~)\n+  EventOrigin(atom, bindings=context)\n }\n \n ///|\n impl DocumentOrigin for EventOrigin with fn bind_context(node, binding, context) {\n   guard binding is Some(binding) else { raise MissingReferenceBinding(node) }\n-  Link(binding, context)\n+  context.append_binding(binding)\n+}\n+\n+///|\n+fn OriginBindings::append_binding(self : OriginBindings, binding : ReferenceBinding) -> OriginBindings {\n+  match self {\n+    End => Link(binding, End)\n+    Link(outer, rest) => Link(outer, rest.append_binding(binding))\n+  }\n }\n \n ///|\n"
+    },
+    "indexed": {
+      "sha256": "19c6a8d84928b0dd8dbac952cb9de0f6d0ec9653d6335a2f328ac781b6b84253",
+      "patch": "--- a/pattern/pattern_doc.mbt\n+++ b/pattern/pattern_doc.mbt\n@@ -787,19 +787,35 @@\n   context : OriginBindings,\n ) -> CompiledPattern[A, O] raise PatternDocError {\n   let token = pattern_node_cache_token_memoized(nodes, id, token_memo)\n-  match cache.lookup(id, token, context) {\n+  let key = (id.value(), context.cache_hash())\n+  match cache.lookup(key, token, context) {\n     Some(compiled) => compiled\n     None => {\n       let compiled = compile_pattern_node(\n         nodes, id, cache, controls, token_memo, context,\n       )\n-      cache.store(id, token, context, compiled)\n+      cache.store(key, token, context, compiled)\n       compiled\n     }\n   }\n }\n \n ///|\n+fn OriginBindings::cache_hash(self : OriginBindings) -> Int {\n+  let hasher = Hasher()\n+  for remaining = self {\n+    match remaining {\n+      End => break\n+      Link(binding, rest) => {\n+        hasher.combine_int64(binding.id.serial())\n+        continue rest\n+      }\n+    }\n+  }\n+  hasher.finalize()\n+}\n+\n+///|\n fn[A, O : DocumentOrigin] compile_pattern_node(\n   nodes : Map[String, PatternDocEntry[A]],\n   id : @identity.PatternNodeId,\n@@ -1006,7 +1022,7 @@\n /// a fresh generation, and the token includes every dependency generation.\n /// Revision is an editing API value; it adds no discrimination to this key.\n priv struct CompiledCache[A, O] {\n-  entries : Map[String, Array[CompiledCacheEntry[A, O]]]\n+  entries : Map[(String, Int), Array[CompiledCacheEntry[A, O]]]\n   mut hits : Int\n   mut misses : Int\n }\n@@ -1019,11 +1035,11 @@\n ///|\n fn[A, O] CompiledCache::lookup(\n   self : CompiledCache[A, O],\n-  id : @identity.PatternNodeId,\n+  key : (String, Int),\n   token : Array[Int64],\n   context : OriginBindings,\n ) -> CompiledPattern[A, O]? {\n-  match self.entries.get(id.value()) {\n+  match self.entries.get(key) {\n     None => {\n       self.misses += 1\n       None\n@@ -1046,12 +1062,11 @@\n /// Called only after a cache miss; the immutable dependency key is absent.\n fn[A, O] CompiledCache::store(\n   self : CompiledCache[A, O],\n-  id : @identity.PatternNodeId,\n+  key : (String, Int),\n   token : Array[Int64],\n   context : OriginBindings,\n   compiled : CompiledPattern[A, O],\n ) -> Unit {\n-  let key = id.value()\n   match self.entries.get(key) {\n     None => self.entries[key] = [{ token: token.copy(), context, compiled, }]\n     Some(entries) => entries.push({ token: token.copy(), context, compiled, })\n"
+    },
+    "cached_hash": {
+      "sha256": "b1802a4de2429c68b16b461f18b2b539584652901ee745fa60128b5879bf6b3a",
+      "patch": "--- a/pattern/pattern_doc.mbt\n+++ b/pattern/pattern_doc.mbt\n@@ -785,21 +785,39 @@\n   controls : CompiledCache[A, Unit],\n   token_memo : Map[String, Array[Int64]],\n   context : OriginBindings,\n+  context_hash : Int,\n ) -> CompiledPattern[A, O] raise PatternDocError {\n   let token = pattern_node_cache_token_memoized(nodes, id, token_memo)\n-  match cache.lookup(id, token, context) {\n+  let key = (id.value(), context_hash)\n+  match cache.lookup(key, token, context) {\n     Some(compiled) => compiled\n     None => {\n       let compiled = compile_pattern_node(\n-        nodes, id, cache, controls, token_memo, context,\n+        nodes, id, cache, controls, token_memo, context, context_hash,\n       )\n-      cache.store(id, token, context, compiled)\n+      cache.store(key, token, context, compiled)\n       compiled\n     }\n   }\n }\n \n ///|\n+fn OriginBindings::cache_hash(self : OriginBindings) -> Int {\n+  if self is End { return 0 }\n+  let hasher = Hasher()\n+  for remaining = self {\n+    match remaining {\n+      End => break\n+      Link(binding, rest) => {\n+        hasher.combine_int64(binding.id.serial())\n+        continue rest\n+      }\n+    }\n+  }\n+  hasher.finalize()\n+}\n+\n+///|\n fn[A, O : DocumentOrigin] compile_pattern_node(\n   nodes : Map[String, PatternDocEntry[A]],\n   id : @identity.PatternNodeId,\n@@ -807,6 +825,7 @@\n   controls : CompiledCache[A, Unit],\n   token_memo : Map[String, Array[Int64]],\n   context : OriginBindings,\n+  context_hash : Int,\n ) -> CompiledPattern[A, O] raise PatternDocError {\n   guard nodes.get(id.value()) is Some(entry) else {\n     raise MissingNode(id.value())\n@@ -815,7 +834,7 @@\n     child : @identity.PatternNodeId,\n   ) -> CompiledPattern[A, O] raise PatternDocError {\n     lower_pattern_node_cached(\n-      nodes, child, cache, controls, token_memo, context,\n+      nodes, child, cache, controls, token_memo, context, context_hash,\n     )\n   }\n   fn prepend(pat : Pat[ScopedValue[A, O]]) -> Pat[ScopedValue[A, O]] {\n@@ -831,6 +850,7 @@\n         controls,\n         {},\n         bound_context,\n+        bound_context.cache_hash(),\n       )\n       CompiledPattern(\n         prepend(target.pat),\n@@ -949,6 +969,7 @@\n         controls,\n         token_memo,\n         End,\n+        0,\n       )\n       let scope = pattern_source_path_for_opaque_children(nodes, id, [\n         left_id, right_id,\n@@ -1006,7 +1027,7 @@\n /// a fresh generation, and the token includes every dependency generation.\n /// Revision is an editing API value; it adds no discrimination to this key.\n priv struct CompiledCache[A, O] {\n-  entries : Map[String, Array[CompiledCacheEntry[A, O]]]\n+  entries : Map[(String, Int), Array[CompiledCacheEntry[A, O]]]\n   mut hits : Int\n   mut misses : Int\n }\n@@ -1019,11 +1040,11 @@\n ///|\n fn[A, O] CompiledCache::lookup(\n   self : CompiledCache[A, O],\n-  id : @identity.PatternNodeId,\n+  key : (String, Int),\n   token : Array[Int64],\n   context : OriginBindings,\n ) -> CompiledPattern[A, O]? {\n-  match self.entries.get(id.value()) {\n+  match self.entries.get(key) {\n     None => {\n       self.misses += 1\n       None\n@@ -1046,12 +1067,11 @@\n /// Called only after a cache miss; the immutable dependency key is absent.\n fn[A, O] CompiledCache::store(\n   self : CompiledCache[A, O],\n-  id : @identity.PatternNodeId,\n+  key : (String, Int),\n   token : Array[Int64],\n   context : OriginBindings,\n   compiled : CompiledPattern[A, O],\n ) -> Unit {\n-  let key = id.value()\n   match self.entries.get(key) {\n     None => self.entries[key] = [{ token: token.copy(), context, compiled, }]\n     Some(entries) => entries.push({ token: token.copy(), context, compiled, })\n@@ -1295,6 +1315,7 @@\n     cache.general,\n     {},\n     End,\n+    0,\n   )\n   {\n     root: self.root,\n@@ -1501,6 +1522,7 @@\n     cache.general,\n     {},\n     End,\n+    0,\n   )\n   {\n     root: self.root,\n"
+    },
+    "memo": {
+      "sha256": "940cbba86ff363f682dff6af15dacf9136022bde7a4479e829be7fc9087c1944",
+      "patch": "--- a/pattern/pattern_doc.mbt\n+++ b/pattern/pattern_doc.mbt\n@@ -517,15 +517,43 @@\n }\n \n ///|\n+priv struct OriginContext {\n+  reversed : OriginBindings\n+  mut forward : OriginBindings?\n+}\n+\n+///|\n+fn OriginContext::OriginContext(reversed : OriginBindings) -> OriginContext {\n+  { reversed, forward: None }\n+}\n+\n+///|\n+fn OriginContext::bindings(self : OriginContext) -> OriginBindings {\n+  if self.forward is Some(bindings) { return bindings }\n+  let mut bindings = End\n+  for remaining = self.reversed {\n+    match remaining {\n+      End => break\n+      Link(binding, rest) => {\n+        bindings = Link(binding, bindings)\n+        continue rest\n+      }\n+    }\n+  }\n+  self.forward = Some(bindings)\n+  bindings\n+}\n+\n+///|\n /// Cold compilation policy. Contexts accumulate inner-to-outer while descending.\n /// Query callbacks only carry the completed origin; they never extend it.\n priv trait DocumentOrigin {\n   fn make_origin(\n     @identity.PatternNodeId,\n     @identity.SourceAtomId?,\n-    OriginBindings,\n+    OriginContext,\n   ) -> Self raise PatternDocError\n-  fn bind_context(@identity.PatternNodeId, ReferenceBinding?, OriginBindings) -> OriginBindings raise PatternDocError\n+  fn bind_context(@identity.PatternNodeId, ReferenceBinding?, OriginContext) -> OriginContext raise PatternDocError\n }\n \n ///|\n@@ -534,30 +562,20 @@\n }\n \n ///|\n-impl DocumentOrigin for Unit with fn bind_context(_, _, _) {\n-  End\n+impl DocumentOrigin for Unit with fn bind_context(_, _, context) {\n+  context\n }\n \n ///|\n impl DocumentOrigin for EventOrigin with fn make_origin(node, atom, context) {\n   guard atom is Some(atom) else { raise MissingAtomOrigin(node) }\n-  let mut bindings = End\n-  for remaining = context {\n-    match remaining {\n-      End => break\n-      Link(binding, rest) => {\n-        bindings = Link(binding, bindings)\n-        continue rest\n-      }\n-    }\n-  }\n-  EventOrigin(atom, bindings~)\n+  EventOrigin(atom, bindings=context.bindings())\n }\n \n ///|\n impl DocumentOrigin for EventOrigin with fn bind_context(node, binding, context) {\n   guard binding is Some(binding) else { raise MissingReferenceBinding(node) }\n-  Link(binding, context)\n+  OriginContext(Link(binding, context.reversed))\n }\n \n ///|\n@@ -784,16 +802,16 @@\n   cache : CompiledCache[A, O],\n   controls : CompiledCache[A, Unit],\n   token_memo : Map[String, Array[Int64]],\n-  context : OriginBindings,\n+  context : OriginContext,\n ) -> CompiledPattern[A, O] raise PatternDocError {\n   let token = pattern_node_cache_token_memoized(nodes, id, token_memo)\n-  match cache.lookup(id, token, context) {\n+  match cache.lookup(id, token, context.reversed) {\n     Some(compiled) => compiled\n     None => {\n       let compiled = compile_pattern_node(\n         nodes, id, cache, controls, token_memo, context,\n       )\n-      cache.store(id, token, context, compiled)\n+      cache.store(id, token, context.reversed, compiled)\n       compiled\n     }\n   }\n@@ -806,7 +824,7 @@\n   cache : CompiledCache[A, O],\n   controls : CompiledCache[A, Unit],\n   token_memo : Map[String, Array[Int64]],\n-  context : OriginBindings,\n+  context : OriginContext,\n ) -> CompiledPattern[A, O] raise PatternDocError {\n   guard nodes.get(id.value()) is Some(entry) else {\n     raise MissingNode(id.value())\n@@ -948,7 +966,7 @@\n         controls,\n         controls,\n         token_memo,\n-        End,\n+        OriginContext(End),\n       )\n       let scope = pattern_source_path_for_opaque_children(nodes, id, [\n         left_id, right_id,\n@@ -1294,7 +1312,7 @@\n     cache.exact,\n     cache.general,\n     {},\n-    End,\n+    OriginContext(End),\n   )\n   {\n     root: self.root,\n@@ -1500,7 +1518,7 @@\n     cache.general,\n     cache.general,\n     {},\n-    End,\n+    OriginContext(End),\n   )\n   {\n     root: self.root,\n"
+    },
+    "sparse": {
+      "sha256": "37728a2555e953009853a4cfaab1bc73849539ac819e55601f8936dec2af61a2",
+      "patch": "--- a/pattern/pattern_doc.mbt\n+++ b/pattern/pattern_doc.mbt\n@@ -995,6 +995,28 @@\n }\n \n ///|\n+priv struct CompiledCacheVariants[A, O] {\n+  first : CompiledCacheEntry[A, O]\n+  mut others : Map[Int, Array[CompiledCacheEntry[A, O]]]?\n+}\n+\n+///|\n+fn OriginBindings::cache_hash(self : OriginBindings) -> Int {\n+  if self is End { return 0 }\n+  let hasher = Hasher()\n+  for remaining = self {\n+    match remaining {\n+      End => break\n+      Link(binding, rest) => {\n+        hasher.combine_int64(binding.id.serial())\n+        continue rest\n+      }\n+    }\n+  }\n+  hasher.finalize()\n+}\n+\n+///|\n /// Cache for compiled playback and provenance of pattern subtrees.\n ///\n /// Entries are keyed by stable `PatternNodeId`, a recursive private subtree\n@@ -1006,7 +1028,7 @@\n /// a fresh generation, and the token includes every dependency generation.\n /// Revision is an editing API value; it adds no discrimination to this key.\n priv struct CompiledCache[A, O] {\n-  entries : Map[String, Array[CompiledCacheEntry[A, O]]]\n+  entries : Map[String, CompiledCacheVariants[A, O]]\n   mut hits : Int\n   mut misses : Int\n }\n@@ -1028,12 +1050,20 @@\n       self.misses += 1\n       None\n     }\n-    Some(entries) => {\n-      for entry in entries {\n-        if entry.context == context &&\n-          pattern_cache_token_equal(entry.token, token) {\n-          self.hits += 1\n-          return Some(entry.compiled)\n+    Some(variants) => {\n+      let first = variants.first\n+      if first.context == context && pattern_cache_token_equal(first.token, token) {\n+        self.hits += 1\n+        return Some(first.compiled)\n+      }\n+      if variants.others is Some(buckets) {\n+        if buckets.get(context.cache_hash()) is Some(entries) {\n+          for entry in entries {\n+            if entry.context == context && pattern_cache_token_equal(entry.token, token) {\n+              self.hits += 1\n+              return Some(entry.compiled)\n+            }\n+          }\n         }\n       }\n       self.misses += 1\n@@ -1052,9 +1082,24 @@\n   compiled : CompiledPattern[A, O],\n ) -> Unit {\n   let key = id.value()\n+  let entry = { token: token.copy(), context, compiled }\n   match self.entries.get(key) {\n-    None => self.entries[key] = [{ token: token.copy(), context, compiled, }]\n-    Some(entries) => entries.push({ token: token.copy(), context, compiled, })\n+    None => self.entries[key] = { first: entry, others: None }\n+    Some(variants) => {\n+      let buckets = match variants.others {\n+        Some(buckets) => buckets\n+        None => {\n+          let buckets : Map[Int, Array[CompiledCacheEntry[A, O]]] = Map([])\n+          variants.others = Some(buckets)\n+          buckets\n+        }\n+      }\n+      let hash = context.cache_hash()\n+      match buckets.get(hash) {\n+        None => buckets[hash] = [entry]\n+        Some(entries) => entries.push(entry)\n+      }\n+    }\n   }\n }\n \n@@ -1071,7 +1116,12 @@\n ///|\n fn[A, O] CompiledCache::entry_count(self : CompiledCache[A, O]) -> Int {\n   let mut count = 0\n-  self.entries.each(fn(_, entries) { count += entries.length() })\n+  self.entries.each(fn(_, variants) {\n+    count += 1\n+    if variants.others is Some(buckets) {\n+      buckets.each(fn(_, entries) { count += entries.length() })\n+    }\n+  })\n   count\n }\n \n"
+    }
+  },
+  "paired_files": {
+    "mini/origin_trial_benchmark.mbt": "///|\nfn trial_source(depth : Int, atoms : Int, branching : Bool, variant : Int) -> String {\n  let notes = Array::makei(atoms, index => (48 + (index + variant) % 24).to_string()).join(\" \")\n  let lines = [\"let p0 = note(\\\"\\{notes}\\\");\"]\n  for level in 1..=depth {\n    let previous = level - 1\n    let body = if branching { \"stack(p\\{previous}, p\\{previous})\" } else { \"p\\{previous}\" }\n    lines.push(\"let p\\{level} = \\{body};\")\n  }\n  lines.push(\"p\\{depth}\")\n  lines.join(\" \")\n}\n\n///|\ntest \"bench/origin_trial/matrix\" (b : @bench.T) {\n  let scenarios = [\n    (\"paths_32\", 5, 1, true),\n    (\"paths_128\", 7, 1, true),\n    (\"paths_512\", 9, 1, true),\n    (\"depth_16\", 16, 1, false),\n    (\"atoms_8_depth_8\", 8, 8, false),\n    (\"atoms_64_depth_8\", 8, 64, false),\n    (\"paths_32_atoms_16\", 5, 16, true),\n  ]\n  for (name, depth, atoms, branching) in scenarios {\n    let docs = Array::makei(4, variant => bench_origin_draft_doc(trial_source(depth, atoms, branching, variant)))\n    let arc = bench_origin_arc(0)\n    for doc in docs {\n      let ordinary = try! doc.lower()\n      let exact = try! doc.lower_with_origins()\n      assert_true(bench_origin_rows(ordinary.query(arc)) == bench_origin_rows(exact.query(arc).map(e => e.event())))\n      assert_true(ordinary.query_sourced_events(arc).map(e => e.pattern_node_path()) == exact.query(arc).map(e => e.pattern_node_path()))\n      for event in exact.query(arc) {\n        assert_eq(event.origin().bindings().length(), depth + 1)\n      }\n    }\n    let index = Ref(0)\n    b.bench(name=\"\\{name}/cold\", fn() {\n      let doc = docs[index.val]\n      index.val = (index.val + 1) % docs.length()\n      b.keep(try! doc.lower_with_origins())\n    })\n  }\n}\n",
+    "mini/origin_trial_factory.mbt": "///|\npub fn origin_trial_action(b : @bench.T, depth : Int, atoms : Int, branching : Bool) -> (() -> Unit) raise {\n  let docs = Array::makei(4, variant => bench_origin_draft_doc(trial_source(depth, atoms, branching, variant)))\n  let arc = bench_origin_arc(0)\n  for doc in docs {\n    let (_, exact) = bench_origin_check_parity(doc, [arc], true)\n    for event in exact.query(arc) { assert_eq(event.origin().bindings().length(), depth + 1) }\n  }\n  let index = Ref(0)\n  fn() {\n    let doc = docs[index.val]\n    index.val = (index.val + 1) % docs.length()\n    b.keep(try! doc.lower_with_origins())\n  }\n}\n",
+    "mini/origin_trial_named_factory.mbt": "///|\npub fn origin_trial_named_action(b : @bench.T, text : String) -> (() -> Unit) raise {\n  let docs = Array::makei(4, _ => bench_origin_draft_doc(text))\n  for doc in docs { ignore(bench_origin_check_parity(doc, [bench_origin_arc(0)], false)) }\n  let index = Ref(0)\n  fn() {\n    let doc = docs[index.val]\n    index.val = (index.val + 1) % docs.length()\n    b.keep(try! doc.lower_with_origins())\n  }\n}\n",
+    "mini_baseline/origin_trial_benchmark.mbt": "///|\nfn trial_source(depth : Int, atoms : Int, branching : Bool, variant : Int) -> String {\n  let notes = Array::makei(atoms, index => (48 + (index + variant) % 24).to_string()).join(\" \")\n  let lines = [\"let p0 = note(\\\"\\{notes}\\\");\"]\n  for level in 1..=depth {\n    let previous = level - 1\n    let body = if branching { \"stack(p\\{previous}, p\\{previous})\" } else { \"p\\{previous}\" }\n    lines.push(\"let p\\{level} = \\{body};\")\n  }\n  lines.push(\"p\\{depth}\")\n  lines.join(\" \")\n}\n\n///|\ntest \"bench/origin_trial/matrix\" (b : @bench.T) {\n  let scenarios = [\n    (\"paths_32\", 5, 1, true),\n    (\"paths_128\", 7, 1, true),\n    (\"paths_512\", 9, 1, true),\n    (\"depth_16\", 16, 1, false),\n    (\"atoms_8_depth_8\", 8, 8, false),\n    (\"atoms_64_depth_8\", 8, 64, false),\n    (\"paths_32_atoms_16\", 5, 16, true),\n  ]\n  for (name, depth, atoms, branching) in scenarios {\n    let docs = Array::makei(4, variant => bench_origin_draft_doc(trial_source(depth, atoms, branching, variant)))\n    let arc = bench_origin_arc(0)\n    for doc in docs {\n      let ordinary = try! doc.lower()\n      let exact = try! doc.lower_with_origins()\n      assert_true(bench_origin_rows(ordinary.query(arc)) == bench_origin_rows(exact.query(arc).map(e => e.event())))\n      assert_true(ordinary.query_sourced_events(arc).map(e => e.pattern_node_path()) == exact.query(arc).map(e => e.pattern_node_path()))\n      for event in exact.query(arc) {\n        assert_eq(event.origin().bindings().length(), depth + 1)\n      }\n    }\n    let index = Ref(0)\n    b.bench(name=\"\\{name}/cold\", fn() {\n      let doc = docs[index.val]\n      index.val = (index.val + 1) % docs.length()\n      b.keep(try! doc.lower_with_origins())\n    })\n  }\n}\n",
+    "mini_baseline/origin_trial_factory.mbt": "///|\npub fn origin_trial_action(b : @bench.T, depth : Int, atoms : Int, branching : Bool) -> (() -> Unit) raise {\n  let docs = Array::makei(4, variant => bench_origin_draft_doc(trial_source(depth, atoms, branching, variant)))\n  let arc = bench_origin_arc(0)\n  for doc in docs {\n    let (_, exact) = bench_origin_check_parity(doc, [arc], true)\n    for event in exact.query(arc) { assert_eq(event.origin().bindings().length(), depth + 1) }\n  }\n  let index = Ref(0)\n  fn() {\n    let doc = docs[index.val]\n    index.val = (index.val + 1) % docs.length()\n    b.keep(try! doc.lower_with_origins())\n  }\n}\n",
+    "mini_baseline/origin_trial_named_factory.mbt": "///|\npub fn origin_trial_named_action(b : @bench.T, text : String) -> (() -> Unit) raise {\n  let docs = Array::makei(4, _ => bench_origin_draft_doc(text))\n  for doc in docs { ignore(bench_origin_check_parity(doc, [bench_origin_arc(0)], false)) }\n  let index = Ref(0)\n  fn() {\n    let doc = docs[index.val]\n    index.val = (index.val + 1) % docs.length()\n    b.keep(try! doc.lower_with_origins())\n  }\n}\n",
+    "mini_baseline/moon.pkg": "import {\n  \"dowdiness/moondsp/identity\",\n  \"dowdiness/moondsp/pattern_baseline\" @pattern,\n  \"dowdiness/moondsp/song_baseline\" @song,\n  \"moonbitlang/core/bench\",\n  \"moonbitlang/core/json\",\n}\nimport { \"moonbitlang/core/debug\" } for \"test\"\n",
+    "song_baseline/moon.pkg": "import {\n \"dowdiness/moondsp/identity\",\n \"dowdiness/moondsp/pattern_baseline\" @pattern,\n}\nimport { \"moonbitlang/core/debug\" } for \"test\"\n",
+    "trial_compare/moon.pkg": "import {\n \"dowdiness/moondsp/mini_baseline\" @baseline,\n \"dowdiness/moondsp/mini\" @candidate,\n \"moonbitlang/core/bench\",\n}\n",
+    "trial_compare/compare_benchmark.mbt": "///|\nfn compare(reverse : Bool, b : @bench.T) -> Unit raise {\n  for (name, depth, atoms, branching) in [\n    (\"paths_32\", 5, 1, true),\n    (\"paths_128\", 7, 1, true),\n    (\"paths_512\", 9, 1, true),\n    (\"depth_16\", 16, 1, false),\n    (\"atoms_8_depth_8\", 8, 8, false),\n    (\"atoms_64_depth_8\", 8, 64, false),\n    (\"paths_32_atoms_16\", 5, 16, true),\n  ] {\n    let actions = [\n      (\"baseline\", @baseline.origin_trial_action(b, depth, atoms, branching)),\n      (\"sparse\", @candidate.origin_trial_action(b, depth, atoms, branching)),\n    ]\n    for slot in 0..<2 {\n      let (label, action) = actions[if reverse { 1 - slot } else { slot }]\n      b.bench(name=\"\\{name}/\\{label}\", action)\n    }\n  }\n}\n\n///|\ntest \"bench/paired/AB\" (b : @bench.T) { compare(false, b) }\n\n///|\ntest \"bench/paired/BA\" (b : @bench.T) { compare(true, b) }\n",
+    "trial_compare/representative_benchmark.mbt": "///|\ntest \"bench/paired/representative\" (b : @bench.T) {\n  for reverse in [false, true] {\n    let order = if reverse { \"BA\" } else { \"AB\" }\n    for (name, source) in [\n      (\"direct\", \"note(\\\"60 62 64 67\\\")\"),\n      (\"nested\", \"let motif = note(\\\"60 62 64 67\\\"); let phrase = stack(motif, motif.slow(2)); stack(phrase, phrase.slow(3))\"),\n    ] {\n      let actions = [\n        (\"baseline\", @baseline.origin_trial_named_action(b, source)),\n        (\"sparse\", @candidate.origin_trial_named_action(b, source)),\n      ]\n      for slot in 0..<2 {\n        let (label, action) = actions[if reverse { 1 - slot } else { slot }]\n        b.bench(name=\"\\{order}/\\{name}/\\{label}\", action)\n      }\n    }\n  }\n}\n"
+  },
+  "reproducer": "import json, shutil, subprocess, sys, tempfile\nfrom pathlib import Path\nroot = Path.cwd()\nevidence = json.loads((root / 'docs/performance/2026-09-24-origin-cache-prototypes.json').read_text())\nwith tempfile.TemporaryDirectory(prefix='moondsp-origin-replay-') as directory:\n    target = Path(directory)\n    for package in ['identity', 'pattern', 'song', 'mini']:\n        shutil.copytree(root / package, target / package)\n    (target / 'pattern/pattern_doc.mbt').write_text(evidence['baseline_source'])\n    for package in ['pattern', 'song', 'mini']:\n        shutil.copytree(target / package, target / (package + '_baseline'))\n    (target / 'moon.mod').write_text(evidence['module_manifest'])\n    (target / '.mooncakes').symlink_to(root / '.mooncakes', target_is_directory=True)\n    for name, content in evidence['paired_files'].items():\n        file = target / name\n        file.parent.mkdir(parents=True, exist_ok=True)\n        file.write_text(content)\n    subprocess.run(['patch', '--batch', '-p1'], input=evidence['variants']['sparse']['patch'], text=True, cwd=target, check=True)\n    scope = 'trial_compare/representative_benchmark.mbt' if '--smoke' in sys.argv else 'trial_compare'\n    subprocess.run(['env', 'NEW_MOON_MOD=0', 'moon', 'bench', scope, '--target', 'wasm-gc', '--release', '--no-parallelize'], cwd=target, check=True)\n",
+  "scenario_matrix": [
+    {
+      "name": "paths_32",
+      "depth": 5,
+      "atoms": 1,
+      "branching": true
+    },
+    {
+      "name": "paths_128",
+      "depth": 7,
+      "atoms": 1,
+      "branching": true
+    },
+    {
+      "name": "paths_512",
+      "depth": 9,
+      "atoms": 1,
+      "branching": true
+    },
+    {
+      "name": "depth_16",
+      "depth": 16,
+      "atoms": 1,
+      "branching": false
+    },
+    {
+      "name": "atoms_8_depth_8",
+      "depth": 8,
+      "atoms": 8,
+      "branching": false
+    },
+    {
+      "name": "atoms_64_depth_8",
+      "depth": 8,
+      "atoms": 64,
+      "branching": false
+    },
+    {
+      "name": "paths_32_atoms_16",
+      "depth": 5,
+      "atoms": 16,
+      "branching": true
+    }
+  ],
+  "method": "Four separately parsed documents rotate per group; parse and event/path/binding-depth parity are outside timing. Each timed invocation uses fresh lowering caches. Release wasm-gc, serial execution. Screening in separate invocations; sparse rechecked with baseline in the same compiled module/process, per-scenario AB and BA orders.",
+  "screening_order": [
+    "baseline",
+    "forward",
+    "indexed",
+    "cached_hash",
+    "memo",
+    "memo",
+    "indexed",
+    "forward",
+    "baseline",
+    "sparse",
+    "sparse",
+    "cached_hash",
+    "baseline"
+  ],
+  "screening_runs": {
+    "baseline": [
+      "[dowdiness/moondsp] bench mini/origin_trial_benchmark.mbt:15 (\"bench/origin_trial/matrix\") ok\nname                   time (mean ± σ)         range (min … max) \npaths_32/cold           262.51 µs ±   4.44 µs   256.12 µs … 270.08 µs  in 10 ×    377 runs\npaths_128/cold            1.77 ms ±  19.73 µs     1.74 ms …   1.80 ms  in 10 ×     56 runs\npaths_512/cold           16.83 ms ± 360.73 µs    16.23 ms …  17.38 ms  in 10 ×      6 runs\ndepth_16/cold            34.45 µs ±   1.99 µs    31.54 µs …  36.91 µs  in 10 ×   3167 runs\natoms_8_depth_8/cold     33.30 µs ±   1.10 µs    32.03 µs …  34.90 µs  in 10 ×   3100 runs\natoms_64_depth_8/cold   200.65 µs ±  11.32 µs   190.64 µs … 223.93 µs  in 10 ×    430 runs\npaths_32_atoms_16/cold    1.80 ms ±  26.37 µs     1.76 ms …   1.85 ms  in 10 ×     54 runs\nTotal tests: 1, passed: 1, failed: 0.\n",
+      "[dowdiness/moondsp] bench mini/origin_trial_benchmark.mbt:15 (\"bench/origin_trial/matrix\") ok\nname                   time (mean ± σ)         range (min … max) \npaths_32/cold           260.75 µs ±   1.96 µs   258.09 µs … 263.79 µs  in 10 ×    374 runs\npaths_128/cold            1.79 ms ±  26.40 µs     1.75 ms …   1.83 ms  in 10 ×     57 runs\npaths_512/cold           17.18 ms ± 487.78 µs    16.50 ms …  17.95 ms  in 10 ×      6 runs\ndepth_16/cold            33.74 µs ± 583.21 ns    33.06 µs …  34.72 µs  in 10 ×   3004 runs\natoms_8_depth_8/cold     32.27 µs ± 753.71 ns    31.63 µs …  33.92 µs  in 10 ×   2992 runs\natoms_64_depth_8/cold   191.10 µs ±   1.82 µs   188.66 µs … 195.12 µs  in 10 ×    526 runs\npaths_32_atoms_16/cold    1.81 ms ±  24.53 µs     1.77 ms …   1.87 ms  in 10 ×     57 runs\nTotal tests: 1, passed: 1, failed: 0.\n",
+      "[dowdiness/moondsp] bench mini/origin_trial_benchmark.mbt:15 (\"bench/origin_trial/matrix\") ok\nname                   time (mean ± σ)         range (min … max) \npaths_32/cold           274.10 µs ±   3.70 µs   269.83 µs … 280.60 µs  in 10 ×    353 runs\npaths_128/cold            1.86 ms ±  21.65 µs     1.84 ms …   1.90 ms  in 10 ×     54 runs\npaths_512/cold           18.43 ms ±   1.04 ms    17.28 ms …  20.07 ms  in 10 ×      6 runs\ndepth_16/cold            33.30 µs ± 358.49 ns    32.81 µs …  33.78 µs  in 10 ×   2991 runs\natoms_8_depth_8/cold     33.63 µs ± 255.74 ns    33.24 µs …  33.93 µs  in 10 ×   2728 runs\natoms_64_depth_8/cold   206.54 µs ±   6.87 µs   197.99 µs … 214.82 µs  in 10 ×    507 runs\npaths_32_atoms_16/cold    1.84 ms ±  35.74 µs     1.80 ms …   1.92 ms  in 10 ×     52 runs\nTotal tests: 1, passed: 1, failed: 0.\n"
+    ],
+    "forward": [
+      "[dowdiness/moondsp] bench mini/origin_trial_benchmark.mbt:15 (\"bench/origin_trial/matrix\") ok\nname                   time (mean ± σ)         range (min … max) \npaths_32/cold           277.15 µs ±   8.98 µs   267.88 µs … 297.85 µs  in 10 ×    365 runs\npaths_128/cold            2.95 ms ±   1.10 ms     2.00 ms …   4.75 ms  in 10 ×     29 runs\npaths_512/cold           19.26 ms ± 653.83 µs    18.40 ms …  20.27 ms  in 10 ×      6 runs\ndepth_16/cold            32.82 µs ± 456.88 ns    32.16 µs …  33.79 µs  in 10 ×   3058 runs\natoms_8_depth_8/cold     31.92 µs ± 292.21 ns    31.43 µs …  32.36 µs  in 10 ×   3176 runs\natoms_64_depth_8/cold   186.71 µs ±   2.83 µs   182.11 µs … 190.11 µs  in 10 ×    532 runs\npaths_32_atoms_16/cold    1.81 ms ±  34.43 µs     1.75 ms …   1.85 ms  in 10 ×     54 runs\nTotal tests: 1, passed: 1, failed: 0.\n",
+      "[dowdiness/moondsp] bench mini/origin_trial_benchmark.mbt:15 (\"bench/origin_trial/matrix\") ok\nname                   time (mean ± σ)         range (min … max) \npaths_32/cold           270.08 µs ±   3.74 µs   266.52 µs … 276.94 µs  in 10 ×    357 runs\npaths_128/cold            1.91 ms ±  22.87 µs     1.88 ms …   1.95 ms  in 10 ×     53 runs\npaths_512/cold           19.33 ms ± 751.20 µs    18.25 ms …  20.44 ms  in 10 ×      6 runs\ndepth_16/cold            32.44 µs ± 426.04 ns    31.99 µs …  33.48 µs  in 10 ×   3040 runs\natoms_8_depth_8/cold     31.84 µs ± 296.56 ns    31.59 µs …  32.52 µs  in 10 ×   3126 runs\natoms_64_depth_8/cold   186.06 µs ±   1.28 µs   184.14 µs … 187.83 µs  in 10 ×    537 runs\npaths_32_atoms_16/cold    1.81 ms ±  40.71 µs     1.77 ms …   1.88 ms  in 10 ×     57 runs\nTotal tests: 1, passed: 1, failed: 0.\n"
+    ],
+    "indexed": [
+      "[dowdiness/moondsp] bench mini/origin_trial_benchmark.mbt:15 (\"bench/origin_trial/matrix\") ok\nname                   time (mean ± σ)         range (min … max) \npaths_32/cold           277.98 µs ±   3.45 µs   273.42 µs … 283.76 µs  in 10 ×    354 runs\npaths_128/cold            1.69 ms ±  24.16 µs     1.65 ms …   1.72 ms  in 10 ×     60 runs\npaths_512/cold           15.13 ms ± 692.61 µs    14.10 ms …  16.22 ms  in 10 ×      8 runs\ndepth_16/cold            35.35 µs ± 249.14 ns    35.01 µs …  35.76 µs  in 10 ×   2779 runs\natoms_8_depth_8/cold     36.21 µs ± 659.87 ns    35.57 µs …  37.37 µs  in 10 ×   2806 runs\natoms_64_depth_8/cold   211.37 µs ±   4.16 µs   206.29 µs … 218.15 µs  in 10 ×    482 runs\npaths_32_atoms_16/cold    1.87 ms ±  30.98 µs     1.81 ms …   1.92 ms  in 10 ×     56 runs\nTotal tests: 1, passed: 1, failed: 0.\n",
+      "[dowdiness/moondsp] bench mini/origin_trial_benchmark.mbt:15 (\"bench/origin_trial/matrix\") ok\nname                   time (mean ± σ)         range (min … max) \npaths_32/cold           278.36 µs ±   2.39 µs   275.82 µs … 284.20 µs  in 10 ×    356 runs\npaths_128/cold            1.70 ms ±   8.92 µs     1.69 ms …   1.71 ms  in 10 ×     60 runs\npaths_512/cold           14.55 ms ± 407.75 µs    13.88 ms …  15.02 ms  in 10 ×      8 runs\ndepth_16/cold            35.78 µs ± 357.98 ns    35.30 µs …  36.48 µs  in 10 ×   2679 runs\natoms_8_depth_8/cold     35.31 µs ± 485.14 ns    34.76 µs …  36.16 µs  in 10 ×   2851 runs\natoms_64_depth_8/cold   206.75 µs ±   2.55 µs   202.57 µs … 210.01 µs  in 10 ×    483 runs\npaths_32_atoms_16/cold    1.83 ms ±  25.22 µs     1.79 ms …   1.87 ms  in 10 ×     56 runs\nTotal tests: 1, passed: 1, failed: 0.\n"
+    ],
+    "cached_hash": [
+      "[dowdiness/moondsp] bench mini/origin_trial_benchmark.mbt:15 (\"bench/origin_trial/matrix\") ok\nname                   time (mean ± σ)         range (min … max) \npaths_32/cold           288.35 µs ±  15.21 µs   277.96 µs … 327.84 µs  in 10 ×    330 runs\npaths_128/cold            1.71 ms ±  23.07 µs     1.68 ms …   1.76 ms  in 10 ×     59 runs\npaths_512/cold           15.06 ms ± 586.87 µs    14.37 ms …  16.18 ms  in 10 ×      7 runs\ndepth_16/cold            36.12 µs ± 468.58 ns    35.56 µs …  37.17 µs  in 10 ×   2761 runs\natoms_8_depth_8/cold     35.65 µs ± 329.75 ns    35.11 µs …  36.09 µs  in 10 ×   2791 runs\natoms_64_depth_8/cold   213.66 µs ±   4.06 µs   208.51 µs … 219.84 µs  in 10 ×    471 runs\npaths_32_atoms_16/cold    1.91 ms ±  41.35 µs     1.87 ms …   2.01 ms  in 10 ×     55 runs\nTotal tests: 1, passed: 1, failed: 0.\n",
+      "[dowdiness/moondsp] bench mini/origin_trial_benchmark.mbt:15 (\"bench/origin_trial/matrix\") ok\nname                   time (mean ± σ)         range (min … max) \npaths_32/cold           279.30 µs ±   2.29 µs   276.07 µs … 283.63 µs  in 10 ×    357 runs\npaths_128/cold            1.71 ms ±  15.84 µs     1.68 ms …   1.74 ms  in 10 ×     59 runs\npaths_512/cold           15.07 ms ± 375.08 µs    14.65 ms …  15.80 ms  in 10 ×      7 runs\ndepth_16/cold            35.49 µs ± 287.05 ns    34.97 µs …  35.96 µs  in 10 ×   2645 runs\natoms_8_depth_8/cold     34.63 µs ± 292.98 ns    34.33 µs …  35.17 µs  in 10 ×   2826 runs\natoms_64_depth_8/cold   204.73 µs ±   1.52 µs   201.87 µs … 207.30 µs  in 10 ×    501 runs\npaths_32_atoms_16/cold    1.85 ms ±  32.36 µs     1.80 ms …   1.89 ms  in 10 ×     55 runs\nTotal tests: 1, passed: 1, failed: 0.\n"
+    ],
+    "memo": [
+      "[dowdiness/moondsp] bench mini/origin_trial_benchmark.mbt:15 (\"bench/origin_trial/matrix\") ok\nname                   time (mean ± σ)         range (min … max) \npaths_32/cold           274.23 µs ±   3.38 µs   270.02 µs … 281.04 µs  in 10 ×    345 runs\npaths_128/cold            1.91 ms ±  66.55 µs     1.83 ms …   2.06 ms  in 10 ×     55 runs\npaths_512/cold           17.12 ms ± 361.74 µs    16.69 ms …  17.62 ms  in 10 ×      6 runs\ndepth_16/cold            32.47 µs ± 276.32 ns    32.11 µs …  32.88 µs  in 10 ×   3023 runs\natoms_8_depth_8/cold     32.88 µs ± 342.14 ns    32.46 µs …  33.43 µs  in 10 ×   3048 runs\natoms_64_depth_8/cold   189.43 µs ±   3.21 µs   186.79 µs … 197.80 µs  in 10 ×    525 runs\npaths_32_atoms_16/cold    1.82 ms ±  95.00 µs     1.75 ms …   2.08 ms  in 10 ×     58 runs\nTotal tests: 1, passed: 1, failed: 0.\n",
+      "[dowdiness/moondsp] bench mini/origin_trial_benchmark.mbt:15 (\"bench/origin_trial/matrix\") ok\nname                   time (mean ± σ)         range (min … max) \npaths_32/cold           266.97 µs ±   2.86 µs   263.03 µs … 272.02 µs  in 10 ×    368 runs\npaths_128/cold            1.81 ms ±  23.35 µs     1.78 ms …   1.84 ms  in 10 ×     56 runs\npaths_512/cold           17.06 ms ± 496.96 µs    16.48 ms …  17.82 ms  in 10 ×      7 runs\ndepth_16/cold            32.04 µs ± 379.24 ns    31.68 µs …  32.92 µs  in 10 ×   3089 runs\natoms_8_depth_8/cold     32.04 µs ± 460.97 ns    31.54 µs …  33.01 µs  in 10 ×   3056 runs\natoms_64_depth_8/cold   187.78 µs ± 964.47 ns   186.75 µs … 189.36 µs  in 10 ×    532 runs\npaths_32_atoms_16/cold    1.73 ms ±  17.27 µs     1.71 ms …   1.76 ms  in 10 ×     59 runs\nTotal tests: 1, passed: 1, failed: 0.\n"
+    ],
+    "sparse": [
+      "[dowdiness/moondsp] bench mini/origin_trial_benchmark.mbt:15 (\"bench/origin_trial/matrix\") ok\nname                   time (mean ± σ)         range (min … max) \npaths_32/cold           381.45 µs ± 132.69 µs   276.65 µs … 651.72 µs  in 10 ×    369 runs\npaths_128/cold            1.92 ms ±  94.53 µs     1.77 ms …   2.07 ms  in 10 ×     44 runs\npaths_512/cold           14.50 ms ± 501.21 µs    13.89 ms …  15.28 ms  in 10 ×      7 runs\ndepth_16/cold            34.57 µs ± 907.23 ns    33.65 µs …  36.31 µs  in 10 ×   2887 runs\natoms_8_depth_8/cold     34.01 µs ± 560.01 ns    33.52 µs …  35.13 µs  in 10 ×   2972 runs\natoms_64_depth_8/cold   201.47 µs ±   2.06 µs   198.52 µs … 205.11 µs  in 10 ×    511 runs\npaths_32_atoms_16/cold    1.85 ms ±  31.24 µs     1.82 ms …   1.91 ms  in 10 ×     54 runs\nTotal tests: 1, passed: 1, failed: 0.\n",
+      "[dowdiness/moondsp] bench mini/origin_trial_benchmark.mbt:15 (\"bench/origin_trial/matrix\") ok\nname                   time (mean ± σ)         range (min … max) \npaths_32/cold           265.75 µs ±   2.54 µs   262.72 µs … 270.64 µs  in 10 ×    364 runs\npaths_128/cold            1.76 ms ±  89.72 µs     1.63 ms …   1.89 ms  in 10 ×     61 runs\npaths_512/cold           15.13 ms ± 459.61 µs    14.35 ms …  15.62 ms  in 10 ×      7 runs\ndepth_16/cold            33.69 µs ± 386.31 ns    33.14 µs …  34.32 µs  in 10 ×   2925 runs\natoms_8_depth_8/cold     33.84 µs ± 294.30 ns    33.28 µs …  34.33 µs  in 10 ×   2953 runs\natoms_64_depth_8/cold   199.21 µs ±   2.62 µs   196.26 µs … 203.46 µs  in 10 ×    497 runs\npaths_32_atoms_16/cold    1.84 ms ±  41.31 µs     1.80 ms …   1.93 ms  in 10 ×     53 runs\nTotal tests: 1, passed: 1, failed: 0.\n"
+    ]
+  },
+  "screening_notes": [
+    "First sparse screening used inferred empty map braces; second added a type annotation but still emitted warning 0082. Archived final candidate and paired/integrated builds use explicit Map([]).",
+    "No outlier samples removed, including noisy first forward paths_128, sparse paths_32 and representative AB/direct/baseline groups."
+  ],
+  "origin_contract_tests": {
+    "memo": "Total tests: 7, passed: 7, failed: 0.\n",
+    "indexed": "Total tests: 7, passed: 7, failed: 0.\n",
+    "forward": "Total tests: 7, passed: 7, failed: 0.\n",
+    "baseline": "Total tests: 7, passed: 7, failed: 0.\n",
+    "sparse": "Total tests: 7, passed: 7, failed: 0.\n",
+    "cached_hash": "Total tests: 7, passed: 7, failed: 0.\n"
+  },
+  "paired_sparse": "[dowdiness/moondsp] bench trial_compare/compare_benchmark.mbt:24 (\"bench/paired/AB\") ok\nname                       time (mean ± σ)         range (min … max) \npaths_32/baseline           268.05 µs ±   3.32 µs   263.21 µs … 273.40 µs  in 10 ×    356 runs\npaths_32/sparse             289.18 µs ±  11.64 µs   277.35 µs … 311.87 µs  in 10 ×    346 runs\npaths_128/baseline            1.93 ms ±  25.46 µs     1.89 ms …   1.96 ms  in 10 ×     51 runs\npaths_128/sparse              1.80 ms ± 113.24 µs     1.69 ms …   1.99 ms  in 10 ×     57 runs\npaths_512/baseline           17.02 ms ± 323.06 µs    16.66 ms …  17.68 ms  in 10 ×      6 runs\npaths_512/sparse             14.47 ms ± 536.69 µs    13.77 ms …  15.36 ms  in 10 ×      8 runs\ndepth_16/baseline            32.46 µs ± 374.84 ns    31.92 µs …  32.91 µs  in 10 ×   3033 runs\ndepth_16/sparse              33.07 µs ± 389.71 ns    32.47 µs …  33.67 µs  in 10 ×   3040 runs\natoms_8_depth_8/baseline     32.55 µs ± 361.53 ns    32.09 µs …  33.17 µs  in 10 ×   3080 runs\natoms_8_depth_8/sparse       33.09 µs ± 229.86 ns    32.69 µs …  33.45 µs  in 10 ×   3029 runs\natoms_64_depth_8/baseline   195.42 µs ±   2.44 µs   192.02 µs … 200.04 µs  in 10 ×    510 runs\natoms_64_depth_8/sparse     194.66 µs ±   1.78 µs   192.41 µs … 198.77 µs  in 10 ×    507 runs\npaths_32_atoms_16/baseline    1.83 ms ±  33.43 µs     1.78 ms …   1.89 ms  in 10 ×     55 runs\npaths_32_atoms_16/sparse      1.81 ms ±  23.20 µs     1.78 ms …   1.84 ms  in 10 ×     56 runs\n[dowdiness/moondsp] bench trial_compare/compare_benchmark.mbt:27 (\"bench/paired/BA\") ok\nname                       time (mean ± σ)         range (min … max) \npaths_32/sparse             274.69 µs ±   3.18 µs   270.05 µs … 279.10 µs  in 10 ×    359 runs\npaths_32/baseline           270.48 µs ±   1.91 µs   268.03 µs … 273.44 µs  in 10 ×    357 runs\npaths_128/sparse              1.66 ms ±  17.30 µs     1.63 ms …   1.68 ms  in 10 ×     61 runs\npaths_128/baseline            1.85 ms ±  30.93 µs     1.80 ms …   1.89 ms  in 10 ×     56 runs\npaths_512/sparse             14.24 ms ± 529.75 µs    13.40 ms …  15.05 ms  in 10 ×      7 runs\npaths_512/baseline           17.04 ms ± 698.14 µs    16.22 ms …  18.49 ms  in 10 ×      6 runs\ndepth_16/sparse              32.26 µs ± 293.83 ns    31.88 µs …  32.78 µs  in 10 ×   3068 runs\ndepth_16/baseline            32.22 µs ± 313.89 ns    31.77 µs …  32.53 µs  in 10 ×   3083 runs\natoms_8_depth_8/sparse       34.40 µs ± 938.47 ns    33.03 µs …  36.26 µs  in 10 ×   3016 runs\natoms_8_depth_8/baseline     33.88 µs ± 548.99 ns    33.43 µs …  35.15 µs  in 10 ×   2896 runs\natoms_64_depth_8/sparse     199.48 µs ±   2.57 µs   195.18 µs … 203.37 µs  in 10 ×    505 runs\natoms_64_depth_8/baseline   202.82 µs ±   2.01 µs   199.05 µs … 205.96 µs  in 10 ×    499 runs\npaths_32_atoms_16/sparse      1.85 ms ±  30.89 µs     1.80 ms …   1.89 ms  in 10 ×     55 runs\npaths_32_atoms_16/baseline    1.94 ms ±  86.19 µs     1.87 ms …   2.14 ms  in 10 ×     54 runs\nTotal tests: 2, passed: 2, failed: 0.\n",
+  "paired_representative": "[dowdiness/moondsp] bench trial_compare/representative_benchmark.mbt:2 (\"bench/paired/representative\") ok\nname               time (mean ± σ)         range (min … max) \nAB/direct/baseline    5.39 µs ±   1.32 µs     4.00 µs …   7.50 µs  in 10 ×  26341 runs\nAB/direct/sparse      3.59 µs ±  38.07 ns     3.54 µs …   3.65 µs  in 10 ×  27631 runs\nAB/nested/baseline   40.60 µs ± 323.41 ns    39.98 µs …  41.04 µs  in 10 ×   2279 runs\nAB/nested/sparse     41.23 µs ± 374.00 ns    40.98 µs …  42.03 µs  in 10 ×   2379 runs\nBA/direct/sparse      3.61 µs ±  92.88 ns     3.52 µs …   3.79 µs  in 10 ×  28017 runs\nBA/direct/baseline    3.72 µs ±  76.55 ns     3.64 µs …   3.85 µs  in 10 ×  26657 runs\nBA/nested/sparse     40.87 µs ± 250.52 ns    40.50 µs …  41.36 µs  in 10 ×   2439 runs\nBA/nested/baseline   40.57 µs ± 750.78 ns    39.67 µs …  42.00 µs  in 10 ×   2452 runs\nTotal tests: 1, passed: 1, failed: 0.\n",
+  "decision": "Integrate sparse first-entry/secondary-index cache only. 128/512-path preparation improves in both paired orders; accept measured 32-path overhead and about 1% overhead on representative nested source. Reject forward sharing, cold reversal memoization, global composite index and per-context fingerprint parameter variants.",
+  "limitations": [
+    "No dynamic allocation-byte, retained-heap or GC-pause measurements.",
+    "Compiler stress cases do not establish browser playback admission.",
+    "Serial hashes select buckets only; full context and generation-token equality remain authoritative. Collisions retain linear bucket search.",
+    "Whole-pattern context specialization and repeated dependency-token work remain. No proof of worst-case preparation bounds or whole-render allocation freedom."
+  ],
+  "production": {
+    "sha256": {
+      "pattern/pattern_doc.mbt": "153fc917bb283cb0492469b026d63064af6a143939bce2489743f8ef81fea41b",
+      "pattern/origin_snapshot_test.mbt": "1b222f89383e3a5456252391013812e027a5db2f67d0cae661ab5932021b9791",
+      "mini/exact_origin_benchmark.mbt": "d3c56c6f5290cab4d1c4b68aa3d6a1f9fb0e175e3e03cde11a72a4b2bd29cb79",
+      "scripts/measure-playback-api.cjs": "280f658de8f612b4059c56bdd410ae4196d3cceecdd41de1955aa14ac6d7ca4a",
+      "scripts/measure-playback-worklet.js": "8be12d8990f16e8aa8bc5a9beae58e1f444e8ea61510feac9b99ca6fbd76d78d",
+      "_build/wasm-gc/release/build/browser/browser.wasm": "36e81c206f1abdd34a18a4f7a35e43c461640a74d52cac1a10318096b9fc2456",
+      "_build/wasm-gc/release/build/browser/browser.wat": "52030e5b4e93796193de9bf9f10983683b58379023951a477988900de12a2689",
+      "_build/js/release/build/browser_authoring/browser_authoring.js": "109f58e80149d1660a17dcfe6662dbd5861b0f87c8b5f07d4542c2fab99988ec"
+    },
+    "benchmark": "[dowdiness/moondsp] bench mini/exact_origin_benchmark.mbt:62 (\"bench/exact_origin/query\") ok\nname                           time (mean ± σ)         range (min … max) \ndirect/ordinary_sourced           5.95 µs ± 107.96 ns     5.82 µs …   6.13 µs  in 10 ×  16718 runs\ndirect/exact_origin               6.09 µs ±  54.10 ns     6.02 µs …   6.18 µs  in 10 ×  16340 runs\nnested_reused/ordinary_sourced   23.85 µs ± 889.88 ns    22.75 µs …  25.14 µs  in 10 ×   4086 runs\nnested_reused/exact_origin       24.38 µs ±   1.04 µs    23.23 µs …  25.82 µs  in 10 ×   3885 runs\n[dowdiness/moondsp] bench mini/exact_origin_benchmark.mbt:106 (\"bench/exact_origin/prepare\") ok\nname                       time (mean ± σ)         range (min … max) \ndirect/cold_exact             4.57 µs ±   1.01 µs     3.89 µs …   7.13 µs  in 10 ×  19339 runs\nnested_reused/cold_exact     46.25 µs ±   2.21 µs    44.32 µs …  50.59 µs  in 10 ×   2039 runs\nshared_32_paths/cold_exact  256.18 µs ±   8.33 µs   246.66 µs … 273.59 µs  in 10 ×    379 runs\nTotal tests: 2, passed: 2, failed: 0.\n",
+    "worklet_runs": {
+      "AB": {
+        "mode": "exact-origin-comparison",
+        "source": "let motif = note(\"60 62 64 67\"); let phrase = stack(motif, motif.slow(2)); stack(phrase, phrase.slow(3))",
+        "order": [
+          "text",
+          "tracked"
+        ],
+        "tracked_versions": [
+          [
+            1,
+            0
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            1,
+            2
+          ],
+          [
+            1,
+            3
+          ],
+          [
+            1,
+            4
+          ],
+          [
+            1,
+            5
+          ],
+          [
+            1,
+            6
+          ],
+          [
+            1,
+            7
+          ],
+          [
+            1,
+            8
+          ],
+          [
+            1,
+            9
+          ],
+          [
+            1,
+            10
+          ],
+          [
+            1,
+            11
+          ],
+          [
+            1,
+            12
+          ],
+          [
+            1,
+            13
+          ],
+          [
+            1,
+            14
+          ],
+          [
+            1,
+            15
+          ],
+          [
+            1,
+            16
+          ],
+          [
+            1,
+            17
+          ],
+          [
+            1,
+            18
+          ],
+          [
+            1,
+            19
+          ],
+          [
+            1,
+            20
+          ],
+          [
+            1,
+            21
+          ],
+          [
+            1,
+            22
+          ],
+          [
+            1,
+            23
+          ],
+          [
+            1,
+            24
+          ],
+          [
+            1,
+            25
+          ],
+          [
+            1,
+            26
+          ],
+          [
+            1,
+            27
+          ],
+          [
+            1,
+            28
+          ],
+          [
+            1,
+            29
+          ],
+          [
+            1,
+            30
+          ],
+          [
+            1,
+            31
+          ],
+          [
+            1,
+            32
+          ],
+          [
+            1,
+            33
+          ],
+          [
+            1,
+            34
+          ],
+          [
+            1,
+            35
+          ],
+          [
+            1,
+            36
+          ],
+          [
+            1,
+            37
+          ],
+          [
+            1,
+            38
+          ],
+          [
+            1,
+            39
+          ],
+          [
+            1,
+            40
+          ]
+        ],
+        "wire_code_units": {
+          "text": {
+            "initial": 142,
+            "minimum": 142,
+            "maximum": 142
+          },
+          "tracked": {
+            "initial": 430,
+            "minimum": 430,
+            "maximum": 432
+          }
+        },
+        "arms": {
+          "text": {
+            "mode": "audio-worklet",
+            "workload": "nested reused Pattern, alternating first note 60/61",
+            "characters": 104,
+            "iterations": 40,
+            "warmup_updates": 10,
+            "sample_rate": 48000,
+            "block_size": 128,
+            "block_budget_ms": 2.6666666666666665,
+            "worklet_clock": "Date.now, integer milliseconds; sub-millisecond values are unresolved",
+            "baseline": {
+              "render": {
+                "count": 370,
+                "mean_ms": 0.24594594594594596,
+                "p50_ms": 0,
+                "p95_ms": 1,
+                "max_ms": 1,
+                "zero_count": 279
+              },
+              "callback_interarrival": {
+                "count": 369,
+                "mean_ms": 2.6097560975609757,
+                "p50_ms": 0,
+                "p95_ms": 23,
+                "max_ms": 24,
+                "zero_count": 239
+              },
+              "owner_update": null
+            },
+            "edited": {
+              "render": {
+                "count": 2581,
+                "mean_ms": 0.16970166602092213,
+                "p50_ms": 0,
+                "p95_ms": 1,
+                "max_ms": 1,
+                "zero_count": 2143
+              },
+              "callback_interarrival": {
+                "count": 2580,
+                "mean_ms": 2.6585271317829458,
+                "p50_ms": 0,
+                "p95_ms": 24,
+                "max_ms": 25,
+                "zero_count": 1830
+              },
+              "owner_update": {
+                "count": 40,
+                "mean_ms": 0.65,
+                "p50_ms": 1,
+                "p95_ms": 1,
+                "max_ms": 1,
+                "zero_count": 14
+              }
+            },
+            "receipt_roundtrip": {
+              "count": 40,
+              "mean_ms": 0.8350000001490117,
+              "p50_ms": 0.8000000007450581,
+              "p95_ms": 1.1000000014901161,
+              "max_ms": 1.199999999254942,
+              "zero_count": 0
+            },
+            "adoption": {
+              "pending_peak_observed": 4,
+              "pending_final": 0,
+              "start_cycle": 1.272,
+              "last_update_cycle": 2.1626666666666665,
+              "final_cycle": 8.184,
+              "post_update_cycles_minimum": 6,
+              "tempo": 60,
+              "rendered_frames": 330368,
+              "final_state": "Playing",
+              "wait_limit_ms": 30000
+            },
+            "conditions": {
+              "headless": true,
+              "output_muted": true,
+              "cross_origin_isolated": false,
+              "baseline_window_ms": 1000,
+              "delay_between_edits_ms": 20,
+              "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+            },
+            "interpretation": "Instrumented callback timings and wall-clock interarrival gaps; not an audible-dropout or real-time deadline guarantee. Buffered callback bursts can exceed one quantum even at baseline."
+          },
+          "tracked": {
+            "mode": "audio-worklet",
+            "workload": "nested reused Pattern, alternating first note 60/61",
+            "characters": 104,
+            "iterations": 40,
+            "warmup_updates": 10,
+            "sample_rate": 48000,
+            "block_size": 128,
+            "block_budget_ms": 2.6666666666666665,
+            "worklet_clock": "Date.now, integer milliseconds; sub-millisecond values are unresolved",
+            "baseline": {
+              "render": {
+                "count": 375,
+                "mean_ms": 0.17066666666666666,
+                "p50_ms": 0,
+                "p95_ms": 1,
+                "max_ms": 1,
+                "zero_count": 311
+              },
+              "callback_interarrival": {
+                "count": 374,
+                "mean_ms": 2.641711229946524,
+                "p50_ms": 0,
+                "p95_ms": 23,
+                "max_ms": 24,
+                "zero_count": 257
+              },
+              "owner_update": null
+            },
+            "edited": {
+              "render": {
+                "count": 2572,
+                "mean_ms": 0.17262830482115085,
+                "p50_ms": 0,
+                "p95_ms": 1,
+                "max_ms": 1,
+                "zero_count": 2128
+              },
+              "callback_interarrival": {
+                "count": 2571,
+                "mean_ms": 2.6577207312329834,
+                "p50_ms": 0,
+                "p95_ms": 24,
+                "max_ms": 27,
+                "zero_count": 1822
+              },
+              "owner_update": {
+                "count": 40,
+                "mean_ms": 0.35,
+                "p50_ms": 0,
+                "p95_ms": 1,
+                "max_ms": 1,
+                "zero_count": 26
+              }
+            },
+            "receipt_roundtrip": {
+              "count": 40,
+              "mean_ms": 0.7949999996460975,
+              "p50_ms": 0.7000000029802322,
+              "p95_ms": 1.2999999970197678,
+              "max_ms": 2.099999997764826,
+              "zero_count": 0
+            },
+            "adoption": {
+              "pending_peak_observed": 4,
+              "pending_final": 0,
+              "start_cycle": 1.272,
+              "last_update_cycle": 2.1626666666666665,
+              "final_cycle": 8.184,
+              "post_update_cycles_minimum": 6,
+              "tempo": 60,
+              "rendered_frames": 329216,
+              "final_state": "Playing",
+              "wait_limit_ms": 30000
+            },
+            "conditions": {
+              "headless": true,
+              "output_muted": true,
+              "cross_origin_isolated": false,
+              "baseline_window_ms": 1000,
+              "delay_between_edits_ms": 20,
+              "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+            },
+            "interpretation": "Instrumented callback timings and wall-clock interarrival gaps; not an audible-dropout or real-time deadline guarantee. Buffered callback bursts can exceed one quantum even at baseline."
+          }
+        },
+        "interpretation": "Same source edit sequence; text versus tracked includes wire validation/compile/admission differences, not just origin-query overhead. Both arms include existing status notifications. No allocation or glitch-free guarantee."
+      },
+      "BA": {
+        "mode": "exact-origin-comparison",
+        "source": "let motif = note(\"60 62 64 67\"); let phrase = stack(motif, motif.slow(2)); stack(phrase, phrase.slow(3))",
+        "order": [
+          "tracked",
+          "text"
+        ],
+        "tracked_versions": [
+          [
+            1,
+            0
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            1,
+            2
+          ],
+          [
+            1,
+            3
+          ],
+          [
+            1,
+            4
+          ],
+          [
+            1,
+            5
+          ],
+          [
+            1,
+            6
+          ],
+          [
+            1,
+            7
+          ],
+          [
+            1,
+            8
+          ],
+          [
+            1,
+            9
+          ],
+          [
+            1,
+            10
+          ],
+          [
+            1,
+            11
+          ],
+          [
+            1,
+            12
+          ],
+          [
+            1,
+            13
+          ],
+          [
+            1,
+            14
+          ],
+          [
+            1,
+            15
+          ],
+          [
+            1,
+            16
+          ],
+          [
+            1,
+            17
+          ],
+          [
+            1,
+            18
+          ],
+          [
+            1,
+            19
+          ],
+          [
+            1,
+            20
+          ],
+          [
+            1,
+            21
+          ],
+          [
+            1,
+            22
+          ],
+          [
+            1,
+            23
+          ],
+          [
+            1,
+            24
+          ],
+          [
+            1,
+            25
+          ],
+          [
+            1,
+            26
+          ],
+          [
+            1,
+            27
+          ],
+          [
+            1,
+            28
+          ],
+          [
+            1,
+            29
+          ],
+          [
+            1,
+            30
+          ],
+          [
+            1,
+            31
+          ],
+          [
+            1,
+            32
+          ],
+          [
+            1,
+            33
+          ],
+          [
+            1,
+            34
+          ],
+          [
+            1,
+            35
+          ],
+          [
+            1,
+            36
+          ],
+          [
+            1,
+            37
+          ],
+          [
+            1,
+            38
+          ],
+          [
+            1,
+            39
+          ],
+          [
+            1,
+            40
+          ]
+        ],
+        "wire_code_units": {
+          "text": {
+            "initial": 142,
+            "minimum": 142,
+            "maximum": 142
+          },
+          "tracked": {
+            "initial": 430,
+            "minimum": 430,
+            "maximum": 432
+          }
+        },
+        "arms": {
+          "tracked": {
+            "mode": "audio-worklet",
+            "workload": "nested reused Pattern, alternating first note 60/61",
+            "characters": 104,
+            "iterations": 40,
+            "warmup_updates": 10,
+            "sample_rate": 48000,
+            "block_size": 128,
+            "block_budget_ms": 2.6666666666666665,
+            "worklet_clock": "Date.now, integer milliseconds; sub-millisecond values are unresolved",
+            "baseline": {
+              "render": {
+                "count": 379,
+                "mean_ms": 0.20316622691292877,
+                "p50_ms": 0,
+                "p95_ms": 1,
+                "max_ms": 1,
+                "zero_count": 302
+              },
+              "callback_interarrival": {
+                "count": 378,
+                "mean_ms": 2.6164021164021163,
+                "p50_ms": 0,
+                "p95_ms": 23,
+                "max_ms": 24,
+                "zero_count": 257
+              },
+              "owner_update": null
+            },
+            "edited": {
+              "render": {
+                "count": 2572,
+                "mean_ms": 0.16951788491446346,
+                "p50_ms": 0,
+                "p95_ms": 1,
+                "max_ms": 2,
+                "zero_count": 2137
+              },
+              "callback_interarrival": {
+                "count": 2571,
+                "mean_ms": 2.6581096849474912,
+                "p50_ms": 0,
+                "p95_ms": 24,
+                "max_ms": 25,
+                "zero_count": 1819
+              },
+              "owner_update": {
+                "count": 40,
+                "mean_ms": 0.625,
+                "p50_ms": 1,
+                "p95_ms": 1,
+                "max_ms": 1,
+                "zero_count": 15
+              }
+            },
+            "receipt_roundtrip": {
+              "count": 40,
+              "mean_ms": 0.9350000001490116,
+              "p50_ms": 0.9000000022351742,
+              "p95_ms": 1.6000000014901161,
+              "max_ms": 1.699999999254942,
+              "zero_count": 0
+            },
+            "adoption": {
+              "pending_peak_observed": 4,
+              "pending_final": 0,
+              "start_cycle": 1.272,
+              "last_update_cycle": 2.1626666666666665,
+              "final_cycle": 8.184,
+              "post_update_cycles_minimum": 6,
+              "tempo": 60,
+              "rendered_frames": 329216,
+              "final_state": "Playing",
+              "wait_limit_ms": 30000
+            },
+            "conditions": {
+              "headless": true,
+              "output_muted": true,
+              "cross_origin_isolated": false,
+              "baseline_window_ms": 1000,
+              "delay_between_edits_ms": 20,
+              "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+            },
+            "interpretation": "Instrumented callback timings and wall-clock interarrival gaps; not an audible-dropout or real-time deadline guarantee. Buffered callback bursts can exceed one quantum even at baseline."
+          },
+          "text": {
+            "mode": "audio-worklet",
+            "workload": "nested reused Pattern, alternating first note 60/61",
+            "characters": 104,
+            "iterations": 40,
+            "warmup_updates": 10,
+            "sample_rate": 48000,
+            "block_size": 128,
+            "block_budget_ms": 2.6666666666666665,
+            "worklet_clock": "Date.now, integer milliseconds; sub-millisecond values are unresolved",
+            "baseline": {
+              "render": {
+                "count": 379,
+                "mean_ms": 0.19261213720316622,
+                "p50_ms": 0,
+                "p95_ms": 1,
+                "max_ms": 2,
+                "zero_count": 307
+              },
+              "callback_interarrival": {
+                "count": 378,
+                "mean_ms": 2.613756613756614,
+                "p50_ms": 0,
+                "p95_ms": 24,
+                "max_ms": 24,
+                "zero_count": 266
+              },
+              "owner_update": null
+            },
+            "edited": {
+              "render": {
+                "count": 2572,
+                "mean_ms": 0.17107309486780714,
+                "p50_ms": 0,
+                "p95_ms": 1,
+                "max_ms": 3,
+                "zero_count": 2134
+              },
+              "callback_interarrival": {
+                "count": 2571,
+                "mean_ms": 2.6581096849474912,
+                "p50_ms": 0,
+                "p95_ms": 24,
+                "max_ms": 25,
+                "zero_count": 1832
+              },
+              "owner_update": {
+                "count": 40,
+                "mean_ms": 0.525,
+                "p50_ms": 1,
+                "p95_ms": 1,
+                "max_ms": 1,
+                "zero_count": 19
+              }
+            },
+            "receipt_roundtrip": {
+              "count": 40,
+              "mean_ms": 0.7525000004097819,
+              "p50_ms": 0.7000000029802322,
+              "p95_ms": 1.1000000014901161,
+              "max_ms": 1.300000000745058,
+              "zero_count": 0
+            },
+            "adoption": {
+              "pending_peak_observed": 4,
+              "pending_final": 0,
+              "start_cycle": 1.272,
+              "last_update_cycle": 2.1626666666666665,
+              "final_cycle": 8.184,
+              "post_update_cycles_minimum": 6,
+              "tempo": 60,
+              "rendered_frames": 329216,
+              "final_state": "Playing",
+              "wait_limit_ms": 30000
+            },
+            "conditions": {
+              "headless": true,
+              "output_muted": true,
+              "cross_origin_isolated": false,
+              "baseline_window_ms": 1000,
+              "delay_between_edits_ms": 20,
+              "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+            },
+            "interpretation": "Instrumented callback timings and wall-clock interarrival gaps; not an audible-dropout or real-time deadline guarantee. Buffered callback bursts can exceed one quantum even at baseline."
+          }
+        },
+        "interpretation": "Same source edit sequence; text versus tracked includes wire validation/compile/admission differences, not just origin-query overhead. Both arms include existing status notifications. No allocation or glitch-free guarantee."
+      }
+    },
+    "allocation_inspection": {
+      "allocators": [
+        {
+          "name": "$_M0IP39dowdiness7moondsp7pattern11EventOriginP39dowdiness7moondsp7pattern14DocumentOrigin13bind__context",
+          "text": "(func $_M0IP39dowdiness7moondsp7pattern11EventOriginP39dowdiness7moondsp7pattern14DocumentOrigin13bind__context (param $_M0L4nodeS13020 (ref $moonbit.string)) (param $_M0L7bindingS13016 (ref null $_M0TP39dowdiness7moondsp7pattern16ReferenceBinding)) (param $_M0L7contextS13019 (ref $moonbit.enum)) (result (ref $moonbit.enum))\n (local $_M0L7_2aSomeS13017 (ref null $_M0TP39dowdiness7moondsp7pattern16ReferenceBinding))\n (local $_M0L10_2abindingS13018 (ref $_M0TP39dowdiness7moondsp7pattern16ReferenceBinding))\n (if (result (ref $moonbit.enum))\n  (ref.is_null\n   (local.get $_M0L7bindingS13016))\n  (then\n   (struct.new $_M0DTPC16result6ResultGRP39dowdiness7moondsp7pattern14OriginBindingsRP39dowdiness7moondsp7pattern15PatternDocErrorE3Err\n    (i32.const 0)\n    (struct.new $_M0DTPC15error5Error73dowdiness_2fmoondsp_2fpattern_2ePatternDocError_2eMissingReferenceBinding\n     (i32.const 9)\n     (local.get $_M0L4nodeS13020))))\n  (else\n   (local.set $_M0L10_2abindingS13018\n    (ref.as_non_null\n     (local.tee $_M0L7_2aSomeS13017\n      (local.get $_M0L7bindingS13016))))\n   (struct.new $_M0DTPC16result6ResultGRP39dowdiness7moondsp7pattern14OriginBindingsRP39dowdiness7moondsp7pattern15PatternDocErrorE2Ok\n    (i32.const 1)\n    (struct.new $_M0DTP39dowdiness7moondsp7pattern14OriginBindings4Link\n     (i32.const 1)\n     (local.get $_M0L10_2abindingS13018)\n     (local.get $_M0L7contextS13019))))))\n"
+        },
+        {
+          "name": "$_M0IP39dowdiness7moondsp7pattern11EventOriginP39dowdiness7moondsp7pattern14DocumentOrigin12make__origin",
+          "text": "(func $_M0IP39dowdiness7moondsp7pattern11EventOriginP39dowdiness7moondsp7pattern14DocumentOrigin12make__origin (param $_M0L4nodeS13015 (ref $moonbit.string)) (param $_M0L4atomS13005 (ref null $_M0TP39dowdiness7moondsp8identity12SourceAtomId)) (param $_M0L7contextS13014 (ref $moonbit.enum)) (result (ref $moonbit.enum))\n (local $_M0L7_2aSomeS13006 (ref null $_M0TP39dowdiness7moondsp8identity12SourceAtomId))\n (local $_M0L7_2aatomS13007 (ref $_M0TP39dowdiness7moondsp8identity12SourceAtomId))\n (local $_M0L9remainingS13009 (ref $moonbit.enum))\n (local $_M0L7_2aLinkS13011 (ref $_M0DTP39dowdiness7moondsp7pattern14OriginBindings4Link))\n (local $_M0L10_2abindingS13012 (ref $_M0TP39dowdiness7moondsp7pattern16ReferenceBinding))\n (local $_M0L7_2arestS13013 (ref $moonbit.enum))\n (local $_M0L3tagS27001 i32)\n (local $_M0Lm8bindingsS13008 (ref $moonbit.enum))\n (if (result (ref $moonbit.enum))\n  (ref.is_null\n   (local.get $_M0L4atomS13005))\n  (then\n   (struct.new $_M0DTPC16result6ResultGRP39dowdiness7moondsp7pattern11EventOriginRP39dowdiness7moondsp7pattern15PatternDocErrorE3Err\n    (i32.const 0)\n    (struct.new $_M0DTPC15error5Error67dowdiness_2fmoondsp_2fpattern_2ePatternDocError_2eMissingAtomOrigin\n     (i32.const 10)\n     (local.get $_M0L4nodeS13015))))\n  (else\n   (local.set $_M0L7_2aatomS13007\n    (ref.as_non_null\n     (local.tee $_M0L7_2aSomeS13006\n      (local.get $_M0L4atomS13005))))\n   (local.set $_M0Lm8bindingsS13008\n    (global.get $moonbit.constr/0))\n   (block $break:13010\n    (local.get $_M0L7contextS13014)\n    (loop $loop:13010 (param (ref $moonbit.enum))\n     (local.tee $_M0L9remainingS13009)\n     (struct.get $moonbit.enum 0)\n     (local.tee $_M0L3tagS27001)\n     (i32.const 0)\n     (i32.eq)\n     (if\n      (then\n       (br $break:13010))\n      (else\n       (local.set $_M0L10_2abindingS13012\n        (struct.get $_M0DTP39dowdiness7moondsp7pattern14OriginBindings4Link 1\n         (local.tee $_M0L7_2aLinkS13011\n          (ref.cast (ref $_M0DTP39dowdiness7moondsp7pattern14OriginBindings4Link)\n           (local.get $_M0L9remainingS13009)))))\n       (local.set $_M0L7_2arestS13013\n        (struct.get $_M0DTP39dowdiness7moondsp7pattern14OriginBindings4Link 2\n         (local.get $_M0L7_2aLinkS13011)))\n       (local.set $_M0Lm8bindingsS13008\n        (struct.new $_M0DTP39dowdiness7moondsp7pattern14OriginBindings4Link\n         (i32.const 1)\n         (local.get $_M0L10_2abindingS13012)\n         (local.get $_M0Lm8bindingsS13008)))\n       (local.get $_M0L7_2arestS13013)\n       (br $loop:13010)))))\n   (struct.new $_M0DTPC16result6ResultGRP39dowdiness7moondsp7pattern11EventOriginRP39dowdiness7moondsp7pattern15PatternDocErrorE2Ok\n    (i32.const 1)\n    (call $_M0MP39dowdiness7moondsp7pattern11EventOrigin19EventOrigin_2einner\n     (local.get $_M0L7_2aatomS13007)\n     (local.get $_M0Lm8bindingsS13008))))))\n"
+        },
+        {
+          "name": "$_M0MP39dowdiness7moondsp7pattern11EventOrigin19EventOrigin_2einner",
+          "text": "(func $_M0MP39dowdiness7moondsp7pattern11EventOrigin19EventOrigin_2einner (param $_M0L4atomS12993 (ref $_M0TP39dowdiness7moondsp8identity12SourceAtomId)) (param $_M0L8bindingsS12994 (ref $moonbit.enum)) (result (ref $_M0TP39dowdiness7moondsp7pattern11EventOrigin))\n (struct.new $_M0TP39dowdiness7moondsp7pattern11EventOrigin\n  (local.get $_M0L4atomS12993)\n  (local.get $_M0L8bindingsS12994)))\n"
+        }
+      ],
+      "callers": [
+        {
+          "name": "$_M0FP39dowdiness7moondsp7pattern22compile__pattern__nodeGRP39dowdiness7moondsp7pattern10ControlMapRP39dowdiness7moondsp7pattern11EventOriginE",
+          "sites": [
+            "                          (call $_M0IP39dowdiness7moondsp7pattern11EventOriginP39dowdiness7moondsp7pattern14DocumentOrigin13bind__context",
+            "                         (call $_M0IP39dowdiness7moondsp7pattern11EventOriginP39dowdiness7moondsp7pattern14DocumentOrigin12make__origin",
+            "                       (call $_M0IP39dowdiness7moondsp7pattern11EventOriginP39dowdiness7moondsp7pattern14DocumentOrigin12make__origin",
+            "                      (call $_M0IP39dowdiness7moondsp7pattern11EventOriginP39dowdiness7moondsp7pattern14DocumentOrigin12make__origin"
+          ]
+        },
+        {
+          "name": "$_M0IP39dowdiness7moondsp7pattern11EventOriginP39dowdiness7moondsp7pattern14DocumentOrigin12make__origin",
+          "sites": [
+            "    (call $_M0MP39dowdiness7moondsp7pattern11EventOrigin19EventOrigin_2einner"
+          ]
+        }
+      ],
+      "legacy_bind_origin_present": false,
+      "allocator_ref_func_references": 0
+    },
+    "validation": {
+      "strict_all_target_check": "passed",
+      "project_tests": 1264,
+      "pattern_public_interface": "unchanged",
+      "info_fmt_release_builds": "passed",
+      "worklet": "AB and BA; each arm 40 updates, pending_final 0, Playing"
+    }
+  },
+  "reproduction_smoke": "patching file pattern/pattern_doc.mbt\n[dowdiness/moondsp] bench trial_compare/representative_benchmark.mbt:2 (\"bench/paired/representative\") ok\nname               time (mean ± σ)         range (min … max) \nAB/direct/baseline    3.60 µs ±  80.63 ns     3.51 µs …   3.77 µs  in 10 ×  27744 runs\nAB/direct/sparse      3.48 µs ±  49.17 ns     3.41 µs …   3.55 µs  in 10 ×  28815 runs\nAB/nested/baseline   39.13 µs ± 492.02 ns    38.57 µs …  39.87 µs  in 10 ×   2342 runs\nAB/nested/sparse     39.60 µs ± 419.78 ns    38.94 µs …  40.23 µs  in 10 ×   2503 runs\nBA/direct/sparse      3.45 µs ±  22.41 ns     3.43 µs …   3.50 µs  in 10 ×  28982 runs\nBA/direct/baseline    3.60 µs ±  37.47 ns     3.55 µs …   3.67 µs  in 10 ×  27738 runs\nBA/nested/sparse     39.39 µs ± 412.79 ns    38.80 µs …  39.97 µs  in 10 ×   2546 runs\nBA/nested/baseline   38.76 µs ± 489.15 ns    38.28 µs …  39.67 µs  in 10 ×   2586 runs\nTotal tests: 1, passed: 1, failed: 0.\n"
+}

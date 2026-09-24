@@ -58,6 +58,7 @@ pub fn PatternScheduler::apply_pattern_voice_effect_result(Self, PatternVoiceSco
 pub fn PatternScheduler::apply_song_voice_effect_result(Self, SongVoiceScope, ActiveVoiceEffect, @voice.BoundVoicePool) -> Result[ActiveVoiceEffectOutcome, @voice.VoiceControlError]
 pub fn PatternScheduler::bpm(Self) -> Double
 pub fn PatternScheduler::current_block(Self) -> Result[BlockFrame, @transport.TransportError]
+pub fn PatternScheduler::cycle_position(Self) -> Double
 pub fn PatternScheduler::expire_notes(Self, @voice.BoundVoicePool, @pattern.TimeSpan) -> Result[Unit, @transport.TransportError]
 pub fn PatternScheduler::expire_notes_at(Self, @voice.BoundVoicePool, PerformanceTime) -> Unit
 pub fn PatternScheduler::last_transport_error(Self) -> @transport.TransportError?
@@ -101,11 +102,13 @@ pub(all) enum PlaybackAdmissionError {
 
 pub enum PlaybackSnapshot {
   Pattern(@pattern.PatternSnapshot[@pattern.ControlMap])
+  PatternWithOrigins(@pattern.PatternSnapshotWithOrigins[@pattern.ControlMap])
   Song(@song.SongSnapshot[@pattern.ControlMap])
   RepeatSong(@song.SongSnapshot[@pattern.ControlMap])
 }
 pub fn PlaybackSnapshot::material_count(Self) -> Int
 pub fn PlaybackSnapshot::pattern(@pattern.PatternSnapshot[@pattern.ControlMap]) -> Self
+pub fn PlaybackSnapshot::pattern_with_origins(@pattern.PatternSnapshotWithOrigins[@pattern.ControlMap]) -> Self
 pub fn PlaybackSnapshot::query(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@pattern.ControlMap]]
 pub fn PlaybackSnapshot::repeat_song(@song.SongSnapshot[@pattern.ControlMap]) -> Self
 pub fn PlaybackSnapshot::revision(Self) -> @identity.Revision

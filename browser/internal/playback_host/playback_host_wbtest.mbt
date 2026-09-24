@@ -58,8 +58,14 @@ fn init_scheduler_graph_for_test() -> Bool {
 ///|
 fn submit_for_test(text : String, restart? : Bool = true) -> Int {
   clear_playback_input()
-  for i in 0..<text.length() {
-    push_playback_char(text[i].to_int())
+  let fields : Map[String, Json] = {
+    "schema": Json::number(1.0),
+    "kind": Json::string("text"),
+    "text": Json::string(text),
+  }
+  let wire = Json::object(fields).stringify()
+  for i in 0..<wire.length() {
+    push_playback_char(wire[i].to_int())
   }
   if restart {
     player_restart_input()

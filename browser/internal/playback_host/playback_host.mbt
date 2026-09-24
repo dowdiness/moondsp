@@ -343,7 +343,7 @@ fn Player::process(self : Player) -> Bool {
       ignore(set_scheduler_parse_error(message))
       return false
     }
-    Playing(_) | Ended(_, _) => ()
+    Playing(_) | Ended(_, _, _) => ()
   }
   self.send_left.fill(0.0)
   self.send_right.fill(0.0)
@@ -387,7 +387,7 @@ fn Player::process(self : Player) -> Bool {
     let scheduler = self.schedulers[0]
     match scheduler.sample_at(end_) {
       Ok(end_sample) if scheduler.sample_counter() >= end_sample =>
-        self.session = Ended(song, end_sample)
+        self.session = Ended(song, end_sample, end_.to_double())
       Ok(_) => ()
       Err(_) => {
         self.session = Fault("song end exceeds transport range")
@@ -421,25 +421,60 @@ fn set_scheduler_parse_error(message : String) -> Int {
 }
 
 ///|
+const MAX_PLAYBACK_INPUT_CODE_UNITS : Int = 2097152
+
+///|
 let playback_input_chars : Array[Int] = []
 
 ///|
-fn input_chars_to_string(chars : Array[Int]) -> String {
+let playback_input_overflow : @ref.Ref[Bool] = @ref.new(false)
+
+///|
+fn input_chars_to_string(chars : Array[Int]) -> Result[String, String] {
   let buf = StringBuilder()
-  for c in chars {
-    buf.write_char(c.unsafe_to_char())
+  let mut i = 0
+  while i < chars.length() {
+    let code = chars[i]
+    guard code >= 0 && code <= 0xffff else {
+      return Err("invalid UTF-16 code unit")
+    }
+    if code >= 0xd800 && code <= 0xdbff {
+      guard i + 1 < chars.length() else {
+        return Err("invalid UTF-16 surrogate pair")
+      }
+      let next = chars[i + 1]
+      guard next >= 0xdc00 && next <= 0xdfff else {
+        return Err("invalid UTF-16 surrogate pair")
+      }
+      buf.write_char(code.unsafe_to_char())
+      buf.write_char(next.unsafe_to_char())
+      i += 2
+    } else {
+      guard code < 0xdc00 || code > 0xdfff else {
+        return Err("invalid UTF-16 surrogate pair")
+      }
+      buf.write_char(code.unsafe_to_char())
+      i += 1
+    }
   }
-  buf.to_string()
+  Ok(buf.to_string())
 }
 
 ///|
 pub fn clear_playback_input() -> Unit {
   playback_input_chars.clear()
+  playback_input_overflow.val = false
 }
 
 ///|
 pub fn push_playback_char(code : Int) -> Unit {
-  playback_input_chars.push(code)
+  if code < 0 ||
+    code > 0xffff ||
+    playback_input_chars.length() >= MAX_PLAYBACK_INPUT_CODE_UNITS {
+    playback_input_overflow.val = true
+  } else {
+    playback_input_chars.push(code)
+  }
 }
 
 ///|
@@ -498,7 +533,7 @@ pub fn set_scheduler_bpm(bpm : Double) -> Int {
           Ready(_) => Ready(next)
           Playing(_) => Playing(next)
           Paused(_) => Paused(next)
-          Ended(_, position) => Ended(next, position)
+          Ended(_, position, cycle) => Ended(next, position, cycle)
           other => other
         }
       }

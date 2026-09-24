@@ -5,3 +5,4 @@ public
 .vite
 playwright-report
 test-results
+src/generated/*.js

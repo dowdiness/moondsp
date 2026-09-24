@@ -1,6 +1,10 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "dowdiness/moondsp/browser"
 
+import {
+  "moonbitlang/core/debug",
+}
+
 // Values
 pub fn clear_playback_input() -> Unit
 
@@ -78,6 +82,8 @@ pub fn init_exit_deliverable_graph(Double, Int) -> Bool
 
 pub fn init_scheduler_graph(Double, Int) -> Bool
 
+pub fn player_mode() -> PlaybackMode
+
 pub fn player_pause() -> Int
 
 pub fn player_pending_count() -> Int
@@ -124,6 +130,8 @@ pub fn reset_phase() -> Unit
 
 pub fn scheduler_bpm() -> Double
 
+pub fn scheduler_cycle_position() -> Double
+
 pub fn scheduler_left_sample(Int) -> Double
 
 pub fn scheduler_right_sample(Int) -> Double
@@ -151,6 +159,11 @@ pub fn tick_source(source_id~ : Int, freq_hz~ : Double, sample_rate~ : Double) -
 // Errors
 
 // Types and methods
+pub(all) enum PlaybackMode {
+  None
+  Pattern
+  Song
+} derive(Eq, @debug.Debug)
 
 // Type aliases
 

@@ -41,6 +41,7 @@ streams, situated between text notation and audio-rate scheduling:
 | **Time Transforms** | `Pat[A]` methods | `Pat::fast`, `Pat::slow`, `Pat::rev`, `Pat::euclid`, `Pat::degrade_by`, `every`, `Pat::gate`, `Pat::jux`, `Pat::filter_map` |
 | **Control Helpers** | `ControlMap`, helper functions | `note`, `note_name`, `chord`, `sound`, `control`, `s_gain`, `s_cutoff`, `s_pan`, `ControlMap::get`, `ControlMap::set`, `ControlMap::merge` |
 | **Document & Identity** | `PatternDoc[A]`, `PatternSnapshot[A]`, `PatternLoweringCache[A]` | `PatternDoc::from_pattern`, `PatternDoc::pure`, `PatternDoc::sequence`, `PatternDoc::stack`, `PatternDoc::lower`, `PatternDoc::lower_with_cache`, `PatternSnapshot::query` |
+| **Exact Origins** | `PatternSnapshotWithOrigins[A]`, `EventWithOrigin[A]`, `EventOrigin`, `ResolvedReference[A]` | `PatternDoc::atom`, `PatternDoc::control_atom`, `PatternDoc::reference_with_binding`, `PatternDoc::lower_with_origins` |
 
 A pattern is a query:
 
@@ -198,16 +199,55 @@ a control maps to an instrument or DSP parameter.
 ## Live-editing identity
 
 `PatternDoc[A]` adds stable `PatternNodeId` values and revisions to an authored
-pattern tree. Lowering produces a `PatternSnapshot[A]`, which keeps source paths
-for events while exposing the same runtime query model.
+pattern tree. General lowering produces a `PatternSnapshot[A]` with voice-scope
+paths. A scope may contain several leaves; its last node is not an exact source
+atom. Use `pattern_node_path()` for scope operations, not source highlighting.
 
 Use `PatternLoweringCache` when repeatedly lowering edited documents. Unchanged
 subtrees can reuse their previous lowered patterns. Identity, content equality,
 and playback entry addresses are separate concepts; changing one does not imply
 that the others changed.
 
-Mini notation builds this layer through `mini.parse_doc` and
-`MiniAuthoringPipeline`. Direct `Pat` users do not need `PatternDoc`.
+Mini notation builds general documents through `mini.parse_doc`; `mini.Draft`
+adds causal source witnesses. Direct `Pat` users do not need `PatternDoc`.
+
+### Origin-preserving snapshots
+
+`PatternDoc::atom(id~, source_atom~, value~)` associates a value with an explicit
+`identity.SourceAtomId`. `control_atom(id~, source_atom~, key~, value~)` additionally
+retains the canonical `control` content signature. A generic atom's musical
+content remains unknown.
+
+For named uses, construct `ResolvedReference::ResolvedReference` with
+`definition~`, `definition_id~`, `reference~`, and `binding~`, then pass it to
+`PatternDoc::reference_with_binding(id~, resolved_reference~)`. Reference,
+definition, and binding IDs must share a source epoch. Identity constructors
+check positive JavaScript-safe `Int64` components; `mini.Draft`, not this compiler,
+allocates non-reused epochs and serials for edited text.
+
+`doc.lower_with_origins(cache?)` returns `PatternSnapshotWithOrigins[A]` or raises
+`PatternDocError`. It rejects unattributed primary leaves with `MissingAtomOrigin`
+and ordinary references with `MissingReferenceBinding` during lowering. A merge's
+right-hand control provider needs no primary origin. `pure`, `from_pattern`,
+ordinary `reference`, and `lower` remain valid general APIs.
+
+The exact snapshot's `query(arc)` and `query_for_entry(index, arc)` return
+`EventWithOrigin[A]`: `event()` carries the musical event, `origin()` carries its
+atom and outer-to-inner bindings, and `pattern_node_path()` carries the separate
+voice scope. Returned binding arrays are defensive copies. `pat()` and
+`as_snapshot()` erase origin capability without recompilation; `select_control`
+retains it. Entry keys, periods, musical signatures, and degradation seeds never
+include source IDs.
+
+Document `every(id~, n~, transform~)` and `jux(id~, transform~)` accept
+`TimeTransform::Fast`, `Slow`, or `Reverse`, not pattern callbacks. Arbitrary
+callbacks remain available on raw `Pat`. Document every/jux keep their previous
+unknown-content policy and broad branch scopes.
+
+`mini.Draft::prepare_playback` now captures these witnesses in immutable input;
+compiling tracked pattern input yields an exact snapshot. This is not browser
+highlighting: editor/worklet adapters, playback observations, and UI integration
+remain separate work.
 
 ## Package boundary
 

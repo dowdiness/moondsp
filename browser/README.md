@@ -1,8 +1,9 @@
 # Browser host boundary
 
-`browser` is the low-level MoonBit-to-AudioWorklet boundary. It exports
-primitive functions for one WASM instance and keeps browser transport state
-outside the reusable DSP, graph, engine, and scheduler packages.
+`browser` is the low-level MoonBit-to-AudioWorklet boundary. Its MoonBit facade
+exposes operations and reviewed value types; its JS/wasm-gc exports use primitive
+representations for one instance. Browser transport state stays outside the
+reusable DSP, graph, engine, and scheduler packages.
 
 Most applications should not call these exports directly. Use
 [`web/graph-engine.js`](../web/graph-engine.js) for graph lifecycle from
@@ -43,6 +44,7 @@ AudioWorklet transport adapter:
 | **Graph Host (Input & Controls)** | `graph_host_clear_input`, `graph_host_push_char`, `graph_host_apply_controls`, `graph_host_set_params` | Push Unicode scalar JSON, apply raw transactional `GraphControl` batches, or atomically update named parameter sets |
 | **Graph Host (Render & Errors)** | `graph_host_process`, `graph_host_sample`, `graph_host_error_length`, `graph_host_error_char` | Render 128-sample block, retrieve output samples, read structured JSON error envelopes |
 | **Scheduler Playback** | `init_scheduler_graph`, `clear_playback_input`, `push_playback_char`, `player_update_input`, `player_restart_input`, `player_play`, `player_pause`, `player_state`, `player_pending_count`, `player_skipped_count`, `process_scheduler_block`, `scheduler_left_sample`, `scheduler_right_sample` | Owning Player with unified source parsing, immediate acceptance, material-boundary updates, frozen Pause, and stereo rendering |
+| **Scheduler Status** | `player_state`, `player_mode`, `scheduler_bpm`, `scheduler_sample_position`, `scheduler_cycle_position`, `player_pending_count`, `player_skipped_count` | Read transport state, accepted source mode/tempo, render position, and musical-material transitions without exposing route internals |
 | **Diagnostics & Error Inspection** | `get_browser_last_error`, `get_browser_error_code`, `get_browser_error_length`, `get_browser_error_char`, `get_playback_error` | Numeric error codes (`BROWSER_ERROR_*`) and diagnostic messages for host inspection |
 | **Compiled & Demo Probes** | `init_compiled_*`, `process_compiled_*`, `queue_compiled_*`, `init_exit_deliverable_graph`, `tick`, `tick_source`, `reset_phase` | Deterministic integration probes and fixed demo graph verification |
 
@@ -58,9 +60,31 @@ Both are pinned by [`browser_abi.baseline`](browser_abi.baseline). Run
 `scripts/check-browser-abi.sh` when reviewing changes. Update the baseline only
 for an intentional compatibility change.
 
-The facade exposes functions, not browser-specific route types, pools,
-scheduler handles, or host state objects. `browser/internal/` is private even
-when an internal symbol is public for package wiring.
+The facade exposes operations and stable semantic value types, not mutable
+browser-specific route types, pools, scheduler handles, or host state objects.
+`PlaybackMode` is defined in the facade and projected exhaustively from internal
+values; consumers need no internal package imports. `browser/internal/` symbols
+remain private even when public for package wiring. The package is built as a
+`foreign_library`, not an executable with a dummy main, so MoonBit applications
+can depend on it directly.
+
+Scheduler status serves the live editor and protocol/debug consumers. Musical
+position is zero-based absolute cycles from the runtime clock, not a bar number,
+wall-clock timer, or estimate of audible output. Pausing freezes it; tempo
+changes preserve it. An Ended run retains its terminal position even when a new
+score is accepted for the next Play. `player_mode()` returns the public
+`PlaybackMode::{None, Pattern, Song}` enum to MoonBit callers, including repeating
+songs in Song. Its constant-enum JS/wasm-gc representation remains `0`/`1`/`2`.
+The Worklet adapter translates these to `none`/`pattern`/`song` and numeric
+transport states to `Empty`/`Ready`/`Playing`/`Paused`/`Ended`/`Fault` before
+publishing status or receipts. UI clients validate strings, not ABI codes.
+
+The editor displays Draft submission separately from acceptance and from
+pending material transitions. One material routed to several outputs is counted
+once. Retiring and newly entering material identities are separate transitions;
+the status layer does not guess continuity from text or visual position.
+See the [status contract](../docs/browser-api-contract.md#scheduler-status-and-introspection)
+for wire fields and consumer requirements.
 
 ## Application graph API
 
@@ -176,12 +200,14 @@ to `GraphEngineError` values.
 
 ## Scheduler playback ABI
 
-The Player accepts both Pattern and arranged Song source through one parser:
+The Player accepts immutable `@mini.PlaybackInput` envelopes for Pattern and
+arranged Song source. Raw source strings are no longer accepted by this ABI:
 
 1. Call `init_scheduler_graph(sample_rate, block_size)`.
-2. Call `clear_playback_input`, then send UTF-16 code units with `push_playback_char`.
+2. Call `clear_playback_input`, then send the UTF-16 code units of
+   `PlaybackInput::encode_wire()` with `push_playback_char`.
 3. Call `player_update_input()` to accept Current song without rewinding, or
-   `player_restart_input()` to parse and start the submitted source from zero.
+   `player_restart_input()` to validate and start the submitted input from zero.
 4. Use `player_play()` to start/resume Current song and `player_pause()` to freeze it.
 5. Call `process_scheduler_block`, then read left and right samples.
 
@@ -190,6 +216,27 @@ may remain Pending until their next entry. Invalid source leaves accepted music
 unchanged. A paused render emits silence without advancing voices, effects, or
 transport; the worklet remains active. Finite songs reach Ended and retain their
 tails. Updating Ended changes the song that the next Play starts.
+
+`web/live` keeps one main-thread `Draft` across AudioContext lifetimes. Every
+CodeMirror transaction is applied in order, including same-text replacement;
+`prepare()` freezes source and exact witnesses together. The scheduler preserves
+those origins through pending material boundaries, but does not yet emit source
+highlighting observations.
+
+At the MessagePort boundary, Update/Restart use `{ type, id, input }`, where
+`input` is the schema-1 JSON string. Explicit untracked callers construct
+`{ schema: 1, kind: "text", text }`; tracked callers use Draft preparation rather
+than hand-building witnesses. Play/Pause contain no input. Every receipt has
+`draftVersion: [epoch, revision]` for tracked submissions, otherwise `null`.
+Malformed tracked witnesses are rejected, never retried as plain text.
+
+Source is limited to 8192 UTF-16 code units; the complete wire envelope is limited
+to 2097152. The receiver validates integer IDs, UTF-16 ranges, complete atom and
+binding coverage, and resolved targets before the existing workload admission.
+Rejection preserves accepted source, clocks, voices, and pending material.
+Automatic editor updates allow one in-flight request plus the latest unsent
+input. Manual Update/Restart discard older unsent automatic work without waiting
+for that request.
 
 | Result | Meaning |
 |---|---|

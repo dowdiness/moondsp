@@ -2,31 +2,8 @@
 pub struct MiniDocBuilder {
   priv previous : @pattern.PatternDoc[@pattern.ControlMap]?
   priv counters : Map[String, Int]
-  priv token_id_by_location : Map[String, String]?
-}
-
-///|
-fn mini_doc_is_note_letter_text(text : String) -> Bool {
-  if text.length() != 1 {
-    return false
-  }
-  match text[0] {
-    'a'
-    | 'A'
-    | 'b'
-    | 'B'
-    | 'c'
-    | 'C'
-    | 'd'
-    | 'D'
-    | 'e'
-    | 'E'
-    | 'f'
-    | 'F'
-    | 'g'
-    | 'G' => true
-    _ => false
-  }
+  priv origins : SourceMap?
+  priv source_atom_by_graph_id : Map[String, @identity.SourceAtomId]
 }
 
 ///|
@@ -55,134 +32,12 @@ fn mini_doc_id_fragment(value : String) -> String {
 }
 
 ///|
-fn mini_doc_can_continue_composite_chord_token(token : MiniToken) -> Bool {
-  mini_token_kind_equal(token.kind, Identifier) ||
-  mini_token_kind_equal(token.kind, Number) ||
-  token.text == "#" ||
-  token.text == "+" ||
-  token.text == "ø"
-}
-
-///|
-fn mini_doc_index_composite_note_names(
-  index : Map[String, String],
-  tokens : Array[MiniToken],
-) -> Unit {
-  for i in 0..<tokens.length() {
-    let root = tokens[i]
-    if mini_token_kind_equal(root.kind, Identifier) &&
-      mini_doc_is_note_letter_text(root.text) {
-      let mut accidental_value = root.text
-      let mut accidental_end = root.end
-      let mut j = i + 1
-      let mut accidental_count = 0
-      while j < tokens.length() &&
-            tokens[j].start == accidental_end &&
-            tokens[j].text == "#" {
-        accidental_value = "\{accidental_value}#"
-        accidental_end = tokens[j].end
-        j += 1
-        accidental_count += 1
-      }
-      let suffix = mini_token_identity_occurrence_suffix(root)
-      if accidental_count > 0 {
-        let mut note_value = accidental_value
-        let mut note_end = accidental_end
-        if j < tokens.length() &&
-          tokens[j].start == note_end &&
-          mini_token_kind_equal(tokens[j].kind, Number) {
-          note_value = "\{note_value}\{tokens[j].text}"
-          note_end = tokens[j].end
-        }
-        let note_key = mini_doc_token_id_key(
-          "note",
-          note_value,
-          root.start,
-          note_end,
-        )
-        let note_fragment = mini_doc_id_fragment(note_value)
-        index[note_key] = "mini:note:\{note_fragment}:\{suffix}"
-      }
-
-      let mut chord_value = root.text
-      let mut chord_end = root.end
-      let mut k = i + 1
-      while k < tokens.length() &&
-            tokens[k].start == chord_end &&
-            mini_doc_can_continue_composite_chord_token(tokens[k]) {
-        chord_value = "\{chord_value}\{tokens[k].text}"
-        chord_end = tokens[k].end
-        k += 1
-      }
-      if chord_end > root.end && @pattern.parse_chord(chord_value) is Some(_) {
-        let chord_key = mini_doc_token_id_key(
-          "chord",
-          chord_value,
-          root.start,
-          chord_end,
-        )
-        let chord_fragment = mini_doc_id_fragment(chord_value)
-        index[chord_key] = "mini:chord:\{chord_fragment}:\{suffix}"
-      }
-    }
-  }
-}
-
-///|
 #alias(new)
 fn MiniDocBuilder::MiniDocBuilder(
   previous~ : @pattern.PatternDoc[@pattern.ControlMap]?,
-  tokens? : Array[MiniToken]? = None,
+  origins? : SourceMap? = None,
 ) -> MiniDocBuilder {
-  {
-    previous,
-    counters: {},
-    token_id_by_location: match tokens {
-      None => None
-      Some(tokens) => {
-        let index : Map[String, String] = Map([])
-        for token in tokens {
-          if mini_token_kind_equal(token.kind, Identifier) {
-            let suffix = mini_token_identity_occurrence_suffix(token)
-            let sound_key = mini_doc_token_id_key(
-              "sound",
-              token.text,
-              token.start,
-              token.end,
-            )
-            index[sound_key] = "mini:sound:\{mini_doc_id_fragment(token.text)}:\{suffix}"
-            let note_key = mini_doc_token_id_key(
-              "note",
-              token.text,
-              token.start,
-              token.end,
-            )
-            let fragment = mini_doc_id_fragment(token.text)
-            index[note_key] = "mini:note:\{fragment}:\{suffix}"
-            let chord_key = mini_doc_token_id_key(
-              "chord",
-              token.text,
-              token.start,
-              token.end,
-            )
-            index[chord_key] = "mini:chord:\{fragment}:\{suffix}"
-          } else if mini_token_kind_equal(token.kind, Number) {
-            let suffix = mini_token_identity_occurrence_suffix(token)
-            let key = mini_doc_token_id_key(
-              "note",
-              token.text,
-              token.start,
-              token.end,
-            )
-            let id = "mini:note:\{mini_doc_id_fragment(token.text)}:\{suffix}"
-            index[key] = id
-          }
-        }
-        mini_doc_index_composite_note_names(index, tokens)
-        Some(index)
-      }
-    },
-  }
+  { previous, counters: Map([]), origins, source_atom_by_graph_id: Map([]), }
 }
 
 ///|
@@ -191,7 +46,7 @@ fn MiniDocBuilder::MiniDocBuilder(
 pub fn MiniDocBuilder::with_previous(
   previous : @pattern.PatternDoc[@pattern.ControlMap]?,
 ) -> MiniDocBuilder {
-  MiniDocBuilder::new(previous~, tokens=None)
+  MiniDocBuilder::new(previous~)
 }
 
 ///|
@@ -251,6 +106,11 @@ fn MiniDocBuilder::chord_doc_from_notes(
       let mut tone_index = 0
       for midi in notes {
         let note_id = self.chord_tone_id(id, tone_index, midi)
+        match self.source_atom_by_graph_id.get(id.value()) {
+          Some(source_atom) =>
+            self.source_atom_by_graph_id[note_id.value()] = source_atom
+          None => ()
+        }
         note_docs.push(self.control_doc(note_id, "note", midi.to_double()))
         tone_index += 1
       }
@@ -394,16 +254,6 @@ pub fn MiniDocBuilder::stack(
 }
 
 ///|
-fn mini_doc_token_id_key(
-  kind : String,
-  value : String,
-  start : Int,
-  end : Int,
-) -> String {
-  "mini-doc-token-id|\{kind}|\{start}|\{end}|\{value}"
-}
-
-///|
 fn MiniDocBuilder::id(
   self : MiniDocBuilder,
   value : String,
@@ -436,26 +286,6 @@ fn MiniDocBuilder::atom_id(
 }
 
 ///|
-fn MiniDocBuilder::token_atom_id(
-  self : MiniDocBuilder,
-  kind : String,
-  value : String,
-  start : Int,
-  end : Int,
-) -> @identity.PatternNodeId? raise ParseError {
-  match self.token_id_by_location {
-    None => None
-    Some(index) => {
-      let key = mini_doc_token_id_key(kind, value, start, end)
-      match index.get(key) {
-        None => None
-        Some(id) => Some(self.id(id))
-      }
-    }
-  }
-}
-
-///|
 fn MiniDocBuilder::atom_id_at(
   self : MiniDocBuilder,
   kind : String,
@@ -463,10 +293,17 @@ fn MiniDocBuilder::atom_id_at(
   start : Int,
   end : Int,
 ) -> @identity.PatternNodeId raise ParseError {
-  match self.token_atom_id(kind, value, start, end) {
-    Some(id) => id
-    None => self.atom_id(kind, value)
+  let id = self.atom_id(kind, value)
+  if self.origins is Some(origins) &&
+    (kind == "sound" || kind == "note" || kind == "chord") {
+    guard origins.atom_at(kind, start, end) is Some(source_atom) else {
+      raise ParseError(
+        "position \{start}: source atom witness missing for \{kind}",
+      )
+    }
+    self.source_atom_by_graph_id[id.value()] = source_atom
   }
+  id
 }
 
 ///|
@@ -484,11 +321,11 @@ fn MiniDocBuilder::reuse_doc(
   id : @identity.PatternNodeId,
   inputs? : Array[@pattern.PatternDoc[@pattern.ControlMap]] = [],
 ) -> @pattern.PatternDoc[@pattern.ControlMap]? raise ParseError {
+  guard self.origins is None else { return None }
   match self.previous {
     None => None
     Some(previous) =>
       if previous.contains_node(id) {
-        // Stable use-site IDs do not imply unchanged referenced content.
         for input in inputs {
           guard previous.contains_node(input.root()) else { return None }
           let old_input = previous.subdoc(root=input.root()) catch {
@@ -530,7 +367,35 @@ fn MiniDocBuilder::control_doc(
   match self.reuse_doc(id) {
     Some(doc) => doc
     None =>
-      @pattern.PatternDoc::from_pattern(id~, pat=@pattern.control(key, value))
+      match self.source_atom_by_graph_id.get(id.value()) {
+        Some(source_atom) =>
+          @pattern.PatternDoc::control_atom(id~, source_atom~, key~, value~)
+        None =>
+          @pattern.PatternDoc::from_pattern(
+            id~,
+            pat=@pattern.control(key, value),
+          )
+      }
+  }
+}
+
+///|
+fn MiniDocBuilder::reference_doc(
+  self : MiniDocBuilder,
+  id : @identity.PatternNodeId,
+  start : Int,
+  end : Int,
+  definition_span : MiniSpan,
+  definition : @pattern.PatternDoc[@pattern.ControlMap],
+) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
+  match self.origins {
+    None => @pattern.PatternDoc::reference(id~, definition~)
+    Some(origins) => {
+      let resolved_reference = origins.resolve_reference(
+        start, end, definition_span, definition,
+      )
+      @pattern.PatternDoc::reference_with_binding(id~, resolved_reference~)
+    }
   }
 }
 
@@ -692,7 +557,7 @@ fn MiniDocBuilder::every_doc(
   match self.reuse_doc(id, inputs=[doc]) {
     Some(doc) => doc
     None =>
-      doc.every(id~, n~, f=callback.runtime()) catch {
+      doc.every(id~, n~, transform=callback.operation()) catch {
         _ => raise ParseError("internal mini PatternDoc construction failed")
       }
   }
@@ -709,7 +574,7 @@ fn MiniDocBuilder::jux_doc(
   match self.reuse_doc(id, inputs=[doc]) {
     Some(doc) => doc
     None =>
-      doc.jux(id~, f=callback.runtime()) catch {
+      doc.jux(id~, transform=callback.operation()) catch {
         _ => raise ParseError("internal mini PatternDoc construction failed")
       }
   }
@@ -760,11 +625,10 @@ fn stable_seed(value : String) -> Int {
 fn parse_doc_internal(
   input : String,
   previous : @pattern.PatternDoc[@pattern.ControlMap]?,
-  tokens? : Array[MiniToken]? = None,
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
   guard !input.is_empty() else { return Err("empty input") }
   let p = Parser::new(input)
-  let builder = MiniDocBuilder::new(previous~, tokens~)
+  let builder = MiniDocBuilder::new(previous~)
   p.parse_bindings(builder=Some(builder)) catch {
     ParseError(msg) => return Err(msg)
   }
@@ -823,15 +687,6 @@ pub fn parse_doc(
   previous? : @pattern.PatternDoc[@pattern.ControlMap]? = None,
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
   parse_doc_internal(input, previous)
-}
-
-///|
-fn parse_doc_with_token_identities(
-  input : String,
-  previous : @pattern.PatternDoc[@pattern.ControlMap]?,
-  tokens : Array[MiniToken],
-) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
-  parse_doc_internal(input, previous, tokens=Some(tokens))
 }
 
 ///|

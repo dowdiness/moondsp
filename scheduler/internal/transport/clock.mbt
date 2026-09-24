@@ -94,6 +94,13 @@ pub fn Clock::sample(self : Clock) -> Int64 {
 }
 
 ///|
+/// Current zero-based musical cycle position without constructing a
+/// `Rational` or allocating a transport result.
+pub fn Clock::cycle_position(self : Clock) -> Double {
+  self.ticks.to_double() / self.scale.to_double()
+}
+
+///|
 fn Clock::ticks_at(self : Clock, sample : Int64) -> Int64 raise TransportError {
   if sample < 0L {
     raise TimeOutOfRange

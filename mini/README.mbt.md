@@ -41,8 +41,9 @@ surface:
 | Category | Types / Functions | Key operations |
 |---|---|---|
 | **Text Parsing** | `parse`, `parse_song`, `parse_song_with_bpm` | Parse string into `Pat[ControlMap]`, `Song[ControlMap]`, or `ParsedSong` |
-| **Document & Live Editing** | `parse_doc`, `parse_snapshot`, `MiniAuthoringPipeline` | Parse identity-bearing `PatternDoc`, lower snapshots, or drive incremental live-update authoring |
-| **Incremental Pipeline** | `MiniAuthoringPipeline` | `MiniAuthoringPipeline::new`, `MiniAuthoringPipeline::set_input`, `MiniAuthoringPipeline::set_input_with_source_edit`, `MiniAuthoringPipeline::parse_doc`, `MiniAuthoringPipeline::parse_snapshot`, `MiniAuthoringPipeline::dispose` |
+| **Documents** | `parse_doc`, `parse_snapshot` | Parse deterministic graph documents or general snapshots without cross-draft source continuity |
+| **Live Authoring** | `Draft`, `DraftVersion`, `EditTransaction`, `TextEdit` | `Draft::new`, `state`, `edit`, `reset`, `prepare_playback`, `locate_origin`, `dispose` |
+| **Frozen Playback Input** | `PlaybackInput`, `PreparedPlayback` | `PlaybackInput::text`, `source`, `version`, `compile`, `encode_wire`, `decode_wire`; exact pattern or explicitly runtime-only source |
 | **Programmatic Doc Building** | `MiniDocBuilder` | `MiniDocBuilder::with_previous`, `MiniDocBuilder::sound_atom`, `MiniDocBuilder::note_atom`, `MiniDocBuilder::sequence`, `MiniDocBuilder::fast` |
 | **Song & Utilities** | `ParsedSong`, `drum_midi` | `ParsedSong::song`, `ParsedSong::bpm`, `drum_midi` |
 
@@ -53,9 +54,9 @@ surface:
 | `parse` | A runtime `Pat[ControlMap]` |
 | `parse_song` | A `Song[ControlMap]` layout |
 | `parse_song_with_bpm` | A song plus authored BPM metadata |
-| `parse_doc` | An identity-bearing document for live editing |
+| `parse_doc` | A general graph document, optionally reusing previous subtrees |
 | `parse_snapshot` | A parsed and lowered document snapshot |
-| `MiniAuthoringPipeline` | Repeated edits with last-good state and lowering-cache reuse |
+| `Draft` | Causal atom/reference identities across valid and invalid edits, frozen playback input, and current source locations |
 
 ## Parse a pattern
 
@@ -107,22 +108,59 @@ pattern playing.
 
 ### Identity across edits
 
-`MiniAuthoringPipeline` realigns identities against the last successfully parsed
-source. A successfully parsed deletion followed by recreation allocates a new
-identity, even while callers retain an older snapshot. Unchanged surviving
-tokens keep their identities.
+`Draft` owns text and source lifetimes. Submit each editor transaction through
+`edit(EditTransaction::EditTransaction(base~, edits~))`. Every `TextEdit` uses
+half-open **old-document UTF-16** coordinates. All ranges are validated before
+anything changes; stale versions, overlapping/out-of-range edits, and boundaries
+inside surrogate pairs are rejected. There is no inferred full-text setter.
 
-A rejected draft does not advance that baseline. For example, changing
-`note("c3 e3")` to the invalid `note("e3"` and then restoring `note("c3 e3")`
-can restore the original `c3` identity. When using `set_input_with_source_edit`,
-provide spans relative to the last successfully parsed source, not the previous
-rejected draft.
+Replacing an atom with the same spelling still retires it. Empty transactions
+do not advance the version. Separate inverse edits must remain separate
+transactions: composing them to an empty change would erase identity history.
+Whitespace at an atom boundary preserves identity only while its lexical extent
+and role remain unchanged. Graph node IDs and musical seeds are independent.
 
-This last-good policy is not the visible-draft identity continuity required by
-[ADR-0018](https://github.com/dowdiness/moondsp/blob/101109416ba8507ce8b917b151408516728041fc/docs/decisions/0018-playback-visualization-origin-truth.md).
-The pipeline also retains allocation counters for distinct token kind/text
-keys for its lifetime, including rejected parse attempts; retained counter
-storage is not bounded by the current document size.
+Completed atom and reference facts survive missing outer delimiters. Recognition
+uses the existing expression/notation parsers and recovers only at certain
+semicolon or dollar-stack boundaries, not invented closing tokens. A reference
+binding survives only while its declaration stays uniquely provable. Ambiguity,
+undefined names, opaque preceding scope, and deletion retire the binding; undo
+does not revive it.
+
+`prepare_playback()` returns a frozen `PlaybackInput` or a version-tagged
+`DraftDiagnostic`. Preparing input is **not playback acceptance**. The input owns
+its captured text/version/source witnesses; subsequent edits or disposal do not
+change it. `compile()` returns `PreparedPlayback::Pattern(exact_snapshot, bpm)`
+for a tracked pattern or `PreparedPlayback::Runtime(play_source)` for a song.
+`PlaybackInput::text(text)` explicitly selects runtime-only programmatic input.
+An exact compilation failure never falls back to runtime-only playback.
+
+`encode_wire()` serializes a frozen input as schema-1 JSON. `decode_wire(wire)`
+returns a `Result`, validating bounded source/wire sizes, safe integer identities,
+and complete source witnesses without inferring identity continuity. It does
+not replace `compile()` or host workload admission. `compile` accepts optional
+`previous` and `max_query_span` arguments; only explicit text input reuses the
+previous general document. A transported Song input must still parse as a song.
+
+`locate_origin(origin)` returns `Located(atom_range, reference_ranges)` with
+outer-to-inner reference ranges, or `Unavailable(SourceReset | AtomRetired |
+BrokenReference)`. It requires the entire original binding path, not a partial
+match. Old-version origins can remain locatable during invalid drafts.
+
+Tracking is limited to 8192 UTF-16 code units; larger text remains editable but
+cannot prepare playback. Crossing the limit, confirmed source-mode changes, and
+explicit `reset` establish fresh source epochs. Unknown syntax alone does not
+select a new mode. Current indices and the internal last-valid document are
+bounded; no per-spelling allocation history is retained. Checked serials and
+revisions never wrap. `Draft::new` raises `DraftEditError` on epoch exhaustion;
+`edit` and `reset` return explicit errors without partially changing the draft.
+
+The live editor uses the JS-target `browser_authoring` adapter to keep this Draft
+on the main thread, independent of AudioContext lifetime. CodeMirror edits,
+immutable Worklet submission, version-correlated receipts, and scheduler exact
+capability retention are connected. Onset observations and visual highlighting
+remain separate work. See the
+[implementation contract](../docs/plans/2026-09-09-playback-position-ui.md).
 
 ## Parse a song
 
@@ -150,9 +188,9 @@ Select Song mode in the browser editor before playing one.
 
 ## Live-editing documents
 
-`parse_doc` creates a `PatternDoc[ControlMap]` with stable source identities.
-Pass the previous successful document back through `previous` to reuse unchanged
-subtrees:
+`parse_doc` creates a `PatternDoc[ControlMap]` with deterministic graph IDs, not
+causal source identities. Pass the previous successful document back through
+`previous` to reuse unchanged subtrees:
 
 ```mbt nocheck
 ///|
@@ -166,10 +204,10 @@ let edited = match first {
 }
 ```
 
-`MiniAuthoringPipeline` manages this loop for an editor. It keeps the last
-successful document across parse errors and reuses one lowering cache. Current
-parsing is still whole-document parsing; it is not token-level incremental
-parsing. Call `dispose()` when the pipeline is no longer needed.
+Use `Draft` rather than this stateless loop when editing needs exact source
+continuity. Its last-valid document is internal parse state, not a playback
+acceptance channel. Parsing remains whole-source; this is not token-level
+incremental parsing. Call `dispose()` when the owner is no longer needed.
 
 ## Parser model
 

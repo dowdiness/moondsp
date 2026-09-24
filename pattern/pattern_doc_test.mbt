@@ -125,7 +125,7 @@ test "PatternSnapshot::query_sourced_events tags fast ancestor and leaf path" {
   @debug.assert_eq(events.length(), 2)
   assert_pattern_event_path(events[0], ["fast", "leaf"])
   assert_pattern_event_path(events[1], ["fast", "leaf"])
-  assert_true(events[0].pattern_node() == pid("leaf"))
+  assert_true(events[0].pattern_node_path().leaf() == pid("leaf"))
   assert_true(events[0].event().value == raw_events[0].value)
   assert_true(events[1].event().part.begin == raw_events[1].part.begin)
 }
@@ -168,7 +168,11 @@ test "PatternSnapshot::query_sourced_events covers every callback subtrees" {
     ])
   })
   let doc = unwrap_doc(() => {
-    child.every(id=pid("every"), n=1, f=fn(p) { p.fast(Rational::from_int(2)) })
+    child.every(
+      id=pid("every"),
+      n=1,
+      transform=TimeTransform::Fast(Rational::from_int(2)),
+    )
   })
   let events = unwrap_snapshot(() => doc.lower()).query_sourced_events(
     doc_span(0, 1, 1, 100),
@@ -188,7 +192,10 @@ test "PatternSnapshot::query_sourced_events covers jux callback subtrees" {
     ])
   })
   let doc = unwrap_doc(() => {
-    child.jux(id=pid("jux"), f=fn(p) { p.fast(Rational::from_int(2)) })
+    child.jux(
+      id=pid("jux"),
+      transform=TimeTransform::Fast(Rational::from_int(2)),
+    )
   })
   let events = unwrap_snapshot(() => doc.lower()).query_sourced_events(
     doc_span(0, 1, 1, 100),
@@ -583,14 +590,11 @@ test "PatternDoc::degrade_by lowers through runtime combinator" {
 
 ///|
 test "PatternDoc::every lowers through runtime combinator" {
-  let double_speed : (Pat[Int]) -> Pat[Int] = fn(p) {
-    p.fast(Rational::from_int(2))
-  }
   let doc = unwrap_doc(() => {
     PatternDoc::pure(id=pid("leaf"), value=1).every(
       id=pid("every"),
       n=2,
-      f=double_speed,
+      transform=TimeTransform::Fast(Rational::from_int(2)),
     )
   })
   inspect(doc.revision().value(), content="1")
@@ -604,7 +608,9 @@ test "PatternDoc::jux lowers through control-map runtime combinator" {
     id=pid("sound"),
     pat=sequence([sound(36.0), sound(38.0)]),
   )
-  let juxed = unwrap_doc(() => doc.jux(id=pid("jux"), f=fn(p) { p.rev() }))
+  let juxed = unwrap_doc(() => {
+    doc.jux(id=pid("jux"), transform=TimeTransform::Reverse)
+  })
   inspect(juxed.revision().value(), content="1")
   let events = unwrap_snapshot(() => juxed.lower()).query(doc_span(0, 1, 1, 1))
   inspect(events.length(), content="4")

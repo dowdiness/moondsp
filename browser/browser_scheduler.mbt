@@ -1,4 +1,14 @@
 ///|
+/// Kind of the latest accepted score, independent of the visible draft.
+/// Constant-enum ABI values are None = 0, Pattern = 1, Song = 2.
+/// Keep the constructor order stable for JS/wasm-gc callers.
+pub(all) enum PlaybackMode {
+  None
+  Pattern
+  Song
+} derive(Eq, Debug)
+
+///|
 pub fn init_scheduler_graph(sample_rate : Double, block_size : Int) -> Bool {
   @playback_host.init_scheduler_graph_with_templates(
     sample_rate,
@@ -65,6 +75,30 @@ pub fn player_pause() -> Int {
 ///|
 pub fn player_state() -> Int {
   @playback_host.player_state()
+}
+
+///|
+/// Kind of the latest accepted score; Song includes finite and repeating songs.
+/// Returns None before initialization and in Empty or Fault. This describes the
+/// accepted score, not the visible draft or every currently sounding material.
+/// JS/wasm-gc exports retain the constant-enum ABI: 0 none, 1 pattern, 2 song.
+pub fn player_mode() -> PlaybackMode {
+  match @playback_host.player_mode() {
+    None => None
+    Pattern => Pattern
+    Song => Song
+  }
+}
+
+///|
+/// Zero-based absolute render position in musical cycles, as a Double.
+/// This is a floating-point observation, not an exact scheduling timestamp or
+/// an estimate of audible position. Pause freezes it; tempo changes preserve
+/// continuity. Ended retains the completed run's endpoint across source updates.
+/// Returns zero before initialization and in Empty, Ready, or Fault; use
+/// `player_state` to distinguish these from the beginning of a performance.
+pub fn scheduler_cycle_position() -> Double {
+  @playback_host.scheduler_cycle_position()
 }
 
 ///|

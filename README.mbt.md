@@ -217,7 +217,7 @@ Shared authoring identity:
 | [`voice/`](voice/README.mbt.md) | Polyphonic voice pool with priority voice stealing, generation handles, ADSR lifecycle, and equal-power stereo panning | `VoicePool`, `BoundVoicePool`, `VoiceHandle`, `VoiceState`, `NoteGate` |
 | [`identity/`](identity/README.mbt.md) | Type-safe stable node identifiers and monotonic revision tokens for structural live-editing trees | `GraphNodeId`, `PatternNodeId`, `SectionId`, `SectionLayerId`, `OccurrenceId`, `Revision` |
 | [`pattern/`](pattern/README.mbt.md) | Queryable musical pattern algebra with exact `Rational` time, polyrhythmic combinators, and `ControlMap` events | `Pat[A]`, `Rational`, `TimeSpan`, `Event[A]`, `ControlMap`, `sequence`, `stack`, `merge_control`, `PatternDoc` |
-| [`mini/`](mini/README.mbt.md) | Mini-notation parser turning concise live-coding text into `Pat[ControlMap]`, `Song[ControlMap]`, or incremental documents | `parse`, `parse_song`, `parse_song_with_bpm`, `parse_doc`, `parse_snapshot`, `MiniAuthoringPipeline` |
+| [`mini/`](mini/README.mbt.md) | Mini-notation parsing, causal draft editing, and frozen playback inputs with exact pattern origins | `parse`, `parse_song`, `parse_song_with_bpm`, `parse_doc`, `parse_snapshot`, `Draft`, `PlaybackInput` |
 | [`song/`](song/README.mbt.md) | Macro-level musical structure arranging patterns into length-bounded sections, layers, parts, and local `TimeScope` | `Song[A]`, `Section[A]`, `SongPart[A]`, `TimeScope`, `SongDoc[A]`, `SongSnapshot[A]` |
 | [`scheduler/`](scheduler/README.mbt.md) | Audio block quantization, tempo clock, note lifecycle tracking, and voice-scope reconciliation | `PatternScheduler`, `PlaybackSnapshot`, `BlockFrame`, `PatternVoiceScope`, `SongVoiceScope` |
 

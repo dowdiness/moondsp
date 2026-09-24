@@ -136,11 +136,26 @@ fn[A] Pat::filter_map_known(
   f : (A) -> A?,
   signature : String,
 ) -> Pat[A] {
+  self.filter_map_payload(f, signature)
+}
+
+///|
+fn[A, B] Pat::filter_map_payload(
+  self : Pat[A],
+  f : (A) -> B?,
+  signature : String,
+) -> Pat[B] {
   if self.body is Silence {
-    return self
+    return make_pat(
+      fn(_arc) { [] },
+      self.metadata.period,
+      Silence,
+      self.metadata.scope,
+      self.metadata.content,
+    )
   }
   let inner = self
-  let children = self.transform_children(p => p.filter_map_known(f, signature))
+  let children = self.transform_children(p => p.filter_map_payload(f, signature))
   let change = if signature == "" { "" } else { "filter:" + signature }
   make_pat(
     fn(arc) {

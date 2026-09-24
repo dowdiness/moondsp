@@ -3,6 +3,7 @@ package "dowdiness/moondsp/browser/internal/playback_host"
 
 import {
   "dowdiness/moondsp/graph",
+  "dowdiness/moondsp/mini",
   "moonbitlang/core/debug",
 }
 
@@ -16,6 +17,8 @@ pub fn get_playback_error_char(Int) -> Int
 pub fn get_playback_error_length() -> Int
 
 pub fn init_scheduler_graph_with_templates(Double, Int, Array[@graph.DspNode], Array[@graph.DspNode], Array[@graph.DspNode], Array[@graph.DspNode], Array[@graph.DspNode], Array[@graph.DspNode]) -> Bool
+
+pub fn player_mode() -> PlaybackMode
 
 pub fn player_pause() -> Int
 
@@ -39,6 +42,8 @@ pub fn reset_scheduler_graph() -> Unit
 
 pub fn scheduler_bpm() -> Double
 
+pub fn scheduler_cycle_position() -> Double
+
 pub fn scheduler_left_sample(Int) -> Double
 
 pub fn scheduler_right_sample(Int) -> Double
@@ -61,13 +66,19 @@ pub(all) enum PlayState {
   Fault
 } derive(Eq, @debug.Debug)
 
+pub enum PlaybackMode {
+  None
+  Pattern
+  Song
+} derive(Eq, @debug.Debug)
+
 pub struct Player {
   // private fields
 }
 pub fn Player::pause(Self) -> Result[Unit, PlayerError]
 pub fn Player::play(Self) -> Result[Unit, PlayerError]
-pub fn Player::restart(Self, String) -> Result[Unit, PlayerError]
-pub fn Player::update(Self, String) -> Result[Unit, PlayerError]
+pub fn Player::restart(Self, @mini.PlaybackInput) -> Result[Unit, PlayerError]
+pub fn Player::update(Self, @mini.PlaybackInput) -> Result[Unit, PlayerError]
 pub fn Player::view(Self) -> PlayerView
 
 pub(all) enum PlayerError {

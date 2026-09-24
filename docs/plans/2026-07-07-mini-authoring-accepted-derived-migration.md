@@ -1,10 +1,15 @@
 # Mini authoring `AcceptedDerived` migration
 
 **Status:** Completed (2026-07-08; implementation PR #227; decision ADR-0017)  
-**Current API refresh:** 2026-09-12; issue #226; incr `0.15.1`
+**Historical API refresh:** 2026-09-12; issue #226; incr `0.15.1`
 **Date:** 2026-07-07  
 **Campaign parent:** #184 (mini authoring loom promotion)  
 **Depends on:** incr `#233` (diamond fix), included in current pin `0.15.1`
+
+**Superseded (2026-09-20):** this completed migration is historical. The
+[Draft implementation](2026-09-09-playback-position-ui.md) removes the reactive
+owner and public accepted-document channel. Last-valid parser state is private;
+immutable playback preparation does not mean playback acceptance.
 
 ## Outcome
 

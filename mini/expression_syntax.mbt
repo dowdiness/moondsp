@@ -78,7 +78,11 @@ fn Parser::parse_syntax_expr(
   guard self.admission is None || depth < 32 else {
     raise ParseError("playback source exceeds nesting depth 32")
   }
-  self.skip_whitespace()
+  if self.syntax_depth_limit is Some(limit) {
+    guard depth < limit else {
+      raise ParseError("source exceeds nesting depth \{limit}")
+    }
+  }
   let start = self.pos
   let first = self.parse_syntax_chain(depth)
   let operands = [first]
@@ -120,6 +124,7 @@ fn Parser::parse_syntax_chain(
   self.skip_whitespace()
   let start = self.pos
   let mut expr = self.parse_syntax_primary(depth)
+  let mut chain_depth = depth
   while true {
     let before_ws = self.pos
     self.skip_whitespace()
@@ -129,6 +134,12 @@ fn Parser::parse_syntax_chain(
     }
     self.pos += 1
     self.skip_whitespace()
+    chain_depth += 1
+    if self.syntax_depth_limit is Some(limit) {
+      guard chain_depth < limit else {
+        raise ParseError("source exceeds nesting depth \{limit}")
+      }
+    }
     let transform = self.parse_transform()
     expr = { span: { start, end: self.pos, }, node: Apply(expr, transform), }
   }
@@ -148,6 +159,9 @@ fn Parser::parse_syntax_primary(
   }
   let start = self.pos
   if self.match_keyword("stack(") {
+    if self.recognition {
+      self.recognized_pattern = true
+    }
     self.skip_whitespace()
     guard !self.at_end() && self.input[self.pos] != ')' else {
       raise ParseError(
@@ -165,6 +179,9 @@ fn Parser::parse_syntax_primary(
     return { span: { start, end: self.pos, }, node: Stack(args), }
   }
   if self.input[self.pos] == '(' {
+    if self.recognition {
+      self.recognized_pattern = true
+    }
     self.pos += 1
     self.skip_whitespace()
     let inner = self.parse_syntax_expr(depth=depth + 1)
@@ -184,6 +201,9 @@ fn Parser::parse_syntax_primary(
     None
   }
   if kind is Some(kind) {
+    if self.recognition {
+      self.recognized_pattern = true
+    }
     if kind is Silence {
       return {
         span: { start, end: self.pos, },
@@ -191,6 +211,9 @@ fn Parser::parse_syntax_primary(
       }
     }
     let (content, content_start) = self.read_quoted_string_with_start()
+    if self.recognition {
+      self.record_literal_fact(kind, content, content_start)
+    }
     self.expect_char(')')
     return {
       span: { start, end: self.pos, },
@@ -199,6 +222,10 @@ fn Parser::parse_syntax_primary(
   }
   let name = self.read_ident()
   if !name.is_empty() {
+    if self.recognition {
+      self.recognized_pattern = true
+      self.record_reference_fact(name, start, self.pos)
+    }
     return { span: { start, end: self.pos, }, node: Reference(name), }
   }
   raise ParseError(

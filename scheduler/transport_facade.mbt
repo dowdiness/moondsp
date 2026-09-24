@@ -86,6 +86,12 @@ pub fn PatternScheduler::sample_counter(self : PatternScheduler) -> Int64 {
 }
 
 ///|
+/// Current zero-based musical cycle position from the authoritative clock.
+pub fn PatternScheduler::cycle_position(self : PatternScheduler) -> Double {
+  self.clock.cycle_position()
+}
+
+///|
 /// Current accepted tempo, rounded to the nearest 0.001 BPM.
 pub fn PatternScheduler::bpm(self : PatternScheduler) -> Double {
   self.clock.tempo().bpm()

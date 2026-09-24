@@ -25,10 +25,14 @@ For a new application, choose the public entry point rather than the raw ABI:
 
 - `browser/pkg.generated.mbti` defines the supported MoonBit source facade.
 - `browser/moon.pkg` defines the supported JS and wasm-gc worklet exports.
-- The browser facade exposes functions only. It has no public browser-specific
-  route types, pools, scheduler handles, traits, or host state objects.
-- `browser/internal/*` packages are private implementation detail, even when an
-  internal package marks a symbol `pub` for package-to-package wiring.
+- The browser facade exposes operations and explicitly reviewed semantic value
+  types. Mutable route types, pools, scheduler handles, and host state objects
+  remain implementation details.
+- `browser/internal/*` package paths are private, even when a symbol is `pub`
+  for package wiring. Public value types are defined in the browser facade and
+  projected from internal values without exposing their definition paths.
+  The package is a `foreign_library`, usable by MoonBit consumers as well as
+  through its configured JS/wasm-gc exports.
 - `browser/browser_abi.baseline` records the reviewed facade/export shape.
   Update it only for an intentional public API or worklet ABI change.
 
@@ -716,9 +720,10 @@ exit-deliverable graph:
 
 scheduler pattern/song playback:
   init_scheduler_graph, process_scheduler_block, scheduler_left_sample,
-  scheduler_right_sample, scheduler_sample_position, clear_playback_input,
+  scheduler_right_sample, scheduler_sample_position, scheduler_cycle_position,
+  clear_playback_input,
   push_playback_char, player_update_input, player_restart_input,
-  player_play, player_pause, player_state, player_pending_count,
+  player_play, player_pause, player_state, player_mode, player_pending_count,
   player_skipped_count,
   get_playback_error, get_playback_error_length, get_playback_error_char,
   set_scheduler_bpm, scheduler_bpm, set_scheduler_gain
@@ -823,8 +828,8 @@ transactions; the old symbols and wire aliases are not retained.
 | `apply_prepared_playback(token, true)` | `player_restart_input()` preflights, resets, and starts atomically |
 | `discard_prepared_playback(token)` | Delete token bookkeeping. Cancel an unsent editor update locally; an accepted command is not a deferred preparation that can be discarded |
 | `restart_playback()` | Fill the input buffer with the desired source and call `player_restart_input()`. To rewind Current song rather than the draft, retain and resubmit the last accepted text |
-| `apply-score` with `policy: "continue"` / `"restart"` | `player-update` / `player-restart`, each with `{ id, text }`; omit the old `mode`, `policy`, and `revision` fields |
-| `restart-playback` | `player-restart` with `{ id, text }` |
+| `apply-score` with `policy: "continue"` / `"restart"` | `player-update` / `player-restart`, each with `{ id, input }`, where `input` is the immutable schema-1 wire string; omit the old `mode`, `policy`, and `revision` fields |
+| `restart-playback` | `player-restart` with `{ id, input }` |
 | `pattern-updated`, `song-updated`, `playback-restarted`, and their old error replies | Correlate immediate `player-receipt` messages by `id`; handle `accepted`, `restartRequired`, and `message` |
 | `playback-superseded` / render-triggered `didRender()` acknowledgement | No replacement notification. Coalesce unsent edits in the host; accepted commands receive their own immediate receipts |
 | `PlaybackController.setTempo(data)` | `PlaybackController.handle({ type: "set-scheduler-bpm", bpm, revision })` for the separate legacy demo control |
@@ -839,6 +844,54 @@ MoonBit scheduler consumers must also migrate the removed tempo validators and
 `active_*` / `has_pending_*` snapshot observations; the
 [scheduler migration table](../scheduler/README.mbt.md#migrating-tempo-and-snapshot-observation)
 lists each replacement.
+
+## Scheduler status and introspection
+
+The supported consumers are the live editor's transport display, its distinction
+between Draft submission and score acceptance, and real-WASM protocol/debug
+checks. These need state, accepted mode/tempo, musical position, and material
+transition counts. Initialization is already covered by the Worklet `ready`
+handshake. Route counts/kinds, drum codes, scheduler handles, and master-gain
+introspection have no current consumer requirement and are not added.
+
+The browser facade and both JS/wasm-gc export lists provide:
+
+| Function | Value |
+|---|---|
+| `player_state()` | `0` Empty, `1` Ready, `2` Playing, `3` Paused, `4` Ended, `5` Fault |
+| `player_mode()` | MoonBit: `PlaybackMode::{None, Pattern, Song}` for the latest accepted score. JS/wasm-gc: `0`, `1`, `2`, respectively. Song includes finite and repeating songs; Fault returns None |
+| `scheduler_bpm()` | Accepted tempo, at 0.001-BPM precision |
+| `scheduler_sample_position()` | Next unrendered sample, or retained terminal sample in Ended |
+| `scheduler_cycle_position()` | Zero-based absolute musical cycles from the piecewise transport clock |
+| `player_pending_count()` / `player_skipped_count()` | Pending/skipped musical materials, not routes, voices, or submissions |
+
+`PlaybackMode` is a public value enum defined in `browser`. It carries
+no mutable state or runtime handles. MoonBit callers use exhaustive matching;
+the Worklet adapter owns the numeric ABI interpretation. Its payload-free
+constructors use MoonBit's [constant-enum ABI](https://docs.moonbitlang.com/en/latest/language/ffi.html#types).
+The constructor order and the `0`/`1`/`2` mapping are part of this export contract.
+
+The cycle getter reads clock scalars without constructing a rational, allocating
+an inspection object, or advancing the scheduler. It is zero before initialization
+and in Empty, Ready, or Fault. Pause freezes position; accepted tempo changes
+preserve it. Repeating songs continue counting absolute cycles rather than
+wrapping the display. Ended retains the completed run's musical endpoint, not
+the end of the render quantum or the duration of a subsequently accepted score.
+Play from Ended and Restart reset position. Display rounding is presentation
+only; clients must not reconstruct this clock from BPM and total samples.
+The returned `Double` is a floating-point observation of the exact internal clock,
+not an exact scheduling timestamp. Reusable scheduler callers can use
+`PatternScheduler::cycle_position()` for the next unrendered position; unlike the
+browser getter, that method has no Player session or finite-song endpoint policy.
+
+These are render positions, not measured or estimated speaker positions.
+Acceptance can occur while Paused or Ended and does not imply audible output.
+Pending materials can still be using previous accepted versions. Route
+projections share musical identities and transition boundaries, so one material
+does not become six pending items because it has six output routes. New identities
+and retired identities count separately: replacing anonymous materials can
+produce both additions and removals, unlike editing named continuing materials.
+Status reporting preserves those existing scheduler semantics.
 
 ## Live editor playback ownership
 
@@ -856,6 +909,25 @@ An accepted source remains Current song even if the draft later becomes invalid.
 Play resumes that accepted song; Restart explicitly submits editor text.
 A delayed rejection cannot annotate a newer draft. Connection epochs quarantine
 retired replies and failures so they cannot mutate a subsequent run.
+
+`PlaybackView` retains `draftVersion`, `acceptedVersion`, and `inFlightVersions`
+separately. `draftStatus` is `unsubmitted`, `queued`, `submitting`, `accepted`,
+`rejected`, or `invalid`. The current Draft's syntax/preparation error is
+`invalid`; a correlated owner refusal is `rejected`. A valid edit first queues
+for debounce and automatic backpressure, not acceptance. Only a successful
+source receipt changes the accepted version; Play/Pause and periodic status do
+not. Explicit untracked text inputs have a null accepted version and cannot
+mark an equal-text Draft accepted. Close/failure clears accepted ownership.
+Source acceptance ordering is independent of control-receipt ordering, and a
+late acceptance cannot erase a newer refusal of the same Draft.
+
+The UI leads with tempo/position and an actionable explanation of the current
+edit: ready to play, sending, accepted, or needing correction. Pending parts
+remain a separate sentence, so acceptance never implies immediate adoption.
+Editor/accepted/in-flight versions and raw transition counts are available in
+the keyboard-accessible Technical details disclosure, not the primary display.
+Position refreshes are not live screen-reader announcements. The compiled demo
+does not display scheduler status.
 
 Numeric musical states are Empty, Ready, Playing, Paused, Ended, and Fault
 (0 through 5). The UI displays Empty as Ready and adds Starting during opening.
@@ -891,8 +963,8 @@ The low-level Mini library does not impose browser limits by default.
 
 | Session method | Meaning | Completion |
 |---|---|---|
-| `update(id, text)` | Accept new Current song without rewinding | Immediate Player receipt |
-| `restart(id, text)` | Accept editor source, reset and start | Immediate Player receipt |
+| `update(id, input)` | Accept immutable `PlaybackInput` without rewinding | Immediate Player receipt |
+| `restart(id, input)` | Accept immutable editor input, reset and start | Immediate Player receipt |
 | `play(id)` / `pause(id)` | Submit musical transport intent | Immediate Player receipt |
 | `fadeIn()` | Schedule an 80ms output fade-in | Does not acknowledge a score or confirm audible output |
 | `close()` | Expire the session, then fade out and suspend its graph | Returns `Promise<CloseSessionResult>`; a healthy graph may be reused |
@@ -920,11 +992,26 @@ browser's native resume promise pending.
 `decodeWorkletMessage` is the single live-editor wire decoder. It turns
 `unknown` into complete typed events or an explicit protocol failure, which
 tears down the graph and enables Retry. `player-receipt` includes the request
-ID, operation, acceptance, and full state projection: `state`, `samplePosition`,
-`tempo`, `pendingCount`, and `skippedCount`. Rejections require a boolean
+ID, operation, acceptance, submitted `draftVersion` (or null for untracked inputs
+and Play/Pause), and full state projection: `state`, `mode`, `cyclePosition`,
+`samplePosition`, `tempo`, `pendingCount`, and `skippedCount`. `PlaybackController`
+converts the low-level ABI codes before publishing either kind of message:
+`state` is `Empty`/`Ready`/`Playing`/`Paused`/`Ended`/`Fault`, and `mode` is
+`none`/`pattern`/`song`. The live decoder validates those strings; it does not
+interpret ABI codes. Numeric, missing, or unknown state/mode values and missing,
+negative, or non-finite cycle position are protocol errors, not fallback values.
+Rejections require a boolean
 `restartRequired` and diagnostic `message`; clients do not infer recovery from
 message wording. `player-status` refreshes the state projection between commands.
 The legacy demo tempo command remains separate from the live editor protocol.
+
+The compiled JS/wasm-gc mode export remains numeric and the existing export
+names and state codes are unchanged. The MoonBit source return type of
+`player_mode()` intentionally changes from `Int` to `PlaybackMode`; migrate
+numeric comparisons to enum matching. The Worklet protocol is a coordinated
+cutover: clients require string-valued `state` and `mode`, plus `cyclePosition`.
+Deploy the UI, Worklet adapters, and WASM from the same build. Legacy numeric
+messages are rejected rather than accepted alongside the new schema.
 
 Controlled tests cover startup cancellation, cleanup barriers, receipt ordering,
 retired sessions, and stale edit diagnostics. Browser and real-WASM tests cover
