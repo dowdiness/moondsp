@@ -183,11 +183,24 @@ pub fn push_playback_char(code : Int) -> Unit {
 
 ///|
 pub fn player_restart_input() -> Int {
-  let text = scheduler_probe_input_chars_to_string(
+  let wire = scheduler_probe_input_chars_to_string(
     scheduler_probe_pattern_input_chars,
   )
   scheduler_probe_pattern_input_chars.clear()
-  match scheduler_probe_pattern_notes(text) {
+  let notes = try {
+    match @json.parse(wire) {
+      Object(fields) =>
+        match (fields.get("schema"), fields.get("kind"), fields.get("text")) {
+          (Some(Number(1, ..)), Some(String("text")), Some(String(text))) =>
+            scheduler_probe_pattern_notes(text)
+          _ => None
+        }
+      _ => None
+    }
+  } catch {
+    _ => None
+  }
+  match notes {
     Some(notes) => {
       scheduler_probe_pending.val = Some(notes)
       scheduler_probe_last_error.val = ""

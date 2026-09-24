@@ -39,7 +39,7 @@ class MoonDspSchedulerProbeProcessor extends AudioWorkletProcessor {
     this.blockIndex = 0;
     this.absoluteFrame = 0;
     this.previousSamples = { left: 0, right: 0 };
-    this.patternText = String(processorOptions.patternText ?? '');
+    this.playbackInput = String(processorOptions.playbackInput ?? '');
     this.initExportName = String(processorOptions.initExportName ?? 'init_scheduler_graph');
     this.initialBpm = this.numberOption(processorOptions.initialBpm, SCHEDULER_PROBE_DEFAULT_BPM);
     this.initialGain = this.numberOption(processorOptions.initialGain, SCHEDULER_PROBE_DEFAULT_GAIN);
@@ -106,7 +106,7 @@ class MoonDspSchedulerProbeProcessor extends AudioWorkletProcessor {
       return true;
     }
 
-    if (!this.patternInitialized && !this.setPatternText(this.patternText)) {
+    if (!this.patternInitialized && !this.setPlaybackInput(this.playbackInput)) {
       this.stopWithSilence(left, right);
       return true;
     }
@@ -170,10 +170,10 @@ class MoonDspSchedulerProbeProcessor extends AudioWorkletProcessor {
     return true;
   }
 
-  setPatternText(text) {
+  setPlaybackInput(wire) {
     this.wasm.clear_playback_input();
-    for (let index = 0; index < text.length; index += 1) {
-      this.wasm.push_playback_char(text.charCodeAt(index));
+    for (let index = 0; index < wire.length; index += 1) {
+      this.wasm.push_playback_char(wire.charCodeAt(index));
     }
     const status = this.wasm.player_restart_input();
     if (status === 0) this.wasm.set_scheduler_bpm(this.initialBpm);

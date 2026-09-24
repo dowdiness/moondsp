@@ -30,6 +30,9 @@ pub(all) suberror DraftEditError {
   IdentityExhausted
   Disposed
 } derive(Eq, @debug.Debug)
+pub fn DraftEditError::equal(Self, Self) -> Bool
+pub fn DraftEditError::not_equal(Self, Self) -> Bool
+pub fn DraftEditError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
 pub struct Draft {
@@ -46,8 +49,11 @@ pub fn Draft::state(Self) -> DraftState
 pub struct DraftDiagnostic {
   // private fields
 } derive(Eq, @debug.Debug)
+pub fn DraftDiagnostic::equal(Self, Self) -> Bool
 pub fn DraftDiagnostic::kind(Self) -> DraftDiagnosticKind
 pub fn DraftDiagnostic::message(Self) -> String
+pub fn DraftDiagnostic::not_equal(Self, Self) -> Bool
+pub fn DraftDiagnostic::to_repr(Self) -> @debug.Repr
 pub fn DraftDiagnostic::version(Self) -> DraftVersion
 
 pub(all) enum DraftDiagnosticKind {
@@ -56,6 +62,9 @@ pub(all) enum DraftDiagnosticKind {
   CompilerContract
   Disposed
 } derive(Eq, @debug.Debug)
+pub fn DraftDiagnosticKind::equal(Self, Self) -> Bool
+pub fn DraftDiagnosticKind::not_equal(Self, Self) -> Bool
+pub fn DraftDiagnosticKind::to_repr(Self) -> @debug.Repr
 
 pub struct DraftState {
   // private fields
@@ -71,12 +80,16 @@ pub(all) enum DraftTracking {
   TrackingUnavailable
   Disposed
 } derive(Eq, @debug.Debug)
+pub fn DraftTracking::equal(Self, Self) -> Bool
+pub fn DraftTracking::not_equal(Self, Self) -> Bool
+pub fn DraftTracking::to_repr(Self) -> @debug.Repr
 
 pub struct DraftVersion {
   // private fields
 } derive(Eq, @debug.Debug)
 pub fn DraftVersion::equal(Self, Self) -> Bool
 pub fn DraftVersion::not_equal(Self, Self) -> Bool
+pub fn DraftVersion::to_json(Self) -> Json
 pub fn DraftVersion::to_repr(Self) -> @debug.Repr
 pub impl ToJson for DraftVersion
 
@@ -104,12 +117,18 @@ pub(all) enum OriginLocation {
   Located(SourceRange, Array[SourceRange])
   Unavailable(OriginUnavailable)
 } derive(Eq, @debug.Debug)
+pub fn OriginLocation::equal(Self, Self) -> Bool
+pub fn OriginLocation::not_equal(Self, Self) -> Bool
+pub fn OriginLocation::to_repr(Self) -> @debug.Repr
 
 pub(all) enum OriginUnavailable {
   SourceReset
   AtomRetired
   BrokenReference
 } derive(Eq, @debug.Debug)
+pub fn OriginUnavailable::equal(Self, Self) -> Bool
+pub fn OriginUnavailable::not_equal(Self, Self) -> Bool
+pub fn OriginUnavailable::to_repr(Self) -> @debug.Repr
 
 pub struct ParsedSong {
   song : @song.Song[@pattern.ControlMap]

@@ -260,8 +260,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Kept the strict cookbook parser check compatible with MoonBit v0.10.14:
-  identity, pattern, and song types now explicitly expose their existing
-  trait methods, and Mini parser tests use qualified package calls.
+  identity, pattern, song, and Draft types now explicitly expose their
+  existing trait methods, and Mini parser tests use qualified package calls.
   Validation still rejects warnings; runtime behavior is unchanged.
 - Restored the mono/stereo single-control prepare/commit path without creating
   a one-element batch. The native release probe records 4 allocations per update

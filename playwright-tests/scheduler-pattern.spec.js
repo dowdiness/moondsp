@@ -97,7 +97,7 @@ test.describe('Pattern Text Input', () => {
     await page.click('button:has-text("Eval")');
 
     const rejected = await waitForReceipt(page, previous, false);
-    expect(rejected.state).toBe(2);
+    expect(rejected.state).toBe('Playing');
   });
 
   test('Unknown drum name shows error', async ({ page }) => {
@@ -108,7 +108,7 @@ test.describe('Pattern Text Input', () => {
     await page.click('button:has-text("Eval")');
 
     const rejected = await waitForReceipt(page, previous, false);
-    expect(rejected.state).toBe(2);
+    expect(rejected.state).toBe('Playing');
   });
 });
 

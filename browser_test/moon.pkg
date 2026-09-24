@@ -1,5 +1,6 @@
 import {
   "dowdiness/moondsp",
+  "moonbitlang/core/json",
   "moonbitlang/core/ref",
 }
 

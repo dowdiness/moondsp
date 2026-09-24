@@ -40,6 +40,9 @@ pub impl ToJson for DraftVersion with fn to_json(self) {
 }
 
 ///|
+pub extend DraftVersion with ToJson::{to_json}
+
+///|
 fn decode_draft_version(value : Json) -> DraftVersion raise PlaybackWireError {
   guard value is Array([epoch, revision]) else {
     raise InvalidWire("invalid draft version")

@@ -96,12 +96,24 @@ pub(all) suberror DraftEditError {
 } derive(Eq, Debug)
 
 ///|
+pub extend DraftEditError with Eq::{equal, not_equal}
+
+///|
+pub extend DraftEditError with Debug::{to_repr}
+
+///|
 pub(all) enum DraftTracking {
   Pattern
   Song
   TrackingUnavailable
   Disposed
 } derive(Eq, Debug)
+
+///|
+pub extend DraftTracking with Eq::{equal, not_equal}
+
+///|
+pub extend DraftTracking with Debug::{to_repr}
 
 ///|
 pub(all) enum DraftDiagnosticKind {
@@ -112,11 +124,23 @@ pub(all) enum DraftDiagnosticKind {
 } derive(Eq, Debug)
 
 ///|
+pub extend DraftDiagnosticKind with Eq::{equal, not_equal}
+
+///|
+pub extend DraftDiagnosticKind with Debug::{to_repr}
+
+///|
 pub struct DraftDiagnostic {
   priv at : DraftVersion
   priv category : DraftDiagnosticKind
   priv detail : String
 } derive(Eq, Debug)
+
+///|
+pub extend DraftDiagnostic with Eq::{equal, not_equal}
+
+///|
+pub extend DraftDiagnostic with Debug::{to_repr}
 
 ///|
 fn DraftDiagnostic::DraftDiagnostic(
@@ -188,10 +212,22 @@ pub(all) enum OriginUnavailable {
 } derive(Eq, Debug)
 
 ///|
+pub extend OriginUnavailable with Eq::{equal, not_equal}
+
+///|
+pub extend OriginUnavailable with Debug::{to_repr}
+
+///|
 pub(all) enum OriginLocation {
   Located(SourceRange, Array[SourceRange])
   Unavailable(OriginUnavailable)
 } derive(Eq, Debug)
+
+///|
+pub extend OriginLocation with Eq::{equal, not_equal}
+
+///|
+pub extend OriginLocation with Debug::{to_repr}
 
 ///|
 priv struct LiveAtom {
