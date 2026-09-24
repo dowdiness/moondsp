@@ -336,3 +336,60 @@ test "exact lowering rejects missing attribution before returning a snapshot" {
     [1],
   )
 }
+
+///|
+test "prepared reference contexts outlive cache clearing before their first query" {
+  let cache : PatternLoweringCache[ControlMap] = PatternLoweringCache::new()
+  let definition = resolved_use("inner", origin_note("atom", 1L, 60.0), 3L, 4L)
+  let standalone = definition.lower_with_origins(cache~)
+  let left = resolved_use("left", definition, 5L, 6L)
+  let right = resolved_use("right", definition, 7L, 8L)
+  let retained = PatternDoc::stack(id=pid("mix"), docs=[left, right]).lower_with_origins(
+    cache~,
+  )
+  cache.clear()
+  let rebound = resolved_use("left", definition, 5L, 9L).lower_with_origins(
+    cache~,
+  )
+  let arc = doc_span(12, 1, 13, 1)
+  @debug.assert_eq(
+    standalone.query(arc)[0].origin().bindings().map(b => b.id().serial()),
+    [4L],
+  )
+  @debug.assert_eq(
+    retained
+    .query(arc)
+    .map(event => event.origin().bindings().map(b => b.id().serial())),
+    [[6L, 4L], [8L, 4L]],
+  )
+  @debug.assert_eq(
+    rebound.query(arc)[0].origin().bindings().map(b => b.id().serial()),
+    [9L, 4L],
+  )
+  let held = retained.query_for_entry(0, arc)[0].origin()
+  ignore(rebound.query(arc))
+  ignore(standalone.query(arc))
+  @debug.assert_eq(held.bindings().map(b => b.id().serial()), [6L, 4L])
+}
+
+///|
+test "origin cache retains full witnesses when binding serials coincide" {
+  let cache : PatternLoweringCache[ControlMap] = PatternLoweringCache::new()
+  let definition = origin_note("atom", 1L, 60.0)
+  let uses = [
+    resolved_use("first", definition, 10L, 7L),
+    resolved_use("second", definition, 20L, 7L),
+    resolved_use("third", definition, 30L, 7L),
+  ]
+  let snapshots = uses.map(doc => doc.lower_with_origins(cache~))
+  let arc = doc_span(0, 1, 1, 1)
+  @debug.assert_eq(
+    snapshots.map(snapshot => {
+      snapshot.query(arc)[0]
+      .origin()
+      .bindings()
+      .map(b => b.reference().serial())
+    }),
+    [[10L], [20L], [30L]],
+  )
+}

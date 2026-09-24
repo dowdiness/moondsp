@@ -517,32 +517,47 @@ pub fn[A] ResolvedReference::ResolvedReference(
 }
 
 ///|
-/// Cold compilation policy. Unit deliberately makes no exact-origin promise.
+/// Cold compilation policy. Contexts accumulate inner-to-outer while descending.
+/// Query callbacks only carry the completed origin; they never extend it.
 priv trait DocumentOrigin {
-  fn make_origin(@identity.PatternNodeId, @identity.SourceAtomId?) -> Self raise PatternDocError
-  fn bind_origin(@identity.PatternNodeId, ReferenceBinding?) -> ((Self) -> Self) raise PatternDocError
+  fn make_origin(
+    @identity.PatternNodeId,
+    @identity.SourceAtomId?,
+    OriginBindings,
+  ) -> Self raise PatternDocError
+  fn bind_context(@identity.PatternNodeId, ReferenceBinding?, OriginBindings) -> OriginBindings raise PatternDocError
 }
 
 ///|
-impl DocumentOrigin for Unit with fn make_origin(_, _) {
+impl DocumentOrigin for Unit with fn make_origin(_, _, _) {
   ()
 }
 
 ///|
-impl DocumentOrigin for Unit with fn bind_origin(_, _) {
-  value => value
+impl DocumentOrigin for Unit with fn bind_context(_, _, _) {
+  End
 }
 
 ///|
-impl DocumentOrigin for EventOrigin with fn make_origin(node, atom) {
+impl DocumentOrigin for EventOrigin with fn make_origin(node, atom, context) {
   guard atom is Some(atom) else { raise MissingAtomOrigin(node) }
-  EventOrigin(atom)
+  let mut bindings = End
+  for remaining = context {
+    match remaining {
+      End => break
+      Link(binding, rest) => {
+        bindings = Link(binding, bindings)
+        continue rest
+      }
+    }
+  }
+  EventOrigin(atom, bindings~)
 }
 
 ///|
-impl DocumentOrigin for EventOrigin with fn bind_origin(node, binding) {
+impl DocumentOrigin for EventOrigin with fn bind_context(node, binding, context) {
   guard binding is Some(binding) else { raise MissingReferenceBinding(node) }
-  origin => EventOrigin(origin.atom, bindings=Link(binding, origin.bindings))
+  Link(binding, context)
 }
 
 ///|
@@ -769,15 +784,16 @@ fn[A, O : DocumentOrigin] lower_pattern_node_cached(
   cache : CompiledCache[A, O],
   controls : CompiledCache[A, Unit],
   token_memo : Map[String, Array[Int64]],
+  context : OriginBindings,
 ) -> CompiledPattern[A, O] raise PatternDocError {
   let token = pattern_node_cache_token_memoized(nodes, id, token_memo)
-  match cache.lookup(id, token) {
+  match cache.lookup(id, token, context) {
     Some(compiled) => compiled
     None => {
       let compiled = compile_pattern_node(
-        nodes, id, cache, controls, token_memo,
+        nodes, id, cache, controls, token_memo, context,
       )
-      cache.store(id, token, compiled)
+      cache.store(id, token, context, compiled)
       compiled
     }
   }
@@ -790,6 +806,7 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
   cache : CompiledCache[A, O],
   controls : CompiledCache[A, Unit],
   token_memo : Map[String, Array[Int64]],
+  context : OriginBindings,
 ) -> CompiledPattern[A, O] raise PatternDocError {
   guard nodes.get(id.value()) is Some(entry) else {
     raise MissingNode(id.value())
@@ -797,38 +814,36 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
   fn lower(
     child : @identity.PatternNodeId,
   ) -> CompiledPattern[A, O] raise PatternDocError {
-    lower_pattern_node_cached(nodes, child, cache, controls, token_memo)
+    lower_pattern_node_cached(
+      nodes, child, cache, controls, token_memo, context,
+    )
   }
   fn prepend(pat : Pat[ScopedValue[A, O]]) -> Pat[ScopedValue[A, O]] {
     pat.map_payload(value => value.prepend(id))
   }
   match entry.node {
     Reference(definition, binding) => {
-      let bind : (O) -> O = O::bind_origin(id, binding)
+      let bound_context = O::bind_context(id, binding, context)
       let target = lower_pattern_node_cached(
         definition.nodes,
         definition.root,
         cache,
         controls,
         {},
+        bound_context,
       )
-      fn annotate(pat : Pat[ScopedValue[A, O]]) -> Pat[ScopedValue[A, O]] {
-        pat.map_payload(value => {
-          ScopedValue(value.value, value.scope.prepend(id), bind(value.origin))
-        })
-      }
       CompiledPattern(
-        annotate(target.pat),
+        prepend(target.pat),
         Array::makei(target.entries.length(), index => {
           CompiledEntry(
             "\{id.value().length()}:\{id.value()}/member:\{index}",
-            annotate(target.entries[index].source),
+            prepend(target.entries[index].source),
           )
         }),
       )
     }
     Runtime(pat) => {
-      let origin : O = O::make_origin(id, None)
+      let origin : O = O::make_origin(id, None, context)
       let source = pat.map_payload(value => {
         ScopedValue(value, PatternNodePath(id), origin)
       })
@@ -836,14 +851,14 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
     }
     Silence => CompiledPattern::single_material(Pat::silence(), id)
     Pure(value) => {
-      let origin : O = O::make_origin(id, None)
+      let origin : O = O::make_origin(id, None, context)
       CompiledPattern::single_material(
         Pat::pure(ScopedValue(value, PatternNodePath(id), origin)),
         id,
       )
     }
     Atom(pat, atom) => {
-      let origin : O = O::make_origin(id, Some(atom))
+      let origin : O = O::make_origin(id, Some(atom), context)
       let source = pat.map_payload(value => {
         ScopedValue(value, PatternNodePath(id), origin)
       })
@@ -928,7 +943,12 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
       let left = lower(left_id)
       // Control providers need no primary source atom or reference binding.
       let right : CompiledPattern[A, Unit] = lower_pattern_node_cached(
-        nodes, right_id, controls, controls, token_memo,
+        nodes,
+        right_id,
+        controls,
+        controls,
+        token_memo,
+        End,
       )
       let scope = pattern_source_path_for_opaque_children(nodes, id, [
         left_id, right_id,
@@ -970,20 +990,50 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
 ///|
 priv struct CompiledCacheEntry[A, O] {
   token : Array[Int64]
+  context : OriginBindings
   compiled : CompiledPattern[A, O]
+}
+
+///|
+/// Keep the common single-variant case free of a secondary hash table.
+priv struct CompiledCacheVariants[A, O] {
+  first : CompiledCacheEntry[A, O]
+  mut others : Map[Int, Array[CompiledCacheEntry[A, O]]]?
+}
+
+///|
+/// This fingerprint selects a bucket, never establishes origin identity.
+/// Lookup still compares the full context, including epochs and binding witnesses.
+fn OriginBindings::cache_hash(self : OriginBindings) -> Int {
+  if self is End {
+    return 0
+  }
+  let hasher = Hasher()
+  for remaining = self {
+    match remaining {
+      End => break
+      Link(binding, rest) => {
+        hasher.combine_int64(binding.id.serial())
+        continue rest
+      }
+    }
+  }
+  hasher.finalize()
 }
 
 ///|
 /// Cache for compiled playback and provenance of pattern subtrees.
 ///
 /// Entries are keyed by stable `PatternNodeId`, a recursive private subtree
-/// token. The subtree token prevents stale hits
+/// token, and the immutable reference context. The context prevents a definition
+/// compiled for one reference use from supplying origins to another use.
+/// The subtree token prevents stale hits
 /// when callers rebuild unrelated docs or fork divergent edits from the same
 /// base with identical stable IDs and revision counters. Every replacement gets
 /// a fresh generation, and the token includes every dependency generation.
 /// Revision is an editing API value; it adds no discrimination to this key.
 priv struct CompiledCache[A, O] {
-  entries : Map[String, Array[CompiledCacheEntry[A, O]]]
+  entries : Map[String, CompiledCacheVariants[A, O]]
   mut hits : Int
   mut misses : Int
 }
@@ -998,17 +1048,29 @@ fn[A, O] CompiledCache::lookup(
   self : CompiledCache[A, O],
   id : @identity.PatternNodeId,
   token : Array[Int64],
+  context : OriginBindings,
 ) -> CompiledPattern[A, O]? {
   match self.entries.get(id.value()) {
     None => {
       self.misses += 1
       None
     }
-    Some(entries) => {
-      for entry in entries {
-        if pattern_cache_token_equal(entry.token, token) {
-          self.hits += 1
-          return Some(entry.compiled)
+    Some(variants) => {
+      let first = variants.first
+      if first.context == context &&
+        pattern_cache_token_equal(first.token, token) {
+        self.hits += 1
+        return Some(first.compiled)
+      }
+      if variants.others is Some(buckets) {
+        if buckets.get(context.cache_hash()) is Some(entries) {
+          for entry in entries {
+            if entry.context == context &&
+              pattern_cache_token_equal(entry.token, token) {
+              self.hits += 1
+              return Some(entry.compiled)
+            }
+          }
         }
       }
       self.misses += 1
@@ -1023,12 +1085,28 @@ fn[A, O] CompiledCache::store(
   self : CompiledCache[A, O],
   id : @identity.PatternNodeId,
   token : Array[Int64],
+  context : OriginBindings,
   compiled : CompiledPattern[A, O],
 ) -> Unit {
   let key = id.value()
+  let entry = { token: token.copy(), context, compiled, }
   match self.entries.get(key) {
-    None => self.entries[key] = [{ token: token.copy(), compiled, }]
-    Some(entries) => entries.push({ token: token.copy(), compiled, })
+    None => self.entries[key] = { first: entry, others: None, }
+    Some(variants) => {
+      let buckets = match variants.others {
+        Some(buckets) => buckets
+        None => {
+          let buckets : Map[Int, Array[CompiledCacheEntry[A, O]]] = Map([])
+          variants.others = Some(buckets)
+          buckets
+        }
+      }
+      let hash = context.cache_hash()
+      match buckets.get(hash) {
+        None => buckets[hash] = [entry]
+        Some(entries) => entries.push(entry)
+      }
+    }
   }
 }
 
@@ -1045,7 +1123,12 @@ fn[A, O] CompiledCache::miss_count(self : CompiledCache[A, O]) -> Int {
 ///|
 fn[A, O] CompiledCache::entry_count(self : CompiledCache[A, O]) -> Int {
   let mut count = 0
-  self.entries.each(fn(_, entries) { count += entries.length() })
+  self.entries.each(fn(_, variants) {
+    count += 1
+    if variants.others is Some(buckets) {
+      buckets.each(fn(_, entries) { count += entries.length() })
+    }
+  })
   count
 }
 
@@ -1268,6 +1351,7 @@ pub fn[A] PatternDoc::lower_with_origins(
     cache.exact,
     cache.general,
     {},
+    End,
   )
   {
     root: self.root,
@@ -1473,6 +1557,7 @@ pub fn[A] PatternDoc::lower_with_cache(
     cache.general,
     cache.general,
     {},
+    End,
   )
   {
     root: self.root,

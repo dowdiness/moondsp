@@ -259,6 +259,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Prepared exact event origins during pattern compilation instead of extending
+  them in reference query callbacks. Context-aware cache reuse preserves
+  distinct reference uses and retained snapshots without changing public APIs.
+  This removes the identified query-time origin allocations, not all rendering
+  allocations; cold compilation costs increase for shared reference paths.
+  A measured follow-up keeps the first cached variant directly accessible and
+  indexes additional contexts, retaining full identity checks on hash collisions.
+  Large reference sets prepare faster; small cases can be slightly slower.
 - Kept the strict cookbook parser check compatible with MoonBit v0.10.14:
   identity, pattern, song, and Draft types now explicitly expose their
   existing trait methods, and Mini parser tests use qualified package calls.

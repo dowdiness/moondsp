@@ -1,0 +1,779 @@
+{
+  "source_commit": "0ca1f514822213cab90e4f16faa5c040778a7b20",
+  "scope": "Current-head ordinary/exact query ablation and text/tracked Worklet input comparison, not a before/after PR benchmark. Production sources unchanged; measurement additions in working tree.",
+  "recorded_at": "2026-09-24T08:36:24.313Z",
+  "environment": {
+    "platform": "linux",
+    "release": "6.18.33.2-microsoft-standard-WSL2",
+    "architecture": "x64",
+    "cpu": "AMD Ryzen 7 6800H with Radeon Graphics",
+    "node": "v24.14.1",
+    "moon": "moon 0.1.20260904 (94521db 2026-09-04) ~/.moon/bin/moon\nmoonc v0.10.12+1634b282e (2026-09-07) ~/.moon/bin/moonc\nmoonrun 0.1.20260904 (94521db 2026-09-04) ~/.moon/bin/moonrun\n\nFeature flags enabled: rr_moon_pkg"
+  },
+  "sha256": {
+    "_build/wasm-gc/release/build/browser/browser.wasm": "36e81c206f1abdd34a18a4f7a35e43c461640a74d52cac1a10318096b9fc2456",
+    "_build/js/release/build/browser_authoring/browser_authoring.js": "9c19a333e3c0b36df94118b885730c570a4f3acf41009b795ea6a3518030566e",
+    "mini/exact_origin_benchmark.mbt": "d35629caf3a95106c718b1e4e9f88f31fc8ab3ad231718951c26dec89c79d54e",
+    "scripts/measure-playback-api.cjs": "280f658de8f612b4059c56bdd410ae4196d3cceecdd41de1955aa14ac6d7ca4a",
+    "scripts/measure-playback-worklet.js": "8be12d8990f16e8aa8bc5a9beae58e1f444e8ea61510feac9b99ca6fbd76d78d"
+  },
+  "query_command": "NEW_MOON_MOD=0 moon bench mini/exact_origin_benchmark.mbt --target wasm-gc --release --no-parallelize",
+  "query_runs": [
+    "[dowdiness/moondsp] bench mini/exact_origin_benchmark.mbt:62 (\"bench/exact_origin/query\") ok\nname                           time (mean ± σ)         range (min … max) \ndirect/ordinary_sourced           5.90 µs ±  69.33 ns     5.79 µs …   6.02 µs  in 10 ×  16364 runs\ndirect/exact_origin               5.84 µs ±  51.80 ns     5.79 µs …   5.97 µs  in 10 ×  17311 runs\nnested_reused/ordinary_sourced   21.67 µs ± 165.95 ns    21.38 µs …  21.89 µs  in 10 ×   4581 runs\nnested_reused/exact_origin       22.25 µs ± 696.51 ns    21.69 µs …  23.97 µs  in 10 ×   3692 runs\nTotal tests: 1, passed: 1, failed: 0.\n",
+    "[dowdiness/moondsp] bench mini/exact_origin_benchmark.mbt:62 (\"bench/exact_origin/query\") ok\nname                           time (mean ± σ)         range (min … max) \ndirect/ordinary_sourced           6.06 µs ± 298.03 ns     5.88 µs …   6.90 µs  in 10 ×  17146 runs\ndirect/exact_origin               5.95 µs ± 132.54 ns     5.85 µs …   6.22 µs  in 10 ×  13983 runs\nnested_reused/ordinary_sourced   21.86 µs ± 168.90 ns    21.55 µs …  22.11 µs  in 10 ×   4527 runs\nnested_reused/exact_origin       22.15 µs ± 470.44 ns    21.83 µs …  23.38 µs  in 10 ×   4446 runs\nTotal tests: 1, passed: 1, failed: 0.\n"
+  ],
+  "worklet_commands": [
+    "node scripts/measure-playback-api.cjs http://127.0.0.1:5189 --exact-origin --order=AB",
+    "node scripts/measure-playback-api.cjs http://127.0.0.1:5189 --exact-origin --order=BA"
+  ],
+  "worklet_runs": [
+    {
+      "mode": "exact-origin-comparison",
+      "source": "let motif = note(\"60 62 64 67\"); let phrase = stack(motif, motif.slow(2)); stack(phrase, phrase.slow(3))",
+      "order": [
+        "text",
+        "tracked"
+      ],
+      "tracked_versions": [
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          1,
+          5
+        ],
+        [
+          1,
+          6
+        ],
+        [
+          1,
+          7
+        ],
+        [
+          1,
+          8
+        ],
+        [
+          1,
+          9
+        ],
+        [
+          1,
+          10
+        ],
+        [
+          1,
+          11
+        ],
+        [
+          1,
+          12
+        ],
+        [
+          1,
+          13
+        ],
+        [
+          1,
+          14
+        ],
+        [
+          1,
+          15
+        ],
+        [
+          1,
+          16
+        ],
+        [
+          1,
+          17
+        ],
+        [
+          1,
+          18
+        ],
+        [
+          1,
+          19
+        ],
+        [
+          1,
+          20
+        ],
+        [
+          1,
+          21
+        ],
+        [
+          1,
+          22
+        ],
+        [
+          1,
+          23
+        ],
+        [
+          1,
+          24
+        ],
+        [
+          1,
+          25
+        ],
+        [
+          1,
+          26
+        ],
+        [
+          1,
+          27
+        ],
+        [
+          1,
+          28
+        ],
+        [
+          1,
+          29
+        ],
+        [
+          1,
+          30
+        ],
+        [
+          1,
+          31
+        ],
+        [
+          1,
+          32
+        ],
+        [
+          1,
+          33
+        ],
+        [
+          1,
+          34
+        ],
+        [
+          1,
+          35
+        ],
+        [
+          1,
+          36
+        ],
+        [
+          1,
+          37
+        ],
+        [
+          1,
+          38
+        ],
+        [
+          1,
+          39
+        ],
+        [
+          1,
+          40
+        ]
+      ],
+      "wire_code_units": {
+        "text": {
+          "initial": 142,
+          "minimum": 142,
+          "maximum": 142
+        },
+        "tracked": {
+          "initial": 430,
+          "minimum": 430,
+          "maximum": 432
+        }
+      },
+      "arms": {
+        "text": {
+          "mode": "audio-worklet",
+          "workload": "nested reused Pattern, alternating first note 60/61",
+          "characters": 104,
+          "iterations": 40,
+          "warmup_updates": 10,
+          "sample_rate": 48000,
+          "block_size": 128,
+          "block_budget_ms": 2.6666666666666665,
+          "worklet_clock": "Date.now, integer milliseconds; sub-millisecond values are unresolved",
+          "baseline": {
+            "render": {
+              "count": 379,
+              "mean_ms": 0.17941952506596306,
+              "p50_ms": 0,
+              "p95_ms": 1,
+              "max_ms": 1,
+              "zero_count": 311
+            },
+            "callback_interarrival": {
+              "count": 378,
+              "mean_ms": 2.6164021164021163,
+              "p50_ms": 0,
+              "p95_ms": 23,
+              "max_ms": 25,
+              "zero_count": 260
+            },
+            "owner_update": null
+          },
+          "edited": {
+            "render": {
+              "count": 2572,
+              "mean_ms": 0.1749611197511664,
+              "p50_ms": 0,
+              "p95_ms": 1,
+              "max_ms": 2,
+              "zero_count": 2123
+            },
+            "callback_interarrival": {
+              "count": 2571,
+              "mean_ms": 2.6577207312329834,
+              "p50_ms": 0,
+              "p95_ms": 24,
+              "max_ms": 25,
+              "zero_count": 1810
+            },
+            "owner_update": {
+              "count": 40,
+              "mean_ms": 0.675,
+              "p50_ms": 1,
+              "p95_ms": 1,
+              "max_ms": 1,
+              "zero_count": 13
+            }
+          },
+          "receipt_roundtrip": {
+            "count": 40,
+            "mean_ms": 0.8799999997019767,
+            "p50_ms": 0.8999999985098839,
+            "p95_ms": 1.1000000014901161,
+            "max_ms": 1.300000000745058,
+            "zero_count": 0
+          },
+          "adoption": {
+            "pending_peak_observed": 4,
+            "pending_final": 0,
+            "start_cycle": 1.272,
+            "last_update_cycle": 2.128,
+            "final_cycle": 8.184,
+            "post_update_cycles_minimum": 6,
+            "tempo": 60,
+            "rendered_frames": 329216,
+            "final_state": "Playing",
+            "wait_limit_ms": 30000
+          },
+          "conditions": {
+            "headless": true,
+            "output_muted": true,
+            "cross_origin_isolated": false,
+            "baseline_window_ms": 1000,
+            "delay_between_edits_ms": 20,
+            "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+          },
+          "interpretation": "Instrumented callback timings and wall-clock interarrival gaps; not an audible-dropout or real-time deadline guarantee. Buffered callback bursts can exceed one quantum even at baseline."
+        },
+        "tracked": {
+          "mode": "audio-worklet",
+          "workload": "nested reused Pattern, alternating first note 60/61",
+          "characters": 104,
+          "iterations": 40,
+          "warmup_updates": 10,
+          "sample_rate": 48000,
+          "block_size": 128,
+          "block_budget_ms": 2.6666666666666665,
+          "worklet_clock": "Date.now, integer milliseconds; sub-millisecond values are unresolved",
+          "baseline": {
+            "render": {
+              "count": 370,
+              "mean_ms": 0.1810810810810811,
+              "p50_ms": 0,
+              "p95_ms": 1,
+              "max_ms": 1,
+              "zero_count": 303
+            },
+            "callback_interarrival": {
+              "count": 369,
+              "mean_ms": 2.6124661246612466,
+              "p50_ms": 0,
+              "p95_ms": 24,
+              "max_ms": 25,
+              "zero_count": 263
+            },
+            "owner_update": null
+          },
+          "edited": {
+            "render": {
+              "count": 2581,
+              "mean_ms": 0.1666020922123208,
+              "p50_ms": 0,
+              "p95_ms": 1,
+              "max_ms": 1,
+              "zero_count": 2151
+            },
+            "callback_interarrival": {
+              "count": 2580,
+              "mean_ms": 2.6585271317829458,
+              "p50_ms": 0,
+              "p95_ms": 24,
+              "max_ms": 30,
+              "zero_count": 1831
+            },
+            "owner_update": {
+              "count": 40,
+              "mean_ms": 0.575,
+              "p50_ms": 1,
+              "p95_ms": 1,
+              "max_ms": 1,
+              "zero_count": 17
+            }
+          },
+          "receipt_roundtrip": {
+            "count": 40,
+            "mean_ms": 0.7950000002980232,
+            "p50_ms": 0.8000000007450581,
+            "p95_ms": 1.199999999254942,
+            "max_ms": 1.300000000745058,
+            "zero_count": 0
+          },
+          "adoption": {
+            "pending_peak_observed": 4,
+            "pending_final": 0,
+            "start_cycle": 1.272,
+            "last_update_cycle": 2.1626666666666665,
+            "final_cycle": 8.184,
+            "post_update_cycles_minimum": 6,
+            "tempo": 60,
+            "rendered_frames": 330368,
+            "final_state": "Playing",
+            "wait_limit_ms": 30000
+          },
+          "conditions": {
+            "headless": true,
+            "output_muted": true,
+            "cross_origin_isolated": false,
+            "baseline_window_ms": 1000,
+            "delay_between_edits_ms": 20,
+            "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+          },
+          "interpretation": "Instrumented callback timings and wall-clock interarrival gaps; not an audible-dropout or real-time deadline guarantee. Buffered callback bursts can exceed one quantum even at baseline."
+        }
+      },
+      "interpretation": "Same source edit sequence; text versus tracked includes wire validation/compile/admission differences, not just origin-query overhead. Both arms include existing status notifications. No allocation or glitch-free guarantee."
+    },
+    {
+      "mode": "exact-origin-comparison",
+      "source": "let motif = note(\"60 62 64 67\"); let phrase = stack(motif, motif.slow(2)); stack(phrase, phrase.slow(3))",
+      "order": [
+        "tracked",
+        "text"
+      ],
+      "tracked_versions": [
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          1,
+          5
+        ],
+        [
+          1,
+          6
+        ],
+        [
+          1,
+          7
+        ],
+        [
+          1,
+          8
+        ],
+        [
+          1,
+          9
+        ],
+        [
+          1,
+          10
+        ],
+        [
+          1,
+          11
+        ],
+        [
+          1,
+          12
+        ],
+        [
+          1,
+          13
+        ],
+        [
+          1,
+          14
+        ],
+        [
+          1,
+          15
+        ],
+        [
+          1,
+          16
+        ],
+        [
+          1,
+          17
+        ],
+        [
+          1,
+          18
+        ],
+        [
+          1,
+          19
+        ],
+        [
+          1,
+          20
+        ],
+        [
+          1,
+          21
+        ],
+        [
+          1,
+          22
+        ],
+        [
+          1,
+          23
+        ],
+        [
+          1,
+          24
+        ],
+        [
+          1,
+          25
+        ],
+        [
+          1,
+          26
+        ],
+        [
+          1,
+          27
+        ],
+        [
+          1,
+          28
+        ],
+        [
+          1,
+          29
+        ],
+        [
+          1,
+          30
+        ],
+        [
+          1,
+          31
+        ],
+        [
+          1,
+          32
+        ],
+        [
+          1,
+          33
+        ],
+        [
+          1,
+          34
+        ],
+        [
+          1,
+          35
+        ],
+        [
+          1,
+          36
+        ],
+        [
+          1,
+          37
+        ],
+        [
+          1,
+          38
+        ],
+        [
+          1,
+          39
+        ],
+        [
+          1,
+          40
+        ]
+      ],
+      "wire_code_units": {
+        "text": {
+          "initial": 142,
+          "minimum": 142,
+          "maximum": 142
+        },
+        "tracked": {
+          "initial": 430,
+          "minimum": 430,
+          "maximum": 432
+        }
+      },
+      "arms": {
+        "tracked": {
+          "mode": "audio-worklet",
+          "workload": "nested reused Pattern, alternating first note 60/61",
+          "characters": 104,
+          "iterations": 40,
+          "warmup_updates": 10,
+          "sample_rate": 48000,
+          "block_size": 128,
+          "block_budget_ms": 2.6666666666666665,
+          "worklet_clock": "Date.now, integer milliseconds; sub-millisecond values are unresolved",
+          "baseline": {
+            "render": {
+              "count": 379,
+              "mean_ms": 0.21108179419525067,
+              "p50_ms": 0,
+              "p95_ms": 1,
+              "max_ms": 1,
+              "zero_count": 299
+            },
+            "callback_interarrival": {
+              "count": 378,
+              "mean_ms": 2.6164021164021163,
+              "p50_ms": 0,
+              "p95_ms": 23,
+              "max_ms": 24,
+              "zero_count": 252
+            },
+            "owner_update": null
+          },
+          "edited": {
+            "render": {
+              "count": 2576,
+              "mean_ms": 0.17468944099378883,
+              "p50_ms": 0,
+              "p95_ms": 1,
+              "max_ms": 2,
+              "zero_count": 2127
+            },
+            "callback_interarrival": {
+              "count": 2575,
+              "mean_ms": 2.658640776699029,
+              "p50_ms": 0,
+              "p95_ms": 24,
+              "max_ms": 25,
+              "zero_count": 1819
+            },
+            "owner_update": {
+              "count": 40,
+              "mean_ms": 0.75,
+              "p50_ms": 1,
+              "p95_ms": 1,
+              "max_ms": 1,
+              "zero_count": 10
+            }
+          },
+          "receipt_roundtrip": {
+            "count": 40,
+            "mean_ms": 0.8899999998509884,
+            "p50_ms": 0.9000000022351742,
+            "p95_ms": 1.199999999254942,
+            "max_ms": 1.199999999254942,
+            "zero_count": 0
+          },
+          "adoption": {
+            "pending_peak_observed": 4,
+            "pending_final": 0,
+            "start_cycle": 1.272,
+            "last_update_cycle": 2.1626666666666665,
+            "final_cycle": 8.184,
+            "post_update_cycles_minimum": 6,
+            "tempo": 60,
+            "rendered_frames": 329728,
+            "final_state": "Playing",
+            "wait_limit_ms": 30000
+          },
+          "conditions": {
+            "headless": true,
+            "output_muted": true,
+            "cross_origin_isolated": false,
+            "baseline_window_ms": 1000,
+            "delay_between_edits_ms": 20,
+            "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+          },
+          "interpretation": "Instrumented callback timings and wall-clock interarrival gaps; not an audible-dropout or real-time deadline guarantee. Buffered callback bursts can exceed one quantum even at baseline."
+        },
+        "text": {
+          "mode": "audio-worklet",
+          "workload": "nested reused Pattern, alternating first note 60/61",
+          "characters": 104,
+          "iterations": 40,
+          "warmup_updates": 10,
+          "sample_rate": 48000,
+          "block_size": 128,
+          "block_budget_ms": 2.6666666666666665,
+          "worklet_clock": "Date.now, integer milliseconds; sub-millisecond values are unresolved",
+          "baseline": {
+            "render": {
+              "count": 379,
+              "mean_ms": 0.17678100263852242,
+              "p50_ms": 0,
+              "p95_ms": 1,
+              "max_ms": 1,
+              "zero_count": 312
+            },
+            "callback_interarrival": {
+              "count": 378,
+              "mean_ms": 2.613756613756614,
+              "p50_ms": 0,
+              "p95_ms": 23,
+              "max_ms": 24,
+              "zero_count": 263
+            },
+            "owner_update": null
+          },
+          "edited": {
+            "render": {
+              "count": 2572,
+              "mean_ms": 0.1734059097978227,
+              "p50_ms": 0,
+              "p95_ms": 1,
+              "max_ms": 1,
+              "zero_count": 2126
+            },
+            "callback_interarrival": {
+              "count": 2571,
+              "mean_ms": 2.6581096849474912,
+              "p50_ms": 0,
+              "p95_ms": 24,
+              "max_ms": 25,
+              "zero_count": 1832
+            },
+            "owner_update": {
+              "count": 40,
+              "mean_ms": 0.55,
+              "p50_ms": 1,
+              "p95_ms": 1,
+              "max_ms": 1,
+              "zero_count": 18
+            }
+          },
+          "receipt_roundtrip": {
+            "count": 40,
+            "mean_ms": 0.70750000057742,
+            "p50_ms": 0.6999999992549419,
+            "p95_ms": 1,
+            "max_ms": 1,
+            "zero_count": 0
+          },
+          "adoption": {
+            "pending_peak_observed": 4,
+            "pending_final": 0,
+            "start_cycle": 1.272,
+            "last_update_cycle": 2.128,
+            "final_cycle": 8.184,
+            "post_update_cycles_minimum": 6,
+            "tempo": 60,
+            "rendered_frames": 329216,
+            "final_state": "Playing",
+            "wait_limit_ms": 30000
+          },
+          "conditions": {
+            "headless": true,
+            "output_muted": true,
+            "cross_origin_isolated": false,
+            "baseline_window_ms": 1000,
+            "delay_between_edits_ms": 20,
+            "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+          },
+          "interpretation": "Instrumented callback timings and wall-clock interarrival gaps; not an audible-dropout or real-time deadline guarantee. Buffered callback bursts can exceed one quantum even at baseline."
+        }
+      },
+      "interpretation": "Same source edit sequence; text versus tracked includes wire validation/compile/admission differences, not just origin-query overhead. Both arms include existing status notifications. No allocation or glitch-free guarantee."
+    }
+  ],
+  "allocation_inspection": {
+    "kind": "Static release WAT, not dynamic allocation bytes/counts or a GC trace",
+    "command": "NEW_MOON_MOD=0 moon build browser --target wasm-gc --release --output-wat --target-dir /tmp/moondsp-origin-wat",
+    "source": "pattern/pattern_doc.mbt:543-545,815-818; pattern/pattern.mbt:65-85",
+    "excerpts": [
+      {
+        "role": "exact bind callback constructs Link and calls EventOrigin constructor",
+        "lines": "64867-64883",
+        "wat": "(func $_M0IP39dowdiness7moondsp7pattern11EventOriginP39dowdiness7moondsp7pattern14DocumentOrigin12bind__originC25055l545 (type $_M0CTWRP39dowdiness7moondsp7pattern11EventOriginERP39dowdiness7moondsp7pattern11EventOrigin) (param $_M0L6_2aenvS25056 (ref $_M0TWRP39dowdiness7moondsp7pattern11EventOriginERP39dowdiness7moondsp7pattern11EventOrigin)) (param $_M0L6originS12820 (ref $_M0TP39dowdiness7moondsp7pattern11EventOrigin)) (result (ref $_M0TP39dowdiness7moondsp7pattern11EventOrigin))\n (local $_M0L10_2abindingS12819 (ref $_M0TP39dowdiness7moondsp7pattern16ReferenceBinding))\n (local $_M0L14_2acasted__envS25057 (ref $_M0R142_40dowdiness_2fmoondsp_2fpattern_2eDocumentOrigin_3a_3abind__origin_7c_40dowdiness_2fmoondsp_2fpattern_2eEventOrigin_7c_2eanon__u25055__l545__))\n (local.set $_M0L10_2abindingS12819\n  (ref.as_non_null\n   (struct.get $_M0R142_40dowdiness_2fmoondsp_2fpattern_2eDocumentOrigin_3a_3abind__origin_7c_40dowdiness_2fmoondsp_2fpattern_2eEventOrigin_7c_2eanon__u25055__l545__ 1\n    (local.tee $_M0L14_2acasted__envS25057\n     (ref.cast (ref $_M0R142_40dowdiness_2fmoondsp_2fpattern_2eDocumentOrigin_3a_3abind__origin_7c_40dowdiness_2fmoondsp_2fpattern_2eEventOrigin_7c_2eanon__u25055__l545__)\n      (local.get $_M0L6_2aenvS25056))))))\n (call $_M0MP39dowdiness7moondsp7pattern11EventOrigin19EventOrigin_2einner\n  (struct.get $_M0TP39dowdiness7moondsp7pattern11EventOrigin 0\n   (local.get $_M0L6originS12820))\n  (struct.new $_M0DTP39dowdiness7moondsp7pattern14OriginBindings4Link\n   (i32.const 1)\n   (local.get $_M0L10_2abindingS12819)\n   (struct.get $_M0TP39dowdiness7moondsp7pattern11EventOrigin 1\n    (local.get $_M0L6originS12820)))))"
+      },
+      {
+        "role": "ordinary Unit bind callback returns its scalar argument",
+        "lines": "64911-64912",
+        "wat": "(func $_M0IPC14unit4UnitP39dowdiness7moondsp7pattern14DocumentOrigin12bind__originC25053l533 (type $_M0CTWuEu) (param $_M0L6_2aenvS25054 (ref $_M0TWuEu)) (param $_M0L5valueS12810 i32) (result i32)\n (local.get $_M0L5valueS12810))"
+      },
+      {
+        "role": "EventOrigin constructor",
+        "lines": "64983-64986",
+        "wat": "(func $_M0MP39dowdiness7moondsp7pattern11EventOrigin19EventOrigin_2einner (param $_M0L4atomS12798 (ref $_M0TP39dowdiness7moondsp8identity12SourceAtomId)) (param $_M0L8bindingsS12799 (ref $moonbit.enum)) (result (ref $_M0TP39dowdiness7moondsp7pattern11EventOrigin))\n (struct.new $_M0TP39dowdiness7moondsp7pattern11EventOrigin\n  (local.get $_M0L4atomS12798)\n  (local.get $_M0L8bindingsS12799)))"
+      }
+    ]
+  },
+  "validation": {
+    "moon_check_all_deny_warn": "passed",
+    "new_query_groups": "4 groups, parity checks passed before timing",
+    "existing_page_local_probe": "completed 60 update/restart iterations",
+    "existing_worklet_probe": "completed 40 Song updates",
+    "allocation_free": "not established; query-time heap constructors remain in release WAT",
+    "audible_glitches": "not measured; headless muted output"
+  }
+}
