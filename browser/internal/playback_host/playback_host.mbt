@@ -343,7 +343,7 @@ fn Player::process(self : Player) -> Bool {
       ignore(set_scheduler_parse_error(message))
       return false
     }
-    Playing(_) | Ended(_, _) => ()
+    Playing(_) | Ended(_, _, _) => ()
   }
   self.send_left.fill(0.0)
   self.send_right.fill(0.0)
@@ -387,7 +387,7 @@ fn Player::process(self : Player) -> Bool {
     let scheduler = self.schedulers[0]
     match scheduler.sample_at(end_) {
       Ok(end_sample) if scheduler.sample_counter() >= end_sample =>
-        self.session = Ended(song, end_sample)
+        self.session = Ended(song, end_sample, end_.to_double())
       Ok(_) => ()
       Err(_) => {
         self.session = Fault("song end exceeds transport range")
@@ -533,7 +533,7 @@ pub fn set_scheduler_bpm(bpm : Double) -> Int {
           Ready(_) => Ready(next)
           Playing(_) => Playing(next)
           Paused(_) => Paused(next)
-          Ended(_, position) => Ended(next, position)
+          Ended(_, position, cycle) => Ended(next, position, cycle)
           other => other
         }
       }

@@ -1,4 +1,7 @@
 import { decodeDraftVersion, type DraftVersion } from "./authoring";
+const PLAY_STATES = ["Empty", "Ready", "Playing", "Paused", "Ended", "Fault"] as const;
+const PLAY_MODES = ["none", "pattern", "song"] as const;
+
 
 export class RequestId {
   private constructor(readonly value: number) {}
@@ -14,8 +17,11 @@ export class RequestId {
 
 export type PlayerOperation = "update" | "restart" | "play" | "pause";
 export type PlayState = "Empty" | "Ready" | "Playing" | "Paused" | "Ended" | "Fault";
+export type PlayerMode = "none" | "pattern" | "song";
 export type PlayerSnapshot = Readonly<{
   state: PlayState;
+  mode: PlayerMode;
+  cyclePosition: number;
   samplePosition: number;
   tempo: number;
   pendingCount: number;
@@ -42,14 +48,23 @@ function count(value: unknown): value is number {
 function tempo(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0.001 && value <= 1000;
 }
+function cyclePosition(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+function playState(value: unknown): value is PlayState {
+  return typeof value === "string" && (PLAY_STATES as readonly string[]).includes(value);
+}
+function mode(value: unknown): value is PlayerMode {
+  return typeof value === "string" && (PLAY_MODES as readonly string[]).includes(value);
+}
 function operation(value: unknown): value is PlayerOperation {
   return value === "update" || value === "restart" || value === "play" || value === "pause";
 }
 function snapshot(value: Record<string, unknown>): PlayerSnapshot | null {
-  const states: readonly PlayState[] = ["Empty", "Ready", "Playing", "Paused", "Ended", "Fault"];
-  const state = count(value.state) ? states[value.state] : undefined;
-  if (!state || !count(value.samplePosition) || !tempo(value.tempo) || !count(value.pendingCount) || !count(value.skippedCount)) return null;
-  return { state, samplePosition: value.samplePosition, tempo: value.tempo, pendingCount: value.pendingCount, skippedCount: value.skippedCount };
+  if (!playState(value.state) || !mode(value.mode) || !cyclePosition(value.cyclePosition) || !count(value.samplePosition) ||
+      !tempo(value.tempo) || !count(value.pendingCount) || !count(value.skippedCount)) return null;
+  return { state: value.state, mode: value.mode, cyclePosition: value.cyclePosition, samplePosition: value.samplePosition,
+    tempo: value.tempo, pendingCount: value.pendingCount, skippedCount: value.skippedCount };
 }
 
 export function decodeWorkletMessage(value: unknown): WorkletMessage {

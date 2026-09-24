@@ -2,6 +2,12 @@
 // immediate owner receipts; render is only used to refresh diagnostics.
 const RESTART_REQUIRED = 2;
 const MAX_WIRE_CODE_UNITS = 2097152;
+const PLAYBACK_STATES = ["Empty", "Ready", "Playing", "Paused", "Ended", "Fault"];
+const PLAYBACK_MODES = ["none", "pattern", "song"];
+
+function decodeAbiValue(value, values) {
+  return Number.isInteger(value) && value >= 0 && value < values.length ? values[value] : undefined;
+}
 
 export class PlaybackController {
   constructor(wasm, post) {
@@ -19,7 +25,9 @@ export class PlaybackController {
 
   snapshot() {
     return {
-      state: this.wasm.player_state(),
+      state: decodeAbiValue(this.wasm.player_state(), PLAYBACK_STATES),
+      mode: decodeAbiValue(this.wasm.player_mode(), PLAYBACK_MODES),
+      cyclePosition: this.wasm.scheduler_cycle_position(),
       samplePosition: this.wasm.scheduler_sample_position(),
       tempo: this.wasm.scheduler_bpm(),
       pendingCount: this.wasm.player_pending_count(),

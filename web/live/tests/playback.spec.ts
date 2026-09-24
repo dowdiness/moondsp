@@ -57,7 +57,7 @@ function harness(deferred = false, delayedClose = false, cancellable = false) {
   const reply = (command: Command, accepted = true, state: PlayState = "Playing") => {
     const draftVersion = command.input === undefined ? null : JSON.parse(command.input).version ?? null;
     const snapshot = { id: RequestId.decode(command.id)!, operation: command.operation, draftVersion, state,
-      samplePosition: 128, tempo: 60, pendingCount: 0, skippedCount: 0 };
+      mode: "pattern" as const, cyclePosition: 0, samplePosition: 128, tempo: 60, pendingCount: 0, skippedCount: 0 };
     deliver({ kind: "receipt", receipt: accepted ? { ...snapshot, kind: "accepted" }
       : { ...snapshot, kind: "rejected", restartRequired: false, message: "invalid source" } });
   };
@@ -187,22 +187,33 @@ test("a worklet fault rejects outstanding commands and retires late receipts", a
   h.fail(); await rejected; h.reply(command);
   expect(h.player.view().state).toBe("Fault");
   expect(h.player.view().currentSource).toBeNull();
+  expect(h.player.view().acceptedVersion).toBeNull();
 });
 
 test("automatic updates retain only the latest unsent draft", async () => {
   const h = harness(); await h.start();
   h.edit('note("62")');
+  const firstVersion = h.draft.state().version;
+  expect(h.player.view().draftStatus).toBe("queued");
   const first = await h.command(1);
+  expect(h.player.view().draftStatus).toBe("submitting");
+  expect(h.player.view().inFlightVersions).toEqual([firstVersion]);
   h.edit('note("64")');
   await delay(250);
   h.edit('note("67")');
   await delay(250);
+  const latestVersion = h.draft.state().version;
+  expect(h.player.view().draftStatus).toBe("queued");
   expect(h.commands).toHaveLength(2);
   h.reply(first);
   const latest = await h.command(2);
   expect(JSON.parse(latest.input!).text).toBe('note("67")');
+  expect(h.player.view().acceptedVersion).toEqual(firstVersion);
+  expect(h.player.view().draftStatus).toBe("submitting");
   h.reply(latest);
   await expect.poll(() => h.player.view().currentSource).toBe('note("67")');
+  expect(h.player.view().acceptedVersion).toEqual(latestVersion);
+  expect(h.player.view().draftStatus).toBe("accepted");
   await h.player.close();
 });
 
@@ -237,6 +248,8 @@ test("an invalid draft cancels queued automatic input without losing real accept
   expect(h.player.view().currentSource).toBe('note("62")');
   expect(h.player.view().diagnostic).toEqual(diagnostic);
   expect(diagnostic).not.toBeNull();
+  expect(h.player.view().draftStatus).toBe("invalid");
+  expect(h.player.view().acceptedVersion).toEqual(JSON.parse(automatic.input!).version);
   await h.player.close();
 });
 
@@ -248,6 +261,7 @@ test("receipt version mismatch is a protocol failure, not acceptance", async () 
   h.deliver({ kind: "receipt", receipt: {
     id: RequestId.decode(command.id)!, operation: "update", draftVersion: null,
     kind: "accepted", state: "Playing", samplePosition: 128, tempo: 60,
+    mode: "pattern", cyclePosition: 0,
     pendingCount: 0, skippedCount: 0,
   } });
   await rejected;
@@ -265,5 +279,40 @@ test("closing audio preserves the document source identities", async () => {
   expect(restarted.input).toBe(input);
   h.reply(restarted); await playing;
   expect(h.player.view().state).toBe("Playing");
+  await h.player.close();
+});
+
+test("an older source receipt still records acceptance after a newer Pause receipt", async () => {
+  const h = harness(); await h.start();
+  h.edit('note("67")');
+  const input = h.draft.prepare();
+  const updating = h.player.update(input);
+  const source = await h.command(1);
+  const pausing = h.player.pause();
+  h.reply(await h.command(2), true, "Paused"); await pausing;
+  h.reply(source); await updating;
+  expect(h.player.view().state).toBe("Paused");
+  expect(h.player.view().acceptedVersion).toEqual(input.draftVersion);
+  expect(h.player.view().draftStatus).toBe("accepted");
+  await h.player.close();
+});
+
+test("the newest current-draft outcome survives reordered source receipts", async () => {
+  const h = harness(); await h.start();
+  const input = h.draft.prepare();
+  const olderAcceptance = h.player.update(input);
+  const newerRejection = h.player.update(input);
+  h.reply(await h.command(2), false); await newerRejection;
+  const diagnostic = h.player.view().diagnostic;
+  h.reply(await h.command(1)); await olderAcceptance;
+  expect(h.player.view().acceptedVersion).toEqual(input.draftVersion);
+  expect(h.player.view().draftStatus).toBe("rejected");
+  expect(h.player.view().diagnostic).toEqual(diagnostic);
+  const olderRejection = h.player.update(input);
+  const newerAcceptance = h.player.update(input);
+  h.reply(await h.command(4)); await newerAcceptance;
+  h.reply(await h.command(3), false); await olderRejection;
+  expect(h.player.view().draftStatus).toBe("accepted");
+  expect(h.player.view().diagnostic).toBeNull();
   await h.player.close();
 });

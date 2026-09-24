@@ -46,9 +46,18 @@ priv enum Session {
   Ready(PreparedSong)
   Playing(PreparedSong)
   Paused(PreparedSong)
-  Ended(PreparedSong, Int64)
+  Ended(PreparedSong, Int64, Double)
   Fault(String)
 }
+
+///|
+/// Kind of the latest accepted score, independent of the visible draft.
+/// Internal observation value, projected into the browser's public enum.
+pub enum PlaybackMode {
+  None
+  Pattern
+  Song
+} derive(Eq, Debug)
 
 ///|
 pub(all) enum PlayState {
@@ -83,7 +92,7 @@ pub struct PlayerView {
 fn Session::song(self : Session) -> PreparedSong? {
   match self {
     Empty | Fault(_) => None
-    Ready(song) | Playing(song) | Paused(song) | Ended(song, _) => Some(song)
+    Ready(song) | Playing(song) | Paused(song) | Ended(song, _, _) => Some(song)
   }
 }
 
@@ -351,7 +360,7 @@ pub fn Player::update(
     Err(error) => return Err(error)
   }
   match self.session {
-    Empty | Ready(_) | Ended(_, _) =>
+    Empty | Ready(_) | Ended(_, _, _) =>
       if next.finite_end() is Some(end_) {
         match
           next.tempo.sample_at_start(
@@ -376,7 +385,7 @@ pub fn Player::update(
         _ => Playing(next)
       }
     }
-    Ended(_, position) => self.session = Ended(next, position)
+    Ended(_, position, cycle) => self.session = Ended(next, position, cycle)
     Empty | Ready(_) => self.session = Ready(next)
     Fault(message) => return Err(Failed(message))
   }
@@ -415,7 +424,7 @@ pub fn Player::play(self : Player) -> Result[Unit, PlayerError] {
       self.session = Playing(song)
       Ok(())
     }
-    Ready(song) | Ended(song, _) =>
+    Ready(song) | Ended(song, _, _) =>
       match self.install(song, true) {
         Err(error) => Err(error)
         Ok(_) => {
@@ -435,7 +444,34 @@ pub fn Player::pause(self : Player) -> Result[Unit, PlayerError] {
       self.session = Paused(song)
       Ok(())
     }
-    Ready(_) | Paused(_) | Ended(_, _) => Ok(())
+    Ready(_) | Paused(_) | Ended(_, _, _) => Ok(())
+  }
+}
+
+///|
+/// Return the accepted source kind without constructing a `PlayerView`.
+fn Player::mode(self : Player) -> PlaybackMode {
+  match self.session {
+    Empty | Fault(_) => None
+    Ready(song) | Playing(song) | Paused(song) | Ended(song, _, _) =>
+      match song.layout {
+        PatternLayout => Pattern
+        SongLayout(_, _) => Song
+      }
+  }
+}
+
+///|
+/// Return the zero-based musical cycle position from the route clock.
+///
+/// Ready and Empty are anchored at zero. Paused reads the frozen clock, and
+/// Ended reports the accepted finite song's exact musical endpoint rather than
+/// deriving it from a BPM/sample approximation.
+fn Player::cycle_position(self : Player) -> Double {
+  match self.session {
+    Empty | Ready(_) | Fault(_) => 0.0
+    Playing(_) | Paused(_) => self.schedulers[0].cycle_position()
+    Ended(_, _, cycle) => cycle
   }
 }
 
@@ -446,11 +482,14 @@ pub fn Player::view(self : Player) -> PlayerView {
     Ready(_) => Ready
     Playing(_) => Playing
     Paused(_) => Paused
-    Ended(_, _) => Ended
+    Ended(_, _, _) => Ended
     Fault(_) => Fault
   }
   let song = self.session.song()
-  // Every route projects the same material identities; do not count six copies.
+  // Pattern control projection and song route filtering preserve each
+  // material's source identity, period, and transition boundary. Every route
+  // therefore observes the same transition set (with route-local content);
+  // do not count six copies.
   let mut pending = 0
   let mut skipped = 0
   if self.session is Playing(_) || self.session is Paused(_) {
@@ -467,7 +506,7 @@ pub fn Player::view(self : Player) -> PlayerView {
       None => self.schedulers[0].bpm()
     },
     sample_position: match self.session {
-      Ended(_, position) => position.to_double()
+      Ended(_, position, _) => position.to_double()
       Empty | Ready(_) => 0.0
       _ => self.schedulers[0].sample_counter().to_double()
     },
@@ -555,9 +594,25 @@ pub fn player_state() -> Int {
         Ready(_) => 1
         Playing(_) => 2
         Paused(_) => 3
-        Ended(_, _) => 4
+        Ended(_, _, _) => 4
         Fault(_) => 5
       }
+  }
+}
+
+///|
+pub fn player_mode() -> PlaybackMode {
+  match player.val {
+    Some(owner) => owner.mode()
+    None => None
+  }
+}
+
+///|
+pub fn scheduler_cycle_position() -> Double {
+  match player.val {
+    Some(owner) => owner.cycle_position()
+    None => 0.0
   }
 }
 

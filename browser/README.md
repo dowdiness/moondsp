@@ -1,8 +1,9 @@
 # Browser host boundary
 
-`browser` is the low-level MoonBit-to-AudioWorklet boundary. It exports
-primitive functions for one WASM instance and keeps browser transport state
-outside the reusable DSP, graph, engine, and scheduler packages.
+`browser` is the low-level MoonBit-to-AudioWorklet boundary. Its MoonBit facade
+exposes operations and reviewed value types; its JS/wasm-gc exports use primitive
+representations for one instance. Browser transport state stays outside the
+reusable DSP, graph, engine, and scheduler packages.
 
 Most applications should not call these exports directly. Use
 [`web/graph-engine.js`](../web/graph-engine.js) for graph lifecycle from
@@ -43,6 +44,7 @@ AudioWorklet transport adapter:
 | **Graph Host (Input & Controls)** | `graph_host_clear_input`, `graph_host_push_char`, `graph_host_apply_controls`, `graph_host_set_params` | Push Unicode scalar JSON, apply raw transactional `GraphControl` batches, or atomically update named parameter sets |
 | **Graph Host (Render & Errors)** | `graph_host_process`, `graph_host_sample`, `graph_host_error_length`, `graph_host_error_char` | Render 128-sample block, retrieve output samples, read structured JSON error envelopes |
 | **Scheduler Playback** | `init_scheduler_graph`, `clear_playback_input`, `push_playback_char`, `player_update_input`, `player_restart_input`, `player_play`, `player_pause`, `player_state`, `player_pending_count`, `player_skipped_count`, `process_scheduler_block`, `scheduler_left_sample`, `scheduler_right_sample` | Owning Player with unified source parsing, immediate acceptance, material-boundary updates, frozen Pause, and stereo rendering |
+| **Scheduler Status** | `player_state`, `player_mode`, `scheduler_bpm`, `scheduler_sample_position`, `scheduler_cycle_position`, `player_pending_count`, `player_skipped_count` | Read transport state, accepted source mode/tempo, render position, and musical-material transitions without exposing route internals |
 | **Diagnostics & Error Inspection** | `get_browser_last_error`, `get_browser_error_code`, `get_browser_error_length`, `get_browser_error_char`, `get_playback_error` | Numeric error codes (`BROWSER_ERROR_*`) and diagnostic messages for host inspection |
 | **Compiled & Demo Probes** | `init_compiled_*`, `process_compiled_*`, `queue_compiled_*`, `init_exit_deliverable_graph`, `tick`, `tick_source`, `reset_phase` | Deterministic integration probes and fixed demo graph verification |
 
@@ -58,9 +60,31 @@ Both are pinned by [`browser_abi.baseline`](browser_abi.baseline). Run
 `scripts/check-browser-abi.sh` when reviewing changes. Update the baseline only
 for an intentional compatibility change.
 
-The facade exposes functions, not browser-specific route types, pools,
-scheduler handles, or host state objects. `browser/internal/` is private even
-when an internal symbol is public for package wiring.
+The facade exposes operations and stable semantic value types, not mutable
+browser-specific route types, pools, scheduler handles, or host state objects.
+`PlaybackMode` is defined in the facade and projected exhaustively from internal
+values; consumers need no internal package imports. `browser/internal/` symbols
+remain private even when public for package wiring. The package is built as a
+`foreign_library`, not an executable with a dummy main, so MoonBit applications
+can depend on it directly.
+
+Scheduler status serves the live editor and protocol/debug consumers. Musical
+position is zero-based absolute cycles from the runtime clock, not a bar number,
+wall-clock timer, or estimate of audible output. Pausing freezes it; tempo
+changes preserve it. An Ended run retains its terminal position even when a new
+score is accepted for the next Play. `player_mode()` returns the public
+`PlaybackMode::{None, Pattern, Song}` enum to MoonBit callers, including repeating
+songs in Song. Its constant-enum JS/wasm-gc representation remains `0`/`1`/`2`.
+The Worklet adapter translates these to `none`/`pattern`/`song` and numeric
+transport states to `Empty`/`Ready`/`Playing`/`Paused`/`Ended`/`Fault` before
+publishing status or receipts. UI clients validate strings, not ABI codes.
+
+The editor displays Draft submission separately from acceptance and from
+pending material transitions. One material routed to several outputs is counted
+once. Retiring and newly entering material identities are separate transitions;
+the status layer does not guess continuity from text or visual position.
+See the [status contract](../docs/browser-api-contract.md#scheduler-status-and-introspection)
+for wire fields and consumer requirements.
 
 ## Application graph API
 

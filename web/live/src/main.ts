@@ -21,7 +21,7 @@ import { CM6Adapter } from "./canopy";
 import type { Diagnostic } from "./canopy";
 import { AudioEngine } from "./audio";
 import type { AudioEngineMode, CompiledSession } from "./audio";
-import { Draft } from "./authoring";
+import { Draft, type DraftVersion } from "./authoring";
 import { Player } from "./playback";
 import type { PlaybackView } from "./playback";
 
@@ -33,6 +33,16 @@ $: note("48(3,8) 60(2,8,2) 67(3,8) 60(2,8,3)").slow(3)`;
 const editorEl = document.getElementById("editor") as HTMLElement;
 const logEl = document.getElementById("log") as HTMLElement;
 const statusEl = document.getElementById("status") as HTMLElement;
+const playbackDetailsEl = document.getElementById("playback-details") as HTMLElement;
+const positionEl = document.getElementById("playback-position") as HTMLElement;
+const tempoEl = document.getElementById("playback-tempo") as HTMLElement;
+const draftStatusEl = document.getElementById("draft-status") as HTMLElement;
+const changeStatusEl = document.getElementById("change-status") as HTMLElement;
+const changeHelpEl = document.getElementById("change-help") as HTMLElement;
+const changeTimingEl = document.getElementById("change-timing") as HTMLElement;
+const draftVersionEl = document.getElementById("draft-version") as HTMLElement;
+const draftVersionsEl = document.getElementById("draft-versions") as HTMLElement;
+const materialStatusEl = document.getElementById("material-status") as HTMLElement;
 const startBtn = document.getElementById("start") as HTMLButtonElement;
 const cheatEl = document.getElementById("cheat") as HTMLElement;
 const cheatToggle = document.getElementById("cheat-toggle") as HTMLButtonElement;
@@ -131,13 +141,76 @@ function setLog(message: string, kind: "ok" | "error" | "info" = "info"): void {
 }
 
 
+function setText(element: HTMLElement, text: string): void {
+  if (element.textContent !== text) element.textContent = text;
+}
+
+function versionLabel(version: DraftVersion): string {
+  return `${version[0]}:${version[1]}`;
+}
+
+function changeMessage(state: PlaybackView): readonly [string, string] {
+  if (state.state === "Fault") return ["Audio stopped", "Check the error below before starting playback again."];
+  const retained = state.currentSource === null ? "Fix the error below, then press Play."
+    : state.state === "Playing" ? "Playback continues with accepted code. Check the error below."
+    : "Your previously accepted code is unchanged. Check the error below.";
+  switch (state.draftStatus) {
+    case "invalid": return ["Check your code", retained];
+    case "rejected": return ["Changes weren't accepted", retained];
+    case "queued": return ["Waiting to send changes", "Your latest edit will be sent automatically."];
+    case "submitting": return ["Sending changes…", "Waiting for the audio engine to accept this version."];
+    case "unsubmitted":
+      return state.state === "Starting" ? ["Starting audio…", "Your code will be submitted when audio is ready."]
+        : state.currentSource === null ? ["Ready to play", "Press Play to hear your code."]
+        : ["Changes not sent", "Restart to play the current code from the beginning."];
+    case "accepted":
+      if (state.state === "Paused") return ["Changes accepted", "Playback is paused. Press Play to continue."];
+      if (state.state === "Ready" || state.state === "Ended") {
+        return ["Ready to play", "Press Play to start the accepted code from the beginning."];
+      }
+      return state.pendingCount || state.skippedCount
+        ? ["Changes accepted", "Each part updates at its own entry point."]
+        : ["Code is up to date", "No changes waiting to switch."];
+  }
+}
+
 function applyStatus(state: PlaybackView): void {
-  const stateName = state.state === "Empty" ? "Ready" : state.state;
-  const pending = state.pendingCount ? ` · ${state.pendingCount} pending` : "";
-  const skipped = state.skippedCount ? ` · ${state.skippedCount} skipped` : "";
-  statusEl.textContent = `${stateName}${pending}${skipped}`;
+  if (audioMode !== "scheduler") return;
+  setText(statusEl, state.state === "Empty" ? "Ready" : state.state);
   statusEl.dataset.samplePosition = String(state.samplePosition);
+  statusEl.dataset.cyclePosition = String(state.cyclePosition);
   statusEl.dataset.tempo = state.tempoText;
+  statusEl.dataset.mode = state.mode;
+  setText(positionEl, `Position: ${state.cyclePosition.toFixed(2)} cycles`);
+  setText(tempoEl, state.mode === "none" ? "Not playing yet"
+    : `${state.tempoText} BPM · ${state.mode === "pattern" ? "Pattern" : "Song"}`);
+  draftStatusEl.dataset.state = state.draftStatus;
+  draftStatusEl.dataset.version = versionLabel(state.draftVersion);
+  const [headline, help] = changeMessage(state);
+  setText(draftStatusEl, headline);
+  setText(changeHelpEl, help);
+  changeStatusEl.dataset.tone = state.state === "Fault" || state.draftStatus === "invalid" || state.draftStatus === "rejected"
+    ? "error" : state.draftStatus === "accepted" && state.pendingCount === 0 && state.skippedCount === 0 ? "ok" : "neutral";
+  setText(draftVersionEl, versionLabel(state.draftVersion));
+  const accepted = state.acceptedVersion !== null
+    ? `Accepted ${versionLabel(state.acceptedVersion)}`
+    : state.currentSource !== null ? "Accepted untracked input" : "No accepted draft";
+  const sending = state.inFlightVersions.length === 0 ? ""
+    : ` · Sending ${state.inFlightVersions.map(version => version === null ? "untracked input" : versionLabel(version)).join(", ")}`;
+  setText(draftVersionsEl, accepted + sending);
+  materialStatusEl.dataset.pendingCount = String(state.pendingCount);
+  materialStatusEl.dataset.skippedCount = String(state.skippedCount);
+  const materials = state.pendingCount === 1 ? "1 material awaiting entry"
+    : `${state.pendingCount} materials awaiting entry`;
+  const skipped = state.skippedCount ? ` · ${state.skippedCount} skipped` : "";
+  setText(materialStatusEl, state.currentSource === null ? "No accepted score"
+    : (state.pendingCount ? materials : "No pending transitions") + skipped);
+  const waiting = state.pendingCount === 1 ? "1 part is waiting to switch."
+    : state.pendingCount > 1 ? `${state.pendingCount} parts are waiting to switch.` : "";
+  const skippedChanges = state.skippedCount === 1 ? "1 change was skipped in this pass."
+    : state.skippedCount > 1 ? `${state.skippedCount} changes were skipped in this pass.` : "";
+  setText(changeTimingEl, [waiting, skippedChanges].filter(Boolean).join(" "));
+  changeTimingEl.hidden = state.currentSource === null || (state.pendingCount === 0 && state.skippedCount === 0);
   startBtn.disabled = false;
   startBtn.textContent = state.state === "Playing" || state.state === "Starting" ? "Pause" : "Play";
   startBtn.dataset.action = state.state === "Playing" || state.state === "Starting" ? "pause" : "play";
@@ -194,6 +267,7 @@ async function toggleCompiled(): Promise<void> {
   }
 }
 if (audioMode === "compiled") document.getElementById("restart")!.hidden = true;
+playbackDetailsEl.hidden = audioMode !== "scheduler";
 
 
 view.dispatch({

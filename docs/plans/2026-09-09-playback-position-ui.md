@@ -1,8 +1,8 @@
 # Playback position UI
 
 Status: origin-preserving compiler, Mini Draft, browser ownership/wire adapters,
-and version-correlated admission implemented. Playback observations and
-visualization remain future work.
+version-correlated admission, and truthful playback status implemented.
+Playback onset observations and highlighting remain future work.
 
 ## Goal
 
@@ -32,14 +32,17 @@ The shared kernels, exact snapshots, checked source identity types, typed
 document transforms, causal Draft transactions, partial binding recognition,
 frozen playback inputs, and complete-path origin location are implemented.
 The live editor now submits those frozen inputs through strict wire validation;
-the scheduler retains exact origins across material transitions. This does not
-implement playback observations or browser highlighting.
+the scheduler retains exact origins across material transitions. The live
+surface now separates runtime state/mode/tempo and absolute cycle position,
+Draft submission/accepted versions, and pending material transitions. This does
+not implement playback onset observations or browser highlighting.
 
 ## Design questions
 
-- Choose a useful position display for both finite songs and repeating patterns.
-  Consider sections, elapsed time, and musical time without assuming every
-  pattern shares one bar length.
+- The current display uses zero-based absolute cycles from the runtime clock for
+  both finite songs and repeating patterns. It does not assume bars, extrapolate
+  from current BPM, or wrap at a song repetition. Section-aware navigation remains
+  an open extension.
 - Define where Play starts after Stop, and how returning to the beginning works.
 - Decide how users select a section or position to audition.
 - Define seek behavior for sustained notes, automation, and effect tails before
@@ -53,8 +56,9 @@ unequal lengths.
 ## Pattern-origin implementation contracts
 
 These contracts implement ADR-0018's pattern-mode requirements. Status reporting
-under #156 still precedes release of highlighting. Song highlighting, seeking,
-new transport semantics, and wholesale parser migration are excluded.
+under #156 is implemented; onset observation transport still precedes highlighting.
+Song highlighting, seeking, new transport semantics, and wholesale parser
+migration are excluded.
 
 Interface 1's compiler APIs, Interfaces 2–3's MoonBit authoring core, scheduler
 capability adapters, and browser/worklet submission are available. Observation

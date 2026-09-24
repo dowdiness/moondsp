@@ -264,6 +264,8 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
         typeof this.wasm.player_play === "function" &&
         typeof this.wasm.player_pause === "function" &&
         typeof this.wasm.player_state === "function" &&
+        typeof this.wasm.player_mode === "function" &&
+        typeof this.wasm.scheduler_cycle_position === "function" &&
         typeof this.wasm.player_pending_count === "function" &&
         typeof this.wasm.player_skipped_count === "function";
 

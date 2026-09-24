@@ -33,7 +33,7 @@ test.beforeEach(async ({ page }) => {
       },
       receipts() { return replies.splice(0); },
       snapshot() {
-        return { state: wasm.player_state(), samplePosition: wasm.scheduler_sample_position(), tempo: wasm.scheduler_bpm() };
+        return controller.snapshot();
       },
       setTempo(revision, bpm) { controller.handle({ type: 'set-scheduler-bpm', revision, bpm }); },
     };
@@ -79,7 +79,7 @@ test('paused update is accepted immediately and commits source tempo without adv
   });
   expect(result.update).toEqual(expect.objectContaining({
     type: 'player-receipt', id: 4, operation: 'update', accepted: true,
-    state: 3, samplePosition: 1024, tempo: 90,
+    state: 'Paused', samplePosition: 1024, tempo: 90,
   }));
   expect(result.afterRender).toEqual(result.beforeRender);
 });
@@ -96,9 +96,9 @@ test('invalid restart preserves the current song and transport position', async 
   });
   expect(result.rejected).toEqual(expect.objectContaining({
     type: 'player-receipt', id: 2, operation: 'restart', accepted: false,
-    restartRequired: false, state: 2, samplePosition: 1024,
+    restartRequired: false, state: 'Playing', samplePosition: 1024,
   }));
-  expect(result.after).toEqual(expect.objectContaining({ state: 2, samplePosition: 1024 }));
+  expect(result.after).toEqual(expect.objectContaining({ state: 'Playing', samplePosition: 1024 }));
   expect(result.advanced.samplePosition).toBe(1152);
 });
 
@@ -115,12 +115,12 @@ test('ended update keeps tails while Play replays the newest song', async ({ pag
     p.render();
     return { ended, update, replay, after: p.snapshot() };
   });
-  expect(result.ended).toEqual(expect.objectContaining({ state: 4, samplePosition: 480 }));
+  expect(result.ended).toEqual(expect.objectContaining({ state: 'Ended', mode: 'song', samplePosition: 480, cyclePosition: 0.01 }));
   expect(result.update).toEqual(expect.objectContaining({
-    id: 2, operation: 'update', accepted: true, state: 4, samplePosition: 480,
+    id: 2, operation: 'update', accepted: true, state: 'Ended', mode: 'pattern', samplePosition: 480, cyclePosition: 0.01,
   }));
-  expect(result.replay).toEqual(expect.objectContaining({ id: 3, operation: 'play', accepted: true, state: 2, samplePosition: 0 }));
-  expect(result.after).toEqual(expect.objectContaining({ state: 2, samplePosition: 128 }));
+  expect(result.replay).toEqual(expect.objectContaining({ id: 3, operation: 'play', accepted: true, state: 'Playing', samplePosition: 0 }));
+  expect(result.after).toEqual(expect.objectContaining({ state: 'Playing', samplePosition: 128 }));
 });
 
 test('Pause freezes transport until Play resumes it', async ({ page }) => {
@@ -136,7 +136,7 @@ test('Pause freezes transport until Play resumes it', async ({ page }) => {
     return { paused, frozen, resumed, after: p.snapshot() };
   });
   expect(result.frozen).toEqual(result.paused);
-  expect(result.resumed).toEqual(expect.objectContaining({ id: 4, operation: 'play', accepted: true, state: 2 }));
+  expect(result.resumed).toEqual(expect.objectContaining({ id: 4, operation: 'play', accepted: true, state: 'Playing' }));
   expect(result.after.samplePosition).toBe(result.paused.samplePosition + 128);
 });
 
@@ -165,10 +165,51 @@ test('source size boundary preserves playback for rejected Update and Restart', 
     p.render();
     return { accepted, rejected, after: p.snapshot() };
   });
-  expect(result.accepted).toMatchObject({ accepted: true, state: 2, tempo: 80 });
+  expect(result.accepted).toMatchObject({ accepted: true, state: 'Playing', tempo: 80 });
   expect(result.rejected).toEqual([
-    expect.objectContaining({ id: 2, operation: 'update', accepted: false, state: 2, tempo: 80, samplePosition: 1024 }),
-    expect.objectContaining({ id: 3, operation: 'restart', accepted: false, state: 2, tempo: 80, samplePosition: 1024 }),
+    expect.objectContaining({ id: 2, operation: 'update', accepted: false, state: 'Playing', tempo: 80, samplePosition: 1024 }),
+    expect.objectContaining({ id: 3, operation: 'restart', accepted: false, state: 'Playing', tempo: 80, samplePosition: 1024 }),
   ]);
-  expect(result.after).toEqual({ state: 2, tempo: 80, samplePosition: 1152 });
+  expect(result.after).toEqual(expect.objectContaining({ state: 'Playing', tempo: 80, samplePosition: 1152 }));
+});
+
+test('status position follows the piecewise musical clock across tempo edits', async ({ page }) => {
+  const result = await page.evaluate(() => {
+    const p = window.playback;
+    const empty = p.snapshot();
+    p.restart(1, 'note("60")');
+    p.render(125);
+    const before = p.snapshot();
+    p.update(2, 'bpm(120); note("60")');
+    const changed = p.receipts().at(-1);
+    p.render(125);
+    const after = p.snapshot();
+    p.pause(3);
+    p.render(10);
+    return { empty, before, changed, after, paused: p.snapshot() };
+  });
+  expect(result.empty).toMatchObject({ state: 'Empty', mode: 'none', cyclePosition: 0 });
+  expect(result.before).toMatchObject({ state: 'Playing', mode: 'pattern', tempo: 60, samplePosition: 16000 });
+  expect(result.before.cyclePosition).toBeCloseTo(1 / 3, 12);
+  expect(result.changed).toMatchObject({ accepted: true, tempo: 120, samplePosition: 16000 });
+  expect(result.changed.cyclePosition).toBe(result.before.cyclePosition);
+  expect(result.after.cyclePosition).toBeCloseTo(1, 12);
+  expect(result.paused.cyclePosition).toBe(result.after.cyclePosition);
+});
+
+test('pending status counts musical materials through independent entry boundaries', async ({ page }) => {
+  const result = await page.evaluate(() => {
+    const p = window.playback;
+    p.restart(1, 'bpm(400); let melody = note("60").slow(3); let drums = s("bd").slow(4); stack(melody, drums)');
+    p.render();
+    p.update(2, 'bpm(400); let melody = note("72").slow(3); let drums = s("sd").slow(4); stack(melody, drums)');
+    const accepted = p.receipts().at(-1);
+    p.render(170);
+    const firstEntry = p.snapshot();
+    p.render(57);
+    return { accepted, firstEntry, secondEntry: p.snapshot() };
+  });
+  expect(result.accepted).toMatchObject({ accepted: true, pendingCount: 2 });
+  expect(result.firstEntry.pendingCount).toBe(1);
+  expect(result.secondEntry.pendingCount).toBe(0);
 });

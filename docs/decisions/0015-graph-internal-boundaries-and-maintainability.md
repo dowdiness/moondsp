@@ -82,7 +82,7 @@ scheduler/internal/voice_runtime/   active-note and voice-side runtime helpers
 The shipped browser shape is:
 
 ```text
-browser/                         function-only browser/worklet facade
+browser/                         operations and reviewed value-type facade
 browser/internal/slot/            reusable graph-slot lifecycle wrapper
 browser/internal/demo_templates/  fixed demo graph templates
 browser/internal/playback_host/   scheduler playback host and routing internals
@@ -128,9 +128,27 @@ Additional boundary rules:
   `dowdiness/moondsp` facade, not `*/internal/*` packages.
 - `graph/` is not a secondary DSP facade. Consumers should import DSP APIs from
   `dowdiness/moondsp/dsp` or the root `dowdiness/moondsp` facade.
-- `browser/` remains a function-only facade. Browser route/pool/scheduler state
-  objects are implementation details unless a future API decision explicitly
-  promotes them.
+- `browser/` exposes operations and explicitly reviewed semantic value types.
+  Mutable browser route/pool/scheduler state objects remain implementation
+  details. Public value types must not expose those resources or their ownership.
+  Browser value types are defined by the facade and projected exhaustively from
+  internal values; consumers must not need an internal package import.
+
+The original extraction used a function-only facade to remove leaked route
+shell types. Playback status refines that restriction: a payload-free
+`PlaybackMode` enum describes accepted source semantics without exposing host
+state. The MoonBit facade returns that value type, its compiled export retains
+the constant-enum integer ABI, and the Worklet adapter translates ABI codes to
+semantic strings for UI consumers. Source types, binary representation, and
+message protocol are separate contracts; excluding all public types is not
+required to keep runtime internals private.
+
+An external-module compiler probe showed that re-exporting the internal enum
+did not make its constructors usable without importing its private origin.
+The facade therefore owns its public enum definition rather than aliasing the
+internal type. `browser` is a `foreign_library`, with its configured JS/wasm-gc
+exports and no dummy executable main, so ordinary MoonBit consumers can depend
+on the same facade without a main-package dependency warning.
 
 ## Migration record
 

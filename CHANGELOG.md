@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added live playback status separating the runtime transport, current Draft
+  submission/acceptance, and pending musical-material transitions. Browser
+  `player_mode` and `scheduler_cycle_position` expose primitive status on JS and
+  wasm-gc without route handles. Musical position follows the piecewise clock
+  across tempo changes, freezes while paused, and retains the completed run's
+  endpoint after an Ended source update. Reordered receipts cannot roll back
+  accepted source versions or overwrite a newer rejection.
+  Status receipts now require `mode` and `cyclePosition`; deploy the UI, Worklet,
+  and WASM together.
+- Published the `PlaybackMode` value enum through the browser facade.
+  MoonBit `player_mode()` now returns that enum instead of `Int`; compiled
+  JS/wasm-gc mode codes remain `0`/`1`/`2`. Worklet status and receipts now carry
+  string-valued `state` and `mode`; UI decoders reject legacy numeric messages.
+  The browser policy permits reviewed semantic value types while keeping mutable
+  route, pool, and scheduler state private.
+  `browser` is now an export library with a facade-owned enum, allowing external
+  MoonBit consumers to match its constructors without private imports.
+- Simplified live status into playback information and actionable edit feedback.
+  Pending parts remain explicit; internal version IDs and material counters move
+  behind Technical details. Narrow screens retain usable editor space when the
+  disclosure is expanded.
 - Added origin-preserving pattern snapshots with checked epoch-qualified source
   IDs, explicit atom and resolved-reference constructors, immutable event origins,
   and exact-preserving control routing. General and exact document lowering now

@@ -61,6 +61,7 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
         "clear_playback_input", "push_playback_char",
         "player_update_input", "player_restart_input", "player_play", "player_pause",
         "player_state", "player_pending_count", "player_skipped_count",
+        "player_mode", "scheduler_cycle_position",
         "scheduler_sample_position", "get_playback_error_length", "get_playback_error_char",
       ]);
       if (missingExports.length > 0) {
