@@ -1069,3 +1069,23 @@ fn NotationParser::read_note_number_value(
     self.pos,
   )
 }
+
+///|
+fn MiniDocBuilder::composition_doc(
+  self : MiniDocBuilder,
+  doc : @pattern.PatternDoc[@pattern.ControlMap],
+  signature : String,
+  operation : @pattern.CompositionOp,
+) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
+  let id = self.node_id(
+    "composition",
+    "\{doc.root().value()}:\{signature.length()}:\{stable_seed(signature)}",
+  )
+  match self.reuse_doc(id, inputs=[doc]) {
+    Some(reused) => reused
+    None =>
+      doc.compose(id~, operation~) catch {
+        _ => raise ParseError("mini composition could not lower its input")
+      }
+  }
+}

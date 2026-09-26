@@ -15,17 +15,21 @@ pub fn[A] Pat::named_entry(self : Pat[A], name : String) -> Pat[A] {
 }
 
 ///|
-/// Group this expression as one authored material without changing its content.
-pub fn[A] Pat::material(self : Pat[A]) -> Pat[A] {
-  let scope = match self.metadata.scope {
+fn EntryScope::as_material(self : EntryScope) -> EntryScope {
+  match self {
     Named(name) | NamedMaterial(name) => NamedMaterial(name)
     Anonymous | Material => Material
   }
+}
+
+///|
+/// Group this expression as one authored material without changing its content.
+pub fn[A] Pat::material(self : Pat[A]) -> Pat[A] {
   make_pat(
     self.query,
     self.metadata.period,
     self.body,
-    scope,
+    self.metadata.scope.as_material(),
     self.metadata.content,
   )
 }

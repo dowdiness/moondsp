@@ -49,7 +49,14 @@ priv enum MiniTransform {
   Slow(@pattern.Rational)
   Gate(@pattern.Rational)
   Rev
-  Degrade(Double)
+  Degrade(Double, Int?)
+  Transpose(Int)
+  Steps(Array[Int], Int)
+  Lowest
+  Voicing(Int, Int, Int?)
+  Mask(Array[Bool])
+  Tail(@pattern.Rational, MiniLiteral, String, Int)
+  PhaseTranspose(@pattern.Rational, @pattern.Rational, Int)
   Control(String, Double)
   Filter(MiniFilterKind, Double, Double?)
   Every(Int, MiniCallback)
@@ -301,8 +308,194 @@ fn Parser::parse_transform(self : Parser) -> MiniTransform raise ParseError {
       self.skip_whitespace()
       let p = self.read_number()
       self.skip_whitespace()
+      let seed = if !self.at_end() && self.input[self.pos] == ',' {
+        self.pos += 1
+        self.skip_whitespace()
+        Some(
+          require_integer(self.read_number(), method_start, "degradeBy() seed"),
+        )
+      } else {
+        None
+      }
+      self.skip_whitespace()
       self.expect_char(')')
-      Degrade(p)
+      Degrade(p, seed)
+    }
+    "transpose" => {
+      self.expect_char('(')
+      self.skip_whitespace()
+      let semitones = require_integer(
+        self.read_number(),
+        method_start,
+        "transpose() semitones",
+      )
+      self.skip_whitespace()
+      self.expect_char(')')
+      Transpose(semitones)
+    }
+    "steps" => {
+      self.expect_char('(')
+      self.skip_whitespace()
+      let scale_text = self.read_quoted_string()
+      let scale = parse_mini_explicit_scale(scale_text, method_start)
+      self.skip_whitespace()
+      self.expect_char(',')
+      self.skip_whitespace()
+      let steps = require_integer(
+        self.read_number(),
+        method_start,
+        "steps() steps",
+      )
+      self.skip_whitespace()
+      self.expect_char(')')
+      Steps(scale, steps)
+    }
+    "lowest" => {
+      self.expect_char('(')
+      self.expect_char(')')
+      Lowest
+    }
+    "voicing" => {
+      self.expect_char('(')
+      self.skip_whitespace()
+      let low = require_integer(
+        self.read_number(),
+        method_start,
+        "voicing() low",
+      )
+      self.skip_whitespace()
+      self.expect_char(',')
+      self.skip_whitespace()
+      let high = require_integer(
+        self.read_number(),
+        method_start,
+        "voicing() high",
+      )
+      self.skip_whitespace()
+      let count = if !self.at_end() && self.input[self.pos] == ',' {
+        self.pos += 1
+        self.skip_whitespace()
+        Some(
+          require_integer(self.read_number(), method_start, "voicing() count"),
+        )
+      } else {
+        None
+      }
+      self.skip_whitespace()
+      self.expect_char(')')
+      guard low <= high && (count is None || count.unwrap() >= 0) else {
+        raise ParseError(
+          "position \{method_start}: voicing() expects low <= high and count >= 0",
+        )
+      }
+      Voicing(low, high, count)
+    }
+    "mask" => {
+      self.expect_char('(')
+      self.skip_whitespace()
+      let rhythm_text = self.read_quoted_string()
+      self.skip_whitespace()
+      self.expect_char(')')
+      Mask(parse_mini_rhythm_mask(rhythm_text, method_start))
+    }
+    "tail" => {
+      self.expect_char('(')
+      self.skip_whitespace()
+      let replacement_kind = self.read_ident()
+      let kind = match replacement_kind {
+        "s" => Sound
+        "note" => Note
+        "chord" => Chord
+        _ =>
+          raise ParseError(
+            "position \{method_start}: tail() expects s(...), note(...), or chord(...)",
+          )
+      }
+      self.expect_char('(')
+      self.skip_whitespace()
+      let (replacement, replacement_offset) = self.read_quoted_string_with_start()
+      if self.recognition {
+        self.record_literal_fact(kind, replacement, replacement_offset)
+      }
+      self.skip_whitespace()
+      self.expect_char(')')
+      self.skip_whitespace()
+      let tail = if !self.at_end() && self.input[self.pos] == ',' {
+        self.pos += 1
+        self.skip_whitespace()
+        let duration_start = self.pos
+        let duration = self.read_number()
+        let duration_end = self.pos
+        guard duration > 0.0 && !duration.is_nan() && !duration.is_inf() else {
+          raise ParseError(
+            "position \{method_start}: tail() duration must be positive",
+          )
+        }
+        parse_decimal_rational(
+          self.input,
+          duration_start,
+          duration_end,
+          method_start,
+        )
+      } else {
+        @pattern.Rational::from_int(1)
+      }
+      self.skip_whitespace()
+      self.expect_char(')')
+      Tail(tail, kind, replacement, replacement_offset)
+    }
+    "phase" => {
+      self.expect_char('(')
+      self.skip_whitespace()
+      let nested_name = self.read_ident()
+      guard nested_name == "transpose" else {
+        raise ParseError(
+          "position \{method_start}: phase() currently accepts transpose(n)",
+        )
+      }
+      self.expect_char('(')
+      self.skip_whitespace()
+      let semitones = require_integer(
+        self.read_number(),
+        method_start,
+        "phase() transpose semitones",
+      )
+      self.skip_whitespace()
+      self.expect_char(')')
+      self.skip_whitespace()
+      self.expect_char(',')
+      self.skip_whitespace()
+      let begin_start = self.pos
+      let begin_value = self.read_number()
+      let begin_end = self.pos
+      self.skip_whitespace()
+      let (end_, end_value) = if !self.at_end() && self.input[self.pos] == ',' {
+        self.pos += 1
+        self.skip_whitespace()
+        let end_start = self.pos
+        let value = self.read_number()
+        let end_end = self.pos
+        (
+          parse_decimal_rational(self.input, end_start, end_end, method_start),
+          value,
+        )
+      } else {
+        (@pattern.Rational::from_int(1), 1.0)
+      }
+      self.skip_whitespace()
+      self.expect_char(')')
+      let begin = parse_decimal_rational(
+        self.input,
+        begin_start,
+        begin_end,
+        method_start,
+      )
+      guard begin_value >= 0.0 && begin_value < end_value && end_value <= 1.0 else {
+        raise ParseError(
+          "position \{method_start}: phase() expects 0 <= from < to <= 1",
+        )
+      }
+      PhaseTranspose(begin, end_, semitones)
     }
     "lpf" | "hpf" => {
       self.expect_char('(')
@@ -447,4 +640,85 @@ fn Parser::parse_transform_callback(
         "position \{method_start}: \{calling_method}() callback must be fast(N), slow(N), or rev; got '\{name}'",
       )
   }
+}
+
+///|
+/// Convert an explicit list of note names to ordered pitch classes. This does
+/// not infer a scale from chord names; every degree must be authored.
+fn parse_mini_explicit_scale(
+  text : String,
+  source_pos : Int,
+) -> Array[Int] raise ParseError {
+  let pitches = []
+  let mut start = 0
+  for i in 0..<=text.length() {
+    if i == text.length() || mini_is_space(text[i]) {
+      if start < i {
+        let token = text[start:i].to_owned()
+        let midi = match @pattern.note_name_to_midi(token) {
+          Some(value) => value.to_int()
+          None =>
+            raise ParseError(
+              "position \{source_pos}: invalid scale note '\{token}'",
+            )
+        }
+        pitches.push(midi % 12)
+      }
+      start = i + 1
+    }
+  }
+  guard !pitches.is_empty() else {
+    raise ParseError("position \{source_pos}: steps() scale is empty")
+  }
+  let mut previous = -1
+  for pitch in pitches {
+    guard pitch > previous else {
+      raise ParseError(
+        "position \{source_pos}: steps() scale must have ascending, unique pitch classes",
+      )
+    }
+    previous = pitch
+  }
+  pitches
+}
+
+///|
+fn parse_mini_rhythm_mask(
+  text : String,
+  source_pos : Int,
+) -> Array[Bool] raise ParseError {
+  let mask = []
+  let mut start = 0
+  for i in 0..<=text.length() {
+    if i == text.length() || mini_is_space(text[i]) {
+      if start < i {
+        let token = text[start:i].to_owned()
+        match token {
+          "x" => mask.push(true)
+          "~" => mask.push(false)
+          _ =>
+            raise ParseError(
+              "position \{source_pos}: rhythm() slots must be 'x' or '~'",
+            )
+        }
+      }
+      start = i + 1
+    }
+  }
+  guard !mask.is_empty() else {
+    raise ParseError(
+      "position \{source_pos}: rhythm() requires at least one slot",
+    )
+  }
+  mask
+}
+
+///|
+fn mini_scale_signature(scale : Array[Int]) -> String {
+  scale.map(value => value.to_string()).join(",")
+}
+
+///|
+fn mini_rhythm_signature(mask : Array[Bool]) -> String {
+  mask.map(value => if value { "1" } else { "0" }).join("")
 }

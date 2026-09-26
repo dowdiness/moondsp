@@ -26,6 +26,11 @@ test.beforeEach(async ({ page }) => {
       },
       play(id = 1) { send({ type: 'player-play', id }); },
       pause(id = 1) { send({ type: 'player-pause', id }); },
+      seek(id, cycleMilli) { send({ type: 'player-seek', id, cycleMilli }); },
+      loop(id, beginMilli, endMilli) { send({ type: 'player-loop', id, beginMilli, endMilli }); },
+      seekSection(id, sectionIndex) { send({ type: 'player-seek-section', id, sectionIndex }); },
+      loopSection(id, sectionIndex) { send({ type: 'player-loop-section', id, sectionIndex }); },
+      whole(id) { send({ type: 'player-whole', id }); },
       render(blocks = 1) {
         for (let i = 0; i < blocks; i++) {
           if (!wasm.process_scheduler_block()) throw new Error('render failed');
@@ -138,6 +143,65 @@ test('Pause freezes transport until Play resumes it', async ({ page }) => {
   expect(result.frozen).toEqual(result.paused);
   expect(result.resumed).toEqual(expect.objectContaining({ id: 4, operation: 'play', accepted: true, state: 'Playing' }));
   expect(result.after.samplePosition).toBe(result.paused.samplePosition + 128);
+});
+
+test('accepted sections preview across boundaries and restore whole-song playback', async ({ page }) => {
+  const result = await page.evaluate(() => {
+    const p = window.playback;
+    p.restart(1, 'song(section("theme",2,note("60").slow(2)),section("break",2,note("64").slow(2)),section("return",2,note("67").slow(2)),part("a","theme"),part("b","break"),part("c","return"))');
+    const initial = p.receipts()[0];
+    p.seek(2, 1000);
+    const seek = p.receipts()[0];
+    p.loop(3, 1000, 5000);
+    const loop = p.receipts()[0];
+    p.setTempo(9, 1000);
+    const tempo = p.receipts()[0];
+    p.render(91);
+    const wrapped = p.snapshot();
+    p.update(6, 'song(section("theme",2,note("62").slow(2)),section("break",2,note("64").slow(2)),section("return",2,note("67").slow(2)),part("a","theme"),part("b","break"),part("c","return"))');
+    const updated = p.receipts()[0];
+    p.loop(4, 4000, 4000);
+    const rejected = p.receipts()[0];
+    const retained = p.snapshot();
+    p.whole(5);
+    const whole = p.receipts()[0];
+    p.render(10);
+    return { initial, seek, loop, tempo, wrapped, updated, rejected, retained, whole, after: p.snapshot() };
+  });
+  expect(result.initial).toMatchObject({
+    accepted: true, sections: [
+      { label: 'a', start: 0, end: 2 },
+      { label: 'b', start: 2, end: 4 },
+      { label: 'c', start: 4, end: 6 },
+    ],
+  });
+  expect(result.seek).toMatchObject({ accepted: true, cyclePosition: 1 });
+  expect(result.loop).toMatchObject({ accepted: true, loopRange: { begin: 1, end: 5 }, cyclePosition: 1 });
+  expect(result.tempo).toMatchObject({ type: 'tempo-updated', tempo: 1000 });
+  expect(result.wrapped.cyclePosition).toBeGreaterThanOrEqual(1);
+  expect(result.wrapped.cyclePosition).toBeLessThan(1.05);
+  expect(result.updated).toMatchObject({ accepted: true, loopRange: { begin: 1, end: 5 } });
+  expect(result.rejected.accepted).toBe(false);
+  expect(result.retained.loopRange).toEqual({ begin: 1, end: 5 });
+  expect(result.whole).toMatchObject({ accepted: true, loopRange: null, cyclePosition: 0 });
+  expect(result.after.cyclePosition).toBeGreaterThan(0);
+});
+
+test('section controls retain fractional accepted timing', async ({ page }) => {
+  const result = await page.evaluate(() => {
+    const p = window.playback;
+    p.restart(1, 'song(section("lead",1/7,note("60")),section("answer",2,note("64")),part("a","lead"),part("b","answer"))');
+    p.receipts();
+    p.seekSection(2, 1);
+    const seek = p.receipts()[0];
+    p.loopSection(3, 1);
+    const loop = p.receipts()[0];
+    return { seek, loop };
+  });
+  expect(result.seek.accepted).toBe(true);
+  expect(result.seek.cyclePosition).toBeCloseTo(1 / 7, 7);
+  expect(result.loop).toMatchObject({ accepted: true, loopRange: { end: 15 / 7 } });
+  expect(result.loop.loopRange.begin).toBeCloseTo(1 / 7, 7);
 });
 
 test('source tempo replaces the legacy tempo setting, including omission default', async ({ page }) => {

@@ -58,6 +58,93 @@ fn notes(state : PlaybackState, begin : Int, end_ : Int) -> Array[Int] raise {
 }
 
 ///|
+test "song loop preserves absolute part phases across two section boundaries" {
+  let first = @song.SectionDoc::single(
+    id=@identity.SectionId::from_string("loop:first"),
+    name="theme",
+    length_cycles=@pattern.Rational::from_int(4),
+    scope=@song.TimeScope::identity(),
+    layer_id=@identity.SectionLayerId::from_string("loop:first:body"),
+    body=material("theme", 60, 4),
+  )
+  let second = @song.SectionDoc::single(
+    id=@identity.SectionId::from_string("loop:second"),
+    name="break",
+    length_cycles=@pattern.Rational::from_int(4),
+    scope=@song.TimeScope::identity(),
+    layer_id=@identity.SectionLayerId::from_string("loop:second:body"),
+    body=material("break", 70, 4),
+  )
+  let score = @song.SongDoc(parts=[
+    @song.SongOccurrenceDoc(
+      id=@identity.OccurrenceId::from_string("loop:a"),
+      name="theme",
+      section=first,
+    ),
+    @song.SongOccurrenceDoc(
+      id=@identity.OccurrenceId::from_string("loop:b"),
+      name="break",
+      section=second,
+    ),
+  ]).lower()
+  let state = PlaybackState()
+  state.queue(PlaybackSnapshot::song(score))
+  state.commit_pending(@pattern.Rational::from_int(0))
+  assert_true(
+    state.set_song_loop(
+      @pattern.Rational::from_int(2),
+      @pattern.Rational::from_int(6),
+    ),
+  )
+  assert_eq(notes(state, 2, 10), [61, 70, 61, 70])
+  assert_false(
+    state.set_song_loop(
+      @pattern.Rational::from_int(6),
+      @pattern.Rational::from_int(2),
+    ),
+  )
+  assert_eq(notes(state, 10, 14), [61, 70])
+  state.clear_song_loop()
+  assert_eq(notes(state, 6, 8), [71])
+}
+
+///|
+test "seeded song events repeat at the same accepted musical coordinates" {
+  let section = @song.SectionDoc::single(
+    id=@identity.SectionId::from_string("seeded"),
+    name="seeded",
+    length_cycles=@pattern.Rational::from_int(8),
+    scope=@song.TimeScope::identity(),
+    layer_id=@identity.SectionLayerId::from_string("seeded:body"),
+    body=@pattern.sequence(
+        Array::makei(8, i => @pattern.note((60 + i).to_double())),
+      )
+      .slow(@pattern.Rational::from_int(8))
+      .degrade_by(0.4, seed=77),
+  )
+  let score = @song.SongDoc(parts=[
+    @song.SongOccurrenceDoc(
+      id=@identity.OccurrenceId::from_string("seeded:occurrence"),
+      name="seeded",
+      section~,
+    ),
+  ]).lower()
+  let state = PlaybackState()
+  state.queue(PlaybackSnapshot::song(score))
+  state.commit_pending(@pattern.Rational::from_int(0))
+  assert_true(
+    state.set_song_loop(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(8),
+    ),
+  )
+  let first = notes(state, 0, 8)
+  assert_true(first.length() > 0)
+  assert_eq(notes(state, 8, 16), first)
+  assert_eq(notes(state, 16, 24), first)
+}
+
+///|
 test "independent entries preserve the rest of each playing phrase" {
   let state = PlaybackState()
   accept(state, [material("three", 60, 3), material("four", 80, 4)], 0)

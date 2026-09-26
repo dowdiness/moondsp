@@ -42,6 +42,24 @@ test "conversion rounds onsets upward and retains millibpm precision" {
 }
 
 ///|
+test "seek reanchors fractional section start without displacing its onset" {
+  let clock = @transport.Clock::at_start(
+      @transport.Tempo::from_bpm(120.0).unwrap(),
+      48000.0,
+    )
+    .unwrap()
+    .advance(128)
+    .unwrap()
+  let position = @pattern.Rational::new(1L, 7L)
+  let sought = clock.seek(position).unwrap()
+  assert_eq(sought.sample(), 128L)
+  assert_eq(sought.sample_at(position).unwrap(), 129L)
+  let next = sought.advance(128).unwrap()
+  assert_eq(next.sample(), 256L)
+  assert_true(next.cycle_position() > position.to_double())
+}
+
+///|
 test "many tempo edits keep exact position without denominator growth" {
   let mut clock = @transport.Clock::at_start(
     @transport.Tempo::from_bpm(120.0).unwrap(),

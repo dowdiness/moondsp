@@ -19,6 +19,10 @@ pub fn default_control_mapper() -> ControlMapper
 
 pub fn midi_to_hz(Double) -> Double
 
+pub fn seek_song_all(Array[PatternScheduler], @pattern.Rational, Array[@voice.BoundVoicePool]) -> Result[Unit, @transport.TransportError]
+
+pub fn set_song_loop_all(Array[PatternScheduler], @pattern.Rational, @pattern.Rational, Array[@voice.BoundVoicePool]) -> Result[Unit, @transport.TransportError]
+
 pub fn set_tempo_all(Array[PatternScheduler], Tempo, restart? : Bool, end_? : @pattern.Rational) -> Result[Unit, @transport.TransportError]
 
 // Errors

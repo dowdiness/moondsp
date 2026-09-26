@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added shared Mini song-composition transforms (`lowest`, `voicing`, `mask`,
+  `steps`, `phase`, and `tail`) with optional trailing `voicing` count,
+  `phase` end, and `tail` duration. Authored source atoms and reference routes
+  remain traceable after transforms and tail replacement. `mask` filters
+  existing onsets rather than creating an independent rhythm; `phase` currently
+  accepts `transpose(n)`. Tail durations beyond the entry period are rejected.
+  Lowest-tone and voicing projections over stacked layers share one playback
+  material, so entry playback matches whole-pattern note selection.
+- Added **Paper Lanterns** to the live editor's Examples: a 56-second song
+  demonstrating shared chord voicings, lowest-tone bass, scale-step and phase
+  variations, seeded hi-hat dropout, onset masks, and tail-rewritten cadences.
+- Organized live-editor help into **Syntax reference**, **Recipes**, and
+  **How playback works**, embedded from their canonical documentation.
+  Five goal-oriented recipes load into the editor with undo support; related
+  links reveal the relevant syntax or playback section without replacing code.
+  The playback guide explains independent phrase timing, draft acceptance,
+  Restart, section/range previews, and browser instrument limits.
 - Added live playback status separating the runtime transport, current Draft
   submission/acceptance, and pending musical-material transitions. Browser
   `player_mode` and `scheduler_cycle_position` expose primitive status on JS and

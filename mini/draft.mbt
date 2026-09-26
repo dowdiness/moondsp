@@ -621,6 +621,7 @@ fn draft_origin_error(error : @pattern.PatternDocError) -> String {
     MissingNode(id) => "exact compilation: missing node \{id}"
     DuplicateNodeId(id) => "exact compilation: duplicate node \{id}"
     EmptyPatternDocs => "exact compilation: empty document list"
+    InvalidTailDuration => "exact compilation: invalid tail duration"
     MissingAtomOrigin(id) =>
       "exact compilation: missing atom origin \{id.value()}"
     MissingReferenceBinding(id) =>

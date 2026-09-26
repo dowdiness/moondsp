@@ -339,6 +339,7 @@ fn Player::install(
   }
   if restart {
     self.reverb.reset()
+    self.loop_range = None
     for route in song.routes {
       route.target.pool.kill_all()
     }
@@ -449,6 +450,154 @@ pub fn Player::pause(self : Player) -> Result[Unit, PlayerError] {
 }
 
 ///|
+fn milli_cycle(value : Int) -> @pattern.Rational {
+  @pattern.Rational::new(value.to_int64(), 1000L)
+}
+
+///|
+fn Player::accepted_duration(self : Player) -> @pattern.Rational? {
+  guard self.session.song() is Some(song) else { return None }
+  match song.layout {
+    SongLayout(_, _) =>
+      match song.span {
+        Finite(end_) | Repeating(end_) => Some(end_)
+        Continuous => None
+      }
+    PatternLayout => None
+  }
+}
+
+///|
+fn Player::section_range(
+  self : Player,
+  index : Int,
+) -> (@pattern.Rational, @pattern.Rational)? {
+  guard self.session.song() is Some(song) else { return None }
+  match song.layout {
+    PatternLayout => None
+    SongLayout(rows, _) =>
+      match rows.get(index) {
+        Some(row) => Some((row.start, row.start + row.length))
+        None => None
+      }
+  }
+}
+
+///|
+fn Player::seek_at(
+  self : Player,
+  position : @pattern.Rational,
+) -> Result[Unit, PlayerError] {
+  guard self.session is (Playing(_) | Paused(_) | Ended(_, _, _)) else {
+    return Err(InvalidSource("press Play before previewing a section"))
+  }
+  guard self.accepted_duration() is Some(duration) else {
+    return Err(InvalidSource("preview requires an accepted song"))
+  }
+  guard position >= @pattern.Rational::from_int(0) && position < duration else {
+    return Err(InvalidSource("preview start must be inside the accepted song"))
+  }
+  let pools = self.routes.map(route => route.pool.pool)
+  match @scheduler.seek_song_all(self.schedulers, position, pools) {
+    Err(_) => Err(TransportRange)
+    Ok(_) => {
+      self.reverb.reset()
+      self.loop_range = None
+      if self.session.song() is Some(song) {
+        self.session = Playing(song)
+      }
+      Ok(())
+    }
+  }
+}
+
+///|
+pub fn Player::seek_cycle(
+  self : Player,
+  cycle_milli : Int,
+) -> Result[Unit, PlayerError] {
+  guard cycle_milli >= 0 else {
+    return Err(InvalidSource("invalid preview cycle"))
+  }
+  self.seek_at(milli_cycle(cycle_milli))
+}
+
+///|
+pub fn Player::seek_section(
+  self : Player,
+  index : Int,
+) -> Result[Unit, PlayerError] {
+  guard self.section_range(index) is Some((begin, _)) else {
+    return Err(InvalidSource("unknown accepted song section"))
+  }
+  self.seek_at(begin)
+}
+
+///|
+fn Player::loop_at(
+  self : Player,
+  begin : @pattern.Rational,
+  end_ : @pattern.Rational,
+) -> Result[Unit, PlayerError] {
+  guard self.session is (Playing(_) | Paused(_) | Ended(_, _, _)) else {
+    return Err(InvalidSource("press Play before looping a section"))
+  }
+  guard begin >= @pattern.Rational::from_int(0) &&
+    end_ > begin &&
+    self.accepted_duration() is Some(duration) else {
+    return Err(
+      InvalidSource("loop requires a positive range in an accepted song"),
+    )
+  }
+  guard end_ <= duration else {
+    return Err(InvalidSource("loop end exceeds the accepted song"))
+  }
+  let pools = self.routes.map(route => route.pool.pool)
+  match @scheduler.set_song_loop_all(self.schedulers, begin, end_, pools) {
+    Err(_) =>
+      Err(
+        InvalidSource("loop range is too short or exceeds transport precision"),
+      )
+    Ok(_) => {
+      self.reverb.reset()
+      self.loop_range = Some((begin, end_))
+      if self.session.song() is Some(song) {
+        self.session = Playing(song)
+      }
+      Ok(())
+    }
+  }
+}
+
+///|
+pub fn Player::loop_cycles(
+  self : Player,
+  begin_milli : Int,
+  end_milli : Int,
+) -> Result[Unit, PlayerError] {
+  guard begin_milli >= 0 && end_milli > begin_milli else {
+    return Err(InvalidSource("invalid loop cycle range"))
+  }
+  self.loop_at(milli_cycle(begin_milli), milli_cycle(end_milli))
+}
+
+///|
+pub fn Player::loop_section(
+  self : Player,
+  index : Int,
+) -> Result[Unit, PlayerError] {
+  guard self.section_range(index) is Some((begin, end_)) else {
+    return Err(InvalidSource("unknown accepted song section"))
+  }
+  self.loop_at(begin, end_)
+}
+
+///|
+pub fn Player::whole_song(self : Player) -> Result[Unit, PlayerError] {
+  self.seek_cycle(0)
+}
+
+///|
 /// Return the accepted source kind without constructing a `PlayerView`.
 fn Player::mode(self : Player) -> PlaybackMode {
   match self.session {
@@ -470,7 +619,21 @@ fn Player::mode(self : Player) -> PlaybackMode {
 fn Player::cycle_position(self : Player) -> Double {
   match self.session {
     Empty | Ready(_) | Fault(_) => 0.0
-    Playing(_) | Paused(_) => self.schedulers[0].cycle_position()
+    Playing(_) | Paused(_) => {
+      let wall = self.schedulers[0].cycle_position()
+      match self.loop_range {
+        None => wall
+        Some((begin, end_)) => {
+          let start = begin.to_double()
+          let length = (end_ - begin).to_double()
+          if wall < start {
+            start
+          } else {
+            wall - ((wall - start) / length).floor() * length
+          }
+        }
+      }
+    }
     Ended(_, _, cycle) => cycle
   }
 }
@@ -585,6 +748,55 @@ pub fn player_pause() -> Int {
 }
 
 ///|
+pub fn player_seek_cycle(cycle_milli : Int) -> Int {
+  player_command(owner => owner.seek_cycle(cycle_milli))
+}
+
+///|
+pub fn player_loop_cycles(begin_milli : Int, end_milli : Int) -> Int {
+  player_command(owner => owner.loop_cycles(begin_milli, end_milli))
+}
+
+///|
+pub fn player_seek_section(index : Int) -> Int {
+  player_command(owner => owner.seek_section(index))
+}
+
+///|
+pub fn player_loop_section(index : Int) -> Int {
+  player_command(owner => owner.loop_section(index))
+}
+
+///|
+pub fn player_whole_song() -> Int {
+  player_command(owner => owner.whole_song())
+}
+
+///|
+pub fn player_loop_begin() -> Double {
+  match player.val {
+    Some(owner) =>
+      match owner.loop_range {
+        Some((begin, _)) => begin.to_double()
+        None => -1.0
+      }
+    None => -1.0
+  }
+}
+
+///|
+pub fn player_loop_end() -> Double {
+  match player.val {
+    Some(owner) =>
+      match owner.loop_range {
+        Some((_, end_)) => end_.to_double()
+        None => -1.0
+      }
+    None => -1.0
+  }
+}
+
+///|
 pub fn player_state() -> Int {
   match player.val {
     None => 0
@@ -645,5 +857,63 @@ pub fn scheduler_sample_position() -> Double {
   match player.val {
     Some(owner) => owner.view().sample_position
     None => 0.0
+  }
+}
+
+///|
+/// Accepted section occurrences, never inferred from the editable draft.
+pub fn player_section_count() -> Int {
+  guard player.val is Some(owner) else { return 0 }
+  guard owner.session.song() is Some(song) else { return 0 }
+  match song.layout {
+    SongLayout(rows, _) => rows.length()
+    PatternLayout => 0
+  }
+}
+
+///|
+fn accepted_section(index : Int) -> PlaybackLayoutRow? {
+  guard player.val is Some(owner) else { return None }
+  guard owner.session.song() is Some(song) else { return None }
+  match song.layout {
+    SongLayout(rows, _) => rows.get(index)
+    PatternLayout => None
+  }
+}
+
+///|
+pub fn player_section_start(index : Int) -> Double {
+  match accepted_section(index) {
+    Some(row) => row.start.to_double()
+    None => -1.0
+  }
+}
+
+///|
+pub fn player_section_end(index : Int) -> Double {
+  match accepted_section(index) {
+    Some(row) => (row.start + row.length).to_double()
+    None => -1.0
+  }
+}
+
+///|
+pub fn player_section_label_length(index : Int) -> Int {
+  match accepted_section(index) {
+    Some(row) => row.name.length()
+    None => 0
+  }
+}
+
+///|
+pub fn player_section_label_char(index : Int, char_index : Int) -> Int {
+  match accepted_section(index) {
+    Some(row) =>
+      if char_index >= 0 && char_index < row.name.length() {
+        row.name[char_index].to_int()
+      } else {
+        0
+      }
+    None => 0
   }
 }

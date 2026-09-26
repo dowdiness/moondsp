@@ -146,6 +146,28 @@ pub fn Clock::reset(self : Clock) -> Clock {
 }
 
 ///|
+/// Re-anchor musical position at the next unrendered sample. Fractions outside
+/// the clock's tick grid round down by less than one tick so an onset at the
+/// requested position remains in the first query and plays at most one sample late.
+pub fn Clock::seek(
+  self : Clock,
+  position : @pattern.Rational,
+) -> Result[Clock, TransportError] {
+  try {
+    if position.num < 0L || position.den <= 0L {
+      raise TimeOutOfRange
+    }
+    let common = gcd(self.scale, position.den)
+    let denominator = position.den / common
+    let numerator = checked_mul(position.num, self.scale / common)
+    let ticks = numerator / denominator
+    Ok({ ..self, ticks, })
+  } catch {
+    error => Err(error)
+  }
+}
+
+///|
 /// Convert on the current affine segment, including endpoints of existing
 /// notes. Cancel common factors before checked multiplication; never wrap.
 pub fn Clock::sample_at(

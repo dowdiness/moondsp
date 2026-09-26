@@ -15,6 +15,7 @@ import sharedRoomAfterglow from "../../../examples/shared-room-afterglow.mini?ra
 import overlayGroove from "../../../examples/overlay-groove.mini?raw";
 import overlayGrouping from "../../../examples/overlay-grouping.mini?raw";
 import restsAndGates from "../../../examples/rests-and-gates.mini?raw";
+import sectionComposition from "../../../examples/section-composition.mini?raw";
 
 import { minilive } from "./lang/minilive";
 import { CM6Adapter } from "./canopy";
@@ -47,6 +48,13 @@ const startBtn = document.getElementById("start") as HTMLButtonElement;
 const cheatEl = document.getElementById("cheat") as HTMLElement;
 const cheatToggle = document.getElementById("cheat-toggle") as HTMLButtonElement;
 const workspaceEl = document.querySelector("main.workspace") as HTMLElement;
+const rangePreviewEl = document.getElementById("range-preview") as HTMLElement;
+const sectionListEl = document.getElementById("section-list") as HTMLElement;
+const rangeStartEl = document.getElementById("range-start") as HTMLInputElement;
+const rangeEndEl = document.getElementById("range-end") as HTMLInputElement;
+const loopStatusEl = document.getElementById("loop-status") as HTMLElement;
+const loopRangeBtn = document.getElementById("loop-range") as HTMLButtonElement;
+const wholeSongBtn = document.getElementById("whole-song") as HTMLButtonElement;
 
 // ── Editor ──────────────────────────────────────────────────
 
@@ -174,6 +182,68 @@ function changeMessage(state: PlaybackView): readonly [string, string] {
   }
 }
 
+let shownSections: PlaybackView["sections"];
+function cycleMilli(text: string): number | null {
+  const value = Number(text);
+  const milli = value * 1000;
+  return text.trim() !== "" && Number.isFinite(milli) && Number.isSafeInteger(milli) &&
+    milli >= 0 && milli <= 2147483647 ? milli : null;
+}
+
+function renderSections(state: PlaybackView): void {
+  const sections = state.sections ?? [];
+  rangePreviewEl.hidden = state.mode !== "song" || state.currentSource === null;
+  if (rangePreviewEl.hidden) return;
+  if (sections !== shownSections) {
+    shownSections = sections;
+    sectionListEl.replaceChildren();
+    for (const [index, section] of sections.entries()) {
+      const row = document.createElement("div");
+      row.className = "section-row";
+      const label = document.createElement("span");
+      label.textContent = `${section.label} [${section.start}, ${section.end})`;
+      const start = document.createElement("button");
+      start.type = "button";
+      start.textContent = "Play from here";
+      start.addEventListener("click", () => {
+        void playback.seekSection(index).catch(error => playback.report(error));
+      });
+      const loop = document.createElement("button");
+      loop.type = "button";
+      loop.textContent = "Loop section";
+      loop.addEventListener("click", () => {
+        rangeStartEl.value = String(section.start);
+        rangeEndEl.value = String(section.end);
+        void playback.loopSection(index).catch(error => playback.report(error));
+      });
+      row.append(label, start, loop);
+      sectionListEl.append(row);
+    }
+  }
+  const usable = state.state === "Playing" || state.state === "Paused" || state.state === "Ended";
+  for (const row of sectionListEl.children) {
+    const [from, to] = (row as HTMLElement).querySelectorAll("button");
+    from.disabled = !usable;
+    to.disabled = !usable;
+  }
+  loopRangeBtn.disabled = !usable;
+  wholeSongBtn.disabled = !usable;
+  setText(loopStatusEl, state.loopRange
+    ? `Loop [${state.loopRange.begin}, ${state.loopRange.end}) · position ${state.cyclePosition.toFixed(2)} cycles`
+    : `Whole song · position ${state.cyclePosition.toFixed(2)} cycles`);
+}
+
+function requestRangeLoop(): void {
+  const begin = cycleMilli(rangeStartEl.value);
+  const end = cycleMilli(rangeEndEl.value);
+  if (begin === null || end === null || end <= begin) {
+    playback.report(new Error("Enter a valid range: start before end, in 0.001-cycle steps."));
+    return;
+  }
+  void playback.loop(begin, end).catch(error => playback.report(error));
+}
+
+
 function applyStatus(state: PlaybackView): void {
   if (audioMode !== "scheduler") return;
   setText(statusEl, state.state === "Empty" ? "Ready" : state.state);
@@ -213,6 +283,7 @@ function applyStatus(state: PlaybackView): void {
   changeTimingEl.hidden = state.currentSource === null || (state.pendingCount === 0 && state.skippedCount === 0);
   startBtn.disabled = false;
   startBtn.textContent = state.state === "Playing" || state.state === "Starting" ? "Pause" : "Play";
+  renderSections(state);
   startBtn.dataset.action = state.state === "Playing" || state.state === "Starting" ? "pause" : "play";
 }
 function diagnosticFromError(raw: string, docLength: number): Diagnostic {
@@ -268,6 +339,11 @@ async function toggleCompiled(): Promise<void> {
 }
 if (audioMode === "compiled") document.getElementById("restart")!.hidden = true;
 playbackDetailsEl.hidden = audioMode !== "scheduler";
+rangePreviewEl.hidden = audioMode !== "scheduler";
+loopRangeBtn.addEventListener("click", requestRangeLoop);
+wholeSongBtn.addEventListener("click", () => {
+  void playback.whole().catch(error => playback.report(error));
+});
 
 
 view.dispatch({
@@ -318,6 +394,7 @@ document.getElementById("restart")!.addEventListener("click", () => {
 (document.getElementById("light-orbit-example") as HTMLButtonElement).dataset.example = `bpm(120);\n${lightOrbit}`;
 (document.getElementById("overlay-grouping-example") as HTMLButtonElement).dataset.example = overlayGrouping;
 (document.getElementById("rests-and-gates-example") as HTMLButtonElement).dataset.example = `bpm(96);\n${restsAndGates}`;
+(document.getElementById("section-composition-example") as HTMLButtonElement).dataset.example = sectionComposition;
 
 cheatToggle.addEventListener("click", () => {
   const collapsed = workspaceEl.classList.toggle("cheat-collapsed");
@@ -327,9 +404,28 @@ cheatToggle.addEventListener("click", () => {
 
 cheatEl.addEventListener("click", (ev) => {
   const target = ev.target as HTMLElement;
+  const link = target.closest<HTMLAnchorElement>('a[href^="#"]');
+  if (link) {
+    const destination = document.getElementById(link.hash.slice(1));
+    if (!destination || !cheatEl.contains(destination)) return;
+    ev.preventDefault();
+    for (let ancestor: HTMLElement | null = destination; ancestor && ancestor !== cheatEl; ancestor = ancestor.parentElement) {
+      if (ancestor instanceof HTMLDetailsElement) ancestor.open = true;
+    }
+    const focusTarget = destination instanceof HTMLDetailsElement
+      ? destination.querySelector<HTMLElement>("summary") : destination;
+    if (focusTarget) {
+      if (focusTarget.tagName !== "SUMMARY") focusTarget.tabIndex = -1;
+      focusTarget.focus({ preventScroll: true });
+    }
+    destination.scrollIntoView({ block: "start" });
+    return;
+  }
   const example = target.closest<HTMLElement>(".example");
   if (!example) return;
-  const text = example.dataset.example;
+  const text = example.dataset.recipe
+    ? document.getElementById(`${example.dataset.recipe}-code`)?.textContent
+    : example.dataset.example;
   if (!text) return;
   view.dispatch({
     changes: { from: 0, to: view.state.doc.length, insert: text },

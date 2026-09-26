@@ -26,6 +26,7 @@ pub fn Clock::position(Self, Int64) -> Result[@pattern.Rational, TransportError]
 pub fn Clock::reset(Self) -> Self
 pub fn Clock::sample(Self) -> Int64
 pub fn Clock::sample_at(Self, @pattern.Rational) -> Result[Int64, TransportError]
+pub fn Clock::seek(Self, @pattern.Rational) -> Result[Self, TransportError]
 pub fn Clock::tempo(Self) -> Tempo
 pub fn Clock::with_tempo(Self, Tempo) -> Self
 

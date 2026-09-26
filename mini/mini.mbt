@@ -17,8 +17,11 @@
 /// - Strudel-style stack lines: `$: s("bd")` / `$: note("C4")` stack top-level lines
 /// - Method chains:
 ///   `.fast(n)`, `.slow(n)`, `.rev()`,
-///   `.degradeBy(p)` (drop with probability p),
-///   `.lpf(hz, resonance?)`, `.hpf(hz, resonance?)`, `.gain(g)`, `.pan(p)`,
+///   `.degradeBy(p, seed?)` (drop with stable, authored randomness),
+///   `.transpose(semitones)`, `.steps("C D E F G A B", steps)`,
+///   `.lowest()`, `.voicing(low, high, count?)`, `.mask("x ~ x x")`,
+///   `.phase(transpose(n), from, to?)`, and
+///   `.tail(note("...")|chord("...")|s("..."), cycles?)`,
 ///   `.room(send)` (merge per-event controls),
 ///   `.every(n, fast(k)|slow(k)|rev)` (apply f every n cycles),
 ///   `.jux(fast(k)|slow(k)|rev)` — split stereo, apply f to right channel

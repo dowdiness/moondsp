@@ -47,6 +47,9 @@ pub struct PlaybackState {
   // private fields
 }
 pub fn PlaybackState::PlaybackState() -> Self
+pub fn PlaybackState::can_seek_song(Self, @pattern.Rational) -> Bool
+pub fn PlaybackState::can_set_song_loop(Self, @pattern.Rational, @pattern.Rational) -> Bool
+pub fn PlaybackState::clear_song_loop(Self) -> Unit
 pub fn PlaybackState::commit_pending(Self, @pattern.Rational) -> Unit
 pub fn PlaybackState::has_pending(Self) -> Bool
 pub fn PlaybackState::inspect(Self) -> PlaybackInspection
@@ -56,6 +59,7 @@ pub fn PlaybackState::query_active_events(Self, @pattern.TimeSpan) -> Array[@pat
 pub fn PlaybackState::query_active_sourced_events(Self, @pattern.TimeSpan) -> Array[PlaybackSourcedEvent]
 pub fn PlaybackState::queue(Self, PlaybackSnapshot) -> Unit
 pub fn PlaybackState::reset(Self) -> Unit
+pub fn PlaybackState::set_song_loop(Self, @pattern.Rational, @pattern.Rational) -> Bool
 pub fn PlaybackState::skipped_entry_count(Self) -> Int
 
 // Type aliases

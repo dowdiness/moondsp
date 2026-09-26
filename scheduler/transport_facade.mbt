@@ -285,6 +285,90 @@ pub fn accept_playback_all(
 }
 
 ///|
+/// Seek every route on the same sample boundary. Planning is all-or-none;
+/// voices and retained note deadlines are discarded only after validation.
+pub fn seek_song_all(
+  schedulers : Array[PatternScheduler],
+  position : @pattern.Rational,
+  pools : Array[@moondsp.BoundVoicePool],
+) -> Result[Unit, TransportError] {
+  guard schedulers.length() == pools.length() && !schedulers.is_empty() else {
+    return Err(TimeOutOfRange)
+  }
+  let clocks : Array[@transport.Clock] = []
+  for scheduler in schedulers {
+    guard scheduler.playback_state.can_seek_song(position) else {
+      return Err(TimeOutOfRange)
+    }
+    let next = match scheduler.clock.seek(position) {
+      Ok(next) => next
+      Err(error) => return Err(error)
+    }
+    match next.advance(scheduler.ctx.block_size()) {
+      Ok(_) => clocks.push(next)
+      Err(error) => return Err(error)
+    }
+  }
+  for i in 0..<schedulers.length() {
+    pools[i].kill_all()
+    let scheduler = schedulers[i]
+    scheduler.clock = clocks[i]
+    scheduler.previous_clock = clocks[i]
+    scheduler.previous_events = []
+    scheduler.active_notes.clear()
+    scheduler.playback_state.clear_song_loop()
+    scheduler.last_error = None
+  }
+  Ok(())
+}
+
+///|
+/// Repeat accepted source coordinates in [begin, end); each route's clock
+/// advances normally while its event query wraps at the same musical boundary.
+pub fn set_song_loop_all(
+  schedulers : Array[PatternScheduler],
+  begin : @pattern.Rational,
+  end_ : @pattern.Rational,
+  pools : Array[@moondsp.BoundVoicePool],
+) -> Result[Unit, TransportError] {
+  guard schedulers.length() == pools.length() && !schedulers.is_empty() else {
+    return Err(TimeOutOfRange)
+  }
+  let clocks : Array[@transport.Clock] = []
+  for scheduler in schedulers {
+    guard scheduler.playback_state.can_set_song_loop(begin, end_) else {
+      return Err(TimeOutOfRange)
+    }
+    let clock = match scheduler.clock.seek(begin) {
+      Ok(clock) => clock
+      Err(error) => return Err(error)
+    }
+    match clock.advance(scheduler.ctx.block_size()) {
+      Ok(_) => ()
+      Err(error) => return Err(error)
+    }
+    let block_end = match
+      clock.position(clock.sample() + scheduler.ctx.block_size().to_int64()) {
+      Ok(end_position) => end_position
+      Err(error) => return Err(error)
+    }
+    guard end_ - begin >= block_end - begin else { return Err(TimeOutOfRange) }
+    clocks.push(clock)
+  }
+  for i in 0..<schedulers.length() {
+    pools[i].kill_all()
+    let scheduler = schedulers[i]
+    scheduler.clock = clocks[i]
+    scheduler.previous_clock = clocks[i]
+    scheduler.previous_events = []
+    scheduler.active_notes.clear()
+    ignore(scheduler.playback_state.set_song_loop(begin, end_))
+    scheduler.last_error = None
+  }
+  Ok(())
+}
+
+///|
 pub fn PatternScheduler::last_transport_error(
   self : PatternScheduler,
 ) -> TransportError? {
