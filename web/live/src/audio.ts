@@ -67,6 +67,11 @@ export type SchedulerSession = SessionControls & Readonly<{
   restart(id: RequestId, input: PlaybackInput): SessionCommandResult;
   play(id: RequestId): SessionCommandResult;
   pause(id: RequestId): SessionCommandResult;
+  seek(id: RequestId, cycleMilli: number): SessionCommandResult;
+  loop(id: RequestId, beginMilli: number, endMilli: number): SessionCommandResult;
+  seekSection(id: RequestId, sectionIndex: number): SessionCommandResult;
+  loopSection(id: RequestId, sectionIndex: number): SessionCommandResult;
+  whole(id: RequestId): SessionCommandResult;
 }>;
 export type CompiledSession = SessionControls & Readonly<{ kind: "compiled" }>;
 export type AudioSession = SchedulerSession | CompiledSession;
@@ -87,7 +92,10 @@ type GraphRun = Readonly<{
 }>;
 type SessionCommand = "fade-in"
   | Readonly<{ type: "player-update" | "player-restart"; id: number; input: string }>
-  | Readonly<{ type: "player-play" | "player-pause"; id: number }>;
+  | Readonly<{ type: "player-play" | "player-pause" | "player-whole"; id: number }>
+  | Readonly<{ type: "player-seek"; id: number; cycleMilli: number }>
+  | Readonly<{ type: "player-loop"; id: number; beginMilli: number; endMilli: number }>
+  | Readonly<{ type: "player-seek-section" | "player-loop-section"; id: number; sectionIndex: number }>;
 type EngineState =
   | { kind: "idle" }
   | { kind: "suspended"; graph: Graph }
@@ -212,6 +220,11 @@ export class AudioEngine {
       restart: (id, input) => this.command(run, { type: "player-restart", id: id.value, input: input.wire }),
       play: id => this.command(run, { type: "player-play", id: id.value }),
       pause: id => this.command(run, { type: "player-pause", id: id.value }),
+      seek: (id, cycleMilli) => this.command(run, { type: "player-seek", id: id.value, cycleMilli }),
+      loop: (id, beginMilli, endMilli) => this.command(run, { type: "player-loop", id: id.value, beginMilli, endMilli }),
+      seekSection: (id, sectionIndex) => this.command(run, { type: "player-seek-section", id: id.value, sectionIndex }),
+      loopSection: (id, sectionIndex) => this.command(run, { type: "player-loop-section", id: id.value, sectionIndex }),
+      whole: id => this.command(run, { type: "player-whole", id: id.value }),
     } : { ...controls, kind: "compiled" };
     return { kind: "opened", session };
   }

@@ -45,6 +45,26 @@ test "notation modifier chains and exact time factor growth reject before loweri
 }
 
 ///|
+test "replacement tail contributes its own query work at playback admission" {
+  let span = Some(@pattern.Rational::new(1L, 8L))
+  match
+    parse_play_source(
+      "note(\"C4\").slow(4).tail(note(\"E4*4\"))",
+      max_query_span=span,
+    ) {
+    Ok(_) => ()
+    Err(message) => fail(message)
+  }
+  assert_true(
+    parse_play_source(
+      "note(\"C4\").slow(4).tail(note(\"E4*4096\"))",
+      max_query_span=span,
+    )
+    is Err(_),
+  )
+}
+
+///|
 test "block comments cannot hide recursive syntax from playback admission" {
   let span = Some(@pattern.Rational::new(2L, 45L))
   for depth in [40, 2000] {

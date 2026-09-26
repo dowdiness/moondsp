@@ -4,8 +4,29 @@ pub(all) suberror PatternDocError {
   DuplicateNodeId(String)
   EmptyPatternDocs
   MissingAtomOrigin(@identity.PatternNodeId)
+  InvalidTailDuration
   MissingReferenceBinding(@identity.PatternNodeId)
 } derive(Eq, Debug)
+
+///|
+/// Authored control-map transformations whose events keep their source atoms.
+pub(all) enum CompositionOp {
+  Transpose(Int)
+  Steps(Array[Int], Int)
+  Lowest
+  Voicing(Int, Int, Int?)
+  Mask(Array[Bool])
+  PhaseTranspose(Int, Rational, Rational)
+}
+
+///|
+fn CompositionOp::snapshot(self : CompositionOp) -> CompositionOp {
+  match self {
+    Steps(scale, steps) => Steps(scale.copy(), steps)
+    Mask(mask) => Mask(mask.copy())
+    _ => self
+  }
+}
 
 ///|
 priv enum PatternDocNode[A] {
@@ -19,6 +40,13 @@ priv enum PatternDocNode[A] {
   Gate(@identity.PatternNodeId, Rational)
   Rev(@identity.PatternNodeId)
   FilterMap(@identity.PatternNodeId, (A) -> A?)
+  Composition(
+    @identity.PatternNodeId,
+    CompositionOp,
+    (A) -> Double?,
+    (A, Double) -> A
+  )
+  Tail(@identity.PatternNodeId, @identity.PatternNodeId, Rational)
   Euclid(@identity.PatternNodeId, Int, Int, Int)
   DegradeBy(@identity.PatternNodeId, Double, Int)
   Every(@identity.PatternNodeId, Int, TimeTransform)
@@ -57,6 +85,9 @@ fn[A] PatternDocNode::snapshot(self : PatternDocNode[A]) -> PatternDocNode[A] {
     Gate(child, factor) => Gate(child, factor)
     Rev(child) => Rev(child)
     FilterMap(child, f) => FilterMap(child, f)
+    Composition(child, op, pitch, set_pitch) =>
+      Composition(child, op.snapshot(), pitch, set_pitch)
+    Tail(child, replacement, cycles) => Tail(child, replacement, cycles)
     Euclid(child, k, n, rotation) => Euclid(child, k, n, rotation)
     DegradeBy(child, p, seed) => DegradeBy(child, p, seed)
     Every(child, n, f) => Every(child, n, f)
@@ -210,6 +241,7 @@ fn[A] pattern_node_cache_token_memoized(
             | Gate(child, _)
             | Rev(child)
             | FilterMap(child, _)
+            | Composition(child, _, _, _)
             | Euclid(child, _, _, _)
             | DegradeBy(child, _, _)
             | Every(child, _, _)
@@ -218,7 +250,7 @@ fn[A] pattern_node_cache_token_memoized(
                 token,
                 pattern_node_cache_token_memoized(nodes, child, memo),
               )
-            MergeControl(left, right, _) => {
+            Tail(left, right, _) | MergeControl(left, right, _) => {
               append_pattern_cache_token(
                 token,
                 pattern_node_cache_token_memoized(nodes, left, memo),
@@ -274,12 +306,13 @@ fn[A] copy_reachable_pattern_nodes(
         | Gate(child, _)
         | Rev(child)
         | FilterMap(child, _)
+        | Composition(child, _, _, _)
         | Euclid(child, _, _, _)
         | DegradeBy(child, _, _)
         | Every(child, _, _)
         | Jux(child, _, _) =>
           copy_reachable_pattern_nodes(source, child, target)
-        MergeControl(left, right, _) => {
+        Tail(left, right, _) | MergeControl(left, right, _) => {
           copy_reachable_pattern_nodes(source, left, target)
           copy_reachable_pattern_nodes(source, right, target)
         }
@@ -315,6 +348,7 @@ fn[A] pattern_node_revision_memoized(
             | Gate(child, _)
             | Rev(child)
             | FilterMap(child, _)
+            | Composition(child, _, _, _)
             | Euclid(child, _, _, _)
             | DegradeBy(child, _, _)
             | Every(child, _, _)
@@ -322,7 +356,7 @@ fn[A] pattern_node_revision_memoized(
               revision = revision.combine(
                 pattern_node_revision_memoized(nodes, child, memo),
               )
-            MergeControl(left, right, _) => {
+            Tail(left, right, _) | MergeControl(left, right, _) => {
               revision = revision.combine(
                 pattern_node_revision_memoized(nodes, left, memo),
               )
@@ -676,12 +710,13 @@ fn[A] append_reachable_pattern_source_ids(
         | Gate(child, _)
         | Rev(child)
         | FilterMap(child, _)
+        | Composition(child, _, _, _)
         | Euclid(child, _, _, _)
         | DegradeBy(child, _, _)
         | Every(child, _, _)
         | Jux(child, _, _) =>
           append_reachable_pattern_source_ids(nodes, child, result, seen)
-        MergeControl(left, right, _) => {
+        Tail(left, right, _) | MergeControl(left, right, _) => {
           append_reachable_pattern_source_ids(nodes, left, result, seen)
           append_reachable_pattern_source_ids(nodes, right, result, seen)
         }
@@ -775,6 +810,29 @@ fn[A, O] opaque_compiled_entries(
       entry,
     )
   })
+}
+
+///|
+fn[A, O] apply_composition(
+  pat : Pat[ScopedValue[A, O]],
+  op : CompositionOp,
+  pitch : (A) -> Double?,
+  set_pitch : (A, Double) -> A,
+) -> Pat[ScopedValue[A, O]] {
+  let read = fn(value : ScopedValue[A, O]) { pitch(value.value) }
+  let write = fn(value : ScopedValue[A, O], note : Double) {
+    ScopedValue(set_pitch(value.value, note), value.scope, value.origin)
+  }
+  match op {
+    Transpose(n) => pat.transpose_by(n, read, write)
+    Steps(scale, steps) => pat.steps_by(scale, steps, read, write)
+    Lowest => pat.lowest_by(read)
+    Voicing(low, high, count) =>
+      pat.voicing_by(low, high, count.unwrap_or(2147483647), read, write)
+    Mask(mask) => pat.mask(mask)
+    PhaseTranspose(n, from, to) =>
+      pat.phase_transpose_by(n, from, to, read, write)
+  }
 }
 
 ///|
@@ -896,6 +954,29 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
           "",
         )
       })
+    Composition(child_id, op, pitch, set_pitch) => {
+      let child = lower(child_id)
+      match op {
+        Lowest | Voicing(_, _, _) if child.entries.length() > 1 => {
+          // Ranking notes requires all simultaneous layers in one query.
+          // An authored material scope prevents entries() from splitting it.
+          let pat = prepend(apply_composition(child.pat, op, pitch, set_pitch)).material()
+          CompiledPattern::single_material(pat, id)
+        }
+        _ =>
+          child.transform(pat => {
+            prepend(apply_composition(pat, op, pitch, set_pitch))
+          })
+      }
+    }
+    Tail(child_id, replacement_id, cycles) => {
+      let child = lower(child_id)
+      let replacement = lower(replacement_id)
+      let pat = child.pat.tail(replacement.pat, cycles~) catch {
+        _ => raise InvalidTailDuration
+      }
+      CompiledPattern::single_material(prepend(pat), id)
+    }
     Euclid(child, k, n, rotation) =>
       CompiledPattern::single_material(
         prepend(lower(child).pat.euclid(k, n, rotation~)),
@@ -1687,6 +1768,48 @@ pub fn[A] PatternDoc::filter_map(
     revision=self.revision.next(),
   )
   PatternDoc(root=id, revision=self.revision.next(), nodes~)
+}
+
+///|
+pub fn PatternDoc::compose(
+  self : PatternDoc[ControlMap],
+  id~ : @identity.PatternNodeId,
+  operation~ : CompositionOp,
+) -> PatternDoc[ControlMap] raise PatternDocError {
+  let nodes = copy_pattern_nodes(self.nodes)
+  insert_pattern_node(
+    nodes,
+    id,
+    Composition(self.root, operation.snapshot(), value => value.get("note"), (
+      value,
+      note,
+    ) => value.set("note", note)),
+    revision=self.revision.next(),
+  )
+  PatternDoc(root=id, revision=self.revision.next(), nodes~)
+}
+
+///|
+pub fn[A] PatternDoc::tail(
+  self : PatternDoc[A],
+  id~ : @identity.PatternNodeId,
+  replacement~ : PatternDoc[A],
+  cycles~ : Rational,
+) -> PatternDoc[A] raise PatternDocError {
+  let period = self.lower().pat().entry_period()
+  guard cycles > Rational::from_int(0) && cycles <= period else {
+    raise InvalidTailDuration
+  }
+  let nodes = copy_pattern_nodes(self.nodes)
+  merge_pattern_nodes(nodes, replacement.nodes)
+  let revision = self.revision.combine(replacement.revision).next()
+  insert_pattern_node(
+    nodes,
+    id,
+    Tail(self.root, replacement.root, cycles),
+    revision~,
+  )
+  PatternDoc(root=id, revision~, nodes~)
 }
 
 ///|

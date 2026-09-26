@@ -82,6 +82,14 @@ pub fn init_exit_deliverable_graph(Double, Int) -> Bool
 
 pub fn init_scheduler_graph(Double, Int) -> Bool
 
+pub fn player_loop_begin() -> Double
+
+pub fn player_loop_cycles(Int, Int) -> Int
+
+pub fn player_loop_end() -> Double
+
+pub fn player_loop_section(Int) -> Int
+
 pub fn player_mode() -> PlaybackMode
 
 pub fn player_pause() -> Int
@@ -92,11 +100,27 @@ pub fn player_play() -> Int
 
 pub fn player_restart_input() -> Int
 
+pub fn player_section_count() -> Int
+
+pub fn player_section_end(Int) -> Double
+
+pub fn player_section_label_char(Int, Int) -> Int
+
+pub fn player_section_label_length(Int) -> Int
+
+pub fn player_section_start(Int) -> Double
+
+pub fn player_seek_cycle(Int) -> Int
+
+pub fn player_seek_section(Int) -> Int
+
 pub fn player_skipped_count() -> Int
 
 pub fn player_state() -> Int
 
 pub fn player_update_input() -> Int
+
+pub fn player_whole_song() -> Int
 
 pub fn process_compiled_block(Double, Double, Double, Int) -> Bool
 

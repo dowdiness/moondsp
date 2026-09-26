@@ -58,6 +58,161 @@ fn notes(state : PlaybackState, begin : Int, end_ : Int) -> Array[Int] raise {
 }
 
 ///|
+test "song loop preserves absolute part phases across two section boundaries" {
+  let first = @song.SectionDoc::single(
+    id=@identity.SectionId::from_string("loop:first"),
+    name="theme",
+    length_cycles=@pattern.Rational::from_int(4),
+    scope=@song.TimeScope::identity(),
+    layer_id=@identity.SectionLayerId::from_string("loop:first:body"),
+    body=material("theme", 60, 4),
+  )
+  let second = @song.SectionDoc::single(
+    id=@identity.SectionId::from_string("loop:second"),
+    name="break",
+    length_cycles=@pattern.Rational::from_int(4),
+    scope=@song.TimeScope::identity(),
+    layer_id=@identity.SectionLayerId::from_string("loop:second:body"),
+    body=material("break", 70, 4),
+  )
+  let score = @song.SongDoc(parts=[
+    @song.SongOccurrenceDoc(
+      id=@identity.OccurrenceId::from_string("loop:a"),
+      name="theme",
+      section=first,
+    ),
+    @song.SongOccurrenceDoc(
+      id=@identity.OccurrenceId::from_string("loop:b"),
+      name="break",
+      section=second,
+    ),
+  ]).lower()
+  let state = PlaybackState()
+  state.queue(PlaybackSnapshot::song(score))
+  state.commit_pending(@pattern.Rational::from_int(0))
+  assert_true(
+    state.set_song_loop(
+      @pattern.Rational::from_int(2),
+      @pattern.Rational::from_int(6),
+    ),
+  )
+  assert_eq(notes(state, 2, 10), [61, 70, 61, 70])
+  assert_false(
+    state.set_song_loop(
+      @pattern.Rational::from_int(6),
+      @pattern.Rational::from_int(2),
+    ),
+  )
+  assert_eq(notes(state, 10, 14), [61, 70])
+  state.clear_song_loop()
+  assert_eq(notes(state, 6, 8), [71])
+}
+
+///|
+test "finite song loop re-enters earlier material on every wrap" {
+  let first = @song.SectionDoc::single(
+    id=@identity.SectionId::from_string("repeat:first"),
+    name="first",
+    length_cycles=@pattern.Rational::from_int(4),
+    scope=@song.TimeScope::identity(),
+    layer_id=@identity.SectionLayerId::from_string("repeat:first:body"),
+    body=material("first", 40, 4),
+  )
+  let second = @song.SectionDoc::single(
+    id=@identity.SectionId::from_string("repeat:second"),
+    name="second",
+    length_cycles=@pattern.Rational::from_int(4),
+    scope=@song.TimeScope::identity(),
+    layer_id=@identity.SectionLayerId::from_string("repeat:second:body"),
+    body=material("second", 70, 4),
+  )
+  let state = PlaybackState()
+  state.queue(
+    PlaybackSnapshot::song(
+      @song.SongDoc(parts=[
+        @song.SongOccurrenceDoc(
+          id=@identity.OccurrenceId::from_string("repeat:a"),
+          name="first",
+          section=first,
+        ),
+        @song.SongOccurrenceDoc(
+          id=@identity.OccurrenceId::from_string("repeat:b"),
+          name="second",
+          section=second,
+        ),
+      ]).lower(),
+    ),
+  )
+  state.commit_pending(@pattern.Rational::from_int(0))
+  assert_true(
+    state.set_song_loop(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(8),
+    ),
+  )
+  state.commit_pending(@pattern.Rational::from_int(5))
+  assert_eq(notes(state, 7, 9), [40])
+  state.commit_pending(@pattern.Rational::from_int(9))
+  assert_eq(notes(state, 9, 11), [41])
+}
+
+///|
+test "finite occurrence edited behind loop cursor enters on next wrap" {
+  let state = PlaybackState()
+  state.queue(finite_occurrence_score(None))
+  state.commit_pending(@pattern.Rational::from_int(0))
+  assert_true(
+    state.set_song_loop(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(8),
+    ),
+  )
+  state.queue(finite_occurrence_score(Some(2)))
+  state.commit_pending(@pattern.Rational::from_int(3))
+  assert_eq(state.skipped_entry_count(), 1)
+  assert_false(notes(state, 3, 8).any(note => note == 80 || note == 81))
+  state.commit_pending(@pattern.Rational::from_int(9))
+  assert_eq(state.skipped_entry_count(), 0)
+  assert_true(notes(state, 10, 11).any(note => note == 80))
+}
+
+///|
+test "seeded song events repeat at the same accepted musical coordinates" {
+  let section = @song.SectionDoc::single(
+    id=@identity.SectionId::from_string("seeded"),
+    name="seeded",
+    length_cycles=@pattern.Rational::from_int(8),
+    scope=@song.TimeScope::identity(),
+    layer_id=@identity.SectionLayerId::from_string("seeded:body"),
+    body=@pattern.sequence(
+        Array::makei(8, i => @pattern.note((60 + i).to_double())),
+      )
+      .slow(@pattern.Rational::from_int(8))
+      .degrade_by(0.4, seed=77),
+  )
+  let score = @song.SongDoc(parts=[
+    @song.SongOccurrenceDoc(
+      id=@identity.OccurrenceId::from_string("seeded:occurrence"),
+      name="seeded",
+      section~,
+    ),
+  ]).lower()
+  let state = PlaybackState()
+  state.queue(PlaybackSnapshot::song(score))
+  state.commit_pending(@pattern.Rational::from_int(0))
+  assert_true(
+    state.set_song_loop(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(8),
+    ),
+  )
+  let first = notes(state, 0, 8)
+  assert_true(first.length() > 0)
+  assert_eq(notes(state, 8, 16), first)
+  assert_eq(notes(state, 16, 24), first)
+}
+
+///|
 test "independent entries preserve the rest of each playing phrase" {
   let state = PlaybackState()
   accept(state, [material("three", 60, 3), material("four", 80, 4)], 0)
@@ -248,6 +403,44 @@ test "silence cancels a waiting addition without starting its old material" {
   assert_eq(notes(state, 2, 5), [])
   accept(state, [material("a", 70, 3)], 2)
   assert_eq(notes(state, 2, 5), [70, 71])
+}
+
+///|
+test "all-rest finite song material unmasks at its next entry" {
+  fn masked_song(resting : Bool) -> PlaybackSnapshot raise {
+    let phrase = @pattern.note(70.0)
+      .slow(@pattern.Rational::from_int(4))
+      .mask([!resting])
+      .material()
+      .named_entry("lead")
+    let section = @song.SectionDoc::single(
+      id=@identity.SectionId::from_string("masked-section"),
+      name="masked",
+      length_cycles=@pattern.Rational::from_int(8),
+      scope=@song.TimeScope::identity(),
+      layer_id=@identity.SectionLayerId::from_string("masked-layer"),
+      body=phrase,
+    )
+    PlaybackSnapshot::song(
+      @song.SongDoc(parts=[
+        @song.SongOccurrenceDoc::at(
+          id=@identity.OccurrenceId::from_string("masked-occurrence"),
+          start=@pattern.Rational::from_int(0),
+          name="masked",
+          section~,
+        ),
+      ]).lower(),
+    )
+  }
+  let state = PlaybackState()
+  state.queue(masked_song(true))
+  state.commit_pending(@pattern.Rational::from_int(0))
+  state.queue(masked_song(false))
+  state.commit_pending(@pattern.Rational::new(1L, 10L))
+  assert_eq(notes(state, 0, 4), [])
+  state.commit_pending(@pattern.Rational::from_int(4))
+  assert_eq(state.skipped_entry_count(), 0)
+  assert_eq(notes(state, 4, 5), [70])
 }
 
 ///|

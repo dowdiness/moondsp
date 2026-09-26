@@ -15,9 +15,10 @@ export class RequestId {
   }
 }
 
-export type PlayerOperation = "update" | "restart" | "play" | "pause";
+export type PlayerOperation = "update" | "restart" | "play" | "pause" | "seek" | "loop" | "whole";
 export type PlayState = "Empty" | "Ready" | "Playing" | "Paused" | "Ended" | "Fault";
 export type PlayerMode = "none" | "pattern" | "song";
+export type SongSection = Readonly<{ label: string; start: number; end: number }>;
 export type PlayerSnapshot = Readonly<{
   state: PlayState;
   mode: PlayerMode;
@@ -26,6 +27,8 @@ export type PlayerSnapshot = Readonly<{
   tempo: number;
   pendingCount: number;
   skippedCount: number;
+  sections?: readonly SongSection[];
+  loopRange?: Readonly<{ begin: number; end: number }> | null;
 }>;
 export type PlayerReceipt = PlayerSnapshot & Readonly<{ id: RequestId; operation: PlayerOperation; draftVersion: DraftVersion | null }> & (
   | Readonly<{ kind: "accepted" }>
@@ -58,13 +61,28 @@ function mode(value: unknown): value is PlayerMode {
   return typeof value === "string" && (PLAY_MODES as readonly string[]).includes(value);
 }
 function operation(value: unknown): value is PlayerOperation {
-  return value === "update" || value === "restart" || value === "play" || value === "pause";
+  return value === "update" || value === "restart" || value === "play" || value === "pause" ||
+    value === "seek" || value === "loop" || value === "whole";
+}
+function sections(value: unknown): SongSection[] | null {
+  if (!Array.isArray(value)) return null;
+  const result: SongSection[] = [];
+  for (const row of value) {
+    if (!record(row) || typeof row.label !== "string" || !cyclePosition(row.start) ||
+        !cyclePosition(row.end) || row.end <= row.start) return null;
+    result.push({ label: row.label, start: row.start, end: row.end });
+  }
+  return result;
 }
 function snapshot(value: Record<string, unknown>): PlayerSnapshot | null {
   if (!playState(value.state) || !mode(value.mode) || !cyclePosition(value.cyclePosition) || !count(value.samplePosition) ||
       !tempo(value.tempo) || !count(value.pendingCount) || !count(value.skippedCount)) return null;
+  const range = value.loopRange;
+  if (range !== undefined && range !== null &&
+      (!record(range) || !cyclePosition(range.begin) || !cyclePosition(range.end) || range.end <= range.begin)) return null;
   return { state: value.state, mode: value.mode, cyclePosition: value.cyclePosition, samplePosition: value.samplePosition,
-    tempo: value.tempo, pendingCount: value.pendingCount, skippedCount: value.skippedCount };
+    tempo: value.tempo, pendingCount: value.pendingCount, skippedCount: value.skippedCount,
+    ...(range !== undefined ? { loopRange: range as PlayerSnapshot["loopRange"] } : {}) };
 }
 
 export function decodeWorkletMessage(value: unknown): WorkletMessage {
@@ -79,12 +97,13 @@ export function decodeWorkletMessage(value: unknown): WorkletMessage {
     const id = RequestId.decode(value.id);
     const view = snapshot(value);
     const version = value.draftVersion === null ? null : decodeDraftVersion(value.draftVersion);
+    const layout = value.sections === undefined ? undefined : sections(value.sections);
     if (!id || !view || !operation(value.operation) || typeof value.accepted !== "boolean" ||
         (value.draftVersion !== null && version === null) ||
-        ((value.operation === "play" || value.operation === "pause") && version !== null)) {
+        ((value.operation !== "update" && value.operation !== "restart") && version !== null) || layout === null) {
       return { kind: "protocol-error", message: "invalid player receipt" };
     }
-    const base = { ...view, id, operation: value.operation, draftVersion: version };
+    const base = { ...view, ...(layout ? { sections: layout } : {}), id, operation: value.operation, draftVersion: version };
     if (value.accepted) return { kind: "receipt", receipt: { ...base, kind: "accepted" } };
     if (typeof value.restartRequired !== "boolean" || typeof value.message !== "string") return { kind: "protocol-error", message: "invalid rejection receipt" };
     return { kind: "receipt", receipt: { ...base, kind: "rejected", restartRequired: value.restartRequired, message: value.message } };

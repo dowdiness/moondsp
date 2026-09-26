@@ -16,3 +16,20 @@ test("the independent compiled demo still starts and closes", async ({ page }) =
   await page.locator("#start").click();
   await expect(page.locator("#status")).toHaveText("Ready");
 });
+
+test("accepted composition previews across sections despite a broken draft", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("#section-composition-example").click();
+  await page.locator("#start").click();
+  await expect(page.locator("#section-list .section-row")).toHaveCount(4);
+  await page.locator("#range-start").fill("31");
+  await page.locator("#range-end").fill("65");
+  await page.locator("#loop-range").click();
+  await expect(page.locator("#loop-status")).toContainText("Loop [31, 65)");
+  await page.locator(".cm-content").fill("note(");
+  await expect(page.locator("#log")).toHaveClass(/error/);
+  await expect(page.locator("#loop-status")).toContainText("Loop [31, 65)");
+  await page.locator("#whole-song").click();
+  await expect(page.locator("#loop-status")).toContainText("Whole song");
+  await expect(page.locator("#status")).toHaveText("Playing");
+});

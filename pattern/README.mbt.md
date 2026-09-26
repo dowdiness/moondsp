@@ -40,8 +40,9 @@ streams, situated between text notation and audio-rate scheduling:
 | **Combinators** | `sequence`, `stack`, `merge_control`, `+` | `sequence`, `stack`, `merge_control`, `Pat::entries`, `Pat::named_entry`, `Pat::select_control` |
 | **Time Transforms** | `Pat[A]` methods | `Pat::fast`, `Pat::slow`, `Pat::rev`, `Pat::euclid`, `Pat::degrade_by`, `every`, `Pat::gate`, `Pat::jux`, `Pat::filter_map` |
 | **Control Helpers** | `ControlMap`, helper functions | `note`, `note_name`, `chord`, `sound`, `control`, `s_gain`, `s_cutoff`, `s_pan`, `ControlMap::get`, `ControlMap::set`, `ControlMap::merge` |
+| **Pitch & Composition** | `Pat[ControlMap]` methods | `Pat::lowest`, `Pat::voicing`, `Pat::mask`, `Pat::transpose`, `Pat::steps`, `Pat::phase_transpose`; `Pat::tail` for any payload |
 | **Document & Identity** | `PatternDoc[A]`, `PatternSnapshot[A]`, `PatternLoweringCache[A]` | `PatternDoc::from_pattern`, `PatternDoc::pure`, `PatternDoc::sequence`, `PatternDoc::stack`, `PatternDoc::lower`, `PatternDoc::lower_with_cache`, `PatternSnapshot::query` |
-| **Exact Origins** | `PatternSnapshotWithOrigins[A]`, `EventWithOrigin[A]`, `EventOrigin`, `ResolvedReference[A]` | `PatternDoc::atom`, `PatternDoc::control_atom`, `PatternDoc::reference_with_binding`, `PatternDoc::lower_with_origins` |
+| **Exact Origins** | `PatternSnapshotWithOrigins[A]`, `EventWithOrigin[A]`, `EventOrigin`, `ResolvedReference[A]` | `PatternDoc::atom`, `PatternDoc::control_atom`, `PatternDoc::reference_with_binding`, `PatternDoc::compose`, `PatternDoc::tail`, `PatternDoc::lower_with_origins` |
 
 A pattern is a query:
 
@@ -169,6 +170,9 @@ The main time operations are:
 | `euclid(k, n)` | Spread `k` events over `n` steps |
 | `degrade_by(p)` | Drop events with probability `p` |
 | `every(n, f)` | Apply a transform every nth cycle |
+| `mask(mask)` | Keep source onsets in enabled slots of its entry period; no retrigger |
+| `phase_transpose(semitones, from, to?)` | Move pitches only for onsets in normalized `[from, to)`; `to` defaults to 1 |
+| `tail(replacement, cycles?)` | Substitute the final part of each entry period; `cycles` defaults to 1 and raises `TailError` if invalid |
 
 Factors use `Rational`:
 

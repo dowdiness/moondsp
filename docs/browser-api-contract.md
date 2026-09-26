@@ -724,7 +724,11 @@ scheduler pattern/song playback:
   clear_playback_input,
   push_playback_char, player_update_input, player_restart_input,
   player_play, player_pause, player_state, player_mode, player_pending_count,
-  player_skipped_count,
+  player_skipped_count, player_seek_cycle, player_loop_cycles,
+  player_seek_section, player_loop_section, player_whole_song,
+  player_section_count, player_section_start, player_section_end,
+  player_section_label_length, player_section_label_char,
+  player_loop_begin, player_loop_end,
   get_playback_error, get_playback_error_length, get_playback_error_char,
   set_scheduler_bpm, scheduler_bpm, set_scheduler_gain
 
@@ -803,6 +807,37 @@ and sample rate; this limits repetition splitting to two slices per block, not
 arbitrary pattern/event density. Finite endpoints are checked on the proposed
 clock before mutation. Ready/Ended updates check their future zero-anchored
 clock, preserving the old performance and tails on rejection.
+
+Section preview commands act on the **accepted** arrangement, not the unsent
+editor draft. `player_seek_section(index)` starts at that occurrence's exact
+cycle boundary; `player_loop_section(index)` repeats that occurrence.
+`player_seek_cycle(millicycles)` starts once at a cycle offset, and
+`player_loop_cycles(start_millicycles, end_millicycles)` repeats a half-open
+range that may cross multiple sections. Indexes are zero-based in accepted
+occurrence order. Numeric coordinates have 0.001-cycle precision; section
+commands use the exact authored fractions instead. A loop must span at least
+one render block at the current tempo. `player_whole_song()` clears the loop
+and restarts at zero. These commands return `0` on acceptance and `1` on
+rejection, without changing accepted material or transport on rejection.
+All routes share one seek/loop boundary; original section offsets, overlapping
+parts, and seeded note choices remain anchored to accepted song coordinates.
+Seeking drops active notes and room tails; natural wrap allows existing release
+and reverb tails to decay rather than cutting them. A new Restart clears the
+preview loop; compatible live edits keep it only when it still spans a render
+block at the proposed tempo. A rejected source-tempo edit leaves the accepted
+song, loop, and transport unchanged.
+Each loop wrap restores finite occurrences from the latest accepted score:
+materials skipped by an edit behind the loop cursor can enter on the next pass.
+Seeking, including after natural song end and an accepted Ended-state edit,
+starts the latest accepted material at the requested position. The new source
+does not sound merely because it was accepted while Ended.
+
+The worklet `player-receipt` carries accepted `sections` as
+`{label,start,end}` and `loopRange` as `{begin,end}` or `null`.
+`player-status` carries `loopRange`; the host retains the last accepted
+section layout between receipts. Before playback initialization, loop bound
+getters return `-1`; the accepted section getters return zero/empty on invalid
+indices.
 
 `set_scheduler_bpm` returns `0` after changing all routes, or `1` on rejection
 with a playback diagnostic. Rejection preserves the current transport and tempo.

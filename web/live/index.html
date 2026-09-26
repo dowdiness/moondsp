@@ -106,6 +106,7 @@
       @media (max-width: 720px) {
         main.workspace { grid-template-columns: 1fr; }
         #cheat { max-height: 40vh; }
+        #cheat nav a, #cheat summary { min-height: 44px; }
         button {
           min-height: 44px;
           padding: 0.55rem 1rem;
@@ -195,6 +196,50 @@
         .playback-details { grid-template-columns: 1fr; gap: 0.7rem; }
         .status-inspector summary { min-height: 44px; display: list-item; align-content: center; }
       }
+      .range-preview {
+        flex-basis: 100%;
+        border-top: 1px solid var(--border);
+        padding-top: 0.65rem;
+      }
+      .range-preview[hidden] { display: none; }
+      .range-preview h2 { font-size: var(--text-sm); margin: 0 0 0.4rem; }
+      .range-preview p { margin: 0.3rem 0; color: var(--ink-muted); }
+      .range-preview .sections, .range-preview .range-fields {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.45rem 0.75rem;
+      }
+      .range-preview .sections { margin: 0.5rem 0; gap: 0.5rem; align-items: stretch; }
+      .range-preview .section-row {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        padding: 0.4rem 0.5rem;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--panel);
+      }
+      .range-preview .section-row span {
+        flex-basis: 100%;
+        font-variant-numeric: tabular-nums;
+        font-weight: 700;
+      }
+      .range-preview .section-row button { background: var(--accent-soft); color: var(--ink); }
+      .range-preview button { min-height: 36px; padding: 0.3rem 0.65rem; }
+      .range-preview input {
+        width: 6.5rem;
+        padding: 0.35rem;
+        font: inherit;
+        color: var(--ink);
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        font-variant-numeric: tabular-nums;
+      }
+      .range-preview input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+      .range-preview .toggle { background: var(--panel); color: var(--ink); }
       button {
         font-family: var(--font-body);
         font-size: var(--text-sm);
@@ -236,6 +281,27 @@
         font-size: var(--text-sm);
         line-height: 1.5;
         color: var(--ink);
+      }
+      #cheat a {
+        color: var(--accent);
+        text-underline-offset: 0.2em;
+      }
+      #cheat a:hover { text-decoration-thickness: 2px; }
+      #cheat a:focus-visible,
+      #cheat h2:focus-visible,
+      #cheat nav:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+      #cheat nav ul { list-style: none; padding: 0; margin: 0 0 1rem; }
+      #cheat nav a { display: block; padding: 0.4rem 0; font-weight: 700; }
+      #cheat ul, #cheat ol { padding-inline-start: 1.2rem; }
+      #cheat li + li { margin-top: 0.4rem; }
+      #cheat > details { border-top: 1px solid var(--border); padding-top: 0.35rem; }
+      #cheat .recipe { margin: 0.6rem 0; }
+      #cheat pre { margin: 0.65rem 0; }
+      #cheat pre code {
+        display: block;
+        padding: 0.6rem;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
       }
       #cheat h2 {
         font-family: var(--font-display);
@@ -469,12 +535,44 @@
           <p>Position counts cycles from the start, not bars or seconds. Parts can have different cycle lengths. Acceptance does not mean every part has switched yet.</p>
         </details>
       </section>
+      <section class="range-preview" id="range-preview" aria-label="Song range preview" hidden>
+        <h2>Song preview</h2>
+        <p id="loop-status" aria-live="polite">Whole song · no loop</p>
+        <div id="section-list" class="sections" aria-label="Accepted song sections"></div>
+        <div class="range-fields">
+          <label for="range-start">From cycle</label>
+          <input id="range-start" type="number" min="0" step="0.001" inputmode="decimal">
+          <label for="range-end">To cycle (exclusive)</label>
+          <input id="range-end" type="number" min="0" step="0.001" inputmode="decimal">
+          <button type="button" id="loop-range">Loop range</button>
+          <button type="button" id="whole-song" class="toggle">Whole song</button>
+        </div>
+        <p>Use the accepted song's cycle positions. Select a section to fill the range, then extend either edge to cross sections.</p>
+      </section>
     </header>
     <main class="workspace">
       <div id="editor"></div>
-      <aside id="cheat" aria-label="mini-notation cheatsheet">
-        <h2>Examples</h2>
+      <aside id="cheat" aria-label="Live coding help">
+        <nav id="help-topics" aria-label="Help topics">
+          <ul>
+            <li><a href="#syntax-reference">Syntax reference</a>Look up arguments, defaults, and limits.</li>
+            <li><a href="#recipes">Recipes</a>Choose a musical goal and load an example.</li>
+            <li><a href="#playback-guide">How playback works</a>Understand time, live edits, and transport.</li>
+          </ul>
+        </nav>
+        <details id="syntax-reference">
+          <summary>Syntax reference</summary>
+          <!-- MINI_SYNTAX_REFERENCE -->
+          <p><a href="#help-topics">All help topics</a></p>
+        </details>
+        <details id="recipes" open>
+          <summary>Recipes</summary>
+          <p><a href="#example-songs">Browse complete examples</a>, or start with a recipe below.</p>
+          <!-- LIVE_RECIPES -->
+        <h2 id="example-songs">Examples</h2>
         <p class="cheat-note">Replaces your code. Play resumes Current song; Restart starts the editor source from the beginning.</p>
+        <button type="button" class="example" id="section-composition-example" data-live-example="section-composition">Paper Lanterns — composed variations</button>
+        <p class="cheat-note">56 seconds: theme → variation → airy interlude → return. Shared harmony, scale-step melody, phase changes, onset masks, and a rewritten cadence. Restart, then try Loop section.</p>
         <button type="button" class="example" id="overlay-groove-example" data-live-example="overlay-groove">Overlay groove: + layers</button>
         <p class="cheat-note">Drums, bass, and a stereo melody loop. The final .slow(2) slows both melodies inside parentheses.</p>
         <button type="button" class="example" id="rests-and-gates-example" data-live-example="rests-and-gates">Space in the groove: rests + gate</button>
@@ -519,12 +617,12 @@
         <button type="button" class="example" data-example='note("48(3,8) 55(2,8,2) 60(3,8) 64(2,8) 67(3,8) 72(1,8)? 67(2,8,2) 60(3,8)").slow(4).jux(rev)'>note("48(3,8) 55(2,8,2) 60(3,8) 64(2,8) 67(3,8) 72(1,8)? 67(2,8,2) 60(3,8)").slow(4).jux(rev)</button>
         <button type="button" class="example" data-example='$: s("bd(1,4), sd(1,4,2)").slow(2).jux(slow(2))&#10;$: note("46*4 60*8, 40*16 192(1,16)?").slow(2).jux(slow(2))'>$: s("bd…").slow(2).jux(slow(2)) / $: note("46…").slow(2).jux(slow(2))</button>
         </details>
-        <h2>While playing</h2>
-        <p>Updates take effect at each material's next entry. Pending changes wait while the current phrase finishes. Invalid code leaves Current song unchanged.</p>
-        <p>Pause freezes the performance. Resume with Play, or use Restart to apply a new song structure from the beginning. Author tempo with <code>bpm(90);</code>; omitted tempo is 60 BPM.</p>
-        <details id="syntax-reference">
-          <summary>Syntax reference</summary>
-          <!-- MINI_SYNTAX_REFERENCE -->
+          <p><a href="#help-topics">All help topics</a></p>
+        </details>
+        <details id="playback-guide">
+          <summary>How playback works</summary>
+          <!-- LIVE_PLAYBACK_GUIDE -->
+          <p><a href="#help-topics">All help topics</a></p>
         </details>
       </aside>
     </main>

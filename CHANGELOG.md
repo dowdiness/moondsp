@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added shared Mini song-composition transforms (`lowest`, `voicing`, `mask`,
+  `steps`, `phase`, and `tail`) with optional trailing `voicing` count,
+  `phase` end, and `tail` duration. Authored source atoms and reference routes
+  remain traceable after transforms and tail replacement. `mask` filters
+  existing onsets rather than creating an independent rhythm; `phase` currently
+  accepts `transpose(n)`. Tail durations beyond the entry period are rejected.
+  Lowest-tone and voicing projections over stacked layers share one playback
+  material, so entry playback matches whole-pattern note selection.
+- Added **Paper Lanterns** to the live editor's Examples: a 56-second song
+  demonstrating shared chord voicings, lowest-tone bass, scale-step and phase
+  variations, seeded hi-hat dropout, onset masks, and tail-rewritten cadences.
+- Organized live-editor help into **Syntax reference**, **Recipes**, and
+  **How playback works**, embedded from their canonical documentation.
+  Five goal-oriented recipes load into the editor with undo support; related
+  links reveal the relevant syntax or playback section without replacing code.
+  The playback guide explains independent phrase timing, draft acceptance,
+  Restart, section/range previews, and browser instrument limits.
 - Added live playback status separating the runtime transport, current Draft
   submission/acceptance, and pending musical-material transitions. Browser
   `player_mode` and `scheduler_cycle_position` expose primitive status on JS and
@@ -259,6 +276,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Live edits to `.transpose` and `.steps` now wait for the material's next
+  entry instead of changing its pitch immediately. Scale-step patterns own
+  their validated scale so later caller mutation cannot change playback.
+- Song previews after an Ended-state edit now start the latest accepted song,
+  without sounding new notes before preview. Rejected Ended-state loops leave
+  the completed run and release tails intact. Source BPM edits cannot retain
+  a loop shorter than one audio block, and preview controls stay hidden until
+  a song is accepted.
+- Onset masks now own their slots and keep silent finite-song materials
+  reserved for their next entry. Lowest-note and bounded-voicing projections
+  select the same onset cohort across split playback queries.
 - Prepared exact event origins during pattern compilation instead of extending
   them in reference query callbacks. Context-aware cache reuse preserves
   distinct reference uses and retained snapshots without changing public APIs.

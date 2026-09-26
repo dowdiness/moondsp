@@ -46,13 +46,30 @@ pub(all) suberror PatternDocError {
   DuplicateNodeId(String)
   EmptyPatternDocs
   MissingAtomOrigin(@identity.PatternNodeId)
+  InvalidTailDuration
   MissingReferenceBinding(@identity.PatternNodeId)
 } derive(Eq, @debug.Debug)
 pub fn PatternDocError::equal(Self, Self) -> Bool
 pub fn PatternDocError::not_equal(Self, Self) -> Bool
 pub fn PatternDocError::to_repr(Self) -> @debug.Repr
 
+pub(all) suberror TailError {
+  InvalidDuration
+} derive(Eq, @debug.Debug)
+pub fn TailError::equal(Self, Self) -> Bool
+pub fn TailError::not_equal(Self, Self) -> Bool
+pub fn TailError::to_repr(Self) -> @debug.Repr
+
 // Types and methods
+pub(all) enum CompositionOp {
+  Transpose(Int)
+  Steps(Array[Int], Int)
+  Lowest
+  Voicing(Int, Int, Int?)
+  Mask(Array[Bool])
+  PhaseTranspose(Int, Rational, Rational)
+}
+
 pub struct ControlMap {
   // private fields
 } derive(@debug.Debug)
@@ -110,8 +127,11 @@ pub fn[A] Pat::filter_map(Self[A], (A) -> A?) -> Self[A]
 pub fn[A] Pat::from_query((TimeSpan) -> Array[Event[A]]) -> Self[A]
 pub fn[A] Pat::gate(Self[A], Rational) -> Self[A]
 pub fn Pat::jux(Self[ControlMap], (Self[ControlMap]) -> Self[ControlMap]) -> Self[ControlMap]
+pub fn Pat::lowest(Self[ControlMap]) -> Self[ControlMap]
+pub fn[A] Pat::mask(Self[A], Array[Bool]) -> Self[A]
 pub fn[A] Pat::material(Self[A]) -> Self[A]
 pub fn[A] Pat::named_entry(Self[A], String) -> Self[A]
+pub fn Pat::phase_transpose(Self[ControlMap], Int, Rational, to? : Rational) -> Self[ControlMap]
 pub fn[A] Pat::pure(A) -> Self[A]
 pub fn[A] Pat::query(Self[A], TimeSpan) -> Array[Event[A]]
 pub fn[A] Pat::rev(Self[A]) -> Self[A]
@@ -119,6 +139,10 @@ pub fn[A] Pat::same_content(Self[A], Self[A]) -> Bool
 pub fn Pat::select_control(Self[ControlMap], String, value? : Double) -> Self[ControlMap]
 pub fn[A] Pat::silence() -> Self[A]
 pub fn[A] Pat::slow(Self[A], Rational) -> Self[A]
+pub fn Pat::steps(Self[ControlMap], Array[Int], Int) -> Self[ControlMap]
+pub fn[A] Pat::tail(Self[A], Self[A], cycles? : Rational) -> Self[A] raise TailError
+pub fn Pat::transpose(Self[ControlMap], Int) -> Self[ControlMap]
+pub fn Pat::voicing(Self[ControlMap], Int, Int, count? : Int) -> Self[ControlMap]
 pub impl[A] Add for Pat[A]
 
 pub struct PatternDoc[A] {
@@ -127,6 +151,7 @@ pub struct PatternDoc[A] {
 pub fn[A] PatternDoc::atom(id~ : @identity.PatternNodeId, source_atom~ : @identity.SourceAtomId, value~ : A) -> Self[A]
 pub fn[A] PatternDoc::backdate_equal(Self[A], Self[A]) -> Bool
 pub fn[A] PatternDoc::changed_at(Self[A]) -> @types.Revision
+pub fn PatternDoc::compose(Self[ControlMap], id~ : @identity.PatternNodeId, operation~ : CompositionOp) -> Self[ControlMap] raise PatternDocError
 pub fn[A] PatternDoc::contains_node(Self[A], @identity.PatternNodeId) -> Bool
 pub fn PatternDoc::control_atom(id~ : @identity.PatternNodeId, source_atom~ : @identity.SourceAtomId, key~ : String, value~ : Double) -> Self[ControlMap]
 pub fn[A] PatternDoc::degrade_by(Self[A], id~ : @identity.PatternNodeId, p~ : Double, seed? : Int) -> Self[A] raise PatternDocError
@@ -158,6 +183,7 @@ pub fn[A] PatternDoc::silence(id~ : @identity.PatternNodeId) -> Self[A]
 pub fn[A] PatternDoc::slow(Self[A], id~ : @identity.PatternNodeId, factor~ : Rational) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::stack(id~ : @identity.PatternNodeId, docs~ : Array[Self[A]]) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::subdoc(Self[A], root~ : @identity.PatternNodeId) -> Self[A] raise PatternDocError
+pub fn[A] PatternDoc::tail(Self[A], id~ : @identity.PatternNodeId, replacement~ : Self[A], cycles~ : Rational) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::with_root(Self[A], root~ : @identity.PatternNodeId) -> Self[A] raise PatternDocError
 pub impl[A] @types.BackdateEq for PatternDoc[A]
 pub impl[A] @types.HasChangedAt for PatternDoc[A]
