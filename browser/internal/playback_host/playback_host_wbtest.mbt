@@ -282,6 +282,112 @@ test "seeking an ended song starts its accepted section again" {
 }
 
 ///|
+fn preview_song_samples(
+  accepted_after_end : Bool,
+  position_milli : Int,
+  loop_preview : Bool,
+  old_source? : Bool = false,
+) -> Array[Double] raise {
+  let old = "song(bpm(120),section(\"a\",1,note(\"60\")),part(\"a1\",\"a\"))"
+  let latest = "song(bpm(120),section(\"a\",2,note(\"72 74\")),part(\"a1\",\"a\"))"
+  assert_true(init_scheduler_graph_for_test())
+  if accepted_after_end {
+    assert_eq(submit_for_test(old), 0)
+    render_for_test(752)
+    assert_eq(player_state(), 4)
+    let ended_position = scheduler_sample_position()
+    assert_eq(submit_for_test(latest, restart=false), 0)
+    assert_eq(player_state(), 4)
+    assert_eq(scheduler_sample_position(), ended_position)
+  } else {
+    assert_eq(submit_for_test(if old_source { old } else { latest }), 0)
+  }
+  if loop_preview {
+    assert_eq(player_loop_cycles(position_milli, 2000), 0)
+    assert_eq(player_loop_begin(), position_milli.to_double() / 1000.0)
+    assert_eq(player_loop_end(), 2.0)
+  } else {
+    assert_eq(player_seek_cycle(position_milli), 0)
+  }
+  let samples : Array[Double] = []
+  for _ in 0..<3 {
+    render_for_test(1)
+    for i in 0..<128 {
+      samples.push(scheduler_left_sample(i))
+    }
+  }
+  assert_true(samples.any(sample => sample.abs() > 0.0001))
+  samples
+}
+
+///|
+test "Ended update previews latest notes at zero and beyond old duration" {
+  let zero = preview_song_samples(true, 0, false)
+  assert_eq(zero, preview_song_samples(false, 0, false))
+  assert_true(zero != preview_song_samples(false, 0, false, old_source=true))
+  let later = preview_song_samples(true, 1500, false)
+  assert_eq(later, preview_song_samples(false, 1500, false))
+  assert_true(zero != later)
+  let looped = preview_song_samples(true, 1500, true)
+  assert_eq(looped, preview_song_samples(false, 1500, true))
+}
+
+///|
+test "Ended accepts a longer song without sounding its future notes" {
+  let old = "song(bpm(120),section(\"a\",1,silence()),part(\"a1\",\"a\"))"
+  let latest = "song(bpm(120),section(\"a\",2,note(\"~ 74\")),part(\"a1\",\"a\"))"
+  assert_true(init_scheduler_graph_for_test())
+  assert_eq(submit_for_test(old), 0)
+  render_for_test(752)
+  assert_eq(player_state(), 4)
+  assert_eq(submit_for_test(latest, restart=false), 0)
+  let ended_position = scheduler_sample_position()
+  for _ in 0..<400 {
+    render_for_test(1)
+    assert_eq(output_energy(), 0.0)
+  }
+  assert_eq(player_state(), 4)
+  assert_eq(scheduler_sample_position(), ended_position)
+  assert_eq(player_seek_cycle(1500), 0)
+  render_for_test(3)
+  assert_true(output_energy() > 0.01)
+}
+
+///|
+test "source tempo update cannot shorten an installed loop below one block" {
+  fn run(rejected : Bool) -> Array[Double] raise {
+    let original = "song(bpm(1),section(\"a\",2,note(\"60\")),part(\"a1\",\"a\"))"
+    let faster = "song(bpm(1000),section(\"a\",2,note(\"72\")),part(\"a1\",\"a\"))"
+    assert_true(init_scheduler_graph_for_test())
+    assert_eq(submit_for_test(original), 0)
+    assert_eq(player_loop_cycles(0, 1), 0)
+    render_for_test(2)
+    let position = scheduler_sample_position()
+    if rejected {
+      assert_eq(submit_for_test(faster, restart=false), 1)
+    }
+    assert_eq(player_state(), 2)
+    assert_eq(player.val.unwrap().view().source, Some(original))
+    assert_eq(scheduler_bpm(), 1.0)
+    assert_tempo(1.0)
+    assert_eq(scheduler_sample_position(), position)
+    assert_eq(player_loop_begin(), 0.0)
+    assert_eq(player_loop_end(), 0.001)
+    let samples : Array[Double] = []
+    for _ in 0..<8 {
+      render_for_test(1)
+      for i in 0..<128 {
+        samples.push(scheduler_left_sample(i))
+      }
+    }
+    samples
+  }
+  let uninterrupted = run(false)
+  assert_true(uninterrupted.any(sample => sample.abs() > 0.0001))
+  assert_eq(run(true), uninterrupted)
+}
+
+///|
 test "accepted song loop sounds again after the first section wraps" {
   assert_true(init_scheduler_graph_for_test())
   let source = "song(bpm(120),section(\"a\",1,note(\"60\")),section(\"b\",1,note(\"67\")),part(\"a\",\"a\"),part(\"b\",\"b\"))"

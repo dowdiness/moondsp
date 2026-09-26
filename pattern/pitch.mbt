@@ -107,15 +107,39 @@ pub fn Pat::lowest(self : Pat[ControlMap]) -> Pat[ControlMap] {
 }
 
 ///|
+// Only widen a query when a visible event started before the requested span.
+// A shorter tone at that same onset may already have ended; it still decides
+// which pitches belong to the projected cohort.
+fn[A] projection_onset_cohort(
+  inner : Pat[A],
+  arc : TimeSpan,
+) -> Array[Event[A]] {
+  let events = inner.query(arc)
+  let mut earliest = arc.begin
+  for event in events {
+    match event.whole {
+      Some(whole) => if whole.begin < earliest { earliest = whole.begin }
+      None => ()
+    }
+  }
+  if earliest < arc.begin {
+    inner.query(TimeSpan::new(earliest, arc.end_))
+  } else {
+    events
+  }
+}
+
+///|
 fn[A] Pat::lowest_by(self : Pat[A], pitch : (A) -> Double?) -> Pat[A] {
   let inner = self
   // One material keeps the whole-pattern note selection on the playback path.
   let scope = self.metadata.scope.as_material()
   make_pat(
     fn(arc) {
-      let events = inner.query(arc)
-      events.filter(event => {
-        match pitch(event.value) {
+      let events = projection_onset_cohort(inner, arc)
+      events.filter_map(event => {
+        guard event.part.intersect(arc) is Some(part) else { return None }
+        let keep = match pitch(event.value) {
           None => true
           Some(note) => {
             let onset = match event.whole {
@@ -134,6 +158,11 @@ fn[A] Pat::lowest_by(self : Pat[A], pitch : (A) -> Double?) -> Pat[A] {
               })
             })
           }
+        }
+        if keep {
+          Some({ whole: event.whole, part, value: event.value, })
+        } else {
+          None
         }
       })
     },
@@ -193,12 +222,14 @@ fn[A] Pat::voicing_by(
       if count <= 0 || low > high {
         []
       } else {
-        let events = inner.query(arc)
+        let events = projection_onset_cohort(inner, arc)
         let result : Array[Event[A]] = []
         for event_index in 0..<events.length() {
           let event = events[event_index]
+          guard event.part.intersect(arc) is Some(part) else { continue }
           match get_pitch(event.value) {
-            None => result.push(event)
+            None =>
+              result.push({ whole: event.whole, part, value: event.value, })
             Some(note) =>
               match voicing_pitch(note, low, high) {
                 None => ()
@@ -235,7 +266,7 @@ fn[A] Pat::voicing_by(
                   if rank < count {
                     result.push({
                       whole: event.whole,
-                      part: event.part,
+                      part,
                       value: set_pitch(event.value, pitch),
                     })
                   }
@@ -260,27 +291,33 @@ fn[A] Pat::voicing_by(
 /// Apply an onset mask over this pattern's entry period. The mask repeats
 /// evenly across that period; false slots silence all events beginning there.
 pub fn[A] Pat::mask(self : Pat[A], mask : Array[Bool]) -> Pat[A] {
-  guard !mask.is_empty() else { return Pat::silence() }
-  guard mask.any(value => value) else { return Pat::silence() }
+  // A caller may edit or clear its array after construction. All child
+  // projections and the content identity must use the same owned slots.
+  let mask = mask.copy()
+  let has_notes = mask.any(value => value)
   let inner = self
   let period = self.entry_period()
   let children = self.transform_children(child => child.mask(mask))
   let signature = mask.map(value => if value { "1" } else { "0" }).join("")
   make_pat(
     fn(arc) {
-      let events = inner.query(arc)
-      events.filter(event => {
-        let onset = match event.whole {
-          Some(whole) => whole.begin
-          None => event.part.begin
-        }
-        let cycle = onset / period
-        let phase = onset - period * Rational::new(cycle.floor(), 1L)
-        let slot = (phase / period * Rational::from_int(mask.length()))
-          .floor()
-          .to_int()
-        mask[slot % mask.length()]
-      })
+      if !has_notes {
+        []
+      } else {
+        let events = inner.query(arc)
+        events.filter(event => {
+          let onset = match event.whole {
+            Some(whole) => whole.begin
+            None => event.part.begin
+          }
+          let cycle = onset / period
+          let phase = onset - period * Rational::new(cycle.floor(), 1L)
+          let slot = (phase / period * Rational::from_int(mask.length()))
+            .floor()
+            .to_int()
+          mask[slot % mask.length()]
+        })
+      }
     },
     period,
     Opaque(children),

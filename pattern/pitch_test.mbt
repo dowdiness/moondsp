@@ -70,6 +70,58 @@ test "onset mask keeps progression period and filters onset slots" {
 }
 
 ///|
+test "onset mask owns the caller's slots across edits and clearing" {
+  let slots = [true, false]
+  let source = sequence([note(60.0), note(64.0)])
+  let filtered = source.mask(slots)
+  let layered = stack([
+    note(60.0).named_entry("low"),
+    note(64.0).named_entry("high"),
+  ]).mask(slots)
+  slots[0] = false
+  slots[1] = true
+  assert_eq(pitch_test_notes(filtered.query(pitch_test_span())), [60.0])
+  assert_true(filtered.same_content(source.mask([true, false])))
+  slots.clear()
+  assert_eq(pitch_test_notes(filtered.query(pitch_test_span())), [60.0])
+  let playback = []
+  for entry in layered.entries() {
+    playback.append(entry.query(pitch_test_span()))
+  }
+  assert_eq(pitch_test_notes(playback), [60.0, 64.0])
+}
+
+///|
+test "all-rest onset mask keeps its authored entry and distinct content" {
+  let source = note(60.0).slow(Rational::from_int(4)).named_entry("lead")
+  let resting = source.mask([false, false])
+  assert_eq(resting.query(pitch_test_span()).length(), 0)
+  assert_eq(resting.entry_period(), Rational::from_int(4))
+  assert_eq(resting.entries().length(), 1)
+  assert_eq(resting.entries()[0].entry_key(), "name:lead")
+  assert_false(resting.same_content(source))
+  assert_true(resting.same_content(source.mask([false, false])))
+  let empty : Array[Bool] = []
+  let no_slots = source.mask(empty)
+  assert_eq(no_slots.query(pitch_test_span()).length(), 0)
+  assert_eq(no_slots.entry_period(), Rational::from_int(4))
+  assert_eq(no_slots.entries().length(), 1)
+  assert_false(no_slots.same_content(resting))
+}
+
+///|
+test "pitch projections select the full onset cohort across split queries" {
+  let source = stack([note(60.0).gate(Rational::new(1L, 4L)), note(72.0)])
+  let late = TimeSpan::new(Rational::new(1L, 2L), Rational::from_int(1))
+  for projected in [source.lowest(), source.voicing(48, 79, count=1)] {
+    let whole = projected.query(pitch_test_span())
+    let second_half = projected.query(late)
+    assert_eq(pitch_test_notes(whole), [60.0])
+    assert_eq(pitch_test_notes(second_half), [])
+  }
+}
+
+///|
 test "tail replacement clips the original span and preserves entry period" {
   let source = note(60.0).slow(Rational::from_int(4))
   let replaced = source.tail(note(64.0))

@@ -823,11 +823,14 @@ All routes share one seek/loop boundary; original section offsets, overlapping
 parts, and seeded note choices remain anchored to accepted song coordinates.
 Seeking drops active notes and room tails; natural wrap allows existing release
 and reverb tails to decay rather than cutting them. A new Restart clears the
-preview loop; compatible live edits keep it.
+preview loop; compatible live edits keep it only when it still spans a render
+block at the proposed tempo. A rejected source-tempo edit leaves the accepted
+song, loop, and transport unchanged.
 Each loop wrap restores finite occurrences from the latest accepted score:
 materials skipped by an edit behind the loop cursor can enter on the next pass.
-Seeking, including after natural song end, restores eligible accepted material
-at the requested position before playback resumes.
+Seeking, including after natural song end and an accepted Ended-state edit,
+starts the latest accepted material at the requested position. The new source
+does not sound merely because it was accepted while Ended.
 
 The worklet `player-receipt` carries accepted `sections` as
 `{label,start,end}` and `loopRange` as `{begin,end}` or `null`.

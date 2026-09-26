@@ -406,6 +406,44 @@ test "silence cancels a waiting addition without starting its old material" {
 }
 
 ///|
+test "all-rest finite song material unmasks at its next entry" {
+  fn masked_song(resting : Bool) -> PlaybackSnapshot raise {
+    let phrase = @pattern.note(70.0)
+      .slow(@pattern.Rational::from_int(4))
+      .mask([!resting])
+      .material()
+      .named_entry("lead")
+    let section = @song.SectionDoc::single(
+      id=@identity.SectionId::from_string("masked-section"),
+      name="masked",
+      length_cycles=@pattern.Rational::from_int(8),
+      scope=@song.TimeScope::identity(),
+      layer_id=@identity.SectionLayerId::from_string("masked-layer"),
+      body=phrase,
+    )
+    PlaybackSnapshot::song(
+      @song.SongDoc(parts=[
+        @song.SongOccurrenceDoc::at(
+          id=@identity.OccurrenceId::from_string("masked-occurrence"),
+          start=@pattern.Rational::from_int(0),
+          name="masked",
+          section~,
+        ),
+      ]).lower(),
+    )
+  }
+  let state = PlaybackState()
+  state.queue(masked_song(true))
+  state.commit_pending(@pattern.Rational::from_int(0))
+  state.queue(masked_song(false))
+  state.commit_pending(@pattern.Rational::new(1L, 10L))
+  assert_eq(notes(state, 0, 4), [])
+  state.commit_pending(@pattern.Rational::from_int(4))
+  assert_eq(state.skipped_entry_count(), 0)
+  assert_eq(notes(state, 4, 5), [70])
+}
+
+///|
 fn finite_occurrence_score(lead_start : Int?) -> PlaybackSnapshot raise {
   let base = @song.SectionDoc::single(
     id=@identity.SectionId::from_string("base-section"),

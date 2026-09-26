@@ -50,7 +50,7 @@ accept. For hands-on examples, read the
   <li><strong>Whole song</strong> clears any active loop and resets position to zero.</li>
 </ul>
 <p>All preview controls use the accepted arrangement, not an invalid or pending draft. Section buttons retain exact fractional boundaries; manually entered ranges use 0.001-cycle precision. See <a href="../mini-notation.md#song-placement">section and part placement</a> to relate those positions to the score.</p>
-<p>Seeking — whether to a section or a cycle number — clears active voices and room tails at the destination. A natural loop wrap at the end of a range lets voices and reverb decay instead of cutting them.</p>
+<p>Seeking — whether to a section or a cycle number — clears active voices and room tails at the destination. A natural loop wrap lets voices and reverb decay instead of cutting them. An edit accepted after the song ends remains silent until Play or a preview command starts the latest accepted song; a loop that becomes shorter than one audio block at a new source tempo is rejected without changing the current playback.</p>
 
 <h2 id="playback-limits">What Mini does not cover</h2>
 <p>The browser instruments are a small, fixed set of voices driven by Mini events. Mini owns event timing and numeric controls; it does not own DSP graph topology. For the full boundary contract, read the

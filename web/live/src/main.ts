@@ -339,7 +339,6 @@ async function toggleCompiled(): Promise<void> {
 }
 if (audioMode === "compiled") document.getElementById("restart")!.hidden = true;
 playbackDetailsEl.hidden = audioMode !== "scheduler";
-rangePreviewEl.hidden = audioMode !== "scheduler";
 loopRangeBtn.addEventListener("click", requestRangeLoop);
 wholeSongBtn.addEventListener("click", () => {
   void playback.whole().catch(error => playback.report(error));

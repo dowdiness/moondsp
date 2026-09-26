@@ -377,6 +377,23 @@ pub fn Player::update(
   match self.session {
     Playing(current) | Paused(current) => {
       guard current.layout == next.layout else { return Err(RestartRequired) }
+      if self.loop_range is Some((begin, end_)) {
+        let block_span = match
+          next.tempo.span_for_samples(
+            self.context.block_size(),
+            sample_rate=self.context.sample_rate(),
+          ) {
+          Ok(span) => span
+          Err(_) => return Err(TransportRange)
+        }
+        guard end_ - begin >= block_span else {
+          return Err(
+            InvalidSource(
+              "loop must span at least one audio block at this tempo",
+            ),
+          )
+        }
+      }
       match self.install(next, false) {
         Err(error) => return Err(error)
         Ok(_) => ()
@@ -386,6 +403,8 @@ pub fn Player::update(
         _ => Playing(next)
       }
     }
+    // Keep rendering the old release tails while Ended. Preview or Play
+    // installs the latest accepted source before dispatching its first note.
     Ended(_, position, cycle) => self.session = Ended(next, position, cycle)
     Empty | Ready(_) => self.session = Ready(next)
     Fault(message) => return Err(Failed(message))
@@ -497,6 +516,12 @@ fn Player::seek_at(
   guard position >= @pattern.Rational::from_int(0) && position < duration else {
     return Err(InvalidSource("preview start must be inside the accepted song"))
   }
+  if self.session is Ended(song, _, _) {
+    match self.install(song, true) {
+      Err(error) => return Err(error)
+      Ok(_) => ()
+    }
+  }
   let pools = self.routes.map(route => route.pool.pool)
   match @scheduler.seek_song_all(self.schedulers, position, pools) {
     Err(_) => Err(TransportRange)
@@ -551,6 +576,12 @@ fn Player::loop_at(
   }
   guard end_ <= duration else {
     return Err(InvalidSource("loop end exceeds the accepted song"))
+  }
+  if self.session is Ended(song, _, _) {
+    match self.install(song, true) {
+      Err(error) => return Err(error)
+      Ok(_) => ()
+    }
   }
   let pools = self.routes.map(route => route.pool.pool)
   match @scheduler.set_song_loop_all(self.schedulers, begin, end_, pools) {

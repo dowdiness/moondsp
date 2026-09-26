@@ -279,6 +279,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Live edits to `.transpose` and `.steps` now wait for the material's next
   entry instead of changing its pitch immediately. Scale-step patterns own
   their validated scale so later caller mutation cannot change playback.
+- Song previews after an Ended-state edit now start the latest accepted song,
+  without sounding new notes before preview. Source BPM edits cannot retain a
+  loop shorter than one audio block, and preview controls stay hidden until a
+  song is accepted.
+- Onset masks now own their slots and keep silent finite-song materials
+  reserved for their next entry. Lowest-note and bounded-voicing projections
+  select the same onset cohort across split playback queries.
 - Prepared exact event origins during pattern compilation instead of extending
   them in reference query callbacks. Context-aware cache reuse preserves
   distinct reference uses and retained snapshots without changing public APIs.
