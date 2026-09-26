@@ -354,6 +354,40 @@ test "Ended accepts a longer song without sounding its future notes" {
 }
 
 ///|
+test "rejected Ended loop leaves accepted playback silent until preview" {
+  fn render_after_end(request_loop : Bool) -> Array[Double] raise {
+    let old = "song(bpm(120),section(\"a\",1,note(\"60\")),part(\"a1\",\"a\"))"
+    let latest = "song(bpm(120),section(\"a\",2,note(\"72\")),part(\"a1\",\"a\"))"
+    assert_true(init_scheduler_graph_for_test())
+    assert_eq(submit_for_test(old), 0)
+    render_for_test(205)
+    assert_eq(player_state(), 4)
+    assert_eq(submit_for_test(latest, restart=false), 0)
+    let before = scheduler_sample_position()
+    if request_loop {
+      assert_eq(player_loop_cycles(0, 1), 1)
+    }
+    assert_eq(player_state(), 4)
+    assert_eq(scheduler_sample_position(), before)
+    let samples : Array[Double] = []
+    for _ in 0..<24 {
+      render_for_test(1)
+      for i in 0..<128 {
+        samples.push(scheduler_left_sample(i))
+      }
+    }
+    assert_eq(scheduler_sample_position(), before)
+    samples
+  }
+  let untouched = render_after_end(false)
+  let rejected = render_after_end(true)
+  assert_eq(rejected.length(), untouched.length())
+  for i in 0..<untouched.length() {
+    assert_eq(rejected[i], untouched[i])
+  }
+}
+
+///|
 test "source tempo update cannot shorten an installed loop below one block" {
   fn run(rejected : Bool) -> Array[Double] raise {
     let original = "song(bpm(1),section(\"a\",2,note(\"60\")),part(\"a1\",\"a\"))"

@@ -577,6 +577,28 @@ fn Player::loop_at(
   guard end_ <= duration else {
     return Err(InvalidSource("loop end exceeds the accepted song"))
   }
+  // Ended still renders release tails. Reject a loop that the new transport
+  // cannot enter before installing its accepted snapshot or resetting voices.
+  if self.session is Ended(song, _, _) {
+    let block_span = match
+      song.tempo.span_for_samples(
+        self.context.block_size(),
+        sample_rate=self.context.sample_rate(),
+      ) {
+      Ok(span) => span
+      Err(_) => return Err(TransportRange)
+    }
+    guard end_ - begin >= block_span else {
+      return Err(
+        InvalidSource("loop range is too short or exceeds transport precision"),
+      )
+    }
+    match
+      song.tempo.sample_at_start(begin, sample_rate=self.context.sample_rate()) {
+      Err(_) => return Err(TransportRange)
+      Ok(_) => ()
+    }
+  }
   if self.session is Ended(song, _, _) {
     match self.install(song, true) {
       Err(error) => return Err(error)
