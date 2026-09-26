@@ -279,6 +279,12 @@ pub(all) suberror TailError {
 } derive(Eq, Debug)
 
 ///|
+pub extend TailError with Eq::{not_equal, equal}
+
+///|
+pub extend TailError with Debug::{to_repr}
+
+///|
 pub fn[A] Pat::tail(
   self : Pat[A],
   replacement : Pat[A],
