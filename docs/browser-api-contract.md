@@ -824,6 +824,10 @@ parts, and seeded note choices remain anchored to accepted song coordinates.
 Seeking drops active notes and room tails; natural wrap allows existing release
 and reverb tails to decay rather than cutting them. A new Restart clears the
 preview loop; compatible live edits keep it.
+Each loop wrap restores finite occurrences from the latest accepted score:
+materials skipped by an edit behind the loop cursor can enter on the next pass.
+Seeking, including after natural song end, restores eligible accepted material
+at the requested position before playback resumes.
 
 The worklet `player-receipt` carries accepted `sections` as
 `{label,start,end}` and `loopRange` as `{begin,end}` or `null`.

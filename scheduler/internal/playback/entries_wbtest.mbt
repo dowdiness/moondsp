@@ -109,6 +109,74 @@ test "song loop preserves absolute part phases across two section boundaries" {
 }
 
 ///|
+test "finite song loop re-enters earlier material on every wrap" {
+  let first = @song.SectionDoc::single(
+    id=@identity.SectionId::from_string("repeat:first"),
+    name="first",
+    length_cycles=@pattern.Rational::from_int(4),
+    scope=@song.TimeScope::identity(),
+    layer_id=@identity.SectionLayerId::from_string("repeat:first:body"),
+    body=material("first", 40, 4),
+  )
+  let second = @song.SectionDoc::single(
+    id=@identity.SectionId::from_string("repeat:second"),
+    name="second",
+    length_cycles=@pattern.Rational::from_int(4),
+    scope=@song.TimeScope::identity(),
+    layer_id=@identity.SectionLayerId::from_string("repeat:second:body"),
+    body=material("second", 70, 4),
+  )
+  let state = PlaybackState()
+  state.queue(
+    PlaybackSnapshot::song(
+      @song.SongDoc(parts=[
+        @song.SongOccurrenceDoc(
+          id=@identity.OccurrenceId::from_string("repeat:a"),
+          name="first",
+          section=first,
+        ),
+        @song.SongOccurrenceDoc(
+          id=@identity.OccurrenceId::from_string("repeat:b"),
+          name="second",
+          section=second,
+        ),
+      ]).lower(),
+    ),
+  )
+  state.commit_pending(@pattern.Rational::from_int(0))
+  assert_true(
+    state.set_song_loop(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(8),
+    ),
+  )
+  state.commit_pending(@pattern.Rational::from_int(5))
+  assert_eq(notes(state, 7, 9), [40])
+  state.commit_pending(@pattern.Rational::from_int(9))
+  assert_eq(notes(state, 9, 11), [41])
+}
+
+///|
+test "finite occurrence edited behind loop cursor enters on next wrap" {
+  let state = PlaybackState()
+  state.queue(finite_occurrence_score(None))
+  state.commit_pending(@pattern.Rational::from_int(0))
+  assert_true(
+    state.set_song_loop(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(8),
+    ),
+  )
+  state.queue(finite_occurrence_score(Some(2)))
+  state.commit_pending(@pattern.Rational::from_int(3))
+  assert_eq(state.skipped_entry_count(), 1)
+  assert_false(notes(state, 3, 8).any(note => note == 80 || note == 81))
+  state.commit_pending(@pattern.Rational::from_int(9))
+  assert_eq(state.skipped_entry_count(), 0)
+  assert_true(notes(state, 10, 11).any(note => note == 80))
+}
+
+///|
 test "seeded song events repeat at the same accepted musical coordinates" {
   let section = @song.SectionDoc::single(
     id=@identity.SectionId::from_string("seeded"),

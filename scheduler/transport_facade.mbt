@@ -316,7 +316,7 @@ pub fn seek_song_all(
     scheduler.previous_clock = clocks[i]
     scheduler.previous_events = []
     scheduler.active_notes.clear()
-    scheduler.playback_state.clear_song_loop()
+    scheduler.playback_state.seek_song(position)
     scheduler.last_error = None
   }
   Ok(())

@@ -265,3 +265,33 @@ test "room send leaves dry playback dry and adds one wet return" {
   assert_true(wet_energy() > 0.0)
   assert_true((reverberant_output - dry_output).abs() > 0.000001)
 }
+
+///|
+test "seeking an ended song starts its accepted section again" {
+  assert_true(init_scheduler_graph_for_test())
+  assert_eq(submit_for_test(test_song(length=1, bpm=120)), 0)
+  render_for_test(205)
+  assert_true(player.val.unwrap().session is Ended(_, _, _))
+  assert_eq(player_seek_section(0), 0)
+  let mut energy = 0.0
+  for _ in 0..<24 {
+    render_for_test(1)
+    energy += output_energy()
+  }
+  assert_true(energy > 0.0)
+}
+
+///|
+test "accepted song loop sounds again after the first section wraps" {
+  assert_true(init_scheduler_graph_for_test())
+  let source = "song(bpm(120),section(\"a\",1,note(\"60\")),section(\"b\",1,note(\"67\")),part(\"a\",\"a\"),part(\"b\",\"b\"))"
+  assert_eq(submit_for_test(source), 0)
+  assert_eq(player_loop_cycles(0, 2000), 0)
+  render_for_test(750)
+  let mut energy = 0.0
+  for _ in 0..<24 {
+    render_for_test(1)
+    energy += output_energy()
+  }
+  assert_true(energy > 0.0)
+}
