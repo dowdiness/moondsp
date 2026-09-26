@@ -27,6 +27,14 @@ test "explicit scale-step transposition follows the supplied scale" {
 }
 
 ///|
+test "scale-step composition owns its validated pitch scale" {
+  let scale = [0, 2, 4, 5, 7, 9, 11]
+  let shifted = note(60.0).steps(scale, 1)
+  scale[1] = 3
+  assert_eq(pitch_test_notes(shifted.query(pitch_test_span())), [62.0])
+}
+
+///|
 test "lowest and voicing project shared chord events without changing their clock" {
   let progression = sequence([chord("C"), chord("G7")]).slow(
     Rational::from_int(4),

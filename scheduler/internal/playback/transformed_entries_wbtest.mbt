@@ -84,3 +84,66 @@ test "authored Euclid preserves stacked notes timing and child provenance" {
     )
   }
 }
+
+///|
+test "direct pitch edits wait for the next material entry" {
+  let phrase = @pattern.sequence([@pattern.note(60.0), @pattern.note(60.0)])
+    .slow(@pattern.Rational::from_int(4))
+    .material()
+    .named_entry("phrase")
+  let scale = [0, 2, 4, 5, 7, 9, 11]
+  let edits = [
+    (phrase.transpose(2), phrase.transpose(4), 62, 64),
+    (phrase.steps(scale, 1), phrase.steps(scale, 2), 62, 64),
+    (phrase.steps(scale, 1), phrase.steps([0, 3, 5, 7, 10], 1), 62, 63),
+  ]
+  for (before, after, old_note, new_note) in edits {
+    let state = PlaybackState()
+    accept(state, [before], 0)
+    accept(state, [after], 1)
+    assert_true(state.has_pending())
+    assert_eq(notes(state, 2, 3), [old_note])
+    state.commit_pending(@pattern.Rational::from_int(4))
+    assert_eq(notes(state, 4, 5), [new_note])
+  }
+}
+
+///|
+test "authored pitch edits wait for the next material entry" {
+  let phrase = @pattern.PatternDoc::from_pattern(
+    id=@identity.PatternNodeId::from_string("phrase"),
+    pat=@pattern.sequence([@pattern.note(60.0), @pattern.note(60.0)]).slow(
+      @pattern.Rational::from_int(4),
+    ),
+  )
+  let id = @identity.PatternNodeId::from_string("pitch")
+  let operations = [
+    (
+      @pattern.CompositionOp::Transpose(2),
+      @pattern.CompositionOp::Transpose(4),
+      62,
+      64,
+    ),
+    (
+      @pattern.CompositionOp::Steps([0, 2, 4, 5, 7, 9, 11], 1),
+      @pattern.CompositionOp::Steps([0, 2, 4, 5, 7, 9, 11], 2),
+      62,
+      64,
+    ),
+  ]
+  for (old_op, new_op, old_note, new_note) in operations {
+    let state = PlaybackState()
+    state.queue(
+      PlaybackSnapshot::pattern(phrase.compose(id~, operation=old_op).lower()),
+    )
+    state.commit_pending(@pattern.Rational::from_int(0))
+    state.queue(
+      PlaybackSnapshot::pattern(phrase.compose(id~, operation=new_op).lower()),
+    )
+    state.commit_pending(@pattern.Rational::from_int(1))
+    assert_true(state.has_pending())
+    assert_eq(notes(state, 2, 3), [old_note])
+    state.commit_pending(@pattern.Rational::from_int(4))
+    assert_eq(notes(state, 4, 5), [new_note])
+  }
+}

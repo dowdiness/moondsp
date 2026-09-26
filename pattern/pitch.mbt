@@ -5,15 +5,28 @@ pub fn Pat::transpose(
   self : Pat[ControlMap],
   semitones : Int,
 ) -> Pat[ControlMap] {
-  if semitones == 0 {
-    return self
-  }
-  self.map_payload(value => {
-    match value.get("note") {
-      Some(note) => value.set("note", note + semitones.to_double())
-      None => value
-    }
+  self.transpose_by(semitones, value => value.get("note"), (value, note) => {
+    value.set("note", note)
   })
+}
+
+///|
+fn[A] Pat::transpose_by(
+  self : Pat[A],
+  semitones : Int,
+  pitch : (A) -> Double?,
+  set_pitch : (A, Double) -> A,
+) -> Pat[A] {
+  guard semitones != 0 else { return self }
+  self.map_payload(
+    value => {
+      match pitch(value) {
+        Some(note) => set_pitch(value, note + semitones.to_double())
+        None => value
+      }
+    },
+    change="transpose:\{semitones}",
+  )
 }
 
 ///|
@@ -44,40 +57,46 @@ fn[A] Pat::steps_by(
     guard pitch > previous && pitch < 12 else { return self }
     previous = pitch
   }
-  self.map_payload(value => {
-    match pitch(value) {
-      Some(note) => {
-        let midi = note.to_int()
-        let octave = midi / 12
-        let pitch = midi % 12
-        let mut degree = -1
-        for i, scale_pitch in scale {
-          if scale_pitch <= pitch {
-            degree = i
+  // The caller can mutate its array; query behavior must match this signature.
+  let scale = scale.copy()
+  let scale_signature = scale.map(degree => degree.to_string()).join(",")
+  self.map_payload(
+    value => {
+      match pitch(value) {
+        Some(note) => {
+          let midi = note.to_int()
+          let octave = midi / 12
+          let pitch = midi % 12
+          let mut degree = -1
+          for i, scale_pitch in scale {
+            if scale_pitch <= pitch {
+              degree = i
+            }
           }
+          let mut target_octave = octave
+          if degree < 0 {
+            degree = scale.length() - 1
+            target_octave -= 1
+          }
+          let mut target_degree = degree + steps
+          while target_degree < 0 {
+            target_degree += scale.length()
+            target_octave -= 1
+          }
+          while target_degree >= scale.length() {
+            target_degree -= scale.length()
+            target_octave += 1
+          }
+          set_pitch(
+            value,
+            (target_octave * 12 + scale[target_degree]).to_double(),
+          )
         }
-        let mut target_octave = octave
-        if degree < 0 {
-          degree = scale.length() - 1
-          target_octave -= 1
-        }
-        let mut target_degree = degree + steps
-        while target_degree < 0 {
-          target_degree += scale.length()
-          target_octave -= 1
-        }
-        while target_degree >= scale.length() {
-          target_degree -= scale.length()
-          target_octave += 1
-        }
-        set_pitch(
-          value,
-          (target_octave * 12 + scale[target_degree]).to_double(),
-        )
+        None => value
       }
-      None => value
-    }
-  })
+    },
+    change="steps:\{steps}:\{scale_signature}",
+  )
 }
 
 ///|

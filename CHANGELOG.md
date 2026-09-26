@@ -276,6 +276,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Live edits to `.transpose` and `.steps` now wait for the material's next
+  entry instead of changing its pitch immediately. Scale-step patterns own
+  their validated scale so later caller mutation cannot change playback.
 - Prepared exact event origins during pattern compilation instead of extending
   them in reference query callbacks. Context-aware cache reuse preserves
   distinct reference uses and retained snapshots without changing public APIs.

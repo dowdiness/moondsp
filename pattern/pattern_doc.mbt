@@ -824,13 +824,7 @@ fn[A, O] apply_composition(
     ScopedValue(set_pitch(value.value, note), value.scope, value.origin)
   }
   match op {
-    Transpose(n) =>
-      pat.map_payload(value => {
-        match read(value) {
-          Some(note) => write(value, note + n.to_double())
-          None => value
-        }
-      })
+    Transpose(n) => pat.transpose_by(n, read, write)
     Steps(scale, steps) => pat.steps_by(scale, steps, read, write)
     Lowest => pat.lowest_by(read)
     Voicing(low, high, count) =>
