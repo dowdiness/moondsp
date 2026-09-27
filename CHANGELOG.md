@@ -128,6 +128,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   qualified, trait-implementation methods use explicit extensions, and unused
   package imports are removed. The browser facade explicitly exposes the
   `PlaybackMode` equality/debug methods; its ABI baseline now records them.
+  CI now rejects compiler warnings across all targets before the JS test suite.
 - **Breaking:** replaced `MiniAuthoringPipeline` with `mini.Draft`. Use
   `edit(EditTransaction)` or explicit `reset`, not full-text setters or
   separately supplied text/edit spans. The public accepted-document channel,
