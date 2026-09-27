@@ -18,9 +18,15 @@ pub(all) enum GraphTopologyEditError {
 } derive(Debug)
 
 ///|
+pub extend GraphTopologyEditError with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 pub impl Show for GraphTopologyEditError with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
+
+///|
+pub extend GraphTopologyEditError with Show::{to_string, output}
 
 ///|
 /// Failure reason for result-typed topology queue APIs.
@@ -32,9 +38,15 @@ pub(all) enum GraphTopologyQueueError {
 } derive(Debug)
 
 ///|
+pub extend GraphTopologyQueueError with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 pub impl Show for GraphTopologyQueueError with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
+
+///|
+pub extend GraphTopologyQueueError with Show::{to_string, output}
 
 ///|
 fn graph_topology_edit_error_from_staging(

@@ -5,12 +5,15 @@ test "compiled dsp resolves simple mono feedback cycle via z^-1 insertion" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::mix(0, 2),
-    DspNode::gain(1, HALF_GAIN),
-    DspNode::output(2),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::mix(0, 2),
+    @graph.DspNode::gain(1, HALF_GAIN),
+    @graph.DspNode::output(2),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -28,19 +31,26 @@ test "compiled dsp runtime gain update retunes accepted feedback cycle" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::mix(0, 2),
-    DspNode::gain(1, HALF_GAIN),
-    DspNode::output(2),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::mix(0, 2),
+    @graph.DspNode::gain(1, HALF_GAIN),
+    @graph.DspNode::output(2),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let baseline_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let retuned_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, baseline_output)
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(2, GraphParamSlot::Value0, QUARTER_SAMPLE),
+      @graph.GraphControl::set_param(
+        2,
+        @graph.GraphParamSlot::Value0,
+        QUARTER_SAMPLE,
+      ),
     )
     is Ok(_),
   )
@@ -60,14 +70,17 @@ test "compiled dsp resolves multiple mono feedback edges from one source" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::gain(4, HALF_GAIN),
-    DspNode::gain(4, QUARTER_SAMPLE),
-    DspNode::mix(0, 1),
-    DspNode::mix(3, 2),
-    DspNode::output(4),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::gain(4, HALF_GAIN),
+    @graph.DspNode::gain(4, QUARTER_SAMPLE),
+    @graph.DspNode::mix(0, 1),
+    @graph.DspNode::mix(3, 2),
+    @graph.DspNode::output(4),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -85,29 +98,33 @@ test "compiled dsp runtime delay update matches fixed feedback loop compile" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let runtime_nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::mix(0, 3),
-    DspNode::delay(input=1, max_delay_samples=DELAY_CAPACITY, delay_samples=0),
-    DspNode::gain(2, HALF_GAIN),
-    DspNode::output(3),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::mix(0, 3),
+    @graph.DspNode::delay(
+      input=1,
+      max_delay_samples=DELAY_CAPACITY,
+      delay_samples=0,
+    ),
+    @graph.DspNode::gain(2, HALF_GAIN),
+    @graph.DspNode::output(3),
   ]
   let fixed_nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::mix(0, 3),
-    DspNode::delay(
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::mix(0, 3),
+    @graph.DspNode::delay(
       input=1,
       max_delay_samples=DELAY_CAPACITY,
       delay_samples=DELAY_SAMPLES,
     ),
-    DspNode::gain(2, HALF_GAIN),
-    DspNode::output(3),
+    @graph.DspNode::gain(2, HALF_GAIN),
+    @graph.DspNode::output(3),
   ]
-  let runtime_compiled = Dsp::compile(
-    AnalyzedGraph::analyze(runtime_nodes),
+  let runtime_compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(runtime_nodes),
     context,
   ).unwrap()
-  let fixed_compiled = Dsp::compile(
-    AnalyzedGraph::analyze(fixed_nodes),
+  let fixed_compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(fixed_nodes),
     context,
   ).unwrap()
   let runtime_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
@@ -115,9 +132,9 @@ test "compiled dsp runtime delay update matches fixed feedback loop compile" {
 
   assert_true(
     runtime_compiled.apply_control(
-      GraphControl::set_param(
+      @graph.GraphControl::set_param(
         2,
-        GraphParamSlot::DelaySamples,
+        @graph.GraphParamSlot::DelaySamples,
         DELAY_SAMPLES_DOUBLE,
       ),
     )
@@ -145,35 +162,35 @@ test "compiled dsp runtime biquad update matches fixed feedback loop compile" {
   )
   let retuned_cutoff = 4000.0
   let runtime_nodes = [
-    DspNode::oscillator(Waveform::Sine, OSCILLATOR_FREQ),
-    DspNode::mix(0, 3),
-    DspNode::biquad(
+    @graph.DspNode::oscillator(Waveform::Sine, OSCILLATOR_FREQ),
+    @graph.DspNode::mix(0, 3),
+    @graph.DspNode::biquad(
       input=1,
       mode=BiquadMode::LowPass,
       cutoff_hz=LOWPASS_CUTOFF,
       q=LOWPASS_Q,
     ),
-    DspNode::gain(2, HALF_GAIN),
-    DspNode::output(3),
+    @graph.DspNode::gain(2, HALF_GAIN),
+    @graph.DspNode::output(3),
   ]
   let fixed_nodes = [
-    DspNode::oscillator(Waveform::Sine, OSCILLATOR_FREQ),
-    DspNode::mix(0, 3),
-    DspNode::biquad(
+    @graph.DspNode::oscillator(Waveform::Sine, OSCILLATOR_FREQ),
+    @graph.DspNode::mix(0, 3),
+    @graph.DspNode::biquad(
       input=1,
       mode=BiquadMode::LowPass,
       cutoff_hz=retuned_cutoff,
       q=LOWPASS_Q,
     ),
-    DspNode::gain(2, HALF_GAIN),
-    DspNode::output(3),
+    @graph.DspNode::gain(2, HALF_GAIN),
+    @graph.DspNode::output(3),
   ]
-  let runtime_compiled = Dsp::compile(
-    AnalyzedGraph::analyze(runtime_nodes),
+  let runtime_compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(runtime_nodes),
     context,
   ).unwrap()
-  let fixed_compiled = Dsp::compile(
-    AnalyzedGraph::analyze(fixed_nodes),
+  let fixed_compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(fixed_nodes),
     context,
   ).unwrap()
   let runtime_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
@@ -181,7 +198,11 @@ test "compiled dsp runtime biquad update matches fixed feedback loop compile" {
 
   assert_true(
     runtime_compiled.apply_control(
-      GraphControl::set_param(2, GraphParamSlot::Value0, retuned_cutoff),
+      @graph.GraphControl::set_param(
+        2,
+        @graph.GraphParamSlot::Value0,
+        retuned_cutoff,
+      ),
     )
     is Ok(_),
   )
@@ -203,13 +224,16 @@ test "compiled stereo dsp resolves mono feedback cycle before pan via z^-1 inser
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::mix(0, 2),
-    DspNode::gain(1, HALF_GAIN),
-    DspNode::pan(2, PAN_CENTER),
-    DspNode::stereo_output(3),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::mix(0, 2),
+    @graph.DspNode::gain(1, HALF_GAIN),
+    @graph.DspNode::pan(2, PAN_CENTER),
+    @graph.DspNode::stereo_output(3),
   ]
-  let compiled = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.StereoDsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
@@ -239,13 +263,16 @@ test "compiled stereo dsp runtime gain update retunes accepted mono feedback cyc
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::mix(0, 2),
-    DspNode::gain(1, HALF_GAIN),
-    DspNode::pan(2, PAN_CENTER),
-    DspNode::stereo_output(3),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::mix(0, 2),
+    @graph.DspNode::gain(1, HALF_GAIN),
+    @graph.DspNode::pan(2, PAN_CENTER),
+    @graph.DspNode::stereo_output(3),
   ]
-  let compiled = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.StereoDsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let baseline_left = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let baseline_right = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let retuned_left = AudioBuffer::filled(SMALL_BLOCK_SIZE)
@@ -254,7 +281,11 @@ test "compiled stereo dsp runtime gain update retunes accepted mono feedback cyc
   compiled.process(context, baseline_left, baseline_right)
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(2, GraphParamSlot::Value0, QUARTER_SAMPLE),
+      @graph.GraphControl::set_param(
+        2,
+        @graph.GraphParamSlot::Value0,
+        QUARTER_SAMPLE,
+      ),
     )
     is Ok(_),
   )
@@ -286,8 +317,11 @@ test "compiled dsp accepts direct self-feedback with zero-initialized z^-1 state
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
-  let nodes = [DspNode::gain(0, HALF_GAIN), DspNode::output(0)]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let nodes = [@graph.DspNode::gain(0, HALF_GAIN), @graph.DspNode::output(0)]
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -304,9 +338,11 @@ test "compiled dsp rejects feedback cycles through output nodes" {
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
-  let nodes = [DspNode::output(1), DspNode::gain(0, HALF_GAIN)]
+  let nodes = [@graph.DspNode::output(1), @graph.DspNode::gain(0, HALF_GAIN)]
 
-  assert_true(Dsp::compile(AnalyzedGraph::analyze(nodes), context) is None)
+  assert_true(
+    @graph.Dsp::compile(@graph.AnalyzedGraph::analyze(nodes), context) is None,
+  )
 }
 
 ///|
@@ -316,12 +352,15 @@ test "compiled dsp accepts stereo-involved feedback cycles via self-registers" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::pan(2, PAN_CENTER),
-    DspNode::stereo_mixdown(1),
-    DspNode::output(2),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::pan(2, PAN_CENTER),
+    @graph.DspNode::stereo_mixdown(1),
+    @graph.DspNode::output(2),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context)
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  )
   assert_true(compiled is Some(_))
   let compiled = compiled.unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
@@ -355,15 +394,18 @@ test "compiled stereo dsp accepts stereo-shaped feedback edges via self-register
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::mix(0, 5),
-    DspNode::gain(1, HALF_GAIN),
-    DspNode::pan(2, PAN_CENTER),
-    DspNode::stereo_gain(input=3, amount=HALF_GAIN),
-    DspNode::stereo_mixdown(4),
-    DspNode::stereo_output(4),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::mix(0, 5),
+    @graph.DspNode::gain(1, HALF_GAIN),
+    @graph.DspNode::pan(2, PAN_CENTER),
+    @graph.DspNode::stereo_gain(input=3, amount=HALF_GAIN),
+    @graph.DspNode::stereo_mixdown(4),
+    @graph.DspNode::stereo_output(4),
   ]
-  let compiled = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context)
+  let compiled = @graph.StereoDsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  )
   assert_true(compiled is Some(_))
   let compiled = compiled.unwrap()
   let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
@@ -380,13 +422,13 @@ test "compiled stereo dsp accepts stereo-shaped feedback edges via self-register
 
 ///|
 test "self-register fields initialized for acyclic graph" {
-  let nodes : Array[DspNode] = [
-    DspNode::constant(440.0),
-    DspNode::oscillator(Waveform::Sine, 440.0),
-    DspNode::output(1),
+  let nodes : Array[@graph.DspNode] = [
+    @graph.DspNode::constant(440.0),
+    @graph.DspNode::oscillator(Waveform::Sine, 440.0),
+    @graph.DspNode::output(1),
   ]
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), ctx).unwrap()
+  let compiled = @graph.Dsp::compile(@graph.AnalyzedGraph::analyze(nodes), ctx).unwrap()
   let buf = AudioBuffer::filled(128)
   compiled.process(ctx, buf)
   // Acyclic graph should process normally — oscillator produces non-zero output
@@ -403,12 +445,15 @@ test "self-register: mono self-feedback produces bounded recurrence" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::mix(0, 2),
-    DspNode::gain(1, HALF_GAIN),
-    DspNode::output(2),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::mix(0, 2),
+    @graph.DspNode::gain(1, HALF_GAIN),
+    @graph.DspNode::output(2),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -436,13 +481,16 @@ test "self-register: stereo feedback via self-registers" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::mix(0, 2),
-    DspNode::gain(1, HALF_GAIN),
-    DspNode::pan(2, PAN_CENTER),
-    DspNode::stereo_output(3),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::mix(0, 2),
+    @graph.DspNode::gain(1, HALF_GAIN),
+    @graph.DspNode::pan(2, PAN_CENTER),
+    @graph.DspNode::stereo_output(3),
   ]
-  let compiled = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.StereoDsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
@@ -488,14 +536,17 @@ test "self-register: mixed-shape feedback across mono/stereo boundary" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::mix(0, 4),
-    DspNode::pan(1, PAN_CENTER),
-    DspNode::stereo_mixdown(2),
-    DspNode::gain(3, HALF_GAIN),
-    DspNode::output(4),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::mix(0, 4),
+    @graph.DspNode::pan(1, PAN_CENTER),
+    @graph.DspNode::stereo_mixdown(2),
+    @graph.DspNode::gain(3, HALF_GAIN),
+    @graph.DspNode::output(4),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context)
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  )
   assert_true(compiled is Some(_))
   let compiled = compiled.unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
@@ -542,14 +593,17 @@ test "feedback clip and mul exercise inline feedback computations" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::mix(0, 4),
-    DspNode::constant(HALF_GAIN),
-    DspNode::mul(1, 2),
-    DspNode::clip(3, 0.8),
-    DspNode::output(4),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::mix(0, 4),
+    @graph.DspNode::constant(HALF_GAIN),
+    @graph.DspNode::mul(1, 2),
+    @graph.DspNode::clip(3, 0.8),
+    @graph.DspNode::output(4),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)

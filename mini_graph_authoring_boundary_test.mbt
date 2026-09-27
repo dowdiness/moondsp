@@ -3,8 +3,8 @@
 // adding production routing behavior while pinning the expected boundary shape.
 struct MiniGraphPreparedTemplate {
   name : String
-  bindings : ControlBindingMap
-  runtime : Dsp
+  bindings : @moondsp.ControlBindingMap
+  runtime : @moondsp.Dsp
 }
 
 ///|
@@ -14,22 +14,34 @@ enum MiniGraphBridgeError {
 } derive(Debug, Eq)
 
 ///|
-fn prepared_bd_graph_template(ctx : DspContext) -> MiniGraphPreparedTemplate {
+fn prepared_bd_graph_template(
+  ctx : @moondsp.DspContext,
+) -> MiniGraphPreparedTemplate {
   let nodes = [
-    DspNode::oscillator(Waveform::Sine, 110.0),
-    DspNode::biquad(input=0, mode=BiquadMode::LowPass, cutoff_hz=800.0, q=0.707),
-    DspNode::biquad(input=1, mode=BiquadMode::HighPass, cutoff_hz=20.0, q=0.707),
-    DspNode::gain(2, 0.2),
-    DspNode::output(3),
+    @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 110.0),
+    @moondsp.DspNode::biquad(
+      input=0,
+      mode=@moondsp.BiquadMode::LowPass,
+      cutoff_hz=800.0,
+      q=0.707,
+    ),
+    @moondsp.DspNode::biquad(
+      input=1,
+      mode=@moondsp.BiquadMode::HighPass,
+      cutoff_hz=20.0,
+      q=0.707,
+    ),
+    @moondsp.DspNode::gain(2, 0.2),
+    @moondsp.DspNode::output(3),
   ]
-  let template = AnalyzedGraph::analyze(nodes)
-  let bindings = ControlBindingBuilder::new()
-    .bind(key="lpf", node_index=1, slot=GraphParamSlot::Value0)
-    .bind(key="hpf", node_index=2, slot=GraphParamSlot::Value0)
-    .bind(key="gain", node_index=3, slot=GraphParamSlot::Value0)
+  let template = @moondsp.AnalyzedGraph::analyze(nodes)
+  let bindings = @moondsp.ControlBindingBuilder::new()
+    .bind(key="lpf", node_index=1, slot=@moondsp.GraphParamSlot::Value0)
+    .bind(key="hpf", node_index=2, slot=@moondsp.GraphParamSlot::Value0)
+    .bind(key="gain", node_index=3, slot=@moondsp.GraphParamSlot::Value0)
     .build(template)
     .unwrap()
-  let runtime = Dsp::compile_result(template, ctx).unwrap()
+  let runtime = @moondsp.Dsp::compile_result(template, ctx).unwrap()
   { name: "bd", bindings, runtime, }
 }
 
@@ -86,7 +98,7 @@ fn mini_sound_selector_label(sound : Double) -> String {
 fn resolve_mini_graph_controls(
   controls : @pattern.ControlMap,
   registry : Array[MiniGraphPreparedTemplate],
-) -> Result[Array[GraphControl], MiniGraphBridgeError] {
+) -> Result[Array[@moondsp.GraphControl], MiniGraphBridgeError] {
   let sound = match controls.get("sound") {
     Some(value) => value
     None => return Err(MiniGraphBridgeError::MissingSoundKey)
@@ -115,7 +127,7 @@ fn resolve_mini_graph_controls(
 
 ///|
 test "Mini graph boundary: sound selects template and controls resolve" {
-  let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
+  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=16)
   let bd = prepared_bd_graph_template(ctx)
   let controls = first_mini_control_map(
     "s(\"bd\").lpf(1200).hpf(80).gain(0.5).pan(-0.25)",
@@ -124,24 +136,24 @@ test "Mini graph boundary: sound selects template and controls resolve" {
 
   @debug.assert_eq(resolved.length(), 3)
   @debug.assert_eq(resolved[0].node_index(), 1)
-  @debug.assert_eq(resolved[0].slot(), GraphParamSlot::Value0)
+  @debug.assert_eq(resolved[0].slot(), @moondsp.GraphParamSlot::Value0)
   @debug.assert_eq(resolved[0].value(), 1200.0)
   @debug.assert_eq(resolved[1].node_index(), 2)
-  @debug.assert_eq(resolved[1].slot(), GraphParamSlot::Value0)
+  @debug.assert_eq(resolved[1].slot(), @moondsp.GraphParamSlot::Value0)
   @debug.assert_eq(resolved[1].value(), 80.0)
   @debug.assert_eq(resolved[2].node_index(), 3)
-  @debug.assert_eq(resolved[2].slot(), GraphParamSlot::Value0)
+  @debug.assert_eq(resolved[2].slot(), @moondsp.GraphParamSlot::Value0)
   @debug.assert_eq(resolved[2].value(), 0.5)
 
   bd.runtime.apply_controls(resolved).unwrap()
-  let output = AudioBuffer::filled(16)
+  let output = @moondsp.AudioBuffer::filled(16)
   bd.runtime.process(ctx, output)
-  assert_true(output.all(fn(sample) { is_finite(sample) }))
+  assert_true(output.all(fn(sample) { @moondsp.is_finite(sample) }))
 }
 
 ///|
 test "Mini graph boundary: missing selected template is diagnostic" {
-  let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
+  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=16)
   let bd = prepared_bd_graph_template(ctx)
   let controls = first_mini_control_map("s(\"sd\").gain(0.5)")
   match resolve_mini_graph_controls(controls, [bd]) {

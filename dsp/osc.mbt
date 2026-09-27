@@ -8,6 +8,9 @@ pub(all) enum Waveform {
 } derive(Eq)
 
 ///|
+pub extend Waveform with Eq::{not_equal, equal}
+
+///|
 /// Stateful oscillator for the first reusable Phase 1 DSP primitive.
 pub struct Oscillator {
   priv mut phase : Double

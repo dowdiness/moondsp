@@ -8,9 +8,15 @@ pub(all) suberror GraphDocumentError {
 } derive(Debug)
 
 ///|
+pub extend GraphDocumentError with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 pub impl Show for GraphDocumentError with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
+
+///|
+pub extend GraphDocumentError with Show::{to_string, output}
 
 ///|
 /// Identity-bearing authoring wrapper for graph templates.

@@ -30,9 +30,15 @@ pub impl NodeSpanning for DspNode with fn signal_shape(self) -> Int {
 }
 
 ///|
+pub extend DspNode with NodeSpanning::{signal_shape}
+
+///|
 pub impl NodeFoldable for DspNode with fn is_foldable(self) -> Bool {
   @model.node_is_foldable(self.raw())
 }
+
+///|
+pub extend DspNode with NodeFoldable::{is_foldable, fold_value}
 
 ///|
 pub impl NodeFoldable for DspNode with fn fold_value(
@@ -49,9 +55,15 @@ pub impl NodeStateful for DspNode with fn is_stateful(self) -> Bool {
 }
 
 ///|
+pub extend DspNode with NodeStateful::{is_stateful}
+
+///|
 pub impl NodeEditable for DspNode with fn can_insert_after(self) -> Bool {
   @model.node_can_insert_after(self.raw())
 }
+
+///|
+pub extend DspNode with NodeEditable::{can_insert_after, can_delete}
 
 ///|
 pub impl NodeEditable for DspNode with fn can_delete(self) -> Bool {

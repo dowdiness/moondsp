@@ -20,24 +20,24 @@ test "seam contract: one analyzed AnalyzedGraph compiles into independent determ
   // Stateful topology (oscillator -> biquad -> output) so per-sample identity
   // across the block is a real signal: divergent internal state would show up.
   let nodes = [
-    DspNode::oscillator(Waveform::Saw, 220.0),
-    DspNode::biquad(
+    @graph.DspNode::oscillator(Waveform::Saw, 220.0),
+    @graph.DspNode::biquad(
       input=0,
       mode=BiquadMode::LowPass,
       cutoff_hz=1000.0,
       q=0.707,
     ),
-    DspNode::output(1),
+    @graph.DspNode::output(1),
   ]
 
   // Cross the boundary exactly once.
-  let template = AnalyzedGraph::analyze(nodes)
+  let template = @graph.AnalyzedGraph::analyze(nodes)
   let orphan_before = template.orphan_adsr_count()
 
   // Compile the *same* template value twice. If `compile` consumed or mutated
   // `template`, the second graph would be built from a disturbed artifact.
-  let compiled_a = Dsp::compile(template, context).unwrap()
-  let compiled_b = Dsp::compile(template, context).unwrap()
+  let compiled_a = @graph.Dsp::compile(template, context).unwrap()
+  let compiled_b = @graph.Dsp::compile(template, context).unwrap()
 
   let out_a = AudioBuffer::filled(64)
   let out_b = AudioBuffer::filled(64)
@@ -70,24 +70,24 @@ test "seam contract: one analyzed AnalyzedGraph compiles into independent determ
   // Stateful mono chain (oscillator -> biquad) into a stereo terminal, so per-sample
   // identity across L and R is a real signal of undisturbed internal state.
   let nodes = [
-    DspNode::oscillator(Waveform::Saw, 220.0),
-    DspNode::biquad(
+    @graph.DspNode::oscillator(Waveform::Saw, 220.0),
+    @graph.DspNode::biquad(
       input=0,
       mode=BiquadMode::LowPass,
       cutoff_hz=1000.0,
       q=0.707,
     ),
-    DspNode::pan(1, PAN_CENTER),
-    DspNode::stereo_output(2),
+    @graph.DspNode::pan(1, PAN_CENTER),
+    @graph.DspNode::stereo_output(2),
   ]
 
   // Cross the boundary exactly once.
-  let template = AnalyzedGraph::analyze(nodes)
+  let template = @graph.AnalyzedGraph::analyze(nodes)
   let orphan_before = template.orphan_adsr_count()
 
   // Compile the *same* template value twice.
-  let compiled_a = StereoDsp::compile(template, context).unwrap()
-  let compiled_b = StereoDsp::compile(template, context).unwrap()
+  let compiled_a = @graph.StereoDsp::compile(template, context).unwrap()
+  let compiled_b = @graph.StereoDsp::compile(template, context).unwrap()
 
   let left_a = AudioBuffer::filled(64)
   let right_a = AudioBuffer::filled(64)

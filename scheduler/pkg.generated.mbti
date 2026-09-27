@@ -34,6 +34,9 @@ pub struct ActiveVoiceEffectOutcome {
   retuned_voice_count : Int
   detached_note_count : Int
 } derive(Eq, @debug.Debug)
+pub fn ActiveVoiceEffectOutcome::equal(Self, Self) -> Bool
+pub fn ActiveVoiceEffectOutcome::not_equal(Self, Self) -> Bool
+pub fn ActiveVoiceEffectOutcome::to_repr(Self) -> @debug.Repr
 
 pub struct BlockFrame {
   sample_begin : Int64
@@ -88,7 +91,10 @@ pub fn PatternScheduler::skipped_material_change_count(Self) -> Int
 pub struct PatternVoiceScope {
   // private fields
 } derive(Eq, @debug.Debug)
+pub fn PatternVoiceScope::equal(Self, Self) -> Bool
 pub fn PatternVoiceScope::node(@identity.PatternNodeId) -> Self
+pub fn PatternVoiceScope::not_equal(Self, Self) -> Bool
+pub fn PatternVoiceScope::to_repr(Self) -> @debug.Repr
 
 pub struct PerformanceTime {
   sample : Int64
@@ -118,9 +124,12 @@ pub fn PlaybackSnapshot::song_layout_revision(Self) -> @identity.Revision?
 pub struct SongVoiceScope {
   // private fields
 } derive(Eq, @debug.Debug)
+pub fn SongVoiceScope::equal(Self, Self) -> Bool
 pub fn SongVoiceScope::layer(@identity.SectionId, @identity.SectionLayerId) -> Self
+pub fn SongVoiceScope::not_equal(Self, Self) -> Bool
 pub fn SongVoiceScope::occurrence(@identity.OccurrenceId) -> Self
 pub fn SongVoiceScope::section(@identity.SectionId) -> Self
+pub fn SongVoiceScope::to_repr(Self) -> @debug.Repr
 
 pub struct Tempo {
   // private fields

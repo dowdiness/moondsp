@@ -1,36 +1,56 @@
 ///|
 test "adsr starts in idle stage" {
-  let env = Adsr::new(attack_ms=5.0, decay_ms=5.0, sustain=0.5, release_ms=10.0)
-  assert_true(env.stage() is EnvStage::Idle)
+  let env = @dsp.Adsr::new(
+    attack_ms=5.0,
+    decay_ms=5.0,
+    sustain=0.5,
+    release_ms=10.0,
+  )
+  assert_true(env.stage() is @dsp.EnvStage::Idle)
   assert_true(env.level() == 0.0)
 }
 
 ///|
 test "adsr gate_on triggers attack" {
-  let env = Adsr::new(attack_ms=5.0, decay_ms=5.0, sustain=0.5, release_ms=10.0)
+  let env = @dsp.Adsr::new(
+    attack_ms=5.0,
+    decay_ms=5.0,
+    sustain=0.5,
+    release_ms=10.0,
+  )
   env.gate_on()
-  assert_true(env.stage() is EnvStage::Attack)
+  assert_true(env.stage() is @dsp.EnvStage::Attack)
 }
 
 ///|
 test "adsr transitions through all stages" {
-  let env = Adsr::new(attack_ms=1.0, decay_ms=1.0, sustain=0.5, release_ms=1.0)
-  let ctx = DspContext::new(sample_rate=1000.0, block_size=8)
-  let buf = AudioBuffer::filled(8)
+  let env = @dsp.Adsr::new(
+    attack_ms=1.0,
+    decay_ms=1.0,
+    sustain=0.5,
+    release_ms=1.0,
+  )
+  let ctx = @dsp.DspContext::new(sample_rate=1000.0, block_size=8)
+  let buf = @dsp.AudioBuffer::filled(8)
   env.gate_on()
   env.process(ctx, buf)
-  assert_true(env.stage() is EnvStage::Sustain)
+  assert_true(env.stage() is @dsp.EnvStage::Sustain)
   env.gate_off()
-  assert_true(env.stage() is EnvStage::Release)
+  assert_true(env.stage() is @dsp.EnvStage::Release)
   env.process(ctx, buf)
-  assert_true(env.stage() is EnvStage::Idle)
+  assert_true(env.stage() is @dsp.EnvStage::Idle)
 }
 
 ///|
 test "adsr zero attack reaches peak immediately" {
-  let env = Adsr::new(attack_ms=0.0, decay_ms=5.0, sustain=0.5, release_ms=10.0)
-  let ctx = DspContext::new(sample_rate=48000.0, block_size=1)
-  let buf = AudioBuffer::filled(1)
+  let env = @dsp.Adsr::new(
+    attack_ms=0.0,
+    decay_ms=5.0,
+    sustain=0.5,
+    release_ms=10.0,
+  )
+  let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=1)
+  let buf = @dsp.AudioBuffer::filled(1)
   env.gate_on()
   env.process(ctx, buf)
   assert_true(buf.get(0) >= 0.99)
@@ -38,28 +58,38 @@ test "adsr zero attack reaches peak immediately" {
 
 ///|
 test "adsr reset returns to idle" {
-  let env = Adsr::new(attack_ms=5.0, decay_ms=5.0, sustain=0.5, release_ms=10.0)
+  let env = @dsp.Adsr::new(
+    attack_ms=5.0,
+    decay_ms=5.0,
+    sustain=0.5,
+    release_ms=10.0,
+  )
   env.gate_on()
-  assert_true(env.stage() is EnvStage::Attack)
+  assert_true(env.stage() is @dsp.EnvStage::Attack)
   env.reset()
-  assert_true(env.stage() is EnvStage::Idle)
+  assert_true(env.stage() is @dsp.EnvStage::Idle)
   assert_true(env.level() == 0.0)
 }
 
 ///|
 test "adsr zero-time attack/decay/release skips via loop not recursion" {
-  let env = Adsr::new(attack_ms=0.0, decay_ms=0.0, sustain=0.5, release_ms=0.0)
-  let ctx = DspContext::new(sample_rate=48000.0, block_size=1)
-  let buf = AudioBuffer::filled(1)
+  let env = @dsp.Adsr::new(
+    attack_ms=0.0,
+    decay_ms=0.0,
+    sustain=0.5,
+    release_ms=0.0,
+  )
+  let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=1)
+  let buf = @dsp.AudioBuffer::filled(1)
   // After gate_on + tick: should skip attack and decay, land on sustain
   env.gate_on()
   env.process(ctx, buf)
-  assert_true(env.stage() is EnvStage::Sustain)
+  assert_true(env.stage() is @dsp.EnvStage::Sustain)
   assert_true(buf.get(0) == 0.5)
   // After gate_off + tick: should skip release, land on idle
   env.gate_off()
   env.process(ctx, buf)
-  assert_true(env.stage() is EnvStage::Idle)
+  assert_true(env.stage() is @dsp.EnvStage::Idle)
   assert_true(buf.get(0) == 0.0)
 }
 
@@ -79,14 +109,14 @@ test "prop: adsr output in [0, 1]" {
         sustain_clamped.is_nan() {
         return true
       }
-      let env = Adsr::new(
+      let env = @dsp.Adsr::new(
         attack_ms~,
         decay_ms~,
         sustain=sustain_clamped,
         release_ms~,
       )
-      let ctx = DspContext::new(sample_rate=48000.0, block_size=64)
-      let buf = AudioBuffer::filled(64)
+      let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=64)
+      let buf = @dsp.AudioBuffer::filled(64)
       env.gate_on()
       env.process(ctx, buf)
       for i = 0; i < 64; i = i + 1 {

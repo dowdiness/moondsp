@@ -19,6 +19,7 @@ pub struct ControlBindingBuilder {
 pub fn ControlBindingBuilder::ControlBindingBuilder() -> Self
 pub fn ControlBindingBuilder::bind(Self, key~ : String, node_index~ : Int, slot~ : @model.GraphParamSlot) -> Self
 pub fn ControlBindingBuilder::build(Self, @template.AnalyzedGraph) -> Result[ControlBindingMap, ControlBindingError]
+pub fn ControlBindingBuilder::to_repr(Self) -> @debug.Repr
 
 pub enum ControlBindingError {
   InvalidNodeIndex(Int)
@@ -26,13 +27,19 @@ pub enum ControlBindingError {
   DuplicateKey(String)
   OrphanBinding(String, Int)
 } derive(Eq, @debug.Debug)
+pub fn ControlBindingError::equal(Self, Self) -> Bool
+pub fn ControlBindingError::not_equal(Self, Self) -> Bool
+pub fn ControlBindingError::to_repr(Self) -> @debug.Repr
 
 pub struct ControlBindingMap {
   // private fields
 } derive(Eq, @debug.Debug)
 pub fn ControlBindingMap::default_value(Self, String) -> Double?
+pub fn ControlBindingMap::equal(Self, Self) -> Bool
 pub fn ControlBindingMap::length(Self) -> Int
+pub fn ControlBindingMap::not_equal(Self, Self) -> Bool
 pub fn ControlBindingMap::resolve_controls(Self, Map[String, Double]) -> Array[@model.GraphControl]
+pub fn ControlBindingMap::to_repr(Self) -> @debug.Repr
 
 // Type aliases
 

@@ -64,31 +64,31 @@ fn prop_biquad_mode(seed : Int) -> BiquadMode {
 /// (oscillator, noise, or constant) through optional processors (gain, clip,
 /// biquad, delay) to an Output node. Every generated graph compiles
 /// successfully — the test aborts on compilation failure.
-fn gen_mono_graph(seed : Int) -> Array[DspNode] {
+fn gen_mono_graph(seed : Int) -> Array[@graph.DspNode] {
   let s = prop_seed(seed)
-  let nodes : Array[DspNode] = []
+  let nodes : Array[@graph.DspNode] = []
   // Source node selection
   let source_kind = s % 4
   match source_kind {
     0 => {
       // Oscillator with fixed frequency
       let freq = 110.0 + (s % 880).to_double()
-      nodes.push(DspNode::oscillator(prop_waveform(s / 4), freq))
+      nodes.push(@graph.DspNode::oscillator(prop_waveform(s / 4), freq))
     }
     1 =>
       // Noise
-      nodes.push(DspNode::noise(s.reinterpret_as_uint()))
+      nodes.push(@graph.DspNode::noise(s.reinterpret_as_uint()))
     2 => {
       // Constant
       let val = (s % 200).to_double() / 200.0 - 0.5
-      nodes.push(DspNode::constant(val))
+      nodes.push(@graph.DspNode::constant(val))
     }
     _ => {
       // FM oscillator: constant freq → oscillator
       let mod_freq = 1.0 + (s % 20).to_double()
-      nodes.push(DspNode::constant(mod_freq))
+      nodes.push(@graph.DspNode::constant(mod_freq))
       let carrier_wf = prop_waveform(s / 7)
-      nodes.push(DspNode::oscillator_from(0, carrier_wf))
+      nodes.push(@graph.DspNode::oscillator_from(0, carrier_wf))
     }
   }
   // Processing chain — add 0 to 4 processors based on seed bits
@@ -97,13 +97,13 @@ fn gen_mono_graph(seed : Int) -> Array[DspNode] {
   if chain_bits % 2 >= 1 {
     // Gain
     let gain_val = 0.1 + (s % 9).to_double() * 0.1
-    nodes.push(DspNode::gain(last, gain_val))
+    nodes.push(@graph.DspNode::gain(last, gain_val))
     last = nodes.length() - 1
   }
   if chain_bits / 2 % 2 >= 1 {
     // Clip
     let threshold = 0.1 + (s % 9).to_double() * 0.1
-    nodes.push(DspNode::clip(last, threshold))
+    nodes.push(@graph.DspNode::clip(last, threshold))
     last = nodes.length() - 1
   }
   if chain_bits / 4 % 2 >= 1 {
@@ -111,7 +111,7 @@ fn gen_mono_graph(seed : Int) -> Array[DspNode] {
     let cutoff = 200.0 + (s % 4000).to_double()
     let q = 0.5 + (s % 10).to_double() * 0.1
     nodes.push(
-      DspNode::biquad(
+      @graph.DspNode::biquad(
         input=last,
         mode=prop_biquad_mode(s / 3),
         cutoff_hz=cutoff,
@@ -126,7 +126,7 @@ fn gen_mono_graph(seed : Int) -> Array[DspNode] {
     let delay_samples = 1 + s % max_samples
     let feedback = (s % 8).to_double() * 0.1
     nodes.push(
-      DspNode::delay(
+      @graph.DspNode::delay(
         input=last,
         max_delay_samples=max_samples,
         delay_samples~,
@@ -136,7 +136,7 @@ fn gen_mono_graph(seed : Int) -> Array[DspNode] {
     last = nodes.length() - 1
   }
   // Terminal
-  nodes.push(DspNode::output(last))
+  nodes.push(@graph.DspNode::output(last))
   nodes
 }
 
@@ -145,50 +145,50 @@ fn gen_mono_graph(seed : Int) -> Array[DspNode] {
 ///
 /// Builds a mono chain, then adds Pan → optional stereo processors →
 /// StereoOutput.
-fn gen_stereo_graph(seed : Int) -> Array[DspNode] {
+fn gen_stereo_graph(seed : Int) -> Array[@graph.DspNode] {
   let s = prop_seed(seed)
-  let nodes : Array[DspNode] = []
+  let nodes : Array[@graph.DspNode] = []
   // Source node: oscillator or noise
   let source_kind = s % 3
   match source_kind {
     0 => {
       let freq = 110.0 + (s % 880).to_double()
-      nodes.push(DspNode::oscillator(prop_waveform(s / 4), freq))
+      nodes.push(@graph.DspNode::oscillator(prop_waveform(s / 4), freq))
     }
-    1 => nodes.push(DspNode::noise(s.reinterpret_as_uint()))
+    1 => nodes.push(@graph.DspNode::noise(s.reinterpret_as_uint()))
     _ => {
       let val = (s % 200).to_double() / 200.0 - 0.5
-      nodes.push(DspNode::constant(val))
+      nodes.push(@graph.DspNode::constant(val))
     }
   }
   let mut last = nodes.length() - 1
   // Optional mono gain before pan
   if s / 3 % 2 == 0 {
     let gain_val = 0.1 + (s % 9).to_double() * 0.1
-    nodes.push(DspNode::gain(last, gain_val))
+    nodes.push(@graph.DspNode::gain(last, gain_val))
     last = nodes.length() - 1
   }
   // Pan to stereo
   let pan_pos = ((s % 20).to_double() - 10.0) / 10.0 // [-1.0, 1.0]
-  nodes.push(DspNode::pan(last, pan_pos))
+  nodes.push(@graph.DspNode::pan(last, pan_pos))
   last = nodes.length() - 1
   // Optional stereo processors — 4 bits select gain, clip, biquad, delay
   let stereo_bits = s / 7 % 16
   if stereo_bits % 2 >= 1 {
     let gain_val = 0.1 + (s % 9).to_double() * 0.1
-    nodes.push(DspNode::stereo_gain(input=last, amount=gain_val))
+    nodes.push(@graph.DspNode::stereo_gain(input=last, amount=gain_val))
     last = nodes.length() - 1
   }
   if stereo_bits / 2 % 2 >= 1 {
     let threshold = 0.1 + (s % 9).to_double() * 0.1
-    nodes.push(DspNode::stereo_clip(input=last, threshold~))
+    nodes.push(@graph.DspNode::stereo_clip(input=last, threshold~))
     last = nodes.length() - 1
   }
   if stereo_bits / 4 % 2 >= 1 {
     let cutoff = 200.0 + (s % 4000).to_double()
     let q = 0.5 + (s % 10).to_double() * 0.1
     nodes.push(
-      DspNode::stereo_biquad(
+      @graph.DspNode::stereo_biquad(
         input=last,
         mode=prop_biquad_mode(s / 3),
         cutoff_hz=cutoff,
@@ -202,7 +202,7 @@ fn gen_stereo_graph(seed : Int) -> Array[DspNode] {
     let delay_samples = 1 + s % max_samples
     let feedback = (s % 8).to_double() * 0.1
     nodes.push(
-      DspNode::stereo_delay(
+      @graph.DspNode::stereo_delay(
         input=last,
         max_delay_samples=max_samples,
         delay_samples~,
@@ -212,51 +212,51 @@ fn gen_stereo_graph(seed : Int) -> Array[DspNode] {
     last = nodes.length() - 1
   }
   // StereoOutput
-  nodes.push(DspNode::stereo_output(last))
+  nodes.push(@graph.DspNode::stereo_output(last))
   nodes
 }
 
 ///|
 /// Generate a valid graph with two mixed sources from a seed.
-fn gen_binary_graph(seed : Int) -> Array[DspNode] {
+fn gen_binary_graph(seed : Int) -> Array[@graph.DspNode] {
   let s = prop_seed(seed)
-  let nodes : Array[DspNode] = []
+  let nodes : Array[@graph.DspNode] = []
   // Source A
   let freq_a = 110.0 + (s % 440).to_double()
-  nodes.push(DspNode::oscillator(prop_waveform(s), freq_a))
+  nodes.push(@graph.DspNode::oscillator(prop_waveform(s), freq_a))
   // Source B
   let source_b = s / 3 % 3
   match source_b {
     0 => {
       let freq_b = 220.0 + (s % 660).to_double()
-      nodes.push(DspNode::oscillator(prop_waveform(s / 5), freq_b))
+      nodes.push(@graph.DspNode::oscillator(prop_waveform(s / 5), freq_b))
     }
-    1 => nodes.push(DspNode::noise((s * 7).reinterpret_as_uint()))
+    1 => nodes.push(@graph.DspNode::noise((s * 7).reinterpret_as_uint()))
     _ => {
       let val = (s % 100).to_double() / 100.0
-      nodes.push(DspNode::constant(val))
+      nodes.push(@graph.DspNode::constant(val))
     }
   }
   // Binary combinator
   if s % 2 == 0 {
-    nodes.push(DspNode::mix(0, 1))
+    nodes.push(@graph.DspNode::mix(0, 1))
   } else {
-    nodes.push(DspNode::mul(0, 1))
+    nodes.push(@graph.DspNode::mul(0, 1))
   }
   // Optional gain
   let mut last = 2
   if s / 11 % 2 == 0 {
     let gain_val = 0.1 + (s % 9).to_double() * 0.1
-    nodes.push(DspNode::gain(last, gain_val))
+    nodes.push(@graph.DspNode::gain(last, gain_val))
     last = nodes.length() - 1
   }
-  nodes.push(DspNode::output(last))
+  nodes.push(@graph.DspNode::output(last))
   nodes
 }
 
 ///|
 /// Generate a graph with ADSR envelope (stateful, time-varying).
-fn gen_adsr_graph(seed : Int) -> Array[DspNode] {
+fn gen_adsr_graph(seed : Int) -> Array[@graph.DspNode] {
   let s = prop_seed(seed)
   let attack_ms = 0.5 + (s % 10).to_double() * 0.5
   let decay_ms = 0.5 + (s / 3 % 10).to_double() * 0.5
@@ -264,10 +264,10 @@ fn gen_adsr_graph(seed : Int) -> Array[DspNode] {
   let release_ms = 0.5 + (s / 11 % 20).to_double() * 0.5
   let freq = 220.0 + (s % 440).to_double()
   [
-    DspNode::adsr(attack_ms~, decay_ms~, sustain~, release_ms~),
-    DspNode::oscillator(prop_waveform(s), freq),
-    DspNode::mul(0, 1),
-    DspNode::output(2),
+    @graph.DspNode::adsr(attack_ms~, decay_ms~, sustain~, release_ms~),
+    @graph.DspNode::oscillator(prop_waveform(s), freq),
+    @graph.DspNode::mul(0, 1),
+    @graph.DspNode::output(2),
   ]
 }
 
@@ -277,7 +277,7 @@ fn gen_adsr_graph(seed : Int) -> Array[DspNode] {
 /// Pattern: Constant → Mix(const, back_edge) → Gain → Output
 /// where Gain feeds back to Mix's input1 via a z^-1 back-edge.
 /// The gain is clamped to (0, 1) to keep the feedback stable.
-fn gen_mono_feedback_graph(seed : Int) -> Array[DspNode] {
+fn gen_mono_feedback_graph(seed : Int) -> Array[@graph.DspNode] {
   let s = prop_seed(seed)
   let constant_val = 0.1 + (s % 9).to_double() * 0.1
   // Feedback gain in (0, 0.95) — stable range
@@ -288,10 +288,10 @@ fn gen_mono_feedback_graph(seed : Int) -> Array[DspNode] {
       // Simple: Constant → Mix(0, 2) → Gain → Output
       // Back-edge: node 2 (Gain output) → node 1 (Mix input1)
       [
-        DspNode::constant(constant_val),
-        DspNode::mix(0, 2),
-        DspNode::gain(1, feedback_gain),
-        DspNode::output(2),
+        @graph.DspNode::constant(constant_val),
+        @graph.DspNode::mix(0, 2),
+        @graph.DspNode::gain(1, feedback_gain),
+        @graph.DspNode::output(2),
       ]
     1 => {
       // With biquad in feedback path:
@@ -299,16 +299,16 @@ fn gen_mono_feedback_graph(seed : Int) -> Array[DspNode] {
       let cutoff = 500.0 + (s % 3000).to_double()
       let q = 0.5 + (s % 10).to_double() * 0.1
       [
-        DspNode::constant(constant_val),
-        DspNode::mix(0, 3),
-        DspNode::biquad(
+        @graph.DspNode::constant(constant_val),
+        @graph.DspNode::mix(0, 3),
+        @graph.DspNode::biquad(
           input=1,
           mode=prop_biquad_mode(s / 3),
           cutoff_hz=cutoff,
           q~,
         ),
-        DspNode::gain(2, feedback_gain),
-        DspNode::output(3),
+        @graph.DspNode::gain(2, feedback_gain),
+        @graph.DspNode::output(3),
       ]
     }
     _ => {
@@ -317,16 +317,16 @@ fn gen_mono_feedback_graph(seed : Int) -> Array[DspNode] {
       let max_samples = 4 + s % 60
       let delay_samples = 1 + s % max_samples
       [
-        DspNode::constant(constant_val),
-        DspNode::mix(0, 3),
-        DspNode::delay(
+        @graph.DspNode::constant(constant_val),
+        @graph.DspNode::mix(0, 3),
+        @graph.DspNode::delay(
           input=1,
           max_delay_samples=max_samples,
           delay_samples~,
           feedback=0.0,
         ),
-        DspNode::gain(2, feedback_gain),
-        DspNode::output(3),
+        @graph.DspNode::gain(2, feedback_gain),
+        @graph.DspNode::output(3),
       ]
     }
   }
@@ -338,7 +338,7 @@ fn gen_mono_feedback_graph(seed : Int) -> Array[DspNode] {
 /// Pattern: Constant → Mix(const, stereo_mixdown) → Gain → Pan → StereoGain
 ///          → StereoMixDown → Output(Gain)
 /// The StereoMixDown feeds back to Mix's input1 crossing the mono/stereo boundary.
-fn gen_stereo_feedback_graph(seed : Int) -> Array[DspNode] {
+fn gen_stereo_feedback_graph(seed : Int) -> Array[@graph.DspNode] {
   let s = prop_seed(seed)
   let constant_val = 0.1 + (s % 9).to_double() * 0.1
   let feedback_gain = 0.05 + (s % 18).to_double() * 0.05
@@ -347,13 +347,13 @@ fn gen_stereo_feedback_graph(seed : Int) -> Array[DspNode] {
   // Constant → Mix(0, 5) → Gain → Pan → StereoGain → StereoMixDown → StereoOutput(4)
   // Back-edge: StereoMixDown(5) → Mix(1) input1
   [
-    DspNode::constant(constant_val),
-    DspNode::mix(0, 5),
-    DspNode::gain(1, feedback_gain),
-    DspNode::pan(2, pan_pos),
-    DspNode::stereo_gain(input=3, amount=stereo_gain_val),
-    DspNode::stereo_mixdown(4),
-    DspNode::stereo_output(4),
+    @graph.DspNode::constant(constant_val),
+    @graph.DspNode::mix(0, 5),
+    @graph.DspNode::gain(1, feedback_gain),
+    @graph.DspNode::pan(2, pan_pos),
+    @graph.DspNode::stereo_gain(input=3, amount=stereo_gain_val),
+    @graph.DspNode::stereo_mixdown(4),
+    @graph.DspNode::stereo_output(4),
   ]
 }
 
@@ -385,27 +385,27 @@ fn samples_identical(a : Array[Double], b : Array[Double]) -> Bool {
 ///|
 /// Compile a mono graph, abort on failure. Generators produce valid graphs,
 /// so compilation failure indicates a generator bug, not expected rejection.
-fn compile_mono(nodes : Array[DspNode]) -> Dsp {
+fn compile_mono(nodes : Array[@graph.DspNode]) -> @graph.Dsp {
   let context = DspContext::new(
     sample_rate=PROP_SAMPLE_RATE,
     block_size=PROP_BLOCK_SIZE,
   )
-  Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  @graph.Dsp::compile(@graph.AnalyzedGraph::analyze(nodes), context).unwrap()
 }
 
 ///|
 /// Compile a stereo graph, abort on failure.
-fn compile_stereo(nodes : Array[DspNode]) -> StereoDsp {
+fn compile_stereo(nodes : Array[@graph.DspNode]) -> @graph.StereoDsp {
   let context = DspContext::new(
     sample_rate=PROP_SAMPLE_RATE,
     block_size=PROP_BLOCK_SIZE,
   )
-  StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  @graph.StereoDsp::compile(@graph.AnalyzedGraph::analyze(nodes), context).unwrap()
 }
 
 ///|
 /// Process a mono compiled graph for N blocks, return all samples.
-fn run_mono(compiled : Dsp, num_blocks : Int) -> Array[Double] {
+fn run_mono(compiled : @graph.Dsp, num_blocks : Int) -> Array[Double] {
   let context = DspContext::new(
     sample_rate=PROP_SAMPLE_RATE,
     block_size=PROP_BLOCK_SIZE,
@@ -424,7 +424,7 @@ fn run_mono(compiled : Dsp, num_blocks : Int) -> Array[Double] {
 ///|
 /// Process a stereo compiled graph for N blocks, return (left, right) samples.
 fn run_stereo(
-  compiled : StereoDsp,
+  compiled : @graph.StereoDsp,
   num_blocks : Int,
 ) -> (Array[Double], Array[Double]) {
   let context = DspContext::new(
@@ -488,8 +488,14 @@ test "prop: mono ADSR graph — compile twice, process identically" {
         sample_rate=PROP_SAMPLE_RATE,
         block_size=PROP_BLOCK_SIZE,
       )
-      let compiled_a = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-      let compiled_b = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+      let compiled_a = @graph.Dsp::compile(
+        @graph.AnalyzedGraph::analyze(nodes),
+        context,
+      ).unwrap()
+      let compiled_b = @graph.Dsp::compile(
+        @graph.AnalyzedGraph::analyze(nodes),
+        context,
+      ).unwrap()
       if compiled_a.gate_on(0) is Err(_) || compiled_b.gate_on(0) is Err(_) {
         return false
       }
@@ -570,8 +576,14 @@ test "prop: mono feedback cycle — runtime retune is deterministic" {
         sample_rate=PROP_SAMPLE_RATE,
         block_size=PROP_BLOCK_SIZE,
       )
-      let compiled_a = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-      let compiled_b = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+      let compiled_a = @graph.Dsp::compile(
+        @graph.AnalyzedGraph::analyze(nodes),
+        context,
+      ).unwrap()
+      let compiled_b = @graph.Dsp::compile(
+        @graph.AnalyzedGraph::analyze(nodes),
+        context,
+      ).unwrap()
       // The gain node is always the last before Output in our feedback graphs
       let gain_index = nodes.length() - 2
       let new_gain = 0.05 + (s / 13 % 18).to_double() * 0.05
@@ -584,11 +596,19 @@ test "prop: mono feedback cycle — runtime retune is deterministic" {
         return false
       }
       if compiled_a.apply_control(
-          GraphControl::set_param(gain_index, GraphParamSlot::Value0, new_gain),
+          @graph.GraphControl::set_param(
+            gain_index,
+            @graph.GraphParamSlot::Value0,
+            new_gain,
+          ),
         )
         is Err(_) ||
         compiled_b.apply_control(
-          GraphControl::set_param(gain_index, GraphParamSlot::Value0, new_gain),
+          @graph.GraphControl::set_param(
+            gain_index,
+            @graph.GraphParamSlot::Value0,
+            new_gain,
+          ),
         )
         is Err(_) {
         return false
@@ -634,11 +654,11 @@ test "prop: mono hot-swap — same swap sequence produces identical output" {
         block_size=PROP_BLOCK_SIZE,
       )
       let crossfade = 64 + s % 128
-      let hs_a = DspHotSwap::from_graph(
+      let hs_a = @graph.DspHotSwap::from_graph(
         compile_mono(nodes_initial),
         crossfade_samples=crossfade,
       )
-      let hs_b = DspHotSwap::from_graph(
+      let hs_b = @graph.DspHotSwap::from_graph(
         compile_mono(nodes_initial),
         crossfade_samples=crossfade,
       )
@@ -681,11 +701,11 @@ test "prop: stereo hot-swap — same swap sequence produces identical output" {
         block_size=PROP_BLOCK_SIZE,
       )
       let crossfade = 64 + s % 128
-      let hs_a = StereoDspHotSwap::from_graph(
+      let hs_a = @graph.StereoDspHotSwap::from_graph(
         compile_stereo(nodes_initial),
         crossfade_samples=crossfade,
       )
-      let hs_b = StereoDspHotSwap::from_graph(
+      let hs_b = @graph.StereoDspHotSwap::from_graph(
         compile_stereo(nodes_initial),
         crossfade_samples=crossfade,
       )
@@ -733,22 +753,36 @@ test "prop: runtime param update is deterministic across compilations" {
       let gain_val = 0.1 + (s % 9).to_double() * 0.1
       let new_gain = 0.05 + (s / 7 % 9).to_double() * 0.1
       let nodes = [
-        DspNode::oscillator(Waveform::Sine, freq),
-        DspNode::gain(0, gain_val),
-        DspNode::output(1),
+        @graph.DspNode::oscillator(Waveform::Sine, freq),
+        @graph.DspNode::gain(0, gain_val),
+        @graph.DspNode::output(1),
       ]
       let context = DspContext::new(
         sample_rate=PROP_SAMPLE_RATE,
         block_size=PROP_BLOCK_SIZE,
       )
-      let compiled_a = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-      let compiled_b = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+      let compiled_a = @graph.Dsp::compile(
+        @graph.AnalyzedGraph::analyze(nodes),
+        context,
+      ).unwrap()
+      let compiled_b = @graph.Dsp::compile(
+        @graph.AnalyzedGraph::analyze(nodes),
+        context,
+      ).unwrap()
       if compiled_a.apply_control(
-          GraphControl::set_param(1, GraphParamSlot::Value0, new_gain),
+          @graph.GraphControl::set_param(
+            1,
+            @graph.GraphParamSlot::Value0,
+            new_gain,
+          ),
         )
         is Err(_) ||
         compiled_b.apply_control(
-          GraphControl::set_param(1, GraphParamSlot::Value0, new_gain),
+          @graph.GraphControl::set_param(
+            1,
+            @graph.GraphParamSlot::Value0,
+            new_gain,
+          ),
         )
         is Err(_) {
         return false
@@ -785,33 +819,55 @@ test "prop: runtime control variants are deterministic" {
           let new_cutoff = 200.0 + (s / 3 % 4000).to_double()
           let new_q = 0.5 + (s / 7 % 10).to_double() * 0.1
           let nodes = [
-            DspNode::oscillator(Waveform::Saw, 440.0),
-            DspNode::biquad(
+            @graph.DspNode::oscillator(Waveform::Saw, 440.0),
+            @graph.DspNode::biquad(
               input=0,
               mode=BiquadMode::LowPass,
               cutoff_hz=cutoff,
               q~,
             ),
-            DspNode::output(1),
+            @graph.DspNode::output(1),
           ]
-          let ca = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-          let cb = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+          let ca = @graph.Dsp::compile(
+            @graph.AnalyzedGraph::analyze(nodes),
+            context,
+          ).unwrap()
+          let cb = @graph.Dsp::compile(
+            @graph.AnalyzedGraph::analyze(nodes),
+            context,
+          ).unwrap()
           ca.process(context, out_a)
           cb.process(context, out_b)
           if ca.apply_control(
-              GraphControl::set_param(1, GraphParamSlot::Value0, new_cutoff),
+              @graph.GraphControl::set_param(
+                1,
+                @graph.GraphParamSlot::Value0,
+                new_cutoff,
+              ),
             )
             is Err(_) ||
             cb.apply_control(
-              GraphControl::set_param(1, GraphParamSlot::Value0, new_cutoff),
+              @graph.GraphControl::set_param(
+                1,
+                @graph.GraphParamSlot::Value0,
+                new_cutoff,
+              ),
             )
             is Err(_) ||
             ca.apply_control(
-              GraphControl::set_param(1, GraphParamSlot::Value1, new_q),
+              @graph.GraphControl::set_param(
+                1,
+                @graph.GraphParamSlot::Value1,
+                new_q,
+              ),
             )
             is Err(_) ||
             cb.apply_control(
-              GraphControl::set_param(1, GraphParamSlot::Value1, new_q),
+              @graph.GraphControl::set_param(
+                1,
+                @graph.GraphParamSlot::Value1,
+                new_q,
+              ),
             )
             is Err(_) {
             return false
@@ -826,31 +882,37 @@ test "prop: runtime control variants are deterministic" {
           let initial_delay = 1 + s % (max_samples / 2)
           let new_delay = 1 + s / 3 % max_samples
           let nodes = [
-            DspNode::oscillator(Waveform::Sine, 220.0),
-            DspNode::delay(
+            @graph.DspNode::oscillator(Waveform::Sine, 220.0),
+            @graph.DspNode::delay(
               input=0,
               max_delay_samples=max_samples,
               delay_samples=initial_delay,
               feedback=0.3,
             ),
-            DspNode::output(1),
+            @graph.DspNode::output(1),
           ]
-          let ca = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-          let cb = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+          let ca = @graph.Dsp::compile(
+            @graph.AnalyzedGraph::analyze(nodes),
+            context,
+          ).unwrap()
+          let cb = @graph.Dsp::compile(
+            @graph.AnalyzedGraph::analyze(nodes),
+            context,
+          ).unwrap()
           ca.process(context, out_a)
           cb.process(context, out_b)
           if ca.apply_control(
-              GraphControl::set_param(
+              @graph.GraphControl::set_param(
                 1,
-                GraphParamSlot::DelaySamples,
+                @graph.GraphParamSlot::DelaySamples,
                 new_delay.to_double(),
               ),
             )
             is Err(_) ||
             cb.apply_control(
-              GraphControl::set_param(
+              @graph.GraphControl::set_param(
                 1,
-                GraphParamSlot::DelaySamples,
+                @graph.GraphParamSlot::DelaySamples,
                 new_delay.to_double(),
               ),
             )
@@ -868,13 +930,19 @@ test "prop: runtime control variants are deterministic" {
           let sustain = 0.2 + (s / 7 % 8).to_double() * 0.1
           let release_ms = 2.0 + (s / 11 % 10).to_double()
           let nodes = [
-            DspNode::adsr(attack_ms~, decay_ms~, sustain~, release_ms~),
-            DspNode::oscillator(Waveform::Sine, 440.0),
-            DspNode::mul(0, 1),
-            DspNode::output(2),
+            @graph.DspNode::adsr(attack_ms~, decay_ms~, sustain~, release_ms~),
+            @graph.DspNode::oscillator(Waveform::Sine, 440.0),
+            @graph.DspNode::mul(0, 1),
+            @graph.DspNode::output(2),
           ]
-          let ca = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-          let cb = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+          let ca = @graph.Dsp::compile(
+            @graph.AnalyzedGraph::analyze(nodes),
+            context,
+          ).unwrap()
+          let cb = @graph.Dsp::compile(
+            @graph.AnalyzedGraph::analyze(nodes),
+            context,
+          ).unwrap()
           if ca.gate_on(0) is Err(_) || cb.gate_on(0) is Err(_) {
             return false
           }
@@ -1174,15 +1242,18 @@ test "graph generators compile at signed seed boundaries and topology variants" 
         gen_mono_graph, gen_binary_graph, gen_adsr_graph, gen_mono_feedback_graph,
       ] {
       match
-        Dsp::compile_result(AnalyzedGraph::analyze(generate(seed)), context) {
+        @graph.Dsp::compile_result(
+          @graph.AnalyzedGraph::analyze(generate(seed)),
+          context,
+        ) {
         Ok(_) => ()
         Err(error) => fail("mono seed \{seed}: \{error}")
       }
     }
     for generate in [gen_stereo_graph, gen_stereo_feedback_graph] {
       match
-        StereoDsp::compile_result(
-          AnalyzedGraph::analyze(generate(seed)),
+        @graph.StereoDsp::compile_result(
+          @graph.AnalyzedGraph::analyze(generate(seed)),
           context,
         ) {
         Ok(_) => ()

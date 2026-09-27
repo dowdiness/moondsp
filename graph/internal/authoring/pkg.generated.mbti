@@ -20,6 +20,9 @@ pub(all) suberror GraphDocumentError {
   RetiredNodeId(String)
   Topology(@staging.GraphTopologyEditError)
 } derive(@debug.Debug)
+pub fn GraphDocumentError::output(Self, &Logger) -> Unit
+pub fn GraphDocumentError::to_repr(Self) -> @debug.Repr
+pub fn GraphDocumentError::to_string(Self) -> String
 pub impl Show for GraphDocumentError
 
 // Types and methods

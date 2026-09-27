@@ -5,11 +5,14 @@ test "compiled dsp preserves constant-fed gain controls and reset" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(3.0),
-    DspNode::gain(0, 0.5),
-    DspNode::output(1),
+    @graph.DspNode::constant(3.0),
+    @graph.DspNode::gain(0, 0.5),
+    @graph.DspNode::output(1),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -17,7 +20,7 @@ test "compiled dsp preserves constant-fed gain controls and reset" {
 
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(1, GraphParamSlot::Value0, 2.0),
+      @graph.GraphControl::set_param(1, @graph.GraphParamSlot::Value0, 2.0),
     )
     is Ok(_),
   )
@@ -42,11 +45,14 @@ test "compiled dsp preserves constant-fed clip controls" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(10.0),
-    DspNode::clip(0, 3.0),
-    DspNode::output(1),
+    @graph.DspNode::constant(10.0),
+    @graph.DspNode::clip(0, 3.0),
+    @graph.DspNode::output(1),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -54,7 +60,7 @@ test "compiled dsp preserves constant-fed clip controls" {
 
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(1, GraphParamSlot::Value0, 7.0),
+      @graph.GraphControl::set_param(1, @graph.GraphParamSlot::Value0, 7.0),
     )
     is Ok(_),
   )
@@ -72,11 +78,18 @@ test "compiled dsp runtime param update changes delay length" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(ZERO_SAMPLE),
-    DspNode::delay(input=0, max_delay_samples=DELAY_CAPACITY, delay_samples=0),
-    DspNode::output(1),
+    @graph.DspNode::constant(ZERO_SAMPLE),
+    @graph.DspNode::delay(
+      input=0,
+      max_delay_samples=DELAY_CAPACITY,
+      delay_samples=0,
+    ),
+    @graph.DspNode::output(1),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -85,15 +98,19 @@ test "compiled dsp runtime param update changes delay length" {
 
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(0, GraphParamSlot::Value0, UNIT_SAMPLE),
+      @graph.GraphControl::set_param(
+        0,
+        @graph.GraphParamSlot::Value0,
+        UNIT_SAMPLE,
+      ),
     )
     is Ok(_),
   )
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(
+      @graph.GraphControl::set_param(
         1,
-        GraphParamSlot::DelaySamples,
+        @graph.GraphParamSlot::DelaySamples,
         DELAY_SAMPLES_DOUBLE,
       ),
     )
@@ -114,18 +131,25 @@ test "compiled dsp reset restores runtime delay parameters" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::delay(input=0, max_delay_samples=DELAY_CAPACITY, delay_samples=0),
-    DspNode::output(1),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::delay(
+      input=0,
+      max_delay_samples=DELAY_CAPACITY,
+      delay_samples=0,
+    ),
+    @graph.DspNode::output(1),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(
+      @graph.GraphControl::set_param(
         1,
-        GraphParamSlot::DelaySamples,
+        @graph.GraphParamSlot::DelaySamples,
         DELAY_SAMPLES_DOUBLE,
       ),
     )
@@ -147,23 +171,30 @@ test "compiled dsp applies mixed control batches in order" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::output(1),
-    DspNode::mul(3, 2),
-    DspNode::adsr(
+    @graph.DspNode::output(1),
+    @graph.DspNode::mul(3, 2),
+    @graph.DspNode::adsr(
       attack_ms=ADSR_ATTACK_MS,
       decay_ms=ADSR_DECAY_MS,
       sustain=ADSR_SUSTAIN_LEVEL,
       release_ms=ADSR_RELEASE_MS,
     ),
-    DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::constant(UNIT_SAMPLE),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   assert_true(
     compiled.apply_controls([
-      GraphControl::set_param(3, GraphParamSlot::Value0, HALF_GAIN),
-      GraphControl::gate_on(2),
+      @graph.GraphControl::set_param(
+        3,
+        @graph.GraphParamSlot::Value0,
+        HALF_GAIN,
+      ),
+      @graph.GraphControl::gate_on(2),
     ])
     is Ok(_),
   )
@@ -182,19 +213,26 @@ test "compiled dsp rejects invalid control batches without partial updates" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::gain(0, QUARTER_SAMPLE),
-    DspNode::output(1),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::gain(0, QUARTER_SAMPLE),
+    @graph.DspNode::output(1),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   assert_true(
     compiled.apply_controls([
-      GraphControl::set_param(1, GraphParamSlot::Value0, HALF_GAIN),
-      GraphControl::set_param(
+      @graph.GraphControl::set_param(
         1,
-        GraphParamSlot::DelaySamples,
+        @graph.GraphParamSlot::Value0,
+        HALF_GAIN,
+      ),
+      @graph.GraphControl::set_param(
+        1,
+        @graph.GraphParamSlot::DelaySamples,
         DELAY_SAMPLES_DOUBLE,
       ),
     ])
@@ -216,17 +254,24 @@ test "compiled dsp apply_control reports invalid node index" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::gain(0, QUARTER_SAMPLE),
-    DspNode::output(1),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::gain(0, QUARTER_SAMPLE),
+    @graph.DspNode::output(1),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
 
   match
     compiled.apply_control(
-      GraphControl::set_param(99, GraphParamSlot::Value0, HALF_GAIN),
+      @graph.GraphControl::set_param(
+        99,
+        @graph.GraphParamSlot::Value0,
+        HALF_GAIN,
+      ),
     ) {
-    Err(GraphControlError::InvalidNodeIndex(99)) => ()
+    Err(@graph.GraphControlError::InvalidNodeIndex(99)) => ()
     other => fail("expected InvalidNodeIndex, got \{@debug.to_string(other)}")
   }
 }
@@ -238,17 +283,24 @@ test "compiled dsp apply_control reports orphan optimized node" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::constant(HALF_GAIN),
-    DspNode::output(1),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::constant(HALF_GAIN),
+    @graph.DspNode::output(1),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
 
   match
     compiled.apply_control(
-      GraphControl::set_param(0, GraphParamSlot::Value0, QUARTER_SAMPLE),
+      @graph.GraphControl::set_param(
+        0,
+        @graph.GraphParamSlot::Value0,
+        QUARTER_SAMPLE,
+      ),
     ) {
-    Err(GraphControlError::OrphanNode(0)) => ()
+    Err(@graph.GraphControlError::OrphanNode(0)) => ()
     other => fail("expected OrphanNode, got \{@debug.to_string(other)}")
   }
 }
@@ -260,21 +312,32 @@ test "compiled dsp apply_control reports invalid slot and value" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::delay(input=0, max_delay_samples=DELAY_CAPACITY, delay_samples=0),
-    DspNode::output(1),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::delay(
+      input=0,
+      max_delay_samples=DELAY_CAPACITY,
+      delay_samples=0,
+    ),
+    @graph.DspNode::output(1),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
 
   match
     compiled.apply_control(
-      GraphControl::set_param(0, GraphParamSlot::DelaySamples, 1.0),
+      @graph.GraphControl::set_param(
+        0,
+        @graph.GraphParamSlot::DelaySamples,
+        1.0,
+      ),
     ) {
     Err(
-      GraphControlError::InvalidSlotForNode(
+      @graph.GraphControlError::InvalidSlotForNode(
         0,
-        DspNodeKind::Constant,
-        GraphParamSlot::DelaySamples
+        @graph.DspNodeKind::Constant,
+        @graph.GraphParamSlot::DelaySamples
       )
     ) => ()
     other => fail("expected InvalidSlotForNode, got \{@debug.to_string(other)}")
@@ -282,13 +345,17 @@ test "compiled dsp apply_control reports invalid slot and value" {
 
   match
     compiled.apply_control(
-      GraphControl::set_param(1, GraphParamSlot::DelaySamples, 1.5),
+      @graph.GraphControl::set_param(
+        1,
+        @graph.GraphParamSlot::DelaySamples,
+        1.5,
+      ),
     ) {
     Err(
-      GraphControlError::InvalidParamValue(
+      @graph.GraphControlError::InvalidParamValue(
         1,
-        DspNodeKind::Delay,
-        GraphParamSlot::DelaySamples,
+        @graph.DspNodeKind::Delay,
+        @graph.GraphParamSlot::DelaySamples,
         1.5
       )
     ) => ()
@@ -303,27 +370,34 @@ test "compiled dsp apply_controls is transactional" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::gain(0, QUARTER_SAMPLE),
-    DspNode::output(1),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::gain(0, QUARTER_SAMPLE),
+    @graph.DspNode::output(1),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   match
     compiled.apply_controls([
-      GraphControl::set_param(1, GraphParamSlot::Value0, HALF_GAIN),
-      GraphControl::set_param(
+      @graph.GraphControl::set_param(
         1,
-        GraphParamSlot::DelaySamples,
+        @graph.GraphParamSlot::Value0,
+        HALF_GAIN,
+      ),
+      @graph.GraphControl::set_param(
+        1,
+        @graph.GraphParamSlot::DelaySamples,
         DELAY_SAMPLES_DOUBLE,
       ),
     ]) {
     Err(
-      GraphControlError::InvalidSlotForNode(
+      @graph.GraphControlError::InvalidSlotForNode(
         1,
-        DspNodeKind::Gain,
-        GraphParamSlot::DelaySamples
+        @graph.DspNodeKind::Gain,
+        @graph.GraphParamSlot::DelaySamples
       )
     ) => ()
     other => fail("expected InvalidSlotForNode, got \{@debug.to_string(other)}")
@@ -344,14 +418,18 @@ test "compiled stereo dsp apply_control reports invalid gate target" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::pan(0, 0.0),
-    DspNode::stereo_output(1),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::pan(0, 0.0),
+    @graph.DspNode::stereo_output(1),
   ]
-  let compiled = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.StereoDsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
 
-  match compiled.apply_control(GraphControl::gate_on(1)) {
-    Err(GraphControlError::InvalidGateNode(1, DspNodeKind::Pan)) => ()
+  match compiled.apply_control(@graph.GraphControl::gate_on(1)) {
+    Err(@graph.GraphControlError::InvalidGateNode(1, @graph.DspNodeKind::Pan)) =>
+      ()
     other => fail("expected InvalidGateNode, got \{@debug.to_string(other)}")
   }
 }
@@ -363,18 +441,25 @@ test "compiled dsp runtime param update rejects unsupported or invalid values" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::delay(input=0, max_delay_samples=DELAY_CAPACITY, delay_samples=0),
-    DspNode::output(1),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::delay(
+      input=0,
+      max_delay_samples=DELAY_CAPACITY,
+      delay_samples=0,
+    ),
+    @graph.DspNode::output(1),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(
+      @graph.GraphControl::set_param(
         0,
-        GraphParamSlot::DelaySamples,
+        @graph.GraphParamSlot::DelaySamples,
         DELAY_SAMPLES_DOUBLE,
       ),
     )
@@ -382,27 +467,39 @@ test "compiled dsp runtime param update rejects unsupported or invalid values" {
   )
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(1, GraphParamSlot::DelaySamples, 1.5),
-    )
-    is Err(_),
-  )
-  assert_true(
-    compiled.apply_control(
-      GraphControl::set_param(1, GraphParamSlot::DelaySamples, 0.0 / 0.0),
-    )
-    is Err(_),
-  )
-  assert_true(
-    compiled.apply_control(
-      GraphControl::set_param(1, GraphParamSlot::Value0, INVALID_DELAY_FEEDBACK),
-    )
-    is Err(_),
-  )
-  assert_true(
-    compiled.apply_control(
-      GraphControl::set_param(
+      @graph.GraphControl::set_param(
         1,
-        GraphParamSlot::Value0,
+        @graph.GraphParamSlot::DelaySamples,
+        1.5,
+      ),
+    )
+    is Err(_),
+  )
+  assert_true(
+    compiled.apply_control(
+      @graph.GraphControl::set_param(
+        1,
+        @graph.GraphParamSlot::DelaySamples,
+        0.0 / 0.0,
+      ),
+    )
+    is Err(_),
+  )
+  assert_true(
+    compiled.apply_control(
+      @graph.GraphControl::set_param(
+        1,
+        @graph.GraphParamSlot::Value0,
+        INVALID_DELAY_FEEDBACK,
+      ),
+    )
+    is Err(_),
+  )
+  assert_true(
+    compiled.apply_control(
+      @graph.GraphControl::set_param(
+        1,
+        @graph.GraphParamSlot::Value0,
         CLAMPED_HIGH_DELAY_FEEDBACK,
       ),
     )
@@ -424,28 +521,39 @@ test "compiled dsp runtime param update rejects invalid biquad values" {
     block_size=LARGE_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::biquad(
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::biquad(
       input=0,
       mode=BiquadMode::LowPass,
       cutoff_hz=LOWPASS_CUTOFF,
       q=LOWPASS_Q,
     ),
-    DspNode::output(1),
+    @graph.DspNode::output(1),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(LARGE_BLOCK_SIZE)
 
   compiled.process(context, output)
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(1, GraphParamSlot::Value0, INVALID_NYQUIST_CUTOFF),
+      @graph.GraphControl::set_param(
+        1,
+        @graph.GraphParamSlot::Value0,
+        INVALID_NYQUIST_CUTOFF,
+      ),
     )
     is Err(_),
   )
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(1, GraphParamSlot::Value1, ZERO_SAMPLE),
+      @graph.GraphControl::set_param(
+        1,
+        @graph.GraphParamSlot::Value1,
+        ZERO_SAMPLE,
+      ),
     )
     is Err(_),
   )
@@ -463,23 +571,31 @@ test "compiled dsp legacy wrappers match apply_control" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::output(1),
-    DspNode::mul(3, 2),
-    DspNode::adsr(
+    @graph.DspNode::output(1),
+    @graph.DspNode::mul(3, 2),
+    @graph.DspNode::adsr(
       attack_ms=ADSR_ATTACK_MS,
       decay_ms=ADSR_DECAY_MS,
       sustain=ADSR_SUSTAIN_LEVEL,
       release_ms=ADSR_RELEASE_MS,
     ),
-    DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::constant(UNIT_SAMPLE),
   ]
-  let wrapper_compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-  let unified_compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let wrapper_compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
+  let unified_compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let wrapper_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let unified_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   assert_true(wrapper_compiled.gate_on(2) is Ok(_))
-  assert_true(unified_compiled.apply_control(GraphControl::gate_on(2)) is Ok(_))
+  assert_true(
+    unified_compiled.apply_control(@graph.GraphControl::gate_on(2)) is Ok(_),
+  )
 
   wrapper_compiled.process(context, wrapper_output)
   unified_compiled.process(context, unified_output)
@@ -490,7 +606,7 @@ test "compiled dsp legacy wrappers match apply_control" {
 
   assert_true(wrapper_compiled.gate_off(2) is Ok(_))
   assert_true(
-    unified_compiled.apply_control(GraphControl::gate_off(2)) is Ok(_),
+    unified_compiled.apply_control(@graph.GraphControl::gate_off(2)) is Ok(_),
   )
 
   wrapper_compiled.process(context, wrapper_output)
@@ -508,21 +624,32 @@ test "compiled dsp set_param wrapper matches apply_control" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::gain(0, QUARTER_SAMPLE),
-    DspNode::output(1),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::gain(0, QUARTER_SAMPLE),
+    @graph.DspNode::output(1),
   ]
-  let wrapper_compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-  let unified_compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let wrapper_compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
+  let unified_compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let wrapper_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let unified_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   assert_true(
-    wrapper_compiled.set_param(1, GraphParamSlot::Value0, HALF_GAIN) is Ok(_),
+    wrapper_compiled.set_param(1, @graph.GraphParamSlot::Value0, HALF_GAIN)
+    is Ok(_),
   )
   assert_true(
     unified_compiled.apply_control(
-      GraphControl::set_param(1, GraphParamSlot::Value0, HALF_GAIN),
+      @graph.GraphControl::set_param(
+        1,
+        @graph.GraphParamSlot::Value0,
+        HALF_GAIN,
+      ),
     )
     is Ok(_),
   )
@@ -542,20 +669,27 @@ test "compiled dsp rejects negative delay_samples via set_param" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::delay(
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::delay(
       input=0,
       max_delay_samples=DELAY_CAPACITY,
       delay_samples=DELAY_SAMPLES,
     ),
-    DspNode::output(1),
+    @graph.DspNode::output(1),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
 
   // Negative delay_samples must be rejected
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(1, GraphParamSlot::DelaySamples, -1.0),
+      @graph.GraphControl::set_param(
+        1,
+        @graph.GraphParamSlot::DelaySamples,
+        -1.0,
+      ),
     )
     is Err(_),
   )
@@ -572,22 +706,25 @@ test "compiled dsp rejects delay_samples exceeding delay_max_samples via set_par
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::delay(
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::delay(
       input=0,
       max_delay_samples=DELAY_CAPACITY,
       delay_samples=DELAY_SAMPLES,
     ),
-    DspNode::output(1),
+    @graph.DspNode::output(1),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
 
   // delay_samples > delay_max_samples (DELAY_CAPACITY=4) must be rejected
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(
+      @graph.GraphControl::set_param(
         1,
-        GraphParamSlot::DelaySamples,
+        @graph.GraphParamSlot::DelaySamples,
         5.0, // exceeds DELAY_CAPACITY of 4
       ),
     )
@@ -602,29 +739,36 @@ test "compiled dsp accepts valid delay_samples within bounds via set_param" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::delay(
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::delay(
       input=0,
       max_delay_samples=DELAY_CAPACITY,
       delay_samples=DELAY_SAMPLES,
     ),
-    DspNode::output(1),
+    @graph.DspNode::output(1),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
 
   // delay_samples == 0 (lower bound) is valid
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(1, GraphParamSlot::DelaySamples, 0.0),
+      @graph.GraphControl::set_param(
+        1,
+        @graph.GraphParamSlot::DelaySamples,
+        0.0,
+      ),
     )
     is Ok(_),
   )
   // delay_samples == delay_max_samples (upper bound) is valid
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(
+      @graph.GraphControl::set_param(
         1,
-        GraphParamSlot::DelaySamples,
+        @graph.GraphParamSlot::DelaySamples,
         4.0, // equals DELAY_CAPACITY
       ),
     )
@@ -633,7 +777,11 @@ test "compiled dsp accepts valid delay_samples within bounds via set_param" {
   // delay_samples == 3 (mid-range) is valid
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(1, GraphParamSlot::DelaySamples, 3.0),
+      @graph.GraphControl::set_param(
+        1,
+        @graph.GraphParamSlot::DelaySamples,
+        3.0,
+      ),
     )
     is Ok(_),
   )

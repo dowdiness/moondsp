@@ -4,8 +4,12 @@ test "compiled dsp topology controller crossfades a replaced node" {
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let topology = DspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::gain(0, 0.25), DspNode::output(1)],
+  let topology = @graph.DspTopologyController::from_nodes(
+    [
+      @graph.DspNode::constant(1.0),
+      @graph.DspNode::gain(0, 0.25),
+      @graph.DspNode::output(1),
+    ],
     context,
     crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
   ).unwrap()
@@ -15,7 +19,7 @@ test "compiled dsp topology controller crossfades a replaced node" {
 
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::replace_node(1, DspNode::gain(0, 0.75)),
+      @graph.GraphTopologyEdit::replace_node(1, @graph.DspNode::gain(0, 0.75)),
     )
     is Ok(_),
   )
@@ -54,16 +58,20 @@ test "compiled dsp topology controller rejects invalid edit batches transactiona
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let topology = DspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::gain(0, 0.25), DspNode::output(1)],
+  let topology = @graph.DspTopologyController::from_nodes(
+    [
+      @graph.DspNode::constant(1.0),
+      @graph.DspNode::gain(0, 0.25),
+      @graph.DspNode::output(1),
+    ],
     context,
   ).unwrap()
   let output = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
 
   assert_true(
     topology.queue_topology_edits([
-      GraphTopologyEdit::replace_node(0, DspNode::constant(0.5)),
-      GraphTopologyEdit::replace_node(2, DspNode::gain(1, 0.5)),
+      @graph.GraphTopologyEdit::replace_node(0, @graph.DspNode::constant(0.5)),
+      @graph.GraphTopologyEdit::replace_node(2, @graph.DspNode::gain(1, 0.5)),
     ])
     is Err(_),
   )
@@ -78,21 +86,25 @@ test "compiled dsp topology controller result reports invalid edit index" {
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let topology = DspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::gain(0, 0.25), DspNode::output(1)],
+  let topology = @graph.DspTopologyController::from_nodes(
+    [
+      @graph.DspNode::constant(1.0),
+      @graph.DspNode::gain(0, 0.25),
+      @graph.DspNode::output(1),
+    ],
     context,
   ).unwrap()
   let output = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
 
   match
     topology.queue_topology_edits([
-      GraphTopologyEdit::replace_node(0, DspNode::constant(0.5)),
-      GraphTopologyEdit::replace_node(99, DspNode::constant(0.75)),
+      @graph.GraphTopologyEdit::replace_node(0, @graph.DspNode::constant(0.5)),
+      @graph.GraphTopologyEdit::replace_node(99, @graph.DspNode::constant(0.75)),
     ]) {
     Err(
-      GraphTopologyQueueError::InvalidEdit(
+      @graph.GraphTopologyQueueError::InvalidEdit(
         index,
-        GraphTopologyEditError::InvalidNodeIndex(node_index)
+        @graph.GraphTopologyEditError::InvalidNodeIndex(node_index)
       )
     ) => {
       @debug.assert_eq(index, 1)
@@ -111,22 +123,30 @@ test "compiled dsp topology controller result reports invalid edit reason" {
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let topology = DspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::gain(0, 0.25), DspNode::output(1)],
+  let topology = @graph.DspTopologyController::from_nodes(
+    [
+      @graph.DspNode::constant(1.0),
+      @graph.DspNode::gain(0, 0.25),
+      @graph.DspNode::output(1),
+    ],
     context,
   ).unwrap()
 
   match
     topology.queue_topology_edit(
-      GraphTopologyEdit::rewire_input(0, GraphTopologyInputSlot::Input0, 1),
+      @graph.GraphTopologyEdit::rewire_input(
+        0,
+        @graph.GraphTopologyInputSlot::Input0,
+        1,
+      ),
     ) {
     Err(
-      GraphTopologyQueueError::InvalidEdit(
+      @graph.GraphTopologyQueueError::InvalidEdit(
         index,
-        GraphTopologyEditError::UnsupportedInputSlot(
+        @graph.GraphTopologyEditError::UnsupportedInputSlot(
           node_index,
-          GraphTopologyInputSlot::Input0,
-          DspNodeKind::Constant
+          @graph.GraphTopologyInputSlot::Input0,
+          @graph.DspNodeKind::Constant
         )
       )
     ) => {
@@ -138,16 +158,18 @@ test "compiled dsp topology controller result reports invalid edit reason" {
   }
   match
     topology.queue_topology_edit(
-      GraphTopologyEdit::insert_node(
+      @graph.GraphTopologyEdit::insert_node(
         2,
-        GraphTopologyInputSlot::Input0,
-        DspNode::constant(0.5),
+        @graph.GraphTopologyInputSlot::Input0,
+        @graph.DspNode::constant(0.5),
       ),
     ) {
     Err(
-      GraphTopologyQueueError::InvalidEdit(
+      @graph.GraphTopologyQueueError::InvalidEdit(
         index,
-        GraphTopologyEditError::UnsupportedInsertTemplate(DspNodeKind::Constant)
+        @graph.GraphTopologyEditError::UnsupportedInsertTemplate(
+          @graph.DspNodeKind::Constant
+        )
       )
     ) => @debug.assert_eq(index, 0)
     other =>
@@ -161,16 +183,20 @@ test "compiled dsp topology controller result reports recompile rejection" {
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let topology = DspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::gain(0, 0.25), DspNode::output(1)],
+  let topology = @graph.DspTopologyController::from_nodes(
+    [
+      @graph.DspNode::constant(1.0),
+      @graph.DspNode::gain(0, 0.25),
+      @graph.DspNode::output(1),
+    ],
     context,
   ).unwrap()
 
   match
     topology.queue_topology_edit(
-      GraphTopologyEdit::replace_node(2, DspNode::gain(1, 0.5)),
+      @graph.GraphTopologyEdit::replace_node(2, @graph.DspNode::gain(1, 0.5)),
     ) {
-    Err(GraphTopologyQueueError::RecompileRejected) => ()
+    Err(@graph.GraphTopologyQueueError::RecompileRejected) => ()
     other => fail("expected RecompileRejected, got \{@debug.to_string(other)}")
   }
 }
@@ -181,24 +207,28 @@ test "compiled dsp topology controller result reports pending swap" {
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let topology = DspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::gain(0, 0.25), DspNode::output(1)],
+  let topology = @graph.DspTopologyController::from_nodes(
+    [
+      @graph.DspNode::constant(1.0),
+      @graph.DspNode::gain(0, 0.25),
+      @graph.DspNode::output(1),
+    ],
     context,
     crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
   ).unwrap()
 
   match
     topology.queue_topology_edit(
-      GraphTopologyEdit::replace_node(0, DspNode::constant(0.5)),
+      @graph.GraphTopologyEdit::replace_node(0, @graph.DspNode::constant(0.5)),
     ) {
     Ok(_) => ()
     other => fail("expected Ok, got \{@debug.to_string(other)}")
   }
   match
     topology.queue_topology_edit(
-      GraphTopologyEdit::replace_node(0, DspNode::constant(0.25)),
+      @graph.GraphTopologyEdit::replace_node(0, @graph.DspNode::constant(0.25)),
     ) {
-    Err(GraphTopologyQueueError::PendingSwap) => ()
+    Err(@graph.GraphTopologyQueueError::PendingSwap) => ()
     other => fail("expected PendingSwap, got \{@debug.to_string(other)}")
   }
 }
@@ -209,8 +239,12 @@ test "compiled dsp topology controller mirrors runtime params into queued edit" 
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let topology = DspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::gain(0, 0.25), DspNode::output(1)],
+  let topology = @graph.DspTopologyController::from_nodes(
+    [
+      @graph.DspNode::constant(1.0),
+      @graph.DspNode::gain(0, 0.25),
+      @graph.DspNode::output(1),
+    ],
     context,
     crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
   ).unwrap()
@@ -220,13 +254,13 @@ test "compiled dsp topology controller mirrors runtime params into queued edit" 
 
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::replace_node(1, DspNode::gain(0, 0.75)),
+      @graph.GraphTopologyEdit::replace_node(1, @graph.DspNode::gain(0, 0.75)),
     )
     is Ok(_),
   )
   assert_true(
     topology.apply_control(
-      GraphControl::set_param(1, GraphParamSlot::Value0, 0.5),
+      @graph.GraphControl::set_param(1, @graph.GraphParamSlot::Value0, 0.5),
     )
     is Ok(_),
   )
@@ -253,8 +287,12 @@ test "compiled dsp topology controller result reports pending graph control reje
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let topology = DspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::gain(0, 0.25), DspNode::output(1)],
+  let topology = @graph.DspTopologyController::from_nodes(
+    [
+      @graph.DspNode::constant(1.0),
+      @graph.DspNode::gain(0, 0.25),
+      @graph.DspNode::output(1),
+    ],
     context,
     crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
   ).unwrap()
@@ -262,16 +300,16 @@ test "compiled dsp topology controller result reports pending graph control reje
 
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::replace_node(1, DspNode::mix(0, 0)),
+      @graph.GraphTopologyEdit::replace_node(1, @graph.DspNode::mix(0, 0)),
     )
     is Ok(_),
   )
-  match topology.set_param(1, GraphParamSlot::Value0, 0.5) {
+  match topology.set_param(1, @graph.GraphParamSlot::Value0, 0.5) {
     Err(
-      GraphControlError::InvalidSlotForNode(
+      @graph.GraphControlError::InvalidSlotForNode(
         1,
-        DspNodeKind::Mix,
-        GraphParamSlot::Value0
+        @graph.DspNodeKind::Mix,
+        @graph.GraphParamSlot::Value0
       )
     ) => ()
     other =>
@@ -290,8 +328,12 @@ test "compiled dsp topology controller rejected control batch does not mirror au
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let topology = DspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::gain(0, 0.25), DspNode::output(1)],
+  let topology = @graph.DspTopologyController::from_nodes(
+    [
+      @graph.DspNode::constant(1.0),
+      @graph.DspNode::gain(0, 0.25),
+      @graph.DspNode::output(1),
+    ],
     context,
     crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
   ).unwrap()
@@ -301,15 +343,15 @@ test "compiled dsp topology controller rejected control batch does not mirror au
 
   match
     topology.apply_controls([
-      GraphControl::set_param(1, GraphParamSlot::Value0, 0.5),
-      GraphControl::set_param(99, GraphParamSlot::Value0, 0.5),
+      @graph.GraphControl::set_param(1, @graph.GraphParamSlot::Value0, 0.5),
+      @graph.GraphControl::set_param(99, @graph.GraphParamSlot::Value0, 0.5),
     ]) {
-    Err(GraphControlError::InvalidNodeIndex(99)) => ()
+    Err(@graph.GraphControlError::InvalidNodeIndex(99)) => ()
     other => fail("expected InvalidNodeIndex, got \{@debug.to_string(other)}")
   }
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::replace_node(0, DspNode::constant(2.0)),
+      @graph.GraphTopologyEdit::replace_node(0, @graph.DspNode::constant(2.0)),
     )
     is Ok(_),
   )
@@ -326,8 +368,12 @@ test "compiled dsp topology controller preserves runtime params across later top
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let topology = DspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::gain(0, 0.25), DspNode::output(1)],
+  let topology = @graph.DspTopologyController::from_nodes(
+    [
+      @graph.DspNode::constant(1.0),
+      @graph.DspNode::gain(0, 0.25),
+      @graph.DspNode::output(1),
+    ],
     context,
     crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
   ).unwrap()
@@ -337,13 +383,13 @@ test "compiled dsp topology controller preserves runtime params across later top
 
   assert_true(
     topology.apply_control(
-      GraphControl::set_param(1, GraphParamSlot::Value0, 0.5),
+      @graph.GraphControl::set_param(1, @graph.GraphParamSlot::Value0, 0.5),
     )
     is Ok(_),
   )
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::replace_node(0, DspNode::constant(2.0)),
+      @graph.GraphTopologyEdit::replace_node(0, @graph.DspNode::constant(2.0)),
     )
     is Ok(_),
   )
@@ -382,15 +428,15 @@ test "compiled dsp topology controller crossfades a rewired input" {
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let topology = DspTopologyController::from_nodes(
+  let topology = @graph.DspTopologyController::from_nodes(
     [
-      DspNode::constant(2.0),
-      DspNode::constant(1.0),
-      DspNode::gain(0, 0.5),
-      DspNode::gain(1, 0.5),
-      DspNode::mix(2, 3),
-      DspNode::mix(4, 3),
-      DspNode::output(5),
+      @graph.DspNode::constant(2.0),
+      @graph.DspNode::constant(1.0),
+      @graph.DspNode::gain(0, 0.5),
+      @graph.DspNode::gain(1, 0.5),
+      @graph.DspNode::mix(2, 3),
+      @graph.DspNode::mix(4, 3),
+      @graph.DspNode::output(5),
     ],
     context,
     crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
@@ -401,7 +447,11 @@ test "compiled dsp topology controller crossfades a rewired input" {
 
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::rewire_input(4, GraphTopologyInputSlot::Input1, 0),
+      @graph.GraphTopologyEdit::rewire_input(
+        4,
+        @graph.GraphTopologyInputSlot::Input1,
+        0,
+      ),
     )
     is Ok(_),
   )
@@ -440,15 +490,15 @@ test "compiled dsp topology controller rejects invalid rewires transactionally" 
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let topology = DspTopologyController::from_nodes(
+  let topology = @graph.DspTopologyController::from_nodes(
     [
-      DspNode::constant(2.0),
-      DspNode::constant(1.0),
-      DspNode::gain(0, 0.5),
-      DspNode::gain(1, 0.5),
-      DspNode::mix(2, 3),
-      DspNode::mix(4, 3),
-      DspNode::output(5),
+      @graph.DspNode::constant(2.0),
+      @graph.DspNode::constant(1.0),
+      @graph.DspNode::gain(0, 0.5),
+      @graph.DspNode::gain(1, 0.5),
+      @graph.DspNode::mix(2, 3),
+      @graph.DspNode::mix(4, 3),
+      @graph.DspNode::output(5),
     ],
     context,
   ).unwrap()
@@ -456,7 +506,11 @@ test "compiled dsp topology controller rejects invalid rewires transactionally" 
 
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::rewire_input(2, GraphTopologyInputSlot::Input1, 1),
+      @graph.GraphTopologyEdit::rewire_input(
+        2,
+        @graph.GraphTopologyInputSlot::Input1,
+        1,
+      ),
     )
     is Err(_),
   )
@@ -471,8 +525,8 @@ test "compiled dsp topology controller crossfades an inserted node" {
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let topology = DspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::output(0)],
+  let topology = @graph.DspTopologyController::from_nodes(
+    [@graph.DspNode::constant(1.0), @graph.DspNode::output(0)],
     context,
     crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
   ).unwrap()
@@ -482,10 +536,10 @@ test "compiled dsp topology controller crossfades an inserted node" {
 
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::insert_node(
+      @graph.GraphTopologyEdit::insert_node(
         1,
-        GraphTopologyInputSlot::Input0,
-        DspNode::gain(0, 0.5),
+        @graph.GraphTopologyInputSlot::Input0,
+        @graph.DspNode::gain(0, 0.5),
       ),
     )
     is Ok(_),
@@ -525,18 +579,18 @@ test "compiled dsp topology controller rejects invalid insert templates transact
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let topology = DspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::output(0)],
+  let topology = @graph.DspTopologyController::from_nodes(
+    [@graph.DspNode::constant(1.0), @graph.DspNode::output(0)],
     context,
   ).unwrap()
   let output = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
 
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::insert_node(
+      @graph.GraphTopologyEdit::insert_node(
         1,
-        GraphTopologyInputSlot::Input0,
-        DspNode::mix(0, 0),
+        @graph.GraphTopologyInputSlot::Input0,
+        @graph.DspNode::mix(0, 0),
       ),
     )
     is Err(_),
@@ -552,8 +606,12 @@ test "compiled dsp topology controller crossfades a deleted node" {
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let topology = DspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::gain(0, 0.5), DspNode::output(1)],
+  let topology = @graph.DspTopologyController::from_nodes(
+    [
+      @graph.DspNode::constant(1.0),
+      @graph.DspNode::gain(0, 0.5),
+      @graph.DspNode::output(1),
+    ],
     context,
     crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
   ).unwrap()
@@ -563,7 +621,12 @@ test "compiled dsp topology controller crossfades a deleted node" {
 
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::delete_node(1, 2, GraphTopologyInputSlot::Input0, 1),
+      @graph.GraphTopologyEdit::delete_node(
+        1,
+        2,
+        @graph.GraphTopologyInputSlot::Input0,
+        1,
+      ),
     )
     is Ok(_),
   )
@@ -602,15 +665,24 @@ test "compiled dsp topology controller rejects invalid deletes transactionally" 
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let topology = DspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::gain(0, 0.5), DspNode::output(1)],
+  let topology = @graph.DspTopologyController::from_nodes(
+    [
+      @graph.DspNode::constant(1.0),
+      @graph.DspNode::gain(0, 0.5),
+      @graph.DspNode::output(1),
+    ],
     context,
   ).unwrap()
   let output = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
 
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::delete_node(0, 2, GraphTopologyInputSlot::Input0, 0),
+      @graph.GraphTopologyEdit::delete_node(
+        0,
+        2,
+        @graph.GraphTopologyInputSlot::Input0,
+        0,
+      ),
     )
     is Err(_),
   )
@@ -625,8 +697,8 @@ test "compiled dsp topology controller insert delete roundtrip restores baseline
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let topology = DspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::output(0)],
+  let topology = @graph.DspTopologyController::from_nodes(
+    [@graph.DspNode::constant(1.0), @graph.DspNode::output(0)],
     context,
     crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
   ).unwrap()
@@ -639,10 +711,10 @@ test "compiled dsp topology controller insert delete roundtrip restores baseline
 
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::insert_node(
+      @graph.GraphTopologyEdit::insert_node(
         1,
-        GraphTopologyInputSlot::Input0,
-        DspNode::gain(0, 0.5),
+        @graph.GraphTopologyInputSlot::Input0,
+        @graph.DspNode::gain(0, 0.5),
       ),
     )
     is Ok(_),
@@ -654,7 +726,12 @@ test "compiled dsp topology controller insert delete roundtrip restores baseline
 
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::delete_node(2, 1, GraphTopologyInputSlot::Input0, 2),
+      @graph.GraphTopologyEdit::delete_node(
+        2,
+        1,
+        @graph.GraphTopologyInputSlot::Input0,
+        2,
+      ),
     )
     is Ok(_),
   )
@@ -694,15 +771,24 @@ test "compiled dsp topology controller rejects deletes with mismatched retarget 
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let topology = DspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::gain(0, 0.5), DspNode::output(1)],
+  let topology = @graph.DspTopologyController::from_nodes(
+    [
+      @graph.DspNode::constant(1.0),
+      @graph.DspNode::gain(0, 0.5),
+      @graph.DspNode::output(1),
+    ],
     context,
   ).unwrap()
   let output = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
 
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::delete_node(1, 0, GraphTopologyInputSlot::Input0, 1),
+      @graph.GraphTopologyEdit::delete_node(
+        1,
+        0,
+        @graph.GraphTopologyInputSlot::Input0,
+        1,
+      ),
     )
     is Err(_),
   )
@@ -717,8 +803,12 @@ test "compiled stereo dsp topology controller crossfades a replaced pan node" {
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let topology = StereoDspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::pan(0, 0.0), DspNode::stereo_output(1)],
+  let topology = @graph.StereoDspTopologyController::from_nodes(
+    [
+      @graph.DspNode::constant(1.0),
+      @graph.DspNode::pan(0, 0.0),
+      @graph.DspNode::stereo_output(1),
+    ],
     context,
     crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
   ).unwrap()
@@ -731,7 +821,7 @@ test "compiled stereo dsp topology controller crossfades a replaced pan node" {
 
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::replace_node(1, DspNode::pan(0, 1.0)),
+      @graph.GraphTopologyEdit::replace_node(1, @graph.DspNode::pan(0, 1.0)),
     )
     is Ok(_),
   )
@@ -783,8 +873,12 @@ test "compiled stereo dsp topology controller rejects invalid edit batches trans
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let topology = StereoDspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::pan(0, 0.0), DspNode::stereo_output(1)],
+  let topology = @graph.StereoDspTopologyController::from_nodes(
+    [
+      @graph.DspNode::constant(1.0),
+      @graph.DspNode::pan(0, 0.0),
+      @graph.DspNode::stereo_output(1),
+    ],
     context,
   ).unwrap()
   let left = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
@@ -792,8 +886,8 @@ test "compiled stereo dsp topology controller rejects invalid edit batches trans
 
   assert_true(
     topology.queue_topology_edits([
-      GraphTopologyEdit::replace_node(0, DspNode::constant(0.5)),
-      GraphTopologyEdit::replace_node(2, DspNode::output(1)),
+      @graph.GraphTopologyEdit::replace_node(0, @graph.DspNode::constant(0.5)),
+      @graph.GraphTopologyEdit::replace_node(2, @graph.DspNode::output(1)),
     ])
     is Err(_),
   )
@@ -817,8 +911,12 @@ test "compiled stereo dsp topology controller result queues valid edit" {
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let topology = StereoDspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::pan(0, 0.0), DspNode::stereo_output(1)],
+  let topology = @graph.StereoDspTopologyController::from_nodes(
+    [
+      @graph.DspNode::constant(1.0),
+      @graph.DspNode::pan(0, 0.0),
+      @graph.DspNode::stereo_output(1),
+    ],
     context,
   ).unwrap()
   let left = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
@@ -826,7 +924,7 @@ test "compiled stereo dsp topology controller result queues valid edit" {
 
   match
     topology.queue_topology_edit(
-      GraphTopologyEdit::replace_node(1, DspNode::pan(0, 1.0)),
+      @graph.GraphTopologyEdit::replace_node(1, @graph.DspNode::pan(0, 1.0)),
     ) {
     Ok(_) => ()
     other => fail("expected Ok, got \{@debug.to_string(other)}")
@@ -843,8 +941,12 @@ test "compiled stereo dsp topology controller accepts insert nodes" {
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let topology = StereoDspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::pan(0, 0.0), DspNode::stereo_output(1)],
+  let topology = @graph.StereoDspTopologyController::from_nodes(
+    [
+      @graph.DspNode::constant(1.0),
+      @graph.DspNode::pan(0, 0.0),
+      @graph.DspNode::stereo_output(1),
+    ],
     context,
     crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
   ).unwrap()
@@ -857,10 +959,10 @@ test "compiled stereo dsp topology controller accepts insert nodes" {
 
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::insert_node(
+      @graph.GraphTopologyEdit::insert_node(
         2,
-        GraphTopologyInputSlot::Input0,
-        DspNode::stereo_gain(input=0, amount=0.5),
+        @graph.GraphTopologyInputSlot::Input0,
+        @graph.DspNode::stereo_gain(input=0, amount=0.5),
       ),
     )
     is Ok(_),
@@ -887,12 +989,12 @@ test "compiled stereo dsp topology controller accepts delete nodes" {
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
   // Graph: constant -> pan -> stereo_gain -> stereo_output
-  let topology = StereoDspTopologyController::from_nodes(
+  let topology = @graph.StereoDspTopologyController::from_nodes(
     [
-      DspNode::constant(1.0),
-      DspNode::pan(0, 0.0),
-      DspNode::stereo_gain(input=1, amount=0.5),
-      DspNode::stereo_output(2),
+      @graph.DspNode::constant(1.0),
+      @graph.DspNode::pan(0, 0.0),
+      @graph.DspNode::stereo_gain(input=1, amount=0.5),
+      @graph.DspNode::stereo_output(2),
     ],
     context,
     crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
@@ -908,7 +1010,12 @@ test "compiled stereo dsp topology controller accepts delete nodes" {
   // to read from pan (replacement_source = 2 means self-resolve to its input)
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::delete_node(2, 3, GraphTopologyInputSlot::Input0, 2),
+      @graph.GraphTopologyEdit::delete_node(
+        2,
+        3,
+        @graph.GraphTopologyInputSlot::Input0,
+        2,
+      ),
     )
     is Ok(_),
   )
@@ -936,8 +1043,12 @@ test "compiled stereo dsp topology controller mirrors runtime params into queued
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let topology = StereoDspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::pan(0, 0.0), DspNode::stereo_output(1)],
+  let topology = @graph.StereoDspTopologyController::from_nodes(
+    [
+      @graph.DspNode::constant(1.0),
+      @graph.DspNode::pan(0, 0.0),
+      @graph.DspNode::stereo_output(1),
+    ],
     context,
     crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
   ).unwrap()
@@ -950,13 +1061,13 @@ test "compiled stereo dsp topology controller mirrors runtime params into queued
 
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::replace_node(1, DspNode::pan(0, 1.0)),
+      @graph.GraphTopologyEdit::replace_node(1, @graph.DspNode::pan(0, 1.0)),
     )
     is Ok(_),
   )
   assert_true(
     topology.apply_control(
-      GraphControl::set_param(1, GraphParamSlot::Value0, -1.0),
+      @graph.GraphControl::set_param(1, @graph.GraphParamSlot::Value0, -1.0),
     )
     is Ok(_),
   )
@@ -986,19 +1097,23 @@ test "compiled stereo dsp topology controller set_param reports invalid value" {
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let topology = StereoDspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::pan(0, 0.0), DspNode::stereo_output(1)],
+  let topology = @graph.StereoDspTopologyController::from_nodes(
+    [
+      @graph.DspNode::constant(1.0),
+      @graph.DspNode::pan(0, 0.0),
+      @graph.DspNode::stereo_output(1),
+    ],
     context,
   ).unwrap()
   let left = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
   let right = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
 
-  match topology.set_param(1, GraphParamSlot::Value0, 0.0 / 0.0) {
+  match topology.set_param(1, @graph.GraphParamSlot::Value0, 0.0 / 0.0) {
     Err(
-      GraphControlError::InvalidParamValue(
+      @graph.GraphControlError::InvalidParamValue(
         1,
-        DspNodeKind::Pan,
-        GraphParamSlot::Value0,
+        @graph.DspNodeKind::Pan,
+        @graph.GraphParamSlot::Value0,
         _
       )
     ) => ()
@@ -1024,16 +1139,16 @@ test "compiled stereo dsp topology controller crossfades a rewired input" {
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let topology = StereoDspTopologyController::from_nodes(
+  let topology = @graph.StereoDspTopologyController::from_nodes(
     [
-      DspNode::constant(1.0),
-      DspNode::constant(0.5),
-      DspNode::gain(0, 0.5),
-      DspNode::gain(1, 0.5),
-      DspNode::mix(2, 3),
-      DspNode::mix(4, 3),
-      DspNode::pan(5, 0.0),
-      DspNode::stereo_output(6),
+      @graph.DspNode::constant(1.0),
+      @graph.DspNode::constant(0.5),
+      @graph.DspNode::gain(0, 0.5),
+      @graph.DspNode::gain(1, 0.5),
+      @graph.DspNode::mix(2, 3),
+      @graph.DspNode::mix(4, 3),
+      @graph.DspNode::pan(5, 0.0),
+      @graph.DspNode::stereo_output(6),
     ],
     context,
     crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
@@ -1047,7 +1162,11 @@ test "compiled stereo dsp topology controller crossfades a rewired input" {
 
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::rewire_input(4, GraphTopologyInputSlot::Input1, 0),
+      @graph.GraphTopologyEdit::rewire_input(
+        4,
+        @graph.GraphTopologyInputSlot::Input1,
+        0,
+      ),
     )
     is Ok(_),
   )
@@ -1105,8 +1224,12 @@ test "compiled stereo dsp topology controller preserves runtime params across la
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let topology = StereoDspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::pan(0, 0.0), DspNode::stereo_output(1)],
+  let topology = @graph.StereoDspTopologyController::from_nodes(
+    [
+      @graph.DspNode::constant(1.0),
+      @graph.DspNode::pan(0, 0.0),
+      @graph.DspNode::stereo_output(1),
+    ],
     context,
     crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
   ).unwrap()
@@ -1119,13 +1242,13 @@ test "compiled stereo dsp topology controller preserves runtime params across la
 
   assert_true(
     topology.apply_controls([
-      GraphControl::set_param(1, GraphParamSlot::Value0, -1.0),
+      @graph.GraphControl::set_param(1, @graph.GraphParamSlot::Value0, -1.0),
     ])
     is Ok(_),
   )
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::replace_node(0, DspNode::constant(0.5)),
+      @graph.GraphTopologyEdit::replace_node(0, @graph.DspNode::constant(0.5)),
     )
     is Ok(_),
   )
@@ -1168,8 +1291,8 @@ test "topology edit: insert chain of two gain nodes" {
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
   // Graph: constant(1.0) -> output(0)
-  let topology = DspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::output(0)],
+  let topology = @graph.DspTopologyController::from_nodes(
+    [@graph.DspNode::constant(1.0), @graph.DspNode::output(0)],
     context,
     crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
   ).unwrap()
@@ -1180,10 +1303,11 @@ test "topology edit: insert chain of two gain nodes" {
   // Insert chain [Gain(0.5), Gain(0.8)] between constant and output
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::insert_chain(1, GraphTopologyInputSlot::Input0, [
-        DspNode::gain(0, 0.5),
-        DspNode::gain(0, 0.8),
-      ]),
+      @graph.GraphTopologyEdit::insert_chain(
+        1,
+        @graph.GraphTopologyInputSlot::Input0,
+        [@graph.DspNode::gain(0, 0.5), @graph.DspNode::gain(0, 0.8)],
+      ),
     )
     is Ok(_),
   )
@@ -1203,8 +1327,8 @@ test "topology edit: delete chain reverses insert chain" {
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
   // Graph: constant(1.0) -> output(0)
-  let topology = DspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::output(0)],
+  let topology = @graph.DspTopologyController::from_nodes(
+    [@graph.DspNode::constant(1.0), @graph.DspNode::output(0)],
     context,
     crossfade_samples=HOT_SWAP_CROSSFADE_SAMPLES,
   ).unwrap()
@@ -1215,10 +1339,11 @@ test "topology edit: delete chain reverses insert chain" {
   // Insert chain [Gain(0.5), Gain(0.8)] between constant and output
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::insert_chain(1, GraphTopologyInputSlot::Input0, [
-        DspNode::gain(0, 0.5),
-        DspNode::gain(0, 0.8),
-      ]),
+      @graph.GraphTopologyEdit::insert_chain(
+        1,
+        @graph.GraphTopologyInputSlot::Input0,
+        [@graph.DspNode::gain(0, 0.5), @graph.DspNode::gain(0, 0.8)],
+      ),
     )
     is Ok(_),
   )
@@ -1236,11 +1361,11 @@ test "topology edit: delete chain reverses insert chain" {
 
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::delete_chain(
+      @graph.GraphTopologyEdit::delete_chain(
         2,
         3,
         1,
-        GraphTopologyInputSlot::Input0,
+        @graph.GraphTopologyInputSlot::Input0,
         0,
       ),
     )
@@ -1258,15 +1383,19 @@ test "topology edit: insert_chain rejects empty chain" {
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let topology = DspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::output(0)],
+  let topology = @graph.DspTopologyController::from_nodes(
+    [@graph.DspNode::constant(1.0), @graph.DspNode::output(0)],
     context,
   ).unwrap()
   let output = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
 
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::insert_chain(1, GraphTopologyInputSlot::Input0, []),
+      @graph.GraphTopologyEdit::insert_chain(
+        1,
+        @graph.GraphTopologyInputSlot::Input0,
+        [],
+      ),
     )
     is Err(_),
   )
@@ -1280,8 +1409,8 @@ test "topology edit: insert_chain rejects chain with binary node" {
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let topology = DspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::output(0)],
+  let topology = @graph.DspTopologyController::from_nodes(
+    [@graph.DspNode::constant(1.0), @graph.DspNode::output(0)],
     context,
   ).unwrap()
   let output = AudioBuffer::filled(HOT_SWAP_BLOCK_SIZE)
@@ -1289,10 +1418,11 @@ test "topology edit: insert_chain rejects chain with binary node" {
   // Mix is binary (has input1), should be rejected
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::insert_chain(1, GraphTopologyInputSlot::Input0, [
-        DspNode::gain(0, 0.5),
-        DspNode::mix(0, 0),
-      ]),
+      @graph.GraphTopologyEdit::insert_chain(
+        1,
+        @graph.GraphTopologyInputSlot::Input0,
+        [@graph.DspNode::gain(0, 0.5), @graph.DspNode::mix(0, 0)],
+      ),
     )
     is Err(_),
   )
@@ -1307,12 +1437,12 @@ test "topology edit: delete_chain rejects chain with binary node" {
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
   // Build a graph with a binary node (mix) in the potential delete range
-  let topology = DspTopologyController::from_nodes(
+  let topology = @graph.DspTopologyController::from_nodes(
     [
-      DspNode::constant(1.0),
-      DspNode::constant(0.5),
-      DspNode::mix(0, 1),
-      DspNode::output(2),
+      @graph.DspNode::constant(1.0),
+      @graph.DspNode::constant(0.5),
+      @graph.DspNode::mix(0, 1),
+      @graph.DspNode::output(2),
     ],
     context,
   ).unwrap()
@@ -1321,11 +1451,11 @@ test "topology edit: delete_chain rejects chain with binary node" {
   // Try to delete chain containing mix node (binary, has input1 >= 0)
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::delete_chain(
+      @graph.GraphTopologyEdit::delete_chain(
         2,
         2,
         3,
-        GraphTopologyInputSlot::Input0,
+        @graph.GraphTopologyInputSlot::Input0,
         0,
       ),
     )
@@ -1338,12 +1468,12 @@ test "topology edit: delete_chain rejects chain with binary node" {
 ///|
 test "topology edit preserves oscillator phase across recompilation" {
   let nodes = [
-    DspNode::constant(440.0),
-    DspNode::oscillator_from(0, Waveform::Sine),
-    DspNode::output(1),
+    @graph.DspNode::constant(440.0),
+    @graph.DspNode::oscillator_from(0, Waveform::Sine),
+    @graph.DspNode::output(1),
   ]
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
-  let controller = DspTopologyController::from_nodes(
+  let controller = @graph.DspTopologyController::from_nodes(
     nodes,
     ctx,
     crossfade_samples=0,
@@ -1354,10 +1484,10 @@ test "topology edit preserves oscillator phase across recompilation" {
   controller.process(ctx, buf)
 
   // Insert a gain(1.0) identity node — should not change output
-  let edit = GraphTopologyEdit::insert_node(
+  let edit = @graph.GraphTopologyEdit::insert_node(
     2,
-    GraphTopologyInputSlot::Input0,
-    DspNode::gain(-1, 1.0),
+    @graph.GraphTopologyInputSlot::Input0,
+    @graph.DspNode::gain(-1, 1.0),
   )
   assert_true(controller.queue_topology_edit(edit) is Ok(_))
   controller.process(ctx, buf) // applies the swap
@@ -1374,13 +1504,13 @@ test "topology edit preserves oscillator phase across recompilation" {
 ///|
 test "topology edit preserves stereo oscillator phase across recompilation" {
   let nodes = [
-    DspNode::constant(440.0),
-    DspNode::oscillator_from(0, Waveform::Sine),
-    DspNode::pan(1, 0.0),
-    DspNode::stereo_output(2),
+    @graph.DspNode::constant(440.0),
+    @graph.DspNode::oscillator_from(0, Waveform::Sine),
+    @graph.DspNode::pan(1, 0.0),
+    @graph.DspNode::stereo_output(2),
   ]
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
-  let controller = StereoDspTopologyController::from_nodes(
+  let controller = @graph.StereoDspTopologyController::from_nodes(
     nodes,
     ctx,
     crossfade_samples=0,
@@ -1392,10 +1522,10 @@ test "topology edit preserves stereo oscillator phase across recompilation" {
   controller.process(ctx, left, right)
 
   // Insert a stereo_gain(1.0) identity node — should not change output
-  let edit = GraphTopologyEdit::insert_node(
+  let edit = @graph.GraphTopologyEdit::insert_node(
     3,
-    GraphTopologyInputSlot::Input0,
-    DspNode::stereo_gain(input=-1, amount=1.0),
+    @graph.GraphTopologyInputSlot::Input0,
+    @graph.DspNode::stereo_gain(input=-1, amount=1.0),
   )
   assert_true(controller.queue_topology_edit(edit) is Ok(_))
   controller.process(ctx, left, right) // applies the swap

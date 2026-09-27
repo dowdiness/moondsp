@@ -18,9 +18,15 @@ pub(all) enum GraphCompileError {
 } derive(Debug)
 
 ///|
+pub extend GraphCompileError with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 pub impl Show for GraphCompileError with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
+
+///|
+pub extend GraphCompileError with Show::{to_string, output}
 
 ///|
 fn graph_input_slot_from_runtime(

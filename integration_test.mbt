@@ -180,23 +180,30 @@ const GRAPH_BANDPASS_CLIP : Double = 0.9
 
 ///|
 test "voice chain stays bounded across note on and release" {
-  let context = DspContext::new(sample_rate=48000.0, block_size=16)
-  let osc = Oscillator::new()
-  let env = Adsr::new(attack_ms=0.0, decay_ms=0.0, sustain=0.5, release_ms=5.0)
-  let filter = Biquad::new()
-  let gain = Gain::new()
-  let delay = DelayLine::new(4, delay_samples=2)
-  let clip = Clip::new()
-  let signal = AudioBuffer::filled(16)
-  let envelope = AudioBuffer::filled(16)
+  let context = @moondsp.DspContext::new(sample_rate=48000.0, block_size=16)
+  let osc = @moondsp.Oscillator::new()
+  let env = @moondsp.Adsr::new(
+    attack_ms=0.0,
+    decay_ms=0.0,
+    sustain=0.5,
+    release_ms=5.0,
+  )
+  let filter = @moondsp.Biquad::new()
+  let gain = @moondsp.Gain::new()
+  let delay = @moondsp.DelayLine::new(4, delay_samples=2)
+  let clip = @moondsp.Clip::new()
+  let signal = @moondsp.AudioBuffer::filled(16)
+  let envelope = @moondsp.AudioBuffer::filled(16)
 
-  assert_true(filter.update(context, BiquadMode::LowPass, 1200.0, 0.707))
+  assert_true(
+    filter.update(context, @moondsp.BiquadMode::LowPass, 1200.0, 0.707),
+  )
 
   env.gate_on()
   osc.process_waveform(
     context~,
     output=signal,
-    waveform=Waveform::Saw,
+    waveform=@moondsp.Waveform::Saw,
     freq_hz=220.0,
   )
   env.process(context, envelope)
@@ -214,13 +221,13 @@ test "voice chain stays bounded across note on and release" {
 
   assert_true(integration_buffer_is_finite_and_bounded(signal, 0.35))
   assert_true(integration_any_non_zero(signal))
-  assert_true(env.stage() is EnvStage::Sustain)
+  assert_true(env.stage() is @moondsp.EnvStage::Sustain)
 
   env.gate_off()
   osc.process_waveform(
     context~,
     output=signal,
-    waveform=Waveform::Saw,
+    waveform=@moondsp.Waveform::Saw,
     freq_hz=220.0,
   )
   env.process(context, envelope)
@@ -237,27 +244,29 @@ test "voice chain stays bounded across note on and release" {
   clip.process(context~, buffer=signal, threshold=0.35)
 
   assert_true(integration_buffer_is_finite_and_bounded(signal, 0.35))
-  assert_true(env.stage() is EnvStage::Release)
+  assert_true(env.stage() is @moondsp.EnvStage::Release)
 }
 
 ///|
 test "mixed oscillator and noise buses remain finite and bounded" {
-  let context = DspContext::new(sample_rate=48000.0, block_size=16)
-  let osc = Oscillator::new()
-  let noise = Noise::new(123U)
-  let smoother = ParamSmoother::from_context(0.0, 1.0, context)
-  let mix = Mix::new()
-  let clip = Clip::new()
-  let filter = Biquad::new()
-  let tone = AudioBuffer::filled(16)
-  let noise_bus = AudioBuffer::filled(16)
+  let context = @moondsp.DspContext::new(sample_rate=48000.0, block_size=16)
+  let osc = @moondsp.Oscillator::new()
+  let noise = @moondsp.Noise::new(123U)
+  let smoother = @moondsp.ParamSmoother::from_context(0.0, 1.0, context)
+  let mix = @moondsp.Mix::new()
+  let clip = @moondsp.Clip::new()
+  let filter = @moondsp.Biquad::new()
+  let tone = @moondsp.AudioBuffer::filled(16)
+  let noise_bus = @moondsp.AudioBuffer::filled(16)
 
-  assert_true(filter.update(context, BiquadMode::HighPass, 800.0, 0.707))
+  assert_true(
+    filter.update(context, @moondsp.BiquadMode::HighPass, 800.0, 0.707),
+  )
 
   osc.process_waveform(
     context~,
     output=tone,
-    waveform=Waveform::Triangle,
+    waveform=@moondsp.Waveform::Triangle,
     freq_hz=110.0,
   )
   let tone_before_mix = integration_copy_samples(tone)
@@ -285,26 +294,31 @@ test "mixed oscillator and noise buses remain finite and bounded" {
 
 ///|
 test "stereo voice path with pan stays balanced and bounded" {
-  let context = DspContext::new(sample_rate=48000.0, block_size=16)
-  let osc = Oscillator::new()
-  let env = Adsr::new(attack_ms=0.0, decay_ms=0.0, sustain=0.6, release_ms=10.0)
-  let filter = Biquad::new()
-  let gain = Gain::new()
-  let pan = Pan::new()
-  let left_clip = Clip::new()
-  let right_clip = Clip::new()
-  let mono = AudioBuffer::filled(16)
-  let envelope = AudioBuffer::filled(16)
-  let left = AudioBuffer::filled(16)
-  let right = AudioBuffer::filled(16)
+  let context = @moondsp.DspContext::new(sample_rate=48000.0, block_size=16)
+  let osc = @moondsp.Oscillator::new()
+  let env = @moondsp.Adsr::new(
+    attack_ms=0.0,
+    decay_ms=0.0,
+    sustain=0.6,
+    release_ms=10.0,
+  )
+  let filter = @moondsp.Biquad::new()
+  let gain = @moondsp.Gain::new()
+  let pan = @moondsp.Pan::new()
+  let left_clip = @moondsp.Clip::new()
+  let right_clip = @moondsp.Clip::new()
+  let mono = @moondsp.AudioBuffer::filled(16)
+  let envelope = @moondsp.AudioBuffer::filled(16)
+  let left = @moondsp.AudioBuffer::filled(16)
+  let right = @moondsp.AudioBuffer::filled(16)
 
-  assert_true(filter.update(context, BiquadMode::BandPass, 900.0, 0.9))
+  assert_true(filter.update(context, @moondsp.BiquadMode::BandPass, 900.0, 0.9))
 
   env.gate_on()
   osc.process_waveform(
     context~,
     output=mono,
-    waveform=Waveform::Triangle,
+    waveform=@moondsp.Waveform::Triangle,
     freq_hz=330.0,
   )
   env.process(context, envelope)
@@ -338,21 +352,24 @@ test "stereo voice path with pan stays balanced and bounded" {
 
 ///|
 test "compiled stereo graph voice path responds to runtime pan updates" {
-  let context = DspContext::new(
+  let context = @moondsp.DspContext::new(
     sample_rate=GRAPH_STEREO_SAMPLE_RATE,
     block_size=GRAPH_STEREO_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::oscillator(Waveform::Triangle, GRAPH_STEREO_FREQ),
-    DspNode::gain(0, GRAPH_STEREO_GAIN),
-    DspNode::pan(1, GRAPH_STEREO_CENTER),
-    DspNode::stereo_gain(input=2, amount=GRAPH_STEREO_POST_GAIN),
-    DspNode::stereo_clip(input=3, threshold=GRAPH_STEREO_CLIP),
-    DspNode::stereo_output(4),
+    @moondsp.DspNode::oscillator(@moondsp.Waveform::Triangle, GRAPH_STEREO_FREQ),
+    @moondsp.DspNode::gain(0, GRAPH_STEREO_GAIN),
+    @moondsp.DspNode::pan(1, GRAPH_STEREO_CENTER),
+    @moondsp.DspNode::stereo_gain(input=2, amount=GRAPH_STEREO_POST_GAIN),
+    @moondsp.DspNode::stereo_clip(input=3, threshold=GRAPH_STEREO_CLIP),
+    @moondsp.DspNode::stereo_output(4),
   ]
-  let compiled = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-  let left_output = AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
-  let right_output = AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
+  let compiled = @moondsp.StereoDsp::compile(
+    @moondsp.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
+  let left_output = @moondsp.AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
+  let right_output = @moondsp.AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
 
   compiled.process(context, left_output, right_output)
 
@@ -374,7 +391,11 @@ test "compiled stereo graph voice path responds to runtime pan updates" {
 
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(2, GraphParamSlot::Value0, GRAPH_STEREO_HARD_LEFT),
+      @moondsp.GraphControl::set_param(
+        2,
+        @moondsp.GraphParamSlot::Value0,
+        GRAPH_STEREO_HARD_LEFT,
+      ),
     )
     is Ok(_),
   )
@@ -395,31 +416,42 @@ test "compiled stereo graph voice path responds to runtime pan updates" {
 
 ///|
 test "compiled stereo graph applies batched control frames" {
-  let context = DspContext::new(
+  let context = @moondsp.DspContext::new(
     sample_rate=GRAPH_STEREO_SAMPLE_RATE,
     block_size=GRAPH_STEREO_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::oscillator(Waveform::Triangle, GRAPH_STEREO_FREQ),
-    DspNode::gain(0, GRAPH_STEREO_GAIN),
-    DspNode::pan(1, GRAPH_STEREO_CENTER),
-    DspNode::stereo_gain(input=2, amount=GRAPH_STEREO_POST_GAIN),
-    DspNode::stereo_clip(input=3, threshold=GRAPH_STEREO_CLIP),
-    DspNode::stereo_output(4),
+    @moondsp.DspNode::oscillator(@moondsp.Waveform::Triangle, GRAPH_STEREO_FREQ),
+    @moondsp.DspNode::gain(0, GRAPH_STEREO_GAIN),
+    @moondsp.DspNode::pan(1, GRAPH_STEREO_CENTER),
+    @moondsp.DspNode::stereo_gain(input=2, amount=GRAPH_STEREO_POST_GAIN),
+    @moondsp.DspNode::stereo_clip(input=3, threshold=GRAPH_STEREO_CLIP),
+    @moondsp.DspNode::stereo_output(4),
   ]
-  let compiled = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-  let left_output = AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
-  let right_output = AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
+  let compiled = @moondsp.StereoDsp::compile(
+    @moondsp.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
+  let left_output = @moondsp.AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
+  let right_output = @moondsp.AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
 
   assert_true(
     compiled.apply_controls([
-      GraphControl::set_param(
+      @moondsp.GraphControl::set_param(
         1,
-        GraphParamSlot::Value0,
+        @moondsp.GraphParamSlot::Value0,
         GRAPH_STEREO_BATCH_GAIN,
       ),
-      GraphControl::set_param(2, GraphParamSlot::Value0, GRAPH_STEREO_HARD_LEFT),
-      GraphControl::set_param(3, GraphParamSlot::Value0, HALF_GAIN),
+      @moondsp.GraphControl::set_param(
+        2,
+        @moondsp.GraphParamSlot::Value0,
+        GRAPH_STEREO_HARD_LEFT,
+      ),
+      @moondsp.GraphControl::set_param(
+        3,
+        @moondsp.GraphParamSlot::Value0,
+        HALF_GAIN,
+      ),
     ])
     is Ok(_),
   )
@@ -435,13 +467,21 @@ test "compiled stereo graph applies batched control frames" {
 
   assert_true(
     compiled.apply_controls([
-      GraphControl::set_param(2, GraphParamSlot::Value0, GRAPH_STEREO_CENTER),
-      GraphControl::set_param(
+      @moondsp.GraphControl::set_param(
         2,
-        GraphParamSlot::Value0,
+        @moondsp.GraphParamSlot::Value0,
+        GRAPH_STEREO_CENTER,
+      ),
+      @moondsp.GraphControl::set_param(
+        2,
+        @moondsp.GraphParamSlot::Value0,
         GRAPH_STEREO_HARD_RIGHT,
       ),
-      GraphControl::set_param(4, GraphParamSlot::Value0, GRAPH_STEREO_CLIP),
+      @moondsp.GraphControl::set_param(
+        4,
+        @moondsp.GraphParamSlot::Value0,
+        GRAPH_STEREO_CLIP,
+      ),
     ])
     is Ok(_),
   )
@@ -462,35 +502,35 @@ test "compiled stereo graph applies batched control frames" {
 
 ///|
 test "compiled stereo graph stereo biquad retune changes output" {
-  let context = DspContext::new(
+  let context = @moondsp.DspContext::new(
     sample_rate=GRAPH_STEREO_SAMPLE_RATE,
     block_size=GRAPH_STEREO_BLOCK_SIZE,
   )
   let baseline_nodes = [
-    DspNode::oscillator(Waveform::Triangle, GRAPH_STEREO_FREQ),
-    DspNode::pan(0, GRAPH_STEREO_CENTER),
-    DspNode::stereo_biquad(
+    @moondsp.DspNode::oscillator(@moondsp.Waveform::Triangle, GRAPH_STEREO_FREQ),
+    @moondsp.DspNode::pan(0, GRAPH_STEREO_CENTER),
+    @moondsp.DspNode::stereo_biquad(
       input=1,
-      mode=BiquadMode::LowPass,
+      mode=@moondsp.BiquadMode::LowPass,
       cutoff_hz=GRAPH_STEREO_FILTER_INITIAL_CUTOFF,
       q=GRAPH_STEREO_FILTER_Q,
     ),
-    DspNode::stereo_gain(input=2, amount=GRAPH_STEREO_POST_GAIN),
-    DspNode::stereo_clip(input=3, threshold=GRAPH_STEREO_CLIP),
-    DspNode::stereo_output(4),
+    @moondsp.DspNode::stereo_gain(input=2, amount=GRAPH_STEREO_POST_GAIN),
+    @moondsp.DspNode::stereo_clip(input=3, threshold=GRAPH_STEREO_CLIP),
+    @moondsp.DspNode::stereo_output(4),
   ]
-  let baseline = StereoDsp::compile(
-    AnalyzedGraph::analyze(baseline_nodes),
+  let baseline = @moondsp.StereoDsp::compile(
+    @moondsp.AnalyzedGraph::analyze(baseline_nodes),
     context,
   ).unwrap()
-  let retuned = StereoDsp::compile(
-    AnalyzedGraph::analyze(baseline_nodes),
+  let retuned = @moondsp.StereoDsp::compile(
+    @moondsp.AnalyzedGraph::analyze(baseline_nodes),
     context,
   ).unwrap()
-  let baseline_left = AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
-  let baseline_right = AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
-  let retuned_left = AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
-  let retuned_right = AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
+  let baseline_left = @moondsp.AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
+  let baseline_right = @moondsp.AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
+  let retuned_left = @moondsp.AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
+  let retuned_right = @moondsp.AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
 
   baseline.process(context, baseline_left, baseline_right)
   retuned.process(context, retuned_left, retuned_right)
@@ -514,9 +554,9 @@ test "compiled stereo graph stereo biquad retune changes output" {
 
   assert_true(
     retuned.apply_control(
-      GraphControl::set_param(
+      @moondsp.GraphControl::set_param(
         2,
-        GraphParamSlot::Value0,
+        @moondsp.GraphParamSlot::Value0,
         GRAPH_STEREO_FILTER_RETUNED_CUTOFF,
       ),
     )
@@ -544,31 +584,41 @@ test "compiled stereo graph stereo biquad retune changes output" {
 
 ///|
 test "compiled stereo graph stereo delay retune changes output" {
-  let context = DspContext::new(
+  let context = @moondsp.DspContext::new(
     sample_rate=GRAPH_STEREO_SAMPLE_RATE,
     block_size=GRAPH_STEREO_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(1.0),
-    DspNode::pan(0, GRAPH_STEREO_CENTER),
-    DspNode::stereo_delay(
+    @moondsp.DspNode::constant(1.0),
+    @moondsp.DspNode::pan(0, GRAPH_STEREO_CENTER),
+    @moondsp.DspNode::stereo_delay(
       input=1,
       max_delay_samples=GRAPH_STEREO_DELAY_CAPACITY,
       delay_samples=GRAPH_STEREO_DELAY_SAMPLES,
     ),
-    DspNode::stereo_output(2),
+    @moondsp.DspNode::stereo_output(2),
   ]
-  let baseline = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-  let retuned = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-  let baseline_left = AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
-  let baseline_right = AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
-  let retuned_left = AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
-  let retuned_right = AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
+  let baseline = @moondsp.StereoDsp::compile(
+    @moondsp.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
+  let retuned = @moondsp.StereoDsp::compile(
+    @moondsp.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
+  let baseline_left = @moondsp.AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
+  let baseline_right = @moondsp.AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
+  let retuned_left = @moondsp.AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
+  let retuned_right = @moondsp.AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
 
   baseline.process(context, baseline_left, baseline_right)
   assert_true(
     retuned.apply_control(
-      GraphControl::set_param(2, GraphParamSlot::DelaySamples, 0.0),
+      @moondsp.GraphControl::set_param(
+        2,
+        @moondsp.GraphParamSlot::DelaySamples,
+        0.0,
+      ),
     )
     is Ok(_),
   )
@@ -614,34 +664,40 @@ test "compiled stereo graph stereo delay retune changes output" {
 
 ///|
 test "compiled stereo graph stereo delay feedback increases tail energy" {
-  let context = DspContext::new(
+  let context = @moondsp.DspContext::new(
     sample_rate=GRAPH_STEREO_SAMPLE_RATE,
     block_size=GRAPH_STEREO_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(1.0),
-    DspNode::pan(0, GRAPH_STEREO_CENTER),
-    DspNode::stereo_delay(
+    @moondsp.DspNode::constant(1.0),
+    @moondsp.DspNode::pan(0, GRAPH_STEREO_CENTER),
+    @moondsp.DspNode::stereo_delay(
       input=1,
       max_delay_samples=GRAPH_STEREO_DELAY_CAPACITY,
       delay_samples=GRAPH_STEREO_DELAY_SAMPLES,
     ),
-    DspNode::stereo_output(2),
+    @moondsp.DspNode::stereo_output(2),
   ]
-  let baseline = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-  let retuned = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-  let baseline_left = AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
-  let baseline_right = AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
-  let retuned_left = AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
-  let retuned_right = AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
+  let baseline = @moondsp.StereoDsp::compile(
+    @moondsp.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
+  let retuned = @moondsp.StereoDsp::compile(
+    @moondsp.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
+  let baseline_left = @moondsp.AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
+  let baseline_right = @moondsp.AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
+  let retuned_left = @moondsp.AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
+  let retuned_right = @moondsp.AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
 
   baseline.process(context, baseline_left, baseline_right)
   retuned.process(context, retuned_left, retuned_right)
   assert_true(
     retuned.apply_control(
-      GraphControl::set_param(
+      @moondsp.GraphControl::set_param(
         2,
-        GraphParamSlot::Value0,
+        @moondsp.GraphParamSlot::Value0,
         GRAPH_STEREO_DELAY_FEEDBACK,
       ),
     )
@@ -678,37 +734,42 @@ test "compiled stereo graph stereo delay feedback increases tail energy" {
 
 ///|
 test "compiled graph stereo delay mixdown matches equivalent mono delay path" {
-  let context = DspContext::new(
+  let context = @moondsp.DspContext::new(
     sample_rate=GRAPH_STEREO_SAMPLE_RATE,
     block_size=GRAPH_STEREO_BLOCK_SIZE,
   )
   let stereo_nodes = [
-    DspNode::constant(1.0),
-    DspNode::pan(0, GRAPH_STEREO_CENTER),
-    DspNode::stereo_delay(
+    @moondsp.DspNode::constant(1.0),
+    @moondsp.DspNode::pan(0, GRAPH_STEREO_CENTER),
+    @moondsp.DspNode::stereo_delay(
       input=1,
       max_delay_samples=GRAPH_STEREO_DELAY_CAPACITY,
       delay_samples=GRAPH_STEREO_DELAY_SAMPLES,
     ),
-    DspNode::stereo_mixdown(2),
-    DspNode::output(3),
+    @moondsp.DspNode::stereo_mixdown(2),
+    @moondsp.DspNode::output(3),
   ]
   let mono_nodes = [
-    DspNode::constant(GRAPH_STEREO_CENTER_GAIN),
-    DspNode::delay(
+    @moondsp.DspNode::constant(GRAPH_STEREO_CENTER_GAIN),
+    @moondsp.DspNode::delay(
       input=0,
       max_delay_samples=GRAPH_STEREO_DELAY_CAPACITY,
       delay_samples=GRAPH_STEREO_DELAY_SAMPLES,
     ),
-    DspNode::output(1),
+    @moondsp.DspNode::output(1),
   ]
-  let stereo_mixdown = Dsp::compile(
-    AnalyzedGraph::analyze(stereo_nodes),
+  let stereo_mixdown = @moondsp.Dsp::compile(
+    @moondsp.AnalyzedGraph::analyze(stereo_nodes),
     context,
   ).unwrap()
-  let mono = Dsp::compile(AnalyzedGraph::analyze(mono_nodes), context).unwrap()
-  let stereo_mixdown_output = AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
-  let mono_output = AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
+  let mono = @moondsp.Dsp::compile(
+    @moondsp.AnalyzedGraph::analyze(mono_nodes),
+    context,
+  ).unwrap()
+  let stereo_mixdown_output = @moondsp.AudioBuffer::filled(
+    GRAPH_STEREO_BLOCK_SIZE,
+  )
+  let mono_output = @moondsp.AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
 
   stereo_mixdown.process(context, stereo_mixdown_output)
   mono.process(context, mono_output)
@@ -730,7 +791,7 @@ test "compiled graph stereo delay mixdown matches equivalent mono delay path" {
 
 ///|
 test "compiled graph stereo mixdown matches equivalent mono gain path" {
-  let context = DspContext::new(
+  let context = @moondsp.DspContext::new(
     sample_rate=GRAPH_STEREO_SAMPLE_RATE,
     block_size=GRAPH_STEREO_BLOCK_SIZE,
   )
@@ -738,27 +799,32 @@ test "compiled graph stereo mixdown matches equivalent mono gain path" {
     GRAPH_STEREO_POST_GAIN *
     0.7071067811865476
   let stereo_nodes = [
-    DspNode::oscillator(Waveform::Triangle, GRAPH_STEREO_FREQ),
-    DspNode::gain(0, GRAPH_STEREO_GAIN),
-    DspNode::pan(1, GRAPH_STEREO_CENTER),
-    DspNode::stereo_gain(input=2, amount=GRAPH_STEREO_POST_GAIN),
-    DspNode::stereo_clip(input=3, threshold=1.0),
-    DspNode::stereo_mixdown(4),
-    DspNode::output(5),
+    @moondsp.DspNode::oscillator(@moondsp.Waveform::Triangle, GRAPH_STEREO_FREQ),
+    @moondsp.DspNode::gain(0, GRAPH_STEREO_GAIN),
+    @moondsp.DspNode::pan(1, GRAPH_STEREO_CENTER),
+    @moondsp.DspNode::stereo_gain(input=2, amount=GRAPH_STEREO_POST_GAIN),
+    @moondsp.DspNode::stereo_clip(input=3, threshold=1.0),
+    @moondsp.DspNode::stereo_mixdown(4),
+    @moondsp.DspNode::output(5),
   ]
   let mono_nodes = [
-    DspNode::oscillator(Waveform::Triangle, GRAPH_STEREO_FREQ),
-    DspNode::gain(0, mono_gain),
-    DspNode::clip(1, 1.0),
-    DspNode::output(2),
+    @moondsp.DspNode::oscillator(@moondsp.Waveform::Triangle, GRAPH_STEREO_FREQ),
+    @moondsp.DspNode::gain(0, mono_gain),
+    @moondsp.DspNode::clip(1, 1.0),
+    @moondsp.DspNode::output(2),
   ]
-  let stereo_mixdown = Dsp::compile(
-    AnalyzedGraph::analyze(stereo_nodes),
+  let stereo_mixdown = @moondsp.Dsp::compile(
+    @moondsp.AnalyzedGraph::analyze(stereo_nodes),
     context,
   ).unwrap()
-  let mono = Dsp::compile(AnalyzedGraph::analyze(mono_nodes), context).unwrap()
-  let stereo_mixdown_output = AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
-  let mono_output = AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
+  let mono = @moondsp.Dsp::compile(
+    @moondsp.AnalyzedGraph::analyze(mono_nodes),
+    context,
+  ).unwrap()
+  let stereo_mixdown_output = @moondsp.AudioBuffer::filled(
+    GRAPH_STEREO_BLOCK_SIZE,
+  )
+  let mono_output = @moondsp.AudioBuffer::filled(GRAPH_STEREO_BLOCK_SIZE)
 
   stereo_mixdown.process(context, stereo_mixdown_output)
   mono.process(context, mono_output)
@@ -778,19 +844,22 @@ test "compiled graph stereo mixdown matches equivalent mono gain path" {
 
 ///|
 test "compiled graph z^-1 feedback cycle persists across blocks and stays bounded" {
-  let context = DspContext::new(
+  let context = @moondsp.DspContext::new(
     sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
     block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(1.0),
-    DspNode::mix(0, 2),
-    DspNode::gain(1, GRAPH_FEEDBACK_GAIN),
-    DspNode::output(2),
+    @moondsp.DspNode::constant(1.0),
+    @moondsp.DspNode::mix(0, 2),
+    @moondsp.DspNode::gain(1, GRAPH_FEEDBACK_GAIN),
+    @moondsp.DspNode::output(2),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-  let first_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let second_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let compiled = @moondsp.Dsp::compile(
+    @moondsp.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
+  let first_block = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let second_block = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
 
   compiled.process(context, first_block)
   compiled.process(context, second_block)
@@ -810,31 +879,34 @@ test "compiled graph z^-1 feedback cycle persists across blocks and stays bounde
 
 ///|
 test "compiled graph z^-1 feedback cycle applies batched runtime changes" {
-  let context = DspContext::new(
+  let context = @moondsp.DspContext::new(
     sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
     block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(1.0),
-    DspNode::mix(0, 2),
-    DspNode::gain(1, GRAPH_FEEDBACK_GAIN),
-    DspNode::output(2),
+    @moondsp.DspNode::constant(1.0),
+    @moondsp.DspNode::mix(0, 2),
+    @moondsp.DspNode::gain(1, GRAPH_FEEDBACK_GAIN),
+    @moondsp.DspNode::output(2),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-  let first_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let second_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let compiled = @moondsp.Dsp::compile(
+    @moondsp.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
+  let first_block = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let second_block = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
 
   compiled.process(context, first_block)
   assert_true(
     compiled.apply_controls([
-      GraphControl::set_param(
+      @moondsp.GraphControl::set_param(
         0,
-        GraphParamSlot::Value0,
+        @moondsp.GraphParamSlot::Value0,
         GRAPH_FEEDBACK_RETUNED_CONSTANT,
       ),
-      GraphControl::set_param(
+      @moondsp.GraphControl::set_param(
         2,
-        GraphParamSlot::Value0,
+        @moondsp.GraphParamSlot::Value0,
         GRAPH_FEEDBACK_RETUNED_GAIN,
       ),
     ])
@@ -854,22 +926,25 @@ test "compiled graph z^-1 feedback cycle applies batched runtime changes" {
 
 ///|
 test "compiled stereo graph mono z^-1 feedback cycle persists across blocks" {
-  let context = DspContext::new(
+  let context = @moondsp.DspContext::new(
     sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
     block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(1.0),
-    DspNode::mix(0, 2),
-    DspNode::gain(1, GRAPH_FEEDBACK_GAIN),
-    DspNode::pan(2, GRAPH_STEREO_CENTER),
-    DspNode::stereo_output(3),
+    @moondsp.DspNode::constant(1.0),
+    @moondsp.DspNode::mix(0, 2),
+    @moondsp.DspNode::gain(1, GRAPH_FEEDBACK_GAIN),
+    @moondsp.DspNode::pan(2, GRAPH_STEREO_CENTER),
+    @moondsp.DspNode::stereo_output(3),
   ]
-  let compiled = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-  let first_left = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let first_right = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let second_left = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let second_right = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let compiled = @moondsp.StereoDsp::compile(
+    @moondsp.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
+  let first_left = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let first_right = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let second_left = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let second_right = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
 
   compiled.process(context, first_left, first_right)
   compiled.process(context, second_left, second_right)
@@ -913,32 +988,39 @@ test "compiled stereo graph mono z^-1 feedback cycle persists across blocks" {
 
 ///|
 test "compiled stereo graph mono z^-1 feedback cycle applies batched runtime changes" {
-  let context = DspContext::new(
+  let context = @moondsp.DspContext::new(
     sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
     block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(1.0),
-    DspNode::mix(0, 2),
-    DspNode::gain(1, GRAPH_FEEDBACK_GAIN),
-    DspNode::pan(2, GRAPH_STEREO_CENTER),
-    DspNode::stereo_output(3),
+    @moondsp.DspNode::constant(1.0),
+    @moondsp.DspNode::mix(0, 2),
+    @moondsp.DspNode::gain(1, GRAPH_FEEDBACK_GAIN),
+    @moondsp.DspNode::pan(2, GRAPH_STEREO_CENTER),
+    @moondsp.DspNode::stereo_output(3),
   ]
-  let compiled = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-  let first_left = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let first_right = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let second_left = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let second_right = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let compiled = @moondsp.StereoDsp::compile(
+    @moondsp.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
+  let first_left = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let first_right = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let second_left = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let second_right = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
 
   compiled.process(context, first_left, first_right)
   assert_true(
     compiled.apply_controls([
-      GraphControl::set_param(
+      @moondsp.GraphControl::set_param(
         2,
-        GraphParamSlot::Value0,
+        @moondsp.GraphParamSlot::Value0,
         GRAPH_FEEDBACK_RETUNED_GAIN,
       ),
-      GraphControl::set_param(3, GraphParamSlot::Value0, GRAPH_STEREO_HARD_LEFT),
+      @moondsp.GraphControl::set_param(
+        3,
+        @moondsp.GraphParamSlot::Value0,
+        GRAPH_STEREO_HARD_LEFT,
+      ),
     ])
     is Ok(_),
   )
@@ -957,22 +1039,28 @@ test "compiled stereo graph mono z^-1 feedback cycle applies batched runtime cha
 
 ///|
 test "compiled graph hot swap crossfades between bounded mono graphs" {
-  let context = DspContext::new(
+  let context = @moondsp.DspContext::new(
     sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
     block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
-  let active = Dsp::compile(
-    AnalyzedGraph::analyze([DspNode::constant(0.25), DspNode::output(0)]),
+  let active = @moondsp.Dsp::compile(
+    @moondsp.AnalyzedGraph::analyze([
+      @moondsp.DspNode::constant(0.25),
+      @moondsp.DspNode::output(0),
+    ]),
     context,
   ).unwrap()
-  let replacement = Dsp::compile(
-    AnalyzedGraph::analyze([DspNode::constant(0.75), DspNode::output(0)]),
+  let replacement = @moondsp.Dsp::compile(
+    @moondsp.AnalyzedGraph::analyze([
+      @moondsp.DspNode::constant(0.75),
+      @moondsp.DspNode::output(0),
+    ]),
     context,
   ).unwrap()
-  let hot_swap = DspHotSwap::from_graph(active, crossfade_samples=8)
-  let first_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let second_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let settled_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let hot_swap = @moondsp.DspHotSwap::from_graph(active, crossfade_samples=8)
+  let first_block = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let second_block = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let settled_block = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
 
   assert_true(hot_swap.queue_swap(replacement) is Ok(_))
   hot_swap.process(context, first_block)
@@ -992,28 +1080,39 @@ test "compiled graph hot swap crossfades between bounded mono graphs" {
 
 ///|
 test "compiled graph topology edit crossfades rebuilt mono graphs" {
-  let context = DspContext::new(
+  let context = @moondsp.DspContext::new(
     sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
     block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
-  let topology = DspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::gain(0, 0.25), DspNode::output(1)],
+  let topology = @moondsp.DspTopologyController::from_nodes(
+    [
+      @moondsp.DspNode::constant(1.0),
+      @moondsp.DspNode::gain(0, 0.25),
+      @moondsp.DspNode::output(1),
+    ],
     context,
     crossfade_samples=8,
   ).unwrap()
-  let first_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let second_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let settled_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let first_block = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let second_block = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let settled_block = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
 
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::replace_node(1, DspNode::gain(0, 0.75)),
+      @moondsp.GraphTopologyEdit::replace_node(
+        1,
+        @moondsp.DspNode::gain(0, 0.75),
+      ),
     )
     is Ok(_),
   )
   assert_true(
     topology.apply_control(
-      GraphControl::set_param(1, GraphParamSlot::Value0, HALF_GAIN),
+      @moondsp.GraphControl::set_param(
+        1,
+        @moondsp.GraphParamSlot::Value0,
+        HALF_GAIN,
+      ),
     )
     is Ok(_),
   )
@@ -1037,30 +1136,34 @@ test "compiled graph topology edit crossfades rebuilt mono graphs" {
 
 ///|
 test "compiled graph topology edit rewires rebuilt mono graphs" {
-  let context = DspContext::new(
+  let context = @moondsp.DspContext::new(
     sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
     block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
-  let topology = DspTopologyController::from_nodes(
+  let topology = @moondsp.DspTopologyController::from_nodes(
     [
-      DspNode::constant(2.0),
-      DspNode::constant(1.0),
-      DspNode::gain(0, HALF_GAIN),
-      DspNode::gain(1, HALF_GAIN),
-      DspNode::mix(2, 3),
-      DspNode::mix(4, 3),
-      DspNode::output(5),
+      @moondsp.DspNode::constant(2.0),
+      @moondsp.DspNode::constant(1.0),
+      @moondsp.DspNode::gain(0, HALF_GAIN),
+      @moondsp.DspNode::gain(1, HALF_GAIN),
+      @moondsp.DspNode::mix(2, 3),
+      @moondsp.DspNode::mix(4, 3),
+      @moondsp.DspNode::output(5),
     ],
     context,
     crossfade_samples=8,
   ).unwrap()
-  let first_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let second_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let settled_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let first_block = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let second_block = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let settled_block = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
 
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::rewire_input(4, GraphTopologyInputSlot::Input1, 0),
+      @moondsp.GraphTopologyEdit::rewire_input(
+        4,
+        @moondsp.GraphTopologyInputSlot::Input1,
+        0,
+      ),
     )
     is Ok(_),
   )
@@ -1078,25 +1181,25 @@ test "compiled graph topology edit rewires rebuilt mono graphs" {
 
 ///|
 test "compiled graph topology edit inserts rebuilt mono graphs" {
-  let context = DspContext::new(
+  let context = @moondsp.DspContext::new(
     sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
     block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
-  let topology = DspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::output(0)],
+  let topology = @moondsp.DspTopologyController::from_nodes(
+    [@moondsp.DspNode::constant(1.0), @moondsp.DspNode::output(0)],
     context,
     crossfade_samples=8,
   ).unwrap()
-  let first_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let second_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let settled_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let first_block = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let second_block = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let settled_block = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
 
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::insert_node(
+      @moondsp.GraphTopologyEdit::insert_node(
         1,
-        GraphTopologyInputSlot::Input0,
-        DspNode::gain(0, HALF_GAIN),
+        @moondsp.GraphTopologyInputSlot::Input0,
+        @moondsp.DspNode::gain(0, HALF_GAIN),
       ),
     )
     is Ok(_),
@@ -1117,22 +1220,31 @@ test "compiled graph topology edit inserts rebuilt mono graphs" {
 
 ///|
 test "compiled graph topology edit deletes rebuilt mono graphs" {
-  let context = DspContext::new(
+  let context = @moondsp.DspContext::new(
     sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
     block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
-  let topology = DspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::gain(0, HALF_GAIN), DspNode::output(1)],
+  let topology = @moondsp.DspTopologyController::from_nodes(
+    [
+      @moondsp.DspNode::constant(1.0),
+      @moondsp.DspNode::gain(0, HALF_GAIN),
+      @moondsp.DspNode::output(1),
+    ],
     context,
     crossfade_samples=8,
   ).unwrap()
-  let first_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let second_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let settled_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let first_block = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let second_block = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let settled_block = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
 
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::delete_node(1, 2, GraphTopologyInputSlot::Input0, 1),
+      @moondsp.GraphTopologyEdit::delete_node(
+        1,
+        2,
+        @moondsp.GraphTopologyInputSlot::Input0,
+        1,
+      ),
     )
     is Ok(_),
   )
@@ -1150,28 +1262,36 @@ test "compiled graph topology edit deletes rebuilt mono graphs" {
 
 ///|
 test "compiled graph topology edit insert delete roundtrip restores rebuilt mono graphs" {
-  let context = DspContext::new(
+  let context = @moondsp.DspContext::new(
     sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
     block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
-  let topology = DspTopologyController::from_nodes(
-    [DspNode::constant(1.0), DspNode::output(0)],
+  let topology = @moondsp.DspTopologyController::from_nodes(
+    [@moondsp.DspNode::constant(1.0), @moondsp.DspNode::output(0)],
     context,
     crossfade_samples=8,
   ).unwrap()
-  let insert_first_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let insert_second_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let inserted_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let delete_first_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let delete_second_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let restored_block = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let insert_first_block = @moondsp.AudioBuffer::filled(
+    GRAPH_FEEDBACK_BLOCK_SIZE,
+  )
+  let insert_second_block = @moondsp.AudioBuffer::filled(
+    GRAPH_FEEDBACK_BLOCK_SIZE,
+  )
+  let inserted_block = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let delete_first_block = @moondsp.AudioBuffer::filled(
+    GRAPH_FEEDBACK_BLOCK_SIZE,
+  )
+  let delete_second_block = @moondsp.AudioBuffer::filled(
+    GRAPH_FEEDBACK_BLOCK_SIZE,
+  )
+  let restored_block = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
 
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::insert_node(
+      @moondsp.GraphTopologyEdit::insert_node(
         1,
-        GraphTopologyInputSlot::Input0,
-        DspNode::gain(0, HALF_GAIN),
+        @moondsp.GraphTopologyInputSlot::Input0,
+        @moondsp.DspNode::gain(0, HALF_GAIN),
       ),
     )
     is Ok(_),
@@ -1182,7 +1302,12 @@ test "compiled graph topology edit insert delete roundtrip restores rebuilt mono
 
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::delete_node(2, 1, GraphTopologyInputSlot::Input0, 2),
+      @moondsp.GraphTopologyEdit::delete_node(
+        2,
+        1,
+        @moondsp.GraphTopologyInputSlot::Input0,
+        2,
+      ),
     )
     is Ok(_),
   )
@@ -1210,33 +1335,36 @@ test "compiled graph topology edit insert delete roundtrip restores rebuilt mono
 
 ///|
 test "compiled stereo graph hot swap preserves bounded stereo output" {
-  let context = DspContext::new(
+  let context = @moondsp.DspContext::new(
     sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
     block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
-  let active = StereoDsp::compile(
-    AnalyzedGraph::analyze([
-      DspNode::constant(0.25),
-      DspNode::pan(0, GRAPH_STEREO_CENTER),
-      DspNode::stereo_output(1),
+  let active = @moondsp.StereoDsp::compile(
+    @moondsp.AnalyzedGraph::analyze([
+      @moondsp.DspNode::constant(0.25),
+      @moondsp.DspNode::pan(0, GRAPH_STEREO_CENTER),
+      @moondsp.DspNode::stereo_output(1),
     ]),
     context,
   ).unwrap()
-  let replacement = StereoDsp::compile(
-    AnalyzedGraph::analyze([
-      DspNode::constant(0.75),
-      DspNode::pan(0, GRAPH_STEREO_CENTER),
-      DspNode::stereo_output(1),
+  let replacement = @moondsp.StereoDsp::compile(
+    @moondsp.AnalyzedGraph::analyze([
+      @moondsp.DspNode::constant(0.75),
+      @moondsp.DspNode::pan(0, GRAPH_STEREO_CENTER),
+      @moondsp.DspNode::stereo_output(1),
     ]),
     context,
   ).unwrap()
-  let hot_swap = StereoDspHotSwap::from_graph(active, crossfade_samples=8)
-  let first_left = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let first_right = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let second_left = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let second_right = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let settled_left = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let settled_right = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let hot_swap = @moondsp.StereoDspHotSwap::from_graph(
+    active,
+    crossfade_samples=8,
+  )
+  let first_left = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let first_right = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let second_left = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let second_right = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let settled_left = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let settled_right = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
 
   assert_true(hot_swap.queue_swap(replacement) is Ok(_))
   hot_swap.process(context, first_left, first_right)
@@ -1299,38 +1427,42 @@ test "compiled stereo graph hot swap preserves bounded stereo output" {
 
 ///|
 test "compiled stereo graph topology edit crossfades rebuilt stereo graphs" {
-  let context = DspContext::new(
+  let context = @moondsp.DspContext::new(
     sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
     block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
-  let topology = StereoDspTopologyController::from_nodes(
+  let topology = @moondsp.StereoDspTopologyController::from_nodes(
     [
-      DspNode::constant(1.0),
-      DspNode::pan(0, GRAPH_STEREO_CENTER),
-      DspNode::stereo_output(1),
+      @moondsp.DspNode::constant(1.0),
+      @moondsp.DspNode::pan(0, GRAPH_STEREO_CENTER),
+      @moondsp.DspNode::stereo_output(1),
     ],
     context,
     crossfade_samples=8,
   ).unwrap()
-  let first_left = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let first_right = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let second_left = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let second_right = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let settled_left = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
-  let settled_right = AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let first_left = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let first_right = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let second_left = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let second_right = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let settled_left = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
+  let settled_right = @moondsp.AudioBuffer::filled(GRAPH_FEEDBACK_BLOCK_SIZE)
 
   assert_true(
     topology.queue_topology_edit(
-      GraphTopologyEdit::replace_node(
+      @moondsp.GraphTopologyEdit::replace_node(
         1,
-        DspNode::pan(0, GRAPH_STEREO_HARD_RIGHT),
+        @moondsp.DspNode::pan(0, GRAPH_STEREO_HARD_RIGHT),
       ),
     )
     is Ok(_),
   )
   assert_true(
     topology.apply_control(
-      GraphControl::set_param(1, GraphParamSlot::Value0, GRAPH_STEREO_HARD_LEFT),
+      @moondsp.GraphControl::set_param(
+        1,
+        @moondsp.GraphParamSlot::Value0,
+        GRAPH_STEREO_HARD_LEFT,
+      ),
     )
     is Ok(_),
   )
@@ -1360,38 +1492,43 @@ test "compiled stereo graph topology edit crossfades rebuilt stereo graphs" {
 
 ///|
 test "compiled graph voice path stays coherent across gates and runtime updates" {
-  let context = DspContext::new(
+  let context = @moondsp.DspContext::new(
     sample_rate=GRAPH_VOICE_SAMPLE_RATE,
     block_size=GRAPH_VOICE_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::output(1),
-    DspNode::clip(2, GRAPH_VOICE_CLIP),
-    DspNode::delay(
+    @moondsp.DspNode::output(1),
+    @moondsp.DspNode::clip(2, GRAPH_VOICE_CLIP),
+    @moondsp.DspNode::delay(
       input=3,
       max_delay_samples=GRAPH_VOICE_DELAY_CAPACITY,
       delay_samples=GRAPH_VOICE_DELAY_SAMPLES,
     ),
-    DspNode::gain(4, GRAPH_VOICE_GAIN),
-    DspNode::biquad(
+    @moondsp.DspNode::gain(4, GRAPH_VOICE_GAIN),
+    @moondsp.DspNode::biquad(
       input=5,
-      mode=BiquadMode::LowPass,
+      mode=@moondsp.BiquadMode::LowPass,
       cutoff_hz=GRAPH_VOICE_CUTOFF,
       q=GRAPH_VOICE_Q,
     ),
-    DspNode::mul(7, 6),
-    DspNode::adsr(
+    @moondsp.DspNode::mul(7, 6),
+    @moondsp.DspNode::adsr(
       attack_ms=0.0,
       decay_ms=0.0,
       sustain=GRAPH_VOICE_SUSTAIN,
       release_ms=GRAPH_VOICE_RELEASE_MS,
     ),
-    DspNode::oscillator(Waveform::Square, GRAPH_VOICE_FREQ),
+    @moondsp.DspNode::oscillator(@moondsp.Waveform::Square, GRAPH_VOICE_FREQ),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-  let output = AudioBuffer::filled(GRAPH_VOICE_BLOCK_SIZE)
+  let compiled = @moondsp.Dsp::compile(
+    @moondsp.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
+  let output = @moondsp.AudioBuffer::filled(GRAPH_VOICE_BLOCK_SIZE)
 
-  assert_true(compiled.apply_control(GraphControl::gate_on(6)) is Ok(_))
+  assert_true(
+    compiled.apply_control(@moondsp.GraphControl::gate_on(6)) is Ok(_),
+  )
   compiled.process(context, output)
 
   assert_true(
@@ -1401,7 +1538,7 @@ test "compiled graph voice path stays coherent across gates and runtime updates"
 
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(3, GraphParamSlot::Value0, 0.0),
+      @moondsp.GraphControl::set_param(3, @moondsp.GraphParamSlot::Value0, 0.0),
     )
     is Ok(_),
   )
@@ -1415,15 +1552,19 @@ test "compiled graph voice path stays coherent across gates and runtime updates"
 
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(3, GraphParamSlot::Value0, GRAPH_VOICE_GAIN),
+      @moondsp.GraphControl::set_param(
+        3,
+        @moondsp.GraphParamSlot::Value0,
+        GRAPH_VOICE_GAIN,
+      ),
     )
     is Ok(_),
   )
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(
+      @moondsp.GraphControl::set_param(
         2,
-        GraphParamSlot::DelaySamples,
+        @moondsp.GraphParamSlot::DelaySamples,
         GRAPH_VOICE_DELAY_SAMPLES_DOUBLE,
       ),
     )
@@ -1436,7 +1577,9 @@ test "compiled graph voice path stays coherent across gates and runtime updates"
   )
   assert_true(integration_any_non_zero(output))
 
-  assert_true(compiled.apply_control(GraphControl::gate_off(6)) is Ok(_))
+  assert_true(
+    compiled.apply_control(@moondsp.GraphControl::gate_off(6)) is Ok(_),
+  )
   compiled.process(context, output)
 
   assert_true(
@@ -1457,41 +1600,44 @@ test "compiled graph voice path stays coherent across gates and runtime updates"
 
 ///|
 test "compiled graph control frames apply batched runtime changes per block" {
-  let context = DspContext::new(
+  let context = @moondsp.DspContext::new(
     sample_rate=GRAPH_VOICE_SAMPLE_RATE,
     block_size=GRAPH_VOICE_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::output(1),
-    DspNode::clip(2, GRAPH_VOICE_CLIP),
-    DspNode::delay(
+    @moondsp.DspNode::output(1),
+    @moondsp.DspNode::clip(2, GRAPH_VOICE_CLIP),
+    @moondsp.DspNode::delay(
       input=3,
       max_delay_samples=GRAPH_VOICE_DELAY_CAPACITY,
       delay_samples=GRAPH_VOICE_DELAY_SAMPLES,
     ),
-    DspNode::gain(4, GRAPH_VOICE_GAIN),
-    DspNode::biquad(
+    @moondsp.DspNode::gain(4, GRAPH_VOICE_GAIN),
+    @moondsp.DspNode::biquad(
       input=5,
-      mode=BiquadMode::LowPass,
+      mode=@moondsp.BiquadMode::LowPass,
       cutoff_hz=GRAPH_VOICE_CUTOFF,
       q=GRAPH_VOICE_Q,
     ),
-    DspNode::mul(7, 6),
-    DspNode::adsr(
+    @moondsp.DspNode::mul(7, 6),
+    @moondsp.DspNode::adsr(
       attack_ms=0.0,
       decay_ms=0.0,
       sustain=GRAPH_VOICE_SUSTAIN,
       release_ms=GRAPH_VOICE_RELEASE_MS,
     ),
-    DspNode::oscillator(Waveform::Square, GRAPH_VOICE_FREQ),
+    @moondsp.DspNode::oscillator(@moondsp.Waveform::Square, GRAPH_VOICE_FREQ),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-  let output = AudioBuffer::filled(GRAPH_VOICE_BLOCK_SIZE)
+  let compiled = @moondsp.Dsp::compile(
+    @moondsp.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
+  let output = @moondsp.AudioBuffer::filled(GRAPH_VOICE_BLOCK_SIZE)
 
   assert_true(
     compiled.apply_controls([
-      GraphControl::gate_on(6),
-      GraphControl::set_param(3, GraphParamSlot::Value0, 0.0),
+      @moondsp.GraphControl::gate_on(6),
+      @moondsp.GraphControl::set_param(3, @moondsp.GraphParamSlot::Value0, 0.0),
     ])
     is Ok(_),
   )
@@ -1504,8 +1650,16 @@ test "compiled graph control frames apply batched runtime changes per block" {
 
   assert_true(
     compiled.apply_controls([
-      GraphControl::set_param(3, GraphParamSlot::Value0, GRAPH_VOICE_GAIN),
-      GraphControl::set_param(2, GraphParamSlot::DelaySamples, 0.0),
+      @moondsp.GraphControl::set_param(
+        3,
+        @moondsp.GraphParamSlot::Value0,
+        GRAPH_VOICE_GAIN,
+      ),
+      @moondsp.GraphControl::set_param(
+        2,
+        @moondsp.GraphParamSlot::DelaySamples,
+        0.0,
+      ),
     ])
     is Ok(_),
   )
@@ -1516,7 +1670,9 @@ test "compiled graph control frames apply batched runtime changes per block" {
   )
   assert_true(integration_any_non_zero(output))
 
-  assert_true(compiled.apply_controls([GraphControl::gate_off(6)]) is Ok(_))
+  assert_true(
+    compiled.apply_controls([@moondsp.GraphControl::gate_off(6)]) is Ok(_),
+  )
   compiled.process(context, output)
 
   assert_true(
@@ -1538,29 +1694,42 @@ test "compiled graph control frames apply batched runtime changes per block" {
 
 ///|
 test "compiled graph multi-source path responds to runtime biquad retune" {
-  let context = DspContext::new(
+  let context = @moondsp.DspContext::new(
     sample_rate=GRAPH_MULTI_SOURCE_SAMPLE_RATE,
     block_size=GRAPH_MULTI_SOURCE_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::oscillator(Waveform::Triangle, GRAPH_MULTI_SOURCE_OSC_FREQ),
-    DspNode::noise(GRAPH_MULTI_SOURCE_NOISE_SEED),
-    DspNode::gain(1, GRAPH_MULTI_SOURCE_NOISE_GAIN),
-    DspNode::mix(0, 2),
-    DspNode::biquad(
+    @moondsp.DspNode::oscillator(
+      @moondsp.Waveform::Triangle,
+      GRAPH_MULTI_SOURCE_OSC_FREQ,
+    ),
+    @moondsp.DspNode::noise(GRAPH_MULTI_SOURCE_NOISE_SEED),
+    @moondsp.DspNode::gain(1, GRAPH_MULTI_SOURCE_NOISE_GAIN),
+    @moondsp.DspNode::mix(0, 2),
+    @moondsp.DspNode::biquad(
       input=3,
-      mode=BiquadMode::LowPass,
+      mode=@moondsp.BiquadMode::LowPass,
       cutoff_hz=GRAPH_MULTI_SOURCE_CUTOFF,
       q=GRAPH_MULTI_SOURCE_Q,
     ),
-    DspNode::gain(4, GRAPH_MULTI_SOURCE_OUTPUT_GAIN),
-    DspNode::clip(5, GRAPH_MULTI_SOURCE_CLIP),
-    DspNode::output(6),
+    @moondsp.DspNode::gain(4, GRAPH_MULTI_SOURCE_OUTPUT_GAIN),
+    @moondsp.DspNode::clip(5, GRAPH_MULTI_SOURCE_CLIP),
+    @moondsp.DspNode::output(6),
   ]
-  let baseline = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-  let retuned = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-  let baseline_output = AudioBuffer::filled(GRAPH_MULTI_SOURCE_BLOCK_SIZE)
-  let retuned_output = AudioBuffer::filled(GRAPH_MULTI_SOURCE_BLOCK_SIZE)
+  let baseline = @moondsp.Dsp::compile(
+    @moondsp.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
+  let retuned = @moondsp.Dsp::compile(
+    @moondsp.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
+  let baseline_output = @moondsp.AudioBuffer::filled(
+    GRAPH_MULTI_SOURCE_BLOCK_SIZE,
+  )
+  let retuned_output = @moondsp.AudioBuffer::filled(
+    GRAPH_MULTI_SOURCE_BLOCK_SIZE,
+  )
 
   baseline.process(context, baseline_output)
   retuned.process(context, retuned_output)
@@ -1589,9 +1758,9 @@ test "compiled graph multi-source path responds to runtime biquad retune" {
 
   assert_true(
     retuned.apply_control(
-      GraphControl::set_param(
+      @moondsp.GraphControl::set_param(
         4,
-        GraphParamSlot::Value0,
+        @moondsp.GraphParamSlot::Value0,
         GRAPH_MULTI_SOURCE_RETUNED_CUTOFF,
       ),
     )
@@ -1626,34 +1795,40 @@ test "compiled graph multi-source path responds to runtime biquad retune" {
 
 ///|
 test "compiled graph runtime high-pass retune changes output directionally" {
-  let context = DspContext::new(
+  let context = @moondsp.DspContext::new(
     sample_rate=GRAPH_HIGHPASS_SAMPLE_RATE,
     block_size=GRAPH_HIGHPASS_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::oscillator(Waveform::Sine, GRAPH_HIGHPASS_FREQ),
-    DspNode::biquad(
+    @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, GRAPH_HIGHPASS_FREQ),
+    @moondsp.DspNode::biquad(
       input=0,
-      mode=BiquadMode::HighPass,
+      mode=@moondsp.BiquadMode::HighPass,
       cutoff_hz=GRAPH_HIGHPASS_INITIAL_CUTOFF,
       q=GRAPH_HIGHPASS_Q,
     ),
-    DspNode::clip(1, GRAPH_HIGHPASS_CLIP),
-    DspNode::output(2),
+    @moondsp.DspNode::clip(1, GRAPH_HIGHPASS_CLIP),
+    @moondsp.DspNode::output(2),
   ]
-  let baseline = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-  let retuned = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-  let baseline_output = AudioBuffer::filled(GRAPH_HIGHPASS_BLOCK_SIZE)
-  let retuned_output = AudioBuffer::filled(GRAPH_HIGHPASS_BLOCK_SIZE)
+  let baseline = @moondsp.Dsp::compile(
+    @moondsp.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
+  let retuned = @moondsp.Dsp::compile(
+    @moondsp.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
+  let baseline_output = @moondsp.AudioBuffer::filled(GRAPH_HIGHPASS_BLOCK_SIZE)
+  let retuned_output = @moondsp.AudioBuffer::filled(GRAPH_HIGHPASS_BLOCK_SIZE)
 
   baseline.process(context, baseline_output)
   retuned.process(context, retuned_output)
 
   assert_true(
     retuned.apply_control(
-      GraphControl::set_param(
+      @moondsp.GraphControl::set_param(
         1,
-        GraphParamSlot::Value0,
+        @moondsp.GraphParamSlot::Value0,
         GRAPH_HIGHPASS_RETUNED_CUTOFF,
       ),
     )
@@ -1691,34 +1866,40 @@ test "compiled graph runtime high-pass retune changes output directionally" {
 
 ///|
 test "compiled graph runtime band-pass retune changes output" {
-  let context = DspContext::new(
+  let context = @moondsp.DspContext::new(
     sample_rate=GRAPH_BANDPASS_SAMPLE_RATE,
     block_size=GRAPH_BANDPASS_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::oscillator(Waveform::Sine, GRAPH_BANDPASS_FREQ),
-    DspNode::biquad(
+    @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, GRAPH_BANDPASS_FREQ),
+    @moondsp.DspNode::biquad(
       input=0,
-      mode=BiquadMode::BandPass,
+      mode=@moondsp.BiquadMode::BandPass,
       cutoff_hz=GRAPH_BANDPASS_INITIAL_CUTOFF,
       q=GRAPH_BANDPASS_Q,
     ),
-    DspNode::clip(1, GRAPH_BANDPASS_CLIP),
-    DspNode::output(2),
+    @moondsp.DspNode::clip(1, GRAPH_BANDPASS_CLIP),
+    @moondsp.DspNode::output(2),
   ]
-  let baseline = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-  let retuned = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-  let baseline_output = AudioBuffer::filled(GRAPH_BANDPASS_BLOCK_SIZE)
-  let retuned_output = AudioBuffer::filled(GRAPH_BANDPASS_BLOCK_SIZE)
+  let baseline = @moondsp.Dsp::compile(
+    @moondsp.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
+  let retuned = @moondsp.Dsp::compile(
+    @moondsp.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
+  let baseline_output = @moondsp.AudioBuffer::filled(GRAPH_BANDPASS_BLOCK_SIZE)
+  let retuned_output = @moondsp.AudioBuffer::filled(GRAPH_BANDPASS_BLOCK_SIZE)
 
   baseline.process(context, baseline_output)
   retuned.process(context, retuned_output)
 
   assert_true(
     retuned.apply_control(
-      GraphControl::set_param(
+      @moondsp.GraphControl::set_param(
         1,
-        GraphParamSlot::Value0,
+        @moondsp.GraphParamSlot::Value0,
         GRAPH_BANDPASS_RETUNED_CUTOFF,
       ),
     )
@@ -1756,12 +1937,15 @@ test "compiled graph runtime band-pass retune changes output" {
 
 ///|
 test "exit deliverable compiles and produces non-zero output" {
-  let graph : GraphBuilder = exit_deliverable()
-  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(graph.nodes()), ctx)
+  let graph : @moondsp.GraphBuilder = @moondsp.exit_deliverable()
+  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
+  let compiled = @moondsp.Dsp::compile(
+    @moondsp.AnalyzedGraph::analyze(graph.nodes()),
+    ctx,
+  )
   assert_true(compiled is Some(_))
   let compiled = compiled.unwrap()
-  let buf = AudioBuffer::filled(128)
+  let buf = @moondsp.AudioBuffer::filled(128)
   compiled.process(ctx, buf)
   let has_nonzero = for i in 0..<128 {
     if buf.get(i) != 0.0 {
@@ -1775,8 +1959,8 @@ test "exit deliverable compiles and produces non-zero output" {
 
 ///|
 fn integration_apply_modulation(
-  signal : AudioBuffer,
-  modulation : AudioBuffer,
+  signal : @moondsp.AudioBuffer,
+  modulation : @moondsp.AudioBuffer,
 ) -> Unit {
   let sample_count = if signal.length() < modulation.length() {
     signal.length()
@@ -1791,8 +1975,8 @@ fn integration_apply_modulation(
 
 ///|
 fn integration_apply_smoothed_gain(
-  signal : AudioBuffer,
-  smoother : ParamSmoother,
+  signal : @moondsp.AudioBuffer,
+  smoother : @moondsp.ParamSmoother,
 ) -> Unit {
   for index = 0; index < signal.length(); index = index + 1 {
     signal.set(index, signal.get(index) * smoother.tick())
@@ -1800,12 +1984,14 @@ fn integration_apply_smoothed_gain(
 }
 
 ///|
-fn integration_any_non_zero(buffer : AudioBuffer) -> Bool {
+fn integration_any_non_zero(buffer : @moondsp.AudioBuffer) -> Bool {
   buffer.any(sample => sample != 0.0)
 }
 
 ///|
-fn integration_copy_samples(buffer : AudioBuffer) -> FixedArray[Double] {
+fn integration_copy_samples(
+  buffer : @moondsp.AudioBuffer,
+) -> FixedArray[Double] {
   let copy = FixedArray::make(buffer.length(), 0.0)
   for index = 0; index < buffer.length(); index = index + 1 {
     copy[index] = buffer.get(index)
@@ -1815,7 +2001,7 @@ fn integration_copy_samples(buffer : AudioBuffer) -> FixedArray[Double] {
 
 ///|
 fn integration_buffer_differs_from_fixed_array(
-  buffer : AudioBuffer,
+  buffer : @moondsp.AudioBuffer,
   baseline : FixedArray[Double],
 ) -> Bool {
   let sample_count = if buffer.length() < baseline.length() {
@@ -1835,8 +2021,8 @@ fn integration_buffer_differs_from_fixed_array(
 
 ///|
 fn integration_buffers_close(
-  left : AudioBuffer,
-  right : AudioBuffer,
+  left : @moondsp.AudioBuffer,
+  right : @moondsp.AudioBuffer,
   epsilon : Double,
 ) -> Bool {
   let sample_count = if left.length() < right.length() {
@@ -1855,7 +2041,10 @@ fn integration_buffers_close(
 }
 
 ///|
-fn integration_all_zero_from(buffer : AudioBuffer, start : Int) -> Bool {
+fn integration_all_zero_from(
+  buffer : @moondsp.AudioBuffer,
+  start : Int,
+) -> Bool {
   let bounded_start = if start < 0 {
     0
   } else if start > buffer.length() {
@@ -1875,7 +2064,7 @@ fn integration_all_zero_from(buffer : AudioBuffer, start : Int) -> Bool {
 
 ///|
 fn integration_buffer_is_finite_and_bounded(
-  buffer : AudioBuffer,
+  buffer : @moondsp.AudioBuffer,
   limit : Double,
 ) -> Bool {
   buffer.every(sample => {
@@ -1884,7 +2073,7 @@ fn integration_buffer_is_finite_and_bounded(
 }
 
 ///|
-fn integration_abs_sum(buffer : AudioBuffer) -> Double {
+fn integration_abs_sum(buffer : @moondsp.AudioBuffer) -> Double {
   let total = for index in 0..<buffer.length(); sum = 0.0 {
     continue sum + buffer.get(index).abs()
   } nobreak {

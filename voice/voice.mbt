@@ -21,9 +21,18 @@ pub enum VoiceState {
 } derive(Eq, Debug)
 
 ///|
+pub extend VoiceState with Eq::{not_equal, equal}
+
+///|
+pub extend VoiceState with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 pub impl Show for VoiceState with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
+
+///|
+pub extend VoiceState with Show::{to_string, output}
 
 ///|
 const VOICE_HANDLE_PACK_FACTOR : Int64 = 2147483648L
@@ -42,9 +51,18 @@ pub struct VoiceHandle {
 } derive(Eq, Debug)
 
 ///|
+pub extend VoiceHandle with Eq::{not_equal, equal}
+
+///|
+pub extend VoiceHandle with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 pub impl Show for VoiceHandle with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
+
+///|
+pub extend VoiceHandle with Show::{to_string, output}
 
 ///|
 /// Construct a handle from primitive parts for host-side fixed storage.
@@ -76,9 +94,18 @@ pub(all) enum BoundVoicePoolError {
 } derive(Eq, Debug)
 
 ///|
+pub extend BoundVoicePoolError with Eq::{not_equal, equal}
+
+///|
+pub extend BoundVoicePoolError with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 pub impl Show for BoundVoicePoolError with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
+
+///|
+pub extend BoundVoicePoolError with Show::{to_string, output}
 
 ///|
 /// Failure modes for VoicePool construction and template replacement.
@@ -91,9 +118,18 @@ pub(all) enum VoicePoolError {
 } derive(Eq, Debug)
 
 ///|
+pub extend VoicePoolError with Eq::{not_equal, equal}
+
+///|
+pub extend VoicePoolError with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 pub impl Show for VoicePoolError with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
+
+///|
+pub extend VoicePoolError with Show::{to_string, output}
 
 ///|
 /// Lift a VoicePoolError to a BoundVoicePoolError. Used by
@@ -117,9 +153,15 @@ pub(all) enum VoiceControlError {
 } derive(Debug)
 
 ///|
+pub extend VoiceControlError with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 pub impl Show for VoiceControlError with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
+
+///|
+pub extend VoiceControlError with Show::{to_string, output}
 
 ///|
 priv struct VoiceSlot {
@@ -1198,6 +1240,12 @@ pub(all) enum NoteGate {
   AfterSeconds(Double)
   InvalidDuration
 } derive(Debug, Eq)
+
+///|
+pub extend NoteGate with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend NoteGate with Eq::{not_equal, equal}
 
 ///|
 /// Resolve gate timing without starting a voice or changing the input controls.

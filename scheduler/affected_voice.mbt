@@ -4,6 +4,12 @@ pub struct PatternVoiceScope {
 } derive(Eq, Debug)
 
 ///|
+pub extend PatternVoiceScope with Eq::{not_equal, equal}
+
+///|
+pub extend PatternVoiceScope with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 pub fn PatternVoiceScope::node(
   node : @identity.PatternNodeId,
 ) -> PatternVoiceScope {
@@ -14,6 +20,12 @@ pub fn PatternVoiceScope::node(
 pub struct SongVoiceScope {
   priv raw : @model.SongVoiceScope
 } derive(Eq, Debug)
+
+///|
+pub extend SongVoiceScope with Eq::{not_equal, equal}
+
+///|
+pub extend SongVoiceScope with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
 pub fn SongVoiceScope::occurrence(

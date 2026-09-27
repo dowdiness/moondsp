@@ -1,6 +1,6 @@
 ///|
 test "delay line delays impulse by delay_samples" {
-  let delay = DelayLine::new(8, delay_samples=3)
+  let delay = @dsp.DelayLine::new(8, delay_samples=3)
   assert_true(delay.tick(1.0) == 0.0)
   assert_true(delay.tick(0.0) == 0.0)
   assert_true(delay.tick(0.0) == 0.0)
@@ -10,14 +10,14 @@ test "delay line delays impulse by delay_samples" {
 
 ///|
 test "delay with zero delay_samples is passthrough" {
-  let delay = DelayLine::new(8, delay_samples=0)
+  let delay = @dsp.DelayLine::new(8, delay_samples=0)
   assert_true(delay.tick(0.5) == 0.5)
   assert_true(delay.tick(0.7) == 0.7)
 }
 
 ///|
 test "delay with max delay_samples uses full buffer" {
-  let delay = DelayLine::new(4, delay_samples=4)
+  let delay = @dsp.DelayLine::new(4, delay_samples=4)
   assert_true(delay.tick(1.0) == 0.0)
   assert_true(delay.tick(0.0) == 0.0)
   assert_true(delay.tick(0.0) == 0.0)
@@ -27,7 +27,7 @@ test "delay with max delay_samples uses full buffer" {
 
 ///|
 test "delay feedback accumulates energy" {
-  let delay = DelayLine::new(2, delay_samples=1, feedback=0.5)
+  let delay = @dsp.DelayLine::new(2, delay_samples=1, feedback=0.5)
   let first = delay.tick(1.0)
   assert_true(first == 0.0)
   let second = delay.tick(0.0)
@@ -38,7 +38,7 @@ test "delay feedback accumulates energy" {
 
 ///|
 test "delay set_delay_samples changes delay mid-stream" {
-  let delay = DelayLine::new(8, delay_samples=2)
+  let delay = @dsp.DelayLine::new(8, delay_samples=2)
   ignore(delay.tick(1.0))
   ignore(delay.tick(0.0))
   assert_true(delay.tick(0.0) == 1.0)
@@ -49,7 +49,7 @@ test "delay set_delay_samples changes delay mid-stream" {
 
 ///|
 test "delay reset returns silence for unwritten samples" {
-  let delay = DelayLine::new(4, delay_samples=1, feedback=0.5)
+  let delay = @dsp.DelayLine::new(4, delay_samples=1, feedback=0.5)
   ignore(delay.tick(1.0))
   ignore(delay.tick(0.0))
   delay.reset()
@@ -59,7 +59,7 @@ test "delay reset returns silence for unwritten samples" {
 
 ///|
 test "delay reset keeps configured delay and feedback" {
-  let delay = DelayLine::new(8, delay_samples=3, feedback=0.25)
+  let delay = @dsp.DelayLine::new(8, delay_samples=3, feedback=0.25)
   ignore(delay.tick(1.0))
   delay.reset()
   assert_eq(delay.delay_samples(), 3)
@@ -72,7 +72,7 @@ test "delay reset keeps configured delay and feedback" {
 
 ///|
 test "delay reset silences stale wrap-around content" {
-  let delay = DelayLine::new(4, delay_samples=2, feedback=0.0)
+  let delay = @dsp.DelayLine::new(4, delay_samples=2, feedback=0.0)
   // Fill and wrap so every physical slot holds a non-zero value.
   ignore(delay.tick(1.0))
   ignore(delay.tick(2.0))
@@ -88,7 +88,7 @@ test "delay reset silences stale wrap-around content" {
 
 ///|
 test "delay reset then length change still reads silence until written" {
-  let delay = DelayLine::new(8, delay_samples=1, feedback=0.9)
+  let delay = @dsp.DelayLine::new(8, delay_samples=1, feedback=0.9)
   ignore(delay.tick(1.0))
   ignore(delay.tick(1.0))
   delay.reset()
@@ -102,7 +102,7 @@ test "delay reset then length change still reads silence until written" {
 
 ///|
 test "delay reset blocks feedback from stale samples" {
-  let delay = DelayLine::new(4, delay_samples=1, feedback=0.9)
+  let delay = @dsp.DelayLine::new(4, delay_samples=1, feedback=0.9)
   ignore(delay.tick(1.0))
   ignore(delay.tick(0.0))
   delay.reset()
@@ -160,7 +160,7 @@ fn physical_reference_reset(reference : PhysicalDelayReference) -> Unit {
 
 ///|
 fn assert_delay_operations(
-  actual : DelayLine,
+  actual : @dsp.DelayLine,
   reference : PhysicalDelayReference,
   operations : Array[DelayOperation],
 ) -> Unit raise {
@@ -185,7 +185,7 @@ fn assert_delay_operations(
 
 ///|
 test "delay reset matches physical reference across state transitions" {
-  let actual = DelayLine::new(5, delay_samples=2, feedback=0.5)
+  let actual = @dsp.DelayLine::new(5, delay_samples=2, feedback=0.5)
   let reference = new_physical_delay_reference(2, 0.5)
   let operations : Array[DelayOperation] = [
     Tick(1.0),
@@ -214,7 +214,7 @@ test "delay reset matches physical reference across state transitions" {
 
 ///|
 test "delay reset matches physical reference at capacity one" {
-  let actual = DelayLine::new(1, delay_samples=1, feedback=0.25)
+  let actual = @dsp.DelayLine::new(1, delay_samples=1, feedback=0.25)
   let reference = new_physical_delay_reference(1, 0.25)
   let operations : Array[DelayOperation] = [
     Tick(1.0),

@@ -16,10 +16,12 @@ pub struct AnalyzedGraph {
 pub fn AnalyzedGraph::adsr_authoring_indices(Self) -> FixedArray[Int]
 pub fn AnalyzedGraph::analyze(Array[@model.DspNode]) -> Self
 pub fn AnalyzedGraph::authoring_nodes(Self) -> Array[@model.DspNode]
+pub fn AnalyzedGraph::equal(Self, Self) -> Bool
 pub fn AnalyzedGraph::index_map(Self) -> FixedArray[Int]
 pub fn AnalyzedGraph::is_node_live(Self, Int) -> Bool
 pub fn AnalyzedGraph::length(Self) -> Int
 pub fn AnalyzedGraph::node_at(Self, Int) -> @model.DspNode
+pub fn AnalyzedGraph::not_equal(Self, Self) -> Bool
 pub fn AnalyzedGraph::optimized_nodes(Self) -> Array[@model.DspNode]
 pub impl Eq for AnalyzedGraph
 

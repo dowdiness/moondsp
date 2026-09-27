@@ -1,10 +1,10 @@
 ///|
 test "noise is deterministic given same seed" {
-  let noise1 = Noise::new(42U)
-  let noise2 = Noise::new(42U)
-  let ctx = DspContext::new(sample_rate=48000.0, block_size=8)
-  let buf1 = AudioBuffer::filled(8)
-  let buf2 = AudioBuffer::filled(8)
+  let noise1 = @dsp.Noise::new(42U)
+  let noise2 = @dsp.Noise::new(42U)
+  let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=8)
+  let buf1 = @dsp.AudioBuffer::filled(8)
+  let buf2 = @dsp.AudioBuffer::filled(8)
   noise1.process(ctx, buf1)
   noise2.process(ctx, buf2)
   for i = 0; i < 8; i = i + 1 {
@@ -14,8 +14,8 @@ test "noise is deterministic given same seed" {
 
 ///|
 test "different seeds produce different sequences" {
-  let noise1 = Noise::new(1U)
-  let noise2 = Noise::new(2U)
+  let noise1 = @dsp.Noise::new(1U)
+  let noise2 = @dsp.Noise::new(2U)
   let differs = for _i in 0..<16 {
     if noise1.tick() != noise2.tick() {
       break true
@@ -28,7 +28,7 @@ test "different seeds produce different sequences" {
 
 ///|
 test "noise reset reproduces original sequence" {
-  let noise = Noise::new(42U)
+  let noise = @dsp.Noise::new(42U)
   let first = noise.tick()
   let second = noise.tick()
   noise.reset(42U)
@@ -41,7 +41,7 @@ test "prop: noise output in [-1, 1]" {
   @qc.quick_check_fn(
     fn(raw_seed : UInt) {
       let seed = if raw_seed == 0U { 1U } else { raw_seed }
-      let noise = Noise::new(seed)
+      let noise = @dsp.Noise::new(seed)
       for i = 0; i < 256; i = i + 1 {
         let sample = noise.tick()
         if sample < -1.0 || sample > 1.0 {

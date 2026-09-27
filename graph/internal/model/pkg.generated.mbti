@@ -71,25 +71,33 @@ pub struct DspNode {
 }
 pub fn DspNode::adsr(attack_ms~ : Double, decay_ms~ : Double, sustain~ : Double, release_ms~ : Double) -> Self
 pub fn DspNode::biquad(input~ : Int, mode~ : @dsp.BiquadMode, cutoff_hz~ : Double, q~ : Double) -> Self
+pub fn DspNode::can_delete(Self) -> Bool
+pub fn DspNode::can_insert_after(Self) -> Bool
 pub fn DspNode::clip(Int, Double) -> Self
 pub fn DspNode::constant(Double) -> Self
 pub fn DspNode::delay(input~ : Int, max_delay_samples~ : Int, delay_samples? : Int, feedback? : Double) -> Self
 pub fn DspNode::delay_max_samples(Self) -> Int
 pub fn DspNode::delay_samples(Self) -> Int
 pub fn DspNode::envelope_gain(input~ : Int, envelope~ : Int, amount~ : Double) -> Self
+pub fn DspNode::equal(Self, Self) -> Bool
 pub fn DspNode::filter_mode(Self) -> @dsp.BiquadMode
+pub fn DspNode::fold_value(Self, Double, Double) -> Double
 pub fn DspNode::gain(Int, Double) -> Self
 pub fn DspNode::input0(Self) -> Int
 pub fn DspNode::input1(Self) -> Int
+pub fn DspNode::is_foldable(Self) -> Bool
+pub fn DspNode::is_stateful(Self) -> Bool
 pub fn DspNode::kind(Self) -> DspNodeKind
 pub fn DspNode::mix(Int, Int) -> Self
 pub fn DspNode::mul(Int, Int) -> Self
 pub fn DspNode::noise(UInt) -> Self
+pub fn DspNode::not_equal(Self, Self) -> Bool
 pub fn DspNode::oscillator(@dsp.Waveform, Double) -> Self
 pub fn DspNode::oscillator_from(Int, @dsp.Waveform) -> Self
 pub fn DspNode::output(Int) -> Self
 pub fn DspNode::pan(Int, Double) -> Self
 pub fn DspNode::seed(Self) -> UInt
+pub fn DspNode::signal_shape(Self) -> Int
 pub fn DspNode::stereo_biquad(input~ : Int, mode~ : @dsp.BiquadMode, cutoff_hz~ : Double, q~ : Double) -> Self
 pub fn DspNode::stereo_clip(input~ : Int, threshold~ : Double) -> Self
 pub fn DspNode::stereo_delay(input~ : Int, max_delay_samples~ : Int, delay_samples? : Int, feedback? : Double) -> Self
@@ -127,6 +135,9 @@ pub(all) enum DspNodeKind {
   StereoMixDown
   StereoOutput
 } derive(Eq, @debug.Debug)
+pub fn DspNodeKind::equal(Self, Self) -> Bool
+pub fn DspNodeKind::not_equal(Self, Self) -> Bool
+pub fn DspNodeKind::to_repr(Self) -> @debug.Repr
 
 pub struct GraphControl {
   // private fields
@@ -144,6 +155,8 @@ pub enum GraphControlKind {
   GateOff
   SetParam
 } derive(Eq)
+pub fn GraphControlKind::equal(Self, Self) -> Bool
+pub fn GraphControlKind::not_equal(Self, Self) -> Bool
 
 pub(all) enum GraphParamSlot {
   Value0
@@ -152,6 +165,11 @@ pub(all) enum GraphParamSlot {
   Value3
   DelaySamples
 } derive(Eq, @debug.Debug)
+pub fn GraphParamSlot::equal(Self, Self) -> Bool
+pub fn GraphParamSlot::not_equal(Self, Self) -> Bool
+pub fn GraphParamSlot::output(Self, &Logger) -> Unit
+pub fn GraphParamSlot::to_repr(Self) -> @debug.Repr
+pub fn GraphParamSlot::to_string(Self) -> String
 pub impl Show for GraphParamSlot
 
 // Type aliases

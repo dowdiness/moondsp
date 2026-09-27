@@ -48,6 +48,14 @@ pub impl ArithSym for GraphBuilder with fn constant(v) -> GraphBuilder {
 }
 
 ///|
+pub extend GraphBuilder with @dowdiness/moondsp/dsp.ArithSym::{
+  constant,
+  clip,
+  mul,
+  mix,
+}
+
+///|
 pub impl ArithSym for GraphBuilder with fn mul(a, b) -> GraphBuilder {
   let b_offset = merge_into(a.nodes_, b.nodes_)
   let b_index = b.index + b_offset
@@ -81,6 +89,15 @@ pub impl DspSym for GraphBuilder with fn oscillator(freq, waveform) -> GraphBuil
   let idx = freq.nodes_.length()
   freq.nodes_.push(DspNode::oscillator_from(freq.index, waveform))
   { nodes_: freq.nodes_, index: idx, }
+}
+
+///|
+pub extend GraphBuilder with @dowdiness/moondsp/dsp.DspSym::{
+  noise,
+  adsr,
+  gain,
+  output,
+  oscillator,
 }
 
 ///|
@@ -123,6 +140,9 @@ pub impl FilterSym for GraphBuilder with fn biquad(self, mode, cutoff, q) -> Gra
   { nodes_: self.nodes_, index: idx, }
 }
 
+///|
+pub extend GraphBuilder with @dowdiness/moondsp/dsp.FilterSym::{biquad}
+
 // ---------------------------------------------------------------------------
 // DelaySym
 // ---------------------------------------------------------------------------
@@ -146,6 +166,9 @@ pub impl DelaySym for GraphBuilder with fn delay(
   { nodes_: self.nodes_, index: idx, }
 }
 
+///|
+pub extend GraphBuilder with @dowdiness/moondsp/dsp.DelaySym::{delay}
+
 // ---------------------------------------------------------------------------
 // StereoSym
 // ---------------------------------------------------------------------------
@@ -155,6 +178,15 @@ pub impl StereoSym for GraphBuilder with fn pan(self, position) -> GraphBuilder 
   let idx = self.nodes_.length()
   self.nodes_.push(DspNode::pan(self.index, position))
   { nodes_: self.nodes_, index: idx, }
+}
+
+///|
+pub extend GraphBuilder with @dowdiness/moondsp/dsp.StereoSym::{
+  stereo_clip,
+  pan,
+  stereo_gain,
+  stereo_mixdown,
+  stereo_output,
 }
 
 ///|
@@ -203,6 +235,11 @@ pub impl StereoFilterSym for GraphBuilder with fn stereo_biquad(
   { nodes_: self.nodes_, index: idx, }
 }
 
+///|
+pub extend GraphBuilder with @dowdiness/moondsp/dsp.StereoFilterSym::{
+  stereo_biquad,
+}
+
 // ---------------------------------------------------------------------------
 // StereoDelaySym
 // ---------------------------------------------------------------------------
@@ -224,6 +261,11 @@ pub impl StereoDelaySym for GraphBuilder with fn stereo_delay(
     ),
   )
   { nodes_: self.nodes_, index: idx, }
+}
+
+///|
+pub extend GraphBuilder with @dowdiness/moondsp/dsp.StereoDelaySym::{
+  stereo_delay,
 }
 
 // ---------------------------------------------------------------------------

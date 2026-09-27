@@ -13,14 +13,14 @@ fn bd_pid(value : String) -> @identity.PatternNodeId {
 
 ///|
 /// A revision-0 `pure` doc carrying `value`.
-fn bd_doc0(value : Int) -> PatternDoc[Int] {
-  PatternDoc::pure(id=bd_pid("root"), value~)
+fn bd_doc0(value : Int) -> @pattern.PatternDoc[Int] {
+  @pattern.PatternDoc::pure(id=bd_pid("root"), value~)
 }
 
 ///|
 /// A revision-1 doc (root reversed once) carrying `value`.
-fn bd_doc1(value : Int) -> PatternDoc[Int] {
-  PatternDoc::pure(id=bd_pid("root"), value~).rev(id=bd_pid("rev1")) catch {
+fn bd_doc1(value : Int) -> @pattern.PatternDoc[Int] {
+  @pattern.PatternDoc::pure(id=bd_pid("root"), value~).rev(id=bd_pid("rev1")) catch {
     _ => abort("rev should not fail on a fresh pure doc")
   }
 }

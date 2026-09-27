@@ -1,6 +1,6 @@
 ///|
 test "chord parse C major" {
-  let notes = parse_chord("C")
+  let notes = @pattern.parse_chord("C")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [60, 64, 67])
     None => fail("expected Some for C major")
@@ -9,7 +9,7 @@ test "chord parse C major" {
 
 ///|
 test "chord parse D minor" {
-  let notes = parse_chord("Dm")
+  let notes = @pattern.parse_chord("Dm")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [62, 65, 69])
     None => fail("expected Some for Dm")
@@ -18,7 +18,7 @@ test "chord parse D minor" {
 
 ///|
 test "chord parse G dominant 7" {
-  let notes = parse_chord("G7")
+  let notes = @pattern.parse_chord("G7")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [67, 71, 74, 77])
     None => fail("expected Some for G7")
@@ -27,7 +27,7 @@ test "chord parse G dominant 7" {
 
 ///|
 test "chord parse C major 7" {
-  let notes = parse_chord("Cmaj7")
+  let notes = @pattern.parse_chord("Cmaj7")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [60, 64, 67, 71])
     None => fail("expected Some for Cmaj7")
@@ -36,7 +36,7 @@ test "chord parse C major 7" {
 
 ///|
 test "chord parse Cmaj7 with M7 alias" {
-  let notes = parse_chord("CM7")
+  let notes = @pattern.parse_chord("CM7")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [60, 64, 67, 71])
     None => fail("expected Some for CM7")
@@ -45,7 +45,7 @@ test "chord parse Cmaj7 with M7 alias" {
 
 ///|
 test "chord parse F# minor 7" {
-  let notes = parse_chord("F#m7")
+  let notes = @pattern.parse_chord("F#m7")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [66, 69, 73, 76])
     None => fail("expected Some for F#m7")
@@ -54,7 +54,7 @@ test "chord parse F# minor 7" {
 
 ///|
 test "chord parse Bb major" {
-  let notes = parse_chord("Bb")
+  let notes = @pattern.parse_chord("Bb")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [70, 74, 77])
     None => fail("expected Some for Bb")
@@ -63,7 +63,7 @@ test "chord parse Bb major" {
 
 ///|
 test "chord parse E sus4" {
-  let notes = parse_chord("Esus4")
+  let notes = @pattern.parse_chord("Esus4")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [64, 69, 71])
     None => fail("expected Some for Esus4")
@@ -72,7 +72,7 @@ test "chord parse E sus4" {
 
 ///|
 test "chord parse A minor" {
-  let notes = parse_chord("Am")
+  let notes = @pattern.parse_chord("Am")
   match notes {
     Some(arr) =>
       // A4 = 69, C5 = 72, E5 = 76
@@ -83,7 +83,7 @@ test "chord parse A minor" {
 
 ///|
 test "chord parse C diminished" {
-  let notes = parse_chord("Cdim")
+  let notes = @pattern.parse_chord("Cdim")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [60, 63, 66])
     None => fail("expected Some for Cdim")
@@ -92,7 +92,7 @@ test "chord parse C diminished" {
 
 ///|
 test "chord parse C augmented" {
-  let notes = parse_chord("Caug")
+  let notes = @pattern.parse_chord("Caug")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [60, 64, 68])
     None => fail("expected Some for Caug")
@@ -101,7 +101,7 @@ test "chord parse C augmented" {
 
 ///|
 test "chord parse C+ augmented" {
-  let notes = parse_chord("C+")
+  let notes = @pattern.parse_chord("C+")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [60, 64, 68])
     None => fail("expected Some for C+")
@@ -110,7 +110,7 @@ test "chord parse C+ augmented" {
 
 ///|
 test "chord parse D diminished 7" {
-  let notes = parse_chord("Ddim7")
+  let notes = @pattern.parse_chord("Ddim7")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [62, 65, 68, 71])
     None => fail("expected Some for Ddim7")
@@ -119,7 +119,7 @@ test "chord parse D diminished 7" {
 
 ///|
 test "chord parse D half-dim 7 (m7b5)" {
-  let notes = parse_chord("Dm7b5")
+  let notes = @pattern.parse_chord("Dm7b5")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [62, 65, 68, 72])
     None => fail("expected Some for Dm7b5")
@@ -128,7 +128,7 @@ test "chord parse D half-dim 7 (m7b5)" {
 
 ///|
 test "chord parse C half-dim 7 with ø7 alias" {
-  let notes = parse_chord("Cø7")
+  let notes = @pattern.parse_chord("Cø7")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [60, 63, 66, 70])
     None => fail("expected Some for Cø7")
@@ -137,7 +137,7 @@ test "chord parse C half-dim 7 with ø7 alias" {
 
 ///|
 test "chord returns None for unsupported extension instead of octave carry" {
-  match parse_chord("Cm13") {
+  match @pattern.parse_chord("Cm13") {
     None => ()
     Some(_) => fail("expected None for unsupported Cm13")
   }
@@ -145,15 +145,15 @@ test "chord returns None for unsupported extension instead of octave carry" {
 
 ///|
 test "chord returns None for mixed accidentals" {
-  match parse_chord("C#b") {
+  match @pattern.parse_chord("C#b") {
     None => ()
     Some(_) => fail("expected None for C#b")
   }
-  match parse_chord("Cb#") {
+  match @pattern.parse_chord("Cb#") {
     None => ()
     Some(_) => fail("expected None for Cb#")
   }
-  match parse_chord("C#b4") {
+  match @pattern.parse_chord("C#b4") {
     None => ()
     Some(_) => fail("expected None for C#b4")
   }
@@ -161,7 +161,7 @@ test "chord returns None for mixed accidentals" {
 
 ///|
 test "chord parse with octave override" {
-  let notes = parse_chord("C5")
+  let notes = @pattern.parse_chord("C5")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [72, 76, 79])
     None => fail("expected Some for C5")
@@ -170,7 +170,7 @@ test "chord parse with octave override" {
 
 ///|
 test "chord parse Dm with octave override" {
-  let notes = parse_chord("Dm3")
+  let notes = @pattern.parse_chord("Dm3")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [50, 53, 57])
     None => fail("expected Some for Dm3")
@@ -179,7 +179,7 @@ test "chord parse Dm with octave override" {
 
 ///|
 test "chord parse A augmented 7" {
-  let notes = parse_chord("Aaug7")
+  let notes = @pattern.parse_chord("Aaug7")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [69, 73, 77, 79])
     None => fail("expected Some for Aaug7")
@@ -188,7 +188,7 @@ test "chord parse A augmented 7" {
 
 ///|
 test "chord parse A+7 augmented 7" {
-  let notes = parse_chord("A+7")
+  let notes = @pattern.parse_chord("A+7")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [69, 73, 77, 79])
     None => fail("expected Some for A+7")
@@ -197,7 +197,7 @@ test "chord parse A+7 augmented 7" {
 
 ///|
 test "chord parse C sus2" {
-  let notes = parse_chord("Csus2")
+  let notes = @pattern.parse_chord("Csus2")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [60, 62, 67])
     None => fail("expected Some for Csus2")
@@ -206,7 +206,7 @@ test "chord parse C sus2" {
 
 ///|
 test "chord parse G 7sus4" {
-  let notes = parse_chord("G7sus4")
+  let notes = @pattern.parse_chord("G7sus4")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [67, 72, 74, 77])
     None => fail("expected Some for G7sus4")
@@ -215,7 +215,7 @@ test "chord parse G 7sus4" {
 
 ///|
 test "chord parse C add9" {
-  let notes = parse_chord("Cadd9")
+  let notes = @pattern.parse_chord("Cadd9")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [60, 64, 67, 74])
     None => fail("expected Some for Cadd9")
@@ -224,7 +224,7 @@ test "chord parse C add9" {
 
 ///|
 test "chord parse C 6th" {
-  let notes = parse_chord("C6")
+  let notes = @pattern.parse_chord("C6")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [60, 64, 67, 69])
     None => fail("expected Some for C6")
@@ -233,7 +233,7 @@ test "chord parse C 6th" {
 
 ///|
 test "chord parse A minor 6" {
-  let notes = parse_chord("Am6")
+  let notes = @pattern.parse_chord("Am6")
   match notes {
     Some(arr) =>
       // A4 = 69, C5 = 72, E5 = 76, F#5 = 78
@@ -244,7 +244,7 @@ test "chord parse A minor 6" {
 
 ///|
 test "chord parse Eb major" {
-  let notes = parse_chord("Eb")
+  let notes = @pattern.parse_chord("Eb")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [63, 67, 70])
     None => fail("expected Some for Eb")
@@ -253,7 +253,7 @@ test "chord parse Eb major" {
 
 ///|
 test "chord parse Gb major 7" {
-  let notes = parse_chord("Gbmaj7")
+  let notes = @pattern.parse_chord("Gbmaj7")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [66, 70, 73, 77])
     None => fail("expected Some for Gbmaj7")
@@ -262,7 +262,7 @@ test "chord parse Gb major 7" {
 
 ///|
 test "chord parse Gb major 7 with M7" {
-  let notes = parse_chord("GbM7")
+  let notes = @pattern.parse_chord("GbM7")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [66, 70, 73, 77])
     None => fail("expected Some for GbM7")
@@ -271,7 +271,7 @@ test "chord parse Gb major 7 with M7" {
 
 ///|
 test "chord parse C major 9 with M9 alias" {
-  let notes = parse_chord("CM9")
+  let notes = @pattern.parse_chord("CM9")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [60, 64, 67, 71, 74])
     None => fail("expected Some for CM9")
@@ -280,7 +280,7 @@ test "chord parse C major 9 with M9 alias" {
 
 ///|
 test "chord returns None for empty string" {
-  match parse_chord("") {
+  match @pattern.parse_chord("") {
     None => () // expected
     Some(_) => fail("expected None for empty string")
   }
@@ -288,7 +288,7 @@ test "chord returns None for empty string" {
 
 ///|
 test "chord returns None for invalid root" {
-  match parse_chord("X") {
+  match @pattern.parse_chord("X") {
     None => () // expected
     Some(_) => fail("expected None for invalid root")
   }
@@ -296,7 +296,7 @@ test "chord returns None for invalid root" {
 
 ///|
 test "chord returns None for unknown quality" {
-  match parse_chord("Cfoo") {
+  match @pattern.parse_chord("Cfoo") {
     None => () // expected
     Some(_) => fail("expected None for unknown quality")
   }
@@ -304,7 +304,7 @@ test "chord returns None for unknown quality" {
 
 ///|
 test "chord pattern C major produces 3 note events" {
-  let pat = chord("C")
+  let pat = @pattern.chord("C")
   let arc = @pattern.TimeSpan::new(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
@@ -315,7 +315,7 @@ test "chord pattern C major produces 3 note events" {
 
 ///|
 test "chord pattern C major has correct note values" {
-  let pat = chord("C")
+  let pat = @pattern.chord("C")
   let arc = @pattern.TimeSpan::new(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
@@ -330,7 +330,7 @@ test "chord pattern C major has correct note values" {
 
 ///|
 test "chord pattern Dm produces 3 note events" {
-  let pat = chord("Dm")
+  let pat = @pattern.chord("Dm")
   let arc = @pattern.TimeSpan::new(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
@@ -345,7 +345,7 @@ test "chord pattern Dm produces 3 note events" {
 
 ///|
 test "chord pattern G7 produces 4 note events" {
-  let pat = chord("G7")
+  let pat = @pattern.chord("G7")
   let arc = @pattern.TimeSpan::new(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
@@ -356,7 +356,7 @@ test "chord pattern G7 produces 4 note events" {
 
 ///|
 test "chord pattern silence for unknown chord" {
-  let pat = chord("X")
+  let pat = @pattern.chord("X")
   let arc = @pattern.TimeSpan::new(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
@@ -376,7 +376,7 @@ test "chord parse E natural (no accidental confusion from f)" {
   // After parsing root E at pos=0, pos=1 is 'f'. In our parser, 'f' is a flat marker.
   // So "Ef" → E flat → offset 9 + (-1) = 8 → E♭4 = [63, 67, 70] (same as Eb).
   // Actually that's correct — "Ef" is the alternate flat spelling for E♭.
-  let notes = parse_chord("Ef")
+  let notes = @pattern.parse_chord("Ef")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [63, 67, 70])
     None => fail("expected Some for Ef (E-flat)")
@@ -385,7 +385,7 @@ test "chord parse E natural (no accidental confusion from f)" {
 
 ///|
 test "chord parse C with octave 2" {
-  let notes = parse_chord("C2")
+  let notes = @pattern.parse_chord("C2")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [36, 40, 43])
     None => fail("expected Some for C2")
@@ -394,7 +394,7 @@ test "chord parse C with octave 2" {
 
 ///|
 test "chord parse with flat using b syntax" {
-  let notes = parse_chord("Bb3")
+  let notes = @pattern.parse_chord("Bb3")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [58, 62, 65])
     None => fail("expected Some for Bb3")
@@ -403,7 +403,7 @@ test "chord parse with flat using b syntax" {
 
 ///|
 test "chord parse Cb preserves lower octave" {
-  let notes = parse_chord("Cb4")
+  let notes = @pattern.parse_chord("Cb4")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [59, 63, 66])
     None => fail("expected Some for Cb4")
@@ -412,7 +412,7 @@ test "chord parse Cb preserves lower octave" {
 
 ///|
 test "chord parse B# preserves upper octave" {
-  let notes = parse_chord("B#4")
+  let notes = @pattern.parse_chord("B#4")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [72, 76, 79])
     None => fail("expected Some for B#4")
@@ -421,7 +421,7 @@ test "chord parse B# preserves upper octave" {
 
 ///|
 test "chord parse F# with octave 5" {
-  let notes = parse_chord("F#5")
+  let notes = @pattern.parse_chord("F#5")
   match notes {
     Some(arr) => @debug.assert_eq(arr, [78, 82, 85])
     None => fail("expected Some for F#5")
@@ -430,7 +430,7 @@ test "chord parse F# with octave 5" {
 
 ///|
 test "note_name_to_midi C4" {
-  match note_name_to_midi("C4") {
+  match @pattern.note_name_to_midi("C4") {
     Some(midi) => @debug.assert_eq(midi, 60.0)
     None => fail("expected Some for C4")
   }
@@ -438,7 +438,7 @@ test "note_name_to_midi C4" {
 
 ///|
 test "note_name_to_midi A4" {
-  match note_name_to_midi("A4") {
+  match @pattern.note_name_to_midi("A4") {
     Some(midi) => @debug.assert_eq(midi, 69.0)
     None => fail("expected Some for A4")
   }
@@ -446,7 +446,7 @@ test "note_name_to_midi A4" {
 
 ///|
 test "note_name_to_midi F#3" {
-  match note_name_to_midi("F#3") {
+  match @pattern.note_name_to_midi("F#3") {
     Some(midi) => @debug.assert_eq(midi, 54.0)
     None => fail("expected Some for F#3")
   }
@@ -454,7 +454,7 @@ test "note_name_to_midi F#3" {
 
 ///|
 test "note_name_to_midi Bb5" {
-  match note_name_to_midi("Bb5") {
+  match @pattern.note_name_to_midi("Bb5") {
     Some(midi) => @debug.assert_eq(midi, 82.0)
     None => fail("expected Some for Bb5")
   }
@@ -462,7 +462,7 @@ test "note_name_to_midi Bb5" {
 
 ///|
 test "note_name_to_midi C without octave defaults to 4" {
-  match note_name_to_midi("C") {
+  match @pattern.note_name_to_midi("C") {
     Some(midi) => @debug.assert_eq(midi, 60.0)
     None => fail("expected Some for C")
   }
@@ -470,7 +470,7 @@ test "note_name_to_midi C without octave defaults to 4" {
 
 ///|
 test "note_name_to_midi Eb6" {
-  match note_name_to_midi("Eb6") {
+  match @pattern.note_name_to_midi("Eb6") {
     Some(midi) => @debug.assert_eq(midi, 87.0)
     None => fail("expected Some for Eb6")
   }
@@ -478,7 +478,7 @@ test "note_name_to_midi Eb6" {
 
 ///|
 test "note_name_to_midi returns None for empty string" {
-  match note_name_to_midi("") {
+  match @pattern.note_name_to_midi("") {
     None => ()
     Some(_) => fail("expected None for empty")
   }
@@ -486,7 +486,7 @@ test "note_name_to_midi returns None for empty string" {
 
 ///|
 test "note_name_to_midi returns None for invalid root" {
-  match note_name_to_midi("X") {
+  match @pattern.note_name_to_midi("X") {
     None => ()
     Some(_) => fail("expected None for invalid root")
   }
@@ -494,7 +494,7 @@ test "note_name_to_midi returns None for invalid root" {
 
 ///|
 test "note_name_to_midi returns None for trailing garbage" {
-  match note_name_to_midi("Cfoo") {
+  match @pattern.note_name_to_midi("Cfoo") {
     None => ()
     Some(_) => fail("expected None for trailing garbage")
   }
@@ -502,15 +502,15 @@ test "note_name_to_midi returns None for trailing garbage" {
 
 ///|
 test "note_name_to_midi returns None for mixed accidentals" {
-  match note_name_to_midi("C#b") {
+  match @pattern.note_name_to_midi("C#b") {
     None => ()
     Some(_) => fail("expected None for C#b")
   }
-  match note_name_to_midi("Cb#") {
+  match @pattern.note_name_to_midi("Cb#") {
     None => ()
     Some(_) => fail("expected None for Cb#")
   }
-  match note_name_to_midi("C#b4") {
+  match @pattern.note_name_to_midi("C#b4") {
     None => ()
     Some(_) => fail("expected None for C#b4")
   }
@@ -518,7 +518,7 @@ test "note_name_to_midi returns None for mixed accidentals" {
 
 ///|
 test "note_name_to_midi C# (no octave) defaults to 4" {
-  match note_name_to_midi("C#") {
+  match @pattern.note_name_to_midi("C#") {
     Some(midi) => @debug.assert_eq(midi, 61.0)
     None => fail("expected Some for C#")
   }

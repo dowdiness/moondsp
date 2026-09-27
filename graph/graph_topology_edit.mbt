@@ -6,6 +6,12 @@ pub(all) enum GraphTopologyInputSlot {
 } derive(Eq, Debug)
 
 ///|
+pub extend GraphTopologyInputSlot with Eq::{not_equal, equal}
+
+///|
+pub extend GraphTopologyInputSlot with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 /// Declarative topology edit applied in authoring order before recompilation.
 ///
 /// Each variant carries exactly the fields it needs — no sentinel values.

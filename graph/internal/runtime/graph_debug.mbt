@@ -9,9 +9,18 @@ pub enum GraphValidationError {
 } derive(Debug, Eq)
 
 ///|
+pub extend GraphValidationError with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend GraphValidationError with Eq::{not_equal, equal}
+
+///|
 pub impl Show for GraphValidationError with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
+
+///|
+pub extend GraphValidationError with Show::{to_string, output}
 
 ///|
 pub fn Dsp::enable_debug_validation(self : Dsp) -> Unit {

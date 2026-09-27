@@ -4,6 +4,12 @@ pub struct PatternVoiceScope {
 } derive(Eq, Debug)
 
 ///|
+pub extend PatternVoiceScope with Eq::{not_equal, equal}
+
+///|
+pub extend PatternVoiceScope with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 pub fn PatternVoiceScope::PatternVoiceScope(
   node : @identity.PatternNodeId,
 ) -> PatternVoiceScope {
@@ -25,11 +31,23 @@ pub(all) enum SongVoiceScope {
 } derive(Eq, Debug)
 
 ///|
+pub extend SongVoiceScope with Eq::{not_equal, equal}
+
+///|
+pub extend SongVoiceScope with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 pub(all) enum VoiceOrigin {
   Anonymous
   Pattern(@pattern.PatternNodePath)
   Song(@song.SongEventOrigin)
 } derive(Eq, Debug)
+
+///|
+pub extend VoiceOrigin with Eq::{not_equal, equal}
+
+///|
+pub extend VoiceOrigin with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
 pub fn VoiceOrigin::matches_pattern_scope(

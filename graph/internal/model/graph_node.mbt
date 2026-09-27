@@ -22,6 +22,12 @@ pub(all) enum DspNodeKind {
 } derive(Eq, Debug)
 
 ///|
+pub extend DspNodeKind with Eq::{not_equal, equal}
+
+///|
+pub extend DspNodeKind with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 /// Runtime-updatable numeric graph parameter slots.
 pub(all) enum GraphParamSlot {
   Value0
@@ -32,9 +38,18 @@ pub(all) enum GraphParamSlot {
 } derive(Eq, Debug)
 
 ///|
+pub extend GraphParamSlot with Eq::{not_equal, equal}
+
+///|
+pub extend GraphParamSlot with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 pub impl Show for GraphParamSlot with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
+
+///|
+pub extend GraphParamSlot with Show::{to_string, output}
 
 ///|
 /// Unified runtime control kinds for compiled graphs.
@@ -43,6 +58,9 @@ pub enum GraphControlKind {
   GateOff
   SetParam
 } derive(Eq)
+
+///|
+pub extend GraphControlKind with Eq::{not_equal, equal}
 
 ///|
 pub const NYQUIST_RATIO : Double = 0.5
@@ -190,6 +208,9 @@ pub impl Eq for DspNode with fn equal(self, other) {
   self.delay_samples == other.delay_samples &&
   self.seed == other.seed
 }
+
+///|
+pub extend DspNode with Eq::{not_equal, equal}
 
 ///|
 pub fn DspNode::kind(self : DspNode) -> DspNodeKind {

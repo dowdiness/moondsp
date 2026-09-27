@@ -4,8 +4,14 @@ test "compiled dsp renders a constant graph" {
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
-  let nodes = [DspNode::constant(QUARTER_SAMPLE), DspNode::output(0)]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let nodes = [
+    @graph.DspNode::constant(QUARTER_SAMPLE),
+    @graph.DspNode::output(0),
+  ]
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -23,12 +29,15 @@ test "compiled dsp renders an oscillator gain clip chain" {
     block_size=LARGE_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::oscillator(Waveform::Sine, OSCILLATOR_FREQ),
-    DspNode::gain(0, HALF_GAIN),
-    DspNode::clip(1, CLIP_THRESHOLD),
-    DspNode::output(2),
+    @graph.DspNode::oscillator(Waveform::Sine, OSCILLATOR_FREQ),
+    @graph.DspNode::gain(0, HALF_GAIN),
+    @graph.DspNode::clip(1, CLIP_THRESHOLD),
+    @graph.DspNode::output(2),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(LARGE_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -47,12 +56,15 @@ test "compiled dsp mixes two constants" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(QUARTER_SAMPLE),
-    DspNode::constant(NEGATIVE_MIX_SAMPLE),
-    DspNode::mix(0, 1),
-    DspNode::output(2),
+    @graph.DspNode::constant(QUARTER_SAMPLE),
+    @graph.DspNode::constant(NEGATIVE_MIX_SAMPLE),
+    @graph.DspNode::mix(0, 1),
+    @graph.DspNode::output(2),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -69,8 +81,11 @@ test "compiled dsp noise graph stays bounded and non-zero" {
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=LARGE_BLOCK_SIZE,
   )
-  let nodes = [DspNode::noise(NOISE_SEED), DspNode::output(0)]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let nodes = [@graph.DspNode::noise(NOISE_SEED), @graph.DspNode::output(0)]
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(LARGE_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -88,20 +103,23 @@ test "compiled dsp applies adsr envelope through multiply" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::output(1),
-    DspNode::mul(3, 2),
-    DspNode::adsr(
+    @graph.DspNode::output(1),
+    @graph.DspNode::mul(3, 2),
+    @graph.DspNode::adsr(
       attack_ms=ADSR_ATTACK_MS,
       decay_ms=ADSR_DECAY_MS,
       sustain=ADSR_SUSTAIN_LEVEL,
       release_ms=ADSR_RELEASE_MS,
     ),
-    DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::constant(UNIT_SAMPLE),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
-  assert_true(compiled.apply_control(GraphControl::gate_on(2)) is Ok(_))
+  assert_true(compiled.apply_control(@graph.GraphControl::gate_on(2)) is Ok(_))
   compiled.process(context, output)
 
   @debug.assert_eq(output.get(0), UNIT_SAMPLE)
@@ -109,7 +127,7 @@ test "compiled dsp applies adsr envelope through multiply" {
   @debug.assert_eq(output.get(2), ADSR_SUSTAIN_LEVEL)
   @debug.assert_eq(output.get(3), ADSR_SUSTAIN_LEVEL)
 
-  assert_true(compiled.apply_control(GraphControl::gate_off(2)) is Ok(_))
+  assert_true(compiled.apply_control(@graph.GraphControl::gate_off(2)) is Ok(_))
   compiled.process(context, output)
 
   @debug.assert_eq(output.get(0), 0.125)
@@ -129,20 +147,23 @@ test "compiled dsp resets adsr state on invalid context" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::output(1),
-    DspNode::mul(3, 2),
-    DspNode::adsr(
+    @graph.DspNode::output(1),
+    @graph.DspNode::mul(3, 2),
+    @graph.DspNode::adsr(
       attack_ms=ADSR_ATTACK_MS,
       decay_ms=ADSR_DECAY_MS,
       sustain=ADSR_SUSTAIN_LEVEL,
       release_ms=ADSR_RELEASE_MS,
     ),
-    DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::constant(UNIT_SAMPLE),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), valid_context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    valid_context,
+  ).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
-  assert_true(compiled.apply_control(GraphControl::gate_on(2)) is Ok(_))
+  assert_true(compiled.apply_control(@graph.GraphControl::gate_on(2)) is Ok(_))
   compiled.process(valid_context, output)
   compiled.process(invalid_context, output)
   compiled.process(valid_context, output)
@@ -157,16 +178,19 @@ test "compiled dsp applies low-pass biquad in graph" {
     block_size=LARGE_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::biquad(
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::biquad(
       input=0,
       mode=BiquadMode::LowPass,
       cutoff_hz=LOWPASS_CUTOFF,
       q=LOWPASS_Q,
     ),
-    DspNode::output(1),
+    @graph.DspNode::output(1),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(LARGE_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -185,15 +209,18 @@ test "compiled dsp applies delay line in graph across blocks" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::delay(
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::delay(
       input=0,
       max_delay_samples=DELAY_CAPACITY,
       delay_samples=DELAY_SAMPLES,
     ),
-    DspNode::output(1),
+    @graph.DspNode::output(1),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -221,8 +248,14 @@ test "compiled dsp silences when runtime block exceeds compiled capacity" {
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=LARGE_BLOCK_SIZE,
   )
-  let nodes = [DspNode::constant(QUARTER_SAMPLE), DspNode::output(0)]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), compile_context).unwrap()
+  let nodes = [
+    @graph.DspNode::constant(QUARTER_SAMPLE),
+    @graph.DspNode::output(0),
+  ]
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    compile_context,
+  ).unwrap()
   let output = AudioBuffer::filled(LARGE_BLOCK_SIZE, init=UNIT_SAMPLE)
 
   compiled.process(runtime_context, output)
@@ -237,11 +270,14 @@ test "compiled dsp: oscillator reads frequency from input buffer" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(OSCILLATOR_FREQ),
-    DspNode::oscillator_from(0, Waveform::Sine),
-    DspNode::output(1),
+    @graph.DspNode::constant(OSCILLATOR_FREQ),
+    @graph.DspNode::oscillator_from(0, Waveform::Sine),
+    @graph.DspNode::output(1),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -257,14 +293,17 @@ test "compiled dsp: FM oscillator with modulated frequency" {
     block_size=LARGE_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::oscillator(Waveform::Sine, 2.0),
-    DspNode::constant(300.0),
-    DspNode::gain(0, 100.0),
-    DspNode::mix(2, 1),
-    DspNode::oscillator_from(3, Waveform::Sine),
-    DspNode::output(4),
+    @graph.DspNode::oscillator(Waveform::Sine, 2.0),
+    @graph.DspNode::constant(300.0),
+    @graph.DspNode::gain(0, 100.0),
+    @graph.DspNode::mix(2, 1),
+    @graph.DspNode::oscillator_from(3, Waveform::Sine),
+    @graph.DspNode::output(4),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(LARGE_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -279,10 +318,13 @@ test "process: clean graph has zero sanitized count" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::oscillator(Waveform::Sine, OSCILLATOR_FREQ),
-    DspNode::output(0),
+    @graph.DspNode::oscillator(Waveform::Sine, OSCILLATOR_FREQ),
+    @graph.DspNode::output(0),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   compiled.process(context, output)
   @debug.assert_eq(compiled.last_sanitized_count(), 0)
@@ -294,9 +336,14 @@ test "process: NaN constant is rejected at compile time" {
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
-  let nodes = [DspNode::constant(@double.not_a_number), DspNode::output(0)]
+  let nodes = [
+    @graph.DspNode::constant(@double.not_a_number),
+    @graph.DspNode::output(0),
+  ]
   // NaN constants are caught by validation — compile returns None
-  assert_true(Dsp::compile(AnalyzedGraph::analyze(nodes), context) is None)
+  assert_true(
+    @graph.Dsp::compile(@graph.AnalyzedGraph::analyze(nodes), context) is None,
+  )
 }
 
 ///|
@@ -305,8 +352,11 @@ test "process: last_sanitized_count resets each call" {
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
-  let nodes = [DspNode::constant(1.0), DspNode::output(0)]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let nodes = [@graph.DspNode::constant(1.0), @graph.DspNode::output(0)]
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   compiled.process(context, output)
   @debug.assert_eq(compiled.last_sanitized_count(), 0)

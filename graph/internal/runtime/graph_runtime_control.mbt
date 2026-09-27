@@ -11,9 +11,15 @@ pub enum GraphControlError {
 } derive(Debug)
 
 ///|
+pub extend GraphControlError with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 pub impl Show for GraphControlError with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
+
+///|
+pub extend GraphControlError with Show::{to_string, output}
 
 ///|
 /// Apply one runtime control message, returning a specific rejection reason.
