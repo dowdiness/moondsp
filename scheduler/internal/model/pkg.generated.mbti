@@ -17,21 +17,30 @@ pub struct PatternVoiceScope {
   // private fields
 } derive(Eq, @debug.Debug)
 pub fn PatternVoiceScope::PatternVoiceScope(@identity.PatternNodeId) -> Self
+pub fn PatternVoiceScope::equal(Self, Self) -> Bool
 pub fn PatternVoiceScope::node(Self) -> @identity.PatternNodeId
+pub fn PatternVoiceScope::not_equal(Self, Self) -> Bool
+pub fn PatternVoiceScope::to_repr(Self) -> @debug.Repr
 
 pub(all) enum SongVoiceScope {
   Occurrence(@identity.OccurrenceId)
   Section(@identity.SectionId)
   Layer(@identity.SectionId, @identity.SectionLayerId)
 } derive(Eq, @debug.Debug)
+pub fn SongVoiceScope::equal(Self, Self) -> Bool
+pub fn SongVoiceScope::not_equal(Self, Self) -> Bool
+pub fn SongVoiceScope::to_repr(Self) -> @debug.Repr
 
 pub(all) enum VoiceOrigin {
   Anonymous
   Pattern(@pattern.PatternNodePath)
   Song(@song.SongEventOrigin)
 } derive(Eq, @debug.Debug)
+pub fn VoiceOrigin::equal(Self, Self) -> Bool
 pub fn VoiceOrigin::matches_pattern_scope(Self, PatternVoiceScope) -> Bool
 pub fn VoiceOrigin::matches_song_scope(Self, SongVoiceScope) -> Bool
+pub fn VoiceOrigin::not_equal(Self, Self) -> Bool
+pub fn VoiceOrigin::to_repr(Self) -> @debug.Repr
 
 // Type aliases
 

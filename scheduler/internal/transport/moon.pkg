@@ -1,3 +1,4 @@
 import {
   "dowdiness/moondsp/pattern",
+  "moonbitlang/core/debug",
 }

@@ -20,6 +20,9 @@ pub(all) suberror GraphDocumentError {
   RetiredNodeId(String)
   Topology(GraphTopologyEditError)
 } derive(@debug.Debug)
+pub fn GraphDocumentError::output(Self, &Logger) -> Unit
+pub fn GraphDocumentError::to_repr(Self) -> @debug.Repr
+pub fn GraphDocumentError::to_string(Self) -> String
 pub impl Show for GraphDocumentError
 
 // Types and methods
@@ -28,6 +31,8 @@ pub struct AnalyzedGraph {
 }
 pub fn AnalyzedGraph::adsr_authoring_indices(Self) -> FixedArray[Int]
 pub fn AnalyzedGraph::analyze(Array[DspNode]) -> Self
+pub fn AnalyzedGraph::equal(Self, Self) -> Bool
+pub fn AnalyzedGraph::not_equal(Self, Self) -> Bool
 pub fn AnalyzedGraph::orphan_adsr_count(Self) -> Int
 pub impl Eq for AnalyzedGraph
 
@@ -38,6 +43,11 @@ pub struct ControlBinding {
 } derive(Eq, @debug.Debug)
 #alias(new)
 pub fn ControlBinding::ControlBinding(key~ : String, node_index~ : Int, slot~ : GraphParamSlot) -> Self
+pub fn ControlBinding::equal(Self, Self) -> Bool
+pub fn ControlBinding::not_equal(Self, Self) -> Bool
+pub fn ControlBinding::output(Self, &Logger) -> Unit
+pub fn ControlBinding::to_repr(Self) -> @debug.Repr
+pub fn ControlBinding::to_string(Self) -> String
 pub impl Show for ControlBinding
 
 pub struct ControlBindingBuilder {
@@ -47,6 +57,9 @@ pub struct ControlBindingBuilder {
 pub fn ControlBindingBuilder::ControlBindingBuilder() -> Self
 pub fn ControlBindingBuilder::bind(Self, key~ : String, node_index~ : Int, slot~ : GraphParamSlot) -> Self
 pub fn ControlBindingBuilder::build(Self, AnalyzedGraph) -> Result[ControlBindingMap, ControlBindingError]
+pub fn ControlBindingBuilder::output(Self, &Logger) -> Unit
+pub fn ControlBindingBuilder::to_repr(Self) -> @debug.Repr
+pub fn ControlBindingBuilder::to_string(Self) -> String
 pub impl Show for ControlBindingBuilder
 
 pub(all) enum ControlBindingError {
@@ -55,14 +68,24 @@ pub(all) enum ControlBindingError {
   DuplicateKey(String)
   OrphanBinding(String, Int)
 } derive(Eq, @debug.Debug)
+pub fn ControlBindingError::equal(Self, Self) -> Bool
+pub fn ControlBindingError::not_equal(Self, Self) -> Bool
+pub fn ControlBindingError::output(Self, &Logger) -> Unit
+pub fn ControlBindingError::to_repr(Self) -> @debug.Repr
+pub fn ControlBindingError::to_string(Self) -> String
 pub impl Show for ControlBindingError
 
 pub struct ControlBindingMap {
   // private fields
 } derive(Eq, @debug.Debug)
 pub fn ControlBindingMap::default_value(Self, String) -> Double?
+pub fn ControlBindingMap::equal(Self, Self) -> Bool
 pub fn ControlBindingMap::length(Self) -> Int
+pub fn ControlBindingMap::not_equal(Self, Self) -> Bool
+pub fn ControlBindingMap::output(Self, &Logger) -> Unit
 pub fn ControlBindingMap::resolve_controls(Self, Map[String, Double]) -> Array[GraphControl]
+pub fn ControlBindingMap::to_repr(Self) -> @debug.Repr
+pub fn ControlBindingMap::to_string(Self) -> String
 pub impl Show for ControlBindingMap
 
 type Dsp
@@ -72,6 +95,8 @@ pub fn[T] Dsp::apply_controls_to_all(Array[Result[Self, T]], Array[GraphControl]
 pub fn Dsp::can_set_param_bool(Self, Int, GraphParamSlot, Double) -> Bool
 pub fn Dsp::compile(AnalyzedGraph, @dsp.DspContext) -> Self?
 pub fn Dsp::compile_result(AnalyzedGraph, @dsp.DspContext) -> Result[Self, GraphCompileError]
+pub fn Dsp::disable_debug_validation(Self) -> Unit
+pub fn Dsp::enable_debug_validation(Self) -> Unit
 pub fn Dsp::gate_off(Self, Int) -> Result[Unit, GraphControlError]
 pub fn Dsp::gate_off_bool(Self, Int) -> Bool
 pub fn Dsp::gate_on(Self, Int) -> Result[Unit, GraphControlError]
@@ -79,6 +104,7 @@ pub fn Dsp::gate_on_bool(Self, Int) -> Bool
 pub fn Dsp::has_feedback_edges(Self) -> Bool
 pub fn Dsp::is_voice_finished(Self) -> Bool
 pub fn Dsp::last_sanitized_count(Self) -> Int
+pub fn Dsp::last_validation_errors(Self) -> Array[GraphValidationError]
 pub fn Dsp::process(Self, @dsp.DspContext, @dsp.AudioBuffer) -> Unit
 pub fn Dsp::reset_runtime_state(Self) -> Unit
 pub fn Dsp::set_param(Self, Int, GraphParamSlot, Double) -> Result[Unit, GraphControlError]
@@ -103,25 +129,33 @@ pub struct DspNode {
 }
 pub fn DspNode::adsr(attack_ms~ : Double, decay_ms~ : Double, sustain~ : Double, release_ms~ : Double) -> Self
 pub fn DspNode::biquad(input~ : Int, mode~ : @dsp.BiquadMode, cutoff_hz~ : Double, q~ : Double) -> Self
+pub fn DspNode::can_delete(Self) -> Bool
+pub fn DspNode::can_insert_after(Self) -> Bool
 pub fn DspNode::clip(Int, Double) -> Self
 pub fn DspNode::constant(Double) -> Self
 pub fn DspNode::delay(input~ : Int, max_delay_samples~ : Int, delay_samples? : Int, feedback? : Double) -> Self
 pub fn DspNode::delay_max_samples(Self) -> Int
 pub fn DspNode::delay_samples(Self) -> Int
 pub fn DspNode::envelope_gain(input~ : Int, envelope~ : Int, amount~ : Double) -> Self
+pub fn DspNode::equal(Self, Self) -> Bool
 pub fn DspNode::filter_mode(Self) -> @dsp.BiquadMode
+pub fn DspNode::fold_value(Self, Double, Double) -> Double
 pub fn DspNode::gain(Int, Double) -> Self
 pub fn DspNode::input0(Self) -> Int
 pub fn DspNode::input1(Self) -> Int
+pub fn DspNode::is_foldable(Self) -> Bool
+pub fn DspNode::is_stateful(Self) -> Bool
 pub fn DspNode::kind(Self) -> DspNodeKind
 pub fn DspNode::mix(Int, Int) -> Self
 pub fn DspNode::mul(Int, Int) -> Self
 pub fn DspNode::noise(UInt) -> Self
+pub fn DspNode::not_equal(Self, Self) -> Bool
 pub fn DspNode::oscillator(@dsp.Waveform, Double) -> Self
 pub fn DspNode::oscillator_from(Int, @dsp.Waveform) -> Self
 pub fn DspNode::output(Int) -> Self
 pub fn DspNode::pan(Int, Double) -> Self
 pub fn DspNode::seed(Self) -> UInt
+pub fn DspNode::signal_shape(Self) -> Int
 pub fn DspNode::stereo_biquad(input~ : Int, mode~ : @dsp.BiquadMode, cutoff_hz~ : Double, q~ : Double) -> Self
 pub fn DspNode::stereo_clip(input~ : Int, threshold~ : Double) -> Self
 pub fn DspNode::stereo_delay(input~ : Int, max_delay_samples~ : Int, delay_samples? : Int, feedback? : Double) -> Self
@@ -159,6 +193,9 @@ pub(all) enum DspNodeKind {
   StereoMixDown
   StereoOutput
 } derive(Eq, @debug.Debug)
+pub fn DspNodeKind::equal(Self, Self) -> Bool
+pub fn DspNodeKind::not_equal(Self, Self) -> Bool
+pub fn DspNodeKind::to_repr(Self) -> @debug.Repr
 
 type DspTopologyController
 pub fn DspTopologyController::apply_control(Self, GraphControl) -> Result[Unit, GraphControlError]
@@ -175,8 +212,26 @@ pub impl GraphControllable for DspTopologyController
 pub struct GraphBuilder {
   // private fields
 }
+pub fn GraphBuilder::adsr(Double, Double, Double, Double) -> Self
 pub fn GraphBuilder::analyze(Self) -> AnalyzedGraph
+pub fn GraphBuilder::biquad(Self, @dsp.BiquadMode, Double, Double) -> Self
+pub fn GraphBuilder::clip(Self, Double) -> Self
+pub fn GraphBuilder::constant(Double) -> Self
+pub fn GraphBuilder::delay(Self, Int, Int, Double) -> Self
+pub fn GraphBuilder::gain(Self, Double) -> Self
+pub fn GraphBuilder::mix(Self, Self) -> Self
+pub fn GraphBuilder::mul(Self, Self) -> Self
 pub fn GraphBuilder::nodes(Self) -> Array[DspNode]
+pub fn GraphBuilder::noise(UInt) -> Self
+pub fn GraphBuilder::oscillator(Self, @dsp.Waveform) -> Self
+pub fn GraphBuilder::output(Self) -> Self
+pub fn GraphBuilder::pan(Self, Double) -> Self
+pub fn GraphBuilder::stereo_biquad(Self, @dsp.BiquadMode, Double, Double) -> Self
+pub fn GraphBuilder::stereo_clip(Self, Double) -> Self
+pub fn GraphBuilder::stereo_delay(Self, Int, Int, Double) -> Self
+pub fn GraphBuilder::stereo_gain(Self, Double) -> Self
+pub fn GraphBuilder::stereo_mixdown(Self) -> Self
+pub fn GraphBuilder::stereo_output(Self) -> Self
 pub impl @dsp.ArithSym for GraphBuilder
 pub impl @dsp.DelaySym for GraphBuilder
 pub impl @dsp.DspSym for GraphBuilder
@@ -198,6 +253,9 @@ pub(all) enum GraphCompileError {
   DuplicateFeedbackInput(Int, GraphTopologyInputSlot)
   InvalidTerminalShape(DspNodeKind)
 } derive(@debug.Debug)
+pub fn GraphCompileError::output(Self, &Logger) -> Unit
+pub fn GraphCompileError::to_repr(Self) -> @debug.Repr
+pub fn GraphCompileError::to_string(Self) -> String
 pub impl Show for GraphCompileError
 
 pub struct GraphControl {
@@ -219,6 +277,9 @@ pub(all) enum GraphControlError {
   InvalidParamValue(Int, DspNodeKind, GraphParamSlot, Double)
   MissingRuntimeState(Int, DspNodeKind)
 } derive(@debug.Debug)
+pub fn GraphControlError::output(Self, &Logger) -> Unit
+pub fn GraphControlError::to_repr(Self) -> @debug.Repr
+pub fn GraphControlError::to_string(Self) -> String
 pub impl Show for GraphControlError
 
 pub(all) enum GraphControlKind {
@@ -226,6 +287,8 @@ pub(all) enum GraphControlKind {
   GateOff
   SetParam
 } derive(Eq)
+pub fn GraphControlKind::equal(Self, Self) -> Bool
+pub fn GraphControlKind::not_equal(Self, Self) -> Bool
 
 pub struct GraphDocument {
   // private fields
@@ -275,6 +338,11 @@ pub(all) enum GraphParamSlot {
   Value3
   DelaySamples
 } derive(Eq, @debug.Debug)
+pub fn GraphParamSlot::equal(Self, Self) -> Bool
+pub fn GraphParamSlot::not_equal(Self, Self) -> Bool
+pub fn GraphParamSlot::output(Self, &Logger) -> Unit
+pub fn GraphParamSlot::to_repr(Self) -> @debug.Repr
+pub fn GraphParamSlot::to_string(Self) -> String
 pub impl Show for GraphParamSlot
 
 pub(all) enum GraphTopologyEdit {
@@ -308,12 +376,18 @@ pub(all) enum GraphTopologyEditError {
   DeleteChainRequiresSingleConsumer(Int)
   DeleteChainConsumerMismatch(Int, Int, Int)
 } derive(@debug.Debug)
+pub fn GraphTopologyEditError::output(Self, &Logger) -> Unit
+pub fn GraphTopologyEditError::to_repr(Self) -> @debug.Repr
+pub fn GraphTopologyEditError::to_string(Self) -> String
 pub impl Show for GraphTopologyEditError
 
 pub(all) enum GraphTopologyInputSlot {
   Input0
   Input1
 } derive(Eq, @debug.Debug)
+pub fn GraphTopologyInputSlot::equal(Self, Self) -> Bool
+pub fn GraphTopologyInputSlot::not_equal(Self, Self) -> Bool
+pub fn GraphTopologyInputSlot::to_repr(Self) -> @debug.Repr
 
 pub(all) enum GraphTopologyQueueError {
   PendingSwap
@@ -321,6 +395,9 @@ pub(all) enum GraphTopologyQueueError {
   RecompileRejected
   HotSwap(HotSwapQueueError)
 } derive(@debug.Debug)
+pub fn GraphTopologyQueueError::output(Self, &Logger) -> Unit
+pub fn GraphTopologyQueueError::to_repr(Self) -> @debug.Repr
+pub fn GraphTopologyQueueError::to_string(Self) -> String
 pub impl Show for GraphTopologyQueueError
 
 pub(all) enum GraphValidationError {
@@ -328,12 +405,20 @@ pub(all) enum GraphValidationError {
   InvalidInput1(Int, Int, Int)
   InvalidStateIndex(Int, String)
 } derive(Eq, @debug.Debug)
+pub fn GraphValidationError::equal(Self, Self) -> Bool
+pub fn GraphValidationError::not_equal(Self, Self) -> Bool
+pub fn GraphValidationError::output(Self, &Logger) -> Unit
+pub fn GraphValidationError::to_repr(Self) -> @debug.Repr
+pub fn GraphValidationError::to_string(Self) -> String
 pub impl Show for GraphValidationError
 
 pub(all) enum HotSwapQueueError {
   SampleRateMismatch(Double, Double)
   BlockCapacityMismatch(Int, Int)
 } derive(@debug.Debug)
+pub fn HotSwapQueueError::output(Self, &Logger) -> Unit
+pub fn HotSwapQueueError::to_repr(Self) -> @debug.Repr
+pub fn HotSwapQueueError::to_string(Self) -> String
 pub impl Show for HotSwapQueueError
 
 type StereoDsp
@@ -341,10 +426,13 @@ pub fn StereoDsp::apply_control(Self, GraphControl) -> Result[Unit, GraphControl
 pub fn StereoDsp::apply_controls(Self, Array[GraphControl]) -> Result[Unit, GraphControlError]
 pub fn StereoDsp::compile(AnalyzedGraph, @dsp.DspContext) -> Self?
 pub fn StereoDsp::compile_result(AnalyzedGraph, @dsp.DspContext) -> Result[Self, GraphCompileError]
+pub fn StereoDsp::disable_debug_validation(Self) -> Unit
+pub fn StereoDsp::enable_debug_validation(Self) -> Unit
 pub fn StereoDsp::gate_off(Self, Int) -> Result[Unit, GraphControlError]
 pub fn StereoDsp::gate_on(Self, Int) -> Result[Unit, GraphControlError]
 pub fn StereoDsp::has_feedback_edges(Self) -> Bool
 pub fn StereoDsp::last_sanitized_count(Self) -> Int
+pub fn StereoDsp::last_validation_errors(Self) -> Array[GraphValidationError]
 pub fn StereoDsp::process(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn StereoDsp::set_param(Self, Int, GraphParamSlot, Double) -> Result[Unit, GraphControlError]
 pub fn StereoDsp::validate_controls(Self, Array[GraphControl]) -> Result[Unit, GraphControlError]

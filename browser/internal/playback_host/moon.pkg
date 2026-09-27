@@ -5,10 +5,10 @@ import {
   "dowdiness/moondsp/scheduler",
   "dowdiness/moondsp/pattern",
   "dowdiness/moondsp/song",
+  "moonbitlang/core/debug",
   "moonbitlang/core/ref",
 }
 
 import {
-  "moonbitlang/core/debug",
   "moonbitlang/core/json",
 } for "wbtest"

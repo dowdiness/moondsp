@@ -14,6 +14,13 @@ pub impl GraphDebuggable for Dsp with fn enable_debug_validation(self) {
 }
 
 ///|
+pub extend Dsp with GraphDebuggable::{
+  disable_debug_validation,
+  last_validation_errors,
+  enable_debug_validation,
+}
+
+///|
 pub impl GraphDebuggable for Dsp with fn disable_debug_validation(self) {
   self.raw().disable_debug_validation()
 }
@@ -26,6 +33,13 @@ pub impl GraphDebuggable for Dsp with fn last_validation_errors(self) {
 ///|
 pub impl GraphDebuggable for StereoDsp with fn enable_debug_validation(self) {
   self.raw().enable_debug_validation()
+}
+
+///|
+pub extend StereoDsp with GraphDebuggable::{
+  disable_debug_validation,
+  last_validation_errors,
+  enable_debug_validation,
 }
 
 ///|

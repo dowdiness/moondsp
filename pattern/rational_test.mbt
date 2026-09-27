@@ -1,6 +1,6 @@
 ///|
-fn r(num : Int, den : Int) -> Rational {
-  Rational::new(Int64::from_int(num), Int64::from_int(den))
+fn r(num : Int, den : Int) -> @pattern.Rational {
+  @pattern.Rational::new(Int64::from_int(num), Int64::from_int(den))
 }
 
 ///|
@@ -27,7 +27,7 @@ test "simplification: 2/4 -> 1/2" {
 
 ///|
 test "negative denominator normalization" {
-  let rat = Rational::new(3L, -4L)
+  let rat = @pattern.Rational::new(3L, -4L)
   inspect(
     rat,
     content=(
@@ -38,7 +38,7 @@ test "negative denominator normalization" {
 
 ///|
 test "negative denominator normalization: -3/-4 -> 3/4" {
-  let rat = Rational::new(-3L, -4L)
+  let rat = @pattern.Rational::new(-3L, -4L)
   inspect(
     rat,
     content=(
@@ -133,7 +133,7 @@ test "floor: negative -4/4 = -1" {
 
 ///|
 test "from_int: 5 -> 5/1" {
-  let rat = Rational::from_int(5)
+  let rat = @pattern.Rational::from_int(5)
   inspect(
     rat,
     content=(
@@ -150,26 +150,32 @@ test "to_double: 1/4 = 0.25" {
 
 ///|
 test "panic zero denominator" {
-  ignore(Rational::new(1L, 0L))
+  ignore(@pattern.Rational::new(1L, 0L))
 }
 
 ///|
 test "large clock fractions cancel shared factors before arithmetic" {
   let n = 1234567890121L
   let d = 22500000L
-  let a = Rational::new(n, d)
-  assert_true(a + a == Rational::new(n * 2L, d))
-  assert_true(a - Rational::new(-n, d) == Rational::new(n * 2L, d))
-  assert_true(a * Rational::new(d, 7L) == Rational::new(n, 7L))
-  assert_true(a / Rational::new(1L, d) == Rational::new(n, 1L))
+  let a = @pattern.Rational::new(n, d)
+  assert_true(a + a == @pattern.Rational::new(n * 2L, d))
+  assert_true(
+    a - @pattern.Rational::new(-n, d) == @pattern.Rational::new(n * 2L, d),
+  )
+  assert_true(
+    a * @pattern.Rational::new(d, 7L) == @pattern.Rational::new(n, 7L),
+  )
+  assert_true(
+    a / @pattern.Rational::new(1L, d) == @pattern.Rational::new(n, 1L),
+  )
 }
 
 ///|
 test "comparison and floor do not overflow intermediate products" {
   let n = 9223372036854775807L
-  let a = Rational::new(n, 3L)
-  let b = Rational::new(n, 4L)
+  let a = @pattern.Rational::new(n, 3L)
+  let b = @pattern.Rational::new(n, 4L)
   assert_true(a > b)
-  assert_true(Rational::new(-n, 3L) < Rational::new(-n, 4L))
-  assert_eq(Rational::new(-n, 3L).floor(), -3074457345618258603L)
+  assert_true(@pattern.Rational::new(-n, 3L) < @pattern.Rational::new(-n, 4L))
+  assert_eq(@pattern.Rational::new(-n, 3L).floor(), -3074457345618258603L)
 }

@@ -1,15 +1,23 @@
 ///|
-fn r_prop(num : Int, den : Int) -> Rational {
-  Rational::new(Int64::from_int(num), Int64::from_int(den))
+fn r_prop(num : Int, den : Int) -> @pattern.Rational {
+  @pattern.Rational::new(Int64::from_int(num), Int64::from_int(den))
 }
 
 ///|
-fn span_prop(b_num : Int, b_den : Int, e_num : Int, e_den : Int) -> TimeSpan {
-  TimeSpan::new(r_prop(b_num, b_den), r_prop(e_num, e_den))
+fn span_prop(
+  b_num : Int,
+  b_den : Int,
+  e_num : Int,
+  e_den : Int,
+) -> @pattern.TimeSpan {
+  @pattern.TimeSpan::new(r_prop(b_num, b_den), r_prop(e_num, e_den))
 }
 
 ///|
-fn events_equal(a : Array[Event[Int]], b : Array[Event[Int]]) -> Bool {
+fn events_equal(
+  a : Array[@pattern.Event[Int]],
+  b : Array[@pattern.Event[Int]],
+) -> Bool {
   if a.length() != b.length() {
     return false
   }
@@ -43,9 +51,9 @@ test "prop: fast(a, fast(b, pat)) == fast(a*b, pat)" {
     fn(pair : (Int, Int)) {
       let a_raw = pair.0.abs() % 7 + 1
       let b_raw = pair.1.abs() % 7 + 1
-      let a = Rational::from_int(a_raw)
-      let b = Rational::from_int(b_raw)
-      let pat = Pat::pure(42)
+      let a = @pattern.Rational::from_int(a_raw)
+      let b = @pattern.Rational::from_int(b_raw)
+      let pat = @pattern.Pat::pure(42)
       let lhs = pat.fast(a).fast(b)
       let rhs = pat.fast(a * b)
       let arc = span_prop(0, 1, 1, 1)
@@ -64,9 +72,9 @@ test "prop: slow(n, pat) == fast(1/n, pat)" {
   @qc.quick_check_fn(
     fn(n_raw : Int) {
       let n_val = n_raw.abs() % 7 + 1
-      let n = Rational::from_int(n_val)
-      let inv_n = Rational::new(1L, Int64::from_int(n_val))
-      let pat = Pat::pure(42)
+      let n = @pattern.Rational::from_int(n_val)
+      let inv_n = @pattern.Rational::new(1L, Int64::from_int(n_val))
+      let pat = @pattern.Pat::pure(42)
       let lhs = pat.slow(n)
       let rhs = pat.fast(inv_n)
       let arc = span_prop(0, 1, 1, 1)
@@ -83,8 +91,8 @@ test "prop: fast(1, pat) == pat" {
   @qc.quick_check_fn(
     fn(value : Int) {
       let v = value.abs() % 1000
-      let pat = Pat::pure(v)
-      let lhs = pat.fast(Rational::from_int(1))
+      let pat = @pattern.Pat::pure(v)
+      let lhs = pat.fast(@pattern.Rational::from_int(1))
       let arc = span_prop(0, 1, 1, 1)
       events_equal(lhs.query(arc), pat.query(arc))
     },
@@ -99,7 +107,7 @@ test "prop: rev(rev(pat)) == pat" {
   @qc.quick_check_fn(
     fn(value : Int) {
       let v = value.abs() % 1000
-      let pat = Pat::pure(v)
+      let pat = @pattern.Pat::pure(v)
       let double_rev = pat.rev().rev()
       let arc = span_prop(0, 1, 1, 1)
       events_equal(double_rev.query(arc), pat.query(arc))
@@ -115,9 +123,9 @@ test "prop: sequence([pat]) == fast(1, pat)" {
   @qc.quick_check_fn(
     fn(value : Int) {
       let v = value.abs() % 1000
-      let pat = Pat::pure(v)
-      let seq1 = sequence([pat])
-      let fast1 = pat.fast(Rational::from_int(1))
+      let pat = @pattern.Pat::pure(v)
+      let seq1 = @pattern.sequence([pat])
+      let fast1 = pat.fast(@pattern.Rational::from_int(1))
       let arc = span_prop(0, 1, 1, 1)
       events_equal(seq1.query(arc), fast1.query(arc))
     },
@@ -132,8 +140,8 @@ test "prop: stack([pat]) == pat" {
   @qc.quick_check_fn(
     fn(value : Int) {
       let v = value.abs() % 1000
-      let pat = Pat::pure(v)
-      let stacked = stack([pat])
+      let pat = @pattern.Pat::pure(v)
+      let stacked = @pattern.stack([pat])
       let arc = span_prop(0, 1, 1, 1)
       events_equal(stacked.query(arc), pat.query(arc))
     },
@@ -151,7 +159,7 @@ test "prop: silence produces no events for any arc" {
       let len = pair.1.abs() % 5 + 1
       let e = b + len
       let arc = span_prop(b, 1, e, 1)
-      let s : Pat[Int] = Pat::silence()
+      let s : @pattern.Pat[Int] = @pattern.Pat::silence()
       s.query(arc).length() == 0
     },
     max_success=100,
@@ -165,7 +173,7 @@ test "prop: pure produces exactly N events for N-cycle query" {
   @qc.quick_check_fn(
     fn(n_raw : Int) {
       let n = n_raw.abs() % 8 + 1
-      let pat = Pat::pure(42)
+      let pat = @pattern.Pat::pure(42)
       let arc = span_prop(0, 1, n, 1)
       pat.query(arc).length() == n
     },
@@ -183,9 +191,13 @@ test "prop: fast associativity with sequence over multi-cycle" {
     fn(pair : (Int, Int)) {
       let a_raw = pair.0.abs() % 4 + 1
       let b_raw = pair.1.abs() % 4 + 1
-      let a = Rational::from_int(a_raw)
-      let b = Rational::from_int(b_raw)
-      let pat = sequence([Pat::pure(1), Pat::pure(2), Pat::pure(3)])
+      let a = @pattern.Rational::from_int(a_raw)
+      let b = @pattern.Rational::from_int(b_raw)
+      let pat = @pattern.sequence([
+        @pattern.Pat::pure(1),
+        @pattern.Pat::pure(2),
+        @pattern.Pat::pure(3),
+      ])
       let lhs = pat.fast(a).fast(b)
       let rhs = pat.fast(a * b)
       let arc = span_prop(0, 1, 2, 1) // 2 cycles
@@ -202,11 +214,11 @@ test "prop: rev(rev(sequence)) is identity over multi-cycle" {
   @qc.quick_check_fn(
     fn(n_raw : Int) {
       let n = n_raw.abs() % 5 + 2 // 2..6 elements
-      let pats : Array[Pat[Int]] = []
+      let pats : Array[@pattern.Pat[Int]] = []
       for i = 0; i < n; i = i + 1 {
-        pats.push(Pat::pure(i))
+        pats.push(@pattern.Pat::pure(i))
       }
-      let pat = sequence(pats)
+      let pat = @pattern.sequence(pats)
       let double_rev = pat.rev().rev()
       let arc = span_prop(0, 1, 2, 1) // 2 cycles
       events_equal(double_rev.query(arc), pat.query(arc))
@@ -219,7 +231,7 @@ test "prop: rev(rev(sequence)) is identity over multi-cycle" {
 // Law 11: fast with non-integer factor preserves event count correctly
 // fast(3/2, pure) over [0, 1) should produce 2 events (ceil(3/2) = 2 cycles in inner time)
 test "fast with non-integer factor 3/2" {
-  let pat = Pat::pure(42)
+  let pat = @pattern.Pat::pure(42)
   let fast_pat = pat.fast(r_prop(3, 2))
   let events = fast_pat.query(span_prop(0, 1, 1, 1))
   // Inner query is [0, 3/2) which spans 2 cycles → 2 events
@@ -235,7 +247,7 @@ test "fast with non-integer factor 3/2" {
 ///|
 // Law 12: sequence queried over partial multi-cycle arc [1/2, 3/2)
 test "sequence over partial multi-cycle arc" {
-  let pat = sequence([Pat::pure(1), Pat::pure(2)])
+  let pat = @pattern.sequence([@pattern.Pat::pure(1), @pattern.Pat::pure(2)])
   let events = pat.query(span_prop(1, 2, 3, 2))
   // Cycle 0 portion [1/2, 1): slot 1 (value 2) occupies [1/2, 1)
   // Cycle 1 portion [1, 3/2): slot 0 (value 1) occupies [1, 3/2)
@@ -250,7 +262,11 @@ test "sequence over partial multi-cycle arc" {
 // the array preserves the inner query's enumeration order. We check that
 // the value at the LATEST time position is what was originally FIRST.
 test "rev of sequence reverses correctly" {
-  let pat = sequence([Pat::pure(1), Pat::pure(2), Pat::pure(3)]).rev()
+  let pat = @pattern.sequence([
+    @pattern.Pat::pure(1),
+    @pattern.Pat::pure(2),
+    @pattern.Pat::pure(3),
+  ]).rev()
   let events = pat.query(span_prop(0, 1, 1, 1))
   @debug.assert_eq(events.length(), 3)
   // Events are in inner-query order (1, 2, 3) but their time positions

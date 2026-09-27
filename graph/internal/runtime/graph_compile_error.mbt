@@ -9,6 +9,12 @@ pub enum GraphInputSlot {
 } derive(Debug, Eq)
 
 ///|
+pub extend GraphInputSlot with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend GraphInputSlot with Eq::{not_equal, equal}
+
+///|
 pub enum GraphCompileError {
   InvalidSampleRate(Double)
   MissingOutput(DspNodeKind)
@@ -24,9 +30,15 @@ pub enum GraphCompileError {
 } derive(Debug)
 
 ///|
+pub extend GraphCompileError with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 pub impl Show for GraphCompileError with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
+
+///|
+pub extend GraphCompileError with Show::{to_string, output}
 
 ///|
 /// Compile a declarative mono graph and return a typed rejection reason when

@@ -12,6 +12,9 @@ pub suberror GraphEngineError {
 } derive(Debug)
 
 ///|
+pub extend GraphEngineError with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 priv enum EngineState {
   Mounting
   Sealed

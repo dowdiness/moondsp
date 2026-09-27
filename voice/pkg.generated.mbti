@@ -51,7 +51,12 @@ pub(all) enum BoundVoicePoolError {
   CompileRejected
   Binding(@graph.ControlBindingError)
 } derive(Eq, @debug.Debug)
+pub fn BoundVoicePoolError::equal(Self, Self) -> Bool
 pub fn BoundVoicePoolError::from_voice_pool(VoicePoolError) -> Self
+pub fn BoundVoicePoolError::not_equal(Self, Self) -> Bool
+pub fn BoundVoicePoolError::output(Self, &Logger) -> Unit
+pub fn BoundVoicePoolError::to_repr(Self) -> @debug.Repr
+pub fn BoundVoicePoolError::to_string(Self) -> String
 pub impl Show for BoundVoicePoolError
 
 pub(all) enum NoteGate {
@@ -59,20 +64,31 @@ pub(all) enum NoteGate {
   AfterSeconds(Double)
   InvalidDuration
 } derive(Eq, @debug.Debug)
+pub fn NoteGate::equal(Self, Self) -> Bool
+pub fn NoteGate::not_equal(Self, Self) -> Bool
+pub fn NoteGate::to_repr(Self) -> @debug.Repr
 
 pub(all) enum VoiceControlError {
   InvalidVoiceHandle(VoiceHandle)
   Graph(@graph.GraphControlError)
 } derive(@debug.Debug)
+pub fn VoiceControlError::output(Self, &Logger) -> Unit
+pub fn VoiceControlError::to_repr(Self) -> @debug.Repr
+pub fn VoiceControlError::to_string(Self) -> String
 pub impl Show for VoiceControlError
 
 pub struct VoiceHandle {
   slot : Int
   generation : Int
 } derive(Eq, @debug.Debug)
+pub fn VoiceHandle::equal(Self, Self) -> Bool
 pub fn VoiceHandle::from_parts(slot~ : Int, generation~ : Int) -> Self
+pub fn VoiceHandle::not_equal(Self, Self) -> Bool
+pub fn VoiceHandle::output(Self, &Logger) -> Unit
 pub fn VoiceHandle::packed_generation(Int64) -> Int
 pub fn VoiceHandle::packed_slot(Int64) -> Int
+pub fn VoiceHandle::to_repr(Self) -> @debug.Repr
+pub fn VoiceHandle::to_string(Self) -> String
 pub impl Show for VoiceHandle
 
 pub struct VoicePool {
@@ -101,6 +117,11 @@ pub(all) enum VoicePoolError {
   OrphanAdsr
   CompileRejected
 } derive(Eq, @debug.Debug)
+pub fn VoicePoolError::equal(Self, Self) -> Bool
+pub fn VoicePoolError::not_equal(Self, Self) -> Bool
+pub fn VoicePoolError::output(Self, &Logger) -> Unit
+pub fn VoicePoolError::to_repr(Self) -> @debug.Repr
+pub fn VoicePoolError::to_string(Self) -> String
 pub impl Show for VoicePoolError
 
 pub enum VoiceState {
@@ -108,6 +129,11 @@ pub enum VoiceState {
   Active
   Releasing
 } derive(Eq, @debug.Debug)
+pub fn VoiceState::equal(Self, Self) -> Bool
+pub fn VoiceState::not_equal(Self, Self) -> Bool
+pub fn VoiceState::output(Self, &Logger) -> Unit
+pub fn VoiceState::to_repr(Self) -> @debug.Repr
+pub fn VoiceState::to_string(Self) -> String
 pub impl Show for VoiceState
 
 // Type aliases

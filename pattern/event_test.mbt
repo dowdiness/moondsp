@@ -1,6 +1,6 @@
 ///|
 test "Event::shift shifts whole and part spans" {
-  let event = Pat::pure(7).query(span(0, 1, 1, 2))[0]
+  let event = @pattern.Pat::pure(7).query(span(0, 1, 1, 2))[0]
   let shifted = event.shift(r(2, 1))
   inspect(
     shifted,

@@ -1,16 +1,16 @@
 ///|
-fn reverb_test_context() -> DspContext {
+fn reverb_test_context() -> @dsp.DspContext {
   DspContext(sample_rate=48000.0, block_size=128)
 }
 
 ///|
 fn render_reverb_block(
-  reverb : StereoReverb,
-  context : DspContext,
-  left_input : AudioBuffer,
-  right_input : AudioBuffer,
-  left_output : AudioBuffer,
-  right_output : AudioBuffer,
+  reverb : @dsp.StereoReverb,
+  context : @dsp.DspContext,
+  left_input : @dsp.AudioBuffer,
+  right_input : @dsp.AudioBuffer,
+  left_output : @dsp.AudioBuffer,
+  right_output : @dsp.AudioBuffer,
 ) -> (Double, Double) raise {
   reverb.process(context, left_input, right_input, left_output, right_output)
   let mut energy = 0.0
@@ -18,8 +18,8 @@ fn render_reverb_block(
   for i in 0..<context.block_size() {
     let left = left_output.get(i)
     let right = right_output.get(i)
-    assert_true(is_finite(left))
-    assert_true(is_finite(right))
+    assert_true(@dsp.is_finite(left))
+    assert_true(@dsp.is_finite(right))
     energy += left * left + right * right
     stereo_difference += (left - right).abs()
   }
@@ -29,7 +29,7 @@ fn render_reverb_block(
 ///|
 test "stereo reverb keeps a decorrelated tail after input stops" {
   let context = reverb_test_context()
-  let reverb = StereoReverb::StereoReverb(
+  let reverb = @dsp.StereoReverb::StereoReverb(
     48000.0,
     decay_seconds=2.4,
     damping=0.35,
@@ -58,12 +58,12 @@ test "stereo reverb keeps a decorrelated tail after input stops" {
 ///|
 test "longer reverb T60 retains more late energy" {
   let context = reverb_test_context()
-  let short = StereoReverb::StereoReverb(
+  let short = @dsp.StereoReverb::StereoReverb(
     48000.0,
     decay_seconds=0.4,
     damping=0.35,
   )
-  let long = StereoReverb::StereoReverb(
+  let long = @dsp.StereoReverb::StereoReverb(
     48000.0,
     decay_seconds=2.4,
     damping=0.35,
@@ -100,7 +100,7 @@ test "longer reverb T60 retains more late energy" {
 ///|
 test "reverb rejects non-finite excitation and reset clears its tail" {
   let context = reverb_test_context()
-  let reverb = StereoReverb::StereoReverb(48000.0)
+  let reverb = @dsp.StereoReverb::StereoReverb(48000.0)
   let left_input = context.make_buffer()
   let right_input = context.make_buffer()
   let left_output = context.make_buffer()

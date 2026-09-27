@@ -6,6 +6,12 @@ pub struct ControlBinding {
 } derive(Debug, Eq)
 
 ///|
+pub extend ControlBinding with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend ControlBinding with Eq::{not_equal, equal}
+
+///|
 #alias(new)
 pub fn ControlBinding::ControlBinding(
   key~ : String,
@@ -24,6 +30,12 @@ pub(all) enum ControlBindingError {
   /// optimize_graph eliminated. Prevents silent set_param no-ops.
   OrphanBinding(String, Int)
 } derive(Debug, Eq)
+
+///|
+pub extend ControlBindingError with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend ControlBindingError with Eq::{not_equal, equal}
 
 ///|
 fn control_binding_error_from_internal(
@@ -48,6 +60,9 @@ fn control_binding_error_from_internal(
 pub struct ControlBindingBuilder {
   priv raw : @binding.ControlBindingBuilder
 } derive(Debug)
+
+///|
+pub extend ControlBindingBuilder with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
 #alias(new)
@@ -90,6 +105,12 @@ pub fn ControlBindingBuilder::bind(
 pub struct ControlBindingMap {
   priv raw : @binding.ControlBindingMap
 } derive(Debug, Eq)
+
+///|
+pub extend ControlBindingMap with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend ControlBindingMap with Eq::{not_equal, equal}
 
 ///|
 fn ControlBindingMap::from_internal(
@@ -144,9 +165,15 @@ pub impl Show for ControlBinding with fn output(self, logger) {
 }
 
 ///|
+pub extend ControlBinding with Show::{to_string, output}
+
+///|
 pub impl Show for ControlBindingError with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
+
+///|
+pub extend ControlBindingError with Show::{to_string, output}
 
 ///|
 pub impl Show for ControlBindingBuilder with fn output(self, logger) {
@@ -154,9 +181,15 @@ pub impl Show for ControlBindingBuilder with fn output(self, logger) {
 }
 
 ///|
+pub extend ControlBindingBuilder with Show::{to_string, output}
+
+///|
 pub impl Show for ControlBindingMap with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
+
+///|
+pub extend ControlBindingMap with Show::{to_string, output}
 
 ///|
 /// Read the default captured when these bindings were validated.

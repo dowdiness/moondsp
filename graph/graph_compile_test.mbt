@@ -5,12 +5,14 @@ test "compiled dsp rejects implicit stereo to mono output" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::pan(0, PAN_CENTER),
-    DspNode::output(1),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::pan(0, PAN_CENTER),
+    @graph.DspNode::output(1),
   ]
 
-  assert_true(Dsp::compile(AnalyzedGraph::analyze(nodes), context) is None)
+  assert_true(
+    @graph.Dsp::compile(@graph.AnalyzedGraph::analyze(nodes), context) is None,
+  )
 }
 
 ///|
@@ -20,46 +22,62 @@ test "compiled dsp rejects stereo-only nodes" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let stereo_gain_nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::stereo_gain(input=0, amount=HALF_GAIN),
-    DspNode::output(1),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::stereo_gain(input=0, amount=HALF_GAIN),
+    @graph.DspNode::output(1),
   ]
   let stereo_clip_nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::stereo_clip(input=0, threshold=STEREO_CLIP_THRESHOLD),
-    DspNode::output(1),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::stereo_clip(input=0, threshold=STEREO_CLIP_THRESHOLD),
+    @graph.DspNode::output(1),
   ]
   let stereo_biquad_nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::stereo_biquad(
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::stereo_biquad(
       input=0,
       mode=BiquadMode::LowPass,
       cutoff_hz=LOWPASS_CUTOFF,
       q=LOWPASS_Q,
     ),
-    DspNode::output(1),
+    @graph.DspNode::output(1),
   ]
   let stereo_delay_nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::stereo_delay(
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::stereo_delay(
       input=0,
       max_delay_samples=DELAY_CAPACITY,
       delay_samples=DELAY_SAMPLES,
     ),
-    DspNode::output(1),
+    @graph.DspNode::output(1),
   ]
 
   assert_true(
-    Dsp::compile(AnalyzedGraph::analyze(stereo_gain_nodes), context) is None,
+    @graph.Dsp::compile(
+      @graph.AnalyzedGraph::analyze(stereo_gain_nodes),
+      context,
+    )
+    is None,
   )
   assert_true(
-    Dsp::compile(AnalyzedGraph::analyze(stereo_clip_nodes), context) is None,
+    @graph.Dsp::compile(
+      @graph.AnalyzedGraph::analyze(stereo_clip_nodes),
+      context,
+    )
+    is None,
   )
   assert_true(
-    Dsp::compile(AnalyzedGraph::analyze(stereo_biquad_nodes), context) is None,
+    @graph.Dsp::compile(
+      @graph.AnalyzedGraph::analyze(stereo_biquad_nodes),
+      context,
+    )
+    is None,
   )
   assert_true(
-    Dsp::compile(AnalyzedGraph::analyze(stereo_delay_nodes), context) is None,
+    @graph.Dsp::compile(
+      @graph.AnalyzedGraph::analyze(stereo_delay_nodes),
+      context,
+    )
+    is None,
   )
 }
 
@@ -70,16 +88,18 @@ test "compiled dsp rejects non-finite adsr parameters" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::adsr(
+    @graph.DspNode::adsr(
       attack_ms=0.0 / 0.0,
       decay_ms=ADSR_DECAY_MS,
       sustain=HALF_GAIN,
       release_ms=10.0,
     ),
-    DspNode::output(0),
+    @graph.DspNode::output(0),
   ]
 
-  assert_true(Dsp::compile(AnalyzedGraph::analyze(nodes), context) is None)
+  assert_true(
+    @graph.Dsp::compile(@graph.AnalyzedGraph::analyze(nodes), context) is None,
+  )
 }
 
 ///|
@@ -88,11 +108,23 @@ test "compiled dsp rejects non-finite constants" {
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
-  let nan_nodes = [DspNode::constant(0.0 / 0.0), DspNode::output(0)]
-  let inf_nodes = [DspNode::constant(1.0 / 0.0), DspNode::output(0)]
+  let nan_nodes = [
+    @graph.DspNode::constant(0.0 / 0.0),
+    @graph.DspNode::output(0),
+  ]
+  let inf_nodes = [
+    @graph.DspNode::constant(1.0 / 0.0),
+    @graph.DspNode::output(0),
+  ]
 
-  assert_true(Dsp::compile(AnalyzedGraph::analyze(nan_nodes), context) is None)
-  assert_true(Dsp::compile(AnalyzedGraph::analyze(inf_nodes), context) is None)
+  assert_true(
+    @graph.Dsp::compile(@graph.AnalyzedGraph::analyze(nan_nodes), context)
+    is None,
+  )
+  assert_true(
+    @graph.Dsp::compile(@graph.AnalyzedGraph::analyze(inf_nodes), context)
+    is None,
+  )
 }
 
 ///|
@@ -101,13 +133,14 @@ test "compile_result reports non-finite constant parameter" {
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
-  let nodes = [DspNode::constant(0.0 / 0.0), DspNode::output(0)]
+  let nodes = [@graph.DspNode::constant(0.0 / 0.0), @graph.DspNode::output(0)]
 
-  match Dsp::compile_result(AnalyzedGraph::analyze(nodes), context) {
-    Err(GraphCompileError::InvalidParamValue(index, kind, slot, value)) => {
+  match
+    @graph.Dsp::compile_result(@graph.AnalyzedGraph::analyze(nodes), context) {
+    Err(@graph.GraphCompileError::InvalidParamValue(index, kind, slot, value)) => {
       @debug.assert_eq(index, 0)
-      @debug.assert_eq(kind, DspNodeKind::Constant)
-      @debug.assert_eq(slot, GraphParamSlot::Value0)
+      @debug.assert_eq(kind, @graph.DspNodeKind::Constant)
+      @debug.assert_eq(slot, @graph.GraphParamSlot::Value0)
       assert_true(value.is_nan())
     }
     _ => fail("expected InvalidParamValue for NaN constant")
@@ -121,16 +154,17 @@ test "compile_result maps optimized errors back to authoring indices" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(QUARTER_SAMPLE), // eliminated before compile
-    DspNode::constant(0.0 / 0.0),
-    DspNode::output(1),
+    @graph.DspNode::constant(QUARTER_SAMPLE), // eliminated before compile
+    @graph.DspNode::constant(0.0 / 0.0),
+    @graph.DspNode::output(1),
   ]
 
-  match Dsp::compile_result(AnalyzedGraph::analyze(nodes), context) {
-    Err(GraphCompileError::InvalidParamValue(index, kind, slot, value)) => {
+  match
+    @graph.Dsp::compile_result(@graph.AnalyzedGraph::analyze(nodes), context) {
+    Err(@graph.GraphCompileError::InvalidParamValue(index, kind, slot, value)) => {
       @debug.assert_eq(index, 1)
-      @debug.assert_eq(kind, DspNodeKind::Constant)
-      @debug.assert_eq(slot, GraphParamSlot::Value0)
+      @debug.assert_eq(kind, @graph.DspNodeKind::Constant)
+      @debug.assert_eq(slot, @graph.GraphParamSlot::Value0)
       assert_true(value.is_nan())
     }
     _ => fail("expected authoring-indexed InvalidParamValue")
@@ -144,16 +178,17 @@ test "compile_result preserves invalid authoring input before optimization" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(QUARTER_SAMPLE), // eliminated before compile
-    DspNode::gain(99, HALF_GAIN),
-    DspNode::output(1),
+    @graph.DspNode::constant(QUARTER_SAMPLE), // eliminated before compile
+    @graph.DspNode::gain(99, HALF_GAIN),
+    @graph.DspNode::output(1),
   ]
 
-  match Dsp::compile_result(AnalyzedGraph::analyze(nodes), context) {
-    Err(GraphCompileError::InvalidInput(index, kind, slot, input)) => {
+  match
+    @graph.Dsp::compile_result(@graph.AnalyzedGraph::analyze(nodes), context) {
+    Err(@graph.GraphCompileError::InvalidInput(index, kind, slot, input)) => {
       @debug.assert_eq(index, 1)
-      @debug.assert_eq(kind, DspNodeKind::Gain)
-      @debug.assert_eq(slot, GraphTopologyInputSlot::Input0)
+      @debug.assert_eq(kind, @graph.DspNodeKind::Gain)
+      @debug.assert_eq(slot, @graph.GraphTopologyInputSlot::Input0)
       @debug.assert_eq(input, 99)
     }
     _ => fail("expected authoring-indexed InvalidInput")
@@ -166,11 +201,12 @@ test "compile_result reports missing output" {
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
-  let nodes = [DspNode::constant(QUARTER_SAMPLE)]
+  let nodes = [@graph.DspNode::constant(QUARTER_SAMPLE)]
 
-  match Dsp::compile_result(AnalyzedGraph::analyze(nodes), context) {
-    Err(GraphCompileError::MissingOutput(kind)) =>
-      @debug.assert_eq(kind, DspNodeKind::Output)
+  match
+    @graph.Dsp::compile_result(@graph.AnalyzedGraph::analyze(nodes), context) {
+    Err(@graph.GraphCompileError::MissingOutput(kind)) =>
+      @debug.assert_eq(kind, @graph.DspNodeKind::Output)
     _ => fail("expected MissingOutput")
   }
 }
@@ -181,9 +217,11 @@ test "compiled dsp rejects graphs without a final output node" {
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
-  let nodes = [DspNode::constant(QUARTER_SAMPLE)]
+  let nodes = [@graph.DspNode::constant(QUARTER_SAMPLE)]
 
-  assert_true(Dsp::compile(AnalyzedGraph::analyze(nodes), context) is None)
+  assert_true(
+    @graph.Dsp::compile(@graph.AnalyzedGraph::analyze(nodes), context) is None,
+  )
 }
 
 ///|
@@ -193,12 +231,14 @@ test "compiled dsp rejects multiple output nodes" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(QUARTER_SAMPLE),
-    DspNode::output(0),
-    DspNode::output(0),
+    @graph.DspNode::constant(QUARTER_SAMPLE),
+    @graph.DspNode::output(0),
+    @graph.DspNode::output(0),
   ]
 
-  assert_true(Dsp::compile(AnalyzedGraph::analyze(nodes), context) is None)
+  assert_true(
+    @graph.Dsp::compile(@graph.AnalyzedGraph::analyze(nodes), context) is None,
+  )
 }
 
 ///|
@@ -208,17 +248,19 @@ test "compiled dsp rejects invalid biquad parameters" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::biquad(
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::biquad(
       input=0,
       mode=BiquadMode::LowPass,
       cutoff_hz=INVALID_NYQUIST_CUTOFF,
       q=LOWPASS_Q,
     ),
-    DspNode::output(1),
+    @graph.DspNode::output(1),
   ]
 
-  assert_true(Dsp::compile(AnalyzedGraph::analyze(nodes), context) is None)
+  assert_true(
+    @graph.Dsp::compile(@graph.AnalyzedGraph::analyze(nodes), context) is None,
+  )
 }
 
 ///|
@@ -228,16 +270,19 @@ test "compiled dsp topologically sorts declarative filter graph" {
     block_size=LARGE_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::output(1),
-    DspNode::biquad(
+    @graph.DspNode::output(1),
+    @graph.DspNode::biquad(
       input=2,
       mode=BiquadMode::LowPass,
       cutoff_hz=LOWPASS_CUTOFF,
       q=LOWPASS_Q,
     ),
-    DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::constant(UNIT_SAMPLE),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(LARGE_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -254,11 +299,14 @@ test "compiled dsp topologically sorts declarative node order" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::output(1),
-    DspNode::gain(2, HALF_GAIN),
-    DspNode::oscillator(Waveform::Sine, OSCILLATOR_FREQ),
+    @graph.DspNode::output(1),
+    @graph.DspNode::gain(2, HALF_GAIN),
+    @graph.DspNode::oscillator(Waveform::Sine, OSCILLATOR_FREQ),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -274,14 +322,14 @@ test "compiled dsp topologically sorts declarative node order" {
 test "compiled dsp optimizes constant subgraph during compilation" {
   // Build: Constant(3) * Constant(4) -> Output
   // After optimization: Constant(12) -> Output (only 2 nodes to compile)
-  let nodes : Array[DspNode] = [
-    DspNode::constant(3.0),
-    DspNode::constant(4.0),
-    DspNode::mul(0, 1),
-    DspNode::output(2),
+  let nodes : Array[@graph.DspNode] = [
+    @graph.DspNode::constant(3.0),
+    @graph.DspNode::constant(4.0),
+    @graph.DspNode::mul(0, 1),
+    @graph.DspNode::output(2),
   ]
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), ctx)
+  let compiled = @graph.Dsp::compile(@graph.AnalyzedGraph::analyze(nodes), ctx)
   assert_true(compiled is Some(_))
   // Process and verify output = 12.0 (constant)
   let compiled = compiled.unwrap()
@@ -293,16 +341,18 @@ test "compiled dsp optimizes constant subgraph during compilation" {
 ///|
 test "compiled dsp compile preserves authoring control indices" {
   let nodes = [
-    DspNode::output(1),
-    DspNode::oscillator(Waveform::Sine, OSCILLATOR_FREQ),
+    @graph.DspNode::output(1),
+    @graph.DspNode::oscillator(Waveform::Sine, OSCILLATOR_FREQ),
   ]
   let ctx = DspContext::new(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), ctx).unwrap()
+  let compiled = @graph.Dsp::compile(@graph.AnalyzedGraph::analyze(nodes), ctx).unwrap()
 
-  assert_true(compiled.set_param(1, GraphParamSlot::Value0, 880.0) is Ok(_))
+  assert_true(
+    compiled.set_param(1, @graph.GraphParamSlot::Value0, 880.0) is Ok(_),
+  )
 }
 
 ///|
@@ -312,11 +362,14 @@ test "compiled dsp delay node keeps zero-capacity default as passthrough" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(QUARTER_SAMPLE),
-    DspNode::delay(input=0, max_delay_samples=0),
-    DspNode::output(1),
+    @graph.DspNode::constant(QUARTER_SAMPLE),
+    @graph.DspNode::delay(input=0, max_delay_samples=0),
+    @graph.DspNode::output(1),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -334,30 +387,37 @@ test "compiled graphs reject delay feedback outside live supported range" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let mono_nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::delay(
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::delay(
       input=0,
       max_delay_samples=DELAY_CAPACITY,
       delay_samples=DELAY_SAMPLES,
       feedback=CLAMPED_HIGH_DELAY_FEEDBACK,
     ),
-    DspNode::output(1),
+    @graph.DspNode::output(1),
   ]
   let stereo_nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_delay(
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::pan(0, PAN_CENTER),
+    @graph.DspNode::stereo_delay(
       input=1,
       max_delay_samples=DELAY_CAPACITY,
       delay_samples=DELAY_SAMPLES,
       feedback=CLAMPED_LOW_DELAY_FEEDBACK,
     ),
-    DspNode::stereo_output(2),
+    @graph.DspNode::stereo_output(2),
   ]
 
-  assert_true(Dsp::compile(AnalyzedGraph::analyze(mono_nodes), context) is None)
   assert_true(
-    StereoDsp::compile(AnalyzedGraph::analyze(stereo_nodes), context) is None,
+    @graph.Dsp::compile(@graph.AnalyzedGraph::analyze(mono_nodes), context)
+    is None,
+  )
+  assert_true(
+    @graph.StereoDsp::compile(
+      @graph.AnalyzedGraph::analyze(stereo_nodes),
+      context,
+    )
+    is None,
   )
 }
 
@@ -367,10 +427,14 @@ test "compiled stereo dsp rejects mono direct to stereo output" {
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
-  let nodes = [DspNode::constant(UNIT_SAMPLE), DspNode::stereo_output(0)]
+  let nodes = [
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::stereo_output(0),
+  ]
 
   assert_true(
-    StereoDsp::compile(AnalyzedGraph::analyze(nodes), context) is None,
+    @graph.StereoDsp::compile(@graph.AnalyzedGraph::analyze(nodes), context)
+    is None,
   )
 }
 
@@ -381,14 +445,15 @@ test "compiled stereo dsp rejects stereo post processing after pan" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::pan(0, PAN_HARD_LEFT),
-    DspNode::gain(1, HALF_GAIN),
-    DspNode::stereo_output(2),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::pan(0, PAN_HARD_LEFT),
+    @graph.DspNode::gain(1, HALF_GAIN),
+    @graph.DspNode::stereo_output(2),
   ]
 
   assert_true(
-    StereoDsp::compile(AnalyzedGraph::analyze(nodes), context) is None,
+    @graph.StereoDsp::compile(@graph.AnalyzedGraph::analyze(nodes), context)
+    is None,
   )
 }
 
@@ -399,14 +464,15 @@ test "compiled stereo dsp rejects stereo mixdown before stereo output" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_mixdown(1),
-    DspNode::stereo_output(2),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::pan(0, PAN_CENTER),
+    @graph.DspNode::stereo_mixdown(1),
+    @graph.DspNode::stereo_output(2),
   ]
 
   assert_true(
-    StereoDsp::compile(AnalyzedGraph::analyze(nodes), context) is None,
+    @graph.StereoDsp::compile(@graph.AnalyzedGraph::analyze(nodes), context)
+    is None,
   )
 }
 
@@ -417,15 +483,16 @@ test "compiled stereo dsp rejects internal stereo mixdown roundtrip" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_mixdown(1),
-    DspNode::gain(2, HALF_GAIN),
-    DspNode::pan(3, PAN_CENTER),
-    DspNode::stereo_output(4),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::pan(0, PAN_CENTER),
+    @graph.DspNode::stereo_mixdown(1),
+    @graph.DspNode::gain(2, HALF_GAIN),
+    @graph.DspNode::pan(3, PAN_CENTER),
+    @graph.DspNode::stereo_output(4),
   ]
 
   assert_true(
-    StereoDsp::compile(AnalyzedGraph::analyze(nodes), context) is None,
+    @graph.StereoDsp::compile(@graph.AnalyzedGraph::analyze(nodes), context)
+    is None,
   )
 }

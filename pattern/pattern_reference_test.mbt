@@ -1,12 +1,12 @@
 ///|
 test "references retain distinct use-site paths into the same definition" {
-  let definition = PatternDoc::pure(id=pid("note"), value=60).slow(
+  let definition = @pattern.PatternDoc::pure(id=pid("note"), value=60).slow(
     id=pid("phrase"),
-    factor=Rational::from_int(3),
+    factor=@pattern.Rational::from_int(3),
   )
-  let left = PatternDoc::reference(id=pid("left"), definition~)
-  let right = PatternDoc::reference(id=pid("right"), definition~)
-  let doc = PatternDoc::stack(id=pid("mix"), docs=[left, right])
+  let left = @pattern.PatternDoc::reference(id=pid("left"), definition~)
+  let right = @pattern.PatternDoc::reference(id=pid("right"), definition~)
+  let doc = @pattern.PatternDoc::stack(id=pid("mix"), docs=[left, right])
   let snapshot = doc.lower()
   let events = snapshot.query_sourced_events(doc_span(0, 1, 3, 1))
   @debug.assert_eq(events.length(), 2)
@@ -20,14 +20,14 @@ test "references retain distinct use-site paths into the same definition" {
 
 ///|
 test "references to divergent definition revisions never share stale values" {
-  let original = PatternDoc::pure(id=pid("note"), value=60).slow(
+  let original = @pattern.PatternDoc::pure(id=pid("note"), value=60).slow(
     id=pid("phrase"),
-    factor=Rational::from_int(3),
+    factor=@pattern.Rational::from_int(3),
   )
   let edited = original.replace_with_pure(id=pid("note"), value=72)
-  let doc = PatternDoc::stack(id=pid("mix"), docs=[
-    PatternDoc::reference(id=pid("original"), definition=original),
-    PatternDoc::reference(id=pid("edited"), definition=edited),
+  let doc = @pattern.PatternDoc::stack(id=pid("mix"), docs=[
+    @pattern.PatternDoc::reference(id=pid("original"), definition=original),
+    @pattern.PatternDoc::reference(id=pid("edited"), definition=edited),
   ])
   let snapshot = doc.lower()
   @debug.assert_eq(
@@ -44,13 +44,14 @@ test "references to divergent definition revisions never share stale values" {
 
 ///|
 test "rebuilding references to an edited definition invalidates a persistent cache" {
-  let original = PatternDoc::pure(id=pid("note"), value=60)
-  let cache : PatternLoweringCache[Int] = PatternLoweringCache::new()
-  let before = PatternDoc::reference(id=pid("use"), definition=original).lower_with_cache(
-    cache,
-  )
+  let original = @pattern.PatternDoc::pure(id=pid("note"), value=60)
+  let cache : @pattern.PatternLoweringCache[Int] = @pattern.PatternLoweringCache::new()
+  let before = @pattern.PatternDoc::reference(
+    id=pid("use"),
+    definition=original,
+  ).lower_with_cache(cache)
   let edited = original.replace_with_pure(id=pid("note"), value=72)
-  let after = PatternDoc::reference(id=pid("use"), definition=edited).lower_with_cache(
+  let after = @pattern.PatternDoc::reference(id=pid("use"), definition=edited).lower_with_cache(
     cache,
   )
   @debug.assert_eq(

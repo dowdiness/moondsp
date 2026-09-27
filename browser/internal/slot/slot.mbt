@@ -30,6 +30,9 @@ pub impl Output for MonoOut with fn reset(self) {
 }
 
 ///|
+pub extend MonoOut with Output::{reset, allocate}
+
+///|
 pub impl Output for MonoOut with fn allocate(self, n) {
   self.buffer.val = Some(@moondsp.AudioBuffer::filled(n))
 }
@@ -63,6 +66,9 @@ pub impl Output for StereoOut with fn reset(self) {
   self.left.val = None
   self.right.val = None
 }
+
+///|
+pub extend StereoOut with Output::{reset, allocate}
 
 ///|
 pub impl Output for StereoOut with fn allocate(self, n) {

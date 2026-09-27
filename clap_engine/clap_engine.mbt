@@ -63,9 +63,18 @@ pub(all) enum ClapEngineError {
 } derive(Eq, Debug)
 
 ///|
+pub extend ClapEngineError with Eq::{not_equal, equal}
+
+///|
+pub extend ClapEngineError with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 pub impl Show for ClapEngineError with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
+
+///|
+pub extend ClapEngineError with Show::{to_string, output}
 
 ///|
 /// Native-host-facing synth engine state for an initial CLAP instrument.

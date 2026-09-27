@@ -124,6 +124,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Aligned MoonBit sources with compiler warning rules: package-under-test APIs
+  are explicit in tests, promoted trait methods use explicit public extensions,
+  and unused package imports are removed.
 - **Breaking:** replaced `MiniAuthoringPipeline` with `mini.Draft`. Use
   `edit(EditTransaction)` or explicit `reset`, not full-text setters or
   separately supplied text/edit spans. The public accepted-document channel,

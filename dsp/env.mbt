@@ -9,6 +9,9 @@ pub enum EnvStage {
 } derive(Eq)
 
 ///|
+pub extend EnvStage with Eq::{not_equal, equal}
+
+///|
 /// Stateful ADSR envelope generator.
 pub struct Adsr {
   priv mut attack_ms : Double

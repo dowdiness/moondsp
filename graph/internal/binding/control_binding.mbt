@@ -25,9 +25,18 @@ pub enum ControlBindingError {
 } derive(Debug, Eq)
 
 ///|
+pub extend ControlBindingError with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend ControlBindingError with Eq::{not_equal, equal}
+
+///|
 pub struct ControlBindingBuilder {
   priv bindings : Array[ControlBinding]
 } derive(Debug)
+
+///|
+pub extend ControlBindingBuilder with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
 #alias(new)
@@ -65,6 +74,12 @@ pub struct ControlBindingMap {
   priv bindings : Array[ControlBinding]
   priv defaults : Array[Double]
 } derive(Debug, Eq)
+
+///|
+pub extend ControlBindingMap with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend ControlBindingMap with Eq::{not_equal, equal}
 
 ///|
 /// Number of validated bindings in this map.

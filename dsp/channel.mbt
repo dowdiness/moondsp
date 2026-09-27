@@ -18,6 +18,9 @@ pub impl ChannelSpec for Mono with fn channel_count(_self) {
 }
 
 ///|
+pub extend Mono with ChannelSpec::{channel_count}
+
+///|
 pub struct Stereo {}
 
 ///|
@@ -30,6 +33,9 @@ pub fn Stereo::Stereo() -> Stereo {
 pub impl ChannelSpec for Stereo with fn channel_count(_self) {
   2
 }
+
+///|
+pub extend Stereo with ChannelSpec::{channel_count}
 
 ///|
 /// Bridge to existing MONO_SIGNAL_SHAPE constant (value 0).

@@ -7,6 +7,9 @@ pub(all) enum BiquadMode {
 } derive(Eq)
 
 ///|
+pub extend BiquadMode with Eq::{not_equal, equal}
+
+///|
 /// Stateful biquad filter using Direct Form II Transposed processing.
 pub struct Biquad {
   priv mut b0 : Double

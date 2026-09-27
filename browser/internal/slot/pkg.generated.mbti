@@ -29,7 +29,9 @@ pub struct MonoOut {
 }
 #alias(new)
 pub fn MonoOut::MonoOut() -> Self
+pub fn MonoOut::allocate(Self, Int) -> Unit
 pub fn MonoOut::get(Self) -> @dsp.AudioBuffer
+pub fn MonoOut::reset(Self) -> Unit
 pub fn MonoOut::sample(Self, Int) -> Double
 pub impl Output for MonoOut
 
@@ -38,8 +40,10 @@ pub struct StereoOut {
 }
 #alias(new)
 pub fn StereoOut::StereoOut() -> Self
+pub fn StereoOut::allocate(Self, Int) -> Unit
 pub fn StereoOut::left_buf(Self) -> @dsp.AudioBuffer
 pub fn StereoOut::left_sample(Self, Int) -> Double
+pub fn StereoOut::reset(Self) -> Unit
 pub fn StereoOut::right_buf(Self) -> @dsp.AudioBuffer
 pub fn StereoOut::right_sample(Self, Int) -> Double
 pub impl Output for StereoOut

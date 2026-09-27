@@ -1,6 +1,11 @@
 ///|
-fn span(b_num : Int, b_den : Int, e_num : Int, e_den : Int) -> TimeSpan {
-  TimeSpan::new(r(b_num, b_den), r(e_num, e_den))
+fn span(
+  b_num : Int,
+  b_den : Int,
+  e_num : Int,
+  e_den : Int,
+) -> @pattern.TimeSpan {
+  @pattern.TimeSpan::new(r(b_num, b_den), r(e_num, e_den))
 }
 
 ///|

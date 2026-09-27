@@ -1,13 +1,13 @@
 ///|
 test "sequence: empty array produces silence (0 events)" {
-  let p : Pat[Int] = sequence([])
+  let p : @pattern.Pat[Int] = @pattern.sequence([])
   let events = p.query(span(0, 1, 1, 1))
   inspect(events.length(), content="0")
 }
 
 ///|
 test "sequence: single pattern produces 1 event compressed to full cycle" {
-  let p = sequence([Pat::pure(99)])
+  let p = @pattern.sequence([@pattern.Pat::pure(99)])
   let events = p.query(span(0, 1, 1, 1))
   inspect(events.length(), content="1")
   inspect(events[0].value, content="99")
@@ -22,7 +22,11 @@ test "sequence: single pattern produces 1 event compressed to full cycle" {
 
 ///|
 test "sequence: 3 patterns produce 3 events with correct values and thirds" {
-  let p = sequence([Pat::pure(10), Pat::pure(20), Pat::pure(30)])
+  let p = @pattern.sequence([
+    @pattern.Pat::pure(10),
+    @pattern.Pat::pure(20),
+    @pattern.Pat::pure(30),
+  ])
   let events = p.query(span(0, 1, 1, 1))
   inspect(events.length(), content="3")
   inspect(events[0].value, content="10")
@@ -51,7 +55,7 @@ test "sequence: 3 patterns produce 3 events with correct values and thirds" {
 
 ///|
 test "sequence: multi-cycle query [0, 2) doubles event count" {
-  let p = sequence([Pat::pure(1), Pat::pure(2)])
+  let p = @pattern.sequence([@pattern.Pat::pure(1), @pattern.Pat::pure(2)])
   let events = p.query(span(0, 1, 2, 1))
   // 2 events per cycle * 2 cycles = 4
   inspect(events.length(), content="4")
@@ -65,14 +69,14 @@ test "sequence: multi-cycle query [0, 2) doubles event count" {
 
 ///|
 test "stack: empty array produces silence (0 events)" {
-  let p : Pat[Int] = stack([])
+  let p : @pattern.Pat[Int] = @pattern.stack([])
   let events = p.query(span(0, 1, 1, 1))
   inspect(events.length(), content="0")
 }
 
 ///|
 test "stack: 2 patterns produce 2 events per cycle (parallel)" {
-  let p = stack([Pat::pure(1), Pat::pure(2)])
+  let p = @pattern.stack([@pattern.Pat::pure(1), @pattern.Pat::pure(2)])
   let events = p.query(span(0, 1, 1, 1))
   inspect(events.length(), content="2")
   inspect(events[0].value, content="1")
@@ -81,7 +85,11 @@ test "stack: 2 patterns produce 2 events per cycle (parallel)" {
 
 ///|
 test "stack: 3 patterns produce 3 events per cycle" {
-  let p = stack([Pat::pure(10), Pat::pure(20), Pat::pure(30)])
+  let p = @pattern.stack([
+    @pattern.Pat::pure(10),
+    @pattern.Pat::pure(20),
+    @pattern.Pat::pure(30),
+  ])
   let events = p.query(span(0, 1, 1, 1))
   inspect(events.length(), content="3")
   inspect(events[0].value, content="10")
@@ -91,8 +99,8 @@ test "stack: 3 patterns produce 3 events per cycle" {
 
 ///|
 test "every: n=1 always applies f (doubles events every cycle)" {
-  let pat = Pat::pure(42)
-  let p = every(1, fn(x) { x.fast(r(2, 1)) }, pat)
+  let pat = @pattern.Pat::pure(42)
+  let p = @pattern.every(1, fn(x) { x.fast(r(2, 1)) }, pat)
   // Cycle 0: f applied → 2 events
   let events0 = p.query(span(0, 1, 1, 1))
   inspect(events0.length(), content="2")
@@ -103,8 +111,8 @@ test "every: n=1 always applies f (doubles events every cycle)" {
 
 ///|
 test "every: n=3 applies f on cycle 0 but not on cycles 1 and 2" {
-  let pat = Pat::pure(42)
-  let p = every(3, fn(x) { x.fast(r(2, 1)) }, pat)
+  let pat = @pattern.Pat::pure(42)
+  let p = @pattern.every(3, fn(x) { x.fast(r(2, 1)) }, pat)
   // Cycle 0: f applied → 2 events
   let events0 = p.query(span(0, 1, 1, 1))
   inspect(events0.length(), content="2")
@@ -118,9 +126,9 @@ test "every: n=3 applies f on cycle 0 but not on cycles 1 and 2" {
 
 ///|
 test "every: n<=0 returns pattern unchanged" {
-  let pat = Pat::pure(42)
-  let p0 = every(0, fn(x) { x.fast(r(2, 1)) }, pat)
-  let p_neg = every(-1, fn(x) { x.fast(r(2, 1)) }, pat)
+  let pat = @pattern.Pat::pure(42)
+  let p0 = @pattern.every(0, fn(x) { x.fast(r(2, 1)) }, pat)
+  let p_neg = @pattern.every(-1, fn(x) { x.fast(r(2, 1)) }, pat)
   // Both should behave like the original pat → 1 event per cycle
   let events0 = p0.query(span(0, 1, 1, 1))
   inspect(events0.length(), content="1")
@@ -131,7 +139,11 @@ test "every: n<=0 returns pattern unchanged" {
 ///|
 test "filter_map: keeps matching events with transformed value" {
   // sequence of 3 values, filter_map keeps only even numbers doubled
-  let p = sequence([Pat::pure(2), Pat::pure(3), Pat::pure(4)])
+  let p = @pattern.sequence([
+    @pattern.Pat::pure(2),
+    @pattern.Pat::pure(3),
+    @pattern.Pat::pure(4),
+  ])
   let filtered = p.filter_map(fn(x) {
     if x % 2 == 0 {
       Some(x * 2)
@@ -148,7 +160,7 @@ test "filter_map: keeps matching events with transformed value" {
 
 ///|
 test "filter_map: removes all non-matching events" {
-  let p = Pat::pure(1)
+  let p = @pattern.Pat::pure(1)
   let filtered = p.filter_map(fn(_x) { None })
   let events = filtered.query(span(0, 1, 1, 1))
   inspect(events.length(), content="0")
@@ -156,7 +168,7 @@ test "filter_map: removes all non-matching events" {
 
 ///|
 test "filter_map: on silence returns empty" {
-  let p : Pat[Int] = Pat::silence()
+  let p : @pattern.Pat[Int] = @pattern.Pat::silence()
   let filtered = p.filter_map(fn(x) { Some(x + 1) })
   let events = filtered.query(span(0, 1, 1, 1))
   inspect(events.length(), content="0")
@@ -164,7 +176,7 @@ test "filter_map: on silence returns empty" {
 
 ///|
 test "euclid: (3,8) tresillo — 3 pulses at steps 0, 3, 6" {
-  let pat = Pat::pure(1)
+  let pat = @pattern.Pat::pure(1)
   let p = pat.euclid(3, 8)
   let events = p.query(span(0, 1, 1, 1))
   inspect(events.length(), content="3")
@@ -191,7 +203,7 @@ test "euclid: (3,8) tresillo — 3 pulses at steps 0, 3, 6" {
 
 ///|
 test "euclid: (5,8) cinquillo — 5 pulses at steps 0, 2, 3, 5, 6" {
-  let p = Pat::pure(1).euclid(5, 8)
+  let p = @pattern.Pat::pure(1).euclid(5, 8)
   let events = p.query(span(0, 1, 1, 1))
   inspect(events.length(), content="5")
   // Verify slot positions: 0, 2, 3, 5, 6 (each slot is 1/8)
@@ -229,7 +241,7 @@ test "euclid: (5,8) cinquillo — 5 pulses at steps 0, 2, 3, 5, 6" {
 
 ///|
 test "euclid: rotation=1 shifts (3,8) pulses left by one slot" {
-  let p = Pat::pure(1).euclid(3, 8, rotation=1)
+  let p = @pattern.Pat::pure(1).euclid(3, 8, rotation=1)
   let events = p.query(span(0, 1, 1, 1))
   inspect(events.length(), content="3")
   // Original tresillo: hits at 0,3,6
@@ -256,30 +268,30 @@ test "euclid: rotation=1 shifts (3,8) pulses left by one slot" {
 
 ///|
 test "euclid: k>=n produces n pulses (every slot)" {
-  let p = Pat::pure(1).euclid(8, 8)
+  let p = @pattern.Pat::pure(1).euclid(8, 8)
   inspect(p.query(span(0, 1, 1, 1)).length(), content="8")
-  let p2 = Pat::pure(1).euclid(10, 8)
+  let p2 = @pattern.Pat::pure(1).euclid(10, 8)
   inspect(p2.query(span(0, 1, 1, 1)).length(), content="8")
 }
 
 ///|
 test "euclid: k=0 or k<0 produces silence" {
-  let p0 = Pat::pure(1).euclid(0, 8)
+  let p0 = @pattern.Pat::pure(1).euclid(0, 8)
   inspect(p0.query(span(0, 1, 1, 1)).length(), content="0")
-  let pn = Pat::pure(1).euclid(-3, 8)
+  let pn = @pattern.Pat::pure(1).euclid(-3, 8)
   inspect(pn.query(span(0, 1, 1, 1)).length(), content="0")
 }
 
 ///|
 test "euclid: n<=0 produces silence" {
-  let p = Pat::pure(1).euclid(3, 0)
+  let p = @pattern.Pat::pure(1).euclid(3, 0)
   inspect(p.query(span(0, 1, 1, 1)).length(), content="0")
 }
 
 ///|
 test "euclid: rotation wraps modulo n (rotation=8 same as 0)" {
-  let pa = Pat::pure(1).euclid(3, 8)
-  let pb = Pat::pure(1).euclid(3, 8, rotation=8)
+  let pa = @pattern.Pat::pure(1).euclid(3, 8)
+  let pb = @pattern.Pat::pure(1).euclid(3, 8, rotation=8)
   let ea = pa.query(span(0, 1, 1, 1))
   let eb = pb.query(span(0, 1, 1, 1))
   inspect(ea.length() == eb.length(), content="true")
@@ -290,29 +302,39 @@ test "euclid: rotation wraps modulo n (rotation=8 same as 0)" {
 
 ///|
 test "degrade_by(0.0) keeps every event" {
-  let p = sequence([Pat::pure(1), Pat::pure(2), Pat::pure(3), Pat::pure(4)])
+  let p = @pattern.sequence([
+    @pattern.Pat::pure(1),
+    @pattern.Pat::pure(2),
+    @pattern.Pat::pure(3),
+    @pattern.Pat::pure(4),
+  ])
   let d = p.degrade_by(0.0)
   inspect(d.query(span(0, 1, 1, 1)).length(), content="4")
 }
 
 ///|
 test "degrade_by(1.0) drops every event (silence)" {
-  let p = sequence([Pat::pure(1), Pat::pure(2), Pat::pure(3), Pat::pure(4)])
+  let p = @pattern.sequence([
+    @pattern.Pat::pure(1),
+    @pattern.Pat::pure(2),
+    @pattern.Pat::pure(3),
+    @pattern.Pat::pure(4),
+  ])
   let d = p.degrade_by(1.0)
   inspect(d.query(span(0, 1, 1, 1)).length(), content="0")
 }
 
 ///|
 test "degrade_by is deterministic — same query yields same result" {
-  let p = sequence([
-    Pat::pure(1),
-    Pat::pure(2),
-    Pat::pure(3),
-    Pat::pure(4),
-    Pat::pure(5),
-    Pat::pure(6),
-    Pat::pure(7),
-    Pat::pure(8),
+  let p = @pattern.sequence([
+    @pattern.Pat::pure(1),
+    @pattern.Pat::pure(2),
+    @pattern.Pat::pure(3),
+    @pattern.Pat::pure(4),
+    @pattern.Pat::pure(5),
+    @pattern.Pat::pure(6),
+    @pattern.Pat::pure(7),
+    @pattern.Pat::pure(8),
   ])
   let d = p.degrade_by(0.5)
   let a = d.query(span(0, 1, 1, 1))
@@ -325,11 +347,11 @@ test "degrade_by is deterministic — same query yields same result" {
 
 ///|
 test "degrade_by(0.5) drops some but not all events from 32-event pattern" {
-  let pats : Array[Pat[Int]] = []
+  let pats : Array[@pattern.Pat[Int]] = []
   for i in 0..<32 {
-    pats.push(Pat::pure(i))
+    pats.push(@pattern.Pat::pure(i))
   }
-  let p = sequence(pats)
+  let p = @pattern.sequence(pats)
   let d = p.degrade_by(0.5)
   let kept = d.query(span(0, 1, 1, 1)).length()
   inspect(kept > 0 && kept < 32, content="true")
@@ -341,11 +363,11 @@ test "degrade_by: split-arc query equivalent to single full-arc query" {
   // Drop decisions must be identical whether we query [0,1) once or
   // [0,1/2) + [1/2,1). A different keying scheme (e.g. arc-begin based)
   // would diverge here.
-  let pats : Array[Pat[Int]] = []
+  let pats : Array[@pattern.Pat[Int]] = []
   for i in 0..<8 {
-    pats.push(Pat::pure(i))
+    pats.push(@pattern.Pat::pure(i))
   }
-  let p = sequence(pats).degrade_by(0.5)
+  let p = @pattern.sequence(pats).degrade_by(0.5)
   let full = p.query(span(0, 1, 1, 1))
   let first_half = p.query(span(0, 1, 1, 2))
   let second_half = p.query(span(1, 2, 1, 1))
@@ -371,8 +393,12 @@ test "every(2, rev) on sequence — cycle 0 timing reversed, cycle 1 not" {
   // Pat::rev mirrors event *timing*, not array order. So we check the
   // part.begin of the first array element: under rev cycle 0, the first
   // element's slot moves from [0, 1/3) to [2/3, 1).
-  let p = sequence([Pat::pure(36), Pat::pure(38), Pat::pure(42)])
-  let p2 = every(2, fn(x) { x.rev() }, p)
+  let p = @pattern.sequence([
+    @pattern.Pat::pure(36),
+    @pattern.Pat::pure(38),
+    @pattern.Pat::pure(42),
+  ])
+  let p2 = @pattern.every(2, fn(x) { x.rev() }, p)
   let cyc0 = p2.query(span(0, 1, 1, 1))
   inspect(cyc0.length(), content="3")
   inspect(
@@ -393,14 +419,14 @@ test "every(2, rev) on sequence — cycle 0 timing reversed, cycle 1 not" {
 
 ///|
 test "degrade_by clamps p outside [0,1]" {
-  let p = sequence([Pat::pure(1), Pat::pure(2)])
+  let p = @pattern.sequence([@pattern.Pat::pure(1), @pattern.Pat::pure(2)])
   inspect(p.degrade_by(-0.5).query(span(0, 1, 1, 1)).length(), content="2")
   inspect(p.degrade_by(2.0).query(span(0, 1, 1, 1)).length(), content="0")
 }
 
 ///|
 test "filter_map: preserves event timing (whole and part spans unchanged)" {
-  let p = Pat::pure(42)
+  let p = @pattern.Pat::pure(42)
   let filtered = p.filter_map(fn(x) { Some(x + 1) })
   let events = filtered.query(span(0, 1, 1, 1))
   inspect(events.length(), content="1")

@@ -6,7 +6,7 @@ fn gid(value : String) -> @identity.GraphNodeId {
 }
 
 ///|
-fn unwrap_graph_control(control : GraphControl?) -> GraphControl {
+fn unwrap_graph_control(control : @graph.GraphControl?) -> @graph.GraphControl {
   match control {
     Some(control) => control
     None => abort("expected graph control")
@@ -15,8 +15,8 @@ fn unwrap_graph_control(control : GraphControl?) -> GraphControl {
 
 ///|
 fn unwrap_binding_builder(
-  builder : ControlBindingBuilder?,
-) -> ControlBindingBuilder {
+  builder : @graph.ControlBindingBuilder?,
+) -> @graph.ControlBindingBuilder {
   match builder {
     Some(builder) => builder
     None => abort("expected control binding builder")
@@ -24,7 +24,7 @@ fn unwrap_binding_builder(
 }
 
 ///|
-fn unwrap_graph_node(node : DspNode?) -> DspNode {
+fn unwrap_graph_node(node : @graph.DspNode?) -> @graph.DspNode {
   match node {
     Some(node) => node
     None => abort("expected graph node")
@@ -32,11 +32,11 @@ fn unwrap_graph_node(node : DspNode?) -> DspNode {
 }
 
 ///|
-fn identity_graph_nodes() -> Array[DspNode] {
+fn identity_graph_nodes() -> Array[@graph.DspNode] {
   [
-    DspNode::oscillator(Waveform::Sine, 440.0),
-    DspNode::gain(0, 0.5),
-    DspNode::output(1),
+    @graph.DspNode::oscillator(Waveform::Sine, 440.0),
+    @graph.DspNode::gain(0, 0.5),
+    @graph.DspNode::output(1),
   ]
 }
 
@@ -46,8 +46,8 @@ fn identity_graph_ids() -> Array[@identity.GraphNodeId] {
 }
 
 ///|
-fn identity_graph_doc() -> GraphDocument {
-  GraphDocument::from_nodes(
+fn identity_graph_doc() -> @graph.GraphDocument {
+  @graph.GraphDocument::from_nodes(
     ids=identity_graph_ids(),
     nodes=identity_graph_nodes(),
   ) catch {
@@ -66,16 +66,16 @@ test "GraphDocument maps stable ids to controls, bindings, and compile" {
     None => fail("expected gain index")
   }
   let control = unwrap_graph_control(
-    index_map.set_param(gid("gain"), GraphParamSlot::Value0, 0.25),
+    index_map.set_param(gid("gain"), @graph.GraphParamSlot::Value0, 0.25),
   )
   inspect(control.node_index(), content="1")
   inspect(control.value(), content="0.25")
   let builder = unwrap_binding_builder(
     index_map.bind_control(
-      ControlBindingBuilder::new(),
+      @graph.ControlBindingBuilder::new(),
       "freq",
       gid("osc"),
-      GraphParamSlot::Value0,
+      @graph.GraphParamSlot::Value0,
     ),
   )
   match builder.build(doc.analyze()) {
@@ -89,9 +89,9 @@ test "GraphDocument maps stable ids to controls, bindings, and compile" {
 ///|
 test "GraphDocument rejects duplicate ids" {
   try
-    GraphDocument::from_nodes(ids=[gid("dup"), gid("dup")], nodes=[
-      DspNode::constant(1.0),
-      DspNode::output(0),
+    @graph.GraphDocument::from_nodes(ids=[gid("dup"), gid("dup")], nodes=[
+      @graph.DspNode::constant(1.0),
+      @graph.DspNode::output(0),
     ])
   catch {
     DuplicateNodeId(value) => inspect(value, content="dup")
@@ -104,7 +104,7 @@ test "GraphDocument rejects duplicate ids" {
 ///|
 test "GraphDocument replace and rewire preserve stable ids" {
   let doc = identity_graph_doc()
-  let replaced = doc.replace_node(gid("gain"), DspNode::gain(0, 0.25))
+  let replaced = doc.replace_node(gid("gain"), @graph.DspNode::gain(0, 0.25))
   inspect(replaced.revision().value(), content="1")
   match replaced.node_index(gid("gain")) {
     Some(index) => inspect(index, content="1")
@@ -114,7 +114,7 @@ test "GraphDocument replace and rewire preserve stable ids" {
   inspect(gain.value0(), content="0.25")
   let rewired = replaced.rewire_input(
     gid("out"),
-    GraphTopologyInputSlot::Input0,
+    @graph.GraphTopologyInputSlot::Input0,
     gid("osc"),
   )
   let output = unwrap_graph_node(rewired.node_at(gid("out")))
@@ -127,15 +127,15 @@ test "GraphDocument replace and rewire preserve stable ids" {
 
 ///|
 test "GraphDocument insert and delete compact ids without reuse" {
-  let base = GraphDocument::from_nodes(ids=[gid("osc"), gid("out")], nodes=[
-    DspNode::oscillator(Waveform::Sine, 440.0),
-    DspNode::output(0),
+  let base = @graph.GraphDocument::from_nodes(ids=[gid("osc"), gid("out")], nodes=[
+    @graph.DspNode::oscillator(Waveform::Sine, 440.0),
+    @graph.DspNode::output(0),
   ])
   let inserted = base.insert_node(
     gid("gain"),
     gid("out"),
-    GraphTopologyInputSlot::Input0,
-    DspNode::gain(0, 0.5),
+    @graph.GraphTopologyInputSlot::Input0,
+    @graph.DspNode::gain(0, 0.5),
   )
   inspect(inserted.length(), content="3")
   match inserted.node_index(gid("out")) {
@@ -151,7 +151,7 @@ test "GraphDocument insert and delete compact ids without reuse" {
   let deleted = inserted.delete_node(
     gid("gain"),
     gid("out"),
-    GraphTopologyInputSlot::Input0,
+    @graph.GraphTopologyInputSlot::Input0,
     gid("gain"),
   )
   inspect(deleted.length(), content="2")
@@ -163,8 +163,8 @@ test "GraphDocument insert and delete compact ids without reuse" {
     deleted.insert_node(
       gid("gain"),
       gid("out"),
-      GraphTopologyInputSlot::Input0,
-      DspNode::gain(0, 0.75),
+      @graph.GraphTopologyInputSlot::Input0,
+      @graph.DspNode::gain(0, 0.75),
     )
   catch {
     RetiredNodeId(value) => inspect(value, content="gain")
@@ -176,15 +176,15 @@ test "GraphDocument insert and delete compact ids without reuse" {
 
 ///|
 test "GraphDocument insert and delete chain round trips stable ids" {
-  let base = GraphDocument::from_nodes(ids=[gid("osc"), gid("out")], nodes=[
-    DspNode::oscillator(Waveform::Sine, 440.0),
-    DspNode::output(0),
+  let base = @graph.GraphDocument::from_nodes(ids=[gid("osc"), gid("out")], nodes=[
+    @graph.DspNode::oscillator(Waveform::Sine, 440.0),
+    @graph.DspNode::output(0),
   ])
   let inserted = base.insert_chain(
     [gid("gain-a"), gid("gain-b")],
     gid("out"),
-    GraphTopologyInputSlot::Input0,
-    [DspNode::gain(0, 0.5), DspNode::gain(0, 0.8)],
+    @graph.GraphTopologyInputSlot::Input0,
+    [@graph.DspNode::gain(0, 0.5), @graph.DspNode::gain(0, 0.8)],
   )
   inspect(inserted.length(), content="4")
   match inserted.node_index(gid("out")) {
@@ -209,7 +209,7 @@ test "GraphDocument insert and delete chain round trips stable ids" {
     gid("gain-a"),
     gid("gain-b"),
     gid("out"),
-    GraphTopologyInputSlot::Input0,
+    @graph.GraphTopologyInputSlot::Input0,
     gid("osc"),
   )
   inspect(deleted.length(), content="2")
@@ -227,8 +227,8 @@ test "GraphDocument insert and delete chain round trips stable ids" {
     deleted.insert_chain(
       [gid("gain-a"), gid("gain-c")],
       gid("out"),
-      GraphTopologyInputSlot::Input0,
-      [DspNode::gain(0, 0.5), DspNode::gain(0, 0.8)],
+      @graph.GraphTopologyInputSlot::Input0,
+      [@graph.DspNode::gain(0, 0.5), @graph.DspNode::gain(0, 0.8)],
     )
   catch {
     RetiredNodeId(value) => inspect(value, content="gain-a")

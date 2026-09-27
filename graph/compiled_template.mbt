@@ -54,6 +54,9 @@ pub impl Eq for AnalyzedGraph with fn equal(self, other) {
 }
 
 ///|
+pub extend AnalyzedGraph with Eq::{not_equal, equal}
+
+///|
 /// Snapshot the template and run optimize_graph once.
 ///
 /// WHY defensive copy: the caller's `template` array is mutable from

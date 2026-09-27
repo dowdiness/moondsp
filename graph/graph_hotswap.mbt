@@ -18,9 +18,15 @@ pub(all) enum HotSwapQueueError {
 } derive(Debug)
 
 ///|
+pub extend HotSwapQueueError with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 pub impl Show for HotSwapQueueError with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
+
+///|
+pub extend HotSwapQueueError with Show::{to_string, output}
 
 ///|
 fn hot_swap_queue_error_from_staging(

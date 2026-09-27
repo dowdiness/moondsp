@@ -60,6 +60,12 @@ pub enum PlaybackMode {
 } derive(Eq, Debug)
 
 ///|
+pub extend PlaybackMode with Eq::{not_equal, equal}
+
+///|
+pub extend PlaybackMode with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 pub(all) enum PlayState {
   Empty
   Ready
@@ -70,6 +76,12 @@ pub(all) enum PlayState {
 } derive(Eq, Debug)
 
 ///|
+pub extend PlayState with Eq::{not_equal, equal}
+
+///|
+pub extend PlayState with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 pub(all) enum PlayerError {
   InvalidSource(String)
   RestartRequired
@@ -77,6 +89,12 @@ pub(all) enum PlayerError {
   TransportRange
   Failed(String)
 } derive(Eq, Debug)
+
+///|
+pub extend PlayerError with Eq::{not_equal, equal}
+
+///|
+pub extend PlayerError with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
 pub struct PlayerView {

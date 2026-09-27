@@ -39,6 +39,9 @@ pub enum GraphControlError {
   InvalidParamValue(Int, @model.DspNodeKind, @model.GraphParamSlot, Double)
   MissingRuntimeState(Int, @model.DspNodeKind)
 } derive(@debug.Debug)
+pub fn GraphControlError::output(Self, &Logger) -> Unit
+pub fn GraphControlError::to_repr(Self) -> @debug.Repr
+pub fn GraphControlError::to_string(Self) -> String
 pub impl Show for GraphControlError
 
 pub struct GraphEditResult {
@@ -78,6 +81,9 @@ pub(all) enum GraphTopologyEditError {
   DeleteChainRequiresSingleConsumer(Int)
   DeleteChainConsumerMismatch(Int, Int, Int)
 } derive(@debug.Debug)
+pub fn GraphTopologyEditError::output(Self, &Logger) -> Unit
+pub fn GraphTopologyEditError::to_repr(Self) -> @debug.Repr
+pub fn GraphTopologyEditError::to_string(Self) -> String
 pub impl Show for GraphTopologyEditError
 
 pub(all) struct GraphTopologyEditFailure {
@@ -89,6 +95,9 @@ pub(all) enum GraphTopologyInputSlot {
   Input0
   Input1
 } derive(Eq, @debug.Debug)
+pub fn GraphTopologyInputSlot::equal(Self, Self) -> Bool
+pub fn GraphTopologyInputSlot::not_equal(Self, Self) -> Bool
+pub fn GraphTopologyInputSlot::to_repr(Self) -> @debug.Repr
 
 pub(all) enum GraphTopologyQueueError {
   PendingSwap
@@ -96,12 +105,18 @@ pub(all) enum GraphTopologyQueueError {
   RecompileRejected
   HotSwap(HotSwapQueueError)
 } derive(@debug.Debug)
+pub fn GraphTopologyQueueError::output(Self, &Logger) -> Unit
+pub fn GraphTopologyQueueError::to_repr(Self) -> @debug.Repr
+pub fn GraphTopologyQueueError::to_string(Self) -> String
 pub impl Show for GraphTopologyQueueError
 
 pub(all) enum HotSwapQueueError {
   SampleRateMismatch(Double, Double)
   BlockCapacityMismatch(Int, Int)
 } derive(@debug.Debug)
+pub fn HotSwapQueueError::output(Self, &Logger) -> Unit
+pub fn HotSwapQueueError::to_repr(Self) -> @debug.Repr
+pub fn HotSwapQueueError::to_string(Self) -> String
 pub impl Show for HotSwapQueueError
 
 type StereoDspHotSwap

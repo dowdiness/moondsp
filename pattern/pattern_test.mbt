@@ -1,20 +1,20 @@
 ///|
 test "silence produces 0 events" {
-  let p : Pat[Int] = Pat::silence()
+  let p : @pattern.Pat[Int] = @pattern.Pat::silence()
   let events = p.query(span(0, 1, 1, 1))
   inspect(events.length(), content="0")
 }
 
 ///|
 test "silence over multi-cycle produces 0 events" {
-  let p : Pat[Int] = Pat::silence()
+  let p : @pattern.Pat[Int] = @pattern.Pat::silence()
   let events = p.query(span(0, 1, 4, 1))
   inspect(events.length(), content="0")
 }
 
 ///|
 test "pure produces 1 event per cycle for single cycle query" {
-  let p = Pat::pure(42)
+  let p = @pattern.Pat::pure(42)
   let events = p.query(span(0, 1, 1, 1))
   inspect(events.length(), content="1")
   inspect(events[0].value, content="42")
@@ -22,7 +22,7 @@ test "pure produces 1 event per cycle for single cycle query" {
 
 ///|
 test "pure: event whole spans full cycle [0,1)" {
-  let p = Pat::pure(42)
+  let p = @pattern.Pat::pure(42)
   let events = p.query(span(0, 1, 1, 1))
   match events[0].whole {
     Some(whole) =>
@@ -38,7 +38,7 @@ test "pure: event whole spans full cycle [0,1)" {
 
 ///|
 test "pure: event part equals query arc when arc is within cycle" {
-  let p = Pat::pure(42)
+  let p = @pattern.Pat::pure(42)
   let events = p.query(span(0, 1, 1, 1))
   inspect(
     events[0].part,
@@ -50,14 +50,14 @@ test "pure: event part equals query arc when arc is within cycle" {
 
 ///|
 test "pure multi-cycle [0,3) produces 3 events" {
-  let p = Pat::pure(42)
+  let p = @pattern.Pat::pure(42)
   let events = p.query(span(0, 1, 3, 1))
   inspect(events.length(), content="3")
 }
 
 ///|
 test "pure slices part to query arc: query [1/4, 3/4)" {
-  let p = Pat::pure(42)
+  let p = @pattern.Pat::pure(42)
   let events = p.query(span(1, 4, 3, 4))
   inspect(events.length(), content="1")
   // part should be clipped to [1/4, 3/4)
@@ -82,7 +82,7 @@ test "pure slices part to query arc: query [1/4, 3/4)" {
 
 ///|
 test "pure slices part across cycle boundary: query [3/4, 5/4)" {
-  let p = Pat::pure(42)
+  let p = @pattern.Pat::pure(42)
   let events = p.query(span(3, 4, 5, 4))
   inspect(events.length(), content="2")
   // first event: part = [3/4, 1), whole = [0, 1)
@@ -103,7 +103,7 @@ test "pure slices part across cycle boundary: query [3/4, 5/4)" {
 
 ///|
 test "fast(2) produces 2 events per cycle with correct part spans" {
-  let p = Pat::pure(42).fast(r(2, 1))
+  let p = @pattern.Pat::pure(42).fast(r(2, 1))
   let events = p.query(span(0, 1, 1, 1))
   inspect(events.length(), content="2")
   // first event part: [0, 1/2)
@@ -124,7 +124,7 @@ test "fast(2) produces 2 events per cycle with correct part spans" {
 
 ///|
 test "fast(2) transforms whole correctly (half-cycle each)" {
-  let p = Pat::pure(42).fast(r(2, 1))
+  let p = @pattern.Pat::pure(42).fast(r(2, 1))
   let events = p.query(span(0, 1, 1, 1))
   inspect(events.length(), content="2")
   match events[0].whole {
@@ -151,7 +151,7 @@ test "fast(2) transforms whole correctly (half-cycle each)" {
 
 ///|
 test "slow(2) halves events: 1 event per cycle, whole spans 2 cycles" {
-  let p = Pat::pure(42).slow(r(2, 1))
+  let p = @pattern.Pat::pure(42).slow(r(2, 1))
   // Query cycle 0: the event's whole should span [0, 2)
   let events = p.query(span(0, 1, 1, 1))
   inspect(events.length(), content="1")
@@ -169,7 +169,7 @@ test "slow(2) halves events: 1 event per cycle, whole spans 2 cycles" {
 
 ///|
 test "rev of fast(2) mirrors the two events" {
-  let p = Pat::pure(42).fast(r(2, 1)).rev()
+  let p = @pattern.Pat::pure(42).fast(r(2, 1)).rev()
   let events = p.query(span(0, 1, 1, 1))
   inspect(events.length(), content="2")
   // After rev, the first event should be [1/2, 1) and second [0, 1/2)
@@ -189,14 +189,18 @@ test "rev of fast(2) mirrors the two events" {
 
 ///|
 test "fast(0) returns silence (no events)" {
-  let p = Pat::pure(42).fast(r(0, 1))
+  let p = @pattern.Pat::pure(42).fast(r(0, 1))
   let events = p.query(span(0, 1, 1, 1))
   inspect(events.length(), content="0")
 }
 
 ///|
 test "sequence([pure(1), pure(2), pure(3)]) produces 3 events at thirds" {
-  let p = sequence([Pat::pure(1), Pat::pure(2), Pat::pure(3)])
+  let p = @pattern.sequence([
+    @pattern.Pat::pure(1),
+    @pattern.Pat::pure(2),
+    @pattern.Pat::pure(3),
+  ])
   let events = p.query(span(0, 1, 1, 1))
   inspect(events.length(), content="3")
   // Event 0: value=1, part=[0, 1/3)
@@ -227,7 +231,11 @@ test "sequence([pure(1), pure(2), pure(3)]) produces 3 events at thirds" {
 
 ///|
 test "sequence with silence creates rest (2 events from 3 slots)" {
-  let p = sequence([Pat::pure(1), Pat::silence(), Pat::pure(3)])
+  let p = @pattern.sequence([
+    @pattern.Pat::pure(1),
+    @pattern.Pat::silence(),
+    @pattern.Pat::pure(3),
+  ])
   let events = p.query(span(0, 1, 1, 1))
   inspect(events.length(), content="2")
   inspect(events[0].value, content="1")
@@ -236,15 +244,15 @@ test "sequence with silence creates rest (2 events from 3 slots)" {
 
 ///|
 test "stack merges events from all patterns" {
-  let p = stack([Pat::pure(1), Pat::pure(2)])
+  let p = @pattern.stack([@pattern.Pat::pure(1), @pattern.Pat::pure(2)])
   let events = p.query(span(0, 1, 1, 1))
   inspect(events.length(), content="2")
 }
 
 ///|
 test "every(2, fast(2), pat): cycle 0 gets 2 events, cycle 1 gets 1" {
-  let pat = Pat::pure(42)
-  let p = every(2, fn(x) { x.fast(r(2, 1)) }, pat)
+  let pat = @pattern.Pat::pure(42)
+  let p = @pattern.every(2, fn(x) { x.fast(r(2, 1)) }, pat)
   // Cycle 0: every fires, so fast(2) applied → 2 events
   let events0 = p.query(span(0, 1, 1, 1))
   inspect(events0.length(), content="2")
@@ -255,7 +263,7 @@ test "every(2, fast(2), pat): cycle 0 gets 2 events, cycle 1 gets 1" {
 
 ///|
 test "empty sequence produces 0 events" {
-  let p : Pat[Int] = sequence([])
+  let p : @pattern.Pat[Int] = @pattern.sequence([])
   let events = p.query(span(0, 1, 1, 1))
   inspect(events.length(), content="0")
 }

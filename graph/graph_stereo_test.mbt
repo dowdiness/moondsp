@@ -5,11 +5,14 @@ test "compiled stereo dsp pans mono input to stereo output" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_output(1),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::pan(0, PAN_CENTER),
+    @graph.DspNode::stereo_output(1),
   ]
-  let compiled = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.StereoDsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
@@ -28,12 +31,15 @@ test "compiled stereo dsp applies stereo gain after pan" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_gain(input=1, amount=HALF_GAIN),
-    DspNode::stereo_output(2),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::pan(0, PAN_CENTER),
+    @graph.DspNode::stereo_gain(input=1, amount=HALF_GAIN),
+    @graph.DspNode::stereo_output(2),
   ]
-  let compiled = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.StereoDsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
@@ -57,12 +63,15 @@ test "compiled stereo dsp preserves constant-fed mono gain controls" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(3.0),
-    DspNode::gain(0, 0.5),
-    DspNode::pan(1, PAN_CENTER),
-    DspNode::stereo_output(2),
+    @graph.DspNode::constant(3.0),
+    @graph.DspNode::gain(0, 0.5),
+    @graph.DspNode::pan(1, PAN_CENTER),
+    @graph.DspNode::stereo_output(2),
   ]
-  let compiled = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.StereoDsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
@@ -72,7 +81,7 @@ test "compiled stereo dsp preserves constant-fed mono gain controls" {
 
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(1, GraphParamSlot::Value0, 2.0),
+      @graph.GraphControl::set_param(1, @graph.GraphParamSlot::Value0, 2.0),
     )
     is Ok(_),
   )
@@ -95,12 +104,15 @@ test "compiled stereo dsp applies stereo clip after pan" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_clip(input=1, threshold=STEREO_CLIP_THRESHOLD),
-    DspNode::stereo_output(2),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::pan(0, PAN_CENTER),
+    @graph.DspNode::stereo_clip(input=1, threshold=STEREO_CLIP_THRESHOLD),
+    @graph.DspNode::stereo_output(2),
   ]
-  let compiled = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.StereoDsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
@@ -119,17 +131,20 @@ test "compiled stereo dsp applies stereo biquad after pan" {
     block_size=LARGE_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_biquad(
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::pan(0, PAN_CENTER),
+    @graph.DspNode::stereo_biquad(
       input=1,
       mode=BiquadMode::LowPass,
       cutoff_hz=LOWPASS_CUTOFF,
       q=LOWPASS_Q,
     ),
-    DspNode::stereo_output(2),
+    @graph.DspNode::stereo_output(2),
   ]
-  let compiled = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.StereoDsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let left_output = AudioBuffer::filled(LARGE_BLOCK_SIZE)
   let right_output = AudioBuffer::filled(LARGE_BLOCK_SIZE)
 
@@ -150,14 +165,17 @@ test "compiled stereo dsp compile matches compile output" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_gain(input=1, amount=HALF_GAIN),
-    DspNode::stereo_output(2),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::pan(0, PAN_CENTER),
+    @graph.DspNode::stereo_gain(input=1, amount=HALF_GAIN),
+    @graph.DspNode::stereo_output(2),
   ]
-  let compiled = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-  let compiled_template = StereoDsp::compile(
-    AnalyzedGraph::analyze(nodes),
+  let compiled = @graph.StereoDsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
+  let compiled_template = @graph.StereoDsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
     context,
   ).unwrap()
   let left = AudioBuffer::filled(SMALL_BLOCK_SIZE)
@@ -181,16 +199,19 @@ test "compiled stereo dsp applies stereo delay after pan" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_delay(
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::pan(0, PAN_CENTER),
+    @graph.DspNode::stereo_delay(
       input=1,
       max_delay_samples=DELAY_CAPACITY,
       delay_samples=DELAY_SAMPLES,
     ),
-    DspNode::stereo_output(2),
+    @graph.DspNode::stereo_output(2),
   ]
-  let compiled = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.StereoDsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
@@ -213,17 +234,24 @@ test "compiled stereo dsp apply_control updates pan position" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_output(1),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::pan(0, PAN_CENTER),
+    @graph.DspNode::stereo_output(1),
   ]
-  let compiled = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.StereoDsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(1, GraphParamSlot::Value0, PAN_HARD_RIGHT),
+      @graph.GraphControl::set_param(
+        1,
+        @graph.GraphParamSlot::Value0,
+        PAN_HARD_RIGHT,
+      ),
     )
     is Ok(_),
   )
@@ -242,25 +270,36 @@ test "compiled stereo dsp runtime params update stereo gain and clip" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_gain(input=1, amount=UNIT_SAMPLE),
-    DspNode::stereo_clip(input=2, threshold=UNIT_SAMPLE),
-    DspNode::stereo_output(3),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::pan(0, PAN_CENTER),
+    @graph.DspNode::stereo_gain(input=1, amount=UNIT_SAMPLE),
+    @graph.DspNode::stereo_clip(input=2, threshold=UNIT_SAMPLE),
+    @graph.DspNode::stereo_output(3),
   ]
-  let compiled = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.StereoDsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(2, GraphParamSlot::Value0, HALF_GAIN),
+      @graph.GraphControl::set_param(
+        2,
+        @graph.GraphParamSlot::Value0,
+        HALF_GAIN,
+      ),
     )
     is Ok(_),
   )
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(3, GraphParamSlot::Value0, STEREO_CLIP_THRESHOLD),
+      @graph.GraphControl::set_param(
+        3,
+        @graph.GraphParamSlot::Value0,
+        STEREO_CLIP_THRESHOLD,
+      ),
     )
     is Ok(_),
   )
@@ -279,17 +318,20 @@ test "compiled stereo dsp runtime params update stereo biquad" {
     block_size=LARGE_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_biquad(
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::pan(0, PAN_CENTER),
+    @graph.DspNode::stereo_biquad(
       input=1,
       mode=BiquadMode::LowPass,
       cutoff_hz=LOWPASS_CUTOFF,
       q=LOWPASS_Q,
     ),
-    DspNode::stereo_output(2),
+    @graph.DspNode::stereo_output(2),
   ]
-  let compiled = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.StereoDsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let baseline_left = AudioBuffer::filled(LARGE_BLOCK_SIZE)
   let baseline_right = AudioBuffer::filled(LARGE_BLOCK_SIZE)
   let retuned_left = AudioBuffer::filled(LARGE_BLOCK_SIZE)
@@ -298,9 +340,9 @@ test "compiled stereo dsp runtime params update stereo biquad" {
   compiled.process(context, baseline_left, baseline_right)
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(
+      @graph.GraphControl::set_param(
         2,
-        GraphParamSlot::Value0,
+        @graph.GraphParamSlot::Value0,
         HALF_GAIN * LOWPASS_CUTOFF,
       ),
     )
@@ -308,7 +350,7 @@ test "compiled stereo dsp runtime params update stereo biquad" {
   )
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(2, GraphParamSlot::Value1, 1.2),
+      @graph.GraphControl::set_param(2, @graph.GraphParamSlot::Value1, 1.2),
     )
     is Ok(_),
   )
@@ -325,24 +367,27 @@ test "compiled stereo dsp runtime params update stereo delay" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_delay(
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::pan(0, PAN_CENTER),
+    @graph.DspNode::stereo_delay(
       input=1,
       max_delay_samples=DELAY_CAPACITY,
       delay_samples=0,
     ),
-    DspNode::stereo_output(2),
+    @graph.DspNode::stereo_output(2),
   ]
-  let compiled = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.StereoDsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(
+      @graph.GraphControl::set_param(
         2,
-        GraphParamSlot::DelaySamples,
+        @graph.GraphParamSlot::DelaySamples,
         DELAY_SAMPLES_DOUBLE,
       ),
     )
@@ -367,17 +412,23 @@ test "compiled stereo dsp runtime params update stereo delay feedback" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_delay(
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::pan(0, PAN_CENTER),
+    @graph.DspNode::stereo_delay(
       input=1,
       max_delay_samples=DELAY_CAPACITY,
       delay_samples=DELAY_SAMPLES,
     ),
-    DspNode::stereo_output(2),
+    @graph.DspNode::stereo_output(2),
   ]
-  let baseline = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-  let retuned = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let baseline = @graph.StereoDsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
+  let retuned = @graph.StereoDsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let baseline_left = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let baseline_right = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let retuned_left = AudioBuffer::filled(SMALL_BLOCK_SIZE)
@@ -387,7 +438,11 @@ test "compiled stereo dsp runtime params update stereo delay feedback" {
   retuned.process(context, retuned_left, retuned_right)
   assert_true(
     retuned.apply_control(
-      GraphControl::set_param(2, GraphParamSlot::Value0, DELAY_FEEDBACK),
+      @graph.GraphControl::set_param(
+        2,
+        @graph.GraphParamSlot::Value0,
+        DELAY_FEEDBACK,
+      ),
     )
     is Ok(_),
   )
@@ -409,18 +464,29 @@ test "compiled stereo dsp apply_controls updates pan and source together" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::pan(0, PAN_HARD_LEFT),
-    DspNode::stereo_output(1),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::pan(0, PAN_HARD_LEFT),
+    @graph.DspNode::stereo_output(1),
   ]
-  let compiled = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.StereoDsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let left_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let right_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   assert_true(
     compiled.apply_controls([
-      GraphControl::set_param(0, GraphParamSlot::Value0, HALF_GAIN),
-      GraphControl::set_param(1, GraphParamSlot::Value0, PAN_CENTER),
+      @graph.GraphControl::set_param(
+        0,
+        @graph.GraphParamSlot::Value0,
+        HALF_GAIN,
+      ),
+      @graph.GraphControl::set_param(
+        1,
+        @graph.GraphParamSlot::Value0,
+        PAN_CENTER,
+      ),
     ])
     is Ok(_),
   )
@@ -444,35 +510,50 @@ test "compiled stereo dsp rejects out-of-bounds delay_samples via set_param" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::pan(0, ZERO_SAMPLE),
-    DspNode::stereo_delay(
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::pan(0, ZERO_SAMPLE),
+    @graph.DspNode::stereo_delay(
       input=1,
       max_delay_samples=DELAY_CAPACITY,
       delay_samples=DELAY_SAMPLES,
     ),
-    DspNode::stereo_output(2),
+    @graph.DspNode::stereo_output(2),
   ]
-  let compiled = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.StereoDsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
 
   // Negative delay_samples must be rejected
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(2, GraphParamSlot::DelaySamples, -1.0),
+      @graph.GraphControl::set_param(
+        2,
+        @graph.GraphParamSlot::DelaySamples,
+        -1.0,
+      ),
     )
     is Err(_),
   )
   // Exceeding max must be rejected
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(2, GraphParamSlot::DelaySamples, 5.0),
+      @graph.GraphControl::set_param(
+        2,
+        @graph.GraphParamSlot::DelaySamples,
+        5.0,
+      ),
     )
     is Err(_),
   )
   // Valid value must be accepted
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(2, GraphParamSlot::DelaySamples, 3.0),
+      @graph.GraphControl::set_param(
+        2,
+        @graph.GraphParamSlot::DelaySamples,
+        3.0,
+      ),
     )
     is Ok(_),
   )
@@ -485,12 +566,15 @@ test "compiled dsp folds stereo graph back to mono output" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_mixdown(1),
-    DspNode::output(2),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::pan(0, PAN_CENTER),
+    @graph.DspNode::stereo_mixdown(1),
+    @graph.DspNode::output(2),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -500,7 +584,7 @@ test "compiled dsp folds stereo graph back to mono output" {
   }
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(2, GraphParamSlot::Value0, 1.0),
+      @graph.GraphControl::set_param(2, @graph.GraphParamSlot::Value0, 1.0),
     )
     is Err(_),
   )
@@ -513,25 +597,36 @@ test "compiled dsp runtime params update stereo nodes before mixdown" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_gain(input=1, amount=UNIT_SAMPLE),
-    DspNode::stereo_clip(input=2, threshold=UNIT_SAMPLE),
-    DspNode::stereo_mixdown(3),
-    DspNode::output(4),
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::pan(0, PAN_CENTER),
+    @graph.DspNode::stereo_gain(input=1, amount=UNIT_SAMPLE),
+    @graph.DspNode::stereo_clip(input=2, threshold=UNIT_SAMPLE),
+    @graph.DspNode::stereo_mixdown(3),
+    @graph.DspNode::output(4),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(2, GraphParamSlot::Value0, HALF_GAIN),
+      @graph.GraphControl::set_param(
+        2,
+        @graph.GraphParamSlot::Value0,
+        HALF_GAIN,
+      ),
     )
     is Ok(_),
   )
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(3, GraphParamSlot::Value0, STEREO_CLIP_THRESHOLD),
+      @graph.GraphControl::set_param(
+        3,
+        @graph.GraphParamSlot::Value0,
+        STEREO_CLIP_THRESHOLD,
+      ),
     )
     is Ok(_),
   )
@@ -542,8 +637,16 @@ test "compiled dsp runtime params update stereo nodes before mixdown" {
   }
   assert_true(
     compiled.apply_controls([
-      GraphControl::set_param(2, GraphParamSlot::Value0, UNIT_SAMPLE),
-      GraphControl::set_param(3, GraphParamSlot::Value0, UNIT_SAMPLE),
+      @graph.GraphControl::set_param(
+        2,
+        @graph.GraphParamSlot::Value0,
+        UNIT_SAMPLE,
+      ),
+      @graph.GraphControl::set_param(
+        3,
+        @graph.GraphParamSlot::Value0,
+        UNIT_SAMPLE,
+      ),
     ])
     is Ok(_),
   )
@@ -556,25 +659,28 @@ test "compiled dsp runtime params update stereo biquad before mixdown" {
     block_size=LARGE_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_biquad(
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::pan(0, PAN_CENTER),
+    @graph.DspNode::stereo_biquad(
       input=1,
       mode=BiquadMode::LowPass,
       cutoff_hz=LOWPASS_CUTOFF,
       q=LOWPASS_Q,
     ),
-    DspNode::stereo_mixdown(2),
-    DspNode::output(3),
+    @graph.DspNode::stereo_mixdown(2),
+    @graph.DspNode::output(3),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(LARGE_BLOCK_SIZE)
 
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(
+      @graph.GraphControl::set_param(
         2,
-        GraphParamSlot::Value0,
+        @graph.GraphParamSlot::Value0,
         HALF_GAIN * LOWPASS_CUTOFF,
       ),
     )
@@ -582,7 +688,7 @@ test "compiled dsp runtime params update stereo biquad before mixdown" {
   )
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(2, GraphParamSlot::Value1, 1.2),
+      @graph.GraphControl::set_param(2, @graph.GraphParamSlot::Value1, 1.2),
     )
     is Ok(_),
   )
@@ -600,17 +706,20 @@ test "compiled dsp applies stereo delay before mixdown" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_delay(
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::pan(0, PAN_CENTER),
+    @graph.DspNode::stereo_delay(
       input=1,
       max_delay_samples=DELAY_CAPACITY,
       delay_samples=DELAY_SAMPLES,
     ),
-    DspNode::stereo_mixdown(2),
-    DspNode::output(3),
+    @graph.DspNode::stereo_mixdown(2),
+    @graph.DspNode::output(3),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   compiled.process(context, output)
@@ -628,24 +737,27 @@ test "compiled dsp runtime params update stereo delay before mixdown" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_delay(
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::pan(0, PAN_CENTER),
+    @graph.DspNode::stereo_delay(
       input=1,
       max_delay_samples=DELAY_CAPACITY,
       delay_samples=0,
     ),
-    DspNode::stereo_mixdown(2),
-    DspNode::output(3),
+    @graph.DspNode::stereo_mixdown(2),
+    @graph.DspNode::output(3),
   ]
-  let compiled = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
   assert_true(
     compiled.apply_control(
-      GraphControl::set_param(
+      @graph.GraphControl::set_param(
         2,
-        GraphParamSlot::DelaySamples,
+        @graph.GraphParamSlot::DelaySamples,
         DELAY_SAMPLES_DOUBLE,
       ),
     )
@@ -666,18 +778,24 @@ test "compiled dsp runtime params update stereo delay feedback before mixdown" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(UNIT_SAMPLE),
-    DspNode::pan(0, PAN_CENTER),
-    DspNode::stereo_delay(
+    @graph.DspNode::constant(UNIT_SAMPLE),
+    @graph.DspNode::pan(0, PAN_CENTER),
+    @graph.DspNode::stereo_delay(
       input=1,
       max_delay_samples=DELAY_CAPACITY,
       delay_samples=DELAY_SAMPLES,
     ),
-    DspNode::stereo_mixdown(2),
-    DspNode::output(3),
+    @graph.DspNode::stereo_mixdown(2),
+    @graph.DspNode::output(3),
   ]
-  let baseline = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
-  let retuned = Dsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let baseline = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
+  let retuned = @graph.Dsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let baseline_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let retuned_output = AudioBuffer::filled(SMALL_BLOCK_SIZE)
 
@@ -685,7 +803,11 @@ test "compiled dsp runtime params update stereo delay feedback before mixdown" {
   retuned.process(context, retuned_output)
   assert_true(
     retuned.apply_control(
-      GraphControl::set_param(2, GraphParamSlot::Value0, DELAY_FEEDBACK),
+      @graph.GraphControl::set_param(
+        2,
+        @graph.GraphParamSlot::Value0,
+        DELAY_FEEDBACK,
+      ),
     )
     is Ok(_),
   )
@@ -711,11 +833,14 @@ test "stereo process: clean graph has zero sanitized count" {
     block_size=SMALL_BLOCK_SIZE,
   )
   let nodes = [
-    DspNode::constant(1.0),
-    DspNode::pan(0, 0.0),
-    DspNode::stereo_output(1),
+    @graph.DspNode::constant(1.0),
+    @graph.DspNode::pan(0, 0.0),
+    @graph.DspNode::stereo_output(1),
   ]
-  let compiled = StereoDsp::compile(AnalyzedGraph::analyze(nodes), context).unwrap()
+  let compiled = @graph.StereoDsp::compile(
+    @graph.AnalyzedGraph::analyze(nodes),
+    context,
+  ).unwrap()
   let left = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   let right = AudioBuffer::filled(SMALL_BLOCK_SIZE)
   compiled.process(context, left, right)

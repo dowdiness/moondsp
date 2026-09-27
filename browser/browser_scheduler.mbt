@@ -9,6 +9,12 @@ pub(all) enum PlaybackMode {
 } derive(Eq, Debug)
 
 ///|
+pub extend PlaybackMode with Eq::{not_equal, equal}
+
+///|
+pub extend PlaybackMode with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 pub fn init_scheduler_graph(sample_rate : Double, block_size : Int) -> Bool {
   @playback_host.init_scheduler_graph_with_templates(
     sample_rate,

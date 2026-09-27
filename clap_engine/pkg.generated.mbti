@@ -29,6 +29,11 @@ pub(all) enum ClapEngineError {
   InvalidMaxVoices
   PoolInitFailed(@voice.BoundVoicePoolError)
 } derive(Eq, @debug.Debug)
+pub fn ClapEngineError::equal(Self, Self) -> Bool
+pub fn ClapEngineError::not_equal(Self, Self) -> Bool
+pub fn ClapEngineError::output(Self, &Logger) -> Unit
+pub fn ClapEngineError::to_repr(Self) -> @debug.Repr
+pub fn ClapEngineError::to_string(Self) -> String
 pub impl Show for ClapEngineError
 
 pub struct ClapSynthEngine {

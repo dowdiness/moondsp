@@ -1,11 +1,11 @@
 ///|
 test "biquad rejects invalid parameters and writes silence" {
-  let biquad = Biquad::new()
-  let context = DspContext::new(sample_rate=48000.0, block_size=4)
-  let buffer = AudioBuffer::filled(4, init=1.0)
+  let biquad = @dsp.Biquad::new()
+  let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=4)
+  let buffer = @dsp.AudioBuffer::filled(4, init=1.0)
 
   @debug.assert_eq(
-    biquad.update(context, BiquadMode::LowPass, 0.0, 0.707),
+    biquad.update(context, @dsp.BiquadMode::LowPass, 0.0, 0.707),
     false,
   )
 
@@ -16,11 +16,11 @@ test "biquad rejects invalid parameters and writes silence" {
 
 ///|
 test "low-pass filter smooths a step input" {
-  let biquad = Biquad::new()
-  let context = DspContext::new(sample_rate=48000.0, block_size=8)
-  let buffer = AudioBuffer::filled(8, init=1.0)
+  let biquad = @dsp.Biquad::new()
+  let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=8)
+  let buffer = @dsp.AudioBuffer::filled(8, init=1.0)
 
-  assert_true(biquad.update(context, BiquadMode::LowPass, 1000.0, 0.707))
+  assert_true(biquad.update(context, @dsp.BiquadMode::LowPass, 1000.0, 0.707))
 
   biquad.process(context, buffer)
 
@@ -33,12 +33,12 @@ test "low-pass filter smooths a step input" {
 
 ///|
 test "high-pass filter attenuates dc across successive blocks" {
-  let biquad = Biquad::new()
-  let context = DspContext::new(sample_rate=48000.0, block_size=64)
-  let first = AudioBuffer::filled(64, init=1.0)
-  let second = AudioBuffer::filled(64, init=1.0)
+  let biquad = @dsp.Biquad::new()
+  let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=64)
+  let first = @dsp.AudioBuffer::filled(64, init=1.0)
+  let second = @dsp.AudioBuffer::filled(64, init=1.0)
 
-  assert_true(biquad.update(context, BiquadMode::HighPass, 4000.0, 0.707))
+  assert_true(biquad.update(context, @dsp.BiquadMode::HighPass, 4000.0, 0.707))
 
   biquad.process(context, first)
   biquad.process(context, second)
@@ -48,12 +48,12 @@ test "high-pass filter attenuates dc across successive blocks" {
 
 ///|
 test "band-pass filter rejects dc input" {
-  let biquad = Biquad::new()
-  let context = DspContext::new(sample_rate=48000.0, block_size=64)
-  let first = AudioBuffer::filled(64, init=1.0)
-  let second = AudioBuffer::filled(64, init=1.0)
+  let biquad = @dsp.Biquad::new()
+  let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=64)
+  let first = @dsp.AudioBuffer::filled(64, init=1.0)
+  let second = @dsp.AudioBuffer::filled(64, init=1.0)
 
-  assert_true(biquad.update(context, BiquadMode::BandPass, 4000.0, 0.707))
+  assert_true(biquad.update(context, @dsp.BiquadMode::BandPass, 4000.0, 0.707))
 
   biquad.process(context, first)
   biquad.process(context, second)
@@ -63,11 +63,11 @@ test "band-pass filter rejects dc input" {
 
 ///|
 test "biquad respects context block size" {
-  let biquad = Biquad::new()
-  let context = DspContext::new(sample_rate=48000.0, block_size=2)
-  let buffer = AudioBuffer::filled(4, init=1.0)
+  let biquad = @dsp.Biquad::new()
+  let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=2)
+  let buffer = @dsp.AudioBuffer::filled(4, init=1.0)
 
-  assert_true(biquad.update(context, BiquadMode::LowPass, 1000.0, 0.707))
+  assert_true(biquad.update(context, @dsp.BiquadMode::LowPass, 1000.0, 0.707))
 
   biquad.process(context, buffer)
 

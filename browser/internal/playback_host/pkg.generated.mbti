@@ -65,12 +65,18 @@ pub(all) enum PlayState {
   Ended
   Fault
 } derive(Eq, @debug.Debug)
+pub fn PlayState::equal(Self, Self) -> Bool
+pub fn PlayState::not_equal(Self, Self) -> Bool
+pub fn PlayState::to_repr(Self) -> @debug.Repr
 
 pub enum PlaybackMode {
   None
   Pattern
   Song
 } derive(Eq, @debug.Debug)
+pub fn PlaybackMode::equal(Self, Self) -> Bool
+pub fn PlaybackMode::not_equal(Self, Self) -> Bool
+pub fn PlaybackMode::to_repr(Self) -> @debug.Repr
 
 pub struct Player {
   // private fields
@@ -88,6 +94,9 @@ pub(all) enum PlayerError {
   TransportRange
   Failed(String)
 } derive(Eq, @debug.Debug)
+pub fn PlayerError::equal(Self, Self) -> Bool
+pub fn PlayerError::not_equal(Self, Self) -> Bool
+pub fn PlayerError::to_repr(Self) -> @debug.Repr
 
 pub struct PlayerView {
   state : PlayState

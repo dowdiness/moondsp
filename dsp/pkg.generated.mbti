@@ -76,6 +76,8 @@ pub(all) enum BiquadMode {
   HighPass
   BandPass
 } derive(Eq)
+pub fn BiquadMode::equal(Self, Self) -> Bool
+pub fn BiquadMode::not_equal(Self, Self) -> Bool
 
 pub struct Clip {
 }
@@ -122,6 +124,8 @@ pub enum EnvStage {
   Sustain
   Release
 } derive(Eq)
+pub fn EnvStage::equal(Self, Self) -> Bool
+pub fn EnvStage::not_equal(Self, Self) -> Bool
 
 pub struct Gain {
 }
@@ -139,6 +143,7 @@ pub struct Mono {
 }
 #alias(new)
 pub fn Mono::Mono() -> Self
+pub fn Mono::channel_count(Self) -> Int
 pub impl ChannelSpec for Mono
 
 pub struct Noise {
@@ -189,6 +194,7 @@ pub struct Stereo {
 }
 #alias(new)
 pub fn Stereo::Stereo() -> Self
+pub fn Stereo::channel_count(Self) -> Int
 pub impl ChannelSpec for Stereo
 
 pub struct StereoReverb {
@@ -204,6 +210,8 @@ pub(all) enum Waveform {
   Square
   Triangle
 } derive(Eq)
+pub fn Waveform::equal(Self, Self) -> Bool
+pub fn Waveform::not_equal(Self, Self) -> Bool
 
 // Type aliases
 

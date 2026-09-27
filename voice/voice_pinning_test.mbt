@@ -26,14 +26,14 @@ fn pr2_a2_closure(
   nodes : Array[DspNode],
   ctx : DspContext,
   max_voices : Int,
-) -> Result[VoicePool, A2Reason] {
-  VoicePool::new(@graph.AnalyzedGraph::analyze(nodes), ctx, max_voices~).map_err(fn(
+) -> Result[@voice.VoicePool, A2Reason] {
+  @voice.VoicePool::new(@graph.AnalyzedGraph::analyze(nodes), ctx, max_voices~).map_err(fn(
       e,
     ) {
       match e {
-        VoicePoolError::InvalidMaxVoices => A2Reason::InvalidMaxVoices
-        VoicePoolError::OrphanAdsr => A2Reason::OrphanAdsr
-        VoicePoolError::CompileRejected => A2Reason::CompileRejected
+        @voice.VoicePoolError::InvalidMaxVoices => A2Reason::InvalidMaxVoices
+        @voice.VoicePoolError::OrphanAdsr => A2Reason::OrphanAdsr
+        @voice.VoicePoolError::CompileRejected => A2Reason::CompileRejected
       }
     },
   )
@@ -42,18 +42,20 @@ fn pr2_a2_closure(
 ///|
 /// PR-3 A3 closure: direct call to the new Result-returning VoicePool::set_template.
 fn pr2_a3_closure(
-  pool : VoicePool,
+  pool : @voice.VoicePool,
   nodes : Array[DspNode],
 ) -> Result[Unit, A3Reason] {
-  match VoicePool::set_template(pool, @graph.AnalyzedGraph::analyze(nodes)) {
+  match
+    @voice.VoicePool::set_template(pool, @graph.AnalyzedGraph::analyze(nodes)) {
     Ok(_) => Ok(())
-    Err(VoicePoolError::OrphanAdsr) => Err(A3Reason::OrphanAdsr)
-    Err(VoicePoolError::CompileRejected) => Err(A3Reason::CompileRejected)
+    Err(@voice.VoicePoolError::OrphanAdsr) => Err(A3Reason::OrphanAdsr)
+    Err(@voice.VoicePoolError::CompileRejected) =>
+      Err(A3Reason::CompileRejected)
     // set_template doesn't accept max_voices, so InvalidMaxVoices must
     // never appear here. abort() catches a future regression where the
     // validation chain leaks an InvalidMaxVoices through, instead of
     // silently remapping it to CompileRejected and hiding the bug.
-    Err(VoicePoolError::InvalidMaxVoices) =>
+    Err(@voice.VoicePoolError::InvalidMaxVoices) =>
       abort("unexpected InvalidMaxVoices from VoicePool::set_template")
   }
 }
@@ -127,7 +129,7 @@ test "A3: well-formed replacement succeeds" {
     DspNode::output(0),
   ]
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
-  let pool = VoicePool::new(
+  let pool = @voice.VoicePool::new(
     @graph.AnalyzedGraph::analyze(nodes),
     ctx,
     max_voices=4,
@@ -147,7 +149,7 @@ test "A3: orphan ADSR replacement fails with OrphanAdsr" {
     DspNode::output(0),
   ]
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
-  let pool = VoicePool::new(
+  let pool = @voice.VoicePool::new(
     @graph.AnalyzedGraph::analyze(nodes),
     ctx,
     max_voices=4,
@@ -168,7 +170,7 @@ test "A3: missing Output replacement fails with CompileRejected" {
     DspNode::output(0),
   ]
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
-  let pool = VoicePool::new(
+  let pool = @voice.VoicePool::new(
     @graph.AnalyzedGraph::analyze(nodes),
     ctx,
     max_voices=4,
@@ -189,8 +191,13 @@ fn pr2_a4_closure(
   ctx : DspContext,
   builder : ControlBindingBuilder,
   max_voices : Int,
-) -> Result[BoundVoicePool, BoundVoicePoolError] {
-  BoundVoicePool::new(AnalyzedGraph::analyze(nodes), ctx, builder, max_voices~)
+) -> Result[@voice.BoundVoicePool, @voice.BoundVoicePoolError] {
+  @voice.BoundVoicePool::new(
+    AnalyzedGraph::analyze(nodes),
+    ctx,
+    builder,
+    max_voices~,
+  )
 }
 
 ///|
@@ -218,7 +225,7 @@ test "A4: max_voices=0 fails with InvalidMaxVoices" {
   let result = pr2_a4_closure(nodes, ctx, builder, 0)
   match result {
     Err(reason) =>
-      @debug.assert_eq(reason, BoundVoicePoolError::InvalidMaxVoices)
+      @debug.assert_eq(reason, @voice.BoundVoicePoolError::InvalidMaxVoices)
     Ok(_) => fail("expected Err(InvalidMaxVoices), got Ok")
   }
 }
@@ -235,7 +242,8 @@ test "A4: orphan ADSR fails with OrphanAdsr" {
   let builder = ControlBindingBuilder::new()
   let result = pr2_a4_closure(nodes, ctx, builder, 4)
   match result {
-    Err(reason) => @debug.assert_eq(reason, BoundVoicePoolError::OrphanAdsr)
+    Err(reason) =>
+      @debug.assert_eq(reason, @voice.BoundVoicePoolError::OrphanAdsr)
     Ok(_) => fail("expected Err(OrphanAdsr), got Ok")
   }
 }
@@ -249,7 +257,7 @@ test "A4: missing Output fails with CompileRejected" {
   let result = pr2_a4_closure(nodes, ctx, builder, 4)
   match result {
     Err(reason) =>
-      @debug.assert_eq(reason, BoundVoicePoolError::CompileRejected)
+      @debug.assert_eq(reason, @voice.BoundVoicePoolError::CompileRejected)
     Ok(_) => fail("expected Err(CompileRejected), got Ok")
   }
 }

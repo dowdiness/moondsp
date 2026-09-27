@@ -20,6 +20,7 @@ pub suberror GraphEngineError {
   BufferSizeMismatch(expected~ : Int, actual~ : Int)
   ControlRejected(@graph.GraphControlError)
 } derive(@debug.Debug)
+pub fn GraphEngineError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
 pub struct GraphEngine {

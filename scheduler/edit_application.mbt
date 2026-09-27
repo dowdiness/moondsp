@@ -11,6 +11,14 @@ pub struct ActiveVoiceEffectOutcome {
 } derive(Eq, Debug)
 
 ///|
+pub extend ActiveVoiceEffectOutcome with Eq::{not_equal, equal}
+
+///|
+pub extend ActiveVoiceEffectOutcome with @moonbitlang/core/debug.Debug::{
+  to_repr,
+}
+
+///|
 pub fn PatternScheduler::queue_pattern_snapshot_effect_result(
   self : PatternScheduler,
   snapshot : @pattern.PatternSnapshot[@pattern.ControlMap],

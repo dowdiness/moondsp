@@ -6,11 +6,23 @@ pub(all) suberror TransportError {
 } derive(Eq, Debug)
 
 ///|
+pub extend TransportError with Eq::{not_equal, equal}
+
+///|
+pub extend TransportError with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 /// Exact millibeats per minute, rounded to nearest (ties upward) on input.
 /// Supported range: 0.001 through 1000 BPM.
 pub struct Tempo {
   priv milli : Int64
 } derive(Eq, Debug)
+
+///|
+pub extend Tempo with Eq::{not_equal, equal}
+
+///|
+pub extend Tempo with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
 pub fn Tempo::from_bpm(bpm : Double) -> Result[Tempo, TransportError] {
@@ -35,6 +47,12 @@ pub struct Clock {
   priv scale : Int64
   priv tempo : Tempo
 } derive(Eq, Debug)
+
+///|
+pub extend Clock with Eq::{not_equal, equal}
+
+///|
+pub extend Clock with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
 pub fn Clock::at_start(
