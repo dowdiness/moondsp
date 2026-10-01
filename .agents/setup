@@ -26,24 +26,24 @@ step 'Install root npm dependencies' npm ci --no-audit --no-fund
 step 'Install live editor npm dependencies' npm --prefix web/live ci --no-audit --no-fund
 step 'Pack browser library for the synth example' env NEW_MOON_MOD=0 npm run pack:browser
 # The generated tarball changes integrity with the local MoonBit toolchain;
-# keep the committed example lockfile untouched.
-step 'Install synth example npm dependencies' npm --prefix examples/basic-synth install --no-save --package-lock=false --no-audit --no-fund
+# read the committed lockfile for registry packages without rewriting it.
+step 'Install synth example npm dependencies' bash -c 'cd examples/basic-synth && npm install ../../packages/browser/moondsp-browser-0.6.0.tgz --no-save --no-audit --no-fund'
 
 # Playwright's ZIP extractor can stall in this orb; system unzip extracts the
 # same archive quickly. Only the headless shell is needed by the test suites.
-browser="$(node -p "JSON.stringify(require('./node_modules/playwright-core/browsers.json').browsers.find(b => b.name === 'chromium-headless-shell'))")"
-revision="$(node -p "JSON.parse(process.argv[1]).revision" "$browser")"
-version="$(node -p "JSON.parse(process.argv[1]).browserVersion" "$browser")"
-browser_dir="$HOME/.cache/ms-playwright/chromium_headless_shell-$revision"
-if [[ ! -x "$browser_dir/chrome-headless-shell-linux64/chrome-headless-shell" || ! -f "$browser_dir/INSTALLATION_COMPLETE" ]]; then
-  echo '── Install Playwright headless Chromium ──'
-  archive="$(mktemp)"
-  trap 'rm -f "$archive"' EXIT
-  time curl -fsSL "https://cdn.playwright.dev/builds/cft/$version/linux64/chrome-headless-shell-linux64.zip" -o "$archive"
-  mkdir -p "$browser_dir"
-  time unzip -qo "$archive" -d "$browser_dir"
-  chmod +x "$browser_dir/chrome-headless-shell-linux64/chrome-headless-shell"
-  touch "$browser_dir/INSTALLATION_COMPLETE"
-  rm -f "$archive"
-  trap - EXIT
-fi
+for manifest in ./node_modules/playwright-core/browsers.json ./web/live/node_modules/playwright-core/browsers.json; do
+  read -r revision version < <(node -e "const b = require(process.argv[1]).browsers.find(b => b.name === 'chromium-headless-shell'); console.log(b.revision, b.browserVersion)" "$PWD/$manifest")
+  browser_dir="$HOME/.cache/ms-playwright/chromium_headless_shell-$revision"
+  if [[ ! -x "$browser_dir/chrome-headless-shell-linux64/chrome-headless-shell" || ! -f "$browser_dir/INSTALLATION_COMPLETE" ]]; then
+    echo "── Install Playwright headless Chromium $revision ──"
+    archive="$(mktemp)"
+    trap 'rm -f "$archive"' EXIT
+    time curl -fsSL "https://cdn.playwright.dev/builds/cft/$version/linux64/chrome-headless-shell-linux64.zip" -o "$archive"
+    mkdir -p "$browser_dir"
+    time unzip -qo "$archive" -d "$browser_dir"
+    chmod +x "$browser_dir/chrome-headless-shell-linux64/chrome-headless-shell"
+    touch "$browser_dir/INSTALLATION_COMPLETE"
+    rm -f "$archive"
+    trap - EXIT
+  fi
+done
