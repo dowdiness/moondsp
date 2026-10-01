@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+step() {
+  echo "── $1 ──"
+  shift
+  time "$@"
+}
+
+if [[ ! -x "$HOME/.moon/bin/moon" ]]; then
+  step 'Install MoonBit' bash -c 'set -euo pipefail; curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash'
+fi
+export PATH="$HOME/.moon/bin:$PATH"
+
+# Amp and supervised services start in new, non-interactive login shells.
+profile_line='export PATH="$HOME/.moon/bin:$PATH" # moondsp MoonBit'
+if ! grep -Fqx "$profile_line" "$HOME/.bash_profile" 2>/dev/null; then
+  printf '\n%s\n' "$profile_line" >> "$HOME/.bash_profile"
+fi
+
+step 'Refresh MoonBit registry' env NEW_MOON_MOD=0 moon update
+step 'Fetch and check MoonBit dependencies' env NEW_MOON_MOD=0 moon check
+step 'Install root npm dependencies' npm ci --no-audit --no-fund
+step 'Install live editor npm dependencies' npm --prefix web/live ci --no-audit --no-fund
+step 'Pack browser library for the synth example' env NEW_MOON_MOD=0 npm run pack:browser
+# The generated tarball changes integrity with the local MoonBit toolchain;
+# keep the committed example lockfile untouched.
+step 'Install synth example npm dependencies' npm --prefix examples/basic-synth install --no-save --package-lock=false --no-audit --no-fund
+
+# Playwright's ZIP extractor can stall in this orb; system unzip extracts the
+# same archive quickly. Only the headless shell is needed by the test suites.
+browser="$(node -p "JSON.stringify(require('./node_modules/playwright-core/browsers.json').browsers.find(b => b.name === 'chromium-headless-shell'))")"
+revision="$(node -p "JSON.parse(process.argv[1]).revision" "$browser")"
+version="$(node -p "JSON.parse(process.argv[1]).browserVersion" "$browser")"
+browser_dir="$HOME/.cache/ms-playwright/chromium_headless_shell-$revision"
+if [[ ! -x "$browser_dir/chrome-headless-shell-linux64/chrome-headless-shell" || ! -f "$browser_dir/INSTALLATION_COMPLETE" ]]; then
+  echo '── Install Playwright headless Chromium ──'
+  archive="$(mktemp)"
+  trap 'rm -f "$archive"' EXIT
+  time curl -fsSL "https://cdn.playwright.dev/builds/cft/$version/linux64/chrome-headless-shell-linux64.zip" -o "$archive"
+  mkdir -p "$browser_dir"
+  time unzip -qo "$archive" -d "$browser_dir"
+  chmod +x "$browser_dir/chrome-headless-shell-linux64/chrome-headless-shell"
+  touch "$browser_dir/INSTALLATION_COMPLETE"
+  rm -f "$archive"
+  trap - EXIT
+fi

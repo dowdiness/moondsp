@@ -21,3 +21,4 @@ web/audio-power-core.js
 !.dev.vars.example
 .env*
 !.env.example
+.amp/portals/*

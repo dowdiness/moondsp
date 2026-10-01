@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# No per-orb authentication or long-lived services are required on wake.
