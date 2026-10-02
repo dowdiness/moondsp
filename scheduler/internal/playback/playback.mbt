@@ -143,6 +143,8 @@ priv struct PlaybackRun {
   snapshot : PlaybackSnapshot
   entries : Array[EntryState]
   cycle : Int64
+  loop_cycle : Int64
+  loop_entries : Array[EntryState]?
 }
 
 ///|
@@ -150,19 +152,111 @@ fn PlaybackRun::PlaybackRun(
   snapshot : PlaybackSnapshot,
   entries : Array[EntryState],
   cycle : Int64,
+  loop_cycle : Int64,
+  loop_entries : Array[EntryState]?,
 ) -> PlaybackRun {
-  { snapshot, entries, cycle, }
+  { snapshot, entries, cycle, loop_cycle, loop_entries, }
 }
 
 ///|
 pub struct PlaybackState {
   priv mut running : PlaybackRun?
   priv mut pending : PlaybackSnapshot?
+  priv mut song_loop : (@pattern.Rational, @pattern.Rational)?
 }
 
 ///|
 pub fn PlaybackState::PlaybackState() -> PlaybackState {
-  { running: None, pending: None, }
+  { running: None, pending: None, song_loop: None, }
+}
+
+///|
+pub fn PlaybackState::can_set_song_loop(
+  self : PlaybackState,
+  begin : @pattern.Rational,
+  end_ : @pattern.Rational,
+) -> Bool {
+  guard begin >= @pattern.Rational::from_int(0) && begin < end_ else {
+    return false
+  }
+  guard self.running is Some(run) else { return false }
+  guard run.snapshot is (Song(snapshot) | RepeatSong(snapshot)) else {
+    return false
+  }
+  end_ <= snapshot.song().duration()
+}
+
+///|
+pub fn PlaybackState::can_seek_song(
+  self : PlaybackState,
+  position : @pattern.Rational,
+) -> Bool {
+  guard self.running is Some(run) else { return false }
+  guard run.snapshot is (Song(snapshot) | RepeatSong(snapshot)) else {
+    return false
+  }
+  position >= @pattern.Rational::from_int(0) &&
+  position < snapshot.song().duration()
+}
+
+///|
+/// Change the accepted song's half-open repeat range without replacing its
+/// accepted material. The caller must validate all routes before applying it.
+pub fn PlaybackState::set_song_loop(
+  self : PlaybackState,
+  begin : @pattern.Rational,
+  end_ : @pattern.Rational,
+) -> Bool {
+  guard begin >= @pattern.Rational::from_int(0) && begin < end_ else {
+    return false
+  }
+  guard self.running is Some(run) else { return false }
+  guard run.snapshot is (Song(snapshot) | RepeatSong(snapshot)) else {
+    return false
+  }
+  guard end_ <= snapshot.song().duration() else { return false }
+  let loop_entries = run.snapshot.start_entries()
+  let cycle = run.snapshot.cycle_at(begin)
+  self.running = Some(
+    PlaybackRun(
+      run.snapshot,
+      settle_entries(loop_entries, begin - run.snapshot.offset_at(cycle)),
+      cycle,
+      0L,
+      Some(loop_entries),
+    ),
+  )
+  self.song_loop = Some((begin, end_))
+  true
+}
+
+///|
+pub fn PlaybackState::clear_song_loop(self : PlaybackState) -> Unit {
+  self.song_loop = None
+}
+
+///|
+/// Restore accepted material on a validated seek, including after a finite
+/// occurrence has already been consumed. The transport owner resets voices.
+pub fn PlaybackState::seek_song(
+  self : PlaybackState,
+  position : @pattern.Rational,
+) -> Unit {
+  guard self.running is Some(run) else { return }
+  let cycle = run.snapshot.cycle_at(position)
+  self.running = Some(
+    PlaybackRun(
+      run.snapshot,
+      settle_entries(
+        run.snapshot.start_entries(),
+        position - run.snapshot.offset_at(cycle),
+      ),
+      cycle,
+      0L,
+      None,
+    ),
+  )
+  self.song_loop = None
 }
 
 ///|
@@ -186,9 +280,26 @@ pub fn PlaybackState::commit_pending(
   self : PlaybackState,
   now : @pattern.Rational,
 ) -> Unit {
+  let (now, loop_cycle) = match self.song_loop {
+    None => (now, 0L)
+    Some((begin, end_)) =>
+      if now < begin {
+        (begin, 0L)
+      } else {
+        let duration = end_ - begin
+        let elapsed = now - begin
+        let cycle = (elapsed / duration).floor()
+        (begin + elapsed - duration * @pattern.Rational::new(cycle, 1L), cycle)
+      }
+  }
   let running = self.running.map(run => {
     let cycle = run.snapshot.cycle_at(now)
-    let entries = if cycle != run.cycle {
+    let entries = if loop_cycle != run.loop_cycle {
+      match run.loop_entries {
+        Some(entries) => entries
+        None => run.snapshot.start_entries()
+      }
+    } else if cycle != run.cycle {
       run.snapshot.start_entries()
     } else {
       run.entries
@@ -197,6 +308,8 @@ pub fn PlaybackState::commit_pending(
       run.snapshot,
       settle_entries(entries, now - run.snapshot.offset_at(cycle)),
       cycle,
+      loop_cycle,
+      run.loop_entries,
     )
   })
   self.running = match self.pending {
@@ -208,7 +321,19 @@ pub fn PlaybackState::commit_pending(
         None => snapshot.start_entries()
         Some(run) => snapshot.reconcile_entries(run.entries, local_now)
       }
-      Some(PlaybackRun(snapshot, settle_entries(entries, local_now), cycle))
+      let loop_entries = match self.song_loop {
+        Some(_) => Some(snapshot.start_entries())
+        None => None
+      }
+      Some(
+        PlaybackRun(
+          snapshot,
+          settle_entries(entries, local_now),
+          cycle,
+          loop_cycle,
+          loop_entries,
+        ),
+      )
     }
   }
   self.pending = None
@@ -226,6 +351,7 @@ pub fn PlaybackState::prepare_acceptance(
 ) -> PlaybackState? {
   guard snapshot.material_count() <= material_limit else { return None }
   let proposed = PlaybackState()
+  proposed.song_loop = if restart { None } else { self.song_loop }
   proposed.running = if restart { None } else { self.running }
   proposed.pending = Some(snapshot)
   proposed.commit_pending(now)
@@ -243,12 +369,14 @@ pub fn PlaybackState::install_acceptance(
 ) -> Unit {
   self.running = proposed.running
   self.pending = proposed.pending
+  self.song_loop = proposed.song_loop
 }
 
 ///|
 pub fn PlaybackState::reset(self : PlaybackState) -> Unit {
   self.running = None
   self.pending = None
+  self.song_loop = None
 }
 
 ///|
@@ -322,15 +450,70 @@ fn[A] PlaybackRun::query(
 }
 
 ///|
+fn[A] PlaybackState::query(
+  self : PlaybackState,
+  arc : @pattern.TimeSpan,
+  query : (Array[EntryState], @pattern.TimeSpan) -> Array[A],
+  shift : (A, @pattern.Rational) -> A,
+) -> Array[A] {
+  match self.running {
+    None => []
+    Some(run) =>
+      match self.song_loop {
+        None => run.query(arc, query, shift)
+        Some((begin, end_)) => {
+          let duration = end_ - begin
+          let mut result : Array[A]? = None
+          let mut cursor = if arc.begin < begin { begin } else { arc.begin }
+          while cursor < arc.end_ {
+            let elapsed = cursor - begin
+            let cycle = (elapsed / duration).floor()
+            let source_begin = begin +
+              elapsed -
+              duration * @pattern.Rational::new(cycle, 1L)
+            let available = end_ - source_begin
+            let remaining = arc.end_ - cursor
+            let span = if available < remaining { available } else { remaining }
+            let source_end = source_begin + span
+            let wall_offset = cursor - source_begin
+            let entries = if cycle == run.loop_cycle {
+              run.entries
+            } else {
+              match run.loop_entries {
+                Some(entries) => entries
+                None => run.snapshot.start_entries()
+              }
+            }
+            let events = query(
+              entries,
+              @pattern.TimeSpan::new(source_begin, source_end),
+            )
+            if wall_offset != @pattern.Rational::from_int(0) {
+              for index in 0..<events.length() {
+                events[index] = shift(events[index], wall_offset)
+              }
+            }
+            match result {
+              Some(combined) =>
+                for value in events {
+                  combined.push(value)
+                }
+              None => result = Some(events)
+            }
+            cursor = cursor + span
+          }
+          result.unwrap_or([])
+        }
+      }
+  }
+}
+
+///|
 pub fn PlaybackState::query_active_events(
   self : PlaybackState,
   arc : @pattern.TimeSpan,
 ) -> Array[@pattern.Event[@pattern.ControlMap]] {
-  match self.running {
-    None => []
-    Some(run) =>
-      run.query(arc, query_entries, (event, offset) => event.shift(offset))
-  }
+  self.query(arc, query_entries, (event, offset) => event.shift(offset))
 }
 
 ///|
@@ -338,15 +521,11 @@ pub fn PlaybackState::query_active_sourced_events(
   self : PlaybackState,
   arc : @pattern.TimeSpan,
 ) -> Array[PlaybackSourcedEvent] {
-  match self.running {
-    None => []
-    Some(run) =>
-      run.query(arc, query_sourced_entries, (sourced, offset) => {
-        event: sourced.event.shift(offset),
-        origin: sourced.origin,
-        source_origin: sourced.source_origin,
-      })
-  }
+  self.query(arc, query_sourced_entries, (sourced, offset) => {
+    event: sourced.event.shift(offset),
+    origin: sourced.origin,
+    source_origin: sourced.source_origin,
+  })
 }
 
 ///|
@@ -360,10 +539,12 @@ pub fn PlaybackSnapshot::query_events(
       snapshot.query(arc).map(event => event.event())
     Song(snapshot) => snapshot.query(arc)
     RepeatSong(_) =>
-      PlaybackRun(self, self.start_entries(), self.cycle_at(arc.begin)).query(
-        arc,
-        query_entries,
-        (event, offset) => event.shift(offset),
-      )
+      PlaybackRun(
+        self,
+        self.start_entries(),
+        self.cycle_at(arc.begin),
+        0L,
+        None,
+      ).query(arc, query_entries, (event, offset) => event.shift(offset))
   }
 }

@@ -32,13 +32,27 @@ export class PlaybackController {
       tempo: this.wasm.scheduler_bpm(),
       pendingCount: this.wasm.player_pending_count(),
       skippedCount: this.wasm.player_skipped_count(),
+      loopRange: this.wasm.player_loop_begin() < 0 ? null
+        : { begin: this.wasm.player_loop_begin(), end: this.wasm.player_loop_end() },
     };
+  }
+
+  sections() {
+    const rows = [];
+    for (let i = 0; i < this.wasm.player_section_count(); i++) {
+      let label = "";
+      for (let j = 0; j < this.wasm.player_section_label_length(i); j++) {
+        label += String.fromCharCode(this.wasm.player_section_label_char(i, j));
+      }
+      rows.push({ label, start: this.wasm.player_section_start(i), end: this.wasm.player_section_end(i) });
+    }
+    return rows;
   }
 
   receipt(id, operation, status, message, draftVersion = null) {
     const snapshot = this.snapshot();
     this.post({ type: "player-receipt", id, operation, accepted: status === 0,
-      restartRequired: status === RESTART_REQUIRED, message, draftVersion, ...snapshot });
+      restartRequired: status === RESTART_REQUIRED, message, draftVersion, ...snapshot, sections: this.sections() });
   }
 
   validateWire(wire) {
@@ -92,7 +106,10 @@ export class PlaybackController {
   handle(data) {
     if (!data || typeof data !== "object") return;
     if ((data.type === "player-update" || data.type === "player-restart" ||
-         data.type === "player-play" || data.type === "player-pause") &&
+         data.type === "player-play" || data.type === "player-pause" ||
+         data.type === "player-seek" || data.type === "player-loop" ||
+         data.type === "player-seek-section" || data.type === "player-loop-section" ||
+         data.type === "player-whole") &&
         (!Number.isSafeInteger(data.id) || data.id <= 0)) {
       this.post({ type: "error", message: "invalid Player request id" });
       return;
@@ -108,6 +125,30 @@ export class PlaybackController {
       case "player-pause": {
         const status = this.wasm.player_pause();
         this.receipt(data.id, "pause", status, status === 0 ? "" : this.errorMessage());
+        break;
+      }
+      case "player-seek":
+      case "player-loop":
+      case "player-seek-section":
+      case "player-loop-section":
+      case "player-whole": {
+        const operation = data.type.slice("player-".length).replace("-section", "");
+        const valid = data.type !== "player-seek" ||
+          (Number.isSafeInteger(data.cycleMilli) && data.cycleMilli >= 0 && data.cycleMilli <= 2147483647);
+        const validEnd = data.type !== "player-loop" ||
+          (Number.isSafeInteger(data.beginMilli) && data.beginMilli >= 0 &&
+           data.beginMilli <= 2147483647 && Number.isSafeInteger(data.endMilli) &&
+           data.endMilli > data.beginMilli && data.endMilli <= 2147483647);
+        const validSection = !data.type.endsWith("-section") ||
+          (Number.isSafeInteger(data.sectionIndex) && data.sectionIndex >= 0 && data.sectionIndex < this.wasm.player_section_count());
+        const status = !valid || !validEnd || !validSection ? 1
+          : data.type === "player-seek" ? this.wasm.player_seek_cycle(data.cycleMilli)
+          : data.type === "player-loop" ? this.wasm.player_loop_cycles(data.beginMilli, data.endMilli)
+          : data.type === "player-seek-section" ? this.wasm.player_seek_section(data.sectionIndex)
+          : data.type === "player-loop-section" ? this.wasm.player_loop_section(data.sectionIndex)
+          : this.wasm.player_whole_song();
+        this.receipt(data.id, operation, status, status === 0 ? "" :
+          !valid || !validEnd || !validSection ? "invalid cycle range or section" : this.errorMessage());
         break;
       }
       case "set-scheduler-bpm": {

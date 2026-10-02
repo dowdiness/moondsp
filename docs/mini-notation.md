@@ -19,6 +19,8 @@ In the live app's **Examples** panel, select an example and press **Play**:
   layers. The two sections last 20 seconds in total at BPM 96.
 - [Space in the groove](../examples/rests-and-gates.mini) combines `~` rests
   with two gate lengths so the pulse stays fixed while notes leave audible room.
+- [Paper Lanterns](../examples/section-composition.mini) is a 56-second song
+  with shared harmony, scale-step variations, onset masks, and a rewritten cadence.
 
 ## Syntax reference
 
@@ -28,6 +30,7 @@ The HTML also renders directly in Markdown viewers without a Markdown parser
 in the browser bundle.
 
 <!-- LIVE_SYNTAX_REFERENCE_START -->
+<p>Look up syntax here; follow <a href="guides/live-coding-cookbook.md">Recipes</a> to build a musical idea, or <a href="guides/live-playback.md">How playback works</a> for timing and live edits. A trailing <code>?</code> in a method signature marks an optional argument; do not type that question mark.</p>
 <h2 id="top-level-forms">Sounds</h2>
 <dl>
   <dt>note("E4 G4")</dt><dd>note names or MIDI numbers</dd>
@@ -57,19 +60,50 @@ in the browser bundle.
 <p><code>note("E4")<br>&nbsp;&nbsp;.attack(0.01).hold(0.1)<br>&nbsp;&nbsp;.release(0.2)</code></p>
 <p class="cheat-note">0.31 seconds total, independent of tempo. Omit hold to follow the pattern's note length. Omitted attack/release use the sound's defaults; release starts from the current level.</p>
 <p class="cheat-note"><code>.gate(0.4)</code> keeps every onset in place but shortens each note to 40% of its step, leaving the rest silent. <code>.gate(0)</code> is silent; <code>.gate(1)</code> keeps the full step. The gate follows tempo. Factors finer than one billionth are rounded to keep long-running timelines representable. An explicit <code>.hold(s)</code> instead uses physical seconds and overrides the event-derived ending.</p>
-<p class="cheat-note">Room is one shared stereo space for every part. Its tail continues across note endings, section changes, and live edits; Stop remains immediate.</p>
+<p class="cheat-note">Room is one shared stereo space for every part. Its tail continues across note endings, section changes, and live edits. See <a href="guides/live-playback.md#playback-preview">preview and seek behavior</a> for how navigation affects tails.</p>
 <p class="cheat-note"><code>.gain(n)</code>, <code>.lpf(hz, resonance?)</code>, and <code>.hpf(hz, resonance?)</code> control note and chord voices in the browser. Drum templates keep their authored level and filter shape; applying these controls to <code>s("...")</code> leaves the drum sound unchanged.</p>
 
-<h2>Rhythm</h2>
-<p class="cheat-note">BPM sets cycles per minute: at 60, one cycle is one second. A cycle has no fixed meter.</p>
+<h2 id="rhythm">Rhythm</h2>
+<p class="cheat-note">BPM sets cycles per minute, not beats in a fixed meter. See <a href="guides/live-playback.md#playback-time">cycles, phrase periods, and seconds</a>.</p>
 <dl>
   <dt>.fast(n)</dt><dd>n× faster</dd>
   <dt>.slow(n)</dt><dd>n× slower; explicit envelope seconds stay unchanged</dd>
   <dt>.rev()</dt><dd>reverse events within each cycle</dd>
-  <dt>.degradeBy(p)</dt><dd>drop events with probability p (0–1)</dd>
   <dt>.every(n, f)</dt><dd>apply f every nth cycle</dd>
 </dl>
 <p class="cheat-note">Use positive integers for fast, slow, and every. Callback <code>f</code> is <code>fast(n)</code>, <code>slow(n)</code>, or <code>rev</code> without parentheses.</p>
+
+<h2 id="harmony-and-voicing">Harmony and voicing</h2>
+<dl>
+  <dt>.lowest()</dt><dd>keep the lowest simultaneous note at each onset; this is not harmonic root detection</dd>
+  <dt>.voicing(low, high, count?)</dt><dd>move tones by octaves into an inclusive MIDI range; omit count to keep all fitting tones, or supply a count to keep only the lowest tones</dd>
+</dl>
+<p><code>let changes = chord("Cmaj7 Am7 Fmaj7 G7").slow(16);<br>stack(changes.lowest().transpose(-24),<br>&nbsp;&nbsp;changes.voicing(60, 83, 3))</code></p>
+<p class="cheat-note">For <code>.voicing(60, 83)</code>, no fitting tone is removed by a count limit. Tones with no octave in the range are dropped; count 0 is silent. Voicing folds octaves, not voice-leading between chords.</p>
+<p class="cheat-note">Applied to <code>stack(...)</code>, both methods compare notes across layers. The projection plays and updates as one material.</p>
+
+<h2 id="pitch-and-phrase-variations">Pitch and phrase variations</h2>
+<dl>
+  <dt>.transpose(n)</dt><dd>move note pitches by n semitones; negative values move down</dd>
+  <dt>.steps(scale, n)</dt><dd>move by n scale degrees; supply ascending, unique pitch classes such as "C D E F G A B"; negative values move down</dd>
+  <dt>.phase(transpose(n), from, to?)</dt><dd>transpose only notes starting within [from, to) of each entry period; to defaults to 1; requires 0 ≤ from &lt; to ≤ 1</dd>
+  <dt>.tail(replacement, cycles?)</dt><dd>replace the final cycles of every entry period; cycles defaults to 1; stretch the replacement to fit without changing the entry period</dd>
+</dl>
+<p><code>note("C4 E4 G4 A4").slow(8)<br>&nbsp;&nbsp;.steps("C D E F G A B", 1)<br>&nbsp;&nbsp;.phase(transpose(12), 0.5)</code></p>
+<p class="cheat-note">The last line changes the latter half of each eight-cycle phrase. For just the middle half, use <code>.phase(transpose(12), 0.25, 0.75)</code>. Only <code>transpose(n)</code> is accepted inside phase. Notes that begin outside the interval keep their pitch even if they extend into it. These fractions are relative to the entry period, not absolute song positions.</p>
+<p><code>note("E4 G4 A4 B4").slow(8)<br>&nbsp;&nbsp;.tail(note("G4 E4 D4 C4"), 2)<br>&nbsp;&nbsp;.gain(0.12).release(0.2)</code></p>
+<p class="cheat-note">Tail accepts a direct <code>note("...")</code>, <code>chord("...")</code>, or <code>s("...")</code>, not a named pattern or a chained expression. Its duration must be positive and no longer than the entry period. A half-cycle phrase needs an explicit duration, for example <code>note("C4").fast(2).tail(note("E4"), 0.5)</code>; the default 1 would be rejected. Put gain, envelope, and filter controls after tail to apply them to replacement notes too.</p>
+
+<h2 id="onset-masks-and-seeds">Onset masks and seeded variation</h2>
+<dl>
+  <dt>.mask("x ~ x x")</dt><dd>divide the entry period into equal slots; x keeps existing onsets, ~ removes them; never creates new onsets</dd>
+  <dt>.degradeBy(p, seed?)</dt><dd>drop events with probability p from 0 to 1; an optional integer seed selects a repeatable version</dd>
+</dl>
+<p><code>note("C4 E4 G4 B4").mask("x ~ x ~")</code></p>
+<p class="cheat-note">Only C4 and G4 remain. The mask repeats over the pattern's entry period; it does not retrigger a sustained chord.</p>
+<p><code>s("hh*8").slow(4).degradeBy(0.22, 119)</code></p>
+<p class="cheat-note">Keep the same source and seed for the same per-event choices across restarts and loop passes. Change the seed to try another version. In <strong>Paper Lanterns</strong>, these gaps stay fixed while the melody and arrangement change.</p>
+
 <h2 id="inside-quoted-notation">Inside quoted notation</h2>
 <dl>
   <dt>a b c</dt><dd>sequence in one cycle; newlines also separate items</dd>
@@ -84,7 +118,7 @@ in the browser bundle.
 <p><code>$: s("bd ~ sd ~")<br>$: note("C3 ~ Eb3 ~").gate(0.35)</code></p>
 <p class="cheat-note">Each <code>~</code> occupies the same share of the cycle as a sounding atom. Gate shortens only the sounding part; neither feature moves the following onset. Hear both in <strong>Space in the groove</strong>.</p>
 
-<h2>Combine patterns</h2>
+<h2 id="combine-patterns">Combine patterns</h2>
 <dl>
   <dt>let a = p;</dt><dd>name a reusable pattern; define it before use</dd>
   <dt>a + b + c</dt><dd>overlay layers in left-to-right order; duplicates are preserved</dd>
@@ -108,10 +142,12 @@ in the browser bundle.
   <dt>part("id", "a", 8)</dt><dd>place the part at absolute cycle 8; overlapping parts play together</dd>
   <dt>part_id("id", "label", "a")</dt><dd>keep a stable id separate from its display label; optional start as the fourth argument</dd>
   <dt>fill("gap", "a")</dt><dd>fill uncovered time between parts with section a</dd>
-  <dt>bpm(n)</dt><dd>tempo inside song(); editable while playing</dd>
+  <dt>bpm(n)</dt><dd>tempo in cycles per minute inside song(); use bpm(n); before a standalone pattern; defaults to 60</dd>
 </dl>
 <p class="cheat-note">Separate calls with commas. Section lengths and explicit starts accept integers or fractions such as <code>3/2</code>; section lengths must be positive. Pattern expressions inside sections support <code>+</code> and parentheses.</p>
-<p class="cheat-note">Select <strong>Song</strong> mode to play a song. The header BPM control sets global tempo; <code>bpm(n)</code> sets it from the score. Examples select their mode and tempo for you.</p>
+<p class="cheat-note">The app recognizes <code>song(...)</code> automatically. Use <code>bpm(n)</code> inside the song to set its tempo; omission uses 60 BPM.</p>
+
+<p>To audition an arrangement, see <a href="guides/live-playback.md#playback-preview">section and range preview</a>. For update timing and structural changes, see <a href="guides/live-playback.md#playback-edits">editing while playing</a>.</p>
 <!-- LIVE_SYNTAX_REFERENCE_END -->
 
 ## Additional notation examples

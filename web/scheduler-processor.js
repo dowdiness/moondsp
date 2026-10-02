@@ -34,7 +34,9 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
   dispatchCommand(data) {
     if (data.type === "player-update" || data.type === "player-restart" ||
         data.type === "player-play" || data.type === "player-pause" ||
-        data.type === "set-scheduler-bpm") {
+        data.type === "player-seek" || data.type === "player-loop" ||
+        data.type === "player-seek-section" || data.type === "player-loop-section" ||
+        data.type === "player-whole" || data.type === "set-scheduler-bpm") {
       this.playback.handle(data);
     } else if (data.type === "set-scheduler-gain") {
       this.gain = this.sanitizeGain(data.gain);
@@ -60,6 +62,11 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
         "set_scheduler_bpm", "set_scheduler_gain", "scheduler_bpm",
         "clear_playback_input", "push_playback_char",
         "player_update_input", "player_restart_input", "player_play", "player_pause",
+        "player_seek_cycle", "player_loop_cycles", "player_whole_song",
+        "player_seek_section", "player_loop_section",
+        "player_loop_begin", "player_loop_end", "player_section_count",
+        "player_section_start", "player_section_end",
+        "player_section_label_length", "player_section_label_char",
         "player_state", "player_pending_count", "player_skipped_count",
         "player_mode", "scheduler_cycle_position",
         "scheduler_sample_position", "get_playback_error_length", "get_playback_error_char",

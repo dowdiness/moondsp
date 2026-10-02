@@ -51,7 +51,10 @@ class MoonBitDspProcessor extends AudioWorkletProcessor {
       } else if (data.type === "set-cutoff") {
         this.cutoff = Number(data.value);
       } else if (data.type === "player-update" || data.type === "player-restart" ||
-                 data.type === "player-play" || data.type === "player-pause") {
+                 data.type === "player-play" || data.type === "player-pause" ||
+                 data.type === "player-seek" || data.type === "player-loop" ||
+                 data.type === "player-seek-section" || data.type === "player-loop-section" ||
+                 data.type === "player-whole") {
         if (this.usesScheduler) this.playback.handle(data);
       } else if (data.type === "set-scheduler-bpm") {
         if (this.usesScheduler) {

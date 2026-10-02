@@ -8,7 +8,7 @@ Use this file as a router. Read the documents for the surface you are changing; 
 
 | Change | Primary references |
 |---|---|
-| Authoring or live coding | [`guides/live-coding-cookbook.md`](guides/live-coding-cookbook.md), [`mini-notation.md`](mini-notation.md), [`pattern-algebra.md`](pattern-algebra.md) |
+| Authoring or live coding | [`mini-notation.md`](mini-notation.md), [`guides/live-coding-cookbook.md`](guides/live-coding-cookbook.md), [`guides/live-playback.md`](guides/live-playback.md) |
 | Graph runtime-control | [`technical-reference.md`](technical-reference.md), [`external-dsl-lowering.md`](external-dsl-lowering.md), and the applicable graph ADR |
 | Editor, Song, Update, identity, or playback-origin semantics | [`../CONTEXT.md`](../CONTEXT.md) and the applicable Song/playback ADR |
 | Browser ABI or AudioWorklet lifecycle | [`browser-api-contract.md`](browser-api-contract.md) and the relevant browser example |
@@ -20,8 +20,15 @@ Use this file as a router. Read the documents for the surface you are changing; 
 
 ## Guides & Language
 
-- **[`guides/live-coding-cookbook.md`](guides/live-coding-cookbook.md)** — Hands-on recipes from a drum pulse through Euclidean polyrhythms, layered harmony, stereo and room effects, and an arranged song.
-- **[`mini-notation.md`](mini-notation.md)** — Pattern syntax: quoted notation, sub-groups, Euclidean rhythms, polyphonic layers, and method chains.
+- **Syntax reference — [`mini-notation.md`](mini-notation.md)** — Syntax, arguments, defaults, and limits for notes, rhythms, composition, and songs.
+- **Recipes — [`guides/live-coding-cookbook.md`](guides/live-coding-cookbook.md)** — Goal-oriented, loadable examples for harmony, motif variations, sparse rhythm, sound shaping, and arrangements, plus the step-by-step cookbook.
+- **How playback works — [`guides/live-playback.md`](guides/live-playback.md)** — Cycles and seconds, draft versus accepted material, live-edit timing, transport, section/range previews, and Mini's capability limits.
+
+These three guides provide the live app's help content at build time. Edit their
+marked HTML blocks rather than adding another copy to the app. Recipe source is
+loaded directly from its displayed code block; related links open the matching
+help chapter.
+
 - **[`pattern-algebra.md`](pattern-algebra.md)** — Rational-time pattern engine design: queryable arcs, events, combinators, and value mapping.
 - **[`mini-graph-authoring-boundary.md`](mini-graph-authoring-boundary.md)** — Boundary contract for bridging mini-notation events into DSP graph templates without mixing layers.
 

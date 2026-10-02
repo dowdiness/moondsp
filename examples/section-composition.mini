@@ -1,0 +1,45 @@
+// Paper Lanterns — 56 seconds at 120 cycles/minute.
+// Four cycles make one phrase here; there is no implicit bar unit.
+// Restart to hear the whole song, or Loop section to work on a variation.
+
+// One 16-cycle progression supplies both the bass and the upper voices.
+let changes = chord("Cmaj7 Am7 Fmaj7 G7").slow(16);
+let bass = changes.lowest().transpose(-24).gain(0.22).lpf(650).attack(0.008).hold(0.22).release(0.18);
+let harmony = changes.voicing(60, 83, 3).gain(0.075).lpf(1800).attack(0.12).hold(0.35).release(0.65).room(0.18);
+
+// Leave space between the four small melodic phrases.
+let motif = note("[E4 ~ G4 E4] [A4 G4 E4 ~] [A4 C5 A4 G4] [B4 A4 G4 D4]").slow(16);
+let lead = motif.gain(0.13).attack(0.008).hold(0.10).release(0.18).room(0.12);
+
+// The explicit seed keeps the same small gaps on every loop.
+// mask filters existing hits; it never inserts new ones.
+let beat = s("bd ~ sd ~ bd bd sd ~").slow(4);
+let hats = s("hh*8").slow(4).degradeBy(0.22, 119);
+let groove = stack(beat, hats);
+
+// Move up two scale degrees, then answer an octave lower in the final quarter.
+// Omitted phase end means 1: this interval repeats every 16 cycles.
+let variation = motif.steps("C D E F G A B", 2).phase(transpose(-12), 0.75).gain(0.12).attack(0.008).hold(0.10).release(0.22).room(0.18);
+
+// A quieter, higher echo: count omission keeps every fitting chord tone.
+let air = changes.voicing(60, 83).mask("x ~ x ~").gain(0.045).lpf(1200).attack(0.25).hold(0.40).release(1.20).room(0.30);
+let echo = motif.transpose(12).mask("x ~ x ~ x ~ x ~").tail(note("G5")).gain(0.055).attack(0.06).hold(0.15).release(0.60).room(0.30);
+
+// Change the last four cycles to a tonic cadence, not a new progression.
+// Apply sound controls after tail so the replacement gets the same timbre.
+let home = changes.tail(chord("Cmaj7"), 4);
+let home_bass = home.lowest().transpose(-24).gain(0.22).lpf(650).attack(0.008).hold(0.22).release(0.18);
+let home_chords = home.voicing(60, 83, 3).gain(0.075).lpf(2200).attack(0.12).hold(0.35).release(0.65).room(0.18);
+let home_lead = motif.tail(note("G4 E4 D4 C4"), 4).gain(0.13).attack(0.008).hold(0.10).release(0.26).room(0.18);
+
+song(
+  bpm(120),
+  section("theme", 32, stack(bass, harmony, lead, groove)),
+  section("variation", 32, stack(bass, harmony, variation, groove)),
+  section("interlude", 16, stack(air, echo, hats.mask("x ~ x ~"))),
+  section("return", 32, stack(home_bass, home_chords, home_lead, groove)),
+  part("theme", "theme"),
+  part("variation", "variation"),
+  part("interlude", "interlude"),
+  part("reprise", "return")
+)

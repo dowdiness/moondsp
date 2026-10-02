@@ -19,6 +19,8 @@ export type PlaybackView = Readonly<{
   cyclePosition: number;
   pendingCount: number;
   skippedCount: number;
+  sections?: PlayerSnapshot["sections"];
+  loopRange?: PlayerSnapshot["loopRange"];
   feedback: Feedback | null;
   diagnostic: Diagnostic | null;
 }>;
@@ -189,6 +191,26 @@ export class Player {
     return this.send("pause");
   }
 
+  seek(cycleMilli: number): Promise<PlayerReceipt> {
+    return this.send("seek", undefined, [cycleMilli]);
+  }
+
+  loop(beginMilli: number, endMilli: number): Promise<PlayerReceipt> {
+    return this.send("loop", undefined, [beginMilli, endMilli]);
+  }
+  seekSection(index: number): Promise<PlayerReceipt> {
+    return this.send("seek", undefined, undefined, index);
+  }
+
+  loopSection(index: number): Promise<PlayerReceipt> {
+    return this.send("loop", undefined, undefined, index);
+  }
+
+
+  whole(): Promise<PlayerReceipt> {
+    return this.send("whole");
+  }
+
   async close(): Promise<void> {
     ++this.epoch;
     ++this.intent;
@@ -269,7 +291,7 @@ export class Player {
     this.render();
     return promise;
   }
-  private send(operation: PlayerOperation, input?: PlaybackInput): Promise<PlayerReceipt> {
+  private send(operation: PlayerOperation, input?: PlaybackInput, range?: readonly number[], section?: number): Promise<PlayerReceipt> {
     if (input !== undefined) this.refreshDraft();
     if (this.connection.kind !== "open") return Promise.reject(new Error("Player is not open"));
     const session = this.connection.session;
@@ -281,7 +303,11 @@ export class Player {
       try {
         const result = operation === "update" ? session.update(id, input!)
           : operation === "restart" ? session.restart(id, input!)
-          : operation === "play" ? session.play(id) : session.pause(id);
+          : operation === "play" ? session.play(id)
+          : operation === "pause" ? session.pause(id)
+          : operation === "seek" ? section === undefined ? session.seek(id, range![0]) : session.seekSection(id, section)
+          : operation === "loop" ? section === undefined ? session.loop(id, range![0], range![1]) : session.loopSection(id, section)
+          : session.whole(id);
         if (result === "session-expired") {
           this.pending.delete(id.value);
           reject(new Error("Player session expired"));
@@ -335,7 +361,11 @@ export class Player {
   }
   private receive(event: AudioEvent): void {
     if (event.kind === "failed") { this.fail(event.message); return; }
-    if (event.kind === "status") { this.snapshot = event; this.render(); return; }
+    if (event.kind === "status") {
+      this.snapshot = { ...event, sections: this.snapshot.sections };
+      this.render();
+      return;
+    }
     const receipt = event.receipt;
     const pending = this.pending.get(receipt.id.value);
     if (!pending) return;
@@ -349,7 +379,7 @@ export class Player {
     }
     if (receipt.id.value > this.lastReceipt) {
       this.lastReceipt = receipt.id.value;
-      this.snapshot = receipt;
+      this.snapshot = { ...receipt, sections: receipt.sections ?? this.snapshot.sections };
       if (receipt.kind === "rejected" && pending.input === undefined) {
         this.feedback = { kind: "error", message: receipt.message };
       }

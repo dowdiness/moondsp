@@ -63,13 +63,20 @@ fn[A, B] Pat::transform_children(
 }
 
 ///|
-/// Map event payloads without changing query spans or authored metadata.
-/// Child bodies are mapped recursively while preserving their shape.
-fn[A, B] Pat::map_payload(self : Pat[A], f : (A) -> B) -> Pat[B] {
+/// Map event payloads without changing query spans, period, scope, or origins.
+/// Named composition changes contribute to content identity; plain projections
+/// preserve it. Child bodies retain their corresponding transformed identity.
+fn[A, B] Pat::map_payload(
+  self : Pat[A],
+  f : (A) -> B,
+  change? : String = "",
+) -> Pat[B] {
   let body : PatBody[B] = match self.body {
     Silence => Silence
-    Opaque(children) => Opaque(children.map(child => child.map_payload(f)))
-    Overlay(children) => Overlay(children.map(child => child.map_payload(f)))
+    Opaque(children) =>
+      Opaque(children.map(child => child.map_payload(f, change~)))
+    Overlay(children) =>
+      Overlay(children.map(child => child.map_payload(f, change~)))
   }
   make_pat(
     fn(arc) {
@@ -80,7 +87,11 @@ fn[A, B] Pat::map_payload(self : Pat[A], f : (A) -> B) -> Pat[B] {
     self.metadata.period,
     body,
     self.metadata.scope,
-    self.metadata.content,
+    if change == "" {
+      self.metadata.content
+    } else {
+      transformed_signature(self.metadata.content, change)
+    },
   )
 }
 

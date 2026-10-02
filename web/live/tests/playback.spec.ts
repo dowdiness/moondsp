@@ -31,6 +31,11 @@ function harness(deferred = false, delayedClose = false, cancellable = false) {
     restart: (id, input) => issue(id, "restart", input),
     play: id => issue(id, "play"),
     pause: id => issue(id, "pause"),
+    seek: id => issue(id, "seek"),
+    loop: id => issue(id, "loop"),
+    seekSection: id => issue(id, "seek"),
+    loopSection: id => issue(id, "loop"),
+    whole: id => issue(id, "whole"),
   };
   const engine = { openSession: async (next: (event: AudioEvent) => void, signal?: AbortSignal): Promise<OpenSessionResult> => {
     if (busy) return { kind: "busy" };

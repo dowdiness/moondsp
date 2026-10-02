@@ -244,7 +244,35 @@ fn PlaybackAdmission::expression(
             Accelerate(child, 1.0 / n.to_double()),
             n.num.to_double().abs().max(n.den.to_double()),
           )
-        Gate(_) | Degrade(_) => MapEvents(child)
+        Gate(_)
+        | Degrade(_, _)
+        | Transpose(_)
+        | Steps(_, _)
+        | Lowest
+        | Voicing(_, _, _)
+        | Mask(_)
+        | PhaseTranspose(_, _, _) => MapEvents(child)
+        Tail(tail, kind, content, _) => {
+          let replacement = if kind is Silence {
+            Quiet
+          } else {
+            let notation = NotationParser(
+              content,
+              sound=kind is Sound,
+              chord=kind is Chord,
+              assess=true,
+            )
+            ignore(notation.parse_notation())
+            notation.query_work.unwrap()
+          }
+          Overlay([
+            MapEvents(child),
+            Precision(
+              Accelerate(replacement, 1.0 / tail.to_double()),
+              tail.den.to_double(),
+            ),
+          ])
+        }
         Rev => Split(child)
         Control(_, _) => MergeScalar(child)
         Filter(_, _, resonance) =>

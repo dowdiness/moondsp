@@ -34,6 +34,7 @@ pub struct Player {
   priv wet_left : @moondsp.AudioBuffer
   priv wet_right : @moondsp.AudioBuffer
   priv mut gain : Double
+  priv mut loop_range : (@pattern.Rational, @pattern.Rational)?
   priv mut session : Session
 }
 
@@ -55,6 +56,7 @@ fn Player::Player(
     wet_left: @moondsp.AudioBuffer::filled(size),
     wet_right: @moondsp.AudioBuffer::filled(size),
     gain: 0.5,
+    loop_range: None,
     session: Empty,
   }
 }
@@ -383,7 +385,9 @@ fn Player::process(self : Player) -> Bool {
     self.left.set(i, (self.left.get(i) + self.wet_left.get(i)) * self.gain)
     self.right.set(i, (self.right.get(i) + self.wet_right.get(i)) * self.gain)
   }
-  if self.session is Playing(song) && song.finite_end() is Some(end_) {
+  if self.session is Playing(song) &&
+    self.loop_range is None &&
+    song.finite_end() is Some(end_) {
     let scheduler = self.schedulers[0]
     match scheduler.sample_at(end_) {
       Ok(end_sample) if scheduler.sample_counter() >= end_sample =>
@@ -505,6 +509,22 @@ pub fn set_scheduler_bpm(bpm : Double) -> Int {
   let tempo = match @scheduler.Tempo::from_bpm(bpm) {
     Ok(tempo) => tempo
     Err(_) => return set_scheduler_parse_error("tempo must be 0.001..1000 BPM")
+  }
+  if owner.loop_range is Some((begin, end_)) {
+    let block_span = match
+      tempo.span_for_samples(
+        owner.context.block_size(),
+        sample_rate=owner.context.sample_rate(),
+      ) {
+      Ok(span) => span
+      Err(_) =>
+        return set_scheduler_parse_error("tempo exceeds transport range")
+    }
+    guard end_ - begin >= block_span else {
+      return set_scheduler_parse_error(
+        "loop must span at least one audio block at this tempo",
+      )
+    }
   }
   if owner.session.song() is Some(song) {
     match owner.check_repeat_span(song.span, tempo) {
