@@ -29,6 +29,9 @@ pub fn TimeSpan::duration(self : TimeSpan) -> Rational {
 
 ///|
 pub fn TimeSpan::shift(self : TimeSpan, offset : Rational) -> TimeSpan {
+  if offset.num == 0L {
+    return self
+  }
   TimeSpan::new(self.begin + offset, self.end_ + offset)
 }
 
@@ -39,10 +42,18 @@ pub fn TimeSpan::contains(self : TimeSpan, time : Rational) -> Bool {
 
 ///|
 pub fn TimeSpan::intersect(self : TimeSpan, other : TimeSpan) -> TimeSpan? {
-  let begin = if self.begin > other.begin { self.begin } else { other.begin }
-  let end_ = if self.end_ < other.end_ { self.end_ } else { other.end_ }
+  let begin_from_self = self.begin >= other.begin
+  let end_from_self = self.end_ <= other.end_
+  let begin = if begin_from_self { self.begin } else { other.begin }
+  let end_ = if end_from_self { self.end_ } else { other.end_ }
   if begin < end_ {
-    Some({ begin, end_, })
+    if begin_from_self && end_from_self {
+      Some(self)
+    } else if !begin_from_self && !end_from_self {
+      Some(other)
+    } else {
+      Some({ begin, end_, })
+    }
   } else {
     None
   }
@@ -61,7 +72,7 @@ pub fn TimeSpan::whole_cycles(self : TimeSpan) -> Array[TimeSpan] {
       Some(intersection) => result.push(intersection)
       None => ()
     }
-    cycle_start = cycle_start + one
+    cycle_start = cycle_end
   }
   result
 }

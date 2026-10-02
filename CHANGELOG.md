@@ -124,6 +124,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Reduced pattern-query allocation with immutable shared node-path tails,
+  compilation-time leaf paths, rational identity fast paths, zero-offset event
+  shifts, and reuse of contained time spans. Public interfaces, exact event
+  origins, and PCM are unchanged. The measured dense 600-block case executes
+  about 33% fewer Wasm GC construction instructions; queries are not yet
+  allocation-free. See the [dated evidence](docs/performance/2026-10-02-pattern-query-allocation-improvements.txt).
+- Precomputed sequence slot indices and exact bounds when constructing the
+  pattern, reused its invariant `[0,1)` child-query span, and removed duplicate
+  cycle-end arithmetic. Two reversed-order real AudioWorklet comparisons show
+  another 10.2% reduction in V8 Wasm-stack allocation count and 11.7% in recorded
+  bytes against the previous improvement. PCM, exact origins, and public
+  interfaces remain unchanged; this is not an allocation-free or deadline
+  guarantee. See the [iteration evidence](docs/performance/2026-10-02-pattern-query-allocation-loop.txt).
 - Aligned MoonBit sources with compiler warning rules: test package APIs are fully
   qualified, trait-implementation methods use explicit extensions, and unused
   package imports are removed. The browser facade explicitly exposes the

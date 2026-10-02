@@ -1,0 +1,139 @@
+2026-10-02 — adaptive pattern-query allocation improvement loop
+
+Baseline and scope
+Branch: perf/pattern-query-allocation
+Worktree: .worktrees/pattern-query-allocation
+HEAD: e07ad86ff99c0d6e315e330c7129e4203ca4211a
+The baseline includes the previous completed, uncommitted optimization batch,
+not the original e07 implementation. Its production binary SHA256 is
+9fe4857f542ec3dd89e0b44fc40133bf77ba60074f58fdc6e2a22f099da749b3.
+Final production binary SHA256:
+95cd20797736cf035c36b091e818cd5b4ef7d459f2d1d0429300c8e31d782759.
+The exit criterion was at least 10% additional dense allocation reduction,
+actual Worklet confirmation, semantic equality, and unchanged public interfaces.
+Experiments ran sequentially locally; no persistent external worker was started.
+During measurement, no commit, push, merge, or unrelated main-checkout
+modification was performed.
+
+Measured iterations, dense 600-block GC construction executions
+Baseline: 3,619,295
+1. Generic from_int zero/one sharing: 3,515,501 (-2.87%). Rejected.
+2. Also sharing zero/one before normalization: 3,273,269 (-9.56%). Rejected.
+   The initial general-fraction control was 9.49 us -> 12.68 us; a later
+   baseline/candidate pair was 11.29 us -> 13.05 us. General integer controls
+   also became slower. These observations justified conservative withdrawal;
+   exact JIT/host causes were not established. Constructor source is restored.
+3. Reuse whole_cycles' already computed cycle_end: 3,602,711 (-0.46%). Retained.
+4. Also precompute sequence slot indices and bounds: 3,364,025 (-7.05%). Retained.
+   The first compile exposed the still-needed slot index; SequenceSlot now
+   retains it with the two bounds. The failure log is preserved.
+5. Also reuse the invariant complete-slot child-query arc: 3,252,467 (-10.14%).
+   Retained. Final cleanup reuses the same admitted unit for the pattern period;
+   steady dense counts are unchanged, and live control cases lose two/three
+   additional admission-time constructions.
+
+Retained implementation
+- sequence computes its scale, indices and rational slot bounds at construction.
+  One private immutable SequenceSlot record per child replaces repeated
+  per-query computation. The caller's pattern array remains copied as before.
+- Every complete slot maps to [0,1) in child-pattern time. One immutable span
+  is prepared at construction and reused. Requested event parts still clip
+  against the independently computed query span.
+- whole_cycles advances to cycle_end instead of computing cycle_start + one
+  a second time. Int64 arithmetic and half-open boundaries remain exact.
+- No generic constructor branches, float replacement, mutable interning table,
+  output pool, query-result cache, or public compatibility layer remains.
+
+Final executed GC construction instructions, 48 kHz / 128 frames / 600 blocks
+Scenario                         baseline        final       reduction
+Dense tracked                   3,619,295     3,252,467          10.14%
+Sparse tracked                    432,431       367,331          15.05%
+Dense text/no sourceMap         3,619,295     3,252,467          10.14%
+Fractional + update/control       570,911       508,297          10.97%
+Rest/degrade/zero gain          1,169,329       965,415          17.44%
+Counters instrument release Wasm construction instructions with scalar globals.
+Counted/uninstrumented PCM agree. Baseline/final PCM bytes and all 600 per-block
+transport/pending/skipped/tempo/sample/cycle states agree in all five cases.
+Admission is excluded except scheduled live update/restart/tempo actions in the
+two control scenarios; diagnostic state getters run only in the uncounted pass.
+
+Actual uninstrumented AudioWorklet, Chrome/148.0.7778.215
+Order, round 0: baseline then final. Round 1: final then baseline.
+Both rounds, Wasm allocation stack beneath process > js-to-wasm::i:
+Count: 3,597,332 -> 3,230,504 (-10.20%)
+Trace size: 74,079,952 -> 65,430,304 bytes (-11.68%)
+All four final-binary runs have identical audio aggregates:
+600 blocks; 0 silent blocks; 153600 nonzero samples;
+checksum 647.1676971881834; energy 21460.42662911741;
+peak 1.1976007050588209. Raw profiles and earlier candidate-5 profiles are saved.
+Trace sizes describe allocation records, not retained or peak heap. Page wall
+windows and the observed maximum frame step of 128 are not callback-duration,
+deadline, or underrun-safety evidence. This is not allocation-free audio.
+
+Isolated query CPU, wasm-gc release, admission excluded
+600 precomputed distinct arcs, query_active_sourced_events:
+Forward pair: sparse 2.51 -> 1.79 ms; dense 21.88 -> 19.25 ms.
+Reverse pair: sparse 2.43 -> 1.79 ms; dense 21.15 -> 18.85 ms.
+The dense mean decreases 10.9–12.0%; sparse decreases 26.3–28.7%.
+Isolated 16-slot sequence, 600 distinct arcs: 4.89 -> 3.47 ms.
+These are batch query timings, not render-callback timing. All raw tables,
+including variable general-operation control timings, are retained.
+Construction now retains O(n) immutable slot data per sequence; admission and
+retained-memory costs are not included in these hot-query timing comparisons.
+
+Semantic and interface verification
+- Full release suite: 1273/1273 pass.
+- Pattern JS: 249/249; pattern native: 249/249.
+- moon check --deny-warn, moon info, moon fmt, release browser build executed.
+- 35 generated .mbti files are byte-identical to the optimized baseline.
+- Added a nested-sequence regression for negative fractional clipping,
+  complete event spans, touching boundaries, and a subsequent query.
+  It passes against both baseline and final implementations.
+- Three actual tracked MiniDraft compilations, 600 arcs each over two cycles:
+  whole/part time, note/gain, source atoms, bindings and node paths serialize
+  identically. Final source was rerun after cleanup.
+  Bytes: 5,385,099
+  SHA256: eab88ad33a790104bef5e20855d4e62b8cdf930e2dbfc507d69c4c675b72694f
+- Audio dense PCM SHA256:
+  28d2d746be53de50b4c696a3bb6fd41792d6832ebb903a69c581af14a458810a
+- No sourceMap policy, CLAP/native bridge, DSP graph, or browser ABI change.
+
+Toolchain
+Moon 0.1.20260920 (914d7da), rr_moon_pkg; NEW_MOON_MOD=0 on direct Moon commands.
+Node 24.14.1; Python 3.14.2; Binaryen 125; WSL2 Linux x64.
+
+Evidence and reproduction
+Adjacent .json: structured iteration ledger, final results, verification and
+archive metadata. Adjacent .tar.gz: 236 members, 235 checksummed input files.
+Archive bytes: 45,056,207
+Archive SHA256:
+118e635521ccafd931c61913b4bc51cc5765dc93a02c3811023f4bdfcdbe5250
+Every manifest size and SHA256 was verified by reading the completed archive.
+The archive includes the fixed optimized source baseline, final source overlay,
+rejected constructor sources, retained-stage sources, raw logs, production and
+counter binaries, WAT/counter metadata, five-case PCM, origin streams, Worklet
+raw gzip snapshots, profile decoders and reusable measurement runners.
+
+Pre-integration evidence review corrected the runner's installation-specific
+Moon tool paths and excluded generated __pycache__ contents from packaging.
+Tools now resolve from PATH, with MOON_BIN and MOON_WASM_OPT_BIN overrides.
+The corrected runner was exercised: the final production binary hash and all
+five PCM/state comparisons and allocation counts reproduce unchanged.
+review-portable-replay.txt and review-portable-results.json preserve that proof.
+
+From this worktree, extract the bundle into _build/allocation-loop. Extract
+optimized-loop-baseline-source.tar.gz into its source-baseline directory.
+Use NEW_MOON_MOD=0 moon -C that directory update to resolve pinned dependencies.
+Apply changes/ to that source baseline to obtain the final implementation;
+loop1/loop2 rational sources and stages/ hold earlier implementations.
+For a reconstructed source tree, place the extracted bundle at that tree's
+_build/allocation-loop path: run-stage.mjs resolves its source root from there.
+Run it with a new stage label to build, count and compare all five cases.
+For actual Worklet comparison, serve seed/harness with serve.mjs and invoke
+runLoopWorklet(page, browser, seedRoot) from run-worklet.mjs in a real Chromium
+page. It asserts both reversed-order runs exceed the 10% reduction criterion.
+For origin proof, copy seed/origin-smoke to
+scheduler/internal/allocation_query_smoke (not cmd, due to internal visibility)
+and run NEW_MOON_MOD=0 moon run scheduler/internal/allocation_query_smoke --release.
+The temporary origin package, profiling services, browser tabs and local loop
+scratch were removed after preserving and validating the evidence.

@@ -111,6 +111,22 @@ test "intersect: same arc = same arc" {
 }
 
 ///|
+test "intersect: empty intervals never intersect" {
+  let empty = span(1, 1, 1, 1)
+  let outer = span(0, 1, 2, 1)
+  debug_inspect(empty.intersect(empty), content="None")
+  debug_inspect(outer.intersect(empty), content="None")
+}
+
+///|
+test "intersect: contained nonempty arc" {
+  let outer = span(0, 1, 2, 1)
+  let inner = span(1, 2, 3, 2)
+  assert_true(outer.intersect(inner) == Some(inner))
+  assert_true(inner.intersect(outer) == Some(inner))
+}
+
+///|
 test "whole_cycles: single cycle [0,1) = [[0,1)]" {
   let ts = span(0, 1, 1, 1)
   let cycles = ts.whole_cycles()

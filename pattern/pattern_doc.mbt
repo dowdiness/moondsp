@@ -345,32 +345,86 @@ fn[A] pattern_node_revision_memoized(
 }
 
 ///|
+priv enum PatternNodePathLink {
+  PathEnd
+  PathLink(@identity.PatternNodeId, PatternNodePathLink)
+} derive(Eq)
+
+///|
 pub struct PatternNodePath {
   priv root : @identity.PatternNodeId
-  priv descendants : Array[@identity.PatternNodeId]
+  priv descendants : PatternNodePathLink
 } derive(Eq, Debug)
+
+///|
+impl Debug for PatternNodePathLink with fn to_repr(self) -> @debug.Repr {
+  match self {
+    PathEnd => {
+      let nodes : Array[@identity.PatternNodeId] = []
+      @debug.Repr(nodes)
+    }
+    PathLink(first, rest) => {
+      let mut length = 1
+      let mut next = rest
+      while next is PathLink(_, tail) {
+        length += 1
+        next = tail
+      }
+      let nodes = Array::make(length, first)
+      let mut index = 1
+      next = rest
+      while next is PathLink(id, tail) {
+        nodes[index] = id
+        index += 1
+        next = tail
+      }
+      @debug.Repr(nodes)
+    }
+  }
+}
 
 ///|
 fn PatternNodePath::PatternNodePath(
   root : @identity.PatternNodeId,
   descendants? : Array[@identity.PatternNodeId] = [],
 ) -> PatternNodePath {
-  { root, descendants: descendants.copy(), }
+  let mut linked = PathEnd
+  for index = descendants.length() - 1; index >= 0; index = index - 1 {
+    linked = PathLink(descendants[index], linked)
+  }
+  { root, descendants: linked, }
 }
 
 ///|
 pub fn PatternNodePath::leaf(self : PatternNodePath) -> @identity.PatternNodeId {
-  match self.descendants.last() {
-    Some(id) => id
-    None => self.root
+  let mut next = self.descendants
+  let mut leaf = self.root
+  while next is PathLink(id, rest) {
+    leaf = id
+    next = rest
   }
+  leaf
 }
 
 ///|
 pub fn PatternNodePath::nodes(
   self : PatternNodePath,
 ) -> Array[@identity.PatternNodeId] {
-  [self.root, ..self.descendants]
+  let mut length = 1
+  let mut next = self.descendants
+  while next is PathLink(_, rest) {
+    length += 1
+    next = rest
+  }
+  let nodes = Array::make(length, self.root)
+  let mut index = 1
+  next = self.descendants
+  while next is PathLink(id, rest) {
+    nodes[index] = id
+    index += 1
+    next = rest
+  }
+  nodes
 }
 
 ///|
@@ -378,7 +432,7 @@ fn PatternNodePath::prepend(
   self : PatternNodePath,
   parent : @identity.PatternNodeId,
 ) -> PatternNodePath {
-  PatternNodePath(parent, descendants=self.nodes())
+  { root: parent, descendants: PathLink(self.root, self.descendants), }
 }
 
 ///|
@@ -844,24 +898,23 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
     }
     Runtime(pat) => {
       let origin : O = O::make_origin(id, None, context)
-      let source = pat.map_payload(value => {
-        ScopedValue(value, PatternNodePath(id), origin)
-      })
+      let path = PatternNodePath(id)
+      let source = pat.map_payload(value => ScopedValue(value, path, origin))
       CompiledPattern(source, opaque_compiled_entries(source, id))
     }
     Silence => CompiledPattern::single_material(Pat::silence(), id)
     Pure(value) => {
       let origin : O = O::make_origin(id, None, context)
+      let path = PatternNodePath(id)
       CompiledPattern::single_material(
-        Pat::pure(ScopedValue(value, PatternNodePath(id), origin)),
+        Pat::pure(ScopedValue(value, path, origin)),
         id,
       )
     }
     Atom(pat, atom) => {
       let origin : O = O::make_origin(id, Some(atom), context)
-      let source = pat.map_payload(value => {
-        ScopedValue(value, PatternNodePath(id), origin)
-      })
+      let path = PatternNodePath(id)
+      let source = pat.map_payload(value => ScopedValue(value, path, origin))
       CompiledPattern(source, opaque_compiled_entries(source, id))
     }
     Fast(child, factor) => {

@@ -179,3 +179,20 @@ test "comparison and floor do not overflow intermediate products" {
   assert_true(@pattern.Rational::new(-n, 3L) < @pattern.Rational::new(-n, 4L))
   assert_eq(@pattern.Rational::new(-n, 3L).floor(), -3074457345618258603L)
 }
+
+///|
+test "rational identities preserve large negative normalized values" {
+  let value = @pattern.Rational::new(-9223372036854775807L, 7L)
+  let zero = @pattern.Rational::from_int(0)
+  let one = @pattern.Rational::from_int(1)
+  assert_true(value + zero == value)
+  assert_true(value - zero == value)
+  assert_true(value * one == value)
+  assert_true(value / one == value)
+  assert_true(zero + value == value)
+}
+
+///|
+test "panic division by zero rational" {
+  ignore(@pattern.Rational::from_int(3) / @pattern.Rational::from_int(0))
+}

@@ -17,6 +17,9 @@ pub struct Event[A] {
 
 ///|
 pub fn[A] Event::shift(self : Event[A], offset : Rational) -> Event[A] {
+  if offset.num == 0L {
+    return self
+  }
   {
     whole: match self.whole {
       Some(whole) => Some(whole.shift(offset))

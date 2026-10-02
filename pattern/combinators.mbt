@@ -1,24 +1,38 @@
 ///|
+priv struct SequenceSlot {
+  index : Rational
+  begin : Rational
+  end_ : Rational
+}
+
+///|
 pub fn[A] sequence(pats : Array[Pat[A]]) -> Pat[A] {
   let n = pats.length()
   if n == 0 {
     return Pat::silence()
   }
   let pats = pats.copy()
+  let n_rat = Rational::from_int(n)
+  let one = Rational::from_int(1)
+  let slots : Array[SequenceSlot] = Array::makei(n, i => {
+    let i_rat = Rational::from_int(i)
+    { index: i_rat, begin: i_rat / n_rat, end_: (i_rat + one) / n_rat, }
+  })
+  // Every complete slot maps to [0,1), independent of its index and cycle.
+  let full_pat_arc = TimeSpan::new(Rational::from_int(0), one)
   make_pat(
     fn(arc) {
-      let n_rat = Rational::from_int(n)
-      let one = Rational::from_int(1)
       let result : Array[Event[A]] = []
       let cycles = arc.whole_cycles()
       for cycle_arc in cycles {
         // Determine the full cycle start from cycle_arc.begin
         let cycle_start = Rational::new(cycle_arc.begin.floor(), 1L)
         for i in 0..<n {
-          let i_rat = Rational::from_int(i)
+          let slot = slots[i]
+          let i_rat = slot.index
           // Slot arc within the cycle: [i/n, (i+1)/n) + cycle_start
-          let slot_begin = cycle_start + i_rat / n_rat
-          let slot_end = cycle_start + (i_rat + one) / n_rat
+          let slot_begin = cycle_start + slot.begin
+          let slot_end = cycle_start + slot.end_
           let slot_arc = TimeSpan::new(slot_begin, slot_end)
           // Intersect slot with the original query arc
           let query_intersect = match slot_arc.intersect(arc) {
@@ -30,12 +44,6 @@ pub fn[A] sequence(pats : Array[Pat[A]]) -> Pat[A] {
           // Scale the intersected query arc into pattern time
           let pat_begin = (query_intersect.begin - cycle_start) * n_rat - i_rat
           let pat_end = (query_intersect.end_ - cycle_start) * n_rat - i_rat
-          // Also compute the full slot in pattern space: [0,1) for this slot
-          // We must use the cycle bounds to avoid querying outside [0,1)
-          // Compute pattern-space arc for the full slot within cycle
-          let cycle_pat_begin = (slot_arc.begin - cycle_start) * n_rat - i_rat
-          let cycle_pat_end = (slot_arc.end_ - cycle_start) * n_rat - i_rat
-          let full_pat_arc = TimeSpan::new(cycle_pat_begin, cycle_pat_end)
           let query_pat_arc = TimeSpan::new(pat_begin, pat_end)
           // Capture i by value to avoid closure capture-by-reference issue
           let i_val = i
@@ -67,7 +75,7 @@ pub fn[A] sequence(pats : Array[Pat[A]]) -> Pat[A] {
       }
       result
     },
-    Rational::from_int(1),
+    one,
     Opaque([]),
     Anonymous,
     combine_signature("sequence", pats),

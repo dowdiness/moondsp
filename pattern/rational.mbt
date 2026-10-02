@@ -60,6 +60,12 @@ pub fn Rational::to_double(self : Rational) -> Double {
 
 ///|
 pub impl Add for Rational with fn add(self : Rational, other : Rational) -> Rational {
+  if other.num == 0L {
+    return self
+  }
+  if self.num == 0L {
+    return other
+  }
   let common = gcd(self.den, other.den)
   let num = self.num * (other.den / common) + other.num * (self.den / common)
   let cancel = gcd(num, common)
@@ -68,6 +74,9 @@ pub impl Add for Rational with fn add(self : Rational, other : Rational) -> Rati
 
 ///|
 pub impl Sub for Rational with fn sub(self : Rational, other : Rational) -> Rational {
+  if other.num == 0L {
+    return self
+  }
   let common = gcd(self.den, other.den)
   let num = self.num * (other.den / common) - other.num * (self.den / common)
   let cancel = gcd(num, common)
@@ -76,6 +85,12 @@ pub impl Sub for Rational with fn sub(self : Rational, other : Rational) -> Rati
 
 ///|
 pub impl Mul for Rational with fn mul(self : Rational, other : Rational) -> Rational {
+  if other.num == 1L && other.den == 1L {
+    return self
+  }
+  if self.num == 1L && self.den == 1L {
+    return other
+  }
   let left = gcd(self.num, other.den)
   let right = gcd(other.num, self.den)
   Rational::new(
@@ -88,6 +103,9 @@ pub impl Mul for Rational with fn mul(self : Rational, other : Rational) -> Rati
 pub impl Div for Rational with fn div(self : Rational, other : Rational) -> Rational {
   if other.num == 0L {
     abort("Rational: division by zero")
+  }
+  if other.num == 1L && other.den == 1L {
+    return self
   }
   let left = gcd(self.num, other.num)
   let right = gcd(self.den, other.den)

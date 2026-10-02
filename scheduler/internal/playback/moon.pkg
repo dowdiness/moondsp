@@ -4,3 +4,7 @@ import {
   "dowdiness/moondsp/scheduler/internal/model",
   "dowdiness/moondsp/song",
 }
+
+import {
+  "moonbitlang/core/bench",
+} for "wbtest"

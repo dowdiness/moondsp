@@ -1,0 +1,274 @@
+{
+  "date": "2026-10-02",
+  "branch": "perf/pattern-query-allocation",
+  "worktree": "/home/antisatori/ghq/github.com/dowdiness/moondsp/.worktrees/pattern-query-allocation",
+  "baselineCommit": "e07ad86ff99c0d6e315e330c7129e4203ca4211a",
+  "priorMeasurementCommit": "0e3549d3aafd026d353976205ef3e6c48b9700e3",
+  "transferredEvidenceFiles": [
+    "2026-09-25-onset-material-free.tar.gz",
+    "2026-09-26-onset-v8-allocation-tracking.txt",
+    "2026-09-25-onset-material-free.json",
+    "2026-09-26-onset-allocation-attribution.txt",
+    "2026-10-02-onset-allocation-source-loop.json",
+    "2026-09-25-real-onset-scheduler.txt",
+    "2026-09-25-onset-worklet-allocation.json",
+    "2026-09-25-onset-worklet-allocation.txt",
+    "2026-09-25-onset-material-free.txt",
+    "2026-10-02-onset-allocation-source-loop.tar.gz",
+    "2026-10-02-onset-allocation-source-loop.txt",
+    "2026-09-26-onset-v8-allocation-tracking.json",
+    "2026-09-25-onset-worklet-allocation.tar.gz",
+    "2026-09-26-onset-v8-allocation-tracking.tar.gz",
+    "2026-09-26-onset-allocation-attribution.tar.gz",
+    "2026-09-26-onset-off-allocation-stages.json",
+    "2026-09-26-onset-off-allocation-stages.txt",
+    "2026-09-25-real-onset-scheduler.json",
+    "2026-09-26-onset-allocation-attribution.json",
+    "2026-09-26-onset-off-allocation-stages.tar.gz",
+    "2026-09-25-real-onset-scheduler.tar.gz"
+  ],
+  "implementation": [
+    "Private pattern-node path tails are immutable and structurally shared; prepend no longer copies descendant arrays. Public nodes() still returns a fresh exact-size mutable array and Debug/structural equality are preserved.",
+    "Runtime and Atom lowering construct invariant leaf paths outside per-event callbacks.",
+    "Rational arithmetic reuses immutable inputs for add/subtract zero and multiply/divide positive one.",
+    "TimeSpan/Event zero shifts reuse immutable values; nonempty contained intersections reuse an existing span."
+  ],
+  "sourceFiles": [
+    "pattern/pattern_doc.mbt",
+    "pattern/rational.mbt",
+    "pattern/time.mbt",
+    "pattern/event.mbt",
+    "pattern/rational_test.mbt",
+    "pattern/time_test.mbt",
+    "pattern/event_test.mbt",
+    "pattern/event_wbtest.mbt",
+    "pattern/pattern_node_path_wbtest.mbt",
+    "pattern/path_allocation_benchmark.mbt",
+    "pattern/time_benchmark.mbt",
+    "scheduler/internal/playback/query_benchmark_wbtest.mbt",
+    "scheduler/internal/playback/moon.pkg",
+    "pattern/README.mbt.md",
+    "CHANGELOG.md"
+  ],
+  "renderScenarios": [
+    {
+      "name": "dense",
+      "blocks": 600,
+      "before": 5399504,
+      "after": 3619295,
+      "reductionFraction": 0.32969861676183587,
+      "pcmSha256": "28d2d746be53de50b4c696a3bb6fd41792d6832ebb903a69c581af14a458810a",
+      "pcmAndStatesEqual": true
+    },
+    {
+      "name": "sparse",
+      "blocks": 600,
+      "before": 575885,
+      "after": 432431,
+      "reductionFraction": 0.24910181720308744,
+      "pcmSha256": "d29dbd1bf6e566f9a2dd1a0eba32fd9b1b5144bc7b524eb97fd6f828056efaf3",
+      "pcmAndStatesEqual": true
+    },
+    {
+      "name": "dense-text",
+      "blocks": 600,
+      "before": 5399504,
+      "after": 3619295,
+      "reductionFraction": 0.32969861676183587,
+      "pcmSha256": "28d2d746be53de50b4c696a3bb6fd41792d6832ebb903a69c581af14a458810a",
+      "pcmAndStatesEqual": true
+    },
+    {
+      "name": "fractional-update",
+      "blocks": 600,
+      "before": 755131,
+      "after": 570911,
+      "reductionFraction": 0.24395767092067466,
+      "pcmSha256": "038cfa3050d6315f7f74b2ed7552371bfe0ca07fdded87a0aa9d4b40424e8dbc",
+      "pcmAndStatesEqual": true
+    },
+    {
+      "name": "rest-degrade-zero-gain",
+      "blocks": 600,
+      "before": 1644011,
+      "after": 1169329,
+      "reductionFraction": 0.2887340778133479,
+      "pcmSha256": "16d22cd4d73e843e0d3957b15e2ba9373ce127b991465a373eba58b7f10d88af",
+      "pcmAndStatesEqual": true
+    }
+  ],
+  "queryBenchmark": {
+    "before": {
+      "command": "NEW_MOON_MOD=0 moon bench scheduler/internal/playback/query_benchmark_wbtest.mbt --release",
+      "baselineCommit": "e07ad86ff99c0d6e315e330c7129e4203ca4211a",
+      "target": "wasm-gc",
+      "operation": "PlaybackState::query_active_sourced_events over 600 precomputed distinct arcs; admission excluded",
+      "sparse": {
+        "meanMs": 3.96,
+        "stddevMs": 0.15812,
+        "minMs": 3.7,
+        "maxMs": 4.24
+      },
+      "dense": {
+        "meanMs": 41.3,
+        "stddevMs": 2.06,
+        "minMs": 39.09,
+        "maxMs": 44.88
+      }
+    },
+    "after": {
+      "command": "NEW_MOON_MOD=0 moon bench scheduler/internal/playback/query_benchmark_wbtest.mbt --release",
+      "target": "wasm-gc",
+      "operation": "PlaybackState::query_active_sourced_events over 600 precomputed distinct arcs; admission excluded",
+      "sparse": {
+        "meanMs": 2.85,
+        "stddevMs": 0.04184,
+        "minMs": 2.79,
+        "maxMs": 2.91
+      },
+      "dense": {
+        "meanMs": 24.88,
+        "stddevMs": 1.14,
+        "minMs": 23.41,
+        "maxMs": 26.75
+      }
+    },
+    "denseReductionFraction": 0.39757869249394673,
+    "sparseReductionFraction": 0.2803030303030303
+  },
+  "isolatedBenchmarkRecords": [
+    "path-before.txt",
+    "path-after.txt",
+    "time-before.txt",
+    "time-after.txt"
+  ],
+  "v8Worklet": {
+    "browser": "Chrome/148.0.7778.215",
+    "rounds": 2,
+    "order": [
+      "before,after",
+      "after,before"
+    ],
+    "binariesAreUninstrumented": true,
+    "rows": [
+      {
+        "round": 0,
+        "arm": "before",
+        "blocks": 600,
+        "audio": {
+          "blocks": 600,
+          "silentBlocks": 0,
+          "nonzeroSamples": 153600,
+          "checksum": 647.1676971881834,
+          "energy": 21460.42662911741,
+          "peak": 1.1976007050588209
+        },
+        "wasmStack": {
+          "count": 5359542,
+          "size": 110702864,
+          "script": "wasm://wasm/dowdiness/moondsp/browser@0.6.0-001ccfca",
+          "line": 1
+        },
+        "maxObservedFrameStep": 128
+      },
+      {
+        "round": 0,
+        "arm": "after",
+        "blocks": 600,
+        "audio": {
+          "blocks": 600,
+          "silentBlocks": 0,
+          "nonzeroSamples": 153600,
+          "checksum": 647.1676971881834,
+          "energy": 21460.42662911741,
+          "peak": 1.1976007050588209
+        },
+        "wasmStack": {
+          "count": 3597332,
+          "size": 74079952,
+          "script": "wasm://wasm/dowdiness/moondsp/browser@0.6.0-001cd642",
+          "line": 1
+        },
+        "maxObservedFrameStep": 128
+      },
+      {
+        "round": 1,
+        "arm": "after",
+        "blocks": 600,
+        "audio": {
+          "blocks": 600,
+          "silentBlocks": 0,
+          "nonzeroSamples": 153600,
+          "checksum": 647.1676971881834,
+          "energy": 21460.42662911741,
+          "peak": 1.1976007050588209
+        },
+        "wasmStack": {
+          "count": 3597321,
+          "size": 74079644,
+          "script": "wasm://wasm/dowdiness/moondsp/browser@0.6.0-001cd642",
+          "line": 1
+        },
+        "maxObservedFrameStep": 128
+      },
+      {
+        "round": 1,
+        "arm": "before",
+        "blocks": 600,
+        "audio": {
+          "blocks": 600,
+          "silentBlocks": 0,
+          "nonzeroSamples": 153600,
+          "checksum": 647.1676971881834,
+          "energy": 21460.42662911741,
+          "peak": 1.1976007050588209
+        },
+        "wasmStack": {
+          "count": 5359530,
+          "size": 110702528,
+          "script": "wasm://wasm/dowdiness/moondsp/browser@0.6.0-001ccfca",
+          "line": 1
+        },
+        "maxObservedFrameStep": 128
+      }
+    ]
+  },
+  "originProof": {
+    "cases": 3,
+    "arcsPerCase": 600,
+    "cyclesPerCase": 2,
+    "exactEventTimeOriginAndNodePathOutputEqual": true,
+    "sha256": "eab88ad33a790104bef5e20855d4e62b8cdf930e2dbfc507d69c4c675b72694f",
+    "bytes": 5385099,
+    "lines": 140218,
+    "commands": {
+      "before": "",
+      "after": ""
+    }
+  },
+  "verification": {
+    "moonCheck": "pass",
+    "releaseTests": {
+      "total": 1272,
+      "passed": 1272,
+      "failed": 0
+    },
+    "patternJavaScriptTests": {"total": 248, "passed": 248, "failed": 0},
+    "patternNativeTests": {"total": 248, "passed": 248, "failed": 0},
+    "browserReleaseBuild": "pass",
+    "moonInfo": "pass; observed empty .mbti diff",
+    "moonFmt": "pass",
+    "denyWarnings": "pass",
+    "pcm": "Five 600-block scenarios; all 153600 Float32 samples per scenario and per-block transport/pending/tempo/position states identical",
+    "origin": "Three tracked sources; 600 arcs each across two cycles; exact event whole/part, note/gain, atom IDs, binding chains and node paths output identical"
+  },
+  "scopeLimits": [
+    "This is a completed initial optimization batch, not a no-allocation implementation. Dense render still executes3619295 GC construction instructions over600 blocks.",
+    "GC instruction counts and V8 trace record counts are distinct; native backing-store/runtime coverage remains unproven.",
+    "V8 trace sizes are cumulative trace-accounted bytes, not retained heap/RSS.",
+    "The query benchmark excludes admission and uses precomputed arcs in the wasm-gc release target; its 39.76% dense improvement is not a measured whole-render callback speedup.",
+    "Actual Worklet callback-duration percentiles, GC pause distributions and underrun/audio-output deadline compliance were not measured. Frame step128 is not deadline proof; profiler wall windows must not be interpreted as callback timings.",
+    "No sourceMap, onset feature, browser ABI, graph, CLAP or native changes. SourceMap-free dense allocation reduction equals tracked dense reduction.",
+    "No commit, push, or merge; main and unrelated dirty files preserved."
+  ]
+}

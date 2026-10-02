@@ -68,6 +68,31 @@ test "sequence: multi-cycle query [0, 2) doubles event count" {
 }
 
 ///|
+test "sequence: nested slots preserve negative fractional clips across queries" {
+  let p = @pattern.sequence([
+    @pattern.sequence([@pattern.Pat::pure(1), @pattern.Pat::pure(2)]),
+    @pattern.Pat::pure(3),
+  ])
+  assert_eq(
+    p
+    .query(span(-5, 8, 3, 8))
+    .map(event => (event.whole.unwrap(), event.part, event.value)),
+    [
+      (span(-3, 4, -1, 2), span(-5, 8, -1, 2), 2),
+      (span(-1, 2, 0, 1), span(-1, 2, 0, 1), 3),
+      (span(0, 1, 1, 4), span(0, 1, 1, 4), 1),
+      (span(1, 4, 1, 2), span(1, 4, 3, 8), 2),
+    ],
+  )
+  assert_eq(
+    p
+    .query(span(-1, 2, 0, 1))
+    .map(event => (event.whole.unwrap(), event.part, event.value)),
+    [(span(-1, 2, 0, 1), span(-1, 2, 0, 1), 3)],
+  )
+}
+
+///|
 test "stack: empty array produces silence (0 events)" {
   let p : @pattern.Pat[Int] = @pattern.stack([])
   let events = p.query(span(0, 1, 1, 1))
