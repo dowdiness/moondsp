@@ -3,7 +3,7 @@
 
 import { Compartment, EditorState, Prec } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers, highlightActiveLine } from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import { defaultKeymap, historyKeymap } from "@codemirror/commands";
 import { bracketMatching } from "@codemirror/language";
 import { closeBrackets, closeBracketsKeymap, acceptCompletion } from "@codemirror/autocomplete";
 
@@ -17,6 +17,7 @@ import overlayGrouping from "../../../examples/overlay-grouping.mini?raw";
 import restsAndGates from "../../../examples/rests-and-gates.mini?raw";
 
 import { minilive } from "./lang/minilive";
+import { inlineControls } from "./inline-controls";
 import { CM6Adapter } from "./canopy";
 import type { Diagnostic } from "./canopy";
 import { AudioEngine } from "./audio";
@@ -26,7 +27,7 @@ import { Player } from "./playback";
 import type { PlaybackView } from "./playback";
 
 const INITIAL = `$: s("bd(3,8), hh*16?, sd(2,8,2)").jux(rev)
-$: note("48(3,8) 60(2,8,2) 67(3,8) 60(2,8,3)").slow(3)`;
+$: note("48(3,8) 60(2,8,2) 67(3,8) 60(2,8,3)").slow(3).gain(0.6).lpf(1800, 0.7)`;
 
 // ── DOM ─────────────────────────────────────────────────────
 
@@ -61,7 +62,7 @@ const view = new EditorView({
       highlightActiveLine(),
       bracketMatching(),
       closeBrackets(),
-      history(),
+      inlineControls(),
       minilive(),
       // Tab → accept the highlighted completion when the popup is open.
       // CM6's default completion keymap only binds Enter; most editors
