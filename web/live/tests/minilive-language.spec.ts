@@ -1,12 +1,58 @@
 import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { buildParser } from "@lezer/generator";
+import { Draft } from "../src/authoring";
 
 const grammar = readFileSync(
   new URL("../src/lang/minilive.grammar", import.meta.url),
   "utf8",
 );
 const parser = buildParser(grammar);
+
+// One corpus exercises both the production MoonBit parser and editor token boundaries.
+for (const [name, source] of [
+  ["consecutive comment stars", '/* 🎹 .gain(.1) **/ note("C3").gain(.6) /* end */'],
+  ["long star runs", '/****/ note("C3").gain(.6) /* .lpf(99) *****/'],
+  ["multiline string", '/* 🎹 */ note("C3\nE3").gain(.6).lpf(1800, .7)'],
+  ["opaque string content", 'song(section("a .gain(.1)",1,note("C3").gain(.6)),part("p","a .gain(.1)"))'],
+  ["literal backslash before quote", String.raw`song(section("a\",1,note("C3").gain(.6)),part("p","a\"))`],
+] as const) {
+  test(`source and editor agree on ${name}`, async ({ page }) => {
+    const draft = new Draft(source);
+    try {
+      expect(draft.state().diagnostic).toBeNull();
+      expect(draft.prepare().source).toBe(source);
+    } finally { draft.dispose(); }
+    const numbers: string[] = [];
+    parser.parse(source).iterate({ enter(node) {
+      if (node.name === "Number" && node.node.parent?.parent?.name === "MemberCall") numbers.push(source.slice(node.from, node.to));
+    } });
+    expect(numbers).toEqual(name === "multiline string" ? [".6", "1800", ".7"] : [".6"]);
+    await page.goto("/");
+    await page.locator(".cm-content").fill(source);
+    await expect(page.locator(".cm-inline-control")).toHaveCount(numbers.length);
+    await page.getByRole("slider", { name: "Adjust Gain", exact: true }).press("Enter");
+    const input = page.getByRole("textbox", { name: "Gain", exact: true });
+    await input.fill(".8");
+    await input.press("Enter");
+    const actual = await page.locator(".cm-line").evaluateAll(lines => lines.map(line => {
+      const copy = line.cloneNode(true) as HTMLElement;
+      copy.querySelectorAll(".cm-inline-control").forEach(node => node.remove());
+      return copy.textContent;
+    }).join("\n"));
+    expect(actual).toBe(source.replace('.gain(.6)', '.gain(.8)'));
+  });
+}
+
+test("unfinished lexical tokens never expose modifier-looking content", async ({ page }) => {
+  await page.goto("/");
+  for (const source of ['note("C3\n.gain(.6).lpf(1800)', '/* 🎹 ** .gain(.6) note("C3").lpf(1800)']) {
+    const draft = new Draft(source);
+    try { expect(draft.state().diagnostic).not.toBeNull(); } finally { draft.dispose(); }
+    await page.locator(".cm-content").fill(source);
+    await expect(page.locator(".cm-inline-control")).toHaveCount(0);
+  }
+});
 
 function parseFacts(source: string) {
   const numbers: string[] = [];
