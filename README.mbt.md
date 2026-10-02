@@ -57,6 +57,13 @@ NEW_MOON_MOD=0 moon run cmd/main
 
 *(Note: `NEW_MOON_MOD=0` preserves the repository's hand-maintained `moon.mod`)*
 
+CI installs MoonBit `0.10.14+7d59c7ec9` in every GitHub Actions workflow
+(including Copilot setup). To upgrade, change the version argument in each
+`.github/workflows/*.yml` MoonBit installer step together; run
+`moon check --target all --deny-warn` and the target test suites with the new
+toolchain before merging. The installer script itself is fetched from its
+upstream URL, so this pins the downloaded toolchain, not the installer script.
+
 ### 1. Run in Browser (Web AudioWorklet via `wasm-gc`)
 ```bash
 NEW_MOON_MOD=0 moon build --target wasm-gc --release
