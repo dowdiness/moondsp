@@ -37,6 +37,7 @@ export default defineConfig({
   server: {
     port: 5180,
     strictPort: false,
+    allowedHosts: ["t-03gyuxpogbl3qlyykpjksbrwu-p20071.onamp.dev"],
   },
   build: {
     target: "es2022",
