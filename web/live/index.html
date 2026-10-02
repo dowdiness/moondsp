@@ -15,10 +15,10 @@
     />
     <style>
       :root {
-        --bg: #f3efe5;
+        --bg: #f6f5f1;
         --ink: #1d1b18;
         --ink-muted: #5a5248;
-        --panel: rgba(255, 252, 245, 0.92);
+        --panel: #fffefa;
         --accent: #b44f2c;
         --accent-soft: #e8c2a2;
         --border: rgba(29, 27, 24, 0.14);
@@ -346,7 +346,11 @@
         font-family: var(--font-mono);
         font-size: var(--text-md);
         line-height: 1.6;
+        padding: 16px 0;
       }
+      .cm-editor .cm-scroller { overflow: auto; }
+      .cm-editor .cm-gutters { background: transparent; border: 0; color: var(--ink-muted); }
+      .cm-editor .cm-line { padding-left: 12px; }
       .cm-diagnostic {
         text-decoration: underline wavy;
         text-decoration-skip-ink: none;
@@ -442,10 +446,9 @@
   </head>
   <body>
     <header>
-      <h1>moondsp · live</h1>
       <div class="controls">
         <span class="status" id="status" aria-live="polite">Ready</span>
-        <button id="cheat-toggle" type="button" class="toggle" aria-controls="cheat" aria-expanded="true">Hide help</button>
+        <button id="cheat-toggle" type="button" class="toggle" aria-controls="cheat" aria-expanded="false">Show help</button>
         <button id="start" type="button">Play</button>
         <button id="restart" type="button" class="toggle">Restart</button>
       </div>
@@ -470,7 +473,7 @@
         </details>
       </section>
     </header>
-    <main class="workspace">
+    <main class="workspace cheat-collapsed">
       <div id="editor"></div>
       <aside id="cheat" aria-label="mini-notation cheatsheet">
         <h2>Examples</h2>
