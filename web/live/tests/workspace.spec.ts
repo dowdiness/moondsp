@@ -346,6 +346,85 @@ test("conflicting tab edits remain downloadable without replacing the newer save
   await stale.close();
 });
 
+test("overlapping tab saves remain recoverable after both tabs leave", async ({ page, context }) => {
+  await page.goto("/");
+  const original = await readCode(page);
+  const other = await context.newPage();
+  await other.goto("/");
+  await expect.poll(() => readCode(other)).toBe(original);
+  // Hold B's storage view at the value both tabs read before either writes.
+  // This deterministically exercises the permitted cross-agent read/write race,
+  // without depending on two 350 ms timers happening to overlap.
+  await other.evaluate(() => {
+    const read = Storage.prototype.getItem;
+    const base = localStorage.getItem("moondsp.live.score.v1");
+    Storage.prototype.getItem = function (key: string) {
+      return key === "moondsp.live.score.v1" ? base : read.call(this, key);
+    };
+  });
+  const first = '// first tab\nnote("D4")';
+  const second = '// second tab\nnote("G4")';
+  await replaceCode(page, first);
+  await page.goto("about:blank");
+  await replaceCode(other, second);
+  await other.goto("about:blank");
+  await page.goto("/");
+  await expect.poll(() => readCode(page)).toBe(second);
+  await page.getByText("Saved drafts", { exact: true }).click();
+  const recovery = page.locator(".saved-draft").filter({ hasText: first });
+  await recovery.getByRole("button", { name: "Restore", exact: true }).click();
+  await expect.poll(() => readCode(page)).toBe(first);
+  await page.locator("#undo").click();
+  await expect.poll(() => readCode(page)).toBe(second);
+  await other.close();
+});
+
+test("a failed recovery write preserves the shared score and leaves the edit downloadable", async ({ page }) => {
+  await page.goto("/");
+  const original = await readCode(page);
+  await page.evaluate(() => {
+    const write = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key: string, value: string) {
+      if (key.startsWith("moondsp.live.draft.v1.")) throw new DOMException("Full", "QuotaExceededError");
+      write.call(this, key, value);
+    };
+  });
+  await replaceCode(page, imported);
+  await expect(page.locator("#save-status")).toHaveText("Not saved");
+  const downloadReady = page.waitForEvent("download");
+  await page.locator("#save-score").click();
+  const stream = await (await downloadReady).createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream!) chunks.push(Buffer.from(chunk));
+  expect(Buffer.concat(chunks).toString("utf8")).toBe(imported);
+  await page.reload();
+  await expect.poll(() => readCode(page)).toBe(original);
+});
+
+test("deleting an older displayed draft cannot delete a newer checkpoint from that tab", async ({ page, context }) => {
+  await page.goto("/");
+  const first = 'note("D4")';
+  const latest = '// 保持\nnote("F4")';
+  await replaceCode(page, first);
+  await expect(page.locator("#save-status")).toHaveText("Saved locally");
+  const other = await context.newPage();
+  await other.goto("/");
+  await other.getByText("Saved drafts", { exact: true }).click();
+  const oldDraft = other.locator(".saved-draft").filter({ hasText: first });
+  await oldDraft.getByRole("button", { name: "Restore", exact: true }).focus();
+  await replaceCode(page, latest);
+  await expect(page.locator("#save-status")).toHaveText("Saved locally");
+  await expect(oldDraft.getByRole("button", { name: "Restore", exact: true })).toBeFocused();
+  other.once("dialog", dialog => dialog.accept());
+  await oldDraft.getByRole("button", { name: "Delete saved draft", exact: true }).click();
+  await page.goto("about:blank");
+  await replaceCode(other, 'note("A4")');
+  await other.locator(".saved-draft").filter({ hasText: latest })
+    .getByRole("button", { name: "Restore", exact: true }).click();
+  await expect.poll(() => readCode(other)).toBe(latest);
+  await other.close();
+});
+
 test("an asynchronous import never overwrites newer typing", async ({ page }) => {
   await page.addInitScript(() => {
     const read = File.prototype.text;

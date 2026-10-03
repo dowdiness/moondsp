@@ -293,6 +293,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Preserve separate browser-session recovery copies before shared score writes,
+  including page-exit saves. Overlapping tab saves can no longer destroy the
+  overwritten draft: Saved drafts restores either copy with Undo support.
+  Recovery-write failures leave the shared score untouched; confirmed deletion
+  of an older checkpoint cannot remove a newer save from another tab.
+
 - Prevented an untouched stale browser tab from overwriting a newer saved score
   on exit. Conflicting edits retain the local draft and remain downloadable,
   with a warning instead of silently replacing another tab's saved work.

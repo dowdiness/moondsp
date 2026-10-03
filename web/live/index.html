@@ -49,6 +49,11 @@
             <button type="button" id="source-toggle" class="view-toggle" aria-pressed="true" title="Show controls for the phrase at your cursor">Controls</button>
           </div>
         </div>
+        <details id="saved-drafts" hidden>
+          <summary>Saved drafts</summary>
+          <p>Recovery copies from other sessions. Restore is undoable.</p>
+          <ul id="saved-draft-list"></ul>
+        </details>
         <div id="editor" tabindex="-1"></div>
         <div class="score-bottom"><span id="cursor-position">Ln 3, Col 1</span><span class="keyboard-hint"><kbd>Ctrl / ⌘</kbd> <kbd>Enter</kbd></span></div>
       </section>
@@ -78,6 +83,7 @@
           <p>A preview plays about 0.7 seconds of the selected phrase with just that source step, using the same DSP, declarations, and modifiers attached directly to the phrase. Other voices and modifiers on enclosing groups or later references are not included. Use Play to hear the complete result in context.</p>
           <p>The small knobs edit gain and filter values for note and chord voices. Browser drums are not affected by those modifiers. Drag vertically, use arrow keys, or press Enter to type a number.</p>
           <p>Controls hides or shows the pads without changing your music. Downloads are plain-text <code>.mini</code> files you can edit, share, or use with your own AI tools. Nothing is sent to an AI service.</p>
+          <p>Each edited session saves a separate recovery copy before updating the shared saved score. If tabs save at the same time, both drafts remain available after reopening, even if one replaces the shared score. Saved drafts lets you restore a copy with Undo support or permanently delete it after confirmation. Copies stay in this browser until you delete them; Download keeps a separate file. If browser storage is full or unavailable, download your open score before leaving.</p>
         </details>
         <h2>Listen to an idea</h2>
         <p class="cheat-note">Examples replace your score; Undo restores it. While paused, Play resumes the accepted score. Restart plays your new score from the beginning.</p>

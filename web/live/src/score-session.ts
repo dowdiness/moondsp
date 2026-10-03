@@ -2,6 +2,7 @@ import { isolateHistory } from "@codemirror/commands";
 import type { EditorView } from "@codemirror/view";
 
 const STORAGE_KEY = "moondsp.live.score.v1";
+const RECOVERY_PREFIX = "moondsp.live.draft.v1.";
 const SAVE_DELAY_MS = 350;
 const MAX_IMPORT_BYTES = 1024 * 1024;
 
@@ -19,12 +20,83 @@ export function mountScoreSession(view: EditorView): { changed(): void; dispose(
   const saveButton = document.getElementById("save-score") as HTMLButtonElement | null;
   const openButton = document.getElementById("open-score") as HTMLButtonElement | null;
   const fileInput = document.getElementById("score-file") as HTMLInputElement | null;
+  const recoveryPanel = document.getElementById("saved-drafts") as HTMLDetailsElement | null;
+  const recoveryList = document.getElementById("saved-draft-list");
   let pickerDoc: typeof view.state.doc | undefined;
   let timer: number | undefined;
   let disposed = false;
   let savedSource: string | null = view.state.doc.toString();
   let dirty = true;
   let saveWarning = false;
+  let recoveryKey: string | undefined;
+
+  // Keys are immutable: a tab can replace only its own previous checkpoint,
+  // and only after its replacement is durable. No shared read/modify/write.
+  const checkpoint = (source: string): void => {
+    const key = `${RECOVERY_PREFIX}${crypto.randomUUID()}`;
+    window.localStorage.setItem(key, JSON.stringify({ source, savedAt: Date.now() }));
+    const previous = recoveryKey;
+    recoveryKey = key;
+    if (previous) window.localStorage.removeItem(previous);
+  };
+
+  const refreshRecoveries = (): void => {
+    if (!recoveryPanel || !recoveryList) return;
+    try {
+      const drafts: { key: string; source: string; savedAt: number }[] = [];
+      for (let index = 0; index < window.localStorage.length; index++) {
+        const key = window.localStorage.key(index);
+        if (!key?.startsWith(RECOVERY_PREFIX) || key === recoveryKey) continue;
+        try {
+          const entry = JSON.parse(window.localStorage.getItem(key) ?? "null");
+          if (entry && typeof entry.source === "string" &&
+              typeof entry.savedAt === "number" && Number.isFinite(entry.savedAt)) {
+            drafts.push({ key, source: entry.source, savedAt: entry.savedAt });
+          }
+        } catch { /* A malformed entry must not hide other recoverable drafts. */ }
+      }
+      drafts.sort((a, b) => b.savedAt - a.savedAt || a.key.localeCompare(b.key));
+      recoveryList.replaceChildren();
+      for (const { key, source, savedAt } of drafts) {
+        const row = document.createElement("li");
+        row.className = "saved-draft";
+        const time = document.createElement("span");
+        time.textContent = new Date(savedAt).toLocaleString();
+        const preview = document.createElement("pre");
+        preview.textContent = source.length ? source.slice(0, 240) : "(Empty score)";
+        const restore = document.createElement("button");
+        restore.type = "button";
+        restore.textContent = "Restore";
+        restore.addEventListener("click", () => {
+          view.dispatch({
+            changes: { from: 0, to: view.state.doc.length, insert: source },
+            annotations: isolateHistory.of("full"),
+          });
+          recoveryPanel.open = false;
+          view.focus();
+          setSessionMessage("Restored a saved draft. Undo restores your previous score.");
+        });
+        const discard = document.createElement("button");
+        discard.type = "button";
+        discard.textContent = "Delete saved draft";
+        discard.addEventListener("click", () => {
+          if (!window.confirm("Delete this saved draft? This cannot be undone. Your open score is unchanged.")) return;
+          try {
+            window.localStorage.removeItem(key);
+            refreshRecoveries();
+            recoveryPanel.querySelector("summary")?.focus();
+          } catch {
+            setSessionMessage("Could not delete the saved draft. Your score is unchanged.");
+          }
+        });
+        row.append(time, preview, restore, discard);
+        recoveryList.append(row);
+      }
+      recoveryPanel.hidden = drafts.length === 0;
+    } catch {
+      setSessionMessage("Saved drafts are unavailable. Download your score to keep it.");
+    }
+  };
 
   const setSaveStatus = (message: string): void => {
     if (saveStatus) saveStatus.textContent = message;
@@ -41,7 +113,7 @@ export function mountScoreSession(view: EditorView): { changed(): void; dispose(
     setSessionMessage(message);
   };
   const warnConflict = (): void => warnSave(
-    "The saved score changed in another tab. Download your score before reloading to use the saved version.",
+    "The saved score changed in another tab. Saving keeps a separate recovery copy in Saved drafts. Download your score before reloading to use the shared saved version.",
   );
   const saveNow = (initialize = false): void => {
     if (timer !== undefined) {
@@ -50,8 +122,11 @@ export function mountScoreSession(view: EditorView): { changed(): void; dispose(
     }
     if (!dirty) return;
     try {
-      const stored = window.localStorage.getItem(STORAGE_KEY);
       const source = view.state.doc.toString();
+      // Synchronous protection must precede the shared write, including pagehide.
+      // A failed checkpoint prevents publishing a score we could not recover.
+      if (!initialize) checkpoint(source);
+      const stored = window.localStorage.getItem(STORAGE_KEY);
       // Only the first mount may establish a previously absent saved score.
       if (initialize && stored === null) savedSource = null;
       if (stored !== savedSource && stored !== source) {
@@ -77,10 +152,14 @@ export function mountScoreSession(view: EditorView): { changed(): void; dispose(
   };
   const onPageHide = (): void => saveNow();
   const onStorage = (event: StorageEvent): void => {
-    if (event.key !== null && event.key !== STORAGE_KEY) return;
     try {
-      if (event.storageArea === window.localStorage &&
-          window.localStorage.getItem(STORAGE_KEY) !== savedSource) warnConflict();
+      if (event.storageArea !== window.localStorage) return;
+      // Do not replace buttons while someone is inspecting or using a snapshot.
+      // Immutable keys make an older displayed snapshot safe to restore/delete.
+      if (!recoveryPanel?.open &&
+          (event.key === null || event.key.startsWith(RECOVERY_PREFIX))) refreshRecoveries();
+      if (event.key !== null && event.key !== STORAGE_KEY) return;
+      if (window.localStorage.getItem(STORAGE_KEY) !== savedSource) warnConflict();
     } catch {
       warnSave("Local storage is unavailable. Download your score to keep it.");
     }
@@ -150,9 +229,11 @@ export function mountScoreSession(view: EditorView): { changed(): void; dispose(
   fileInput?.addEventListener("change", onFileChange);
   window.addEventListener("pagehide", onPageHide);
   window.addEventListener("storage", onStorage);
+  recoveryPanel?.addEventListener("toggle", refreshRecoveries);
 
   // A matching stored score is already saved; do not rewrite it on mount or exit.
   saveNow(true);
+  refreshRecoveries();
 
   return {
     changed,
@@ -165,6 +246,7 @@ export function mountScoreSession(view: EditorView): { changed(): void; dispose(
       fileInput?.removeEventListener("change", onFileChange);
       window.removeEventListener("pagehide", onPageHide);
       window.removeEventListener("storage", onStorage);
+      recoveryPanel?.removeEventListener("toggle", refreshRecoveries);
     },
   };
 }
