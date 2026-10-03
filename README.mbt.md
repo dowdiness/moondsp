@@ -272,7 +272,7 @@ The codebase strictly decouples platform-agnostic core engines from platform-spe
 │   ├── clap_plugin/    Native CLAP prototype payload and C ABI shim (passes clap-validator)
 │   └── cmd/main/       CLI entry point and offline experiments
 │
-└── docs/               Architecture blueprint, technical reference, ADRs, performance snapshots
+└── docs/               Architecture blueprint, technical reference, ADRs, performance findings
 ```
 
 ---
@@ -282,9 +282,9 @@ The codebase strictly decouples platform-agnostic core engines from platform-spe
 The audio callback budget at 128 samples / 48 kHz is **2.67 ms per block**.
 Graph compilation and buffer preparation happen before playback. Benchmark
 results depend on the graph, target, toolchain, host, and measurement method;
-dated records are under [`docs/performance/`](docs/performance/).
+measured findings and limits are summarized under [`docs/performance/`](docs/performance/README.md).
 
-The [Wasm-GC sine allocation investigation](docs/performance/2026-09-14-wasm-gc-sine-allocation-fix.txt)
+The [Wasm-GC sine allocation investigation](docs/performance/2026-09-20-dsp-and-authoring-summary.md#sine-allocation)
 verified removal of the oscillator's scratch allocation and observed no GC in
 the measured fixed AudioWorklet windows. It also recorded an output underrun:
 these results do not prove zero allocation for the whole engine or glitch-free

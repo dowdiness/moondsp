@@ -4,7 +4,7 @@
 - **Date:** 2026-09-15
 - **Source:** Domain-modeling interview for [browser status issue #156](https://github.com/dowdiness/moondsp/issues/156) and pattern source highlighting
 - **Related:** [Domain glossary](../../CONTEXT.md), [scheduler edit semantics](../../scheduler/README.mbt.md#pattern-edits), [playback position goal](../plans/2026-09-09-playback-position-ui.md)
-- **Evidence:** [2026-09-19 synthetic transport probe](../performance/2026-09-19-playback-visualization-probe.txt). This probe evaluates transport feasibility only; it does not prove real-onset integration, editor mapping, or audio-thread allocation safety.
+- **Evidence:** [2026-09-19 synthetic transport findings](../performance/2026-09-24-playback-and-origin-summary.md#playback-visualization). This probe evaluates transport feasibility only; it does not prove real-onset integration, editor mapping, or audio-thread allocation safety.
 
 ## Context
 

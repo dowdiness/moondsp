@@ -5,7 +5,7 @@ timing descriptions are historical. See the [scheduler guide](../../scheduler/RE
 and [current playback contract](../technical-reference.md#browser-playback-preparation-and-application)
 for the current API, including `acceptedAtSample`.
 
-状態: 本体実装・ローカル検証済み。性能結果は `docs/performance/2026-09-08-unified-playback-api.md` を参照。
+状態: 本体実装・ローカル検証済み。性能結果は [再生・origin測定の要約](../performance/2026-09-24-playback-and-origin-summary.md#unified-playback-and-authoring-identity) を参照。
 基点: PR #232のsquash merge `18b2a80bfe414dc785c6350b225e9f30ccb71288`。
 
 ## 目的

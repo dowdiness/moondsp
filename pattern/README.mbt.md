@@ -89,13 +89,13 @@ immutable inputs. A nonempty intersection can reuse an already contained span.
 These optimizations preserve exact values and half-open boundary semantics.
 Pattern queries still allocate event and time temporaries; they do not provide
 an allocation-free audio-thread contract. See the
-[allocation measurements](../docs/performance/2026-10-02-pattern-query-allocation-improvements.txt).
+[allocation measurements](../docs/performance/2026-10-02-pattern-allocation-summary.md#initial-batch).
 
 `sequence` prepares immutable slot indices and rational bounds when constructed.
 Queries translate those bounds into the current cycle and reuse the complete
 slot's `[0,1)` child-query span; event-part clipping still uses the requested
 query span. `whole_cycles` advances to the cycle end it already computed.
-The [follow-up iteration measurements](../docs/performance/2026-10-02-pattern-query-allocation-loop.txt)
+The [follow-up findings](../docs/performance/2026-10-02-pattern-allocation-summary.md#follow-up-loop)
 compare these changes with the previous optimized baseline, including actual
 Worklet allocation profiles and exact-origin preservation.
 

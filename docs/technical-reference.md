@@ -1617,26 +1617,23 @@ boundaries; Restart checks the new source against an empty material state.
 the current play position. Lower-level unbounded scheduler APIs remain available.
 
 Rejection retains the accepted source, voices, tempo, and position. The
-[bounded-player measurements](performance/2026-09-16-player-bounds.json) record
+[bounded-player measurements](performance/2026-09-24-playback-and-origin-summary.md#player-bounds) record
 the high-density reproduction, retained-state checks, and all 30 shipped source
 examples. These limits bound supported workloads; they are not an AudioWorklet
 deadline or allocation-free rendering guarantee.
 
-The [2026-09-16 acceptance measurements](performance/2026-09-16-player-owner.json)
+The [2026-09-16 acceptance measurements](performance/2026-09-24-playback-and-origin-summary.md#player-owner)
 record page-local WASM Update and Restart p95 of 2.8 ms and 2.9 ms, respectively,
 against a 2.667 ms audio quantum. They are not AudioWorklet deadline measurements.
-The [62-group benchmark snapshot](performance/2026-09-16-player-owner-benchmarks.txt)
-records the toolchain and shared-workstation conditions; neither run establishes
-a speedup, regression, or glitch-free guarantee.
+These historical measurements used shared-workstation conditions; neither
+run establishes a speedup, regression, or glitch-free guarantee.
 
-The [post-fix admission smoke](performance/2026-09-16-player-reliability.json)
+The [post-fix admission smoke](performance/2026-09-24-playback-and-origin-summary.md#player-reliability)
 checks rejected tiny repeats, rejected finite endpoints, and an exact one-block
-repeat against release WASM. The
-[post-fix benchmark snapshot](performance/2026-09-16-player-reliability-benchmarks.txt)
-records the full suite separately; accepting a source still does not establish
-a real-time deadline guarantee.
+repeat against release WASM. Accepting a source still does not establish a
+real-time deadline guarantee.
 
-The [2026-09-17 review-fix measurements](performance/2026-09-17-player-review.json)
+The [2026-09-17 review-fix measurements](performance/2026-09-24-playback-and-origin-summary.md#player-review)
 also run the actual scheduler AudioWorklet. With 40 alternating tempo edits of
 the 12-section score, owner Update p95 was 11 ms against a 2.667 ms quantum.
 Instrumented render p95 was 1 ms, but the worklet clock resolves only integer
@@ -1644,8 +1641,6 @@ milliseconds. Callback interarrival gaps reached 24 ms both with and without
 edits because this headless configuration batches callbacks; those gaps do not
 establish audible dropouts. The command timings still exceed one quantum: source
 admission and retained-state bounds are not a hard-real-time guarantee.
-The companion [62-group benchmark snapshot](performance/2026-09-17-player-review-benchmarks.txt)
-records the full suite after the review fixes.
 
 MoonBit async remains at the JS host lifetime boundary, not in the synchronous
 AudioWorklet renderer. `packages/browser/host` already uses async 0.21.3:
