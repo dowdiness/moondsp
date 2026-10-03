@@ -22,6 +22,9 @@ export function mountScoreSession(view: EditorView): { changed(): void; dispose(
   let pickerDoc: typeof view.state.doc | undefined;
   let timer: number | undefined;
   let disposed = false;
+  let savedSource: string | null = view.state.doc.toString();
+  let dirty = true;
+  let saveWarning = false;
 
   const setSaveStatus = (message: string): void => {
     if (saveStatus) saveStatus.textContent = message;
@@ -32,26 +35,56 @@ export function mountScoreSession(view: EditorView): { changed(): void; dispose(
       sessionMessage.hidden = message.length === 0;
     }
   };
-  const saveNow = (): void => {
+  const warnSave = (message: string): void => {
+    saveWarning = true;
+    setSaveStatus("Not saved");
+    setSessionMessage(message);
+  };
+  const warnConflict = (): void => warnSave(
+    "The saved score changed in another tab. Download your score before reloading to use the saved version.",
+  );
+  const saveNow = (initialize = false): void => {
     if (timer !== undefined) {
       window.clearTimeout(timer);
       timer = undefined;
     }
+    if (!dirty) return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, view.state.doc.toString());
+      const stored = window.localStorage.getItem(STORAGE_KEY);
+      const source = view.state.doc.toString();
+      // Only the first mount may establish a previously absent saved score.
+      if (initialize && stored === null) savedSource = null;
+      if (stored !== savedSource && stored !== source) {
+        warnConflict();
+        return;
+      }
+      if (stored !== source) window.localStorage.setItem(STORAGE_KEY, source);
+      savedSource = source;
+      dirty = false;
       setSaveStatus("Saved locally");
+      if (saveWarning) setSessionMessage("");
+      saveWarning = false;
     } catch {
-      setSaveStatus("Not saved");
-      setSessionMessage("Local storage is unavailable. Download your score to keep it.");
+      warnSave("Local storage is unavailable. Download your score to keep it.");
     }
   };
   const changed = (): void => {
     if (disposed) return;
+    dirty = true;
     if (timer !== undefined) window.clearTimeout(timer);
     setSaveStatus("Saving…");
     timer = window.setTimeout(saveNow, SAVE_DELAY_MS);
   };
   const onPageHide = (): void => saveNow();
+  const onStorage = (event: StorageEvent): void => {
+    if (event.key !== null && event.key !== STORAGE_KEY) return;
+    try {
+      if (event.storageArea === window.localStorage &&
+          window.localStorage.getItem(STORAGE_KEY) !== savedSource) warnConflict();
+    } catch {
+      warnSave("Local storage is unavailable. Download your score to keep it.");
+    }
+  };
 
   const download = (): void => {
     let url: string | undefined;
@@ -116,9 +149,10 @@ export function mountScoreSession(view: EditorView): { changed(): void; dispose(
   openButton?.addEventListener("click", openPicker);
   fileInput?.addEventListener("change", onFileChange);
   window.addEventListener("pagehide", onPageHide);
+  window.addEventListener("storage", onStorage);
 
-  // Establish status by attempting a real write; never label an unpersisted source as saved.
-  saveNow();
+  // A matching stored score is already saved; do not rewrite it on mount or exit.
+  saveNow(true);
 
   return {
     changed,
@@ -130,6 +164,7 @@ export function mountScoreSession(view: EditorView): { changed(): void; dispose(
       openButton?.removeEventListener("click", openPicker);
       fileInput?.removeEventListener("change", onFileChange);
       window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("storage", onStorage);
     },
   };
 }

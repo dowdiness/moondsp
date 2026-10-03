@@ -300,6 +300,52 @@ test("UTF-8 import is undoable, downloads exact text, and survives reload", asyn
   await expect.poll(() => readCode(page)).toBe("");
 });
 
+test("an untouched stale tab cannot overwrite a newer saved score on exit", async ({ page, context }) => {
+  await page.goto("/");
+  await replaceCode(page, 'note("C4")');
+  await expect(page.locator("#save-status")).toHaveText("Saved locally");
+  const stale = await context.newPage();
+  await stale.goto("/");
+  await expect.poll(() => readCode(stale)).toBe('note("C4")');
+
+  const latest = 'note("G4").gain(0.2)';
+  await replaceCode(page, latest);
+  await expect(page.locator("#save-status")).toHaveText("Saved locally");
+  await page.goto("about:blank");
+  await stale.goto("about:blank");
+  await page.goto("/");
+  await expect.poll(() => readCode(page)).toBe(latest);
+  await stale.close();
+});
+
+test("conflicting tab edits remain downloadable without replacing the newer saved score", async ({ page, context }) => {
+  await page.goto("/");
+  await replaceCode(page, 'note("C4")');
+  await expect(page.locator("#save-status")).toHaveText("Saved locally");
+  const stale = await context.newPage();
+  await stale.goto("/");
+  await expect.poll(() => readCode(stale)).toBe('note("C4")');
+
+  const latest = 'note("G4").gain(0.2)';
+  await replaceCode(page, latest);
+  await expect(page.locator("#save-status")).toHaveText("Saved locally");
+  await replaceCode(stale, imported);
+  await expect(stale.locator("#save-status")).toHaveText("Not saved");
+  await expect(stale.locator("#session-message")).toContainText("another tab");
+  expect(await readCode(stale)).toBe(imported);
+  const downloadReady = stale.waitForEvent("download");
+  await stale.locator("#save-score").click();
+  const stream = await (await downloadReady).createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream!) chunks.push(Buffer.from(chunk));
+  expect(Buffer.concat(chunks).toString("utf8")).toBe(imported);
+  await page.goto("about:blank");
+  await stale.goto("about:blank");
+  await page.goto("/");
+  await expect.poll(() => readCode(page)).toBe(latest);
+  await stale.close();
+});
+
 test("an asynchronous import never overwrites newer typing", async ({ page }) => {
   await page.addInitScript(() => {
     const read = File.prototype.text;

@@ -293,6 +293,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Prevented an untouched stale browser tab from overwriting a newer saved score
+  on exit. Conflicting edits retain the local draft and remain downloadable,
+  with a warning instead of silently replacing another tab's saved work.
 - Isolated browser pattern-control keys from the code editor: pitch-menu arrows
   no longer move the source selection, and Escape returns to the retained
   selection for continued typing. Shared Undo/Redo and playback shortcuts remain

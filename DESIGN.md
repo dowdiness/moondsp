@@ -48,7 +48,7 @@ Light and dark palettes are defined as CSS custom properties in [`web/live/src/w
 - **Draft code, accepted code, and sounding material are distinct.** An invalid edit never replaces the accepted score; the footer reports the actual state.
 - **Edits take effect at each material's next entry boundary.** Pending changes wait while the current phrase finishes; accepted edits switch per part, not all at once.
 - **Restore** returns to the last accepted score via a regular undoable CodeMirror transaction.
-- **Session persistence** is `localStorage` under `moondsp.live.score.v1`, debounced at 350 ms, flushed on `pagehide`.
+- **Session persistence** is `localStorage` under `moondsp.live.score.v1`, debounced at 350 ms. Only pending edits are flushed on `pagehide`; an untouched tab does not rewrite its loaded score. Before saving, the session checks the stored text against its last saved text. A conflicting save from another tab leaves the local draft intact, reports **Not saved**, and asks the user to Download before reloading the saved version. Storage events also warn idle tabs when their saved copy changes; tabs do not automatically merge or replace each other's drafts.
 
 ## Help
 
