@@ -3,7 +3,7 @@
 
 import { Compartment, EditorState, Prec } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers, highlightActiveLine } from "@codemirror/view";
-import { defaultKeymap, historyKeymap } from "@codemirror/commands";
+import { defaultKeymap, historyKeymap, undo, redo, undoDepth, redoDepth, isolateHistory } from "@codemirror/commands";
 import { bracketMatching } from "@codemirror/language";
 import { closeBrackets, closeBracketsKeymap, acceptCompletion } from "@codemirror/autocomplete";
 
@@ -18,6 +18,9 @@ import restsAndGates from "../../../examples/rests-and-gates.mini?raw";
 
 import { minilive } from "./lang/minilive";
 import { inlineControls } from "./inline-controls";
+import { patternControls } from "./pattern-controls";
+import { Audition } from "./audition";
+import { loadScore, mountScoreSession } from "./score-session";
 import { CM6Adapter } from "./canopy";
 import type { Diagnostic } from "./canopy";
 import { AudioEngine } from "./audio";
@@ -26,8 +29,33 @@ import { Draft, type DraftVersion } from "./authoring";
 import { Player } from "./playback";
 import type { PlaybackView } from "./playback";
 
-const INITIAL = `$: s("bd(3,8), hh*16?, sd(2,8,2)").jux(rev)
-$: note("48(3,8) 60(2,8,2) 67(3,8) 60(2,8,3)").slow(3).gain(0.6).lpf(1800, 0.7)`;
+const STARTERS = {
+  "first-light": {
+    name: "First light",
+    source: `bpm(96);
+
+$: s("bd ~ sd ~ bd bd sd ~")
+$: s("hh hh hh hh hh hh hh hh")
+$: note("C4 ~ Eb4 G4 Bb4 ~ G4 Eb4").gain(0.25).lpf(1800)`,
+  },
+  offbeat: {
+    name: "Offbeat",
+    source: `bpm(112);
+
+$: s("bd ~ ~ bd sd ~ bd ~")
+$: s("~ hh ~ hh ~ hh ~ oh")
+$: note("C3 ~ C3 Eb3 ~ G3 Bb3 ~").gain(0.3).lpf(1200)`,
+  },
+  "slow-drift": {
+    name: "Slow drift",
+    source: `bpm(72);
+
+$: s("bd ~ ~ ~ sd ~ ~ ~")
+$: note("C4 ~ G4 ~ Eb4 ~ Bb4 ~").slow(2).gain(0.2).lpf(2400)
+$: chord("Cm7 Abmaj7").slow(4).gain(0.12).lpf(900)`,
+  },
+} as const;
+const INITIAL = loadScore(STARTERS["first-light"].source);
 
 // ── DOM ─────────────────────────────────────────────────────
 
@@ -45,24 +73,40 @@ const draftVersionEl = document.getElementById("draft-version") as HTMLElement;
 const draftVersionsEl = document.getElementById("draft-versions") as HTMLElement;
 const materialStatusEl = document.getElementById("material-status") as HTMLElement;
 const startBtn = document.getElementById("start") as HTMLButtonElement;
-const cheatEl = document.getElementById("cheat") as HTMLElement;
+const cheatEl = document.getElementById("cheat") as HTMLDialogElement;
 const cheatToggle = document.getElementById("cheat-toggle") as HTMLButtonElement;
 const workspaceEl = document.querySelector("main.workspace") as HTMLElement;
 
 // ── Editor ──────────────────────────────────────────────────
 
 const listenerCompartment = new Compartment();
+const controlsCompartment = new Compartment();
+const audition = new Audition();
+function canAutoListen(): boolean {
+  const state = playback.view().state;
+  return !compiledSession && state !== "Playing" && state !== "Starting";
+}
+window.addEventListener("pagehide", () => audition.stop());
+document.addEventListener("visibilitychange", () => { if (document.hidden) audition.stop(); });
 
 const view = new EditorView({
   parent: editorEl,
   state: EditorState.create({
     doc: INITIAL,
+    selection: { anchor: Math.max(0, INITIAL.indexOf("$:")) },
     extensions: [
       lineNumbers(),
       highlightActiveLine(),
       bracketMatching(),
       closeBrackets(),
       inlineControls(),
+      controlsCompartment.of(patternControls(audition, canAutoListen)),
+      EditorView.lineWrapping,
+      EditorView.contentAttributes.of({ "aria-label": "Music code", spellcheck: "false" }),
+      keymap.of([
+        { key: "Mod-Enter", scope: "editor pattern-control", run: () => { startBtn.click(); return true; } },
+        { key: "Mod-Shift-Enter", scope: "editor pattern-control", run: () => { document.getElementById("restart")!.click(); return true; } },
+      ]),
       minilive(),
       // Tab → accept the highlighted completion when the popup is open.
       // CM6's default completion keymap only binds Enter; most editors
@@ -82,6 +126,41 @@ const view = new EditorView({
 });
 
 const adapter = new CM6Adapter(view);
+const scoreSession = mountScoreSession(view);
+const undoBtn = document.getElementById("undo") as HTMLButtonElement;
+const redoBtn = document.getElementById("redo") as HTMLButtonElement;
+const sourceToggle = document.getElementById("source-toggle") as HTMLButtonElement;
+
+function refreshEditorChrome(): void {
+  undoBtn.disabled = undoDepth(view.state) === 0;
+  redoBtn.disabled = redoDepth(view.state) === 0;
+  const head = view.state.selection.main.head;
+  const line = view.state.doc.lineAt(head);
+  setText(document.getElementById("cursor-position")!, `Ln ${line.number}, Col ${head - line.from + 1}`);
+  const text = view.state.doc.toString();
+  const starter = Object.entries(STARTERS).find(([, value]) => value.source === text);
+  setText(document.getElementById("score-title")!, starter?.[1].name ?? "Your score");
+  document.querySelectorAll<HTMLButtonElement>("[data-starter]").forEach(button =>
+    button.setAttribute("aria-pressed", String(button.dataset.starter === starter?.[0])));
+}
+
+function replaceScore(source: string): void {
+  view.dispatch({
+    changes: { from: 0, to: view.state.doc.length, insert: source },
+    selection: { anchor: Math.max(0, source.indexOf("$:")) },
+    annotations: isolateHistory.of("full"),
+  });
+  view.focus();
+}
+
+undoBtn.addEventListener("click", () => { undo(view); view.focus(); });
+redoBtn.addEventListener("click", () => { redo(view); view.focus(); });
+sourceToggle.addEventListener("click", () => {
+  const enabled = sourceToggle.getAttribute("aria-pressed") !== "true";
+  sourceToggle.setAttribute("aria-pressed", String(enabled));
+  view.dispatch({ effects: controlsCompartment.reconfigure(enabled ? patternControls(audition, canAutoListen) : []) });
+});
+refreshEditorChrome();
 
 
 // ── Engine ──────────────────────────────────────────────────
@@ -137,6 +216,7 @@ if (schedulerTimingEnabled) {
 
 function setLog(message: string, kind: "ok" | "error" | "info" = "info"): void {
   logEl.textContent = message;
+  logEl.hidden = message.length === 0;
   logEl.classList.toggle("error", kind === "error");
   logEl.classList.toggle("ok", kind === "ok");
 }
@@ -178,6 +258,11 @@ function changeMessage(state: PlaybackView): readonly [string, string] {
 function applyStatus(state: PlaybackView): void {
   if (audioMode !== "scheduler") return;
   setText(statusEl, state.state === "Empty" ? "Ready" : state.state);
+  document.body.dataset.playback = state.state.toLowerCase();
+  const progress = document.getElementById("cycle-progress")!;
+  progress.style.transform = `scaleX(${state.cyclePosition - Math.floor(state.cyclePosition)})`;
+  document.getElementById("restore-score")!.hidden = state.currentSource === null ||
+    (state.draftStatus !== "invalid" && state.draftStatus !== "rejected");
   statusEl.dataset.samplePosition = String(state.samplePosition);
   statusEl.dataset.cyclePosition = String(state.cyclePosition);
   statusEl.dataset.tempo = state.tempoText;
@@ -190,6 +275,7 @@ function applyStatus(state: PlaybackView): void {
   const [headline, help] = changeMessage(state);
   setText(draftStatusEl, headline);
   setText(changeHelpEl, help);
+  changeHelpEl.hidden = state.draftStatus !== "invalid" && state.draftStatus !== "rejected" && state.state !== "Fault";
   changeStatusEl.dataset.tone = state.state === "Fault" || state.draftStatus === "invalid" || state.draftStatus === "rejected"
     ? "error" : state.draftStatus === "accepted" && state.pendingCount === 0 && state.skippedCount === 0 ? "ok" : "neutral";
   setText(draftVersionEl, versionLabel(state.draftVersion));
@@ -275,6 +361,8 @@ view.dispatch({
   effects: listenerCompartment.reconfigure([
     adapter.createUpdateListener(),
     EditorView.updateListener.of(update => {
+      if (update.docChanged) scoreSession.changed();
+      if (update.docChanged || update.selectionSet) refreshEditorChrome();
       if (!update.docChanged || audioMode !== "scheduler") return;
       try {
         // Preserve each transaction's causality; composing a replace and undo
@@ -297,17 +385,24 @@ view.dispatch({
 });
 
 startBtn.addEventListener("click", () => {
+  audition.stop();
   if (audioMode === "compiled") { void toggleCompiled(); return; }
   const state = playback.view().state;
   void (state === "Playing" || state === "Starting" ? playback.pause() : playback.play()).catch(error => playback.report(error));
 });
 
 document.getElementById("restart")!.addEventListener("click", () => {
+  audition.stop();
   try {
     void playback.restart(draft.prepare()).catch(error => playback.report(error));
   } catch (error) {
     playback.reportDraftFailure(error);
   }
+});
+
+document.getElementById("restore-score")!.addEventListener("click", () => {
+  const source = playback.view().currentSource;
+  if (source !== null) replaceScore(source);
 });
 
 // ── Cheatsheet ──────────────────────────────────────────────
@@ -320,10 +415,39 @@ document.getElementById("restart")!.addEventListener("click", () => {
 (document.getElementById("overlay-grouping-example") as HTMLButtonElement).dataset.example = overlayGrouping;
 (document.getElementById("rests-and-gates-example") as HTMLButtonElement).dataset.example = `bpm(96);\n${restsAndGates}`;
 
-cheatToggle.addEventListener("click", () => {
-  const collapsed = workspaceEl.classList.toggle("cheat-collapsed");
-  cheatToggle.setAttribute("aria-expanded", String(!collapsed));
-  cheatToggle.textContent = collapsed ? "Show help" : "Hide help";
+const narrowHelp = window.matchMedia("(max-width: 760px)");
+function setHelp(open: boolean): void {
+  workspaceEl.classList.toggle("cheat-collapsed", !open);
+  cheatEl.inert = !open;
+  cheatToggle.setAttribute("aria-expanded", String(open));
+  cheatToggle.textContent = open ? "Hide help" : "Show help";
+  if (open && !cheatEl.open) {
+    if (narrowHelp.matches) cheatEl.showModal();
+    else cheatEl.show();
+  } else if (!open && cheatEl.open) {
+    cheatEl.close();
+    cheatToggle.focus();
+  }
+}
+cheatToggle.addEventListener("click", () => setHelp(!cheatEl.open));
+document.getElementById("close-help")!.addEventListener("click", () => setHelp(false));
+cheatEl.addEventListener("cancel", event => { event.preventDefault(); setHelp(false); });
+cheatEl.addEventListener("keydown", event => {
+  if (event.key === "Escape") { event.preventDefault(); setHelp(false); }
+});
+narrowHelp.addEventListener("change", () => {
+  if (!cheatEl.open) return;
+  cheatEl.close();
+  setHelp(true);
+});
+document.querySelectorAll<HTMLButtonElement>("[data-starter]").forEach(button => {
+  button.addEventListener("click", () => {
+    const starter = STARTERS[button.dataset.starter as keyof typeof STARTERS];
+    if (starter) {
+      if (narrowHelp.matches) setHelp(false);
+      replaceScore(starter.source);
+    }
+  });
 });
 
 cheatEl.addEventListener("click", (ev) => {
@@ -332,10 +456,8 @@ cheatEl.addEventListener("click", (ev) => {
   if (!example) return;
   const text = example.dataset.example;
   if (!text) return;
-  view.dispatch({
-    changes: { from: 0, to: view.state.doc.length, insert: text },
-  });
-  view.focus();
+  if (narrowHelp.matches) setHelp(false);
+  replaceScore(text);
 });
 
 // Test hook: exposes the engine so smoke tests can inject synthetic

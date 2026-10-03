@@ -3,7 +3,7 @@
 // Wraps the Lezer parser with style tags for highlighting
 // and registers the autocomplete source via languageData.
 
-import { LRLanguage, LanguageSupport, syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
+import { LRLanguage, LanguageSupport, syntaxHighlighting, HighlightStyle, defaultHighlightStyle } from "@codemirror/language";
 import { autocompletion } from "@codemirror/autocomplete";
 import { styleTags, tags as t } from "@lezer/highlight";
 
@@ -40,9 +40,18 @@ export const miniliveLanguage = LRLanguage.define({
   },
 });
 
+// Keep the established token coverage; adapt its palette to the workspace theme.
+const scoreHighlightStyle = HighlightStyle.define([
+  ...defaultHighlightStyle.specs,
+  { tag: t.string, color: "var(--syntax-string, #97424d)" },
+  { tag: t.number, color: "var(--syntax-number, #286653)" },
+  { tag: [t.keyword, t.definition(t.variableName)], color: "var(--accent, #3e50a8)" },
+  { tag: t.comment, color: "var(--ink-muted, #616a7a)", fontStyle: "italic" },
+]);
+
 export function minilive(): LanguageSupport {
   return new LanguageSupport(miniliveLanguage, [
     autocompletion(),
-    syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+    syntaxHighlighting(scoreHighlightStyle, { fallback: true }),
   ]);
 }

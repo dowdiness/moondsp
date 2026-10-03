@@ -35,3 +35,11 @@ These documents provide concrete empirical evidence that `moondsp` satisfies its
 ### 5. DSP & Feature Research
 - **[`2026-09-11-shared-reverb-research.md`](2026-09-11-shared-reverb-research.md)**  
   Research and evaluation for the shared stereo room-reverb bus integrated in release `v0.6.0`.
+
+### 6. Browser Workspace & Interaction Evidence
+- **[`2026-10-02-musical-workspace.md`](2026-10-02-musical-workspace.md)**  
+  Text-first workspace design, musical-interface research, real browser/audio
+  observations, and the limits of automated usability evidence.
+- **[`2026-10-02-pitch-editing-research.md`](2026-10-02-pitch-editing-research.md)**  
+  Pitch-control alternatives, primary-source product and HCI evidence, live
+  browser observations, accessibility constraints, and a text-first recommendation.
