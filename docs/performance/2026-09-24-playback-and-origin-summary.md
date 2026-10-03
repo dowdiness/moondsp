@@ -6,7 +6,7 @@ Measurements used release wasm-gc, Moon 0.1.20260904/07, Ryzen 7 6800H / Linux W
 
 ## Player bounds
 
-The 2026-09-16 bounded-player study admitted all 30 shipped source examples (up to 2,201 characters). First-block render after 16 warmup and 64 measured operations: mean 0.648 ms, p95 0.9 ms, max 1.2 ms. Five unsupported cases were rejected: extreme query expansion, excessive Euclidean steps and the 8,192-character ingress cap. A 1 MiB input was rejected in 1.2 ms without changing state.
+The 2026-09-16 bounded-player study admitted all 30 shipped source examples (up to 2,201 characters). First-block render after 16 warmup and 64 measured operations: mean 0.648 ms, p95 0.9 ms, max 1.2 ms. Five pathological cases were rejected: four for query expansion and one for excessive Euclidean steps. Separate ingress checks rejected 8,193-character and 1 MiB inputs exceeding the 8,192-character cap. The 1 MiB input was rejected in 1.2 ms without changing state.
 
 The pathological source was rejected, not rendered faster. Supported-workload and retained-state bounds do not establish allocation-free rendering or AudioWorklet deadline safety.
 
@@ -24,7 +24,7 @@ The 2026-09-08 preparation experiments exercised headless/headed playback, busy 
 
 ## Player review
 
-The 2026-09-17 review-fix study (`67f2003` plus PR271 fixes) ran the actual scheduler AudioWorklet with 40 alternating 120/121 BPM edits. **Owner Update p95/max was 11 ms**, exceeding one quantum. Edited render p95 was 1 ms but over 80% of readings were zero: the clock could not resolve those callbacks. Interarrival gaps reached 24 ms both with and without edits in headless callback bursts; they are not audible-dropout evidence.
+The 2026-09-17 review-fix study (`67f2003` plus PR271 fixes) ran the actual scheduler AudioWorklet with 40 alternating 120/121 BPM edits. **Owner Update p95/max was 11 ms**, exceeding one quantum. Edited render p95 was 1 ms; about 69% of readings were zero (250 of 362, inferred from the integer-ms mean and maximum), so the clock could not resolve those callbacks. Interarrival gaps reached 24 ms both with and without edits in headless callback bursts; they are not audible-dropout evidence.
 
 Retained-history stress hit the pending-material limit at round 256 after 766 updates. Rejected resubmission preserved state; Restart recovered. Deep malformed parser input was rejected while controls remained usable. All 30 supported sources produced finite stereo output. Source admission and retained-state limits are not hard-real-time guarantees.
 

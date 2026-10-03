@@ -92,7 +92,7 @@ External graph-authoring/control measured in isolation across wasm-gc,
 native, and JS. Fixtures: synthetic mono chains (10/34/130 nodes), realistic
 shapes (branch fan-out, mix bus, terminal stereo, feedback loop), and
 diagnostic/rejection paths. **Measured peaks:** Largest authoring operation
-in these snapshots: 130-node template compile — wasm-gc ~55–88 µs, native
+in these snapshots: 130-node template compile — wasm-gc 55.74–63.35 µs, native
 ~48 µs, JS ~130 µs. All below 60 Hz UI frame (16.6 ms) in these fixtures.
 Block-boundary control application peaked at ~17.56 µs (native, synthetic
 large topology-controller path) — below 2.667 ms audio budget in this
