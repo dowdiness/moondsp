@@ -22,6 +22,10 @@ editor accepts a single pattern, multiple `$:` layers, or a `song(...)`
 arrangement; there is no mode selector. **Show help** opens starter scores
 and built-in examples.
 
+After replacing the score, press **Restart** to apply the new example and
+play it from the beginning. **Play** resumes paused playback; it does not
+apply a structural change that requires Restart.
+
 Click inside a plain `s(...)` or `note(...)` sequence to show its step
 controls. Text and controls edit the same score, and **Undo** applies to
 both. **Download** saves the score as a plain-text `.mini` file.
@@ -272,6 +276,10 @@ song(
 
 `section(name, cycles, pattern)` defines music. `part(id, section)` places each
 section in order. Keep every part ID unique.
+
+Patterns loop, but this song ends after its final part. To repeat the song,
+append `.repeat()` to the closing `song(...)` call, so the last line becomes
+`).repeat()`.
 
 For a larger song, read
 [`light-orbit.mini`](../../examples/light-orbit.mini).
