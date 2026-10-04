@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Reworked the browser live workspace around a text-first score, with cursor-scoped
+  drum/note controls editing the same undo history, starter scores and explanations
+  in Help, native modal Help on narrow screens, local draft persistence, and
+  undoable plain-text import/export. Invalid edits retain accepted playback.
+  Pattern controls follow the editor typography, with wrapping source steps,
+  an inline pitch keyboard or direct drum choices, and no step-count captions.
+  See the [workspace design and evidence](docs/development/2026-10-02-musical-workspace.md)
+  for supported notation, research sources, and verification limits.
+- Added a source-bound chromatic keyboard, octave browsing, direct drum choices,
+  and short DSP auditions for the selected step, replacing note/sound dropdowns.
+  GUI edits preview while the main score is stopped or paused, without moving its
+  transport. Undo/Redo are consolidated in the score toolbar to express their
+  score-wide scope; shortcuts remain available from sound controls. Numbered
+  buttons select and listen, without a duplicate Listen action. Melodic Rest sits
+  beside Octave; drum Rest stays in the sound grid. Undo restores the exact prior note.
+  Numeric/flat source spellings and preview-failure recovery are preserved.
 - Added live playback status separating the runtime transport, current Draft
   submission/acceptance, and pending musical-material transitions. Browser
   `player_mode` and `scheduler_cycle_position` expose primitive status on JS and
@@ -277,6 +293,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Preserve separate browser-session recovery copies before shared score writes,
+  including page-exit saves. Overlapping tab saves can no longer destroy the
+  overwritten draft: Saved drafts restores either copy with Undo support.
+  Recovery-write failures leave the shared score untouched; confirmed deletion
+  of an older checkpoint cannot remove a newer save from another tab.
+
+- Prevented an untouched stale browser tab from overwriting a newer saved score
+  on exit. Conflicting edits retain the local draft and remain downloadable,
+  with a warning instead of silently replacing another tab's saved work.
+- Isolated browser pattern-control keys from the code editor: pitch-menu arrows
+  no longer move the source selection, and Escape returns to the retained
+  selection for continued typing. Shared Undo/Redo and playback shortcuts remain
+  available from the controls.
 - Prepared exact event origins during pattern compilation instead of extending
   them in reference query callbacks. Context-aware cache reuse preserves
   distinct reference uses and retained snapshots without changing public APIs.

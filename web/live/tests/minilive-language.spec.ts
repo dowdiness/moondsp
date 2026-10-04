@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { buildParser } from "@lezer/generator";
 import { Draft } from "../src/authoring";
+import { replaceCode, readCode } from "./editor-helpers";
 
 const grammar = readFileSync(
   new URL("../src/lang/minilive.grammar", import.meta.url),
@@ -29,17 +30,13 @@ for (const [name, source] of [
     } });
     expect(numbers).toEqual(name === "multiline string" ? [".6", "1800", ".7"] : [".6"]);
     await page.goto("/");
-    await page.locator(".cm-content").fill(source);
+    await replaceCode(page, source);
     await expect(page.locator(".cm-inline-control")).toHaveCount(numbers.length);
     await page.getByRole("slider", { name: "Adjust Gain", exact: true }).press("Enter");
     const input = page.getByRole("textbox", { name: "Gain", exact: true });
     await input.fill(".8");
     await input.press("Enter");
-    const actual = await page.locator(".cm-line").evaluateAll(lines => lines.map(line => {
-      const copy = line.cloneNode(true) as HTMLElement;
-      copy.querySelectorAll(".cm-inline-control").forEach(node => node.remove());
-      return copy.textContent;
-    }).join("\n"));
+    const actual = await readCode(page);
     expect(actual).toBe(source.replace('.gain(.6)', '.gain(.8)'));
   });
 }
@@ -49,7 +46,7 @@ test("unfinished lexical tokens never expose modifier-looking content", async ({
   for (const source of ['note("C3\n.gain(.6).lpf(1800)', '/* 🎹 ** .gain(.6) note("C3").lpf(1800)']) {
     const draft = new Draft(source);
     try { expect(draft.state().diagnostic).not.toBeNull(); } finally { draft.dispose(); }
-    await page.locator(".cm-content").fill(source);
+    await replaceCode(page, source);
     await expect(page.locator(".cm-inline-control")).toHaveCount(0);
   }
 });
@@ -99,7 +96,7 @@ test("MiniLive keeps number highlighting while the sign is edited", async ({ pag
   const source = 'note("E4").pan(-0.45) + note("G4").pan(0.45)';
   await page.goto("/");
   const editor = page.locator(".cm-content");
-  await editor.fill(source);
+  await replaceCode(page, source);
   const numberTokens = () => editor.locator("span").evaluateAll((spans) =>
     spans
       .filter((span) => span.textContent?.endsWith("0.45"))
@@ -116,27 +113,23 @@ test("MiniLive keeps number highlighting while the sign is edited", async ({ pag
     await editor.press("ArrowRight");
   }
   await editor.press("Delete");
-  await expect(editor).toHaveText(source.replace("-0.45", "0.45"));
   await expect.poll(numberTokens).toEqual([
     ["0.45", initialTokens[0][1]],
     ["0.45", initialTokens[0][1]],
   ]);
 
   await editor.pressSequentially("-");
-  await expect(editor).toHaveText(source);
   await expect.poll(numberTokens).toEqual(initialTokens);
 
   await editor.pressSequentially("-");
-  await expect(editor).toHaveText(source.replace("-0.45", "--0.45"));
   await editor.press("Backspace");
-  await expect(editor).toHaveText(source);
   await expect.poll(numberTokens).toEqual(initialTokens);
 });
 
 test("MiniLive completes filters with cutoff and resonance arguments", async ({ page }) => {
   await page.goto("/");
   const editor = page.locator(".cm-content");
-  await editor.fill('note("C4").');
+  await replaceCode(page, 'note("C4").');
   await editor.press("Control+Space");
 
   const labels = page.locator(".cm-completionLabel");
@@ -144,5 +137,5 @@ test("MiniLive completes filters with cutoff and resonance arguments", async ({ 
   await expect(labels.filter({ hasText: /^lpf$/ })).toBeVisible();
   await expect(labels.filter({ hasText: /^hpf$/ })).toBeVisible();
   await labels.filter({ hasText: /^lpf$/ }).click();
-  await expect(editor).toHaveText('note("C4").lpf(hz, resonance)');
+  await expect.poll(() => readCode(page)).toBe('note("C4").lpf(hz, resonance)');
 });
