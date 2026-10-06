@@ -11,7 +11,7 @@ import sys
 import tempfile
 
 FENCE_MODES = {
-    "```mini": "parse",
+    "```mini": "parse_play_source",
     "```mini-song": "parse_song_with_bpm",
 }
 DEFAULT_DOCUMENT = "docs/guides/live-coding-cookbook.md"
@@ -129,7 +129,7 @@ def main() -> int:
         if test_path is not None:
             test_path.unlink(missing_ok=True)
 
-    pattern_count = sum(parser == "parse" for _, parser, _ in blocks)
+    pattern_count = sum(parser == "parse_play_source" for _, parser, _ in blocks)
     song_count = sum(parser == "parse_song_with_bpm" for _, parser, _ in blocks)
     print(
         f"OK: parsed {pattern_count} pattern and {song_count} song "

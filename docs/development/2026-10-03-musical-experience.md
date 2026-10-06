@@ -1304,3 +1304,38 @@ Six Markdown files passed fence and local-link validation (**79 links**); the
 mechanical UI detector reported no findings. The existing bundle-size advisory
 remains. No beginner-comprehension or award-quality claim follows from these
 results.
+
+## Local main integration — 2026-10-06
+
+Feature commit `03e05eb` was committed on `feat/musical-experience`; merge
+`1ec012e` incorporated local `main`. The ADR-0018 evidence-link conflict retained
+the implemented onset evidence and adopted main's consolidated historical
+transport reference. Local `main` was not moved.
+
+Post-merge verification passed:
+
+- `moon check`, all **1,305 MoonBit tests**, `moon info`, `moon fmt`, and the
+  release browser WebAssembly build, with `NEW_MOON_MOD=0`.
+- Browser ABI, public graph-boundary/facade parity, and architecture-boundary
+  scripts.
+- The production TypeScript/Vite build and all **165 browser tests**, with
+  virtual audio, one worker, no retries, and a 60-second per-test deadline.
+- Markdown fences and **211 local links across 24 changed Markdown files**.
+
+The cookbook check initially failed on the newly tempo-prefixed `$:` example:
+its pattern-expression parser rejected `bpm(96);`. The checker now uses
+`parse_play_source` for `mini` fences, preserving the song-specific parser for
+`mini-song` fences. All **29 cookbook examples** then passed. The same example
+was played in the production browser: **96 BPM · Pattern**, nonzero rendered
+audio, and no diagnostic.
+
+The production browser smoke at 1440 × 1000 verified initial playback, dragging
+E4 to D#4 (`C@2` → `Cm@2`), unchanged source during drag preview, shared Undo/Redo,
+and actual onset pitches `[60,63,67]`. At 390 × 844, native touch raised G4 to
+G#4, retaining the explicit source `{60,63,68}@2`; playback reported those three
+onset pitches and a nonzero waveform. Invalid `{60,60}` source retained accepted
+playback; Undo and reload recovered the exact valid score. Neither viewport
+overflowed horizontally; the smoke tab reported no runtime errors.
+
+The existing bundle-size advisory remains. Rendered signals and browser touch
+emulation are not subjective listening or physical-device usability evidence.
