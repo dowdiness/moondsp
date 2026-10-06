@@ -110,7 +110,8 @@ and Live UI passed 36 tests, with no retries. Release WASM and Live builds,
 asset hash agreement, and all five boundary checks passed.
 
 All 60 existing release benchmark groups passed with moon 0.1.20260814.
-[Raw results](../performance/2026-09-11-playback-admission-benchmarks.txt) were
-collected with `NEW_MOON_MOD=0 moon bench --release` in a temporary target
-directory, overlapping builds and browser tests. They are a regression snapshot,
-not a controlled speed comparison or a measurement of this admission path alone.
+The original `NEW_MOON_MOD=0 moon bench --release` output was collected in a
+temporary target directory, overlapping builds and browser tests. It was a
+regression snapshot, not a controlled speed comparison or a measurement of
+this admission path alone. The [evidence summary](../performance/2026-09-24-playback-and-origin-summary.md#evidence-omitted)
+explains why repetitive full-suite output was removed during consolidation.

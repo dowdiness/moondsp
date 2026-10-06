@@ -10,7 +10,7 @@ path under `specs/loom-mini-cst/`.
 
 ## Browser live examples
 
-In the live app's **Examples** panel, select an example and press **Play**:
+In the live app, open **Show help**, select an example, and press **Play**:
 
 - [Overlay groove](../examples/overlay-groove.mini) layers drums, bass, and
   stereo melodies with `+`; a parenthesized `.slow(2)` affects both melodies.
@@ -57,7 +57,7 @@ in the browser bundle.
 <p><code>note("E4")<br>&nbsp;&nbsp;.attack(0.01).hold(0.1)<br>&nbsp;&nbsp;.release(0.2)</code></p>
 <p class="cheat-note">0.31 seconds total, independent of tempo. Omit hold to follow the pattern's note length. Omitted attack/release use the sound's defaults; release starts from the current level.</p>
 <p class="cheat-note"><code>.gate(0.4)</code> keeps every onset in place but shortens each note to 40% of its step, leaving the rest silent. <code>.gate(0)</code> is silent; <code>.gate(1)</code> keeps the full step. The gate follows tempo. Factors finer than one billionth are rounded to keep long-running timelines representable. An explicit <code>.hold(s)</code> instead uses physical seconds and overrides the event-derived ending.</p>
-<p class="cheat-note">Room is one shared stereo space for every part. Its tail continues across note endings, section changes, and live edits; Stop remains immediate.</p>
+<p class="cheat-note">Room is one shared stereo space for every part. Its tail continues across note endings, section changes, and live edits. Pause freezes playback and the room tail; Play resumes them. Restart clears the room state.</p>
 <p class="cheat-note"><code>.gain(n)</code>, <code>.lpf(hz, resonance?)</code>, and <code>.hpf(hz, resonance?)</code> control note and chord voices in the browser. Drum templates keep their authored level and filter shape; applying these controls to <code>s("...")</code> leaves the drum sound unchanged.</p>
 
 <h2>Rhythm</h2>
@@ -113,7 +113,7 @@ in the browser bundle.
   <dt>bpm(n)</dt><dd>tempo inside song(); editable while playing</dd>
 </dl>
 <p class="cheat-note">Separate calls with commas. Section lengths and explicit starts accept integers or fractions such as <code>3/2</code>; section lengths must be positive. Pattern expressions inside sections support <code>+</code> and parentheses.</p>
-<p class="cheat-note">Select <strong>Song</strong> mode to play a song. The header BPM control sets global tempo; <code>bpm(n)</code> sets it from the score. Examples select their mode and tempo for you.</p>
+<p class="cheat-note">The editor accepts patterns and <code>song(...)</code> without a mode selector. Set tempo in the score with <code>bpm(96);</code> before the pattern or song, or with <code>bpm(96)</code> inside <code>song(...)</code>. Declare tempo only once; there is no separate header BPM control.</p>
 <!-- LIVE_SYNTAX_REFERENCE_END -->
 
 ## Additional notation examples

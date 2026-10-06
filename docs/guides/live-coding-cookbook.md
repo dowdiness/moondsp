@@ -14,8 +14,21 @@ npm ci
 npm run dev
 ```
 
-Open <http://localhost:5180>, choose **Pattern** or **Song**, then press
-**Play**. If the port is busy, Vite prints another URL.
+Open <http://localhost:5180> and press **Play**. If the port is busy, Vite
+prints another URL.
+
+To try an example below, replace the whole score in the editor. The same
+editor accepts a single pattern, multiple `$:` layers, or a `song(...)`
+arrangement; there is no mode selector. **Show help** opens starter scores
+and built-in examples.
+
+After replacing the score, press **Restart** to apply the new example and
+play it from the beginning. **Play** resumes paused playback; it does not
+apply a structural change that requires Restart.
+
+Click inside a plain `s(...)` or `note(...)` sequence to show its step
+controls. Text and controls edit the same score, and **Undo** applies to
+both. **Download** saves the score as a plain-text `.mini` file.
 
 At 60 BPM, one cycle lasts one second. At 120 BPM, it lasts half a second.
 A cycle is a unit of time, not a fixed bar or beat.
@@ -186,6 +199,24 @@ This speeds up only the hi-hat. Add parentheses to speed up both layers:
 Hear the difference in
 [`overlay-grouping.mini`](../../examples/overlay-grouping.mini).
 
+## Use separate tracks
+
+Prefix each top-level layer with `$:` to play several patterns together:
+
+```mini
+bpm(96);
+
+$: s("bd ~ sd ~")
+$: s("hh hh hh hh hh hh hh hh")
+$: note("C3 ~ Eb3 ~ G3 ~ Bb3 ~").gain(0.25)
+```
+
+Ordinary newlines do not combine independent expressions. Use `$:` on each
+layer, or combine them with `+` or `stack(...)`.
+
+Set tempo with `bpm(number);` before the patterns. Without an explicit
+tempo, a score uses 60 BPM.
+
 ## Shape the sound
 
 Envelope times are seconds. They do not change with tempo.
@@ -224,7 +255,7 @@ Compare dry and wet versions in
 
 ## Build a song
 
-Switch the editor to **Song** mode:
+Replace the whole editor score with this arrangement; no mode switch is needed:
 
 ```mini-song
 let beat = s("bd hh sd hh").slow(4);
@@ -246,6 +277,10 @@ song(
 `section(name, cycles, pattern)` defines music. `part(id, section)` places each
 section in order. Keep every part ID unique.
 
+Patterns loop, but this song ends after its final part. To repeat the song,
+append `.repeat()` to the closing `song(...)` call, so the last line becomes
+`).repeat()`.
+
 For a larger song, read
 [`light-orbit.mini`](../../examples/light-orbit.mini).
 
@@ -256,7 +291,13 @@ For a larger song, read
 - Invalid code leaves the last working version playing.
 - Tempo changes work while playing.
 - Envelope times stay in seconds when tempo changes.
-- After changing song sections or parts, press **Stop**, then **Play**.
+- Press **Pause** to freeze playback, then **Play** to resume.
+- If a structural edit requires a restart, press **Restart** to apply the
+  current editor score and play it from the beginning. Pause/Play alone does
+  not apply a structure that was rejected as requiring Restart.
+
+See the [browser playback contract](../technical-reference.md#browser-player-ownership-and-source-updates)
+for Update, Play, Pause, and Restart behavior.
 
 ## More examples
 

@@ -13,7 +13,7 @@ web/audio-power-core.js
 .worktrees/
 .codex
 .codex-runtime/
-.claude/scheduled_tasks.lock
+/omp-browser-recording-*/
 
 # wrangler files
 .wrangler

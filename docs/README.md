@@ -14,7 +14,7 @@ Use this file as a router. Read the documents for the surface you are changing; 
 | Browser ABI or AudioWorklet lifecycle | [`browser-api-contract.md`](browser-api-contract.md) and the relevant browser example |
 | Mini notation crossing into DSP graphs | [`mini-graph-authoring-boundary.md`](mini-graph-authoring-boundary.md) and [`external-dsl-lowering.md`](external-dsl-lowering.md) |
 | Native CLAP or C ABI | [`clap-plugin-guide.md`](clap-plugin-guide.md) and relevant records in [`development/`](development/) |
-| Performance or allocation claim | The relevant dated record in [`performance/`](performance/) and, for hard-real-time claims, [`development/`](development/) |
+| Performance or allocation claim | The [retained performance findings](performance/README.md) and, for hard-real-time claims, [`development/`](development/) |
 | Why an architectural choice exists | The applicable record in [`decisions/`](decisions/README.md) |
 | Historical reconstruction | [`archive/`](archive/) only when historical context is explicitly requested |
 
@@ -45,7 +45,7 @@ For a browser instrument, start with the [basic synth guide](../examples/basic-s
 
 ## Evidence & Contributor Resources
 
-- **[`performance/`](performance/)** — Dated benchmark snapshots and allocation investigations. Each record states its measured scope; it is not a whole-engine or hard-real-time guarantee.
+- **[Performance findings](performance/README.md)** — Concise measured comparisons, rejected approaches, and measurement limitations. Historical results are not a current whole-engine or hard-real-time guarantee.
 - **[`development/`](development/README.md)** — Hardware probes, zero-allocation audits, DAW compatibility records, and boundary inventories.
 - **[GitHub Issues](https://github.com/dowdiness/moondsp/issues)** — Open issues are the source of truth for upcoming work. Per-PR history belongs in `git log`; released behavior belongs in [`CHANGELOG.md`](../CHANGELOG.md).
 - **[`../CLAUDE.md`](../CLAUDE.md)** — Always-loaded project router and safety boundaries.

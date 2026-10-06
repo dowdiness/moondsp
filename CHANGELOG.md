@@ -223,14 +223,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shifts, and reuse of contained time spans. Public interfaces, exact event
   origins, and PCM are unchanged. The measured dense 600-block case executes
   about 33% fewer Wasm GC construction instructions; queries are not yet
-  allocation-free. See the [dated evidence](docs/performance/2026-10-02-pattern-query-allocation-improvements.txt).
+  allocation-free. See the [measurement summary](docs/performance/2026-10-02-pattern-allocation-summary.md#initial-batch).
 - Precomputed sequence slot indices and exact bounds when constructing the
   pattern, reused its invariant `[0,1)` child-query span, and removed duplicate
   cycle-end arithmetic. Two reversed-order real AudioWorklet comparisons show
   another 10.2% reduction in V8 Wasm-stack allocation count and 11.7% in recorded
   bytes against the previous improvement. PCM, exact origins, and public
   interfaces remain unchanged; this is not an allocation-free or deadline
-  guarantee. See the [iteration evidence](docs/performance/2026-10-02-pattern-query-allocation-loop.txt).
+  guarantee. See the [follow-up findings](docs/performance/2026-10-02-pattern-allocation-summary.md#follow-up-loop).
 - Aligned MoonBit sources with compiler warning rules: test package APIs are fully
   qualified, trait-implementation methods use explicit extensions, and unused
   package imports are removed. The browser facade explicitly exposes the
@@ -400,7 +400,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a one-element batch. The native release probe records 4 allocations per update
   instead of 7, with retained-batch allocation counts unchanged; this is not an
   allocation-free control API claim. See the
-  [measurement record](docs/performance/2026-09-20-graph-single-control-allocation.txt).
+  [measurement summary](docs/performance/2026-09-20-dsp-and-authoring-summary.md#graph-control).
 - Run MoonBit target-matrix tests and boundary checks for pull requests against
   any base branch, including stacked PRs and PR base changes.
 - Preserve the browser demo's first DSP telemetry across asynchronous startup:

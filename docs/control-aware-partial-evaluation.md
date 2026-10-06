@@ -3,7 +3,7 @@
 - **Status:** Exploratory; not approved for implementation
 - **Recorded:** 2026-07-19
 - **Context:** [PR #228](https://github.com/dowdiness/moondsp/pull/228)
-- **Evidence:** [runtime-control constant-fold barrier snapshot](performance/2026-07-19-runtime-control-constant-fold-barriers.md)
+- **Evidence:** [runtime-control constant-fold barrier findings](performance/2026-09-20-dsp-and-authoring-summary.md#constant-fold-barriers)
 
 ## Question
 
