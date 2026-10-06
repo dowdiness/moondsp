@@ -1,4 +1,5 @@
 import { PlaybackController } from "./playback-controller.js";
+import { OnsetRing } from "./playback-onsets.js";
 
 class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
   constructor(options) {
@@ -13,6 +14,9 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
     this.graphInitialized = false;
     this.graphBlockSize = 0;
     this.statusCountdown = 0;
+    const onsetBuffer = options?.processorOptions?.onsetBuffer;
+    this.onsets = onsetBuffer ? new OnsetRing(onsetBuffer) : null;
+    this.onsetGeneration = 0;
 
     this.port.onmessage = (event) => {
       const data = event.data;
@@ -32,6 +36,11 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
     }
   }
   dispatchCommand(data) {
+    if (Number.isSafeInteger(data.onsetGeneration) && data.onsetGeneration > 0) {
+      this.onsetGeneration = data.onsetGeneration;
+      this.wasm.player_onset_clear();
+    }
+    if (data.type === "observe-onsets") return;
     if (data.type === "player-update" || data.type === "player-restart" ||
         data.type === "player-play" || data.type === "player-pause" ||
         data.type === "set-scheduler-bpm") {
@@ -63,6 +72,8 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
         "player_state", "player_pending_count", "player_skipped_count",
         "player_mode", "scheduler_cycle_position",
         "scheduler_sample_position", "get_playback_error_length", "get_playback_error_char",
+        "player_onset_enable", "player_onset_count", "player_onset_field",
+        "player_onset_clear", "player_onset_dropped",
       ]);
       if (missingExports.length > 0) {
         throw new Error(`Scheduler browser exports not found: ${missingExports.join(", ")}`);
@@ -94,6 +105,7 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
     this.graphInitialized = ok;
     this.graphBlockSize = ok ? blockSize : 0;
     if (ok) {
+      this.wasm.player_onset_enable(this.onsets ? 1 : 0);
       this.port.postMessage({ type: "ready", mode: "scheduler-dsp" });
       this.applySchedulerState();
     } else if (!this.reportedInitError) {
@@ -135,6 +147,7 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
       return true;
     }
 
+    const engineBlockStart = this.onsets ? this.wasm.scheduler_sample_position() : 0;
     const processed = this.wasm.process_scheduler_block();
     if (!processed) {
       this.fillSilence(left, right);
@@ -143,6 +156,9 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
         this.postError(this.playback.errorMessage());
       }
       return true;
+    }
+    if (this.onsets) {
+      this.onsets.write(this.wasm, engineBlockStart, currentTime, sampleRate, this.onsetGeneration);
     }
 
     this.statusCountdown -= 1;

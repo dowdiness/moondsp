@@ -223,13 +223,17 @@ export function mountScoreSession(view: EditorView): { changed(): void; dispose(
       setSessionMessage("Could not read that score file. Your editing session is still available.");
     }
   };
+  const onRecoveryToggle = (): void => {
+    // The queued disclosure event can arrive after a user has focused a draft.
+    if (!recoveryList?.contains(document.activeElement)) refreshRecoveries();
+  };
 
   saveButton?.addEventListener("click", download);
   openButton?.addEventListener("click", openPicker);
   fileInput?.addEventListener("change", onFileChange);
   window.addEventListener("pagehide", onPageHide);
   window.addEventListener("storage", onStorage);
-  recoveryPanel?.addEventListener("toggle", refreshRecoveries);
+  recoveryPanel?.addEventListener("toggle", onRecoveryToggle);
 
   // A matching stored score is already saved; do not rewrite it on mount or exit.
   saveNow(true);
@@ -246,7 +250,7 @@ export function mountScoreSession(view: EditorView): { changed(): void; dispose(
       fileInput?.removeEventListener("change", onFileChange);
       window.removeEventListener("pagehide", onPageHide);
       window.removeEventListener("storage", onStorage);
-      recoveryPanel?.removeEventListener("toggle", refreshRecoveries);
+      recoveryPanel?.removeEventListener("toggle", onRecoveryToggle);
     },
   };
 }

@@ -35,7 +35,7 @@ in the browser bundle.
   <dt>s("bd hh sd hh")</dt><dd>drums: bd kick, sd snare, hh closed hat, oh open hat, cp clap</dd>
 </dl>
 <p class="cheat-note">Notes: <code>C4</code> = MIDI 60. Use <code>#</code> or <code>b</code> for accidentals; octave defaults to 4.</p>
-<p class="cheat-note">Chords: <code>C</code> major, <code>Cm</code> minor; also <code>7</code>, <code>maj7</code>, <code>m7</code>, <code>dim</code>, <code>aug</code>, <code>sus2</code>, <code>sus4</code>, <code>6</code>, <code>add9</code>, <code>maj9</code>, <code>m9</code>. In <code>chord("C+7")</code>, the quoted <code>+</code> is part of the chord name, not an overlay.</p>
+<p class="cheat-note">Chords: <code>C</code> major, <code>Cm</code> minor; also <code>7</code>, <code>maj7</code>, <code>m7</code>, <code>dim</code>, <code>aug</code>, <code>sus2</code>, <code>sus4</code>, <code>6</code>, <code>add9</code>, <code>maj9</code>, <code>m9</code>. Write an exact pitch set as <code>{60,63,68}</code>: braces contain one or more unique MIDI integers from 0 through 127 in strictly ascending order, with no spaces. In <code>chord("C+7")</code>, the quoted <code>+</code> is part of the chord name, not an overlay.</p>
 
 <h2 id="method-chains">Sound shape</h2>
 <p class="cheat-note">Shape browser notes and chords with filters: LPF softens high frequencies, while HPF clears low frequencies. Add the optional second argument to emphasize the cutoff frequency.</p>
@@ -69,20 +69,22 @@ in the browser bundle.
   <dt>.degradeBy(p)</dt><dd>drop events with probability p (0–1)</dd>
   <dt>.every(n, f)</dt><dd>apply f every nth cycle</dd>
 </dl>
-<p class="cheat-note">Use positive integers for fast, slow, and every. Callback <code>f</code> is <code>fast(n)</code>, <code>slow(n)</code>, or <code>rev</code> without parentheses.</p>
+<p class="cheat-note">Direct <code>.fast(n)</code> and <code>.slow(n)</code> accept positive integers or representable decimal factors: <code>.fast(1.5)</code> is 1.5× faster and <code>.slow(0.5)</code> halves the duration. Decimals retain their exact rational value rather than truncating to integers. <code>every</code> and callback factors still require positive integers. Callback <code>f</code> is <code>fast(n)</code>, <code>slow(n)</code>, or <code>rev</code> without parentheses.</p>
 <h2 id="inside-quoted-notation">Inside quoted notation</h2>
 <dl>
   <dt>a b c</dt><dd>sequence in one cycle; newlines also separate items</dd>
   <dt>~</dt><dd>rest: reserve one sequence step without emitting an event</dd>
   <dt>[a b]</dt><dd>subdivide a step</dd>
+  <dt>a@2</dt><dd>relative duration weight; omitted weights are 1</dd>
   <dt>a, b</dt><dd>play together</dd>
-  <dt>a*4</dt><dd>repeat 4× faster</dd>
+  <dt>{60,63,68}</dt><dd>one explicit chord atom with absolute MIDI pitches, ascending and comma-separated without spaces</dd>
   <dt>a/2</dt><dd>stretch 2× slower</dd>
   <dt>a?</dt><dd>50% chance to drop</dd>
   <dt>a(3,8)</dt><dd>3 hits across 8 steps; a(3,8,1) adds rotation</dd>
 </dl>
 <p><code>$: s("bd ~ sd ~")<br>$: note("C3 ~ Eb3 ~").gate(0.35)</code></p>
-<p class="cheat-note">Each <code>~</code> occupies the same share of the cycle as a sounding atom. Gate shortens only the sounding part; neither feature moves the following onset. Hear both in <strong>Space in the groove</strong>.</p>
+<p class="cheat-note">An unweighted <code>~</code> occupies the same share of the cycle as an unweighted sounding atom; duration weights make either share proportional to its weight. Replacing an atom with a rest preserves onsets. Changing its weight can move subsequent onsets; gate shortens only the sounding part without moving them. Hear rests and gates in <strong>Space in the groove</strong>.</p>
+<p class="cheat-note"><code>@n</code> gives an atom, rest, chord, or group a relative integer duration; omitted weights count as 1. For example, <code>note("C4@2 Eb4 F4")</code> divides one cycle into four units: C4 lasts 1/2, Eb4 1/4, and F4 1/4. Weights must be 1–16 and a sequence containing a weight may total at most 256 units, keeping exact rational event boundaries bounded. Unweighted sequences retain their existing equal-slot timing.</p>
 
 <h2>Combine patterns</h2>
 <dl>
@@ -129,9 +131,14 @@ note("C3 E3 G3").gain(0.6).lpf(1800, 2).hpf(80)
 
 `note(...)` accepts names such as `C4`, `F#3`, and `Bb`; omitted octaves
 default to 4. `chord(...)` accepts common chord names such as `C`, `Dm`,
-`G7`, `F#m7`, `Bb`, `Cmaj7`, `C+`, `Cø7`, and `Esus4`. Each chord atom lowers
-to a stack of note events at the same time position; space-separated chord
-names are sequenced like other quoted mini atoms.
+`G7`, `F#m7`, `Bb`, `Cmaj7`, `C+`, `Cø7`, and `Esus4`. It also accepts explicit
+pitch-set atoms such as `{60,63,68}`, where the braces contain one or more
+unique integer MIDI pitches from 0 through 127, strictly ascending with no
+spaces. Empty, duplicate, descending, malformed, and out-of-range sets are
+parse errors; the parser never sorts or repairs them. An explicit set is one
+chord atom, so weights, repeats, and grouping apply to all its voices together.
+Each chord atom lowers to a stack of note events at the same time position;
+space-separated chord atoms are sequenced like other quoted mini atoms.
 
 Chord quality compatibility is intentionally conservative. The stable spellings
 are the plain triad (`C`), `m`, `7`, `maj7`, `m7`, `dim`, `dim7`, `aug`, `sus2`,
@@ -141,9 +148,44 @@ aliases such as `min`, `min7`, `min9`, `M7`, `M9`, `+`, `+7`, `ø`, `ø7`,
 as aliases rather than separate semantic forms. Unsupported qualities are parse
 errors instead of guessed chord names.
 
+
+
+A chord's optional octave follows its quality: `Cm3` and `Cmaj73` use a C3
+root. For a bare major chord, a zero-prefixed octave avoids confusion with a
+numeric quality: `C07` is C major rooted at C7, while `C7` remains a dominant
+seventh rooted at C4. Octaves are one digit (`0`–`9`), optionally prefixed by
+one zero; the browser still enforces its MIDI pitch range. Accidentals precede
+the quality: `C#sus4` and `Dbsus4` are supported, including double accidentals.
+The `s` in `sus2`/`sus4` is not consumed as another sharp.
+
 ## Source identity
 
 Parentheses group expressions without adding a source node. Regrouping a raw
 overlay preserves known material content and playback clocks; source ancestry
 still reflects the authored grouping. See [Pattern algebra](pattern-algebra.md)
 for the distinction between material content and source identity.
+
+## Authoring structure
+
+`mini.project_notation_nodes(kind, content)` parses the content **inside** quotes
+with the production notation parser. `kind` is `note`, `drum`, or `chord`.
+Its JSON result contains `roots`, recursive `nodes`, and the bounded `span`.
+Node `from`, `baseTo`, and `end` offsets count UTF-16 code units relative to that
+content: `baseTo` excludes postfixes, while `end` includes them. Explicit chord
+atoms use the complete brace token as their core span; all compiled chord voices
+and repeats retain that single source atom. Nodes retain parents, children,
+relative weights, and ordered modifier spans.
+
+The main-thread `browser_authoring.project_notation` export adds compiled
+`events` with source-node indices, start/end cycle positions, and pitches.
+Exact event origins link repeated events and chord voices back to the same
+written atom. Rests remain selectable source nodes without fabricated events.
+The projection covers the quoted notation, not outer expression transforms,
+arrangements, or the accepted playback state.
+
+Projection has independent source/depth/node and query-work bounds, with at
+most 256 emitted events over a window of at most 16 cycles. Explicit chord
+voices count individually toward the same event bound. It checks the existing
+query-work model for its zero-aligned, whole-cycle window; it does not weaken
+runtime admission for arbitrary playback queries. Projection errors disable
+unsafe graphical edits without preventing ordinary text editing.

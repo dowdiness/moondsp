@@ -65,6 +65,7 @@ pub struct SectionLayerDoc[A] {
   priv name : String
   priv revision : @identity.Revision
   priv body : @pattern.Pat[A]
+  priv source_snapshot : @pattern.PatternSnapshotWithOrigins[A]?
 }
 
 ///|
@@ -73,7 +74,13 @@ pub fn[A] SectionLayerDoc::SectionLayerDoc(
   name~ : String,
   body~ : @pattern.Pat[A],
 ) -> SectionLayerDoc[A] {
-  { id, name, revision: @identity.Revision::zero(), body, }
+  {
+    id,
+    name,
+    revision: @identity.Revision::zero(),
+    body,
+    source_snapshot: None,
+  }
 }
 
 ///|
@@ -105,7 +112,13 @@ pub fn[A] SectionLayerDoc::rename(
   self : SectionLayerDoc[A],
   name~ : String,
 ) -> SectionLayerDoc[A] {
-  { id: self.id, name, revision: self.revision, body: self.body, }
+  {
+    id: self.id,
+    name,
+    revision: self.revision,
+    body: self.body,
+    source_snapshot: self.source_snapshot,
+  }
 }
 
 ///|
@@ -113,7 +126,13 @@ pub fn[A] SectionLayerDoc::replace_body(
   self : SectionLayerDoc[A],
   body~ : @pattern.Pat[A],
 ) -> SectionLayerDoc[A] {
-  { id: self.id, name: self.name, revision: self.revision.next(), body, }
+  {
+    id: self.id,
+    name: self.name,
+    revision: self.revision.next(),
+    body,
+    source_snapshot: None,
+  }
 }
 
 ///|
@@ -414,6 +433,7 @@ pub struct Section[A] {
   priv length_cycles : @pattern.Rational
   priv scope : TimeScope
   priv body : SectionBody[A]
+  priv source_snapshot : @pattern.PatternSnapshotWithOrigins[A]?
 }
 
 ///|
@@ -426,8 +446,42 @@ pub fn[A] Section::Section(
   if length_cycles.num <= 0L {
     raise NonPositiveLength
   } else {
-    { name, length_cycles, scope, body: body.snapshot(), }
+    {
+      name,
+      length_cycles,
+      scope,
+      body: body.snapshot(),
+      source_snapshot: None,
+    }
   }
+}
+
+///|
+/// Compile-time provenance for a single pattern section. The runtime body is
+/// derived from the snapshot, so its events cannot disagree with its origins.
+pub fn[A] Section::with_origins(
+  name~ : String,
+  length_cycles~ : @pattern.Rational,
+  scope~ : TimeScope,
+  snapshot~ : @pattern.PatternSnapshotWithOrigins[A],
+) -> Section[A] raise SectionBuildError {
+  if length_cycles.num <= 0L {
+    raise NonPositiveLength
+  }
+  {
+    name,
+    length_cycles,
+    scope,
+    body: SectionBody::single(snapshot.pat()),
+    source_snapshot: Some(snapshot),
+  }
+}
+
+///|
+pub fn[A] Section::source_snapshot(
+  self : Section[A],
+) -> @pattern.PatternSnapshotWithOrigins[A]? {
+  self.source_snapshot
 }
 
 ///|
@@ -484,6 +538,30 @@ pub fn[A] SectionDoc::single(
     body=SectionDocBody::single(
       SectionLayerDoc(id=layer_id, name="main", body~),
     ),
+  )
+}
+
+///|
+pub fn[A] SectionDoc::single_with_origins(
+  id~ : @identity.SectionId,
+  name~ : String,
+  length_cycles~ : @pattern.Rational,
+  scope~ : TimeScope,
+  layer_id~ : @identity.SectionLayerId,
+  snapshot~ : @pattern.PatternSnapshotWithOrigins[A],
+) -> SectionDoc[A] raise SectionDocBuildError {
+  SectionDoc(
+    id~,
+    name~,
+    length_cycles~,
+    scope~,
+    body=SectionDocBody::single({
+      id: layer_id,
+      name: DEFAULT_LAYER_NAME,
+      revision: @identity.Revision::zero(),
+      body: snapshot.pat(),
+      source_snapshot: Some(snapshot),
+    }),
   )
 }
 
@@ -670,6 +748,10 @@ pub fn[A] SectionDoc::to_section(self : SectionDoc[A]) -> Section[A] {
     length_cycles: self.length_cycles,
     scope: self.scope,
     body: self.body.to_section_body(),
+    source_snapshot: match self.body {
+      Single(layer) => layer.source_snapshot
+      Layers(_) => None
+    },
   }
 }
 
@@ -683,6 +765,7 @@ pub fn[A] Section::from_pattern(
     length_cycles: @pattern.Rational::from_int(1),
     scope: TimeScope::identity(),
     body: SectionBody::single(body),
+    source_snapshot: None,
   }
 }
 
@@ -754,6 +837,7 @@ pub fn[A] Section::layer(
     length_cycles: self.length_cycles,
     scope: self.scope,
     body: self.body.upsert_layer(name, body),
+    source_snapshot: None,
   }
 }
 
@@ -771,6 +855,7 @@ pub fn[A] Section::apply_patch(
     length_cycles: self.length_cycles,
     scope: self.scope,
     body,
+    source_snapshot: None,
   }
 }
 

@@ -17,6 +17,89 @@ test "parse s(\"cp oh\") cross-pool drum sequence" {
 }
 
 ///|
+test "relative durations distribute exact sequence timing" {
+  let pat = unwrap_ok(@mini.parse("note(\"C4@2 Eb4 F4\")"))
+  let events = query_one_cycle(pat)
+  assert_eq(events.length(), 3)
+  assert_eq(events[0].whole.unwrap().begin, @pattern.Rational::from_int(0))
+  assert_eq(events[0].whole.unwrap().end_, @pattern.Rational::new(1L, 2L))
+  assert_eq(events[0].part.begin, @pattern.Rational::from_int(0))
+  assert_eq(events[0].part.end_, @pattern.Rational::new(1L, 2L))
+  assert_eq(events[1].whole.unwrap().begin, @pattern.Rational::new(1L, 2L))
+  assert_eq(events[1].whole.unwrap().end_, @pattern.Rational::new(3L, 4L))
+  assert_eq(events[2].whole.unwrap().begin, @pattern.Rational::new(3L, 4L))
+  assert_eq(events[2].whole.unwrap().end_, @pattern.Rational::from_int(1))
+
+  let clipped = pat.query(
+    @pattern.TimeSpan::new(
+      @pattern.Rational::new(1L, 4L),
+      @pattern.Rational::new(3L, 8L),
+    ),
+  )
+  assert_eq(clipped.length(), 1)
+  assert_eq(clipped[0].whole.unwrap().begin, @pattern.Rational::from_int(0))
+  assert_eq(clipped[0].whole.unwrap().end_, @pattern.Rational::new(1L, 2L))
+  assert_eq(clipped[0].part.begin, @pattern.Rational::new(1L, 4L))
+  assert_eq(clipped[0].part.end_, @pattern.Rational::new(3L, 8L))
+
+  let drum_events = query_one_cycle(unwrap_ok(@mini.parse("s(\"bd ~@2 sd\")")))
+  assert_eq(drum_events.length(), 2)
+  assert_eq(drum_events[0].whole.unwrap().end_, @pattern.Rational::new(1L, 4L))
+  assert_eq(drum_events[1].whole.unwrap().begin, @pattern.Rational::new(3L, 4L))
+
+  let chord_events = query_one_cycle(unwrap_ok(@mini.parse("chord(\"C@2 G\")")))
+  assert_eq(chord_events.length(), 6)
+  assert_eq(chord_events[0].whole.unwrap().end_, @pattern.Rational::new(2L, 3L))
+  assert_eq(
+    chord_events[3].whole.unwrap().begin,
+    @pattern.Rational::new(2L, 3L),
+  )
+
+  let grouped = query_one_cycle(
+    unwrap_ok(@mini.parse("note(\"[C4 E4]@2 G4\")")),
+  )
+  assert_eq(grouped.length(), 3)
+  assert_eq(grouped[0].whole.unwrap().begin, @pattern.Rational::from_int(0))
+  assert_eq(grouped[0].whole.unwrap().end_, @pattern.Rational::new(1L, 3L))
+  assert_eq(grouped[1].whole.unwrap().begin, @pattern.Rational::new(1L, 3L))
+  assert_eq(grouped[1].whole.unwrap().end_, @pattern.Rational::new(2L, 3L))
+  assert_eq(grouped[2].whole.unwrap().begin, @pattern.Rational::new(2L, 3L))
+
+  let repeated = query_one_cycle(unwrap_ok(@mini.parse("note(\"C4@2*2 Eb4\")")))
+  assert_eq(repeated.length(), 3)
+  assert_eq(repeated[0].whole.unwrap().end_, @pattern.Rational::new(1L, 3L))
+  assert_eq(repeated[1].whole.unwrap().begin, @pattern.Rational::new(1L, 3L))
+  assert_eq(repeated[1].whole.unwrap().end_, @pattern.Rational::new(2L, 3L))
+  assert_eq(repeated[2].whole.unwrap().begin, @pattern.Rational::new(2L, 3L))
+}
+
+///|
+test "relative duration weights reject invalid values and excessive sums" {
+  for
+    source in [
+      "note(\"C4@0\")", "note(\"C4@-1\")", "note(\"C4@17\")", "note(\"C4@999999999999999999999999999999999999\")",
+    ] {
+    assert_true(@mini.parse(source) is Err(_))
+  }
+  assert_true(
+    @mini.parse(
+      "note(\"C4@16 D4@16 E4@16 F4@16 G4@16 A4@16 B4@16 C5@16 D5@16 E5@16 F5@16 G5@16 A5@16 B5@16 C6@16 D6@16 E6@16\")",
+    )
+    is Err(_),
+  )
+}
+
+///|
+test "unweighted sequence timing remains equal-slot" {
+  let events = query_one_cycle(unwrap_ok(@mini.parse("note(\"C4 Eb4 F4\")")))
+  assert_eq(events.length(), 3)
+  assert_eq(events[0].whole.unwrap().end_, @pattern.Rational::new(1L, 3L))
+  assert_eq(events[1].whole.unwrap().begin, @pattern.Rational::new(1L, 3L))
+  assert_eq(events[1].whole.unwrap().end_, @pattern.Rational::new(2L, 3L))
+  assert_eq(events[2].whole.unwrap().begin, @pattern.Rational::new(2L, 3L))
+}
+
+///|
 test "rest atoms reserve their notation slots without emitting events" {
   let sound_events = query_one_cycle(unwrap_ok(@mini.parse("s(\"bd ~ sd ~\")")))
   assert_eq(sound_events.length(), 2)
@@ -602,6 +685,83 @@ test "Draft same-text replacement is causal and frozen input is immutable" {
     fail("frozen compilation failed")
   }
   assert_eq(retained.query(draft_arc())[0].origin(), old[0].origin())
+}
+
+///|
+test "Draft preparation preserves weighted timing and note source origin" {
+  let draft = @mini.Draft::new("note(\"C4@2 Eb4 F4\")")
+  let events = draft_snapshot(draft).query(draft_arc())
+  assert_eq(events.length(), 3)
+  assert_eq(
+    events[0].event().whole.unwrap().end_,
+    @pattern.Rational::new(1L, 2L),
+  )
+  assert_eq(
+    events[1].event().whole.unwrap().begin,
+    @pattern.Rational::new(1L, 2L),
+  )
+  assert_eq(
+    events[1].event().whole.unwrap().end_,
+    @pattern.Rational::new(3L, 4L),
+  )
+  assert_eq(
+    events[2].event().whole.unwrap().begin,
+    @pattern.Rational::new(3L, 4L),
+  )
+  match draft.locate_origin(events[0].origin()) {
+    @mini.OriginLocation::Located(range, _) => {
+      assert_eq(range.start(), 6)
+      assert_eq(range.end(), 8)
+    }
+    _ => fail("weighted note origin should remain locatable")
+  }
+}
+
+///|
+test "Draft lowers explicit chord voices with one brace-token origin" {
+  let draft = @mini.Draft::new("chord(\"{60,63,68}@2\")")
+  let events = draft_snapshot(draft).query(draft_arc())
+  assert_eq(events.length(), 3)
+  assert_eq(events[0].origin(), events[1].origin())
+  assert_eq(events[1].origin(), events[2].origin())
+  match draft.locate_origin(events[0].origin()) {
+    @mini.OriginLocation::Located(range, _) => {
+      assert_eq(range.start(), 7)
+      assert_eq(range.end(), 17)
+    }
+    _ => fail("explicit chord origin should point to its full brace atom")
+  }
+}
+
+///|
+test "Draft prepared playback keeps weighted rests silent and in time" {
+  let draft = @mini.Draft::new("note(\"C4@2 ~@2 Eb4\")")
+  let events = draft_snapshot(draft).query(draft_arc())
+  assert_eq(events.length(), 2)
+  assert_eq(
+    events[0].event().whole.unwrap().begin,
+    @pattern.Rational::from_int(0),
+  )
+  assert_eq(
+    events[0].event().whole.unwrap().end_,
+    @pattern.Rational::new(2L, 5L),
+  )
+  assert_eq(
+    events[1].event().whole.unwrap().begin,
+    @pattern.Rational::new(4L, 5L),
+  )
+  assert_eq(
+    events[1].event().whole.unwrap().end_,
+    @pattern.Rational::from_int(1),
+  )
+  assert_true(
+    draft.locate_origin(events[0].origin())
+    is @mini.OriginLocation::Located(_, _),
+  )
+  assert_true(
+    draft.locate_origin(events[1].origin())
+    is @mini.OriginLocation::Located(_, _),
+  )
 }
 
 ///|
@@ -1400,6 +1560,63 @@ test "parse every with non-integer callback arg returns error" {
 }
 
 ///|
+test "direct fast and slow transforms preserve exact decimal factors" {
+  let fast = unwrap_ok(@mini.parse("note(\"60\").fast(1.5)"))
+  let fast_events = query_one_cycle(fast)
+  assert_eq(fast_events.length(), 2)
+  assert_eq(fast_events[1].whole.unwrap().begin, @pattern.Rational::new(2L, 3L))
+  let slow = unwrap_ok(@mini.parse("note(\"60\").slow(0.5)"))
+  let slow_events = query_one_cycle(slow)
+  assert_eq(slow_events.length(), 2)
+  assert_eq(slow_events[1].whole.unwrap().begin, @pattern.Rational::new(1L, 2L))
+}
+
+///|
+test "notation projection retains nested source spans and postfix order" {
+  let projection = @mini.project_notation_nodes("note", "[60 64]*2/3?@2,~").unwrap()
+  guard projection is Object(fields) &&
+    fields.get("nodes") is Some(Array(nodes)) else {
+    fail("expected notation source projection")
+  }
+  let groups = nodes.filter(node => {
+    node is Object(fields) && fields.get("kind") == Some("group".to_json())
+  })
+  guard groups is [Object(group)] &&
+    group.get("from") == Some(Json::number(0.0)) &&
+    group.get("baseTo") == Some(Json::number(7.0)) &&
+    group.get("end") == Some(Json::number(14.0)) &&
+    group.get("modifiers") is Some(Array(modifiers)) else {
+    fail("expected bracket group with postfix span")
+  }
+  assert_eq(modifiers.length(), 4)
+  guard modifiers[0] is Object(first_modifier) &&
+    first_modifier.get("kind") == Some("repeat".to_json()) &&
+    modifiers[1] is Object(second_modifier) &&
+    second_modifier.get("kind") == Some("slow".to_json()) &&
+    modifiers[2] is Object(third_modifier) &&
+    third_modifier.get("kind") == Some("degrade".to_json()) &&
+    modifiers[3] is Object(fourth_modifier) &&
+    fourth_modifier.get("kind") == Some("weight".to_json()) else {
+    fail("expected source modifier order")
+  }
+
+  let rests = nodes.filter(node => {
+    node is Object(fields) &&
+    fields.get("kind") == Some("atom".to_json()) &&
+    fields.get("value") == Some("~".to_json())
+  })
+  assert_eq(rests.length(), 1)
+}
+
+///|
+test "invalid notation reports its content-relative source position" {
+  match @mini.project_notation_nodes("note", "60 😀") {
+    Err(message) => assert_true(message.contains("position 3"))
+    Ok(_) => fail("expected invalid token after astral character")
+  }
+}
+
+///|
 test "parse chained postfix bd*3*4 stacks replications" {
   let pat = unwrap_ok(@mini.parse("s(\"bd*3*4\")"))
   let events = query_one_cycle(pat)
@@ -1839,5 +2056,26 @@ test "chord(C) and note(60 64 67) produce identical events" {
   for n in [Some(60.0), Some(64.0), Some(67.0)] {
     assert_true(notes1.contains(n))
     assert_true(notes2.contains(n))
+  }
+}
+
+///|
+test "explicit chord notation compiles with named chords weights repeats and rests" {
+  let events = query_one_cycle(
+    unwrap_ok(@mini.parse("chord(\"[C {60,63,68}@2]*2 ~\")")),
+  )
+  assert_true(events.map(event => event.value.get("note")).contains(Some(60.0)))
+  assert_true(events.map(event => event.value.get("note")).contains(Some(63.0)))
+  assert_true(events.map(event => event.value.get("note")).contains(Some(68.0)))
+  assert_true(events.map(event => event.value.get("note")).contains(Some(64.0)))
+}
+
+///|
+test "malformed explicit chord notation is rejected" {
+  for
+    atom in [
+      "{}", "{60,}", "{60,,63}", "{60, 63}", "{60,60}", "{63,60}", "{128}", "{60",
+    ] {
+    assert_true(@mini.parse("chord(\"" + atom + "\")") is Err(_))
   }
 }

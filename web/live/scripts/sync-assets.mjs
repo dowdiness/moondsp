@@ -14,7 +14,7 @@ const webDir = resolve(liveDir, "..");
 const repoDir = resolve(webDir, "..");
 const publicDir = resolve(liveDir, "public");
 const generatedDir = resolve(liveDir, "src/generated");
-const ASSETS = ["playback-controller.js", "processor.js", "scheduler-processor.js", "moonbit_dsp.wasm"];
+const ASSETS = ["playback-controller.js", "playback-onsets.js", "processor.js", "scheduler-processor.js", "moonbit_dsp.wasm"];
 const authoringSource = resolve(repoDir, "_build/js/release/build/browser_authoring/browser_authoring.js");
 
 mkdirSync(generatedDir, { recursive: true });

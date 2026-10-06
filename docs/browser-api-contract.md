@@ -893,6 +893,80 @@ and retired identities count separately: replacing anonymous materials can
 produce both additions and removals, unlike editing named continuing materials.
 Status reporting preserves those existing scheduler semantics.
 
+## Dispatched-onset observation
+
+The scheduler observes successful note-on dispatch, including fractional
+onsets carried into the next render block. Rejected voice allocation, rests,
+and events removed by transforms do not produce observations. Zero-gain notes
+still do: this is execution evidence, not an audibility meter.
+
+Both browser export targets expose these primitive operations:
+
+| Function | Contract |
+|---|---|
+| `player_onset_enable(enabled)` | Enable with nonzero `Int`; disabled by default |
+| `player_onset_count()` | Number of retained observations, at most 256 |
+| `player_onset_field(index, field)` | `Double` field; invalid/unused fields return zero |
+| `player_onset_clear()` | Clear observations and per-buffer drop count |
+| `player_onset_dropped()` | Drops since clear, returned as `Double` |
+
+One preallocated Player buffer is shared across routes. Each row has at most
+103 doubles: engine sample, source epoch, atom serial, literal-frame serial
+(`0` when absent), local onset (`-1` when absent), source pitch (NaN when
+unpitched), binding count, then reference/binding/definition serial triples.
+At most 32 bindings are admitted. Mixed epochs, unsafe numeric identities, and
+oversized paths drop the whole observation, never a suffix of its provenance.
+The buffer keeps the newest observations on overflow.
+
+The scheduler Worklet converts engine samples to AudioContext seconds and
+copies fields plus an observation generation into a 256-slot `SharedArrayBuffer`.
+Atomic slot ownership prevents torn Float64 reads; the writer never waits on a
+reader. There are no per-onset messages or render-path observer allocations.
+`AudioEngine.onsetStatistics()` exposes cumulative written, overwritten,
+reader-busy, and engine-drop counts for diagnostics. `?onsets=0` disables
+observation for comparison without changing playback.
+
+The live deployment requires `Cross-Origin-Opener-Policy: same-origin` and
+`Cross-Origin-Embedder-Policy: require-corp` for shared memory. Vite development
+and preview configure both; `web/live/public/_headers` supplies the static
+Cloudflare deployment rules. Without cross-origin isolation, playback and
+editing remain available but onset highlights are disabled, not approximated.
+
+The main thread maps observations through `getOutputTimestamp()` when valid,
+otherwise current context time plus reported base/output latency. It retains
+at most 256 observations. The latest due onset group remains highlighted until
+the next dispatched onset across the score; rests do not clear it. Simultaneous
+notes share an audio timestamp and stay highlighted together. Grouping and
+ordering use that stable audio timestamp, not the changing listener-time
+estimate. Late batches select only their newest due group, never replaying
+intermediate notes or replacing a newer group with an older one. An unresolved
+new origin replaces the old group without inventing a highlight.
+Pause, run changes, and visibility changes clear held and pending observations
+and retire the prior generation. This is a last-onset indication, not voice duration.
+
+`browser_authoring.locate_onsets(draft, wire)` accepts JSON rows of
+`7 + 3 * binding_count` fields. NaN pitch becomes JSON null. It returns an
+equal-length array of null or
+`{from,to,references:[{from,to}],notation:{from,to,start,pitch}|null}`.
+Ranges are current-draft UTF-16 coordinates; notation bounds delimit literal
+content, not quotes. Source identity and the full reference path must survive.
+Tracked Song section snapshots preserve those identities through entry
+selection, section time scope, clipping, placement, and repetition.
+
+A separate literal frame anchors local occurrence coordinates before outer
+expression transforms. Any literal-content edit retires that frame, while
+unchanged atoms can remain represented in code. Repeated notes match atom,
+frame, local onset, and pitch, never spelling alone. Frame metadata does not
+change musical node IDs, material keys, voice scopes, or content signatures.
+CodeMirror effects do not edit source, history, selection, or scroll; the
+existing focused notation receives highlight classes without rebuilding geometry.
+
+These are observer-specific guarantees. Existing pattern queries allocate;
+they and the complete audio engine are not certified allocation-free. See
+[ADR-0018](decisions/0018-playback-visualization-origin-truth.md) and the
+[measurement record](development/2026-10-03-musical-experience.md#actual-onset-linkage--2026-10-04)
+for evidence and timing limits.
+
 ## Live editor playback ownership
 
 The live editor routes draft edits and Play/Pause/Restart through `Player` in
@@ -947,6 +1021,102 @@ finishes. The signal is detached after opening and cannot cancel an active
 session. An opened session starts muted.
 The adapter owns AudioContext, AudioWorklet, suspension, teardown, and output
 gain; it does not expose nullable-node command methods.
+
+The live UI can call `AudioEngine.readWaveform(target)` with caller-owned
+`Float32Array` storage. It copies up to 1,024 post-master mono-mixed samples from a
+graph-owned `AnalyserNode`, clears excess target elements, and returns `true`
+only while the graph is active and its context is running. In every other state
+it clears the target and returns `false`. `true` means the signal is available,
+not that it is nonzero or that the listener's device is audible. The analyser
+branches from the gain output without changing the audible route and is
+disconnected with its graph. It adds no Worklet message, source-origin claim, or
+render-loop JavaScript allocation. A waveform is not evidence that a particular
+source note or pending material has started.
+
+The live output scope observes only the main transport. There is no separate
+audition engine or drawing preview. The source-structure and notation drawings
+are block widgets below the phrase at the cursor, sharing source transactions
+and Undo with pitch/rhythm controls. A user's drawing gesture can move the
+source caret; playback pulses cannot. Hiding Controls cancels unfinished
+gestures without changing source. Add melody appends ordinary code to empty
+or stack programs; Song and other expression programs remain editable in code.
+
+Note-body movement rotates complete sibling source tokens and optionally
+changes the moved core's pitch; it does not overwrite occupied steps or move
+an atom outside its sequence. Note-edge resizing edits adjacent source weights
+and preserves unrelated boundaries. Both preview by projecting candidate source
+through the same compiler and commit one document edit into shared history.
+Source selection follows the moved token, including after Redo. Rests remain
+blank but retain note-entry hit areas; Shift-drag retains contour drawing.
+
+Complete source ranges are shared between code and notation selection. A range
+can transpose or rotate as a sibling block; nested groups and linked occurrences
+retain their source identity. Duplicate inserts literal independent source after
+the selection, rather than changing `*n`. Candidate edits pass through the bounded
+notation projection before committing. Partial or cross-sequence selections are
+not silently widened. Redo restores the full destination range.
+
+Chord controls replace one authored chord atom's core, even when a gesture moves
+only one of its compiled tones. Weights, groups, repetitions, whitespace, and
+outer transforms remain untouched. The entire candidate phrase must fit the
+production notation projection before committing. Tone pitches and recognition
+templates come from that compiler, not a second interval table.
+
+Direct edits transpose the whole chord, move one tone, or add/remove tones.
+Pointer movement is a local preview; release commits one shared-history source
+transaction. Escape, pointer cancellation, or a changed document/atom cancels it.
+Duplicate and out-of-range MIDI pitches are rejected. Exact supported voicings
+can serialize as named chords; arbitrary combinations serialize as ascending
+unique MIDI sets, for example `{60,63,68}`. No-op edits retain the original token,
+and whole-chord transposition preserves a quality alias when exact. Removing
+the last tone writes `~`. Explicit sets are one source atom shared by every
+compiled voice, including its weights, repeats, and playback origins.
+
+Optional Root/Type selectors edit named chords through the same validation and
+transaction. They retain octave and quality aliases where applicable, including
+numeric-register disambiguation, and do not rewrite an already-selected type.
+Custom sets have no inferred Root/Type. A rest can use a neighboring named chord
+or C as a seed; direct Add tone starts at MIDI 60. Selecting a chord pad moves
+the source caret to that atom; partial ranges and groups cannot edit another
+chord accidentally. Pads and direct tone rows consume exact-source actual-onset
+highlights. The optional whole-progression tone diagram remembers its disclosure
+state and remains an inspection surface, separate from the direct tone editor.
+
+The optional division ruler measures local notation cycles, not global beats or
+bars. Compiled movement previews include displaced neighbors. Structure controls
+are a disclosure within the same source widget, not another editing state.
+
+Phrase-local update notices consume the existing `PlaybackView`. Queued/sending
+feedback refers to the edited source; accepted pending-material feedback is
+explicitly score-wide. It does not assert phrase-specific audibility. Edited
+source spans follow document changes, including edits made while controls are
+hidden. Current-version acceptance with no pending material clears the notice;
+an older accepted version cannot clear newer edits.
+
+The main-thread `browser_authoring.project_notation(kind, content)` export
+returns a JSON string for the quoted notation, independently of playback:
+
+- `error` is `null` on success or a diagnostic string on failure.
+- `roots` and `nodes` describe the parser's source tree, with UTF-16 offsets
+  relative to `content`. Authored atoms are distinct from repeated occurrences.
+- `events` contains compiled `{node, start, end, pitch}` occurrences. Times are
+  local notation cycles; note/chord pitches are MIDI values and drum pitch is
+  `null`. Outer score transformations and voice gate/release are not included.
+- `rests` has the same occurrence shape, with `pitch: null`, for explicit `~`
+  atoms in `kind="note"` only. Drum and chord projections return `rests: []`.
+  Silence generated by other operators is not a source rest.
+- `span` is the positive integer-cycle repeat window, at most 16 cycles.
+
+Rest timing uses a temporary compiler probe: replace only each one-code-unit
+`~` core with `0`, reapply the production parser's query-work admission, then
+query that compiled pattern and map its origins back to original rest nodes.
+This preserves offsets, weights, nesting, repetition, and original sounded
+events without interpreting timing in JavaScript. Both drafts are disposed.
+Input is bounded to 8,192 UTF-16 code units and the combined event/rest
+projection to 256 occurrences, with the existing conservative query budget
+also applying. Failure returns empty roots/nodes/events/rests and `span: 1`;
+the source remains editable in code. This projection does not schedule sound,
+modify the user's draft, or run on the audio thread.
 
 Player sources are subject to the
 [structural admission limits](technical-reference.md#browser-player-ownership-and-source-updates):

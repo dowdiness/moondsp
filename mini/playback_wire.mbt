@@ -56,59 +56,74 @@ fn decode_draft_version(value : Json) -> DraftVersion raise PlaybackWireError {
 }
 
 ///|
+fn SourceMap::wire_json(self : SourceMap) -> Json {
+  let atoms : Array[Json] = self.atoms.map(atom => {
+    [
+      atom.id.serial().to_double().to_json(),
+      atom.kind.to_json(),
+      atom.span.start.to_json(),
+      atom.span.end.to_json(),
+    ]
+  })
+  let literals : Array[Json] = self.literals.map(literal => {
+    [
+      literal.id.serial().to_double().to_json(),
+      literal.kind.to_json(),
+      literal.span.start.to_json(),
+      literal.span.end.to_json(),
+    ]
+  })
+  let definitions : Array[Json] = self.definitions.map(definition => {
+    [
+      definition.id.serial().to_double().to_json(),
+      definition.name.to_json(),
+      definition.span.start.to_json(),
+      definition.span.end.to_json(),
+      definition.visible_after.to_json(),
+    ]
+  })
+  let references : Array[Json] = self.references.map(reference => {
+    let (binding, target) : (Json, Json) = match reference.binding {
+      Bound(binding, target) =>
+        (
+          binding.serial().to_double().to_json(),
+          target.serial().to_double().to_json(),
+        )
+      Unresolved(_) => (Json::null(), Json::null())
+    }
+    [
+      reference.id.serial().to_double().to_json(),
+      reference.name.to_json(),
+      reference.span.start.to_json(),
+      reference.span.end.to_json(),
+      binding,
+      target,
+    ]
+  })
+  {
+    "epoch": self.epoch.serial().to_double().to_json(),
+    "atoms": atoms.to_json(),
+    "literals": literals.to_json(),
+    "definitions": definitions.to_json(),
+    "references": references.to_json(),
+  }
+}
+
+///|
 /// Encode frozen text and witnesses together; never serialize closures or history.
 pub fn PlaybackInput::encode_wire(self : PlaybackInput) -> String {
   let fields : Map[String, Json] = { "schema": 1, "text": self.input.to_json() }
   match self.payload {
     Text => fields["kind"] = "text"
-    Song(version) => {
+    Song(version, sources) => {
       fields["kind"] = "song"
       fields["version"] = draft_version_json(version)
+      fields["sourceMap"] = sources.wire_json()
     }
     Pattern(version, sources) => {
       fields["kind"] = "pattern"
       fields["version"] = draft_version_json(version)
-      let atoms : Array[Json] = sources.atoms.map(atom => {
-        [
-          atom.id.serial().to_double().to_json(),
-          atom.kind.to_json(),
-          atom.span.start.to_json(),
-          atom.span.end.to_json(),
-        ]
-      })
-      let definitions : Array[Json] = sources.definitions.map(definition => {
-        [
-          definition.id.serial().to_double().to_json(),
-          definition.name.to_json(),
-          definition.span.start.to_json(),
-          definition.span.end.to_json(),
-          definition.visible_after.to_json(),
-        ]
-      })
-      let references : Array[Json] = sources.references.map(reference => {
-        let (binding, target) : (Json, Json) = match reference.binding {
-          Bound(binding, target) =>
-            (
-              binding.serial().to_double().to_json(),
-              target.serial().to_double().to_json(),
-            )
-          Unresolved(_) => (Json::null(), Json::null())
-        }
-        [
-          reference.id.serial().to_double().to_json(),
-          reference.name.to_json(),
-          reference.span.start.to_json(),
-          reference.span.end.to_json(),
-          binding,
-          target,
-        ]
-      })
-      fields["sourceMap"] = {
-        "epoch": sources.epoch.serial().to_double().to_json(),
-        "atoms": atoms.to_json(),
-        "definitions": definitions.to_json(),
-        "references": references.to_json(),
-      }
+      fields["sourceMap"] = sources.wire_json()
     }
   }
   Json::object(fields).stringify()
@@ -147,11 +162,13 @@ fn wire_span(
 fn decode_source_map(
   value : Json,
   input : String,
+  expected_mode : MiniSourceMode,
 ) -> SourceMap raise PlaybackWireError {
   guard value is Object(fields) &&
-    fields.length() == 4 &&
+    fields.length() == 5 &&
     fields.get("epoch") is Some(epoch) &&
     fields.get("atoms") is Some(Array(atom_rows)) &&
+    fields.get("literals") is Some(Array(literal_rows)) &&
     fields.get("definitions") is Some(Array(definition_rows)) &&
     fields.get("references") is Some(Array(reference_rows)) else {
     raise InvalidWire("invalid source map")
@@ -162,13 +179,19 @@ fn decode_source_map(
     _ => raise InvalidWire("invalid source epoch")
   }
   guard atom_rows.length() <= input.length() &&
+    literal_rows.length() <= input.length() &&
     definition_rows.length() <= input.length() &&
     reference_rows.length() <= input.length() else {
     raise InvalidWire("source map exceeds source bounds")
   }
   let facts = recognize_mini_source(input)
-  guard facts.mode is Some(Pattern) &&
+  let mode_matches = match (facts.mode, expected_mode) {
+    (Some(Pattern), Pattern) | (Some(Song), Song) => true
+    _ => false
+  }
+  guard mode_matches &&
     atom_rows.length() == facts.atoms.length() &&
+    literal_rows.length() == facts.literals.length() &&
     definition_rows.length() == facts.definitions.length() &&
     reference_rows.length() == facts.references.length() else {
     raise InvalidWire("source map does not cover the submitted program")
@@ -191,6 +214,24 @@ fn decode_source_map(
       _ => raise InvalidWire("invalid atom identity")
     }
     atoms.push(LiveAtom(id, kind, span))
+  }
+  let literals : Array[LiveLiteral] = []
+  for index, row in literal_rows {
+    guard row is Array([serial, String(kind), start, end_]) else {
+      raise InvalidWire("invalid literal witness")
+    }
+    let serial = wire_unique_serial(serial, seen)
+    let span = wire_span(start, end_, input)
+    let fact = facts.literals[index]
+    guard kind == fact.kind &&
+      span.start == fact.span.start &&
+      span.end == fact.span.end else {
+      raise InvalidWire("literal witness does not match parsed source")
+    }
+    let id = @identity.SourceFrameId::SourceFrameId(epoch, serial) catch {
+      _ => raise InvalidWire("invalid source frame identity")
+    }
+    literals.push(LiveLiteral(id, kind, span))
   }
   let definitions : Array[LiveDefinition] = []
   for index, row in definition_rows {
@@ -257,7 +298,7 @@ fn decode_source_map(
     references.push(LiveReference(id, fact, Bound(binding, definition.id)))
   }
   // Received maps are immutable capabilities, never authoring-counter owners.
-  SourceMap(epoch, 0L, atoms, definitions, references)
+  SourceMap(epoch, 0L, atoms, literals, definitions, references)
 }
 
 ///|
@@ -290,15 +331,18 @@ fn decode_playback_wire(wire : String) -> PlaybackInput raise PlaybackWireError 
       }
       let version = decode_draft_version(version)
       if kind == "song" {
-        guard fields.length() == 4 else {
-          raise InvalidWire("unexpected song input metadata")
+        guard fields.length() == 5 && fields.get("sourceMap") is Some(sources) else {
+          raise InvalidWire("missing song source map")
         }
-        PlaybackPayload::Song(version)
+        PlaybackPayload::Song(version, decode_source_map(sources, input, Song))
       } else {
         guard fields.length() == 5 && fields.get("sourceMap") is Some(sources) else {
           raise InvalidWire("missing pattern source map")
         }
-        PlaybackPayload::Pattern(version, decode_source_map(sources, input))
+        PlaybackPayload::Pattern(
+          version,
+          decode_source_map(sources, input, Pattern),
+        )
       }
     }
     _ => raise InvalidWire("unknown playback input capability")

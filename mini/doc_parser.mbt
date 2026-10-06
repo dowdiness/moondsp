@@ -41,6 +41,18 @@ fn MiniDocBuilder::MiniDocBuilder(
 }
 
 ///|
+fn MiniDocBuilder::source_frame_at(
+  self : MiniDocBuilder,
+  content_from : Int,
+  content_to : Int,
+) -> @identity.SourceFrameId? {
+  match self.origins {
+    Some(origins) => origins.frame_at(content_from, content_to)
+    None => None
+  }
+}
+
+///|
 /// Create a reusable mini `PatternDoc` semantic builder for external
 /// frontends. Pass the last successful document to preserve subtree reuse.
 pub fn MiniDocBuilder::with_previous(
@@ -413,6 +425,23 @@ fn MiniDocBuilder::sequence_doc(
     None =>
       @pattern.PatternDoc::sequence(id~, docs~) catch {
         _ => raise ParseError("internal mini PatternDoc construction failed")
+      }
+  }
+}
+
+///|
+fn MiniDocBuilder::weighted_sequence_doc(
+  self : MiniDocBuilder,
+  docs : Array[@pattern.PatternDoc[@pattern.ControlMap]],
+  weights : Array[Int],
+) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
+  let signature = "\{doc_root_signature(docs)}:\{weights.map(weight => "\{weight}").join(":")}"
+  let id = self.node_id("weighted_seq", signature)
+  match self.reuse_doc(id, inputs=docs) {
+    Some(doc) => doc
+    None =>
+      @pattern.PatternDoc::sequence_weighted(id~, docs~, weights~) catch {
+        _ => raise ParseError("invalid relative duration sequence")
       }
   }
 }
@@ -803,10 +832,20 @@ fn NotationParser::parse_doc_layer(
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
   self.skip_spaces()
   let elements : Array[@pattern.PatternDoc[@pattern.ControlMap]] = []
+  let weights : Array[Int] = []
+  let mut total_weight = 0
+  let mut weighted = false
   while !self.at_end() &&
         self.input[self.pos] != ',' &&
         self.input[self.pos] != ']' {
-    elements.push(self.parse_doc_element(builder))
+    let (element, weight) = self.parse_doc_element(builder)
+    elements.push(element)
+    weights.push(weight)
+    total_weight += weight
+    weighted = weighted || weight != 1
+    guard !weighted || total_weight <= 256 else {
+      raise ParseError("relative duration sum must not exceed 256")
+    }
     self.require_element_boundary()
     self.skip_spaces()
   }
@@ -815,14 +854,17 @@ fn NotationParser::parse_doc_layer(
       "position \{self.pos}: expected at least one element in layer",
     )
   }
-  builder.sequence_doc(elements)
+  if !weighted {
+    return builder.sequence_doc(elements)
+  }
+  builder.weighted_sequence_doc(elements, weights)
 }
 
 ///|
 fn NotationParser::parse_doc_element(
   self : NotationParser,
   builder : MiniDocBuilder,
-) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
+) -> (@pattern.PatternDoc[@pattern.ControlMap], Int) raise ParseError {
   self.skip_spaces()
   guard !self.at_end() else {
     raise ParseError("position \{self.pos}: unexpected end of notation")
@@ -839,6 +881,7 @@ fn NotationParser::parse_doc_element(
     self.parse_doc_atom(builder)
   }
   let mut doc = base
+  let mut weight = 1
   let mut applied = true
   while applied {
     applied = false
@@ -858,10 +901,13 @@ fn NotationParser::parse_doc_element(
         let seed = stable_seed(doc.root().value())
         doc = builder.degrade_doc(doc, 0.5, seed)
         applied = true
+      } else if c == '@' {
+        weight = self.read_relative_duration()
+        applied = true
       }
     }
   }
-  doc
+  (doc, weight)
 }
 
 ///|

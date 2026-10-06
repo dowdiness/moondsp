@@ -40,6 +40,7 @@ priv struct Parser {
   mut recognition : Bool
   mut recognized_pattern : Bool
   recognized_atoms : Array[RecognizedAtom]
+  recognized_literals : Array[RecognizedLiteral]
   recognized_references : Array[RecognizedReference]
   mut last_binding_span : MiniSpan
   syntax_depth_limit : Int?
@@ -68,6 +69,7 @@ fn Parser::Parser(
     recognition: false,
     recognized_pattern: false,
     recognized_atoms: [],
+    recognized_literals: [],
     recognized_references: [],
     last_binding_span: { start: 0, end: 0, },
     syntax_depth_limit,
@@ -346,7 +348,13 @@ fn parse_decimal_rational(
   }
   let mut whole = 0L
   for index in digits_start..<point {
-    whole = whole * 10L + Int64::from_int(input[index].to_int() - '0'.to_int())
+    let digit = Int64::from_int(input[index].to_int() - '0'.to_int())
+    guard whole <= (9223372036854775807L - digit) / 10L else {
+      raise ParseError(
+        "position \{error_position}: decimal factor exceeds exact rational range",
+      )
+    }
+    whole = whole * 10L + digit
   }
   let mut fractional_end = end_
   while fractional_end > point + 1 && input[fractional_end - 1] == '0' {
@@ -359,7 +367,7 @@ fn parse_decimal_rational(
   }
   guard fractional_digits <= 18 else {
     raise ParseError(
-      "position \{error_position}: gate() accepts at most 18 decimal places",
+      "position \{error_position}: exact decimal factors support at most 18 fractional digits",
     )
   }
   let mut denominator = 1L
@@ -368,6 +376,11 @@ fn parse_decimal_rational(
     denominator *= 10L
     fractional = fractional * 10L +
       Int64::from_int(input[index].to_int() - '0'.to_int())
+  }
+  guard whole <= (9223372036854775807L - fractional) / denominator else {
+    raise ParseError(
+      "position \{error_position}: decimal factor exceeds exact rational range",
+    )
   }
   let numerator = whole * denominator + fractional
   @pattern.Rational::new(

@@ -4,13 +4,23 @@ pub struct PlaybackSourcedEvent {
   priv event : @pattern.Event[@pattern.ControlMap]
   priv origin : @model.VoiceOrigin
   priv source_origin : @pattern.EventOrigin?
+  priv source_frame : @identity.SourceFrameId?
+  priv source_start : Double
+  priv source_pitch : Double
 }
 
 ///|
 pub fn PlaybackSourcedEvent::anonymous(
   event : @pattern.Event[@pattern.ControlMap],
 ) -> PlaybackSourcedEvent {
-  { event, origin: @model.VoiceOrigin::Anonymous, source_origin: None, }
+  {
+    event,
+    origin: @model.VoiceOrigin::Anonymous,
+    source_origin: None,
+    source_frame: None,
+    source_start: -1.0,
+    source_pitch: -1.0,
+  }
 }
 
 ///|
@@ -18,6 +28,27 @@ pub fn PlaybackSourcedEvent::source_origin(
   self : PlaybackSourcedEvent,
 ) -> @pattern.EventOrigin? {
   self.source_origin
+}
+
+///|
+pub fn PlaybackSourcedEvent::source_frame(
+  self : PlaybackSourcedEvent,
+) -> @identity.SourceFrameId? {
+  self.source_frame
+}
+
+///|
+pub fn PlaybackSourcedEvent::source_start(
+  self : PlaybackSourcedEvent,
+) -> Double {
+  self.source_start
+}
+
+///|
+pub fn PlaybackSourcedEvent::source_pitch(
+  self : PlaybackSourcedEvent,
+) -> Double {
+  self.source_pitch
 }
 
 ///|
@@ -345,6 +376,9 @@ pub fn PlaybackState::query_active_sourced_events(
         event: sourced.event.shift(offset),
         origin: sourced.origin,
         source_origin: sourced.source_origin,
+        source_frame: sourced.source_frame,
+        source_start: sourced.source_start,
+        source_pitch: sourced.source_pitch,
       })
   }
 }

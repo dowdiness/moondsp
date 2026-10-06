@@ -37,6 +37,9 @@ These documents provide concrete empirical evidence that `moondsp` satisfies its
   Research and evaluation for the shared stereo room-reverb bus integrated in release `v0.6.0`.
 
 ### 6. Browser Workspace & Interaction Evidence
+- **[`2026-10-03-musical-experience.md`](2026-10-03-musical-experience.md)**
+  Drawable source editing, complete phrase previews, comparison and answering
+  phrases, independent experience reviews, and browser/audio verification limits.
 - **[`2026-10-02-musical-workspace.md`](2026-10-02-musical-workspace.md)**  
   Text-first workspace design, musical-interface research, real browser/audio
   observations, and the limits of automated usability evidence.

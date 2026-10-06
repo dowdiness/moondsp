@@ -1,0 +1,21 @@
+.chord-editor { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px 16px; margin-block: 8px; }
+.chord-editor > .step-grid { flex-basis: 100%; gap: 6px; }
+.chord-editor .step-pad { min-height: 44px; max-width: 100%; padding: 8px 12px; font-size: 13px; overflow-wrap: anywhere; }
+.chord-editor .step-pad[aria-pressed='true'] { outline: 2px solid var(--part-color); outline-offset: 2px; }
+.chord-editor .step-pad.is-playing { background: var(--accent); border-color: var(--accent); color: var(--panel); }
+.chord-editor .step-pad.is-playing .step-index { color: inherit; }
+.chord-editor > .note-properties { margin: 0; min-height: 44px; }
+.chord-controls { flex-basis: 100%; min-width: 0; color: var(--ink-muted); font: 12px/1.5 var(--font-body); }
+.chord-controls__named > summary { min-height: 44px; font-weight: 400; }
+.chord-controls__fields { display: flex; flex-wrap: wrap; gap: 8px 12px; }
+.chord-controls label { display: grid; gap: 4px; min-width: 0; }
+.chord-controls select { min-height: 44px; max-width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--panel); color: var(--ink); font: inherit; }
+.chord-controls select:hover:not(:disabled) { border-color: var(--ink-muted); }
+.chord-controls select:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.chord-controls :disabled { opacity: .5; }
+.chord-controls__tones { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.chord-controls .step-feedback { display: block; color: var(--err-fg); margin-top: 6px; }
+.chord-controls .step-feedback:empty { display: none; }
+@media (forced-colors: active) {
+  .chord-editor .step-pad.is-playing { background: Highlight; color: HighlightText; }
+}

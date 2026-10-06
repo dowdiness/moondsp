@@ -209,6 +209,15 @@ occurrence, section, and layer identity for selective live updates.
 Document edit methods return new values and reject duplicate identities, names,
 invalid indices, and removal of the final occurrence.
 
+`Section::with_origins(..., snapshot~)` derives a section body from an exact
+`PatternSnapshotWithOrigins`; it cannot pair an unrelated body with its witness.
+`SectionDoc::single_with_origins(..., snapshot~)` preserves that capability in
+the document path. `SongSnapshotEvent` carries optional source origin/frame and
+local onset/pitch alongside occurrence, section, and layer identity. Section
+rate, clipping, placement, and repeating playback change event spans without
+reinterpreting those source-local coordinates. Replacing a body with an
+anonymous runtime pattern clears its origin capability; renaming preserves it.
+
 ## Package boundary
 
 `song` owns long-form musical structure. It relies on exact pattern time and

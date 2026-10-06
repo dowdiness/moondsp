@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { readCode, replaceCode } from "./editor-helpers";
+import { openPitchControls, readCode, replaceCode } from "./editor-helpers";
 
 declare global {
   interface Window {
@@ -9,13 +9,14 @@ declare global {
 
 const imported = '// 日本語のスケッチ\nbpm(84);\nnote("C4 Eb4 G4").gain(0.2)';
 
-test("pattern edits preserve multiline source and undo; nested syntax stays in code", async ({ page }) => {
+test("pattern edits preserve multiline and nested source through shared Undo", async ({ page }) => {
   await page.goto("/");
   const source = '// 日本語\nlet melody = note("C4 ~\nG4 Eb4").gain(0.2);\nmelody';
   await replaceCode(page, source);
   const editor = page.locator(".cm-content");
   await editor.press("Control+Home");
   await editor.press("ArrowDown");
+  await openPitchControls(page);
   const pitch = page.getByRole("button", { name: "Set D4", exact: true });
   await page.locator(".step-pad").first().focus();
   await pitch.click();
@@ -24,8 +25,12 @@ test("pattern edits preserve multiline source and undo; nested syntax stays in c
   await pitch.press("Control+z");
   await expect.poll(() => readCode(page)).toBe(source);
   await replaceCode(page, 'note("[C4 E4] G4")');
-  await expect(page.locator(".step-pad")).toHaveCount(0);
-  expect(await readCode(page)).toBe('note("[C4 E4] G4")');
+  await page.locator(".moving-score__note-block").first().click();
+  await openPitchControls(page);
+  await page.getByRole("button", { name: "Set D4", exact: true }).click();
+  await expect.poll(() => readCode(page)).toBe('note("[D4 E4] G4")');
+  await page.locator("#undo").click();
+  await expect.poll(() => readCode(page)).toBe('note("[C4 E4] G4")');
 });
 
 test("code cursor selects the note that pitch controls change, including the lowest octave", async ({ page }) => {
@@ -34,11 +39,13 @@ test("code cursor selects the note that pitch controls change, including the low
   const editor = page.locator(".cm-content");
   await editor.press("Home");
   for (let index = 0; index < 9; index++) await editor.press("ArrowRight");
+  await openPitchControls(page);
   await page.getByRole("button", { name: "Set F4", exact: true }).click();
   await expect.poll(() => readCode(page)).toBe('note("C4 F4 G4")');
   await page.locator("#undo").click();
   await expect.poll(() => readCode(page)).toBe('note("C4 E4 G4")');
   await replaceCode(page, 'note("C0")');
+  await openPitchControls(page);
   await page.locator(".step-pad").press("Shift+ArrowDown");
   await expect.poll(() => readCode(page)).toBe('note("C-1")');
   await expect(page.locator(".octave-down")).toBeDisabled();
@@ -56,6 +63,7 @@ test("pitch key navigation and history preserve the source selection on return t
   for (let index = 0; index < 9; index++) await editor.press("ArrowRight");
   await editor.press("Shift+ArrowRight");
   await editor.press("Shift+ArrowRight");
+  await openPitchControls(page);
   await page.locator(".step-pad").first().focus();
   await page.getByRole("button", { name: "Set C4", exact: true }).focus();
   await page.keyboard.press("ArrowRight");
@@ -83,6 +91,7 @@ test("keyboard and pointer switching keeps one Tab stop and accidental keys reac
   await page.goto("/");
   const source = 'note("C4").gain(0.2)';
   await replaceCode(page, source);
+  await openPitchControls(page);
   const natural = page.getByRole("button", { name: "Set C4", exact: true });
   const sharp = page.getByRole("button", { name: "Set C#4", exact: true });
   await natural.focus();
@@ -110,6 +119,7 @@ test("choosing a pitch and activating a step return to the selected source witho
   for (let index = 0; index < 6; index++) await editor.press("ArrowRight");
   await editor.press("Shift+ArrowRight");
   await editor.press("Shift+ArrowRight");
+  await openPitchControls(page);
   await page.locator(".step-pad").nth(1).focus();
   const pitch = page.getByRole("button", { name: "Set F#4", exact: true });
   await pitch.click();
@@ -137,6 +147,7 @@ test("pattern controls retain play, pause and restart shortcuts without editing 
   await page.goto("/");
   const source = 'note("C4").gain(0.2)';
   await replaceCode(page, source);
+  await openPitchControls(page);
   const pitch = page.getByRole("button", { name: "Set C4", exact: true });
   await pitch.focus();
   await pitch.press("Control+Enter");
@@ -160,6 +171,7 @@ test("musical adjustments and rest replacement share exact source undo without l
   await page.goto("/");
   const source = '// 保持\nnote("G4 Eb4 127 ~").gain(0.2)';
   await replaceCode(page, source);
+  await openPitchControls(page);
   const pitch = page.locator(".step-pad").first();
   await pitch.focus();
   await page.getByRole("button", { name: "Set F#4", exact: true }).click();
@@ -170,11 +182,8 @@ test("musical adjustments and rest replacement share exact source undo without l
   await expect.poll(() => readCode(page)).toBe(source.replace("G4", "F#4"));
   await page.locator(".step-rest").click();
   await expect.poll(() => readCode(page)).toBe(source.replace("G4", "~"));
-  await expect(page.locator(".step-rest")).toHaveAttribute("aria-pressed", "true");
   await page.locator("#undo").click();
   await expect.poll(() => readCode(page)).toBe(source.replace("G4", "F#4"));
-  // The restored note must not retain the rest's preview announcement.
-  await expect(page.locator(".step-feedback")).toBeEmpty();
   await page.locator(".step-pad").nth(2).focus();
   await expect(page.getByRole("button", { name: "Set G#9", exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "Set F#9", exact: true }).click();
@@ -183,75 +192,30 @@ test("musical adjustments and rest replacement share exact source undo without l
   await expect.poll(() => readCode(page)).toBe(source.replace("G4", "F#4"));
 });
 
-test("rest remains keyboard accessible beside octave controls and within drum choices with shared history", async ({ page }) => {
-  await page.goto("/");
-  for (const { source, atom, groupSelector } of [
-    { source: 'note("C4 E4")', atom: "C4", groupSelector: ".pitch-keyboard" },
-    { source: 's("bd sd")', atom: "bd", groupSelector: ".drum-choices" },
-  ]) {
-    await replaceCode(page, source);
-    const group = page.locator(groupSelector);
-    await group.locator("button").first().focus();
-    await page.keyboard.press(groupSelector === ".pitch-keyboard" ? "Shift+Tab" : "End");
-    const rest = page.locator(".score-pattern").getByRole("button", { name: "Rest", exact: true });
-    await expect(rest).toBeFocused();
-    expect(await readCode(page)).toBe(source);
-    await rest.press("Space");
-    await expect.poll(() => readCode(page)).toBe(source.replace(atom, "~"));
-    await expect(rest).toHaveAttribute("aria-pressed", "true");
-    await expect(group.locator("button[aria-pressed='true']")).toHaveCount(groupSelector === ".pitch-keyboard" ? 0 : 1);
-    await rest.press(groupSelector === ".pitch-keyboard" ? "Tab" : "Home");
-    await expect(group.locator("button").first()).toBeFocused();
-    await page.keyboard.press("Space");
-    await expect.poll(() => readCode(page)).toBe(source);
-    await expect(rest).toHaveAttribute("aria-pressed", "false");
-    await page.locator("#undo").click();
-    await expect.poll(() => readCode(page)).toBe(source.replace(atom, "~"));
-    await page.locator("#undo").click();
-    await expect.poll(() => readCode(page)).toBe(source);
-  }
-});
 
-test("listening is bounded, does not start the score, and survives change–undo–listen", async ({ page }) => {
+test("numbered note buttons select without listening or starting the score", async ({ page }) => {
   await page.goto("/");
   const source = 'note("G4 E4").gain(0.2)';
   await replaceCode(page, source);
-  const controls = page.locator(".score-pattern");
-  await page.locator(".step-pad").first().click();
-  await expect(controls).toHaveAttribute("data-preview", "playing");
+  await openPitchControls(page);
+  const select = page.getByRole("button", { name: "Select G4, Melody, step 1", exact: true });
+  await select.click();
+  await expect(select).toHaveAttribute("aria-pressed", "true");
   expect(await readCode(page)).toBe(source);
   await expect(page.locator("#status")).toHaveText("Ready");
-  await expect(controls).toHaveAttribute("data-preview", "idle");
   await page.getByRole("button", { name: "Set G#4", exact: true }).click();
   await expect.poll(() => readCode(page)).toBe(source.replace("G4", "G#4"));
-  await expect(controls).toHaveAttribute("data-preview", "playing");
+  await expect(page.locator("#status")).toHaveText("Ready");
   await page.locator("#undo").click();
   await expect.poll(() => readCode(page)).toBe(source);
-  await page.locator(".step-pad").first().click();
-  await expect(controls).toHaveAttribute("data-preview", "playing");
-  await page.locator("#start").click();
-  await expect(controls).toHaveAttribute("data-preview", "idle");
-  await expect(page.locator("#status")).toHaveText("Playing");
-  await expect.poll(async () => Number(await page.locator("#status").getAttribute("data-cycle-position"))).toBeGreaterThan(0);
-  await page.getByRole("button", { name: "Set G#4", exact: true }).click();
-  await expect.poll(() => readCode(page)).toBe(source.replace("G4", "G#4"));
-  await expect(controls).toHaveAttribute("data-preview", "idle");
-  await page.locator("#start").click();
-  await expect(page.locator("#status")).toHaveText("Paused");
-  const pausedPosition = await page.locator("#status").getAttribute("data-cycle-position");
-  await page.locator(".step-pad").first().click();
-  await expect(controls).toHaveAttribute("data-preview", "playing");
-  await page.locator("#source-toggle").click();
-  await expect(page.locator(".score-pattern")).toHaveCount(0);
-  await expect(page.locator("#status")).toHaveText("Paused");
-  await expect(page.locator("#status")).toHaveAttribute("data-cycle-position", pausedPosition!);
+  await expect(page.locator("#status")).toHaveText("Ready");
 });
 
 test("mobile Help contains keyboard focus, closes on Escape and yields to a chosen score", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   const original = await readCode(page);
-  const trigger = page.getByRole("button", { name: "Show help", exact: true });
+  const trigger = page.getByRole("button", { name: "Help", exact: true });
   const help = page.getByRole("dialog", { name: "Help & sounds" });
   await trigger.click();
   await expect(page.getByRole("button", { name: "Close help", exact: true })).toBeFocused();
@@ -460,3 +424,22 @@ test("denied local storage leaves edits and file export usable", async ({ page }
   expect(Buffer.concat(chunks).toString("utf8")).toBe(imported);
   expect(await readCode(page)).toBe(imported);
 });
+
+for (const phrase of [
+  { kind: "note", source: 'note("D4 ~@2*2 G4").slow(2)', value: "D4", action: "Add note" },
+  { kind: "chord", source: 'chord("Dm ~@2 C").gate(.4)', value: "Dm", action: "Add chord" },
+]) {
+  test(`a selected ${phrase.kind} rest can take its neighboring sound without losing timing or history`, async ({ page }) => {
+    await page.goto("/");
+    await replaceCode(page, phrase.source);
+    if (phrase.kind === "note") await openPitchControls(page);
+    await page.locator(".step-pad").nth(1).click();
+    await page.getByRole("button", { name: phrase.action, exact: true }).click();
+    await expect.poll(() => readCode(page)).toBe(phrase.source.replace("~", phrase.value));
+    await expect(page.locator("#status")).toHaveText("Ready");
+    await page.locator("#undo").click();
+    await expect.poll(() => readCode(page)).toBe(phrase.source);
+    await page.locator("#redo").click();
+    await expect.poll(() => readCode(page)).toBe(phrase.source.replace("~", phrase.value));
+  });
+}

@@ -43,7 +43,7 @@ surface:
 | **Text Parsing** | `parse`, `parse_song`, `parse_song_with_bpm` | Parse string into `Pat[ControlMap]`, `Song[ControlMap]`, or `ParsedSong` |
 | **Documents** | `parse_doc`, `parse_snapshot` | Parse deterministic graph documents or general snapshots without cross-draft source continuity |
 | **Live Authoring** | `Draft`, `DraftVersion`, `EditTransaction`, `TextEdit` | `Draft::new`, `state`, `edit`, `reset`, `prepare_playback`, `locate_origin`, `dispose` |
-| **Frozen Playback Input** | `PlaybackInput`, `PreparedPlayback` | `PlaybackInput::text`, `source`, `version`, `compile`, `encode_wire`, `decode_wire`; exact pattern or explicitly runtime-only source |
+| **Frozen Playback Input** | `PlaybackInput`, `PreparedPlayback` | `PlaybackInput::text`, `source`, `version`, `compile`, `encode_wire`, `decode_wire`; tracked Pattern/Song or explicitly runtime-only text |
 | **Programmatic Doc Building** | `MiniDocBuilder` | `MiniDocBuilder::with_previous`, `MiniDocBuilder::sound_atom`, `MiniDocBuilder::note_atom`, `MiniDocBuilder::sequence`, `MiniDocBuilder::fast` |
 | **Song & Utilities** | `ParsedSong`, `drum_midi` | `ParsedSong::song`, `ParsedSong::bpm`, `drum_midi` |
 
@@ -131,9 +131,10 @@ does not revive it.
 `DraftDiagnostic`. Preparing input is **not playback acceptance**. The input owns
 its captured text/version/source witnesses; subsequent edits or disposal do not
 change it. `compile()` returns `PreparedPlayback::Pattern(exact_snapshot, bpm)`
-for a tracked pattern or `PreparedPlayback::Runtime(play_source)` for a song.
-`PlaybackInput::text(text)` explicitly selects runtime-only programmatic input.
-An exact compilation failure never falls back to runtime-only playback.
+for a tracked pattern or `PreparedPlayback::Runtime(play_source)` for a song;
+tracked Song sections retain exact source snapshots inside that runtime source.
+`PlaybackInput::text(text)` explicitly selects untracked programmatic input.
+An exact compilation failure never falls back to untracked playback.
 
 `encode_wire()` serializes a frozen input as schema-1 JSON. `decode_wire(wire)`
 returns a `Result`, validating bounded source/wire sizes, safe integer identities,
@@ -147,6 +148,13 @@ outer-to-inner reference ranges, or `Unavailable(SourceReset | AtomRetired |
 BrokenReference)`. It requires the entire original binding path, not a partial
 match. Old-version origins can remain locatable during invalid drafts.
 
+Literal content has a separate `SourceFrameId`. Offset-only edits preserve it;
+editing any part of that content retires it without necessarily retiring every
+atom. `locate_frame_fields(epoch, serial)` resolves a surviving literal to its
+current content range. `locate_origin_fields(epoch, atom_serial, path)` validates
+the complete scalar reference/binding/definition path from onset transport.
+Neither lookup infers continuity from spelling, pitch, or nearby text.
+
 Tracking is limited to 8192 UTF-16 code units; larger text remains editable but
 cannot prepare playback. Crossing the limit, confirmed source-mode changes, and
 explicit `reset` establish fresh source epochs. Unknown syntax alone does not
@@ -158,9 +166,9 @@ revisions never wrap. `Draft::new` raises `DraftEditError` on epoch exhaustion;
 The live editor uses the JS-target `browser_authoring` adapter to keep this Draft
 on the main thread, independent of AudioContext lifetime. CodeMirror edits,
 immutable Worklet submission, version-correlated receipts, and scheduler exact
-capability retention are connected. Onset observations and visual highlighting
-remain separate work. See the
-[implementation contract](../docs/plans/2026-09-09-playback-position-ui.md).
+capability retention are connected. Actual dispatched onsets now drive code and
+inline notation pulses in both Pattern and Song; see the
+[browser observation contract](../docs/browser-api-contract.md#dispatched-onset-observation).
 
 ## Parse a song
 

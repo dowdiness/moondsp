@@ -14,7 +14,11 @@ pub fn draft_state(@mini.Draft) -> String
 
 pub fn edit_draft(@mini.Draft, String) -> String
 
+pub fn locate_onsets(@mini.Draft, String) -> String
+
 pub fn prepare_playback(@mini.Draft) -> String
+
+pub fn project_notation(String, String) -> String
 
 // Errors
 

@@ -33,6 +33,13 @@ pub struct ReferenceBindingId {
 } derive(Eq, Debug)
 
 ///|
+/// A stable exact identity for one complete quoted notation literal.
+pub struct SourceFrameId {
+  priv epoch : SourceEpoch
+  priv serial : Int64
+} derive(Eq, Debug)
+
+///|
 /// JavaScript-safe positive integer upper bound, inclusive.
 const SOURCE_IDENTITY_MAX : Int64 = 9007199254740991L
 
@@ -78,6 +85,24 @@ pub fn SourceAtomId::epoch(self : SourceAtomId) -> SourceEpoch {
 ///|
 /// Return the serial number of this atom identity.
 pub fn SourceAtomId::serial(self : SourceAtomId) -> Int64 {
+  self.serial
+}
+
+///|
+pub fn SourceFrameId::SourceFrameId(
+  epoch : SourceEpoch,
+  serial : Int64,
+) -> SourceFrameId raise StableIdError {
+  { epoch, serial: validate_source_identity_component(serial), }
+}
+
+///|
+pub fn SourceFrameId::epoch(self : SourceFrameId) -> SourceEpoch {
+  self.epoch
+}
+
+///|
+pub fn SourceFrameId::serial(self : SourceFrameId) -> Int64 {
   self.serial
 }
 
@@ -155,6 +180,12 @@ pub extend SourceAtomId with Eq::{equal, not_equal}
 
 ///|
 pub extend SourceAtomId with Debug::{to_repr}
+
+///|
+pub extend SourceFrameId with Eq::{equal, not_equal}
+
+///|
+pub extend SourceFrameId with Debug::{to_repr}
 
 ///|
 pub extend DefinitionId with Eq::{equal, not_equal}

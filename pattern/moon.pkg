@@ -3,6 +3,7 @@ import {
   "dowdiness/moondsp/identity",
   "moonbitlang/core/bench",
   "moonbitlang/core/debug",
+  "moonbitlang/core/double",
   "moonbitlang/core/math",
 }
 

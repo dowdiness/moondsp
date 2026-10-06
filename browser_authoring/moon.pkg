@@ -1,5 +1,6 @@
 import {
   "dowdiness/moondsp/mini",
+  "dowdiness/moondsp/pattern",
   "moonbitlang/core/json",
 }
 
@@ -14,7 +15,9 @@ options(
         "draft_state",
         "edit_draft",
         "prepare_playback",
+        "locate_onsets",
         "dispose_draft",
+        "project_notation",
       ],
     },
   },

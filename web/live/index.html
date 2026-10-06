@@ -3,20 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>moondsp — a playable score</title>
-    <meta name="description" content="Make music with a score you can touch. Play a pattern, shape its notes, and discover the code as you go." />
-    <meta name="theme-color" content="#eef1f5" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#171d27" media="(prefers-color-scheme: dark)" />
+    <title>moondsp — music takes shape</title>
+    <meta name="description" content="Draw a melody, turn it into a variation, and hear your code come alive. A playful music-making space, right in your browser." />
+    <meta name="theme-color" content="#e9efeb" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preload" href="/fonts/manrope-regular.ttf" as="font" type="font/ttf" crossorigin />
     <link rel="stylesheet" href="/src/workspace.css" />
   </head>
   <body>
-    <!-- THESIS: A score you can touch, not an IDE beside a separate sequencer.
-    OWN-WORLD: Silver-blue notation sheet, ink typography, indigo transport, clay rhythm and blue pitch.
-    STORY: Hear a phrase, change its marks, discover that those marks and the code are one score.
-    FIRST VIEWPORT: Persistent transport, a full-height text score, compact controls under the focused phrase, help on demand.
-    FORM: Graphic score workshop, grounded direction 3, seed c93d7327.
+    <!-- THESIS: Music takes shape: draw a phrase, read its code, hear its real output. Not an IDE with decorative meters.
+    OWN-WORLD: Mint dance-notation field, deep green ink, cobalt and lavender pitch forms, orange rhythm; broad flat planes.
+    STORY: Play a feeling, draw a melody, turn it into an answer, keep the music as an editable text score.
+    FIRST VIEWPORT: Persistent transport above contrasting starter gestures; drawable notes embedded in their source phrase, actual output below.
+    FORM: Dance-floor notation, grounded direction 6, seed 97187dec.
     FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md -->
     <a class="skip-link" href="#editor">Skip to your score</a>
     <header class="masthead">
@@ -29,61 +28,102 @@
         <button id="restart" type="button" class="icon-button" aria-label="Restart" title="Restart the current score from the beginning">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9a8 8 0 1 1 1 8M4 3v6h6"/></svg>
         </button>
-        <div class="transport-state"><span class="status" id="status" aria-live="polite">Ready</span><span id="playback-tempo">Not playing yet</span></div>
+        <div class="transport-state"><span class="status" id="status" aria-live="polite">Ready</span><span id="playback-tempo"></span></div>
         <div class="cycle-meter" aria-hidden="true"><span id="cycle-progress"></span></div>
       </div>
+          <div class="score-tools">
+            <button type="button" id="add-melody" class="quiet-button">Add melody</button>
+            <button type="button" id="undo" class="icon-button" aria-label="Undo" title="Undo · Ctrl/⌘ + Z"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5-5 5 5 5M4 10h9a6 6 0 0 1 6 6v3"/></svg></button>
+            <button type="button" id="redo" class="icon-button" aria-label="Redo" title="Redo · Ctrl/⌘ + Shift + Z"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5 5 5-5 5m5-5h-9a6 6 0 0 0-6 6v3"/></svg></button>
+            <button type="button" id="source-toggle" class="view-toggle" aria-pressed="true" title="Show controls for the phrase at your cursor">Controls</button>
+          </div>
       <nav class="file-actions" aria-label="Score files and help">
         <button id="open-score" type="button" class="quiet-button">Open</button>
         <button id="save-score" type="button" class="quiet-button">Download</button>
-        <button id="cheat-toggle" type="button" class="quiet-button" aria-controls="cheat" aria-expanded="false">Show help</button>
+        <button id="cheat-toggle" type="button" class="quiet-button" aria-controls="cheat" aria-expanded="false">Help</button>
         <input id="score-file" type="file" accept=".mini,.txt,text/plain" hidden />
       </nav>
     </header>
     <main class="workspace cheat-collapsed">
       <section class="score-sheet" aria-label="Your musical score">
-        <div class="score-toolbar">
-          <div class="score-title"><span class="score-symbol" aria-hidden="true"></span><h1 id="score-title">First light</h1><span id="save-status" role="status"></span></div>
-          <div class="score-tools">
-            <button type="button" id="undo" class="icon-button" aria-label="Undo" title="Undo · Ctrl/⌘ + Z"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5-5 5 5 5M4 10h9a6 6 0 0 1 6 6v3"/></svg></button>
-            <button type="button" id="redo" class="icon-button" aria-label="Redo" title="Redo · Ctrl/⌘ + Shift + Z"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5 5 5-5 5m5-5h-9a6 6 0 0 0-6 6v3"/></svg></button>
-            <button type="button" id="source-toggle" class="view-toggle" aria-pressed="true" title="Show controls for the phrase at your cursor">Controls</button>
-          </div>
-        </div>
-        <details id="saved-drafts" hidden>
-          <summary>Saved drafts</summary>
-          <p>Recovery copies from other sessions. Restore is undoable.</p>
-          <ul id="saved-draft-list"></ul>
-        </details>
         <div id="editor" tabindex="-1"></div>
-        <div class="score-bottom"><span id="cursor-position">Ln 3, Col 1</span><span class="keyboard-hint"><kbd>Ctrl / ⌘</kbd> <kbd>Enter</kbd></span></div>
       </section>
       <dialog id="cheat" aria-labelledby="help-title" inert>
         <div class="help-heading"><h2 id="help-title">Help &amp; sounds</h2><button type="button" id="close-help" class="icon-button" aria-label="Close help"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
         <p>Press Play to hear the score. Edit any phrase as text; its musical controls appear at your cursor. Both change the same score, and both support Undo.</p>
+    <section class="experience-intro" aria-label="Starting sounds">
+      <p class="starting-label">Play a starting sound</p>
+      <div class="scene-list" aria-label="Explore a starting sound">
+        <button class="scene" type="button" data-scene="first-light" aria-label="Explore First light" aria-pressed="true">
+          <svg class="scene-art scene-art-light" viewBox="0 0 100 64" aria-hidden="true"><circle cx="34" cy="32" r="25"/><path d="M55 7h10a25 25 0 0 1 0 50H55Z"/></svg>
+          <span><strong>First light</strong><small>96 BPM</small></span>
+        </button>
+        <button class="scene" type="button" data-scene="offbeat" aria-label="Explore Offbeat" aria-pressed="false">
+          <svg class="scene-art scene-art-offbeat" viewBox="0 0 100 64" aria-hidden="true"><path d="M8 39h23V14h23v25h23V14h15v39H8Z"/></svg>
+          <span><strong>Offbeat</strong><small>112 BPM</small></span>
+        </button>
+        <button class="scene" type="button" data-scene="slow-drift" aria-label="Explore Slow drift" aria-pressed="false">
+          <svg class="scene-art scene-art-drift" viewBox="0 0 100 64" aria-hidden="true"><ellipse cx="50" cy="32" rx="42" ry="23"/><ellipse cx="50" cy="32" rx="27" ry="23"/><ellipse cx="50" cy="32" rx="10" ry="23"/></svg>
+          <span><strong>Slow drift</strong><small>72 BPM</small></span>
+        </button>
+      </div>
+    </section>
       <div class="starting-points">
-        <p class="starting-label">Start with a feeling</p>
+        <p class="starting-label">Load a score</p>
         <div class="starter-list" aria-label="Starter scores">
           <button class="starter" type="button" data-starter="first-light" aria-pressed="true"><span class="starter-art art-light" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span><strong>First light</strong><small>A warm, unhurried groove</small></span><span class="starter-tempo">96 BPM</span></button>
           <button class="starter" type="button" data-starter="offbeat" aria-pressed="false"><span class="starter-art art-offbeat" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span><strong>Offbeat</strong><small>A little space to move</small></span><span class="starter-tempo">112 BPM</span></button>
           <button class="starter" type="button" data-starter="slow-drift" aria-pressed="false"><span class="starter-art art-drift" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span><strong>Slow drift</strong><small>Leave room between notes</small></span><span class="starter-tempo">72 BPM</span></button>
         </div>
-        <p class="starter-note">Choosing a starter replaces your score. Undo brings it back.</p>
+        <p class="starter-note">Loading only replaces the text. Undo restores your previous score.</p>
       </div>
+        <details class="help-basics">
+          <summary>Draw a melody</summary>
+          <p>Place the code cursor in a <code>note("…")</code> phrase. Its note grid opens directly beneath the code. Rows are pitches; time runs left to right. Click a block to select its source note. Click or tap an empty source-rest interval to place a note at that pitch. Releasing the pointer commits; Escape cancels the preview and Undo restores the phrase.</p>
+          <p>Drag a note up/down to change pitch and sideways to reorder it within its written sequence. Occupied steps shift rather than being overwritten; the moved note keeps its weight and repetitions. Horizontal movement follows source steps, not arbitrary time positions. Drag a note's left or right edge to trade time with its adjacent source step while keeping the other boundaries fixed. A dashed preview shows the result before release.</p>
+          <p>To edit several notes together, turn on Select and drag from the first source step to the last, or use Left/Right to extend or shrink the selection. Select again or Escape leaves selection mode. Drag a selected note to move the whole range; Up/Down transposes it and Alt+Left/Right moves it one sibling step. The same complete source range can be selected in code. Duplicate inserts an independent copy after the range, adding steps within the notation's existing cycle; Repeat keeps occurrences linked. Neither operation overwrites other notes. Ranges stay within one written sequence.</p>
+          <p>Shift-drag a note, or start drawing in empty grid space, to change a contour across existing notes in one edit without filling crossed rests. Open Structure for source steps and nested groups. Split divides one written step into two; Repeat edits its <code>*n</code> suffix. Repeated appearances stay linked to the same source step. Drag a source-strip boundary, or adjust Share, to trade time with the next sibling. Rest writes <code>~</code> without removing suffixes. On a selected rest, Add note or Add chord uses a neighboring value, or C4/C when the phrase is entirely rests.</p>
+          <p>Use Play to hear your score, including its tempo, effects, and other parts. Editing never starts a separate preview. You can keep editing during playback; changes take effect at each part's next entry. Near an edited phrase, Queued and Sending mean the edit is not accepted yet. Accepted · score still updating reports score-wide pending material, not proof that this phrase is already sounding. The notice clears when the current score has no pending changes. Ctrl/⌘+Enter toggles Play/Pause from the code or drawing.</p>
+          <p>Tab focuses the grid. Left/Right selects a source step; Up/Down changes a note by one semitone. Alt+Left/Right moves the selected note one source step; Shift+Left/Right resizes its right boundary. Delete/Backspace clears it to a rest. Enter starts a drawing, arrows move its preview, and Enter commits. For a selected rest, Enter starts note entry, Up/Down chooses the pitch, and Enter commits. Escape cancels unfinished edits and returns to code. Ctrl/⌘+Z and Ctrl/⌘+Shift+Z share Undo and Redo. Add melody creates an editable phrase in an empty or <code>$:</code> stack score.</p>
+        </details>
+        <details class="help-basics">
+          <summary>Edit chords</summary>
+          <p>Place the cursor in <code>chord("C Am F G7")</code> and select a numbered chord. Drag one of its tone blocks up or down to change that note. Drag Move chord to transpose all its notes together. Tap an empty pitch row or use Add tone to add a note; select a block and use Remove tone to remove it. Lower/Raise changes the selected tone, or the whole chord when Move chord is selected. The outlined source step is the one you are editing; filled steps and tones follow actual playback.</p>
+          <p>Drag previews do not change the score until release. Escape cancels; each completed change shares Undo and the main Play transport. In the tone grid, Left/Right selects a tone, Up/Down changes its pitch, Shift+Up/Down moves an octave, and Delete removes it. Move chord also accepts Up/Down. Add tone supports keyboard entry into a rest. Notes already present and pitches outside MIDI 0–127 are rejected, not silently merged.</p>
+          <p>The source uses a chord name when it describes the exact notes; other voicings and inversions use explicit pitches such as <code>chord("{64,67,72}")</code>. Removing every tone writes <code>~</code>. Weights, repetitions, and surrounding code stay intact. Choose by chord name offers optional Root/Type choices for named chords; these are unavailable for custom sets. View chord tones opens a separate inspection of the whole progression: its blocks select whole chords, not individual notes. Repeated occurrences stay linked to the same written chord. Slash-bass names are not supported; edit the tones directly instead.</p>
+        </details>
+        <details class="help-basics">
+          <summary>Percussion steps</summary>
+          <p>In <code>s("…")</code>, rows choose Kick, Snare, Hi-hat, Open hat, or Clap. Tap an empty cell to set that sound; tap a filled cell to clear it to <code>~</code>. Choosing another row replaces that step's sound. Click a column number to select without editing. Arrow keys move between cells; Space/Enter edits, and Escape returns to code.</p>
+          <p>Each column is one written source step, not an equal slice of playback time. Weights, nested groups, and repeated occurrences stay linked to the source; open Structure for group and boundary edits. The matrix scrolls horizontally on narrow screens. Simultaneous layers remain in code. These are the existing built-in percussion sounds, not sample-file import.</p>
+        </details>
         <details class="help-basics" open>
           <summary>From a step to a pattern</summary>
           <p><code>s("bd ~ sd ~")</code> plays a kick, a rest, a snare, then a rest. The spaces divide the pattern into equal steps.</p>
-          <p><code>note("C4 E4 G4 ~")</code> does the same with pitches. Press a numbered step to select and hear it without changing your score or moving its playback position. Choose a key to change its pitch, or a named drum choice to change its sound. Rest writes <code>~</code>, a silent step.</p>
-          <p>The keyboard runs from lower notes on the left to higher notes on the right. Rest sits beside the Octave controls; for drums, it stays among the sound choices. Octave −/+ shows another range without editing the score; press a key to use it. While stopped or paused, sound choices automatically preview that step; choosing Rest stops the preview. During playback, edits follow their normal update timing. Press a numbered step whenever you want to hear it separately.</p>
-          <p>Undo and Redo live in the score toolbar and act on the whole score, including both typing and sound choices. Undo can restore a note replaced with a rest; press its numbered step to hear it again. Left/Right moves between steps, keys, or drum choices without editing; Space/Enter activates them. Use Tab to reach Rest beside Octave. On a step, Up/Down changes pitch by one semitone; Shift moves an octave. Escape returns to your code selection. Ctrl/⌘+Z and Ctrl/⌘+Shift+Z also work while using the sound controls.</p>
+          <p><code>note("C4 E4 G4 ~")</code> does the same with pitches. Numbered steps select without changing the score or starting playback. Choose a key to change the selected note. Rest clears it; Add note fills a selected rest. Undo restores the previous value.</p>
+          <p>Pitch controls contains the chromatic keyboard and octave browsing. The keyboard runs from low to high; Octave −/+ browses without editing. Its open state follows the phrase for this session.</p>
+          <p>Left/Right moves between numbered steps or pitch keys; Space/Enter selects. On a numbered note step, Up/Down changes pitch by one semitone; Shift moves an octave. Escape returns to your code selection. The toolbar's Undo/Redo and their Ctrl/⌘+Z shortcuts act on both text and graphical edits.</p>
           <p><code>bpm(96);</code> sets the tempo. <code>.slow(2)</code> stretches a pattern to twice its length.</p>
         </details>
         <details class="help-basics">
           <summary>What the controls can edit</summary>
-          <p>Controls edit plain sequences of up to 32 drum sounds or notes, including rests. Nested rhythms, repetitions, chords, and transformations remain fully editable as code; the controls show source steps, not the transformed playback timeline. Pitch nudges stay within MIDI 0–127.</p>
-          <p>A preview plays about 0.7 seconds of the selected phrase with just that source step, using the same DSP, declarations, and modifiers attached directly to the phrase. Other voices and modifiers on enclosing groups or later references are not included. Use Play to hear the complete result in context.</p>
+          <p>The drawing follows the notation inside quotes, including subdivisions, repetitions, parallel layers, chords, and rests. Its source strip selects the written step or group; an edit changes every linked occurrence, never just one repeated copy. Outer transformations, arrangements, and effects remain code and are not folded into this local drawing. Complex or oversized notation stays editable in code when a safe graphical edit is unavailable.</p>
+          <p>A block's left edge shows its start and its width shows its interval in the quoted notation, not the synth's gate or release. The ruler measures local cycles, before outer speed and song placement—not bars. Choose 4 divisions for quarter-cycle guides; labels such as 2.3 mean the third division of local cycle two, not a claimed time signature. Dashed edit previews include displaced neighboring notes. Chords appear as separate pitch blocks. Explicit note rests remain blank but accept note entry; silence from other notation operations is not an insertion target. Overlapping rest sources require selection in Structure rather than a guessed edit. The outline marks your selection; a solid fill marks the latest played notes.</p>
+          <p>Timing separates three operations. Weight changes a step's relative <code>@1</code>–<code>@16</code> share and may move following onsets. Phrase stretch edits or adds <code>.slow(n)</code>, including fractions. Phrase gate edits or adds <code>.gate(n)</code>, changing sounding duration without moving onsets; explicit envelopes may determine the audible release instead. Existing transformations and formatting are preserved. Each committed edit is one Undo step.</p>
           <p>The small knobs edit gain and filter values for note and chord voices. Browser drums are not affected by those modifiers. Drag vertically, use arrow keys, or press Enter to type a number.</p>
-          <p>Controls hides or shows the pads without changing your music. Downloads are plain-text <code>.mini</code> files you can edit, share, or use with your own AI tools. Nothing is sent to an AI service.</p>
-          <p>Each edited session saves a separate recovery copy before updating the shared saved score. If tabs save at the same time, both drafts remain available after reopening, even if one replaces the shared score. Saved drafts lets you restore a copy with Undo support or permanently delete it after confirmation. Copies stay in this browser until you delete them; Download keeps a separate file. If browser storage is full or unavailable, download your open score before leaving.</p>
+          <p>Controls hides or shows both the drawing and sound controls without changing your music.</p>
+        </details>
+        <details class="help-basics">
+          <summary>Files &amp; recovery</summary>
+          <p>Open imports a plain-text score; Download saves a <code>.mini</code> file you can edit, share, or use with your own AI tools. Nothing is sent to an AI service.</p>
+          <p>Each edited session saves a separate recovery copy before updating the shared saved score. Saved drafts contains recovery copies from other sessions. Restore supports Undo. If tabs save at the same time, both drafts remain available after reopening, even if one replaces the shared score. You can permanently delete a saved draft after confirmation. Copies stay in this browser until you delete them; Download keeps a separate file. If browser storage is full or unavailable, download your open score before leaving.</p>
+        </details>
+        <details class="help-basics">
+          <summary>Playback &amp; updates</summary>
+          <p>Play starts or resumes the accepted score; Pause freezes it. Restart applies the editor's score from the beginning. Use Ctrl/⌘+Enter for Play/Pause and Ctrl/⌘+Shift+Enter for Restart.</p>
+          <p>Updates take effect at each material's next entry. Pending changes wait while the current phrase finishes. Invalid code leaves Current song unchanged. Author tempo with <code>bpm(90);</code>; omitted tempo is 60 BPM.</p>
+          <p>Triggered notes, their source, and named references stay highlighted until the next note starts. Simultaneous notes light together; rests keep the previous highlight. Pause clears it. This shows the latest note starts, not note duration or proof that every edit has taken effect. After a notation edit, unchanged code atoms may stay highlighted even when the drawing cannot identify the older events.</p>
+          <p>Playback details counts cycles, not bars or seconds. Parts can have different cycle lengths. Accepted edits switch at each part's entry, not all at once.</p>
         </details>
         <h2>Listen to an idea</h2>
         <p class="cheat-note">Examples replace your score; Undo restores it. While paused, Play resumes the accepted score. Restart plays your new score from the beginning.</p>
@@ -131,9 +171,6 @@
         <button type="button" class="example" data-example='note("48(3,8) 55(2,8,2) 60(3,8) 64(2,8) 67(3,8) 72(1,8)? 67(2,8,2) 60(3,8)").slow(4).jux(rev)'>note("48(3,8) 55(2,8,2) 60(3,8) 64(2,8) 67(3,8) 72(1,8)? 67(2,8,2) 60(3,8)").slow(4).jux(rev)</button>
         <button type="button" class="example" data-example='$: s("bd(1,4), sd(1,4,2)").slow(2).jux(slow(2))&#10;$: note("46*4 60*8, 40*16 192(1,16)?").slow(2).jux(slow(2))'>$: s("bd…").slow(2).jux(slow(2)) / $: note("46…").slow(2).jux(slow(2))</button>
         </details>
-        <h2>While playing</h2>
-        <p>Updates take effect at each material's next entry. Pending changes wait while the current phrase finishes. Invalid code leaves Current song unchanged.</p>
-        <p>Pause freezes the performance. Resume with Play, or use Restart to apply a new song structure from the beginning. Author tempo with <code>bpm(90);</code>; omitted tempo is 60 BPM.</p>
         <details id="syntax-reference">
           <summary>Syntax reference</summary>
           <!-- MINI_SYNTAX_REFERENCE -->
@@ -141,26 +178,30 @@
       </dialog>
     </main>
     <footer>
+      <div class="document-status"><span id="score-title">First light</span><span id="save-status" role="status"></span><span id="cursor-position">Ln 3, Col 1</span></div>
+        <details id="saved-drafts" hidden>
+          <summary>Saved drafts</summary>
+          <ul id="saved-draft-list"></ul>
+        </details>
       <section class="playback-details" id="playback-details" aria-label="Playback and code updates">
         <div class="change-status" id="change-status" aria-live="polite" aria-atomic="true">
           <span class="state-light" aria-hidden="true"></span>
-          <div><p class="status-heading" id="draft-status">Ready to play</p><p class="status-help" id="change-help">Press Play to hear your score.</p><p id="change-timing" hidden></p></div>
+          <div><p class="status-heading" id="draft-status">Ready to play</p><p class="status-help" id="change-help" hidden></p><p id="change-timing" hidden></p></div>
           <button id="restore-score" type="button" class="quiet-button" hidden>Restore accepted score</button>
         </div>
         <details class="status-inspector">
           <summary>Playback details</summary>
+          <div id="output-scope"></div>
           <p id="playback-position">Position: 0.00 cycles</p>
           <dl>
             <div><dt>Editor version</dt><dd id="draft-version">—</dd></div>
             <div><dt>Audio engine versions</dt><dd id="draft-versions">No accepted draft</dd></div>
             <div><dt>Material transitions</dt><dd id="material-status">No accepted score</dd></div>
           </dl>
-          <p>Position counts cycles, not bars or seconds. Parts can have different cycle lengths. Accepted edits switch at each part's entry, not all at once.</p>
         </details>
       </section>
       <div class="panel" id="log" aria-live="polite" hidden></div>
       <p id="session-message" role="status" hidden></p>
-      <div class="footer-line"><span>moondsp</span><span id="score-mode">mini notation</span></div>
     </footer>
     <script type="module" src="/src/main.ts"></script>
   </body>

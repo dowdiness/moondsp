@@ -20,6 +20,16 @@ pub fn init_scheduler_graph_with_templates(Double, Int, Array[@graph.DspNode], A
 
 pub fn player_mode() -> PlaybackMode
 
+pub fn player_onset_clear() -> Unit
+
+pub fn player_onset_count() -> Int
+
+pub fn player_onset_dropped() -> Double
+
+pub fn player_onset_enable(Int) -> Unit
+
+pub fn player_onset_field(Int, Int) -> Double
+
 pub fn player_pause() -> Int
 
 pub fn player_pending_count() -> Int

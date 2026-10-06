@@ -291,6 +291,7 @@ fn[A] move_song_doc_occurrence_to(
 priv struct SourcedSongSnapshotLayer[A] {
   id : @identity.SectionLayerId
   body : @pattern.Pat[A]
+  source_snapshot : @pattern.PatternSnapshotWithOrigins[A]?
 }
 
 ///|
@@ -309,14 +310,24 @@ fn[A] source_song_snapshot_occurrence(
   let layers = match
     (authored_section.body(), occurrence.section().section_body()) {
     (Single(authored_layer), Single(body)) =>
-      [{ id: authored_layer.id(), body, }]
+      [
+        {
+          id: authored_layer.id(),
+          body,
+          source_snapshot: authored_layer.source_snapshot,
+        },
+      ]
     (Layers(authored_layers), Layers(runtime_layers)) => {
       guard authored_layers.length() == runtime_layers.length() else {
         abort("lowered song layer provenance is incomplete")
       }
       [
         for index, authored_layer in authored_layers => {
-          { id: authored_layer.id(), body: runtime_layers[index].body(), }
+          {
+            id: authored_layer.id(),
+            body: runtime_layers[index].body(),
+            source_snapshot: authored_layer.source_snapshot,
+          }
         }
       ]
     }
@@ -347,6 +358,8 @@ priv struct SourcedSongSnapshotEntry[A] {
   section : @identity.SectionId
   layer : @identity.SectionLayerId
   body : @pattern.Pat[A]
+  source_snapshot : @pattern.PatternSnapshotWithOrigins[A]?
+  source_index : Int
 }
 
 ///|
@@ -356,12 +369,14 @@ fn[A] source_song_snapshot_entries(
   let result : Array[SourcedSongSnapshotEntry[A]] = []
   for sourced in sourced_occurrences {
     for layer in sourced.layers {
-      for body in layer.body.entries() {
+      for source_index, body in layer.body.entries() {
         result.push({
           occurrence: sourced.occurrence,
           section: sourced.section,
           layer: layer.id,
           body,
+          source_snapshot: layer.source_snapshot,
+          source_index,
         })
       }
     }
@@ -408,6 +423,10 @@ pub fn SongEventOrigin::layer(
 pub struct SongSnapshotEvent[A] {
   priv event : @pattern.Event[A]
   priv origin : SongEventOrigin
+  priv source_origin : @pattern.EventOrigin?
+  priv source_frame : @identity.SourceFrameId?
+  priv source_start : Double
+  priv source_pitch : Double
 }
 
 ///|
@@ -422,6 +441,36 @@ pub fn[A] SongSnapshotEvent::origin(
   self : SongSnapshotEvent[A],
 ) -> SongEventOrigin {
   self.origin
+}
+
+///|
+/// Exact atom and binding provenance, when this section was compiled from
+/// an origin-bearing pattern rather than an anonymous runtime pattern.
+pub fn[A] SongSnapshotEvent::source_origin(
+  self : SongSnapshotEvent[A],
+) -> @pattern.EventOrigin? {
+  self.source_origin
+}
+
+///|
+pub fn[A] SongSnapshotEvent::source_frame(
+  self : SongSnapshotEvent[A],
+) -> @identity.SourceFrameId? {
+  self.source_frame
+}
+
+///|
+pub fn[A] SongSnapshotEvent::source_start(
+  self : SongSnapshotEvent[A],
+) -> Double {
+  self.source_start
+}
+
+///|
+pub fn[A] SongSnapshotEvent::source_pitch(
+  self : SongSnapshotEvent[A],
+) -> Double {
+  self.source_pitch
 }
 
 ///|
@@ -503,27 +552,84 @@ fn[A] query_scoped_snapshot_layer(
 }
 
 ///|
-fn[A] push_song_snapshot_layer_events(
+fn place_song_span(
+  span : @pattern.TimeSpan,
+  rate : @pattern.Rational,
+  offset : @pattern.Rational,
+) -> @pattern.TimeSpan {
+  @pattern.TimeSpan::new(span.begin / rate + offset, span.end_ / rate + offset)
+}
+
+///|
+fn[A] push_song_snapshot_events(
   result : Array[SongSnapshotEvent[A]],
-  sourced : SourcedSongSnapshotOccurrence[A],
-  layer : SourcedSongSnapshotLayer[A],
+  body : @pattern.Pat[A],
+  snapshot : @pattern.PatternSnapshotWithOrigins[A]?,
+  source_index : Int,
+  occurrence : SectionOccurrence[A],
+  section : @identity.SectionId,
+  layer : @identity.SectionLayerId,
   local_arc : @pattern.TimeSpan,
 ) -> Unit {
-  let occurrence = sourced.occurrence
-  let events = query_scoped_snapshot_layer(
-    layer.body,
-    occurrence.section().scope(),
-    local_arc,
-  )
-  for event in events {
-    result.push({
-      event: event.shift(occurrence.start()),
-      origin: SongEventOrigin(
-        occurrence=occurrence.id(),
-        section=sourced.section,
-        layer=layer.id,
-      ),
-    })
+  let origin = SongEventOrigin(occurrence=occurrence.id(), section~, layer~)
+  match snapshot {
+    Some(snapshot) => {
+      let scope = occurrence.section().scope()
+      let query_arc = if scope.is_identity() {
+        local_arc
+      } else {
+        @pattern.TimeSpan::new(
+          local_arc.begin * scope.rate(),
+          local_arc.end_ * scope.rate(),
+        )
+      }
+      let events = if source_index < 0 {
+        snapshot.query(query_arc)
+      } else {
+        snapshot.query_for_entry(source_index, query_arc)
+      }
+      for sourced in events {
+        let event = sourced.event()
+        let shifted = if scope.is_identity() {
+          event.shift(occurrence.start())
+        } else {
+          let rate = scope.rate()
+          let offset = occurrence.start()
+          event.with_spans(
+            whole=match event.whole {
+              Some(span) => Some(place_song_span(span, rate, offset))
+              None => None
+            },
+            part=place_song_span(event.part, rate, offset),
+          )
+        }
+        result.push({
+          event: shifted,
+          origin,
+          source_origin: Some(sourced.origin()),
+          source_frame: sourced.source_frame(),
+          source_start: sourced.source_start(),
+          source_pitch: sourced.source_pitch(),
+        })
+      }
+    }
+    None => {
+      let events = query_scoped_snapshot_layer(
+        body,
+        occurrence.section().scope(),
+        local_arc,
+      )
+      for event in events {
+        result.push({
+          event: event.shift(occurrence.start()),
+          origin,
+          source_origin: None,
+          source_frame: None,
+          source_start: -1.0,
+          source_pitch: -1.0,
+        })
+      }
+    }
   }
 }
 
@@ -539,7 +645,16 @@ pub fn[A] SongSnapshot::query_sourced_events(
       Some(global_arc) => {
         let local_arc = unshift_span(global_arc, occurrence.start())
         for layer in sourced.layers {
-          push_song_snapshot_layer_events(result, sourced, layer, local_arc)
+          push_song_snapshot_events(
+            result,
+            layer.body,
+            layer.source_snapshot,
+            -1,
+            occurrence,
+            sourced.section,
+            layer.id,
+            local_arc,
+          )
         }
       }
       None => ()
@@ -565,23 +680,18 @@ pub fn[A] SongSnapshot::query_sourced_events_for_entry(
     None => []
     Some(global_arc) => {
       let local_arc = unshift_span(global_arc, source.occurrence.start())
-      let events = query_scoped_snapshot_layer(
+      let result : Array[SongSnapshotEvent[A]] = []
+      push_song_snapshot_events(
+        result,
         source.body,
-        source.occurrence.section().scope(),
+        source.source_snapshot,
+        source.source_index,
+        source.occurrence,
+        source.section,
+        source.layer,
         local_arc,
       )
-      [
-        for event in events => {
-          {
-            event: event.shift(source.occurrence.start()),
-            origin: SongEventOrigin(
-              occurrence=source.occurrence.id(),
-              section=source.section,
-              layer=source.layer,
-            ),
-          }
-        }
-      ]
+      result
     }
   }
 }

@@ -3,6 +3,7 @@ pub(all) suberror PatternDocError {
   MissingNode(String)
   DuplicateNodeId(String)
   EmptyPatternDocs
+  InvalidSequenceWeights
   MissingAtomOrigin(@identity.PatternNodeId)
   MissingReferenceBinding(@identity.PatternNodeId)
 } derive(Eq, Debug)
@@ -13,7 +14,7 @@ priv enum PatternDocNode[A] {
   Reference(PatternDoc[A], ReferenceBinding?)
   Silence
   Pure(A)
-  Atom(Pat[A], @identity.SourceAtomId)
+  Atom(Pat[A], @identity.SourceAtomId, Double)
   Fast(@identity.PatternNodeId, Rational)
   Slow(@identity.PatternNodeId, Rational)
   Gate(@identity.PatternNodeId, Rational)
@@ -25,6 +26,7 @@ priv enum PatternDocNode[A] {
   Jux(@identity.PatternNodeId, TimeTransform, (A, ControlMap) -> A)
   MergeControl(@identity.PatternNodeId, @identity.PatternNodeId, (A, A) -> A)
   Sequence(Array[@identity.PatternNodeId])
+  WeightedSequence(Array[@identity.PatternNodeId], Array[Int])
   Stack(Array[@identity.PatternNodeId])
 }
 
@@ -33,6 +35,7 @@ priv struct PatternDocEntry[A] {
   generation : Int64
   revision : @identity.Revision
   node : PatternDocNode[A]
+  source_frame : @identity.SourceFrameId?
 }
 
 ///|
@@ -51,7 +54,7 @@ fn[A] PatternDocNode::snapshot(self : PatternDocNode[A]) -> PatternDocNode[A] {
     Reference(definition, binding) => Reference(definition, binding)
     Silence => Silence
     Pure(value) => Pure(value)
-    Atom(pat, atom) => Atom(pat, atom)
+    Atom(pat, atom, pitch) => Atom(pat, atom, pitch)
     Fast(child, factor) => Fast(child, factor)
     Slow(child, factor) => Slow(child, factor)
     Gate(child, factor) => Gate(child, factor)
@@ -63,6 +66,8 @@ fn[A] PatternDocNode::snapshot(self : PatternDocNode[A]) -> PatternDocNode[A] {
     Jux(child, transform, merge) => Jux(child, transform, merge)
     MergeControl(left, right, f) => MergeControl(left, right, f)
     Sequence(children) => Sequence(children.copy())
+    WeightedSequence(children, weights) =>
+      WeightedSequence(children.copy(), weights.copy())
     Stack(children) => Stack(children.copy())
   }
 }
@@ -75,6 +80,7 @@ fn[A] PatternDocEntry::snapshot(
     generation: self.generation,
     revision: self.revision,
     node: self.node.snapshot(),
+    source_frame: self.source_frame,
   }
 }
 
@@ -97,6 +103,7 @@ fn[A] singleton_pattern_nodes(
     generation: next_pattern_node_generation(),
     revision: @identity.Revision::zero(),
     node: node.snapshot(),
+    source_frame: None,
   }
   nodes
 }
@@ -116,6 +123,7 @@ fn[A] insert_pattern_node(
     generation: next_pattern_node_generation(),
     revision,
     node: node.snapshot(),
+    source_frame: None,
   }
 }
 
@@ -157,6 +165,7 @@ fn[A] replace_pattern_node(
         generation: next_pattern_node_generation(),
         revision: entry.revision.next(),
         node: node.snapshot(),
+        source_frame: None,
       }
   }
 }
@@ -204,7 +213,7 @@ fn[A] pattern_node_cache_token_memoized(
                   {},
                 ),
               )
-            Runtime(_) | Silence | Pure(_) | Atom(_, _) => ()
+            Runtime(_) | Silence | Pure(_) | Atom(_, _, _) => ()
             Fast(child, _)
             | Slow(child, _)
             | Gate(child, _)
@@ -235,6 +244,17 @@ fn[A] pattern_node_cache_token_memoized(
                   pattern_node_cache_token_memoized(nodes, child, memo),
                 )
               }
+            WeightedSequence(children, weights) => {
+              for weight in weights {
+                token.push(weight.to_int64())
+              }
+              for child in children {
+                append_pattern_cache_token(
+                  token,
+                  pattern_node_cache_token_memoized(nodes, child, memo),
+                )
+              }
+            }
           }
           memo[key] = token
           token
@@ -268,7 +288,7 @@ fn[A] copy_reachable_pattern_nodes(
       target[key] = entry.snapshot()
       match entry.node {
         Reference(_, _) => ()
-        Runtime(_) | Silence | Pure(_) | Atom(_, _) => ()
+        Runtime(_) | Silence | Pure(_) | Atom(_, _, _) => ()
         Fast(child, _)
         | Slow(child, _)
         | Gate(child, _)
@@ -283,7 +303,7 @@ fn[A] copy_reachable_pattern_nodes(
           copy_reachable_pattern_nodes(source, left, target)
           copy_reachable_pattern_nodes(source, right, target)
         }
-        Sequence(children) | Stack(children) =>
+        Sequence(children) | Stack(children) | WeightedSequence(children, _) =>
           for child in children {
             copy_reachable_pattern_nodes(source, child, target)
           }
@@ -309,7 +329,7 @@ fn[A] pattern_node_revision_memoized(
           match entry.node {
             Reference(definition, _) =>
               revision = revision.combine(definition.revision)
-            Runtime(_) | Silence | Pure(_) | Atom(_, _) => ()
+            Runtime(_) | Silence | Pure(_) | Atom(_, _, _) => ()
             Fast(child, _)
             | Slow(child, _)
             | Gate(child, _)
@@ -330,7 +350,9 @@ fn[A] pattern_node_revision_memoized(
                 pattern_node_revision_memoized(nodes, right, memo),
               )
             }
-            Sequence(children) | Stack(children) =>
+            Sequence(children)
+            | Stack(children)
+            | WeightedSequence(children, _) =>
               for child in children {
                 revision = revision.combine(
                   pattern_node_revision_memoized(nodes, child, memo),
@@ -550,6 +572,50 @@ pub fn EventOrigin::bindings(self : EventOrigin) -> Array[ReferenceBinding] {
 }
 
 ///|
+/// Write reference/binding/definition serial triples into caller-owned storage.
+/// Returns the number of links, or -1 without modifying storage if the complete
+/// path does not fit or cannot be represented exactly as JavaScript numbers.
+/// Validation and copying are linear in path length; neither allocates.
+pub fn EventOrigin::write_binding_serials(
+  self : EventOrigin,
+  target : Array[Double],
+  offset : Int,
+  limit : Int,
+) -> Int {
+  guard offset >= 0 && offset <= target.length() && limit >= 0 else {
+    return -1
+  }
+  let available = (target.length() - offset) / 3
+  let epoch = self.atom.epoch()
+  let mut count = 0
+  let mut remaining = self.bindings
+  while remaining is Link(binding, rest) {
+    if count == limit ||
+      count == available ||
+      binding.reference.epoch() != epoch ||
+      binding.id.epoch() != epoch ||
+      binding.definition.epoch() != epoch ||
+      binding.reference.serial() > 9007199254740991L ||
+      binding.id.serial() > 9007199254740991L ||
+      binding.definition.serial() > 9007199254740991L {
+      return -1
+    }
+    count += 1
+    remaining = rest
+  }
+  remaining = self.bindings
+  let mut cursor = offset
+  while remaining is Link(binding, rest) {
+    target[cursor] = binding.reference.serial().to_double()
+    target[cursor + 1] = binding.id.serial().to_double()
+    target[cursor + 2] = binding.definition.serial().to_double()
+    cursor += 3
+    remaining = rest
+  }
+  count
+}
+
+///|
 /// Name resolution supplies this witness; lowering never guesses from spelling.
 pub struct ResolvedReference[A] {
   priv definition : PatternDoc[A]
@@ -580,6 +646,7 @@ priv trait DocumentOrigin {
     OriginBindings,
   ) -> Self raise PatternDocError
   fn bind_context(@identity.PatternNodeId, ReferenceBinding?, OriginBindings) -> OriginBindings raise PatternDocError
+  fn carries_origins() -> Bool
 }
 
 ///|
@@ -590,6 +657,16 @@ impl DocumentOrigin for Unit with fn make_origin(_, _, _) {
 ///|
 impl DocumentOrigin for Unit with fn bind_context(_, _, _) {
   End
+}
+
+///|
+impl DocumentOrigin for Unit with fn carries_origins() {
+  false
+}
+
+///|
+impl DocumentOrigin for EventOrigin with fn carries_origins() {
+  true
 }
 
 ///|
@@ -619,6 +696,9 @@ priv struct ScopedValue[A, O] {
   value : A
   scope : PatternNodePath
   origin : O
+  mut source_frame : @identity.SourceFrameId?
+  mut source_start : Double
+  source_pitch : Double
 }
 
 ///|
@@ -626,8 +706,27 @@ fn[A, O] ScopedValue::ScopedValue(
   value : A,
   scope : PatternNodePath,
   origin : O,
+  source_frame? : @identity.SourceFrameId? = None,
+  source_start? : Double = -1.0,
+  source_pitch? : Double = @double.not_a_number,
 ) -> ScopedValue[A, O] {
-  { value, scope, origin, }
+  { value, scope, origin, source_frame, source_start, source_pitch, }
+}
+
+///|
+fn[A, B, O] ScopedValue::remap(
+  self : ScopedValue[A, O],
+  value : B,
+  scope : PatternNodePath,
+) -> ScopedValue[B, O] {
+  ScopedValue(
+    value,
+    scope,
+    self.origin,
+    source_frame=self.source_frame,
+    source_start=self.source_start,
+    source_pitch=self.source_pitch,
+  )
 }
 
 ///|
@@ -635,7 +734,46 @@ fn[A, O] ScopedValue::prepend(
   self : ScopedValue[A, O],
   id : @identity.PatternNodeId,
 ) -> ScopedValue[A, O] {
-  ScopedValue(self.value, self.scope.prepend(id), self.origin)
+  self.remap(self.value, self.scope.prepend(id))
+}
+
+///|
+/// Exact lowering creates a fresh ScopedValue for every queried atom, and each
+/// transform remaps it. Pure/Runtime cannot enter that lowering. Capture on those
+/// owned query values without another array, event, origin, or option allocation.
+/// General lowering skips this operation because Pure may share a cold payload.
+fn[A, O] Pat::capture_source_frame(
+  self : Pat[ScopedValue[A, O]],
+  frame : @identity.SourceFrameId?,
+  span : Double,
+) -> Pat[ScopedValue[A, O]] {
+  let body : PatBody[ScopedValue[A, O]] = match self.body {
+    Silence => Silence
+    Opaque(children) =>
+      Opaque(children.map(child => child.capture_source_frame(frame, span)))
+    Overlay(children) =>
+      Overlay(children.map(child => child.capture_source_frame(frame, span)))
+  }
+  make_pat(
+    fn(arc) {
+      let events = self.query(arc)
+      for event in events {
+        event.value.source_frame = frame
+        event.value.source_start = match event.whole {
+          Some(whole) => {
+            let start = whole.begin.to_double()
+            start - (start / span).floor() * span
+          }
+          None => -1.0
+        }
+      }
+      events
+    },
+    self.metadata.period,
+    body,
+    self.metadata.scope,
+    self.metadata.content,
+  )
 }
 
 ///|
@@ -658,6 +796,9 @@ pub struct EventWithOrigin[A] {
   priv event : Event[A]
   priv origin : EventOrigin
   priv scope : PatternNodePath
+  priv source_frame : @identity.SourceFrameId?
+  priv source_start : Double
+  priv source_pitch : Double
 }
 
 ///|
@@ -668,6 +809,9 @@ fn[A] EventWithOrigin::EventWithOrigin(
     event: { whole: event.whole, part: event.part, value: event.value.value, },
     origin: event.value.origin,
     scope: event.value.scope,
+    source_frame: event.value.source_frame,
+    source_start: event.value.source_start,
+    source_pitch: event.value.source_pitch,
   }
 }
 
@@ -679,6 +823,23 @@ pub fn[A] EventWithOrigin::event(self : EventWithOrigin[A]) -> Event[A] {
 ///|
 pub fn[A] EventWithOrigin::origin(self : EventWithOrigin[A]) -> EventOrigin {
   self.origin
+}
+
+///|
+pub fn[A] EventWithOrigin::source_frame(
+  self : EventWithOrigin[A],
+) -> @identity.SourceFrameId? {
+  self.source_frame
+}
+
+///|
+pub fn[A] EventWithOrigin::source_start(self : EventWithOrigin[A]) -> Double {
+  self.source_start
+}
+
+///|
+pub fn[A] EventWithOrigin::source_pitch(self : EventWithOrigin[A]) -> Double {
+  self.source_pitch
 }
 
 ///|
@@ -724,7 +885,7 @@ fn[A] append_reachable_pattern_source_ids(
             result,
             {},
           )
-        Runtime(_) | Silence | Pure(_) | Atom(_, _) => ()
+        Runtime(_) | Silence | Pure(_) | Atom(_, _, _) => ()
         Fast(child, _)
         | Slow(child, _)
         | Gate(child, _)
@@ -739,7 +900,7 @@ fn[A] append_reachable_pattern_source_ids(
           append_reachable_pattern_source_ids(nodes, left, result, seen)
           append_reachable_pattern_source_ids(nodes, right, result, seen)
         }
-        Sequence(children) | Stack(children) =>
+        Sequence(children) | Stack(children) | WeightedSequence(children, _) =>
           for child in children {
             append_reachable_pattern_source_ids(nodes, child, result, seen)
           }
@@ -875,7 +1036,7 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
   fn prepend(pat : Pat[ScopedValue[A, O]]) -> Pat[ScopedValue[A, O]] {
     pat.map_payload(value => value.prepend(id))
   }
-  match entry.node {
+  let compiled = match entry.node {
     Reference(definition, binding) => {
       let bound_context = O::bind_context(id, binding, context)
       let target = lower_pattern_node_cached(
@@ -911,10 +1072,12 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
         id,
       )
     }
-    Atom(pat, atom) => {
+    Atom(pat, atom, pitch) => {
       let origin : O = O::make_origin(id, Some(atom), context)
       let path = PatternNodePath(id)
-      let source = pat.map_payload(value => ScopedValue(value, path, origin))
+      let source = pat.map_payload(value => {
+        ScopedValue(value, path, origin, source_pitch=pitch)
+      })
       CompiledPattern(source, opaque_compiled_entries(source, id))
     }
     Fast(child, factor) => {
@@ -943,7 +1106,7 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
         pat.filter_map_payload(
           value => {
             f(value.value).map(mapped => {
-              ScopedValue(mapped, value.scope.prepend(id), value.origin)
+              value.remap(mapped, value.scope.prepend(id))
             })
           },
           "",
@@ -963,10 +1126,10 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
       // Keep the old opaque-callback signature policy, despite the typed operation.
       let pat = every(
         n,
-        p => {
+        fn(p : Pat[ScopedValue[A, O]]) {
           transform
           .apply(p)
-          .map_payload(value => ScopedValue(value.value, scope, value.origin))
+          .map_payload(value => value.remap(value.value, scope))
         },
         base,
       )
@@ -985,11 +1148,9 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
       let pat = jux_kernel(
         child.pat,
         p => transform.apply(p),
-        (value, pan) => {
-          ScopedValue(merge(value.value, pan), value.scope, value.origin)
-        },
+        (value, pan) => value.remap(merge(value.value, pan), value.scope),
         "",
-      ).map_payload(value => ScopedValue(value.value, scope, value.origin))
+      ).map_payload(value => value.remap(value.value, scope))
       CompiledPattern(pat, opaque_compiled_entries(pat, id))
     }
     MergeControl(left_id, right_id, merge) => {
@@ -1010,9 +1171,9 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
         left.pat,
         right.pat.map_payload(erase_value),
         (value, control) => {
-          ScopedValue(merge(value.value, control), value.scope, value.origin)
+          value.remap(merge(value.value, control), value.scope)
         },
-      ).map_payload(value => ScopedValue(value.value, scope, value.origin))
+      ).map_payload(value => value.remap(value.value, scope))
       let entries = pat.entries()
       CompiledPattern(
         pat,
@@ -1024,6 +1185,13 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
     Sequence(children) => {
       let pats = children.map(child => lower(child).pat)
       CompiledPattern::single_material(prepend(sequence(pats)), id)
+    }
+    WeightedSequence(children, weights) => {
+      let pats = children.map(child => lower(child).pat)
+      CompiledPattern::single_material(
+        prepend(sequence_weighted(pats, weights)),
+        id,
+      )
     }
     Stack(children) => {
       let children = children.map(lower)
@@ -1037,6 +1205,12 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
         .collect()
       CompiledPattern(prepend(stack(children.map(child => child.pat))), entries)
     }
+  }
+  if O::carries_origins() && entry.source_frame is Some(_) {
+    let span = compiled.pat.entry_period().num.to_double().max(1.0)
+    compiled.transform(pat => pat.capture_source_frame(entry.source_frame, span))
+  } else {
+    compiled
   }
 }
 
@@ -1380,7 +1554,14 @@ pub fn[A] PatternSnapshotWithOrigins::as_snapshot(
   self : PatternSnapshotWithOrigins[A],
 ) -> PatternSnapshot[A] {
   fn erase_origin(value : ScopedValue[A, EventOrigin]) -> ScopedValue[A, Unit] {
-    ScopedValue(value.value, value.scope, ())
+    ScopedValue(
+      value.value,
+      value.scope,
+      (),
+      source_frame=value.source_frame,
+      source_start=value.source_start,
+      source_pitch=value.source_pitch,
+    )
   }
   {
     root: self.root,
@@ -1425,7 +1606,10 @@ pub fn[A] PatternDoc::atom(
   PatternDoc(
     root=id,
     revision=@identity.Revision::zero(),
-    nodes=singleton_pattern_nodes(id, Atom(Pat::pure(value), source_atom)),
+    nodes=singleton_pattern_nodes(
+      id,
+      Atom(Pat::pure(value), source_atom, @double.not_a_number),
+    ),
   )
 }
 
@@ -1440,7 +1624,18 @@ pub fn PatternDoc::control_atom(
   PatternDoc(
     root=id,
     revision=@identity.Revision::zero(),
-    nodes=singleton_pattern_nodes(id, Atom(control(key, value), source_atom)),
+    nodes=singleton_pattern_nodes(
+      id,
+      Atom(
+        control(key, value),
+        source_atom,
+        if key == "note" {
+          value
+        } else {
+          @double.not_a_number
+        },
+      ),
+    ),
   )
 }
 
@@ -1669,6 +1864,26 @@ pub fn[A] PatternDoc::replace_with_pure(
 }
 
 ///|
+/// Capture source-local coordinates before enclosing musical transformations.
+/// This does not change the pattern's timing, material keys, or musical values.
+pub fn[A] PatternDoc::with_source_frame(
+  self : PatternDoc[A],
+  frame~ : @identity.SourceFrameId,
+) -> PatternDoc[A] raise PatternDocError {
+  let nodes = copy_pattern_nodes(self.nodes)
+  guard nodes.get(self.root.value()) is Some(entry) else {
+    raise MissingNode(self.root.value())
+  }
+  nodes[self.root.value()] = {
+    generation: next_pattern_node_generation(),
+    revision: entry.revision.next(),
+    node: entry.node,
+    source_frame: Some(frame),
+  }
+  PatternDoc(root=self.root, revision=self.revision.next(), nodes~)
+}
+
+///|
 pub fn[A] PatternDoc::fast(
   self : PatternDoc[A],
   id~ : @identity.PatternNodeId,
@@ -1845,6 +2060,43 @@ pub fn[A] PatternDoc::sequence(
   let children = docs.map(doc => doc.root)
   let revision = aggregate_pattern_revision(docs)
   insert_pattern_node(nodes, id, Sequence(children), revision~)
+  PatternDoc(root=id, revision~, nodes~)
+}
+
+///|
+pub fn[A] PatternDoc::sequence_weighted(
+  id~ : @identity.PatternNodeId,
+  docs~ : Array[PatternDoc[A]],
+  weights~ : Array[Int],
+) -> PatternDoc[A] raise PatternDocError {
+  if docs.is_empty() {
+    raise EmptyPatternDocs
+  }
+  if weights.length() != docs.length() {
+    raise InvalidSequenceWeights
+  }
+  let mut total = 0
+  for weight in weights {
+    if weight <= 0 || weight > 16 {
+      raise InvalidSequenceWeights
+    }
+    total += weight
+    if total > 256 {
+      raise InvalidSequenceWeights
+    }
+  }
+  let nodes : Map[String, PatternDocEntry[A]] = Map([])
+  for doc in docs {
+    merge_pattern_nodes(nodes, doc.nodes)
+  }
+  let children = docs.map(doc => doc.root)
+  let revision = aggregate_pattern_revision(docs)
+  insert_pattern_node(
+    nodes,
+    id,
+    WeightedSequence(children, weights.copy()),
+    revision~,
+  )
   PatternDoc(root=id, revision~, nodes~)
 }
 

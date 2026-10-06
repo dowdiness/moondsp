@@ -90,10 +90,7 @@ test "wire capabilities cannot downgrade exact failure or forge song mode" {
   assert_true(@mini.PlaybackInput::decode_wire(json.stringify()) is Err(_))
   fields["kind"] = "song"
   ignore(fields.remove("sourceMap"))
-  guard @mini.PlaybackInput::decode_wire(json.stringify()) is Ok(song) else {
-    fail("expected envelope decode")
-  }
-  assert_true(song.compile() is Err(_))
+  assert_true(@mini.PlaybackInput::decode_wire(json.stringify()) is Err(_))
   let text = @mini.PlaybackInput::text("note(\"60\")")
   guard @mini.PlaybackInput::decode_wire(text.encode_wire()) is Ok(runtime) else {
     fail("expected text decode")
@@ -173,4 +170,52 @@ test "wire preserves rotated source epochs independently of document versions" {
     assert_true(draft.locate_origin(actual) is Located(_, _))
     assert_true(draft.locate_origin(old_origin) is Unavailable(SourceReset))
   }
+}
+
+///|
+test "Song source maps preserve literal frame identities on the wire" {
+  let text = "song(section(\"a\",1,note(\"60\")),part(\"a1\",\"a\"))"
+  let draft = @mini.Draft::new(text)
+  guard draft.prepare_playback() is Ok(input) else {
+    fail("expected tracked Song playback")
+  }
+  let original = @json.parse(input.encode_wire())
+  guard original is Object(original_fields) &&
+    original_fields.get("sourceMap") is Some(Object(source_map)) &&
+    source_map.get("literals")
+    is Some(
+      Array(
+        [
+          Array(
+            [Number(serial, ..), String("note"), Number(25, ..), Number(27, ..)]
+          ),
+        ]
+      )
+    ) else {
+    fail("expected recognized Song section literal")
+  }
+  guard @mini.PlaybackInput::decode_wire(input.encode_wire()) is Ok(decoded) else {
+    fail("expected decoded Song source map")
+  }
+  let roundtrip = @json.parse(decoded.encode_wire())
+  guard roundtrip is Object(roundtrip_fields) &&
+    roundtrip_fields.get("sourceMap") is Some(Object(roundtrip_map)) &&
+    roundtrip_map.get("literals")
+    is Some(
+      Array(
+        [
+          Array(
+            [
+              Number(roundtrip_serial, ..),
+              String("note"),
+              Number(25, ..),
+              Number(27, ..),
+            ]
+          ),
+        ]
+      )
+    ) else {
+    fail("expected transported Song literal witness")
+  }
+  assert_true(serial == roundtrip_serial)
 }

@@ -36,6 +36,8 @@ pub fn s_pan(Double) -> Pat[ControlMap]
 
 pub fn[A] sequence(Array[Pat[A]]) -> Pat[A]
 
+pub fn[A] sequence_weighted(Array[Pat[A]], Array[Int]) -> Pat[A]
+
 pub fn sound(Double) -> Pat[ControlMap]
 
 pub fn[A] stack(Array[Pat[A]]) -> Pat[A]
@@ -45,6 +47,7 @@ pub(all) suberror PatternDocError {
   MissingNode(String)
   DuplicateNodeId(String)
   EmptyPatternDocs
+  InvalidSequenceWeights
   MissingAtomOrigin(@identity.PatternNodeId)
   MissingReferenceBinding(@identity.PatternNodeId)
 } derive(Eq, @debug.Debug)
@@ -77,6 +80,7 @@ pub fn[A : @debug.Debug] Event::output(Self[A], &Logger) -> Unit
 pub fn[A] Event::shift(Self[A], Rational) -> Self[A]
 pub fn[A : @debug.Debug] Event::to_repr(Self[A]) -> @debug.Repr
 pub fn[A : @debug.Debug] Event::to_string(Self[A]) -> String
+pub fn[A] Event::with_spans(Self[A], whole~ : TimeSpan?, part~ : TimeSpan) -> Self[A]
 pub impl[A : @debug.Debug] Show for Event[A]
 
 pub struct EventOrigin {
@@ -87,6 +91,7 @@ pub fn EventOrigin::bindings(Self) -> Array[ReferenceBinding]
 pub fn EventOrigin::equal(Self, Self) -> Bool
 pub fn EventOrigin::not_equal(Self, Self) -> Bool
 pub fn EventOrigin::to_repr(Self) -> @debug.Repr
+pub fn EventOrigin::write_binding_serials(Self, Array[Double], Int, Int) -> Int
 
 pub struct EventWithOrigin[A] {
   // private fields
@@ -94,6 +99,9 @@ pub struct EventWithOrigin[A] {
 pub fn[A] EventWithOrigin::event(Self[A]) -> Event[A]
 pub fn[A] EventWithOrigin::origin(Self[A]) -> EventOrigin
 pub fn[A] EventWithOrigin::pattern_node_path(Self[A]) -> PatternNodePath
+pub fn[A] EventWithOrigin::source_frame(Self[A]) -> @identity.SourceFrameId?
+pub fn[A] EventWithOrigin::source_pitch(Self[A]) -> Double
+pub fn[A] EventWithOrigin::source_start(Self[A]) -> Double
 
 pub struct Pat[A] {
   query : (TimeSpan) -> Array[Event[A]]
@@ -154,11 +162,13 @@ pub fn[A] PatternDoc::rev(Self[A], id~ : @identity.PatternNodeId) -> Self[A] rai
 pub fn[A] PatternDoc::revision(Self[A]) -> @identity.Revision
 pub fn[A] PatternDoc::root(Self[A]) -> @identity.PatternNodeId
 pub fn[A] PatternDoc::sequence(id~ : @identity.PatternNodeId, docs~ : Array[Self[A]]) -> Self[A] raise PatternDocError
+pub fn[A] PatternDoc::sequence_weighted(id~ : @identity.PatternNodeId, docs~ : Array[Self[A]], weights~ : Array[Int]) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::silence(id~ : @identity.PatternNodeId) -> Self[A]
 pub fn[A] PatternDoc::slow(Self[A], id~ : @identity.PatternNodeId, factor~ : Rational) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::stack(id~ : @identity.PatternNodeId, docs~ : Array[Self[A]]) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::subdoc(Self[A], root~ : @identity.PatternNodeId) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::with_root(Self[A], root~ : @identity.PatternNodeId) -> Self[A] raise PatternDocError
+pub fn[A] PatternDoc::with_source_frame(Self[A], frame~ : @identity.SourceFrameId) -> Self[A] raise PatternDocError
 pub impl[A] @types.BackdateEq for PatternDoc[A]
 pub impl[A] @types.HasChangedAt for PatternDoc[A]
 

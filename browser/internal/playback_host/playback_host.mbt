@@ -25,6 +25,7 @@ priv struct SchedulerRoute {
 pub struct Player {
   priv routes : Array[SchedulerRoute]
   priv schedulers : Array[@scheduler.PatternScheduler]
+  priv onsets : @scheduler.OnsetBuffer
   priv context : @moondsp.DspContext
   priv left : @moondsp.AudioBuffer
   priv right : @moondsp.AudioBuffer
@@ -43,9 +44,14 @@ fn Player::Player(
   context : @moondsp.DspContext,
 ) -> Player {
   let size = context.block_size()
+  let onsets = @scheduler.OnsetBuffer::new()
+  for route in routes {
+    route.pool.scheduler.attach_onset_buffer(onsets)
+  }
   {
     routes,
     schedulers: routes.map(route => route.pool.scheduler),
+    onsets,
     context,
     left: @moondsp.AudioBuffer::filled(size),
     right: @moondsp.AudioBuffer::filled(size),
@@ -284,6 +290,21 @@ fn filter_section_for_route(
   selector : SchedulerRouteSelector,
   section : @song.Section[@pattern.ControlMap],
 ) -> Result[@song.Section[@pattern.ControlMap], String] {
+  if section.source_snapshot() is Some(snapshot) {
+    let selected = match selector {
+      RouteSynth => snapshot.select_control("note")
+      RouteSound(code) => snapshot.select_control("sound", value=code)
+    }
+    let filtered = @song.Section::with_origins(
+      name=section.name(),
+      length_cycles=section.length_cycles(),
+      scope=section.scope(),
+      snapshot=selected,
+    ) catch {
+      _ => return Err("internal song routing error: invalid section length")
+    }
+    return Ok(filtered)
+  }
   let body = @song.SectionBody::single(
     filter_pat_for_route(selector, section.body()),
   )

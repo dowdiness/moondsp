@@ -3,6 +3,7 @@ import {
   draft_state as draftState,
   edit_draft as editDraft,
   prepare_playback as preparePlayback,
+  locate_onsets as locateOnsets,
   dispose_draft as disposeDraft,
   type DraftHandle,
 } from "./generated/authoring.js";
@@ -10,6 +11,12 @@ import {
 export type DraftVersion = readonly [number, number];
 export type DraftState = Readonly<{ text: string; version: DraftVersion; diagnostic: string | null }>;
 export type DraftEdit = Readonly<{ from: number; to: number; inserted: string }>;
+export type LocatedOnset = Readonly<{
+  from: number;
+  to: number;
+  references: readonly Readonly<{ from: number; to: number }>[];
+  notation: Readonly<{ from: number; to: number; start: number; pitch: number | null }> | null;
+}>;
 
 export function decodeDraftVersion(value: unknown): DraftVersion | null {
   if (!Array.isArray(value) || value.length !== 2 ||
@@ -71,6 +78,27 @@ export class Draft {
     const result = JSON.parse(preparePlayback(this.handle));
     if (!result.ok) throw new Error(result.message);
     return inputFromDraft(result.input, this.state());
+  }
+  locateOnsets(rows: readonly (readonly number[])[]): readonly (LocatedOnset | null)[] {
+    if (this.disposed) throw new Error("Draft is disposed");
+    const result: unknown = JSON.parse(locateOnsets(this.handle, JSON.stringify(rows)));
+    if (!Array.isArray(result) || result.length !== rows.length) throw new Error("Invalid playback origin lookup");
+    const range = (value: unknown): boolean => {
+      if (typeof value !== "object" || value === null) return false;
+      const item = value as Record<string, unknown>;
+      return Number.isSafeInteger(item.from) && Number.isSafeInteger(item.to) &&
+        Number(item.from) >= 0 && Number(item.to) > Number(item.from);
+    };
+    for (const item of result) {
+      if (item === null) continue;
+      if (!range(item) || !Array.isArray(item.references) || !item.references.every(range) ||
+        (item.notation !== null && (!range(item.notation) ||
+          !Number.isFinite(item.notation.start) ||
+          (item.notation.pitch !== null && !Number.isFinite(item.notation.pitch))))) {
+        throw new Error("Invalid playback origin location");
+      }
+    }
+    return result as (LocatedOnset | null)[];
   }
   dispose(): void {
     if (!this.disposed) {

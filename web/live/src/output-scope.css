@@ -1,0 +1,44 @@
+.output-scope {
+  --output-ink: #153e39;
+  --output-live: #354acb;
+  --output-quiet: #87a99b;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 2px 16px;
+  padding: 16px 24px 12px;
+  color: var(--output-ink);
+}
+
+.output-scope__title {
+  margin: 0;
+  font: 700 13px/1.25 var(--font-body, Manrope, ui-sans-serif, system-ui, sans-serif);
+  letter-spacing: -.015em;
+}
+
+.output-scope__state {
+  color: var(--output-ink);
+  font: 400 11px/1.4 var(--font-body, Manrope, ui-sans-serif, system-ui, sans-serif);
+}
+
+.output-scope__state::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin: 0 7px 1px 0;
+  border-radius: 50%;
+  background: currentColor;
+  vertical-align: middle;
+}
+
+.output-scope__state[data-state='live'] { color: var(--output-live); }
+.output-scope__trace { grid-column: 1 / -1; display: block; width: 100%; height: 52px; overflow: hidden; }
+
+@media (prefers-color-scheme: dark) {
+  .output-scope {
+    --output-ink: #d4e8dc;
+    --output-live: #788bff;
+    --output-quiet: #789b8d;
+  }
+}

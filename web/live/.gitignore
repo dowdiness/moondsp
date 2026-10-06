@@ -1,6 +1,7 @@
 node_modules
 dist
-public
+public/*
+!public/_headers
 *.log
 .vite
 playwright-report

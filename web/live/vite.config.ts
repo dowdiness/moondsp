@@ -32,13 +32,21 @@ const syntaxReference: Plugin = {
   },
 };
 
+// Required for allocation-free AudioWorklet -> UI onset observations.
+const isolationHeaders = {
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Embedder-Policy": "require-corp",
+};
+
 export default defineConfig({
   plugins: [lezer(), syntaxReference],
   server: {
     port: 5180,
     strictPort: false,
     allowedHosts: ["t-03gyuxpogbl3qlyykpjksbrwu-p20071.onamp.dev"],
+    headers: isolationHeaders,
   },
+  preview: { headers: isolationHeaders },
   build: {
     target: "es2022",
     sourcemap: true,

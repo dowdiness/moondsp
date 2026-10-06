@@ -131,8 +131,8 @@ fn compile_mini_doc(
   builder : MiniDocBuilder,
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
   match expr.node {
-    Literal(kind, content, offset) =>
-      match kind {
+    Literal(kind, content, offset) => {
+      let doc = match kind {
         Sound =>
           parse_sound_doc_notation(content, builder, source_offset=offset)
         Note => parse_note_doc_notation(content, builder, source_offset=offset)
@@ -143,6 +143,21 @@ fn compile_mini_doc(
           @pattern.PatternDoc::silence(id~)
         }
       }
+      match builder.source_frame_at(offset, offset + content.length()) {
+        Some(frame) =>
+          doc.with_source_frame(frame~) catch {
+            _ => raise ParseError("internal source-frame construction failed")
+          }
+        None => {
+          if builder.origins is Some(_) && !(kind is Silence) {
+            raise ParseError(
+              "position \{offset}: missing source-frame identity",
+            )
+          }
+          doc
+        }
+      }
+    }
     Stack(children) =>
       builder.stack_doc(children.map(child => compile_mini_doc(child, builder)))
     Reference(name, definition) => {

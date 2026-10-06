@@ -464,6 +464,9 @@ fn EntrySpec::query_sourced(
         event: event.event().shift(origin),
         origin: @model.VoiceOrigin::Pattern(event.pattern_node_path()),
         source_origin: None,
+        source_frame: None,
+        source_start: -1.0,
+        source_pitch: -1.0,
       })
     PatternWithOrigins(snapshot, index) =>
       snapshot
@@ -472,6 +475,9 @@ fn EntrySpec::query_sourced(
         event: event.event().shift(origin),
         origin: @model.VoiceOrigin::Pattern(event.pattern_node_path()),
         source_origin: Some(event.origin()),
+        source_frame: event.source_frame(),
+        source_start: event.source_start(),
+        source_pitch: event.source_pitch(),
       })
     Song(snapshot, index) => {
       let source_arc = @pattern.TimeSpan::new(
@@ -484,7 +490,10 @@ fn EntrySpec::query_sourced(
       .map(event => {
         event: event.event().shift(delta),
         origin: @model.VoiceOrigin::Song(event.origin()),
-        source_origin: None,
+        source_origin: event.source_origin(),
+        source_frame: event.source_frame(),
+        source_start: event.source_start(),
+        source_pitch: event.source_pitch(),
       })
     }
   }

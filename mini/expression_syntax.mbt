@@ -238,31 +238,35 @@ fn Parser::parse_transform(self : Parser) -> MiniTransform raise ParseError {
   let method_start = self.pos
   let name = self.read_ident()
   match name {
-    "fast" => {
+    "fast" | "slow" => {
       self.expect_char('(')
       self.skip_whitespace()
-      let n = self.read_number()
+      let value_start = self.pos
+      let value = self.read_number()
+      let value_end = self.pos
       self.skip_whitespace()
       self.expect_char(')')
-      guard n > 0.0 else {
+      guard !value.is_nan() && !value.is_inf() && value > 0.0 else {
         raise ParseError(
-          "position \{method_start}: fast() requires a positive number, got \{n}",
+          "position \{method_start}: \{name}() requires a finite positive number, got \{value}",
         )
       }
-      Fast(@pattern.Rational::from_int(n.to_int()))
-    }
-    "slow" => {
-      self.expect_char('(')
-      self.skip_whitespace()
-      let n = self.read_number()
-      self.skip_whitespace()
-      self.expect_char(')')
-      guard n > 0.0 else {
+      let factor = parse_decimal_rational(
+        self.input,
+        value_start,
+        value_end,
+        method_start,
+      )
+      guard factor > @pattern.Rational::from_int(0) else {
         raise ParseError(
-          "position \{method_start}: slow() requires a positive number, got \{n}",
+          "position \{method_start}: \{name}() requires a representable positive factor",
         )
       }
-      Slow(@pattern.Rational::from_int(n.to_int()))
+      if name == "fast" {
+        Fast(factor)
+      } else {
+        Slow(factor)
+      }
     }
     "gate" => {
       self.expect_char('(')

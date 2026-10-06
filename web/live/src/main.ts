@@ -18,8 +18,7 @@ import restsAndGates from "../../../examples/rests-and-gates.mini?raw";
 
 import { minilive } from "./lang/minilive";
 import { inlineControls } from "./inline-controls";
-import { patternControls } from "./pattern-controls";
-import { Audition } from "./audition";
+import { appendMelody, canAppendMelody, patternControls, patternControlsVisible, sourcePatterns } from "./pattern-controls";
 import { loadScore, mountScoreSession } from "./score-session";
 import { CM6Adapter } from "./canopy";
 import type { Diagnostic } from "./canopy";
@@ -28,34 +27,44 @@ import type { AudioEngineMode, CompiledSession } from "./audio";
 import { Draft, type DraftVersion } from "./authoring";
 import { Player } from "./playback";
 import type { PlaybackView } from "./playback";
+import { mountOutputScope } from "./output-scope";
+import { playbackHighlights } from "./playback-highlights";
+import { mountPlaybackObservation } from "./playback-observation";
+import { phraseUpdateStatus, renderPhraseUpdateStatus } from "./phrase-update-status";
+import "./phrase-update-status.css";
 
 const STARTERS = {
   "first-light": {
     name: "First light",
     source: `bpm(96);
 
-$: s("bd ~ sd ~ bd bd sd ~")
-$: s("hh hh hh hh hh hh hh hh")
-$: note("C4 ~ Eb4 G4 Bb4 ~ G4 Eb4").gain(0.25).lpf(1800)`,
+$: s("bd ~ sd ~ bd bd sd ~").slow(4)
+$: s("hh hh hh hh hh hh hh hh").slow(4)
+$: note("C4 ~ Eb4 G4 Bb4 ~ G4 Eb4").slow(4).gain(0.25).lpf(1800)`,
   },
   offbeat: {
     name: "Offbeat",
     source: `bpm(112);
 
-$: s("bd ~ ~ bd sd ~ bd ~")
-$: s("~ hh ~ hh ~ hh ~ oh")
-$: note("C3 ~ C3 Eb3 ~ G3 Bb3 ~").gain(0.3).lpf(1200)`,
+$: s("bd ~ ~ bd sd ~ bd ~").slow(4)
+$: s("~ hh ~ hh ~ hh ~ oh").slow(4)
+$: note("C3 ~ C3 Eb3 ~ G3 Bb3 ~").slow(4).gain(0.3).lpf(1200)`,
   },
   "slow-drift": {
     name: "Slow drift",
     source: `bpm(72);
 
-$: s("bd ~ ~ ~ sd ~ ~ ~")
-$: note("C4 ~ G4 ~ Eb4 ~ Bb4 ~").slow(2).gain(0.2).lpf(2400)
-$: chord("Cm7 Abmaj7").slow(4).gain(0.12).lpf(900)`,
+$: s("bd ~ ~ ~ sd ~ ~ ~").slow(4)
+$: note("C4 ~ G4 ~ Eb4 ~ Bb4 ~").slow(4).gain(0.2).lpf(2400)
+$: chord("Cm7 Abmaj7").slow(8).gain(0.12).lpf(900)`,
   },
 } as const;
 const INITIAL = loadScore(STARTERS["first-light"].source);
+
+function initialCursor(source: string): number {
+  return sourcePatterns(EditorState.create({ doc: source })).find(pattern => pattern.kind === "note")?.from
+    ?? Math.max(0, source.indexOf("$:"));
+}
 
 // ── DOM ─────────────────────────────────────────────────────
 
@@ -81,26 +90,22 @@ const workspaceEl = document.querySelector("main.workspace") as HTMLElement;
 
 const listenerCompartment = new Compartment();
 const controlsCompartment = new Compartment();
-const audition = new Audition();
-function canAutoListen(): boolean {
-  const state = playback.view().state;
-  return !compiledSession && state !== "Playing" && state !== "Starting";
-}
-window.addEventListener("pagehide", () => audition.stop());
-document.addEventListener("visibilitychange", () => { if (document.hidden) audition.stop(); });
 
 const view = new EditorView({
   parent: editorEl,
   state: EditorState.create({
     doc: INITIAL,
-    selection: { anchor: Math.max(0, INITIAL.indexOf("$:")) },
+    selection: { anchor: initialCursor(INITIAL) },
     extensions: [
       lineNumbers(),
       highlightActiveLine(),
       bracketMatching(),
       closeBrackets(),
       inlineControls(),
-      controlsCompartment.of(patternControls(audition, canAutoListen)),
+      patternControls(),
+      phraseUpdateStatus(),
+      playbackHighlights(),
+      controlsCompartment.of(patternControlsVisible.of(true)),
       EditorView.lineWrapping,
       EditorView.contentAttributes.of({ "aria-label": "Music code", spellcheck: "false" }),
       keymap.of([
@@ -130,6 +135,7 @@ const scoreSession = mountScoreSession(view);
 const undoBtn = document.getElementById("undo") as HTMLButtonElement;
 const redoBtn = document.getElementById("redo") as HTMLButtonElement;
 const sourceToggle = document.getElementById("source-toggle") as HTMLButtonElement;
+const addMelodyBtn = document.getElementById("add-melody") as HTMLButtonElement;
 
 function refreshEditorChrome(): void {
   undoBtn.disabled = undoDepth(view.state) === 0;
@@ -137,17 +143,23 @@ function refreshEditorChrome(): void {
   const head = view.state.selection.main.head;
   const line = view.state.doc.lineAt(head);
   setText(document.getElementById("cursor-position")!, `Ln ${line.number}, Col ${head - line.from + 1}`);
+  addMelodyBtn.disabled = !canAppendMelody(view.state);
+  addMelodyBtn.title = addMelodyBtn.disabled
+    ? "Available for empty or $: stack scores"
+    : "Add melody";
   const text = view.state.doc.toString();
   const starter = Object.entries(STARTERS).find(([, value]) => value.source === text);
   setText(document.getElementById("score-title")!, starter?.[1].name ?? "Your score");
   document.querySelectorAll<HTMLButtonElement>("[data-starter]").forEach(button =>
     button.setAttribute("aria-pressed", String(button.dataset.starter === starter?.[0])));
+  document.querySelectorAll<HTMLButtonElement>("[data-scene]").forEach(button =>
+    button.setAttribute("aria-pressed", String(button.dataset.scene === starter?.[0])));
 }
 
 function replaceScore(source: string): void {
   view.dispatch({
     changes: { from: 0, to: view.state.doc.length, insert: source },
-    selection: { anchor: Math.max(0, source.indexOf("$:")) },
+    selection: { anchor: initialCursor(source) },
     annotations: isolateHistory.of("full"),
   });
   view.focus();
@@ -155,10 +167,11 @@ function replaceScore(source: string): void {
 
 undoBtn.addEventListener("click", () => { undo(view); view.focus(); });
 redoBtn.addEventListener("click", () => { redo(view); view.focus(); });
+addMelodyBtn.addEventListener("click", () => appendMelody(view));
 sourceToggle.addEventListener("click", () => {
   const enabled = sourceToggle.getAttribute("aria-pressed") !== "true";
   sourceToggle.setAttribute("aria-pressed", String(enabled));
-  view.dispatch({ effects: controlsCompartment.reconfigure(enabled ? patternControls(audition, canAutoListen) : []) });
+  view.dispatch({ effects: controlsCompartment.reconfigure(patternControlsVisible.of(enabled)) });
 });
 refreshEditorChrome();
 
@@ -201,6 +214,7 @@ const engine = new AudioEngine("/processor.js", "/moonbit_dsp.wasm", {
   sampleRate: audioSampleRate,
   latencyHint,
   mode: audioMode,
+  enableOnsets: urlParams.get("onsets") !== "0",
 });
 
 if (audioMode !== "scheduler") {
@@ -268,7 +282,7 @@ function applyStatus(state: PlaybackView): void {
   statusEl.dataset.tempo = state.tempoText;
   statusEl.dataset.mode = state.mode;
   setText(positionEl, `Position: ${state.cyclePosition.toFixed(2)} cycles`);
-  setText(tempoEl, state.mode === "none" ? "Not playing yet"
+  setText(tempoEl, state.mode === "none" ? ""
     : `${state.tempoText} BPM · ${state.mode === "pattern" ? "Pattern" : "Song"}`);
   draftStatusEl.dataset.state = state.draftStatus;
   draftStatusEl.dataset.version = versionLabel(state.draftVersion);
@@ -309,8 +323,11 @@ function diagnosticFromError(raw: string, docLength: number): Diagnostic {
 }
 let renderedPlayback: PlaybackView | undefined;
 
+let playbackObservation: ReturnType<typeof mountPlaybackObservation> | undefined;
 function renderPlayback(state: PlaybackView): void {
+  renderPhraseUpdateStatus(view, state);
   applyStatus(state);
+  playbackObservation?.setPlaying(audioMode === "scheduler" && state.state === "Playing");
   if (state.feedback !== renderedPlayback?.feedback) {
     setLog(state.feedback?.message ?? "", state.feedback?.kind ?? "info");
   }
@@ -322,7 +339,19 @@ function renderPlayback(state: PlaybackView): void {
 }
 const draft = new Draft(INITIAL);
 const playback = new Player(engine, { draft }, renderPlayback);
+playbackObservation = mountPlaybackObservation(view, draft, engine, error => {
+  setLog(`Playback highlighting: ${error instanceof Error ? error.message : String(error)}`, "error");
+});
 let compiledSession: CompiledSession | undefined;
+const outputScope = mountOutputScope(document.getElementById("output-scope")!, {
+  readWaveform: target => engine.readWaveform(target),
+});
+if (import.meta.hot) import.meta.hot.dispose(() => {
+  playbackObservation?.dispose();
+  view.destroy();
+  outputScope.dispose();
+  scoreSession.dispose();
+});
 async function toggleCompiled(): Promise<void> {
   startBtn.disabled = true;
   try {
@@ -375,6 +404,7 @@ view.dispatch({
           }, true);
           draft.edit({ base: draft.state().version, edits });
         }
+        playbackObservation?.edited();
         // Diagnostic decoration dispatch must happen outside CM's update turn.
         queueMicrotask(() => playback.editDraft());
       } catch (error) {
@@ -385,14 +415,12 @@ view.dispatch({
 });
 
 startBtn.addEventListener("click", () => {
-  audition.stop();
   if (audioMode === "compiled") { void toggleCompiled(); return; }
   const state = playback.view().state;
   void (state === "Playing" || state === "Starting" ? playback.pause() : playback.play()).catch(error => playback.report(error));
 });
 
 document.getElementById("restart")!.addEventListener("click", () => {
-  audition.stop();
   try {
     void playback.restart(draft.prepare()).catch(error => playback.report(error));
   } catch (error) {
@@ -420,7 +448,6 @@ function setHelp(open: boolean): void {
   workspaceEl.classList.toggle("cheat-collapsed", !open);
   cheatEl.inert = !open;
   cheatToggle.setAttribute("aria-expanded", String(open));
-  cheatToggle.textContent = open ? "Hide help" : "Show help";
   if (open && !cheatEl.open) {
     if (narrowHelp.matches) cheatEl.showModal();
     else cheatEl.show();
@@ -446,6 +473,21 @@ document.querySelectorAll<HTMLButtonElement>("[data-starter]").forEach(button =>
     if (starter) {
       if (narrowHelp.matches) setHelp(false);
       replaceScore(starter.source);
+    }
+  });
+});
+
+document.querySelectorAll<HTMLButtonElement>("[data-scene]").forEach(button => {
+  button.addEventListener("click", () => {
+    const starter = STARTERS[button.dataset.scene as keyof typeof STARTERS];
+    if (!starter) return;
+    if (narrowHelp.matches) setHelp(false);
+    replaceScore(starter.source);
+    if (audioMode !== "scheduler") return;
+    try {
+      void playback.restart(draft.prepare()).catch(error => playback.report(error));
+    } catch (error) {
+      playback.reportDraftFailure(error);
     }
   });
 });

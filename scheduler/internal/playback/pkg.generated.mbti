@@ -41,7 +41,10 @@ pub struct PlaybackSourcedEvent {
 pub fn PlaybackSourcedEvent::anonymous(@pattern.Event[@pattern.ControlMap]) -> Self
 pub fn PlaybackSourcedEvent::event(Self) -> @pattern.Event[@pattern.ControlMap]
 pub fn PlaybackSourcedEvent::origin(Self) -> @model.VoiceOrigin
+pub fn PlaybackSourcedEvent::source_frame(Self) -> @identity.SourceFrameId?
 pub fn PlaybackSourcedEvent::source_origin(Self) -> @pattern.EventOrigin?
+pub fn PlaybackSourcedEvent::source_pitch(Self) -> Double
+pub fn PlaybackSourcedEvent::source_start(Self) -> Double
 
 pub struct PlaybackState {
   // private fields

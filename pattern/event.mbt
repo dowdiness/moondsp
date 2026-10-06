@@ -31,6 +31,16 @@ pub fn[A] Event::shift(self : Event[A], offset : Rational) -> Event[A] {
 }
 
 ///|
+/// Place the same musical value in new ideal and clipped spans.
+pub fn[A] Event::with_spans(
+  self : Event[A],
+  whole~ : TimeSpan?,
+  part~ : TimeSpan,
+) -> Event[A] {
+  { whole, part, value: self.value, }
+}
+
+///|
 pub impl[A : Debug] Show for Event[A] with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }

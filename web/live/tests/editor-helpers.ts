@@ -10,6 +10,11 @@ export async function replaceCode(page: Page, source: string): Promise<void> {
   await page.keyboard.insertText(source);
 }
 
+export async function openPitchControls(page: Page): Promise<void> {
+  const closed = page.locator(".pattern-pitch-editor:not([open]) > summary");
+  if (await closed.isVisible()) await closed.click();
+}
+
 export async function readCode(page: Page): Promise<string> {
   return page.locator(".cm-line").evaluateAll(lines => lines.map(line => {
     const copy = line.cloneNode(true) as HTMLElement;

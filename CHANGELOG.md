@@ -9,6 +9,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added direct inline chord-tone editing: transpose the whole chord, drag one
+  tone, add/remove tones, and share keyboard edits and Undo with code.
+  Exact named voicings retain chord names; arbitrary combinations and inversions
+  serialize losslessly as explicit MIDI sets such as `{60,63,68}`.
+  Weights, linked repetitions, surrounding code, and the main transport remain
+  shared. Name-based Root/Type choices are optional; a separate progression
+  diagram opens on demand. Chord steps and tones show actual playback
+  independently of edit selection.
+  Corrected accidental/suspended-quality parsing (for example, `Dbsus4`) and
+  added zero-prefixed chord octaves (`C07`) so major-chord register survives
+  quality changes without confusing octave digits with chord extensions.
+
+- Added source-linked phrase selection, block movement/transposition, and
+  independent duplication with shared Undo/Redo. Structure controls now open
+  on demand. Local-cycle division guides and displaced-note previews clarify
+  timing edits; phrase-local feedback distinguishes queued edits from accepted
+  code with score-wide pending material.
+
+- Added diagonal note dragging for pitch and source-order changes, direct
+  note-edge resizing, and keyboard movement/resize/delete controls. Occupied
+  steps rotate without losing notes; weights, repetitions, and shared history
+  survive. Rests now appear as blank space while remaining editable.
+
+- Added direct note entry in source rests, with pitch preview, cancellation,
+  keyboard entry, and shared Undo. Weights and linked repetitions survive edits;
+  selected note/chord rests also offer Add note/Add chord. Percussion now has
+  separate sound rows and source-step columns, including distinct closed/open
+  hats, hit toggling, keyboard navigation, and a touch-sized scrolling matrix.
+
+- Replaced the inline notation's connecting curves and thin note marks with
+  labelled pitch rows, note blocks, and a cycle ruler. Selection and playback
+  have distinct outline/fill states. Dragging and grid arrows use chromatic
+  pitches; source-linked repeats, structural edits, and shared Undo remain intact.
+
+- Linked actual dispatched notes to code and the focused inline notation in
+  Pattern and Song playback. Exact occurrences stay highlighted until the next
+  onset; simultaneous notes light together and rests retain the previous group.
+  Named references and surviving source identities remain traceable across edits.
+  Listener-time estimates, bounded shared-memory transport, and pause/visibility
+  retirement prevent a second visual clock or replay of stale observations.
+
+- Added parser-backed structural editing for nested notation, repeated source
+  atoms/groups, subdivision, and adjacent duration boundaries in the live editor.
+  Compiled notation events retain exact source links instead of flattening
+  repeated occurrences. Phrase stretch and gate have separate timing controls;
+  source formatting, surrounding transforms, and shared Undo are preserved.
+- Corrected direct Mini `.fast()` and `.slow()` decimal factors: `1.5` and `0.5`
+  now retain exact rational timing instead of truncating to integers. Callback
+  factors retain their positive-integer contract.
+
+- Reduced the live editor to source editing, direct pitch/rhythm manipulation,
+  one transport, and shared Undo/Redo. Removed proposal, variation, comparison,
+  answer, and auxiliary-preview workflows and their state instead of hiding them.
+  Selected-step Length and Rest remain beside the drawing; chromatic editing is
+  optional. Mini-notation retains `@1`–`@16` relative lengths, bounded at 256 units.
+
+- Expanded the live editor edge-to-edge and to the remaining viewport height.
+  Removed the outer card and page gutters, merged toolbars, moved starting sounds
+  into Help and the waveform into Playback details, and kept long-score scrolling
+  inside CodeMirror with transport and file actions available.
+
+- Simplified the live workspace's default copy: compact named starters, a shared
+  score title, stable Help action, and concise state feedback. Consolidated
+  editing, files/recovery, and playback-timing instructions in Help while keeping
+  actionable errors and playback/save states visible.
+
+- Refined inline melody editing into a compact, neutral, source-aligned contour.
+  Pitch steps and the chromatic keyboard open on demand without losing source
+  selection, edits, or shared Undo history.
+
+- Embedded the drawable melody directly beneath its source phrase in the editor,
+  sharing selected notes with the pitch controls and removing the separate
+  workspace and phrase selector. The score toolbar can add a melody.
+- Added source-bound pointer and keyboard contours with single-step Undo.
+  Graphical edits preserve surrounding source, rhythmic weights, and effects;
+  unsupported notation stays editable in code. Starting sounds are directly
+  playable. A post-master waveform shows the main transport's actual output
+  without claiming full-score note provenance.
+  Draft recovery controls also retain focus if a queued disclosure event arrives
+  after a user begins interacting with a saved snapshot.
+  See the [experience and verification record](docs/development/2026-10-03-musical-experience.md).
 - Reworked the browser live workspace around a text-first score, with cursor-scoped
   drum/note controls editing the same undo history, starter scores and explanations
   in Help, native modal Help on narrow screens, local draft persistence, and
@@ -17,14 +98,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   an inline pitch keyboard or direct drum choices, and no step-count captions.
   See the [workspace design and evidence](docs/development/2026-10-02-musical-workspace.md)
   for supported notation, research sources, and verification limits.
-- Added a source-bound chromatic keyboard, octave browsing, direct drum choices,
-  and short DSP auditions for the selected step, replacing note/sound dropdowns.
-  GUI edits preview while the main score is stopped or paused, without moving its
-  transport. Undo/Redo are consolidated in the score toolbar to express their
-  score-wide scope; shortcuts remain available from sound controls. Numbered
-  buttons select and listen, without a duplicate Listen action. Melodic Rest sits
-  beside Octave; drum Rest stays in the sound grid. Undo restores the exact prior note.
-  Numeric/flat source spellings and preview-failure recovery are preserved.
+- Added a source-bound chromatic keyboard, octave browsing, and direct drum
+  choices, replacing note/sound dropdowns. Numbered buttons select without
+  starting audio. Melodic Rest sits beside Length; drum Rest stays in the sound
+  grid. Numeric/flat spellings and exact prior source survive shared Undo.
+  Play/Pause and history shortcuts work from the drawing and sound controls.
 - Added live playback status separating the runtime transport, current Draft
   submission/acceptance, and pending musical-material transitions. Browser
   `player_mode` and `scheduler_cycle_position` expose primitive status on JS and

@@ -3,6 +3,7 @@
 import { decodeWorkletMessage } from "./playback-protocol";
 import type { PlaybackInput } from "./authoring";
 import type { PlayerReceipt, PlayerSnapshot, RequestId } from "./playback-protocol";
+import { ONSET_BYTES, OnsetRing, type OnsetStatistics } from "../../playback-onsets.js";
 
 function abortError(): DOMException {
   return new DOMException("Audio initialization cancelled", "AbortError");
@@ -48,6 +49,7 @@ export type AudioEngineOptions = {
   sampleRate?: number;
   latencyHint?: AudioContextOptions["latencyHint"];
   mode?: AudioEngineMode;
+  enableOnsets?: boolean;
 };
 
 export type AudioEvent =
@@ -75,10 +77,14 @@ export type OpenSessionResult =
   | { kind: "failed"; message: string }
   | { kind: "busy" };
 
+export type OnsetObservation = Readonly<{ fields: readonly number[]; at: number }>;
+
 type Graph = Readonly<{
   ctx: AudioContext;
   node: AudioWorkletNode;
   gain: GainNode;
+  analyser: AnalyserNode;
+  onsets: OnsetRing | null;
 }>;
 type GraphRun = Readonly<{
   run: symbol;
@@ -97,6 +103,52 @@ type EngineState =
   | { kind: "failed"; message: string };
 
 export class AudioEngine {
+  private onsetEpoch = 0;
+
+  get observationGeneration(): number { return this.onsetEpoch; }
+
+  /** Retire queued visuals without changing the transport or accepted score. */
+  discardOnsets(): void {
+    this.onsetEpoch++;
+    const state = this.state;
+    if ("graph" in state && state.graph.onsets) {
+      state.graph.onsets.read(-1);
+      state.graph.node.port.postMessage({ type: "observe-onsets", onsetGeneration: this.onsetEpoch });
+    }
+  }
+
+  /** Observed device-time mapping, not a second musical clock. Main thread only. */
+  readOnsets(now: number): readonly OnsetObservation[] {
+    const state = this.state;
+    if (state.kind !== "active" || state.graph.ctx.state !== "running" || !state.graph.onsets) return [];
+    const rows = state.graph.onsets.read(this.onsetEpoch);
+    if (!rows.length) return [];
+    const ctx = state.graph.ctx;
+    const timestamp = ctx.getOutputTimestamp?.();
+    const offset = timestamp && typeof timestamp.contextTime === "number" &&
+      typeof timestamp.performanceTime === "number" && Number.isFinite(timestamp.contextTime) &&
+      Number.isFinite(timestamp.performanceTime) && timestamp.performanceTime > 0
+      ? timestamp.performanceTime - timestamp.contextTime * 1000
+      : now - ctx.currentTime * 1000 + ((ctx.baseLatency || 0) + (ctx.outputLatency || 0)) * 1000;
+    return rows.map(fields => ({ fields, at: offset + fields[0] * 1000 }));
+  }
+
+  onsetStatistics(): OnsetStatistics | null {
+    const state = this.state;
+    return "graph" in state ? state.graph.onsets?.statistics() ?? null : null;
+  }
+
+  /** Copy up to 1024 live post-master samples; clear unused/inactive storage. */
+  readWaveform(target: Float32Array<ArrayBuffer>): boolean {
+    const state = this.state;
+    if (state.kind !== "active" || state.graph.ctx.state !== "running") {
+      target.fill(0);
+      return false;
+    }
+    state.graph.analyser.getFloatTimeDomainData(target);
+    if (target.length > state.graph.analyser.fftSize) target.fill(0, state.graph.analyser.fftSize);
+    return true;
+  }
   private state: EngineState = { kind: "idle" };
   readonly mode: AudioEngineMode;
 
@@ -199,6 +251,7 @@ export class AudioEngine {
 
   private activate(graph: Graph, run: symbol, deliver: (event: AudioEvent) => void): OpenSessionResult {
     this.state = { kind: "active", run, graph, deliver };
+    this.discardOnsets();
     graph.node.port.postMessage(this.mode === "scheduler"
       ? { type: "set-scheduler-gain", gain: 0.6 }
       : { type: "set-gain", value: 0.6 });
@@ -221,20 +274,25 @@ export class AudioEngine {
     const ctx = new AudioContext({ sampleRate: this.options.sampleRate, latencyHint: this.options.latencyHint });
     let node: AudioWorkletNode | undefined;
     let gain: GainNode | undefined;
+    let analyser: AnalyserNode | undefined;
     try {
       gain = new GainNode(ctx, { gain: 0 });
+      analyser = new AnalyserNode(ctx, { fftSize: 1024, smoothingTimeConstant: 0 });
       gain.connect(ctx.destination);
-      await abortable(() => ctx.resume(), signal);
+      gain.connect(analyser);
       const response = await abortable(() => fetch(this.wasmUrl, { signal }), signal);
       if (!response.ok) throw new Error(`fetch ${this.wasmUrl}: ${response.status}`);
       const bytes = await abortable(() => response.arrayBuffer(), signal);
       const wasmModule = await abortable(() => WebAssembly.compile(bytes), signal);
       const scheduler = this.mode === "scheduler";
+      const onsets = scheduler && this.options.enableOnsets !== false &&
+        globalThis.crossOriginIsolated && typeof SharedArrayBuffer !== "undefined"
+        ? new OnsetRing(new SharedArrayBuffer(ONSET_BYTES)) : null;
       await abortable(() => ctx.audioWorklet.addModule(scheduler ? "/scheduler-processor.js" : this.processorUrl), signal);
       signal.throwIfAborted();
       node = new AudioWorkletNode(ctx, scheduler ? "moondsp-scheduler" : "moonbit-dsp", {
         numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2],
-        processorOptions: scheduler ? { wasmModule } : {
+        processorOptions: scheduler ? { wasmModule, onsetBuffer: onsets?.buffer } : {
           wasmModule, useScheduler: false, useProbeSine: false,
           enableTelemetry: this.options.enableTelemetry === true,
           enableSchedulerTiming: this.options.enableSchedulerTiming === true,
@@ -245,9 +303,10 @@ export class AudioEngine {
       node.connect(gain);
       await ready;
       if (signal.aborted) throw signal.reason ?? abortError();
-      return { ctx, node, gain };
+      return { ctx, node, gain, analyser, onsets };
     } catch (error) {
       if (node) { node.port.onmessage = null; node.onprocessorerror = null; node.disconnect(); }
+      analyser?.disconnect();
       gain?.disconnect();
       if (ctx.state !== "closed") await ctx.close().catch(closeError => console.warn("Audio close failed", closeError));
       throw error;
@@ -320,7 +379,10 @@ export class AudioEngine {
     const state = this.state;
     if (state.kind !== "active" || state.run !== run) return "session-expired";
     if (command === "fade-in") this.ramp(state.graph, 1, 80);
-    else state.graph.node.port.postMessage(command);
+    else if (command.type === "player-restart" || command.type === "player-play" || command.type === "player-pause") {
+      this.onsetEpoch++;
+      state.graph.node.port.postMessage({ ...command, onsetGeneration: this.onsetEpoch });
+    } else state.graph.node.port.postMessage(command);
     return "issued";
   }
 
@@ -337,6 +399,7 @@ export class AudioEngine {
     if (active.kind !== "active" || active.run !== run) return { kind: "session-expired" };
     const closing = { ...active, kind: "closing" as const };
     const graph = active.graph;
+    this.discardOnsets();
     this.state = closing;
     try {
       this.ramp(graph, 0, 60);
@@ -357,6 +420,7 @@ export class AudioEngine {
     graph.node.port.onmessage = null;
     graph.node.onprocessorerror = null;
     graph.node.disconnect();
+    graph.analyser.disconnect();
     graph.gain.disconnect();
     if (graph.ctx.state !== "closed") await graph.ctx.close().catch(error => console.warn("Audio close failed", error));
   }
@@ -365,6 +429,7 @@ export class AudioEngine {
     graph.node.port.onmessage = null;
     graph.node.onprocessorerror = null;
     graph.node.disconnect();
+    graph.analyser.disconnect();
     graph.gain.disconnect();
     if (graph.ctx.state !== "closed") void graph.ctx.close().catch(error => console.warn("Audio close failed", error));
   }

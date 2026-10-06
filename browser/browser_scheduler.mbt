@@ -152,3 +152,30 @@ pub fn scheduler_bpm() -> Double {
 pub fn scheduler_sample_position() -> Double {
   @playback_host.scheduler_sample_position()
 }
+
+///|
+/// Enable actual-onset observation (1) or disable it (0).
+pub fn player_onset_enable(enabled : Int) -> Unit {
+  @playback_host.player_onset_enable(enabled)
+}
+
+///|
+pub fn player_onset_count() -> Int {
+  @playback_host.player_onset_count()
+}
+
+///|
+/// Read a zero-based field from the chronological scheduler-route rows.
+pub fn player_onset_field(index : Int, field : Int) -> Double {
+  @playback_host.player_onset_field(index, field)
+}
+
+///|
+pub fn player_onset_clear() -> Unit {
+  @playback_host.player_onset_clear()
+}
+
+///|
+pub fn player_onset_dropped() -> Double {
+  @playback_host.player_onset_dropped()
+}

@@ -172,14 +172,26 @@ fn song_update_snapshot(
   let parts = song
     .occurrences()
     .map(o => {
-      let section = @song.SectionDoc::single(
-        id=@identity.SectionId::from_string("live:" + o.id().value()),
-        name=o.section().name(),
-        length_cycles=o.section().length_cycles(),
-        scope=o.section().scope(),
-        layer_id=@identity.SectionLayerId::from_string("live:body"),
-        body=o.section().body(),
-      )
+      let section = match o.section().source_snapshot() {
+        Some(snapshot) =>
+          @song.SectionDoc::single_with_origins(
+            id=@identity.SectionId::from_string("live:" + o.id().value()),
+            name=o.section().name(),
+            length_cycles=o.section().length_cycles(),
+            scope=o.section().scope(),
+            layer_id=@identity.SectionLayerId::from_string("live:body"),
+            snapshot~,
+          )
+        None =>
+          @song.SectionDoc::single(
+            id=@identity.SectionId::from_string("live:" + o.id().value()),
+            name=o.section().name(),
+            length_cycles=o.section().length_cycles(),
+            scope=o.section().scope(),
+            layer_id=@identity.SectionLayerId::from_string("live:body"),
+            body=o.section().body(),
+          )
+      }
       @song.SongOccurrenceDoc::at(
         id=o.id(),
         start=o.start(),
@@ -662,6 +674,46 @@ pub fn scheduler_bpm() -> Double {
 pub fn scheduler_sample_position() -> Double {
   match player.val {
     Some(owner) => owner.view().sample_position
+    None => 0.0
+  }
+}
+
+///|
+pub fn player_onset_enable(enabled : Int) -> Unit {
+  if player.val is Some(owner) {
+    owner.onsets.enable(enabled == 1)
+  }
+}
+
+///|
+pub fn player_onset_count() -> Int {
+  match player.val {
+    Some(owner) => owner.onsets.count()
+    None => 0
+  }
+}
+
+///|
+/// Read the shared bounded ring; no array or binding path is copied.
+pub fn player_onset_field(index : Int, field : Int) -> Double {
+  guard index >= 0 else { return 0.0 }
+  match player.val {
+    None => 0.0
+    Some(owner) => owner.onsets.field(index, field)
+  }
+}
+
+///|
+pub fn player_onset_clear() -> Unit {
+  if player.val is Some(owner) {
+    owner.onsets.clear()
+  }
+}
+
+///|
+pub fn player_onset_dropped() -> Double {
+  match player.val {
+    Some(owner) => owner.onsets.dropped()
     None => 0.0
   }
 }

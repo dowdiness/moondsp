@@ -523,3 +523,40 @@ test "note_name_to_midi C# (no octave) defaults to 4" {
     None => fail("expected Some for C#")
   }
 }
+
+///|
+test "chord accidentals leave suspended quality intact" {
+  @debug.assert_eq(@pattern.parse_chord("C#sus4"), Some([61, 66, 68]))
+  @debug.assert_eq(@pattern.parse_chord("Dbsus2"), Some([61, 63, 68]))
+  @debug.assert_eq(@pattern.parse_chord("Csssus4"), Some([62, 67, 69]))
+  @debug.assert_eq(@pattern.parse_chord("Dfsus43"), Some([49, 54, 56]))
+  @debug.assert_eq(@pattern.parse_chord("C#bsus4"), None)
+}
+
+///|
+test "chord zero-prefixed register distinguishes major from numeric quality" {
+  @debug.assert_eq(@pattern.parse_chord("C06"), Some([84, 88, 91]))
+  @debug.assert_eq(@pattern.parse_chord("C07"), Some([96, 100, 103]))
+  @debug.assert_eq(@pattern.parse_chord("C09"), Some([120, 124, 127]))
+  @debug.assert_eq(@pattern.parse_chord("Db07"), Some([97, 101, 104]))
+  @debug.assert_eq(@pattern.parse_chord("C7"), Some([60, 64, 67, 70]))
+  @debug.assert_eq(@pattern.parse_chord("C007"), None)
+  @debug.assert_eq(@pattern.parse_chord("C10"), None)
+}
+
+///|
+test "explicit chord atoms preserve absolute MIDI pitches" {
+  assert_eq(@pattern.parse_chord("{0,60,127}"), Some([0, 60, 127]))
+  assert_eq(@pattern.parse_chord("{60,63,68}"), Some([60, 63, 68]))
+}
+
+///|
+test "explicit chord atoms reject malformed pitch sets" {
+  for
+    source in [
+      "{}", "{,60}", "{60,}", "{60,,63}", "{60, 63}", "{60,63 }", "{60", "{60}x",
+      "{128}", "{-1}", "{60,60}", "{63,60}", "{999999999999999999999}",
+    ] {
+    assert_true(@pattern.parse_chord(source) is None)
+  }
+}

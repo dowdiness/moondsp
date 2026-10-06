@@ -3,4 +3,6 @@ export function create_draft(text: string, onCreated: (handle: DraftHandle) => v
 export function draft_state(handle: DraftHandle): string;
 export function edit_draft(handle: DraftHandle, transaction: string): string;
 export function prepare_playback(handle: DraftHandle): string;
+export function locate_onsets(handle: DraftHandle, wire: string): string;
 export function dispose_draft(handle: DraftHandle): void;
+export function project_notation(kind: string, content: string): string;

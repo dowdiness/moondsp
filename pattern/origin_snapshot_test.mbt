@@ -412,3 +412,101 @@ test "origin cache retains full witnesses when binding serials coincide" {
     [[10L], [20L], [30L]],
   )
 }
+
+///|
+test "source frame distinguishes repeated atoms through reference slow and reverse" {
+  let base = @pattern.PatternDoc::sequence(id=pid("framed-sequence"), docs=[
+    origin_note("framed-c", 1L, 60.0),
+    origin_note("framed-e", 2L, 64.0),
+  ]).fast(id=pid("literal-repeat"), factor=@pattern.Rational::from_int(2))
+  let frame = @identity.SourceFrameId(@identity.SourceEpoch(1L), 50L)
+  let framed = base.with_source_frame(frame~)
+  let transformed = resolved_use("frame-use", framed, 201L, 301L)
+    .rev(id=pid("outer-reverse"))
+    .slow(id=pid("outer-slow"), factor=@pattern.Rational::from_int(2))
+    .lower_with_origins()
+  let events = transformed.query(doc_span(0, 1, 2, 1))
+  let rows = events.map(event => {
+    let whole = event.event().whole.unwrap()
+    (whole.begin.to_double(), event.source_start(), event.source_pitch())
+  })
+  rows.sort_by((a, b) => a.0.compare(b.0))
+  @debug.assert_eq(rows, [
+    (0.0, 0.75, 64.0),
+    (0.5, 0.5, 60.0),
+    (1.0, 0.25, 64.0),
+    (1.5, 0.0, 60.0),
+  ])
+  for event in events {
+    @debug.assert_eq(event.source_frame(), Some(frame))
+    @debug.assert_eq(
+      event.origin().bindings().map(binding => binding.reference().serial()),
+      [201L],
+    )
+    @debug.assert_eq(
+      event.origin().atom(),
+      atom_id(if event.source_pitch() == 60.0 { 1L } else { 2L }),
+    )
+  }
+}
+
+///|
+test "source frame uses full whole-cycle repeat span for rational notation rates" {
+  let frame = @identity.SourceFrameId(@identity.SourceEpoch(1L), 51L)
+  let snapshot = @pattern.PatternDoc::sequence(id=pid("rational-sequence"), docs=[
+      origin_note("rational-c", 1L, 60.0),
+      origin_note("rational-e", 2L, 64.0),
+    ])
+    .slow(id=pid("literal-slow"), factor=@pattern.Rational::from_int(3))
+    .fast(id=pid("literal-fast"), factor=@pattern.Rational::from_int(2))
+    .with_source_frame(frame~)
+    .fast(id=pid("playback-fast"), factor=@pattern.Rational::from_int(2))
+    .lower_with_origins()
+  for cycle in [-3L, 3L] {
+    let arc = @pattern.TimeSpan::new(
+      @pattern.Rational::new(cycle, 2L),
+      @pattern.Rational::new(cycle + 3L, 2L),
+    )
+    let events = snapshot.query(arc)
+    @debug.assert_eq(
+      events.map(event => (event.source_start(), event.source_pitch())),
+      [(0.0, 60.0), (0.75, 64.0), (1.5, 60.0), (2.25, 64.0)],
+    )
+    for index, event in events {
+      @debug.assert_eq(
+        event.event().whole.unwrap().begin.to_double(),
+        arc.begin.to_double() + index.to_double() * 0.375,
+      )
+    }
+  }
+}
+
+///|
+test "bounded origin transport preserves the complete path or leaves storage untouched" {
+  let mut doc = origin_note("wire-atom", 1L, 60.0)
+  for index in 0..<32 {
+    doc = resolved_use(
+      "wire-use-\{index}",
+      doc,
+      1000L + index.to_int64(),
+      2000L + index.to_int64(),
+    )
+  }
+  let arc = doc_span(0, 1, 1, 1)
+  let origin = doc.lower_with_origins().query(arc)[0].origin()
+  let storage = Array::make(96, -9.0)
+  assert_eq(origin.write_binding_serials(storage, 0, 32), 32)
+  for index in 0..<32 {
+    assert_eq(storage[index * 3], (1031 - index).to_double())
+    assert_eq(storage[index * 3 + 1], (2031 - index).to_double())
+    assert_eq(storage[index * 3 + 2], 100.0)
+  }
+  let accepted = storage.copy()
+  let oversized = resolved_use("wire-overflow", doc, 1032L, 2032L)
+  .lower_with_origins()
+  .query(arc)[0].origin()
+  assert_eq(oversized.write_binding_serials(storage, 0, 32), -1)
+  @debug.assert_eq(storage, accepted)
+  assert_eq(origin.write_binding_serials(storage, 1, 32), -1)
+  @debug.assert_eq(storage, accepted)
+}

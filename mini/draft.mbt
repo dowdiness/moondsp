@@ -246,6 +246,22 @@ fn LiveAtom::LiveAtom(
 }
 
 ///|
+priv struct LiveLiteral {
+  id : @identity.SourceFrameId
+  kind : String
+  span : MiniSpan
+}
+
+///|
+fn LiveLiteral::LiveLiteral(
+  id : @identity.SourceFrameId,
+  kind : String,
+  span : MiniSpan,
+) -> LiveLiteral {
+  { id, kind, span, }
+}
+
+///|
 priv struct LiveDefinition {
   id : @identity.DefinitionId
   name : String
@@ -290,6 +306,7 @@ priv struct SourceMap {
   epoch : @identity.SourceEpoch
   serial : Int64
   atoms : Array[LiveAtom]
+  literals : Array[LiveLiteral]
   definitions : Array[LiveDefinition]
   references : Array[LiveReference]
 }
@@ -299,15 +316,16 @@ fn SourceMap::SourceMap(
   epoch : @identity.SourceEpoch,
   serial : Int64,
   atoms : Array[LiveAtom],
+  literals : Array[LiveLiteral],
   definitions : Array[LiveDefinition],
   references : Array[LiveReference],
 ) -> SourceMap {
-  { epoch, serial, atoms, definitions, references, }
+  { epoch, serial, atoms, literals, definitions, references, }
 }
 
 ///|
 fn SourceMap::empty(epoch : @identity.SourceEpoch) -> SourceMap {
-  SourceMap(epoch, 0L, [], [], [])
+  SourceMap(epoch, 0L, [], [], [], [])
 }
 
 ///|
@@ -359,17 +377,49 @@ fn draft_map_untouched(span : MiniSpan, edits : Array[TextEdit]) -> MiniSpan? {
 }
 
 ///|
+/// A literal frame owns its complete content. Even boundary insertions retire
+/// it, unlike token mappings that intentionally survive endpoint insertion.
+fn draft_map_untouched_literal(
+  span : MiniSpan,
+  edits : Array[TextEdit],
+) -> MiniSpan? {
+  let mut delta = 0
+  for edit in edits {
+    if edit.from == edit.to {
+      guard !(edit.from >= span.start && edit.from <= span.end) else {
+        return None
+      }
+      if edit.from < span.start {
+        delta += edit.inserted.length()
+      }
+    } else {
+      guard !(edit.from < span.end && edit.to > span.start) else { return None }
+      if edit.to <= span.start {
+        delta += edit.inserted.length() - (edit.to - edit.from)
+      }
+    }
+  }
+  Some({ start: span.start + delta, end: span.end + delta, })
+}
+
+///|
 fn SourceMap::advance(
   self : SourceMap,
   facts : SourceRecognition,
   edits : Array[TextEdit],
 ) -> SourceMap raise DraftEditError {
   let old_atoms : Map[String, LiveAtom] = Map([])
+  let old_literals : Map[String, LiveLiteral] = Map([])
   let old_definitions : Map[String, LiveDefinition] = Map([])
   let old_references : Map[String, LiveReference] = Map([])
   for atom in self.atoms {
     if draft_map_untouched(atom.span, edits) is Some(span) {
       old_atoms[draft_span_key(atom.kind, span)] = atom
+    }
+  }
+  for literal in self.literals {
+    if draft_map_untouched_literal(literal.span, edits) is Some(span) {
+      old_literals[draft_span_key(literal.kind, span)] = literal
     }
   }
   for definition in self.definitions {
@@ -396,6 +446,20 @@ fn SourceMap::advance(
         }
     }
     atoms.push(LiveAtom(id, fact.kind, fact.span))
+  }
+  let literals : Array[LiveLiteral] = []
+  for fact in facts.literals {
+    let id = match old_literals.get(draft_span_key(fact.kind, fact.span)) {
+      Some(old) => old.id
+      None =>
+        @identity.SourceFrameId::SourceFrameId(
+          self.epoch,
+          next_draft_serial(counter),
+        ) catch {
+          _ => raise IdentityExhausted
+        }
+    }
+    literals.push(LiveLiteral(id, fact.kind, fact.span))
   }
   let definitions : Array[LiveDefinition] = []
   for fact in facts.definitions {
@@ -456,7 +520,7 @@ fn SourceMap::advance(
     }
     references.push(LiveReference(id, fact, binding))
   }
-  SourceMap(self.epoch, counter.val, atoms, definitions, references)
+  SourceMap(self.epoch, counter.val, atoms, literals, definitions, references)
 }
 
 ///|
@@ -469,6 +533,30 @@ fn SourceMap::atom_at(
   for atom in self.atoms {
     if atom.kind == kind && atom.span.start == start && atom.span.end == end {
       return Some(atom.id)
+    }
+  }
+  None
+}
+
+///|
+fn SourceMap::frame_at(
+  self : SourceMap,
+  content_from : Int,
+  content_to : Int,
+) -> @identity.SourceFrameId? {
+  for literal in self.literals {
+    if literal.span.start == content_from && literal.span.end == content_to {
+      return Some(literal.id)
+    }
+  }
+  None
+}
+
+///|
+fn SourceMap::frame_range(self : SourceMap, serial : Int64) -> SourceRange? {
+  for literal in self.literals {
+    if literal.id.serial() == serial {
+      return Some(SourceRange(literal.span))
     }
   }
   None
@@ -517,7 +605,7 @@ fn SourceMap::resolve_reference(
 ///|
 priv enum PlaybackPayload {
   Pattern(DraftVersion, SourceMap)
-  Song(DraftVersion)
+  Song(DraftVersion, SourceMap)
   Text
 }
 
@@ -550,7 +638,7 @@ pub fn PlaybackInput::source(self : PlaybackInput) -> String {
 ///|
 pub fn PlaybackInput::version(self : PlaybackInput) -> DraftVersion? {
   match self.payload {
-    Pattern(version, _) | Song(version) => Some(version)
+    Pattern(version, _) | Song(version, _) => Some(version)
     Text => None
   }
 }
@@ -575,12 +663,13 @@ pub fn PlaybackInput::compile(
       parse_play_source(self.input, previous~, max_query_span~).map(source => {
         Runtime(source)
       })
-    Song(_) => {
+    Song(_, origins) => {
       let source = match
         parse_play_source_with_origins(
           self.input,
           previous,
           max_query_span,
+          origins=Some(origins),
           syntax_depth_limit=Some(32),
         ) {
         Ok(source) => source
@@ -621,6 +710,8 @@ fn draft_origin_error(error : @pattern.PatternDocError) -> String {
     MissingNode(id) => "exact compilation: missing node \{id}"
     DuplicateNodeId(id) => "exact compilation: duplicate node \{id}"
     EmptyPatternDocs => "exact compilation: empty document list"
+    InvalidSequenceWeights =>
+      "exact compilation: invalid relative sequence weights"
     MissingAtomOrigin(id) =>
       "exact compilation: missing atom origin \{id.value()}"
     MissingReferenceBinding(id) =>
@@ -670,19 +761,12 @@ fn draft_parse(
   match mode {
     TrackingUnavailable => Err("source tracking exceeds 8192 UTF-16 code units")
     Disposed => Err("Draft is disposed")
-    Pattern =>
+    Pattern | Song =>
       parse_play_source_with_origins(
         input,
         previous,
         None,
         origins=Some(sources),
-        syntax_depth_limit=Some(32),
-      )
-    Song =>
-      parse_play_source_with_origins(
-        input,
-        previous,
-        None,
         syntax_depth_limit=Some(32),
       )
   }
@@ -718,7 +802,7 @@ pub fn Draft::new(input : String) -> Draft raise DraftEditError {
   let mode = draft_tracking(facts, Pattern)
   let empty = SourceMap::empty(epoch)
   let sources = match facts {
-    Some(facts) if mode == Pattern => empty.advance(facts, [])
+    Some(facts) if mode == Pattern || mode == Song => empty.advance(facts, [])
     _ => empty
   }
   let version = DraftVersion(epoch, 0L)
@@ -825,7 +909,8 @@ fn Draft::edit_checked(
     SourceMap::empty(next_draft_epoch())
   }
   let sources = match facts {
-    Some(facts) if mode == Pattern => baseline.advance(facts, edits)
+    Some(facts) if mode == Pattern || mode == Song =>
+      baseline.advance(facts, edits)
     _ => baseline
   }
   let version = DraftVersion(
@@ -892,7 +977,7 @@ pub fn Draft::prepare_playback(
   }
   let payload = match self.current.mode {
     Pattern => PlaybackPayload::Pattern(self.current.at, self.sources)
-    Song => PlaybackPayload::Song(self.current.at)
+    Song => PlaybackPayload::Song(self.current.at, self.sources)
     TrackingUnavailable =>
       return Err(
         DraftDiagnostic(
@@ -940,7 +1025,7 @@ pub fn Draft::locate_origin(
   self : Draft,
   origin : @pattern.EventOrigin,
 ) -> OriginLocation {
-  guard self.current.mode == Pattern &&
+  guard (self.current.mode == Pattern || self.current.mode == Song) &&
     origin.atom().epoch() == self.sources.epoch else {
     return Unavailable(SourceReset)
   }
@@ -969,6 +1054,67 @@ pub fn Draft::locate_origin(
     guard found else { return Unavailable(BrokenReference) }
   }
   Located(SourceRange(span), reference_ranges)
+}
+
+///|
+/// Checked scalar-wire lookup for authoring adapters. The path is flattened
+/// as reference, binding, definition serial triples in outer-to-inner order.
+pub fn Draft::locate_origin_fields(
+  self : Draft,
+  atom_epoch : Int64,
+  atom_serial : Int64,
+  path : Array[Int64],
+) -> OriginLocation {
+  guard (self.current.mode == Pattern || self.current.mode == Song) &&
+    path.length() % 3 == 0 else {
+    return Unavailable(SourceReset)
+  }
+  guard atom_epoch == self.sources.epoch.serial() else {
+    return Unavailable(SourceReset)
+  }
+  let mut atom_span : MiniSpan? = None
+  for atom in self.sources.atoms {
+    if atom.id.serial() == atom_serial {
+      atom_span = Some(atom.span)
+      break
+    }
+  }
+  guard atom_span is Some(span) else { return Unavailable(AtomRetired) }
+  let references : Array[SourceRange] = []
+  for index in 0..<(path.length() / 3) {
+    let reference_serial = path[index * 3]
+    let binding_serial = path[index * 3 + 1]
+    let definition_serial = path[index * 3 + 2]
+    let mut found = false
+    for reference in self.sources.references {
+      if reference.id.serial() == reference_serial {
+        if reference.binding is Bound(binding, definition) &&
+          binding.serial() == binding_serial &&
+          definition.serial() == definition_serial {
+          references.push(SourceRange(reference.span))
+          found = true
+        }
+        break
+      }
+    }
+    guard found else { return Unavailable(BrokenReference) }
+  }
+  Located(SourceRange(span), references)
+}
+
+///|
+/// Resolve a serialized literal-frame identity only while that exact frame is
+/// still present in the current source map.
+pub fn Draft::locate_frame_fields(
+  self : Draft,
+  frame_epoch : Int64,
+  frame_serial : Int64,
+) -> SourceRange? {
+  guard self.current.mode == Pattern || self.current.mode == Song else {
+    return None
+  }
+  guard frame_epoch == self.sources.epoch.serial() else { return None }
+  self.sources.frame_range(frame_serial)
 }
 
 ///|

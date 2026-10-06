@@ -44,7 +44,7 @@ _Avoid_: Counting one material multiple times across separate output routes or s
 The start of a musical event dispatched for playback that can be attributed to a specific source token, even when rendered with zero gain or muted. Rests and events excluded by pattern transformations (such as degradation) do not produce playback onsets.
 
 **Estimated audible onset**:
-The projected listener-time of a rendered event, calculated by adding estimated output latency to the audio render timestamp. This is an estimate for visual synchronization, not proof that the event produced audible sound.
+The projected listener-time of a rendered event, mapped from audio-context time through `getOutputTimestamp()` when available; otherwise estimated using current time and reported base/output latency. Timestamp mapping already accounts for output timing: do not add latency twice. This is a visual estimate, not proof that the listener heard the event.
 
 **Source atom**:
 The smallest authored sound, note, or chord token attributable as the origin of a playback event. A chord name is treated as a single atom even though it expands into multiple notes.
@@ -52,6 +52,9 @@ The smallest authored sound, note, or chord token attributable as the origin of 
 **Source atom identity**:
 The persistent identity of an authored atom across non-destructive edits, including offset shifts caused by edits elsewhere. Deleting and recreating an atom, including undo reinsertion, creates a new identity rather than continuing the old one.
 _Avoid_: Relying on identical spelling or string matching to establish continuity
+
+**Source frame**:
+The persistent identity of an unchanged notation literal's complete content. It anchors local onset and pitch coordinates before enclosing expression transforms or Song placement. Editing literal content retires its frame even when individual atoms survive; those atoms may remain highlighted in code without claiming that old events match the edited diagram.
 
 **Named pattern definition**:
 A particular authored declaration of a reusable pattern. Its identity is distinct from both its name's spelling and the current contents of its body.
@@ -72,7 +75,7 @@ The authored provenance chain connecting a playback material to the source atom 
 An event origin whose source atom and reference path can be traced with exact identity into the currently visible draft. An origin remains represented across partial material transitions or when unrelated syntax errors exist in the draft.
 
 **Playback highlight**:
-A brief onset indication on a represented source atom, with the traversed pattern references shown as secondary context. It reflects event execution, not the adoption of all visible draft edits, event duration, or voice lifetime.
+A held indication of the latest dispatched onset group on represented source atoms, with traversed pattern references shown as secondary context. Simultaneous notes stay lit together until the next onset across the score; rests retain the preceding indication. Pause, run changes, and tab visibility changes clear it. It reflects event execution, not adoption of all visible draft edits, event duration, or voice lifetime.
 
-**Expired onset**:
-A reported onset whose full highlight duration has already elapsed at the estimated listener-time. It represents historical activity and is dropped rather than displayed late.
+**Superseded onset**:
+A reported onset older than the latest due onset group. It is discarded rather than replayed late; delayed batches show only their newest due group.

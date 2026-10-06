@@ -72,7 +72,10 @@ pub fn parse_song_with_bpm(input : String) -> Result[ParsedSong, String] {
 }
 
 ///|
-fn Parser::parse_song_expr(self : Parser) -> ParsedSong raise ParseError {
+fn Parser::parse_song_expr(
+  self : Parser,
+  builder? : MiniDocBuilder? = None,
+) -> ParsedSong raise ParseError {
   self.skip_whitespace()
   let song_start = self.pos
   guard self.match_keyword("song(") else {
@@ -88,12 +91,12 @@ fn Parser::parse_song_expr(self : Parser) -> ParsedSong raise ParseError {
   let part_specs : Array[SongPartSpec] = []
   let fill_specs : Array[SongFillSpec] = []
   let bpm_values : Array[Double] = []
-  self.parse_song_item(sections, part_specs, fill_specs, bpm_values)
+  self.parse_song_item(sections, part_specs, fill_specs, bpm_values, builder~)
   self.skip_whitespace()
   while !self.at_end() && self.input[self.pos] == ',' {
     self.pos += 1
     self.skip_whitespace()
-    self.parse_song_item(sections, part_specs, fill_specs, bpm_values)
+    self.parse_song_item(sections, part_specs, fill_specs, bpm_values, builder~)
     self.skip_whitespace()
   }
   self.expect_char(')')
@@ -126,11 +129,12 @@ fn Parser::parse_song_item(
   part_specs : Array[SongPartSpec],
   fill_specs : Array[SongFillSpec],
   bpm_values : Array[Double],
+  builder~ : MiniDocBuilder?,
 ) -> Unit raise ParseError {
   self.skip_whitespace()
   let item_start = self.pos
   if self.match_keyword("section(") {
-    let section = self.parse_song_section(item_start)
+    let section = self.parse_song_section(item_start, builder~)
     if sections.contains(section.name()) {
       raise ParseError(
         "position \{item_start}: duplicate section '\{section.name()}'",
@@ -179,24 +183,54 @@ fn Parser::parse_song_bpm(
 fn Parser::parse_song_section(
   self : Parser,
   item_start : Int,
+  builder~ : MiniDocBuilder?,
 ) -> @song.Section[@pattern.ControlMap] raise ParseError {
   self.skip_whitespace()
   let name = self.read_quoted_string()
   self.expect_comma()
   let length_cycles = self.read_song_rational("section length")
   self.expect_comma()
-  let body = self.parse_expr()
+  let snapshot = match builder {
+    Some(builder) => {
+      let doc = self.parse_doc_expr(builder)
+      Some(
+        doc.lower_with_origins() catch {
+          _ =>
+            raise ParseError(
+              "position \{item_start}: could not compile section origins",
+            )
+        },
+      )
+    }
+    None => None
+  }
+  let body = match snapshot {
+    Some(snapshot) => snapshot.pat()
+    None => self.parse_expr()
+  }
   if self.admission is Some(admission) {
     admission.sections[name] = admission.last
   }
   self.skip_whitespace()
   self.expect_char(')')
-  @song.Section(
-    name~,
-    length_cycles~,
-    scope=@song.TimeScope::identity(),
-    body=@song.SectionBody::single(body),
-  ) catch {
+  try {
+    match snapshot {
+      Some(snapshot) =>
+        @song.Section::with_origins(
+          name~,
+          length_cycles~,
+          scope=@song.TimeScope::identity(),
+          snapshot~,
+        )
+      None =>
+        @song.Section(
+          name~,
+          length_cycles~,
+          scope=@song.TimeScope::identity(),
+          body=@song.SectionBody::single(body),
+        )
+    }
+  } catch {
     _ =>
       raise ParseError(
         "position \{item_start}: section '\{name}' requires a positive length",

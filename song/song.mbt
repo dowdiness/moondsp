@@ -505,6 +505,7 @@ fn[A] section_with_length(
     length_cycles,
     scope: section.scope(),
     body: section.section_body(),
+    source_snapshot: section.source_snapshot(),
   }
 }
 

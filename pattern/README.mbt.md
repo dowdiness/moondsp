@@ -261,15 +261,24 @@ voice scope. Returned binding arrays are defensive copies. `pat()` and
 retains it. Entry keys, periods, musical signatures, and degradation seeds never
 include source IDs.
 
+`doc.with_source_frame(frame~)` captures literal-local onset coordinates before
+enclosing transforms. It annotates the root without adding a musical graph node
+or changing node paths. Exact events expose `source_frame()`, `source_start()`,
+and `source_pitch()`; absent pitch is NaN, not `-1`, since negative numeric notes
+are valid. Local time wraps over the notation's whole-cycle repeat span.
+`EventOrigin::write_binding_serials(storage, offset, limit)` writes complete
+reference/binding/definition triples into caller-owned storage. It returns the
+binding count, or `-1` without writing if capacity, epoch, or scalar bounds fail.
+
 Document `every(id~, n~, transform~)` and `jux(id~, transform~)` accept
 `TimeTransform::Fast`, `Slow`, or `Reverse`, not pattern callbacks. Arbitrary
 callbacks remain available on raw `Pat`. Document every/jux keep their previous
 unknown-content policy and broad branch scopes.
 
-`mini.Draft::prepare_playback` now captures these witnesses in immutable input;
-compiling tracked pattern input yields an exact snapshot. This is not browser
-highlighting: editor/worklet adapters, playback observations, and UI integration
-remain separate work.
+`mini.Draft::prepare_playback` captures these witnesses in immutable input.
+Tracked Pattern input and tracked Song sections preserve them through scheduler
+dispatch. The browser maps observations back through the current Draft; this
+package owns neither DOM highlighting nor a browser clock.
 
 ## Package boundary
 

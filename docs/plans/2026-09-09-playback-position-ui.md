@@ -1,8 +1,11 @@
 # Playback position UI
 
-Status: origin-preserving compiler, Mini Draft, browser ownership/wire adapters,
-version-correlated admission, and truthful playback status implemented.
-Playback onset observations and highlighting remain future work.
+Status: historical implementation plan. Origin-preserving compilation, Mini
+Draft, browser adapters, playback status, and Pattern/Song onset highlighting
+are implemented. The current contract is
+[ADR-0018](../decisions/0018-playback-visualization-origin-truth.md):
+highlights now hold until the next onset. Earlier pulse-expiry assumptions and
+future-work descriptions below are retained as planning history, not current behavior.
 
 ## Goal
 

@@ -391,3 +391,89 @@ test "SongDoc rename reports missing occurrence before duplicate display name" {
     _ => assert_true(false)
   }
 }
+
+///|
+test "exact Song entry origins survive scoped placement but not anonymous replacement" {
+  let epoch = @identity.SourceEpoch(7001L)
+  let c = @identity.SourceAtomId(epoch, 1L)
+  let g = @identity.SourceAtomId(epoch, 2L)
+  let exact = @pattern.PatternDoc::stack(
+    id=@identity.PatternNodeId::from_string("source:stack"),
+    docs=[
+      @pattern.PatternDoc::control_atom(
+        id=@identity.PatternNodeId::from_string("source:c"),
+        source_atom=c,
+        key="note",
+        value=60.0,
+      ),
+      @pattern.PatternDoc::control_atom(
+        id=@identity.PatternNodeId::from_string("source:g"),
+        source_atom=g,
+        key="note",
+        value=67.0,
+      ),
+    ],
+  ).lower_with_origins()
+  let layer_id = song_doc_test_layer_id("layer:exact")
+  let section = @song.SectionDoc::single_with_origins(
+    id=song_doc_test_section_id("section:exact"),
+    name="Exact",
+    length_cycles=@pattern.Rational::from_int(1),
+    scope=@song.TimeScope::fast(factor=@pattern.Rational::from_int(2)),
+    layer_id~,
+    snapshot=exact,
+  )
+  let occurrence = @song.SongOccurrenceDoc::at(
+    id=song_doc_test_occurrence_id("occurrence:exact"),
+    name="Later",
+    start=@pattern.Rational::from_int(3),
+    section~,
+  )
+  let snapshot = song_doc_test_doc([occurrence]).lower()
+  let arc = @pattern.TimeSpan::new(
+    @pattern.Rational::new(13L, 4L),
+    @pattern.Rational::new(15L, 4L),
+  )
+  for index, atom in [c, g] {
+    let events = snapshot.query_sourced_events_for_entry(index, arc)
+    @debug.assert_eq(events.length(), 2)
+    for event in events {
+      guard event.source_origin() is Some(origin) else {
+        fail("scoped Song event lost exact origin")
+      }
+      assert_true(origin.atom() == atom)
+      assert_true(
+        event.event().value.get("note") ==
+        Some(if index == 0 { 60.0 } else { 67.0 }),
+      )
+    }
+    @debug.assert_eq(
+      events[0].event().whole,
+      Some(
+        @pattern.TimeSpan::new(
+          @pattern.Rational::from_int(3),
+          @pattern.Rational::new(7L, 2L),
+        ),
+      ),
+    )
+    @debug.assert_eq(
+      events[1].event().whole,
+      Some(
+        @pattern.TimeSpan::new(
+          @pattern.Rational::new(7L, 2L),
+          @pattern.Rational::from_int(4),
+        ),
+      ),
+    )
+    @debug.assert_eq(events[0].event().part.begin, arc.begin)
+    @debug.assert_eq(events[1].event().part.end_, arc.end_)
+  }
+  let replaced = section.replace_layer_body(layer_id, body=@pattern.note(72.0))
+  let anonymous = song_doc_test_doc([
+    occurrence.replace_section(section=replaced),
+  ]).lower()
+  for event in anonymous.query_sourced_events(arc) {
+    assert_true(event.source_origin() is None)
+    assert_true(event.event().value.get("note") == Some(72.0))
+  }
+}

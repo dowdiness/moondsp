@@ -140,21 +140,12 @@ fn accidental_delta(c : UInt16) -> Int? {
 }
 
 ///|
-/// Try to parse a one-digit chord octave suffix.
+/// A one-digit register, optionally zero-prefixed to distinguish C07 from C7.
 fn parse_octave_digits(s : String) -> Int? {
-  if s.length() != 1 {
-    return None
-  }
-  let mut oct = 0
-  for i in 0..<s.length() {
-    let c = s[i]
-    if c >= '0' && c <= '9' {
-      oct = oct * 10 + (c.to_int() - '0'.to_int())
-    } else {
-      return None // non-digit in octave string
-    }
-  }
-  Some(oct)
+  guard s.length() == 1 || (s.length() == 2 && s[0] == '0') else { return None }
+  let c = s[s.length() - 1]
+  guard c >= '0' && c <= '9' else { return None }
+  Some(c.to_int() - '0'.to_int())
 }
 
 ///|
@@ -187,80 +178,89 @@ priv struct ChordParts {
 }
 
 ///|
-/// After parsing the root note at position 0, try to parse the rest of the
-/// name as an accidental followed by a quality suffix and optional octave.
-/// Supports both standard (#/b) and alternate (s/f) accidental notation.
+/// After the root, resolve quality before consuming another accidental:
+/// the s in C#sus4 starts sus4, while Css uses two sharp accidentals.
 fn parse_accidental_then_quality(
   name : String,
   start_pos : Int,
   len : Int,
   default_octave : Int,
 ) -> ChordParts? {
-  if start_pos >= len {
+  guard start_pos < len else { return None }
+  guard accidental_delta(name[start_pos]) is Some(first_delta) else {
     return None
   }
-  let c = name[start_pos]
-  let first_delta = match accidental_delta(c) {
-    Some(delta) => delta
-    None => return None
-  }
-
-  let mut accidental = first_delta
-  let mut new_pos = start_pos + 1
-
-  // Double accidental? Same-direction spellings such as ##, ss, bf, or fb are
-  // accepted; mixed sharp/flat spellings such as #b and b# are rejected.
-  if new_pos < len {
-    match accidental_delta(name[new_pos]) {
-      Some(second_delta) => {
-        if first_delta != second_delta {
-          return None
-        }
-        accidental = accidental + second_delta
-        new_pos += 1
-      }
-      None => ()
+  let mut accidental = 0
+  for offset in 0..<2 {
+    let pos = start_pos + offset
+    guard pos < len else { return None }
+    guard accidental_delta(name[pos]) is Some(delta) else { return None }
+    // Same-direction double accidentals remain valid; mixed #b/b# do not.
+    guard delta == first_delta else { return None }
+    accidental += delta
+    let rest = name[pos + 1:].to_owned()
+    if rest.is_empty() {
+      return Some({ accidental, quality: major, octave: default_octave, })
     }
-  }
-
-  // Now parse quality and optional octave from the rest
-  let rest = name[new_pos:].to_owned()
-  if rest.is_empty() {
-    // Just root + accidental, no quality → major triad
-    return Some({ accidental, quality: major, octave: default_octave, })
-  }
-
-  match match_quality(rest) {
-    Some((quality, remaining)) => {
-      let octave = match parse_octave_digits(remaining) {
-        Some(oct) => oct
-        None => default_octave
-      }
+    if match_quality(rest) is Some((quality, remaining)) {
+      let octave = parse_octave_digits(remaining).unwrap_or(default_octave)
       return Some({ accidental, quality, octave, })
     }
-    None =>
-      // Not a recognized quality — try to parse rest as octave number
-      match parse_octave_digits(rest) {
-        Some(oct) => return Some({ accidental, quality: major, octave: oct, })
-        None => return None
+    if parse_octave_digits(rest) is Some(octave) {
+      return Some({ accidental, quality: major, octave, })
+    }
+  }
+  None
+}
+
+///|
+/// Parse a brace-delimited set of absolute MIDI pitches without normalizing it.
+fn parse_explicit_chord(name : String) -> Array[Int]? {
+  let len = name.length()
+  guard len >= 3 && name[0] == '{' && name[len - 1] == '}' else { return None }
+  let notes : Array[Int] = []
+  let mut pos = 1
+  let end = len - 1
+  while pos < end {
+    let mut pitch = 0
+    let digits_start = pos
+    while pos < end && name[pos] >= '0' && name[pos] <= '9' {
+      let digit = name[pos].to_int() - '0'.to_int()
+      if pitch > 12 || (pitch == 12 && digit > 7) {
+        return None
       }
+      pitch = pitch * 10 + digit
+      pos += 1
+    }
+    guard pos > digits_start else { return None }
+    if notes.length() > 0 {
+      guard pitch > notes[notes.length() - 1] else { return None }
+    }
+    notes.push(pitch)
+    if pos < end {
+      guard name[pos] == ',' else { return None }
+      pos += 1
+      guard pos < end else { return None }
+    }
+  }
+  if notes.is_empty() {
+    None
+  } else {
+    Some(notes)
   }
 }
 
 ///|
-/// Parse a chord name and return the MIDI note numbers (as Int).
+/// Parse a named chord or a brace-delimited explicit MIDI pitch set.
 ///
-/// Format: `<root><accidental?><quality?><octave?>`
-/// - root: A-G (case insensitive)
-/// - accidental: `#` or `b` (or `s`/`f` for sharp/flat)
-/// - quality: `m`, `min`, `dim`, `aug`, `+`, `maj7`, `M7`, `7`, etc.
-/// - octave: integer 0-9 (default 4)
+/// Named chord format: `<root><accidental?><quality?><octave?>`.
+/// Explicit format: `{n,n,...}` with strictly ascending MIDI pitches 0–127.
+/// Returns `None` if either form is malformed or unsupported.
 ///
 /// Quality is matched with longest-prefix semantics on the suffix
 /// AFTER any accidental. Quality-only names like "Esus4" are matched
 /// directly without accidental parsing (the 's' starts "sus4", not a sharp).
 ///
-/// Returns `None` if the chord name cannot be parsed.
 pub fn parse_chord(name : String) -> Array[Int]? {
   parse_chord_with_default_octave(name, 4)
 }
@@ -270,6 +270,9 @@ fn parse_chord_with_default_octave(
   name : String,
   default_octave : Int,
 ) -> Array[Int]? {
+  if !name.is_empty() && name[0] == '{' {
+    return parse_explicit_chord(name)
+  }
   let len = name.length()
   if len < 1 {
     return None

@@ -89,6 +89,16 @@ pub fn init_scheduler_graph(Double, Int) -> Bool
 
 pub fn player_mode() -> PlaybackMode
 
+pub fn player_onset_clear() -> Unit
+
+pub fn player_onset_count() -> Int
+
+pub fn player_onset_dropped() -> Double
+
+pub fn player_onset_enable(Int) -> Unit
+
+pub fn player_onset_field(Int, Int) -> Double
+
 pub fn player_pause() -> Int
 
 pub fn player_pending_count() -> Int
@@ -242,6 +252,11 @@ player_play
 player_pause
 player_state
 player_mode
+player_onset_enable
+player_onset_count
+player_onset_field
+player_onset_clear
+player_onset_dropped
 player_pending_count
 player_skipped_count
 get_playback_error
@@ -319,6 +334,11 @@ player_play
 player_pause
 player_state
 player_mode
+player_onset_enable
+player_onset_count
+player_onset_field
+player_onset_clear
+player_onset_dropped
 player_pending_count
 player_skipped_count
 get_playback_error

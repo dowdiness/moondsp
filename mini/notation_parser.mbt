@@ -36,16 +36,92 @@ fn parse_chord_notation(
 }
 
 ///|
+priv struct NotationProjectionModifier {
+  kind : String
+  from : Int
+  to : Int
+  value : Double
+  args : Array[Int]
+}
+
+///|
+priv struct NotationProjectionNode {
+  kind : String
+  from : Int
+  base_to : Int
+  mut end : Int
+  value : String
+  mut parent : Int?
+  children : Array[Int]
+  mut weight : Int
+  modifiers : Array[NotationProjectionModifier]
+}
+
+///|
+fn NotationParser::projection_node(
+  self : NotationParser,
+  kind : String,
+  from : Int,
+  base_to : Int,
+  value : String,
+  children : Array[Int],
+) -> Int raise ParseError {
+  guard self.projection_nodes is Some(nodes) else { return -1 }
+  guard nodes.length() < 256 else {
+    raise ParseError("notation projection exceeds 256 source nodes")
+  }
+  let index = nodes.length()
+  for child in children {
+    nodes[child].parent = Some(index)
+  }
+  nodes.push({
+    kind,
+    from,
+    base_to,
+    end: base_to,
+    value,
+    parent: None,
+    children,
+    weight: 1,
+    modifiers: [],
+  })
+  index
+}
+
+///|
+fn NotationParser::projection_modifier(
+  self : NotationParser,
+  node : Int?,
+  kind : String,
+  from : Int,
+  to : Int,
+  value : Double,
+  args : Array[Int],
+) -> Unit {
+  match (self.projection_nodes, node) {
+    (Some(nodes), Some(index)) => {
+      nodes[index].modifiers.push({ kind, from, to, value, args, })
+      nodes[index].end = to
+    }
+    _ => ()
+  }
+}
+
+///|
 /// Sub-parser for the notation content inside quotes.
 priv struct NotationParser {
   input : String
   mut pos : Int
-  sound : Bool // true = drum names, false = note numbers
-  chord : Bool // true = chord names (stacked notes per name)
+  sound : Bool
+  chord : Bool
   source_offset : Int
   mut query_work : MiniQueryWork?
   recognized_atoms : Array[RecognizedAtom]?
   mut depth : Int
+  mut projection_nodes : Array[NotationProjectionNode]?
+  mut projection_root : Int?
+  mut last_modifier_value : Int
+  mut last_euclid_args : Array[Int]
 }
 
 ///|
@@ -66,6 +142,10 @@ fn NotationParser::NotationParser(
     source_offset,
     recognized_atoms,
     depth: 0,
+    projection_nodes: None,
+    projection_root: None,
+    last_modifier_value: 0,
+    last_euclid_args: [],
     query_work: if assess {
       Some(Atom)
     } else {
@@ -93,14 +173,21 @@ fn NotationParser::parse_notation(
 ) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
   let first = self.parse_layer()
   let layers : Array[@pattern.Pat[@pattern.ControlMap]] = [first]
+  let layer_roots : Array[Int] = match self.projection_root {
+    Some(index) => [index]
+    None => []
+  }
   let costs : Array[MiniQueryWork]? = self.query_work.map(_ => [])
   if self.query_work is Some(cost) {
     costs.unwrap().push(cost)
   }
   while !self.at_end() && self.input[self.pos] == ',' {
-    self.pos += 1 // consume ','
+    self.pos += 1
     self.skip_spaces()
     layers.push(self.parse_layer())
+    if self.projection_root is Some(index) {
+      layer_roots.push(index)
+    }
     if self.query_work is Some(cost) {
       costs.unwrap().push(cost)
     }
@@ -115,6 +202,12 @@ fn NotationParser::parse_notation(
     )
     return @pattern.Pat::silence()
   }
+  if layer_roots.length() > 1 {
+    let from = self.projection_nodes.unwrap()[layer_roots[0]].from
+    self.projection_root = Some(
+      self.projection_node("parallel", from, self.pos, "", layer_roots),
+    )
+  }
   if layers.length() == 1 {
     layers[0]
   } else {
@@ -128,14 +221,33 @@ fn NotationParser::parse_layer(
   self : NotationParser,
 ) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
   self.skip_spaces()
+  let layer_start = self.pos
   let elements : Array[@pattern.Pat[@pattern.ControlMap]] = []
+  let weights : Array[Int] = []
+  let child_nodes : Array[Int] = []
   let costs : Array[MiniQueryWork]? = self.query_work.map(_ => [])
+  let mut total_weight = 0
+  let mut weighted = false
   while !self.at_end() &&
         self.input[self.pos] != ',' &&
         self.input[self.pos] != ']' {
-    elements.push(self.parse_element())
+    let (element, weight, node) = self.parse_element()
+    elements.push(element)
+    weights.push(weight)
+    if node is Some(index) {
+      child_nodes.push(index)
+      self.projection_nodes.unwrap()[index].weight = weight
+    }
+    total_weight += weight
+    weighted = weighted || weight != 1
+    guard !weighted || total_weight <= 256 else {
+      raise ParseError("relative duration sum must not exceed 256")
+    }
     if self.query_work is Some(cost) {
       costs.unwrap().push(cost)
+      for _ in 1..<weight {
+        costs.unwrap().push(Quiet)
+      }
     }
     self.require_element_boundary()
     self.skip_spaces()
@@ -155,77 +267,182 @@ fn NotationParser::parse_layer(
     )
     return @pattern.Pat::silence()
   }
-  if elements.length() == 1 {
-    elements[0]
-  } else {
-    @pattern.sequence(elements)
+  if child_nodes.length() == 1 && !weighted {
+    self.projection_root = Some(child_nodes[0])
+  } else if !child_nodes.is_empty() {
+    self.projection_root = Some(
+      self.projection_node("sequence", layer_start, self.pos, "", child_nodes),
+    )
   }
+  if !weighted {
+    return if elements.length() == 1 {
+      elements[0]
+    } else {
+      @pattern.sequence(elements)
+    }
+  }
+  @pattern.sequence_weighted(elements, weights)
 }
 
 ///|
-/// Parse an element: (atom | "[" notation "]") postfix*
-/// where postfix = euclid | "*" int | "/" int
-/// and   euclid  = "(" int "," int ("," int)? ")"
+const RELATIVE_DURATION_WEIGHT_LIMIT : Int = 16
+
+///|
+fn NotationParser::read_relative_duration(
+  self : NotationParser,
+) -> Int raise ParseError {
+  let at_pos = self.pos
+  self.pos += 1
+  let digits_start = self.pos
+  let mut weight = 0
+  while !self.at_end() &&
+        self.input[self.pos] >= '0' &&
+        self.input[self.pos] <= '9' {
+    weight = if weight > RELATIVE_DURATION_WEIGHT_LIMIT {
+      weight
+    } else {
+      weight * 10 + self.input[self.pos].to_int() - '0'.to_int()
+    }
+    self.pos += 1
+  }
+  guard self.pos > digits_start &&
+    weight > 0 &&
+    weight <= RELATIVE_DURATION_WEIGHT_LIMIT else {
+    raise ParseError(
+      "position \{at_pos}: '@' requires a positive integer from 1 to 16",
+    )
+  }
+  weight
+}
+
+///|
 fn NotationParser::parse_element(
   self : NotationParser,
-) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
-  guard self.recognized_atoms is None || self.depth < 32 else {
+) -> (@pattern.Pat[@pattern.ControlMap], Int, Int?) raise ParseError {
+  guard (self.recognized_atoms is None && self.projection_nodes is None) ||
+    self.depth < 32 else {
     raise ParseError("source exceeds notation nesting depth 32")
   }
   self.skip_spaces()
   guard !self.at_end() else {
     raise ParseError("position \{self.pos}: unexpected end of notation")
   }
+  let start = self.pos
+  let mut source_node : Int? = None
   let base = if self.input[self.pos] == '[' {
-    self.pos += 1 // consume '['
+    self.pos += 1
     self.depth += 1
     let inner = self.parse_notation()
+    let inner_node = self.projection_root
     self.depth -= 1
     guard !self.at_end() && self.input[self.pos] == ']' else {
       raise ParseError("position \{self.pos}: expected ']'")
     }
-    self.pos += 1 // consume ']'
+    self.pos += 1
+    if self.projection_nodes is Some(_) {
+      source_node = Some(
+        self.projection_node(
+          "group",
+          start,
+          self.pos,
+          "",
+          match inner_node {
+            Some(index) => [index]
+            None => []
+          },
+        ),
+      )
+    }
     inner
   } else {
-    self.parse_atom()
+    let atom = self.parse_atom()
+    if self.projection_nodes is Some(_) {
+      source_node = Some(
+        self.projection_node(
+          "atom",
+          start,
+          self.pos,
+          self.input[start:self.pos].to_owned(),
+          [],
+        ),
+      )
+    }
+    atom
   }
-  // Apply zero or more postfix modifiers in left-to-right order.
   let mut pat = base
+  let mut weight = 1
   let mut applied = true
   while applied {
     applied = false
     if !self.at_end() {
       let c = self.input[self.pos]
       if c == '(' {
+        let modifier_start = self.pos
         pat = self.maybe_apply_euclid(pat)
+        if self.pos > modifier_start {
+          self.projection_modifier(
+            source_node,
+            "euclid",
+            modifier_start,
+            self.pos,
+            self.last_euclid_args[0].to_double(),
+            self.last_euclid_args,
+          )
+        }
         applied = true
       } else if c == '*' {
+        let modifier_start = self.pos
         pat = self.apply_replicate(pat)
+        self.projection_modifier(
+          source_node,
+          "repeat",
+          modifier_start,
+          self.pos,
+          self.last_modifier_value.to_double(),
+          [],
+        )
         applied = true
       } else if c == '/' {
+        let modifier_start = self.pos
         pat = self.apply_step_slow(pat)
+        self.projection_modifier(
+          source_node,
+          "slow",
+          modifier_start,
+          self.pos,
+          self.last_modifier_value.to_double(),
+          [],
+        )
         applied = true
       } else if c == '?' {
-        // Per-occurrence seed from source position so adjacent `?` elements
-        // hash independently — sequence places each inner pattern at the
-        // same local arc, so a fixed seed would drop them in lockstep.
         let salt = self.pos
-        self.pos += 1 // consume '?'
+        self.pos += 1
         if self.query_work is Some(cost) {
           self.query_work = Some(MapEvents(cost))
         } else {
           pat = pat.degrade_by(0.5, seed=salt)
         }
+        self.projection_modifier(source_node, "degrade", salt, self.pos, 0.5, [])
+        applied = true
+      } else if c == '@' {
+        let modifier_start = self.pos
+        weight = self.read_relative_duration()
+        self.projection_modifier(
+          source_node,
+          "weight",
+          modifier_start,
+          self.pos,
+          weight.to_double(),
+          [],
+        )
         applied = true
       }
     }
-    // Validate construction prefixes too: a later silent Euclid must not hide
-    // an overflowing time factor or an excessively deep modifier chain.
     if self.query_work is Some(cost) {
       cost.check(0.0)
     }
   }
-  pat
+  (pat, weight, source_node)
 }
 
 ///|
@@ -256,6 +473,7 @@ fn NotationParser::apply_replicate(
       "position \{op_pos}: '*' requires a positive integer, got \{n}",
     )
   }
+  self.last_modifier_value = n
   if self.query_work is Some(cost) {
     self.query_work = Some(
       Precision(Accelerate(cost, n.to_double()), n.to_double()),
@@ -279,6 +497,7 @@ fn NotationParser::apply_step_slow(
       "position \{op_pos}: '/' requires a positive integer, got \{n}",
     )
   }
+  self.last_modifier_value = n
   if self.query_work is Some(cost) {
     self.query_work = Some(
       Precision(Accelerate(cost, 1.0 / n.to_double()), n.to_double()),
@@ -320,6 +539,7 @@ fn NotationParser::maybe_apply_euclid(
     raise ParseError("position \{self.pos}: expected ')' to close euclid")
   }
   self.pos += 1 // consume ')'
+  self.last_euclid_args = [k, n, rotation]
   if self.query_work is Some(cost) {
     guard n <= 128 else {
       raise ParseError("playback Euclidean rhythm exceeds 128 steps")
@@ -376,7 +596,7 @@ fn NotationParser::read_int_signed(
 
 ///|
 /// Parse an atom: `~` for a rest; otherwise an identifier in sound mode, a
-/// number or note name in note mode, or a chord name in chord mode.
+/// number or note name in note mode, or a named/explicit chord in chord mode.
 fn NotationParser::parse_atom(
   self : NotationParser,
 ) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
@@ -386,7 +606,7 @@ fn NotationParser::parse_atom(
     let complete = self.at_end() ||
       mini_is_space(self.input[self.pos]) ||
       (match self.input[self.pos] {
-        ',' | ']' | '(' | '*' | '/' | '?' => true
+        ',' | ']' | '(' | '*' | '/' | '?' | '@' => true
         _ => false
       })
     if complete {
@@ -436,7 +656,6 @@ fn NotationParser::parse_atom_value(
       None => raise ParseError("position \{start}: unknown drum name '\{name}'")
     }
   } else if self.chord {
-    // Read chord name (including accidentals like #, b)
     let name = self.read_chord_name_text()
     guard !name.is_empty() else {
       raise ParseError("position \{start}: expected chord name")
@@ -460,6 +679,19 @@ fn NotationParser::parse_atom_value(
       pat => pat
     }
   }
+}
+
+///|
+/// Read through a closing brace so malformed contents are rejected as one atom.
+fn NotationParser::read_explicit_chord_text(self : NotationParser) -> String {
+  let start = self.pos
+  while !self.at_end() && self.input[self.pos] != '}' {
+    self.pos += 1
+  }
+  if !self.at_end() {
+    self.pos += 1
+  }
+  self.input[start:self.pos].to_owned()
 }
 
 ///|
@@ -519,10 +751,12 @@ fn NotationParser::read_note_name_text(self : NotationParser) -> String {
 }
 
 ///|
-/// Read a chord name text: letter (A-G) + optional accidental (#/s/b/f)
-/// + quality suffix (alphanumeric, +, ø) + optional octave digits.
-/// Unlike read_ident(), this includes accidentals which are not alphanumeric.
+/// Read a named chord or a complete brace-delimited MIDI pitch set.
+/// Shared by pattern parsing, work assessment, and source-origin document parsing.
 fn NotationParser::read_chord_name_text(self : NotationParser) -> String {
+  if !self.at_end() && self.input[self.pos] == '{' {
+    return self.read_explicit_chord_text()
+  }
   let start = self.pos
   // Read root note letter (must start with A-G)
   if !self.at_end() {

@@ -51,6 +51,16 @@ pub struct ControlMapper {
 #alias(new)
 pub fn ControlMapper::ControlMapper(transform~ : (String, Double) -> (String, Double)?, voice_action~ : (String, Double) -> VoiceAction?) -> Self
 
+pub struct OnsetBuffer {
+  // private fields
+}
+pub fn OnsetBuffer::clear(Self) -> Unit
+pub fn OnsetBuffer::count(Self) -> Int
+pub fn OnsetBuffer::dropped(Self) -> Double
+pub fn OnsetBuffer::enable(Self, Bool) -> Unit
+pub fn OnsetBuffer::field(Self, Int, Int) -> Double
+pub fn OnsetBuffer::new() -> Self
+
 pub struct PatternScheduler {
   // private fields
 }
@@ -59,6 +69,7 @@ pub fn PatternScheduler::accepted_snapshot(Self) -> PlaybackSnapshot?
 pub fn PatternScheduler::active_note_count(Self) -> Int
 pub fn PatternScheduler::apply_pattern_voice_effect_result(Self, PatternVoiceScope, ActiveVoiceEffect, @voice.BoundVoicePool) -> Result[ActiveVoiceEffectOutcome, @voice.VoiceControlError]
 pub fn PatternScheduler::apply_song_voice_effect_result(Self, SongVoiceScope, ActiveVoiceEffect, @voice.BoundVoicePool) -> Result[ActiveVoiceEffectOutcome, @voice.VoiceControlError]
+pub fn PatternScheduler::attach_onset_buffer(Self, OnsetBuffer) -> Unit
 pub fn PatternScheduler::bpm(Self) -> Double
 pub fn PatternScheduler::current_block(Self) -> Result[BlockFrame, @transport.TransportError]
 pub fn PatternScheduler::cycle_position(Self) -> Double

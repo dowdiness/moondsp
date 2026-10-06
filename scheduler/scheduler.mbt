@@ -83,6 +83,7 @@ pub struct PatternScheduler {
   priv active_notes : @voice_runtime.ActiveNotes
   priv mapper : ControlMapper
   priv playback_state : @playback.PlaybackState
+  priv mut onsets : OnsetBuffer?
 }
 
 ///|
@@ -118,6 +119,7 @@ pub fn PatternScheduler::new(
     active_notes: @voice_runtime.ActiveNotes(),
     mapper: mapper.unwrap_or(default_control_mapper()),
     playback_state: @playback.PlaybackState(),
+    onsets: None,
   })
 }
 
@@ -174,6 +176,11 @@ fn PatternScheduler::process_single_event(
   self : PatternScheduler,
   event : @pattern.Event[@pattern.ControlMap],
   origin : @model.VoiceOrigin,
+  source_origin : @pattern.EventOrigin?,
+  source_frame : @identity.SourceFrameId?,
+  source_start : Double,
+  source_pitch : Double,
+  onset_sample : Int64,
   arc : @pattern.TimeSpan,
   pool : @moondsp.BoundVoicePool,
 ) -> Unit {
@@ -233,6 +240,15 @@ fn PatternScheduler::process_single_event(
               end_sample~,
               musical_end?,
             )
+            if onset_sample >= 0L && self.onsets is Some(buffer) {
+              buffer.record(
+                onset_sample,
+                source_origin,
+                source_frame~,
+                source_start~,
+                source_pitch~,
+              )
+            }
             for action in actions {
               match action {
                 SetPan(pan) => ignore(pool.set_voice_pan_result(handle, pan))
@@ -258,7 +274,17 @@ fn PatternScheduler::process_events_with_origin(
     events.sort_by(fn(a, b) { @voice_runtime.compare_event_onset(a, b) })
   }
   for event in events {
-    self.process_single_event(event, origin, arc, pool)
+    self.process_single_event(
+      event,
+      origin,
+      None,
+      None,
+      -1.0,
+      -1.0,
+      -1L,
+      arc,
+      pool,
+    )
   }
 }
 
@@ -360,6 +386,11 @@ fn PatternScheduler::process_block_events(
           self.process_single_event(
             event,
             sourced.origin(),
+            sourced.source_origin(),
+            sourced.source_frame(),
+            sourced.source_start(),
+            sourced.source_pitch(),
+            frame.sample_begin,
             @pattern.TimeSpan::new(whole.begin, whole.end_),
             pool,
           )
@@ -395,6 +426,11 @@ fn PatternScheduler::process_block_events(
       self.process_single_event(
         event,
         sourced.origin(),
+        sourced.source_origin(),
+        sourced.source_frame(),
+        sourced.source_start(),
+        sourced.source_pitch(),
+        start,
         frame.logical_arc,
         pool,
       )

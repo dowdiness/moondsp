@@ -20,6 +20,20 @@ fn RecognizedAtom::RecognizedAtom(
 }
 
 ///|
+priv struct RecognizedLiteral {
+  kind : String
+  span : MiniSpan
+}
+
+///|
+fn RecognizedLiteral::RecognizedLiteral(
+  kind : String,
+  span : MiniSpan,
+) -> RecognizedLiteral {
+  { kind, span, }
+}
+
+///|
 priv struct RecognizedDefinition {
   name : String
   span : MiniSpan
@@ -60,6 +74,7 @@ priv enum MiniSourceMode {
 ///|
 priv struct SourceRecognition {
   atoms : Array[RecognizedAtom]
+  literals : Array[RecognizedLiteral]
   definitions : Array[RecognizedDefinition]
   references : Array[RecognizedReference]
   mode : MiniSourceMode?
@@ -68,11 +83,12 @@ priv struct SourceRecognition {
 ///|
 fn SourceRecognition::SourceRecognition(
   atoms : Array[RecognizedAtom],
+  literals : Array[RecognizedLiteral],
   definitions : Array[RecognizedDefinition],
   references : Array[RecognizedReference],
   mode : MiniSourceMode?,
 ) -> SourceRecognition {
-  { atoms, definitions, references, mode, }
+  { atoms, literals, definitions, references, mode, }
 }
 
 ///|
@@ -102,6 +118,18 @@ fn Parser::record_literal_fact(
   content_start : Int,
 ) -> Unit {
   guard !(kind is Silence) else { return }
+  let kind_name = match kind {
+    Sound => "drum"
+    Note => "note"
+    Chord => "chord"
+    Silence => "silence"
+  }
+  self.recognized_literals.push(
+    RecognizedLiteral(kind_name, {
+      start: content_start,
+      end: content_start + content.length(),
+    }),
+  )
   let parser = NotationParser::new(
     content,
     sound=kind is Sound,
@@ -200,6 +228,71 @@ fn recognize_expression(
 }
 
 ///|
+/// Recognize section-body literals and name uses independently of layout.
+/// A damaged section does not hide later complete section bodies.
+fn Parser::recognize_song_sections(
+  self : Parser,
+  scope_opaque : Bool,
+  references : Array[RecognizedReference],
+) -> Unit {
+  let mut cursor = 0
+  while cursor < self.input.length() {
+    if self.input[cursor] == '"' {
+      cursor += 1
+      while cursor < self.input.length() && self.input[cursor] != '"' {
+        cursor += 1
+      }
+      if cursor < self.input.length() {
+        cursor += 1
+      }
+    } else if mini_comment_end(self.input, cursor) is Some(end_) {
+      cursor = end_
+    } else if cursor + 1 < self.input.length() &&
+      self.input[cursor] == '/' &&
+      self.input[cursor + 1] == '*' {
+      break
+    } else {
+      self.pos = cursor
+      if self.match_keyword("section(") {
+        let first_reference = self.recognized_references.length()
+        let body_start = try {
+          self.skip_whitespace()
+          ignore(self.read_quoted_string())
+          self.skip_whitespace()
+          self.expect_char(',')
+          self.skip_whitespace()
+          ignore(self.read_song_rational("section length"))
+          self.skip_whitespace()
+          self.expect_char(',')
+          self.skip_whitespace()
+          self.pos
+        } catch {
+          ParseError(_) => cursor + 1
+        }
+        if body_start > cursor + 1 {
+          self.pos = body_start
+          try self.parse_syntax_expr() catch {
+            ParseError(_) => ()
+          } noraise {
+            _ => ()
+          }
+          for reference in self.recognized_references[first_reference:] {
+            references.push(
+              RecognizedReference(reference.name, reference.span, scope_opaque),
+            )
+          }
+          cursor = if self.pos > body_start { self.pos } else { body_start + 1 }
+        } else {
+          cursor += 1
+        }
+      } else {
+        cursor += 1
+      }
+    }
+  }
+}
+
+///|
 fn recognize_mini_source(input : String) -> SourceRecognition {
   let parser = Parser::new(input, syntax_depth_limit=Some(32))
   parser.recognition = true
@@ -268,6 +361,7 @@ fn recognize_mini_source(input : String) -> SourceRecognition {
         parser.pos = start
         if parser.match_keyword("song(") {
           mode = Some(Song)
+          parser.recognize_song_sections(scope_opaque, references)
           break
         }
         parser.pos = start
@@ -298,5 +392,11 @@ fn recognize_mini_source(input : String) -> SourceRecognition {
       }
     }
   }
-  SourceRecognition(parser.recognized_atoms, definitions, references, mode)
+  SourceRecognition(
+    parser.recognized_atoms,
+    parser.recognized_literals,
+    definitions,
+    references,
+    mode,
+  )
 }
