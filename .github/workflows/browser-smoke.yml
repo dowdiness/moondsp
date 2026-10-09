@@ -8,6 +8,8 @@ on:
 
 env:
   NEW_MOON_MOD: '0'
+  NPM_VERSION: '11.19.0'
+  NPM_CONFIG_STRICT_ALLOW_SCRIPTS: 'true'
 
 jobs:
   browser-smoke:
@@ -23,6 +25,11 @@ jobs:
         with:
           node-version: 22
           cache: npm
+
+      - name: Set up npm
+        run: |
+          npm install --global "npm@$NPM_VERSION"
+          npm --version
 
       - name: Set up MoonBit
         run: |
@@ -76,6 +83,11 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: web/live/package-lock.json
+
+      - name: Set up npm
+        run: |
+          npm install --global "npm@$NPM_VERSION"
+          npm --version
 
       - name: Set up MoonBit
         run: |

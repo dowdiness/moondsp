@@ -296,7 +296,8 @@ separate gate.
 
 ## Development
 
-Use Node.js 22.12+ (22.x) or a newer LTS release for browser tooling.
+Use Node.js 22.12+ (22.x) or a newer LTS release and npm 11.19.0 for browser tooling.
+CI uses `strict-allow-scripts` to reject dependency install scripts not covered by `allowScripts`.
 
 ```bash
 # Type-check all targets with warnings denied
@@ -316,6 +317,7 @@ NEW_MOON_MOD=0 moon info && NEW_MOON_MOD=0 moon fmt
 NEW_MOON_MOD=0 moon bench graph/graph_benchmark.mbt --release
 
 # Install browser verification tools and Chromium
+npm install --global npm@11.19.0
 npm ci
 npm --prefix web/live ci
 npx playwright install chromium
