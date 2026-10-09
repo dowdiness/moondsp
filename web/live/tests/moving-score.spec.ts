@@ -272,11 +272,20 @@ test("Escape cancels a pending rest click without changing source", async ({ pag
   await page.goto("/");
   const source = 'note("C4 ~@2 D4").gain(0.2)';
   await replaceCode(page, source);
-  const slot = (await page.locator(".moving-score__rest-hit").boundingBox())!;
-  const row = (await page.locator('.moving-score__lane[data-pitch="65"]').boundingBox())!;
-  await page.mouse.move(slot.x + slot.width / 2, row.y + row.height / 2);
+  const geometry = await page.waitForFunction(() => {
+    const slot = document.querySelector(".moving-score__rest-hit")?.getBoundingClientRect();
+    const row = document.querySelector('.moving-score__lane[data-pitch="65"]')?.getBoundingClientRect();
+    if (!slot?.width || !slot.height || !row?.height) return null;
+    return { x: slot.x + slot.width / 2, y: row.y + row.height / 2 };
+  });
+  const point = (await geometry.jsonValue())!;
+  await geometry.dispose();
+  await page.mouse.move(point.x, point.y);
   await page.mouse.down();
+  const preview = page.locator(".moving-score__preview-block");
+  await expect(preview).toBeVisible();
   await page.keyboard.press("Escape");
+  await expect(preview).toBeHidden();
   await page.mouse.up();
   expect(await readCode(page)).toBe(source);
 });
