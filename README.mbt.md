@@ -296,6 +296,8 @@ separate gate.
 
 ## Development
 
+Use Node.js 22.12+ (22.x) or a newer LTS release for browser tooling.
+
 ```bash
 # Type-check all targets with warnings denied
 NEW_MOON_MOD=0 moon check --target all --deny-warn
