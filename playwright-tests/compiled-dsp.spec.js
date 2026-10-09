@@ -52,12 +52,6 @@ async function telemetryHistory(page) {
   return page.evaluate(() => window.__moondspTelemetryHistory);
 }
 
-async function clearTelemetryHistory(page) {
-  await page.evaluate(() => {
-    window.__moondspTelemetryHistory = [];
-  });
-}
-
 function previewEnergy(samples) {
   return samples.reduce((sum, sample) => sum + Math.abs(sample), 0);
 }
@@ -70,18 +64,62 @@ function previewVariation(samples) {
   return total;
 }
 
-function average(values) {
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function averagePreviewVariation(telemetrySamples) {
-  return average(telemetrySamples.map(t => previewVariation(t.leftPreview)));
-}
-
-function matchingCutoffTelemetry(history, cutoff) {
-  return history.filter(t =>
-    Math.abs(t.cutoff - cutoff) < 0.000001 && previewEnergy(t.leftPreview) > 0.01,
-  );
+async function captureSettledCutoffRms(page) {
+  await page.addInitScript(() => {
+    const addModule = AudioWorklet.prototype.addModule;
+    AudioWorklet.prototype.addModule = async function (url, options) {
+      const wrapper = URL.createObjectURL(new Blob([`
+        const register = globalThis.registerProcessor;
+        globalThis.registerProcessor = (name, Processor) => {
+          register(name, class extends Processor {
+            process(inputs, outputs) {
+              const result = super.process(inputs, outputs);
+              if (!this.ready) return result;
+              if (this.cutoffCapture?.cutoff !== this.cutoff) {
+                this.cutoffCapture = { cutoff: this.cutoff, frames: 0, sum: 0, sumSquares: 0 };
+              }
+              const capture = this.cutoffCapture;
+              if (capture.frames === 2 * sampleRate) return result;
+              // Discard one second of settling, then measure one second of PCM.
+              for (const sample of outputs[0][0]) {
+                if (capture.frames++ < sampleRate) continue;
+                capture.sum += sample;
+                capture.sumSquares += sample * sample;
+                if (capture.frames === 2 * sampleRate) {
+                  const mean = capture.sum / sampleRate;
+                  this.port.postMessage({
+                    type: 'test-cutoff-rms',
+                    cutoff: capture.cutoff,
+                    rms: Math.sqrt(capture.sumSquares / sampleRate - mean * mean),
+                  });
+                  break;
+                }
+              }
+              return result;
+            }
+          });
+        };
+      `], { type: 'application/javascript' }));
+      try {
+        await addModule.call(this, wrapper);
+      } finally {
+        URL.revokeObjectURL(wrapper);
+      }
+      return addModule.call(this, url, options);
+    };
+    window.__settledCutoffRms = {};
+    const NativeNode = window.AudioWorkletNode;
+    window.AudioWorkletNode = class extends NativeNode {
+      constructor(...args) {
+        super(...args);
+        this.port.addEventListener('message', ({ data }) => {
+          if (data.type === 'test-cutoff-rms') {
+            window.__settledCutoffRms[data.cutoff] = data.rms;
+          }
+        });
+      }
+    };
+  });
 }
 
 function hotSwapExpectedSample(index) {
@@ -275,7 +313,8 @@ test('browser demo first render proves StereoDelay startup offset on feedback gr
   expect(delayedRightEnergy).toBeLessThan(0.000000001);
 });
 
-test('browser demo retunes stereo feedback gain and reacts to pan', async ({ page }) => {
+test('browser demo retunes gain, cutoff and pan in the rendered audio', async ({ page }) => {
+  await captureSettledCutoffRms(page);
   await startAudio(page, '/');
   await expect
     .poll(async () => (await currentTelemetry(page))?.sequence || 0, { timeout: 10_000 })
@@ -331,45 +370,19 @@ test('browser demo retunes stereo feedback gain and reacts to pan', async ({ pag
     }, { timeout: 10_000 })
     .toBeLessThan(0.000001);
 
-  // Compare cutoff response over a window of telemetry blocks. A single
-  // 8-sample preview is phase-dependent; averaging several matching blocks
-  // keeps the smoke test about the control response, not the exact phase the
-  // worker happened to report on a loaded runner.
-  await clearTelemetryHistory(page);
-  await setRangeValue(page, '#cutoffSlider', 180);
-  await expect(page.locator('#cutoffValue')).toHaveText('180');
-  let lowCutoffTelemetry = [];
-  await expect
-    .poll(async () => {
-      lowCutoffTelemetry = matchingCutoffTelemetry(
-        await telemetryHistory(page),
-        180,
-      );
-      return lowCutoffTelemetry.length;
-    }, { timeout: 10_000 })
-    .toBeGreaterThanOrEqual(4);
-  const lowCutoffVariation = averagePreviewVariation(lowCutoffTelemetry);
-
-  await clearTelemetryHistory(page);
-  await setRangeValue(page, '#cutoffSlider', 4000);
-  await expect(page.locator('#cutoffValue')).toHaveText('4000');
-  let highCutoffTelemetry = [];
-  await expect
-    .poll(async () => {
-      highCutoffTelemetry = matchingCutoffTelemetry(
-        await telemetryHistory(page),
-        4000,
-      );
-      if (highCutoffTelemetry.length < 4) {
-        return -1;
-      }
-      return averagePreviewVariation(highCutoffTelemetry) - lowCutoffVariation;
-    }, { timeout: 10_000 })
-    .toBeGreaterThan(0.0005);
-  const highCutoffVariation = averagePreviewVariation(highCutoffTelemetry);
-
-  expect(average(lowCutoffTelemetry.map(t => previewEnergy(t.leftPreview)))).toBeGreaterThan(0.01);
-  expect(highCutoffVariation).toBeGreaterThan(lowCutoffVariation);
+  const cutoffRms = [];
+  for (const cutoff of [180, 4000]) {
+    await setRangeValue(page, '#cutoffSlider', cutoff);
+    await expect(page.locator('#cutoffValue')).toHaveText(String(cutoff));
+    let rms;
+    await expect.poll(async () => {
+      rms = await page.evaluate(value => window.__settledCutoffRms[value], cutoff);
+      return rms;
+    }, { timeout: 10_000 }).toBeGreaterThan(0.001);
+    cutoffRms.push(rms);
+  }
+  const [lowCutoffRms, highCutoffRms] = cutoffRms;
+  expect(highCutoffRms).toBeGreaterThan(5 * lowCutoffRms);
 
   await setRangeValue(page, '#panSlider', -100);
   await expect(page.locator('#panValue')).toHaveText('L100');

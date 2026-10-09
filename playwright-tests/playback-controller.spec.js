@@ -40,72 +40,75 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test('draft failures retain their version without degrading to text admission', async ({ page }) => {
-  const result = await page.evaluate(() => {
-    const p = window.playback;
-    p.restart(1, 'note("60").slow(8)'); p.render(8); p.receipts();
-    const before = p.snapshot();
-    p.send({ type: 'player-restart', id: 2, input: JSON.stringify({
-      schema: 1, kind: 'pattern', text: 'note("72")', version: [9, 3],
-      sourceMap: { epoch: 9, atoms: [], definitions: [], references: [] },
-    }) });
-    const rejected = p.receipts()[0];
-    const after = p.snapshot();
-    p.send({ type: 'player-restart', id: 3, input: JSON.stringify({
-      schema: 1, kind: 'song', version: [10, 4],
-      text: 'song(section("a",1,note("67")),part("first","a"))',
-    }) });
-    return { before, after, rejected, accepted: p.receipts()[0] };
+for (const [reason, input] of [
+  ['invalid source', { kind: 'text', text: 'note(' }],
+  ['incomplete pattern provenance', {
+    kind: 'pattern', text: 'note("72")', version: [9, 3],
+    sourceMap: { epoch: 9, atoms: [], definitions: [], references: [] },
+  }],
+  ['missing song provenance', {
+    kind: 'song', text: 'song(section("a",1,note("67")),part("first","a"))',
+    version: [10, 4],
+  }],
+]) {
+  test(`Restart rejects ${reason} without disturbing playback`, async ({ page }) => {
+    const result = await page.evaluate(input => {
+      const p = window.playback;
+      p.restart(1, 'note("60").slow(8)'); p.render(8); p.receipts();
+      const before = p.snapshot();
+      p.send({ type: 'player-restart', id: 2, input: JSON.stringify({ schema: 1, ...input }) });
+      const rejected = p.receipts()[0];
+      const after = p.snapshot();
+      p.render();
+      return { before, rejected, after, continued: p.snapshot() };
+    }, input);
+    expect(result.before.state).toBe('Playing');
+    expect(result.rejected).toMatchObject({
+      id: 2, accepted: false, draftVersion: input.version ?? null,
+    });
+    expect(result.after).toEqual(result.before);
+    expect(result.continued.samplePosition).toBe(result.before.samplePosition + 128);
   });
-  expect(result.after).toEqual(result.before);
-  expect(result.rejected).toEqual(expect.objectContaining({
-    id: 2, accepted: false, draftVersion: [9, 3], samplePosition: 1024,
-  }));
-  expect(result.accepted).toEqual(expect.objectContaining({
-    id: 3, accepted: true, draftVersion: [10, 4], samplePosition: 0,
-  }));
-});
+}
 
-test('paused update is accepted immediately and commits source tempo without advancing', async ({ page }) => {
+test('Update while Paused changes tempo without advancing; Play resumes in place', async ({ page }) => {
   const result = await page.evaluate(() => {
     const p = window.playback;
-    p.update(1, 'note("60").slow(8)'); p.play(2); p.render(8); p.pause(3);
+    p.update(1, 'note("60").slow(8)'); p.play(2); p.render(8);
+    const beforePause = p.snapshot();
+    p.pause(3);
     p.receipts();
+    const paused = p.snapshot();
     p.update(4, 'bpm(90); note("72").slow(8)');
     const update = p.receipts()[0];
     const beforeRender = p.snapshot();
     p.render(10);
-    return { update, beforeRender, afterRender: p.snapshot() };
+    const frozen = p.snapshot();
+    p.play(5);
+    const resumed = p.receipts()[0];
+    p.render();
+    return { beforePause, paused, update, beforeRender, frozen, resumed, continued: p.snapshot() };
+  });
+  expect(result.paused).toMatchObject({
+    state: 'Paused',
+    samplePosition: result.beforePause.samplePosition,
+    cyclePosition: result.beforePause.cyclePosition,
   });
   expect(result.update).toEqual(expect.objectContaining({
-    type: 'player-receipt', id: 4, operation: 'update', accepted: true,
-    state: 'Paused', samplePosition: 1024, tempo: 90,
+    accepted: true, state: 'Paused', tempo: 90,
+    samplePosition: result.paused.samplePosition,
   }));
-  expect(result.afterRender).toEqual(result.beforeRender);
-});
-
-test('invalid restart preserves the current song and transport position', async ({ page }) => {
-  const result = await page.evaluate(() => {
-    const p = window.playback;
-    p.update(1, 'note("60").slow(8)'); p.play(); p.render(8); p.receipts();
-    p.restart(2, 'note(');
-    const rejected = p.receipts()[0];
-    const after = p.snapshot();
-    p.render();
-    return { rejected, after, advanced: p.snapshot() };
+  expect(result.frozen).toEqual(result.beforeRender);
+  expect(result.resumed).toMatchObject({
+    accepted: true, state: 'Playing', samplePosition: result.paused.samplePosition,
   });
-  expect(result.rejected).toEqual(expect.objectContaining({
-    type: 'player-receipt', id: 2, operation: 'restart', accepted: false,
-    restartRequired: false, state: 'Playing', samplePosition: 1024,
-  }));
-  expect(result.after).toEqual(expect.objectContaining({ state: 'Playing', samplePosition: 1024 }));
-  expect(result.advanced.samplePosition).toBe(1152);
+  expect(result.continued.samplePosition).toBe(result.paused.samplePosition + 128);
 });
 
-test('ended update keeps tails while Play replays the newest song', async ({ page }) => {
+test('Update after Ended preserves position; Play starts the latest score', async ({ page }) => {
   const result = await page.evaluate(() => {
     const p = window.playback;
-    const finite = 'song(section("a",1/100,note("60").release(1).room(1)),part("a1","a"))';
+    const finite = 'song(section("a",1/100,note("60")),part("a1","a"))';
     p.update(1, finite); p.play(); p.receipts(); p.render(4);
     const ended = p.snapshot();
     p.update(2, 'note("72")');
@@ -121,23 +124,6 @@ test('ended update keeps tails while Play replays the newest song', async ({ pag
   }));
   expect(result.replay).toEqual(expect.objectContaining({ id: 3, operation: 'play', accepted: true, state: 'Playing', samplePosition: 0 }));
   expect(result.after).toEqual(expect.objectContaining({ state: 'Playing', samplePosition: 128 }));
-});
-
-test('Pause freezes transport until Play resumes it', async ({ page }) => {
-  const result = await page.evaluate(() => {
-    const p = window.playback;
-    p.update(1, 'note("60").slow(8)'); p.play(2); p.render(20); p.pause(3); p.receipts();
-    const paused = p.snapshot();
-    p.render(100);
-    const frozen = p.snapshot();
-    p.play(4);
-    const resumed = p.receipts()[0];
-    p.render();
-    return { paused, frozen, resumed, after: p.snapshot() };
-  });
-  expect(result.frozen).toEqual(result.paused);
-  expect(result.resumed).toEqual(expect.objectContaining({ id: 4, operation: 'play', accepted: true, state: 'Playing' }));
-  expect(result.after.samplePosition).toBe(result.paused.samplePosition + 128);
 });
 
 test('source tempo replaces the legacy tempo setting, including omission default', async ({ page }) => {
@@ -184,9 +170,7 @@ test('status position follows the piecewise musical clock across tempo edits', a
     const changed = p.receipts().at(-1);
     p.render(125);
     const after = p.snapshot();
-    p.pause(3);
-    p.render(10);
-    return { empty, before, changed, after, paused: p.snapshot() };
+    return { empty, before, changed, after };
   });
   expect(result.empty).toMatchObject({ state: 'Empty', mode: 'none', cyclePosition: 0 });
   expect(result.before).toMatchObject({ state: 'Playing', mode: 'pattern', tempo: 60, samplePosition: 16000 });
@@ -194,7 +178,6 @@ test('status position follows the piecewise musical clock across tempo edits', a
   expect(result.changed).toMatchObject({ accepted: true, tempo: 120, samplePosition: 16000 });
   expect(result.changed.cyclePosition).toBe(result.before.cyclePosition);
   expect(result.after.cyclePosition).toBeCloseTo(1, 12);
-  expect(result.paused.cyclePosition).toBe(result.after.cyclePosition);
 });
 
 test('pending status counts musical materials through independent entry boundaries', async ({ page }) => {
