@@ -1,4 +1,4 @@
-import { decodeDraftVersion, type DraftVersion } from "./authoring";
+import { decodeDraftVersion, type DraftVersion } from "./draft-version";
 const PLAY_STATES = ["Empty", "Ready", "Playing", "Paused", "Ended", "Fault"] as const;
 const PLAY_MODES = ["none", "pattern", "song"] as const;
 

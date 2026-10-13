@@ -8,7 +8,8 @@ import {
   type DraftHandle,
 } from "./generated/authoring.js";
 
-export type DraftVersion = readonly [number, number];
+import { decodeDraftVersion, type DraftVersion } from "./draft-version";
+
 export type DraftState = Readonly<{ text: string; version: DraftVersion; diagnostic: string | null }>;
 export type DraftEdit = Readonly<{ from: number; to: number; inserted: string }>;
 export type LocatedOnset = Readonly<{
@@ -18,17 +19,6 @@ export type LocatedOnset = Readonly<{
   notation: Readonly<{ from: number; to: number; start: number; pitch: number | null }> | null;
 }>;
 
-export function decodeDraftVersion(value: unknown): DraftVersion | null {
-  if (!Array.isArray(value) || value.length !== 2 ||
-      !Number.isSafeInteger(value[0]) || value[0] <= 0 ||
-      !Number.isSafeInteger(value[1]) || value[1] < 0) return null;
-  return Object.freeze([value[0], value[1]]) as DraftVersion;
-}
-
-export function sameDraftVersion(left: DraftVersion | null, right: DraftVersion | null): boolean {
-  return left === null || right === null ? left === right : left[0] === right[0] && left[1] === right[1];
-}
-
 function decodeState(raw: { text: string; version: unknown; diagnostic: string | null }): DraftState {
   const version = decodeDraftVersion(raw.version);
   if (!version || typeof raw.text !== "string" || (raw.diagnostic !== null && typeof raw.diagnostic !== "string")) {
@@ -36,6 +26,7 @@ function decodeState(raw: { text: string; version: unknown; diagnostic: string |
   }
   return Object.freeze({ text: raw.text, version, diagnostic: raw.diagnostic });
 }
+
 
 let inputFromDraft: (wire: string, state: DraftState) => PlaybackInput;
 

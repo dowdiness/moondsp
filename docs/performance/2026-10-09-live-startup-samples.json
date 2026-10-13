@@ -1,0 +1,429 @@
+{
+  "date": "2026-10-09",
+  "browser": "Chrome/148.0.7778.215",
+  "vite": "5.4.21",
+  "baselineCommit": "5f76b3c54fe8976a86d16bfeb52be11d2053d703",
+  "baselineOverlayFiles": [
+    "main.ts",
+    "authoring.ts",
+    "playback-protocol.ts",
+    "playback.ts"
+  ],
+  "viewport": {
+    "width": 1365,
+    "height": 768
+  },
+  "profiles": [
+    {
+      "name": "local",
+      "cpuRate": 1,
+      "latencyMs": 0,
+      "downloadBytesPerSecond": -1,
+      "uploadBytesPerSecond": -1
+    },
+    {
+      "name": "constrained",
+      "cpuRate": 4,
+      "latencyMs": 150,
+      "downloadBytesPerSecond": 200000,
+      "uploadBytesPerSecond": 93750
+    }
+  ],
+  "method": "gzip HTTP, cold browser cache and origin storage per navigation, 10 alternating before/after pairs per profile; performance.now in first rAF after visible contenteditable or rendered score controls with enabled Play",
+  "summaries": [
+    {
+      "profile": "local",
+      "metric": "editorFrame",
+      "before": 221.31749999523163,
+      "after": 138.78749999403954,
+      "deltaMs": -82.5300000011921,
+      "changePercent": -37.29031820934641
+    },
+    {
+      "profile": "local",
+      "metric": "toolsFrame",
+      "before": 221.32249999046326,
+      "after": 255.21500000357628,
+      "deltaMs": 33.89250001311302,
+      "changePercent": 15.313626050028105
+    },
+    {
+      "profile": "constrained",
+      "metric": "editorFrame",
+      "before": 2614.8849999904633,
+      "after": 1780.210000038147,
+      "deltaMs": -834.6749999523163,
+      "changePercent": -31.920141801852107
+    },
+    {
+      "profile": "constrained",
+      "metric": "toolsFrame",
+      "before": 2614.889999985695,
+      "after": 3022.387499988079,
+      "deltaMs": 407.4975000023842,
+      "changePercent": 15.583733923974364
+    }
+  ],
+  "rows": [
+    {
+      "profile": "local",
+      "round": 0,
+      "variant": "before",
+      "editorFrame": 223.0649999976158,
+      "toolsFrame": 223.06999999284744,
+      "fcp": 102.76499998569489,
+      "jsBytes": 248628
+    },
+    {
+      "profile": "local",
+      "round": 0,
+      "variant": "after",
+      "editorFrame": 164.33999997377396,
+      "toolsFrame": 283.3949999809265,
+      "fcp": 107.62999999523163,
+      "jsBytes": 251050
+    },
+    {
+      "profile": "local",
+      "round": 1,
+      "variant": "after",
+      "editorFrame": 162.50999999046326,
+      "toolsFrame": 285.49000000953674,
+      "fcp": 87.56000000238419,
+      "jsBytes": 251050
+    },
+    {
+      "profile": "local",
+      "round": 1,
+      "variant": "before",
+      "editorFrame": 237.3149999976158,
+      "toolsFrame": 237.3299999833107,
+      "fcp": 266.8799999952316,
+      "jsBytes": 248628
+    },
+    {
+      "profile": "local",
+      "round": 2,
+      "variant": "before",
+      "editorFrame": 226.6050000190735,
+      "toolsFrame": 226.61000001430511,
+      "fcp": 89.32500004768372,
+      "jsBytes": 248628
+    },
+    {
+      "profile": "local",
+      "round": 2,
+      "variant": "after",
+      "editorFrame": 140.64500004053116,
+      "toolsFrame": 252.21000003814697,
+      "fcp": 165.91500002145767,
+      "jsBytes": 251050
+    },
+    {
+      "profile": "local",
+      "round": 3,
+      "variant": "after",
+      "editorFrame": 176.05500000715256,
+      "toolsFrame": 316.52999997138977,
+      "fcp": 94.11500000953674,
+      "jsBytes": 251050
+    },
+    {
+      "profile": "local",
+      "round": 3,
+      "variant": "before",
+      "editorFrame": 219.56999999284744,
+      "toolsFrame": 219.57499998807907,
+      "fcp": null,
+      "jsBytes": 248628
+    },
+    {
+      "profile": "local",
+      "round": 4,
+      "variant": "before",
+      "editorFrame": 210.6449999809265,
+      "toolsFrame": 210.65499997138977,
+      "fcp": 87.24500000476837,
+      "jsBytes": 248628
+    },
+    {
+      "profile": "local",
+      "round": 4,
+      "variant": "after",
+      "editorFrame": 131.12999999523163,
+      "toolsFrame": 251.9350000023842,
+      "fcp": 62.110000014305115,
+      "jsBytes": 251050
+    },
+    {
+      "profile": "local",
+      "round": 5,
+      "variant": "after",
+      "editorFrame": 136.9099999666214,
+      "toolsFrame": 243.65499997138977,
+      "fcp": 73.5349999666214,
+      "jsBytes": 251050
+    },
+    {
+      "profile": "local",
+      "round": 5,
+      "variant": "before",
+      "editorFrame": 208.79499995708466,
+      "toolsFrame": 208.80500000715256,
+      "fcp": 69.30000001192093,
+      "jsBytes": 248628
+    },
+    {
+      "profile": "local",
+      "round": 6,
+      "variant": "before",
+      "editorFrame": 224.72500002384186,
+      "toolsFrame": 224.74000000953674,
+      "fcp": 256.4950000047684,
+      "jsBytes": 248628
+    },
+    {
+      "profile": "local",
+      "round": 6,
+      "variant": "after",
+      "editorFrame": 133.9399999976158,
+      "toolsFrame": 244.82500004768372,
+      "fcp": 156.50499999523163,
+      "jsBytes": 251050
+    },
+    {
+      "profile": "local",
+      "round": 7,
+      "variant": "after",
+      "editorFrame": 134.5250000357628,
+      "toolsFrame": 244.32499998807907,
+      "fcp": 162.15500003099442,
+      "jsBytes": 251050
+    },
+    {
+      "profile": "local",
+      "round": 7,
+      "variant": "before",
+      "editorFrame": 203.59499996900558,
+      "toolsFrame": 203.6050000190735,
+      "fcp": null,
+      "jsBytes": 248628
+    },
+    {
+      "profile": "local",
+      "round": 8,
+      "variant": "before",
+      "editorFrame": 211.8149999976158,
+      "toolsFrame": 211.81999999284744,
+      "fcp": 85.375,
+      "jsBytes": 248628
+    },
+    {
+      "profile": "local",
+      "round": 8,
+      "variant": "after",
+      "editorFrame": 136.9299999475479,
+      "toolsFrame": 258.2199999690056,
+      "fcp": 69.29499995708466,
+      "jsBytes": 251050
+    },
+    {
+      "profile": "local",
+      "round": 9,
+      "variant": "after",
+      "editorFrame": 150.3299999833107,
+      "toolsFrame": 285.5799999833107,
+      "fcp": 82.26999998092651,
+      "jsBytes": 251050
+    },
+    {
+      "profile": "local",
+      "round": 9,
+      "variant": "before",
+      "editorFrame": 232.51499998569489,
+      "toolsFrame": 232.52499997615814,
+      "fcp": 88.1700000166893,
+      "jsBytes": 248628
+    },
+    {
+      "profile": "constrained",
+      "round": 0,
+      "variant": "before",
+      "editorFrame": 2721.3400000333786,
+      "toolsFrame": 2721.3550000190735,
+      "fcp": 742.8500000238419,
+      "jsBytes": 248628
+    },
+    {
+      "profile": "constrained",
+      "round": 0,
+      "variant": "after",
+      "editorFrame": 1830.3799999952316,
+      "toolsFrame": 3107.0299999713898,
+      "fcp": 624.2099999785423,
+      "jsBytes": 251050
+    },
+    {
+      "profile": "constrained",
+      "round": 1,
+      "variant": "after",
+      "editorFrame": 1799.2599999904633,
+      "toolsFrame": 3052.8550000190735,
+      "fcp": 629.7450000047684,
+      "jsBytes": 251050
+    },
+    {
+      "profile": "constrained",
+      "round": 1,
+      "variant": "before",
+      "editorFrame": 2592.639999985695,
+      "toolsFrame": 2592.649999976158,
+      "fcp": 721.7599999904633,
+      "jsBytes": 248628
+    },
+    {
+      "profile": "constrained",
+      "round": 2,
+      "variant": "before",
+      "editorFrame": 2613.6099999547005,
+      "toolsFrame": 2613.614999949932,
+      "fcp": 726.0449999570847,
+      "jsBytes": 248628
+    },
+    {
+      "profile": "constrained",
+      "round": 2,
+      "variant": "after",
+      "editorFrame": 1776.695000052452,
+      "toolsFrame": 2974.585000038147,
+      "fcp": 611.835000038147,
+      "jsBytes": 251050
+    },
+    {
+      "profile": "constrained",
+      "round": 3,
+      "variant": "after",
+      "editorFrame": 1765.2599999904633,
+      "toolsFrame": 2969.4599999785423,
+      "fcp": 627.4150000214577,
+      "jsBytes": 251050
+    },
+    {
+      "profile": "constrained",
+      "round": 3,
+      "variant": "before",
+      "editorFrame": 2660.8799999952316,
+      "toolsFrame": 2660.8849999904633,
+      "fcp": 734.6200000047684,
+      "jsBytes": 248628
+    },
+    {
+      "profile": "constrained",
+      "round": 4,
+      "variant": "before",
+      "editorFrame": 2626.9699999690056,
+      "toolsFrame": 2626.979999959469,
+      "fcp": 713.0699999928474,
+      "jsBytes": 248628
+    },
+    {
+      "profile": "constrained",
+      "round": 4,
+      "variant": "after",
+      "editorFrame": 1767.1200000047684,
+      "toolsFrame": 2978.1050000190735,
+      "fcp": 618.6700000166893,
+      "jsBytes": 251050
+    },
+    {
+      "profile": "constrained",
+      "round": 5,
+      "variant": "after",
+      "editorFrame": 1758.8299999833107,
+      "toolsFrame": 2994.5,
+      "fcp": 629.789999961853,
+      "jsBytes": 251050
+    },
+    {
+      "profile": "constrained",
+      "round": 5,
+      "variant": "before",
+      "editorFrame": 2612.3650000095367,
+      "toolsFrame": 2612.3799999952316,
+      "fcp": 726.8650000095367,
+      "jsBytes": 248628
+    },
+    {
+      "profile": "constrained",
+      "round": 6,
+      "variant": "before",
+      "editorFrame": 2810.889999985695,
+      "toolsFrame": 2810.9050000309944,
+      "fcp": 728.7400000095367,
+      "jsBytes": 248628
+    },
+    {
+      "profile": "constrained",
+      "round": 6,
+      "variant": "after",
+      "editorFrame": 1914.2049999833107,
+      "toolsFrame": 3128.8650000095367,
+      "fcp": 644.2250000238419,
+      "jsBytes": 251050
+    },
+    {
+      "profile": "constrained",
+      "round": 7,
+      "variant": "after",
+      "editorFrame": 1827.1050000190735,
+      "toolsFrame": 3050.274999976158,
+      "fcp": 630.5249999761581,
+      "jsBytes": 251050
+    },
+    {
+      "profile": "constrained",
+      "round": 7,
+      "variant": "before",
+      "editorFrame": 2616.160000026226,
+      "toolsFrame": 2616.1650000214577,
+      "fcp": 726.8700000047684,
+      "jsBytes": 248628
+    },
+    {
+      "profile": "constrained",
+      "round": 8,
+      "variant": "before",
+      "editorFrame": 2579.0450000166893,
+      "toolsFrame": 2579.060000002384,
+      "fcp": 703.2599999904633,
+      "jsBytes": 248628
+    },
+    {
+      "profile": "constrained",
+      "round": 8,
+      "variant": "after",
+      "editorFrame": 1768.3500000238419,
+      "toolsFrame": 2954.285000026226,
+      "fcp": 607.6899999976158,
+      "jsBytes": 251050
+    },
+    {
+      "profile": "constrained",
+      "round": 9,
+      "variant": "after",
+      "editorFrame": 1783.7250000238419,
+      "toolsFrame": 3052.3650000095367,
+      "fcp": 617.0199999809265,
+      "jsBytes": 251050
+    },
+    {
+      "profile": "constrained",
+      "round": 9,
+      "variant": "before",
+      "editorFrame": 2596.060000002384,
+      "toolsFrame": 2596.074999988079,
+      "fcp": 738.2950000166893,
+      "jsBytes": 248628
+    }
+  ]
+}

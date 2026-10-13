@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Split live production JavaScript into MoonBit authoring, CodeMirror/Lezer,
+  and application chunks without raising the bundle-size warning limit.
+  Basic editing, saving, and Undo/Redo start before asynchronous authoring and
+  score-tool initialization. Preparation uses the latest editor text and retains
+  its history and selection; load failures leave text editable with reload advice.
+  Short startup no longer flashes loading labels; an editable-code notice appears
+  only when score-tool preparation lasts 500 ms. Installing notation preserves
+  focus, selection, and scroll position instead of following the expanded document end.
+  Score-tool startup failures do not label the independent compiled-demo
+  playback button as unavailable.
+
 - Added direct inline chord-tone editing: transpose the whole chord, drag one
   tone, add/remove tones, and share keyboard edits and Undo with code.
   Exact named voicings retain chord names; arbitrary combinations and inversions
