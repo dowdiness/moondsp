@@ -31,12 +31,13 @@ Use this file as a router. Read the documents for the surface you are changing; 
 
 - **Browser:** [`browser-api-contract.md`](browser-api-contract.md) — Web AudioWorklet export ABI (`wasm-gc`), JS/TS bindings, and browser integration review rules.
 - **Native DAW:** [`clap-plugin-guide.md`](clap-plugin-guide.md) — Native CLAP plugin architecture, C ABI bridge, Linux/Windows builds, and zero-allocation audit.
-- **Host-independent MoonBit:** Direct programmatic API via `GraphEngine` (see [Root README](../README.md#host-independent-moonbit-api)).
+- **Host-independent MoonBit:** Direct programmatic API via `GraphEngine` (see [Architecture guide](engine-architecture.md#host-independent-moonbit-api)).
 
 For a browser instrument, start with the [basic synth guide](../examples/basic-synth/README.md), which provides Svelte and framework-free adapters over one shared core. Then use the browser contract's [graph lifecycle](browser-api-contract.md#rendering-and-lifecycle) and [live controls](browser-api-contract.md#live-controls) sections.
 
 ## Core Architecture & Specifications
 
+- **[`engine-architecture.md`](engine-architecture.md)** — **Engine Architecture & Technical Details**: platform targets, core DSP/pattern engine internals, package map, memory/performance guarantees, and development commands.
 - **[`technical-reference.md`](technical-reference.md)** — **Authoritative** reference for graph runtime-control behavior: node types, parameter slots, compilation, and rendering. Update it first when that contract changes; code remains the implementation source of truth.
 - **[`blueprint.md`](blueprint.md)** — Architectural vision, design principles, and multi-target roadmap.
 - **[`decisions/`](decisions/README.md)** — Architecture Decision Records capturing why key architectural choices were made.
