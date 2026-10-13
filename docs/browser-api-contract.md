@@ -1259,6 +1259,39 @@ Keep demo/probe behavior out of the dedicated scheduler. This division does not
 require removing the existing scheduler mode from the demo worklet or duplicating
 the shared playback protocol.
 
+## Live editor startup
+
+The live page mounts CodeMirror and its editing, history, save, and help
+handlers before loading MoonBit authoring. After the first animation frame,
+a separate task dynamically imports authoring, Player, and pattern controls.
+This is staged startup, not a promise to defer those downloads until Play.
+
+`document.body.dataset.authoring` exposes `loading`, `ready`, or `failed`.
+While loading, score controls, Add melody, and scheduler Play/Restart are
+disabled; text editing and Undo/Redo remain available. The independent
+`audioMode=compiled` demo can still start without score authoring.
+
+Short startup does not change the Play label or show loading text. Only if
+preparation is still pending after 500 ms does a footer message say that code
+is editable while score tools load; the visible message also describes the
+editor for assistive technology. The controls retain their disabled/busy states
+until ready. Readiness, failure, and disposal cancel the notice timer; readiness
+removes the message and busy attributes. Failures show an immediate notice that
+distinguishes unavailable score tools from the still-editable document.
+
+When imports finish, initialization reads the current editor document rather
+than the startup snapshot. It creates one Draft and installs score controls
+without replacing EditorState or clearing history. The initial note/chord cursor
+is found syntactically, without loading the compiler; readiness never relocates
+it. Selection and CodeMirror's scroll snapshot are retained, including a document
+scrolled to its end. Subsequent edits retain their transaction-by-transaction
+Draft identity semantics. Compiler-backed operations remain synchronous once ready.
+The lightweight draft-version decoder and equality helper do not load the compiler.
+
+An import failure reports reload advice and leaves the editor usable; score tools
+and scheduler transport remain disabled. AudioWorklet rendering does not perform
+dynamic imports.
+
 ## Building and verifying the actual worklet assets
 
 Run the following from the repository root. Install live dependencies once per
@@ -1286,7 +1319,8 @@ The live `prebuild`/`predev` hook runs `scripts/sync-assets.mjs`, copying the
 WASM and all three worklet/controller JS modules from `web/` into `public/`.
 Vite's production build copies those public assets into `dist/`.
 
-`sync:assets` does not compile MoonBit, and `preview` does not rebuild anything.
+`sync:assets` compiles the JS authoring target, but not browser WASM;
+`preview` does not rebuild anything.
 Missing assets currently produce sync warnings rather than a failing exit;
 read the output and do not treat an old public/dist copy as a successful build.
 When using an already-running dev server after a worklet/WASM edit, rerun

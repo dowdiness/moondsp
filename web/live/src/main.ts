@@ -16,17 +16,17 @@ import overlayGroove from "../../../examples/overlay-groove.mini?raw";
 import overlayGrouping from "../../../examples/overlay-grouping.mini?raw";
 import restsAndGates from "../../../examples/rests-and-gates.mini?raw";
 
-import { minilive } from "./lang/minilive";
+import { minilive, miniliveLanguage } from "./lang/minilive";
 import { inlineControls } from "./inline-controls";
-import { appendMelody, canAppendMelody, patternControls, patternControlsVisible, sourcePatterns } from "./pattern-controls";
+import type * as PatternControls from "./pattern-controls";
 import { loadScore, mountScoreSession } from "./score-session";
 import { CM6Adapter } from "./canopy";
 import type { Diagnostic } from "./canopy";
 import { AudioEngine } from "./audio";
 import type { AudioEngineMode, CompiledSession } from "./audio";
-import { Draft, type DraftVersion } from "./authoring";
-import { Player } from "./playback";
-import type { PlaybackView } from "./playback";
+import type { Draft } from "./authoring";
+import type { DraftVersion } from "./draft-version";
+import type { Player, PlaybackView } from "./playback";
 import { mountOutputScope } from "./output-scope";
 import { playbackHighlights } from "./playback-highlights";
 import { mountPlaybackObservation } from "./playback-observation";
@@ -60,10 +60,18 @@ $: chord("Cm7 Abmaj7").slow(8).gain(0.12).lpf(900)`,
   },
 } as const;
 const INITIAL = loadScore(STARTERS["first-light"].source);
+let patternTools: typeof PatternControls | undefined;
 
 function initialCursor(source: string): number {
-  return sourcePatterns(EditorState.create({ doc: source })).find(pattern => pattern.kind === "note")?.from
-    ?? Math.max(0, source.indexOf("$:"));
+  let firstNote: number | undefined;
+  miniliveLanguage.parser.parse(source).iterate({ enter(ref) {
+    if (firstNote !== undefined || ref.name !== "Chain") return;
+    const call = ref.node.getChild("Call");
+    const name = call?.getChild("CallName");
+    if (!name || !call?.getChild("Args")?.getChild("String")) return;
+    if (["note", "chord"].includes(source.slice(name.from, name.to))) firstNote = ref.from;
+  } });
+  return firstNote ?? Math.max(0, source.indexOf("$:"));
 }
 
 // ── DOM ─────────────────────────────────────────────────────
@@ -85,11 +93,17 @@ const startBtn = document.getElementById("start") as HTMLButtonElement;
 const cheatEl = document.getElementById("cheat") as HTMLDialogElement;
 const cheatToggle = document.getElementById("cheat-toggle") as HTMLButtonElement;
 const workspaceEl = document.querySelector("main.workspace") as HTMLElement;
+const readinessEl = document.getElementById("score-readiness") as HTMLElement;
 
 // ── Editor ──────────────────────────────────────────────────
 
 const listenerCompartment = new Compartment();
 const controlsCompartment = new Compartment();
+const patternCompartment = new Compartment();
+const contentAttributesCompartment = new Compartment();
+let draft: Draft | undefined;
+let playback: Player | undefined;
+let disposed = false;
 
 const view = new EditorView({
   parent: editorEl,
@@ -102,12 +116,14 @@ const view = new EditorView({
       bracketMatching(),
       closeBrackets(),
       inlineControls(),
-      patternControls(),
+      patternCompartment.of([]),
       phraseUpdateStatus(),
       playbackHighlights(),
-      controlsCompartment.of(patternControlsVisible.of(true)),
+      controlsCompartment.of([]),
       EditorView.lineWrapping,
-      EditorView.contentAttributes.of({ "aria-label": "Music code", spellcheck: "false" }),
+      contentAttributesCompartment.of(EditorView.contentAttributes.of({
+        "aria-label": "Music code", spellcheck: "false",
+      })),
       keymap.of([
         { key: "Mod-Enter", scope: "editor pattern-control", run: () => { startBtn.click(); return true; } },
         { key: "Mod-Shift-Enter", scope: "editor pattern-control", run: () => { document.getElementById("restart")!.click(); return true; } },
@@ -143,10 +159,12 @@ function refreshEditorChrome(): void {
   const head = view.state.selection.main.head;
   const line = view.state.doc.lineAt(head);
   setText(document.getElementById("cursor-position")!, `Ln ${line.number}, Col ${head - line.from + 1}`);
-  addMelodyBtn.disabled = !canAppendMelody(view.state);
-  addMelodyBtn.title = addMelodyBtn.disabled
-    ? "Available for empty or $: stack scores"
-    : "Add melody";
+  addMelodyBtn.disabled = !patternTools || !patternTools.canAppendMelody(view.state);
+  addMelodyBtn.title = !patternTools
+    ? document.body.dataset.authoring === "failed"
+      ? "Score tools unavailable. Reload to try again; code remains editable."
+      : "Loading score tools. You can edit code now."
+    : addMelodyBtn.disabled ? "Available for empty or $: stack scores" : "Add melody";
   const text = view.state.doc.toString();
   const starter = Object.entries(STARTERS).find(([, value]) => value.source === text);
   setText(document.getElementById("score-title")!, starter?.[1].name ?? "Your score");
@@ -167,11 +185,13 @@ function replaceScore(source: string): void {
 
 undoBtn.addEventListener("click", () => { undo(view); view.focus(); });
 redoBtn.addEventListener("click", () => { redo(view); view.focus(); });
-addMelodyBtn.addEventListener("click", () => appendMelody(view));
+addMelodyBtn.addEventListener("click", () => patternTools?.appendMelody(view));
 sourceToggle.addEventListener("click", () => {
   const enabled = sourceToggle.getAttribute("aria-pressed") !== "true";
   sourceToggle.setAttribute("aria-pressed", String(enabled));
-  view.dispatch({ effects: controlsCompartment.reconfigure(patternControlsVisible.of(enabled)) });
+  if (patternTools) {
+    view.dispatch({ effects: controlsCompartment.reconfigure(patternTools.patternControlsVisible.of(enabled)) });
+  }
 });
 refreshEditorChrome();
 
@@ -337,16 +357,15 @@ function renderPlayback(state: PlaybackView): void {
   }
   renderedPlayback = state;
 }
-const draft = new Draft(INITIAL);
-const playback = new Player(engine, { draft }, renderPlayback);
-playbackObservation = mountPlaybackObservation(view, draft, engine, error => {
-  setLog(`Playback highlighting: ${error instanceof Error ? error.message : String(error)}`, "error");
-});
 let compiledSession: CompiledSession | undefined;
 const outputScope = mountOutputScope(document.getElementById("output-scope")!, {
   readWaveform: target => engine.readWaveform(target),
 });
 if (import.meta.hot) import.meta.hot.dispose(() => {
+  disposed = true;
+  cancelAnimationFrame(startupFrame);
+  clearTimeout(startupTimer);
+  clearTimeout(readinessNoticeTimer);
   playbackObservation?.dispose();
   view.destroy();
   outputScope.dispose();
@@ -392,7 +411,9 @@ view.dispatch({
     EditorView.updateListener.of(update => {
       if (update.docChanged) scoreSession.changed();
       if (update.docChanged || update.selectionSet) refreshEditorChrome();
-      if (!update.docChanged || audioMode !== "scheduler") return;
+      if (!update.docChanged || audioMode !== "scheduler" || !draft || !playback) return;
+      const activeDraft = draft;
+      const activePlayback = playback;
       try {
         // Preserve each transaction's causality; composing a replace and undo
         // into one text diff would incorrectly revive retired source identities.
@@ -402,13 +423,13 @@ view.dispatch({
           transaction.changes.iterChanges((from, to, _newFrom, _newTo, inserted) => {
             edits.push({ from, to, inserted: inserted.toString() });
           }, true);
-          draft.edit({ base: draft.state().version, edits });
+          activeDraft.edit({ base: activeDraft.state().version, edits });
         }
         playbackObservation?.edited();
         // Diagnostic decoration dispatch must happen outside CM's update turn.
-        queueMicrotask(() => playback.editDraft());
+        queueMicrotask(() => activePlayback.editDraft());
       } catch (error) {
-        queueMicrotask(() => playback.reportDraftFailure(error));
+        queueMicrotask(() => activePlayback.reportDraftFailure(error));
       }
     }),
   ]),
@@ -416,20 +437,24 @@ view.dispatch({
 
 startBtn.addEventListener("click", () => {
   if (audioMode === "compiled") { void toggleCompiled(); return; }
-  const state = playback.view().state;
-  void (state === "Playing" || state === "Starting" ? playback.pause() : playback.play()).catch(error => playback.report(error));
+  if (!playback) return;
+  const activePlayback = playback;
+  const state = activePlayback.view().state;
+  void (state === "Playing" || state === "Starting" ? activePlayback.pause() : activePlayback.play()).catch(error => activePlayback.report(error));
 });
 
 document.getElementById("restart")!.addEventListener("click", () => {
+  if (!playback || !draft) return;
+  const activePlayback = playback;
   try {
-    void playback.restart(draft.prepare()).catch(error => playback.report(error));
+    void activePlayback.restart(draft.prepare()).catch(error => activePlayback.report(error));
   } catch (error) {
-    playback.reportDraftFailure(error);
+    activePlayback.reportDraftFailure(error);
   }
 });
 
 document.getElementById("restore-score")!.addEventListener("click", () => {
-  const source = playback.view().currentSource;
+  const source = playback?.view().currentSource ?? null;
   if (source !== null) replaceScore(source);
 });
 
@@ -483,11 +508,12 @@ document.querySelectorAll<HTMLButtonElement>("[data-scene]").forEach(button => {
     if (!starter) return;
     if (narrowHelp.matches) setHelp(false);
     replaceScore(starter.source);
-    if (audioMode !== "scheduler") return;
+    if (audioMode !== "scheduler" || !playback || !draft) return;
+    const activePlayback = playback;
     try {
-      void playback.restart(draft.prepare()).catch(error => playback.report(error));
+      void activePlayback.restart(draft.prepare()).catch(error => activePlayback.report(error));
     } catch (error) {
-      playback.reportDraftFailure(error);
+      activePlayback.reportDraftFailure(error);
     }
   });
 });
@@ -502,6 +528,113 @@ cheatEl.addEventListener("click", (ev) => {
   replaceScore(text);
 });
 
+// Keep editing and saving independent of the compiler's network/evaluation time.
+const restartBtn = document.getElementById("restart") as HTMLButtonElement;
+document.body.dataset.authoring = "loading";
+sourceToggle.disabled = true;
+restartBtn.disabled = true;
+if (audioMode === "scheduler") {
+  startBtn.disabled = true;
+  startBtn.setAttribute("aria-busy", "true");
+}
+sourceToggle.setAttribute("aria-busy", "true");
+changeStatusEl.hidden = true;
+
+function showReadiness(message: string): void {
+  setText(readinessEl, message);
+  readinessEl.hidden = false;
+  view.dispatch({
+    effects: contentAttributesCompartment.reconfigure(EditorView.contentAttributes.of({
+      "aria-label": "Music code", "aria-describedby": "score-readiness", spellcheck: "false",
+    })),
+  });
+}
+
+// Short startup should not flash loading labels; editing remains available.
+const readinessNoticeTimer = window.setTimeout(() => {
+  if (!disposed && document.body.dataset.authoring === "loading") {
+    showReadiness("Code is editable. Loading score tools…");
+  }
+}, 500);
+
+async function prepareAuthoring(): Promise<void> {
+  let createdDraft: Draft | undefined;
+  try {
+    const [authoring, player, controls] = await Promise.all([
+      import("./authoring"),
+      import("./playback"),
+      import("./pattern-controls"),
+    ]);
+    if (disposed) return;
+    // No await between reading the document and installing its edit listener.
+    createdDraft = new authoring.Draft(view.state.doc.toString());
+    draft = createdDraft;
+    playback = new player.Player(engine, { draft }, renderPlayback);
+    playbackObservation = mountPlaybackObservation(view, draft, engine, error => {
+      setLog(`Playback highlighting: ${error instanceof Error ? error.message : String(error)}`, "error");
+    });
+    patternTools = controls;
+    view.dispatch({
+      // Adding notation must not move the user's selection to a startup phrase.
+      effects: [
+        view.scrollSnapshot(),
+        patternCompartment.reconfigure(controls.patternControls()),
+        controlsCompartment.reconfigure(controls.patternControlsVisible.of(sourceToggle.getAttribute("aria-pressed") === "true")),
+        contentAttributesCompartment.reconfigure(EditorView.contentAttributes.of({
+          "aria-label": "Music code", spellcheck: "false",
+        })),
+      ],
+    });
+    document.body.dataset.authoring = "ready";
+    clearTimeout(readinessNoticeTimer);
+    sourceToggle.disabled = false;
+    restartBtn.disabled = false;
+    readinessEl.hidden = true;
+    changeStatusEl.hidden = false;
+    sourceToggle.removeAttribute("aria-busy");
+    sourceToggle.title = "Show controls for the phrase at your cursor";
+    startBtn.removeAttribute("aria-busy");
+    startBtn.title = "Play or pause · Ctrl/⌘ + Enter";
+    restartBtn.title = "Restart the current score from the beginning";
+    refreshEditorChrome();
+  } catch (error) {
+    if (disposed) { createdDraft?.dispose(); return; }
+    playbackObservation?.dispose();
+    playbackObservation = undefined;
+    createdDraft?.dispose();
+    draft = undefined;
+    playback = undefined;
+    patternTools = undefined;
+    document.body.dataset.authoring = "failed";
+    clearTimeout(readinessNoticeTimer);
+    sourceToggle.disabled = true;
+    restartBtn.disabled = true;
+    if (audioMode === "scheduler") {
+      startBtn.disabled = true;
+      startBtn.textContent = "Play";
+      startBtn.dataset.action = "play";
+      setText(statusEl, "Playback unavailable");
+      startBtn.title = "Playback unavailable. Reload to try again; code remains editable.";
+      restartBtn.title = startBtn.title;
+    }
+    startBtn.removeAttribute("aria-busy");
+    sourceToggle.removeAttribute("aria-busy");
+    sourceToggle.title = "Score tools unavailable. Reload to try again; code remains editable.";
+    showReadiness("Code is editable. Score tools unavailable.");
+    changeStatusEl.hidden = false;
+    setText(draftStatusEl, "Playback unavailable");
+    setText(draftVersionEl, "Unavailable");
+    setLog(`Could not load score tools. Reload to try again. ${error instanceof Error ? error.message : String(error)}`, "error");
+    refreshEditorChrome();
+  }
+}
+
+// A task after the first animation frame lets the basic editor paint first.
+let startupTimer: number | undefined;
+const startupFrame = requestAnimationFrame(() => {
+  startupTimer = window.setTimeout(() => { if (!disposed) void prepareAuthoring(); }, 0);
+});
+
 // Test hook: exposes the engine so smoke tests can inject synthetic
 // worklet replies (specifically the runtime-error path that's
 // otherwise unreachable from the live REPL UI). Harmless to ship —
@@ -514,4 +647,4 @@ declare global {
 window.__moondspEngine = engine;
 
 // eslint-disable-next-line no-console
-console.info("[moondsp/live] ready — click Play to bring up audio");
+console.info("[moondsp/live] basic editor ready — preparing score tools");

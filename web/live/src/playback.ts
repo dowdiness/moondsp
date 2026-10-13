@@ -1,5 +1,6 @@
 import type { AudioEngine, AudioEvent, AudioStatus, OpenSessionResult, SchedulerSession } from "./audio";
-import { Draft, PlaybackInput, sameDraftVersion, type DraftState, type DraftVersion } from "./authoring";
+import { Draft, PlaybackInput, type DraftState } from "./authoring";
+import { sameDraftVersion, type DraftVersion } from "./draft-version";
 import { RequestId } from "./playback-protocol";
 import type { PlayerOperation, PlayerReceipt, PlayerSnapshot } from "./playback-protocol";
 type Feedback = Readonly<{ message: string; kind: "error" | "info" }>;

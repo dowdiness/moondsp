@@ -50,5 +50,14 @@ export default defineConfig({
   build: {
     target: "es2022",
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          const path = normalizePath(id);
+          if (path.endsWith("/src/generated/authoring.js")) return "authoring";
+          if (/\/node_modules\/(?:@codemirror|@lezer)\//.test(path)) return "editor";
+        },
+      },
+    },
   },
 });
