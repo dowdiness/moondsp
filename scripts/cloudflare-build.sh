@@ -15,8 +15,11 @@
 
 set -euo pipefail
 
+# Keep deployment on the toolchain tested by GitHub Actions.
+export NEW_MOON_MOD=0
+
 echo "── Installing MoonBit toolchain ───────────────────────"
-curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash -s -- 0.10.14+7d59c7ec9
 export PATH="$HOME/.moon/bin:$PATH"
 moon version || true
 

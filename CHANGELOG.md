@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Pin the Cloudflare Pages MoonBit toolchain to the same version as GitHub
+  Actions, preventing untested manifest-parser changes from rejecting dependencies.
+
 ### Added
 
 - Split live production JavaScript into MoonBit authoring, CodeMirror/Lezer,
