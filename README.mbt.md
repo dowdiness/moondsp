@@ -8,10 +8,8 @@ A text-first music editor in the browser. The source document is the score; visu
 
 ![moondsp live editing preview](docs/assets/preview.gif)
 
-<video src="docs/assets/demo.mp4" controls width="100%">
-  <a href="docs/assets/demo.mp4">▶ Play demo with audio (MP4)</a>
-</video>
-<p><em>Turn on audio to hear the live groove and seamless loop transition. (<a href="docs/assets/demo.mp4">Direct video link</a>)</em></p>
+
+<video src="https://github.com/user-attachments/assets/d5f6e781-3512-448d-a395-f3e8c04a79da" controls width="100%"></video>
 
 ---
 
@@ -26,7 +24,7 @@ A text-first music editor in the browser. The source document is the score; visu
 
 ### In the browser
 
-Open **[moondsp.koji-ishimoto.workers.dev](https://moondsp.koji-ishimoto.workers.dev/)** and press `Ctrl/⌘ + Enter` to play.
+Open **[Playground](https://moondsp.koji-ishimoto.workers.dev/)** and press `Ctrl/⌘ + Enter` to play.
 
 | Shortcut | Action |
 |:---|:---|
