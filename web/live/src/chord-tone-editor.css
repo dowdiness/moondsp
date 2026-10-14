@@ -1,26 +1,28 @@
-.chord-tones { width: min(100%, 440px); min-width: 0; }
+.chord-tones { width: min(100%, 520px); min-width: 0; }
 .chord-tones__tools { display: flex; flex-wrap: wrap; gap: 6px; }
-.chord-tones__tools button { min-height: 44px; padding: 5px 9px; border: 1px solid var(--border); border-radius: 3px; background: transparent; color: var(--ink); font: 12px var(--font-body); }
+.chord-tones__tools button { min-height: 44px; padding: 5px 14px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--ink); font: 600 12px var(--font-body); }
 .chord-tones__whole { touch-action: none; cursor: ns-resize; }
-.chord-tones__whole[aria-pressed='true'] { border-color: var(--accent); background: var(--accent-soft); }
+.chord-tones__whole[aria-pressed='true'] { border-color: transparent; background: var(--accent-soft); color: var(--accent); }
 .chord-tones__selection { display: block; margin: 8px 0 4px; color: var(--ink-muted); font: 12px/1.5 var(--font-body); }
-.chord-tones__viewport { position: relative; max-height: 288px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--border); }
+.chord-tones__viewport { position: relative; max-height: 288px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--border); border-radius: 12px; background: var(--stage); }
 .chord-tones__canvas { display: block; width: 100%; touch-action: none; user-select: none; }
 .chord-tones__scroll-gutter { position: absolute; inset: 0 auto auto 0; width: 13.75%; touch-action: pan-y; }
-.chord-tones__lane { fill: var(--panel); stroke: var(--border); stroke-width: .5; }
-.chord-tones__lane.is-sharp { fill: color-mix(in srgb, var(--border) 24%, var(--panel)); }
+.chord-tones__lane { fill: var(--stage); stroke: color-mix(in srgb, var(--border) 55%, transparent); stroke-width: .5; vector-effect: non-scaling-stroke; }
+.chord-tones__lane.is-sharp { fill: color-mix(in srgb, var(--ink) 3.5%, var(--stage)); }
 .chord-tones__canvas text { fill: var(--ink-muted); stroke: none; font: 10px var(--font-mono); pointer-events: none; }
 .chord-tones__tone { touch-action: none; cursor: ns-resize; }
-.chord-tones__tone rect { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.chord-tones__tone rect { rx: 4px; fill: color-mix(in srgb, var(--note) 20%, var(--stage)); stroke: color-mix(in srgb, var(--note) 75%, transparent); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.chord-tones__tone:hover rect { fill: color-mix(in srgb, var(--note) 34%, var(--stage)); }
 .chord-tones__tone.is-selected rect { stroke: var(--ink); stroke-width: 2; }
 .chord-tones__tone.is-preview rect { stroke-dasharray: 4 2; }
-.chord-tones__tone text { fill: var(--ink); font-size: 12px; }
+.chord-tones__tone text { fill: var(--ink); font-size: 11px; font-weight: 600; }
 .chord-tones__hint { margin: 5px 0 0; color: var(--ink-muted); font: 11px/1.5 var(--font-body); }
 .chord-tones__message { display: block; margin-top: 4px; color: var(--err-fg); font: 12px/1.5 var(--font-body); }
 .chord-tones__message:empty { display: none; }
 .chord-tones button:focus-visible, .chord-tones__canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.chord-tones.is-playing .chord-tones__tone:not(.is-preview) rect { fill: var(--accent); }
-.chord-tones.is-playing .chord-tones__tone:not(.is-preview) text { fill: var(--panel); }
+.chord-tones.is-playing .chord-tones__tone:not(.is-preview) rect { fill: var(--note); stroke: var(--note); filter: drop-shadow(0 0 6px color-mix(in srgb, var(--note) 80%, transparent)); }
+.chord-tones.is-playing .chord-tones__tone.is-selected:not(.is-preview) rect { stroke: var(--ink); }
+.chord-tones.is-playing .chord-tones__tone:not(.is-preview) text { fill: var(--accent-ink); }
 @media (forced-colors: active) {
   .chord-tones__tone rect { fill: Canvas; stroke: CanvasText; }
   .chord-tones__tone.is-selected rect { stroke: Highlight; }

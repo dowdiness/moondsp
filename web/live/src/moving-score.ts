@@ -280,9 +280,9 @@ export function mountMovingScore(
   function renderBands(): void {
     bands.replaceChildren();
     ruler.replaceChildren();
-    const row = (y: number, name: string, sharp: boolean, pitch?: number): void => {
+    const row = (y: number, name: string, sharp: boolean, pitch?: number, octave = false): void => {
       bands.append(svgEl("rect", {
-        x: String(plotLeft), y: String(y - ROW_H / 2), width: String(plotRight - plotLeft), height: String(ROW_H),
+        x: String(plotLeft), y: String(y - ROW_H / 2), width: String(W - plotLeft), height: String(ROW_H),
         class: `moving-score__lane${sharp ? " is-sharp" : ""}`,
         ...(pitch === undefined ? {} : { "data-pitch": String(pitch) }),
       }));
@@ -292,13 +292,13 @@ export function mountMovingScore(
       }));
       const label = svgEl("text", {
         x: String(plotLeft - pixelsX(10)), y: String(y),
-        class: "moving-score__pitch-label", "dominant-baseline": "central",
+        class: `moving-score__pitch-label${sharp ? " is-sharp" : ""}${octave ? " is-octave" : ""}`, "dominant-baseline": "central",
       });
       label.textContent = name;
       bands.append(label);
     };
     for (let midi = viewHigh; midi >= viewLow; midi--) {
-      row(yAt(midi), displayPitch(pitchName(midi)), [1, 3, 6, 8, 10].includes(midi % 12), midi);
+      row(yAt(midi), displayPitch(pitchName(midi)), [1, 3, 6, 8, 10].includes(midi % 12), midi, midi % 12 === 0);
     }
     const span = Math.max(1, active?.structure.span ?? 1);
     const divisions = rulerSelect.value === "pulse" ? span * 4 : 4;
@@ -314,7 +314,7 @@ export function mountMovingScore(
       });
       label.textContent = rulerSelect.value === "pulse"
         ? tick === divisions ? "Next" : `${Math.floor(tick / 4) + 1}.${tick % 4 + 1}`
-        : span === 1 ? ["0", "¼", "½", "¾", "1"][tick] : String(Number(time.toFixed(2)));
+        : span === 1 ? ["0", "1/4", "1/2", "3/4", "1"][tick] : String(Number(time.toFixed(2)));
       ruler.append(label);
     }
   }
@@ -525,7 +525,7 @@ export function mountMovingScore(
       title.textContent = `${midi === null ? step.value : pitchName(midi)} · ${event.start}–${end} cycles · source ${step.value}`;
       group.append(title);
       group.append(block(event.start, end, y, "moving-score__note-block"));
-      if (width / pixelsX(1) >= 34) {
+      if (width / pixelsX(1) >= 30) {
         const label = svgEl("text", {
           x: String(x), y: String(y), class: "moving-score__note-label", "dominant-baseline": "central",
         });
@@ -576,7 +576,8 @@ export function mountMovingScore(
         const rightWeight = active!.structure.nodes[rightNode].weight;
         target.dataset.ratio = String(leftWeight / (leftWeight + rightWeight));
         group.append(target, svgEl("path", {
-          d: `M${centerX} ${y - ROW_H / 2 + 4}V${y + ROW_H / 2 - 4}`,
+          // Draw the grip just inside the note so it never reads as a stray tick.
+          d: `M${centerX + (edge === "left" ? 1 : -1) * Math.min(pixelsX(5), width / 4)} ${y - ROW_H / 2 + 6}V${y + ROW_H / 2 - 6}`,
           class: "moving-score__note-edge-mark", "pointer-events": "none",
         }));
       }
