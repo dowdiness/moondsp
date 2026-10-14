@@ -233,6 +233,7 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px 20px;
 .scene-art-light { fill: var(--orange); stroke: var(--ink); }
 .scene-art-offbeat { fill: var(--accent); stroke: none; }
 .scene-art-drift { fill: var(--lavender); stroke: var(--ink); }
+.scene-art-rise { fill: var(--drum-bg); stroke: var(--drum); }
 #cheat-toggle[aria-expanded='true'] { background: var(--accent-soft); color: var(--accent); }
 @media (hover: hover) and (pointer: fine) {
   button:hover:not(:disabled) { background: var(--surface); }

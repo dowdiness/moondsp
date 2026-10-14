@@ -51,6 +51,15 @@ $: s("bd ~ ~ bd sd ~ bd ~").slow(4)
 $: s("~ hh ~ hh ~ hh ~ oh").slow(4)
 $: note("C3 ~ C3 Eb3 ~ G3 Bb3 ~").slow(4).gain(0.3).lpf(1200)`,
   },
+  moonrise: {
+    name: "Moonrise",
+    source: `bpm(104);
+
+$: s("bd ~ ~ bd sd ~ bd ~, hh*8").slow(4)
+$: note("A2 ~ A2 C3 ~ E3 G2 ~").slow(4).gain(0.3).lpf(900)
+$: chord("Am7 Fmaj7 Cmaj7 G").slow(16).gain(0.12).lpf(1400)
+$: note("E5 ~ C5 D5 ~ B4 G4 A4").slow(8).gain(0.16).lpf(3200)`,
+  },
   "slow-drift": {
     name: "Slow drift",
     source: `bpm(72);
