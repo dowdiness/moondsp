@@ -186,24 +186,6 @@ test("hiding controls cancels a pending contour without writing it", async ({ pa
   await expect.poll(() => readCode(page)).toBe(source);
 });
 
-test("adding a melody preserves a chord-only stack and rejects song programs", async ({ page }) => {
-  await page.goto("/");
-  const chords = '$: chord("Cm7 Abmaj7").slow(8).gain(0.1)';
-  await replaceCode(page, chords);
-  await page.getByRole("button", { name: "Add melody", exact: true }).click();
-  await expect.poll(async () => (await readCode(page)).split("\n")[0]).toBe(chords);
-  await expect(page.locator(".moving-score__canvas")).toBeVisible();
-  await page.locator("#start").click();
-  await expect(page.locator("#status")).toHaveText("Playing");
-  await page.locator("#start").click();
-  await page.locator("#undo").click();
-  await expect.poll(() => readCode(page)).toBe(chords);
-  const song = 'song(section("a", 4, note("C4 E4")), part("melody", "a"))';
-  await replaceCode(page, song);
-  await expect(page.getByRole("button", { name: "Add melody", exact: true })).toBeDisabled();
-  await expect.poll(() => readCode(page)).toBe(song);
-});
-
 test("closing pitch controls retains edits and history", async ({ page }) => {
   await page.goto("/");
   const source = 'note("C4 E4").gain(0.2)';

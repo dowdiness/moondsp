@@ -151,7 +151,6 @@ const scoreSession = mountScoreSession(view);
 const undoBtn = document.getElementById("undo") as HTMLButtonElement;
 const redoBtn = document.getElementById("redo") as HTMLButtonElement;
 const sourceToggle = document.getElementById("source-toggle") as HTMLButtonElement;
-const addMelodyBtn = document.getElementById("add-melody") as HTMLButtonElement;
 
 function refreshEditorChrome(): void {
   undoBtn.disabled = undoDepth(view.state) === 0;
@@ -159,12 +158,6 @@ function refreshEditorChrome(): void {
   const head = view.state.selection.main.head;
   const line = view.state.doc.lineAt(head);
   setText(document.getElementById("cursor-position")!, `Ln ${line.number}, Col ${head - line.from + 1}`);
-  addMelodyBtn.disabled = !patternTools || !patternTools.canAppendMelody(view.state);
-  addMelodyBtn.title = !patternTools
-    ? document.body.dataset.authoring === "failed"
-      ? "Score tools unavailable. Reload to try again; code remains editable."
-      : "Loading score tools. You can edit code now."
-    : addMelodyBtn.disabled ? "Available for empty or $: stack scores" : "Add melody";
   const text = view.state.doc.toString();
   const starter = Object.entries(STARTERS).find(([, value]) => value.source === text);
   setText(document.getElementById("score-title")!, starter?.[1].name ?? "Your score");
@@ -185,7 +178,6 @@ function replaceScore(source: string): void {
 
 undoBtn.addEventListener("click", () => { undo(view); view.focus(); });
 redoBtn.addEventListener("click", () => { redo(view); view.focus(); });
-addMelodyBtn.addEventListener("click", () => patternTools?.appendMelody(view));
 sourceToggle.addEventListener("click", () => {
   const enabled = sourceToggle.getAttribute("aria-pressed") !== "true";
   sourceToggle.setAttribute("aria-pressed", String(enabled));

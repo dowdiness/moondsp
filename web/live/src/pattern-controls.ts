@@ -106,26 +106,6 @@ export function sourcePatterns(state: EditorState): Pattern[] {
   return patterns;
 }
 
-export function canAppendMelody(state: EditorState): boolean {
-  const source = state.doc.toString();
-  return source.trim().length === 0 || miniliveLanguage.parser.parse(source).topNode.getChild("DollarStack") !== null;
-}
-
-export function appendMelody(view: EditorView): void {
-  if (!canAppendMelody(view.state)) return;
-  const doc = view.state.doc;
-  const separator = doc.length === 0 || doc.sliceString(doc.length - 1) === "\n" ? "" : "\n";
-  const notes = "C4 Eb4 F4 G4 Bb4 G4 F4 Eb4";
-  const source = `${separator}$: note("${notes}").slow(6).gain(0.12).lpf(1600).pan(0.35)`;
-  view.dispatch({
-    changes: { from: doc.length, insert: source },
-    selection: { anchor: doc.length + separator.length + 9 },
-    annotations: isolateHistory.of("full"),
-    scrollIntoView: true,
-  });
-  view.focus();
-}
-
 const liveWidgets = new WeakMap<HTMLElement, PatternWidgetDOM>();
 class PatternWidgetDOM {
   readonly dom = document.createElement("section");

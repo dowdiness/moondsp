@@ -3,7 +3,7 @@ import type { Page } from "@playwright/test";
 import { readCode, replaceCode } from "./editor-helpers";
 
 const authoringAsset = /\/assets\/authoring-[^/]+\.js$/;
-const gatedControls = ["#start", "#restart", "#source-toggle", "#add-melody"];
+const gatedControls = ["#start", "#restart", "#source-toggle"];
 
 function gateAuthoringRequest() {
   let release!: () => void;
