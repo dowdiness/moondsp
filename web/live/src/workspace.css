@@ -203,23 +203,7 @@ summary { cursor: pointer; font-weight: 700; min-height: 40px; padding: 10px 0; 
 #cheat dd { margin: 0 0 10px; color: var(--ink-muted); }
 #cheat .example { display: block; width: 100%; justify-content: flex-start; text-align: left; margin-top: 16px; padding: 8px 10px; font-size: 11px; font-weight: 700; border: 1px solid var(--border); background: var(--panel); overflow-wrap: anywhere; white-space: pre-wrap; }
 .cheat-note { margin: 6px 0 18px; font-size: 11px; }
-.starting-points { margin: 22px 0; }
 .starting-label { font-weight: 700; }
-.starter-list { display: grid; gap: 5px; }
-.starter { width: 100%; text-align: left; justify-content: flex-start; gap: 12px; padding: 9px; border-radius: 7px; }
-.starter[aria-pressed='true'] { background: var(--accent-soft); }
-.starter strong, .starter small { display: block; }
-.starter strong { font-size: 12px; }
-.starter small { font-size: 10px; font-weight: 400; color: var(--ink-muted); }
-.starter-tempo { margin-left: auto; white-space: nowrap; font: 10px var(--font-mono); color: var(--ink-muted); }
-.starter-art { flex-shrink: 0; width: 33px; height: 33px; display: flex; gap: 3px; align-items: center; justify-content: center; border-radius: 4px; color: var(--accent); }
-.starter-art i { width: 3px; height: 9px; background: currentColor; }
-.starter-art i:nth-child(2) { height: 22px; }
-.starter-art i:nth-child(3) { height: 16px; }
-.starter-art i:nth-child(4) { height: 25px; }
-.art-offbeat { color: var(--drum); transform: rotate(90deg); }
-.art-drift i { border-radius: 100%; width: 5px; }
-.starter-note { font-size: 10px; }
 footer { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px 20px; max-height: 40dvh; overflow: auto; padding: 4px 12px; }
 .playback-details { display: flex; flex: 1; align-items: flex-start; justify-content: flex-end; gap: 20px; }
 .change-status { display: flex; gap: 10px; align-items: flex-start; min-width: 0; }

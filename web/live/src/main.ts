@@ -161,8 +161,6 @@ function refreshEditorChrome(): void {
   const text = view.state.doc.toString();
   const starter = Object.entries(STARTERS).find(([, value]) => value.source === text);
   setText(document.getElementById("score-title")!, starter?.[1].name ?? "Your score");
-  document.querySelectorAll<HTMLButtonElement>("[data-starter]").forEach(button =>
-    button.setAttribute("aria-pressed", String(button.dataset.starter === starter?.[0])));
   document.querySelectorAll<HTMLButtonElement>("[data-scene]").forEach(button =>
     button.setAttribute("aria-pressed", String(button.dataset.scene === starter?.[0])));
 }
@@ -483,15 +481,6 @@ narrowHelp.addEventListener("change", () => {
   if (!cheatEl.open) return;
   cheatEl.close();
   setHelp(true);
-});
-document.querySelectorAll<HTMLButtonElement>("[data-starter]").forEach(button => {
-  button.addEventListener("click", () => {
-    const starter = STARTERS[button.dataset.starter as keyof typeof STARTERS];
-    if (starter) {
-      if (narrowHelp.matches) setHelp(false);
-      replaceScore(starter.source);
-    }
-  });
 });
 
 document.querySelectorAll<HTMLButtonElement>("[data-scene]").forEach(button => {

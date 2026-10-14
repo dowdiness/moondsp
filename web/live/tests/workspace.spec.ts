@@ -225,7 +225,7 @@ test("mobile Help contains keyboard focus, closes on Escape and yields to a chos
   await expect(help).not.toBeVisible();
   await expect(trigger).toBeFocused();
   await trigger.click();
-  await page.locator('[data-starter="slow-drift"]').click();
+  await page.getByRole("button", { name: "Explore Slow drift", exact: true }).click();
   await expect(help).not.toBeVisible();
   await expect(page.locator(".cm-content")).toBeFocused();
   expect(await readCode(page)).toContain("bpm(72)");
