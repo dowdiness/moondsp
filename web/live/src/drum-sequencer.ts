@@ -156,6 +156,7 @@ export function mountDrumSequencer(
     if (result) return result;
     const row = document.createElement("div");
     row.className = "drum-sequencer__row";
+    row.dataset.sound = key;
     const rowLabel = document.createElement("div");
     rowLabel.className = "drum-sequencer__sound-label";
     rowLabel.textContent = label;

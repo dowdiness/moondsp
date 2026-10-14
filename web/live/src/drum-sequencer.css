@@ -1,16 +1,52 @@
+/* A compact step sequencer: small pads, one quiet frame, sound labels at the
+   left. Columns are source steps, not beats; pads keep a 44 px touch size on
+   coarse pointers and narrow screens. */
 .drum-sequencer {
-  --drum-label-width: 88px;
-  --drum-cell-size: 48px;
+  --drum-label-width: 64px;
+  --drum-cell-size: 30px;
+  --drum-cell-height: 26px;
+  --drum-gap: 3px;
+  /* The dark-theme pastels are used in both themes, one hue per sound. On the
+     light panel each filled pad adds a deeper edge of its hue for definition. */
+  --sound-bd: #efb596;
+  --sound-sd: #f0c97e;
+  --sound-hh: #8fd0b0;
+  --sound-oh: #9cc6e4;
+  --sound-cp: #c4b6f2;
+  --edge-bd: #934a2a;
+  --edge-sd: #a8641a;
+  --edge-hh: #2c7558;
+  --edge-oh: #2f6b97;
+  --edge-cp: #6b55b3;
+  --pad-empty: 18%;
+  --pad-edge: 1px;
   max-width: 100%;
   min-width: 0;
   color: var(--ink);
   font: inherit;
 }
+@media (prefers-color-scheme: dark) {
+  .drum-sequencer {
+    --pad-empty: 10%; --pad-edge: 0px;
+    --edge-bd: var(--sound-bd); --edge-sd: var(--sound-sd); --edge-hh: var(--sound-hh); --edge-oh: var(--sound-oh); --edge-cp: var(--sound-cp);
+  }
+}
+.drum-sequencer__row { --row-color: var(--ink-muted); --row-edge: var(--ink-muted); }
+.drum-sequencer__row[data-sound='bd'] { --row-color: var(--sound-bd); --row-edge: var(--edge-bd); }
+.drum-sequencer__row[data-sound='sd'] { --row-color: var(--sound-sd); --row-edge: var(--edge-sd); }
+.drum-sequencer__row[data-sound='hh'] { --row-color: var(--sound-hh); --row-edge: var(--edge-hh); }
+.drum-sequencer__row[data-sound='oh'] { --row-color: var(--sound-oh); --row-edge: var(--edge-oh); }
+.drum-sequencer__row[data-sound='cp'] { --row-color: var(--sound-cp); --row-edge: var(--edge-cp); }
 .drum-sequencer__viewport {
+  width: fit-content;
   max-width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-inline: contain;
+  padding: 6px 10px 8px 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
   outline: none;
@@ -18,15 +54,14 @@
 .drum-sequencer__matrix {
   display: grid;
   width: max-content;
-  min-width: 100%;
-  padding: 2px 0 5px;
+  row-gap: var(--drum-gap);
   --step-count: 0;
 }
 .drum-sequencer__row {
   display: grid;
   grid-template-columns: var(--drum-label-width) repeat(var(--step-count), var(--drum-cell-size));
-  align-items: stretch;
-  min-height: var(--drum-cell-size);
+  align-items: center;
+  column-gap: var(--drum-gap);
 }
 .drum-sequencer__sound-label {
   position: sticky;
@@ -34,63 +69,53 @@
   z-index: 2;
   display: flex;
   align-items: center;
-  padding: 0 8px 0 0;
+  height: 100%;
+  padding-right: 8px;
   background: var(--panel);
   color: var(--ink-muted);
-  font-size: 11px;
+  font: 500 11px/1.2 var(--font-body);
   white-space: nowrap;
 }
-.drum-sequencer__header .drum-sequencer__sound-label {
-  align-items: end;
-  padding-bottom: 5px;
-}
+.drum-sequencer__row:not(.drum-sequencer__header) .drum-sequencer__sound-label::before { content: ''; flex: none; width: 6px; height: 6px; margin-right: 7px; border-radius: 50%; background: var(--row-color); box-shadow: inset 0 0 0 var(--pad-edge) var(--row-edge); }
+.drum-sequencer__header .drum-sequencer__sound-label { color: transparent; }
+.drum-sequencer__row:not(.drum-sequencer__header):not(:has([aria-pressed='true'])) .drum-sequencer__sound-label { color: var(--ink-faint); }
+.drum-sequencer__row:not(.drum-sequencer__header):not(:has([aria-pressed='true'])) .drum-sequencer__sound-label::before { opacity: .55; }
+
 .drum-sequencer__step,
 .drum-sequencer__cell {
   width: var(--drum-cell-size);
-  min-width: var(--drum-cell-size);
-  height: var(--drum-cell-size);
-  min-height: var(--drum-cell-size);
+  min-width: 0;
+  height: var(--drum-cell-height);
+  min-height: 0;
   margin: 0;
   padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 2px;
-  font: 11px/1 var(--font-mono);
+  border: 0;
+  border-radius: 6px;
+  font: 10px/1 var(--font-mono);
 }
 .drum-sequencer__step {
-  color: var(--ink-muted);
-  border-bottom-color: var(--ink-muted);
+  height: 18px;
+  background: transparent;
+  color: var(--ink-faint);
+  font-weight: 400;
 }
 .drum-sequencer__step.is-selected {
-  border-color: var(--accent);
-  background: var(--accent-soft);
+  background: transparent;
   color: var(--accent);
+  font-weight: 700;
   box-shadow: inset 0 -2px var(--accent);
+  border-radius: 0;
 }
 .drum-sequencer__cell {
-  background: transparent;
-  color: var(--drum);
-  font-size: 15px;
+  background: color-mix(in srgb, var(--row-color) var(--pad-empty), var(--panel));
+  color: var(--row-color);
 }
-.drum-sequencer__cell.is-selected-column {
-  border-top-color: color-mix(in srgb, var(--accent) 55%, var(--border));
-  border-bottom-color: color-mix(in srgb, var(--accent) 55%, var(--border));
-}
-.drum-sequencer__cell[aria-pressed='true'] {
-  border-color: var(--drum);
-  background: var(--drum-bg);
-  color: var(--drum);
-  font-size: 11px;
-}
-.drum-sequencer__cell[aria-pressed='true']::before {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: currentColor;
-  content: '';
-}
+.drum-sequencer__cell.is-selected-column { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ink) 38%, transparent); }
+.drum-sequencer__cell[aria-pressed='true'] { background: var(--row-color); box-shadow: inset 0 0 0 var(--pad-edge) var(--row-edge); }
+.drum-sequencer__cell[aria-pressed='true'].is-selected-column { box-shadow: inset 0 0 0 2px var(--panel), inset 0 0 0 3.5px color-mix(in srgb, var(--ink) 55%, transparent); }
 .drum-sequencer__cell.is-playing {
-  background: var(--drum);
-  color: var(--panel);
+  background: var(--row-color);
+  box-shadow: inset 0 0 0 var(--pad-edge) var(--row-edge), 0 0 0 2px var(--panel), 0 0 0 4px var(--row-edge);
 }
 .drum-sequencer__step:focus-visible,
 .drum-sequencer__cell:focus-visible {
@@ -103,8 +128,20 @@
   color: var(--ink-muted);
   font-size: 11px;
 }
-@media (max-width: 760px) {
-  .drum-sequencer { --drum-label-width: 80px; --drum-cell-size: 48px; }
+@media (prefers-reduced-motion: no-preference) {
+  .drum-sequencer__cell { transition: background-color 120ms var(--ease-out); }
+  .drum-sequencer__cell.is-playing { animation: drum-hit 300ms var(--ease-out); transition: none; }
+}
+@keyframes drum-hit {
+  from { transform: scale(.82); }
+}
+@media (hover: hover) and (pointer: fine) {
+  .drum-sequencer__cell:hover:not([aria-pressed='true']) { background: color-mix(in srgb, var(--row-color) 30%, var(--panel)); }
+  .drum-sequencer__step:hover { background: transparent; color: var(--ink); }
+}
+@media (pointer: coarse), (max-width: 760px) {
+  .drum-sequencer { --drum-label-width: 58px; --drum-cell-size: 44px; --drum-cell-height: 40px; --drum-gap: 4px; }
+  .drum-sequencer__step { height: 28px; }
 }
 @media (forced-colors: active) {
   .drum-sequencer__step.is-selected,
