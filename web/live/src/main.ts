@@ -28,6 +28,7 @@ import type { Draft } from "./authoring";
 import type { DraftVersion } from "./draft-version";
 import type { Player, PlaybackView } from "./playback";
 import { mountOutputScope } from "./output-scope";
+import { mountScoreLink } from "./score-link";
 import { playbackHighlights } from "./playback-highlights";
 import { mountPlaybackObservation } from "./playback-observation";
 import { phraseUpdateStatus, renderPhraseUpdateStatus } from "./phrase-update-status";
@@ -351,6 +352,7 @@ let compiledSession: CompiledSession | undefined;
 const outputScope = mountOutputScope(document.getElementById("output-scope")!, {
   readWaveform: target => engine.readWaveform(target),
 });
+const scoreLink = mountScoreLink(view, document.getElementById("share-score") as HTMLButtonElement | null);
 if (import.meta.hot) import.meta.hot.dispose(() => {
   disposed = true;
   cancelAnimationFrame(startupFrame);
@@ -359,6 +361,7 @@ if (import.meta.hot) import.meta.hot.dispose(() => {
   playbackObservation?.dispose();
   view.destroy();
   outputScope.dispose();
+  scoreLink.dispose();
   scoreSession.dispose();
 });
 async function toggleCompiled(): Promise<void> {

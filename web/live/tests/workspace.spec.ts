@@ -264,6 +264,42 @@ test("UTF-8 import is undoable, downloads exact text, and survives reload", asyn
   await expect.poll(() => readCode(page)).toBe("");
 });
 
+test("a copied score link reopens the exact UTF-8 text as one undoable replacement", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.goto("/");
+  await replaceCode(page, imported);
+  await page.locator("#share-score").click();
+  await expect(page.locator("#session-message")).toContainText("Link copied");
+  const link = await page.evaluate(() => navigator.clipboard.readText());
+  expect(link).toMatch(/#score=[A-Za-z0-9_-]+$/);
+  // Sharing again replaces whatever the clipboard held since.
+  await page.evaluate(() => navigator.clipboard.writeText("stale"));
+  await page.locator("#share-score").click();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(link);
+
+  const other = await context.newPage();
+  await other.goto("/");
+  await replaceCode(other, 's("bd sd")');
+  await other.goto(link);
+  await expect.poll(() => readCode(other)).toBe(imported);
+  await expect(other.locator("#session-message")).toContainText("Opened a shared score");
+  expect(await other.evaluate(() => location.hash)).toBe("");
+  await other.locator("#undo").click();
+  expect(await readCode(other)).toBe('s("bd sd")');
+});
+
+test("a refused clipboard write leaves the score and address unchanged and says so", async ({ page }) => {
+  await page.addInitScript(() => {
+    navigator.clipboard.write = () => Promise.reject(new DOMException("Denied", "NotAllowedError"));
+  });
+  await page.goto("/");
+  await replaceCode(page, 'note("C4 E4")');
+  await page.locator("#share-score").click();
+  await expect(page.locator("#session-message")).toContainText("Could not copy a link");
+  expect(await page.evaluate(() => location.hash)).toBe("");
+  expect(await readCode(page)).toBe('note("C4 E4")');
+});
+
 test("an untouched stale tab cannot overwrite a newer saved score on exit", async ({ page, context }) => {
   await page.goto("/");
   await replaceCode(page, 'note("C4")');

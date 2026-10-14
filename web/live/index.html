@@ -39,6 +39,7 @@
       <nav class="file-actions" aria-label="Score files and help">
         <button id="open-score" type="button" class="quiet-button">Open</button>
         <button id="save-score" type="button" class="quiet-button">Download</button>
+        <button id="share-score" type="button" class="quiet-button" title="Copy a link that opens this score">Share</button>
         <button id="cheat-toggle" type="button" class="quiet-button" aria-controls="cheat" aria-expanded="false">Help</button>
         <input id="score-file" type="file" accept=".mini,.txt,text/plain" hidden />
       </nav>
@@ -106,6 +107,7 @@
         <details class="help-basics">
           <summary>Files &amp; recovery</summary>
           <p>Open imports a plain-text score; Download saves a <code>.mini</code> file you can edit, share, or use with your own AI tools. Nothing is sent to an AI service.</p>
+          <p>Share copies a link that opens this score. The score travels inside the link itself; nothing is uploaded. Opening a link replaces your text once, and Undo restores it.</p>
           <p>Each edited session saves a separate recovery copy before updating the shared saved score. Saved drafts contains recovery copies from other sessions. Restore supports Undo. If tabs save at the same time, both drafts remain available after reopening, even if one replaces the shared score. You can permanently delete a saved draft after confirmation. Copies stay in this browser until you delete them; Download keeps a separate file. If browser storage is full or unavailable, download your open score before leaving.</p>
         </details>
         <details class="help-basics">
