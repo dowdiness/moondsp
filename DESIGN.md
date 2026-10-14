@@ -4,29 +4,32 @@ A text-first music editor in the browser. The source document is the editable sc
 
 ## Form
 
-A source-bound note grid sits directly beneath its editable phrase. Labelled pitch rows, subtle accidental-key shading, a cycle ruler, and rectangular notes replace pitch-connecting curves and eye-shaped marks. Deep green ink and the existing cobalt accent remain part of the code-first workspace. Sonic Pi informs role separation; Ableton Learning Music informs the note-grid vocabulary, not an independent DAW model.
+A source-bound note grid sits directly beneath its editable phrase: labelled pitch rows with a piano-key column, a cycle ruler, and rounded note blocks. Sonic Pi informs role separation; Ableton Learning Music informs the note-grid vocabulary, not an independent DAW model.
+
+**Signature.** The signal horizon under the masthead is the only decorative-looking element, and it is driven by measurements of the post-master analyser. It is a scrolling level history (up to 8 s; about two 20 ms slots per bar, so narrow screens show a shorter window) drawn as rounded 3 px bars on a 5 px pitch, mirrored about a centre line, newest at the right. Each bar takes the loudest 20 ms RMS slot in its window, normalised by a peak tracker with a 3 s half-life and mapped over a 30 dB range, with an instant attack and a short visual release so hits read as shapes. Bars fade with age; silence leaves a dotted baseline. Behind the bars, the present waveform (triggered at a rising zero crossing, tapered at the edges) sways across the full width as a teal-to-lavender gradient (`--wave-a` → `--wave-b`: `#2f9479` → `#8b7ad8` light, `#8fd0b0` → `#c4b6f2` dark), lightly smoothed over three samples. Ticks along the bottom edge mark each transport cycle, with a longer accent tick every fourth cycle. A stopped transport freezes the history at reduced opacity; gaps longer than 250 ms (a hidden tab) are skipped like a pause rather than interpolated. The level model is a pure module (`web/live/src/level-history.ts`) with its own tests; drawing stays in `signal-horizon.ts`. It does not claim note provenance or that a pending edit is audible.
 
 ## What is primary
 
-- **Text editing is the musical source of truth.** CodeMirror holds the draft. Text, GUI controls, starters, and file imports change that document through transactions. The engine separately retains the last accepted score and sounding material.
-- **One editor, multiple ways to edit.** Starting sounds play directly. The focused phrase opens a 760 px maximum-width grid below its source. Pitch rows are 20 px high and fit the phrase's range, with at least one octave. Wide ranges scroll vertically inside a 304 px desktop / 264 px mobile viewport; the 24 px cycle ruler stays outside that scrolling area. Notes contain pitch names when space permits; narrow notes retain pitch-row context and accessible names. Source labels remain editor-sized, and touch toolbar actions retain 44 px targets.
+- **Text editing is the musical source of truth.** CodeMirror holds the draft. Text, GUI controls, starting sounds, and file imports change that document through transactions. The engine separately retains the last accepted score and sounding material.
+- **One editor, multiple ways to edit.** Starting sounds play directly. The focused phrase opens a grid of up to 1080 px below its source. Pitch rows are 20 px high and fit the phrase's range, with at least one octave. Wide ranges scroll vertically inside a 304 px desktop / 264 px mobile viewport; the 24 px cycle ruler stays outside that scrolling area. Notes contain pitch names when space permits; narrow notes retain pitch-row context and accessible names. Source labels remain editor-sized, and touch toolbar actions retain 44 px targets.
 - **No alternative GUI truth.** There is no separate sequencer state, project file, or hidden model that can disagree with the source. What you see in the pads is what the source says at your cursor.
-- **The editor fills the viewport.** No outer card, centered width cap, or page gutters. A compact toolbar and status strip bound an independently scrolling code surface. Starting sounds live in Help; the waveform opens under Playback details. Errors, save failures, and recovery actions remain available.
+- **The editor fills the viewport, with as few words as possible.** No outer card, centered width cap, or page gutters. One icon toolbar (accessible names and tooltips, no visible labels) and the horizon sit above an independently scrolling code surface at a performance-friendly `clamp(15px, min(1.3vw, 2.6vh), 22px)`. A single 30 px status line at the bottom shows change status on the left and save state and cursor position on the right; messages, errors, and saved drafts add rows only when present. Starting sounds and Playback details (audio output, versions) live in Help.
 
 ## Typography
 
+- **Brand:** the original waveform mark and Manrope bold "moondsp." (16 px, -0.035 em, cobalt dot), hidden at ≤1100 px.
 - **Body:** Manrope (regular 400, bold 700), self-hosted from `/fonts/` under the SIL Open Font License.
 - **Code and notation:** JetBrains Mono (regular 400), self-hosted under the SIL Open Font License.
-- **Scale:** body 14 px / 1.55 on desktop; score content 14 px / 1.95 (15 px at ≥1600 px, 13 px at ≤760 px). Brand 16 px, transport status 12 px, document status 11 px. Pitch labels suppress inherited SVG strokes; dark-scheme pastel marks use dark text.
-- **Measurements:** tabular numerals in transport; letter-spacing -0.035 em on the brand; -0.02 em on headings.
+- **Scale:** body 14 px / 1.55 on desktop; score content `clamp(15px, min(1.3vw, 2.6vh), 22px)` / 1.95 (14 px at ≤760 px), with line numbers at 62% of it. Wordmark 16 px, transport status 13 px, status line 11 px. Help headings are Manrope bold 18 px (title) and 16 px (sections); section labels use 10.5 px uppercase with 0.14 em tracking.
+- **Measurements:** tabular numerals in transport and positions.
 
 ## Color
 
-Light and dark palettes are defined as CSS custom properties in [`web/live/src/workspace.css`](web/live/src/workspace.css).
+Light and dark palettes are the established moondsp colors, defined as CSS custom properties in [`web/live/src/workspace.css`](web/live/src/workspace.css). The workspace follows `prefers-color-scheme` in CSS alone, so the first paint is already correct; two `theme-color` meta tags carry each scheme's color. There is no theme toggle and no theme script.
 
-- **Light:** ink `#153e39` on `#f9fbf8` over `#e9efeb`, with cobalt `#354acb`. The grid uses the editor panel and border colors rather than a separate colored stage.
-- **Dark:** ink `#e2eee5` on `#1e3631` over `#162c28`, with accent `#b8c1ff`; the grid inherits those same tokens.
-- **Notes:** neutral pitch rows, subtle accidental-key bands, soft accent blocks, ink selection outlines, and solid accent playback fills. Pitch names and position carry meaning rather than a decorative pitch-color palette.
+- **Light:** ink `#153e39` on `#f9fbf8` over `#e9efeb`, with cobalt `#354acb` for notes, focus, and Play, and rust `#934a2a` for percussion. The grid uses the editor panel and border colors rather than a separate colored stage.
+- **Dark:** ink `#e2eee5` on `#1e3631` over `#162c28`, with accent `#b8c1ff`, percussion `#efb596`, and Play `#485db9`.
+- **Notes:** tinted rounded blocks with a note-colored stroke; selection is an ink outline; the latest onset is a solid note fill with a soft glow. Pitch names and position carry meaning rather than a decorative pitch-color palette.
 - **Semantic colors:** successful, invalid, pending, and accepted playback states remain separate from note selection and onset indication.
 - **Forced colors:** selected controls retain `Highlight` borders; note selection uses a 3 px `Highlight` stroke, and playing blocks use `Highlight` / `HighlightText`.
 
@@ -45,14 +48,14 @@ Light and dark palettes are defined as CSS custom properties in [`web/live/src/w
 - **Timing:** the optional disclosure separates relative Weight (`@1`–`@16`, total at most 256) from Phrase stretch (`.slow(n)`) and Phrase gate (`.gate(n)`). Weight can move subsequent onsets; gate cannot. Existing whitespace, comments, postfix order, and surrounding transforms survive local edits. Invalid input restores the previous field value with feedback.
 - **Pitch controls:** the optional disclosure contains numbered selection buttons, octave browsing, and the chromatic keyboard. Its open state follows the source phrase for the session. Numeric and flat spellings are preserved; selecting the current pitch does not rewrite it.
 - **Chords:** numbered source steps select a chord without changing playback. Editable tone rows sit beneath them: drag a tone vertically, drag Move chord to transpose all tones, tap an empty row or use Add tone, and remove the selected tone. Lower/Raise and keyboard arrows provide discrete edits. Pointer movement previews only; release writes one shared Undo step, while Escape, cancellation, or a changed source discards the gesture. Exact compiler-derived voicings retain chord names; other combinations, including inversions, use sorted explicit MIDI sets such as `{64,67,72}`. Collisions and out-of-range tones are rejected rather than merged or clamped. The last removed tone becomes a rest. Choose by chord name discloses the optional Root/Type selectors for named chords; custom sets are edited directly. View chord tones remains an optional whole-progression inspection diagram, not another editing state. Actual-onset highlights mark source steps and the selected chord's tones independently of selection. Weights, groups, linked repetitions, and surrounding transforms survive.
-- **Percussion:** a dedicated matrix has Kick, Snare, Hi-hat, Open hat, and Clap rows. Columns are source atoms, not a performance ruler. A filled cell clears to `~`; an empty cell sets/replaces that atom's sound. Headers select without editing. Postfixes, grouping, and linked repeats stay intact; parallel layers remain code-authored. Sticky sound labels and internal horizontal scrolling keep 48 px cells usable on narrow screens. Only occupied cells receive actual-onset highlights.
+- **Percussion:** a compact matrix inside one quiet frame has Kick, Snare, Hi-hat, Open hat, and Clap rows. Columns are source atoms, not a performance ruler; small step numbers sit above them and the selected step is underlined. Pads are 30 × 26 px on fine pointers and 44 × 40 px on coarse pointers or ≤760 px, with 3–4 px gaps. The matrix frame uses the theme's panel. Each sound has the same pastel hue in both themes (Kick peach, Snare amber, Hi-hat mint, Open hat sky, Clap lavender), shown as a dot before its label. Empty pads are a faint tint of that hue; filled pads are solid, and on the light panel they add a 1 px edge in a deeper shade of their hue for definition, the selected column has a neutral ink outline, and an actual onset adds a ring. A filled cell clears to `~`; an empty cell sets/replaces that atom's sound. Headers select without editing. Postfixes, grouping, and linked repeats stay intact; parallel layers remain code-authored. Sticky sound labels and internal horizontal scrolling keep touch-sized pads usable on narrow screens. Only occupied cells receive actual-onset highlights. Rows with no hits in the phrase have fainter labels.
 - **Shared history, not a second comparison model:** no kept versions, candidate proposals, motif generators, answers, or auxiliary audition Player. Use Undo/Redo to try and reverse source edits.
-- **Add melody:** the toolbar appends an editable phrase to an empty or stack score, including chord-only stacks, and moves the source cursor to it. It does not convert an arranged song into a stack.
-- **Audio output:** under Playback details, a post-master analyser displays the main transport's samples. It does not claim note provenance or that a pending source edit is already sounding.
+- **Audio output:** under Playback details in Help, a post-master analyser displays the main transport's samples. It does not claim note provenance or that a pending source edit is already sounding.
 - **Keyboard focus:** steps and pitch keys use roving Tab stops; percussion arrows move between sound rows and source columns, with Space/Enter toggling the focused cell. Source atoms, groups, and boundary sliders are keyboard reachable; boundary arrows adjust adjacent weights. Grid Up/Down changes pitch by a semitone, Alt+Left/Right reorders a note, Shift+Left/Right resizes its right boundary, and Delete/Backspace clears it. Numbered-note-step Up/Down changes pitch, with Shift for an octave. Escape cancels a pending gesture and returns to code. Numeric fields retain native text undo; Enter commits and Escape discards unfinished input.
 - **Inline knobs** edit gain and filter values for note and chord voices; drums are not affected.
-- **File actions:** Open (`.mini`, `.txt`, `text/plain`), Download, Help. Imports are bounded at 1 MiB and decoded by the browser's `File.text()`; they need not be valid MiniLive to remain editable.
-- **Starting sounds** in Help start playback; **Load a score** only replaces the text. Both support Undo. On mobile, either choice closes Help and focuses the editor.
+- **File actions:** Import (document-with-up-arrow icon; `.mini`, `.txt`, `text/plain`), Download, Share (connected-nodes icon), Help. Imports are bounded at 1 MiB and decoded by the browser's `File.text()`; they need not be valid MiniLive to remain editable.
+- **Share:** copies a link to the clipboard. The link's URL fragment carries the score, compressed with `deflate-raw` and base64url-encoded; fragments are never sent to a server. The click hands the clipboard a `ClipboardItem` whose text is the link still being encoded, so the write starts inside the gesture (Safari rejects writes after an await). There is no other path: if the clipboard refuses, the message says so and points to Download. Confirmation clears after 4 s. Opening a link (or changing to a `#score=` fragment) behaves like Import, with the same 1 MiB bound enforced while inflating (oversized fragments are refused before decoding): one undoable replacement, refused if the text changed while decoding, then the fragment is removed. Links over 8,000 characters warn that Download is safer.
+- **Starting sounds** in Help are four icon-only cards (First light, Offbeat, Slow drift, Moonrise, named by tooltip and accessible label). A card replaces the score and starts playback; Undo restores the previous score. On mobile it closes Help and focuses the editor.
 - **Examples** in Help replace the score and are individually labelled with duration and what to listen for.
 
 ## One immutable text score
@@ -62,7 +65,7 @@ Light and dark palettes are defined as CSS custom properties in [`web/live/src/w
 - **Restore** returns to the last accepted score via a regular undoable CodeMirror transaction.
 - **Session persistence** uses `localStorage` under `moondsp.live.score.v1`, debounced at 350 ms. Pending edits are flushed synchronously on `pagehide`; an untouched tab does not rewrite its loaded score. The stored text is compared with the session's last saved text; an observed conflict leaves the shared score untouched, reports **Not saved**, and retains the draft for recovery or Download. This check is not a cross-tab transaction: overlapping saves can still replace the shared score.
 - **Recovery copies** prevent that overlap from destroying either edit. Before publishing an edited score, each save writes `{ source, savedAt }` to a fresh `moondsp.live.draft.v1.<UUID>` key. Only after that succeeds may the tab remove its own previous checkpoint and attempt the shared write. It never removes another session's copy automatically. A checkpoint failure blocks the shared write and asks the user to Download. This is local browser storage, not protection against storage eviction, quota exhaustion, or a process killed before pending edits flush.
-- **Saved drafts** in the bottom status strip lists checkpoints from other sessions, newest first, with source previews. Expanding it uses the bounded, scrollable footer rather than covering the editor. Restore inserts the complete text through the shared undo history; confirmed Delete removes only that immutable key, so deleting an older displayed snapshot cannot remove a newer checkpoint. An open list stays stable while other tabs save and refreshes when reopened. Copies from closed sessions remain until explicitly deleted; an active session normally retains one latest checkpoint.
+- **Saved drafts** in the bottom status line (shown only when copies exist) lists checkpoints from other sessions, newest first, with source previews. Expanding it uses the bounded, scrollable footer rather than covering the editor. Restore inserts the complete text through the shared undo history; confirmed Delete removes only that immutable key, so deleting an older displayed snapshot cannot remove a newer checkpoint. An open list stays stable while other tabs save and refreshes when reopened. Copies from closed sessions remain until explicitly deleted; an active session normally retains one latest checkpoint.
 
 ## Help
 
@@ -70,28 +73,29 @@ All explanatory prose — first-sound story, syntax reference, what controls can
 
 ## Responsive layout
 
-- **Viewport:** `100dvh` shell, no maximum width or outside padding. The editor fills the remaining height between toolbar and footer; CodeMirror owns long-document scrolling. Expanded playback details and error messages can use up to 40% of viewport height before the footer scrolls.
-- **Desktop (>1100 px):** one wrapping toolbar for brand, transport, score tools, and file actions. Optional Help occupies a 344 px right column with its own scrolling.
-- **Narrow (≤1100 px):** brand yields space to controls; optional Help narrows to 288 px.
-- **Mobile (≤760 px):** transport and files occupy the first row, score tools the second. Help becomes a native modal up to `min(380px, 100%)`, contains focus, closes on Escape, and restores the trigger.
-- **Compact (≤380 px):** playback control widths and file-button padding contract; the editor remains edge-to-edge.
-- **≥1600 px:** score font grows to 15 px without adding a minimum editor height.
+- **Viewport:** `100dvh` shell, no maximum width or outside padding. The editor fills the remaining height between toolbar and footer; CodeMirror owns long-document scrolling. Error messages and expanded saved drafts can use up to 40% of viewport height before the status line scrolls.
+- **Desktop (>1100 px):** one row with the wordmark, transport, and right-aligned icons (Undo, Redo, Controls │ Import, Download, Share, Help), above a `clamp(56px, 8.5vh, 92px)` horizon. Optional Help occupies a 372 px right column with its own scrolling.
+- **Narrow (≤1100 px):** optional Help narrows to 300 px.
+- **Mobile (≤760 px):** the wordmark is hidden; transport occupies the first row, the seven icons share the second, and a 44 px horizon the third. The tempo shows BPM only. Help becomes a native modal up to `min(380px, 100%)`, contains focus, closes on Escape, and restores the trigger.
+- **Compact (≤380 px):** the toolbar icons share the row width (about 34–41 px wide, 44 px high); 320, 360, and 390 px widths have no horizontal page overflow.
 - An open Help dialog switches between modal and non-modal behavior when crossing the 760 px breakpoint.
 
 ## Motion
 
-- Transitions run only under `prefers-reduced-motion: no-preference` and are limited to 120 ms background/border easing on buttons.
-- The cycle progress bar is the only continuous motion; it is `aria-hidden="true"`.
-- No decorative animation interrupts the score or transport.
+- All animation runs only under `prefers-reduced-motion: no-preference`. With reduced motion the horizon redraws at 4 Hz and nothing else moves.
+- Entry: the masthead groups fade in with a 60 ms stagger, opacity only (an animated blur on the transport made Chromium drop touch taps on Play during the first second); the score and horizon fade in. Help content slides 18 px in a short stagger when it opens.
+- Onsets: highlighted code atoms, note blocks, chord tones, and percussion cells flash once (300–420 ms ease-out) when the onset observer marks them; they then hold a steady fill until the next onset, without blinking.
+- Controls ease background, border, and color over 140 ms.
+- Continuous motion is limited to the horizon, which is `aria-hidden="true"` and pauses when the tab is hidden. It idles at 5 Hz once its history is silent or frozen. Cycle progress is shown by the horizon's cycle ticks.
 
 ## Accessibility
 
 - Skip link to `#editor`.
 - `lang="en"`; `theme-color` matches the active palette.
 - Transport status is `aria-live="polite"`; change status is `aria-live="polite" aria-atomic="true"`.
-- Numbered selection buttons have accessible sound/step names; validation feedback has `role="status"`. Starters use `aria-pressed`; Help uses `aria-controls` and `aria-expanded`.
+- Numbered selection buttons have accessible sound/step names; validation feedback has `role="status"`. Starting-sound cards use `aria-pressed`; Help uses `aria-controls` and `aria-expanded`.
 - Focus is a 2 px accent outline at 3 px offset on interactive elements.
-- Transport Play is 40 px high on desktop and 44 px on mobile. Structural number fields, Split, and melodic Rest are 32 px on desktop and 44 px on touch/small screens. Source selection and boundary hit regions expand for touch. Optional pitch steps and octave controls also reach 44 px there. The keyboard scales with the code font, with a 23 em width constrained to the editor. This is not a claim of universal 44 px targets.
+- Transport Play is a 6 px-radius cobalt button, 40 px high on desktop and 44 px on mobile. Structural number fields, Split, and melodic Rest are 32 px on desktop and 44 px on touch/small screens. Source selection and boundary hit regions expand for touch. Optional pitch steps and octave controls also reach 44 px there. The keyboard scales with the code font, with a 23 em width constrained to the editor. This is not a claim of universal 44 px targets.
 - Forced-colors mode adds `Highlight` borders to selected steps, pressed keys, occupied percussion cells, Rest, and toggles; note-rest cells retain dashed outlines.
 - Screen-reader, novice-user, and physical-device perception studies have not been conducted; these are structural provisions, not validated outcomes.
 

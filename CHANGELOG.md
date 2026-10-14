@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Simplify the live workspace into a quiet, mostly wordless surface. It keeps
+  the established palette and adds an icon-only toolbar, larger code, and a
+  single compact status line. A signal horizon draws a scrolling history of the
+  measured output level as bars, with the live waveform behind them and cycle
+  ticks. Add Share links that copy the score, carried in the URL fragment, to the
+  clipboard, and a fourth starting sound, Moonrise. Compact the percussion
+  matrix with one hue per sound. Remove Add melody and the load-only starter
+  buttons. No audio-thread or render-path code changed.
 - Split live production JavaScript into MoonBit authoring, CodeMirror/Lezer,
   and application chunks without raising the bundle-size warning limit.
   Basic editing, saving, and Undo/Redo start before asynchronous authoring and
