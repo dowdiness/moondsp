@@ -43,7 +43,8 @@ export default defineConfig({
   server: {
     port: 5180,
     strictPort: false,
-    allowedHosts: ["t-03gyuxpogbl3qlyykpjksbrwu-p20071.onamp.dev"],
+    // Amp orb portals proxy the dev server through per-thread onamp.dev hosts.
+    allowedHosts: [".onamp.dev"],
     headers: isolationHeaders,
   },
   preview: { headers: isolationHeaders },
