@@ -99,7 +99,9 @@ export function mountScoreSession(view: EditorView): { changed(): void; dispose(
   };
 
   const setSaveStatus = (message: string): void => {
-    if (saveStatus) saveStatus.textContent = message;
+    if (!saveStatus) return;
+    saveStatus.textContent = message;
+    saveStatus.dataset.warning = String(message === "Not saved");
   };
   const setSessionMessage = (message: string): void => {
     if (sessionMessage) {

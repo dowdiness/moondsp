@@ -1,7 +1,7 @@
 .output-scope {
-  --output-ink: #153e39;
-  --output-live: #354acb;
-  --output-quiet: #87a99b;
+  --output-ink: var(--ink);
+  --output-live: var(--accent);
+  --output-quiet: var(--ink-faint);
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: baseline;
@@ -34,11 +34,3 @@
 
 .output-scope__state[data-state='live'] { color: var(--output-live); }
 .output-scope__trace { grid-column: 1 / -1; display: block; width: 100%; height: 52px; overflow: hidden; }
-
-@media (prefers-color-scheme: dark) {
-  .output-scope {
-    --output-ink: #d4e8dc;
-    --output-live: #788bff;
-    --output-quiet: #789b8d;
-  }
-}

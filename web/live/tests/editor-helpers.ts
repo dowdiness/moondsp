@@ -18,7 +18,7 @@ export async function openPitchControls(page: Page): Promise<void> {
 export async function readCode(page: Page): Promise<string> {
   return page.locator(".cm-line").evaluateAll(lines => lines.map(line => {
     const copy = line.cloneNode(true) as HTMLElement;
-    copy.querySelectorAll(".cm-inline-control").forEach(widget => widget.remove());
+    copy.querySelectorAll(".cm-inline-control, .cm-placeholder").forEach(widget => widget.remove());
     return copy.textContent;
   }).join("\n"));
 }

@@ -4,19 +4,18 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>moondsp — music takes shape</title>
-    <meta name="description" content="Draw a melody, turn it into a variation, and hear your code come alive. A playful music-making space, right in your browser." />
-    <meta name="theme-color" content="#e9efeb" />
+    <meta name="description" content="A score you can read, draw, and hear. Write a phrase, shape it with your hands, and listen to it change while it plays — right in your browser." />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#e9efeb" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#162c28" />
+    <meta name="color-scheme" content="light dark" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preload" href="/fonts/manrope-regular.ttf" as="font" type="font/ttf" crossorigin />
     <link rel="stylesheet" href="/src/workspace.css" />
   </head>
   <body>
-    <!-- THESIS: Music takes shape: draw a phrase, read its code, hear its real output. Not an IDE with decorative meters.
-    OWN-WORLD: Mint dance-notation field, deep green ink, cobalt and lavender pitch forms, orange rhythm; broad flat planes.
-    STORY: Play a feeling, draw a melody, turn it into an answer, keep the music as an editable text score.
-    FIRST VIEWPORT: Persistent transport above contrasting starter gestures; drawable notes embedded in their source phrase, actual output below.
-    FORM: Dance-floor notation, grounded direction 6, seed 97187dec.
-    FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md -->
+    <!-- THESIS: A quiet surface for one text score. Code first; the phrase grid at the cursor; the horizon draws the measured output.
+    PALETTE: The established moondsp mint, deep green ink, cobalt notes, and rust percussion, with its dark counterpart.
+    FIRST VIEWPORT: Transport, the score, and icon tools. Status appears only when something needs attention; explanations live in Help. -->
     <a class="skip-link" href="#editor">Skip to your score</a>
     <header class="masthead">
       <div class="brand" aria-label="moondsp">
@@ -25,23 +24,25 @@
       </div>
       <div class="transport" aria-label="Playback controls">
         <button id="start" type="button" data-action="play" title="Play or pause · Ctrl/⌘ + Enter">Play</button>
-        <button id="restart" type="button" class="icon-button" aria-label="Restart" title="Restart the current score from the beginning">
+        <button id="restart" type="button" class="icon-button" aria-label="Restart" title="Restart from the beginning · Ctrl/⌘ + Shift + Enter">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9a8 8 0 1 1 1 8M4 3v6h6"/></svg>
         </button>
         <div class="transport-state"><span class="status" id="status" aria-live="polite">Ready</span><span id="playback-tempo"></span></div>
       </div>
-          <div class="score-tools">
-            <button type="button" id="undo" class="icon-button" aria-label="Undo" title="Undo · Ctrl/⌘ + Z"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5-5 5 5 5M4 10h9a6 6 0 0 1 6 6v3"/></svg></button>
-            <button type="button" id="redo" class="icon-button" aria-label="Redo" title="Redo · Ctrl/⌘ + Shift + Z"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5 5 5-5 5m5-5h-9a6 6 0 0 0-6 6v3"/></svg></button>
-            <button type="button" id="source-toggle" class="view-toggle" aria-pressed="true" title="Show controls for the phrase at your cursor">Controls</button>
-          </div>
-      <nav class="file-actions" aria-label="Score files and help">
-        <button id="open-score" type="button" class="quiet-button">Open</button>
-        <button id="save-score" type="button" class="quiet-button">Download</button>
-        <button id="share-score" type="button" class="quiet-button" title="Copy a link that opens this score">Share</button>
-        <button id="cheat-toggle" type="button" class="quiet-button" aria-controls="cheat" aria-expanded="false">Help</button>
-        <input id="score-file" type="file" accept=".mini,.txt,text/plain" hidden />
-      </nav>
+      <div class="toolbar">
+        <div class="score-tools" role="group" aria-label="Score tools">
+          <button type="button" id="undo" class="icon-button" aria-label="Undo" title="Undo · Ctrl/⌘ + Z"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5-5 5 5 5M4 10h9a6 6 0 0 1 6 6v3"/></svg></button>
+          <button type="button" id="redo" class="icon-button" aria-label="Redo" title="Redo · Ctrl/⌘ + Shift + Z"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5 5 5-5 5m5-5h-9a6 6 0 0 0-6 6v3"/></svg></button>
+          <button type="button" id="source-toggle" class="icon-button view-toggle" aria-pressed="true" aria-label="Controls" title="Show controls for the phrase at your cursor"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button>
+        </div>
+        <nav class="file-actions" aria-label="Score files and help">
+          <button id="open-score" type="button" class="icon-button" aria-label="Import" title="Import a score file (.mini, .txt)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5M12 18v-7m-3 3 3-3 3 3"/></svg></button>
+          <button id="save-score" type="button" class="icon-button" aria-label="Download" title="Download this score as a .mini file"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m-5-5 5 5 5-5M5 20h14"/></svg></button>
+          <button id="share-score" type="button" class="icon-button" aria-label="Share" title="Share: copy a link that opens this score"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5.5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><path d="m8.2 10.8 7.6-4.1M8.2 13.2l7.6 4.1"/></svg></button>
+          <button id="cheat-toggle" type="button" class="icon-button" aria-label="Help" aria-controls="cheat" aria-expanded="false" title="Help and starting sounds"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.6M12 16.8v.2"/></svg></button>
+          <input id="score-file" type="file" accept=".mini,.txt,text/plain" hidden />
+        </nav>
+      </div>
       <div class="horizon" id="signal-horizon" aria-hidden="true"></div>
     </header>
     <main class="workspace cheat-collapsed">
@@ -50,25 +51,21 @@
       </section>
       <dialog id="cheat" aria-labelledby="help-title" inert>
         <div class="help-heading"><h2 id="help-title">Help &amp; sounds</h2><button type="button" id="close-help" class="icon-button" aria-label="Close help"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
-        <p>Press Play to hear the score. Edit any phrase as text; its musical controls appear at your cursor. Both change the same score, and both support Undo.</p>
+        <p>moondsp is a score you can read, draw, and hear. Every phrase is code; the grid under your cursor edits that same code, even while it plays. Press Play, change a note, and listen. Undo always brings it back.</p>
     <section class="experience-intro" aria-label="Starting sounds">
       <p class="starting-label">Play a starting sound</p>
       <div class="scene-list" aria-label="Explore a starting sound">
-        <button class="scene" type="button" data-scene="first-light" aria-label="Explore First light" aria-pressed="true">
+        <button class="scene" type="button" data-scene="first-light" aria-label="Explore First light" title="First light" aria-pressed="true">
           <svg class="scene-art scene-art-light" viewBox="0 0 100 64" aria-hidden="true"><circle cx="34" cy="32" r="25"/><path d="M55 7h10a25 25 0 0 1 0 50H55Z"/></svg>
-          <span><strong>First light</strong><small>96 BPM</small></span>
         </button>
-        <button class="scene" type="button" data-scene="offbeat" aria-label="Explore Offbeat" aria-pressed="false">
+        <button class="scene" type="button" data-scene="offbeat" aria-label="Explore Offbeat" title="Offbeat" aria-pressed="false">
           <svg class="scene-art scene-art-offbeat" viewBox="0 0 100 64" aria-hidden="true"><path d="M8 39h23V14h23v25h23V14h15v39H8Z"/></svg>
-          <span><strong>Offbeat</strong><small>112 BPM</small></span>
         </button>
-        <button class="scene" type="button" data-scene="slow-drift" aria-label="Explore Slow drift" aria-pressed="false">
+        <button class="scene" type="button" data-scene="slow-drift" aria-label="Explore Slow drift" title="Slow drift" aria-pressed="false">
           <svg class="scene-art scene-art-drift" viewBox="0 0 100 64" aria-hidden="true"><ellipse cx="50" cy="32" rx="42" ry="23"/><ellipse cx="50" cy="32" rx="27" ry="23"/><ellipse cx="50" cy="32" rx="10" ry="23"/></svg>
-          <span><strong>Slow drift</strong><small>72 BPM</small></span>
         </button>
-        <button class="scene" type="button" data-scene="moonrise" aria-label="Explore Moonrise" aria-pressed="false">
+        <button class="scene" type="button" data-scene="moonrise" aria-label="Explore Moonrise" title="Moonrise" aria-pressed="false">
           <svg class="scene-art scene-art-rise" viewBox="0 0 100 64" aria-hidden="true"><path d="M8 53h84M20 53a30 30 0 0 1 60 0Z"/></svg>
-          <span><strong>Moonrise</strong><small>104 BPM</small></span>
         </button>
       </div>
     </section>
@@ -110,7 +107,7 @@
         </details>
         <details class="help-basics">
           <summary>Files &amp; recovery</summary>
-          <p>Open imports a plain-text score; Download saves a <code>.mini</code> file you can edit, share, or use with your own AI tools. Nothing is sent to an AI service.</p>
+          <p>Import opens a plain-text score; Download saves a <code>.mini</code> file you can edit, share, or use with your own AI tools. Nothing is sent to an AI service.</p>
           <p>Share copies a link that opens this score. The score travels inside the link itself; nothing is uploaded. Opening a link replaces your text once, and Undo restores it.</p>
           <p>Each edited session saves a separate recovery copy before updating the shared saved score. Saved drafts contains recovery copies from other sessions. Restore supports Undo. If tabs save at the same time, both drafts remain available after reopening, even if one replaces the shared score. You can permanently delete a saved draft after confirmation. Copies stay in this browser until you delete them; Download keeps a separate file. If browser storage is full or unavailable, download your open score before leaving.</p>
         </details>
@@ -171,21 +168,6 @@
           <summary>Syntax reference</summary>
           <!-- MINI_SYNTAX_REFERENCE -->
         </details>
-      </dialog>
-    </main>
-    <footer>
-      <div class="document-status"><span id="score-title">First light</span><span id="save-status" role="status"></span><span id="cursor-position">Ln 3, Col 1</span></div>
-      <p id="score-readiness" role="status" hidden></p>
-        <details id="saved-drafts" hidden>
-          <summary>Saved drafts</summary>
-          <ul id="saved-draft-list"></ul>
-        </details>
-      <section class="playback-details" id="playback-details" aria-label="Playback and code updates">
-        <div class="change-status" id="change-status" aria-live="polite" aria-atomic="true">
-          <span class="state-light" aria-hidden="true"></span>
-          <div><p class="status-heading" id="draft-status">Ready to play</p><p class="status-help" id="change-help" hidden></p><p id="change-timing" hidden></p></div>
-          <button id="restore-score" type="button" class="quiet-button" hidden>Restore accepted score</button>
-        </div>
         <details class="status-inspector">
           <summary>Playback details</summary>
           <div id="output-scope"></div>
@@ -196,6 +178,21 @@
             <div><dt>Material transitions</dt><dd id="material-status">No accepted score</dd></div>
           </dl>
         </details>
+      </dialog>
+    </main>
+    <footer>
+      <div class="document-status"><span id="save-status" role="status"></span><span id="cursor-position">Ln 3, Col 1</span></div>
+      <p id="score-readiness" role="status" hidden></p>
+        <details id="saved-drafts" hidden>
+          <summary>Saved drafts</summary>
+          <ul id="saved-draft-list"></ul>
+        </details>
+      <section class="playback-details" id="playback-details" aria-label="Playback and code updates">
+        <div class="change-status" id="change-status" aria-live="polite" aria-atomic="true">
+          <span class="state-light" aria-hidden="true"></span>
+          <div><p class="status-heading" id="draft-status">Not sent to audio yet</p><p class="status-help" id="change-help" hidden></p><p id="change-timing" hidden></p></div>
+          <button id="restore-score" type="button" class="quiet-button" hidden>Restore accepted score</button>
+        </div>
       </section>
       <div class="panel" id="log" aria-live="polite" hidden></div>
       <p id="session-message" role="status" hidden></p>

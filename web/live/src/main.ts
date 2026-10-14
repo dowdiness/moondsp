@@ -2,7 +2,7 @@
 // Current song and sounding material versions remain owned by the audio engine.
 
 import { Compartment, EditorState, Prec } from "@codemirror/state";
-import { EditorView, keymap, lineNumbers, highlightActiveLine } from "@codemirror/view";
+import { EditorView, keymap, lineNumbers, highlightActiveLine, placeholder } from "@codemirror/view";
 import { defaultKeymap, historyKeymap, undo, redo, undoDepth, redoDepth, isolateHistory } from "@codemirror/commands";
 import { bracketMatching } from "@codemirror/language";
 import { closeBrackets, closeBracketsKeymap, acceptCompletion } from "@codemirror/autocomplete";
@@ -132,6 +132,7 @@ const view = new EditorView({
       playbackHighlights(),
       controlsCompartment.of([]),
       EditorView.lineWrapping,
+      placeholder('s("bd ~ sd ~")'),
       contentAttributesCompartment.of(EditorView.contentAttributes.of({
         "aria-label": "Music code", spellcheck: "false",
       })),
@@ -171,7 +172,6 @@ function refreshEditorChrome(): void {
   setText(document.getElementById("cursor-position")!, `Ln ${line.number}, Col ${head - line.from + 1}`);
   const text = view.state.doc.toString();
   const starter = Object.entries(STARTERS).find(([, value]) => value.source === text);
-  setText(document.getElementById("score-title")!, starter?.[1].name ?? "Your score");
   document.querySelectorAll<HTMLButtonElement>("[data-scene]").forEach(button =>
     button.setAttribute("aria-pressed", String(button.dataset.scene === starter?.[0])));
 }
@@ -277,12 +277,12 @@ function changeMessage(state: PlaybackView): readonly [string, string] {
     case "submitting": return ["Sending changes…", "Waiting for the audio engine to accept this version."];
     case "unsubmitted":
       return state.state === "Starting" ? ["Starting audio…", "Your code will be submitted when audio is ready."]
-        : state.currentSource === null ? ["Ready to play", "Press Play to hear your code."]
+        : state.currentSource === null ? ["Not sent to audio yet", "Press Play to hear your code."]
         : ["Changes not sent", "Restart to play the current code from the beginning."];
     case "accepted":
       if (state.state === "Paused") return ["Changes accepted", "Playback is paused. Press Play to continue."];
       if (state.state === "Ready" || state.state === "Ended") {
-        return ["Ready to play", "Press Play to start the accepted code from the beginning."];
+        return ["Code accepted", "Press Play to start the accepted code from the beginning."];
       }
       return state.pendingCount || state.skippedCount
         ? ["Changes accepted", "Each part updates at its own entry point."]
@@ -302,8 +302,7 @@ function applyStatus(state: PlaybackView): void {
   statusEl.dataset.tempo = state.tempoText;
   statusEl.dataset.mode = state.mode;
   setText(positionEl, `Position: ${state.cyclePosition.toFixed(2)} cycles`);
-  setText(tempoEl, state.mode === "none" ? ""
-    : `${state.tempoText} BPM · ${state.mode === "pattern" ? "Pattern" : "Song"}`);
+  setText(tempoEl, state.mode === "none" ? "" : `${state.tempoText} BPM`);
   draftStatusEl.dataset.state = state.draftStatus;
   draftStatusEl.dataset.version = versionLabel(state.draftVersion);
   const [headline, help] = changeMessage(state);
