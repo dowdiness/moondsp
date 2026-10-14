@@ -144,6 +144,9 @@ export function mountMovingScore(
   let selectedNode: number | null = null;
   let plotLeft = 70;
   let pixelsToX = 1;
+  // Geometry the last render measured; height changes caused by our own content need no re-render.
+  let renderedWidth = 0;
+  let renderedStageHeight = 0;
   let plotRight = W - 24;
   let plotHeight = 280;
   let visibleSelection = "";
@@ -425,7 +428,9 @@ export function mountMovingScore(
     }
   }
   function render(): void {
-    pixelsToX = W / (structureSvg.clientWidth || root.clientWidth || W);
+    renderedWidth = structureSvg.clientWidth || root.clientWidth;
+    renderedStageHeight = stage.clientHeight;
+    pixelsToX = W / (renderedWidth || W);
     const pitches = active ? [
       ...active.steps.flatMap(step => {
         const midi = step.rest || active?.notationKind === "chord" ? null : noteMidi(step.value);
@@ -1319,7 +1324,8 @@ export function mountMovingScore(
   const resizeObserver = new ResizeObserver(entries => {
     const { width, height } = entries[0].contentRect;
     if (width > 0 && height > 0) {
-      render();
+      const widthChanged = (structureSvg.clientWidth || root.clientWidth) !== renderedWidth;
+      if (widthChanged || (renderedStageHeight === 0 && stage.clientHeight > 0)) render();
     } else if (gesture || moveGesture || edgeGesture || restGesture || keyboardGesture || keyboardRestGesture || boundaryGesture) cancel();
     view.requestMeasure();
   });
