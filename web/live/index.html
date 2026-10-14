@@ -29,7 +29,6 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9a8 8 0 1 1 1 8M4 3v6h6"/></svg>
         </button>
         <div class="transport-state"><span class="status" id="status" aria-live="polite">Ready</span><span id="playback-tempo"></span></div>
-        <div class="cycle-meter" aria-hidden="true"><span id="cycle-progress"></span></div>
       </div>
           <div class="score-tools">
             <button type="button" id="undo" class="icon-button" aria-label="Undo" title="Undo · Ctrl/⌘ + Z"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5-5 5 5 5M4 10h9a6 6 0 0 1 6 6v3"/></svg></button>
@@ -43,6 +42,7 @@
         <button id="cheat-toggle" type="button" class="quiet-button" aria-controls="cheat" aria-expanded="false">Help</button>
         <input id="score-file" type="file" accept=".mini,.txt,text/plain" hidden />
       </nav>
+      <div class="horizon" id="signal-horizon" aria-hidden="true"></div>
     </header>
     <main class="workspace cheat-collapsed">
       <section class="score-sheet" aria-label="Your musical score">

@@ -28,6 +28,7 @@ import type { Draft } from "./authoring";
 import type { DraftVersion } from "./draft-version";
 import type { Player, PlaybackView } from "./playback";
 import { mountOutputScope } from "./output-scope";
+import { mountSignalHorizon } from "./signal-horizon";
 import { mountScoreLink } from "./score-link";
 import { playbackHighlights } from "./playback-highlights";
 import { mountPlaybackObservation } from "./playback-observation";
@@ -293,8 +294,7 @@ function applyStatus(state: PlaybackView): void {
   if (audioMode !== "scheduler") return;
   setText(statusEl, state.state === "Empty" ? "Ready" : state.state);
   document.body.dataset.playback = state.state.toLowerCase();
-  const progress = document.getElementById("cycle-progress")!;
-  progress.style.transform = `scaleX(${state.cyclePosition - Math.floor(state.cyclePosition)})`;
+  signalHorizon.setCycle(state.cyclePosition, state.state === "Playing");
   document.getElementById("restore-score")!.hidden = state.currentSource === null ||
     (state.draftStatus !== "invalid" && state.draftStatus !== "rejected");
   statusEl.dataset.samplePosition = String(state.samplePosition);
@@ -361,6 +361,9 @@ let compiledSession: CompiledSession | undefined;
 const outputScope = mountOutputScope(document.getElementById("output-scope")!, {
   readWaveform: target => engine.readWaveform(target),
 });
+const signalHorizon = mountSignalHorizon(document.getElementById("signal-horizon")!, {
+  readWaveform: target => engine.readWaveform(target),
+});
 const scoreLink = mountScoreLink(view, document.getElementById("share-score") as HTMLButtonElement | null);
 if (import.meta.hot) import.meta.hot.dispose(() => {
   disposed = true;
@@ -370,6 +373,7 @@ if (import.meta.hot) import.meta.hot.dispose(() => {
   playbackObservation?.dispose();
   view.destroy();
   outputScope.dispose();
+  signalHorizon.dispose();
   scoreLink.dispose();
   scoreSession.dispose();
 });

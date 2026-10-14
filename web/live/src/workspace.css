@@ -24,6 +24,9 @@
   --ink: #153e39;
   --ink-muted: #526b63;
   --accent: #354acb;
+  --horizon-a: #354acb;
+  --wave-a: #2f9479;
+  --wave-b: #8b7ad8;
   --accent-soft: #e2e5fc;
   --border: #c7d4cd;
   --ok-fg: #286649;
@@ -95,8 +98,9 @@ a { color: var(--accent); text-underline-offset: 4px; }
 .transport-state { display: grid; gap: 1px; min-width: 108px; margin-left: 4px; font-variant-numeric: tabular-nums; }
 #status { font-weight: 700; font-size: 12px; }
 #playback-tempo { font: 11px/1.5 var(--font-mono); color: var(--ink-muted); }
-.cycle-meter { position: absolute; left: 130px; right: 0; bottom: 0; height: 2px; background: var(--border); overflow: hidden; }
-#cycle-progress { display: block; height: 100%; width: 100%; transform: scaleX(0); transform-origin: left; background: var(--accent); }
+/* The horizon draws the measured master output across the full width. */
+.horizon { flex-basis: calc(100% + 24px); height: clamp(56px, 8.5vh, 92px); margin: 2px -12px 0; pointer-events: none; }
+.horizon canvas { display: block; width: 100%; height: 100%; }
 .file-actions { display: flex; justify-content: flex-end; gap: 3px; margin-left: auto; }
 .quiet-button { color: var(--ink-muted); font-size: 12px; }
 .icon-button { width: 40px; padding: 8px; min-height: 40px; color: var(--ink-muted); }
@@ -262,7 +266,7 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px 20px;
   .icon-button { width: 44px; }
   .transport-state { margin-left: 0; }
   #playback-tempo { font-size: 9px; }
-  .cycle-meter { left: 130px; }
+  .horizon { order: 3; flex-basis: calc(100% + 16px); height: 44px; margin: 0 -8px; }
   .workspace, .workspace.cheat-collapsed { grid-template-columns: minmax(0, 1fr); }
   .workspace:not(.cheat-collapsed) #cheat { position: fixed; inset: 0 0 0 auto; z-index: 10; width: min(380px, 100%); height: 100dvh; max-height: 100dvh; padding: 16px 24px 32px; }
   .help-heading { position: sticky; top: -16px; padding: 8px 0; background: var(--panel); }
@@ -281,7 +285,7 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px 20px;
 @media (max-width: 380px) {
   .transport { gap: 4px; }
   .transport-state { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .cycle-meter { display: none; }
+  .horizon { flex-basis: calc(100% + 8px); margin: 0 -4px; }
   #start { min-width: 64px; padding-inline: 8px; }
   #restart { width: 36px; }
   .masthead { gap: 2px 4px; padding-inline: 4px; }
@@ -296,6 +300,9 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px 20px;
     --ink: #e2eee5;
     --ink-muted: #b0c6b9;
     --accent: #b8c1ff;
+    --horizon-a: #b8c1ff;
+    --wave-a: #8fd0b0;
+    --wave-b: #c4b6f2;
     --accent-soft: #354361;
     --border: #415e52;
     --ok-fg: #99c5a6;
