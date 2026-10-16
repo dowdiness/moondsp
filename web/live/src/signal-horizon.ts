@@ -1,31 +1,40 @@
 import type { AudioEngine } from "./audio";
 import { barLevels, createLevelHistory, markCycle, pushLevel } from "./level-history";
+import { MAX_BARS, barShape, horizonLayout, tickShape } from "./horizon-geometry";
+import { canvasPixels, signalStats, triggerOffset } from "./signal-math";
 
-// The horizon draws the measured master output as a scrolling level history:
-// one rounded bar per short window of RMS, mirrored about the centre line, newest
-// at the right. Cycle boundaries are ticked along the bottom edge. It shows what
-// the analyser measured, not which notes produced it. Behind the bars, the live
-// waveform sways across the band.
+// Imperative shell for the horizon: one rounded bar per short window of measured
+// RMS, mirrored about the centre line, newest at the right, with cycle ticks along
+// the bottom edge and the live waveform swaying behind. It shows what the analyser
+// measured, not which notes produced it. Level and geometry decisions live in
+// level-history, horizon-geometry, and signal-math; this module measures, draws, and subscribes.
 
 const SAMPLE_COUNT = 1024;
-const SIGNAL_FLOOR = 0.0015;
-const BAR_PX = 3;
-const GAP_PX = 2;
 const WAVE_SAMPLES = 640;
-// Enough bars for an 8K-wide canvas; the arrays are reused every frame.
-const MAX_BARS = 2048;
+const SILENT = { rms: 0, peak: 0, live: false } as const;
 
 export type SignalHorizon = {
   setCycle(position: number, playing: boolean): void;
   dispose(): void;
 };
 
-export function mountSignalHorizon(root: HTMLElement, engine: Pick<AudioEngine, "readWaveform">): SignalHorizon {
-  const canvas = document.createElement("canvas");
+export type SignalHorizonHost = {
+  /** The horizon container; the canvas is appended to it. */
+  root: HTMLElement;
+  /** The document whose visibility pauses drawing. */
+  visibility: Document;
+  reducedMotion: MediaQueryList;
+  /** A color-scheme change re-reads the palette. */
+  colorScheme: MediaQueryList;
+};
+
+export function mountSignalHorizon(host: SignalHorizonHost, engine: Pick<AudioEngine, "readWaveform">): SignalHorizon {
+  const { root, visibility, reducedMotion, colorScheme } = host;
+  const canvas = root.ownerDocument.createElement("canvas");
   root.append(canvas);
-  const context = canvas.getContext("2d");
+  // A fresh canvas always provides a 2D context.
+  const context = canvas.getContext("2d")!;
   const samples = new Float32Array(SAMPLE_COUNT);
-  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   let disposed = false;
   let frame = 0;
   let slowTimer = 0;
@@ -43,54 +52,26 @@ export function mountSignalHorizon(root: HTMLElement, engine: Pick<AudioEngine, 
 
   function readColors(): { bar: string; wave: string; waveEnd: string; tick: string; group: string } {
     const style = getComputedStyle(root);
-    return {
-      wave: style.getPropertyValue("--wave-a").trim() || "#2f9479",
-      waveEnd: style.getPropertyValue("--wave-b").trim() || "#8b7ad8",
-      bar: style.getPropertyValue("--horizon-a").trim() || "#354acb",
-      tick: style.getPropertyValue("--ink-muted").trim() || "#526b63",
-      group: style.getPropertyValue("--accent").trim() || "#354acb",
-    };
-  }
-
-  // Start the waveform at a rising zero crossing so periodic tones stand still.
-  function triggerOffset(): number {
-    const limit = SAMPLE_COUNT - WAVE_SAMPLES;
-    for (let i = 1; i < limit; i++) if (samples[i - 1] <= 0 && samples[i] > 0) return i;
-    return 0;
+    const token = (name: string): string => style.getPropertyValue(name).trim();
+    return { wave: token("--wave-a"), waveEnd: token("--wave-b"), bar: token("--horizon-a"), tick: token("--ink-muted"), group: token("--accent") };
   }
 
   function draw(): void {
-    if (!context || disposed || width === 0) return;
-    const available = engine.readWaveform(samples);
-    let sum = 0;
-    let peak = 0;
-    if (available) {
-      for (let i = 0; i < SAMPLE_COUNT; i++) {
-        const value = samples[i];
-        sum += value * value;
-        if (Math.abs(value) > peak) peak = Math.abs(value);
-      }
-    }
-    const live = available && peak > SIGNAL_FLOOR;
-    pushLevel(history, live ? Math.sqrt(sum / SAMPLE_COUNT) : 0, performance.now(), transportPlaying);
+    if (disposed || width === 0) return;
+    const { rms, peak, live } = engine.readWaveform(samples) ? signalStats(samples) : SILENT;
+    pushLevel(history, rms, performance.now(), transportPlaying);
     if (root.dataset.live !== String(live)) root.dataset.live = String(live);
     lastLive = live;
 
     context.clearRect(0, 0, width, height);
-    const tickSpace = 10 * dpr;
-    const center = (height - tickSpace) / 2;
-    const reach = center - 2 * dpr;
-    const minHalf = 0.75 * dpr;
-    const barWidth = BAR_PX * dpr;
-    const pitch = (BAR_PX + GAP_PX) * dpr;
-    const bars = Math.max(1, Math.min(MAX_BARS, Math.floor(width / pitch)));
-    const offsetX = width - bars * pitch + GAP_PX * dpr;
+    const layout = horizonLayout(width, height, dpr);
+    const { center, reach, barWidth } = layout;
     const frozen = !transportPlaying;
-    historyQuiet = barLevels(history, bars, levels, barTicks);
+    historyQuiet = barLevels(history, layout.bars, levels, barTicks);
 
     // Behind the bars, the present waveform sways across the band.
     if (live) {
-      const offset = triggerOffset();
+      const offset = triggerOffset(samples, WAVE_SAMPLES);
       const gain = reach * 0.9 / Math.max(0.02, peak);
       const step = width / (WAVE_SAMPLES - 1);
       context.beginPath();
@@ -114,39 +95,33 @@ export function mountSignalHorizon(root: HTMLElement, engine: Pick<AudioEngine, 
       context.stroke();
     }
 
-    for (let bar = 0; bar < bars; bar++) {
-      const shaped = levels[bar];
-      const tick = barTicks[bar];
-      const half = minHalf + Math.pow(shaped, 1.15) * (reach - minHalf);
-      const age = (bar + 1) / bars;
-      const x = offsetX + bar * pitch;
-      context.globalAlpha = (0.22 + 0.78 * Math.pow(age, 0.8)) * (0.5 + 0.5 * shaped) * (frozen ? 0.55 : 1);
+    for (let bar = 0; bar < layout.bars; bar++) {
+      const { half, alpha } = barShape(layout, levels[bar], bar, frozen);
+      const x = layout.offsetX + bar * layout.pitch;
+      context.globalAlpha = alpha;
       context.fillStyle = colors.bar;
       context.beginPath();
       context.roundRect(x, center - half, barWidth, half * 2, barWidth / 2);
       context.fill();
+      const tick = barTicks[bar];
       if (!tick) continue;
       // Cycle ticks along the bottom edge; every fourth cycle is longer and in the accent.
-      const group = tick === 2;
-      context.globalAlpha = (group ? 0.9 : 0.4) * (frozen ? 0.6 : 1);
-      context.fillStyle = group ? colors.group : colors.tick;
-      const tickHeight = (group ? 7 : 4) * dpr;
-      context.fillRect(Math.round(x + barWidth / 2 - dpr / 2), height - tickHeight, dpr, tickHeight);
+      const shape = tickShape(tick, frozen, dpr);
+      context.globalAlpha = shape.alpha;
+      context.fillStyle = tick === 2 ? colors.group : colors.tick;
+      context.fillRect(Math.round(x + barWidth / 2 - dpr / 2), height - shape.height, dpr, shape.height);
     }
     context.globalAlpha = 1;
   }
 
   function resize(): void {
     const rect = root.getBoundingClientRect();
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const nextWidth = Math.max(1, Math.round(rect.width * dpr));
-    const nextHeight = Math.max(1, Math.round(rect.height * dpr));
-    if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
-      canvas.width = nextWidth;
-      canvas.height = nextHeight;
+    const pixels = canvasPixels(rect.width, rect.height, root.ownerDocument.defaultView!.devicePixelRatio, { maxDpr: 2 });
+    if (canvas.width !== pixels.width || canvas.height !== pixels.height) {
+      canvas.width = pixels.width;
+      canvas.height = pixels.height;
     }
-    width = nextWidth;
-    height = nextHeight;
+    ({ width, height, dpr } = pixels);
     draw();
   }
 
@@ -158,7 +133,7 @@ export function mountSignalHorizon(root: HTMLElement, engine: Pick<AudioEngine, 
   };
   const animate = (): void => {
     frame = 0;
-    if (disposed || document.visibilityState !== "visible") return;
+    if (disposed || visibility.visibilityState !== "visible") return;
     draw();
     // Idle at a low rate once the visible history is silent or frozen.
     if (historyQuiet || (!transportPlaying && !lastLive)) slowTimer = window.setTimeout(() => { slowTimer = 0; animate(); }, 200);
@@ -166,7 +141,7 @@ export function mountSignalHorizon(root: HTMLElement, engine: Pick<AudioEngine, 
   };
   const schedule = (): void => {
     stop();
-    if (disposed || document.visibilityState !== "visible") return;
+    if (disposed || visibility.visibilityState !== "visible") return;
     if (reducedMotion.matches) {
       draw();
       slowTimer = window.setInterval(() => draw(), 250);
@@ -178,11 +153,9 @@ export function mountSignalHorizon(root: HTMLElement, engine: Pick<AudioEngine, 
   const resizeObserver = new ResizeObserver(resize);
   resizeObserver.observe(root);
   const onVisibility = (): void => schedule();
-  // A color-scheme change re-reads the palette.
-  const colorScheme = window.matchMedia("(prefers-color-scheme: dark)");
   const onColorScheme = (): void => { colors = readColors(); draw(); };
   colorScheme.addEventListener("change", onColorScheme);
-  document.addEventListener("visibilitychange", onVisibility);
+  visibility.addEventListener("visibilitychange", onVisibility);
   reducedMotion.addEventListener("change", schedule);
   resize();
   schedule();
@@ -202,7 +175,7 @@ export function mountSignalHorizon(root: HTMLElement, engine: Pick<AudioEngine, 
       stop();
       resizeObserver.disconnect();
       colorScheme.removeEventListener("change", onColorScheme);
-      document.removeEventListener("visibilitychange", onVisibility);
+      visibility.removeEventListener("visibilitychange", onVisibility);
       reducedMotion.removeEventListener("change", schedule);
       canvas.remove();
     },

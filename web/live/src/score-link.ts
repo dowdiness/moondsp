@@ -1,5 +1,7 @@
 import { isolateHistory } from "@codemirror/commands";
 import type { EditorView } from "@codemirror/view";
+import type { Notice } from "./notice";
+import type { Disposable } from "./scope";
 
 // A score link carries the plain-text score in the URL fragment, compressed with
 // deflate-raw and base64url-encoded. Fragments are never sent to a server.
@@ -62,18 +64,19 @@ export async function decodeScoreFragment(fragment: string): Promise<string | nu
   return bytes === null ? null : new TextDecoder("utf-8", { fatal: true }).decode(bytes);
 }
 
-export function mountScoreLink(view: EditorView, button: HTMLButtonElement | null): { dispose(): void } {
-  const message = document.getElementById("session-message");
+/** Pure: the warning appended to a share message for a link of `length` characters. */
+export function longLinkNote(length: number): string {
+  return length > LONG_LINK_CHARS ? " This score is long; some apps may shorten the link, so Download is safer." : "";
+}
+
+export type ScoreLinkElements = {
+  button: HTMLButtonElement;
+};
+
+export function mountScoreLink(elements: ScoreLinkElements, deps: { view: EditorView; notice: Notice }): Disposable {
+  const { button } = elements;
+  const { view, notice } = deps;
   let disposed = false;
-  let clearTimer = 0;
-  const say = (text: string, transient = false): void => {
-    if (!message) return;
-    window.clearTimeout(clearTimer);
-    message.textContent = text;
-    message.hidden = text.length === 0;
-    // Confirmations fade from the quiet surface; problems stay until replaced.
-    if (transient) clearTimer = window.setTimeout(() => { if (message.textContent === text) say(""); }, 4000);
-  };
   const base = (): string => `${location.origin}${location.pathname}${location.search}`;
 
   // Clipboard writes must begin inside the click: Safari rejects a write that
@@ -82,10 +85,9 @@ export function mountScoreLink(view: EditorView, button: HTMLButtonElement | nul
     const link = encodeScoreLink(view.state.doc.toString(), base());
     const item = new ClipboardItem({ "text/plain": link.then(text => new Blob([text], { type: "text/plain" })) });
     navigator.clipboard.write([item]).then(async () => {
-      const text = await link;
-      const long = text.length > LONG_LINK_CHARS ? " This score is long; some apps may shorten the link, so Download is safer." : "";
-      say(`Link copied to the clipboard. Opening it loads this score; nothing is uploaded.${long}`, !long);
-    }, () => say("Could not copy a link to the clipboard. Download keeps this score exactly."));
+      const long = longLinkNote((await link).length);
+      notice.say(`Link copied to the clipboard. Opening it loads this score; nothing is uploaded.${long}`, { transient: !long });
+    }, () => notice.say("Could not copy a link to the clipboard. Download keeps this score exactly."));
   };
 
   const openFromFragment = async (): Promise<void> => {
@@ -101,11 +103,11 @@ export function mountScoreLink(view: EditorView, button: HTMLButtonElement | nul
     if (disposed || location.hash !== fragment) return;
     history.replaceState(null, "", base());
     if (source === null) {
-      say("That score link could not be read. Your score is unchanged.");
+      notice.say("That score link could not be read. Your score is unchanged.");
       return;
     }
     if (view.state.doc !== before) {
-      say("The linked score was not opened because your text changed while it loaded. Open the link again.");
+      notice.say("The linked score was not opened because your text changed while it loaded. Open the link again.");
       return;
     }
     if (source === before.toString()) return;
@@ -113,19 +115,17 @@ export function mountScoreLink(view: EditorView, button: HTMLButtonElement | nul
       changes: { from: 0, to: before.length, insert: source },
       annotations: isolateHistory.of("full"),
     });
-    say("Opened a shared score. Undo restores your previous score.", true);
+    notice.say("Opened a shared score. Undo restores your previous score.", { transient: true });
   };
 
-  const onClick = (): void => share();
   const onHashChange = (): void => { void openFromFragment(); };
-  button?.addEventListener("click", onClick);
+  button.addEventListener("click", share);
   window.addEventListener("hashchange", onHashChange);
   void openFromFragment();
   return {
     dispose(): void {
       disposed = true;
-      window.clearTimeout(clearTimer);
-      button?.removeEventListener("click", onClick);
+      button.removeEventListener("click", share);
       window.removeEventListener("hashchange", onHashChange);
     },
   };

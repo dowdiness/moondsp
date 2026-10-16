@@ -1,34 +1,44 @@
 import "./output-scope.css";
 import type { AudioEngine } from "./audio";
+import { canvasPixels, signalStats } from "./signal-math";
 
 const SAMPLE_COUNT = 512;
 const MAX_CANVAS_WIDTH = 640;
 const MAX_CANVAS_HEIGHT = 128;
-const SIGNAL_FLOOR = 0.0015;
 
 type OutputState = "Silent" | "Live";
 
-export function mountOutputScope(root: HTMLElement, engine: Pick<AudioEngine, "readWaveform">): { dispose(): void } {
-  const section = document.createElement("section");
+export type OutputScopeHost = {
+  /** The container the scope section is appended to. */
+  root: HTMLElement;
+  /** The document whose visibility pauses drawing. */
+  visibility: Document;
+  reducedMotion: MediaQueryList;
+};
+
+export function mountOutputScope(host: OutputScopeHost, engine: Pick<AudioEngine, "readWaveform">): { dispose(): void } {
+  const { root, visibility, reducedMotion } = host;
+  const doc = root.ownerDocument;
+  const section = doc.createElement("section");
   section.className = "output-scope";
   section.setAttribute("aria-label", "Audio output");
 
-  const heading = document.createElement("h2");
+  const heading = doc.createElement("h2");
   heading.className = "output-scope__title";
   heading.textContent = "Audio output";
-  const stateText = document.createElement("span");
+  const stateText = doc.createElement("span");
   stateText.className = "output-scope__state";
   stateText.textContent = "Silent";
 
-  const canvas = document.createElement("canvas");
+  const canvas = doc.createElement("canvas");
   canvas.className = "output-scope__trace";
   canvas.setAttribute("aria-hidden", "true");
-  const context = canvas.getContext("2d");
+  // A fresh canvas always provides a 2D context.
+  const context = canvas.getContext("2d")!;
   section.append(heading, stateText, canvas);
   root.append(section);
 
   const samples = new Float32Array(SAMPLE_COUNT);
-  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   let disposed = false;
   let intersecting = true;
   let frame = 0;
@@ -38,13 +48,8 @@ export function mountOutputScope(root: HTMLElement, engine: Pick<AudioEngine, "r
   const palette = getComputedStyle(section);
 
   const draw = (): void => {
-    if (!context || disposed) return;
-    const available = engine.readWaveform(samples);
-    let peak = 0;
-    if (available) {
-      for (let i = 0; i < samples.length; i++) peak = Math.max(peak, Math.abs(samples[i]));
-    }
-    const live = available && peak > SIGNAL_FLOOR;
+    if (disposed) return;
+    const live = engine.readWaveform(samples) && signalStats(samples).live;
     const state: OutputState = live ? "Live" : "Silent";
     if (stateText.textContent !== state) stateText.textContent = state;
     stateText.dataset.state = state.toLowerCase();
@@ -71,19 +76,18 @@ export function mountOutputScope(root: HTMLElement, engine: Pick<AudioEngine, "r
 
   const resize = (): void => {
     const rect = canvas.getBoundingClientRect();
-    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-    const nextWidth = Math.max(1, Math.min(MAX_CANVAS_WIDTH, Math.round(rect.width * dpr)));
-    const nextHeight = Math.max(1, Math.min(MAX_CANVAS_HEIGHT, Math.round(rect.height * dpr)));
-    if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
-      canvas.width = nextWidth;
-      canvas.height = nextHeight;
+    const pixels = canvasPixels(rect.width, rect.height, doc.defaultView!.devicePixelRatio,
+      { maxDpr: 1.5, maxWidth: MAX_CANVAS_WIDTH, maxHeight: MAX_CANVAS_HEIGHT });
+    if (canvas.width !== pixels.width || canvas.height !== pixels.height) {
+      canvas.width = pixels.width;
+      canvas.height = pixels.height;
     }
-    width = nextWidth;
-    height = nextHeight;
+    width = pixels.width;
+    height = pixels.height;
     draw();
   };
 
-  const active = (): boolean => !disposed && document.visibilityState === "visible" && intersecting;
+  const active = (): boolean => !disposed && visibility.visibilityState === "visible" && intersecting;
   const stop = (): void => {
     if (frame) cancelAnimationFrame(frame);
     if (slowTimer) window.clearInterval(slowTimer);
@@ -117,7 +121,7 @@ export function mountOutputScope(root: HTMLElement, engine: Pick<AudioEngine, "r
   intersectionObserver.observe(section);
   const onVisibility = (): void => schedule();
   const onMotionPreference = (): void => schedule();
-  document.addEventListener("visibilitychange", onVisibility);
+  visibility.addEventListener("visibilitychange", onVisibility);
   reducedMotion.addEventListener("change", onMotionPreference);
   resize();
   schedule();
@@ -129,7 +133,7 @@ export function mountOutputScope(root: HTMLElement, engine: Pick<AudioEngine, "r
       stop();
       resizeObserver.disconnect();
       intersectionObserver.disconnect();
-      document.removeEventListener("visibilitychange", onVisibility);
+      visibility.removeEventListener("visibilitychange", onVisibility);
       reducedMotion.removeEventListener("change", onMotionPreference);
       section.remove();
     },

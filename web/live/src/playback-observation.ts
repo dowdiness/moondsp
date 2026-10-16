@@ -92,6 +92,7 @@ export function mountPlaybackObservation(
     },
     edited() { changed = true; schedule(); },
     dispose() {
+      if (disposed) return;
       disposed = true;
       cancelAnimationFrame(frame);
       document.removeEventListener("visibilitychange", visibilityChanged);

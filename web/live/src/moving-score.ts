@@ -6,6 +6,7 @@ import { boundaryInfo, layoutNodes, moveBoundary, projectNotation, relocationTar
   type NotationProjection, type SourceEdit } from "./notation-structure";
 import { midiValue } from "./pitch";
 import { mountDrumSequencer } from "./drum-sequencer";
+import { ROW_H, TIME_H, W, boundedPitch, midiAtY, needsResizeRender, plotPoint, scoreGeometry, type GridSize, type ScoreGeometry } from "./score-geometry";
 import "./moving-score.css";
 
 type Point = { x: number; y: number };
@@ -17,9 +18,6 @@ type BoundaryGesture = { pointer: number; startDoc: string; node: number; initia
 type MoveGesture = { pointer: number; startDoc: string; source: number; target: number; pitch: number; initialPitch: number; start: Point; dirty: boolean; range: number[] };
 type EdgeGesture = { pointer: number; startDoc: string; node: number; leftNode: number; rightNode: number; pairStart: number; pairEnd: number; initial: number; ratio: number; previewKey?: string };
 type SelectionGesture = { pointer: number; startDoc: string; anchor: number; focus: number; nodes: number[] };
-const W = 960;
-const ROW_H = 20;
-const TIME_H = 24;
 const STRUCTURE_H = 64;
 const NS = "http://www.w3.org/2000/svg";
 
@@ -29,9 +27,6 @@ function svgEl<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<strin
   return el;
 }
 function noteMidi(value: string): number | null { return midiValue(value.split("@")[0])?.midi ?? null; }
-function boundedPitch(midi: number, low = 0, high = 127): number {
-  return Math.max(low, Math.min(high, Math.round(midi)));
-}
 function pitchName(midi: number): string {
   const names = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
   return `${names[midi % 12]}${Math.floor(midi / 12) - 1}`;
@@ -142,13 +137,9 @@ export function mountMovingScore(
   let active: EditablePhrase | null = validPhrase(pattern) ? pattern : null;
   let selectedStep = 0;
   let selectedNode: number | null = null;
-  let plotLeft = 70;
-  let pixelsToX = 1;
-  // Geometry the last render measured; height changes caused by our own content need no re-render.
-  let renderedWidth = 0;
-  let renderedStageHeight = 0;
-  let plotRight = W - 24;
-  let plotHeight = 280;
+  let geometry: ScoreGeometry = scoreGeometry(0, []);
+  // The size the last render measured; height changes caused by our own content need no re-render.
+  let rendered: GridSize = { width: 0, stageHeight: 0 };
   let visibleSelection = "";
   let gesture: DrawGesture | null = null;
   let keyboardGesture: Omit<DrawGesture, "pointer"> | null = null;
@@ -165,8 +156,6 @@ export function mountMovingScore(
   let focusedBoundary: number | null = null;
   let disposed = false;
   let feedbackText = "";
-  let viewLow = 58;
-  let viewHigh = 69;
   let drumSequencer: { update(pattern: Pattern, selected: number): void; dispose(): void } | null = null;
   const pointerOrigin: Point = { x: 0, y: 0 };
   function setMessage(text: string): void { feedbackText = text; message.textContent = text; }
@@ -234,17 +223,14 @@ export function mountMovingScore(
     }
     return { changes, selection: { from: node.from + shift, to: node.baseTo + shift } };
   }
-  function pixelsX(pixels: number): number { return pixels * pixelsToX; }
-  function sourceX(time: number): number { return plotLeft + (plotRight - plotLeft) * time; }
+  function pixelsX(pixels: number): number { return pixels * geometry.pixelsToX; }
+  function sourceX(time: number): number { return geometry.plotLeft + (geometry.plotRight - geometry.plotLeft) * time; }
   function projectionX(time: number): number {
     const span = Math.max(1, active?.structure.span ?? 1);
     return sourceX(Math.max(0, Math.min(span, time)) / span);
   }
-  function timeAtX(x: number): number { return (x - plotLeft) * (active?.structure.span ?? 1) / (plotRight - plotLeft); }
-  function yAt(midi: number): number { return TIME_H + (viewHigh - midi + .5) * ROW_H; }
-  function midiAtY(y: number): number {
-    return boundedPitch(viewHigh - Math.floor((y - TIME_H) / ROW_H), viewLow, viewHigh);
-  }
+  function timeAtX(x: number): number { return (x - geometry.plotLeft) * (active?.structure.span ?? 1) / (geometry.plotRight - geometry.plotLeft); }
+  function yAt(midi: number): number { return TIME_H + (geometry.viewHigh - midi + .5) * ROW_H; }
   function block(start: number, end: number, y: number, className: string): SVGRectElement {
     const width = projectionX(end) - projectionX(start);
     return svgEl("rect", {
@@ -282,22 +268,22 @@ export function mountMovingScore(
     ruler.replaceChildren();
     const row = (y: number, name: string, sharp: boolean, pitch?: number, octave = false): void => {
       bands.append(svgEl("rect", {
-        x: String(plotLeft), y: String(y - ROW_H / 2), width: String(W - plotLeft), height: String(ROW_H),
+        x: String(geometry.plotLeft), y: String(y - ROW_H / 2), width: String(W - geometry.plotLeft), height: String(ROW_H),
         class: `moving-score__lane${sharp ? " is-sharp" : ""}`,
         ...(pitch === undefined ? {} : { "data-pitch": String(pitch) }),
       }));
       bands.append(svgEl("rect", {
-        x: "0", y: String(y - ROW_H / 2), width: String(plotLeft - pixelsX(4)), height: String(ROW_H),
+        x: "0", y: String(y - ROW_H / 2), width: String(geometry.plotLeft - pixelsX(4)), height: String(ROW_H),
         class: `moving-score__key${sharp ? " is-sharp" : ""}`,
       }));
       const label = svgEl("text", {
-        x: String(plotLeft - pixelsX(10)), y: String(y),
+        x: String(geometry.plotLeft - pixelsX(10)), y: String(y),
         class: `moving-score__pitch-label${sharp ? " is-sharp" : ""}${octave ? " is-octave" : ""}`, "dominant-baseline": "central",
       });
       label.textContent = name;
       bands.append(label);
     };
-    for (let midi = viewHigh; midi >= viewLow; midi--) {
+    for (let midi = geometry.viewHigh; midi >= geometry.viewLow; midi--) {
       row(yAt(midi), displayPitch(pitchName(midi)), [1, 3, 6, 8, 10].includes(midi % 12), midi, midi % 12 === 0);
     }
     const span = Math.max(1, active?.structure.span ?? 1);
@@ -305,7 +291,7 @@ export function mountMovingScore(
     for (let tick = 0; tick <= divisions; tick++) {
       const time = span * tick / divisions, x = projectionX(time);
       bands.append(svgEl("path", {
-        d: `M${x} ${TIME_H}V${plotHeight}`, class: `moving-score__time-line${Number.isInteger(time) ? " is-cycle" : ""}`,
+        d: `M${x} ${TIME_H}V${geometry.plotHeight}`, class: `moving-score__time-line${Number.isInteger(time) ? " is-cycle" : ""}`,
       }));
       if (divisions > 8 && tick % 4 !== 0) continue;
       const label = svgEl("text", {
@@ -333,7 +319,7 @@ export function mountMovingScore(
     const rowCssHeight = matchMedia("(pointer: coarse), (max-width: 680px)").matches ? 44 : 32;
     structureSvg.setAttribute("viewBox", `0 0 ${W} ${structureHeight}`);
     structureSvg.style.height = `${rowCount * rowCssHeight}px`;
-    const hitWidth = Math.min(plotRight - plotLeft, pixelsX(44));
+    const hitWidth = Math.min(geometry.plotRight - geometry.plotLeft, pixelsX(44));
     const xAt = sourceX;
     structureSvg.style.setProperty("--source-text-aspect", String((rowCssHeight / 32) * pixelsX(1)));
     structureSvg.style.setProperty("--source-label-size", `${12 * 32 / rowCssHeight}px`);
@@ -368,7 +354,7 @@ export function mountMovingScore(
           structureItems.append(label);
         }
         const targetWidth = Math.max(width, hitWidth);
-        const targetX = Math.max(plotLeft, Math.min(plotRight - targetWidth, (x1 + x2 - targetWidth) / 2));
+        const targetX = Math.max(geometry.plotLeft, Math.min(geometry.plotRight - targetWidth, (x1 + x2 - targetWidth) / 2));
         const hit = svgEl("rect", {
           x: String(targetX), y: String(sourceRow * 32), width: String(targetWidth), height: "32",
           class: `moving-score__source-hit${selected ? " is-selected" : ""}`,
@@ -383,7 +369,7 @@ export function mountMovingScore(
         const selected = item.node === selectedIndex;
         const context = selectedGroups.has(item.node);
         const targetWidth = Math.max(right - left, hitWidth);
-        const targetX = Math.max(plotLeft, Math.min(plotRight - targetWidth, (left + right - targetWidth) / 2));
+        const targetX = Math.max(geometry.plotLeft, Math.min(geometry.plotRight - targetWidth, (left + right - targetWidth) / 2));
         const group = svgEl("g", {
           class: `moving-score__group${selected ? " is-selected" : context ? " is-context" : ""}`,
           tabindex: "0", role: "button", "data-node": String(item.node),
@@ -409,7 +395,7 @@ export function mountMovingScore(
         ? "Weight boundary after notation group"
         : `Weight boundary after source step ${Math.max(1, stepFor(leftNode) + 1)}`;
       const targetWidth = Math.max(44, hitWidth);
-      const targetX = Math.max(plotLeft, Math.min(plotRight - targetWidth, boundaryX - targetWidth / 2));
+      const targetX = Math.max(geometry.plotLeft, Math.min(geometry.plotRight - targetWidth, boundaryX - targetWidth / 2));
       const handle = svgEl("g", {
         class: "moving-score__boundary", tabindex: "0", role: "slider", "aria-orientation": "horizontal",
         "data-node": String(leftNode), "data-depth": String(left.depth), "data-row": String(sourceRow), "data-ratio": String(info.ratio),
@@ -427,10 +413,11 @@ export function mountMovingScore(
       boundaries.append(handle);
     }
   }
+  function measureGrid(): GridSize {
+    return { width: structureSvg.clientWidth || root.clientWidth, stageHeight: stage.clientHeight };
+  }
   function render(): void {
-    renderedWidth = structureSvg.clientWidth || root.clientWidth;
-    renderedStageHeight = stage.clientHeight;
-    pixelsToX = W / (renderedWidth || W);
+    rendered = measureGrid();
     const pitches = active ? [
       ...active.steps.flatMap(step => {
         const midi = step.rest || active?.notationKind === "chord" ? null : noteMidi(step.value);
@@ -441,16 +428,9 @@ export function mountMovingScore(
       ...(restGesture ? [restGesture.midi] : []),
       ...(keyboardRestGesture ? [keyboardRestGesture.midi] : []),
     ] : [];
-    const lowest = pitches.length ? Math.min(...pitches) : 60;
-    const highest = pitches.length ? Math.max(...pitches) : 67;
-    viewLow = Math.max(0, Math.min(116, lowest - 2));
-    viewHigh = Math.min(127, Math.max(viewLow + 11, highest + 2));
-    plotLeft = pixelsX(48);
-    plotRight = W - pixelsX(8);
-    const rows = viewHigh - viewLow + 1;
-    plotHeight = TIME_H + rows * ROW_H;
-    svg.setAttribute("viewBox", `0 ${TIME_H} ${W} ${plotHeight - TIME_H}`);
-    svg.style.height = `${plotHeight - TIME_H}px`;
+    geometry = scoreGeometry(rendered.width, pitches);
+    svg.setAttribute("viewBox", `0 ${TIME_H} ${W} ${geometry.plotHeight - TIME_H}`);
+    svg.style.height = `${geometry.plotHeight - TIME_H}px`;
     svg.style.setProperty("--text-aspect", String(pixelsX(1)));
     ruler.style.setProperty("--text-aspect", String(pixelsX(1)));
     renderBands();
@@ -497,7 +477,7 @@ export function mountMovingScore(
         hit.append(svgEl("rect", {
           x: String(x), y: String(TIME_H),
           width: String(Math.max(pixelsX(4), projectionX(end) - x)),
-          height: String(plotHeight - TIME_H), class: "moving-score__rest-hit-area",
+          height: String(geometry.plotHeight - TIME_H), class: "moving-score__rest-hit-area",
         }));
         restMarks.append(hit);
       }
@@ -586,7 +566,7 @@ export function mountMovingScore(
     const selectedPitch = keyboardRestGesture?.midi ?? restGesture?.midi ??
       keyboardGesture?.pitches.get(active!.steps[keyboardGesture.to].node) ??
       events.find(event => sourceIsSelected(event.node) && event.pitch !== null)?.pitch;
-    const selectionKey = `${sourceNode()}:${selectedPitch}:${viewLow}:${viewHigh}`;
+    const selectionKey = `${sourceNode()}:${selectedPitch}:${geometry.viewLow}:${geometry.viewHigh}`;
     if (stage.clientHeight && selectionKey !== visibleSelection) {
       if (selectedPitch !== null && selectedPitch !== undefined) {
         const y = yAt(selectedPitch) - TIME_H;
@@ -600,9 +580,7 @@ export function mountMovingScore(
   }
   function canvasPoint(event: PointerEvent): Point {
     const rect = svg.getBoundingClientRect();
-    const x = Math.max(plotLeft, Math.min(plotRight, (event.clientX - rect.left) * W / Math.max(1, rect.width)));
-    const y = Math.max(TIME_H, Math.min(plotHeight - 1, TIME_H + (event.clientY - rect.top) * (plotHeight - TIME_H) / Math.max(1, rect.height)));
-    return { x, y };
+    return plotPoint(geometry, event.clientX - rect.left, event.clientY - rect.top, rect.width, rect.height);
   }
   function drawPreview(drawing: Pick<DrawGesture, "pitches">): void {
     preview.replaceChildren();
@@ -745,7 +723,7 @@ export function mountMovingScore(
   function nodeAtPoint(point: Point): number | null {
     if (!active) return null;
     const time = Math.min(active.structure.span - Number.EPSILON * Math.max(1, active.structure.span), timeAtX(point.x));
-    const pitch = midiAtY(point.y);
+    const pitch = midiAtY(geometry, point.y);
     let best: number | null = null, distance = Infinity;
     for (const event of [...active.structure.events, ...active.structure.rests]) {
       if (event.start > time || time >= event.end) continue;
@@ -872,7 +850,7 @@ export function mountMovingScore(
       selectSource(sourceNode);
       pointerOrigin.x = event.clientX; pointerOrigin.y = event.clientY;
       svg.focus({ preventScroll: true }); pointerBusy = true;
-      restGesture = { pointer: event.pointerId, startDoc: view.state.doc.toString(), node: sourceNode, to: index, occurrence, midi: midiAtY(p.y) };
+      restGesture = { pointer: event.pointerId, startDoc: view.state.doc.toString(), node: sourceNode, to: index, occurrence, midi: midiAtY(geometry, p.y) };
       svg.setPointerCapture(event.pointerId); drawRestPreview(restGesture); event.preventDefault(); return;
     }
     const note = target.closest<SVGGElement>(".moving-score__note");
@@ -909,7 +887,7 @@ export function mountMovingScore(
       };
       render();
     } else {
-      gesture = { pointer: event.pointerId, startDoc: view.state.doc.toString(), node, to: index, end: p, lastTime: timeAtX(p.x), pitches: new Map([[node, midiAtY(p.y)]]), dirty: false };
+      gesture = { pointer: event.pointerId, startDoc: view.state.doc.toString(), node, to: index, end: p, lastTime: timeAtX(p.x), pitches: new Map([[node, midiAtY(geometry, p.y)]]), dirty: false };
     }
     svg.setPointerCapture(event.pointerId); event.preventDefault();
   }
@@ -944,7 +922,7 @@ export function mountMovingScore(
       if (view.state.doc.toString() !== moveGesture.startDoc) { endMove(event, false); return; }
       if (!moveGesture.dirty && Math.hypot(event.clientX - pointerOrigin.x, event.clientY - pointerOrigin.y) < 4) return;
       const point = canvasPoint(event), time = timeAtX(point.x);
-      let nextTarget = moveGesture.source, nextPitch = midiAtY(point.y);
+      let nextTarget = moveGesture.source, nextPitch = midiAtY(geometry, point.y);
       if (Math.abs(event.clientX - pointerOrigin.x) >= 4) {
         const targets = new Set<number>();
         for (const item of [...active.structure.events, ...active.structure.rests]) {
@@ -995,7 +973,7 @@ export function mountMovingScore(
     }
     if (restGesture?.pointer === event.pointerId && active) {
       if (view.state.doc.toString() !== restGesture.startDoc) { endRestPointer(event, false); return; }
-      restGesture.midi = midiAtY(canvasPoint(event).y);
+      restGesture.midi = midiAtY(geometry, canvasPoint(event).y);
       drawRestPreview(restGesture);
       return;
     }
@@ -1004,8 +982,8 @@ export function mountMovingScore(
     if (view.state.doc.toString() !== gesture.startDoc) { endPointer(event, false); return; }
     const p = canvasPoint(event);
     const time = Math.max(0, Math.min(active.structure.span, timeAtX(p.x)));
-    const nextMidi = midiAtY(p.y), delta = time - gesture.lastTime;
-    const previousMidi = midiAtY(gesture.end.y);
+    const nextMidi = midiAtY(geometry, p.y), delta = time - gesture.lastTime;
+    const previousMidi = midiAtY(geometry, gesture.end.y);
     // Pointer coordinates may round to device pixels while SVG centers do not.
     const tolerance = active.structure.span / Math.max(1, svg.clientWidth);
     if (Math.abs(delta) < 1e-8) {
@@ -1014,7 +992,7 @@ export function mountMovingScore(
       const center = (projected.start + Math.min(projected.end, active.structure.span)) / 2;
       if (center < Math.min(gesture.lastTime, time) - tolerance || center > Math.max(gesture.lastTime, time) + tolerance) continue;
       const fraction = Math.max(0, Math.min(1, (center - gesture.lastTime) / delta));
-      gesture.pitches.set(projected.node, boundedPitch(previousMidi + (nextMidi - previousMidi) * fraction, viewLow, viewHigh));
+      gesture.pitches.set(projected.node, boundedPitch(previousMidi + (nextMidi - previousMidi) * fraction, geometry.viewLow, geometry.viewHigh));
     }
     let closestDistance = Infinity;
     for (const projected of active.structure.events) {
@@ -1266,7 +1244,7 @@ export function mountMovingScore(
         const direction = event.key === "ArrowRight" ? 1 : -1;
         keyboardGesture.to = Math.max(0, Math.min(active.steps.length - 1, keyboardGesture.to + direction));
         const step = active.steps[keyboardGesture.to];
-        const midi = keyboardGesture.pitches.get(step.node) ?? noteMidi(step.value) ?? midiAtY(keyboardGesture.end.y);
+        const midi = keyboardGesture.pitches.get(step.node) ?? noteMidi(step.value) ?? midiAtY(geometry, keyboardGesture.end.y);
         keyboardGesture.pitches.set(step.node, midi);
         const occurrence = active.structure.events.find(item => item.node === step.node);
         keyboardGesture.end = { x: projectionX(occurrence?.start ?? 0), y: yAt(midi) };
@@ -1275,7 +1253,7 @@ export function mountMovingScore(
         render(); drawPreview(keyboardGesture); event.preventDefault();
       } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
         const step = active.steps[keyboardGesture.to];
-        const currentMidi = keyboardGesture.pitches.get(step.node) ?? noteMidi(step.value) ?? midiAtY(keyboardGesture.end.y);
+        const currentMidi = keyboardGesture.pitches.get(step.node) ?? noteMidi(step.value) ?? midiAtY(geometry, keyboardGesture.end.y);
         const next = boundedPitch(currentMidi + (event.key === "ArrowUp" ? 1 : -1));
         keyboardGesture.pitches.set(step.node, next);
         keyboardGesture.end = { x: keyboardGesture.end.x, y: yAt(next) };
@@ -1325,8 +1303,7 @@ export function mountMovingScore(
   const resizeObserver = new ResizeObserver(entries => {
     const { width, height } = entries[0].contentRect;
     if (width > 0 && height > 0) {
-      const widthChanged = (structureSvg.clientWidth || root.clientWidth) !== renderedWidth;
-      if (widthChanged || (renderedStageHeight === 0 && stage.clientHeight > 0)) render();
+      if (needsResizeRender(measureGrid(), rendered)) render();
     } else if (gesture || moveGesture || edgeGesture || restGesture || keyboardGesture || keyboardRestGesture || boundaryGesture) cancel();
     view.requestMeasure();
   });
