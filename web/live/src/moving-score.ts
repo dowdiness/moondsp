@@ -18,6 +18,21 @@ type BoundaryGesture = { pointer: number; startDoc: string; node: number; initia
 type MoveGesture = { pointer: number; startDoc: string; source: number; target: number; pitch: number; initialPitch: number; start: Point; dirty: boolean; range: number[] };
 type EdgeGesture = { pointer: number; startDoc: string; node: number; leftNode: number; rightNode: number; pairStart: number; pairEnd: number; initial: number; ratio: number; previewKey?: string };
 type SelectionGesture = { pointer: number; startDoc: string; anchor: number; focus: number; nodes: number[] };
+// At most one interaction runs at a time. Pointer interactions hold a captured
+// pointer; keyboard interactions preview an edit until Enter or Escape.
+type Interaction =
+  | (DrawGesture & { kind: "draw" })
+  | (Omit<DrawGesture, "pointer"> & { kind: "keyboard-draw" })
+  | (PointerRestGesture & { kind: "rest" })
+  | (RestGesture & { kind: "keyboard-rest" })
+  | (MoveGesture & { kind: "move" })
+  | (EdgeGesture & { kind: "edge" })
+  | (BoundaryGesture & { kind: "boundary" })
+  | (SelectionGesture & { kind: "selection" });
+type InteractionOf<K extends Interaction["kind"]> = Extract<Interaction, { kind: K }>;
+type PointerKind = Extract<Interaction, { pointer: number }>["kind"];
+// Canvas drags lock touch scrolling; a boundary drag runs on the structure strip.
+const SCROLL_LOCKING: ReadonlySet<Interaction["kind"]> = new Set(["draw", "move", "edge", "rest", "selection"]);
 const STRUCTURE_H = 64;
 const NS = "http://www.w3.org/2000/svg";
 
@@ -141,29 +156,33 @@ export function mountMovingScore(
   // The size the last render measured; height changes caused by our own content need no re-render.
   let rendered: GridSize = { width: 0, stageHeight: 0 };
   let visibleSelection = "";
-  let gesture: DrawGesture | null = null;
-  let keyboardGesture: Omit<DrawGesture, "pointer"> | null = null;
-  let boundaryGesture: BoundaryGesture | null = null;
-  let restGesture: PointerRestGesture | null = null;
-  let moveGesture: MoveGesture | null = null;
-  let edgeGesture: EdgeGesture | null = null;
-  let keyboardRestGesture: RestGesture | null = null;
+  let interaction: Interaction | null = null;
   let selecting = false;
   let selectionAnchor: number | null = null;
   let selectionFocus: number | null = null;
-  let selectionGesture: SelectionGesture | null = null;
-  let pointerBusy = false;
   let focusedBoundary: number | null = null;
   let disposed = false;
   let feedbackText = "";
   let drumSequencer: { update(pattern: Pattern, selected: number): void; dispose(): void } | null = null;
   const pointerOrigin: Point = { x: 0, y: 0 };
+  function ongoing<K extends Interaction["kind"]>(kind: K): InteractionOf<K> | null {
+    return interaction?.kind === kind ? interaction as InteractionOf<K> : null;
+  }
+  function ongoingPointer<K extends PointerKind>(kind: K, pointer: number): InteractionOf<K> | null {
+    const current = ongoing(kind);
+    return current && (current as { pointer: number }).pointer === pointer ? current : null;
+  }
+  /** The pitch a rest entry is choosing, by pointer or keyboard. */
+  function restMidi(): number | undefined {
+    return interaction?.kind === "rest" || interaction?.kind === "keyboard-rest" ? interaction.midi : undefined;
+  }
   function setMessage(text: string): void { feedbackText = text; message.textContent = text; }
   function stepFor(node: number): number { return active?.steps.findIndex(step => step.node === node) ?? -1; }
   function sourceNode(): number | null { return selectedNode ?? active?.steps[selectedStep]?.node ?? null; }
   function selectedSources(): number[] {
     if (!active) return [];
-    if (selectionGesture) return selectionGesture.nodes;
+    const selection = ongoing("selection");
+    if (selection) return selection.nodes;
     const range = sourceRangeNodes(active.structure, pattern.selectionFrom - active.contentFrom, pattern.selectionTo - active.contentFrom);
     if (pattern.selectionTo > pattern.selectionFrom) return range;
     return sourceNode() === null ? [] : [sourceNode()!];
@@ -424,9 +443,8 @@ export function mountMovingScore(
         return midi === null ? [] : [midi];
       }),
       ...active.structure.events.flatMap(event => event.pitch === null ? [] : [event.pitch]),
-      ...(keyboardGesture?.pitches.values() ?? []),
-      ...(restGesture ? [restGesture.midi] : []),
-      ...(keyboardRestGesture ? [keyboardRestGesture.midi] : []),
+      ...(ongoing("keyboard-draw")?.pitches.values() ?? []),
+      ...(restMidi() === undefined ? [] : [restMidi()!]),
     ] : [];
     geometry = scoreGeometry(rendered.width, pitches);
     svg.setAttribute("viewBox", `0 ${TIME_H} ${W} ${geometry.plotHeight - TIME_H}`);
@@ -490,7 +508,7 @@ export function mountMovingScore(
       const midi = event.pitch ?? (active!.notationKind === "chord" ? null : noteMidi(step.value));
       const x = projectionX((event.start + Math.min(event.end, active!.structure.span)) / 2);
       const group = svgEl("g", {
-        class: `moving-score__note${sourceIsSelected(event.node) ? " is-selected" : ""}${moveGesture?.source === event.node ? " is-editing" : ""}`,
+        class: `moving-score__note${sourceIsSelected(event.node) ? " is-selected" : ""}${ongoing("move")?.source === event.node ? " is-editing" : ""}`,
         "data-node": String(event.node), "data-index": String(index), "data-start": String(event.start),
         "data-from": String(step.from), "data-to": String(step.to), "data-literal-from": String(active!.contentFrom),
         "data-literal-to": String(active!.contentTo), "data-pitch": String(midi),
@@ -563,8 +581,9 @@ export function mountMovingScore(
       }
     }
     // Only source selection can scroll the grid, never playback highlighting.
-    const selectedPitch = keyboardRestGesture?.midi ?? restGesture?.midi ??
-      keyboardGesture?.pitches.get(active!.steps[keyboardGesture.to].node) ??
+    const keyboardDraw = ongoing("keyboard-draw");
+    const selectedPitch = restMidi() ??
+      keyboardDraw?.pitches.get(active!.steps[keyboardDraw.to].node) ??
       events.find(event => sourceIsSelected(event.node) && event.pitch !== null)?.pitch;
     const selectionKey = `${sourceNode()}:${selectedPitch}:${geometry.viewLow}:${geometry.viewHigh}`;
     if (stage.clientHeight && selectionKey !== visibleSelection) {
@@ -575,7 +594,7 @@ export function mountMovingScore(
       }
       visibleSelection = selectionKey;
     }
-    if (!gesture && !keyboardGesture && !restGesture && !keyboardRestGesture && !moveGesture && !edgeGesture) preview.replaceChildren();
+    if (!interaction || interaction.kind === "boundary" || interaction.kind === "selection") preview.replaceChildren();
     message.textContent = feedbackText;
   }
   function canvasPoint(event: PointerEvent): Point {
@@ -734,15 +753,15 @@ export function mountMovingScore(
     return best;
   }
   function beginPointer(event: PointerEvent): void {
-    if (pointerBusy || !active || gesture || moveGesture || edgeGesture || restGesture || keyboardGesture || keyboardRestGesture || boundaryGesture || event.button !== 0) return;
+    if (interaction || !active || event.button !== 0) return;
     const target = event.target instanceof Element ? event.target : null;
     if (selecting && target && svg.contains(target) && active.notationKind === "note") {
       if (event.clientX < svg.getBoundingClientRect().left + 48) return;
       const node = nodeAtPoint(canvasPoint(event));
       if (node === null) return;
       selectionAnchor = node;
-      selectionGesture = { pointer: event.pointerId, startDoc: view.state.doc.toString(), anchor: node, focus: node, nodes: [node] };
-      pointerBusy = true; render(); svg.focus({ preventScroll: true });
+      interaction = { kind: "selection", pointer: event.pointerId, startDoc: view.state.doc.toString(), anchor: node, focus: node, nodes: [node] };
+      render(); svg.focus({ preventScroll: true });
       svg.setPointerCapture(event.pointerId); event.preventDefault(); return;
     }
     const noteEdge = target?.closest<SVGRectElement>(".moving-score__note-edge");
@@ -757,13 +776,13 @@ export function mountMovingScore(
       const rightNode = siblings[leftIndex + 1];
       if (rightNode === undefined) return;
       const initial = Number(noteEdge.dataset.ratio);
-      edgeGesture = {
-        pointer: event.pointerId, startDoc: view.state.doc.toString(), node,
+      interaction = {
+        kind: "edge", pointer: event.pointerId, startDoc: view.state.doc.toString(), node,
         leftNode, rightNode,
         pairStart: Number(noteEdge.dataset.pairStart), pairEnd: Number(noteEdge.dataset.pairEnd),
         initial, ratio: initial,
       };
-      selectSource(node); svg.focus({ preventScroll: true }); pointerBusy = true;
+      selectSource(node); svg.focus({ preventScroll: true });
       svg.setPointerCapture(event.pointerId); event.preventDefault(); return;
     }
     const boundary = target?.closest<SVGGElement>(".moving-score__boundary");
@@ -787,8 +806,8 @@ export function mountMovingScore(
       if (!info) return;
       const focusTarget = boundaries.querySelector<SVGGElement>(`.moving-score__boundary[data-node="${node}"]`) ?? boundary;
       focusedBoundary = node;
-      focusTarget.focus({ preventScroll: true }); pointerBusy = true;
-      boundaryGesture = { pointer: event.pointerId, startDoc: view.state.doc.toString(), node, initial: info.ratio, ratio: info.ratio };
+      focusTarget.focus({ preventScroll: true });
+      interaction = { kind: "boundary", pointer: event.pointerId, startDoc: view.state.doc.toString(), node, initial: info.ratio, ratio: info.ratio };
       structureSvg.setPointerCapture(event.pointerId); event.preventDefault(); return;
     }
     const sourceTarget = target?.closest<SVGGElement>(".moving-score__source-hit, .moving-score__group");
@@ -849,9 +868,10 @@ export function mountMovingScore(
       if (!occurrence || index < 0 || !active.steps[index].rest) return;
       selectSource(sourceNode);
       pointerOrigin.x = event.clientX; pointerOrigin.y = event.clientY;
-      svg.focus({ preventScroll: true }); pointerBusy = true;
-      restGesture = { pointer: event.pointerId, startDoc: view.state.doc.toString(), node: sourceNode, to: index, occurrence, midi: midiAtY(geometry, p.y) };
-      svg.setPointerCapture(event.pointerId); drawRestPreview(restGesture); event.preventDefault(); return;
+      svg.focus({ preventScroll: true });
+      const rest: InteractionOf<"rest"> = { kind: "rest", pointer: event.pointerId, startDoc: view.state.doc.toString(), node: sourceNode, to: index, occurrence, midi: midiAtY(geometry, p.y) };
+      interaction = rest;
+      svg.setPointerCapture(event.pointerId); drawRestPreview(rest); event.preventDefault(); return;
     }
     const note = target.closest<SVGGElement>(".moving-score__note");
     let projected: EditablePhrase["structure"]["events"][number] | undefined;
@@ -875,93 +895,97 @@ export function mountMovingScore(
     if (active.notationKind !== "note") { event.preventDefault(); return; }
     if (note) note.focus({ preventScroll: true });
     pointerOrigin.x = event.clientX; pointerOrigin.y = event.clientY;
-    svg.focus({ preventScroll: true }); pointerBusy = true;
+    svg.focus({ preventScroll: true });
     if (note && !event.shiftKey) {
       const initialPitch = projected.pitch ?? noteMidi(active.steps[index].value);
-      if (initialPitch === null || initialPitch === undefined) { pointerBusy = false; return; }
-      moveGesture = {
-        pointer: event.pointerId, startDoc: view.state.doc.toString(),
+      if (initialPitch === null || initialPitch === undefined) return;
+      interaction = {
+        kind: "move", pointer: event.pointerId, startDoc: view.state.doc.toString(),
         source: keepRange ? rangeSibling(node, previousRange) ?? node : node,
         target: keepRange ? rangeSibling(node, previousRange) ?? node : node,
         pitch: initialPitch, initialPitch, start: p, dirty: false, range: keepRange ? previousRange : [node],
       };
       render();
     } else {
-      gesture = { pointer: event.pointerId, startDoc: view.state.doc.toString(), node, to: index, end: p, lastTime: timeAtX(p.x), pitches: new Map([[node, midiAtY(geometry, p.y)]]), dirty: false };
+      interaction = { kind: "draw", pointer: event.pointerId, startDoc: view.state.doc.toString(), node, to: index, end: p, lastTime: timeAtX(p.x), pitches: new Map([[node, midiAtY(geometry, p.y)]]), dirty: false };
     }
     svg.setPointerCapture(event.pointerId); event.preventDefault();
   }
   function movePointer(event: PointerEvent): void {
-    if (selectionGesture?.pointer === event.pointerId && active) {
-      if (view.state.doc.toString() !== selectionGesture.startDoc) { endSelection(event, false); return; }
+    const selection = ongoingPointer("selection", event.pointerId);
+    if (selection && active) {
+      if (view.state.doc.toString() !== selection.startDoc) { endSelection(event, false); return; }
       const node = nodeAtPoint(canvasPoint(event));
       if (node !== null) {
-        const range = extendSourceRange(active.structure, selectionGesture.anchor, node);
-        if (range.length) { selectionGesture.nodes = range; selectionGesture.focus = node; render(); }
+        const range = extendSourceRange(active.structure, selection.anchor, node);
+        if (range.length) { selection.nodes = range; selection.focus = node; render(); }
       }
       return;
     }
-    if (edgeGesture?.pointer === event.pointerId && active) {
-      if (view.state.doc.toString() !== edgeGesture.startDoc) { endEdge(event, false); return; }
+    const edge = ongoingPointer("edge", event.pointerId);
+    if (edge && active) {
+      if (view.state.doc.toString() !== edge.startDoc) { endEdge(event, false); return; }
       const time = timeAtX(canvasPoint(event).x);
-      const ratio = Math.max(.01, Math.min(.99, (time - edgeGesture.pairStart) / Math.max(1e-9, edgeGesture.pairEnd - edgeGesture.pairStart)));
-      edgeGesture.ratio = ratio;
+      const ratio = Math.max(.01, Math.min(.99, (time - edge.pairStart) / Math.max(1e-9, edge.pairEnd - edge.pairStart)));
+      edge.ratio = ratio;
       try {
         const content = view.state.doc.sliceString(active.contentFrom, active.contentTo);
-        const nextContent = applyDraft(content, moveBoundary(content, active.structure, edgeGesture.leftNode, ratio));
-        if (nextContent !== edgeGesture.previewKey) {
-          edgeGesture.previewKey = nextContent;
-          previewEdge(edgeGesture);
+        const nextContent = applyDraft(content, moveBoundary(content, active.structure, edge.leftNode, ratio));
+        if (nextContent !== edge.previewKey) {
+          edge.previewKey = nextContent;
+          previewEdge(edge);
         }
       } catch {
         setMessage("This note boundary has no representable adjacent weight.");
       }
       return;
     }
-    if (moveGesture?.pointer === event.pointerId && active) {
-      if (view.state.doc.toString() !== moveGesture.startDoc) { endMove(event, false); return; }
-      if (!moveGesture.dirty && Math.hypot(event.clientX - pointerOrigin.x, event.clientY - pointerOrigin.y) < 4) return;
+    const move = ongoingPointer("move", event.pointerId);
+    if (move && active) {
+      if (view.state.doc.toString() !== move.startDoc) { endMove(event, false); return; }
+      if (!move.dirty && Math.hypot(event.clientX - pointerOrigin.x, event.clientY - pointerOrigin.y) < 4) return;
       const point = canvasPoint(event), time = timeAtX(point.x);
-      let nextTarget = moveGesture.source, nextPitch = midiAtY(geometry, point.y);
+      let nextTarget = move.source, nextPitch = midiAtY(geometry, point.y);
       if (Math.abs(event.clientX - pointerOrigin.x) >= 4) {
         const targets = new Set<number>();
         for (const item of [...active.structure.events, ...active.structure.rests]) {
           if (item.start > time || time >= Math.min(item.end, active.structure.span)) continue;
-          const target = isPhraseRange(moveGesture.range) ? rangeSibling(item.node, moveGesture.range)
-            : item.node === moveGesture.source ? item.node : relocationTarget(active.structure, moveGesture.source, item.node);
+          const target = isPhraseRange(move.range) ? rangeSibling(item.node, move.range)
+            : item.node === move.source ? item.node : relocationTarget(active.structure, move.source, item.node);
           if (target !== null) targets.add(target);
         }
         if (targets.size === 1) {
           nextTarget = targets.values().next().value!;
           setMessage("");
         } else {
-          nextPitch = moveGesture.initialPitch;
+          nextPitch = move.initialPitch;
           setMessage(targets.size ? "Choose an unambiguous source step to move this note."
             : "This note can only move within its own source sequence.");
         }
       } else setMessage("");
-      if (nextTarget !== moveGesture.target || nextPitch !== moveGesture.pitch) {
-        moveGesture.target = nextTarget;
-        moveGesture.pitch = nextPitch;
-        moveGesture.dirty = nextTarget !== moveGesture.source || nextPitch !== moveGesture.initialPitch;
-        if (moveGesture.dirty) previewMove(moveGesture);
+      if (nextTarget !== move.target || nextPitch !== move.pitch) {
+        move.target = nextTarget;
+        move.pitch = nextPitch;
+        move.dirty = nextTarget !== move.source || nextPitch !== move.initialPitch;
+        if (move.dirty) previewMove(move);
         else preview.replaceChildren();
       }
       return;
     }
-    if (boundaryGesture?.pointer === event.pointerId && active) {
-      if (view.state.doc.toString() !== boundaryGesture.startDoc) { endBoundary(event, false); return; }
+    const boundary = ongoingPointer("boundary", event.pointerId);
+    if (boundary && active) {
+      if (view.state.doc.toString() !== boundary.startDoc) { endBoundary(event, false); return; }
       const rect = structureSvg.getBoundingClientRect();
       const x = (event.clientX - rect.left) * W / Math.max(1, rect.width);
-      const layout = layoutNodes(active.structure), left = layout.find(item => item.node === boundaryGesture!.node);
-      const info = boundaryInfo(active.structure, boundaryGesture.node);
+      const layout = layoutNodes(active.structure), left = layout.find(item => item.node === boundary.node);
+      const info = boundaryInfo(active.structure, boundary.node);
       const right = info && layout.find(item => item.node === info.right);
       if (!left || !right) return;
       const xAt = sourceX;
       const start = xAt(left.start), end = xAt(right.end);
       const ratio = Math.max(.01, Math.min(.99, (x - start) / Math.max(1, end - start)));
-      boundaryGesture.ratio = ratio;
-      const handle = boundaries.querySelector<SVGGElement>(`.moving-score__boundary[data-node="${boundaryGesture.node}"]`);
+      boundary.ratio = ratio;
+      const handle = boundaries.querySelector<SVGGElement>(`.moving-score__boundary[data-node="${boundary.node}"]`);
       if (handle) {
         handle.dataset.ratio = String(ratio);
         handle.setAttribute("aria-valuenow", String(ratio));
@@ -971,45 +995,48 @@ export function mountMovingScore(
       }
       return;
     }
-    if (restGesture?.pointer === event.pointerId && active) {
-      if (view.state.doc.toString() !== restGesture.startDoc) { endRestPointer(event, false); return; }
-      restGesture.midi = midiAtY(geometry, canvasPoint(event).y);
-      drawRestPreview(restGesture);
+    const rest = ongoingPointer("rest", event.pointerId);
+    if (rest && active) {
+      if (view.state.doc.toString() !== rest.startDoc) { endRestPointer(event, false); return; }
+      rest.midi = midiAtY(geometry, canvasPoint(event).y);
+      drawRestPreview(rest);
       return;
     }
-    if (!gesture || gesture.pointer !== event.pointerId || !active) return;
-    if (!gesture.dirty && Math.hypot(event.clientX - pointerOrigin.x, event.clientY - pointerOrigin.y) < 4) return;
-    if (view.state.doc.toString() !== gesture.startDoc) { endPointer(event, false); return; }
+    const draw = ongoingPointer("draw", event.pointerId);
+    if (!draw || !active) return;
+    if (!draw.dirty && Math.hypot(event.clientX - pointerOrigin.x, event.clientY - pointerOrigin.y) < 4) return;
+    if (view.state.doc.toString() !== draw.startDoc) { endPointer(event, false); return; }
     const p = canvasPoint(event);
     const time = Math.max(0, Math.min(active.structure.span, timeAtX(p.x)));
-    const nextMidi = midiAtY(geometry, p.y), delta = time - gesture.lastTime;
-    const previousMidi = midiAtY(geometry, gesture.end.y);
+    const nextMidi = midiAtY(geometry, p.y), delta = time - draw.lastTime;
+    const previousMidi = midiAtY(geometry, draw.end.y);
     // Pointer coordinates may round to device pixels while SVG centers do not.
     const tolerance = active.structure.span / Math.max(1, svg.clientWidth);
     if (Math.abs(delta) < 1e-8) {
-      gesture.pitches.set(active.steps[gesture.to].node, nextMidi);
+      draw.pitches.set(active.steps[draw.to].node, nextMidi);
     } else for (const projected of active.structure.events) {
       const center = (projected.start + Math.min(projected.end, active.structure.span)) / 2;
-      if (center < Math.min(gesture.lastTime, time) - tolerance || center > Math.max(gesture.lastTime, time) + tolerance) continue;
-      const fraction = Math.max(0, Math.min(1, (center - gesture.lastTime) / delta));
-      gesture.pitches.set(projected.node, boundedPitch(previousMidi + (nextMidi - previousMidi) * fraction, geometry.viewLow, geometry.viewHigh));
+      if (center < Math.min(draw.lastTime, time) - tolerance || center > Math.max(draw.lastTime, time) + tolerance) continue;
+      const fraction = Math.max(0, Math.min(1, (center - draw.lastTime) / delta));
+      draw.pitches.set(projected.node, boundedPitch(previousMidi + (nextMidi - previousMidi) * fraction, geometry.viewLow, geometry.viewHigh));
     }
     let closestDistance = Infinity;
     for (const projected of active.structure.events) {
       const distance = Math.abs((projected.start + Math.min(projected.end, active.structure.span)) / 2 - time);
       if (distance < closestDistance) {
         const index = stepFor(projected.node);
-        if (index >= 0) { gesture.to = index; closestDistance = distance; }
+        if (index >= 0) { draw.to = index; closestDistance = distance; }
       }
     }
-    gesture.end = p;
-    gesture.lastTime = time;
-    gesture.dirty = true;
-    drawPreview(gesture);
+    draw.end = p;
+    draw.lastTime = time;
+    draw.dirty = true;
+    drawPreview(draw);
   }
   function endBoundary(event: PointerEvent, commit: boolean): void {
-    if (!boundaryGesture || boundaryGesture.pointer !== event.pointerId) return;
-    const current = boundaryGesture; boundaryGesture = null; pointerBusy = false;
+    const current = ongoingPointer("boundary", event.pointerId);
+    if (!current) return;
+    interaction = null;
     if (structureSvg.hasPointerCapture(event.pointerId)) structureSvg.releasePointerCapture(event.pointerId);
     if (commit && view.state.doc.toString() === current.startDoc && Math.abs(current.initial - current.ratio) > .005) {
       controls.boundary(current.node, current.ratio); setMessage("");
@@ -1018,9 +1045,9 @@ export function mountMovingScore(
     structureSvg.focus({ preventScroll: true });
   }
   function endEdge(event: PointerEvent, commit: boolean): void {
-    if (!edgeGesture || edgeGesture.pointer !== event.pointerId) return;
-    const current = edgeGesture;
-    edgeGesture = null; pointerBusy = false;
+    const current = ongoingPointer("edge", event.pointerId);
+    if (!current) return;
+    interaction = null;
     if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
     if (commit && active && view.state.doc.toString() === current.startDoc) {
       try {
@@ -1034,8 +1061,9 @@ export function mountMovingScore(
     preview.replaceChildren(); render();
   }
   function endMove(event: PointerEvent, commit: boolean): void {
-    if (!moveGesture || moveGesture.pointer !== event.pointerId) return;
-    const current = moveGesture; moveGesture = null; pointerBusy = false;
+    const current = ongoingPointer("move", event.pointerId);
+    if (!current) return;
+    interaction = null;
     if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
     preview.replaceChildren();
     if (commit) commitMove(current);
@@ -1043,8 +1071,9 @@ export function mountMovingScore(
     render();
   }
   function endSelection(event: PointerEvent, commit: boolean): void {
-    if (!selectionGesture || selectionGesture.pointer !== event.pointerId) return;
-    const current = selectionGesture; selectionGesture = null; pointerBusy = false;
+    const current = ongoingPointer("selection", event.pointerId);
+    if (!current) return;
+    interaction = null;
     if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
     if (commit && view.state.doc.toString() === current.startDoc) {
       selectionFocus = current.focus; selectRange(current.nodes);
@@ -1052,35 +1081,33 @@ export function mountMovingScore(
     render();
   }
   function endPointer(event: PointerEvent, commit: boolean): void {
-    if (!gesture || gesture.pointer !== event.pointerId) return;
-    const current = gesture; gesture = null; pointerBusy = false;
+    const current = ongoingPointer("draw", event.pointerId);
+    if (!current) return;
+    interaction = null;
     if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
     preview.replaceChildren();
     if (commit) commitDraw(current);
     render();
   }
   function endRestPointer(event: PointerEvent, commit: boolean): void {
-    if (!restGesture || restGesture.pointer !== event.pointerId) return;
-    const current = restGesture; restGesture = null; pointerBusy = false;
+    const current = ongoingPointer("rest", event.pointerId);
+    if (!current) return;
+    interaction = null;
     if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
     preview.replaceChildren();
     if (commit) commitRest(current);
     render();
   }
   function cancelKeyboardRest(): void {
-    keyboardRestGesture = null;
+    interaction = null;
     preview.replaceChildren();
     render();
   }
   function cancel(): void {
-    if (selectionGesture) endSelection(new PointerEvent("pointercancel", { pointerId: selectionGesture.pointer }), false);
-    if (gesture) endPointer(new PointerEvent("pointercancel", { pointerId: gesture.pointer }), false);
-    if (edgeGesture) endEdge(new PointerEvent("pointercancel", { pointerId: edgeGesture.pointer }), false);
-    if (moveGesture) endMove(new PointerEvent("pointercancel", { pointerId: moveGesture.pointer }), false);
-    if (restGesture) endRestPointer(new PointerEvent("pointercancel", { pointerId: restGesture.pointer }), false);
-    if (boundaryGesture) endBoundary(new PointerEvent("pointercancel", { pointerId: boundaryGesture.pointer }), false);
-    if (keyboardGesture) { keyboardGesture = null; preview.replaceChildren(); render(); }
-    if (keyboardRestGesture) cancelKeyboardRest();
+    const current = interaction;
+    if (current && "pointer" in current) onPointerCancel(new PointerEvent("pointercancel", { pointerId: current.pointer }));
+    else if (current?.kind === "keyboard-draw") { interaction = null; preview.replaceChildren(); render(); }
+    else if (current?.kind === "keyboard-rest") cancelKeyboardRest();
     focusedBoundary = null;
     setMessage("");
   }
@@ -1089,7 +1116,7 @@ export function mountMovingScore(
     const isNativeControl = target instanceof HTMLSelectElement || target instanceof HTMLInputElement;
     if (event.key === "Escape") {
       if (isNativeControl) return;
-      if (gesture || moveGesture || edgeGesture || restGesture || keyboardGesture || keyboardRestGesture || boundaryGesture || selectionGesture) cancel();
+      if (interaction) cancel();
       if (selecting) {
         selecting = false; selectButton.setAttribute("aria-pressed", "false");
         setMessage(""); event.preventDefault(); return;
@@ -1102,7 +1129,7 @@ export function mountMovingScore(
       if (runScopeHandlers(view, event, "pattern-control") || runScopeHandlers(view, event, "editor")) { event.preventDefault(); return; }
       if (event.key.toLowerCase() === "z") { if (event.shiftKey) redo(view); else undo(view); event.preventDefault(); return; }
     }
-    if (target === svg && active && !pointerBusy && !keyboardGesture && !keyboardRestGesture) {
+    if (target === svg && active && !interaction) {
       const range = selectedSources();
       const horizontal = event.key === "ArrowLeft" || event.key === "ArrowRight";
       const vertical = event.key === "ArrowUp" || event.key === "ArrowDown";
@@ -1138,7 +1165,7 @@ export function mountMovingScore(
         event.preventDefault(); return;
       }
     }
-    if (target === svg && active?.notationKind === "note" && !pointerBusy && !keyboardGesture && !keyboardRestGesture && (event.altKey || event.shiftKey) &&
+    if (target === svg && active?.notationKind === "note" && !interaction && (event.altKey || event.shiftKey) &&
         (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
       const nodeIndex = sourceNode();
       const node = nodeIndex === null ? undefined : active.structure.nodes[nodeIndex];
@@ -1174,7 +1201,7 @@ export function mountMovingScore(
         event.preventDefault(); return;
       }
     }
-    if (target === svg && active && !pointerBusy && !keyboardGesture && !keyboardRestGesture && (event.key === "Delete" || event.key === "Backspace")) {
+    if (target === svg && active && !interaction && (event.key === "Delete" || event.key === "Backspace")) {
       controls.clear(); event.preventDefault(); return;
     }
     if (target instanceof Element && structureSvg.contains(target) && active) {
@@ -1204,18 +1231,19 @@ export function mountMovingScore(
       }
     }
     if (target !== svg || !active) return;
-    if (keyboardRestGesture) {
+    const keyboardRest = ongoing("keyboard-rest");
+    if (keyboardRest) {
       if (event.key === "Enter") {
-        const current = keyboardRestGesture; keyboardRestGesture = null;
-        preview.replaceChildren(); commitRest(current); render(); event.preventDefault(); return;
+        interaction = null;
+        preview.replaceChildren(); commitRest(keyboardRest); render(); event.preventDefault(); return;
       }
       if (event.key === "ArrowUp" || event.key === "ArrowDown") {
-        keyboardRestGesture.midi = boundedPitch(keyboardRestGesture.midi + (event.key === "ArrowUp" ? 1 : -1));
-        render(); drawRestPreview(keyboardRestGesture); event.preventDefault(); return;
+        keyboardRest.midi = boundedPitch(keyboardRest.midi + (event.key === "ArrowUp" ? 1 : -1));
+        render(); drawRestPreview(keyboardRest); event.preventDefault(); return;
       }
       return;
     }
-    if (event.key === "Enter" && !keyboardGesture && active.notationKind === "note" && active.steps[selectedStep]?.rest) {
+    if (event.key === "Enter" && !interaction && active.notationKind === "note" && active.steps[selectedStep]?.rest) {
       const step = active.steps[selectedStep];
       const occurrence = active.structure.rests.find(item => item.node === step.node);
       if (!occurrence) { setMessage("Select this rest in the source steps to add a note."); return; }
@@ -1226,39 +1254,42 @@ export function mountMovingScore(
         const midi = before && !before.rest ? noteMidi(before.value) : after && !after.rest ? noteMidi(after.value) : null;
         if (midi !== null) { initialPitch = midi; break; }
       }
-      keyboardRestGesture = { startDoc: view.state.doc.toString(), node: step.node, to: selectedStep, occurrence, midi: initialPitch };
-      drawRestPreview(keyboardRestGesture); setMessage("Rest entry · Up/Down changes pitch · Enter applies · Escape cancels"); event.preventDefault(); return;
+      const rest: InteractionOf<"keyboard-rest"> = { kind: "keyboard-rest", startDoc: view.state.doc.toString(), node: step.node, to: selectedStep, occurrence, midi: initialPitch };
+      interaction = rest;
+      drawRestPreview(rest); setMessage("Rest entry · Up/Down changes pitch · Enter applies · Escape cancels"); event.preventDefault(); return;
     }
-    if (event.key === "Enter" && !keyboardGesture && active.notationKind === "note") {
+    if (event.key === "Enter" && !interaction && active.notationKind === "note") {
       const step = active.steps[selectedStep]; if (!step || step.rest) return;
       const midi = noteMidi(step.value) ?? 60;
       const firstEvent = active.structure.events.find(item => item.node === step.node);
       const startTime = firstEvent?.start ?? 0;
       const start = { x: projectionX(startTime), y: yAt(midi) };
-      keyboardGesture = { startDoc: view.state.doc.toString(), node: step.node, to: selectedStep, end: start, lastTime: startTime, pitches: new Map([[step.node, midi]]), dirty: false };
-      drawPreview(keyboardGesture); setMessage("Drawing · Left/Right extends · Up/Down changes pitch · Enter applies · Escape cancels"); event.preventDefault(); return;
+      const draw: InteractionOf<"keyboard-draw"> = { kind: "keyboard-draw", startDoc: view.state.doc.toString(), node: step.node, to: selectedStep, end: start, lastTime: startTime, pitches: new Map([[step.node, midi]]), dirty: false };
+      interaction = draw;
+      drawPreview(draw); setMessage("Drawing · Left/Right extends · Up/Down changes pitch · Enter applies · Escape cancels"); event.preventDefault(); return;
     }
-    if (keyboardGesture) {
-      if (event.key === "Enter") { const current = keyboardGesture; keyboardGesture = null; preview.replaceChildren(); commitDraw(current); render(); event.preventDefault(); return; }
+    const keyboardDraw = ongoing("keyboard-draw");
+    if (keyboardDraw) {
+      if (event.key === "Enter") { interaction = null; preview.replaceChildren(); commitDraw(keyboardDraw); render(); event.preventDefault(); return; }
       if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
         const direction = event.key === "ArrowRight" ? 1 : -1;
-        keyboardGesture.to = Math.max(0, Math.min(active.steps.length - 1, keyboardGesture.to + direction));
-        const step = active.steps[keyboardGesture.to];
-        const midi = keyboardGesture.pitches.get(step.node) ?? noteMidi(step.value) ?? midiAtY(geometry, keyboardGesture.end.y);
-        keyboardGesture.pitches.set(step.node, midi);
+        keyboardDraw.to = Math.max(0, Math.min(active.steps.length - 1, keyboardDraw.to + direction));
+        const step = active.steps[keyboardDraw.to];
+        const midi = keyboardDraw.pitches.get(step.node) ?? noteMidi(step.value) ?? midiAtY(geometry, keyboardDraw.end.y);
+        keyboardDraw.pitches.set(step.node, midi);
         const occurrence = active.structure.events.find(item => item.node === step.node);
-        keyboardGesture.end = { x: projectionX(occurrence?.start ?? 0), y: yAt(midi) };
-        keyboardGesture.dirty = true;
-        selectedStep = keyboardGesture.to;
-        render(); drawPreview(keyboardGesture); event.preventDefault();
+        keyboardDraw.end = { x: projectionX(occurrence?.start ?? 0), y: yAt(midi) };
+        keyboardDraw.dirty = true;
+        selectedStep = keyboardDraw.to;
+        render(); drawPreview(keyboardDraw); event.preventDefault();
       } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
-        const step = active.steps[keyboardGesture.to];
-        const currentMidi = keyboardGesture.pitches.get(step.node) ?? noteMidi(step.value) ?? midiAtY(geometry, keyboardGesture.end.y);
+        const step = active.steps[keyboardDraw.to];
+        const currentMidi = keyboardDraw.pitches.get(step.node) ?? noteMidi(step.value) ?? midiAtY(geometry, keyboardDraw.end.y);
         const next = boundedPitch(currentMidi + (event.key === "ArrowUp" ? 1 : -1));
-        keyboardGesture.pitches.set(step.node, next);
-        keyboardGesture.end = { x: keyboardGesture.end.x, y: yAt(next) };
-        keyboardGesture.dirty = true;
-        render(); drawPreview(keyboardGesture); event.preventDefault();
+        keyboardDraw.pitches.set(step.node, next);
+        keyboardDraw.end = { x: keyboardDraw.end.x, y: yAt(next) };
+        keyboardDraw.dirty = true;
+        render(); drawPreview(keyboardDraw); event.preventDefault();
       } else {
         return;
       }
@@ -1275,12 +1306,12 @@ export function mountMovingScore(
   }
   function update(next: Pattern, selected: number): void {
     if (disposed) return;
-    if (next.doc !== pattern.doc && (gesture || moveGesture || edgeGesture || restGesture || keyboardGesture || keyboardRestGesture || boundaryGesture || selectionGesture)) cancel();
+    if (next.doc !== pattern.doc && interaction) cancel();
     if (next.doc !== pattern.doc) { focusedBoundary = null; selectionAnchor = null; selectionFocus = null; }
     pattern = next; active = validPhrase(pattern) ? pattern : null;
     selectedStep = active ? Math.max(0, Math.min(selected, active.steps.length - 1)) : 0;
     selectedNode = active?.selectedNode ?? active?.steps[selectedStep]?.node ?? null;
-    if (!active && (gesture || moveGesture || edgeGesture || restGesture || keyboardGesture || keyboardRestGesture || boundaryGesture || selectionGesture)) cancel();
+    if (!active && interaction) cancel();
     syncDrum(pattern, selectedStep);
     render();
   }
@@ -1289,7 +1320,7 @@ export function mountMovingScore(
   const preventGestureScroll = (event: TouchEvent) => {
     // Selection redraws detach the hit group during pointerdown. Its touchstart
     // still arrives there, so listen on that group rather than the canvas.
-    if (event.cancelable && (gesture || moveGesture || edgeGesture || restGesture || selectionGesture)) event.preventDefault();
+    if (event.cancelable && interaction && SCROLL_LOCKING.has(interaction.kind)) event.preventDefault();
   };
   svg.addEventListener("pointerdown", beginPointer);
   svg.addEventListener("pointermove", movePointer);
@@ -1304,7 +1335,7 @@ export function mountMovingScore(
     const { width, height } = entries[0].contentRect;
     if (width > 0 && height > 0) {
       if (needsResizeRender(measureGrid(), rendered)) render();
-    } else if (gesture || moveGesture || edgeGesture || restGesture || keyboardGesture || keyboardRestGesture || boundaryGesture) cancel();
+    } else if (interaction && interaction.kind !== "selection") cancel();
     view.requestMeasure();
   });
   resizeObserver.observe(root);

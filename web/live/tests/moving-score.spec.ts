@@ -121,6 +121,23 @@ test("drawn contours preserve intermediate bends and formatting as one undo step
 });
 
 
+test("Enter during a note drag does not start a second, keyboard edit", async ({ page }) => {
+  await page.goto("/");
+  const source = 'note("C4 E4 G4").gain(0.2)';
+  await replaceCode(page, source);
+  const box = (await page.locator(".moving-score__note-block").first().boundingBox())!;
+  const row = (await page.locator('.moving-score__lane[data-pitch="62"]').boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2, row.y + row.height / 2, { steps: 5 });
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".moving-score__message")).not.toContainText("Drawing");
+  await page.mouse.up();
+  await expect.poll(() => readCode(page)).toBe(source.replace("C4", "D4"));
+  await expect(page.locator(".moving-score__message")).toHaveText("");
+  await expect(page.locator(".moving-score__preview > *")).toHaveCount(0);
+});
+
 test("a note click preserves chromatic pitch while a drag from that note edits and undoes", async ({ page }) => {
   await page.goto("/");
   const source = '$: note("C#4 D4 Eb4 F4").gain(0.2)';
