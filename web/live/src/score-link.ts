@@ -81,13 +81,23 @@ export function mountScoreLink(elements: ScoreLinkElements, deps: { view: Editor
 
   // Clipboard writes must begin inside the click: Safari rejects a write that
   // follows an await. The clipboard receives the link as a pending item instead.
+  // Insecure (plain HTTP) pages have no Clipboard API at all, so the write can
+  // also fail before it returns a promise.
   const share = (): void => {
+    const failed = (): void => notice.say("Could not copy a link to the clipboard. Download keeps this score exactly.");
     const link = encodeScoreLink(view.state.doc.toString(), base());
-    const item = new ClipboardItem({ "text/plain": link.then(text => new Blob([text], { type: "text/plain" })) });
-    navigator.clipboard.write([item]).then(async () => {
+    let written: Promise<void>;
+    try {
+      const item = new ClipboardItem({ "text/plain": link.then(text => new Blob([text], { type: "text/plain" })) });
+      written = navigator.clipboard.write([item]);
+    } catch {
+      failed();
+      return;
+    }
+    written.then(async () => {
       const long = longLinkNote((await link).length);
       notice.say(`Link copied to the clipboard. Opening it loads this score; nothing is uploaded.${long}`, { transient: !long });
-    }, () => notice.say("Could not copy a link to the clipboard. Download keeps this score exactly."));
+    }, failed);
   };
 
   const openFromFragment = async (): Promise<void> => {

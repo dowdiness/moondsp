@@ -288,17 +288,26 @@ test("a copied score link reopens the exact UTF-8 text as one undoable replaceme
   expect(await readCode(other)).toBe('s("bd sd")');
 });
 
-test("a refused clipboard write leaves the score and address unchanged and says so", async ({ page }) => {
-  await page.addInitScript(() => {
+for (const [clipboard, refuse] of [
+  ["a refused clipboard write", () => {
     navigator.clipboard.write = () => Promise.reject(new DOMException("Denied", "NotAllowedError"));
+  }],
+  // Plain-HTTP pages expose neither navigator.clipboard nor ClipboardItem.
+  ["a page without the Clipboard API", () => {
+    Object.defineProperty(Navigator.prototype, "clipboard", { get: () => undefined });
+    Object.defineProperty(window, "ClipboardItem", { value: undefined });
+  }],
+] as const) {
+  test(`${clipboard} leaves the score and address unchanged and says so`, async ({ page }) => {
+    await page.addInitScript(refuse);
+    await page.goto("/");
+    await replaceCode(page, 'note("C4 E4")');
+    await page.locator("#share-score").click();
+    await expect(page.locator("#session-message")).toContainText("Could not copy a link");
+    expect(await page.evaluate(() => location.hash)).toBe("");
+    expect(await readCode(page)).toBe('note("C4 E4")');
   });
-  await page.goto("/");
-  await replaceCode(page, 'note("C4 E4")');
-  await page.locator("#share-score").click();
-  await expect(page.locator("#session-message")).toContainText("Could not copy a link");
-  expect(await page.evaluate(() => location.hash)).toBe("");
-  expect(await readCode(page)).toBe('note("C4 E4")');
-});
+}
 
 test("an untouched stale tab cannot overwrite a newer saved score on exit", async ({ page, context }) => {
   await page.goto("/");
