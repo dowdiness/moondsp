@@ -76,7 +76,7 @@ export function statusView(state: StatusInput): StatusView {
     ? `Accepted ${versionLabel(state.acceptedVersion)}`
     : state.currentSource !== null ? "Accepted untracked input" : "No accepted draft";
   const sending = state.inFlightVersions.length === 0 ? ""
-    : ` · Sending ${state.inFlightVersions.map(version => version === null ? "untracked input" : versionLabel(version)).join(", ")}`;
+    : ` · Sending ${state.inFlightVersions.map(versionLabel).join(", ")}`;
 
   const materials = state.pendingCount === 1 ? "1 material awaiting entry"
     : `${state.pendingCount} materials awaiting entry`;

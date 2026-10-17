@@ -20,7 +20,7 @@ test("a rejected edit during playback keeps the accepted code and offers restore
   const view = statusView({
     ...base,
     draftStatus: "invalid",
-    inFlightVersions: [null, [3, 4]],
+    inFlightVersions: [[3, 3], [3, 4]],
     pendingCount: 1,
     skippedCount: 2,
   });
@@ -34,7 +34,7 @@ test("a rejected edit during playback keeps the accepted code and offers restore
     help: "Playback continues with accepted code. Check the error below.",
     helpHidden: false,
     draftVersion: "3:4",
-    versions: "Accepted 3:2 · Sending untracked input, 3:4",
+    versions: "Accepted 3:2 · Sending 3:3, 3:4",
     materials: "1 material awaiting entry · 2 skipped",
     timing: "1 part is waiting to switch. 2 changes were skipped in this pass.",
     timingHidden: false,

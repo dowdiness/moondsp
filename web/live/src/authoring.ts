@@ -30,17 +30,14 @@ function decodeState(raw: { text: string; version: unknown; diagnostic: string |
 
 let inputFromDraft: (wire: string, state: DraftState) => PlaybackInput;
 
-/** Immutable capability; only Draft preparation or deliberate text input can create it. */
+/** Immutable capability; only Draft preparation can create it. */
 export class PlaybackInput {
-  private constructor(private readonly encoded: string, readonly source: string, readonly draftVersion: DraftVersion | null) {
+  private constructor(private readonly encoded: string, readonly source: string, readonly draftVersion: DraftVersion) {
     Object.freeze(this);
   }
   get wire(): string { return this.encoded; }
   static {
     inputFromDraft = (wire, state) => new PlaybackInput(wire, state.text, state.version);
-  }
-  static text(source: string): PlaybackInput {
-    return new PlaybackInput(JSON.stringify({ schema: 1, kind: "text", text: source }), source, null);
   }
 }
 

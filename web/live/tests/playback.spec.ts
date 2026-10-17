@@ -172,7 +172,7 @@ for (const duringOpen of [true, false]) {
 
 test("closing settles an outstanding command and quarantines its late receipt", async () => {
   const h = harness(); await h.start();
-  const updating = h.player.update(PlaybackInput.text('note("67")')); const command = await h.command(1);
+  const updating = h.player.update(new Draft('note("67")').prepare()); const command = await h.command(1);
   const cancelled = expect(updating).rejects.toMatchObject({ name: "AbortError" });
   await h.player.close(); await cancelled;
   h.reply(command);
@@ -182,7 +182,7 @@ test("closing settles an outstanding command and quarantines its late receipt", 
 
 test("a worklet fault rejects outstanding commands and retires late receipts", async () => {
   const h = harness(); await h.start();
-  const updating = h.player.update(PlaybackInput.text('note("67")')); const command = await h.command(1);
+  const updating = h.player.update(new Draft('note("67")').prepare()); const command = await h.command(1);
   const rejected = expect(updating).rejects.toThrow("worklet failed");
   h.fail(); await rejected; h.reply(command);
   expect(h.player.view().state).toBe("Fault");

@@ -12,7 +12,7 @@ export type PlaybackView = Readonly<{
   currentSource: string | null;
   acceptedVersion: DraftVersion | null;
   draftVersion: DraftVersion;
-  inFlightVersions: readonly (DraftVersion | null)[];
+  inFlightVersions: readonly DraftVersion[];
   draftStatus: DraftStatus;
   tempoText: string;
   samplePosition: number;
@@ -73,7 +73,7 @@ export class Player {
       : state === "Fault" ? { kind: "error", message: this.feedback?.message ?? "Audio failed" }
       : this.connection.kind === "open" ? { kind: "running" } : { kind: "idle" };
     const draftState = this.draftState;
-    const inFlightVersions: (DraftVersion | null)[] = [];
+    const inFlightVersions: DraftVersion[] = [];
     for (const pending of this.pending.values()) {
       if (pending.input !== undefined) inFlightVersions.push(pending.input.draftVersion);
     }
@@ -363,8 +363,6 @@ export class Player {
         this.latestRejectedVersion = receipt.kind === "rejected" ? version : null;
         this.diagnostic = receipt.kind === "rejected" ? { message: receipt.message, documentLength: pending.input.source.length } : null;
         this.feedback = receipt.kind === "rejected" ? { kind: "error", message: receipt.message } : null;
-      } else if (version === null && receipt.kind === "rejected" && receipt.id.value === this.lastReceipt) {
-        this.feedback = { kind: "error", message: receipt.message };
       }
     }
     pending.resolve(receipt);
