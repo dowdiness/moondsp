@@ -38,8 +38,9 @@ These documents provide concrete empirical evidence that `moondsp` satisfies its
 
 ### 6. Browser Workspace & Interaction Evidence
 - **[`2026-10-14-live-workspace-redesign.md`](2026-10-14-live-workspace-redesign.md)**  
-  Measured output horizon, Share links, the quiet icon-only default surface,
-  critique rounds, and verification limits.
+  The quiet icon-only surface, measured output horizon, and Share links; how
+  audio starts inside a click; the core/shell split of the note grid; the
+  Chromium, Firefox, and WebKit test setup; verification and its limits.
 - **[`2026-10-03-musical-experience.md`](2026-10-03-musical-experience.md)**
   Drawable source editing, complete phrase previews, comparison and answering
   phrases, independent experience reviews, and browser/audio verification limits.

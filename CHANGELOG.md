@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Pin the Cloudflare Pages MoonBit toolchain to the same version as GitHub
   Actions, preventing untested manifest-parser changes from rejecting dependencies.
+- Start live audio from Play in Firefox and WebKit, which start audio only while
+  the page is handling a click. The editor now asks for running audio inside the
+  Play click, before it loads the worklet and WASM. Pressing Play while Stop is
+  fading out resumes the same audio at once, and Play right after a cancelled
+  start opens a new one; neither waits for the previous session to close, which
+  would ask for audio after the click had been handled. A start that has not
+  produced audio after five seconds fails with "Press Play again".
+- Share on a plain-HTTP page, which has no Clipboard API, now says that the link
+  was not copied and that Download keeps the score, instead of showing nothing.
+- With reduced motion, the signal horizon records the level for the whole time
+  between its 250 ms redraws, instead of one bar per redraw.
+- The live editor's code no longer shifts right when a score reaches 10 or 100
+  lines; the line-number gutter has room for three digits.
 
 ### Added
 
@@ -30,8 +43,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Short startup no longer flashes loading labels; an editable-code notice appears
   only when score-tool preparation lasts 500 ms. Installing notation preserves
   focus, selection, and scroll position instead of following the expanded document end.
-  Score-tool startup failures do not label the independent compiled-demo
-  playback button as unavailable.
 
 - Added direct inline chord-tone editing: transpose the whole chord, drag one
   tone, add/remove tones, and share keyboard edits and Undo with code.
@@ -242,6 +253,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The live editor's Playwright suite runs in Chromium, Firefox, and WebKit; CI
+  runs one job per engine. Each run builds and serves its own end-to-end bundle,
+  so tests need no prior `npm run build`. Firefox and WebKit need an audio
+  device; CI and the orb setup provide a PulseAudio sink.
+- Restructured the live note grid and structure strip as pure layouts that
+  decide what a pointer hits, rendered through keyed SVG patching so elements
+  keep their identity across renders. Pattern controls apply every source edit
+  through one dispatch, Help's starting sounds and examples come from one
+  catalogue (`web/live/src/examples.ts`), and phrase update status is derived
+  from editor state.
 - Reduced pattern-query allocation with immutable shared node-path tails,
   compilation-time leaf paths, rational identity fast paths, zero-offset event
   shifts, and reuse of contained time spans. Public interfaces, exact event
@@ -369,7 +390,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and transition states, and shared raw/sourced entry traversal. Public
   interfaces, reserved replacement timing, and event output are unchanged.
 - Redesigned live editor playback around parsed tempo/source/request values,
-  a closed lifecycle state union, and scheduler/compiled session capabilities.
+  a closed lifecycle state union, and session capabilities.
   DOM callbacks submit intent and render a projection; one wire decoder reports
   malformed messages explicitly. Stop/Retry invalidate retired-session replies.
 - Named live audio session operations explicitly: `openSession`, `submitScore`,
@@ -389,6 +410,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Removed the live editor's `?audioMode=compiled` demo and its telemetry and
+  scheduler-timing URL switches. The live editor always plays through the
+  scheduler worklet; `processor.js` remains for the other demos but is no longer
+  copied into the live app.
+- Production builds of the live editor no longer expose
+  `window.__moondspEngine`; only the end-to-end build (`npm run build:e2e`) that
+  the tests use sets it.
 - Removed the ambiguous Mini `.cutoff(hz)` method and pattern `s_cutoff`
   constructor. Use `.lpf(hz, resonance?)` / `s_lpf` for low-pass control or
   `.hpf(hz, resonance?)` / `s_hpf` for high-pass control.
