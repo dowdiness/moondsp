@@ -53,52 +53,53 @@ export function mountScoreSession(
   };
 
   const refreshRecoveries = (): void => {
+    let drafts;
     try {
       const storage = window.localStorage;
-      const entries = Array.from({ length: storage.length }, (_, index) => storage.key(index))
+      drafts = recoveryDrafts(Array.from({ length: storage.length }, (_, index) => storage.key(index))
         .filter((key): key is string => key !== null)
-        .map(key => [key, storage.getItem(key)] as const);
-      const drafts = recoveryDrafts(entries, recoveryKey);
-      recoveryList.replaceChildren();
-      for (const { key, source, savedAt } of drafts) {
-        const row = document.createElement("li");
-        row.className = "saved-draft";
-        const time = document.createElement("span");
-        time.textContent = new Date(savedAt).toLocaleString();
-        const preview = document.createElement("pre");
-        preview.textContent = source.length ? source.slice(0, 240) : "(Empty score)";
-        const restore = document.createElement("button");
-        restore.type = "button";
-        restore.textContent = "Restore";
-        restore.addEventListener("click", () => {
-          view.dispatch({
-            changes: { from: 0, to: view.state.doc.length, insert: source },
-            annotations: isolateHistory.of("full"),
-          });
-          recoveryPanel.open = false;
-          view.focus();
-          say("Restored a saved draft. Undo restores your previous score.");
-        });
-        const discard = document.createElement("button");
-        discard.type = "button";
-        discard.textContent = "Delete saved draft";
-        discard.addEventListener("click", () => {
-          if (!window.confirm("Delete this saved draft? This cannot be undone. Your open score is unchanged.")) return;
-          try {
-            window.localStorage.removeItem(key);
-            refreshRecoveries();
-            recoveryPanel.querySelector("summary")?.focus();
-          } catch {
-            say("Could not delete the saved draft. Your score is unchanged.");
-          }
-        });
-        row.append(time, preview, restore, discard);
-        recoveryList.append(row);
-      }
-      recoveryPanel.hidden = drafts.length === 0;
+        .map(key => [key, storage.getItem(key)] as const), recoveryKey);
     } catch {
       say("Saved drafts are unavailable. Download your score to keep it.");
+      return;
     }
+    recoveryList.replaceChildren();
+    for (const { key, source, savedAt } of drafts) {
+      const row = document.createElement("li");
+      row.className = "saved-draft";
+      const time = document.createElement("span");
+      time.textContent = new Date(savedAt).toLocaleString();
+      const preview = document.createElement("pre");
+      preview.textContent = source.length ? source.slice(0, 240) : "(Empty score)";
+      const restore = document.createElement("button");
+      restore.type = "button";
+      restore.textContent = "Restore";
+      restore.addEventListener("click", () => {
+        view.dispatch({
+          changes: { from: 0, to: view.state.doc.length, insert: source },
+          annotations: isolateHistory.of("full"),
+        });
+        recoveryPanel.open = false;
+        view.focus();
+        say("Restored a saved draft. Undo restores your previous score.");
+      });
+      const discard = document.createElement("button");
+      discard.type = "button";
+      discard.textContent = "Delete saved draft";
+      discard.addEventListener("click", () => {
+        if (!window.confirm("Delete this saved draft? This cannot be undone. Your open score is unchanged.")) return;
+        try {
+          window.localStorage.removeItem(key);
+          refreshRecoveries();
+          recoveryPanel.querySelector("summary")?.focus();
+        } catch {
+          say("Could not delete the saved draft. Your score is unchanged.");
+        }
+      });
+      row.append(time, preview, restore, discard);
+      recoveryList.append(row);
+    }
+    recoveryPanel.hidden = drafts.length === 0;
   };
 
   const setSaveStatus = (message: string): void => {
@@ -150,35 +151,25 @@ export function mountScoreSession(
     timer = window.setTimeout(saveNow, SAVE_DELAY_MS);
   };
   const onPageHide = (): void => saveNow();
+  // Storage events reach only tabs that can use storage.
   const onStorage = (event: StorageEvent): void => {
-    try {
-      if (event.storageArea !== window.localStorage) return;
-      // Do not replace buttons while someone is inspecting or using a snapshot.
-      // Immutable keys make an older displayed snapshot safe to restore/delete.
-      if (!recoveryPanel.open &&
-          (event.key === null || event.key.startsWith(RECOVERY_PREFIX))) refreshRecoveries();
-      if (event.key !== null && event.key !== STORAGE_KEY) return;
-      if (window.localStorage.getItem(STORAGE_KEY) !== savedSource) warnConflict();
-    } catch {
-      warnSave("Local storage is unavailable. Download your score to keep it.");
-    }
+    if (event.storageArea !== window.localStorage) return;
+    // Do not replace buttons while someone is inspecting or using a snapshot.
+    // Immutable keys make an older displayed snapshot safe to restore/delete.
+    if (!recoveryPanel.open &&
+        (event.key === null || event.key.startsWith(RECOVERY_PREFIX))) refreshRecoveries();
+    if (event.key !== null && event.key !== STORAGE_KEY) return;
+    if (window.localStorage.getItem(STORAGE_KEY) !== savedSource) warnConflict();
   };
 
   const download = (): void => {
-    let url: string | undefined;
-    try {
-      const blob = new Blob([view.state.doc.toString()], { type: "text/plain;charset=utf-8" });
-      url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "moondsp-score.mini";
-      link.click();
-      say("Score downloaded as moondsp-score.mini.");
-    } catch {
-      say("Could not download the score. Your editing session is still available.");
-    } finally {
-      if (url !== undefined) window.setTimeout(() => URL.revokeObjectURL(url!), 0);
-    }
+    const url = URL.createObjectURL(new Blob([view.state.doc.toString()], { type: "text/plain;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "moondsp-score.mini";
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    say("Score downloaded as moondsp-score.mini.");
   };
 
   const openPicker = (): void => {
@@ -200,10 +191,6 @@ export function mountScoreSession(
 
     try {
       const source = await file.text();
-      if (source.length > MAX_IMPORT_BYTES) {
-        say("That score is larger than 1 MB and was not opened.");
-        return;
-      }
       if (view.state.doc !== originalDoc) {
         say("The score was not opened because your text changed while the file was loading. Try opening it again.");
         return;

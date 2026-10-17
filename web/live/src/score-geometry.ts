@@ -6,6 +6,8 @@
 export const W = 960;
 export const ROW_H = 20;
 export const TIME_H = 24;
+/** The pitch-label column left of the plot, in CSS pixels; pointers there edit nothing. */
+export const PLOT_LEFT_PX = 48;
 
 export type ScoreGeometry = Readonly<{
   /** viewBox units per CSS pixel. */
@@ -34,7 +36,7 @@ export function scoreGeometry(measuredWidth: number, pitches: readonly number[])
   const viewHigh = Math.min(127, Math.max(viewLow + 11, highest + 2));
   return {
     pixelsToX,
-    plotLeft: 48 * pixelsToX,
+    plotLeft: PLOT_LEFT_PX * pixelsToX,
     plotRight: W - 8 * pixelsToX,
     viewLow,
     viewHigh,

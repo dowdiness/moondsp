@@ -412,7 +412,7 @@ setAuthoring("starting");
 
 // Short startup should not flash loading labels; editing remains available.
 const readinessNoticeTimer = window.setTimeout(() => {
-  if (!disposed && authoringPhase === "starting") setAuthoring("loading");
+  if (authoringPhase === "starting") setAuthoring("loading");
 }, 500);
 scope.own({ dispose: () => clearTimeout(readinessNoticeTimer) });
 
@@ -460,7 +460,7 @@ async function prepareAuthoring(): Promise<void> {
 // A task after the first animation frame lets the basic editor paint first.
 let startupTimer: number | undefined;
 const startupFrame = requestAnimationFrame(() => {
-  startupTimer = window.setTimeout(() => { if (!disposed) void prepareAuthoring(); }, 0);
+  startupTimer = window.setTimeout(() => { void prepareAuthoring(); }, 0);
 });
 scope.own({ dispose: () => { cancelAnimationFrame(startupFrame); clearTimeout(startupTimer); } });
 

@@ -54,7 +54,11 @@ export function relocationTarget(projection: NotationProjection, source: number,
   return target;
 }
 
-/** Rotate complete sibling tokens while leaving their source separators untouched. */
+/**
+ * Moves an atom to `target`'s slot among its siblings, rotating the tokens
+ * between them while leaving their source separators untouched, and optionally
+ * replaces its value. An atom kept in place may sit outside any sequence.
+ */
 export function relocateNode(
   content: string,
   projection: NotationProjection,
@@ -63,22 +67,9 @@ export function relocateNode(
   value?: string,
 ): SourceEdit {
   const sourceNode = nodeAt(projection, source);
-  const resolvedTarget = relocationTarget(projection, source, target);
-  if (resolvedTarget === null) throw new Error("Move targets must be siblings in the same sequence");
-  target = resolvedTarget;
-  const targetNode = nodeAt(projection, target);
-  if (sourceNode.kind !== "atom" || sourceNode.parent === null) {
-    throw new Error("Select an atom in a sequence to move");
-  }
-  const parent = nodeAt(projection, sourceNode.parent);
-  if (parent.kind !== "sequence" || targetNode.parent !== sourceNode.parent ||
-      !parent.children.includes(source) || !parent.children.includes(target) ||
-      (targetNode.kind !== "atom" && targetNode.kind !== "group")) {
-    throw new Error("Move targets must be siblings in the same sequence");
-  }
-
-  const core = content.slice(sourceNode.from, sourceNode.baseTo);
+  if (sourceNode.kind !== "atom") throw new Error("Select an atom to move");
   if (value !== undefined && !value.length) throw new Error("Moved atom value cannot be empty");
+  const core = content.slice(sourceNode.from, sourceNode.baseTo);
   if (source === target) {
     if (value === undefined || value === core) return { changes: [], selection: { from: sourceNode.from, to: sourceNode.baseTo } };
     return {
@@ -86,11 +77,16 @@ export function relocateNode(
       selection: { from: sourceNode.from, to: sourceNode.from + value.length },
     };
   }
+  const resolvedTarget = relocationTarget(projection, source, target);
+  if (resolvedTarget === null) throw new Error("Move targets must be siblings in the same sequence");
+  target = resolvedTarget;
+  const targetNode = nodeAt(projection, target);
+  // relocationTarget guarantees both are children of the source's sequence.
+  const parent = nodeAt(projection, sourceNode.parent!);
 
   const children = parent.children;
   const sourceSlot = children.indexOf(source);
   const targetSlot = children.indexOf(target);
-  if (sourceSlot < 0 || targetSlot < 0) throw new Error("Move targets must be siblings in the same sequence");
   const suffix = content.slice(sourceNode.baseTo, sourceNode.end);
   const movedToken = `${value ?? core}${suffix}`;
   const low = Math.min(sourceSlot, targetSlot);
