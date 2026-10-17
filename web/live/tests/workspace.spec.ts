@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { openPitchControls, readCode, replaceCode } from "./editor-helpers";
+import { platformKeys, boxOf, leave, openPitchControls, readCode, replaceCode, insertText } from "./editor-helpers";
+import { encodeScoreLink } from "../src/score-link";
 
 declare global {
   interface Window {
@@ -11,10 +12,11 @@ const imported = '// 日本語のスケッチ\nbpm(84);\nnote("C4 Eb4 G4").gain(
 
 test("pattern edits preserve multiline and nested source through shared Undo", async ({ page }) => {
   await page.goto("/");
+  const { mod } = await platformKeys(page);
   const source = '// 日本語\nlet melody = note("C4 ~\nG4 Eb4").gain(0.2);\nmelody';
   await replaceCode(page, source);
   const editor = page.locator(".cm-content");
-  await editor.press("Control+Home");
+  await editor.press(`${mod}+Home`);
   await editor.press("ArrowDown");
   await openPitchControls(page);
   const pitch = page.getByRole("button", { name: "Set D4", exact: true });
@@ -22,7 +24,7 @@ test("pattern edits preserve multiline and nested source through shared Undo", a
   await pitch.click();
   await expect.poll(() => readCode(page)).toBe(source.replace("C4", "D4"));
   await expect(pitch).toBeFocused();
-  await pitch.press("Control+z");
+  await pitch.press(`${mod}+z`);
   await expect.poll(() => readCode(page)).toBe(source);
   await replaceCode(page, 'note("[C4 E4] G4")');
   await page.locator(".moving-score__note-block").first().click();
@@ -35,6 +37,7 @@ test("pattern edits preserve multiline and nested source through shared Undo", a
 
 test("code cursor selects the note that pitch controls change, including the lowest octave", async ({ page }) => {
   await page.goto("/");
+  const { mod } = await platformKeys(page);
   await replaceCode(page, 'note("C4 E4 G4")');
   const editor = page.locator(".cm-content");
   await editor.press("Home");
@@ -50,12 +53,13 @@ test("code cursor selects the note that pitch controls change, including the low
   await expect.poll(() => readCode(page)).toBe('note("C-1")');
   await expect(page.locator(".octave-down")).toBeDisabled();
   await expect(page.getByRole("button", { name: "Set C#-1", exact: true })).toBeEnabled();
-  await page.locator(".step-pad").press("Control+z");
+  await page.locator(".step-pad").press(`${mod}+z`);
   await expect.poll(() => readCode(page)).toBe('note("C0")');
 });
 
 test("pitch key navigation and history preserve the source selection on return to typing", async ({ page }) => {
   await page.goto("/");
+  const { mod } = await platformKeys(page);
   const source = 'note("C4 E4 G4").gain(0.2)';
   await replaceCode(page, source);
   const editor = page.locator(".cm-content");
@@ -74,16 +78,16 @@ test("pitch key navigation and history preserve the source selection on return t
   const changed = 'note("C#4 E4 G4").gain(0.2)';
   await expect.poll(() => readCode(page)).toBe(changed);
   await expect(pitch).toBeFocused();
-  await pitch.press("Control+z");
+  await pitch.press(`${mod}+z`);
   await expect.poll(() => readCode(page)).toBe(source);
-  await pitch.press("Control+Shift+Z");
+  await pitch.press(`${mod}+Shift+Z`);
   await expect.poll(() => readCode(page)).toBe(changed);
   await pitch.press("Escape");
   await expect(editor).toBeFocused();
   expect(await page.evaluate(() => window.getSelection()?.toString())).toBe("E4");
-  await page.keyboard.insertText("F4");
+  await insertText(page, "F4");
   await expect.poll(() => readCode(page)).toBe('note("C#4 F4 G4").gain(0.2)');
-  await editor.press("Control+z");
+  await editor.press(`${mod}+z`);
   await expect.poll(() => readCode(page)).toBe(changed);
 });
 
@@ -98,14 +102,19 @@ test("keyboard and pointer switching keeps one Tab stop and accidental keys reac
   await natural.press("ArrowRight");
   await expect(sharp).toBeFocused();
   await natural.click();
-  await natural.press("Tab");
+  // The keyboard is one Tab stop: only the chosen key is in the tab order, and
+  // Shift+Tab leaves the keyboard instead of visiting another key. (The keyboard
+  // can be the page's last stop, where forward Tab is the browser's to define.)
+  expect(await page.locator(".pitch-keyboard button").evaluateAll(keys =>
+    keys.filter(key => (key as HTMLElement).tabIndex === 0).map(key => key.getAttribute("aria-label")))).toEqual(["Set C4"]);
+  await natural.press("Shift+Tab");
   expect(await page.locator(".pitch-keyboard").evaluate(element => element.contains(document.activeElement))).toBe(false);
   expect(await readCode(page)).toBe(source);
   await natural.focus();
   await natural.press("ArrowRight");
   await sharp.press("ArrowLeft");
   await expect(natural).toBeFocused();
-  const box = (await sharp.boundingBox())!;
+  const box = await boxOf(sharp);
   // Click the visible part that overlaps the focused natural key, not its centre.
   await sharp.click({ position: { x: box.width * 0.2, y: box.height / 2 } });
   await expect.poll(() => readCode(page)).toBe('note("C#4").gain(0.2)');
@@ -113,6 +122,7 @@ test("keyboard and pointer switching keeps one Tab stop and accidental keys reac
 
 test("choosing a pitch and activating a step return to the selected source without consuming text keys", async ({ page }) => {
   await page.goto("/");
+  const { mod } = await platformKeys(page);
   await replaceCode(page, 'note("C4 E4 G4")');
   const editor = page.locator(".cm-content");
   await editor.press("Home");
@@ -126,42 +136,43 @@ test("choosing a pitch and activating a step return to the selected source witho
   await pitch.press("Escape");
   await expect(editor).toBeFocused();
   expect(await page.evaluate(() => window.getSelection()?.toString())).toBe("C4");
-  await page.keyboard.insertText("D4");
+  await insertText(page, "D4");
   await expect.poll(() => readCode(page)).toBe('note("D4 F#4 G4")');
   const step = page.locator(".step-pad").first();
   await step.focus();
   await step.press("Space");
   await expect.poll(() => readCode(page)).toBe('note("D4 F#4 G4")');
-  await step.press("Control+z");
+  await step.press(`${mod}+z`);
   await expect.poll(() => readCode(page)).toBe('note("C4 F#4 G4")');
-  await step.press("Control+Shift+Z");
+  await step.press(`${mod}+Shift+Z`);
   await expect.poll(() => readCode(page)).toBe('note("D4 F#4 G4")');
   await step.press("Escape");
   await expect(editor).toBeFocused();
   await editor.press("ArrowRight");
-  await page.keyboard.insertText(" ");
+  await insertText(page, " ");
   await expect.poll(() => readCode(page)).toBe('note("D4  F#4 G4")');
 });
 
 test("pattern controls retain play, pause and restart shortcuts without editing the score", async ({ page }) => {
   await page.goto("/");
+  const { mod } = await platformKeys(page);
   const source = 'note("C4").gain(0.2)';
   await replaceCode(page, source);
   await openPitchControls(page);
   const pitch = page.getByRole("button", { name: "Set C4", exact: true });
   await pitch.focus();
-  await pitch.press("Control+Enter");
+  await pitch.press(`${mod}+Enter`);
   await expect(page.locator("#status")).toHaveText("Playing");
   await expect(pitch).toBeFocused();
-  await pitch.press("Control+Enter");
+  await pitch.press(`${mod}+Enter`);
   await expect(page.locator("#status")).toHaveText("Paused");
   const step = page.locator(".step-pad");
   await step.focus();
-  await step.press("Control+Shift+Enter");
+  await step.press(`${mod}+Shift+Enter`);
   await expect(page.locator("#status")).toHaveText("Playing");
   await expect(step).toBeFocused();
   expect(await readCode(page)).toBe(source);
-  await step.press("Control+Enter");
+  await step.press(`${mod}+Enter`);
   await expect(page.locator("#status")).toHaveText("Paused");
   await step.press("Escape");
   await expect(page.locator(".cm-content")).toBeFocused();
@@ -264,18 +275,26 @@ test("UTF-8 import is undoable, downloads exact text, and survives reload", asyn
   await expect.poll(() => readCode(page)).toBe("");
 });
 
-test("a copied score link reopens the exact UTF-8 text as one undoable replacement", async ({ page, context }) => {
-  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+test("a copied score link reopens the exact UTF-8 text as one undoable replacement", async ({ page, context, browserName }) => {
+  // Every engine performs the real clipboard write. Only Chromium lets
+  // automation grant clipboard-read, so elsewhere the test opens the link the
+  // shared encoder produces; score-link.spec covers that encoder in every engine.
+  const readable = browserName === "chromium";
+  if (!readable) test.info().annotations.push({ type: "clipboard", description: `${browserName} cannot read the clipboard back under automation` });
+  if (readable) await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.goto("/");
   await replaceCode(page, imported);
   await page.locator("#share-score").click();
   await expect(page.locator("#session-message")).toContainText("Link copied");
-  const link = await page.evaluate(() => navigator.clipboard.readText());
+  const link = readable ? await page.evaluate(() => navigator.clipboard.readText())
+    : await encodeScoreLink(imported, new URL("/", page.url()).href);
   expect(link).toMatch(/#score=[A-Za-z0-9_-]+$/);
-  // Sharing again replaces whatever the clipboard held since.
-  await page.evaluate(() => navigator.clipboard.writeText("stale"));
-  await page.locator("#share-score").click();
-  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(link);
+  if (readable) {
+    // Sharing again replaces whatever the clipboard held since.
+    await page.evaluate(() => navigator.clipboard.writeText("stale"));
+    await page.locator("#share-score").click();
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(link);
+  }
 
   const other = await context.newPage();
   await other.goto("/");
@@ -320,8 +339,8 @@ test("an untouched stale tab cannot overwrite a newer saved score on exit", asyn
   const latest = 'note("G4").gain(0.2)';
   await replaceCode(page, latest);
   await expect(page.locator("#save-status")).toHaveText("Saved locally");
-  await page.goto("about:blank");
-  await stale.goto("about:blank");
+  await leave(page);
+  await leave(stale);
   await page.goto("/");
   await expect.poll(() => readCode(page)).toBe(latest);
   await stale.close();
@@ -348,8 +367,8 @@ test("conflicting tab edits remain downloadable without replacing the newer save
   const chunks: Buffer[] = [];
   for await (const chunk of stream!) chunks.push(Buffer.from(chunk));
   expect(Buffer.concat(chunks).toString("utf8")).toBe(imported);
-  await page.goto("about:blank");
-  await stale.goto("about:blank");
+  await leave(page);
+  await leave(stale);
   await page.goto("/");
   await expect.poll(() => readCode(page)).toBe(latest);
   await stale.close();
@@ -374,9 +393,9 @@ test("overlapping tab saves remain recoverable after both tabs leave", async ({ 
   const first = '// first tab\nnote("D4")';
   const second = '// second tab\nnote("G4")';
   await replaceCode(page, first);
-  await page.goto("about:blank");
+  await leave(page);
   await replaceCode(other, second);
-  await other.goto("about:blank");
+  await leave(other);
   await page.goto("/");
   await expect.poll(() => readCode(page)).toBe(second);
   await page.getByText("Saved drafts", { exact: true }).click();
@@ -426,7 +445,7 @@ test("deleting an older displayed draft cannot delete a newer checkpoint from th
   await expect(oldDraft.getByRole("button", { name: "Restore", exact: true })).toBeFocused();
   other.once("dialog", dialog => dialog.accept());
   await oldDraft.getByRole("button", { name: "Delete saved draft", exact: true }).click();
-  await page.goto("about:blank");
+  await leave(page);
   await replaceCode(other, 'note("A4")');
   await other.locator(".saved-draft").filter({ hasText: latest })
     .getByRole("button", { name: "Restore", exact: true }).click();

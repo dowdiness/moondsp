@@ -14,14 +14,26 @@ export default defineConfig({
   reporter: "line",
   use: {
     baseURL,
-    browserName: "chromium",
     headless: true,
-    // Virtual output keeps real AudioWorklet/WASM rendering without a device.
-    // Opt in for automation; leave unset for hardware/listening checks.
-    launchOptions: {
-      args: process.env.MOONDSP_VIRTUAL_AUDIO === "1" ? ["--disable-audio-output"] : [],
-    },
   },
+  // Every engine runs the same suite without device emulation: a Mac user agent
+  // on a Linux host would give CodeMirror Mac shortcuts that Playwright's keys
+  // do not send. Select one engine with --project.
+  projects: [
+    {
+      name: "chromium",
+      use: {
+        browserName: "chromium",
+        // Virtual output keeps real AudioWorklet/WASM rendering without a device.
+        // Opt in for automation; leave unset for hardware/listening checks.
+        launchOptions: {
+          args: process.env.MOONDSP_VIRTUAL_AUDIO === "1" ? ["--disable-audio-output"] : [],
+        },
+      },
+    },
+    { name: "firefox", use: { browserName: "firefox" } },
+    { name: "webkit", use: { browserName: "webkit" } },
+  ],
   webServer: {
     // `vite preview` serves the production build deterministically.
     // Test runs assume `npm run build` has already produced dist/.

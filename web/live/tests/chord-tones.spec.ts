@@ -1,16 +1,9 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { readCode, replaceCode } from "./editor-helpers";
+import { centerOf, readCode, replaceCode } from "./editor-helpers";
 
 const tone = (page: Page, pitch: number) => page.locator(`.chord-tones__tone[data-pitch="${pitch}"]`);
-async function center(locator: Locator) {
-  await locator.scrollIntoViewIfNeeded();
-  return locator.evaluate(element => {
-    const box = element.getBoundingClientRect();
-    return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-  });
-}
 async function drag(page: Page, locator: Locator, semitones: number, cancel = false) {
-  const point = await center(locator);
+  const point = await centerOf(locator);
   await page.mouse.move(point.x, point.y);
   await page.mouse.down();
   await page.mouse.move(point.x, point.y - semitones * 24, { steps: 4 });
@@ -75,7 +68,7 @@ test("pitch collisions and MIDI boundaries do not discard tones", async ({ page 
 test("a source replacement cancels an unfinished tone drag", async ({ page }) => {
   await page.goto("/");
   await replaceCode(page, 'chord("C")');
-  const point = await center(tone(page, 64));
+  const point = await centerOf(tone(page, 64));
   await page.mouse.move(point.x, point.y);
   await page.mouse.down();
   await page.mouse.move(point.x, point.y + 24);
@@ -88,13 +81,15 @@ test("a source replacement cancels an unfinished tone drag", async ({ page }) =>
 
 test.describe("touch chord tones", () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+  // Native touch input is sent through the Chrome DevTools Protocol.
+  test.skip(({ browserName }) => browserName !== "chromium", "native touch input needs Chromium");
   test("native touch writes custom tones and plays the saved source", async ({ page }) => {
     await page.goto("/");
     const source = 'bpm(120); chord("C@2 F").gain(.2)';
     await replaceCode(page, source);
     const client = await page.context().newCDPSession(page);
     for (const [pitch, delta] of [[64, -1], [67, 1]]) {
-      const point = await center(tone(page, pitch));
+      const point = await centerOf(tone(page, pitch));
       await client.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ ...point }] });
       await client.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: point.x, y: point.y - delta * 24 }] });
       await client.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });

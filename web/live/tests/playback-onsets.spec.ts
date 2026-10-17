@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { readCode, replaceCode } from "./editor-helpers";
+import { platformKeys, readCode, replaceCode, insertText } from "./editor-helpers";
 
 async function collectOccurrences(page: Page): Promise<{ occurrences: string[]; mismatches: string[]; peak: number; references: string[] }> {
   return page.evaluate(() => {
@@ -35,12 +35,13 @@ async function collectOccurrences(page: Page): Promise<{ occurrences: string[]; 
 for (const mode of ["pattern", "song"] as const) {
   test(`${mode} actual onsets link source and individual repeated notes without changing code`, async ({ page }) => {
     await page.goto("/");
+    const { mod } = await platformKeys(page);
     const source = mode === "pattern"
       ? 'bpm(120); note("[C4 E4]*2").gain(.2)'
       : 'let motif = note("[C4 E4]*2").gain(.2);\nsong(bpm(120), section("A", 1, motif), part("loop", "A")).repeat()';
     await replaceCode(page, source);
     // Inline notation follows the cursor's source line, not the Song layout.
-    await page.locator(".cm-content").press("Control+Home");
+    await page.locator(".cm-content").press(`${mod}+Home`);
     await page.locator("#start").click();
     await expect(page.locator("#status")).toHaveText("Playing");
     const result = await collectOccurrences(page);
@@ -57,6 +58,7 @@ for (const mode of ["pattern", "song"] as const) {
 test("mobile source and diagram onsets survive editing, saving and restoration", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
+  const { mod } = await platformKeys(page);
   const source = 'bpm(120); note("[C4 E4]*2").gain(.2)';
   await replaceCode(page, source);
   await page.locator("#start").click();
@@ -65,8 +67,8 @@ test("mobile source and diagram onsets survive editing, saving and restoration",
   // Insert before the source without replacing the atoms: their identities move.
   const editor = page.locator(".cm-content");
   await editor.focus();
-  await editor.press("Control+Home");
-  await page.keyboard.insertText("// shifted while playing\n");
+  await editor.press(`${mod}+Home`);
+  await insertText(page, "// shifted while playing\n");
   const edited = `// shifted while playing\n${source}`;
   await expect.poll(() => readCode(page)).toBe(edited);
   const moved = await collectOccurrences(page);
@@ -78,7 +80,7 @@ test("mobile source and diagram onsets survive editing, saving and restoration",
   await page.reload();
   await expect.poll(() => readCode(page)).toBe(edited);
   await editor.focus();
-  await editor.press("Control+Home");
+  await editor.press(`${mod}+Home`);
   await editor.press("ArrowDown");
   await page.locator("#start").click();
   const restored = await collectOccurrences(page);
@@ -88,23 +90,24 @@ test("mobile source and diagram onsets survive editing, saving and restoration",
 
 test("invalid drafts retain unchanged origins but Undo reinsertion cannot inherit retired onsets", async ({ page }) => {
   await page.goto("/");
+  const { mod } = await platformKeys(page);
   const source = 'bpm(240); note("C4").fast(2)';
   await replaceCode(page, source);
   await page.locator("#start").click();
   await expect(page.locator(".cm-playback-atom")).toHaveText("C4");
   const editor = page.locator(".cm-content");
   await editor.focus();
-  await editor.press("Control+End");
-  await page.keyboard.insertText("\n???");
+  await editor.press(`${mod}+End`);
+  await insertText(page, "\n???");
   const invalid = `${source}\n???`;
   await expect.poll(() => readCode(page)).toBe(invalid);
   await expect(page.locator(".cm-playback-atom")).toHaveText("C4");
-  await editor.press("Control+Home");
+  await editor.press(`${mod}+Home`);
   for (let i = 0; i < source.indexOf("C4"); i++) await editor.press("ArrowRight");
   await editor.press("Shift+ArrowRight");
   await editor.press("Shift+ArrowRight");
   await editor.press("Backspace");
-  await editor.press("Control+z");
+  await editor.press(`${mod}+z`);
   await expect.poll(() => readCode(page)).toBe(invalid);
   const retired = await page.evaluate(() => {
     const { promise, resolve } = Promise.withResolvers<{ events: number; falselyHighlighted: boolean }>();

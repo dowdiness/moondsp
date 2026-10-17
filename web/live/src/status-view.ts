@@ -121,7 +121,8 @@ export type ControlView = Readonly<{ disabled: boolean; busy: boolean; title: st
 export type AuthoringView = Readonly<{
   /** body data-authoring. */
   authoring: "loading" | "ready" | "failed";
-  start: ControlView;
+  /** Null in compiled mode: Start does not wait for score tools there, and its own toggle owns it. */
+  start: ControlView | null;
   restart: ControlView;
   sourceToggle: ControlView;
   changeStatusHidden: boolean;
@@ -144,7 +145,7 @@ export function authoringView(phase: AuthoringPhase, scheduler: boolean): Author
     case "loading":
       return {
         authoring: "loading",
-        start: { disabled: scheduler, busy: scheduler, title: START_TITLE },
+        start: scheduler ? { disabled: true, busy: true, title: START_TITLE } : null,
         restart: { disabled: true, busy: false, title: RESTART_TITLE },
         sourceToggle: { disabled: true, busy: true, title: TOOLS_TITLE },
         changeStatusHidden: true,
@@ -154,7 +155,7 @@ export function authoringView(phase: AuthoringPhase, scheduler: boolean): Author
     case "ready":
       return {
         authoring: "ready",
-        start: { disabled: false, busy: false, title: START_TITLE },
+        start: scheduler ? { disabled: false, busy: false, title: START_TITLE } : null,
         restart: { disabled: false, busy: false, title: RESTART_TITLE },
         sourceToggle: { disabled: false, busy: false, title: TOOLS_TITLE },
         changeStatusHidden: false,
@@ -164,7 +165,7 @@ export function authoringView(phase: AuthoringPhase, scheduler: boolean): Author
     case "failed":
       return {
         authoring: "failed",
-        start: { disabled: scheduler, busy: false, title: scheduler ? PLAYBACK_UNAVAILABLE : START_TITLE },
+        start: scheduler ? { disabled: true, busy: false, title: PLAYBACK_UNAVAILABLE } : null,
         restart: { disabled: true, busy: false, title: scheduler ? PLAYBACK_UNAVAILABLE : RESTART_TITLE },
         sourceToggle: { disabled: true, busy: false, title: TOOLS_UNAVAILABLE },
         changeStatusHidden: false,

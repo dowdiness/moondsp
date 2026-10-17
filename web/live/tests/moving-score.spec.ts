@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { openPitchControls, readCode, replaceCode } from "./editor-helpers";
+import { platformKeys, boxOf, openPitchControls, readCode, replaceCode, insertText } from "./editor-helpers";
 
 test("output trace follows real audio, pause, and failure without retaining old samples", async ({ page }) => {
   await page.goto("/");
@@ -38,14 +38,9 @@ test("drawing and pitch edits do not start audio; main Play outputs sound and Un
   await page.goto("/");
   const source = 'note("C4 E4 G4").gain(0.2)';
   await replaceCode(page, source);
-  const geometry = await page.waitForFunction(() => {
-    const note = document.querySelector(".moving-score__note-block")?.getBoundingClientRect();
-    const row = document.querySelector('.moving-score__lane[data-pitch="62"]')?.getBoundingClientRect();
-    if (!note?.width || !note.height || !row?.height) return null;
-    return { x: note.x + note.width / 2, from: note.y + note.height / 2, to: row.y + row.height / 2 };
-  });
-  const point = (await geometry.jsonValue())!;
-  await geometry.dispose();
+  const note = await boxOf(page.locator(".moving-score__note-block").first());
+  const row = await boxOf(page.locator('.moving-score__lane[data-pitch="62"]'));
+  const point = { x: note.x + note.width / 2, from: note.y + note.height / 2, to: row.y + row.height / 2 };
   await page.mouse.move(point.x, point.from);
   await page.mouse.down();
   await page.mouse.move(point.x, point.to);
@@ -96,11 +91,12 @@ test("drawn contours preserve intermediate bends and formatting as one undo step
   const source = '// 曲線\nbpm(96);\n$: note("C4  C4\nC4 C4").gain(0.2)';
   await replaceCode(page, source);
   const surface = page.locator(".moving-score__canvas");
-  const centers = await page.locator(".moving-score__note-block").evaluateAll(notes =>
-    notes.map(note => { const rect = note.getBoundingClientRect(); return rect.x + rect.width / 2; }));
+  const notes = page.locator(".moving-score__note-block");
+  await expect(notes).toHaveCount(4);
   const point = async (index: number, pitch: number) => {
-    const row = (await page.locator(`.moving-score__lane[data-pitch="${pitch}"]`).boundingBox())!;
-    return { x: centers[index], y: row.y + row.height / 2 };
+    const note = await boxOf(notes.nth(index));
+    const row = await boxOf(page.locator(`.moving-score__lane[data-pitch="${pitch}"]`));
+    return { x: note.x + note.width / 2, y: row.y + row.height / 2 };
   };
   const first = await point(0, 67), middle = await point(1, 60), third = await point(2, 64), last = await point(3, 67);
   await page.mouse.move(first.x, first.y);
@@ -125,8 +121,8 @@ test("Enter during a note drag does not start a second, keyboard edit", async ({
   await page.goto("/");
   const source = 'note("C4 E4 G4").gain(0.2)';
   await replaceCode(page, source);
-  const box = (await page.locator(".moving-score__note-block").first().boundingBox())!;
-  const row = (await page.locator('.moving-score__lane[data-pitch="62"]').boundingBox())!;
+  const box = await boxOf(page.locator(".moving-score__note-block").first());
+  const row = await boxOf(page.locator('.moving-score__lane[data-pitch="62"]'));
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width / 2, row.y + row.height / 2, { steps: 5 });
@@ -145,8 +141,8 @@ test("a note click preserves chromatic pitch while a drag from that note edits a
   const note = page.locator(".moving-score__note-block").first();
   await note.click();
   expect(await readCode(page)).toBe(source);
-  const box = (await note.boundingBox())!;
-  const row = (await page.locator('.moving-score__lane[data-pitch="66"]').boundingBox())!;
+  const box = await boxOf(note);
+  const row = await boxOf(page.locator('.moving-score__lane[data-pitch="66"]'));
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width / 2, row.y + row.height / 2, { steps: 5 });
@@ -158,6 +154,7 @@ test("a note click preserves chromatic pitch while a drag from that note edits a
 
 test("inline drawing shares the selected note with pitch controls and typing", async ({ page }) => {
   await page.goto("/");
+  const { mod } = await platformKeys(page);
   const source = 'note("C4 E4 G4").gain(0.2)';
   await replaceCode(page, source);
   const surface = page.locator("#editor .moving-score__canvas");
@@ -171,9 +168,9 @@ test("inline drawing shares the selected note with pitch controls and typing", a
   await surface.press("ArrowRight");
   await surface.press("ArrowUp");
   await expect.poll(() => readCode(page)).toBe(source.replace("E4 G4", "F4 Ab4"));
-  await surface.press("Control+z");
+  await surface.press(`${mod}+z`);
   await expect.poll(() => readCode(page)).toBe(source.replace("E4", "F4"));
-  await surface.press("Control+Shift+Z");
+  await surface.press(`${mod}+Shift+Z`);
   await expect.poll(() => readCode(page)).toBe(source.replace("E4 G4", "F4 Ab4"));
   await surface.press("Escape");
   const editor = page.locator(".cm-content");
@@ -181,7 +178,7 @@ test("inline drawing shares the selected note with pitch controls and typing", a
   await editor.press("Shift+ArrowRight");
   await editor.press("Shift+ArrowRight");
   await editor.press("Shift+ArrowRight");
-  await page.keyboard.insertText("A4");
+  await insertText(page, "A4");
   await expect.poll(() => readCode(page)).toBe(source.replace("E4 G4", "F4 A4"));
   await expect(page.locator(".moving-score__note.is-selected text").first()).toHaveText("A4");
 });
@@ -232,8 +229,8 @@ test("direct rest entry preserves weighted repeated source identity and one-step
   await replaceCode(page, source);
   const rests = page.locator(".moving-score__rest-hit");
   await expect(rests).toHaveCount(2);
-  const slot = (await rests.first().boundingBox())!;
-  const row = (await page.locator('.moving-score__lane[data-pitch="61"]').boundingBox())!;
+  const slot = await boxOf(rests.first());
+  const row = await boxOf(page.locator('.moving-score__lane[data-pitch="61"]'));
   await page.mouse.move(slot.x + slot.width / 2, row.y + row.height / 2);
   await page.mouse.down();
   expect(await readCode(page)).toBe(source);
@@ -250,7 +247,9 @@ test("clicks in a degraded silent gap do not select a neighboring note", async (
   const notation = Array.from({ length: 32 }, () => "C4?").join(" ");
   const source = `note("${notation}").gain(0.2)`;
   await replaceCode(page, source);
-  const point = await page.locator(".moving-score__canvas").evaluate(element => {
+  const canvas = page.locator(".moving-score__canvas");
+  await boxOf(canvas);
+  const point = await canvas.evaluate(element => {
     const svg = element as SVGSVGElement;
     const starts = [...svg.querySelectorAll<SVGGElement>(".moving-score__note")].map(note => Number(note.dataset.start));
     const missing = Array.from({ length: 32 }, (_, index) => index)
@@ -271,14 +270,9 @@ test("Escape cancels a pending rest click without changing source", async ({ pag
   await page.goto("/");
   const source = 'note("C4 ~@2 D4").gain(0.2)';
   await replaceCode(page, source);
-  const geometry = await page.waitForFunction(() => {
-    const slot = document.querySelector(".moving-score__rest-hit")?.getBoundingClientRect();
-    const row = document.querySelector('.moving-score__lane[data-pitch="65"]')?.getBoundingClientRect();
-    if (!slot?.width || !slot.height || !row?.height) return null;
-    return { x: slot.x + slot.width / 2, y: row.y + row.height / 2 };
-  });
-  const point = (await geometry.jsonValue())!;
-  await geometry.dispose();
+  const slot = await boxOf(page.locator(".moving-score__rest-hit"));
+  const row = await boxOf(page.locator('.moving-score__lane[data-pitch="65"]'));
+  const point = { x: slot.x + slot.width / 2, y: row.y + row.height / 2 };
   await page.mouse.move(point.x, point.y);
   await page.mouse.down();
   const preview = page.locator(".moving-score__preview-block");

@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { buildParser } from "@lezer/generator";
 import { Draft } from "../src/authoring";
-import { replaceCode, readCode } from "./editor-helpers";
+import { platformKeys, replaceCode, readCode } from "./editor-helpers";
 
 const grammar = readFileSync(
   new URL("../src/lang/minilive.grammar", import.meta.url),
@@ -95,6 +95,7 @@ test("MiniLive accepts source declarations, comments, and repeated arrangements"
 test("MiniLive keeps number highlighting while the sign is edited", async ({ page }) => {
   const source = 'note("E4").pan(-0.45) + note("G4").pan(0.45)';
   await page.goto("/");
+  const { mod } = await platformKeys(page);
   const editor = page.locator(".cm-content");
   await replaceCode(page, source);
   const numberTokens = () => editor.locator("span").evaluateAll((spans) =>
@@ -108,7 +109,7 @@ test("MiniLive keeps number highlighting while the sign is edited", async ({ pag
   expect(initialTokens[0][1]).not.toBe("");
   expect(initialTokens[0][1]).toBe(initialTokens[1][1]);
 
-  await editor.press("Control+Home");
+  await editor.press(`${mod}+Home`);
   for (let pos = 0; pos < source.indexOf("-"); pos += 1) {
     await editor.press("ArrowRight");
   }

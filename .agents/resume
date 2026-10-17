@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# No per-orb authentication or long-lived services are required on wake.
+# No per-orb authentication is required on wake. A paused orb loses its
+# processes, so restart the PulseAudio sink WebKit's audio tests play into.
+if command -v pulseaudio >/dev/null && ! pactl info >/dev/null 2>&1; then
+  pulseaudio --start --exit-idle-time=-1
+fi

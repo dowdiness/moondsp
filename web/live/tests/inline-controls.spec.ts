@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { replaceCode, readCode as code } from "./editor-helpers";
+import { platformKeys, boxOf, replaceCode, readCode as code } from "./editor-helpers";
 
 const source = 'note("C3 E3").gain(0.6).lpf(1800, 0.7)';
 async function enter(page: Page, label: string, value: string, index = 0) {
@@ -10,7 +10,7 @@ async function enter(page: Page, label: string, value: string, index = 0) {
 }
 async function dragStart(page: Page, label = "Gain") {
   const handle = page.getByRole("slider", { name: `Adjust ${label}`, exact: true });
-  const box = (await handle.boundingBox())!;
+  const box = await boxOf(handle);
   const x = box.x + box.width / 2, y = box.y + box.height / 2;
   await page.mouse.move(x, y);
   await page.mouse.down();
@@ -44,13 +44,14 @@ test("knobs sit before source literals at text size without increasing line heig
 
 test("cutoff drag is logarithmic and its visible value and undo stay source-bound", async ({ page }) => {
   await page.goto("/");
+  const { mod } = await platformKeys(page);
   await replaceCode(page, source);
   const { x, y } = await dragStart(page, "Cutoff Hz");
   await page.mouse.move(x, y - 40);
   await page.mouse.up();
   expect(await code(page)).toBe(source.replace("1800", "3600"));
   await expect(page.getByRole("slider", { name: "Adjust Cutoff Hz", exact: true })).toHaveAttribute("aria-valuetext", "3600 Hz");
-  await page.locator(".cm-content").press("Control+z");
+  await page.locator(".cm-content").press(`${mod}+z`);
   expect(await code(page)).toBe(source);
 });
 
@@ -58,6 +59,8 @@ test("literal edits preserve duplicate targets, UTF-16, comments and multiline f
   await page.goto("/");
   const original = '// 日本語 🎹 .gain(0.6)\nlet bass = note("C3")\n .gain(/* keep */ 0.6)\n .lpf(1800, 0.7);\nlet lead = chord("Cm").gain(0.6);\nbass + lead';
   await replaceCode(page, original);
+  // The draft version appears once score tools have loaded.
+  await expect(page.locator("#draft-status")).toHaveAttribute("data-version", /^\d+:\d+$/);
   const version = (await page.locator("#draft-status").getAttribute("data-version"))!.split(":").map(Number);
   await enter(page, "Gain", "0.8");
   const gain = original.replace('/* keep */ 0.6', '/* keep */ 0.8');
@@ -73,12 +76,13 @@ test("literal edits preserve duplicate targets, UTF-16, comments and multiline f
 
 test("code edits refresh controls; omitted Q and unsupported arguments stay untouched", async ({ page }) => {
   await page.goto("/");
+  const { mod } = await platformKeys(page);
   const editor = page.locator(".cm-content");
   await replaceCode(page, 'note("C3").lpf(1800).gain(12)');
   await expect(page.getByRole("slider", { name: "Adjust Q", exact: true })).toHaveCount(0);
   await expect(page.getByRole("slider", { name: "Adjust Gain", exact: true })).toHaveAttribute("aria-valuenow", "12");
   expect(await code(page)).toBe('note("C3").lpf(1800).gain(12)');
-  await editor.press("Control+Home");
+  await editor.press(`${mod}+Home`);
   for (let i = 0; i < 'note("C3").lpf(1'.length; i++) await editor.press("ArrowRight");
   await editor.press("Delete");
   await editor.pressSequentially("2");
@@ -110,6 +114,7 @@ test("references, groups, stacks and drums expose locally editable literals", as
 
 test("repeated modifiers expose per-argument overrides without discarding inherited Q", async ({ page }) => {
   await page.goto("/");
+  const { mod } = await platformKeys(page);
   const original = 'note("C3").gain(.6).gain(.8).lpf(1800, .7).lpf(2400)';
   await replaceCode(page, original);
   const gains = page.getByRole("slider", { name: "Adjust Gain", exact: true });
@@ -120,7 +125,7 @@ test("repeated modifiers expose per-argument overrides without discarding inheri
   await expect(page.getByRole("slider", { name: "Adjust Q", exact: true })).not.toHaveAttribute("aria-description", /Overridden/);
   await enter(page, "Gain", "1.", 0);
   expect(await code(page)).toBe(original.replace('.gain(.6)', '.gain(1.)'));
-  await page.locator(".cm-content").press("Control+z");
+  await page.locator(".cm-content").press(`${mod}+z`);
   expect(await code(page)).toBe(original);
   await replaceCode(page, original + '.lpf(3000, 1.2)');
   await expect(page.getByRole("slider", { name: "Adjust Q", exact: true }).nth(0)).toHaveAttribute("aria-description", /Overridden/);
@@ -128,9 +133,10 @@ test("repeated modifiers expose per-argument overrides without discarding inheri
 
 test("a drag with a long pause is one undo/redo, isolated from adjacent typing", async ({ page }) => {
   await page.goto("/");
+  const { mod, redo } = await platformKeys(page);
   const editor = page.locator(".cm-content");
   await replaceCode(page, source);
-  await editor.press("Control+Home");
+  await editor.press(`${mod}+Home`);
   await editor.pressSequentially(" ");
   const { x, y } = await dragStart(page);
   await page.mouse.move(x, y - 10);
@@ -139,21 +145,22 @@ test("a drag with a long pause is one undo/redo, isolated from adjacent typing",
   await page.mouse.move(x, y - 20);
   await page.mouse.up();
   expect(await code(page)).toBe(" " + source.replace("0.6", "0.8"));
-  await editor.press("Control+Home");
+  await editor.press(`${mod}+Home`);
   await editor.pressSequentially(" ");
-  await editor.press("Control+z");
+  await editor.press(`${mod}+z`);
   expect(await code(page)).toBe(" " + source.replace("0.6", "0.8"));
-  await editor.press("Control+z");
+  await editor.press(`${mod}+z`);
   expect(await code(page)).toBe(" " + source);
-  await editor.press("Control+y");
+  await editor.press(redo);
   expect(await code(page)).toBe(" " + source.replace("0.6", "0.8"));
-  await editor.press("Control+z");
-  await editor.press("Control+z");
+  await editor.press(`${mod}+z`);
+  await editor.press(`${mod}+z`);
   expect(await code(page)).toBe(source);
 });
 
 test("focused knob routes history shortcuts without refocusing; input keeps native undo", async ({ page }) => {
   await page.goto("/");
+  const { mod, redo } = await platformKeys(page);
   await replaceCode(page, source);
   const gain = page.getByRole("slider", { name: "Adjust Gain", exact: true });
   const { x, y } = await dragStart(page);
@@ -163,26 +170,29 @@ test("focused knob routes history shortcuts without refocusing; input keeps nati
   await page.mouse.up();
   await expect(gain).toBeFocused();
   expect(await code(page)).toBe(source.replace("0.6", "0.8"));
-  await page.keyboard.press("Control+z");
+  await page.keyboard.press(`${mod}+z`);
   expect(await code(page)).toBe(source);
-  await page.keyboard.press("Control+Shift+Z");
+  await page.keyboard.press(`${mod}+Shift+Z`);
   expect(await code(page)).toBe(source.replace("0.6", "0.8"));
   await gain.focus();
   await page.keyboard.press("ArrowUp");
-  await page.keyboard.press("Control+z");
+  await page.keyboard.press(`${mod}+z`);
   expect(await code(page)).toBe(source.replace("0.6", "0.8"));
-  await page.keyboard.press("Control+y");
+  await page.keyboard.press(redo);
   expect(await code(page)).toBe(source.replace("0.6", "0.81"));
   await gain.press("Enter");
   const input = page.getByRole("textbox", { name: "Gain", exact: true });
-  await page.keyboard.type("0.9");
-  await page.keyboard.press("Control+z");
+  // One insertion is one native undo step in every engine; typed keys coalesce differently.
+  await page.keyboard.insertText("0.9");
+  // Native text editing follows the host toolkit, not the page's platform.
+  await page.keyboard.press("ControlOrMeta+z");
   await expect(input).toHaveValue("0.81");
   expect(await code(page)).toBe(source.replace("0.6", "0.81"));
 });
 
 test("external transaction interrupts a captured drag without blur and keeps separate history", async ({ page }) => {
   await page.goto("/");
+  const { mod } = await platformKeys(page);
   await replaceCode(page, source);
   const gain = page.getByRole("slider", { name: "Adjust Gain", exact: true });
   const { x, y } = await dragStart(page);
@@ -196,9 +206,9 @@ test("external transaction interrupts a captured drag without blur and keeps sep
   await page.mouse.move(x, y - 30);
   await page.mouse.up();
   expect(await code(page)).toBe(" " + source.replace("0.6", "0.7"));
-  await page.keyboard.press("Control+z");
+  await page.keyboard.press(`${mod}+z`);
   expect(await code(page)).toBe(source.replace("0.6", "0.7"));
-  await page.keyboard.press("Control+z");
+  await page.keyboard.press(`${mod}+z`);
   expect(await code(page)).toBe(source);
 });
 
@@ -220,9 +230,12 @@ for (const platform of ["Win32", "MacIntel", "Linux x86_64"]) {
   });
 }
 
-test("invalid direct input cancels; keyboard adjustment and copy use source only", async ({ page, context }) => {
-  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+test("invalid direct input cancels; keyboard adjustment and copy use source only", async ({ page, context, browserName }) => {
+  // Only Chromium lets automation read the clipboard back.
+  const readable = browserName === "chromium";
+  if (readable) await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.goto("/");
+  const { mod } = await platformKeys(page);
   const editor = page.locator(".cm-content");
   await replaceCode(page, source);
   await enter(page, "Gain", "1e3");
@@ -232,8 +245,9 @@ test("invalid direct input cancels; keyboard adjustment and copy use source only
   await expect(page.getByRole("slider", { name: "Adjust Gain", exact: true })).toHaveAttribute("aria-valuenow", "0.6");
   await page.getByRole("slider", { name: "Adjust Gain", exact: true }).press("Shift+ArrowUp");
   expect(await code(page)).toBe(source.replace("0.6", "0.601"));
-  await editor.press("Control+a");
-  await editor.press("Control+c");
+  if (!readable) return;
+  await editor.press(`${mod}+a`);
+  await editor.press(`${mod}+c`);
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(source.replace("0.6", "0.601"));
 });
 
@@ -241,6 +255,7 @@ test("opening, unchanged input and pointer click do not write or clamp source", 
   await page.goto("/");
   const original = 'note("C3").gain(0.00001).lpf(25000)';
   await replaceCode(page, original);
+  await expect(page.locator("#draft-status")).toHaveAttribute("data-version", /^\d+:\d+$/);
   const version = await page.locator("#draft-status").getAttribute("data-version");
   await page.getByRole("slider", { name: "Adjust Gain", exact: true }).click();
   await enter(page, "Cutoff Hz", "25000");
@@ -267,13 +282,14 @@ for (const interruption of ["pointercancel", "blur", "replace"] as const) {
 
 test("GUI edits use existing acceptance path; invalid draft preserves playback and recovery", async ({ page }) => {
   await page.goto("/");
+  const { mod } = await platformKeys(page);
   await replaceCode(page, source);
   await page.locator("#start").click();
   await expect(page.locator("#status")).toHaveText("Playing");
   await enter(page, "Gain", "0.8");
   await expect(page.locator("#draft-status")).toHaveAttribute("data-state", "accepted");
   const accepted = await page.locator("#draft-versions").textContent();
-  await page.locator(".cm-content").press("Control+End");
+  await page.locator(".cm-content").press(`${mod}+End`);
   await page.locator(".cm-content").pressSequentially(".lpf(");
   await expect(page.locator("#draft-status")).toHaveAttribute("data-state", "invalid");
   await expect(page.locator("#status")).toHaveText("Playing");

@@ -30,20 +30,32 @@ step 'Pack browser library for the synth example' env NEW_MOON_MOD=0 npm run pac
 step 'Install synth example npm dependencies' bash -c 'cd examples/basic-synth && npm install ../../packages/browser/moondsp-browser-0.6.0.tgz --no-save --no-audit --no-fund'
 
 # Playwright's ZIP extractor can stall in this orb; system unzip extracts the
-# same archive quickly. Only the headless shell is needed by the test suites.
-for manifest in ./node_modules/playwright-core/browsers.json ./web/live/node_modules/playwright-core/browsers.json; do
-  read -r revision version < <(node -e "const b = require(process.argv[1]).browsers.find(b => b.name === 'chromium-headless-shell'); console.log(b.revision, b.browserVersion)" "$PWD/$manifest")
-  browser_dir="$HOME/.cache/ms-playwright/chromium_headless_shell-$revision"
-  if [[ ! -x "$browser_dir/chrome-headless-shell-linux64/chrome-headless-shell" || ! -f "$browser_dir/INSTALLATION_COMPLETE" ]]; then
-    echo "── Install Playwright headless Chromium $revision ──"
+# same archives quickly. Each project's Playwright names its builds' install
+# locations and download URLs, so they follow its version and this platform.
+install_browsers() {
+  local project="$1" location url archive
+  shift
+  while read -r location url; do
+    [[ -f "$location/INSTALLATION_COMPLETE" ]] && continue
+    echo "── Install Playwright $(basename "$location") ──"
     archive="$(mktemp)"
     trap 'rm -f "$archive"' EXIT
-    time curl -fsSL "https://cdn.playwright.dev/builds/cft/$version/linux64/chrome-headless-shell-linux64.zip" -o "$archive"
-    mkdir -p "$browser_dir"
-    time unzip -qo "$archive" -d "$browser_dir"
-    chmod +x "$browser_dir/chrome-headless-shell-linux64/chrome-headless-shell"
-    touch "$browser_dir/INSTALLATION_COMPLETE"
+    time curl -fsSL "$url" -o "$archive"
+    rm -rf "$location"
+    mkdir -p "$location"
+    time unzip -qo "$archive" -d "$location"
+    touch "$location/INSTALLATION_COMPLETE"
     rm -f "$archive"
     trap - EXIT
-  fi
-done
+  done < <(node "$project/node_modules/playwright-core/cli.js" install --dry-run "$@" |
+    awk '/Install location:/ { location = $3 } /Download url:/ && !seen[location]++ { print location, $3 }')
+}
+
+# The root suites need only the headless shell; web/live also runs Firefox and
+# WebKit. WebKit plays through GStreamer, which needs a PulseAudio sink
+# (.agents/resume starts one) to start an AudioContext.
+install_browsers . chromium-headless-shell
+install_browsers web/live chromium-headless-shell firefox webkit
+step 'Install WebKit audio output' sudo apt-get install -y -q --no-install-recommends \
+  pulseaudio gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-pulseaudio
+(cd web/live && step 'Install Firefox and WebKit system libraries' npx playwright install-deps firefox webkit)

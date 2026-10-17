@@ -70,8 +70,13 @@ jobs:
         run: npm run test:browser
 
   live-smoke:
+    name: live-smoke (${{ matrix.browser }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
 
     steps:
       - name: Checkout code
@@ -110,9 +115,17 @@ jobs:
       - name: Check public browser API types
         run: npm run typecheck:browser
 
-      - name: Install Playwright Chromium
+      - name: Install Playwright ${{ matrix.browser }}
         working-directory: web/live
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+
+      # Firefox and WebKit need an audio device to start an AudioContext;
+      # WebKit reaches it through GStreamer's PulseAudio sink.
+      - name: Start a virtual audio device
+        if: matrix.browser != 'chromium'
+        run: |
+          sudo apt-get install -y -q --no-install-recommends pulseaudio gstreamer1.0-pulseaudio
+          pulseaudio --start --exit-idle-time=-1
 
       - name: Build web/live (also syncs assets into dist/)
         working-directory: web/live
@@ -120,4 +133,4 @@ jobs:
 
       - name: Run web/live smoke tests
         working-directory: web/live
-        run: npm test
+        run: npm test -- --project=${{ matrix.browser }}

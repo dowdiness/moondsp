@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { readCode, replaceCode } from "./editor-helpers";
+import { platformKeys, readCode, replaceCode } from "./editor-helpers";
 
 const root = (page: Page) => page.getByRole("combobox", { name: "Chord root", exact: true, includeHidden: true });
 const quality = (page: Page) => page.getByRole("combobox", { name: "Chord type", exact: true, includeHidden: true });
@@ -61,10 +61,11 @@ test("root editing preserves quality aliases and registers without confusing sus
 
 test("code edits refresh chord controls and partial source selections cannot change an unrelated chord", async ({ page }) => {
   await page.goto("/");
+  const { mod } = await platformKeys(page);
   const source = 'chord("Cmaj7 Dm")';
   await replaceCode(page, source);
   const editor = page.locator(".cm-content");
-  await editor.press("Control+Home");
+  await editor.press(`${mod}+Home`);
   for (let i = 0; i < source.indexOf("maj7"); i++) await editor.press("ArrowRight");
   await editor.press("Shift+ArrowRight");
   await expect(page.locator(".chord-controls")).toBeHidden();
@@ -110,6 +111,8 @@ test("a denser chord cannot exceed the notation projection boundary or leave sta
 
 test.describe("touch chord editing", () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+  // Firefox has no mobile emulation.
+  test.skip(({ browserName }) => browserName === "firefox", "Firefox has no mobile emulation");
   test("a selected chord changes all its tones and survives a saved reload", async ({ page }) => {
     await page.goto("/");
     const source = 'bpm(120); chord("C Am").gain(.2)';

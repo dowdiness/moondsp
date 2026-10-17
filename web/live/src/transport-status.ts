@@ -64,7 +64,7 @@ function writeControl(control: HTMLButtonElement, view: ControlView): void {
 export function writeAuthoring(elements: TransportElements, authoring: AuthoringView): void {
   const e = elements;
   e.body.dataset.authoring = authoring.authoring;
-  writeControl(e.start, authoring.start);
+  if (authoring.start) writeControl(e.start, authoring.start);
   writeControl(e.restart, authoring.restart);
   writeControl(e.sourceToggle, authoring.sourceToggle);
   e.changeStatus.hidden = authoring.changeStatusHidden;

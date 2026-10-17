@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
-import { readCode, replaceCode } from "./editor-helpers";
+import { readCode, replaceCode, insertText } from "./editor-helpers";
 
 const authoringAsset = /\/assets\/authoring-[^/]+\.js$/;
 const gatedControls = ["#start", "#restart", "#source-toggle"];
@@ -177,7 +177,7 @@ for (const viewport of [{ name: "desktop", width: 1280, height: 800 }, { name: "
       await expect(page.locator(".moving-score__note-label")).toHaveText(["A4", "B4", "G4"]);
       expect(await readCode(page)).toBe(source);
 
-      await page.keyboard.insertText("D4");
+      await insertText(page, "D4");
       const edited = source.replace("A4 B4 G4", "D4");
       await expect.poll(() => readCode(page)).toBe(edited);
       await expect(page.locator(".moving-score__note-label")).toHaveText(["D4"]);

@@ -1,8 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { openPitchControls, readCode, replaceCode } from "./editor-helpers";
+import { platformKeys, openPitchControls, readCode, replaceCode } from "./editor-helpers";
 
 test("real onset decorations preserve editing selection, scroll and shared Undo", async ({ page }) => {
   await page.goto("/");
+  const { mod } = await platformKeys(page);
   const source = 'bpm(120); note("C4 E4 G4").gain(.2)';
   await replaceCode(page, source);
   await page.locator(".moving-score__note-block").nth(2).click();
@@ -14,7 +15,7 @@ test("real onset decorations preserve editing selection, scroll and shared Undo"
   await expect(page.locator("#status")).toHaveText("Playing");
   const editor = page.locator(".cm-content");
   await editor.focus();
-  await editor.press("Control+Home");
+  await editor.press(`${mod}+Home`);
   for (let i = 0; i < source.indexOf("C4"); i++) await editor.press("ArrowRight");
   await editor.press("Shift+ArrowRight");
   await editor.press("Shift+ArrowRight");
