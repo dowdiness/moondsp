@@ -33,6 +33,27 @@ export type NotationProjection = Readonly<{
 export type SourceChange = Readonly<{ from: number; to: number; insert: string }>;
 export type SourceEdit = Readonly<{ changes: SourceChange[]; selection: { from: number; to: number } }>;
 
+/**
+ * Where `pos` lands after `changes`. Text inserted exactly at `pos` stays after
+ * it when `assoc` is -1 and before it when 1; a replaced range covering `pos`
+ * maps it to the replacement's start or end the same way.
+ */
+export function mapPosition(changes: readonly SourceChange[], pos: number, assoc: -1 | 1): number {
+  let shift = 0;
+  for (const change of [...changes].sort((a, b) => a.from - b.from)) {
+    if (change.from > pos || (change.from === pos && (change.to > pos || assoc < 0))) break;
+    if (change.to <= pos) shift += change.insert.length - (change.to - change.from);
+    else return change.from + shift + (assoc < 0 ? 0 : change.insert.length);
+  }
+  return pos + shift;
+}
+
+/** An edit applying `changes` that keeps node `index`'s core selected. */
+export function keepingSelection(projection: NotationProjection, index: number, changes: SourceChange[]): SourceEdit {
+  const node = nodeAt(projection, index);
+  return { changes, selection: { from: mapPosition(changes, node.from, -1), to: mapPosition(changes, node.baseTo, -1) } };
+}
+
 /** Resolve a projected hit to a movable sibling in the source atom's sequence. */
 export function relocationTarget(projection: NotationProjection, source: number, hit: number): number | null {
   if (projection.error) return null;
@@ -278,6 +299,12 @@ export function weightNode(content: string, projection: NotationProjection, inde
   if (weight === 1) return [];
   return sourceChange(node.end, node.end, `@${weight}`);
 }
+
+/** The share of a pair that boundary controls offer, adjusted in `BOUNDARY_STEP`s. */
+export const BOUNDARY_MIN = 0.05;
+export const BOUNDARY_MAX = 0.95;
+export const BOUNDARY_STEP = 0.05;
+export function clampBoundary(ratio: number): number { return Math.max(BOUNDARY_MIN, Math.min(BOUNDARY_MAX, ratio)); }
 
 export function boundaryInfo(projection: NotationProjection, index: number): { right: number; ratio: number } | null {
   if (projection.error) return null;
@@ -558,7 +585,7 @@ function transposeToken(content: string, projection: NotationProjection, index: 
   return applySourceChanges(content.slice(from, to), changes.map(change => ({ ...change, from: change.from - from, to: change.to - from })));
 }
 
-function applySourceChanges(content: string, changes: SourceChange[]): string {
+export function applySourceChanges(content: string, changes: readonly SourceChange[]): string {
   return [...changes].sort((a, b) => b.from - a.from).reduce(
     (source, change) => source.slice(0, change.from) + change.insert + source.slice(change.to), content,
   );

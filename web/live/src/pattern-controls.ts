@@ -1,5 +1,5 @@
-import { EditorState, Facet, MapMode, StateField, Transaction, type ChangeDesc, type Extension, type Text } from "@codemirror/state";
-import { isolateHistory, historyKeymap } from "@codemirror/commands";
+import { EditorState, Facet, MapMode, StateField, type ChangeDesc, type Extension, type Text } from "@codemirror/state";
+import { historyKeymap } from "@codemirror/commands";
 import { Decoration, EditorView, WidgetType, keymap, runScopeHandlers, type DecorationSet } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
 import { miniliveLanguage } from "./lang/minilive";
@@ -8,8 +8,9 @@ import { mountMovingScore } from "./moving-score";
 import { mountChordControls } from "./chord-controls";
 import {
   projectNotation, leafNodes, splitNode, repeatNode, weightNode, moveBoundary, boundaryInfo, sourceRangeNodes,
-  type NotationProjection, type SourceChange,
+  keepingSelection, mapPosition, BOUNDARY_MAX, BOUNDARY_MIN, BOUNDARY_STEP, type NotationProjection, type SourceChange,
 } from "./notation-structure";
+import { dispatchPatternEdit } from "./pattern-edit";
 
 type PatternMemory = { pitchOpen?: boolean; timingOpen?: boolean; structureOpen?: boolean; tonesOpen?: boolean };
 
@@ -110,10 +111,13 @@ const liveWidgets = new WeakMap<HTMLElement, PatternWidgetDOM>();
 class PatternWidgetDOM {
   readonly dom = document.createElement("section");
   private label = "";
+  /** The selected step, or -1 when a group is selected. */
+  private get selected(): number {
+    return this.pattern.steps?.findIndex(step => step.node === this.pattern.selectedNode) ?? -1;
+  }
   private unavailable = document.createElement("span");
   private grid = document.createElement("div");
   private cells: HTMLElement[] = [];
-  private selected = 0;
   private choices: HTMLButtonElement[] = [];
   private keyboard = document.createElement("div");
   private keys: HTMLButtonElement[] = [];
@@ -186,7 +190,7 @@ class PatternWidgetDOM {
     const repeatLabel = this.numberControl(this.repeat, "Repeat", "Repeat selected source", 1, 16, 1,
       () => this.editStructure("repeat", this.repeat.valueAsNumber));
     this.share.type = "range";
-    this.share.min = "0.05"; this.share.max = "0.95"; this.share.step = "0.05";
+    this.share.min = String(BOUNDARY_MIN); this.share.max = String(BOUNDARY_MAX); this.share.step = String(BOUNDARY_STEP);
     this.share.setAttribute("aria-label", "Share with next step");
     this.share.addEventListener("change", () => this.changeBoundary(this.pattern.selectedNode, this.share.valueAsNumber));
     this.shareLabel.className = "structure-share";
@@ -321,13 +325,11 @@ class PatternWidgetDOM {
         (pattern.cursor !== this.pattern.cursor && !this.dom.contains(document.activeElement))) {
       this.feedback.textContent = "";
     }
-    if (pattern.cursor !== this.pattern.cursor || !this.dom.contains(document.activeElement)) {
-      this.selected = pattern.steps?.findIndex(step => step.node === pattern.selectedNode) ?? -1;
-    } else {
+    // A step chosen inside the widget stays chosen while the editor's cursor stays put.
+    if (pattern.cursor === this.pattern.cursor && this.dom.contains(document.activeElement)) {
       const old = this.pattern.structure?.nodes[this.pattern.selectedNode ?? -1];
       const retained = old && pattern.structure?.nodes.findIndex(node => node.from === old.from && node.kind === old.kind);
       if (retained !== undefined && retained >= 0) pattern = { ...pattern, selectedNode: retained };
-      this.selected = pattern.steps?.findIndex(step => step.node === pattern.selectedNode) ?? -1;
     }
     this.pattern = pattern;
     this.dom.dataset.kind = pattern.kind;
@@ -346,7 +348,7 @@ class PatternWidgetDOM {
     this.properties.hidden = !steps;
     this.timingDetails.hidden = !steps;
     if (this.pitchDetails) this.pitchDetails.hidden = !steps || this.selected < 0;
-    this.melody?.update(this.pattern, this.selected);
+    this.melody?.update(this.pattern);
     this.grid.hidden = !steps || kind === "drum";
     this.keyboard.hidden = !steps || this.pattern.notationKind !== "note" || this.selected < 0;
     this.octaveControls.hidden = !steps || this.pattern.notationKind !== "note" || this.selected < 0;
@@ -373,7 +375,6 @@ class PatternWidgetDOM {
       }
       this.updateCell(cell, step, index);
     }
-    this.selected = Math.min(this.selected, steps.length - 1);
     this.renderTools();
   }
 
@@ -415,10 +416,7 @@ class PatternWidgetDOM {
     const focusedClass = root === this.dom && active instanceof HTMLElement && active.classList.contains("step-pad")
       ? "step-pad" : "";
     const index = this.pattern.steps?.indexOf(step) ?? -1;
-    this.view.dispatch({
-      changes: { from: step.from, to: step.to, insert: value },
-      annotations: [Transaction.userEvent.of("input.type.pattern"), isolateHistory.of("full")],
-    });
+    dispatchPatternEdit(this.view, { changes: [{ from: step.from, to: step.to, insert: value }] });
     if (focusedClass && document.activeElement !== active) {
       const selector = `.cm-score-pattern[data-pattern-start="${this.pattern.from}"][data-kind="${this.pattern.kind}"] .step-cell:nth-child(${index + 1}) .${focusedClass}`;
       this.view.dom.querySelector<HTMLElement>(selector)?.focus({ preventScroll: true });
@@ -428,12 +426,11 @@ class PatternWidgetDOM {
   private selectStep(index: number, moveCursor = false): void {
     const step = this.pattern.steps?.[index];
     if (!step) return;
-    this.selected = index;
     this.pattern = { ...this.pattern, selectedNode: step.node };
     // Chord pads and drawing target source atoms; note pads retain text ranges.
     if (moveCursor) this.view.dispatch({ selection: { anchor: step.from } });
     this.renderTools();
-    this.melody?.update(this.pattern, index);
+    this.melody?.update(this.pattern);
   }
   private renderTools(): void {
     const step = this.pattern.steps?.[this.selected];
@@ -565,30 +562,18 @@ class PatternWidgetDOM {
     const node = this.pattern.structure?.nodes[index];
     if (!node) return;
     this.pattern = { ...this.pattern, selectedNode: index };
-    this.selected = this.pattern.steps?.findIndex(step => step.node === index) ?? -1;
     this.view.dispatch({ selection: {
       anchor: this.pattern.contentFrom + node.from, head: this.pattern.contentFrom + node.baseTo,
     } });
     this.renderTools();
-    this.melody?.update(this.pattern, this.selected);
+    this.melody?.update(this.pattern);
   }
 
   private commitStructure(changes: SourceChange[], nodeIndex: number): void {
-    if (!changes.length || this.view.state.doc !== this.pattern.doc || !this.dom.isConnected) return;
-    const node = this.pattern.structure?.nodes[nodeIndex];
-    if (!node) return;
-    const offset = this.pattern.contentFrom;
-    const absolute = changes
-      .filter(change => this.pattern.doc.sliceString(change.from + offset, change.to + offset) !== change.insert)
-      .map(change => ({ ...change, from: change.from + offset, to: change.to + offset }));
-    if (!absolute.length) return;
-    const changeSet = this.view.state.changes(absolute);
+    const { structure, doc, contentFrom } = this.pattern;
+    if (!structure || this.view.state.doc !== doc) return;
     this.feedback.textContent = "";
-    this.view.dispatch({
-      changes: changeSet,
-      selection: { anchor: changeSet.mapPos(offset + node.from, -1), head: changeSet.mapPos(offset + node.baseTo, 1) },
-      annotations: [Transaction.userEvent.of("input.type.pattern"), isolateHistory.of("full")],
-    });
+    dispatchPatternEdit(this.view, keepingSelection(structure, nodeIndex, changes), contentFrom);
   }
 
   private editStructure(operation: "split" | "repeat" | "weight", value = 0): void {
@@ -629,11 +614,8 @@ class PatternWidgetDOM {
     }
     const current = timing[kind];
     if (value === (current?.value ?? 1)) return;
-    this.view.dispatch({
-      changes: current ? { from: current.from, to: current.to, insert: String(value) }
-        : { from: to, insert: `.${kind}(${value})` },
-      annotations: [Transaction.userEvent.of("input.type.pattern"), isolateHistory.of("full")],
-    });
+    dispatchPatternEdit(this.view, { changes: [current ? { from: current.from, to: current.to, insert: String(value) }
+      : { from: to, to, insert: `.${kind}(${value})` }] });
   }
 
   destroy(): void {
@@ -658,11 +640,7 @@ class PatternWidgetDOM {
       const to = structure.nodes[range.at(-1)!].end + contentFrom;
       const changes = this.pattern.steps?.filter(step => !step.rest && step.from >= from && step.to <= to)
         .map(step => ({ from: step.from, to: step.to, insert: "~" })) ?? [];
-      if (!changes.length) return;
-      const changeSet = this.view.state.changes(changes);
-      this.view.dispatch({ changes: changeSet, selection: { anchor: from, head: changeSet.mapPos(to, 1) },
-        annotations: isolateHistory.of("full") });
-      this.view.dispatch({ selection: this.view.state.selection });
+      if (changes.length) dispatchPatternEdit(this.view, { changes, selection: { from, to: mapPosition(changes, to, 1) } });
       return;
     }
     const step = this.pattern.steps?.[this.selected];

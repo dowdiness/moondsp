@@ -1,9 +1,10 @@
-import { isolateHistory, redo, undo } from "@codemirror/commands";
+import { redo, undo } from "@codemirror/commands";
 import { EditorView, runScopeHandlers } from "@codemirror/view";
 import type { Pattern } from "./pattern-controls";
-import { boundaryInfo, layoutNodes, moveBoundary, projectNotation, relocationTarget, relocateNode,
+import { BOUNDARY_MAX, BOUNDARY_MIN, BOUNDARY_STEP, applySourceChanges, boundaryInfo, clampBoundary, keepingSelection, layoutNodes, mapPosition, moveBoundary, projectNotation, relocationTarget, relocateNode,
   sourceRangeNodes, extendSourceRange, transposeRange, moveRange, duplicateRange,
   type NotationProjection, type SourceEdit } from "./notation-structure";
+import { dispatchPatternEdit } from "./pattern-edit";
 import { midiValue } from "./pitch";
 import { mountDrumSequencer } from "./drum-sequencer";
 import { PLOT_LEFT_PX, ROW_H, TIME_H, W, boundedPitch, midiAtY, needsResizeRender, plotPoint, scoreGeometry, type GridSize, type ScoreGeometry } from "./score-geometry";
@@ -61,7 +62,7 @@ export function mountMovingScore(
   controls: { select(index: number): void; selectNode(node: number): void; boundary(node: number, ratio: number): void;
     clear(): void; structureOpen: boolean; structureChanged(open: boolean): void;
     tonesOpen: boolean; tonesChanged(open: boolean): void },
-): { update(pattern: Pattern, selected: number): void; dispose(): void; selectionTools: HTMLElement; structureTools: HTMLElement } {
+): { update(pattern: Pattern): void; dispose(): void; selectionTools: HTMLElement; structureTools: HTMLElement } {
   root.classList.add("moving-score");
   root.innerHTML = `
     <div class="moving-score__drums" hidden></div>
@@ -151,8 +152,6 @@ export function mountMovingScore(
     } catch (error) { setMessage(error instanceof Error ? error.message : "Cannot duplicate this source range."); }
   });
   let active: EditablePhrase | null = validPhrase(pattern) ? pattern : null;
-  let selectedStep = 0;
-  let selectedNode: number | null = null;
   let geometry: ScoreGeometry = scoreGeometry(0, []);
   // The size the last render measured; height changes caused by our own content need no re-render.
   let rendered: GridSize = { width: 0, stageHeight: 0 };
@@ -163,7 +162,7 @@ export function mountMovingScore(
   let selectionFocus: number | null = null;
   let focusedBoundary: number | null = null;
   let disposed = false;
-  let drumSequencer: { update(pattern: Pattern, selected: number): void; dispose(): void } | null = null;
+  let drumSequencer: { update(pattern: Pattern): void; dispose(): void } | null = null;
   function ongoing<K extends Interaction["kind"]>(kind: K): InteractionOf<K> | null {
     return interaction?.kind === kind ? interaction as InteractionOf<K> : null;
   }
@@ -173,7 +172,16 @@ export function mountMovingScore(
   }
   function setMessage(text: string): void { message.textContent = text; }
   function stepFor(node: number): number { return active?.steps.findIndex(step => step.node === node) ?? -1; }
-  function sourceNode(): number | null { return selectedNode ?? active?.steps[selectedStep]?.node ?? null; }
+  /** The selected source node: the editor's selection, or the step a keyboard drawing is on. */
+  function sourceNode(): number | null {
+    const drawing = ongoing("keyboard-draw");
+    return drawing && active ? active.steps[drawing.to].node : active?.selectedNode ?? null;
+  }
+  /** The selected step, or -1 when a group is selected. */
+  function selectedStep(): number {
+    const node = sourceNode();
+    return node === null ? -1 : stepFor(node);
+  }
   function selectedSources(): number[] {
     if (!active) return [];
     const selection = ongoing("selection");
@@ -210,32 +218,13 @@ export function mountMovingScore(
     }
     return false;
   }
-  function applyDraft(content: string, changes: SourceEdit["changes"]): string {
-    let result = content;
-    for (const change of [...changes].sort((a, b) => b.from - a.from))
-      result = result.slice(0, change.from) + change.insert + result.slice(change.to);
-    return result;
-  }
   function dispatchSourceEdit(edit: SourceEdit): void {
-    if (!active) return;
-    const offset = active.contentFrom;
-    const changes = edit.changes.map(change => ({ ...change, from: change.from + offset, to: change.to + offset }));
-    const selection = { anchor: edit.selection.from + offset, head: edit.selection.to + offset };
-    view.dispatch({ changes, selection, ...(changes.length ? { annotations: isolateHistory.of("full") } : {}) });
-    // CodeMirror records the selection before a selection transaction for Redo.
-    // Checkpoint the full destination range, not a mapping of its old position.
-    if (changes.length) view.dispatch({ selection: view.state.selection });
+    if (active) dispatchPatternEdit(view, edit, active.contentFrom);
   }
   function boundaryEdit(leftNode: number, ratio: number, selected: number): SourceEdit {
     const phrase = active!;
     const content = view.state.doc.sliceString(phrase.contentFrom, phrase.contentTo);
-    const changes = moveBoundary(content, phrase.structure, leftNode, ratio);
-    const node = phrase.structure.nodes[selected];
-    let shift = 0;
-    for (const change of changes) {
-      if (change.to <= node.from) shift += change.insert.length - (change.to - change.from);
-    }
-    return { changes, selection: { from: node.from + shift, to: node.baseTo + shift } };
+    return keepingSelection(phrase.structure, selected, moveBoundary(content, phrase.structure, leftNode, ratio));
   }
   function pixelsX(pixels: number): number { return pixels * geometry.pixelsToX; }
   function sourceX(time: number): number { return geometry.plotLeft + (geometry.plotRight - geometry.plotLeft) * time; }
@@ -254,18 +243,10 @@ export function mountMovingScore(
       rx: String(pixelsX(2)), ry: "2", class: className,
     });
   }
-  function syncDrum(next: Pattern, selected: number): void {
+  function syncDrum(next: Pattern): void {
     if (next.kind === "drum") {
-      if (drumSequencer) drumSequencer.update(next, selected);
-      else drumSequencer = mountDrumSequencer(drumRoot, view, next, {
-        select(index) {
-          if (!active) return;
-          selectedStep = index;
-          selectedNode = active.steps[index]?.node ?? null;
-          controls.select(index);
-          render();
-        },
-      });
+      if (drumSequencer) drumSequencer.update(next);
+      else drumSequencer = mountDrumSequencer(drumRoot, view, next, { select: index => controls.select(index) });
     } else if (drumSequencer) {
       drumSequencer.dispose();
       drumSequencer = null;
@@ -413,7 +394,7 @@ export function mountMovingScore(
       const handle = svgEl("g", {
         class: "moving-score__boundary", tabindex: "0", role: "slider", "aria-orientation": "horizontal",
         "data-node": String(leftNode), "data-depth": String(left.depth), "data-row": String(sourceRow), "data-ratio": String(info.ratio),
-        "aria-valuemin": "0.05", "aria-valuemax": "0.95", "aria-valuenow": String(info.ratio),
+        "aria-valuemin": String(BOUNDARY_MIN), "aria-valuemax": String(BOUNDARY_MAX), "aria-valuenow": String(info.ratio),
         "aria-label": ariaLabel,
       });
       handle.append(svgEl("rect", {
@@ -633,7 +614,7 @@ export function mountMovingScore(
     try {
       const content = view.state.doc.sliceString(active.contentFrom, active.contentTo);
       const edit = noteMoveEdit(content, drawing);
-      const projection = projectNotation("note", applyDraft(content, edit.changes));
+      const projection = projectNotation("note", applySourceChanges(content, edit.changes));
       if (projection.error) return;
       previewProjection(projection, index => {
         const node = projection.nodes[index];
@@ -667,7 +648,7 @@ export function mountMovingScore(
     try {
       const content = view.state.doc.sliceString(active.contentFrom, active.contentTo);
       const changes = moveBoundary(content, active.structure, drawing.leftNode, drawing.ratio);
-      const projection = projectNotation("note", applyDraft(content, changes));
+      const projection = projectNotation("note", applySourceChanges(content, changes));
       if (projection.error) return;
       previewProjection(projection, node => node === drawing.leftNode || node === drawing.rightNode);
     } catch {
@@ -681,13 +662,7 @@ export function mountMovingScore(
   }
   function commitRest(phrase: EditablePhrase, drawing: RestGesture): void {
     const step = phrase.steps[drawing.to];
-    selectedStep = drawing.to;
-    selectedNode = step.node;
-    view.dispatch({
-      changes: { from: step.from, to: step.to, insert: pitchName(drawing.midi) },
-      selection: { anchor: step.from },
-      annotations: isolateHistory.of("full"),
-    });
+    dispatchPatternEdit(view, { changes: [{ from: step.from, to: step.to, insert: pitchName(drawing.midi) }], selection: { from: step.from, to: step.from } });
     setMessage("");
   }
   function commitDraw(phrase: EditablePhrase, drawing: DrawGesture): void {
@@ -702,17 +677,17 @@ export function mountMovingScore(
     }
     if (!drawing.dirty || !changes.length) return;
     changes.sort((left, right) => left.from - right.from);
-    selectedStep = drawing.to;
-    selectedNode = phrase.steps[drawing.to].node;
-    view.dispatch({ changes, selection: { anchor: view.state.changes(changes).mapPos(phrase.steps[drawing.to].from) }, annotations: isolateHistory.of("full") });
+    const cursor = mapPosition(changes, phrase.steps[drawing.to].from, -1);
+    dispatchPatternEdit(view, { changes, selection: { from: cursor, to: cursor } });
   }
   function selectSource(node: number): void {
     if (!active) return;
     const index = stepFor(node);
     focusedBoundary = null;
-    if (index < 0) { selectedNode = node; controls.selectNode(node); }
-    else { selectedStep = index; selectedNode = node; controls.select(index); }
-    setMessage(""); render();
+    setMessage("");
+    // Either control re-renders this grid with the new selection.
+    if (index < 0) controls.selectNode(node);
+    else controls.select(index);
   }
   function nodeAtPoint(point: Point): number | null {
     if (!active) return null;
@@ -898,10 +873,10 @@ export function mountMovingScore(
       }
       case "edge": {
         const time = timeAtX(canvasPoint(event).x);
-        current.ratio = Math.max(.01, Math.min(.99, (time - current.pairStart) / Math.max(1e-9, current.pairEnd - current.pairStart)));
+        current.ratio = clampBoundary((time - current.pairStart) / Math.max(1e-9, current.pairEnd - current.pairStart));
         try {
           const content = view.state.doc.sliceString(active.contentFrom, active.contentTo);
-          const nextContent = applyDraft(content, moveBoundary(content, active.structure, current.leftNode, current.ratio));
+          const nextContent = applySourceChanges(content, moveBoundary(content, active.structure, current.leftNode, current.ratio));
           if (nextContent !== current.previewKey) {
             current.previewKey = nextContent;
             previewEdge(current);
@@ -958,7 +933,7 @@ export function mountMovingScore(
     if (!left || !right) return;
     const xAt = sourceX;
     const start = xAt(left.start), end = xAt(right.end);
-    const ratio = Math.max(.01, Math.min(.99, (x - start) / Math.max(1, end - start)));
+    const ratio = clampBoundary((x - start) / Math.max(1, end - start));
     boundary.ratio = ratio;
     const handle = boundaries.querySelector<SVGGElement>(`.moving-score__boundary[data-node="${boundary.node}"]`);
     if (handle) {
@@ -1043,7 +1018,7 @@ export function mountMovingScore(
         setMessage(""); event.preventDefault(); return;
       }
       focusedBoundary = null;
-      if (active) controls.select(selectedStep);
+      if (active) controls.select(selectedStep());
       view.focus(); event.preventDefault(); return;
     }
     if (!isNativeControl && (event.metaKey || event.ctrlKey)) {
@@ -1111,7 +1086,7 @@ export function mountMovingScore(
           const info = boundaryInfo(active.structure, nodeIndex!);
           if (!info) setMessage("This note has no right boundary to resize.");
           else {
-            const ratio = Math.max(.01, Math.min(.99, info.ratio + direction * .05));
+            const ratio = clampBoundary(info.ratio + direction * BOUNDARY_STEP);
             try {
               const edit = boundaryEdit(nodeIndex!, ratio, nodeIndex!);
               if (!edit.changes.length) setMessage("This note boundary cannot move further.");
@@ -1132,8 +1107,7 @@ export function mountMovingScore(
       if (boundaryNode !== null && (target === structureSvg || handle) && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
         const info = boundaryInfo(active.structure, boundaryNode);
         if (!info) { focusedBoundary = null; return; }
-        const ratio = info.ratio + (event.key === "ArrowRight" ? .05 : -.05);
-        controls.boundary(boundaryNode, Math.max(.01, Math.min(.99, ratio)));
+        controls.boundary(boundaryNode, clampBoundary(info.ratio + (event.key === "ArrowRight" ? BOUNDARY_STEP : -BOUNDARY_STEP)));
         structureSvg.focus({ preventScroll: true });
         event.preventDefault(); return;
       }
@@ -1161,26 +1135,27 @@ export function mountMovingScore(
       }
       return;
     }
-    if (event.key === "Enter" && !interaction && active.notationKind === "note" && active.steps[selectedStep]?.rest) {
-      const step = active.steps[selectedStep];
+    const stepIndex = selectedStep();
+    if (event.key === "Enter" && !interaction && active.notationKind === "note" && active.steps[stepIndex]?.rest) {
+      const step = active.steps[stepIndex];
       const occurrence = active.structure.rests.find(item => item.node === step.node);
       if (!occurrence) { setMessage("Select this rest in the source steps to add a note."); return; }
       let initialPitch = 60;
       for (let distance = 1; distance < active.steps.length; distance++) {
-        const before = active.steps[selectedStep - distance];
-        const after = active.steps[selectedStep + distance];
+        const before = active.steps[stepIndex - distance];
+        const after = active.steps[stepIndex + distance];
         const midi = before && !before.rest ? noteMidi(before.value) : after && !after.rest ? noteMidi(after.value) : null;
         if (midi !== null) { initialPitch = midi; break; }
       }
-      const rest: InteractionOf<"keyboard-rest"> = { kind: "keyboard-rest", to: selectedStep, occurrence, midi: initialPitch };
+      const rest: InteractionOf<"keyboard-rest"> = { kind: "keyboard-rest", to: stepIndex, occurrence, midi: initialPitch };
       interaction = rest;
       drawRestPreview(rest); setMessage("Rest entry · Up/Down changes pitch · Enter applies · Escape cancels"); event.preventDefault(); return;
     }
     if (event.key === "Enter" && !interaction && active.notationKind === "note") {
-      const step = active.steps[selectedStep]; if (!step || step.rest) return;
+      const step = active.steps[stepIndex]; if (!step || step.rest) return;
       const midi = noteMidi(step.value) ?? 60;
       const firstEvent = active.structure.events.find(item => item.node === step.node);
-      const draw: InteractionOf<"keyboard-draw"> = { kind: "keyboard-draw", to: selectedStep, lastPitch: midi, lastTime: firstEvent?.start ?? 0, pitches: new Map([[step.node, midi]]), dirty: false };
+      const draw: InteractionOf<"keyboard-draw"> = { kind: "keyboard-draw", to: stepIndex, lastPitch: midi, lastTime: firstEvent?.start ?? 0, pitches: new Map([[step.node, midi]]), dirty: false };
       interaction = draw;
       drawPreview(draw); setMessage("Drawing · Left/Right extends · Up/Down changes pitch · Enter applies · Escape cancels"); event.preventDefault(); return;
     }
@@ -1195,7 +1170,6 @@ export function mountMovingScore(
         keyboardDraw.pitches.set(step.node, midi);
         keyboardDraw.lastPitch = midi;
         keyboardDraw.dirty = true;
-        selectedStep = keyboardDraw.to;
         render(); drawPreview(keyboardDraw); event.preventDefault();
       } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
         const step = active.steps[keyboardDraw.to];
@@ -1211,23 +1185,25 @@ export function mountMovingScore(
       return;
     }
     if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
-      selectedStep = Math.max(0, Math.min(active.steps.length - 1, selectedStep + (event.key === "ArrowRight" ? 1 : -1)));
-      selectedNode = active.steps[selectedStep].node; controls.select(selectedStep); setMessage(""); render(); event.preventDefault();
+      // From a selected group, the arrows start at its first step.
+      const group = sourceNode() === null ? null : active.structure.nodes[sourceNode()!];
+      const next = stepIndex >= 0
+        ? Math.max(0, Math.min(active.steps.length - 1, stepIndex + (event.key === "ArrowRight" ? 1 : -1)))
+        : Math.max(0, active.steps.findIndex(step => step.from >= active!.contentFrom + (group?.from ?? 0)));
+      setMessage(""); controls.select(next); event.preventDefault();
     } else if ((event.key === "ArrowUp" || event.key === "ArrowDown") && active.notationKind === "note") {
-      const step = active.steps[selectedStep]; if (!step || step.rest) return;
+      const step = active.steps[stepIndex]; if (!step || step.rest) return;
       const current = noteMidi(step.value) ?? 60, result = pitchName(boundedPitch(current + (event.key === "ArrowUp" ? 1 : -1)));
-      view.dispatch({ changes: { from: step.from, to: step.to, insert: result }, annotations: isolateHistory.of("full") }); event.preventDefault();
+      dispatchPatternEdit(view, { changes: [{ from: step.from, to: step.to, insert: result }] }); event.preventDefault();
     }
   }
-  function update(next: Pattern, selected: number): void {
+  function update(next: Pattern): void {
     if (disposed) return;
     if (next.doc !== pattern.doc && interaction) cancel();
     if (next.doc !== pattern.doc) { focusedBoundary = null; selectionAnchor = null; selectionFocus = null; }
     pattern = next; active = validPhrase(pattern) ? pattern : null;
-    selectedStep = active ? Math.max(0, Math.min(selected, active.steps.length - 1)) : 0;
-    selectedNode = active?.selectedNode ?? active?.steps[selectedStep]?.node ?? null;
     if (!active && interaction) cancel();
-    syncDrum(pattern, selectedStep);
+    syncDrum(pattern);
     render();
   }
   const preventGestureScroll = (event: TouchEvent) => {
@@ -1252,7 +1228,7 @@ export function mountMovingScore(
     view.requestMeasure();
   });
   resizeObserver.observe(root);
-  syncDrum(pattern, selectedStep);
+  syncDrum(pattern);
   render();
   return {
     update,

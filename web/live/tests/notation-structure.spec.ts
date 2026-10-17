@@ -3,6 +3,7 @@ import {
   boundaryInfo,
   duplicateRange,
   extendSourceRange,
+  keepingSelection,
   leafNodes,
   layoutNodes,
   moveBoundary,
@@ -21,6 +22,33 @@ function apply(content: string, changes: readonly { from: number; to: number; in
     (source, change) => source.slice(0, change.from) + change.insert + source.slice(change.to), content,
   );
 }
+
+test("structural edits keep the edited node's core selected, not suffixes added after it", () => {
+  const content = "C4 D4";
+  const projection = projectNotation("note", content);
+  const [c, d] = leafNodes(projection);
+  const split = keepingSelection(projection, c, splitNode(content, projection, c));
+  const splitResult = apply(content, split.changes);
+  expect(splitResult.slice(split.selection.from, split.selection.to)).toBe("[C4 C4]");
+  const weighted = keepingSelection(projection, d, weightNode(content, projection, d, 3));
+  const weightedResult = apply(content, weighted.changes);
+  expect(weightedResult).toBe("C4 D4@3");
+  expect(weightedResult.slice(weighted.selection.from, weighted.selection.to)).toBe("D4");
+  // An edit before the node shifts the selection by the length it adds.
+  const shifted = keepingSelection(projection, d, weightNode(content, projection, c, 12));
+  const shiftedResult = apply(content, shifted.changes);
+  expect(shiftedResult.slice(shifted.selection.from, shifted.selection.to)).toBe("D4");
+  expect(shifted.selection.from).toBe(6);
+});
+
+test("an atom outside any sequence can change pitch in place but cannot move", () => {
+  const projection = projectNotation("note", "C4");
+  const [atom] = leafNodes(projection);
+  expect(relocateNode("C4", projection, atom, atom, "D4")).toEqual({
+    changes: [{ from: 0, to: 2, insert: "D4" }], selection: { from: 0, to: 2 },
+  });
+  expect(relocateNode("C4", projection, atom, atom).changes).toEqual([]);
+});
 
 test("nested split and postfix edits preserve the original modifier suffix", () => {
   const content = "[C4 D4]*2@3  E4";

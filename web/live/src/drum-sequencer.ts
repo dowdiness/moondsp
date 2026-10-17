@@ -1,7 +1,6 @@
-import { EditorSelection, Transaction } from "@codemirror/state";
-import { isolateHistory } from "@codemirror/commands";
 import type { EditorView } from "@codemirror/view";
 import type { Pattern } from "./pattern-controls";
+import { dispatchPatternEdit } from "./pattern-edit";
 import "./drum-sequencer.css";
 
 const SOUNDS = [
@@ -14,13 +13,18 @@ const SOUNDS = [
 type Sound = (typeof SOUNDS)[number]["name"];
 type Controls = { select(index: number): void };
 
+/** The step of the pattern's selected source, or the first step when a group is selected. */
+function selectedIndex(pattern: Pattern): number {
+  return Math.max(0, pattern.steps?.findIndex(step => step.node === pattern.selectedNode) ?? 0);
+}
+
 /** Mount a source-step percussion matrix. Its only musical state is the editor's text. */
 export function mountDrumSequencer(
   root: HTMLElement,
   view: EditorView,
   pattern: Pattern,
   controls: Controls,
-): { update(pattern: Pattern, selected: number): void; dispose(): void } {
+): { update(pattern: Pattern): void; dispose(): void } {
   const abort = new AbortController();
   const dom = document.createElement("section");
   dom.className = "drum-sequencer";
@@ -36,7 +40,7 @@ export function mountDrumSequencer(
   root.append(dom);
 
   let current = pattern;
-  let selected = 0;
+  let selected = selectedIndex(pattern);
   let disposed = false;
   let headers: HTMLButtonElement[] = [];
   const rows = new Map<Sound, { row: HTMLDivElement; label: HTMLDivElement; cells: HTMLButtonElement[] }>();
@@ -218,17 +222,10 @@ export function mountDrumSequencer(
   }
   function edit(index: number, sound: Sound): void {
     const step = current.steps?.[index];
-    if (!step || disposed || !dom.isConnected || current.kind !== "drum" ||
-      current.doc !== view.state.doc || step.from < current.contentFrom || step.to <= step.from ||
-      step.to > current.contentTo || step.to > view.state.doc.length ||
-      view.state.doc.sliceString(step.from, step.to) !== step.value) return;
+    if (!step || current.doc !== view.state.doc) return;
     const next = step.value === sound ? "~" : sound;
     const anchor = document.activeElement instanceof HTMLButtonElement ? document.activeElement : null;
-    view.dispatch({
-      changes: { from: step.from, to: step.to, insert: next },
-      selection: EditorSelection.range(step.from, step.from + next.length),
-      annotations: [Transaction.userEvent.of("input.type.pattern"), isolateHistory.of("full")],
-    });
+    dispatchPatternEdit(view, { changes: [{ from: step.from, to: step.to, insert: next }], selection: { from: step.from, to: step.from + next.length } });
     callSelect(index);
     const cell = rows.get(sound)?.cells[index];
     if (anchor && cell && !cell.matches(":focus")) cell.focus({ preventScroll: true });
@@ -237,10 +234,10 @@ export function mountDrumSequencer(
   // All matrix cells share this key handler; headers remain select-only controls.
   renderState();
   return {
-    update(nextPattern, nextSelected) {
+    update(nextPattern) {
       if (disposed) return;
       current = nextPattern;
-      selected = current.steps?.length ? Math.max(0, Math.min(current.steps.length - 1, nextSelected)) : 0;
+      selected = selectedIndex(current);
       renderState();
     },
     dispose() {

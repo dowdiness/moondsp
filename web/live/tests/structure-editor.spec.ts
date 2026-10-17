@@ -73,3 +73,19 @@ test("fractional phrase stretch and gate retain outer transforms and produce rea
   await expect.poll(() => readCode(page)).toBe(stretched);
   await expect(page.locator("#status")).toHaveText("Playing");
 });
+
+test("Enter on a selected group starts no single-step edit", async ({ page }) => {
+  await page.goto("/");
+  const source = 'note("[C4 D4] E4").gain(.2)';
+  await replaceCode(page, source);
+  await page.locator(".moving-score__note-block").first().click();
+  await page.locator(".moving-score__structure-details > summary").click();
+  await page.locator(".moving-score__group").first().click();
+  await expect(page.locator(".moving-score__note.is-selected")).toHaveCount(2);
+  const canvas = page.locator(".moving-score__canvas");
+  await canvas.focus();
+  await canvas.press("Enter");
+  await expect(page.locator(".moving-score__message")).not.toContainText("Drawing");
+  await expect(page.locator(".moving-score__preview-block")).toHaveCount(0);
+  expect(await readCode(page)).toBe(source);
+});
