@@ -2,7 +2,7 @@ import type { EditorView } from "@codemirror/view";
 import type { Pattern, Step } from "./pattern-controls";
 import { BOUNDARY_STEP, applySourceChanges, boundaryInfo, clampBoundary, duplicateRange, extendSourceRange, keepingSelection,
   mapPosition, moveBoundary, moveRange, projectNotation, relocateNode, relocationTarget, sourceRangeNodes, transposeRange,
-  type NotationEvent, type NotationProjection, type SourceEdit } from "./notation-structure";
+  type Edit, type NotationEvent, type NotationProjection, type SourceEdit } from "./notation-structure";
 import { EMPTY_GRID, bandNodes, gridLayout, hitGrid, nodeAt, noteMidi, noteNodes, pitchName, previewNodes, restNodes,
   type GridLayout, type PreviewBlock } from "./note-grid-layout";
 import { dispatchPatternEdit } from "./pattern-edit";
@@ -10,6 +10,9 @@ import { PLOT_LEFT_PX, ROW_H, TIME_H, W, boundedPitch, midiAtY, plotPoint, plotS
   type PlotScale } from "./score-geometry";
 import { patchSvg } from "./svg-patch";
 import type { InteractionLock } from "./moving-score";
+
+const MOVE_REFUSED = "This note cannot move to that source step.";
+const EDGE_REFUSED = "This note boundary has no representable adjacent weight.";
 
 /** A phrase whose every step can be drawn. */
 export type EditablePhrase = Pattern & { steps: Step[]; structure: NotationProjection };
@@ -213,8 +216,16 @@ export function mountNoteGrid(
   function dispatchSourceEdit(edit: SourceEdit): void {
     if (active) dispatchPatternEdit(view, edit, active.contentFrom);
   }
-  function boundaryEdit(phrase: EditablePhrase, leftNode: number, ratio: number, selected: number): SourceEdit {
-    return keepingSelection(phrase.structure, selected, moveBoundary(content(phrase), phrase.structure, leftNode, ratio));
+  /** Applies `edit`, or shows `refused` (or the edit's own reason) when the notation cannot take it. */
+  function applyEdit(edit: Edit<SourceEdit>, refused?: string): boolean {
+    if (!edit.ok) { setMessage(refused ?? edit.reason); return false; }
+    dispatchSourceEdit(edit.value);
+    setMessage("");
+    return true;
+  }
+  function boundaryEdit(phrase: EditablePhrase, leftNode: number, ratio: number, selected: number): Edit<SourceEdit> {
+    const changes = moveBoundary(content(phrase), phrase.structure, leftNode, ratio);
+    return changes.ok ? { ok: true, value: keepingSelection(phrase.structure, selected, changes.value) } : changes;
   }
   function renderTimeLabel(phrase: EditablePhrase): void {
     const label = editable ? "Notes" : "Chord tones";
@@ -309,7 +320,7 @@ export function mountNoteGrid(
       return isSelected || !unchanged ? [{ start: event.start, end: Math.min(event.end, projection.span), midi, context: !isSelected }] : [];
     }));
   }
-  function noteMoveEdit(phrase: EditablePhrase, drawing: MoveGesture): SourceEdit {
+  function noteMoveEdit(phrase: EditablePhrase, drawing: MoveGesture): Edit<SourceEdit> {
     const source = content(phrase);
     if (isPhraseRange(drawing.range)) {
       const parent = phrase.structure.nodes[drawing.range[0]].parent;
@@ -322,46 +333,42 @@ export function mountNoteGrid(
   }
   function previewMove(phrase: EditablePhrase, drawing: MoveGesture): void {
     showPreview([]);
-    try {
-      const edit = noteMoveEdit(phrase, drawing);
-      const projection = projectNotation("note", applySourceChanges(content(phrase), edit.changes));
-      if (projection.error) return;
-      projectionPreview(phrase, projection, index => {
-        const node = projection.nodes[index];
-        return node.from >= edit.selection.from && node.baseTo <= edit.selection.to;
-      });
-    } catch {
-      setMessage("This note cannot move to that source step.");
-    }
+    const edit = noteMoveEdit(phrase, drawing);
+    if (!edit.ok) { setMessage(MOVE_REFUSED); return; }
+    const { changes, selection } = edit.value;
+    const projection = projectNotation("note", applySourceChanges(content(phrase), changes));
+    if (projection.error) return;
+    projectionPreview(phrase, projection, index => {
+      const node = projection.nodes[index];
+      return node.from >= selection.from && node.baseTo <= selection.to;
+    });
   }
+  /** Previews an edge drag, redrawing only when the edited text changes. */
   function previewEdge(phrase: EditablePhrase, drawing: EdgeGesture): void {
-    showPreview([]);
-    try {
-      const source = content(phrase);
-      const projection = projectNotation("note", applySourceChanges(source, moveBoundary(source, phrase.structure, drawing.leftNode, drawing.ratio)));
-      if (projection.error) return;
-      projectionPreview(phrase, projection, node => node === drawing.leftNode || node === drawing.rightNode);
-    } catch {
-      setMessage("This note boundary has no representable adjacent weight.");
+    const source = content(phrase);
+    const changes = moveBoundary(source, phrase.structure, drawing.leftNode, drawing.ratio);
+    if (!changes.ok) {
+      drawing.previewKey = undefined;
+      showPreview([]);
+      setMessage(EDGE_REFUSED);
+      return;
     }
+    const next = applySourceChanges(source, changes.value);
+    if (next === drawing.previewKey) return;
+    drawing.previewKey = next;
+    showPreview([]);
+    const projection = projectNotation("note", next);
+    if (projection.error) return;
+    projectionPreview(phrase, projection, node => node === drawing.leftNode || node === drawing.rightNode);
   }
   function commitMove(phrase: EditablePhrase, drawing: MoveGesture): void {
-    if (!drawing.dirty) return;
-    try {
-      dispatchSourceEdit(noteMoveEdit(phrase, drawing));
-      setMessage("");
-    } catch {
-      setMessage("This note cannot move to that source step.");
-    }
+    if (drawing.dirty) applyEdit(noteMoveEdit(phrase, drawing), MOVE_REFUSED);
   }
   function commitEdge(phrase: EditablePhrase, drawing: EdgeGesture): void {
-    try {
-      const edit = boundaryEdit(phrase, drawing.leftNode, drawing.ratio, drawing.node);
-      if (edit.changes.length) dispatchSourceEdit(edit);
-      setMessage("");
-    } catch {
-      setMessage("This note boundary has no representable adjacent weight.");
-    }
+    const edit = boundaryEdit(phrase, drawing.leftNode, drawing.ratio, drawing.node);
+    // An edge released where it started changes nothing, not even the selection.
+    if (edit.ok && !edit.value.changes.length) setMessage("");
+    else applyEdit(edit, EDGE_REFUSED);
   }
   function commitRest(phrase: EditablePhrase, drawing: RestGesture): void {
     const step = phrase.steps[drawing.to];
@@ -476,16 +483,7 @@ export function mountNoteGrid(
       case "edge": {
         const time = scale.timeAt(canvasPoint(event).x);
         current.ratio = clampBoundary((time - current.pairStart) / Math.max(1e-9, current.pairEnd - current.pairStart));
-        try {
-          const source = content(active);
-          const next = applySourceChanges(source, moveBoundary(source, active.structure, current.leftNode, current.ratio));
-          if (next !== current.previewKey) {
-            current.previewKey = next;
-            previewEdge(active, current);
-          }
-        } catch {
-          setMessage("This note boundary has no representable adjacent weight.");
-        }
+        previewEdge(active, current);
         return;
       }
       case "move": return moveNote(active, current, event);
@@ -610,12 +608,9 @@ export function mountNoteGrid(
         event.preventDefault(); return;
       }
       if (isPhraseRange(range) && (vertical || horizontal && event.altKey)) {
-        try {
-          const direction = event.key === "ArrowUp" || event.key === "ArrowRight" ? 1 : -1;
-          dispatchSourceEdit(vertical ? transposeRange(content(phrase), phrase.structure, range, direction)
-            : moveRange(content(phrase), phrase.structure, range, direction));
-          setMessage("");
-        } catch (error) { setMessage(error instanceof Error ? error.message : "This source range cannot move further."); }
+        const direction = event.key === "ArrowUp" || event.key === "ArrowRight" ? 1 : -1;
+        applyEdit(vertical ? transposeRange(content(phrase), phrase.structure, range, direction)
+          : moveRange(content(phrase), phrase.structure, range, direction));
         event.preventDefault(); return;
       }
       if (isPhraseRange(range) && horizontal && event.shiftKey) {
@@ -710,21 +705,14 @@ export function mountNoteGrid(
       const siblings = parent?.kind === "sequence" ? parent.children : [];
       const target = siblings[siblings.indexOf(nodeIndex) + direction];
       if (target === undefined) setMessage("No adjacent note in this source sequence.");
-      else {
-        try {
-          dispatchSourceEdit(relocateNode(content(phrase), phrase.structure, nodeIndex, target));
-          setMessage("");
-        } catch { setMessage("This note cannot move outside its source sequence."); }
-      }
+      else applyEdit(relocateNode(content(phrase), phrase.structure, nodeIndex, target), "This note cannot move outside its source sequence.");
       return true;
     }
     const info = boundaryInfo(phrase.structure, nodeIndex);
     if (!info) { setMessage("This note has no right boundary to resize."); return true; }
-    try {
-      const edit = boundaryEdit(phrase, nodeIndex, clampBoundary(info.ratio + direction * BOUNDARY_STEP), nodeIndex);
-      if (!edit.changes.length) setMessage("This note boundary cannot move further.");
-      else dispatchSourceEdit(edit);
-    } catch { setMessage("This note boundary has no representable adjacent weight."); }
+    const edit = boundaryEdit(phrase, nodeIndex, clampBoundary(info.ratio + direction * BOUNDARY_STEP), nodeIndex);
+    if (edit.ok && !edit.value.changes.length) setMessage("This note boundary cannot move further.");
+    else applyEdit(edit, EDGE_REFUSED);
     return true;
   }
   const preventGestureScroll = (event: TouchEvent): void => {
@@ -742,11 +730,7 @@ export function mountNoteGrid(
     svg.focus({ preventScroll: true });
   });
   duplicateButton.addEventListener("click", () => {
-    if (!active) return;
-    try {
-      dispatchSourceEdit(duplicateRange(content(active), active.structure, selectedSources()));
-      setMessage(""); svg.focus({ preventScroll: true });
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Cannot duplicate this source range."); }
+    if (active && applyEdit(duplicateRange(content(active), active.structure, selectedSources()))) svg.focus({ preventScroll: true });
   });
   svg.addEventListener("pointerdown", beginPointer);
   svg.addEventListener("pointermove", movePointer);

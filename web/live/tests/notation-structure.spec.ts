@@ -16,7 +16,15 @@ import {
   splitNode,
   transposeRange,
   weightNode,
+  type Edit,
 } from "../src/notation-structure";
+
+/** The value of an edit the notation accepts. */
+function applied<T>(edit: Edit<T>): T {
+  if (!edit.ok) throw new Error(`edit refused: ${edit.reason}`);
+  return edit.value;
+}
+
 function apply(content: string, changes: readonly { from: number; to: number; insert: string }[]): string {
   return [...changes].sort((a, b) => b.from - a.from).reduce(
     (source, change) => source.slice(0, change.from) + change.insert + source.slice(change.to), content,
@@ -27,15 +35,15 @@ test("structural edits keep the edited node's core selected, not suffixes added 
   const content = "C4 D4";
   const projection = projectNotation("note", content);
   const [c, d] = leafNodes(projection);
-  const split = keepingSelection(projection, c, splitNode(content, projection, c));
+  const split = keepingSelection(projection, c, applied(splitNode(content, projection, c)));
   const splitResult = apply(content, split.changes);
   expect(splitResult.slice(split.selection.from, split.selection.to)).toBe("[C4 C4]");
-  const weighted = keepingSelection(projection, d, weightNode(content, projection, d, 3));
+  const weighted = keepingSelection(projection, d, applied(weightNode(content, projection, d, 3)));
   const weightedResult = apply(content, weighted.changes);
   expect(weightedResult).toBe("C4 D4@3");
   expect(weightedResult.slice(weighted.selection.from, weighted.selection.to)).toBe("D4");
   // An edit before the node shifts the selection by the length it adds.
-  const shifted = keepingSelection(projection, d, weightNode(content, projection, c, 12));
+  const shifted = keepingSelection(projection, d, applied(weightNode(content, projection, c, 12)));
   const shiftedResult = apply(content, shifted.changes);
   expect(shiftedResult.slice(shifted.selection.from, shifted.selection.to)).toBe("D4");
   expect(shifted.selection.from).toBe(6);
@@ -44,10 +52,10 @@ test("structural edits keep the edited node's core selected, not suffixes added 
 test("an atom outside any sequence can change pitch in place but cannot move", () => {
   const projection = projectNotation("note", "C4");
   const [atom] = leafNodes(projection);
-  expect(relocateNode("C4", projection, atom, atom, "D4")).toEqual({
+  expect(applied(relocateNode("C4", projection, atom, atom, "D4"))).toEqual({
     changes: [{ from: 0, to: 2, insert: "D4" }], selection: { from: 0, to: 2 },
   });
-  expect(relocateNode("C4", projection, atom, atom).changes).toEqual([]);
+  expect(applied(relocateNode("C4", projection, atom, atom)).changes).toEqual([]);
 });
 
 test("nested split and postfix edits preserve the original modifier suffix", () => {
@@ -56,8 +64,8 @@ test("nested split and postfix edits preserve the original modifier suffix", () 
   expect(projection.error).toBeNull();
   const atom = leafNodes(projection).find(index => projection.nodes[index].value === "C4");
   expect(atom).toBeDefined();
-  expect(apply(content, splitNode(content, projection, atom!))).toBe("[[C4 C4] D4]*2@3  E4");
-  const repeat = apply(content, repeatNode(content, projection, atom!, 4));
+  expect(apply(content, applied(splitNode(content, projection, atom!)))).toBe("[[C4 C4] D4]*2@3  E4");
+  const repeat = apply(content, applied(repeatNode(content, projection, atom!, 4)));
   expect(repeat).toContain("C4*4");
   expect(repeat).toContain("@3  E4");
 });
@@ -69,7 +77,7 @@ test("repeated source remains one editable atom with linked projected events", (
   const c = leafNodes(projection).find(index => projection.nodes[index].value === "C4");
   expect(c).toBeDefined();
   expect(projection.events.filter(event => event.node === c).length).toBeGreaterThan(1);
-  expect(repeatNode(content, projection, c!, 1)).toEqual([]);
+  expect(applied(repeatNode(content, projection, c!, 1))).toEqual([]);
 });
 
 test("adjacent boundary edits preserve outer sibling boundaries and expose the shared split", () => {
@@ -79,7 +87,7 @@ test("adjacent boundary edits preserve outer sibling boundaries and expose the s
   const atoms = leafNodes(projection);
   const before = layoutNodes(projection).filter(item => atoms.includes(item.node));
   expect(boundaryInfo(projection, atoms[0])?.right).toBe(atoms[1]);
-  const edited = apply(content, moveBoundary(content, projection, atoms[0], 0.75));
+  const edited = apply(content, applied(moveBoundary(content, projection, atoms[0], 0.75)));
   const next = projectNotation("note", edited);
   expect(next.error).toBeNull();
   const afterAtoms = leafNodes(next);
@@ -96,7 +104,7 @@ test("saturated sibling weights are reduced before finding a representable bound
   expect(projection.error).toBeNull();
   const atoms = leafNodes(projection);
   const before = layoutNodes(projection).filter(item => atoms.includes(item.node));
-  const edited = apply(content, moveBoundary(content, projection, atoms[0], 0.75));
+  const edited = apply(content, applied(moveBoundary(content, projection, atoms[0], 0.75)));
   expect(edited).toBe("C4@3 D4@1 E4@2");
   const next = projectNotation("note", edited);
   const afterAtoms = leafNodes(next);
@@ -110,14 +118,14 @@ test("ambiguous modifiers and unusable boundary targets fail cleanly", () => {
   const projection = projectNotation("note", content);
   expect(projection.error).toBeNull();
   const atom = leafNodes(projection)[0];
-  expect(() => weightNode(content, projection, atom, 4)).toThrow(/repeated weight/i);
+  expect(weightNode(content, projection, atom, 4)).toMatchObject({ ok: false, reason: expect.stringMatching(/repeated weight/i) });
   expect(boundaryInfo(projection, atom)).toBeNull();
-  expect(() => moveBoundary(content, projection, atom, 0)).toThrow();
-  expect(() => moveBoundary(content, projection, atom, 1)).toThrow();
+  expect(moveBoundary(content, projection, atom, 0)).toMatchObject({ ok: false });
+  expect(moveBoundary(content, projection, atom, 1)).toMatchObject({ ok: false });
   const slow = "C4/2";
   const slowProjection = projectNotation("note", slow);
   expect(slowProjection.error).toBeNull();
-  expect(() => repeatNode(slow, slowProjection, leafNodes(slowProjection)[0], 2)).toThrow(/combined/i);
+  expect(repeatNode(slow, slowProjection, leafNodes(slowProjection)[0], 2)).toMatchObject({ ok: false, reason: expect.stringMatching(/combined/i) });
 });
 test("relocation rotates occupied and rest slots in either direction without changing separators", () => {
   const rightContent = " C4@2  ~\tD4*3 ";
@@ -126,7 +134,7 @@ test("relocation rotates occupied and rest slots in either direction without cha
   const c = rightAtoms.find(index => rightProjection.nodes[index].value === "C4")!;
   const d = rightAtoms.find(index => rightProjection.nodes[index].value === "D4")!;
   expect(relocationTarget(rightProjection, c, d)).toBe(d);
-  const rightEdit = relocateNode(rightContent, rightProjection, c, d);
+  const rightEdit = applied(relocateNode(rightContent, rightProjection, c, d));
   const rightResult = apply(rightContent, rightEdit.changes);
   expect(rightResult).toBe(" ~  D4*3\tC4@2 ");
   expect(rightResult.slice(rightEdit.selection.from, rightEdit.selection.to)).toBe("C4");
@@ -136,7 +144,7 @@ test("relocation rotates occupied and rest slots in either direction without cha
   const leftAtoms = leafNodes(leftProjection);
   const leftC = leftAtoms.find(index => leftProjection.nodes[index].value === "C4")!;
   const leftD = leftAtoms.find(index => leftProjection.nodes[index].value === "D4")!;
-  const leftEdit = relocateNode(leftContent, leftProjection, leftD, leftC);
+  const leftEdit = applied(relocateNode(leftContent, leftProjection, leftD, leftC));
   const leftResult = apply(leftContent, leftEdit.changes);
   expect(leftResult).toBe("D4@2  C4*3\t~");
   expect(leftResult.slice(leftEdit.selection.from, leftEdit.selection.to)).toBe("D4");
@@ -148,7 +156,7 @@ test("relocation selection follows the moved token across changed slot lengths a
   const atoms = leafNodes(projection);
   const source = atoms.find(index => projection.nodes[index].value === "C4")!;
   const target = atoms.find(index => projection.nodes[index].value === "E4")!;
-  const edit = relocateNode(content, projection, source, target, "D#5");
+  const edit = applied(relocateNode(content, projection, source, target, "D#5"));
   const result = apply(content, edit.changes);
   expect(result).toBe("D#5*2 E4 D#5@2");
   expect(result.slice(edit.selection.from, edit.selection.to)).toBe("D#5");
@@ -164,9 +172,9 @@ test("nested repeated scopes remain intact and relocation rejects parent crossin
   const e = atoms.find(index => projection.nodes[index].value === "E4")!;
   expect(relocationTarget(projection, c, d)).toBe(d);
   expect(relocationTarget(projection, c, e)).toBeNull();
-  expect(apply(content, relocateNode(content, projection, c, d).changes)).toBe("[D4*3 C4@2]*2 E4");
-  expect(() => relocateNode(content, projection, c, e)).toThrow(/same sequence/i);
-  const beforeGroup = relocateNode(content, projection, e, c);
+  expect(apply(content, applied(relocateNode(content, projection, c, d)).changes)).toBe("[D4*3 C4@2]*2 E4");
+  expect(relocateNode(content, projection, c, e)).toMatchObject({ ok: false, reason: expect.stringMatching(/same sequence/i) });
+  const beforeGroup = applied(relocateNode(content, projection, e, c));
   const beforeGroupSource = apply(content, beforeGroup.changes);
   expect(beforeGroupSource).toBe("E4 [C4@2 D4*3]*2");
   expect(beforeGroupSource.slice(beforeGroup.selection.from, beforeGroup.selection.to)).toBe("E4");
@@ -185,24 +193,24 @@ test("source intervals resolve complete contiguous siblings and reject partial g
   expect(sourceRangeNodes(suffixed, 0, 2)).toEqual([c]);
   const inner = leafNodes(projection).filter(index => projection.nodes[index].value !== "E4");
   expect(sourceRangeNodes(projection, 1, 6)).toEqual(inner);
-  const edited = transposeRange(content, projection, inner, 1);
+  const edited = applied(transposeRange(content, projection, inner, 1));
   expect(apply(content, edited.changes)).toBe("[C#4 D#4]*2  E4");
   const singleContent = "[C4]*2";
   const single = projectNotation("note", singleContent);
   const innerNote = leafNodes(single)[0];
   expect(sourceRangeNodes(single, 1, 3)).toEqual([innerNote]);
-  expect(apply(singleContent, duplicateRange(singleContent, single, [innerNote]).changes)).toBe("[C4 C4]*2");
+  expect(apply(singleContent, applied(duplicateRange(singleContent, single, [innerNote])).changes)).toBe("[C4 C4]*2");
 });
 
 test("range movement rotates separators and selection tracks a repeated block", () => {
   const content = "C4@2  E4\t~ D4";
   const projection = projectNotation("note", content);
   const nodes = leafNodes(projection).slice(0, 2);
-  const edit = moveRange(content, projection, nodes, 1);
+  const edit = applied(moveRange(content, projection, nodes, 1));
   const result = apply(content, edit.changes);
   expect(result).toBe("~  C4@2\tE4 D4");
   expect(result.slice(edit.selection.from, edit.selection.to)).toBe("C4@2\tE4");
-  const left = moveRange(result, projectNotation("note", result), [leafNodes(projectNotation("note", result))[1]], -1);
+  const left = applied(moveRange(result, projectNotation("note", result), [leafNodes(projectNotation("note", result))[1]], -1));
   expect(apply(result, left.changes)).toBe("C4@2  ~\tE4 D4");
 });
 
@@ -210,15 +218,15 @@ test("range transpose is atomic at MIDI limits and duplicate keeps independent r
   const content = "[C4@2 D4*3]*2  E4";
   const projection = projectNotation("note", content);
   const group = projection.nodes.findIndex(node => node.kind === "group");
-  const duplicate = duplicateRange(content, projection, [group]);
+  const duplicate = applied(duplicateRange(content, projection, [group]));
   const copied = apply(content, duplicate.changes);
   expect(copied).toBe("[C4@2 D4*3]*2 [C4@2 D4*3]*2  E4");
   expect(copied.slice(duplicate.selection.from, duplicate.selection.to)).toBe("[C4@2 D4*3]*2");
   const copyProjection = projectNotation("note", copied);
   const groups = copyProjection.nodes.flatMap((node, index) => node.kind === "group" ? [index] : []);
-  const transposed = transposeRange(copied, copyProjection, [groups[1]], 1);
+  const transposed = applied(transposeRange(copied, copyProjection, [groups[1]], 1));
   expect(apply(copied, transposed.changes)).toContain("[C#4@2 D#4*3]*2");
   const high = "G9";
   const highProjection = projectNotation("note", high);
-  expect(() => transposeRange(high, highProjection, [leafNodes(highProjection)[0]], 1)).toThrow();
+  expect(transposeRange(high, highProjection, [leafNodes(highProjection)[0]], 1)).toMatchObject({ ok: false });
 });

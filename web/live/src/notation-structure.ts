@@ -34,6 +34,26 @@ export type SourceChange = Readonly<{ from: number; to: number; insert: string }
 export type SourceEdit = Readonly<{ changes: SourceChange[]; selection: { from: number; to: number } }>;
 
 /**
+ * An edit's result: its value, or why the notation cannot take it. A refusal
+ * is an ordinary outcome, such as a move outside its sequence; any thrown error
+ * is a bug.
+ */
+export type Edit<T> = Readonly<{ ok: true; value: T }> | Readonly<{ ok: false; reason: string }>;
+
+// Helpers refuse from any depth by throwing a Refusal; each exported edit turns
+// it into a value at its boundary and lets every other error through.
+class Refusal extends Error {}
+function refuse(reason: string): never { throw new Refusal(reason); }
+function attempt<T>(edit: () => T): Edit<T> {
+  try {
+    return { ok: true, value: edit() };
+  } catch (error) {
+    if (error instanceof Refusal) return { ok: false, reason: error.message };
+    throw error;
+  }
+}
+
+/**
  * Where `pos` lands after `changes`. Text inserted exactly at `pos` stays after
  * it when `assoc` is -1 and before it when 1; a replaced range covering `pos`
  * maps it to the replacement's start or end the same way.
@@ -86,54 +106,56 @@ export function relocateNode(
   source: number,
   target: number,
   value?: string,
-): SourceEdit {
-  const sourceNode = nodeAt(projection, source);
-  if (sourceNode.kind !== "atom") throw new Error("Select an atom to move");
-  if (value !== undefined && !value.length) throw new Error("Moved atom value cannot be empty");
-  const core = content.slice(sourceNode.from, sourceNode.baseTo);
-  if (source === target) {
-    if (value === undefined || value === core) return { changes: [], selection: { from: sourceNode.from, to: sourceNode.baseTo } };
-    return {
-      changes: [{ from: sourceNode.from, to: sourceNode.baseTo, insert: value }],
-      selection: { from: sourceNode.from, to: sourceNode.from + value.length },
-    };
-  }
-  const resolvedTarget = relocationTarget(projection, source, target);
-  if (resolvedTarget === null) throw new Error("Move targets must be siblings in the same sequence");
-  target = resolvedTarget;
-  const targetNode = nodeAt(projection, target);
-  // relocationTarget guarantees both are children of the source's sequence.
-  const parent = nodeAt(projection, sourceNode.parent!);
-
-  const children = parent.children;
-  const sourceSlot = children.indexOf(source);
-  const targetSlot = children.indexOf(target);
-  const suffix = content.slice(sourceNode.baseTo, sourceNode.end);
-  const movedToken = `${value ?? core}${suffix}`;
-  const low = Math.min(sourceSlot, targetSlot);
-  const high = Math.max(sourceSlot, targetSlot);
-  const changes: SourceChange[] = [];
-  for (let slot = low; slot <= high; slot++) {
-    const destination = nodeAt(projection, children[slot]);
-    let token: string;
-    if (slot === targetSlot) {
-      token = movedToken;
-    } else {
-      const originSlot = sourceSlot < targetSlot ? slot + 1 : slot - 1;
-      const origin = nodeAt(projection, children[originSlot]);
-      token = content.slice(origin.from, origin.end);
+): Edit<SourceEdit> {
+  return attempt(() => {
+    const sourceNode = nodeAt(projection, source);
+    if (sourceNode.kind !== "atom") refuse("Select an atom to move");
+    if (value !== undefined && !value.length) refuse("Moved atom value cannot be empty");
+    const core = content.slice(sourceNode.from, sourceNode.baseTo);
+    if (source === target) {
+      if (value === undefined || value === core) return { changes: [], selection: { from: sourceNode.from, to: sourceNode.baseTo } };
+      return {
+        changes: [{ from: sourceNode.from, to: sourceNode.baseTo, insert: value }],
+        selection: { from: sourceNode.from, to: sourceNode.from + value.length },
+      };
     }
-    if (content.slice(destination.from, destination.end) !== token)
-      changes.push({ from: destination.from, to: destination.end, insert: token });
-  }
-  let targetStart = targetNode.from;
-  for (const change of changes) {
-    if (change.from < targetNode.from) targetStart += change.insert.length - (change.to - change.from);
-  }
-  return {
-    changes,
-    selection: { from: targetStart, to: targetStart + (value === undefined ? core.length : value.length) },
-  };
+    const resolvedTarget = relocationTarget(projection, source, target);
+    if (resolvedTarget === null) refuse("Move targets must be siblings in the same sequence");
+    target = resolvedTarget;
+    const targetNode = nodeAt(projection, target);
+    // relocationTarget guarantees both are children of the source's sequence.
+    const parent = nodeAt(projection, sourceNode.parent!);
+
+    const children = parent.children;
+    const sourceSlot = children.indexOf(source);
+    const targetSlot = children.indexOf(target);
+    const suffix = content.slice(sourceNode.baseTo, sourceNode.end);
+    const movedToken = `${value ?? core}${suffix}`;
+    const low = Math.min(sourceSlot, targetSlot);
+    const high = Math.max(sourceSlot, targetSlot);
+    const changes: SourceChange[] = [];
+    for (let slot = low; slot <= high; slot++) {
+      const destination = nodeAt(projection, children[slot]);
+      let token: string;
+      if (slot === targetSlot) {
+        token = movedToken;
+      } else {
+        const originSlot = sourceSlot < targetSlot ? slot + 1 : slot - 1;
+        const origin = nodeAt(projection, children[originSlot]);
+        token = content.slice(origin.from, origin.end);
+      }
+      if (content.slice(destination.from, destination.end) !== token)
+        changes.push({ from: destination.from, to: destination.end, insert: token });
+    }
+    let targetStart = targetNode.from;
+    for (const change of changes) {
+      if (change.from < targetNode.from) targetStart += change.insert.length - (change.to - change.from);
+    }
+    return {
+      changes,
+      selection: { from: targetStart, to: targetStart + (value === undefined ? core.length : value.length) },
+    };
+  });
 }
 
 
@@ -215,34 +237,34 @@ function isRecord(value: unknown): value is Record<string, unknown> { return typ
 function isInt(value: unknown): value is number { return Number.isInteger(value) && (value as number) >= 0; }
 
 function nodeAt(projection: NotationProjection, index: number): NotationNode {
-  if (projection.error) throw new Error(projection.error);
+  if (projection.error) refuse(projection.error);
   const node = projection.nodes[index];
-  if (!node) throw new Error("Notation selection is no longer available");
+  if (!node) refuse("Notation selection is no longer available");
   return node;
 }
 function requireAtomOrGroup(node: NotationNode): void {
-  if (node.kind !== "atom" && node.kind !== "group") throw new Error("Select an atom or group");
+  if (node.kind !== "atom" && node.kind !== "group") refuse("Select an atom or group");
 }
 function weightModifier(node: NotationNode): NotationModifier | undefined {
   const all = node.modifiers.filter(mod => mod.kind === "weight");
-  if (all.length > 1) throw new Error("Cannot edit repeated weight modifiers");
+  if (all.length > 1) refuse("Cannot edit repeated weight modifiers");
   return all[0];
 }
 function siblingNodes(projection: NotationProjection, node: NotationNode): { parent: NotationNode; index: number; children: NotationNode[] } {
-  if (node.parent === null) throw new Error("This notation has no adjacent sibling");
+  if (node.parent === null) refuse("This notation has no adjacent sibling");
   const parent = nodeAt(projection, node.parent);
-  if (parent.kind !== "sequence") throw new Error("Boundary edits require a sequence");
+  if (parent.kind !== "sequence") refuse("Boundary edits require a sequence");
   const children = parent.children.map(child => nodeAt(projection, child));
   const index = parent.children.indexOf(projection.nodes.indexOf(node));
   if (index < 0 || index + 1 >= children.length ||
       (node.kind !== "atom" && node.kind !== "group") ||
       (children[index + 1].kind !== "atom" && children[index + 1].kind !== "group")) {
-    throw new Error("Select adjacent atoms or groups in the same sequence");
+    refuse("Select adjacent atoms or groups in the same sequence");
   }
   return { parent, index, children };
 }
 function boundedWeight(value: number): void {
-  if (!Number.isInteger(value) || value < 1 || value > 16) throw new Error("Weight must be an integer from 1 to 16");
+  if (!Number.isInteger(value) || value < 1 || value > 16) refuse("Weight must be an integer from 1 to 16");
 }
 function sourceChange(from: number, to: number, insert: string): SourceChange[] {
   return [{ from, to, insert }];
@@ -250,54 +272,60 @@ function sourceChange(from: number, to: number, insert: string): SourceChange[] 
 function replaceNumeric(mod: NotationModifier, content: string, value: number): SourceChange {
   const text = content.slice(mod.from, mod.to);
   const match = /\d+/.exec(text);
-  if (!match) throw new Error("Cannot safely edit this modifier");
+  if (!match) refuse("Cannot safely edit this modifier");
   return { from: mod.from + match.index, to: mod.from + match.index + match[0].length, insert: String(value) };
 }
 
-export function splitNode(content: string, projection: NotationProjection, index: number): SourceChange[] {
-  const node = nodeAt(projection, index);
-  if (node.kind === "group") throw new Error("Groups are already subdivided");
-  if (node.kind !== "atom") throw new Error("Select an atom to subdivide");
-  return sourceChange(node.from, node.baseTo, `[${content.slice(node.from, node.baseTo)} ${content.slice(node.from, node.baseTo)}]`);
+export function splitNode(content: string, projection: NotationProjection, index: number): Edit<SourceChange[]> {
+  return attempt(() => {
+    const node = nodeAt(projection, index);
+    if (node.kind === "group") refuse("Groups are already subdivided");
+    if (node.kind !== "atom") refuse("Select an atom to subdivide");
+    return sourceChange(node.from, node.baseTo, `[${content.slice(node.from, node.baseTo)} ${content.slice(node.from, node.baseTo)}]`);
+  });
 }
 
-export function repeatNode(content: string, projection: NotationProjection, index: number, count: number): SourceChange[] {
-  if (!Number.isInteger(count) || count < 1 || count > 16) throw new Error("Repeat count must be an integer from 1 to 16");
-  const node = nodeAt(projection, index);
-  requireAtomOrGroup(node);
-  const repeats = node.modifiers.filter(mod => mod.kind === "repeat");
-  if (repeats.length > 1) throw new Error("Cannot edit multiple repeat modifiers");
-  if (node.modifiers.some(mod => ["euclid", "slow", "degrade"].includes(mod.kind))) {
-    throw new Error("Cannot edit repeat when combined with euclid, slow, or degrade");
-  }
-  if (repeats.length) {
-    if (count === 1) return sourceChange(repeats[0].from, repeats[0].to, "");
-    return [replaceNumeric(repeats[0], content, count)];
-  }
-  if (count === 1) return [];
-  return sourceChange(node.end, node.end, `*${count}`);
-}
-
-export function weightNode(content: string, projection: NotationProjection, index: number, weight: number): SourceChange[] {
-  boundedWeight(weight);
-  const node = nodeAt(projection, index);
-  requireAtomOrGroup(node);
-  const mod = weightModifier(node);
-  if (node.parent !== null) {
-    const parent = nodeAt(projection, node.parent);
-    if (parent.kind === "sequence") {
-      const sum = parent.children.reduce((total, childIndex) => {
-        const child = nodeAt(projection, childIndex);
-        return total + (childIndex === index ? weight : child.weight);
-      }, 0);
-      if (sum > 256) throw new Error("Sibling weights cannot exceed 256");
+export function repeatNode(content: string, projection: NotationProjection, index: number, count: number): Edit<SourceChange[]> {
+  return attempt(() => {
+    if (!Number.isInteger(count) || count < 1 || count > 16) refuse("Repeat count must be an integer from 1 to 16");
+    const node = nodeAt(projection, index);
+    requireAtomOrGroup(node);
+    const repeats = node.modifiers.filter(mod => mod.kind === "repeat");
+    if (repeats.length > 1) refuse("Cannot edit multiple repeat modifiers");
+    if (node.modifiers.some(mod => ["euclid", "slow", "degrade"].includes(mod.kind))) {
+      refuse("Cannot edit repeat when combined with euclid, slow, or degrade");
     }
-  }
-  if (mod) return weight === 1
-    ? sourceChange(mod.from, mod.to, "")
-    : [replaceNumeric(mod, content, weight)];
-  if (weight === 1) return [];
-  return sourceChange(node.end, node.end, `@${weight}`);
+    if (repeats.length) {
+      if (count === 1) return sourceChange(repeats[0].from, repeats[0].to, "");
+      return [replaceNumeric(repeats[0], content, count)];
+    }
+    if (count === 1) return [];
+    return sourceChange(node.end, node.end, `*${count}`);
+  });
+}
+
+export function weightNode(content: string, projection: NotationProjection, index: number, weight: number): Edit<SourceChange[]> {
+  return attempt(() => {
+    boundedWeight(weight);
+    const node = nodeAt(projection, index);
+    requireAtomOrGroup(node);
+    const mod = weightModifier(node);
+    if (node.parent !== null) {
+      const parent = nodeAt(projection, node.parent);
+      if (parent.kind === "sequence") {
+        const sum = parent.children.reduce((total, childIndex) => {
+          const child = nodeAt(projection, childIndex);
+          return total + (childIndex === index ? weight : child.weight);
+        }, 0);
+        if (sum > 256) refuse("Sibling weights cannot exceed 256");
+      }
+    }
+    if (mod) return weight === 1
+      ? sourceChange(mod.from, mod.to, "")
+      : [replaceNumeric(mod, content, weight)];
+    if (weight === 1) return [];
+    return sourceChange(node.end, node.end, `@${weight}`);
+  });
 }
 
 /** The share of a pair that boundary controls offer, adjusted in `BOUNDARY_STEP`s. */
@@ -323,50 +351,52 @@ export function boundaryInfo(projection: NotationProjection, index: number): { r
   return { right: parent.children[at + 1], ratio: node.weight / total };
 }
 
-export function moveBoundary(content: string, projection: NotationProjection, index: number, ratio: number): SourceChange[] {
-  if (!Number.isFinite(ratio) || ratio <= 0 || ratio >= 1) throw new Error("Boundary ratio must be between 0 and 1");
-  const selected = nodeAt(projection, index);
-  requireAtomOrGroup(selected);
-  const { index: at, children } = siblingNodes(projection, selected);
-  const modifiers = children.map(weightModifier);
-  const original = children.map(child => child.weight);
-  for (let i = 0; i < original.length; i++) {
-    if (!Number.isFinite(original[i]) || original[i] <= 0 || original[i] > 16) throw new Error("Cannot edit invalid sibling weights");
-  }
-  const divisor = original.reduce((common, weight) => greatestCommonDivisor(common, weight));
-  const baseline = original.map(weight => weight / divisor);
-  const pairSum = baseline[at] + baseline[at + 1];
-  const currentRatio = baseline[at] / pairSum;
-  if (currentRatio === ratio) return [];
-  let best: number[] | null = null;
-  let bestError = Infinity;
-  // Uniform scaling preserves every sibling boundary except the selected one.
-  const maxScale = Math.min(...baseline.map(weight => Math.floor(16 / weight)), Math.floor(256 / baseline.reduce((a, b) => a + b, 0)));
-  for (let scale = 1; scale <= maxScale; scale++) {
-    const total = pairSum * scale;
-    for (let left = 1; left < total; left++) {
-      const right = total - left;
-      if (left > 16 || right > 16) continue;
-      const candidate = baseline.map(weight => weight * scale);
-      candidate[at] = left;
-      candidate[at + 1] = right;
-      if (candidate.reduce((a, b) => a + b, 0) > 256) continue;
-      const error = Math.abs(left / total - ratio);
-      if (error < bestError - Number.EPSILON || (Math.abs(error - bestError) <= Number.EPSILON && (!best || left < best[at]))) {
-        best = candidate;
-        bestError = error;
+export function moveBoundary(content: string, projection: NotationProjection, index: number, ratio: number): Edit<SourceChange[]> {
+  return attempt(() => {
+    if (!Number.isFinite(ratio) || ratio <= 0 || ratio >= 1) refuse("Boundary ratio must be between 0 and 1");
+    const selected = nodeAt(projection, index);
+    requireAtomOrGroup(selected);
+    const { index: at, children } = siblingNodes(projection, selected);
+    const modifiers = children.map(weightModifier);
+    const original = children.map(child => child.weight);
+    for (let i = 0; i < original.length; i++) {
+      if (!Number.isFinite(original[i]) || original[i] <= 0 || original[i] > 16) refuse("Cannot edit invalid sibling weights");
+    }
+    const divisor = original.reduce((common, weight) => greatestCommonDivisor(common, weight));
+    const baseline = original.map(weight => weight / divisor);
+    const pairSum = baseline[at] + baseline[at + 1];
+    const currentRatio = baseline[at] / pairSum;
+    if (currentRatio === ratio) return [];
+    let best: number[] | null = null;
+    let bestError = Infinity;
+    // Uniform scaling preserves every sibling boundary except the selected one.
+    const maxScale = Math.min(...baseline.map(weight => Math.floor(16 / weight)), Math.floor(256 / baseline.reduce((a, b) => a + b, 0)));
+    for (let scale = 1; scale <= maxScale; scale++) {
+      const total = pairSum * scale;
+      for (let left = 1; left < total; left++) {
+        const right = total - left;
+        if (left > 16 || right > 16) continue;
+        const candidate = baseline.map(weight => weight * scale);
+        candidate[at] = left;
+        candidate[at + 1] = right;
+        if (candidate.reduce((a, b) => a + b, 0) > 256) continue;
+        const error = Math.abs(left / total - ratio);
+        if (error < bestError - Number.EPSILON || (Math.abs(error - bestError) <= Number.EPSILON && (!best || left < best[at]))) {
+          best = candidate;
+          bestError = error;
+        }
       }
     }
-  }
-  if (!best) throw new Error("No representable boundary fits the weight limits");
-  const changes: SourceChange[] = [];
-  for (let i = 0; i < children.length; i++) {
-    if (best[i] === original[i]) continue;
-    const modifier = modifiers[i];
-    if (modifier) changes.push(replaceNumeric(modifier, content, best[i]));
-    else changes.push({ from: children[i].end, to: children[i].end, insert: `@${best[i]}` });
-  }
-  return changes.sort((a, b) => a.from - b.from);
+    if (!best) refuse("No representable boundary fits the weight limits");
+    const changes: SourceChange[] = [];
+    for (let i = 0; i < children.length; i++) {
+      if (best[i] === original[i]) continue;
+      const modifier = modifiers[i];
+      if (modifier) changes.push(replaceNumeric(modifier, content, best[i]));
+      else changes.push({ from: children[i].end, to: children[i].end, insert: `@${best[i]}` });
+    }
+    return changes.sort((a, b) => a.from - b.from);
+  });
 }
 function greatestCommonDivisor(left: number, right: number): number {
   while (right !== 0) [left, right] = [right, left % right];
@@ -457,104 +487,113 @@ export function extendSourceRange(projection: NotationProjection, anchor: number
 }
 
 /** Transpose all note atoms in complete selected tokens while preserving authored syntax. */
-export function transposeRange(content: string, projection: NotationProjection, nodes: number[], semitones: number): SourceEdit {
-  const checked = checkedRange(projection, nodes);
-  if (!Number.isInteger(semitones)) throw new Error("Transpose interval must be an integer");
-  const from = projection.nodes[checked[0]].from;
-  const to = projection.nodes[checked[checked.length - 1]].end;
-  if (semitones === 0) return { changes: [], selection: { from, to } };
-  const changes: SourceChange[] = [];
-  const visit = (index: number): void => {
-    const node = nodeAt(projection, index);
-    if (node.kind === "atom" && node.value !== "~") {
-      const pitch = transposePitch(node.value, semitones);
-      if (pitch === null) throw new Error(`Cannot transpose note ${node.value} by ${semitones} semitones`);
-      changes.push({ from: node.from, to: node.baseTo, insert: pitch });
-    } else {
-      for (const child of node.children) visit(child);
-    }
-  };
-  checked.forEach(visit);
-  const result = applySourceChanges(content, changes);
-  validateCandidate(result);
-  return { changes, selection: { from, to: to + changes.reduce((delta, change) => delta + change.insert.length - (change.to - change.from), 0) } };
+export function transposeRange(content: string, projection: NotationProjection, nodes: number[], semitones: number): Edit<SourceEdit> {
+  return attempt(() => {
+    const checked = checkedRange(projection, nodes);
+    if (!Number.isInteger(semitones)) refuse("Transpose interval must be an integer");
+    const from = projection.nodes[checked[0]].from;
+    const to = projection.nodes[checked[checked.length - 1]].end;
+    if (semitones === 0) return { changes: [], selection: { from, to } };
+    const changes: SourceChange[] = [];
+    const visit = (index: number): void => {
+      const node = nodeAt(projection, index);
+      if (node.kind === "atom" && node.value !== "~") {
+        const pitch = transposePitch(node.value, semitones);
+        if (pitch === null) refuse(`Cannot transpose note ${node.value} by ${semitones} semitones`);
+        changes.push({ from: node.from, to: node.baseTo, insert: pitch });
+      } else {
+        for (const child of node.children) visit(child);
+      }
+    };
+    checked.forEach(visit);
+    const result = applySourceChanges(content, changes);
+    validateCandidate(result);
+    return { changes, selection: { from, to: to + changes.reduce((delta, change) => delta + change.insert.length - (change.to - change.from), 0) } };
+  });
 }
 
 /** Rotate a complete contiguous block through sibling slots, preserving separators. */
-export function moveRange(content: string, projection: NotationProjection, nodes: number[], steps: number, semitones = 0): SourceEdit {
-  const checked = checkedRange(projection, nodes);
-  if (!Number.isInteger(steps) || !Number.isInteger(semitones)) throw new Error("Move and transpose amounts must be integers");
-  if (steps === 0) return transposeRange(content, projection, nodes, semitones);
-  const parentIndex = projection.nodes[checked[0]].parent;
-  if (parentIndex === null || checked.some(index => projection.nodes[index].parent !== parentIndex)) throw new Error("Selected range must be siblings in one sequence");
-  const parent = nodeAt(projection, parentIndex);
-  if (parent.kind !== "sequence") throw new Error("Selected range must be siblings in one sequence");
-  const slots = checked.map(index => parent.children.indexOf(index));
-  const start = slots[0], end = slots[slots.length - 1];
-  if (slots.some((slot, i) => slot !== start + i)) throw new Error("Selected nodes must be contiguous siblings");
-  const destination = start + steps;
-  if (destination < 0 || destination + checked.length > parent.children.length) throw new Error("Move is outside the sibling sequence");
-  const low = Math.min(start, destination), high = Math.max(end, destination + checked.length - 1);
-  const tokens = parent.children.map(index => {
-    const node = nodeAt(projection, index);
-    return content.slice(node.from, node.end);
-  });
-  const moved = tokens.splice(start, checked.length);
-  tokens.splice(destination, 0, ...moved);
-  const changes: SourceChange[] = [];
-  for (let slot = low; slot <= high; slot++) {
-    const node = nodeAt(projection, parent.children[slot]);
-    let token = tokens[slot];
-    if (slot >= destination && slot < destination + checked.length && semitones !== 0) {
-      const originalIndex = checked[slot - destination];
-      token = transposeToken(content, projection, originalIndex, semitones);
+export function moveRange(content: string, projection: NotationProjection, nodes: number[], steps: number, semitones = 0): Edit<SourceEdit> {
+  return attempt(() => {
+    const checked = checkedRange(projection, nodes);
+    if (!Number.isInteger(steps) || !Number.isInteger(semitones)) refuse("Move and transpose amounts must be integers");
+    if (steps === 0) {
+      const transposed = transposeRange(content, projection, nodes, semitones);
+      return transposed.ok ? transposed.value : refuse(transposed.reason);
     }
-    if (content.slice(node.from, node.end) !== token) changes.push({ from: node.from, to: node.end, insert: token });
-  }
-  const result = applySourceChanges(content, changes);
-  validateCandidate(result);
-  const first = nodeAt(projection, parent.children[destination]);
-  let selectionFrom = first.from;
-  for (const change of changes) if (change.from < first.from) selectionFrom += change.insert.length - (change.to - change.from);
-  const selectionEndNode = nodeAt(projection, parent.children[destination + checked.length - 1]);
-  const selectionLength = selectionEndNode.end - first.from + changes
-    .filter(change => change.from >= first.from && change.from < selectionEndNode.end)
-    .reduce((delta, change) => delta + change.insert.length - (change.to - change.from), 0);
-  return { changes, selection: { from: selectionFrom, to: selectionFrom + selectionLength } };
+    const parentIndex = projection.nodes[checked[0]].parent;
+    if (parentIndex === null || checked.some(index => projection.nodes[index].parent !== parentIndex)) refuse("Selected range must be siblings in one sequence");
+    const parent = nodeAt(projection, parentIndex);
+    if (parent.kind !== "sequence") refuse("Selected range must be siblings in one sequence");
+    const slots = checked.map(index => parent.children.indexOf(index));
+    const start = slots[0], end = slots[slots.length - 1];
+    if (slots.some((slot, i) => slot !== start + i)) refuse("Selected nodes must be contiguous siblings");
+    const destination = start + steps;
+    if (destination < 0 || destination + checked.length > parent.children.length) refuse("Move is outside the sibling sequence");
+    const low = Math.min(start, destination), high = Math.max(end, destination + checked.length - 1);
+    const tokens = parent.children.map(index => {
+      const node = nodeAt(projection, index);
+      return content.slice(node.from, node.end);
+    });
+    const moved = tokens.splice(start, checked.length);
+    tokens.splice(destination, 0, ...moved);
+    const changes: SourceChange[] = [];
+    for (let slot = low; slot <= high; slot++) {
+      const node = nodeAt(projection, parent.children[slot]);
+      let token = tokens[slot];
+      if (slot >= destination && slot < destination + checked.length && semitones !== 0) {
+        const originalIndex = checked[slot - destination];
+        token = transposeToken(content, projection, originalIndex, semitones);
+      }
+      if (content.slice(node.from, node.end) !== token) changes.push({ from: node.from, to: node.end, insert: token });
+    }
+    const result = applySourceChanges(content, changes);
+    validateCandidate(result);
+    const first = nodeAt(projection, parent.children[destination]);
+    let selectionFrom = first.from;
+    for (const change of changes) if (change.from < first.from) selectionFrom += change.insert.length - (change.to - change.from);
+    const selectionEndNode = nodeAt(projection, parent.children[destination + checked.length - 1]);
+    const selectionLength = selectionEndNode.end - first.from + changes
+      .filter(change => change.from >= first.from && change.from < selectionEndNode.end)
+      .reduce((delta, change) => delta + change.insert.length - (change.to - change.from), 0);
+    return { changes, selection: { from: selectionFrom, to: selectionFrom + selectionLength } };
+  });
 }
 
 /** Insert a literal independent copy after the selected token block. */
-export function duplicateRange(content: string, projection: NotationProjection, nodes: number[]): SourceEdit {
-  const checked = checkedRange(projection, nodes);
-  const first = checked[0], last = checked[checked.length - 1];
-  const source = content.slice(projection.nodes[first].from, projection.nodes[last].end);
-  const insertAt = projection.nodes[last].end;
-  const separator = " ";
-  const insert = separator + source;
-  const changes = [{ from: insertAt, to: insertAt, insert }];
-  validateCandidate(applySourceChanges(content, changes));
-  const selectionFrom = insertAt + separator.length;
-  return { changes, selection: { from: selectionFrom, to: selectionFrom + source.length } };
+export function duplicateRange(content: string, projection: NotationProjection, nodes: number[]): Edit<SourceEdit> {
+  return attempt(() => {
+    const checked = checkedRange(projection, nodes);
+    const first = checked[0], last = checked[checked.length - 1];
+    const source = content.slice(projection.nodes[first].from, projection.nodes[last].end);
+    const insertAt = projection.nodes[last].end;
+    const separator = " ";
+    const insert = separator + source;
+    const changes = [{ from: insertAt, to: insertAt, insert }];
+    validateCandidate(applySourceChanges(content, changes));
+    const selectionFrom = insertAt + separator.length;
+    return { changes, selection: { from: selectionFrom, to: selectionFrom + source.length } };
+  });
 }
 
 function checkedRange(projection: NotationProjection, nodes: number[]): number[] {
-  if (projection.error || !nodes.length) throw new Error("Select a complete source range");
+  if (projection.error || !nodes.length) refuse("Select a complete source range");
   const unique = [...nodes];
-  if (new Set(unique).size !== unique.length) throw new Error("Selected range contains duplicate nodes");
+  if (new Set(unique).size !== unique.length) refuse("Selected range contains duplicate nodes");
   const first = nodeAt(projection, unique[0]);
   requireAtomOrGroup(first);
   if (unique.some(index => {
     const node = projection.nodes[index];
     return !node || (node.kind !== "atom" && node.kind !== "group") || node.parent !== first.parent;
-  })) throw new Error("Selected range must share a parent");
+  })) refuse("Selected range must share a parent");
   if (unique.length === 1 && first.parent !== null) return unique;
   if (first.parent !== null) {
     const parent = nodeAt(projection, first.parent);
-    if (parent.kind !== "sequence") throw new Error("Selected range must belong to a sequence");
+    if (parent.kind !== "sequence") refuse("Selected range must belong to a sequence");
     const slots = unique.map(index => parent.children.indexOf(index));
-    if (slots.some((slot, i) => slot < 0 || (i > 0 && slot !== slots[i - 1] + 1))) throw new Error("Selected range must be contiguous");
+    if (slots.some((slot, i) => slot < 0 || (i > 0 && slot !== slots[i - 1] + 1))) refuse("Selected range must be contiguous");
   } else if (unique.length !== 1 || !projection.roots.includes(unique[0])) {
-    throw new Error("Standalone selection must be one root token");
+    refuse("Standalone selection must be one root token");
   }
   return unique;
 }
@@ -577,7 +616,7 @@ function transposeToken(content: string, projection: NotationProjection, index: 
     const child = nodeAt(projection, childIndex);
     if (child.kind === "atom" && child.value !== "~") {
       const pitch = transposePitch(child.value, semitones);
-      if (pitch === null) throw new Error(`Cannot transpose note ${child.value} by ${semitones} semitones`);
+      if (pitch === null) refuse(`Cannot transpose note ${child.value} by ${semitones} semitones`);
       changes.push({ from: child.from, to: child.baseTo, insert: pitch });
     } else child.children.forEach(visit);
   };
@@ -593,7 +632,7 @@ export function applySourceChanges(content: string, changes: readonly SourceChan
 
 function validateCandidate(content: string): void {
   const candidate = projectNotation("note", content);
-  if (candidate.error) throw new Error(`Edited notation is invalid: ${candidate.error}`);
+  if (candidate.error) refuse(`Edited notation is invalid: ${candidate.error}`);
 }
 export function leafNodes(projection: NotationProjection): number[] {
   if (projection.error) return [];

@@ -8,7 +8,7 @@ import { mountMovingScore } from "./moving-score";
 import { mountChordControls } from "./chord-controls";
 import {
   projectNotation, leafNodes, splitNode, repeatNode, weightNode, moveBoundary, boundaryInfo, sourceRangeNodes,
-  keepingSelection, mapPosition, BOUNDARY_MAX, BOUNDARY_MIN, BOUNDARY_STEP, type NotationProjection, type SourceChange,
+  keepingSelection, mapPosition, BOUNDARY_MAX, BOUNDARY_MIN, BOUNDARY_STEP, type Edit, type NotationProjection, type SourceChange,
 } from "./notation-structure";
 import { dispatchPatternEdit } from "./pattern-edit";
 import { noPhraseUpdates, phraseUpdateAt, trackPhraseUpdates, type PhraseUpdateFeedback, type PhraseUpdates } from "./phrase-update-status";
@@ -572,39 +572,33 @@ class PatternWidgetDOM {
     this.melody?.update(this.pattern);
   }
 
-  private commitStructure(changes: SourceChange[], nodeIndex: number): void {
-    const { structure, doc, contentFrom } = this.pattern;
-    if (!structure || this.view.state.doc !== doc) return;
+  /** Applies a structural edit that keeps `nodeIndex` selected, or says why it cannot apply. */
+  private commitStructure(edit: Edit<SourceChange[]>, nodeIndex: number): void {
+    const { structure, contentFrom } = this.pattern;
+    if (!structure) return;
+    if (!edit.ok) {
+      this.renderTools();
+      this.feedback.textContent = edit.reason;
+      this.view.requestMeasure();
+      return;
+    }
     this.feedback.textContent = "";
-    dispatchPatternEdit(this.view, keepingSelection(structure, nodeIndex, changes), contentFrom);
+    dispatchPatternEdit(this.view, keepingSelection(structure, nodeIndex, edit.value), contentFrom);
   }
 
   private editStructure(operation: "split" | "repeat" | "weight", value = 0): void {
     const { structure, selectedNode, contentFrom, contentTo, doc } = this.pattern;
     if (!structure || selectedNode === null || this.view.state.doc !== doc) return;
-    try {
-      const content = doc.sliceString(contentFrom, contentTo);
-      const changes = operation === "split" ? splitNode(content, structure, selectedNode)
-        : operation === "repeat" ? repeatNode(content, structure, selectedNode, value)
-        : weightNode(content, structure, selectedNode, value);
-      this.commitStructure(changes, selectedNode);
-    } catch (error) {
-      this.renderTools();
-      this.feedback.textContent = error instanceof Error ? error.message : "Cannot edit this structure.";
-      this.view.requestMeasure();
-    }
+    const content = doc.sliceString(contentFrom, contentTo);
+    this.commitStructure(operation === "split" ? splitNode(content, structure, selectedNode)
+      : operation === "repeat" ? repeatNode(content, structure, selectedNode, value)
+      : weightNode(content, structure, selectedNode, value), selectedNode);
   }
 
   private changeBoundary(node: number | null, ratio: number): void {
     const { structure, doc, contentFrom, contentTo } = this.pattern;
     if (!structure || node === null || this.view.state.doc !== doc) return;
-    try {
-      this.commitStructure(moveBoundary(doc.sliceString(contentFrom, contentTo), structure, node, ratio), node);
-    } catch (error) {
-      this.renderTools();
-      this.feedback.textContent = error instanceof Error ? error.message : "Cannot move this boundary.";
-      this.view.requestMeasure();
-    }
+    this.commitStructure(moveBoundary(doc.sliceString(contentFrom, contentTo), structure, node, ratio), node);
   }
 
   private changeTiming(kind: "slow" | "gate", value: number): void {
