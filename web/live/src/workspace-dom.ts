@@ -1,3 +1,4 @@
+import type { HelpExamplesHost } from "./help-examples";
 import type { OutputScopeHost } from "./output-scope";
 import type { ScoreLinkElements } from "./score-link";
 import type { ScoreSessionElements } from "./score-session";
@@ -58,6 +59,11 @@ export function queryWorkspaceDom(doc: Document) {
     recoveryList: element("saved-draft-list"),
   };
   const share: ScoreLinkElements = { button: button("share-score") };
+  const examples: HelpExamplesHost = {
+    sounds: element("starting-sounds"),
+    featured: element("examples"),
+    more: element("more-examples"),
+  };
 
   return {
     editor: element("editor"),
@@ -79,17 +85,7 @@ export function queryWorkspaceDom(doc: Document) {
       toggle: button("cheat-toggle"),
       close: button("close-help"),
       narrow: view.matchMedia("(max-width: 760px)"),
-      sceneButtons: [...doc.querySelectorAll<HTMLButtonElement>("[data-scene]")],
-      examples: {
-        roomOfLight: button("room-of-light-example"),
-        envelopeCompare: button("envelope-compare-example"),
-        sharedRoom: button("shared-room-example"),
-        sharedRoomAfterglow: button("shared-room-afterglow-example"),
-        overlayGroove: button("overlay-groove-example"),
-        lightOrbit: button("light-orbit-example"),
-        overlayGrouping: button("overlay-grouping-example"),
-        restsAndGates: button("rests-and-gates-example"),
-      },
+      examples,
     },
   };
 }

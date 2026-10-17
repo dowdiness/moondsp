@@ -54,20 +54,7 @@
         <p>moondsp is a score you can read, draw, and hear. Every phrase is code; the grid under your cursor edits that same code, even while it plays. Press Play, change a note, and listen. Undo always brings it back.</p>
     <section class="experience-intro" aria-label="Starting sounds">
       <p class="starting-label">Play a starting sound</p>
-      <div class="scene-list" aria-label="Explore a starting sound">
-        <button class="scene" type="button" data-scene="first-light" aria-label="Explore First light" title="First light" aria-pressed="true">
-          <svg class="scene-art scene-art-light" viewBox="0 0 100 64" aria-hidden="true"><circle cx="34" cy="32" r="25"/><path d="M55 7h10a25 25 0 0 1 0 50H55Z"/></svg>
-        </button>
-        <button class="scene" type="button" data-scene="offbeat" aria-label="Explore Offbeat" title="Offbeat" aria-pressed="false">
-          <svg class="scene-art scene-art-offbeat" viewBox="0 0 100 64" aria-hidden="true"><path d="M8 39h23V14h23v25h23V14h15v39H8Z"/></svg>
-        </button>
-        <button class="scene" type="button" data-scene="slow-drift" aria-label="Explore Slow drift" title="Slow drift" aria-pressed="false">
-          <svg class="scene-art scene-art-drift" viewBox="0 0 100 64" aria-hidden="true"><ellipse cx="50" cy="32" rx="42" ry="23"/><ellipse cx="50" cy="32" rx="27" ry="23"/><ellipse cx="50" cy="32" rx="10" ry="23"/></svg>
-        </button>
-        <button class="scene" type="button" data-scene="moonrise" aria-label="Explore Moonrise" title="Moonrise" aria-pressed="false">
-          <svg class="scene-art scene-art-rise" viewBox="0 0 100 64" aria-hidden="true"><path d="M8 53h84M20 53a30 30 0 0 1 60 0Z"/></svg>
-        </button>
-      </div>
+      <div class="scene-list" id="starting-sounds" aria-label="Explore a starting sound"></div>
     </section>
         <details class="help-basics">
           <summary>Draw a melody</summary>
@@ -120,49 +107,10 @@
         </details>
         <h2>Listen to an idea</h2>
         <p class="cheat-note">Examples replace your score; Undo restores it. While paused, Play resumes the accepted score. Restart plays your new score from the beginning.</p>
-        <button type="button" class="example" id="overlay-groove-example" data-live-example="overlay-groove">Overlay groove: + layers</button>
-        <p class="cheat-note">Drums, bass, and a stereo melody loop. The final .slow(2) slows both melodies inside parentheses.</p>
-        <button type="button" class="example" id="rests-and-gates-example" data-live-example="rests-and-gates">Space in the groove: rests + gate</button>
-        <p class="cheat-note">Rests keep every step in place; gate(0.35) shortens the bass without moving its attacks.</p>
-        <button type="button" class="example" id="overlay-grouping-example" data-live-example="overlay-grouping">Grouping A/B: hear the parentheses</button>
-        <p class="cheat-note">20 seconds: fast hats first, then fast kick and hats. Compare kick + hats.fast(2) with (kick + hats).fast(2).</p>
-        <button type="button" class="example" id="envelope-compare-example" data-live-example="envelope-compare">One note, three envelopes</button>
-        <p class="cheat-note">Same E4: short → swell → drift. 23 seconds.</p>
-        <button type="button" class="example" data-live-example="filter-shaping" data-example='bpm(84);&#10;let warm = chord("Cmaj7 Fmaj7").slow(4).gain(0.45).lpf(900, 2.5).hpf(60);&#10;let air = note("G5 E5 D5 B4").slow(4).gain(0.2).lpf(5000).hpf(1200, 1.4);&#10;stack(warm, air)'>Carve the mix: cutoff + resonance</button>
-        <p class="cheat-note">LPF warms the chords; HPF clears lows from the lead. The second argument adds emphasis at each cutoff.</p>
-        <button type="button" class="example" id="room-of-light-example" data-live-example="room-of-light">Room of Light — pop sketch</button>
-        <p class="cheat-note">Short bass, soft chords, and a singing lead. 39 seconds.</p>
-        <button type="button" class="example" id="shared-room-example" data-live-example="shared-room">Dry → shared room comparison</button>
-        <p class="cheat-note">Same groove dry, then drums and chords send into one room. 16 seconds.</p>
-        <button type="button" class="example" id="shared-room-afterglow-example" data-live-example="shared-room-afterglow">Shared Room Afterglow</button>
-        <p class="cheat-note">Dry low end, drifting polyrhythms, a sparse room break, and one shared tail. 60 seconds.</p>
-          <button type="button" class="example" data-live-example="envelope" data-example='note("E4 G4 D4").slow(21).attack(2).hold(3).release(8)'>Drifting notes — long envelopes</button>
-          <p class="cheat-note">Each note lasts 13 seconds. Try changing release(8).</p>
+        <div id="examples"></div>
         <details>
           <summary>More examples</summary>
-        <button type="button" class="example" data-live-example="entries" data-example='let melody = note("E4 G4 A4").slow(3).gain(0.12);&#10;let response = note("D5 A4 G4 E5").slow(4).gain(0.08);&#10;stack(melody, response)'>Independent entries — 3 and 4 cycles</button>
-        <p class="cheat-note">Change E4 to F4 and D5 to C5 while playing.</p>
-        <button type="button" class="example" data-live-example="tempo" data-example='let melody = note("E4 G4 A4").slow(3).gain(0.12);&#10;let beat = s("bd hh sd hh").slow(4).gain(0.2);&#10;song(&#10;  bpm(60),&#10;  section("opening", 12, melody),&#10;  section("groove", 24, stack(melody, beat)),&#10;  part("first", "opening"),&#10;  part("second", "groove")&#10;)'>Shared melody + live tempo</button>
-        <p class="cheat-note">Change bpm(60) to bpm(72) while playing.</p>
-        <button type="button" class="example" id="light-orbit-example" data-live-example="light-orbit">Light Orbit — full song, sets BPM 120</button>
-        <p class="cheat-note">Edit motif or orbit near the top.</p>
-        <button type="button" class="example" data-example='let motif = note("E4 G4 A4").slow(3);&#10;let groove = stack(motif, s("bd").gain(0.3));&#10;groove'>Named motif + groove</button>
-        <button type="button" class="example" data-song-example="ode" data-example='bpm(72);&#10;song(&#10;  section(&#10;    "ode",&#10;    256,&#10;    stack(&#10;      s("bd").slow(4),&#10;      note("64 64 65 67&#10;67 65 64 62&#10;60 60 62 64&#10;64 62 62 62").slow(16)&#10;    )&#10;  ),&#10;  part("ode1", "ode")&#10;)'>song("ode" — multiline melody + kick, sets BPM 72)</button>
-        <button type="button" class="example" data-example='chord("C")'>chord("C") — C major triad</button>
-        <button type="button" class="example" data-example='chord("C Dm G7 C").slow(2)'>chord("C Dm G7 C").slow(2) — chord progression</button>
-        <button type="button" class="example" data-example='chord("Cmaj7").gain(0.4)'>chord("Cmaj7").gain(0.4) — major 7th chord</button>
-        <button type="button" class="example" data-example='note("C4 E4 G4 C5").slow(2)'>note("C4 E4 G4 C5").slow(2) — note names instead of numbers</button>
-        <button type="button" class="example" data-example='note("C D E F G A B C5").slow(2)'>note("C D E F G A B C5").slow(2) — C major scale with note names</button>
-        <button type="button" class="example" data-example='s("bd sd hh sd")'>s("bd sd hh sd")</button>
-        <button type="button" class="example" data-example='s("bd(3,8), hh*16?, sd(2,8,2)").jux(rev)'>s("bd(3,8), hh*16?, sd(2,8,2)").jux(rev)</button>
-        <button type="button" class="example" data-example='s("bd*4").every(3, fast(2))'>s("bd*4").every(3, fast(2))</button>
-        <button type="button" class="example" data-example='note("C4 E4 G4").jux(rev)'>note("C4 E4 G4").jux(rev)</button>
-        <button type="button" class="example" data-example='s("[bd sd, hh*8]").degradeBy(0.3)'>s("[bd sd, hh*8]").degradeBy(0.3)</button>
-        <button type="button" class="example" data-example='$: s("bd sd hh sd")&#10;$: chord("C Dm G7")'>$: s("bd sd hh sd") / $: chord("C Dm G7")</button>
-        <button type="button" class="example" data-example='note("60(3,8) 64(2,8,2) 67(3,8) 64(2,8) 60(3,8) 62(2,8,3) 64(3,8) 67(2,8)").slow(4).every(4, rev)'>note("60(3,8) 64(2,8,2) 67(3,8) 64(2,8) 60(3,8) 62(2,8,3) 64(3,8) 67(2,8)").slow(4).every(4, rev)</button>
-        <button type="button" class="example" data-example='$: s("bd(3,8), hh(5,16)?, sd(2,8,4)").slow(2)&#10;$: note("C4(3,8) E4(2,8,2) G4(3,8) E4(2,8,3) C4(3,8)").slow(3)'>$: s("bd(3,8), hh(5,16)?, sd(2,8,4)").slow(2) / $: note("C4…").slow(3)</button>
-        <button type="button" class="example" data-example='note("48(3,8) 55(2,8,2) 60(3,8) 64(2,8) 67(3,8) 72(1,8)? 67(2,8,2) 60(3,8)").slow(4).jux(rev)'>note("48(3,8) 55(2,8,2) 60(3,8) 64(2,8) 67(3,8) 72(1,8)? 67(2,8,2) 60(3,8)").slow(4).jux(rev)</button>
-        <button type="button" class="example" data-example='$: s("bd(1,4), sd(1,4,2)").slow(2).jux(slow(2))&#10;$: note("46*4 60*8, 40*16 192(1,16)?").slow(2).jux(slow(2))'>$: s("bd…").slow(2).jux(slow(2)) / $: note("46…").slow(2).jux(slow(2))</button>
+          <div id="more-examples"></div>
         </details>
         <details id="syntax-reference">
           <summary>Syntax reference</summary>

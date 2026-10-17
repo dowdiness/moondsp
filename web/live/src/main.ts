@@ -7,14 +7,6 @@ import { defaultKeymap, historyKeymap, undo, redo, undoDepth, redoDepth, isolate
 import { bracketMatching } from "@codemirror/language";
 import { closeBrackets, closeBracketsKeymap, acceptCompletion } from "@codemirror/autocomplete";
 
-import envelopeComparison from "../../../examples/envelope-comparison.mini?raw";
-import roomOfLight from "../../../examples/room-of-light.mini?raw";
-import lightOrbit from "../../../examples/light-orbit.mini?raw";
-import sharedRoomComparison from "../../../examples/shared-room-comparison.mini?raw";
-import sharedRoomAfterglow from "../../../examples/shared-room-afterglow.mini?raw";
-import overlayGroove from "../../../examples/overlay-groove.mini?raw";
-import overlayGrouping from "../../../examples/overlay-grouping.mini?raw";
-import restsAndGates from "../../../examples/rests-and-gates.mini?raw";
 
 import { minilive, miniliveLanguage } from "./lang/minilive";
 import { inlineControls } from "./inline-controls";
@@ -38,43 +30,10 @@ import { playbackHighlights } from "./playback-highlights";
 import { mountPlaybackObservation } from "./playback-observation";
 import { playbackChanged } from "./phrase-update-status";
 import "./phrase-update-status.css";
+import { FIRST_SCORE } from "./examples";
+import { mountHelpExamples } from "./help-examples";
 
-const STARTERS = {
-  "first-light": {
-    name: "First light",
-    source: `bpm(96);
-
-$: s("bd ~ sd ~ bd bd sd ~").slow(4)
-$: s("hh hh hh hh hh hh hh hh").slow(4)
-$: note("C4 ~ Eb4 G4 Bb4 ~ G4 Eb4").slow(4).gain(0.25).lpf(1800)`,
-  },
-  offbeat: {
-    name: "Offbeat",
-    source: `bpm(112);
-
-$: s("bd ~ ~ bd sd ~ bd ~").slow(4)
-$: s("~ hh ~ hh ~ hh ~ oh").slow(4)
-$: note("C3 ~ C3 Eb3 ~ G3 Bb3 ~").slow(4).gain(0.3).lpf(1200)`,
-  },
-  moonrise: {
-    name: "Moonrise",
-    source: `bpm(104);
-
-$: s("bd ~ ~ bd sd ~ bd ~, hh*8").slow(4)
-$: note("A2 ~ A2 C3 ~ E3 G2 ~").slow(4).gain(0.3).lpf(900)
-$: chord("Am7 Fmaj7 Cmaj7 G").slow(16).gain(0.12).lpf(1400)
-$: note("E5 ~ C5 D5 ~ B4 G4 A4").slow(8).gain(0.16).lpf(3200)`,
-  },
-  "slow-drift": {
-    name: "Slow drift",
-    source: `bpm(72);
-
-$: s("bd ~ ~ ~ sd ~ ~ ~").slow(4)
-$: note("C4 ~ G4 ~ Eb4 ~ Bb4 ~").slow(4).gain(0.2).lpf(2400)
-$: chord("Cm7 Abmaj7").slow(8).gain(0.12).lpf(900)`,
-  },
-} as const;
-const INITIAL = loadScore(STARTERS["first-light"].source);
+const INITIAL = loadScore(FIRST_SCORE);
 
 function initialCursor(source: string): number {
   let firstNote: number | undefined;
@@ -151,6 +110,12 @@ scope.own({ dispose: () => view.destroy() });
 
 const adapter = new CM6Adapter(view);
 const scoreSession = scope.own(mountScoreSession(dom.session, { view, notice }));
+// Starting sounds and examples replace the score; starting sounds also play it.
+const helpExamples = scope.own(mountHelpExamples(dom.help.examples, (source, plays) => {
+  if (dom.help.narrow.matches) setHelp(false);
+  replaceScore(source);
+  if (plays && tools) restart(tools);
+}));
 
 function refreshEditorChrome(): void {
   dom.edit.undo.disabled = undoDepth(view.state) === 0;
@@ -158,10 +123,7 @@ function refreshEditorChrome(): void {
   const head = view.state.selection.main.head;
   const line = view.state.doc.lineAt(head);
   setText(dom.edit.cursorPosition, `Ln ${line.number}, Col ${head - line.from + 1}`);
-  const text = view.state.doc.toString();
-  const starter = Object.entries(STARTERS).find(([, value]) => value.source === text);
-  dom.help.sceneButtons.forEach(button =>
-    button.setAttribute("aria-pressed", String(button.dataset.scene === starter?.[0])));
+  helpExamples.show(view.state.doc.toString());
 }
 
 function replaceScore(source: string): void {
@@ -284,15 +246,6 @@ dom.transport.restoreScore.addEventListener("click", () => {
 });
 
 // ── Cheatsheet ──────────────────────────────────────────────
-dom.help.examples.roomOfLight.dataset.example = roomOfLight;
-dom.help.examples.envelopeCompare.dataset.example = envelopeComparison;
-dom.help.examples.sharedRoom.dataset.example = sharedRoomComparison;
-dom.help.examples.sharedRoomAfterglow.dataset.example = sharedRoomAfterglow;
-dom.help.examples.overlayGroove.dataset.example = `bpm(96);\n${overlayGroove}`;
-dom.help.examples.lightOrbit.dataset.example = `bpm(120);\n${lightOrbit}`;
-dom.help.examples.overlayGrouping.dataset.example = overlayGrouping;
-dom.help.examples.restsAndGates.dataset.example = `bpm(96);\n${restsAndGates}`;
-
 function setHelp(open: boolean): void {
   dom.help.workspace.classList.toggle("cheat-collapsed", !open);
   dom.help.dialog.inert = !open;
@@ -317,25 +270,6 @@ dom.help.narrow.addEventListener("change", () => {
   setHelp(true);
 });
 
-dom.help.sceneButtons.forEach(button => {
-  button.addEventListener("click", () => {
-    const starter = STARTERS[button.dataset.scene as keyof typeof STARTERS];
-    if (!starter) return;
-    if (dom.help.narrow.matches) setHelp(false);
-    replaceScore(starter.source);
-    if (tools) restart(tools);
-  });
-});
-
-dom.help.dialog.addEventListener("click", (ev) => {
-  const target = ev.target as HTMLElement;
-  const example = target.closest<HTMLElement>(".example");
-  if (!example) return;
-  const text = example.dataset.example;
-  if (!text) return;
-  if (dom.help.narrow.matches) setHelp(false);
-  replaceScore(text);
-});
 
 // Keep editing and saving independent of the compiler's network/evaluation time.
 let authoringPhase: AuthoringPhase = "starting";

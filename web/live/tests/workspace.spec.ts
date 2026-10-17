@@ -250,6 +250,27 @@ test("mobile Help contains keyboard focus, closes on Escape and yields to a chos
   expect(await readCode(page)).toBe('note("D4")');
 });
 
+test("every Help example loads its own score without playing; a scene plays what it loads", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Help", exact: true }).click();
+  await page.locator("#cheat details").evaluateAll(sections => sections.forEach(section => { (section as HTMLDetailsElement).open = true; }));
+  const examples = page.locator("#cheat button.example");
+  const loaded = new Set([await readCode(page)]);
+  for (let index = 0; index < await examples.count(); index++) {
+    await examples.nth(index).click();
+    const code = await readCode(page);
+    expect(loaded.has(code), await examples.nth(index).innerText()).toBe(false);
+    loaded.add(code);
+  }
+  await expect(page.locator("#status")).toHaveText("Ready");
+  const offbeat = page.getByRole("button", { name: "Explore Offbeat", exact: true });
+  await offbeat.click();
+  await expect(page.locator("#status")).toHaveText("Playing");
+  expect(await readCode(page)).toMatch(/^bpm\(112\);/);
+  await expect(offbeat).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Explore First light", exact: true })).toHaveAttribute("aria-pressed", "false");
+});
+
 test("UTF-8 import is undoable, downloads exact text, and survives reload", async ({ page }) => {
   await page.goto("/");
   const original = await readCode(page);
