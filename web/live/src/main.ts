@@ -75,7 +75,6 @@ $: chord("Cm7 Abmaj7").slow(8).gain(0.12).lpf(900)`,
   },
 } as const;
 const INITIAL = loadScore(STARTERS["first-light"].source);
-let patternTools: typeof PatternControls | undefined;
 
 function initialCursor(source: string): number {
   let firstNote: number | undefined;
@@ -103,8 +102,9 @@ const listenerCompartment = new Compartment();
 const controlsCompartment = new Compartment();
 const patternCompartment = new Compartment();
 const contentAttributesCompartment = new Compartment();
-let draft: Draft | undefined;
-let playback: Player | undefined;
+/** Score tools: the draft, its player, and the score controls, present together once they load. */
+type Tools = Readonly<{ draft: Draft; playback: Player; observation: ReturnType<typeof mountPlaybackObservation>; controls: typeof PatternControls }>;
+let tools: Tools | null = null;
 let disposed = false;
 
 const view = new EditorView({
@@ -178,9 +178,7 @@ dom.edit.redo.addEventListener("click", () => { redo(view); view.focus(); });
 dom.transport.sourceToggle.addEventListener("click", () => {
   const enabled = dom.transport.sourceToggle.getAttribute("aria-pressed") !== "true";
   dom.transport.sourceToggle.setAttribute("aria-pressed", String(enabled));
-  if (patternTools) {
-    view.dispatch({ effects: controlsCompartment.reconfigure(patternTools.patternControlsVisible.of(enabled)) });
-  }
+  if (tools) view.dispatch({ effects: controlsCompartment.reconfigure(tools.controls.patternControlsVisible.of(enabled)) });
 });
 refreshEditorChrome();
 
@@ -211,11 +209,10 @@ function diagnosticFromError(raw: string, docLength: number): Diagnostic {
 }
 let renderedPlayback: PlaybackView | undefined;
 
-let playbackObservation: ReturnType<typeof mountPlaybackObservation> | undefined;
 function renderPlayback(state: PlaybackView): void {
   view.dispatch({ effects: playbackChanged.of(state) });
   applyStatus(state);
-  playbackObservation?.setPlaying(state.state === "Playing");
+  tools?.observation.setPlaying(state.state === "Playing");
   if (state.feedback !== renderedPlayback?.feedback) {
     setLog(state.feedback?.message ?? "", state.feedback?.kind ?? "info");
   }
@@ -240,9 +237,8 @@ view.dispatch({
     EditorView.updateListener.of(update => {
       if (update.docChanged) scoreSession.changed();
       if (update.docChanged || update.selectionSet) refreshEditorChrome();
-      if (!update.docChanged || !draft || !playback) return;
-      const activeDraft = draft;
-      const activePlayback = playback;
+      if (!update.docChanged || !tools) return;
+      const { draft: activeDraft, playback: activePlayback, observation } = tools;
       try {
         // Preserve each transaction's causality; composing a replace and undo
         // into one text diff would incorrectly revive retired source identities.
@@ -254,7 +250,7 @@ view.dispatch({
           }, true);
           activeDraft.edit({ base: activeDraft.state().version, edits });
         }
-        playbackObservation?.edited();
+        observation.edited();
         // Diagnostic decoration dispatch must happen outside CM's update turn.
         queueMicrotask(() => activePlayback.editDraft());
       } catch (error) {
@@ -264,25 +260,26 @@ view.dispatch({
   ]),
 });
 
+/** Play the editor's score from the beginning. */
+function restart({ draft, playback }: Tools): void {
+  try {
+    void playback.restart(draft.prepare()).catch(error => playback.report(error));
+  } catch (error) {
+    playback.reportDraftFailure(error);
+  }
+}
+
 dom.transport.start.addEventListener("click", () => {
-  if (!playback) return;
-  const activePlayback = playback;
-  const state = activePlayback.view().state;
-  void (state === "Playing" || state === "Starting" ? activePlayback.pause() : activePlayback.play()).catch(error => activePlayback.report(error));
+  if (!tools) return;
+  const { playback } = tools;
+  const state = playback.view().state;
+  void (state === "Playing" || state === "Starting" ? playback.pause() : playback.play()).catch(error => playback.report(error));
 });
 
-dom.transport.restart.addEventListener("click", () => {
-  if (!playback || !draft) return;
-  const activePlayback = playback;
-  try {
-    void activePlayback.restart(draft.prepare()).catch(error => activePlayback.report(error));
-  } catch (error) {
-    activePlayback.reportDraftFailure(error);
-  }
-});
+dom.transport.restart.addEventListener("click", () => { if (tools) restart(tools); });
 
 dom.transport.restoreScore.addEventListener("click", () => {
-  const source = playback?.view().currentSource ?? null;
+  const source = tools?.playback.view().currentSource ?? null;
   if (source !== null) replaceScore(source);
 });
 
@@ -326,13 +323,7 @@ dom.help.sceneButtons.forEach(button => {
     if (!starter) return;
     if (dom.help.narrow.matches) setHelp(false);
     replaceScore(starter.source);
-    if (!playback || !draft) return;
-    const activePlayback = playback;
-    try {
-      void activePlayback.restart(draft.prepare()).catch(error => activePlayback.report(error));
-    } catch (error) {
-      activePlayback.reportDraftFailure(error);
-    }
+    if (tools) restart(tools);
   });
 });
 
@@ -370,6 +361,7 @@ scope.own({ dispose: () => clearTimeout(readinessNoticeTimer) });
 
 async function prepareAuthoring(): Promise<void> {
   let createdDraft: Draft | undefined;
+  let observation: Tools["observation"] | undefined;
   try {
     const [authoring, player, controls] = await Promise.all([
       import("./authoring"),
@@ -378,13 +370,12 @@ async function prepareAuthoring(): Promise<void> {
     ]);
     if (disposed) return;
     // No await between reading the document and installing its edit listener.
-    createdDraft = new authoring.Draft(view.state.doc.toString());
-    draft = createdDraft;
-    playback = new player.Player(engine, { draft }, renderPlayback);
-    playbackObservation = scope.own(mountPlaybackObservation(view, draft, engine, error => {
+    const draft = createdDraft = new authoring.Draft(view.state.doc.toString());
+    const playback = new player.Player(engine, { draft }, renderPlayback);
+    observation = scope.own(mountPlaybackObservation(view, draft, engine, error => {
       setLog(`Playback highlighting: ${error instanceof Error ? error.message : String(error)}`, "error");
     }));
-    patternTools = controls;
+    tools = { draft, playback, observation, controls };
     view.dispatch({
       // Adding notation must not move the user's selection to a startup phrase.
       effects: [
@@ -397,12 +388,9 @@ async function prepareAuthoring(): Promise<void> {
     refreshEditorChrome();
   } catch (error) {
     if (disposed) { createdDraft?.dispose(); return; }
-    playbackObservation?.dispose();
-    playbackObservation = undefined;
+    observation?.dispose();
     createdDraft?.dispose();
-    draft = undefined;
-    playback = undefined;
-    patternTools = undefined;
+    tools = null;
     setAuthoring("failed");
     setLog(`Could not load score tools. Reload to try again. ${error instanceof Error ? error.message : String(error)}`, "error");
     refreshEditorChrome();
