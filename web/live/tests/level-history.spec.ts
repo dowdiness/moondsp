@@ -19,7 +19,7 @@ test("level history interpolates missed slots and freezes while the transport is
   expect(history.head).toBe((head + 1) % HISTORY_SLOTS);
 });
 
-test("a gap longer than 250 ms is skipped instead of drawn as an interpolated ramp", () => {
+test("a gap longer than a second is skipped instead of drawn as an interpolated ramp", () => {
   const history = createLevelHistory();
   pushLevel(history, 0, 1000, true);
   pushLevel(history, 0.2, 1000 + SLOT_MS, true);
@@ -30,6 +30,14 @@ test("a gap longer than 250 ms is skipped instead of drawn as an interpolated ra
   expect(newest(history.values, history.head, 3).map(value => Number(value.toFixed(3)))).toEqual([0, 0.2, 1]);
   pushLevel(history, 1, 9000 + 2 * SLOT_MS, true);
   expect(history.head).toBe((head + 3) % HISTORY_SLOTS);
+});
+
+test("reduced-motion redraws every 250 ms fill every slot they span", () => {
+  const history = createLevelHistory();
+  pushLevel(history, 0.5, 1000, true);
+  // Timer jitter puts each redraw just past 250 ms; each still fills 12 or 13 slots.
+  for (let draw = 1; draw <= 8; draw++) pushLevel(history, 0.5, 1000 + draw * 250.4, true);
+  expect(history.head).toBe(Math.floor(8 * 250.4 / SLOT_MS));
 });
 
 test("bar levels map the tracked peak over 30 dB with a short release", () => {

@@ -10,8 +10,9 @@ const PEAK_FLOOR = 0.02;
 const DYNAMIC_RANGE_DB = 30;
 const RELEASE_PER_BAR = 0.86;
 // Longer gaps (a hidden tab, a stalled main thread) were never measured; they are
-// skipped like a pause instead of being drawn as an interpolated ramp.
-const MAX_INTERPOLATED_MS = 250;
+// skipped like a pause instead of being drawn as an interpolated ramp. Reduced
+// motion draws every 250 ms, so the limit stays well above that cadence.
+const MAX_INTERPOLATED_MS = 1000;
 
 /** 0 = no boundary, 1 = cycle boundary, 2 = every GROUP_CYCLES cycles. */
 export type Tick = 0 | 1 | 2;
@@ -38,7 +39,7 @@ export function markCycle(history: LevelHistory, cycle: number): void {
  * Records `rms` for every whole slot elapsed since the last push. A stopped
  * transport freezes the history. Slots missed by a long frame are interpolated
  * from the previous value instead of holding one level; a gap longer than
- * 250 ms records one slot, as if the history had been paused.
+ * a second records one slot, as if the history had been paused.
  */
 export function pushLevel(history: LevelHistory, rms: number, now: number, playing: boolean): void {
   if (!playing) { history.lastPush = now; return; }
