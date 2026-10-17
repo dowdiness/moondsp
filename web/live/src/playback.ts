@@ -29,13 +29,23 @@ type Pending = {
   resolve: (receipt: PlayerReceipt) => void;
   reject: (error: Error) => void;
 };
+const EMPTY: PlayerSnapshot = { state: "Empty", mode: "none", cyclePosition: 0, tempo: 60, samplePosition: 0, pendingCount: 0, skippedCount: 0 };
+
+/** The draft's own parse error, shown until the draft changes or audio reports another. */
+function draftDiagnostic(state: DraftState): Diagnostic | null {
+  return state.diagnostic === null ? null : { message: state.diagnostic, documentLength: state.text.length };
+}
+function draftFeedback(state: DraftState): Feedback | null {
+  return state.diagnostic === null ? null : { kind: "error", message: state.diagnostic };
+}
+
 type Connection =
   | { kind: "closed" }
   | { kind: "opening"; promise: Promise<AudioSession>; retirement: () => Promise<void>; controller: AbortController }
   | { kind: "open"; session: AudioSession };
 export class Player {
   private connection: Connection = { kind: "closed" };
-  private snapshot: PlayerSnapshot = { state: "Empty", mode: "none", cyclePosition: 0, tempo: 60, samplePosition: 0, pendingCount: 0, skippedCount: 0 };
+  private snapshot: PlayerSnapshot = EMPTY;
   private readonly draft: Draft;
   private currentSource: string | null = null;
   private acceptedVersion: DraftVersion | null = null;
@@ -62,7 +72,7 @@ export class Player {
   ) {
     this.draft = initial.draft;
     this.draftState = this.draft.state();
-    this.diagnostic = this.draftState.diagnostic === null ? null : { message: this.draftState.diagnostic, documentLength: this.draftState.text.length };
+    this.diagnostic = draftDiagnostic(this.draftState);
     this.render();
   }
 
@@ -93,8 +103,8 @@ export class Player {
     if (!sameDraftVersion(state.version, this.draftState.version)) {
       this.latestDraftReceipt = 0;
       this.latestRejectedVersion = null;
-      this.diagnostic = state.diagnostic === null ? null : { message: state.diagnostic, documentLength: state.text.length };
-      this.feedback = state.diagnostic === null ? null : { kind: "error", message: state.diagnostic };
+      this.diagnostic = draftDiagnostic(state);
+      this.feedback = draftFeedback(state);
     }
     this.draftState = state;
   }
@@ -110,8 +120,8 @@ export class Player {
     this.cancelAutomatic();
     this.refreshDraft();
     const state = this.draftState;
-    this.diagnostic = state.diagnostic === null ? null : { message: state.diagnostic, documentLength: state.text.length };
-    this.feedback = state.diagnostic === null ? null : { kind: "error", message: state.diagnostic };
+    this.diagnostic = draftDiagnostic(state);
+    this.feedback = draftFeedback(state);
     if (state.diagnostic === null && this.connection.kind === "open") {
       this.queuedVersion = state.version;
       this.debounce = setTimeout(() => {
@@ -190,6 +200,21 @@ export class Player {
   }
 
   async close(): Promise<void> {
+    const retirement = this.endRun(new DOMException("Player closed", "AbortError"));
+    this.snapshot = EMPTY;
+    this.feedback = null;
+    this.refreshDraft();
+    this.diagnostic = draftDiagnostic(this.draftState);
+    this.render();
+    await retirement;
+  }
+
+  /**
+   * Ends the current run, whether it is open or still starting: its pending
+   * commands fail with `reason`, its accepted score is forgotten, and its
+   * connection is closed in the background.
+   */
+  private endRun(reason: Error): Promise<void> {
     ++this.epoch;
     ++this.intent;
     this.cancelAutomatic();
@@ -197,20 +222,13 @@ export class Player {
     const previous = this.connection;
     this.connection = { kind: "closed" };
     if (previous.kind === "opening") previous.controller.abort();
-    this.rejectPending(new DOMException("Player closed", "AbortError"));
+    this.rejectPending(reason);
     this.currentSource = null;
     this.acceptedVersion = null;
     this.latestAcceptedSourceId = 0;
     this.latestRejectedVersion = null;
     this.latestDraftReceipt = 0;
-    this.snapshot = { state: "Empty", mode: "none", cyclePosition: 0, tempo: 60, samplePosition: 0, pendingCount: 0, skippedCount: 0 };
-    this.feedback = null;
-    this.refreshDraft();
-    const state = this.draftState;
-    this.diagnostic = state.diagnostic === null ? null : { message: state.diagnostic, documentLength: state.text.length };
-    const retirement = this.retire(previous);
-    this.render();
-    await retirement;
+    return this.retire(previous);
   }
 
   /** Closes a connection the player has already let go of. */
@@ -302,22 +320,9 @@ export class Player {
     this.pending.clear();
   }
   private fail(message: string): void {
-    ++this.epoch;
-    ++this.intent;
-    this.cancelAutomatic();
-    this.automaticInFlight = undefined;
-    const previous = this.connection;
-    if (previous.kind === "opening") previous.controller.abort();
-    this.connection = { kind: "closed" };
-    this.currentSource = null;
-    this.acceptedVersion = null;
-    this.latestAcceptedSourceId = 0;
-    this.latestRejectedVersion = null;
-    this.latestDraftReceipt = 0;
+    const retirement = this.endRun(new Error(message));
     this.snapshot = { ...this.snapshot, state: "Fault" };
     this.feedback = { kind: "error", message };
-    this.rejectPending(new Error(message));
-    const retirement = this.retire(previous);
     this.render();
     void retirement.catch(error => this.report(error));
   }
