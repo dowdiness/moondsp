@@ -1,4 +1,4 @@
-import type { AudioEngine, AudioEvent, AudioSession, AudioStatus, OpenSessionResult } from "./audio";
+import type { AudioEngine, AudioEvent, AudioSession, AudioStatus } from "./audio";
 import { Draft, PlaybackInput, type DraftState } from "./authoring";
 import { sameDraftVersion, type DraftVersion } from "./draft-version";
 import { RequestId } from "./playback-protocol";
@@ -49,7 +49,6 @@ export class Player {
   private intent = 0;
   private lastReceipt = 0;
   private pending = new Map<number, Pending>();
-  private retirement: Promise<void> | undefined;
   private debounce: ReturnType<typeof setTimeout> | undefined;
   private automaticInFlight: symbol | undefined;
   private latestUnsent: PlaybackInput | undefined;
@@ -214,29 +213,21 @@ export class Player {
     await retirement;
   }
 
-  private retire(previous: Connection): Promise<void> {
-    if (this.retirement !== undefined) return this.retirement;
-    const closing = previous.kind === "open" ? previous.session.close()
-      : previous.kind === "opening" ? previous.retirement() : Promise.resolve();
-    let retirement: Promise<void>;
-    retirement = Promise.resolve(closing).then(() => undefined).finally(() => {
-      if (this.retirement === retirement) this.retirement = undefined;
-    });
-    this.retirement = retirement;
-    return retirement;
+  /** Closes a connection the player has already let go of. */
+  private async retire(previous: Connection): Promise<void> {
+    if (previous.kind === "open") await previous.session.close();
+    else if (previous.kind === "opening") await previous.retirement();
   }
   private open(): Promise<AudioSession> {
     if (this.connection.kind === "open") return Promise.resolve(this.connection.session);
     if (this.connection.kind === "opening") return this.connection.promise;
     const epoch = ++this.epoch;
     const controller = new AbortController();
-    const raw = (async (): Promise<OpenSessionResult> => {
-      if (this.retirement !== undefined) await this.retirement;
-      if (epoch !== this.epoch) throw new DOMException("Player closed during startup", "AbortError");
-      return this.engine.openSession(event => {
-        if (epoch === this.epoch) this.receive(event);
-      }, controller.signal);
-    })();
+    // Called within the user's gesture, which a browser requires to start
+    // audio; the engine lets a retiring session give way rather than wait.
+    const raw = this.engine.openSession(event => {
+      if (epoch === this.epoch) this.receive(event);
+    }, controller.signal);
     let retirement: Promise<void> | undefined;
     const retireOpening = (): Promise<void> => {
       if (retirement !== undefined) return retirement;

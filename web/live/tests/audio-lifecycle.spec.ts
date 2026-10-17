@@ -229,3 +229,40 @@ test("the initialization deadline covers a fetch that never settles", async ({ p
   await page.locator("#start").click();
   await expect(page.locator("#status")).toHaveText("Paused");
 });
+
+test("Play right after a cancelled start starts audio inside its own click", async ({ page }) => {
+  // Browsers start audio only from a user gesture, and Safari only while the
+  // click is being handled. Record whether each context is made or resumed then.
+  await page.addInitScript(() => {
+    const calls: boolean[] = [];
+    let inClick = false;
+    window.addEventListener("click", () => { inClick = true; }, true);
+    window.addEventListener("click", () => { inClick = false; });
+    const resume = AudioContext.prototype.resume;
+    AudioContext.prototype.resume = function() { calls.push(inClick); return resume.call(this); };
+    // Closing a context can take a while, as it does in Firefox.
+    const close = AudioContext.prototype.close;
+    AudioContext.prototype.close = function() { return close.call(this).then(() => new Promise(resolve => setTimeout(resolve, 300))); };
+    window.AudioContext = class extends AudioContext {
+      constructor(options?: AudioContextOptions) { super(options); calls.push(inClick); }
+    };
+    Object.assign(window, { __audioStarts: calls });
+  });
+  // A slow engine download keeps the first start cancellable.
+  await page.route("**/moonbit_dsp.wasm", async route => {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    await route.continue();
+  });
+  await page.goto("/");
+  await expect(page.locator("body")).toHaveAttribute("data-authoring", "ready");
+  const start = page.locator("#start"), status = page.locator("#status");
+  await start.click();
+  await expect(status).toHaveText("Starting");
+  await start.click();
+  await start.click();
+  await expect(status).toHaveText("Playing");
+  const starts = await page.evaluate(() => (window as unknown as { __audioStarts: boolean[] }).__audioStarts);
+  // The first click and the replacing click each made a context.
+  expect(starts.length).toBeGreaterThanOrEqual(2);
+  expect(starts).not.toContain(false);
+});

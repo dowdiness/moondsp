@@ -90,10 +90,10 @@ type SessionCommand = "fade-in"
 type EngineState =
   | { kind: "idle" }
   | { kind: "suspended"; graph: Graph }
-  | { kind: "opening"; run: symbol }
-  | (GraphRun & { kind: "active" | "closing" })
-  // A failure reported while resuming aborts the attempt.
+  // Cancelling, the deadline, or a failure while starting aborts the attempt.
+  | { kind: "opening"; run: symbol; attempt: AbortController }
   | (GraphRun & { kind: "resuming"; attempt: AbortController })
+  | (GraphRun & { kind: "active" | "closing" })
   | { kind: "failed"; message: string };
 
 export class AudioEngine {
@@ -160,16 +160,21 @@ export class AudioEngine {
     }
   }
 
-  /** Open a muted session, creating or resuming a healthy graph.
-   * Call from a user gesture so AudioContext.resume retains activation. */
+  /**
+   * Open a muted session, creating or resuming a healthy graph. Call from a
+   * user gesture: the context is created or resumed before this first awaits,
+   * so it keeps the gesture's activation. A closing session or a cancelled
+   * start gives way at once rather than making the gesture wait for it.
+   */
   async openSession(
     deliver: (event: AudioEvent) => void,
     signal?: AbortSignal,
   ): Promise<OpenSessionResult> {
     const previous = this.state;
     switch (previous.kind) {
-      case "opening": case "resuming": case "active": case "closing": return { kind: "busy" };
-      case "idle": case "suspended": case "failed": break;
+      case "active": return { kind: "busy" };
+      case "opening": case "resuming": if (!previous.attempt.signal.aborted) return { kind: "busy" }; break;
+      case "idle": case "suspended": case "closing": case "failed": break;
     }
     if (signal?.aborted) throw abortError();
     // One signal ends the attempt: the caller cancels, the deadline passes, or the graph fails.
@@ -179,13 +184,15 @@ export class AudioEngine {
     signal?.addEventListener("abort", cancel, { once: true });
     try {
       const run = Symbol("audio run");
-      if (previous.kind === "suspended" && previous.graph.ctx.state !== "closed") {
+      // Reopening during Stop's fade cancels the fade and keeps the graph.
+      if ((previous.kind === "suspended" || previous.kind === "closing") && previous.graph.ctx.state !== "closed") {
         return await this.resume(previous.graph, run, deliver, attempt);
       }
-      this.state = { kind: "opening", run };
+      const opening: EngineState = { kind: "opening", run, attempt };
+      this.state = opening;
       let graph: Graph;
       try {
-        if (previous.kind === "suspended") await this.dispose(previous.graph);
+        if (previous.kind === "suspended") void this.dispose(previous.graph);
         graph = await this.createGraph(attempt.signal);
         // These handlers follow the graph's lifetime, not a playback run.
         graph.node.port.onmessage = event => { this.dispatch(event.data, graph); };
@@ -193,7 +200,8 @@ export class AudioEngine {
           this.dispatch({ type: "error", message: "AudioWorklet processor failed" }, graph);
         };
       } catch (error) {
-        this.state = isAbort(error) ? { kind: "idle" } : { kind: "failed", message: errorMessage(error) };
+        // A later start may already have replaced this one.
+        if (this.state === opening) this.state = isAbort(error) ? { kind: "idle" } : { kind: "failed", message: errorMessage(error) };
         if (isAbort(error)) throw error;
         return { kind: "failed", message: errorMessage(error) };
       }
@@ -210,14 +218,16 @@ export class AudioEngine {
     deliver: (event: AudioEvent) => void,
     attempt: AbortController,
   ): Promise<OpenSessionResult> {
-    this.state = { kind: "resuming", graph, run, deliver, attempt };
+    const resuming: EngineState = { kind: "resuming", graph, run, deliver, attempt };
+    this.state = resuming;
     try {
       this.ramp(graph, 0, 0);
       await abortable(() => graph.ctx.resume(), attempt.signal);
       return this.activate(graph, run, deliver);
     } catch (error) {
+      // Leave the engine to a later start at once; the graph closes behind it.
+      if (this.state === resuming) this.state = isAbort(error) ? { kind: "idle" } : { kind: "failed", message: errorMessage(error) };
       await this.dispose(graph);
-      this.state = isAbort(error) ? { kind: "idle" } : { kind: "failed", message: errorMessage(error) };
       if (isAbort(error)) throw error;
       deliver({ kind: "failed", message: errorMessage(error) });
       return { kind: "failed", message: errorMessage(error) };

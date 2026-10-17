@@ -12,7 +12,10 @@ function harness(deferred = false, delayedClose = false, cancellable = false) {
   let deliver: (event: AudioEvent) => void = () => {};
   const opening = Promise.withResolvers<OpenSessionResult>();
   const closingStarted = Promise.withResolvers<void>();
-  let busy = false;
+  // Like AudioEngine, only a running session or a live start is busy: a
+  // closing session and a cancelled start give way to the next one at once.
+  let owner: "running" | AbortSignal | undefined | null = null;
+  const busy = () => owner === "running" || (owner !== null && !owner?.aborted);
   let firstOpening = true;
   const issue = (id: RequestId, operation: PlayerOperation, input?: PlaybackInput) => {
     commands.push({ id: id.value, operation, input: input?.wire });
@@ -22,9 +25,9 @@ function harness(deferred = false, delayedClose = false, cancellable = false) {
   const session: AudioSession = {
     fadeIn: () => "issued",
     close: async () => {
+      owner = null;
       closingStarted.resolve();
       if (delayedClose) await closing.promise;
-      busy = false;
       return { kind: "closed" } as const;
     },
     update: (id, input) => issue(id, "update", input),
@@ -33,20 +36,21 @@ function harness(deferred = false, delayedClose = false, cancellable = false) {
     pause: id => issue(id, "pause"),
   };
   const engine = { openSession: async (next: (event: AudioEvent) => void, signal?: AbortSignal): Promise<OpenSessionResult> => {
-    if (busy) return { kind: "busy" };
-    busy = true;
+    if (busy()) return { kind: "busy" };
     deliver = next;
     const shouldDefer = deferred && firstOpening;
     firstOpening = false;
-    if (!shouldDefer) return { kind: "opened", session };
-    if (!cancellable) return opening.promise;
+    if (!shouldDefer) { owner = "running"; return { kind: "opened", session }; }
+    owner = signal;
+    const opened = opening.promise.then(result => { if (owner === signal) owner = "running"; return result; });
+    if (!cancellable) return opened;
     return new Promise<OpenSessionResult>((resolve, reject) => {
       const abort = () => {
-        busy = false;
+        if (owner === signal) owner = null;
         reject(new DOMException("Opening cancelled", "AbortError"));
       };
       signal?.addEventListener("abort", abort, { once: true });
-      void opening.promise.then(result => {
+      void opened.then(result => {
         signal?.removeEventListener("abort", abort);
         resolve(result);
       });
@@ -145,7 +149,7 @@ test("Play Pause Play replaces the cancelled initialization without a Pause comm
 });
 
 for (const duringOpen of [true, false]) {
-  test(`close waits for ${duringOpen ? "opening" : "open"} session cleanup before reuse`, async () => {
+  test(`Play during ${duringOpen ? "opening" : "open"} session cleanup reopens without waiting for it`, async () => {
     const h = harness(duringOpen, true);
     let cancelled: Promise<void> | undefined;
     if (duringOpen) {
@@ -160,11 +164,13 @@ for (const duringOpen of [true, false]) {
     await h.whenClosing;
     await cancelled;
     expect(closed).toBe(false);
+    // The new run starts inside Play's gesture, while the old one still closes.
     const reopening = h.player.play();
-    h.releaseClose();
-    await closing;
     h.reply(await h.command(nextCommand));
     expect((await reopening).kind).toBe("accepted");
+    expect(closed).toBe(false);
+    h.releaseClose();
+    await closing;
     expect(h.player.view().state).toBe("Playing");
     await h.player.close();
   });
