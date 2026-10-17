@@ -230,6 +230,8 @@ a { color: var(--accent); text-underline-offset: 4px; }
 .cm-editor .cm-line { padding: 0 32px 0 2vw; overflow-wrap: anywhere; }
 .cm-editor .cm-gutters { background: transparent; border: none; color: var(--ink-faint); padding: 0 0 0 1.6vw; font-size: calc(var(--code-size) * .62); }
 .score-sheet .cm-editor .cm-gutterElement { padding: 0 10px 0 0; line-height: calc(var(--code-size) * 1.95); }
+/* Room for three digits, so the code does not shift as a score passes 9 or 99 lines. */
+.score-sheet .cm-editor .cm-lineNumbers .cm-gutterElement { min-width: calc(3ch + 10px); }
 .score-sheet { --code-size: clamp(15px, min(1.3vw, 2.6vh), 22px); }
 .cm-editor .cm-activeLine { background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 9%, transparent), color-mix(in srgb, var(--accent) 2%, transparent) 60%, transparent); box-shadow: inset 2px 0 var(--accent); }
 .cm-editor .cm-activeLineGutter { background: transparent; color: var(--accent); }
@@ -427,6 +429,7 @@ footer > #score-readiness, footer > #log, footer > #session-message { order: 4; 
   .score-sheet .cm-editor .cm-content { padding-top: 16px; padding-bottom: 48px; }
   .cm-editor .cm-gutters { padding-left: 6px; }
   .score-sheet .cm-editor .cm-gutterElement { padding-right: 7px; }
+  .score-sheet .cm-editor .cm-lineNumbers .cm-gutterElement { min-width: calc(3ch + 7px); }
   .cm-editor .cm-line { padding-left: 8px; padding-right: 12px; }
   .score-pattern { margin: 0 8px 0 0; padding-left: 12px; }
   .score-pattern[data-kind='note'] { padding-left: 12px; }
