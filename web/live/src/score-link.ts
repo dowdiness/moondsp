@@ -1,6 +1,7 @@
 import { isolateHistory } from "@codemirror/commands";
 import type { EditorView } from "@codemirror/view";
 import type { Notice } from "./notice";
+import { MAX_SCORE_BYTES } from "./save-policy";
 import type { Disposable } from "./scope";
 
 // A score link carries the plain-text score in the URL fragment, compressed with
@@ -8,8 +9,6 @@ import type { Disposable } from "./scope";
 // Opening a link behaves like Open: one undoable replacement of the draft.
 
 const PREFIX = "#score=";
-// The same bound as Import: a decoded score larger than 1 MiB is not opened.
-const MAX_SCORE_BYTES = 1024 * 1024;
 // Deflate output exceeds its input by at most a few bytes per 64 KiB block, so a fragment
 // longer than base64 of 1 MiB plus 1% cannot decode to an acceptable score.
 const MAX_FRAGMENT_CHARS = Math.ceil(MAX_SCORE_BYTES * 1.01 * 4 / 3) + PREFIX.length;

@@ -1,7 +1,7 @@
 import { isolateHistory } from "@codemirror/commands";
 import type { EditorView } from "@codemirror/view";
 import type { Notice } from "./notice";
-import { RECOVERY_PREFIX, STORAGE_KEY, recoveryDrafts, saveDecision } from "./save-policy";
+import { MAX_SCORE_BYTES, RECOVERY_PREFIX, STORAGE_KEY, recoveryDrafts, saveDecision } from "./save-policy";
 import type { Disposable } from "./scope";
 
 // Imperative shell for local saving, saved drafts, and score files. The rules
@@ -9,7 +9,6 @@ import type { Disposable } from "./scope";
 // and the DOM.
 
 const SAVE_DELAY_MS = 350;
-const MAX_IMPORT_BYTES = 1024 * 1024;
 
 export function loadScore(fallback: string): string {
   try {
@@ -184,7 +183,7 @@ export function mountScoreSession(
     // Allow selecting the same file again; a cancelled picker leaves the draft untouched.
     fileInput.value = "";
     if (!file || !originalDoc) return;
-    if (file.size > MAX_IMPORT_BYTES) {
+    if (file.size > MAX_SCORE_BYTES) {
       say("That score is larger than 1 MB and was not opened.");
       return;
     }

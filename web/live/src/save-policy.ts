@@ -4,6 +4,8 @@
 
 export const STORAGE_KEY = "moondsp.live.score.v1";
 export const RECOVERY_PREFIX = "moondsp.live.draft.v1.";
+/** The largest score a file or link may open. */
+export const MAX_SCORE_BYTES = 1024 * 1024;
 
 export type SaveDecision = "write" | "unchanged" | "conflict";
 
