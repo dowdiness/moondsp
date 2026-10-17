@@ -9,8 +9,11 @@ function abortError(): DOMException {
   return new DOMException("Audio initialization cancelled", "AbortError");
 }
 
-function timeoutError(): Error {
-  return new Error("Audio initialization timeout (5s)");
+// Fetching the engine can stall, and a browser can refuse to run audio that was
+// not started inside a user gesture. Either way, a new press can start it.
+const STARTUP_DEADLINE_MS = 5000;
+function deadlineError(): Error {
+  return new Error("Audio did not start within 5 seconds. Press Play again.");
 }
 
 function errorMessage(error: unknown): string {
@@ -99,7 +102,8 @@ type EngineState =
   | { kind: "suspended"; graph: Graph }
   | { kind: "opening"; run: symbol }
   | (GraphRun & { kind: "active" | "closing" })
-  | (GraphRun & { kind: "resuming"; interrupted: (message: string) => void })
+  // A failure reported while resuming aborts the attempt.
+  | (GraphRun & { kind: "resuming"; attempt: AbortController })
   | { kind: "failed"; message: string };
 
 export class AudioEngine {
@@ -182,41 +186,35 @@ export class AudioEngine {
       case "idle": case "suspended": case "failed": break;
     }
     if (signal?.aborted) throw abortError();
-    const deadline = new AbortController();
-    const timer = window.setTimeout(() => deadline.abort(timeoutError()), 5000);
-    const abort = () => deadline.abort(signal?.reason instanceof DOMException && signal.reason.name === "AbortError"
-      ? signal.reason : abortError());
-    signal?.addEventListener("abort", abort, { once: true });
+    // One signal ends the attempt: the caller cancels, the deadline passes, or the graph fails.
+    const attempt = new AbortController();
+    const timer = window.setTimeout(() => attempt.abort(deadlineError()), STARTUP_DEADLINE_MS);
+    const cancel = () => attempt.abort(abortError());
+    signal?.addEventListener("abort", cancel, { once: true });
     try {
       const run = Symbol("audio run");
       if (previous.kind === "suspended" && previous.graph.ctx.state !== "closed") {
-        return await this.resume(previous.graph, run, deliver, deadline.signal);
+        return await this.resume(previous.graph, run, deliver, attempt);
       }
-      const opening = { kind: "opening" as const, run };
-      this.state = opening;
+      this.state = { kind: "opening", run };
       let graph: Graph;
       try {
-        if (previous.kind === "suspended") await this.disposeAndWait(previous.graph);
-        graph = await this.createGraph(deadline.signal);
-        if (this.state !== opening || deadline.signal.aborted) {
-          await this.disposeAndWait(graph);
-          throw deadline.signal.reason ?? abortError();
-        }
+        if (previous.kind === "suspended") await this.dispose(previous.graph);
+        graph = await this.createGraph(attempt.signal);
         // These handlers follow the graph's lifetime, not a playback run.
         graph.node.port.onmessage = event => { this.dispatch(event.data, graph); };
         graph.node.onprocessorerror = () => {
           this.dispatch({ type: "error", message: "AudioWorklet processor failed" }, graph);
         };
       } catch (error) {
-        if (this.state === opening) this.state = deadline.signal.aborted && isAbort(error)
-          ? { kind: "idle" } : { kind: "failed", message: errorMessage(error) };
+        this.state = isAbort(error) ? { kind: "idle" } : { kind: "failed", message: errorMessage(error) };
         if (isAbort(error)) throw error;
         return { kind: "failed", message: errorMessage(error) };
       }
       return this.activate(graph, run, deliver);
     } finally {
       window.clearTimeout(timer);
-      signal?.removeEventListener("abort", abort);
+      signal?.removeEventListener("abort", cancel);
     }
   }
 
@@ -224,30 +222,21 @@ export class AudioEngine {
     graph: Graph,
     run: symbol,
     deliver: (event: AudioEvent) => void,
-    signal: AbortSignal,
+    attempt: AbortController,
   ): Promise<OpenSessionResult> {
-    let interrupted!: (message: string) => void;
-    const fault = new Promise<never>((_resolve, reject) => {
-      interrupted = message => reject(new Error(message));
-    });
-    const resuming = { kind: "resuming" as const, graph, run, deliver, interrupted };
-    this.state = resuming;
+    this.state = { kind: "resuming", graph, run, deliver, attempt };
     try {
       this.ramp(graph, 0, 0);
-      await abortable(() => Promise.race([graph.ctx.resume(), fault]), signal);
-      signal.throwIfAborted();
-      if (this.state !== resuming) throw abortError();
+      await abortable(() => graph.ctx.resume(), attempt.signal);
       return this.activate(graph, run, deliver);
     } catch (error) {
-      await this.disposeAndWait(graph);
-      if (this.state === resuming) this.state = isAbort(error)
-        ? { kind: "idle" } : { kind: "failed", message: errorMessage(error) };
+      await this.dispose(graph);
+      this.state = isAbort(error) ? { kind: "idle" } : { kind: "failed", message: errorMessage(error) };
       if (isAbort(error)) throw error;
       deliver({ kind: "failed", message: errorMessage(error) });
       return { kind: "failed", message: errorMessage(error) };
     }
   }
-
 
   private activate(graph: Graph, run: symbol, deliver: (event: AudioEvent) => void): OpenSessionResult {
     this.state = { kind: "active", run, graph, deliver };
@@ -272,6 +261,10 @@ export class AudioEngine {
   private async createGraph(signal: AbortSignal): Promise<Graph> {
     signal.throwIfAborted();
     const ctx = new AudioContext({ sampleRate: this.options.sampleRate, latencyHint: this.options.latencyHint });
+    // A browser may create the context suspended until a user gesture lets it run.
+    // Ask now, inside the caller's gesture; a session is reported only once audio runs.
+    const running = ctx.state === "running" ? Promise.resolve() : ctx.resume();
+    void running.catch(() => { /* Observed below, after the graph is built. */ });
     let node: AudioWorkletNode | undefined;
     let gain: GainNode | undefined;
     let analyser: AnalyserNode | undefined;
@@ -289,7 +282,6 @@ export class AudioEngine {
         globalThis.crossOriginIsolated && typeof SharedArrayBuffer !== "undefined"
         ? new OnsetRing(new SharedArrayBuffer(ONSET_BYTES)) : null;
       await abortable(() => ctx.audioWorklet.addModule(scheduler ? "/scheduler-processor.js" : this.processorUrl), signal);
-      signal.throwIfAborted();
       node = new AudioWorkletNode(ctx, scheduler ? "moondsp-scheduler" : "moonbit-dsp", {
         numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2],
         processorOptions: scheduler ? { wasmModule, onsetBuffer: onsets?.buffer } : {
@@ -302,13 +294,10 @@ export class AudioEngine {
       const ready = this.waitForReady(node, signal);
       node.connect(gain);
       await ready;
-      if (signal.aborted) throw signal.reason ?? abortError();
+      await abortable(() => running, signal);
       return { ctx, node, gain, analyser, onsets };
     } catch (error) {
-      if (node) { node.port.onmessage = null; node.onprocessorerror = null; node.disconnect(); }
-      analyser?.disconnect();
-      gain?.disconnect();
-      if (ctx.state !== "closed") await ctx.close().catch(closeError => console.warn("Audio close failed", closeError));
+      await release(ctx, node, analyser, gain);
       throw error;
     }
   }
@@ -361,10 +350,10 @@ export class AudioEngine {
 
   private fail(state: Extract<EngineState, { graph: Graph }>, message: string): void {
     if (state.kind === "resuming") {
-      state.interrupted(message);
+      state.attempt.abort(new Error(message));
       return;
     }
-    this.dispose(state.graph);
+    void this.dispose(state.graph);
     this.state = { kind: "failed", message };
     if (state.kind !== "suspended") state.deliver({ kind: "failed", message });
   }
@@ -408,7 +397,7 @@ export class AudioEngine {
       await graph.ctx.suspend();
     } catch {
       if (this.state !== closing) return { kind: "session-expired" };
-      this.dispose(graph);
+      void this.dispose(graph);
       this.state = { kind: "idle" };
       return { kind: "closed" };
     }
@@ -416,21 +405,16 @@ export class AudioEngine {
     this.state = { kind: "suspended", graph };
     return { kind: "closed" };
   }
-  private async disposeAndWait(graph: Graph): Promise<void> {
-    graph.node.port.onmessage = null;
-    graph.node.onprocessorerror = null;
-    graph.node.disconnect();
-    graph.analyser.disconnect();
-    graph.gain.disconnect();
-    if (graph.ctx.state !== "closed") await graph.ctx.close().catch(error => console.warn("Audio close failed", error));
+  private dispose(graph: Graph): Promise<void> {
+    return release(graph.ctx, graph.node, graph.analyser, graph.gain);
   }
+}
 
-  private dispose(graph: Graph): void {
-    graph.node.port.onmessage = null;
-    graph.node.onprocessorerror = null;
-    graph.node.disconnect();
-    graph.analyser.disconnect();
-    graph.gain.disconnect();
-    if (graph.ctx.state !== "closed") void graph.ctx.close().catch(error => console.warn("Audio close failed", error));
+/** Detaches a graph, built or partly built, and closes its context. */
+async function release(ctx: AudioContext, ...nodes: (AudioNode | undefined)[]): Promise<void> {
+  for (const node of nodes) {
+    if (node instanceof AudioWorkletNode) { node.port.onmessage = null; node.onprocessorerror = null; }
+    node?.disconnect();
   }
+  if (ctx.state !== "closed") await ctx.close().catch(error => console.warn("Audio close failed", error));
 }

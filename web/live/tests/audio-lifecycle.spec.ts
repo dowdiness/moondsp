@@ -206,6 +206,7 @@ test("late non-abortable WASM completion cannot disturb the replacement session"
 });
 
 test("the initialization deadline covers a fetch that never settles", async ({ page }) => {
+  test.setTimeout(30_000);
   await page.goto("/?audioMode=compiled");
   await page.locator(".cm-content").click();
   const result = await page.evaluate(async () => {
@@ -214,16 +215,17 @@ test("the initialization deadline covers a fetch that never settles", async ({ p
     window.fetch = () => new Promise<Response>(() => {});
     try {
       const opening = await engine.openSession(() => {});
-      const status = engine.getStatus();
-      window.fetch = originalFetch;
-      const retry = await engine.openSession(() => {});
-      if (retry.kind === "opened") await retry.session.close();
-      return { opening, status, retry: retry.kind };
+      return { opening, status: engine.getStatus() };
     } finally {
       window.fetch = originalFetch;
     }
   });
-  expect(result.opening).toMatchObject({ kind: "failed" });
+  // The deadline ends the start and says how to recover.
+  expect(result.opening).toMatchObject({ kind: "failed", message: expect.stringContaining("Press Play again") });
   expect(result.status).toMatchObject({ kind: "error" });
-  expect(result.retry).toBe("opened");
+  // Pressing Play, as the failure advises, starts audio in every browser.
+  await page.locator("#start").click();
+  await expect(page.locator("#status")).toHaveText("Playing");
+  await page.locator("#start").click();
+  await expect(page.locator("#status")).toHaveText("Ready");
 });
