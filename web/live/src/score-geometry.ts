@@ -1,6 +1,6 @@
 // Functional core for the note grid's coordinate system: which pitch rows are
 // shown, where the plot sits in the fixed-width viewBox, and how measured sizes
-// and pointer positions map into it. moving-score measures and draws.
+// and pointer positions map into it. The note grid and structure strip measure and draw.
 
 /** The note grid's viewBox width; measured widths only scale text and hit areas. */
 export const W = 960;
@@ -51,15 +51,55 @@ export function midiAtY(geometry: ScoreGeometry, y: number): number {
 
 /**
  * A pointer offset (`offsetX`, `offsetY` CSS pixels from the canvas's top left,
- * which measured `width` × `height`) mapped into the plot and clamped to it.
+ * which measured `width` × `height`) in viewBox units: where the pointer is
+ * over the drawing.
  */
+export function viewBoxPoint(
+  geometry: ScoreGeometry, offsetX: number, offsetY: number, width: number, height: number,
+): { x: number; y: number } {
+  return {
+    x: offsetX * W / Math.max(1, width),
+    y: TIME_H + offsetY * (geometry.plotHeight - TIME_H) / Math.max(1, height),
+  };
+}
+
+/** The pointer offset as `viewBoxPoint` maps it, clamped to the plot: what it edits. */
 export function plotPoint(
   geometry: ScoreGeometry, offsetX: number, offsetY: number, width: number, height: number,
 ): { x: number; y: number } {
-  const { plotLeft, plotRight, plotHeight } = geometry;
+  const { x, y } = viewBoxPoint(geometry, offsetX, offsetY, width, height);
   return {
-    x: Math.max(plotLeft, Math.min(plotRight, offsetX * W / Math.max(1, width))),
-    y: Math.max(TIME_H, Math.min(plotHeight - 1, TIME_H + offsetY * (plotHeight - TIME_H) / Math.max(1, height))),
+    x: Math.max(geometry.plotLeft, Math.min(geometry.plotRight, x)),
+    y: Math.max(TIME_H, Math.min(geometry.plotHeight - 1, y)),
+  };
+}
+
+/** The grid's scales for a phrase lasting `span` cycles. */
+export type PlotScale = Readonly<{
+  geometry: ScoreGeometry;
+  /** The x of a fraction of the plot's width. */
+  fraction(at: number): number;
+  /** The x of a notation time, clamped to the phrase. */
+  time(at: number): number;
+  /** The notation time at `x`. */
+  timeAt(x: number): number;
+  /** A length of CSS pixels in viewBox x units. */
+  px(pixels: number): number;
+  /** The centre y of a pitch row. */
+  y(midi: number): number;
+}>;
+
+export function plotScale(geometry: ScoreGeometry, span: number): PlotScale {
+  const width = geometry.plotRight - geometry.plotLeft;
+  const fraction = (at: number): number => geometry.plotLeft + width * at;
+  const shown = Math.max(1, span);
+  return {
+    geometry,
+    fraction,
+    time: at => fraction(Math.max(0, Math.min(shown, at)) / shown),
+    timeAt: x => (x - geometry.plotLeft) * span / width,
+    px: pixels => pixels * geometry.pixelsToX,
+    y: midi => TIME_H + (geometry.viewHigh - midi + .5) * ROW_H,
   };
 }
 

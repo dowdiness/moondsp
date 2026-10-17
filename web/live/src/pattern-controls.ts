@@ -20,7 +20,7 @@ export const patternControlsVisible = Facet.define<boolean, boolean>({
 });
 
 type Kind = "drum" | "note";
-type Step = { from: number; to: number; end: number; value: string; rest: boolean; weight: number; node: number };
+export type Step = { from: number; to: number; end: number; value: string; rest: boolean; weight: number; node: number };
 type TimingValue = { from: number; to: number; value: number };
 type PhraseTiming = { slow: TimingValue | null; gate: TimingValue | null; ambiguous: Set<string> };
 export type Pattern = {

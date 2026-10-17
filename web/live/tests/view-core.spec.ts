@@ -1,7 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { MAX_BARS, barShape, horizonLayout, tickShape } from "../src/horizon-geometry";
 import { canvasPixels, signalStats, triggerOffset } from "../src/signal-math";
-import { ROW_H, TIME_H, midiAtY, needsResizeRender, plotPoint, scoreGeometry } from "../src/score-geometry";
+import { projectNotation, type NotationProjection } from "../src/notation-structure";
+import { gridLayout, hitGrid } from "../src/note-grid-layout";
+import { ROW_H, TIME_H, midiAtY, needsResizeRender, plotPoint, plotScale, scoreGeometry } from "../src/score-geometry";
+import { hitStrip, stripLayout } from "../src/structure-layout";
 import { longLinkNote } from "../src/score-link";
 
 test("canvas backing stores follow the measured size, the capped pixel ratio, and size limits", () => {
@@ -58,6 +61,56 @@ test("the note grid shows an octave or more of headroom-padded rows inside the M
   // A canvas drawn at half size maps pointer offsets back into viewBox units, clamped to the plot.
   expect(plotPoint(geometry, 240, 60, 480, 120)).toEqual({ x: 480, y: TIME_H + 120 });
   expect(plotPoint(geometry, -5, 999, 480, 120)).toEqual({ x: geometry.plotLeft, y: geometry.plotHeight - 1 });
+});
+
+/** A phrase's steps as the editor reads them, in source order. */
+function phrase(content: string): { structure: NotationProjection; steps: { from: number; to: number; end: number; value: string; rest: boolean; weight: number; node: number }[] } {
+  const structure = projectNotation("note", content);
+  const steps = structure.nodes.flatMap((node, index) => node.kind === "atom"
+    ? [{ from: node.from, to: node.baseTo, end: node.end, value: node.value, rest: node.value === "~", weight: node.weight, node: index }] : []);
+  return { structure, steps };
+}
+
+test("a pointer on the note grid takes the topmost edge, note, or rest under it", () => {
+  // C4 fills 0–0.2, the rest 0.2–0.4, and D4 0.4–1 of a plot from x 48 to 952.
+  const { structure, steps } = phrase("C4 ~ D4@3");
+  const [c4, rest, d4] = steps.map(step => step.node);
+  const layout = gridLayout({ structure, steps, notationKind: "note" }, plotScale(scoreGeometry(960, [60, 62]), 1));
+  const c4Row = TIME_H + 9.5 * ROW_H, d4Row = TIME_H + 7.5 * ROW_H;
+  const hit = (x: number, y: number) => {
+    const result = hitGrid(layout, x, y);
+    return result.kind === "edge" ? { edge: result.edge.side, node: result.note.node }
+      : result.kind === "note" ? { note: result.note.node } : result.kind === "rest" ? { rest: result.rest.node } : null;
+  };
+  expect(hit(100, c4Row)).toEqual({ note: c4 });
+  // C4's right grip lies over both its own end and the rest beyond it.
+  expect(hit(226, c4Row)).toEqual({ edge: "right", node: c4 });
+  expect(hit(231, c4Row)).toEqual({ edge: "right", node: c4 });
+  expect(hit(300, TIME_H + 1)).toEqual({ rest });
+  // D4's left grip is on D4's row only; elsewhere its column is the rest's.
+  expect(hit(407, d4Row)).toEqual({ edge: "left", node: d4 });
+  expect(hit(407, c4Row)).toEqual({ rest });
+  expect(hit(600, c4Row)).toBeNull();
+});
+
+test("a pointer on the structure strip takes a boundary first, then the nearest source or group", () => {
+  const { structure, steps } = phrase("C4 [D4 E4]");
+  const [c4, d4, e4] = steps.map(step => step.node);
+  const wide = stripLayout({ structure, steps }, plotScale(scoreGeometry(960, []), 1), 32);
+  // The group takes the top row; sources and boundaries share the row below it.
+  expect(wide.sourceRow).toBe(1);
+  expect(hitStrip(wide, 510, 48)).toMatchObject({ kind: "boundary", boundary: { node: c4 } });
+  expect(hitStrip(wide, 600, 48)).toEqual({ kind: "select", node: d4 });
+  expect(hitStrip(wide, 760, 48)).toEqual({ kind: "select", node: e4 });
+  expect(hitStrip(wide, 600, 16)).toEqual({ kind: "select", node: structure.nodes.findIndex(node => node.kind === "group") });
+  expect(hitStrip(wide, 100, 16)).toBeNull();
+
+  // At 200 px, eight groups are narrower than their 44 px targets, which overlap.
+  const narrowPhrase = phrase("[C4] [D4] [E4] [F4] [G4] [A4] [B4] [C5]");
+  const groups = narrowPhrase.structure.nodes.flatMap((node, index) => node.kind === "group" ? [index] : []);
+  const narrow = stripLayout(narrowPhrase, plotScale(scoreGeometry(200, []), 1), 32);
+  // x 480 is inside the third group and under the fourth's target, which is drawn later.
+  expect(hitStrip(narrow, 480, 16)).toEqual({ kind: "select", node: groups[2] });
 });
 
 test("only a width change or the first stage height re-renders a resized note grid", () => {
