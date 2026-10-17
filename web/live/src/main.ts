@@ -37,7 +37,7 @@ import { mountNotice } from "./notice";
 import { createScope } from "./scope";
 import { playbackHighlights } from "./playback-highlights";
 import { mountPlaybackObservation } from "./playback-observation";
-import { phraseUpdateStatus, renderPhraseUpdateStatus } from "./phrase-update-status";
+import { playbackChanged } from "./phrase-update-status";
 import "./phrase-update-status.css";
 
 const STARTERS = {
@@ -120,7 +120,6 @@ const view = new EditorView({
       closeBrackets(),
       inlineControls(),
       patternCompartment.of([]),
-      phraseUpdateStatus(),
       playbackHighlights(),
       controlsCompartment.of([]),
       EditorView.lineWrapping,
@@ -227,7 +226,7 @@ let renderedPlayback: PlaybackView | undefined;
 
 let playbackObservation: ReturnType<typeof mountPlaybackObservation> | undefined;
 function renderPlayback(state: PlaybackView): void {
-  renderPhraseUpdateStatus(view, state);
+  view.dispatch({ effects: playbackChanged.of(state) });
   applyStatus(state);
   playbackObservation?.setPlaying(audioMode === "scheduler" && state.state === "Playing");
   if (state.feedback !== renderedPlayback?.feedback) {

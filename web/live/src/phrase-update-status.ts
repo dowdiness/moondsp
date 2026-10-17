@@ -1,9 +1,12 @@
-import type { Extension } from "@codemirror/state";
-import { ViewPlugin, type ViewUpdate, type EditorView } from "@codemirror/view";
+import { StateEffect, type Transaction } from "@codemirror/state";
 import type { PlaybackView } from "./playback";
 
+// Functional core for the update status shown on a phrase: which phrases were
+// edited since playback last settled, and what their status says. The pattern
+// widget shows it; main.ts reports each playback view with `playbackChanged`.
+
 export type PhraseUpdateFeedback = Readonly<{ text: string; scope: "phrase" | "score"; tone: "neutral" | "error" }>;
-type Span = { from: number; to: number };
+type Span = Readonly<{ from: number; to: number }>;
 
 /** Status wording intentionally distinguishes accepted code from material activation. */
 export function phraseUpdateFeedback(state: PlaybackView): PhraseUpdateFeedback | null {
@@ -27,64 +30,37 @@ export function phraseUpdateFeedback(state: PlaybackView): PhraseUpdateFeedback 
   }
 }
 
-function ranges(view: EditorView): Span[] {
-  return [...view.dom.querySelectorAll<HTMLElement>(".score-pattern[data-pattern-start][data-pattern-end][data-content-from][data-content-to]")]
-    .map(element => ({ from: Number(element.dataset.contentFrom), to: Number(element.dataset.contentTo) }))
-    .filter(range => Number.isSafeInteger(range.from) && Number.isSafeInteger(range.to) && range.to > range.from);
-}
+export const playbackChanged = StateEffect.define<PlaybackView>();
 
-const instances = new WeakMap<EditorView, PhraseStatusView>();
-class PhraseStatusView {
-  private spans: Span[] = [];
-  private pendingChanges: Span[] = [];
-  private lastState: PlaybackView | undefined;
-  constructor(private readonly view: EditorView) { instances.set(view, this); }
-  update(update: ViewUpdate): void {
-    if (!update.docChanged) return;
-    const desc = update.changes;
-    this.pendingChanges = this.pendingChanges.map(span => ({
-      from: desc.mapPos(span.from, -1), to: desc.mapPos(span.to, 1),
-    }));
-    desc.iterChangedRanges((_fromA, _toA, fromB, toB) =>
-      this.pendingChanges.push({ from: fromB, to: toB }));
-    this.spans = this.spans.map(span => ({ from: desc.mapPos(span.from, 1), to: desc.mapPos(span.to, -1) }))
+/** The latest playback view, and the phrase contents edited since playback settled. */
+export type PhraseUpdates = Readonly<{ playback: PlaybackView | null; edited: readonly Span[] }>;
+export const noPhraseUpdates: PhraseUpdates = { playback: null, edited: [] };
+
+/** `phrases` are the content ranges of every phrase after `transaction`. */
+export function trackPhraseUpdates(value: PhraseUpdates, transaction: Transaction, phrases: readonly Span[]): PhraseUpdates {
+  let { playback, edited } = value;
+  for (const effect of transaction.effects) {
+    if (!effect.is(playbackChanged)) continue;
+    playback = effect.value;
+    const settled = ["Empty", "Ready", "Ended", "Fault"].includes(playback.state) ||
+      playback.draftStatus === "accepted" && phraseUpdateFeedback(playback) === null;
+    if (settled) edited = [];
+  }
+  if (transaction.docChanged) {
+    const { changes } = transaction;
+    const next = edited.map(span => ({ from: changes.mapPos(span.from, 1), to: changes.mapPos(span.to, -1) }))
       .filter(span => span.to > span.from);
-  }
-  docViewUpdate(): void {
-    const current = ranges(this.view);
-    this.pendingChanges = this.pendingChanges.filter(change => {
-      const hit = current.find(range => change.from <= range.to && change.to >= range.from);
-      if (!hit) return true;
-      if (!this.spans.some(span => span.from === hit.from && span.to === hit.to)) this.spans.push({ ...hit });
-      return false;
+    changes.iterChangedRanges((_fromA, _toA, from, to) => {
+      const hit = phrases.find(range => from <= range.to && to >= range.from);
+      if (hit && !next.some(span => span.from === hit.from && span.to === hit.to)) next.push(hit);
     });
-    if (this.lastState) this.render(this.lastState, false);
+    edited = next;
   }
-  render(state: PlaybackView, settle = true): void {
-    this.lastState = state;
-    const feedback = phraseUpdateFeedback(state);
-    if (settle && (["Empty", "Ready", "Ended", "Fault"].includes(state.state) ||
-        state.draftStatus === "accepted" && feedback === null)) {
-      this.spans = []; this.pendingChanges = [];
-    }
-    for (const pattern of this.view.dom.querySelectorAll<HTMLElement>(".score-pattern")) {
-      const from = Number(pattern.dataset.contentFrom), to = Number(pattern.dataset.contentTo);
-      const relevant = this.spans.some(span => span.from === from && span.to === to);
-      const slot = pattern.querySelector<HTMLElement>(".phrase-update[role=status]");
-      if (!slot) continue;
-      const visible = relevant && feedback !== null;
-      slot.hidden = !visible;
-      slot.textContent = visible ? feedback.text : "";
-      slot.dataset.scope = visible ? feedback.scope : "";
-      slot.dataset.tone = visible ? feedback.tone : "";
-    }
-  }
-  destroy(): void { instances.delete(this.view); }
+  return playback === value.playback && edited === value.edited ? value : { playback, edited };
 }
 
-export function phraseUpdateStatus(): Extension {
-  return ViewPlugin.fromClass(PhraseStatusView);
-}
-export function renderPhraseUpdateStatus(view: EditorView, state: PlaybackView): void {
-  instances.get(view)?.render(state);
+/** The status to show on the phrase whose content is `range`, if it was edited. */
+export function phraseUpdateAt(value: PhraseUpdates, range: Span): PhraseUpdateFeedback | null {
+  if (!value.playback || !value.edited.some(span => span.from === range.from && span.to === range.to)) return null;
+  return phraseUpdateFeedback(value.playback);
 }

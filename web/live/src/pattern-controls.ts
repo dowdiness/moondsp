@@ -1,4 +1,4 @@
-import { EditorState, Facet, MapMode, StateField, type ChangeDesc, type Extension, type Text } from "@codemirror/state";
+import { EditorState, Facet, MapMode, StateField, type Extension, type Text, type Transaction } from "@codemirror/state";
 import { historyKeymap } from "@codemirror/commands";
 import { Decoration, EditorView, WidgetType, keymap, runScopeHandlers, type DecorationSet } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
@@ -11,6 +11,7 @@ import {
   keepingSelection, mapPosition, BOUNDARY_MAX, BOUNDARY_MIN, BOUNDARY_STEP, type NotationProjection, type SourceChange,
 } from "./notation-structure";
 import { dispatchPatternEdit } from "./pattern-edit";
+import { noPhraseUpdates, phraseUpdateAt, trackPhraseUpdates, type PhraseUpdateFeedback, type PhraseUpdates } from "./phrase-update-status";
 
 type PatternMemory = { pitchOpen?: boolean; timingOpen?: boolean; structureOpen?: boolean; tonesOpen?: boolean };
 
@@ -153,7 +154,7 @@ class PatternWidgetDOM {
     return button;
   }
 
-  constructor(private view: EditorView, private pattern: Pattern, readonly memory: PatternMemory) {
+  constructor(private view: EditorView, private pattern: Pattern, readonly memory: PatternMemory, phraseUpdate: PhraseUpdateFeedback | null) {
     this.dom.className = "score-pattern cm-score-pattern";
     this.dom.dataset.kind = pattern.kind;
     this.dom.dataset.patternStart = String(pattern.from);
@@ -317,10 +318,16 @@ class PatternWidgetDOM {
       }
     });
     liveWidgets.set(this.dom, this);
-    this.update(pattern);
+    this.update(pattern, phraseUpdate);
   }
 
-  update(pattern: Pattern): void {
+  get notationKind(): Pattern["notationKind"] { return this.pattern.notationKind; }
+
+  update(pattern: Pattern, phraseUpdate: PhraseUpdateFeedback | null): void {
+    this.phraseUpdate.hidden = phraseUpdate === null;
+    this.phraseUpdate.textContent = phraseUpdate?.text ?? "";
+    this.phraseUpdate.dataset.scope = phraseUpdate?.scope ?? "";
+    this.phraseUpdate.dataset.tone = phraseUpdate?.tone ?? "";
     if (pattern.doc !== this.pattern.doc || pattern.from !== this.pattern.from ||
         (pattern.cursor !== this.pattern.cursor && !this.dom.contains(document.activeElement))) {
       this.feedback.textContent = "";
@@ -333,11 +340,7 @@ class PatternWidgetDOM {
     }
     this.pattern = pattern;
     this.dom.dataset.kind = pattern.kind;
-    this.dom.dataset.notationKind = pattern.notationKind;
     this.dom.dataset.patternStart = String(pattern.from);
-    this.dom.dataset.patternEnd = String(pattern.to);
-    this.dom.dataset.contentFrom = String(pattern.contentFrom);
-    this.dom.dataset.contentTo = String(pattern.contentTo);
     this.render();
   }
 
@@ -658,35 +661,47 @@ class PatternWidgetDOM {
 }
 
 class PatternWidget extends WidgetType {
-  constructor(readonly pattern: Pattern, readonly memory: PatternMemory) { super(); }
+  constructor(readonly pattern: Pattern, readonly memory: PatternMemory, readonly phraseUpdate: PhraseUpdateFeedback | null) { super(); }
   override eq(other: PatternWidget): boolean {
     return this.pattern.doc === other.pattern.doc && this.pattern.from === other.pattern.from &&
       this.pattern.notationKind === other.pattern.notationKind && this.pattern.cursor === other.pattern.cursor &&
       this.pattern.selectionFrom === other.pattern.selectionFrom && this.pattern.selectionTo === other.pattern.selectionTo &&
-      this.pattern.selectedNode === other.pattern.selectedNode && this.memory === other.memory;
+      this.pattern.selectedNode === other.pattern.selectedNode && this.memory === other.memory &&
+      this.phraseUpdate?.text === other.phraseUpdate?.text && this.phraseUpdate?.scope === other.phraseUpdate?.scope &&
+      this.phraseUpdate?.tone === other.phraseUpdate?.tone;
   }
-  toDOM(view: EditorView): HTMLElement { return new PatternWidgetDOM(view, this.pattern, this.memory).dom; }
+  toDOM(view: EditorView): HTMLElement { return new PatternWidgetDOM(view, this.pattern, this.memory, this.phraseUpdate).dom; }
   override updateDOM(dom: HTMLElement): boolean {
     const widget = liveWidgets.get(dom);
-    if (!widget || widget.memory !== this.memory || dom.dataset.notationKind !== this.pattern.notationKind) return false;
-    widget.update(this.pattern);
+    if (!widget || widget.memory !== this.memory || widget.notationKind !== this.pattern.notationKind) return false;
+    widget.update(this.pattern, this.phraseUpdate);
     return true;
   }
   override destroy(dom: HTMLElement): void { liveWidgets.get(dom)?.destroy(); }
 }
 
-type PatternState = { memories: Map<number, PatternMemory>; decorations: DecorationSet };
+type PatternState = { memories: Map<number, PatternMemory>; shown: readonly Pattern[]; updates: PhraseUpdates; decorations: DecorationSet };
 
-function patternState(state: EditorState, previous?: PatternState, changes?: ChangeDesc): PatternState {
+function decorate(state: EditorState, shown: readonly Pattern[], memories: Map<number, PatternMemory>, updates: PhraseUpdates): DecorationSet {
+  return Decoration.set(shown.map(pattern => Decoration.widget({
+    widget: new PatternWidget(pattern, memories.get(pattern.from)!, phraseUpdateAt(updates, { from: pattern.contentFrom, to: pattern.contentTo })),
+    side: 1, block: true,
+  }).range(state.doc.lineAt(pattern.to).to)), true);
+}
+
+function patternState(state: EditorState, previous?: PatternState, transaction?: Transaction): PatternState {
   const all = sourcePatterns(state);
+  const updates = previous && transaction
+    ? trackPhraseUpdates(previous.updates, transaction, all.map(pattern => ({ from: pattern.contentFrom, to: pattern.contentTo })))
+    : noPhraseUpdates;
   const memories = new Map<number, PatternMemory>();
   const current = new Set(all.map(pattern => pattern.from));
   previous?.memories.forEach((memory, from) => {
-    const mapped = changes ? changes.mapPos(from, 1, MapMode.TrackDel) : from;
+    const mapped = transaction ? transaction.changes.mapPos(from, 1, MapMode.TrackDel) : from;
     if (mapped !== null && current.has(mapped)) memories.set(mapped, memory);
   });
   for (const pattern of all) if (!memories.has(pattern.from)) memories.set(pattern.from, {});
-  if (!state.facet(patternControlsVisible)) return { memories, decorations: Decoration.none };
+  if (!state.facet(patternControlsVisible)) return { memories, shown: [], updates, decorations: Decoration.none };
   const head = state.selection.main.head;
   let selected = all.filter(pattern => head >= pattern.from && head <= pattern.to);
   if (selected.length === 0) {
@@ -696,9 +711,7 @@ function patternState(state: EditorState, previous?: PatternState, changes?: Cha
     selected = selected.slice(0, 1);
   }
   if (selected.length > 1) selected = selected.sort((a, b) => (a.to - a.from) - (b.to - b.from)).slice(0, 1);
-  return { memories, decorations: Decoration.set(selected.map(pattern => Decoration.widget({
-    widget: new PatternWidget(pattern, memories.get(pattern.from)!), side: 1, block: true,
-  }).range(state.doc.lineAt(pattern.to).to)), true) };
+  return { memories, shown: selected, updates, decorations: decorate(state, selected, memories, updates) };
 }
 
 export function patternControls(): Extension {
@@ -706,9 +719,16 @@ export function patternControls(): Extension {
     keymap.of(historyKeymap.map(binding => ({ ...binding, scope: "pattern-control" }))),
     StateField.define<PatternState>({
       create: state => patternState(state),
-      update: (value, transaction) => transaction.docChanged || transaction.selection ||
-        transaction.startState.facet(patternControlsVisible) !== transaction.state.facet(patternControlsVisible)
-        ? patternState(transaction.state, value, transaction.changes) : value,
+      update: (value, transaction) => {
+        if (transaction.docChanged || transaction.selection ||
+            transaction.startState.facet(patternControlsVisible) !== transaction.state.facet(patternControlsVisible)) {
+          return patternState(transaction.state, value, transaction);
+        }
+        // A playback report changes only the status shown on the same phrases.
+        const updates = trackPhraseUpdates(value.updates, transaction, []);
+        return updates === value.updates ? value
+          : { ...value, updates, decorations: decorate(transaction.state, value.shown, value.memories, updates) };
+      },
       provide: field => EditorView.decorations.from(field, value => value.decorations),
     }),
   ];
