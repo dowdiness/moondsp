@@ -1,4 +1,4 @@
-import type { AudioEngine, AudioEvent, AudioStatus, OpenSessionResult, SchedulerSession } from "./audio";
+import type { AudioEngine, AudioEvent, AudioSession, AudioStatus, OpenSessionResult } from "./audio";
 import { Draft, PlaybackInput, type DraftState } from "./authoring";
 import { sameDraftVersion, type DraftVersion } from "./draft-version";
 import { RequestId } from "./playback-protocol";
@@ -31,8 +31,8 @@ type Pending = {
 };
 type Connection =
   | { kind: "closed" }
-  | { kind: "opening"; promise: Promise<SchedulerSession>; retirement: () => Promise<void>; controller: AbortController }
-  | { kind: "open"; session: SchedulerSession };
+  | { kind: "opening"; promise: Promise<AudioSession>; retirement: () => Promise<void>; controller: AbortController }
+  | { kind: "open"; session: AudioSession };
 export class Player {
   private connection: Connection = { kind: "closed" };
   private snapshot: PlayerSnapshot = { state: "Empty", mode: "none", cyclePosition: 0, tempo: 60, samplePosition: 0, pendingCount: 0, skippedCount: 0 };
@@ -225,7 +225,7 @@ export class Player {
     this.retirement = retirement;
     return retirement;
   }
-  private open(): Promise<SchedulerSession> {
+  private open(): Promise<AudioSession> {
     if (this.connection.kind === "open") return Promise.resolve(this.connection.session);
     if (this.connection.kind === "opening") return this.connection.promise;
     const epoch = ++this.epoch;
@@ -249,10 +249,6 @@ export class Player {
       if (epoch !== this.epoch) throw new DOMException("Player closed during startup", "AbortError");
       if (opened.kind !== "opened") {
         throw new Error(opened.kind === "failed" ? opened.message : "Audio owner is busy");
-      }
-      if (opened.session.kind !== "scheduler") {
-        await opened.session.close();
-        throw new Error("Player requires the scheduler audio engine");
       }
       this.connection = { kind: "open", session: opened.session };
       this.render();

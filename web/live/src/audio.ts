@@ -1,5 +1,5 @@
 // Audio resource owner. Opening produces a capability tied to one playback run;
-// score/tempo operations do not exist on a stopped engine or compiled session.
+// score/tempo operations do not exist on a stopped engine.
 import { decodeWorkletMessage } from "./playback-protocol";
 import type { PlaybackInput } from "./authoring";
 import type { PlayerReceipt, PlayerSnapshot, RequestId } from "./playback-protocol";
@@ -44,14 +44,9 @@ function abortable<T>(start: () => Promise<T>, signal: AbortSignal): Promise<T> 
 export type AudioStatus =
   | { kind: "idle" } | { kind: "starting" } | { kind: "stopping" }
   | { kind: "running" } | { kind: "error"; message: string };
-export type AudioEngineMode = "scheduler" | "compiled";
 export type AudioEngineOptions = {
-  enableTelemetry?: boolean;
-  enableSchedulerTiming?: boolean;
-  schedulerTimingBatchSize?: number;
   sampleRate?: number;
   latencyHint?: AudioContextOptions["latencyHint"];
-  mode?: AudioEngineMode;
   enableOnsets?: boolean;
 };
 
@@ -62,19 +57,14 @@ export type AudioEvent =
 export type CloseSessionResult = { kind: "closed" } | { kind: "session-expired" };
 export type SessionCommandResult = "issued" | "session-expired";
 
-type SessionControls = Readonly<{
+export type AudioSession = Readonly<{
   fadeIn(): SessionCommandResult;
   close(): Promise<CloseSessionResult>;
-}>;
-export type SchedulerSession = SessionControls & Readonly<{
-  kind: "scheduler";
   update(id: RequestId, input: PlaybackInput): SessionCommandResult;
   restart(id: RequestId, input: PlaybackInput): SessionCommandResult;
   play(id: RequestId): SessionCommandResult;
   pause(id: RequestId): SessionCommandResult;
 }>;
-export type CompiledSession = SessionControls & Readonly<{ kind: "compiled" }>;
-export type AudioSession = SchedulerSession | CompiledSession;
 export type OpenSessionResult =
   | { kind: "opened"; session: AudioSession }
   | { kind: "failed"; message: string }
@@ -154,15 +144,11 @@ export class AudioEngine {
     return true;
   }
   private state: EngineState = { kind: "idle" };
-  readonly mode: AudioEngineMode;
 
   constructor(
-    private readonly processorUrl = "/processor.js",
     private readonly wasmUrl = "/moonbit_dsp.wasm",
     private readonly options: AudioEngineOptions = {},
-  ) {
-    this.mode = options.mode ?? "scheduler";
-  }
+  ) {}
 
   getStatus(): AudioStatus {
     switch (this.state.kind) {
@@ -241,20 +227,15 @@ export class AudioEngine {
   private activate(graph: Graph, run: symbol, deliver: (event: AudioEvent) => void): OpenSessionResult {
     this.state = { kind: "active", run, graph, deliver };
     this.discardOnsets();
-    graph.node.port.postMessage(this.mode === "scheduler"
-      ? { type: "set-scheduler-gain", gain: 0.6 }
-      : { type: "set-gain", value: 0.6 });
-    const controls: SessionControls = {
+    graph.node.port.postMessage({ type: "set-scheduler-gain", gain: 0.6 });
+    const session: AudioSession = {
       fadeIn: () => this.command(run, "fade-in"),
       close: () => this.close(run),
-    };
-    const session: AudioSession = this.mode === "scheduler" ? {
-      ...controls, kind: "scheduler",
       update: (id, input) => this.command(run, { type: "player-update", id: id.value, input: input.wire }),
       restart: (id, input) => this.command(run, { type: "player-restart", id: id.value, input: input.wire }),
       play: id => this.command(run, { type: "player-play", id: id.value }),
       pause: id => this.command(run, { type: "player-pause", id: id.value }),
-    } : { ...controls, kind: "compiled" };
+    };
     return { kind: "opened", session };
   }
 
@@ -277,19 +258,14 @@ export class AudioEngine {
       if (!response.ok) throw new Error(`fetch ${this.wasmUrl}: ${response.status}`);
       const bytes = await abortable(() => response.arrayBuffer(), signal);
       const wasmModule = await abortable(() => WebAssembly.compile(bytes), signal);
-      const scheduler = this.mode === "scheduler";
-      const onsets = scheduler && this.options.enableOnsets !== false &&
+      // Onsets reach the page through shared memory, which needs cross-origin isolation.
+      const onsets = this.options.enableOnsets !== false &&
         globalThis.crossOriginIsolated && typeof SharedArrayBuffer !== "undefined"
         ? new OnsetRing(new SharedArrayBuffer(ONSET_BYTES)) : null;
-      await abortable(() => ctx.audioWorklet.addModule(scheduler ? "/scheduler-processor.js" : this.processorUrl), signal);
-      node = new AudioWorkletNode(ctx, scheduler ? "moondsp-scheduler" : "moonbit-dsp", {
+      await abortable(() => ctx.audioWorklet.addModule("/scheduler-processor.js"), signal);
+      node = new AudioWorkletNode(ctx, "moondsp-scheduler", {
         numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2],
-        processorOptions: scheduler ? { wasmModule, onsetBuffer: onsets?.buffer } : {
-          wasmModule, useScheduler: false, useProbeSine: false,
-          enableTelemetry: this.options.enableTelemetry === true,
-          enableSchedulerTiming: this.options.enableSchedulerTiming === true,
-          schedulerTimingBatchSize: this.options.schedulerTimingBatchSize ?? 128,
-        },
+        processorOptions: { wasmModule, onsetBuffer: onsets?.buffer },
       });
       const ready = this.waitForReady(node, signal);
       node.connect(gain);
@@ -317,7 +293,6 @@ export class AudioEngine {
         switch (message.kind) {
           case "ready": signal.removeEventListener("abort", onAbort); resolve(); break;
           case "runtime-error": case "protocol-error": fail(new Error(message.message)); break;
-          case "notice": console.debug("[moondsp/live]", message.data); break;
           case "status": break;
           case "receipt": fail(new Error("Playback receipt arrived before worklet readiness")); break;
         }
@@ -326,7 +301,7 @@ export class AudioEngine {
   }
 
 
-  private dispatch(raw: unknown, graph: Graph): "delivered" | "notice" | "obsolete-session" {
+  private dispatch(raw: unknown, graph: Graph): "delivered" | "obsolete-session" {
     const state = this.state;
     if (!("graph" in state) || state.graph !== graph) return "obsolete-session";
     const message = decodeWorkletMessage(raw);
@@ -338,7 +313,6 @@ export class AudioEngine {
       case "status":
         if (state.kind === "active") state.deliver(message);
         return "delivered";
-      case "notice": console.debug("[moondsp/live]", message.data); return "notice";
       case "ready":
         this.fail(state, "Worklet announced readiness twice");
         return "delivered";
@@ -359,7 +333,7 @@ export class AudioEngine {
   }
 
   /** Test injection crosses the same unknown-message decoder as MessagePort. */
-  _testInjectReply(raw: unknown): "delivered" | "notice" | "obsolete-session" {
+  _testInjectReply(raw: unknown): "delivered" | "obsolete-session" {
     return "graph" in this.state ? this.dispatch(raw, this.state.graph) : "obsolete-session";
   }
 

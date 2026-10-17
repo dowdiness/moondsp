@@ -23,7 +23,6 @@ import { loadScore, mountScoreSession } from "./score-session";
 import { CM6Adapter } from "./canopy";
 import type { Diagnostic } from "./canopy";
 import { AudioEngine } from "./audio";
-import type { CompiledSession } from "./audio";
 import type { Draft } from "./authoring";
 import type { Player, PlaybackView } from "./playback";
 import { mountOutputScope } from "./output-scope";
@@ -189,18 +188,7 @@ refreshEditorChrome();
 // ── Engine ──────────────────────────────────────────────────
 
 const options = engineOptions(new URLSearchParams(window.location.search));
-const audioMode = options.mode;
-const engine = new AudioEngine("/processor.js", "/moonbit_dsp.wasm", options);
-
-if (audioMode !== "scheduler") {
-  console.info(`[moondsp/live] audioMode=${audioMode}; pattern editor updates are ignored in this mode`);
-}
-
-if (options.enableSchedulerTiming) {
-  console.info(
-    "[moondsp/live] scheduler timing enabled; inspect scheduler-timing messages in DevTools",
-  );
-}
+const engine = new AudioEngine("/moonbit_dsp.wasm", options);
 
 
 function setLog(message: string, kind: "ok" | "error" | "info" = "info"): void {
@@ -212,7 +200,6 @@ function setLog(message: string, kind: "ok" | "error" | "info" = "info"): void {
 
 
 function applyStatus(state: PlaybackView): void {
-  if (audioMode !== "scheduler") return;
   const status = statusView(state);
   writeStatus(dom.transport, status);
   signalHorizon.setCycle(state.cyclePosition, status.playing);
@@ -228,7 +215,7 @@ let playbackObservation: ReturnType<typeof mountPlaybackObservation> | undefined
 function renderPlayback(state: PlaybackView): void {
   view.dispatch({ effects: playbackChanged.of(state) });
   applyStatus(state);
-  playbackObservation?.setPlaying(audioMode === "scheduler" && state.state === "Playing");
+  playbackObservation?.setPlaying(state.state === "Playing");
   if (state.feedback !== renderedPlayback?.feedback) {
     setLog(state.feedback?.message ?? "", state.feedback?.kind ?? "info");
   }
@@ -238,7 +225,6 @@ function renderPlayback(state: PlaybackView): void {
   }
   renderedPlayback = state;
 }
-let compiledSession: CompiledSession | undefined;
 scope.own(mountOutputScope(dom.outputScope, engine));
 const signalHorizon = scope.own(mountSignalHorizon(dom.horizon, engine));
 scope.own(mountScoreLink(dom.share, { view, notice }));
@@ -246,38 +232,6 @@ if (import.meta.hot) import.meta.hot.dispose(() => {
   disposed = true;
   scope.dispose();
 });
-async function toggleCompiled(): Promise<void> {
-  dom.transport.start.disabled = true;
-  try {
-    if (compiledSession) {
-      await compiledSession.close();
-      compiledSession = undefined;
-      dom.transport.status.textContent = "Ready";
-      dom.transport.start.textContent = "Play";
-    } else {
-      const opened = await engine.openSession(event => {
-        if (event.kind === "failed") {
-          compiledSession = undefined;
-          dom.transport.status.textContent = "Fault";
-          dom.transport.start.textContent = "Play";
-          setLog(event.message, "error");
-        }
-      });
-      if (opened.kind !== "opened") throw new Error(opened.kind === "failed" ? opened.message : "Audio owner is busy");
-      if (opened.session.kind !== "compiled") throw new Error("Expected compiled audio session");
-      compiledSession = opened.session;
-      compiledSession.fadeIn();
-      dom.transport.status.textContent = "Playing";
-      dom.transport.start.textContent = "Stop";
-    }
-  } catch (error) {
-    setLog(error instanceof Error ? error.message : String(error), "error");
-  } finally {
-    dom.transport.start.disabled = false;
-  }
-}
-if (audioMode === "compiled") dom.transport.restart.hidden = true;
-dom.playbackDetails.hidden = audioMode !== "scheduler";
 
 
 view.dispatch({
@@ -286,7 +240,7 @@ view.dispatch({
     EditorView.updateListener.of(update => {
       if (update.docChanged) scoreSession.changed();
       if (update.docChanged || update.selectionSet) refreshEditorChrome();
-      if (!update.docChanged || audioMode !== "scheduler" || !draft || !playback) return;
+      if (!update.docChanged || !draft || !playback) return;
       const activeDraft = draft;
       const activePlayback = playback;
       try {
@@ -311,7 +265,6 @@ view.dispatch({
 });
 
 dom.transport.start.addEventListener("click", () => {
-  if (audioMode === "compiled") { void toggleCompiled(); return; }
   if (!playback) return;
   const activePlayback = playback;
   const state = activePlayback.view().state;
@@ -373,7 +326,7 @@ dom.help.sceneButtons.forEach(button => {
     if (!starter) return;
     if (dom.help.narrow.matches) setHelp(false);
     replaceScore(starter.source);
-    if (audioMode !== "scheduler" || !playback || !draft) return;
+    if (!playback || !draft) return;
     const activePlayback = playback;
     try {
       void activePlayback.restart(draft.prepare()).catch(error => activePlayback.report(error));
@@ -397,7 +350,7 @@ dom.help.dialog.addEventListener("click", (ev) => {
 let authoringPhase: AuthoringPhase = "starting";
 function setAuthoring(phase: AuthoringPhase): void {
   authoringPhase = phase;
-  const authoring = authoringView(phase, audioMode === "scheduler");
+  const authoring = authoringView(phase);
   writeAuthoring(dom.transport, authoring);
   // The editor names the readiness notice while it is shown.
   view.dispatch({

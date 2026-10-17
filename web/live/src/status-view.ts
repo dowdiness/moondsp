@@ -121,15 +121,14 @@ export type ControlView = Readonly<{ disabled: boolean; busy: boolean; title: st
 export type AuthoringView = Readonly<{
   /** body data-authoring. */
   authoring: "loading" | "ready" | "failed";
-  /** Null in compiled mode: Start does not wait for score tools there, and its own toggle owns it. */
-  start: ControlView | null;
+  start: ControlView;
   restart: ControlView;
   sourceToggle: ControlView;
   changeStatusHidden: boolean;
   /** The readiness notice, or null when hidden. */
   readiness: string | null;
   /** What replaces the transport and change status once playback cannot load. */
-  unavailable: Readonly<{ transport: string | null; draftStatus: string; draftVersion: string }> | null;
+  unavailable: Readonly<{ transport: string; draftStatus: string; draftVersion: string }> | null;
 }>;
 
 const START_TITLE = "Play or pause · Ctrl/⌘ + Enter";
@@ -138,14 +137,14 @@ const TOOLS_TITLE = "Show controls for the phrase at your cursor";
 const PLAYBACK_UNAVAILABLE = "Playback unavailable. Reload to try again; code remains editable.";
 const TOOLS_UNAVAILABLE = "Score tools unavailable. Reload to try again; code remains editable.";
 
-/** Pure: the controls for one authoring phase. Only the scheduler waits for score tools to play. */
-export function authoringView(phase: AuthoringPhase, scheduler: boolean): AuthoringView {
+/** Pure: the controls for one authoring phase. Playing waits for score tools. */
+export function authoringView(phase: AuthoringPhase): AuthoringView {
   switch (phase) {
     case "starting":
     case "loading":
       return {
         authoring: "loading",
-        start: scheduler ? { disabled: true, busy: true, title: START_TITLE } : null,
+        start: { disabled: true, busy: true, title: START_TITLE },
         restart: { disabled: true, busy: false, title: RESTART_TITLE },
         sourceToggle: { disabled: true, busy: true, title: TOOLS_TITLE },
         changeStatusHidden: true,
@@ -155,7 +154,7 @@ export function authoringView(phase: AuthoringPhase, scheduler: boolean): Author
     case "ready":
       return {
         authoring: "ready",
-        start: scheduler ? { disabled: false, busy: false, title: START_TITLE } : null,
+        start: { disabled: false, busy: false, title: START_TITLE },
         restart: { disabled: false, busy: false, title: RESTART_TITLE },
         sourceToggle: { disabled: false, busy: false, title: TOOLS_TITLE },
         changeStatusHidden: false,
@@ -165,12 +164,12 @@ export function authoringView(phase: AuthoringPhase, scheduler: boolean): Author
     case "failed":
       return {
         authoring: "failed",
-        start: scheduler ? { disabled: true, busy: false, title: PLAYBACK_UNAVAILABLE } : null,
-        restart: { disabled: true, busy: false, title: scheduler ? PLAYBACK_UNAVAILABLE : RESTART_TITLE },
+        start: { disabled: true, busy: false, title: PLAYBACK_UNAVAILABLE },
+        restart: { disabled: true, busy: false, title: PLAYBACK_UNAVAILABLE },
         sourceToggle: { disabled: true, busy: false, title: TOOLS_UNAVAILABLE },
         changeStatusHidden: false,
         readiness: "Code is editable. Score tools unavailable.",
-        unavailable: { transport: scheduler ? "Playback unavailable" : null, draftStatus: "Playback unavailable", draftVersion: "Unavailable" },
+        unavailable: { transport: "Playback unavailable", draftStatus: "Playback unavailable", draftVersion: "Unavailable" },
       };
   }
 }

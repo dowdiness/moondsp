@@ -1000,8 +1000,7 @@ edit: ready to play, sending, accepted, or needing correction. Pending parts
 remain a separate sentence, so acceptance never implies immediate adoption.
 Editor/accepted/in-flight versions and raw transition counts are available in
 the keyboard-accessible Technical details disclosure, not the primary display.
-Position refreshes are not live screen-reader announcements. The compiled demo
-does not display scheduler status.
+Position refreshes are not live screen-reader announcements.
 
 Numeric musical states are Empty, Ready, Playing, Paused, Ended, and Fault
 (0 through 5). The UI displays Empty as Ready and adds Starting during opening.
@@ -1223,22 +1222,19 @@ compatibility; direct string crossing is not the canonical JS/wasm-gc transport.
 
 | Entry point | Worklet module / registered processor | Purpose |
 |---|---|---|
-| Live editor, default or `?audioMode=scheduler` | `web/scheduler-processor.js` / `moondsp-scheduler` | Pattern/song playback |
-| Live editor, `?audioMode=compiled` | `web/processor.js` / `moonbit-dsp` | Compiled demo graph; editor score updates are not submitted |
+| Live editor | `web/scheduler-processor.js` / `moondsp-scheduler` | Pattern/song playback |
 | Demos and probe modes implemented in `processor.js` | `web/processor.js` / `moonbit-dsp` | Graph controls, hot swaps, topology edits, and optional scheduler/probe modes selected through processor options |
 | Dedicated scheduler probes (`playwright-tests/scheduler-probe.spec.js`) | `web/scheduler-probe-processor.js` / `moondsp-scheduler-probe` | Isolated scheduler-path rendering probes |
 | Dedicated crackle probes (`playwright-tests/crackle-probe.spec.js`) | `web/crackle-probe-processor.js` / `moondsp-crackle-probe` | Isolated crackle-investigation rendering probes |
 
-The live page selects compiled mode only for the exact `audioMode=compiled`
-value; other values use scheduler mode. Its compiled session passes
-`useScheduler: false` and `useProbeSine: false`. Do not infer the registered
+The live page always uses the dedicated scheduler. Do not infer the registered
 processor's mode from its filename alone: `processor.js` also retains a
 scheduler path selected through `useScheduler` and available WASM exports.
 
 The dedicated probe tests load their own modules into `OfflineAudioContext`;
 they do not select a live-editor mode. These two probe modules are separate
 from the three JS assets copied into the live app (`playback-controller.js`,
-`processor.js`, and `scheduler-processor.js`). Running the live suite does not
+`playback-onsets.js`, and `scheduler-processor.js`). Running the live suite does not
 run these dedicated probe suites.
 
 Message responsibilities:
@@ -1267,9 +1263,8 @@ a separate task dynamically imports authoring, Player, and pattern controls.
 This is staged startup, not a promise to defer those downloads until Play.
 
 `document.body.dataset.authoring` exposes `loading`, `ready`, or `failed`.
-While loading, score controls, Add melody, and scheduler Play/Restart are
-disabled; text editing and Undo/Redo remain available. The independent
-`audioMode=compiled` demo can still start without score authoring.
+While loading, score controls, Add melody, and Play/Restart are disabled; text
+editing and Undo/Redo remain available.
 
 Short startup does not change the Play label or show loading text. Only if
 preparation is still pending after 500 ms does a footer message say that code
@@ -1365,8 +1360,7 @@ npm --prefix web/live run dev -- --host 127.0.0.1
 ```
 
 Open the printed URL in a normal browser connected to the intended output
-device. Use the default URL for live scheduler playback and
-`?audioMode=compiled` for the compiled demo. The environment switch above
+device. The environment switch above
 affects only Playwright, not the application or the dev server.
 
 Check sound onset, sustained playback, edits, Stop and Play again. Listen for

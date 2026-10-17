@@ -27,35 +27,25 @@ test("saved drafts list other tabs' checkpoints newest first and skip malformed 
   expect(drafts.map(draft => draft.source)).toEqual(["newer", "older", "same time, later key"]);
 });
 
-test("score tools gate playback only in scheduler mode and explain a failed load", () => {
-  expect(authoringView("starting", true)).toMatchObject({ authoring: "loading", readiness: null, changeStatusHidden: true });
-  expect(authoringView("loading", true).readiness).toBe("Code is editable. Loading score tools…");
-  expect(authoringView("loading", true).start).toMatchObject({ disabled: true, busy: true });
-  expect(authoringView("ready", true)).toMatchObject({
+test("score tools gate playback and explain a failed load", () => {
+  expect(authoringView("starting")).toMatchObject({ authoring: "loading", readiness: null, changeStatusHidden: true });
+  expect(authoringView("loading").readiness).toBe("Code is editable. Loading score tools…");
+  expect(authoringView("loading").start).toMatchObject({ disabled: true, busy: true });
+  expect(authoringView("ready")).toMatchObject({
     authoring: "ready", readiness: null, changeStatusHidden: false, unavailable: null,
     start: { disabled: false, busy: false }, restart: { disabled: false }, sourceToggle: { disabled: false, busy: false },
   });
-  const failed = authoringView("failed", true);
+  const failed = authoringView("failed");
   expect(failed.start).toMatchObject({ disabled: true, title: expect.stringContaining("Playback unavailable") });
   expect(failed.unavailable).toEqual({ transport: "Playback unavailable", draftStatus: "Playback unavailable", draftVersion: "Unavailable" });
-  // Compiled mode plays without score tools: no phase touches its Start, which
-  // stays disabled while its own toggle opens a session.
-  for (const phase of ["starting", "loading", "ready", "failed"] as const) expect(authoringView(phase, false).start).toBeNull();
-  expect(authoringView("failed", false).unavailable?.transport).toBeNull();
 });
 
 test("URL switches parse strictly and fall back to engine defaults", () => {
-  expect(engineOptions(new URLSearchParams(""))).toEqual({
-    enableTelemetry: false, enableSchedulerTiming: false, schedulerTimingBatchSize: 128,
-    sampleRate: 48000, latencyHint: undefined, mode: "scheduler", enableOnsets: true,
-  });
-  expect(engineOptions(new URLSearchParams("audioMode=compiled&telemetry=true&schedulerTiming=1&schedulerTimingBatch=0&sampleRate=-5&latencyHint=fast&onsets=0")))
-    .toEqual({
-      enableTelemetry: true, enableSchedulerTiming: true, schedulerTimingBatchSize: undefined,
-      sampleRate: 48000, latencyHint: undefined, mode: "compiled", enableOnsets: false,
-    });
+  expect(engineOptions(new URLSearchParams(""))).toEqual({ sampleRate: 48000, latencyHint: undefined, enableOnsets: true });
+  expect(engineOptions(new URLSearchParams("sampleRate=-5&latencyHint=fast&onsets=0")))
+    .toEqual({ sampleRate: 48000, latencyHint: undefined, enableOnsets: false });
   expect(engineOptions(new URLSearchParams("nativeSampleRate=1&sampleRate=44100&latencyHint=playback")))
-    .toMatchObject({ sampleRate: undefined, latencyHint: "playback" });
-  expect(engineOptions(new URLSearchParams("sampleRate=44100&telemetry=yes")))
-    .toMatchObject({ sampleRate: 44100, enableTelemetry: false });
+    .toEqual({ sampleRate: undefined, latencyHint: "playback", enableOnsets: true });
+  expect(engineOptions(new URLSearchParams("sampleRate=44100")))
+    .toMatchObject({ sampleRate: 44100 });
 });

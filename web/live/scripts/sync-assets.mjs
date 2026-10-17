@@ -1,4 +1,4 @@
-// Copies processor.js + moonbit_dsp.wasm from web/ into web/live/public/
+// Copies the scheduler worklet and moonbit_dsp.wasm from web/ into web/live/public/
 // so Vite's dev server and production build serve them at the site root.
 //
 // Run by `npm run sync:assets`, automatically before `dev` and `build`.
@@ -14,7 +14,7 @@ const webDir = resolve(liveDir, "..");
 const repoDir = resolve(webDir, "..");
 const publicDir = resolve(liveDir, "public");
 const generatedDir = resolve(liveDir, "src/generated");
-const ASSETS = ["playback-controller.js", "playback-onsets.js", "processor.js", "scheduler-processor.js", "moonbit_dsp.wasm"];
+const ASSETS = ["playback-controller.js", "playback-onsets.js", "scheduler-processor.js", "moonbit_dsp.wasm"];
 const authoringSource = resolve(repoDir, "_build/js/release/build/browser_authoring/browser_authoring.js");
 
 mkdirSync(generatedDir, { recursive: true });

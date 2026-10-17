@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 // external failure notification is injected; close/resume timing is real.
 for (const phase of ["closing", "suspended", "resuming"] as const) {
   test(`runtime failure during ${phase} survives async completion and permits recovery`, async ({ page }) => {
-    await page.goto("/?audioMode=compiled");
+    await page.goto("/");
     await page.locator(".cm-content").click();
     const result = await page.evaluate(async phase => {
       const engine = window.__moondspEngine!;
@@ -41,7 +41,7 @@ for (const phase of ["closing", "suspended", "resuming"] as const) {
 }
 
 test("retired session cannot reveal or close a later playback run", async ({ page }) => {
-  await page.goto("/?audioMode=compiled");
+  await page.goto("/");
   await page.locator(".cm-content").click();
   const result = await page.evaluate(async () => {
     const engine = window.__moondspEngine!;
@@ -67,7 +67,7 @@ test("retired session cannot reveal or close a later playback run", async ({ pag
 });
 
 test("a failed Stop cannot overwrite an immediate Retry", async ({ page }) => {
-  await page.goto("/?audioMode=compiled");
+  await page.goto("/");
   await page.locator(".cm-content").click();
   const result = await page.evaluate(async () => {
     const engine = window.__moondspEngine!;
@@ -87,7 +87,7 @@ test("a failed Stop cannot overwrite an immediate Retry", async ({ page }) => {
 });
 
 test("cancelling stalled WASM fetch closes the owned context before reopening", async ({ page }) => {
-  await page.goto("/?audioMode=compiled");
+  await page.goto("/");
   await page.locator(".cm-content").click();
   const result = await page.evaluate(async () => {
     const engine = window.__moondspEngine!;
@@ -133,7 +133,7 @@ test("cancelling stalled WASM fetch closes the owned context before reopening", 
 });
 
 test("cancelling suspended resume closes its graph before a late completion", async ({ page }) => {
-  await page.goto("/?audioMode=compiled");
+  await page.goto("/");
   await page.locator(".cm-content").click();
   const result = await page.evaluate(async () => {
     const engine = window.__moondspEngine!;
@@ -173,7 +173,7 @@ test("cancelling suspended resume closes its graph before a late completion", as
 test("late non-abortable WASM completion cannot disturb the replacement session", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
-  await page.goto("/?audioMode=compiled");
+  await page.goto("/");
   await page.locator(".cm-content").click();
   const result = await page.evaluate(async () => {
     const engine = window.__moondspEngine!;
@@ -207,7 +207,7 @@ test("late non-abortable WASM completion cannot disturb the replacement session"
 
 test("the initialization deadline covers a fetch that never settles", async ({ page }) => {
   test.setTimeout(30_000);
-  await page.goto("/?audioMode=compiled");
+  await page.goto("/");
   await page.locator(".cm-content").click();
   const result = await page.evaluate(async () => {
     const engine = window.__moondspEngine!;
@@ -227,5 +227,5 @@ test("the initialization deadline covers a fetch that never settles", async ({ p
   await page.locator("#start").click();
   await expect(page.locator("#status")).toHaveText("Playing");
   await page.locator("#start").click();
-  await expect(page.locator("#status")).toHaveText("Ready");
+  await expect(page.locator("#status")).toHaveText("Paused");
 });

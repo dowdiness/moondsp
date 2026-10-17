@@ -64,7 +64,7 @@ function writeControl(control: HTMLButtonElement, view: ControlView): void {
 export function writeAuthoring(elements: TransportElements, authoring: AuthoringView): void {
   const e = elements;
   e.body.dataset.authoring = authoring.authoring;
-  if (authoring.start) writeControl(e.start, authoring.start);
+  writeControl(e.start, authoring.start);
   writeControl(e.restart, authoring.restart);
   writeControl(e.sourceToggle, authoring.sourceToggle);
   e.changeStatus.hidden = authoring.changeStatusHidden;
@@ -72,10 +72,8 @@ export function writeAuthoring(elements: TransportElements, authoring: Authoring
   e.readiness.hidden = authoring.readiness === null;
   const unavailable = authoring.unavailable;
   if (!unavailable) return;
-  if (unavailable.transport !== null) {
-    setText(e.status, unavailable.transport);
-    writeAction(e.start, "play", "Play");
-  }
+  setText(e.status, unavailable.transport);
+  writeAction(e.start, "play", "Play");
   setText(e.draftStatus, unavailable.draftStatus);
   setText(e.draftVersion, unavailable.draftVersion);
 }

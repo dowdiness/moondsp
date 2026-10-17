@@ -2,7 +2,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { expect, test } from "@playwright/test";
 import { Player } from "../src/playback";
 import { Draft, PlaybackInput } from "../src/authoring";
-import type { AudioEvent, OpenSessionResult, SchedulerSession } from "../src/audio";
+import type { AudioEvent, AudioSession, OpenSessionResult } from "../src/audio";
 import { RequestId } from "../src/playback-protocol";
 import type { PlayerOperation, PlayState } from "../src/playback-protocol";
 
@@ -19,8 +19,8 @@ function harness(deferred = false, delayedClose = false, cancellable = false) {
     return "issued" as const;
   };
   const closing = Promise.withResolvers<{ kind: "closed" }>();
-  const session: SchedulerSession = {
-    kind: "scheduler", fadeIn: () => "issued",
+  const session: AudioSession = {
+    fadeIn: () => "issued",
     close: async () => {
       closingStarted.resolve();
       if (delayedClose) await closing.promise;

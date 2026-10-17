@@ -36,7 +36,6 @@ export type WorkletMessage =
   | { kind: "receipt"; receipt: PlayerReceipt }
   | ({ kind: "status" } & PlayerSnapshot)
   | { kind: "runtime-error"; message: string }
-  | { kind: "notice"; data: Readonly<Record<string, unknown>> }
   | { kind: "protocol-error"; message: string };
 
 function record(value: unknown): value is Record<string, unknown> {
@@ -89,7 +88,5 @@ export function decodeWorkletMessage(value: unknown): WorkletMessage {
     if (typeof value.restartRequired !== "boolean" || typeof value.message !== "string") return { kind: "protocol-error", message: "invalid rejection receipt" };
     return { kind: "receipt", receipt: { ...base, kind: "rejected", restartRequired: value.restartRequired, message: value.message } };
   }
-  // Compiled-engine diagnostics are not Player state changes.
-  if (value.type === "telemetry" || value.type === "scheduler-timing") return { kind: "notice", data: value };
   return { kind: "protocol-error", message: "unknown worklet message" };
 }
