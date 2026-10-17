@@ -127,10 +127,11 @@ jobs:
           sudo apt-get install -y -q --no-install-recommends pulseaudio gstreamer1.0-pulseaudio
           pulseaudio --start --exit-idle-time=-1
 
-      - name: Build web/live (also syncs assets into dist/)
+      - name: Type-check and build web/live for production
         working-directory: web/live
         run: npm run build
 
+      # The test run builds and serves its own e2e bundle.
       - name: Run web/live smoke tests
         working-directory: web/live
         run: npm test -- --project=${{ matrix.browser }}

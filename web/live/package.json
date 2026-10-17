@@ -10,6 +10,8 @@
     "prebuild": "npm run sync:assets",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "prebuild:e2e": "npm run sync:assets",
+    "build:e2e": "vite build --mode e2e --outDir dist-e2e",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "playwright test",

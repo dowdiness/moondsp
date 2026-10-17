@@ -1294,9 +1294,9 @@ checkout with `npm ci --prefix web/live`.
 
 | Changed source | Preparation before testing |
 |---|---|
-| Live TypeScript, HTML, or CSS | `npm --prefix web/live run build` |
-| Worklet JS or shared playback controller | `npm --prefix web/live run build` |
-| MoonBit code or WASM export manifest | Build WASM and copy it first, then build the live app as below |
+| Live TypeScript, HTML, or CSS | None; the test run builds the app |
+| Worklet JS or shared playback controller | None; the test run syncs and builds them |
+| MoonBit code or WASM export manifest | Build WASM and copy it first, as below |
 
 ```bash
 NEW_MOON_MOD=0 moon build browser --target wasm-gc --release
@@ -1310,9 +1310,16 @@ The artifact chain is:
 → `web/live/public/moonbit_dsp.wasm`
 → `web/live/dist/moonbit_dsp.wasm`.
 `playwright-sync-wasm.sh` performs the first copy.
-The live `prebuild`/`predev` hook runs `scripts/sync-assets.mjs`, copying the
-WASM and all three worklet/controller JS modules from `web/` into `public/`.
-Vite's production build copies those public assets into `dist/`.
+The live `prebuild`/`prebuild:e2e`/`predev` hooks run `scripts/sync-assets.mjs`,
+copying the WASM and all three worklet/controller JS modules from `web/` into
+`public/`. Vite's build copies those public assets into `dist/`.
+
+`npm --prefix web/live run build` type-checks and produces the production
+bundle. The live Playwright suite does not test that bundle: each run builds
+`dist-e2e/` with `npm run build:e2e`, which differs only in exposing
+`window.__moondspEngine` so tests can drive the engine's lifecycle and inject
+worklet faults, and serves it with `vite preview`. Production builds omit the
+handle.
 
 `sync:assets` compiles the JS authoring target, but not browser WASM;
 `preview` does not rebuild anything.

@@ -416,16 +416,15 @@ const startupFrame = requestAnimationFrame(() => {
 });
 scope.own({ dispose: () => { cancelAnimationFrame(startupFrame); clearTimeout(startupTimer); } });
 
-// Test hook: exposes the engine so smoke tests can inject synthetic
-// worklet replies (specifically the runtime-error path that's
-// otherwise unreachable from the live REPL UI). Harmless to ship —
-// the only public method beyond the normal API is `_testInjectReply`.
+// End-to-end builds (`npm run build:e2e`) expose the engine so tests can drive
+// its lifecycle and inject worklet faults the page cannot cause. Production
+// builds drop this branch.
 declare global {
   interface Window {
     __moondspEngine?: AudioEngine;
   }
 }
-window.__moondspEngine = engine;
+if (import.meta.env.MODE === "e2e") window.__moondspEngine = engine;
 
 // eslint-disable-next-line no-console
 console.info("[moondsp/live] basic editor ready — preparing score tools");

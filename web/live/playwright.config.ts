@@ -35,11 +35,12 @@ export default defineConfig({
     { name: "webkit", use: { browserName: "webkit" } },
   ],
   webServer: {
-    // `vite preview` serves the production build deterministically.
-    // Test runs assume `npm run build` has already produced dist/.
-    // --host pins the bind address so `127.0.0.1` resolves on CI runners
-    // where vite's default `localhost` can race with IPv6 preferences.
-    command: `npm run preview -- --port ${port} --strictPort --host 127.0.0.1`,
+    // Every run builds and serves its own bundle, so tests never see stale
+    // assets. The e2e build is the production build plus the engine handle
+    // tests need (see main.ts). --host pins the bind address so `127.0.0.1`
+    // resolves on CI runners where vite's default `localhost` can race with
+    // IPv6 preferences.
+    command: `npm run build:e2e && npm run preview -- --outDir dist-e2e --port ${port} --strictPort --host 127.0.0.1`,
     url: baseURL,
     // Never accept assets from a preview launched in another checkout.
     reuseExistingServer: false,
