@@ -250,7 +250,9 @@ test("mobile Help contains keyboard focus, closes on Escape and yields to a chos
   expect(await readCode(page)).toBe('note("D4")');
 });
 
-test("every Help example loads its own score without playing; a scene plays what it loads", async ({ page }) => {
+test("every Help example loads its own score without playing", async ({ page }) => {
+  // One page walks the whole catalogue, so this test is long by design.
+  test.slow();
   await page.goto("/");
   await page.getByRole("button", { name: "Help", exact: true }).click();
   await page.locator("#cheat details").evaluateAll(sections => sections.forEach(section => { (section as HTMLDetailsElement).open = true; }));
@@ -263,6 +265,11 @@ test("every Help example loads its own score without playing; a scene plays what
     loaded.add(code);
   }
   await expect(page.locator("#status")).toHaveText("Ready");
+});
+
+test("a Help scene plays the score it loads", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Help", exact: true }).click();
   const offbeat = page.getByRole("button", { name: "Explore Offbeat", exact: true });
   await offbeat.click();
   await expect(page.locator("#status")).toHaveText("Playing");
