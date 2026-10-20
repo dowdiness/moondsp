@@ -6,13 +6,8 @@
   --drum-cell-size: 30px;
   --drum-cell-height: 26px;
   --drum-gap: 3px;
-  /* The dark-theme pastels are used in both themes, one hue per sound. On the
-     light panel each filled pad adds a deeper edge of its hue for definition. */
-  --sound-bd: #efb596;
-  --sound-sd: #f0c97e;
-  --sound-hh: #8fd0b0;
-  --sound-oh: #9cc6e4;
-  --sound-cp: #c4b6f2;
+  /* Pads use the shared --sound-* pastels in both themes. On the light panel
+     each filled pad adds a deeper edge of its hue for definition. */
   --edge-bd: #934a2a;
   --edge-sd: #a8641a;
   --edge-hh: #2c7558;

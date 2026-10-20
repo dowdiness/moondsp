@@ -46,7 +46,7 @@ $: note("C3 ~ C3 Eb3 ~ G3 Bb3 ~").slow(4).gain(0.3).lpf(1200)` },
 $: s("bd ~ ~ ~ sd ~ ~ ~").slow(4)
 $: note("C4 ~ G4 ~ Eb4 ~ Bb4 ~").slow(4).gain(0.2).lpf(2400)
 $: chord("Cm7 Abmaj7").slow(8).gain(0.12).lpf(900)` },
-  { title: "Moonrise", artClass: "scene-art-rise", art: '<path d="M8 53h84M20 53a30 30 0 0 1 60 0Z"/>',
+  { title: "Moonrise", artClass: "scene-art-rise", art: '<path d="M14 50a36 36 0 0 1 72 0Z"/><path d="M6 50h88"/>',
     source: `bpm(104);
 
 $: s("bd ~ ~ bd sd ~ bd ~, hh*8").slow(4)

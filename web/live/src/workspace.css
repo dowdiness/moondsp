@@ -46,8 +46,12 @@
   --key-white: #f9fbf8;
   --key-black: #dce6df;
   --key-black-ink: #153e39;
-  --lavender: #b5a3df;
-  --orange: #ee9b73;
+  /* The percussion pastels, one hue per sound, in both themes. */
+  --sound-bd: #efb596;
+  --sound-sd: #f0c97e;
+  --sound-hh: #8fd0b0;
+  --sound-oh: #9cc6e4;
+  --sound-cp: #c4b6f2;
   --play-bg: #354acb;
   --play-ink: #ffffff;
   --glow: #354acb;
@@ -90,8 +94,6 @@
     --key-white: #24403a;
     --key-black: #162c28;
     --key-black-ink: #b0c6b9;
-    --lavender: #b5a3df;
-    --orange: #dc9a75;
     --play-bg: #485db9;
     --play-ink: #ffffff;
     --glow: #b8c1ff;
@@ -356,10 +358,12 @@ summary { cursor: pointer; font-weight: 700; min-height: 40px; padding: 10px 0; 
 }
 .scene[aria-pressed='true'] { border-color: color-mix(in srgb, var(--accent) 60%, var(--border)); background: var(--raised); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
 .scene svg { flex: none; width: 70%; height: auto; stroke-width: 1.5; }
-.scene-art-light { fill: var(--orange); stroke: var(--ink); }
-.scene-art-offbeat { fill: var(--accent); stroke: none; }
-.scene-art-drift { fill: var(--lavender); stroke: var(--ink); }
-.scene-art-rise { fill: var(--drum-bg); stroke: var(--drum); }
+.scene svg { stroke: var(--ink); }
+/* One family: the percussion pastels, each outlined in ink at the same weight. */
+.scene-art-light { fill: var(--sound-bd); }
+.scene-art-offbeat { fill: var(--sound-oh); }
+.scene-art-drift { fill: var(--sound-cp); }
+.scene-art-rise { fill: var(--sound-hh); }
 
 
 /* ── Footer ───────────────────────────────────────────────────────
