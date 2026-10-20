@@ -199,14 +199,15 @@ const measurer = ViewPlugin.fromClass(class {
   measure(): void {
     this.view.requestMeasure({
       key: this,
-      // The read phase runs after CodeMirror has drawn its lines, so a line is there to measure.
+      // The content element carries the font and, as registered lengths, the line inset.
       read: view => {
-        const line = view.contentDOM.querySelector<HTMLElement>(".cm-line");
-        if (!line) return null;
-        const style = getComputedStyle(line);
+        const content = view.contentDOM;
+        const style = getComputedStyle(content);
         // Canvas text measures the same font and fallbacks without touching the layout.
         probe.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-        return measuredColumns(line.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
+        const inset = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight)
+          + parseFloat(style.getPropertyValue("--line-start")) + parseFloat(style.getPropertyValue("--line-end"));
+        return measuredColumns(content.clientWidth - inset,
           view.defaultCharacterWidth, probe.measureText("国").width, probe.measureText("0").width);
       },
       write: (next, view) => {

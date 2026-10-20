@@ -154,7 +154,7 @@ refreshEditorChrome();
 
 // ── Engine ──────────────────────────────────────────────────
 
-const options = engineOptions(new URLSearchParams(window.location.search));
+const options = engineOptions(new URLSearchParams(dom.page.location.search));
 const engine = new AudioEngine("/moonbit_dsp.wasm", options);
 
 

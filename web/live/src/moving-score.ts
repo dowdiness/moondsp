@@ -32,23 +32,35 @@ export function mountMovingScore(
     tonesOpen: boolean; tonesChanged(open: boolean): void; sources: SourceElements },
 ): { update(pattern: Pattern): void; dispose(): void; selectionTools: HTMLElement; structureTools: HTMLElement } {
   root.classList.add("moving-score");
-  root.innerHTML = `
-    <div class="moving-score__selection-tools"></div>
-    <details class="moving-score__structure-details">
-      <summary>Structure</summary>
-      <div class="moving-score__structure-label">Source steps · linked repetitions</div>
-      <svg class="moving-score__structure" preserveAspectRatio="none" role="group" aria-label="Selectable source structure and adjacent weight boundaries" tabindex="0"></svg>
-      <div class="moving-score__structure-tools note-properties"></div>
-    </details>
-    <div class="moving-score__foot"><span class="moving-score__message" role="status" aria-live="polite"></span></div>
-    <p class="moving-score__unsupported" hidden></p>`;
-  // Connect once to the template just drawn; nothing is looked up after mount.
-  const selectionTools = root.querySelector<HTMLElement>(".moving-score__selection-tools")!;
-  const structureDetails = root.querySelector<HTMLDetailsElement>(".moving-score__structure-details")!;
-  const structureSvg = root.querySelector<SVGSVGElement>(".moving-score__structure")!;
-  const structureTools = root.querySelector<HTMLElement>(".moving-score__structure-tools")!;
-  const message = root.querySelector<HTMLElement>(".moving-score__message")!;
-  const unsupported = root.querySelector<HTMLElement>(".moving-score__unsupported")!;
+  const selectionTools = document.createElement("div");
+  selectionTools.className = "moving-score__selection-tools";
+  const structureDetails = document.createElement("details");
+  structureDetails.className = "moving-score__structure-details";
+  const structureSummary = document.createElement("summary");
+  structureSummary.textContent = "Structure";
+  const structureLabel = document.createElement("div");
+  structureLabel.className = "moving-score__structure-label";
+  structureLabel.textContent = "Source steps · linked repetitions";
+  const structureSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  structureSvg.setAttribute("class", "moving-score__structure");
+  structureSvg.setAttribute("preserveAspectRatio", "none");
+  structureSvg.setAttribute("role", "group");
+  structureSvg.setAttribute("aria-label", "Selectable source structure and adjacent weight boundaries");
+  structureSvg.setAttribute("tabindex", "0");
+  const structureTools = document.createElement("div");
+  structureTools.className = "moving-score__structure-tools note-properties";
+  structureDetails.append(structureSummary, structureLabel, structureSvg, structureTools);
+  const foot = document.createElement("div");
+  foot.className = "moving-score__foot";
+  const message = document.createElement("span");
+  message.className = "moving-score__message";
+  message.setAttribute("role", "status");
+  message.setAttribute("aria-live", "polite");
+  foot.append(message);
+  const unsupported = document.createElement("p");
+  unsupported.className = "moving-score__unsupported";
+  unsupported.hidden = true;
+  root.replaceChildren(selectionTools, structureDetails, foot, unsupported);
   structureDetails.open = controls.structureOpen;
   structureDetails.addEventListener("toggle", () => controls.structureChanged(structureDetails.open));
 

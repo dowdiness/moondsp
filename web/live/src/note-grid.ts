@@ -91,11 +91,16 @@ export function mountNoteGrid(
   const editable = notationKind === "note";
   const heading = document.createElement("div");
   heading.className = "moving-score__heading";
-  heading.innerHTML = `<div class="moving-score__event-label">Notation events</div>
-    <label class="moving-score__time-view">Ruler <select aria-label="Notation ruler"><option value="cycle">Cycle</option><option value="pulse">4 divisions</option></select></label>`;
-  // Connect once to the template just drawn; nothing is looked up after mount.
-  const eventLabel = heading.querySelector<HTMLElement>(".moving-score__event-label")!;
-  const rulerSelect = heading.querySelector<HTMLSelectElement>("select")!;
+  const eventLabel = document.createElement("div");
+  eventLabel.className = "moving-score__event-label";
+  eventLabel.textContent = "Notation events";
+  const rulerLabel = document.createElement("label");
+  rulerLabel.className = "moving-score__time-view";
+  const rulerSelect = document.createElement("select");
+  rulerSelect.setAttribute("aria-label", "Notation ruler");
+  for (const [value, text] of [["cycle", "Cycle"], ["pulse", "4 divisions"]]) rulerSelect.add(new Option(text, value));
+  rulerLabel.append("Ruler ", rulerSelect);
+  heading.append(eventLabel, rulerLabel);
   const ruler = document.createElementNS(NS, "svg");
   ruler.setAttribute("class", "moving-score__ruler");
   ruler.setAttribute("viewBox", `0 0 ${W} ${TIME_H}`);

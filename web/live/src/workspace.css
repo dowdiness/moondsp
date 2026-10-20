@@ -230,11 +230,15 @@ a { color: var(--accent); text-underline-offset: 4px; }
 /* ── Editor ───────────────────────────────────────────────────────── */
 #editor { min-height: 0; flex: 1; overflow: hidden; cursor: text; }
 #editor:focus { outline: none; }
-.cm-editor { height: 100%; font-family: var(--font-mono); }
+.cm-editor { height: 100%; font-family: var(--font-mono); --line-start: 2vw; --line-end: 32px; }
 .cm-editor.cm-focused { outline: none; }
 .cm-editor .cm-scroller { height: 100%; font-family: var(--font-mono); line-height: 1.95; overflow: auto; scrollbar-gutter: stable; }
 .score-sheet .cm-editor .cm-content { padding: 4vh 0 12vh; font-size: var(--code-size); caret-color: var(--accent); min-width: 0; flex-basis: 0; }
-.cm-editor .cm-line { padding: 0 32px 0 2vw; overflow-wrap: anywhere; }
+/* The line inset is registered as lengths so the code layout reads it, in pixels,
+   from the content element instead of searching for a line. */
+@property --line-start { syntax: "<length>"; inherits: true; initial-value: 0px; }
+@property --line-end { syntax: "<length>"; inherits: true; initial-value: 0px; }
+.cm-editor .cm-line { padding: 0 var(--line-end) 0 var(--line-start); overflow-wrap: anywhere; }
 /* Long statements break by syntax (code-layout.ts): row breaks are widgets, and a
    phrase too long for its row wraps inside a box the layout sizes in columns. */
 .cm-wrap-phrase { display: inline-block; }
@@ -451,7 +455,7 @@ footer > #score-readiness, footer > #log, footer > #session-message { order: 4; 
   .cm-editor .cm-gutters { padding-left: 6px; }
   .score-sheet .cm-editor .cm-gutterElement { padding-right: 7px; }
   .score-sheet .cm-editor .cm-lineNumbers .cm-gutterElement { min-width: calc(3ch + 7px); }
-  .cm-editor .cm-line { padding-left: 8px; padding-right: 12px; }
+  .cm-editor { --line-start: 8px; --line-end: 12px; }
   .score-pattern { margin: 0 8px 0 0; padding-left: 12px; }
   .score-pattern[data-kind='note'] { padding-left: 12px; }
   footer { gap: 0 12px; padding: 3px 12px; }
