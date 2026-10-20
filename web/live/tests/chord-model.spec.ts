@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { chordParts, chordPitches, spellChord } from "../src/chord-model";
+import { DEFAULT_CHORD, DEFAULT_CHORD_TONES, chordParts, chordPitches, freePitchNear, spellChord } from "../src/chord-model";
 
 test("lowering a chord third spells the exact minor chord", () => {
   expect(chordPitches("C")).toEqual([60, 64, 67]);
@@ -52,4 +52,12 @@ test("invalid and duplicate edited pitches are rejected", () => {
 
 test("explicit pitch atoms do not expose named-chord parts", () => {
   expect(chordParts("{60,63,67}")).toBeNull();
+});
+
+test("the default chord's tones are the tones it compiles to, and a new tone starts at its root", () => {
+  expect(chordPitches(DEFAULT_CHORD)).toEqual(DEFAULT_CHORD_TONES);
+  expect(freePitchNear(DEFAULT_CHORD_TONES[0], [])).toBe(60);
+  // An occupied anchor gives way above before below.
+  expect(freePitchNear(64, [60, 64, 65])).toBe(63);
+  expect(freePitchNear(64, [64])).toBe(65);
 });

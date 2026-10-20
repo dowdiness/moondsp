@@ -1,4 +1,4 @@
-import { chordParts, chordPitches, spellChord, QUALITIES, ROOTS, type ChordParts } from "./chord-model";
+import { DEFAULT_CHORD, DEFAULT_CHORD_TONES, chordParts, chordPitches, spellChord, QUALITIES, ROOTS, type ChordParts } from "./chord-model";
 import { mountChordToneEditor } from "./chord-tone-editor";
 import { transposePitch } from "./pitch";
 import type { SourceElements } from "./source-elements";
@@ -94,13 +94,13 @@ export function mountChordControls(
       atom = value;
       feedback.textContent = "";
       if (value === null) { current = null; editor.update([], [], "C4", doc, from); return; }
-      current = value === "~" ? chordParts(restSeed) ?? chordParts("C") : chordParts(value);
+      current = value === "~" ? chordParts(restSeed) ?? chordParts(DEFAULT_CHORD) : chordParts(value);
       root.disabled = quality.disabled = !current;
       container.setAttribute("aria-label", value === "~" ? "Fill selected chord rest" : `Edit selected chord ${value}`);
       const pitches = chordPitches(value) ?? [];
       const spelling = current && /[bf]/.test(current.root.slice(1)) ? "Db4" : "C4";
       const base = spelling === "Db4" ? 61 : 60;
-      editor.update(pitches, chordPitches(restSeed) ?? [60, 64, 67], spelling, doc, from);
+      editor.update(pitches, chordPitches(restSeed) ?? DEFAULT_CHORD_TONES, spelling, doc, from);
       if (current) {
         retainSpelling(root, current.root);
         const kind = QUALITIES.find(item => item.value === current!.quality || item.aliases.includes(current!.quality));

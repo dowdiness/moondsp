@@ -1,4 +1,4 @@
-import { freePitchNear, movedPastTap, rowDelta, shiftTones, toneAtY, toneRows, toneSetError } from "./chord-model";
+import { DEFAULT_CHORD_TONES, freePitchNear, movedPastTap, rowDelta, shiftTones, toneAtY, toneRows, toneSetError } from "./chord-model";
 import { transposePitch } from "./pitch";
 import { columnFor } from "./roving-focus";
 import "./chord-tone-editor.css";
@@ -33,7 +33,9 @@ export function mountChordToneEditor(root: HTMLElement, change: (pitches: readon
   const lower = button("Lower", () => move(-1));
   const raise = button("Raise", () => move(1));
   button("Add tone", () => {
-    const pitch = freePitchNear(selected === null ? pitches.at(-1) ?? 59 : pitches[selected], pitches);
+    // Beside the selected tone, else the highest, else where the default chord starts.
+    const nearTone = selected !== null ? pitches[selected] : pitches.at(-1) ?? DEFAULT_CHORD_TONES[0];
+    const pitch = freePitchNear(nearTone, pitches);
     if (pitch === null) { message.textContent = "Every MIDI pitch already has a tone."; return; }
     commit([...pitches, pitch], pitch);
     canvas.focus({ preventScroll: true });

@@ -175,14 +175,24 @@ function samePitches(left: readonly number[], right: readonly number[]): boolean
 
 // Chord tone editing: the decisions behind the tone grid's gestures and buttons.
 
+/** The chord a rest becomes when no neighbouring chord suggests one. */
+export const DEFAULT_CHORD = "C";
+/** C4 E4 G4, the tones of `DEFAULT_CHORD`, wherever tones are needed and there are none. */
+export const DEFAULT_CHORD_TONES: readonly number[] = [60, 64, 67];
+
 /** Pointer travel, in CSS pixels, beyond which a tap on an empty row no longer adds a tone. */
 const TAP_SLOP_PX = 6;
+/** Rows a tone grid shows beyond its lowest and highest tone. */
+const HEADROOM_ROWS = 2;
+/** The fewest semitones a tone grid spans above its lowest row: an octave. */
+const MIN_SPAN = 11;
 
-/** The pitch rows a tone grid shows around `reference` (C to G when empty): two rows of headroom and at least an octave. */
+/** The pitch rows a tone grid shows around `reference`, or around `DEFAULT_CHORD_TONES` when it is empty. */
 export function toneRows(reference: readonly number[]): { low: number; high: number } {
-  let low = Math.max(0, Math.min(...(reference.length ? reference : [60])) - 2);
-  let high = Math.min(127, Math.max(...(reference.length ? reference : [67])) + 2);
-  if (high - low < 11) { high = Math.min(127, low + 11); low = Math.max(0, high - 11); }
+  const framed = reference.length ? reference : DEFAULT_CHORD_TONES;
+  let low = Math.max(0, Math.min(...framed) - HEADROOM_ROWS);
+  let high = Math.min(127, Math.max(...framed) + HEADROOM_ROWS);
+  if (high - low < MIN_SPAN) { high = Math.min(127, low + MIN_SPAN); low = Math.max(0, high - MIN_SPAN); }
   return { low, high };
 }
 
@@ -206,8 +216,9 @@ export function shiftTones(pitches: readonly number[], index: number | null, del
   return pitches.map((pitch, at) => index === null || at === index ? pitch + delta : pitch);
 }
 
-/** The pitch without a tone nearest `anchor`, above before below; null when every MIDI pitch has one. */
+/** The pitch without a tone nearest `anchor`, `anchor` itself first, then above before below; null when every MIDI pitch has one. */
 export function freePitchNear(anchor: number, pitches: readonly number[]): number | null {
+  if (anchor >= 0 && anchor <= 127 && !pitches.includes(anchor)) return anchor;
   for (let distance = 1; distance <= 128; distance++)
     for (const pitch of [anchor + distance, anchor - distance])
       if (pitch >= 0 && pitch <= 127 && !pitches.includes(pitch)) return pitch;

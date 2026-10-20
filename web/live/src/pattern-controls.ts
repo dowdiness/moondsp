@@ -6,6 +6,7 @@ import { miniliveLanguage } from "./lang/minilive";
 import { midiValue, transposePitch } from "./pitch";
 import { mountMovingScore } from "./moving-score";
 import { mountChordControls } from "./chord-controls";
+import { DEFAULT_CHORD } from "./chord-model";
 import {
   projectNotation, leafNodes, splitNode, repeatNode, weightNode, moveBoundary, boundaryInfo, sourceRangeNodes,
   keepingSelection, mapPosition, BOUNDARY_MAX, BOUNDARY_MIN, BOUNDARY_STEP, type Edit, type NotationProjection, type SourceChange,
@@ -109,6 +110,9 @@ export function sourcePatterns(state: EditorState): Pattern[] {
   }
   return patterns;
 }
+
+/** The note a rest becomes when no neighbouring note suggests one. */
+const DEFAULT_NOTE = "C4";
 
 const liveWidgets = new WeakMap<HTMLElement, PatternWidgetDOM>();
 type Cell = { cell: HTMLElement; pad: HTMLButtonElement; note: HTMLElement };
@@ -617,13 +621,14 @@ class PatternWidgetDOM {
     this.chordControls?.dispose();
   }
 
+  /** The sound a selected rest becomes: the nearest earlier sound, else the nearest later one, else the default. */
   private restValue(): string {
     const steps = this.pattern.steps ?? [];
     for (let index = this.selected - 1; index >= 0; index--)
       if (!steps[index].rest) return steps[index].value;
     for (let index = this.selected + 1; index < steps.length; index++)
       if (!steps[index].rest) return steps[index].value;
-    return this.pattern.notationKind === "chord" ? "C" : "C4";
+    return this.pattern.notationKind === "chord" ? DEFAULT_CHORD : DEFAULT_NOTE;
   }
 
   private toggleRest(): void {
