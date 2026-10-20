@@ -52,7 +52,7 @@
   --play-ink: #ffffff;
   --glow: #354acb;
   --horizon-a: #354acb;
-  --horizon-b: #934a2a;
+  --horizon-bright: #1f9a74;
   --wave-a: #2f9479;
   --wave-b: #8b7ad8;
   --font-body: Manrope, ui-sans-serif, system-ui, sans-serif;
@@ -95,8 +95,8 @@
     --play-bg: #485db9;
     --play-ink: #ffffff;
     --glow: #b8c1ff;
-    --horizon-a: #b8c1ff;
-    --horizon-b: #efb596;
+    --horizon-a: #8f9dff;
+    --horizon-bright: #72dfb0;
     --wave-a: #8fd0b0;
     --wave-b: #c4b6f2;
     --syntax-string: #efb79b;
@@ -450,7 +450,8 @@ footer > #score-readiness, footer > #log, footer > #session-message { order: 4; 
   .masthead > *:not(.horizon) { animation: fade-in 640ms var(--ease-out) backwards; }
   .masthead > .transport { animation-delay: 60ms; }
   .masthead > .toolbar { animation-delay: 120ms; }
-  .horizon { animation: fade-in 1200ms 200ms var(--ease-out) backwards; }
+  /* The horizon's baseline draws in from the write head at the right edge. */
+  .horizon canvas { animation: horizon-in 1100ms 160ms var(--ease-out) backwards; }
   .score-sheet { animation: fade-in 700ms 140ms var(--ease-out) backwards; }
   #start[aria-busy='true'] { animation: busy-sheen 1.4s linear infinite; }
   #cheat[open] > * { animation: drawer-in 420ms var(--ease-out) backwards; }
@@ -467,6 +468,7 @@ footer > #score-readiness, footer > #log, footer > #session-message { order: 4; 
 @keyframes drawer-in { from { opacity: 0; transform: translateX(18px); } }
 @keyframes busy-sheen { to { background-position: -300% 0; } }
 @keyframes fade-in { from { opacity: 0; } }
+@keyframes horizon-in { from { clip-path: inset(0 0 0 100%); } }
 
 @media (forced-colors: active) {
   .step-cell.is-selected .step-pad { border: 2px solid Highlight; }

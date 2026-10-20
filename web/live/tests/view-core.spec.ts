@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { MAX_BARS, barShape, horizonLayout, tickShape } from "../src/horizon-geometry";
-import { canvasPixels, signalStats, triggerOffset } from "../src/signal-math";
+import { brightness, canvasPixels, signalStats, triggerOffset } from "../src/signal-math";
 import { projectNotation, type NotationProjection } from "../src/notation-structure";
 import { gridLayout, hitGrid } from "../src/note-grid-layout";
 import { ROW_H, TIME_H, midiAtY, needsResizeRender, plotPoint, plotScale, scoreGeometry } from "../src/score-geometry";
@@ -22,6 +22,20 @@ test("signal statistics report RMS only above the noise floor and triggers find 
   expect(triggerOffset([0.2, 0.1, -0.3, 0.4], 2)).toBe(0);
 });
 
+test("brightness orders tones by energy, so a loud kick under a quiet hi-hat stays dark", () => {
+  const sine = (hz: number, gain = 1): number[] => Array.from({ length: 1024 }, (_, i) => gain * Math.sin(2 * Math.PI * hz * i / 48_000));
+  const kick = brightness(sine(60), 48_000);
+  const middle = brightness(sine(880), 48_000);
+  const air = brightness(sine(6000), 48_000);
+  expect(kick).toBeLessThan(0.15);
+  expect(air).toBeGreaterThan(0.85);
+  expect(middle).toBeGreaterThan(kick);
+  expect(middle).toBeLessThan(air);
+  const kickUnderHat = sine(60).map((value, i) => value + sine(6000, 0.15)[i]);
+  expect(brightness(kickUnderHat, 48_000)).toBeLessThan(0.15);
+  expect(brightness(new Array(1024).fill(0), 48_000)).toBe(0);
+});
+
 test("horizon layout right-aligns whole bars and caps the bar count", () => {
   const layout = horizonLayout(1003, 120, 2);
   expect(layout.pitch).toBe(10);
@@ -29,7 +43,7 @@ test("horizon layout right-aligns whole bars and caps the bar count", () => {
   // The newest bar ends flush with the right edge.
   expect(layout.offsetX + (layout.bars - 1) * layout.pitch + layout.barWidth).toBe(1003);
   expect(layout.center).toBe(50);
-  expect(layout.reach).toBe(46);
+  expect(layout.reach).toBe(38);
   expect(horizonLayout(100_000, 40, 1).bars).toBe(MAX_BARS);
 
   const grid = { bars: 10, reach: 46, minHalf: 1.5 };

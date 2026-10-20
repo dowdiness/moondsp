@@ -19,6 +19,8 @@ export type Tick = 0 | 1 | 2;
 
 export type LevelHistory = {
   readonly values: Float32Array;
+  /** Measured tone colour per slot in [0, 1]; see signal-math `brightness`. */
+  readonly tones: Float32Array;
   readonly ticks: Uint8Array;
   head: number;
   lastPush: number;
@@ -27,7 +29,7 @@ export type LevelHistory = {
 };
 
 export function createLevelHistory(): LevelHistory {
-  return { values: new Float32Array(HISTORY_SLOTS), ticks: new Uint8Array(HISTORY_SLOTS), head: 0, lastPush: 0, peak: 0, pendingTick: 0 };
+  return { values: new Float32Array(HISTORY_SLOTS), tones: new Float32Array(HISTORY_SLOTS), ticks: new Uint8Array(HISTORY_SLOTS), head: 0, lastPush: 0, peak: 0, pendingTick: 0 };
 }
 
 /** Marks the next recorded slot with the cycle boundary the transport crossed. */
@@ -41,13 +43,13 @@ export function markCycle(history: LevelHistory, cycle: number): void {
  * from the previous value instead of holding one level; a gap longer than
  * a second records one slot, as if the history had been paused.
  */
-export function pushLevel(history: LevelHistory, rms: number, now: number, playing: boolean): void {
+export function pushLevel(history: LevelHistory, rms: number, now: number, playing: boolean, tone: number): void {
   if (!playing) { history.lastPush = now; return; }
   if (history.lastPush === 0) history.lastPush = now;
   const elapsed = now - history.lastPush;
   if (elapsed > MAX_INTERPOLATED_MS) {
     history.lastPush = now;
-    record(history, rms);
+    record(history, rms, tone);
     return;
   }
   let slots = Math.floor(elapsed / SLOT_MS);
@@ -55,11 +57,12 @@ export function pushLevel(history: LevelHistory, rms: number, now: number, playi
   history.lastPush = now - (elapsed % SLOT_MS);
   const previous = history.values[(history.head + HISTORY_SLOTS - 1) % HISTORY_SLOTS];
   const total = slots;
-  while (slots-- > 0) record(history, previous + (rms - previous) * (total - slots) / total);
+  while (slots-- > 0) record(history, previous + (rms - previous) * (total - slots) / total, tone);
 }
 
-function record(history: LevelHistory, value: number): void {
+function record(history: LevelHistory, value: number, tone: number): void {
   history.values[history.head] = value;
+  history.tones[history.head] = tone;
   history.ticks[history.head] = history.pendingTick;
   history.pendingTick = 0;
   history.head = (history.head + 1) % HISTORY_SLOTS;
@@ -73,9 +76,10 @@ function record(history: LevelHistory, value: number): void {
  * takes the loudest slot in its window, normalised by the tracked peak and
  * mapped over a 30 dB range, with an instant attack and a short visual release.
  * About two slots feed each bar, so narrow displays show a shorter window.
+ * `tones` receives the tone colour of each bar's loudest slot.
  * Returns true when every visible slot is silent.
  */
-export function barLevels(history: LevelHistory, bars: number, levels: Float32Array, ticks: Uint8Array): boolean {
+export function barLevels(history: LevelHistory, bars: number, levels: Float32Array, ticks: Uint8Array, tones: Float32Array): boolean {
   const visibleSlots = Math.min(HISTORY_SLOTS, bars * 2);
   const firstSlot = HISTORY_SLOTS - visibleSlots;
   const slotsPerBar = visibleSlots / bars;
@@ -86,10 +90,11 @@ export function barLevels(history: LevelHistory, bars: number, levels: Float32Ar
     const first = firstSlot + Math.floor(bar * slotsPerBar);
     const last = Math.max(first + 1, firstSlot + Math.floor((bar + 1) * slotsPerBar));
     let value = 0;
+    let tone = 0;
     let tick = 0;
     for (let slot = first; slot < last; slot++) {
       const index = (history.head + slot) % HISTORY_SLOTS;
-      if (history.values[index] > value) value = history.values[index];
+      if (history.values[index] > value) { value = history.values[index]; tone = history.tones[index]; }
       if (history.ticks[index] > tick) tick = history.ticks[index];
     }
     if (value > 0) quiet = false;
@@ -98,6 +103,7 @@ export function barLevels(history: LevelHistory, bars: number, levels: Float32Ar
     carried = Math.max(measured, carried * RELEASE_PER_BAR);
     levels[bar] = carried;
     ticks[bar] = tick;
+    tones[bar] = value > 0 ? tone : (bar > 0 ? tones[bar - 1] : 0);
   }
   return quiet;
 }

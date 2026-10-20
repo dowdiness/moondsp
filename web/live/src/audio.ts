@@ -132,16 +132,19 @@ export class AudioEngine {
     return "graph" in state ? state.graph.onsets?.statistics() ?? null : null;
   }
 
-  /** Copy up to 1024 live post-master samples; clear unused/inactive storage. */
-  readWaveform(target: Float32Array<ArrayBuffer>): boolean {
+  /**
+   * Copy up to 1024 live post-master samples and return their sample rate, or
+   * clear the storage and return 0 when nothing is running.
+   */
+  readWaveform(target: Float32Array<ArrayBuffer>): number {
     const state = this.state;
     if (state.kind !== "active" || state.graph.ctx.state !== "running") {
       target.fill(0);
-      return false;
+      return 0;
     }
     state.graph.analyser.getFloatTimeDomainData(target);
     if (target.length > state.graph.analyser.fftSize) target.fill(0, state.graph.analyser.fftSize);
-    return true;
+    return state.graph.ctx.sampleRate;
   }
   private state: EngineState = { kind: "idle" };
 

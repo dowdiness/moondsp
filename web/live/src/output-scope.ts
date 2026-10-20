@@ -49,7 +49,7 @@ export function mountOutputScope(host: OutputScopeHost, engine: Pick<AudioEngine
 
   const draw = (): void => {
     if (disposed) return;
-    const live = engine.readWaveform(samples) && signalStats(samples).live;
+    const live = engine.readWaveform(samples) > 0 && signalStats(samples).live;
     const state: OutputState = live ? "Live" : "Silent";
     if (stateText.textContent !== state) stateText.textContent = state;
     stateText.dataset.state = state.toLowerCase();

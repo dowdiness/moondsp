@@ -24,7 +24,8 @@ export function horizonLayout(width: number, height: number, dpr: number): Horiz
   const bars = Math.max(1, Math.min(MAX_BARS, Math.floor(width / pitch)));
   return {
     center,
-    reach: center - 2 * dpr,
+    // Headroom keeps the loudest bars off the masthead above.
+    reach: center - 6 * dpr,
     minHalf: 0.75 * dpr,
     barWidth: BAR_PX * dpr,
     pitch,
@@ -49,4 +50,35 @@ export function barShape(
 export function tickShape(tick: number, frozen: boolean, dpr: number): { height: number; alpha: number } {
   const group = tick === 2;
   return { height: (group ? 7 : 4) * dpr, alpha: (group ? 0.9 : 0.4) * (frozen ? 0.6 : 1) };
+}
+
+/** Number of tone colours a horizon ramp provides. */
+export const TONE_STEPS = 16;
+
+/**
+ * `TONE_STEPS` colours from `low` to `high` (`#rrggbb`), each as an opaque
+ * `rgb()` and a softened `rgba()` for bar tips.
+ */
+export function toneRamp(low: string, high: string): { solid: string; soft: string }[] {
+  const parse = (hex: string): number[] => {
+    const value = parseInt(hex.slice(1), 16);
+    return [value >> 16 & 255, value >> 8 & 255, value & 255];
+  };
+  const a = parse(low);
+  const b = parse(high);
+  return Array.from({ length: TONE_STEPS }, (_, step) => {
+    const t = step / (TONE_STEPS - 1);
+    const [r, g, bl] = a.map((channel, i) => Math.round(channel + (b[i] - channel) * t));
+    return { solid: `rgb(${r}, ${g}, ${bl})`, soft: `rgba(${r}, ${g}, ${bl}, 0.6)` };
+  });
+}
+
+/**
+ * Ramp index for a tone in [0, 1]. A smoothstep pushes material toward either
+ * end, so mixed passages commit to dark or bright instead of a muddy middle.
+ */
+export function toneStep(tone: number): number {
+  const t = Math.max(0, Math.min(1, tone));
+  const committed = t * t * (3 - 2 * t);
+  return Math.round(committed * (TONE_STEPS - 1));
 }

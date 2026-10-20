@@ -1,7 +1,7 @@
 import type { AudioEngine } from "./audio";
 import { barLevels, createLevelHistory, markCycle, pushLevel } from "./level-history";
-import { MAX_BARS, barShape, horizonLayout, tickShape } from "./horizon-geometry";
-import { canvasPixels, signalStats, triggerOffset } from "./signal-math";
+import { MAX_BARS, barShape, horizonLayout, tickShape, toneRamp, toneStep } from "./horizon-geometry";
+import { brightness, canvasPixels, signalStats, triggerOffset } from "./signal-math";
 
 // Imperative shell for the horizon: one rounded bar per short window of measured
 // RMS, mirrored about the centre line, newest at the right, with cycle ticks along
@@ -44,22 +44,42 @@ export function mountSignalHorizon(host: SignalHorizonHost, engine: Pick<AudioEn
   const history = createLevelHistory();
   const levels = new Float32Array(MAX_BARS);
   const barTicks = new Uint8Array(MAX_BARS);
+  const barTones = new Float32Array(MAX_BARS);
   let lastCycle: number | null = null;
   let transportPlaying = false;
   let historyQuiet = true;
   let lastLive = false;
   let colors = readColors();
+  let toneFills: CanvasGradient[] = [];
 
-  function readColors(): { bar: string; wave: string; waveEnd: string; tick: string; group: string } {
+  function readColors(): { bar: string; barBright: string; wave: string; waveEnd: string; tick: string; group: string; rule: string } {
     const style = getComputedStyle(root);
     const token = (name: string): string => style.getPropertyValue(name).trim();
-    return { wave: token("--wave-a"), waveEnd: token("--wave-b"), bar: token("--horizon-a"), tick: token("--ink-muted"), group: token("--accent") };
+    return {
+      wave: token("--wave-a"), waveEnd: token("--wave-b"), bar: token("--horizon-a"), barBright: token("--horizon-bright"),
+      tick: token("--ink-muted"), group: token("--accent"), rule: token("--border"),
+    };
+  }
+
+  // Each bar is coloured by the measured tone of its loudest slot, from dark
+  // (low) to bright (high). Bars are solid at the centre line and soften toward
+  // their tips, so loud passages read as shapes rather than as a wall of colour.
+  function paintBars(): void {
+    const { center, reach } = horizonLayout(width, height, dpr);
+    toneFills = toneRamp(colors.bar, colors.barBright).map(({ solid, soft }) => {
+      const fill = context.createLinearGradient(0, center - reach, 0, center + reach);
+      fill.addColorStop(0, soft);
+      fill.addColorStop(0.5, solid);
+      fill.addColorStop(1, soft);
+      return fill;
+    });
   }
 
   function draw(): void {
     if (disposed || width === 0) return;
-    const { rms, peak, live } = engine.readWaveform(samples) ? signalStats(samples) : SILENT;
-    pushLevel(history, rms, performance.now(), transportPlaying);
+    const sampleRate = engine.readWaveform(samples);
+    const { rms, peak, live } = sampleRate ? signalStats(samples) : SILENT;
+    pushLevel(history, rms, performance.now(), transportPlaying, live ? brightness(samples, sampleRate) : 0);
     if (root.dataset.live !== String(live)) root.dataset.live = String(live);
     lastLive = live;
 
@@ -67,7 +87,7 @@ export function mountSignalHorizon(host: SignalHorizonHost, engine: Pick<AudioEn
     const layout = horizonLayout(width, height, dpr);
     const { center, reach, barWidth } = layout;
     const frozen = !transportPlaying;
-    historyQuiet = barLevels(history, layout.bars, levels, barTicks);
+    historyQuiet = barLevels(history, layout.bars, levels, barTicks, barTones);
 
     // Behind the bars, the present waveform sways across the band.
     if (live) {
@@ -90,16 +110,21 @@ export function mountSignalHorizon(host: SignalHorizonHost, engine: Pick<AudioEn
       context.globalAlpha = frozen ? 0.06 : 0.14;
       context.lineWidth = 6 * dpr;
       context.stroke();
-      context.globalAlpha = frozen ? 0.25 : 0.55;
+      context.globalAlpha = frozen ? 0.3 : 0.7;
       context.lineWidth = 1.5 * dpr;
       context.stroke();
     }
+
+    // The cycle ruler: one hairline along the bottom edge that the ticks rise from.
+    context.globalAlpha = 1;
+    context.fillStyle = colors.rule;
+    context.fillRect(0, height - dpr, width, dpr);
 
     for (let bar = 0; bar < layout.bars; bar++) {
       const { half, alpha } = barShape(layout, levels[bar], bar, frozen);
       const x = layout.offsetX + bar * layout.pitch;
       context.globalAlpha = alpha;
-      context.fillStyle = colors.bar;
+      context.fillStyle = toneFills[toneStep(barTones[bar])];
       context.beginPath();
       context.roundRect(x, center - half, barWidth, half * 2, barWidth / 2);
       context.fill();
@@ -111,6 +136,19 @@ export function mountSignalHorizon(host: SignalHorizonHost, engine: Pick<AudioEn
       context.fillStyle = tick === 2 ? colors.group : colors.tick;
       context.fillRect(Math.round(x + barWidth / 2 - dpr / 2), height - shape.height, dpr, shape.height);
     }
+
+    // The write head: where the next measurement lands, at the right edge on the
+    // centre line. It is brighter while the transport runs and shows no level.
+    const headX = width - 10 * dpr;
+    context.globalAlpha = frozen ? 0.12 : 0.22;
+    context.fillStyle = colors.group;
+    context.beginPath();
+    context.arc(headX, center, 6 * dpr, 0, Math.PI * 2);
+    context.fill();
+    context.globalAlpha = frozen ? 0.55 : 1;
+    context.beginPath();
+    context.arc(headX, center, 2.5 * dpr, 0, Math.PI * 2);
+    context.fill();
     context.globalAlpha = 1;
   }
 
@@ -122,6 +160,7 @@ export function mountSignalHorizon(host: SignalHorizonHost, engine: Pick<AudioEn
       canvas.height = pixels.height;
     }
     ({ width, height, dpr } = pixels);
+    paintBars();
     draw();
   }
 
@@ -153,7 +192,7 @@ export function mountSignalHorizon(host: SignalHorizonHost, engine: Pick<AudioEn
   const resizeObserver = new ResizeObserver(resize);
   resizeObserver.observe(root);
   const onVisibility = (): void => schedule();
-  const onColorScheme = (): void => { colors = readColors(); draw(); };
+  const onColorScheme = (): void => { colors = readColors(); paintBars(); draw(); };
   colorScheme.addEventListener("change", onColorScheme);
   visibility.addEventListener("visibilitychange", onVisibility);
   reducedMotion.addEventListener("change", schedule);

@@ -20,10 +20,10 @@ test("output trace follows real audio, pause, and failure without retaining old 
   const retired = await page.evaluate(() => {
     window.__moondspEngine!._testInjectReply({ type: "error", message: "trace lifetime regression" });
     const samples = new Float32Array(2048).fill(1);
-    const active = window.__moondspEngine!.readWaveform(samples);
-    return { active, max: Math.max(...samples) };
+    const sampleRate = window.__moondspEngine!.readWaveform(samples);
+    return { sampleRate, max: Math.max(...samples) };
   });
-  expect(retired).toEqual({ active: false, max: 0 });
+  expect(retired).toEqual({ sampleRate: 0, max: 0 });
 });
 
 test("drawing and pitch edits do not start audio; main Play outputs sound and Undo leaves playback running", async ({ page }) => {
