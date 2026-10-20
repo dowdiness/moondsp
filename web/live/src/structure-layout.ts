@@ -3,11 +3,24 @@
 // the SVG that shows them.
 import { BOUNDARY_MAX, BOUNDARY_MIN, boundaryInfo, layoutNodes, type NotationProjection } from "./notation-structure";
 import type { Step } from "./pattern-controls";
-import type { PlotScale } from "./score-geometry";
+import { W, type PlotScale } from "./score-geometry";
 import type { SvgNode } from "./svg-patch";
 
 /** The height of one strip row in viewBox units. */
 export const STRIP_ROW = 32;
+
+/** CSS pixels per strip row: touch-sized on coarse pointers and narrow screens. */
+export function stripRowPixels(compact: boolean): number { return compact ? 44 : 32; }
+
+/** A pointer at client (`x`, `y`) over a strip of `rows` rows drawn in `box`, in strip viewBox units. */
+export function stripPoint(
+  x: number, y: number, box: Readonly<{ left: number; top: number; width: number; height: number }>, rows: number,
+): { x: number; y: number } {
+  return {
+    x: (x - box.left) * W / Math.max(1, box.width),
+    y: (y - box.top) * rows * STRIP_ROW / Math.max(1, box.height),
+  };
+}
 
 export type StripPhrase = Readonly<{ steps: readonly Step[]; structure: NotationProjection }>;
 type Span = Readonly<{ x: number; width: number }>;
@@ -132,14 +145,19 @@ export type StripState = Readonly<{
   dragging: Readonly<{ node: number; ratio: number }> | null;
 }>;
 
-export function stripNodes(layout: StripLayout, structure: NotationProjection, state: StripState): { items: SvgNode[]; hits: SvgNode[]; boundaries: SvgNode[] } {
+/** What a drawn strip element stands for: a source step, a group, or the boundary after a node. */
+export type StripTarget = Readonly<{ kind: "source"; node: number; step: Step } | { kind: "group" | "boundary"; node: number }>;
+/** A strip element to draw, with what it stands for; labels stand for nothing. */
+export type StripDrawn = Readonly<{ svg: SvgNode; target: StripTarget | null }>;
+
+export function stripNodes(layout: StripLayout, structure: NotationProjection, state: StripState): { items: StripDrawn[]; hits: StripDrawn[]; boundaries: StripDrawn[] } {
   const context = new Set<number>();
   for (let parent = state.selected === null ? null : structure.nodes[state.selected]?.parent ?? null; parent !== null;
     parent = structure.nodes[parent]?.parent ?? null) {
     if (structure.nodes[parent]?.kind === "group") context.add(parent);
   }
   const top = layout.sourceRow * STRIP_ROW;
-  const items: SvgNode[] = [];
+  const items: StripDrawn[] = [];
   const sourceByNode = new Map(layout.sources.map(source => [source.node, source]));
   const groupByNode = new Map(layout.groups.map(group => [group.node, group]));
   // Layout order keeps each source's label right after its box, which styles it.
@@ -147,47 +165,45 @@ export function stripNodes(layout: StripLayout, structure: NotationProjection, s
     const source = sourceByNode.get(item.node), group = groupByNode.get(item.node);
     const selected = item.node === state.selected;
     if (source) {
-      items.push({
+      items.push({ target: { kind: "source", node: source.node, step: source.step }, svg: {
         key: String(source.node), tag: "rect", className: "moving-score__source", flags: { "is-selected": selected },
-        attrs: { x: String(source.left), y: String(top), width: String(Math.max(1, source.right - source.left)), height: String(STRIP_ROW),
-          "data-node": String(source.node), "data-from": String(source.step.from), "data-to": String(source.step.to) },
-      });
-      if (source.label !== null) items.push({
+        attrs: { x: String(source.left), y: String(top), width: String(Math.max(1, source.right - source.left)), height: String(STRIP_ROW) },
+      } });
+      if (source.label !== null) items.push({ target: null, svg: {
         key: String(source.node), tag: "text", className: "moving-score__source-label", flags: { "is-selected": selected },
         attrs: { x: String((source.left + source.right) / 2), y: String(top + STRIP_ROW / 2), "dominant-baseline": "central", "aria-hidden": "true" },
         text: source.label,
-      });
+      } });
     } else if (group) {
       const y = group.depth * STRIP_ROW + 5;
-      items.push({
+      items.push({ target: { kind: "group", node: group.node }, svg: {
         key: String(group.node), tag: "g", className: "moving-score__group",
         flags: { "is-selected": selected, "is-context": !selected && context.has(group.node) },
-        attrs: { tabindex: "0", role: "button", "data-node": String(group.node), "aria-label": `Select group ${group.value || "notation"}` },
+        attrs: { tabindex: "0", role: "button", "aria-label": `Select group ${group.value || "notation"}` },
         children: [
           { key: "hit", tag: "rect", className: "moving-score__group-hit",
             attrs: { x: String(group.hit.x), y: String(group.depth * STRIP_ROW), width: String(group.hit.width), height: String(STRIP_ROW) } },
           { key: "bracket", tag: "path", className: "moving-score__bracket", attrs: { d: `M${group.left} ${y + 4}V${y}H${group.right}V${y + 4}` } },
         ],
-      });
+      } });
     }
   }
-  const hits: SvgNode[] = layout.sources.map(source => ({
+  const hits: StripDrawn[] = layout.sources.map(source => ({ target: { kind: "source", node: source.node, step: source.step }, svg: {
     key: String(source.node), tag: "rect", className: "moving-score__source-hit", flags: { "is-selected": source.node === state.selected },
     attrs: {
       x: String(source.hit.x), y: String(top), width: String(source.hit.width), height: String(STRIP_ROW),
-      tabindex: "0", role: "button", "data-node": String(source.node),
-      "data-from": String(source.step.from), "data-to": String(source.step.to),
+      tabindex: "0", role: "button",
       "aria-label": `Select source step ${source.index + 1}${source.step.rest ? ", rest" : `, ${source.step.value}`}`,
     },
-  }));
-  const boundaries: SvgNode[] = layout.boundaries.map((boundary): SvgNode => {
+  } }));
+  const boundaries: StripDrawn[] = layout.boundaries.map((boundary): StripDrawn => {
     const dragged = state.dragging?.node === boundary.node ? state.dragging.ratio : null;
     const ratio = dragged ?? boundary.ratio;
     const x = dragged === null ? boundary.x : boundaryX(boundary, dragged);
-    return {
+    return { target: { kind: "boundary", node: boundary.node }, svg: {
       key: String(boundary.node), tag: "g", className: "moving-score__boundary",
       attrs: {
-        tabindex: "0", role: "slider", "aria-orientation": "horizontal", "data-node": String(boundary.node),
+        tabindex: "0", role: "slider", "aria-orientation": "horizontal",
         "aria-valuemin": String(BOUNDARY_MIN), "aria-valuemax": String(BOUNDARY_MAX), "aria-valuenow": String(ratio),
         "aria-label": boundary.label,
       },
@@ -196,7 +212,7 @@ export function stripNodes(layout: StripLayout, structure: NotationProjection, s
           attrs: { x: String(boundary.hit.x), y: String(top), width: String(boundary.hit.width), height: String(STRIP_ROW) } },
         { key: "mark", tag: "path", className: "moving-score__boundary-mark", attrs: { d: `M${x} ${top + 4}V${top + STRIP_ROW - 4}` } },
       ],
-    };
+    } };
   });
   return { items, hits, boundaries };
 }

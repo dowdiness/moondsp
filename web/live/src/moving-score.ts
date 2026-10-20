@@ -5,6 +5,7 @@ import { mountDrumSequencer } from "./drum-sequencer";
 import { mountNoteGrid, type EditablePhrase } from "./note-grid";
 import { noteMidi } from "./note-grid-layout";
 import { needsResizeRender, type GridSize } from "./score-geometry";
+import type { SourceElements } from "./source-elements";
 import { mountStructureStrip } from "./structure-strip";
 import "./moving-score.css";
 
@@ -28,7 +29,7 @@ export function mountMovingScore(
   pattern: Pattern,
   controls: { select(index: number): void; selectNode(node: number): void; boundary(node: number, ratio: number): void;
     clear(): void; structureOpen: boolean; structureChanged(open: boolean): void;
-    tonesOpen: boolean; tonesChanged(open: boolean): void },
+    tonesOpen: boolean; tonesChanged(open: boolean): void; sources: SourceElements },
 ): { update(pattern: Pattern): void; dispose(): void; selectionTools: HTMLElement; structureTools: HTMLElement } {
   root.classList.add("moving-score");
   root.innerHTML = `
@@ -41,6 +42,7 @@ export function mountMovingScore(
     </details>
     <div class="moving-score__foot"><span class="moving-score__message" role="status" aria-live="polite"></span></div>
     <p class="moving-score__unsupported" hidden></p>`;
+  // Connect once to the template just drawn; nothing is looked up after mount.
   const selectionTools = root.querySelector<HTMLElement>(".moving-score__selection-tools")!;
   const structureDetails = root.querySelector<HTMLDetailsElement>(".moving-score__structure-details")!;
   const structureSvg = root.querySelector<SVGSVGElement>(".moving-score__structure")!;
@@ -68,13 +70,14 @@ export function mountMovingScore(
     if (index < 0) controls.selectNode(node);
     else controls.select(index);
   }
-  const strip = mountStructureStrip(structureSvg, { select: selectSource, boundary: controls.boundary, setMessage, lock });
+  const { sources } = controls;
+  const strip = mountStructureStrip(structureSvg, { select: selectSource, boundary: controls.boundary, setMessage, lock, sources });
   let drum: ReturnType<typeof mountDrumSequencer> | null = null;
   if (kind === "drum") {
     const drumRoot = document.createElement("div");
     drumRoot.className = "moving-score__drums";
     root.prepend(drumRoot);
-    drum = mountDrumSequencer(drumRoot, view, pattern, { select: index => controls.select(index) });
+    drum = mountDrumSequencer(drumRoot, view, pattern, { select: index => controls.select(index), sources });
   }
   const grid = kind === "drum" ? null : mountNoteGrid(selectionTools, view, kind, selectionTools, {
     select: index => controls.select(index),
@@ -86,6 +89,7 @@ export function mountMovingScore(
     lock,
     tonesOpen: controls.tonesOpen,
     tonesChanged: open => controls.tonesChanged(open),
+    sources,
   });
 
   function measure(): GridSize {

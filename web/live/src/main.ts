@@ -28,6 +28,7 @@ import { mountNotice } from "./notice";
 import { createScope } from "./scope";
 import { playbackHighlights } from "./playback-highlights";
 import { sourceHints } from "./source-hints";
+import { createSourceElements } from "./source-elements";
 import { codeLayout } from "./code-layout";
 import { mountPlaybackObservation } from "./playback-observation";
 import { playbackChanged } from "./phrase-update-status";
@@ -68,6 +69,8 @@ type Tools = Readonly<{ draft: Draft; playback: Player; observation: ReturnType<
 let tools: Tools | null = null;
 let disposed = false;
 
+// The phrase GUI publishes the elements it draws here; highlights and hints read them.
+const sources = createSourceElements();
 const view = new EditorView({
   parent: dom.editor,
   state: EditorState.create({
@@ -80,8 +83,8 @@ const view = new EditorView({
       closeBrackets(),
       inlineControls(),
       patternCompartment.of([]),
-      playbackHighlights(),
-      sourceHints(),
+      playbackHighlights(sources),
+      sourceHints(sources),
       codeLayout(),
       controlsCompartment.of([]),
       EditorView.lineWrapping,
@@ -318,7 +321,7 @@ async function prepareAuthoring(): Promise<void> {
       // Adding notation must not move the user's selection to a startup phrase.
       effects: [
         view.scrollSnapshot(),
-        patternCompartment.reconfigure(controls.patternControls()),
+        patternCompartment.reconfigure(controls.patternControls(sources)),
         controlsCompartment.reconfigure(controls.patternControlsVisible.of(dom.transport.sourceToggle.getAttribute("aria-pressed") === "true")),
       ],
     });

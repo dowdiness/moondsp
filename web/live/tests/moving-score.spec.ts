@@ -260,10 +260,10 @@ test("clicks in a degraded silent gap do not select a neighboring note", async (
     return { x: rect.left + 48 + (rect.width - 56) * (missing + .5) / 32, y: row.top + row.height / 2 };
   });
   expect(point).not.toBeNull();
-  const selected = await page.locator(".moving-score__source-hit.is-selected").getAttribute("data-node");
+  const selected = await page.locator(".moving-score__source-hit.is-selected").getAttribute("aria-label");
   await page.mouse.click(point!.x, point!.y);
   expect(await readCode(page)).toBe(source);
-  await expect(page.locator(".moving-score__source-hit.is-selected")).toHaveAttribute("data-node", selected!);
+  await expect(page.locator(".moving-score__source-hit.is-selected")).toHaveAttribute("aria-label", selected!);
 });
 
 test("Escape cancels a pending rest click without changing source", async ({ page }) => {

@@ -1,6 +1,7 @@
-import { BOUNDARY_STEP, boundaryInfo, clampBoundary } from "./notation-structure";
+import { BOUNDARY_STEP, boundaryInfo, boundaryRatio, clampBoundary } from "./notation-structure";
 import { W, plotScale, scoreGeometry } from "./score-geometry";
-import { STRIP_ROW, hitStrip, stripLayout, stripNodes, type StripLayout, type StripPhrase } from "./structure-layout";
+import type { SourceElement, SourceElements } from "./source-elements";
+import { STRIP_ROW, hitStrip, stripLayout, stripNodes, stripPoint, stripRowPixels, type StripLayout, type StripPhrase, type StripTarget } from "./structure-layout";
 import { patchSvg } from "./svg-patch";
 import type { InteractionLock } from "./moving-score";
 
@@ -17,6 +18,8 @@ export function mountStructureStrip(
     boundary(node: number, ratio: number): void;
     setMessage(text: string): void;
     lock: InteractionLock;
+    /** Where the drawn source steps are shown. */
+    sources: SourceElements;
   }>,
 ): {
   update(phrase: StripPhrase | null, docChanged: boolean): void;
@@ -36,6 +39,7 @@ export function mountStructureStrip(
   const marks = document.createElementNS(ns, "g");
   marks.setAttribute("class", "moving-score__boundaries");
   svg.append(items, hits, marks);
+  const compact = svg.ownerDocument.defaultView!.matchMedia("(pointer: coarse), (max-width: 680px)");
 
   let phrase: StripPhrase | null = null;
   let layout: StripLayout | null = null;
@@ -43,14 +47,19 @@ export function mountStructureStrip(
   let selected: number | null = null;
   let drag: Drag | null = null;
   let focusedBoundary: number | null = null;
+  /** What each drawn element stands for, so events resolve to their data without searching. */
+  let drawn = new Map<SVGElement, StripTarget>();
+  const shownSources = controls.sources.slot();
 
   function render(): void {
     if (!phrase) {
       layout = null;
       patchSvg(items, []); patchSvg(hits, []); patchSvg(marks, []);
+      drawn = new Map();
+      shownSources.show([]);
       return;
     }
-    const rowPixels = matchMedia("(pointer: coarse), (max-width: 680px)").matches ? 44 : 32;
+    const rowPixels = stripRowPixels(compact.matches);
     const scale = plotScale(scoreGeometry(width, []), phrase.structure.span);
     layout = stripLayout(phrase, scale, rowPixels);
     svg.setAttribute("viewBox", `0 0 ${W} ${layout.rows * STRIP_ROW}`);
@@ -58,17 +67,24 @@ export function mountStructureStrip(
     svg.style.setProperty("--source-text-aspect", String((rowPixels / STRIP_ROW) * scale.px(1)));
     svg.style.setProperty("--source-label-size", `${12 * STRIP_ROW / rowPixels}px`);
     const nodes = stripNodes(layout, phrase.structure, { selected, dragging: drag });
-    patchSvg(items, nodes.items); patchSvg(hits, nodes.hits); patchSvg(marks, nodes.boundaries);
+    drawn = new Map(([[items, nodes.items], [hits, nodes.hits], [marks, nodes.boundaries]] as const).flatMap(([parent, list]) => {
+      const elements = patchSvg(parent, list.map(item => item.svg));
+      return list.flatMap(({ target }, index) => target ? [[elements[index], target] as const] : []);
+    }));
+    shownSources.show([...drawn].flatMap(([element, target]): SourceElement[] => target.kind === "source"
+      ? [{ element, from: target.step.from, to: target.step.to, note: null, hint: false }] : []));
   }
   function point(event: PointerEvent): { x: number; y: number } {
-    const rect = svg.getBoundingClientRect();
-    return {
-      x: (event.clientX - rect.left) * W / Math.max(1, rect.width),
-      y: (event.clientY - rect.top) * (layout?.rows ?? 1) * STRIP_ROW / Math.max(1, rect.height),
-    };
+    return stripPoint(event.clientX, event.clientY, svg.getBoundingClientRect(), layout?.rows ?? 1);
   }
-  function boundaryElement(node: number): SVGGElement | null {
-    return marks.querySelector<SVGGElement>(`.moving-score__boundary[data-node="${node}"]`);
+  /** The node a drawn element of one of `kinds` stands for, if `target` is one. */
+  function drawnNode(target: EventTarget | null, ...kinds: StripTarget["kind"][]): number | null {
+    const drawnTarget = target instanceof SVGElement ? drawn.get(target) : undefined;
+    return drawnTarget && kinds.includes(drawnTarget.kind) ? drawnTarget.node : null;
+  }
+  function boundaryElement(node: number): SVGElement | undefined {
+    for (const [element, target] of drawn) if (target.kind === "boundary" && target.node === node) return element;
+    return undefined;
   }
   function finish(commit: boolean): void {
     const current = drag;
@@ -104,7 +120,7 @@ export function mountStructureStrip(
   function pointermove(event: PointerEvent): void {
     const boundary = drag && layout?.boundaries.find(item => item.node === drag!.node);
     if (!drag || drag.pointer !== event.pointerId || !boundary) return;
-    drag.ratio = clampBoundary((point(event).x - boundary.start) / Math.max(1, boundary.end - boundary.start));
+    drag.ratio = boundaryRatio(point(event).x, boundary.start, boundary.end);
     render();
   }
   function pointerend(event: PointerEvent): void {
@@ -113,10 +129,10 @@ export function mountStructureStrip(
   function keydown(event: KeyboardEvent): void {
     if (!phrase || !(event.target instanceof Element)) return;
     const target = event.target;
-    const handle = target.closest<SVGGElement>(".moving-score__boundary");
-    if (handle) focusedBoundary = Number(handle.dataset.node);
+    const handle = drawnNode(target, "boundary");
+    if (handle !== null) focusedBoundary = handle;
     const horizontal = event.key === "ArrowLeft" || event.key === "ArrowRight";
-    if (focusedBoundary !== null && (target === svg || handle) && horizontal) {
+    if (focusedBoundary !== null && (target === svg || handle !== null) && horizontal) {
       const info = boundaryInfo(phrase.structure, focusedBoundary);
       if (!info) { focusedBoundary = null; return; }
       controls.boundary(focusedBoundary, clampBoundary(info.ratio + (event.key === "ArrowRight" ? BOUNDARY_STEP : -BOUNDARY_STEP)));
@@ -124,16 +140,16 @@ export function mountStructureStrip(
       event.preventDefault();
       return;
     }
-    const chosen = target.closest<SVGElement>(".moving-score__source-hit, .moving-score__group");
-    if (chosen && (event.key === "Enter" || event.key === " ")) {
-      controls.select(Number(chosen.dataset.node));
+    const chosen = drawnNode(target, "source", "group");
+    if (chosen !== null && (event.key === "Enter" || event.key === " ")) {
+      controls.select(chosen);
       svg.focus({ preventScroll: true });
       event.preventDefault();
       return;
     }
     if (horizontal) {
       const nodes = phrase.structure.nodes.flatMap((node, index) => node.kind === "group" || node.kind === "atom" ? [index] : []);
-      const current = chosen ? Number(chosen.dataset.node) : selected ?? -1;
+      const current = chosen ?? selected ?? -1;
       const position = Math.max(0, nodes.indexOf(current));
       controls.select(nodes[Math.max(0, Math.min(nodes.length - 1, position + (event.key === "ArrowRight" ? 1 : -1)))]);
       svg.focus({ preventScroll: true });
@@ -160,6 +176,7 @@ export function mountStructureStrip(
     keydown,
     dispose() {
       finish(false);
+      shownSources.dispose();
       svg.removeEventListener("pointerdown", pointerdown);
       svg.removeEventListener("pointermove", pointermove);
       svg.removeEventListener("pointerup", pointerend);

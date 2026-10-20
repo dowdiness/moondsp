@@ -1,6 +1,8 @@
 import type { EditorView } from "@codemirror/view";
 import type { Pattern } from "./pattern-controls";
 import { dispatchPatternEdit } from "./pattern-edit";
+import { columnFor, rowFor } from "./roving-focus";
+import type { SourceElement, SourceElements } from "./source-elements";
 import "./drum-sequencer.css";
 
 const SOUNDS = [
@@ -11,7 +13,11 @@ const SOUNDS = [
   { name: "cp", label: "Clap" },
 ] as const;
 type Sound = (typeof SOUNDS)[number]["name"];
-type Controls = { select(index: number): void };
+type Controls = {
+  select(index: number): void;
+  /** Where the occupied cells are shown as they are drawn. */
+  sources: SourceElements;
+};
 
 /** The step of the pattern's selected source, or the first step when a group is selected. */
 function selectedIndex(pattern: Pattern): number {
@@ -27,6 +33,7 @@ export function mountDrumSequencer(
 ): { update(pattern: Pattern): void; dispose(): void } {
   const abort = new AbortController();
   const dom = document.createElement("section");
+  const shownCells = controls.sources.slot();
   dom.className = "drum-sequencer";
   dom.setAttribute("aria-label", "Percussion source steps");
   const viewport = document.createElement("div");
@@ -43,6 +50,8 @@ export function mountDrumSequencer(
   let selected = selectedIndex(pattern);
   let disposed = false;
   let headers: HTMLButtonElement[] = [];
+  let headerRow: HTMLDivElement | null = null;
+  let empty: HTMLElement | null = null;
   const rows = new Map<Sound, { row: HTMLDivElement; label: HTMLDivElement; cells: HTMLButtonElement[] }>();
 
   function callSelect(index: number): void {
@@ -54,8 +63,8 @@ export function mountDrumSequencer(
   }
   function renderState(): void {
     const steps = current.steps;
-    const focused = document.activeElement instanceof HTMLButtonElement && dom.contains(document.activeElement)
-      ? document.activeElement : null;
+    const active = dom.ownerDocument.activeElement;
+    const focused = active instanceof HTMLButtonElement && dom.contains(active) ? active : null;
     const focusStep = focused && steps?.length ? Math.max(0, Math.min(steps.length - 1, Number(focused.dataset.step))) : selected;
     const focusSound = focused?.dataset.sound as Sound | undefined;
     const focusHeader = focused?.classList.contains("drum-sequencer__step") ?? true;
@@ -63,15 +72,20 @@ export function mountDrumSequencer(
     if (!steps?.length) {
       matrix.replaceChildren();
       headers = [];
+      headerRow = null;
       rows.clear();
-      const empty = document.createElement("p");
+      empty = document.createElement("p");
       empty.className = "drum-sequencer__empty";
       empty.textContent = current.reason || "No percussion source steps are available.";
       matrix.append(empty);
       viewport.scrollLeft = scrollLeft;
+      shownCells.show([]);
       return;
     }
-    if (matrix.querySelector(".drum-sequencer__empty")) matrix.replaceChildren();
+    if (empty) {
+      matrix.replaceChildren();
+      empty = null;
+    }
 
     matrix.style.setProperty("--step-count", String(steps.length));
     const stepRow = ensureRow("step", "Source step");
@@ -125,19 +139,14 @@ export function mountDrumSequencer(
         button.setAttribute("aria-pressed", String(occupied));
         button.title = `${occupied ? `Clear ${sound.label}` : `Set ${sound.label}`} · source step ${index + 1}`;
         button.classList.toggle("moving-score__source", occupied);
-        if (occupied) {
-          button.dataset.from = String(step.from);
-          button.dataset.to = String(step.to);
-        } else {
-          delete button.dataset.from;
-          delete button.dataset.to;
-          button.classList.remove("is-playing");
-        }
+        if (!occupied) button.classList.remove("is-playing");
         button.tabIndex = index === selected && !focusHeader && sound.name === (focusSound ?? currentSoundAt(selected)) ? 0 : -1;
         button.classList.toggle("is-selected-column", index === selected);
       }
     }
     viewport.scrollLeft = scrollLeft;
+    shownCells.show(SOUNDS.flatMap(sound => steps.flatMap((step, index): SourceElement[] => step.value === sound.name
+      ? [{ element: rows.get(sound.name)!.cells[index], from: step.from, to: step.to, note: null, hint: true }] : [])));
     if (focused) {
       const target = focusHeader ? headers[focusStep] : rows.get(focusSound ?? currentSoundAt(focusStep))?.cells[focusStep];
       if (target && target !== focused) target.focus({ preventScroll: true });
@@ -146,16 +155,16 @@ export function mountDrumSequencer(
   function ensureRow(key: string, label: string): { row: HTMLDivElement; label: HTMLDivElement; cells: HTMLButtonElement[] } {
     let result = rows.get(key as Sound);
     if (key === "step") {
-      const existing = matrix.querySelector<HTMLDivElement>(".drum-sequencer__header");
-      if (existing) return { row: existing, label: existing.firstElementChild as HTMLDivElement, cells: headers };
-      const row = document.createElement("div");
-      row.className = "drum-sequencer__row drum-sequencer__header";
-      const labelCell = document.createElement("div");
-      labelCell.className = "drum-sequencer__sound-label";
-      labelCell.textContent = label;
-      row.append(labelCell);
-      matrix.append(row);
-      return { row, label: labelCell, cells: headers };
+      if (!headerRow) {
+        headerRow = document.createElement("div");
+        headerRow.className = "drum-sequencer__row drum-sequencer__header";
+        const labelCell = document.createElement("div");
+        labelCell.className = "drum-sequencer__sound-label";
+        labelCell.textContent = label;
+        headerRow.append(labelCell);
+        matrix.append(headerRow);
+      }
+      return { row: headerRow, label: headerRow.firstElementChild as HTMLDivElement, cells: headers };
     }
     if (result) return result;
     const row = document.createElement("div");
@@ -185,14 +194,10 @@ export function mountDrumSequencer(
     const rowIndex = SOUNDS.findIndex(sound => sound.name === target.dataset.sound);
     if (rowIndex < 0 || !current.steps?.length) return;
     const column = Number(target.dataset.step);
-    let nextRow = rowIndex, nextColumn = column;
-    if (event.key === "ArrowLeft") nextColumn = Math.max(0, column - 1);
-    else if (event.key === "ArrowRight") nextColumn = Math.min(current.steps.length - 1, column + 1);
-    else if (event.key === "ArrowUp") nextRow = Math.max(0, rowIndex - 1);
-    else if (event.key === "ArrowDown") nextRow = Math.min(SOUNDS.length - 1, rowIndex + 1);
-    else if (event.key === "Home") nextColumn = 0;
-    else if (event.key === "End") nextColumn = current.steps.length - 1;
-    else return;
+    const movedColumn = columnFor(event.key, column, current.steps.length);
+    const movedRow = rowFor(event.key, rowIndex, SOUNDS.length);
+    if (movedColumn === null && movedRow === null) return;
+    const nextColumn = movedColumn ?? column, nextRow = movedRow ?? rowIndex;
     event.preventDefault();
     callSelect(nextColumn);
     rows.get(SOUNDS[nextRow].name)?.cells[nextColumn]?.focus();
@@ -206,16 +211,13 @@ export function mountDrumSequencer(
       return;
     }
     const column = Number(target.dataset.step);
-    let nextColumn = column;
-    if (event.key === "ArrowLeft") nextColumn = Math.max(0, column - 1);
-    else if (event.key === "ArrowRight") nextColumn = Math.min(current.steps.length - 1, column + 1);
-    else if (event.key === "Home") nextColumn = 0;
-    else if (event.key === "End") nextColumn = current.steps.length - 1;
-    else if (event.key === "ArrowDown") {
+    if (event.key === "ArrowDown") {
       event.preventDefault();
       rows.get(SOUNDS[0].name)?.cells[column]?.focus();
       return;
-    } else return;
+    }
+    const nextColumn = columnFor(event.key, column, current.steps.length);
+    if (nextColumn === null) return;
     event.preventDefault();
     callSelect(nextColumn);
     headers[nextColumn]?.focus();
@@ -224,7 +226,7 @@ export function mountDrumSequencer(
     const step = current.steps?.[index];
     if (!step || current.doc !== view.state.doc) return;
     const next = step.value === sound ? "~" : sound;
-    const anchor = document.activeElement instanceof HTMLButtonElement ? document.activeElement : null;
+    const anchor = dom.ownerDocument.activeElement instanceof HTMLButtonElement ? dom.ownerDocument.activeElement : null;
     dispatchPatternEdit(view, { changes: [{ from: step.from, to: step.to, insert: next }], selection: { from: step.from, to: step.from + next.length } });
     callSelect(index);
     const cell = rows.get(sound)?.cells[index];
@@ -244,6 +246,7 @@ export function mountDrumSequencer(
       if (disposed) return;
       disposed = true;
       abort.abort();
+      shownCells.dispose();
       dom.remove();
       headers = [];
       rows.clear();

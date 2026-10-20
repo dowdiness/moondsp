@@ -1,13 +1,15 @@
 import type { EditorView } from "@codemirror/view";
 import type { Pattern, Step } from "./pattern-controls";
-import { BOUNDARY_STEP, applySourceChanges, boundaryInfo, clampBoundary, duplicateRange, extendSourceRange, keepingSelection,
-  mapPosition, moveBoundary, moveRange, projectNotation, relocateNode, relocationTarget, sourceRangeNodes, transposeRange,
+import { BOUNDARY_STEP, applySourceChanges, boundaryInfo, boundaryRatio, clampBoundary, duplicateRange, extendSourceRange, keepingSelection,
+  mapPosition, moveBoundary, moveRange, projectNotation, relocateNode, sourceRangeNodes, transposeRange,
   type Edit, type NotationEvent, type NotationProjection, type SourceEdit } from "./notation-structure";
-import { EMPTY_GRID, bandNodes, gridLayout, hitGrid, nodeAt, noteMidi, noteNodes, pitchName, previewNodes, restNodes,
+import { EMPTY_GRID, bandNodes, gridLayout, hitGrid, isPhraseRange, moveTargets, nearestNode, nodeAt, noteMidi, noteNodes, pitchName,
+  previewNodes, rangeSibling, restNodes, soundingNodes, strokePitches,
   type GridLayout, type PreviewBlock } from "./note-grid-layout";
 import { dispatchPatternEdit } from "./pattern-edit";
-import { PLOT_LEFT_PX, ROW_H, TIME_H, W, boundedPitch, midiAtY, plotPoint, plotScale, scoreGeometry, viewBoxPoint,
+import { PLOT_LEFT_PX, ROW_H, TIME_H, W, boundedPitch, isDrag, midiAtY, plotPoint, plotScale, revealScrollTop, scoreGeometry, viewBoxPoint,
   type PlotScale } from "./score-geometry";
+import type { SourceElements } from "./source-elements";
 import { patchSvg } from "./svg-patch";
 import type { InteractionLock } from "./moving-score";
 
@@ -70,6 +72,8 @@ export function mountNoteGrid(
     lock: InteractionLock;
     tonesOpen: boolean;
     tonesChanged(open: boolean): void;
+    /** Where the note blocks are shown as they are drawn. */
+    sources: SourceElements;
   }>,
 ): {
   update(phrase: EditablePhrase | null, docChanged: boolean): void;
@@ -89,6 +93,7 @@ export function mountNoteGrid(
   heading.className = "moving-score__heading";
   heading.innerHTML = `<div class="moving-score__event-label">Notation events</div>
     <label class="moving-score__time-view">Ruler <select aria-label="Notation ruler"><option value="cycle">Cycle</option><option value="pulse">4 divisions</option></select></label>`;
+  // Connect once to the template just drawn; nothing is looked up after mount.
   const eventLabel = heading.querySelector<HTMLElement>(".moving-score__event-label")!;
   const rulerSelect = heading.querySelector<HTMLSelectElement>("select")!;
   const ruler = document.createElementNS(NS, "svg");
@@ -109,6 +114,7 @@ export function mountNoteGrid(
   const bands = svgGroup("moving-score__bands", true);
   const restMarks = svgGroup("moving-score__rests");
   const notes = svgGroup("moving-score__notes");
+  const shownNotes = controls.sources.slot();
   const preview = svgGroup("moving-score__preview", true);
   svg.append(bands, restMarks, notes, preview);
   stage.append(svg);
@@ -183,28 +189,13 @@ export function mountNoteGrid(
     const node = sourceNode();
     return node === null ? [] : [node];
   }
-  function isPhraseRange(nodes: number[]): boolean {
-    return nodes.length > 1 || active?.structure.nodes[nodes[0]]?.kind === "group";
-  }
   function selectRange(nodes: number[]): void {
     if (!active || !nodes.length) return;
     const from = active.structure.nodes[nodes[0]].from + active.contentFrom;
     const to = active.structure.nodes[nodes.at(-1)!].end + active.contentFrom;
     view.dispatch({ selection: { anchor: from, head: to } });
   }
-  /** The node of `range`'s sequence that contains `hit`. */
-  function rangeSibling(hit: number, range: number[]): number | null {
-    if (!active || !range.length) return null;
-    const parent = active.structure.nodes[range[0]].parent;
-    if (parent === null) return range.includes(hit) ? hit : null;
-    let node = hit;
-    while (active.structure.nodes[node]?.parent !== parent) {
-      const next = active.structure.nodes[node]?.parent;
-      if (next === undefined || next === null) return null;
-      node = next;
-    }
-    return node;
-  }
+
   function sourceIsSelected(node: number): boolean {
     const selected = selectedSources();
     for (let current: number | null = node; current !== null; current = active?.structure.nodes[current]?.parent ?? null) {
@@ -264,6 +255,7 @@ export function mountNoteGrid(
     if (!phrase) {
       layout = EMPTY_GRID;
       patchSvg(restMarks, []); patchSvg(notes, []); showPreview([]);
+      shownNotes.show([]);
       controls.shown(null);
       return;
     }
@@ -271,21 +263,24 @@ export function mountNoteGrid(
     const drawn = { steps: phrase.steps, structure: phrase.structure, notationKind };
     layout = gridLayout(drawn, scale);
     patchSvg(restMarks, restNodes(layout, geometry.plotHeight));
-    patchSvg(notes, noteNodes(layout, drawn, {
+    const noteElements = patchSvg(notes, noteNodes(layout, drawn, {
       selected: sourceIsSelected, moving: ongoing("move")?.source ?? null,
-      contentFrom: phrase.contentFrom, contentTo: phrase.contentTo,
     }, scale));
+    shownNotes.show(layout.notes.map((note, index) => ({
+      element: noteElements[index], from: note.step.from, to: note.step.to, hint: true,
+      note: { literalFrom: phrase.contentFrom, literalTo: phrase.contentTo, start: note.start, pitch: note.midi },
+    })));
     // Only source selection can scroll the grid, never playback highlighting.
     const keyboardDraw = ongoing("keyboard-draw");
     const selectedPitch = restMidi() ??
       keyboardDraw?.pitches.get(phrase.steps[keyboardDraw.to].node) ??
       phrase.structure.events.find(event => sourceIsSelected(event.node) && event.pitch !== null)?.pitch;
     const selectionKey = `${sourceNode()}:${selectedPitch}:${geometry.viewLow}:${geometry.viewHigh}`;
-    if (stage.clientHeight && selectionKey !== visibleSelection) {
+    const stageHeight = stage.clientHeight;
+    if (stageHeight && selectionKey !== visibleSelection) {
       if (selectedPitch !== null && selectedPitch !== undefined) {
-        const y = scale.y(selectedPitch) - TIME_H;
-        if (y - ROW_H < stage.scrollTop || y + ROW_H > stage.scrollTop + stage.clientHeight)
-          stage.scrollTop = Math.max(0, y - stage.clientHeight / 2);
+        const top = revealScrollTop(scale.y(selectedPitch) - TIME_H, ROW_H, stage.scrollTop, stageHeight);
+        if (top !== null) stage.scrollTop = top;
       }
       visibleSelection = selectionKey;
     }
@@ -322,7 +317,7 @@ export function mountNoteGrid(
   }
   function noteMoveEdit(phrase: EditablePhrase, drawing: MoveGesture): Edit<SourceEdit> {
     const source = content(phrase);
-    if (isPhraseRange(drawing.range)) {
+    if (isPhraseRange(phrase.structure, drawing.range)) {
       const parent = phrase.structure.nodes[drawing.range[0]].parent;
       const siblings = parent === null ? [] : phrase.structure.nodes[parent].children;
       const steps = siblings.indexOf(drawing.target) - siblings.indexOf(drawing.source);
@@ -441,22 +436,21 @@ export function mountNoteGrid(
     if (note) node = note.node;
     else {
       // Over no note, the one source sounding at that time is drawn into.
-      const sounding = new Set(phrase.structure.events
-        .filter(item => item.start <= time && time < Math.min(item.end, phrase.structure.span)).map(item => item.node));
+      const sounding = soundingNodes(phrase.structure.events, phrase.structure.span, time);
       if (sounding.size !== 1) return;
       node = sounding.values().next().value!;
     }
     const index = stepFor(node);
     if (index < 0) return;
     const previousRange = selectedSources();
-    const keepRange = !!note && !event.shiftKey && sourceIsSelected(node) && isPhraseRange(previousRange);
+    const keepRange = !!note && !event.shiftKey && sourceIsSelected(node) && isPhraseRange(phrase.structure, previousRange);
     if (!keepRange) controls.selectSource(node);
     if (!editable) { event.preventDefault(); return; }
     const origin = { x: event.clientX, y: event.clientY };
     svg.focus({ preventScroll: true });
     if (note && !event.shiftKey) {
       if (note.midi === null) return;
-      const moved = keepRange ? rangeSibling(node, previousRange) ?? node : node;
+      const moved = keepRange ? rangeSibling(phrase.structure, node, previousRange) ?? node : node;
       capture({
         kind: "move", pointer: event.pointerId, origin, source: moved, target: moved,
         pitch: note.midi, initialPitch: note.midi, dirty: false, range: keepRange ? previousRange : [node],
@@ -482,7 +476,7 @@ export function mountNoteGrid(
       }
       case "edge": {
         const time = scale.timeAt(canvasPoint(event).x);
-        current.ratio = clampBoundary((time - current.pairStart) / Math.max(1e-9, current.pairEnd - current.pairStart));
+        current.ratio = boundaryRatio(time, current.pairStart, current.pairEnd);
         previewEdge(active, current);
         return;
       }
@@ -495,17 +489,11 @@ export function mountNoteGrid(
     }
   }
   function moveNote(phrase: EditablePhrase, move: InteractionOf<"move">, event: PointerEvent): void {
-    if (!move.dirty && Math.hypot(event.clientX - move.origin.x, event.clientY - move.origin.y) < 4) return;
+    if (!move.dirty && !isDrag(event.clientX - move.origin.x, event.clientY - move.origin.y)) return;
     const point = canvasPoint(event), time = scale.timeAt(point.x);
     let nextTarget = move.source, nextPitch = midiAtY(scale.geometry, point.y);
-    if (Math.abs(event.clientX - move.origin.x) >= 4) {
-      const targets = new Set<number>();
-      for (const item of [...phrase.structure.events, ...phrase.structure.rests]) {
-        if (item.start > time || time >= Math.min(item.end, phrase.structure.span)) continue;
-        const target = isPhraseRange(move.range) ? rangeSibling(item.node, move.range)
-          : item.node === move.source ? item.node : relocationTarget(phrase.structure, move.source, item.node);
-        if (target !== null) targets.add(target);
-      }
+    if (isDrag(event.clientX - move.origin.x, 0)) {
+      const targets = moveTargets(phrase.structure, move.source, move.range, time);
       if (targets.size === 1) {
         nextTarget = targets.values().next().value!;
         setMessage("");
@@ -524,30 +512,19 @@ export function mountNoteGrid(
     }
   }
   function drawContour(phrase: EditablePhrase, draw: InteractionOf<"draw">, event: PointerEvent): void {
-    if (!draw.dirty && Math.hypot(event.clientX - draw.origin.x, event.clientY - draw.origin.y) < 4) return;
+    if (!draw.dirty && !isDrag(event.clientX - draw.origin.x, event.clientY - draw.origin.y)) return;
     const p = canvasPoint(event);
     const { geometry } = scale;
-    const time = Math.max(0, Math.min(phrase.structure.span, scale.timeAt(p.x)));
-    const nextMidi = midiAtY(geometry, p.y), delta = time - draw.lastTime;
-    const previousMidi = draw.lastPitch;
+    const { span, events } = phrase.structure;
+    const time = Math.max(0, Math.min(span, scale.timeAt(p.x)));
+    const nextMidi = midiAtY(geometry, p.y);
     // Pointer coordinates may round to device pixels while SVG centers do not.
-    const tolerance = phrase.structure.span / Math.max(1, svg.clientWidth);
-    if (Math.abs(delta) < 1e-8) {
-      draw.pitches.set(phrase.steps[draw.to].node, nextMidi);
-    } else for (const projected of phrase.structure.events) {
-      const center = (projected.start + Math.min(projected.end, phrase.structure.span)) / 2;
-      if (center < Math.min(draw.lastTime, time) - tolerance || center > Math.max(draw.lastTime, time) + tolerance) continue;
-      const fraction = Math.max(0, Math.min(1, (center - draw.lastTime) / delta));
-      draw.pitches.set(projected.node, boundedPitch(previousMidi + (nextMidi - previousMidi) * fraction, geometry.viewLow, geometry.viewHigh));
-    }
-    let closestDistance = Infinity;
-    for (const projected of phrase.structure.events) {
-      const distance = Math.abs((projected.start + Math.min(projected.end, phrase.structure.span)) / 2 - time);
-      if (distance < closestDistance) {
-        const index = stepFor(projected.node);
-        if (index >= 0) { draw.to = index; closestDistance = distance; }
-      }
-    }
+    const tolerance = span / Math.max(1, svg.clientWidth);
+    const stroke = strokePitches(events, span, phrase.steps[draw.to].node,
+      { time: draw.lastTime, pitch: draw.lastPitch }, { time, pitch: nextMidi }, tolerance, geometry.viewLow, geometry.viewHigh);
+    for (const [node, pitch] of stroke) draw.pitches.set(node, pitch);
+    const nearest = nearestNode(events, span, time, node => stepFor(node) >= 0);
+    if (nearest !== null) draw.to = stepFor(nearest);
     draw.lastPitch = nextMidi;
     draw.lastTime = time;
     draw.dirty = true;
@@ -607,13 +584,13 @@ export function mountNoteGrid(
         }
         event.preventDefault(); return;
       }
-      if (isPhraseRange(range) && (vertical || horizontal && event.altKey)) {
+      if (isPhraseRange(phrase.structure, range) && (vertical || horizontal && event.altKey)) {
         const direction = event.key === "ArrowUp" || event.key === "ArrowRight" ? 1 : -1;
         applyEdit(vertical ? transposeRange(content(phrase), phrase.structure, range, direction)
           : moveRange(content(phrase), phrase.structure, range, direction));
         event.preventDefault(); return;
       }
-      if (isPhraseRange(range) && horizontal && event.shiftKey) {
+      if (isPhraseRange(phrase.structure, range) && horizontal && event.shiftKey) {
         setMessage("Resize a single note edge; moving a phrase preserves its source weights.");
         event.preventDefault(); return;
       }
@@ -760,6 +737,7 @@ export function mountNoteGrid(
     keydown,
     dispose() {
       cancel();
+      shownNotes.dispose();
       svg.removeEventListener("pointerdown", beginPointer);
       svg.removeEventListener("pointermove", movePointer);
       svg.removeEventListener("pointerup", endPointer);

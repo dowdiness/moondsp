@@ -1,5 +1,6 @@
 import { StateEffect, StateField, Transaction, type Extension, type Range } from "@codemirror/state";
-import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
+import { Decoration, EditorView, ViewPlugin, type DecorationSet } from "@codemirror/view";
+import type { SourceElement, SourceElements } from "./source-elements";
 
 export type PlaybackHighlight = Readonly<{
   from: number;
@@ -42,40 +43,41 @@ const pulseField = StateField.define<PulseState>({
   provide: field => EditorView.decorations.from(field, value => value.decorations),
 });
 
+/**
+ * Whether a drawn source shows one of `pulses`: the same source span and, for a
+ * note block, the same literal and onset.
+ */
+export function sourceIsPlaying(source: Pick<SourceElement, "from" | "to" | "note">, pulses: readonly PlaybackHighlight[]): boolean {
+  const { note } = source;
+  return pulses.some(pulse => pulse.from === source.from && pulse.to === source.to && (note === null ||
+    (pulse.notation !== null && pulse.notation.from === note.literalFrom && pulse.notation.to === note.literalTo &&
+      pulse.notation.start === note.start && pulse.notation.pitch === note.pitch)));
+}
+
+// Marks the drawn sources that are sounding, whenever the pulses change or a
+// drawing shows newly drawn sources.
 class PulseDOM {
+  private readonly unsubscribe: () => void;
   private lastPulses: readonly PlaybackHighlight[] | null = null;
-  constructor(private view: EditorView) { this.apply(); }
-  update(update: ViewUpdate): void {
-    if (update.docChanged || update.viewportChanged || update.selectionSet || this.pulses() !== this.lastPulses) this.apply();
+  constructor(private view: EditorView, private readonly sources: SourceElements) {
+    this.unsubscribe = this.sources.subscribe(() => this.apply());
+    this.apply();
   }
-  // Widgets may be replaced after update(); decorate the new nodes as well.
-  docViewUpdate(): void { this.apply(); }
+  update(): void {
+    if (this.pulses() !== this.lastPulses) this.apply();
+  }
+  destroy(): void { this.unsubscribe(); }
   private pulses(): readonly PlaybackHighlight[] { return this.view.state.field(pulseField).pulses; }
   private apply(): void {
     const pulses = this.pulses();
     this.lastPulses = pulses;
-    const pulseKey = (from: number, to: number) => `${from}:${to}`;
-    const sourceKeys = new Set(pulses.map(pulse => pulseKey(pulse.from, pulse.to)));
-    for (const source of this.view.dom.querySelectorAll<HTMLElement | SVGElement>(".moving-score__source[data-from][data-to], .step-pad[data-from][data-to], .chord-tones[data-from][data-to]")) {
-      const active = sourceKeys.has(pulseKey(Number(source.dataset.from), Number(source.dataset.to)));
-      source.classList.toggle("is-playing", active);
-    }
-    const notes = this.view.dom.querySelectorAll<SVGGElement>(".moving-score__note[data-from][data-to]");
-    for (const note of notes) {
-      const from = Number(note.dataset.from), to = Number(note.dataset.to);
-      const start = Number(note.dataset.start), pitch = note.dataset.pitch === "null" ? null : Number(note.dataset.pitch);
-      const active = pulses.some(pulse => pulse.from === from && pulse.to === to && pulse.notation !== null &&
-        note.dataset.literalFrom === String(pulse.notation.from) && note.dataset.literalTo === String(pulse.notation.to) &&
-        pulse.notation.start === start && pulse.notation.pitch === pitch);
-      note.classList.toggle("is-playing", active);
-    }
-    for (const source of this.view.dom.querySelectorAll<SVGElement>(".moving-score__source-hit[data-from][data-to]"))
-      source.classList.toggle("is-playing", sourceKeys.has(pulseKey(Number(source.dataset.from), Number(source.dataset.to))));
+    for (const source of this.sources.all()) source.element.classList.toggle("is-playing", sourceIsPlaying(source, pulses));
   }
 }
 
-export function playbackHighlights(): Extension {
-  return [pulseField, ViewPlugin.fromClass(PulseDOM)];
+/** Marks the elements shown in `sources` while their source is sounding. */
+export function playbackHighlights(sources: SourceElements): Extension {
+  return [pulseField, ViewPlugin.define(view => new PulseDOM(view, sources))];
 }
 
 export function setPlaybackHighlights(view: EditorView, pulses: readonly PlaybackHighlight[]): void {

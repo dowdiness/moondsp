@@ -113,3 +113,21 @@ export type GridSize = Readonly<{ width: number; stageHeight: number }>;
 export function needsResizeRender(measured: GridSize, rendered: GridSize): boolean {
   return measured.width !== rendered.width || (rendered.stageHeight === 0 && measured.stageHeight > 0);
 }
+
+/** Pointer travel, in CSS pixels, before a press becomes a drag. */
+export const DRAG_PX = 4;
+
+/** Whether a pointer that has travelled (`dx`, `dy`) CSS pixels from its press is dragging. */
+export function isDrag(dx: number, dy: number): boolean {
+  return Math.hypot(dx, dy) >= DRAG_PX;
+}
+
+/**
+ * The scroll offset that shows a row centred at `y`, with `margin` around it, in
+ * a viewport `height` tall scrolled to `scrollTop`: the row centred, or null
+ * when it already shows.
+ */
+export function revealScrollTop(y: number, margin: number, scrollTop: number, height: number): number | null {
+  if (y - margin >= scrollTop && y + margin <= scrollTop + height) return null;
+  return Math.max(0, y - height / 2);
+}

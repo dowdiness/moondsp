@@ -172,3 +172,51 @@ function isMidiPitch(pitch: number): boolean {
 function samePitches(left: readonly number[], right: readonly number[]): boolean {
   return left.length === right.length && left.every((pitch, index) => pitch === right[index]);
 }
+
+// Chord tone editing: the decisions behind the tone grid's gestures and buttons.
+
+/** Pointer travel, in CSS pixels, beyond which a tap on an empty row no longer adds a tone. */
+const TAP_SLOP_PX = 6;
+
+/** The pitch rows a tone grid shows around `reference` (C to G when empty): two rows of headroom and at least an octave. */
+export function toneRows(reference: readonly number[]): { low: number; high: number } {
+  let low = Math.max(0, Math.min(...(reference.length ? reference : [60])) - 2);
+  let high = Math.min(127, Math.max(...(reference.length ? reference : [67])) + 2);
+  if (high - low < 11) { high = Math.min(127, low + 11); low = Math.max(0, high - 11); }
+  return { low, high };
+}
+
+/** The pitch row `y` pixels below the top of a grid of `rowHeight` rows showing `high` down to `low`. */
+export function toneAtY(y: number, rowHeight: number, low: number, high: number): number {
+  return Math.max(low, Math.min(high, high - Math.floor(y / rowHeight)));
+}
+
+/** The whole semitones a vertical drag from `startY` to `y` covers, upward positive. */
+export function rowDelta(startY: number, y: number, rowHeight: number): number {
+  return Math.round((startY - y) / rowHeight);
+}
+
+/** Whether a press that travelled (`dx`, `dy`) pixels has moved too far to count as a tap. */
+export function movedPastTap(dx: number, dy: number): boolean {
+  return Math.hypot(dx, dy) > TAP_SLOP_PX;
+}
+
+/** `pitches` with tone `index`, or every tone when it is null, moved by `delta` semitones. */
+export function shiftTones(pitches: readonly number[], index: number | null, delta: number): number[] {
+  return pitches.map((pitch, at) => index === null || at === index ? pitch + delta : pitch);
+}
+
+/** The pitch without a tone nearest `anchor`, above before below; null when every MIDI pitch has one. */
+export function freePitchNear(anchor: number, pitches: readonly number[]): number | null {
+  for (let distance = 1; distance <= 128; distance++)
+    for (const pitch of [anchor + distance, anchor - distance])
+      if (pitch >= 0 && pitch <= 127 && !pitches.includes(pitch)) return pitch;
+  return null;
+}
+
+/** Why a set of tones cannot be written, or null when it can. */
+export function toneSetError(pitches: readonly number[]): string | null {
+  if (pitches.some(pitch => !Number.isInteger(pitch) || pitch < 0 || pitch > 127)) return "Keep tones within MIDI 0–127.";
+  if (new Set(pitches).size !== pitches.length) return "That pitch already has a tone. Move to an empty row.";
+  return null;
+}

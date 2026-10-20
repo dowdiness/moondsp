@@ -333,6 +333,10 @@ export const BOUNDARY_MIN = 0.05;
 export const BOUNDARY_MAX = 0.95;
 export const BOUNDARY_STEP = 0.05;
 export function clampBoundary(ratio: number): number { return Math.max(BOUNDARY_MIN, Math.min(BOUNDARY_MAX, ratio)); }
+/** The boundary ratio a pointer at `at` sets between a pair spanning `start` to `end`, in the same units. */
+export function boundaryRatio(at: number, start: number, end: number): number {
+  return clampBoundary((at - start) / Math.max(1e-9, end - start));
+}
 
 export function boundaryInfo(projection: NotationProjection, index: number): { right: number; ratio: number } | null {
   if (projection.error) return null;

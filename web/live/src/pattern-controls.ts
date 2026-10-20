@@ -11,6 +11,8 @@ import {
   keepingSelection, mapPosition, BOUNDARY_MAX, BOUNDARY_MIN, BOUNDARY_STEP, type Edit, type NotationProjection, type SourceChange,
 } from "./notation-structure";
 import { dispatchPatternEdit } from "./pattern-edit";
+import { columnFor } from "./roving-focus";
+import type { SourceElements, SourceSlot } from "./source-elements";
 import { noPhraseUpdates, phraseUpdateAt, trackPhraseUpdates, type PhraseUpdateFeedback, type PhraseUpdates } from "./phrase-update-status";
 
 type PatternMemory = { pitchOpen?: boolean; timingOpen?: boolean; structureOpen?: boolean; tonesOpen?: boolean };
@@ -109,8 +111,11 @@ export function sourcePatterns(state: EditorState): Pattern[] {
 }
 
 const liveWidgets = new WeakMap<HTMLElement, PatternWidgetDOM>();
+type Cell = { cell: HTMLElement; pad: HTMLButtonElement; note: HTMLElement };
 class PatternWidgetDOM {
   readonly dom = document.createElement("section");
+  /** The chord pads this widget shows for their source chords. */
+  private readonly shownPads: SourceSlot;
   private label = "";
   /** The selected step, or -1 when a group is selected. */
   private get selected(): number {
@@ -118,7 +123,7 @@ class PatternWidgetDOM {
   }
   private unavailable = document.createElement("span");
   private grid = document.createElement("div");
-  private cells: HTMLElement[] = [];
+  private cells: Cell[] = [];
   private choices: HTMLButtonElement[] = [];
   private keyboard = document.createElement("div");
   private keys: HTMLButtonElement[] = [];
@@ -154,10 +159,11 @@ class PatternWidgetDOM {
     return button;
   }
 
-  constructor(private view: EditorView, private pattern: Pattern, readonly memory: PatternMemory, phraseUpdate: PhraseUpdateFeedback | null) {
+  constructor(private view: EditorView, private pattern: Pattern, readonly memory: PatternMemory, phraseUpdate: PhraseUpdateFeedback | null,
+    private readonly sources: SourceElements) {
+    this.shownPads = sources.slot();
     this.dom.className = "score-pattern cm-score-pattern";
     this.dom.dataset.kind = pattern.kind;
-    this.dom.dataset.patternStart = String(pattern.from);
     this.dom.contentEditable = "false";
     this.dom.setAttribute("aria-description", "Select a note or group. Structural edits change its source, including every linked repetition.");
     this.unavailable.className = "pattern-unavailable";
@@ -228,6 +234,7 @@ class PatternWidgetDOM {
       structureChanged: open => { memory.structureOpen = open; this.view.requestMeasure(); },
       tonesOpen: memory.tonesOpen ?? false,
       tonesChanged: open => { memory.tonesOpen = open; this.view.requestMeasure(); },
+      sources: this.sources,
     });
     this.melody.selectionTools.append(this.properties);
     this.melody.structureTools.append(this.split, repeatLabel, this.shareLabel);
@@ -261,7 +268,7 @@ class PatternWidgetDOM {
         }
         this.apply(step, value);
         return true;
-      }, () => this.view.requestMeasure());
+      }, () => this.view.requestMeasure(), this.sources);
       const editor = document.createElement("div");
       editor.className = "chord-editor";
       editor.append(this.grid, controls, this.properties);
@@ -269,9 +276,8 @@ class PatternWidgetDOM {
     }
     this.dom.addEventListener("focusin", event => {
       const target = event.target;
-      const cell = target instanceof HTMLElement ? target.closest<HTMLElement>(".step-cell") : null;
-      if (cell) {
-        const next = this.cells.indexOf(cell);
+      const next = target instanceof Node ? this.cells.findIndex(item => item.cell.contains(target)) : -1;
+      if (next >= 0) {
         if (next !== this.selected) this.feedback.textContent = "";
         this.selectStep(next, this.pattern.notationKind === "chord");
       } else if (target instanceof HTMLButtonElement) {
@@ -297,21 +303,18 @@ class PatternWidgetDOM {
       } else if (event.key === "Escape") {
         event.preventDefault();
         this.view.focus();
-      } else if (event.target instanceof HTMLElement && event.target.classList.contains("step-pad") &&
-          (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+      } else if (this.isPad(event.target) && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
         event.preventDefault();
         this.transpose((event.key === "ArrowUp" ? 1 : -1) * (event.shiftKey ? 12 : 1));
       } else if (event.target instanceof HTMLButtonElement &&
           ["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
         const target = event.target;
         const buttons = this.choices.includes(target) ? this.choices.filter(button => !button.disabled)
-          : target.classList.contains("step-pad") ? this.cells.map(cell => cell.querySelector<HTMLButtonElement>(".step-pad")!)
+          : this.isPad(target) ? this.cells.map(cell => cell.pad)
           : [];
-        if (buttons.length) {
+        const next = columnFor(event.key, buttons.indexOf(target), buttons.length);
+        if (buttons.length && next !== null) {
           event.preventDefault();
-          const current = buttons.indexOf(target);
-          const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1
-            : Math.max(0, Math.min(buttons.length - 1, current + (event.key === "ArrowRight" ? 1 : -1)));
           buttons.forEach((button, index) => { button.tabIndex = index === next ? 0 : -1; });
           buttons[next].focus();
         }
@@ -329,18 +332,17 @@ class PatternWidgetDOM {
     this.phraseUpdate.dataset.scope = phraseUpdate?.scope ?? "";
     this.phraseUpdate.dataset.tone = phraseUpdate?.tone ?? "";
     if (pattern.doc !== this.pattern.doc || pattern.from !== this.pattern.from ||
-        (pattern.cursor !== this.pattern.cursor && !this.dom.contains(document.activeElement))) {
+        (pattern.cursor !== this.pattern.cursor && !this.dom.contains(this.dom.ownerDocument.activeElement))) {
       this.feedback.textContent = "";
     }
     // A step chosen inside the widget stays chosen while the editor's cursor stays put.
-    if (pattern.cursor === this.pattern.cursor && this.dom.contains(document.activeElement)) {
+    if (pattern.cursor === this.pattern.cursor && this.dom.contains(this.dom.ownerDocument.activeElement)) {
       const old = this.pattern.structure?.nodes[this.pattern.selectedNode ?? -1];
       const retained = old && pattern.structure?.nodes.findIndex(node => node.from === old.from && node.kind === old.kind);
       if (retained !== undefined && retained >= 0) pattern = { ...pattern, selectedNode: retained };
     }
     this.pattern = pattern;
     this.dom.dataset.kind = pattern.kind;
-    this.dom.dataset.patternStart = String(pattern.from);
     this.render();
   }
 
@@ -360,6 +362,7 @@ class PatternWidgetDOM {
       this.unavailable.textContent = this.pattern.reason || "Edit in code";
       this.grid.replaceChildren();
       this.cells = [];
+      this.shownPads.show([]);
       this.dom.setAttribute("aria-label", this.pattern.reason);
       this.dom.title = this.pattern.reason;
       return;
@@ -367,21 +370,28 @@ class PatternWidgetDOM {
     this.dom.removeAttribute("aria-label");
     this.dom.title = "";
     const cellSteps = kind === "drum" ? [] : steps;
-    while (this.cells.length > cellSteps.length) this.cells.pop()!.remove();
+    while (this.cells.length > cellSteps.length) this.cells.pop()!.cell.remove();
     for (let index = 0; index < cellSteps.length; index++) {
       const step = cellSteps[index];
       let cell = this.cells[index];
       if (!cell) {
         cell = this.makeCell(index);
         this.cells.push(cell);
-        this.grid.append(cell);
+        this.grid.append(cell.cell);
       }
       this.updateCell(cell, step, index);
     }
+    // Chord pads stand for their source chords; note pads edit text ranges instead.
+    this.shownPads.show(this.pattern.notationKind !== "chord" ? []
+      : this.cells.map((cell, index) => ({ element: cell.pad, from: cellSteps[index].from, to: cellSteps[index].to, note: null, hint: true })));
     this.renderTools();
   }
 
-  private makeCell(index: number): HTMLElement {
+  private isPad(target: EventTarget | null): target is HTMLButtonElement {
+    return this.cells.some(cell => cell.pad === target);
+  }
+
+  private makeCell(index: number): Cell {
     const cell = document.createElement("div");
     cell.className = "step-cell";
     const pad = document.createElement("button");
@@ -395,35 +405,22 @@ class PatternWidgetDOM {
     pad.append(number, value);
     cell.append(pad);
     pad.addEventListener("click", () => this.selectStep(index, this.pattern.notationKind === "chord"));
-    return cell;
+    return { cell, pad, note: value };
   }
 
-  private updateCell(cell: HTMLElement, step: Step, index: number): void {
-    const pad = cell.querySelector<HTMLButtonElement>(".step-pad")!;
+  private updateCell({ pad, note }: Cell, step: Step, index: number): void {
     const voice = step.rest ? "Rest" : step.value;
     pad.setAttribute("aria-label", `Select ${voice}, ${this.label}, step ${index + 1}`);
     pad.title = `${voice}, step ${index + 1}`;
-    pad.querySelector<HTMLElement>(".step-note")!.textContent = voice;
-    if (this.pattern.notationKind === "chord") {
-      pad.dataset.from = String(step.from);
-      pad.dataset.to = String(step.to);
-    }
+    note.textContent = voice;
   }
 
   private apply(step: Step, value: string): void {
     if (value === step.value || !this.dom.isConnected || this.view.state.doc !== this.pattern.doc ||
       step.from < 0 || step.to > this.view.state.doc.length ||
       this.view.state.doc.sliceString(step.from, step.to) !== step.value) return;
-    const active = document.activeElement;
-    const root = active instanceof HTMLElement ? active.closest<HTMLElement>(".cm-score-pattern") : null;
-    const focusedClass = root === this.dom && active instanceof HTMLElement && active.classList.contains("step-pad")
-      ? "step-pad" : "";
-    const index = this.pattern.steps?.indexOf(step) ?? -1;
+    // The widget is updated in place (updateDOM), so a focused pad keeps its focus.
     dispatchPatternEdit(this.view, { changes: [{ from: step.from, to: step.to, insert: value }] });
-    if (focusedClass && document.activeElement !== active) {
-      const selector = `.cm-score-pattern[data-pattern-start="${this.pattern.from}"][data-kind="${this.pattern.kind}"] .step-cell:nth-child(${index + 1}) .${focusedClass}`;
-      this.view.dom.querySelector<HTMLElement>(selector)?.focus({ preventScroll: true });
-    }
   }
 
   private selectStep(index: number, moveCursor = false): void {
@@ -480,9 +477,8 @@ class PatternWidgetDOM {
     this.gate.disabled = this.pattern.timing.ambiguous.has("gate");
     this.stretch.title = this.stretch.disabled ? "Multiple slow transforms: edit in code" : "Time scale of this source phrase; explicit envelope seconds are unchanged";
     this.gate.title = this.gate.disabled ? "Multiple gate transforms: edit in code" : "All events in this phrase; an explicit hold uses seconds instead";
-    this.cells.forEach((cell, index) => {
+    this.cells.forEach(({ cell, pad }, index) => {
       cell.classList.toggle("is-selected", index === this.selected);
-      const pad = cell.querySelector<HTMLButtonElement>(".step-pad")!;
       pad.setAttribute("aria-pressed", String(index === this.selected));
       pad.tabIndex = index === this.selected ? 0 : -1;
     });
@@ -616,6 +612,7 @@ class PatternWidgetDOM {
   }
 
   destroy(): void {
+    this.shownPads.dispose();
     this.melody?.dispose();
     this.chordControls?.dispose();
   }
@@ -655,7 +652,8 @@ class PatternWidgetDOM {
 }
 
 class PatternWidget extends WidgetType {
-  constructor(readonly pattern: Pattern, readonly memory: PatternMemory, readonly phraseUpdate: PhraseUpdateFeedback | null) { super(); }
+  constructor(readonly pattern: Pattern, readonly memory: PatternMemory, readonly phraseUpdate: PhraseUpdateFeedback | null,
+    readonly sources: SourceElements) { super(); }
   override eq(other: PatternWidget): boolean {
     return this.pattern.doc === other.pattern.doc && this.pattern.from === other.pattern.from &&
       this.pattern.notationKind === other.pattern.notationKind && this.pattern.cursor === other.pattern.cursor &&
@@ -664,7 +662,7 @@ class PatternWidget extends WidgetType {
       this.phraseUpdate?.text === other.phraseUpdate?.text && this.phraseUpdate?.scope === other.phraseUpdate?.scope &&
       this.phraseUpdate?.tone === other.phraseUpdate?.tone;
   }
-  toDOM(view: EditorView): HTMLElement { return new PatternWidgetDOM(view, this.pattern, this.memory, this.phraseUpdate).dom; }
+  toDOM(view: EditorView): HTMLElement { return new PatternWidgetDOM(view, this.pattern, this.memory, this.phraseUpdate, this.sources).dom; }
   override updateDOM(dom: HTMLElement): boolean {
     const widget = liveWidgets.get(dom);
     if (!widget || widget.memory !== this.memory || widget.notationKind !== this.pattern.notationKind) return false;
@@ -676,14 +674,14 @@ class PatternWidget extends WidgetType {
 
 type PatternState = { memories: Map<number, PatternMemory>; shown: readonly Pattern[]; updates: PhraseUpdates; decorations: DecorationSet };
 
-function decorate(state: EditorState, shown: readonly Pattern[], memories: Map<number, PatternMemory>, updates: PhraseUpdates): DecorationSet {
+function decorate(state: EditorState, shown: readonly Pattern[], memories: Map<number, PatternMemory>, updates: PhraseUpdates, sources: SourceElements): DecorationSet {
   return Decoration.set(shown.map(pattern => Decoration.widget({
-    widget: new PatternWidget(pattern, memories.get(pattern.from)!, phraseUpdateAt(updates, { from: pattern.contentFrom, to: pattern.contentTo })),
+    widget: new PatternWidget(pattern, memories.get(pattern.from)!, phraseUpdateAt(updates, { from: pattern.contentFrom, to: pattern.contentTo }), sources),
     side: 1, block: true,
   }).range(state.doc.lineAt(pattern.to).to)), true);
 }
 
-function patternState(state: EditorState, previous?: PatternState, transaction?: Transaction): PatternState {
+function patternState(state: EditorState, sources: SourceElements, previous?: PatternState, transaction?: Transaction): PatternState {
   const all = sourcePatterns(state);
   const updates = previous && transaction
     ? trackPhraseUpdates(previous.updates, transaction, all.map(pattern => ({ from: pattern.contentFrom, to: pattern.contentTo })))
@@ -705,23 +703,24 @@ function patternState(state: EditorState, previous?: PatternState, transaction?:
     selected = selected.slice(0, 1);
   }
   if (selected.length > 1) selected = selected.sort((a, b) => (a.to - a.from) - (b.to - b.from)).slice(0, 1);
-  return { memories, shown: selected, updates, decorations: decorate(state, selected, memories, updates) };
+  return { memories, shown: selected, updates, decorations: decorate(state, selected, memories, updates, sources) };
 }
 
-export function patternControls(): Extension {
+/** The phrase controls, which publish the pads they draw to `sources`. */
+export function patternControls(sources: SourceElements): Extension {
   return [
     keymap.of(historyKeymap.map(binding => ({ ...binding, scope: "pattern-control" }))),
     StateField.define<PatternState>({
-      create: state => patternState(state),
+      create: state => patternState(state, sources),
       update: (value, transaction) => {
         if (transaction.docChanged || transaction.selection ||
             transaction.startState.facet(patternControlsVisible) !== transaction.state.facet(patternControlsVisible)) {
-          return patternState(transaction.state, value, transaction);
+          return patternState(transaction.state, sources, value, transaction);
         }
         // A playback report changes only the status shown on the same phrases.
         const updates = trackPhraseUpdates(value.updates, transaction, []);
         return updates === value.updates ? value
-          : { ...value, updates, decorations: decorate(transaction.state, value.shown, value.memories, updates) };
+          : { ...value, updates, decorations: decorate(transaction.state, value.shown, value.memories, updates, sources) };
       },
       provide: field => EditorView.decorations.from(field, value => value.decorations),
     }),

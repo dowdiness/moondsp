@@ -619,3 +619,18 @@ test("a long statement breaks by syntax on a narrow screen without changing its 
   await page.setViewportSize({ width: 1280, height: 800 });
   await expect.poll(async () => (await place([])).knob?.row).toBe(0);
 });
+
+test("arrow keys on a focused pad transpose its note in place and keep the focus there", async ({ page }) => {
+  await page.goto("/");
+  await replaceCode(page, 'note("C4 E4 G4").gain(.2)');
+  await openPitchControls(page);
+  const pad = page.locator(".step-pad").first();
+  await pad.focus();
+  // C#4 is longer than C4, so the phrase's later source positions move.
+  await pad.press("ArrowUp");
+  await expect.poll(() => readCode(page)).toBe('note("C#4 E4 G4").gain(.2)');
+  await expect(pad).toBeFocused();
+  await pad.press("Shift+ArrowUp");
+  await expect.poll(() => readCode(page)).toBe('note("C#5 E4 G4").gain(.2)');
+  await expect(pad).toBeFocused();
+});

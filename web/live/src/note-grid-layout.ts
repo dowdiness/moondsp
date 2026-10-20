@@ -1,9 +1,9 @@
 // Functional core for the note grid: where a phrase's notes, rests, and resize
 // edges are drawn, what lies under a point, and the SVG that shows them.
-import type { NotationEvent, NotationNode, NotationProjection } from "./notation-structure";
+import { relocationTarget, type NotationEvent, type NotationNode, type NotationProjection } from "./notation-structure";
 import type { Step } from "./pattern-controls";
 import { midiValue } from "./pitch";
-import { ROW_H, TIME_H, W, type PlotScale } from "./score-geometry";
+import { ROW_H, TIME_H, W, boundedPitch, type PlotScale } from "./score-geometry";
 import type { SvgNode } from "./svg-patch";
 
 export function noteMidi(value: string): number | null { return midiValue(value.split("@")[0])?.midi ?? null; }
@@ -224,9 +224,6 @@ export type NoteState = Readonly<{
   selected(node: number): boolean;
   /** The source a move drags, drawn faded under its preview. */
   moving: number | null;
-  /** The phrase literal's content, which playback highlights match. */
-  contentFrom: number;
-  contentTo: number;
 }>;
 
 export function restNodes(layout: GridLayout, plotHeight: number): SvgNode[] {
@@ -251,9 +248,7 @@ export function noteNodes(layout: GridLayout, phrase: GridPhrase, state: NoteSta
       key: note.key, tag: "g", className: "moving-score__note",
       flags: { "is-selected": selected, "is-editing": state.moving === note.node },
       attrs: {
-        "data-node": String(note.node), "data-index": String(note.index), "data-start": String(note.start),
-        "data-from": String(step.from), "data-to": String(step.to),
-        "data-literal-from": String(state.contentFrom), "data-literal-to": String(state.contentTo), "data-pitch": String(midi),
+        "data-node": String(note.node), "data-index": String(note.index), "data-start": String(note.start), "data-pitch": String(midi),
         tabindex: "-1", role: "button", "aria-pressed": String(selected),
         "aria-label": `Select source step ${note.index + 1}, occurrence at ${note.start}, ${step.value}${tone}`,
       },
@@ -281,4 +276,77 @@ export function previewNodes(blocks: readonly PreviewBlock[], scale: PlotScale):
     className: block.context ? "moving-score__context-preview" : "moving-score__preview-block",
     attrs: { ...rect(noteBlock(scale, block.start, block.end, scale.y(block.midi))), rx: String(scale.px(2)), ry: "2" },
   }));
+}
+
+type Timed = Pick<NotationEvent, "node" | "start" | "end">;
+
+/** The nodes sounding at notation `time`. */
+export function soundingNodes(events: readonly Timed[], span: number, time: number): Set<number> {
+  return new Set(events.filter(item => item.start <= time && time < Math.min(item.end, span)).map(item => item.node));
+}
+
+/** Whether `nodes` is a phrase range: several sources, or one group. */
+export function isPhraseRange(projection: NotationProjection, nodes: readonly number[]): boolean {
+  return nodes.length > 1 || projection.nodes[nodes[0]]?.kind === "group";
+}
+
+/** The node of `range`'s sequence that contains `hit`. */
+export function rangeSibling(projection: NotationProjection, hit: number, range: readonly number[]): number | null {
+  if (!range.length) return null;
+  const parent = projection.nodes[range[0]].parent;
+  if (parent === null) return range.includes(hit) ? hit : null;
+  let node = hit;
+  while (projection.nodes[node]?.parent !== parent) {
+    const next = projection.nodes[node]?.parent;
+    if (next === undefined || next === null) return null;
+    node = next;
+  }
+  return node;
+}
+
+/** Where a note moved from `source` (with its `range`) could land at notation `time`. */
+export function moveTargets(projection: NotationProjection, source: number, range: readonly number[], time: number): Set<number> {
+  const phrase = isPhraseRange(projection, range);
+  const targets = new Set<number>();
+  for (const item of [...projection.events, ...projection.rests]) {
+    if (item.start > time || time >= Math.min(item.end, projection.span)) continue;
+    const target = phrase ? rangeSibling(projection, item.node, range)
+      : item.node === source ? item.node : relocationTarget(projection, source, item.node);
+    if (target !== null) targets.add(target);
+  }
+  return targets;
+}
+
+/**
+ * The pitches a contour stroke draws as it goes from (`from.time`, `from.pitch`)
+ * to (`to.time`, `to.pitch`): each event centred between them, within
+ * `tolerance`, takes the pitch interpolated at its centre, bounded to
+ * `low`..`high`. A stroke that has not moved in time sets only `current`.
+ */
+export function strokePitches(
+  events: readonly Timed[], span: number, current: number,
+  from: Readonly<{ time: number; pitch: number }>, to: Readonly<{ time: number; pitch: number }>,
+  tolerance: number, low: number, high: number,
+): Map<number, number> {
+  const delta = to.time - from.time;
+  if (Math.abs(delta) < 1e-8) return new Map([[current, to.pitch]]);
+  const pitches = new Map<number, number>();
+  for (const event of events) {
+    const center = (event.start + Math.min(event.end, span)) / 2;
+    if (center < Math.min(from.time, to.time) - tolerance || center > Math.max(from.time, to.time) + tolerance) continue;
+    const fraction = Math.max(0, Math.min(1, (center - from.time) / delta));
+    pitches.set(event.node, boundedPitch(from.pitch + (to.pitch - from.pitch) * fraction, low, high));
+  }
+  return pitches;
+}
+
+/** The node, among those `eligible`, whose event is centred nearest notation `time`. */
+export function nearestNode(events: readonly Timed[], span: number, time: number, eligible: (node: number) => boolean): number | null {
+  let nearest: number | null = null;
+  let closest = Infinity;
+  for (const event of events) {
+    const distance = Math.abs((event.start + Math.min(event.end, span)) / 2 - time);
+    if (distance < closest && eligible(event.node)) { nearest = event.node; closest = distance; }
+  }
+  return nearest;
 }

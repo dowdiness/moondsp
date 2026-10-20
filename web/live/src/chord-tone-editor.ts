@@ -1,9 +1,13 @@
+import { freePitchNear, movedPastTap, rowDelta, shiftTones, toneAtY, toneRows, toneSetError } from "./chord-model";
 import { transposePitch } from "./pitch";
+import { columnFor } from "./roving-focus";
 import "./chord-tone-editor.css";
 
 const NS = "http://www.w3.org/2000/svg";
 const ROW = 24;
 const WIDTH = 320;
+/** The pitch-name gutter, in viewBox units, which stays available for touch scrolling. */
+const GUTTER = 44;
 function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string | number>) {
   const element = document.createElementNS(NS, tag);
   for (const [key, value] of Object.entries(attrs)) element.setAttribute(key, String(value));
@@ -29,17 +33,10 @@ export function mountChordToneEditor(root: HTMLElement, change: (pitches: readon
   const lower = button("Lower", () => move(-1));
   const raise = button("Raise", () => move(1));
   button("Add tone", () => {
-    const anchor = selected === null ? pitches.at(-1) ?? 59 : pitches[selected];
-    for (let distance = 1; distance <= 128; distance++) {
-      for (const pitch of [anchor + distance, anchor - distance]) {
-        if (pitch >= 0 && pitch <= 127 && !pitches.includes(pitch)) {
-          commit([...pitches, pitch], pitch);
-          canvas.focus({ preventScroll: true });
-          return;
-        }
-      }
-    }
-    message.textContent = "Every MIDI pitch already has a tone.";
+    const pitch = freePitchNear(selected === null ? pitches.at(-1) ?? 59 : pitches[selected], pitches);
+    if (pitch === null) { message.textContent = "Every MIDI pitch already has a tone."; return; }
+    commit([...pitches, pitch], pitch);
+    canvas.focus({ preventScroll: true });
   });
   const remove = button("Remove tone", () => removeTone());
   const selection = document.createElement("span");
@@ -74,18 +71,22 @@ export function mountChordToneEditor(root: HTMLElement, change: (pitches: readon
   let gesture: { id: number; y: number; x: number; index: number | null; base: readonly number[]; preview: number[]; add: number | null; moved: boolean } | null = null;
   const name = (pitch: number) => transposePitch(spelling, pitch - (spelling === "Db4" ? 61 : 60)) ?? String(pitch);
   const y = (pitch: number) => (high - pitch) * ROW;
+  /** The tone marks the last render drew, in tone order. */
+  let tones: SVGGElement[] = [];
 
   function render() {
     const values = gesture?.preview ?? pitches;
     marks.replaceChildren();
+    tones = [];
     for (let index = 0; index < values.length; index++) {
       const pitch = values[index];
-      const note = svg("g", { class: `chord-tones__tone${selected === null || selected === index ? " is-selected" : ""}${gesture ? " is-preview" : ""}`, "data-index": index, "data-pitch": pitch, role: "button", "aria-label": name(pitch) });
-      note.append(svg("rect", { x: 44, y: y(pitch) + 1, width: WIDTH - 50, height: ROW - 2, rx: 3 }));
+      const note = svg("g", { class: `chord-tones__tone${selected === null || selected === index ? " is-selected" : ""}${gesture ? " is-preview" : ""}`, "data-pitch": pitch, role: "button", "aria-label": name(pitch) });
+      note.append(svg("rect", { x: GUTTER, y: y(pitch) + 1, width: WIDTH - 50, height: ROW - 2, rx: 3 }));
       const label = svg("text", { x: 54, y: y(pitch) + 16 });
       label.textContent = name(pitch);
       note.append(label);
       marks.append(note);
+      tones.push(note);
     }
     whole.setAttribute("aria-pressed", String(selected === null));
     const target = selected === null ? "whole chord" : name(values[selected] ?? pitches[selected]);
@@ -99,9 +100,7 @@ export function mountChordToneEditor(root: HTMLElement, change: (pitches: readon
     remove.disabled = selected === null || !values.length;
   }
   function layout(reference: readonly number[]) {
-    low = Math.max(0, Math.min(...(reference.length ? reference : [60])) - 2);
-    high = Math.min(127, Math.max(...(reference.length ? reference : [67])) + 2);
-    if (high - low < 11) { high = Math.min(127, low + 11); low = Math.max(0, high - 11); }
+    ({ low, high } = toneRows(reference));
     const height = (high - low + 1) * ROW;
     canvas.setAttribute("viewBox", `0 0 ${WIDTH} ${height}`);
     canvas.setAttribute("preserveAspectRatio", "none");
@@ -117,12 +116,8 @@ export function mountChordToneEditor(root: HTMLElement, change: (pitches: readon
     render();
   }
   function commit(next: readonly number[], chosen: number | null) {
-    if (next.some(pitch => !Number.isInteger(pitch) || pitch < 0 || pitch > 127)) {
-      message.textContent = "Keep tones within MIDI 0–127."; render(); return;
-    }
-    if (new Set(next).size !== next.length) {
-      message.textContent = "That pitch already has a tone. Move to an empty row."; render(); return;
-    }
+    const error = toneSetError(next);
+    if (error) { message.textContent = error; render(); return; }
     if (next.length === pitches.length && next.every((pitch, index) => pitch === pitches[index])) { render(); return; }
     message.textContent = "";
     const previous = selected;
@@ -132,7 +127,7 @@ export function mountChordToneEditor(root: HTMLElement, change: (pitches: readon
     render();
   }
   function move(delta: number) {
-    const next = pitches.map((pitch, index) => selected === null || index === selected ? pitch + delta : pitch);
+    const next = shiftTones(pitches, selected, delta);
     commit(next, selected === null ? null : next[selected]);
   }
   function removeTone() {
@@ -149,16 +144,16 @@ export function mountChordToneEditor(root: HTMLElement, change: (pitches: readon
   }
   function onDown(event: PointerEvent) {
     if (disposed || !event.isPrimary || event.button !== 0 || gesture) return;
-    const target = event.target instanceof Element ? event.target : null;
-    const tone = target?.closest<SVGGElement>(".chord-tones__tone");
+    const target = event.target instanceof Node ? event.target : null;
+    const toneIndex = target ? tones.findIndex(tone => tone.contains(target)) : -1;
+    const tone = toneIndex >= 0;
     const all = target === whole;
     if (!all && !canvas.contains(target)) return;
     if (all && !pitches.length) return;
     const rect = canvas.getBoundingClientRect();
-    const localX = (event.clientX - rect.left) * WIDTH / rect.width;
-    if (!all && localX < 44) return; // Gutter remains available for touch scrolling.
-    const pitch = Math.max(low, Math.min(high, high - Math.floor((event.clientY - rect.top) / ROW)));
-    const index = tone ? Number(tone.dataset.index) : null;
+    if (!all && (event.clientX - rect.left) * WIDTH / rect.width < GUTTER) return;
+    const pitch = toneAtY(event.clientY - rect.top, ROW, low, high);
+    const index = tone ? toneIndex : null;
     if (tone || all) selected = index;
     const add = tone || all ? null : pitch;
     gesture = { id: event.pointerId, y: event.clientY, x: event.clientX, index, base: pitches, preview: [...pitches], add, moved: false };
@@ -172,10 +167,9 @@ export function mountChordToneEditor(root: HTMLElement, change: (pitches: readon
   function onMove(event: PointerEvent) {
     const active = gesture;
     if (!active || active.id !== event.pointerId) return;
-    active.moved ||= Math.hypot(event.clientX - active.x, event.clientY - active.y) > 6;
+    active.moved ||= movedPastTap(event.clientX - active.x, event.clientY - active.y);
     if (active.add !== null) return;
-    const delta = Math.round((active.y - event.clientY) / ROW);
-    active.preview = active.base.map((pitch, index) => active.index === null || active.index === index ? pitch + delta : pitch);
+    active.preview = shiftTones(active.base, active.index, rowDelta(active.y, event.clientY, ROW));
     render();
   }
   function onUp(event: PointerEvent) {
@@ -199,7 +193,7 @@ export function mountChordToneEditor(root: HTMLElement, change: (pitches: readon
     if (event.key === "ArrowUp" || event.key === "ArrowDown") {
       cancel(); move((event.key === "ArrowUp" ? 1 : -1) * (event.shiftKey ? 12 : 1));
     } else if (event.target === canvas && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
-      if (pitches.length) selected = selected === null ? 0 : Math.max(0, Math.min(pitches.length - 1, selected + (event.key === "ArrowRight" ? 1 : -1)));
+      if (pitches.length) selected = selected === null ? 0 : columnFor(event.key, selected, pitches.length);
       render();
     } else if (event.target === canvas && (event.key === "Delete" || event.key === "Backspace")) removeTone();
     else return;

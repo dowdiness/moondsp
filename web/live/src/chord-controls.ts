@@ -1,16 +1,20 @@
 import { chordParts, chordPitches, spellChord, QUALITIES, ROOTS, type ChordParts } from "./chord-model";
 import { mountChordToneEditor } from "./chord-tone-editor";
 import { transposePitch } from "./pitch";
+import type { SourceElements } from "./source-elements";
 import "./chord-controls.css";
 
 
-export function mountChordControls(container: HTMLElement, change: (value: string) => boolean, measure: () => void): {
+export function mountChordControls(
+  container: HTMLElement, change: (value: string) => boolean, measure: () => void, sources: SourceElements,
+): {
   update: (value: string | null, restSeed: string, doc: unknown, from: number) => void;
   dispose: () => void;
 } {
   container.className = "chord-controls";
   container.setAttribute("role", "group");
   const direct = document.createElement("div");
+  const shownChord = sources.slot();
   let atom: string | null = null;
   let current: ChordParts | null = null;
   const editor = mountChordToneEditor(direct, pitches => {
@@ -44,11 +48,14 @@ export function mountChordControls(container: HTMLElement, change: (value: strin
   named.append(summary, fields);
   container.append(direct, named, tones, feedback);
   named.addEventListener("toggle", measure);
+  /** The option each select gained for a spelling it does not list. */
+  const added = new Map<HTMLSelectElement, HTMLOptionElement>();
   function retainSpelling(select: HTMLSelectElement, value: string, label = value): void {
-    select.querySelector("option[data-current]")?.remove();
+    added.get(select)?.remove();
+    added.delete(select);
     if (![...select.options].some(option => option.value === value)) {
       const option = new Option(label, value);
-      option.dataset.current = "true";
+      added.set(select, option);
       select.add(option);
     }
     select.value = value;
@@ -82,8 +89,8 @@ export function mountChordControls(container: HTMLElement, change: (value: strin
   return {
     update(value, restSeed, doc, from) {
       container.hidden = value === null;
-      direct.dataset.from = String(from);
-      direct.dataset.to = String(from + (value?.length ?? 0));
+      // The tone editor stands for the selected chord's source.
+      shownChord.show(value === null ? [] : [{ element: direct, from, to: from + value.length, note: null, hint: false }]);
       atom = value;
       feedback.textContent = "";
       if (value === null) { current = null; editor.update([], [], "C4", doc, from); return; }
@@ -103,6 +110,6 @@ export function mountChordControls(container: HTMLElement, change: (value: strin
       }
       tones.textContent = value === "~" ? "Choose a chord to fill this step" : pitches.map(pitch => transposePitch(spelling, pitch - base) ?? String(pitch)).join(" · ");
     },
-    dispose() { editor.dispose(); },
+    dispose() { shownChord.dispose(); editor.dispose(); },
   };
 }

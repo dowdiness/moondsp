@@ -21,11 +21,11 @@ const keyed = new WeakMap<Element, Map<string, SVGElement>>();
 const written = new WeakMap<Element, readonly string[]>();
 
 /**
- * Makes `parent`'s children match `nodes`. An element that stays keeps its
- * focus, pointer capture, box, and other classes, so a render never detaches
- * what the user is touching.
+ * Makes `parent`'s children match `nodes` and returns them in the same order.
+ * An element that stays keeps its focus, pointer capture, box, and other
+ * classes, so a render never detaches what the user is touching.
  */
-export function patchSvg(parent: Element, nodes: readonly SvgNode[]): void {
+export function patchSvg(parent: Element, nodes: readonly SvgNode[]): SVGElement[] {
   const previous = keyed.get(parent) ?? new Map<string, SVGElement>();
   const next = new Map<string, SVGElement>();
   for (const node of nodes) {
@@ -43,6 +43,7 @@ export function patchSvg(parent: Element, nodes: readonly SvgNode[]): void {
     else parent.insertBefore(element, cursor);
   }
   keyed.set(parent, next);
+  return [...next.values()];
 }
 
 function create(node: SvgNode): SVGElement {

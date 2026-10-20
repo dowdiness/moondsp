@@ -3,7 +3,9 @@ import { MAX_BARS, barShape, horizonLayout, tickShape } from "../src/horizon-geo
 import { brightness, canvasPixels, signalStats, triggerOffset } from "../src/signal-math";
 import { projectNotation, type NotationProjection } from "../src/notation-structure";
 import { gridLayout, hitGrid } from "../src/note-grid-layout";
-import { ROW_H, TIME_H, midiAtY, needsResizeRender, plotPoint, plotScale, scoreGeometry } from "../src/score-geometry";
+import { ROW_H, TIME_H, midiAtY, needsResizeRender, plotPoint, plotScale, revealScrollTop, scoreGeometry } from "../src/score-geometry";
+import { advanceOnsets, soundingOnsets } from "../src/playback-observation";
+import { sourceIsPlaying } from "../src/playback-highlights";
 import { hitStrip, stripLayout } from "../src/structure-layout";
 import { longLinkNote } from "../src/score-link";
 
@@ -137,4 +139,32 @@ test("only a width change or the first stage height re-renders a resized note gr
 test("long links carry a warning", () => {
   expect(longLinkNote(8000)).toBe("");
   expect(longLinkNote(8001)).toContain("Download is safer");
+});
+
+test("a late onset batch jumps to its newest due group and holds it until a later onset is due", () => {
+  const onset = (audio: number, at: number) => ({ at, fields: [audio] });
+  // Arrives out of audio order; 0.5 and 1 are both due, 2 is not yet.
+  const { pending, latest } = advanceOnsets([], [onset(1, 10), onset(2, 20), onset(0.5, 5), onset(1, 10)], -Infinity, 12);
+  expect(latest).toBe(1);
+  expect(pending.map(item => item.fields[0])).toEqual([1, 1, 2]);
+  expect(soundingOnsets(pending, latest, 12)).toHaveLength(2);
+  expect(soundingOnsets(pending, latest, 19)).toHaveLength(2);
+  expect(advanceOnsets(pending, [], latest, 20).latest).toBe(2);
+});
+
+test("a note block plays only for its own onset and pitch; a span without a note plays for any onset in it", () => {
+  const pulse = { from: 5, to: 20, references: [], notation: { from: 8, to: 12, start: 0.5, pitch: 60 } };
+  const note = { literalFrom: 8, literalTo: 12, start: 0.5, pitch: 60 };
+  expect(sourceIsPlaying({ from: 5, to: 20, note }, [pulse])).toBe(true);
+  expect(sourceIsPlaying({ from: 5, to: 20, note: { ...note, start: 0 } }, [pulse])).toBe(false);
+  expect(sourceIsPlaying({ from: 5, to: 20, note: { ...note, pitch: 64 } }, [pulse])).toBe(false);
+  expect(sourceIsPlaying({ from: 5, to: 20, note: null }, [pulse])).toBe(true);
+  expect(sourceIsPlaying({ from: 5, to: 21, note: null }, [pulse])).toBe(false);
+});
+
+test("the score scrolls only when a target leaves its margin, and then centres it", () => {
+  expect(revealScrollTop(150, 20, 100, 200)).toBeNull();
+  expect(revealScrollTop(119, 20, 100, 200)).toBe(19);
+  expect(revealScrollTop(281, 20, 100, 200)).toBe(181);
+  expect(revealScrollTop(30, 50, 10, 200)).toBe(0);
 });
