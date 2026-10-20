@@ -122,6 +122,14 @@ rect.moving-score__source { fill: color-mix(in srgb, var(--score-border) 42%, tr
   .moving-score__structure { height: 88px; }
   .moving-score__stage { max-height: 264px; }
   .moving-score__time-view select, .moving-score__selection-tools > button, .moving-score__structure-details > summary { min-height: 44px; }
+  /* Touch targets stay 44 px while the drawn pill matches the 32 px desktop
+     controls: a transparent 6 px border extends the hit area around it. */
+  .moving-score__time-view select, .moving-score__selection-tools > button {
+    border: 6px solid transparent; background-clip: padding-box; box-shadow: inset 0 0 0 1px var(--score-border);
+  }
+  .moving-score__time-view select { padding-inline: 6px 20px; background-position: right 3px center; }
+  .moving-score__selection-tools > button { padding: 0 8px; }
+  .moving-score__select[aria-pressed="true"] { border-color: transparent; box-shadow: inset 0 0 0 1px var(--score-cobalt); }
 }
 @media (forced-colors: active) {
   .moving-score__note-block { fill: Canvas; stroke: CanvasText; }

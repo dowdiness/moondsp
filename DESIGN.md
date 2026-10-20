@@ -76,7 +76,7 @@ All explanatory prose — first-sound story, syntax reference, what controls can
 - **Viewport:** `100dvh` shell, no maximum width or outside padding. The editor fills the remaining height between toolbar and footer; CodeMirror owns long-document scrolling. Error messages and expanded saved drafts can use up to 40% of viewport height before the status line scrolls.
 - **Desktop (>1100 px):** one row with the wordmark, transport, and right-aligned icons (Undo, Redo, Controls │ Import, Download, Share, Help), above a `clamp(56px, 8.5vh, 92px)` horizon. Optional Help occupies a 372 px right column with its own scrolling.
 - **Narrow (≤1100 px):** optional Help narrows to 300 px.
-- **Mobile (≤760 px):** the wordmark is hidden; transport occupies the first row, the seven icons share the second, and a 44 px horizon the third. The tempo shows BPM only. Help becomes a native modal up to `min(380px, 100%)`, contains focus, closes on Escape, and restores the trigger.
+- **Mobile (≤760 px):** grid and phrase tools look like their desktop pills but keep 44 px touch targets; the wordmark is hidden; transport occupies the first row, the seven icons share the second, and a 44 px horizon the third. The tempo shows BPM only. Help becomes a native modal up to `min(380px, 100%)`, contains focus, closes on Escape, and restores the trigger.
 - **Compact (≤380 px):** the toolbar icons share the row width (about 34–41 px wide, 44 px high); 320, 360, and 390 px widths have no horizontal page overflow.
 - An open Help dialog switches between modal and non-modal behavior when crossing the 760 px breakpoint.
 

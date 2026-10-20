@@ -269,7 +269,7 @@ a { color: var(--accent); text-underline-offset: 4px; }
 .note-properties label { display: inline-flex; align-items: center; gap: 6px; }
 .note-properties input { width: 4.5em; min-height: 32px; padding: 3px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--raised); color: var(--ink); font: inherit; font-variant-numeric: tabular-nums; }
 .note-properties input:focus-visible { outline-offset: 1px; border-color: var(--accent); }
-.note-properties .step-rest, .structure-split { min-height: 32px; padding: 3px 12px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--ink-muted); font: inherit; }
+.note-properties .step-rest, .structure-split { min-height: 32px; padding: 3px 14px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--ink); font: 600 12px var(--font-body); }
 .note-properties .step-feedback { flex-basis: 100%; color: var(--err-fg); }
 .step-feedback:empty { display: none; }
 .structure-scope { font-size: 11px; color: var(--ink-muted); }
@@ -283,6 +283,8 @@ a { color: var(--accent); text-underline-offset: 4px; }
   .pattern-pitch-editor > summary, .structure-timing > summary { min-height: 44px; padding-block: 13px; }
   .pattern-pitch-editor .step-pad, .pattern-pitch-editor .octave-controls button { min-height: 44px; }
   .note-properties input, .note-properties .step-rest, .structure-split { min-height: 44px; }
+  /* The same 44 px target around a 32 px pill as the grid's selection tools. */
+  .note-properties .step-rest, .structure-split { padding: 0 8px; border: 6px solid transparent; background-clip: padding-box; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 70%, transparent); color: var(--ink-muted); }
 }
 .step-grid { display: flex; flex-wrap: wrap; gap: .3em .45em; }
 .step-cell { display: flex; align-items: center; gap: 2px; border-radius: 8px; }
@@ -428,6 +430,8 @@ footer > #score-readiness, footer > #log, footer > #session-message { order: 4; 
   .horizon { order: 3; flex-basis: calc(100% + 20px); height: 44px; margin: 0 -8px 0 -12px; }
   #start, .icon-button { min-height: 44px; }
   .icon-button { width: 44px; min-width: 44px; }
+  /* Icons share the row width; the pressed fill stays a circle, not a stretched pill. */
+  .toolbar .view-toggle[aria-pressed='true'], .toolbar #cheat-toggle[aria-expanded='true'] { background: radial-gradient(circle closest-side, var(--accent-soft) calc(100% - 1px), transparent 100%) center / 44px 44px no-repeat; }
   #start { width: 96px; padding-inline: 12px 14px; }
   .workspace, .workspace.cheat-collapsed { grid-template-columns: minmax(0, 1fr); }
   .workspace:not(.cheat-collapsed) #cheat { position: fixed; inset: 0 0 0 auto; z-index: 10; width: min(380px, 100%); height: 100dvh; max-height: 100dvh; padding: 16px 22px 32px; }
