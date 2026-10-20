@@ -238,12 +238,14 @@ a { color: var(--accent); text-underline-offset: 4px; }
 /* Room for three digits, so the code does not shift as a score passes 9 or 99 lines. */
 .score-sheet .cm-editor .cm-lineNumbers .cm-gutterElement { min-width: calc(3ch + 10px); }
 .score-sheet { --code-size: clamp(15px, min(1.3vw, 2.6vh), 22px); }
-.cm-editor .cm-activeLine { background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 9%, transparent), color-mix(in srgb, var(--accent) 2%, transparent) 60%, transparent); box-shadow: inset 2px 0 var(--accent); }
+/* A flat tint: a long, low-contrast gradient bands visibly. */
+.cm-editor .cm-activeLine { background: color-mix(in srgb, var(--accent) 6%, transparent); box-shadow: inset 2px 0 var(--accent); }
 .cm-editor .cm-activeLineGutter { background: transparent; color: var(--accent); }
 .cm-editor .cm-cursor { border-left: 2px solid var(--accent); }
 .cm-editor .cm-selectionBackground, .cm-editor.cm-focused .cm-selectionBackground { background: color-mix(in srgb, var(--accent) 22%, transparent) !important; }
 .cm-editor .cm-matchingBracket { background: color-mix(in srgb, var(--accent) 16%, transparent); outline: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 2px; }
-.cm-editor .cm-playback-atom { background: color-mix(in srgb, var(--accent) 25%, transparent); text-decoration: underline 2px var(--accent); text-underline-offset: 3px; }
+.cm-editor .cm-playback-atom { background: color-mix(in srgb, var(--accent) 22%, transparent); border-radius: 3px; box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent); text-decoration: underline 2px var(--accent); text-underline-offset: 4px; }
+.cm-editor .cm-playback-percussion { --accent: var(--drum); }
 .cm-editor .cm-playback-reference { background: color-mix(in srgb, var(--accent) 11%, transparent); text-decoration: underline 1px dotted var(--accent); text-underline-offset: 3px; }
 .cm-editor .cm-tooltip { background: var(--raised); color: var(--ink); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-pop); overflow: hidden; }
 .cm-editor .cm-tooltip-autocomplete > ul { font-family: var(--font-mono); }

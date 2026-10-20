@@ -29,7 +29,9 @@ const pulseField = StateField.define<PulseState>({
     };
     for (const pulse of pulses) {
       if (pulse.from < 0 || pulse.to <= pulse.from || pulse.to > docLength) continue;
-      mark("cm-playback-atom", pulse.from, pulse.to);
+      // Drum events carry no pitch; their atoms take the percussion colour.
+      const percussion = pulse.notation !== null && pulse.notation.pitch === null;
+      mark(percussion ? "cm-playback-atom cm-playback-percussion" : "cm-playback-atom", pulse.from, pulse.to);
       for (const ref of pulse.references)
         if (ref.from >= 0 && ref.to > ref.from && ref.to <= docLength)
           mark("cm-playback-reference", ref.from, ref.to);
