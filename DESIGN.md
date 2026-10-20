@@ -35,7 +35,7 @@ Light and dark palettes are the established moondsp colors, defined as CSS custo
 
 ## Interaction patterns
 
-- **Play / Pause / Restart** are always visible in the masthead; `Ctrl/⌘+Enter` plays, `Ctrl/⌘+Shift+Enter` restarts.
+- **Play / Pause / Restart** are always visible in the masthead; Play keeps one width for both labels so the transport status never shifts; `Ctrl/⌘+Enter` plays, `Ctrl/⌘+Shift+Enter` restarts.
 - **Undo / Redo** appear in the shared top toolbar, never inside pitch/drum controls: their scope is the entire score. Standard `Ctrl/⌘+Z` / `Ctrl/⌘+Shift+Z` also work from the sound controls. GUI edits and text edits share the same CodeMirror history.
 - **Edit / listen / refine:** the score is the only editable musical state and the main transport is the only listening path. Selecting, drawing, changing a pitch or length, and Undo never start audio. While playing, those edits use the existing material-entry acceptance path. `Ctrl/⌘+Enter` works from the drawing and controls without returning focus to the toolbar.
 - **Direct manipulation:** clicking an existing note selects its exact source atom without changing pitch. Body drag changes chromatic pitch and reorders whole source tokens within their sequence; occupied slots rotate rather than overwrite, with separators and postfixes preserved. Horizontal movement is source-order editing, not arbitrary-time placement. Note-edge drag trades adjacent weights while holding unrelated boundaries fixed. Compiled dashed previews precede one document change and one Undo step; Redo retains the destination selection. Shift-drag and blank-grid drawing retain contour editing. Repeated appearances stay linked.
