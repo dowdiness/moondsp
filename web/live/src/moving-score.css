@@ -83,6 +83,7 @@ rect.moving-score__source { fill: color-mix(in srgb, var(--score-border) 42%, tr
 .moving-score__note:hover .moving-score__note-edge-mark { opacity: 1; }
 .moving-score__note-block { rx: calc(5px * var(--text-aspect, 1)); ry: 5px; fill: var(--note-fill, color-mix(in srgb, var(--note) var(--note-tint, 24%), var(--stage))); stroke: var(--note-edge, var(--note)); stroke-width: 1; vector-effect: non-scaling-stroke; transform-box: fill-box; transform-origin: center; }
 .moving-score__note:hover .moving-score__note-block { fill: var(--note-fill-hover, color-mix(in srgb, var(--note) calc(var(--note-tint, 24%) + 14%), var(--stage))); }
+.moving-score__note.is-hinted .moving-score__note-block { stroke: color-mix(in srgb, var(--score-ink) 70%, transparent); stroke-width: 1; stroke-dasharray: 3 2; filter: drop-shadow(0 2px 4px color-mix(in srgb, var(--score-ink) 35%, transparent)); }
 .moving-score__note.is-selected .moving-score__note-block { stroke: var(--score-ink); stroke-width: 1.75; filter: drop-shadow(0 0 0 transparent) drop-shadow(0 0 5px color-mix(in srgb, var(--score-ink) 30%, transparent)); }
 .moving-score__note-label { fill: var(--score-ink); text-anchor: middle; font: 600 10.5px var(--font-mono); pointer-events: none; }
 .moving-score__note.is-playing .moving-score__note-block { fill: var(--note); stroke: var(--note); filter: drop-shadow(0 0 var(--onset-glow, 6px) color-mix(in srgb, var(--note) 85%, transparent)); }

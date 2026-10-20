@@ -27,6 +27,7 @@ import { engineOptions } from "./engine-options";
 import { mountNotice } from "./notice";
 import { createScope } from "./scope";
 import { playbackHighlights } from "./playback-highlights";
+import { sourceHints } from "./source-hints";
 import { mountPlaybackObservation } from "./playback-observation";
 import { playbackChanged } from "./phrase-update-status";
 import "./phrase-update-status.css";
@@ -79,6 +80,7 @@ const view = new EditorView({
       inlineControls(),
       patternCompartment.of([]),
       playbackHighlights(),
+      sourceHints(),
       controlsCompartment.of([]),
       EditorView.lineWrapping,
       placeholder('s("bd ~ sd ~")'),
