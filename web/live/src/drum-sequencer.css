@@ -51,6 +51,14 @@
   scrollbar-color: var(--border) transparent;
   outline: none;
 }
+/* When steps run past the frame, its right edge fades until the last column is in view. */
+@supports (animation-timeline: scroll()) {
+  .drum-sequencer__viewport { animation: drum-edge linear both; animation-timeline: scroll(self inline); }
+  @keyframes drum-edge {
+    from, 94% { mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); }
+    to { mask-image: none; }
+  }
+}
 .drum-sequencer__matrix {
   display: grid;
   width: max-content;
@@ -110,9 +118,10 @@
   background: color-mix(in srgb, var(--row-color) var(--pad-empty), var(--panel));
   color: var(--row-color);
 }
-.drum-sequencer__cell.is-selected-column { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ink) 38%, transparent); }
+.drum-sequencer__cell.is-selected-column { background: color-mix(in srgb, var(--row-color) calc(var(--pad-empty) + 12%), var(--panel)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 30%, transparent); }
 .drum-sequencer__cell[aria-pressed='true'] { background: var(--row-color); box-shadow: inset 0 0 0 var(--pad-edge) var(--row-edge); }
-.drum-sequencer__cell[aria-pressed='true'].is-selected-column { box-shadow: inset 0 0 0 2px var(--panel), inset 0 0 0 3.5px color-mix(in srgb, var(--ink) 55%, transparent); }
+/* A solid pad cannot deepen, so a selected filled pad takes an ink ring set off from it by the panel. */
+.drum-sequencer__cell[aria-pressed='true'].is-selected-column { background: var(--row-color); box-shadow: inset 0 0 0 var(--pad-edge) var(--row-edge), 0 0 0 1.5px var(--panel), 0 0 0 2.5px color-mix(in srgb, var(--ink) 50%, transparent); }
 .drum-sequencer__cell.is-playing {
   background: var(--row-color);
   box-shadow: inset 0 0 0 var(--pad-edge) var(--row-edge), 0 0 0 2px var(--panel), 0 0 0 4px var(--row-edge);

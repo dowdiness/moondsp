@@ -7,9 +7,9 @@
   max-width: min(1080px, 100%);
   overflow: hidden;
 }
-.moving-score__structure-label, .moving-score__event-label { color: var(--score-muted); font: 11px/1.4 var(--font-body); margin: 6px 0 4px; }
+.moving-score__structure-label, .moving-score__event-label { color: var(--score-muted); font: 12px/1.4 var(--font-body); margin: 6px 0 4px; }
 .moving-score__heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; }
-.moving-score__time-view { display: inline-flex; align-items: center; gap: 6px; color: var(--score-muted); font: 11px var(--font-body); }
+.moving-score__time-view { display: inline-flex; align-items: center; gap: 6px; color: var(--score-muted); font: 12px var(--font-body); }
 .moving-score__time-view select { min-height: 32px; padding: 3px 26px 3px 12px; color: var(--score-ink); background: var(--raised) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' fill='none' stroke='%23888' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 9px center / 12px; border: 1px solid var(--score-border); border-radius: 999px; font: inherit; appearance: none; cursor: pointer; }
 .moving-score__selection-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-top: 6px; }
 .moving-score__selection-tools > .note-properties { order: -1; flex: 1 1 auto; margin: 0; }
@@ -81,11 +81,23 @@ rect.moving-score__source { fill: color-mix(in srgb, var(--score-border) 42%, tr
 .moving-score__note.is-selected .moving-score__note-edge-mark { opacity: .55; }
 .moving-score__note.is-playing .moving-score__note-edge-mark { stroke: var(--accent-ink); }
 .moving-score__note:hover .moving-score__note-edge-mark { opacity: 1; }
-.moving-score__note-block { rx: calc(5px * var(--text-aspect, 1)); ry: 5px; fill: color-mix(in srgb, var(--note) 20%, var(--stage)); stroke: color-mix(in srgb, var(--note) 75%, transparent); stroke-width: 1; vector-effect: non-scaling-stroke; transform-box: fill-box; transform-origin: center; }
-.moving-score__note:hover .moving-score__note-block { fill: color-mix(in srgb, var(--note) 34%, var(--stage)); }
+.moving-score__note-block { rx: calc(5px * var(--text-aspect, 1)); ry: 5px; fill: var(--note-fill, color-mix(in srgb, var(--note) var(--note-tint, 24%), var(--stage))); stroke: var(--note-edge, var(--note)); stroke-width: 1; vector-effect: non-scaling-stroke; transform-box: fill-box; transform-origin: center; }
+.moving-score__note:hover .moving-score__note-block { fill: var(--note-fill-hover, color-mix(in srgb, var(--note) calc(var(--note-tint, 24%) + 14%), var(--stage))); }
 .moving-score__note.is-selected .moving-score__note-block { stroke: var(--score-ink); stroke-width: 1.75; filter: drop-shadow(0 0 0 transparent) drop-shadow(0 0 5px color-mix(in srgb, var(--score-ink) 30%, transparent)); }
 .moving-score__note-label { fill: var(--score-ink); text-anchor: middle; font: 600 10.5px var(--font-mono); pointer-events: none; }
 .moving-score__note.is-playing .moving-score__note-block { fill: var(--note); stroke: var(--note); filter: drop-shadow(0 0 var(--onset-glow, 6px) color-mix(in srgb, var(--note) 85%, transparent)); }
+@media (prefers-color-scheme: dark) {
+  .moving-score {
+    --note-tint: 32%; --onset-glow: 0px;
+    /* Mixing cobalt into the green stage greys it; a deep cobalt keeps the note
+       hue. The edge sits one step above the fill so idle notes stay quiet and the
+       bright note colour is left to selection and sound. */
+    --note-fill: #34457f; --note-fill-hover: #3f5296; --note-edge: #5466ad;
+  }
+  /* A solid cobalt with light text, so sounding notes never read like the pale, ink-ringed selection. */
+  :root .moving-score__note.is-playing .moving-score__note-block { fill: #4a5ae8; stroke: #4a5ae8; }
+  :root .moving-score__note.is-playing .moving-score__note-label { fill: #ffffff; }
+}
 @media (prefers-color-scheme: light) {
   .moving-score { --onset-glow: 3px; --onset-ring: 4; }
   :root .moving-score__note.is-playing .moving-score__note-block { fill: color-mix(in srgb, var(--note) 82%, var(--stage)); }
