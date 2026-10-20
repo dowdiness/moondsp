@@ -17,6 +17,7 @@ import type { Diagnostic } from "./canopy";
 import { AudioEngine } from "./audio";
 import type { Draft } from "./authoring";
 import type { Player, PlaybackView } from "./playback";
+import { mountOutputObservation } from "./output-observation";
 import { mountOutputScope } from "./output-scope";
 import { mountSignalHorizon } from "./signal-horizon";
 import { mountScoreLink } from "./score-link";
@@ -191,8 +192,9 @@ function renderPlayback(state: PlaybackView): void {
   }
   renderedPlayback = state;
 }
-scope.own(mountOutputScope(dom.outputScope, engine));
-const signalHorizon = scope.own(mountSignalHorizon(dom.horizon, engine));
+const output = scope.own(mountOutputObservation(dom.output, engine));
+scope.own(mountOutputScope(dom.outputScope, output));
+const signalHorizon = scope.own(mountSignalHorizon(dom.horizon, output));
 scope.own(mountScoreLink(dom.share, { view, notice }));
 if (import.meta.hot) import.meta.hot.dispose(() => {
   disposed = true;

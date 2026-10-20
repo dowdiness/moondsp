@@ -23,7 +23,7 @@ test("output trace follows real audio, pause, and failure without retaining old 
     const sampleRate = window.__moondspEngine!.readWaveform(samples);
     return { sampleRate, max: Math.max(...samples) };
   });
-  expect(retired).toEqual({ sampleRate: 0, max: 0 });
+  expect(retired).toEqual({ sampleRate: null, max: 0 });
 });
 
 test("drawing and pitch edits do not start audio; main Play outputs sound and Undo leaves playback running", async ({ page }) => {

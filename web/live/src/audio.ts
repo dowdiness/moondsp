@@ -132,14 +132,15 @@ export class AudioEngine {
   }
 
   /**
-   * Copy up to 1024 live post-master samples and return their sample rate, or
-   * clear the storage and return 0 when nothing is running.
+   * Copy up to 1024 live post-master samples and return their sample rate.
+   * When nothing is running the output is silent: `target` is cleared and the
+   * sample rate is null.
    */
-  readWaveform(target: Float32Array<ArrayBuffer>): number {
+  readWaveform(target: Float32Array<ArrayBuffer>): number | null {
     const state = this.state;
     if (state.kind !== "active" || state.graph.ctx.state !== "running") {
       target.fill(0);
-      return 0;
+      return null;
     }
     state.graph.analyser.getFloatTimeDomainData(target);
     if (target.length > state.graph.analyser.fftSize) target.fill(0, state.graph.analyser.fftSize);

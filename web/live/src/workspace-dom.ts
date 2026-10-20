@@ -1,4 +1,5 @@
 import type { HelpExamplesHost } from "./help-examples";
+import type { OutputObservationHost } from "./output-observation";
 import type { OutputScopeHost } from "./output-scope";
 import type { ScoreLinkElements } from "./score-link";
 import type { ScoreSessionElements } from "./score-session";
@@ -43,13 +44,12 @@ export function queryWorkspaceDom(doc: Document) {
     draftVersions: element("draft-versions"),
     materialStatus: element("material-status"),
   };
+  const output: OutputObservationHost = { page: view, reducedMotion };
   const horizon: SignalHorizonHost = {
     root: element("signal-horizon"),
-    visibility: doc,
-    reducedMotion,
     colorScheme: view.matchMedia("(prefers-color-scheme: dark)"),
   };
-  const outputScope: OutputScopeHost = { root: element("output-scope"), visibility: doc, reducedMotion };
+  const outputScope: OutputScopeHost = { root: element("output-scope") };
   const session: ScoreSessionElements = {
     saveStatus: element("save-status"),
     saveButton: button("save-score"),
@@ -72,6 +72,7 @@ export function queryWorkspaceDom(doc: Document) {
     page: view,
     editor: element("editor"),
     transport,
+    output,
     horizon,
     outputScope,
     session,

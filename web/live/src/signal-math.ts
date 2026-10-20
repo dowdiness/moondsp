@@ -63,15 +63,33 @@ export function brightness(samples: ArrayLike<number>, sampleRate: number): numb
   return (e1 + 2 * e2 + 3 * e3) / (3 * total);
 }
 
+/** What one reading of the audio output shows: its level and its tone colour. */
+export type OutputAnalysis = Readonly<{ stats: SignalStats; tone: number }>;
+
 /**
- * How a canvas drawing loop runs: not at all while it is not `shown`, at a
- * slow interval under reduced motion, and otherwise every animation frame.
+ * Analyses post-master `samples` read at `sampleRate`. The sample rate is null
+ * when the engine was not running, and the samples are then silence.
  */
-export function drawCadence(shown: boolean, reducedMotion: boolean): "stopped" | "interval" | "frame" {
-  return !shown ? "stopped" : reducedMotion ? "interval" : "frame";
+export function analyseOutput(samples: ArrayLike<number>, sampleRate: number | null): OutputAnalysis {
+  const stats = signalStats(samples);
+  const sounding = stats.live && sampleRate !== null;
+  return { stats, tone: sounding ? brightness(samples, sampleRate) : 0 };
 }
 
-/** Whether the horizon idles at a low rate after a frame: its history is quiet, or frozen with nothing sounding. */
-export function horizonIdles(quiet: boolean, playing: boolean, live: boolean): boolean {
+export type OutputCadence = "stopped" | "interval" | "rest" | "frame";
+
+/**
+ * How often the audio output is read: never while no meter is on screen, at
+ * the slow `interval` under reduced motion, at the `rest` rate while every meter
+ * on screen is resting, and otherwise every animation frame.
+ */
+export function outputCadence(metersOnScreen: number, reducedMotion: boolean, allResting: boolean): OutputCadence {
+  if (metersOnScreen === 0) return "stopped";
+  if (reducedMotion) return "interval";
+  return allResting ? "rest" : "frame";
+}
+
+/** Whether the horizon can rest between readings: its history is quiet, or frozen with nothing sounding. */
+export function horizonResting(quiet: boolean, playing: boolean, live: boolean): boolean {
   return quiet || (!playing && !live);
 }

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { MAX_BARS, barShape, horizonLayout, tickShape } from "../src/horizon-geometry";
-import { brightness, canvasPixels, signalStats, triggerOffset } from "../src/signal-math";
+import { analyseOutput, brightness, canvasPixels, outputCadence, signalStats, triggerOffset } from "../src/signal-math";
 import { projectNotation, type NotationProjection } from "../src/notation-structure";
 import { gridLayout, hitGrid } from "../src/note-grid-layout";
 import { ROW_H, TIME_H, midiAtY, needsResizeRender, plotPoint, plotScale, revealScrollTop, scoreGeometry } from "../src/score-geometry";
@@ -167,4 +167,21 @@ test("the score scrolls only when a target leaves its margin, and then centres i
   expect(revealScrollTop(119, 20, 100, 200)).toBe(19);
   expect(revealScrollTop(281, 20, 100, 200)).toBe(181);
   expect(revealScrollTop(30, 50, 10, 200)).toBe(0);
+});
+
+test("the output is read every frame unless no meter is on screen, motion is reduced, or every meter rests", () => {
+  expect(outputCadence(0, false, false)).toBe("stopped");
+  expect(outputCadence(0, true, true)).toBe("stopped");
+  expect(outputCadence(2, true, false)).toBe("interval");
+  expect(outputCadence(2, false, true)).toBe("rest");
+  expect(outputCadence(2, false, false)).toBe("frame");
+});
+
+test("a stopped engine's silence has no tone, and a sounding output is coloured at its own sample rate", () => {
+  expect(analyseOutput(new Float32Array(1024), null)).toEqual({ stats: { rms: 0, peak: 0, live: false }, tone: 0 });
+  const air = Array.from({ length: 1024 }, (_, i) => 0.5 * Math.sin(2 * Math.PI * 6000 * i / 48_000));
+  const { stats, tone } = analyseOutput(air, 48_000);
+  expect(stats.live).toBe(true);
+  expect(tone).toBe(brightness(air, 48_000));
+  expect(tone).toBeGreaterThan(0.5);
 });
