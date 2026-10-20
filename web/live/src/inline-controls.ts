@@ -2,7 +2,7 @@ import { Annotation, EditorState, StateField, Transaction, type Extension, type 
 import { Decoration, EditorView, WidgetType, keymap, runScopeHandlers, type DecorationSet } from "@codemirror/view";
 import { history, historyKeymap, isolateHistory } from "@codemirror/commands";
 import type { SyntaxNode, Tree } from "@lezer/common";
-import { miniliveLanguage } from "./lang/minilive";
+import { syntaxTree } from "@codemirror/language";
 
 type Target = { from: number; to: number; label: string; step: number; value: string; notice: string };
 const lastInlineEdit = StateField.define<boolean>({
@@ -49,6 +49,14 @@ function controlTargets(tree: Tree, source: string): Target[] {
     targets.push(...local);
   } });
   return targets;
+}
+
+/** Code columns an inline knob occupies, so long lines can lay out by column count. */
+export const KNOB_COLUMNS = 2;
+
+/** Source positions where inline knobs are drawn. */
+export function controlPositions(tree: Tree, source: string): number[] {
+  return controlTargets(tree, source).map(target => target.from);
 }
 
 // The DOM owns only ephemeral input/gesture state. Source ranges and values are derived afresh.
@@ -226,9 +234,11 @@ class ControlWidget extends WidgetType {
 
 function decorations(state: EditorState): DecorationSet {
   const source = state.doc.toString();
-  const targets = controlTargets(miniliveLanguage.parser.parse(source), source);
+  const targets = controlTargets(syntaxTree(state), source);
+  // After its position: a caret arriving from the left, as after End on the row
+  // above, stops before the knob, and a row indent that starts there covers it.
   return Decoration.set(targets.map(target => Decoration.widget({
-    widget: new ControlWidget(target, state.doc), side: -1,
+    widget: new ControlWidget(target, state.doc), side: 1,
   }).range(target.from)), true);
 }
 
@@ -244,11 +254,12 @@ export function inlineControls(): Extension {
         ? { annotations: isolateHistory.of("before") } : null),
     StateField.define<DecorationSet>({
       create: decorations,
-      update: (value, transaction) => transaction.docChanged ? decorations(transaction.state) : value,
+      // The tree can also grow after the edit, as parsing completes in the background.
+      update: (value, transaction) => syntaxTree(transaction.state) !== syntaxTree(transaction.startState) ? decorations(transaction.state) : value,
       provide: field => EditorView.decorations.from(field),
     }),
     EditorView.baseTheme({
-      ".cm-inline-control": { position: "relative", display: "inline-flex", width: "1.1em", height: "1em", margin: "0 0.18em", verticalAlign: "-0.1em", font: "inherit", color: "var(--ink)" },
+      ".cm-inline-control": { position: "relative", display: "inline-flex", justifyContent: "center", width: `${KNOB_COLUMNS}ch`, height: "1em", verticalAlign: "-0.1em", font: "inherit", color: "var(--ink)" },
       ".cm-inline-control .cm-sound-knob": { width: "1em", height: "1em", minHeight: "0", padding: "0", border: "0", borderRadius: "50%", background: "transparent", font: "inherit", lineHeight: "1", cursor: "ns-resize", touchAction: "none" },
       ".cm-sound-knob svg": { width: "100%", height: "100%", overflow: "visible" },
       ".knob-face": { fill: "var(--panel)", stroke: "var(--ink-muted)", strokeWidth: "3" },

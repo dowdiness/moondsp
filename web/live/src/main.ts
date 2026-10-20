@@ -28,6 +28,7 @@ import { mountNotice } from "./notice";
 import { createScope } from "./scope";
 import { playbackHighlights } from "./playback-highlights";
 import { sourceHints } from "./source-hints";
+import { codeLayout } from "./code-layout";
 import { mountPlaybackObservation } from "./playback-observation";
 import { playbackChanged } from "./phrase-update-status";
 import "./phrase-update-status.css";
@@ -81,6 +82,7 @@ const view = new EditorView({
       patternCompartment.of([]),
       playbackHighlights(),
       sourceHints(),
+      codeLayout(),
       controlsCompartment.of([]),
       EditorView.lineWrapping,
       placeholder('s("bd ~ sd ~")'),

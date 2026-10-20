@@ -535,3 +535,87 @@ for (const phrase of [
     await expect.poll(() => readCode(page)).toBe(phrase.source.replace("~", phrase.value));
   });
 }
+
+test("a long statement breaks by syntax on a narrow screen without changing its source", async ({ page }) => {
+  const source = '$: note("C4 ~ Eb4 G4 Bb4 ~ G4 Eb4").slow(4).gain(0.25).lpf(1800)';
+  await page.setViewportSize({ width: 320, height: 700 });
+  await page.goto("/");
+  await replaceCode(page, source);
+  // Code columns from the statement start, and rows, of each token's first glyph and
+  // of the first knob, and the caret's row.
+  const place = (tokens: string[]) => page.locator(".cm-line").first().evaluate((line, tokens) => {
+    const glyph = (node: Node, index: number, length = 1) => {
+      const range = document.createRange();
+      range.setStart(node, index);
+      range.setEnd(node, index + length);
+      return range.getBoundingClientRect();
+    };
+    const at = (token: string, length = 1) => {
+      const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const index = (node as Text).data.indexOf(token);
+        if (index >= 0) return glyph(node, index, length);
+      }
+      throw new Error(`missing ${token}`);
+    };
+    // A run of glyphs gives the column width; one glyph's box is not exact in every engine.
+    const start = at("$:"), ch = at("$: note", 7).width / 7, pitch = parseFloat(getComputedStyle(line).lineHeight);
+    const place = (box: DOMRect) => ({ column: Math.round((box.left - start.left) / ch), row: Math.round((box.top - start.top) / pitch) });
+    const knob = line.querySelector(".cm-sound-knob");
+    // The caret's row is the number of row breaks before it in the DOM: a row's end and the
+    // next row's start are one source position, told apart only by the side of the break.
+    const caret = getSelection()!.rangeCount ? getSelection()!.getRangeAt(0) : null;
+    return {
+      ...Object.fromEntries(tokens.map(token => [token, place(at(token))])),
+      knob: knob ? place(knob.getBoundingClientRect()) : null,
+      caretRow: caret ? [...line.querySelectorAll(".cm-row-break")].filter(br => caret.comparePoint(br, 0) < 0).length : null,
+    };
+  }, tokens);
+  const narrow = await place(["C4 ~", "slow", "gain", "lpf"]);
+  // Arguments (here the phrase, after its quote) sit two columns deeper than the chain,
+  // so the chain reads as one level out.
+  expect(narrow["C4 ~"].column).toBe(5);
+  expect(narrow.slow.column - 1).toBe(2);
+  expect(narrow.lpf.column - 1).toBe(2);
+  expect(narrow.slow.row).toBeGreaterThan(narrow["C4 ~"].row);
+  expect(narrow.gain.row).toBe(narrow.slow.row);
+  expect(narrow.lpf.row).toBeGreaterThan(narrow.slow.row);
+  expect(await readCode(page)).toBe(source);
+
+  // A row's end and the next row's start are one source position; End and Home keep the caret on its row.
+  const click = async (token: string) => {
+    const glyph = await page.locator(".cm-line").first().evaluate((line, token) => {
+      const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const index = (node as Text).data.indexOf(token);
+        if (index < 0) continue;
+        const range = document.createRange();
+        range.setStart(node, index + 1);
+        range.setEnd(node, index + 2);
+        const box = range.getBoundingClientRect();
+        return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+      }
+      throw new Error(`missing ${token}`);
+    }, token);
+    await page.mouse.click(glyph.x, glyph.y);
+  };
+  await click("slow");
+  // The editor settles the caret's side of the break after the key, so poll.
+  await page.keyboard.press("End");
+  await expect.poll(async () => (await place([])).caretRow).toBe(narrow.slow.row);
+  await page.keyboard.press("Home");
+  await expect.poll(async () => (await place([])).caretRow).toBe(narrow.slow.row);
+  await expect(page.locator("footer").getByText(/^Ln \d/)).toHaveText(`Ln 1, Col ${source.indexOf(".slow") + 1}`);
+
+  // A knob that starts an argument row is indented with that row.
+  await replaceCode(page, '$: note("C4").lpf(1800, 0.7)');
+  await page.setViewportSize({ width: 220, height: 700 });
+  await expect.poll(async () => (await place([])).knob).toEqual({ column: 4, row: 2 });
+  // The row above ends before that knob, not after it.
+  await click("lpf");
+  await page.keyboard.press("End");
+  await expect.poll(async () => (await place([])).caretRow).toBe(1);
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expect.poll(async () => (await place([])).knob?.row).toBe(0);
+});

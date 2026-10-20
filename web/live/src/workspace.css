@@ -235,6 +235,9 @@ a { color: var(--accent); text-underline-offset: 4px; }
 .cm-editor .cm-scroller { height: 100%; font-family: var(--font-mono); line-height: 1.95; overflow: auto; scrollbar-gutter: stable; }
 .score-sheet .cm-editor .cm-content { padding: 4vh 0 12vh; font-size: var(--code-size); caret-color: var(--accent); min-width: 0; flex-basis: 0; }
 .cm-editor .cm-line { padding: 0 32px 0 2vw; overflow-wrap: anywhere; }
+/* Long statements break by syntax (code-layout.ts): row breaks are widgets, and a
+   phrase too long for its row wraps inside a box the layout sizes in columns. */
+.cm-wrap-phrase { display: inline-block; }
 .cm-editor .cm-gutters { background: transparent; border: none; color: var(--ink-faint); padding: 0 0 0 1.6vw; font-size: calc(var(--code-size) * .62); }
 .score-sheet .cm-editor .cm-gutterElement { padding: 0 10px 0 0; line-height: calc(var(--code-size) * 1.95); }
 /* Room for three digits, so the code does not shift as a score passes 9 or 99 lines. */
