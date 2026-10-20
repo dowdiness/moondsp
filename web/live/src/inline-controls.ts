@@ -59,6 +59,36 @@ export function controlPositions(tree: Tree, source: string): number[] {
   return controlTargets(tree, source).map(target => target.from);
 }
 
+/** Whether `value` is a plain decimal number literal, as a knob writes. */
+export function isNumberLiteral(value: string): boolean {
+  return /^-?(\d+(\.\d*)?|\.\d+)$/.test(value) && Number.isFinite(Number(value));
+}
+
+/** The value a knob drag `dy` pixels upward from `start` sets; cutoff moves by octaves per 400 px. */
+export function dragValue(label: string, start: number, dy: number, step: number, fine: boolean): number {
+  const delta = dy * step * (fine ? 0.1 : 1);
+  return label === "Cutoff Hz" && start > 0
+    ? Math.round(start * 2 ** (delta / 400))
+    : Math.round((start + delta) * 10000) / 10000;
+}
+
+/** The value an arrow key sets: one `step` (a tenth when fine) up or down. */
+export function nudgeValue(value: number, step: number, fine: boolean, up: boolean): number {
+  return Math.round((value + step * (fine ? 0.1 : 1) * (up ? 1 : -1)) * 10000) / 10000;
+}
+
+/** A knob's displayed range, and how far through it `value` sits in [0, 1] (logarithmic for cutoff). */
+export function knobPosition(label: string, value: number): { min: number; max: number; amount: number } {
+  const [min, max] = label === "Gain" ? [0, 2] : label === "Q" ? [0.1, 10] : [20, 20000];
+  const fraction = label === "Cutoff Hz" ? Math.log(Math.max(value, min) / min) / Math.log(max / min) : (value - min) / (max - min);
+  return { min, max, amount: Math.max(0, Math.min(1, fraction)) };
+}
+
+/** Where the number field opens below a knob whose box ends at (`left`, `bottom`), kept inside a `width` × `height` viewport. */
+export function numberFieldPosition(left: number, bottom: number, width: number, height: number): { left: number; top: number } {
+  return { left: Math.max(4, Math.min(left, width - 130)), top: Math.max(4, Math.min(bottom + 4, height - 44)) };
+}
+
 // The DOM owns only ephemeral input/gesture state. Source ranges and values are derived afresh.
 const controls = new WeakMap<HTMLElement, Control>();
 class Control {
@@ -69,7 +99,10 @@ class Control {
   private gesture: { y: number; value: number; changed: boolean; time: number } | null = null;
   private writing = false;
   private readonly blur = () => this.finish();
+  /** The window whose blur ends a gesture and whose size bounds the number field. */
+  private readonly page: Window;
   constructor(private view: EditorView, private target: Target, private doc: Text) {
+    this.page = view.dom.ownerDocument.defaultView!;
     this.dom.className = "cm-inline-control";
     this.dom.contentEditable = "false";
     this.handle.type = "button";
@@ -100,12 +133,9 @@ class Control {
     this.handle.onpointermove = event => {
       const gesture = this.gesture;
       if (!gesture) return;
-      const delta = (gesture.y - event.clientY) * this.target.step * (event.shiftKey ? 0.1 : 1);
-      if (delta === 0 && !gesture.changed) return;
-      const value = this.target.label === "Cutoff Hz" && gesture.value > 0
-        ? Math.round(gesture.value * 2 ** (delta / 400))
-        : Math.round((gesture.value + delta) * 10000) / 10000;
-      this.write(String(value), gesture);
+      const dy = gesture.y - event.clientY;
+      if (dy === 0 && !gesture.changed) return;
+      this.write(String(dragValue(this.target.label, gesture.value, dy, this.target.step, event.shiftKey)), gesture);
     };
     this.handle.onpointerup = () => {
       const clicked = this.gesture !== null && !this.gesture.changed;
@@ -128,8 +158,7 @@ class Control {
       }
       if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
       event.preventDefault();
-      const delta = this.target.step * (event.shiftKey ? 0.1 : 1) * (event.key === "ArrowUp" ? 1 : -1);
-      this.write(String(Math.round((Number(this.target.value) + delta) * 10000) / 10000));
+      this.write(String(nudgeValue(Number(this.target.value), this.target.step, event.shiftKey, event.key === "ArrowUp")));
     };
     this.input.onkeydown = event => {
       if (event.key === "Enter") {
@@ -147,12 +176,14 @@ class Control {
       this.input.removeAttribute("aria-invalid");
       this.input.hidePopover();
     };
-    window.addEventListener("blur", this.blur);
+    this.page.addEventListener("blur", this.blur);
   }
+  get label(): string { return this.target.label; }
   private editNumber(): void {
     const rect = this.handle.getBoundingClientRect();
-    this.input.style.left = `${Math.max(4, Math.min(rect.left, window.innerWidth - 130))}px`;
-    this.input.style.top = `${Math.max(4, Math.min(rect.bottom + 4, window.innerHeight - 44))}px`;
+    const { left, top } = numberFieldPosition(rect.left, rect.bottom, this.page.innerWidth, this.page.innerHeight);
+    this.input.style.left = `${left}px`;
+    this.input.style.top = `${top}px`;
     this.input.showPopover();
     this.input.focus();
     this.input.select();
@@ -160,7 +191,7 @@ class Control {
   private commit(): boolean {
     const value = this.input.value.trim();
     // Validation of a number, not source discovery or replacement.
-    if (!/^-?(\d+(\.\d*)?|\.\d+)$/.test(value) || !Number.isFinite(Number(value))) {
+    if (!isNumberLiteral(value)) {
       this.input.setAttribute("aria-invalid", "true");
       return false;
     }
@@ -170,7 +201,7 @@ class Control {
   }
   private write(value: string, gesture?: NonNullable<Control["gesture"]>): void {
     if (this.doc !== this.view.state.doc || !this.dom.isConnected) { this.finish(); return; }
-    if (!/^-?(\d+(\.\d*)?|\.\d+)$/.test(value) || !Number.isFinite(Number(value))) return;
+    if (!isNumberLiteral(value)) return;
     if (value === this.target.value) return;
     const annotations: Annotation<unknown>[] = [Transaction.userEvent.of("input.type.inline")];
     // One gesture has one history timestamp, even when the pointer pauses.
@@ -196,10 +227,7 @@ class Control {
   }
   private renderKnob(): void {
     const value = Number(this.target.value);
-    const [min, max] = this.target.label === "Gain" ? [0, 2] : this.target.label === "Q" ? [0.1, 10] : [20, 20000];
-    const fraction = this.target.label === "Cutoff Hz"
-      ? Math.log(Math.max(value, min) / min) / Math.log(max / min) : (value - min) / (max - min);
-    const amount = Math.max(0, Math.min(1, fraction));
+    const { min, max, amount } = knobPosition(this.target.label, value);
     this.handle.style.setProperty("--knob-angle", `${-135 + amount * 270}deg`);
     this.hint.textContent = `${this.target.label} · ${this.target.value}\nDrag ↑↓ · Shift: fine · Click: type\n${this.target.notice}`;
     this.handle.setAttribute("aria-description", `Drag up or down. Shift for fine adjustment. Enter to type a number. ${this.target.notice}`);
@@ -215,7 +243,7 @@ class Control {
   }
   destroy(): void {
     this.gesture = null;
-    window.removeEventListener("blur", this.blur);
+    this.page.removeEventListener("blur", this.blur);
   }
 }
 
@@ -225,7 +253,7 @@ class ControlWidget extends WidgetType {
   toDOM(view: EditorView): HTMLElement { return new Control(view, this.target, this.doc).dom; }
   override updateDOM(dom: HTMLElement): boolean {
     const control = controls.get(dom);
-    if (!control || dom.querySelector("input")?.getAttribute("aria-label") !== this.target.label) return false;
+    if (!control || control.label !== this.target.label) return false;
     control.update(this.target, this.doc);
     return true;
   }

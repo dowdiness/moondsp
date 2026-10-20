@@ -1,7 +1,7 @@
 import type { AudioEngine } from "./audio";
 import { barLevels, createLevelHistory, markCycle, pushLevel } from "./level-history";
 import { MAX_BARS, barShape, horizonLayout, tickShape, toneRamp, toneStep } from "./horizon-geometry";
-import { brightness, canvasPixels, signalStats, triggerOffset } from "./signal-math";
+import { brightness, canvasPixels, drawCadence, horizonIdles, signalStats, triggerOffset } from "./signal-math";
 
 // Imperative shell for the horizon: one rounded bar per short window of measured
 // RMS, mirrored about the centre line, newest at the right, with cycle ticks along
@@ -170,23 +170,24 @@ export function mountSignalHorizon(host: SignalHorizonHost, engine: Pick<AudioEn
     frame = 0;
     slowTimer = 0;
   };
+  const shown = (): boolean => !disposed && visibility.visibilityState === "visible";
   const animate = (): void => {
     frame = 0;
-    if (disposed || visibility.visibilityState !== "visible") return;
+    if (!shown()) return;
     draw();
-    // Idle at a low rate once the visible history is silent or frozen.
-    if (historyQuiet || (!transportPlaying && !lastLive)) slowTimer = window.setTimeout(() => { slowTimer = 0; animate(); }, 200);
+    if (horizonIdles(historyQuiet, transportPlaying, lastLive)) slowTimer = window.setTimeout(() => { slowTimer = 0; animate(); }, 200);
     else frame = requestAnimationFrame(animate);
   };
   const schedule = (): void => {
     stop();
-    if (disposed || visibility.visibilityState !== "visible") return;
-    if (reducedMotion.matches) {
-      draw();
-      slowTimer = window.setInterval(() => draw(), 250);
-      return;
+    switch (drawCadence(shown(), reducedMotion.matches)) {
+      case "stopped": return;
+      case "interval":
+        draw();
+        slowTimer = window.setInterval(() => draw(), 250);
+        return;
+      case "frame": frame = requestAnimationFrame(animate);
     }
-    frame = requestAnimationFrame(animate);
   };
 
   const resizeObserver = new ResizeObserver(resize);

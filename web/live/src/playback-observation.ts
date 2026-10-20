@@ -5,12 +5,38 @@ import { setPlaybackHighlights, type PlaybackHighlight } from "./playback-highli
 
 const MAX_OBSERVATIONS = 256;
 type PendingOnset = OnsetObservation & { location: LocatedOnset | null };
+type Timed = Pick<OnsetObservation, "at" | "fields">;
+
+/**
+ * Adds `incoming` onsets to `pending` in audio-time order, keeping the newest
+ * `MAX_OBSERVATIONS`, and advances `latest` to the newest audio time due by
+ * `now`. Onsets older than it are dropped: a late batch jumps to its newest
+ * due group and never replays the ones in between.
+ */
+export function advanceOnsets<T extends Timed>(pending: readonly T[], incoming: readonly T[], latest: number, now: number): { pending: T[]; latest: number } {
+  let next = [...pending, ...incoming];
+  if (incoming.length) {
+    // Order by the audio timestamp: device-time estimates can shift between
+    // drains, but simultaneous notes must remain one onset group.
+    next.sort((a, b) => a.fields[0] - b.fields[0]);
+    if (next.length > MAX_OBSERVATIONS) next = next.slice(-MAX_OBSERVATIONS);
+  }
+  for (const onset of next) if (onset.at <= now) latest = Math.max(latest, onset.fields[0]);
+  return { pending: next.filter(onset => onset.fields[0] >= latest), latest };
+}
+
+/** The onsets sounding at `now`: the latest due group, held until another replaces it. */
+export function soundingOnsets<T extends Timed>(pending: readonly T[], latest: number, now: number): T[] {
+  return pending.filter(onset => onset.fields[0] === latest && onset.at <= now);
+}
 
 /** Presents executed events. Never queries patterns or advances a musical clock. */
 export function mountPlaybackObservation(
   view: EditorView,
   draft: Draft,
   engine: AudioEngine,
+  /** The document whose visibility pauses observation. */
+  visibility: Document,
   report: (error: unknown) => void,
 ): { setPlaying(playing: boolean): void; edited(): void; dispose(): void } {
   let playing = false;
@@ -28,40 +54,26 @@ export function mountPlaybackObservation(
     setPlaybackHighlights(view, []);
   }
   function schedule(): void {
-    if (!frame && playing && !faulted && !disposed && !document.hidden) frame = requestAnimationFrame(tick);
+    if (!frame && playing && !faulted && !disposed && !visibility.hidden) frame = requestAnimationFrame(tick);
   }
   function tick(now: number): void {
     frame = 0;
-    if (!playing || disposed || document.hidden) return;
+    if (!playing || disposed || visibility.hidden) return;
     try {
       if (generation !== engine.observationGeneration) {
         generation = engine.observationGeneration;
         clear();
       }
-      const incoming = engine.readOnsets(now).filter(onset => Number.isFinite(onset.at));
-      if (incoming.length) {
-        pending.push(...incoming.map(onset => ({ ...onset, location: null })));
-        // Order by the audio timestamp: device-time estimates can shift between
-        // drains, but simultaneous notes must remain one onset group.
-        pending.sort((a, b) => a.fields[0] - b.fields[0]);
-        if (pending.length > MAX_OBSERVATIONS) pending = pending.slice(-MAX_OBSERVATIONS);
-      }
-      for (const onset of pending) {
-        if (onset.at <= now) latestOnset = Math.max(latestOnset, onset.fields[0]);
-      }
-      // Keep the latest executed group until another onset replaces it. A late
-      // batch jumps to its newest due group; it never replays intermediate notes.
-      pending = pending.filter(onset => onset.fields[0] >= latestOnset);
+      const incoming = engine.readOnsets(now).filter(onset => Number.isFinite(onset.at))
+        .map((onset): PendingOnset => ({ ...onset, location: null }));
+      ({ pending, latest: latestOnset } = advanceOnsets(pending, incoming, latestOnset, now));
       if (pending.length && (changed || incoming.length)) {
         const locations = draft.locateOnsets(pending.map(onset => onset.fields));
         for (let i = 0; i < pending.length; i++) pending[i].location = locations[i];
       }
       changed = false;
-      const highlights: PlaybackHighlight[] = [];
-      for (const onset of pending) {
-        if (onset.fields[0] === latestOnset && onset.at <= now && onset.location) highlights.push(onset.location);
-      }
-      setPlaybackHighlights(view, highlights);
+      setPlaybackHighlights(view, soundingOnsets(pending, latestOnset, now)
+        .flatMap((onset): PlaybackHighlight[] => onset.location ? [onset.location] : []));
       schedule();
     } catch (error) {
       // A broken observation contract must be visible, but must not stop audio.
@@ -78,7 +90,7 @@ export function mountPlaybackObservation(
     clear();
     schedule();
   }
-  document.addEventListener("visibilitychange", visibilityChanged);
+  visibility.addEventListener("visibilitychange", visibilityChanged);
   return {
     setPlaying(value) {
       if (!value) faulted = false;
@@ -95,7 +107,7 @@ export function mountPlaybackObservation(
       if (disposed) return;
       disposed = true;
       cancelAnimationFrame(frame);
-      document.removeEventListener("visibilitychange", visibilityChanged);
+      visibility.removeEventListener("visibilitychange", visibilityChanged);
       clear();
     },
   };

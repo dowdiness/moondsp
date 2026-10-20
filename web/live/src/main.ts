@@ -310,7 +310,7 @@ async function prepareAuthoring(): Promise<void> {
     // No await between reading the document and installing its edit listener.
     const draft = createdDraft = new authoring.Draft(view.state.doc.toString());
     const playback = new player.Player(engine, { draft }, renderPlayback);
-    observation = scope.own(mountPlaybackObservation(view, draft, engine, error => {
+    observation = scope.own(mountPlaybackObservation(view, draft, engine, dom.page.document, error => {
       setLog(`Playback highlighting: ${error instanceof Error ? error.message : String(error)}`, "error");
     }));
     tools = { draft, playback, observation, controls };

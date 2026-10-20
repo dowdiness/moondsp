@@ -62,3 +62,16 @@ export function brightness(samples: ArrayLike<number>, sampleRate: number): numb
   if (total <= 1e-12) return 0;
   return (e1 + 2 * e2 + 3 * e3) / (3 * total);
 }
+
+/**
+ * How a canvas drawing loop runs: not at all while it is not `shown`, at a
+ * slow interval under reduced motion, and otherwise every animation frame.
+ */
+export function drawCadence(shown: boolean, reducedMotion: boolean): "stopped" | "interval" | "frame" {
+  return !shown ? "stopped" : reducedMotion ? "interval" : "frame";
+}
+
+/** Whether the horizon idles at a low rate after a frame: its history is quiet, or frozen with nothing sounding. */
+export function horizonIdles(quiet: boolean, playing: boolean, live: boolean): boolean {
+  return quiet || (!playing && !live);
+}

@@ -29,6 +29,16 @@ const WIDE = /[\u1100-\u115f\u2e80-\u303e\u3041-\u33ff\u3400-\u4dbf\u4e00-\u9fff
 export type Columns = { row: number; wide: number };
 
 /**
+ * Columns from measured CSS pixels: a row `rowWidth` wide of `charWidth`
+ * columns, where a wide character measures `wideWidth` against a digit's
+ * `digitWidth`. Null until the font has a width.
+ */
+export function measuredColumns(rowWidth: number, charWidth: number, wideWidth: number, digitWidth: number): Columns | null {
+  if (!(charWidth > 0) || !(digitWidth > 0)) return null;
+  return { row: Math.floor(rowWidth / charWidth), wide: Math.round(wideWidth / digitWidth * 100) / 100 };
+}
+
+/**
  * Breaks for the top-level expression `node`, given the measured columns and
  * the extra columns drawn at source positions (inline knobs). Pure: no DOM.
  */
@@ -189,16 +199,15 @@ const measurer = ViewPlugin.fromClass(class {
   measure(): void {
     this.view.requestMeasure({
       key: this,
+      // The read phase runs after CodeMirror has drawn its lines, so a line is there to measure.
       read: view => {
         const line = view.contentDOM.querySelector<HTMLElement>(".cm-line");
-        const cw = view.defaultCharacterWidth;
-        if (!line || !(cw > 0)) return null;
+        if (!line) return null;
         const style = getComputedStyle(line);
-        const inner = line.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
         // Canvas text measures the same font and fallbacks without touching the layout.
         probe.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-        const wide = Math.round(probe.measureText("国").width / probe.measureText("0").width * 100) / 100;
-        return { row: Math.floor(inner / cw), wide };
+        return measuredColumns(line.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
+          view.defaultCharacterWidth, probe.measureText("国").width, probe.measureText("0").width);
       },
       write: (next, view) => {
         const current = view.state.field(layout).columns;

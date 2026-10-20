@@ -1,6 +1,6 @@
 import "./output-scope.css";
 import type { AudioEngine } from "./audio";
-import { canvasPixels, signalStats } from "./signal-math";
+import { canvasPixels, drawCadence, signalStats } from "./signal-math";
 
 const SAMPLE_COUNT = 512;
 const MAX_CANVAS_WIDTH = 640;
@@ -87,7 +87,7 @@ export function mountOutputScope(host: OutputScopeHost, engine: Pick<AudioEngine
     draw();
   };
 
-  const active = (): boolean => !disposed && visibility.visibilityState === "visible" && intersecting;
+  const cadence = () => drawCadence(!disposed && visibility.visibilityState === "visible" && intersecting, reducedMotion.matches);
   const stop = (): void => {
     if (frame) cancelAnimationFrame(frame);
     if (slowTimer) window.clearInterval(slowTimer);
@@ -96,19 +96,20 @@ export function mountOutputScope(host: OutputScopeHost, engine: Pick<AudioEngine
   };
   const animate = (): void => {
     frame = 0;
-    if (!active() || reducedMotion.matches) return;
+    if (cadence() !== "frame") return;
     draw();
     frame = requestAnimationFrame(animate);
   };
   const schedule = (): void => {
     stop();
-    if (!active()) return;
-    if (reducedMotion.matches) {
-      draw();
-      slowTimer = window.setInterval(draw, 250);
-      return;
+    switch (cadence()) {
+      case "stopped": return;
+      case "interval":
+        draw();
+        slowTimer = window.setInterval(draw, 250);
+        return;
+      case "frame": frame = requestAnimationFrame(animate);
     }
-    frame = requestAnimationFrame(animate);
   };
 
   const resizeObserver = new ResizeObserver(resize);
