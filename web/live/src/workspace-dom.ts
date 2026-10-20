@@ -56,9 +56,11 @@ export function queryWorkspaceDom(doc: Document) {
     openButton: button("open-score"),
     fileInput: required(doc, "score-file", HTMLInputElement),
     recoveryPanel: required(doc, "saved-drafts", HTMLDetailsElement),
+    recoverySummary: element("saved-drafts-summary"),
     recoveryList: element("saved-draft-list"),
+    page: view,
   };
-  const share: ScoreLinkElements = { button: button("share-score") };
+  const share: ScoreLinkElements = { button: button("share-score"), page: view };
   const examples: HelpExamplesHost = {
     sounds: element("starting-sounds"),
     featured: element("examples"),
@@ -66,6 +68,8 @@ export function queryWorkspaceDom(doc: Document) {
   };
 
   return {
+    /** The window, for shells that watch the page itself rather than an element. */
+    page: view,
     editor: element("editor"),
     transport,
     horizon,

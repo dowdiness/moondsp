@@ -24,13 +24,16 @@ export type ScoreSessionElements = {
   openButton: HTMLButtonElement;
   fileInput: HTMLInputElement;
   recoveryPanel: HTMLDetailsElement;
+  recoverySummary: HTMLElement;
   recoveryList: HTMLElement;
+  /** The window whose storage keeps drafts and whose page events trigger saves. */
+  page: Window;
 };
 
 export function mountScoreSession(
   elements: ScoreSessionElements, deps: { view: EditorView; notice: Notice },
 ): Disposable & { changed(): void } {
-  const { saveStatus, saveButton, openButton, fileInput, recoveryPanel, recoveryList } = elements;
+  const { saveStatus, saveButton, openButton, fileInput, recoveryPanel, recoverySummary, recoveryList, page } = elements;
   const { view, notice } = deps;
   const say = (message: string): void => notice.say(message);
   let pickerDoc: typeof view.state.doc | undefined;
@@ -45,16 +48,16 @@ export function mountScoreSession(
   // and only after its replacement is durable. No shared read/modify/write.
   const checkpoint = (source: string): void => {
     const key = `${RECOVERY_PREFIX}${crypto.randomUUID()}`;
-    window.localStorage.setItem(key, JSON.stringify({ source, savedAt: Date.now() }));
+    page.localStorage.setItem(key, JSON.stringify({ source, savedAt: Date.now() }));
     const previous = recoveryKey;
     recoveryKey = key;
-    if (previous) window.localStorage.removeItem(previous);
+    if (previous) page.localStorage.removeItem(previous);
   };
 
   const refreshRecoveries = (): void => {
     let drafts;
     try {
-      const storage = window.localStorage;
+      const storage = page.localStorage;
       drafts = recoveryDrafts(Array.from({ length: storage.length }, (_, index) => storage.key(index))
         .filter((key): key is string => key !== null)
         .map(key => [key, storage.getItem(key)] as const), recoveryKey);
@@ -86,11 +89,11 @@ export function mountScoreSession(
       discard.type = "button";
       discard.textContent = "Delete saved draft";
       discard.addEventListener("click", () => {
-        if (!window.confirm("Delete this saved draft? This cannot be undone. Your open score is unchanged.")) return;
+        if (!page.confirm("Delete this saved draft? This cannot be undone. Your open score is unchanged.")) return;
         try {
-          window.localStorage.removeItem(key);
+          page.localStorage.removeItem(key);
           refreshRecoveries();
-          recoveryPanel.querySelector("summary")?.focus();
+          recoverySummary.focus();
         } catch {
           say("Could not delete the saved draft. Your score is unchanged.");
         }
@@ -115,7 +118,7 @@ export function mountScoreSession(
   );
   const saveNow = (initialize = false): void => {
     if (timer !== undefined) {
-      window.clearTimeout(timer);
+      page.clearTimeout(timer);
       timer = undefined;
     }
     if (!dirty) return;
@@ -124,7 +127,7 @@ export function mountScoreSession(
       // Synchronous protection must precede the shared write, including pagehide.
       // A failed checkpoint prevents publishing a score we could not recover.
       if (!initialize) checkpoint(source);
-      const stored = window.localStorage.getItem(STORAGE_KEY);
+      const stored = page.localStorage.getItem(STORAGE_KEY);
       // Only the first mount may establish a previously absent saved score.
       if (initialize && stored === null) savedSource = null;
       const decision = saveDecision(stored, savedSource, source);
@@ -132,7 +135,7 @@ export function mountScoreSession(
         warnConflict();
         return;
       }
-      if (decision === "write") window.localStorage.setItem(STORAGE_KEY, source);
+      if (decision === "write") page.localStorage.setItem(STORAGE_KEY, source);
       savedSource = source;
       dirty = false;
       setSaveStatus("Saved locally");
@@ -145,20 +148,20 @@ export function mountScoreSession(
   const changed = (): void => {
     if (disposed) return;
     dirty = true;
-    if (timer !== undefined) window.clearTimeout(timer);
+    if (timer !== undefined) page.clearTimeout(timer);
     setSaveStatus("Saving…");
-    timer = window.setTimeout(saveNow, SAVE_DELAY_MS);
+    timer = page.setTimeout(saveNow, SAVE_DELAY_MS);
   };
   const onPageHide = (): void => saveNow();
   // Storage events reach only tabs that can use storage.
   const onStorage = (event: StorageEvent): void => {
-    if (event.storageArea !== window.localStorage) return;
+    if (event.storageArea !== page.localStorage) return;
     // Do not replace buttons while someone is inspecting or using a snapshot.
     // Immutable keys make an older displayed snapshot safe to restore/delete.
     if (!recoveryPanel.open &&
         (event.key === null || event.key.startsWith(RECOVERY_PREFIX))) refreshRecoveries();
     if (event.key !== null && event.key !== STORAGE_KEY) return;
-    if (window.localStorage.getItem(STORAGE_KEY) !== savedSource) warnConflict();
+    if (page.localStorage.getItem(STORAGE_KEY) !== savedSource) warnConflict();
   };
 
   const download = (): void => {
@@ -167,7 +170,7 @@ export function mountScoreSession(
     link.href = url;
     link.download = "moondsp-score.mini";
     link.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    page.setTimeout(() => URL.revokeObjectURL(url), 0);
     say("Score downloaded as moondsp-score.mini.");
   };
 
@@ -205,14 +208,14 @@ export function mountScoreSession(
   };
   const onRecoveryToggle = (): void => {
     // The queued disclosure event can arrive after a user has focused a draft.
-    if (!recoveryList.contains(document.activeElement)) refreshRecoveries();
+    if (!recoveryList.contains(page.document.activeElement)) refreshRecoveries();
   };
 
   saveButton.addEventListener("click", download);
   openButton.addEventListener("click", openPicker);
   fileInput.addEventListener("change", onFileChange);
-  window.addEventListener("pagehide", onPageHide);
-  window.addEventListener("storage", onStorage);
+  page.addEventListener("pagehide", onPageHide);
+  page.addEventListener("storage", onStorage);
   recoveryPanel.addEventListener("toggle", onRecoveryToggle);
 
   // A matching stored score is already saved; do not rewrite it on mount or exit.
@@ -228,8 +231,8 @@ export function mountScoreSession(
       saveButton.removeEventListener("click", download);
       openButton.removeEventListener("click", openPicker);
       fileInput.removeEventListener("change", onFileChange);
-      window.removeEventListener("pagehide", onPageHide);
-      window.removeEventListener("storage", onStorage);
+      page.removeEventListener("pagehide", onPageHide);
+      page.removeEventListener("storage", onStorage);
       recoveryPanel.removeEventListener("toggle", onRecoveryToggle);
     },
   };

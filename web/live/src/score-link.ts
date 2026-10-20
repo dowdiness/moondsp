@@ -70,10 +70,13 @@ export function longLinkNote(length: number): string {
 
 export type ScoreLinkElements = {
   button: HTMLButtonElement;
+  /** The window whose address carries shared scores. */
+  page: Window;
 };
 
 export function mountScoreLink(elements: ScoreLinkElements, deps: { view: EditorView; notice: Notice }): Disposable {
-  const { button } = elements;
+  const { button, page } = elements;
+  const { location, history } = page;
   const { view, notice } = deps;
   let disposed = false;
   const base = (): string => `${location.origin}${location.pathname}${location.search}`;
@@ -129,13 +132,13 @@ export function mountScoreLink(elements: ScoreLinkElements, deps: { view: Editor
 
   const onHashChange = (): void => { void openFromFragment(); };
   button.addEventListener("click", share);
-  window.addEventListener("hashchange", onHashChange);
+  page.addEventListener("hashchange", onHashChange);
   void openFromFragment();
   return {
     dispose(): void {
       disposed = true;
       button.removeEventListener("click", share);
-      window.removeEventListener("hashchange", onHashChange);
+      page.removeEventListener("hashchange", onHashChange);
     },
   };
 }
