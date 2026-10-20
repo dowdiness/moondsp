@@ -58,9 +58,9 @@ function longSource(): string {
 }
 
 test("short authoring startup never shows a loading notice", async ({ page }) => {
-  const time = new Date("2026-01-01T00:00:00Z");
-  await page.clock.install({ time });
-  await page.clock.pauseAt(time);
+  // The installed clock runs until paused, so pause at a time it has not reached yet.
+  await page.clock.install({ time: new Date("2026-01-01T00:00:00Z") });
+  await page.clock.pauseAt(new Date("2026-01-01T00:01:00Z"));
   const gate = gateAuthoringRequest();
   await page.route(authoringAsset, async route => {
     gate.markIntercepted();

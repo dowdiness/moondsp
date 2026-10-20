@@ -91,7 +91,14 @@ test.describe("touch chord tones", () => {
     for (const [pitch, delta] of [[64, -1], [67, 1]]) {
       const point = await centerOf(tone(page, pitch));
       await client.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ ...point }] });
-      await client.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: point.x, y: point.y - delta * 24 }] });
+      // Move over a few frames and rest before lifting, as a finger does. A
+      // 24 px jump lifted at once is a fling, and Chrome swallows the next tap
+      // as the one that stops it.
+      for (let step = 1; step <= 4; step++) {
+        await client.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: point.x, y: point.y - delta * 6 * step }] });
+        await page.waitForTimeout(16);
+      }
+      await page.waitForTimeout(150);
       await client.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
     }
     const edited = source.replace("C@2", "{60,63,68}@2");
