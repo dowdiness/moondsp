@@ -4,7 +4,13 @@ import { history, historyKeymap, isolateHistory } from "@codemirror/commands";
 import type { SyntaxNode, Tree } from "@lezer/common";
 import { syntaxTree } from "@codemirror/language";
 
-type Target = { from: number; to: number; label: string; step: number; value: string; notice: string };
+/** A knob's parameter: how it is named, the range it shows, and how a gesture moves it. */
+type Param = Readonly<{ label: string; unit: string; min: number; max: number; step: number; scale: "linear" | "log" }>;
+const GAIN: Param = { label: "Gain", unit: "", min: 0, max: 2, step: 0.01, scale: "linear" };
+const CUTOFF: Param = { label: "Cutoff Hz", unit: " Hz", min: 20, max: 20000, step: 10, scale: "log" };
+const Q: Param = { label: "Q", unit: "", min: 0.1, max: 10, step: 0.01, scale: "linear" };
+
+type Target = { from: number; to: number; param: Param; value: string; notice: string };
 const lastInlineEdit = StateField.define<boolean>({
   create: () => false,
   update: (value, transaction) => transaction.docChanged ? transaction.isUserEvent("input.type.inline") : value,
@@ -37,13 +43,12 @@ function controlTargets(tree: Tree, source: string): Target[] {
       children.filter(child => child.name === "Number").forEach((number, index) => {
         const value = text(number);
         if (!Number.isFinite(Number(value))) return;
-        const label = name === "gain" ? "Gain" : index === 0 ? "Cutoff Hz" : "Q";
+        const param = name === "gain" ? GAIN : index === 0 ? CUTOFF : Q;
         for (const earlier of local) {
-          if (earlier.label === label) earlier.notice = "Overridden by a later modifier in this chain.";
+          if (earlier.param === param) earlier.notice = "Overridden by a later modifier in this chain.";
         }
-        local.push({ from: number.from, to: number.to, value, label,
-          notice: "Source edit · browser note/chord voices only; drums are unaffected.",
-          step: name === "lpf" && index === 0 ? 10 : 0.01 });
+        local.push({ from: number.from, to: number.to, value, param,
+          notice: "Source edit · browser note/chord voices only; drums are unaffected." });
       });
     }
     targets.push(...local);
@@ -64,10 +69,14 @@ export function isNumberLiteral(value: string): boolean {
   return /^-?(\d+(\.\d*)?|\.\d+)$/.test(value) && Number.isFinite(Number(value));
 }
 
-/** The value a knob drag `dy` pixels upward from `start` sets; cutoff moves by octaves per 400 px. */
-export function dragValue(label: string, start: number, dy: number, step: number, fine: boolean): number {
-  const delta = dy * step * (fine ? 0.1 : 1);
-  return label === "Cutoff Hz" && start > 0
+/**
+ * The value a knob drag `dy` pixels upward from `start` sets. A logarithmic
+ * parameter moves by octaves per 400 px; from zero, which no ratio can leave,
+ * it moves by steps.
+ */
+export function dragValue(param: Param, start: number, dy: number, fine: boolean): number {
+  const delta = dy * param.step * (fine ? 0.1 : 1);
+  return param.scale === "log" && start > 0
     ? Math.round(start * 2 ** (delta / 400))
     : Math.round((start + delta) * 10000) / 10000;
 }
@@ -77,11 +86,11 @@ export function nudgeValue(value: number, step: number, fine: boolean, up: boole
   return Math.round((value + step * (fine ? 0.1 : 1) * (up ? 1 : -1)) * 10000) / 10000;
 }
 
-/** A knob's displayed range, and how far through it `value` sits in [0, 1] (logarithmic for cutoff). */
-export function knobPosition(label: string, value: number): { min: number; max: number; amount: number } {
-  const [min, max] = label === "Gain" ? [0, 2] : label === "Q" ? [0.1, 10] : [20, 20000];
-  const fraction = label === "Cutoff Hz" ? Math.log(Math.max(value, min) / min) / Math.log(max / min) : (value - min) / (max - min);
-  return { min, max, amount: Math.max(0, Math.min(1, fraction)) };
+/** How far through its parameter's range `value` sits, in [0, 1]. */
+export function knobAmount(param: Param, value: number): number {
+  const { min, max } = param;
+  const fraction = param.scale === "log" ? Math.log(Math.max(value, min) / min) / Math.log(max / min) : (value - min) / (max - min);
+  return Math.max(0, Math.min(1, fraction));
 }
 
 /** Where the number field opens below a knob whose box ends at (`left`, `bottom`), kept inside a `width` × `height` viewport. */
@@ -110,11 +119,11 @@ class Control {
     this.handle.setAttribute("role", "slider");
     this.handle.setAttribute("aria-orientation", "vertical");
     this.handle.innerHTML = '<svg viewBox="0 0 64 64" aria-hidden="true"><circle class="knob-face" cx="32" cy="32" r="27"/><path class="knob-pointer" d="M32 10V26"/></svg>';
-    this.handle.setAttribute("aria-label", `Adjust ${target.label}`);
+    this.handle.setAttribute("aria-label", `Adjust ${target.param.label}`);
     this.handle.setAttribute("aria-description", "Drag up or down. Shift for fine adjustment. Enter to type a number.");
     this.input.type = "text";
     this.input.inputMode = "decimal";
-    this.input.setAttribute("aria-label", target.label);
+    this.input.setAttribute("aria-label", target.param.label);
     this.input.title = "Enter to apply; Escape or leaving the field to cancel";
     this.input.value = target.value;
     this.input.popover = "auto";
@@ -135,7 +144,7 @@ class Control {
       if (!gesture) return;
       const dy = gesture.y - event.clientY;
       if (dy === 0 && !gesture.changed) return;
-      this.write(String(dragValue(this.target.label, gesture.value, dy, this.target.step, event.shiftKey)), gesture);
+      this.write(String(dragValue(this.target.param, gesture.value, dy, event.shiftKey)), gesture);
     };
     this.handle.onpointerup = () => {
       const clicked = this.gesture !== null && !this.gesture.changed;
@@ -158,7 +167,7 @@ class Control {
       }
       if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
       event.preventDefault();
-      this.write(String(nudgeValue(Number(this.target.value), this.target.step, event.shiftKey, event.key === "ArrowUp")));
+      this.write(String(nudgeValue(Number(this.target.value), this.target.param.step, event.shiftKey, event.key === "ArrowUp")));
     };
     this.input.onkeydown = event => {
       if (event.key === "Enter") {
@@ -178,7 +187,7 @@ class Control {
     };
     this.page.addEventListener("blur", this.blur);
   }
-  get label(): string { return this.target.label; }
+  get param(): Param { return this.target.param; }
   private editNumber(): void {
     const rect = this.handle.getBoundingClientRect();
     const { left, top } = numberFieldPosition(rect.left, rect.bottom, this.page.innerWidth, this.page.innerHeight);
@@ -227,14 +236,15 @@ class Control {
   }
   private renderKnob(): void {
     const value = Number(this.target.value);
-    const { min, max, amount } = knobPosition(this.target.label, value);
+    const { param } = this.target;
+    const amount = knobAmount(param, value);
     this.handle.style.setProperty("--knob-angle", `${-135 + amount * 270}deg`);
-    this.hint.textContent = `${this.target.label} · ${this.target.value}\nDrag ↑↓ · Shift: fine · Click: type\n${this.target.notice}`;
+    this.hint.textContent = `${this.target.param.label} · ${this.target.value}\nDrag ↑↓ · Shift: fine · Click: type\n${this.target.notice}`;
     this.handle.setAttribute("aria-description", `Drag up or down. Shift for fine adjustment. Enter to type a number. ${this.target.notice}`);
-    this.handle.setAttribute("aria-valuemin", String(Math.min(min, value)));
-    this.handle.setAttribute("aria-valuemax", String(Math.max(max, value)));
+    this.handle.setAttribute("aria-valuemin", String(Math.min(param.min, value)));
+    this.handle.setAttribute("aria-valuemax", String(Math.max(param.max, value)));
     this.handle.setAttribute("aria-valuenow", this.target.value);
-    this.handle.setAttribute("aria-valuetext", `${this.target.value}${this.target.label === "Cutoff Hz" ? " Hz" : ""}`);
+    this.handle.setAttribute("aria-valuetext", `${this.target.value}${this.target.param.unit}`);
   }
   private finish(): void {
     const changed = this.gesture?.changed;
@@ -253,7 +263,7 @@ class ControlWidget extends WidgetType {
   toDOM(view: EditorView): HTMLElement { return new Control(view, this.target, this.doc).dom; }
   override updateDOM(dom: HTMLElement): boolean {
     const control = controls.get(dom);
-    if (!control || control.label !== this.target.label) return false;
+    if (!control || control.param !== this.target.param) return false;
     control.update(this.target, this.doc);
     return true;
   }
