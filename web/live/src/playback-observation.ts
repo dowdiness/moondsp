@@ -64,8 +64,7 @@ export function mountPlaybackObservation(
         generation = engine.observationGeneration;
         clear();
       }
-      const incoming = engine.readOnsets(now).filter(onset => Number.isFinite(onset.at))
-        .map((onset): PendingOnset => ({ ...onset, location: null }));
+      const incoming = engine.readOnsets(now).map((onset): PendingOnset => ({ ...onset, location: null }));
       ({ pending, latest: latestOnset } = advanceOnsets(pending, incoming, latestOnset, now));
       if (pending.length && (changed || incoming.length)) {
         const locations = draft.locateOnsets(pending.map(onset => onset.fields));

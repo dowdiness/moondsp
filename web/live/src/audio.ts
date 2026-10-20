@@ -118,11 +118,10 @@ export class AudioEngine {
     const rows = state.graph.onsets.read(this.onsetEpoch);
     if (!rows.length) return [];
     const ctx = state.graph.ctx;
-    const timestamp = ctx.getOutputTimestamp?.();
-    const offset = timestamp && typeof timestamp.contextTime === "number" &&
-      typeof timestamp.performanceTime === "number" && Number.isFinite(timestamp.contextTime) &&
-      Number.isFinite(timestamp.performanceTime) && timestamp.performanceTime > 0
-      ? timestamp.performanceTime - timestamp.contextTime * 1000
+    const { contextTime = 0, performanceTime = 0 } = ctx.getOutputTimestamp();
+    const outputStarted = performanceTime > 0;
+    const offset = outputStarted
+      ? performanceTime - contextTime * 1000
       : now - ctx.currentTime * 1000 + ((ctx.baseLatency || 0) + (ctx.outputLatency || 0)) * 1000;
     return rows.map(fields => ({ fields, at: offset + fields[0] * 1000 }));
   }

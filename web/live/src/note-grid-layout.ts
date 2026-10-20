@@ -287,19 +287,24 @@ export function soundingNodes(events: readonly Timed[], span: number, time: numb
 
 /** Whether `nodes` is a phrase range: several sources, or one group. */
 export function isPhraseRange(projection: NotationProjection, nodes: readonly number[]): boolean {
-  return nodes.length > 1 || projection.nodes[nodes[0]]?.kind === "group";
+  const oneGroup = nodes.length === 1 && projection.nodes[nodes[0]].kind === "group";
+  return nodes.length > 1 || oneGroup;
 }
 
-/** The node of `range`'s sequence that contains `hit`. */
+/**
+ * The node of `range`'s sequence that contains `hit`: `hit` or its ancestor
+ * whose parent is the range's. At the top level only `range`'s own nodes count.
+ * Null when `hit` is outside that sequence.
+ */
 export function rangeSibling(projection: NotationProjection, hit: number, range: readonly number[]): number | null {
   if (!range.length) return null;
-  const parent = projection.nodes[range[0]].parent;
-  if (parent === null) return range.includes(hit) ? hit : null;
+  const sequence = projection.nodes[range[0]].parent;
+  if (sequence === null) return range.includes(hit) ? hit : null;
   let node = hit;
-  while (projection.nodes[node]?.parent !== parent) {
-    const next = projection.nodes[node]?.parent;
-    if (next === undefined || next === null) return null;
-    node = next;
+  while (projection.nodes[node].parent !== sequence) {
+    const parent = projection.nodes[node].parent;
+    if (parent === null) return null;
+    node = parent;
   }
   return node;
 }

@@ -148,10 +148,11 @@ export function mountStructureStrip(
       return;
     }
     if (horizontal) {
-      const nodes = phrase.structure.nodes.flatMap((node, index) => node.kind === "group" || node.kind === "atom" ? [index] : []);
-      const current = chosen ?? selected ?? -1;
-      const position = Math.max(0, nodes.indexOf(current));
-      controls.select(nodes[Math.max(0, Math.min(nodes.length - 1, position + (event.key === "ArrowRight" ? 1 : -1)))]);
+      const selectable = phrase.structure.nodes.flatMap((node, index) => node.kind === "group" || node.kind === "atom" ? [index] : []);
+      const current = chosen ?? selected;
+      const position = current === null ? 0 : Math.max(0, selectable.indexOf(current));
+      const step = event.key === "ArrowRight" ? 1 : -1;
+      controls.select(selectable[Math.max(0, Math.min(selectable.length - 1, position + step))]);
       svg.focus({ preventScroll: true });
       event.preventDefault();
     }

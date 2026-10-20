@@ -28,21 +28,38 @@ const WIDE = /[\u1100-\u115f\u2e80-\u303e\u3041-\u33ff\u3400-\u4dbf\u4e00-\u9fff
 /** Measured code columns: the row width, and how wide a wide character is. */
 export type Columns = { row: number; wide: number };
 
+/** CSS pixel widths measured from the editor: a row's text, one code column, a wide character, and a digit. */
+export type MeasuredWidths = Readonly<{ rowText: number; column: number; wideGlyph: number; digitGlyph: number }>;
+
 /**
- * Columns from measured CSS pixels: a row `rowWidth` wide of `charWidth`
- * columns, where a wide character measures `wideWidth` against a digit's
- * `digitWidth`. Null until the font has a width.
+ * The columns those widths give: how many fit in a row, and how many a wide
+ * character takes, relative to a digit (to two decimals).
  */
-export function measuredColumns(rowWidth: number, charWidth: number, wideWidth: number, digitWidth: number): Columns | null {
-  if (!(charWidth > 0) || !(digitWidth > 0)) return null;
-  return { row: Math.floor(rowWidth / charWidth), wide: Math.round(wideWidth / digitWidth * 100) / 100 };
+export function measuredColumns({ rowText, column, wideGlyph, digitGlyph }: MeasuredWidths): Columns {
+  return { row: Math.floor(rowText / column), wide: Math.round(wideGlyph / digitGlyph * 100) / 100 };
+}
+
+/**
+ * Columns the UTF-16 code unit at `at` takes, where a wide character takes
+ * `wide`. A surrogate pair (emoji, rare ideographs) counts once, as wide.
+ */
+function codeUnitColumns(source: string, at: number, wide: number): number {
+  const code = source.charCodeAt(at);
+  const startsPair = code >= 0xd800 && code <= 0xdbff;
+  const endsPair = code >= 0xdc00 && code <= 0xdfff;
+  if (endsPair) return 0;
+  return startsPair || (code >= 0x1100 && WIDE.test(source[at])) ? wide : 1;
+}
+
+function sameColumns(a: Columns, b: Columns): boolean {
+  return a.row === b.row && a.wide === b.wide;
 }
 
 /**
  * Breaks for the top-level expression `node`, given the measured columns and
- * the extra columns drawn at source positions (inline knobs). Pure: no DOM.
+ * the columns of widgets drawn at source positions (inline knobs). Pure: no DOM.
  */
-export function layoutStatement(source: string, node: SyntaxNode, columns: Columns, extra: ReadonlyMap<number, number> = new Map()): { breaks: Break[]; boxes: Box[] } {
+export function layoutStatement(source: string, node: SyntaxNode, columns: Columns, widgetColumns: ReadonlyMap<number, number>): { breaks: Break[]; boxes: Box[] } {
   const lineStart = source.lastIndexOf("\n", node.from - 1) + 1;
   const breaks: Break[] = [];
   const boxes: Box[] = [];
@@ -50,13 +67,8 @@ export function layoutStatement(source: string, node: SyntaxNode, columns: Colum
   if (source.slice(lineStart, node.to).includes("\n")) return { breaks, boxes };
   const width = (from: number, to: number) => {
     let total = 0;
-    for (let at = from; at < to; at++) {
-      const code = source.charCodeAt(at);
-      // A surrogate pair (emoji, rare ideographs) counts once, as wide.
-      if (code >= 0xdc00 && code <= 0xdfff) continue;
-      total += code < 0x1100 ? 1 : code >= 0xd800 && code <= 0xdbff || WIDE.test(source[at]) ? columns.wide : 1;
-    }
-    for (const [pos, cols] of extra) if (from <= pos && pos < to) total += cols;
+    for (let at = from; at < to; at++) total += codeUnitColumns(source, at, columns.wide);
+    for (const [pos, widgetWidth] of widgetColumns) if (from <= pos && pos < to) total += widgetWidth;
     return total;
   };
   let pos = node.from;
@@ -154,11 +166,11 @@ function decorations(state: EditorState, columns: Columns | null): DecorationSet
   if (!columns || columns.row <= 0) return Decoration.none;
   const source = state.doc.toString();
   const tree = syntaxTree(state);
-  const knobs = new Map(controlPositions(tree, source).map(pos => [pos, KNOB_COLUMNS]));
+  const knobColumns = new Map(controlPositions(tree, source).map(pos => [pos, KNOB_COLUMNS]));
   const ranges: Range<Decoration>[] = [];
   tree.iterate({ enter: ref => {
     if (ref.name !== "Expression") return;
-    const { breaks, boxes } = layoutStatement(source, ref.node, columns, knobs);
+    const { breaks, boxes } = layoutStatement(source, ref.node, columns, knobColumns);
     // The break holds only the line break and the row's indent pads its start, so
     // nothing but text and knobs sits between rows and End and Home reach each
     // row's end and start; the narrow-screen layout test covers both.
@@ -191,7 +203,19 @@ const layout = StateField.define<{ columns: Columns | null; decorations: Decorat
   provide: field => EditorView.decorations.from(field, value => value.decorations),
 });
 
-const probe = document.createElement("canvas").getContext("2d")!;
+const glyphCanvas = document.createElement("canvas").getContext("2d")!;
+
+/** The width a code row's text gets: the content box minus each line's inset, registered as CSS lengths. */
+function rowTextWidth(content: HTMLElement, style: CSSStyleDeclaration): number {
+  const lengths = [style.paddingLeft, style.paddingRight, style.getPropertyValue("--line-start"), style.getPropertyValue("--line-end")];
+  return content.clientWidth - lengths.reduce((sum, length) => sum + parseFloat(length), 0);
+}
+
+/** How wide the code font draws a wide character and a digit, measured on a canvas so the layout is untouched. */
+function glyphWidths(style: CSSStyleDeclaration): { wideGlyph: number; digitGlyph: number } {
+  glyphCanvas.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+  return { wideGlyph: glyphCanvas.measureText("国").width, digitGlyph: glyphCanvas.measureText("0").width };
+}
 
 const measurer = ViewPlugin.fromClass(class {
   constructor(readonly view: EditorView) { this.measure(); }
@@ -199,20 +223,18 @@ const measurer = ViewPlugin.fromClass(class {
   measure(): void {
     this.view.requestMeasure({
       key: this,
-      // The content element carries the font and, as registered lengths, the line inset.
+      // The content element carries the code font and the line inset.
       read: view => {
-        const content = view.contentDOM;
-        const style = getComputedStyle(content);
-        // Canvas text measures the same font and fallbacks without touching the layout.
-        probe.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-        const inset = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight)
-          + parseFloat(style.getPropertyValue("--line-start")) + parseFloat(style.getPropertyValue("--line-end"));
-        return measuredColumns(content.clientWidth - inset,
-          view.defaultCharacterWidth, probe.measureText("国").width, probe.measureText("0").width);
+        const style = getComputedStyle(view.contentDOM);
+        return measuredColumns({
+          rowText: rowTextWidth(view.contentDOM, style),
+          column: view.defaultCharacterWidth,
+          ...glyphWidths(style),
+        });
       },
       write: (next, view) => {
         const current = view.state.field(layout).columns;
-        if (!next || (current && current.row === next.row && current.wide === next.wide)) return;
+        if (current && sameColumns(current, next)) return;
         // Updates may not start inside a measure cycle; a microtask still lands before paint.
         queueMicrotask(() => view.dispatch({ effects: setMeasure.of(next) }));
       },
