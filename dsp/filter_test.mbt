@@ -76,3 +76,40 @@ test "biquad respects context block size" {
   @debug.assert_eq(buffer.get(2), 0.0)
   @debug.assert_eq(buffer.get(3), 0.0)
 }
+
+///|
+test "biquad impulse preserves core trigonometric rounding across cutoff range" {
+  let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=1)
+  let filter = @dsp.Biquad::new()
+  let cutoffs = [ for i in 1..<4096 => i.to_double() * 24000.0 / 4096.0 ]
+  // Both sides of reduction boundaries, including the near-Nyquist limit.
+  for boundary in [6000.0, 12000.0, 18000.0, 23999.99999999999] {
+    let bits = boundary.reinterpret_as_uint64()
+    for offset in 0..<=8 {
+      cutoffs.push((bits - offset.to_uint64()).reinterpret_as_double())
+      let above = (bits + offset.to_uint64()).reinterpret_as_double()
+      if above < 24000.0 {
+        cutoffs.push(above)
+      }
+    }
+  }
+  for cutoff in cutoffs {
+    let angle = 2.0 * @math.PI * cutoff / 48000.0
+    let cosine = @math.cos(angle)
+    let alpha = @math.sin(angle) / (2.0 * 0.73)
+    let inverse = 1.0 / (1.0 + alpha)
+    for mode in [@dsp.LowPass, @dsp.HighPass, @dsp.BandPass] {
+      let numerator = match mode {
+        LowPass => (1.0 - cosine) * 0.5
+        HighPass => (1.0 + cosine) * 0.5
+        BandPass => alpha
+      }
+      filter.reset()
+      assert_true(filter.update(context, mode, cutoff, 0.73))
+      assert_eq(filter.tick(1.0), numerator * inverse)
+    }
+  }
+  let huge = @dsp.DspContext::new(sample_rate=1.0e308, block_size=1)
+  assert_false(filter.update(huge, @dsp.LowPass, 4.0e307, 0.73))
+  assert_eq(filter.tick(1.0), 0.0)
+}

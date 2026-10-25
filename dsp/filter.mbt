@@ -70,8 +70,13 @@ pub fn Biquad::update(
   }
 
   let w0 = 2.0 * @math.PI * cutoff / sample_rate
-  let cos_w0 = @math.cos(w0)
-  let alpha = @math.sin(w0) / (2.0 * q)
+  // Finite inputs can still overflow the multiplication above.
+  if !is_finite(w0) {
+    self.invalidate()
+    return false
+  }
+  let cos_w0 = cos(w0)
+  let alpha = sin(w0) / (2.0 * q)
   let a0 = 1.0 + alpha
   if !is_finite(a0) || a0 <= 0.0 {
     self.invalidate()

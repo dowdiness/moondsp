@@ -15,9 +15,9 @@
 // Adapted from moonbitlang/core math/{trig_double_nonjs,utils}.mbt shipped
 // with moonc v0.10.12+1634b282e (2026-09-07):
 // https://github.com/moonbitlang/core/tree/main/math
-// Changes: retain only the oscillator's nonnegative, at-most-one-turn range;
+// Changes: retain only the oscillator/filter nonnegative, at-most-one-turn range;
 // replace rem_pio2's scratch array with scalars. Coefficients and floating-point
-// evaluation order are unchanged. Do not use this as a general-purpose sin.
+// evaluation order are unchanged. Do not use this as general-purpose trig.
 
 ///|
 const SINE_PIO2_1 : Double = 1.5707963267341256e+00
@@ -42,11 +42,40 @@ const SINE_PIO2_3T : Double = 8.4784276603688996e-32
 // Rounding while wrapping a tiny negative phase can produce exactly 1.
 fn sine_for_phase(phase : Double) -> Double {
   let x = phase * 2.0 * @math.PI
+  sin(x)
+}
+
+///|
+// Nonnegative angles up to one turn; shared by oscillators and biquads.
+fn sin(x : Double) -> Double {
+  trig_kernel(x, cosine=false)
+}
+
+///|
+// Nonnegative angles up to one turn; shared by oscillators and biquads.
+fn cos(x : Double) -> Double {
+  trig_kernel(x, cosine=true)
+}
+
+///|
+fn trig_kernel(x : Double, cosine~ : Bool) -> Double {
   guard !x.is_nan() else { return x }
-  guard x > 0.785398163397448309616 else { return sine_kernel(x, 0.0, false) }
+  guard x > 0.785398163397448309616 else {
+    return if cosine {
+      sine_cosine_kernel(x, 0.0)
+    } else {
+      sine_kernel(x, 0.0, false)
+    }
+  }
   let ix = sine_high_word(x)
   // Preserve rem_pio2's high-word cutoff, which differs from sin's cutoff.
-  guard ix > 0x3fe921fb else { return sine_kernel(x, 0.0, true) }
+  guard ix > 0x3fe921fb else {
+    return if cosine {
+      sine_cosine_kernel(x, 0.0)
+    } else {
+      sine_kernel(x, 0.0, true)
+    }
+  }
   let mut y0 = 0.0
   let mut y1 = 0.0
   let quadrant = if ix < 0x4002d97c {
@@ -93,7 +122,7 @@ fn sine_for_phase(phase : Double) -> Double {
     y1 = r - y0 - w
     n
   }
-  match quadrant & 3 {
+  match (quadrant + (if cosine { 1 } else { 0 })) & 3 {
     0 => sine_kernel(y0, y1, true)
     1 => sine_cosine_kernel(y0, y1)
     2 => -sine_kernel(y0, y1, true)
