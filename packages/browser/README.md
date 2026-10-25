@@ -4,6 +4,29 @@
 
 Applications using this package do not need the MoonBit toolchain or moondsp source tree.
 
+## Choose an API
+
+| Use case | Recommended API | Resource owner |
+|---|---|---|
+| Realtime instrument with Power on/off | [`AudioPower`](#package-owned-realtime-audio) from `@moondsp/browser/audio` | Package owns the context, engine, output connection, and cleanup |
+| Existing context, custom routing, or an OfflineAudioContext | [`GraphEngine`](#2-caller-owned-context-example) from `@moondsp/browser` | Application owns the context and output routing; close the engine before the context |
+| Graph creation without connection indices | `Graph(params, build)` | One synchronous builder owns all node references |
+| Volume, cutoff, note-on/off, or a parameter-and-gate transaction | [`sound.update()`](#updating-sound-prefer-named-parameters) | Application supplies named parameters and ordered gates; each update is atomic |
+
+Start with `AudioPower` unless you need to own the context. It handles browser
+gesture admission, cancellation, and repeated power cycles. Do not implement a
+Worklet or call `graph_host_*` exports in ordinary application code.
+
+Both entry points use the same mono graph engine. Mount **all** session graphs
+before the first `play()`; pausing or unmounting does not reopen mounting.
+Neither provides timestamped automation, live topology replacement, or
+polyphonic note allocation. Pattern/song playback in the live editor is a
+separate integration, not a feature of this graph wrapper.
+
+For a complete application with failure recovery and keyboard handling, use the
+[basic synth examples](../../examples/basic-synth/README.md). For host-independent
+MoonBit rendering, use the [engine examples](../../engine/README.mbt.md).
+
 ## Architecture context
 
 In moondsp's web integration architecture, `@moondsp/browser` acts as the primary package distribution layer between web applications and MoonBit AudioWorklets:
@@ -58,10 +81,25 @@ Install the generated tarball in your web application:
 npm install /path/to/moondsp/packages/browser/moondsp-browser-0.6.0.tgz
 ```
 
-### 2. TypeScript / JavaScript usage
+This is a local distribution workflow, not a claim of npm-registry publication.
+Keep the packaged JS, Worklet, and Wasm from the same build. Vite users should
+follow the [example configuration](../../examples/basic-synth/vanilla/vite.config.ts)
+to preserve package-relative asset URLs during development.
+
+After installation, most realtime apps should start with the
+[package-owned example](#package-owned-realtime-audio) below. The following
+example is for applications that deliberately manage their own context.
+
+### 2. Caller-owned context example
+
+This illustrates setup followed by a separate Start gesture and terminal Stop.
+It is not a reusable Power on/off controller: after Stop, create a fresh session.
+Production hosts must also observe `engine.wait()`, handle command rejections,
+and clean up partially initialized resources; `AudioPower` handles the owned
+lifecycle for the common case.
 
 ```ts
-import { GraphEngine, type GraphDescription } from "@moondsp/browser";
+import { GraphEngine, type Graph } from "@moondsp/browser";
 
 // 1. Author a declarative graph description
 const synthGraph = {
@@ -76,7 +114,7 @@ const synthGraph = {
     { type: "gain", input: 1, gain: { param: "volume" } },
     { type: "output", input: 2 },
   ],
-} as const satisfies GraphDescription<"frequency" | "cutoff" | "volume">;
+} as const satisfies Graph<"frequency" | "cutoff" | "volume">;
 
 // 2. The host application owns the AudioContext
 const context = new AudioContext();
@@ -99,7 +137,7 @@ startButton.addEventListener("click", async () => {
   }
   await sound.play();
   // Parameters can be updated dynamically at block boundaries:
-  await sound.setParams({ cutoff: 3500, volume: 0.15 });
+  await sound.update({ params: { cutoff: 3500, volume: 0.15 } });
 });
 
 // 6. Stop playback and clean up resources when finished (e.g. Stop button)
@@ -111,6 +149,65 @@ stopButton.addEventListener("click", async () => {
   await context.close(); // Only the application closes its context
 });
 ```
+
+## Updating sound: prefer named parameters
+
+Prefer `Graph` to author connections without numeric indices. Declare
+parameter defaults up front; return the output signal and named ADSR gates.
+Parameter and gate names are inferred through construction, mounting, and updates:
+
+```ts
+import { Graph } from "@moondsp/browser";
+
+const instrument = Graph({ frequency: 220, volume: 0.1 }, g => {
+  const oscillator = g.oscillator("sine", g.param("frequency"));
+  const amp = g.adsr({ attackMs: 10, decayMs: 80, sustain: 0.7, releaseMs: 180 });
+  return { output: g.gain(g.mul(oscillator, amp), g.param("volume")), gates: { amp } };
+});
+
+// During setup, before any graph plays:
+const sound = await engine.mount(instrument);
+await sound.play();
+// Later, set pitch and trigger the envelope in a single transaction:
+await sound.update({
+  params: { frequency: 440 },
+  gates: [{ target: "amp", action: "on" }],
+});
+await sound.update({ gates: [{ target: "amp", action: "off" }] });
+```
+
+The same description can be mounted inside `AudioPower` setup; return the
+mounted graph and obtain it through `audio.ready`. Retain its named type
+(`MountedGraph<"frequency" | "volume", "amp">`) when storing the handle.
+Handle rejected updates in your application action, including retirement while
+an update is pending.
+
+- `Graph(params, build)` is called without `new`; it returns a frozen, reusable
+  `Graph<Name, Gate>` value, not a running graph. The function and type share
+  one name; no wrapper class or compatibility alias is needed.
+  Its callback is synchronous; foreign node references and use of the builder
+  after it returns are rejected. Shared references do not duplicate nodes.
+  Numeric descriptions remain the serialization format; MoonBit still validates
+  topology and parameter ranges at mount. The builder adds no DSP implementation.
+- `params` holds initial values, not a readable current-value store. Keep UI
+  values in application state and distinguish requested from accepted updates.
+- A named update is validated as one transaction: an invalid entry rejects the
+  whole batch. Names may intentionally update multiple node fields.
+- Parameters are prepared first, then up to 64 gate actions in array order.
+  Use `off` then `on` to retrigger; `on` then `off` finishes released. No audio
+  renders between actions. Empty updates are valid no-ops on a live handle.
+  Runtime controls use declared names; there is no raw numeric control method.
+- Gate `off` allows an ADSR release to render; `pause()` freezes DSP state and
+  is not note-off. Keep the graph playing for release tails.
+- Updates apply between render callbacks, not at a requested sample timestamp.
+  `update()` is not an `AudioParam` ramp or a smoothing guarantee.
+
+**Breaking migration:** replace `sound.setParams(values)` with
+`sound.update({ params: values })`. Replace numeric `applyControls()` calls by
+declaring named parameters/gates and calling `update()`; neither `applyControls`
+nor the `GraphControl` TypeScript export remains. There are no compatibility
+aliases. Deploy the matching package/Worklet/Wasm together; the ABI now uses
+`graph_host_update`.
 
 ## Package-owned realtime audio
 
@@ -250,14 +347,13 @@ Creates the audio engine instance within an existing, suspended `AudioContext` o
 - `options.signal` *(optional)*: `AbortSignal` owning engine creation only (aborts fetch/compilation if cancelled).
 - `options.closeTimeoutMs` *(optional)*: Deadline for processor close acknowledgment (defaults to 5000 ms).
 
-### `MountedGraph<Name>`
+### `MountedGraph<Name, Gate>`
 
 Returned by `engine.mount(graph)`. Represents a paused, mounted graph instance:
 
 - `sound.play(): Promise<void>`: Starts or resumes playback of this graph.
 - `sound.pause(): Promise<void>`: Freezes processing and oscillator phases.
-- `sound.setParams(values): Promise<void>`: Atomically updates declared named parameters between render blocks.
-- `sound.applyControls(controls): Promise<void>`: Applies an ordered batch of raw `setParam`, `gateOn`, or `gateOff` controls.
+- `sound.update({ params?, gates? }): Promise<void>`: Atomically updates named parameters and ordered gate actions between render blocks.
 - `sound.unmount(): Promise<void>`: Permanently detaches and releases the graph from the engine.
 
 ### `engine.wait(options?: GraphEngineWaitOptions): Promise<EngineExit>`

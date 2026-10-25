@@ -30,7 +30,7 @@ of compiled graphs, providing host-independent mounting and buffer mixing:
 
 | Category | Types | Key operations |
 |---|---|---|
-| **Lifecycle & Mixing** | `GraphEngine` | `GraphEngine::new`, `GraphEngine::mount`, `GraphEngine::process`, `GraphEngine::close` |
+| **Lifecycle & Mixing** | `GraphEngine` | `GraphEngine::GraphEngine`, `GraphEngine::mount`, `GraphEngine::process`, `GraphEngine::close` |
 | **Mounted Sound** | `MountedGraph` | `MountedGraph::play`, `MountedGraph::pause`, `MountedGraph::unmount`, `MountedGraph::apply_controls` |
 | **Errors** | `GraphEngineError` | `InvalidConfiguration`, `EngineClosed`, `MountClosed`, `CapacityExceeded`, `InvalidHandle`, `InvalidGraph`, `BufferSizeMismatch`, `ControlRejected` |
 
@@ -38,6 +38,14 @@ of compiled graphs, providing host-independent mounting and buffer mixing:
 
 Construct an engine with a `DspContext`. Mounting validates and compiles the
 graph but leaves it paused.
+
+Allocate the output buffer once and reuse it for each host callback. `process`
+fills a buffer; it does not open an audio device or play through speakers.
+The host owns output delivery. The examples use the `dsp`, `graph`, and `engine`
+package aliases; the root `dowdiness/moondsp` facade also re-exports these types.
+For a browser application, start with the
+[browser package's API selector](../packages/browser/README.md#choose-an-api)
+instead of implementing your own Worklet bridge.
 
 ```mbt check
 ///|

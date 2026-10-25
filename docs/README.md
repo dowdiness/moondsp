@@ -4,6 +4,13 @@ This directory contains architecture blueprints, technical references, integrati
 
 Use this file as a router. Read the documents for the surface you are changing; do not preload the entire documentation tree.
 
+## Start as a library consumer
+
+- [Choose an API](../README.mbt.md#use-moondsp-as-a-library) — browser audio ownership, direct MoonBit rendering, or pattern authoring.
+- [Browser package quick start](../packages/browser/README.md#choose-an-api) — prefer `AudioPower` for owned realtime audio, `Graph` for connections without indices, and `update()` for named parameters and gates.
+- [MoonBit engine examples](../engine/README.mbt.md#mount-and-play-a-graph) — mount, render into a reusable buffer, mix, and close.
+- [Complete keyboard synth](../examples/basic-synth/README.md) — runnable vanilla TypeScript and Svelte adapters with cancellation and failure recovery.
+
 ## Read when changing
 
 | Change | Primary references |
