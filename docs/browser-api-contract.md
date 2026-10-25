@@ -15,8 +15,8 @@ For a new application, choose the public entry point rather than the raw ABI:
 
 | Application | Entry point |
 | --- | --- |
-| JavaScript or TypeScript instrument | `@moondsp/browser`; see [local distribution](#standalone-synth-examples-and-local-distribution) |
-| Realtime instrument with package-owned context | `@moondsp/browser/audio`; see [owned audio power](#owned-audio-power) |
+| Realtime JavaScript or TypeScript instrument (recommended default) | `AudioPower` from `@moondsp/browser/audio`; see [owned audio power](#owned-audio-power) |
+| Caller-owned context or custom output routing | `GraphEngine` from `@moondsp/browser`; see [local distribution](#standalone-synth-examples-and-local-distribution) |
 | Repository-hosted browser integration | `web/graph-engine.js`; see [the external graph API](#external-graph-entry-point) |
 | MoonBit code observing an existing JS engine | The separate [JS-host lifetime module](#moonbit-lifetime-observation-and-ownership-on-the-js-host) |
 | Host-independent MoonBit rendering | Root-package `GraphEngine`; see [the engine contract](technical-reference.md#354-host-independent-graph-engine) |
@@ -51,8 +51,8 @@ worklet messages.
 The implementation is MoonBit-first: `engine/` owns `GraphEngine`,
 `MountedGraph`, and checked domain errors, re-exported from the root package.
 Native MoonBit callers use `engine.mount(Array[DspNode])`, handle methods,
-and `engine.process(AudioBuffer)` directly. See the checked example in
-[`README.mbt.md`](../README.mbt.md) and the authoritative
+and `engine.process(AudioBuffer)` directly. See the checked examples in
+[`engine/README.mbt.md`](../engine/README.mbt.md#mount-and-play-a-graph) and the authoritative
 [engine contract](technical-reference.md#354-host-independent-graph-engine).
 JavaScript manages browser resources and asynchronous transport, not DSP
 state or compilation.
@@ -118,8 +118,22 @@ perform browser admission.
 - `output`: required integer `input`. The existing compiler validates the
   output structure and graph semantics; exactly one mono output is required.
 - The `params` values are initial values only. They do not form a current-value
-  cache: raw controls and named updates can subsequently change the same
-  runtime targets independently.
+  cache: named updates subsequently change runtime targets, not the description.
+- Optional `gates` maps at most 64 exact names to authoring node indices. Each
+  target must be a reachable ADSR in the compiled graph. Invalid, non-envelope,
+  or optimized-away targets reject mounting before a handle is published.
+  Multiple names may refer to one envelope. All envelopes initially have closed gates.
+  Named parameter and gate requirements are validated against the compiled
+  graph before registration, without applying updates or gate actions.
+- `Graph(params, build)` constructs this same format without `new`.
+  The synchronous callback receives `param`, `oscillator`, `gain`, `mul`,
+  `biquad`, and `adsr` operations and returns `{ output, gates? }`. Connections
+  use opaque references owned by that callback's builder; shared references
+  reuse nodes. Foreign references and post-callback builder calls reject with
+  `INVALID_GRAPH`. The result is a frozen description with one appended output.
+  Parameter defaults and references are snapshotted. TypeScript infers parameter
+  names from defaults and gate names from the returned map. It does not prove
+  per-builder ownership or graph validity; runtime checks remain authoritative.
 - The Worklet serializes the description as JSON. MoonBit decodes the browser
   node and parameter subset, then `GraphEngine::mount` uses the existing
   `AnalyzedGraph::analyze` and `Dsp::compile_result` path. There is
@@ -141,19 +155,18 @@ perform browser admission.
 ### Rendering and lifecycle
 
 - `engine.mount(description)` resolves to a `MountedGraph` handle with
-  asynchronous `play()`, `pause()`, `unmount()`, `applyControls()`, and
-  `setParams(values)` methods. `MountedGraph` is an exported TypeScript type,
-  not a runtime constructor. `setParams` accepts a partial record of declared
-  names and finite numeric values, and writes every target referring to each
-  supplied name.
+  asynchronous `play()`, `pause()`, `unmount()`, and
+  `update(changes)` methods. `MountedGraph` is an exported TypeScript type,
+  not a runtime constructor. `update` applies named parameters and ordered
+  gate actions as one transaction; see [Live controls](#live-controls).
 - Mounting creates independent DSP state and registers it with the engine's
   output, but does not start playback. The input description is reusable:
   mounting it twice creates two independent graphs.
 - `play` starts or resumes processing; `pause` freezes oscillator phase.
   Repeated play/pause operations are allowed.
 - `unmount()` permanently removes that graph. Concurrent and repeated calls
-  share one completion promise. Once unmounting begins, play, pause, controls,
-  and `setParams` reject with `GraphEngineError.code === "INVALID_HANDLE"`.
+  share one completion promise. Once unmounting begins, play, pause,
+  and `update` reject with `GraphEngineError.code === "INVALID_HANDLE"`.
   Repeated unmount cannot affect another graph that reuses the underlying slot.
   An invalid command does not change another graph or close mount admission.
 - All playing graphs sum into `engine.output`, a mono `AudioWorkletNode`.
@@ -517,42 +530,85 @@ Normative transitions (public temporal misuse is rejected before dispatch):
 
 ### Live controls
 
-`sound.applyControls(controls)` accepts an ordered batch of 1–64 controls:
+`sound.update({ params?, gates? })` is the browser JavaScript control API:
 
-- `{ type: "setParam", node, slot, value }` sets a finite numeric parameter.
-  Slots are `value0`, `value1`, `value2`, `value3`, or `delaySamples`.
-- `{ type: "gateOn", node }` and `{ type: "gateOff", node }` control an ADSR.
+- `params` is a partial record of declared parameter names and finite values.
+- `gates` is an ordered array of up to 64 `{ target: name, action: "on" | "off" }`
+  entries. Repeated targets are allowed. Parameters are staged first, followed
+  by gate actions in array order, using the existing runtime's gate folding.
+  `off → on` ends gated on; `on → off` triggers then releases. No samples render
+  between entries; this is not timestamped gate scheduling.
+- The JS adapter reads own data properties synchronously, checks the update
+  shape and names, and captures primitive finite numbers and gate actions.
+  Records must have the ordinary object prototype or a null prototype.
+  Accessors, unknown fields, symbols, boxed values, sparse arrays, and custom
+  serialization hooks are rejected without invoking getters or `toJSON`.
+  JavaScript Proxy reflection traps are outside this data-object contract.
+  Later caller mutations cannot change a submitted update.
+- Mounting resolves each declared target against the compiled graph, including
+  liveness and parameter/gate compatibility, before registration. The mount
+  returns a name-to-binding-ID table to JS; only the mounted graph owns the
+  resolved runtime targets. JS converts updates into numeric ID/value pairs.
+  The Worklet does no name lookup or JSON parsing on successful updates.
+- MoonBit stages the numeric batch in preallocated storage and checks DSP
+  value domains before committing it once. A bad gate must
+  not apply otherwise valid parameters, nor a bad parameter otherwise valid gates.
+  `{}`, `{ params: {} }`, and `{ gates: [] }` are no-ops on valid handles.
+- There is no current-value cache. Runtime updates use declared names, not
+  numeric node indices or parameter slots.
 
-`sound.setParams(values)` accepts a partial record of names declared by the
-graph. The object must be non-null, non-array, and contain only own enumerable
-string keys whose values are finite numbers. Unknown names, malformed records,
-and non-finite values reject atomically with `INVALID_CONTROL`; an empty record
-is a successful no-op on a valid handle. `setParams` has no current-value cache,
-and it does not make raw controls unavailable: applications may use named
-updates for shared knobs and raw batches for controls such as notes.
+This replaces `setParams(values)` with `update({ params: values })` and replaces
+the `graph_host_set_params` ABI export with `graph_host_update`. No old method,
+wire-message, or ABI alias remains. Ship the JS, Worklet, and Wasm together.
 
-`node` is the original authoring index, not the optimized execution index.
-Named references and raw slots can coexist and can update the same target.
-These operations take effect between render callbacks, not at sample timestamps.
+The former JavaScript `applyControls()` method and `GraphControl` type are
+removed, without an alias. Declare parameters and gates on the graph and use
+`update` instead. The unused `graph_host_apply_controls` JSON ABI is also removed.
+The native MoonBit `MountedGraph::apply_controls` API remains independent.
+Updates take effect between render callbacks, not at sample timestamps.
 
-MoonBit validates the whole batch before changing runtime state. A bad node,
-slot, value, or gate target rejects the batch with `INVALID_CONTROL`;
-preceding controls in the batch do not take effect. Named update errors use
-`INVALID_CONTROL` for unknown names or invalid values. Lifecycle errors take
+JS rejects unknown names before transport; MoonBit validates the whole numeric
+batch before changing runtime state. Invalid names, values, or gate targets
+reject with `INVALID_CONTROL`; preceding controls do not take effect.
+An error's `nodeIndex`, when present, is the original authoring index, not the
+optimized execution index. Lifecycle errors take
 precedence. Gate-off starts the release tail; keep the graph playing until it
 finishes. `pause()` freezes the envelope and is not a substitute for gate-off.
-Control decoding and transactional validation are not an allocation-free
-audio-thread contract; a real-time allocation/GC audit remains a separate gate.
+The numeric batch has capacity 320 (64 nodes × at most four parameter fields,
+plus 64 gate actions). Overflow rejects the whole batch, never a truncated
+prefix. The fixed buffers remove update decoding and control-array creation;
+they do not make this an allocation-free audio-thread contract. Release WAT
+inspection confirms removal of successful result wrappers from the browser
+update and shared render entry paths. MessagePort delivery/replies and error
+construction still allocate; an end-to-end allocation/GC audit remains a separate gate.
 
 The dedicated processor is `web/graph-processor.js`. It instantiates the same
 browser WASM artifact as the existing browser paths, in its own WASM instance.
 Its primitive ABI is `graph_host_init`, `graph_host_clear_input`,
-`graph_host_push_char`, `graph_host_mount`, `graph_host_command`,
-`graph_host_apply_controls`, `graph_host_set_params`, `graph_host_process`,
-`graph_host_sample`, `graph_host_close`, `graph_host_error_length`, and
-`graph_host_error_char`.
-Input is JSON transmitted as Unicode scalar values; errors are MoonBit-generated
-JSON envelopes containing `code`, `message`, and optional `nodeIndex`.
+`graph_host_push_char`, `graph_host_mount`, `graph_host_bindings_length`,
+`graph_host_bindings_char`, `graph_host_command`,
+`graph_host_begin_update`, `graph_host_push_update`, `graph_host_update`, `graph_host_process`,
+`graph_host_sample`, `graph_host_close`, `graph_host_error_length`,
+`graph_host_error_char`, `graph_host_error_code`, and `graph_host_error_node_index`.
+Graph descriptions use JSON transmitted as
+Unicode scalar values. After a successful mount, read the binding-table JSON
+through `graph_host_bindings_length/char` before the next mount. Returned string
+characters, like error characters, are UTF-16 code units.
+For an update, call `graph_host_begin_update()`, then
+`graph_host_push_update(bindingId, value)` for each entry, then
+`graph_host_update(handle)`. Gate values are 1 (on) or 0 (off). A failed push
+poisons the batch until the next begin; a failed update never commits a prefix.
+This replaces the previous JSON-input meaning of `graph_host_update`, without
+a fallback. Errors cross the Wasm boundary as separate primitive fields, not
+JSON: `graph_host_error_length/char` read the message as UTF-16 code units;
+`graph_host_error_node_index` returns an original node index or -1.
+`graph_host_error_code` returns 0 for no error, 1 `INVALID_STATE`, 2 `ENGINE_CLOSED`,
+3 `MOUNT_CLOSED`, 4 `MOUNT_REJECTED`, 5 `INVALID_HANDLE`, 6 `PROCESSOR_FAILED`,
+7 `INVALID_CONTROL`, or 8 `INVALID_GRAPH`. Read the fields synchronously after
+failure, before another command. Deploy matching Worklet and Wasm; there is no
+old JSON-error fallback. Public JavaScript errors retain `code`, `message`, and
+optional `nodeIndex`; control messages describe the failure category rather
+than formatting internal MoonBit enums or rejected values.
 Integer handles exist only in this adapter; MoonBit callers receive typed,
 engine-owned handles. `graph_host_close` delegates to the MoonBit engine.
 Existing scheduler/demo behavior and exports are unchanged. The earlier
@@ -566,9 +622,12 @@ module to TypeScript consumers. Imports retain the `.js` extension; TypeScript
 resolves the adjacent declaration automatically. No runtime wrapper is required.
 The declarations require TypeScript 5.4 or newer (`NoInfer` keeps references
 from widening the names declared in `params`).
+The generic `update` parameter rejects extra parameter keys even in prebound
+objects, not just fresh literals. Its exact-key constraint is intentional;
+replacing it with only `Partial<Record<Name, number>>` would lose that guarantee.
 
 ```ts
-import { GraphEngine, type GraphDescription } from "./graph-engine.js";
+import { GraphEngine, type Graph } from "./graph-engine.js";
 
 const graph = {
   params: { volume: 0.1, cutoff: 2_000 },
@@ -578,20 +637,22 @@ const graph = {
     { type: "gain", input: 1, gain: { param: "volume" } },
     { type: "output", input: 2 },
   ],
-} as const satisfies GraphDescription<"volume" | "cutoff">;
+} as const satisfies Graph<"volume" | "cutoff">;
 
 const engine = await GraphEngine({ context });
 const sound = await engine.mount(graph);
-await sound.setParams({ volume: 0.2 }); // updates every volume target
+await sound.update({ params: { volume: 0.2 } }); // updates every volume target
 ```
-The declaration exports `GraphDescription<Name>`, the discriminated
-`GraphNode<Name>` union and its node variants, `ParamRef<Name>`, `GraphControl`,
+The declaration exports the `Graph` function and `Graph<Name, Gate>` type,
+`GraphBuilder<Name>`, `GraphSignal`, `GraphUpdate<Name, Gate>`, the discriminated
+`GraphNode<Name>` union and its node variants, `ParamRef<Name>`,
 `GraphEngineOptions`, `GraphEngineWaitOptions`, `EngineExit`, `GraphEngine`,
-`MountedGraph<Name>`, and `GraphEngineErrorCode`. `Name` is inferred from
+`MountedGraph<Name, Gate>`, and `GraphEngineErrorCode`. `Name` is inferred from
 `params` keys when mounting; an explicit union such as
-`GraphDescription<"volume" | "cutoff">` enables exact ref and update-key
-checking. A no-parameter graph does not admit typed nonempty `setParams`
-updates. Runtime validation remains authoritative for broadened dynamic data.
+`Graph<"volume" | "cutoff">` enables exact ref and update-key
+checking. `Gate` is inferred from `gates` keys. Graphs without declarations do
+not acquire parameter or gate names from updates. Runtime validation remains
+authoritative for broadened dynamic data.
 
 Readonly descriptions (including `as const` arrays) are accepted without
 requiring a mutable copy. Returned handle properties are readonly, matching
@@ -601,7 +662,7 @@ Catch values still require narrowing with `instanceof GraphEngineError`;
 `nodeIndex` is optional and `cause` is `unknown`, including arbitrary abort reasons.
 
 JavaScript consumers can annotate descriptions with
-`/** @type {import('./graph-engine.js').GraphDescription} */` and enable
+`/** @type {import('./graph-engine.js').Graph} */` and enable
 `// @ts-check` for diagnostics as well as editor completion.
 
 From the repository root, run `npm run typecheck:browser` to check positive

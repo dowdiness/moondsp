@@ -1,4 +1,5 @@
 ///|
+// The browser wire format lowers directly to the internal graph model.
 priv suberror GraphDecodeError {
   InvalidDescription(String, Int)
 }
@@ -41,27 +42,16 @@ fn graph_json_input(
 }
 
 ///|
-fn graph_json_node_index(
-  node : Json,
-  index : Int,
-) -> Int raise GraphDecodeError {
-  let value = graph_json_number(node, "node", index)
-  guard value >= 0.0 && value <= 2147483646.0 && @math.floor(value) == value else {
-    raise InvalidDescription("Node index must be a non-negative integer", index)
-  }
-  value.to_int()
-}
-
-///|
 // References are browser authoring metadata, not additional DSP nodes.
-// Each stored control identifies a target and its declared initial value.
+// Binding IDs belong to this mount; parameter defaults stay in the nodes.
 fn graph_json_param(
   node : Json,
   key : String,
   index : Int,
-  slot : @moondsp.GraphParamSlot,
+  slot : @model.GraphParamSlot,
   defaults : Map[String, Double],
-  bindings : Map[String, Array[@moondsp.GraphControl]],
+  bindings : Map[String, Array[Int]],
+  targets : Array[@runtime.GraphControlTarget],
 ) -> Double raise GraphDecodeError {
   guard node is Object(fields) else {
     raise InvalidDescription("Expected node object", index)
@@ -75,11 +65,11 @@ fn graph_json_param(
           index,
         )
       }
-      guard defaults.get(name) is Some(value) &&
-        bindings.get(name) is Some(targets) else {
+      guard defaults.get(name) is Some(value) && bindings.get(name) is Some(ids) else {
         raise InvalidDescription("Unknown parameter \{name}", index)
       }
-      targets.push(@moondsp.GraphControl::set_param(index, slot, value))
+      ids.push(targets.length())
+      targets.push(@runtime.GraphControlTarget::Param(index, slot))
       value
     }
     _ => graph_json_number(node, key, index)
@@ -90,8 +80,10 @@ fn graph_json_param(
 /// Browser representation only: canonical authoring remains Array[DspNode].
 fn decode_browser_graph(
   text : String,
-  bindings~ : Map[String, Array[@moondsp.GraphControl]],
-) -> Array[@moondsp.DspNode] raise GraphDecodeError {
+  bindings~ : Map[String, Array[Int]],
+  gates~ : Map[String, Int],
+  targets~ : Array[@runtime.GraphControlTarget],
+) -> Array[@model.DspNode] raise GraphDecodeError {
   let json = @json.parse(text) catch {
     _ => raise InvalidDescription("Invalid graph JSON", -1)
   }
@@ -135,13 +127,21 @@ fn decode_browser_graph(
           "triangle" => @moondsp.Waveform::Triangle
           _ => raise InvalidDescription("Unknown oscillator waveform", index)
         }
-        @moondsp.DspNode::oscillator(
+        @model.DspNode::oscillator(
           waveform,
-          graph_json_param(node, "frequency", index, Value0, defaults, bindings),
+          graph_json_param(
+            node,
+            "frequency",
+            index,
+            Value0,
+            defaults,
+            bindings,
+            targets,
+          ),
         )
       }
       { "type": String("adsr"), .. } =>
-        @moondsp.DspNode::adsr(
+        @model.DspNode::adsr(
           attack_ms=graph_json_param(
             node,
             "attackMs",
@@ -149,6 +149,7 @@ fn decode_browser_graph(
             Value0,
             defaults,
             bindings,
+            targets,
           ),
           decay_ms=graph_json_param(
             node,
@@ -157,6 +158,7 @@ fn decode_browser_graph(
             Value1,
             defaults,
             bindings,
+            targets,
           ),
           sustain=graph_json_param(
             node,
@@ -165,6 +167,7 @@ fn decode_browser_graph(
             Value2,
             defaults,
             bindings,
+            targets,
           ),
           release_ms=graph_json_param(
             node,
@@ -173,6 +176,7 @@ fn decode_browser_graph(
             Value3,
             defaults,
             bindings,
+            targets,
           ),
         )
       { "type": String("biquad"), .. } => {
@@ -186,7 +190,7 @@ fn decode_browser_graph(
             }
           _ => raise InvalidDescription("Expected biquad mode", index)
         }
-        @moondsp.DspNode::biquad(
+        @model.DspNode::biquad(
           input=graph_json_input(node, nodes.length(), index),
           mode~,
           cutoff_hz=graph_json_param(
@@ -196,22 +200,39 @@ fn decode_browser_graph(
             Value0,
             defaults,
             bindings,
+            targets,
           ),
-          q=graph_json_param(node, "q", index, Value1, defaults, bindings),
+          q=graph_json_param(
+            node,
+            "q",
+            index,
+            Value1,
+            defaults,
+            bindings,
+            targets,
+          ),
         )
       }
       { "type": String("gain"), .. } =>
-        @moondsp.DspNode::gain(
+        @model.DspNode::gain(
           graph_json_input(node, nodes.length(), index),
-          graph_json_param(node, "gain", index, Value0, defaults, bindings),
+          graph_json_param(
+            node,
+            "gain",
+            index,
+            Value0,
+            defaults,
+            bindings,
+            targets,
+          ),
         )
       { "type": String("mul"), .. } =>
-        @moondsp.DspNode::mul(
+        @model.DspNode::mul(
           graph_json_input_field(node, "input0", nodes.length(), index),
           graph_json_input_field(node, "input1", nodes.length(), index),
         )
       { "type": String("output"), .. } =>
-        @moondsp.DspNode::output(graph_json_input(node, nodes.length(), index))
+        @model.DspNode::output(graph_json_input(node, nodes.length(), index))
       _ =>
         raise InvalidDescription(
           "Unknown or incomplete node description", index,
@@ -224,88 +245,25 @@ fn decode_browser_graph(
       raise InvalidDescription("Unused parameter \{name}", -1)
     }
   }
-  decoded
-}
-
-///|
-fn decode_browser_controls(
-  text : String,
-) -> Array[@moondsp.GraphControl] raise GraphDecodeError {
-  let json = @json.parse(text) catch {
-    _ => raise InvalidDescription("Invalid graph controls JSON", -1)
-  }
-  guard json is Array(controls) &&
-    controls.length() >= 1 &&
-    controls.length() <= 64 else {
-    raise InvalidDescription("Controls must contain 1 to 64 messages", -1)
-  }
-  let decoded = []
-  for control in controls {
-    // Diagnostics identify authoring nodes, never positions in this batch.
-    let index = graph_json_node_index(control, -1)
-    let graph_control = match control {
-      { "type": String("gateOn"), .. } => @moondsp.GraphControl::gate_on(index)
-      { "type": String("gateOff"), .. } =>
-        @moondsp.GraphControl::gate_off(index)
-      { "type": String("setParam"), .. } => {
-        let slot = match control {
-          { "slot": String(slot), .. } =>
-            match slot {
-              "value0" => @moondsp.GraphParamSlot::Value0
-              "value1" => @moondsp.GraphParamSlot::Value1
-              "value2" => @moondsp.GraphParamSlot::Value2
-              "value3" => @moondsp.GraphParamSlot::Value3
-              "delaySamples" => @moondsp.GraphParamSlot::DelaySamples
-              _ =>
-                raise InvalidDescription(
-                  "Unknown control parameter slot", index,
-                )
-            }
-          _ =>
-            raise InvalidDescription("Expected control parameter slot", index)
-        }
-        @moondsp.GraphControl::set_param(
-          index,
-          slot,
-          graph_json_number(control, "value", index),
-        )
+  match fields.get("gates") {
+    None => ()
+    Some(Object(names)) => {
+      guard names.length() <= 64 else {
+        raise InvalidDescription("A graph may declare at most 64 gates", -1)
       }
-      _ =>
-        raise InvalidDescription("Unknown or incomplete graph control", index)
+      for name, target in names {
+        guard target is Number(index, ..) &&
+          @moondsp.is_finite(index) &&
+          index >= 0.0 &&
+          index < nodes.length().to_double() &&
+          @math.floor(index) == index else {
+          raise InvalidDescription("Invalid gate target for \{name}", -1)
+        }
+        gates[name] = targets.length()
+        targets.push(@runtime.GraphControlTarget::Gate(index.to_int()))
+      }
     }
-    decoded.push(graph_control)
+    Some(_) => raise InvalidDescription("Expected gate declarations object", -1)
   }
   decoded
-}
-
-///|
-fn decode_browser_params(
-  text : String,
-  bindings : Map[String, Array[@moondsp.GraphControl]],
-) -> Array[@moondsp.GraphControl] raise GraphDecodeError {
-  let json = @json.parse(text) catch {
-    _ => raise InvalidDescription("Invalid parameter update JSON", -1)
-  }
-  guard json is Object(values) else {
-    raise InvalidDescription("Expected parameter update object", -1)
-  }
-  let controls : Array[@moondsp.GraphControl] = []
-  for name, updated in values {
-    guard bindings.get(name) is Some(targets) else {
-      raise InvalidDescription("Unknown parameter \{name}", -1)
-    }
-    guard updated is Number(value, ..) && @moondsp.is_finite(value) else {
-      raise InvalidDescription("Expected finite value for \{name}", -1)
-    }
-    for target in targets {
-      controls.push(
-        @moondsp.GraphControl::set_param(
-          target.node_index(),
-          target.slot(),
-          value,
-        ),
-      )
-    }
-  }
-  controls
 }

@@ -110,10 +110,12 @@ check_manifest "song/moon.pkg" '^(dowdiness/moondsp/(identity|pattern))$'
 check_manifest "mini/moon.pkg" '^(dowdiness/moondsp/(identity|pattern|song))$'
 check_manifest "graph/moon.pkg" '^(dowdiness/moondsp/(dsp|identity|graph/internal/(model|template|binding|runtime|staging|authoring)))$'
 check_manifest "voice/moon.pkg" '^(dowdiness/moondsp/(dsp|graph))$'
-# Host-independent lifecycle; see technical reference section 3.5.4.
-check_manifest "engine/moon.pkg" '^(dowdiness/moondsp/(dsp|graph))$'
+# Shared lifecycle and primitive browser adapter; see docs/engine-architecture.md.
+check_manifest "engine/moon.pkg" '^(dowdiness/moondsp/(dsp|graph|engine/lifecycle))$'
+check_manifest "engine/lifecycle/moon.pkg" '^(dowdiness/moondsp/dsp)$'
+check_manifest "graph/browser/moon.pkg" '^(dowdiness/moondsp/(dsp|engine/lifecycle|graph/internal/(model|template|runtime)))$'
 check_manifest "scheduler/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(identity|pattern|song|scheduler/internal/(model|transport|playback|voice_runtime|edit_policy)))$'
-check_manifest "browser/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(scheduler|browser/internal/(slot|demo_templates|playback_host)))$'
+check_manifest "browser/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(graph/browser|scheduler|browser/internal/(slot|demo_templates|playback_host)))$'
 check_manifest "browser_test/moon.pkg" '^(dowdiness/moondsp)$'
 check_manifest "cmd/main/moon.pkg" '^$'
 

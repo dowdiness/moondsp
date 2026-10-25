@@ -42,7 +42,11 @@ pub fn get_playback_error_char(Int) -> Int
 
 pub fn get_playback_error_length() -> Int
 
-pub fn graph_host_apply_controls(Int) -> Bool
+pub fn graph_host_begin_update() -> Unit
+
+pub fn graph_host_bindings_char(Int) -> Int
+
+pub fn graph_host_bindings_length() -> Int
 
 pub fn graph_host_clear_input() -> Unit
 
@@ -52,7 +56,11 @@ pub fn graph_host_command(Int, Int) -> Bool
 
 pub fn graph_host_error_char(Int) -> Int
 
+pub fn graph_host_error_code() -> Int
+
 pub fn graph_host_error_length() -> Int
+
+pub fn graph_host_error_node_index() -> Int
 
 pub fn graph_host_init(Double) -> Bool
 
@@ -62,9 +70,11 @@ pub fn graph_host_process(Int) -> Bool
 
 pub fn graph_host_push_char(Int) -> Unit
 
+pub fn graph_host_push_update(Int, Double) -> Bool
+
 pub fn graph_host_sample(Int) -> Double
 
-pub fn graph_host_set_params(Int) -> Bool
+pub fn graph_host_update(Int) -> Bool
 
 pub fn init_compiled_graph(Double, Int) -> Bool
 

@@ -730,6 +730,23 @@ Current graph node support:
 
 Current runtime control support:
 
+- Numeric binding IDs and bounded update batches are internal transport
+  details, not part of the root, graph, or engine source API. Browser callers
+  use named `sound.update({ params, gates })`; direct MoonBit callers use the
+  graph controls documented below.
+  Batch capacity, binding-index, and numeric gate-value failures belong to
+  the internal `GraphControlBatchError`, not `GraphControlError`. The browser
+  adapter maps batch failures to `INVALID_CONTROL` with unchanged diagnostics.
+- The browser's internal mount path resolves parameter and gate targets before
+  registration, without applying fake controls. Resolved bindings belong to
+  that compiled graph and cannot be reconfigured after construction.
+- Numeric updates stage the entire batch before committing. Overflow poisons
+  the batch until reset, so ignoring a failed append cannot apply a truncated
+  prefix. Invalid binding IDs, invalid gate values, and invalid parameter
+  values leave parameters and envelope state unchanged. Diagnostics retain
+  original authoring indices. Final parameters are adopted before folded gates;
+  the supplied gate order is preserved. See the [browser contract](browser-api-contract.md#live-controls)
+  for the ABI and remaining transport allocation limits.
 - `apply_control(GraphControl) -> Result[Unit, GraphControlError]` is the
   runtime-control entrypoint. Direct compiled mono/stereo graphs and their
   hot-swap/topology wrappers all return `Result[Unit, GraphControlError]` and
@@ -1058,6 +1075,10 @@ It depends on `graph/` and `dsp/`, not on browser APIs or global registries.
   `Dsp::compile_result` crossing and returns a paused, typed handle.
   Compilation failure retains the underlying `GraphCompileError` in
   `GraphEngineError::InvalidGraph` and does not consume a slot.
+  Named binding resolution belongs to the browser's internal construction
+  path, not to a public target-reconfiguration method. Rejected bindings,
+  including optimized-away targets, consume no slot, do not seal admission,
+  and never mutate DSP state or require rolling back a registered graph.
 - `MountedGraph::play` seals mount admission on its owning engine only.
   `pause` preserves DSP state; `unmount` detaches permanently and is idempotent.
   A retired handle cannot control a replacement that reuses its slot.
@@ -1080,7 +1101,7 @@ It depends on `graph/` and `dsp/`, not on browser APIs or global registries.
   scheduler integration are not added by this layer.
 
 The browser adapter decodes its oscillator/gain/output/ADSR/biquad/multiply
-JSON subset into canonical nodes in MoonBit, maps typed errors to a JSON error envelope, and
+JSON subset into canonical nodes in MoonBit, maps typed errors to primitive code/message/node fields, and
 keeps integer handles only at the WASM boundary. JavaScript owns browser
 resources, serialization, pending promises, and creation cancellation; it
 does not compile graphs or decide the engine's mount/playing state.

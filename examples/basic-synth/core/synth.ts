@@ -1,33 +1,31 @@
-import type { GraphDescription, GraphControl } from "@moondsp/browser";
-
-const OSCILLATOR_NODE = 0;
-const FILTER_NODE = 1;
-const ADSR_NODE = 2;
-const GAIN_NODE = 4;
+import { Graph, type GraphUpdate, type MountedGraph } from "@moondsp/browser";
 
 export const DEFAULT_SETTINGS = { volume: 0.15, cutoff: 2_000 } as const;
 export interface Settings { readonly volume: number; readonly cutoff: number }
 
-export const SYNTH_GRAPH = {
-  params: DEFAULT_SETTINGS,
-  nodes: [
-    { type: "oscillator", waveform: "triangle", frequency: 261.625565 },
-    { type: "biquad", input: OSCILLATOR_NODE, mode: "lowpass", cutoff: { param: "cutoff" }, q: 0.7 },
-    { type: "adsr", attackMs: 10, decayMs: 80, sustain: 0.7, releaseMs: 180 },
-    { type: "mul", input0: FILTER_NODE, input1: ADSR_NODE },
-    { type: "gain", input: 3, gain: { param: "volume" } },
-    { type: "output", input: GAIN_NODE },
-  ],
-} as const satisfies GraphDescription<keyof Settings>;
+type SynthParam = keyof Settings | "frequency";
+export type SynthGraph = MountedGraph<SynthParam, "amp">;
+export type SynthUpdate = GraphUpdate<SynthParam, "amp">;
 
-export function noteOn(midi: number): GraphControl[] {
-  return [
-    { type: "setParam", node: OSCILLATOR_NODE, slot: "value0", value: 440 * 2 ** ((midi - 69) / 12) },
-    { type: "gateOn", node: ADSR_NODE },
-  ];
+export const SYNTH_GRAPH = Graph({ ...DEFAULT_SETTINGS, frequency: 261.625565 }, g => {
+  const oscillator = g.oscillator("triangle", g.param("frequency"));
+  const filter = g.biquad(oscillator, "lowpass", g.param("cutoff"), 0.7);
+  const amp = g.adsr({ attackMs: 10, decayMs: 80, sustain: 0.7, releaseMs: 180 });
+  return { output: g.gain(g.mul(filter, amp), g.param("volume")), gates: { amp } };
+});
+
+export function noteOn(midi: number): SynthUpdate {
+  return {
+    params: { frequency: 440 * 2 ** ((midi - 69) / 12) },
+    gates: [{ target: "amp", action: "on" }],
+  };
 }
 
-export function noteOff(nextMidi: number | null = null): GraphControl[] {
-  const gateOff: GraphControl = { type: "gateOff", node: ADSR_NODE };
-  return nextMidi === null ? [gateOff] : [gateOff, ...noteOn(nextMidi)];
+export function noteOff(nextMidi: number | null = null): SynthUpdate {
+  return nextMidi === null
+    ? { gates: [{ target: "amp", action: "off" }] }
+    : {
+        params: { frequency: 440 * 2 ** ((nextMidi - 69) / 12) },
+        gates: [{ target: "amp", action: "off" }, { target: "amp", action: "on" }],
+      };
 }

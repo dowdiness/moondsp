@@ -68,7 +68,14 @@ engine.close()
 
 Operations raise the checked `GraphEngineError` type. Mount compiles the graph and prepares its buffers before `process()` renders it.
 
-For browser use, `web/graph-engine.js` adapts this engine to AudioWorklet and Promise-based methods. Its JSON subset accepts oscillator, gain, output, ADSR, biquad, and multiply nodes; `applyControls` exposes atomic parameter and gate updates. See [the browser contract](browser-api-contract.md).
+For browser use, `web/graph-engine.js` adapts this engine to AudioWorklet and Promise-based methods. Its JSON subset accepts oscillator, gain, output, ADSR, biquad, and multiply nodes; `update` exposes atomic named parameter and gate updates. See [the browser contract](browser-api-contract.md).
+
+The native facade and browser adapter share lifecycle and mixing through
+`engine/lifecycle`. This is an implementation package, not compiler-enforced
+`internal`; its generic types are absent from the normal facade interfaces.
+`graph/browser` owns wire decoding and primitive host operations so it can use
+`graph/internal/runtime` without exposing numeric bindings. `browser/` forwards
+the primitive exports; it does not duplicate lifecycle state transitions.
 
 ---
 
@@ -145,7 +152,7 @@ Shared authoring identity:
 | Package / Directory | Role & Responsibility | Key Files / Entry Points |
 |---|---|---|
 | [`browser/`](../browser/README.md) | AudioWorklet export ABI and WASM-to-JS transport adapter (128-frame quantum, JSON decoding, named params) | `graph_host_*`, `scheduler_*`, `get_browser_*`, `browser_abi.baseline` |
-| [`packages/browser/`](../packages/browser/README.md) | Local distribution bundle for `@moondsp/browser` (TypeScript declarations, JS API wrapper, processor, release Wasm) | `GraphEngine`, `GraphDescription`, `GraphControl` |
+| [`packages/browser/`](../packages/browser/README.md) | Local distribution bundle for `@moondsp/browser` (TypeScript declarations, JS API wrapper, processor, release Wasm) | `GraphEngine`, `Graph`, `GraphUpdate` |
 | [`examples/basic-synth/`](../examples/basic-synth/README.md) | Shared synth core with framework-free TypeScript and Svelte 5 UI adapters | `AudioView`, `AudioActions`, `App.svelte`, `startApplication` |
 | [`clap_engine/`](../clap_engine/README.mbt.md) | Polyphonic subtractive synth engine core tailored for CLAP plugins (preallocated voices, note ID / wildcard matching) | `ClapSynthEngine`, `CLAP_PARAM_*`, `default_synth_template` |
 | [`clap_host/`](../clap_host/README.mbt.md) | Flat primitive integer-handle C-ABI bridge exposing scalar getters/setters without object leaking | `engine_create`, `engine_destroy`, `engine_note_on`, `engine_process`, `engine_set_param` |

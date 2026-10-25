@@ -1,0 +1,15 @@
+import {
+  "dowdiness/moondsp/dsp" @moondsp,
+  "dowdiness/moondsp/engine/lifecycle",
+  "dowdiness/moondsp/graph/internal/model",
+  "dowdiness/moondsp/graph/internal/runtime",
+  "dowdiness/moondsp/graph/internal/template",
+  "moonbitlang/core/debug",
+  "moonbitlang/core/ref",
+  "moonbitlang/core/json",
+  "moonbitlang/core/math",
+}
+
+import {
+  "dowdiness/moondsp/dsp",
+} for "test"

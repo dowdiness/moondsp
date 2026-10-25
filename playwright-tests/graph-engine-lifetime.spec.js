@@ -19,18 +19,18 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/graph-example.html');
 });
 
-test('pause and rejected controls remain live; normal close retains one result for multiple and late waits', async ({ page }) => {
+test('pause and rejected updates remain live; normal close retains one result for multiple and late waits', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const { GraphEngine } = await import('/graph-engine.js');
     const context = new OfflineAudioContext(1, 128, 48000);
     const engine = await GraphEngine({ context });
-    const graph = await engine.mount({ nodes: [{ type: 'oscillator', waveform: 'sine', frequency: 220 }, { type: 'output', input: 0 }] });
+    const graph = await engine.mount({ params: { pitch: 220 }, nodes: [{ type: 'oscillator', waveform: 'sine', frequency: { param: 'pitch' } }, { type: 'output', input: 0 }] });
     let exited = false;
     const first = engine.wait().then(exit => { exited = true; return exit; });
     const second = engine.wait();
     await graph.play();
     await graph.pause();
-    const invalid = await graph.applyControls([{ type: 'setParam', node: 99, slot: 'value0', value: 1 }]).catch(error => error.code);
+    const invalid = await graph.update({ params: { unknown: 1 } }).catch(error => error.code);
     const live = !exited;
     await engine.close();
     const exit = await first;

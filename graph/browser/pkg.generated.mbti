@@ -1,0 +1,45 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp/graph/browser"
+
+// Values
+pub fn graph_host_begin_update() -> Unit
+
+pub fn graph_host_bindings_char(Int) -> Int
+
+pub fn graph_host_bindings_length() -> Int
+
+pub fn graph_host_clear_input() -> Unit
+
+pub fn graph_host_close() -> Unit
+
+pub fn graph_host_command(Int, Int) -> Bool
+
+pub fn graph_host_error_char(Int) -> Int
+
+pub fn graph_host_error_code() -> Int
+
+pub fn graph_host_error_length() -> Int
+
+pub fn graph_host_error_node_index() -> Int
+
+pub fn graph_host_init(Double) -> Bool
+
+pub fn graph_host_mount() -> Int
+
+pub fn graph_host_process(Int) -> Bool
+
+pub fn graph_host_push_char(Int) -> Unit
+
+pub fn graph_host_push_update(Int, Double) -> Bool
+
+pub fn graph_host_sample(Int) -> Double
+
+pub fn graph_host_update(Int) -> Bool
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

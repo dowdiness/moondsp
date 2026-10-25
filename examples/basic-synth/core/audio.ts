@@ -1,9 +1,8 @@
 import { GraphEngineError } from "@moondsp/browser";
-import type { GraphControl, MountedGraph } from "@moondsp/browser";
 import { AudioPower, type PoweredAudio } from "@moondsp/browser/audio";
 import { errorMessage, type ControlState } from "./controls";
 import { attempt, attemptAsync, type Result } from "./result";
-import { SYNTH_GRAPH, noteOn, noteOff, type Settings } from "./synth";
+import { SYNTH_GRAPH, noteOn, noteOff, type Settings, type SynthGraph, type SynthUpdate } from "./synth";
 
 export interface AudioView {
   render(state: ControlState): void;
@@ -20,12 +19,12 @@ export interface AudioActions {
   cutoffChanged(value: number): void;
 }
 
-type SynthPower = PoweredAudio<MountedGraph<keyof Settings>>;
+type SynthPower = PoweredAudio<SynthGraph>;
 
 // The application owns command ordering and note epochs, not audio resources.
 interface AudioSession {
   readonly powered: SynthPower;
-  readonly graph: MountedGraph<keyof Settings>;
+  readonly graph: SynthGraph;
   operations: Promise<void>;
   noteEpoch: number;
 }
@@ -81,7 +80,7 @@ export function createAudio(view: AudioView, initialSettings: Settings): AudioAc
       powerOff.throwIfAborted();
       const graph = await engine.mount(SYNTH_GRAPH);
       powerOff.throwIfAborted();
-      await graph.setParams(settings);
+      await graph.update({ params: settings });
       powerOff.throwIfAborted();
       await graph.play();
       powerOff.throwIfAborted();
@@ -156,13 +155,13 @@ export function createAudio(view: AudioView, initialSettings: Settings): AudioAc
     });
   }
 
-  function queueControls(changes: readonly GraphControl[]): void {
+  function queueControls(changes: SynthUpdate): void {
     const session = currentSession();
     if (!session) return;
     const epoch = session.noteEpoch;
     enqueue(session, async () => {
       if (!canControl() || epoch !== session.noteEpoch) return;
-      await session.graph.applyControls(changes);
+      await session.graph.update(changes);
     });
   }
 
@@ -171,7 +170,7 @@ export function createAudio(view: AudioView, initialSettings: Settings): AudioAc
     if (!session) return;
     enqueue(session, async () => {
       if (!canControl()) return;
-      await session.graph.setParams(values);
+      await session.graph.update({ params: values });
     });
   }
 

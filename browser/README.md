@@ -41,8 +41,8 @@ AudioWorklet transport adapter:
 | ABI family | Key exports | Purpose |
 |---|---|---|
 | **Graph Host (Lifecycle)** | `graph_host_init`, `graph_host_mount`, `graph_host_command`, `graph_host_close` | Initialize engine (128-frame quantum), mount JSON graph description, transport play/pause/unmount, close engine |
-| **Graph Host (Input & Controls)** | `graph_host_clear_input`, `graph_host_push_char`, `graph_host_apply_controls`, `graph_host_set_params` | Push Unicode scalar JSON, apply raw transactional `GraphControl` batches, or atomically update named parameter sets |
-| **Graph Host (Render & Errors)** | `graph_host_process`, `graph_host_sample`, `graph_host_error_length`, `graph_host_error_char` | Render 128-sample block, retrieve output samples, read structured JSON error envelopes |
+| **Graph Host (Input & Controls)** | `graph_host_clear_input`, `graph_host_push_char`, `graph_host_begin_update`, `graph_host_push_update`, `graph_host_update` | Push graph JSON or atomically apply a bounded numeric update batch |
+| **Graph Host (Render & Errors)** | `graph_host_process`, `graph_host_sample`, `graph_host_error_length`, `graph_host_error_char`, `graph_host_error_code`, `graph_host_error_node_index` | Render 128-sample block, retrieve output samples, read primitive error fields |
 | **Scheduler Playback** | `init_scheduler_graph`, `clear_playback_input`, `push_playback_char`, `player_update_input`, `player_restart_input`, `player_play`, `player_pause`, `player_state`, `player_pending_count`, `player_skipped_count`, `process_scheduler_block`, `scheduler_left_sample`, `scheduler_right_sample` | Owning Player with unified source parsing, immediate acceptance, material-boundary updates, frozen Pause, and stereo rendering |
 | **Scheduler Status** | `player_state`, `player_mode`, `scheduler_bpm`, `scheduler_sample_position`, `scheduler_cycle_position`, `player_pending_count`, `player_skipped_count` | Read transport state, accepted source mode/tempo, render position, and musical-material transitions without exposing route internals |
 | **Diagnostics & Error Inspection** | `get_browser_last_error`, `get_browser_error_code`, `get_browser_error_length`, `get_browser_error_char`, `get_playback_error` | Numeric error codes (`BROWSER_ERROR_*`) and diagnostic messages for host inspection |
@@ -132,23 +132,24 @@ The supported browser description is deliberately narrow:
 - `gain` with an input index and finite linear gain (or parameter reference);
 - one terminal `output` node with an input index;
 - optional `params` mapping declaring up to 256 named parameters with finite initial values, referenced by nodes via `{ "param": "name" }`.
+- optional `gates` mapping declaring up to 64 names of reachable ADSR nodes.
 
 MoonBit decodes this data and delegates to the canonical `GraphEngine` compile
 path. JavaScript does not contain a second graph compiler or DSP
-implementation.
+implementation. Use `Graph(params, build)` to create this description
+with opaque node references rather than numeric input indices; see the
+[application example](../packages/browser/README.md#updating-sound-prefer-named-parameters).
 
 ### Live parameter updates
 
-Once mounted, applications can control graphs in two ways:
-
-1. **Named parameter updates (`sound.setParams({ cutoff: 1200, volume: 0.2 })`)**:
-   Updates parameters declared in `params` across all referencing nodes. The update
-   is validated atomically before applying; unknown names or non-finite values reject
-   with `INVALID_CONTROL`. Uses `graph_host_set_params`.
-2. **Raw control batches (`sound.applyControls(controls)`)**:
-   Sends an ordered batch of 1–64 raw `{ type: "setParam", node, slot, value }`,
-   `{ type: "gateOn", node }`, or `{ type: "gateOff", node }` operations targeting
-   original authoring node indices. Uses `graph_host_apply_controls`.
+Once mounted, JavaScript applications use named updates:
+`sound.update({ params: { cutoff: 1200, volume: 0.2 }, gates: [{ target: "amp", action: "on" }] })`.
+Parameters reach all referencing nodes and ordered gate actions apply in one
+transaction. Invalid names or values reject the whole update with `INVALID_CONTROL`.
+Mounting returns binding IDs to the adapter; updates send numeric pairs into
+fixed-capacity storage, without JSON decoding or name lookup in the Worklet.
+There is no raw-control JSON ABI or JavaScript `applyControls` method.
+Native MoonBit callers retain `MountedGraph::apply_controls`.
 
 See the [browser API contract](../docs/browser-api-contract.md) for lifecycle,
 error precedence, cancellation, TypeScript declarations, and deployment.
@@ -161,10 +162,10 @@ AudioWorklet glue uses these exports:
 |---|---|
 | Initialize | `graph_host_init` |
 | Transfer JSON | `graph_host_clear_input`, `graph_host_push_char` |
-| Mount | `graph_host_mount` |
-| Control | `graph_host_command`, `graph_host_apply_controls`, `graph_host_set_params` |
+| Mount and read bindings | `graph_host_mount`, `graph_host_bindings_length`, `graph_host_bindings_char` |
+| Control | `graph_host_command`, `graph_host_begin_update`, `graph_host_push_update`, `graph_host_update` |
 | Render | `graph_host_process`, `graph_host_sample` |
-| Diagnose | `graph_host_error_length`, `graph_host_error_char` |
+| Diagnose | `graph_host_error_length`, `graph_host_error_char`, `graph_host_error_code`, `graph_host_error_node_index` |
 | Close | `graph_host_close` |
 
 `graph_host_push_char` accepts Unicode scalar values, not UTF-16 code units.

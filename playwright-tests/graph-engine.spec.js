@@ -69,44 +69,38 @@ test('invalid graphs return reasons without damaging a mounted graph', async ({ 
   expect(result.residual).toBeLessThan(1e-6);
 });
 
-test('external controls apply atomically and gate release keeps the graph playable', async ({ page }) => {
+test('named updates apply atomically and gate release keeps the graph playable', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const { GraphEngine } = await import('/graph-engine.js')
     const context = new OfflineAudioContext(1, 4096, 48000);
     const engine = await GraphEngine({ context });
-    const source = await engine.mount({ nodes: [
+    const source = await engine.mount({ params: { volume: 0.2, sustain: 1 }, gates: { amp: 2 }, nodes: [
       { type: 'oscillator', waveform: 'sine', frequency: 440 },
       { type: 'biquad', input: 0, mode: 'lowpass', cutoff: 2000, q: 0.7 },
-      { type: 'adsr', attackMs: 0, decayMs: 0, sustain: 1, releaseMs: 1 },
+      { type: 'adsr', attackMs: 0, decayMs: 0, sustain: { param: 'sustain' }, releaseMs: 1 },
       { type: 'mul', input0: 1, input1: 2 },
-      { type: 'gain', input: 3, gain: 0.2 },
+      { type: 'gain', input: 3, gain: { param: 'volume' } },
       { type: 'output', input: 4 },
     ] });
     let rejected;
     try {
-      await source.applyControls([
-        { type: 'setParam', node: 4, slot: 'value0', value: 0.4 },
-        { type: 'setParam', node: 4, slot: 'delaySamples', value: 1 },
-      ]);
+      await source.update({ params: { volume: 0.4, sustain: 1.5 } });
     } catch (error) {
       rejected = { code: error.code, nodeIndex: error.nodeIndex };
     }
     let decodedRejection;
     try {
-      await source.applyControls([
-        { type: 'setParam', node: 0, slot: 'value0', value: 880 },
-        { type: 'setParam', node: 4, slot: 'unknown', value: 0.4 },
-      ]);
+      await source.update({ params: { volume: 0.4, unknown: 1 } });
     } catch (error) {
-      decodedRejection = { code: error.code, nodeIndex: error.nodeIndex };
+      decodedRejection = error.code;
     }
-    await source.applyControls([{ type: 'gateOn', node: 2 }]);
+    await source.update({ gates: [{ target: 'amp', action: 'on' }] });
     engine.output.connect(context.destination);
     await source.play();
     const suspended = context.suspend(2048 / 48000);
     const rendering = context.startRendering();
     await suspended;
-    await source.applyControls([{ type: 'gateOff', node: 2 }]);
+    await source.update({ gates: [{ target: 'amp', action: 'off' }] });
     await context.resume();
     const buffer = await rendering;
     let beforeReleasePeak = 0;
@@ -120,28 +114,28 @@ test('external controls apply atomically and gate release keeps the graph playab
     return { rejected, decodedRejection, beforeReleasePeak, afterReleasePeak };
   });
   expect(result.rejected.code).toBe('INVALID_CONTROL');
-  expect(result.rejected.nodeIndex).toBe(4);
-  expect(result.decodedRejection).toEqual({ code: 'INVALID_CONTROL', nodeIndex: 4 });
+  expect(result.rejected.nodeIndex).toBe(2);
+  expect(result.decodedRejection).toBe('INVALID_CONTROL');
   // The rejected batch did not partially change the gain from 0.2 to 0.4.
   expect(result.beforeReleasePeak).toBeGreaterThan(0.08);
   expect(result.beforeReleasePeak).toBeLessThan(0.3);
   expect(result.afterReleasePeak).toBeLessThan(0.03);
 });
 
-test('controls reject after unmount and engine close without reviving a graph', async ({ page }) => {
+test('updates reject after unmount and engine close without reviving a graph', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const { GraphEngine } = await import('/graph-engine.js')
     const context = new OfflineAudioContext(1, 128, 48000);
     const engine = await GraphEngine({ context });
-    const graph = { nodes: [
-      { type: 'oscillator', waveform: 'triangle', frequency: 440 },
+    const graph = { params: { pitch: 440 }, nodes: [
+      { type: 'oscillator', waveform: 'triangle', frequency: { param: 'pitch' } },
       { type: 'output', input: 0 },
     ] };
     const retired = await engine.mount(graph);
     await retired.unmount();
     let afterUnmount;
     try {
-      await retired.applyControls([{ type: 'gateOn', node: 0 }]);
+      await retired.update({ params: { pitch: 220 } });
     } catch (error) {
       afterUnmount = error.code;
     }
@@ -150,7 +144,7 @@ test('controls reject after unmount and engine close without reviving a graph', 
     const closing = engine.close();
     let afterClose;
     try {
-      await replacement.applyControls([{ type: 'setParam', node: 0, slot: 'value0', value: 1 }]);
+      await replacement.update({ params: { pitch: 220 } });
     } catch (error) {
       afterClose = error.code;
     }
@@ -696,7 +690,7 @@ test.describe('named parameters', () => {
       const boundary = context.suspend(128 / context.sampleRate);
       const output = render(sound);
       await boundary;
-      await sound.setParams({ level: 0.25 });
+      await sound.update({ params: { level: 0.25 } });
       await context.resume();
       return output;
     });
@@ -708,7 +702,7 @@ test.describe('named parameters', () => {
       const { engine, graph, render } = window.namedParameters;
       const changed = await engine.mount(graph);
       const untouched = await engine.mount(graph);
-      await changed.setParams({ level: 0.25 });
+      await changed.update({ params: { level: 0.25 } });
       return render(untouched);
     });
     expectSquareWave(samples, 0.5 * 0.5);
@@ -721,7 +715,7 @@ test.describe('named parameters', () => {
       await sound.play();
       await sound.pause();
       const values = { level: 0.25 };
-      const submitted = sound.setParams(values);
+      const submitted = sound.update({ params: values });
       values.level = 0.75;
       await submitted;
       return render(sound);
@@ -729,12 +723,12 @@ test.describe('named parameters', () => {
     expectSquareWave(samples, 0.25 * 0.25);
   });
 
-  test('named updates overwrite raw edits to their targets', async ({ page }) => {
+  test('later named updates overwrite earlier values at every target', async ({ page }) => {
     const samples = await page.evaluate(async () => {
       const { engine, graph, render } = window.namedParameters;
       const sound = await engine.mount(graph);
-      await sound.applyControls([{ type: 'setParam', node: 1, slot: 'value0', value: 0.75 }]);
-      await sound.setParams({ level: 0.25 });
+      await sound.update({ params: { level: 0.75 } });
+      await sound.update({ params: { level: 0.25 } });
       return render(sound);
     });
     expectSquareWave(samples, 0.25 * 0.25);
@@ -744,21 +738,50 @@ test.describe('named parameters', () => {
     const samples = await page.evaluate(async () => {
       const { engine, graph, render } = window.namedParameters;
       const sound = await engine.mount(graph);
-      await sound.setParams({});
+      await sound.update({});
       return render(sound);
     });
     expectSquareWave(samples, 0.5 * 0.5);
   });
 
+  test('captured transport never invokes inherited serialization hooks', async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const { engine, graph, render } = window.namedParameters;
+      const sound = await engine.mount(graph);
+      let calls = 0;
+      const hook = () => { calls++; throw new Error('Caller serialization hook ran'); };
+      const prototypes = [Object.prototype, Array.prototype];
+      const previous = prototypes.map(prototype => Object.getOwnPropertyDescriptor(prototype, 'toJSON'));
+      let submitted;
+      try {
+        for (const prototype of prototypes) {
+          Object.defineProperty(prototype, 'toJSON', { value: hook, configurable: true });
+        }
+        submitted = sound.update({ params: { level: 0.25 }, gates: [] });
+      } finally {
+        prototypes.forEach((prototype, i) => {
+          if (previous[i]) Object.defineProperty(prototype, 'toJSON', previous[i]);
+          else delete prototype.toJSON;
+        });
+      }
+      await submitted;
+      return { calls, samples: await render(sound) };
+    });
+    expect(result.calls).toBe(0);
+    expectSquareWave(result.samples, 0.25 * 0.25);
+  });
+
   for (const [reason, values] of [
     ['unknown names', { level: 0.25, unknown: 1 }],
     ['undefined values that JSON would silently omit', { level: undefined }],
+    ['NaN values that JSON would turn into null', { level: NaN }],
+    ['infinite values that JSON would turn into null', { level: Infinity }],
   ]) {
     test(`rejects ${reason} without changing the sound`, async ({ page }) => {
       const result = await page.evaluate(async values => {
         const { engine, graph, render } = window.namedParameters;
         const sound = await engine.mount(graph);
-        const code = await sound.setParams(values).then(() => null, error => error.code);
+        const code = await sound.update({ params: values }).then(() => null, error => error.code);
         return { code, samples: await render(sound) };
       }, values);
       expect(result.code).toBe('INVALID_CONTROL');
@@ -771,6 +794,7 @@ test.describe('named parameters', () => {
       const { engine, render } = window.namedParameters;
       const sound = await engine.mount({
         params: { shared: 0.5 },
+        gates: { amp: 2 },
         nodes: [
           { type: 'oscillator', waveform: 'square', frequency: 375 },
           { type: 'gain', input: 0, gain: { param: 'shared' } },
@@ -779,9 +803,9 @@ test.describe('named parameters', () => {
           { type: 'output', input: 3 },
         ],
       });
-      await sound.applyControls([{ type: 'gateOn', node: 2 }]);
+      await sound.update({ gates: [{ target: 'amp', action: 'on' }] });
       // 1.5 is a valid gain but an invalid sustain.
-      const error = await sound.setParams({ shared: 1.5 }).then(() => null,
+      const error = await sound.update({ params: { shared: 1.5 } }).then(() => null,
         error => ({ code: error.code, nodeIndex: error.nodeIndex }));
       return { error, samples: await render(sound) };
     });
@@ -795,10 +819,10 @@ test.describe('named parameters', () => {
       const retired = await engine.mount(graph);
       const remaining = await engine.mount(graph);
       const unmounting = retired.unmount();
-      const unmounted = await retired.setParams({}).then(() => null, error => error.code);
+      const unmounted = await retired.update({}).then(() => null, error => error.code);
       await unmounting;
       await engine.close();
-      const closed = await remaining.setParams(null).then(() => null, error => error.code);
+      const closed = await remaining.update(null).then(() => null, error => error.code);
       return { unmounted, closed };
     });
     expect(result).toEqual({ unmounted: 'INVALID_HANDLE', closed: 'ENGINE_CLOSED' });
@@ -811,6 +835,12 @@ test.describe('named parameters', () => {
       nodes: [oscillator, { type: 'gain', input: 0, gain: { param: 'missing' } }, numericNodes[2]],
     }],
     ['unused declarations', { params: { unused: 1 }, nodes: numericNodes }],
+    ['non-envelope gate targets', { gates: { amp: 0 }, nodes: numericNodes }],
+    ['fractional gate indices', { gates: { amp: 0.5 }, nodes: numericNodes }],
+    ['undefined gate indices', { gates: { amp: undefined }, nodes: numericNodes }],
+    ['orphan gate targets', { gates: { amp: 3 }, nodes: [
+      ...numericNodes, { type: 'adsr', attackMs: 0, decayMs: 0, sustain: 1, releaseMs: 0 },
+    ] }],
     ['malformed references', {
       params: { level: 0.5 },
       nodes: [oscillator, { type: 'gain', input: 0, gain: { param: 'level', extra: 1 } }, numericNodes[2]],
@@ -828,6 +858,46 @@ test.describe('named parameters', () => {
       expect(code).toBe('INVALID_GRAPH');
     });
   }
+
+  test('named envelope defaults use update domains without consuming rejected mount slots', async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const { Graph } = await import('/graph-engine.js');
+      const { engine, graph, render } = window.namedParameters;
+      for (let i = 0; i < 15; i++) await engine.mount(graph);
+      const envelope = defaults => Graph(defaults, g => {
+        g.oscillator('sine', 220); // Optimized away: diagnostics must retain authoring index 1.
+        const amp = g.adsr({
+          attackMs: g.param('attackMs'), decayMs: g.param('decayMs'),
+          sustain: g.param('sustain'), releaseMs: g.param('releaseMs'),
+        });
+        return { output: amp, gates: { amp } };
+      });
+      const defaults = { attackMs: 0, decayMs: 0, sustain: 0.25, releaseMs: 0 };
+      const errors = [];
+      for (const [name, value] of [
+        ['sustain', 1.5], ['sustain', -0.5],
+        ['attackMs', -1], ['decayMs', -1], ['releaseMs', -1],
+      ]) {
+        try {
+          const unexpected = await engine.mount(envelope({ ...defaults, [name]: value }));
+          await unexpected.unmount();
+          errors.push(null);
+        } catch (error) { errors.push({ code: error.code, nodeIndex: error.nodeIndex }); }
+      }
+      // Both sustain endpoints and zero times remain accepted at mount and update.
+      for (const sustain of [0, 1]) {
+        const values = { ...defaults, sustain };
+        const sound = await engine.mount(envelope(values));
+        await sound.update({ params: values });
+        await sound.unmount();
+      }
+      const sound = await engine.mount(envelope(defaults));
+      await sound.update({ gates: [{ target: 'amp', action: 'on' }] });
+      return { errors, samples: await render(sound) };
+    });
+    expect(result.errors).toEqual(Array(5).fill({ code: 'INVALID_GRAPH', nodeIndex: 1 }));
+    for (const sample of result.samples.slice(8)) expect(sample).toBe(0.25);
+  });
 
   test('a rejected dead binding returns its mount slot', async ({ page }) => {
     const result = await page.evaluate(async () => {
@@ -858,9 +928,161 @@ test.describe('named parameters', () => {
           { type: 'output', input: names.length },
         ],
       });
-      await sound.setParams(Object.fromEntries(names.map(name => [name, 0.25])));
+      await sound.update({ params: Object.fromEntries(names.map(name => [name, 0.25])) });
       return render(sound);
     }, names);
     expectSquareWave(samples, 0.25 ** names.length);
   });
+});
+
+test('builder graph applies named params and ordered gates atomically at render boundaries', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const { GraphEngine, Graph } = await import('/graph-engine.js');
+    const context = new OfflineAudioContext(1, 768, 48000);
+    const engine = await GraphEngine({ context });
+    engine.output.connect(context.destination);
+    const description = Graph({ pitch: 375, volume: 0.5, sustain: 1 }, g => {
+      const oscillator = g.oscillator('square', g.param('pitch'));
+      const envelope = g.adsr({ attackMs: 0, decayMs: 0, sustain: g.param('sustain'), releaseMs: 0 });
+      return { output: g.gain(g.mul(oscillator, envelope), g.param('volume')), gates: { '音🙂': envelope } };
+    });
+    const sound = await engine.mount(description);
+    const boundaries = [128, 256, 384, 512, 640].map(frame => context.suspend(frame / 48000));
+    const on = { target: '音🙂', action: 'on' };
+    const off = { target: '音🙂', action: 'off' };
+    await sound.update({ gates: Array(64).fill(off) });
+    const malformed = [];
+    const circular = {};
+    circular.params = circular;
+    let hookCalls = 0;
+    const hook = () => { hookCalls++; return {}; };
+    const malformedUpdates = [
+      { gates: Array(65).fill(on) },
+      { gates: [{ target: '音🙂', action: 'toggle' }] },
+      { gates: undefined },
+      { params: undefined },
+      { gates: [undefined] },
+      { unexpected: 1 },
+      { params: null },
+      { params: { volume: () => 1 } },
+      { params: { volume: Symbol('volume') } },
+      { params: { volume: 1n } },
+      { gates: Array(1) },
+      { gates: [{ ...on, extra: 1 }] },
+      circular,
+      undefined,
+      [],
+      null,
+      new Number(1),
+      new Boolean(false),
+      new String(''),
+      { params: new Number(1) },
+      { params: { volume: new Number(0.75) }, gates: [on] },
+      { gates: [{ target: new String('音🙂'), action: 'on' }] },
+      { gates: [{ target: '音🙂', action: new String('on') }] },
+      { gates: [{ target: '音🙂' }] },
+      { gates: [{ action: 'on' }] },
+      { params: { volume: 0.75 }, gates: [on], unexpected: undefined },
+      { params: { volume: 0.75 }, gates: [{ ...on, extra: undefined }] },
+      { params: { volume: 0.75 }, gates: [on], toJSON: hook },
+      { params: { volume: 0.75, toJSON: hook }, gates: [on] },
+      { params: { volume: 0.75 }, gates: [{ ...on, toJSON: hook }] },
+      { params: { volume: 0.75 }, gates: Object.assign([on], { toJSON: hook }) },
+      { params: { volume: 0.75 }, gates: [on], [Symbol('extra')]: 1 },
+      { params: { volume: 0.75, [Symbol('extra')]: 1 }, gates: [on] },
+      { params: { volume: 0.75 }, gates: [{ ...on, [Symbol('extra')]: 1 }] },
+      { get params() { hookCalls++; return { volume: 0.75 }; } },
+      { params: { get volume() { hookCalls++; return 0.75; } } },
+      { gates: [{ target: '音🙂', get action() { hookCalls++; return 'on'; } }] },
+    ];
+    for (const update of malformedUpdates) {
+      malformed.push(await sound.update(update).then(() => null, error => error.code));
+    }
+    await sound.play();
+    const rendered = context.startRendering();
+    await boundaries[0];
+    const changes = { params: { pitch: 750, volume: 0.25 }, gates: [off, { ...on }] };
+    const accepted = sound.update(changes);
+    changes.params.volume = 0.9;
+    changes.gates[1].action = 'off';
+    changes.gates[1].target = 'missing';
+    changes.gates.reverse();
+    changes.gates.length = 0;
+    changes.params = { pitch: 1, volume: 1 };
+    await accepted;
+    await context.resume();
+    await boundaries[1];
+    const unknown = await sound.update({ params: { volume: 0.75 }, gates: [off, { target: 'missing', action: 'on' }] })
+      .then(() => null, error => error.code);
+    // Rejections must preserve a playing graph too, not merely its initial silence.
+    for (const update of malformedUpdates) {
+      malformed.push(await sound.update(update).then(() => null, error => error.code));
+    }
+    await context.resume();
+    await boundaries[2];
+    const invalid = await sound.update({ params: { volume: 0.75, sustain: 1.5 }, gates: [off] })
+      .then(() => null, error => error.code);
+    await context.resume();
+    await boundaries[3];
+    await sound.update({ gates: [on, off] });
+    await context.resume();
+    await boundaries[4];
+    await sound.update({ gates: [off, on] });
+    await context.resume();
+    const samples = Array.from((await rendered).getChannelData(0));
+    await engine.close();
+    return { samples, unknown, invalid, malformed, malformedCount: malformedUpdates.length, hookCalls };
+  });
+  expect(result.unknown).toBe('INVALID_CONTROL');
+  expect(result.invalid).toBe('INVALID_CONTROL');
+  expect(result.malformed).toEqual(Array(result.malformedCount * 2).fill('INVALID_CONTROL'));
+  expect(result.hookCalls).toBe(0);
+  // Independent analytic expectation: 750 Hz at 48 kHz has 32 samples per half-period.
+  // Ignore the first samples of each quantum where zero-time ADSR stages transition.
+  for (let block = 0; block < 6; block++) {
+    for (let i = 8; i < 128; i++) {
+      const expected = block === 0 || block === 4 ? 0 : (i % 64 < 32 ? 0.25 : -0.25);
+      expect(result.samples[block * 128 + i], `block ${block}, sample ${i}`).toBe(expected);
+    }
+  }
+});
+
+test('builder owns references and freezes reusable descriptions without duplicating shared nodes', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const { GraphEngine, Graph } = await import('/graph-engine.js');
+    let builder, source;
+    const defaults = { gain: 0.25 };
+    const graph = Graph(defaults, g => {
+      builder = g;
+      source = g.oscillator('sine', 375);
+      return { output: g.gain(g.mul(source, source), g.param('gain')) };
+    });
+    defaults.gain = 1;
+    const reject = operation => { try { operation(); return null; } catch (error) { return error.code; } };
+    const foreign = reject(() => Graph({}, g => ({ output: g.gain(source, 1) })));
+    const late = reject(() => builder.gain(source, 1));
+    const fake = reject(() => Graph({}, g => ({ output: g.mul({}, {}) })));
+    const wrongGate = reject(() => Graph({}, g => {
+      const oscillator = g.oscillator('sine', 375);
+      return { output: oscillator, gates: { amp: oscillator } };
+    }));
+    const context = new OfflineAudioContext(1, 128, 48000);
+    const engine = await GraphEngine({ context });
+    engine.output.connect(context.destination);
+    const a = await engine.mount(graph);
+    const b = await engine.mount(graph);
+    await a.update({ params: { gain: 0.5 } });
+    await a.play();
+    await b.play();
+    const samples = Array.from((await context.startRendering()).getChannelData(0));
+    await engine.close();
+    return { foreign, late, fake, wrongGate, samples, nodeCount: graph.nodes.length,
+      frozen: Object.isFrozen(graph) && Object.isFrozen(graph.nodes) && Object.isFrozen(graph.params) };
+  });
+  expect([result.foreign, result.late, result.fake, result.wrongGate]).toEqual(Array(4).fill('INVALID_GRAPH'));
+  expect(result.nodeCount).toBe(4); // oscillator, multiply, gain, output; no duplicate oscillator.
+  expect(result.frozen).toBe(true);
+  for (let i = 0; i < 128; i++) {
+    expect(result.samples[i]).toBeCloseTo(0.75 * Math.sin(2 * Math.PI * 375 * i / 48000) ** 2, 6);
+  }
 });

@@ -29,7 +29,7 @@ The seam between `core/` and each UI adapter is `AudioView` / `AudioActions` in 
 
 | File | Responsibility |
 |---|---|
-| [`core/synth.ts`](core/synth.ts) | Named graph parameters and pure raw note-control batches |
+| [`core/synth.ts`](core/synth.ts) | Index-free graph construction and atomic named parameter/gate updates |
 | [`core/notes.ts`](core/notes.ts) | Shared C4–C5 note table, key maps, and accessible labels |
 | [`core/keyboard.ts`](core/keyboard.ts) | Pure last-held-note transitions and keyboard projections |
 | [`core/input.ts`](core/input.ts) | Gesture interpretation, pointer-session tracking, deferred activation releases, note-input controller, and [`input.test.ts`](core/input.test.ts) |

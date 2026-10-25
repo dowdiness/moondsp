@@ -1,4 +1,9 @@
 // Private transport for graph-engine.js. Public callers use the engine API.
+const hostErrorCodes = [
+  null, 'INVALID_STATE', 'ENGINE_CLOSED', 'MOUNT_CLOSED', 'MOUNT_REJECTED',
+  'INVALID_HANDLE', 'PROCESSOR_FAILED', 'INVALID_CONTROL', 'INVALID_GRAPH',
+];
+
 class MoonDspGraphProcessor extends AudioWorkletProcessor {
   constructor(options) {
     super();
@@ -20,8 +25,9 @@ class MoonDspGraphProcessor extends AudioWorkletProcessor {
       if (this.closed) return;
       this.wasm = instance.exports;
       for (const name of ['graph_host_init', 'graph_host_clear_input', 'graph_host_push_char', 'graph_host_mount',
-        'graph_host_command', 'graph_host_apply_controls', 'graph_host_process', 'graph_host_sample', 'graph_host_close',
-        'graph_host_error_length', 'graph_host_error_char']) {
+        'graph_host_command', 'graph_host_update', 'graph_host_process', 'graph_host_sample', 'graph_host_close',
+        'graph_host_begin_update', 'graph_host_push_update', 'graph_host_bindings_length', 'graph_host_bindings_char',
+        'graph_host_error_length', 'graph_host_error_char', 'graph_host_error_code', 'graph_host_error_node_index']) {
         if (typeof this.wasm[name] !== 'function') throw new Error(`Missing export: ${name}`);
       }
       if (!this.wasm.graph_host_init(sampleRate)) throw this.hostError();
@@ -34,12 +40,15 @@ class MoonDspGraphProcessor extends AudioWorkletProcessor {
   }
 
   hostError() {
-    let encoded = '';
+    let message = '';
     for (let i = 0; i < this.wasm.graph_host_error_length(); i++) {
-      encoded += String.fromCharCode(this.wasm.graph_host_error_char(i));
+      message += String.fromCharCode(this.wasm.graph_host_error_char(i));
     }
-    const detail = JSON.parse(encoded);
-    return Object.assign(new Error(detail.message), detail);
+    const error = new Error(message);
+    error.code = hostErrorCodes[this.wasm.graph_host_error_code()];
+    const nodeIndex = this.wasm.graph_host_error_node_index();
+    if (nodeIndex >= 0) error.nodeIndex = nodeIndex;
+    return error;
   }
 
   mount(graph) {
@@ -51,35 +60,26 @@ class MoonDspGraphProcessor extends AudioWorkletProcessor {
     }
     const handle = this.wasm.graph_host_mount();
     if (handle === 0) throw this.hostError();
-    return handle;
+    let bindings = '';
+    for (let i = 0; i < this.wasm.graph_host_bindings_length(); i++) {
+      bindings += String.fromCharCode(this.wasm.graph_host_bindings_char(i));
+    }
+    return { handle, bindings: JSON.parse(bindings) };
   }
 
-  applyControls(handle, controls) {
-    let encoded;
-    try {
-      encoded = JSON.stringify(controls);
-    } catch (_) {
-      throw Object.assign(new Error('Invalid graph controls'), { code: 'INVALID_CONTROL' });
+  update(handle, commands) {
+    if (!(commands instanceof Float64Array) || commands.length % 2 !== 0 || commands.length > 640) {
+      throw Object.assign(new Error('Invalid update batch'), { code: 'INVALID_CONTROL' });
     }
-    this.wasm.graph_host_clear_input();
-    if (encoded !== undefined) {
-      for (const char of encoded) this.wasm.graph_host_push_char(char.codePointAt(0));
+    this.wasm.graph_host_begin_update();
+    for (let i = 0; i < commands.length; i += 2) {
+      const target = commands[i];
+      if (!Number.isInteger(target) || target < 0 || target >= 320) {
+        throw Object.assign(new Error('Invalid update target'), { code: 'INVALID_CONTROL' });
+      }
+      if (!this.wasm.graph_host_push_update(target, commands[i + 1])) throw this.hostError();
     }
-    if (!this.wasm.graph_host_apply_controls(handle)) throw this.hostError();
-  }
-
-  setParams(handle, values) {
-    let encoded;
-    try {
-      encoded = JSON.stringify(values);
-    } catch (_) {
-      throw Object.assign(new Error('Invalid graph parameters'), { code: 'INVALID_CONTROL' });
-    }
-    this.wasm.graph_host_clear_input();
-    if (encoded !== undefined) {
-      for (const char of encoded) this.wasm.graph_host_push_char(char.codePointAt(0));
-    }
-    if (!this.wasm.graph_host_set_params(handle)) throw this.hostError();
+    if (!this.wasm.graph_host_update(handle)) throw this.hostError();
   }
 
   receive(data) {
@@ -104,17 +104,11 @@ class MoonDspGraphProcessor extends AudioWorkletProcessor {
           }
           if (!this.wasm.graph_host_command(data.handle, data.command)) throw this.hostError();
           break;
-        case 'applyControls':
+        case 'update':
           if (!Number.isInteger(data.handle) || data.handle <= 0 || data.handle >= 2147483647) {
             throw Object.assign(new Error('Invalid graph handle'), { code: 'INVALID_HANDLE' });
           }
-          value = this.applyControls(data.handle, data.controls);
-          break;
-        case 'setParams':
-          if (!Number.isInteger(data.handle) || data.handle <= 0 || data.handle >= 2147483647) {
-            throw Object.assign(new Error('Invalid graph handle'), { code: 'INVALID_HANDLE' });
-          }
-          value = this.setParams(data.handle, data.values);
+          value = this.update(data.handle, data.commands);
           break;
         default: throw Object.assign(new Error('Unknown request'), { code: 'INVALID_REQUEST' });
       }

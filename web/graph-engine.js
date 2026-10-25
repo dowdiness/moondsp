@@ -8,22 +8,130 @@ export class GraphEngineError extends Error {
   }
 }
 
-const invalidParams = code => new GraphEngineError(code, 'Graph parameters must be a record of finite numbers');
-const snapshotParams = (values, code = 'INVALID_CONTROL') => {
-  if (values === null || typeof values !== 'object' || Array.isArray(values)) throw invalidParams(code);
+const invalidParams = () => new GraphEngineError('INVALID_GRAPH', 'Graph parameters must be a record of finite numbers');
+const snapshotParams = values => {
+  if (values === null || typeof values !== 'object' || Array.isArray(values)) throw invalidParams();
   const snapshot = Object.create(null);
   try {
     for (const name of Object.keys(values)) {
       const value = values[name];
-      if (typeof value !== 'number' || !Number.isFinite(value)) throw invalidParams(code);
+      if (typeof value !== 'number' || !Number.isFinite(value)) throw invalidParams();
       snapshot[name] = value;
     }
   } catch (error) {
     if (error instanceof GraphEngineError) throw error;
-    throw invalidParams(code);
+    throw invalidParams();
   }
   return snapshot;
 };
+
+// Capture data once and resolve names using this mount's compiled bindings.
+// DSP-specific ranges and atomic application remain MoonBit's responsibility.
+const encodeUpdate = (update, bindings) => {
+  try {
+    const invalid = () => { throw new TypeError('Invalid update data'); };
+    const record = value => {
+      if (value === null || typeof value !== 'object') invalid();
+      const prototype = Object.getPrototypeOf(value);
+      if (prototype !== null && prototype !== Object.prototype) invalid();
+      return value;
+    };
+    const data = (value, key) => {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor || !Object.hasOwn(descriptor, 'value')) invalid();
+      return descriptor.value;
+    };
+    // Field order in the caller's object must not change transaction order.
+    for (const key of Reflect.ownKeys(record(update))) {
+      if (key !== 'params' && key !== 'gates') invalid();
+    }
+    const commands = [];
+    if (Object.hasOwn(update, 'params')) {
+      const params = record(data(update, 'params'));
+      for (const name of Reflect.ownKeys(params)) {
+        if (typeof name !== 'string' || !Object.hasOwn(bindings.params, name)) invalid();
+        const value = data(params, name);
+        if (typeof value !== 'number' || !Number.isFinite(value)) invalid();
+        for (const target of bindings.params[name]) commands.push(target, value);
+      }
+    }
+    if (Object.hasOwn(update, 'gates')) {
+      const gates = data(update, 'gates');
+      if (!Array.isArray(gates)) invalid();
+      const length = data(gates, 'length');
+      // Only dense indexed data: no holes, extra keys, or serialization hooks.
+      if (length > 64 || Reflect.ownKeys(gates).length !== length + 1) invalid();
+      for (let i = 0; i < length; i++) {
+        const gate = record(data(gates, String(i)));
+        const keys = Reflect.ownKeys(gate);
+        if (keys.length !== 2 || !keys.includes('target') || !keys.includes('action')) invalid();
+        const target = data(gate, 'target');
+        const action = data(gate, 'action');
+        if (typeof target !== 'string' || !Object.hasOwn(bindings.gates, target) ||
+            (action !== 'on' && action !== 'off')) invalid();
+        commands.push(bindings.gates[target], action === 'on' ? 1 : 0);
+      }
+    }
+    return new Float64Array(commands);
+  } catch (_) {
+    throw new GraphEngineError('INVALID_CONTROL', 'Update must contain finite numeric params and ordered target/action gates');
+  }
+};
+
+/** Build a reusable description; MoonBit remains the graph validator/compiler. */
+export function Graph(params, build) {
+  const defaults = Object.freeze(snapshotParams(params));
+  const nodes = [];
+  const references = new WeakMap();
+  let active = true;
+  const invalid = message => new GraphEngineError('INVALID_GRAPH', message);
+  const index = (reference, kind) => {
+    const entry = references.get(reference);
+    if (!entry || (kind && entry.kind !== kind)) throw invalid('Expected a node from this graph');
+    return entry.index;
+  };
+  const scalar = value => typeof value === 'object' && value !== null
+    ? Object.freeze({ ...value }) : value;
+  const add = node => {
+    if (!active) throw invalid('Graph construction has finished');
+    const reference = Object.freeze({});
+    references.set(reference, { index: nodes.length, kind: node.type });
+    nodes.push(Object.freeze(node));
+    return reference;
+  };
+  const builder = Object.freeze({
+    param(name) {
+      if (!active) throw invalid('Graph construction has finished');
+      if (!Object.hasOwn(defaults, name)) throw invalid(`Unknown parameter ${name}`);
+      return Object.freeze({ param: name });
+    },
+    oscillator: (waveform, frequency) => add({ type: 'oscillator', waveform, frequency: scalar(frequency) }),
+    gain: (input, gain) => add({ type: 'gain', input: index(input), gain: scalar(gain) }),
+    mul: (left, right) => add({ type: 'mul', input0: index(left), input1: index(right) }),
+    biquad: (input, mode, cutoff, q) => add({ type: 'biquad', input: index(input), mode, cutoff: scalar(cutoff), q: scalar(q) }),
+    adsr: ({ attackMs, decayMs, sustain, releaseMs }) => add({
+      type: 'adsr', attackMs: scalar(attackMs), decayMs: scalar(decayMs),
+      sustain: scalar(sustain), releaseMs: scalar(releaseMs),
+    }),
+  });
+  try {
+    const result = build(builder);
+    if (!result || typeof result !== 'object' || !Object.hasOwn(result, 'output')) {
+      throw invalid('Return an output node synchronously');
+    }
+    const gates = Object.create(null);
+    if (Object.hasOwn(result, 'gates')) {
+      if (!result.gates || typeof result.gates !== 'object' || Array.isArray(result.gates)) {
+        throw invalid('Expected named ADSR references');
+      }
+      for (const [name, reference] of Object.entries(result.gates)) gates[name] = index(reference, 'adsr');
+    }
+    add({ type: 'output', input: index(result.output) });
+    return Object.freeze({ params: defaults, gates: Object.freeze(gates), nodes: Object.freeze(nodes) });
+  } finally {
+    active = false;
+  }
+}
 
 const hostError = (message, cause) => {
   if (cause instanceof GraphEngineError) return cause;
@@ -242,11 +350,12 @@ function createSession(context, node, closeTimeoutMs) {
       if (context.state !== 'suspended') {
         throw new GraphEngineError('MOUNT_CLOSED', 'Mount graphs before playback or resuming the context');
       }
-      if (graph !== null && typeof graph === 'object' && !Array.isArray(graph) &&
-          Object.hasOwn(graph, 'params')) {
-        graph = { ...graph, params: snapshotParams(graph.params, 'INVALID_GRAPH') };
+      if (graph !== null && typeof graph === 'object' && !Array.isArray(graph)) {
+        graph = { ...graph };
+        if (Object.hasOwn(graph, 'params')) graph.params = snapshotParams(graph.params);
+        if (Object.hasOwn(graph, 'gates')) graph.gates = snapshotParams(graph.gates);
       }
-      const handle = await request('mount', { graph });
+      const { handle, bindings } = await request('mount', { graph });
       let unmounting = null;
       const command = action => unmounting
         ? Promise.reject(new GraphEngineError('INVALID_HANDLE', 'The graph has been unmounted'))
@@ -254,19 +363,14 @@ function createSession(context, node, closeTimeoutMs) {
       return Object.freeze({
         play() { return command(0); },
         pause() { return command(1); },
-        applyControls(controls) {
-          return unmounting
-            ? Promise.reject(new GraphEngineError('INVALID_HANDLE', 'The graph has been unmounted'))
-            : request('applyControls', { handle, controls });
-        },
-        setParams(values) {
+        update(changes) {
           if (unmounting) return Promise.reject(new GraphEngineError('INVALID_HANDLE', 'The graph has been unmounted'));
           const error = unavailable();
           if (error) return Promise.reject(error);
-          let snapshot;
-          try { snapshot = snapshotParams(values); }
+          let commands;
+          try { commands = encodeUpdate(changes, bindings); }
           catch (error) { return Promise.reject(error); }
-          return request('setParams', { handle, values: snapshot });
+          return request('update', { handle, commands });
         },
         unmount() {
           if (!unmounting) unmounting = request('command', { handle, command: 2 });

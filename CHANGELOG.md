@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Reuse scalar bounded trigonometry for Wasm-GC biquad coefficients, removing
+  measured render-time sine/cosine scratch construction without changing PCM.
+- **Breaking worklet error ABI:** replace JSON errors with primitive code,
+  message, and node-index getters. Control errors use static category messages
+  instead of formatting internal enums; public JS error codes and node indices
+  are unchanged. No old-protocol fallback is retained.
+- **Breaking browser API/ABI:** replace `MountedGraph.setParams(values)` with
+  `update({ params: values, gates? })`. Named ADSR gates and parameters resolve
+  to one atomic control batch; gate actions retain array order. Replace the
+  `graph_host_set_params` export with `graph_host_update`; deploy matching JS,
+  Worklet, and Wasm. No compatibility aliases remain. This requires a breaking
+  pre-1.0 release (next minor, not a 0.6.x patch); no release is published here.
+- Rename the browser graph type from `GraphDescription` to `Graph`, without
+  a compatibility alias.
+- Add `Graph(params, build)` for synchronous, single-owner node-reference
+  authoring with inferred parameter/gate names. It produces the existing graph
+  description format and retains MoonBit validation and compilation. Migrate
+  both basic-synth adapters' shared core to this API.
+- Resolve browser control targets during construction before registration,
+  without dummy controls or a post-construction reconfiguration method.
+  Numeric binding IDs and batches stay internal; the normal MoonBit API does
+  not expose `GraphControlBatch`, `GraphControlTarget`, or numeric `update`.
+- Remove the browser JavaScript `applyControls` method and `GraphControl` type;
+  runtime updates use declared parameter and gate names. Remove the unused
+  `graph_host_apply_controls` JSON ABI. Native MoonBit `apply_controls` remains.
+- Capture browser updates as data properties at the call boundary; reject
+  getters, boxed values, unknown fields, and serialization hooks without calling
+  them. Encode parameters then gates directly into numeric commands without
+  intermediate snapshots or prototype changes. Retain exact parameter-key
+  TypeScript checking for prebound objects.
+- **Breaking worklet ABI:** `graph_host_update` consumes a numeric batch built
+  with `graph_host_begin_update` / `graph_host_push_update`, not JSON input.
+  `graph_host_bindings_length/char` expose mount-time name-to-ID bindings.
+  Updates no longer parse JSON, look up names, or allocate control arrays in
+  MoonBit. MessagePort delivery and replies still prevent a whole-path
+  allocation-free guarantee. Deploy matching JS, Worklet, and Wasm; no fallback.
+
 ### Fixed
 
 - Pin the Cloudflare Pages MoonBit toolchain to the same version as GitHub

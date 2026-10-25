@@ -12,8 +12,19 @@ import {
 pub fn updated_model_node_param_result(@model.DspNode, Int, @model.GraphParamSlot, Double, Double) -> Result[@model.DspNode, GraphControlError]
 
 // Errors
+pub suberror BoundGraphError {
+  InvalidGraph(GraphCompileError)
+  ControlRejected(GraphControlError)
+}
 
 // Types and methods
+pub struct BoundDsp {
+  // private fields
+}
+pub fn BoundDsp::BoundDsp(@template.AnalyzedGraph, @dsp.DspContext, Array[GraphControlTarget]) -> Self raise BoundGraphError
+pub fn BoundDsp::process(Self, @dsp.DspContext, @dsp.AudioBuffer) -> Unit
+pub fn BoundDsp::update(Self, GraphControlBatch) -> GraphControlBatchError?
+
 pub struct CompiledGraph {
   // private fields
 }
@@ -67,6 +78,21 @@ pub fn GraphCompileError::to_repr(Self) -> @debug.Repr
 pub fn GraphCompileError::to_string(Self) -> String
 pub impl Show for GraphCompileError
 
+pub struct GraphControlBatch {
+  // private fields
+}
+pub fn GraphControlBatch::GraphControlBatch(Int) -> Self
+pub fn GraphControlBatch::clear(Self) -> Unit
+pub fn GraphControlBatch::length(Self) -> Int
+pub fn GraphControlBatch::push(Self, Int, Double) -> Bool
+
+pub enum GraphControlBatchError {
+  BatchCapacityExceeded
+  InvalidBindingIndex(Int)
+  InvalidGateValue(Int, Double)
+  InvalidParamValue(Int, @model.DspNodeKind, @model.GraphParamSlot, Double)
+}
+
 pub enum GraphControlError {
   InvalidNodeIndex(Int)
   OrphanNode(Int)
@@ -79,6 +105,11 @@ pub fn GraphControlError::output(Self, &Logger) -> Unit
 pub fn GraphControlError::to_repr(Self) -> @debug.Repr
 pub fn GraphControlError::to_string(Self) -> String
 pub impl Show for GraphControlError
+
+pub(all) enum GraphControlTarget {
+  Param(Int, @model.GraphParamSlot)
+  Gate(Int)
+}
 
 pub enum GraphInputSlot {
   Input0
