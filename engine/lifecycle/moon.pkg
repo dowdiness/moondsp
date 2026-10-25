@@ -1,0 +1,5 @@
+// Shared lifecycle implementation, with no numeric control API.
+import {
+  "dowdiness/moondsp/dsp",
+  "moonbitlang/core/debug",
+}

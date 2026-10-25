@@ -269,3 +269,52 @@ test "invalid engine configuration is rejected before allocation" {
   }
   @debug.assert_eq(ctx.block_size(), 128)
 }
+
+///|
+test "public controls reject orphan targets atomically without changing defaults" {
+  let ctx = @dsp.DspContext::DspContext(sample_rate=48000.0, block_size=128)
+  let engine = @engine.GraphEngine::GraphEngine(ctx, capacity=1)
+  let nodes = [
+    @graph.DspNode::oscillator(@dsp.Waveform::Sine, 220.0),
+    @graph.DspNode::oscillator(@dsp.Waveform::Square, 375.0),
+    @graph.DspNode::adsr(
+      attack_ms=0.0,
+      decay_ms=0.0,
+      sustain=1.0,
+      release_ms=0.0,
+    ),
+    @graph.DspNode::mul(1, 2),
+    @graph.DspNode::gain(3, 0.1),
+    @graph.DspNode::output(4),
+  ]
+  let sound = engine.mount(nodes)
+  let rejected = try {
+    sound.apply_controls([
+      @graph.GraphControl::gate_on(2),
+      @graph.GraphControl::set_param(0, @graph.GraphParamSlot::Value0, 440.0),
+    ])
+    None
+  } catch {
+    error => Some(error)
+  }
+  guard rejected
+    is Some(
+      @engine.GraphEngineError::ControlRejected(
+        @graph.GraphControlError::OrphanNode(0)
+      )
+    ) else {
+    fail("expected optimized-away target rejection")
+  }
+  sound.play()
+  let output = ctx.make_buffer()
+  engine.process(output)
+  assert_true(output.all(x => x == 0.0))
+  sound.apply_controls([@graph.GraphControl::gate_on(2)])
+  engine.process(output)
+  // Validation changed neither the gate nor the compile-time gain of 0.1.
+  for i in 8..<128 {
+    let expected = if i < 64 { 0.1 } else { -0.1 }
+    assert_true((output.get(i) - expected).abs() < 0.000001)
+  }
+  engine.close()
+}

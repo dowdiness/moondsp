@@ -1,0 +1,43 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp/engine/lifecycle"
+
+import {
+  "dowdiness/moondsp/dsp",
+  "moonbitlang/core/debug",
+}
+
+// Values
+
+// Errors
+pub suberror LifecycleError {
+  InvalidConfiguration
+  EngineClosed
+  MountClosed
+  CapacityExceeded
+  InvalidHandle
+  BufferSizeMismatch(expected~ : Int, actual~ : Int)
+} derive(@debug.Debug)
+pub fn LifecycleError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+pub struct Engine[G] {
+  // private fields
+}
+pub fn[G] Engine::Engine(@dsp.DspContext, (G, @dsp.DspContext, @dsp.AudioBuffer) -> Unit, capacity? : Int) -> Self[G] raise LifecycleError
+pub fn[G] Engine::check_mount(Self[G]) -> Unit raise LifecycleError
+pub fn[G] Engine::close(Self[G]) -> Unit
+pub fn[G] Engine::process(Self[G], @dsp.AudioBuffer) -> LifecycleError?
+pub fn[G] Engine::register(Self[G], G) -> Mount[G] raise LifecycleError
+
+pub struct Mount[G] {
+  // private fields
+}
+pub fn[G] Mount::graph(Self[G]) -> G raise LifecycleError
+pub fn[G] Mount::live_graph(Self[G]) -> G?
+pub fn[G] Mount::pause(Self[G]) -> Unit raise LifecycleError
+pub fn[G] Mount::play(Self[G]) -> Unit raise LifecycleError
+pub fn[G] Mount::unmount(Self[G]) -> Unit raise LifecycleError
+
+// Type aliases
+
+// Traits
