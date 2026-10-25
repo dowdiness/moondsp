@@ -32,6 +32,24 @@ const hostError = (message, cause) => {
   return error;
 };
 
+const closedError = () => new GraphEngineError('ENGINE_CLOSED', 'The graph engine is closed');
+
+// Both owners use the same release order, even if a native operation throws.
+const releaseNode = (node, retire) => {
+  node.onprocessorerror = null;
+  node.port.onmessage = null;
+  let error = null;
+  if (retire) {
+    try { node.port.postMessage({ type: 'close' }); }
+    catch (cause) { error ??= hostError('Failed to retire the graph processor', cause); }
+  }
+  try { node.disconnect(); }
+  catch (cause) { error ??= hostError('Failed to disconnect the graph output', cause); }
+  try { node.port.close(); }
+  catch (cause) { error ??= hostError('Failed to close the graph message port', cause); }
+  return error;
+};
+
 /**
  * Create a mono graph engine in a caller-owned, suspended AudioContext.
  * OfflineAudioContext is supported for deterministic host verification.
@@ -52,58 +70,21 @@ export async function GraphEngine({
     throw new GraphEngineError('INVALID_REQUEST', 'closeTimeoutMs must be positive and at most 2147483647');
   }
   let node;
-  let nextId = 1;
-  let closed = false;
-  let closure = null;
-  let terminal = null;
   let interruption = null;
-  let released = false;
-  const pending = new Map();
-  const waiters = new Set();
   const loading = new AbortController();
   let interrupt;
   // Resolve rather than reject: interruption can precede the first async wait.
   const interrupted = new Promise(resolve => { interrupt = resolve; });
-  const closedError = () => new GraphEngineError('ENGINE_CLOSED', 'The graph engine is closed');
-  const failure = () => terminal?.type === 'failed' ? terminal.error : null;
-  const finish = exit => {
-    if (terminal) return;
-    terminal = Object.freeze(exit);
-    for (const deliver of waiters) deliver(terminal);
-    waiters.clear();
-  };
-  const rejectPending = error => {
-    for (const request of pending.values()) request.reject(error);
-    pending.clear();
-  };
-  // Attempt every local release, including when a native cleanup operation throws.
-  const release = (retire = false) => {
-    if (released) return null;
-    released = true;
-    signal?.removeEventListener('abort', onAbort);
-    context.removeEventListener('statechange', onStateChange);
-    let cleanupError = null;
-    if (node) {
-      node.onprocessorerror = null;
-      node.port.onmessage = null;
-      if (!closed || retire) {
-        try { node.port.postMessage({ type: 'close' }); }
-        catch (error) { cleanupError ??= hostError('Failed to retire the graph processor', error); }
-      }
-      try { node.disconnect(); }
-      catch (error) { cleanupError ??= hostError('Failed to disconnect the graph output', error); }
-      try { node.port.close(); }
-      catch (error) { cleanupError ??= hostError('Failed to close the graph message port', error); }
-    }
-    return cleanupError;
+  const release = () => {
+    if (node) releaseNode(node, context.state !== 'closed');
+    node = undefined;
   };
   const stop = error => {
-    if (interruption) return null;
+    if (interruption) return;
     interruption = error;
     interrupt(error);
     loading.abort();
-    rejectPending(error);
-    return release();
+    release();
   };
   const onAbort = () => {
     const error = new GraphEngineError('ABORTED', 'Graph engine creation was aborted');
@@ -111,11 +92,7 @@ export async function GraphEngine({
     stop(error);
   };
   const onStateChange = () => {
-    if (context.state === 'closed') {
-      closed = true;
-      const error = stop(closedError());
-      finish(error ? { type: 'failed', error } : { type: 'closed' });
-    }
+    if (context.state === 'closed') stop(closedError());
   };
   const waitInit = async operation => {
     const value = await Promise.race([
@@ -139,12 +116,7 @@ export async function GraphEngine({
     let resolveReady;
     const ready = new Promise(resolve => { resolveReady = resolve; });
     const fail = message => {
-      if (terminal) return;
-      const error = new GraphEngineError('PROCESSOR_FAILED', message);
-      // Report the cause before cleanup; cleanup cannot replace a runtime failure.
-      finish({ type: 'failed', error });
-      resolveReady(error);
-      stop(error);
+      stop(new GraphEngineError('PROCESSOR_FAILED', message));
     };
     node = new AudioWorkletNode(context, 'moondsp-graph', {
       numberOfInputs: 0,
@@ -154,16 +126,17 @@ export async function GraphEngine({
     });
     node.onprocessorerror = () => fail('AudioWorklet processor failed');
     node.port.onmessage = ({ data }) => {
-      if (data.type === 'ready') { resolveReady(null); return; }
-      if (data.type === 'fatal') { fail(data.message); return; }
-      const request = pending.get(data.id);
-      if (!request) return;
-      pending.delete(data.id);
-      if (data.ok) request.resolve(data.value);
-      else request.reject(new GraphEngineError(data.error.code, data.error.message, data.error.nodeIndex));
+      if (data.type === 'ready') resolveReady();
+      else if (data.type === 'fatal') fail(data.message);
     };
-    const error = await waitInit(ready);
-    if (error) throw error;
+    await waitInit(ready);
+    onStateChange();
+    if (interruption) throw interruption;
+    // No await during handoff: runtime monitoring replaces startup monitoring
+    // before another browser event can run. Creation's signal owns nothing after this.
+    const engine = createSession(context, node, closeTimeoutMs);
+    node = undefined;
+    return engine;
   } catch (cause) {
     onStateChange();
     loading.abort();
@@ -175,10 +148,62 @@ export async function GraphEngine({
     throw error;
   } finally {
     signal?.removeEventListener('abort', onAbort);
+    context.removeEventListener('statechange', onStateChange);
   }
+}
+
+// Owns an initialized node only; no loading or creation-cancellation state.
+function createSession(context, node, closeTimeoutMs) {
+  let nextId = 1;
+  let closure = null;
+  let terminal = null;
+  let released = false;
+  const pending = new Map();
+  const waiters = new Set();
+  const failure = () => terminal?.type === 'failed' ? terminal.error : null;
+  const finish = exit => {
+    if (terminal) return;
+    terminal = Object.freeze(exit);
+    for (const deliver of waiters) deliver(terminal);
+    waiters.clear();
+  };
+  const rejectPending = error => {
+    for (const request of pending.values()) request.reject(error);
+    pending.clear();
+  };
+  const release = (retire = false) => {
+    if (released) return null;
+    released = true;
+    context.removeEventListener('statechange', onStateChange);
+    return releaseNode(node, retire);
+  };
+  const onStateChange = () => {
+    if (context.state !== 'closed') return;
+    rejectPending(closedError());
+    const error = release();
+    finish(error ? { type: 'failed', error } : { type: 'closed' });
+  };
+  const fail = message => {
+    if (terminal) return;
+    const error = new GraphEngineError('PROCESSOR_FAILED', message);
+    // Publish the primary failure before cleanup, which cannot replace it.
+    finish({ type: 'failed', error });
+    rejectPending(error);
+    release(!closure && context.state !== 'closed');
+  };
+  context.addEventListener('statechange', onStateChange);
+  node.onprocessorerror = () => fail('AudioWorklet processor failed');
+  node.port.onmessage = ({ data }) => {
+    if (data.type === 'fatal') { fail(data.message); return; }
+    const request = pending.get(data.id);
+    if (!request) return;
+    pending.delete(data.id);
+    if (data.ok) request.resolve(data.value);
+    else request.reject(new GraphEngineError(data.error.code, data.error.message, data.error.nodeIndex));
+  };
 
   // Closing/context state retains precedence for commands, independently of wait's result.
-  const unavailable = () => closed || context.state === 'closed' ? closedError() : failure();
+  const unavailable = () => closure || context.state === 'closed' ? closedError() : failure();
   const request = (type, payload = {}) => {
     const error = unavailable();
     if (error) return Promise.reject(error);
@@ -254,7 +279,6 @@ export async function GraphEngine({
       // Post before closing admission, without an await or a deferred task start.
       const closing = !failure() && context.state !== 'closed'
         ? request('close') : Promise.resolve();
-      closed = true;
       closure = (async () => {
         let timer;
         let closeError = null;
