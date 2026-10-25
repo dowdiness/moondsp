@@ -3,17 +3,23 @@ const { test, expect } = require('@playwright/test');
 test.use({ launchOptions: { args: ['--disable-audio-output', '--autoplay-policy=user-gesture-required'] } });
 test.setTimeout(30_000);
 
-const GRAPH = {
-  nodes: [
-    { type: 'oscillator', waveform: 'sine', frequency: 220 },
-    { type: 'gain', input: 0, gain: 0.15 },
-    { type: 'output', input: 1 },
-  ],
-};
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__workletByContext = new WeakMap();
+    const NativeNode = window.AudioWorkletNode;
+    window.AudioWorkletNode = class extends NativeNode {
+      constructor(...args) {
+        super(...args);
+        window.__workletByContext.set(this.context, this);
+      }
+    };
+  });
+});
 
 async function open(page) {
   await page.goto('/graph-example.html');
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
+    window.Graph = (await import('/graph-engine.js')).Graph;
     window.__audioPower = import('/audio-power.js');
     window.__audioPower.then(({ AudioPower }) => { window.__AudioPower = AudioPower; });
   });
@@ -39,7 +45,7 @@ async function audible(page) {
     const engine = window.__engine;
     const analyser = context.createAnalyser();
     analyser.fftSize = 2048;
-    engine.output.connect(analyser);
+    engine.connect(analyser);
     analyser.connect(context.destination);
     const samples = new Float32Array(analyser.fftSize);
     window.__rms = () => {
@@ -49,7 +55,7 @@ async function audible(page) {
   });
 }
 
-async function turnOn(page, body = `async ({ engine }) => { const graph = await engine.mount(${JSON.stringify(GRAPH)}); await graph.play(); return graph; }`) {
+async function turnOn(page, body = `async ({ engine }) => { const graph = await engine.mount(Graph({}, g => ({ output: g.gain(g.oscillator('sine', 220), 0.15) }))); await graph.play(); return graph; }`) {
   return page.evaluate(async source => {
     const power = window.__power ?? window.__AudioPower();
     const original = (0, eval)(`(${source})`);
@@ -88,11 +94,7 @@ test('1. one gesture preserves admission through delayed Wasm and produces audib
       const powered = power.turnOn(async ({ engine }) => {
         window.__engine = engine;
         window.__setupValue = value;
-        const graph = await engine.mount({ nodes: [
-          { type: 'oscillator', waveform: 'sine', frequency: 220 },
-          { type: 'gain', input: 0, gain: 0.15 },
-          { type: 'output', input: 1 },
-        ] });
+        const graph = await engine.mount(Graph({}, g => ({ output: g.gain(g.oscillator('sine', 220), 0.15) })));
         await graph.play();
         return value;
       });
@@ -180,7 +182,7 @@ test('4. processor failure is retained as GraphEngineError and cleanup follows',
   await turnOn(page);
   await expect.poll(() => page.evaluate(() => window.__ready.then(() => true, () => false))).toBe(true);
   const result = await page.evaluate(async () => {
-    window.__engine.output.onprocessorerror(new Event('processorerror'));
+    window.__workletByContext.get(window.__active.context).onprocessorerror(new Event('processorerror'));
     const end = await window.__ended;
     const exit = await window.__engine.wait();
     const { GraphEngineError } = await import('/graph-engine.js');
@@ -206,7 +208,7 @@ test('5. replacement waits for the cumulative predecessor retirement barrier', a
     const close = context.close.bind(context);
     const gate = new Promise(resolve => { window.__releaseA = resolve; });
     context.close = () => close().then(() => gate);
-    window.__engine.output.onprocessorerror(new Event('processorerror'));
+    window.__workletByContext.get(context).onprocessorerror(new Event('processorerror'));
   });
   await page.evaluate(() => window.__a.ended);
   await turnOn(page);
@@ -244,7 +246,7 @@ test('6. duplicate turn-on is invalid, while a separate owner is independent', a
   await open(page);
   const result = await page.evaluate(() => {
     const first = window.__AudioPower();
-    const setup = async ({ engine }) => { const graph = await engine.mount({ nodes: [{ type: 'oscillator', waveform: 'sine', frequency: 220 }, { type: 'output', input: 0 }] }); await graph.play(); return graph; };
+    const setup = async ({ engine }) => { const graph = await engine.mount(Graph({}, g => ({ output: g.oscillator('sine', 220) }))); await graph.play(); return graph; };
     const powered = first.turnOn(setup);
     powered.ready.catch(() => {}); powered.ended.catch(() => {});
     let error;

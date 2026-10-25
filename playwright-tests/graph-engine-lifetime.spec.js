@@ -15,8 +15,19 @@ test.beforeAll(() => {
 });
 
 test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__workletByContext = new WeakMap();
+    const NativeNode = window.AudioWorkletNode;
+    window.AudioWorkletNode = class extends NativeNode {
+      constructor(...args) {
+        super(...args);
+        window.__workletByContext.set(this.context, this);
+      }
+    };
+  });
   await page.route('**/lifetime-test-driver.js', route => route.fulfill({ path: driver, contentType: 'application/javascript' }));
   await page.goto('/graph-example.html');
+  await page.evaluate(async () => { window.Graph = (await import('/graph-engine.js')).Graph; });
 });
 
 test('pause and rejected updates remain live; normal close retains one result for multiple and late waits', async ({ page }) => {
@@ -24,7 +35,7 @@ test('pause and rejected updates remain live; normal close retains one result fo
     const { GraphEngine } = await import('/graph-engine.js');
     const context = new OfflineAudioContext(1, 128, 48000);
     const engine = await GraphEngine({ context });
-    const graph = await engine.mount({ params: { pitch: 220 }, nodes: [{ type: 'oscillator', waveform: 'sine', frequency: { param: 'pitch' } }, { type: 'output', input: 0 }] });
+    const graph = await engine.mount(Graph({ pitch: 220 }, g => ({ output: g.oscillator('sine', g.param('pitch')) })));
     let exited = false;
     const first = engine.wait().then(exit => { exited = true; return exit; });
     const second = engine.wait();
@@ -80,7 +91,7 @@ test('processor failure during close wins and command admission remains closed',
       const engine = await GraphEngine({ context });
       const waiting = engine.wait();
       const closing = engine.close().catch(error => error);
-      engine.output.onprocessorerror(new Event('processorerror'));
+      window.__workletByContext.get(context).onprocessorerror(new Event('processorerror'));
       const error = await closing;
       const exit = await waiting;
       const admission = await engine.mount({ nodes: [] }).catch(error => error.code);
@@ -98,11 +109,12 @@ test('close deadline releases a silent worklet and rejects its pending commands'
     try {
       const engine = await GraphEngine({ context, closeTimeoutMs: 30 });
       let portClosed = false;
-      const portClose = engine.output.port.close.bind(engine.output.port);
-      engine.output.port.close = () => { portClosed = true; portClose(); };
+      const node = window.__workletByContext.get(context);
+      const portClose = node.port.close.bind(node.port);
+      node.port.close = () => { portClosed = true; portClose(); };
       // Drop outgoing messages after real initialization: the host never gets an ack.
-      engine.output.port.postMessage = () => {};
-      const pending = engine.mount({ nodes: [] }).catch(error => error);
+      node.port.postMessage = () => {};
+      const pending = engine.mount(Graph({}, g => ({ output: g.oscillator('sine', 220) }))).catch(error => error);
       const closing = engine.close();
       const repeated = engine.close();
       const error = await closing.catch(error => error);
@@ -124,7 +136,7 @@ test('MoonBit wait and close preserve a native cleanup error and its metadata by
       const error = new GraphEngineError('HOST_ERROR', 'native cleanup failed', 7);
       const cause = { operation: 'disconnect' };
       error.cause = cause;
-      engine.output.disconnect = () => { throw error; };
+      window.__workletByContext.get(context).disconnect = () => { throw error; };
       const closed = await bridge.engine_lifetime_close(engine);
       const exit = await bridge.engine_lifetime_wait(engine, new AbortController().signal);
       return { ok: closed.ok, type: exit.type, same: closed.error === error && exit.error === error && exit.error.cause === cause, code: exit.error.code, nodeIndex: exit.error.nodeIndex };
@@ -148,8 +160,8 @@ test('cancelling one MoonBit observer leaves another observer and the engine ali
       controller.abort();
       const cancellation = await cancelled;
       const alreadyAborted = await bridge.engine_lifetime_wait(engine, controller.signal).catch(error => error.name);
-      await engine.mount({ nodes: [{ type: 'oscillator', waveform: 'sine', frequency: 220 }, { type: 'output', input: 0 }] });
-      engine.output.onprocessorerror(new Event('processorerror'));
+      await engine.mount(Graph({}, g => ({ output: g.oscillator('sine', 220) })));
+      window.__workletByContext.get(context).onprocessorerror(new Event('processorerror'));
       const exit = await survivor;
       const late = await bridge.engine_lifetime_wait(engine, new AbortController().signal);
       await engine.close();
@@ -171,7 +183,7 @@ for (const ending of ['failure', 'context-close']) {
         const log = [];
         const running = bridge.engine_lifetime_group_probe(engine, new AbortController().signal, log);
         await new Promise(resolve => setTimeout(resolve, 0));
-        if (ending === 'failure') engine.output.onprocessorerror(new Event('processorerror'));
+        if (ending === 'failure') window.__workletByContext.get(context).onprocessorerror(new Event('processorerror'));
         else await context.close();
         const exit = await running;
         return { type: exit.type, log: log.map(event => event.type) };
@@ -189,7 +201,7 @@ test('MoonBit group cancellation still completes bounded cleanup when close is u
     await context.suspend();
     try {
       const engine = await GraphEngine({ context, closeTimeoutMs: 30 });
-      engine.output.port.postMessage = () => {};
+      window.__workletByContext.get(context).port.postMessage = () => {};
       const log = [];
       const controller = new AbortController();
       const running = bridge.engine_lifetime_group_probe(engine, controller.signal, log).catch(error => error.name);

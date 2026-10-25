@@ -7,63 +7,12 @@ export interface ParamRef<Name extends string> {
 
 type Scalar<Name extends string> = [Name] extends [never] ? number : number | ParamRef<Name>;
 
-export interface OscillatorNode<Name extends string = never> {
-  readonly type: 'oscillator';
-  readonly waveform: Waveform;
-  /** Finite frequency in Hz; validated by the host. */
-  readonly frequency: Scalar<Name>;
-}
-
-export interface GainNode<Name extends string = never> {
-  readonly type: 'gain';
-  /** Index of the input node in Graph.nodes. */
-  readonly input: number;
-  readonly gain: Scalar<Name>;
-}
-
-export interface OutputNode {
-  readonly type: 'output';
-  readonly input: number;
-}
-
-/** Authoring data, not a Web Audio AudioNode or a compiled DSP node. */
-export interface AdsrNode<Name extends string = never> {
-  readonly type: 'adsr';
-  readonly attackMs: Scalar<Name>;
-  readonly decayMs: Scalar<Name>;
-  readonly sustain: Scalar<Name>;
-  readonly releaseMs: Scalar<Name>;
-}
-
 export type BiquadMode = 'lowpass' | 'highpass' | 'bandpass';
 
-export interface BiquadNode<Name extends string = never> {
-  readonly type: 'biquad';
-  /** Index of the input node in Graph.nodes. */
-  readonly input: number;
-  readonly mode: BiquadMode;
-  readonly cutoff: Scalar<Name>;
-  readonly q: Scalar<Name>;
-}
-
-export interface MulNode {
-  readonly type: 'mul';
-  /** Index of the first input node in Graph.nodes. */
-  readonly input0: number;
-  /** Index of the second input node in Graph.nodes. */
-  readonly input1: number;
-}
-
-/** Authoring data, not a Web Audio AudioNode or a compiled DSP node. */
-export type GraphNode<Name extends string = never> =
-  | OscillatorNode<Name> | AdsrNode<Name> | BiquadNode<Name> | MulNode | GainNode<Name> | OutputNode;
-
-/** Reusable description. Bounds, finite values and graph topology are checked at runtime. */
+declare const graphBrand: unique symbol;
+/** Opaque reusable graph created by Graph() in this module; not serializable. */
 export interface Graph<Name extends string = never, Gate extends string = never> {
-  readonly nodes: readonly GraphNode<Name>[];
-  readonly params?: Readonly<Record<Name, number>>;
-  /** Names of reachable ADSR nodes, validated when mounted. */
-  readonly gates?: Readonly<Record<Gate, number>>;
+  readonly [graphBrand]: { readonly params: Name; readonly gates: Gate };
 }
 
 export interface GraphUpdate<Name extends string = never, Gate extends string = never> {
@@ -83,10 +32,15 @@ export interface GraphBuilder<Name extends string> {
   gain(input: GraphSignal, gain: Scalar<Name>): GraphSignal;
   mul(left: GraphSignal, right: GraphSignal): GraphSignal;
   biquad(input: GraphSignal, mode: BiquadMode, cutoff: Scalar<Name>, q: Scalar<Name>): GraphSignal;
-  adsr(options: Omit<AdsrNode<Name>, 'type'>): GraphSignal<'adsr'>;
+  adsr(options: {
+    readonly attackMs: Scalar<Name>;
+    readonly decayMs: Scalar<Name>;
+    readonly sustain: Scalar<Name>;
+    readonly releaseMs: Scalar<Name>;
+  }): GraphSignal<'adsr'>;
 }
 
-/** Synchronous, single-owner construction. Returns a frozen reusable description. */
+/** Synchronous, single-owner construction. Returns a frozen opaque graph. */
 export function Graph<Name extends string = never, Gate extends string = never>(
   params: Readonly<Record<Name, number>>,
   build: (graph: GraphBuilder<NoInfer<Name>>) => {
@@ -123,14 +77,13 @@ export interface GraphEngineWaitOptions {
 }
 
 export interface GraphEngine {
-  /** Mono output; connecting it is the caller's responsibility. */
-  readonly output: AudioWorkletNode;
+  /** Connect the mono output using native overloads/returns. Throws synchronously after closing/failure. */
+  readonly connect: AudioNode['connect'];
+  /** Native disconnection, including targeted removal. Available after close for cleanup; does not pause. */
+  readonly disconnect: AudioNode['disconnect'];
   /** Compile and register a paused graph, before playback in a suspended context. */
   readonly mount: <Name extends string = never, Gate extends string = never>(
-    graph: Graph<NoInfer<Name>, NoInfer<Gate>> & {
-      readonly params?: Readonly<Record<Name, number>>;
-      readonly gates?: Readonly<Record<Gate, number>>;
-    },
+    graph: Graph<Name, Gate>,
   ) => Promise<MountedGraph<Name, Gate>>;
   /** Observe retained exit without stopping the engine. Pre-aborted signals reject even after exit. */
   readonly wait: (options?: GraphEngineWaitOptions) => Promise<EngineExit>;

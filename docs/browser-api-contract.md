@@ -58,20 +58,16 @@ JavaScript manages browser resources and asynchronous transport, not DSP
 state or compilation.
 
 ```js
-import { GraphEngine } from "./graph-engine.js";
+import { GraphEngine, Graph } from "./graph-engine.js";
 
 // The application owns this context. Mount graphs before resuming it.
 const context = new AudioContext();
 await context.suspend();
 const engine = await GraphEngine({ context });
-const sound = await engine.mount({
-  nodes: [
-    { type: "oscillator", waveform: "triangle", frequency: 220 },
-    { type: "gain", input: 0, gain: 0.1 },
-    { type: "output", input: 1 },
-  ],
-});
-engine.output.connect(context.destination);
+const sound = await engine.mount(Graph({}, g => ({
+  output: g.gain(g.oscillator("triangle", 220), 0.1),
+})));
+engine.connect(context.destination);
 
 // Run these operations from a user gesture, such as a Play button.
 await context.resume();
@@ -93,7 +89,18 @@ perform browser admission.
 
 ### Description and mounting
 
-- A description contains `nodes`, an array of 1–64 node objects. It may also
+- `engine.mount` accepts only opaque values made by this module's `Graph`
+  function. A graph exposes no `nodes`, `params`, or `gates` properties. Raw
+  objects, spread copies, structured clones, and JSON round-trips reject with
+  `INVALID_GRAPH`, without reading caller properties. JS-side closed-engine
+  and context-state checks take precedence. Worklet mount admission runs only
+  after a genuine graph passes this boundary; JS does not mirror its sealed state.
+  The same graph can be mounted more
+  than once, with independent DSP state. Graphs from a separate module instance
+  are not interchangeable; import `Graph` and `GraphEngine` from the same module.
+- The following description format is private JS/Worklet/Wasm transport, not
+  a public authoring or persistence API. There is no raw-data import API.
+  A description contains `nodes`, an array of 1–64 node objects. It may also
   contain `params`, a record of at most 256 exact string names mapped to finite
   numeric initial values. Array indices identify connections. The caller
   supplies the graph; it is not a demo preset.
@@ -125,12 +132,14 @@ perform browser admission.
   Multiple names may refer to one envelope. All envelopes initially have closed gates.
   Named parameter and gate requirements are validated against the compiled
   graph before registration, without applying updates or gate actions.
-- `Graph(params, build)` constructs this same format without `new`.
+- `Graph(params, build)` constructs an opaque graph without `new` and retains
+  its description privately.
   The synchronous callback receives `param`, `oscillator`, `gain`, `mul`,
   `biquad`, and `adsr` operations and returns `{ output, gates? }`. Connections
   use opaque references owned by that callback's builder; shared references
   reuse nodes. Foreign references and post-callback builder calls reject with
-  `INVALID_GRAPH`. The result is a frozen description with one appended output.
+  `INVALID_GRAPH`. The result is a frozen graph; its private description has
+  one appended output.
   Parameter defaults and references are snapshotted. TypeScript infers parameter
   names from defaults and gate names from the returned map. It does not prove
   per-builder ownership or graph validity; runtime checks remain authoritative.
@@ -169,9 +178,19 @@ perform browser admission.
   and `update` reject with `GraphEngineError.code === "INVALID_HANDLE"`.
   Repeated unmount cannot affect another graph that reuses the underlying slot.
   An invalid command does not change another graph or close mount admission.
-- All playing graphs sum into `engine.output`, a mono `AudioWorkletNode`.
-  Connect it to any compatible Web Audio destination. There is no automatic
-  master limiter; callers must choose gains appropriate for the sum.
+- All playing graphs sum into one private mono Worklet output. Use synchronous
+  `engine.connect(...)` and `engine.disconnect(...)`, with the native
+  `AudioNode` overloads, returns, and exceptions. There is one output (index 0).
+  AudioNode/AudioParam destinations, input selection, fan-out, and targeted
+  disconnection follow Web Audio semantics; no connection registry is mirrored
+  in JS. `connect` throws the engine's unavailable error after close begins,
+  context closure, or processor failure. `disconnect` remains callable for
+  cleanup, even after termination; no-argument disconnection removes all
+  connections, while removing a nonexistent target throws the native exception.
+  Disconnecting does not pause DSP or close the engine. The Worklet, port, and
+  error handler are not public; `engine.output` has no compatibility alias.
+  There is no automatic master limiter; callers must choose gains appropriate
+  for the sum.
 - Rendering uses the actual context sample rate and currently supports
   128-frame render quanta. A different quantum produces a processor failure,
   rather than silently truncating audio.
@@ -627,36 +646,33 @@ objects, not just fresh literals. Its exact-key constraint is intentional;
 replacing it with only `Partial<Record<Name, number>>` would lose that guarantee.
 
 ```ts
-import { GraphEngine, type Graph } from "./graph-engine.js";
+import { GraphEngine, Graph } from "./graph-engine.js";
 
-const graph = {
-  params: { volume: 0.1, cutoff: 2_000 },
-  nodes: [
-    { type: "oscillator", waveform: "triangle", frequency: 220 },
-    { type: "biquad", input: 0, mode: "lowpass", cutoff: { param: "cutoff" }, q: 0.7 },
-    { type: "gain", input: 1, gain: { param: "volume" } },
-    { type: "output", input: 2 },
-  ],
-} as const satisfies Graph<"volume" | "cutoff">;
+const graph = Graph({ volume: 0.1, cutoff: 2_000 }, g => {
+  const oscillator = g.oscillator("triangle", 220);
+  const filter = g.biquad(oscillator, "lowpass", g.param("cutoff"), 0.7);
+  return { output: g.gain(filter, g.param("volume")) };
+});
 
 const engine = await GraphEngine({ context });
 const sound = await engine.mount(graph);
 await sound.update({ params: { volume: 0.2 } }); // updates every volume target
 ```
 The declaration exports the `Graph` function and `Graph<Name, Gate>` type,
-`GraphBuilder<Name>`, `GraphSignal`, `GraphUpdate<Name, Gate>`, the discriminated
-`GraphNode<Name>` union and its node variants, `ParamRef<Name>`,
+`GraphBuilder<Name>`, `GraphSignal`, `GraphUpdate<Name, Gate>`, `ParamRef<Name>`,
 `GraphEngineOptions`, `GraphEngineWaitOptions`, `EngineExit`, `GraphEngine`,
 `MountedGraph<Name, Gate>`, and `GraphEngineErrorCode`. `Name` is inferred from
-`params` keys when mounting; an explicit union such as
+the constructor's parameter keys; an explicit union such as
 `Graph<"volume" | "cutoff">` enables exact ref and update-key
-checking. `Gate` is inferred from `gates` keys. Graphs without declarations do
+checking. `Gate` is inferred from the builder's returned gate keys. Graphs without declarations do
 not acquire parameter or gate names from updates. Runtime validation remains
 authoritative for broadened dynamic data.
 
-Readonly descriptions (including `as const` arrays) are accepted without
-requiring a mutable copy. Returned handle properties are readonly, matching
-their frozen runtime objects. Bounds, finite numbers, topology, and lifecycle
+The graph type is branded; a plain object is not a graph. Runtime identity
+checks remain necessary even for typed values (for example, structured cloning
+does not preserve identity). Numeric node-shape types are not exported.
+Returned handle properties are readonly, matching their frozen runtime objects.
+Bounds, finite numbers, topology, and lifecycle
 state remain runtime checks; the declarations do not claim to prove them.
 Catch values still require narrowing with `instanceof GraphEngineError`;
 `nodeIndex` is optional and `cause` is `unknown`, including arbitrary abort reasons.

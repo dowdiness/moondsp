@@ -1,6 +1,6 @@
 /// <reference lib="esnext.disposable" />
 import { AudioPower, type AudioSetup, type AudioEnd, type PoweredAudio } from '../web/audio-power.js';
-import type { GraphEngine, MountedGraph } from '../web/graph-engine.js';
+import { Graph, type GraphEngine, type MountedGraph } from '../web/graph-engine.js';
 
 const power: AudioPower = AudioPower({
   contextOptions: { sampleRate: 48000 },
@@ -15,11 +15,7 @@ const powered = power.turnOn(async (setup: AudioSetup) => {
   const engine: GraphEngine = setup.engine;
   const signal: AbortSignal = setup.powerOff;
   signal.throwIfAborted();
-  const graph = await engine.mount({ nodes: [
-    { type: 'oscillator', waveform: 'sine', frequency: 220 },
-    { type: 'gain', input: 0, gain: 0.1 },
-    { type: 'output', input: 1 },
-  ] });
+  const graph = await engine.mount(Graph({}, g => ({ output: g.gain(g.oscillator('sine', 220), 0.1) })));
   await graph.play();
   void context;
   return { graph, name: 'instrument' as const };

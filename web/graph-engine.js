@@ -78,7 +78,10 @@ const encodeUpdate = (update, bindings) => {
   }
 };
 
-/** Build a reusable description; MoonBit remains the graph validator/compiler. */
+// Graph values carry identity only; wire descriptions are private transport data.
+const graphDescriptions = new WeakMap();
+
+/** Build a reusable graph; MoonBit remains the graph validator/compiler. */
 export function Graph(params, build) {
   const defaults = Object.freeze(snapshotParams(params));
   const nodes = [];
@@ -127,7 +130,11 @@ export function Graph(params, build) {
       for (const [name, reference] of Object.entries(result.gates)) gates[name] = index(reference, 'adsr');
     }
     add({ type: 'output', input: index(result.output) });
-    return Object.freeze({ params: defaults, gates: Object.freeze(gates), nodes: Object.freeze(nodes) });
+    const graph = Object.freeze(Object.create(null));
+    graphDescriptions.set(graph, Object.freeze({
+      params: defaults, gates: Object.freeze(gates), nodes: Object.freeze(nodes),
+    }));
+    return graph;
   } finally {
     active = false;
   }
@@ -324,7 +331,13 @@ function createSession(context, node, closeTimeoutMs) {
   };
 
   return Object.freeze({
-    output: node,
+    connect(...args) {
+      const error = unavailable();
+      if (error) throw error;
+      return node.connect(...args);
+    },
+    // Cleanup remains available after termination; native disconnect semantics apply.
+    disconnect(...args) { return node.disconnect(...args); },
     wait({ signal: observerSignal } = {}) {
       const abortError = () => {
         const error = new DOMException('Engine wait was aborted', 'AbortError');
@@ -350,12 +363,11 @@ function createSession(context, node, closeTimeoutMs) {
       if (context.state !== 'suspended') {
         throw new GraphEngineError('MOUNT_CLOSED', 'Mount graphs before playback or resuming the context');
       }
-      if (graph !== null && typeof graph === 'object' && !Array.isArray(graph)) {
-        graph = { ...graph };
-        if (Object.hasOwn(graph, 'params')) graph.params = snapshotParams(graph.params);
-        if (Object.hasOwn(graph, 'gates')) graph.gates = snapshotParams(graph.gates);
+      const description = graphDescriptions.get(graph);
+      if (!description) {
+        throw new GraphEngineError('INVALID_GRAPH', 'Mount a graph created by Graph() from this module');
       }
-      const { handle, bindings } = await request('mount', { graph });
+      const { handle, bindings } = await request('mount', { graph: description });
       let unmounting = null;
       const command = action => unmounting
         ? Promise.reject(new GraphEngineError('INVALID_HANDLE', 'The graph has been unmounted'))

@@ -5,20 +5,20 @@ test.use({ launchOptions: { args: ['--disable-audio-output'] } });
 // These tests use the public engine, not WASM exports or worklet messages.
 // OfflineAudioContext is the browser's real AudioWorklet render path and lets
 // us compare every PCM frame without device timing or listening judgments.
-test.beforeEach(async ({ page }) => { await page.goto('/graph-example.html'); });
+test.beforeEach(async ({ page }) => {
+  await page.goto('/graph-example.html');
+  await page.evaluate(async () => { window.Graph = (await import('/graph-engine.js')).Graph; });
+});
 
 test('external graph produces the requested oscillator and chained gains', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const { GraphEngine } = await import('/graph-engine.js')
     const context = new OfflineAudioContext(1, 4096, 48000);
     const engine = await GraphEngine({ context });
-    const source = await engine.mount({ nodes: [
-      { type: 'oscillator', waveform: 'sine', frequency: 375 },
-      { type: 'gain', input: 0, gain: 0.4 },
-      { type: 'gain', input: 1, gain: 0.5 },
-      { type: 'output', input: 2 },
-    ] });
-    engine.output.connect(context.destination);
+    const source = await engine.mount(Graph({}, g => ({
+      output: g.gain(g.gain(g.oscillator('sine', 375), 0.4), 0.5),
+    })));
+    engine.connect(context.destination);
     await source.play();
     const buffer = await context.startRendering();
     let residual = 0;
@@ -36,23 +36,19 @@ test('invalid graphs return reasons without damaging a mounted graph', async ({ 
     const { GraphEngine } = await import('/graph-engine.js')
     const context = new OfflineAudioContext(1, 1024, 48000);
     const engine = await GraphEngine({ context });
-    const source = await engine.mount({ nodes: [
-      { type: 'oscillator', waveform: 'square', frequency: 750 },
-      { type: 'gain', input: 0, gain: 0.125 },
-      { type: 'output', input: 1 },
-    ] });
+    const source = await engine.mount(Graph({}, g => ({ output: g.gain(g.oscillator('square', 750), 0.125) })));
     const errors = [];
-    for (const graph of [
-      { nodes: [{ type: 'gain', input: 9, gain: 0.2 }, { type: 'output', input: 0 }] },
-      { nodes: [{ type: 'oscillator', waveform: 'unknown', frequency: 440 }] },
-      { nodes: [{ type: 'oscillator', waveform: 'sine', frequency: NaN }] },
-      { nodes: [{ type: 'oscillator', waveform: 'sine', frequency: 440 }] },
-      { nodes: [{ type: 'oscillator', waveform: 'sine', frequency: 440 }, { type: 'output', input: 0 }, { type: 'output', input: 0 }] },
+    for (const build of [
+      g => ({ output: g.gain({}, 0.2) }),
+      g => ({ output: g.oscillator('unknown', 440) }),
+      g => ({ output: g.oscillator('sine', NaN) }),
+      g => { g.oscillator('sine', 440); return {}; },
+      g => ({ output: g.biquad(g.oscillator('sine', 440), 'lowpass', -1, 0.7) }),
     ]) {
-      try { await engine.mount(graph); errors.push(null); }
+      try { await engine.mount(Graph({}, build)); errors.push(null); }
       catch (error) { errors.push({ code: error.code, nodeIndex: error.nodeIndex }); }
     }
-    engine.output.connect(context.destination);
+    engine.connect(context.destination);
     await source.play();
     const buffer = await context.startRendering();
     let residual = 0;
@@ -65,7 +61,6 @@ test('invalid graphs return reasons without damaging a mounted graph', async ({ 
   for (const error of result.errors) {
     expect(error).toMatchObject({ code: 'INVALID_GRAPH' });
   }
-  expect(result.errors[0].nodeIndex).toBe(0);
   expect(result.residual).toBeLessThan(1e-6);
 });
 
@@ -74,14 +69,11 @@ test('named updates apply atomically and gate release keeps the graph playable',
     const { GraphEngine } = await import('/graph-engine.js')
     const context = new OfflineAudioContext(1, 4096, 48000);
     const engine = await GraphEngine({ context });
-    const source = await engine.mount({ params: { volume: 0.2, sustain: 1 }, gates: { amp: 2 }, nodes: [
-      { type: 'oscillator', waveform: 'sine', frequency: 440 },
-      { type: 'biquad', input: 0, mode: 'lowpass', cutoff: 2000, q: 0.7 },
-      { type: 'adsr', attackMs: 0, decayMs: 0, sustain: { param: 'sustain' }, releaseMs: 1 },
-      { type: 'mul', input0: 1, input1: 2 },
-      { type: 'gain', input: 3, gain: { param: 'volume' } },
-      { type: 'output', input: 4 },
-    ] });
+    const source = await engine.mount(Graph({ volume: 0.2, sustain: 1 }, g => {
+      const filtered = g.biquad(g.oscillator('sine', 440), 'lowpass', 2000, 0.7);
+      const amp = g.adsr({ attackMs: 0, decayMs: 0, sustain: g.param('sustain'), releaseMs: 1 });
+      return { output: g.gain(g.mul(filtered, amp), g.param('volume')), gates: { amp } };
+    }));
     let rejected;
     try {
       await source.update({ params: { volume: 0.4, sustain: 1.5 } });
@@ -95,7 +87,7 @@ test('named updates apply atomically and gate release keeps the graph playable',
       decodedRejection = error.code;
     }
     await source.update({ gates: [{ target: 'amp', action: 'on' }] });
-    engine.output.connect(context.destination);
+    engine.connect(context.destination);
     await source.play();
     const suspended = context.suspend(2048 / 48000);
     const rendering = context.startRendering();
@@ -127,10 +119,7 @@ test('updates reject after unmount and engine close without reviving a graph', a
     const { GraphEngine } = await import('/graph-engine.js')
     const context = new OfflineAudioContext(1, 128, 48000);
     const engine = await GraphEngine({ context });
-    const graph = { params: { pitch: 440 }, nodes: [
-      { type: 'oscillator', waveform: 'triangle', frequency: { param: 'pitch' } },
-      { type: 'output', input: 0 },
-    ] };
+    const graph = Graph({ pitch: 440 }, g => ({ output: g.oscillator('triangle', g.param('pitch')) }));
     const retired = await engine.mount(graph);
     await retired.unmount();
     let afterUnmount;
@@ -159,14 +148,10 @@ test('unmounting one playing graph preserves the other graph and its phase', asy
     const { GraphEngine } = await import('/graph-engine.js')
     const context = new OfflineAudioContext(1, 4096, 48000);
     const engine = await GraphEngine({ context });
-    const patch = (frequency, gain) => ({ nodes: [
-      { type: 'oscillator', waveform: 'sine', frequency },
-      { type: 'gain', input: 0, gain },
-      { type: 'output', input: 1 },
-    ] });
+    const patch = (frequency, gain) => Graph({}, g => ({ output: g.gain(g.oscillator('sine', frequency), gain) }));
     const first = await engine.mount(patch(375, 0.2));
     const second = await engine.mount(patch(562.5, 0.1));
-    engine.output.connect(context.destination);
+    engine.connect(context.destination);
     await first.play();
     await second.play();
     const suspended = context.suspend(2048 / 48000);
@@ -203,11 +188,7 @@ test('unmounted handles cannot control a replacement graph in a reused slot', as
     const { GraphEngine } = await import('/graph-engine.js')
     const context = new OfflineAudioContext(1, 1024, 48000);
     const engine = await GraphEngine({ context });
-    const patch = { nodes: [
-      { type: 'oscillator', waveform: 'triangle', frequency: 375 },
-      { type: 'gain', input: 0, gain: 0.2 },
-      { type: 'output', input: 1 },
-    ] };
+    const patch = Graph({}, g => ({ output: g.gain(g.oscillator('triangle', 375), 0.2) }));
     const retired = await engine.mount(patch);
     await Promise.all([retired.unmount(), retired.unmount()]);
     const replacement = await engine.mount(patch);
@@ -220,7 +201,7 @@ test('unmounted handles cannot control a replacement graph in a reused slot', as
     // Rejected playback must not close mount admission.
     const afterRejection = await engine.mount(patch);
     await afterRejection.unmount();
-    engine.output.connect(context.destination);
+    engine.connect(context.destination);
     await replacement.play();
     const buffer = await context.startRendering();
     let residual = 0;
@@ -245,7 +226,7 @@ test('external page mounts, plays, pauses and unmounts through public controls',
   await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'Unmount', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Mount graph', exact: true })).toBeEnabled();
-  await expect(page.getByRole('textbox', { name: 'Graph description' })).toBeEnabled();
+  await expect(page.getByRole('textbox', { name: 'Graph parameters' })).toBeEnabled();
   const ownership = await page.evaluate(async () => {
     const { GraphEngine } = await import('/graph-engine.js')
     const context = new AudioContext();
@@ -277,7 +258,7 @@ test('example releases a failed engine and allows mounting again', async ({ page
   await page.evaluate(() => failedExampleNode.onprocessorerror(new Event('processorerror')));
   await page.getByRole('button', { name: 'Unmount', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Mount graph', exact: true })).toBeEnabled();
-  await expect(page.getByRole('textbox', { name: 'Graph description' })).toBeEnabled();
+  await expect(page.getByRole('textbox', { name: 'Graph parameters' })).toBeEnabled();
   expect(await page.evaluate(() => failedExampleContext.state)).toBe('closed');
   await expect(page.locator('#status')).toContainText('PROCESSOR_FAILED');
 
@@ -294,11 +275,7 @@ test('concurrent engine close shares completion and closes admission immediately
     const { GraphEngine } = await import('/graph-engine.js')
     const context = new OfflineAudioContext(1, 128, 48000);
     const engine = await GraphEngine({ context });
-    const graph = { nodes: [
-      { type: 'oscillator', waveform: 'sine', frequency: 440 },
-      { type: 'gain', input: 0, gain: 0.1 },
-      { type: 'output', input: 1 },
-    ] };
+    const graph = Graph({}, g => ({ output: g.gain(g.oscillator('sine', 440), 0.1) }));
     const source = await engine.mount(graph);
     const firstClose = engine.close();
     const secondClose = engine.close();
@@ -325,10 +302,7 @@ test('closed engine takes precedence over playback admission and closed context'
     const context = new AudioContext();
     await context.suspend();
     const engine = await GraphEngine({ context });
-    const graph = { nodes: [
-      { type: 'oscillator', waveform: 'sine', frequency: 440 },
-      { type: 'output', input: 0 },
-    ] };
+    const graph = Graph({}, g => ({ output: g.oscillator('sine', 440) }));
     const sound = await engine.mount(graph);
     await sound.play();
     const closing = engine.close();
@@ -375,14 +349,10 @@ test('pause freezes phase while another graph continues rendering', async ({ pag
     const { GraphEngine } = await import('/graph-engine.js')
     const context = new OfflineAudioContext(1, 4096, 48000);
     const engine = await GraphEngine({ context });
-    const patch = frequency => ({ nodes: [
-      { type: 'oscillator', waveform: 'sine', frequency },
-      { type: 'gain', input: 0, gain: 0.1 },
-      { type: 'output', input: 1 },
-    ] });
+    const patch = frequency => Graph({}, g => ({ output: g.gain(g.oscillator('sine', frequency), 0.1) }));
     const sound = await engine.mount(patch(437));
     const other = await engine.mount(patch(613));
-    engine.output.connect(context.destination);
+    engine.connect(context.destination);
     await sound.play();
     await other.play();
     const pauseAt = context.suspend(1024 / 48000);
@@ -505,9 +475,7 @@ test('context closure settles commands whose worklet never replies', async ({ pa
       context: shutdownContext, processorUrl,
     });
     URL.revokeObjectURL(processorUrl);
-    const mounting = shutdownEngine.mount({ nodes: [
-      { type: 'oscillator', waveform: 'sine', frequency: 440 }, { type: 'output', input: 0 },
-    ] });
+    const mounting = shutdownEngine.mount(Graph({}, g => ({ output: g.oscillator('sine', 440) })));
     const closing = shutdownEngine.close();
     window.shutdownOutcome = null;
     Promise.allSettled([mounting, closing]).then(results => {
@@ -529,11 +497,8 @@ test('abort signal stops owning the engine after successful creation', async ({ 
     const controller = new AbortController();
     const engine = await GraphEngine({ context, signal: controller.signal });
     controller.abort();
-    const sound = await engine.mount({ nodes: [
-      { type: 'oscillator', waveform: 'square', frequency: 440 },
-      { type: 'gain', input: 0, gain: 0.1 }, { type: 'output', input: 1 },
-    ] });
-    engine.output.connect(context.destination);
+    const sound = await engine.mount(Graph({}, g => ({ output: g.gain(g.oscillator('square', 440), 0.1) })));
+    engine.connect(context.destination);
     await sound.play();
     const buffer = await context.startRendering();
     await engine.close();
@@ -648,19 +613,13 @@ test.describe('named parameters', () => {
       const { GraphEngine } = await import('/graph-engine.js');
       const context = new OfflineAudioContext(1, 256, 48000);
       const engine = await GraphEngine({ context });
-      engine.output.connect(context.destination);
+      engine.connect(context.destination);
       window.namedParameters = {
         engine,
         context,
-        graph: {
-          params: { level: 0.5, pitch: 375 },
-          nodes: [
-            { type: 'oscillator', waveform: 'square', frequency: { param: 'pitch' } },
-            { type: 'gain', input: 0, gain: { param: 'level' } },
-            { type: 'gain', input: 1, gain: { param: 'level' } },
-            { type: 'output', input: 2 },
-          ],
-        },
+        graph: Graph({ level: 0.5, pitch: 375 }, g => ({
+          output: g.gain(g.gain(g.oscillator('square', g.param('pitch')), g.param('level')), g.param('level')),
+        })),
         async render(sound) {
           await sound.play();
           const buffer = await context.startRendering();
@@ -792,17 +751,11 @@ test.describe('named parameters', () => {
   test('one target rejecting a value leaves every target unchanged', async ({ page }) => {
     const result = await page.evaluate(async () => {
       const { engine, render } = window.namedParameters;
-      const sound = await engine.mount({
-        params: { shared: 0.5 },
-        gates: { amp: 2 },
-        nodes: [
-          { type: 'oscillator', waveform: 'square', frequency: 375 },
-          { type: 'gain', input: 0, gain: { param: 'shared' } },
-          { type: 'adsr', attackMs: 0, decayMs: 0, sustain: { param: 'shared' }, releaseMs: 0 },
-          { type: 'mul', input0: 1, input1: 2 },
-          { type: 'output', input: 3 },
-        ],
-      });
+      const sound = await engine.mount(Graph({ shared: 0.5 }, g => {
+        const signal = g.gain(g.oscillator('square', 375), g.param('shared'));
+        const amp = g.adsr({ attackMs: 0, decayMs: 0, sustain: g.param('shared'), releaseMs: 0 });
+        return { output: g.mul(signal, amp), gates: { amp } };
+      }));
       await sound.update({ gates: [{ target: 'amp', action: 'on' }] });
       // 1.5 is a valid gain but an invalid sustain.
       const error = await sound.update({ params: { shared: 1.5 } }).then(() => null,
@@ -828,33 +781,33 @@ test.describe('named parameters', () => {
     expect(result).toEqual({ unmounted: 'INVALID_HANDLE', closed: 'ENGINE_CLOSED' });
   });
 
-  const oscillator = { type: 'oscillator', waveform: 'square', frequency: 375 };
-  const numericNodes = [oscillator, { type: 'gain', input: 0, gain: 0.5 }, { type: 'output', input: 1 }];
-  for (const [reason, description] of [
-    ['undeclared references', {
-      nodes: [oscillator, { type: 'gain', input: 0, gain: { param: 'missing' } }, numericNodes[2]],
-    }],
-    ['unused declarations', { params: { unused: 1 }, nodes: numericNodes }],
-    ['non-envelope gate targets', { gates: { amp: 0 }, nodes: numericNodes }],
-    ['fractional gate indices', { gates: { amp: 0.5 }, nodes: numericNodes }],
-    ['undefined gate indices', { gates: { amp: undefined }, nodes: numericNodes }],
-    ['orphan gate targets', { gates: { amp: 3 }, nodes: [
-      ...numericNodes, { type: 'adsr', attackMs: 0, decayMs: 0, sustain: 1, releaseMs: 0 },
-    ] }],
-    ['malformed references', {
-      params: { level: 0.5 },
-      nodes: [oscillator, { type: 'gain', input: 0, gain: { param: 'level', extra: 1 } }, numericNodes[2]],
-    }],
-    ['undefined defaults that JSON would silently omit', { params: { lost: undefined }, nodes: numericNodes }],
-    ['non-finite defaults', {
-      params: { level: NaN },
-      nodes: [oscillator, { type: 'gain', input: 0, gain: { param: 'level' } }, numericNodes[2]],
-    }],
+  for (const reason of [
+    'undeclared references', 'unused declarations', 'non-envelope gate targets',
+    'numeric gate references', 'undefined gate references', 'orphan gate targets',
+    'malformed references', 'undefined defaults', 'non-finite defaults',
   ]) {
-    test(`mount rejects ${reason}`, async ({ page }) => {
-      const code = await page.evaluate(description =>
-        window.namedParameters.engine.mount(description).then(() => null, error => error.code),
-      description);
+    test(`builder admission rejects ${reason}`, async ({ page }) => {
+      const code = await page.evaluate(async reason => {
+        const defaults = reason === 'unused declarations' ? { unused: 1 }
+          : { level: reason === 'undefined defaults' ? undefined : reason === 'non-finite defaults' ? NaN : 0.5 };
+        try {
+          const graph = Graph(defaults, g => {
+            const oscillator = g.oscillator('square', 375);
+            const output = g.gain(oscillator, reason === 'unused declarations' ? 0.5
+              : reason === 'malformed references' ? { param: 'level', extra: 1 }
+              : g.param(reason === 'undeclared references' ? 'missing' : 'level'));
+            if (reason === 'non-envelope gate targets') return { output, gates: { amp: oscillator } };
+            if (reason === 'numeric gate references') return { output, gates: { amp: 0.5 } };
+            if (reason === 'undefined gate references') return { output, gates: { amp: undefined } };
+            if (reason === 'orphan gate targets') return {
+              output, gates: { amp: g.adsr({ attackMs: 0, decayMs: 0, sustain: 1, releaseMs: 0 }) },
+            };
+            return { output };
+          });
+          await window.namedParameters.engine.mount(graph);
+          return null;
+        } catch (error) { return error.code; }
+      }, reason);
       expect(code).toBe('INVALID_GRAPH');
     });
   }
@@ -905,10 +858,15 @@ test.describe('named parameters', () => {
       // The documented capacity is 16. Leave exactly one slot available.
       const capacity = 16;
       for (let i = 0; i < capacity - 1; i++) await engine.mount(graph);
-      const orphan = structuredClone(graph);
-      orphan.nodes[3].input = 0; // Both named gains are now outside the output path.
-      const error = await engine.mount(orphan).then(() => null,
-        error => ({ code: error.code, nodeIndex: error.nodeIndex }));
+      let error;
+      try {
+        const orphan = Graph({ level: 0.5, pitch: 375 }, g => {
+          const output = g.oscillator('square', g.param('pitch'));
+          g.gain(g.gain(output, g.param('level')), g.param('level'));
+          return { output }; // Both named gains are outside the output path.
+        });
+        await engine.mount(orphan);
+      } catch (cause) { error = { code: cause.code, nodeIndex: cause.nodeIndex }; }
       const replacement = await engine.mount(graph);
       return { error, samples: await render(replacement) };
     });
@@ -920,14 +878,11 @@ test.describe('named parameters', () => {
     const names = ['__proto__', 'toJSON', 'constructor', '音\u{1F642}'];
     const samples = await page.evaluate(async names => {
       const { engine, render } = window.namedParameters;
-      const sound = await engine.mount({
-        params: Object.fromEntries(names.map(name => [name, 0.5])),
-        nodes: [
-          { type: 'oscillator', waveform: 'square', frequency: 375 },
-          ...names.map((name, input) => ({ type: 'gain', input, gain: { param: name } })),
-          { type: 'output', input: names.length },
-        ],
-      });
+      const sound = await engine.mount(Graph(Object.fromEntries(names.map(name => [name, 0.5])), g => {
+        let output = g.oscillator('square', 375);
+        for (const name of names) output = g.gain(output, g.param(name));
+        return { output };
+      }));
       await sound.update({ params: Object.fromEntries(names.map(name => [name, 0.25])) });
       return render(sound);
     }, names);
@@ -940,7 +895,7 @@ test('builder graph applies named params and ordered gates atomically at render 
     const { GraphEngine, Graph } = await import('/graph-engine.js');
     const context = new OfflineAudioContext(1, 768, 48000);
     const engine = await GraphEngine({ context });
-    engine.output.connect(context.destination);
+    engine.connect(context.destination);
     const description = Graph({ pitch: 375, volume: 0.5, sustain: 1 }, g => {
       const oscillator = g.oscillator('square', g.param('pitch'));
       const envelope = g.adsr({ attackMs: 0, decayMs: 0, sustain: g.param('sustain'), releaseMs: 0 });
@@ -1047,7 +1002,7 @@ test('builder graph applies named params and ordered gates atomically at render 
   }
 });
 
-test('builder owns references and freezes reusable descriptions without duplicating shared nodes', async ({ page }) => {
+test('opaque tokens reject counterfeits and preserve independent mounts and shared signals', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const { GraphEngine, Graph } = await import('/graph-engine.js');
     let builder, source;
@@ -1068,19 +1023,45 @@ test('builder owns references and freezes reusable descriptions without duplicat
     }));
     const context = new OfflineAudioContext(1, 128, 48000);
     const engine = await GraphEngine({ context });
-    engine.output.connect(context.destination);
+    engine.connect(context.destination);
+    let getterCalls = 0;
+    const getter = () => { getterCalls++; throw new Error('counterfeit getter invoked'); };
+    const counterfeit = Object.defineProperties({}, Object.fromEntries(
+      ['nodes', 'params', 'gates', 'then', 'toJSON'].map(name => [name, { get: getter }]),
+    ));
+    const otherModule = await import('/graph-engine.js?foreign-token');
+    const foreignToken = otherModule.Graph({}, g => ({ output: g.oscillator('sine', 375) }));
+    const counterfeits = [
+      { nodes: [{ type: 'oscillator', waveform: 'sine', frequency: 375 }, { type: 'output', input: 0 }] },
+      { ...graph }, structuredClone(graph), Object.create(graph), counterfeit, foreignToken,
+    ];
+    const rejected = [];
+    for (const candidate of counterfeits) {
+      rejected.push(await engine.mount(candidate).then(() => null, error => error.code));
+    }
     const a = await engine.mount(graph);
     const b = await engine.mount(graph);
     await a.update({ params: { gain: 0.5 } });
     await a.play();
     await b.play();
+    const sealedGraph = await engine.mount(graph).then(() => null, error => error.code);
+    // Invalid identities stop at JS admission, before the Worklet's sealed state.
+    const sealedCounterfeit = await engine.mount(counterfeit).then(() => null, error => error.code);
     const samples = Array.from((await context.startRendering()).getChannelData(0));
     await engine.close();
-    return { foreign, late, fake, wrongGate, samples, nodeCount: graph.nodes.length,
-      frozen: Object.isFrozen(graph) && Object.isFrozen(graph.nodes) && Object.isFrozen(graph.params) };
+    const closedCounterfeit = await engine.mount(counterfeit).then(() => null, error => error.code);
+    return { foreign, late, fake, wrongGate, samples, rejected, getterCalls, sealedGraph, sealedCounterfeit, closedCounterfeit,
+      hidden: !('nodes' in graph) && !('params' in graph) && !('gates' in graph),
+      ownKeys: Reflect.ownKeys(graph).length, frozen: Object.isFrozen(graph) };
   });
   expect([result.foreign, result.late, result.fake, result.wrongGate]).toEqual(Array(4).fill('INVALID_GRAPH'));
-  expect(result.nodeCount).toBe(4); // oscillator, multiply, gain, output; no duplicate oscillator.
+  expect(result.rejected).toEqual(Array(6).fill('INVALID_GRAPH'));
+  expect(result.getterCalls).toBe(0);
+  expect(result.sealedGraph).toBe('MOUNT_CLOSED');
+  expect(result.sealedCounterfeit).toBe('INVALID_GRAPH');
+  expect(result.closedCounterfeit).toBe('ENGINE_CLOSED');
+  expect(result.hidden).toBe(true);
+  expect(result.ownKeys).toBe(0);
   expect(result.frozen).toBe(true);
   for (let i = 0; i < 128; i++) {
     expect(result.samples[i]).toBeCloseTo(0.75 * Math.sin(2 * Math.PI * 375 * i / 48000) ** 2, 6);

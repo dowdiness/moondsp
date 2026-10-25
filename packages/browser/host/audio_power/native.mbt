@@ -150,11 +150,11 @@ extern "js" fn connect_output(
   engine : @host.NativeEngine,
   context : NativeContext,
 ) -> NativeResult =
-  #| (engine, context) => { try { engine.output.connect(context.destination); return { ok: true }; } catch (error) { return { ok: false, error }; } }
+  #| (engine, context) => { try { engine.connect(context.destination); return { ok: true }; } catch (error) { return { ok: false, error }; } }
 
 ///|
 extern "js" fn disconnect_output(engine : @host.NativeEngine) -> NativeResult =
-  #| engine => { try { engine.output.disconnect(); return { ok: true }; } catch (error) { return { ok: false, error }; } }
+  #| engine => { try { engine.disconnect(); return { ok: true }; } catch (error) { return { ok: false, error }; } }
 
 ///|
 extern "js" fn call_setup(

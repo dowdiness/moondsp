@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking browser API:** replace the exposed `engine.output` Worklet with
+  synchronous `engine.connect` / `engine.disconnect`, preserving native routing
+  overloads. New connections reject after closing/failure; disconnection remains
+  available for cleanup. No additional audio node or compatibility alias.
+- **Breaking browser API:** `mount` accepts only opaque values created by
+  `Graph` in the same module instance. Node indices and wire descriptions are
+  private; raw objects and cloned values are rejected. Remove public numeric
+  node-shape types, with no compatibility fallback or raw-data import API.
 - Reuse scalar bounded trigonometry for Wasm-GC biquad coefficients, removing
   measured render-time sine/cosine scratch construction without changing PCM.
 - **Breaking worklet error ABI:** replace JSON errors with primitive code,

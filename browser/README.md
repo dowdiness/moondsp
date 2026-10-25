@@ -92,21 +92,17 @@ for wire fields and consumer requirements.
 lifecycle objects, and browser resource ownership.
 
 ```js
-import { GraphEngine } from "./graph-engine.js";
+import { GraphEngine, Graph } from "./graph-engine.js";
 
 const context = new AudioContext();
 await context.suspend();
 
 const engine = await GraphEngine({ context });
-const sound = await engine.mount({
-  nodes: [
-    { type: "oscillator", waveform: "triangle", frequency: 220 },
-    { type: "gain", input: 0, gain: 0.1 },
-    { type: "output", input: 1 },
-  ],
-});
+const sound = await engine.mount(Graph({}, g => ({
+  output: g.gain(g.oscillator("triangle", 220), 0.1),
+})));
 
-engine.output.connect(context.destination);
+engine.connect(context.destination);
 await context.resume(); // Perform from a user gesture.
 await sound.play();
 
@@ -121,7 +117,9 @@ Creation and mounting require a suspended `AudioContext` or
 `OfflineAudioContext`. Mount all graphs before the first successful `play`.
 Playback permanently closes mount admission for that engine.
 
-The supported browser description is deliberately narrow:
+`mount` accepts only opaque values created by this module's `Graph` function,
+not raw descriptions or cloned graphs. The private browser description is
+deliberately narrow:
 
 - 1–64 nodes;
 - `oscillator` with `sine`, `saw`, `square`, or `triangle` and a finite

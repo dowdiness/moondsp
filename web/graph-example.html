@@ -23,12 +23,9 @@
   <h1>External graph example</h1>
   <p>This page defines its own mono graph and uses only <code>graph-engine.js</code>.
     Mount before playback. Start at a low device volume.</p>
-  <label for="graph">Graph description</label>
-  <textarea id="graph" spellcheck="false">{"nodes":[
-  {"type":"oscillator","waveform":"triangle","frequency":220},
-  {"type":"gain","input":0,"gain":0.1},
-  {"type":"output","input":1}
-]}</textarea>
+  <label for="graph">Graph parameters</label>
+  <p>Edit the parameter defaults for a triangle oscillator and gain built with <code>Graph</code>.</p>
+  <textarea id="graph" spellcheck="false">{"frequency":220,"volume":0.1}</textarea>
   <div class="actions">
     <button id="mount">Mount graph</button>
     <button id="play" disabled>Play</button>
@@ -38,7 +35,7 @@
   <p id="status" role="status" aria-live="polite">No graph mounted.</p>
   <p>Pause preserves phase. Unmount also closes this example's engine; mounting again creates a new engine.</p>
   <script type="module">
-    import { GraphEngine } from './graph-engine.js';
+    import { GraphEngine, Graph } from './graph-engine.js';
     const description = document.querySelector('#graph');
     const status = document.querySelector('#status');
     const mount = document.querySelector('#mount');
@@ -63,12 +60,14 @@
       mount.disabled = true;
       status.textContent = 'Mounting graph…';
       try {
-        const graph = JSON.parse(description.value);
+        const graph = Graph(JSON.parse(description.value), g => ({
+          output: g.gain(g.oscillator('triangle', g.param('frequency')), g.param('volume')),
+        }));
         context = new AudioContext();
         await context.suspend();
         engine = await GraphEngine({ context });
         source = await engine.mount(graph);
-        engine.output.connect(context.destination);
+        engine.connect(context.destination);
         description.disabled = true;
         play.disabled = unmount.disabled = false;
         status.textContent = 'Mounted. Select Play to begin.';

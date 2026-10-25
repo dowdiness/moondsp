@@ -99,22 +99,14 @@ and clean up partially initialized resources; `AudioPower` handles the owned
 lifecycle for the common case.
 
 ```ts
-import { GraphEngine, type Graph } from "@moondsp/browser";
+import { GraphEngine, Graph } from "@moondsp/browser";
 
-// 1. Author a declarative graph description
-const synthGraph = {
-  params: {
-    frequency: 220,
-    cutoff: 1200,
-    volume: 0.2,
-  },
-  nodes: [
-    { type: "oscillator", waveform: "saw", frequency: { param: "frequency" } },
-    { type: "biquad", input: 0, mode: "lowpass", cutoff: { param: "cutoff" }, q: 1.0 },
-    { type: "gain", input: 1, gain: { param: "volume" } },
-    { type: "output", input: 2 },
-  ],
-} as const satisfies Graph<"frequency" | "cutoff" | "volume">;
+// 1. Build a reusable graph
+const synthGraph = Graph({ frequency: 220, cutoff: 1200, volume: 0.2 }, g => {
+  const oscillator = g.oscillator("saw", g.param("frequency"));
+  const filter = g.biquad(oscillator, "lowpass", g.param("cutoff"), 1.0);
+  return { output: g.gain(filter, g.param("volume")) };
+});
 
 // 2. The host application owns the AudioContext
 const context = new AudioContext();
@@ -124,7 +116,7 @@ await context.suspend();
 
 // 3. Initialize GraphEngine
 const engine = await GraphEngine({ context });
-engine.output.connect(context.destination);
+engine.connect(context.destination);
 
 // 4. Mount the graph (starts paused)
 const sound = await engine.mount(synthGraph);
@@ -185,11 +177,15 @@ an update is pending.
 - `Graph(params, build)` is called without `new`; it returns a frozen, reusable
   `Graph<Name, Gate>` value, not a running graph. The function and type share
   one name; no wrapper class or compatibility alias is needed.
+  `mount` accepts only values created by the same module's `Graph` function.
+  Graph values expose no nodes, parameters, or gate indices. They cannot be
+  reconstructed by object spread, JSON, or structured cloning. Keep application
+  settings separately and call `Graph` again when constructing a new graph.
   Its callback is synchronous; foreign node references and use of the builder
   after it returns are rejected. Shared references do not duplicate nodes.
   Numeric descriptions remain the serialization format; MoonBit still validates
   topology and parameter ranges at mount. The builder adds no DSP implementation.
-- `params` holds initial values, not a readable current-value store. Keep UI
+- The constructor's `params` supplies initial values, not a readable current-value store. Keep UI
   values in application state and distinguish requested from accepted updates.
 - A named update is validated as one transaction: an invalid entry rejects the
   whole batch. Names may intentionally update multiple node fields.
@@ -208,6 +204,9 @@ declaring named parameters/gates and calling `update()`; neither `applyControls`
 nor the `GraphControl` TypeScript export remains. There are no compatibility
 aliases. Deploy the matching package/Worklet/Wasm together; the ABI now uses
 `graph_host_update`.
+Replace raw objects passed to `mount` with `Graph(params, build)`. The numeric
+description format and node-shape types are no longer public authoring APIs;
+there is no raw-data import API.
 
 ## Package-owned realtime audio
 
@@ -224,7 +223,7 @@ startup error a second time.
 
 ```ts
 import { AudioPower, type PoweredAudio } from "@moondsp/browser/audio";
-import type { MountedGraph } from "@moondsp/browser";
+import { Graph, type MountedGraph } from "@moondsp/browser";
 
 const power = AudioPower();
 let current: PoweredAudio<MountedGraph> | undefined;
@@ -239,11 +238,9 @@ on.onclick = () => {
   try {
     audio = power.turnOn(async ({ engine, powerOff }) => {
       powerOff.throwIfAborted();
-      const graph = await engine.mount({ nodes: [
-        { type: "oscillator", waveform: "sine", frequency: 220 },
-        { type: "gain", input: 0, gain: 0.1 },
-        { type: "output", input: 1 },
-      ] });
+      const graph = await engine.mount(Graph({}, g => ({
+        output: g.gain(g.oscillator("sine", 220), 0.1),
+      })));
       powerOff.throwIfAborted();
       await graph.play();
       powerOff.throwIfAborted();
@@ -346,6 +343,28 @@ Creates the audio engine instance within an existing, suspended `AudioContext` o
 - `options.processorUrl` *(optional)*: Override URL for `graph-processor.js`.
 - `options.signal` *(optional)*: `AbortSignal` owning engine creation only (aborts fetch/compilation if cancelled).
 - `options.closeTimeoutMs` *(optional)*: Deadline for processor close acknowledgment (defaults to 5000 ms).
+
+### Output routing
+
+`engine.connect(...)` and `engine.disconnect(...)` use the native `AudioNode`
+overloads, return values, and exceptions. The mono source has one output (index
+0); it accepts `AudioNode` or `AudioParam` destinations. Calls are synchronous.
+Connect throws after engine closing/failure; disconnect remains available for
+cleanup. Disconnecting does not pause playback or end the engine.
+
+```ts
+engine.connect(context.destination);
+engine.connect(analyser);
+engine.disconnect(analyser); // Leave the speaker connection intact.
+engine.disconnect(); // Remove all output connections.
+```
+
+The Worklet, message port, and processor-error handler are private. Replace
+`engine.output.connect/disconnect` with `engine.connect/disconnect`; no output
+node or compatibility alias is exposed. `close()` still disconnects all output.
+Repeated identical connections follow Web Audio semantics (one connection,
+not independent leases). Disconnecting a missing destination throws the native
+exception; repeated no-argument disconnection is harmless.
 
 ### `MountedGraph<Name, Gate>`
 

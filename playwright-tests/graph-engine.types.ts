@@ -5,38 +5,31 @@ import {
   type EngineExit,
   type GraphEngineErrorCode,
   type GraphEngineWaitOptions,
-  type GraphNode,
   type MountedGraph,
 } from '../web/graph-engine.js';
 
-const graph = {
-  nodes: [
-    { type: 'oscillator', waveform: 'triangle', frequency: 220 },
-    { type: 'gain', input: 0, gain: 0.1 },
-    { type: 'output', input: 1 },
-  ],
-} as const satisfies Graph;
+const graph = Graph({}, g => ({ output: g.gain(g.oscillator('triangle', 220), 0.1) }));
 
-const extendedGraph = {
-  nodes: [
-    { type: 'oscillator', waveform: 'triangle', frequency: 220 },
-    { type: 'biquad', input: 0, mode: 'lowpass', cutoff: 2000, q: 0.7 },
-    { type: 'adsr', attackMs: 10, decayMs: 80, sustain: 0.7, releaseMs: 180 },
-    { type: 'mul', input0: 1, input1: 2 },
-    { type: 'gain', input: 3, gain: 0.15 },
-    { type: 'output', input: 4 },
-  ],
-} as const satisfies Graph;
+const extendedGraph = Graph({}, g => {
+  const filtered = g.biquad(g.oscillator('triangle', 220), 'lowpass', 2000, 0.7);
+  const envelope = g.adsr({ attackMs: 10, decayMs: 80, sustain: 0.7, releaseMs: 180 });
+  return { output: g.gain(g.mul(filtered, envelope), 0.15) };
+});
 
-const parameterizedGraph = {
-  params: { volume: 0.2, cutoff: 1800 },
-  nodes: [
-    { type: 'oscillator', waveform: 'sine', frequency: 220 },
-    { type: 'biquad', input: 0, mode: 'lowpass', cutoff: { param: 'cutoff' }, q: 0.7 },
-    { type: 'gain', input: 1, gain: { param: 'volume' } },
-    { type: 'output', input: 2 },
-  ],
-} as const satisfies Graph<'volume' | 'cutoff'>;
+const parameterizedGraph = Graph({ volume: 0.2, cutoff: 1800 }, g => ({
+  output: g.gain(g.biquad(g.oscillator('sine', 220), 'lowpass', g.param('cutoff'), 0.7), g.param('volume')),
+})) satisfies Graph<'volume' | 'cutoff'>;
+
+// @ts-expect-error Graphs are opaque, not structural wire descriptions.
+const rawGraph: Graph = { nodes: [] };
+// @ts-expect-error Empty objects cannot counterfeit graph tokens.
+const emptyGraph: Graph = {};
+// @ts-expect-error Node arrays are private implementation details.
+graph.nodes;
+// @ts-expect-error Parameter defaults are not exposed on the token.
+parameterizedGraph.params;
+// @ts-expect-error Gate metadata is hidden on the token.
+graph.gates;
 
 async function consume(context: AudioContext | OfflineAudioContext, signal: AbortSignal) {
   const engine: GraphEngine = await GraphEngine({
@@ -61,15 +54,18 @@ async function consume(context: AudioContext | OfflineAudioContext, signal: Abor
   await plain.update({});
   // @ts-expect-error Numeric-only graphs do not acquire parameter names.
   await plain.update({ params: { volume: 0.2 } });
-  const wrongReference = {
+  const rawDescription = {
     params: { volume: 0.2 },
-    nodes: [{ type: 'gain', input: 0, gain: { param: 'typo' } }],
+    nodes: [
+      { type: 'oscillator', waveform: 'sine', frequency: 220 },
+      { type: 'gain', input: 0, gain: { param: 'volume' } },
+      { type: 'output', input: 1 },
+    ],
   } as const;
-  // @ts-expect-error References must not widen the keys inferred from defaults.
-  await engine.mount(wrongReference);
-  const undeclaredReference = { nodes: [{ type: 'gain', input: 0, gain: { param: 'volume' } }] } as const;
-  // @ts-expect-error References alone cannot declare parameters.
-  await engine.mount(undeclaredReference);
+  // @ts-expect-error Even prebound, well-shaped wire descriptions are not graph tokens.
+  await engine.mount(rawDescription);
+  // @ts-expect-error Mount does not admit empty structural counterfeits.
+  await engine.mount({});
   const dynamic: Graph<string> = parameterizedGraph;
   const dynamicValues: Record<string, number> = { volume: 0.2 };
   await (await engine.mount(dynamic)).update({ params: dynamicValues });
@@ -96,7 +92,27 @@ async function consume(context: AudioContext | OfflineAudioContext, signal: Abor
   Graph({}, g => { const osc = g.oscillator('sine', 220); return { output: osc, gates: { amp: osc } }; });
   // @ts-expect-error The replaced update API is not retained as an alias.
   instrument.setParams({ pitch: 440 });
-  engine.output.connect(context.destination);
+  const connected: AudioNode = engine.connect(context.destination);
+  const indexed: AudioNode = engine.connect(context.destination, 0, 0);
+  const gain = context.createGain();
+  const paramConnected: void = engine.connect(gain.gain);
+  const indexedParam: void = engine.connect(gain.gain, 0);
+  const connect: AudioNode['connect'] = engine.connect;
+  const disconnect: AudioNode['disconnect'] = engine.disconnect;
+  engine.disconnect();
+  engine.disconnect(0);
+  engine.disconnect(gain);
+  engine.disconnect(gain, 0);
+  engine.disconnect(gain, 0, 0);
+  engine.disconnect(gain.gain);
+  engine.disconnect(gain.gain, 0);
+  void [connected, indexed, paramConnected, indexedParam, connect, disconnect];
+  // @ts-expect-error The native worklet is private.
+  engine.output;
+  // @ts-expect-error Raw transport is not part of the public API.
+  engine.port;
+  // @ts-expect-error AudioParam routing has no input index.
+  engine.connect(gain.gain, 0, 0);
   const playing: Promise<void> = sound.play();
   await playing;
   await sound.pause();
@@ -123,26 +139,12 @@ async function consume(context: AudioContext | OfflineAudioContext, signal: Abor
   new MountedGraph();
 }
 
-function describe(node: GraphNode): number {
-  switch (node.type) {
-    case 'oscillator':
-      // @ts-expect-error Oscillators do not have graph inputs.
-      node.input;
-      return node.frequency;
-    case 'adsr': return node.sustain;
-    case 'biquad': return node.cutoff;
-    case 'mul': return node.input0 + node.input1;
-    case 'gain': return node.gain;
-    case 'output': return node.input;
-  }
-}
-
 // @ts-expect-error Unknown waveforms must be rejected at the authoring boundary.
-const badWaveform: GraphNode = { type: 'oscillator', waveform: 'noise', frequency: 440 };
-// @ts-expect-error A gain requires an input index.
-const missingInput: GraphNode = { type: 'gain', gain: 0.1 };
+Graph({}, g => ({ output: g.oscillator('noise', 440) }));
+// @ts-expect-error A gain requires a signal input and a value.
+Graph({}, g => ({ output: g.gain(0.1) }));
 // @ts-expect-error Frequencies are numeric, not strings.
-const stringFrequency: GraphNode = { type: 'oscillator', waveform: 'sine', frequency: '440' };
+Graph({}, g => ({ output: g.oscillator('sine', '440') }));
 // @ts-expect-error A context is required.
 GraphEngine({});
 
@@ -157,11 +159,10 @@ function handle(error: unknown) {
   }
   throw error;
 }
-const missingParameterRef = {
-  params: { volume: 0.2 },
+Graph({ volume: 0.2 }, g => ({
   // @ts-expect-error Parameter references must use a declared name.
-  nodes: [{ type: 'gain', input: 0, gain: { param: 'loudness' } }],
-} as const satisfies Graph<'volume'>;
+  output: g.gain(g.oscillator('sine', 220), g.param('loudness')),
+}));
 
 // @ts-expect-error Error codes form a closed public vocabulary.
 new GraphEngineError('NOT_AN_ENGINE_ERROR', 'invalid');

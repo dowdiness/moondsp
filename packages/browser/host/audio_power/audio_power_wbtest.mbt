@@ -79,8 +79,7 @@ extern "js" fn test_engine(
   closing? : () -> Unit = () => (),
 ) -> @host.NativeEngine =
   #| (completion, closing) => {
-  #|   const engine = { closes: 0 };
-  #|   engine.output = { connect() {}, disconnect() {} };
+  #|   const engine = { closes: 0, connect() {}, disconnect() {} };
   #|   engine.close = () => { engine.closes++; closing(); return completion.promise; };
   #|   engine.wait = ({ signal }) => new Promise((resolve, reject) => {
   #|     const cancel = () => reject(new DOMException('cancelled', 'AbortError'));
