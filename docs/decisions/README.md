@@ -36,3 +36,4 @@ shipped plan or spec.
 - [ADR-0016 — Loom-backed runtime mini parser](0016-loom-backed-runtime-mini-parser.md)
 - [ADR-0017 — Mini authoring AcceptedDerived adoption](0017-mini-authoring-accepted-derived.md)
 - [ADR-0018 — Playback visualization follows event origins](0018-playback-visualization-origin-truth.md)
+- [ADR-0019 — Parameter automation through automatic control buses](0019-automatic-control-buses.md)
