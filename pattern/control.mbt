@@ -247,7 +247,9 @@ fn[A, B] merge_control_kernel(
       .query(arc)
       .map(ae => {
         let merged = b_events.fold(init=ae.value, (merged, be) => {
-          if ae.part.intersect(be.part) is Some(_) {
+          // Sample the control at the fragment start, so the value does not
+          // depend on how long the query arc is.
+          if be.part.contains(ae.part.begin) {
             merge(merged, be.value)
           } else {
             merged

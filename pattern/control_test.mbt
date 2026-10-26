@@ -200,3 +200,19 @@ test "deliverable: sequence c3 e3 g3 fast 2 produces 6 events" {
   @debug.assert_eq(events[5].part.begin, @pattern.Rational::new(5L, 6L))
   @debug.assert_eq(events[5].part.end_, @pattern.Rational::new(1L, 1L))
 }
+
+///|
+test "merge_control samples the control at the fragment start" {
+  let pat = @pattern.merge_control(
+    @pattern.note(60.0),
+    @pattern.sequence([
+      @pattern.control("gain", 0.3),
+      @pattern.control("gain", 0.6),
+    ]),
+  )
+  // The same onset gets the same value however long the query arc is.
+  @debug.assert_eq(pat.query(span(0, 1, 1, 8))[0].value.get("gain"), Some(0.3))
+  @debug.assert_eq(pat.query(span(0, 1, 1, 1))[0].value.get("gain"), Some(0.3))
+  // A fragment that starts mid-note follows the value at that time.
+  @debug.assert_eq(pat.query(span(5, 8, 6, 8))[0].value.get("gain"), Some(0.6))
+}
