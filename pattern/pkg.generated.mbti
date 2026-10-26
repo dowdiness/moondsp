@@ -56,6 +56,22 @@ pub fn PatternDocError::not_equal(Self, Self) -> Bool
 pub fn PatternDocError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
+pub struct BusVoice {
+  controls : ControlMap
+  bindings : Array[(String, Int)]
+}
+pub fn BusVoice::bus_for(Self, String) -> Int?
+pub fn BusVoice::controls(Self) -> ControlMap
+
+pub struct ControlBusSnapshot {
+  // private fields
+}
+pub fn ControlBusSnapshot::bus_count(Self) -> Int
+pub fn ControlBusSnapshot::bus_value(Self, Int, Rational) -> Double
+pub fn ControlBusSnapshot::evaluate_all(Self, Rational, Array[Double]) -> Unit
+pub fn ControlBusSnapshot::query(Self, TimeSpan) -> Array[Event[BusVoice]]
+pub fn ControlBusSnapshot::query_bus_value(Self, Int, TimeSpan) -> Double?
+
 pub struct ControlMap {
   // private fields
 } derive(@debug.Debug)
@@ -136,6 +152,7 @@ pub fn[A] PatternDoc::atom(id~ : @identity.PatternNodeId, source_atom~ : @identi
 pub fn[A] PatternDoc::backdate_equal(Self[A], Self[A]) -> Bool
 pub fn[A] PatternDoc::changed_at(Self[A]) -> @types.Revision
 pub fn[A] PatternDoc::contains_node(Self[A], @identity.PatternNodeId) -> Bool
+pub fn PatternDoc::continuous(id~ : @identity.PatternNodeId, key~ : String, f~ : (Double) -> Double) -> Self[ControlMap]
 pub fn PatternDoc::control_atom(id~ : @identity.PatternNodeId, source_atom~ : @identity.SourceAtomId, key~ : String, value~ : Double) -> Self[ControlMap]
 pub fn[A] PatternDoc::degrade_by(Self[A], id~ : @identity.PatternNodeId, p~ : Double, seed? : Int) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::euclid(Self[A], id~ : @identity.PatternNodeId, k~ : Int, n~ : Int, rotation? : Int) -> Self[A] raise PatternDocError
@@ -146,6 +163,7 @@ pub fn[A] PatternDoc::from_pattern(id~ : @identity.PatternNodeId, pat~ : Pat[A])
 pub fn[A] PatternDoc::gate(Self[A], id~ : @identity.PatternNodeId, factor~ : Rational) -> Self[A] raise PatternDocError
 pub fn PatternDoc::jux(Self[ControlMap], id~ : @identity.PatternNodeId, transform~ : TimeTransform) -> Self[ControlMap] raise PatternDocError
 pub fn[A] PatternDoc::lower(Self[A]) -> PatternSnapshot[A] raise PatternDocError
+pub fn PatternDoc::lower_with_buses(Self[ControlMap]) -> ControlBusSnapshot raise
 pub fn[A] PatternDoc::lower_with_cache(Self[A], PatternLoweringCache[A]) -> PatternSnapshot[A] raise PatternDocError
 pub fn[A] PatternDoc::lower_with_origins(Self[A], cache? : PatternLoweringCache[A]) -> PatternSnapshotWithOrigins[A] raise PatternDocError
 pub fn PatternDoc::merge_control(id~ : @identity.PatternNodeId, left~ : Self[ControlMap], right~ : Self[ControlMap]) -> Self[ControlMap] raise PatternDocError
