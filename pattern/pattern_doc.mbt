@@ -11,6 +11,9 @@ pub(all) suberror PatternDocError {
 ///|
 priv enum PatternDocNode[A] {
   Runtime(Pat[A])
+  /// PROTOTYPE: a continuous control as both its query form and its
+  /// allocation-free time function `(cycles) -> value` for one key.
+  Continuous(Pat[A], String, (Double) -> Double)
   Reference(PatternDoc[A], ReferenceBinding?)
   Silence
   Pure(A)
@@ -51,6 +54,7 @@ fn next_pattern_node_generation() -> Int64 {
 fn[A] PatternDocNode::snapshot(self : PatternDocNode[A]) -> PatternDocNode[A] {
   match self {
     Runtime(pat) => Runtime(pat)
+    Continuous(pat, key, f) => Continuous(pat, key, f)
     Reference(definition, binding) => Reference(definition, binding)
     Silence => Silence
     Pure(value) => Pure(value)
@@ -213,7 +217,7 @@ fn[A] pattern_node_cache_token_memoized(
                   {},
                 ),
               )
-            Runtime(_) | Silence | Pure(_) | Atom(_, _, _) => ()
+            Runtime(_) | Continuous(_, _, _) | Silence | Pure(_) | Atom(_, _, _) => ()
             Fast(child, _)
             | Slow(child, _)
             | Gate(child, _)
@@ -288,7 +292,7 @@ fn[A] copy_reachable_pattern_nodes(
       target[key] = entry.snapshot()
       match entry.node {
         Reference(_, _) => ()
-        Runtime(_) | Silence | Pure(_) | Atom(_, _, _) => ()
+        Runtime(_) | Continuous(_, _, _) | Silence | Pure(_) | Atom(_, _, _) => ()
         Fast(child, _)
         | Slow(child, _)
         | Gate(child, _)
@@ -329,7 +333,7 @@ fn[A] pattern_node_revision_memoized(
           match entry.node {
             Reference(definition, _) =>
               revision = revision.combine(definition.revision)
-            Runtime(_) | Silence | Pure(_) | Atom(_, _, _) => ()
+            Runtime(_) | Continuous(_, _, _) | Silence | Pure(_) | Atom(_, _, _) => ()
             Fast(child, _)
             | Slow(child, _)
             | Gate(child, _)
@@ -885,7 +889,7 @@ fn[A] append_reachable_pattern_source_ids(
             result,
             {},
           )
-        Runtime(_) | Silence | Pure(_) | Atom(_, _, _) => ()
+        Runtime(_) | Continuous(_, _, _) | Silence | Pure(_) | Atom(_, _, _) => ()
         Fast(child, _)
         | Slow(child, _)
         | Gate(child, _)
@@ -1057,7 +1061,7 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
         }),
       )
     }
-    Runtime(pat) => {
+    Runtime(pat) | Continuous(pat, _, _) => {
       let origin : O = O::make_origin(id, None, context)
       let path = PatternNodePath(id)
       let source = pat.map_payload(value => ScopedValue(value, path, origin))
@@ -1697,6 +1701,30 @@ pub fn[A] PatternDoc::from_pattern(
     root=id,
     revision=@identity.Revision::zero(),
     nodes=singleton_pattern_nodes(id, Runtime(pat)),
+  )
+}
+
+///|
+/// PROTOTYPE: a continuous control `key = f(cycles)`, sampled at each query
+/// arc's start when queried as a pattern.
+pub fn PatternDoc::continuous(
+  id~ : @identity.PatternNodeId,
+  key~ : String,
+  f~ : (Double) -> Double,
+) -> PatternDoc[ControlMap] {
+  let pat = Pat::from_query(arc => {
+    [
+      {
+        whole: None,
+        part: arc,
+        value: ControlMap::single(key, f(arc.begin.to_double())),
+      },
+    ]
+  })
+  PatternDoc(
+    root=id,
+    revision=@identity.Revision::zero(),
+    nodes=singleton_pattern_nodes(id, Continuous(pat, key, f)),
   )
 }
 
