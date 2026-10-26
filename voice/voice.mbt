@@ -183,6 +183,8 @@ priv struct VoiceSlot {
   mut pan_left_gain : Double
   mut pan_right_gain : Double
   mut send_gain : Double
+  /// Voice-frame level, applied before pan and therefore before the send.
+  mut gain : Double
   mono_buffer : AudioBuffer
 }
 
@@ -200,6 +202,7 @@ fn VoiceSlot::VoiceSlot(block_size : Int) -> VoiceSlot {
     pan_left_gain: @dsp.pan_left_gain(0.0),
     pan_right_gain: @dsp.pan_right_gain(0.0),
     send_gain: 0.0,
+    gain: 1.0,
     mono_buffer: AudioBuffer::filled(block_size),
   }
 }
@@ -214,6 +217,11 @@ fn VoiceSlot::update_pan(self : VoiceSlot, pan : Double) -> Unit {
   let clamped = pan.clamp(min=-1.0, max=1.0)
   self.pan_left_gain = @dsp.pan_left_gain(clamped)
   self.pan_right_gain = @dsp.pan_right_gain(clamped)
+}
+
+///|
+fn VoiceSlot::update_gain(self : VoiceSlot, gain : Double) -> Unit {
+  self.gain = if !@dsp.is_finite(gain) || gain < 0.0 { 0.0 } else { gain }
 }
 
 ///|
@@ -579,6 +587,16 @@ pub fn BoundVoicePool::set_voice_pan_result(
 }
 
 ///|
+/// Set this voice's level. It scales the voice before pan, so the send follows.
+pub fn BoundVoicePool::set_voice_gain_result(
+  self : BoundVoicePool,
+  handle : VoiceHandle,
+  gain : Double,
+) -> Result[Unit, VoiceControlError] {
+  self.pool.set_voice_gain_result(handle, gain)
+}
+
+///|
 /// Set this voice's gain into the pool's single stereo send output.
 pub fn BoundVoicePool::set_voice_send_result(
   self : BoundVoicePool,
@@ -775,6 +793,7 @@ fn VoicePool::activate_slot(
     slot.update_pan(pan)
   }
   slot.send_gain = 0.0
+  slot.gain = 1.0
   slot.state = VoiceState::Active
   // WHY overflow guard on generation: after 2^31 increments the counter
   // wraps negative, which could revalidate stale VoiceHandles. Resetting
@@ -1045,6 +1064,22 @@ pub fn VoicePool::set_voice_pan_result(
 }
 
 ///|
+/// Set this voice's level. It scales the voice before pan, so the send follows.
+pub fn VoicePool::set_voice_gain_result(
+  self : VoicePool,
+  handle : VoiceHandle,
+  gain : Double,
+) -> Result[Unit, VoiceControlError] {
+  match self.resolve_slot(handle) {
+    None => Err(VoiceControlError::InvalidVoiceHandle(handle))
+    Some(slot) => {
+      slot.update_gain(gain)
+      Ok(())
+    }
+  }
+}
+
+///|
 pub fn VoicePool::set_voice_send_result(
   self : VoicePool,
   handle : VoiceHandle,
@@ -1169,8 +1204,9 @@ fn VoicePool::process_outputs(
         // WHY cached gains: pan_left_gain/pan_right_gain are updated only
         // when set_voice_pan is called (control-rate), not here (audio-rate).
         // This avoids 2 trig calls per voice per block.
-        let left_gain = slot.pan_left_gain
-        let right_gain = slot.pan_right_gain
+        // Mix order: gain -> pan -> (dry, send).
+        let left_gain = slot.gain * slot.pan_left_gain
+        let right_gain = slot.gain * slot.pan_right_gain
         if write_send {
           let send_gain = slot.send_gain
           for s = 0; s < sample_count; s = s + 1 {

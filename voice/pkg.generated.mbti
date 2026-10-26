@@ -38,6 +38,7 @@ pub fn BoundVoicePool::note_on_prevalidated_params4_id(Self, Int, @graph.GraphPa
 pub fn BoundVoicePool::process(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn BoundVoicePool::process_with_send(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuffer, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn BoundVoicePool::set_template(Self, @graph.AnalyzedGraph, @graph.ControlBindingBuilder) -> Result[Unit, BoundVoicePoolError]
+pub fn BoundVoicePool::set_voice_gain_result(Self, VoiceHandle, Double) -> Result[Unit, VoiceControlError]
 #deprecated
 pub fn BoundVoicePool::set_voice_pan(Self, VoiceHandle, Double) -> Bool
 pub fn BoundVoicePool::set_voice_pan_bool(Self, VoiceHandle, Double) -> Bool
@@ -106,6 +107,7 @@ pub fn VoicePool::note_on(Self, Array[@graph.GraphControl]) -> VoiceHandle?
 pub fn VoicePool::process(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn VoicePool::process_with_send(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuffer, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn VoicePool::set_template(Self, @graph.AnalyzedGraph) -> Result[Unit, VoicePoolError]
+pub fn VoicePool::set_voice_gain_result(Self, VoiceHandle, Double) -> Result[Unit, VoiceControlError]
 #deprecated
 pub fn VoicePool::set_voice_pan(Self, VoiceHandle, Double) -> Bool
 pub fn VoicePool::set_voice_pan_result(Self, VoiceHandle, Double) -> Result[Unit, VoiceControlError]
