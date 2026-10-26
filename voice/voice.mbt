@@ -779,7 +779,6 @@ fn VoicePool::activate_slot(
   slot : VoiceSlot,
   slot_index : Int,
   compiled : Dsp,
-  update_pan : Bool,
   pan : Double,
 ) -> Int64 {
   gate_adsrs_at(compiled, self.adsr_authoring_indices, true)
@@ -789,9 +788,10 @@ fn VoicePool::activate_slot(
   // instead of mutating it. Holding the current FixedArray preserves the note-on
   // ADSR set for later note_off without allocating a per-note copy.
   slot.adsr_authoring_indices_snapshot = self.adsr_authoring_indices
-  if update_pan {
-    slot.update_pan(pan)
-  }
+  // Every note starts from its own voice frame: pan from the caller (center
+  // unless given), no send, unit gain. Nothing carries over from the slot's
+  // previous note.
+  slot.update_pan(pan)
   slot.send_gain = 0.0
   slot.gain = 1.0
   slot.state = VoiceState::Active
@@ -852,7 +852,7 @@ fn VoicePool::note_on_prevalidated_params4_id(
     !compiled.set_param_bool(node3, slot3, value3) {
     return -1L
   }
-  self.activate_slot(slot, slot_index, compiled, true, pan)
+  self.activate_slot(slot, slot_index, compiled, pan)
 }
 
 ///|
@@ -900,7 +900,7 @@ pub fn VoicePool::note_on(
   if used_template_preparation {
     self.prepared_graph = None
   }
-  let handle_id = self.activate_slot(slot, slot_index, compiled, false, 0.0)
+  let handle_id = self.activate_slot(slot, slot_index, compiled, 0.0)
   Some(
     VoiceHandle::from_parts(
       slot=VoiceHandle::packed_slot(handle_id),

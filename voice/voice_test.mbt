@@ -861,7 +861,7 @@ test "shared send follows post-pan voice output and resets per note" {
 }
 
 ///|
-test "voice gain scales dry and send before pan and resets per note" {
+test "voice gain scales dry and send before pan; gain and pan reset per note" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]
   let pool = @voice.VoicePool::new(
@@ -884,13 +884,15 @@ test "voice gain scales dry and send before pan and resets per note" {
     assert_true((send_left.get(i) - 0.125).abs() < 0.0001)
   }
   pool.kill_all()
-  let next = pool.note_on([]).unwrap()
-  assert_true(pool.set_voice_pan_result(next, -1.0) is Ok(_))
+  // The next note on the same slot starts at unit gain and center pan.
+  ignore(pool.note_on([]).unwrap())
   left.fill(0.0)
   right.fill(0.0)
   pool.process(ctx, left, right)
+  let center = @dsp.pan_left_gain(0.0)
   for i in 0..<4 {
-    assert_true((left.get(i) - 1.0).abs() < 0.0001)
+    assert_true((left.get(i) - center).abs() < 0.0001)
+    assert_true((right.get(i) - center).abs() < 0.0001)
   }
   assert_true(pool.set_voice_gain_result(handle, 0.5) is Err(_))
 }
