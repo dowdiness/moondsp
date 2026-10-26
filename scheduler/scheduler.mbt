@@ -6,66 +6,39 @@ fn copy_control_events(
 }
 
 ///|
-/// Per-voice side-effect extracted from a control map entry.
-/// The scheduler applies these after note-on, outside the control binding path.
-pub enum VoiceAction {
-  SetPan(Double)
-  SetSend(Double)
-}
-
-///|
-/// Decouples control key routing from the scheduler's event loop.
+/// Decouples graph control key routing from the scheduler's event loop.
 ///
 /// `transform` maps a raw (key, value) pair to an optional (key, value) for the
-/// control binding map. Return `None` to drop entries consumed as per-voice
-/// side effects, currently `pan` and `room`. Return
-/// `Some((key, transformed_value))` to include an entry.
-///
-/// `voice_action` inspects a raw (key, value) pair and optionally returns a
-/// `VoiceAction` to apply after note-on.
+/// control binding map. Return `None` to drop an entry. Voice-frame keys
+/// (`gain`, `pan`, `room`) never reach it: the scheduler applies them to every
+/// voice, whatever its graph.
 pub struct ControlMapper {
   transform : (String, Double) -> (String, Double)?
-  voice_action : (String, Double) -> VoiceAction?
 }
 
 ///|
 #alias(new)
 pub fn ControlMapper::ControlMapper(
   transform~ : (String, Double) -> (String, Double)?,
-  voice_action~ : (String, Double) -> VoiceAction?,
 ) -> ControlMapper {
-  { transform, voice_action, }
+  { transform, }
 }
 
 ///|
 /// Default mapper:
 /// - "note" values are converted from MIDI note numbers to Hz
-/// - "pan" values become `SetPan` voice actions
-/// - "room" values become `SetSend` voice actions
+/// - "attack" and "release" are converted from seconds to milliseconds
 /// - All other keys pass through unchanged
 pub fn default_control_mapper() -> ControlMapper {
-  ControlMapper(
-    transform=fn(k, v) {
-      if k == "pan" || k == "room" {
-        None
-      } else if k == "attack" || k == "release" {
-        Some((k, v * 1000.0))
-      } else if k == "note" {
-        Some(("note", midi_to_hz(v)))
-      } else {
-        Some((k, v))
-      }
-    },
-    voice_action=fn(k, v) {
-      if k == "pan" {
-        Some(SetPan(v))
-      } else if k == "room" {
-        Some(SetSend(v))
-      } else {
-        None
-      }
-    },
-  )
+  ControlMapper(transform=fn(k, v) {
+    if k == "attack" || k == "release" {
+      Some((k, v * 1000.0))
+    } else if k == "note" {
+      Some(("note", midi_to_hz(v)))
+    } else {
+      Some((k, v))
+    }
+  })
 }
 
 ///|
@@ -193,18 +166,22 @@ fn PatternScheduler::process_single_event(
         // WHY fresh map: process_events takes Array[Event] so callers may
         // reuse event arrays across calls. Building a fresh map avoids
         // mutating the original ControlMap. The ControlMapper transforms
-        // values (e.g. MIDI→Hz) and extracts per-voice actions (e.g. pan).
+        // graph-bound values (e.g. MIDI→Hz); voice-frame keys bypass it.
         let map : Map[String, Double] = Map([])
-        let actions : Array[VoiceAction] = []
+        let mut gain : Double? = None
+        let mut pan : Double? = None
+        let mut send : Double? = None
         let mapper = self.mapper
         event.value.each(fn(k, v) {
-          match (mapper.voice_action)(k, v) {
-            Some(action) => actions.push(action)
-            None => ()
-          }
-          match (mapper.transform)(k, v) {
-            Some((tk, tv)) => map[tk] = tv
-            None => ()
+          match k {
+            "gain" => gain = Some(v)
+            "pan" => pan = Some(v)
+            "room" => send = Some(v)
+            _ =>
+              match (mapper.transform)(k, v) {
+                Some((tk, tv)) => map[tk] = tv
+                None => ()
+              }
           }
         })
         let gate = pool.note_gate(map)
@@ -249,12 +226,14 @@ fn PatternScheduler::process_single_event(
                 source_pitch~,
               )
             }
-            for action in actions {
-              match action {
-                SetPan(pan) => ignore(pool.set_voice_pan_result(handle, pan))
-                SetSend(gain) =>
-                  ignore(pool.set_voice_send_result(handle, gain))
-              }
+            if gain is Some(gain) {
+              ignore(pool.set_voice_gain_result(handle, gain))
+            }
+            if pan is Some(pan) {
+              ignore(pool.set_voice_pan_result(handle, pan))
+            }
+            if send is Some(send) {
+              ignore(pool.set_voice_send_result(handle, send))
             }
           }
         }

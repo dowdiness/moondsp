@@ -46,10 +46,9 @@ pub struct BlockFrame {
 
 pub struct ControlMapper {
   transform : (String, Double) -> (String, Double)?
-  voice_action : (String, Double) -> VoiceAction?
 }
 #alias(new)
-pub fn ControlMapper::ControlMapper(transform~ : (String, Double) -> (String, Double)?, voice_action~ : (String, Double) -> VoiceAction?) -> Self
+pub fn ControlMapper::ControlMapper(transform~ : (String, Double) -> (String, Double)?) -> Self
 
 pub struct OnsetBuffer {
   // private fields
@@ -149,11 +148,6 @@ pub fn Tempo::bpm(Self) -> Double
 pub fn Tempo::from_bpm(Double) -> Result[Self, @transport.TransportError]
 pub fn Tempo::sample_at_start(Self, @pattern.Rational, sample_rate~ : Double) -> Result[Int64, @transport.TransportError]
 pub fn Tempo::span_for_samples(Self, Int, sample_rate~ : Double) -> Result[@pattern.Rational, @transport.TransportError]
-
-pub enum VoiceAction {
-  SetPan(Double)
-  SetSend(Double)
-}
 
 pub struct VoiceControlBatch {
   // private fields

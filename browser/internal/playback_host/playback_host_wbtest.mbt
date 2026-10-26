@@ -252,6 +252,14 @@ test "shared room tail survives a two-part continue edit and restart clears it" 
 }
 
 ///|
+test "drums apply gain through the voice frame" {
+  let baseline = rendered_synth_energy("s(\"hh*8\")")
+  let quieter = rendered_synth_energy("s(\"hh*8\").gain(0.1)")
+  assert_true(baseline > 0.0)
+  assert_true(quieter > baseline * 0.09 && quieter < baseline * 0.11)
+}
+
+///|
 test "room send leaves dry playback dry and adds one wet return" {
   assert_true(init_scheduler_graph_for_test())
   assert_eq(submit_for_test("s(\"bd\").slow(8)"), 0)
