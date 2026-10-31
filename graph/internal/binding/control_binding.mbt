@@ -1,18 +1,72 @@
 ///|
-priv struct ControlBinding {
-  key : String
-  node_index : Int
-  slot : @model.GraphParamSlot
+/// How a score value converts to the value its target takes.
+pub(all) enum ControlUnit {
+  Linear
+  /// MIDI note number to Hz.
+  MidiToHz
+  /// Seconds to milliseconds.
+  SecondsToMs
 } derive(Debug, Eq)
 
 ///|
-fn ControlBinding::ControlBinding(
-  key~ : String,
-  node_index~ : Int,
-  slot~ : @model.GraphParamSlot,
-) -> ControlBinding {
-  { key, node_index, slot, }
+pub extend ControlUnit with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend ControlUnit with Eq::{not_equal, equal}
+
+///|
+/// A score value in this unit, as its target takes it.
+pub fn ControlUnit::convert(self : ControlUnit, value : Double) -> Double {
+  match self {
+    Linear => value
+    MidiToHz => 440.0 * @math.pow(2.0, (value - 69.0) / 12.0)
+    SecondsToMs => value * 1000.0
+  }
 }
+
+///|
+/// A target value back in score units.
+pub fn ControlUnit::invert(self : ControlUnit, value : Double) -> Double {
+  match self {
+    Linear => value
+    MidiToHz => 69.0 + 12.0 * @math.log2(value / 440.0)
+    SecondsToMs => value / 1000.0
+  }
+}
+
+///|
+/// A parameter every voice has outside its graph (ADR-0019 Decision 8).
+/// The mix order is gain -> pan -> (dry, send).
+pub(all) enum VoiceParam {
+  Gain
+  Pan
+  Send
+} derive(Debug, Eq)
+
+///|
+pub extend VoiceParam with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend VoiceParam with Eq::{not_equal, equal}
+
+///|
+pub(all) enum BindingTarget {
+  Graph(Int, @model.GraphParamSlot)
+  Voice(VoiceParam)
+} derive(Debug, Eq)
+
+///|
+pub extend BindingTarget with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend BindingTarget with Eq::{not_equal, equal}
+
+///|
+priv struct ControlBinding {
+  key : String
+  target : BindingTarget
+  unit : ControlUnit
+} derive(Debug, Eq)
 
 ///|
 pub enum ControlBindingError {
@@ -48,10 +102,10 @@ pub fn ControlBindingBuilder::ControlBindingBuilder() -> ControlBindingBuilder {
 pub fn ControlBindingBuilder::bind(
   self : ControlBindingBuilder,
   key~ : String,
-  node_index~ : Int,
-  slot~ : @model.GraphParamSlot,
+  target~ : BindingTarget,
+  unit~ : ControlUnit,
 ) -> ControlBindingBuilder {
-  self.bindings.push(ControlBinding(key~, node_index~, slot~))
+  self.bindings.push({ key, target, unit, })
   self
 }
 
@@ -100,39 +154,42 @@ pub fn ControlBindingBuilder::build(
   let seen_keys : Map[String, Bool] = Map([])
   for i in 0..<self.bindings.length() {
     let binding = self.bindings[i]
-    if binding.node_index < 0 ||
-      binding.node_index >= compiled_template.length() {
-      return Err(ControlBindingError::InvalidNodeIndex(binding.node_index))
-    }
-    if !@model.node_accepts_slot(
-        compiled_template.node_at(binding.node_index),
-        binding.slot,
-      ) {
-      return Err(
-        ControlBindingError::InvalidSlotForNode(
-          binding.node_index,
-          binding.slot,
-        ),
-      )
-    }
-    if !compiled_template.is_node_live(binding.node_index) {
-      return Err(
-        ControlBindingError::OrphanBinding(binding.key, binding.node_index),
-      )
-    }
     if seen_keys.contains(binding.key) {
       return Err(ControlBindingError::DuplicateKey(binding.key))
     }
     seen_keys[binding.key] = true
-    let node = compiled_template.node_at(binding.node_index)
+    let (node_index, slot) = match binding.target {
+      Graph(node_index, slot) => (node_index, slot)
+      // A new voice starts with unit gain, centre pan, and no send.
+      Voice(Gain) => {
+        defaults.push(1.0)
+        continue
+      }
+      Voice(Pan | Send) => {
+        defaults.push(0.0)
+        continue
+      }
+    }
+    if node_index < 0 || node_index >= compiled_template.length() {
+      return Err(ControlBindingError::InvalidNodeIndex(node_index))
+    }
+    if !@model.node_accepts_slot(compiled_template.node_at(node_index), slot) {
+      return Err(ControlBindingError::InvalidSlotForNode(node_index, slot))
+    }
+    if !compiled_template.is_node_live(node_index) {
+      return Err(ControlBindingError::OrphanBinding(binding.key, node_index))
+    }
+    let node = compiled_template.node_at(node_index)
     defaults.push(
-      match binding.slot {
-        Value0 => node.value0()
-        Value1 => node.value1()
-        Value2 => node.value2()
-        Value3 => node.value3()
-        DelaySamples => node.delay_samples().to_double()
-      },
+      binding.unit.invert(
+        match slot {
+          Value0 => node.value0()
+          Value1 => node.value1()
+          Value2 => node.value2()
+          Value3 => node.value3()
+          DelaySamples => node.delay_samples().to_double()
+        },
+      ),
     )
   }
   // WHY copy: self.bindings is a mutable Array shared with the builder.
@@ -142,10 +199,11 @@ pub fn ControlBindingBuilder::build(
 }
 
 ///|
-/// Convert pattern controls to graph controls using the validated bindings.
-/// Emits GraphControl::set_param for each bound key found in the input map,
-/// in binding insertion order. Missing keys are skipped; unrecognized keys
-/// are ignored. Values are passed through without domain validation.
+/// Convert score controls to graph controls using the validated bindings.
+/// Emits GraphControl::set_param, in target units, for each graph-bound key
+/// found in the input map, in binding insertion order. Missing keys are
+/// skipped; unrecognized keys and voice-frame keys are ignored. Values are
+/// passed through without domain validation.
 pub fn ControlBindingMap::resolve_controls(
   self : ControlBindingMap,
   controls : Map[String, Double],
@@ -154,37 +212,53 @@ pub fn ControlBindingMap::resolve_controls(
   result.reserve_capacity(self.bindings.length())
   for i in 0..<self.bindings.length() {
     let binding = self.bindings[i]
-    match controls.get(binding.key) {
-      Some(value) =>
+    match (binding.target, controls.get(binding.key)) {
+      (Graph(node_index, slot), Some(value)) =>
         result.push(
           @model.GraphControl::set_param(
-            binding.node_index,
-            binding.slot,
-            value,
+            node_index,
+            slot,
+            binding.unit.convert(value),
           ),
         )
-      None => ()
+      _ => ()
     }
   }
   result
 }
 
 ///|
-/// The graph parameter `key` is bound to, if any.
-pub fn ControlBindingMap::target(
+/// Visit each voice-frame-bound key found in `controls`, in binding order.
+pub fn ControlBindingMap::each_voice_value(
+  self : ControlBindingMap,
+  controls : Map[String, Double],
+  f : (VoiceParam, Double) -> Unit,
+) -> Unit {
+  for binding in self.bindings {
+    match (binding.target, controls.get(binding.key)) {
+      (Voice(param), Some(value)) => f(param, value)
+      _ => ()
+    }
+  }
+}
+
+///|
+/// The target and unit `key` is bound to, if any.
+pub fn ControlBindingMap::binding(
   self : ControlBindingMap,
   key : String,
-) -> (Int, @model.GraphParamSlot)? {
+) -> (BindingTarget, ControlUnit)? {
   for binding in self.bindings {
     if binding.key == key {
-      return Some((binding.node_index, binding.slot))
+      return Some((binding.target, binding.unit))
     }
   }
   None
 }
 
 ///|
-/// Read the default captured when these bindings were validated.
+/// Read the default captured when these bindings were validated, in score
+/// units.
 pub fn ControlBindingMap::default_value(
   self : ControlBindingMap,
   key : String,

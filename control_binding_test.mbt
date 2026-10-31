@@ -377,3 +377,54 @@ test "binding defaults belong to each validated template" {
   assert_eq(changed.default_value("note"), Some(880.0))
   assert_eq(original.default_value("missing"), None)
 }
+
+///|
+test "bindings convert score units and route voice-frame keys" {
+  let map = @moondsp.ControlBindingBuilder()
+    .bind(
+      key="note",
+      node_index=0,
+      slot=@moondsp.GraphParamSlot::Value0,
+      unit=MidiToHz,
+    )
+    .bind(
+      key="attack",
+      node_index=1,
+      slot=@moondsp.GraphParamSlot::Value0,
+      unit=SecondsToMs,
+    )
+    .bind_voice(key="pan", param=Pan)
+    .build(
+      @moondsp.AnalyzedGraph::analyze([
+        @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 440.0),
+        @moondsp.DspNode::adsr(
+          attack_ms=5.0,
+          decay_ms=10.0,
+          sustain=1.0,
+          release_ms=50.0,
+        ),
+        @moondsp.DspNode::envelope_gain(input=0, envelope=1, amount=1.0),
+        @moondsp.DspNode::output(2),
+      ]),
+    )
+    .unwrap()
+  let result = map.resolve_controls({
+    "note": 60.0,
+    "attack": 0.25,
+    "pan": -1.0,
+  })
+  // Voice-frame keys never become graph controls.
+  @debug.assert_eq(result.length(), 2)
+  // 440 × 2^((60 − 69) / 12)
+  assert_true((result[0].value() - 261.6255653006).abs() < 0.000001)
+  @debug.assert_eq(result[1].value(), 250.0)
+  // Defaults read back in score units: 440 Hz is MIDI 69, 5 ms is 0.005 s.
+  assert_true((map.default_value("note").unwrap() - 69.0).abs() < 0.000000001)
+  @debug.assert_eq(map.default_value("attack"), Some(0.005))
+  @debug.assert_eq(map.default_value("pan"), Some(0.0))
+  let voice = []
+  map.each_voice_value({ "note": 60.0, "pan": -1.0 }, (param, value) => {
+    voice.push((param, value))
+  })
+  @debug.assert_eq(voice, [(@moondsp.VoiceParam::Pan, -1.0)])
+}

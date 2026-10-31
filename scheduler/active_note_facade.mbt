@@ -4,13 +4,6 @@ pub fn PatternScheduler::active_note_count(self : PatternScheduler) -> Int {
 }
 
 ///|
-/// Convert MIDI note number to frequency in Hz.
-/// Uses equal temperament: A4 (MIDI 69) = 440 Hz, each semitone is 2^(1/12).
-pub fn midi_to_hz(midi : Double) -> Double {
-  @voice_runtime.midi_to_hz(midi)
-}
-
-///|
 /// Track an externally triggered voice of `instrument` (an index into the
 /// constructor's instrument list) with a musical gate-off deadline.
 pub fn PatternScheduler::push_active_note(

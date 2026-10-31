@@ -25,7 +25,13 @@ fn transport_fixture(
     template,
     ctx,
     @moondsp.ControlBindingBuilder()
-    .bind(key="attack", node_index=1, slot=@moondsp.GraphParamSlot::Value0)
+    .bind_voice(key="pan", param=Pan)
+    .bind(
+      key="attack",
+      node_index=1,
+      slot=@moondsp.GraphParamSlot::Value0,
+      unit=SecondsToMs,
+    )
     .bind(
       key="envelope_decay",
       node_index=1,
@@ -36,7 +42,12 @@ fn transport_fixture(
       node_index=1,
       slot=@moondsp.GraphParamSlot::Value2,
     )
-    .bind(key="release", node_index=1, slot=@moondsp.GraphParamSlot::Value3),
+    .bind(
+      key="release",
+      node_index=1,
+      slot=@moondsp.GraphParamSlot::Value3,
+      unit=SecondsToMs,
+    ),
     max_voices=4,
   )
   (

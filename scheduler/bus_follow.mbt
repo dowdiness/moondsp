@@ -4,8 +4,8 @@ priv enum BusTarget {
   Gain
   Pan
   Send
-  /// A graph binding; the value converts through the mapper under `key`.
-  Param(String, Int, @moondsp.GraphParamSlot)
+  /// A graph parameter; the value converts through its binding's unit.
+  Param(@moondsp.ControlUnit, Int, @moondsp.GraphParamSlot)
 }
 
 ///|
@@ -49,15 +49,16 @@ fn BusFollowers::follow(
     follower.instrument == instrument && follower.handle.slot == handle.slot
   })
   buses.each_reader((key, reader) => {
-    let target = match key {
-      "gain" => Some(Gain)
-      "pan" => Some(Pan)
-      "room" => Some(Send)
-      _ =>
-        pool
-        .binding(key)
-        .map(binding => Param(key, binding.node_index, binding.slot))
-    }
+    let target = pool
+      .binding(key)
+      .map(binding => {
+        match binding.target {
+          Voice(Gain) => Gain
+          Voice(Pan) => Pan
+          Voice(Send) => Send
+          Graph(node, slot) => Param(binding.unit, node, slot)
+        }
+      })
     if target is Some(target) {
       self.followers.push({
         instrument,
@@ -78,7 +79,6 @@ fn BusFollowers::update(
   self : BusFollowers,
   at : @pattern.Rational,
   pools : Array[@moondsp.BoundVoicePool],
-  convert : (String, Double) -> Double,
 ) -> Unit {
   let mut i = 0
   while i < self.followers.length() {
@@ -98,13 +98,13 @@ fn BusFollowers::update(
       Gain => ignore(pool.set_voice_gain_result(follower.handle, value))
       Pan => ignore(pool.set_voice_pan_bool(follower.handle, value))
       Send => ignore(pool.set_voice_send_result(follower.handle, value))
-      Param(key, node, slot) =>
+      Param(unit, node, slot) =>
         ignore(
           pool.apply_voice_param_bool(
             follower.handle,
             node,
             slot,
-            convert(key, value),
+            unit.convert(value),
           ),
         )
     }

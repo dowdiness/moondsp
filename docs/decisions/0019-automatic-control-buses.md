@@ -243,9 +243,11 @@ ADR); user `Continuous` functions, which must themselves be allocation-free.
   because the bus table must come from the unfiltered score. Done: one
   `PatternScheduler` now plays every instrument pool and routes each event by
   `InstrumentSelector`, so the score reaches it unfiltered.
-- `ControlMapper` converts values only (`convert : (String, Double) ->
-  Double`) and no longer renames or drops keys, because bus updates call it
-  every block and it must not allocate.
+- A pool's bindings are the single place that interprets a key: each binding
+  targets a graph parameter or a voice-frame parameter (`bind_voice`) and
+  carries the unit that converts score values (`MidiToHz`, `SecondsToMs`).
+  `ControlMapper` and the scheduler's `gain`/`pan`/`room` switch are removed;
+  a host binds the voice-frame keys it uses on every instrument.
 - Control keys stay strings (ADR-0007). A typed key enum would make the
   per-key nesting rule explicit and is a separate decision.
 

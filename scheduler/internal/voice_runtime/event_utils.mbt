@@ -1,10 +1,4 @@
 ///|
-/// Convert MIDI note number to frequency in Hz.
-pub fn midi_to_hz(midi : Double) -> Double {
-  440.0 * @math.pow(2.0, (midi - 69.0) / 12.0)
-}
-
-///|
 pub fn copy_control_events(
   events : Array[@pattern.Event[@pattern.ControlMap]],
 ) -> Array[@pattern.Event[@pattern.ControlMap]] {

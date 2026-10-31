@@ -1216,10 +1216,20 @@ test "instrument gate follows template changes without mutating note controls" {
   }
   fn bindings() -> ControlBindingBuilder {
     ControlBindingBuilder()
-    .bind(key="attack", node_index=1, slot=GraphParamSlot::Value0)
+    .bind(
+      key="attack",
+      node_index=1,
+      slot=GraphParamSlot::Value0,
+      unit=SecondsToMs,
+    )
     .bind(key="envelope_decay", node_index=1, slot=GraphParamSlot::Value1)
     .bind(key="envelope_sustain", node_index=1, slot=GraphParamSlot::Value2)
-    .bind(key="release", node_index=1, slot=GraphParamSlot::Value3)
+    .bind(
+      key="release",
+      node_index=1,
+      slot=GraphParamSlot::Value3,
+      unit=SecondsToMs,
+    )
   }
   let ctx = DspContext(sample_rate=128.0, block_size=128)
   let pool = @voice.BoundVoicePool(template(1000.0), ctx, bindings())

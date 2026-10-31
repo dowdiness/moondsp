@@ -97,6 +97,9 @@ pub using @graph {
 
   // Control binding
   type ControlBinding,
+  type ControlTarget,
+  type ControlUnit,
+  type VoiceParam,
   type ControlBindingBuilder,
   type ControlBindingError,
   type ControlBindingMap,

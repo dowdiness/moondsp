@@ -69,6 +69,10 @@ pub using @graph {type ControlBindingError}
 
 pub using @graph {type ControlBindingMap}
 
+pub using @graph {type ControlTarget}
+
+pub using @graph {type ControlUnit}
+
 pub using @dsp {type DelayLine}
 
 pub using @dsp {type DemoSource}
@@ -156,6 +160,8 @@ pub using @dsp {type StereoReverb}
 pub using @voice {type VoiceControlError}
 
 pub using @voice {type VoiceHandle}
+
+pub using @graph {type VoiceParam}
 
 pub using @voice {type VoicePool}
 

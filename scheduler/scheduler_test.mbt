@@ -1,28 +1,4 @@
 ///|
-test "midi_to_hz: A4 (69) = 440 Hz" {
-  let hz = @scheduler.midi_to_hz(69.0)
-  assert_true((hz - 440.0).abs() < 0.001)
-}
-
-///|
-test "midi_to_hz: C4 (60) = 261.63 Hz" {
-  let hz = @scheduler.midi_to_hz(60.0)
-  assert_true((hz - 261.6255653006).abs() < 0.01)
-}
-
-///|
-test "midi_to_hz: MIDI 0" {
-  let hz = @scheduler.midi_to_hz(0.0)
-  assert_true((hz - 8.1758).abs() < 0.01)
-}
-
-///|
-test "midi_to_hz: MIDI 127" {
-  let hz = @scheduler.midi_to_hz(127.0)
-  assert_true((hz - 12543.85).abs() < 1.0)
-}
-
-///|
 test "PatternScheduler constructor initializes with zero position" {
   let ctx = @moondsp.DspContext(sample_rate=48000.0, block_size=128)
   let sched = @scheduler.PatternScheduler(bpm=120.0, ctx~, instruments=[])
@@ -81,11 +57,16 @@ fn make_test_pool() -> (
     @moondsp.BoundVoicePool(
       @moondsp.AnalyzedGraph::analyze(template),
       ctx,
-      @moondsp.ControlBindingBuilder().bind(
+      @moondsp.ControlBindingBuilder()
+      .bind(
         key="note",
         node_index=0,
         slot=@moondsp.GraphParamSlot::Value0,
-      ),
+        unit=MidiToHz,
+      )
+      .bind_voice(key="gain", param=Gain)
+      .bind_voice(key="pan", param=Pan)
+      .bind_voice(key="room", param=Send),
       max_voices=4,
     ),
   ) catch {
@@ -297,7 +278,7 @@ test "expire_notes: removes notes past their end_time" {
   let sched = @scheduler.PatternScheduler(bpm=120.0, ctx~, instruments=[
     (@scheduler.AllEvents, pool),
   ])
-  let handle = pool.note_on_controls({ "note": 440.0 })
+  let handle = pool.note_on_controls({ "note": 69.0 })
   match handle {
     None => assert_true(false)
     Some(h) => {
@@ -319,7 +300,7 @@ test "expire_notes_at: expires on performance sample boundary" {
   let sched = @scheduler.PatternScheduler(bpm=120.0, ctx~, instruments=[
     (@scheduler.AllEvents, pool),
   ])
-  let handle = pool.note_on_controls({ "note": 440.0 })
+  let handle = pool.note_on_controls({ "note": 69.0 })
   match handle {
     None => assert_true(false)
     Some(h) => {

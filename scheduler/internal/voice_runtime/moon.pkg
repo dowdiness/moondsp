@@ -2,5 +2,4 @@ import {
   "dowdiness/moondsp/pattern",
   "dowdiness/moondsp/scheduler/internal/model",
   "dowdiness/moondsp/voice",
-  "moonbitlang/core/math",
 }

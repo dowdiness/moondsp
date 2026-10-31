@@ -2,4 +2,5 @@ import {
   "dowdiness/moondsp/graph/internal/model",
   "dowdiness/moondsp/graph/internal/template",
   "moonbitlang/core/debug",
+  "moonbitlang/core/math",
 }

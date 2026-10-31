@@ -1,8 +1,94 @@
 ///|
+/// How a score value converts to the value its target takes.
+pub(all) enum ControlUnit {
+  Linear
+  /// MIDI note number to Hz.
+  MidiToHz
+  /// Seconds to milliseconds.
+  SecondsToMs
+} derive(Debug, Eq)
+
+///|
+pub extend ControlUnit with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend ControlUnit with Eq::{not_equal, equal}
+
+///|
+fn ControlUnit::to_model(self : ControlUnit) -> @binding.ControlUnit {
+  match self {
+    Linear => Linear
+    MidiToHz => MidiToHz
+    SecondsToMs => SecondsToMs
+  }
+}
+
+///|
+fn ControlUnit::from_model(unit : @binding.ControlUnit) -> ControlUnit {
+  match unit {
+    Linear => Linear
+    MidiToHz => MidiToHz
+    SecondsToMs => SecondsToMs
+  }
+}
+
+///|
+/// A score value in this unit, as its target takes it.
+pub fn ControlUnit::convert(self : ControlUnit, value : Double) -> Double {
+  self.to_model().convert(value)
+}
+
+///|
+/// A parameter every voice has outside its graph (ADR-0019 Decision 8).
+/// The mix order is gain -> pan -> (dry, send).
+pub(all) enum VoiceParam {
+  Gain
+  Pan
+  Send
+} derive(Debug, Eq)
+
+///|
+pub extend VoiceParam with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend VoiceParam with Eq::{not_equal, equal}
+
+///|
+fn VoiceParam::to_model(self : VoiceParam) -> @binding.VoiceParam {
+  match self {
+    Gain => Gain
+    Pan => Pan
+    Send => Send
+  }
+}
+
+///|
+fn VoiceParam::from_model(param : @binding.VoiceParam) -> VoiceParam {
+  match param {
+    Gain => Gain
+    Pan => Pan
+    Send => Send
+  }
+}
+
+///|
+/// What a bound key sets: a graph parameter or a voice-frame parameter.
+pub(all) enum ControlTarget {
+  Graph(Int, GraphParamSlot)
+  Voice(VoiceParam)
+} derive(Debug, Eq)
+
+///|
+pub extend ControlTarget with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend ControlTarget with Eq::{not_equal, equal}
+
+///|
 pub struct ControlBinding {
   key : String
-  node_index : Int
-  slot : GraphParamSlot
+  target : ControlTarget
+  unit : ControlUnit
 } derive(Debug, Eq)
 
 ///|
@@ -14,10 +100,10 @@ pub extend ControlBinding with Eq::{not_equal, equal}
 ///|
 pub fn ControlBinding::ControlBinding(
   key~ : String,
-  node_index~ : Int,
-  slot~ : GraphParamSlot,
+  target~ : ControlTarget,
+  unit~ : ControlUnit,
 ) -> ControlBinding {
-  { key, node_index, slot, }
+  { key, target, unit, }
 }
 
 ///|
@@ -76,14 +162,33 @@ fn ControlBindingBuilder::from_internal(
 }
 
 ///|
-/// Add a binding. Mutates internal array, returns self for chaining.
+/// Bind `key` to a graph parameter; `unit` converts score values to the
+/// parameter's unit. Mutates internal array, returns self for chaining.
 pub fn ControlBindingBuilder::bind(
   self : ControlBindingBuilder,
   key~ : String,
   node_index~ : Int,
   slot~ : GraphParamSlot,
+  unit? : ControlUnit = Linear,
 ) -> ControlBindingBuilder {
-  { raw: self.raw.bind(key~, node_index~, slot=slot.to_model()), }
+  {
+    raw: self.raw.bind(
+      key~,
+      target=@binding.BindingTarget::Graph(node_index, slot.to_model()),
+      unit=unit.to_model(),
+    ),
+  }
+}
+
+///|
+/// Bind `key` to a voice-frame parameter, which every voice has whatever its
+/// graph. Mutates internal array, returns self for chaining.
+pub fn ControlBindingBuilder::bind_voice(
+  self : ControlBindingBuilder,
+  key~ : String,
+  param~ : VoiceParam,
+) -> ControlBindingBuilder {
+  { raw: self.raw.bind(key~, target=Voice(param.to_model()), unit=Linear), }
 }
 
 ///|
@@ -140,10 +245,11 @@ pub fn ControlBindingBuilder::build(
 }
 
 ///|
-/// Convert pattern controls to graph controls using the validated bindings.
-/// Emits GraphControl::set_param for each bound key found in the input map,
-/// in binding insertion order. Missing keys are skipped; unrecognized keys
-/// are ignored. Values are passed through without domain validation.
+/// Convert score controls to graph controls using the validated bindings.
+/// Emits GraphControl::set_param, in parameter units, for each graph-bound key
+/// found in the input map, in binding insertion order. Missing keys are
+/// skipped; unrecognized and voice-frame keys are ignored. Values are passed
+/// through without domain validation.
 pub fn ControlBindingMap::resolve_controls(
   self : ControlBindingMap,
   controls : Map[String, Double],
@@ -163,17 +269,37 @@ pub fn ControlBindingMap::binding(
   self : ControlBindingMap,
   key : String,
 ) -> ControlBinding? {
-  match self.raw.target(key) {
-    Some((node_index, slot)) =>
+  match self.raw.binding(key) {
+    Some((Graph(node_index, slot), unit)) =>
       Some(
         ControlBinding(
           key~,
-          node_index~,
-          slot=graph_param_slot_from_model(slot),
+          target=Graph(node_index, graph_param_slot_from_model(slot)),
+          unit=ControlUnit::from_model(unit),
+        ),
+      )
+    Some((Voice(param), unit)) =>
+      Some(
+        ControlBinding(
+          key~,
+          target=Voice(VoiceParam::from_model(param)),
+          unit=ControlUnit::from_model(unit),
         ),
       )
     None => None
   }
+}
+
+///|
+/// Visit each voice-frame-bound key found in `controls`, in binding order.
+pub fn ControlBindingMap::each_voice_value(
+  self : ControlBindingMap,
+  controls : Map[String, Double],
+  f : (VoiceParam, Double) -> Unit,
+) -> Unit {
+  self.raw.each_voice_value(controls, (param, value) => {
+    f(VoiceParam::from_model(param), value)
+  })
 }
 
 ///|
@@ -209,7 +335,8 @@ pub impl Show for ControlBindingMap with fn output(self, logger) {
 pub extend ControlBindingMap with Show::{to_string, output}
 
 ///|
-/// Read the default captured when these bindings were validated.
+/// Read the default captured when these bindings were validated, in score
+/// units.
 pub fn ControlBindingMap::default_value(
   self : ControlBindingMap,
   key : String,

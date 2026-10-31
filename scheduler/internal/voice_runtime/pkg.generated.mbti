@@ -12,8 +12,6 @@ pub fn compare_event_onset(@pattern.Event[@pattern.ControlMap], @pattern.Event[@
 
 pub fn copy_control_events(Array[@pattern.Event[@pattern.ControlMap]]) -> Array[@pattern.Event[@pattern.ControlMap]]
 
-pub fn midi_to_hz(Double) -> Double
-
 // Errors
 
 // Types and methods

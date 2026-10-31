@@ -6,41 +6,6 @@ fn copy_control_events(
 }
 
 ///|
-/// Decouples graph control key routing from the scheduler's event loop.
-///
-/// `convert` turns a pattern value into the graph value for the same key, at
-/// note-on and for every bus update while the voice sounds, so it must not
-/// allocate. Voice-frame keys (`gain`, `pan`, `room`) never reach it: the
-/// scheduler applies them to every voice, whatever its graph.
-pub struct ControlMapper {
-  convert : (String, Double) -> Double
-}
-
-///|
-pub fn ControlMapper::ControlMapper(
-  convert~ : (String, Double) -> Double,
-) -> ControlMapper {
-  { convert, }
-}
-
-///|
-/// Default mapper:
-/// - "note" values are converted from MIDI note numbers to Hz
-/// - "attack" and "release" are converted from seconds to milliseconds
-/// - All other keys pass through unchanged
-pub fn default_control_mapper() -> ControlMapper {
-  ControlMapper(convert=fn(k, v) {
-    if k == "attack" || k == "release" {
-      v * 1000.0
-    } else if k == "note" {
-      midi_to_hz(v)
-    } else {
-      v
-    }
-  })
-}
-
-///|
 /// Which events an instrument plays. The scheduler routes each event to the
 /// first instrument whose selector matches its controls; an event no
 /// instrument selects stays silent.
@@ -84,7 +49,6 @@ pub struct PatternScheduler {
   priv selectors : Array[InstrumentSelector]
   priv pools : Array[@moondsp.BoundVoicePool]
   priv active_notes : @voice_runtime.ActiveNotes
-  priv mapper : ControlMapper
   priv playback_state : @playback.PlaybackState
   priv mut onsets : OnsetBuffer?
   priv followers : BusFollowers
@@ -97,7 +61,6 @@ pub struct PatternScheduler {
 pub fn PatternScheduler::PatternScheduler(
   bpm~ : Double,
   ctx~ : @moondsp.DspContext,
-  mapper? : ControlMapper,
   instruments~ : Array[(InstrumentSelector, @moondsp.BoundVoicePool)],
 ) -> PatternScheduler raise @transport.TransportError {
   let tempo = @transport.Tempo::from_bpm(bpm).unwrap_or_error()
@@ -121,7 +84,6 @@ pub fn PatternScheduler::PatternScheduler(
     selectors: instruments.map(instrument => instrument.0),
     pools: instruments.map(instrument => instrument.1),
     active_notes: @voice_runtime.ActiveNotes(),
-    mapper: mapper.unwrap_or(default_control_mapper()),
     playback_state: @playback.PlaybackState(),
     onsets: None,
     followers: BusFollowers(),
@@ -199,23 +161,9 @@ fn PatternScheduler::process_single_event(
       if !arc.contains(whole.begin) {
         ()
       } else {
-        // WHY fresh map: process_events takes Array[Event] so callers may
-        // reuse event arrays across calls. Building a fresh map avoids
-        // mutating the original ControlMap. The ControlMapper transforms
-        // graph-bound values (e.g. MIDI→Hz); voice-frame keys bypass it.
+        // The pool's bindings decide what each key sets and in which unit.
         let map : Map[String, Double] = Map([])
-        let mut gain : Double? = None
-        let mut pan : Double? = None
-        let mut send : Double? = None
-        let mapper = self.mapper
-        event.value.each(fn(k, v) {
-          match k {
-            "gain" => gain = Some(v)
-            "pan" => pan = Some(v)
-            "room" => send = Some(v)
-            _ => map[k] = (mapper.convert)(k, v)
-          }
-        })
+        event.value.each(fn(k, v) { map[k] = v })
         let gate = pool.note_gate(map)
         let endpoint = match gate {
           EventEnd => self.clock.sample_at(whole.end_)
@@ -258,15 +206,6 @@ fn PatternScheduler::process_single_event(
                 source_start~,
                 source_pitch~,
               )
-            }
-            if gain is Some(gain) {
-              ignore(pool.set_voice_gain_result(handle, gain))
-            }
-            if pan is Some(pan) {
-              ignore(pool.set_voice_pan_result(handle, pan))
-            }
-            if send is Some(send) {
-              ignore(pool.set_voice_send_result(handle, send))
             }
             self.followers.follow(
               instrument,
@@ -409,11 +348,7 @@ fn PatternScheduler::process_block_events(
   }
   // Voices started earlier follow their buses from this block's start; a
   // voice starting inside the block begins from its own onset value.
-  self.followers.update(
-    frame.logical_arc.begin,
-    self.pools,
-    self.mapper.convert,
-  )
+  self.followers.update(frame.logical_arc.begin, self.pools)
   // Ceil may put a preceding block's final fractional onset at this block's
   // first sample. Retain that query result for one block; never query history.
   for sourced in self.previous_events {

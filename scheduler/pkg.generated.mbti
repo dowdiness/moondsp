@@ -13,9 +13,6 @@ import {
 }
 
 // Values
-pub fn default_control_mapper() -> ControlMapper
-
-pub fn midi_to_hz(Double) -> Double
 
 // Errors
 
@@ -40,11 +37,6 @@ pub struct BlockFrame {
   logical_arc : @pattern.TimeSpan
 }
 
-pub struct ControlMapper {
-  convert : (String, Double) -> Double
-}
-pub fn ControlMapper::ControlMapper(convert~ : (String, Double) -> Double) -> Self
-
 pub(all) enum InstrumentSelector {
   AllEvents
   HasControl(String)
@@ -67,7 +59,7 @@ pub fn OnsetBuffer::field(Self, Int, Int) -> Double
 pub struct PatternScheduler {
   // private fields
 }
-pub fn PatternScheduler::PatternScheduler(bpm~ : Double, ctx~ : @dsp.DspContext, mapper? : ControlMapper, instruments~ : Array[(InstrumentSelector, @voice.BoundVoicePool)]) -> Self raise @transport.TransportError
+pub fn PatternScheduler::PatternScheduler(bpm~ : Double, ctx~ : @dsp.DspContext, instruments~ : Array[(InstrumentSelector, @voice.BoundVoicePool)]) -> Self raise @transport.TransportError
 pub fn PatternScheduler::accept_playback(Self, PlaybackSnapshot, Tempo, material_limit~ : Int, restart? : Bool, end_? : @pattern.Rational) -> Result[Unit, PlaybackAdmissionError]
 pub fn PatternScheduler::accept_playback_snapshot(Self, PlaybackSnapshot) -> Unit
 pub fn PatternScheduler::accepted_snapshot(Self) -> PlaybackSnapshot?

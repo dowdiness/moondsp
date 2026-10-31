@@ -38,10 +38,10 @@ pub impl Eq for AnalyzedGraph
 
 pub struct ControlBinding {
   key : String
-  node_index : Int
-  slot : GraphParamSlot
+  target : ControlTarget
+  unit : ControlUnit
 } derive(Eq, @debug.Debug)
-pub fn ControlBinding::ControlBinding(key~ : String, node_index~ : Int, slot~ : GraphParamSlot) -> Self
+pub fn ControlBinding::ControlBinding(key~ : String, target~ : ControlTarget, unit~ : ControlUnit) -> Self
 pub fn ControlBinding::equal(Self, Self) -> Bool
 pub fn ControlBinding::not_equal(Self, Self) -> Bool
 pub fn ControlBinding::output(Self, &Logger) -> Unit
@@ -53,7 +53,8 @@ pub struct ControlBindingBuilder {
   // private fields
 } derive(@debug.Debug)
 pub fn ControlBindingBuilder::ControlBindingBuilder() -> Self
-pub fn ControlBindingBuilder::bind(Self, key~ : String, node_index~ : Int, slot~ : GraphParamSlot) -> Self
+pub fn ControlBindingBuilder::bind(Self, key~ : String, node_index~ : Int, slot~ : GraphParamSlot, unit? : ControlUnit) -> Self
+pub fn ControlBindingBuilder::bind_voice(Self, key~ : String, param~ : VoiceParam) -> Self
 pub fn ControlBindingBuilder::build(Self, AnalyzedGraph) -> Result[ControlBindingMap, ControlBindingError]
 pub fn ControlBindingBuilder::output(Self, &Logger) -> Unit
 pub fn ControlBindingBuilder::to_repr(Self) -> @debug.Repr
@@ -78,6 +79,7 @@ pub struct ControlBindingMap {
 } derive(Eq, @debug.Debug)
 pub fn ControlBindingMap::binding(Self, String) -> ControlBinding?
 pub fn ControlBindingMap::default_value(Self, String) -> Double?
+pub fn ControlBindingMap::each_voice_value(Self, Map[String, Double], (VoiceParam, Double) -> Unit) -> Unit
 pub fn ControlBindingMap::equal(Self, Self) -> Bool
 pub fn ControlBindingMap::length(Self) -> Int
 pub fn ControlBindingMap::not_equal(Self, Self) -> Bool
@@ -86,6 +88,24 @@ pub fn ControlBindingMap::resolve_controls(Self, Map[String, Double]) -> Array[G
 pub fn ControlBindingMap::to_repr(Self) -> @debug.Repr
 pub fn ControlBindingMap::to_string(Self) -> String
 pub impl Show for ControlBindingMap
+
+pub(all) enum ControlTarget {
+  Graph(Int, GraphParamSlot)
+  Voice(VoiceParam)
+} derive(Eq, @debug.Debug)
+pub fn ControlTarget::equal(Self, Self) -> Bool
+pub fn ControlTarget::not_equal(Self, Self) -> Bool
+pub fn ControlTarget::to_repr(Self) -> @debug.Repr
+
+pub(all) enum ControlUnit {
+  Linear
+  MidiToHz
+  SecondsToMs
+} derive(Eq, @debug.Debug)
+pub fn ControlUnit::convert(Self, Double) -> Double
+pub fn ControlUnit::equal(Self, Self) -> Bool
+pub fn ControlUnit::not_equal(Self, Self) -> Bool
+pub fn ControlUnit::to_repr(Self) -> @debug.Repr
 
 type Dsp
 pub fn Dsp::apply_control(Self, GraphControl) -> Result[Unit, GraphControlError]
@@ -460,6 +480,15 @@ pub fn StereoDspTopologyController::queue_topology_edit(Self, GraphTopologyEdit)
 pub fn StereoDspTopologyController::queue_topology_edits(Self, Array[GraphTopologyEdit]) -> Result[Unit, GraphTopologyQueueError]
 pub fn StereoDspTopologyController::set_param(Self, Int, GraphParamSlot, Double) -> Result[Unit, GraphControlError]
 pub impl GraphControllable for StereoDspTopologyController
+
+pub(all) enum VoiceParam {
+  Gain
+  Pan
+  Send
+} derive(Eq, @debug.Debug)
+pub fn VoiceParam::equal(Self, Self) -> Bool
+pub fn VoiceParam::not_equal(Self, Self) -> Bool
+pub fn VoiceParam::to_repr(Self) -> @debug.Repr
 
 // Type aliases
 

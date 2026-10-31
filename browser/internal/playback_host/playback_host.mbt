@@ -42,7 +42,16 @@ fn Player::Player(
 let player : @ref.Ref[Player?] = @ref.new(None)
 
 ///|
-/// Create a drum instrument pool (no control bindings needed).
+/// Mini's voice-frame keys, which every instrument receives.
+fn voice_frame_bindings() -> @moondsp.ControlBindingBuilder {
+  @moondsp.ControlBindingBuilder()
+  .bind_voice(key="gain", param=Gain)
+  .bind_voice(key="pan", param=Pan)
+  .bind_voice(key="room", param=Send)
+}
+
+///|
+/// Create a drum instrument pool (voice-frame bindings only).
 fn make_drum_pool(
   template : Array[@moondsp.DspNode],
   ctx : @moondsp.DspContext,
@@ -56,7 +65,7 @@ fn make_drum_pool(
     @moondsp.BoundVoicePool(
       @moondsp.AnalyzedGraph::analyze(template),
       ctx,
-      @moondsp.ControlBindingBuilder(),
+      voice_frame_bindings(),
       max_voices=8,
     ),
   ) catch {
@@ -75,13 +84,19 @@ fn make_synth_pool(
     @moondsp.BoundVoicePool(
       @moondsp.AnalyzedGraph::analyze(template),
       ctx,
-      @moondsp.ControlBindingBuilder()
+      voice_frame_bindings()
       .bind(
         key="note",
         node_index=0, // oscillator(Value0) frequency placeholder
         slot=@moondsp.GraphParamSlot::Value0,
+        unit=MidiToHz,
       )
-      .bind(key="attack", node_index=1, slot=@moondsp.GraphParamSlot::Value0)
+      .bind(
+        key="attack",
+        node_index=1,
+        slot=@moondsp.GraphParamSlot::Value0,
+        unit=SecondsToMs,
+      )
       .bind(
         key="envelope_decay",
         node_index=1,
@@ -92,7 +107,12 @@ fn make_synth_pool(
         node_index=1,
         slot=@moondsp.GraphParamSlot::Value2,
       )
-      .bind(key="release", node_index=1, slot=@moondsp.GraphParamSlot::Value3)
+      .bind(
+        key="release",
+        node_index=1,
+        slot=@moondsp.GraphParamSlot::Value3,
+        unit=SecondsToMs,
+      )
       .bind(key="lpf", node_index=2, slot=@moondsp.GraphParamSlot::Value0)
       .bind(
         key="lpf_resonance",

@@ -12,8 +12,8 @@ control side.
 ```text
 Mini PatternDoc / PatternSnapshot
   -> scheduler events + ControlMap
-  -> template registry + ControlMapper
-  -> ControlBindingMap for the selected AnalyzedGraph
+  -> template registry
+  -> ControlBindingMap for the selected AnalyzedGraph (targets and units)
   -> GraphControl batch / BoundVoicePool note-on at block boundary
 
 Graph DSL document
@@ -45,13 +45,13 @@ these rules before calling `ControlBindingMap::resolve_controls`:
 | Mini key | Mini meaning | Bridge behavior | Graph-control result |
 | --- | --- | --- | --- |
 | `sound` | Drum/sound selector from `s("...")`; current Mini atoms use GM MIDI drum numbers such as `bd = 36`. | Consumed as a template/route selector. A registry may expose graph templates by name (`bd`) while normalizing to the same sound code. | No `GraphControl` by default. Missing selected template is a control-side diagnostic; do not parse/lower/compile on the audio callback. |
-| `note` | MIDI note number from `note("...")`. | Convert to Hz when using the default scheduler semantics, then bind to the selected template's pitch/frequency control. The canonical graph-facing key is `note`; a host may explicitly alias it to another declared key such as `freq`. | `GraphControl::set_param` for the bound oscillator/frequency slot. |
+| `note` | MIDI note number from `note("...")`. | Bind with `unit=MidiToHz` to the selected template's pitch/frequency control. The canonical graph-facing key is `note`; a host may explicitly alias it to another declared key such as `freq`. | `GraphControl::set_param` for the bound oscillator/frequency slot. |
 | `lpf` | Low-pass cutoff in Hz from `.lpf(hz, resonance?)`. | Pass through only if the selected graph template declares/binds it to a low-pass filter. | Usually `GraphParamSlot::Value0` on a `Biquad` / `StereoBiquad` whose mode is `LowPass`; runtime validation still checks sample-rate-dependent domains. |
 | `lpf_resonance` | Optional low-pass resonance/Q from the second `.lpf(...)` argument. | Pass through only if the selected graph template declares/binds it to the same low-pass filter as `lpf`. Omitted arguments emit no key, preserving the template default. | Usually `GraphParamSlot::Value1` on the low-pass `Biquad` / `StereoBiquad`; Q must be finite and positive. |
 | `hpf` | High-pass cutoff in Hz from `.hpf(hz, resonance?)`. | Pass through only if the selected graph template declares/binds it to a high-pass filter. | Usually `GraphParamSlot::Value0` on a `Biquad` / `StereoBiquad` whose mode is `HighPass`; runtime validation still checks sample-rate-dependent domains. |
 | `hpf_resonance` | Optional high-pass resonance/Q from the second `.hpf(...)` argument. | Pass through only if the selected graph template declares/binds it to the same high-pass filter as `hpf`. Omitted arguments emit no key, preserving the template default. | Usually `GraphParamSlot::Value1` on the high-pass `Biquad` / `StereoBiquad`; Q must be finite and positive. |
-| `gain` | Linear gain from `.gain(g)`. | Pass through only if declared/bound. | Usually `GraphParamSlot::Value0` on `Gain` / `StereoGain`. |
-| `pan` | Voice pan from `.pan(p)` or `.jux(...)`. | Default scheduler behavior consumes it as a per-voice pan side effect and drops it before binding. | None. |
+| `gain` | Linear gain from `.gain(g)`. | The browser host binds it to the voice frame on every instrument (`bind_voice(param=Gain)`). | None; the voice frame scales the voice before pan. |
+| `pan` | Voice pan from `.pan(p)` or `.jux(...)`. | The browser host binds it to the voice frame on every instrument (`bind_voice(param=Pan)`). | None. |
 | Future keys | Opaque numeric controls added by Mini or host code. | The graph document's declared-control schema decides whether the key is accepted, optional, required, defaulted, or reported as unknown. | `GraphControl::set_param` only after validated binding compatibility. |
 
 `ControlBindingMap::resolve_controls` deliberately ignores unbound keys so low

@@ -435,6 +435,8 @@ pub fn BoundVoicePool::set_template(
 }
 
 ///|
+/// Start a voice from score controls: graph-bound keys convert through their
+/// bindings' units, and voice-frame keys set the new voice's frame.
 pub fn BoundVoicePool::note_on_controls(
   self : BoundVoicePool,
   controls : Map[String, Double],
@@ -450,7 +452,20 @@ pub fn BoundVoicePool::note_on_controls(
       self.bindings.resolve_controls(held)
     }
   }
-  self.pool.note_on(resolved)
+  let handle = self.pool.note_on(resolved)
+  if handle is Some(handle) {
+    self.bindings.each_voice_value(controls, (param, value) => {
+      match param {
+        @graph.VoiceParam::Gain =>
+          ignore(self.pool.set_voice_gain_result(handle, value))
+        @graph.VoiceParam::Pan =>
+          ignore(self.pool.set_voice_pan_result(handle, value))
+        @graph.VoiceParam::Send =>
+          ignore(self.pool.set_voice_send_result(handle, value))
+      }
+    })
+  }
+  handle
 }
 
 ///|
@@ -1289,7 +1304,7 @@ pub extend NoteGate with Eq::{not_equal, equal}
 
 ///|
 /// Resolve gate timing without starting a voice or changing the input controls.
-/// Attack/release controls use graph milliseconds; hold uses seconds.
+/// Controls are in score units: attack and hold in seconds.
 /// Instruments without all four envelope bindings retain their event gate.
 pub fn BoundVoicePool::note_gate(
   self : BoundVoicePool,
@@ -1305,7 +1320,7 @@ pub fn BoundVoicePool::note_gate(
       self.bindings.default_value("release") is Some(_) => attack
     _ => return EventEnd
   }
-  let attack = controls.get("attack").unwrap_or(default_attack) / 1000.0
+  let attack = controls.get("attack").unwrap_or(default_attack)
   if hold.is_nan() ||
     hold.is_inf() ||
     hold < 0.0 ||

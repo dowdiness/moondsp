@@ -12,11 +12,19 @@ import {
 // Errors
 
 // Types and methods
+pub(all) enum BindingTarget {
+  Graph(Int, @model.GraphParamSlot)
+  Voice(VoiceParam)
+} derive(Eq, @debug.Debug)
+pub fn BindingTarget::equal(Self, Self) -> Bool
+pub fn BindingTarget::not_equal(Self, Self) -> Bool
+pub fn BindingTarget::to_repr(Self) -> @debug.Repr
+
 pub struct ControlBindingBuilder {
   // private fields
 } derive(@debug.Debug)
 pub fn ControlBindingBuilder::ControlBindingBuilder() -> Self
-pub fn ControlBindingBuilder::bind(Self, key~ : String, node_index~ : Int, slot~ : @model.GraphParamSlot) -> Self
+pub fn ControlBindingBuilder::bind(Self, key~ : String, target~ : BindingTarget, unit~ : ControlUnit) -> Self
 pub fn ControlBindingBuilder::build(Self, @template.AnalyzedGraph) -> Result[ControlBindingMap, ControlBindingError]
 pub fn ControlBindingBuilder::to_repr(Self) -> @debug.Repr
 
@@ -33,13 +41,34 @@ pub fn ControlBindingError::to_repr(Self) -> @debug.Repr
 pub struct ControlBindingMap {
   // private fields
 } derive(Eq, @debug.Debug)
+pub fn ControlBindingMap::binding(Self, String) -> (BindingTarget, ControlUnit)?
 pub fn ControlBindingMap::default_value(Self, String) -> Double?
+pub fn ControlBindingMap::each_voice_value(Self, Map[String, Double], (VoiceParam, Double) -> Unit) -> Unit
 pub fn ControlBindingMap::equal(Self, Self) -> Bool
 pub fn ControlBindingMap::length(Self) -> Int
 pub fn ControlBindingMap::not_equal(Self, Self) -> Bool
 pub fn ControlBindingMap::resolve_controls(Self, Map[String, Double]) -> Array[@model.GraphControl]
-pub fn ControlBindingMap::target(Self, String) -> (Int, @model.GraphParamSlot)?
 pub fn ControlBindingMap::to_repr(Self) -> @debug.Repr
+
+pub(all) enum ControlUnit {
+  Linear
+  MidiToHz
+  SecondsToMs
+} derive(Eq, @debug.Debug)
+pub fn ControlUnit::convert(Self, Double) -> Double
+pub fn ControlUnit::equal(Self, Self) -> Bool
+pub fn ControlUnit::invert(Self, Double) -> Double
+pub fn ControlUnit::not_equal(Self, Self) -> Bool
+pub fn ControlUnit::to_repr(Self) -> @debug.Repr
+
+pub(all) enum VoiceParam {
+  Gain
+  Pan
+  Send
+} derive(Eq, @debug.Debug)
+pub fn VoiceParam::equal(Self, Self) -> Bool
+pub fn VoiceParam::not_equal(Self, Self) -> Bool
+pub fn VoiceParam::to_repr(Self) -> @debug.Repr
 
 // Type aliases
 

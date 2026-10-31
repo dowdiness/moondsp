@@ -976,15 +976,17 @@ Current semantics:
   `PlaybackSnapshot` values; it does not duplicate the pool's voice state or
   control bindings.
 - `PatternScheduler::process_block(...)` routes each event to the first
-  instrument pool whose selector matches it, expires old notes, queries the pattern for the current block arc, converts raw control
-  values through the scheduler's mapper, calls `note_on_controls(...)`, applies
-  per-voice side effects such as pan and the single shared-send gain, then
-  renders and sums every instrument pool. Snapshot playback also records each
+  instrument pool whose selector matches it, expires old notes, queries the pattern for the current block arc, passes the
+  event's score controls to `note_on_controls(...)`, then renders and sums
+  every instrument pool. The pool's bindings decide what each key sets: a
+  graph parameter, converted by the binding's unit (`MidiToHz`,
+  `SecondsToMs`), or a voice-frame parameter (gain, pan, or the single
+  shared-send gain); unbound keys are ignored. Snapshot playback also records each
   time-varying control bus the event's keys follow (ADR-0019); at every block
   start the scheduler sends changed bus values to those voices until they are
-  idle, including release tails. The default mapper consumes `room` as a
-  normalized `0..1` send; it is not a graph control and does not add reverb
-  nodes to each voice.
+  idle, including release tails. The browser host binds `room` to the voice
+  send as a normalized `0..1` value; it is not a graph control and does not
+  add reverb nodes to each voice.
 - The browser note/chord template binds Mini `lpf` and `hpf` controls to each
   biquad's `Value0` cutoff slot. When `.lpf(hz, resonance)` or
   `.hpf(hz, resonance)` includes its optional second argument, the corresponding

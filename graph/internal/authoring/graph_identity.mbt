@@ -443,7 +443,7 @@ pub fn GraphIndexMap::bind_control(
 ) -> @binding.ControlBindingBuilder? {
   self
   .node_index(id)
-  .map(fn(index) { builder.bind(key~, node_index=index, slot~) })
+  .map(fn(index) { builder.bind(key~, target=Graph(index, slot), unit=Linear) })
 }
 
 ///|
