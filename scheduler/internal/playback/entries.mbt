@@ -456,47 +456,48 @@ fn EntrySpec::query_sourced(
   origin : @pattern.Rational,
   arc : @pattern.TimeSpan,
 ) -> Array[PlaybackSourcedEvent] {
+  let placement = @pattern.Placement(origin~)
   match self.source {
     Pattern(snapshot, index) =>
       snapshot
       .query_sourced_events_for_entry(index, arc)
       .map(event => {
-        event: event.event().shift(origin),
+        event: event.event().placed(placement),
         origin: @model.VoiceOrigin::Pattern(event.pattern_node_path()),
         source_origin: None,
         source_frame: None,
         source_start: -1.0,
         source_pitch: -1.0,
-        buses: event.buses().placed(origin~),
+        buses: event.buses().placed(placement),
       })
     PatternWithOrigins(snapshot, index) =>
       snapshot
       .query_for_entry(index, arc)
       .map(event => {
-        event: event.event().shift(origin),
+        event: event.event().placed(placement),
         origin: @model.VoiceOrigin::Pattern(event.pattern_node_path()),
         source_origin: Some(event.origin()),
         source_frame: event.source_frame(),
         source_start: event.source_start(),
         source_pitch: event.source_pitch(),
-        buses: event.buses().placed(origin~),
+        buses: event.buses().placed(placement),
       })
     Song(snapshot, index) => {
       let source_arc = @pattern.TimeSpan(
         arc.begin + self.start,
         arc.end_ + self.start,
       )
-      let delta = origin - self.start
+      let placement = @pattern.Placement(origin=origin - self.start)
       snapshot
       .query_sourced_events_for_entry(index, source_arc)
       .map(event => {
-        event: event.event().shift(delta),
+        event: event.event().placed(placement),
         origin: @model.VoiceOrigin::Song(event.origin()),
         source_origin: event.source_origin(),
         source_frame: event.source_frame(),
         source_start: event.source_start(),
         source_pitch: event.source_pitch(),
-        buses: event.buses().placed(origin=delta),
+        buses: event.buses().placed(placement),
       })
     }
   }

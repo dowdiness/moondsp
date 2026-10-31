@@ -84,21 +84,18 @@ fn shift_bus_bindings(
 }
 
 ///|
-/// The buses one event's controls follow, placed on the clock the event is on:
-/// the snapshot's local time is `(t - origin) × rate`.
+/// The buses one event's controls follow, placed on the clock the event is on.
 pub struct EventBuses {
   priv table : Array[BusSignal]
   priv bindings : FixedArray[(String, Int)]
-  priv origin : Rational
-  priv rate : Rational
+  priv placement : Placement
 }
 
 ///|
 let no_event_buses : EventBuses = {
   table: [],
   bindings: no_bus_bindings,
-  origin: Rational::from_int(0),
-  rate: Rational::from_int(1),
+  placement: Placement(),
 }
 
 ///|
@@ -119,31 +116,30 @@ fn EventBuses::in_snapshot(
 }
 
 ///|
-/// Follow the event when it is placed at `t / rate + origin`, the same
-/// placement a caller applies to the event's spans.
+/// Follow the event when `placement` moves it, as `Event::placed` does.
 pub fn EventBuses::placed(
   self : EventBuses,
-  origin~ : Rational,
-  rate? : Rational = Rational::from_int(1),
+  placement : Placement,
 ) -> EventBuses {
   if self.bindings.is_empty() {
     return self
   }
-  { ..self, origin: origin + self.origin / rate, rate: rate * self.rate, }
+  { ..self, placement: self.placement.then(placement), }
 }
 
 ///|
 /// `signal` on this event's clock.
 fn EventBuses::place(self : EventBuses, signal : BusSignal) -> BusSignal {
-  let scaled : BusSignal = if self.rate == Rational::from_int(1) {
+  let { origin, rate } = self.placement
+  let scaled : BusSignal = if rate == Rational::from_int(1) {
     signal
   } else {
-    Fast(self.rate.num, self.rate.den, signal)
+    Fast(rate.num, rate.den, signal)
   }
-  if self.origin == Rational::from_int(0) {
+  if origin.num == 0L {
     scaled
   } else {
-    Shift(self.origin.num, self.origin.den, scaled)
+    Shift(origin.num, origin.den, scaled)
   }
 }
 

@@ -35,6 +35,58 @@ pub fn TimeSpan::shift(self : TimeSpan, offset : Rational) -> TimeSpan {
 }
 
 ///|
+/// Where a local clock sits on an outer clock: local time `t` is outer time
+/// `t / rate + origin` (`rate > 0`). Events and the buses they follow are
+/// placed with the same value, so they stay on one clock.
+pub struct Placement {
+  priv origin : Rational
+  priv rate : Rational
+}
+
+///|
+pub fn Placement::Placement(
+  origin? : Rational = Rational::from_int(0),
+  rate? : Rational = Rational::from_int(1),
+) -> Placement {
+  { origin, rate, }
+}
+
+///|
+fn Placement::is_identity(self : Placement) -> Bool {
+  self.origin.num == 0L && self.rate == Rational::from_int(1)
+}
+
+///|
+/// This placement followed by `outer`.
+fn Placement::then(self : Placement, outer : Placement) -> Placement {
+  {
+    origin: self.origin / outer.rate + outer.origin,
+    rate: self.rate * outer.rate,
+  }
+}
+
+///|
+/// `span` from the local clock on the outer clock.
+fn Placement::span(self : Placement, span : TimeSpan) -> TimeSpan {
+  if self.rate == Rational::from_int(1) {
+    return span.shift(self.origin)
+  }
+  TimeSpan(
+    span.begin / self.rate + self.origin,
+    span.end_ / self.rate + self.origin,
+  )
+}
+
+///|
+/// `span` from the outer clock on the local clock.
+pub fn Placement::local_span(self : Placement, span : TimeSpan) -> TimeSpan {
+  TimeSpan(
+    (span.begin - self.origin) * self.rate,
+    (span.end_ - self.origin) * self.rate,
+  )
+}
+
+///|
 pub fn TimeSpan::contains(self : TimeSpan, time : Rational) -> Bool {
   self.begin <= time && time < self.end_
 }

@@ -31,13 +31,16 @@ pub fn[A] Event::shift(self : Event[A], offset : Rational) -> Event[A] {
 }
 
 ///|
-/// Place the same musical value in new ideal and clipped spans.
-pub fn[A] Event::with_spans(
-  self : Event[A],
-  whole~ : TimeSpan?,
-  part~ : TimeSpan,
-) -> Event[A] {
-  { whole, part, value: self.value, }
+/// This event from a local clock on the outer clock of `placement`.
+pub fn[A] Event::placed(self : Event[A], placement : Placement) -> Event[A] {
+  if placement.is_identity() {
+    return self
+  }
+  {
+    whole: self.whole.map(whole => placement.span(whole)),
+    part: placement.span(self.part),
+    value: self.value,
+  }
 }
 
 ///|

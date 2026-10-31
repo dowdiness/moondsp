@@ -383,13 +383,16 @@ pub fn PlaybackState::query_active_sourced_events(
     None => []
     Some(run) =>
       run.query(arc, query_sourced_entries, (sourced, offset) => {
-        event: sourced.event.shift(offset),
-        origin: sourced.origin,
-        source_origin: sourced.source_origin,
-        source_frame: sourced.source_frame,
-        source_start: sourced.source_start,
-        source_pitch: sourced.source_pitch,
-        buses: sourced.buses.placed(origin=offset),
+        let placement = @pattern.Placement(origin=offset)
+        {
+          event: sourced.event.placed(placement),
+          origin: sourced.origin,
+          source_origin: sourced.source_origin,
+          source_frame: sourced.source_frame,
+          source_start: sourced.source_start,
+          source_pitch: sourced.source_pitch,
+          buses: sourced.buses.placed(placement),
+        }
       })
   }
 }

@@ -528,4 +528,18 @@ test "song events read their buses on the song clock" {
   })
   // (3.25 - 3) × 2 = 0.5 and (3.4 - 3) × 2 = 0.8.
   @debug.assert_eq(values, ["lpf 50 80"])
+  // An entry that starts the song at playback time 1 adds 1, after the rate.
+  let entry = @pattern.Placement(origin=@pattern.Rational::from_int(1))
+  let placed = []
+  events[0]
+  .buses()
+  .placed(entry)
+  .each_reader((key, reader) => {
+    placed.push("\{key} \{reader(17L, 4L)} \{reader(22L, 5L)}")
+  })
+  @debug.assert_eq(placed, ["lpf 50 80"])
+  @debug.assert_eq(
+    events[0].event().placed(entry).part,
+    @pattern.TimeSpan(@pattern.Rational(17L, 4L), @pattern.Rational(9L, 2L)),
+  )
 }

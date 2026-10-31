@@ -561,15 +561,6 @@ fn[A] query_scoped_snapshot_layer(
 }
 
 ///|
-fn place_song_span(
-  span : @pattern.TimeSpan,
-  rate : @pattern.Rational,
-  offset : @pattern.Rational,
-) -> @pattern.TimeSpan {
-  @pattern.TimeSpan(span.begin / rate + offset, span.end_ / rate + offset)
-}
-
-///|
 fn[A] push_song_snapshot_events(
   result : Array[SongSnapshotEvent[A]],
   body : @pattern.Pat[A],
@@ -578,53 +569,30 @@ fn[A] push_song_snapshot_events(
   occurrence : SectionOccurrence[A],
   section : @identity.SectionId,
   layer : @identity.SectionLayerId,
-  local_arc : @pattern.TimeSpan,
+  global_arc : @pattern.TimeSpan,
 ) -> Unit {
   let origin = SongEventOrigin(occurrence=occurrence.id(), section~, layer~)
   match snapshot {
     Some(snapshot) => {
-      let scope = occurrence.section().scope()
-      let query_arc = if scope.is_identity() {
-        local_arc
-      } else {
-        @pattern.TimeSpan(
-          local_arc.begin * scope.rate(),
-          local_arc.end_ * scope.rate(),
-        )
-      }
+      let placement = @pattern.Placement(
+        origin=occurrence.start(),
+        rate=occurrence.section().scope().rate(),
+      )
+      let query_arc = placement.local_span(global_arc)
       let events = if source_index < 0 {
         snapshot.query(query_arc)
       } else {
         snapshot.query_for_entry(source_index, query_arc)
       }
       for sourced in events {
-        let event = sourced.event()
-        let buses = if scope.is_identity() {
-          sourced.buses().placed(origin=occurrence.start())
-        } else {
-          sourced.buses().placed(origin=occurrence.start(), rate=scope.rate())
-        }
-        let shifted = if scope.is_identity() {
-          event.shift(occurrence.start())
-        } else {
-          let rate = scope.rate()
-          let offset = occurrence.start()
-          event.with_spans(
-            whole=match event.whole {
-              Some(span) => Some(place_song_span(span, rate, offset))
-              None => None
-            },
-            part=place_song_span(event.part, rate, offset),
-          )
-        }
         result.push({
-          event: shifted,
+          event: sourced.event().placed(placement),
           origin,
           source_origin: Some(sourced.origin()),
           source_frame: sourced.source_frame(),
           source_start: sourced.source_start(),
           source_pitch: sourced.source_pitch(),
-          buses,
+          buses: sourced.buses().placed(placement),
         })
       }
     }
@@ -632,7 +600,7 @@ fn[A] push_song_snapshot_events(
       let events = query_scoped_snapshot_layer(
         body,
         occurrence.section().scope(),
-        local_arc,
+        unshift_span(global_arc, occurrence.start()),
       )
       for event in events {
         result.push({
@@ -658,8 +626,7 @@ pub fn[A] SongSnapshot::query_sourced_events(
   for sourced in self.sourced_occurrences {
     let occurrence = sourced.occurrence
     match occurrence.span().intersect(arc) {
-      Some(global_arc) => {
-        let local_arc = unshift_span(global_arc, occurrence.start())
+      Some(global_arc) =>
         for layer in sourced.layers {
           push_song_snapshot_events(
             result,
@@ -669,10 +636,9 @@ pub fn[A] SongSnapshot::query_sourced_events(
             occurrence,
             sourced.section,
             layer.id,
-            local_arc,
+            global_arc,
           )
         }
-      }
       None => ()
     }
   }
@@ -695,7 +661,6 @@ pub fn[A] SongSnapshot::query_sourced_events_for_entry(
   match source.occurrence.span().intersect(arc) {
     None => []
     Some(global_arc) => {
-      let local_arc = unshift_span(global_arc, source.occurrence.start())
       let result : Array[SongSnapshotEvent[A]] = []
       push_song_snapshot_events(
         result,
@@ -705,7 +670,7 @@ pub fn[A] SongSnapshot::query_sourced_events_for_entry(
         source.occurrence,
         source.section,
         source.layer,
-        local_arc,
+        global_arc,
       )
       result
     }

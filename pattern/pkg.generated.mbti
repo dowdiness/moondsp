@@ -80,10 +80,10 @@ pub struct Event[A] {
   value : A
 } derive(@debug.Debug)
 pub fn[A : @debug.Debug] Event::output(Self[A], &Logger) -> Unit
+pub fn[A] Event::placed(Self[A], Placement) -> Self[A]
 pub fn[A] Event::shift(Self[A], Rational) -> Self[A]
 pub fn[A : @debug.Debug] Event::to_repr(Self[A]) -> @debug.Repr
 pub fn[A : @debug.Debug] Event::to_string(Self[A]) -> String
-pub fn[A] Event::with_spans(Self[A], whole~ : TimeSpan?, part~ : TimeSpan) -> Self[A]
 pub impl[A : @debug.Debug] Show for Event[A]
 
 pub struct EventBuses {
@@ -91,7 +91,7 @@ pub struct EventBuses {
 }
 pub fn EventBuses::each_reader(Self, (String, (Int64, Int64) -> Double) -> Unit) -> Unit
 pub fn EventBuses::none() -> Self
-pub fn EventBuses::placed(Self, origin~ : Rational, rate? : Rational) -> Self
+pub fn EventBuses::placed(Self, Placement) -> Self
 pub fn EventBuses::reader(Self, String) -> ((Int64, Int64) -> Double)?
 
 pub struct EventOrigin {
@@ -233,6 +233,12 @@ pub fn[A] PatternSnapshotWithOrigins::query(Self[A], TimeSpan) -> Array[EventWit
 pub fn[A] PatternSnapshotWithOrigins::query_for_entry(Self[A], Int, TimeSpan) -> Array[EventWithOrigin[A]]
 pub fn[A] PatternSnapshotWithOrigins::revision(Self[A]) -> @identity.Revision
 pub fn[A] PatternSnapshotWithOrigins::root(Self[A]) -> @identity.PatternNodeId
+
+pub struct Placement {
+  // private fields
+}
+pub fn Placement::Placement(origin? : Rational, rate? : Rational) -> Self
+pub fn Placement::local_span(Self, TimeSpan) -> TimeSpan
 
 pub struct Rational {
   num : Int64
