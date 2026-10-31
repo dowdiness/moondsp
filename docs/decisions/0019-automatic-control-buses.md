@@ -248,8 +248,9 @@ ADR); user `Continuous` functions, which must themselves be allocation-free.
 - Lowering is single. `compile_pattern_node` keeps each subtree's buses in
   that subtree's local time beside its pattern, and each enclosing node wraps
   them with its own transform, so the lowering cache shares them unchanged.
-  Events hold subtree-local bus indices that a parent renumbers. Snapshots
-  expose the table as `buses()` and each event's bus as `bus_for(key)`.
+  Events hold subtree-local bus indices that a parent renumbers. The table
+  and its indices stay private: each event exposes only `buses()`
+  (`EventBuses`), whose `reader(key)` reads one bus on the event's clock.
 - Unifying the per-instrument schedulers was close to a prerequisite,
   because the bus table must come from the unfiltered score. Done: one
   `PatternScheduler` now plays every instrument pool and routes each event by

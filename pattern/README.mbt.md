@@ -261,9 +261,10 @@ voice scope. Returned binding arrays are defensive copies. `pat()` and
 periods, musical signatures, and degradation seeds never include source IDs.
 
 Lowering also derives automatic control buses ([ADR-0019](../docs/decisions/0019-automatic-control-buses.md)):
-one per `merge_control` and control key, in root time. `snapshot.buses()`
-evaluates them at exact times without allocating, and an event's
-`bus_for(key)` names the bus that key follows while the voice sounds. A
+one per `merge_control` and control key. An event's `buses()` carries the
+buses its keys follow, placed on the clock the event is on; `reader(key)`
+returns an allocation-free reader of exact time, and `each_reader` visits the
+keys whose bus changes over time. A
 provider must be built from atoms, `pure`, `continuous`, and time or
 structure nodes; an opaque `from_pattern` provider raises
 `UnsupportedControl`.

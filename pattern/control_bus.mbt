@@ -84,43 +84,10 @@ fn shift_bus_bindings(
 }
 
 ///|
-/// The buses of one lowered snapshot. Evaluation is allocation-free.
-pub struct ControlBuses {
-  priv signals : Array[BusSignal]
-}
-
-///|
-pub fn ControlBuses::length(self : ControlBuses) -> Int {
-  self.signals.length()
-}
-
-///|
-/// The bus value at exact time `at`; `NaN` where the control has no value.
-pub fn ControlBuses::value(
-  self : ControlBuses,
-  bus : Int,
-  at : Rational,
-) -> Double {
-  self.signals[bus].eval(at.num, at.den, false)
-}
-
-///|
-/// Evaluate every bus once for a block into a caller-owned array.
-pub fn ControlBuses::evaluate_all(
-  self : ControlBuses,
-  at : Rational,
-  out : Array[Double],
-) -> Unit {
-  for bus in 0..<self.signals.length() {
-    out[bus] = self.signals[bus].eval(at.num, at.den, false)
-  }
-}
-
-///|
 /// The buses one event's controls follow, placed on the clock the event is on:
 /// the snapshot's local time is `(t - origin) × rate`.
 pub struct EventBuses {
-  priv table : ControlBuses
+  priv table : Array[BusSignal]
   priv bindings : FixedArray[(String, Int)]
   priv origin : Rational
   priv rate : Rational
@@ -128,7 +95,7 @@ pub struct EventBuses {
 
 ///|
 let no_event_buses : EventBuses = {
-  table: { signals: [], },
+  table: [],
   bindings: no_bus_bindings,
   origin: Rational::from_int(0),
   rate: Rational::from_int(1),
@@ -142,7 +109,7 @@ pub fn EventBuses::none() -> EventBuses {
 
 ///|
 fn EventBuses::in_snapshot(
-  table : ControlBuses,
+  table : Array[BusSignal],
   bindings : FixedArray[(String, Int)],
 ) -> EventBuses {
   if bindings.is_empty() {
@@ -166,28 +133,45 @@ pub fn EventBuses::placed(
 }
 
 ///|
-/// Visit each bound key whose bus changes over time, with a reader of its
-/// value at exact time `num / den` (`den > 0`) that allocates nothing. A
+/// `signal` on this event's clock.
+fn EventBuses::place(self : EventBuses, signal : BusSignal) -> BusSignal {
+  let scaled : BusSignal = if self.rate == Rational::from_int(1) {
+    signal
+  } else {
+    Fast(self.rate.num, self.rate.den, signal)
+  }
+  if self.origin == Rational::from_int(0) {
+    scaled
+  } else {
+    Shift(self.origin.num, self.origin.den, scaled)
+  }
+}
+
+///|
+/// The bus `key` follows, read at exact time `num / den` (`den > 0`) on this
+/// event's clock; `NaN` where the control has no value. Reading allocates
+/// nothing. `None` when `key` follows no bus.
+pub fn EventBuses::reader(
+  self : EventBuses,
+  key : String,
+) -> ((Int64, Int64) -> Double)? {
+  bus_binding_for(self.bindings, key).map(bus => {
+    let placed = self.place(self.table[bus])
+    (num, den) => placed.eval(num, den, false)
+  })
+}
+
+///|
+/// Visit each bound key whose bus changes over time, with its reader. A
 /// constant bus needs no reader: the value set at note-on already holds.
 pub fn EventBuses::each_reader(
   self : EventBuses,
   f : (String, (Int64, Int64) -> Double) -> Unit,
 ) -> Unit {
   for binding in self.bindings {
-    let signal = self.table.signals[binding.1]
+    let signal = self.table[binding.1]
     guard !signal.is_constant() else { continue }
-    let zero = Rational::from_int(0)
-    let one = Rational::from_int(1)
-    let scaled : BusSignal = if self.rate == one {
-      signal
-    } else {
-      Fast(self.rate.num, self.rate.den, signal)
-    }
-    let placed : BusSignal = if self.origin == zero {
-      scaled
-    } else {
-      Shift(self.origin.num, self.origin.den, scaled)
-    }
+    let placed = self.place(signal)
     f(binding.0, (num, den) => placed.eval(num, den, false))
   }
 }

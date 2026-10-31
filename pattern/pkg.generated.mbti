@@ -57,13 +57,6 @@ pub fn PatternDocError::not_equal(Self, Self) -> Bool
 pub fn PatternDocError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
-pub struct ControlBuses {
-  // private fields
-}
-pub fn ControlBuses::evaluate_all(Self, Rational, Array[Double]) -> Unit
-pub fn ControlBuses::length(Self) -> Int
-pub fn ControlBuses::value(Self, Int, Rational) -> Double
-
 pub struct ControlMap {
   // private fields
 } derive(@debug.Debug)
@@ -97,6 +90,7 @@ pub struct EventBuses {
 pub fn EventBuses::each_reader(Self, (String, (Int64, Int64) -> Double) -> Unit) -> Unit
 pub fn EventBuses::none() -> Self
 pub fn EventBuses::placed(Self, origin~ : Rational, rate? : Rational) -> Self
+pub fn EventBuses::reader(Self, String) -> ((Int64, Int64) -> Double)?
 
 pub struct EventOrigin {
   // private fields
@@ -111,7 +105,6 @@ pub fn EventOrigin::write_binding_serials(Self, Array[Double], Int, Int) -> Int
 pub struct EventWithOrigin[A] {
   // private fields
 }
-pub fn[A] EventWithOrigin::bus_for(Self[A], String) -> Int?
 pub fn[A] EventWithOrigin::buses(Self[A]) -> EventBuses
 pub fn[A] EventWithOrigin::event(Self[A]) -> Event[A]
 pub fn[A] EventWithOrigin::origin(Self[A]) -> EventOrigin
@@ -212,7 +205,6 @@ pub fn PatternNodePath::to_repr(Self) -> @debug.Repr
 pub struct PatternSnapshot[A] {
   // private fields
 }
-pub fn[A] PatternSnapshot::buses(Self[A]) -> ControlBuses
 pub fn[A] PatternSnapshot::entry_key(Self[A], Int) -> String?
 pub fn[A] PatternSnapshot::pat(Self[A]) -> Pat[A]
 pub fn[A] PatternSnapshot::query(Self[A], TimeSpan) -> Array[Event[A]]
@@ -224,7 +216,6 @@ pub fn[A] PatternSnapshot::root(Self[A]) -> @identity.PatternNodeId
 pub struct PatternSnapshotEvent[A] {
   // private fields
 }
-pub fn[A] PatternSnapshotEvent::bus_for(Self[A], String) -> Int?
 pub fn[A] PatternSnapshotEvent::buses(Self[A]) -> EventBuses
 pub fn[A] PatternSnapshotEvent::event(Self[A]) -> Event[A]
 pub fn[A] PatternSnapshotEvent::pattern_node_path(Self[A]) -> PatternNodePath
@@ -234,7 +225,6 @@ pub struct PatternSnapshotWithOrigins[A] {
   // private fields
 }
 pub fn[A] PatternSnapshotWithOrigins::as_snapshot(Self[A]) -> PatternSnapshot[A]
-pub fn[A] PatternSnapshotWithOrigins::buses(Self[A]) -> ControlBuses
 pub fn[A] PatternSnapshotWithOrigins::entry_key(Self[A], Int) -> String?
 pub fn[A] PatternSnapshotWithOrigins::pat(Self[A]) -> Pat[A]
 pub fn[A] PatternSnapshotWithOrigins::query(Self[A], TimeSpan) -> Array[EventWithOrigin[A]]

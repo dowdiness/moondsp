@@ -35,12 +35,15 @@ test "bench/control_bus/per_block" (b : @bench.T) {
       b.keep(snapshot.query_sourced_events(arc))
     }
   })
-  let buses = snapshot.buses()
-  let values = Array::make(buses.length(), 0.0)
+  let read = snapshot.query_sourced_events(arcs[0])[0]
+    .buses()
+    .reader("lpf")
+    .unwrap()
   b.bench(name="one compiled bus signal per block", () => {
+    let mut sum = 0.0
     for arc in arcs {
-      buses.evaluate_all(arc.begin, values)
+      sum += read(arc.begin.num, arc.begin.den)
     }
-    b.keep(values)
+    b.keep(sum)
   })
 }

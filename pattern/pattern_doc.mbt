@@ -502,15 +502,6 @@ fn[A] PatternSnapshotEvent::PatternSnapshotEvent(
 }
 
 ///|
-/// The control bus this event's `key` follows while it sounds, if any.
-pub fn[A] PatternSnapshotEvent::bus_for(
-  self : PatternSnapshotEvent[A],
-  key : String,
-) -> Int? {
-  bus_binding_for(self.buses.bindings, key)
-}
-
-///|
 /// The buses this event's controls follow while it sounds.
 pub fn[A] PatternSnapshotEvent::buses(
   self : PatternSnapshotEvent[A],
@@ -841,7 +832,7 @@ fn[A, O] Pat::capture_source_frame(
 ///|
 fn[A, O] scoped_event(
   event : Event[ScopedValue[A, O]],
-  table : ControlBuses,
+  table : Array[BusSignal],
 ) -> PatternSnapshotEvent[A] {
   PatternSnapshotEvent(
     event={ whole: event.whole, part: event.part, value: event.value.value, },
@@ -869,7 +860,7 @@ pub struct EventWithOrigin[A] {
 ///|
 fn[A] EventWithOrigin::EventWithOrigin(
   event : Event[ScopedValue[A, EventOrigin]],
-  table : ControlBuses,
+  table : Array[BusSignal],
 ) -> EventWithOrigin[A] {
   {
     event: { whole: event.whole, part: event.part, value: event.value.value, },
@@ -880,15 +871,6 @@ fn[A] EventWithOrigin::EventWithOrigin(
     source_pitch: event.value.source_pitch,
     buses: EventBuses::in_snapshot(table, event.value.bindings),
   }
-}
-
-///|
-/// The control bus this event's `key` follows while it sounds, if any.
-pub fn[A] EventWithOrigin::bus_for(
-  self : EventWithOrigin[A],
-  key : String,
-) -> Int? {
-  bus_binding_for(self.buses.bindings, key)
 }
 
 ///|
@@ -1640,7 +1622,7 @@ pub struct PatternSnapshot[A] {
   priv pat : Pat[A]
   priv sourced : Pat[ScopedValue[A, Unit]]
   priv entry_sourced : Array[CompiledEntry[A, Unit]]
-  priv buses : ControlBuses
+  priv buses : Array[BusSignal]
 }
 
 ///|
@@ -1670,12 +1652,6 @@ pub fn[A] PatternSnapshot::entry_key(
 ///|
 pub fn[A] PatternSnapshot::pat(self : PatternSnapshot[A]) -> Pat[A] {
   self.pat
-}
-
-///|
-/// The control buses that events' `bus_for` indexes, in root time.
-pub fn[A] PatternSnapshot::buses(self : PatternSnapshot[A]) -> ControlBuses {
-  self.buses
 }
 
 ///|
@@ -1718,7 +1694,7 @@ pub struct PatternSnapshotWithOrigins[A] {
   priv pat : Pat[A]
   priv sourced : Pat[ScopedValue[A, EventOrigin]]
   priv entry_sourced : Array[CompiledEntry[A, EventOrigin]]
-  priv buses : ControlBuses
+  priv buses : Array[BusSignal]
 }
 
 ///|
@@ -1740,14 +1716,6 @@ pub fn[A] PatternSnapshotWithOrigins::pat(
   self : PatternSnapshotWithOrigins[A],
 ) -> Pat[A] {
   self.pat
-}
-
-///|
-/// The control buses that events' `bus_for` indexes, in root time.
-pub fn[A] PatternSnapshotWithOrigins::buses(
-  self : PatternSnapshotWithOrigins[A],
-) -> ControlBuses {
-  self.buses
 }
 
 ///|
@@ -1827,7 +1795,7 @@ pub fn[A] PatternDoc::lower_with_origins(
     pat: compiled.pat.map_payload(erase_value),
     sourced: compiled.pat,
     entry_sourced: compiled.entries,
-    buses: { signals: compiled.buses, },
+    buses: compiled.buses,
   }
 }
 
@@ -2074,7 +2042,7 @@ pub fn[A] PatternDoc::lower_with_cache(
     pat: compiled.pat.map_payload(erase_value),
     sourced: compiled.pat,
     entry_sourced: compiled.entries,
-    buses: { signals: compiled.buses, },
+    buses: compiled.buses,
   }
 }
 
