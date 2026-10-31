@@ -18,12 +18,6 @@ priv enum PlaybackLayout {
 } derive(Eq)
 
 ///|
-priv struct PreparedRoute {
-  target : SoundPool
-  snapshot : @scheduler.PlaybackSnapshot
-}
-
-///|
 priv enum PlaybackSpan {
   Continuous
   Finite(@pattern.Rational)
@@ -36,7 +30,7 @@ priv struct PreparedSong {
   tempo : @scheduler.Tempo
   layout : PlaybackLayout
   doc : @pattern.PatternDoc[@pattern.ControlMap]?
-  routes : Array[PreparedRoute]
+  snapshot : @scheduler.PlaybackSnapshot
   span : PlaybackSpan
 }
 
@@ -236,22 +230,12 @@ fn Player::prepare(
         Ok(tempo) => tempo
         Err(_) => return Err(InvalidSource("tempo must be 0.001..1000 BPM"))
       }
-      let routes = self.routes.map(route => {
-        let selected = match route.selector {
-          RouteSynth => snapshot.select_control("note")
-          RouteSound(code) => snapshot.select_control("sound", value=code)
-        }
-        {
-          target: route.pool,
-          snapshot: @scheduler.PlaybackSnapshot::pattern_with_origins(selected),
-        }
-      })
       Ok({
         source,
         tempo,
         layout: PatternLayout,
         doc: None,
-        routes,
+        snapshot: @scheduler.PlaybackSnapshot::pattern_with_origins(snapshot),
         span: Continuous,
       })
     }
@@ -268,22 +252,12 @@ fn Player::prepare(
                 InvalidSource("could not lower source: \{Repr(error)}"),
               )
           }
-          let routes = self.routes.map(route => {
-            let selected = match route.selector {
-              RouteSynth => snapshot.select_control("note")
-              RouteSound(code) => snapshot.select_control("sound", value=code)
-            }
-            {
-              target: route.pool,
-              snapshot: @scheduler.PlaybackSnapshot::pattern(selected),
-            }
-          })
           Ok({
             source,
             tempo,
             layout: PatternLayout,
             doc: Some(doc),
-            routes,
+            snapshot: @scheduler.PlaybackSnapshot::pattern(snapshot),
             span: Continuous,
           })
         }
@@ -300,30 +274,19 @@ fn Player::prepare(
             Err(error) => return Err(error)
             Ok(_) => ()
           }
-          let routes : Array[PreparedRoute] = []
-          for route in self.routes {
-            let routed = match filter_song_for_route(route.selector, song) {
-              Ok(song) => song
-              Err(message) => return Err(InvalidSource(message))
-            }
-            let snapshot = song_update_snapshot(routed) catch {
-              error => return Err(InvalidSource(error.to_string()))
-            }
-            routes.push({
-              target: route.pool,
-              snapshot: if repeated {
-                @scheduler.PlaybackSnapshot::repeat_song(snapshot)
-              } else {
-                @scheduler.PlaybackSnapshot::song(snapshot)
-              },
-            })
+          let snapshot = song_update_snapshot(song) catch {
+            error => return Err(InvalidSource(error.to_string()))
           }
           Ok({
             source,
             tempo,
             layout: song_layout(song, repeated),
             doc: None,
-            routes,
+            snapshot: if repeated {
+              @scheduler.PlaybackSnapshot::repeat_song(snapshot)
+            } else {
+              @scheduler.PlaybackSnapshot::song(snapshot)
+            },
             span,
           })
         }
@@ -334,9 +297,7 @@ fn Player::prepare(
     Err(error) => return Err(error)
     Ok(song) => song
   }
-  guard song.routes.all(route => {
-    route.snapshot.material_count() <= PLAYBACK_MATERIAL_LIMIT
-  }) else {
+  guard song.snapshot.material_count() <= PLAYBACK_MATERIAL_LIMIT else {
     return Err(InvalidSource("playback source exceeds 256 material entries"))
   }
   Ok(song)
@@ -351,8 +312,8 @@ fn Player::install(
   restart : Bool,
 ) -> Result[Unit, PlayerError] {
   match
-    @scheduler.accept_playback_all(
-      song.routes.map(route => (route.target.scheduler, route.snapshot)),
+    self.scheduler.accept_playback(
+      song.snapshot,
       song.tempo,
       material_limit=PLAYBACK_MATERIAL_LIMIT,
       restart~,
@@ -369,9 +330,7 @@ fn Player::install(
   }
   if restart {
     self.reverb.reset()
-    for route in song.routes {
-      route.target.pool.kill_all()
-    }
+    self.scheduler.kill_all_voices()
   }
   Ok(())
 }
@@ -492,7 +451,7 @@ fn Player::mode(self : Player) -> PlaybackMode {
 }
 
 ///|
-/// Return the zero-based musical cycle position from the route clock.
+/// Return the zero-based musical cycle position from the scheduler clock.
 ///
 /// Ready and Empty are anchored at zero. Paused reads the frozen clock, and
 /// Ended reports the accepted finite song's exact musical endpoint rather than
@@ -500,7 +459,7 @@ fn Player::mode(self : Player) -> PlaybackMode {
 fn Player::cycle_position(self : Player) -> Double {
   match self.session {
     Empty | Ready(_) | Fault(_) => 0.0
-    Playing(_) | Paused(_) => self.schedulers[0].cycle_position()
+    Playing(_) | Paused(_) => self.scheduler.cycle_position()
     Ended(_, _, cycle) => cycle
   }
 }
@@ -516,29 +475,26 @@ pub fn Player::view(self : Player) -> PlayerView {
     Fault(_) => Fault
   }
   let song = self.session.song()
-  // Pattern control projection and song route filtering preserve each
-  // material's source identity, period, and transition boundary. Every route
-  // therefore observes the same transition set (with route-local content);
-  // do not count six copies.
-  let mut pending = 0
-  let mut skipped = 0
-  if self.session is Playing(_) || self.session is Paused(_) {
-    for scheduler in self.schedulers {
-      pending = Int::max(pending, scheduler.pending_material_change_count())
-      skipped = Int::max(skipped, scheduler.skipped_material_change_count())
-    }
+  let (pending, skipped) = if self.session is Playing(_) ||
+    self.session is Paused(_) {
+    (
+      self.scheduler.pending_material_change_count(),
+      self.scheduler.skipped_material_change_count(),
+    )
+  } else {
+    (0, 0)
   }
   {
     state,
     source: song.map(song => song.source),
     bpm: match song {
       Some(song) => song.tempo.bpm()
-      None => self.schedulers[0].bpm()
+      None => self.scheduler.bpm()
     },
     sample_position: match self.session {
       Ended(_, position, _) => position.to_double()
       Empty | Ready(_) => 0.0
-      _ => self.schedulers[0].sample_counter().to_double()
+      _ => self.scheduler.sample_counter().to_double()
     },
     pending_materials: pending,
     skipped_materials: skipped,

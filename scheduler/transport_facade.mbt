@@ -119,7 +119,6 @@ pub fn PatternScheduler::current_block(
 ///|
 fn PatternScheduler::render_frame(
   self : PatternScheduler,
-  pool : @moondsp.BoundVoicePool,
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
 ) -> BlockFrame? {
@@ -129,7 +128,7 @@ fn PatternScheduler::render_frame(
       self.last_error = Some(e)
       left.fill(0.0)
       right.fill(0.0)
-      pool.kill_all()
+      self.kill_all_voices()
       self.active_notes.clear()
       None
     }
@@ -201,39 +200,28 @@ pub fn PatternScheduler::set_bpm(
   self : PatternScheduler,
   bpm : Double,
 ) -> Result[Unit, TransportError] {
-  let tempo = match parse_tempo(bpm) {
-    Ok(tempo) => tempo
-    Err(e) => return Err(e)
+  match parse_tempo(bpm) {
+    Ok(tempo) => self.set_tempo(tempo)
+    Err(e) => Err(e)
   }
-  let plan = match self.tempo_plan(tempo, false) {
-    Err(e) => return Err(e)
-    Ok(plan) => plan
-  }
-  self.apply_tempo_plan(plan)
-  Ok(())
 }
 
 ///|
-/// Atomically change tempo across all schedulers. Existing note deadlines and
-/// an optional finite performance endpoint are checked on each proposed clock
-/// before any scheduler is mutated.
-pub fn set_tempo_all(
-  schedulers : Array[PatternScheduler],
+/// Change tempo at the next unrendered sample, retaining musical position.
+/// Existing note deadlines and an optional finite performance endpoint are
+/// checked on the proposed clock before anything is mutated.
+pub fn PatternScheduler::set_tempo(
+  self : PatternScheduler,
   tempo : Tempo,
-  restart? : Bool = false,
   end_? : @pattern.Rational,
 ) -> Result[Unit, TransportError] {
-  let plans : Array[TempoPlan] = []
-  for scheduler in schedulers {
-    match scheduler.tempo_plan(tempo, restart, end_?) {
-      Err(e) => return Err(e)
-      Ok(plan) => plans.push(plan)
+  match self.tempo_plan(tempo, false, end_?) {
+    Err(e) => Err(e)
+    Ok(plan) => {
+      self.apply_tempo_plan(plan)
+      Ok(())
     }
   }
-  for i in 0..<schedulers.length() {
-    schedulers[i].apply_tempo_plan(plans[i])
-  }
-  Ok(())
 }
 
 ///|
@@ -243,44 +231,36 @@ pub(all) enum PlaybackAdmissionError {
 }
 
 ///|
-/// Atomically accept bounded material state and tempo across all routes.
-/// Rejection leaves every clock, accepted snapshot, and note deadline intact.
+/// Atomically accept bounded material state and tempo.
+/// Rejection leaves the clock, accepted snapshot, and note deadlines intact.
 /// The limit covers both retained entries and a future repetition's entries.
-pub fn accept_playback_all(
-  targets : Array[(PatternScheduler, PlaybackSnapshot)],
+pub fn PatternScheduler::accept_playback(
+  self : PatternScheduler,
+  snapshot : PlaybackSnapshot,
   tempo : Tempo,
   material_limit~ : Int,
   restart? : Bool = false,
   end_? : @pattern.Rational,
 ) -> Result[Unit, PlaybackAdmissionError] {
-  let plans : Array[(TempoPlan, @playback.PlaybackState)] = []
-  for target in targets {
-    let (scheduler, snapshot) = target
-    let plan = match scheduler.tempo_plan(tempo, restart, end_?) {
-      Err(error) => return Err(Transport(error))
-      Ok(plan) => plan
-    }
-    let now = match plan.clock.position(plan.clock.sample()) {
-      Err(error) => return Err(Transport(error))
-      Ok(now) => now
-    }
-    guard scheduler.playback_state.prepare_acceptance(
-        snapshot.raw(),
-        now,
-        material_limit~,
-        restart~,
-      )
-      is Some(state) else {
-      return Err(MaterialLimit)
-    }
-    plans.push((plan, state))
+  let plan = match self.tempo_plan(tempo, restart, end_?) {
+    Err(error) => return Err(Transport(error))
+    Ok(plan) => plan
   }
-  for index in 0..<targets.length() {
-    let scheduler = targets[index].0
-    let (tempo_plan, playback) = plans[index]
-    scheduler.apply_tempo_plan(tempo_plan)
-    scheduler.playback_state.install_acceptance(playback)
+  let now = match plan.clock.position(plan.clock.sample()) {
+    Err(error) => return Err(Transport(error))
+    Ok(now) => now
   }
+  guard self.playback_state.prepare_acceptance(
+      snapshot.raw(),
+      now,
+      material_limit~,
+      restart~,
+    )
+    is Some(playback) else {
+    return Err(MaterialLimit)
+  }
+  self.apply_tempo_plan(plan)
+  self.playback_state.install_acceptance(playback)
   Ok(())
 }
 
@@ -319,16 +299,23 @@ pub fn PatternScheduler::reset_transport(self : PatternScheduler) -> Unit {
 }
 
 ///|
-/// Reset the transport and immediately kill every voice in `pool`.
+/// Immediately silence every voice of every instrument, including releases.
 ///
 /// WHY whole-pool kill: active-note tracking removes a note as soon as
 /// gate-off is sent, while the voice may keep releasing for a few blocks.
-/// Browser pattern swaps need a hard boundary so old releases or templates
-/// cannot leak into the next pattern.
+/// Restarts need a hard boundary so old releases or templates cannot leak
+/// into the next performance.
+pub fn PatternScheduler::kill_all_voices(self : PatternScheduler) -> Unit {
+  for pool in self.pools {
+    pool.kill_all()
+  }
+}
+
+///|
+/// Reset the transport and immediately kill every instrument's voices.
 pub fn PatternScheduler::reset_transport_and_kill_notes(
   self : PatternScheduler,
-  pool : @moondsp.BoundVoicePool,
 ) -> Unit {
-  pool.kill_all()
+  self.kill_all_voices()
   self.reset_transport()
 }

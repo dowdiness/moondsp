@@ -131,20 +131,13 @@ fn wet_energy() -> Double {
 }
 
 ///|
-fn sound_route_active_notes(sound : Double) -> Int {
-  for route in player.val.unwrap().routes {
-    if route.selector is RouteSound(code) && code == sound {
-      return route.pool.scheduler.active_note_count()
-    }
-  }
-  0
+fn active_notes() -> Int {
+  player.val.unwrap().scheduler.active_note_count()
 }
 
 ///|
 fn assert_position(position : Int) -> Unit raise {
-  for route in player.val.unwrap().routes {
-    assert_eq(route.pool.scheduler.sample_counter(), position.to_int64())
-  }
+  assert_eq(player.val.unwrap().scheduler.sample_counter(), position.to_int64())
 }
 
 ///|
@@ -153,11 +146,8 @@ fn test_song(length~ : Int, bpm~ : Int) -> String {
 }
 
 ///|
-// All routes must observe the same tempo at the commit boundary.
 fn assert_tempo(bpm : Double) -> Unit raise {
-  for route in player.val.unwrap().routes {
-    assert_eq(route.pool.scheduler.bpm(), bpm)
-  }
+  assert_eq(player.val.unwrap().scheduler.bpm(), bpm)
 }
 
 ///|
@@ -243,12 +233,12 @@ test "shared room tail survives a two-part continue edit and restart clears it" 
   assert_eq(submit_for_test(after, restart=false), 0)
   render_for_test(1)
   assert_true(wet_energy() > 0.0)
-  assert_true(sound_route_active_notes(38.0) > 0)
+  assert_true(active_notes() > 0)
   assert_true(output_energy() > 0.0)
   assert_eq(submit_for_test(after), 0)
   render_for_test(1)
   assert_eq(wet_energy(), 0.0)
-  assert_true(sound_route_active_notes(38.0) > 0)
+  assert_true(active_notes() > 0)
 }
 
 ///|

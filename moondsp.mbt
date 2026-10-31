@@ -121,6 +121,7 @@ pub using @voice {
   type VoicePool,
   type VoicePoolError,
   type VoiceState,
+  apply_controls_to_voices,
 }
 
 ///|

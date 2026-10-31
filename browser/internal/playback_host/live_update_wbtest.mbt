@@ -171,7 +171,7 @@ test "layout rejection changes neither tempo nor Current song" {
 }
 
 ///|
-test "source tempo commits on all routes at unchanged musical position" {
+test "source tempo commits at unchanged musical position" {
   assert_true(init_scheduler_graph_for_test())
   assert_eq(submit_for_test(test_song(length=8, bpm=120)), 0)
   render_for_test(4)
@@ -179,12 +179,10 @@ test "source tempo commits on all routes at unchanged musical position" {
   assert_position(512)
   assert_tempo(90.0)
   render_for_test(1)
-  for scheduler in player.val.unwrap().schedulers {
-    assert_eq(
-      scheduler.current_block().unwrap().logical_arc.begin,
-      @pattern.Rational::new(512L * 120L + 128L * 90L, 2880000L),
-    )
-  }
+  assert_eq(
+    player.val.unwrap().scheduler.current_block().unwrap().logical_arc.begin,
+    @pattern.Rational::new(512L * 120L + 128L * 90L, 2880000L),
+  )
 }
 
 ///|

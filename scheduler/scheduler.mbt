@@ -42,6 +42,35 @@ pub fn default_control_mapper() -> ControlMapper {
 }
 
 ///|
+/// Which events an instrument plays. The scheduler routes each event to the
+/// first instrument whose selector matches its controls; an event no
+/// instrument selects stays silent.
+pub(all) enum InstrumentSelector {
+  AllEvents
+  HasControl(String)
+  ControlEquals(String, Double)
+} derive(Eq, Debug)
+
+///|
+pub extend InstrumentSelector with Eq::{not_equal, equal}
+
+///|
+pub extend InstrumentSelector with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+fn InstrumentSelector::selects(
+  self : InstrumentSelector,
+  controls : @pattern.ControlMap,
+) -> Bool {
+  match self {
+    AllEvents => true
+    HasControl(key) => controls.get(key) is Some(_)
+    ControlEquals(key, expected) =>
+      controls.get(key) is Some(v) && v == expected
+  }
+}
+
+///|
 pub struct PatternScheduler {
   priv mut clock : @transport.Clock
   priv mut last_error : @transport.TransportError?
@@ -53,6 +82,8 @@ pub struct PatternScheduler {
   priv mut previous_events : Array[@playback.PlaybackSourcedEvent]
   priv mut previous_clock : @transport.Clock
   priv ctx : @moondsp.DspContext
+  priv selectors : Array[InstrumentSelector]
+  priv pools : Array[@moondsp.BoundVoicePool]
   priv active_notes : @voice_runtime.ActiveNotes
   priv mapper : ControlMapper
   priv playback_state : @playback.PlaybackState
@@ -60,23 +91,21 @@ pub struct PatternScheduler {
 }
 
 ///|
-pub fn PatternScheduler::new(
+///
+/// `instruments` lists every voice pool this scheduler plays, in routing
+/// order. All instruments share one clock, one accepted score, and one mix.
+pub fn PatternScheduler::PatternScheduler(
   bpm~ : Double,
   ctx~ : @moondsp.DspContext,
   mapper? : ControlMapper,
-) -> Result[PatternScheduler, @transport.TransportError] {
-  let tempo = match @transport.Tempo::from_bpm(bpm) {
-    Ok(tempo) => tempo
-    Err(e) => return Err(e)
-  }
-  let clock = match @transport.Clock::at_start(tempo, ctx.sample_rate()) {
-    Ok(clock) => clock
-    Err(e) => return Err(e)
-  }
+  instruments~ : Array[(InstrumentSelector, @moondsp.BoundVoicePool)],
+) -> PatternScheduler raise @transport.TransportError {
+  let tempo = @transport.Tempo::from_bpm(bpm).unwrap_or_error()
+  let clock = @transport.Clock::at_start(tempo, ctx.sample_rate()).unwrap_or_error()
   if ctx.block_size() <= 0 || ctx.block_size() > 65536 {
-    return Err(@transport.TransportError::TimeOutOfRange)
+    raise @transport.TransportError::TimeOutOfRange
   }
-  Ok({
+  {
     clock,
     last_error: None,
     contexts: Array::makei(ctx.block_size() + 1, n => {
@@ -89,11 +118,13 @@ pub fn PatternScheduler::new(
     previous_events: [],
     previous_clock: clock,
     ctx,
+    selectors: instruments.map(instrument => instrument.0),
+    pools: instruments.map(instrument => instrument.1),
     active_notes: @voice_runtime.ActiveNotes(),
     mapper: mapper.unwrap_or(default_control_mapper()),
     playback_state: @playback.PlaybackState(),
     onsets: None,
-  })
+  }
 }
 
 ///|
@@ -101,24 +132,22 @@ pub fn PatternScheduler::new(
 /// Block rendering calls this at each event boundary, including note endings.
 pub fn PatternScheduler::expire_notes_at(
   self : PatternScheduler,
-  pool : @moondsp.BoundVoicePool,
   time : PerformanceTime,
 ) -> Unit {
-  self.active_notes.expire_at_sample(pool, time.sample)
+  self.active_notes.expire_at_sample(self.pools, time.sample)
 }
 
 ///|
 /// Expire at a musical position on the current clock.
 pub fn PatternScheduler::expire_notes(
   self : PatternScheduler,
-  pool : @moondsp.BoundVoicePool,
   arc : @pattern.TimeSpan,
 ) -> Result[Unit, TransportError] {
   let sample = match self.clock.sample_at(arc.begin) {
     Ok(sample) => sample
     Err(e) => return Err(e)
   }
-  self.expire_notes_at(pool, PerformanceTime(sample))
+  self.expire_notes_at(PerformanceTime(sample))
   Ok(())
 }
 
@@ -134,12 +163,10 @@ pub fn PatternScheduler::process_events(
   self : PatternScheduler,
   events : Array[@pattern.Event[@pattern.ControlMap]],
   arc : @pattern.TimeSpan,
-  pool : @moondsp.BoundVoicePool,
 ) -> Unit {
   self.process_events_with_origin(
     copy_control_events(events),
     arc,
-    pool,
     @model.VoiceOrigin::Anonymous,
   )
 }
@@ -155,8 +182,15 @@ fn PatternScheduler::process_single_event(
   source_pitch : Double,
   onset_sample : Int64,
   arc : @pattern.TimeSpan,
-  pool : @moondsp.BoundVoicePool,
 ) -> Unit {
+  let instrument = for i in 0..<self.selectors.length() {
+    if self.selectors[i].selects(event.value) {
+      break i
+    }
+  } nobreak {
+    return
+  }
+  let pool = self.pools[instrument]
   match event.whole {
     None => ()
     Some(whole) =>
@@ -212,6 +246,7 @@ fn PatternScheduler::process_single_event(
               Some(whole.end_)
             }
             self.active_notes.push_note(
+              instrument~,
               handle~,
               origin~,
               end_sample~,
@@ -246,24 +281,13 @@ fn PatternScheduler::process_events_with_origin(
   self : PatternScheduler,
   events : Array[@pattern.Event[@pattern.ControlMap]],
   arc : @pattern.TimeSpan,
-  pool : @moondsp.BoundVoicePool,
   origin : @model.VoiceOrigin,
 ) -> Unit {
   if events.length() > 1 {
     events.sort_by(fn(a, b) { @voice_runtime.compare_event_onset(a, b) })
   }
   for event in events {
-    self.process_single_event(
-      event,
-      origin,
-      None,
-      None,
-      -1.0,
-      -1.0,
-      -1L,
-      arc,
-      pool,
-    )
+    self.process_single_event(event, origin, None, None, -1.0, -1.0, -1L, arc)
   }
 }
 
@@ -291,7 +315,6 @@ fn PatternScheduler::render_until(
   cursor : Int64,
   stop : Int64,
   frame : BlockFrame,
-  pool : @moondsp.BoundVoicePool,
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
   send_left : @moondsp.AudioBuffer,
@@ -300,40 +323,54 @@ fn PatternScheduler::render_until(
 ) -> Int64 {
   let mut cursor = cursor
   while cursor < stop {
-    self.active_notes.expire_at_sample(pool, cursor)
+    self.active_notes.expire_at_sample(self.pools, cursor)
     let next = self.active_notes.next_end_sample(stop)
     let count = (next - cursor).to_int()
-    for i in 0..<count {
-      self.scratch_left.set(i, 0.0)
-      self.scratch_right.set(i, 0.0)
-      if write_send {
-        self.scratch_send_left.set(i, 0.0)
-        self.scratch_send_right.set(i, 0.0)
-      }
-    }
-    if write_send {
-      pool.process_with_send(
-        self.contexts[count],
-        self.scratch_left,
-        self.scratch_right,
-        self.scratch_send_left,
-        self.scratch_send_right,
-      )
-    } else {
-      pool.process(self.contexts[count], self.scratch_left, self.scratch_right)
-    }
     let offset = (cursor - frame.sample_begin).to_int()
-    for i in 0..<count {
-      left.set(offset + i, self.scratch_left.get(i))
-      right.set(offset + i, self.scratch_right.get(i))
+    // WHY per-instrument scratch: each pool sanitizes its own output, so one
+    // instrument's non-finite sample cannot erase another's contribution.
+    for pool in self.pools {
+      for i in 0..<count {
+        self.scratch_left.set(i, 0.0)
+        self.scratch_right.set(i, 0.0)
+        if write_send {
+          self.scratch_send_left.set(i, 0.0)
+          self.scratch_send_right.set(i, 0.0)
+        }
+      }
       if write_send {
-        send_left.set(offset + i, self.scratch_send_left.get(i))
-        send_right.set(offset + i, self.scratch_send_right.get(i))
+        pool.process_with_send(
+          self.contexts[count],
+          self.scratch_left,
+          self.scratch_right,
+          self.scratch_send_left,
+          self.scratch_send_right,
+        )
+      } else {
+        pool.process(
+          self.contexts[count],
+          self.scratch_left,
+          self.scratch_right,
+        )
+      }
+      for i in 0..<count {
+        left.set(offset + i, left.get(offset + i) + self.scratch_left.get(i))
+        right.set(offset + i, right.get(offset + i) + self.scratch_right.get(i))
+        if write_send {
+          send_left.set(
+            offset + i,
+            send_left.get(offset + i) + self.scratch_send_left.get(i),
+          )
+          send_right.set(
+            offset + i,
+            send_right.get(offset + i) + self.scratch_send_right.get(i),
+          )
+        }
       }
     }
     cursor = next
   }
-  self.active_notes.expire_at_sample(pool, cursor)
+  self.active_notes.expire_at_sample(self.pools, cursor)
   cursor
 }
 
@@ -342,7 +379,6 @@ fn PatternScheduler::process_block_events(
   self : PatternScheduler,
   events : Array[@playback.PlaybackSourcedEvent],
   frame : BlockFrame,
-  pool : @moondsp.BoundVoicePool,
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
   send_left : @moondsp.AudioBuffer,
@@ -371,7 +407,6 @@ fn PatternScheduler::process_block_events(
             sourced.source_pitch(),
             frame.sample_begin,
             @pattern.TimeSpan::new(whole.begin, whole.end_),
-            pool,
           )
         _ => ()
       }
@@ -400,7 +435,7 @@ fn PatternScheduler::process_block_events(
         continue
       }
       cursor = self.render_until(
-        cursor, start, frame, pool, left, right, send_left, send_right, write_send,
+        cursor, start, frame, left, right, send_left, send_right, write_send,
       )
       self.process_single_event(
         event,
@@ -411,7 +446,6 @@ fn PatternScheduler::process_block_events(
         sourced.source_pitch(),
         start,
         frame.logical_arc,
-        pool,
       )
     }
   }
@@ -420,7 +454,6 @@ fn PatternScheduler::process_block_events(
       cursor,
       frame.sample_end,
       frame,
-      pool,
       left,
       right,
       send_left,
@@ -440,20 +473,18 @@ fn PatternScheduler::process_block_events(
 pub fn PatternScheduler::process_block(
   self : PatternScheduler,
   pat : @pattern.Pat[@pattern.ControlMap],
-  pool : @moondsp.BoundVoicePool,
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
 ) -> Unit {
-  let frame = match self.render_frame(pool, left, right) {
+  let frame = match self.render_frame(left, right) {
     Some(frame) => frame
     None => return
   }
-  self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
+  self.expire_notes_at(PerformanceTime(frame.sample_begin))
   let events = self.query_pattern_block(pat, frame)
   self.process_block_events(
     anonymous_playback_events(events),
     frame,
-    pool,
     left,
     right,
     left,
@@ -472,11 +503,10 @@ pub fn PatternScheduler::process_block(
 /// staged, and `last_transport_error()` is set.
 pub fn PatternScheduler::render_block(
   self : PatternScheduler,
-  pool : @moondsp.BoundVoicePool,
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
 ) -> Unit {
-  self.render_snapshot_outputs(pool, left, right, left, right, false)
+  self.render_snapshot_outputs(left, right, left, right, false)
 }
 
 ///|
@@ -487,19 +517,17 @@ pub fn PatternScheduler::render_block(
 /// the queued snapshot stays staged, and `last_transport_error()` is set.
 pub fn PatternScheduler::render_block_with_send(
   self : PatternScheduler,
-  pool : @moondsp.BoundVoicePool,
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
   send_left : @moondsp.AudioBuffer,
   send_right : @moondsp.AudioBuffer,
 ) -> Unit {
-  self.render_snapshot_outputs(pool, left, right, send_left, send_right, true)
+  self.render_snapshot_outputs(left, right, send_left, send_right, true)
 }
 
 ///|
 fn PatternScheduler::render_snapshot_outputs(
   self : PatternScheduler,
-  pool : @moondsp.BoundVoicePool,
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
   send_left : @moondsp.AudioBuffer,
@@ -511,17 +539,17 @@ fn PatternScheduler::render_snapshot_outputs(
     send_left.fill(0.0)
     send_right.fill(0.0)
   }
-  let frame = match self.render_frame(pool, left, right) {
+  let frame = match self.render_frame(left, right) {
     Some(frame) => frame
     None => return
   }
   self.commit_pending_playback_snapshot()
-  self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
+  self.expire_notes_at(PerformanceTime(frame.sample_begin))
   let events = self.playback_state.query_active_sourced_events(
     frame.logical_arc,
   )
   self.process_block_events(
-    events, frame, pool, left, right, send_left, send_right, write_send,
+    events, frame, left, right, send_left, send_right, write_send,
   )
 }
 
@@ -534,20 +562,18 @@ fn PatternScheduler::render_snapshot_outputs(
 pub fn PatternScheduler::process_section_block(
   self : PatternScheduler,
   section : @song.Section[@pattern.ControlMap],
-  pool : @moondsp.BoundVoicePool,
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
 ) -> Unit {
-  let frame = match self.render_frame(pool, left, right) {
+  let frame = match self.render_frame(left, right) {
     Some(frame) => frame
     None => return
   }
-  self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
+  self.expire_notes_at(PerformanceTime(frame.sample_begin))
   let events = section.query(frame.logical_arc)
   self.process_block_events(
     anonymous_playback_events(events),
     frame,
-    pool,
     left,
     right,
     left,
@@ -564,20 +590,18 @@ pub fn PatternScheduler::process_section_block(
 pub fn PatternScheduler::process_song_block(
   self : PatternScheduler,
   song : @song.Song[@pattern.ControlMap],
-  pool : @moondsp.BoundVoicePool,
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
 ) -> Unit {
-  let frame = match self.render_frame(pool, left, right) {
+  let frame = match self.render_frame(left, right) {
     Some(frame) => frame
     None => return
   }
-  self.expire_notes_at(pool, PerformanceTime(frame.sample_begin))
+  self.expire_notes_at(PerformanceTime(frame.sample_begin))
   let events = song.query(frame.logical_arc)
   self.process_block_events(
     anonymous_playback_events(events),
     frame,
-    pool,
     left,
     right,
     left,

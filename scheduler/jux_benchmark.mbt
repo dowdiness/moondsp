@@ -58,8 +58,11 @@ fn bench_pool(
 }
 
 ///|
-fn bench_scheduler(ctx : @moondsp.DspContext) -> PatternScheduler {
-  PatternScheduler::new(bpm=120.0, ctx~).unwrap()
+fn bench_scheduler(
+  ctx : @moondsp.DspContext,
+  pool : @moondsp.BoundVoicePool,
+) -> PatternScheduler raise {
+  PatternScheduler(bpm=120.0, ctx~, instruments=[(AllEvents, pool)])
 }
 
 ///|
@@ -73,21 +76,18 @@ fn bench_jux_pattern() -> @pattern.Pat[@pattern.ControlMap] {
 }
 
 ///|
-fn bench_seed_jux_voices(
-  scheduler : PatternScheduler,
-  pool : @moondsp.BoundVoicePool,
-) -> Unit {
+fn bench_seed_jux_voices(scheduler : PatternScheduler) -> Unit {
   let arc = bench_arc()
   let events = bench_jux_pattern().query(arc)
-  scheduler.process_events(events, arc, pool)
+  scheduler.process_events(events, arc)
 }
 
 ///|
 test "bench/jux/scheduler_dispatch" (b : @bench.T) {
   let ctx = bench_ctx()
   let template = bench_template()
-  let scheduler = bench_scheduler(ctx)
   let pool = bench_pool(template, ctx)
+  let scheduler = bench_scheduler(ctx, pool)
   let arc = bench_arc()
   let expire_arc = @pattern.TimeSpan::new(
     @pattern.Rational::from_int(1),
@@ -95,8 +95,8 @@ test "bench/jux/scheduler_dispatch" (b : @bench.T) {
   )
   let events = bench_jux_pattern().query(arc)
   b.bench(name="process_events_8_jux_events", fn() {
-    scheduler.process_events(events.copy(), arc, pool)
-    scheduler.expire_notes(pool, expire_arc).unwrap()
+    scheduler.process_events(events.copy(), arc)
+    scheduler.expire_notes(expire_arc).unwrap()
     b.keep(pool.active_voice_count())
   })
 }
@@ -105,9 +105,9 @@ test "bench/jux/scheduler_dispatch" (b : @bench.T) {
 test "bench/jux/stereo_routing" (b : @bench.T) {
   let ctx = bench_ctx()
   let template = bench_template()
-  let scheduler = bench_scheduler(ctx)
   let pool = bench_pool(template, ctx)
-  bench_seed_jux_voices(scheduler, pool)
+  let scheduler = bench_scheduler(ctx, pool)
+  bench_seed_jux_voices(scheduler)
   let left = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)
   let right = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)
   b.bench(name="voicepool_process_8_panned_jux_voices", fn() {
@@ -123,13 +123,13 @@ test "bench/jux/stereo_routing" (b : @bench.T) {
 test "bench/jux/process_block" (b : @bench.T) {
   let ctx = bench_ctx()
   let template = bench_template()
-  let scheduler = bench_scheduler(ctx)
   let pool = bench_pool(template, ctx)
+  let scheduler = bench_scheduler(ctx, pool)
   let pattern = bench_jux_pattern()
   let left = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)
   let right = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)
   b.bench(name="process_block_jux_rev", fn() {
-    scheduler.process_block(pattern, pool, left, right)
+    scheduler.process_block(pattern, left, right)
     b.keep(left)
     b.keep(right)
   })
@@ -138,8 +138,8 @@ test "bench/jux/process_block" (b : @bench.T) {
 ///|
 test "bench/entries/prepared_playback" (b : @bench.T) {
   let ctx = bench_ctx()
-  let scheduler = bench_scheduler(ctx)
   let pool = bench_pool(bench_template(), ctx)
+  let scheduler = bench_scheduler(ctx, pool)
   let source = bench_jux_pattern()
   let id = try! @identity.PatternNodeId::from_string("bench:entries")
   let snapshot = try! @pattern.PatternDoc::from_pattern(
@@ -152,20 +152,20 @@ test "bench/entries/prepared_playback" (b : @bench.T) {
   let left = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)
   let right = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)
   scheduler.queue_pattern_snapshot(snapshot)
-  scheduler.render_block(pool, left, right)
+  scheduler.render_block(left, right)
   b.bench(name="prepared_two_materials_render", fn() {
-    scheduler.render_block(pool, left, right)
+    scheduler.render_block(left, right)
     b.keep(left)
   })
   b.bench(name="prepared_two_materials_accept_and_render", fn() {
     scheduler.queue_pattern_snapshot(snapshot)
-    scheduler.render_block(pool, left, right)
+    scheduler.render_block(left, right)
     b.keep(left)
   })
   let send_left = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)
   let send_right = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)
   b.bench(name="prepared_two_materials_render_with_send", fn() {
-    scheduler.render_block_with_send(pool, left, right, send_left, send_right)
+    scheduler.render_block_with_send(left, right, send_left, send_right)
     b.keep(left)
     b.keep(send_left)
   })

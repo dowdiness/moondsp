@@ -1,7 +1,10 @@
 # Scheduler
 
-The scheduler bridges identity-bearing pattern/song snapshots to a bound voice
-pool. Edit orchestration helpers let UI or authoring code stage a replacement
+The scheduler bridges identity-bearing pattern/song snapshots to a set of
+instruments, each a bound voice pool. One scheduler owns the clock, the
+accepted score, and the active notes for every instrument; it routes each event
+to the first instrument whose `InstrumentSelector` matches the event's controls
+and mixes all instruments into the caller's buffers. Edit orchestration helpers let UI or authoring code stage a replacement
 snapshot, choose how already-sounding voices should be reconciled, and
 optionally apply live graph-control changes to matching active voices before the
 replacement is accepted at the next block boundary. Normal browser edits keep
@@ -39,15 +42,15 @@ sample-accurate audio voice triggers across block boundaries:
 
 | Category | Types | Key operations |
 |---|---|---|
-| **Scheduler Engine** | `PatternScheduler` | `PatternScheduler::new`, `PatternScheduler::process_block`, `PatternScheduler::process_song_block`, `PatternScheduler::render_block`, `PatternScheduler::render_block_with_send` |
+| **Scheduler Engine** | `PatternScheduler` | `PatternScheduler(...)`, `PatternScheduler::process_block`, `PatternScheduler::process_song_block`, `PatternScheduler::render_block`, `PatternScheduler::render_block_with_send` |
 | **Playback & Snapshots** | `PatternScheduler`, `PlaybackSnapshot` | `PatternScheduler::queue_playback_snapshot`, `PatternScheduler::queue_pattern_snapshot`, `PatternScheduler::queue_song_snapshot`, `PlaybackSnapshot::pattern`, `PlaybackSnapshot::song`, `PlaybackSnapshot::query` |
 | **Snapshot Observation** | `PatternScheduler`, `PlaybackSnapshot` | `PatternScheduler::accepted_snapshot`, `PatternScheduler::queued_snapshot`, `PatternScheduler::pending_material_change_count`, `PatternScheduler::skipped_material_change_count` |
 | **Timing & Transport** | `PatternScheduler`, `BlockFrame`, `PerformanceTime` | `PatternScheduler::set_bpm`, `PatternScheduler::bpm`, `PatternScheduler::current_block`, `PatternScheduler::sample_at`, `PatternScheduler::sample_counter`, `PatternScheduler::reset_transport` |
 | **Voice Scopes & Reconciliation** | `PatternVoiceScope`, `SongVoiceScope`, `ActiveVoiceEffect` | `PatternVoiceScope::node`, `SongVoiceScope::section`, `SongVoiceScope::occurrence`, `PatternScheduler::apply_pattern_voice_effect_result`, `PatternScheduler::apply_song_voice_effect_result` |
 | **Controls & Notes** | `ControlMapper`, `VoiceControlBatch` | `default_control_mapper`, `ControlMapper::new`, `PatternScheduler::push_active_note`, `PatternScheduler::expire_notes`, `PatternScheduler::active_note_count` |
 
-`render_block(pool, left, right)` renders dry stereo from the current snapshot.
-`render_block_with_send(pool, left, right, send_left, send_right)` also writes
+`render_block(left, right)` renders dry stereo from the current snapshot.
+`render_block_with_send(left, right, send_left, send_right)` also writes
 the post-pan, pre-master-gain stereo effect send. Both accept any queued
 replacement at block start through the same implementation and advance one
 block on success. Switching between them does not change dry playback.
@@ -65,8 +68,10 @@ Migrate `process_playback_snapshot_block_with_send` calls to
 
 ## Transport
 
-`PatternScheduler::new` validates the tempo and DSP context and returns a
-`Result`. Use `current_block()` to read the next block's sample range and
+The `PatternScheduler(bpm~, ctx~, instruments~)` constructor takes the instruments as
+`(InstrumentSelector, BoundVoicePool)` pairs in routing order. An event no
+instrument selects stays silent. It validates the tempo and DSP context and raises
+`TransportError` on rejection. Use `current_block()` to read the next block's sample range and
 rational musical span. Use `sample_at(position)` for conversion against the
 current clock; an absolute sample count and a BPM alone cannot describe an
 edited transport.
@@ -108,7 +113,7 @@ The Player-owner cutover removes the following APIs without compatibility aliase
 | Removed API | Replacement |
 |---|---|
 | `normalize_bpm(value)` | `Tempo::from_bpm(value)` returns `Result[Tempo, TransportError]`; read the normalized value with `Tempo::bpm()` |
-| `PatternScheduler::validate_bpm(value)` | Call `set_bpm(value)` and handle its transactional `Result`. For multiple routes, call `set_tempo_all(schedulers, tempo)` once |
+| `PatternScheduler::validate_bpm(value)` | Call `set_bpm(value)` or `set_tempo(tempo, end_?)` and handle its transactional `Result` |
 | `active_playback_revision()` | `accepted_snapshot().map(snapshot => snapshot.revision())` |
 | `active_playback_song_layout_revision()` / `active_song_layout_revision()` | `accepted_snapshot().and_then(snapshot => snapshot.song_layout_revision())` |
 | `active_song_revision()` | Match `accepted_snapshot()` for `Song(snapshot)` or `RepeatSong(snapshot)` and read `snapshot.revision()`; return `None` for Pattern/absence |
@@ -120,11 +125,11 @@ The Player-owner cutover removes the following APIs without compatibility aliase
 `Tempo::from_bpm` validates and normalizes a number, not a running clock's
 representability. Do not replace `validate_bpm` with a pure scalar check followed
 by separate mutations. The mutating operations preflight clocks and active
-deadlines before changing anything. `accept_playback_all(targets, tempo,
-material_limit=limit)` additionally admits all `(scheduler, snapshot)` pairs
-against a material budget in the same transaction. It returns
-`PlaybackAdmissionError::MaterialLimit` or `Transport(error)` without installing
-an earlier route; `restart=true` prepares against empty retained state.
+deadlines before changing anything. `accept_playback(snapshot, tempo,
+material_limit=limit)` additionally admits the snapshot against a material
+budget in the same transaction. It returns
+`PlaybackAdmissionError::MaterialLimit` or `Transport(error)` without changing
+anything; `restart=true` prepares against empty retained state.
 
 Queued snapshots await acceptance; pending material changes await their own
 entry boundaries **after** acceptance. Replace an old pending-snapshot query
@@ -219,14 +224,14 @@ comparison, entry addressing, and event generation remain separate concerns.
 
 ### Acceptance and receipts
 
-The browser Player prepares a complete source, all route tempo/deadline plans,
+The browser Player prepares a complete source, its tempo/deadline plan,
 and reconciled material states before changing Current song. Rejection preserves the previous song, transport,
 and material reservations. Accepted plans are installed once; the owner does
 not expose preparation tokens to its clients. See the
 [Player contract](../docs/technical-reference.md#browser-player-ownership-and-source-updates).
 
 `accepted_snapshot()` returns the Pattern, Song, or RepeatSong selected by
-`accept_playback_snapshot()`, `accept_playback_all()`, or a render-block commit.
+`accept_playback_snapshot()`, `accept_playback()`, or a render-block commit.
 Independent scheduler clients may use `queue_playback_snapshot()` instead; `queued_snapshot()` exposes
 that snapshot until commitment. Player operations accept immediately, including
 while Paused. In the lower-level queued API both observations can be present at once.
@@ -236,10 +241,10 @@ and `skipped_material_change_count()` reports finite changes that cannot enter
 during this Play. These queries do not describe transport activity or whether
 audio is audible.
 
-The browser owner limits each route to 256 source and retained material entries.
+The browser owner limits the score to 256 source and retained material entries.
 `PlaybackSnapshot::material_count()` counts all source entries, including future
 song occurrences, independently of the current play position. The atomic
-`accept_playback_all` operation also counts old entries waiting for replacement
+`accept_playback` operation also counts old entries waiting for replacement
 or removal. Capacity returns at their boundaries, or through Restart after the
 new source passes admission. Other scheduler entry points remain unbounded.
 
@@ -284,7 +289,11 @@ test "edit orchestration stages a replacement and reconciles active voices" {
     ),
     max_voices=4,
   ).unwrap()
-  let sched = @scheduler.PatternScheduler::new(bpm=120.0, ctx~).unwrap()
+  let sched = try! @scheduler.PatternScheduler(
+    bpm=120.0,
+    ctx~,
+    instruments=[(@scheduler.AllEvents, pool)],
+  )
   let edited = try! @identity.PatternNodeId::from_string("docs:lead")
   let replacement_root = try! @identity.PatternNodeId::from_string(
     "docs:replacement",
@@ -303,13 +312,12 @@ test "edit orchestration stages a replacement and reconciles active voices" {
   let left = @moondsp.AudioBuffer::filled(128)
   let right = @moondsp.AudioBuffer::filled(128)
   sched.queue_pattern_snapshot(active_snapshot)
-  sched.render_block(pool, left, right)
+  sched.render_block(left, right)
   let outcome = sched
     .queue_pattern_snapshot_effect_result(
       replacement,
       @scheduler.PatternVoiceScope::node(edited),
       @scheduler.ActiveVoiceEffect::Release,
-      pool,
     )
     .unwrap()
 

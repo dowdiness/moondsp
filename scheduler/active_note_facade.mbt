@@ -11,9 +11,11 @@ pub fn midi_to_hz(midi : Double) -> Double {
 }
 
 ///|
-/// Track an externally triggered voice with a musical gate-off deadline.
+/// Track an externally triggered voice of `instrument` (an index into the
+/// constructor's instrument list) with a musical gate-off deadline.
 pub fn PatternScheduler::push_active_note(
   self : PatternScheduler,
+  instrument : Int,
   handle : @moondsp.VoiceHandle,
   end_time : @pattern.Rational,
 ) -> Result[Unit, TransportError] {
@@ -22,6 +24,7 @@ pub fn PatternScheduler::push_active_note(
     Err(e) => return Err(e)
   }
   self.active_notes.push_note(
+    instrument~,
     handle~,
     origin=@model.VoiceOrigin::Anonymous,
     end_sample~,
@@ -31,14 +34,16 @@ pub fn PatternScheduler::push_active_note(
 }
 
 ///|
-/// Track an externally triggered voice with a physical gate-off deadline.
-/// Tempo changes leave this deadline unchanged.
+/// Track an externally triggered voice of `instrument` with a physical
+/// gate-off deadline. Tempo changes leave this deadline unchanged.
 pub fn PatternScheduler::push_active_note_until(
   self : PatternScheduler,
+  instrument : Int,
   handle : @moondsp.VoiceHandle,
   end_time : PerformanceTime,
 ) -> Unit {
   self.active_notes.push_note(
+    instrument~,
     handle~,
     origin=@model.VoiceOrigin::Anonymous,
     end_sample=end_time.sample,

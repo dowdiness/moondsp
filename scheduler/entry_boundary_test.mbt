@@ -13,9 +13,9 @@ test "a prepared entry switch is audible at its rounded sample inside the block"
     pat=note.material(),
   ).lower()
   sched.queue_pattern_snapshot(old)
-  sched.render_block(pool, left, right)
+  sched.render_block(left, right)
   sched.queue_pattern_snapshot(next)
-  sched.render_block(pool, left, right)
+  sched.render_block(left, right)
   assert_eq(left.get(0), 0.0)
   assert_true(left.get(1) > 0.0)
   assert_eq(sched.active_note_count(), 1)

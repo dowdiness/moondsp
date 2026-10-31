@@ -217,8 +217,10 @@ functions, which must themselves be allocation-free.
 - Follow-up: lowering is still duplicated. The bus lowering runs beside
   `compile_pattern_node` and must be merged into it, including the cache,
   before shipping.
-- Follow-up: unifying the per-instrument schedulers becomes close to a
-  prerequisite, because the bus table must come from the unfiltered score.
+- Unifying the per-instrument schedulers was close to a prerequisite,
+  because the bus table must come from the unfiltered score. Done: one
+  `PatternScheduler` now plays every instrument pool and routes each event by
+  `InstrumentSelector`, so the score reaches it unfiltered.
 - Control keys stay strings (ADR-0007). A typed key enum would make the
   per-key nesting rule explicit and is a separate decision.
 

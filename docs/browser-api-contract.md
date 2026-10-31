@@ -881,7 +881,7 @@ arbitrary pattern/event density. Finite endpoints are checked on the proposed
 clock before mutation. Ready/Ended updates check their future zero-anchored
 clock, preserving the old performance and tails on rejection.
 
-`set_scheduler_bpm` returns `0` after changing all routes, or `1` on rejection
+`set_scheduler_bpm` returns `0` after changing the tempo, or `1` on rejection
 with a playback diagnostic. Rejection preserves the current transport and tempo.
 Range-valid numbers can still be unrepresentable at the current transport
 position; hosts must consume the result rather than assume success.
@@ -963,9 +963,9 @@ browser getter, that method has no Player session or finite-song endpoint policy
 
 These are render positions, not measured or estimated speaker positions.
 Acceptance can occur while Paused or Ended and does not imply audible output.
-Pending materials can still be using previous accepted versions. Route
-projections share musical identities and transition boundaries, so one material
-does not become six pending items because it has six output routes. New identities
+Pending materials can still be using previous accepted versions. One scheduler
+holds the whole score for every instrument, so a material is counted once
+however many instruments its events reach. New identities
 and retired identities count separately: replacing anonymous materials can
 produce both additions and removals, unlike editing named continuing materials.
 Status reporting preserves those existing scheduler semantics.
@@ -987,7 +987,7 @@ Both browser export targets expose these primitive operations:
 | `player_onset_clear()` | Clear observations and per-buffer drop count |
 | `player_onset_dropped()` | Drops since clear, returned as `Double` |
 
-One preallocated Player buffer is shared across routes. Each row has at most
+One preallocated Player buffer is shared by every instrument. Each row has at most
 103 doubles: engine sample, source epoch, atom serial, literal-frame serial
 (`0` when absent), local onset (`-1` when absent), source pitch (NaN when
 unpitched), binding count, then reference/binding/definition serial triples.
@@ -1197,13 +1197,13 @@ modify the user's draft, or run on the audio thread.
 Player sources are subject to the
 [structural admission limits](technical-reference.md#browser-player-ownership-and-source-updates):
 8,192 code units, bounded syntax/query-plan depth, 128-step Euclidean rhythms,
-128 occurrences, 256 source/retained material entries per route, and conservative
+128 occurrences, 256 source/retained material entries per score, and conservative
 event/work expansion bounds at 1000 BPM.
 Admission checks future callback branches and full-cycle sequence queries,
 not just a sample of the opening blocks. Rejection preserves Current song.
 Material admission includes accumulated entries waiting for replacement/removal
-and future occurrences, not just the latest source. It checks all route clocks
-and proposed material states before installing any route. Waiting for removal
+and future occurrences, not just the latest source. It checks the proposed clock
+and material state before installing either. Waiting for removal
 boundaries or explicitly restarting can recover retained capacity.
 The low-level Mini library does not impose browser limits by default.
 
@@ -1479,7 +1479,7 @@ The following packages and concepts are outside the public API:
 - `dowdiness/moondsp/browser/internal/slot`
 - `dowdiness/moondsp/browser/internal/demo_templates`
 - `dowdiness/moondsp/browser/internal/playback_host`
-- route selectors, scheduler routes, sound pools, demo template shapes, temporary
+- instrument selectors, instrument pools, demo template shapes, temporary
   output buffers, and scheduler-owned transport state
 
 Issue #150 / PR #155 removed the legacy browser facade route shell types

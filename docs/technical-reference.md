@@ -903,8 +903,9 @@ Current semantics:
     `process(...)` call
 - `apply_control(...)` remains the single-message form of the same runtime API
 - standalone control validation does not mutate audible graph state.
-  Multi-voice effects instead use `BoundVoicePool::apply_voices_controls_result`:
-  each selected handle and graph batch is prepared in selection order, then
+  Multi-voice effects instead use `apply_controls_to_voices`, whose voices may
+  belong to different pools: each selected handle and graph batch is prepared
+  in selection order against that voice's graph, then
   every target is adopted together. An earlier graph error takes precedence
   over a later stale handle, and any rejection leaves all voices unchanged.
 
@@ -1515,11 +1516,12 @@ Source identity and event origins remain attached to the actual retained
 version. At a repetition boundary the latest song begins its next local cycle;
 transport, voice releases, and the shared room are not reset.
 
-Tempo parsing produces a validated `Tempo`. The owner calculates each proposed
-clock and every musical note deadline once, before mutating any route. If any
-route is unrepresentable, none changes. Applying the retained plans preserves
-musical position; physical note deadlines stay fixed. Restart plans use a zero
-anchor and clear voices after every route has accepted the plan.
+Tempo parsing produces a validated `Tempo`. The owner's single scheduler
+calculates the proposed clock and every musical note deadline once, for all
+instruments, before mutating anything. If any deadline is unrepresentable,
+nothing changes. Applying the plan preserves musical position; physical note
+deadlines stay fixed. Restart plans use a zero anchor and clear every
+instrument's voices after the plan is accepted.
 The finite song endpoint is checked on the proposed clock before commit,
 including Restart. Ready/Ended source updates check the future zero-anchored
 clock without touching the old performance or tails.
@@ -1552,7 +1554,7 @@ queued/submitting is not accepted, and accepted is not fully transitioned.
 preserving tempo-change continuity and Pause freezes. Ended retains the finished
 run's endpoint across later source updates until Play/Restart; repeating songs
 do not wrap this position. It is a render position, not an audible-time estimate.
-Pending counts follow musical material identities across route projections.
+Pending counts follow musical material identities in the one accepted score.
 Additions and removals of different identities remain separate; presentation
 does not infer a replacement from equal text or editor location.
 Pause during initial Starting cancels the pending start locally; no Pause command
@@ -1573,14 +1575,15 @@ over a session after successful activation.
 `set_scheduler_bpm` remains a lower-level demo/probe control, returning 0 on
 success and 1 on rejection. Its `set-scheduler-bpm` worklet message reports a
 `tempo-updated` or `tempo-error` receipt with a request revision. It uses the same
-all-route tempo plan, but is not part of the live Player command API.
+tempo plan, but is not part of the live Player command API.
 `scheduler_bpm()` reports accepted tempo at the runtime's 0.001-BPM precision;
 source updates replace a previous demo tempo, including the omission default.
 Snapshots and preparation plans stay inside WASM.
 
 The browser audio owner also owns exactly one stereo room reverb, outside all
-routed voice pools. Each voice keeps one normalized send gain; every route
-renders dry stereo plus a send pair, the host sums all sends, and the reverb is
+instrument voice pools. Each voice keeps one normalized send gain; the
+scheduler renders dry stereo plus one send pair summed over every instrument,
+and the reverb is
 processed once per block with fixed room settings. This is a dedicated shared
 bus, not a generic effect graph: there are no per-part reverb instances,
 multiple rooms, or event-controlled decay and damping. Its state is independent
@@ -1628,11 +1631,11 @@ reduce their cost. Direct Mini parsers remain unrestricted unless
 `parse_play_source(..., max_query_span=Some(span))` is requested.
 
 Source entry counts are checked even while Ready, before publication. For a live
-Update, `accept_playback_all` prepares every route's proposed tempo, deadlines,
-and reconciled material state before installing any of them. The 256-entry cap
+Update, `PatternScheduler::accept_playback` prepares the proposed tempo,
+deadlines, and reconciled material state before installing any of them. The 256-entry cap
 covers the incoming snapshot as well as accumulated retained entries, not merely
-the latest source or pending count. A rejected edit cannot partially retime an
-earlier route. Capacity returns when retained entries reach their removal
+the latest source or pending count. A rejected edit cannot partially retime
+the performance. Capacity returns when retained entries reach their removal
 boundaries; Restart checks the new source against an empty material state.
 `PlaybackSnapshot::material_count` exposes the source count without consulting
 the current play position. Lower-level unbounded scheduler APIs remain available.

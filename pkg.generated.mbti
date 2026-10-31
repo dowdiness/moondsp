@@ -10,6 +10,8 @@ import {
 }
 
 // Values
+pub fn apply_controls_to_voices(Array[(@voice.BoundVoicePool, @voice.VoiceHandle)], Array[@graph.GraphControl]) -> Result[Unit, @voice.VoiceControlError]
+
 pub fn effective_sample_count(@dsp.DspContext, @dsp.AudioBuffer) -> Int
 
 pub fn[T : @dsp.FilterSym] exit_deliverable() -> T

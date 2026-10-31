@@ -377,7 +377,7 @@ test "multi voice rejection preserves earlier targets and diagnostic order" {
   pool.process(ctx, left, right)
   let before = left.get(0)
   assert_invalid_voice_handle(
-    pool.apply_voices_controls_result([first, stale], [
+    @voice.apply_controls_to_voices([(pool, first), (pool, stale)], [
       GraphControl::set_param(0, GraphParamSlot::Value0, 2.0),
     ]),
     stale,
@@ -387,7 +387,7 @@ test "multi voice rejection preserves earlier targets and diagnostic order" {
   pool.process(ctx, left, right)
   assert_eq(left.get(0), before)
   match
-    pool.apply_voices_controls_result([first, stale], [
+    @voice.apply_controls_to_voices([(pool, first), (pool, stale)], [
       GraphControl::set_param(99, GraphParamSlot::Value0, 2.0),
     ]) {
     Err(
@@ -403,7 +403,7 @@ test "multi voice rejection preserves earlier targets and diagnostic order" {
   .unwrap()
   let second = pool.note_on_controls({}).unwrap()
   match
-    pool.apply_voices_controls_result([first, second], [
+    @voice.apply_controls_to_voices([(pool, first), (pool, second)], [
       GraphControl::set_param(0, GraphParamSlot::Value0, 2.0),
     ]) {
     Err(

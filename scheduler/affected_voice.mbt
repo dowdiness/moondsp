@@ -82,7 +82,6 @@ fn PatternScheduler::apply_matching_voice_effect_result(
   self : PatternScheduler,
   matches : (@model.VoiceOrigin) -> Bool,
   effect : ActiveVoiceEffect,
-  pool : @moondsp.BoundVoicePool,
 ) -> Result[ActiveVoiceEffectOutcome, @moondsp.VoiceControlError] {
   match effect {
     Release =>
@@ -90,7 +89,7 @@ fn PatternScheduler::apply_matching_voice_effect_result(
         retuned_voice_count: 0,
         detached_note_count: self.active_notes.remove_matching(
           matches,
-          pool,
+          self.pools,
           kill=false,
         ),
       })
@@ -99,16 +98,16 @@ fn PatternScheduler::apply_matching_voice_effect_result(
         retuned_voice_count: 0,
         detached_note_count: self.active_notes.remove_matching(
           matches,
-          pool,
+          self.pools,
           kill=true,
         ),
       })
     Retune(batch) => {
-      let handles = self.active_notes.matching_handles(matches)
-      match pool.apply_voices_controls_result(handles, batch.borrow()) {
+      let voices = self.active_notes.matching_voices(matches, self.pools)
+      match @moondsp.apply_controls_to_voices(voices, batch.borrow()) {
         Err(error) => Err(error)
         Ok(_) =>
-          Ok({ retuned_voice_count: handles.length(), detached_note_count: 0, })
+          Ok({ retuned_voice_count: voices.length(), detached_note_count: 0, })
       }
     }
   }
@@ -119,12 +118,10 @@ pub fn PatternScheduler::apply_pattern_voice_effect_result(
   self : PatternScheduler,
   scope : PatternVoiceScope,
   effect : ActiveVoiceEffect,
-  pool : @moondsp.BoundVoicePool,
 ) -> Result[ActiveVoiceEffectOutcome, @moondsp.VoiceControlError] {
   self.apply_matching_voice_effect_result(
     source => source.matches_pattern_scope(scope.raw),
     effect,
-    pool,
   )
 }
 
@@ -133,11 +130,9 @@ pub fn PatternScheduler::apply_song_voice_effect_result(
   self : PatternScheduler,
   scope : SongVoiceScope,
   effect : ActiveVoiceEffect,
-  pool : @moondsp.BoundVoicePool,
 ) -> Result[ActiveVoiceEffectOutcome, @moondsp.VoiceControlError] {
   self.apply_matching_voice_effect_result(
     source => source.matches_song_scope(scope.raw),
     effect,
-    pool,
   )
 }

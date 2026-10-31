@@ -1,6 +1,7 @@
 ///|
 /// Scheduler-owned active voice with its performance-sample gate-off time.
 priv struct ActiveNote {
+  instrument : Int
   handle : @voice.VoiceHandle
   origin : @model.VoiceOrigin
   mut end_sample : Int64
@@ -9,12 +10,13 @@ priv struct ActiveNote {
 
 ///|
 fn ActiveNote::ActiveNote(
+  instrument~ : Int,
   handle~ : @voice.VoiceHandle,
   origin? : @model.VoiceOrigin = @model.VoiceOrigin::Anonymous,
   end_sample~ : Int64,
   musical_end~ : @pattern.Rational?,
 ) -> ActiveNote {
-  { handle, origin, end_sample, musical_end, }
+  { instrument, handle, origin, end_sample, musical_end, }
 }
 
 ///|
@@ -35,14 +37,17 @@ fn ActiveNote::expires_at(self : ActiveNote, sample : Int64) -> Bool {
 ///|
 fn ActiveNote::note_off(
   self : ActiveNote,
-  pool : @voice.BoundVoicePool,
+  pools : Array[@voice.BoundVoicePool],
 ) -> Unit {
-  ignore(pool.note_off_result(self.handle))
+  ignore(pools[self.instrument].note_off_result(self.handle))
 }
 
 ///|
-fn ActiveNote::kill(self : ActiveNote, pool : @voice.BoundVoicePool) -> Unit {
-  ignore(pool.kill_result(self.handle))
+fn ActiveNote::kill(
+  self : ActiveNote,
+  pools : Array[@voice.BoundVoicePool],
+) -> Unit {
+  ignore(pools[self.instrument].kill_result(self.handle))
 }
 
 ///|
@@ -64,6 +69,7 @@ pub fn ActiveNotes::length(self : ActiveNotes) -> Int {
 ///|
 pub fn ActiveNotes::push_note(
   self : ActiveNotes,
+  instrument~ : Int,
   handle~ : @voice.VoiceHandle,
   origin? : @model.VoiceOrigin = @model.VoiceOrigin::Anonymous,
   end_sample~ : Int64,
@@ -71,12 +77,21 @@ pub fn ActiveNotes::push_note(
 ) -> Unit {
   // A stolen voice's old endpoint must not retain another record for its slot.
   for i in 0..<self.notes.length() {
-    if self.notes[i].handle.slot == handle.slot {
-      self.notes[i] = ActiveNote(handle~, origin~, end_sample~, musical_end~)
+    if self.notes[i].instrument == instrument &&
+      self.notes[i].handle.slot == handle.slot {
+      self.notes[i] = ActiveNote(
+        instrument~,
+        handle~,
+        origin~,
+        end_sample~,
+        musical_end~,
+      )
       return
     }
   }
-  self.notes.push(ActiveNote(handle~, origin~, end_sample~, musical_end~))
+  self.notes.push(
+    ActiveNote(instrument~, handle~, origin~, end_sample~, musical_end~),
+  )
 }
 
 ///|
@@ -87,23 +102,23 @@ pub fn ActiveNotes::clear(self : ActiveNotes) -> Unit {
 ///|
 pub fn ActiveNotes::kill_all(
   self : ActiveNotes,
-  pool : @voice.BoundVoicePool,
+  pools : Array[@voice.BoundVoicePool],
 ) -> Unit {
   for note in self.notes {
-    note.kill(pool)
+    note.kill(pools)
   }
 }
 
 ///|
 pub fn ActiveNotes::expire_at_sample(
   self : ActiveNotes,
-  pool : @voice.BoundVoicePool,
+  pools : Array[@voice.BoundVoicePool],
   sample : Int64,
 ) -> Unit {
   let mut i = 0
   while i < self.notes.length() {
     if self.notes[i].expires_at(sample) {
-      self.notes[i].note_off(pool)
+      self.notes[i].note_off(pools)
       // WHY swap-remove: Array::remove shifts all later elements O(n).
       // Swap with last + pop is O(1). Active-note order is not observable;
       // gate-off correctness depends only on end_sample, not position.
@@ -134,7 +149,7 @@ pub fn ActiveNotes::matching_count(
 pub fn ActiveNotes::remove_matching(
   self : ActiveNotes,
   matches : (@model.VoiceOrigin) -> Bool,
-  pool : @voice.BoundVoicePool,
+  pools : Array[@voice.BoundVoicePool],
   kill~ : Bool,
 ) -> Int {
   let mut count = 0
@@ -142,9 +157,9 @@ pub fn ActiveNotes::remove_matching(
   while i < self.notes.length() {
     if matches(self.notes[i].origin()) {
       if kill {
-        self.notes[i].kill(pool)
+        self.notes[i].kill(pools)
       } else {
-        self.notes[i].note_off(pool)
+        self.notes[i].note_off(pools)
       }
       let last = self.notes.length() - 1
       if i < last {
@@ -160,12 +175,15 @@ pub fn ActiveNotes::remove_matching(
 }
 
 ///|
-pub fn ActiveNotes::matching_handles(
+pub fn ActiveNotes::matching_voices(
   self : ActiveNotes,
   matches : (@model.VoiceOrigin) -> Bool,
-) -> Array[@voice.VoiceHandle] {
+  pools : Array[@voice.BoundVoicePool],
+) -> Array[(@voice.BoundVoicePool, @voice.VoiceHandle)] {
   [
-    for note in self.notes if matches(note.origin()) => note.handle()
+    for note in self.notes if matches(note.origin()) => {
+      (pools[note.instrument], note.handle())
+    }
   ]
 }
 

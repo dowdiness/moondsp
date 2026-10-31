@@ -24,9 +24,8 @@ pub fn PatternScheduler::queue_pattern_snapshot_effect_result(
   snapshot : @pattern.PatternSnapshot[@pattern.ControlMap],
   scope : PatternVoiceScope,
   effect : ActiveVoiceEffect,
-  pool : @moondsp.BoundVoicePool,
 ) -> Result[ActiveVoiceEffectOutcome, @moondsp.VoiceControlError] {
-  match self.apply_pattern_voice_effect_result(scope, effect, pool) {
+  match self.apply_pattern_voice_effect_result(scope, effect) {
     Err(error) => Err(error)
     Ok(outcome) => {
       self.queue_pattern_snapshot(snapshot)
@@ -41,9 +40,8 @@ pub fn PatternScheduler::queue_song_snapshot_effect_result(
   snapshot : @song.SongSnapshot[@pattern.ControlMap],
   scope : SongVoiceScope,
   effect : ActiveVoiceEffect,
-  pool : @moondsp.BoundVoicePool,
 ) -> Result[ActiveVoiceEffectOutcome, @moondsp.VoiceControlError] {
-  match self.apply_song_voice_effect_result(scope, effect, pool) {
+  match self.apply_song_voice_effect_result(scope, effect) {
     Err(error) => Err(error)
     Ok(outcome) => {
       self.queue_song_snapshot(snapshot)

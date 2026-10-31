@@ -608,14 +608,15 @@ pub fn BoundVoicePool::set_voice_send_result(
 
 ///|
 /// Apply a batch atomically to all selected live voices, in selection order.
-pub fn BoundVoicePool::apply_voices_controls_result(
-  self : BoundVoicePool,
-  handles : Array[VoiceHandle],
+/// Voices may belong to different pools; each is validated against its own
+/// graph before any voice changes.
+pub fn apply_controls_to_voices(
+  voices : Array[(BoundVoicePool, VoiceHandle)],
   controls : Array[GraphControl],
 ) -> Result[Unit, VoiceControlError] {
   // Retain handle failures in place: an earlier graph rejection must win over
   // a later stale handle. No voice is changed until every target is prepared.
-  let targets = handles.map(handle => self.pool.compiled_voice_result(handle))
+  let targets = voices.map(voice => voice.0.pool.compiled_voice_result(voice.1))
   Dsp::apply_controls_to_all(targets, controls, error => {
     VoiceControlError::Graph(error)
   })

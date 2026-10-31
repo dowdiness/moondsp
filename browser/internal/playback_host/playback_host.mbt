@@ -1,30 +1,6 @@
 ///|
-/// Per-sound pool state: voice pool + scheduler + tmp buffers.
-priv struct SoundPool {
-  pool : @moondsp.BoundVoicePool
-  scheduler : @scheduler.PatternScheduler
-  tmp_left : @moondsp.AudioBuffer
-  tmp_right : @moondsp.AudioBuffer
-  tmp_send_left : @moondsp.AudioBuffer
-  tmp_send_right : @moondsp.AudioBuffer
-}
-
-///|
-priv enum SchedulerRouteSelector {
-  RouteSound(Double)
-  RouteSynth
-}
-
-///|
-priv struct SchedulerRoute {
-  selector : SchedulerRouteSelector
-  pool : SoundPool
-}
-
-///|
 pub struct Player {
-  priv routes : Array[SchedulerRoute]
-  priv schedulers : Array[@scheduler.PatternScheduler]
+  priv scheduler : @scheduler.PatternScheduler
   priv onsets : @scheduler.OnsetBuffer
   priv context : @moondsp.DspContext
   priv left : @moondsp.AudioBuffer
@@ -40,17 +16,14 @@ pub struct Player {
 
 ///|
 fn Player::Player(
-  routes : Array[SchedulerRoute],
+  scheduler : @scheduler.PatternScheduler,
   context : @moondsp.DspContext,
 ) -> Player {
   let size = context.block_size()
   let onsets = @scheduler.OnsetBuffer::new()
-  for route in routes {
-    route.pool.scheduler.attach_onset_buffer(onsets)
-  }
+  scheduler.attach_onset_buffer(onsets)
   {
-    routes,
-    schedulers: routes.map(route => route.pool.scheduler),
+    scheduler,
     onsets,
     context,
     left: @moondsp.AudioBuffer::filled(size),
@@ -69,127 +42,68 @@ fn Player::Player(
 let player : @ref.Ref[Player?] = @ref.new(None)
 
 ///|
-/// Create a SoundPool for a drum template (no control bindings needed).
+/// Create a drum instrument pool (no control bindings needed).
 fn make_drum_pool(
   template : Array[@moondsp.DspNode],
   ctx : @moondsp.DspContext,
-  block_size : Int,
-) -> SoundPool? {
-  let scheduler = match @scheduler.PatternScheduler::new(bpm=60.0, ctx~) {
-    Ok(scheduler) => scheduler
-    Err(_) => return None
-  }
+) -> @moondsp.BoundVoicePool? {
   // 8 voices = defensive headroom for .jux(f) patterns where f causes
   // same-sound overlap (e.g. the demo's hh*16? layer puts left's hh at
   // slot t and right's hh at slot 1-t — frequent coincidence at fine
   // subdivisions). Multi-sound patterns like s("bd sd hh sd").jux(rev)
   // do NOT need this headroom because per-pool pressure stays at 1.
-  match
-    @moondsp.BoundVoicePool::new(
-      @moondsp.AnalyzedGraph::analyze(template),
-      ctx,
-      @moondsp.ControlBindingBuilder::new(),
-      max_voices=8,
-    ) {
-    Err(_) => None
-    Ok(pool) =>
-      Some({
-        pool,
-        scheduler,
-        tmp_left: @moondsp.AudioBuffer::filled(block_size),
-        tmp_right: @moondsp.AudioBuffer::filled(block_size),
-        tmp_send_left: @moondsp.AudioBuffer::filled(block_size),
-        tmp_send_right: @moondsp.AudioBuffer::filled(block_size),
-      })
-  }
+  @moondsp.BoundVoicePool::new(
+    @moondsp.AnalyzedGraph::analyze(template),
+    ctx,
+    @moondsp.ControlBindingBuilder::new(),
+    max_voices=8,
+  ).to_option()
 }
 
 ///|
-/// Create a SoundPool for the synth template (with note->freq binding).
+/// Create the synth instrument pool (with note->freq binding).
 fn make_synth_pool(
   template : Array[@moondsp.DspNode],
   ctx : @moondsp.DspContext,
-  block_size : Int,
-) -> SoundPool? {
-  let scheduler = match @scheduler.PatternScheduler::new(bpm=60.0, ctx~) {
-    Ok(scheduler) => scheduler
-    Err(_) => return None
-  }
+) -> @moondsp.BoundVoicePool? {
   // See make_drum_pool for the .jux headroom rationale.
-  match
-    @moondsp.BoundVoicePool::new(
-      @moondsp.AnalyzedGraph::analyze(template),
-      ctx,
-      @moondsp.ControlBindingBuilder::new()
-      .bind(
-        key="note",
-        node_index=0, // oscillator(Value0) frequency placeholder
-        slot=@moondsp.GraphParamSlot::Value0,
-      )
-      .bind(key="attack", node_index=1, slot=@moondsp.GraphParamSlot::Value0)
-      .bind(
-        key="envelope_decay",
-        node_index=1,
-        slot=@moondsp.GraphParamSlot::Value1,
-      )
-      .bind(
-        key="envelope_sustain",
-        node_index=1,
-        slot=@moondsp.GraphParamSlot::Value2,
-      )
-      .bind(key="release", node_index=1, slot=@moondsp.GraphParamSlot::Value3)
-      .bind(key="lpf", node_index=2, slot=@moondsp.GraphParamSlot::Value0)
-      .bind(
-        key="lpf_resonance",
-        node_index=2,
-        slot=@moondsp.GraphParamSlot::Value1,
-      )
-      .bind(key="hpf", node_index=3, slot=@moondsp.GraphParamSlot::Value0)
-      .bind(
-        key="hpf_resonance",
-        node_index=3,
-        slot=@moondsp.GraphParamSlot::Value1,
-      ),
-      // 24 voices for chords: a 5-note chord × 4 layers of jux/stereo
-      // needs up to 20 voices. Fewer steals → fewer clicks.
-      max_voices=24,
-    ) {
-    Err(_) => None
-    Ok(pool) =>
-      Some({
-        pool,
-        scheduler,
-        tmp_left: @moondsp.AudioBuffer::filled(block_size),
-        tmp_right: @moondsp.AudioBuffer::filled(block_size),
-        tmp_send_left: @moondsp.AudioBuffer::filled(block_size),
-        tmp_send_right: @moondsp.AudioBuffer::filled(block_size),
-      })
-  }
-}
-
-///|
-fn make_drum_route(
-  sound_code : Double,
-  template : Array[@moondsp.DspNode],
-  ctx : @moondsp.DspContext,
-  block_size : Int,
-) -> SchedulerRoute? {
-  match make_drum_pool(template, ctx, block_size) {
-    Some(pool) => Some({ selector: RouteSound(sound_code), pool, })
-    None => None
-  }
-}
-
-///|
-fn make_synth_route(
-  template : Array[@moondsp.DspNode],
-  ctx : @moondsp.DspContext,
-  block_size : Int,
-) -> SchedulerRoute? {
-  match make_synth_pool(template, ctx, block_size) {
-    Some(pool) => Some({ selector: RouteSynth, pool, })
-    None => None
-  }
+  @moondsp.BoundVoicePool::new(
+    @moondsp.AnalyzedGraph::analyze(template),
+    ctx,
+    @moondsp.ControlBindingBuilder::new()
+    .bind(
+      key="note",
+      node_index=0, // oscillator(Value0) frequency placeholder
+      slot=@moondsp.GraphParamSlot::Value0,
+    )
+    .bind(key="attack", node_index=1, slot=@moondsp.GraphParamSlot::Value0)
+    .bind(
+      key="envelope_decay",
+      node_index=1,
+      slot=@moondsp.GraphParamSlot::Value1,
+    )
+    .bind(
+      key="envelope_sustain",
+      node_index=1,
+      slot=@moondsp.GraphParamSlot::Value2,
+    )
+    .bind(key="release", node_index=1, slot=@moondsp.GraphParamSlot::Value3)
+    .bind(key="lpf", node_index=2, slot=@moondsp.GraphParamSlot::Value0)
+    .bind(
+      key="lpf_resonance",
+      node_index=2,
+      slot=@moondsp.GraphParamSlot::Value1,
+    )
+    .bind(key="hpf", node_index=3, slot=@moondsp.GraphParamSlot::Value0)
+    .bind(
+      key="hpf_resonance",
+      node_index=3,
+      slot=@moondsp.GraphParamSlot::Value1,
+    ),
+    // 24 voices for chords: a 5-note chord × 4 layers of jux/stereo
+    // needs up to 20 voices. Fewer steals → fewer clicks.
+    max_voices=24,
+  ).to_option()
 }
 
 ///|
@@ -208,25 +122,33 @@ pub fn init_scheduler_graph_with_templates(
     return false
   }
   let ctx = @moondsp.DspContext::new(sample_rate~, block_size~)
-  let route_candidates = [
-    make_drum_route(36.0, bd_template, ctx, block_size),
-    make_drum_route(38.0, sd_template, ctx, block_size),
-    make_drum_route(42.0, hh_template, ctx, block_size),
-    make_drum_route(39.0, cp_template, ctx, block_size),
-    make_drum_route(46.0, oh_template, ctx, block_size),
-    make_synth_route(synth_template, ctx, block_size),
+  let candidates = [
+    (@scheduler.ControlEquals("sound", 36.0), make_drum_pool(bd_template, ctx)),
+    (@scheduler.ControlEquals("sound", 38.0), make_drum_pool(sd_template, ctx)),
+    (@scheduler.ControlEquals("sound", 42.0), make_drum_pool(hh_template, ctx)),
+    (@scheduler.ControlEquals("sound", 39.0), make_drum_pool(cp_template, ctx)),
+    (@scheduler.ControlEquals("sound", 46.0), make_drum_pool(oh_template, ctx)),
+    (@scheduler.HasControl("note"), make_synth_pool(synth_template, ctx)),
   ]
-  let routes : Array[SchedulerRoute] = []
-  for candidate in route_candidates {
+  let instruments : Array[
+    (@scheduler.InstrumentSelector, @moondsp.BoundVoicePool),
+  ] = []
+  for candidate in candidates {
     match candidate {
-      Some(route) => routes.push(route)
-      None => {
+      (selector, Some(pool)) => instruments.push((selector, pool))
+      (_, None) => {
         reset_scheduler_graph()
         return false
       }
     }
   }
-  player.val = Some(Player(routes, ctx))
+  let scheduler = @scheduler.PatternScheduler(bpm=60.0, ctx~, instruments~) catch {
+    _ => {
+      reset_scheduler_graph()
+      return false
+    }
+  }
+  player.val = Some(Player(scheduler, ctx))
   playback_input_chars.clear()
   true
 }
@@ -260,91 +182,6 @@ pub fn scheduler_right_sample(index : Int) -> Double {
 }
 
 ///|
-/// Accumulate one sub-pool's rendered tmp buffers into main buffers.
-fn accumulate_sub_pool(
-  sp : SoundPool,
-  left : @moondsp.AudioBuffer,
-  right : @moondsp.AudioBuffer,
-) -> Unit {
-  let len = left.length()
-  for i = 0; i < len; i = i + 1 {
-    left.set(i, left.get(i) + sp.tmp_left.get(i))
-    right.set(i, right.get(i) + sp.tmp_right.get(i))
-  }
-}
-
-///|
-fn filter_pat_for_route(
-  selector : SchedulerRouteSelector,
-  pat : @pattern.Pat[@pattern.ControlMap],
-) -> @pattern.Pat[@pattern.ControlMap] {
-  match selector {
-    RouteSynth => pat.select_control("note")
-    RouteSound(code) => pat.select_control("sound", value=code)
-  }
-}
-
-///|
-fn filter_section_for_route(
-  selector : SchedulerRouteSelector,
-  section : @song.Section[@pattern.ControlMap],
-) -> Result[@song.Section[@pattern.ControlMap], String] {
-  if section.source_snapshot() is Some(snapshot) {
-    let selected = match selector {
-      RouteSynth => snapshot.select_control("note")
-      RouteSound(code) => snapshot.select_control("sound", value=code)
-    }
-    let filtered = @song.Section::with_origins(
-      name=section.name(),
-      length_cycles=section.length_cycles(),
-      scope=section.scope(),
-      snapshot=selected,
-    ) catch {
-      _ => return Err("internal song routing error: invalid section length")
-    }
-    return Ok(filtered)
-  }
-  let body = @song.SectionBody::single(
-    filter_pat_for_route(selector, section.body()),
-  )
-  let filtered = @song.Section(
-    name=section.name(),
-    length_cycles=section.length_cycles(),
-    scope=section.scope(),
-    body~,
-  ) catch {
-    _ => return Err("internal song routing error: invalid section length")
-  }
-  Ok(filtered)
-}
-
-///|
-fn filter_song_for_route(
-  selector : SchedulerRouteSelector,
-  song : @song.Song[@pattern.ControlMap],
-) -> Result[@song.Song[@pattern.ControlMap], String] {
-  let parts : Array[@song.SongPart[@pattern.ControlMap]] = []
-  for occurrence in song.occurrences() {
-    match filter_section_for_route(selector, occurrence.section()) {
-      Ok(section) =>
-        parts.push(
-          @song.SongPart::with_id_at(
-            id=occurrence.id(),
-            start=occurrence.start(),
-            name=occurrence.name(),
-            section~,
-          ),
-        )
-      Err(msg) => return Err(msg)
-    }
-  }
-  let filtered = @song.Song(parts~) catch {
-    _ => return Err("internal song routing error: invalid song layout")
-  }
-  Ok(filtered)
-}
-
-///|
 pub fn process_scheduler_block() -> Bool {
   guard player.val is Some(owner) else {
     ignore(set_scheduler_parse_error("Player is not initialized"))
@@ -365,32 +202,19 @@ fn Player::process(self : Player) -> Bool {
     }
     Playing(_) | Ended(_, _, _) => ()
   }
-  self.send_left.fill(0.0)
-  self.send_right.fill(0.0)
-  for route in self.routes {
-    let sp = route.pool
-    sp.scheduler.render_block_with_send(
-      sp.pool,
-      sp.tmp_left,
-      sp.tmp_right,
-      sp.tmp_send_left,
-      sp.tmp_send_right,
-    )
-    if sp.scheduler.last_transport_error() is Some(_) {
-      self.session = Fault("transport range exhausted")
-      self.left.fill(0.0)
-      self.right.fill(0.0)
-      for route in self.routes {
-        route.pool.pool.kill_all()
-      }
-      ignore(set_scheduler_parse_error("transport range exhausted"))
-      return false
-    }
-    for i in 0..<self.context.block_size() {
-      self.send_left.set(i, self.send_left.get(i) + sp.tmp_send_left.get(i))
-      self.send_right.set(i, self.send_right.get(i) + sp.tmp_send_right.get(i))
-    }
-    accumulate_sub_pool(sp, self.left, self.right)
+  self.scheduler.render_block_with_send(
+    self.left,
+    self.right,
+    self.send_left,
+    self.send_right,
+  )
+  if self.scheduler.last_transport_error() is Some(_) {
+    self.session = Fault("transport range exhausted")
+    self.left.fill(0.0)
+    self.right.fill(0.0)
+    self.scheduler.kill_all_voices()
+    ignore(set_scheduler_parse_error("transport range exhausted"))
+    return false
   }
   self.reverb.process(
     self.context,
@@ -404,7 +228,7 @@ fn Player::process(self : Player) -> Bool {
     self.right.set(i, (self.right.get(i) + self.wet_right.get(i)) * self.gain)
   }
   if self.session is Playing(song) && song.finite_end() is Some(end_) {
-    let scheduler = self.schedulers[0]
+    let scheduler = self.scheduler
     match scheduler.sample_at(end_) {
       Ok(end_sample) if scheduler.sample_counter() >= end_sample =>
         self.session = Ended(song, end_sample, end_.to_double())
@@ -544,7 +368,7 @@ pub fn set_scheduler_bpm(bpm : Double) -> Int {
     Some(song) => song.finite_end()
     None => None
   }
-  match @scheduler.set_tempo_all(owner.schedulers, tempo, end_?) {
+  match owner.scheduler.set_tempo(tempo, end_?) {
     Err(_) => set_scheduler_parse_error("tempo change exceeds transport range")
     Ok(_) => {
       if owner.session.song() is Some(song) {
