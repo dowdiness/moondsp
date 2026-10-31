@@ -716,6 +716,8 @@ fn draft_origin_error(error : @pattern.PatternDocError) -> String {
       "exact compilation: missing atom origin \{id.value()}"
     MissingReferenceBinding(id) =>
       "exact compilation: missing reference binding \{id.value()}"
+    UnsupportedControl(id) =>
+      "exact compilation: unsupported control provider \{id.value()}"
   }
 }
 

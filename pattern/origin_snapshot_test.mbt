@@ -151,13 +151,10 @@ test "control providers keep left origin and overlap precedence including zero g
   let left = origin_note("note", 1L, 60.0)
   let provider = @pattern.PatternDoc::reference(
     id=pid("provider"),
-    definition=@pattern.PatternDoc::from_pattern(
-      id=pid("controls"),
-      pat=@pattern.stack([
-        @pattern.control("gain", 0.8),
-        @pattern.control("gain", 0.0),
-      ]),
-    ),
+    definition=@pattern.PatternDoc::stack(id=pid("controls"), docs=[
+      @pattern.PatternDoc::control_atom(id=pid("loud"), key="gain", value=0.8),
+      @pattern.PatternDoc::control_atom(id=pid("muted"), key="gain", value=0.0),
+    ]),
   )
   let doc = @pattern.PatternDoc::merge_control(
     id=pid("merge"),
@@ -173,12 +170,12 @@ test "control providers keep left origin and overlap precedence including zero g
   @debug.assert_eq(event.origin().atom(), atom_id(1L))
   @debug.assert_eq(event.origin().bindings(), [])
   @debug.assert_eq(event.pattern_node_path().nodes().map(id => id.value()), [
-    "merge", "note", "provider", "controls",
+    "merge", "note", "provider", "controls", "loud", "muted",
   ])
 }
 
 ///|
-test "filtering changes values but retains source and exact control routing" {
+test "filtering changes values but retains source" {
   let doc = @pattern.PatternDoc::stack(id=pid("chord"), docs=[
     origin_note("tone-c", 1L, 60.0),
     origin_note("tone-e", 1L, 64.0),
@@ -190,9 +187,9 @@ test "filtering changes values but retains source and exact control routing" {
       None => None
     }
   })
-  let snapshot = doc.lower_with_origins().select_control("note", value=72.0)
-  guard snapshot.query(doc_span(0, 1, 1, 1)) is [event] else {
-    fail("expected selected transposed chord tone")
+  let snapshot = doc.lower_with_origins()
+  guard snapshot.query(doc_span(0, 1, 1, 1)) is [event, _] else {
+    fail("expected the transposed chord tone and the other note")
   }
   @debug.assert_eq(event.origin().atom(), atom_id(1L))
   @debug.assert_eq(event.pattern_node_path().nodes().map(id => id.value()), [

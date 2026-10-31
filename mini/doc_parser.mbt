@@ -378,15 +378,12 @@ fn MiniDocBuilder::control_doc(
   match self.reuse_doc(id) {
     Some(doc) => doc
     None =>
-      match self.source_atom_by_graph_id.get(id.value()) {
-        Some(source_atom) =>
-          @pattern.PatternDoc::control_atom(id~, source_atom~, key~, value~)
-        None =>
-          @pattern.PatternDoc::from_pattern(
-            id~,
-            pat=@pattern.control(key, value),
-          )
-      }
+      @pattern.PatternDoc::control_atom(
+        id~,
+        source_atom?=self.source_atom_by_graph_id.get(id.value()),
+        key~,
+        value~,
+      )
   }
 }
 

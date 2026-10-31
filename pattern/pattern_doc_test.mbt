@@ -223,9 +223,10 @@ test "PatternSnapshot::query_sourced_events covers merge_control inputs" {
     id=pid("merge-left"),
     pat=@pattern.note(60.0),
   )
-  let right = @pattern.PatternDoc::from_pattern(
+  let right = @pattern.PatternDoc::control_atom(
     id=pid("merge-right"),
-    pat=@pattern.s_lpf(800.0),
+    key="lpf",
+    value=800.0,
   )
   let doc = unwrap_doc(() => {
     @pattern.PatternDoc::merge_control(id=pid("merge"), left~, right~)
@@ -653,9 +654,10 @@ test "PatternDoc::merge_control lowers through control-map runtime combinator" {
     id=pid("note"),
     pat=@pattern.note(60.0),
   )
-  let gain_doc = @pattern.PatternDoc::from_pattern(
+  let gain_doc = @pattern.PatternDoc::control_atom(
     id=pid("gain"),
-    pat=@pattern.s_gain(0.5),
+    key="gain",
+    value=0.5,
   )
   let merged = unwrap_doc(() => {
     @pattern.PatternDoc::merge_control(
@@ -686,12 +688,15 @@ test "PatternDoc::merge_control revision changes when lower-revision input chang
   let note_doc = unwrap_doc(() => {
     note_doc.replace_with_pattern(id=pid("note"), pat=@pattern.note(63.0))
   })
-  let gain_doc = @pattern.PatternDoc::from_pattern(
+  let gain_doc = @pattern.PatternDoc::pure(
     id=pid("gain"),
-    pat=@pattern.s_gain(0.5),
+    value=@pattern.ControlMap::single("gain", 0.5),
   )
   let edited_gain_doc = unwrap_doc(() => {
-    gain_doc.replace_with_pattern(id=pid("gain"), pat=@pattern.s_gain(0.75))
+    gain_doc.replace_with_pure(
+      id=pid("gain"),
+      value=@pattern.ControlMap::single("gain", 0.75),
+    )
   })
   let base = unwrap_doc(() => {
     @pattern.PatternDoc::merge_control(

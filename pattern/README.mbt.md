@@ -257,9 +257,16 @@ The exact snapshot's `query(arc)` and `query_for_entry(index, arc)` return
 `EventWithOrigin[A]`: `event()` carries the musical event, `origin()` carries its
 atom and outer-to-inner bindings, and `pattern_node_path()` carries the separate
 voice scope. Returned binding arrays are defensive copies. `pat()` and
-`as_snapshot()` erase origin capability without recompilation; `select_control`
-retains it. Entry keys, periods, musical signatures, and degradation seeds never
-include source IDs.
+`as_snapshot()` erase origin capability without recompilation. Entry keys,
+periods, musical signatures, and degradation seeds never include source IDs.
+
+Lowering also derives automatic control buses ([ADR-0019](../docs/decisions/0019-automatic-control-buses.md)):
+one per `merge_control` and control key, in root time. `snapshot.buses()`
+evaluates them at exact times without allocating, and an event's
+`bus_for(key)` names the bus that key follows while the voice sounds. A
+provider must be built from atoms, `pure`, `continuous`, and time or
+structure nodes; an opaque `from_pattern` provider raises
+`UnsupportedControl`.
 
 `doc.with_source_frame(frame~)` captures literal-local onset coordinates before
 enclosing transforms. It annotates the root without adding a musical graph node

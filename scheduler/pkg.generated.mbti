@@ -41,9 +41,9 @@ pub struct BlockFrame {
 }
 
 pub struct ControlMapper {
-  transform : (String, Double) -> (String, Double)?
+  convert : (String, Double) -> Double
 }
-pub fn ControlMapper::ControlMapper(transform~ : (String, Double) -> (String, Double)?) -> Self
+pub fn ControlMapper::ControlMapper(convert~ : (String, Double) -> Double) -> Self
 
 pub(all) enum InstrumentSelector {
   AllEvents

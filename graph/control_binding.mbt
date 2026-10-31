@@ -158,6 +158,25 @@ pub fn ControlBindingMap::resolve_controls(
 }
 
 ///|
+/// The binding for `key`, if any.
+pub fn ControlBindingMap::binding(
+  self : ControlBindingMap,
+  key : String,
+) -> ControlBinding? {
+  match self.raw.target(key) {
+    Some((node_index, slot)) =>
+      Some(
+        ControlBinding(
+          key~,
+          node_index~,
+          slot=graph_param_slot_from_model(slot),
+        ),
+      )
+    None => None
+  }
+}
+
+///|
 pub impl Show for ControlBinding with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }

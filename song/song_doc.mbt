@@ -427,6 +427,7 @@ pub struct SongSnapshotEvent[A] {
   priv source_frame : @identity.SourceFrameId?
   priv source_start : Double
   priv source_pitch : Double
+  priv buses : @pattern.EventBuses
 }
 
 ///|
@@ -471,6 +472,14 @@ pub fn[A] SongSnapshotEvent::source_pitch(
   self : SongSnapshotEvent[A],
 ) -> Double {
   self.source_pitch
+}
+
+///|
+/// The buses this event's controls follow, on the song clock.
+pub fn[A] SongSnapshotEvent::buses(
+  self : SongSnapshotEvent[A],
+) -> @pattern.EventBuses {
+  self.buses
 }
 
 ///|
@@ -590,6 +599,11 @@ fn[A] push_song_snapshot_events(
       }
       for sourced in events {
         let event = sourced.event()
+        let buses = if scope.is_identity() {
+          sourced.buses().placed(origin=occurrence.start())
+        } else {
+          sourced.buses().placed(origin=occurrence.start(), rate=scope.rate())
+        }
         let shifted = if scope.is_identity() {
           event.shift(occurrence.start())
         } else {
@@ -610,6 +624,7 @@ fn[A] push_song_snapshot_events(
           source_frame: sourced.source_frame(),
           source_start: sourced.source_start(),
           source_pitch: sourced.source_pitch(),
+          buses,
         })
       }
     }
@@ -627,6 +642,7 @@ fn[A] push_song_snapshot_events(
           source_frame: None,
           source_start: -1.0,
           source_pitch: -1.0,
+          buses: @pattern.EventBuses::none(),
         })
       }
     }

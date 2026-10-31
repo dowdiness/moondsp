@@ -12,9 +12,10 @@ test "document control merge preserves material clocks and broad voice scopes" {
     @pattern.PatternDoc::from_pattern(id=pid("bass"), pat=bass),
     @pattern.PatternDoc::from_pattern(id=pid("lead"), pat=lead),
   ])
-  let controls = @pattern.PatternDoc::from_pattern(
+  let controls = @pattern.PatternDoc::control_atom(
     id=pid("gain"),
-    pat=@pattern.s_gain(0.0),
+    key="gain",
+    value=0.0,
   )
   let snapshot = @pattern.PatternDoc::merge_control(
     id=pid("merge"),

@@ -38,6 +38,7 @@ pub fn ControlBindingMap::equal(Self, Self) -> Bool
 pub fn ControlBindingMap::length(Self) -> Int
 pub fn ControlBindingMap::not_equal(Self, Self) -> Bool
 pub fn ControlBindingMap::resolve_controls(Self, Map[String, Double]) -> Array[@model.GraphControl]
+pub fn ControlBindingMap::target(Self, String) -> (Int, @model.GraphParamSlot)?
 pub fn ControlBindingMap::to_repr(Self) -> @debug.Repr
 
 // Type aliases

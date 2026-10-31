@@ -265,6 +265,7 @@ pub fn[A] SongSnapshot::song(Self[A]) -> Song[A]
 pub struct SongSnapshotEvent[A] {
   // private fields
 }
+pub fn[A] SongSnapshotEvent::buses(Self[A]) -> @pattern.EventBuses
 pub fn[A] SongSnapshotEvent::event(Self[A]) -> @pattern.Event[A]
 pub fn[A] SongSnapshotEvent::layer(Self[A]) -> @identity.SectionLayerId
 pub fn[A] SongSnapshotEvent::occurrence(Self[A]) -> @identity.OccurrenceId

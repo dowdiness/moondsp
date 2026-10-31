@@ -7,6 +7,7 @@ pub struct PlaybackSourcedEvent {
   priv source_frame : @identity.SourceFrameId?
   priv source_start : Double
   priv source_pitch : Double
+  priv buses : @pattern.EventBuses
 }
 
 ///|
@@ -20,7 +21,16 @@ pub fn PlaybackSourcedEvent::anonymous(
     source_frame: None,
     source_start: -1.0,
     source_pitch: -1.0,
+    buses: @pattern.EventBuses::none(),
   }
+}
+
+///|
+/// The buses this event's controls follow, on the playback clock.
+pub fn PlaybackSourcedEvent::buses(
+  self : PlaybackSourcedEvent,
+) -> @pattern.EventBuses {
+  self.buses
 }
 
 ///|
@@ -379,6 +389,7 @@ pub fn PlaybackState::query_active_sourced_events(
         source_frame: sourced.source_frame,
         source_start: sourced.source_start,
         source_pitch: sourced.source_pitch,
+        buses: sourced.buses.placed(origin=offset),
       })
   }
 }

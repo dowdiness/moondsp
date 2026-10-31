@@ -50,27 +50,24 @@ pub(all) suberror PatternDocError {
   InvalidSequenceWeights
   MissingAtomOrigin(@identity.PatternNodeId)
   MissingReferenceBinding(@identity.PatternNodeId)
+  UnsupportedControl(@identity.PatternNodeId)
 } derive(Eq, @debug.Debug)
 pub fn PatternDocError::equal(Self, Self) -> Bool
 pub fn PatternDocError::not_equal(Self, Self) -> Bool
 pub fn PatternDocError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
-pub struct BusVoice {
-  controls : ControlMap
-  bindings : Array[(String, Int)]
-}
-pub fn BusVoice::bus_for(Self, String) -> Int?
-pub fn BusVoice::controls(Self) -> ControlMap
-
-pub struct ControlBusSnapshot {
+pub struct BusReader {
   // private fields
 }
-pub fn ControlBusSnapshot::bus_count(Self) -> Int
-pub fn ControlBusSnapshot::bus_value(Self, Int, Rational) -> Double
-pub fn ControlBusSnapshot::evaluate_all(Self, Rational, Array[Double]) -> Unit
-pub fn ControlBusSnapshot::query(Self, TimeSpan) -> Array[Event[BusVoice]]
-pub fn ControlBusSnapshot::query_bus_value(Self, Int, TimeSpan) -> Double?
+pub fn BusReader::value(Self, Rational) -> Double
+
+pub struct ControlBuses {
+  // private fields
+}
+pub fn ControlBuses::evaluate_all(Self, Rational, Array[Double]) -> Unit
+pub fn ControlBuses::length(Self) -> Int
+pub fn ControlBuses::value(Self, Int, Rational) -> Double
 
 pub struct ControlMap {
   // private fields
@@ -99,6 +96,13 @@ pub fn[A : @debug.Debug] Event::to_string(Self[A]) -> String
 pub fn[A] Event::with_spans(Self[A], whole~ : TimeSpan?, part~ : TimeSpan) -> Self[A]
 pub impl[A : @debug.Debug] Show for Event[A]
 
+pub struct EventBuses {
+  // private fields
+}
+pub fn EventBuses::each_reader(Self, (String, BusReader) -> Unit) -> Unit
+pub fn EventBuses::none() -> Self
+pub fn EventBuses::placed(Self, origin~ : Rational, rate? : Rational) -> Self
+
 pub struct EventOrigin {
   // private fields
 } derive(Eq, @debug.Debug)
@@ -112,6 +116,8 @@ pub fn EventOrigin::write_binding_serials(Self, Array[Double], Int, Int) -> Int
 pub struct EventWithOrigin[A] {
   // private fields
 }
+pub fn[A] EventWithOrigin::bus_for(Self[A], String) -> Int?
+pub fn[A] EventWithOrigin::buses(Self[A]) -> EventBuses
 pub fn[A] EventWithOrigin::event(Self[A]) -> Event[A]
 pub fn[A] EventWithOrigin::origin(Self[A]) -> EventOrigin
 pub fn[A] EventWithOrigin::pattern_node_path(Self[A]) -> PatternNodePath
@@ -153,7 +159,7 @@ pub fn[A] PatternDoc::backdate_equal(Self[A], Self[A]) -> Bool
 pub fn[A] PatternDoc::changed_at(Self[A]) -> @types.Revision
 pub fn[A] PatternDoc::contains_node(Self[A], @identity.PatternNodeId) -> Bool
 pub fn PatternDoc::continuous(id~ : @identity.PatternNodeId, key~ : String, f~ : (Double) -> Double) -> Self[ControlMap]
-pub fn PatternDoc::control_atom(id~ : @identity.PatternNodeId, source_atom~ : @identity.SourceAtomId, key~ : String, value~ : Double) -> Self[ControlMap]
+pub fn PatternDoc::control_atom(id~ : @identity.PatternNodeId, source_atom? : @identity.SourceAtomId, key~ : String, value~ : Double) -> Self[ControlMap]
 pub fn[A] PatternDoc::degrade_by(Self[A], id~ : @identity.PatternNodeId, p~ : Double, seed? : Int) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::euclid(Self[A], id~ : @identity.PatternNodeId, k~ : Int, n~ : Int, rotation? : Int) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::every(Self[A], id~ : @identity.PatternNodeId, n~ : Int, transform~ : TimeTransform) -> Self[A] raise PatternDocError
@@ -163,7 +169,6 @@ pub fn[A] PatternDoc::from_pattern(id~ : @identity.PatternNodeId, pat~ : Pat[A])
 pub fn[A] PatternDoc::gate(Self[A], id~ : @identity.PatternNodeId, factor~ : Rational) -> Self[A] raise PatternDocError
 pub fn PatternDoc::jux(Self[ControlMap], id~ : @identity.PatternNodeId, transform~ : TimeTransform) -> Self[ControlMap] raise PatternDocError
 pub fn[A] PatternDoc::lower(Self[A]) -> PatternSnapshot[A] raise PatternDocError
-pub fn PatternDoc::lower_with_buses(Self[ControlMap]) -> ControlBusSnapshot raise
 pub fn[A] PatternDoc::lower_with_cache(Self[A], PatternLoweringCache[A]) -> PatternSnapshot[A] raise PatternDocError
 pub fn[A] PatternDoc::lower_with_origins(Self[A], cache? : PatternLoweringCache[A]) -> PatternSnapshotWithOrigins[A] raise PatternDocError
 pub fn PatternDoc::merge_control(id~ : @identity.PatternNodeId, left~ : Self[ControlMap], right~ : Self[ControlMap]) -> Self[ControlMap] raise PatternDocError
@@ -212,6 +217,7 @@ pub fn PatternNodePath::to_repr(Self) -> @debug.Repr
 pub struct PatternSnapshot[A] {
   // private fields
 }
+pub fn[A] PatternSnapshot::buses(Self[A]) -> ControlBuses
 pub fn[A] PatternSnapshot::entry_key(Self[A], Int) -> String?
 pub fn[A] PatternSnapshot::pat(Self[A]) -> Pat[A]
 pub fn[A] PatternSnapshot::query(Self[A], TimeSpan) -> Array[Event[A]]
@@ -219,11 +225,12 @@ pub fn[A] PatternSnapshot::query_sourced_events(Self[A], TimeSpan) -> Array[Patt
 pub fn[A] PatternSnapshot::query_sourced_events_for_entry(Self[A], Int, TimeSpan) -> Array[PatternSnapshotEvent[A]]
 pub fn[A] PatternSnapshot::revision(Self[A]) -> @identity.Revision
 pub fn[A] PatternSnapshot::root(Self[A]) -> @identity.PatternNodeId
-pub fn PatternSnapshot::select_control(Self[ControlMap], String, value? : Double) -> Self[ControlMap]
 
 pub struct PatternSnapshotEvent[A] {
   // private fields
 }
+pub fn[A] PatternSnapshotEvent::bus_for(Self[A], String) -> Int?
+pub fn[A] PatternSnapshotEvent::buses(Self[A]) -> EventBuses
 pub fn[A] PatternSnapshotEvent::event(Self[A]) -> Event[A]
 pub fn[A] PatternSnapshotEvent::pattern_node_path(Self[A]) -> PatternNodePath
 pub fn[A] PatternSnapshotEvent::pattern_nodes(Self[A]) -> Array[@identity.PatternNodeId]
@@ -232,13 +239,13 @@ pub struct PatternSnapshotWithOrigins[A] {
   // private fields
 }
 pub fn[A] PatternSnapshotWithOrigins::as_snapshot(Self[A]) -> PatternSnapshot[A]
+pub fn[A] PatternSnapshotWithOrigins::buses(Self[A]) -> ControlBuses
 pub fn[A] PatternSnapshotWithOrigins::entry_key(Self[A], Int) -> String?
 pub fn[A] PatternSnapshotWithOrigins::pat(Self[A]) -> Pat[A]
 pub fn[A] PatternSnapshotWithOrigins::query(Self[A], TimeSpan) -> Array[EventWithOrigin[A]]
 pub fn[A] PatternSnapshotWithOrigins::query_for_entry(Self[A], Int, TimeSpan) -> Array[EventWithOrigin[A]]
 pub fn[A] PatternSnapshotWithOrigins::revision(Self[A]) -> @identity.Revision
 pub fn[A] PatternSnapshotWithOrigins::root(Self[A]) -> @identity.PatternNodeId
-pub fn PatternSnapshotWithOrigins::select_control(Self[ControlMap], String, value? : Double) -> Self[ControlMap]
 
 pub struct Rational {
   num : Int64

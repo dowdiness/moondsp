@@ -83,6 +83,9 @@ fn PatternScheduler::apply_matching_voice_effect_result(
   matches : (@model.VoiceOrigin) -> Bool,
   effect : ActiveVoiceEffect,
 ) -> Result[ActiveVoiceEffectOutcome, @moondsp.VoiceControlError] {
+  if effect is (Release | Kill) {
+    self.followers.drop_matching(matches)
+  }
   match effect {
     Release =>
       Ok({

@@ -467,6 +467,7 @@ fn EntrySpec::query_sourced(
         source_frame: None,
         source_start: -1.0,
         source_pitch: -1.0,
+        buses: event.buses().placed(origin~),
       })
     PatternWithOrigins(snapshot, index) =>
       snapshot
@@ -478,6 +479,7 @@ fn EntrySpec::query_sourced(
         source_frame: event.source_frame(),
         source_start: event.source_start(),
         source_pitch: event.source_pitch(),
+        buses: event.buses().placed(origin~),
       })
     Song(snapshot, index) => {
       let source_arc = @pattern.TimeSpan(
@@ -494,6 +496,7 @@ fn EntrySpec::query_sourced(
         source_frame: event.source_frame(),
         source_start: event.source_start(),
         source_pitch: event.source_pitch(),
+        buses: event.buses().placed(origin=delta),
       })
     }
   }

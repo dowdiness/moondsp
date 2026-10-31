@@ -1,5 +1,5 @@
 ///|
-/// PROTOTYPE: automatic control buses.
+/// Automatic control buses (ADR-0019).
 ///
 /// A sounding voice follows a control by reading a bus, instead of the
 /// scheduler re-matching each block's event fragments to voices. Lowering
@@ -7,25 +7,21 @@
 /// with every enclosing time transform applied, so it is in root time. Each
 /// event records which bus each control key reads.
 ///
-/// A bus exists in two forms. `BusSignal` is the playback form: a tree of
-/// time maps evaluated at one exact time without allocating. The query form
-/// (`Pat[ControlMap]`) is kept only to check the signal against the pattern
-/// semantics it must reproduce.
-pub struct BusVoice {
-  controls : ControlMap
-  /// `(key, bus)` pairs. The outermost `MergeControl` for a key wins, the same
-  /// order as `ControlMap::merge`.
-  bindings : Array[(String, Int)]
-}
+/// Compiled subtrees keep their buses in their own local time, and every
+/// enclosing node wraps them with its transform, so the lowering cache can
+/// share a subtree's buses wherever the subtree is reused.
 
 ///|
-pub fn BusVoice::controls(self : BusVoice) -> ControlMap {
-  self.controls
-}
+/// `(key, bus)` pairs, shared and never mutated. The outermost `MergeControl`
+/// for a key wins, the same order as `ControlMap::merge`.
+let no_bus_bindings : FixedArray[(String, Int)] = []
 
 ///|
-pub fn BusVoice::bus_for(self : BusVoice, key : String) -> Int? {
-  for binding in self.bindings {
+fn bus_binding_for(
+  bindings : FixedArray[(String, Int)],
+  key : String,
+) -> Int? {
+  for binding in bindings {
     if binding.0 == key {
       return Some(binding.1)
     }
@@ -34,43 +30,177 @@ pub fn BusVoice::bus_for(self : BusVoice, key : String) -> Int? {
 }
 
 ///|
-/// Replace the controls after `filter_map`. A key whose value the map changed
-/// or removed no longer follows its bus: the bus would undo the mapping.
-fn BusVoice::with_controls(self : BusVoice, controls : ControlMap) -> BusVoice {
-  {
-    controls,
-    bindings: self.bindings.filter(binding => {
-      controls.get(binding.0) == self.controls.get(binding.0)
-    }),
-  }
-}
-
-///|
-fn BusVoice::bind(
-  self : BusVoice,
-  controls : ControlMap,
+/// Keep the bindings `keys` does not override, then bind each key of `keys`
+/// that has a bus in `bus_of`, so the outermost merge wins like
+/// `ControlMap::merge`. One allocation; none when nothing changes.
+fn rebind_buses(
+  bindings : FixedArray[(String, Int)],
   keys : ControlMap,
   bus_of : Map[String, Int],
-) -> BusVoice {
-  let bindings = self.bindings.filter(binding => keys.get(binding.0) is None)
+) -> FixedArray[(String, Int)] {
+  let mut kept = 0
+  for binding in bindings {
+    if keys.get(binding.0) is None {
+      kept += 1
+    }
+  }
+  let mut bound = 0
+  keys.each((key, _) => if bus_of.contains(key) { bound += 1 })
+  if bound == 0 && kept == bindings.length() {
+    return bindings
+  }
+  let result = FixedArray::make(kept + bound, ("", 0))
+  let mut next = 0
+  for binding in bindings {
+    if keys.get(binding.0) is None {
+      result[next] = binding
+      next += 1
+    }
+  }
   keys.each((key, _) => {
     if bus_of.get(key) is Some(bus) {
-      bindings.push((key, bus))
+      result[next] = (key, bus)
+      next += 1
     }
   })
-  { controls, bindings }
+  result
 }
 
 ///|
-fn BusVoice::unbind(
-  self : BusVoice,
-  controls : ControlMap,
-  keys : ControlMap,
-) -> BusVoice {
-  {
-    controls,
-    bindings: self.bindings.filter(binding => keys.get(binding.0) is None),
+/// For a fixed value that overrides keys without binding them (`jux` pan).
+let no_buses : Map[String, Int] = {}
+
+///|
+fn shift_bus_bindings(
+  bindings : FixedArray[(String, Int)],
+  offset : Int,
+) -> FixedArray[(String, Int)] {
+  if bindings.is_empty() {
+    return bindings
   }
+  FixedArray::makei(bindings.length(), i => {
+    (bindings[i].0, bindings[i].1 + offset)
+  })
+}
+
+///|
+/// The buses of one lowered snapshot. Evaluation is allocation-free.
+pub struct ControlBuses {
+  priv signals : Array[BusSignal]
+}
+
+///|
+pub fn ControlBuses::length(self : ControlBuses) -> Int {
+  self.signals.length()
+}
+
+///|
+/// The bus value at exact time `at`; `NaN` where the control has no value.
+pub fn ControlBuses::value(
+  self : ControlBuses,
+  bus : Int,
+  at : Rational,
+) -> Double {
+  self.signals[bus].eval(at.num, at.den, false)
+}
+
+///|
+/// Evaluate every bus once for a block into a caller-owned array.
+pub fn ControlBuses::evaluate_all(
+  self : ControlBuses,
+  at : Rational,
+  out : Array[Double],
+) -> Unit {
+  for bus in 0..<self.signals.length() {
+    out[bus] = self.signals[bus].eval(at.num, at.den, false)
+  }
+}
+
+///|
+/// The buses one event's controls follow, placed on the clock the event is on:
+/// the snapshot's local time is `(t - origin) × rate`.
+pub struct EventBuses {
+  priv table : ControlBuses
+  priv bindings : FixedArray[(String, Int)]
+  priv origin : Rational
+  priv rate : Rational
+}
+
+///|
+let no_event_buses : EventBuses = {
+  table: { signals: [], },
+  bindings: no_bus_bindings,
+  origin: Rational::from_int(0),
+  rate: Rational::from_int(1),
+}
+
+///|
+/// For events that follow no bus.
+pub fn EventBuses::none() -> EventBuses {
+  no_event_buses
+}
+
+///|
+fn EventBuses::in_snapshot(
+  table : ControlBuses,
+  bindings : FixedArray[(String, Int)],
+) -> EventBuses {
+  if bindings.is_empty() {
+    return no_event_buses
+  }
+  { ..no_event_buses, table, bindings, }
+}
+
+///|
+/// Follow the event when it is placed at `t / rate + origin`, the same
+/// placement a caller applies to the event's spans.
+pub fn EventBuses::placed(
+  self : EventBuses,
+  origin~ : Rational,
+  rate? : Rational = Rational::from_int(1),
+) -> EventBuses {
+  if self.bindings.is_empty() {
+    return self
+  }
+  { ..self, origin: origin + self.origin / rate, rate: rate * self.rate, }
+}
+
+///|
+/// Visit each bound key whose bus changes over time. A constant bus needs no
+/// reader: the value set at note-on already holds.
+pub fn EventBuses::each_reader(
+  self : EventBuses,
+  f : (String, BusReader) -> Unit,
+) -> Unit {
+  for binding in self.bindings {
+    let signal = self.table.signals[binding.1]
+    guard !signal.is_constant() else { continue }
+    let zero = Rational::from_int(0)
+    let one = Rational::from_int(1)
+    let scaled : BusSignal = if self.rate == one {
+      signal
+    } else {
+      Fast(self.rate.num, self.rate.den, signal)
+    }
+    let placed : BusSignal = if self.origin == zero {
+      scaled
+    } else {
+      Shift(self.origin.num, self.origin.den, scaled)
+    }
+    f(binding.0, { signal: placed, })
+  }
+}
+
+///|
+/// One bus on a playback clock. Reading it allocates nothing.
+pub struct BusReader {
+  priv signal : BusSignal
+}
+
+///|
+/// The bus value at exact time `at`; `NaN` where the control has no value.
+pub fn BusReader::value(self : BusReader, at : Rational) -> Double {
+  self.signal.eval(at.num, at.den, false)
 }
 
 ///|
@@ -80,6 +210,8 @@ priv enum BusSignal {
   Continuous((Double) -> Double)
   /// Local time = time × num / den.
   Fast(Int64, Int64, BusSignal)
+  /// Local time = time − num / den.
+  Shift(Int64, Int64, BusSignal)
   /// Mirror each cycle.
   Rev(BusSignal)
   /// Equal slots; each child sees its own [0, 1).
@@ -92,11 +224,6 @@ priv enum BusSignal {
   Stack(Array[BusSignal])
   /// Right-hand values override left where the left has an event.
   Merge(BusSignal, BusSignal)
-}
-
-///|
-priv suberror BusSignalError {
-  Unsupported(String)
 }
 
 ///|
@@ -144,6 +271,12 @@ fn BusSignal::eval(
       let d = den * fden
       let g = bus_gcd(n, d)
       let g = if g == 0L { 1L } else { g }
+      child.eval(n / g, d / g, left)
+    }
+    Shift(snum, sden, child) => {
+      let n = num * sden - snum * den
+      let d = den * sden
+      let g = bus_gcd(n, d)
       child.eval(n / g, d / g, left)
     }
     Rev(child) => {
@@ -208,6 +341,15 @@ fn BusSignal::eval(
 }
 
 ///|
+fn BusSignal::is_constant(self : BusSignal) -> Bool {
+  match self {
+    Const(_) => true
+    Fast(_, _, child) | Shift(_, _, child) | Rev(child) => child.is_constant()
+    _ => false
+  }
+}
+
+///|
 fn BusSignal::transformed(
   self : BusSignal,
   transform : TimeTransform,
@@ -243,7 +385,11 @@ fn euclid_slots(
 }
 
 ///|
-fn slot_signals(count : Int, index : Int, hit : BusSignal) -> Array[BusSignal] {
+fn slot_signals(
+  count : Int,
+  index : Int,
+  hit : BusSignal,
+) -> Array[BusSignal] {
   Array::makei(count, i => {
     if i == index {
       hit
@@ -263,37 +409,14 @@ fn weight_bounds(weights : Array[Int]) -> Array[Int64] {
 }
 
 ///|
-/// Fold an opaque atom to a constant when it is the same pure value in every
-/// probed cycle. Anything else cannot become a signal.
-fn constant_controls(pat : Pat[ControlMap]) -> ControlMap? {
-  let mut value : ControlMap? = None
-  for cycle in 0..<4 {
-    let begin = Rational::from_int(cycle)
-    let whole = TimeSpan(begin, begin + Rational::from_int(1))
-    let events = pat.query(whole)
-    guard events.length() == 1 &&
-      events[0].whole is Some(w) &&
-      w == whole &&
-      events[0].part == whole else {
-      return None
-    }
-    match value {
-      None => value = Some(events[0].value)
-      Some(first) =>
-        if first.entries() != events[0].value.entries() {
-          return None
-        }
-    }
-  }
-  value
-}
-
-///|
-fn control_keys(
-  nodes : Map[String, PatternDocEntry[ControlMap]],
+/// Every key a control-provider subtree can set, in first-seen order.
+/// `controls_of` views the generic payload as the controls it carries.
+fn[A] control_keys(
+  nodes : Map[String, PatternDocEntry[A]],
   id : @identity.PatternNodeId,
+  controls_of : (A) -> ControlMap,
   keys : Array[String],
-) -> Unit raise {
+) -> Unit raise PatternDocError {
   guard nodes.get(id.value()) is Some(entry) else {
     raise PatternDocError::MissingNode(id.value())
   }
@@ -304,14 +427,11 @@ fn control_keys(
   }
   match entry.node {
     Reference(definition, _) =>
-      control_keys(definition.nodes, definition.root, keys)
+      control_keys(definition.nodes, definition.root, controls_of, keys)
     Continuous(_, key, _) => add(key)
-    Pure(value) => value.each((key, _) => add(key))
-    Runtime(pat) | Atom(pat, _, _) =>
-      match constant_controls(pat) {
-        Some(value) => value.each((key, _) => add(key))
-        None => raise Unsupported("opaque control pattern \{id.value()}")
-      }
+    Pure(value) | Atom(_, value, _, _) =>
+      controls_of(value).each((key, _) => add(key))
+    Runtime(_) => raise UnsupportedControl(id)
     Silence => ()
     Fast(child, _)
     | Slow(child, _)
@@ -321,42 +441,40 @@ fn control_keys(
     | Gate(child, _)
     | DegradeBy(child, _, _)
     | FilterMap(child, _)
-    | Jux(child, _, _) => control_keys(nodes, child, keys)
-    MergeControl(left, right, _) => {
-      control_keys(nodes, left, keys)
-      control_keys(nodes, right, keys)
+    | Jux(child, _, _) => control_keys(nodes, child, controls_of, keys)
+    MergeControl(left, right, _, _) => {
+      control_keys(nodes, left, controls_of, keys)
+      control_keys(nodes, right, controls_of, keys)
     }
     Sequence(children) | Stack(children) | WeightedSequence(children, _) =>
       for child in children {
-        control_keys(nodes, child, keys)
+        control_keys(nodes, child, controls_of, keys)
       }
   }
 }
 
 ///|
 /// Compile one key of a control-provider subtree into its signal.
-fn compile_signal(
-  nodes : Map[String, PatternDocEntry[ControlMap]],
+fn[A] compile_signal(
+  nodes : Map[String, PatternDocEntry[A]],
   id : @identity.PatternNodeId,
   key : String,
-) -> BusSignal raise {
+  controls_of : (A) -> ControlMap,
+) -> BusSignal raise PatternDocError {
   guard nodes.get(id.value()) is Some(entry) else {
     raise PatternDocError::MissingNode(id.value())
   }
-  fn sub(child : @identity.PatternNodeId) -> BusSignal raise {
-    compile_signal(nodes, child, key)
+  fn sub(child : @identity.PatternNodeId) -> BusSignal raise PatternDocError {
+    compile_signal(nodes, child, key, controls_of)
   }
   let none = @double.not_a_number
   match entry.node {
     Reference(definition, _) =>
-      compile_signal(definition.nodes, definition.root, key)
+      compile_signal(definition.nodes, definition.root, key, controls_of)
     Continuous(_, k, f) => if k == key { Continuous(f) } else { Const(none) }
-    Pure(value) => Const(value.get(key).unwrap_or(none))
-    Runtime(pat) | Atom(pat, _, _) =>
-      match constant_controls(pat) {
-        Some(value) => Const(value.get(key).unwrap_or(none))
-        None => raise Unsupported("opaque control pattern \{id.value()}")
-      }
+    Pure(value) | Atom(_, value, _, _) =>
+      Const(controls_of(value).get(key).unwrap_or(none))
+    Runtime(_) => raise UnsupportedControl(id)
     Silence => Const(none)
     Fast(child, factor) => Fast(factor.num, factor.den, sub(child))
     Slow(child, factor) => Fast(factor.den, factor.num, sub(child))
@@ -374,248 +492,8 @@ fn compile_signal(
     WeightedSequence(children, weights) =>
       Weighted(children.map(sub), weight_bounds(weights))
     Stack(children) => Stack(children.map(sub))
-    MergeControl(left, right, _) => Merge(sub(left), sub(right))
+    MergeControl(left, right, _, _) => Merge(sub(left), sub(right))
     Gate(_, _) | DegradeBy(_, _, _) | FilterMap(_, _) | Jux(_, _, _) =>
-      raise Unsupported("event selection inside a control \{id.value()}")
+      raise UnsupportedControl(id)
   }
-}
-
-///|
-pub struct ControlBusSnapshot {
-  priv pat : Pat[BusVoice]
-  priv signals : Array[BusSignal]
-  priv queries : Array[(Pat[ControlMap], String)]
-}
-
-///|
-pub fn ControlBusSnapshot::query(
-  self : ControlBusSnapshot,
-  arc : TimeSpan,
-) -> Array[Event[BusVoice]] {
-  self.pat.query(arc)
-}
-
-///|
-pub fn ControlBusSnapshot::bus_count(self : ControlBusSnapshot) -> Int {
-  self.signals.length()
-}
-
-///|
-/// Playback form: the bus value at exact time `at`. Allocation-free.
-pub fn ControlBusSnapshot::bus_value(
-  self : ControlBusSnapshot,
-  bus : Int,
-  at : Rational,
-) -> Double {
-  self.signals[bus].eval(at.num, at.den, false)
-}
-
-///|
-/// Evaluate every bus once for a block into a caller-owned array.
-pub fn ControlBusSnapshot::evaluate_all(
-  self : ControlBusSnapshot,
-  at : Rational,
-  out : Array[Double],
-) -> Unit {
-  for bus in 0..<self.signals.length() {
-    out[bus] = self.signals[bus].eval(at.num, at.den, false)
-  }
-}
-
-///|
-/// Reference form: query the bus pattern over `arc` and take the value at
-/// `arc.begin`. Allocates; used only to check `bus_value`.
-pub fn ControlBusSnapshot::query_bus_value(
-  self : ControlBusSnapshot,
-  bus : Int,
-  arc : TimeSpan,
-) -> Double? {
-  let (pat, key) = self.queries[bus]
-  let mut value = None
-  for event in pat.query(arc) {
-    if event.part.contains(arc.begin) {
-      value = event.value.get(key)
-    }
-  }
-  value
-}
-
-///|
-priv struct BusTables {
-  signals : Array[BusSignal]
-  queries : Array[(Pat[ControlMap], String)]
-  controls : CompiledCache[ControlMap, Unit]
-}
-
-///|
-pub fn PatternDoc::lower_with_buses(
-  self : PatternDoc[ControlMap],
-) -> ControlBusSnapshot raise {
-  let tables = { signals: [], queries: [], controls: CompiledCache::new() }
-  let pat = lower_bus_node(self.nodes, self.root, p => p, s => s, tables)
-  { pat, signals: tables.signals, queries: tables.queries }
-}
-
-///|
-/// `to_root` and `to_root_signal` map this node's local time to root time,
-/// for the query form and the signal form of a bus.
-fn lower_bus_node(
-  nodes : Map[String, PatternDocEntry[ControlMap]],
-  id : @identity.PatternNodeId,
-  to_root : (Pat[ControlMap]) -> Pat[ControlMap],
-  to_root_signal : (BusSignal) -> BusSignal,
-  tables : BusTables,
-) -> Pat[BusVoice] raise {
-  guard nodes.get(id.value()) is Some(entry) else {
-    raise PatternDocError::MissingNode(id.value())
-  }
-  fn lower(
-    child : @identity.PatternNodeId,
-    to_root : (Pat[ControlMap]) -> Pat[ControlMap],
-    to_root_signal : (BusSignal) -> BusSignal,
-  ) -> Pat[BusVoice] raise {
-    lower_bus_node(nodes, child, to_root, to_root_signal, tables)
-  }
-  fn unbound(pat : Pat[ControlMap]) -> Pat[BusVoice] {
-    pat.map_payload(controls => { controls, bindings: [] })
-  }
-  match entry.node {
-    Reference(definition, _) =>
-      lower_bus_node(
-        definition.nodes,
-        definition.root,
-        to_root,
-        to_root_signal,
-        tables,
-      )
-    Runtime(pat) | Atom(pat, _, _) | Continuous(pat, _, _) => unbound(pat)
-    Silence => Pat::silence()
-    Pure(value) => Pat::pure({ controls: value, bindings: [] })
-    // Time transforms: the bus gets the same transform.
-    Fast(child, factor) =>
-      lower(child, p => to_root(p.fast(factor)), s => {
-        to_root_signal(Fast(factor.num, factor.den, s))
-      }).fast(factor)
-    Slow(child, factor) =>
-      lower(child, p => to_root(p.slow(factor)), s => {
-        to_root_signal(Fast(factor.den, factor.num, s))
-      }).slow(factor)
-    Rev(child) =>
-      lower(child, p => to_root(p.rev()), s => to_root_signal(Rev(s))).rev()
-    Euclid(child, k, n, rotation) =>
-      lower(child, p => to_root(p.euclid(k, n, rotation~)), s => {
-        to_root_signal(euclid_slots(k, n, rotation, s))
-      }).euclid(k, n, rotation~)
-    Every(child, n, transform) => {
-      let apply = (p : Pat[ControlMap]) => transform.apply(p)
-      every(
-        n,
-        p => transform.apply(p),
-        lower(child, p => to_root(every(n, apply, p)), s => {
-          if n <= 0 {
-            to_root_signal(s)
-          } else {
-            to_root_signal(
-              Every(Int64::from_int(n), s, s.transformed(transform)),
-            )
-          }
-        }),
-      )
-    }
-    // Event selection: the bus keeps flowing; only voices are dropped. A
-    // filter_map that rewrites a bound value unbinds that key.
-    Gate(child, factor) => lower(child, to_root, to_root_signal).gate(factor)
-    DegradeBy(child, p, seed) =>
-      lower(child, to_root, to_root_signal).degrade_by(p, seed~)
-    FilterMap(child, f) =>
-      lower(child, to_root, to_root_signal).filter_map_payload(
-        voice => f(voice.controls).map(c => voice.with_controls(c)),
-        "",
-      )
-    // Time partition: the bus is silent outside this child's slot.
-    Sequence(children) => {
-      let count = children.length()
-      sequence(
-        children.mapi((index, child) => {
-          lower(
-            child,
-            p => to_root(sequence(slot_only(count, index, p))),
-            s => to_root_signal(Sequence(slot_signals(count, index, s))),
-          )
-        }),
-      )
-    }
-    WeightedSequence(children, weights) => {
-      let count = children.length()
-      let bounds = weight_bounds(weights)
-      sequence_weighted(
-        children.mapi((index, child) => {
-          lower(
-            child,
-            p => to_root(
-              sequence_weighted(slot_only(count, index, p), weights),
-            ),
-            s => to_root_signal(Weighted(slot_signals(count, index, s), bounds)),
-          )
-        }),
-        weights,
-      )
-    }
-    Stack(children) =>
-      stack(children.map(child => lower(child, to_root, to_root_signal)))
-    // Simultaneous branches with different transforms: one bus per branch.
-    Jux(child, transform, merge) => {
-      let pan = (voice : BusVoice, c : ControlMap) => {
-        voice.unbind(merge(voice.controls, c), c)
-      }
-      let left = merge_control_kernel(
-        lower(child, to_root, to_root_signal),
-        s_pan(-1.0),
-        pan,
-      )
-      let right = merge_control_kernel(
-        transform.apply(
-          lower(child, p => to_root(transform.apply(p)), s => {
-            to_root_signal(s.transformed(transform))
-          }),
-        ),
-        s_pan(1.0),
-        pan,
-      )
-      stack([left, right])
-    }
-    MergeControl(left, right, merge) => {
-      let control = lower_pattern_node_cached(
-        nodes,
-        right,
-        tables.controls,
-        tables.controls,
-        {},
-        End,
-      ).pat.map_payload(erase_value)
-      let keys = []
-      control_keys(nodes, right, keys)
-      let bus_of : Map[String, Int] = Map([])
-      let query = to_root(control)
-      for key in keys {
-        bus_of[key] = tables.signals.length()
-        tables.signals.push(to_root_signal(compile_signal(nodes, right, key)))
-        tables.queries.push((query, key))
-      }
-      merge_control_kernel(
-        lower(left, to_root, to_root_signal),
-        control,
-        (voice, c) => voice.bind(merge(voice.controls, c), c, bus_of),
-      )
-    }
-  }
-}
-
-///|
-fn slot_only(
-  count : Int,
-  index : Int,
-  pat : Pat[ControlMap],
-) -> Array[Pat[ControlMap]] {
-  Array::makei(count, i => if i == index { pat } else { Pat::silence() })
 }

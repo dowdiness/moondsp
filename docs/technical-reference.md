@@ -977,9 +977,12 @@ Current semantics:
   control bindings.
 - `PatternScheduler::process_block(...)` routes each event to the first
   instrument pool whose selector matches it, expires old notes, queries the pattern for the current block arc, converts raw control
-  maps through the scheduler's mapper, calls `note_on_controls(...)`, applies
+  values through the scheduler's mapper, calls `note_on_controls(...)`, applies
   per-voice side effects such as pan and the single shared-send gain, then
-  renders and sums every instrument pool. The default mapper consumes `room` as a
+  renders and sums every instrument pool. Snapshot playback also records each
+  time-varying control bus the event's keys follow (ADR-0019); at every block
+  start the scheduler sends changed bus values to those voices until they are
+  idle, including release tails. The default mapper consumes `room` as a
   normalized `0..1` send; it is not a graph control and does not add reverb
   nodes to each voice.
 - The browser note/chord template binds Mini `lpf` and `hpf` controls to each

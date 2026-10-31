@@ -1,6 +1,6 @@
 # ADR-0019: Parameter automation through automatic control buses
 
-- **Status:** Accepted 2026-10-26. Implemented only as the prototype named under Evidence; scheduler, browser, and CLAP integration have not started.
+- **Status:** Accepted 2026-10-26. Pattern lowering derives buses, and `PatternScheduler` makes sounding voices follow them. Mini has no syntax for time-varying controls yet, so browser scores only produce constant buses; CLAP does not read buses.
 - **Date:** 2026-10-26
 - **Source:** "moondsp パラメータ・オートメーション設計" (Koji Ishimoto, 2026-10-23; not in the repository) and its review in [Amp thread T-01a1714e](https://ampcode.com/threads/T-01a1714e-2aed-7167-9b7d-63c73f2b4396)
 - **Related:** [ADR-0007 ControlMap accessor surface](0007-control-map-accessor-surface.md), [ADR-0018 playback visualization](0018-playback-visualization-origin-truth.md), [Domain glossary](../../CONTEXT.md), [technical reference](../technical-reference.md)
@@ -68,7 +68,7 @@ combinator kind:
 | Time partition: `sequence`, weighted sequence | The child's slot carries the bus; other slots are silent |
 | Simultaneous branches: `stack` | Unchanged |
 | Branches with different transforms: `jux` | One bus per branch |
-| Event selection: `degradeBy`, `gate`, `filter_map`, routing `select_control` | Unchanged; only voices are dropped |
+| Event selection: `degradeBy`, `gate`, `filter_map`, routing `select_control` | Unchanged; only voices are dropped. A `filter_map` that replaces an event's value unbinds that event |
 
 Routing must select voices, not buses: the bus table is built once from the
 unfiltered score and shared by every instrument pool.
@@ -105,9 +105,15 @@ compile error.
 ### 6. Playback evaluates each bus once per block
 
 At note-on the scheduler starts the voice with the event's values and records
-the bus index for each bound key. Every block it evaluates all buses once into
-a preallocated array, then sends a value to a voice only when it changed. Bus
-evaluation and the per-block update allocate nothing on the audio thread.
+the bus for each bound key. Every block it evaluates the buses and sends a
+value to a voice only when it changed. Bus evaluation and the per-block update
+allocate nothing on the audio thread.
+
+Each event carries its buses already placed on the clock the event is on
+(`EventBuses`): Song placement and song repetition move a bus exactly as they
+move the event's spans. The scheduler keeps one follower per sounding voice and
+time-varying key, evaluated at block start; a voice that starts inside a block
+begins from its own onset value. A constant bus gets no follower.
 
 ### 7. Smoothing belongs to DSP nodes
 
@@ -187,10 +193,22 @@ because this toolchain rejects it; the repository was not changed for that.
   query of the same score. These are native benchmark numbers, not
   AudioWorklet timings.
 
-Not covered: `PatternScheduler` and browser/CLAP integration; weighted
-sequences in the allocation audit; onset-path allocation, which still runs
-the event query (an existing problem outside this ADR); user `Continuous`
-functions, which must themselves be allocation-free.
+- **Scheduler.** The same held note played through `PatternScheduler`
+  produced the same brightness numbers as the prototype driver; disabling the
+  per-block update made it match the unswept voice. A Song test pins bus
+  placement under an occurrence start and a `TimeScope` rate, and fails
+  (`lpf 25 40` against `lpf 50 80`) when the rate is dropped. Browser output
+  for five scores with constant controls (drums, `jux`, envelopes and `room`,
+  a Song, a `Dm9` chord) was bit-identical to the previous commit over 400
+  blocks each. In a release wasm-gc build holding a five-voice chord under an
+  `lpf` sweep, the sweep and an unchanging control executed the same number of
+  GC constructions (520,990 per 1,000 blocks, all in the existing event query),
+  and running the bus update ten times per block did not change it.
+
+Not covered: CLAP integration and browser syntax for time-varying controls;
+weighted sequences in the allocation audit; onset-path allocation, which still
+runs the event query and builds each follower (an existing problem outside this
+ADR); user `Continuous` functions, which must themselves be allocation-free.
 
 ## Alternatives considered
 
@@ -210,17 +228,24 @@ functions, which must themselves be allocation-free.
   control right-hand sides are scalars. Admission must bound the bus count
   instead.
 - New constraint: controls outside the closed set fail at compile time
-  instead of silently freezing.
+  with `PatternDocError::UnsupportedControl` instead of silently freezing.
+  An opaque `Runtime` provider is outside the set, so control atoms carry
+  their value, including Mini controls without a source atom.
 - New constraint: every new combinator must state its bus rule; the
   derivation test fails until it does.
 - `PatternDocNode` gains a `Continuous` variant.
-- Follow-up: lowering is still duplicated. The bus lowering runs beside
-  `compile_pattern_node` and must be merged into it, including the cache,
-  before shipping.
+- Lowering is single. `compile_pattern_node` keeps each subtree's buses in
+  that subtree's local time beside its pattern, and each enclosing node wraps
+  them with its own transform, so the lowering cache shares them unchanged.
+  Events hold subtree-local bus indices that a parent renumbers. Snapshots
+  expose the table as `buses()` and each event's bus as `bus_for(key)`.
 - Unifying the per-instrument schedulers was close to a prerequisite,
   because the bus table must come from the unfiltered score. Done: one
   `PatternScheduler` now plays every instrument pool and routes each event by
   `InstrumentSelector`, so the score reaches it unfiltered.
+- `ControlMapper` converts values only (`convert : (String, Double) ->
+  Double`) and no longer renames or drops keys, because bus updates call it
+  every block and it must not allocate.
 - Control keys stay strings (ADR-0007). A typed key enum would make the
   per-key nesting rule explicit and is a separate decision.
 

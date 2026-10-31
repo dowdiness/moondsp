@@ -477,3 +477,57 @@ test "exact Song entry origins survive scoped placement but not anonymous replac
     assert_true(event.event().value.get("note") == Some(72.0))
   }
 }
+
+///|
+test "song events read their buses on the song clock" {
+  let id = (name : String) => {
+    @identity.PatternNodeId::from_string("song-bus:" + name) catch {
+      _ => abort("bad id")
+    }
+  }
+  let pattern = @pattern.PatternDoc::merge_control(
+    id=id("merge"),
+    left=@pattern.PatternDoc::control_atom(
+      id=id("note"),
+      source_atom=@identity.SourceAtomId(@identity.SourceEpoch(7002L), 1L),
+      key="note",
+      value=60.0,
+    ),
+    right=@pattern.PatternDoc::continuous(id=id("ramp"), key="lpf", f=t => {
+      100.0 * t
+    }),
+  ).lower_with_origins()
+  // Placed at cycle 3 and played twice as fast: local = (t - 3) × 2.
+  let section = @song.SectionDoc::single_with_origins(
+    id=song_doc_test_section_id("section:bus"),
+    name="Bus",
+    length_cycles=@pattern.Rational::from_int(1),
+    scope=@song.TimeScope::fast(factor=@pattern.Rational::from_int(2)),
+    layer_id=song_doc_test_layer_id("layer:bus"),
+    snapshot=pattern,
+  )
+  let snapshot = song_doc_test_snapshot(
+    song_doc_test_doc([
+      @song.SongOccurrenceDoc::at(
+        id=song_doc_test_occurrence_id("occurrence:bus"),
+        start=@pattern.Rational::from_int(3),
+        name="Bus",
+        section~,
+      ),
+    ]),
+  )
+  let events = snapshot.query_sourced_events(
+    @pattern.TimeSpan(@pattern.Rational(13L, 4L), @pattern.Rational(7L, 2L)),
+  )
+  @debug.assert_eq(events.length(), 1)
+  let values = []
+  events[0]
+  .buses()
+  .each_reader((key, reader) => {
+    values.push(
+      "\{key} \{reader.value(@pattern.Rational(13L, 4L))} \{reader.value(@pattern.Rational(17L, 5L))}",
+    )
+  })
+  // (3.25 - 3) × 2 = 0.5 and (3.4 - 3) × 2 = 0.8.
+  @debug.assert_eq(values, ["lpf 50 80"])
+}

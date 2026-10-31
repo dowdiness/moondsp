@@ -6,18 +6,23 @@ pub(all) suberror PatternDocError {
   InvalidSequenceWeights
   MissingAtomOrigin(@identity.PatternNodeId)
   MissingReferenceBinding(@identity.PatternNodeId)
+  /// A control provider outside the bus signal set (ADR-0019): an opaque
+  /// runtime pattern, or event selection inside the provider.
+  UnsupportedControl(@identity.PatternNodeId)
 } derive(Eq, Debug)
 
 ///|
 priv enum PatternDocNode[A] {
   Runtime(Pat[A])
-  /// PROTOTYPE: a continuous control as both its query form and its
-  /// allocation-free time function `(cycles) -> value` for one key.
+  /// A continuous control as both its query form and its allocation-free
+  /// time function `(cycles) -> value` for one key.
   Continuous(Pat[A], String, (Double) -> Double)
   Reference(PatternDoc[A], ReferenceBinding?)
   Silence
   Pure(A)
-  Atom(Pat[A], @identity.SourceAtomId, Double)
+  /// A pure value; the pattern carries its content signature. Without a
+  /// source atom it has no exact origin.
+  Atom(Pat[A], A, @identity.SourceAtomId?, Double)
   Fast(@identity.PatternNodeId, Rational)
   Slow(@identity.PatternNodeId, Rational)
   Gate(@identity.PatternNodeId, Rational)
@@ -27,7 +32,13 @@ priv enum PatternDocNode[A] {
   DegradeBy(@identity.PatternNodeId, Double, Int)
   Every(@identity.PatternNodeId, Int, TimeTransform)
   Jux(@identity.PatternNodeId, TimeTransform, (A, ControlMap) -> A)
-  MergeControl(@identity.PatternNodeId, @identity.PatternNodeId, (A, A) -> A)
+  /// The last function views the payload as controls, to derive buses.
+  MergeControl(
+    @identity.PatternNodeId,
+    @identity.PatternNodeId,
+    (A, A) -> A,
+    (A) -> ControlMap
+  )
   Sequence(Array[@identity.PatternNodeId])
   WeightedSequence(Array[@identity.PatternNodeId], Array[Int])
   Stack(Array[@identity.PatternNodeId])
@@ -58,7 +69,7 @@ fn[A] PatternDocNode::snapshot(self : PatternDocNode[A]) -> PatternDocNode[A] {
     Reference(definition, binding) => Reference(definition, binding)
     Silence => Silence
     Pure(value) => Pure(value)
-    Atom(pat, atom, pitch) => Atom(pat, atom, pitch)
+    Atom(pat, value, atom, pitch) => Atom(pat, value, atom, pitch)
     Fast(child, factor) => Fast(child, factor)
     Slow(child, factor) => Slow(child, factor)
     Gate(child, factor) => Gate(child, factor)
@@ -68,7 +79,8 @@ fn[A] PatternDocNode::snapshot(self : PatternDocNode[A]) -> PatternDocNode[A] {
     DegradeBy(child, p, seed) => DegradeBy(child, p, seed)
     Every(child, n, f) => Every(child, n, f)
     Jux(child, transform, merge) => Jux(child, transform, merge)
-    MergeControl(left, right, f) => MergeControl(left, right, f)
+    MergeControl(left, right, f, controls_of) =>
+      MergeControl(left, right, f, controls_of)
     Sequence(children) => Sequence(children.copy())
     WeightedSequence(children, weights) =>
       WeightedSequence(children.copy(), weights.copy())
@@ -217,7 +229,11 @@ fn[A] pattern_node_cache_token_memoized(
                   {},
                 ),
               )
-            Runtime(_) | Continuous(_, _, _) | Silence | Pure(_) | Atom(_, _, _) => ()
+            Runtime(_)
+            | Continuous(_, _, _)
+            | Silence
+            | Pure(_)
+            | Atom(_, _, _, _) => ()
             Fast(child, _)
             | Slow(child, _)
             | Gate(child, _)
@@ -231,7 +247,7 @@ fn[A] pattern_node_cache_token_memoized(
                 token,
                 pattern_node_cache_token_memoized(nodes, child, memo),
               )
-            MergeControl(left, right, _) => {
+            MergeControl(left, right, _, _) => {
               append_pattern_cache_token(
                 token,
                 pattern_node_cache_token_memoized(nodes, left, memo),
@@ -292,7 +308,11 @@ fn[A] copy_reachable_pattern_nodes(
       target[key] = entry.snapshot()
       match entry.node {
         Reference(_, _) => ()
-        Runtime(_) | Continuous(_, _, _) | Silence | Pure(_) | Atom(_, _, _) => ()
+        Runtime(_)
+        | Continuous(_, _, _)
+        | Silence
+        | Pure(_)
+        | Atom(_, _, _, _) => ()
         Fast(child, _)
         | Slow(child, _)
         | Gate(child, _)
@@ -303,7 +323,7 @@ fn[A] copy_reachable_pattern_nodes(
         | Every(child, _, _)
         | Jux(child, _, _) =>
           copy_reachable_pattern_nodes(source, child, target)
-        MergeControl(left, right, _) => {
+        MergeControl(left, right, _, _) => {
           copy_reachable_pattern_nodes(source, left, target)
           copy_reachable_pattern_nodes(source, right, target)
         }
@@ -333,7 +353,11 @@ fn[A] pattern_node_revision_memoized(
           match entry.node {
             Reference(definition, _) =>
               revision = revision.combine(definition.revision)
-            Runtime(_) | Continuous(_, _, _) | Silence | Pure(_) | Atom(_, _, _) => ()
+            Runtime(_)
+            | Continuous(_, _, _)
+            | Silence
+            | Pure(_)
+            | Atom(_, _, _, _) => ()
             Fast(child, _)
             | Slow(child, _)
             | Gate(child, _)
@@ -346,7 +370,7 @@ fn[A] pattern_node_revision_memoized(
               revision = revision.combine(
                 pattern_node_revision_memoized(nodes, child, memo),
               )
-            MergeControl(left, right, _) => {
+            MergeControl(left, right, _, _) => {
               revision = revision.combine(
                 pattern_node_revision_memoized(nodes, left, memo),
               )
@@ -465,14 +489,33 @@ fn PatternNodePath::prepend(
 pub struct PatternSnapshotEvent[A] {
   priv event : Event[A]
   priv path : PatternNodePath
+  priv buses : EventBuses
 }
 
 ///|
 fn[A] PatternSnapshotEvent::PatternSnapshotEvent(
   event~ : Event[A],
   path~ : PatternNodePath,
+  buses~ : EventBuses,
 ) -> PatternSnapshotEvent[A] {
-  { event, path, }
+  { event, path, buses, }
+}
+
+///|
+/// The control bus this event's `key` follows while it sounds, if any.
+pub fn[A] PatternSnapshotEvent::bus_for(
+  self : PatternSnapshotEvent[A],
+  key : String,
+) -> Int? {
+  bus_binding_for(self.buses.bindings, key)
+}
+
+///|
+/// The buses this event's controls follow while it sounds.
+pub fn[A] PatternSnapshotEvent::buses(
+  self : PatternSnapshotEvent[A],
+) -> EventBuses {
+  self.buses
 }
 
 ///|
@@ -703,6 +746,7 @@ priv struct ScopedValue[A, O] {
   mut source_frame : @identity.SourceFrameId?
   mut source_start : Double
   source_pitch : Double
+  bindings : FixedArray[(String, Int)]
 }
 
 ///|
@@ -713,8 +757,9 @@ fn[A, O] ScopedValue::ScopedValue(
   source_frame? : @identity.SourceFrameId? = None,
   source_start? : Double = -1.0,
   source_pitch? : Double = @double.not_a_number,
+  bindings? : FixedArray[(String, Int)] = no_bus_bindings,
 ) -> ScopedValue[A, O] {
-  { value, scope, origin, source_frame, source_start, source_pitch, }
+  { value, scope, origin, source_frame, source_start, source_pitch, bindings, }
 }
 
 ///|
@@ -722,6 +767,7 @@ fn[A, B, O] ScopedValue::remap(
   self : ScopedValue[A, O],
   value : B,
   scope : PatternNodePath,
+  bindings? : FixedArray[(String, Int)] = self.bindings,
 ) -> ScopedValue[B, O] {
   ScopedValue(
     value,
@@ -730,7 +776,19 @@ fn[A, B, O] ScopedValue::remap(
     source_frame=self.source_frame,
     source_start=self.source_start,
     source_pitch=self.source_pitch,
+    bindings~,
   )
+}
+
+///|
+fn[A, O] Pat::shift_buses(
+  self : Pat[ScopedValue[A, O]],
+  offset : Int,
+) -> Pat[ScopedValue[A, O]] {
+  self.map_payload(value => {
+    ..value,
+    bindings: shift_bus_bindings(value.bindings, offset),
+  })
 }
 
 ///|
@@ -783,10 +841,12 @@ fn[A, O] Pat::capture_source_frame(
 ///|
 fn[A, O] scoped_event(
   event : Event[ScopedValue[A, O]],
+  table : ControlBuses,
 ) -> PatternSnapshotEvent[A] {
   PatternSnapshotEvent(
     event={ whole: event.whole, part: event.part, value: event.value.value, },
     path=event.value.scope,
+    buses=EventBuses::in_snapshot(table, event.value.bindings),
   )
 }
 
@@ -803,11 +863,13 @@ pub struct EventWithOrigin[A] {
   priv source_frame : @identity.SourceFrameId?
   priv source_start : Double
   priv source_pitch : Double
+  priv buses : EventBuses
 }
 
 ///|
 fn[A] EventWithOrigin::EventWithOrigin(
   event : Event[ScopedValue[A, EventOrigin]],
+  table : ControlBuses,
 ) -> EventWithOrigin[A] {
   {
     event: { whole: event.whole, part: event.part, value: event.value.value, },
@@ -816,7 +878,23 @@ fn[A] EventWithOrigin::EventWithOrigin(
     source_frame: event.value.source_frame,
     source_start: event.value.source_start,
     source_pitch: event.value.source_pitch,
+    buses: EventBuses::in_snapshot(table, event.value.bindings),
   }
+}
+
+///|
+/// The control bus this event's `key` follows while it sounds, if any.
+pub fn[A] EventWithOrigin::bus_for(
+  self : EventWithOrigin[A],
+  key : String,
+) -> Int? {
+  bus_binding_for(self.buses.bindings, key)
+}
+
+///|
+/// The buses this event's controls follow while it sounds.
+pub fn[A] EventWithOrigin::buses(self : EventWithOrigin[A]) -> EventBuses {
+  self.buses
 }
 
 ///|
@@ -889,7 +967,11 @@ fn[A] append_reachable_pattern_source_ids(
             result,
             {},
           )
-        Runtime(_) | Continuous(_, _, _) | Silence | Pure(_) | Atom(_, _, _) => ()
+        Runtime(_)
+        | Continuous(_, _, _)
+        | Silence
+        | Pure(_)
+        | Atom(_, _, _, _) => ()
         Fast(child, _)
         | Slow(child, _)
         | Gate(child, _)
@@ -900,7 +982,7 @@ fn[A] append_reachable_pattern_source_ids(
         | Every(child, _, _)
         | Jux(child, _, _) =>
           append_reachable_pattern_source_ids(nodes, child, result, seen)
-        MergeControl(left, right, _) => {
+        MergeControl(left, right, _, _) => {
           append_reachable_pattern_source_ids(nodes, left, result, seen)
           append_reachable_pattern_source_ids(nodes, right, result, seen)
         }
@@ -944,17 +1026,65 @@ fn[A, O] CompiledEntry::CompiledEntry(
 
 ///|
 /// One execution kernel; raw events and scoped/origin views are projections.
+/// `buses` are in this subtree's local time; event bindings index into them.
 priv struct CompiledPattern[A, O] {
   pat : Pat[ScopedValue[A, O]]
   entries : Array[CompiledEntry[A, O]]
+  buses : Array[BusSignal]
 }
 
 ///|
 fn[A, O] CompiledPattern::CompiledPattern(
   pat : Pat[ScopedValue[A, O]],
   entries : Array[CompiledEntry[A, O]],
+  buses? : Array[BusSignal] = [],
 ) -> CompiledPattern[A, O] {
-  { pat, entries, }
+  { pat, entries, buses, }
+}
+
+///|
+/// Apply an enclosing node's time transform to every bus.
+fn[A, O] CompiledPattern::map_buses(
+  self : CompiledPattern[A, O],
+  f : (BusSignal) -> BusSignal,
+) -> CompiledPattern[A, O] {
+  { ..self, buses: self.buses.map(f), }
+}
+
+///|
+/// Renumber this child's bindings after `offset` earlier sibling buses.
+fn[A, O] CompiledPattern::shift_buses(
+  self : CompiledPattern[A, O],
+  offset : Int,
+) -> CompiledPattern[A, O] {
+  if offset == 0 || self.buses.is_empty() {
+    return self
+  }
+  CompiledPattern(
+    self.pat.shift_buses(offset),
+    self.entries.map(entry => {
+      CompiledEntry(entry.key, entry.source.shift_buses(offset))
+    }),
+    buses=self.buses,
+  )
+}
+
+///|
+/// Concatenate sibling buses; `wrap(index, signal)` applies the parent's
+/// time partition for that child. Returns children with renumbered bindings.
+fn[A, O] concat_child_buses(
+  children : Array[CompiledPattern[A, O]],
+  wrap : (Int, BusSignal) -> BusSignal,
+) -> (Array[CompiledPattern[A, O]], Array[BusSignal]) {
+  let buses : Array[BusSignal] = []
+  let shifted = children.mapi((index, child) => {
+    let offset = buses.length()
+    for signal in child.buses {
+      buses.push(wrap(index, signal))
+    }
+    child.shift_buses(offset)
+  })
+  (shifted, buses)
 }
 
 ///|
@@ -978,6 +1108,7 @@ fn[A, O] CompiledPattern::transform(
   CompiledPattern(
     f(self.pat),
     self.entries.map(entry => CompiledEntry(entry.key, f(entry.source))),
+    buses=self.buses,
   )
 }
 
@@ -1059,6 +1190,7 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
             prepend(target.entries[index].source),
           )
         }),
+        buses=target.buses,
       )
     }
     Runtime(pat) | Continuous(pat, _, _) => {
@@ -1076,8 +1208,8 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
         id,
       )
     }
-    Atom(pat, atom, pitch) => {
-      let origin : O = O::make_origin(id, Some(atom), context)
+    Atom(pat, _, atom, pitch) => {
+      let origin : O = O::make_origin(id, atom, context)
       let path = PatternNodePath(id)
       let source = pat.map_payload(value => {
         ScopedValue(value, path, origin, source_pitch=pitch)
@@ -1086,41 +1218,60 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
     }
     Fast(child, factor) => {
       let child = lower(child)
-      let result = child.transform(pat => prepend(pat.fast(factor)))
+      let result = child
+        .transform(pat => prepend(pat.fast(factor)))
+        .map_buses(signal => Fast(factor.num, factor.den, signal))
       if factor.num <= 0L {
-        CompiledPattern(result.pat, [])
+        CompiledPattern(result.pat, [], buses=result.buses)
       } else {
         result
       }
     }
     Slow(child, factor) => {
       let child = lower(child)
-      let result = child.transform(pat => prepend(pat.slow(factor)))
+      let result = child
+        .transform(pat => prepend(pat.slow(factor)))
+        .map_buses(signal => Fast(factor.den, factor.num, signal))
       if factor.num <= 0L {
-        CompiledPattern(result.pat, [])
+        CompiledPattern(result.pat, [], buses=result.buses)
       } else {
         result
       }
     }
     Gate(child, factor) =>
       lower(child).transform(pat => prepend(pat.gate(factor)))
-    Rev(child) => lower(child).transform(pat => prepend(pat.rev()))
+    Rev(child) =>
+      lower(child)
+      .transform(pat => prepend(pat.rev()))
+      .map_buses(signal => Rev(signal))
+    // A value the map replaces no longer follows its buses: a bus would
+    // undo the mapping.
     FilterMap(child, f) =>
       lower(child).transform(pat => {
         pat.filter_map_payload(
           value => {
             f(value.value).map(mapped => {
-              value.remap(mapped, value.scope.prepend(id))
+              let bindings = if physical_equal(mapped, value.value) {
+                value.bindings
+              } else {
+                no_bus_bindings
+              }
+              value.remap(mapped, value.scope.prepend(id), bindings~)
             })
           },
           "",
         )
       })
-    Euclid(child, k, n, rotation) =>
-      CompiledPattern::single_material(
-        prepend(lower(child).pat.euclid(k, n, rotation~)),
+    Euclid(child, k, n, rotation) => {
+      let child = lower(child)
+      let compiled = CompiledPattern::single_material(
+        prepend(child.pat.euclid(k, n, rotation~)),
         id,
       )
+      { ..compiled, buses: child.buses, }.map_buses(signal => {
+        euclid_slots(k, n, rotation, signal)
+      })
+    }
     DegradeBy(child, p, seed) =>
       lower(child).transform(pat => prepend(pat.degrade_by(p, seed~)))
     Every(child_id, n, transform) => {
@@ -1144,21 +1295,52 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
       } else {
         [CompiledEntry("\{id.value().length()}:\{id.value()}", pat)]
       }
-      CompiledPattern(pat, entries)
+      let buses = if n <= 0 {
+        child.buses
+      } else {
+        child.buses.map(signal => {
+          Every(Int64::from_int(n), signal, signal.transformed(transform))
+        })
+      }
+      CompiledPattern(pat, entries, buses~)
     }
+    // The transformed branch reads its own copy of each bus. The fixed pan
+    // overrides a pan bus.
     Jux(child_id, transform, merge) => {
       let child = lower(child_id)
       let scope = pattern_source_path_for_opaque_children(nodes, id, [child_id])
+      let offset = child.buses.length()
       let pat = jux_kernel(
         child.pat,
-        p => transform.apply(p),
-        (value, pan) => value.remap(merge(value.value, pan), value.scope),
+        p => {
+          transform.apply(if offset == 0 { p } else { p.shift_buses(offset) })
+        },
+        (value, pan) => {
+          value.remap(
+            merge(value.value, pan),
+            value.scope,
+            bindings=rebind_buses(value.bindings, pan, no_buses),
+          )
+        },
         "",
       ).map_payload(value => value.remap(value.value, scope))
-      CompiledPattern(pat, opaque_compiled_entries(pat, id))
+      let buses = child.buses.copy()
+      for signal in child.buses {
+        buses.push(signal.transformed(transform))
+      }
+      CompiledPattern(pat, opaque_compiled_entries(pat, id), buses~)
     }
-    MergeControl(left_id, right_id, merge) => {
+    // One new bus per key the provider sets, after the left side's buses.
+    MergeControl(left_id, right_id, merge, controls_of) => {
       let left = lower(left_id)
+      let keys = []
+      control_keys(nodes, right_id, controls_of, keys)
+      let buses = left.buses.copy()
+      let bus_of : Map[String, Int] = Map([])
+      for key in keys {
+        bus_of[key] = buses.length()
+        buses.push(compile_signal(nodes, right_id, key, controls_of))
+      }
       // Control providers need no primary source atom or reference binding.
       let right : CompiledPattern[A, Unit] = lower_pattern_node_cached(
         nodes,
@@ -1175,7 +1357,11 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
         left.pat,
         right.pat.map_payload(erase_value),
         (value, control) => {
-          value.remap(merge(value.value, control), value.scope)
+          value.remap(
+            merge(value.value, control),
+            value.scope,
+            bindings=rebind_buses(value.bindings, controls_of(control), bus_of),
+          )
         },
       ).map_payload(value => value.remap(value.value, scope))
       let entries = pat.entries()
@@ -1184,21 +1370,41 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
         Array::makei(entries.length(), index => {
           CompiledEntry(left.entries[index].key, entries[index])
         }),
+        buses~,
       )
     }
+    // A child's bus is silent outside that child's slot.
     Sequence(children) => {
-      let pats = children.map(child => lower(child).pat)
-      CompiledPattern::single_material(prepend(sequence(pats)), id)
+      let count = children.length()
+      let (children, buses) = concat_child_buses(children.map(lower), (
+        index,
+        signal,
+      ) => Sequence(slot_signals(count, index, signal)))
+      let pats = children.map(child => child.pat)
+      {
+        ..CompiledPattern::single_material(prepend(sequence(pats)), id),
+        buses,
+      }
     }
     WeightedSequence(children, weights) => {
-      let pats = children.map(child => lower(child).pat)
-      CompiledPattern::single_material(
+      let count = children.length()
+      let bounds = weight_bounds(weights)
+      let (children, buses) = concat_child_buses(children.map(lower), (
+        index,
+        signal,
+      ) => Weighted(slot_signals(count, index, signal), bounds))
+      let pats = children.map(child => child.pat)
+      let compiled = CompiledPattern::single_material(
         prepend(sequence_weighted(pats, weights)),
         id,
       )
+      { ..compiled, buses, }
     }
     Stack(children) => {
-      let children = children.map(lower)
+      let (children, buses) = concat_child_buses(children.map(lower), (
+        _,
+        signal,
+      ) => signal)
       let entries = children
         .iter()
         .flat_map(child => {
@@ -1207,7 +1413,11 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
           .map(entry => CompiledEntry(entry.key, prepend(entry.source)))
         })
         .collect()
-      CompiledPattern(prepend(stack(children.map(child => child.pat))), entries)
+      CompiledPattern(
+        prepend(stack(children.map(child => child.pat))),
+        entries,
+        buses~,
+      )
     }
   }
   if O::carries_origins() && entry.source_frame is Some(_) {
@@ -1430,6 +1640,7 @@ pub struct PatternSnapshot[A] {
   priv pat : Pat[A]
   priv sourced : Pat[ScopedValue[A, Unit]]
   priv entry_sourced : Array[CompiledEntry[A, Unit]]
+  priv buses : ControlBuses
 }
 
 ///|
@@ -1462,6 +1673,12 @@ pub fn[A] PatternSnapshot::pat(self : PatternSnapshot[A]) -> Pat[A] {
 }
 
 ///|
+/// The control buses that events' `bus_for` indexes, in root time.
+pub fn[A] PatternSnapshot::buses(self : PatternSnapshot[A]) -> ControlBuses {
+  self.buses
+}
+
+///|
 pub fn[A] PatternSnapshot::query(
   self : PatternSnapshot[A],
   arc : TimeSpan,
@@ -1474,7 +1691,7 @@ pub fn[A] PatternSnapshot::query_sourced_events(
   self : PatternSnapshot[A],
   arc : TimeSpan,
 ) -> Array[PatternSnapshotEvent[A]] {
-  self.sourced.query(arc).map(scoped_event)
+  self.sourced.query(arc).map(event => scoped_event(event, self.buses))
 }
 
 ///|
@@ -1487,7 +1704,8 @@ pub fn[A] PatternSnapshot::query_sourced_events_for_entry(
   arc : TimeSpan,
 ) -> Array[PatternSnapshotEvent[A]] {
   match self.entry_sourced.get(source_index) {
-    Some(entry) => entry.source.query(arc).map(scoped_event)
+    Some(entry) =>
+      entry.source.query(arc).map(event => scoped_event(event, self.buses))
     None => []
   }
 }
@@ -1500,6 +1718,7 @@ pub struct PatternSnapshotWithOrigins[A] {
   priv pat : Pat[A]
   priv sourced : Pat[ScopedValue[A, EventOrigin]]
   priv entry_sourced : Array[CompiledEntry[A, EventOrigin]]
+  priv buses : ControlBuses
 }
 
 ///|
@@ -1524,6 +1743,14 @@ pub fn[A] PatternSnapshotWithOrigins::pat(
 }
 
 ///|
+/// The control buses that events' `bus_for` indexes, in root time.
+pub fn[A] PatternSnapshotWithOrigins::buses(
+  self : PatternSnapshotWithOrigins[A],
+) -> ControlBuses {
+  self.buses
+}
+
+///|
 pub fn[A] PatternSnapshotWithOrigins::entry_key(
   self : PatternSnapshotWithOrigins[A],
   index : Int,
@@ -1536,7 +1763,7 @@ pub fn[A] PatternSnapshotWithOrigins::query(
   self : PatternSnapshotWithOrigins[A],
   arc : TimeSpan,
 ) -> Array[EventWithOrigin[A]] {
-  self.sourced.query(arc).map(event => EventWithOrigin(event))
+  self.sourced.query(arc).map(event => EventWithOrigin(event, self.buses))
 }
 
 ///|
@@ -1548,7 +1775,8 @@ pub fn[A] PatternSnapshotWithOrigins::query_for_entry(
 ) -> Array[EventWithOrigin[A]] {
   match self.entry_sourced.get(index) {
     None => []
-    Some(entry) => entry.source.query(arc).map(event => EventWithOrigin(event))
+    Some(entry) =>
+      entry.source.query(arc).map(event => EventWithOrigin(event, self.buses))
   }
 }
 
@@ -1565,6 +1793,7 @@ pub fn[A] PatternSnapshotWithOrigins::as_snapshot(
       source_frame=value.source_frame,
       source_start=value.source_start,
       source_pitch=value.source_pitch,
+      bindings=value.bindings,
     )
   }
   {
@@ -1575,6 +1804,7 @@ pub fn[A] PatternSnapshotWithOrigins::as_snapshot(
     entry_sourced: self.entry_sourced.map(entry => {
       CompiledEntry(entry.key, entry.source.map_payload(erase_origin))
     }),
+    buses: self.buses,
   }
 }
 
@@ -1597,6 +1827,7 @@ pub fn[A] PatternDoc::lower_with_origins(
     pat: compiled.pat.map_payload(erase_value),
     sourced: compiled.pat,
     entry_sourced: compiled.entries,
+    buses: { signals: compiled.buses, },
   }
 }
 
@@ -1612,16 +1843,17 @@ pub fn[A] PatternDoc::atom(
     revision=@identity.Revision::zero(),
     nodes=singleton_pattern_nodes(
       id,
-      Atom(Pat::pure(value), source_atom, @double.not_a_number),
+      Atom(Pat::pure(value), value, Some(source_atom), @double.not_a_number),
     ),
   )
 }
 
 ///|
 /// Use the canonical control constructor's signature; source IDs never enter it.
+/// Without `source_atom` the control has no exact origin.
 pub fn PatternDoc::control_atom(
   id~ : @identity.PatternNodeId,
-  source_atom~ : @identity.SourceAtomId,
+  source_atom? : @identity.SourceAtomId,
   key~ : String,
   value~ : Double,
 ) -> PatternDoc[ControlMap] {
@@ -1632,6 +1864,7 @@ pub fn PatternDoc::control_atom(
       id,
       Atom(
         control(key, value),
+        ControlMap::single(key, value),
         source_atom,
         if key == "note" {
           value
@@ -1705,8 +1938,8 @@ pub fn[A] PatternDoc::from_pattern(
 }
 
 ///|
-/// PROTOTYPE: a continuous control `key = f(cycles)`, sampled at each query
-/// arc's start when queried as a pattern.
+/// A continuous control `key = f(cycles)`, sampled at each query arc's start
+/// when queried as a pattern; its bus evaluates `f` at exact time.
 pub fn PatternDoc::continuous(
   id~ : @identity.PatternNodeId,
   key~ : String,
@@ -1841,6 +2074,7 @@ pub fn[A] PatternDoc::lower_with_cache(
     pat: compiled.pat.map_payload(erase_value),
     sourced: compiled.pat,
     entry_sourced: compiled.entries,
+    buses: { signals: compiled.buses, },
   }
 }
 
@@ -2067,7 +2301,7 @@ pub fn PatternDoc::merge_control(
   insert_pattern_node(
     nodes,
     id,
-    MergeControl(left.root, right.root, merge_maps),
+    MergeControl(left.root, right.root, merge_maps, controls => controls),
     revision~,
   )
   PatternDoc(root=id, revision~, nodes~)

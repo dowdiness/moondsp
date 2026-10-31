@@ -649,6 +649,15 @@ pub fn BoundVoicePool::apply_voice_controls_result(
 }
 
 ///|
+/// The graph parameter this pool's template binds `key` to, if any.
+pub fn BoundVoicePool::binding(
+  self : BoundVoicePool,
+  key : String,
+) -> @graph.ControlBinding? {
+  self.bindings.binding(key)
+}
+
+///|
 pub fn BoundVoicePool::voice_state(
   self : BoundVoicePool,
   handle : VoiceHandle,

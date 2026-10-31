@@ -170,6 +170,20 @@ pub fn ControlBindingMap::resolve_controls(
 }
 
 ///|
+/// The graph parameter `key` is bound to, if any.
+pub fn ControlBindingMap::target(
+  self : ControlBindingMap,
+  key : String,
+) -> (Int, @model.GraphParamSlot)? {
+  for binding in self.bindings {
+    if binding.key == key {
+      return Some((binding.node_index, binding.slot))
+    }
+  }
+  None
+}
+
+///|
 /// Read the default captured when these bindings were validated.
 pub fn ControlBindingMap::default_value(
   self : ControlBindingMap,

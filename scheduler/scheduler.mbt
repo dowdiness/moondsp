@@ -8,19 +8,19 @@ fn copy_control_events(
 ///|
 /// Decouples graph control key routing from the scheduler's event loop.
 ///
-/// `transform` maps a raw (key, value) pair to an optional (key, value) for the
-/// control binding map. Return `None` to drop an entry. Voice-frame keys
-/// (`gain`, `pan`, `room`) never reach it: the scheduler applies them to every
-/// voice, whatever its graph.
+/// `convert` turns a pattern value into the graph value for the same key, at
+/// note-on and for every bus update while the voice sounds, so it must not
+/// allocate. Voice-frame keys (`gain`, `pan`, `room`) never reach it: the
+/// scheduler applies them to every voice, whatever its graph.
 pub struct ControlMapper {
-  transform : (String, Double) -> (String, Double)?
+  convert : (String, Double) -> Double
 }
 
 ///|
 pub fn ControlMapper::ControlMapper(
-  transform~ : (String, Double) -> (String, Double)?,
+  convert~ : (String, Double) -> Double,
 ) -> ControlMapper {
-  { transform, }
+  { convert, }
 }
 
 ///|
@@ -29,13 +29,13 @@ pub fn ControlMapper::ControlMapper(
 /// - "attack" and "release" are converted from seconds to milliseconds
 /// - All other keys pass through unchanged
 pub fn default_control_mapper() -> ControlMapper {
-  ControlMapper(transform=fn(k, v) {
+  ControlMapper(convert=fn(k, v) {
     if k == "attack" || k == "release" {
-      Some((k, v * 1000.0))
+      v * 1000.0
     } else if k == "note" {
-      Some(("note", midi_to_hz(v)))
+      midi_to_hz(v)
     } else {
-      Some((k, v))
+      v
     }
   })
 }
@@ -87,6 +87,7 @@ pub struct PatternScheduler {
   priv mapper : ControlMapper
   priv playback_state : @playback.PlaybackState
   priv mut onsets : OnsetBuffer?
+  priv followers : BusFollowers
 }
 
 ///|
@@ -123,6 +124,7 @@ pub fn PatternScheduler::PatternScheduler(
     mapper: mapper.unwrap_or(default_control_mapper()),
     playback_state: @playback.PlaybackState(),
     onsets: None,
+    followers: BusFollowers(),
   }
 }
 
@@ -179,6 +181,7 @@ fn PatternScheduler::process_single_event(
   source_frame : @identity.SourceFrameId?,
   source_start : Double,
   source_pitch : Double,
+  buses : @pattern.EventBuses,
   onset_sample : Int64,
   arc : @pattern.TimeSpan,
 ) -> Unit {
@@ -210,11 +213,7 @@ fn PatternScheduler::process_single_event(
             "gain" => gain = Some(v)
             "pan" => pan = Some(v)
             "room" => send = Some(v)
-            _ =>
-              match (mapper.transform)(k, v) {
-                Some((tk, tv)) => map[tk] = tv
-                None => ()
-              }
+            _ => map[k] = (mapper.convert)(k, v)
           }
         })
         let gate = pool.note_gate(map)
@@ -269,6 +268,14 @@ fn PatternScheduler::process_single_event(
             if send is Some(send) {
               ignore(pool.set_voice_send_result(handle, send))
             }
+            self.followers.follow(
+              instrument,
+              handle,
+              origin,
+              buses,
+              pool,
+              event.value,
+            )
           }
         }
       }
@@ -286,7 +293,17 @@ fn PatternScheduler::process_events_with_origin(
     events.sort_by(fn(a, b) { @voice_runtime.compare_event_onset(a, b) })
   }
   for event in events {
-    self.process_single_event(event, origin, None, None, -1.0, -1.0, -1L, arc)
+    self.process_single_event(
+      event,
+      origin,
+      None,
+      None,
+      -1.0,
+      -1.0,
+      @pattern.EventBuses::none(),
+      -1L,
+      arc,
+    )
   }
 }
 
@@ -390,6 +407,13 @@ fn PatternScheduler::process_block_events(
     send_left.fill(0.0)
     send_right.fill(0.0)
   }
+  // Voices started earlier follow their buses from this block's start; a
+  // voice starting inside the block begins from its own onset value.
+  self.followers.update(
+    frame.logical_arc.begin,
+    self.pools,
+    self.mapper.convert,
+  )
   // Ceil may put a preceding block's final fractional onset at this block's
   // first sample. Retain that query result for one block; never query history.
   for sourced in self.previous_events {
@@ -404,6 +428,7 @@ fn PatternScheduler::process_block_events(
             sourced.source_frame(),
             sourced.source_start(),
             sourced.source_pitch(),
+            sourced.buses(),
             frame.sample_begin,
             @pattern.TimeSpan(whole.begin, whole.end_),
           )
@@ -443,6 +468,7 @@ fn PatternScheduler::process_block_events(
         sourced.source_frame(),
         sourced.source_start(),
         sourced.source_pitch(),
+        sourced.buses(),
         start,
         frame.logical_arc,
       )
