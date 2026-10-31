@@ -35,7 +35,7 @@ compiled DSP graph execution:
 
 | Category | Types | Key operations |
 |---|---|---|
-| **Voice Pools** | `VoicePool`, `BoundVoicePool` | `VoicePool::new`, `BoundVoicePool::new`, `BoundVoicePool::set_template`, `VoicePool::process`, `BoundVoicePool::process_with_send` |
+| **Voice Pools** | `VoicePool`, `BoundVoicePool` | `VoicePool(...)`, `BoundVoicePool(...)`, `BoundVoicePool::set_template`, `VoicePool::process`, `BoundVoicePool::process_with_send` |
 | **Note Lifecycle** | `VoiceHandle`, `VoiceState`, `NoteGate` | `VoicePool::note_on`, `BoundVoicePool::note_on_controls`, `BoundVoicePool::note_on_graph_controls`, `VoicePool::note_off_result`, `BoundVoicePool::kill_result`, `BoundVoicePool::note_gate` |
 | **Voice Control & Pan** | `BoundVoicePool`, `VoicePool` | `VoicePool::set_voice_pan_result`, `BoundVoicePool::set_voice_send_result`, `BoundVoicePool::apply_voice_control_result`, `BoundVoicePool::apply_voice_controls_result` |
 | **Inspection & Safety** | `BoundVoicePool`, `VoicePool` | `VoicePool::active_voice_count`, `VoicePool::voice_state`, `VoicePool::last_sanitized_count` |
@@ -62,7 +62,7 @@ test "start, render, and release a voice" {
     @graph.DspNode::envelope_gain(input=0, envelope=1, amount=0.25),
     @graph.DspNode::output(2),
   ])
-  let pool = @voice.VoicePool::new(template, context, max_voices=4).unwrap()
+  let pool = @voice.VoicePool(template, context, max_voices=4)
   let handle = pool.note_on([]).unwrap()
   let left = context.make_buffer()
   let right = context.make_buffer()
@@ -95,7 +95,7 @@ test "set oscillator frequency for one voice" {
     @graph.DspNode::oscillator(@dsp.Waveform::Triangle, 220.0),
     @graph.DspNode::output(0),
   ])
-  let pool = @voice.VoicePool::new(template, context, max_voices=2).unwrap()
+  let pool = @voice.VoicePool(template, context, max_voices=2)
   let handle = pool.note_on([
     @graph.GraphControl::set_param(0, @graph.GraphParamSlot::Value0, 440.0),
   ])
@@ -127,7 +127,7 @@ test "a stolen handle cannot control its replacement" {
     @graph.DspNode::constant(0.25),
     @graph.DspNode::output(0),
   ])
-  let pool = @voice.VoicePool::new(template, context, max_voices=1).unwrap()
+  let pool = @voice.VoicePool(template, context, max_voices=1)
   let stale = pool.note_on([]).unwrap()
   let current = pool.note_on([]).unwrap()
 
@@ -163,12 +163,12 @@ test "resolve a named control at note-on" {
     node_index=0,
     slot=@graph.GraphParamSlot::Value0,
   )
-  let pool = @voice.BoundVoicePool::new(
+  let pool = @voice.BoundVoicePool(
     template,
     context,
     bindings,
     max_voices=4,
-  ).unwrap()
+  )
   let handle = pool.note_on_controls({ "note": 330.0 })
 
   assert_true(handle is Some(_))
@@ -212,7 +212,7 @@ that the voice is finished.
 
 ## Real-time behavior
 
-`VoicePool::new` allocates every slot, mono scratch buffer, and initial compiled
+`VoicePool(...)` allocates every slot, mono scratch buffer, and initial compiled
 graph before playback. With an unchanged template, an idle slot resets and
 reuses its prepared graph.
 

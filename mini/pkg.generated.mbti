@@ -40,12 +40,12 @@ pub fn DraftEditError::to_repr(Self) -> @debug.Repr
 pub struct Draft {
   // private fields
 }
+pub fn Draft::Draft(String) -> Self raise DraftEditError
 pub fn Draft::dispose(Self) -> Unit
 pub fn Draft::edit(Self, EditTransaction) -> Result[DraftState, DraftEditError]
 pub fn Draft::locate_frame_fields(Self, Int64, Int64) -> SourceRange?
 pub fn Draft::locate_origin(Self, @pattern.EventOrigin) -> OriginLocation
 pub fn Draft::locate_origin_fields(Self, Int64, Int64, Array[Int64]) -> OriginLocation
-pub fn Draft::new(String) -> Self raise DraftEditError
 pub fn Draft::prepare_playback(Self) -> Result[PlaybackInput, DraftDiagnostic]
 pub fn Draft::reset(Self, String) -> Result[DraftState, DraftEditError]
 pub fn Draft::state(Self) -> DraftState

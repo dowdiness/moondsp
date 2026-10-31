@@ -218,7 +218,7 @@ test "rest probes share the projection event and expansion bounds" {
 
 ///|
 test "onset lookup keeps exact references but retires edited literal geometry" {
-  let draft = @mini.Draft::new("let motif = note(\"60\"); motif") catch {
+  let draft = @mini.Draft("let motif = note(\"60\"); motif") catch {
     _ => fail("expected draft")
   }
   guard draft.prepare_playback() is Ok(input) else {
@@ -310,7 +310,7 @@ test "negative pitch is distinct from an unpitched drum onset" {
       ("note(\"-1\")", Json::number(-1.0), 6.0),
       ("s(\"hh\")", Json::null(), 3.0),
     ] {
-    let draft = @mini.Draft::new(text)
+    let draft = @mini.Draft(text)
     guard draft.prepare_playback() is Ok(input) &&
       input.compile() is Ok(@mini.PreparedPlayback::Pattern(snapshot, _)) else {
       fail("expected exact playback: \{draft_state(draft)}")

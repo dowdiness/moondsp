@@ -79,7 +79,7 @@ fn projection_boundary_mini_draft_snapshot(
   old_end~ : Int,
   new_end~ : Int,
 ) -> @pattern.PatternSnapshot[@pattern.ControlMap] {
-  let draft = try! @mini.Draft::new(input)
+  let draft = try! @mini.Draft(input)
   projection_boundary_edit_draft(
     draft,
     edited,
@@ -537,7 +537,7 @@ fn projection_boundary_assert_recovery_matrix_row(
       }
     Ok(_) => abort("expected \{row.family} loom projection to fail")
   }
-  let draft = try! @mini.Draft::new(row.initial)
+  let draft = try! @mini.Draft(row.initial)
   match
     draft.edit(
       @mini.EditTransaction::EditTransaction(
@@ -637,7 +637,7 @@ fn projection_boundary_assert_semantic_recovery_matrix_row(
       }
     Ok(_) => abort("expected \{row.family} loom projection to fail")
   }
-  let draft = try! @mini.Draft::new(row.initial)
+  let draft = try! @mini.Draft(row.initial)
   projection_boundary_edit_draft(draft, row.malformed, row.malformed_edit)
   if draft.prepare_playback() is Ok(_) {
     abort("expected malformed mini draft")

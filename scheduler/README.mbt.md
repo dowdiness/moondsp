@@ -269,7 +269,7 @@ turn a rejected combination into a no-op.
 ///|
 test "edit orchestration stages a replacement and reconciles active voices" {
   let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
-  let pool = @moondsp.BoundVoicePool::new(
+  let pool = @moondsp.BoundVoicePool(
     @moondsp.AnalyzedGraph::analyze([
       @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 440.0),
       @moondsp.DspNode::adsr(
@@ -288,7 +288,7 @@ test "edit orchestration stages a replacement and reconciles active voices" {
       slot=@moondsp.GraphParamSlot::Value0,
     ),
     max_voices=4,
-  ).unwrap()
+  )
   let sched = try! @scheduler.PatternScheduler(
     bpm=120.0,
     ctx~,

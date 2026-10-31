@@ -55,19 +55,17 @@ fn bus_play_pool(ctx : @moondsp.DspContext) -> @moondsp.BoundVoicePool {
     @moondsp.DspNode::envelope_gain(input=1, envelope=2, amount=1.0),
     @moondsp.DspNode::output(3),
   ]
-  match
-    @moondsp.BoundVoicePool::new(
-      @moondsp.AnalyzedGraph::analyze(template),
-      ctx,
-      @moondsp.ControlBindingBuilder::new().bind(
-        key="lpf",
-        node_index=1,
-        slot=@moondsp.GraphParamSlot::Value0,
-      ),
-      max_voices=4,
-    ) {
-    Ok(pool) => pool
-    Err(_) => abort("pool")
+  @moondsp.BoundVoicePool(
+    @moondsp.AnalyzedGraph::analyze(template),
+    ctx,
+    @moondsp.ControlBindingBuilder::new().bind(
+      key="lpf",
+      node_index=1,
+      slot=@moondsp.GraphParamSlot::Value0,
+    ),
+    max_voices=4,
+  ) catch {
+    _ => abort("pool")
   }
 }
 

@@ -192,11 +192,11 @@ test "integration: resolved controls accepted by VoicePool::note_on" {
     @moondsp.DspNode::gain(0, 0.3),
     @moondsp.DspNode::output(1),
   ]
-  let pool = @moondsp.VoicePool::new(
+  let pool = @moondsp.VoicePool(
     @moondsp.AnalyzedGraph::analyze(template),
     ctx,
     max_voices=4,
-  ).unwrap()
+  )
   let bindings = @moondsp.ControlBindingBuilder::new()
     .bind(key="note", node_index=0, slot=@moondsp.GraphParamSlot::Value0)
     .bind(key="gain", node_index=1, slot=@moondsp.GraphParamSlot::Value0)

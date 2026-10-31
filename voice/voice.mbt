@@ -86,7 +86,7 @@ pub fn VoiceHandle::packed_generation(handle_id : Int64) -> Int {
 }
 
 ///|
-pub(all) enum BoundVoicePoolError {
+pub(all) suberror BoundVoicePoolError {
   InvalidMaxVoices
   OrphanAdsr
   CompileRejected
@@ -111,7 +111,7 @@ pub extend BoundVoicePoolError with Show::{to_string, output}
 /// Failure modes for VoicePool construction and template replacement.
 /// Mirrors BoundVoicePoolError minus the Binding(...) variant
 /// (VoicePool has no bindings).
-pub(all) enum VoicePoolError {
+pub(all) suberror VoicePoolError {
   InvalidMaxVoices
   OrphanAdsr
   CompileRejected
@@ -320,42 +320,38 @@ fn prepare_voice_template(
 /// Reject orphan envelopes before preparing independent runtime slots.
 /// The first compiled graph becomes slot zero rather than a discarded check.
 /// Each sounding voice retains its ADSR index snapshot across template changes.
-pub fn VoicePool::new(
+pub fn VoicePool::VoicePool(
   compiled_template : AnalyzedGraph,
   context : DspContext,
   max_voices? : Int = 32,
-) -> Result[VoicePool, VoicePoolError] {
+) -> VoicePool raise VoicePoolError {
   if max_voices <= 0 {
-    return Err(VoicePoolError::InvalidMaxVoices)
+    raise VoicePoolError::InvalidMaxVoices
   }
-  match prepare_voice_template(compiled_template, context) {
-    Err(error) => Err(error)
-    Ok(first_graph) => {
-      let block_size = context.block_size()
-      let slots = FixedArray::makei(max_voices, _ => VoiceSlot::new(block_size))
-      slots[0].compiled = Some(first_graph)
-      slots[0].template_generation = 0
-      for i in 1..<max_voices {
-        match Dsp::compile(compiled_template, context) {
-          Some(compiled) => {
-            slots[i].compiled = Some(compiled)
-            slots[i].template_generation = 0
-          }
-          None => return Err(VoicePoolError::CompileRejected)
-        }
+  let first_graph = prepare_voice_template(compiled_template, context).unwrap_or_error()
+  let block_size = context.block_size()
+  let slots = FixedArray::makei(max_voices, _ => VoiceSlot::new(block_size))
+  slots[0].compiled = Some(first_graph)
+  slots[0].template_generation = 0
+  for i in 1..<max_voices {
+    match Dsp::compile(compiled_template, context) {
+      Some(compiled) => {
+        slots[i].compiled = Some(compiled)
+        slots[i].template_generation = 0
       }
-      Ok({
-        slots,
-        adsr_authoring_indices: compiled_template.adsr_authoring_indices(),
-        compiled_template,
-        prepared_graph: None,
-        compile_context: context,
-        next_allocation_order: 0,
-        template_generation: 0,
-        max_voices,
-        last_sanitized_count: 0,
-      })
+      None => raise VoicePoolError::CompileRejected
     }
+  }
+  {
+    slots,
+    adsr_authoring_indices: compiled_template.adsr_authoring_indices(),
+    compiled_template,
+    prepared_graph: None,
+    compile_context: context,
+    next_allocation_order: 0,
+    template_generation: 0,
+    max_voices,
+    last_sanitized_count: 0,
   }
 }
 
@@ -404,19 +400,18 @@ pub struct BoundVoicePool {
 }
 
 ///|
-pub fn BoundVoicePool::new(
+pub fn BoundVoicePool::BoundVoicePool(
   compiled_template : AnalyzedGraph,
   context : DspContext,
   bindings : ControlBindingBuilder,
   max_voices? : Int = 32,
-) -> Result[BoundVoicePool, BoundVoicePoolError] {
-  let pool = match VoicePool::new(compiled_template, context, max_voices~) {
-    Ok(pool) => pool
-    Err(error) => return Err(BoundVoicePoolError::from_voice_pool(error))
+) -> BoundVoicePool raise BoundVoicePoolError {
+  let pool = VoicePool(compiled_template, context, max_voices~) catch {
+    error => raise BoundVoicePoolError::from_voice_pool(error)
   }
   match bindings.build(compiled_template) {
-    Ok(bindings) => Ok({ pool, bindings, })
-    Err(error) => Err(BoundVoicePoolError::Binding(error))
+    Ok(bindings) => { pool, bindings, }
+    Err(error) => raise BoundVoicePoolError::Binding(error)
   }
 }
 

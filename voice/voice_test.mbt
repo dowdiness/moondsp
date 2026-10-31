@@ -99,7 +99,9 @@ test "is_voice_finished returns false when delay tail is audible" {
 test "voice pool constructor accepts valid template" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
   let nodes = [DspNode::constant(440.0), DspNode::output(0)]
-  let pool = @voice.VoicePool::new(AnalyzedGraph::analyze(nodes), ctx)
+  let pool = Ok(@voice.VoicePool(AnalyzedGraph::analyze(nodes), ctx)) catch {
+    e => Err(e)
+  }
   assert_true(pool is Ok(_))
   assert_true(pool.unwrap().active_voice_count() == 0)
 }
@@ -108,7 +110,9 @@ test "voice pool constructor accepts valid template" {
 test "voice pool constructor rejects invalid template" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
   let nodes : Array[DspNode] = []
-  let pool = @voice.VoicePool::new(AnalyzedGraph::analyze(nodes), ctx)
+  let pool = Ok(@voice.VoicePool(AnalyzedGraph::analyze(nodes), ctx)) catch {
+    e => Err(e)
+  }
   assert_true(pool is Err(_))
 }
 
@@ -124,7 +128,9 @@ test "voice pool constructor rejects template with orphan ADSR" {
     DspNode::gain(0, 1.0),
     DspNode::output(2),
   ]
-  let pool = @voice.VoicePool::new(AnalyzedGraph::analyze(template), ctx)
+  let pool = Ok(@voice.VoicePool(AnalyzedGraph::analyze(template), ctx)) catch {
+    e => Err(e)
+  }
   assert_true(pool is Err(_))
 }
 
@@ -137,7 +143,9 @@ test "voice pool constructor accepts wired-ADSR template via envelope_gain" {
     DspNode::envelope_gain(input=0, envelope=1, amount=1.0),
     DspNode::output(2),
   ]
-  let pool = @voice.VoicePool::new(AnalyzedGraph::analyze(template), ctx)
+  let pool = Ok(@voice.VoicePool(AnalyzedGraph::analyze(template), ctx)) catch {
+    e => Err(e)
+  }
   assert_true(pool is Ok(_))
 }
 
@@ -150,7 +158,7 @@ test "set_template rejects template with orphan ADSR" {
     DspNode::envelope_gain(input=0, envelope=1, amount=1.0),
     DspNode::output(2),
   ]
-  let pool = @voice.VoicePool::new(AnalyzedGraph::analyze(wired_template), ctx).unwrap()
+  let pool = @voice.VoicePool(AnalyzedGraph::analyze(wired_template), ctx)
   let orphan_template = [
     DspNode::oscillator(Waveform::Sine, 440.0),
     DspNode::adsr(attack_ms=5.0, decay_ms=5.0, sustain=0.5, release_ms=50.0),
@@ -174,7 +182,7 @@ test "set_template rejection leaves previous template intact" {
     DspNode::envelope_gain(input=0, envelope=1, amount=1.0),
     DspNode::output(2),
   ]
-  let pool = @voice.VoicePool::new(AnalyzedGraph::analyze(wired_template), ctx).unwrap()
+  let pool = @voice.VoicePool(AnalyzedGraph::analyze(wired_template), ctx)
   let orphan_template = [
     DspNode::oscillator(Waveform::Sine, 440.0),
     DspNode::adsr(attack_ms=5.0, decay_ms=5.0, sustain=0.5, release_ms=50.0),
@@ -193,7 +201,7 @@ test "set_template rejection leaves previous template intact" {
 test "set_template accepts valid template" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
   let nodes = [DspNode::constant(440.0), DspNode::output(0)]
-  let pool = @voice.VoicePool::new(AnalyzedGraph::analyze(nodes), ctx).unwrap()
+  let pool = @voice.VoicePool(AnalyzedGraph::analyze(nodes), ctx)
   let new_nodes = [DspNode::constant(880.0), DspNode::output(0)]
   assert_true(pool.set_template(AnalyzedGraph::analyze(new_nodes)) is Ok(_))
 }
@@ -202,7 +210,7 @@ test "set_template accepts valid template" {
 test "set_template rejects invalid template" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
   let nodes = [DspNode::constant(440.0), DspNode::output(0)]
-  let pool = @voice.VoicePool::new(AnalyzedGraph::analyze(nodes), ctx).unwrap()
+  let pool = @voice.VoicePool(AnalyzedGraph::analyze(nodes), ctx)
   assert_true(pool.set_template(AnalyzedGraph::analyze([])) is Err(_))
 }
 
@@ -210,11 +218,15 @@ test "set_template rejects invalid template" {
 test "bound voice pool constructor accepts valid empty bindings" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
   let nodes = [DspNode::constant(440.0), DspNode::output(0)]
-  let pool = @voice.BoundVoicePool::new(
-    AnalyzedGraph::analyze(nodes),
-    ctx,
-    ControlBindingBuilder::new(),
-  )
+  let pool = Ok(
+    @voice.BoundVoicePool(
+      AnalyzedGraph::analyze(nodes),
+      ctx,
+      ControlBindingBuilder::new(),
+    ),
+  ) catch {
+    e => Err(e)
+  }
   assert_true(pool is Ok(_))
 }
 
@@ -222,15 +234,19 @@ test "bound voice pool constructor accepts valid empty bindings" {
 test "bound voice pool constructor reports invalid bindings" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
   let nodes = [DspNode::constant(440.0), DspNode::output(0)]
-  let result = @voice.BoundVoicePool::new(
-    AnalyzedGraph::analyze(nodes),
-    ctx,
-    ControlBindingBuilder::new().bind(
-      key="bad",
-      node_index=5,
-      slot=GraphParamSlot::Value0,
+  let result = Ok(
+    @voice.BoundVoicePool(
+      AnalyzedGraph::analyze(nodes),
+      ctx,
+      ControlBindingBuilder::new().bind(
+        key="bad",
+        node_index=5,
+        slot=GraphParamSlot::Value0,
+      ),
     ),
-  )
+  ) catch {
+    e => Err(e)
+  }
   match result {
     Err(
       @voice.BoundVoicePoolError::Binding(
@@ -246,7 +262,7 @@ test "bound voice pool set_template rejection leaves prior bindings active" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
   let nodes_a = [DspNode::oscillator(Waveform::Sine, 440.0), DspNode::output(0)]
   let nodes_b = [DspNode::noise(1U), DspNode::output(0)]
-  let pool = @voice.BoundVoicePool::new(
+  let pool = @voice.BoundVoicePool(
     AnalyzedGraph::analyze(nodes_a),
     ctx,
     ControlBindingBuilder::new().bind(
@@ -254,7 +270,7 @@ test "bound voice pool set_template rejection leaves prior bindings active" {
       node_index=0,
       slot=GraphParamSlot::Value0,
     ),
-  ).unwrap()
+  )
   let rejected = pool.set_template(
     AnalyzedGraph::analyze(nodes_b),
     ControlBindingBuilder::new().bind(
@@ -276,12 +292,12 @@ test "bound voice pool set_template rejection leaves prior bindings active" {
 test "bound voice live control updates one active voice" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]
-  let pool = @voice.BoundVoicePool::new(
+  let pool = @voice.BoundVoicePool(
     AnalyzedGraph::analyze(nodes),
     ctx,
     ControlBindingBuilder::new(),
     max_voices=4,
-  ).unwrap()
+  )
   let handle = pool.note_on_controls({}).unwrap()
   let before_left = AudioBuffer::filled(4)
   let before_right = AudioBuffer::filled(4)
@@ -305,12 +321,12 @@ test "bound voice live control updates one active voice" {
 test "bound voice live control rejects stale handles" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]
-  let pool = @voice.BoundVoicePool::new(
+  let pool = @voice.BoundVoicePool(
     AnalyzedGraph::analyze(nodes),
     ctx,
     ControlBindingBuilder::new(),
     max_voices=1,
-  ).unwrap()
+  )
   let stale = pool.note_on_controls({}).unwrap()
   let current = pool.note_on_controls({}).unwrap()
   match
@@ -329,12 +345,12 @@ test "bound voice live control rejects stale handles" {
 test "bound voice live control invalid batch leaves voice unchanged" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]
-  let pool = @voice.BoundVoicePool::new(
+  let pool = @voice.BoundVoicePool(
     AnalyzedGraph::analyze(nodes),
     ctx,
     ControlBindingBuilder::new(),
     max_voices=4,
-  ).unwrap()
+  )
   let handle = pool.note_on_controls({}).unwrap()
   let before_left = AudioBuffer::filled(4)
   let before_right = AudioBuffer::filled(4)
@@ -363,12 +379,12 @@ test "multi voice rejection preserves earlier targets and diagnostic order" {
     DspNode::constant(1.0),
     DspNode::output(0),
   ])
-  let pool = @voice.BoundVoicePool::new(
+  let pool = @voice.BoundVoicePool(
     template,
     ctx,
     ControlBindingBuilder::new(),
     max_voices=3,
-  ).unwrap()
+  )
   let first = pool.note_on_controls({}).unwrap()
   let stale = pool.note_on_controls({}).unwrap()
   pool.kill_result(stale).unwrap()
@@ -424,12 +440,12 @@ test "multi voice rejection preserves earlier targets and diagnostic order" {
 test "bound voice live control leaves future voice template unchanged" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]
-  let pool = @voice.BoundVoicePool::new(
+  let pool = @voice.BoundVoicePool(
     AnalyzedGraph::analyze(nodes),
     ctx,
     ControlBindingBuilder::new(),
     max_voices=4,
-  ).unwrap()
+  )
   let first = pool.note_on_controls({}).unwrap()
   let before_left = AudioBuffer::filled(4)
   let before_right = AudioBuffer::filled(4)
@@ -456,12 +472,12 @@ test "bound voice live control leaves future voice template unchanged" {
 test "bound voice graph-control note_on reuses template defaults" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]
-  let pool = @voice.BoundVoicePool::new(
+  let pool = @voice.BoundVoicePool(
     AnalyzedGraph::analyze(nodes),
     ctx,
     ControlBindingBuilder::new(),
     max_voices=1,
-  ).unwrap()
+  )
   let raised = pool
     .note_on_graph_controls([
       GraphControl::set_param(0, GraphParamSlot::Value0, 2.0),
@@ -484,12 +500,12 @@ test "bound voice graph-control note_on reuses template defaults" {
 test "bound voice graph-control invalid steal leaves active voice unchanged" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]
-  let pool = @voice.BoundVoicePool::new(
+  let pool = @voice.BoundVoicePool(
     AnalyzedGraph::analyze(nodes),
     ctx,
     ControlBindingBuilder::new(),
     max_voices=1,
-  ).unwrap()
+  )
   let current = pool
     .note_on_graph_controls([
       GraphControl::set_param(0, GraphParamSlot::Value0, 2.0),
@@ -515,12 +531,12 @@ test "bound voice graph-control invalid steal leaves active voice unchanged" {
 test "bound voice prevalidated params4 id sets params and rejects invalid steal" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]
-  let pool = @voice.BoundVoicePool::new(
+  let pool = @voice.BoundVoicePool(
     AnalyzedGraph::analyze(nodes),
     ctx,
     ControlBindingBuilder::new(),
     max_voices=1,
-  ).unwrap()
+  )
   let handle_id = pool.note_on_prevalidated_params4_id(
     0,
     GraphParamSlot::Value0,
@@ -573,11 +589,7 @@ test "bound voice prevalidated params4 id sets params and rejects invalid steal"
 test "note_on allocates a voice and returns valid handle" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
   let nodes = [DspNode::constant(440.0), DspNode::output(0)]
-  let pool = @voice.VoicePool::new(
-    AnalyzedGraph::analyze(nodes),
-    ctx,
-    max_voices=4,
-  ).unwrap()
+  let pool = @voice.VoicePool(AnalyzedGraph::analyze(nodes), ctx, max_voices=4)
   let handle = pool.note_on([])
   assert_true(handle is Some(_))
   assert_true(pool.active_voice_count() == 1)
@@ -587,11 +599,7 @@ test "note_on allocates a voice and returns valid handle" {
 test "note_on fills pool to capacity" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
   let nodes = [DspNode::constant(440.0), DspNode::output(0)]
-  let pool = @voice.VoicePool::new(
-    AnalyzedGraph::analyze(nodes),
-    ctx,
-    max_voices=4,
-  ).unwrap()
+  let pool = @voice.VoicePool(AnalyzedGraph::analyze(nodes), ctx, max_voices=4)
   for i = 0; i < 4; i = i + 1 {
     let h = pool.note_on([])
     assert_true(h is Some(_))
@@ -603,11 +611,7 @@ test "note_on fills pool to capacity" {
 test "note_on steals oldest active when pool is full" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
   let nodes = [DspNode::constant(440.0), DspNode::output(0)]
-  let pool = @voice.VoicePool::new(
-    AnalyzedGraph::analyze(nodes),
-    ctx,
-    max_voices=2,
-  ).unwrap()
+  let pool = @voice.VoicePool(AnalyzedGraph::analyze(nodes), ctx, max_voices=2)
   let h1 = pool.note_on([]).unwrap()
   ignore(pool.note_on([]))
   let h3 = pool.note_on([]).unwrap()
@@ -623,11 +627,7 @@ test "note_off transitions voice to Releasing" {
     DspNode::adsr(attack_ms=5.0, decay_ms=5.0, sustain=0.5, release_ms=50.0),
     DspNode::output(1),
   ]
-  let pool = @voice.VoicePool::new(
-    AnalyzedGraph::analyze(nodes),
-    ctx,
-    max_voices=4,
-  ).unwrap()
+  let pool = @voice.VoicePool(AnalyzedGraph::analyze(nodes), ctx, max_voices=4)
   let handle = pool.note_on([]).unwrap()
   assert_true(pool.voice_state(handle) is @voice.VoiceState::Active)
   assert_true(pool.note_off_result(handle) is Ok(_))
@@ -642,11 +642,7 @@ test "note_off_result transitions voice to Releasing" {
     DspNode::adsr(attack_ms=5.0, decay_ms=5.0, sustain=0.5, release_ms=50.0),
     DspNode::output(1),
   ]
-  let pool = @voice.VoicePool::new(
-    AnalyzedGraph::analyze(nodes),
-    ctx,
-    max_voices=4,
-  ).unwrap()
+  let pool = @voice.VoicePool(AnalyzedGraph::analyze(nodes), ctx, max_voices=4)
   let handle = pool.note_on([]).unwrap()
   assert_true(pool.voice_state(handle) is @voice.VoiceState::Active)
   assert_true(pool.note_off_result(handle) is Ok(_))
@@ -657,11 +653,7 @@ test "note_off_result transitions voice to Releasing" {
 test "stale handle note_off_result returns error" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
   let nodes = [DspNode::constant(440.0), DspNode::output(0)]
-  let pool = @voice.VoicePool::new(
-    AnalyzedGraph::analyze(nodes),
-    ctx,
-    max_voices=1,
-  ).unwrap()
+  let pool = @voice.VoicePool(AnalyzedGraph::analyze(nodes), ctx, max_voices=1)
   let h1 = pool.note_on([]).unwrap()
   ignore(pool.note_on([]))
   assert_true(pool.note_off_result(h1) is Err(_))
@@ -671,11 +663,7 @@ test "stale handle note_off_result returns error" {
 test "stale handle note_off_result reports invalid handle" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
   let nodes = [DspNode::constant(440.0), DspNode::output(0)]
-  let pool = @voice.VoicePool::new(
-    AnalyzedGraph::analyze(nodes),
-    ctx,
-    max_voices=1,
-  ).unwrap()
+  let pool = @voice.VoicePool(AnalyzedGraph::analyze(nodes), ctx, max_voices=1)
   let h1 = pool.note_on([]).unwrap()
   ignore(pool.note_on([]))
   assert_invalid_voice_handle(pool.note_off_result(h1), h1)
@@ -685,11 +673,7 @@ test "stale handle note_off_result reports invalid handle" {
 test "stale handle voice_state returns Idle" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
   let nodes = [DspNode::constant(440.0), DspNode::output(0)]
-  let pool = @voice.VoicePool::new(
-    AnalyzedGraph::analyze(nodes),
-    ctx,
-    max_voices=1,
-  ).unwrap()
+  let pool = @voice.VoicePool(AnalyzedGraph::analyze(nodes), ctx, max_voices=1)
   let h1 = pool.note_on([]).unwrap()
   ignore(pool.note_on([]))
   assert_true(pool.voice_state(h1) is @voice.VoiceState::Idle)
@@ -699,11 +683,7 @@ test "stale handle voice_state returns Idle" {
 test "stale handle set_voice_pan_result returns error" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
   let nodes = [DspNode::constant(440.0), DspNode::output(0)]
-  let pool = @voice.VoicePool::new(
-    AnalyzedGraph::analyze(nodes),
-    ctx,
-    max_voices=1,
-  ).unwrap()
+  let pool = @voice.VoicePool(AnalyzedGraph::analyze(nodes), ctx, max_voices=1)
   let h1 = pool.note_on([]).unwrap()
   ignore(pool.note_on([]))
   assert_true(pool.set_voice_pan_result(h1, 0.5) is Err(_))
@@ -713,11 +693,7 @@ test "stale handle set_voice_pan_result returns error" {
 test "stale handle set_voice_pan_result reports invalid handle" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
   let nodes = [DspNode::constant(440.0), DspNode::output(0)]
-  let pool = @voice.VoicePool::new(
-    AnalyzedGraph::analyze(nodes),
-    ctx,
-    max_voices=1,
-  ).unwrap()
+  let pool = @voice.VoicePool(AnalyzedGraph::analyze(nodes), ctx, max_voices=1)
   let h1 = pool.note_on([]).unwrap()
   ignore(pool.note_on([]))
   assert_invalid_voice_handle(pool.set_voice_pan_result(h1, 0.5), h1)
@@ -739,11 +715,7 @@ test "drum template sd: noise envelope decays to silence via envelope_gain" {
     DspNode::envelope_gain(input=1, envelope=2, amount=1.0),
     DspNode::output(3),
   ]
-  let pool = @voice.VoicePool::new(
-    AnalyzedGraph::analyze(nodes),
-    ctx,
-    max_voices=4,
-  ).unwrap()
+  let pool = @voice.VoicePool(AnalyzedGraph::analyze(nodes), ctx, max_voices=4)
   let handle = pool.note_on([]).unwrap()
   // First block: should have non-zero output (attack/decay phase)
   let left1 = AudioBuffer::filled(128)
@@ -772,11 +744,7 @@ test "drum template sd: noise envelope decays to silence via envelope_gain" {
 test "process produces stereo output from mono voices" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]
-  let pool = @voice.VoicePool::new(
-    AnalyzedGraph::analyze(nodes),
-    ctx,
-    max_voices=4,
-  ).unwrap()
+  let pool = @voice.VoicePool(AnalyzedGraph::analyze(nodes), ctx, max_voices=4)
   ignore(pool.note_on([]))
   let left = AudioBuffer::filled(4)
   let right = AudioBuffer::filled(4)
@@ -792,11 +760,7 @@ test "process produces stereo output from mono voices" {
 test "process pans hard left" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]
-  let pool = @voice.VoicePool::new(
-    AnalyzedGraph::analyze(nodes),
-    ctx,
-    max_voices=4,
-  ).unwrap()
+  let pool = @voice.VoicePool(AnalyzedGraph::analyze(nodes), ctx, max_voices=4)
   let handle = pool.note_on([]).unwrap()
   assert_true(pool.set_voice_pan_result(handle, -1.0) is Ok(_))
   let left = AudioBuffer::filled(4)
@@ -812,11 +776,7 @@ test "process pans hard left" {
 test "set_voice_pan_result pans hard right" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]
-  let pool = @voice.VoicePool::new(
-    AnalyzedGraph::analyze(nodes),
-    ctx,
-    max_voices=4,
-  ).unwrap()
+  let pool = @voice.VoicePool(AnalyzedGraph::analyze(nodes), ctx, max_voices=4)
   let handle = pool.note_on([]).unwrap()
   assert_true(pool.set_voice_pan_result(handle, 1.0) is Ok(_))
   let left = AudioBuffer::filled(4)
@@ -832,11 +792,7 @@ test "set_voice_pan_result pans hard right" {
 test "shared send follows post-pan voice output and resets per note" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]
-  let pool = @voice.VoicePool::new(
-    AnalyzedGraph::analyze(nodes),
-    ctx,
-    max_voices=1,
-  ).unwrap()
+  let pool = @voice.VoicePool(AnalyzedGraph::analyze(nodes), ctx, max_voices=1)
   let handle = pool.note_on([]).unwrap()
   assert_true(pool.set_voice_pan_result(handle, -1.0) is Ok(_))
   assert_true(pool.set_voice_send_result(handle, 0.5) is Ok(_))
@@ -864,11 +820,7 @@ test "shared send follows post-pan voice output and resets per note" {
 test "voice gain scales dry and send before pan; gain and pan reset per note" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]
-  let pool = @voice.VoicePool::new(
-    AnalyzedGraph::analyze(nodes),
-    ctx,
-    max_voices=1,
-  ).unwrap()
+  let pool = @voice.VoicePool(AnalyzedGraph::analyze(nodes), ctx, max_voices=1)
   let handle = pool.note_on([]).unwrap()
   assert_true(pool.set_voice_pan_result(handle, -1.0) is Ok(_))
   assert_true(pool.set_voice_send_result(handle, 0.5) is Ok(_))
@@ -905,11 +857,7 @@ test "process reclaims finished releasing voices" {
     DspNode::adsr(attack_ms=0.0, decay_ms=0.0, sustain=1.0, release_ms=0.0),
     DspNode::output(1),
   ]
-  let pool = @voice.VoicePool::new(
-    AnalyzedGraph::analyze(nodes),
-    ctx,
-    max_voices=4,
-  ).unwrap()
+  let pool = @voice.VoicePool(AnalyzedGraph::analyze(nodes), ctx, max_voices=4)
   let handle = pool.note_on([]).unwrap()
   let left = AudioBuffer::filled(8)
   let right = AudioBuffer::filled(8)
@@ -931,12 +879,12 @@ test "kill immediately idles an active voice" {
     DspNode::envelope_gain(input=0, envelope=1, amount=1.0),
     DspNode::output(2),
   ]
-  let pool = @voice.BoundVoicePool::new(
+  let pool = @voice.BoundVoicePool(
     AnalyzedGraph::analyze(nodes),
     ctx,
     ControlBindingBuilder::new(),
     max_voices=4,
-  ).unwrap()
+  )
   let handle = pool.note_on_controls({}).unwrap()
   assert_true(pool.active_voice_count() == 1)
   assert_true(pool.kill_result(handle) is Ok(_))
@@ -954,12 +902,12 @@ test "kill_result immediately idles an active voice" {
     DspNode::envelope_gain(input=0, envelope=1, amount=1.0),
     DspNode::output(2),
   ]
-  let pool = @voice.BoundVoicePool::new(
+  let pool = @voice.BoundVoicePool(
     AnalyzedGraph::analyze(nodes),
     ctx,
     ControlBindingBuilder::new(),
     max_voices=4,
-  ).unwrap()
+  )
   let handle = pool.note_on_controls({}).unwrap()
   assert_true(pool.active_voice_count() == 1)
   assert_true(pool.kill_result(handle) is Ok(_))
@@ -976,12 +924,12 @@ test "bound note_off_result transitions voice to Releasing" {
     DspNode::adsr(attack_ms=5.0, decay_ms=5.0, sustain=0.5, release_ms=50.0),
     DspNode::output(1),
   ]
-  let pool = @voice.BoundVoicePool::new(
+  let pool = @voice.BoundVoicePool(
     AnalyzedGraph::analyze(nodes),
     ctx,
     ControlBindingBuilder::new(),
     max_voices=4,
-  ).unwrap()
+  )
   let handle = pool.note_on_controls({}).unwrap()
   assert_true(pool.voice_state(handle) is @voice.VoiceState::Active)
   assert_true(pool.note_off_result(handle) is Ok(_))
@@ -992,12 +940,12 @@ test "bound note_off_result transitions voice to Releasing" {
 test "bound note_off_result reports stale handle" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
   let nodes = [DspNode::constant(440.0), DspNode::output(0)]
-  let pool = @voice.BoundVoicePool::new(
+  let pool = @voice.BoundVoicePool(
     AnalyzedGraph::analyze(nodes),
     ctx,
     ControlBindingBuilder::new(),
     max_voices=1,
-  ).unwrap()
+  )
   let stale = pool.note_on_controls({}).unwrap()
   let current = pool.note_on_controls({}).unwrap()
   assert_invalid_voice_handle(pool.note_off_result(stale), stale)
@@ -1009,12 +957,12 @@ test "bound note_off_result reports stale handle" {
 test "bound set_voice_pan_result pans hard left" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]
-  let pool = @voice.BoundVoicePool::new(
+  let pool = @voice.BoundVoicePool(
     AnalyzedGraph::analyze(nodes),
     ctx,
     ControlBindingBuilder::new(),
     max_voices=4,
-  ).unwrap()
+  )
   let handle = pool.note_on_controls({}).unwrap()
   assert_true(pool.set_voice_pan_result(handle, -1.0) is Ok(_))
   let left = AudioBuffer::filled(4)
@@ -1030,12 +978,12 @@ test "bound set_voice_pan_result pans hard left" {
 test "bound set_voice_pan_result reports stale handle" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=16)
   let nodes = [DspNode::constant(440.0), DspNode::output(0)]
-  let pool = @voice.BoundVoicePool::new(
+  let pool = @voice.BoundVoicePool(
     AnalyzedGraph::analyze(nodes),
     ctx,
     ControlBindingBuilder::new(),
     max_voices=1,
-  ).unwrap()
+  )
   let stale = pool.note_on_controls({}).unwrap()
   ignore(pool.note_on_controls({}))
   assert_invalid_voice_handle(pool.set_voice_pan_result(stale, 0.5), stale)
@@ -1046,11 +994,7 @@ test "bound set_voice_pan_result reports stale handle" {
 test "process mixes multiple voices" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]
-  let pool = @voice.VoicePool::new(
-    AnalyzedGraph::analyze(nodes),
-    ctx,
-    max_voices=4,
-  ).unwrap()
+  let pool = @voice.VoicePool(AnalyzedGraph::analyze(nodes), ctx, max_voices=4)
   ignore(pool.note_on([]))
   ignore(pool.note_on([]))
   let left = AudioBuffer::filled(4)
@@ -1058,11 +1002,7 @@ test "process mixes multiple voices" {
   pool.process(ctx, left, right)
   let one_voice_left = AudioBuffer::filled(4)
   let one_voice_right = AudioBuffer::filled(4)
-  let pool2 = @voice.VoicePool::new(
-    AnalyzedGraph::analyze(nodes),
-    ctx,
-    max_voices=4,
-  ).unwrap()
+  let pool2 = @voice.VoicePool(AnalyzedGraph::analyze(nodes), ctx, max_voices=4)
   ignore(pool2.note_on([]))
   pool2.process(ctx, one_voice_left, one_voice_right)
   for i = 0; i < 4; i = i + 1 {
@@ -1075,11 +1015,11 @@ test "new voices use updated template after set_template" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes_a = [DspNode::constant(1.0), DspNode::output(0)]
   let nodes_b = [DspNode::constant(2.0), DspNode::output(0)]
-  let pool = @voice.VoicePool::new(
+  let pool = @voice.VoicePool(
     AnalyzedGraph::analyze(nodes_a),
     ctx,
     max_voices=4,
-  ).unwrap()
+  )
   let _h1 = pool.note_on([]).unwrap()
   let left1 = AudioBuffer::filled(4)
   let right1 = AudioBuffer::filled(4)
@@ -1104,7 +1044,7 @@ test "rejected note after template replacement preserves old voice and prepared 
     DspNode::constant(0.75),
     DspNode::output(0),
   ])
-  let pool = @voice.VoicePool::new(original, ctx, max_voices=1).unwrap()
+  let pool = @voice.VoicePool(original, ctx, max_voices=1)
   let old_handle = pool.note_on([]).unwrap()
   let left = ctx.make_buffer()
   let right = ctx.make_buffer()
@@ -1142,11 +1082,7 @@ test "stealing prefers releasing over active" {
     DspNode::adsr(attack_ms=5.0, decay_ms=5.0, sustain=0.5, release_ms=100.0),
     DspNode::output(1),
   ]
-  let pool = @voice.VoicePool::new(
-    AnalyzedGraph::analyze(nodes),
-    ctx,
-    max_voices=2,
-  ).unwrap()
+  let pool = @voice.VoicePool(AnalyzedGraph::analyze(nodes), ctx, max_voices=2)
   let h1 = pool.note_on([]).unwrap()
   let h2 = pool.note_on([]).unwrap()
   let left = AudioBuffer::filled(16)
@@ -1163,11 +1099,7 @@ test "stealing prefers releasing over active" {
 test "VoicePool process sanitizes final mixdown output" {
   let ctx = DspContext::new(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]
-  let pool = @voice.VoicePool::new(
-    AnalyzedGraph::analyze(nodes),
-    ctx,
-    max_voices=2,
-  ).unwrap()
+  let pool = @voice.VoicePool(AnalyzedGraph::analyze(nodes), ctx, max_voices=2)
   ignore(pool.note_on([]))
   let left = AudioBuffer::filled(4)
   let right = AudioBuffer::filled(4)
@@ -1180,22 +1112,23 @@ test "VoicePool process sanitizes final mixdown output" {
 
 ///|
 /// B7: VoicePoolError::InvalidMaxVoices fires under max_voices <= 0.
-test "B7: VoicePool::new with max_voices=0 returns InvalidMaxVoices" {
+test "B7: VoicePool constructor with max_voices=0 raises InvalidMaxVoices" {
   let nodes : Array[DspNode] = [
     DspNode::oscillator(Waveform::Sine, 440.0),
     DspNode::output(0),
   ]
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
   let template = AnalyzedGraph::analyze(nodes)
-  match @voice.VoicePool::new(template, ctx, max_voices=0) {
-    Err(e) => @debug.assert_eq(e, @voice.VoicePoolError::InvalidMaxVoices)
-    Ok(_) => fail("expected Err(InvalidMaxVoices), got Ok")
+  try @voice.VoicePool(template, ctx, max_voices=0) catch {
+    e => @debug.assert_eq(e, @voice.VoicePoolError::InvalidMaxVoices)
+  } noraise {
+    _ => fail("expected Err(InvalidMaxVoices), got Ok")
   }
 }
 
 ///|
 /// B7: VoicePoolError::OrphanAdsr fires for dead-code ADSR.
-test "B7: VoicePool::new with orphan ADSR returns OrphanAdsr" {
+test "B7: VoicePool constructor with orphan ADSR raises OrphanAdsr" {
   let nodes : Array[DspNode] = [
     DspNode::oscillator(Waveform::Sine, 440.0),
     DspNode::adsr(attack_ms=10.0, decay_ms=50.0, sustain=0.5, release_ms=100.0),
@@ -1203,21 +1136,23 @@ test "B7: VoicePool::new with orphan ADSR returns OrphanAdsr" {
   ]
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
   let template = AnalyzedGraph::analyze(nodes)
-  match @voice.VoicePool::new(template, ctx, max_voices=4) {
-    Err(e) => @debug.assert_eq(e, @voice.VoicePoolError::OrphanAdsr)
-    Ok(_) => fail("expected Err(OrphanAdsr), got Ok")
+  try @voice.VoicePool(template, ctx, max_voices=4) catch {
+    e => @debug.assert_eq(e, @voice.VoicePoolError::OrphanAdsr)
+  } noraise {
+    _ => fail("expected Err(OrphanAdsr), got Ok")
   }
 }
 
 ///|
 /// B7: VoicePoolError::CompileRejected fires for missing Output.
-test "B7: VoicePool::new with missing Output returns CompileRejected" {
+test "B7: VoicePool constructor with missing Output raises CompileRejected" {
   let nodes : Array[DspNode] = [DspNode::oscillator(Waveform::Sine, 440.0)]
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
   let template = AnalyzedGraph::analyze(nodes)
-  match @voice.VoicePool::new(template, ctx, max_voices=4) {
-    Err(e) => @debug.assert_eq(e, @voice.VoicePoolError::CompileRejected)
-    Ok(_) => fail("expected Err(CompileRejected), got Ok")
+  try @voice.VoicePool(template, ctx, max_voices=4) catch {
+    e => @debug.assert_eq(e, @voice.VoicePoolError::CompileRejected)
+  } noraise {
+    _ => fail("expected Err(CompileRejected), got Ok")
   }
 }
 
@@ -1235,7 +1170,7 @@ test "per-note envelope controls preserve older voices and reset on reuse" {
     .bind(key="decay", node_index=1, slot=GraphParamSlot::Value1)
     .bind(key="sustain", node_index=1, slot=GraphParamSlot::Value2)
     .bind(key="release", node_index=1, slot=GraphParamSlot::Value3)
-  let pool = @voice.BoundVoicePool::new(template, ctx, bindings, max_voices=2).unwrap()
+  let pool = @voice.BoundVoicePool(template, ctx, bindings, max_voices=2)
   let left = ctx.make_buffer()
   let right = ctx.make_buffer()
   fn render_second() -> Unit {
@@ -1287,7 +1222,7 @@ test "instrument gate follows template changes without mutating note controls" {
     .bind(key="release", node_index=1, slot=GraphParamSlot::Value3)
   }
   let ctx = DspContext::new(sample_rate=128.0, block_size=128)
-  let pool = @voice.BoundVoicePool::new(template(1000.0), ctx, bindings()).unwrap()
+  let pool = @voice.BoundVoicePool(template(1000.0), ctx, bindings())
   let controls : Map[String, Double] = { "hold": 2.0 }
   assert_eq(pool.note_gate(controls), @voice.NoteGate::AfterSeconds(3.0))
   assert_true(pool.note_on_controls(controls) is Some(_))

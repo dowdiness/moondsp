@@ -48,13 +48,13 @@ fn bench_binding_builder() -> @moondsp.ControlBindingBuilder {
 fn bench_pool(
   template : Array[@moondsp.DspNode],
   ctx : @moondsp.DspContext,
-) -> @moondsp.BoundVoicePool {
-  @moondsp.BoundVoicePool::new(
+) -> @moondsp.BoundVoicePool raise {
+  @moondsp.BoundVoicePool(
     @moondsp.AnalyzedGraph::analyze(template),
     ctx,
     bench_binding_builder(),
     max_voices=16,
-  ).unwrap()
+  )
 }
 
 ///|

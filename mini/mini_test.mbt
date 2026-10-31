@@ -668,7 +668,7 @@ fn edit_draft(
 
 ///|
 test "Draft same-text replacement is causal and frozen input is immutable" {
-  let draft = @mini.Draft::new("note(\"60 60\")")
+  let draft = @mini.Draft("note(\"60 60\")")
   let version = draft.state().version()
   guard draft.prepare_playback() is Ok(input) else {
     fail("expected prepared input")
@@ -689,7 +689,7 @@ test "Draft same-text replacement is causal and frozen input is immutable" {
 
 ///|
 test "Draft preparation preserves weighted timing and note source origin" {
-  let draft = @mini.Draft::new("note(\"C4@2 Eb4 F4\")")
+  let draft = @mini.Draft("note(\"C4@2 Eb4 F4\")")
   let events = draft_snapshot(draft).query(draft_arc())
   assert_eq(events.length(), 3)
   assert_eq(
@@ -719,7 +719,7 @@ test "Draft preparation preserves weighted timing and note source origin" {
 
 ///|
 test "Draft lowers explicit chord voices with one brace-token origin" {
-  let draft = @mini.Draft::new("chord(\"{60,63,68}@2\")")
+  let draft = @mini.Draft("chord(\"{60,63,68}@2\")")
   let events = draft_snapshot(draft).query(draft_arc())
   assert_eq(events.length(), 3)
   assert_eq(events[0].origin(), events[1].origin())
@@ -735,7 +735,7 @@ test "Draft lowers explicit chord voices with one brace-token origin" {
 
 ///|
 test "Draft prepared playback keeps weighted rests silent and in time" {
-  let draft = @mini.Draft::new("note(\"C4@2 ~@2 Eb4\")")
+  let draft = @mini.Draft("note(\"C4@2 ~@2 Eb4\")")
   let events = draft_snapshot(draft).query(draft_arc())
   assert_eq(events.length(), 2)
   assert_eq(
@@ -766,7 +766,7 @@ test "Draft prepared playback keeps weighted rests silent and in time" {
 
 ///|
 test "Draft separate inverse edits do not resurrect an atom" {
-  let draft = @mini.Draft::new("note(\"60 62\")")
+  let draft = @mini.Draft("note(\"60 62\")")
   let old = draft_snapshot(draft).query(draft_arc())
   edit_draft(draft, 7, 7, "1")
   edit_draft(draft, 7, 8, "")
@@ -778,7 +778,7 @@ test "Draft separate inverse edits do not resurrect an atom" {
 
 ///|
 test "Draft multi-range transaction preserves the untouched middle atom" {
-  let draft = @mini.Draft::new("note(\"60 62 64\")")
+  let draft = @mini.Draft("note(\"60 62 64\")")
   let old = draft_snapshot(draft).query(draft_arc())
   let edits = [
     @mini.TextEdit::TextEdit(from=6, to=8, inserted="67"),
@@ -810,7 +810,7 @@ test "Draft duplicate insertion uses lexical extents for every atom reader" {
       ("chord(\"Cø7 Cø7\")", 11, "Cø7 ", 4),
     ] {
     let (text, position, inserted, tones) = sample
-    let draft = @mini.Draft::new(text)
+    let draft = @mini.Draft(text)
     let old = draft_snapshot(draft).query(draft_arc())
     edit_draft(draft, position, position, inserted)
     let fresh = draft_snapshot(draft).query(draft_arc())
@@ -829,7 +829,7 @@ test "Draft duplicate insertion uses lexical extents for every atom reader" {
 
 ///|
 test "Draft endpoint whitespace preserves while lexical merge and split retire" {
-  let draft = @mini.Draft::new("note(\"C4 E4\")")
+  let draft = @mini.Draft("note(\"C4 E4\")")
   let old = draft_snapshot(draft).query(draft_arc())
   edit_draft(draft, 8, 8, " ")
   assert_eq(
@@ -850,7 +850,7 @@ test "Draft endpoint whitespace preserves while lexical merge and split retire" 
 
 ///|
 test "Draft changing literal role retires an untouched spelling" {
-  let draft = @mini.Draft::new("note(\"E4\")")
+  let draft = @mini.Draft("note(\"E4\")")
   let old = draft_snapshot(draft).query(draft_arc())[0].origin()
   edit_draft(draft, 0, 4, "s")
   assert_true(draft.locate_origin(old) is Unavailable(AtomRetired))
@@ -860,7 +860,7 @@ test "Draft changing literal role retires an untouched spelling" {
 
 ///|
 test "Draft missing outer delimiter retains live atoms but not deleted generations" {
-  let draft = @mini.Draft::new("note(\"c3 e3\")")
+  let draft = @mini.Draft("note(\"c3 e3\")")
   let old = draft_snapshot(draft).query(draft_arc())
   edit_draft(draft, 12, 13, "")
   guard draft.prepare_playback() is Err(diagnostic) else {
@@ -881,7 +881,7 @@ test "Draft missing outer delimiter retains live atoms but not deleted generatio
 test "Draft semicolon recovery preserves references across another invalid body" {
   let prefix = "let tone = note(\"60\"); "
   let middle = "let broken = stack(s(\"bd\")); "
-  let draft = @mini.Draft::new(prefix + middle + "tone")
+  let draft = @mini.Draft(prefix + middle + "tone")
   let origin = draft_snapshot(draft).query(draft_arc())[0].origin()
   let close = prefix.length() + middle.length() - 3
   edit_draft(draft, close, close + 1, "")
@@ -894,7 +894,7 @@ test "Draft semicolon recovery preserves references across another invalid body"
 ///|
 test "Draft opaque suffix keeps an independent prefix without guessing reference edges" {
   let prefix = "let tone = note(\"60\"); stack(tone,"
-  let draft = @mini.Draft::new(prefix + "tone)")
+  let draft = @mini.Draft(prefix + "tone)")
   let old = draft_snapshot(draft).query(draft_arc())
   edit_draft(draft, prefix.length(), prefix.length(), "/*")
   assert_true(draft.prepare_playback() is Err(_))
@@ -912,7 +912,7 @@ test "Draft opaque suffix keeps an independent prefix without guessing reference
 test "Draft duplicate target and undo end a binding even when endpoints survive" {
   let prefix = "let tone = note(\"60\"); "
   let duplicate = "let tone = note(\"62\"); "
-  let draft = @mini.Draft::new(prefix + "tone")
+  let draft = @mini.Draft(prefix + "tone")
   let old = draft_snapshot(draft).query(draft_arc())[0].origin()
   edit_draft(draft, prefix.length(), prefix.length(), duplicate)
   assert_true(draft.prepare_playback() is Err(_))
@@ -929,7 +929,7 @@ test "Draft duplicate target and undo end a binding even when endpoints survive"
 ///|
 test "Draft missing terminators cannot hide declarations and revive bindings" {
   for prefix in ["let tone = note(\"60\")", "let tone = note(\"60\"); bpm(120)"] {
-    let draft = @mini.Draft::new(prefix + "; tone")
+    let draft = @mini.Draft(prefix + "; tone")
     let old = draft_snapshot(draft).query(draft_arc())[0].origin()
     let hidden = " let tone = note(\"62\");"
     edit_draft(draft, prefix.length(), prefix.length() + 1, hidden)
@@ -953,7 +953,7 @@ test "Draft declaration certainty respects lexical boundaries" {
       "s(\"let tone = x;\")", "s(\"bd\") /* let tone = x; */", "s(\"bd\") // let tone = x;\n",
       "palette", "tone. /* member name, not a declaration */ let()",
     ] {
-    let draft = @mini.Draft::new(prefix + "tone")
+    let draft = @mini.Draft(prefix + "tone")
     let old = draft_snapshot(draft).query(draft_arc())[0].origin()
     edit_draft(
       draft,
@@ -968,7 +968,7 @@ test "Draft declaration certainty respects lexical boundaries" {
 ///|
 test "Draft decimal dots cannot conceal ambiguous declarations" {
   let prefix = "let tone = note(\"60\"); "
-  let draft = @mini.Draft::new(prefix + "tone")
+  let draft = @mini.Draft(prefix + "tone")
   let old = draft_snapshot(draft).query(draft_arc())[0].origin()
   edit_draft(
     draft,
@@ -982,7 +982,7 @@ test "Draft decimal dots cannot conceal ambiguous declarations" {
 
 ///|
 test "Draft undefined target and restoration never revive an old binding" {
-  let draft = @mini.Draft::new("let tone = note(\"60\"); tone")
+  let draft = @mini.Draft("let tone = note(\"60\"); tone")
   let old = draft_snapshot(draft).query(draft_arc())[0].origin()
   edit_draft(draft, 4, 8, "other")
   assert_true(draft.locate_origin(old) is Unavailable(BrokenReference))
@@ -998,7 +998,7 @@ test "Draft undefined target and restoration never revive an old binding" {
 ///|
 test "Draft nested uses share primary atoms but locate every outer-to-inner reference" {
   let prefix = "let tone = note(\"60\"); let group = tone; "
-  let draft = @mini.Draft::new(prefix + "stack(group,group)")
+  let draft = @mini.Draft(prefix + "stack(group,group)")
   let events = draft_snapshot(draft).query(draft_arc())
   assert_eq(events[0].origin().atom(), events[1].origin().atom())
   assert_true(
@@ -1023,7 +1023,7 @@ test "Draft nested uses share primary atoms but locate every outer-to-inner refe
 ///|
 test "Draft control changes preserve live source paths including zero gain" {
   let prefix = "let tone = note(\"60\").gain("
-  let draft = @mini.Draft::new(prefix + "1); tone")
+  let draft = @mini.Draft(prefix + "1); tone")
   let old = draft_snapshot(draft).query(draft_arc())[0].origin()
   edit_draft(draft, prefix.length(), prefix.length() + 1, "0")
   let event = draft_snapshot(draft).query(draft_arc())[0]
@@ -1039,7 +1039,7 @@ test "Draft exact lowering preserves music material and graph scopes" {
       "s(\"bd(3,8) sd*2 hh/2?\").degradeBy(0.3).lpf(800).pan(0.2)", "/* 𝄞 */ let tone = note(\"C-1 F#3\"); bpm(120); let group = tone; stack(group,group.rev())",
       "let tone = note(\"60\");\n$: tone\n$: chord(\"C\")", "silence() + s(\"~ bd\")",
     ] {
-    let draft = @mini.Draft::new(text)
+    let draft = @mini.Draft(text)
     let exact = draft_snapshot(draft)
     guard @mini.parse_play_source(text) is Ok(source) else {
       fail("general parse failed")
@@ -1079,7 +1079,7 @@ test "Draft exact lowering preserves music material and graph scopes" {
 
 ///|
 test "Draft invalid transactions are atomic including UTF-16 boundaries" {
-  let draft = @mini.Draft::new("// 𝄞\nnote(\"60\")")
+  let draft = @mini.Draft("// 𝄞\nnote(\"60\")")
   let before = draft.state()
   let origin = draft_snapshot(draft).query(draft_arc())[0].origin()
   let edits = [
@@ -1117,7 +1117,7 @@ test "Draft invalid transactions are atomic including UTF-16 boundaries" {
 
 ///|
 test "Draft tracking limit and reset each establish fresh source epochs" {
-  let draft = @mini.Draft::new("note(\"60\")")
+  let draft = @mini.Draft("note(\"60\")")
   let old = draft_snapshot(draft).query(draft_arc())[0].origin()
   let padding = " ".repeat(8192)
   edit_draft(draft, 0, 0, padding)
@@ -1133,7 +1133,7 @@ test "Draft tracking limit and reset each establish fresh source epochs" {
 
 ///|
 test "Draft disposal does not invalidate a separately frozen playback input" {
-  let draft = @mini.Draft::new("note(\"60\")")
+  let draft = @mini.Draft("note(\"60\")")
   guard draft.prepare_playback() is Ok(input) else { fail("expected input") }
   let origin = draft_snapshot(draft).query(draft_arc())[0].origin()
   draft.dispose()
@@ -1154,7 +1154,7 @@ test "Draft disposal does not invalidate a separately frozen playback input" {
 
 ///|
 test "Draft confirmed song mode and explicit text input remain valid runtime sources" {
-  let draft = @mini.Draft::new("note(\"60\")")
+  let draft = @mini.Draft("note(\"60\")")
   let old = draft_snapshot(draft).query(draft_arc())[0].origin()
   let text = "bpm(72); song(section(\"intro\",1,s(\"bd\")),part(\"intro1\",\"intro\")).repeat()"
   edit_draft(draft, 0, draft.state().text().length(), text)
@@ -1192,7 +1192,7 @@ test "Draft confirmed song mode and explicit text input remain valid runtime sou
 ///|
 test "Draft opaque preceding scope retires a binding without retiring its endpoints" {
   let prefix = "let tone = note(\"60\"); "
-  let draft = @mini.Draft::new(prefix + "tone")
+  let draft = @mini.Draft(prefix + "tone")
   let old = draft_snapshot(draft).query(draft_arc())[0].origin()
   edit_draft(draft, prefix.length(), prefix.length(), "unknown(;")
   assert_true(draft.locate_origin(old) is Unavailable(BrokenReference))
@@ -1208,7 +1208,7 @@ test "Draft opaque preceding scope retires a binding without retiring its endpoi
 test "Draft local depth failure preserves independent reference proofs" {
   let prefix = "let tone = note(\"60\"); let other = "
   let body = "s(\"bd\")"
-  let draft = @mini.Draft::new(prefix + body + "; tone")
+  let draft = @mini.Draft(prefix + body + "; tone")
   let old = draft_snapshot(draft).query(draft_arc())[0].origin()
   apply_draft_edits(draft, [
     @mini.TextEdit::TextEdit(
@@ -1231,7 +1231,7 @@ test "Draft local depth failure preserves independent reference proofs" {
 
 ///|
 test "Draft chord tones share one atom and retain separate voice scopes" {
-  let draft = @mini.Draft::new("chord(\"C\")")
+  let draft = @mini.Draft("chord(\"C\")")
   guard draft_snapshot(draft).query(draft_arc()) is [root, third, fifth] else {
     fail("expected major chord")
   }
@@ -1761,7 +1761,7 @@ test "parse_doc lowers Strudel-style dollar stack lines" {
 
 ///|
 test "Draft accepts dollar stack lines with independent exact origins" {
-  let draft = @mini.Draft::new("$: s(\"bd\")\n$: s(\"hh\")")
+  let draft = @mini.Draft("$: s(\"bd\")\n$: s(\"hh\")")
   let events = draft_snapshot(draft).query(draft_arc())
   assert_named_events(
     events.map(e => e.event()),

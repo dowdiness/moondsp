@@ -98,7 +98,7 @@ fn AnalyzedGraph::is_node_live(self : AnalyzedGraph, index : Int) -> Bool {
 ///|
 /// Count Adsr nodes in the template snapshot whose compiled index is < 0
 /// (eliminated by optimize_graph as dead code). On a Dsp, `gate_on`
-/// for an orphan ADSR returns `Err(OrphanNode)` — VoicePool::new and
+/// for an orphan ADSR returns `Err(OrphanNode)` — VoicePool constructor and
 /// set_template reject templates where this count is > 0 so the per-note
 /// gate loop can `.unwrap()` instead of branching on every voice trigger.
 ///

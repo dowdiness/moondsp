@@ -385,7 +385,7 @@ test "exact wire rejects broken witnesses atomically and accepts UTF16 source sp
   }
   assert_true(init_scheduler_graph_for_test())
   let original = "/* \u{10400} */ " + HELD_NOTE
-  let draft = @mini.Draft::new(original)
+  let draft = @mini.Draft(original)
   guard draft.prepare_playback() is Ok(input) else {
     fail("expected exact input")
   }
@@ -394,7 +394,7 @@ test "exact wire rejects broken witnesses atomically and accepts UTF16 source sp
   assert_eq(player.val.unwrap().view().source, Some(original))
   render_for_test(8)
   let next = "note(\"72\").slow(8)"
-  let next_draft = @mini.Draft::new(next)
+  let next_draft = @mini.Draft(next)
   guard next_draft.prepare_playback() is Ok(candidate) else {
     fail("expected candidate")
   }

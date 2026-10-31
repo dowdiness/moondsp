@@ -42,12 +42,12 @@ test "bench/voice/prepared_steal_delay_reset" (b : @bench.T) {
     let template = @graph.AnalyzedGraph::analyze(
       delay_reset_voice_nodes(capacity),
     )
-    let pool = BoundVoicePool::new(
+    let pool = BoundVoicePool(
       template,
       ctx,
       @graph.ControlBindingBuilder::new(),
       max_voices=1,
-    ).unwrap()
+    )
     let values = Array::makei(64, i => {
       (
         220.0 + i.to_double(),

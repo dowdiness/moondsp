@@ -27,7 +27,7 @@ fn onset_test_origin() -> @pattern.EventOrigin {
 
 ///|
 test "onset ring records fixed rows and overwrites oldest with bounded diagnostics" {
-  let ring = OnsetBuffer::new()
+  let ring = OnsetBuffer()
   let origin = onset_test_origin()
   ring.enabled = true
   for sample in 0..<=ONSET_RING_CAPACITY {
@@ -45,7 +45,7 @@ test "onset ring records fixed rows and overwrites oldest with bounded diagnosti
 
 ///|
 test "onset ring defaults disabled and clear resets bounded state" {
-  let ring = OnsetBuffer::new()
+  let ring = OnsetBuffer()
   ring.record(0L, Some(onset_test_origin()))
   assert_eq(ring.count, 0)
   ring.enabled = true

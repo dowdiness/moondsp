@@ -34,7 +34,7 @@ and the DSP graph / voice subsystem:
 
 | Category | Types / Constants | Key operations |
 |---|---|---|
-| **Lifecycle** | `ClapSynthEngine`, `ClapEngineError` | `ClapSynthEngine::new`, error variants for sample rate, block size, voices |
+| **Lifecycle** | `ClapSynthEngine`, `ClapEngineError` | `ClapSynthEngine(...)`, error variants for sample rate, block size, voices |
 | **Note Events** | `ClapSynthEngine` | `ClapSynthEngine::note_on`, `ClapSynthEngine::note_off`, `ClapSynthEngine::all_notes_off` |
 | **Parameters** | `CLAP_PARAM_*`, `ClapSynthEngine` | `ClapSynthEngine::set_param`, `ClapSynthEngine::set_master_gain`, `ClapSynthEngine::set_cutoff_hz`, `ClapSynthEngine::set_resonance`, `ClapSynthEngine::set_pan` |
 | **Audio Rendering** | `ClapSynthEngine` | `ClapSynthEngine::process`, `ClapSynthEngine::left_sample`, `ClapSynthEngine::right_sample` |
@@ -48,14 +48,12 @@ voice count. The engine preallocates all buffers and voice slots up front.
 ```mbt check
 ///|
 test "initialize clap synth engine and process audio" {
-  let engine = match
-    @clap_engine.ClapSynthEngine::new(
+  let engine = @clap_engine.ClapSynthEngine(
       sample_rate=48000.0,
       max_block_size=128,
       max_voices=8,
-    ) {
-    Ok(e) => e
-    Err(_) => fail("failed to initialize clap engine")
+    ) catch {
+    _ => fail("failed to initialize clap engine")
   }
 
   // Before note events, processing produces silence

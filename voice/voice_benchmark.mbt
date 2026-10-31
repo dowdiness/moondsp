@@ -127,7 +127,7 @@ test "bench voice: minimal_voice template compiles + pool accepts" {
   )
   let template = @graph.AnalyzedGraph::analyze(bench_minimal_voice_nodes())
   assert_true(@graph.Dsp::compile(template, ctx) is Some(_))
-  assert_true(VoicePool::new(template, ctx) is Ok(_))
+  ignore(VoicePool(template, ctx))
 }
 
 ///|
@@ -138,7 +138,7 @@ test "bench voice: fm_voice template compiles + pool accepts" {
   )
   let template = @graph.AnalyzedGraph::analyze(bench_fm_voice_nodes())
   assert_true(@graph.Dsp::compile(template, ctx) is Some(_))
-  assert_true(VoicePool::new(template, ctx) is Ok(_))
+  ignore(VoicePool(template, ctx))
 }
 
 ///|
@@ -149,7 +149,7 @@ test "bench voice: full_voice template compiles + pool accepts" {
   )
   let template = @graph.AnalyzedGraph::analyze(bench_full_voice_nodes())
   assert_true(@graph.Dsp::compile(template, ctx) is Some(_))
-  assert_true(VoicePool::new(template, ctx) is Ok(_))
+  ignore(VoicePool(template, ctx))
 }
 
 // ---- set_template (isolates the discarded compile) ----
@@ -169,9 +169,9 @@ test "bench/voice/set_template" (b : @bench.T) {
   let minimal = @graph.AnalyzedGraph::analyze(bench_minimal_voice_nodes())
   let fm = @graph.AnalyzedGraph::analyze(bench_fm_voice_nodes())
   let full = @graph.AnalyzedGraph::analyze(bench_full_voice_nodes())
-  let pool_min = VoicePool::new(minimal, ctx).unwrap()
-  let pool_fm = VoicePool::new(fm, ctx).unwrap()
-  let pool_full = VoicePool::new(full, ctx).unwrap()
+  let pool_min = VoicePool(minimal, ctx)
+  let pool_fm = VoicePool(fm, ctx)
+  let pool_full = VoicePool(full, ctx)
   b.bench(name="minimal_voice", fn() {
     let r = pool_min.set_template(minimal)
     b.keep(r)
@@ -203,9 +203,9 @@ test "bench/voice/note_on" (b : @bench.T) {
   let minimal = @graph.AnalyzedGraph::analyze(bench_minimal_voice_nodes())
   let fm = @graph.AnalyzedGraph::analyze(bench_fm_voice_nodes())
   let full = @graph.AnalyzedGraph::analyze(bench_full_voice_nodes())
-  let pool_min = VoicePool::new(minimal, ctx, max_voices=1).unwrap()
-  let pool_fm = VoicePool::new(fm, ctx, max_voices=1).unwrap()
-  let pool_full = VoicePool::new(full, ctx, max_voices=1).unwrap()
+  let pool_min = VoicePool(minimal, ctx, max_voices=1)
+  let pool_fm = VoicePool(fm, ctx, max_voices=1)
+  let pool_full = VoicePool(full, ctx, max_voices=1)
   let empty : Array[@graph.GraphControl] = []
   b.bench(name="minimal_voice", fn() {
     let h = pool_min.note_on(empty)
@@ -241,15 +241,15 @@ test "bench/voice/voicepool_new" (b : @bench.T) {
   let fm = @graph.AnalyzedGraph::analyze(bench_fm_voice_nodes())
   let full = @graph.AnalyzedGraph::analyze(bench_full_voice_nodes())
   b.bench(name="minimal_voice", fn() {
-    let pool = VoicePool::new(minimal, ctx)
+    let pool = try! VoicePool(minimal, ctx)
     b.keep(pool)
   })
   b.bench(name="fm_voice", fn() {
-    let pool = VoicePool::new(fm, ctx)
+    let pool = try! VoicePool(fm, ctx)
     b.keep(pool)
   })
   b.bench(name="full_voice", fn() {
-    let pool = VoicePool::new(full, ctx)
+    let pool = try! VoicePool(full, ctx)
     b.keep(pool)
   })
 }

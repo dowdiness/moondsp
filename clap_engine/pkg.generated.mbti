@@ -21,9 +21,7 @@ pub const CLAP_PARAM_VOICE_GAIN : Int = 1
 pub fn default_synth_template() -> Array[@graph.DspNode]
 
 // Errors
-
-// Types and methods
-pub(all) enum ClapEngineError {
+pub(all) suberror ClapEngineError {
   InvalidSampleRate
   InvalidMaxBlockSize
   InvalidMaxVoices
@@ -36,14 +34,15 @@ pub fn ClapEngineError::to_repr(Self) -> @debug.Repr
 pub fn ClapEngineError::to_string(Self) -> String
 pub impl Show for ClapEngineError
 
+// Types and methods
 pub struct ClapSynthEngine {
   // private fields
 }
+pub fn ClapSynthEngine::ClapSynthEngine(sample_rate? : Double, max_block_size? : Int, max_voices? : Int) -> Self raise ClapEngineError
 pub fn ClapSynthEngine::all_notes_off(Self) -> Unit
 pub fn ClapSynthEngine::cutoff_hz(Self) -> Double
 pub fn ClapSynthEngine::left_sample(Self, Int) -> Double
 pub fn ClapSynthEngine::master_gain(Self) -> Double
-pub fn ClapSynthEngine::new(sample_rate? : Double, max_block_size? : Int, max_voices? : Int) -> Result[Self, ClapEngineError]
 pub fn ClapSynthEngine::note_off(Self, note_id~ : Int, key~ : Int) -> Bool
 pub fn ClapSynthEngine::note_on(Self, note_id~ : Int, key~ : Int, velocity~ : Double) -> Bool
 pub fn ClapSynthEngine::pan(Self) -> Double

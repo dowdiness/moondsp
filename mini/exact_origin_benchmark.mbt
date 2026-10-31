@@ -2,7 +2,7 @@
 fn bench_origin_draft_doc(
   text : String,
 ) -> @pattern.PatternDoc[@pattern.ControlMap] {
-  let draft = try! Draft::new(text)
+  let draft = try! Draft(text)
   match draft.parsed {
     Ok(source) =>
       match source.body() {

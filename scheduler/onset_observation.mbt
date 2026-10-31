@@ -19,7 +19,7 @@ pub struct OnsetBuffer {
 }
 
 ///|
-pub fn OnsetBuffer::new() -> OnsetBuffer {
+pub fn OnsetBuffer::OnsetBuffer() -> OnsetBuffer {
   {
     enabled: false,
     head: 0,

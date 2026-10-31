@@ -58,12 +58,12 @@ pub fn InstrumentSelector::to_repr(Self) -> @debug.Repr
 pub struct OnsetBuffer {
   // private fields
 }
+pub fn OnsetBuffer::OnsetBuffer() -> Self
 pub fn OnsetBuffer::clear(Self) -> Unit
 pub fn OnsetBuffer::count(Self) -> Int
 pub fn OnsetBuffer::dropped(Self) -> Double
 pub fn OnsetBuffer::enable(Self, Bool) -> Unit
 pub fn OnsetBuffer::field(Self, Int, Int) -> Double
-pub fn OnsetBuffer::new() -> Self
 
 pub struct PatternScheduler {
   // private fields

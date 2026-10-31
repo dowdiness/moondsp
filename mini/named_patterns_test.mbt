@@ -107,7 +107,7 @@ fn assert_named_compiles_like(
 test "Draft definition edits update nested named groups without stale playback" {
   let tail = "let group = stack(tone,tone.gain(0.2)); group.slow(3)"
   let prefix = "let tone = note(\""
-  let draft = @mini.Draft::new(prefix + "60\"); " + tail)
+  let draft = @mini.Draft(prefix + "60\"); " + tail)
   let span = song_span(0L, 1L, 3L, 1L)
   for note in [60, 72, 67] {
     edit_draft(draft, prefix.length(), prefix.length() + 2, note.to_string())

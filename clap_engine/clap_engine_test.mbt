@@ -1,13 +1,11 @@
 ///|
 fn new_test_engine() -> @clap_engine.ClapSynthEngine {
-  match
-    @clap_engine.ClapSynthEngine::new(
-      sample_rate=48000.0,
-      max_block_size=128,
-      max_voices=8,
-    ) {
-    Ok(engine) => engine
-    Err(error) => abort("expected CLAP synth engine to initialize: \{error}")
+  @clap_engine.ClapSynthEngine(
+    sample_rate=48000.0,
+    max_block_size=128,
+    max_voices=8,
+  ) catch {
+    error => abort("expected CLAP synth engine to initialize: \{error}")
   }
 }
 
@@ -62,7 +60,8 @@ test "engine initializes and renders silence before notes" {
 
 ///|
 test "engine rejects unsafe tiny sample rates" {
-  match @clap_engine.ClapSynthEngine::new(sample_rate=1.0) {
+  match
+    (try Ok(@clap_engine.ClapSynthEngine(sample_rate=1.0)) catch { e => Err(e) }) {
     Err(@clap_engine.ClapEngineError::InvalidSampleRate) => ()
     _ => abort("expected invalid sample rate")
   }
@@ -115,14 +114,12 @@ test "fully wildcard note off releases all active notes" {
 
 ///|
 test "voice stealing removes stale active note for stolen slot" {
-  let engine = match
-    @clap_engine.ClapSynthEngine::new(
-      sample_rate=48000.0,
-      max_block_size=128,
-      max_voices=1,
-    ) {
-    Ok(engine) => engine
-    Err(error) => abort("expected one-voice engine: \{error}")
+  let engine = @clap_engine.ClapSynthEngine(
+    sample_rate=48000.0,
+    max_block_size=128,
+    max_voices=1,
+  ) catch {
+    error => abort("expected one-voice engine: \{error}")
   }
   assert_true(engine.note_on(note_id=1, key=60, velocity=1.0))
   assert_true(engine.note_on(note_id=2, key=64, velocity=1.0))

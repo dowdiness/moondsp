@@ -796,7 +796,7 @@ fn draft_diagnostic(
 }
 
 ///|
-pub fn Draft::new(input : String) -> Draft raise DraftEditError {
+pub fn Draft::Draft(input : String) -> Draft raise DraftEditError {
   let epoch = next_draft_epoch()
   let facts = draft_recognize(input)
   let mode = draft_tracking(facts, Pattern)
@@ -955,7 +955,7 @@ pub fn Draft::reset(
   input : String,
 ) -> Result[DraftState, DraftEditError] {
   guard self.current.mode != Disposed else { return Err(Disposed) }
-  try Draft::new(input) catch {
+  try Draft(input) catch {
     error => Err(error)
   } noraise {
     fresh => {

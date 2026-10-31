@@ -21,22 +21,21 @@ enum A3Reason {
 } derive(Eq, @debug.Debug)
 
 ///|
-/// PR-3 A2 closure: direct call to the new Result-returning VoicePool::new.
+/// PR-3 A2 closure: direct call to the raising VoicePool constructor, lifted to Result.
 fn pr2_a2_closure(
   nodes : Array[DspNode],
   ctx : DspContext,
   max_voices : Int,
 ) -> Result[@voice.VoicePool, A2Reason] {
-  @voice.VoicePool::new(@graph.AnalyzedGraph::analyze(nodes), ctx, max_voices~).map_err(fn(
-      e,
-    ) {
-      match e {
-        @voice.VoicePoolError::InvalidMaxVoices => A2Reason::InvalidMaxVoices
-        @voice.VoicePoolError::OrphanAdsr => A2Reason::OrphanAdsr
-        @voice.VoicePoolError::CompileRejected => A2Reason::CompileRejected
-      }
-    },
-  )
+  (Ok(@voice.VoicePool(@graph.AnalyzedGraph::analyze(nodes), ctx, max_voices~)) catch {
+    e => Err(e)
+  }).map_err(fn(e) {
+    match e {
+      @voice.VoicePoolError::InvalidMaxVoices => A2Reason::InvalidMaxVoices
+      @voice.VoicePoolError::OrphanAdsr => A2Reason::OrphanAdsr
+      @voice.VoicePoolError::CompileRejected => A2Reason::CompileRejected
+    }
+  })
 }
 
 ///|
@@ -129,11 +128,11 @@ test "A3: well-formed replacement succeeds" {
     DspNode::output(0),
   ]
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
-  let pool = @voice.VoicePool::new(
+  let pool = @voice.VoicePool(
     @graph.AnalyzedGraph::analyze(nodes),
     ctx,
     max_voices=4,
-  ).unwrap()
+  )
   let new_nodes : Array[DspNode] = [
     DspNode::oscillator(Waveform::Square, 880.0),
     DspNode::output(0),
@@ -149,11 +148,11 @@ test "A3: orphan ADSR replacement fails with OrphanAdsr" {
     DspNode::output(0),
   ]
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
-  let pool = @voice.VoicePool::new(
+  let pool = @voice.VoicePool(
     @graph.AnalyzedGraph::analyze(nodes),
     ctx,
     max_voices=4,
-  ).unwrap()
+  )
   let new_nodes : Array[DspNode] = [
     DspNode::oscillator(Waveform::Sine, 440.0),
     DspNode::adsr(attack_ms=10.0, decay_ms=50.0, sustain=0.5, release_ms=100.0),
@@ -170,11 +169,11 @@ test "A3: missing Output replacement fails with CompileRejected" {
     DspNode::output(0),
   ]
   let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
-  let pool = @voice.VoicePool::new(
+  let pool = @voice.VoicePool(
     @graph.AnalyzedGraph::analyze(nodes),
     ctx,
     max_voices=4,
-  ).unwrap()
+  )
   let new_nodes : Array[DspNode] = [DspNode::oscillator(Waveform::Sine, 440.0)]
   @debug.assert_eq(
     pr2_a3_closure(pool, new_nodes),
@@ -192,12 +191,16 @@ fn pr2_a4_closure(
   builder : ControlBindingBuilder,
   max_voices : Int,
 ) -> Result[@voice.BoundVoicePool, @voice.BoundVoicePoolError] {
-  @voice.BoundVoicePool::new(
-    AnalyzedGraph::analyze(nodes),
-    ctx,
-    builder,
-    max_voices~,
-  )
+  Ok(
+    @voice.BoundVoicePool(
+      AnalyzedGraph::analyze(nodes),
+      ctx,
+      builder,
+      max_voices~,
+    ),
+  ) catch {
+    e => Err(e)
+  }
 }
 
 ///|

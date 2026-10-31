@@ -42,7 +42,7 @@ surface:
 |---|---|---|
 | **Text Parsing** | `parse`, `parse_song`, `parse_song_with_bpm` | Parse string into `Pat[ControlMap]`, `Song[ControlMap]`, or `ParsedSong` |
 | **Documents** | `parse_doc`, `parse_snapshot` | Parse deterministic graph documents or general snapshots without cross-draft source continuity |
-| **Live Authoring** | `Draft`, `DraftVersion`, `EditTransaction`, `TextEdit` | `Draft::new`, `state`, `edit`, `reset`, `prepare_playback`, `locate_origin`, `dispose` |
+| **Live Authoring** | `Draft`, `DraftVersion`, `EditTransaction`, `TextEdit` | `Draft(...)`, `state`, `edit`, `reset`, `prepare_playback`, `locate_origin`, `dispose` |
 | **Frozen Playback Input** | `PlaybackInput`, `PreparedPlayback` | `PlaybackInput::text`, `source`, `version`, `compile`, `encode_wire`, `decode_wire`; tracked Pattern/Song or explicitly runtime-only text |
 | **Programmatic Doc Building** | `MiniDocBuilder` | `MiniDocBuilder::with_previous`, `MiniDocBuilder::sound_atom`, `MiniDocBuilder::note_atom`, `MiniDocBuilder::sequence`, `MiniDocBuilder::fast` |
 | **Song & Utilities** | `ParsedSong`, `drum_midi` | `ParsedSong::song`, `ParsedSong::bpm`, `drum_midi` |
@@ -160,7 +160,7 @@ cannot prepare playback. Crossing the limit, confirmed source-mode changes, and
 explicit `reset` establish fresh source epochs. Unknown syntax alone does not
 select a new mode. Current indices and the internal last-valid document are
 bounded; no per-spelling allocation history is retained. Checked serials and
-revisions never wrap. `Draft::new` raises `DraftEditError` on epoch exhaustion;
+revisions never wrap. `Draft(...)` raises `DraftEditError` on epoch exhaustion;
 `edit` and `reset` return explicit errors without partially changing the draft.
 
 The live editor uses the JS-target `browser_authoring` adapter to keep this Draft

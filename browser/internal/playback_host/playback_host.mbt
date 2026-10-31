@@ -20,7 +20,7 @@ fn Player::Player(
   context : @moondsp.DspContext,
 ) -> Player {
   let size = context.block_size()
-  let onsets = @scheduler.OnsetBuffer::new()
+  let onsets = @scheduler.OnsetBuffer()
   scheduler.attach_onset_buffer(onsets)
   {
     scheduler,
@@ -47,17 +47,21 @@ fn make_drum_pool(
   template : Array[@moondsp.DspNode],
   ctx : @moondsp.DspContext,
 ) -> @moondsp.BoundVoicePool? {
-  // 8 voices = defensive headroom for .jux(f) patterns where f causes
-  // same-sound overlap (e.g. the demo's hh*16? layer puts left's hh at
-  // slot t and right's hh at slot 1-t — frequent coincidence at fine
-  // subdivisions). Multi-sound patterns like s("bd sd hh sd").jux(rev)
-  // do NOT need this headroom because per-pool pressure stays at 1.
-  @moondsp.BoundVoicePool::new(
-    @moondsp.AnalyzedGraph::analyze(template),
-    ctx,
-    @moondsp.ControlBindingBuilder::new(),
-    max_voices=8,
-  ).to_option()
+  Some(
+    // 8 voices = defensive headroom for .jux(f) patterns where f causes
+    // same-sound overlap (e.g. the demo's hh*16? layer puts left's hh at
+    // slot t and right's hh at slot 1-t — frequent coincidence at fine
+    // subdivisions). Multi-sound patterns like s("bd sd hh sd").jux(rev)
+    // do NOT need this headroom because per-pool pressure stays at 1.
+    @moondsp.BoundVoicePool(
+      @moondsp.AnalyzedGraph::analyze(template),
+      ctx,
+      @moondsp.ControlBindingBuilder::new(),
+      max_voices=8,
+    ),
+  ) catch {
+    _ => None
+  }
 }
 
 ///|
@@ -66,44 +70,48 @@ fn make_synth_pool(
   template : Array[@moondsp.DspNode],
   ctx : @moondsp.DspContext,
 ) -> @moondsp.BoundVoicePool? {
-  // See make_drum_pool for the .jux headroom rationale.
-  @moondsp.BoundVoicePool::new(
-    @moondsp.AnalyzedGraph::analyze(template),
-    ctx,
-    @moondsp.ControlBindingBuilder::new()
-    .bind(
-      key="note",
-      node_index=0, // oscillator(Value0) frequency placeholder
-      slot=@moondsp.GraphParamSlot::Value0,
-    )
-    .bind(key="attack", node_index=1, slot=@moondsp.GraphParamSlot::Value0)
-    .bind(
-      key="envelope_decay",
-      node_index=1,
-      slot=@moondsp.GraphParamSlot::Value1,
-    )
-    .bind(
-      key="envelope_sustain",
-      node_index=1,
-      slot=@moondsp.GraphParamSlot::Value2,
-    )
-    .bind(key="release", node_index=1, slot=@moondsp.GraphParamSlot::Value3)
-    .bind(key="lpf", node_index=2, slot=@moondsp.GraphParamSlot::Value0)
-    .bind(
-      key="lpf_resonance",
-      node_index=2,
-      slot=@moondsp.GraphParamSlot::Value1,
-    )
-    .bind(key="hpf", node_index=3, slot=@moondsp.GraphParamSlot::Value0)
-    .bind(
-      key="hpf_resonance",
-      node_index=3,
-      slot=@moondsp.GraphParamSlot::Value1,
+  Some(
+    // See make_drum_pool for the .jux headroom rationale.
+    @moondsp.BoundVoicePool(
+      @moondsp.AnalyzedGraph::analyze(template),
+      ctx,
+      @moondsp.ControlBindingBuilder::new()
+      .bind(
+        key="note",
+        node_index=0, // oscillator(Value0) frequency placeholder
+        slot=@moondsp.GraphParamSlot::Value0,
+      )
+      .bind(key="attack", node_index=1, slot=@moondsp.GraphParamSlot::Value0)
+      .bind(
+        key="envelope_decay",
+        node_index=1,
+        slot=@moondsp.GraphParamSlot::Value1,
+      )
+      .bind(
+        key="envelope_sustain",
+        node_index=1,
+        slot=@moondsp.GraphParamSlot::Value2,
+      )
+      .bind(key="release", node_index=1, slot=@moondsp.GraphParamSlot::Value3)
+      .bind(key="lpf", node_index=2, slot=@moondsp.GraphParamSlot::Value0)
+      .bind(
+        key="lpf_resonance",
+        node_index=2,
+        slot=@moondsp.GraphParamSlot::Value1,
+      )
+      .bind(key="hpf", node_index=3, slot=@moondsp.GraphParamSlot::Value0)
+      .bind(
+        key="hpf_resonance",
+        node_index=3,
+        slot=@moondsp.GraphParamSlot::Value1,
+      ),
+      // 24 voices for chords: a 5-note chord × 4 layers of jux/stereo
+      // needs up to 20 voices. Fewer steals → fewer clicks.
+      max_voices=24,
     ),
-    // 24 voices for chords: a 5-note chord × 4 layers of jux/stereo
-    // needs up to 20 voices. Fewer steals → fewer clicks.
-    max_voices=24,
-  ).to_option()
+  ) catch {
+    _ => None
+  }
 }
 
 ///|

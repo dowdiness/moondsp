@@ -936,7 +936,7 @@ Current semantics:
   with priority stealing, per-slot template snapshots, and per-voice pan gains
 - `BoundVoicePool` owns both a `VoicePool` and the `ControlBindingMap` proven
   against that pool's current `AnalyzedGraph`
-- `BoundVoicePool::new(...)` analyzes the template once, validates voice-pool
+- `BoundVoicePool(...)` analyzes the template once, validates voice-pool
   requirements, and builds bindings against the same analyzed template
 - `BoundVoicePool::set_template(...)` is transactional:
   - it analyzes and validates the replacement template first
@@ -975,11 +975,11 @@ Current semantics:
   direct unsourced playback. The scheduler also owns optional active and pending
   `PlaybackSnapshot` values; it does not duplicate the pool's voice state or
   control bindings.
-- `PatternScheduler::process_block(...)` takes a `BoundVoicePool`, expires old
-  notes, queries the pattern for the current block arc, converts raw control
+- `PatternScheduler::process_block(...)` routes each event to the first
+  instrument pool whose selector matches it, expires old notes, queries the pattern for the current block arc, converts raw control
   maps through the scheduler's mapper, calls `note_on_controls(...)`, applies
   per-voice side effects such as pan and the single shared-send gain, then
-  renders through the bound pool. The default mapper consumes `room` as a
+  renders and sums every instrument pool. The default mapper consumes `room` as a
   normalized `0..1` send; it is not a graph control and does not add reverb
   nodes to each voice.
 - The browser note/chord template binds Mini `lpf` and `hpf` controls to each

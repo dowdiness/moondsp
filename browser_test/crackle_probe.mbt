@@ -888,8 +888,8 @@ fn crackle_probe_stream_voice_pool_state(
     @moondsp.DspNode::oscillator(waveform, 0.0),
     @moondsp.DspNode::output(0),
   ])
-  match
-    @moondsp.BoundVoicePool::new(
+  try
+    @moondsp.BoundVoicePool(
       template,
       context,
       @moondsp.ControlBindingBuilder::new().bind(
@@ -898,8 +898,14 @@ fn crackle_probe_stream_voice_pool_state(
         slot=@moondsp.GraphParamSlot::Value0,
       ),
       max_voices=1,
-    ) {
-    Ok(pool) => {
+    )
+  catch {
+    _ => {
+      crackle_probe_last_error_code.val = CRACKLE_PROBE_ERROR_COMPILE_FAILED
+      None
+    }
+  } noraise {
+    pool => {
       let controls : Map[String, Double] = { "note": freq_hz }
       if pool.note_on_controls(controls) is None {
         crackle_probe_last_error_code.val = CRACKLE_PROBE_ERROR_NOTE_ON_FAILED
@@ -915,10 +921,6 @@ fn crackle_probe_stream_voice_pool_state(
           @moondsp.pan_left_gain(0.0),
         ),
       )
-    }
-    Err(_) => {
-      crackle_probe_last_error_code.val = CRACKLE_PROBE_ERROR_COMPILE_FAILED
-      None
     }
   }
 }
@@ -947,8 +949,8 @@ fn crackle_probe_stream_browser_synth_shape_state(
     ),
     @moondsp.DspNode::output(3),
   ])
-  match
-    @moondsp.BoundVoicePool::new(
+  try
+    @moondsp.BoundVoicePool(
       template,
       context,
       @moondsp.ControlBindingBuilder::new().bind(
@@ -957,8 +959,14 @@ fn crackle_probe_stream_browser_synth_shape_state(
         slot=@moondsp.GraphParamSlot::Value0,
       ),
       max_voices=1,
-    ) {
-    Ok(pool) => {
+    )
+  catch {
+    _ => {
+      crackle_probe_last_error_code.val = CRACKLE_PROBE_ERROR_COMPILE_FAILED
+      None
+    }
+  } noraise {
+    pool => {
       let controls : Map[String, Double] = { "note": freq_hz }
       if pool.note_on_controls(controls) is None {
         crackle_probe_last_error_code.val = CRACKLE_PROBE_ERROR_NOTE_ON_FAILED
@@ -967,10 +975,6 @@ fn crackle_probe_stream_browser_synth_shape_state(
       Some(
         StreamBrowserSynthShape(pool, @moondsp.AudioBuffer::filled(block_size)),
       )
-    }
-    Err(_) => {
-      crackle_probe_last_error_code.val = CRACKLE_PROBE_ERROR_COMPILE_FAILED
-      None
     }
   }
 }

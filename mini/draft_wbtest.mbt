@@ -16,7 +16,7 @@ fn wb_draft_origin(draft : Draft) -> @pattern.EventOrigin raise {
 
 ///|
 test "identity exhaustion rejects the whole transaction and reset recovers" {
-  let draft = Draft::new("note(\"60 62\")")
+  let draft = Draft("note(\"60 62\")")
   let old_origin = wb_draft_origin(draft)
   let before = draft.state()
   draft.sources = SourceMap(
@@ -42,7 +42,7 @@ test "identity exhaustion rejects the whole transaction and reset recovers" {
 
 ///|
 test "literal frame identities survive offsets but retire on content edits" {
-  let draft = Draft::new("note(\"60 62\")")
+  let draft = Draft("note(\"60 62\")")
   guard draft.sources.literals is [literal, ..] else {
     fail("expected literal source frame")
   }
@@ -97,7 +97,7 @@ test "literal frame identities survive offsets but retire on content edits" {
 
 ///|
 test "revision exhaustion cannot wrap into a prior edit base" {
-  let draft = Draft::new("note(\"60\")")
+  let draft = Draft("note(\"60\")")
   let version = DraftVersion(draft.current.at.epoch, DRAFT_IDENTITY_MAX)
   draft.current = DraftState(draft.current.input, version, Pattern, None)
   assert_true(draft.edit(EditTransaction(base=version, edits=[])) is Ok(_))
@@ -117,7 +117,7 @@ test "revision exhaustion cannot wrap into a prior edit base" {
 
 ///|
 test "current source indices stay bounded across unique historical names" {
-  let draft = Draft::new("let first = note(\"60\"); first")
+  let draft = Draft("let first = note(\"60\"); first")
   let origin = wb_draft_origin(draft)
   for index in 0..<300 {
     let text = "let phrase_\{index} = note(\"60\"); phrase_\{index}"

@@ -11,11 +11,37 @@ import {
 pub fn apply_controls_to_voices(Array[(BoundVoicePool, VoiceHandle)], Array[@graph.GraphControl]) -> Result[Unit, VoiceControlError]
 
 // Errors
+pub(all) suberror BoundVoicePoolError {
+  InvalidMaxVoices
+  OrphanAdsr
+  CompileRejected
+  Binding(@graph.ControlBindingError)
+} derive(Eq, @debug.Debug)
+pub fn BoundVoicePoolError::equal(Self, Self) -> Bool
+pub fn BoundVoicePoolError::from_voice_pool(VoicePoolError) -> Self
+pub fn BoundVoicePoolError::not_equal(Self, Self) -> Bool
+pub fn BoundVoicePoolError::output(Self, &Logger) -> Unit
+pub fn BoundVoicePoolError::to_repr(Self) -> @debug.Repr
+pub fn BoundVoicePoolError::to_string(Self) -> String
+pub impl Show for BoundVoicePoolError
+
+pub(all) suberror VoicePoolError {
+  InvalidMaxVoices
+  OrphanAdsr
+  CompileRejected
+} derive(Eq, @debug.Debug)
+pub fn VoicePoolError::equal(Self, Self) -> Bool
+pub fn VoicePoolError::not_equal(Self, Self) -> Bool
+pub fn VoicePoolError::output(Self, &Logger) -> Unit
+pub fn VoicePoolError::to_repr(Self) -> @debug.Repr
+pub fn VoicePoolError::to_string(Self) -> String
+pub impl Show for VoicePoolError
 
 // Types and methods
 pub struct BoundVoicePool {
   // private fields
 }
+pub fn BoundVoicePool::BoundVoicePool(@graph.AnalyzedGraph, @dsp.DspContext, @graph.ControlBindingBuilder, max_voices? : Int) -> Self raise BoundVoicePoolError
 pub fn BoundVoicePool::active_voice_count(Self) -> Int
 pub fn BoundVoicePool::apply_voice_control_result(Self, VoiceHandle, @graph.GraphControl) -> Result[Unit, VoiceControlError]
 pub fn BoundVoicePool::apply_voice_controls_result(Self, VoiceHandle, Array[@graph.GraphControl]) -> Result[Unit, VoiceControlError]
@@ -25,7 +51,6 @@ pub fn BoundVoicePool::kill(Self, VoiceHandle) -> Bool
 pub fn BoundVoicePool::kill_all(Self) -> Unit
 pub fn BoundVoicePool::kill_result(Self, VoiceHandle) -> Result[Unit, VoiceControlError]
 pub fn BoundVoicePool::last_sanitized_count(Self) -> Int
-pub fn BoundVoicePool::new(@graph.AnalyzedGraph, @dsp.DspContext, @graph.ControlBindingBuilder, max_voices? : Int) -> Result[Self, BoundVoicePoolError]
 pub fn BoundVoicePool::note_gate(Self, Map[String, Double]) -> NoteGate
 #deprecated
 pub fn BoundVoicePool::note_off(Self, VoiceHandle) -> Bool
@@ -45,20 +70,6 @@ pub fn BoundVoicePool::set_voice_pan_bool(Self, VoiceHandle, Double) -> Bool
 pub fn BoundVoicePool::set_voice_pan_result(Self, VoiceHandle, Double) -> Result[Unit, VoiceControlError]
 pub fn BoundVoicePool::set_voice_send_result(Self, VoiceHandle, Double) -> Result[Unit, VoiceControlError]
 pub fn BoundVoicePool::voice_state(Self, VoiceHandle) -> VoiceState
-
-pub(all) enum BoundVoicePoolError {
-  InvalidMaxVoices
-  OrphanAdsr
-  CompileRejected
-  Binding(@graph.ControlBindingError)
-} derive(Eq, @debug.Debug)
-pub fn BoundVoicePoolError::equal(Self, Self) -> Bool
-pub fn BoundVoicePoolError::from_voice_pool(VoicePoolError) -> Self
-pub fn BoundVoicePoolError::not_equal(Self, Self) -> Bool
-pub fn BoundVoicePoolError::output(Self, &Logger) -> Unit
-pub fn BoundVoicePoolError::to_repr(Self) -> @debug.Repr
-pub fn BoundVoicePoolError::to_string(Self) -> String
-pub impl Show for BoundVoicePoolError
 
 pub(all) enum NoteGate {
   EventEnd
@@ -95,10 +106,10 @@ pub impl Show for VoiceHandle
 pub struct VoicePool {
   // private fields
 }
+pub fn VoicePool::VoicePool(@graph.AnalyzedGraph, @dsp.DspContext, max_voices? : Int) -> Self raise VoicePoolError
 pub fn VoicePool::active_voice_count(Self) -> Int
 pub fn VoicePool::kill_all(Self) -> Unit
 pub fn VoicePool::last_sanitized_count(Self) -> Int
-pub fn VoicePool::new(@graph.AnalyzedGraph, @dsp.DspContext, max_voices? : Int) -> Result[Self, VoicePoolError]
 #deprecated
 pub fn VoicePool::note_off(Self, VoiceHandle) -> Bool
 pub fn VoicePool::note_off_all(Self) -> Unit
@@ -113,18 +124,6 @@ pub fn VoicePool::set_voice_pan(Self, VoiceHandle, Double) -> Bool
 pub fn VoicePool::set_voice_pan_result(Self, VoiceHandle, Double) -> Result[Unit, VoiceControlError]
 pub fn VoicePool::set_voice_send_result(Self, VoiceHandle, Double) -> Result[Unit, VoiceControlError]
 pub fn VoicePool::voice_state(Self, VoiceHandle) -> VoiceState
-
-pub(all) enum VoicePoolError {
-  InvalidMaxVoices
-  OrphanAdsr
-  CompileRejected
-} derive(Eq, @debug.Debug)
-pub fn VoicePoolError::equal(Self, Self) -> Bool
-pub fn VoicePoolError::not_equal(Self, Self) -> Bool
-pub fn VoicePoolError::output(Self, &Logger) -> Unit
-pub fn VoicePoolError::to_repr(Self) -> @debug.Repr
-pub fn VoicePoolError::to_string(Self) -> String
-pub impl Show for VoicePoolError
 
 pub enum VoiceState {
   Idle

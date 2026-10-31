@@ -55,7 +55,7 @@ const DEFAULT_RESONANCE : Double = 0.707
 const DEFAULT_PAN : Double = 0.0
 
 ///|
-pub(all) enum ClapEngineError {
+pub(all) suberror ClapEngineError {
   InvalidSampleRate
   InvalidMaxBlockSize
   InvalidMaxVoices
@@ -114,7 +114,7 @@ priv struct ActiveNoteTable {
 }
 
 ///|
-fn ActiveNoteTable::new(capacity : Int) -> ActiveNoteTable {
+fn ActiveNoteTable::ActiveNoteTable(capacity : Int) -> ActiveNoteTable {
   {
     used: FixedArray::make(capacity, false),
     map_keys: FixedArray::make(capacity, 0),
@@ -292,43 +292,46 @@ fn synth_bindings() -> @moondsp.ControlBindingBuilder {
 }
 
 ///|
-pub fn ClapSynthEngine::new(
+pub fn ClapSynthEngine::ClapSynthEngine(
   sample_rate? : Double = DEFAULT_SAMPLE_RATE,
   max_block_size? : Int = DEFAULT_MAX_BLOCK_SIZE,
   max_voices? : Int = DEFAULT_MAX_VOICES,
-) -> Result[ClapSynthEngine, ClapEngineError] {
+) -> ClapSynthEngine raise ClapEngineError {
   if !is_valid_sample_rate(sample_rate) {
-    return Err(ClapEngineError::InvalidSampleRate)
+    raise ClapEngineError::InvalidSampleRate
   }
   if max_block_size <= 0 {
-    return Err(ClapEngineError::InvalidMaxBlockSize)
+    raise ClapEngineError::InvalidMaxBlockSize
   }
   if max_voices <= 0 {
-    return Err(ClapEngineError::InvalidMaxVoices)
+    raise ClapEngineError::InvalidMaxVoices
   }
   let ctx = @moondsp.DspContext::new(sample_rate~, block_size=max_block_size)
   let template = @moondsp.AnalyzedGraph::analyze(default_synth_template())
-  match
-    @moondsp.BoundVoicePool::new(template, ctx, synth_bindings(), max_voices~) {
-    Err(error) => Err(ClapEngineError::PoolInitFailed(error))
-    Ok(pool) =>
-      Ok({
-        sample_rate,
-        max_block_size,
-        pool,
-        left: @moondsp.AudioBuffer::filled(max_block_size),
-        right: @moondsp.AudioBuffer::filled(max_block_size),
-        render_contexts: FixedArray::makei(max_block_size + 1, fn(block_size) {
-          @moondsp.DspContext::new(sample_rate~, block_size~)
-        }),
-        active_notes: ActiveNoteTable::new(max_voices),
-        last_frame_count: 0,
-        master_gain: DEFAULT_MASTER_GAIN,
-        voice_gain: DEFAULT_VOICE_GAIN,
-        cutoff_hz: DEFAULT_CUTOFF_HZ,
-        resonance: DEFAULT_RESONANCE,
-        pan: DEFAULT_PAN,
-      })
+  let pool = @moondsp.BoundVoicePool(
+    template,
+    ctx,
+    synth_bindings(),
+    max_voices~,
+  ) catch {
+    error => raise ClapEngineError::PoolInitFailed(error)
+  }
+  {
+    sample_rate,
+    max_block_size,
+    pool,
+    left: @moondsp.AudioBuffer::filled(max_block_size),
+    right: @moondsp.AudioBuffer::filled(max_block_size),
+    render_contexts: FixedArray::makei(max_block_size + 1, fn(block_size) {
+      @moondsp.DspContext::new(sample_rate~, block_size~)
+    }),
+    active_notes: ActiveNoteTable(max_voices),
+    last_frame_count: 0,
+    master_gain: DEFAULT_MASTER_GAIN,
+    voice_gain: DEFAULT_VOICE_GAIN,
+    cutoff_hz: DEFAULT_CUTOFF_HZ,
+    resonance: DEFAULT_RESONANCE,
+    pan: DEFAULT_PAN,
   }
 }
 

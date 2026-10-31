@@ -41,10 +41,12 @@ pub fn engine_create(
   max_block_size : Int,
   max_voices : Int,
 ) -> Int {
-  match
-    @engine.ClapSynthEngine::new(sample_rate~, max_block_size~, max_voices~) {
-    Ok(engine) => push_engine(engine)
-    Err(_) => 0
+  try
+    @engine.ClapSynthEngine(sample_rate~, max_block_size~, max_voices~)
+  catch {
+    _ => 0
+  } noraise {
+    engine => push_engine(engine)
   }
 }
 

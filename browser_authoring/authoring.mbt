@@ -15,7 +15,7 @@ pub fn create_draft(
   on_created : (@mini.Draft) -> Unit,
   on_error : (String) -> Unit,
 ) -> Unit {
-  let draft = @mini.Draft::new(text) catch {
+  let draft = @mini.Draft(text) catch {
     error => {
       on_error("\{Repr(error)}")
       return
@@ -272,7 +272,7 @@ fn notation_projection_compile_events(
 fn notation_projection_temp_draft(
   source : String,
 ) -> @mini.Draft raise EditWireError {
-  @mini.Draft::new(source) catch {
+  @mini.Draft(source) catch {
     error => raise InvalidEdit("\{Repr(error)}")
   }
 }
@@ -305,7 +305,7 @@ fn notation_projection_json(
     raise InvalidEdit("notation entry period exceeds 16 cycles")
   }
   let span = span_value.to_int()
-  let draft = @mini.Draft::new(source) catch {
+  let draft = @mini.Draft(source) catch {
     error => raise InvalidEdit("\{Repr(error)}")
   }
   let result : Json = try {

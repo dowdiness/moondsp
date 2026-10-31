@@ -1,6 +1,6 @@
 ///|
 fn wire_test_input(text : String) -> @mini.PlaybackInput raise {
-  let draft = @mini.Draft::new(text)
+  let draft = @mini.Draft(text)
   match draft.prepare_playback() {
     Ok(input) => input
     Err(error) => fail(error.message())
@@ -19,7 +19,7 @@ fn wire_test_snapshot(
 
 ///|
 test "wire roundtrip preserves named routes and frozen source identity" {
-  let draft = @mini.Draft::new("let tone = note(\"60\"); stack(tone, tone)")
+  let draft = @mini.Draft("let tone = note(\"60\"); stack(tone, tone)")
   guard draft.prepare_playback() is Ok(input) else { fail("expected input") }
   let encoded = input.encode_wire()
   let before = wire_test_snapshot(input)
@@ -136,7 +136,7 @@ test "wire preserves rotated source epochs independently of document versions" {
       "song(section(\"a\",1,note(\"60\")),part(\"p\",\"a\"))",
       " ".repeat(8193),
     ] {
-    let draft = @mini.Draft::new(text)
+    let draft = @mini.Draft(text)
     guard draft.prepare_playback() is Ok(initial) else {
       fail("expected input")
     }
@@ -175,7 +175,7 @@ test "wire preserves rotated source epochs independently of document versions" {
 ///|
 test "Song source maps preserve literal frame identities on the wire" {
   let text = "song(section(\"a\",1,note(\"60\")),part(\"a1\",\"a\"))"
-  let draft = @mini.Draft::new(text)
+  let draft = @mini.Draft(text)
   guard draft.prepare_playback() is Ok(input) else {
     fail("expected tracked Song playback")
   }

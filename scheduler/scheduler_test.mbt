@@ -55,7 +55,7 @@ test "current_block exposes sample range and logical arc" {
 ///|
 /// Helper: build a VoicePool with a minimal osc→adsr→envelope_gain→output
 /// template. Envelope_gain wires the ADSR at index 1 into the signal path so
-/// `VoicePool::new`'s orphan-ADSR gate accepts it; swapping to bare `gain(0)`
+/// `VoicePool constructor`'s orphan-ADSR gate accepts it; swapping to bare `gain(0)`
 /// would orphan the ADSR and be rejected.
 /// The 0.3 ms release at 48 kHz lasts about 14 samples: the first 128-sample
 /// block after gate-off contains a tail, and the following block is silent.
@@ -77,16 +77,20 @@ fn make_test_pool() -> (
     @moondsp.DspNode::output(2),
   ]
   let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
-  let pool = @moondsp.BoundVoicePool::new(
-    @moondsp.AnalyzedGraph::analyze(template),
-    ctx,
-    @moondsp.ControlBindingBuilder::new().bind(
-      key="note",
-      node_index=0,
-      slot=@moondsp.GraphParamSlot::Value0,
+  let pool = Ok(
+    @moondsp.BoundVoicePool(
+      @moondsp.AnalyzedGraph::analyze(template),
+      ctx,
+      @moondsp.ControlBindingBuilder::new().bind(
+        key="note",
+        node_index=0,
+        slot=@moondsp.GraphParamSlot::Value0,
+      ),
+      max_voices=4,
     ),
-    max_voices=4,
-  )
+  ) catch {
+    e => Err(e)
+  }
   match pool {
     Ok(p) => (p, template, ctx)
     Err(_) => abort("test pool creation failed")
@@ -1010,16 +1014,20 @@ test "process_block: stolen voice gate-off is harmless" {
     @moondsp.DspNode::output(2),
   ]
   let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
-  let pool = @moondsp.BoundVoicePool::new(
-    @moondsp.AnalyzedGraph::analyze(template),
-    ctx,
-    @moondsp.ControlBindingBuilder::new().bind(
-      key="note",
-      node_index=0,
-      slot=@moondsp.GraphParamSlot::Value0,
+  let pool = Ok(
+    @moondsp.BoundVoicePool(
+      @moondsp.AnalyzedGraph::analyze(template),
+      ctx,
+      @moondsp.ControlBindingBuilder::new().bind(
+        key="note",
+        node_index=0,
+        slot=@moondsp.GraphParamSlot::Value0,
+      ),
+      max_voices=1,
     ),
-    max_voices=1,
-  )
+  ) catch {
+    e => Err(e)
+  }
   match pool {
     Err(_) => assert_true(false)
     Ok(pool) => {

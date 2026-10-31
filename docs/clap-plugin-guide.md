@@ -18,7 +18,7 @@ DAW / CLAP host
 
 - a fixed default synth template with stable node indices for CLAP parameter
   binding;
-- `ClapSynthEngine::new(sample_rate?, max_block_size?, max_voices?)`;
+- `ClapSynthEngine(sample_rate?, max_block_size?, max_voices?)` (raises `ClapEngineError`);
 - CLAP-style `note_on(note_id~, key~, velocity~)` and
   `note_off(note_id~, key~)`;
 - parameter ids for master gain, voice gain, cutoff, resonance, and pan;

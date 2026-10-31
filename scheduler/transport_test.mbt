@@ -21,7 +21,7 @@ fn transport_fixture(
     @moondsp.DspNode::envelope_gain(input=0, envelope=1, amount=1.0),
     @moondsp.DspNode::output(2),
   ])
-  let pool = @moondsp.BoundVoicePool::new(
+  let pool = @moondsp.BoundVoicePool(
     template,
     ctx,
     @moondsp.ControlBindingBuilder::new()
@@ -38,7 +38,7 @@ fn transport_fixture(
     )
     .bind(key="release", node_index=1, slot=@moondsp.GraphParamSlot::Value3),
     max_voices=4,
-  ).unwrap()
+  )
   (
     @scheduler.PatternScheduler(bpm=120.0, ctx~, instruments=[
       (@scheduler.AllEvents, pool),
