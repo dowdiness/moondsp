@@ -524,9 +524,7 @@ test "song events read their buses on the song clock" {
   events[0]
   .buses()
   .each_reader((key, reader) => {
-    values.push(
-      "\{key} \{reader.value(@pattern.Rational(13L, 4L))} \{reader.value(@pattern.Rational(17L, 5L))}",
-    )
+    values.push("\{key} \{reader(13L, 4L)} \{reader(17L, 5L)}")
   })
   // (3.25 - 3) × 2 = 0.5 and (3.4 - 3) × 2 = 0.8.
   @debug.assert_eq(values, ["lpf 50 80"])

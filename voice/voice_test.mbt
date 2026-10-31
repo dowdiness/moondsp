@@ -1253,3 +1253,54 @@ test "instrument gate follows template changes without mutating note controls" {
   pool.set_template(template(0.0), ControlBindingBuilder()).unwrap()
   assert_eq(pool.note_gate(controls), @voice.NoteGate::EventEnd)
 }
+
+///|
+test "followed values reach a releasing voice and end with the voice's slot" {
+  let ctx = DspContext(sample_rate=48000.0, block_size=4)
+  let pool = @voice.BoundVoicePool(
+    AnalyzedGraph::analyze([
+      DspNode::constant(1.0),
+      DspNode::adsr(
+        attack_ms=0.01,
+        decay_ms=0.01,
+        sustain=1.0,
+        release_ms=1000.0,
+      ),
+      DspNode::envelope_gain(input=0, envelope=1, amount=1.0),
+      DspNode::output(2),
+    ]),
+    ctx,
+    ControlBindingBuilder().bind_voice(key="gain", param=Gain),
+    max_voices=1,
+  )
+  let left = AudioBuffer::filled(4)
+  let right = AudioBuffer::filled(4)
+  let level = () => {
+    left.fill(0.0)
+    right.fill(0.0)
+    pool.process(ctx, left, right)
+    left.get(3)
+  }
+  // gain follows t = num / den.
+  let ramp = (num : Int64, den : Int64) => num.to_double() / den.to_double()
+  let first = pool
+    .note_on_controls({ "gain": 1.0 }, follow=[("gain", ramp)])
+    .unwrap()
+  for _ in 0..<100 {
+    ignore(level())
+  }
+  let full = level()
+  pool.note_off_result(first).unwrap()
+  pool.update_follows(1L, 4L)
+  let released = level()
+  assert_true(pool.voice_state(first) is Releasing)
+  // A quarter of the level, less the first samples of a 1 s release.
+  assert_true((released / full - 0.25).abs() < 0.001)
+  // Stealing the slot starts a voice without the old follower.
+  ignore(pool.note_on_controls({ "gain": 1.0 }).unwrap())
+  for _ in 0..<100 {
+    ignore(level())
+  }
+  pool.update_follows(1L, 2L)
+  assert_true((level() / full - 1.0).abs() < 0.000001)
+}

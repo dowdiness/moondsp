@@ -166,11 +166,12 @@ pub fn EventBuses::placed(
 }
 
 ///|
-/// Visit each bound key whose bus changes over time. A constant bus needs no
-/// reader: the value set at note-on already holds.
+/// Visit each bound key whose bus changes over time, with a reader of its
+/// value at exact time `num / den` (`den > 0`) that allocates nothing. A
+/// constant bus needs no reader: the value set at note-on already holds.
 pub fn EventBuses::each_reader(
   self : EventBuses,
-  f : (String, BusReader) -> Unit,
+  f : (String, (Int64, Int64) -> Double) -> Unit,
 ) -> Unit {
   for binding in self.bindings {
     let signal = self.table.signals[binding.1]
@@ -187,20 +188,8 @@ pub fn EventBuses::each_reader(
     } else {
       Shift(self.origin.num, self.origin.den, scaled)
     }
-    f(binding.0, { signal: placed, })
+    f(binding.0, (num, den) => placed.eval(num, den, false))
   }
-}
-
-///|
-/// One bus on a playback clock. Reading it allocates nothing.
-pub struct BusReader {
-  priv signal : BusSignal
-}
-
-///|
-/// The bus value at exact time `at`; `NaN` where the control has no value.
-pub fn BusReader::value(self : BusReader, at : Rational) -> Double {
-  self.signal.eval(at.num, at.den, false)
 }
 
 ///|

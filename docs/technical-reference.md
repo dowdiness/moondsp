@@ -981,10 +981,11 @@ Current semantics:
   every instrument pool. The pool's bindings decide what each key sets: a
   graph parameter, converted by the binding's unit (`MidiToHz`,
   `SecondsToMs`), or a voice-frame parameter (gain, pan, or the single
-  shared-send gain); unbound keys are ignored. Snapshot playback also records each
-  time-varying control bus the event's keys follow (ADR-0019); at every block
-  start the scheduler sends changed bus values to those voices until they are
-  idle, including release tails. The browser host binds `room` to the voice
+  shared-send gain); unbound keys are ignored. Snapshot playback also hands the
+  pool a reader for each time-varying control bus the event's keys follow
+  (ADR-0019). The follower lives in the voice slot; at every block start the
+  scheduler calls `update_follows`, and the pool applies changed values to
+  every non-idle voice, including release tails. The browser host binds `room` to the voice
   send as a normalized `0..1` value; it is not a graph control and does not
   add reverb nodes to each voice.
 - The browser note/chord template binds Mini `lpf` and `hpf` controls to each

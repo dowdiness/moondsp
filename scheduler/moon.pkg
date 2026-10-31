@@ -8,6 +8,5 @@ import {
   "dowdiness/moondsp/scheduler/internal/transport",
   "dowdiness/moondsp/scheduler/internal/voice_runtime",
   "moonbitlang/core/debug",
-  "moonbitlang/core/double",
   "moonbitlang/core/bench",
 }

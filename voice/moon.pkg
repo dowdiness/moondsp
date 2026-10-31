@@ -3,5 +3,6 @@ import {
   "dowdiness/moondsp/graph",
   "moonbitlang/core/bench",
   "moonbitlang/core/debug",
+  "moonbitlang/core/double",
   "moonbitlang/core/int",
 }

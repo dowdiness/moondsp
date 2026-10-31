@@ -164,6 +164,25 @@ pub impl Show for VoiceControlError with fn output(self, logger) {
 pub extend VoiceControlError with Show::{to_string, output}
 
 ///|
+/// Where a followed value goes on its voice.
+priv enum FollowTarget {
+  Gain
+  Pan
+  Send
+  Graph(Int, GraphParamSlot, @graph.ControlUnit)
+}
+
+///|
+/// One voice parameter that reads a time-varying value while the voice
+/// sounds, including its release tail (ADR-0019 Decisions 1 and 9).
+priv struct SlotFollow {
+  target : FollowTarget
+  read : (Int64, Int64) -> Double
+  /// The last score-unit value applied, so unchanged values apply nothing.
+  mut last : Double
+}
+
+///|
 priv struct VoiceSlot {
   mut compiled : Dsp?
   /// WHY per-slot snapshot: after set_template, the pool's
@@ -185,6 +204,8 @@ priv struct VoiceSlot {
   mut send_gain : Double
   /// Voice-frame level, applied before pan and therefore before the send.
   mut gain : Double
+  /// Belongs to the slot's current voice; cleared when the slot is reused.
+  follows : Array[SlotFollow]
   mono_buffer : AudioBuffer
 }
 
@@ -202,6 +223,7 @@ fn VoiceSlot::VoiceSlot(block_size : Int) -> VoiceSlot {
     pan_right_gain: @dsp.pan_right_gain(0.0),
     send_gain: 0.0,
     gain: 1.0,
+    follows: [],
     mono_buffer: AudioBuffer::filled(block_size),
   }
 }
@@ -437,9 +459,14 @@ pub fn BoundVoicePool::set_template(
 ///|
 /// Start a voice from score controls: graph-bound keys convert through their
 /// bindings' units, and voice-frame keys set the new voice's frame.
+///
+/// Each `follow` entry makes the bound parameter for its key read a value at
+/// exact time `num / den` while the voice sounds; `update_follows` applies it.
+/// Keys this pool does not bind are ignored.
 pub fn BoundVoicePool::note_on_controls(
   self : BoundVoicePool,
   controls : Map[String, Double],
+  follow? : Array[(String, (Int64, Int64) -> Double)] = [],
 ) -> VoiceHandle? {
   let resolved = match self.note_gate(controls) {
     InvalidDuration => return None
@@ -464,8 +491,60 @@ pub fn BoundVoicePool::note_on_controls(
           ignore(self.pool.set_voice_send_result(handle, value))
       }
     })
+    if !follow.is_empty() {
+      let slot = self.pool.slots[handle.slot]
+      for entry in follow {
+        guard self.bindings.binding(entry.0) is Some(binding) else { continue }
+        let target = match binding.target {
+          Voice(Gain) => FollowTarget::Gain
+          Voice(Pan) => Pan
+          Voice(Send) => Send
+          Graph(node, param) => Graph(node, param, binding.unit)
+        }
+        slot.follows.push({
+          target,
+          read: entry.1,
+          last: controls.get(entry.0).unwrap_or(@double.not_a_number),
+        })
+      }
+    }
   }
   handle
+}
+
+///|
+/// Apply each sounding voice's followed values at exact time `num / den`
+/// (`den > 0`), only where they changed. Allocates nothing.
+pub fn BoundVoicePool::update_follows(
+  self : BoundVoicePool,
+  num : Int64,
+  den : Int64,
+) -> Unit {
+  for slot in self.pool.slots {
+    guard !(slot.state is VoiceState::Idle) else { continue }
+    for follow in slot.follows {
+      let value = (follow.read)(num, den)
+      if value.is_nan() || value == follow.last {
+        continue
+      }
+      follow.last = value
+      match follow.target {
+        Gain => slot.update_gain(value)
+        Pan => slot.update_pan(value)
+        Send => slot.update_send(value)
+        Graph(node, param, unit) =>
+          match slot.compiled {
+            Some(compiled) => {
+              let converted = unit.convert(value)
+              if compiled.can_set_param_bool(node, param, converted) {
+                ignore(compiled.set_param_bool(node, param, converted))
+              }
+            }
+            None => ()
+          }
+      }
+    }
+  }
 }
 
 ///|
@@ -813,6 +892,7 @@ fn VoicePool::activate_slot(
   slot.update_pan(pan)
   slot.send_gain = 0.0
   slot.gain = 1.0
+  slot.follows.clear()
   slot.state = VoiceState::Active
   // WHY overflow guard on generation: after 2^31 increments the counter
   // wraps negative, which could revalidate stale VoiceHandles. Resetting

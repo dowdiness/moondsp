@@ -57,11 +57,6 @@ pub fn PatternDocError::not_equal(Self, Self) -> Bool
 pub fn PatternDocError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
-pub struct BusReader {
-  // private fields
-}
-pub fn BusReader::value(Self, Rational) -> Double
-
 pub struct ControlBuses {
   // private fields
 }
@@ -99,7 +94,7 @@ pub impl[A : @debug.Debug] Show for Event[A]
 pub struct EventBuses {
   // private fields
 }
-pub fn EventBuses::each_reader(Self, (String, BusReader) -> Unit) -> Unit
+pub fn EventBuses::each_reader(Self, (String, (Int64, Int64) -> Double) -> Unit) -> Unit
 pub fn EventBuses::none() -> Self
 pub fn EventBuses::placed(Self, origin~ : Rational, rate? : Rational) -> Self
 

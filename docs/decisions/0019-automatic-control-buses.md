@@ -102,18 +102,22 @@ pure value in every cycle. Event selection inside a control provider
 (`degradeBy`, `gate`, `filter_map`, `jux` on the right-hand side) is a
 compile error.
 
-### 6. Playback evaluates each bus once per block
+### 6. The voice pool follows buses once per block
 
-At note-on the scheduler starts the voice with the event's values and records
-the bus for each bound key. Every block it evaluates the buses and sends a
-value to a voice only when it changed. Bus evaluation and the per-block update
-allocate nothing on the audio thread.
+At note-on the scheduler starts the voice with the event's values and, in the
+same call, hands the pool a reader for each time-varying bound key
+(`note_on_controls(controls, follow=...)`). The follower belongs to the voice
+slot: reusing the slot (including a steal) clears it, and an idle slot is
+skipped. Once per block the scheduler calls `update_follows` at the block's
+start time; each follower reads its bus and applies a value only when it
+changed. A shared bus is evaluated once per follower rather than once per
+table, because each placement is its own function and one evaluation costs
+about 41 ns. Reading and applying allocate nothing on the audio thread.
 
 Each event carries its buses already placed on the clock the event is on
 (`EventBuses`): Song placement and song repetition move a bus exactly as they
-move the event's spans. The scheduler keeps one follower per sounding voice and
-time-varying key, evaluated at block start; a voice that starts inside a block
-begins from its own onset value. A constant bus gets no follower.
+move the event's spans. A voice that starts inside a block begins from its own
+onset value. A constant bus gets no follower.
 
 ### 7. Smoothing belongs to DSP nodes
 
@@ -141,8 +145,9 @@ does today. Pattern values are in cycles; envelope times are in seconds.
   a note released during a fade keeps fading.
 - **Score edits.** When a new snapshot replaces a material, sounding voices
   keep reading the bus table of the snapshot that started them; new onsets
-  use the new table. A voice detached from the scheduler keeps its last
-  value.
+  use the new table. An edit that releases voices does not stop their
+  followers: a released voice keeps following until it is idle, like any
+  release. A killed voice is idle at once.
 - **Note-relative modulation.** A modulation that restarts at each onset
   cannot be one shared root-time bus. It is reserved as a later extension in
   which a voice reads its bus at `t − onset`, and is not built now.
@@ -203,11 +208,17 @@ because this toolchain rejects it; the repository was not changed for that.
   blocks each. In a release wasm-gc build holding a five-voice chord under an
   `lpf` sweep, the sweep and an unchanging control executed the same number of
   GC constructions (520,990 per 1,000 blocks, all in the existing event query),
-  and running the bus update ten times per block did not change it.
+  and running the bus update ten times per block did not change it. After
+  followers moved into voice slots, the same audit with a stacked `lpf` sweep
+  and `gain` fade was again unchanged by running `update_follows` ten times
+  per block, and browser output stayed bit-identical for six scores. A voice
+  test pins that a releasing voice keeps following and that a voice stealing
+  its slot starts without the old follower; each check fails when its rule is
+  removed.
 
 Not covered: CLAP integration and browser syntax for time-varying controls;
 weighted sequences in the allocation audit; onset-path allocation, which still
-runs the event query and builds each follower (an existing problem outside this
+runs the event query and builds each follower closure (an existing problem outside this
 ADR); user `Continuous` functions, which must themselves be allocation-free.
 
 ## Alternatives considered

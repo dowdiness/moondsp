@@ -51,7 +51,6 @@ pub struct PatternScheduler {
   priv active_notes : @voice_runtime.ActiveNotes
   priv playback_state : @playback.PlaybackState
   priv mut onsets : OnsetBuffer?
-  priv followers : BusFollowers
 }
 
 ///|
@@ -86,7 +85,6 @@ pub fn PatternScheduler::PatternScheduler(
     active_notes: @voice_runtime.ActiveNotes(),
     playback_state: @playback.PlaybackState(),
     onsets: None,
-    followers: BusFollowers(),
   }
 }
 
@@ -183,7 +181,9 @@ fn PatternScheduler::process_single_event(
             return
           }
         }
-        match pool.note_on_controls(map) {
+        let follow : Array[(String, (Int64, Int64) -> Double)] = []
+        buses.each_reader((key, read) => follow.push((key, read)))
+        match pool.note_on_controls(map, follow~) {
           None => ()
           Some(handle) => {
             let musical_end = if gate is AfterSeconds(_) {
@@ -207,14 +207,6 @@ fn PatternScheduler::process_single_event(
                 source_pitch~,
               )
             }
-            self.followers.follow(
-              instrument,
-              handle,
-              origin,
-              buses,
-              pool,
-              event.value,
-            )
           }
         }
       }
@@ -348,7 +340,10 @@ fn PatternScheduler::process_block_events(
   }
   // Voices started earlier follow their buses from this block's start; a
   // voice starting inside the block begins from its own onset value.
-  self.followers.update(frame.logical_arc.begin, self.pools)
+  let at = frame.logical_arc.begin
+  for pool in self.pools {
+    pool.update_follows(at.num, at.den)
+  }
   // Ceil may put a preceding block's final fractional onset at this block's
   // first sample. Retain that query result for one block; never query history.
   for sourced in self.previous_events {

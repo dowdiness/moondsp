@@ -130,7 +130,6 @@ fn PatternScheduler::render_frame(
       right.fill(0.0)
       self.kill_all_voices()
       self.active_notes.clear()
-      self.followers.clear()
       None
     }
   }
@@ -189,7 +188,6 @@ fn PatternScheduler::apply_tempo_plan(
     self.previous_events = []
     self.last_error = None
     self.active_notes.clear()
-    self.followers.clear()
     self.playback_state.reset()
   } else {
     self.active_notes.apply_retime(plan.deadlines)
@@ -297,7 +295,6 @@ pub fn PatternScheduler::reset_transport(self : PatternScheduler) -> Unit {
   self.previous_events = []
   self.last_error = None
   self.active_notes.clear()
-  self.followers.clear()
   self.playback_state.reset()
 }
 
