@@ -4,6 +4,7 @@ import {
   "dowdiness/moondsp/song",
   "moonbitlang/core/bench",
   "moonbitlang/core/json",
+  "moonbitlang/core/math",
 }
 
 import {

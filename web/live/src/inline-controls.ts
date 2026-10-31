@@ -48,7 +48,9 @@ function controlTargets(tree: Tree, source: string): Target[] {
           if (earlier.param === param) earlier.notice = "Overridden by a later modifier in this chain.";
         }
         local.push({ from: number.from, to: number.to, value, param,
-          notice: "Source edit · browser note/chord voices only; drums are unaffected." });
+          notice: param === GAIN
+            ? "Source edit · every sound, including drums."
+            : "Source edit · browser note/chord voices only; drums are unaffected." });
       });
     }
     targets.push(...local);

@@ -1913,19 +1913,10 @@ pub fn PatternDoc::continuous(
   key~ : String,
   f~ : (Double) -> Double,
 ) -> PatternDoc[ControlMap] {
-  let pat = Pat::from_query(arc => {
-    [
-      {
-        whole: None,
-        part: arc,
-        value: ControlMap::single(key, f(arc.begin.to_double())),
-      },
-    ]
-  })
   PatternDoc(
     root=id,
     revision=@identity.Revision::zero(),
-    nodes=singleton_pattern_nodes(id, Continuous(pat, key, f)),
+    nodes=singleton_pattern_nodes(id, Continuous(continuous(key, f), key, f)),
   )
 }
 

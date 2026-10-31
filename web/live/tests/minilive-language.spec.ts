@@ -140,3 +140,27 @@ test("MiniLive completes filters with cutoff and resonance arguments", async ({ 
   await labels.filter({ hasText: /^lpf$/ }).click();
   await expect.poll(() => readCode(page)).toBe('note("C4").lpf(hz, resonance)');
 });
+
+test("MiniLive completes signals inside control arguments and their methods", async ({ page }) => {
+  await page.goto("/");
+  const editor = page.locator(".cm-content");
+  const labels = page.locator(".cm-completionLabel");
+  await replaceCode(page, 'note("C4").lpf(sa');
+  await editor.press("Control+Space");
+  await expect(labels.filter({ hasText: /^saw$/ })).toBeVisible();
+  await labels.filter({ hasText: /^saw$/ }).click();
+  await expect.poll(() => readCode(page)).toBe('note("C4").lpf(saw');
+
+  await replaceCode(page, 'note("C4").lpf(saw.');
+  await editor.press("Control+Space");
+  await expect(labels.filter({ hasText: /^range$/ })).toBeVisible();
+  await expect(labels.filter({ hasText: /^gain$/ })).toHaveCount(0);
+  await labels.filter({ hasText: /^range$/ }).click();
+  await expect.poll(() => readCode(page)).toBe('note("C4").lpf(saw.range(low, high)');
+
+  // A pattern's own chain still offers pattern methods.
+  await replaceCode(page, 'note("C4").');
+  await editor.press("Control+Space");
+  await expect(labels.filter({ hasText: /^gain$/ })).toBeVisible();
+  await expect(labels.filter({ hasText: /^range$/ })).toHaveCount(0);
+});

@@ -108,7 +108,7 @@ test("references, groups, stacks and drums expose locally editable literals", as
     await enter(page, "Gain", "-.8");
     await enter(page, "Cutoff Hz", "2400");
     expect(await code(page)).toBe(`${receiver}.gain(-.8).lpf(2400, 1.)`);
-    await expect(page.getByRole("slider", { name: "Adjust Gain", exact: true })).toHaveAttribute("aria-description", /drums are unaffected/);
+    await expect(page.getByRole("slider", { name: "Adjust Gain", exact: true })).toHaveAttribute("aria-description", /including drums/);
   }
 });
 

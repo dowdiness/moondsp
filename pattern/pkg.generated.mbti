@@ -12,6 +12,8 @@ pub fn chord(String, octave? : Int) -> Pat[ControlMap]
 
 pub fn chord_notes(String, octave? : Int) -> Array[Double]?
 
+pub fn continuous(String, (Double) -> Double) -> Pat[ControlMap]
+
 pub fn control(String, Double) -> Pat[ControlMap]
 
 pub fn[A] every(Int, (Pat[A]) -> Pat[A], Pat[A]) -> Pat[A]

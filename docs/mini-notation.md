@@ -58,7 +58,18 @@ in the browser bundle.
 <p class="cheat-note">0.31 seconds total, independent of tempo. Omit hold to follow the pattern's note length. Omitted attack/release use the sound's defaults; release starts from the current level.</p>
 <p class="cheat-note"><code>.gate(0.4)</code> keeps every onset in place but shortens each note to 40% of its step, leaving the rest silent. <code>.gate(0)</code> is silent; <code>.gate(1)</code> keeps the full step. The gate follows tempo. Factors finer than one billionth are rounded to keep long-running timelines representable. An explicit <code>.hold(s)</code> instead uses physical seconds and overrides the event-derived ending.</p>
 <p class="cheat-note">Room is one shared stereo space for every part. Its tail continues across note endings, section changes, and live edits. Pause freezes playback and the room tail; Play resumes them. Restart clears the room state.</p>
-<p class="cheat-note"><code>.gain(n)</code>, <code>.lpf(hz, resonance?)</code>, and <code>.hpf(hz, resonance?)</code> control note and chord voices in the browser. Drum templates keep their authored level and filter shape; applying these controls to <code>s("...")</code> leaves the drum sound unchanged.</p>
+<p class="cheat-note"><code>.gain(n)</code>, <code>.pan(n)</code>, and <code>.room(n)</code> apply to every sound. <code>.lpf(hz, resonance?)</code> and <code>.hpf(hz, resonance?)</code> shape note and chord voices; drum templates keep their authored filter shape.</p>
+
+<h2 id="changing-values">Values that change over time</h2>
+<p class="cheat-note">Every control above takes a number, a quoted pattern of numbers, or a signal. A sounding note follows the change, including its release.</p>
+<dl>
+  <dt>.gain("0.3 0.8")</dt><dd>step through values; quoted notation works as in <code>note("...")</code></dd>
+  <dt>sine cosine saw isaw tri square</dt><dd>continuous signals from 0 to 1, one period per cycle</dd>
+  <dt>.range(lo, hi)</dt><dd>map a signal onto lo–hi</dd>
+  <dt>.slow(n) .fast(n)</dt><dd>stretch or speed up a signal</dd>
+</dl>
+<p><code>note("C2").slow(4)<br>&nbsp;&nbsp;.lpf(saw.range(200, 4000).slow(4))<br>&nbsp;&nbsp;.pan(sine)</code></p>
+<p class="cheat-note">A note starts from the value at its onset, then follows once per audio block. Limits such as room 0–1 apply to every value a pattern or signal can take.</p>
 
 <h2>Rhythm</h2>
 <p class="cheat-note">BPM sets cycles per minute: at 60, one cycle is one second. A cycle has no fixed meter.</p>
@@ -127,6 +138,8 @@ chord("C Am F G7").slow(2)
 s("bd ~ sd ~")
 note("C3 ~ C3 Eb3 ~ G2 Bb2 ~").gate(0.35)
 note("C3 E3 G3").gain(0.6).lpf(1800, 2).hpf(80)
+s("hh*16").gain("1 0.4 0.7 0.4")
+note("C2").slow(4).lpf(saw.range(200, 4000).slow(4)).pan(sine.slow(2))
 ```
 
 `note(...)` accepts names such as `C4`, `F#3`, and `Bb`; omitted octaves

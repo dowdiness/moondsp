@@ -392,3 +392,110 @@ test "cached subtree buses follow their new position after an edit" {
   @debug.assert_eq(gain_buses(cached), [(Some(64.0), 0.8)])
   @debug.assert_eq(gain_buses(cached), gain_buses(fresh))
 }
+
+///|
+/// The onset value and the bus reading, at `at`, of `key` on the first onset.
+fn mini_control_at(
+  source : String,
+  key : String,
+  at : @pattern.Rational,
+) -> (Double?, Double) raise {
+  let snapshot = match @mini.parse_snapshot(source) {
+    Ok(snapshot) => snapshot
+    Err(message) => fail(message)
+  }
+  let onset = snapshot.query_sourced_events(
+      @pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 64L)),
+    )[0]
+  guard onset.buses().reader(key) is Some(read) else { fail("no \{key} bus") }
+  (onset.event().value.get(key), read(at.num, at.den))
+}
+
+///|
+test "Mini control arguments accept quoted steps and signals" {
+  // A held note follows the second step while it sounds.
+  @debug.assert_eq(
+    mini_control_at("note(\"60\").gain(\"0.2 0.8\")", "gain", bus_r(3L, 4L)),
+    (Some(0.2), 0.8),
+  )
+  // slow(4) stretches the saw: 200 + 800 × t / 4.
+  @debug.assert_eq(
+    mini_control_at(
+      "note(\"60\").slow(8).lpf(saw.range(200, 1000).slow(4))",
+      "lpf",
+      bus_r(2L, 1L),
+    ),
+    (Some(200.0), 600.0),
+  )
+  // A later range maps the earlier one: 1 + 2 × (0 + 10 × 0.5).
+  @debug.assert_eq(
+    mini_control_at(
+      "note(\"60\").pan(saw.range(0, 10).range(1, 3))",
+      "pan",
+      bus_r(1L, 2L),
+    ),
+    (Some(1.0), 11.0),
+  )
+  // The resonance argument takes the same forms.
+  @debug.assert_eq(
+    mini_control_at(
+      "note(\"60\").lpf(800, \"1 4\")",
+      "lpf_resonance",
+      bus_r(1L, 2L),
+    ),
+    (Some(1.0), 4.0),
+  )
+  let shape = (name : String, t : @pattern.Rational) => {
+    mini_control_at("note(\"60\").gain(\{name})", "gain", t).1
+  }
+  @debug.assert_eq(
+    [
+      shape("sine", bus_r(1L, 4L)),
+      shape("cosine", bus_r(0L, 1L)),
+      shape("isaw", bus_r(1L, 4L)),
+      shape("tri", bus_r(1L, 4L)),
+      shape("tri", bus_r(3L, 4L)),
+      shape("square", bus_r(1L, 4L)),
+      shape("square", bus_r(3L, 4L)),
+    ],
+    [1.0, 1.0, 0.75, 0.5, 0.5, 0.0, 1.0],
+  )
+  // The runtime pattern path gives the same onset values.
+  guard @mini.parse("note(\"60 64\").gain(\"0.2 0.8\")") is Ok(pat) else {
+    fail("parse")
+  }
+  @debug.assert_eq(
+    pat
+    .query(@pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 1L)))
+    .map(event => event.value.get("gain")),
+    [Some(0.2), Some(0.8)],
+  )
+}
+
+///|
+test "Mini control arguments are range-checked and syntax-checked" {
+  let error = (source : String) => {
+    match @mini.parse_snapshot(source) {
+      Ok(_) => "ok"
+      Err(message) => message
+    }
+  }
+  inspect(
+    [
+      error("note(\"60\").room(\"0.5 2\")"),
+      error("note(\"60\").attack(saw.range(0, 100000))"),
+      error("note(\"60\").lpf(800, saw.range(0, 2))"),
+      error("note(\"60\").gain(sin)"),
+      error("note(\"60\").gain(saw.wobble(2))"),
+      error("note(\"60\").gain(\"0.3 C4\")"),
+    ].join("\n"),
+    content=(
+      #|position 11: room() expects a send between 0 and 1
+      #|position 11: attack() expects seconds between 0 and 86400
+      #|position 11: lpf() expects finite resonance above 0
+      #|position 16: expected a number, a quoted pattern, or a signal (sine, cosine, saw, isaw, tri, square), got 'sin'
+      #|position 20: unknown signal method 'wobble'; use range, fast, or slow
+      #|position 4: expected number
+    ),
+  )
+}

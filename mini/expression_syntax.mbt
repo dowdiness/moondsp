@@ -44,14 +44,103 @@ fn MiniFilterKind::resonance_control_key(self : MiniFilterKind) -> String {
 }
 
 ///|
+/// A periodic signal shape with values in [0, 1] and period one cycle.
+priv enum MiniShape {
+  Sine
+  Cosine
+  Saw
+  Isaw
+  Tri
+  Square
+}
+
+///|
+fn MiniShape::from_name(name : String) -> MiniShape? {
+  match name {
+    "sine" => Some(Sine)
+    "cosine" => Some(Cosine)
+    "saw" => Some(Saw)
+    "isaw" => Some(Isaw)
+    "tri" => Some(Tri)
+    "square" => Some(Square)
+    _ => None
+  }
+}
+
+///|
+fn MiniShape::name(self : MiniShape) -> String {
+  match self {
+    Sine => "sine"
+    Cosine => "cosine"
+    Saw => "saw"
+    Isaw => "isaw"
+    Tri => "tri"
+    Square => "square"
+  }
+}
+
+///|
+/// The shape at cycle position `t`. Allocates nothing.
+fn MiniShape::at(self : MiniShape, t : Double) -> Double {
+  let phase = t - t.floor()
+  match self {
+    Sine => 0.5 + 0.5 * @math.sin(2.0 * @math.PI * phase)
+    Cosine => 0.5 + 0.5 * @math.cos(2.0 * @math.PI * phase)
+    Saw => phase
+    Isaw => 1.0 - phase
+    Tri => if phase < 0.5 { 2.0 * phase } else { 2.0 - 2.0 * phase }
+    Square => if phase < 0.5 { 0.0 } else { 1.0 }
+  }
+}
+
+///|
+/// `low + (high - low) × shape(t × rate)`.
+priv struct MiniSignal {
+  shape : MiniShape
+  low : Double
+  high : Double
+  rate : @pattern.Rational
+}
+
+///|
+/// The signal before its rate, as a function of cycle position.
+fn MiniSignal::function(self : MiniSignal) -> (Double) -> Double {
+  let shape = self.shape
+  let low = self.low
+  let span = self.high - self.low
+  t => low + span * shape.at(t)
+}
+
+///|
+/// A control argument: one value, a quoted Mini pattern of numbers, or a
+/// continuous signal.
+priv enum MiniValue {
+  Number(Double)
+  /// Quoted notation, the source offset of its content, and its numbers.
+  Steps(String, Int, Array[Double])
+  Signal(MiniSignal)
+}
+
+///|
+/// Whether every value this argument can take satisfies `ok`. A signal stays
+/// between its two range endpoints.
+fn MiniValue::all(self : MiniValue, ok : (Double) -> Bool) -> Bool {
+  match self {
+    Number(value) => ok(value)
+    Steps(_, _, values) => values.iter().all(ok)
+    Signal(signal) => ok(signal.low) && ok(signal.high)
+  }
+}
+
+///|
 priv enum MiniTransform {
   Fast(@pattern.Rational)
   Slow(@pattern.Rational)
   Gate(@pattern.Rational)
   Rev
   Degrade(Double)
-  Control(String, Double)
-  Filter(MiniFilterKind, Double, Double?)
+  Control(String, MiniValue)
+  Filter(MiniFilterKind, MiniValue, MiniValue?)
   Every(Int, MiniCallback)
   Jux(MiniCallback)
 }
@@ -310,52 +399,40 @@ fn Parser::parse_transform(self : Parser) -> MiniTransform raise ParseError {
     }
     "lpf" | "hpf" => {
       self.expect_char('(')
-      self.skip_whitespace()
-      let frequency_hz = self.read_number()
+      let kind : MiniFilterKind = if name == "lpf" { LowPass } else { HighPass }
+      let frequency_hz = self.read_control_value(kind.control_key())
       self.skip_whitespace()
       let resonance = if !self.at_end() && self.input[self.pos] == ',' {
         self.pos += 1
-        self.skip_whitespace()
-        let q = self.read_number()
-        self.skip_whitespace()
+        let q = self.read_control_value(kind.resonance_control_key())
+        guard q.all(q => !q.is_nan() && !q.is_inf() && q > 0.0) else {
+          raise ParseError(
+            "position \{method_start}: \{name}() expects finite resonance above 0",
+          )
+        }
         Some(q)
       } else {
         None
       }
+      self.skip_whitespace()
       self.expect_char(')')
-      match resonance {
-        Some(q) if q.is_nan() || q.is_inf() || q <= 0.0 =>
-          raise ParseError(
-            "position \{method_start}: \{name}() expects finite resonance above 0",
-          )
-        _ => ()
-      }
-      let kind : MiniFilterKind = if name == "lpf" { LowPass } else { HighPass }
       Filter(kind, frequency_hz, resonance)
     }
     "attack" | "hold" | "release" => {
-      let seconds = self.read_method_number_argument()
-      if seconds.is_nan() ||
-        seconds.is_inf() ||
-        seconds < 0.0 ||
-        seconds > 86400.0 {
+      let seconds = self.read_method_control_argument(name)
+      guard seconds.all(s => {
+        !s.is_nan() && !s.is_inf() && s >= 0.0 && s <= 86400.0
+      }) else {
         raise ParseError(
           "position \{method_start}: \{name}() expects seconds between 0 and 86400",
         )
       }
       Control(name, seconds)
     }
-    "gain" => {
-      let gain = self.read_method_number_argument()
-      Control("gain", gain)
-    }
-    "pan" => {
-      let pan = self.read_method_number_argument()
-      Control("pan", pan)
-    }
+    "gain" | "pan" => Control(name, self.read_method_control_argument(name))
     "room" => {
-      let send = self.read_method_number_argument()
-      if send.is_nan() || send.is_inf() || send < 0.0 || send > 1.0 {
+      let send = self.read_method_control_argument("room")
+      guard send.all(s => !s.is_nan() && !s.is_inf() && s >= 0.0 && s <= 1.0) else {
         raise ParseError(
           "position \{method_start}: room() expects a send between 0 and 1",
         )

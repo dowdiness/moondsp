@@ -286,15 +286,104 @@ fn Parser::read_number(self : Parser) -> Double raise ParseError {
 }
 
 ///|
-fn Parser::read_method_number_argument(
+fn Parser::read_method_control_argument(
   self : Parser,
-) -> Double raise ParseError {
+  key : String,
+) -> MiniValue raise ParseError {
   self.expect_char('(')
-  self.skip_whitespace()
-  let value = self.read_number()
+  let value = self.read_control_value(key)
   self.skip_whitespace()
   self.expect_char(')')
   value
+}
+
+///|
+/// A control argument: a number, a quoted Mini pattern of numbers such as
+/// `"0.3 <0.6 0.9>"`, or a signal such as `sine.range(200, 4000).slow(4)`.
+fn Parser::read_control_value(
+  self : Parser,
+  key : String,
+) -> MiniValue raise ParseError {
+  self.skip_whitespace()
+  let start = self.pos
+  guard !self.at_end() else {
+    raise ParseError("position \{start}: expected a control value")
+  }
+  if self.input[self.pos] == '"' {
+    let (content, offset) = self.read_quoted_string_with_start()
+    guard !content.is_empty() else {
+      raise ParseError("position \{offset}: empty notation")
+    }
+    let notation = NotationParser(content, sound=false, control=key)
+    ignore(notation.parse_notation())
+    return Steps(content, offset, notation.control_values)
+  }
+  let name = self.read_ident()
+  if name.is_empty() {
+    return Number(self.read_number())
+  }
+  guard MiniShape::from_name(name) is Some(shape) else {
+    raise ParseError(
+      "position \{start}: expected a number, a quoted pattern, or a signal (sine, cosine, saw, isaw, tri, square), got '\{name}'",
+    )
+  }
+  let mut low = 0.0
+  let mut high = 1.0
+  let mut rate = @pattern.Rational::from_int(1)
+  while true {
+    let before = self.pos
+    self.skip_whitespace()
+    guard !self.at_end() && self.input[self.pos] == '.' else {
+      self.pos = before
+      break
+    }
+    self.pos += 1
+    let method_start = self.pos
+    match self.read_ident() {
+      "range" => {
+        self.expect_char('(')
+        self.skip_whitespace()
+        let from = self.read_number()
+        self.skip_whitespace()
+        self.expect_char(',')
+        self.skip_whitespace()
+        let to = self.read_number()
+        self.skip_whitespace()
+        self.expect_char(')')
+        // Ranges compose: the new range maps the current one.
+        let span = to - from
+        let next_low = from + span * low
+        high = from + span * high
+        low = next_low
+      }
+      "fast" | "slow" as op => {
+        self.expect_char('(')
+        self.skip_whitespace()
+        let value_start = self.pos
+        let value = self.read_number()
+        let value_end = self.pos
+        self.skip_whitespace()
+        self.expect_char(')')
+        guard !value.is_nan() && !value.is_inf() && value > 0.0 else {
+          raise ParseError(
+            "position \{method_start}: \{op}() requires a finite positive number, got \{value}",
+          )
+        }
+        let factor = parse_decimal_rational(
+          self.input,
+          value_start,
+          value_end,
+          method_start,
+        )
+        rate = if op == "fast" { rate * factor } else { rate / factor }
+      }
+      other =>
+        raise ParseError(
+          "position \{method_start}: unknown signal method '\{other}'; use range, fast, or slow",
+        )
+    }
+  }
+  Signal({ shape, low, high, rate, })
 }
 
 ///|

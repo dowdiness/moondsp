@@ -631,6 +631,58 @@ fn MiniDocBuilder::scalar_control_doc(
 }
 
 ///|
+/// Merge the control `value` gives `key` into `doc`.
+fn MiniDocBuilder::control_value_doc(
+  self : MiniDocBuilder,
+  doc : @pattern.PatternDoc[@pattern.ControlMap],
+  key : String,
+  value : MiniValue,
+) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
+  let (signature, control_doc) = match value {
+    Number(value) => return self.scalar_control_doc(doc, key, value)
+    Steps(content, offset, _) => {
+      let notation = NotationParser(
+        content,
+        sound=false,
+        control=key,
+        source_offset=offset,
+      )
+      (
+        "steps:\{mini_doc_id_fragment(content)}",
+        notation.parse_doc_notation(self),
+      )
+    }
+    Signal(signal) => {
+      let signature = mini_doc_id_fragment(
+        "\{signal.shape.name()}:\{signal.low}:\{signal.high}:\{signal.rate.num}:\{signal.rate.den}",
+      )
+      let id = self.node_id("signal", "\{key}:\{signature}")
+      let shaped = match self.reuse_doc(id) {
+        Some(doc) => doc
+        None => @pattern.PatternDoc::continuous(id~, key~, f=signal.function())
+      }
+      let timed = if signal.rate == @pattern.Rational::from_int(1) {
+        shaped
+      } else {
+        self.fast_doc(shaped, signal.rate)
+      }
+      ("signal:\{signature}", timed)
+    }
+  }
+  let id = self.node_id(
+    "merge_control",
+    "\{doc.root().value()}:\{key}:\{signature}",
+  )
+  match self.reuse_doc(id, inputs=[doc, control_doc]) {
+    Some(doc) => doc
+    None =>
+      @pattern.PatternDoc::merge_control(id~, left=doc, right=control_doc) catch {
+        _ => raise ParseError("internal mini PatternDoc construction failed")
+      }
+  }
+}
+
+///|
 fn doc_root_signature(
   docs : Array[@pattern.PatternDoc[@pattern.ControlMap]],
 ) -> String {
@@ -985,6 +1037,16 @@ fn NotationParser::parse_doc_atom(
       self.source_offset + self.pos,
     )
     return builder.rest_doc(id)
+  }
+  if self.control is Some(key) {
+    let (value, token, token_start, token_end) = self.read_control_number(start)
+    let id = builder.atom_id_at(
+      "control",
+      "\{key}:\{token}",
+      self.source_offset + token_start,
+      self.source_offset + token_end,
+    )
+    return builder.control_doc(id, key, value)
   }
   if self.sound {
     let name = self.read_ident()

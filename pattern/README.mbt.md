@@ -213,6 +213,7 @@ Audio-facing helpers produce `Pat[ControlMap]` values:
 - `chord` overlays several note events;
 - `sound` sets `sound`;
 - `control` creates any scalar control;
+- `continuous` creates a control whose value is a function of exact time;
 - `s_gain`, `s_lpf`, `s_hpf`, and `s_pan` create common control patterns.
 
 The pattern package only carries these values. A scheduler or host decides how

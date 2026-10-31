@@ -9,6 +9,9 @@ s("bd hh sd hh").fast(2)
 The package owns parsing and source identity. It does not choose DSP graphs or
 instruments. Parsed events contain controls such as `sound`, `note`, `pan`, and
 `room`; the scheduler and host decide how those controls affect audio.
+Control arguments may change over time: `gain("1 0.5")` steps through values,
+and `lpf(sine.range(400, 2000).slow(4))` follows a signal. See
+[mini notation](../docs/mini-notation.md).
 
 ## Architecture context
 

@@ -64,6 +64,21 @@ pub fn ControlMap::merge(self : ControlMap, other : ControlMap) -> ControlMap {
 }
 
 ///|
+/// A continuous control: `key` is `f(t)` at the start of every queried part,
+/// with no onsets. `f` must not allocate when it drives a control bus.
+pub fn continuous(key : String, f : (Double) -> Double) -> Pat[ControlMap] {
+  Pat::from_query(arc => {
+    [
+      {
+        whole: None,
+        part: arc,
+        value: ControlMap::single(key, f(arc.begin.to_double())),
+      },
+    ]
+  })
+}
+
+///|
 pub fn note(n : Double) -> Pat[ControlMap] {
   control("note", n)
 }

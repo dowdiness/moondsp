@@ -1,6 +1,6 @@
 # ADR-0019: Parameter automation through automatic control buses
 
-- **Status:** Accepted 2026-10-26. Pattern lowering derives buses, and `PatternScheduler` makes sounding voices follow them. Mini has no syntax for time-varying controls yet, so browser scores only produce constant buses; CLAP does not read buses.
+- **Status:** Accepted 2026-10-26. Pattern lowering derives buses, and `PatternScheduler` makes sounding voices follow them. Mini control arguments accept quoted steps and signals (`sine`, `saw`, … with `.range`, `.slow`, `.fast`), so browser scores produce time-varying buses; CLAP does not read buses.
 - **Date:** 2026-10-26
 - **Source:** "moondsp パラメータ・オートメーション設計" (Koji Ishimoto, 2026-10-23; not in the repository) and its review in [Amp thread T-01a1714e](https://ampcode.com/threads/T-01a1714e-2aed-7167-9b7d-63c73f2b4396)
 - **Related:** [ADR-0007 ControlMap accessor surface](0007-control-map-accessor-surface.md), [ADR-0018 playback visualization](0018-playback-visualization-origin-truth.md), [Domain glossary](../../CONTEXT.md), [technical reference](../technical-reference.md)
@@ -216,7 +216,7 @@ because this toolchain rejects it; the repository was not changed for that.
   its slot starts without the old follower; each check fails when its rule is
   removed.
 
-Not covered: CLAP integration and browser syntax for time-varying controls;
+Not covered: CLAP integration;
 weighted sequences in the allocation audit; onset-path allocation, which still
 runs the event query and builds each follower closure (an existing problem outside this
 ADR); user `Continuous` functions, which must themselves be allocation-free.

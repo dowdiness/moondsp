@@ -114,6 +114,10 @@ priv struct NotationParser {
   mut pos : Int
   sound : Bool
   chord : Bool
+  /// Numbers only, each the value of this control key.
+  control : String?
+  /// Every number read in control mode, for range checks.
+  control_values : Array[Double]
   source_offset : Int
   mut query_work : MiniQueryWork?
   recognized_atoms : Array[RecognizedAtom]?
@@ -129,6 +133,7 @@ fn NotationParser::NotationParser(
   input : String,
   sound~ : Bool,
   chord? : Bool = false,
+  control? : String,
   source_offset? : Int = 0,
   assess? : Bool = false,
   recognized_atoms? : Array[RecognizedAtom]? = None,
@@ -138,6 +143,8 @@ fn NotationParser::NotationParser(
     pos: 0,
     sound,
     chord,
+    control,
+    control_values: [],
     source_offset,
     recognized_atoms,
     depth: 0,
@@ -644,6 +651,10 @@ fn NotationParser::parse_atom_value(
     }
     return @pattern.Pat::silence()
   }
+  if self.control is Some(key) {
+    let (value, _, _, _) = self.read_control_number(start)
+    return @pattern.control(key, value)
+  }
   if self.sound {
     // Read identifier
     let name = self.read_ident()
@@ -806,6 +817,19 @@ fn NotationParser::read_ident(self : NotationParser) -> String {
     }
   }
   self.input[start:self.pos].to_owned()
+}
+
+///|
+/// Read one number of a control pattern, with its token and span.
+fn NotationParser::read_control_number(
+  self : NotationParser,
+  start : Int,
+) -> (Double, String, Int, Int) raise ParseError {
+  let read = self.read_note_number_value(start) catch {
+    ParseError(_) => raise ParseError("position \{start}: expected number")
+  }
+  self.control_values.push(read.0)
+  read
 }
 
 ///|

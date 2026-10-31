@@ -3,9 +3,10 @@
 // Four contexts, in priority order:
 //   1. Inside a `String` whose enclosing call is `s(...)` → drum names.
 //   2. After `.<word>` → method names (`fast`, `slow`, `rev`, …).
+//   2a. After `.` on a chain that starts with a signal → `range`, `fast`, `slow`.
 //   3. Inside `Args` of a `MemberCall` whose method is `jux` (any
 //      position) or `every` (past the first comma) → callback names
-//      (`fast`, `slow`, `rev`).
+//      (`fast`, `slow`, `rev`); of a control method → signal names.
 //   4. Top-level prefix → `$:`, `s`, `note`, `chord`, `stack`.
 
 import type { CompletionContext, CompletionResult, Completion } from "@codemirror/autocomplete";
@@ -31,7 +32,7 @@ const METHODS: Completion[] = [
   snippetCompletion("hold(${seconds})", { label: "hold", type: "method", detail: "hold after attack, seconds" }),
   snippetCompletion("release(${seconds})", { label: "release", type: "method", detail: "note fade-out, seconds" }),
   snippetCompletion("gate(${fraction})", { label: "gate", type: "method", detail: "audible fraction of each step (0–1)" }),
-  snippetCompletion("gain(${amount})", { label: "gain", type: "method", detail: "synth voice level" }),
+  snippetCompletion("gain(${amount})", { label: "gain", type: "method", detail: "voice level" }),
   snippetCompletion("lpf(${hz}, ${resonance})", { label: "lpf", type: "method", detail: "low-pass cutoff and optional resonance (Q)" }),
   snippetCompletion("hpf(${hz}, ${resonance})", { label: "hpf", type: "method", detail: "high-pass cutoff and optional resonance (Q)" }),
   snippetCompletion("room(${send})", { label: "room", type: "method", detail: "send to shared room (0–1)" }),
@@ -47,6 +48,24 @@ const CALLBACKS: Completion[] = [
   snippetCompletion("fast(${k})", { label: "fast", type: "function" }),
   snippetCompletion("slow(${k})", { label: "slow", type: "function" }),
   { label: "rev", type: "constant" },
+];
+
+// Methods whose arguments take a number, a quoted pattern, or a signal.
+const CONTROL_METHODS = new Set(["gain", "pan", "room", "lpf", "hpf", "attack", "hold", "release"]);
+
+const SIGNALS: Completion[] = [
+  { label: "sine", type: "constant", detail: "0–1 sine, one period per cycle" },
+  { label: "cosine", type: "constant", detail: "sine starting at 1" },
+  { label: "saw", type: "constant", detail: "rise 0→1 each cycle" },
+  { label: "isaw", type: "constant", detail: "fall 1→0 each cycle" },
+  { label: "tri", type: "constant", detail: "0→1→0 each cycle" },
+  { label: "square", type: "constant", detail: "0, then 1 for the second half" },
+];
+
+const SIGNAL_METHODS: Completion[] = [
+  snippetCompletion("range(${low}, ${high})", { label: "range", type: "method", detail: "map 0–1 onto low–high" }),
+  snippetCompletion("slow(${n})", { label: "slow", type: "method", detail: "n× slower" }),
+  snippetCompletion("fast(${n})", { label: "fast", type: "method", detail: "n× faster" }),
 ];
 
 const DRUMS: Completion[] = [
@@ -153,9 +172,12 @@ export function miniliveCompletion(context: CompletionContext): CompletionResult
   // ── 2. After `.` → method completion ───────────────────────
   const dot = context.matchBefore(/\.[A-Za-z_]*$/);
   if (dot) {
+    const chain = ancestorOfType(tree.resolveInner(dot.from, -1), "Chain");
+    const head = chain?.firstChild?.name === "Call" ? chain.firstChild.getChild("CallName") : null;
+    const headText = head ? state.doc.sliceString(head.from, head.to) : "";
     return {
       from: dot.from + 1,
-      options: METHODS,
+      options: SIGNALS.some(signal => signal.label === headText) ? SIGNAL_METHODS : METHODS,
       validFor: /^[A-Za-z_0-9]*$/,
     };
   }
@@ -169,12 +191,12 @@ export function miniliveCompletion(context: CompletionContext): CompletionResult
       const mtext = mname ? state.doc.sliceString(mname.from, mname.to) : "";
       const isCallbackSlot =
         mtext === "jux" || (mtext === "every" && pastFirstComma(argsNode, pos, state.doc));
-      if (isCallbackSlot) {
+      if (isCallbackSlot || CONTROL_METHODS.has(mtext)) {
         const word = context.matchBefore(/[A-Za-z_]+$/);
         if (!word && !context.explicit) return null;
         return {
           from: word ? word.from : pos,
-          options: CALLBACKS,
+          options: isCallbackSlot ? CALLBACKS : SIGNALS,
           validFor: /^[A-Za-z_0-9]*$/,
         };
       }

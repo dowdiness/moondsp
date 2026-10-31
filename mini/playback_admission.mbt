@@ -12,6 +12,9 @@ priv enum MiniQueryWork {
   Split(MiniQueryWork)
   MapEvents(MiniQueryWork)
   MergeScalar(MiniQueryWork)
+  /// Merge a control pattern: every left event folds over the right events
+  /// of the same query.
+  MergeWith(MiniQueryWork, MiniQueryWork)
   Precision(MiniQueryWork, Double)
 }
 
@@ -114,6 +117,14 @@ fn MiniQueryWork::estimate(
       let bound = child.estimate(width, scale~, aligned~, depth=depth + 1)
       MiniQueryBound(bound.events, bound.work + bound.events * cycles + cycles)
     }
+    MergeWith(left, right) => {
+      let left = left.estimate(width, scale~, aligned~, depth=depth + 1)
+      let right = right.estimate(width, scale~, aligned~, depth=depth + 1)
+      MiniQueryBound(
+        left.events,
+        left.work + right.work + left.events * right.events + 1.0,
+      )
+    }
     Precision(child, magnitude) =>
       child.estimate(width, scale=scale * magnitude, aligned~, depth=depth + 1)
   }
@@ -191,6 +202,28 @@ fn PlaybackAdmission::PlaybackAdmission(width : Double) -> PlaybackAdmission {
 }
 
 ///|
+/// Merging this argument into `child`. A number or signal answers each query
+/// with one event per cycle, like a scalar.
+fn MiniValue::merge_work(
+  self : MiniValue,
+  child : MiniQueryWork,
+) -> MiniQueryWork raise ParseError {
+  match self {
+    Number(_) | Signal(_) => MergeScalar(child)
+    Steps(content, _, _) => {
+      let notation = NotationParser(
+        content,
+        sound=false,
+        control="",
+        assess=true,
+      )
+      ignore(notation.parse_notation())
+      MergeWith(child, notation.query_work.unwrap())
+    }
+  }
+}
+
+///|
 fn MiniCallback::query_work(
   self : MiniCallback,
   child : MiniQueryWork,
@@ -246,13 +279,14 @@ fn PlaybackAdmission::expression(
           )
         Gate(_) | Degrade(_) => MapEvents(child)
         Rev => Split(child)
-        Control(_, _) => MergeScalar(child)
-        Filter(_, _, resonance) =>
-          if resonance is Some(_) {
-            MergeScalar(MergeScalar(child))
-          } else {
-            MergeScalar(child)
+        Control(_, value) => value.merge_work(child)
+        Filter(_, frequency_hz, resonance) => {
+          let filtered = frequency_hz.merge_work(child)
+          match resonance {
+            Some(q) => q.merge_work(filtered)
+            None => filtered
           }
+        }
         Every(_, callback) =>
           Split(Overlay([child, callback.query_work(child)]))
         Jux(callback) =>

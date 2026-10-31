@@ -76,6 +76,27 @@ fn[A] ResolvedMiniExpr::ResolvedMiniExpr(
 }
 
 ///|
+/// The control pattern this argument gives `key`.
+fn MiniValue::pattern(
+  self : MiniValue,
+  key : String,
+) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
+  match self {
+    Number(value) => @pattern.control(key, value)
+    Steps(content, _, _) =>
+      NotationParser(content, sound=false, control=key).parse_notation()
+    Signal(signal) => {
+      let pat = @pattern.continuous(key, signal.function())
+      if signal.rate == @pattern.Rational::from_int(1) {
+        pat
+      } else {
+        pat.fast(signal.rate)
+      }
+    }
+  }
+}
+
+///|
 fn compile_mini_pattern(
   expr : ResolvedMiniExpr[@pattern.Pat[@pattern.ControlMap]],
 ) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
@@ -102,19 +123,18 @@ fn compile_mini_pattern(
         Gate(factor) => pat.gate(factor)
         Rev => pat.rev()
         Degrade(p) => pat.degrade_by(p)
-        Control(key, value) =>
-          @pattern.merge_control(pat, @pattern.control(key, value))
+        Control(key, value) => @pattern.merge_control(pat, value.pattern(key))
         Filter(kind, frequency_hz, resonance) => {
           let filtered = @pattern.merge_control(
             pat,
-            @pattern.control(kind.control_key(), frequency_hz),
+            frequency_hz.pattern(kind.control_key()),
           )
           match resonance {
             None => filtered
             Some(q) =>
               @pattern.merge_control(
                 filtered,
-                @pattern.control(kind.resonance_control_key(), q),
+                q.pattern(kind.resonance_control_key()),
               )
           }
         }
@@ -184,9 +204,9 @@ fn compile_mini_doc(
         Rev => builder.rev_doc(doc)
         Degrade(p) =>
           builder.degrade_doc(doc, p, stable_seed(doc.root().value()))
-        Control(key, value) => builder.scalar_control_doc(doc, key, value)
+        Control(key, value) => builder.control_value_doc(doc, key, value)
         Filter(kind, frequency_hz, resonance) => {
-          let filtered = builder.scalar_control_doc(
+          let filtered = builder.control_value_doc(
             doc,
             kind.control_key(),
             frequency_hz,
@@ -194,7 +214,7 @@ fn compile_mini_doc(
           match resonance {
             None => filtered
             Some(q) =>
-              builder.scalar_control_doc(
+              builder.control_value_doc(
                 filtered,
                 kind.resonance_control_key(),
                 q,
