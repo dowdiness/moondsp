@@ -31,17 +31,17 @@ test "bench/rational/construction" (b : @bench.T) {
   })
   b.bench(name="normalize_zero", fn() {
     for den in denominators {
-      b.keep(Rational::new(0L, den))
+      b.keep(Rational(0L, den))
     }
   })
   b.bench(name="normalize_one", fn() {
     for den in denominators {
-      b.keep(Rational::new(den, den))
+      b.keep(Rational(den, den))
     }
   })
   b.bench(name="normalize_general", fn() {
     for pair in fractions {
-      b.keep(Rational::new(pair.0, pair.1))
+      b.keep(Rational(pair.0, pair.1))
     }
   })
 }
@@ -49,8 +49,8 @@ test "bench/rational/construction" (b : @bench.T) {
 ///|
 test "bench/time/whole-cycles" (b : @bench.T) {
   let arcs = Array::makei(128, index => {
-    let begin = Rational::new(Int64::from_int(index * 13 - 512), 12L)
-    TimeSpan::new(begin, begin + Rational::new(7L, 4L))
+    let begin = Rational(Int64::from_int(index * 13 - 512), 12L)
+    TimeSpan(begin, begin + Rational(7L, 4L))
   })
   b.bench(name="whole_cycles_varied", fn() {
     for arc in arcs {
@@ -62,10 +62,10 @@ test "bench/time/whole-cycles" (b : @bench.T) {
 ///|
 test "bench/pattern/sequence-slots" (b : @bench.T) {
   let pat = sequence(Array::makei(16, index => Pat::pure(index)))
-  let width = Rational::new(1L, 600L)
+  let width = Rational(1L, 600L)
   let arcs = Array::makei(600, index => {
-    let begin = Rational::new(Int64::from_int(index), 300L)
-    TimeSpan::new(begin, begin + width)
+    let begin = Rational(Int64::from_int(index), 300L)
+    TimeSpan(begin, begin + width)
   })
   b.bench(name="sequence_600_varied_arcs", fn() {
     for arc in arcs {

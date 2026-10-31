@@ -7,7 +7,7 @@ fn bus_id(name : String) -> @identity.PatternNodeId {
 
 ///|
 fn bus_r(num : Int64, den : Int64) -> @pattern.Rational {
-  @pattern.Rational::new(num, den)
+  @pattern.Rational(num, den)
 }
 
 ///|
@@ -77,7 +77,7 @@ fn bus_follow(
   let mut unbound = 0
   let mut t = bus_r(0L, 1L)
   while t < bus_r(4L, 1L) {
-    let arc = @pattern.TimeSpan::new(t, t + step)
+    let arc = @pattern.TimeSpan(t, t + step)
     for event in snapshot.query(arc) {
       guard event.whole is Some(_) && event.part.begin == arc.begin else {
         continue
@@ -295,7 +295,7 @@ test "held voice follows a stretched sweep through its bus" {
   )
   let snapshot = doc.lower_with_buses()
   let step = bus_r(1L, 4L)
-  let onset = snapshot.query(@pattern.TimeSpan::new(bus_r(0L, 1L), step))[0]
+  let onset = snapshot.query(@pattern.TimeSpan(bus_r(0L, 1L), step))[0]
   guard onset.value.bus_for("gain") is Some(bus) else { fail("no gain bus") }
   let values = []
   let mut t = bus_r(0L, 1L)
@@ -347,15 +347,13 @@ test "filter_map that rewrites a bound value unbinds it" {
   let snapshot = bus_with("note(\"60\")", "m", bus_steps("st", [0.5]))
     .filter_map(id=bus_id("f"), f=c => Some(c.set("gain", 1.0)))
     .lower_with_buses()
-  let onset = snapshot.query(
-      @pattern.TimeSpan::new(bus_r(0L, 1L), bus_r(1L, 8L)),
-    )[0]
+  let onset = snapshot.query(@pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 8L)))[0]
   @debug.assert_eq(onset.value.controls().get("gain"), Some(1.0))
   @debug.assert_eq(onset.value.bus_for("gain"), None)
   // An unchanged value keeps following its bus.
   let kept = bus_with("note(\"60\")", "k", bus_steps("st", [0.5]))
     .filter_map(id=bus_id("f"), f=c => Some(c))
     .lower_with_buses()
-  let onset = kept.query(@pattern.TimeSpan::new(bus_r(0L, 1L), bus_r(1L, 8L)))[0]
+  let onset = kept.query(@pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 8L)))[0]
   @debug.assert_eq(onset.value.bus_for("gain") is Some(_), true)
 }

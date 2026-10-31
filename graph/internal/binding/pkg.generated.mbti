@@ -15,7 +15,6 @@ import {
 pub struct ControlBindingBuilder {
   // private fields
 } derive(@debug.Debug)
-#alias(new)
 pub fn ControlBindingBuilder::ControlBindingBuilder() -> Self
 pub fn ControlBindingBuilder::bind(Self, key~ : String, node_index~ : Int, slot~ : @model.GraphParamSlot) -> Self
 pub fn ControlBindingBuilder::build(Self, @template.AnalyzedGraph) -> Result[ControlBindingMap, ControlBindingError]

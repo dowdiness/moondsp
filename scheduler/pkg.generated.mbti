@@ -43,7 +43,6 @@ pub struct BlockFrame {
 pub struct ControlMapper {
   transform : (String, Double) -> (String, Double)?
 }
-#alias(new)
 pub fn ControlMapper::ControlMapper(transform~ : (String, Double) -> (String, Double)?) -> Self
 
 pub(all) enum InstrumentSelector {

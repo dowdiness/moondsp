@@ -35,7 +35,7 @@ test "wire roundtrip preserves named routes and frozen source identity" {
     fail("decode failed")
   }
   assert_eq(decoded.version(), input.version())
-  let arc = @pattern.TimeSpan::new(
+  let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
@@ -127,7 +127,7 @@ test "wire validates safe integers versions and input bounds" {
 ///|
 test "wire preserves rotated source epochs independently of document versions" {
   let text = "let tone = note(\"60\"); tone"
-  let arc = @pattern.TimeSpan::new(
+  let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )

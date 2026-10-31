@@ -37,7 +37,7 @@ fn delay_reset_voice_nodes(capacity : Int) -> Array[@graph.DspNode] {
 
 ///|
 test "bench/voice/prepared_steal_delay_reset" (b : @bench.T) {
-  let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=128)
+  let ctx = @dsp.DspContext(sample_rate=48000.0, block_size=128)
   for capacity in [4800, 48000, 480000] {
     let template = @graph.AnalyzedGraph::analyze(
       delay_reset_voice_nodes(capacity),
@@ -45,7 +45,7 @@ test "bench/voice/prepared_steal_delay_reset" (b : @bench.T) {
     let pool = BoundVoicePool(
       template,
       ctx,
-      @graph.ControlBindingBuilder::new(),
+      @graph.ControlBindingBuilder(),
       max_voices=1,
     )
     let values = Array::makei(64, i => {

@@ -5,7 +5,7 @@ fn span(
   e_num : Int,
   e_den : Int,
 ) -> @pattern.TimeSpan {
-  @pattern.TimeSpan::new(r(b_num, b_den), r(e_num, e_den))
+  @pattern.TimeSpan(r(b_num, b_den), r(e_num, e_den))
 }
 
 ///|

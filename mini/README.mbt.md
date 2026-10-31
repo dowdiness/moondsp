@@ -69,7 +69,7 @@ test "parse a layered mini pattern" {
     Ok(value) => value
     Err(message) => fail(message)
   }
-  let cycle = @pattern.TimeSpan::new(
+  let cycle = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )

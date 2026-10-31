@@ -1,6 +1,6 @@
 ///|
 test "reset rewinds phase to zero" {
-  let osc = Oscillator::new()
+  let osc = Oscillator()
 
   ignore(osc.tick(freq_hz=440.0, sample_rate=48000.0))
   ignore(osc.tick(freq_hz=440.0, sample_rate=48000.0))
@@ -14,8 +14,8 @@ test "reset rewinds phase to zero" {
 
 ///|
 test "process with invalid sample rate writes silence" {
-  let osc = Oscillator::new()
-  let context = DspContext::new(sample_rate=0.0, block_size=8)
+  let osc = Oscillator()
+  let context = DspContext(sample_rate=0.0, block_size=8)
   let buffer = AudioBuffer::filled(8, init=1.0)
 
   osc.process(context~, output=buffer, freq_hz=440.0)
@@ -26,8 +26,8 @@ test "process with invalid sample rate writes silence" {
 
 ///|
 test "process_waveform respects context block size" {
-  let osc = Oscillator::new()
-  let context = DspContext::new(sample_rate=48000.0, block_size=2)
+  let osc = Oscillator()
+  let context = DspContext(sample_rate=48000.0, block_size=2)
   let buffer = AudioBuffer::filled(4, init=1.0)
 
   osc.process_waveform(
@@ -45,7 +45,7 @@ test "process_waveform respects context block size" {
 
 ///|
 test "waveform selection preserves shared phase progression" {
-  let osc = Oscillator::new()
+  let osc = Oscillator()
 
   ignore(
     osc.tick_waveform(
@@ -69,7 +69,7 @@ test "waveform selection preserves shared phase progression" {
 
 ///|
 test "tick_waveform rejects non-finite parameters without poisoning phase" {
-  let osc = Oscillator::new()
+  let osc = Oscillator()
 
   assert_eq(
     osc.tick_waveform(
@@ -100,8 +100,8 @@ test "tick_waveform rejects non-finite parameters without poisoning phase" {
 
 ///|
 test "process_waveform rejects non-finite frequency without advancing phase" {
-  let osc = Oscillator::new()
-  let context = DspContext::new(sample_rate=48000.0, block_size=4)
+  let osc = Oscillator()
+  let context = DspContext(sample_rate=48000.0, block_size=4)
   let buffer = AudioBuffer::filled(4, init=1.0)
 
   osc.process_waveform(
@@ -117,8 +117,8 @@ test "process_waveform rejects non-finite frequency without advancing phase" {
 
 ///|
 test "process respects context block size" {
-  let osc = Oscillator::new()
-  let context = DspContext::new(sample_rate=48000.0, block_size=2)
+  let osc = Oscillator()
+  let context = DspContext(sample_rate=48000.0, block_size=2)
   let buffer = AudioBuffer::filled(4, init=1.0)
 
   osc.process(context~, output=buffer, freq_hz=440.0)
@@ -131,9 +131,9 @@ test "process respects context block size" {
 
 ///|
 test "gain with invalid context writes silence" {
-  let gain = Gain::new()
-  let context = DspContext::new(sample_rate=0.0, block_size=4)
-  let buffer = AudioBuffer::new(make_gain_test_samples_wb())
+  let gain = Gain()
+  let context = DspContext(sample_rate=0.0, block_size=4)
+  let buffer = AudioBuffer(make_gain_test_samples_wb())
 
   gain.process(context~, buffer~, amount=0.5)
 
@@ -142,9 +142,9 @@ test "gain with invalid context writes silence" {
 
 ///|
 test "gain with invalid amount writes silence" {
-  let gain = Gain::new()
-  let context = DspContext::new(sample_rate=48000.0, block_size=4)
-  let buffer = AudioBuffer::new(make_gain_test_samples_wb())
+  let gain = Gain()
+  let context = DspContext(sample_rate=48000.0, block_size=4)
+  let buffer = AudioBuffer(make_gain_test_samples_wb())
 
   gain.process(context~, buffer~, amount=0.0 / 0.0)
 
@@ -153,9 +153,9 @@ test "gain with invalid amount writes silence" {
 
 ///|
 test "gain respects context block size" {
-  let gain = Gain::new()
-  let context = DspContext::new(sample_rate=48000.0, block_size=2)
-  let buffer = AudioBuffer::new(make_gain_block_samples_wb())
+  let gain = Gain()
+  let context = DspContext(sample_rate=48000.0, block_size=2)
+  let buffer = AudioBuffer(make_gain_block_samples_wb())
 
   gain.process(context~, buffer~, amount=0.5)
 
@@ -187,10 +187,10 @@ fn make_gain_block_samples_wb() -> FixedArray[Double] {
 
 ///|
 test "mix with invalid context writes silence" {
-  let mix = Mix::new()
-  let context = DspContext::new(sample_rate=0.0, block_size=4)
-  let output = AudioBuffer::new(make_mix_output_samples_wb())
-  let input = AudioBuffer::new(make_mix_input_samples_wb())
+  let mix = Mix()
+  let context = DspContext(sample_rate=0.0, block_size=4)
+  let output = AudioBuffer(make_mix_output_samples_wb())
+  let input = AudioBuffer(make_mix_input_samples_wb())
 
   mix.process(context, output, input)
 
@@ -199,10 +199,10 @@ test "mix with invalid context writes silence" {
 
 ///|
 test "mix respects context block size" {
-  let mix = Mix::new()
-  let context = DspContext::new(sample_rate=48000.0, block_size=2)
-  let output = AudioBuffer::new(make_mix_output_samples_wb())
-  let input = AudioBuffer::new(make_mix_input_samples_wb())
+  let mix = Mix()
+  let context = DspContext(sample_rate=48000.0, block_size=2)
+  let output = AudioBuffer(make_mix_output_samples_wb())
+  let input = AudioBuffer(make_mix_input_samples_wb())
 
   mix.process(context, output, input)
 
@@ -214,10 +214,10 @@ test "mix respects context block size" {
 
 ///|
 test "mix stops at the shorter input length" {
-  let mix = Mix::new()
-  let context = DspContext::new(sample_rate=48000.0, block_size=4)
-  let output = AudioBuffer::new(make_mix_output_samples_wb())
-  let input = AudioBuffer::new(make_short_mix_input_samples_wb())
+  let mix = Mix()
+  let context = DspContext(sample_rate=48000.0, block_size=4)
+  let output = AudioBuffer(make_mix_output_samples_wb())
+  let input = AudioBuffer(make_short_mix_input_samples_wb())
 
   mix.process(context, output, input)
 
@@ -257,7 +257,7 @@ fn make_short_mix_input_samples_wb() -> FixedArray[Double] {
 
 ///|
 test "noise normalizes zero seed to a usable internal state" {
-  let noise = Noise::new(0U)
+  let noise = Noise(0U)
 
   assert_true(noise.seed() != 0U)
   assert_true(noise.tick() >= -1.0)
@@ -265,9 +265,9 @@ test "noise normalizes zero seed to a usable internal state" {
 
 ///|
 test "noise with invalid context writes silence without advancing state" {
-  let noise = Noise::new(42U)
+  let noise = Noise(42U)
   let state_before = noise.seed()
-  let context = DspContext::new(sample_rate=0.0, block_size=4)
+  let context = DspContext(sample_rate=0.0, block_size=4)
   let buffer = AudioBuffer::filled(4, init=1.0)
 
   noise.process(context, buffer)
@@ -278,8 +278,8 @@ test "noise with invalid context writes silence without advancing state" {
 
 ///|
 test "noise respects context block size and zeros the tail" {
-  let noise = Noise::new(17U)
-  let context = DspContext::new(sample_rate=48000.0, block_size=2)
+  let noise = Noise(17U)
+  let context = DspContext(sample_rate=48000.0, block_size=2)
   let buffer = AudioBuffer::filled(4, init=1.0)
 
   noise.process(context, buffer)
@@ -292,9 +292,9 @@ test "noise respects context block size and zeros the tail" {
 
 ///|
 test "clip with invalid context writes silence" {
-  let clip = Clip::new()
-  let context = DspContext::new(sample_rate=0.0, block_size=4)
-  let buffer = AudioBuffer::new(make_clip_test_samples_wb())
+  let clip = Clip()
+  let context = DspContext(sample_rate=0.0, block_size=4)
+  let buffer = AudioBuffer(make_clip_test_samples_wb())
 
   clip.process(context~, buffer~, threshold=0.5)
 
@@ -303,9 +303,9 @@ test "clip with invalid context writes silence" {
 
 ///|
 test "clip with invalid threshold writes silence" {
-  let clip = Clip::new()
-  let context = DspContext::new(sample_rate=48000.0, block_size=4)
-  let buffer = AudioBuffer::new(make_clip_test_samples_wb())
+  let clip = Clip()
+  let context = DspContext(sample_rate=48000.0, block_size=4)
+  let buffer = AudioBuffer(make_clip_test_samples_wb())
 
   clip.process(context~, buffer~, threshold=0.0)
 
@@ -314,9 +314,9 @@ test "clip with invalid threshold writes silence" {
 
 ///|
 test "clip respects context block size" {
-  let clip = Clip::new()
-  let context = DspContext::new(sample_rate=48000.0, block_size=2)
-  let buffer = AudioBuffer::new(make_clip_test_samples_wb())
+  let clip = Clip()
+  let context = DspContext(sample_rate=48000.0, block_size=2)
+  let buffer = AudioBuffer(make_clip_test_samples_wb())
 
   clip.process(context~, buffer~, threshold=0.5)
 
@@ -338,13 +338,8 @@ fn make_clip_test_samples_wb() -> FixedArray[Double] {
 
 ///|
 test "adsr invalid context resets to idle silence" {
-  let env = Adsr::new(
-    attack_ms=10.0,
-    decay_ms=10.0,
-    sustain=0.5,
-    release_ms=10.0,
-  )
-  let context = DspContext::new(sample_rate=0.0, block_size=4)
+  let env = Adsr(attack_ms=10.0, decay_ms=10.0, sustain=0.5, release_ms=10.0)
+  let context = DspContext(sample_rate=0.0, block_size=4)
   let buffer = AudioBuffer::filled(4, init=1.0)
 
   env.gate_on()
@@ -357,8 +352,8 @@ test "adsr invalid context resets to idle silence" {
 
 ///|
 test "adsr zero times transition immediately" {
-  let env = Adsr::new(attack_ms=0.0, decay_ms=0.0, sustain=0.25, release_ms=0.0)
-  let context = DspContext::new(sample_rate=1000.0, block_size=4)
+  let env = Adsr(attack_ms=0.0, decay_ms=0.0, sustain=0.25, release_ms=0.0)
+  let context = DspContext(sample_rate=1000.0, block_size=4)
 
   env.gate_on()
   assert_eq(env.tick(context), 0.25)
@@ -371,8 +366,8 @@ test "adsr zero times transition immediately" {
 
 ///|
 test "adsr process respects context block size" {
-  let env = Adsr::new(attack_ms=0.0, decay_ms=0.0, sustain=0.5, release_ms=10.0)
-  let context = DspContext::new(sample_rate=1000.0, block_size=2)
+  let env = Adsr(attack_ms=0.0, decay_ms=0.0, sustain=0.5, release_ms=10.0)
+  let context = DspContext(sample_rate=1000.0, block_size=2)
   let buffer = AudioBuffer::filled(4, init=1.0)
 
   env.gate_on()
@@ -386,17 +381,12 @@ test "adsr process respects context block size" {
 
 ///|
 test "adsr zero-sample process preserves state" {
-  let env = Adsr::new(
-    attack_ms=10.0,
-    decay_ms=10.0,
-    sustain=0.5,
-    release_ms=10.0,
-  )
-  let context = DspContext::new(sample_rate=1000.0, block_size=0)
+  let env = Adsr(attack_ms=10.0, decay_ms=10.0, sustain=0.5, release_ms=10.0)
+  let context = DspContext(sample_rate=1000.0, block_size=0)
   let buffer = AudioBuffer::filled(4, init=1.0)
 
   env.gate_on()
-  ignore(env.tick(DspContext::new(sample_rate=1000.0, block_size=4)))
+  ignore(env.tick(DspContext(sample_rate=1000.0, block_size=4)))
   let level_before = env.level()
 
   env.process(context, buffer)
@@ -411,13 +401,8 @@ test "adsr zero-sample process preserves state" {
 
 ///|
 test "adsr non-finite sample rate resets to idle silence" {
-  let env = Adsr::new(
-    attack_ms=10.0,
-    decay_ms=10.0,
-    sustain=0.5,
-    release_ms=10.0,
-  )
-  let context = DspContext::new(sample_rate=1.0 / 0.0, block_size=4)
+  let env = Adsr(attack_ms=10.0, decay_ms=10.0, sustain=0.5, release_ms=10.0)
+  let context = DspContext(sample_rate=1.0 / 0.0, block_size=4)
   let buffer = AudioBuffer::filled(4, init=1.0)
 
   env.gate_on()
@@ -430,7 +415,7 @@ test "adsr non-finite sample rate resets to idle silence" {
 
 ///|
 test "delay line clamps invalid delay lengths deterministically" {
-  let delay = DelayLine::new(4, delay_samples=99)
+  let delay = DelayLine(4, delay_samples=99)
   assert_eq(delay.delay_samples(), 4)
 
   delay.set_delay_samples(-3)
@@ -439,7 +424,7 @@ test "delay line clamps invalid delay lengths deterministically" {
 
 ///|
 test "delay line clamps invalid feedback deterministically" {
-  let delay = DelayLine::new(4, feedback=99.0)
+  let delay = DelayLine(4, feedback=99.0)
   assert_eq(delay.feedback(), 0.99)
 
   delay.set_feedback(-2.0)
@@ -450,9 +435,9 @@ test "delay line clamps invalid feedback deterministically" {
 
 ///|
 test "delay line process respects context block size" {
-  let delay = DelayLine::new(4, delay_samples=1)
-  let context = DspContext::new(sample_rate=48000.0, block_size=2)
-  let buffer = AudioBuffer::new(make_delay_process_samples())
+  let delay = DelayLine(4, delay_samples=1)
+  let context = DspContext(sample_rate=48000.0, block_size=2)
+  let buffer = AudioBuffer(make_delay_process_samples())
 
   delay.process(context, buffer)
 
@@ -464,9 +449,9 @@ test "delay line process respects context block size" {
 
 ///|
 test "delay line zero-sample process writes silence" {
-  let delay = DelayLine::new(4, delay_samples=1)
-  let context = DspContext::new(sample_rate=48000.0, block_size=0)
-  let buffer = AudioBuffer::new(make_delay_process_samples())
+  let delay = DelayLine(4, delay_samples=1)
+  let context = DspContext(sample_rate=48000.0, block_size=0)
+  let buffer = AudioBuffer(make_delay_process_samples())
 
   delay.process(context, buffer)
 
@@ -475,11 +460,11 @@ test "delay line zero-sample process writes silence" {
 
 ///|
 test "delay line invalid context writes silence without resetting state" {
-  let delay = DelayLine::new(4, delay_samples=2)
-  let invalid_context = DspContext::new(sample_rate=0.0, block_size=4)
-  let valid_context = DspContext::new(sample_rate=48000.0, block_size=4)
-  let invalid_buffer = AudioBuffer::new(make_delay_process_samples())
-  let valid_buffer = AudioBuffer::new(make_delay_followup_samples())
+  let delay = DelayLine(4, delay_samples=2)
+  let invalid_context = DspContext(sample_rate=0.0, block_size=4)
+  let valid_context = DspContext(sample_rate=48000.0, block_size=4)
+  let invalid_buffer = AudioBuffer(make_delay_process_samples())
+  let valid_buffer = AudioBuffer(make_delay_followup_samples())
 
   ignore(delay.tick(1.0))
   ignore(delay.tick(2.0))
@@ -512,9 +497,9 @@ fn make_delay_followup_samples() -> FixedArray[Double] {
 
 ///|
 test "pan invalid context writes silence to both outputs" {
-  let pan = Pan::new()
-  let context = DspContext::new(sample_rate=0.0, block_size=4)
-  let input = AudioBuffer::new(make_pan_test_samples_wb())
+  let pan = Pan()
+  let context = DspContext(sample_rate=0.0, block_size=4)
+  let input = AudioBuffer(make_pan_test_samples_wb())
   let left = AudioBuffer::filled(4, init=1.0)
   let right = AudioBuffer::filled(4, init=1.0)
 
@@ -532,9 +517,9 @@ test "pan invalid context writes silence to both outputs" {
 
 ///|
 test "pan invalid position writes silence to both outputs" {
-  let pan = Pan::new()
-  let context = DspContext::new(sample_rate=48000.0, block_size=4)
-  let input = AudioBuffer::new(make_pan_test_samples_wb())
+  let pan = Pan()
+  let context = DspContext(sample_rate=48000.0, block_size=4)
+  let input = AudioBuffer(make_pan_test_samples_wb())
   let left = AudioBuffer::filled(4, init=1.0)
   let right = AudioBuffer::filled(4, init=1.0)
 
@@ -552,9 +537,9 @@ test "pan invalid position writes silence to both outputs" {
 
 ///|
 test "pan respects context block size and zeros both tails" {
-  let pan = Pan::new()
-  let context = DspContext::new(sample_rate=48000.0, block_size=2)
-  let input = AudioBuffer::new(make_pan_test_samples_wb())
+  let pan = Pan()
+  let context = DspContext(sample_rate=48000.0, block_size=2)
+  let input = AudioBuffer(make_pan_test_samples_wb())
   let left = AudioBuffer::filled(4, init=1.0)
   let right = AudioBuffer::filled(4, init=1.0)
 

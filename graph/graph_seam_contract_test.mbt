@@ -16,7 +16,7 @@
 /// that would corrupt every voice after the first. This test analyzes once and
 /// compiles the same value twice to pin that reuse invariant directly.
 test "seam contract: one analyzed AnalyzedGraph compiles into independent deterministic graphs" {
-  let context = DspContext::new(sample_rate=STANDARD_SAMPLE_RATE, block_size=64)
+  let context = DspContext(sample_rate=STANDARD_SAMPLE_RATE, block_size=64)
   // Stateful topology (oscillator -> biquad -> output) so per-sample identity
   // across the block is a real signal: divergent internal state would show up.
   let nodes = [
@@ -66,7 +66,7 @@ test "seam contract: one analyzed AnalyzedGraph compiles into independent determ
 /// Stereo compilation has its own terminal-shape contract. Reusing the analyzed
 /// graph must still construct independent histories for every stereo instance.
 test "seam contract: one analyzed AnalyzedGraph compiles into independent deterministic stereo graphs" {
-  let context = DspContext::new(sample_rate=STANDARD_SAMPLE_RATE, block_size=64)
+  let context = DspContext(sample_rate=STANDARD_SAMPLE_RATE, block_size=64)
   // Stateful mono chain (oscillator -> biquad) into a stereo terminal, so per-sample
   // identity across L and R is a real signal of undisturbed internal state.
   let nodes = [

@@ -31,7 +31,6 @@ fn normalize_audio_samples(data : FixedArray[Double]) -> Unit {
 /// `0.0` in the copied storage; finite samples pass through unchanged.
 /// Use this when ingesting external data of unclear lifetime. For
 /// explicit zero-copy adoption, see `AudioBuffer::adopt`.
-#alias(new)
 pub fn AudioBuffer::AudioBuffer(data : FixedArray[Double]) -> AudioBuffer {
   let copy = data.copy()
   normalize_audio_samples(copy)
@@ -54,7 +53,7 @@ pub fn AudioBuffer::AudioBuffer(data : FixedArray[Double]) -> AudioBuffer {
 /// FFI-bridged buffers (e.g., `TypedArray` or `SharedArrayBuffer`
 /// wrappers) where the copy cost is genuinely prohibitive and the
 /// caller can reason about the source lifetime. Otherwise use
-/// `AudioBuffer::new`.
+/// `AudioBuffer`.
 pub fn AudioBuffer::adopt(data : FixedArray[Double]) -> AudioBuffer {
   { data, }
 }
@@ -64,7 +63,7 @@ pub fn AudioBuffer::adopt(data : FixedArray[Double]) -> AudioBuffer {
 ///
 /// The buffer's storage is freshly allocated and not shared with any
 /// caller-visible array. Routed through `adopt` to avoid the
-/// unnecessary copy `AudioBuffer::new` would now perform on the
+/// unnecessary copy `AudioBuffer` would now perform on the
 /// freshly-allocated `FixedArray`.
 /// The initializer is normalized once before allocation: non-finite
 /// values become `0.0`, while finite values pass through unchanged.

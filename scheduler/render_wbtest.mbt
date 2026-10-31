@@ -1,13 +1,13 @@
 ///|
 test "Unrepresentable render frame silences dry and send without accepting queued edits" {
-  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
+  let ctx = @moondsp.DspContext(sample_rate=48000.0, block_size=128)
   let pool = @moondsp.BoundVoicePool(
     @moondsp.AnalyzedGraph::analyze([
       @moondsp.DspNode::constant(1.0),
       @moondsp.DspNode::output(0),
     ]),
     ctx,
-    @moondsp.ControlBindingBuilder::new(),
+    @moondsp.ControlBindingBuilder(),
     max_voices=1,
   )
   let sched = PatternScheduler(bpm=1000.0, ctx~, instruments=[(AllEvents, pool)])

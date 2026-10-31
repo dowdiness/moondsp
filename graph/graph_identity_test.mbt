@@ -72,7 +72,7 @@ test "GraphDocument maps stable ids to controls, bindings, and compile" {
   inspect(control.value(), content="0.25")
   let builder = unwrap_binding_builder(
     index_map.bind_control(
-      @graph.ControlBindingBuilder::new(),
+      @graph.ControlBindingBuilder(),
       "freq",
       gid("osc"),
       @graph.GraphParamSlot::Value0,
@@ -82,7 +82,7 @@ test "GraphDocument maps stable ids to controls, bindings, and compile" {
     Ok(bindings) => inspect(bindings.length(), content="1")
     Err(error) => abort("expected valid control binding map, got \{error}")
   }
-  let context = DspContext::new(sample_rate=48000.0, block_size=128)
+  let context = DspContext(sample_rate=48000.0, block_size=128)
   assert_true(doc.compile(context) is Some(_))
 }
 

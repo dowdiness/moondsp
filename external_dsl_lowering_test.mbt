@@ -19,7 +19,7 @@ fn valid_external_lowering_fixture() -> ExternalLoweredGraphFixture {
       @moondsp.DspNode::gain(0, 0.3),
       @moondsp.DspNode::output(1),
     ],
-    bindings: @moondsp.ControlBindingBuilder::new()
+    bindings: @moondsp.ControlBindingBuilder()
     .bind(key="freq", node_index=0, slot=@moondsp.GraphParamSlot::Value0)
     .bind(key="gain", node_index=1, slot=@moondsp.GraphParamSlot::Value0),
   }
@@ -38,7 +38,7 @@ fn unresolved_external_reference_fixture() -> Result[
 
 ///|
 test "external DSL lowering contract: generated graph compiles with bindings" {
-  let context = @moondsp.DspContext::new(sample_rate=48000.0, block_size=16)
+  let context = @moondsp.DspContext(sample_rate=48000.0, block_size=16)
   let fixture = valid_external_lowering_fixture()
   let template = @moondsp.AnalyzedGraph::analyze(fixture.nodes)
   let bindings = fixture.bindings.build(template).unwrap()
@@ -63,7 +63,7 @@ test "external DSL lowering contract: unresolved references reject before analyz
 
 ///|
 test "external DSL lowering contract: compile errors preserve last good runtime" {
-  let context = @moondsp.DspContext::new(sample_rate=48000.0, block_size=16)
+  let context = @moondsp.DspContext(sample_rate=48000.0, block_size=16)
   let last_good = @moondsp.Dsp::compile_result(
     @moondsp.AnalyzedGraph::analyze([
       @moondsp.DspNode::constant(0.25),

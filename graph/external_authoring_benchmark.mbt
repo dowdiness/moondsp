@@ -430,7 +430,7 @@ fn build_bench_external_binding_builder(
   index_map : GraphIndexMap,
   fixture : BenchExternalAuthoringFixture,
 ) -> ControlBindingBuilder {
-  let mut builder = ControlBindingBuilder::new()
+  let mut builder = ControlBindingBuilder()
   for i in 0..<fixture.control_ids.length() {
     match
       index_map.bind_control(
@@ -740,7 +740,7 @@ fn bench_external_compile_result_rejection(
   make_template : (BenchExternalAuthoringFixture) -> AnalyzedGraph,
   label : String,
 ) -> Unit {
-  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
+  let ctx = DspContext(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   for fixture in bench_external_authoring_fixtures() {
     let template = make_template(fixture)
     b.bench(name=fixture.name, fn() {
@@ -886,7 +886,7 @@ fn bench_external_invalid_param_template(
 
 ///|
 test "bench graph: external authoring fixtures compile, bind, and edit" {
-  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
+  let ctx = DspContext(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   for fixture in bench_external_authoring_fixtures() {
     let doc = bench_external_doc(fixture)
     assert_true(doc.length() == fixture.nodes.length())
@@ -923,7 +923,7 @@ test "bench graph: external authoring fixtures compile, bind, and edit" {
 
 ///|
 test "bench graph: external authoring diagnostic fixtures reject safely" {
-  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
+  let ctx = DspContext(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   for fixture in bench_external_authoring_fixtures() {
     let doc = bench_external_doc(fixture)
     let index_map = doc.index_map()
@@ -1021,7 +1021,7 @@ test "bench graph: external authoring diagnostic fixtures reject safely" {
 
 ///|
 test "bench graph: realistic external authoring fixtures compile, bind, and edit" {
-  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
+  let ctx = DspContext(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   for fixture in bench_external_realistic_authoring_fixtures() {
     let doc = bench_external_doc(fixture)
     assert_true(doc.length() == fixture.nodes.length())
@@ -1102,7 +1102,7 @@ test "bench/external_authoring/string_control_resolution" (b : @bench.T) {
 
 ///|
 test "bench/external_control/apply_param_batch_compiled" (b : @bench.T) {
-  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
+  let ctx = DspContext(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   for fixture in bench_external_authoring_fixtures() {
     let compiled = Dsp::compile(AnalyzedGraph::analyze(fixture.nodes), ctx).unwrap()
     let controls_a = bench_external_control_batch(fixture, 0.01)
@@ -1121,7 +1121,7 @@ test "bench/external_control/apply_param_batch_compiled" (b : @bench.T) {
 test "bench/external_control/apply_param_batch_topology_controller" (
   b : @bench.T,
 ) {
-  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
+  let ctx = DspContext(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   for fixture in bench_external_authoring_fixtures() {
     let controller = DspTopologyController::from_nodes(
       fixture.nodes,
@@ -1166,7 +1166,7 @@ test "bench/external_authoring/topology_doc_roundtrips" (b : @bench.T) {
 
 ///|
 test "bench/external_authoring/compile_prepared_template_change" (b : @bench.T) {
-  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
+  let ctx = DspContext(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   for fixture in bench_external_authoring_fixtures() {
     let doc = bench_external_doc(fixture)
     let edited_doc = try
@@ -1190,7 +1190,7 @@ test "bench/external_authoring/compile_prepared_template_change" (b : @bench.T) 
 
 ///|
 test "bench/external_authoring/queue_prepared_hotswap_setup" (b : @bench.T) {
-  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
+  let ctx = DspContext(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   for fixture in bench_external_authoring_fixtures() {
     let doc = bench_external_doc(fixture)
     let edited_doc = try
@@ -1250,7 +1250,7 @@ test "bench/external_authoring_diagnostics/control_binding_duplicate_key" (
 test "bench/external_control_diagnostics/apply_invalid_param_batch_compiled" (
   b : @bench.T,
 ) {
-  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
+  let ctx = DspContext(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   for fixture in bench_external_authoring_fixtures() {
     let compiled = Dsp::compile(AnalyzedGraph::analyze(fixture.nodes), ctx).unwrap()
     let controls_a = bench_external_invalid_param_batch(fixture, 0.01)
@@ -1272,7 +1272,7 @@ test "bench/external_control_diagnostics/apply_invalid_param_batch_compiled" (
 test "bench/external_control_diagnostics/apply_invalid_param_batch_topology_controller" (
   b : @bench.T,
 ) {
-  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
+  let ctx = DspContext(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   for fixture in bench_external_authoring_fixtures() {
     let controller = DspTopologyController::from_nodes(
       fixture.nodes,
@@ -1311,7 +1311,7 @@ test "bench/external_authoring_diagnostics/topology_doc_invalid_rewire" (
 test "bench/external_authoring_diagnostics/queue_invalid_topology_edit" (
   b : @bench.T,
 ) {
-  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
+  let ctx = DspContext(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   for fixture in bench_external_authoring_fixtures() {
     let controller = DspTopologyController::from_nodes(
       fixture.nodes,
@@ -1333,7 +1333,7 @@ test "bench/external_authoring_diagnostics/queue_invalid_topology_edit" (
 test "bench/external_authoring_diagnostics/queue_invalid_topology_edit_batch" (
   b : @bench.T,
 ) {
-  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
+  let ctx = DspContext(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   for fixture in bench_external_authoring_fixtures() {
     let controller = DspTopologyController::from_nodes(
       fixture.nodes,
@@ -1355,7 +1355,7 @@ test "bench/external_authoring_diagnostics/queue_invalid_topology_edit_batch" (
 test "bench/external_authoring_diagnostics/queue_topology_recompile_rejected" (
   b : @bench.T,
 ) {
-  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
+  let ctx = DspContext(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   for fixture in bench_external_authoring_fixtures() {
     let controller = DspTopologyController::from_nodes(
       fixture.nodes,
@@ -1377,7 +1377,7 @@ test "bench/external_authoring_diagnostics/queue_topology_recompile_rejected" (
 test "bench/external_authoring_diagnostics/queue_topology_pending_rejection" (
   b : @bench.T,
 ) {
-  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
+  let ctx = DspContext(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   for fixture in bench_external_authoring_fixtures() {
     let controller = DspTopologyController::from_nodes(
       fixture.nodes,
@@ -1480,7 +1480,7 @@ test "bench/external_authoring/realistic_string_control_resolution" (
 test "bench/external_control/realistic_apply_param_batch_compiled" (
   b : @bench.T,
 ) {
-  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
+  let ctx = DspContext(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   for fixture in bench_external_realistic_authoring_fixtures() {
     let controls_a = bench_external_control_batch(fixture, 0.01)
     let controls_b = bench_external_control_batch(fixture, 0.02)
@@ -1515,7 +1515,7 @@ test "bench/external_control/realistic_apply_param_batch_compiled" (
 test "bench/external_control/realistic_apply_param_batch_topology_controller" (
   b : @bench.T,
 ) {
-  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
+  let ctx = DspContext(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   for fixture in bench_external_realistic_authoring_fixtures() {
     let controls_a = bench_external_control_batch(fixture, 0.01)
     let controls_b = bench_external_control_batch(fixture, 0.02)
@@ -1587,7 +1587,7 @@ test "bench/external_authoring/realistic_shape_rewire_roundtrip" (b : @bench.T) 
 test "bench/external_authoring/realistic_compile_prepared_shape_change" (
   b : @bench.T,
 ) {
-  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
+  let ctx = DspContext(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   for fixture in bench_external_realistic_authoring_fixtures() {
     let doc = bench_external_doc(fixture)
     let edited_doc = bench_external_shape_rewire_doc(doc, fixture)
@@ -1617,7 +1617,7 @@ test "bench/external_authoring/realistic_compile_prepared_shape_change" (
 test "bench/external_authoring/realistic_queue_prepared_hotswap_setup" (
   b : @bench.T,
 ) {
-  let ctx = DspContext::new(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
+  let ctx = DspContext(sample_rate=BENCH_SAMPLE_RATE, block_size=128)
   for fixture in bench_external_realistic_authoring_fixtures() {
     let doc = bench_external_doc(fixture)
     let edited_doc = bench_external_shape_rewire_doc(doc, fixture)

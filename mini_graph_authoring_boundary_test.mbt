@@ -35,7 +35,7 @@ fn prepared_bd_graph_template(
     @moondsp.DspNode::output(3),
   ]
   let template = @moondsp.AnalyzedGraph::analyze(nodes)
-  let bindings = @moondsp.ControlBindingBuilder::new()
+  let bindings = @moondsp.ControlBindingBuilder()
     .bind(key="lpf", node_index=1, slot=@moondsp.GraphParamSlot::Value0)
     .bind(key="hpf", node_index=2, slot=@moondsp.GraphParamSlot::Value0)
     .bind(key="gain", node_index=3, slot=@moondsp.GraphParamSlot::Value0)
@@ -76,7 +76,7 @@ fn find_prepared_template(
 ///|
 fn first_mini_control_map(input : String) -> @pattern.ControlMap {
   let pat = @mini.parse(input).unwrap()
-  let arc = @pattern.TimeSpan::new(
+  let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
@@ -127,7 +127,7 @@ fn resolve_mini_graph_controls(
 
 ///|
 test "Mini graph boundary: sound selects template and controls resolve" {
-  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=16)
+  let ctx = @moondsp.DspContext(sample_rate=48000.0, block_size=16)
   let bd = prepared_bd_graph_template(ctx)
   let controls = first_mini_control_map(
     "s(\"bd\").lpf(1200).hpf(80).gain(0.5).pan(-0.25)",
@@ -153,7 +153,7 @@ test "Mini graph boundary: sound selects template and controls resolve" {
 
 ///|
 test "Mini graph boundary: missing selected template is diagnostic" {
-  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=16)
+  let ctx = @moondsp.DspContext(sample_rate=48000.0, block_size=16)
   let bd = prepared_bd_graph_template(ctx)
   let controls = first_mini_control_map("s(\"sd\").gain(0.5)")
   match resolve_mini_graph_controls(controls, [bd]) {

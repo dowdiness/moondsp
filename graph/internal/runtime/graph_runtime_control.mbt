@@ -923,7 +923,7 @@ fn make_graph_delay_state(node : @model.DspNode) -> DelayLine? {
   match node.kind() {
     Delay =>
       Some(
-        DelayLine::new(
+        DelayLine(
           node.delay_max_samples(),
           delay_samples=node.delay_samples(),
           feedback=node.value0(),

@@ -567,7 +567,7 @@ fn compiled_block_size(context : DspContext) -> Int {
 ///|
 fn make_graph_osc_state(node : @model.DspNode) -> Oscillator? {
   match node.kind() {
-    Oscillator => Some(Oscillator::new())
+    Oscillator => Some(Oscillator())
     _ => None
   }
 }
@@ -575,7 +575,7 @@ fn make_graph_osc_state(node : @model.DspNode) -> Oscillator? {
 ///|
 fn make_graph_noise_state(node : @model.DspNode) -> Noise? {
   match node.kind() {
-    Noise => Some(Noise::new(node.seed()))
+    Noise => Some(Noise(node.seed()))
     _ => None
   }
 }
@@ -585,7 +585,7 @@ fn make_graph_env_state(node : @model.DspNode) -> Adsr? {
   match node.kind() {
     Adsr =>
       Some(
-        Adsr::new(
+        Adsr(
           attack_ms=node.value0(),
           decay_ms=node.value1(),
           sustain=node.value2(),
@@ -599,7 +599,7 @@ fn make_graph_env_state(node : @model.DspNode) -> Adsr? {
 ///|
 fn make_graph_biquad_state(node : @model.DspNode) -> Biquad? {
   match node.kind() {
-    Biquad => Some(Biquad::new())
+    Biquad => Some(Biquad())
     _ => None
   }
 }
@@ -607,7 +607,7 @@ fn make_graph_biquad_state(node : @model.DspNode) -> Biquad? {
 ///|
 fn make_graph_stereo_biquad_state(node : @model.DspNode) -> Biquad? {
   match node.kind() {
-    StereoBiquad => Some(Biquad::new())
+    StereoBiquad => Some(Biquad())
     _ => None
   }
 }
@@ -617,7 +617,7 @@ fn make_graph_stereo_delay_state(node : @model.DspNode) -> DelayLine? {
   match node.kind() {
     StereoDelay =>
       Some(
-        DelayLine::new(
+        DelayLine(
           node.delay_max_samples(),
           delay_samples=node.delay_samples(),
           feedback=node.value0(),

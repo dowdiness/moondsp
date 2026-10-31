@@ -1,6 +1,6 @@
 ///|
 fn r_prop(num : Int, den : Int) -> @pattern.Rational {
-  @pattern.Rational::new(Int64::from_int(num), Int64::from_int(den))
+  @pattern.Rational(Int64::from_int(num), Int64::from_int(den))
 }
 
 ///|
@@ -10,7 +10,7 @@ fn span_prop(
   e_num : Int,
   e_den : Int,
 ) -> @pattern.TimeSpan {
-  @pattern.TimeSpan::new(r_prop(b_num, b_den), r_prop(e_num, e_den))
+  @pattern.TimeSpan(r_prop(b_num, b_den), r_prop(e_num, e_den))
 }
 
 ///|
@@ -73,7 +73,7 @@ test "prop: slow(n, pat) == fast(1/n, pat)" {
     fn(n_raw : Int) {
       let n_val = n_raw.abs() % 7 + 1
       let n = @pattern.Rational::from_int(n_val)
-      let inv_n = @pattern.Rational::new(1L, Int64::from_int(n_val))
+      let inv_n = @pattern.Rational(1L, Int64::from_int(n_val))
       let pat = @pattern.Pat::pure(42)
       let lhs = pat.slow(n)
       let rhs = pat.fast(inv_n)

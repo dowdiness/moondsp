@@ -17,7 +17,7 @@ test "build: valid bindings produce Ok" {
     @moondsp.DspNode::gain(0, 0.3),
     @moondsp.DspNode::output(1),
   ]
-  let result = @moondsp.ControlBindingBuilder::new()
+  let result = @moondsp.ControlBindingBuilder()
     .bind(key="note", node_index=0, slot=@moondsp.GraphParamSlot::Value0)
     .bind(key="gain", node_index=1, slot=@moondsp.GraphParamSlot::Value0)
     .build(@moondsp.AnalyzedGraph::analyze(template))
@@ -27,7 +27,7 @@ test "build: valid bindings produce Ok" {
 ///|
 test "build: invalid node index returns InvalidNodeIndex" {
   let template = [@moondsp.DspNode::constant(1.0), @moondsp.DspNode::output(0)]
-  let result = @moondsp.ControlBindingBuilder::new()
+  let result = @moondsp.ControlBindingBuilder()
     .bind(key="note", node_index=5, slot=@moondsp.GraphParamSlot::Value0)
     .build(@moondsp.AnalyzedGraph::analyze(template))
   @debug.assert_eq(
@@ -39,7 +39,7 @@ test "build: invalid node index returns InvalidNodeIndex" {
 ///|
 test "build: negative node index returns InvalidNodeIndex" {
   let template = [@moondsp.DspNode::constant(1.0), @moondsp.DspNode::output(0)]
-  let result = @moondsp.ControlBindingBuilder::new()
+  let result = @moondsp.ControlBindingBuilder()
     .bind(key="note", node_index=-1, slot=@moondsp.GraphParamSlot::Value0)
     .build(@moondsp.AnalyzedGraph::analyze(template))
   @debug.assert_eq(
@@ -51,7 +51,7 @@ test "build: negative node index returns InvalidNodeIndex" {
 ///|
 test "build: invalid slot for node returns InvalidSlotForNode" {
   let template = [@moondsp.DspNode::constant(1.0), @moondsp.DspNode::output(0)]
-  let result = @moondsp.ControlBindingBuilder::new()
+  let result = @moondsp.ControlBindingBuilder()
     .bind(key="x", node_index=1, slot=@moondsp.GraphParamSlot::Value0)
     .build(@moondsp.AnalyzedGraph::analyze(template))
   @debug.assert_eq(
@@ -74,7 +74,7 @@ test "build: duplicate keys returns DuplicateKey" {
     @moondsp.DspNode::gain(0, 0.3),
     @moondsp.DspNode::output(1),
   ]
-  let result = @moondsp.ControlBindingBuilder::new()
+  let result = @moondsp.ControlBindingBuilder()
     .bind(key="freq", node_index=0, slot=@moondsp.GraphParamSlot::Value0)
     .bind(key="freq", node_index=1, slot=@moondsp.GraphParamSlot::Value0)
     .build(@moondsp.AnalyzedGraph::analyze(template))
@@ -90,7 +90,7 @@ test "build: multiple keys mapping to same node and slot are allowed" {
     @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 440.0),
     @moondsp.DspNode::output(0),
   ]
-  let result = @moondsp.ControlBindingBuilder::new()
+  let result = @moondsp.ControlBindingBuilder()
     .bind(key="freq", node_index=0, slot=@moondsp.GraphParamSlot::Value0)
     .bind(key="note", node_index=0, slot=@moondsp.GraphParamSlot::Value0)
     .build(@moondsp.AnalyzedGraph::analyze(template))
@@ -100,7 +100,7 @@ test "build: multiple keys mapping to same node and slot are allowed" {
 ///|
 test "build: empty builder produces Ok with empty map" {
   let template = [@moondsp.DspNode::constant(1.0), @moondsp.DspNode::output(0)]
-  let result = @moondsp.ControlBindingBuilder::new().build(
+  let result = @moondsp.ControlBindingBuilder().build(
     @moondsp.AnalyzedGraph::analyze(template),
   )
   assert_true(result is Ok(_))
@@ -113,7 +113,7 @@ test "resolve: all present keys converted in binding insertion order" {
     @moondsp.DspNode::gain(0, 0.3),
     @moondsp.DspNode::output(1),
   ]
-  let map = @moondsp.ControlBindingBuilder::new()
+  let map = @moondsp.ControlBindingBuilder()
     .bind(key="note", node_index=0, slot=@moondsp.GraphParamSlot::Value0)
     .bind(key="gain", node_index=1, slot=@moondsp.GraphParamSlot::Value0)
     .build(@moondsp.AnalyzedGraph::analyze(template))
@@ -136,7 +136,7 @@ test "resolve: partial map skips missing keys" {
     @moondsp.DspNode::gain(0, 0.3),
     @moondsp.DspNode::output(1),
   ]
-  let map = @moondsp.ControlBindingBuilder::new()
+  let map = @moondsp.ControlBindingBuilder()
     .bind(key="note", node_index=0, slot=@moondsp.GraphParamSlot::Value0)
     .bind(key="gain", node_index=1, slot=@moondsp.GraphParamSlot::Value0)
     .build(@moondsp.AnalyzedGraph::analyze(template))
@@ -151,7 +151,7 @@ test "resolve: partial map skips missing keys" {
 ///|
 test "resolve: extra keys in map are ignored" {
   let template = [@moondsp.DspNode::constant(1.0), @moondsp.DspNode::output(0)]
-  let map = @moondsp.ControlBindingBuilder::new()
+  let map = @moondsp.ControlBindingBuilder()
     .bind(key="freq", node_index=0, slot=@moondsp.GraphParamSlot::Value0)
     .build(@moondsp.AnalyzedGraph::analyze(template))
     .unwrap()
@@ -164,7 +164,7 @@ test "resolve: extra keys in map are ignored" {
 ///|
 test "resolve: empty map produces empty controls" {
   let template = [@moondsp.DspNode::constant(1.0), @moondsp.DspNode::output(0)]
-  let map = @moondsp.ControlBindingBuilder::new()
+  let map = @moondsp.ControlBindingBuilder()
     .bind(key="freq", node_index=0, slot=@moondsp.GraphParamSlot::Value0)
     .build(@moondsp.AnalyzedGraph::analyze(template))
     .unwrap()
@@ -176,7 +176,7 @@ test "resolve: empty map produces empty controls" {
 ///|
 test "resolve: empty binding map produces empty controls" {
   let template = [@moondsp.DspNode::constant(1.0), @moondsp.DspNode::output(0)]
-  let map = @moondsp.ControlBindingBuilder::new()
+  let map = @moondsp.ControlBindingBuilder()
     .build(@moondsp.AnalyzedGraph::analyze(template))
     .unwrap()
   let controls : Map[String, Double] = { "freq": 440.0 }
@@ -186,7 +186,7 @@ test "resolve: empty binding map produces empty controls" {
 
 ///|
 test "integration: resolved controls accepted by VoicePool::note_on" {
-  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=16)
+  let ctx = @moondsp.DspContext(sample_rate=48000.0, block_size=16)
   let template = [
     @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 440.0),
     @moondsp.DspNode::gain(0, 0.3),
@@ -197,7 +197,7 @@ test "integration: resolved controls accepted by VoicePool::note_on" {
     ctx,
     max_voices=4,
   )
-  let bindings = @moondsp.ControlBindingBuilder::new()
+  let bindings = @moondsp.ControlBindingBuilder()
     .bind(key="note", node_index=0, slot=@moondsp.GraphParamSlot::Value0)
     .bind(key="gain", node_index=1, slot=@moondsp.GraphParamSlot::Value0)
     .build(@moondsp.AnalyzedGraph::analyze(template))
@@ -212,7 +212,7 @@ test "integration: resolved controls accepted by VoicePool::note_on" {
 ///|
 test "build: post-build bind does not mutate validated map" {
   let template = [@moondsp.DspNode::constant(1.0), @moondsp.DspNode::output(0)]
-  let builder = @moondsp.ControlBindingBuilder::new().bind(
+  let builder = @moondsp.ControlBindingBuilder().bind(
     key="freq",
     node_index=0,
     slot=@moondsp.GraphParamSlot::Value0,
@@ -236,7 +236,7 @@ test "build: live binding on surviving node produces Ok" {
     @moondsp.DspNode::gain(0, 0.3),
     @moondsp.DspNode::output(1),
   ]
-  let result = @moondsp.ControlBindingBuilder::new()
+  let result = @moondsp.ControlBindingBuilder()
     .bind(key="freq", node_index=0, slot=@moondsp.GraphParamSlot::Value0)
     .build(@moondsp.AnalyzedGraph::analyze(template))
   assert_true(result is Ok(_))
@@ -244,7 +244,7 @@ test "build: live binding on surviving node produces Ok" {
 
 ///|
 test "build: orphan binding returns OrphanBinding with key and index" {
-  let result = @moondsp.ControlBindingBuilder::new()
+  let result = @moondsp.ControlBindingBuilder()
     .bind(key="orphan_freq", node_index=1, slot=@moondsp.GraphParamSlot::Value0)
     .build(@moondsp.AnalyzedGraph::analyze(orphan_template()))
   @debug.assert_eq(
@@ -257,7 +257,7 @@ test "build: orphan binding returns OrphanBinding with key and index" {
 test "build: orphan error carries the specific binding's key" {
   // Two bindings on the same orphan node with different keys — build reports
   // the FIRST encountered (insertion order).
-  let result = @moondsp.ControlBindingBuilder::new()
+  let result = @moondsp.ControlBindingBuilder()
     .bind(key="orphan_a", node_index=1, slot=@moondsp.GraphParamSlot::Value0)
     .bind(key="orphan_b", node_index=1, slot=@moondsp.GraphParamSlot::Value0)
     .build(@moondsp.AnalyzedGraph::analyze(orphan_template()))
@@ -272,7 +272,7 @@ test "build: slot error preempts orphan check" {
   // Node 1 is Output — has no Value0 slot. Slot check runs before orphan
   // check per the per-binding validation ordering.
   let template = [@moondsp.DspNode::constant(1.0), @moondsp.DspNode::output(0)]
-  let result = @moondsp.ControlBindingBuilder::new()
+  let result = @moondsp.ControlBindingBuilder()
     .bind(key="x", node_index=1, slot=@moondsp.GraphParamSlot::Value0)
     .build(@moondsp.AnalyzedGraph::analyze(template))
   @debug.assert_eq(
@@ -290,7 +290,7 @@ test "build: slot error preempts orphan check" {
 test "build: bounds error preempts orphan check" {
   // Out-of-range node_index reports InvalidNodeIndex regardless of
   // optimization state.
-  let result = @moondsp.ControlBindingBuilder::new()
+  let result = @moondsp.ControlBindingBuilder()
     .bind(key="x", node_index=99, slot=@moondsp.GraphParamSlot::Value0)
     .build(@moondsp.AnalyzedGraph::analyze(orphan_template()))
   @debug.assert_eq(
@@ -302,7 +302,7 @@ test "build: bounds error preempts orphan check" {
 ///|
 test "build: orphan preempts duplicate key" {
   // First binding is orphan; duplicate appears later. Orphan reported first.
-  let result = @moondsp.ControlBindingBuilder::new()
+  let result = @moondsp.ControlBindingBuilder()
     .bind(key="dup", node_index=1, slot=@moondsp.GraphParamSlot::Value0)
     .bind(key="dup", node_index=0, slot=@moondsp.GraphParamSlot::Value0)
     .build(@moondsp.AnalyzedGraph::analyze(orphan_template()))
@@ -320,7 +320,7 @@ test "build: duplicate key still reported for live-node bindings" {
     @moondsp.DspNode::gain(0, 0.3),
     @moondsp.DspNode::output(1),
   ]
-  let result = @moondsp.ControlBindingBuilder::new()
+  let result = @moondsp.ControlBindingBuilder()
     .bind(key="g", node_index=0, slot=@moondsp.GraphParamSlot::Value0)
     .bind(key="g", node_index=1, slot=@moondsp.GraphParamSlot::Value0)
     .build(@moondsp.AnalyzedGraph::analyze(template))
@@ -329,7 +329,7 @@ test "build: duplicate key still reported for live-node bindings" {
 
 ///|
 test "build: empty builder still succeeds on any template" {
-  let result = @moondsp.ControlBindingBuilder::new().build(
+  let result = @moondsp.ControlBindingBuilder().build(
     @moondsp.AnalyzedGraph::analyze(orphan_template()),
   )
   assert_true(result is Ok(_))
@@ -342,7 +342,7 @@ test "build: constant-fed source and Gain bindings remain valid" {
     @moondsp.DspNode::gain(0, 0.3),
     @moondsp.DspNode::output(1),
   ]
-  let bindings = @moondsp.ControlBindingBuilder::new()
+  let bindings = @moondsp.ControlBindingBuilder()
     .bind(key="base", node_index=0, slot=@moondsp.GraphParamSlot::Value0)
     .bind(key="gain", node_index=1, slot=@moondsp.GraphParamSlot::Value0)
     .build(@moondsp.AnalyzedGraph::analyze(template))
@@ -352,7 +352,7 @@ test "build: constant-fed source and Gain bindings remain valid" {
 
 ///|
 test "binding defaults belong to each validated template" {
-  let builder = @moondsp.ControlBindingBuilder::new().bind(
+  let builder = @moondsp.ControlBindingBuilder().bind(
     key="note",
     node_index=0,
     slot=@moondsp.GraphParamSlot::Value0,

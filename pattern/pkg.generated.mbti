@@ -244,7 +244,6 @@ pub struct Rational {
   num : Int64
   den : Int64
 } derive(Eq, @debug.Debug)
-#alias(new)
 pub fn Rational::Rational(Int64, Int64) -> Self
 pub fn Rational::add(Self, Self) -> Self
 pub fn Rational::compare(Self, Self) -> Int
@@ -289,7 +288,6 @@ pub struct TimeSpan {
   begin : Rational
   end_ : Rational
 } derive(Eq, @debug.Debug)
-#alias(new)
 pub fn TimeSpan::TimeSpan(Rational, Rational) -> Self
 pub fn TimeSpan::contains(Self, Rational) -> Bool
 pub fn TimeSpan::duration(Self) -> Rational

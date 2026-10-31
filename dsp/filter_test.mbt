@@ -1,7 +1,7 @@
 ///|
 test "biquad rejects invalid parameters and writes silence" {
-  let biquad = @dsp.Biquad::new()
-  let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=4)
+  let biquad = @dsp.Biquad()
+  let context = @dsp.DspContext(sample_rate=48000.0, block_size=4)
   let buffer = @dsp.AudioBuffer::filled(4, init=1.0)
 
   @debug.assert_eq(
@@ -16,8 +16,8 @@ test "biquad rejects invalid parameters and writes silence" {
 
 ///|
 test "low-pass filter smooths a step input" {
-  let biquad = @dsp.Biquad::new()
-  let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=8)
+  let biquad = @dsp.Biquad()
+  let context = @dsp.DspContext(sample_rate=48000.0, block_size=8)
   let buffer = @dsp.AudioBuffer::filled(8, init=1.0)
 
   assert_true(biquad.update(context, @dsp.BiquadMode::LowPass, 1000.0, 0.707))
@@ -33,8 +33,8 @@ test "low-pass filter smooths a step input" {
 
 ///|
 test "high-pass filter attenuates dc across successive blocks" {
-  let biquad = @dsp.Biquad::new()
-  let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=64)
+  let biquad = @dsp.Biquad()
+  let context = @dsp.DspContext(sample_rate=48000.0, block_size=64)
   let first = @dsp.AudioBuffer::filled(64, init=1.0)
   let second = @dsp.AudioBuffer::filled(64, init=1.0)
 
@@ -48,8 +48,8 @@ test "high-pass filter attenuates dc across successive blocks" {
 
 ///|
 test "band-pass filter rejects dc input" {
-  let biquad = @dsp.Biquad::new()
-  let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=64)
+  let biquad = @dsp.Biquad()
+  let context = @dsp.DspContext(sample_rate=48000.0, block_size=64)
   let first = @dsp.AudioBuffer::filled(64, init=1.0)
   let second = @dsp.AudioBuffer::filled(64, init=1.0)
 
@@ -63,8 +63,8 @@ test "band-pass filter rejects dc input" {
 
 ///|
 test "biquad respects context block size" {
-  let biquad = @dsp.Biquad::new()
-  let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=2)
+  let biquad = @dsp.Biquad()
+  let context = @dsp.DspContext(sample_rate=48000.0, block_size=2)
   let buffer = @dsp.AudioBuffer::filled(4, init=1.0)
 
   assert_true(biquad.update(context, @dsp.BiquadMode::LowPass, 1000.0, 0.707))
@@ -79,8 +79,8 @@ test "biquad respects context block size" {
 
 ///|
 test "biquad impulse preserves core trigonometric rounding across cutoff range" {
-  let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=1)
-  let filter = @dsp.Biquad::new()
+  let context = @dsp.DspContext(sample_rate=48000.0, block_size=1)
+  let filter = @dsp.Biquad()
   let cutoffs = [ for i in 1..<4096 => i.to_double() * 24000.0 / 4096.0 ]
   // Both sides of reduction boundaries, including the near-Nyquist limit.
   for boundary in [6000.0, 12000.0, 18000.0, 23999.99999999999] {
@@ -109,7 +109,7 @@ test "biquad impulse preserves core trigonometric rounding across cutoff range" 
       assert_eq(filter.tick(1.0), numerator * inverse)
     }
   }
-  let huge = @dsp.DspContext::new(sample_rate=1.0e308, block_size=1)
+  let huge = @dsp.DspContext(sample_rate=1.0e308, block_size=1)
   assert_false(filter.update(huge, @dsp.LowPass, 4.0e307, 0.73))
   assert_eq(filter.tick(1.0), 0.0)
 }

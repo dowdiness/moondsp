@@ -111,9 +111,9 @@ pub fn[A] Pat::pure(value : A) -> Pat[A] {
       .filter_map(span => {
         // the whole event spans one full cycle: [floor(begin), floor(begin)+1)
         let cycle_n = span.begin.floor()
-        let whole_begin = Rational::new(cycle_n, 1L)
-        let whole_end = Rational::new(cycle_n + 1L, 1L)
-        let whole = TimeSpan::new(whole_begin, whole_end)
+        let whole_begin = Rational(cycle_n, 1L)
+        let whole_end = Rational(cycle_n + 1L, 1L)
+        let whole = TimeSpan(whole_begin, whole_end)
         // part is the intersection of whole with the original query arc
         whole.intersect(arc).map(part => { whole: Some(whole), part, value, })
       })
@@ -153,16 +153,14 @@ pub fn[A] Pat::fast(self : Pat[A], factor : Rational) -> Pat[A] {
       // Scale the query arc forward in time by factor (compress)
       let scaled_begin = arc.begin * factor
       let scaled_end = arc.end_ * factor
-      let scaled_arc = TimeSpan::new(scaled_begin, scaled_end)
-      let inv = Rational::new(1L, 1L) / factor
+      let scaled_arc = TimeSpan(scaled_begin, scaled_end)
+      let inv = Rational(1L, 1L) / factor
       // Scale the returned events back by 1/factor
       inner
       .query(scaled_arc)
       .map(ev => {
-        let new_part = TimeSpan::new(ev.part.begin * inv, ev.part.end_ * inv)
-        let new_whole = ev.whole.map(w => {
-          TimeSpan::new(w.begin * inv, w.end_ * inv)
-        })
+        let new_part = TimeSpan(ev.part.begin * inv, ev.part.end_ * inv)
+        let new_whole = ev.whole.map(w => TimeSpan(w.begin * inv, w.end_ * inv))
         { whole: new_whole, part: new_part, value: ev.value, }
       })
     },
@@ -179,7 +177,7 @@ pub fn[A] Pat::fast(self : Pat[A], factor : Rational) -> Pat[A] {
 ///|
 pub fn[A] Pat::slow(self : Pat[A], factor : Rational) -> Pat[A] {
   guard factor.num > 0L else { return Pat::silence() }
-  let inv = Rational::new(1L, 1L) / factor
+  let inv = Rational(1L, 1L) / factor
   self.fast(inv)
 }
 
@@ -196,11 +194,11 @@ pub fn[A] Pat::rev(self : Pat[A]) -> Pat[A] {
       .iter()
       .flat_map(cycle_arc => {
         // Determine the full cycle boundaries from cycle_arc.begin
-        let cycle_start = Rational::new(cycle_arc.begin.floor(), 1L)
+        let cycle_start = Rational(cycle_arc.begin.floor(), 1L)
         let cycle_end = cycle_start + one
         // Mirror the query sub-arc within the cycle:
         // [begin, end) -> [cycle_end - end, cycle_end - begin)
-        let mirror_arc = TimeSpan::new(
+        let mirror_arc = TimeSpan(
           cycle_end - cycle_arc.end_,
           cycle_end - cycle_arc.begin,
         )
@@ -209,12 +207,12 @@ pub fn[A] Pat::rev(self : Pat[A]) -> Pat[A] {
         .iter()
         .map(ev => {
           // Mirror part back
-          let new_part = TimeSpan::new(
+          let new_part = TimeSpan(
             cycle_end - ev.part.end_,
             cycle_end - ev.part.begin,
           )
           let new_whole = ev.whole.map(w => {
-            TimeSpan::new(cycle_end - w.end_, cycle_end - w.begin)
+            TimeSpan(cycle_end - w.end_, cycle_end - w.begin)
           })
           { whole: new_whole, part: new_part, value: ev.value, }
         })

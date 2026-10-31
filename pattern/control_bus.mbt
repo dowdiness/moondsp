@@ -269,7 +269,7 @@ fn constant_controls(pat : Pat[ControlMap]) -> ControlMap? {
   let mut value : ControlMap? = None
   for cycle in 0..<4 {
     let begin = Rational::from_int(cycle)
-    let whole = TimeSpan::new(begin, begin + Rational::from_int(1))
+    let whole = TimeSpan(begin, begin + Rational::from_int(1))
     let events = pat.query(whole)
     guard events.length() == 1 &&
       events[0].whole is Some(w) &&

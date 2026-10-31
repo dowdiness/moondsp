@@ -50,7 +50,7 @@ all surviving envelopes for each note.
 ```mbt check
 ///|
 test "start, render, and release a voice" {
-  let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=16)
+  let context = @dsp.DspContext(sample_rate=48000.0, block_size=16)
   let template = @graph.AnalyzedGraph::analyze([
     @graph.DspNode::oscillator(@dsp.Waveform::Sine, 440.0),
     @graph.DspNode::adsr(
@@ -90,7 +90,7 @@ ADSR gates open.
 ```mbt check
 ///|
 test "set oscillator frequency for one voice" {
-  let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=8)
+  let context = @dsp.DspContext(sample_rate=48000.0, block_size=8)
   let template = @graph.AnalyzedGraph::analyze([
     @graph.DspNode::oscillator(@dsp.Waveform::Triangle, 220.0),
     @graph.DspNode::output(0),
@@ -122,7 +122,7 @@ occupant.
 ```mbt check
 ///|
 test "a stolen handle cannot control its replacement" {
-  let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=4)
+  let context = @dsp.DspContext(sample_rate=48000.0, block_size=4)
   let template = @graph.AnalyzedGraph::analyze([
     @graph.DspNode::constant(0.25),
     @graph.DspNode::output(0),
@@ -153,12 +153,12 @@ graph controls without making the pattern layer know graph indices.
 ```mbt check
 ///|
 test "resolve a named control at note-on" {
-  let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=8)
+  let context = @dsp.DspContext(sample_rate=48000.0, block_size=8)
   let template = @graph.AnalyzedGraph::analyze([
     @graph.DspNode::oscillator(@dsp.Waveform::Saw, 220.0),
     @graph.DspNode::output(0),
   ])
-  let bindings = @graph.ControlBindingBuilder::new().bind(
+  let bindings = @graph.ControlBindingBuilder().bind(
     key="note",
     node_index=0,
     slot=@graph.GraphParamSlot::Value0,

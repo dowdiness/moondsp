@@ -6,7 +6,7 @@ using @song {type Song, type SongBuildError, type SongPart}
 
 ///|
 fn rat(n : Int64, d : Int64) -> @pattern.Rational {
-  @pattern.Rational::new(n, d)
+  @pattern.Rational(n, d)
 }
 
 ///|
@@ -16,7 +16,7 @@ fn span(
   end_num : Int64,
   end_den : Int64,
 ) -> @pattern.TimeSpan {
-  @pattern.TimeSpan::new(rat(begin_num, begin_den), rat(end_num, end_den))
+  @pattern.TimeSpan(rat(begin_num, begin_den), rat(end_num, end_den))
 }
 
 ///|

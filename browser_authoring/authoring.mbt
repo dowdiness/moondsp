@@ -182,7 +182,7 @@ fn notation_projection_events(
 ) -> Array[Json] raise EditWireError {
   match compiled {
     @mini.PreparedPlayback::Pattern(snapshot, _) => {
-      let arc = @pattern.TimeSpan::new(
+      let arc = @pattern.TimeSpan(
         @pattern.Rational::from_int(0),
         @pattern.Rational::from_int(span),
       )

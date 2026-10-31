@@ -1,6 +1,6 @@
 ///|
 test "compiled stereo dsp pans mono input to stereo output" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -26,7 +26,7 @@ test "compiled stereo dsp pans mono input to stereo output" {
 
 ///|
 test "compiled stereo dsp applies stereo gain after pan" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -58,7 +58,7 @@ test "compiled stereo dsp applies stereo gain after pan" {
 
 ///|
 test "compiled stereo dsp preserves constant-fed mono gain controls" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -99,7 +99,7 @@ test "compiled stereo dsp preserves constant-fed mono gain controls" {
 
 ///|
 test "compiled stereo dsp applies stereo clip after pan" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -126,7 +126,7 @@ test "compiled stereo dsp applies stereo clip after pan" {
 
 ///|
 test "compiled stereo dsp applies stereo biquad after pan" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=LARGE_BLOCK_SIZE,
   )
@@ -160,7 +160,7 @@ test "compiled stereo dsp applies stereo biquad after pan" {
 
 ///|
 test "compiled stereo dsp compile matches compile output" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -194,7 +194,7 @@ test "compiled stereo dsp compile matches compile output" {
 
 ///|
 test "compiled stereo dsp applies stereo delay after pan" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -229,7 +229,7 @@ test "compiled stereo dsp applies stereo delay after pan" {
 
 ///|
 test "compiled stereo dsp apply_control updates pan position" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -265,7 +265,7 @@ test "compiled stereo dsp apply_control updates pan position" {
 
 ///|
 test "compiled stereo dsp runtime params update stereo gain and clip" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -313,7 +313,7 @@ test "compiled stereo dsp runtime params update stereo gain and clip" {
 
 ///|
 test "compiled stereo dsp runtime params update stereo biquad" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=LARGE_BLOCK_SIZE,
   )
@@ -362,7 +362,7 @@ test "compiled stereo dsp runtime params update stereo biquad" {
 
 ///|
 test "compiled stereo dsp runtime params update stereo delay" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -407,7 +407,7 @@ test "compiled stereo dsp runtime params update stereo delay" {
 
 ///|
 test "compiled stereo dsp runtime params update stereo delay feedback" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -459,7 +459,7 @@ test "compiled stereo dsp runtime params update stereo delay feedback" {
 
 ///|
 test "compiled stereo dsp apply_controls updates pan and source together" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -505,7 +505,7 @@ test "compiled stereo dsp apply_controls updates pan and source together" {
 
 ///|
 test "compiled stereo dsp rejects out-of-bounds delay_samples via set_param" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -561,7 +561,7 @@ test "compiled stereo dsp rejects out-of-bounds delay_samples via set_param" {
 
 ///|
 test "compiled dsp folds stereo graph back to mono output" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -592,7 +592,7 @@ test "compiled dsp folds stereo graph back to mono output" {
 
 ///|
 test "compiled dsp runtime params update stereo nodes before mixdown" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -654,7 +654,7 @@ test "compiled dsp runtime params update stereo nodes before mixdown" {
 
 ///|
 test "compiled dsp runtime params update stereo biquad before mixdown" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=LARGE_BLOCK_SIZE,
   )
@@ -701,7 +701,7 @@ test "compiled dsp runtime params update stereo biquad before mixdown" {
 
 ///|
 test "compiled dsp applies stereo delay before mixdown" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -732,7 +732,7 @@ test "compiled dsp applies stereo delay before mixdown" {
 
 ///|
 test "compiled dsp runtime params update stereo delay before mixdown" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -773,7 +773,7 @@ test "compiled dsp runtime params update stereo delay before mixdown" {
 
 ///|
 test "compiled dsp runtime params update stereo delay feedback before mixdown" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -828,7 +828,7 @@ test "compiled dsp runtime params update stereo delay feedback before mixdown" {
 
 ///|
 test "stereo process: clean graph has zero sanitized count" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )

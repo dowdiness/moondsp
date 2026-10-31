@@ -1,13 +1,13 @@
 ///|
 test "copied envelope history retains destination timing" {
-  let context = @dsp.DspContext::new(sample_rate=1000.0, block_size=16)
-  let old = @dsp.Adsr::new(
+  let context = @dsp.DspContext(sample_rate=1000.0, block_size=16)
+  let old = @dsp.Adsr(
     attack_ms=100.0,
     decay_ms=100.0,
     sustain=0.5,
     release_ms=100.0,
   )
-  let next = @dsp.Adsr::new(
+  let next = @dsp.Adsr(
     attack_ms=200.0,
     decay_ms=200.0,
     sustain=0.25,
@@ -27,8 +27,8 @@ test "copied envelope history retains destination timing" {
 
 ///|
 test "copied delay history retains destination settings and storage ownership" {
-  let old = @dsp.DelayLine::new(8, delay_samples=1, feedback=0.0)
-  let next = @dsp.DelayLine::new(8, delay_samples=3, feedback=0.5)
+  let old = @dsp.DelayLine(8, delay_samples=1, feedback=0.0)
+  let next = @dsp.DelayLine(8, delay_samples=3, feedback=0.5)
   for sample in [1.0, 2.0, 3.0, 4.0] {
     ignore(old.tick(sample))
   }
@@ -41,7 +41,7 @@ test "copied delay history retains destination settings and storage ownership" {
   assert_eq(next.tick(0.0), 3.0)
   assert_eq(next.tick(0.0), 4.0)
   assert_eq(next.tick(0.0), 1.0)
-  let incompatible = @dsp.DelayLine::new(4, delay_samples=1)
+  let incompatible = @dsp.DelayLine(4, delay_samples=1)
   assert_false(incompatible.copy_state_from(next))
   assert_eq(incompatible.tick(0.0), 0.0)
 }

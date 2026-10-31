@@ -16,7 +16,6 @@ pub struct DelayLine {
 
 ///|
 /// Create a delay line with preallocated storage and a normalized delay length.
-#alias(new)
 pub fn DelayLine::DelayLine(
   max_delay_samples : Int,
   delay_samples? : Int = default_delay_samples(max_delay_samples),

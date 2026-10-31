@@ -9,7 +9,6 @@ pub struct ParamSmoother {
 ///|
 /// Create a parameter smoother from an initial value, smoothing time, and
 /// explicit sample rate.
-#alias(new)
 pub fn ParamSmoother::ParamSmoother(
   initial : Double,
   smoothing_ms : Double,
@@ -30,7 +29,7 @@ pub fn ParamSmoother::from_context(
   smoothing_ms : Double,
   context : DspContext,
 ) -> ParamSmoother {
-  ParamSmoother::new(initial, smoothing_ms, context.sample_rate())
+  ParamSmoother(initial, smoothing_ms, context.sample_rate())
 }
 
 ///|

@@ -64,7 +64,7 @@ compile context; each runtime instance owns its mutable parameters and histories
 ```mbt check
 ///|
 test "compile and process a mono graph" {
-  let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=8)
+  let context = @dsp.DspContext(sample_rate=48000.0, block_size=8)
   let nodes = [
     @graph.DspNode::constant(0.5),
     @graph.DspNode::gain(0, 0.4),
@@ -93,7 +93,7 @@ unreachable nodes, and unsupported feedback cycles.
 ```mbt check
 ///|
 test "compile_result reports an invalid input" {
-  let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=8)
+  let context = @dsp.DspContext(sample_rate=48000.0, block_size=8)
   let template = @graph.AnalyzedGraph::analyze([
     @graph.DspNode::gain(9, 0.5),
     @graph.DspNode::output(0),
@@ -121,7 +121,7 @@ applies it in order. An invalid control rejects the complete batch.
 ```mbt check
 ///|
 test "retune a compiled graph" {
-  let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=4)
+  let context = @dsp.DspContext(sample_rate=48000.0, block_size=4)
   let template = @graph.AnalyzedGraph::analyze([
     @graph.DspNode::constant(1.0),
     @graph.DspNode::gain(0, 0.25),
@@ -156,7 +156,7 @@ left and right buffers from a terminal `StereoOutput` graph.
 ```mbt check
 ///|
 test "compile a terminal stereo graph" {
-  let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=4)
+  let context = @dsp.DspContext(sample_rate=48000.0, block_size=4)
   let template = @graph.AnalyzedGraph::analyze([
     @graph.DspNode::constant(1.0),
     @graph.DspNode::pan(0, -1.0),
@@ -186,7 +186,7 @@ uses an equal-power transition; the default replaces the graph immediately.
 ```mbt check
 ///|
 test "replace a graph at a block boundary" {
-  let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=4)
+  let context = @dsp.DspContext(sample_rate=48000.0, block_size=4)
   let old_graph = @graph.Dsp::compile_result(
     @graph.AnalyzedGraph::analyze([
       @graph.DspNode::constant(0.25),

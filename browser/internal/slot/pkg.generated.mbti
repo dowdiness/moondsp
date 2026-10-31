@@ -17,7 +17,6 @@ pub struct GraphSlot[T, O] {
   output : O
   // private fields
 }
-#alias(new)
 pub fn[T, O] GraphSlot::GraphSlot(output~ : O, compile~ : (@dsp.DspContext) -> T?) -> Self[T, O]
 pub fn[T, O] GraphSlot::ctx_val(Self[T, O]) -> @dsp.DspContext
 pub fn[T, O : Output] GraphSlot::ensure(Self[T, O], Double, Int, on_rebuild? : () -> Unit) -> Bool
@@ -27,7 +26,6 @@ pub fn[T, O : Output] GraphSlot::reset(Self[T, O]) -> Unit
 pub struct MonoOut {
   // private fields
 }
-#alias(new)
 pub fn MonoOut::MonoOut() -> Self
 pub fn MonoOut::allocate(Self, Int) -> Unit
 pub fn MonoOut::get(Self) -> @dsp.AudioBuffer
@@ -38,7 +36,6 @@ pub impl Output for MonoOut
 pub struct StereoOut {
   // private fields
 }
-#alias(new)
 pub fn StereoOut::StereoOut() -> Self
 pub fn StereoOut::allocate(Self, Int) -> Unit
 pub fn StereoOut::left_buf(Self) -> @dsp.AudioBuffer

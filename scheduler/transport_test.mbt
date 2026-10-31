@@ -9,7 +9,7 @@ fn transport_fixture(
   @moondsp.AudioBuffer,
   @moondsp.AudioBuffer,
 ) raise {
-  let ctx = @moondsp.DspContext::new(sample_rate~, block_size=128)
+  let ctx = @moondsp.DspContext(sample_rate~, block_size=128)
   let template = @moondsp.AnalyzedGraph::analyze([
     @moondsp.DspNode::constant(1.0),
     @moondsp.DspNode::adsr(
@@ -24,7 +24,7 @@ fn transport_fixture(
   let pool = @moondsp.BoundVoicePool(
     template,
     ctx,
-    @moondsp.ControlBindingBuilder::new()
+    @moondsp.ControlBindingBuilder()
     .bind(key="attack", node_index=1, slot=@moondsp.GraphParamSlot::Value0)
     .bind(
       key="envelope_decay",
@@ -71,8 +71,8 @@ fn single_span(
 test "audio starts and releases at exact samples within a block" {
   let (sched, pool, left, right) = transport_fixture()
   let pat = single_span(
-    @pattern.Rational::new(17L, 24000L),
-    @pattern.Rational::new(73L, 24000L),
+    @pattern.Rational(17L, 24000L),
+    @pattern.Rational(73L, 24000L),
   )
   sched.process_song_block(pat, left, right)
   for i in 0..<128 {
@@ -85,7 +85,7 @@ test "audio starts and releases at exact samples within a block" {
 test "fractional onset rounded across a block survives a tempo edit exactly once" {
   let (sched, pool, left, right) = transport_fixture()
   let pat = single_span(
-    @pattern.Rational::new(255L, 48000L),
+    @pattern.Rational(255L, 48000L),
     @pattern.Rational::from_int(1),
   )
   sched.process_song_block(pat, left, right)
@@ -159,7 +159,7 @@ test "set_tempo rejects atomically when an endpoint is unrepresentable" {
   let (sched, pool, left, right) = transport_fixture()
   sched.set_bpm(0.001).unwrap()
   let handle = pool.note_on_controls({}).unwrap()
-  let endpoint = @pattern.Rational::new(100000000L, 10000019L * 100000003L)
+  let endpoint = @pattern.Rational(100000000L, 10000019L * 100000003L)
   sched.push_active_note(0, handle, endpoint).unwrap()
   sched.process_block(@pattern.Pat::silence(), left, right)
   let before = sched.current_block().unwrap().logical_arc
@@ -230,12 +230,12 @@ test "without hold the event end releases an unfinished attack" {
 test "tempo sample spans preserve exact millibpm arithmetic" {
   let tempo = @scheduler.Tempo::from_bpm(120.1234).unwrap()
   let span = tempo.span_for_samples(128, sample_rate=48000.0).unwrap()
-  assert_true(span == @pattern.Rational::new(128L * 120123L, 2880000000L))
+  assert_true(span == @pattern.Rational(128L * 120123L, 2880000000L))
   // The exact block boundary maps back to its final sample without drift.
   assert_eq(tempo.sample_at_start(span, sample_rate=48000.0).unwrap(), 128L)
   assert_true(
     tempo.span_for_samples(128, sample_rate=128.0).unwrap() ==
-    @pattern.Rational::new(128L * 120123L, 128L * 60000L),
+    @pattern.Rational(128L * 120123L, 128L * 60000L),
   )
   assert_true(
     tempo.span_for_samples(0, sample_rate=48000.0).unwrap() ==
@@ -280,7 +280,7 @@ test "material admission rejects before retiming and restart recovers capacity" 
   assert_eq(second.bpm(), 120.0)
   assert_true(second.current_block().unwrap().logical_arc == before)
   assert_eq(second.active_note_count(), 1)
-  let arc = @pattern.TimeSpan::new(
+  let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )

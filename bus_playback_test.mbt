@@ -58,7 +58,7 @@ fn bus_play_pool(ctx : @moondsp.DspContext) -> @moondsp.BoundVoicePool {
   @moondsp.BoundVoicePool(
     @moondsp.AnalyzedGraph::analyze(template),
     ctx,
-    @moondsp.ControlBindingBuilder::new().bind(
+    @moondsp.ControlBindingBuilder().bind(
       key="lpf",
       node_index=1,
       slot=@moondsp.GraphParamSlot::Value0,
@@ -103,9 +103,9 @@ fn bus_play(follow~ : Bool, fixed? : Double) -> BusPlayback raise {
   let mut previous = 0.0
   let blocks = 2 * BUS_RATE.to_int() / BUS_BLOCK
   for n in 0..<blocks {
-    let arc = @pattern.TimeSpan::new(
-      @pattern.Rational::new(Int64::from_int(n * BUS_BLOCK), 48000L),
-      @pattern.Rational::new(Int64::from_int((n + 1) * BUS_BLOCK), 48000L),
+    let arc = @pattern.TimeSpan(
+      @pattern.Rational(Int64::from_int(n * BUS_BLOCK), 48000L),
+      @pattern.Rational(Int64::from_int((n + 1) * BUS_BLOCK), 48000L),
     )
     for event in snapshot.query(arc) {
       guard event.whole is Some(whole) && arc.contains(whole.begin) else {

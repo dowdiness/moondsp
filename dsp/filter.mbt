@@ -24,7 +24,6 @@ pub struct Biquad {
 
 ///|
 /// Create a new biquad filter with zeroed state and no active coefficients.
-#alias(new)
 pub fn Biquad::Biquad() -> Biquad {
   {
     b0: 0.0,

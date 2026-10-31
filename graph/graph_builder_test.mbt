@@ -305,7 +305,7 @@ test "B8: GraphBuilder::analyze ≡ AnalyzedGraph::analyze(builder.nodes())" {
   let builder : @graph.GraphBuilder = DspSym::output(osc)
   let template_a = builder.analyze()
   let template_b = @graph.AnalyzedGraph::analyze(builder.nodes())
-  let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=128)
+  let ctx = @dsp.DspContext(sample_rate=48000.0, block_size=128)
   let compiled_a = @graph.Dsp::compile(template_a, ctx).unwrap()
   let compiled_b = @graph.Dsp::compile(template_b, ctx).unwrap()
   let buf_a = @dsp.AudioBuffer::filled(128)

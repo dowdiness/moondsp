@@ -2,7 +2,7 @@
 
 ///|
 fn cycle_span(begin : Int, end : Int) -> @pattern.TimeSpan {
-  @pattern.TimeSpan::new(
+  @pattern.TimeSpan(
     @pattern.Rational::from_int(begin),
     @pattern.Rational::from_int(end),
   )

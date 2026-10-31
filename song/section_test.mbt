@@ -60,7 +60,7 @@ test "Section::from_pattern wraps a pattern with identity scope" {
   @debug.assert_eq(section.name(), "main")
   assert_true(section.length_cycles() == @pattern.Rational::from_int(1))
   assert_true(section.scope().is_identity())
-  let arc = @pattern.TimeSpan::new(
+  let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
@@ -102,7 +102,7 @@ test "TimeScope fast and slow constructors expose exact rates" {
     _ => abort("slow scope creation failed")
   }
   assert_true(!slow.is_identity())
-  assert_true(slow.rate() == @pattern.Rational::new(1L, 2L))
+  assert_true(slow.rate() == @pattern.Rational(1L, 2L))
 }
 
 ///|
@@ -127,7 +127,7 @@ test "Section::query applies non-identity TimeScope" {
   ) catch {
     _ => abort("section creation failed")
   }
-  let arc = @pattern.TimeSpan::new(
+  let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
@@ -136,9 +136,9 @@ test "Section::query applies non-identity TimeScope" {
   @debug.assert_eq(raw_events.length(), 1)
   @debug.assert_eq(scoped_events.length(), 2)
   assert_true(scoped_events[0].part.begin == @pattern.Rational::from_int(0))
-  assert_true(scoped_events[1].part.begin == @pattern.Rational::new(1L, 2L))
+  assert_true(scoped_events[1].part.begin == @pattern.Rational(1L, 2L))
   assert_true(
-    scoped_events[1].whole.unwrap().begin == @pattern.Rational::new(1L, 2L),
+    scoped_events[1].whole.unwrap().begin == @pattern.Rational(1L, 2L),
   )
 }
 
@@ -292,7 +292,7 @@ test "SectionDoc layer body edits advance layer and section revisions without la
     _ => abort("expected matching occurrences")
   }
   let events = after_song.query(
-    @pattern.TimeSpan::new(
+    @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
       @pattern.Rational::from_int(1),
     ),
@@ -364,7 +364,7 @@ test "SectionBody::layers stacks ordered named layers" {
   @debug.assert_eq(section.layer_count(), 2)
   assert_true(section.get_layer("bass") is Some(_))
   assert_true(section.get_layer("lead") is Some(_))
-  let arc = @pattern.TimeSpan::new(
+  let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
@@ -385,7 +385,7 @@ test "Section constructor accepts pattern body wrapper" {
   ) catch {
     _ => abort("section creation failed")
   }
-  let arc = @pattern.TimeSpan::new(
+  let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
@@ -401,7 +401,7 @@ test "Section::layer converts single body to named layers" {
   @debug.assert_eq(section.layer_count(), 2)
   assert_true(section.get_layer("main") is Some(_))
   assert_true(section.get_layer("counter") is Some(_))
-  let arc = @pattern.TimeSpan::new(
+  let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
@@ -416,7 +416,7 @@ test "Section::layer replaces existing layer by name" {
   let base = Section::from_pattern(name="verse", body=@pattern.note(48.0))
   let section = base.layer(name="main", body=@pattern.note(60.0))
   @debug.assert_eq(section.layer_count(), 1)
-  let arc = @pattern.TimeSpan::new(
+  let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
@@ -446,7 +446,7 @@ test "Section::apply_patch set layer replaces existing layer" {
   ) catch {
     _ => abort("patch failed")
   }
-  let arc = @pattern.TimeSpan::new(
+  let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )

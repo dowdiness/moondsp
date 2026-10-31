@@ -195,10 +195,10 @@ test "deliverable: sequence c3 e3 g3 fast 2 produces 6 events" {
   @debug.assert_eq(events[4].value.get("note"), Some(52.0))
   @debug.assert_eq(events[5].value.get("note"), Some(55.0))
   // Verify rational time boundaries
-  @debug.assert_eq(events[0].part.begin, @pattern.Rational::new(0L, 1L))
-  @debug.assert_eq(events[0].part.end_, @pattern.Rational::new(1L, 6L))
-  @debug.assert_eq(events[5].part.begin, @pattern.Rational::new(5L, 6L))
-  @debug.assert_eq(events[5].part.end_, @pattern.Rational::new(1L, 1L))
+  @debug.assert_eq(events[0].part.begin, @pattern.Rational(0L, 1L))
+  @debug.assert_eq(events[0].part.end_, @pattern.Rational(1L, 6L))
+  @debug.assert_eq(events[5].part.begin, @pattern.Rational(5L, 6L))
+  @debug.assert_eq(events[5].part.end_, @pattern.Rational(1L, 1L))
 }
 
 ///|

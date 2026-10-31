@@ -39,7 +39,6 @@ pub struct ControlBindingBuilder {
 pub extend ControlBindingBuilder with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
-#alias(new)
 pub fn ControlBindingBuilder::ControlBindingBuilder() -> ControlBindingBuilder {
   { bindings: [], }
 }

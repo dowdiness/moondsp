@@ -402,7 +402,7 @@ pub fn[A] Song::Song(
       id,
       name: part.name,
       section: part.section,
-      span: @pattern.TimeSpan::new(start, end_),
+      span: @pattern.TimeSpan(start, end_),
     })
     cursor = max_rational(cursor, end_)
   }
@@ -488,7 +488,7 @@ pub fn[A] Song::gap_spans(self : Song[A]) -> Array[@pattern.TimeSpan] {
   for index in self.occurrence_by_start {
     let occurrence = self.occurrences[index]
     if cursor < occurrence.start() {
-      result.push(@pattern.TimeSpan::new(cursor, occurrence.start()))
+      result.push(@pattern.TimeSpan(cursor, occurrence.start()))
     }
     cursor = max_rational(cursor, occurrence.end_())
   }
@@ -576,7 +576,7 @@ fn unshift_span(
   span : @pattern.TimeSpan,
   offset : @pattern.Rational,
 ) -> @pattern.TimeSpan {
-  @pattern.TimeSpan::new(span.begin - offset, span.end_ - offset)
+  @pattern.TimeSpan(span.begin - offset, span.end_ - offset)
 }
 
 ///|

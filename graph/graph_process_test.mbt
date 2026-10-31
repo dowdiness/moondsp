@@ -1,6 +1,6 @@
 ///|
 test "compiled dsp renders a constant graph" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -24,7 +24,7 @@ test "compiled dsp renders a constant graph" {
 
 ///|
 test "compiled dsp renders an oscillator gain clip chain" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=LARGE_BLOCK_SIZE,
   )
@@ -51,7 +51,7 @@ test "compiled dsp renders an oscillator gain clip chain" {
 
 ///|
 test "compiled dsp mixes two constants" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -77,7 +77,7 @@ test "compiled dsp mixes two constants" {
 
 ///|
 test "compiled dsp noise graph stays bounded and non-zero" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=LARGE_BLOCK_SIZE,
   )
@@ -98,7 +98,7 @@ test "compiled dsp noise graph stays bounded and non-zero" {
 
 ///|
 test "compiled dsp applies adsr envelope through multiply" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=ADSR_TEST_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -138,11 +138,11 @@ test "compiled dsp applies adsr envelope through multiply" {
 
 ///|
 test "compiled dsp resets adsr state on invalid context" {
-  let valid_context = DspContext::new(
+  let valid_context = DspContext(
     sample_rate=ADSR_TEST_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
-  let invalid_context = DspContext::new(
+  let invalid_context = DspContext(
     sample_rate=ZERO_SAMPLE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -173,7 +173,7 @@ test "compiled dsp resets adsr state on invalid context" {
 
 ///|
 test "compiled dsp applies low-pass biquad in graph" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=LARGE_BLOCK_SIZE,
   )
@@ -204,7 +204,7 @@ test "compiled dsp applies low-pass biquad in graph" {
 
 ///|
 test "compiled dsp applies delay line in graph across blocks" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -240,11 +240,11 @@ test "compiled dsp applies delay line in graph across blocks" {
 
 ///|
 test "compiled dsp silences when runtime block exceeds compiled capacity" {
-  let compile_context = DspContext::new(
+  let compile_context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
-  let runtime_context = DspContext::new(
+  let runtime_context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=LARGE_BLOCK_SIZE,
   )
@@ -265,7 +265,7 @@ test "compiled dsp silences when runtime block exceeds compiled capacity" {
 
 ///|
 test "compiled dsp: oscillator reads frequency from input buffer" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -288,7 +288,7 @@ test "compiled dsp: oscillator reads frequency from input buffer" {
 
 ///|
 test "compiled dsp: FM oscillator with modulated frequency" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=LARGE_BLOCK_SIZE,
   )
@@ -313,7 +313,7 @@ test "compiled dsp: FM oscillator with modulated frequency" {
 
 ///|
 test "process: clean graph has zero sanitized count" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -332,7 +332,7 @@ test "process: clean graph has zero sanitized count" {
 
 ///|
 test "process: NaN constant is rejected at compile time" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -348,7 +348,7 @@ test "process: NaN constant is rejected at compile time" {
 
 ///|
 test "process: last_sanitized_count resets each call" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )

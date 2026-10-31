@@ -54,7 +54,6 @@ priv struct MiniDollarStackLine {
 }
 
 ///|
-#alias(new)
 fn Parser::Parser(
   input : String,
   admission? : PlaybackAdmission? = None,
@@ -136,7 +135,7 @@ fn mini_collect_dollar_stack_lines(
 fn mini_parse_dollar_stack_program(
   input : String,
   lines : Array[MiniDollarStackLine],
-  parser? : Parser = Parser::new(input),
+  parser? : Parser = Parser(input),
 ) -> Result[@pattern.Pat[@pattern.ControlMap], String] {
   let args : Array[@pattern.Pat[@pattern.ControlMap]] = []
   for line in lines {
@@ -383,14 +382,7 @@ fn parse_decimal_rational(
     )
   }
   let numerator = whole * denominator + fractional
-  @pattern.Rational::new(
-    if negative {
-      -numerator
-    } else {
-      numerator
-    },
-    denominator,
-  )
+  @pattern.Rational(if negative { -numerator } else { numerator }, denominator)
 }
 
 ///|

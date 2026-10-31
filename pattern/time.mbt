@@ -17,7 +17,6 @@ pub impl Show for TimeSpan with fn output(self, logger) {
 }
 
 ///|
-#alias(new)
 pub fn TimeSpan::TimeSpan(begin : Rational, end_ : Rational) -> TimeSpan {
   { begin, end_, }
 }
@@ -32,7 +31,7 @@ pub fn TimeSpan::shift(self : TimeSpan, offset : Rational) -> TimeSpan {
   if offset.num == 0L {
     return self
   }
-  TimeSpan::new(self.begin + offset, self.end_ + offset)
+  TimeSpan(self.begin + offset, self.end_ + offset)
 }
 
 ///|
@@ -64,10 +63,10 @@ pub fn TimeSpan::whole_cycles(self : TimeSpan) -> Array[TimeSpan] {
   let result : Array[TimeSpan] = []
   let one = Rational::from_int(1)
   // first cycle: cycle containing begin
-  let mut cycle_start = Rational::new(self.begin.floor(), 1L)
+  let mut cycle_start = Rational(self.begin.floor(), 1L)
   while cycle_start < self.end_ {
     let cycle_end = cycle_start + one
-    let arc = TimeSpan::new(cycle_start, cycle_end)
+    let arc = TimeSpan(cycle_start, cycle_end)
     match arc.intersect(self) {
       Some(intersection) => result.push(intersection)
       None => ()

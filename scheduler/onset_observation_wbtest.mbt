@@ -18,7 +18,7 @@ fn onset_test_origin() -> @pattern.EventOrigin {
   let snapshot = doc.lower_with_origins() catch {
     _ => abort("valid exact test snapshot")
   }
-  let arc = @pattern.TimeSpan::new(
+  let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )

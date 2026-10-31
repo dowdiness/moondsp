@@ -181,7 +181,7 @@ test "source tempo commits at unchanged musical position" {
   render_for_test(1)
   assert_eq(
     player.val.unwrap().scheduler.current_block().unwrap().logical_arc.begin,
-    @pattern.Rational::new(512L * 120L + 128L * 90L, 2880000L),
+    @pattern.Rational(512L * 120L + 128L * 90L, 2880000L),
   )
 }
 

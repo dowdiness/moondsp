@@ -32,7 +32,6 @@ pub fn stereo_shape() -> Int
 pub struct Adsr {
   // private fields
 }
-#alias(new)
 pub fn Adsr::Adsr(attack_ms~ : Double, decay_ms~ : Double, sustain~ : Double, release_ms~ : Double) -> Self
 pub fn Adsr::copy_state_from(Self, Self) -> Unit
 pub fn Adsr::gate_off(Self) -> Unit
@@ -47,7 +46,6 @@ pub fn Adsr::tick(Self, DspContext) -> Double
 pub struct AudioBuffer {
   // private fields
 }
-#alias(new)
 pub fn AudioBuffer::AudioBuffer(FixedArray[Double]) -> Self
 pub fn AudioBuffer::adopt(FixedArray[Double]) -> Self
 #alias(every)
@@ -63,7 +61,6 @@ pub fn AudioBuffer::set(Self, Int, Double) -> Unit
 pub struct Biquad {
   // private fields
 }
-#alias(new)
 pub fn Biquad::Biquad() -> Self
 pub fn Biquad::copy_state_from(Self, Self) -> Unit
 pub fn Biquad::process(Self, DspContext, AudioBuffer) -> Unit
@@ -81,14 +78,12 @@ pub fn BiquadMode::not_equal(Self, Self) -> Bool
 
 pub struct Clip {
 }
-#alias(new)
 pub fn Clip::Clip() -> Self
 pub fn Clip::process(Self, context~ : DspContext, buffer~ : AudioBuffer, threshold~ : Double) -> Unit
 
 pub struct DelayLine {
   // private fields
 }
-#alias(new)
 pub fn DelayLine::DelayLine(Int, delay_samples? : Int, feedback? : Double) -> Self
 pub fn DelayLine::copy_state_from(Self, Self) -> Bool
 pub fn DelayLine::delay_samples(Self) -> Int
@@ -103,7 +98,6 @@ pub fn DelayLine::tick(Self, Double) -> Double
 pub struct DemoSource {
   // private fields
 }
-#alias(new)
 pub fn DemoSource::DemoSource() -> Self
 pub fn DemoSource::reset(Self) -> Unit
 pub fn DemoSource::tick_source(Self, source_id~ : Int, freq_hz~ : Double, sample_rate~ : Double) -> Double
@@ -111,7 +105,6 @@ pub fn DemoSource::tick_source(Self, source_id~ : Int, freq_hz~ : Double, sample
 pub struct DspContext {
   // private fields
 }
-#alias(new)
 pub fn DspContext::DspContext(sample_rate~ : Double, block_size~ : Int) -> Self
 pub fn DspContext::block_size(Self) -> Int
 pub fn DspContext::make_buffer(Self, init? : Double) -> AudioBuffer
@@ -129,19 +122,16 @@ pub fn EnvStage::not_equal(Self, Self) -> Bool
 
 pub struct Gain {
 }
-#alias(new)
 pub fn Gain::Gain() -> Self
 pub fn Gain::process(Self, context~ : DspContext, buffer~ : AudioBuffer, amount~ : Double) -> Unit
 
 pub struct Mix {
 }
-#alias(new)
 pub fn Mix::Mix() -> Self
 pub fn Mix::process(Self, DspContext, AudioBuffer, AudioBuffer) -> Unit
 
 pub struct Mono {
 }
-#alias(new)
 pub fn Mono::Mono() -> Self
 pub fn Mono::channel_count(Self) -> Int
 pub impl ChannelSpec for Mono
@@ -149,7 +139,6 @@ pub impl ChannelSpec for Mono
 pub struct Noise {
   // private fields
 }
-#alias(new)
 pub fn Noise::Noise(UInt) -> Self
 pub fn Noise::copy_state_from(Self, Self) -> Unit
 pub fn Noise::process(Self, DspContext, AudioBuffer) -> Unit
@@ -160,7 +149,6 @@ pub fn Noise::tick(Self) -> Double
 pub struct Oscillator {
   // private fields
 }
-#alias(new)
 pub fn Oscillator::Oscillator() -> Self
 pub fn Oscillator::copy_state_from(Self, Self) -> Unit
 pub fn Oscillator::phase(Self) -> Double
@@ -172,14 +160,12 @@ pub fn Oscillator::tick_waveform(Self, waveform~ : Waveform, freq_hz~ : Double, 
 
 pub struct Pan {
 }
-#alias(new)
 pub fn Pan::Pan() -> Self
 pub fn Pan::process(Self, context~ : DspContext, input~ : AudioBuffer, left_output~ : AudioBuffer, right_output~ : AudioBuffer, position~ : Double) -> Unit
 
 pub struct ParamSmoother {
   // private fields
 }
-#alias(new)
 pub fn ParamSmoother::ParamSmoother(Double, Double, Double) -> Self
 pub fn ParamSmoother::current(Self) -> Double
 pub fn ParamSmoother::from_context(Double, Double, DspContext) -> Self
@@ -192,7 +178,6 @@ pub fn ParamSmoother::tick(Self) -> Double
 
 pub struct Stereo {
 }
-#alias(new)
 pub fn Stereo::Stereo() -> Self
 pub fn Stereo::channel_count(Self) -> Int
 pub impl ChannelSpec for Stereo

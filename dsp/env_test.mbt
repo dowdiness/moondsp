@@ -1,36 +1,21 @@
 ///|
 test "adsr starts in idle stage" {
-  let env = @dsp.Adsr::new(
-    attack_ms=5.0,
-    decay_ms=5.0,
-    sustain=0.5,
-    release_ms=10.0,
-  )
+  let env = @dsp.Adsr(attack_ms=5.0, decay_ms=5.0, sustain=0.5, release_ms=10.0)
   assert_true(env.stage() is @dsp.EnvStage::Idle)
   assert_true(env.level() == 0.0)
 }
 
 ///|
 test "adsr gate_on triggers attack" {
-  let env = @dsp.Adsr::new(
-    attack_ms=5.0,
-    decay_ms=5.0,
-    sustain=0.5,
-    release_ms=10.0,
-  )
+  let env = @dsp.Adsr(attack_ms=5.0, decay_ms=5.0, sustain=0.5, release_ms=10.0)
   env.gate_on()
   assert_true(env.stage() is @dsp.EnvStage::Attack)
 }
 
 ///|
 test "adsr transitions through all stages" {
-  let env = @dsp.Adsr::new(
-    attack_ms=1.0,
-    decay_ms=1.0,
-    sustain=0.5,
-    release_ms=1.0,
-  )
-  let ctx = @dsp.DspContext::new(sample_rate=1000.0, block_size=8)
+  let env = @dsp.Adsr(attack_ms=1.0, decay_ms=1.0, sustain=0.5, release_ms=1.0)
+  let ctx = @dsp.DspContext(sample_rate=1000.0, block_size=8)
   let buf = @dsp.AudioBuffer::filled(8)
   env.gate_on()
   env.process(ctx, buf)
@@ -43,13 +28,8 @@ test "adsr transitions through all stages" {
 
 ///|
 test "adsr zero attack reaches peak immediately" {
-  let env = @dsp.Adsr::new(
-    attack_ms=0.0,
-    decay_ms=5.0,
-    sustain=0.5,
-    release_ms=10.0,
-  )
-  let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=1)
+  let env = @dsp.Adsr(attack_ms=0.0, decay_ms=5.0, sustain=0.5, release_ms=10.0)
+  let ctx = @dsp.DspContext(sample_rate=48000.0, block_size=1)
   let buf = @dsp.AudioBuffer::filled(1)
   env.gate_on()
   env.process(ctx, buf)
@@ -58,12 +38,7 @@ test "adsr zero attack reaches peak immediately" {
 
 ///|
 test "adsr reset returns to idle" {
-  let env = @dsp.Adsr::new(
-    attack_ms=5.0,
-    decay_ms=5.0,
-    sustain=0.5,
-    release_ms=10.0,
-  )
+  let env = @dsp.Adsr(attack_ms=5.0, decay_ms=5.0, sustain=0.5, release_ms=10.0)
   env.gate_on()
   assert_true(env.stage() is @dsp.EnvStage::Attack)
   env.reset()
@@ -73,13 +48,8 @@ test "adsr reset returns to idle" {
 
 ///|
 test "adsr zero-time attack/decay/release skips via loop not recursion" {
-  let env = @dsp.Adsr::new(
-    attack_ms=0.0,
-    decay_ms=0.0,
-    sustain=0.5,
-    release_ms=0.0,
-  )
-  let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=1)
+  let env = @dsp.Adsr(attack_ms=0.0, decay_ms=0.0, sustain=0.5, release_ms=0.0)
+  let ctx = @dsp.DspContext(sample_rate=48000.0, block_size=1)
   let buf = @dsp.AudioBuffer::filled(1)
   // After gate_on + tick: should skip attack and decay, land on sustain
   env.gate_on()
@@ -109,13 +79,13 @@ test "prop: adsr output in [0, 1]" {
         sustain_clamped.is_nan() {
         return true
       }
-      let env = @dsp.Adsr::new(
+      let env = @dsp.Adsr(
         attack_ms~,
         decay_ms~,
         sustain=sustain_clamped,
         release_ms~,
       )
-      let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=64)
+      let ctx = @dsp.DspContext(sample_rate=48000.0, block_size=64)
       let buf = @dsp.AudioBuffer::filled(64)
       env.gate_on()
       env.process(ctx, buf)

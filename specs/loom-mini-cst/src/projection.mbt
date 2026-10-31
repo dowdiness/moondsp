@@ -1833,7 +1833,7 @@ fn loom_song_rational_value(
         Ok(n) => n
         Err(_) => return Err("loom song expected an integer")
       }
-      Ok(@pattern.Rational::new(Int64::from_int(n), 1L))
+      Ok(@pattern.Rational(Int64::from_int(n), 1L))
     }
     [num, den] => {
       let n = match loom_mini_parse_int(num.text()) {
@@ -1847,7 +1847,7 @@ fn loom_song_rational_value(
       if d == 0 {
         return Err("loom song denominator cannot be zero")
       }
-      Ok(@pattern.Rational::new(Int64::from_int(n), Int64::from_int(d)))
+      Ok(@pattern.Rational(Int64::from_int(n), Int64::from_int(d)))
     }
     _ => Err("loom song expected a rational")
   }

@@ -68,9 +68,9 @@ fn allocation_bench_snapshot(dense : Bool) -> PlaybackSnapshot raise {
 ///|
 test "bench/playback/sourced-query" (b : @bench.T) {
   let arcs = Array::makei(600, index => {
-    @pattern.TimeSpan::new(
-      @pattern.Rational::new(Int64::from_int(index * 128), 96000L),
-      @pattern.Rational::new(Int64::from_int((index + 1) * 128), 96000L),
+    @pattern.TimeSpan(
+      @pattern.Rational(Int64::from_int(index * 128), 96000L),
+      @pattern.Rational(Int64::from_int((index + 1) * 128), 96000L),
     )
   })
   for dense in [false, true] {

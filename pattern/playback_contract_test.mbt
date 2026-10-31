@@ -52,7 +52,7 @@ test "document control merge preserves material clocks and broad voice scopes" {
   let entries = snapshot.pat().entries()
   @debug.assert_eq(entries.map(p => p.entry_period()), [
     @pattern.Rational::from_int(2),
-    @pattern.Rational::new(1L, 2L),
+    @pattern.Rational(1L, 2L),
   ])
   let before = source.lower()
   @debug.assert_eq(snapshot.entry_key(0), before.entry_key(0))

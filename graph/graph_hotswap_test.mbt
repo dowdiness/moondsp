@@ -15,7 +15,7 @@ const HOT_SWAP_CENTER_GAIN : Double = 0.7071067811865476
 
 ///|
 test "compiled dsp hot swap crossfades equal-power between graphs" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
@@ -73,7 +73,7 @@ test "compiled dsp hot swap crossfades equal-power between graphs" {
 
 ///|
 test "compiled dsp hot swap can replace instantly" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
@@ -102,11 +102,11 @@ test "compiled dsp hot swap can replace instantly" {
 
 ///|
 test "compiled dsp hot swap rejects incompatible replacement graph" {
-  let active_context = DspContext::new(
+  let active_context = DspContext(
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let incompatible_context = DspContext::new(
+  let incompatible_context = DspContext(
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=8,
   )
@@ -135,11 +135,11 @@ test "compiled dsp hot swap rejects incompatible replacement graph" {
 
 ///|
 test "compiled dsp hot swap result reports sample rate mismatch" {
-  let active_context = DspContext::new(
+  let active_context = DspContext(
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let incompatible_context = DspContext::new(
+  let incompatible_context = DspContext(
     sample_rate=HOT_SWAP_SAMPLE_RATE * 2.0,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
@@ -170,11 +170,11 @@ test "compiled dsp hot swap result reports sample rate mismatch" {
 
 ///|
 test "compiled dsp hot swap result reports block capacity mismatch" {
-  let active_context = DspContext::new(
+  let active_context = DspContext(
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
-  let incompatible_context = DspContext::new(
+  let incompatible_context = DspContext(
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE * 2,
   )
@@ -211,7 +211,7 @@ test "compiled dsp hot swap result reports block capacity mismatch" {
 
 ///|
 test "compiled dsp hot swap mirrors runtime param changes into pending graph" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
@@ -265,7 +265,7 @@ test "compiled dsp hot swap mirrors runtime param changes into pending graph" {
 
 ///|
 test "compiled dsp hot swap result reports pending graph control rejection" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
@@ -311,7 +311,7 @@ test "compiled dsp hot swap result reports pending graph control rejection" {
 
 ///|
 test "compiled stereo dsp hot swap crossfades equal-power between graphs" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
@@ -400,7 +400,7 @@ test "compiled stereo dsp hot swap crossfades equal-power between graphs" {
 
 ///|
 test "compiled stereo dsp hot swap result queues compatible graph" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
@@ -441,7 +441,7 @@ test "compiled stereo dsp hot swap result queues compatible graph" {
 
 ///|
 test "compiled stereo dsp hot swap mirrors pan changes into pending graph" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )
@@ -501,7 +501,7 @@ test "compiled stereo dsp hot swap mirrors pan changes into pending graph" {
 
 ///|
 test "compiled stereo dsp hot swap result reports pending graph control rejection" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=HOT_SWAP_SAMPLE_RATE,
     block_size=HOT_SWAP_BLOCK_SIZE,
   )

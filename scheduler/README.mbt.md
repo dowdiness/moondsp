@@ -47,7 +47,7 @@ sample-accurate audio voice triggers across block boundaries:
 | **Snapshot Observation** | `PatternScheduler`, `PlaybackSnapshot` | `PatternScheduler::accepted_snapshot`, `PatternScheduler::queued_snapshot`, `PatternScheduler::pending_material_change_count`, `PatternScheduler::skipped_material_change_count` |
 | **Timing & Transport** | `PatternScheduler`, `BlockFrame`, `PerformanceTime` | `PatternScheduler::set_bpm`, `PatternScheduler::bpm`, `PatternScheduler::current_block`, `PatternScheduler::sample_at`, `PatternScheduler::sample_counter`, `PatternScheduler::reset_transport` |
 | **Voice Scopes & Reconciliation** | `PatternVoiceScope`, `SongVoiceScope`, `ActiveVoiceEffect` | `PatternVoiceScope::node`, `SongVoiceScope::section`, `SongVoiceScope::occurrence`, `PatternScheduler::apply_pattern_voice_effect_result`, `PatternScheduler::apply_song_voice_effect_result` |
-| **Controls & Notes** | `ControlMapper`, `VoiceControlBatch` | `default_control_mapper`, `ControlMapper::new`, `PatternScheduler::push_active_note`, `PatternScheduler::expire_notes`, `PatternScheduler::active_note_count` |
+| **Controls & Notes** | `ControlMapper`, `VoiceControlBatch` | `default_control_mapper`, `ControlMapper(...)`, `PatternScheduler::push_active_note`, `PatternScheduler::expire_notes`, `PatternScheduler::active_note_count` |
 
 `render_block(left, right)` renders dry stereo from the current snapshot.
 `render_block_with_send(left, right, send_left, send_right)` also writes
@@ -268,7 +268,7 @@ turn a rejected combination into a no-op.
 ```mbt check
 ///|
 test "edit orchestration stages a replacement and reconciles active voices" {
-  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
+  let ctx = @moondsp.DspContext(sample_rate=48000.0, block_size=128)
   let pool = @moondsp.BoundVoicePool(
     @moondsp.AnalyzedGraph::analyze([
       @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 440.0),
@@ -282,7 +282,7 @@ test "edit orchestration stages a replacement and reconciles active voices" {
       @moondsp.DspNode::output(2),
     ]),
     ctx,
-    @moondsp.ControlBindingBuilder::new().bind(
+    @moondsp.ControlBindingBuilder().bind(
       key="note",
       node_index=0,
       slot=@moondsp.GraphParamSlot::Value0,

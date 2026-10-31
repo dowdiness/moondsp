@@ -7,7 +7,6 @@ pub struct DspContext {
 
 ///|
 /// Create a DSP context with normalized runtime parameters.
-#alias(new)
 pub fn DspContext::DspContext(
   sample_rate~ : Double,
   block_size~ : Int,

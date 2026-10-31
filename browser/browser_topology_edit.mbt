@@ -5,8 +5,8 @@ let topo_edit_gain : @ref.Ref[Double] = @ref.new(BROWSER_COMPILED_DEFAULT_GAIN)
 let topo_edit_inserted : @ref.Ref[Bool] = @ref.new(false)
 
 ///|
-let compiled_topology_edit : GraphSlot[@moondsp.DspTopologyController, MonoOut] = GraphSlot::new(
-  output=MonoOut::new(),
+let compiled_topology_edit : GraphSlot[@moondsp.DspTopologyController, MonoOut] = GraphSlot(
+  output=MonoOut(),
   compile=fn(ctx) {
     @moondsp.DspTopologyController::from_nodes(
       [

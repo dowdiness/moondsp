@@ -22,55 +22,49 @@ test "relative durations distribute exact sequence timing" {
   let events = query_one_cycle(pat)
   assert_eq(events.length(), 3)
   assert_eq(events[0].whole.unwrap().begin, @pattern.Rational::from_int(0))
-  assert_eq(events[0].whole.unwrap().end_, @pattern.Rational::new(1L, 2L))
+  assert_eq(events[0].whole.unwrap().end_, @pattern.Rational(1L, 2L))
   assert_eq(events[0].part.begin, @pattern.Rational::from_int(0))
-  assert_eq(events[0].part.end_, @pattern.Rational::new(1L, 2L))
-  assert_eq(events[1].whole.unwrap().begin, @pattern.Rational::new(1L, 2L))
-  assert_eq(events[1].whole.unwrap().end_, @pattern.Rational::new(3L, 4L))
-  assert_eq(events[2].whole.unwrap().begin, @pattern.Rational::new(3L, 4L))
+  assert_eq(events[0].part.end_, @pattern.Rational(1L, 2L))
+  assert_eq(events[1].whole.unwrap().begin, @pattern.Rational(1L, 2L))
+  assert_eq(events[1].whole.unwrap().end_, @pattern.Rational(3L, 4L))
+  assert_eq(events[2].whole.unwrap().begin, @pattern.Rational(3L, 4L))
   assert_eq(events[2].whole.unwrap().end_, @pattern.Rational::from_int(1))
 
   let clipped = pat.query(
-    @pattern.TimeSpan::new(
-      @pattern.Rational::new(1L, 4L),
-      @pattern.Rational::new(3L, 8L),
-    ),
+    @pattern.TimeSpan(@pattern.Rational(1L, 4L), @pattern.Rational(3L, 8L)),
   )
   assert_eq(clipped.length(), 1)
   assert_eq(clipped[0].whole.unwrap().begin, @pattern.Rational::from_int(0))
-  assert_eq(clipped[0].whole.unwrap().end_, @pattern.Rational::new(1L, 2L))
-  assert_eq(clipped[0].part.begin, @pattern.Rational::new(1L, 4L))
-  assert_eq(clipped[0].part.end_, @pattern.Rational::new(3L, 8L))
+  assert_eq(clipped[0].whole.unwrap().end_, @pattern.Rational(1L, 2L))
+  assert_eq(clipped[0].part.begin, @pattern.Rational(1L, 4L))
+  assert_eq(clipped[0].part.end_, @pattern.Rational(3L, 8L))
 
   let drum_events = query_one_cycle(unwrap_ok(@mini.parse("s(\"bd ~@2 sd\")")))
   assert_eq(drum_events.length(), 2)
-  assert_eq(drum_events[0].whole.unwrap().end_, @pattern.Rational::new(1L, 4L))
-  assert_eq(drum_events[1].whole.unwrap().begin, @pattern.Rational::new(3L, 4L))
+  assert_eq(drum_events[0].whole.unwrap().end_, @pattern.Rational(1L, 4L))
+  assert_eq(drum_events[1].whole.unwrap().begin, @pattern.Rational(3L, 4L))
 
   let chord_events = query_one_cycle(unwrap_ok(@mini.parse("chord(\"C@2 G\")")))
   assert_eq(chord_events.length(), 6)
-  assert_eq(chord_events[0].whole.unwrap().end_, @pattern.Rational::new(2L, 3L))
-  assert_eq(
-    chord_events[3].whole.unwrap().begin,
-    @pattern.Rational::new(2L, 3L),
-  )
+  assert_eq(chord_events[0].whole.unwrap().end_, @pattern.Rational(2L, 3L))
+  assert_eq(chord_events[3].whole.unwrap().begin, @pattern.Rational(2L, 3L))
 
   let grouped = query_one_cycle(
     unwrap_ok(@mini.parse("note(\"[C4 E4]@2 G4\")")),
   )
   assert_eq(grouped.length(), 3)
   assert_eq(grouped[0].whole.unwrap().begin, @pattern.Rational::from_int(0))
-  assert_eq(grouped[0].whole.unwrap().end_, @pattern.Rational::new(1L, 3L))
-  assert_eq(grouped[1].whole.unwrap().begin, @pattern.Rational::new(1L, 3L))
-  assert_eq(grouped[1].whole.unwrap().end_, @pattern.Rational::new(2L, 3L))
-  assert_eq(grouped[2].whole.unwrap().begin, @pattern.Rational::new(2L, 3L))
+  assert_eq(grouped[0].whole.unwrap().end_, @pattern.Rational(1L, 3L))
+  assert_eq(grouped[1].whole.unwrap().begin, @pattern.Rational(1L, 3L))
+  assert_eq(grouped[1].whole.unwrap().end_, @pattern.Rational(2L, 3L))
+  assert_eq(grouped[2].whole.unwrap().begin, @pattern.Rational(2L, 3L))
 
   let repeated = query_one_cycle(unwrap_ok(@mini.parse("note(\"C4@2*2 Eb4\")")))
   assert_eq(repeated.length(), 3)
-  assert_eq(repeated[0].whole.unwrap().end_, @pattern.Rational::new(1L, 3L))
-  assert_eq(repeated[1].whole.unwrap().begin, @pattern.Rational::new(1L, 3L))
-  assert_eq(repeated[1].whole.unwrap().end_, @pattern.Rational::new(2L, 3L))
-  assert_eq(repeated[2].whole.unwrap().begin, @pattern.Rational::new(2L, 3L))
+  assert_eq(repeated[0].whole.unwrap().end_, @pattern.Rational(1L, 3L))
+  assert_eq(repeated[1].whole.unwrap().begin, @pattern.Rational(1L, 3L))
+  assert_eq(repeated[1].whole.unwrap().end_, @pattern.Rational(2L, 3L))
+  assert_eq(repeated[2].whole.unwrap().begin, @pattern.Rational(2L, 3L))
 }
 
 ///|
@@ -93,35 +87,26 @@ test "relative duration weights reject invalid values and excessive sums" {
 test "unweighted sequence timing remains equal-slot" {
   let events = query_one_cycle(unwrap_ok(@mini.parse("note(\"C4 Eb4 F4\")")))
   assert_eq(events.length(), 3)
-  assert_eq(events[0].whole.unwrap().end_, @pattern.Rational::new(1L, 3L))
-  assert_eq(events[1].whole.unwrap().begin, @pattern.Rational::new(1L, 3L))
-  assert_eq(events[1].whole.unwrap().end_, @pattern.Rational::new(2L, 3L))
-  assert_eq(events[2].whole.unwrap().begin, @pattern.Rational::new(2L, 3L))
+  assert_eq(events[0].whole.unwrap().end_, @pattern.Rational(1L, 3L))
+  assert_eq(events[1].whole.unwrap().begin, @pattern.Rational(1L, 3L))
+  assert_eq(events[1].whole.unwrap().end_, @pattern.Rational(2L, 3L))
+  assert_eq(events[2].whole.unwrap().begin, @pattern.Rational(2L, 3L))
 }
 
 ///|
 test "rest atoms reserve their notation slots without emitting events" {
   let sound_events = query_one_cycle(unwrap_ok(@mini.parse("s(\"bd ~ sd ~\")")))
   assert_eq(sound_events.length(), 2)
-  assert_eq(
-    sound_events[0].whole.unwrap().begin,
-    @pattern.Rational::new(0L, 1L),
-  )
-  assert_eq(
-    sound_events[1].whole.unwrap().begin,
-    @pattern.Rational::new(1L, 2L),
-  )
+  assert_eq(sound_events[0].whole.unwrap().begin, @pattern.Rational(0L, 1L))
+  assert_eq(sound_events[1].whole.unwrap().begin, @pattern.Rational(1L, 2L))
   let note_events = query_one_cycle(
     unwrap_ok(@mini.parse("note(\"C4 ~ E4 ~\")")),
   )
   assert_eq(note_events.length(), 2)
-  assert_eq(note_events[1].whole.unwrap().begin, @pattern.Rational::new(1L, 2L))
+  assert_eq(note_events[1].whole.unwrap().begin, @pattern.Rational(1L, 2L))
   let chord_events = query_one_cycle(unwrap_ok(@mini.parse("chord(\"C ~ G\")")))
   assert_eq(chord_events.length(), 6)
-  assert_eq(
-    chord_events[3].whole.unwrap().begin,
-    @pattern.Rational::new(2L, 3L),
-  )
+  assert_eq(chord_events[3].whole.unwrap().begin, @pattern.Rational(2L, 3L))
   let doc = unwrap_doc(@mini.parse_doc("note(\"C4 ~ E4 ~\")"))
   assert_true(doc.contains_node(pid("mini:rest:_x126_:0")))
   assert_true(doc.contains_node(pid("mini:rest:_x126_:1")))
@@ -134,13 +119,13 @@ test "parse_snapshot preserves rest timing and source identity" {
   )
   assert_true(snapshot.pat().entry_period() == @pattern.Rational::from_int(1))
   let events = snapshot.query(
-    @pattern.TimeSpan::new(
+    @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
       @pattern.Rational::from_int(1),
     ),
   )
   assert_eq(events.length(), 2)
-  assert_eq(events[1].whole.unwrap().begin, @pattern.Rational::new(1L, 2L))
+  assert_eq(events[1].whole.unwrap().begin, @pattern.Rational(1L, 2L))
 }
 
 ///|
@@ -148,16 +133,16 @@ test "gate uses an exact fraction and leaves note onsets unchanged" {
   let source = "note(\"C4 D4 E4 G4\").gate(0.4)"
   let runtime_events = query_one_cycle(unwrap_ok(@mini.parse(source)))
   let snapshot_events = unwrap_mini_snapshot(@mini.parse_snapshot(source)).query(
-    @pattern.TimeSpan::new(
+    @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
       @pattern.Rational::from_int(1),
     ),
   )
   for events in [runtime_events, snapshot_events] {
     assert_eq(events.length(), 4)
-    assert_eq(events[0].whole.unwrap().end_, @pattern.Rational::new(1L, 10L))
-    assert_eq(events[1].whole.unwrap().begin, @pattern.Rational::new(1L, 4L))
-    assert_eq(events[1].whole.unwrap().end_, @pattern.Rational::new(7L, 20L))
+    assert_eq(events[0].whole.unwrap().end_, @pattern.Rational(1L, 10L))
+    assert_eq(events[1].whole.unwrap().begin, @pattern.Rational(1L, 4L))
+    assert_eq(events[1].whole.unwrap().end_, @pattern.Rational(7L, 20L))
   }
 }
 
@@ -190,7 +175,7 @@ test "drum_midi returns None for unknown names" {
 fn query_one_cycle(
   pat : @pattern.Pat[@pattern.ControlMap],
 ) -> Array[@pattern.Event[@pattern.ControlMap]] {
-  let arc = @pattern.TimeSpan::new(
+  let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
@@ -328,7 +313,7 @@ test "parse_snapshot lowers mini output through PatternDoc" {
     content="mini:seq:mini:sound:bd:0:mini:sound:sd:0",
   )
   let events = snapshot.query(
-    @pattern.TimeSpan::new(
+    @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
       @pattern.Rational::from_int(1),
     ),
@@ -346,7 +331,7 @@ test "parse_snapshot lowers filter resonance through PatternDoc" {
     content="mini:merge_control:mini:merge_control:mini:merge_control:mini:merge_control:mini:sound:bd:0:lpf:200:lpf_resonance:2:hpf:40:hpf_resonance:0.5",
   )
   let events = snapshot.query(
-    @pattern.TimeSpan::new(
+    @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
       @pattern.Rational::from_int(1),
     ),
@@ -371,7 +356,7 @@ test "parse_snapshot lowers gain and pan methods through PatternDoc" {
     content="mini:merge_control:mini:merge_control:mini:sound:bd:0:gain:0.5:pan:-0.25",
   )
   let events = snapshot.query(
-    @pattern.TimeSpan::new(
+    @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
       @pattern.Rational::from_int(1),
     ),
@@ -388,7 +373,7 @@ test "parse_snapshot supports repeated lpf values in PatternDoc" {
     @mini.parse_snapshot("stack(s(\"bd\").lpf(200), s(\"sd\").lpf(200))"),
   )
   let events = snapshot.query(
-    @pattern.TimeSpan::new(
+    @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
       @pattern.Rational::from_int(1),
     ),
@@ -404,7 +389,7 @@ test "parse_snapshot supports repeated hpf chain in PatternDoc" {
     @mini.parse_snapshot("s(\"bd\").hpf(200).hpf(200)"),
   )
   let events = snapshot.query(
-    @pattern.TimeSpan::new(
+    @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
       @pattern.Rational::from_int(1),
     ),
@@ -422,7 +407,7 @@ test "parse_snapshot supports repeated gain and pan values in PatternDoc" {
     ),
   )
   let events = snapshot.query(
-    @pattern.TimeSpan::new(
+    @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
       @pattern.Rational::from_int(1),
     ),
@@ -505,7 +490,7 @@ test "parse_doc_reusing lpf edit preserves sound atom id" {
   let snapshot = edited.lower_with_cache(cache)
   assert_true(cache.hit_count() >= 1)
   let events = snapshot.query(
-    @pattern.TimeSpan::new(
+    @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
       @pattern.Rational::from_int(1),
     ),
@@ -531,7 +516,7 @@ test "parse_doc_reusing gain edit preserves sound atom id" {
   let events = edited
     .lower()
     .query(
-      @pattern.TimeSpan::new(
+      @pattern.TimeSpan(
         @pattern.Rational::from_int(0),
         @pattern.Rational::from_int(1),
       ),
@@ -557,7 +542,7 @@ test "parse_doc_reusing pan edit preserves sound atom id" {
   let events = edited
     .lower()
     .query(
-      @pattern.TimeSpan::new(
+      @pattern.TimeSpan(
         @pattern.Rational::from_int(0),
         @pattern.Rational::from_int(1),
       ),
@@ -584,7 +569,7 @@ test "parse_doc_reusing token replacement preserves unaffected token ids" {
   assert_true(cache.hit_count() >= 2)
   assert_true(cache.miss_count() >= 1)
   let events = snapshot.query(
-    @pattern.TimeSpan::new(
+    @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
       @pattern.Rational::from_int(1),
     ),
@@ -634,7 +619,7 @@ fn draft_snapshot(
 
 ///|
 fn draft_arc() -> @pattern.TimeSpan {
-  @pattern.TimeSpan::new(
+  @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
@@ -692,22 +677,10 @@ test "Draft preparation preserves weighted timing and note source origin" {
   let draft = @mini.Draft("note(\"C4@2 Eb4 F4\")")
   let events = draft_snapshot(draft).query(draft_arc())
   assert_eq(events.length(), 3)
-  assert_eq(
-    events[0].event().whole.unwrap().end_,
-    @pattern.Rational::new(1L, 2L),
-  )
-  assert_eq(
-    events[1].event().whole.unwrap().begin,
-    @pattern.Rational::new(1L, 2L),
-  )
-  assert_eq(
-    events[1].event().whole.unwrap().end_,
-    @pattern.Rational::new(3L, 4L),
-  )
-  assert_eq(
-    events[2].event().whole.unwrap().begin,
-    @pattern.Rational::new(3L, 4L),
-  )
+  assert_eq(events[0].event().whole.unwrap().end_, @pattern.Rational(1L, 2L))
+  assert_eq(events[1].event().whole.unwrap().begin, @pattern.Rational(1L, 2L))
+  assert_eq(events[1].event().whole.unwrap().end_, @pattern.Rational(3L, 4L))
+  assert_eq(events[2].event().whole.unwrap().begin, @pattern.Rational(3L, 4L))
   match draft.locate_origin(events[0].origin()) {
     @mini.OriginLocation::Located(range, _) => {
       assert_eq(range.start(), 6)
@@ -742,14 +715,8 @@ test "Draft prepared playback keeps weighted rests silent and in time" {
     events[0].event().whole.unwrap().begin,
     @pattern.Rational::from_int(0),
   )
-  assert_eq(
-    events[0].event().whole.unwrap().end_,
-    @pattern.Rational::new(2L, 5L),
-  )
-  assert_eq(
-    events[1].event().whole.unwrap().begin,
-    @pattern.Rational::new(4L, 5L),
-  )
+  assert_eq(events[0].event().whole.unwrap().end_, @pattern.Rational(2L, 5L))
+  assert_eq(events[1].event().whole.unwrap().begin, @pattern.Rational(4L, 5L))
   assert_eq(
     events[1].event().whole.unwrap().end_,
     @pattern.Rational::from_int(1),
@@ -1564,11 +1531,11 @@ test "direct fast and slow transforms preserve exact decimal factors" {
   let fast = unwrap_ok(@mini.parse("note(\"60\").fast(1.5)"))
   let fast_events = query_one_cycle(fast)
   assert_eq(fast_events.length(), 2)
-  assert_eq(fast_events[1].whole.unwrap().begin, @pattern.Rational::new(2L, 3L))
+  assert_eq(fast_events[1].whole.unwrap().begin, @pattern.Rational(2L, 3L))
   let slow = unwrap_ok(@mini.parse("note(\"60\").slow(0.5)"))
   let slow_events = query_one_cycle(slow)
   assert_eq(slow_events.length(), 2)
-  assert_eq(slow_events[1].whole.unwrap().begin, @pattern.Rational::new(1L, 2L))
+  assert_eq(slow_events[1].whole.unwrap().begin, @pattern.Rational(1L, 2L))
 }
 
 ///|
@@ -1747,7 +1714,7 @@ test "parse_doc lowers Strudel-style dollar stack lines" {
     #|$: note("60")
   let snapshot = unwrap_mini_snapshot(@mini.parse_snapshot(input))
   let events = snapshot.query(
-    @pattern.TimeSpan::new(
+    @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
       @pattern.Rational::from_int(1),
     ),
@@ -2015,11 +1982,11 @@ test "chord(Bb) parses B-flat major" {
 ///|
 test "chord(C) produces same events each cycle" {
   let pat = unwrap_ok(@mini.parse("chord(\"C\")"))
-  let arc1 = @pattern.TimeSpan::new(
+  let arc1 = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
-  let arc2 = @pattern.TimeSpan::new(
+  let arc2 = @pattern.TimeSpan(
     @pattern.Rational::from_int(1),
     @pattern.Rational::from_int(2),
   )
@@ -2042,7 +2009,7 @@ test "chord(C) produces same events each cycle" {
 test "chord(C) and note(60 64 67) produce identical events" {
   let pat1 = unwrap_ok(@mini.parse("chord(\"C\")"))
   let pat2 = unwrap_ok(@mini.parse("note(\"60 64 67\")"))
-  let arc = @pattern.TimeSpan::new(
+  let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )

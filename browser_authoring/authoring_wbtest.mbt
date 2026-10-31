@@ -227,7 +227,7 @@ test "onset lookup keeps exact references but retires edited literal geometry" {
   guard input.compile() is Ok(@mini.PreparedPlayback::Pattern(snapshot, _)) else {
     fail("expected compiled exact pattern")
   }
-  let arc = @pattern.TimeSpan::new(
+  let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
@@ -316,7 +316,7 @@ test "negative pitch is distinct from an unpitched drum onset" {
       fail("expected exact playback: \{draft_state(draft)}")
     }
     let event = snapshot.query(
-        @pattern.TimeSpan::new(
+        @pattern.TimeSpan(
           @pattern.Rational::from_int(0),
           @pattern.Rational::from_int(1),
         ),

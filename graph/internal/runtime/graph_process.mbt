@@ -186,7 +186,7 @@ fn CompiledGraph::run_node_loop(
   context : DspContext,
   sample_count : Int,
 ) -> Unit {
-  let pan = Pan::new()
+  let pan = Pan()
   for index in 0..<self.nodes.length() {
     process_node_block(self, index, context, sample_count, pan)
   }

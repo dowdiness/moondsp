@@ -360,7 +360,7 @@ struct DelayLine {
   delay_samples : Int
 }
 
-fn DelayLine::new(max_delay_samples : Int) -> DelayLine {
+fn DelayLine(max_delay_samples : Int) -> DelayLine {
   {
     buffer: FixedArray::make(max_delay_samples, 0.0),
     write_pos: 0,
@@ -407,7 +407,7 @@ struct ParamSmoother {
   coeff : Double  // smoothing coefficient
 }
 
-fn ParamSmoother::new(initial : Double, smoothing_ms : Double, sample_rate : Double) -> ParamSmoother {
+fn ParamSmoother(initial : Double, smoothing_ms : Double, sample_rate : Double) -> ParamSmoother {
   {
     current: initial,
     target: initial,

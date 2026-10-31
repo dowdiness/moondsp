@@ -109,7 +109,7 @@ pub fn PatternScheduler::current_block(
   Ok({
     sample_begin: self.clock.sample(),
     sample_end: next.sample(),
-    logical_arc: @pattern.TimeSpan::new(
+    logical_arc: @pattern.TimeSpan(
       self.clock.position(self.clock.sample()).unwrap(),
       next.position(next.sample()).unwrap(),
     ),

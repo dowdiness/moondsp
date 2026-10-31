@@ -117,7 +117,7 @@ fn assert_song_parity_equal(
   }
   // Whole-song parity over the song's own duration window folds part placement,
   // section bodies, and timing into one global cross-check.
-  let global_window = @pattern.TimeSpan::new(
+  let global_window = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     loom_song.duration(),
   )

@@ -12,7 +12,6 @@ pub extend ControlBinding with @moonbitlang/core/debug.Debug::{to_repr}
 pub extend ControlBinding with Eq::{not_equal, equal}
 
 ///|
-#alias(new)
 pub fn ControlBinding::ControlBinding(
   key~ : String,
   node_index~ : Int,
@@ -65,9 +64,8 @@ pub struct ControlBindingBuilder {
 pub extend ControlBindingBuilder with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
-#alias(new)
 pub fn ControlBindingBuilder::ControlBindingBuilder() -> ControlBindingBuilder {
-  { raw: @binding.ControlBindingBuilder::new(), }
+  { raw: @binding.ControlBindingBuilder(), }
 }
 
 ///|

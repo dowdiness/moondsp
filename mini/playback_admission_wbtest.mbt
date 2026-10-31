@@ -6,14 +6,11 @@ test "query bounds cover phase edges full-cycle slots and future callbacks" {
   ]
   let starts = [
     @pattern.Rational::from_int(0),
-    @pattern.Rational::new(999L, 1000L),
+    @pattern.Rational(999L, 1000L),
     @pattern.Rational::from_int(999999),
     @pattern.Rational::from_int(1000000),
   ]
-  let widths = [
-    @pattern.Rational::new(1L, 1000L),
-    @pattern.Rational::new(1L, 8L),
-  ]
+  let widths = [@pattern.Rational(1L, 1000L), @pattern.Rational(1L, 8L)]
   for source in sources {
     let parser = Parser(source)
     let syntax = parser.parse_syntax_expr()
@@ -22,7 +19,7 @@ test "query bounds cover phase edges full-cycle slots and future callbacks" {
     let pat = compile_mini_pattern(resolve_mini_expr(syntax, parser.bindings))
     for start in starts {
       for width in widths {
-        let events = pat.query(@pattern.TimeSpan::new(start, start + width))
+        let events = pat.query(@pattern.TimeSpan(start, start + width))
         assert_true(
           events.length().to_double() <= work.estimate(width.to_double()).events,
         )
@@ -33,7 +30,7 @@ test "query bounds cover phase edges full-cycle slots and future callbacks" {
 
 ///|
 test "notation modifier chains and exact time factor growth reject before lowering" {
-  let span = Some(@pattern.Rational::new(2L, 45L))
+  let span = Some(@pattern.Rational(2L, 45L))
   let source = "note(\"60" + Array::make(1000, "*1").join("") + "\")"
   assert_true(parse_play_source(source, max_query_span=span) is Err(_))
   assert_true(
@@ -46,7 +43,7 @@ test "notation modifier chains and exact time factor growth reject before loweri
 
 ///|
 test "block comments cannot hide recursive syntax from playback admission" {
-  let span = Some(@pattern.Rational::new(2L, 45L))
+  let span = Some(@pattern.Rational(2L, 45L))
   for depth in [40, 2000] {
     let source = "/* // */ " +
       Array::make(depth, "(").join("") +
@@ -64,10 +61,7 @@ test "unterminated comments never publish a valid source prefix" {
     let source = "bpm(120); note(\"64\") " + suffix
     assert_true(parse_play_source(source) is Err(_))
     assert_true(
-      parse_play_source(
-        source,
-        max_query_span=Some(@pattern.Rational::new(2L, 45L)),
-      )
+      parse_play_source(source, max_query_span=Some(@pattern.Rational(2L, 45L)))
       is Err(_),
     )
     assert_true(parse("note(\"64\") " + suffix) is Err(_))
@@ -99,15 +93,12 @@ test "generated transform compositions respect estimated events and preserve out
     ".gate(0.5)", ".lpf(1200,0.7)",
   ]
   let starts = [
-    @pattern.Rational::new(-1L, 16L),
-    @pattern.Rational::new(999L, 1000L),
+    @pattern.Rational(-1L, 16L),
+    @pattern.Rational(999L, 1000L),
     @pattern.Rational::from_int(3),
     @pattern.Rational::from_int(1000000),
   ]
-  let widths = [
-    @pattern.Rational::new(1L, 1000L),
-    @pattern.Rational::new(1L, 8L),
-  ]
+  let widths = [@pattern.Rational(1L, 1000L), @pattern.Rational(1L, 8L)]
   for atom in atoms {
     for first in transforms {
       for second in transforms {
@@ -119,13 +110,13 @@ test "generated transform compositions respect estimated events and preserve out
         let ordinary = parse(source).unwrap()
         let bounded = parse_play_source(
           source,
-          max_query_span=Some(@pattern.Rational::new(1L, 8L)),
+          max_query_span=Some(@pattern.Rational(1L, 8L)),
         ).unwrap()
         guard bounded.body() is Pattern(doc) else { fail("expected pattern") }
         let snapshot = doc.lower()
         for start in starts {
           for width in widths {
-            let arc = @pattern.TimeSpan::new(start, start + width)
+            let arc = @pattern.TimeSpan(start, start + width)
             let events = ordinary.query(arc)
             assert_true(
               events.length().to_double() <=

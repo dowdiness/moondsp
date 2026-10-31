@@ -56,7 +56,7 @@ fn make_drum_pool(
     @moondsp.BoundVoicePool(
       @moondsp.AnalyzedGraph::analyze(template),
       ctx,
-      @moondsp.ControlBindingBuilder::new(),
+      @moondsp.ControlBindingBuilder(),
       max_voices=8,
     ),
   ) catch {
@@ -75,7 +75,7 @@ fn make_synth_pool(
     @moondsp.BoundVoicePool(
       @moondsp.AnalyzedGraph::analyze(template),
       ctx,
-      @moondsp.ControlBindingBuilder::new()
+      @moondsp.ControlBindingBuilder()
       .bind(
         key="note",
         node_index=0, // oscillator(Value0) frequency placeholder
@@ -129,7 +129,7 @@ pub fn init_scheduler_graph_with_templates(
     reset_scheduler_graph()
     return false
   }
-  let ctx = @moondsp.DspContext::new(sample_rate~, block_size~)
+  let ctx = @moondsp.DspContext(sample_rate~, block_size~)
   let candidates = [
     (@scheduler.ControlEquals("sound", 36.0), make_drum_pool(bd_template, ctx)),
     (@scheduler.ControlEquals("sound", 38.0), make_drum_pool(sd_template, ctx)),

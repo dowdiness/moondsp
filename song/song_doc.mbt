@@ -557,7 +557,7 @@ fn place_song_span(
   rate : @pattern.Rational,
   offset : @pattern.Rational,
 ) -> @pattern.TimeSpan {
-  @pattern.TimeSpan::new(span.begin / rate + offset, span.end_ / rate + offset)
+  @pattern.TimeSpan(span.begin / rate + offset, span.end_ / rate + offset)
 }
 
 ///|
@@ -578,7 +578,7 @@ fn[A] push_song_snapshot_events(
       let query_arc = if scope.is_identity() {
         local_arc
       } else {
-        @pattern.TimeSpan::new(
+        @pattern.TimeSpan(
           local_arc.begin * scope.rate(),
           local_arc.end_ * scope.rate(),
         )

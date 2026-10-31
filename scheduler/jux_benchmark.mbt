@@ -6,7 +6,7 @@ const BENCH_BLOCK_SIZE : Int = 128
 
 ///|
 fn bench_ctx() -> @moondsp.DspContext {
-  @moondsp.DspContext::new(
+  @moondsp.DspContext(
     sample_rate=BENCH_SAMPLE_RATE,
     block_size=BENCH_BLOCK_SIZE,
   )
@@ -14,7 +14,7 @@ fn bench_ctx() -> @moondsp.DspContext {
 
 ///|
 fn bench_arc() -> @pattern.TimeSpan {
-  @pattern.TimeSpan::new(
+  @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
@@ -37,7 +37,7 @@ fn bench_template() -> Array[@moondsp.DspNode] {
 
 ///|
 fn bench_binding_builder() -> @moondsp.ControlBindingBuilder {
-  @moondsp.ControlBindingBuilder::new().bind(
+  @moondsp.ControlBindingBuilder().bind(
     key="note",
     node_index=0,
     slot=@moondsp.GraphParamSlot::Value0,
@@ -89,7 +89,7 @@ test "bench/jux/scheduler_dispatch" (b : @bench.T) {
   let pool = bench_pool(template, ctx)
   let scheduler = bench_scheduler(ctx, pool)
   let arc = bench_arc()
-  let expire_arc = @pattern.TimeSpan::new(
+  let expire_arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(1),
     @pattern.Rational::from_int(2),
   )

@@ -102,7 +102,7 @@ the template it was built with.
 ## Public example
 
 ```moonbit
-let context = DspContext::new(sample_rate=48000.0, block_size=128)
+let context = DspContext(sample_rate=48000.0, block_size=128)
 
 // Produced by a validated external DSL. Comments show stable external IDs.
 let nodes = [
@@ -112,7 +112,7 @@ let nodes = [
 ]
 
 let template = AnalyzedGraph::analyze(nodes)
-let bindings = ControlBindingBuilder::new()
+let bindings = ControlBindingBuilder()
   .bind(key="freq", node_index=0, slot=GraphParamSlot::Value0)
   .bind(key="gain", node_index=1, slot=GraphParamSlot::Value0)
   .build(template)

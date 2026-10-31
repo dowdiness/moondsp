@@ -88,9 +88,9 @@ test "SongSnapshot::query_sourced_events tags occurrence section and layer IDs" 
   ])
   let snapshot = song_doc_test_snapshot(doc)
   let events = snapshot.query_sourced_events(
-    @pattern.TimeSpan::new(
+    @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
-      @pattern.Rational::new(1L, 100L),
+      @pattern.Rational(1L, 100L),
     ),
   )
   @debug.assert_eq(events.length(), 2)
@@ -354,7 +354,7 @@ test "SongDoc same-length section edits reuse layout and unchanged sections" {
     None => abort("expected chorus span after body edit")
   }
   let events = edited_song.query(
-    @pattern.TimeSpan::new(
+    @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
       @pattern.Rational::from_int(1),
     ),
@@ -430,9 +430,9 @@ test "exact Song entry origins survive scoped placement but not anonymous replac
     section~,
   )
   let snapshot = song_doc_test_doc([occurrence]).lower()
-  let arc = @pattern.TimeSpan::new(
-    @pattern.Rational::new(13L, 4L),
-    @pattern.Rational::new(15L, 4L),
+  let arc = @pattern.TimeSpan(
+    @pattern.Rational(13L, 4L),
+    @pattern.Rational(15L, 4L),
   )
   for index, atom in [c, g] {
     let events = snapshot.query_sourced_events_for_entry(index, arc)
@@ -450,17 +450,17 @@ test "exact Song entry origins survive scoped placement but not anonymous replac
     @debug.assert_eq(
       events[0].event().whole,
       Some(
-        @pattern.TimeSpan::new(
+        @pattern.TimeSpan(
           @pattern.Rational::from_int(3),
-          @pattern.Rational::new(7L, 2L),
+          @pattern.Rational(7L, 2L),
         ),
       ),
     )
     @debug.assert_eq(
       events[1].event().whole,
       Some(
-        @pattern.TimeSpan::new(
-          @pattern.Rational::new(7L, 2L),
+        @pattern.TimeSpan(
+          @pattern.Rational(7L, 2L),
           @pattern.Rational::from_int(4),
         ),
       ),

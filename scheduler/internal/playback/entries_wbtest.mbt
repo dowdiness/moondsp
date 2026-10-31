@@ -37,7 +37,7 @@ fn accept(
 
 ///|
 fn notes(state : PlaybackState, begin : Int, end_ : Int) -> Array[Int] raise {
-  let arc = @pattern.TimeSpan::new(
+  let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(begin),
     @pattern.Rational::from_int(end_),
   )
@@ -471,7 +471,7 @@ test "exact pattern origins survive admission and active queries" {
   state.queue(snapshot)
   state.commit_pending(@pattern.Rational::from_int(0))
   let events = state.query_active_sourced_events(
-    @pattern.TimeSpan::new(
+    @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
       @pattern.Rational::from_int(1),
     ),
@@ -501,7 +501,7 @@ test "origin-only edits update retained material provenance" {
   state.queue(exact(2L))
   state.commit_pending(@pattern.Rational::from_int(0))
   let events = state.query_active_sourced_events(
-    @pattern.TimeSpan::new(
+    @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
       @pattern.Rational::from_int(1),
     ),
@@ -534,7 +534,7 @@ test "pending material retains old exact origins until its musical boundary" {
   state.commit_pending(@pattern.Rational::from_int(1))
   assert_true(state.has_pending())
   let events = state.query_active_sourced_events(
-    @pattern.TimeSpan::new(
+    @pattern.TimeSpan(
       @pattern.Rational::from_int(1),
       @pattern.Rational::from_int(4),
     ),

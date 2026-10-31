@@ -131,7 +131,7 @@ pub fn Clock::position(
   self : Clock,
   sample : Int64,
 ) -> Result[@pattern.Rational, TransportError] {
-  Ok(@pattern.Rational::new(self.ticks_at(sample), self.scale)) catch {
+  Ok(@pattern.Rational(self.ticks_at(sample), self.scale)) catch {
     e => Err(e)
   }
 }

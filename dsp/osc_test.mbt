@@ -1,7 +1,7 @@
 ///|
 test "sine oscillator accumulates phase correctly" {
-  let osc = @dsp.Oscillator::new()
-  let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=4)
+  let osc = @dsp.Oscillator()
+  let ctx = @dsp.DspContext(sample_rate=48000.0, block_size=4)
   let buf = @dsp.AudioBuffer::filled(4)
   osc.process_waveform(
     context=ctx,
@@ -17,9 +17,9 @@ test "sine oscillator accumulates phase correctly" {
 
 ///|
 test "saw oscillator produces distinct output from sine" {
-  let osc_sine = @dsp.Oscillator::new()
-  let osc_saw = @dsp.Oscillator::new()
-  let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=4)
+  let osc_sine = @dsp.Oscillator()
+  let osc_saw = @dsp.Oscillator()
+  let ctx = @dsp.DspContext(sample_rate=48000.0, block_size=4)
   let buf_sine = @dsp.AudioBuffer::filled(4)
   let buf_saw = @dsp.AudioBuffer::filled(4)
   osc_sine.process_waveform(
@@ -39,9 +39,9 @@ test "saw oscillator produces distinct output from sine" {
 
 ///|
 test "oscillator tick matches process output" {
-  let osc1 = @dsp.Oscillator::new()
-  let osc2 = @dsp.Oscillator::new()
-  let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=4)
+  let osc1 = @dsp.Oscillator()
+  let osc2 = @dsp.Oscillator()
+  let ctx = @dsp.DspContext(sample_rate=48000.0, block_size=4)
   let buf = @dsp.AudioBuffer::filled(4)
   osc1.process_waveform(
     context=ctx,
@@ -61,7 +61,7 @@ test "oscillator tick matches process output" {
 
 ///|
 test "oscillator reset returns phase to zero" {
-  let osc = @dsp.Oscillator::new()
+  let osc = @dsp.Oscillator()
   ignore(osc.tick(freq_hz=440.0, sample_rate=48000.0))
   ignore(osc.tick(freq_hz=440.0, sample_rate=48000.0))
   assert_true(osc.phase() > 0.0)
@@ -71,8 +71,8 @@ test "oscillator reset returns phase to zero" {
 
 ///|
 test "oscillator with zero frequency produces zero (sine)" {
-  let osc = @dsp.Oscillator::new()
-  let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=4)
+  let osc = @dsp.Oscillator()
+  let ctx = @dsp.DspContext(sample_rate=48000.0, block_size=4)
   let buf = @dsp.AudioBuffer::filled(4)
   osc.process_waveform(
     context=ctx,
@@ -90,8 +90,8 @@ test "prop: all waveforms output in [-1, 1]" {
   @qc.quick_check_fn(
     fn(raw_freq : Double) {
       let freq = raw_freq.abs() * 19999.0 + 1.0
-      let osc = @dsp.Oscillator::new()
-      let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=128)
+      let osc = @dsp.Oscillator()
+      let ctx = @dsp.DspContext(sample_rate=48000.0, block_size=128)
       let waveforms : FixedArray[@dsp.Waveform] = [
         @dsp.Waveform::Sine,
         @dsp.Waveform::Saw,

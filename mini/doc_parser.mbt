@@ -32,7 +32,6 @@ fn mini_doc_id_fragment(value : String) -> String {
 }
 
 ///|
-#alias(new)
 fn MiniDocBuilder::MiniDocBuilder(
   previous~ : @pattern.PatternDoc[@pattern.ControlMap]?,
   origins? : SourceMap? = None,
@@ -58,7 +57,7 @@ fn MiniDocBuilder::source_frame_at(
 pub fn MiniDocBuilder::with_previous(
   previous : @pattern.PatternDoc[@pattern.ControlMap]?,
 ) -> MiniDocBuilder {
-  MiniDocBuilder::new(previous~)
+  MiniDocBuilder(previous~)
 }
 
 ///|
@@ -656,8 +655,8 @@ fn parse_doc_internal(
   previous : @pattern.PatternDoc[@pattern.ControlMap]?,
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
   guard !input.is_empty() else { return Err("empty input") }
-  let p = Parser::new(input)
-  let builder = MiniDocBuilder::new(previous~)
+  let p = Parser(input)
+  let builder = MiniDocBuilder(previous~)
   p.parse_bindings(builder=Some(builder)) catch {
     ParseError(msg) => return Err(msg)
   }
@@ -775,7 +774,7 @@ fn parse_sound_doc_notation(
   guard !content.is_empty() else {
     raise ParseError("position 0: empty notation")
   }
-  let sub = NotationParser::new(content, sound=true, source_offset~)
+  let sub = NotationParser(content, sound=true, source_offset~)
   sub.parse_doc_notation(builder)
 }
 
@@ -788,7 +787,7 @@ fn parse_note_doc_notation(
   guard !content.is_empty() else {
     raise ParseError("position 0: empty notation")
   }
-  let sub = NotationParser::new(content, sound=false, source_offset~)
+  let sub = NotationParser(content, sound=false, source_offset~)
   sub.parse_doc_notation(builder)
 }
 
@@ -801,12 +800,7 @@ fn parse_chord_doc_notation(
   guard !content.is_empty() else {
     raise ParseError("position 0: empty notation")
   }
-  let sub = NotationParser::new(
-    content,
-    sound=false,
-    chord=true,
-    source_offset~,
-  )
+  let sub = NotationParser(content, sound=false, chord=true, source_offset~)
   sub.parse_doc_notation(builder)
 }
 

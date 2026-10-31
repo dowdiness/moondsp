@@ -1,7 +1,7 @@
 ///|
 test "gain scales samples by gain value" {
-  let gain = @dsp.Gain::new()
-  let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=4)
+  let gain = @dsp.Gain()
+  let ctx = @dsp.DspContext(sample_rate=48000.0, block_size=4)
   let buf = @dsp.AudioBuffer::filled(4, init=0.5)
   gain.process(context=ctx, buffer=buf, amount=0.8)
   for i = 0; i < 4; i = i + 1 {
@@ -11,8 +11,8 @@ test "gain scales samples by gain value" {
 
 ///|
 test "zero gain produces silence" {
-  let gain = @dsp.Gain::new()
-  let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=4)
+  let gain = @dsp.Gain()
+  let ctx = @dsp.DspContext(sample_rate=48000.0, block_size=4)
   let buf = @dsp.AudioBuffer::filled(4, init=1.0)
   gain.process(context=ctx, buffer=buf, amount=0.0)
   for i = 0; i < 4; i = i + 1 {
@@ -22,8 +22,8 @@ test "zero gain produces silence" {
 
 ///|
 test "unity gain is passthrough" {
-  let gain = @dsp.Gain::new()
-  let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=4)
+  let gain = @dsp.Gain()
+  let ctx = @dsp.DspContext(sample_rate=48000.0, block_size=4)
   let buf = @dsp.AudioBuffer::filled(4, init=0.7)
   gain.process(context=ctx, buffer=buf, amount=1.0)
   for i = 0; i < 4; i = i + 1 {
@@ -33,8 +33,8 @@ test "unity gain is passthrough" {
 
 ///|
 test "negative gain inverts signal" {
-  let gain = @dsp.Gain::new()
-  let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=4)
+  let gain = @dsp.Gain()
+  let ctx = @dsp.DspContext(sample_rate=48000.0, block_size=4)
   let buf = @dsp.AudioBuffer::filled(4, init=0.5)
   gain.process(context=ctx, buffer=buf, amount=-1.0)
   for i = 0; i < 4; i = i + 1 {
@@ -53,8 +53,8 @@ test "prop: gain is exact multiplication" {
         gain_val.is_inf() {
         return true
       }
-      let gain = @dsp.Gain::new()
-      let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=1)
+      let gain = @dsp.Gain()
+      let ctx = @dsp.DspContext(sample_rate=48000.0, block_size=1)
       let buf = @dsp.AudioBuffer::filled(1, init=input)
       gain.process(context=ctx, buffer=buf, amount=gain_val)
       let expected = input * gain_val

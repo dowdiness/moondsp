@@ -1,12 +1,12 @@
 ///|
 test "ChannelSpec: mono is 1 channel" {
-  let m = @dsp.Mono::new()
+  let m = @dsp.Mono()
   @debug.assert_eq(m.channel_count(), 1)
 }
 
 ///|
 test "ChannelSpec: stereo is 2 channels" {
-  let s = @dsp.Stereo::new()
+  let s = @dsp.Stereo()
   @debug.assert_eq(s.channel_count(), 2)
 }
 

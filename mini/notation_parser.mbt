@@ -6,7 +6,7 @@ fn parse_sound_notation(
   guard !content.is_empty() else {
     raise ParseError("position 0: empty notation")
   }
-  let sub = NotationParser::new(content, sound=true)
+  let sub = NotationParser(content, sound=true)
   sub.parse_notation()
 }
 
@@ -18,7 +18,7 @@ fn parse_note_notation(
   guard !content.is_empty() else {
     raise ParseError("position 0: empty notation")
   }
-  let sub = NotationParser::new(content, sound=false)
+  let sub = NotationParser(content, sound=false)
   sub.parse_notation()
 }
 
@@ -31,7 +31,7 @@ fn parse_chord_notation(
   guard !content.is_empty() else {
     raise ParseError("position 0: empty notation")
   }
-  let sub = NotationParser::new(content, sound=false, chord=true)
+  let sub = NotationParser(content, sound=false, chord=true)
   sub.parse_notation()
 }
 
@@ -125,7 +125,6 @@ priv struct NotationParser {
 }
 
 ///|
-#alias(new)
 fn NotationParser::NotationParser(
   input : String,
   sound~ : Bool,

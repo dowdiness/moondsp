@@ -5,14 +5,14 @@
 /// already-reset line; use reset-plus-ticks and prepared stealing as the
 /// primary evidence for active-use cost.
 fn delay_reset_fixture(capacity : Int) -> DelayLine {
-  let delay = DelayLine::new(capacity, delay_samples=1, feedback=0.3)
+  let delay = DelayLine(capacity, delay_samples=1, feedback=0.3)
   ignore(delay.tick(1.0))
   delay
 }
 
 ///|
 fn delay_tick_fixture(capacity : Int) -> DelayLine {
-  DelayLine::new(capacity, delay_samples=2400, feedback=0.3)
+  DelayLine(capacity, delay_samples=2400, feedback=0.3)
 }
 
 ///|

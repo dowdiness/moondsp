@@ -26,7 +26,7 @@ pub fn parse(
   input : String,
 ) -> Result[@pattern.Pat[@pattern.ControlMap], String] {
   guard !input.is_empty() else { return Err("empty input") }
-  let p = Parser::new(input)
+  let p = Parser(input)
   p.parse_bindings() catch {
     ParseError(msg) => return Err(msg)
   }

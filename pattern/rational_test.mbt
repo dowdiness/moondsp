@@ -1,6 +1,6 @@
 ///|
 fn r(num : Int, den : Int) -> @pattern.Rational {
-  @pattern.Rational::new(Int64::from_int(num), Int64::from_int(den))
+  @pattern.Rational(Int64::from_int(num), Int64::from_int(den))
 }
 
 ///|
@@ -27,7 +27,7 @@ test "simplification: 2/4 -> 1/2" {
 
 ///|
 test "negative denominator normalization" {
-  let rat = @pattern.Rational::new(3L, -4L)
+  let rat = @pattern.Rational(3L, -4L)
   inspect(
     rat,
     content=(
@@ -38,7 +38,7 @@ test "negative denominator normalization" {
 
 ///|
 test "negative denominator normalization: -3/-4 -> 3/4" {
-  let rat = @pattern.Rational::new(-3L, -4L)
+  let rat = @pattern.Rational(-3L, -4L)
   inspect(
     rat,
     content=(
@@ -150,39 +150,33 @@ test "to_double: 1/4 = 0.25" {
 
 ///|
 test "panic zero denominator" {
-  ignore(@pattern.Rational::new(1L, 0L))
+  ignore(@pattern.Rational(1L, 0L))
 }
 
 ///|
 test "large clock fractions cancel shared factors before arithmetic" {
   let n = 1234567890121L
   let d = 22500000L
-  let a = @pattern.Rational::new(n, d)
-  assert_true(a + a == @pattern.Rational::new(n * 2L, d))
-  assert_true(
-    a - @pattern.Rational::new(-n, d) == @pattern.Rational::new(n * 2L, d),
-  )
-  assert_true(
-    a * @pattern.Rational::new(d, 7L) == @pattern.Rational::new(n, 7L),
-  )
-  assert_true(
-    a / @pattern.Rational::new(1L, d) == @pattern.Rational::new(n, 1L),
-  )
+  let a = @pattern.Rational(n, d)
+  assert_true(a + a == @pattern.Rational(n * 2L, d))
+  assert_true(a - @pattern.Rational(-n, d) == @pattern.Rational(n * 2L, d))
+  assert_true(a * @pattern.Rational(d, 7L) == @pattern.Rational(n, 7L))
+  assert_true(a / @pattern.Rational(1L, d) == @pattern.Rational(n, 1L))
 }
 
 ///|
 test "comparison and floor do not overflow intermediate products" {
   let n = 9223372036854775807L
-  let a = @pattern.Rational::new(n, 3L)
-  let b = @pattern.Rational::new(n, 4L)
+  let a = @pattern.Rational(n, 3L)
+  let b = @pattern.Rational(n, 4L)
   assert_true(a > b)
-  assert_true(@pattern.Rational::new(-n, 3L) < @pattern.Rational::new(-n, 4L))
-  assert_eq(@pattern.Rational::new(-n, 3L).floor(), -3074457345618258603L)
+  assert_true(@pattern.Rational(-n, 3L) < @pattern.Rational(-n, 4L))
+  assert_eq(@pattern.Rational(-n, 3L).floor(), -3074457345618258603L)
 }
 
 ///|
 test "rational identities preserve large negative normalized values" {
-  let value = @pattern.Rational::new(-9223372036854775807L, 7L)
+  let value = @pattern.Rational(-9223372036854775807L, 7L)
   let zero = @pattern.Rational::from_int(0)
   let one = @pattern.Rational::from_int(1)
   assert_true(value + zero == value)

@@ -64,10 +64,10 @@ overlap, so an event at cycle 1 is returned only by the second query.
 ```mbt check
 ///|
 test "rational time stays exact" {
-  let third = @pattern.Rational::new(1L, 3L)
+  let third = @pattern.Rational(1L, 3L)
   assert_true(third + third + third == @pattern.Rational::from_int(1))
 
-  let first_cycle = @pattern.TimeSpan::new(
+  let first_cycle = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
@@ -112,7 +112,7 @@ test "sequence divides one cycle" {
     @pattern.Pat::pure("b"),
     @pattern.Pat::pure("c"),
   ])
-  let cycle = @pattern.TimeSpan::new(
+  let cycle = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
@@ -120,7 +120,7 @@ test "sequence divides one cycle" {
 
   assert_eq(events.length(), 3)
   assert_eq(events.map(event => event.value), ["a", "b", "c"])
-  assert_true(events[0].part.duration() == @pattern.Rational::new(1L, 3L))
+  assert_true(events[0].part.duration() == @pattern.Rational(1L, 3L))
 }
 ```
 
@@ -142,7 +142,7 @@ Use `+` to play patterns together:
 test "overlay keeps separate events" {
   let notes = @pattern.note(60.0)
   let drums = @pattern.sound(36.0)
-  let cycle = @pattern.TimeSpan::new(
+  let cycle = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
@@ -164,7 +164,7 @@ Use `merge_control` when one `Pat[ControlMap]` should add controls to another:
 test "merge control shapes one event" {
   let note = @pattern.note(60.0)
   let pan = @pattern.s_pan(-0.5)
-  let cycle = @pattern.TimeSpan::new(
+  let cycle = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )

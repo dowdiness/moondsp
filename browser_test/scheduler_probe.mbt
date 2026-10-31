@@ -90,12 +90,12 @@ fn init_scheduler_probe_graph_with_waveform(
     reset_scheduler_probe_graph()
     return false
   }
-  let ctx = @moondsp.DspContext::new(sample_rate~, block_size~)
+  let ctx = @moondsp.DspContext(sample_rate~, block_size~)
   try
     @moondsp.BoundVoicePool(
       @moondsp.AnalyzedGraph::analyze(scheduler_probe_synth_template(waveform)),
       ctx,
-      @moondsp.ControlBindingBuilder::new().bind(
+      @moondsp.ControlBindingBuilder().bind(
         key="note",
         node_index=0,
         slot=@moondsp.GraphParamSlot::Value0,

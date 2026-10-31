@@ -38,7 +38,7 @@ fn normalize_gate_factor(factor : Rational) -> Rational {
   if factor.den <= MAX_GATE_FACTOR_DENOMINATOR {
     factor
   } else {
-    Rational::new(
+    Rational(
       (factor.to_double() * MAX_GATE_FACTOR_DENOMINATOR.to_double() + 0.5).to_int64(),
       MAX_GATE_FACTOR_DENOMINATOR,
     )
@@ -50,7 +50,7 @@ fn[A] gate_event(event : Event[A], factor : Rational) -> Event[A]? {
   match event.whole {
     None => Some(event)
     Some(whole) => {
-      let gated_whole = TimeSpan::new(
+      let gated_whole = TimeSpan(
         whole.begin,
         whole.begin + whole.duration() * factor,
       )

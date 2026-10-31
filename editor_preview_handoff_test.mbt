@@ -25,7 +25,7 @@ fn editor_preview_base_doc() -> @moondsp.GraphDocument {
 
 ///|
 test "editor preview handoff: stages topology replacement and parameter update" {
-  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=16)
+  let ctx = @moondsp.DspContext(sample_rate=48000.0, block_size=16)
   let active_doc = editor_preview_base_doc()
   let active_runtime = @moondsp.Dsp::compile_result(active_doc.analyze(), ctx).unwrap()
   let preview = @moondsp.DspHotSwap::from_graph(
@@ -43,7 +43,7 @@ test "editor preview handoff: stages topology replacement and parameter update" 
   let replacement_index = replacement_doc.index_map()
   let replacement_bindings = match
     replacement_index.bind_control(
-      @moondsp.ControlBindingBuilder::new(),
+      @moondsp.ControlBindingBuilder(),
       "gain",
       editor_preview_gid("gain"),
       @moondsp.GraphParamSlot::Value0,
@@ -80,7 +80,7 @@ test "editor preview handoff: stages topology replacement and parameter update" 
 
 ///|
 test "editor preview handoff: failed candidate maps diagnostics to stable ids" {
-  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=16)
+  let ctx = @moondsp.DspContext(sample_rate=48000.0, block_size=16)
   let last_good = @moondsp.Dsp::compile_result(
     @moondsp.AnalyzedGraph::analyze([
       @moondsp.DspNode::constant(0.25),

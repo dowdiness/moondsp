@@ -1,21 +1,20 @@
 ///|
-let compiled : GraphSlot[@moondsp.Dsp, MonoOut] = GraphSlot::new(
-  output=MonoOut::new(),
-  compile=fn(ctx) {
-    @moondsp.Dsp::compile(
-      @moondsp.AnalyzedGraph::analyze([
-        @moondsp.DspNode::oscillator(
-          @moondsp.Waveform::Triangle,
-          BROWSER_COMPILED_DEFAULT_FREQ,
-        ),
-        @moondsp.DspNode::gain(0, BROWSER_COMPILED_DEFAULT_GAIN),
-        @moondsp.DspNode::clip(1, BROWSER_COMPILED_CLIP_THRESHOLD),
-        @moondsp.DspNode::output(2),
-      ]),
-      ctx,
-    )
-  },
-)
+let compiled : GraphSlot[@moondsp.Dsp, MonoOut] = GraphSlot(output=MonoOut(), compile=fn(
+  ctx,
+) {
+  @moondsp.Dsp::compile(
+    @moondsp.AnalyzedGraph::analyze([
+      @moondsp.DspNode::oscillator(
+        @moondsp.Waveform::Triangle,
+        BROWSER_COMPILED_DEFAULT_FREQ,
+      ),
+      @moondsp.DspNode::gain(0, BROWSER_COMPILED_DEFAULT_GAIN),
+      @moondsp.DspNode::clip(1, BROWSER_COMPILED_CLIP_THRESHOLD),
+      @moondsp.DspNode::output(2),
+    ]),
+    ctx,
+  )
+})
 
 ///|
 /// Initialize the browser proof graph that runs through `Dsp`.

@@ -18,7 +18,6 @@ pub struct Oscillator {
 
 ///|
 /// Create a new oscillator at phase zero.
-#alias(new)
 pub fn Oscillator::Oscillator() -> Oscillator {
   { phase: 0.0, }
 }

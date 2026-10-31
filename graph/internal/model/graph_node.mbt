@@ -82,7 +82,6 @@ pub struct GraphControl {
 }
 
 ///|
-#alias(new)
 fn GraphControl::GraphControl(
   kind : GraphControlKind,
   node_index : Int,
@@ -145,7 +144,6 @@ pub struct DspNode {
 }
 
 ///|
-#alias(new)
 fn DspNode::DspNode(
   kind : DspNodeKind,
   input0 : Int,
@@ -275,7 +273,7 @@ pub fn DspNode::seed(self : DspNode) -> UInt {
 ///|
 /// Return an independent node object with the same structural fields.
 pub fn clone_node(node : DspNode) -> DspNode {
-  DspNode::new(
+  DspNode(
     node.kind(),
     node.input0(),
     node.input1(),
@@ -322,7 +320,7 @@ pub fn restore_node_runtime_params(node : DspNode, defaults : DspNode) -> Unit {
 ///|
 /// Create a constant-value node.
 pub fn DspNode::constant(value : Double) -> DspNode {
-  DspNode::new(
+  DspNode(
     DspNodeKind::Constant,
     -1,
     -1,
@@ -341,7 +339,7 @@ pub fn DspNode::constant(value : Double) -> DspNode {
 ///|
 /// Create an oscillator node with a fixed frequency.
 pub fn DspNode::oscillator(waveform : Waveform, freq : Double) -> DspNode {
-  DspNode::new(
+  DspNode(
     DspNodeKind::Oscillator,
     -1,
     -1,
@@ -360,7 +358,7 @@ pub fn DspNode::oscillator(waveform : Waveform, freq : Double) -> DspNode {
 ///|
 /// Create an oscillator node that reads frequency from another node (FM mode).
 pub fn DspNode::oscillator_from(input : Int, waveform : Waveform) -> DspNode {
-  DspNode::new(
+  DspNode(
     DspNodeKind::Oscillator,
     input,
     -1,
@@ -379,7 +377,7 @@ pub fn DspNode::oscillator_from(input : Int, waveform : Waveform) -> DspNode {
 ///|
 /// Create a white-noise source node.
 pub fn DspNode::noise(seed : UInt) -> DspNode {
-  DspNode::new(
+  DspNode(
     DspNodeKind::Noise,
     -1,
     -1,
@@ -407,7 +405,7 @@ pub fn DspNode::adsr(
   sustain~ : Double,
   release_ms~ : Double,
 ) -> DspNode {
-  DspNode::new(
+  DspNode(
     DspNodeKind::Adsr,
     -1,
     -1,
@@ -431,7 +429,7 @@ pub fn DspNode::biquad(
   cutoff_hz~ : Double,
   q~ : Double,
 ) -> DspNode {
-  DspNode::new(
+  DspNode(
     DspNodeKind::Biquad,
     input,
     -1,
@@ -455,7 +453,7 @@ pub fn DspNode::delay(
   delay_samples? : Int = graph_default_delay_samples(max_delay_samples),
   feedback? : Double = 0.0,
 ) -> DspNode {
-  DspNode::new(
+  DspNode(
     DspNodeKind::Delay,
     input,
     -1,
@@ -474,7 +472,7 @@ pub fn DspNode::delay(
 ///|
 /// Create an in-place gain node from one upstream node.
 pub fn DspNode::gain(input : Int, amount : Double) -> DspNode {
-  DspNode::new(
+  DspNode(
     DspNodeKind::Gain,
     input,
     -1,
@@ -498,7 +496,7 @@ pub fn DspNode::envelope_gain(
   envelope~ : Int,
   amount~ : Double,
 ) -> DspNode {
-  DspNode::new(
+  DspNode(
     DspNodeKind::Gain,
     input,
     envelope,
@@ -517,7 +515,7 @@ pub fn DspNode::envelope_gain(
 ///|
 /// Create a sample-wise multiply node from two upstream nodes.
 pub fn DspNode::mul(left : Int, right : Int) -> DspNode {
-  DspNode::new(
+  DspNode(
     DspNodeKind::Mul,
     left,
     right,
@@ -536,7 +534,7 @@ pub fn DspNode::mul(left : Int, right : Int) -> DspNode {
 ///|
 /// Create a mix node from two upstream nodes.
 pub fn DspNode::mix(left : Int, right : Int) -> DspNode {
-  DspNode::new(
+  DspNode(
     DspNodeKind::Mix,
     left,
     right,
@@ -555,7 +553,7 @@ pub fn DspNode::mix(left : Int, right : Int) -> DspNode {
 ///|
 /// Create a clip node from one upstream node.
 pub fn DspNode::clip(input : Int, threshold : Double) -> DspNode {
-  DspNode::new(
+  DspNode(
     DspNodeKind::Clip,
     input,
     -1,
@@ -574,7 +572,7 @@ pub fn DspNode::clip(input : Int, threshold : Double) -> DspNode {
 ///|
 /// Mark the final output node.
 pub fn DspNode::output(input : Int) -> DspNode {
-  DspNode::new(
+  DspNode(
     DspNodeKind::Output,
     input,
     -1,
@@ -593,7 +591,7 @@ pub fn DspNode::output(input : Int) -> DspNode {
 ///|
 /// Create a terminal stereo pan node from one mono upstream node.
 pub fn DspNode::pan(input : Int, position : Double) -> DspNode {
-  DspNode::new(
+  DspNode(
     DspNodeKind::Pan,
     input,
     -1,
@@ -612,7 +610,7 @@ pub fn DspNode::pan(input : Int, position : Double) -> DspNode {
 ///|
 /// Create a stereo gain node from one stereo upstream node.
 pub fn DspNode::stereo_gain(input~ : Int, amount~ : Double) -> DspNode {
-  DspNode::new(
+  DspNode(
     DspNodeKind::StereoGain,
     input,
     -1,
@@ -631,7 +629,7 @@ pub fn DspNode::stereo_gain(input~ : Int, amount~ : Double) -> DspNode {
 ///|
 /// Create a stereo clip node from one stereo upstream node.
 pub fn DspNode::stereo_clip(input~ : Int, threshold~ : Double) -> DspNode {
-  DspNode::new(
+  DspNode(
     DspNodeKind::StereoClip,
     input,
     -1,
@@ -655,7 +653,7 @@ pub fn DspNode::stereo_biquad(
   cutoff_hz~ : Double,
   q~ : Double,
 ) -> DspNode {
-  DspNode::new(
+  DspNode(
     DspNodeKind::StereoBiquad,
     input,
     -1,
@@ -679,7 +677,7 @@ pub fn DspNode::stereo_delay(
   delay_samples? : Int = graph_default_delay_samples(max_delay_samples),
   feedback? : Double = 0.0,
 ) -> DspNode {
-  DspNode::new(
+  DspNode(
     DspNodeKind::StereoDelay,
     input,
     -1,
@@ -698,7 +696,7 @@ pub fn DspNode::stereo_delay(
 ///|
 /// Create a fixed-policy stereo-to-mono fold-down node.
 pub fn DspNode::stereo_mixdown(input : Int) -> DspNode {
-  DspNode::new(
+  DspNode(
     DspNodeKind::StereoMixDown,
     input,
     -1,
@@ -717,7 +715,7 @@ pub fn DspNode::stereo_mixdown(input : Int) -> DspNode {
 ///|
 /// Mark the final stereo output node.
 pub fn DspNode::stereo_output(input : Int) -> DspNode {
-  DspNode::new(
+  DspNode(
     DspNodeKind::StereoOutput,
     input,
     -1,
@@ -736,7 +734,7 @@ pub fn DspNode::stereo_output(input : Int) -> DspNode {
 ///|
 /// Create a runtime gate-on control targeting an original authoring index.
 pub fn GraphControl::gate_on(node_index : Int) -> GraphControl {
-  GraphControl::new(
+  GraphControl(
     GraphControlKind::GateOn,
     node_index,
     GraphParamSlot::Value0,
@@ -747,7 +745,7 @@ pub fn GraphControl::gate_on(node_index : Int) -> GraphControl {
 ///|
 /// Create a runtime gate-off control targeting an original authoring index.
 pub fn GraphControl::gate_off(node_index : Int) -> GraphControl {
-  GraphControl::new(
+  GraphControl(
     GraphControlKind::GateOff,
     node_index,
     GraphParamSlot::Value0,
@@ -763,7 +761,7 @@ pub fn GraphControl::set_param(
   slot : GraphParamSlot,
   value : Double,
 ) -> GraphControl {
-  GraphControl::new(GraphControlKind::SetParam, node_index, slot, value)
+  GraphControl(GraphControlKind::SetParam, node_index, slot, value)
 }
 
 ///|
@@ -781,7 +779,7 @@ pub fn node_with_inputs(
   input0~ : Int,
   input1~ : Int,
 ) -> DspNode {
-  DspNode::new(
+  DspNode(
     node.kind,
     input0,
     input1,
@@ -806,7 +804,7 @@ pub fn node_with_offset_inputs(node : DspNode, offset : Int) -> DspNode {
 
 ///|
 pub fn node_with_value0(node : DspNode, value0 : Double) -> DspNode {
-  DspNode::new(
+  DspNode(
     node.kind,
     node.input0,
     node.input1,
@@ -824,7 +822,7 @@ pub fn node_with_value0(node : DspNode, value0 : Double) -> DspNode {
 
 ///|
 pub fn node_with_value1(node : DspNode, value1 : Double) -> DspNode {
-  DspNode::new(
+  DspNode(
     node.kind,
     node.input0,
     node.input1,
@@ -842,7 +840,7 @@ pub fn node_with_value1(node : DspNode, value1 : Double) -> DspNode {
 
 ///|
 pub fn node_with_delay_samples(node : DspNode, delay_samples : Int) -> DspNode {
-  DspNode::new(
+  DspNode(
     node.kind,
     node.input0,
     node.input1,

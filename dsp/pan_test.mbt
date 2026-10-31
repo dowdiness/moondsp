@@ -1,7 +1,7 @@
 ///|
 test "pan center splits signal equally" {
-  let pan = @dsp.Pan::new()
-  let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=4)
+  let pan = @dsp.Pan()
+  let ctx = @dsp.DspContext(sample_rate=48000.0, block_size=4)
   let input = @dsp.AudioBuffer::filled(4, init=1.0)
   let left = @dsp.AudioBuffer::filled(4)
   let right = @dsp.AudioBuffer::filled(4)
@@ -20,8 +20,8 @@ test "pan center splits signal equally" {
 
 ///|
 test "pan hard left sends signal only to left" {
-  let pan = @dsp.Pan::new()
-  let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=4)
+  let pan = @dsp.Pan()
+  let ctx = @dsp.DspContext(sample_rate=48000.0, block_size=4)
   let input = @dsp.AudioBuffer::filled(4, init=1.0)
   let left = @dsp.AudioBuffer::filled(4)
   let right = @dsp.AudioBuffer::filled(4)
@@ -40,8 +40,8 @@ test "pan hard left sends signal only to left" {
 
 ///|
 test "pan hard right sends signal only to right" {
-  let pan = @dsp.Pan::new()
-  let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=4)
+  let pan = @dsp.Pan()
+  let ctx = @dsp.DspContext(sample_rate=48000.0, block_size=4)
   let input = @dsp.AudioBuffer::filled(4, init=1.0)
   let left = @dsp.AudioBuffer::filled(4)
   let right = @dsp.AudioBuffer::filled(4)
@@ -60,8 +60,8 @@ test "pan hard right sends signal only to right" {
 
 ///|
 test "pan zero input produces zero output regardless of position" {
-  let pan = @dsp.Pan::new()
-  let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=4)
+  let pan = @dsp.Pan()
+  let ctx = @dsp.DspContext(sample_rate=48000.0, block_size=4)
   let input = @dsp.AudioBuffer::filled(4)
   let left = @dsp.AudioBuffer::filled(4)
   let right = @dsp.AudioBuffer::filled(4)
@@ -86,8 +86,8 @@ test "prop: pan preserves energy (equal-power law)" {
       if pan_pos.is_nan() || pan_pos.is_inf() {
         return true
       }
-      let pan = @dsp.Pan::new()
-      let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=1)
+      let pan = @dsp.Pan()
+      let ctx = @dsp.DspContext(sample_rate=48000.0, block_size=1)
       let input = @dsp.AudioBuffer::filled(1, init=1.0)
       let left = @dsp.AudioBuffer::filled(1)
       let right = @dsp.AudioBuffer::filled(1)

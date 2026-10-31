@@ -155,12 +155,12 @@ fn next_unbounded_entry(
   let period = material.body.entry_period()
   let relative = (now - origin) / period
   let floor = relative.floor()
-  let cycle = if relative == @pattern.Rational::new(floor, 1L) {
+  let cycle = if relative == @pattern.Rational(floor, 1L) {
     floor
   } else {
     floor + 1L
   }
-  origin + period * @pattern.Rational::new(cycle, 1L)
+  origin + period * @pattern.Rational(cycle, 1L)
 }
 
 ///|
@@ -480,7 +480,7 @@ fn EntrySpec::query_sourced(
         source_pitch: event.source_pitch(),
       })
     Song(snapshot, index) => {
-      let source_arc = @pattern.TimeSpan::new(
+      let source_arc = @pattern.TimeSpan(
         arc.begin + self.start,
         arc.end_ + self.start,
       )
@@ -529,7 +529,7 @@ fn[A] append_entry_segment(
     _ => arc.end_
   }
   guard begin < end_ else { return }
-  let local_arc = @pattern.TimeSpan::new(begin - origin, end_ - origin)
+  let local_arc = @pattern.TimeSpan(begin - origin, end_ - origin)
   result.append(query(spec, origin, local_arc))
 }
 
@@ -549,14 +549,7 @@ fn[A] append_replacement_segment(
       result,
       spec,
       replacement_origin(current, origin, spec, due),
-      @pattern.TimeSpan::new(
-        if due > arc.begin {
-          due
-        } else {
-          arc.begin
-        },
-        arc.end_,
-      ),
+      @pattern.TimeSpan(if due > arc.begin { due } else { arc.begin }, arc.end_),
       query,
     )
   }
@@ -581,7 +574,7 @@ fn[A] query_entry_segments(
             result,
             material,
             origin,
-            @pattern.TimeSpan::new(
+            @pattern.TimeSpan(
               if due > arc.begin {
                 due
               } else {
@@ -600,7 +593,7 @@ fn[A] query_entry_segments(
               result,
               material,
               origin,
-              @pattern.TimeSpan::new(arc.begin, due),
+              @pattern.TimeSpan(arc.begin, due),
               query,
             )
           }
@@ -615,7 +608,7 @@ fn[A] query_entry_segments(
             result,
             material,
             origin,
-            @pattern.TimeSpan::new(
+            @pattern.TimeSpan(
               arc.begin,
               if due < arc.end_ {
                 due
@@ -632,7 +625,7 @@ fn[A] query_entry_segments(
             result,
             material,
             origin,
-            @pattern.TimeSpan::new(
+            @pattern.TimeSpan(
               arc.begin,
               if due < arc.end_ {
                 due

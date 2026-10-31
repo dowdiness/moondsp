@@ -57,7 +57,7 @@ pub fn parse_song(
 /// layout value for compatibility.
 pub fn parse_song_with_bpm(input : String) -> Result[ParsedSong, String] {
   guard !input.is_empty() else { return Err("empty input") }
-  let p = Parser::new(input)
+  let p = Parser(input)
   p.parse_bindings() catch {
     ParseError(msg) => return Err(msg)
   }
@@ -321,7 +321,7 @@ fn Parser::read_song_rational(
       "position \{value_start}: \{label} denominator cannot be zero",
     )
   }
-  @pattern.Rational::new(Int64::from_int(num), Int64::from_int(den))
+  @pattern.Rational(Int64::from_int(num), Int64::from_int(den))
 }
 
 ///|

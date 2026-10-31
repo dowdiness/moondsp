@@ -189,7 +189,6 @@ priv struct VoiceSlot {
 }
 
 ///|
-#alias(new)
 fn VoiceSlot::VoiceSlot(block_size : Int) -> VoiceSlot {
   {
     compiled: None,
@@ -330,7 +329,7 @@ pub fn VoicePool::VoicePool(
   }
   let first_graph = prepare_voice_template(compiled_template, context).unwrap_or_error()
   let block_size = context.block_size()
-  let slots = FixedArray::makei(max_voices, _ => VoiceSlot::new(block_size))
+  let slots = FixedArray::makei(max_voices, _ => VoiceSlot(block_size))
   slots[0].compiled = Some(first_graph)
   slots[0].template_generation = 0
   for i in 1..<max_voices {

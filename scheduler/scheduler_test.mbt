@@ -24,7 +24,7 @@ test "midi_to_hz: MIDI 127" {
 
 ///|
 test "PatternScheduler constructor initializes with zero position" {
-  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
+  let ctx = @moondsp.DspContext(sample_rate=48000.0, block_size=128)
   let sched = @scheduler.PatternScheduler(bpm=120.0, ctx~, instruments=[])
   @debug.assert_eq(sched.sample_counter(), 0L)
   @debug.assert_eq(sched.active_note_count(), 0)
@@ -32,7 +32,7 @@ test "PatternScheduler constructor initializes with zero position" {
 
 ///|
 test "PatternScheduler::bpm round-trips construction and set_bpm" {
-  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
+  let ctx = @moondsp.DspContext(sample_rate=48000.0, block_size=128)
   let sched = @scheduler.PatternScheduler(bpm=120.0, ctx~, instruments=[])
   @debug.assert_eq(sched.bpm(), 120.0)
   sched.set_bpm(174.0).unwrap()
@@ -43,13 +43,13 @@ test "PatternScheduler::bpm round-trips construction and set_bpm" {
 
 ///|
 test "current_block exposes sample range and logical arc" {
-  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
+  let ctx = @moondsp.DspContext(sample_rate=48000.0, block_size=128)
   let sched = @scheduler.PatternScheduler(bpm=120.0, ctx~, instruments=[])
   let frame = sched.current_block().unwrap()
   @debug.assert_eq(frame.sample_begin, 0L)
   @debug.assert_eq(frame.sample_end, 128L)
   assert_true(frame.logical_arc.begin == @pattern.Rational::from_int(0))
-  assert_true(frame.logical_arc.end_ == @pattern.Rational::new(128L, 24000L))
+  assert_true(frame.logical_arc.end_ == @pattern.Rational(128L, 24000L))
 }
 
 ///|
@@ -76,12 +76,12 @@ fn make_test_pool() -> (
     @moondsp.DspNode::envelope_gain(input=0, envelope=1, amount=1.0),
     @moondsp.DspNode::output(2),
   ]
-  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
+  let ctx = @moondsp.DspContext(sample_rate=48000.0, block_size=128)
   let pool = Ok(
     @moondsp.BoundVoicePool(
       @moondsp.AnalyzedGraph::analyze(template),
       ctx,
-      @moondsp.ControlBindingBuilder::new().bind(
+      @moondsp.ControlBindingBuilder().bind(
         key="note",
         node_index=0,
         slot=@moondsp.GraphParamSlot::Value0,
@@ -122,7 +122,7 @@ test "each event plays on the first instrument that selects it" {
     (@scheduler.ControlEquals("sound", 36.0), drum),
     (@scheduler.HasControl("note"), synth),
   ])
-  let arc = @pattern.TimeSpan::new(
+  let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
@@ -140,7 +140,7 @@ test "each event plays on the first instrument that selects it" {
   @debug.assert_eq(sched.active_note_count(), 2)
   sched
   .expire_notes(
-    @pattern.TimeSpan::new(
+    @pattern.TimeSpan(
       @pattern.Rational::from_int(1),
       @pattern.Rational::from_int(2),
     ),
@@ -303,7 +303,7 @@ test "expire_notes: removes notes past their end_time" {
     Some(h) => {
       sched.push_active_note(0, h, @pattern.Rational::from_int(0)).unwrap()
       @debug.assert_eq(sched.active_note_count(), 1)
-      let arc = @pattern.TimeSpan::new(
+      let arc = @pattern.TimeSpan(
         @pattern.Rational::from_int(1),
         @pattern.Rational::from_int(2),
       )
@@ -335,9 +335,9 @@ test "expire_notes_at: expires on performance sample boundary" {
 ///|
 test "process_events: single note-on creates active voice" {
   let (pool, sched, _, _) = make_test_sched()
-  let arc = @pattern.TimeSpan::new(
+  let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
-    @pattern.Rational::new(1L, 100L),
+    @pattern.Rational(1L, 100L),
   )
   let events = @pattern.note(60.0).query(arc)
   sched.process_events(events, arc)
@@ -348,18 +348,18 @@ test "process_events: single note-on creates active voice" {
 ///|
 test "process_events: preserves caller-owned event order" {
   let (pool, sched, _, _) = make_test_sched()
-  let arc = @pattern.TimeSpan::new(
+  let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(2),
   )
   let early = @pattern.note(60.0).query(arc)[0]
-  let late = early.shift(@pattern.Rational::new(1L, 2L))
+  let late = early.shift(@pattern.Rational(1L, 2L))
   let events = [late, early]
   sched.process_events(events, arc)
   @debug.assert_eq(sched.active_note_count(), 2)
   match (events[0].whole, events[1].whole) {
     (Some(first), Some(second)) => {
-      assert_true(first.begin == @pattern.Rational::new(1L, 2L))
+      assert_true(first.begin == @pattern.Rational(1L, 2L))
       assert_true(second.begin == @pattern.Rational::from_int(0))
     }
     _ => assert_true(false)
@@ -608,7 +608,7 @@ test "Retune preflights later voices before mutating the first voice" {
         @moondsp.DspNode::envelope_gain(input=1, envelope=0, amount=1.0),
         @moondsp.DspNode::output(2),
       ]),
-      @moondsp.ControlBindingBuilder::new().bind(
+      @moondsp.ControlBindingBuilder().bind(
         key="note",
         node_index=1,
         slot=@moondsp.GraphParamSlot::Value0,
@@ -970,7 +970,7 @@ test "process_block: gate-off is sent within the block containing the endpoint" 
 ///|
 test "process_block: gate fraction ends a note before its next onset" {
   let (pool, sched, left, right) = make_test_sched()
-  let pat = @pattern.note(60.0).gate(@pattern.Rational::new(1L, 2L))
+  let pat = @pattern.note(60.0).gate(@pattern.Rational(1L, 2L))
   let silence : @pattern.Pat[@pattern.ControlMap] = @pattern.Pat::silence()
   sched.process_block(pat, left, right)
   for _ in 0..<92 {
@@ -1013,12 +1013,12 @@ test "process_block: stolen voice gate-off is harmless" {
     @moondsp.DspNode::envelope_gain(input=0, envelope=1, amount=1.0),
     @moondsp.DspNode::output(2),
   ]
-  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
+  let ctx = @moondsp.DspContext(sample_rate=48000.0, block_size=128)
   let pool = Ok(
     @moondsp.BoundVoicePool(
       @moondsp.AnalyzedGraph::analyze(template),
       ctx,
-      @moondsp.ControlBindingBuilder::new().bind(
+      @moondsp.ControlBindingBuilder().bind(
         key="note",
         node_index=0,
         slot=@moondsp.GraphParamSlot::Value0,

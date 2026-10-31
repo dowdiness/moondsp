@@ -60,7 +60,7 @@ pub fn TimeScope::slow(
   if factor.num <= 0L {
     raise NonPositiveRate
   } else {
-    TimeScope::at_rate(rate=@pattern.Rational::new(1L, 1L) / factor)
+    TimeScope::at_rate(rate=@pattern.Rational(1L, 1L) / factor)
   }
 }
 

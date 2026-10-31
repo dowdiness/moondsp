@@ -190,7 +190,7 @@ fn TopologyGraph::queue_topology_edits_impl(
         GraphTopologyQueueError::InvalidEdit(failure.edit_index, failure.reason),
       )
   }
-  let compile_context = DspContext::new(
+  let compile_context = DspContext(
     sample_rate=self.compile_sample_rate,
     block_size=self.compile_block_size,
   )

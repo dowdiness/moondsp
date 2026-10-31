@@ -92,7 +92,7 @@ fn projection_boundary_mini_draft_snapshot(
 
 ///|
 fn projection_boundary_one_cycle() -> @pattern.TimeSpan {
-  @pattern.TimeSpan::new(
+  @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
@@ -156,7 +156,7 @@ fn projection_boundary_assert_matches_mini_doc(input : String) -> Unit {
 /// sides (apples-to-apples). Widen HERE, not per input, if a corpus case needs a
 /// longer period (Phase 2 plan, Orchestrator resolution 1).
 fn projection_boundary_parity_window() -> @pattern.TimeSpan {
-  @pattern.TimeSpan::new(
+  @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(8),
   )

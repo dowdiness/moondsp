@@ -10,7 +10,7 @@ fn assert_same_audio(
 
 ///|
 test "program instances own parameters reset and oscillator history" {
-  let context = DspContext::new(sample_rate=48000.0, block_size=128)
+  let context = DspContext(sample_rate=48000.0, block_size=128)
   let program = DspProgram(
     build_graph_program(
       [
@@ -47,7 +47,7 @@ test "program instances own parameters reset and oscillator history" {
 
 ///|
 test "transferred mono histories are independent of the old graph" {
-  let context = DspContext::new(sample_rate=48000.0, block_size=128)
+  let context = DspContext(sample_rate=48000.0, block_size=128)
   let sources = [
     [DspNode::oscillator(@dsp.Waveform::Sine, 440.0), DspNode::output(0)],
     [DspNode::noise(42U), DspNode::output(0)],
@@ -102,7 +102,7 @@ test "transferred mono histories are independent of the old graph" {
 
 ///|
 test "transferred stereo filter and delay histories remain independent" {
-  let context = DspContext::new(sample_rate=48000.0, block_size=128)
+  let context = DspContext(sample_rate=48000.0, block_size=128)
   let nodes = [
     DspNode::noise(42U),
     DspNode::pan(0, -0.3),

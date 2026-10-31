@@ -1,7 +1,7 @@
 ///|
 test "low-pass coefficients are normalized and symmetric" {
-  let biquad = Biquad::new()
-  let context = DspContext::new(sample_rate=48000.0, block_size=128)
+  let biquad = Biquad()
+  let context = DspContext(sample_rate=48000.0, block_size=128)
 
   assert_true(biquad.update(context, BiquadMode::LowPass, 1000.0, 0.707))
 
@@ -15,8 +15,8 @@ test "low-pass coefficients are normalized and symmetric" {
 
 ///|
 test "high-pass coefficients are normalized and symmetric" {
-  let biquad = Biquad::new()
-  let context = DspContext::new(sample_rate=48000.0, block_size=128)
+  let biquad = Biquad()
+  let context = DspContext(sample_rate=48000.0, block_size=128)
 
   assert_true(biquad.update(context, BiquadMode::HighPass, 1000.0, 0.707))
 
@@ -30,8 +30,8 @@ test "high-pass coefficients are normalized and symmetric" {
 
 ///|
 test "band-pass coefficients keep zero center tap" {
-  let biquad = Biquad::new()
-  let context = DspContext::new(sample_rate=48000.0, block_size=128)
+  let biquad = Biquad()
+  let context = DspContext(sample_rate=48000.0, block_size=128)
 
   assert_true(biquad.update(context, BiquadMode::BandPass, 1000.0, 0.707))
 
@@ -45,8 +45,8 @@ test "band-pass coefficients keep zero center tap" {
 
 ///|
 test "invalid update clears coefficients and delay state" {
-  let biquad = Biquad::new()
-  let context = DspContext::new(sample_rate=48000.0, block_size=128)
+  let biquad = Biquad()
+  let context = DspContext(sample_rate=48000.0, block_size=128)
 
   assert_true(biquad.update(context, BiquadMode::LowPass, 1000.0, 0.707))
   ignore(biquad.tick(1.0))

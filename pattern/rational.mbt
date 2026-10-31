@@ -4,7 +4,7 @@
 /// WHY Int64: MoonBit Int is 32-bit. Cross-multiplication for comparison
 /// and nested fast/slow transforms overflow 32-bit quickly in live sessions.
 ///
-/// Invariants (enforced by Rational::new):
+/// Invariants (enforced by Rational):
 /// - den is always positive (sign lives in num)
 /// - num/den is always in lowest terms (GCD-reduced)
 /// Arithmetic cancels common factors before multiplying. Results must still
@@ -32,7 +32,6 @@ fn gcd(a : Int64, b : Int64) -> Int64 {
 }
 
 ///|
-#alias(new)
 pub fn Rational::Rational(num : Int64, den : Int64) -> Rational {
   if den == 0L {
     abort("Rational: denominator cannot be zero")
@@ -69,7 +68,7 @@ pub impl Add for Rational with fn add(self : Rational, other : Rational) -> Rati
   let common = gcd(self.den, other.den)
   let num = self.num * (other.den / common) + other.num * (self.den / common)
   let cancel = gcd(num, common)
-  Rational::new(num / cancel, self.den / common * (other.den / cancel))
+  Rational(num / cancel, self.den / common * (other.den / cancel))
 }
 
 ///|
@@ -80,7 +79,7 @@ pub impl Sub for Rational with fn sub(self : Rational, other : Rational) -> Rati
   let common = gcd(self.den, other.den)
   let num = self.num * (other.den / common) - other.num * (self.den / common)
   let cancel = gcd(num, common)
-  Rational::new(num / cancel, self.den / common * (other.den / cancel))
+  Rational(num / cancel, self.den / common * (other.den / cancel))
 }
 
 ///|
@@ -93,7 +92,7 @@ pub impl Mul for Rational with fn mul(self : Rational, other : Rational) -> Rati
   }
   let left = gcd(self.num, other.den)
   let right = gcd(other.num, self.den)
-  Rational::new(
+  Rational(
     self.num / left * (other.num / right),
     self.den / right * (other.den / left),
   )
@@ -109,7 +108,7 @@ pub impl Div for Rational with fn div(self : Rational, other : Rational) -> Rati
   }
   let left = gcd(self.num, other.num)
   let right = gcd(self.den, other.den)
-  Rational::new(
+  Rational(
     self.num / left * (other.den / right),
     self.den / right * (other.num / left),
   )

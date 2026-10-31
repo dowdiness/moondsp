@@ -33,7 +33,7 @@ test "regrouping overlay keeps material clocks and publishes current provenance"
   edited.commit_pending(@pattern.Rational::from_int(1))
   assert_false(edited.has_pending())
   assert_eq(notes(edited, 1, 8), notes(control, 1, 8))
-  let arc = @pattern.TimeSpan::new(
+  let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(1),
     @pattern.Rational::from_int(2),
   )

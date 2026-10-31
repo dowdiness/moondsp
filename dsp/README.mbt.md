@@ -48,9 +48,9 @@ signal processing leaf layer:
 ```mbt check
 ///|
 test "render one oscillator block" {
-  let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=128)
+  let context = @dsp.DspContext(sample_rate=48000.0, block_size=128)
   let output = context.make_buffer()
-  let oscillator = @dsp.Oscillator::new()
+  let oscillator = @dsp.Oscillator()
 
   oscillator.process_waveform(
     context~,
@@ -73,15 +73,15 @@ the audio callback, then reuse them for every block.
 ## Buffers and ownership
 
 Use `AudioBuffer::filled(size)` or `DspContext::make_buffer()` to allocate a new
-buffer. `AudioBuffer::new(samples)` copies a `FixedArray`; `AudioBuffer::adopt`
+buffer. `AudioBuffer(samples)` copies a `FixedArray`; `AudioBuffer::adopt`
 wraps it without copying.
 
 ```mbt check
 ///|
 test "gain processes a buffer in place" {
-  let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=4)
+  let context = @dsp.DspContext(sample_rate=48000.0, block_size=4)
   let buffer = @dsp.AudioBuffer::filled(4, init=0.5)
-  let gain = @dsp.Gain::new()
+  let gain = @dsp.Gain()
 
   gain.process(context~, buffer~, amount=0.4)
 
@@ -118,13 +118,13 @@ example generates a saw wave, filters it, and pans it to stereo:
 ```mbt check
 ///|
 test "process a mono source into stereo" {
-  let context = @dsp.DspContext::new(sample_rate=48000.0, block_size=16)
+  let context = @dsp.DspContext(sample_rate=48000.0, block_size=16)
   let mono = context.make_buffer()
   let left = context.make_buffer()
   let right = context.make_buffer()
-  let oscillator = @dsp.Oscillator::new()
-  let filter = @dsp.Biquad::new()
-  let pan = @dsp.Pan::new()
+  let oscillator = @dsp.Oscillator()
+  let filter = @dsp.Biquad()
+  let pan = @dsp.Pan()
 
   oscillator.process_waveform(
     context~,
@@ -161,7 +161,7 @@ range.
 ```mbt check
 ///|
 test "delay returns an impulse after its delay" {
-  let delay = @dsp.DelayLine::new(8, delay_samples=2, feedback=0.0)
+  let delay = @dsp.DelayLine(8, delay_samples=2, feedback=0.0)
 
   assert_true(delay.tick(1.0) == 0.0)
   assert_true(delay.tick(0.0) == 0.0)

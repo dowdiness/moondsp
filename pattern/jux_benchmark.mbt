@@ -1,6 +1,6 @@
 ///|
 fn bench_one_cycle() -> TimeSpan {
-  TimeSpan::new(Rational::from_int(0), Rational::from_int(1))
+  TimeSpan(Rational::from_int(0), Rational::from_int(1))
 }
 
 ///|

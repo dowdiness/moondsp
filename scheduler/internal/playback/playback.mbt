@@ -163,7 +163,7 @@ fn PlaybackSnapshot::offset_at(
 ) -> @pattern.Rational {
   match self {
     RepeatSong(snapshot) =>
-      snapshot.song().duration() * @pattern.Rational::new(cycle, 1L)
+      snapshot.song().duration() * @pattern.Rational(cycle, 1L)
     _ => @pattern.Rational::from_int(0)
   }
 }
@@ -343,7 +343,7 @@ fn[A] PlaybackRun::query(
     } else {
       self.snapshot.start_entries()
     }
-    let local_arc = @pattern.TimeSpan::new(cursor - offset, end_ - offset)
+    let local_arc = @pattern.TimeSpan(cursor - offset, end_ - offset)
     for event in query(entries, local_arc) {
       result.push(shift(event, offset))
     }

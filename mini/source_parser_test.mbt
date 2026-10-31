@@ -78,14 +78,14 @@ test "bounded play source preserves ordinary musical output" {
   let source = "let beat = note(\"60 64\"); beat.fast(2)"
   let bounded = @mini.parse_play_source(
     source,
-    max_query_span=Some(@pattern.Rational::new(2L, 45L)),
+    max_query_span=Some(@pattern.Rational(2L, 45L)),
   ).unwrap()
   guard bounded.body() is Pattern(doc) else { fail("expected pattern") }
   let snapshot = doc.lower()
   let events = snapshot
     .pat()
     .query(
-      @pattern.TimeSpan::new(
+      @pattern.TimeSpan(
         @pattern.Rational::from_int(0),
         @pattern.Rational::from_int(1),
       ),
@@ -106,7 +106,7 @@ test "bounded play source rejects amplification before querying future branches"
     assert_true(
       @mini.parse_play_source(
         source,
-        max_query_span=Some(@pattern.Rational::new(2L, 45L)),
+        max_query_span=Some(@pattern.Rational(2L, 45L)),
       )
       is Err(_),
     )
@@ -118,21 +118,21 @@ test "bounded play source prevents eager Euclidean allocation" {
   assert_true(
     @mini.parse_play_source(
       "s(\"bd(1,128)\")",
-      max_query_span=Some(@pattern.Rational::new(2L, 45L)),
+      max_query_span=Some(@pattern.Rational(2L, 45L)),
     )
     is Ok(_),
   )
   assert_true(
     @mini.parse_play_source(
       "s(\"bd(1,129)\")",
-      max_query_span=Some(@pattern.Rational::new(2L, 45L)),
+      max_query_span=Some(@pattern.Rational(2L, 45L)),
     )
     is Err(_),
   )
   assert_true(
     @mini.parse_play_source(
       "song(section(\"a\",1,s(\"bd(1,100000)\")),part(\"a1\",\"a\"))",
-      max_query_span=Some(@pattern.Rational::new(2L, 45L)),
+      max_query_span=Some(@pattern.Rational(2L, 45L)),
     )
     is Err(_),
   )
@@ -144,7 +144,7 @@ test "bounded play source accounts for cumulative layers and repeated occurrence
   assert_true(
     @mini.parse_play_source(
       layer,
-      max_query_span=Some(@pattern.Rational::new(2L, 45L)),
+      max_query_span=Some(@pattern.Rational(2L, 45L)),
     )
     is Ok(_),
   )
@@ -152,7 +152,7 @@ test "bounded play source accounts for cumulative layers and repeated occurrence
   assert_true(
     @mini.parse_play_source(
       layers,
-      max_query_span=Some(@pattern.Rational::new(2L, 45L)),
+      max_query_span=Some(@pattern.Rational(2L, 45L)),
     )
     is Err(_),
   )
@@ -162,14 +162,14 @@ test "bounded play source accounts for cumulative layers and repeated occurrence
   assert_true(
     @mini.parse_play_source(
       song,
-      max_query_span=Some(@pattern.Rational::new(2L, 45L)),
+      max_query_span=Some(@pattern.Rational(2L, 45L)),
     )
     is Ok(_),
   )
   assert_true(
     @mini.parse_play_source(
       song + ".repeat()",
-      max_query_span=Some(@pattern.Rational::new(2L, 45L)),
+      max_query_span=Some(@pattern.Rational(2L, 45L)),
     )
     is Err(_),
   )
@@ -177,7 +177,7 @@ test "bounded play source accounts for cumulative layers and repeated occurrence
 
 ///|
 test "bounded play source rejects source size and recursive depth before parsing" {
-  let span = Some(@pattern.Rational::new(2L, 45L))
+  let span = Some(@pattern.Rational(2L, 45L))
   let oversized = "note(\"60\")" + Array::make(8192, " ").join("")
   assert_true(@mini.parse_play_source(oversized, max_query_span=span) is Err(_))
   let nested = Array::make(40, "(").join("") +

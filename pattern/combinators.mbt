@@ -19,21 +19,21 @@ pub fn[A] sequence(pats : Array[Pat[A]]) -> Pat[A] {
     { index: i_rat, begin: i_rat / n_rat, end_: (i_rat + one) / n_rat, }
   })
   // Every complete slot maps to [0,1), independent of its index and cycle.
-  let full_pat_arc = TimeSpan::new(Rational::from_int(0), one)
+  let full_pat_arc = TimeSpan(Rational::from_int(0), one)
   make_pat(
     fn(arc) {
       let result : Array[Event[A]] = []
       let cycles = arc.whole_cycles()
       for cycle_arc in cycles {
         // Determine the full cycle start from cycle_arc.begin
-        let cycle_start = Rational::new(cycle_arc.begin.floor(), 1L)
+        let cycle_start = Rational(cycle_arc.begin.floor(), 1L)
         for i in 0..<n {
           let slot = slots[i]
           let i_rat = slot.index
           // Slot arc within the cycle: [i/n, (i+1)/n) + cycle_start
           let slot_begin = cycle_start + slot.begin
           let slot_end = cycle_start + slot.end_
-          let slot_arc = TimeSpan::new(slot_begin, slot_end)
+          let slot_arc = TimeSpan(slot_begin, slot_end)
           // Intersect slot with the original query arc
           let query_intersect = match slot_arc.intersect(arc) {
             Some(ts) => ts
@@ -44,7 +44,7 @@ pub fn[A] sequence(pats : Array[Pat[A]]) -> Pat[A] {
           // Scale the intersected query arc into pattern time
           let pat_begin = (query_intersect.begin - cycle_start) * n_rat - i_rat
           let pat_end = (query_intersect.end_ - cycle_start) * n_rat - i_rat
-          let query_pat_arc = TimeSpan::new(pat_begin, pat_end)
+          let query_pat_arc = TimeSpan(pat_begin, pat_end)
           // Capture i by value to avoid closure capture-by-reference issue
           let i_val = i
           let pat = pats[i_val]
@@ -60,12 +60,12 @@ pub fn[A] sequence(pats : Array[Pat[A]]) -> Pat[A] {
               cycle_start
             let part_end_orig = (ev_part_clipped.end_ + i_rat) / n_rat +
               cycle_start
-            let new_part = TimeSpan::new(part_begin_orig, part_end_orig)
+            let new_part = TimeSpan(part_begin_orig, part_end_orig)
             let new_whole = match ev.whole {
               Some(w) => {
                 let wb = (w.begin + i_rat) / n_rat + cycle_start
                 let we = (w.end_ + i_rat) / n_rat + cycle_start
-                Some(TimeSpan::new(wb, we))
+                Some(TimeSpan(wb, we))
               }
               None => None
             }
@@ -116,7 +116,7 @@ pub fn[A] sequence_weighted(
     let end_ = Rational::from_int(elapsed) / total_rat
     { begin, end_, duration: Rational::from_int(weight) / total_rat, }
   })
-  let full_pat_arc = TimeSpan::new(Rational::from_int(0), one)
+  let full_pat_arc = TimeSpan(Rational::from_int(0), one)
   let signature = combine_signature(
     "weighted_sequence:\{weights.map(weight => "\{weight}").join(",")}",
     pats,
@@ -125,17 +125,17 @@ pub fn[A] sequence_weighted(
     fn(arc) {
       let result : Array[Event[A]] = []
       for cycle_arc in arc.whole_cycles() {
-        let cycle_start = Rational::new(cycle_arc.begin.floor(), 1L)
+        let cycle_start = Rational(cycle_arc.begin.floor(), 1L)
         for i in 0..<n {
           let slot = slots[i]
           let slot_begin = cycle_start + slot.begin
           let slot_end = cycle_start + slot.end_
-          let slot_arc = TimeSpan::new(slot_begin, slot_end)
+          let slot_arc = TimeSpan(slot_begin, slot_end)
           let query_intersect = match slot_arc.intersect(arc) {
             Some(ts) => ts
             None => continue
           }
-          let query_pat_arc = TimeSpan::new(
+          let query_pat_arc = TimeSpan(
             (query_intersect.begin - slot_begin) / slot.duration,
             (query_intersect.end_ - slot_begin) / slot.duration,
           )
@@ -149,14 +149,14 @@ pub fn[A] sequence_weighted(
             let part_end_orig = slot_begin +
               ev_part_clipped.end_ * slot.duration
             let new_whole = ev.whole.map(w => {
-              TimeSpan::new(
+              TimeSpan(
                 slot_begin + w.begin * slot.duration,
                 slot_begin + w.end_ * slot.duration,
               )
             })
             result.push({
               whole: new_whole,
-              part: TimeSpan::new(part_begin_orig, part_end_orig),
+              part: TimeSpan(part_begin_orig, part_end_orig),
               value: ev.value,
             })
           }

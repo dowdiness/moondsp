@@ -6,7 +6,7 @@ fn wb_draft_origin(draft : Draft) -> @pattern.EventOrigin raise {
   guard input.compile() is Ok(Pattern(snapshot, _)) else {
     fail("expected exact pattern")
   }
-  let span = @pattern.TimeSpan::new(
+  let span = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )

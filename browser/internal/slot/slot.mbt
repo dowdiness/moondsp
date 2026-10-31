@@ -19,7 +19,6 @@ pub struct MonoOut {
 }
 
 ///|
-#alias(new)
 pub fn MonoOut::MonoOut() -> MonoOut {
   { buffer: @ref.new(None), }
 }
@@ -56,7 +55,6 @@ pub struct StereoOut {
 }
 
 ///|
-#alias(new)
 pub fn StereoOut::StereoOut() -> StereoOut {
   { left: @ref.new(None), right: @ref.new(None), }
 }
@@ -113,7 +111,6 @@ pub struct GraphSlot[T, O] {
 }
 
 ///|
-#alias(new)
 pub fn[T, O] GraphSlot::GraphSlot(
   output~ : O,
   compile~ : (@moondsp.DspContext) -> T?,
@@ -156,7 +153,7 @@ pub fn[T, O : Output] GraphSlot::ensure(
     self.block_size.val == block {
     return true
   }
-  let ctx = @moondsp.DspContext::new(sample_rate=rate, block_size=block)
+  let ctx = @moondsp.DspContext(sample_rate=rate, block_size=block)
   match (self.compile)(ctx) {
     Some(g) => {
       self.output.allocate(block)

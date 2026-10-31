@@ -53,7 +53,7 @@ test "wrap a pattern as a section" {
     body=@pattern.note(60.0),
   )
   let events = section.query(
-    @pattern.TimeSpan::new(
+    @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
       @pattern.Rational::from_int(1),
     ),
@@ -85,7 +85,7 @@ test "combine named section layers" {
     body=@pattern.sound(36.0),
   ).layer(name="bass", body=@pattern.note(36.0))
   let events = section.query(
-    @pattern.TimeSpan::new(
+    @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
       @pattern.Rational::from_int(1),
     ),
@@ -122,7 +122,7 @@ test "arrange sections sequentially" {
   )
   let arrangement = @song.Song::from_sections([intro, chorus])
   let events = arrangement.query(
-    @pattern.TimeSpan::new(
+    @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
       @pattern.Rational::from_int(3),
     ),
@@ -156,21 +156,21 @@ test "query explicitly placed occurrences" {
       section=a,
     ),
     @song.SongPart::at(
-      start=@pattern.Rational::new(1L, 2L),
+      start=@pattern.Rational(1L, 2L),
       name="b1",
       section=b,
     ),
   ])
   let overlap = arrangement.query(
-    @pattern.TimeSpan::new(
-      @pattern.Rational::new(1L, 2L),
+    @pattern.TimeSpan(
+      @pattern.Rational(1L, 2L),
       @pattern.Rational::from_int(1),
     ),
   )
 
   assert_eq(overlap.length(), 2)
   assert_eq(
-    arrangement.occurrences_at(@pattern.Rational::new(3L, 4L)).length(),
+    arrangement.occurrences_at(@pattern.Rational(3L, 4L)).length(),
     2,
   )
 }

@@ -90,8 +90,8 @@ fn parse_play_source_with_origins(
       Some(PlaybackAdmission(span.to_double()))
     }
   }
-  let parser = Parser::new(input, admission~, syntax_depth_limit~)
-  let builder = MiniDocBuilder::new(previous~, origins~)
+  let parser = Parser(input, admission~, syntax_depth_limit~)
+  let builder = MiniDocBuilder(previous~, origins~)
   let mut authored_bpm : Double? = None
   while true {
     parser.parse_bindings(builder=Some(builder)) catch {

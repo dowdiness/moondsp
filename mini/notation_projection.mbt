@@ -44,7 +44,7 @@ pub fn project_notation_nodes(
   if content.is_empty() {
     return Err("position 0: empty notation")
   }
-  let parser = NotationParser::new(content, sound~, chord~)
+  let parser = NotationParser(content, sound~, chord~)
   parser.projection_nodes = Some([])
   let pattern = parser.parse_notation() catch {
     ParseError(message) => return Err(message)
@@ -68,7 +68,7 @@ pub fn project_notation_nodes(
   }
   // Projection queries start at zero and cover whole cycles. Reuse the source
   // admission model with that alignment, rather than an arbitrary runtime arc.
-  let assessment = NotationParser::new(content, sound~, chord~, assess=true)
+  let assessment = NotationParser(content, sound~, chord~, assess=true)
   let _ = assessment.parse_notation() catch {
     ParseError(message) => return Err(message)
   }

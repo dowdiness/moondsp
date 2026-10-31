@@ -1,6 +1,6 @@
 ///|
 test "compiled dsp resolves simple mono feedback cycle via z^-1 insertion" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -26,7 +26,7 @@ test "compiled dsp resolves simple mono feedback cycle via z^-1 insertion" {
 
 ///|
 test "compiled dsp runtime gain update retunes accepted feedback cycle" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -65,7 +65,7 @@ test "compiled dsp runtime gain update retunes accepted feedback cycle" {
 
 ///|
 test "compiled dsp resolves multiple mono feedback edges from one source" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -93,7 +93,7 @@ test "compiled dsp resolves multiple mono feedback edges from one source" {
 
 ///|
 test "compiled dsp runtime delay update matches fixed feedback loop compile" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -156,7 +156,7 @@ test "compiled dsp runtime delay update matches fixed feedback loop compile" {
 
 ///|
 test "compiled dsp runtime biquad update matches fixed feedback loop compile" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -219,7 +219,7 @@ test "compiled dsp runtime biquad update matches fixed feedback loop compile" {
 
 ///|
 test "compiled stereo dsp resolves mono feedback cycle before pan via z^-1 insertion" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -258,7 +258,7 @@ test "compiled stereo dsp resolves mono feedback cycle before pan via z^-1 inser
 
 ///|
 test "compiled stereo dsp runtime gain update retunes accepted mono feedback cycle" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -313,7 +313,7 @@ test "compiled stereo dsp runtime gain update retunes accepted mono feedback cyc
 
 ///|
 test "compiled dsp accepts direct self-feedback with zero-initialized z^-1 state" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -334,7 +334,7 @@ test "compiled dsp accepts direct self-feedback with zero-initialized z^-1 state
 
 ///|
 test "compiled dsp rejects feedback cycles through output nodes" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -347,7 +347,7 @@ test "compiled dsp rejects feedback cycles through output nodes" {
 
 ///|
 test "compiled dsp accepts stereo-involved feedback cycles via self-registers" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -389,7 +389,7 @@ test "compiled stereo dsp accepts stereo-shaped feedback edges via self-register
   // Hmm, but StereoOutput(4) means it reads from node 4 (StereoGain).
   // The StereoMixDown(5) is only used as feedback source for Mix's input1.
   // Back-edge: StereoMixDown(5) -> Mix(1), slot 1. Source=mono, target=mono. Valid!
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -427,7 +427,7 @@ test "self-register fields initialized for acyclic graph" {
     @graph.DspNode::oscillator(Waveform::Sine, 440.0),
     @graph.DspNode::output(1),
   ]
-  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
+  let ctx = DspContext(sample_rate=48000.0, block_size=128)
   let compiled = @graph.Dsp::compile(@graph.AnalyzedGraph::analyze(nodes), ctx).unwrap()
   let buf = AudioBuffer::filled(128)
   compiled.process(ctx, buf)
@@ -440,7 +440,7 @@ test "self-register: mono self-feedback produces bounded recurrence" {
   // A Gain node feeding back to itself with gain < 1 should decay to zero.
   // Graph: Constant(1.0) -> Mix(0, 2) -> Gain(1, 0.5) -> Output(2)
   // Back-edge: Gain -> Mix (slot 1)
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -476,7 +476,7 @@ test "self-register: mono self-feedback produces bounded recurrence" {
 test "self-register: stereo feedback via self-registers" {
   // Mono Gain -> Mix feedback followed by stereo panning.
   // The back-edge reads the previous sample's Gain output.
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -531,7 +531,7 @@ test "self-register: mixed-shape feedback across mono/stereo boundary" {
   //   5: Output(4)
   //
   // Back-edge: Gain(4) -> Mix(1) on slot 1.
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -588,7 +588,7 @@ test "feedback clip and mul exercise inline feedback computations" {
   //   s[1]: Mix(1.0, 0.5) = 1.5, Mul(1.5*0.5) = 0.75, Clip(0.75, 0.8) = 0.75
   //   s[2]: Mix(1.0, 0.75)= 1.75, Mul(1.75*0.5)= 0.875, Clip(0.875, 0.8) = 0.8
   //   s[3]: Mix(1.0, 0.8) = 1.8, Mul(1.8*0.5) = 0.9, Clip(0.9, 0.8) = 0.8
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )

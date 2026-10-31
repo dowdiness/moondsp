@@ -1,6 +1,6 @@
 ///|
 test "compiled dsp preserves constant-fed gain controls and reset" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -40,7 +40,7 @@ test "compiled dsp preserves constant-fed gain controls and reset" {
 
 ///|
 test "compiled dsp preserves constant-fed clip controls" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -73,7 +73,7 @@ test "compiled dsp preserves constant-fed clip controls" {
 
 ///|
 test "compiled dsp runtime param update changes delay length" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -126,7 +126,7 @@ test "compiled dsp runtime param update changes delay length" {
 
 ///|
 test "compiled dsp reset restores runtime delay parameters" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -166,7 +166,7 @@ test "compiled dsp reset restores runtime delay parameters" {
 
 ///|
 test "compiled dsp applies mixed control batches in order" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=ADSR_TEST_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -208,7 +208,7 @@ test "compiled dsp applies mixed control batches in order" {
 
 ///|
 test "compiled dsp rejects invalid control batches without partial updates" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -249,7 +249,7 @@ test "compiled dsp rejects invalid control batches without partial updates" {
 
 ///|
 test "compiled dsp apply_control reports invalid node index" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -278,7 +278,7 @@ test "compiled dsp apply_control reports invalid node index" {
 
 ///|
 test "compiled dsp apply_control reports orphan optimized node" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -307,7 +307,7 @@ test "compiled dsp apply_control reports orphan optimized node" {
 
 ///|
 test "compiled dsp apply_control reports invalid slot and value" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -365,7 +365,7 @@ test "compiled dsp apply_control reports invalid slot and value" {
 
 ///|
 test "compiled dsp apply_controls is transactional" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -413,7 +413,7 @@ test "compiled dsp apply_controls is transactional" {
 
 ///|
 test "compiled stereo dsp apply_control reports invalid gate target" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -436,7 +436,7 @@ test "compiled stereo dsp apply_control reports invalid gate target" {
 
 ///|
 test "compiled dsp runtime param update rejects unsupported or invalid values" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -516,7 +516,7 @@ test "compiled dsp runtime param update rejects unsupported or invalid values" {
 
 ///|
 test "compiled dsp runtime param update rejects invalid biquad values" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=LARGE_BLOCK_SIZE,
   )
@@ -566,7 +566,7 @@ test "compiled dsp runtime param update rejects invalid biquad values" {
 
 ///|
 test "compiled dsp legacy wrappers match apply_control" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=ADSR_TEST_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -619,7 +619,7 @@ test "compiled dsp legacy wrappers match apply_control" {
 
 ///|
 test "compiled dsp set_param wrapper matches apply_control" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -664,7 +664,7 @@ test "compiled dsp set_param wrapper matches apply_control" {
 
 ///|
 test "compiled dsp rejects negative delay_samples via set_param" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -701,7 +701,7 @@ test "compiled dsp rejects negative delay_samples via set_param" {
 
 ///|
 test "compiled dsp rejects delay_samples exceeding delay_max_samples via set_param" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )
@@ -734,7 +734,7 @@ test "compiled dsp rejects delay_samples exceeding delay_max_samples via set_par
 
 ///|
 test "compiled dsp accepts valid delay_samples within bounds via set_param" {
-  let context = DspContext::new(
+  let context = DspContext(
     sample_rate=STANDARD_SAMPLE_RATE,
     block_size=SMALL_BLOCK_SIZE,
   )

@@ -2,7 +2,7 @@
 test "a prepared entry switch is audible at its rounded sample inside the block" {
   let (sched, pool, left, right) = transport_fixture()
   // One source cycle lasts 128.5 samples. The edit arrives at sample 128.
-  let period = @pattern.Rational::new(257L, 48000L)
+  let period = @pattern.Rational(257L, 48000L)
   let note = @pattern.Pat::pure(@pattern.ControlMap::empty()).slow(period)
   let old = @pattern.PatternDoc::from_pattern(
     id=@identity.PatternNodeId::from_string("entry"),

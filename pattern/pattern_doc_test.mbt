@@ -12,9 +12,9 @@ fn doc_span(
   e_num : Int,
   e_den : Int,
 ) -> @pattern.TimeSpan {
-  @pattern.TimeSpan::new(
-    @pattern.Rational::new(b_num.to_int64(), b_den.to_int64()),
-    @pattern.Rational::new(e_num.to_int64(), e_den.to_int64()),
+  @pattern.TimeSpan(
+    @pattern.Rational(b_num.to_int64(), b_den.to_int64()),
+    @pattern.Rational(e_num.to_int64(), e_den.to_int64()),
   )
 }
 

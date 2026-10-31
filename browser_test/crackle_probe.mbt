@@ -201,7 +201,7 @@ pub fn crackle_probe_run(
     None => return false
   }
 
-  let context = @moondsp.DspContext::new(
+  let context = @moondsp.DspContext(
     sample_rate=input.sample_rate,
     block_size=input.block_size,
   )
@@ -293,7 +293,7 @@ pub fn crackle_probe_stream_init(
     None => return false
   }
 
-  let context = @moondsp.DspContext::new(
+  let context = @moondsp.DspContext(
     sample_rate=input.sample_rate,
     block_size=input.block_size,
   )
@@ -304,8 +304,8 @@ pub fn crackle_probe_stream_init(
         input.waveform,
         input.freq_hz,
         input.sample_rate,
-        @moondsp.Oscillator::new(),
-        @moondsp.Oscillator::new(),
+        @moondsp.Oscillator(),
+        @moondsp.Oscillator(),
       ),
     )
   } else if input.route_id <= 5 {
@@ -633,8 +633,8 @@ fn crackle_probe_run_direct(
   residual : @moondsp.AudioBuffer,
   metrics : FixedArray[Double],
 ) -> Bool {
-  let output_osc = @moondsp.Oscillator::new()
-  let reference_osc = @moondsp.Oscillator::new()
+  let output_osc = @moondsp.Oscillator()
+  let reference_osc = @moondsp.Oscillator()
   let mut has_previous = false
   let mut previous_output = 0.0
   let mut previous_reference = 0.0
@@ -868,7 +868,7 @@ fn crackle_probe_stream_compiled_state(
           return None
         }
       }
-      Some(StreamCompiled(waveform, freq_hz, graph, @moondsp.Oscillator::new()))
+      Some(StreamCompiled(waveform, freq_hz, graph, @moondsp.Oscillator()))
     }
     None => {
       crackle_probe_last_error_code.val = CRACKLE_PROBE_ERROR_COMPILE_FAILED
@@ -892,7 +892,7 @@ fn crackle_probe_stream_voice_pool_state(
     @moondsp.BoundVoicePool(
       template,
       context,
-      @moondsp.ControlBindingBuilder::new().bind(
+      @moondsp.ControlBindingBuilder().bind(
         key="note",
         node_index=0,
         slot=@moondsp.GraphParamSlot::Value0,
@@ -917,7 +917,7 @@ fn crackle_probe_stream_voice_pool_state(
           freq_hz,
           pool,
           @moondsp.AudioBuffer::filled(block_size),
-          @moondsp.Oscillator::new(),
+          @moondsp.Oscillator(),
           @moondsp.pan_left_gain(0.0),
         ),
       )
@@ -953,7 +953,7 @@ fn crackle_probe_stream_browser_synth_shape_state(
     @moondsp.BoundVoicePool(
       template,
       context,
-      @moondsp.ControlBindingBuilder::new().bind(
+      @moondsp.ControlBindingBuilder().bind(
         key="note",
         node_index=0,
         slot=@moondsp.GraphParamSlot::Value0,

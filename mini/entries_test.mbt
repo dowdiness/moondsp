@@ -56,7 +56,7 @@ test "envelope seconds change content without stretching the source period" {
   let shaped = @mini.parse(text + ".attack(2).hold(3).release(8)").unwrap()
   assert_true(base.entry_period() == shaped.entry_period())
   assert_false(base.same_content(shaped))
-  let arc = @pattern.TimeSpan::new(
+  let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(3),
   )

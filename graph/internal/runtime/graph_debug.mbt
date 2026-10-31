@@ -176,7 +176,7 @@ fn process_debug_loop(
 ) -> Unit {
   graph.last_validation_errors = []
   let buffer_count = graph.buffers.length()
-  let pan = Pan::new()
+  let pan = Pan()
   for index = 0; index < graph.nodes.length(); index = index + 1 {
     let node = graph.nodes[index]
     if !validate_node_inputs(

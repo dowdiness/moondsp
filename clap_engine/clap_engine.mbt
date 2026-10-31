@@ -268,7 +268,7 @@ pub fn default_synth_template() -> Array[@moondsp.DspNode] {
 
 ///|
 fn synth_bindings() -> @moondsp.ControlBindingBuilder {
-  @moondsp.ControlBindingBuilder::new()
+  @moondsp.ControlBindingBuilder()
   .bind(
     key="note",
     node_index=NOTE_NODE_INDEX,
@@ -306,7 +306,7 @@ pub fn ClapSynthEngine::ClapSynthEngine(
   if max_voices <= 0 {
     raise ClapEngineError::InvalidMaxVoices
   }
-  let ctx = @moondsp.DspContext::new(sample_rate~, block_size=max_block_size)
+  let ctx = @moondsp.DspContext(sample_rate~, block_size=max_block_size)
   let template = @moondsp.AnalyzedGraph::analyze(default_synth_template())
   let pool = @moondsp.BoundVoicePool(
     template,
@@ -323,7 +323,7 @@ pub fn ClapSynthEngine::ClapSynthEngine(
     left: @moondsp.AudioBuffer::filled(max_block_size),
     right: @moondsp.AudioBuffer::filled(max_block_size),
     render_contexts: FixedArray::makei(max_block_size + 1, fn(block_size) {
-      @moondsp.DspContext::new(sample_rate~, block_size~)
+      @moondsp.DspContext(sample_rate~, block_size~)
     }),
     active_notes: ActiveNoteTable(max_voices),
     last_frame_count: 0,

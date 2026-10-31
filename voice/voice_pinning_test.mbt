@@ -69,7 +69,7 @@ test "A2: well-formed template constructs VoicePool successfully" {
     DspNode::oscillator(Waveform::Sine, 440.0),
     DspNode::output(0),
   ]
-  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
+  let ctx = DspContext(sample_rate=48000.0, block_size=128)
   let result = pr2_a2_closure(nodes, ctx, 4)
   assert_true(result is Ok(_))
 }
@@ -81,7 +81,7 @@ test "A2: max_voices=0 fails with InvalidMaxVoices" {
     DspNode::oscillator(Waveform::Sine, 440.0),
     DspNode::output(0),
   ]
-  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
+  let ctx = DspContext(sample_rate=48000.0, block_size=128)
   let result = pr2_a2_closure(nodes, ctx, 0)
   match result {
     Err(reason) => @debug.assert_eq(reason, A2Reason::InvalidMaxVoices)
@@ -99,7 +99,7 @@ test "A2: orphan ADSR fails with OrphanAdsr" {
     DspNode::adsr(attack_ms=10.0, decay_ms=50.0, sustain=0.5, release_ms=100.0), // orphan — not referenced by Output
     DspNode::output(0),
   ]
-  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
+  let ctx = DspContext(sample_rate=48000.0, block_size=128)
   let result = pr2_a2_closure(nodes, ctx, 4)
   match result {
     Err(reason) => @debug.assert_eq(reason, A2Reason::OrphanAdsr)
@@ -112,7 +112,7 @@ test "A2: orphan ADSR fails with OrphanAdsr" {
 /// CompileRejected.
 test "A2: missing Output fails with CompileRejected" {
   let nodes : Array[DspNode] = [DspNode::oscillator(Waveform::Sine, 440.0)]
-  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
+  let ctx = DspContext(sample_rate=48000.0, block_size=128)
   let result = pr2_a2_closure(nodes, ctx, 4)
   match result {
     Err(reason) => @debug.assert_eq(reason, A2Reason::CompileRejected)
@@ -127,7 +127,7 @@ test "A3: well-formed replacement succeeds" {
     DspNode::oscillator(Waveform::Sine, 440.0),
     DspNode::output(0),
   ]
-  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
+  let ctx = DspContext(sample_rate=48000.0, block_size=128)
   let pool = @voice.VoicePool(
     @graph.AnalyzedGraph::analyze(nodes),
     ctx,
@@ -147,7 +147,7 @@ test "A3: orphan ADSR replacement fails with OrphanAdsr" {
     DspNode::oscillator(Waveform::Sine, 440.0),
     DspNode::output(0),
   ]
-  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
+  let ctx = DspContext(sample_rate=48000.0, block_size=128)
   let pool = @voice.VoicePool(
     @graph.AnalyzedGraph::analyze(nodes),
     ctx,
@@ -168,7 +168,7 @@ test "A3: missing Output replacement fails with CompileRejected" {
     DspNode::oscillator(Waveform::Sine, 440.0),
     DspNode::output(0),
   ]
-  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
+  let ctx = DspContext(sample_rate=48000.0, block_size=128)
   let pool = @voice.VoicePool(
     @graph.AnalyzedGraph::analyze(nodes),
     ctx,
@@ -210,8 +210,8 @@ test "A4: well-formed template constructs BoundVoicePool successfully" {
     DspNode::oscillator(Waveform::Sine, 440.0),
     DspNode::output(0),
   ]
-  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
-  let builder = ControlBindingBuilder::new()
+  let ctx = DspContext(sample_rate=48000.0, block_size=128)
+  let builder = ControlBindingBuilder()
   let result = pr2_a4_closure(nodes, ctx, builder, 4)
   assert_true(result is Ok(_))
 }
@@ -223,8 +223,8 @@ test "A4: max_voices=0 fails with InvalidMaxVoices" {
     DspNode::oscillator(Waveform::Sine, 440.0),
     DspNode::output(0),
   ]
-  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
-  let builder = ControlBindingBuilder::new()
+  let ctx = DspContext(sample_rate=48000.0, block_size=128)
+  let builder = ControlBindingBuilder()
   let result = pr2_a4_closure(nodes, ctx, builder, 0)
   match result {
     Err(reason) =>
@@ -241,8 +241,8 @@ test "A4: orphan ADSR fails with OrphanAdsr" {
     DspNode::adsr(attack_ms=10.0, decay_ms=50.0, sustain=0.5, release_ms=100.0),
     DspNode::output(0),
   ]
-  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
-  let builder = ControlBindingBuilder::new()
+  let ctx = DspContext(sample_rate=48000.0, block_size=128)
+  let builder = ControlBindingBuilder()
   let result = pr2_a4_closure(nodes, ctx, builder, 4)
   match result {
     Err(reason) =>
@@ -255,8 +255,8 @@ test "A4: orphan ADSR fails with OrphanAdsr" {
 /// A4 CompileRejected: missing Output fails with the specific variant.
 test "A4: missing Output fails with CompileRejected" {
   let nodes : Array[DspNode] = [DspNode::oscillator(Waveform::Sine, 440.0)]
-  let ctx = DspContext::new(sample_rate=48000.0, block_size=128)
-  let builder = ControlBindingBuilder::new()
+  let ctx = DspContext(sample_rate=48000.0, block_size=128)
+  let builder = ControlBindingBuilder()
   let result = pr2_a4_closure(nodes, ctx, builder, 4)
   match result {
     Err(reason) =>

@@ -1,6 +1,6 @@
 ///|
-let compiled_stereo : GraphSlot[@moondsp.StereoDsp, StereoOut] = GraphSlot::new(
-  output=StereoOut::new(),
+let compiled_stereo : GraphSlot[@moondsp.StereoDsp, StereoOut] = GraphSlot(
+  output=StereoOut(),
   compile=fn(ctx) {
     @moondsp.StereoDsp::compile(
       @moondsp.AnalyzedGraph::analyze([

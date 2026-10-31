@@ -305,7 +305,7 @@ test "chord returns None for unknown quality" {
 ///|
 test "chord pattern C major produces 3 note events" {
   let pat = @pattern.chord("C")
-  let arc = @pattern.TimeSpan::new(
+  let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
@@ -316,7 +316,7 @@ test "chord pattern C major produces 3 note events" {
 ///|
 test "chord pattern C major has correct note values" {
   let pat = @pattern.chord("C")
-  let arc = @pattern.TimeSpan::new(
+  let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
@@ -331,7 +331,7 @@ test "chord pattern C major has correct note values" {
 ///|
 test "chord pattern Dm produces 3 note events" {
   let pat = @pattern.chord("Dm")
-  let arc = @pattern.TimeSpan::new(
+  let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
@@ -346,7 +346,7 @@ test "chord pattern Dm produces 3 note events" {
 ///|
 test "chord pattern G7 produces 4 note events" {
   let pat = @pattern.chord("G7")
-  let arc = @pattern.TimeSpan::new(
+  let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
@@ -357,7 +357,7 @@ test "chord pattern G7 produces 4 note events" {
 ///|
 test "chord pattern silence for unknown chord" {
   let pat = @pattern.chord("X")
-  let arc = @pattern.TimeSpan::new(
+  let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )

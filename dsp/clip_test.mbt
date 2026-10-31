@@ -1,10 +1,8 @@
 ///|
 test "clip clamps values exceeding threshold" {
-  let clip = @dsp.Clip::new()
-  let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=4)
-  let buf = @dsp.AudioBuffer::new(
-    FixedArray::from_array([2.0, -2.0, 0.5, -0.3]),
-  )
+  let clip = @dsp.Clip()
+  let ctx = @dsp.DspContext(sample_rate=48000.0, block_size=4)
+  let buf = @dsp.AudioBuffer(FixedArray::from_array([2.0, -2.0, 0.5, -0.3]))
   clip.process(context=ctx, buffer=buf, threshold=0.5)
   assert_true(buf.get(0) == 0.5)
   assert_true(buf.get(1) == -0.5)
@@ -14,9 +12,9 @@ test "clip clamps values exceeding threshold" {
 
 ///|
 test "clip with threshold 1.0 clamps to standard range" {
-  let clip = @dsp.Clip::new()
-  let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=2)
-  let buf = @dsp.AudioBuffer::new(FixedArray::from_array([1.5, -1.5]))
+  let clip = @dsp.Clip()
+  let ctx = @dsp.DspContext(sample_rate=48000.0, block_size=2)
+  let buf = @dsp.AudioBuffer(FixedArray::from_array([1.5, -1.5]))
   clip.process(context=ctx, buffer=buf, threshold=1.0)
   assert_true(buf.get(0) == 1.0)
   assert_true(buf.get(1) == -1.0)
@@ -24,8 +22,8 @@ test "clip with threshold 1.0 clamps to standard range" {
 
 ///|
 test "clip with zero threshold produces silence" {
-  let clip = @dsp.Clip::new()
-  let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=4)
+  let clip = @dsp.Clip()
+  let ctx = @dsp.DspContext(sample_rate=48000.0, block_size=4)
   let buf = @dsp.AudioBuffer::filled(4, init=0.5)
   clip.process(context=ctx, buffer=buf, threshold=0.0)
   for i = 0; i < 4; i = i + 1 {
@@ -45,8 +43,8 @@ test "prop: clip output within threshold" {
         return true
       }
       let threshold = raw_threshold.abs()
-      let clip = @dsp.Clip::new()
-      let ctx = @dsp.DspContext::new(sample_rate=48000.0, block_size=1)
+      let clip = @dsp.Clip()
+      let ctx = @dsp.DspContext(sample_rate=48000.0, block_size=1)
       let buf = @dsp.AudioBuffer::filled(1, init=input)
       clip.process(context=ctx, buffer=buf, threshold~)
       let out = buf.get(0)

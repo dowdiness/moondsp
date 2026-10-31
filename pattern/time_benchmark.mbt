@@ -2,7 +2,7 @@
 fn time_bench_rationals() -> Array[Rational] {
   [
     for i in 0..<128 => {
-      Rational::new(
+      Rational(
         Int64::from_int(i * 7919 % 100003 - 50001),
         Int64::from_int(i * 3571 % 997 + 1),
       )
@@ -15,7 +15,7 @@ test "bench/pattern-time/rational-identities" (b : @bench.T) {
   let values = time_bench_rationals()
   let other_values = [
     for i in 0..<values.length() => {
-      Rational::new(
+      Rational(
         Int64::from_int(i * 4567 % 997 + 1),
         Int64::from_int(i * 1237 % 991 + 1),
       )
@@ -78,14 +78,14 @@ test "bench/pattern-time/rational-identities" (b : @bench.T) {
 test "bench/pattern-time/shift-intersection-identities" (b : @bench.T) {
   let spans = [
     for i in 0..<128 => {
-      TimeSpan::new(
-        Rational::new(Int64::from_int(i * 17), 23L),
-        Rational::new(Int64::from_int(i * 17 + 11), 23L),
+      TimeSpan(
+        Rational(Int64::from_int(i * 17), 23L),
+        Rational(Int64::from_int(i * 17 + 11), 23L),
       )
     }
   ]
   let zero = Rational::from_int(0)
-  let offset = Rational::new(7L, 13L)
+  let offset = Rational(7L, 13L)
   let events = [
     for i in 0..<spans.length() => {
       {
@@ -101,17 +101,17 @@ test "bench/pattern-time/shift-intersection-identities" (b : @bench.T) {
   ]
   let containers = [
     for i in 0..<spans.length() => {
-      TimeSpan::new(
-        Rational::new(Int64::from_int(i * 17 - 1), 23L),
-        Rational::new(Int64::from_int(i * 17 + 12), 23L),
+      TimeSpan(
+        Rational(Int64::from_int(i * 17 - 1), 23L),
+        Rational(Int64::from_int(i * 17 + 12), 23L),
       )
     }
   ]
   let overlaps = [
     for i in 0..<spans.length() => {
-      TimeSpan::new(
-        Rational::new(Int64::from_int(i * 17 + 5), 23L),
-        Rational::new(Int64::from_int(i * 17 + 15), 23L),
+      TimeSpan(
+        Rational(Int64::from_int(i * 17 + 5), 23L),
+        Rational(Int64::from_int(i * 17 + 15), 23L),
       )
     }
   ]

@@ -1,5 +1,5 @@
 ///|
-let demo : @ref.Ref[@moondsp.DemoSource] = @ref.new(@moondsp.DemoSource::new())
+let demo : @ref.Ref[@moondsp.DemoSource] = @ref.new(@moondsp.DemoSource())
 
 ///|
 /// Browser test wrapper package that proves mono compiled fallback when
@@ -149,7 +149,7 @@ fn ensure_compiled_graph(sample_rate : Double, block_size : Int) -> Bool {
     return true
   }
 
-  let context = @moondsp.DspContext::new(sample_rate~, block_size~)
+  let context = @moondsp.DspContext(sample_rate~, block_size~)
   let output = @moondsp.AudioBuffer::filled(block_size)
   let nodes = [
     @moondsp.DspNode::constant(BROWSER_TEST_FEEDBACK_DEFAULT_CONSTANT),
@@ -218,7 +218,7 @@ fn reset_compiled_graph() -> Unit {
 /// wasm-gc release build produces non-trivial audio — counter-evidence to the
 /// former "Mul wasm-gc bug" memory. Returns -1.0 if compile fails.
 pub fn mul_adsr_peak(sample_rate : Double, block_size : Int) -> Double {
-  let ctx = @moondsp.DspContext::new(sample_rate~, block_size~)
+  let ctx = @moondsp.DspContext(sample_rate~, block_size~)
   let nodes = [
     @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 440.0),
     @moondsp.DspNode::adsr(

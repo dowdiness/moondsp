@@ -62,7 +62,7 @@ test "exact compiler shares musical kernels without changing material metadata" 
     base.fast(id=pid("fast"), factor~),
     base.slow(id=pid("slow"), factor~),
     base.rev(id=pid("rev")),
-    base.gate(id=pid("gate"), factor=@pattern.Rational::new(1L, 3L)),
+    base.gate(id=pid("gate"), factor=@pattern.Rational(1L, 3L)),
     base.euclid(id=pid("euclid"), k=3, n=8, rotation=2),
     base.degrade_by(id=pid("degrade"), p=0.4, seed=71),
     base.every(
@@ -81,7 +81,7 @@ test "exact compiler shares musical kernels without changing material metadata" 
     raw.fast(factor),
     raw.slow(factor),
     raw.rev(),
-    raw.gate(@pattern.Rational::new(1L, 3L)),
+    raw.gate(@pattern.Rational(1L, 3L)),
     raw.euclid(3, 8, rotation=2),
     raw.degrade_by(0.4, seed=71),
     @pattern.every(2, p => p.fast(factor), raw),
@@ -463,9 +463,9 @@ test "source frame uses full whole-cycle repeat span for rational notation rates
     .fast(id=pid("playback-fast"), factor=@pattern.Rational::from_int(2))
     .lower_with_origins()
   for cycle in [-3L, 3L] {
-    let arc = @pattern.TimeSpan::new(
-      @pattern.Rational::new(cycle, 2L),
-      @pattern.Rational::new(cycle + 3L, 2L),
+    let arc = @pattern.TimeSpan(
+      @pattern.Rational(cycle, 2L),
+      @pattern.Rational(cycle + 3L, 2L),
     )
     let events = snapshot.query(arc)
     @debug.assert_eq(

@@ -130,7 +130,7 @@ fn Parser::record_literal_fact(
       end: content_start + content.length(),
     }),
   )
-  let parser = NotationParser::new(
+  let parser = NotationParser(
     content,
     sound=kind is Sound,
     chord=kind is Chord,
@@ -294,7 +294,7 @@ fn Parser::recognize_song_sections(
 
 ///|
 fn recognize_mini_source(input : String) -> SourceRecognition {
-  let parser = Parser::new(input, syntax_depth_limit=Some(32))
+  let parser = Parser(input, syntax_depth_limit=Some(32))
   parser.recognition = true
   let definitions : Array[RecognizedDefinition] = []
   let references : Array[RecognizedReference] = []

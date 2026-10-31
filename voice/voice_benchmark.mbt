@@ -121,7 +121,7 @@ fn bench_full_voice_nodes() -> Array[@graph.DspNode] {
 
 ///|
 test "bench voice: minimal_voice template compiles + pool accepts" {
-  let ctx = @dsp.DspContext::new(
+  let ctx = @dsp.DspContext(
     sample_rate=BENCH_SAMPLE_RATE,
     block_size=BENCH_BLOCK_SIZE,
   )
@@ -132,7 +132,7 @@ test "bench voice: minimal_voice template compiles + pool accepts" {
 
 ///|
 test "bench voice: fm_voice template compiles + pool accepts" {
-  let ctx = @dsp.DspContext::new(
+  let ctx = @dsp.DspContext(
     sample_rate=BENCH_SAMPLE_RATE,
     block_size=BENCH_BLOCK_SIZE,
   )
@@ -143,7 +143,7 @@ test "bench voice: fm_voice template compiles + pool accepts" {
 
 ///|
 test "bench voice: full_voice template compiles + pool accepts" {
-  let ctx = @dsp.DspContext::new(
+  let ctx = @dsp.DspContext(
     sample_rate=BENCH_SAMPLE_RATE,
     block_size=BENCH_BLOCK_SIZE,
   )
@@ -162,7 +162,7 @@ test "bench voice: full_voice template compiles + pool accepts" {
 
 ///|
 test "bench/voice/set_template" (b : @bench.T) {
-  let ctx = @dsp.DspContext::new(
+  let ctx = @dsp.DspContext(
     sample_rate=BENCH_SAMPLE_RATE,
     block_size=BENCH_BLOCK_SIZE,
   )
@@ -196,7 +196,7 @@ test "bench/voice/set_template" (b : @bench.T) {
 
 ///|
 test "bench/voice/note_on" (b : @bench.T) {
-  let ctx = @dsp.DspContext::new(
+  let ctx = @dsp.DspContext(
     sample_rate=BENCH_SAMPLE_RATE,
     block_size=BENCH_BLOCK_SIZE,
   )
@@ -222,7 +222,7 @@ test "bench/voice/note_on" (b : @bench.T) {
 }
 
 // ---- voicepool_new (constructor cost, post-analyze) ----
-// WHY: measures validate + 32 × VoiceSlot::new (each allocates a
+// WHY: measures validate + 32 × VoiceSlot (each allocates a
 // mono_buffer of block_size doubles). `AnalyzedGraph::analyze` is
 // hoisted OUT of the bench closure because real authoring re-uses one
 // analyzed template across many pool constructions; the bench therefore
@@ -233,7 +233,7 @@ test "bench/voice/note_on" (b : @bench.T) {
 
 ///|
 test "bench/voice/voicepool_new" (b : @bench.T) {
-  let ctx = @dsp.DspContext::new(
+  let ctx = @dsp.DspContext(
     sample_rate=BENCH_SAMPLE_RATE,
     block_size=BENCH_BLOCK_SIZE,
   )

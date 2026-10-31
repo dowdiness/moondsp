@@ -180,18 +180,18 @@ const GRAPH_BANDPASS_CLIP : Double = 0.9
 
 ///|
 test "voice chain stays bounded across note on and release" {
-  let context = @moondsp.DspContext::new(sample_rate=48000.0, block_size=16)
-  let osc = @moondsp.Oscillator::new()
-  let env = @moondsp.Adsr::new(
+  let context = @moondsp.DspContext(sample_rate=48000.0, block_size=16)
+  let osc = @moondsp.Oscillator()
+  let env = @moondsp.Adsr(
     attack_ms=0.0,
     decay_ms=0.0,
     sustain=0.5,
     release_ms=5.0,
   )
-  let filter = @moondsp.Biquad::new()
-  let gain = @moondsp.Gain::new()
-  let delay = @moondsp.DelayLine::new(4, delay_samples=2)
-  let clip = @moondsp.Clip::new()
+  let filter = @moondsp.Biquad()
+  let gain = @moondsp.Gain()
+  let delay = @moondsp.DelayLine(4, delay_samples=2)
+  let clip = @moondsp.Clip()
   let signal = @moondsp.AudioBuffer::filled(16)
   let envelope = @moondsp.AudioBuffer::filled(16)
 
@@ -249,13 +249,13 @@ test "voice chain stays bounded across note on and release" {
 
 ///|
 test "mixed oscillator and noise buses remain finite and bounded" {
-  let context = @moondsp.DspContext::new(sample_rate=48000.0, block_size=16)
-  let osc = @moondsp.Oscillator::new()
-  let noise = @moondsp.Noise::new(123U)
+  let context = @moondsp.DspContext(sample_rate=48000.0, block_size=16)
+  let osc = @moondsp.Oscillator()
+  let noise = @moondsp.Noise(123U)
   let smoother = @moondsp.ParamSmoother::from_context(0.0, 1.0, context)
-  let mix = @moondsp.Mix::new()
-  let clip = @moondsp.Clip::new()
-  let filter = @moondsp.Biquad::new()
+  let mix = @moondsp.Mix()
+  let clip = @moondsp.Clip()
+  let filter = @moondsp.Biquad()
   let tone = @moondsp.AudioBuffer::filled(16)
   let noise_bus = @moondsp.AudioBuffer::filled(16)
 
@@ -294,19 +294,19 @@ test "mixed oscillator and noise buses remain finite and bounded" {
 
 ///|
 test "stereo voice path with pan stays balanced and bounded" {
-  let context = @moondsp.DspContext::new(sample_rate=48000.0, block_size=16)
-  let osc = @moondsp.Oscillator::new()
-  let env = @moondsp.Adsr::new(
+  let context = @moondsp.DspContext(sample_rate=48000.0, block_size=16)
+  let osc = @moondsp.Oscillator()
+  let env = @moondsp.Adsr(
     attack_ms=0.0,
     decay_ms=0.0,
     sustain=0.6,
     release_ms=10.0,
   )
-  let filter = @moondsp.Biquad::new()
-  let gain = @moondsp.Gain::new()
-  let pan = @moondsp.Pan::new()
-  let left_clip = @moondsp.Clip::new()
-  let right_clip = @moondsp.Clip::new()
+  let filter = @moondsp.Biquad()
+  let gain = @moondsp.Gain()
+  let pan = @moondsp.Pan()
+  let left_clip = @moondsp.Clip()
+  let right_clip = @moondsp.Clip()
   let mono = @moondsp.AudioBuffer::filled(16)
   let envelope = @moondsp.AudioBuffer::filled(16)
   let left = @moondsp.AudioBuffer::filled(16)
@@ -352,7 +352,7 @@ test "stereo voice path with pan stays balanced and bounded" {
 
 ///|
 test "compiled stereo graph voice path responds to runtime pan updates" {
-  let context = @moondsp.DspContext::new(
+  let context = @moondsp.DspContext(
     sample_rate=GRAPH_STEREO_SAMPLE_RATE,
     block_size=GRAPH_STEREO_BLOCK_SIZE,
   )
@@ -416,7 +416,7 @@ test "compiled stereo graph voice path responds to runtime pan updates" {
 
 ///|
 test "compiled stereo graph applies batched control frames" {
-  let context = @moondsp.DspContext::new(
+  let context = @moondsp.DspContext(
     sample_rate=GRAPH_STEREO_SAMPLE_RATE,
     block_size=GRAPH_STEREO_BLOCK_SIZE,
   )
@@ -502,7 +502,7 @@ test "compiled stereo graph applies batched control frames" {
 
 ///|
 test "compiled stereo graph stereo biquad retune changes output" {
-  let context = @moondsp.DspContext::new(
+  let context = @moondsp.DspContext(
     sample_rate=GRAPH_STEREO_SAMPLE_RATE,
     block_size=GRAPH_STEREO_BLOCK_SIZE,
   )
@@ -584,7 +584,7 @@ test "compiled stereo graph stereo biquad retune changes output" {
 
 ///|
 test "compiled stereo graph stereo delay retune changes output" {
-  let context = @moondsp.DspContext::new(
+  let context = @moondsp.DspContext(
     sample_rate=GRAPH_STEREO_SAMPLE_RATE,
     block_size=GRAPH_STEREO_BLOCK_SIZE,
   )
@@ -664,7 +664,7 @@ test "compiled stereo graph stereo delay retune changes output" {
 
 ///|
 test "compiled stereo graph stereo delay feedback increases tail energy" {
-  let context = @moondsp.DspContext::new(
+  let context = @moondsp.DspContext(
     sample_rate=GRAPH_STEREO_SAMPLE_RATE,
     block_size=GRAPH_STEREO_BLOCK_SIZE,
   )
@@ -734,7 +734,7 @@ test "compiled stereo graph stereo delay feedback increases tail energy" {
 
 ///|
 test "compiled graph stereo delay mixdown matches equivalent mono delay path" {
-  let context = @moondsp.DspContext::new(
+  let context = @moondsp.DspContext(
     sample_rate=GRAPH_STEREO_SAMPLE_RATE,
     block_size=GRAPH_STEREO_BLOCK_SIZE,
   )
@@ -791,7 +791,7 @@ test "compiled graph stereo delay mixdown matches equivalent mono delay path" {
 
 ///|
 test "compiled graph stereo mixdown matches equivalent mono gain path" {
-  let context = @moondsp.DspContext::new(
+  let context = @moondsp.DspContext(
     sample_rate=GRAPH_STEREO_SAMPLE_RATE,
     block_size=GRAPH_STEREO_BLOCK_SIZE,
   )
@@ -844,7 +844,7 @@ test "compiled graph stereo mixdown matches equivalent mono gain path" {
 
 ///|
 test "compiled graph z^-1 feedback cycle persists across blocks and stays bounded" {
-  let context = @moondsp.DspContext::new(
+  let context = @moondsp.DspContext(
     sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
     block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
@@ -879,7 +879,7 @@ test "compiled graph z^-1 feedback cycle persists across blocks and stays bounde
 
 ///|
 test "compiled graph z^-1 feedback cycle applies batched runtime changes" {
-  let context = @moondsp.DspContext::new(
+  let context = @moondsp.DspContext(
     sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
     block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
@@ -926,7 +926,7 @@ test "compiled graph z^-1 feedback cycle applies batched runtime changes" {
 
 ///|
 test "compiled stereo graph mono z^-1 feedback cycle persists across blocks" {
-  let context = @moondsp.DspContext::new(
+  let context = @moondsp.DspContext(
     sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
     block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
@@ -988,7 +988,7 @@ test "compiled stereo graph mono z^-1 feedback cycle persists across blocks" {
 
 ///|
 test "compiled stereo graph mono z^-1 feedback cycle applies batched runtime changes" {
-  let context = @moondsp.DspContext::new(
+  let context = @moondsp.DspContext(
     sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
     block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
@@ -1039,7 +1039,7 @@ test "compiled stereo graph mono z^-1 feedback cycle applies batched runtime cha
 
 ///|
 test "compiled graph hot swap crossfades between bounded mono graphs" {
-  let context = @moondsp.DspContext::new(
+  let context = @moondsp.DspContext(
     sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
     block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
@@ -1080,7 +1080,7 @@ test "compiled graph hot swap crossfades between bounded mono graphs" {
 
 ///|
 test "compiled graph topology edit crossfades rebuilt mono graphs" {
-  let context = @moondsp.DspContext::new(
+  let context = @moondsp.DspContext(
     sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
     block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
@@ -1136,7 +1136,7 @@ test "compiled graph topology edit crossfades rebuilt mono graphs" {
 
 ///|
 test "compiled graph topology edit rewires rebuilt mono graphs" {
-  let context = @moondsp.DspContext::new(
+  let context = @moondsp.DspContext(
     sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
     block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
@@ -1181,7 +1181,7 @@ test "compiled graph topology edit rewires rebuilt mono graphs" {
 
 ///|
 test "compiled graph topology edit inserts rebuilt mono graphs" {
-  let context = @moondsp.DspContext::new(
+  let context = @moondsp.DspContext(
     sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
     block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
@@ -1220,7 +1220,7 @@ test "compiled graph topology edit inserts rebuilt mono graphs" {
 
 ///|
 test "compiled graph topology edit deletes rebuilt mono graphs" {
-  let context = @moondsp.DspContext::new(
+  let context = @moondsp.DspContext(
     sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
     block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
@@ -1262,7 +1262,7 @@ test "compiled graph topology edit deletes rebuilt mono graphs" {
 
 ///|
 test "compiled graph topology edit insert delete roundtrip restores rebuilt mono graphs" {
-  let context = @moondsp.DspContext::new(
+  let context = @moondsp.DspContext(
     sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
     block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
@@ -1335,7 +1335,7 @@ test "compiled graph topology edit insert delete roundtrip restores rebuilt mono
 
 ///|
 test "compiled stereo graph hot swap preserves bounded stereo output" {
-  let context = @moondsp.DspContext::new(
+  let context = @moondsp.DspContext(
     sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
     block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
@@ -1427,7 +1427,7 @@ test "compiled stereo graph hot swap preserves bounded stereo output" {
 
 ///|
 test "compiled stereo graph topology edit crossfades rebuilt stereo graphs" {
-  let context = @moondsp.DspContext::new(
+  let context = @moondsp.DspContext(
     sample_rate=GRAPH_FEEDBACK_SAMPLE_RATE,
     block_size=GRAPH_FEEDBACK_BLOCK_SIZE,
   )
@@ -1492,7 +1492,7 @@ test "compiled stereo graph topology edit crossfades rebuilt stereo graphs" {
 
 ///|
 test "compiled graph voice path stays coherent across gates and runtime updates" {
-  let context = @moondsp.DspContext::new(
+  let context = @moondsp.DspContext(
     sample_rate=GRAPH_VOICE_SAMPLE_RATE,
     block_size=GRAPH_VOICE_BLOCK_SIZE,
   )
@@ -1600,7 +1600,7 @@ test "compiled graph voice path stays coherent across gates and runtime updates"
 
 ///|
 test "compiled graph control frames apply batched runtime changes per block" {
-  let context = @moondsp.DspContext::new(
+  let context = @moondsp.DspContext(
     sample_rate=GRAPH_VOICE_SAMPLE_RATE,
     block_size=GRAPH_VOICE_BLOCK_SIZE,
   )
@@ -1694,7 +1694,7 @@ test "compiled graph control frames apply batched runtime changes per block" {
 
 ///|
 test "compiled graph multi-source path responds to runtime biquad retune" {
-  let context = @moondsp.DspContext::new(
+  let context = @moondsp.DspContext(
     sample_rate=GRAPH_MULTI_SOURCE_SAMPLE_RATE,
     block_size=GRAPH_MULTI_SOURCE_BLOCK_SIZE,
   )
@@ -1795,7 +1795,7 @@ test "compiled graph multi-source path responds to runtime biquad retune" {
 
 ///|
 test "compiled graph runtime high-pass retune changes output directionally" {
-  let context = @moondsp.DspContext::new(
+  let context = @moondsp.DspContext(
     sample_rate=GRAPH_HIGHPASS_SAMPLE_RATE,
     block_size=GRAPH_HIGHPASS_BLOCK_SIZE,
   )
@@ -1866,7 +1866,7 @@ test "compiled graph runtime high-pass retune changes output directionally" {
 
 ///|
 test "compiled graph runtime band-pass retune changes output" {
-  let context = @moondsp.DspContext::new(
+  let context = @moondsp.DspContext(
     sample_rate=GRAPH_BANDPASS_SAMPLE_RATE,
     block_size=GRAPH_BANDPASS_BLOCK_SIZE,
   )
@@ -1938,7 +1938,7 @@ test "compiled graph runtime band-pass retune changes output" {
 ///|
 test "exit deliverable compiles and produces non-zero output" {
   let graph : @moondsp.GraphBuilder = @moondsp.exit_deliverable()
-  let ctx = @moondsp.DspContext::new(sample_rate=48000.0, block_size=128)
+  let ctx = @moondsp.DspContext(sample_rate=48000.0, block_size=128)
   let compiled = @moondsp.Dsp::compile(
     @moondsp.AnalyzedGraph::analyze(graph.nodes()),
     ctx,

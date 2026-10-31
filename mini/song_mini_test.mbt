@@ -10,7 +10,7 @@ fn unwrap_parsed_song(
 
 ///|
 fn song_rat(n : Int64, d : Int64) -> @pattern.Rational {
-  @pattern.Rational::new(n, d)
+  @pattern.Rational(n, d)
 }
 
 ///|
@@ -20,10 +20,7 @@ fn song_span(
   end_num : Int64,
   end_den : Int64,
 ) -> @pattern.TimeSpan {
-  @pattern.TimeSpan::new(
-    song_rat(begin_num, begin_den),
-    song_rat(end_num, end_den),
-  )
+  @pattern.TimeSpan(song_rat(begin_num, begin_den), song_rat(end_num, end_den))
 }
 
 ///|

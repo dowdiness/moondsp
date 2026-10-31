@@ -17,7 +17,6 @@ pub struct ControlMapper {
 }
 
 ///|
-#alias(new)
 pub fn ControlMapper::ControlMapper(
   transform~ : (String, Double) -> (String, Double)?,
 ) -> ControlMapper {
@@ -406,7 +405,7 @@ fn PatternScheduler::process_block_events(
             sourced.source_start(),
             sourced.source_pitch(),
             frame.sample_begin,
-            @pattern.TimeSpan::new(whole.begin, whole.end_),
+            @pattern.TimeSpan(whole.begin, whole.end_),
           )
         _ => ()
       }

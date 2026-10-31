@@ -40,11 +40,11 @@ test "authored Euclid preserves stacked notes timing and child provenance" {
   let state = PlaybackState()
   state.queue(PlaybackSnapshot::pattern(snapshot))
   state.commit_pending(@pattern.Rational::from_int(0))
-  let whole = @pattern.TimeSpan::new(
+  let whole = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
-    @pattern.Rational::new(1L, 2L),
+    @pattern.Rational(1L, 2L),
   )
-  let arc = @pattern.TimeSpan::new(
+  let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
@@ -64,10 +64,7 @@ test "authored Euclid preserves stacked notes timing and child provenance" {
     assert_true(path.nodes() == [euclid, pair, children[i]])
   }
   let clipped = state.query_active_sourced_events(
-    @pattern.TimeSpan::new(
-      @pattern.Rational::new(1L, 4L),
-      @pattern.Rational::new(3L, 4L),
-    ),
+    @pattern.TimeSpan(@pattern.Rational(1L, 4L), @pattern.Rational(3L, 4L)),
   )
   assert_eq(
     clipped.map(event => event.event().value.get("note").unwrap().to_int()),
@@ -77,10 +74,7 @@ test "authored Euclid preserves stacked notes timing and child provenance" {
     assert_true(sourced.event().whole == Some(whole))
     assert_true(
       sourced.event().part ==
-      @pattern.TimeSpan::new(
-        @pattern.Rational::new(1L, 4L),
-        @pattern.Rational::new(1L, 2L),
-      ),
+      @pattern.TimeSpan(@pattern.Rational(1L, 4L), @pattern.Rational(1L, 2L)),
     )
   }
 }
