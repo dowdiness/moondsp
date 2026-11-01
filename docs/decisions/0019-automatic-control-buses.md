@@ -56,8 +56,10 @@ CC, CLAP host automation) can be added later without changing voices.
 
 Lowering a `PatternDoc` creates one bus per `MergeControl` occurrence and
 control key, expressed in root time. Each emitted event records which bus
-each bound key reads; the outermost `MergeControl` for a key wins, matching
-`ControlMap::merge`. Voices that share a bus, such as the five tones of a
+each bound key reads; the outermost `MergeControl` for a key wins where it
+has a value, matching `ControlMap::merge`. When an inner merge already binds
+the key, the outer bus falls back to the inner one (`Stack`), so the binding
+never depends on whether the outer provider has a value at the onset. Voices that share a bus, such as the five tones of a
 chord, receive the same value, so the scheduler never needs to tell them
 apart. The time mapping from a node to the root follows one rule per
 combinator kind:
@@ -85,14 +87,20 @@ The query form (`Pat[ControlMap]` over an arc) is not the definition. For
 continuous values it is not well defined: under `rev` it depends on the block
 length, and inside `sequence` each child is read at its slot start.
 
-### 4. Onset values are sampled at `part.begin`
+### 4. Merged values come from the buses at the snapshot root
 
-`merge_control_kernel` merges only right-hand events whose part contains the
-left fragment's `part.begin`, so an onset's values do not depend on the query
-length. Under `rev` the kernel sees the mirrored fragment, whose `part.begin`
-is the onset's end, so there the queried value can differ from the signal,
-which reads the limit just before the reversed onset. The signal is the
-definition: the scheduler starts each voice from its buses (Decision 6).
+A `MergeControl` in lowering binds keys but never queries its provider. A
+snapshot writes each bound key of each event from its bus at the fragment's
+`part.begin`, on the snapshot's clock. Every consumer of a snapshot (the
+scheduler, Song, visualization, offline queries) therefore sees the signal's
+value, whatever the query length and under `rev`. A key whose bus has no
+value there keeps the event's own value. A `filter_map` reads its child's
+bound keys the same way, on the child's clock, before its function runs.
+
+`merge_control_kernel` remains the merge of the `Pat` API, which has no buses.
+It merges the right-hand events whose part contains the left fragment's
+`part.begin`; under `rev` it sees the mirrored fragment, so its value can
+differ from the signal there.
 
 ### 5. Signals come from a closed set of control nodes
 
@@ -109,9 +117,9 @@ one that does not set the key.
 
 ### 6. The voice pool follows buses once per block
 
-At note-on the scheduler starts the voice with the event's values, taking each
-time-varying bound key from its bus at the onset, and, in the same call, hands
-the pool a reader for each time-varying bound key
+At note-on the scheduler starts the voice with the event's values, which
+already come from its buses (Decision 4), and, in the same call, hands the
+pool a reader for each time-varying bound key
 (`note_on_controls(controls, follow=...)`). The follower belongs to the voice
 slot: reusing the slot (including a steal) clears it, and an idle slot is
 skipped. Once per block the scheduler calls `update_follows` at the block's
@@ -221,6 +229,17 @@ because this toolchain rejects it; the repository was not changed for that.
   test pins that a releasing voice keeps following and that a voice stealing
   its slot starts without the old follower; each check fails when its rule is
   removed.
+
+- **Root values.** After merged values moved to the snapshot root
+  (Decision 4), browser output over 400 blocks was bit-identical for seven
+  scores, four of them time-varying; only `note("C3").gain(saw).gain("1 ~")`
+  changed, because its rest now falls back to `saw` instead of holding 1. At
+  every onset of six stepped and three continuous Mini scores, the document
+  path agrees with Mini's runtime pattern wherever that merge is well
+  defined. Hand-derived tests pin the outer-rest fallback, query-length
+  independence under `rev`, and a nested provider; each fails when its rule
+  is removed. Block queries of three Mini scores took 19–50% less time
+  ([pattern performance summary](../performance/2026-10-02-pattern-allocation-summary.md)).
 
 Not covered: score playback in CLAP, which would need the event query off
 the audio thread or allocation-free, since CLAP's audio callback must not

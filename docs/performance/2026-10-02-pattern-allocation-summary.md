@@ -69,6 +69,28 @@ High source identities above 2^32 survived actual scheduler/getter/SAB transport
 
 No complete Worklet-thread JS + Wasm-GC + native allocation census or unconditional allocation-neutral onset transport was established. Timing checks in one Chromium environment do not establish worst-case latency or physical glitch-free output.
 
+## 2026-11-01: merged controls come from buses at the snapshot root
+
+ADR-0019 lowering stopped querying each `merge_control` provider; a snapshot
+now writes bound keys from their buses at its root. Measured with a temporary
+`moon bench --release` (native, Moon 0.1.20261023 `3778465`, Linux x64 orb)
+that queried `query_sourced_events` and `pat().query` for 750 blocks of 128
+samples at 48 kHz, against the previous commit in a separate worktree, run
+sequentially once each:
+
+| Mini source | Before (mean ± σ) | After (mean ± σ) |
+|---|---:|---:|
+| `note("C4 E4 G4 B4").gain(0.5).lpf(1200).pan(-0.3).room(0.2)` | 37.96 ± 5.50 ms | 18.87 ± 3.34 ms |
+| `chord("Dm9 Bbmaj7").slow(2).lpf(saw.range(200, 4000).slow(4)).gain("1 0.6").pan(sine)` | 78.93 ± 7.28 ms | 64.01 ± 8.30 ms |
+| `s("hh*16").gain("1 0.4 0.7 0.4")` | 14.38 ± 0.33 ms | 7.54 ± 0.66 ms |
+
+Browser host output was bit-identical over 400 blocks for seven scores,
+four with time-varying controls; only `note("C3").gain(saw).gain("1 ~")`
+changed, because its rest now falls back to the inner `saw`. This was a
+shared orb with one run per side: it supports that removing the provider
+queries outweighs the root fill, not a stable speedup figure. Allocation
+counts and the Worklet path were not measured.
+
 ## Provenance and reproduction limits
 
 Optimization toolchain: Moon 0.1.20260920 (`914d7da`), Node 24.14.1, Python 3.14.2, Binaryen 125, WSL2 x64. Direct Moon commands used `NEW_MOON_MOD=0`.

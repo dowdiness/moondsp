@@ -250,11 +250,6 @@ fn[A, B] merge_control_kernel(
   }
   let left = a
   let children = a.transform_children(p => merge_control_kernel(p, b, merge))
-  let change = if b.entry_signature() == "" {
-    ""
-  } else {
-    "merge:" + b.entry_signature()
-  }
   make_pat(
     fn(arc) {
       let b_events = b.query(arc)
@@ -276,7 +271,42 @@ fn[A, B] merge_control_kernel(
     a.metadata.period,
     Opaque(children),
     a.metadata.scope,
-    transformed_signature(a.entry_signature(), change),
+    merged_signature(a, b.entry_signature()),
+  )
+}
+
+///|
+/// The content of `a` with controls whose content is `provider` merged in.
+fn[A] merged_signature(a : Pat[A], provider : String) -> String {
+  let change = if provider == "" { "" } else { "merge:" + provider }
+  transformed_signature(a.entry_signature(), change)
+}
+
+///|
+/// The shape and content of `merge_control_kernel(a, b, _)`, where `b` has
+/// content `provider`, without querying `b`: `bind` maps each event of `a`.
+/// Lowering uses this when buses supply the merged values.
+fn[A] bind_control_kernel(
+  a : Pat[A],
+  provider : String,
+  bind : (A) -> A,
+) -> Pat[A] {
+  if a.body is Silence {
+    return a
+  }
+  let children = a.transform_children(p => {
+    bind_control_kernel(p, provider, bind)
+  })
+  make_pat(
+    fn(arc) {
+      a
+      .query(arc)
+      .map(ae => { whole: ae.whole, part: ae.part, value: bind(ae.value), })
+    },
+    a.metadata.period,
+    Opaque(children),
+    a.metadata.scope,
+    merged_signature(a, provider),
   )
 }
 

@@ -5,7 +5,7 @@ Keep decision-bearing results here, not a file per benchmark run. These summarie
 | Summary | Use it for |
 |---|---|
 | [Browser numeric updates](2026-10-23-browser-updates.md) | Mount-bound updates, transitive Wasm allocation counts, biquad scratch removal, primitive diagnostics, and measured AudioWorklet timing limits. |
-| [Pattern allocation and onset investigations](2026-10-02-pattern-allocation-summary.md) | Adopted allocation reductions, the comparison baselines, rejected constructor caching, exact PCM/origin checks and profiler-attribution corrections. |
+| [Pattern allocation and onset investigations](2026-10-02-pattern-allocation-summary.md) | Adopted allocation reductions, the comparison baselines, rejected constructor caching, exact PCM/origin checks, profiler-attribution corrections and the query cost of root-filled control values. |
 | [Playback and source origins](2026-09-24-playback-and-origin-summary.md) | Player/admission bounds, measured control latency, source-identity experiments and visualization evidence limits. |
 | [DSP, graph controls and external authoring](2026-09-20-dsp-and-authoring-summary.md) | Sine scratch allocation, control-update costs, constant-fold barriers, delay-line reset and authoring baselines. |
 

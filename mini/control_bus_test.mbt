@@ -63,246 +63,196 @@ fn bus_with_ramp(
 }
 
 ///|
-/// Play `doc` in blocks of `step` cycles. In every block, each sounding voice
-/// reads its gain bus at the block start. The pattern's own gain for that
-/// voice at that time must equal both the queried bus and the compiled signal.
-fn bus_follow(
-  doc : @pattern.PatternDoc[@pattern.ControlMap],
-  step : @pattern.Rational,
-) -> String raise {
-  let snapshot = doc.lower()
+/// An onset with its controls in key order.
+fn bus_onset_text(event : @pattern.Event[@pattern.ControlMap]) -> String {
+  let controls = []
+  event.value.each((key, value) => controls.push("\{key}=\{value}"))
+  controls.sort()
+  "\{event.whole} \{controls}"
+}
+
+///|
+/// Play `source` in blocks of `step` cycles for four cycles and count the
+/// onsets whose controls differ between the bus-derived document path and
+/// Mini's runtime pattern, which merges controls by querying them.
+fn bus_runtime_agreement(source : String, step : @pattern.Rational) -> String {
+  let runtime = match @mini.parse(source) {
+    Ok(pat) => pat
+    Err(message) => abort(message)
+  }
+  let snapshot = match @mini.parse_snapshot(source) {
+    Ok(snapshot) => snapshot
+    Err(message) => abort(message)
+  }
+  let onsets = (events : Array[@pattern.Event[@pattern.ControlMap]]) => {
+    let texts = events
+      .filter(event => {
+        event.whole is Some(whole) && whole.begin == event.part.begin
+      })
+      .map(bus_onset_text)
+    texts.sort()
+    texts
+  }
   let mut checked = 0
   let mut mismatched = 0
-  let mut unbound = 0
   let mut t = bus_r(0L, 1L)
   while t < bus_r(4L, 1L) {
     let arc = @pattern.TimeSpan(t, t + step)
-    for sourced in snapshot.query_sourced_events(arc) {
-      let event = sourced.event()
-      guard event.whole is Some(_) && event.part.begin == arc.begin else {
-        continue
-      }
-      let expected = event.value.get("gain")
-      match sourced.buses().reader("gain") {
-        None => unbound += 1
-        Some(read) => {
-          checked += 1
-          let signal = read(arc.begin.num, arc.begin.den)
-          let signal = if signal.is_nan() { None } else { Some(signal) }
-          if signal != expected {
-            mismatched += 1
-          }
-        }
+    let expected = onsets(runtime.query(arc))
+    for text in onsets(snapshot.pat().query(arc)) {
+      checked += 1
+      if !expected.contains(text) {
+        mismatched += 1
       }
     }
     t = t + step
   }
-  "checked=\{checked} mismatched=\{mismatched} unbound=\{unbound}"
+  "checked=\{checked} mismatched=\{mismatched}"
 }
 
 ///|
-test "control bus follows the pattern under every combinator" {
-  let reverse = @pattern.TimeTransform::Reverse
-  let cases : Array[(String, @pattern.PatternDoc[@pattern.ControlMap])] = [
-    (
-      "slow 3",
-      bus_with_ramp("note(\"60 64\")", "a").slow(
-        id=bus_id("op"),
-        factor=bus_r(3L, 1L),
-      ),
-    ),
-    (
-      "fast 2",
-      bus_with_ramp("note(\"60 64\")", "a").fast(
-        id=bus_id("op"),
-        factor=bus_r(2L, 1L),
-      ),
-    ),
-    ("rev", bus_with_ramp("note(\"60 64\")", "a").rev(id=bus_id("op"))),
-    (
-      "euclid",
-      bus_with_ramp("note(\"60 64\")", "a").euclid(id=bus_id("op"), k=3, n=8),
-    ),
-    (
-      "every",
-      bus_with_ramp("note(\"60 64\")", "a").every(
-        id=bus_id("op"),
-        n=2,
-        transform=reverse,
-      ),
-    ),
-    (
-      "degrade",
-      bus_with_ramp("note(\"60*4\")", "a").degrade_by(id=bus_id("op"), p=0.5),
-    ),
-    (
-      "jux",
-      bus_with_ramp("note(\"60 64\")", "a").jux(
-        id=bus_id("op"),
-        transform=reverse,
-      ),
-    ),
-    (
-      "sequence",
-      @pattern.PatternDoc::sequence(id=bus_id("op"), docs=[
-        bus_with_ramp("note(\"60 64\")", "a"),
-        bus_doc("note(\"67\")"),
-      ]),
-    ),
-    (
-      "stack",
-      @pattern.PatternDoc::stack(id=bus_id("op"), docs=[
-        bus_with_ramp("note(\"60 64\")", "a"),
-        bus_doc("note(\"67\")"),
-      ]),
-    ),
-    (
-      "nested",
-      @pattern.PatternDoc::sequence(id=bus_id("seq"), docs=[
-        bus_with_ramp("note(\"60 64\")", "a").slow(
-          id=bus_id("slow"),
-          factor=bus_r(2L, 1L),
-        ),
-        bus_doc("note(\"67\")"),
-      ]).fast(id=bus_id("fast"), factor=bus_r(3L, 1L)),
-    ),
-    (
-      "chord jux",
-      bus_with_ramp("chord(\"Dm9 Bbmaj7\")", "a")
-      .slow(id=bus_id("slow"), factor=bus_r(2L, 1L))
-      .jux(id=bus_id("jux"), transform=reverse),
-    ),
-    // Discrete steps held across a long note: the value changes mid-note.
-    (
-      "steps under slow 3",
-      bus_with("note(\"60\")", "a", bus_steps("st", [0.3, 0.6])).slow(
-        id=bus_id("op"),
-        factor=bus_r(3L, 1L),
-      ),
-    ),
-    (
-      "steps rev every 2 under jux",
-      bus_with(
-        "note(\"60 64 67\")",
-        "a",
-        bus_steps("st", [0.1, 0.2, 0.3]).every(
-          id=bus_id("ev"),
-          n=2,
-          transform=reverse,
-        ),
-      ).jux(id=bus_id("op"), transform=reverse),
-    ),
-    (
-      "euclid steps, weighted",
-      bus_with(
-        "note(\"60*8\")",
-        "a",
-        @pattern.PatternDoc::sequence_weighted(
-          id=bus_id("w"),
-          docs=[
-            bus_steps("x", [0.2]).euclid(id=bus_id("eu"), k=3, n=8),
-            bus_steps("y", [0.9, 0.7]),
-          ],
-          weights=[3, 1],
-        ),
-      ),
-    ),
-    (
-      "stack of steps and ramp",
-      bus_with(
-        "note(\"60 64\")",
-        "a",
-        @pattern.PatternDoc::stack(id=bus_id("stk"), docs=[
-          bus_ramp("r"),
-          bus_steps("st", [0.4]).euclid(id=bus_id("eu"), k=1, n=4),
-        ]),
-      ).fast(id=bus_id("op"), factor=bus_r(3L, 2L)),
-    ),
-    // The provider is itself a merge whose left side never sets gain.
-    (
-      "nested merge provider",
-      bus_with(
-        "note(\"60 64\")",
-        "a",
-        @pattern.PatternDoc::merge_control(
-          id=bus_id("inner"),
-          left=@pattern.PatternDoc::pure(
-            id=bus_id("lpf"),
-            value=@pattern.ControlMap::single("lpf", 800.0),
-          ),
-          right=bus_steps("st", [0.3, 0.6, 0.9]),
-        ),
-      ),
-    ),
-    (
-      "mini gain on chord jux",
-      bus_doc("chord(\"Dm9 Bbmaj7\").gain(0.5).slow(2).jux(rev)"),
-    ),
+/// Wherever the runtime pattern's merge is well defined, the document path's
+/// bus-derived values agree with it at every onset. The runtime pattern reads
+/// a continuous control at the query start, so those sources only play in
+/// blocks that start at every onset. The two paths drop different events
+/// under `degradeBy` (their seeds differ), so it is left out.
+test "bus-derived controls agree with the queried runtime pattern" {
+  let stepped = [
+    "note(\"60 64\").gain(\"0.3 0.6 0.9\").slow(3)", "note(\"60 64 67\").gain(\"0.1 0.2 0.3\").every(2, rev).jux(rev)",
+    "note(\"60*8\").gain(\"0.2(3,8)@3 [0.9 0.7]\")", "chord(\"Dm9 Bbmaj7\").gain(0.5).slow(2).jux(rev)",
+    "stack(note(\"60\").gain(\"0.2 0.8\"), note(\"67 64\").pan(\"-1 1\"))", "note(\"60 64\").gain(\"0.3 0.6\").rev()",
+  ]
+  let continuous = [
+    "note(\"60 64\").gain(saw).fast(2)", "note(\"60 64\").lpf(saw.range(200, 800).slow(3)).slow(2)",
+    "stack(note(\"60\").gain(\"0.2 0.8\"), note(\"67\").gain(sine))",
   ]
   let lines = []
-  for case in cases {
+  for source in stepped {
     for step in [bus_r(1L, 64L), bus_r(1L, 7L), bus_r(3L, 5L)] {
       lines.push(
-        "\{case.0} step=\{step.num}/\{step.den}: \{bus_follow(case.1, step)}",
+        "\{step.num}/\{step.den} \{source}: \{bus_runtime_agreement(source, step)}",
       )
     }
+  }
+  for source in continuous {
+    lines.push(
+      "1/64 \{source}: \{bus_runtime_agreement(source, bus_r(1L, 64L))}",
+    )
   }
   inspect(
     lines.join("\n"),
     content=(
-      #|slow 3 step=1/64: checked=256 mismatched=0 unbound=0
-      #|slow 3 step=1/7: checked=28 mismatched=0 unbound=0
-      #|slow 3 step=3/5: checked=7 mismatched=0 unbound=0
-      #|fast 2 step=1/64: checked=256 mismatched=0 unbound=0
-      #|fast 2 step=1/7: checked=28 mismatched=0 unbound=0
-      #|fast 2 step=3/5: checked=7 mismatched=0 unbound=0
-      #|rev step=1/64: checked=256 mismatched=256 unbound=0
-      #|rev step=1/7: checked=28 mismatched=28 unbound=0
-      #|rev step=3/5: checked=7 mismatched=7 unbound=0
-      #|euclid step=1/64: checked=96 mismatched=84 unbound=0
-      #|euclid step=1/7: checked=12 mismatched=8 unbound=0
-      #|euclid step=3/5: checked=4 mismatched=2 unbound=0
-      #|every step=1/64: checked=256 mismatched=128 unbound=0
-      #|every step=1/7: checked=28 mismatched=14 unbound=0
-      #|every step=3/5: checked=7 mismatched=3 unbound=0
-      #|degrade step=1/64: checked=176 mismatched=0 unbound=0
-      #|degrade step=1/7: checked=19 mismatched=0 unbound=0
-      #|degrade step=3/5: checked=4 mismatched=0 unbound=0
-      #|jux step=1/64: checked=512 mismatched=256 unbound=0
-      #|jux step=1/7: checked=56 mismatched=28 unbound=0
-      #|jux step=3/5: checked=14 mismatched=7 unbound=0
-      #|sequence step=1/64: checked=128 mismatched=124 unbound=128
-      #|sequence step=1/7: checked=16 mismatched=12 unbound=12
-      #|sequence step=3/5: checked=4 mismatched=2 unbound=3
-      #|stack step=1/64: checked=256 mismatched=0 unbound=256
-      #|stack step=1/7: checked=28 mismatched=0 unbound=28
-      #|stack step=3/5: checked=7 mismatched=0 unbound=7
-      #|nested step=1/64: checked=128 mismatched=124 unbound=128
-      #|nested step=1/7: checked=16 mismatched=12 unbound=12
-      #|nested step=3/5: checked=4 mismatched=2 unbound=3
-      #|chord jux step=1/64: checked=2432 mismatched=1280 unbound=0
-      #|chord jux step=1/7: checked=266 mismatched=140 unbound=0
-      #|chord jux step=3/5: checked=66 mismatched=35 unbound=0
-      #|steps under slow 3 step=1/64: checked=256 mismatched=0 unbound=0
-      #|steps under slow 3 step=1/7: checked=28 mismatched=0 unbound=0
-      #|steps under slow 3 step=3/5: checked=7 mismatched=0 unbound=0
-      #|steps rev every 2 under jux step=1/64: checked=512 mismatched=0 unbound=0
-      #|steps rev every 2 under jux step=1/7: checked=56 mismatched=0 unbound=0
-      #|steps rev every 2 under jux step=3/5: checked=14 mismatched=0 unbound=0
-      #|euclid steps, weighted step=1/64: checked=136 mismatched=0 unbound=120
-      #|euclid steps, weighted step=1/7: checked=16 mismatched=0 unbound=12
-      #|euclid steps, weighted step=3/5: checked=5 mismatched=0 unbound=2
-      #|stack of steps and ramp step=1/64: checked=256 mismatched=0 unbound=0
-      #|stack of steps and ramp step=1/7: checked=28 mismatched=0 unbound=0
-      #|stack of steps and ramp step=3/5: checked=7 mismatched=0 unbound=0
-      #|nested merge provider step=1/64: checked=256 mismatched=0 unbound=0
-      #|nested merge provider step=1/7: checked=28 mismatched=0 unbound=0
-      #|nested merge provider step=3/5: checked=7 mismatched=0 unbound=0
-      #|mini gain on chord jux step=1/64: checked=2432 mismatched=0 unbound=0
-      #|mini gain on chord jux step=1/7: checked=266 mismatched=0 unbound=0
-      #|mini gain on chord jux step=3/5: checked=66 mismatched=0 unbound=0
+      #|1/64 note("60 64").gain("0.3 0.6 0.9").slow(3): checked=3 mismatched=0
+      #|1/7 note("60 64").gain("0.3 0.6 0.9").slow(3): checked=3 mismatched=0
+      #|3/5 note("60 64").gain("0.3 0.6 0.9").slow(3): checked=3 mismatched=0
+      #|1/64 note("60 64 67").gain("0.1 0.2 0.3").every(2, rev).jux(rev): checked=24 mismatched=0
+      #|1/7 note("60 64 67").gain("0.1 0.2 0.3").every(2, rev).jux(rev): checked=24 mismatched=0
+      #|3/5 note("60 64 67").gain("0.1 0.2 0.3").every(2, rev).jux(rev): checked=26 mismatched=0
+      #|1/64 note("60*8").gain("0.2(3,8)@3 [0.9 0.7]"): checked=32 mismatched=0
+      #|1/7 note("60*8").gain("0.2(3,8)@3 [0.9 0.7]"): checked=32 mismatched=0
+      #|3/5 note("60*8").gain("0.2(3,8)@3 [0.9 0.7]"): checked=34 mismatched=0
+      #|1/64 chord("Dm9 Bbmaj7").gain(0.5).slow(2).jux(rev): checked=38 mismatched=0
+      #|1/7 chord("Dm9 Bbmaj7").gain(0.5).slow(2).jux(rev): checked=38 mismatched=0
+      #|3/5 chord("Dm9 Bbmaj7").gain(0.5).slow(2).jux(rev): checked=48 mismatched=0
+      #|1/64 stack(note("60").gain("0.2 0.8"), note("67 64").pan("-1 1")): checked=12 mismatched=0
+      #|1/7 stack(note("60").gain("0.2 0.8"), note("67 64").pan("-1 1")): checked=12 mismatched=0
+      #|3/5 stack(note("60").gain("0.2 0.8"), note("67 64").pan("-1 1")): checked=14 mismatched=0
+      #|1/64 note("60 64").gain("0.3 0.6").rev(): checked=8 mismatched=0
+      #|1/7 note("60 64").gain("0.3 0.6").rev(): checked=8 mismatched=0
+      #|3/5 note("60 64").gain("0.3 0.6").rev(): checked=9 mismatched=0
+      #|1/64 note("60 64").gain(saw).fast(2): checked=16 mismatched=0
+      #|1/64 note("60 64").lpf(saw.range(200, 800).slow(3)).slow(2): checked=4 mismatched=0
+      #|1/64 stack(note("60").gain("0.2 0.8"), note("67").gain(sine)): checked=8 mismatched=0
     ),
   )
+}
+
+///|
+/// The first onset of `source` queried over `[0, end)`: its `key`, and its bus
+/// read at each of `times`.
+fn bus_first_onset(
+  source : String,
+  key : String,
+  end : @pattern.Rational,
+  times : Array[@pattern.Rational],
+) -> (Double?, Array[Double]) {
+  let snapshot = match @mini.parse_snapshot(source) {
+    Ok(snapshot) => snapshot
+    Err(message) => abort(message)
+  }
+  let onset = snapshot.query_sourced_events(
+      @pattern.TimeSpan(bus_r(0L, 1L), end),
+    )[0]
+  let read = match onset.buses().reader(key) {
+    Some(read) => read
+    None => abort("no bus for \{key}")
+  }
+  (onset.event().value.get(key), times.map(t => read(t.num, t.den)))
+}
+
+///|
+test "a key set twice falls back to the inner value where the outer one rests" {
+  let times = [bus_r(1L, 4L), bus_r(3L, 4L)]
+  // The outer "1 ~" rests over [1/2, 1), where saw reads t.
+  @debug.assert_eq(
+    bus_first_onset(
+      "note(\"60\").gain(saw).gain(\"1 ~\")",
+      "gain",
+      bus_r(1L, 8L),
+      times,
+    ),
+    (Some(1.0), [1.0, 0.75]),
+  )
+  // Resting at the onset must not bind the voice to the inner bus alone.
+  @debug.assert_eq(
+    bus_first_onset(
+      "note(\"60\").gain(saw).gain(\"~ 1\")",
+      "gain",
+      bus_r(1L, 8L),
+      times,
+    ),
+    (Some(0.0), [0.25, 1.0]),
+  )
+}
+
+///|
+test "onset values under rev do not depend on the query length" {
+  // Reversed, the onset at 0 reads the step just before the note's end.
+  let source = "note(\"60\").gain(\"0.1 0.2\").rev()"
+  for end in [bus_r(1L, 8L), bus_r(1L, 3L), bus_r(1L, 1L)] {
+    @debug.assert_eq(
+      bus_first_onset(source, "gain", end, [bus_r(0L, 1L)]),
+      (Some(0.2), [0.2]),
+    )
+  }
+}
+
+///|
+test "a provider that is itself a merge sets the key wherever its left has an event" {
+  // The inner left side sets only lpf; the gain steps still apply.
+  let snapshot = bus_with(
+    "note(\"60 64\")",
+    "a",
+    @pattern.PatternDoc::merge_control(
+      id=bus_id("inner"),
+      left=@pattern.PatternDoc::pure(
+        id=bus_id("lpf"),
+        value=@pattern.ControlMap::single("lpf", 800.0),
+      ),
+      right=bus_steps("st", [0.3, 0.6, 0.9]),
+    ),
+  ).lower()
+  let events = snapshot.query_sourced_events(
+    @pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 1L)),
+  )
+  @debug.assert_eq(
+    events.map(event => {
+      (event.event().value.get("gain"), event.event().value.get("lpf"))
+    }),
+    [(Some(0.3), Some(800.0)), (Some(0.6), Some(800.0))],
+  )
+  let read = events[1].buses().reader("gain").unwrap()
+  @debug.assert_eq(read(3L, 4L), 0.9)
 }
 
 ///|

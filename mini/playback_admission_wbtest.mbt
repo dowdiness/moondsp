@@ -84,6 +84,20 @@ test "bounded recursive descent rejects depth without relying on the pre-scan" {
 }
 
 ///|
+/// An event with its controls in key order: which merge set a key first
+/// does not change the event.
+fn admission_event_text(event : @pattern.Event[@pattern.ControlMap]) -> String {
+  let controls = []
+  event.value.each((key, value) => controls.push("\{key}=\{value}"))
+  controls.sort()
+  let whole = match event.whole {
+    Some(span) => span.to_string()
+    None => "-"
+  }
+  "\{whole} \{event.part} \{controls.join(",")}"
+}
+
+///|
 test "generated transform compositions respect estimated events and preserve output" {
   let atoms = [
     "note(\"60 64\")", "note(\"60*2 ~\")", "chord(\"C G7\").slow(2)", "stack(note(\"60\"),note(\"67\"))",
@@ -123,8 +137,8 @@ test "generated transform compositions respect estimated events and preserve out
               work.estimate(width.to_double()).events,
             )
             assert_eq(
-              snapshot.pat().query(arc).map(event => event.to_string()),
-              events.map(event => event.to_string()),
+              snapshot.pat().query(arc).map(admission_event_text),
+              events.map(admission_event_text),
             )
           }
         }

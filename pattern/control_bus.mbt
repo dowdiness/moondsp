@@ -30,13 +30,60 @@ fn bus_binding_for(
 }
 
 ///|
-/// Keep the bindings `keys` does not override, then bind each key of `keys`
-/// that has a bus in `bus_of`, so the outermost merge wins like
-/// `ControlMap::merge`. One allocation; none when nothing changes.
-fn rebind_buses(
+/// One bus of a compiled subtree: the signal one `MergeControl` gives `key`,
+/// and how that merge writes a value into the payload.
+priv struct ControlBus[A] {
+  key : String
+  signal : BusSignal
+  apply : (A, ControlMap) -> A
+}
+
+///|
+fn[A] ControlBus::map_signal(
+  self : ControlBus[A],
+  f : (BusSignal) -> BusSignal,
+) -> ControlBus[A] {
+  { ..self, signal: f(self.signal), }
+}
+
+///|
+/// Bind each `(key, bus)` of `provided`. A key already bound to an inner bus
+/// moves to the bus in `chained` that falls back to that inner bus, so the
+/// outermost merge wins where it has a value. The binding does not depend on
+/// time, so a sounding voice keeps the right bus across rests.
+fn bind_buses(
+  bindings : FixedArray[(String, Int)],
+  provided : Array[(String, Int)],
+  chained : Map[Int, Int],
+) -> FixedArray[(String, Int)] {
+  let mut added = 0
+  for pair in provided {
+    if bus_binding_for(bindings, pair.0) is None {
+      added += 1
+    }
+  }
+  let result = FixedArray::make(bindings.length() + added, ("", 0))
+  for i, binding in bindings {
+    result[i] = match chained.get(binding.1) {
+      Some(bus) => (binding.0, bus)
+      None => binding
+    }
+  }
+  let mut next = bindings.length()
+  for pair in provided {
+    if bus_binding_for(bindings, pair.0) is None {
+      result[next] = pair
+      next += 1
+    }
+  }
+  result
+}
+
+///|
+/// Drop the bindings of the keys `keys` sets to fixed values (`jux` pan).
+fn unbind_keys(
   bindings : FixedArray[(String, Int)],
   keys : ControlMap,
-  bus_of : Map[String, Int],
 ) -> FixedArray[(String, Int)] {
   let mut kept = 0
   for binding in bindings {
@@ -44,12 +91,10 @@ fn rebind_buses(
       kept += 1
     }
   }
-  let mut bound = 0
-  keys.each((key, _) => if bus_of.contains(key) { bound += 1 })
-  if bound == 0 && kept == bindings.length() {
+  if kept == bindings.length() {
     return bindings
   }
-  let result = FixedArray::make(kept + bound, ("", 0))
+  let result = FixedArray::make(kept, ("", 0))
   let mut next = 0
   for binding in bindings {
     if keys.get(binding.0) is None {
@@ -57,18 +102,28 @@ fn rebind_buses(
       next += 1
     }
   }
-  keys.each((key, _) => {
-    if bus_of.get(key) is Some(bus) {
-      result[next] = (key, bus)
-      next += 1
-    }
-  })
   result
 }
 
 ///|
-/// For a fixed value that overrides keys without binding them (`jux` pan).
-let no_buses : Map[String, Int] = {}
+/// Set each bound key of `value` to its bus at `time`. A key whose bus has no
+/// value there keeps the payload's own value.
+fn[A] fill_bound_controls(
+  value : A,
+  bindings : FixedArray[(String, Int)],
+  buses : Array[ControlBus[A]],
+  time : Rational,
+) -> A {
+  let mut result = value
+  for binding in bindings {
+    let bus = buses[binding.1]
+    let v = bus.signal.eval(time.num, time.den, false)
+    if !v.is_nan() {
+      result = (bus.apply)(result, ControlMap::single(binding.0, v))
+    }
+  }
+  result
+}
 
 ///|
 fn shift_bus_bindings(
@@ -130,7 +185,7 @@ pub fn EventBuses::placed(
 ///|
 /// `signal` on this event's clock.
 fn EventBuses::place(self : EventBuses, signal : BusSignal) -> BusSignal {
-  let { origin, rate } = self.placement
+  let { origin, rate, } = self.placement
   let scaled : BusSignal = if rate == Rational::from_int(1) {
     signal
   } else {

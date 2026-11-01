@@ -32,11 +32,12 @@ priv enum PatternDocNode[A] {
   DegradeBy(@identity.PatternNodeId, Double, Int)
   Every(@identity.PatternNodeId, Int, TimeTransform)
   Jux(@identity.PatternNodeId, TimeTransform, (A, ControlMap) -> A)
-  /// The last function views the payload as controls, to derive buses.
+  /// The functions write controls into the payload and view it as
+  /// controls, to derive buses.
   MergeControl(
     @identity.PatternNodeId,
     @identity.PatternNodeId,
-    (A, A) -> A,
+    (A, ControlMap) -> A,
     (A) -> ControlMap
   )
   Sequence(Array[@identity.PatternNodeId])
@@ -791,6 +792,56 @@ fn[A, O] ScopedValue::prepend(
 }
 
 ///|
+/// Give each bound key the value of its bus at the start of the event's
+/// fragment. `buses` must be on this pattern's clock; child bodies share it.
+fn[A, O] Pat::fill_bound_controls(
+  self : Pat[ScopedValue[A, O]],
+  buses : Array[ControlBus[A]],
+) -> Pat[ScopedValue[A, O]] {
+  if buses.is_empty() {
+    return self
+  }
+  let body : PatBody[ScopedValue[A, O]] = match self.body {
+    Silence => Silence
+    Opaque(children) =>
+      Opaque(children.map(child => child.fill_bound_controls(buses)))
+    Overlay(children) =>
+      Overlay(children.map(child => child.fill_bound_controls(buses)))
+  }
+  make_pat(
+    fn(arc) {
+      self
+      .query(arc)
+      .map(event => {
+        let value = event.value
+        if value.bindings.is_empty() {
+          return event
+        }
+        let filled = fill_bound_controls(
+          value.value,
+          value.bindings,
+          buses,
+          event.part.begin,
+        )
+        { ..event, value: value.remap(filled, value.scope), }
+      })
+    },
+    self.metadata.period,
+    body,
+    self.metadata.scope,
+    self.metadata.content,
+  )
+}
+
+///|
+/// This subtree as a snapshot root: bound keys carry their bus values.
+fn[A, O] CompiledPattern::at_root(
+  self : CompiledPattern[A, O],
+) -> CompiledPattern[A, O] {
+  self.transform(pat => pat.fill_bound_controls(self.buses))
+}
+
+///|
 /// Exact lowering creates a fresh ScopedValue for every queried atom, and each
 /// transform remaps it. Pure/Runtime cannot enter that lowering. Capture on those
 /// owned query values without another array, event, origin, or option allocation.
@@ -1012,14 +1063,14 @@ fn[A, O] CompiledEntry::CompiledEntry(
 priv struct CompiledPattern[A, O] {
   pat : Pat[ScopedValue[A, O]]
   entries : Array[CompiledEntry[A, O]]
-  buses : Array[BusSignal]
+  buses : Array[ControlBus[A]]
 }
 
 ///|
 fn[A, O] CompiledPattern::CompiledPattern(
   pat : Pat[ScopedValue[A, O]],
   entries : Array[CompiledEntry[A, O]],
-  buses? : Array[BusSignal] = [],
+  buses? : Array[ControlBus[A]] = [],
 ) -> CompiledPattern[A, O] {
   { pat, entries, buses, }
 }
@@ -1030,7 +1081,7 @@ fn[A, O] CompiledPattern::map_buses(
   self : CompiledPattern[A, O],
   f : (BusSignal) -> BusSignal,
 ) -> CompiledPattern[A, O] {
-  { ..self, buses: self.buses.map(f), }
+  { ..self, buses: self.buses.map(bus => bus.map_signal(f)), }
 }
 
 ///|
@@ -1057,12 +1108,12 @@ fn[A, O] CompiledPattern::shift_buses(
 fn[A, O] concat_child_buses(
   children : Array[CompiledPattern[A, O]],
   wrap : (Int, BusSignal) -> BusSignal,
-) -> (Array[CompiledPattern[A, O]], Array[BusSignal]) {
-  let buses : Array[BusSignal] = []
+) -> (Array[CompiledPattern[A, O]], Array[ControlBus[A]]) {
+  let buses : Array[ControlBus[A]] = []
   let shifted = children.mapi((index, child) => {
     let offset = buses.length()
-    for signal in child.buses {
-      buses.push(wrap(index, signal))
+    for bus in child.buses {
+      buses.push(bus.map_signal(signal => wrap(index, signal)))
     }
     child.shift_buses(offset)
   })
@@ -1226,11 +1277,15 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
       lower(child)
       .transform(pat => prepend(pat.rev()))
       .map_buses(signal => Rev(signal))
-    // A value the map replaces no longer follows its buses: a bus would
-    // undo the mapping.
-    FilterMap(child, f) =>
-      lower(child).transform(pat => {
-        pat.filter_map_payload(
+    // The map sees the child's controls with their bus values, on the
+    // child's clock. A value the map replaces no longer follows its buses:
+    // a bus would undo the mapping.
+    FilterMap(child, f) => {
+      let child = lower(child)
+      child.transform(pat => {
+        pat
+        .fill_bound_controls(child.buses)
+        .filter_map_payload(
           value => {
             f(value.value).map(mapped => {
               let bindings = if physical_equal(mapped, value.value) {
@@ -1244,6 +1299,7 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
           "",
         )
       })
+    }
     Euclid(child, k, n, rotation) => {
       let child = lower(child)
       let compiled = CompiledPattern::single_material(
@@ -1280,8 +1336,10 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
       let buses = if n <= 0 {
         child.buses
       } else {
-        child.buses.map(signal => {
-          Every(Int64::from_int(n), signal, signal.transformed(transform))
+        child.buses.map(bus => {
+          bus.map_signal(signal => {
+            Every(Int64::from_int(n), signal, signal.transformed(transform))
+          })
         })
       }
       CompiledPattern(pat, entries, buses~)
@@ -1301,29 +1359,41 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
           value.remap(
             merge(value.value, pan),
             value.scope,
-            bindings=rebind_buses(value.bindings, pan, no_buses),
+            bindings=unbind_keys(value.bindings, pan),
           )
         },
         "",
       ).map_payload(value => value.remap(value.value, scope))
       let buses = child.buses.copy()
-      for signal in child.buses {
-        buses.push(signal.transformed(transform))
+      for bus in child.buses {
+        buses.push(bus.map_signal(signal => signal.transformed(transform)))
       }
       CompiledPattern(pat, opaque_compiled_entries(pat, id), buses~)
     }
-    // One new bus per key the provider sets, after the left side's buses.
-    MergeControl(left_id, right_id, merge, controls_of) => {
+    // One new bus per key the provider sets, after the left side's buses,
+    // plus one per inner bus of that key that falls back to it. The merged
+    // values come from the buses at the snapshot root, on its clock, so the
+    // provider is never queried.
+    MergeControl(left_id, right_id, apply, controls_of) => {
       let left = lower(left_id)
       let keys = []
       control_keys(nodes, right_id, controls_of, keys)
       let buses = left.buses.copy()
-      let bus_of : Map[String, Int] = Map([])
+      let provided : Array[(String, Int)] = []
+      let chained : Map[Int, Int] = Map([])
       for key in keys {
-        bus_of[key] = buses.length()
-        buses.push(compile_signal(nodes, right_id, Some(key), controls_of))
+        let signal = compile_signal(nodes, right_id, Some(key), controls_of)
+        provided.push((key, buses.length()))
+        buses.push({ key, signal, apply, })
+        for inner, bus in left.buses {
+          if bus.key == key {
+            chained[inner] = buses.length()
+            buses.push({ key, signal: Stack([bus.signal, signal]), apply, })
+          }
+        }
       }
-      // Control providers need no primary source atom or reference binding.
+      // Control providers need no primary source atom or reference binding;
+      // lowering one only gives the merge's content signature.
       let right : CompiledPattern[A, Unit] = lower_pattern_node_cached(
         nodes,
         right_id,
@@ -1335,17 +1405,16 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
       let scope = pattern_source_path_for_opaque_children(nodes, id, [
         left_id, right_id,
       ])
-      let pat = merge_control_kernel(
-        left.pat,
-        right.pat.map_payload(erase_value),
-        (value, control) => {
-          value.remap(
-            merge(value.value, control),
-            value.scope,
-            bindings=rebind_buses(value.bindings, controls_of(control), bus_of),
-          )
-        },
-      ).map_payload(value => value.remap(value.value, scope))
+      // Events of one atom share their bindings, so reuse the last result.
+      let mut last_in = no_bus_bindings
+      let mut last_out = bind_buses(no_bus_bindings, provided, chained)
+      let pat = bind_control_kernel(left.pat, right.pat.entry_signature(), value => {
+        if !physical_equal(value.bindings, last_in) {
+          last_in = value.bindings
+          last_out = bind_buses(value.bindings, provided, chained)
+        }
+        value.remap(value.value, scope, bindings=last_out)
+      })
       let entries = pat.entries()
       CompiledPattern(
         pat,
@@ -1788,14 +1857,14 @@ pub fn[A] PatternDoc::lower_with_origins(
     cache.general,
     {},
     End,
-  )
+  ).at_root()
   {
     root: self.root,
     revision: self.revision,
     pat: compiled.pat.map_payload(erase_value),
     sourced: compiled.pat,
     entry_sourced: compiled.entries,
-    buses: compiled.buses,
+    buses: compiled.buses.map(bus => bus.signal),
   }
 }
 
@@ -2026,14 +2095,14 @@ pub fn[A] PatternDoc::lower_with_cache(
     cache.general,
     {},
     End,
-  )
+  ).at_root()
   {
     root: self.root,
     revision: self.revision,
     pat: compiled.pat.map_payload(erase_value),
     sourced: compiled.pat,
     entry_sourced: compiled.entries,
-    buses: compiled.buses,
+    buses: compiled.buses.map(bus => bus.signal),
   }
 }
 
