@@ -129,6 +129,12 @@ test("repeated modifiers expose per-argument overrides without discarding inheri
   expect(await code(page)).toBe(original);
   await replaceCode(page, original + '.lpf(3000, 1.2)');
   await expect(page.getByRole("slider", { name: "Adjust Q", exact: true }).nth(0)).toHaveAttribute("aria-description", /Overridden/);
+  // Quoted steps and signals get no knob, but still override earlier ones.
+  await replaceCode(page, 'note("C3").gain(.6).gain("0.2 0.8").lpf(1800, .7).lpf(saw.range(200, 2000))');
+  await expect(gains).toHaveCount(1);
+  await expect(gains).toHaveAttribute("aria-description", /Overridden/);
+  await expect(cutoffs).toHaveAttribute("aria-description", /Overridden/);
+  await expect(page.getByRole("slider", { name: "Adjust Q", exact: true })).not.toHaveAttribute("aria-description", /Overridden/);
 });
 
 test("a drag with a long pause is one undo/redo, isolated from adjacent typing", async ({ page }) => {

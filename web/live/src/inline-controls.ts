@@ -37,6 +37,15 @@ function controlTargets(tree: Tree, source: string): Target[] {
       for (let child = args.firstChild; child; child = child.nextSibling) {
         if (!["LineComment", "BlockComment"].includes(child.name)) children.push(child);
       }
+      // Any argument overrides earlier knobs for its parameter, including
+      // quoted steps and signals, which get no knob of their own.
+      const argCount = children.some(child => !["(", ",", ")"].includes(child.name))
+        ? children.filter(child => child.name === ",").length + 1
+        : 0;
+      const overridden = name === "gain" ? [GAIN] : [CUTOFF, Q].slice(0, argCount);
+      for (const earlier of local) {
+        if (overridden.includes(earlier.param)) earlier.notice = "Overridden by a later modifier in this chain.";
+      }
       // Exact grammar shape excludes fractions, nested calls, missing delimiters and extra args.
       const shape = children.map(child => child.name).join(" ");
       if (shape !== "( Number )" && !(name === "lpf" && shape === "( Number , Number )")) continue;
@@ -44,9 +53,6 @@ function controlTargets(tree: Tree, source: string): Target[] {
         const value = text(number);
         if (!Number.isFinite(Number(value))) return;
         const param = name === "gain" ? GAIN : index === 0 ? CUTOFF : Q;
-        for (const earlier of local) {
-          if (earlier.param === param) earlier.notice = "Overridden by a later modifier in this chain.";
-        }
         local.push({ from: number.from, to: number.to, value, param,
           notice: param === GAIN
             ? "Source edit · every sound, including drums."
