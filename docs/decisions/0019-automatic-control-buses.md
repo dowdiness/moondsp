@@ -100,7 +100,9 @@ carries both its query form and an allocation-free `(Double) -> Double`. An
 opaque `Runtime`/`Atom` pattern is accepted only when it folds to the same
 pure value in every cycle. Event selection inside a control provider
 (`degradeBy`, `gate`, `filter_map`, `jux` on the right-hand side) is a
-compile error.
+compile error; Mini rejects `?` inside a quoted control pattern while parsing.
+A nested `MergeControl` overrides wherever its left side has an event, even
+one that does not set the key.
 
 ### 6. The voice pool follows buses once per block
 

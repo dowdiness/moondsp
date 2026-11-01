@@ -218,6 +218,22 @@ test "control bus follows the pattern under every combinator" {
         ]),
       ).fast(id=bus_id("op"), factor=bus_r(3L, 2L)),
     ),
+    // The provider is itself a merge whose left side never sets gain.
+    (
+      "nested merge provider",
+      bus_with(
+        "note(\"60 64\")",
+        "a",
+        @pattern.PatternDoc::merge_control(
+          id=bus_id("inner"),
+          left=@pattern.PatternDoc::pure(
+            id=bus_id("lpf"),
+            value=@pattern.ControlMap::single("lpf", 800.0),
+          ),
+          right=bus_steps("st", [0.3, 0.6, 0.9]),
+        ),
+      ),
+    ),
     (
       "mini gain on chord jux",
       bus_doc("chord(\"Dm9 Bbmaj7\").gain(0.5).slow(2).jux(rev)"),
@@ -279,6 +295,9 @@ test "control bus follows the pattern under every combinator" {
       #|stack of steps and ramp step=1/64: checked=256 mismatched=0 unbound=0
       #|stack of steps and ramp step=1/7: checked=28 mismatched=0 unbound=0
       #|stack of steps and ramp step=3/5: checked=7 mismatched=0 unbound=0
+      #|nested merge provider step=1/64: checked=256 mismatched=0 unbound=0
+      #|nested merge provider step=1/7: checked=28 mismatched=0 unbound=0
+      #|nested merge provider step=3/5: checked=7 mismatched=0 unbound=0
       #|mini gain on chord jux step=1/64: checked=2432 mismatched=0 unbound=0
       #|mini gain on chord jux step=1/7: checked=266 mismatched=0 unbound=0
       #|mini gain on chord jux step=3/5: checked=66 mismatched=0 unbound=0
@@ -488,6 +507,8 @@ test "Mini control arguments are range-checked and syntax-checked" {
       error("note(\"60\").gain(sin)"),
       error("note(\"60\").gain(saw.wobble(2))"),
       error("note(\"60\").gain(\"0.3 C4\")"),
+      error("note(\"60\").gain(\"0.1 0.2?\")"),
+      error("stack(note(\"60\").pan(sine), note(\"64\").pan(sine))"),
     ].join("\n"),
     content=(
       #|position 11: room() expects a send between 0 and 1
@@ -496,6 +517,8 @@ test "Mini control arguments are range-checked and syntax-checked" {
       #|position 16: expected a number, a quoted pattern, or a signal (sine, cosine, saw, isaw, tri, square), got 'sin'
       #|position 20: unknown signal method 'wobble'; use range, fast, or slow
       #|position 4: expected number
+      #|position 7: random drop ? is not supported in gain patterns
+      #|ok
     ),
   )
 }

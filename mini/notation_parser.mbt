@@ -421,6 +421,11 @@ fn NotationParser::parse_element(
         )
         applied = true
       } else if c == '?' {
+        if self.control is Some(key) {
+          raise ParseError(
+            "position \{self.pos}: random drop ? is not supported in \{key} patterns",
+          )
+        }
         let salt = self.pos
         self.pos += 1
         if self.query_work is Some(cost) {

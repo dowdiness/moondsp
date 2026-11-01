@@ -1321,7 +1321,7 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
       let bus_of : Map[String, Int] = Map([])
       for key in keys {
         bus_of[key] = buses.length()
-        buses.push(compile_signal(nodes, right_id, key, controls_of))
+        buses.push(compile_signal(nodes, right_id, Some(key), controls_of))
       }
       // Control providers need no primary source atom or reference binding.
       let right : CompiledPattern[A, Unit] = lower_pattern_node_cached(

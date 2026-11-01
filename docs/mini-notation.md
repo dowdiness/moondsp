@@ -63,7 +63,7 @@ in the browser bundle.
 <h2 id="changing-values">Values that change over time</h2>
 <p class="cheat-note">Every control above takes a number, a quoted pattern of numbers, or a signal. A sounding note follows the change, including its release.</p>
 <dl>
-  <dt>.gain("0.3 0.8")</dt><dd>step through values; quoted notation works as in <code>note("...")</code></dd>
+  <dt>.gain("0.3 0.8")</dt><dd>step through values; quoted notation works as in <code>note("...")</code>, except <code>?</code></dd>
   <dt>sine cosine saw isaw tri square</dt><dd>continuous signals from 0 to 1, one period per cycle</dd>
   <dt>.range(lo, hi)</dt><dd>map a signal onto lo–hi</dd>
   <dt>.slow(n) .fast(n)</dt><dd>stretch or speed up a signal</dd>

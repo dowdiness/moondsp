@@ -656,7 +656,7 @@ fn MiniDocBuilder::control_value_doc(
       let signature = mini_doc_id_fragment(
         "\{signal.shape.name()}:\{signal.low}:\{signal.high}:\{signal.rate.num}:\{signal.rate.den}",
       )
-      let id = self.node_id("signal", "\{key}:\{signature}")
+      let id = self.atom_id("signal", "\{key}:\{signature}")
       let shaped = match self.reuse_doc(id) {
         Some(doc) => doc
         None => @pattern.PatternDoc::continuous(id~, key~, f=signal.function())

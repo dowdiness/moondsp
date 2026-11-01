@@ -191,8 +191,10 @@ priv enum BusSignal {
   Every(Int64, BusSignal, BusSignal)
   /// The last child with a value wins, like the merge fold.
   Stack(Array[BusSignal])
-  /// Right-hand values override left where the left has an event.
-  Merge(BusSignal, BusSignal)
+  /// `(presence, left, right)`: right-hand values override left where the
+  /// left has an event. `presence` is non-`NaN` exactly there, so a left
+  /// event that does not set this key still takes the right-hand value.
+  Merge(BusSignal, BusSignal, BusSignal)
 }
 
 ///|
@@ -293,17 +295,15 @@ fn BusSignal::eval(
       }
       value
     }
-    Merge(left_signal, right_signal) => {
-      let base = left_signal.eval(num, den, left)
-      if base.is_nan() {
-        base
+    Merge(presence, left_signal, right_signal) => {
+      if presence.eval(num, den, left).is_nan() {
+        return @double.not_a_number
+      }
+      let over = right_signal.eval(num, den, left)
+      if over.is_nan() {
+        left_signal.eval(num, den, left)
       } else {
-        let over = right_signal.eval(num, den, left)
-        if over.is_nan() {
-          base
-        } else {
-          over
-        }
+        over
       }
     }
   }
@@ -423,11 +423,13 @@ fn[A] control_keys(
 }
 
 ///|
-/// Compile one key of a control-provider subtree into its signal.
+/// Compile one key of a control-provider subtree into its signal. With
+/// `key=None`, compile its presence instead: `0` wherever the subtree has an
+/// event, whichever keys it sets, and `NaN` elsewhere.
 fn[A] compile_signal(
   nodes : Map[String, PatternDocEntry[A]],
   id : @identity.PatternNodeId,
-  key : String,
+  key : String?,
   controls_of : (A) -> ControlMap,
 ) -> BusSignal raise PatternDocError {
   guard nodes.get(id.value()) is Some(entry) else {
@@ -440,9 +442,16 @@ fn[A] compile_signal(
   match entry.node {
     Reference(definition, _) =>
       compile_signal(definition.nodes, definition.root, key, controls_of)
-    Continuous(_, k, f) => if k == key { Continuous(f) } else { Const(none) }
+    Continuous(_, k, f) =>
+      match key {
+        None => Const(0.0)
+        Some(key) => if k == key { Continuous(f) } else { Const(none) }
+      }
     Pure(value) | Atom(_, value, _, _) =>
-      Const(controls_of(value).get(key).unwrap_or(none))
+      match key {
+        None => Const(0.0)
+        Some(key) => Const(controls_of(value).get(key).unwrap_or(none))
+      }
     Runtime(_) => raise UnsupportedControl(id)
     Silence => Const(none)
     Fast(child, factor) => Fast(factor.num, factor.den, sub(child))
@@ -461,7 +470,16 @@ fn[A] compile_signal(
     WeightedSequence(children, weights) =>
       Weighted(children.map(sub), weight_bounds(weights))
     Stack(children) => Stack(children.map(sub))
-    MergeControl(left, right, _, _) => Merge(sub(left), sub(right))
+    MergeControl(left, right, _, _) =>
+      match key {
+        None => sub(left)
+        Some(_) =>
+          Merge(
+            compile_signal(nodes, left, None, controls_of),
+            sub(left),
+            sub(right),
+          )
+      }
     Gate(_, _) | DegradeBy(_, _, _) | FilterMap(_, _) | Jux(_, _, _) =>
       raise UnsupportedControl(id)
   }
