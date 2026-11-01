@@ -125,3 +125,81 @@ test "a held voice follows a stretched lpf sweep through its bus" {
     ),
   )
 }
+
+///|
+/// RMS of the first block of `doc` played with gain bound to the voice frame.
+fn bus_first_block_rms(
+  doc : @pattern.PatternDoc[@pattern.ControlMap],
+) -> Double raise {
+  let ctx = @moondsp.DspContext(sample_rate=BUS_RATE, block_size=BUS_BLOCK)
+  let pool = @moondsp.BoundVoicePool(
+    @moondsp.AnalyzedGraph::analyze([
+      @moondsp.DspNode::oscillator(@moondsp.Waveform::Saw, 110.0),
+      @moondsp.DspNode::output(0),
+    ]),
+    ctx,
+    @moondsp.ControlBindingBuilder().bind_voice(key="gain", param=Gain),
+    max_voices=4,
+  )
+  let scheduler = @scheduler.PatternScheduler(bpm=60.0, ctx~, instruments=[
+    (@scheduler.InstrumentSelector::AllEvents, pool),
+  ])
+  scheduler.queue_pattern_snapshot(doc.lower())
+  let left = @moondsp.AudioBuffer::filled(BUS_BLOCK)
+  let right = @moondsp.AudioBuffer::filled(BUS_BLOCK)
+  scheduler.render_block(left, right)
+  let mut energy = 0.0
+  for i in 0..<BUS_BLOCK {
+    energy += left.get(i) * left.get(i)
+  }
+  (energy / BUS_BLOCK.to_double()).sqrt()
+}
+
+///|
+test "a voice starts from its bus value, which rev defines" {
+  // Reversed, the second slot's note sounds first. Its bus reads the step
+  // just before the slot's end (0.9); the slot's own query samples its
+  // start (0.1).
+  let doc = (gain : @pattern.PatternDoc[@pattern.ControlMap]) => {
+    @pattern.PatternDoc::sequence(id=bus_id("seq"), docs=[
+      @pattern.PatternDoc::control_atom(
+        id=bus_id("other"),
+        key="gain",
+        value=0.0,
+      ),
+      @pattern.PatternDoc::merge_control(
+        id=bus_id("merge"),
+        left=@pattern.PatternDoc::control_atom(
+          id=bus_id("note"),
+          key="note",
+          value=60.0,
+        ),
+        right=gain,
+      ),
+    ]).rev(id=bus_id("rev"))
+  }
+  let steps = bus_first_block_rms(
+    doc(
+      @pattern.PatternDoc::sequence(id=bus_id("steps"), docs=[
+        @pattern.PatternDoc::pure(
+          id=bus_id("low"),
+          value=@pattern.ControlMap::single("gain", 0.1),
+        ),
+        @pattern.PatternDoc::pure(
+          id=bus_id("high"),
+          value=@pattern.ControlMap::single("gain", 0.9),
+        ),
+      ]),
+    ),
+  )
+  let fixed = bus_first_block_rms(
+    doc(
+      @pattern.PatternDoc::pure(
+        id=bus_id("fixed"),
+        value=@pattern.ControlMap::single("gain", 0.9),
+      ),
+    ),
+  )
+  assert_true(fixed > 0.0)
+  inspect((steps / fixed * 100.0).round() / 100.0, content="1")
+}

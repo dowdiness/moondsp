@@ -121,11 +121,13 @@ test "tempo follows remaining musical duration and preserves physical deadlines"
     @pattern.Rational::from_int(24),
   )
   let physical = pool.note_on_controls({}).unwrap()
-  sched.push_active_note_until(
+  sched
+  .push_active_note_until(
     0,
     physical,
     @scheduler.PerformanceTime::PerformanceTime(1536L),
   )
+  .unwrap()
   for _ in 0..<10 {
     sched.process_song_block(pat, left, right)
   }

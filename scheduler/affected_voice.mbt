@@ -48,19 +48,24 @@ pub fn SongVoiceScope::layer(
 }
 
 ///|
+/// Graph controls for the voices of one instrument: node indices only mean
+/// something for that instrument's graph.
 pub struct VoiceControlBatch {
+  priv instrument : Int
   priv controls : Array[@moondsp.GraphControl]
 }
 
 ///|
+/// `instrument` is an index into the scheduler's instrument list.
 pub fn VoiceControlBatch::VoiceControlBatch(
+  instrument~ : Int,
   first : @moondsp.GraphControl,
   rest? : Array[@moondsp.GraphControl] = [],
 ) -> VoiceControlBatch {
   let controls = Array(capacity=rest.length() + 1)
   controls.push(first)
   controls.append(rest)
-  { controls, }
+  { instrument, controls, }
 }
 
 ///|
@@ -103,7 +108,11 @@ fn PatternScheduler::apply_matching_voice_effect_result(
         ),
       })
     Retune(batch) => {
-      let voices = self.active_notes.matching_voices(matches, self.pools)
+      let voices = self.active_notes.matching_voices(
+        matches,
+        batch.instrument,
+        self.pools,
+      )
       match @moondsp.apply_controls_to_voices(voices, batch.borrow()) {
         Err(error) => Err(error)
         Ok(_) =>

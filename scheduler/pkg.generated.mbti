@@ -17,6 +17,14 @@ import {
 // Errors
 
 // Types and methods
+pub(all) enum ActiveNoteError {
+  UnknownInstrument(Int)
+  Transport(@transport.TransportError)
+} derive(Eq, @debug.Debug)
+pub fn ActiveNoteError::equal(Self, Self) -> Bool
+pub fn ActiveNoteError::not_equal(Self, Self) -> Bool
+pub fn ActiveNoteError::to_repr(Self) -> @debug.Repr
+
 pub(all) enum ActiveVoiceEffect {
   Release
   Kill
@@ -79,8 +87,8 @@ pub fn PatternScheduler::process_block(Self, @pattern.Pat[@pattern.ControlMap], 
 pub fn PatternScheduler::process_events(Self, Array[@pattern.Event[@pattern.ControlMap]], @pattern.TimeSpan) -> Unit
 pub fn PatternScheduler::process_section_block(Self, @song.Section[@pattern.ControlMap], @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::process_song_block(Self, @song.Song[@pattern.ControlMap], @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
-pub fn PatternScheduler::push_active_note(Self, Int, @voice.VoiceHandle, @pattern.Rational) -> Result[Unit, @transport.TransportError]
-pub fn PatternScheduler::push_active_note_until(Self, Int, @voice.VoiceHandle, PerformanceTime) -> Unit
+pub fn PatternScheduler::push_active_note(Self, Int, @voice.VoiceHandle, @pattern.Rational) -> Result[Unit, ActiveNoteError]
+pub fn PatternScheduler::push_active_note_until(Self, Int, @voice.VoiceHandle, PerformanceTime) -> Result[Unit, ActiveNoteError]
 pub fn PatternScheduler::queue_pattern_snapshot(Self, @pattern.PatternSnapshot[@pattern.ControlMap]) -> Unit
 pub fn PatternScheduler::queue_pattern_snapshot_effect_result(Self, @pattern.PatternSnapshot[@pattern.ControlMap], PatternVoiceScope, ActiveVoiceEffect) -> Result[ActiveVoiceEffectOutcome, @voice.VoiceControlError]
 pub fn PatternScheduler::queue_playback_snapshot(Self, PlaybackSnapshot) -> Unit
@@ -151,7 +159,7 @@ pub fn Tempo::span_for_samples(Self, Int, sample_rate~ : Double) -> Result[@patt
 pub struct VoiceControlBatch {
   // private fields
 }
-pub fn VoiceControlBatch::VoiceControlBatch(@graph.GraphControl, rest? : Array[@graph.GraphControl]) -> Self
+pub fn VoiceControlBatch::VoiceControlBatch(instrument~ : Int, @graph.GraphControl, rest? : Array[@graph.GraphControl]) -> Self
 
 // Type aliases
 pub using @transport {type TransportError}

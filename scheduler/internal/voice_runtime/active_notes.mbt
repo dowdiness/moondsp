@@ -175,15 +175,16 @@ pub fn ActiveNotes::remove_matching(
 }
 
 ///|
+/// The matching voices of `instrument`.
 pub fn ActiveNotes::matching_voices(
   self : ActiveNotes,
   matches : (@model.VoiceOrigin) -> Bool,
+  instrument : Int,
   pools : Array[@voice.BoundVoicePool],
 ) -> Array[(@voice.BoundVoicePool, @voice.VoiceHandle)] {
   [
-    for note in self.notes if matches(note.origin()) => {
-      (pools[note.instrument], note.handle())
-    }
+    for note in self.notes if note.instrument == instrument &&
+    matches(note.origin()) => (pools[note.instrument], note.handle())
   ]
 }
 

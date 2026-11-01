@@ -162,6 +162,17 @@ fn PatternScheduler::process_single_event(
         // The pool's bindings decide what each key sets and in which unit.
         let map : Map[String, Double] = Map([])
         event.value.each(fn(k, v) { map[k] = v })
+        // A key that follows a bus starts from the bus value at the onset:
+        // the bus defines the control, while the queried value depends on
+        // how enclosing transforms such as rev sliced the query.
+        let follow : Array[(String, (Int64, Int64) -> Double)] = []
+        buses.each_reader((key, read) => {
+          let value = read(whole.begin.num, whole.begin.den)
+          if !value.is_nan() {
+            map[key] = value
+          }
+          follow.push((key, read))
+        })
         let gate = pool.note_gate(map)
         let endpoint = match gate {
           EventEnd => self.clock.sample_at(whole.end_)
@@ -181,8 +192,6 @@ fn PatternScheduler::process_single_event(
             return
           }
         }
-        let follow : Array[(String, (Int64, Int64) -> Double)] = []
-        buses.each_reader((key, read) => follow.push((key, read)))
         match pool.note_on_controls(map, follow~) {
           None => ()
           Some(handle) => {

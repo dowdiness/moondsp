@@ -417,6 +417,7 @@ test "Retune changes the sounding voice without detaching its note" {
   assert_true(buffer_abs_sum(left) > 0.0)
   // Mute the envelope gain rather than asserting oscillator sample values.
   let mute = @scheduler.VoiceControlBatch(
+    instrument=0,
     @moondsp.GraphControl::set_param(2, @moondsp.GraphParamSlot::Value0, 0.0),
   )
   let outcome = sched
@@ -448,6 +449,7 @@ test "Rejected retune preserves audio and the previously queued snapshot" {
   reference.queue_pattern_snapshot(pending)
   // A valid mutation followed by an invalid one must not partially apply.
   let invalid = @scheduler.VoiceControlBatch(
+    instrument=0,
     @moondsp.GraphControl::set_param(2, @moondsp.GraphParamSlot::Value0, 0.0),
     rest=[
       @moondsp.GraphControl::set_param(
@@ -608,6 +610,7 @@ test "Retune preflights later voices before mutating the first voice" {
   }
   @debug.assert_eq(sched.active_note_count(), 2)
   let controls = @scheduler.VoiceControlBatch(
+    instrument=0,
     @moondsp.GraphControl::set_param(2, @moondsp.GraphParamSlot::Value0, 0.0),
     rest=[
       @moondsp.GraphControl::set_param(1, @moondsp.GraphParamSlot::Value2, 0.0),
@@ -1276,4 +1279,79 @@ test "deferred song replacement preserves selected layer provenance" {
   @debug.assert_eq(new_outcome.detached_note_count, 1)
   // The unchanged pad layer remains tracked after both lead generations stop.
   @debug.assert_eq(sched.active_note_count(), 1)
+}
+
+///|
+test "Retune changes only its instrument's voices" {
+  let (synth, _, ctx) = make_test_pool()
+  // Node 2 is the synth's envelope gain; this graph has no node 2.
+  let other = @moondsp.BoundVoicePool(
+    @moondsp.AnalyzedGraph::analyze([
+      @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 220.0),
+      @moondsp.DspNode::output(0),
+    ]),
+    ctx,
+    @moondsp.ControlBindingBuilder(),
+    max_voices=4,
+  )
+  let sched = @scheduler.PatternScheduler(bpm=120.0, ctx~, instruments=[
+    (@scheduler.ControlEquals("note", 62.0), other),
+    (@scheduler.HasControl("note"), synth),
+  ])
+  let root = pid("two-instruments")
+  let doc = @pattern.PatternDoc::stack(id=root, docs=[
+    @pattern.PatternDoc::from_pattern(
+      id=pid("synth-note"),
+      pat=@pattern.note(60.0),
+    ),
+    @pattern.PatternDoc::from_pattern(
+      id=pid("other-note"),
+      pat=@pattern.note(62.0),
+    ),
+  ])
+  sched.queue_pattern_snapshot(doc.lower())
+  let left = @moondsp.AudioBuffer::filled(128)
+  let right = @moondsp.AudioBuffer::filled(128)
+  sched.render_block(left, right)
+  @debug.assert_eq(synth.active_voice_count(), 1)
+  @debug.assert_eq(other.active_voice_count(), 1)
+  let mute = @scheduler.VoiceControlBatch(
+    instrument=1,
+    @moondsp.GraphControl::set_param(2, @moondsp.GraphParamSlot::Value0, 0.0),
+  )
+  let outcome = sched
+    .apply_pattern_voice_effect_result(
+      @scheduler.PatternVoiceScope::node(root),
+      @scheduler.ActiveVoiceEffect::Retune(mute),
+    )
+    .unwrap()
+  @debug.assert_eq(outcome.retuned_voice_count, 1)
+  // The synth is muted; the other instrument still sounds.
+  sched.render_block(left, right)
+  assert_true(buffer_abs_sum(left) > 0.0)
+}
+
+///|
+test "an active note of an unknown instrument is rejected" {
+  let (pool, _, ctx) = make_test_pool()
+  let sched = @scheduler.PatternScheduler(bpm=120.0, ctx~, instruments=[
+    (@scheduler.AllEvents, pool),
+  ])
+  let handle = pool.note_on_controls({ "note": 69.0 }).unwrap()
+  @debug.assert_eq(
+    sched.push_active_note(1, handle, @pattern.Rational::from_int(1)),
+    Err(@scheduler.UnknownInstrument(1)),
+  )
+  @debug.assert_eq(
+    sched.push_active_note_until(
+      -1,
+      handle,
+      @scheduler.PerformanceTime::PerformanceTime(128L),
+    ),
+    Err(@scheduler.UnknownInstrument(-1)),
+  )
+  @debug.assert_eq(sched.active_note_count(), 0)
+  let left = @moondsp.AudioBuffer::filled(128)
+  let right = @moondsp.AudioBuffer::filled(128)
+  sched.render_block(left, right)
 }

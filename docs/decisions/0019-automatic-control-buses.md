@@ -88,8 +88,11 @@ length, and inside `sequence` each child is read at its slot start.
 ### 4. Onset values are sampled at `part.begin`
 
 `merge_control_kernel` merges only right-hand events whose part contains the
-left fragment's `part.begin`, so an onset's values no longer depend on the
-query length. This rule agrees with the signal at onsets.
+left fragment's `part.begin`, so an onset's values do not depend on the query
+length. Under `rev` the kernel sees the mirrored fragment, whose `part.begin`
+is the onset's end, so there the queried value can differ from the signal,
+which reads the limit just before the reversed onset. The signal is the
+definition: the scheduler starts each voice from its buses (Decision 6).
 
 ### 5. Signals come from a closed set of control nodes
 
@@ -106,8 +109,9 @@ one that does not set the key.
 
 ### 6. The voice pool follows buses once per block
 
-At note-on the scheduler starts the voice with the event's values and, in the
-same call, hands the pool a reader for each time-varying bound key
+At note-on the scheduler starts the voice with the event's values, taking each
+time-varying bound key from its bus at the onset, and, in the same call, hands
+the pool a reader for each time-varying bound key
 (`note_on_controls(controls, follow=...)`). The follower belongs to the voice
 slot: reusing the slot (including a steal) clears it, and an idle slot is
 skipped. Once per block the scheduler calls `update_follows` at the block's
