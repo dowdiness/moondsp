@@ -75,3 +75,24 @@ test "envelope seconds change content without stretching the source period" {
     assert_true(@mini.parse(text + ".\{method_name}(86401)") is Err(_))
   }
 }
+
+///|
+test "a transformed silent layer leaves its stacked sibling playing" {
+  let arc = @pattern.TimeSpan(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::from_int(2),
+  )
+  for silent in [".every(2, fast(2))", ".jux(rev)", ".degradeBy(0.5)", ".rev()"] {
+    let snapshot = @mini.parse_snapshot(
+      "stack(s(\"~\")" + silent + ", s(\"bd\"))",
+    ).unwrap()
+    let entries = snapshot.pat().entries()
+    let per_entry = Array::makei(entries.length(), index => {
+      snapshot.query_sourced_events_for_entry(index, arc).length()
+    })
+    @debug.assert_eq(
+      (silent, per_entry.fold(init=0, (sum, count) => sum + count)),
+      (silent, snapshot.query(arc).length()),
+    )
+  }
+}

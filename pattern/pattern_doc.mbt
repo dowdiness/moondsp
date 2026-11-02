@@ -1316,8 +1316,7 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
       let child = lower(child_id)
       let scope = pattern_source_path_for_opaque_children(nodes, id, [child_id])
       let base = prepend(child.pat)
-      // Keep the old opaque-callback signature policy, despite the typed operation.
-      let pat = every(
+      let pat = every_known(
         n,
         fn(p : Pat[ScopedValue[A, O]]) {
           transform
@@ -1325,15 +1324,18 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
           .map_payload(value => value.remap(value.value, scope))
         },
         base,
+        transform.signature(),
       )
-      let entries = if n <= 0 {
+      // `every_known` returns these unchanged, so they keep the child's entries.
+      let unchanged = n <= 0 || base.body is Silence
+      let entries = if unchanged {
         child.entries.map(entry => {
           CompiledEntry(entry.key, prepend(entry.source))
         })
       } else {
         [CompiledEntry("\{id.value().length()}:\{id.value()}", pat)]
       }
-      let buses = if n <= 0 {
+      let buses = if unchanged {
         child.buses
       } else {
         child.buses.map(bus => {
@@ -1362,7 +1364,7 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
             bindings=unbind_keys(value.bindings, pan),
           )
         },
-        "",
+        transform.signature(),
       ).map_payload(value => value.remap(value.value, scope))
       let buses = child.buses.copy()
       for bus in child.buses {

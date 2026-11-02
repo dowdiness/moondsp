@@ -99,7 +99,7 @@ test "document every preserves negative cycle selection and branch voice scopes"
 }
 
 ///|
-test "document jux preserves atomic material pan precedence and unknown content" {
+test "document jux preserves atomic material pan precedence and its content" {
   let source = @pattern.PatternDoc::stack(id=pid("parts"), docs=[
     @pattern.PatternDoc::from_pattern(
       id=pid("left"),
@@ -128,5 +128,13 @@ test "document jux preserves atomic material pan precedence and unknown content"
     snapshot.pat().entry_period(),
     @pattern.Rational::from_int(1),
   )
-  assert_false(snapshot.pat().same_content(snapshot.pat()))
+  // The typed transform is part of the content, so a different one differs.
+  fn jux_with(transform) raise {
+    source.jux(id=pid("jux"), transform~).lower().pat()
+  }
+
+  assert_true(snapshot.pat().same_content(jux_with(Reverse)))
+  assert_false(
+    snapshot.pat().same_content(jux_with(Fast(@pattern.Rational::from_int(2)))),
+  )
 }
