@@ -177,7 +177,7 @@ fn[A] append_overlay(pat : Pat[A], result : Array[Pat[A]]) -> Unit {
     Silence =>
       match pat.metadata.scope {
         Anonymous => ()
-        Named(_) | Material | NamedMaterial(_) => result.push(pat)
+        Material | Addressed(_) => result.push(pat)
       }
     Overlay(children) =>
       match pat.metadata.scope {
@@ -185,7 +185,7 @@ fn[A] append_overlay(pat : Pat[A], result : Array[Pat[A]]) -> Unit {
           for child in children {
             append_overlay(child, result)
           }
-        Named(_) | Material | NamedMaterial(_) => result.push(pat)
+        Material | Addressed(_) => result.push(pat)
       }
     Opaque(_) => result.push(pat)
   }

@@ -62,13 +62,13 @@ test "internal metadata changes do not reserve a material replacement" {
   let b = @pattern.note(64.0)
   let c = @pattern.note(67.0)
   let period = @pattern.Rational::from_int(3)
-  let before = (a + b + c).material().slow(period).named_entry("track")
-  let after = ((a + b).named_entry("phrase") +
-    c +
-    @pattern.Pat::silence().named_entry("rest"))
+  let before = addressed((a + b + c).material().slow(period), "track")
+  let after = addressed(
+    ((a + b).material() + c + @pattern.Pat::silence().material())
     .material()
-    .slow(period)
-    .named_entry("track")
+    .slow(period),
+    "track",
+  )
   let control = PlaybackState()
   let edited = PlaybackState()
   for state in [control, edited] {

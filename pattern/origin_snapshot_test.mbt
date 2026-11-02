@@ -122,7 +122,6 @@ test "exact compiler shares musical kernels without changing material metadata" 
     let raw_entries = runtime[index].entries()
     @debug.assert_eq(entries.length(), raw_entries.length())
     for slot in 0..<entries.length() {
-      @debug.assert_eq(entries[slot].entry_key(), raw_entries[slot].entry_key())
       @debug.assert_eq(
         entries[slot].entry_period(),
         raw_entries[slot].entry_period(),
@@ -131,7 +130,10 @@ test "exact compiler shares musical kernels without changing material metadata" 
         entries[slot].same_content(raw_entries[slot]),
         raw_entries[slot].same_content(raw_entries[slot]),
       )
-      @debug.assert_eq(exact.entry_key(slot), general.entry_key(slot))
+      @debug.assert_eq(
+        exact.pat().entries()[slot].entry_key(),
+        general.pat().entries()[slot].entry_key(),
+      )
       @debug.assert_eq(
         musical_rows(
           exact.query_for_entry(slot, arc).map(event => event.event()),
@@ -208,7 +210,10 @@ test "filtering changes values but retains source" {
     snapshot.query_for_entry(3, doc_span(0, 1, 1, 1)).length(),
     0,
   )
-  @debug.assert_eq(snapshot.entry_key(0), doc.lower().entry_key(0))
+  @debug.assert_eq(
+    snapshot.pat().entries()[0].entry_key(),
+    doc.lower().pat().entries()[0].entry_key(),
+  )
 }
 
 ///|
@@ -236,7 +241,10 @@ test "nested reference bindings are immutable outer to inner and distinct per us
   @debug.assert_eq(b.pattern_node_path().nodes().map(id => id.value()), [
     "mix", "right", "inner", "atom",
   ])
-  assert_true(snapshot.entry_key(0) != snapshot.entry_key(1))
+  assert_true(
+    snapshot.pat().entries()[0].entry_key() !=
+    snapshot.pat().entries()[1].entry_key(),
+  )
   let copy = a.origin().bindings()
   copy.clear()
   @debug.assert_eq(
@@ -260,7 +268,10 @@ test "same music refreshes origins through reused cache without changing entry i
   let after = after_doc.lower_with_origins(cache~)
   let arc = doc_span(0, 1, 1, 1)
   assert_true(before.pat().same_content(after.pat()))
-  @debug.assert_eq(before.entry_key(0), after.entry_key(0))
+  @debug.assert_eq(
+    before.pat().entries()[0].entry_key(),
+    after.pat().entries()[0].entry_key(),
+  )
   @debug.assert_eq(before.query(arc)[0].origin().atom(), atom_id(1L))
   @debug.assert_eq(after.query(arc)[0].origin().atom(), atom_id(2L))
   @debug.assert_eq(

@@ -1,14 +1,16 @@
 ///|
 test "named entry identities survive reordering and unchanged material stays unchanged" {
-  let a = @mini.parse(
+  let a = @mini.parse_snapshot(
       "let a = note(\"60\").slow(3); let b = note(\"72\").slow(4); stack(a,b)",
     )
     .unwrap()
+    .pat()
     .entries()
-  let b = @mini.parse(
+  let b = @mini.parse_snapshot(
       "let a = note(\"60\").slow(3); let b = note(\"74\").slow(4); stack(b,a)",
     )
     .unwrap()
+    .pat()
     .entries()
   assert_eq(a[0].entry_key(), b[1].entry_key())
   assert_true(a[0].same_content(b[1]))
@@ -74,6 +76,21 @@ test "envelope seconds change content without stretching the source period" {
     assert_true(@mini.parse(text + ".\{method_name}(-1)") is Err(_))
     assert_true(@mini.parse(text + ".\{method_name}(86401)") is Err(_))
   }
+}
+
+///|
+test "song section entries keep their binding addresses across reordering" {
+  fn keys(body : String) -> Array[String] raise {
+    let song = @mini.parse_song(
+      "let a = note(\"60\").slow(3); let b = note(\"72\").slow(4); song(section(\"s\",4," +
+      body +
+      "),part(\"p\",\"s\"))",
+    ).unwrap()
+    song.occurrences()[0].section().body().entries().map(e => e.entry_key())
+  }
+
+  let forward = keys("stack(a,b)")
+  @debug.assert_eq(keys("stack(b,a)"), [forward[1], forward[0]])
 }
 
 ///|

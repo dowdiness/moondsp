@@ -14,13 +14,13 @@ priv enum PatBody[A] {
 ///|
 /// Entry metadata is deliberately independent from the execution body.
 ///
-/// A named scope anchors entry addresses; a material scope groups one clock.
-/// Both prevent raw normalization from erasing their authored boundary.
+/// A material groups one clock. An addressed material also carries its entry
+/// address, which document lowering derives from node IDs. Both prevent raw
+/// normalization from erasing their authored boundary.
 priv enum EntryScope {
   Anonymous
-  Named(String)
   Material
-  NamedMaterial(String)
+  Addressed(String)
 }
 
 ///|

@@ -105,7 +105,7 @@ fn compile_mini_pattern(
       let pats = children.map(child => compile_mini_pattern(child))
       @pattern.stack(pats)
     }
-    Reference(name, definition) => definition.body.named_entry(name)
+    Reference(_, definition) => definition.body
     Apply(child, transform) => {
       let pat = compile_mini_pattern(child)
       match transform {

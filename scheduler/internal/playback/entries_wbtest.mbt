@@ -1,16 +1,30 @@
 ///|
+/// `pat` as one entry addressed by the document node `name`.
+fn addressed(
+  pat : @pattern.Pat[@pattern.ControlMap],
+  name : String,
+) -> @pattern.Pat[@pattern.ControlMap] raise {
+  @pattern.PatternDoc::from_pattern(
+    id=@identity.PatternNodeId::from_string(name),
+    pat=pat.material(),
+  )
+  .lower()
+  .pat()
+}
+
+///|
 fn material(
   name : String,
   note : Int,
   period : Int,
-) -> @pattern.Pat[@pattern.ControlMap] {
-  @pattern.sequence([
-    @pattern.note(note.to_double()),
-    @pattern.note((note + 1).to_double()),
-  ])
-  .slow(@pattern.Rational::from_int(period))
-  .material()
-  .named_entry(name)
+) -> @pattern.Pat[@pattern.ControlMap] raise {
+  addressed(
+    @pattern.sequence([
+      @pattern.note(note.to_double()),
+      @pattern.note((note + 1).to_double()),
+    ]).slow(@pattern.Rational::from_int(period)),
+    name,
+  )
 }
 
 ///|
@@ -183,7 +197,7 @@ test "reverting cancels a reservation while a new material waits for its entry" 
 
 ///|
 test "content edits preserve the cycle count used by variation" {
-  fn varying(note : Int) -> @pattern.Pat[@pattern.ControlMap] {
+  fn varying(note : Int) -> @pattern.Pat[@pattern.ControlMap] raise {
     @pattern.every(2, p => p.rev(), material("a", note, 3))
   }
   let state = PlaybackState()
@@ -200,13 +214,14 @@ test "content edits preserve the cycle count used by variation" {
 
 ///|
 test "combined custom content without signatures is conservatively replaced" {
-  fn combined(note : Int) -> @pattern.Pat[@pattern.ControlMap] {
-    @pattern.stack([
-      @pattern.note(note.to_double()),
-      @pattern.note((note + 1).to_double()),
-    ])
-    .jux(p => p.rev())
-    .named_entry("a")
+  fn combined(note : Int) -> @pattern.Pat[@pattern.ControlMap] raise {
+    addressed(
+      @pattern.stack([
+        @pattern.note(note.to_double()),
+        @pattern.note((note + 1).to_double()),
+      ]).jux(p => p.rev()),
+      "a",
+    )
   }
   let state = PlaybackState()
   accept(state, [combined(60)], 0)
@@ -240,9 +255,10 @@ test "silence cancels a waiting addition without starting its old material" {
   let state = PlaybackState()
   accept(state, [], 0)
   accept(state, [material("a", 60, 3)], 1)
-  let silence : @pattern.Pat[@pattern.ControlMap] = @pattern.Pat::silence()
-    .slow(@pattern.Rational::from_int(3))
-    .named_entry("a")
+  let silence = addressed(
+    @pattern.Pat::silence().slow(@pattern.Rational::from_int(3)),
+    "a",
+  )
   accept(state, [silence], 2)
   assert_false(state.has_pending())
   assert_eq(notes(state, 2, 5), [])

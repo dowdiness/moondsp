@@ -57,17 +57,18 @@ These are separate contracts:
 
 - Known content compares equally after raw overlay regrouping, including after
   `.material()` and known transforms. Content normalization traverses raw overlays
-  independently of named/material boundaries, removes silence, and reduces a
+  independently of material boundaries, removes silence, and reduces a
   single remaining operand to its own content identity. Playback boundaries and
   silent placeholders remain intact. Opaque queries stay atomic; arbitrary
   queries and callbacks remain unknown and cannot suppress a live replacement.
 - Playback occurrence keys exclude raw overlay ancestry. Document references
   own their member slots independently of their definition's content IDs.
-  Anonymous silence has no playback entry; explicitly named/material silence
-  retains a placeholder for playback transitions.
-- `PatternDoc` retains the authored source tree. `PatternSnapshot::entry_key`
-  identifies the playback occurrence; sourced queries still report its source
-  ancestry. Regrouping unchanged known content preserves the material clock
+  Anonymous silence has no playback entry; material silence retains a
+  placeholder for playback transitions.
+- `PatternDoc` retains the authored source tree. Lowering addresses each
+  entry of the snapshot's `Pat` by its document node path; that entry's
+  `entry_key` identifies the playback occurrence, and sourced queries still
+  report its source ancestry. Regrouping unchanged known content preserves the material clock
   while publishing the latest source view.
 
 ### Mini-notation consequences

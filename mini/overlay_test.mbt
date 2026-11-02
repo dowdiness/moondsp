@@ -137,7 +137,10 @@ test "editing a binding keeps the playback identity of its use site" {
   let after = unwrap_doc(
     @mini.parse_doc("let motif = note(\"72\").slow(4); motif"),
   ).lower()
-  @debug.assert_eq(before.entry_key(0), after.entry_key(0))
+  @debug.assert_eq(
+    before.pat().entries()[0].entry_key(),
+    after.pat().entries()[0].entry_key(),
+  )
   @debug.assert_eq(
     after.query(song_span(0L, 1L, 1L, 1L)).map(event => event.value.get("note")),
     [Some(72.0)],
@@ -160,7 +163,10 @@ test "regrouping a shaped document preserves known material content and addresse
   let old_entries = before.pat().entries()
   let new_entries = after.pat().entries()
   for index in 0..<old_entries.length() {
-    @debug.assert_eq(before.entry_key(index), after.entry_key(index))
+    @debug.assert_eq(
+      before.pat().entries()[index].entry_key(),
+      after.pat().entries()[index].entry_key(),
+    )
     assert_true(old_entries[index].same_content(new_entries[index]))
   }
 }

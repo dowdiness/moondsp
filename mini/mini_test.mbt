@@ -1042,7 +1042,10 @@ test "Draft exact lowering preserves music material and graph scopes" {
       assert_true(draft.locate_origin(actual[index].origin()) is Located(_, _))
     }
     for index in 0..<actual_entries.length() {
-      assert_eq(exact.entry_key(index), general.entry_key(index))
+      assert_eq(
+        exact.pat().entries()[index].entry_key(),
+        general.pat().entries()[index].entry_key(),
+      )
       assert_eq(
         actual_entries[index].entry_period(),
         expected_entries[index].entry_period(),

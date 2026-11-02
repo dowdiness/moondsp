@@ -131,7 +131,6 @@ pub fn[A] Pat::from_query((TimeSpan) -> Array[Event[A]]) -> Self[A]
 pub fn[A] Pat::gate(Self[A], Rational) -> Self[A]
 pub fn Pat::jux(Self[ControlMap], (Self[ControlMap]) -> Self[ControlMap]) -> Self[ControlMap]
 pub fn[A] Pat::material(Self[A]) -> Self[A]
-pub fn[A] Pat::named_entry(Self[A], String) -> Self[A]
 pub fn[A] Pat::pure(A) -> Self[A]
 pub fn[A] Pat::query(Self[A], TimeSpan) -> Array[Event[A]]
 pub fn[A] Pat::rev(Self[A]) -> Self[A]
@@ -207,7 +206,6 @@ pub fn PatternNodePath::to_repr(Self) -> @debug.Repr
 pub struct PatternSnapshot[A] {
   // private fields
 }
-pub fn[A] PatternSnapshot::entry_key(Self[A], Int) -> String?
 pub fn[A] PatternSnapshot::pat(Self[A]) -> Pat[A]
 pub fn[A] PatternSnapshot::query(Self[A], TimeSpan) -> Array[Event[A]]
 pub fn[A] PatternSnapshot::query_sourced_events(Self[A], TimeSpan) -> Array[PatternSnapshotEvent[A]]
@@ -227,7 +225,6 @@ pub struct PatternSnapshotWithOrigins[A] {
   // private fields
 }
 pub fn[A] PatternSnapshotWithOrigins::as_snapshot(Self[A]) -> PatternSnapshot[A]
-pub fn[A] PatternSnapshotWithOrigins::entry_key(Self[A], Int) -> String?
 pub fn[A] PatternSnapshotWithOrigins::pat(Self[A]) -> Pat[A]
 pub fn[A] PatternSnapshotWithOrigins::query(Self[A], TimeSpan) -> Array[EventWithOrigin[A]]
 pub fn[A] PatternSnapshotWithOrigins::query_for_entry(Self[A], Int, TimeSpan) -> Array[EventWithOrigin[A]]

@@ -12,7 +12,10 @@ test "overlay regrouping preserves playback keys while retaining source ancestry
     flat.query(arc).map(e => (e.whole, e.part, e.value)),
   )
   for index in 0..<3 {
-    @debug.assert_eq(nested.entry_key(index), flat.entry_key(index))
+    @debug.assert_eq(
+      nested.pat().entries()[index].entry_key(),
+      flat.pat().entries()[index].entry_key(),
+    )
     @debug.assert_eq(
       nested
       .query_sourced_events_for_entry(index, arc)
@@ -48,12 +51,8 @@ test "reference identity belongs to the use site rather than its definition" {
   let first = @pattern.PatternDoc::reference(id=pid("first-use"), definition~)
   let second = @pattern.PatternDoc::reference(id=pid("second-use"), definition~)
   let snapshot = @pattern.PatternDoc::stack(id=pid("both"), docs=[first, second]).lower()
-  guard snapshot.entry_key(0) is Some(first_key) else {
-    fail("first occurrence missing")
-  }
-  guard snapshot.entry_key(1) is Some(second_key) else {
-    fail("second occurrence missing")
-  }
+  let first_key = snapshot.pat().entries()[0].entry_key()
+  let second_key = snapshot.pat().entries()[1].entry_key()
   assert_true(first_key != second_key)
   let arc = doc_span(0, 1, 1, 1)
   @debug.assert_eq(
@@ -84,7 +83,7 @@ test "reference identity belongs to the use site rather than its definition" {
     id=pid("first-use"),
     definition=@pattern.PatternDoc::pure(id=pid("changed-definition"), value=8),
   ).lower()
-  @debug.assert_eq(edited.entry_key(0), Some(first_key))
+  @debug.assert_eq(edited.pat().entries()[0].entry_key(), first_key)
   @debug.assert_eq(edited.query(arc).map(event => event.value), [8])
 }
 
@@ -108,6 +107,5 @@ test "silence in an overlay does not shift sourced playback entries" {
     }),
     snapshot.query(arc).map(e => (e.whole, e.part, e.value)),
   )
-  @debug.assert_eq(snapshot.entry_key(1), None)
   assert_true(snapshot.query_sourced_events_for_entry(1, arc).is_empty())
 }

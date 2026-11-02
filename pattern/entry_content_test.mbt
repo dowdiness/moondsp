@@ -14,10 +14,10 @@ test "editing event controls leaves source content unchanged" {
 }
 
 ///|
-test "content comparison distinguishes values but ignores grouped names" {
-  let a = @pattern.stack([@pattern.note(60.0).named_entry("a")]).material()
-  let b = @pattern.stack([@pattern.note(60.0).named_entry("b")]).material()
-  let changed = @pattern.stack([@pattern.note(61.0).named_entry("a")]).material()
+test "content comparison distinguishes values but ignores material grouping" {
+  let a = @pattern.stack([@pattern.note(60.0).material()]).material()
+  let b = @pattern.stack([@pattern.note(60.0)]).material()
+  let changed = @pattern.stack([@pattern.note(61.0).material()]).material()
   assert_true(a.same_content(b))
   assert_false(a.same_content(changed))
 }
@@ -68,13 +68,13 @@ test "grouping and known transforms cannot identify arbitrary code" {
 }
 
 ///|
-test "overlay content ignores subgroup names and material boundaries" {
+test "overlay content ignores material boundaries" {
   let a = @pattern.note(60.0)
   let b = @pattern.note(64.0)
   let c = @pattern.note(67.0)
   let plain = (a + b + c).material()
   let arc = span(0, 1, 2, 1)
-  for subgroup in [(a + b).named_entry("phrase"), (a + b).material()] {
+  for subgroup in [a + b, (a + b).material()] {
     let annotated = (subgroup + c).material()
     assert_eq(
       annotated.query(arc).map(e => (e.whole, e.part, e.value.entries())),
@@ -88,7 +88,7 @@ test "overlay content ignores subgroup names and material boundaries" {
 ///|
 test "silent playback placeholders do not change overlay content" {
   let a = @pattern.note(60.0)
-  let silent = @pattern.Pat::silence().named_entry("rest")
+  let silent = @pattern.Pat::silence().material()
   let annotated = a + silent
   assert_eq(annotated.entries().length(), 2)
   assert_true(annotated.material().same_content(a.material()))
@@ -104,13 +104,13 @@ test "content normalization preserves opaque queries order and unknown callbacks
   let a = @pattern.note(60.0)
   let b = @pattern.note(64.0)
   let c = @pattern.note(67.0)
-  let wrapped = (a + b).rev().named_entry("reversed")
+  let wrapped = (a + b).rev().material()
   assert_false(
     (wrapped + c).material().same_content((a.rev() + b.rev() + c).material()),
   )
   assert_false((a + b).material().same_content((b + a).material()))
   assert_false((a + a).material().same_content(a.material()))
-  let unknown = (a + b).filter_map(v => Some(v)).named_entry("unknown")
+  let unknown = (a + b).filter_map(v => Some(v)).material()
   let combined = (unknown + c).material()
   assert_false(combined.same_content(combined))
 }

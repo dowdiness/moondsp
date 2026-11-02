@@ -92,7 +92,7 @@ fn PlaybackSnapshot::entries(self : PlaybackSnapshot) -> Array[EntrySpec] {
       for index, body in snapshot.pat().entries() {
         result.push(
           EntrySpec(
-            id=snapshot.entry_key(index).unwrap(),
+            id=body.entry_key(),
             body~,
             start=@pattern.Rational::from_int(0),
             end_=None,
@@ -107,7 +107,7 @@ fn PlaybackSnapshot::entries(self : PlaybackSnapshot) -> Array[EntrySpec] {
       for index, body in snapshot.pat().entries() {
         result.push(
           EntrySpec(
-            id=snapshot.entry_key(index).unwrap(),
+            id=body.entry_key(),
             body~,
             start=@pattern.Rational::from_int(0),
             end_=None,

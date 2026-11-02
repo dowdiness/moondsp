@@ -191,16 +191,17 @@ repetition from generated events. Literals have a one-cycle entry period;
 when gain or filtering wraps the stack. `every` and `jux` form one material with
 the input's entry period: their changing values need not repeat every entry.
 
-Named references keep addresses when uniquely named siblings are reordered
-inside the same stack. Anonymous members use positions; repeated uses of the
-same name use occurrence order. Restructuring a stack can therefore create new
+An entry's address is its document node path: a reference use keeps its
+address when siblings are reordered inside the same stack, and repeated uses
+of the same name use occurrence order. Members of an anonymous pattern without
+a document use positions. Restructuring a stack can therefore create new
 addresses. This is not semantic identity inference from text similarity.
 
 ### Content comparison
 
-Library callers can use `named_entry` to name a material and `material()` to
-make an expression indivisible. Names address edits; content comparison does
-not depend on those names. Scalar notes, sounds, controls, silence, and their
+Library callers can use `material()` to make an expression indivisible, and
+`PatternDoc` node IDs to address it. Addresses identify edits; content
+comparison does not depend on them. Scalar notes, sounds, controls, silence, and their
 combinations track content automatically. `same_content` answers whether two
 patterns have known equal content without exposing the representation.
 Control values do not expose mutable storage: `set` and `merge` return new

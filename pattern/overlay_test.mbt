@@ -74,12 +74,10 @@ test "normalization does not rebuild reverse queries from entry projections" {
 }
 
 ///|
-test "names anchor independent clocks while material explicitly groups them" {
+test "overlays keep independent clocks while material explicitly groups them" {
   let three = @pattern.Rational::from_int(3)
   let four = @pattern.Rational::from_int(4)
-  let named = (@pattern.note(60.0).slow(three) + @pattern.note(72.0).slow(four)).named_entry(
-    "phrase",
-  )
+  let named = @pattern.note(60.0).slow(three) + @pattern.note(72.0).slow(four)
   assert_eq(named.entries().map(p => p.entry_period()), [three, four])
   assert_eq(named.material().entries().length(), 1)
   let two = @pattern.Rational::from_int(2)
@@ -92,7 +90,7 @@ test "names anchor independent clocks while material explicitly groups them" {
   )
   let rest : @pattern.Pat[Int] = @pattern.Pat::silence()
     .slow(three)
-    .named_entry("rest")
+    .material()
   assert_eq(rest.entries().map(p => p.entry_period()), [three])
   assert_true(rest.query(span(0, 1, 4, 1)).is_empty())
 }

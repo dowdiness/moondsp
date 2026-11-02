@@ -37,7 +37,7 @@ streams, situated between text notation and audio-rate scheduling:
 |---|---|---|
 | **Musical Time** | `Rational`, `TimeSpan`, `TimeTransform` | `Rational::from_int`, `Rational::to_double`, `TimeSpan::duration`, `TimeSpan::contains`, `TimeSpan::intersect`, `TimeSpan::shift`, `TimeTransform::apply` |
 | **Core Query & Events** | `Pat[A]`, `Event[A]` | `Pat::pure`, `Pat::silence`, `Pat::from_query`, `Pat::query`, `Pat::same_content`, `Event::shift` |
-| **Combinators** | `sequence`, `stack`, `merge_control`, `+` | `sequence`, `stack`, `merge_control`, `Pat::entries`, `Pat::named_entry`, `Pat::select_control` |
+| **Combinators** | `sequence`, `stack`, `merge_control`, `+` | `sequence`, `stack`, `merge_control`, `Pat::entries`, `Pat::material`, `Pat::select_control` |
 | **Time Transforms** | `Pat[A]` methods | `Pat::fast`, `Pat::slow`, `Pat::rev`, `Pat::euclid`, `Pat::degrade_by`, `every`, `Pat::gate`, `Pat::jux`, `Pat::filter_map` |
 | **Control Helpers** | `ControlMap`, helper functions | `note`, `note_name`, `chord`, `sound`, `control`, `s_gain`, `s_cutoff`, `s_pan`, `ControlMap::get`, `ControlMap::set`, `ControlMap::merge` |
 | **Document & Identity** | `PatternDoc[A]`, `PatternSnapshot[A]`, `PatternLoweringCache[A]` | `PatternDoc::from_pattern`, `PatternDoc::pure`, `PatternDoc::sequence`, `PatternDoc::stack`, `PatternDoc::lower`, `PatternDoc::lower_with_cache`, `PatternSnapshot::query` |

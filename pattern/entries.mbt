@@ -1,26 +1,14 @@
 ///|
-/// Give an authored material a stable address. The name is not a clock group.
-pub fn[A] Pat::named_entry(self : Pat[A], name : String) -> Pat[A] {
-  let scope = match self.metadata.scope {
-    Material | NamedMaterial(_) => NamedMaterial(name)
-    Anonymous | Named(_) => Named(name)
+/// Group this expression as one authored material without changing its content.
+pub fn[A] Pat::material(self : Pat[A]) -> Pat[A] {
+  match self.metadata.scope {
+    Addressed(_) => self
+    Anonymous | Material => self.with_scope(Material)
   }
-  make_pat(
-    self.query,
-    self.metadata.period,
-    self.body,
-    scope,
-    self.metadata.content,
-  )
 }
 
 ///|
-/// Group this expression as one authored material without changing its content.
-pub fn[A] Pat::material(self : Pat[A]) -> Pat[A] {
-  let scope = match self.metadata.scope {
-    Named(name) | NamedMaterial(name) => NamedMaterial(name)
-    Anonymous | Material => Material
-  }
+fn[A] Pat::with_scope(self : Pat[A], scope : EntryScope) -> Pat[A] {
   make_pat(
     self.query,
     self.metadata.period,
@@ -112,37 +100,17 @@ fn[A] Pat::entry_signature(self : Pat[A]) -> String {
 }
 
 ///|
+/// The entry's address: its document node path when lowered from a document,
+/// otherwise its position inside this anonymous pattern.
 pub fn[A] Pat::entry_key(self : Pat[A]) -> String {
   match self.metadata.scope {
     Anonymous | Material => ""
-    Named(name) | NamedMaterial(name) => name
+    Addressed(key) => key
   }
 }
 
 ///|
-fn scope_path_key(scope : EntryScope, index : Int) -> String {
-  match scope {
-    Named(name) | NamedMaterial(name) => "name:\{name}"
-    Anonymous | Material => "slot:\{index}"
-  }
-}
-
-///|
-fn[A] Pat::entry_at_path(self : Pat[A], path : String) -> Pat[A] {
-  make_pat(
-    self.query,
-    self.metadata.period,
-    self.body,
-    match self.metadata.scope {
-      Material | NamedMaterial(_) => NamedMaterial(path)
-      Anonymous | Named(_) => Named(path)
-    },
-    self.metadata.content,
-  )
-}
-
-///|
-/// Return independent authored members, with owned address metadata.
+/// Return independent authored members, with their addresses.
 ///
 /// Only raw anonymous overlays are traversed structurally. A transformed
 /// query may retain child projections for entry consumers, but it is never
@@ -151,31 +119,58 @@ pub fn[A] Pat::entries(self : Pat[A]) -> Array[Pat[A]] {
   let result = []
   fn visit(pat : Pat[A], path : String) -> Unit {
     match pat.metadata.scope {
-      Material | NamedMaterial(_) => result.push(pat.entry_at_path(path))
-      Anonymous | Named(_) =>
+      Addressed(_) => result.push(pat)
+      Material => result.push(pat.with_scope(Addressed(path)))
+      Anonymous =>
         match pat.body {
-          Opaque([]) => result.push(pat.entry_at_path(path))
-          Overlay(children) | Opaque(children) => {
-            let seen : Map[String, Int] = Map([])
+          Opaque([]) => result.push(pat.with_scope(Addressed(path)))
+          Overlay(children) | Opaque(children) =>
             for i, child in children {
-              let key = scope_path_key(child.metadata.scope, i)
-              let count = seen.get(key).unwrap_or(0)
-              seen[key] = count + 1
-              visit(child, path + "/\{key.length()}:\{key}:\{count}")
+              visit(child, "\{path}/\{i}")
             }
-          }
-          Silence =>
-            match pat.metadata.scope {
-              Named(_) => result.push(pat.entry_at_path(path))
-              _ => ()
-            }
+          Silence => ()
         }
     }
   }
-  let root_path = match self.metadata.scope {
-    Named(name) | NamedMaterial(name) => "name:" + name
-    Anonymous | Material => "root"
-  }
-  visit(self, root_path)
+  visit(self, "root")
   result
+}
+
+///|
+/// Give each entry, in `entries()` order, its address from `keys`.
+fn[A] Pat::address_entries(self : Pat[A], keys : Array[String]) -> Pat[A] {
+  let mut next = 0
+  fn address(pat : Pat[A]) -> Pat[A] {
+    fn take() -> Pat[A] {
+      let key = keys[next]
+      next += 1
+      pat.with_scope(Addressed(key))
+    }
+
+    match pat.metadata.scope {
+      Addressed(_) | Material => take()
+      Anonymous =>
+        match pat.body {
+          Opaque([]) => take()
+          Overlay(children) =>
+            make_pat(
+              pat.query,
+              pat.metadata.period,
+              Overlay(children.map(address)),
+              Anonymous,
+              pat.metadata.content,
+            )
+          Opaque(children) =>
+            make_pat(
+              pat.query,
+              pat.metadata.period,
+              Opaque(children.map(address)),
+              Anonymous,
+              pat.metadata.content,
+            )
+          Silence => pat
+        }
+    }
+  }
+  address(self)
 }

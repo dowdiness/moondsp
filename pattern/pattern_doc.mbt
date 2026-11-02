@@ -1711,16 +1711,6 @@ pub fn[A] PatternSnapshot::revision(
 }
 
 ///|
-/// Stable playback occurrence key, independent of overlay source ancestry.
-/// Reusing a definition at distinct reference nodes produces distinct keys.
-pub fn[A] PatternSnapshot::entry_key(
-  self : PatternSnapshot[A],
-  source_index : Int,
-) -> String? {
-  self.entry_sourced.get(source_index).map(entry => entry.key)
-}
-
-///|
 pub fn[A] PatternSnapshot::pat(self : PatternSnapshot[A]) -> Pat[A] {
   self.pat
 }
@@ -1790,14 +1780,6 @@ pub fn[A] PatternSnapshotWithOrigins::pat(
 }
 
 ///|
-pub fn[A] PatternSnapshotWithOrigins::entry_key(
-  self : PatternSnapshotWithOrigins[A],
-  index : Int,
-) -> String? {
-  self.entry_sourced.get(index).map(entry => entry.key)
-}
-
-///|
 pub fn[A] PatternSnapshotWithOrigins::query(
   self : PatternSnapshotWithOrigins[A],
   arc : TimeSpan,
@@ -1863,7 +1845,9 @@ pub fn[A] PatternDoc::lower_with_origins(
   {
     root: self.root,
     revision: self.revision,
-    pat: compiled.pat.map_payload(erase_value),
+    pat: compiled.pat
+    .map_payload(erase_value)
+    .address_entries(compiled.entries.map(entry => entry.key)),
     sourced: compiled.pat,
     entry_sourced: compiled.entries,
     buses: compiled.buses.map(bus => bus.signal),
@@ -2101,7 +2085,9 @@ pub fn[A] PatternDoc::lower_with_cache(
   {
     root: self.root,
     revision: self.revision,
-    pat: compiled.pat.map_payload(erase_value),
+    pat: compiled.pat
+    .map_payload(erase_value)
+    .address_entries(compiled.entries.map(entry => entry.key)),
     sourced: compiled.pat,
     entry_sourced: compiled.entries,
     buses: compiled.buses.map(bus => bus.signal),

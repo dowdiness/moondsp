@@ -276,8 +276,7 @@ test "material admission rejects before retiming and restart recovers capacity" 
         id=@identity.PatternNodeId::from_string(name),
         pat=@pattern.note(note)
           .slow(@pattern.Rational::from_int(1000))
-          .material()
-          .named_entry(name),
+          .material(),
       ).lower(),
     )
   }

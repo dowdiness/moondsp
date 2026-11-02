@@ -1,13 +1,7 @@
 ///|
 test "document control merge preserves material clocks and broad voice scopes" {
-  let bass = @pattern.note(60.0)
-    .slow(@pattern.Rational::from_int(2))
-    .material()
-    .named_entry("bass")
-  let lead = @pattern.note(64.0)
-    .fast(@pattern.Rational::from_int(2))
-    .material()
-    .named_entry("lead")
+  let bass = @pattern.note(60.0).slow(@pattern.Rational::from_int(2)).material()
+  let lead = @pattern.note(64.0).fast(@pattern.Rational::from_int(2)).material()
   let source = @pattern.PatternDoc::stack(id=pid("parts"), docs=[
     @pattern.PatternDoc::from_pattern(id=pid("bass"), pat=bass),
     @pattern.PatternDoc::from_pattern(id=pid("lead"), pat=lead),
@@ -56,9 +50,18 @@ test "document control merge preserves material clocks and broad voice scopes" {
     @pattern.Rational(1L, 2L),
   ])
   let before = source.lower()
-  @debug.assert_eq(snapshot.entry_key(0), before.entry_key(0))
-  @debug.assert_eq(snapshot.entry_key(1), before.entry_key(1))
-  assert_true(snapshot.entry_key(0) != snapshot.entry_key(1))
+  @debug.assert_eq(
+    snapshot.pat().entries()[0].entry_key(),
+    before.pat().entries()[0].entry_key(),
+  )
+  @debug.assert_eq(
+    snapshot.pat().entries()[1].entry_key(),
+    before.pat().entries()[1].entry_key(),
+  )
+  assert_true(
+    snapshot.pat().entries()[0].entry_key() !=
+    snapshot.pat().entries()[1].entry_key(),
+  )
   let raw = @pattern.merge_control(
     @pattern.stack([bass, lead]),
     @pattern.s_gain(0.0),
