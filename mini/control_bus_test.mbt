@@ -63,111 +63,6 @@ fn bus_with_ramp(
 }
 
 ///|
-/// An onset with its controls in key order.
-fn bus_onset_text(event : @pattern.Event[@pattern.ControlMap]) -> String {
-  let controls = []
-  event.value.each((key, value) => controls.push("\{key}=\{value}"))
-  controls.sort()
-  "\{event.whole} \{controls}"
-}
-
-///|
-/// Play `source` in blocks of `step` cycles for four cycles and count the
-/// onsets whose controls differ between the bus-derived document path and
-/// Mini's runtime pattern, which merges controls by querying them.
-fn bus_runtime_agreement(source : String, step : @pattern.Rational) -> String {
-  let runtime = match @mini.parse(source) {
-    Ok(pat) => pat
-    Err(message) => abort(message)
-  }
-  let snapshot = match @mini.parse_snapshot(source) {
-    Ok(snapshot) => snapshot
-    Err(message) => abort(message)
-  }
-  let onsets = (events : Array[@pattern.Event[@pattern.ControlMap]]) => {
-    let texts = events
-      .filter(event => {
-        event.whole is Some(whole) && whole.begin == event.part.begin
-      })
-      .map(bus_onset_text)
-    texts.sort()
-    texts
-  }
-  let mut checked = 0
-  let mut mismatched = 0
-  let mut t = bus_r(0L, 1L)
-  while t < bus_r(4L, 1L) {
-    let arc = @pattern.TimeSpan(t, t + step)
-    let expected = onsets(runtime.query(arc))
-    for text in onsets(snapshot.pat().query(arc)) {
-      checked += 1
-      if !expected.contains(text) {
-        mismatched += 1
-      }
-    }
-    t = t + step
-  }
-  "checked=\{checked} mismatched=\{mismatched}"
-}
-
-///|
-/// Wherever the runtime pattern's merge is well defined, the document path's
-/// bus-derived values agree with it at every onset. The runtime pattern reads
-/// a continuous control at the query start, so those sources only play in
-/// blocks that start at every onset. The two paths drop different events
-/// under `degradeBy` (their seeds differ), so it is left out.
-test "bus-derived controls agree with the queried runtime pattern" {
-  let stepped = [
-    "note(\"60 64\").gain(\"0.3 0.6 0.9\").slow(3)", "note(\"60 64 67\").gain(\"0.1 0.2 0.3\").every(2, rev).jux(rev)",
-    "note(\"60*8\").gain(\"0.2(3,8)@3 [0.9 0.7]\")", "chord(\"Dm9 Bbmaj7\").gain(0.5).slow(2).jux(rev)",
-    "stack(note(\"60\").gain(\"0.2 0.8\"), note(\"67 64\").pan(\"-1 1\"))", "note(\"60 64\").gain(\"0.3 0.6\").rev()",
-  ]
-  let continuous = [
-    "note(\"60 64\").gain(saw).fast(2)", "note(\"60 64\").lpf(saw.range(200, 800).slow(3)).slow(2)",
-    "stack(note(\"60\").gain(\"0.2 0.8\"), note(\"67\").gain(sine))",
-  ]
-  let lines = []
-  for source in stepped {
-    for step in [bus_r(1L, 64L), bus_r(1L, 7L), bus_r(3L, 5L)] {
-      lines.push(
-        "\{step.num}/\{step.den} \{source}: \{bus_runtime_agreement(source, step)}",
-      )
-    }
-  }
-  for source in continuous {
-    lines.push(
-      "1/64 \{source}: \{bus_runtime_agreement(source, bus_r(1L, 64L))}",
-    )
-  }
-  inspect(
-    lines.join("\n"),
-    content=(
-      #|1/64 note("60 64").gain("0.3 0.6 0.9").slow(3): checked=3 mismatched=0
-      #|1/7 note("60 64").gain("0.3 0.6 0.9").slow(3): checked=3 mismatched=0
-      #|3/5 note("60 64").gain("0.3 0.6 0.9").slow(3): checked=3 mismatched=0
-      #|1/64 note("60 64 67").gain("0.1 0.2 0.3").every(2, rev).jux(rev): checked=24 mismatched=0
-      #|1/7 note("60 64 67").gain("0.1 0.2 0.3").every(2, rev).jux(rev): checked=24 mismatched=0
-      #|3/5 note("60 64 67").gain("0.1 0.2 0.3").every(2, rev).jux(rev): checked=26 mismatched=0
-      #|1/64 note("60*8").gain("0.2(3,8)@3 [0.9 0.7]"): checked=32 mismatched=0
-      #|1/7 note("60*8").gain("0.2(3,8)@3 [0.9 0.7]"): checked=32 mismatched=0
-      #|3/5 note("60*8").gain("0.2(3,8)@3 [0.9 0.7]"): checked=34 mismatched=0
-      #|1/64 chord("Dm9 Bbmaj7").gain(0.5).slow(2).jux(rev): checked=38 mismatched=0
-      #|1/7 chord("Dm9 Bbmaj7").gain(0.5).slow(2).jux(rev): checked=38 mismatched=0
-      #|3/5 chord("Dm9 Bbmaj7").gain(0.5).slow(2).jux(rev): checked=48 mismatched=0
-      #|1/64 stack(note("60").gain("0.2 0.8"), note("67 64").pan("-1 1")): checked=12 mismatched=0
-      #|1/7 stack(note("60").gain("0.2 0.8"), note("67 64").pan("-1 1")): checked=12 mismatched=0
-      #|3/5 stack(note("60").gain("0.2 0.8"), note("67 64").pan("-1 1")): checked=14 mismatched=0
-      #|1/64 note("60 64").gain("0.3 0.6").rev(): checked=8 mismatched=0
-      #|1/7 note("60 64").gain("0.3 0.6").rev(): checked=8 mismatched=0
-      #|3/5 note("60 64").gain("0.3 0.6").rev(): checked=9 mismatched=0
-      #|1/64 note("60 64").gain(saw).fast(2): checked=16 mismatched=0
-      #|1/64 note("60 64").lpf(saw.range(200, 800).slow(3)).slow(2): checked=4 mismatched=0
-      #|1/64 stack(note("60").gain("0.2 0.8"), note("67").gain(sine)): checked=8 mismatched=0
-    ),
-  )
-}
-
-///|
 /// The first onset of `source` queried over `[0, end)`: its `key`, and its bus
 /// read at each of `times`.
 fn bus_first_onset(
@@ -428,16 +323,6 @@ test "Mini control arguments accept quoted steps and signals" {
       shape("square", bus_r(3L, 4L)),
     ],
     [1.0, 1.0, 0.75, 0.5, 0.5, 0.0, 1.0],
-  )
-  // The runtime pattern path gives the same onset values.
-  guard @mini.parse("note(\"60 64\").gain(\"0.2 0.8\")") is Ok(pat) else {
-    fail("parse")
-  }
-  @debug.assert_eq(
-    pat
-    .query(@pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 1L)))
-    .map(event => event.value.get("gain")),
-    [Some(0.2), Some(0.8)],
   )
 }
 

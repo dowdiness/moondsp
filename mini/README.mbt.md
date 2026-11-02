@@ -52,9 +52,14 @@ surface:
 
 ## Choose an entry point
 
+Every entry point compiles through the same `PatternDoc` lowering, so a
+source plays the same events whichever one parses it. `parse` and
+`parse_song` are `parse_snapshot` and the song parser without exact source
+origins; `Draft` adds them.
+
 | Function | Use it when you need |
 |---|---|
-| `parse` | A runtime `Pat[ControlMap]` |
+| `parse` | The lowered `Pat[ControlMap]` of `parse_snapshot` |
 | `parse_song` | A `Song[ControlMap]` layout |
 | `parse_song_with_bpm` | A song plus authored BPM metadata |
 | `parse_doc` | A general graph document, optionally reusing previous subtrees |

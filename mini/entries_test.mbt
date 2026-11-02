@@ -80,7 +80,7 @@ test "envelope seconds change content without stretching the source period" {
 
 ///|
 test "song section entries keep their binding addresses across reordering" {
-  fn keys(body : String) -> Array[String] raise {
+  fn keys(body : String) -> Array[String] {
     let song = @mini.parse_song(
       "let a = note(\"60\").slow(3); let b = note(\"72\").slow(4); song(section(\"s\",4," +
       body +

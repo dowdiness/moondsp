@@ -1,41 +1,4 @@
 ///|
-/// Parse sound notation string into Pat[ControlMap].
-fn parse_sound_notation(
-  content : String,
-) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
-  guard !content.is_empty() else {
-    raise ParseError("position 0: empty notation")
-  }
-  let sub = NotationParser(content, sound=true)
-  sub.parse_notation()
-}
-
-///|
-/// Parse note notation string into Pat[ControlMap].
-fn parse_note_notation(
-  content : String,
-) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
-  guard !content.is_empty() else {
-    raise ParseError("position 0: empty notation")
-  }
-  let sub = NotationParser(content, sound=false)
-  sub.parse_notation()
-}
-
-///|
-/// Parse chord notation string into Pat[ControlMap].
-/// Space-separated chord names are sequenced; each chord is a stacked pattern.
-fn parse_chord_notation(
-  content : String,
-) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
-  guard !content.is_empty() else {
-    raise ParseError("position 0: empty notation")
-  }
-  let sub = NotationParser(content, sound=false, chord=true)
-  sub.parse_notation()
-}
-
-///|
 priv struct NotationProjectionModifier {
   kind : String
   from : Int

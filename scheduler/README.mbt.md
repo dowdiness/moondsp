@@ -185,7 +185,7 @@ entry of their own source grid, without backfilling earlier notes.
 
 ### Material periods and addresses
 
-The runtime mini compiler records authored periods rather than trying to infer
+Mini lowering records authored periods rather than trying to infer
 repetition from generated events. Literals have a one-cycle entry period;
 `slow` and `fast` scale it. Ordinary stacks keep independent members, including
 when gain or filtering wraps the stack. `every` and `jux` form one material with

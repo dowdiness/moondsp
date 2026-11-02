@@ -8,39 +8,39 @@ fn MiniCallback::operation(self : MiniCallback) -> @pattern.TimeTransform {
 }
 
 ///|
-priv struct MiniDefinition[A] {
-  body : A
+priv struct MiniDefinition {
+  body : @pattern.PatternDoc[@pattern.ControlMap]
   name_span : MiniSpan
 }
 
 ///|
-fn[A] MiniDefinition::MiniDefinition(
-  body : A,
+fn MiniDefinition::MiniDefinition(
+  body : @pattern.PatternDoc[@pattern.ControlMap],
   name_span : MiniSpan,
-) -> MiniDefinition[A] {
+) -> MiniDefinition {
   { body, name_span, }
 }
 
 ///|
-priv struct ResolvedMiniExpr[A] {
+priv struct ResolvedMiniExpr {
   span : MiniSpan
-  node : ResolvedMiniExprNode[A]
+  node : ResolvedMiniExprNode
 }
 
 ///|
-priv enum ResolvedMiniExprNode[A] {
+priv enum ResolvedMiniExprNode {
   Literal(MiniLiteral, String, Int)
-  Stack(Array[ResolvedMiniExpr[A]])
-  Reference(String, MiniDefinition[A])
-  Apply(ResolvedMiniExpr[A], MiniTransform)
+  Stack(Array[ResolvedMiniExpr])
+  Reference(String, MiniDefinition)
+  Apply(ResolvedMiniExpr, MiniTransform)
 }
 
 ///|
-fn[A] resolve_mini_expr(
+fn resolve_mini_expr(
   expr : MiniExpr,
-  definitions : Map[String, MiniDefinition[A]],
-) -> ResolvedMiniExpr[A] raise ParseError {
-  let node : ResolvedMiniExprNode[A] = match expr.node {
+  definitions : Map[String, MiniDefinition],
+) -> ResolvedMiniExpr raise ParseError {
+  let node : ResolvedMiniExprNode = match expr.node {
     Literal(kind, content, offset) => Literal(kind, content, offset)
     Stack(children) =>
       Stack(children.map(child => resolve_mini_expr(child, definitions)))
@@ -59,86 +59,16 @@ fn[A] resolve_mini_expr(
 }
 
 ///|
-fn[A] ResolvedMiniExpr::ResolvedMiniExpr(
+fn ResolvedMiniExpr::ResolvedMiniExpr(
   span : MiniSpan,
-  node : ResolvedMiniExprNode[A],
-) -> ResolvedMiniExpr[A] {
+  node : ResolvedMiniExprNode,
+) -> ResolvedMiniExpr {
   { span, node, }
 }
 
 ///|
-/// The control pattern this argument gives `key`.
-fn MiniValue::pattern(
-  self : MiniValue,
-  key : String,
-) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
-  match self {
-    Number(value) => @pattern.control(key, value)
-    Steps(content, _, _) =>
-      NotationParser(content, sound=false, control=key).parse_notation()
-    Signal(signal) => {
-      let pat = @pattern.continuous(key, signal.function())
-      if signal.rate == @pattern.Rational::from_int(1) {
-        pat
-      } else {
-        pat.fast(signal.rate)
-      }
-    }
-  }
-}
-
-///|
-fn compile_mini_pattern(
-  expr : ResolvedMiniExpr[@pattern.Pat[@pattern.ControlMap]],
-) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
-  match expr.node {
-    Literal(kind, content, _) => {
-      let pat = match kind {
-        Sound => parse_sound_notation(content)
-        Note => parse_note_notation(content)
-        Chord => parse_chord_notation(content)
-        Silence => @pattern.Pat::silence()
-      }
-      pat.material()
-    }
-    Stack(children) => {
-      let pats = children.map(child => compile_mini_pattern(child))
-      @pattern.stack(pats)
-    }
-    Reference(_, definition) => definition.body
-    Apply(child, transform) => {
-      let pat = compile_mini_pattern(child)
-      match transform {
-        Fast(n) => pat.fast(n)
-        Slow(n) => pat.slow(n)
-        Gate(factor) => pat.gate(factor)
-        Rev => pat.rev()
-        Degrade(p) => pat.degrade_by(p)
-        Control(key, value) => @pattern.merge_control(pat, value.pattern(key))
-        Filter(kind, frequency_hz, resonance) => {
-          let filtered = @pattern.merge_control(
-            pat,
-            frequency_hz.pattern(kind.control_key()),
-          )
-          match resonance {
-            None => filtered
-            Some(q) =>
-              @pattern.merge_control(
-                filtered,
-                q.pattern(kind.resonance_control_key()),
-              )
-          }
-        }
-        Every(n, callback) => callback.operation().every(n, pat)
-        Jux(callback) => callback.operation().jux(pat)
-      }
-    }
-  }
-}
-
-///|
 fn compile_mini_doc(
-  expr : ResolvedMiniExpr[@pattern.PatternDoc[@pattern.ControlMap]],
+  expr : ResolvedMiniExpr,
   builder : MiniDocBuilder,
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
   match expr.node {

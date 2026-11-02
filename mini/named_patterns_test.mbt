@@ -95,11 +95,9 @@ fn assert_named_compiles_like(
   inline : String,
   span : @pattern.TimeSpan,
 ) -> Unit raise {
-  let expected = unwrap_ok(@mini.parse(inline)).query(span)
-  assert_named_events(unwrap_ok(@mini.parse(source)).query(span), expected)
   assert_named_events(
-    unwrap_mini_snapshot(@mini.parse_snapshot(source)).query(span),
-    expected,
+    unwrap_ok(@mini.parse(source)).query(span),
+    unwrap_ok(@mini.parse(inline)).query(span),
   )
 }
 
@@ -180,8 +178,7 @@ test "undefined names are reported before missing declaration terminators" {
 }
 
 ///|
-test "unused definitions are validated by both compilation paths" {
+test "unused definitions are validated" {
   let source = "let unused = note(\"NotANote\"); note(\"60\")"
   assert_true(@mini.parse(source) is Err(_))
-  assert_true(@mini.parse_doc(source) is Err(_))
 }

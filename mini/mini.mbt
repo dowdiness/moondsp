@@ -25,23 +25,5 @@
 pub fn parse(
   input : String,
 ) -> Result[@pattern.Pat[@pattern.ControlMap], String] {
-  guard !input.is_empty() else { return Err("empty input") }
-  let p = Parser(input)
-  p.parse_bindings() catch {
-    ParseError(msg) => return Err(msg)
-  }
-  match mini_collect_dollar_stack_lines(input, start=p.pos) {
-    Err(msg) => return Err(msg)
-    Ok(Some(lines)) =>
-      return mini_parse_dollar_stack_program(input, lines, parser=p)
-    Ok(None) => ()
-  }
-  let result = p.parse_expr() catch { ParseError(msg) => return Err(msg) }
-  p.skip_whitespace()
-  guard p.at_end() else {
-    return Err(
-      "position \{p.pos}: unexpected trailing input '\{input[p.pos:].to_owned()}'",
-    )
-  }
-  Ok(result)
+  parse_snapshot(input).map(snapshot => snapshot.pat())
 }

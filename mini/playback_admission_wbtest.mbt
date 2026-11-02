@@ -16,7 +16,12 @@ test "query bounds cover phase edges full-cycle slots and future callbacks" {
     let syntax = parser.parse_syntax_expr()
     let admission = PlaybackAdmission(0.125)
     let work = admission.expression(syntax)
-    let pat = compile_mini_pattern(resolve_mini_expr(syntax, parser.bindings))
+    let pat = compile_mini_doc(
+        resolve_mini_expr(syntax, parser.bindings),
+        MiniDocBuilder(previous=None),
+      )
+      .lower()
+      .pat()
     for start in starts {
       for width in widths {
         let events = pat.query(@pattern.TimeSpan(start, start + width))

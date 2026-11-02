@@ -94,7 +94,7 @@ fn parse_play_source_with_origins(
   let builder = MiniDocBuilder(previous~, origins~)
   let mut authored_bpm : Double? = None
   while true {
-    parser.parse_bindings(builder=Some(builder)) catch {
+    parser.parse_bindings(builder) catch {
       ParseError(msg) => return Err(msg)
     }
     parser.skip_whitespace()

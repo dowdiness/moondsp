@@ -59,7 +59,7 @@ pub fn parse_song_with_bpm(input : String) -> Result[ParsedSong, String] {
   guard !input.is_empty() else { return Err("empty input") }
   let p = Parser(input)
   let builder = MiniDocBuilder(previous=None, origins=None)
-  p.parse_bindings(builder=Some(builder)) catch {
+  p.parse_bindings(builder) catch {
     ParseError(msg) => return Err(msg)
   }
   let result = p.parse_song_expr(builder) catch {
@@ -199,7 +199,7 @@ fn Parser::parse_song_section(
   if self.admission is Some(admission) {
     admission.sections[name] = admission.expression(syntax)
   }
-  let doc = compile_mini_doc(resolve_mini_expr(syntax, self.doc_bindings), builder)
+  let doc = compile_mini_doc(resolve_mini_expr(syntax, self.bindings), builder)
   self.skip_whitespace()
   self.expect_char(')')
   let compile_error = ParseError(

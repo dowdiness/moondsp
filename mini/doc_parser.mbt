@@ -784,7 +784,7 @@ fn parse_doc_internal(
   guard !input.is_empty() else { return Err("empty input") }
   let p = Parser(input)
   let builder = MiniDocBuilder(previous~)
-  p.parse_bindings(builder=Some(builder)) catch {
+  p.parse_bindings(builder) catch {
     ParseError(msg) => return Err(msg)
   }
   match mini_collect_dollar_stack_lines(input, start=p.pos) {
@@ -874,7 +874,7 @@ fn Parser::parse_doc_expr(
     admission.roots.push(admission.expression(syntax))
     Overlay(admission.roots).check(admission.width)
   }
-  let resolved = resolve_mini_expr(syntax, self.doc_bindings)
+  let resolved = resolve_mini_expr(syntax, self.bindings)
   compile_mini_doc(resolved, builder)
 }
 

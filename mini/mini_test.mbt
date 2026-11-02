@@ -131,19 +131,11 @@ test "parse_snapshot preserves rest timing and source identity" {
 ///|
 test "gate uses an exact fraction and leaves note onsets unchanged" {
   let source = "note(\"C4 D4 E4 G4\").gate(0.4)"
-  let runtime_events = query_one_cycle(unwrap_ok(@mini.parse(source)))
-  let snapshot_events = unwrap_mini_snapshot(@mini.parse_snapshot(source)).query(
-    @pattern.TimeSpan(
-      @pattern.Rational::from_int(0),
-      @pattern.Rational::from_int(1),
-    ),
-  )
-  for events in [runtime_events, snapshot_events] {
-    assert_eq(events.length(), 4)
-    assert_eq(events[0].whole.unwrap().end_, @pattern.Rational(1L, 10L))
-    assert_eq(events[1].whole.unwrap().begin, @pattern.Rational(1L, 4L))
-    assert_eq(events[1].whole.unwrap().end_, @pattern.Rational(7L, 20L))
-  }
+  let events = query_one_cycle(unwrap_ok(@mini.parse(source)))
+  assert_eq(events.length(), 4)
+  assert_eq(events[0].whole.unwrap().end_, @pattern.Rational(1L, 10L))
+  assert_eq(events[1].whole.unwrap().begin, @pattern.Rational(1L, 4L))
+  assert_eq(events[1].whole.unwrap().end_, @pattern.Rational(7L, 20L))
 }
 
 ///|
@@ -1481,7 +1473,7 @@ test "parse degradeBy method chain" {
 
 ///|
 test "degradeBy drops the same events wherever the same expression is written" {
-  fn kept_hats(source : String) -> Array[@pattern.Rational] raise {
+  fn kept_hats(source : String) -> Array[@pattern.Rational] {
     let pat = @mini.parse_snapshot(source).unwrap().pat()
     pat
     .query(

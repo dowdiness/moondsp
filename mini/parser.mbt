@@ -31,11 +31,7 @@ priv suberror ParseError {
 priv struct Parser {
   input : String
   mut pos : Int
-  bindings : Map[String, MiniDefinition[@pattern.Pat[@pattern.ControlMap]]]
-  doc_bindings : Map[
-    String,
-    MiniDefinition[@pattern.PatternDoc[@pattern.ControlMap]],
-  ]
+  bindings : Map[String, MiniDefinition]
   admission : PlaybackAdmission?
   mut recognition : Bool
   mut recognized_pattern : Bool
@@ -63,7 +59,6 @@ fn Parser::Parser(
     input,
     pos: 0,
     bindings: Map([]),
-    doc_bindings: Map([]),
     admission,
     recognition: false,
     recognized_pattern: false,
@@ -129,27 +124,6 @@ fn mini_collect_dollar_stack_lines(
   } else {
     Ok(None)
   }
-}
-
-///|
-fn mini_parse_dollar_stack_program(
-  input : String,
-  lines : Array[MiniDollarStackLine],
-  parser? : Parser = Parser(input),
-) -> Result[@pattern.Pat[@pattern.ControlMap], String] {
-  let args : Array[@pattern.Pat[@pattern.ControlMap]] = []
-  for line in lines {
-    parser.pos = line.start
-    let pat = parser.parse_expr() catch { ParseError(msg) => return Err(msg) }
-    parser.skip_inline_whitespace()
-    if parser.pos != line.end {
-      return Err(
-        "position \{parser.pos}: unexpected trailing input '\{input[parser.pos:line.end].to_owned()}'",
-      )
-    }
-    args.push(pat)
-  }
-  Ok(if args.length() == 1 { args[0] } else { @pattern.stack(args) })
 }
 
 ///|
@@ -488,19 +462,6 @@ fn Parser::read_quoted_string(self : Parser) -> String raise ParseError {
 }
 
 ///|
-/// Parse the top-level expression: primary ( "." method )*
-fn Parser::parse_expr(
-  self : Parser,
-) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
-  let syntax = self.parse_syntax_expr()
-  if self.admission is Some(admission) {
-    ignore(admission.expression(syntax))
-  }
-  let resolved = resolve_mini_expr(syntax, self.bindings)
-  compile_mini_pattern(resolved)
-}
-
-///|
 /// Reject silent integer truncation. `every(2.5, ...)` and
 /// `every(2, fast(1.9))` should raise rather than round to 2/1.
 fn require_integer(
@@ -540,7 +501,7 @@ fn Parser::read_binding_name(self : Parser) -> String? raise ParseError {
       )
     _ => ()
   }
-  if self.bindings.contains(name) || self.doc_bindings.contains(name) {
+  if self.bindings.contains(name) {
     raise ParseError("position \{name_start}: duplicate pattern '\{name}'")
   }
   self.skip_whitespace()
@@ -555,7 +516,7 @@ fn Parser::read_binding_name(self : Parser) -> String? raise ParseError {
 ///|
 fn Parser::parse_bindings(
   self : Parser,
-  builder? : MiniDocBuilder? = None,
+  builder : MiniDocBuilder,
 ) -> Unit raise ParseError {
   while true {
     self.skip_whitespace()
@@ -566,25 +527,12 @@ fn Parser::parse_bindings(
     }
     // Resolve before checking the terminator to preserve diagnostic precedence.
     // Compile unused declarations too; publish a name only after success.
-    match builder {
-      None => {
-        let body = resolve_mini_expr(syntax, self.bindings)
-        self.skip_whitespace()
-        self.expect_char(';')
-        self.bindings[name] = MiniDefinition::MiniDefinition(
-          compile_mini_pattern(body),
-          self.last_binding_span,
-        )
-      }
-      Some(builder) => {
-        let body = resolve_mini_expr(syntax, self.doc_bindings)
-        self.skip_whitespace()
-        self.expect_char(';')
-        self.doc_bindings[name] = MiniDefinition::MiniDefinition(
-          compile_mini_doc(body, builder),
-          self.last_binding_span,
-        )
-      }
-    }
+    let body = resolve_mini_expr(syntax, self.bindings)
+    self.skip_whitespace()
+    self.expect_char(';')
+    self.bindings[name] = MiniDefinition::MiniDefinition(
+      compile_mini_doc(body, builder),
+      self.last_binding_span,
+    )
   }
 }
