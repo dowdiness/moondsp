@@ -126,6 +126,8 @@ priv struct NotationParser {
   mut projection_root : Int?
   mut last_modifier_value : Int
   mut last_euclid_args : Array[Int]
+  /// `?` steps so far, so each one drops independently of the others.
+  mut degrade_steps : Int
 }
 
 ///|
@@ -152,6 +154,7 @@ fn NotationParser::NotationParser(
     projection_root: None,
     last_modifier_value: 0,
     last_euclid_args: [],
+    degrade_steps: 0,
     query_work: if assess {
       Some(Atom)
     } else {

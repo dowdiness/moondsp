@@ -171,6 +171,16 @@ one zero; the browser still enforces its MIDI pitch range. Accidentals precede
 the quality: `C#sus4` and `Dbsus4` are supported, including double accidentals.
 The `s` in `sus2`/`sus4` is not consumed as another sharp.
 
+## Random drops
+
+`.degradeBy(p)` and `a?` are deterministic: the same source drops the same
+events on every run. The seed comes from the transformed expression's
+musical content, not from where it is written, so naming it with `let`,
+reordering a stack, or editing another part of the source keeps its drops.
+Two identical expressions therefore drop the same events. Each `?` within one
+quoted string also counts its order there, so `"bd? bd?"` drops its steps
+independently. The seed never depends on `p`: raising `p` drops a superset.
+
 ## Source identity
 
 Parentheses group expressions without adding a source node. Regrouping a raw

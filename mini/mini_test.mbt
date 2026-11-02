@@ -455,6 +455,17 @@ test "MiniDocBuilder::note_atom rejects invalid note text" {
 }
 
 ///|
+test "MiniDocBuilder transforms documents it did not build" {
+  let builder = @mini.MiniDocBuilder::with_previous(None)
+  let parsed = unwrap_doc(@mini.parse_doc("note(\"60 62\")"))
+  let own = builder.note_atom(pid("mini:note:64:0"), "64").unwrap()
+  let fast = builder.fast(parsed, @pattern.Rational::from_int(2)).unwrap()
+  let dropped = builder.degrade(fast, 0.5).unwrap()
+  let doc = builder.sequence([dropped, own]).unwrap()
+  assert_true(doc.lower().pat().entries().length() > 0)
+}
+
+///|
 test "parse_doc_reusing preserves ids across whitespace edits" {
   let doc = unwrap_doc(@mini.parse_doc("s(\"bd sd\")"))
   let edited = unwrap_doc(
@@ -1463,6 +1474,52 @@ test "parse degradeBy method chain" {
   )
   let kept = query_one_cycle(pat).length()
   inspect(kept < 16 && kept > 0, content="true")
+}
+
+///|
+test "degradeBy drops the same events wherever the same expression is written" {
+  fn kept_hats(source : String) -> Array[@pattern.Rational] raise {
+    let pat = @mini.parse_snapshot(source).unwrap().pat()
+    pat
+    .query(
+      @pattern.TimeSpan(
+        @pattern.Rational::from_int(0),
+        @pattern.Rational::from_int(4),
+      ),
+    )
+    .filter(event => event.value.get("gain") is None)
+    .map(event => event.part.begin)
+  }
+
+  let alone = kept_hats("s(\"hh*16\").degradeBy(0.5)")
+  assert_true(alone.length() > 0 && alone.length() < 64)
+  // An earlier hh atom must not reseed the later one, and naming is transparent.
+  @debug.assert_eq(
+    kept_hats("stack(s(\"hh\").gain(0.3), s(\"hh*16\").degradeBy(0.5))"),
+    alone,
+  )
+  @debug.assert_eq(
+    kept_hats(
+      "let hats = s(\"hh*16\"); stack(s(\"hh\").gain(0.3), hats.degradeBy(0.5))",
+    ),
+    alone,
+  )
+}
+
+///|
+test "each ? step of a notation drops independently" {
+  let steps = Array::make(16, "bd?").join(" ")
+  let kept = @mini.parse_snapshot("s(\"\{steps}\")")
+    .unwrap()
+    .pat()
+    .query(
+      @pattern.TimeSpan(
+        @pattern.Rational::from_int(0),
+        @pattern.Rational::from_int(1),
+      ),
+    )
+    .length()
+  assert_true(kept > 0 && kept < 16)
 }
 
 ///|

@@ -472,3 +472,21 @@ test "Mini control arguments are range-checked and syntax-checked" {
     ),
   )
 }
+
+///|
+test "step argument spelling does not change identity or degrade drops" {
+  fn shape(steps : String) -> (String, Array[@pattern.Rational]) raise {
+    let doc = @mini.parse_doc(
+      "s(\"bd sd hh cp\").gain(\"" + steps + "\").degradeBy(0.5)",
+    ).unwrap()
+    let kept = doc
+      .lower()
+      .query(@pattern.TimeSpan(bus_r(0L, 1L), bus_r(8L, 1L)))
+      .map(event => event.part.begin)
+    (doc.root().value(), kept)
+  }
+
+  let (root, kept) = shape("0.3 0.8")
+  @debug.assert_eq(shape("0.3   0.8"), (root, kept))
+  @debug.assert_eq(shape("[0.3 0.8]").1, kept)
+}

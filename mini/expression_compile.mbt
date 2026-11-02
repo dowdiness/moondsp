@@ -1,13 +1,4 @@
 ///|
-fn MiniCallback::signature(self : MiniCallback) -> String {
-  match self {
-    Fast(n) => "fast:\{n}"
-    Slow(n) => "slow:\{n}"
-    Rev => "rev"
-  }
-}
-
-///|
 fn MiniCallback::operation(self : MiniCallback) -> @pattern.TimeTransform {
   match self {
     Fast(n) => @pattern.TimeTransform::Fast(@pattern.Rational::from_int(n))
@@ -160,7 +151,7 @@ fn compile_mini_doc(
           parse_chord_doc_notation(content, builder, source_offset=offset)
         Silence => {
           let id = builder.atom_id_at("silence", "~", offset, offset + 9)
-          @pattern.PatternDoc::silence(id~)
+          builder.rest_doc(id)
         }
       }
       match builder.source_frame_at(offset, offset + content.length()) {
@@ -202,8 +193,7 @@ fn compile_mini_doc(
         Slow(n) => builder.slow_doc(doc, n)
         Gate(factor) => builder.gate_doc(doc, factor)
         Rev => builder.rev_doc(doc)
-        Degrade(p) =>
-          builder.degrade_doc(doc, p, stable_seed(doc.root().value()))
+        Degrade(p) => builder.degrade_doc(doc, p)
         Control(key, value) => builder.control_value_doc(doc, key, value)
         Filter(kind, frequency_hz, resonance) => {
           let filtered = builder.control_value_doc(
@@ -221,8 +211,8 @@ fn compile_mini_doc(
               )
           }
         }
-        Every(n, callback) => builder.every_doc(doc, n, callback)
-        Jux(callback) => builder.jux_doc(doc, callback)
+        Every(n, callback) => builder.every_doc(doc, n, callback.operation())
+        Jux(callback) => builder.jux_doc(doc, callback.operation())
       }
     }
   }

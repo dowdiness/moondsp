@@ -109,6 +109,8 @@ priv struct LoomMiniRawProjection {
 priv struct LoomMiniProjectedCursor {
   atoms : Array[LoomMiniProjectedAtom]
   mut offset : Int
+  /// `?` postfixes so far in the current notation string.
+  mut degrade_steps : Int
 }
 
 ///|
@@ -183,13 +185,7 @@ pub fn LoomMiniAtomProjection::new(input : String) -> LoomMiniAtomProjection {
         stable,
       )
       let builder = @mini.MiniDocBuilder::with_previous(previous_doc)
-      match
-        loom_mini_build_projected_doc(
-          builder,
-          previous_doc,
-          raw_projection.expr,
-          atoms,
-        ) {
+      match loom_mini_build_projected_doc(builder, raw_projection.expr, atoms) {
         Ok(doc) => {
           previous_doc = Some(doc)
           identity_tracker.commit_success(current_source, stable)
@@ -1090,18 +1086,17 @@ fn loom_mini_atom_kind_label(kind : LoomMiniAtomKind) -> String {
 fn LoomMiniProjectedCursor::new(
   atoms : Array[LoomMiniProjectedAtom],
 ) -> LoomMiniProjectedCursor {
-  { atoms, offset: 0, }
+  { atoms, offset: 0, degrade_steps: 0, }
 }
 
 ///|
 fn loom_mini_build_projected_doc(
   builder : @mini.MiniDocBuilder,
-  previous_doc : @pattern.PatternDoc[@pattern.ControlMap]?,
   expr : LoomMiniExpr,
   atoms : Array[LoomMiniProjectedAtom],
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
   let cursor = LoomMiniProjectedCursor::new(atoms)
-  let doc = match loom_mini_lower_expr(builder, previous_doc, expr, cursor) {
+  let doc = match loom_mini_lower_expr(builder, expr, cursor) {
     Ok(doc) => doc
     Err(msg) => return Err(msg)
   }
@@ -1114,16 +1109,18 @@ fn loom_mini_build_projected_doc(
 ///|
 fn loom_mini_lower_expr(
   builder : @mini.MiniDocBuilder,
-  previous_doc : @pattern.PatternDoc[@pattern.ControlMap]?,
   expr : LoomMiniExpr,
   cursor : LoomMiniProjectedCursor,
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
   match expr {
-    NotationExpr(layers) => loom_mini_lower_notation(builder, layers, cursor)
+    NotationExpr(layers) => {
+      cursor.degrade_steps = 0
+      loom_mini_lower_notation(builder, layers, cursor)
+    }
     StackExpr(children) => {
       let docs : Array[@pattern.PatternDoc[@pattern.ControlMap]] = []
       for child in children {
-        match loom_mini_lower_expr(builder, previous_doc, child, cursor) {
+        match loom_mini_lower_expr(builder, child, cursor) {
           Ok(doc) => docs.push(doc)
           Err(msg) => return Err(msg)
         }
@@ -1131,12 +1128,11 @@ fn loom_mini_lower_expr(
       builder.stack(docs)
     }
     MethodChainExpr(inner, methods) => {
-      let base_doc = match
-        loom_mini_lower_expr(builder, previous_doc, inner, cursor) {
+      let base_doc = match loom_mini_lower_expr(builder, inner, cursor) {
         Ok(doc) => doc
         Err(msg) => return Err(msg)
       }
-      loom_mini_apply_method_chain(builder, previous_doc, base_doc, methods)
+      loom_mini_apply_method_chain(builder, base_doc, methods)
     }
   }
 }
@@ -1144,7 +1140,6 @@ fn loom_mini_lower_expr(
 ///|
 fn loom_mini_apply_method_chain(
   builder : @mini.MiniDocBuilder,
-  previous_doc : @pattern.PatternDoc[@pattern.ControlMap]?,
   base_doc : @pattern.PatternDoc[@pattern.ControlMap],
   methods : Array[LoomMiniMethodCall],
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
@@ -1166,43 +1161,32 @@ fn loom_mini_apply_method_chain(
           Err(msg) => return Err(msg)
         }
       ControlMethod(key, value) =>
-        match loom_mini_apply_control_method(previous_doc, doc, key, value) {
+        match builder.control(doc, key, value) {
           Ok(next) => continue next
           Err(msg) => return Err(msg)
         }
       FilterMethod(kind, frequency_hz, resonance) => {
         let filtered = match
-          loom_mini_apply_control_method(
-            previous_doc,
-            doc,
-            kind.control_key(),
-            frequency_hz,
-          ) {
+          builder.control(doc, kind.control_key(), frequency_hz) {
           Ok(next) => next
           Err(msg) => return Err(msg)
         }
         match resonance {
           None => continue filtered
           Some(q) =>
-            match
-              loom_mini_apply_control_method(
-                previous_doc,
-                filtered,
-                kind.resonance_control_key(),
-                q,
-              ) {
+            match builder.control(filtered, kind.resonance_control_key(), q) {
               Ok(next) => continue next
               Err(msg) => return Err(msg)
             }
         }
       }
       JuxMethod(callback) =>
-        match loom_mini_apply_jux_method(doc, callback) {
+        match builder.jux(doc, loom_mini_callback_transform(callback)) {
           Ok(next) => continue next
           Err(msg) => return Err(msg)
         }
       EveryMethod(n, callback) =>
-        match loom_mini_apply_every_method(doc, n, callback) {
+        match builder.every(doc, n, loom_mini_callback_transform(callback)) {
           Ok(next) => continue next
           Err(msg) => return Err(msg)
         }
@@ -1211,124 +1195,6 @@ fn loom_mini_apply_method_chain(
     doc
   }
   Ok(doc)
-}
-
-///|
-fn loom_mini_apply_control_method(
-  previous_doc : @pattern.PatternDoc[@pattern.ControlMap]?,
-  doc : @pattern.PatternDoc[@pattern.ControlMap],
-  key : String,
-  value : Double,
-) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
-  let control_id = match
-    loom_mini_pattern_node_id(
-      "mini:control:\{doc.root().value()}:\{key}:\{value}",
-    ) {
-    Ok(id) => id
-    Err(msg) => return Err(msg)
-  }
-  let id = match
-    loom_mini_pattern_node_id(
-      "mini:merge_control:\{doc.root().value()}:\{key}:\{value}",
-    ) {
-    Ok(id) => id
-    Err(msg) => return Err(msg)
-  }
-  match loom_mini_reuse_previous_doc(previous_doc, id) {
-    Ok(Some(doc)) => return Ok(doc)
-    Ok(None) => ()
-    Err(msg) => return Err(msg)
-  }
-  let control_doc = match
-    loom_mini_reuse_previous_doc(previous_doc, control_id) {
-    Ok(Some(doc)) => doc
-    Ok(None) =>
-      @pattern.PatternDoc::pure(
-        id=control_id,
-        value=@pattern.ControlMap::single(key, value),
-      )
-    Err(msg) => return Err(msg)
-  }
-  let result = try? @pattern.PatternDoc::merge_control(
-    id~,
-    left=doc,
-    right=control_doc,
-  )
-  match result {
-    Ok(next) => Ok(next)
-    Err(_) => Err("internal loom mini PatternDoc construction failed")
-  }
-}
-
-///|
-fn loom_mini_reuse_previous_doc(
-  previous_doc : @pattern.PatternDoc[@pattern.ControlMap]?,
-  id : @identity.PatternNodeId,
-) -> Result[@pattern.PatternDoc[@pattern.ControlMap]?, String] {
-  match previous_doc {
-    None => Ok(None)
-    Some(previous) =>
-      if previous.contains_node(id) {
-        let result = try? previous.subdoc(root=id)
-        match result {
-          Ok(doc) => Ok(Some(doc))
-          Err(_) =>
-            Err("internal loom mini id could not be reused: \{id.value()}")
-        }
-      } else {
-        Ok(None)
-      }
-  }
-}
-
-///|
-fn loom_mini_apply_jux_method(
-  doc : @pattern.PatternDoc[@pattern.ControlMap],
-  callback : LoomMiniMethodCallback,
-) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
-  let signature = loom_mini_callback_signature(callback)
-  let id = match
-    loom_mini_pattern_node_id("mini:jux:\{doc.root().value()}:\{signature}") {
-    Ok(id) => id
-    Err(msg) => return Err(msg)
-  }
-  let transform = loom_mini_callback_transform(callback)
-  let result = try? doc.jux(id~, transform~)
-  match result {
-    Ok(next) => Ok(next)
-    Err(_) => Err("internal loom mini PatternDoc construction failed")
-  }
-}
-
-///|
-fn loom_mini_apply_every_method(
-  doc : @pattern.PatternDoc[@pattern.ControlMap],
-  n : Int,
-  callback : LoomMiniMethodCallback,
-) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
-  let signature = loom_mini_callback_signature(callback)
-  let id = match
-    loom_mini_pattern_node_id(
-      "mini:every:\{doc.root().value()}:\{n}:\{signature}",
-    ) {
-    Ok(id) => id
-    Err(msg) => return Err(msg)
-  }
-  let transform = loom_mini_callback_transform(callback)
-  let result = try? doc.every(id~, n~, transform~)
-  match result {
-    Ok(next) => Ok(next)
-    Err(_) => Err("internal loom mini PatternDoc construction failed")
-  }
-}
-
-///|
-fn loom_mini_callback_signature(callback : LoomMiniMethodCallback) -> String {
-  match callback {
-    FastCallback(factor) => "fast:\{factor}"
-    SlowCallback(factor) => "slow:\{factor}"
-    RevCallback => "rev"
-  }
 }
 
 ///|
@@ -1393,14 +1259,14 @@ fn loom_mini_lower_element(
         Err(msg) => return Err(msg)
       }
       cursor.offset += 1
-      loom_mini_apply_postfixes(builder, atom_doc, raw.postfixes)
+      loom_mini_apply_postfixes(builder, atom_doc, raw.postfixes, cursor)
     }
     SubNotationElement(layers, postfixes) => {
       let doc = match loom_mini_lower_notation(builder, layers, cursor) {
         Ok(doc) => doc
         Err(msg) => return Err(msg)
       }
-      loom_mini_apply_postfixes(builder, doc, postfixes)
+      loom_mini_apply_postfixes(builder, doc, postfixes, cursor)
     }
   }
 }
@@ -1410,6 +1276,7 @@ fn loom_mini_apply_postfixes(
   builder : @mini.MiniDocBuilder,
   base_doc : @pattern.PatternDoc[@pattern.ControlMap],
   postfixes : Array[LoomMiniAtomPostfix],
+  cursor : LoomMiniProjectedCursor,
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
   let doc = for postfix in postfixes; doc = base_doc {
     match postfix {
@@ -1423,11 +1290,14 @@ fn loom_mini_apply_postfixes(
           Ok(next) => continue next
           Err(msg) => return Err(msg)
         }
-      DegradePostfix =>
-        match builder.degrade(doc, 0.5) {
+      DegradePostfix => {
+        let step = cursor.degrade_steps
+        cursor.degrade_steps += 1
+        match builder.degrade(doc, 0.5, step~) {
           Ok(next) => continue next
           Err(msg) => return Err(msg)
         }
+      }
       EuclidPostfix(k, n, rotation) =>
         match builder.euclid(doc, k, n, rotation) {
           Ok(next) => continue next
