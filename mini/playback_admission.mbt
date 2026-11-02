@@ -192,13 +192,12 @@ priv struct PlaybackAdmission {
   definitions : Map[String, MiniQueryWork]
   sections : Map[String, MiniQueryWork]
   roots : Array[MiniQueryWork]
-  mut last : MiniQueryWork
   mut nodes : Int
 }
 
 ///|
 fn PlaybackAdmission::PlaybackAdmission(width : Double) -> PlaybackAdmission {
-  { width, definitions: {}, sections: {}, roots: [], last: Quiet, nodes: 0, }
+  { width, definitions: {}, sections: {}, roots: [], nodes: 0, }
 }
 
 ///|
@@ -295,7 +294,6 @@ fn PlaybackAdmission::expression(
     }
   }
   work.check(self.width)
-  self.last = work
   work
 }
 

@@ -58,10 +58,13 @@ pub fn parse_song(
 pub fn parse_song_with_bpm(input : String) -> Result[ParsedSong, String] {
   guard !input.is_empty() else { return Err("empty input") }
   let p = Parser(input)
-  p.parse_bindings() catch {
+  let builder = MiniDocBuilder(previous=None, origins=None)
+  p.parse_bindings(builder=Some(builder)) catch {
     ParseError(msg) => return Err(msg)
   }
-  let result = p.parse_song_expr() catch { ParseError(msg) => return Err(msg) }
+  let result = p.parse_song_expr(builder) catch {
+    ParseError(msg) => return Err(msg)
+  }
   p.skip_whitespace()
   guard p.at_end() else {
     return Err(
@@ -74,7 +77,7 @@ pub fn parse_song_with_bpm(input : String) -> Result[ParsedSong, String] {
 ///|
 fn Parser::parse_song_expr(
   self : Parser,
-  builder? : MiniDocBuilder? = None,
+  builder : MiniDocBuilder,
 ) -> ParsedSong raise ParseError {
   self.skip_whitespace()
   let song_start = self.pos
@@ -129,7 +132,7 @@ fn Parser::parse_song_item(
   part_specs : Array[SongPartSpec],
   fill_specs : Array[SongFillSpec],
   bpm_values : Array[Double],
-  builder~ : MiniDocBuilder?,
+  builder~ : MiniDocBuilder,
 ) -> Unit raise ParseError {
   self.skip_whitespace()
   let item_start = self.pos
@@ -183,58 +186,40 @@ fn Parser::parse_song_bpm(
 fn Parser::parse_song_section(
   self : Parser,
   item_start : Int,
-  builder~ : MiniDocBuilder?,
+  builder~ : MiniDocBuilder,
 ) -> @song.Section[@pattern.ControlMap] raise ParseError {
   self.skip_whitespace()
   let name = self.read_quoted_string()
   self.expect_comma()
   let length_cycles = self.read_song_rational("section length")
   self.expect_comma()
-  let snapshot = match builder {
-    Some(builder) => {
-      let doc = self.parse_doc_expr(builder)
-      Some(
-        doc.lower_with_origins() catch {
-          _ =>
-            raise ParseError(
-              "position \{item_start}: could not compile section origins",
-            )
-        },
-      )
-    }
-    None => None
-  }
-  let body = match snapshot {
-    Some(snapshot) => snapshot.pat()
-    None => self.parse_expr()
-  }
+  // A section plays only within its occurrences, which `arrangement` bounds,
+  // so it is not overlaid with the other sections.
+  let syntax = self.parse_syntax_expr()
   if self.admission is Some(admission) {
-    admission.sections[name] = admission.last
+    admission.sections[name] = admission.expression(syntax)
   }
+  let doc = compile_mini_doc(resolve_mini_expr(syntax, self.doc_bindings), builder)
   self.skip_whitespace()
   self.expect_char(')')
-  try {
-    match snapshot {
-      Some(snapshot) =>
-        @song.Section::with_origins(
-          name~,
-          length_cycles~,
-          scope=@song.TimeScope::identity(),
-          snapshot~,
-        )
-      None =>
-        @song.Section(
-          name~,
-          length_cycles~,
-          scope=@song.TimeScope::identity(),
-          body=@song.SectionBody::single(body),
-        )
+  let compile_error = ParseError(
+    "position \{item_start}: could not compile section '\{name}'",
+  )
+  let length_error = ParseError(
+    "position \{item_start}: section '\{name}' requires a positive length",
+  )
+  let scope = @song.TimeScope::identity()
+  if builder.origins is Some(_) {
+    let snapshot = doc.lower_with_origins() catch { _ => raise compile_error }
+    @song.Section::with_origins(name~, length_cycles~, scope~, snapshot~) catch {
+      _ => raise length_error
     }
-  } catch {
-    _ =>
-      raise ParseError(
-        "position \{item_start}: section '\{name}' requires a positive length",
-      )
+  } else {
+    let snapshot = doc.lower() catch { _ => raise compile_error }
+    let body = @song.SectionBody::single(snapshot.pat())
+    @song.Section(name~, length_cycles~, scope~, body~) catch {
+      _ => raise length_error
+    }
   }
 }
 

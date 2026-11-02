@@ -363,7 +363,7 @@ test "source material budget rejects future occurrences before publishing Ready"
   assert_true(init_scheduler_graph_for_test())
   assert_eq(submit_for_test(HELD_NOTE, restart=false), 0)
   let parts = [ for i in 0..<100 => "part(\"p\{i}\",\"a\")" ]
-  let oversized = "song(section(\"a\",1,stack(note(\"~\"),note(\"~\"),note(\"~\")))," +
+  let oversized = "song(section(\"a\",1,stack(note(\"60\"),note(\"62\"),note(\"64\")))," +
     parts.join(",") +
     ")"
   assert_eq(submit_for_test(oversized, restart=false), 1)

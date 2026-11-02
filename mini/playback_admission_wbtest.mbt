@@ -146,3 +146,30 @@ test "generated transform compositions respect estimated events and preserve out
     }
   }
 }
+
+///|
+test "sequential song sections are admitted one occurrence at a time" {
+  let span = Some(@pattern.Rational::from_int(1))
+  let sections = [
+    for name in ["bd", "sd", "hh", "cp", "oh"] => {
+      "section(\"\{name}\",4,s(\"\{name}*64\"))"
+    }
+  ]
+  let parts = [
+    for name in ["bd", "sd", "hh", "cp", "oh"] => {
+      "part(\"p\{name}\",\"\{name}\")"
+    }
+  ]
+  let song = "song(" + sections.join(",") + "," + parts.join(",") + ")"
+  assert_true(parse_play_source(song, max_query_span=span) is Ok(_))
+  let draft = Draft(song)
+  guard draft.prepare_playback() is Ok(input) else { fail("prepare") }
+  assert_true(input.compile(max_query_span=span) is Ok(_))
+  // Occurrences that sound together are still bounded together.
+  let layered = "song(" +
+    sections.join(",") +
+    "," +
+    parts.map(part => part.replace(old=")", new=",0)")).join(",") +
+    ")"
+  assert_true(parse_play_source(layered, max_query_span=span) is Err(_))
+}

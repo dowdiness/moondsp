@@ -109,20 +109,7 @@ fn parse_play_source_with_origins(
   }
   if parser.match_keyword("song(") {
     parser.pos -= 5
-    if origins is None {
-      for name, definition in parser.doc_bindings {
-        let lowered = definition.body.lower() catch {
-          _ => return Err("could not lower section binding '\{name}'")
-        }
-        parser.bindings[name] = MiniDefinition(
-          lowered.pat(),
-          definition.name_span,
-        )
-      }
-    }
-    let parsed = parser.parse_song_expr(
-      builder=if origins is Some(_) { Some(builder) } else { None },
-    ) catch {
+    let parsed = parser.parse_song_expr(builder) catch {
       ParseError(msg) => return Err(msg)
     }
     parser.skip_whitespace()
