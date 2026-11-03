@@ -328,7 +328,7 @@ test "process_events: single note-on creates active voice" {
 
 ///|
 test "process_events: preserves caller-owned event order" {
-  let (pool, sched, _, _) = make_test_sched()
+  let (_, sched, _, _) = make_test_sched()
   let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(2),
@@ -372,7 +372,7 @@ test "render_block: pending snapshot commits at block boundary" {
 
 ///|
 test "Release detaches the note while its tail finishes sounding" {
-  let (pool, sched, left, right) = make_test_sched()
+  let (_, sched, left, right) = make_test_sched()
   let root = pid("release")
   sched.queue_pattern_snapshot(note_snapshot(root.value(), 60.0))
   sched.render_block(left, right)
@@ -392,7 +392,7 @@ test "Release detaches the note while its tail finishes sounding" {
 
 ///|
 test "Kill detaches the note and silences it immediately" {
-  let (pool, sched, left, right) = make_test_sched()
+  let (_, sched, left, right) = make_test_sched()
   let root = pid("kill")
   sched.queue_pattern_snapshot(note_snapshot(root.value(), 60.0))
   sched.render_block(left, right)
@@ -436,8 +436,8 @@ test "Retune changes the sounding voice without detaching its note" {
 
 ///|
 test "Rejected retune preserves audio and the previously queued snapshot" {
-  let (pool, sched, left, right) = make_test_sched()
-  let (reference_pool, reference, expected_left, expected_right) = make_test_sched()
+  let (_, sched, left, right) = make_test_sched()
+  let (_, reference, expected_left, expected_right) = make_test_sched()
   let root = pid("rejected-retune")
   let playing = note_snapshot(root.value(), 60.0)
   sched.queue_pattern_snapshot(playing)
@@ -489,8 +489,8 @@ test "Rejected retune preserves audio and the previously queued snapshot" {
 
 ///|
 test "Pattern selection kills the selected child but leaves its sibling sounding" {
-  let (pool, sched, left, right) = make_test_sched()
-  let (reference_pool, reference, expected_left, expected_right) = make_test_sched()
+  let (_, sched, left, right) = make_test_sched()
+  let (_, reference, expected_left, expected_right) = make_test_sched()
   reference.queue_pattern_snapshot(note_snapshot("sibling", 72.0))
   reference.render_block(expected_left, expected_right)
   let doc = @pattern.PatternDoc::stack(id=pid("mix"), docs=[
@@ -524,8 +524,8 @@ test "Pattern selection kills the selected child but leaves its sibling sounding
 
 ///|
 test "Song layer selection does not cross section boundaries" {
-  let (pool, sched, left, right) = make_test_sched()
-  let (reference_pool, reference, expected_left, expected_right) = make_test_sched()
+  let (_, sched, left, right) = make_test_sched()
+  let (_, reference, expected_left, expected_right) = make_test_sched()
   reference.queue_pattern_snapshot(note_snapshot("unrelated", 72.0))
   reference.render_block(expected_left, expected_right)
   let layer = lid("shared-layer")
@@ -670,7 +670,7 @@ test "render_block: multiple pending snapshots keep the latest" {
 
 ///|
 test "render_block: pending song snapshot commits at block boundary" {
-  let (pool, sched, left, right) = make_test_sched()
+  let (_, sched, left, right) = make_test_sched()
   let main_id = oid("song-snapshot:main")
   let section = scheduler_section_doc("section:song-snapshot", "Main", 60.0)
   let doc = scheduler_song_doc([
@@ -698,7 +698,7 @@ test "render_block: pending song snapshot commits at block boundary" {
 
 ///|
 test "render_block: same-layout song edit commits without layout boundary change" {
-  let (pool, sched, left, right) = make_test_sched()
+  let (_, sched, left, right) = make_test_sched()
   let main_id = oid("song-snapshot:same-layout")
   let section_id = "section:same-layout"
   let layer_id = lid("\{section_id}:main")
@@ -927,7 +927,7 @@ test "process_block: fast(2) triggers two voices per cycle" {
 
 ///|
 test "process_block: gate-off fires after note ends" {
-  let (pool, sched, left, right) = make_test_sched()
+  let (_, sched, left, right) = make_test_sched()
   let pat = @pattern.note(60.0)
   sched.process_block(pat, left, right)
   @debug.assert_eq(sched.active_note_count(), 1)
@@ -940,7 +940,7 @@ test "process_block: gate-off fires after note ends" {
 
 ///|
 test "process_block: gate-off is sent within the block containing the endpoint" {
-  let (pool, sched, left, right) = make_test_sched()
+  let (_, sched, left, right) = make_test_sched()
   let note_pat = @pattern.note(60.0)
   let silence_pat : @pattern.Pat[@pattern.ControlMap] = @pattern.Pat::silence()
   sched.process_block(note_pat, left, right)
@@ -953,7 +953,7 @@ test "process_block: gate-off is sent within the block containing the endpoint" 
 
 ///|
 test "process_block: gate fraction ends a note before its next onset" {
-  let (pool, sched, left, right) = make_test_sched()
+  let (_, sched, left, right) = make_test_sched()
   let pat = @pattern.note(60.0).gate(@pattern.Rational(1L, 2L))
   let silence : @pattern.Pat[@pattern.ControlMap] = @pattern.Pat::silence()
   sched.process_block(pat, left, right)
@@ -1044,7 +1044,7 @@ fn buffer_abs_sum(buf : @moondsp.AudioBuffer) -> Double {
 
 ///|
 test "process_block silence produces zero output" {
-  let (pool, sched, left, right) = make_test_sched()
+  let (_, sched, left, right) = make_test_sched()
   let pat : @pattern.Pat[@pattern.ControlMap] = @pattern.Pat::silence()
   sched.process_block(pat, left, right)
   let all_zero = for i in 0..<left.length() {
@@ -1059,7 +1059,7 @@ test "process_block silence produces zero output" {
 
 ///|
 test "process_block note pattern produces non-zero output" {
-  let (pool, sched, left, right) = make_test_sched()
+  let (_, sched, left, right) = make_test_sched()
   let pat = @pattern.note(60.0)
   // Process several blocks so the oscillator has time to produce output
   for _i = 0; _i < 4; _i = _i + 1 {
@@ -1077,7 +1077,7 @@ test "process_block note pattern produces non-zero output" {
 
 ///|
 test "process_block: pan=-1 routes signal to left buffer only" {
-  let (pool, sched, left, right) = make_test_sched()
+  let (_, sched, left, right) = make_test_sched()
   let pat = @pattern.merge_control(@pattern.note(60.0), @pattern.s_pan(-1.0))
   // Run 4 blocks so the ADSR attack accumulates audible energy; matches
   // the existing `process_block: produces non-zero output` test shape.
@@ -1095,7 +1095,7 @@ test "process_block: pan=-1 routes signal to left buffer only" {
 
 ///|
 test "process_block: pan=+1 routes signal to right buffer only" {
-  let (pool, sched, left, right) = make_test_sched()
+  let (_, sched, left, right) = make_test_sched()
   let pat = @pattern.merge_control(@pattern.note(60.0), @pattern.s_pan(1.0))
   for _i = 0; _i < 4; _i = _i + 1 {
     sched.process_block(pat, left, right)
@@ -1108,7 +1108,7 @@ test "process_block: pan=+1 routes signal to right buffer only" {
 
 ///|
 test "process_block multi-block note expiry" {
-  let (pool, sched, left, right) = make_test_sched()
+  let (_, sched, left, right) = make_test_sched()
   let note_pat = @pattern.note(60.0)
   let silence_pat : @pattern.Pat[@pattern.ControlMap] = @pattern.Pat::silence()
   // First block triggers the note
@@ -1125,8 +1125,8 @@ test "process_block multi-block note expiry" {
 
 ///|
 test "Switching send output leaves dry playback and transport unchanged" {
-  let (pool, sched, left, right) = make_test_sched()
-  let (dry_pool, dry_sched, dry_left, dry_right) = make_test_sched()
+  let (_, sched, left, right) = make_test_sched()
+  let (_, dry_sched, dry_left, dry_right) = make_test_sched()
   let snapshot = @pattern.PatternDoc::from_pattern(
     id=pid("send-toggle"),
     pat=@pattern.merge_control(
@@ -1164,7 +1164,7 @@ test "Switching send output leaves dry playback and transport unchanged" {
 
 ///|
 test "Room scales each post-pan send channel and overwrites previous audio" {
-  let (pool, sched, left, right) = make_test_sched()
+  let (_, sched, left, right) = make_test_sched()
   let snapshot = @pattern.PatternDoc::from_pattern(
     id=pid("room-send"),
     pat=@pattern.merge_control(
@@ -1186,7 +1186,7 @@ test "Room scales each post-pan send channel and overwrites previous audio" {
 
 ///|
 test "deferred pattern replacement preserves selected voice provenance" {
-  let (pool, sched, left, right) = make_test_sched()
+  let (_, sched, left, right) = make_test_sched()
   let root = pid("deferred-provenance-root")
   let selected = pid("deferred-provenance-selected")
   let sibling = pid("deferred-provenance-sibling")
@@ -1229,7 +1229,7 @@ test "deferred pattern replacement preserves selected voice provenance" {
 
 ///|
 test "deferred song replacement preserves selected layer provenance" {
-  let (pool, sched, left, right) = make_test_sched()
+  let (_, sched, left, right) = make_test_sched()
   let occurrence = oid("deferred-song-provenance-occurrence")
   let section_id = sid("deferred-song-provenance-section")
   let lead_id = lid("deferred-song-provenance-lead")

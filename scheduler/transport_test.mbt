@@ -80,7 +80,7 @@ fn single_span(
 
 ///|
 test "audio starts and releases at exact samples within a block" {
-  let (sched, pool, left, right) = transport_fixture()
+  let (sched, _, left, right) = transport_fixture()
   let pat = single_span(
     @pattern.Rational(17L, 24000L),
     @pattern.Rational(73L, 24000L),
@@ -94,7 +94,7 @@ test "audio starts and releases at exact samples within a block" {
 
 ///|
 test "fractional onset rounded across a block survives a tempo edit exactly once" {
-  let (sched, pool, left, right) = transport_fixture()
+  let (sched, _, left, right) = transport_fixture()
   let pat = single_span(
     @pattern.Rational(255L, 48000L),
     @pattern.Rational::from_int(1),
@@ -154,7 +154,7 @@ test "tempo follows remaining musical duration and preserves physical deadlines"
 
 ///|
 test "invalid tempo leaves the position and sounding note unchanged" {
-  let (sched, pool, left, right) = transport_fixture()
+  let (sched, _, left, right) = transport_fixture()
   let pat = single_span(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
@@ -184,7 +184,7 @@ test "set_tempo rejects atomically when an endpoint is unrepresentable" {
 
 ///|
 test "physical envelope lasts thirteen seconds across a tempo change" {
-  let (sched, pool, left, right) = transport_fixture(sample_rate=128.0)
+  let (sched, _, left, right) = transport_fixture(sample_rate=128.0)
   sched.set_bpm(60.0).unwrap()
   let control = @pattern.ControlMap::empty()
     .set("attack", 2.0)
@@ -212,7 +212,7 @@ test "physical envelope lasts thirteen seconds across a tempo change" {
 
 ///|
 test "zero hold finishes immediately and invalid hold does not start a voice" {
-  let (sched, pool, left, right) = transport_fixture(sample_rate=128.0)
+  let (sched, _, left, right) = transport_fixture(sample_rate=128.0)
   let silent = @pattern.Pat::pure(@pattern.ControlMap::empty().set("hold", 0.0))
   sched.process_block(silent, left, right)
   assert_eq(left.get(0), 0.0)
@@ -227,7 +227,7 @@ test "zero hold finishes immediately and invalid hold does not start a voice" {
 
 ///|
 test "without hold the event end releases an unfinished attack" {
-  let (sched, pool, left, right) = transport_fixture(sample_rate=128.0)
+  let (sched, _, left, right) = transport_fixture(sample_rate=128.0)
   let song = single_span(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
