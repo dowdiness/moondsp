@@ -46,7 +46,7 @@ in the browser bundle.
   <dt>.hold(s)</dt><dd>stay at peak volume for s seconds</dd>
   <dt>.release(s)</dt><dd>fade out over s seconds</dd>
   <dt>.gate(n)</dt><dd>sound for n of each step, from 0 to 1</dd>
-  <dt>.gain(n)</dt><dd>note/chord level; 0 is silent, 1 keeps the template level</dd>
+  <dt>.gain(n)</dt><dd>level of any sound, including drums; 0 is silent, 1 keeps the template level</dd>
   <dt>.lpf(hz, resonance?)</dt><dd>reduce frequencies above hz; resonance/Q must be finite and greater than 0 (default 0.707)</dd>
   <dt>.hpf(hz, resonance?)</dt><dd>reduce frequencies below hz; resonance/Q must be finite and greater than 0 (default 0.707)</dd>
 </dl>

@@ -69,6 +69,12 @@ export const EXAMPLES: readonly Example[] = [
 let warm = chord("Cmaj7 Fmaj7").slow(4).gain(0.45).lpf(900, 2.5).hpf(60);
 let air = note("G5 E5 D5 B4").slow(4).gain(0.2).lpf(5000).hpf(1200, 1.4);
 stack(warm, air)` },
+  { label: "Moving controls: accents + filter sweep", note: "Quoted steps accent the drums; saw and sine move a held chord's filter and pan while it sounds.",
+    source: `bpm(96);
+
+$: s("bd ~ sd ~").gain("1 0.7")
+$: s("hh*8").gain("0.2 0.6 0.3 0.8")
+$: chord("Cm9").slow(4).gain(0.3).lpf(saw.range(300, 3000).slow(4), 2).pan(sine.range(-0.5, 0.5).slow(8))` },
   { label: "Room of Light — pop sketch", note: "Short bass, soft chords, and a singing lead. 39 seconds.",
     source: roomOfLight },
   { label: "Dry → shared room comparison", note: "Same groove dry, then drums and chords send into one room. 16 seconds.",
