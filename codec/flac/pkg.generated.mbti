@@ -1,0 +1,151 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp/codec/flac"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn decode(Bytes) -> FlacFile raise FlacError
+
+pub fn parse_metadata(Bytes) -> ParsedMetadata raise FlacError
+
+pub fn read_application(Bytes, MetadataBlock) -> ApplicationBlock raise FlacError
+
+pub fn read_cuesheet(Bytes, MetadataBlock) -> CueSheet raise FlacError
+
+pub fn read_picture(Bytes, MetadataBlock) -> Picture raise FlacError
+
+pub fn read_seektable(Bytes, MetadataBlock) -> Array[SeekPoint] raise FlacError
+
+pub fn read_vorbis_comment(Bytes, MetadataBlock) -> VorbisComment raise FlacError
+
+// Errors
+pub suberror FlacError {
+  Truncated(offset~ : Int, need~ : Int, actual~ : Int)
+  NotFlac
+  BadMetadata(reason~ : String)
+  BadFrameHeader(reason~ : String)
+  BadCrc(kind~ : String, expected~ : Int, actual~ : Int)
+  BadSubframe(reason~ : String)
+  BadResidual(reason~ : String)
+  Md5Mismatch(expected~ : String, actual~ : String)
+} derive(@debug.Debug)
+pub fn FlacError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+pub struct ApplicationBlock {
+  app_id : String
+  data : Bytes
+}
+
+type BitReader
+pub fn BitReader::read_bit(Self) -> Int
+pub fn BitReader::remaining_bits(Self) -> Int
+pub fn BitReader::total_bits(Self) -> Int
+
+pub struct CueSheet {
+  media_catalog_number : String
+  lead_in_samples : Int64
+  is_cd : Bool
+  tracks : Array[CueSheetTrack]
+}
+
+pub struct CueSheetIndex {
+  offset : Int64
+  index_number : Int
+}
+
+pub struct CueSheetTrack {
+  offset : Int64
+  track_number : Int
+  isrc : String
+  is_non_audio : Bool
+  pre_emphasis : Bool
+  indexes : Array[CueSheetIndex]
+}
+
+pub struct FlacFeeder {
+  mut buf : Array[Byte]
+  mut base_offset : Int
+  mut info : StreamInfo?
+  mut blocks : Array[MetadataBlock]
+  mut next_frame_byte : Int
+  mut meta_done : Bool
+  mut finished : Bool
+  mut decoded : Int64
+  mut eof : Bool
+}
+pub fn FlacFeeder::feed(Self, Bytes) -> Unit
+pub fn FlacFeeder::finish(Self) -> Unit raise FlacError
+pub fn FlacFeeder::is_done(Self) -> Bool
+pub fn FlacFeeder::new() -> Self
+pub fn FlacFeeder::next(Self) -> Array[Array[Int]]? raise FlacError
+
+pub struct FlacFile {
+  info : StreamInfo
+  channels : Array[Array[Int]]
+}
+
+pub struct FlacStream {
+  info : StreamInfo
+  br : BitReader
+  blocks : Array[MetadataBlock]
+  frame_offset : Int
+  mut decoded : Int64
+  mut pending : Array[Array[Int]]
+  mut eof : Bool
+}
+pub fn FlacStream::new(Bytes) -> Self raise FlacError
+pub fn FlacStream::next(Self) -> Array[Array[Int]]? raise FlacError
+pub fn FlacStream::seek(Self, Int64) -> Unit raise FlacError
+
+pub struct MetadataBlock {
+  block_type : Int
+  offset : Int
+  length : Int
+}
+
+pub struct ParsedMetadata {
+  stream_info : StreamInfo
+  blocks : Array[MetadataBlock]
+  frame_offset : Int
+}
+
+pub struct Picture {
+  picture_type : Int
+  mime : String
+  description : String
+  width : Int
+  height : Int
+  depth : Int
+  colors : Int
+  data : Bytes
+}
+
+pub struct SeekPoint {
+  sample_position : Int64
+  byte_offset : Int64
+  frame_samples : Int
+}
+
+pub struct StreamInfo {
+  min_block_size : Int
+  max_block_size : Int
+  min_frame_size : Int
+  max_frame_size : Int
+  sample_rate : Int
+  channels : Int
+  bits_per_sample : Int
+  total_samples : Int64
+  md5 : Bytes
+}
+
+pub struct VorbisComment {
+  vendor : String
+  comments : Array[(String, String)]
+}
+
+// Type aliases
+
+// Traits

@@ -1,0 +1,53 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp/codec/wav"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn decode(Bytes) -> WaveFile raise WavError
+
+pub fn encode(format~ : WavSampleFormat, sample_rate~ : Int, channels~ : Int, samples~ : Array[Double]) -> Bytes raise WavError
+
+// Errors
+pub suberror WavError {
+  NotRiff
+  NotWave
+  Truncated(String)
+  InvalidFormat(String)
+  UnsupportedFormat(String)
+  DataTooLarge
+} derive(@debug.Debug)
+pub fn WavError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+pub(all) enum WavSampleFormat {
+  PcmU8
+  PcmI16
+  PcmI24
+  PcmI32
+  IeeeF32
+  IeeeF64
+} derive(Eq, @debug.Debug)
+pub fn WavSampleFormat::bytes_per_sample(Self) -> Int
+pub fn WavSampleFormat::equal(Self, Self) -> Bool
+pub fn WavSampleFormat::is_pcm(Self) -> Bool
+pub fn WavSampleFormat::not_equal(Self, Self) -> Bool
+pub fn WavSampleFormat::to_repr(Self) -> @debug.Repr
+
+pub struct WaveFile {
+  // private fields
+} derive(@debug.Debug)
+pub fn WaveFile::WaveFile(sample_rate~ : Int, channels~ : Int, samples~ : Array[Double], source_format~ : WavSampleFormat) -> Self raise WavError
+pub fn WaveFile::channels(Self) -> Int
+pub fn WaveFile::duration_seconds(Self) -> Double
+pub fn WaveFile::frame_count(Self) -> Int
+pub fn WaveFile::sample_rate(Self) -> Int
+pub fn WaveFile::samples(Self) -> Array[Double]
+pub fn WaveFile::source_format(Self) -> WavSampleFormat
+pub fn WaveFile::to_repr(Self) -> @debug.Repr
+
+// Type aliases
+
+// Traits

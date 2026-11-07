@@ -9,6 +9,7 @@ Use this file as a router. Read the documents for the surface you are changing; 
 - [Choose an API](../README.mbt.md#use-moondsp-as-a-library) — browser audio ownership, direct MoonBit rendering, or pattern authoring.
 - [Browser package quick start](../packages/browser/README.md#choose-an-api) — prefer `AudioPower` for owned realtime audio, `Graph` for connections without indices, and `update()` for named parameters and gates.
 - [MoonBit engine examples](../engine/README.mbt.md#mount-and-play-a-graph) — mount, render into a reusable buffer, mix, and close.
+- [Audio files: WAV / FLAC / offline render](audio-codec.md) — decode audio files with `decode_any`, encode WAV, and render Mini patterns to `.wav`.
 - [Complete keyboard synth](../examples/basic-synth/README.md) — runnable vanilla TypeScript and Svelte adapters with cancellation and failure recovery.
 
 ## Read when changing
@@ -20,6 +21,7 @@ Use this file as a router. Read the documents for the surface you are changing; 
 | Editor, Song, Update, identity, or playback-origin semantics | [`../CONTEXT.md`](../CONTEXT.md) and the applicable Song/playback ADR |
 | Browser ABI or AudioWorklet lifecycle | [`browser-api-contract.md`](browser-api-contract.md) and the relevant browser example |
 | Mini notation crossing into DSP graphs | [`mini-graph-authoring-boundary.md`](mini-graph-authoring-boundary.md) and [`external-dsl-lowering.md`](external-dsl-lowering.md) |
+| Audio file codecs or offline file rendering | [`audio-codec.md`](audio-codec.md) and the tests under `codec/` |
 | Native CLAP or C ABI | [`clap-plugin-guide.md`](clap-plugin-guide.md) and relevant records in [`development/`](development/) |
 | Performance or allocation claim | The [retained performance findings](performance/README.md) and, for hard-real-time claims, [`development/`](development/) |
 | Why an architectural choice exists | The applicable record in [`decisions/`](decisions/README.md) |
