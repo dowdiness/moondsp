@@ -194,19 +194,27 @@ fn checked_sample(index : Int, buffer : @moondsp.AudioBuffer) -> Double {
 }
 
 ///|
-pub fn scheduler_left_sample(index : Int) -> Double {
+/// Shared read path for the per-sample scheduler exports (issue #214):
+/// the player is optional, missing players and out-of-range reads both
+/// yield silent zeros. One helper keeps the left/right exports from
+/// drifting apart; the branch (instead of a closure) stays
+/// allocation-free for the per-sample worklet path.
+fn player_sample(index : Int, left~ : Bool) -> Double {
   match player.val {
-    Some(owner) => checked_sample(index, owner.left)
+    Some(owner) =>
+      checked_sample(index, if left { owner.left } else { owner.right })
     None => 0.0
   }
 }
 
 ///|
+pub fn scheduler_left_sample(index : Int) -> Double {
+  player_sample(index, left=true)
+}
+
+///|
 pub fn scheduler_right_sample(index : Int) -> Double {
-  match player.val {
-    Some(owner) => checked_sample(index, owner.right)
-    None => 0.0
-  }
+  player_sample(index, left=false)
 }
 
 ///|

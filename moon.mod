@@ -5,6 +5,7 @@ version = "0.6.0"
 import {
   "dowdiness/incr@0.15.1",
   "moonbitlang/quickcheck@0.14.0",
+  "moonbitlang/x@0.5.5",
 }
 
 readme = "README.mbt.md"

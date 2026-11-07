@@ -1,0 +1,11 @@
+import {
+  "dowdiness/moondsp/codec/render",
+  "moonbitlang/core/env",
+}
+
+pkgtype(kind: "executable")
+
+options(
+  targets: { "native_io.mbt": [ "native" ], "stub_io.mbt": [ "not", "native" ] },
+  "native-stub": [ "io.c" ],
+)

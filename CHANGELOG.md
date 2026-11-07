@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Audio codec layer (`codec/`):** pure-MoonBit WAV decode/encode
+  (RIFF/RIFX, PCM u8/i16/i24/i32, IEEE float32/64, WAVE_FORMAT_EXTENSIBLE,
+  odd-chunk alignment), FLAC decode ported from
+  [moonflac](https://github.com/Xcsa-ee/moonflac) (Apache-2.0; CRC-8/CRC-16
+  frame verification, STREAMINFO MD5 check, SEEKTABLE/VORBIS_COMMENT/PICTURE
+  metadata), unified `decode_any` magic routing to an interleaved `AudioFile`,
+  and `codec/render` for deterministic offline rendering of Mini notation to
+  `.wav` bytes (`render_wav`). WAV/FLAC cross-validated sample-exact against
+  ffmpeg; see [`docs/audio-codec.md`](docs/audio-codec.md) and the
+  `examples/render-to-file` CLI (native target).
+- Document the `VoiceHandle` field-visibility API contract (#215) and
+  centralize the browser scheduler per-sample read helpers (#214).
+
 ### Changed
 
 - **Breaking browser API:** replace the exposed `engine.output` Worklet with

@@ -1,0 +1,26 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp/codec/render"
+
+import {
+  "dowdiness/moondsp/codec/wav",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn render_samples(source~ : String, seconds~ : Double, sample_rate~ : Int, block_size? : Int, bpm? : Double, max_voices? : Int) -> Array[Double] raise RenderError
+
+pub fn render_wav(source~ : String, seconds~ : Double, sample_rate~ : Int, block_size? : Int, bpm? : Double, format? : @wav.WavSampleFormat, max_voices? : Int) -> Bytes raise RenderError
+
+// Errors
+pub suberror RenderError {
+  ParseFailed(String)
+  InvalidConfig(String)
+  EncodeFailed(@wav.WavError)
+} derive(@debug.Debug)
+pub fn RenderError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+
+// Type aliases
+
+// Traits

@@ -39,6 +39,16 @@ const VOICE_HANDLE_PACK_FACTOR : Int64 = 2147483648L
 
 ///|
 /// Generation-tagged voice handle.
+///
+/// API contract (decision recorded for issue #215): the `slot` and
+/// `generation` fields are deliberately **not** part of the public API —
+/// they carry no visibility marker, so they are package-private under
+/// MoonBit's default field visibility. Hosts construct handles with
+/// `VoiceHandle::from_parts` and decompose packed `Int64` ids with
+/// `VoiceHandle::packed_slot` / `VoiceHandle::packed_generation`. Any
+/// future field exposure must go through documented accessors, not by
+/// widening these fields.
+///
 /// WHY generation counter: slot indices are reused after voice stealing.
 /// Without a generation tag, a stale handle from a stolen note could
 /// accidentally gate_off or pan the wrong voice occupying that slot.
@@ -66,6 +76,8 @@ pub extend VoiceHandle with Show::{to_string, output}
 
 ///|
 /// Construct a handle from primitive parts for host-side fixed storage.
+/// This is the supported way to build a handle without field access
+/// (see the type-level API contract for issue #215).
 pub fn VoiceHandle::from_parts(slot~ : Int, generation~ : Int) -> VoiceHandle {
   { slot, generation, }
 }
@@ -76,11 +88,15 @@ fn VoiceHandle::pack_parts(slot~ : Int, generation~ : Int) -> Int64 {
 }
 
 ///|
+/// Extract the slot index from a packed handle id. The read-side
+/// counterpart of `from_parts` in the public handle contract.
 pub fn VoiceHandle::packed_slot(handle_id : Int64) -> Int {
   (handle_id / VOICE_HANDLE_PACK_FACTOR).to_int()
 }
 
 ///|
+/// Extract the generation tag from a packed handle id. The read-side
+/// counterpart of `from_parts` in the public handle contract.
 pub fn VoiceHandle::packed_generation(handle_id : Int64) -> Int {
   (handle_id % VOICE_HANDLE_PACK_FACTOR).to_int()
 }

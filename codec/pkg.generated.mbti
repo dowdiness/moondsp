@@ -1,0 +1,44 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp/codec"
+
+import {
+  "dowdiness/moondsp/codec/flac",
+  "dowdiness/moondsp/codec/wav",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn decode_any(Bytes) -> AudioFile raise CodecError
+
+// Errors
+pub suberror CodecError {
+  NotAudio(String)
+  WavFailed(@wav.WavError)
+  FlacFailed(@flac.FlacError)
+} derive(@debug.Debug)
+pub fn CodecError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+pub struct AudioFile {
+  // private fields
+} derive(@debug.Debug)
+pub fn AudioFile::AudioFile(sample_rate~ : Int, channels~ : Int, samples~ : Array[Double], source_format~ : SourceFormat) -> Self raise CodecError
+pub fn AudioFile::channels(Self) -> Int
+pub fn AudioFile::duration_seconds(Self) -> Double
+pub fn AudioFile::frame_count(Self) -> Int
+pub fn AudioFile::sample_rate(Self) -> Int
+pub fn AudioFile::samples(Self) -> Array[Double]
+pub fn AudioFile::source_format(Self) -> SourceFormat
+pub fn AudioFile::to_repr(Self) -> @debug.Repr
+
+pub(all) enum SourceFormat {
+  Wav
+  Flac
+} derive(Eq, @debug.Debug)
+pub fn SourceFormat::equal(Self, Self) -> Bool
+pub fn SourceFormat::not_equal(Self, Self) -> Bool
+pub fn SourceFormat::to_repr(Self) -> @debug.Repr
+
+// Type aliases
+
+// Traits
