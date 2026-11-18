@@ -9,8 +9,13 @@ step() {
   time "$@"
 }
 
-if [[ ! -x "$HOME/.moon/bin/moon" ]]; then
-  step 'Install MoonBit' bash -c 'set -euo pipefail; curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash'
+# Match the toolchain CI pins so dependencies and warnings resolve the same way.
+moonbit_version='0.10.14+7d59c7ec9'
+# The installer replaces lib/core after the binaries, so an interrupted install
+# can leave the right moonc without core; require all three before skipping.
+if ! { [[ -x "$HOME/.moon/bin/moon" && -f "$HOME/.moon/lib/core/moon.mod" ]] &&
+  "$HOME/.moon/bin/moonc" -v 2>/dev/null | grep -Fq "v$moonbit_version"; }; then
+  step 'Install MoonBit' env MOON_HOME="$HOME/.moon" bash -c 'set -euo pipefail; curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash -s -- "$1"' _ "$moonbit_version"
 fi
 export PATH="$HOME/.moon/bin:$PATH"
 
