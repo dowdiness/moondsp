@@ -65,9 +65,11 @@ callback-path allocation counts are:
   boxed voice-handle return values, pan result boxing, and growable active-note
   map insertion.
 - Cutoff, voice-gain, and pan automation are allocation-free in the measured
-  CLAP path. They use primitive active-note storage and allocation-conscious
-  voice/graph parameter predicates instead of graph-control arrays and boxed
-  result-returning wrappers.
+  CLAP path. Since 2026-11-18 a parameter change only stores the host value
+  in its bus, and voices read it through followers that note-on attaches from
+  activation-resolved `VoiceFollower`s into reserved slot entries (ADR-0019).
+  Rerun under MoonBit 0.10.14 after that change: every scenario above
+  measured 0 allocations and 0 bytes.
 - CLAP note-off, MIDI note-off, transport-stop, and MIDI all-notes-off are
   allocation-free in the measured path after switching ADSR gate helpers and
   note-off dispatch to allocation-conscious primitives.

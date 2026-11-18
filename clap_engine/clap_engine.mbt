@@ -91,12 +91,25 @@ pub struct ClapSynthEngine {
   priv render_contexts : FixedArray[@moondsp.DspContext]
   priv active_notes : ActiveNoteTable
   priv mut last_frame_count : Int
-  priv mut master_gain : Double
-  priv mut voice_gain : Double
-  priv mut cutoff_hz : Double
-  priv mut resonance : Double
-  priv mut pan : Double
+  /// Each host parameter's sanitized value, indexed by parameter id. The voice
+  /// parameters are buses: every sounding voice follows them, including its
+  /// release tail (ADR-0019 Decision 1). Master gain scales the output.
+  priv params : FixedArray[Double]
+  /// One follower per voice bus, resolved at activation so note-on attaches
+  /// them without allocating.
+  priv followers : FixedArray[@moondsp.VoiceFollower]
+  /// Frames rendered since activation: the time voices read their buses at.
+  priv mut rendered_frames : Int64
 }
+
+///|
+/// The voice parameters host automation drives, by binding key.
+let voice_buses : Array[(String, Int)] = [
+  ("gain", CLAP_PARAM_VOICE_GAIN),
+  ("cutoff", CLAP_PARAM_CUTOFF_HZ),
+  ("q", CLAP_PARAM_RESONANCE),
+  ("pan", CLAP_PARAM_PAN),
+]
 
 ///|
 /// Fixed-capacity active-note index for the CLAP callback path.
@@ -107,7 +120,6 @@ priv struct ActiveNoteTable {
   used : FixedArray[Bool]
   map_keys : FixedArray[Int]
   keys : FixedArray[Int]
-  velocities : FixedArray[Double]
   slots : FixedArray[Int]
   generations : FixedArray[Int]
   mut count : Int
@@ -119,16 +131,10 @@ fn ActiveNoteTable::ActiveNoteTable(capacity : Int) -> ActiveNoteTable {
     used: FixedArray::make(capacity, false),
     map_keys: FixedArray::make(capacity, 0),
     keys: FixedArray::make(capacity, -1),
-    velocities: FixedArray::make(capacity, 0.0),
     slots: FixedArray::make(capacity, -1),
     generations: FixedArray::make(capacity, -1),
     count: 0,
   }
-}
-
-///|
-fn ActiveNoteTable::capacity(self : ActiveNoteTable) -> Int {
-  self.used.length()
 }
 
 ///|
@@ -139,11 +145,6 @@ fn ActiveNoteTable::is_used(self : ActiveNoteTable, index : Int) -> Bool {
 ///|
 fn ActiveNoteTable::key_at(self : ActiveNoteTable, index : Int) -> Int {
   self.keys[index]
-}
-
-///|
-fn ActiveNoteTable::velocity_at(self : ActiveNoteTable, index : Int) -> Double {
-  self.velocities[index]
 }
 
 ///|
@@ -208,7 +209,6 @@ fn ActiveNoteTable::store_handle_id(
   self : ActiveNoteTable,
   map_key : Int,
   key : Int,
-  velocity : Double,
   handle_id : Int64,
 ) -> Unit {
   let slot = @moondsp.VoiceHandle::packed_slot(handle_id)
@@ -218,7 +218,6 @@ fn ActiveNoteTable::store_handle_id(
       self.used[index] = true
       self.map_keys[index] = map_key
       self.keys[index] = key
-      self.velocities[index] = velocity
       self.slots[index] = slot
       self.generations[index] = @moondsp.VoiceHandle::packed_generation(
         handle_id,
@@ -239,8 +238,8 @@ fn ActiveNoteTable::store_handle_id(
 /// - 1: oscillator reading node 0
 /// - 2: ADSR envelope gated by the voice pool
 /// - 3: low-pass biquad, bound as `cutoff` and `q`
-/// - 4: envelope gain, bound as `gain`
-/// - 5: mono output, panned by `BoundVoicePool`
+/// - 4: envelope gain, set to each note's velocity
+/// - 5: mono output; the voice frame applies `gain` and `pan`
 pub fn default_synth_template() -> Array[@moondsp.DspNode] {
   [
     @moondsp.DspNode::constant(440.0),
@@ -260,7 +259,7 @@ pub fn default_synth_template() -> Array[@moondsp.DspNode] {
     @moondsp.DspNode::envelope_gain(
       input=FILTER_NODE_INDEX,
       envelope=2,
-      amount=DEFAULT_VOICE_GAIN,
+      amount=1.0,
     ),
     @moondsp.DspNode::output(GAIN_NODE_INDEX),
   ]
@@ -284,11 +283,8 @@ fn synth_bindings() -> @moondsp.ControlBindingBuilder {
     node_index=FILTER_NODE_INDEX,
     slot=@moondsp.GraphParamSlot::Value1,
   )
-  .bind(
-    key="gain",
-    node_index=GAIN_NODE_INDEX,
-    slot=@moondsp.GraphParamSlot::Value0,
-  )
+  .bind_voice(key="gain", param=Gain)
+  .bind_voice(key="pan", param=Pan)
 }
 
 ///|
@@ -316,6 +312,18 @@ pub fn ClapSynthEngine::ClapSynthEngine(
   ) catch {
     error => raise ClapEngineError::PoolInitFailed(error)
   }
+  let params = FixedArray::make(5, 0.0)
+  params[CLAP_PARAM_MASTER_GAIN] = DEFAULT_MASTER_GAIN
+  params[CLAP_PARAM_VOICE_GAIN] = DEFAULT_VOICE_GAIN
+  params[CLAP_PARAM_CUTOFF_HZ] = DEFAULT_CUTOFF_HZ
+  params[CLAP_PARAM_RESONANCE] = DEFAULT_RESONANCE
+  params[CLAP_PARAM_PAN] = DEFAULT_PAN
+  let followers = FixedArray::from_array(
+    voice_buses.map(bus => {
+      let id = bus.1
+      pool.follower(bus.0, (_, _) => params[id]).unwrap()
+    }),
+  )
   {
     sample_rate,
     max_block_size,
@@ -327,37 +335,35 @@ pub fn ClapSynthEngine::ClapSynthEngine(
     }),
     active_notes: ActiveNoteTable(max_voices),
     last_frame_count: 0,
-    master_gain: DEFAULT_MASTER_GAIN,
-    voice_gain: DEFAULT_VOICE_GAIN,
-    cutoff_hz: DEFAULT_CUTOFF_HZ,
-    resonance: DEFAULT_RESONANCE,
-    pan: DEFAULT_PAN,
+    params,
+    followers,
+    rendered_frames: 0L,
   }
 }
 
 ///|
 pub fn ClapSynthEngine::master_gain(self : ClapSynthEngine) -> Double {
-  self.master_gain
+  self.params[CLAP_PARAM_MASTER_GAIN]
 }
 
 ///|
 pub fn ClapSynthEngine::voice_gain(self : ClapSynthEngine) -> Double {
-  self.voice_gain
+  self.params[CLAP_PARAM_VOICE_GAIN]
 }
 
 ///|
 pub fn ClapSynthEngine::cutoff_hz(self : ClapSynthEngine) -> Double {
-  self.cutoff_hz
+  self.params[CLAP_PARAM_CUTOFF_HZ]
 }
 
 ///|
 pub fn ClapSynthEngine::resonance(self : ClapSynthEngine) -> Double {
-  self.resonance
+  self.params[CLAP_PARAM_RESONANCE]
 }
 
 ///|
 pub fn ClapSynthEngine::pan(self : ClapSynthEngine) -> Double {
-  self.pan
+  self.params[CLAP_PARAM_PAN]
 }
 
 ///|
@@ -527,28 +533,34 @@ pub fn ClapSynthEngine::note_on(
   }
   let map_key = note_map_key(note_id, key)
   ignore(self.release_active_note(map_key))
-  let note_velocity = sanitize_velocity(velocity)
   let handle_id = self.pool.note_on_prevalidated_params4_id(
     NOTE_NODE_INDEX,
     @moondsp.GraphParamSlot::Value0,
     midi_to_hz(key),
     FILTER_NODE_INDEX,
     @moondsp.GraphParamSlot::Value0,
-    self.cutoff_hz,
+    self.cutoff_hz(),
     FILTER_NODE_INDEX,
     @moondsp.GraphParamSlot::Value1,
-    self.resonance,
+    self.resonance(),
     GAIN_NODE_INDEX,
     @moondsp.GraphParamSlot::Value0,
-    self.voice_gain * note_velocity,
-    self.pan,
+    sanitize_velocity(velocity),
+    self.pan(),
   )
   if handle_id < 0L {
-    false
-  } else {
-    self.active_notes.store_handle_id(map_key, key, note_velocity, handle_id)
-    true
+    return false
   }
+  let handle = @moondsp.VoiceHandle::from_parts(
+    slot=@moondsp.VoiceHandle::packed_slot(handle_id),
+    generation=@moondsp.VoiceHandle::packed_generation(handle_id),
+  )
+  // The voice frame's gain comes from its bus at the next block.
+  for follower in self.followers {
+    ignore(self.pool.follow(handle, follower))
+  }
+  self.active_notes.store_handle_id(map_key, key, handle_id)
+  true
 }
 
 ///|
@@ -585,48 +597,8 @@ pub fn ClapSynthEngine::set_master_gain(
   value : Double,
 ) -> Double {
   let sanitized = sanitize_gain(value)
-  self.master_gain = sanitized
+  self.params[CLAP_PARAM_MASTER_GAIN] = sanitized
   sanitized
-}
-
-///|
-fn ClapSynthEngine::apply_param_to_active_voices(
-  self : ClapSynthEngine,
-  node_index : Int,
-  slot : @moondsp.GraphParamSlot,
-  value : Double,
-) -> Unit {
-  for index in 0..<self.active_notes.capacity() {
-    if self.active_notes.is_used(index) {
-      ignore(
-        self.pool.apply_voice_param_bool(
-          self.active_notes.handle_at(index),
-          node_index,
-          slot,
-          value,
-        ),
-      )
-    }
-  }
-}
-
-///|
-fn ClapSynthEngine::apply_voice_gain_to_active_notes(
-  self : ClapSynthEngine,
-  value : Double,
-) -> Unit {
-  for index in 0..<self.active_notes.capacity() {
-    if self.active_notes.is_used(index) {
-      ignore(
-        self.pool.apply_voice_param_bool(
-          self.active_notes.handle_at(index),
-          GAIN_NODE_INDEX,
-          @moondsp.GraphParamSlot::Value0,
-          value * self.active_notes.velocity_at(index),
-        ),
-      )
-    }
-  }
 }
 
 ///|
@@ -635,8 +607,7 @@ pub fn ClapSynthEngine::set_voice_gain(
   value : Double,
 ) -> Double {
   let sanitized = sanitize_gain(value)
-  self.voice_gain = sanitized
-  self.apply_voice_gain_to_active_notes(sanitized)
+  self.params[CLAP_PARAM_VOICE_GAIN] = sanitized
   sanitized
 }
 
@@ -646,12 +617,7 @@ pub fn ClapSynthEngine::set_cutoff_hz(
   value : Double,
 ) -> Double {
   let sanitized = sanitize_cutoff(value, self.sample_rate)
-  self.cutoff_hz = sanitized
-  self.apply_param_to_active_voices(
-    FILTER_NODE_INDEX,
-    @moondsp.GraphParamSlot::Value0,
-    sanitized,
-  )
+  self.params[CLAP_PARAM_CUTOFF_HZ] = sanitized
   sanitized
 }
 
@@ -661,12 +627,7 @@ pub fn ClapSynthEngine::set_resonance(
   value : Double,
 ) -> Double {
   let sanitized = sanitize_resonance(value)
-  self.resonance = sanitized
-  self.apply_param_to_active_voices(
-    FILTER_NODE_INDEX,
-    @moondsp.GraphParamSlot::Value1,
-    sanitized,
-  )
+  self.params[CLAP_PARAM_RESONANCE] = sanitized
   sanitized
 }
 
@@ -676,17 +637,7 @@ pub fn ClapSynthEngine::set_pan(
   value : Double,
 ) -> Double {
   let sanitized = sanitize_pan(value)
-  self.pan = sanitized
-  for index in 0..<self.active_notes.capacity() {
-    if self.active_notes.is_used(index) {
-      ignore(
-        self.pool.set_voice_pan_bool(
-          self.active_notes.handle_at(index),
-          sanitized,
-        ),
-      )
-    }
-  }
+  self.params[CLAP_PARAM_PAN] = sanitized
   sanitized
 }
 
@@ -736,8 +687,10 @@ pub fn ClapSynthEngine::process(
     return 0
   }
   let ctx = self.render_contexts[frames]
+  self.pool.update_follows(self.rendered_frames, 1L)
   self.pool.process(ctx, self.left, self.right)
-  let gain = self.master_gain
+  self.rendered_frames = self.rendered_frames + frames.to_int64()
+  let gain = self.master_gain()
   for i = 0; i < frames; i = i + 1 {
     self.left.set(i, self.left.get(i) * gain)
     self.right.set(i, self.right.get(i) * gain)

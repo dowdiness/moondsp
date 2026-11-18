@@ -1,6 +1,6 @@
 # ADR-0019: Parameter automation through automatic control buses
 
-- **Status:** Accepted 2026-10-26. Pattern lowering derives buses, and `PatternScheduler` makes sounding voices follow them. Mini control arguments accept quoted steps and signals (`sine`, `saw`, … with `.range`, `.slow`, `.fast`), so browser scores produce time-varying buses. The CLAP prototype plays host MIDI notes and applies host parameter changes to sounding voices directly; it plays no score, so no buses reach it.
+- **Status:** Accepted 2026-10-26. Pattern lowering derives buses, and `PatternScheduler` makes sounding voices follow them. Mini control arguments accept quoted steps and signals (`sine`, `saw`, … with `.range`, `.slow`, `.fast`), so browser scores produce time-varying buses. The CLAP prototype plays host MIDI notes and no score; its voice gain, cutoff, resonance, and pan are buses holding the host's latest value, which every sounding voice follows, including its release tail.
 - **Date:** 2026-10-26
 - **Source:** "moondsp パラメータ・オートメーション設計" (Koji Ishimoto, 2026-10-23; not in the repository) and its review in [Amp thread T-01a1714e](https://ampcode.com/threads/T-01a1714e-2aed-7167-9b7d-63c73f2b4396)
 - **Related:** [ADR-0007 ControlMap accessor surface](0007-control-map-accessor-surface.md), [ADR-0018 playback visualization](0018-playback-visualization-origin-truth.md), [Domain glossary](../../CONTEXT.md), [technical reference](../technical-reference.md)
@@ -51,6 +51,12 @@ A voice parameter is either a constant set at note-on or bound to exactly one
 bus. The voice never sees patterns, fragments, or event identity. This is the
 durable extension point: other bus writers (graph-internal modulators, MIDI
 CC, CLAP host automation) can be added later without changing voices.
+
+CLAP host automation is the first such writer. The engine keeps each host
+voice parameter as a bus holding the latest host value, and every note
+follows those buses from note-on. A `VoiceFollower` pairs a bound key with its
+bus once, at activation, and each voice slot reserves one entry per binding,
+so attaching followers on the audio thread allocates nothing.
 
 ### 2. Lowering derives buses automatically
 
@@ -240,6 +246,20 @@ because this toolchain rejects it; the repository was not changed for that.
   independence under `rev`, and a nested provider; each fails when its rule
   is removed. Block queries of three Mini scores took 19–50% less time
   ([pattern performance summary](../performance/2026-10-02-pattern-allocation-summary.md)).
+
+- **CLAP host buses.** A test that moves pan after note-off fails on the
+  previous engine, whose host changes reached only held notes, and passes
+  now. Over 40 blocks of held notes with cutoff, gain, pan, and resonance
+  automation, output stayed within 2.2e-16 of the previous engine (5,958 of
+  8,448 samples identical; the rest differ by rounding, because velocity and
+  voice gain now multiply in different stages). Under the CI toolchain
+  (MoonBit 0.10.14), `scripts/audit-clap-audio-allocations.sh --expect-zero`
+  passes all 14 scenarios, including note-on and every automation event; the
+  smoke test's post-event peak is unchanged at 0.0269566, and the CLAP
+  validator passes 13 tests with 8 skipped. A first version that gave each
+  follow its own record failed the audit with 4 allocations (96 bytes) per
+  note-on, which is why slots keep followers and their last values in
+  parallel arrays.
 
 Not covered: score playback in CLAP, which would need the event query off
 the audio thread or allocation-free, since CLAP's audio callback must not

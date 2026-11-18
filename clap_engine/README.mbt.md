@@ -82,6 +82,15 @@ MIDI `key` (0–127). The engine supports standard CLAP wildcard conventions:
 - `note_off(note_id=-1, key=-1)`: full wildcard; releases all currently held
   notes across all keys.
 
+## Host parameters as buses
+
+Voice gain, cutoff, resonance, and pan are control buses (ADR-0019): a
+parameter change only stores the host's value, and at the start of each
+rendered span every sounding voice reads the buses it follows, including
+voices in their release tail. Each note starts following them at note-on, with
+its velocity as a constant on the envelope gain. Master gain scales the
+summed output.
+
 ## Real-time allocation rule
 
 `ClapSynthEngine::process` reuses preallocated scratch and voice buffers. It

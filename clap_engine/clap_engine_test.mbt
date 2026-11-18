@@ -161,3 +161,28 @@ test "voice gain automation preserves held-note velocity" {
   assert_true(full_peak > 0.000001)
   assert_true(quiet_peak < full_peak * 0.5)
 }
+
+///|
+test "host automation reaches a voice in its release tail" {
+  let engine = new_test_engine()
+  assert_true(engine.note_on(note_id=1, key=69, velocity=1.0))
+  ignore(engine.process(128))
+  assert_true(engine.note_off(note_id=1, key=69))
+  ignore(engine.set_pan(1.0))
+  let frames = engine.process(128)
+  let mut left = 0.0
+  let mut right = 0.0
+  for i in 0..<frames {
+    let l = abs_double(engine.left_sample(i))
+    let r = abs_double(engine.right_sample(i))
+    if l > left {
+      left = l
+    }
+    if r > right {
+      right = r
+    }
+  }
+  // Hard right: the releasing voice still sounds, and only on the right.
+  assert_true(right > 0.000001)
+  assert_true(left < right * 0.000001)
+}

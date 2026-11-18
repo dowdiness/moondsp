@@ -159,6 +159,8 @@ pub using @dsp {type StereoReverb}
 
 pub using @voice {type VoiceControlError}
 
+pub using @voice {type VoiceFollower}
+
 pub using @voice {type VoiceHandle}
 
 pub using @graph {type VoiceParam}

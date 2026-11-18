@@ -22,6 +22,9 @@ DAW / CLAP host
 - CLAP-style `note_on(note_id~, key~, velocity~)` and
   `note_off(note_id~, key~)`;
 - parameter ids for master gain, voice gain, cutoff, resonance, and pan;
+  voice gain, cutoff, resonance, and pan are buses that every sounding voice
+  follows, including its release tail (ADR-0019), and master gain scales the
+  output;
 - `process(frame_count)` plus `left_sample(i)` / `right_sample(i)` accessors.
 
 `clap_host/` wraps that object API in positive integer handles and primitive

@@ -173,13 +173,16 @@ priv enum FollowTarget {
 }
 
 ///|
-/// One voice parameter that reads a time-varying value while the voice
-/// sounds, including its release tail (ADR-0019 Decisions 1 and 9).
-priv struct SlotFollow {
-  target : FollowTarget
-  read : (Int64, Int64) -> Double
-  /// The last score-unit value applied, so unchanged values apply nothing.
-  mut last : Double
+/// A bound voice parameter paired with the bus it reads: a function of exact
+/// time `num / den` in the caller's clock. A voice that follows it reads the
+/// bus while it sounds, including its release tail (ADR-0019 Decisions 1 and 9).
+///
+/// Resolved once against the pool's bindings, so attaching it with `follow`
+/// allocates nothing. A follower made before `set_template` no longer attaches.
+pub struct VoiceFollower {
+  priv target : FollowTarget
+  priv read : (Int64, Int64) -> Double
+  priv template_generation : Int
 }
 
 ///|
@@ -205,7 +208,10 @@ priv struct VoiceSlot {
   /// Voice-frame level, applied before pan and therefore before the send.
   mut gain : Double
   /// Belongs to the slot's current voice; cleared when the slot is reused.
-  follows : Array[SlotFollow]
+  follows : Array[VoiceFollower]
+  /// The last score-unit value applied for each of `follows`, so unchanged
+  /// values apply nothing. Parallel arrays keep attaching allocation-free.
+  follow_last : Array[Double]
   mono_buffer : AudioBuffer
 }
 
@@ -224,6 +230,7 @@ fn VoiceSlot::VoiceSlot(block_size : Int) -> VoiceSlot {
     send_gain: 0.0,
     gain: 1.0,
     follows: [],
+    follow_last: [],
     mono_buffer: AudioBuffer::filled(block_size),
   }
 }
@@ -431,8 +438,21 @@ pub fn BoundVoicePool::BoundVoicePool(
     error => raise BoundVoicePoolError::from_voice_pool(error)
   }
   match bindings.build(compiled_template) {
-    Ok(bindings) => { pool, bindings, }
+    Ok(bindings) => {
+      reserve_follows(pool, bindings)
+      { pool, bindings, }
+    }
     Err(error) => raise BoundVoicePoolError::Binding(error)
+  }
+}
+
+///|
+/// A voice follows at most one bus per bound key, so reserving that many
+/// entries keeps `follow` from allocating on the audio thread.
+fn reserve_follows(pool : VoicePool, bindings : ControlBindingMap) -> Unit {
+  for slot in pool.slots {
+    slot.follows.reserve_capacity(bindings.length())
+    slot.follow_last.reserve_capacity(bindings.length())
   }
 }
 
@@ -452,8 +472,50 @@ pub fn BoundVoicePool::set_template(
     Err(error) => return Err(BoundVoicePoolError::Binding(error))
   }
   self.pool.adopt_template(compiled_template, prepared)
+  reserve_follows(self.pool, next_bindings)
   self.bindings = next_bindings
   Ok(())
+}
+
+///|
+/// Pair the parameter bound to `key` with the bus `read`, or `None` when this
+/// pool does not bind `key`.
+pub fn BoundVoicePool::follower(
+  self : BoundVoicePool,
+  key : String,
+  read : (Int64, Int64) -> Double,
+) -> VoiceFollower? {
+  guard self.bindings.binding(key) is Some(binding) else { return None }
+  let target = match binding.target {
+    Voice(Gain) => FollowTarget::Gain
+    Voice(Pan) => Pan
+    Voice(Send) => Send
+    Graph(node, param) => Graph(node, param, binding.unit)
+  }
+  Some({ target, read, template_generation: self.pool.template_generation, })
+}
+
+///|
+/// Make the voice behind `handle` follow `follower` from the next
+/// `update_follows`. False for a stale handle, or for a follower made before
+/// the template the voice plays. Allocates nothing within the reserved entries.
+pub fn BoundVoicePool::follow(
+  self : BoundVoicePool,
+  handle : VoiceHandle,
+  follower : VoiceFollower,
+) -> Bool {
+  guard handle.slot >= 0 && handle.slot < self.pool.slots.length() else {
+    return false
+  }
+  let slot = self.pool.slots[handle.slot]
+  guard slot.is_handle_valid(handle) &&
+    !(slot.state is VoiceState::Idle) &&
+    slot.template_generation == follower.template_generation else {
+    return false
+  }
+  slot.follows.push(follower)
+  slot.follow_last.push(@double.not_a_number)
+  true
 }
 
 ///|
@@ -491,22 +553,14 @@ pub fn BoundVoicePool::note_on_controls(
           ignore(self.pool.set_voice_send_result(handle, value))
       }
     })
-    if !follow.is_empty() {
-      let slot = self.pool.slots[handle.slot]
-      for entry in follow {
-        guard self.bindings.binding(entry.0) is Some(binding) else { continue }
-        let target = match binding.target {
-          Voice(Gain) => FollowTarget::Gain
-          Voice(Pan) => Pan
-          Voice(Send) => Send
-          Graph(node, param) => Graph(node, param, binding.unit)
-        }
-        slot.follows.push({
-          target,
-          read: entry.1,
-          last: controls.get(entry.0).unwrap_or(@double.not_a_number),
-        })
-      }
+    let slot = self.pool.slots[handle.slot]
+    for entry in follow {
+      guard self.follower(entry.0, entry.1) is Some(follower) else { continue }
+      slot.follows.push(follower)
+      // The voice already holds its onset value, so only a change applies.
+      slot.follow_last.push(
+        controls.get(entry.0).unwrap_or(@double.not_a_number),
+      )
     }
   }
   handle
@@ -522,13 +576,13 @@ pub fn BoundVoicePool::update_follows(
 ) -> Unit {
   for slot in self.pool.slots {
     guard !(slot.state is VoiceState::Idle) else { continue }
-    for follow in slot.follows {
-      let value = (follow.read)(num, den)
-      if value.is_nan() || value == follow.last {
+    for index, follower in slot.follows {
+      let value = (follower.read)(num, den)
+      if value.is_nan() || value == slot.follow_last[index] {
         continue
       }
-      follow.last = value
-      match follow.target {
+      slot.follow_last[index] = value
+      match follower.target {
         Gain => slot.update_gain(value)
         Pan => slot.update_pan(value)
         Send => slot.update_send(value)
@@ -893,6 +947,7 @@ fn VoicePool::activate_slot(
   slot.send_gain = 0.0
   slot.gain = 1.0
   slot.follows.clear()
+  slot.follow_last.clear()
   slot.state = VoiceState::Active
   // WHY overflow guard on generation: after 2^31 increments the counter
   // wraps negative, which could revalidate stale VoiceHandles. Resetting

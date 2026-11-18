@@ -120,6 +120,7 @@ pub using @voice {
   type BoundVoicePoolError,
   type NoteGate,
   type VoiceControlError,
+  type VoiceFollower,
   type VoiceHandle,
   type VoicePool,
   type VoicePoolError,

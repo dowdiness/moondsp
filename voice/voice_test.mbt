@@ -1304,3 +1304,32 @@ test "followed values reach a releasing voice and end with the voice's slot" {
   pool.update_follows(1L, 2L)
   assert_true((level() / full - 1.0).abs() < 0.000001)
 }
+
+///|
+test "a follower attaches only to voices of the template it was made for" {
+  let ctx = DspContext(sample_rate=48000.0, block_size=4)
+  let nodes = [DspNode::constant(1.0), DspNode::output(0)]
+  let bindings = ControlBindingBuilder().bind_voice(key="gain", param=Gain)
+  let pool = @voice.BoundVoicePool(
+    AnalyzedGraph::analyze(nodes),
+    ctx,
+    bindings,
+    max_voices=1,
+  )
+  let half = (_ : Int64, _ : Int64) => 0.5
+  let stale = pool.follower("gain", half).unwrap()
+  assert_true(pool.follower("cutoff", half) is None)
+  pool.set_template(AnalyzedGraph::analyze(nodes), bindings).unwrap()
+  let handle = pool.note_on_controls({}).unwrap()
+  assert_true(!pool.follow(handle, stale))
+  assert_true(pool.follow(handle, pool.follower("gain", half).unwrap()))
+  let left = AudioBuffer::filled(4)
+  let right = AudioBuffer::filled(4)
+  pool.process(ctx, left, right)
+  let unit = left.get(3)
+  pool.update_follows(0L, 1L)
+  left.fill(0.0)
+  right.fill(0.0)
+  pool.process(ctx, left, right)
+  assert_true((left.get(3) / unit - 0.5).abs() < 0.000001)
+}
