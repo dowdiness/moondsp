@@ -23,7 +23,7 @@ jobs:
         run: moon update
 
       - name: Install MoonBit deps
-        run: moon install
+        run: NEW_MOON_MOD=0 moon check
 
       - name: Parse cookbook Mini examples
         run: ./scripts/check-cookbook-mini.py
