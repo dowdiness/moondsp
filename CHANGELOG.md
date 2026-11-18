@@ -9,6 +9,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking MoonBit API:** one `PatternScheduler(bpm~, ctx~, instruments~)`
+  drives every instrument pool. Each event plays on the first instrument whose
+  `InstrumentSelector` matches its controls, so an event carrying both `sound`
+  and `note` plays only on the drum. Rendering, expiry, voice effects, and kill
+  no longer take a pool; `set_tempo` and `accept_playback` replace their `_all`
+  forms, `apply_controls_to_voices` replaces `apply_voices_controls_result`,
+  `VoiceControlBatch` names its instrument, and pushing a note for an unknown
+  instrument returns `ActiveNoteError::UnknownInstrument`. Rendered browser
+  output is bit-identical to the per-route schedulers.
+- **Breaking MoonBit API:** every control key resolves through the pool's
+  bindings. A binding targets a graph parameter, converted by a `ControlUnit`
+  (`MidiToHz`, `SecondsToMs`), or a voice-frame parameter through
+  `bind_voice(key~, param~)` (`Gain`, `Pan`, `Send`).
+  `BoundVoicePool::note_on_controls` takes score controls and sets the voice
+  frame itself. `ControlMapper`, `default_control_mapper`, `midi_to_hz`,
+  `VoiceAction`, and the synth-only `gain` graph binding are removed; no
+  compatibility path.
+- **Breaking MoonBit API:** lowering a `PatternDoc` derives control buses
+  (ADR-0019), and every snapshot event carries `EventBuses`, read through
+  `EventBuses::reader` / `each_reader`. `Placement` places an event and its
+  buses together (`Event::placed`, `EventBuses::placed`), and songs derive
+  their query span from it. Controls outside the closed signal set fail with
+  `PatternDocError::UnsupportedControl`. `Event::with_spans` is removed. A key
+  set twice now reads the outer bus and falls back to the inner one where the
+  outer one rests: `note("C3").gain(saw).gain("1 ~")` follows `saw` on the
+  rest instead of holding 1.
+- The CLAP prototype's voice gain, cutoff, resonance, and pan are buses holding
+  the host's latest value, so a note in its release tail also follows host
+  automation. Velocity is a constant on the envelope gain, and voice gain is
+  the voice-frame gain; held-note output is unchanged up to rounding, and the
+  audio-callback allocation audit still measures zero.
+
+- **Breaking MoonBit API:** `VoicePool`, `BoundVoicePool`, `ClapSynthEngine`,
+  `PatternScheduler`, `OnsetBuffer`, and `Draft` are built with `Type(...)`
+  constructors instead of `Type::new`. `VoicePoolError`, `BoundVoicePoolError`,
+  and `ClapEngineError` become suberror types that the constructors raise
+  instead of returning `Result`. Every remaining `#alias(new)` constructor
+  alias is removed; call `Type(...)`. No compatibility alias.
+- **Breaking MoonBit API:** every Mini source compiles through `PatternDoc`
+  documents. `@mini.parse` lowers `parse_snapshot`, and untracked play sources
+  and text songs build their section bodies with `MiniDocBuilder`; the separate
+  runtime Mini compiler is removed. Entries are addressed by document node ID
+  only: `Pat::entry_key` replaces `Pat::named_entry` and
+  `PatternSnapshot(WithOrigins)::entry_key`, so text songs keep stable entry
+  addresses when sections are reordered, and reparsing keeps unchanged
+  `every` and `jux` entries. `MiniDocBuilder` gains `control`, `every`, and
+  `jux`, and `degrade` takes the `?` step.
+- **Breaking behavior:** `degradeBy` and `?` seed from expression content. The
+  same expression drops the same events in the editor and in text playback,
+  whether or not it is named with `let`, wherever it appears, and after
+  whitespace-only edits; each `?` in a notation string also salts its seed with
+  its step order. Scores that use them drop different events than before.
+
 - **Breaking browser API:** replace the exposed `engine.output` Worklet with
   synchronous `engine.connect` / `engine.disconnect`, preserving native routing
   overloads. New connections reject after closing/failure; disconnection remains
@@ -56,6 +109,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A merged control's value no longer depends on the query length: an onset
+  reads the value at its own start instead of the last value overlapping the
+  queried span, which could differ between a 1/8-cycle and a 1-cycle query.
+- Every note starts at center pan unless it sets one. A note without `.pan`
+  no longer inherits the pan of the last note that used its voice slot.
+- The editor no longer rejects a song whose sections play one after another as
+  if they all sounded at once; only overlapping parts count toward the query
+  budget, as in text playback.
+- In Safari and other WebKit 27 browsers, pressing Enter while dragging a note
+  in the note grid no longer inserts a line break into the code and cancels
+  the drag. Keys pressed during a pointer drag no longer reach the editor.
 - Pin the Cloudflare Pages MoonBit toolchain to the same version as GitHub
   Actions, preventing untested manifest-parser changes from rejecting dependencies.
 - Start live audio from Play in Firefox and WebKit, which start audio only while
@@ -73,6 +137,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lines; the line-number gutter has room for three digits.
 
 ### Added
+
+- Parameter automation through automatic control buses (ADR-0019). Control
+  arguments in Mini take a number, a quoted step pattern such as
+  `s("hh*8").gain("0.2 0.6 0.3 0.8")`, or a signal (`sine`, `cosine`, `saw`,
+  `isaw`, `tri`, `square`) refined by `.range(lo, hi)`, `.slow(n)`, and
+  `.fast(n)`, as in `note("C2").slow(4).lpf(saw.range(200, 4000).slow(4))`.
+  A sounding note follows its controls once per audio block, including its
+  release tail, without retriggering. Range limits such as room 0–1 apply to
+  every value a pattern or signal can take; `?` is rejected inside quoted
+  control steps. `.gain`, `.pan`, and `.room` now apply to every sound,
+  drums included, through each voice's frame. The live editor completes signal
+  names, marks knobs overridden by a later step or signal argument, and Help
+  gains a moving-controls example. MoonBit hosts attach buses with
+  `note_on_controls(..., follow=...)` or `BoundVoicePool::follower` / `follow`
+  and apply them with `update_follows`; `PatternDoc::continuous` and
+  `continuous(key, f)` add continuous controls. Audio-thread bus updates
+  allocate nothing.
 
 - Simplify the live workspace into a quiet, mostly wordless surface. It keeps
   the established palette and adds an icon-only toolbar, larger code, and a
