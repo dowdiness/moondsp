@@ -54,8 +54,8 @@ fn parse_play_bpm_declaration(parser : Parser) -> Double raise ParseError {
 /// including future conditional branches; no pattern queries are executed.
 pub fn parse_play_source(
   input : String,
-  previous? : @pattern.PatternDoc[@pattern.ControlMap]? = None,
-  max_query_span? : @pattern.Rational? = None,
+  previous~ : @pattern.PatternDoc[@pattern.ControlMap]? = None,
+  max_query_span~ : @pattern.Rational? = None,
 ) -> Result[PlaySource, String] {
   parse_play_source_with_origins(
     input,
@@ -71,8 +71,8 @@ fn parse_play_source_with_origins(
   input : String,
   previous : @pattern.PatternDoc[@pattern.ControlMap]?,
   max_query_span : @pattern.Rational?,
-  origins? : SourceMap? = None,
-  syntax_depth_limit? : Int? = None,
+  origins~ : SourceMap? = None,
+  syntax_depth_limit~ : Int32? = None,
 ) -> Result[PlaySource, String] {
   guard !input.is_empty() else { return Err("empty input") }
   if syntax_depth_limit is Some(_) {

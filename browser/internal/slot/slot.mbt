@@ -9,7 +9,7 @@
 ///|
 pub trait Output {
   fn reset(Self) -> Unit
-  fn allocate(Self, block_size : Int) -> Unit
+  fn allocate(Self, block_size : Int32) -> Unit
 }
 
 ///|
@@ -43,7 +43,7 @@ pub fn MonoOut::get(self : MonoOut) -> @moondsp.AudioBuffer {
 }
 
 ///|
-pub fn MonoOut::sample(self : MonoOut, index : Int) -> Double {
+pub fn MonoOut::sample(self : MonoOut, index : Int32) -> Double {
   checked_sample(index, self.buffer.val)
 }
 
@@ -89,12 +89,12 @@ pub fn StereoOut::right_buf(self : StereoOut) -> @moondsp.AudioBuffer {
 }
 
 ///|
-pub fn StereoOut::left_sample(self : StereoOut, index : Int) -> Double {
+pub fn StereoOut::left_sample(self : StereoOut, index : Int32) -> Double {
   checked_sample(index, self.left.val)
 }
 
 ///|
-pub fn StereoOut::right_sample(self : StereoOut, index : Int) -> Double {
+pub fn StereoOut::right_sample(self : StereoOut, index : Int32) -> Double {
   checked_sample(index, self.right.val)
 }
 
@@ -106,7 +106,7 @@ pub struct GraphSlot[T, O] {
   context : @ref.Ref[@moondsp.DspContext?]
   output : O
   priv sample_rate : @ref.Ref[Double]
-  priv block_size : @ref.Ref[Int]
+  priv block_size : @ref.Ref[Int32]
   priv compile : (@moondsp.DspContext) -> T?
 }
 
@@ -141,8 +141,8 @@ pub fn[T, O] GraphSlot::GraphSlot(
 pub fn[T, O : Output] GraphSlot::ensure(
   self : GraphSlot[T, O],
   rate : Double,
-  block : Int,
-  on_rebuild? : () -> Unit = fn() {  },
+  block : Int32,
+  on_rebuild~ : () -> Unit = fn() {  },
 ) -> Bool {
   if rate <= 0.0 || block <= 0 {
     self.reset()
@@ -194,7 +194,7 @@ pub fn[T, O] GraphSlot::ctx_val(self : GraphSlot[T, O]) -> @moondsp.DspContext {
 /// Bounds-checked sample read from an optional buffer. Returns 0.0
 /// for out-of-bounds indices or uninitialized buffers. Shared by
 /// `MonoOut::sample` / `StereoOut::*_sample` and the scheduler file.
-fn checked_sample(index : Int, output : @moondsp.AudioBuffer?) -> Double {
+fn checked_sample(index : Int32, output : @moondsp.AudioBuffer?) -> Double {
   match output {
     Some(buffer) =>
       if index >= 0 && index < buffer.length() {

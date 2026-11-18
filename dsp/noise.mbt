@@ -1,18 +1,18 @@
 ///|
 /// Deterministic white-noise source with explicit RNG state.
 pub struct Noise {
-  priv mut state : UInt
+  priv mut state : UInt32
 }
 
 ///|
 /// Create a new white-noise generator from an explicit seed.
-pub fn Noise::Noise(seed : UInt) -> Noise {
+pub fn Noise::Noise(seed : UInt32) -> Noise {
   { state: normalize_seed(seed), }
 }
 
 ///|
 /// Expose the current RNG state for testing and diagnostics.
-pub fn Noise::seed(self : Noise) -> UInt {
+pub fn Noise::seed(self : Noise) -> UInt32 {
   self.state
 }
 
@@ -26,7 +26,7 @@ pub fn Noise::copy_state_from(self : Noise, source : Noise) -> Unit {
 
 ///|
 /// Reset the generator to a new explicit seed.
-pub fn Noise::reset(self : Noise, seed : UInt) -> Unit {
+pub fn Noise::reset(self : Noise, seed : UInt32) -> Unit {
   self.state = normalize_seed(seed)
 }
 
@@ -62,7 +62,7 @@ pub fn Noise::process(
 }
 
 ///|
-fn normalize_seed(seed : UInt) -> UInt {
+fn normalize_seed(seed : UInt32) -> UInt32 {
   if seed == 0U {
     0x6D2B79F5U
   } else {
@@ -71,11 +71,11 @@ fn normalize_seed(seed : UInt) -> UInt {
 }
 
 ///|
-fn next_state(state : UInt) -> UInt {
+fn next_state(state : UInt32) -> UInt32 {
   normalize_seed(state * 1664525U + 1013904223U)
 }
 
 ///|
-fn sample_from_state(state : UInt) -> Double {
+fn sample_from_state(state : UInt32) -> Double {
   state.to_double() / 2147483648.0 - 1.0
 }

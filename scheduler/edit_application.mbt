@@ -5,10 +5,11 @@
 /// `detached_note_count` counts note records removed from scheduler tracking by
 /// Release or Kill, not voices destroyed in the pool. Release tails may still
 /// sound after detachment. Each effect leaves the other counter at zero.
+#derive(Eq, Debug)
 pub struct ActiveVoiceEffectOutcome {
-  retuned_voice_count : Int
-  detached_note_count : Int
-} derive(Eq, Debug)
+  retuned_voice_count : Int32
+  detached_note_count : Int32
+}
 
 ///|
 pub extend ActiveVoiceEffectOutcome with Eq::{not_equal, equal}

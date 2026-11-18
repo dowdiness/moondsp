@@ -77,21 +77,21 @@ pub fn AnalyzedGraph::analyze(template : Array[DspNode]) -> AnalyzedGraph {
 
 ///|
 /// Length of the authoring template snapshot.
-fn AnalyzedGraph::length(self : AnalyzedGraph) -> Int {
+fn AnalyzedGraph::length(self : AnalyzedGraph) -> Int32 {
   self.raw.length()
 }
 
 ///|
 /// Return the authoring node at `index` (panics if out of range; callers
 /// are expected to bounds-check first).
-fn AnalyzedGraph::node_at(self : AnalyzedGraph, index : Int) -> DspNode {
+fn AnalyzedGraph::node_at(self : AnalyzedGraph, index : Int32) -> DspNode {
   DspNode::from_model(self.raw.node_at(index))
 }
 
 ///|
 /// Does authoring index `i` survive the optimizer? Returns false for
 /// out-of-range indices (no abort).
-fn AnalyzedGraph::is_node_live(self : AnalyzedGraph, index : Int) -> Bool {
+fn AnalyzedGraph::is_node_live(self : AnalyzedGraph, index : Int32) -> Bool {
   self.raw.is_node_live(index)
 }
 
@@ -104,7 +104,7 @@ fn AnalyzedGraph::is_node_live(self : AnalyzedGraph, index : Int) -> Bool {
 ///
 /// Parameterless because the template snapshot is owned by self; callers
 /// do not need to remember which template was compiled.
-pub fn AnalyzedGraph::orphan_adsr_count(self : AnalyzedGraph) -> Int {
+pub fn AnalyzedGraph::orphan_adsr_count(self : AnalyzedGraph) -> Int32 {
   let count = for i in 0..<self.length(); total = 0 {
     if self.node_at(i).kind() is Adsr && !self.is_node_live(i) {
       continue total + 1
@@ -132,6 +132,6 @@ pub fn AnalyzedGraph::orphan_adsr_count(self : AnalyzedGraph) -> Int {
 /// introspection waits for a concrete consumer.
 pub fn AnalyzedGraph::adsr_authoring_indices(
   self : AnalyzedGraph,
-) -> FixedArray[Int] {
+) -> FixedArray[Int32] {
   self.raw.adsr_authoring_indices()
 }

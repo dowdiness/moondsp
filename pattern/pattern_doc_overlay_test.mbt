@@ -89,7 +89,7 @@ test "reference identity belongs to the use site rather than its definition" {
 
 ///|
 test "silence in an overlay does not shift sourced playback entries" {
-  let silent : @pattern.PatternDoc[Int] = @pattern.PatternDoc::silence(
+  let silent : @pattern.PatternDoc[Int32] = @pattern.PatternDoc::silence(
     id=pid("silent"),
   )
   let audible = @pattern.PatternDoc::pure(id=pid("audible"), value=8)

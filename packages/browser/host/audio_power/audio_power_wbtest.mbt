@@ -1,6 +1,6 @@
 ///|
 extern "js" fn test_context(
-  suspended? : () -> Unit = () => (),
+  suspended~ : () -> Unit = () => (),
 ) -> NativeContext =
   #| suspended => Object.assign(new EventTarget(), {
   #|   state: 'suspended', closes: 0,
@@ -22,7 +22,7 @@ extern "js" fn test_error_name(error : @host.NativeError) -> String =
   #| error => error.name
 
 ///|
-extern "js" fn test_close_count(context : NativeContext) -> Int =
+extern "js" fn test_close_count(context : NativeContext) -> Int32 =
   #| context => context.closes
 
 ///|
@@ -65,7 +65,7 @@ extern "js" fn test_value() -> NativeValue =
 extern "js" fn test_delay_close(
   context : NativeContext,
   completion : NativeDeferred,
-  closing? : () -> Unit = () => (),
+  closing~ : () -> Unit = () => (),
 ) -> Unit =
   #| (context, completion, closing) => { context.close = () => { context.closes++; context.state = 'closed'; closing(); return completion.promise; }; }
 
@@ -76,7 +76,7 @@ extern "js" fn test_context_closed(context : NativeContext) -> Unit =
 ///|
 extern "js" fn test_engine(
   completion : NativeDeferred,
-  closing? : () -> Unit = () => (),
+  closing~ : () -> Unit = () => (),
 ) -> @host.NativeEngine =
   #| (completion, closing) => {
   #|   const engine = { closes: 0, connect() {}, disconnect() {} };
@@ -96,7 +96,7 @@ extern "js" fn test_engine_value(engine : @host.NativeEngine) -> NativeValue =
   #| engine => engine
 
 ///|
-extern "js" fn test_engine_closes(engine : @host.NativeEngine) -> Int =
+extern "js" fn test_engine_closes(engine : @host.NativeEngine) -> Int32 =
   #| engine => engine.closes
 
 ///|

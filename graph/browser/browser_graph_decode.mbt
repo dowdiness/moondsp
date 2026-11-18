@@ -1,14 +1,14 @@
 ///|
 // The browser wire format lowers directly to the internal graph model.
 priv suberror GraphDecodeError {
-  InvalidDescription(String, Int)
+  InvalidDescription(String, Int32)
 }
 
 ///|
 fn graph_json_number(
   node : Json,
   key : String,
-  index : Int,
+  index : Int32,
 ) -> Double raise GraphDecodeError {
   guard node is Object(fields) &&
     fields.get(key) is Some(Number(value, ..)) &&
@@ -22,9 +22,9 @@ fn graph_json_number(
 fn graph_json_input_field(
   node : Json,
   key : String,
-  count : Int,
-  index : Int,
-) -> Int raise GraphDecodeError {
+  count : Int32,
+  index : Int32,
+) -> Int32 raise GraphDecodeError {
   let value = graph_json_number(node, key, index)
   guard value >= 0.0 && value < count.to_double() && @math.floor(value) == value else {
     raise InvalidDescription("Input index is outside the graph", index)
@@ -35,9 +35,9 @@ fn graph_json_input_field(
 ///|
 fn graph_json_input(
   node : Json,
-  count : Int,
-  index : Int,
-) -> Int raise GraphDecodeError {
+  count : Int32,
+  index : Int32,
+) -> Int32 raise GraphDecodeError {
   graph_json_input_field(node, "input", count, index)
 }
 
@@ -47,10 +47,10 @@ fn graph_json_input(
 fn graph_json_param(
   node : Json,
   key : String,
-  index : Int,
+  index : Int32,
   slot : @model.GraphParamSlot,
   defaults : Map[String, Double],
-  bindings : Map[String, Array[Int]],
+  bindings : Map[String, Array[Int32]],
   targets : Array[@runtime.GraphControlTarget],
 ) -> Double raise GraphDecodeError {
   guard node is Object(fields) else {
@@ -80,8 +80,8 @@ fn graph_json_param(
 /// Browser representation only: canonical authoring remains Array[DspNode].
 fn decode_browser_graph(
   text : String,
-  bindings~ : Map[String, Array[Int]],
-  gates~ : Map[String, Int],
+  bindings~ : Map[String, Array[Int32]],
+  gates~ : Map[String, Int32],
   targets~ : Array[@runtime.GraphControlTarget],
 ) -> Array[@model.DspNode] raise GraphDecodeError {
   let json = @json.parse(text) catch {

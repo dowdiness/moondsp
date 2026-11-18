@@ -1,11 +1,12 @@
 ///|
+#derive(Debug)
 pub(all) suberror GraphDocumentError {
-  LengthMismatch(Int, Int)
+  LengthMismatch(Int32, Int32)
   DuplicateNodeId(String)
   MissingNodeId(String)
   RetiredNodeId(String)
   Topology(GraphTopologyEditError)
-} derive(Debug)
+}
 
 ///|
 pub extend GraphDocumentError with @moonbitlang/core/debug.Debug::{to_repr}
@@ -92,7 +93,7 @@ pub fn GraphDocument::revision(self : GraphDocument) -> @identity.Revision {
 }
 
 ///|
-pub fn GraphDocument::length(self : GraphDocument) -> Int {
+pub fn GraphDocument::length(self : GraphDocument) -> Int32 {
   self.raw.length()
 }
 
@@ -105,14 +106,14 @@ pub fn GraphDocument::nodes(self : GraphDocument) -> Array[DspNode] {
 pub fn GraphDocument::node_index(
   self : GraphDocument,
   id : @identity.GraphNodeId,
-) -> Int? {
+) -> Int32? {
   self.raw.node_index(id)
 }
 
 ///|
 pub fn GraphDocument::node_id_at(
   self : GraphDocument,
-  index : Int,
+  index : Int32,
 ) -> @identity.GraphNodeId? {
   self.raw.node_id_at(index)
 }
@@ -278,7 +279,7 @@ pub fn GraphIndexMap::revision(self : GraphIndexMap) -> @identity.Revision {
 }
 
 ///|
-pub fn GraphIndexMap::length(self : GraphIndexMap) -> Int {
+pub fn GraphIndexMap::length(self : GraphIndexMap) -> Int32 {
   self.raw.length()
 }
 
@@ -286,14 +287,14 @@ pub fn GraphIndexMap::length(self : GraphIndexMap) -> Int {
 pub fn GraphIndexMap::node_index(
   self : GraphIndexMap,
   id : @identity.GraphNodeId,
-) -> Int? {
+) -> Int32? {
   self.raw.node_index(id)
 }
 
 ///|
 pub fn GraphIndexMap::node_id_at(
   self : GraphIndexMap,
-  index : Int,
+  index : Int32,
 ) -> @identity.GraphNodeId? {
   self.raw.node_id_at(index)
 }

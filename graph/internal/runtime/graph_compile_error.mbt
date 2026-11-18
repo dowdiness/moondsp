@@ -3,10 +3,11 @@
 ///
 /// Node indices reported by public `compile_result` entry points are original
 /// authoring indices when they can be mapped from the analyzed template.
+#derive(Debug, Eq)
 pub enum GraphInputSlot {
   Input0
   Input1
-} derive(Debug, Eq)
+}
 
 ///|
 pub extend GraphInputSlot with @moonbitlang/core/debug.Debug::{to_repr}
@@ -15,19 +16,20 @@ pub extend GraphInputSlot with @moonbitlang/core/debug.Debug::{to_repr}
 pub extend GraphInputSlot with Eq::{not_equal, equal}
 
 ///|
+#derive(Debug)
 pub enum GraphCompileError {
   InvalidSampleRate(Double)
   MissingOutput(DspNodeKind)
   MultipleOutputs(DspNodeKind)
-  WrongOutputKind(Int, DspNodeKind, DspNodeKind)
-  InvalidInput(Int, DspNodeKind, GraphInputSlot, Int)
-  InvalidParamValue(Int, DspNodeKind, GraphParamSlot, Double)
-  InvalidDelaySamples(Int, Int, Int)
-  UnreachableNode(Int)
-  InvalidFeedbackEdge(Int, Int, Int)
-  DuplicateFeedbackInput(Int, GraphInputSlot)
+  WrongOutputKind(Int32, DspNodeKind, DspNodeKind)
+  InvalidInput(Int32, DspNodeKind, GraphInputSlot, Int32)
+  InvalidParamValue(Int32, DspNodeKind, GraphParamSlot, Double)
+  InvalidDelaySamples(Int32, Int32, Int32)
+  UnreachableNode(Int32)
+  InvalidFeedbackEdge(Int32, Int32, Int32)
+  DuplicateFeedbackInput(Int32, GraphInputSlot)
   InvalidTerminalShape(DspNodeKind)
-} derive(Debug)
+}
 
 ///|
 pub extend GraphCompileError with @moonbitlang/core/debug.Debug::{to_repr}
@@ -156,8 +158,8 @@ fn build_graph_program(
     None => return Err(GraphCompileError::MissingOutput(output_kind))
   }
   let marks = FixedArray::make(nodes.length(), 0)
-  let order : Array[Int] = []
-  let raw_feedback_edges : Array[(Int, Int, Int)] = []
+  let order : Array[Int32] = []
+  let raw_feedback_edges : Array[(Int32, Int32, Int32)] = []
   visit_graph_node_with_feedback(
     output_index, nodes, marks, order, raw_feedback_edges,
   )
@@ -249,9 +251,9 @@ fn authoring_graph_compile_error(
 fn mark_reachable(
   nodes : Array[DspNode],
   reachable : FixedArray[Bool],
-  start : Int,
+  start : Int32,
 ) -> Unit {
-  let stack : Array[Int] = [start]
+  let stack : Array[Int32] = [start]
   while !stack.is_empty() {
     let index = stack.pop().unwrap()
     if index < 0 || index >= nodes.length() || reachable[index] {
@@ -270,9 +272,9 @@ fn mark_reachable(
 
 ///|
 fn compile_error_inverse_map(
-  index_map : FixedArray[Int],
-  optimized_count : Int,
-) -> FixedArray[Int] {
+  index_map : FixedArray[Int32],
+  optimized_count : Int32,
+) -> FixedArray[Int32] {
   let inverse = FixedArray::make(optimized_count, -1)
   for authoring_index in 0..<index_map.length() {
     let optimized_index = index_map[authoring_index]
@@ -286,7 +288,7 @@ fn compile_error_inverse_map(
 }
 
 ///|
-fn remap_compile_index(index : Int, inverse : FixedArray[Int]) -> Int {
+fn remap_compile_index(index : Int32, inverse : FixedArray[Int32]) -> Int32 {
   if index >= 0 && index < inverse.length() && inverse[index] >= 0 {
     inverse[index]
   } else {
@@ -297,7 +299,7 @@ fn remap_compile_index(index : Int, inverse : FixedArray[Int]) -> Int {
 ///|
 fn remap_graph_compile_error(
   error : GraphCompileError,
-  inverse : FixedArray[Int],
+  inverse : FixedArray[Int32],
 ) -> GraphCompileError {
   match error {
     WrongOutputKind(index, actual, expected) =>
@@ -344,7 +346,10 @@ fn remap_graph_compile_error(
 }
 
 ///|
-fn count_output_kind(nodes : Array[DspNode], output_kind : DspNodeKind) -> Int {
+fn count_output_kind(
+  nodes : Array[DspNode],
+  output_kind : DspNodeKind,
+) -> Int32 {
   for node in nodes; count = 0 {
     if node.kind() == output_kind {
       continue count + 1
@@ -357,9 +362,9 @@ fn count_output_kind(nodes : Array[DspNode], output_kind : DspNodeKind) -> Int {
 
 ///|
 fn invalid_compile_node(
-  index : Int,
+  index : Int32,
   node : DspNode,
-  node_count : Int,
+  node_count : Int32,
   sample_rate : Double,
   output_kind : DspNodeKind,
 ) -> GraphCompileError? {
@@ -390,9 +395,9 @@ fn invalid_compile_node(
 
 ///|
 fn invalid_oscillator_node(
-  index : Int,
+  index : Int32,
   node : DspNode,
-  node_count : Int,
+  node_count : Int32,
 ) -> GraphCompileError? {
   if node.input0() >= 0 {
     invalid_unary_input_node(index, node, node_count)
@@ -407,7 +412,7 @@ fn invalid_oscillator_node(
 }
 
 ///|
-fn invalid_adsr_node(index : Int, node : DspNode) -> GraphCompileError? {
+fn invalid_adsr_node(index : Int32, node : DspNode) -> GraphCompileError? {
   let params : Array[(GraphParamSlot, Double)] = [
     (GraphParamSlot::Value0, node.value0()),
     (GraphParamSlot::Value1, node.value1()),
@@ -425,9 +430,9 @@ fn invalid_adsr_node(index : Int, node : DspNode) -> GraphCompileError? {
 
 ///|
 fn invalid_biquad_node(
-  index : Int,
+  index : Int32,
   node : DspNode,
-  node_count : Int,
+  node_count : Int32,
   sample_rate : Double,
 ) -> GraphCompileError? {
   match invalid_unary_input_node(index, node, node_count) {
@@ -445,9 +450,9 @@ fn invalid_biquad_node(
 
 ///|
 fn invalid_delay_node(
-  index : Int,
+  index : Int32,
   node : DspNode,
-  node_count : Int,
+  node_count : Int32,
 ) -> GraphCompileError? {
   match invalid_unary_input_node(index, node, node_count) {
     Some(error) => Some(error)
@@ -464,9 +469,9 @@ fn invalid_delay_node(
 
 ///|
 fn invalid_gain_node(
-  index : Int,
+  index : Int32,
   node : DspNode,
-  node_count : Int,
+  node_count : Int32,
 ) -> GraphCompileError? {
   match invalid_unary_input_node(index, node, node_count) {
     Some(error) => Some(error)
@@ -502,9 +507,9 @@ fn invalid_gain_node(
 
 ///|
 fn invalid_binary_input_node(
-  index : Int,
+  index : Int32,
   node : DspNode,
-  node_count : Int,
+  node_count : Int32,
 ) -> GraphCompileError? {
   match invalid_unary_input_node(index, node, node_count) {
     Some(error) => Some(error)
@@ -521,9 +526,9 @@ fn invalid_binary_input_node(
 
 ///|
 fn invalid_unary_positive_param_node(
-  index : Int,
+  index : Int32,
   node : DspNode,
-  node_count : Int,
+  node_count : Int32,
 ) -> GraphCompileError? {
   match invalid_unary_input_node(index, node, node_count) {
     Some(error) => Some(error)
@@ -545,9 +550,9 @@ fn invalid_unary_positive_param_node(
 
 ///|
 fn invalid_output_node(
-  index : Int,
+  index : Int32,
   node : DspNode,
-  node_count : Int,
+  node_count : Int32,
   output_kind : DspNodeKind,
 ) -> GraphCompileError? {
   if node.kind() != output_kind {
@@ -559,9 +564,9 @@ fn invalid_output_node(
 
 ///|
 fn invalid_unary_finite_param_node(
-  index : Int,
+  index : Int32,
   node : DspNode,
-  node_count : Int,
+  node_count : Int32,
 ) -> GraphCompileError? {
   match invalid_unary_input_node(index, node, node_count) {
     Some(error) => Some(error)
@@ -577,9 +582,9 @@ fn invalid_unary_finite_param_node(
 
 ///|
 fn invalid_unary_input_node(
-  index : Int,
+  index : Int32,
   node : DspNode,
-  node_count : Int,
+  node_count : Int32,
 ) -> GraphCompileError? {
   invalid_input(
     index,
@@ -592,11 +597,11 @@ fn invalid_unary_input_node(
 
 ///|
 fn invalid_input(
-  index : Int,
+  index : Int32,
   kind : DspNodeKind,
   slot : GraphInputSlot,
-  input : Int,
-  node_count : Int,
+  input : Int32,
+  node_count : Int32,
 ) -> GraphCompileError? {
   if valid_reference(input, node_count) {
     None
@@ -607,7 +612,7 @@ fn invalid_input(
 
 ///|
 fn invalid_finite_param(
-  index : Int,
+  index : Int32,
   kind : DspNodeKind,
   slot : GraphParamSlot,
   value : Double,
@@ -621,7 +626,7 @@ fn invalid_finite_param(
 
 ///|
 fn invalid_biquad_params(
-  index : Int,
+  index : Int32,
   kind : DspNodeKind,
   sample_rate : Double,
   cutoff : Double,
@@ -653,11 +658,11 @@ fn invalid_biquad_params(
 
 ///|
 fn invalid_delay_params(
-  index : Int,
+  index : Int32,
   kind : DspNodeKind,
   feedback : Double,
-  delay_samples : Int,
-  delay_max_samples : Int,
+  delay_samples : Int32,
+  delay_max_samples : Int32,
 ) -> GraphCompileError? {
   if !valid_delay_feedback(feedback) {
     Some(
@@ -681,10 +686,10 @@ fn invalid_delay_params(
 
 ///|
 fn build_feedback_inputs(
-  feedback_edges : FixedArray[(Int, Int, Int)],
-  node_count : Int,
+  feedback_edges : FixedArray[(Int32, Int32, Int32)],
+  node_count : Int32,
 ) -> Result[
-  (FixedArray[Bool], FixedArray[Int], FixedArray[Int]),
+  (FixedArray[Bool], FixedArray[Int32], FixedArray[Int32]),
   GraphCompileError,
 ] {
   let self_enabled = FixedArray::make(node_count, false)

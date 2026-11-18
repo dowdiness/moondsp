@@ -10,7 +10,7 @@ pub struct CompiledGraph {
   priv compile_sample_rate : Double
   priv nodes : FixedArray[@model.DspNode]
   priv default_nodes : FixedArray[@model.DspNode]
-  priv index_map : FixedArray[Int]
+  priv index_map : FixedArray[Int32]
   priv controls : ControlScratch
   // Mono signal path buffers — one per node
   priv buffers : FixedArray[AudioBuffer]
@@ -26,14 +26,14 @@ pub struct CompiledGraph {
   priv delay_states : FixedArray[DelayLine?]
   priv stereo_delay_left_states : FixedArray[DelayLine?]
   priv stereo_delay_right_states : FixedArray[DelayLine?]
-  priv feedback_edges : FixedArray[(Int, Int, Int)]
+  priv feedback_edges : FixedArray[(Int32, Int32, Int32)]
   // Feedback graph per-sample self-registers — one value per node, updated each sample
   priv self_values : FixedArray[Double]
   priv self_left_values : FixedArray[Double]
   priv self_right_values : FixedArray[Double]
   priv self_enabled : FixedArray[Bool]
-  priv back_edge_input0_source : FixedArray[Int]
-  priv back_edge_input1_source : FixedArray[Int]
+  priv back_edge_input0_source : FixedArray[Int32]
+  priv back_edge_input1_source : FixedArray[Int32]
   // Pre-allocated scratch arrays for feedback processing (avoid hot-path alloc)
   priv sample_values : FixedArray[Double]
   priv left_sample_values : FixedArray[Double]
@@ -41,7 +41,7 @@ pub struct CompiledGraph {
   // Pre-computed pan gains — trig is done once per block, not per sample
   priv pan_left_gains : FixedArray[Double]
   priv pan_right_gains : FixedArray[Double]
-  priv mut last_sanitized_count : Int
+  priv mut last_sanitized_count : Int32
   priv mut debug_validate : Bool
   priv mut last_validation_errors : Array[GraphValidationError]
 }
@@ -82,12 +82,12 @@ pub fn StereoDsp::raw_graph(self : StereoDsp) -> CompiledGraph {
 ///|
 /// Number of non-finite samples replaced with 0.0 during the most recent
 /// process() call. Returns 0 if output was clean.
-pub fn Dsp::last_sanitized_count(self : Dsp) -> Int {
+pub fn Dsp::last_sanitized_count(self : Dsp) -> Int32 {
   self.0.last_sanitized_count
 }
 
 ///|
-pub fn StereoDsp::last_sanitized_count(self : StereoDsp) -> Int {
+pub fn StereoDsp::last_sanitized_count(self : StereoDsp) -> Int32 {
   self.0.last_sanitized_count
 }
 
@@ -251,7 +251,7 @@ pub fn StereoDsp::compile_raw(
 }
 
 ///|
-pub fn CompiledGraph::compiled_buffer_capacity(self : CompiledGraph) -> Int {
+pub fn CompiledGraph::compiled_buffer_capacity(self : CompiledGraph) -> Int32 {
   if self.buffers.is_empty() {
     0
   } else {
@@ -262,8 +262,8 @@ pub fn CompiledGraph::compiled_buffer_capacity(self : CompiledGraph) -> Int {
 ///|
 fn CompiledGraph::compiled_index_for(
   self : CompiledGraph,
-  node_index : Int,
-) -> Int? {
+  node_index : Int32,
+) -> Int32? {
   if node_index < 0 || node_index >= self.index_map.length() {
     None
   } else {
@@ -277,22 +277,22 @@ fn CompiledGraph::compiled_index_for(
 }
 
 ///|
-pub fn Dsp::compiled_buffer_capacity(self : Dsp) -> Int {
+pub fn Dsp::compiled_buffer_capacity(self : Dsp) -> Int32 {
   self.0.compiled_buffer_capacity()
 }
 
 ///|
-pub fn StereoDsp::compiled_buffer_capacity(self : StereoDsp) -> Int {
+pub fn StereoDsp::compiled_buffer_capacity(self : StereoDsp) -> Int32 {
   self.0.compiled_buffer_capacity()
 }
 
 ///|
 fn visit_graph_node_with_feedback(
-  index : Int,
+  index : Int32,
   nodes : Array[DspNode],
-  marks : FixedArray[Int],
-  order : Array[Int],
-  feedback_edges : Array[(Int, Int, Int)],
+  marks : FixedArray[Int32],
+  order : Array[Int32],
+  feedback_edges : Array[(Int32, Int32, Int32)],
 ) -> Unit {
   if marks[index] != 0 {
     return
@@ -307,11 +307,11 @@ fn visit_graph_node_with_feedback(
 
 ///|
 fn visit_graph_dependencies_with_feedback(
-  index : Int,
+  index : Int32,
   nodes : Array[DspNode],
-  marks : FixedArray[Int],
-  order : Array[Int],
-  feedback_edges : Array[(Int, Int, Int)],
+  marks : FixedArray[Int32],
+  order : Array[Int32],
+  feedback_edges : Array[(Int32, Int32, Int32)],
 ) -> Unit {
   let node = nodes[index]
   match node.kind() {
@@ -507,13 +507,13 @@ fn visit_graph_dependencies_with_feedback(
 
 ///|
 fn visit_graph_input_with_feedback(
-  input : Int,
-  target_index : Int,
-  target_slot : Int,
+  input : Int32,
+  target_index : Int32,
+  target_slot : Int32,
   nodes : Array[DspNode],
-  marks : FixedArray[Int],
-  order : Array[Int],
-  feedback_edges : Array[(Int, Int, Int)],
+  marks : FixedArray[Int32],
+  order : Array[Int32],
+  feedback_edges : Array[(Int32, Int32, Int32)],
 ) -> Unit {
   match marks[input] {
     0 =>
@@ -527,7 +527,7 @@ fn visit_graph_input_with_feedback(
 fn find_single_output_index_of_kind(
   nodes : Array[DspNode],
   kind : DspNodeKind,
-) -> Int? {
+) -> Int32? {
   let mut output_index = -1
   for index = 0; index < nodes.length(); index = index + 1 {
     if nodes[index].kind() == kind {
@@ -546,9 +546,9 @@ fn find_single_output_index_of_kind(
 
 ///|
 fn remapped_feedback_edges(
-  edges : Array[(Int, Int, Int)],
-  remap : FixedArray[Int],
-) -> FixedArray[(Int, Int, Int)] {
+  edges : Array[(Int32, Int32, Int32)],
+  remap : FixedArray[Int32],
+) -> FixedArray[(Int32, Int32, Int32)] {
   FixedArray::makei(edges.length(), index => {
     let edge = edges[index]
     (remap[edge.0], remap[edge.1], edge.2)
@@ -556,7 +556,7 @@ fn remapped_feedback_edges(
 }
 
 ///|
-fn compiled_block_size(context : DspContext) -> Int {
+fn compiled_block_size(context : DspContext) -> Int32 {
   if context.block_size() > 0 {
     context.block_size()
   } else {

@@ -2,7 +2,7 @@
 const REVERB_BENCH_SAMPLE_RATE : Double = 48000.0
 
 ///|
-const REVERB_BENCH_BLOCK_SIZE : Int = 128
+const REVERB_BENCH_BLOCK_SIZE : Int32 = 128
 
 ///|
 test "bench/reverb/dry_stereo_copy_128" (b : @bench.T) {

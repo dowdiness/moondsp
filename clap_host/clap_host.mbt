@@ -2,12 +2,12 @@
 let engine_slots : Array[@engine.ClapSynthEngine?] = []
 
 ///|
-fn handle_to_index(handle : Int) -> Int {
+fn handle_to_index(handle : Int32) -> Int32 {
   handle - 1
 }
 
 ///|
-fn valid_handle_index(handle : Int) -> Int? {
+fn valid_handle_index(handle : Int32) -> Int32? {
   let index = handle_to_index(handle)
   if handle <= 0 || index < 0 || index >= engine_slots.length() {
     None
@@ -17,13 +17,13 @@ fn valid_handle_index(handle : Int) -> Int? {
 }
 
 ///|
-fn push_engine(engine : @engine.ClapSynthEngine) -> Int {
+fn push_engine(engine : @engine.ClapSynthEngine) -> Int32 {
   engine_slots.push(Some(engine))
   engine_slots.length()
 }
 
 ///|
-fn get_engine(handle : Int) -> @engine.ClapSynthEngine? {
+fn get_engine(handle : Int32) -> @engine.ClapSynthEngine? {
   match valid_handle_index(handle) {
     Some(index) => engine_slots[index]
     None => None
@@ -38,9 +38,9 @@ fn get_engine(handle : Int) -> @engine.ClapSynthEngine? {
 /// MoonBit objects or `Result` values across the native boundary.
 pub fn engine_create(
   sample_rate : Double,
-  max_block_size : Int,
-  max_voices : Int,
-) -> Int {
+  max_block_size : Int32,
+  max_voices : Int32,
+) -> Int32 {
   try
     @engine.ClapSynthEngine(sample_rate~, max_block_size~, max_voices~)
   catch {
@@ -52,7 +52,7 @@ pub fn engine_create(
 
 ///|
 /// Destroy an engine handle. Returns `false` for stale/invalid handles.
-pub fn engine_destroy(handle : Int) -> Bool {
+pub fn engine_destroy(handle : Int32) -> Bool {
   match valid_handle_index(handle) {
     None => false
     Some(index) =>
@@ -69,9 +69,9 @@ pub fn engine_destroy(handle : Int) -> Bool {
 
 ///|
 pub fn engine_note_on(
-  handle : Int,
-  note_id : Int,
-  key : Int,
+  handle : Int32,
+  note_id : Int32,
+  key : Int32,
   velocity : Double,
 ) -> Bool {
   match get_engine(handle) {
@@ -81,7 +81,7 @@ pub fn engine_note_on(
 }
 
 ///|
-pub fn engine_note_off(handle : Int, note_id : Int, key : Int) -> Bool {
+pub fn engine_note_off(handle : Int32, note_id : Int32, key : Int32) -> Bool {
   match get_engine(handle) {
     Some(engine) => engine.note_off(note_id~, key~)
     None => false
@@ -89,7 +89,7 @@ pub fn engine_note_off(handle : Int, note_id : Int, key : Int) -> Bool {
 }
 
 ///|
-pub fn engine_all_notes_off(handle : Int) -> Bool {
+pub fn engine_all_notes_off(handle : Int32) -> Bool {
   match get_engine(handle) {
     Some(engine) => {
       engine.all_notes_off()
@@ -100,7 +100,11 @@ pub fn engine_all_notes_off(handle : Int) -> Bool {
 }
 
 ///|
-pub fn engine_set_param(handle : Int, param_id : Int, value : Double) -> Bool {
+pub fn engine_set_param(
+  handle : Int32,
+  param_id : Int32,
+  value : Double,
+) -> Bool {
   match get_engine(handle) {
     Some(engine) => engine.set_param(param_id, value)
     None => false
@@ -111,7 +115,7 @@ pub fn engine_set_param(handle : Int, param_id : Int, value : Double) -> Bool {
 /// Render up to the engine's preallocated max block size.
 ///
 /// Returns the actual processed frame count, or `0` for an invalid handle.
-pub fn engine_process(handle : Int, frame_count : Int) -> Int {
+pub fn engine_process(handle : Int32, frame_count : Int32) -> Int32 {
   match get_engine(handle) {
     Some(engine) => engine.process(frame_count)
     None => 0
@@ -119,7 +123,7 @@ pub fn engine_process(handle : Int, frame_count : Int) -> Int {
 }
 
 ///|
-pub fn engine_left_sample(handle : Int, index : Int) -> Double {
+pub fn engine_left_sample(handle : Int32, index : Int32) -> Double {
   match get_engine(handle) {
     Some(engine) => engine.left_sample(index)
     None => 0.0
@@ -127,7 +131,7 @@ pub fn engine_left_sample(handle : Int, index : Int) -> Double {
 }
 
 ///|
-pub fn engine_right_sample(handle : Int, index : Int) -> Double {
+pub fn engine_right_sample(handle : Int32, index : Int32) -> Double {
   match get_engine(handle) {
     Some(engine) => engine.right_sample(index)
     None => 0.0
@@ -135,7 +139,7 @@ pub fn engine_right_sample(handle : Int, index : Int) -> Double {
 }
 
 ///|
-pub fn engine_master_gain(handle : Int) -> Double {
+pub fn engine_master_gain(handle : Int32) -> Double {
   match get_engine(handle) {
     Some(engine) => engine.master_gain()
     None => 0.0
@@ -143,7 +147,7 @@ pub fn engine_master_gain(handle : Int) -> Double {
 }
 
 ///|
-pub fn engine_voice_gain(handle : Int) -> Double {
+pub fn engine_voice_gain(handle : Int32) -> Double {
   match get_engine(handle) {
     Some(engine) => engine.voice_gain()
     None => 0.0
@@ -151,7 +155,7 @@ pub fn engine_voice_gain(handle : Int) -> Double {
 }
 
 ///|
-pub fn engine_cutoff_hz(handle : Int) -> Double {
+pub fn engine_cutoff_hz(handle : Int32) -> Double {
   match get_engine(handle) {
     Some(engine) => engine.cutoff_hz()
     None => 0.0
@@ -159,7 +163,7 @@ pub fn engine_cutoff_hz(handle : Int) -> Double {
 }
 
 ///|
-pub fn engine_resonance(handle : Int) -> Double {
+pub fn engine_resonance(handle : Int32) -> Double {
   match get_engine(handle) {
     Some(engine) => engine.resonance()
     None => 0.0
@@ -167,7 +171,7 @@ pub fn engine_resonance(handle : Int) -> Double {
 }
 
 ///|
-pub fn engine_pan(handle : Int) -> Double {
+pub fn engine_pan(handle : Int32) -> Double {
   match get_engine(handle) {
     Some(engine) => engine.pan()
     None => 0.0

@@ -1,11 +1,12 @@
 ///|
 /// Supported oscillator waveforms for the Phase 1 source primitive.
+#derive(Eq)
 pub(all) enum Waveform {
   Sine
   Saw
   Square
   Triangle
-} derive(Eq)
+}
 
 ///|
 pub extend Waveform with Eq::{not_equal, equal}

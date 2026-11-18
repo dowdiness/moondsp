@@ -191,8 +191,8 @@ test "targets resolve before registration and are independent of authoring array
   guard error
     is Some(
       @runtime.BoundGraphError::ControlRejected(
-        @runtime.GraphControlError::OrphanNode(0)
-      )
+        @runtime.GraphControlError::OrphanNode(0),
+      ),
     ) else {
     fail("orphan target rejected")
   }

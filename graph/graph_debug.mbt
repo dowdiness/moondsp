@@ -1,9 +1,10 @@
 ///|
+#derive(Debug, Eq)
 pub(all) enum GraphValidationError {
-  InvalidInput0(Int, Int, Int)
-  InvalidInput1(Int, Int, Int)
-  InvalidStateIndex(Int, String)
-} derive(Debug, Eq)
+  InvalidInput0(Int32, Int32, Int32)
+  InvalidInput1(Int32, Int32, Int32)
+  InvalidStateIndex(Int32, String)
+}
 
 ///|
 pub extend GraphValidationError with @moonbitlang/core/debug.Debug::{to_repr}

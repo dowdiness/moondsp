@@ -7,10 +7,10 @@ fn pid(value : String) -> @identity.PatternNodeId {
 
 ///|
 fn doc_span(
-  b_num : Int,
-  b_den : Int,
-  e_num : Int,
-  e_den : Int,
+  b_num : Int32,
+  b_den : Int32,
+  e_num : Int32,
+  e_den : Int32,
 ) -> @pattern.TimeSpan {
   @pattern.TimeSpan(
     @pattern.Rational(b_num.to_int64(), b_den.to_int64()),
@@ -62,7 +62,10 @@ fn unwrap_revision(
 }
 
 ///|
-fn edited_leaf_doc(edit_count : Int, value : Int) -> @pattern.PatternDoc[Int] {
+fn edited_leaf_doc(
+  edit_count : Int32,
+  value : Int32,
+) -> @pattern.PatternDoc[Int32] {
   let count = edit_count.abs() % 8 + 1
   let mut doc = @pattern.PatternDoc::pure(id=pid("leaf"), value~)
   for i in 0..<count {
@@ -76,9 +79,9 @@ fn edited_leaf_doc(edit_count : Int, value : Int) -> @pattern.PatternDoc[Int] {
 ///|
 fn revisioned_leaf_doc(
   id_value : String,
-  revision : Int,
-  value : Int,
-) -> @pattern.PatternDoc[Int] {
+  revision : Int32,
+  value : Int32,
+) -> @pattern.PatternDoc[Int32] {
   let mut doc = @pattern.PatternDoc::pure(id=pid(id_value), value~)
   for i in 0..<revision {
     doc = unwrap_doc(() => {
@@ -297,7 +300,7 @@ test "PatternLoweringCache reuses unchanged child after pattern edit" {
   let base = unwrap_doc(() => {
     @pattern.PatternDoc::sequence(id=pid("seq"), docs=[left, right])
   })
-  let cache : @pattern.PatternLoweringCache[Int] = @pattern.PatternLoweringCache::new()
+  let cache : @pattern.PatternLoweringCache[Int32] = @pattern.PatternLoweringCache::new()
   ignore(unwrap_snapshot(() => base.lower_with_cache(cache)))
   inspect(cache.hit_count(), content="0")
   inspect(cache.miss_count(), content="3")
@@ -327,7 +330,7 @@ test "PatternLoweringCache reuses unchanged child after pattern edit" {
 test "PatternLoweringCache does not reuse fresh doc with same id and revision" {
   let first = @pattern.PatternDoc::pure(id=pid("leaf"), value=1)
   let second = @pattern.PatternDoc::pure(id=pid("leaf"), value=2)
-  let cache : @pattern.PatternLoweringCache[Int] = @pattern.PatternLoweringCache::new()
+  let cache : @pattern.PatternLoweringCache[Int32] = @pattern.PatternLoweringCache::new()
   let first_snapshot = unwrap_snapshot(() => first.lower_with_cache(cache))
   inspect(first_snapshot.query(doc_span(0, 1, 1, 1))[0].value, content="1")
   cache.reset_stats()
@@ -347,7 +350,7 @@ test "PatternLoweringCache does not reuse divergent replacements" {
   })
   let first = unwrap_doc(() => base.replace_with_pure(id=pid("left"), value=3))
   let second = unwrap_doc(() => base.replace_with_pure(id=pid("left"), value=4))
-  let cache : @pattern.PatternLoweringCache[Int] = @pattern.PatternLoweringCache::new()
+  let cache : @pattern.PatternLoweringCache[Int32] = @pattern.PatternLoweringCache::new()
   let first_snapshot = unwrap_snapshot(() => first.lower_with_cache(cache))
   let first_events = first_snapshot.query(doc_span(0, 1, 1, 1))
   inspect(first_events[0].value, content="3")
@@ -432,7 +435,7 @@ test "PatternDoc aggregate revisions preserve child edits" {
 ///|
 test "prop: aggregate sequence revision advances with child revisions" {
   @qc.quick_check_fn(
-    fn(raw : Int) {
+    fn(raw : Int32) {
       let base_child = @pattern.PatternDoc::pure(id=pid("leaf"), value=1)
       let edited_child = edited_leaf_doc(raw, 2)
       let base = unwrap_doc(() => {
@@ -451,7 +454,7 @@ test "prop: aggregate sequence revision advances with child revisions" {
 ///|
 test "prop: aggregate stack revision advances with child revisions" {
   @qc.quick_check_fn(
-    fn(raw : Int) {
+    fn(raw : Int32) {
       let base_child = @pattern.PatternDoc::pure(id=pid("leaf"), value=1)
       let edited_child = edited_leaf_doc(raw, 2)
       let base = unwrap_doc(() => {
@@ -504,7 +507,7 @@ test "PatternDoc aggregate revisions distinguish shifted child revisions" {
 ///|
 test "prop: aggregate sequence revisions distinguish child revision vectors" {
   @qc.quick_check_fn(
-    fn(raw : (Int, Int, Int, Int)) {
+    fn(raw : (Int32, Int32, Int32, Int32)) {
       let (raw_left_a, raw_right_a, raw_left_b, raw_right_b) = raw
       let left_a = raw_left_a.abs() % 8
       let right_a = raw_right_a.abs() % 8
@@ -753,7 +756,7 @@ test "PatternDoc rejects missing edit target" {
 
 ///|
 test "PatternDoc rejects empty sequence documents" {
-  let docs : Array[@pattern.PatternDoc[Int]] = []
+  let docs : Array[@pattern.PatternDoc[Int32]] = []
   try @pattern.PatternDoc::sequence(id=pid("seq"), docs~) catch {
     @pattern.PatternDocError::EmptyPatternDocs => ()
     _ => abort("expected empty pattern docs")

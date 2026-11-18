@@ -4,7 +4,7 @@ const BENCH_SAMPLE_RATE : Double = 48000.0
 ///|
 /// WHY three sizes: 64 stresses per-block overhead, 128 is the production
 /// AudioWorklet quantum, 256 is common for higher-latency backends.
-let bench_block_sizes : FixedArray[Int] = [64, 128, 256]
+let bench_block_sizes : FixedArray[Int32] = [64, 128, 256]
 
 ///|
 /// Passthrough: constant → output (2 nodes).

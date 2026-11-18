@@ -3,19 +3,20 @@
 ///
 /// Node indices reported by public `compile_result` entry points are original
 /// authoring indices when they can be mapped from the analyzed template.
+#derive(Debug)
 pub(all) enum GraphCompileError {
   InvalidSampleRate(Double)
   MissingOutput(DspNodeKind)
   MultipleOutputs(DspNodeKind)
-  WrongOutputKind(Int, DspNodeKind, DspNodeKind)
-  InvalidInput(Int, DspNodeKind, GraphTopologyInputSlot, Int)
-  InvalidParamValue(Int, DspNodeKind, GraphParamSlot, Double)
-  InvalidDelaySamples(Int, Int, Int)
-  UnreachableNode(Int)
-  InvalidFeedbackEdge(Int, Int, Int)
-  DuplicateFeedbackInput(Int, GraphTopologyInputSlot)
+  WrongOutputKind(Int32, DspNodeKind, DspNodeKind)
+  InvalidInput(Int32, DspNodeKind, GraphTopologyInputSlot, Int32)
+  InvalidParamValue(Int32, DspNodeKind, GraphParamSlot, Double)
+  InvalidDelaySamples(Int32, Int32, Int32)
+  UnreachableNode(Int32)
+  InvalidFeedbackEdge(Int32, Int32, Int32)
+  DuplicateFeedbackInput(Int32, GraphTopologyInputSlot)
   InvalidTerminalShape(DspNodeKind)
-} derive(Debug)
+}
 
 ///|
 pub extend GraphCompileError with @moonbitlang/core/debug.Debug::{to_repr}
@@ -72,7 +73,7 @@ fn graph_compile_error_from_runtime(
     @runtime.GraphCompileError::InvalidDelaySamples(
       index,
       delay_samples,
-      delay_max_samples
+      delay_max_samples,
     ) =>
       GraphCompileError::InvalidDelaySamples(
         index, delay_samples, delay_max_samples,

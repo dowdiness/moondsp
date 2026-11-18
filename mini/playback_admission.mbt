@@ -47,9 +47,9 @@ fn MiniQueryBound::allowed(self : MiniQueryBound) -> Bool {
 fn MiniQueryWork::estimate(
   self : MiniQueryWork,
   width : Double,
-  scale? : Double = 1.0,
-  aligned? : Bool = false,
-  depth? : Int = 0,
+  scale~ : Double = 1.0,
+  aligned~ : Bool = false,
+  depth~ : Int32 = 0,
 ) -> MiniQueryBound {
   guard depth <= 64 &&
     width >= 0.0 &&
@@ -192,7 +192,7 @@ priv struct PlaybackAdmission {
   definitions : Map[String, MiniQueryWork]
   sections : Map[String, MiniQueryWork]
   roots : Array[MiniQueryWork]
-  mut nodes : Int
+  mut nodes : Int32
 }
 
 ///|
@@ -238,7 +238,7 @@ fn MiniCallback::query_work(
 fn PlaybackAdmission::expression(
   self : PlaybackAdmission,
   expr : MiniExpr,
-  depth? : Int = 0,
+  depth~ : Int32 = 0,
 ) -> MiniQueryWork raise ParseError {
   self.nodes += 1
   guard self.nodes <= 512 && depth <= 32 else {

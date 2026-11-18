@@ -1,5 +1,5 @@
 ///|
-pub fn drum_midi(name : String) -> Int? {
+pub fn drum_midi(name : String) -> Int32? {
   match name {
     "bd" => Some(36)
     "sd" => Some(38)

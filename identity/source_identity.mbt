@@ -1,43 +1,49 @@
 ///|
 /// A validated namespace for one uninterrupted source-tracking lifetime.
+#derive(Eq, Debug)
 pub struct SourceEpoch {
   priv value : Int64
-} derive(Eq, Debug)
+}
 
 ///|
 /// A validated source atom identity qualified by its source epoch.
+#derive(Eq, Debug)
 pub struct SourceAtomId {
   priv epoch : SourceEpoch
   priv serial : Int64
-} derive(Eq, Debug)
+}
 
 ///|
 /// A validated definition identity qualified by its source epoch.
+#derive(Eq, Debug)
 pub struct DefinitionId {
   priv epoch : SourceEpoch
   priv serial : Int64
-} derive(Eq, Debug)
+}
 
 ///|
 /// A validated reference identity qualified by its source epoch.
+#derive(Eq, Debug)
 pub struct ReferenceId {
   priv epoch : SourceEpoch
   priv serial : Int64
-} derive(Eq, Debug)
+}
 
 ///|
 /// A validated reference binding identity qualified by its source epoch.
+#derive(Eq, Debug)
 pub struct ReferenceBindingId {
   priv epoch : SourceEpoch
   priv serial : Int64
-} derive(Eq, Debug)
+}
 
 ///|
 /// A stable exact identity for one complete quoted notation literal.
+#derive(Eq, Debug)
 pub struct SourceFrameId {
   priv epoch : SourceEpoch
   priv serial : Int64
-} derive(Eq, Debug)
+}
 
 ///|
 /// JavaScript-safe positive integer upper bound, inclusive.

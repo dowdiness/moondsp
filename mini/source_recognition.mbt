@@ -37,14 +37,14 @@ fn RecognizedLiteral::RecognizedLiteral(
 priv struct RecognizedDefinition {
   name : String
   span : MiniSpan
-  visible_after : Int
+  visible_after : Int32
 }
 
 ///|
 fn RecognizedDefinition::RecognizedDefinition(
   name : String,
   span : MiniSpan,
-  visible_after : Int,
+  visible_after : Int32,
 ) -> RecognizedDefinition {
   { name, span, visible_after, }
 }
@@ -115,7 +115,7 @@ fn Parser::record_literal_fact(
   self : Parser,
   kind : MiniLiteral,
   content : String,
-  content_start : Int,
+  content_start : Int32,
 ) -> Unit {
   guard !(kind is Silence) else { return }
   let kind_name = match kind {
@@ -149,8 +149,8 @@ fn Parser::record_literal_fact(
 fn Parser::record_reference_fact(
   self : Parser,
   name : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
 ) -> Unit {
   self.recognized_references.push(
     RecognizedReference(name, { start, end, }, false),
@@ -161,7 +161,7 @@ fn Parser::record_reference_fact(
 /// Expressions contain no semicolons or declaration keywords. Scan beyond parse
 /// failures so a missing terminator cannot hide another declaration. Quotes,
 /// comments and identifiers follow the parser's lexical rules.
-fn mini_recognition_boundary(parser : Parser) -> (Int, Bool) {
+fn mini_recognition_boundary(parser : Parser) -> (Int32, Bool) {
   let start = parser.pos
   let input = parser.input
   let mut hides_declaration = false

@@ -5,27 +5,29 @@
 /// inside the test closure populates these variants by checking
 /// max_voices and orphan_adsr_count before invoking the current
 /// Option/Bool-returning API.
+#derive(Eq, @debug.Debug)
 enum A2Reason {
   InvalidMaxVoices
   OrphanAdsr
   CompileRejected
-} derive(Eq, @debug.Debug)
+}
 
 ///|
 /// PR-2 local enum mirroring the subset of VoicePoolError that the
 /// VoicePool::set_template path can produce (no max_voices check there).
 /// Deleted in PR 3 when the real VoicePoolError is available.
+#derive(Eq, @debug.Debug)
 enum A3Reason {
   OrphanAdsr
   CompileRejected
-} derive(Eq, @debug.Debug)
+}
 
 ///|
 /// PR-3 A2 closure: direct call to the raising VoicePool constructor, lifted to Result.
 fn pr2_a2_closure(
   nodes : Array[DspNode],
   ctx : DspContext,
-  max_voices : Int,
+  max_voices : Int32,
 ) -> Result[@voice.VoicePool, A2Reason] {
   (Ok(@voice.VoicePool(@graph.AnalyzedGraph::analyze(nodes), ctx, max_voices~)) catch {
     e => Err(e)
@@ -189,7 +191,7 @@ fn pr2_a4_closure(
   nodes : Array[DspNode],
   ctx : DspContext,
   builder : ControlBindingBuilder,
-  max_voices : Int,
+  max_voices : Int32,
 ) -> Result[@voice.BoundVoicePool, @voice.BoundVoicePoolError] {
   Ok(
     @voice.BoundVoicePool(

@@ -30,7 +30,7 @@ priv suberror ParseError {
 /// Parser state: input string + current position.
 priv struct Parser {
   input : String
-  mut pos : Int
+  mut pos : Int32
   bindings : Map[String, MiniDefinition]
   admission : PlaybackAdmission?
   mut recognition : Bool
@@ -39,21 +39,21 @@ priv struct Parser {
   recognized_literals : Array[RecognizedLiteral]
   recognized_references : Array[RecognizedReference]
   mut last_binding_span : MiniSpan
-  syntax_depth_limit : Int?
-  mut limit : Int
+  syntax_depth_limit : Int32?
+  mut limit : Int32
 }
 
 ///|
 priv struct MiniDollarStackLine {
-  start : Int
-  end : Int
+  start : Int32
+  end : Int32
 }
 
 ///|
 fn Parser::Parser(
   input : String,
-  admission? : PlaybackAdmission? = None,
-  syntax_depth_limit? : Int? = None,
+  admission~ : PlaybackAdmission? = None,
+  syntax_depth_limit~ : Int32? = None,
 ) -> Parser {
   {
     input,
@@ -74,8 +74,8 @@ fn Parser::Parser(
 ///|
 fn mini_collect_dollar_stack_lines(
   input : String,
-  start? : Int = 0,
-  partial? : Bool = false,
+  start~ : Int32 = 0,
+  partial~ : Bool = false,
 ) -> Result[Array[MiniDollarStackLine]?, String] {
   let lines : Array[MiniDollarStackLine] = []
   let mut saw_program = false
@@ -134,7 +134,7 @@ fn Parser::at_end(self : Parser) -> Bool {
 ///|
 /// Return the end of a complete comment. An unterminated block is left at its
 /// opening delimiter so normal parsing rejects it instead of accepting a prefix.
-fn mini_comment_end(input : String, start : Int) -> Int? {
+fn mini_comment_end(input : String, start : Int32) -> Int32? {
   guard start + 1 < input.length() && input[start] == '/' else { return None }
   let mut end_ = start + 2
   match input[start + 1] {
@@ -362,7 +362,7 @@ fn Parser::read_control_value(
 
 ///|
 /// Simple manual double parsing to avoid strconv dependency issues.
-fn parse_double_manual(s : String, start : Int, end : Int) -> Double {
+fn parse_double_manual(s : String, start : Int32, end : Int32) -> Double {
   let mut result = 0.0
   let mut i = start
   let negative = i < end && s[i] == '-'
@@ -395,9 +395,9 @@ fn parse_double_manual(s : String, start : Int, end : Int) -> Double {
 /// Convert the parser's plain decimal syntax to exact musical time.
 fn parse_decimal_rational(
   input : String,
-  start : Int,
-  end_ : Int,
-  error_position : Int,
+  start : Int32,
+  end_ : Int32,
+  error_position : Int32,
 ) -> @pattern.Rational raise ParseError {
   let negative = input[start] == '-'
   let digits_start = if negative { start + 1 } else { start }
@@ -466,9 +466,9 @@ fn Parser::read_quoted_string(self : Parser) -> String raise ParseError {
 /// `every(2, fast(1.9))` should raise rather than round to 2/1.
 fn require_integer(
   value : Double,
-  method_start : Int,
+  method_start : Int32,
   label : String,
-) -> Int raise ParseError {
+) -> Int32 raise ParseError {
   let n = value.to_int()
   if value != n.to_double() {
     raise ParseError(

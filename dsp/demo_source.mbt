@@ -1,5 +1,5 @@
 ///|
-const DEMO_NOISE_SEED : UInt = 0x6D2B79F5U
+const DEMO_NOISE_SEED : UInt32 = 0x6D2B79F5U
 
 ///|
 /// Encapsulates the mutable oscillator + noise state used by the browser
@@ -33,7 +33,7 @@ pub fn DemoSource::reset(self : DemoSource) -> Unit {
 /// - `4`: noise
 pub fn DemoSource::tick_source(
   self : DemoSource,
-  source_id~ : Int,
+  source_id~ : Int32,
   freq_hz~ : Double,
   sample_rate~ : Double,
 ) -> Double {

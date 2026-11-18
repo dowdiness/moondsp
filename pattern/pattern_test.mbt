@@ -1,13 +1,13 @@
 ///|
 test "silence produces 0 events" {
-  let p : @pattern.Pat[Int] = @pattern.Pat::silence()
+  let p : @pattern.Pat[Int32] = @pattern.Pat::silence()
   let events = p.query(span(0, 1, 1, 1))
   inspect(events.length(), content="0")
 }
 
 ///|
 test "silence over multi-cycle produces 0 events" {
-  let p : @pattern.Pat[Int] = @pattern.Pat::silence()
+  let p : @pattern.Pat[Int32] = @pattern.Pat::silence()
   let events = p.query(span(0, 1, 4, 1))
   inspect(events.length(), content="0")
 }
@@ -263,7 +263,7 @@ test "every(2, fast(2), pat): cycle 0 gets 2 events, cycle 1 gets 1" {
 
 ///|
 test "empty sequence produces 0 events" {
-  let p : @pattern.Pat[Int] = @pattern.sequence([])
+  let p : @pattern.Pat[Int32] = @pattern.sequence([])
   let events = p.query(span(0, 1, 1, 1))
   inspect(events.length(), content="0")
 }

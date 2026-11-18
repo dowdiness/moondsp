@@ -1,22 +1,22 @@
 ///|
 priv struct NotationProjectionModifier {
   kind : String
-  from : Int
-  to : Int
+  from : Int32
+  to : Int32
   value : Double
-  args : Array[Int]
+  args : Array[Int32]
 }
 
 ///|
 priv struct NotationProjectionNode {
   kind : String
-  from : Int
-  base_to : Int
-  mut end : Int
+  from : Int32
+  base_to : Int32
+  mut end : Int32
   value : String
-  mut parent : Int?
-  children : Array[Int]
-  mut weight : Int
+  mut parent : Int32?
+  children : Array[Int32]
+  mut weight : Int32
   modifiers : Array[NotationProjectionModifier]
 }
 
@@ -24,11 +24,11 @@ priv struct NotationProjectionNode {
 fn NotationParser::projection_node(
   self : NotationParser,
   kind : String,
-  from : Int,
-  base_to : Int,
+  from : Int32,
+  base_to : Int32,
   value : String,
-  children : Array[Int],
-) -> Int raise ParseError {
+  children : Array[Int32],
+) -> Int32 raise ParseError {
   guard self.projection_nodes is Some(nodes) else { return -1 }
   guard nodes.length() < 256 else {
     raise ParseError("notation projection exceeds 256 source nodes")
@@ -54,12 +54,12 @@ fn NotationParser::projection_node(
 ///|
 fn NotationParser::projection_modifier(
   self : NotationParser,
-  node : Int?,
+  node : Int32?,
   kind : String,
-  from : Int,
-  to : Int,
+  from : Int32,
+  to : Int32,
   value : Double,
-  args : Array[Int],
+  args : Array[Int32],
 ) -> Unit {
   match (self.projection_nodes, node) {
     (Some(nodes), Some(index)) => {
@@ -74,34 +74,34 @@ fn NotationParser::projection_modifier(
 /// Sub-parser for the notation content inside quotes.
 priv struct NotationParser {
   input : String
-  mut pos : Int
+  mut pos : Int32
   sound : Bool
   chord : Bool
   /// Numbers only, each the value of this control key.
   control : String?
   /// Every number read in control mode, for range checks.
   control_values : Array[Double]
-  source_offset : Int
+  source_offset : Int32
   mut query_work : MiniQueryWork?
   recognized_atoms : Array[RecognizedAtom]?
-  mut depth : Int
+  mut depth : Int32
   mut projection_nodes : Array[NotationProjectionNode]?
-  mut projection_root : Int?
-  mut last_modifier_value : Int
-  mut last_euclid_args : Array[Int]
+  mut projection_root : Int32?
+  mut last_modifier_value : Int32
+  mut last_euclid_args : Array[Int32]
   /// `?` steps so far, so each one drops independently of the others.
-  mut degrade_steps : Int
+  mut degrade_steps : Int32
 }
 
 ///|
 fn NotationParser::NotationParser(
   input : String,
   sound~ : Bool,
-  chord? : Bool = false,
+  chord~ : Bool = false,
   control? : String,
-  source_offset? : Int = 0,
-  assess? : Bool = false,
-  recognized_atoms? : Array[RecognizedAtom]? = None,
+  source_offset~ : Int32 = 0,
+  assess~ : Bool = false,
+  recognized_atoms~ : Array[RecognizedAtom]? = None,
 ) -> NotationParser {
   {
     input,
@@ -145,7 +145,7 @@ fn NotationParser::parse_notation(
 ) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
   let first = self.parse_layer()
   let layers : Array[@pattern.Pat[@pattern.ControlMap]] = [first]
-  let layer_roots : Array[Int] = match self.projection_root {
+  let layer_roots : Array[Int32] = match self.projection_root {
     Some(index) => [index]
     None => []
   }
@@ -195,8 +195,8 @@ fn NotationParser::parse_layer(
   self.skip_spaces()
   let layer_start = self.pos
   let elements : Array[@pattern.Pat[@pattern.ControlMap]] = []
-  let weights : Array[Int] = []
-  let child_nodes : Array[Int] = []
+  let weights : Array[Int32] = []
+  let child_nodes : Array[Int32] = []
   let costs : Array[MiniQueryWork]? = self.query_work.map(_ => [])
   let mut total_weight = 0
   let mut weighted = false
@@ -257,12 +257,12 @@ fn NotationParser::parse_layer(
 }
 
 ///|
-const RELATIVE_DURATION_WEIGHT_LIMIT : Int = 16
+const RELATIVE_DURATION_WEIGHT_LIMIT : Int32 = 16
 
 ///|
 fn NotationParser::read_relative_duration(
   self : NotationParser,
-) -> Int raise ParseError {
+) -> Int32 raise ParseError {
   let at_pos = self.pos
   self.pos += 1
   let digits_start = self.pos
@@ -290,7 +290,7 @@ fn NotationParser::read_relative_duration(
 ///|
 fn NotationParser::parse_element(
   self : NotationParser,
-) -> (@pattern.Pat[@pattern.ControlMap], Int, Int?) raise ParseError {
+) -> (@pattern.Pat[@pattern.ControlMap], Int32, Int32?) raise ParseError {
   guard (self.recognized_atoms is None && self.projection_nodes is None) ||
     self.depth < 32 else {
     raise ParseError("source exceeds notation nesting depth 32")
@@ -300,7 +300,7 @@ fn NotationParser::parse_element(
     raise ParseError("position \{self.pos}: unexpected end of notation")
   }
   let start = self.pos
-  let mut source_node : Int? = None
+  let mut source_node : Int32? = None
   let base = if self.input[self.pos] == '[' {
     self.pos += 1
     self.depth += 1
@@ -537,8 +537,8 @@ fn NotationParser::maybe_apply_euclid(
 /// Read a signed integer at current position (no decimal point allowed).
 fn NotationParser::read_int_signed(
   self : NotationParser,
-  err_pos : Int,
-) -> Int raise ParseError {
+  err_pos : Int32,
+) -> Int32 raise ParseError {
   let start = self.pos
   if !self.at_end() && self.input[self.pos] == '-' {
     self.pos += 1
@@ -681,7 +681,7 @@ fn NotationParser::read_explicit_chord_text(self : NotationParser) -> String {
 /// Reads the full note name including accidentals (#, s, b, f) and octave digits.
 fn NotationParser::read_note_name_atom(
   self : NotationParser,
-  start : Int,
+  start : Int32,
 ) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
   let name = self.read_note_name_text()
   guard !name.is_empty() else {
@@ -794,8 +794,8 @@ fn NotationParser::read_ident(self : NotationParser) -> String {
 /// Read one number of a control pattern, with its token and span.
 fn NotationParser::read_control_number(
   self : NotationParser,
-  start : Int,
-) -> (Double, String, Int, Int) raise ParseError {
+  start : Int32,
+) -> (Double, String, Int32, Int32) raise ParseError {
   let read = self.read_note_number_value(start) catch {
     ParseError(_) => raise ParseError("position \{start}: expected number")
   }
@@ -806,7 +806,7 @@ fn NotationParser::read_control_number(
 ///|
 fn NotationParser::read_note_number(
   self : NotationParser,
-  start : Int,
+  start : Int32,
 ) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
   let num_start = self.pos
   if !self.at_end() && self.input[self.pos] == '-' {

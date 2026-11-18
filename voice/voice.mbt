@@ -14,11 +14,12 @@ using @graph {
 }
 
 ///|
+#derive(Eq, Debug)
 pub enum VoiceState {
   Idle
   Active
   Releasing
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend VoiceState with Eq::{not_equal, equal}
@@ -44,11 +45,12 @@ const VOICE_HANDLE_PACK_FACTOR : Int64 = 2147483648L
 /// accidentally gate_off or pan the wrong voice occupying that slot.
 /// Every note_on increments the slot's generation; all operations compare
 /// the handle's generation against the slot's current generation.
+#derive(Eq, Debug)
 #valtype
 pub struct VoiceHandle {
-  slot : Int
-  generation : Int
-} derive(Eq, Debug)
+  slot : Int32
+  generation : Int32
+}
 
 ///|
 pub extend VoiceHandle with Eq::{not_equal, equal}
@@ -66,32 +68,36 @@ pub extend VoiceHandle with Show::{to_string, output}
 
 ///|
 /// Construct a handle from primitive parts for host-side fixed storage.
-pub fn VoiceHandle::from_parts(slot~ : Int, generation~ : Int) -> VoiceHandle {
+pub fn VoiceHandle::from_parts(
+  slot~ : Int32,
+  generation~ : Int32,
+) -> VoiceHandle {
   { slot, generation, }
 }
 
 ///|
-fn VoiceHandle::pack_parts(slot~ : Int, generation~ : Int) -> Int64 {
+fn VoiceHandle::pack_parts(slot~ : Int32, generation~ : Int32) -> Int64 {
   slot.to_int64() * VOICE_HANDLE_PACK_FACTOR + generation.to_int64()
 }
 
 ///|
-pub fn VoiceHandle::packed_slot(handle_id : Int64) -> Int {
+pub fn VoiceHandle::packed_slot(handle_id : Int64) -> Int32 {
   (handle_id / VOICE_HANDLE_PACK_FACTOR).to_int()
 }
 
 ///|
-pub fn VoiceHandle::packed_generation(handle_id : Int64) -> Int {
+pub fn VoiceHandle::packed_generation(handle_id : Int64) -> Int32 {
   (handle_id % VOICE_HANDLE_PACK_FACTOR).to_int()
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) suberror BoundVoicePoolError {
   InvalidMaxVoices
   OrphanAdsr
   CompileRejected
   Binding(ControlBindingError)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend BoundVoicePoolError with Eq::{not_equal, equal}
@@ -111,11 +117,12 @@ pub extend BoundVoicePoolError with Show::{to_string, output}
 /// Failure modes for VoicePool construction and template replacement.
 /// Mirrors BoundVoicePoolError minus the Binding(...) variant
 /// (VoicePool has no bindings).
+#derive(Eq, Debug)
 pub(all) suberror VoicePoolError {
   InvalidMaxVoices
   OrphanAdsr
   CompileRejected
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend VoicePoolError with Eq::{not_equal, equal}
@@ -147,10 +154,11 @@ pub fn BoundVoicePoolError::from_voice_pool(
 }
 
 ///|
+#derive(Debug)
 pub(all) enum VoiceControlError {
   InvalidVoiceHandle(VoiceHandle)
   Graph(GraphControlError)
-} derive(Debug)
+}
 
 ///|
 pub extend VoiceControlError with @moonbitlang/core/debug.Debug::{to_repr}
@@ -169,7 +177,7 @@ priv enum FollowTarget {
   Gain
   Pan
   Send
-  Graph(Int, GraphParamSlot, @graph.ControlUnit)
+  Graph(Int32, GraphParamSlot, @graph.ControlUnit)
 }
 
 ///|
@@ -182,7 +190,7 @@ priv enum FollowTarget {
 pub struct VoiceFollower {
   priv target : FollowTarget
   priv read : (Int64, Int64) -> Double
-  priv template_generation : Int
+  priv template_generation : Int32
 }
 
 ///|
@@ -193,11 +201,11 @@ priv struct VoiceSlot {
   /// indices used at note_on to gate the right ADSRs. Without this,
   /// gate_off would target wrong nodes (or miss freshly-orphaned ADSRs)
   /// if the new template differs.
-  mut adsr_authoring_indices_snapshot : FixedArray[Int]
+  mut adsr_authoring_indices_snapshot : FixedArray[Int32]
   mut state : VoiceState
-  mut generation : Int
-  mut allocation_order : Int
-  mut template_generation : Int
+  mut generation : Int32
+  mut allocation_order : Int32
+  mut template_generation : Int32
   /// WHY cached gains instead of a pan field: avoids 2 trig calls (cos + sin)
   /// per voice per block in process(). Updated only when pan changes
   /// (control-rate), not per block. The pan position is fully encoded by the
@@ -216,7 +224,7 @@ priv struct VoiceSlot {
 }
 
 ///|
-fn VoiceSlot::VoiceSlot(block_size : Int) -> VoiceSlot {
+fn VoiceSlot::VoiceSlot(block_size : Int32) -> VoiceSlot {
   {
     compiled: None,
     adsr_authoring_indices_snapshot: FixedArray::make(0, 0),
@@ -272,7 +280,7 @@ fn VoiceSlot::update_send(self : VoiceSlot, gain : Double) -> Unit {
 /// succeed; an Err here means an invariant has been violated.
 fn gate_adsrs_at_bool(
   compiled : Dsp,
-  authoring_indices : FixedArray[Int],
+  authoring_indices : FixedArray[Int32],
   gate_on : Bool,
 ) -> Bool {
   for n in 0..<authoring_indices.length() {
@@ -292,7 +300,7 @@ fn gate_adsrs_at_bool(
 ///|
 fn gate_adsrs_at(
   compiled : Dsp,
-  authoring_indices : FixedArray[Int],
+  authoring_indices : FixedArray[Int32],
   gate_on : Bool,
 ) -> Unit {
   if !gate_adsrs_at_bool(compiled, authoring_indices, gate_on) {
@@ -320,14 +328,14 @@ fn VoicePool::resolve_slot(
 ///|
 pub struct VoicePool {
   priv slots : FixedArray[VoiceSlot]
-  priv mut adsr_authoring_indices : FixedArray[Int]
+  priv mut adsr_authoring_indices : FixedArray[Int32]
   priv mut compiled_template : AnalyzedGraph
   priv mut prepared_graph : Dsp?
   priv compile_context : DspContext
-  priv mut next_allocation_order : Int
-  priv mut template_generation : Int
-  priv max_voices : Int
-  priv mut last_sanitized_count : Int
+  priv mut next_allocation_order : Int32
+  priv mut template_generation : Int32
+  priv max_voices : Int32
+  priv mut last_sanitized_count : Int32
 }
 
 ///|
@@ -351,7 +359,7 @@ fn prepare_voice_template(
 pub fn VoicePool::VoicePool(
   compiled_template : AnalyzedGraph,
   context : DspContext,
-  max_voices? : Int = 32,
+  max_voices~ : Int32 = 32,
 ) -> VoicePool raise VoicePoolError {
   if max_voices <= 0 {
     raise VoicePoolError::InvalidMaxVoices
@@ -410,7 +418,7 @@ fn VoicePool::adopt_template(
 }
 
 ///|
-fn VoicePool::next_template_generation(self : VoicePool) -> Int {
+fn VoicePool::next_template_generation(self : VoicePool) -> Int32 {
   if self.template_generation >= @int.MAX_VALUE - 1 {
     for i in 0..<self.max_voices {
       self.slots[i].template_generation = -1
@@ -432,7 +440,7 @@ pub fn BoundVoicePool::BoundVoicePool(
   compiled_template : AnalyzedGraph,
   context : DspContext,
   bindings : ControlBindingBuilder,
-  max_voices? : Int = 32,
+  max_voices~ : Int32 = 32,
 ) -> BoundVoicePool raise BoundVoicePoolError {
   let pool = VoicePool(compiled_template, context, max_voices~) catch {
     error => raise BoundVoicePoolError::from_voice_pool(error)
@@ -528,7 +536,7 @@ pub fn BoundVoicePool::follow(
 pub fn BoundVoicePool::note_on_controls(
   self : BoundVoicePool,
   controls : Map[String, Double],
-  follow? : Array[(String, (Int64, Int64) -> Double)] = [],
+  follow~ : Array[(String, (Int64, Int64) -> Double)] = [],
 ) -> VoiceHandle? {
   let resolved = match self.note_gate(controls) {
     InvalidDuration => return None
@@ -620,16 +628,16 @@ pub fn BoundVoicePool::note_on_graph_controls(
 /// should use `note_on_graph_controls`.
 pub fn BoundVoicePool::note_on_prevalidated_params4_id(
   self : BoundVoicePool,
-  node0 : Int,
+  node0 : Int32,
   slot0 : GraphParamSlot,
   value0 : Double,
-  node1 : Int,
+  node1 : Int32,
   slot1 : GraphParamSlot,
   value1 : Double,
-  node2 : Int,
+  node2 : Int32,
   slot2 : GraphParamSlot,
   value2 : Double,
-  node3 : Int,
+  node3 : Int32,
   slot3 : GraphParamSlot,
   value3 : Double,
   pan : Double,
@@ -779,7 +787,7 @@ pub fn BoundVoicePool::apply_voice_control_result(
 pub fn BoundVoicePool::apply_voice_param_bool(
   self : BoundVoicePool,
   handle : VoiceHandle,
-  node_index : Int,
+  node_index : Int32,
   slot : GraphParamSlot,
   value : Double,
 ) -> Bool {
@@ -814,12 +822,12 @@ pub fn BoundVoicePool::voice_state(
 }
 
 ///|
-pub fn BoundVoicePool::active_voice_count(self : BoundVoicePool) -> Int {
+pub fn BoundVoicePool::active_voice_count(self : BoundVoicePool) -> Int32 {
   self.pool.active_voice_count()
 }
 
 ///|
-pub fn BoundVoicePool::last_sanitized_count(self : BoundVoicePool) -> Int {
+pub fn BoundVoicePool::last_sanitized_count(self : BoundVoicePool) -> Int32 {
   self.pool.last_sanitized_count()
 }
 
@@ -847,7 +855,7 @@ pub fn BoundVoicePool::process_with_send(
 }
 
 ///|
-pub fn VoicePool::active_voice_count(self : VoicePool) -> Int {
+pub fn VoicePool::active_voice_count(self : VoicePool) -> Int32 {
   let count = for i in 0..<self.max_voices; total = 0 {
     if !(self.slots[i].state is VoiceState::Idle) {
       continue total + 1
@@ -862,7 +870,7 @@ pub fn VoicePool::active_voice_count(self : VoicePool) -> Int {
 ///|
 /// Number of non-finite samples replaced with 0.0 during the most recent
 /// process() call, across both L and R output channels after mixdown.
-pub fn VoicePool::last_sanitized_count(self : VoicePool) -> Int {
+pub fn VoicePool::last_sanitized_count(self : VoicePool) -> Int32 {
   self.last_sanitized_count
 }
 
@@ -872,7 +880,7 @@ pub fn VoicePool::last_sanitized_count(self : VoicePool) -> Int {
 /// pop. Active voices are a last resort — cutting them is audible but
 /// unavoidable at full polyphony. Within each tier, oldest-first ensures
 /// the most recently played notes survive longest.
-fn VoicePool::find_slot(self : VoicePool) -> Int {
+fn VoicePool::find_slot(self : VoicePool) -> Int32 {
   // Priority 1: any idle slot (free)
   for i = 0; i < self.max_voices; i = i + 1 {
     if self.slots[i].state is VoiceState::Idle {
@@ -929,7 +937,7 @@ fn VoicePool::compact_allocation_orders(self : VoicePool) -> Unit {
 fn VoicePool::activate_slot(
   self : VoicePool,
   slot : VoiceSlot,
-  slot_index : Int,
+  slot_index : Int32,
   compiled : Dsp,
   pan : Double,
 ) -> Int64 {
@@ -972,16 +980,16 @@ fn VoicePool::activate_slot(
 ///|
 fn VoicePool::note_on_prevalidated_params4_id(
   self : VoicePool,
-  node0 : Int,
+  node0 : Int32,
   slot0 : GraphParamSlot,
   value0 : Double,
-  node1 : Int,
+  node1 : Int32,
   slot1 : GraphParamSlot,
   value1 : Double,
-  node2 : Int,
+  node2 : Int32,
   slot2 : GraphParamSlot,
   value2 : Double,
-  node3 : Int,
+  node3 : Int32,
   slot3 : GraphParamSlot,
   value3 : Double,
   pan : Double,
@@ -1287,7 +1295,7 @@ fn VoicePool::apply_voice_controls_result(
 fn VoicePool::apply_voice_param_bool(
   self : VoicePool,
   handle : VoiceHandle,
-  node_index : Int,
+  node_index : Int32,
   slot : GraphParamSlot,
   value : Double,
 ) -> Bool {
@@ -1425,11 +1433,12 @@ pub fn VoicePool::process_with_send(
 
 ///|
 /// Gate timing selected by the instrument. Release continues after gate-off.
+#derive(Debug, Eq)
 pub(all) enum NoteGate {
   EventEnd
   AfterSeconds(Double)
   InvalidDuration
-} derive(Debug, Eq)
+}
 
 ///|
 pub extend NoteGate with @moonbitlang/core/debug.Debug::{to_repr}

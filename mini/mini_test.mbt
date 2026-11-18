@@ -647,8 +647,8 @@ fn apply_draft_edits(
 ///|
 fn edit_draft(
   draft : @mini.Draft,
-  from : Int,
-  to : Int,
+  from : Int32,
+  to : Int32,
   inserted : String,
 ) -> Unit raise {
   apply_draft_edits(draft, [@mini.TextEdit::TextEdit(from~, to~, inserted~)])

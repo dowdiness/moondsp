@@ -2,7 +2,7 @@
 const GRAPH_VOICE_SAMPLE_RATE : Double = 1000.0
 
 ///|
-const GRAPH_VOICE_BLOCK_SIZE : Int = 8
+const GRAPH_VOICE_BLOCK_SIZE : Int32 = 8
 
 ///|
 const GRAPH_VOICE_FREQ : Double = 125.0
@@ -26,10 +26,10 @@ const GRAPH_VOICE_SUSTAIN : Double = 0.5
 const GRAPH_VOICE_RELEASE_MS : Double = 2.0
 
 ///|
-const GRAPH_VOICE_DELAY_CAPACITY : Int = 4
+const GRAPH_VOICE_DELAY_CAPACITY : Int32 = 4
 
 ///|
-const GRAPH_VOICE_DELAY_SAMPLES : Int = 2
+const GRAPH_VOICE_DELAY_SAMPLES : Int32 = 2
 
 ///|
 const GRAPH_VOICE_DELAY_SAMPLES_DOUBLE : Double = 2.0
@@ -41,7 +41,7 @@ const GRAPH_VOICE_RELEASE_TAIL_LIMIT : Double = 0.001
 const GRAPH_FEEDBACK_SAMPLE_RATE : Double = 1000.0
 
 ///|
-const GRAPH_FEEDBACK_BLOCK_SIZE : Int = 8
+const GRAPH_FEEDBACK_BLOCK_SIZE : Int32 = 8
 
 ///|
 const GRAPH_FEEDBACK_GAIN : Double = 0.5
@@ -56,13 +56,13 @@ const GRAPH_FEEDBACK_RETUNED_CONSTANT : Double = 2.0
 const GRAPH_MULTI_SOURCE_SAMPLE_RATE : Double = 48000.0
 
 ///|
-const GRAPH_MULTI_SOURCE_BLOCK_SIZE : Int = 16
+const GRAPH_MULTI_SOURCE_BLOCK_SIZE : Int32 = 16
 
 ///|
 const GRAPH_MULTI_SOURCE_OSC_FREQ : Double = 220.0
 
 ///|
-const GRAPH_MULTI_SOURCE_NOISE_SEED : UInt = 456U
+const GRAPH_MULTI_SOURCE_NOISE_SEED : UInt32 = 456U
 
 ///|
 const GRAPH_MULTI_SOURCE_NOISE_GAIN : Double = 0.2
@@ -86,7 +86,7 @@ const GRAPH_MULTI_SOURCE_CLIP : Double = 0.5
 const GRAPH_STEREO_SAMPLE_RATE : Double = 48000.0
 
 ///|
-const GRAPH_STEREO_BLOCK_SIZE : Int = 16
+const GRAPH_STEREO_BLOCK_SIZE : Int32 = 16
 
 ///|
 const GRAPH_STEREO_FREQ : Double = 330.0
@@ -122,10 +122,10 @@ const GRAPH_STEREO_FILTER_RETUNED_CUTOFF : Double = 4000.0
 const GRAPH_STEREO_FILTER_Q : Double = 0.707
 
 ///|
-const GRAPH_STEREO_DELAY_CAPACITY : Int = 8
+const GRAPH_STEREO_DELAY_CAPACITY : Int32 = 8
 
 ///|
-const GRAPH_STEREO_DELAY_SAMPLES : Int = 4
+const GRAPH_STEREO_DELAY_SAMPLES : Int32 = 4
 
 ///|
 const GRAPH_STEREO_DELAY_FEEDBACK : Double = 0.5
@@ -140,7 +140,7 @@ const INTEGRATION_BUFFER_EPSILON : Double = 0.000000000001
 const GRAPH_HIGHPASS_SAMPLE_RATE : Double = 48000.0
 
 ///|
-const GRAPH_HIGHPASS_BLOCK_SIZE : Int = 32
+const GRAPH_HIGHPASS_BLOCK_SIZE : Int32 = 32
 
 ///|
 const GRAPH_HIGHPASS_FREQ : Double = 220.0
@@ -161,7 +161,7 @@ const GRAPH_HIGHPASS_CLIP : Double = 0.9
 const GRAPH_BANDPASS_SAMPLE_RATE : Double = 48000.0
 
 ///|
-const GRAPH_BANDPASS_BLOCK_SIZE : Int = 32
+const GRAPH_BANDPASS_BLOCK_SIZE : Int32 = 32
 
 ///|
 const GRAPH_BANDPASS_FREQ : Double = 440.0
@@ -2043,7 +2043,7 @@ fn integration_buffers_close(
 ///|
 fn integration_all_zero_from(
   buffer : @moondsp.AudioBuffer,
-  start : Int,
+  start : Int32,
 ) -> Bool {
   let bounded_start = if start < 0 {
     0

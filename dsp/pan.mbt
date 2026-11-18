@@ -97,7 +97,7 @@ fn pan_sample_count(
   input : AudioBuffer,
   left_output : AudioBuffer,
   right_output : AudioBuffer,
-) -> Int {
+) -> Int32 {
   let block_size = context.block_size()
   let input_len = input.length()
   let left_len = left_output.length()

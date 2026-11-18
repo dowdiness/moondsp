@@ -9,10 +9,11 @@
 /// - num/den is always in lowest terms (GCD-reduced)
 /// Arithmetic cancels common factors before multiplying. Results must still
 /// fit Int64; comparisons avoid cross-products entirely.
+#derive(Eq, Debug)
 pub struct Rational {
   num : Int64
   den : Int64
-} derive(Eq, Debug)
+}
 
 ///|
 pub impl Show for Rational with fn output(self, logger) {
@@ -48,7 +49,7 @@ pub fn Rational::Rational(num : Int64, den : Int64) -> Rational {
 }
 
 ///|
-pub fn Rational::from_int(n : Int) -> Rational {
+pub fn Rational::from_int(n : Int32) -> Rational {
   { num: n.to_int64(), den: 1L, }
 }
 
@@ -117,7 +118,7 @@ pub impl Div for Rational with fn div(self : Rational, other : Rational) -> Rati
 ///|
 // Compare integer parts, then reciprocal remainders with reversed ordering.
 // Euclidean division terminates without an overflowing cross-product.
-pub impl Compare for Rational with fn compare(self : Rational, other : Rational) -> Int {
+pub impl Compare for Rational with fn compare(self : Rational, other : Rational) -> Int32 {
   if self.den == other.den {
     return if self.num < other.num {
       -1

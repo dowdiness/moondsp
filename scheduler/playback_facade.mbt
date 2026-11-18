@@ -82,7 +82,7 @@ pub fn PlaybackSnapshot::song_layout_revision(
 
 ///|
 /// Number of source entries, including occurrences outside the current cycle.
-pub fn PlaybackSnapshot::material_count(self : PlaybackSnapshot) -> Int {
+pub fn PlaybackSnapshot::material_count(self : PlaybackSnapshot) -> Int32 {
   self.raw().material_count()
 }
 

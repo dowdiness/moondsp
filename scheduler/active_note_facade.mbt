@@ -1,14 +1,15 @@
 ///|
-pub fn PatternScheduler::active_note_count(self : PatternScheduler) -> Int {
+pub fn PatternScheduler::active_note_count(self : PatternScheduler) -> Int32 {
   self.active_notes.length()
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum ActiveNoteError {
   /// Not an index into the constructor's instrument list.
-  UnknownInstrument(Int)
+  UnknownInstrument(Int32)
   Transport(TransportError)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend ActiveNoteError with Eq::{not_equal, equal}
@@ -21,7 +22,7 @@ pub extend ActiveNoteError with @moonbitlang/core/debug.Debug::{to_repr}
 /// constructor's instrument list) with a musical gate-off deadline.
 pub fn PatternScheduler::push_active_note(
   self : PatternScheduler,
-  instrument : Int,
+  instrument : Int32,
   handle : @moondsp.VoiceHandle,
   end_time : @pattern.Rational,
 ) -> Result[Unit, ActiveNoteError] {
@@ -47,7 +48,7 @@ pub fn PatternScheduler::push_active_note(
 /// gate-off deadline. Tempo changes leave this deadline unchanged.
 pub fn PatternScheduler::push_active_note_until(
   self : PatternScheduler,
-  instrument : Int,
+  instrument : Int32,
   handle : @moondsp.VoiceHandle,
   end_time : PerformanceTime,
 ) -> Result[Unit, ActiveNoteError] {

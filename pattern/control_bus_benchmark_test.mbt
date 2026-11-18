@@ -7,11 +7,9 @@ test "bench/control_bus/per_block" (b : @bench.T) {
       _ => abort("id")
     }
   }
-  let sweep = @pattern.PatternDoc::continuous(
-    id=id("sweep"),
-    key="lpf",
-    f=t => 200.0 + 3800.0 * t,
-  )
+  let sweep = @pattern.PatternDoc::continuous(id=id("sweep"), key="lpf", f=t => {
+    200.0 + 3800.0 * t
+  })
   let chord = @pattern.PatternDoc::from_pattern(
     id=id("chord"),
     pat=@pattern.chord("Dm9"),

@@ -1,7 +1,8 @@
 ///|
+#derive(Eq, Debug)
 pub struct PatternVoiceScope {
   priv node : @identity.PatternNodeId
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend PatternVoiceScope with Eq::{not_equal, equal}
@@ -24,11 +25,12 @@ pub fn PatternVoiceScope::node(
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum SongVoiceScope {
   Occurrence(@identity.OccurrenceId)
   Section(@identity.SectionId)
   Layer(@identity.SectionId, @identity.SectionLayerId)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend SongVoiceScope with Eq::{not_equal, equal}
@@ -37,11 +39,12 @@ pub extend SongVoiceScope with Eq::{not_equal, equal}
 pub extend SongVoiceScope with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum VoiceOrigin {
   Anonymous
   Pattern(@pattern.PatternNodePath)
   Song(@song.SongEventOrigin)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend VoiceOrigin with Eq::{not_equal, equal}

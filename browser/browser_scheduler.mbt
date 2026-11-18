@@ -2,11 +2,12 @@
 /// Kind of the latest accepted score, independent of the visible draft.
 /// Constant-enum ABI values are None = 0, Pattern = 1, Song = 2.
 /// Keep the constructor order stable for JS/wasm-gc callers.
+#derive(Eq, Debug)
 pub(all) enum PlaybackMode {
   None
   Pattern
   Song
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend PlaybackMode with Eq::{not_equal, equal}
@@ -15,7 +16,7 @@ pub extend PlaybackMode with Eq::{not_equal, equal}
 pub extend PlaybackMode with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
-pub fn init_scheduler_graph(sample_rate : Double, block_size : Int) -> Bool {
+pub fn init_scheduler_graph(sample_rate : Double, block_size : Int32) -> Bool {
   @playback_host.init_scheduler_graph_with_templates(
     sample_rate,
     block_size,
@@ -34,12 +35,12 @@ fn reset_scheduler_graph() -> Unit {
 }
 
 ///|
-pub fn scheduler_left_sample(index : Int) -> Double {
+pub fn scheduler_left_sample(index : Int32) -> Double {
   @playback_host.scheduler_left_sample(index)
 }
 
 ///|
-pub fn scheduler_right_sample(index : Int) -> Double {
+pub fn scheduler_right_sample(index : Int32) -> Double {
   @playback_host.scheduler_right_sample(index)
 }
 
@@ -54,32 +55,32 @@ pub fn clear_playback_input() -> Unit {
 }
 
 ///|
-pub fn push_playback_char(code : Int) -> Unit {
+pub fn push_playback_char(code : Int32) -> Unit {
   @playback_host.push_playback_char(code)
 }
 
 ///|
-pub fn player_update_input() -> Int {
+pub fn player_update_input() -> Int32 {
   @playback_host.player_update_input()
 }
 
 ///|
-pub fn player_restart_input() -> Int {
+pub fn player_restart_input() -> Int32 {
   @playback_host.player_restart_input()
 }
 
 ///|
-pub fn player_play() -> Int {
+pub fn player_play() -> Int32 {
   @playback_host.player_play()
 }
 
 ///|
-pub fn player_pause() -> Int {
+pub fn player_pause() -> Int32 {
   @playback_host.player_pause()
 }
 
 ///|
-pub fn player_state() -> Int {
+pub fn player_state() -> Int32 {
   @playback_host.player_state()
 }
 
@@ -108,12 +109,12 @@ pub fn scheduler_cycle_position() -> Double {
 }
 
 ///|
-pub fn player_pending_count() -> Int {
+pub fn player_pending_count() -> Int32 {
   @playback_host.player_pending_count()
 }
 
 ///|
-pub fn player_skipped_count() -> Int {
+pub fn player_skipped_count() -> Int32 {
   @playback_host.player_skipped_count()
 }
 
@@ -123,18 +124,18 @@ pub fn get_playback_error() -> String {
 }
 
 ///|
-pub fn get_playback_error_length() -> Int {
+pub fn get_playback_error_length() -> Int32 {
   @playback_host.get_playback_error_length()
 }
 
 ///|
-pub fn get_playback_error_char(i : Int) -> Int {
+pub fn get_playback_error_char(i : Int32) -> Int32 {
   @playback_host.get_playback_error_char(i)
 }
 
 ///|
 /// Return 0 after an accepted tempo change, or 1 with a playback diagnostic.
-pub fn set_scheduler_bpm(bpm : Double) -> Int {
+pub fn set_scheduler_bpm(bpm : Double) -> Int32 {
   @playback_host.set_scheduler_bpm(bpm)
 }
 
@@ -155,18 +156,18 @@ pub fn scheduler_sample_position() -> Double {
 
 ///|
 /// Enable actual-onset observation (1) or disable it (0).
-pub fn player_onset_enable(enabled : Int) -> Unit {
+pub fn player_onset_enable(enabled : Int32) -> Unit {
   @playback_host.player_onset_enable(enabled)
 }
 
 ///|
-pub fn player_onset_count() -> Int {
+pub fn player_onset_count() -> Int32 {
   @playback_host.player_onset_count()
 }
 
 ///|
 /// Read a zero-based field from the chronological scheduler-route rows.
-pub fn player_onset_field(index : Int, field : Int) -> Double {
+pub fn player_onset_field(index : Int32, field : Int32) -> Double {
   @playback_host.player_onset_field(index, field)
 }
 

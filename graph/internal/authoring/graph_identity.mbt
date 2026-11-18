@@ -1,11 +1,12 @@
 ///|
+#derive(Debug)
 pub(all) suberror GraphDocumentError {
-  LengthMismatch(Int, Int)
+  LengthMismatch(Int32, Int32)
   DuplicateNodeId(String)
   MissingNodeId(String)
   RetiredNodeId(String)
   Topology(GraphTopologyEditError)
-} derive(Debug)
+}
 
 ///|
 pub extend GraphDocumentError with @moonbitlang/core/debug.Debug::{to_repr}
@@ -35,7 +36,7 @@ pub struct GraphDocument {
 pub struct GraphIndexMap {
   priv revision : @identity.Revision
   priv ids : Array[@identity.GraphNodeId]
-  priv indices : Map[String, Int]
+  priv indices : Map[String, Int32]
 }
 
 ///|
@@ -49,7 +50,7 @@ fn copy_retired_graph_ids(source : Map[String, Bool]) -> Map[String, Bool] {
 fn find_graph_id_index(
   ids : Array[@identity.GraphNodeId],
   id : @identity.GraphNodeId,
-) -> Int? {
+) -> Int32? {
   for index in 0..<ids.length() {
     if ids[index] == id {
       return Some(index)
@@ -61,7 +62,7 @@ fn find_graph_id_index(
 ///|
 fn validate_graph_template_ids(
   ids : Array[@identity.GraphNodeId],
-  expected_length : Int,
+  expected_length : Int32,
 ) -> Unit raise GraphDocumentError {
   if ids.length() != expected_length {
     raise LengthMismatch(ids.length(), expected_length)
@@ -112,7 +113,7 @@ fn validate_new_graph_ids(
 fn graph_id_index_or_raise(
   ids : Array[@identity.GraphNodeId],
   id : @identity.GraphNodeId,
-) -> Int raise GraphDocumentError {
+) -> Int32 raise GraphDocumentError {
   match find_graph_id_index(ids, id) {
     Some(index) => index
     None => raise MissingNodeId(id.value())
@@ -172,7 +173,7 @@ pub fn GraphDocument::revision(self : GraphDocument) -> @identity.Revision {
 }
 
 ///|
-pub fn GraphDocument::length(self : GraphDocument) -> Int {
+pub fn GraphDocument::length(self : GraphDocument) -> Int32 {
   self.nodes.length()
 }
 
@@ -185,14 +186,14 @@ pub fn GraphDocument::nodes(self : GraphDocument) -> Array[DspNode] {
 pub fn GraphDocument::node_index(
   self : GraphDocument,
   id : @identity.GraphNodeId,
-) -> Int? {
+) -> Int32? {
   find_graph_id_index(self.ids, id)
 }
 
 ///|
 pub fn GraphDocument::node_id_at(
   self : GraphDocument,
-  index : Int,
+  index : Int32,
 ) -> @identity.GraphNodeId? {
   if index < 0 || index >= self.ids.length() {
     None
@@ -230,7 +231,7 @@ pub fn GraphDocument::contains_retired_node(
 
 ///|
 pub fn GraphDocument::index_map(self : GraphDocument) -> GraphIndexMap {
-  let indices : Map[String, Int] = Map([])
+  let indices : Map[String, Int32] = Map([])
   for index in 0..<self.ids.length() {
     indices[self.ids[index].value()] = index
   }
@@ -381,7 +382,7 @@ pub fn GraphIndexMap::revision(self : GraphIndexMap) -> @identity.Revision {
 }
 
 ///|
-pub fn GraphIndexMap::length(self : GraphIndexMap) -> Int {
+pub fn GraphIndexMap::length(self : GraphIndexMap) -> Int32 {
   self.ids.length()
 }
 
@@ -389,14 +390,14 @@ pub fn GraphIndexMap::length(self : GraphIndexMap) -> Int {
 pub fn GraphIndexMap::node_index(
   self : GraphIndexMap,
   id : @identity.GraphNodeId,
-) -> Int? {
+) -> Int32? {
   self.indices.get(id.value())
 }
 
 ///|
 pub fn GraphIndexMap::node_id_at(
   self : GraphIndexMap,
-  index : Int,
+  index : Int32,
 ) -> @identity.GraphNodeId? {
   if index < 0 || index >= self.ids.length() {
     None

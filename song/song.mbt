@@ -1,10 +1,11 @@
 ///|
+#derive(Eq, Debug)
 pub(all) suberror SongBuildError {
   EmptySong
   DuplicateOccurrence(String)
   DuplicateOccurrenceId(String)
   InvalidOccurrenceId(String)
-} derive(Eq, Debug)
+}
 
 ///|
 /// User-authored song part.
@@ -137,10 +138,10 @@ pub fn[A] SectionOccurrence::end_(
 /// and `Pat`. Scheduler integration specializes it to `Song[ControlMap]`.
 pub struct Song[A] {
   priv occurrences : Array[SectionOccurrence[A]]
-  priv occurrence_by_id : Map[String, Int]
-  priv occurrence_by_name : Map[String, Int]
-  priv occurrence_by_start : Array[Int]
-  priv occurrence_by_end : Array[Int]
+  priv occurrence_by_id : Map[String, Int32]
+  priv occurrence_by_name : Map[String, Int32]
+  priv occurrence_by_start : Array[Int32]
+  priv occurrence_by_end : Array[Int32]
   priv duration : @pattern.Rational
 }
 
@@ -167,8 +168,8 @@ fn[A] copy_occurrences(
 ///|
 fn[A] sorted_occurrence_indexes_by_start(
   occurrences : Array[SectionOccurrence[A]],
-) -> Array[Int] {
-  let result : Array[Int] = []
+) -> Array[Int32] {
+  let result : Array[Int32] = []
   for occurrence_index in 0..<occurrences.length() {
     result.push(occurrence_index)
     let mut index = result.length() - 1
@@ -187,8 +188,8 @@ fn[A] sorted_occurrence_indexes_by_start(
 ///|
 fn[A] sorted_occurrence_indexes_by_end(
   occurrences : Array[SectionOccurrence[A]],
-) -> Array[Int] {
-  let result : Array[Int] = []
+) -> Array[Int32] {
+  let result : Array[Int32] = []
   for occurrence_index in 0..<occurrences.length() {
     result.push(occurrence_index)
     let mut index = result.length() - 1
@@ -207,9 +208,9 @@ fn[A] sorted_occurrence_indexes_by_end(
 ///|
 fn[A] first_start_not_before(
   occurrences : Array[SectionOccurrence[A]],
-  indexes : Array[Int],
+  indexes : Array[Int32],
   time : @pattern.Rational,
-) -> Int {
+) -> Int32 {
   let mut low = 0
   let mut high = indexes.length()
   while low < high {
@@ -226,9 +227,9 @@ fn[A] first_start_not_before(
 ///|
 fn[A] first_start_after(
   occurrences : Array[SectionOccurrence[A]],
-  indexes : Array[Int],
+  indexes : Array[Int32],
   time : @pattern.Rational,
-) -> Int {
+) -> Int32 {
   let mut low = 0
   let mut high = indexes.length()
   while low < high {
@@ -245,9 +246,9 @@ fn[A] first_start_after(
 ///|
 fn[A] first_end_after(
   occurrences : Array[SectionOccurrence[A]],
-  indexes : Array[Int],
+  indexes : Array[Int32],
   time : @pattern.Rational,
-) -> Int {
+) -> Int32 {
   let mut low = 0
   let mut high = indexes.length()
   while low < high {
@@ -263,8 +264,8 @@ fn[A] first_end_after(
 
 ///|
 fn push_index_in_authoring_order(
-  indexes : Array[Int],
-  occurrence_index : Int,
+  indexes : Array[Int32],
+  occurrence_index : Int32,
 ) -> Unit {
   let mut insert_at = indexes.length()
   let mut cursor = 0
@@ -296,8 +297,8 @@ fn push_index_in_authoring_order(
 fn[A] Song::occurrence_indexes_at(
   self : Song[A],
   time : @pattern.Rational,
-) -> Array[Int] {
-  let result : Array[Int] = []
+) -> Array[Int32] {
+  let result : Array[Int32] = []
   let start_limit = first_start_after(
     self.occurrences,
     self.occurrence_by_start,
@@ -331,8 +332,8 @@ fn[A] Song::occurrence_indexes_at(
 fn[A] Song::occurrence_indexes_intersecting(
   self : Song[A],
   arc : @pattern.TimeSpan,
-) -> Array[Int] {
-  let result : Array[Int] = []
+) -> Array[Int32] {
+  let result : Array[Int32] = []
   let start_limit = first_start_not_before(
     self.occurrences,
     self.occurrence_by_start,
@@ -382,8 +383,8 @@ pub fn[A] Song::Song(
     raise EmptySong
   }
   let occurrences : Array[SectionOccurrence[A]] = []
-  let by_id : Map[String, Int] = Map([])
-  let by_name : Map[String, Int] = Map([])
+  let by_id : Map[String, Int32] = Map([])
+  let by_name : Map[String, Int32] = Map([])
   let mut cursor = @pattern.Rational::from_int(0)
   for part in parts {
     if by_name.contains(part.name) {
@@ -429,7 +430,7 @@ pub fn[A] Song::duration(self : Song[A]) -> @pattern.Rational {
 }
 
 ///|
-pub fn[A] Song::occurrence_count(self : Song[A]) -> Int {
+pub fn[A] Song::occurrence_count(self : Song[A]) -> Int32 {
   self.occurrences.length()
 }
 
@@ -441,7 +442,7 @@ pub fn[A] Song::occurrences(self : Song[A]) -> Array[SectionOccurrence[A]] {
 ///|
 pub fn[A] Song::occurrence(
   self : Song[A],
-  index : Int,
+  index : Int32,
 ) -> SectionOccurrence[A]? {
   match self.occurrences.get(index) {
     Some(occurrence) => Some(occurrence.snapshot())
@@ -510,7 +511,7 @@ fn[A] section_with_length(
 }
 
 ///|
-fn fill_occurrence_name(prefix : String, index : Int) -> String {
+fn fill_occurrence_name(prefix : String, index : Int32) -> String {
   "\{prefix}:\{index}"
 }
 

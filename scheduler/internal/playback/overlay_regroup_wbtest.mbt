@@ -2,8 +2,8 @@
 test "regrouping overlay keeps material clocks and publishes current provenance" {
   fn leaf(
     name : String,
-    note : Int,
-    period : Int,
+    note : Int32,
+    period : Int32,
   ) -> @pattern.PatternDoc[@pattern.ControlMap] raise {
     @pattern.PatternDoc::from_pattern(
       id=@identity.PatternNodeId::from_string(name),

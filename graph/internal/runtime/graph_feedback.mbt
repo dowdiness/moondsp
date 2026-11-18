@@ -18,7 +18,7 @@ fn CompiledGraph::process_feedback_graph_impl(
   left_output : AudioBuffer,
   right_output : AudioBuffer,
   is_stereo : Bool,
-  sample_count : Int,
+  sample_count : Int32,
 ) -> Unit {
   clear_compiled_buffers(self.buffers)
   clear_compiled_buffers(self.left_buffers)
@@ -340,7 +340,7 @@ fn Dsp::process_feedback_graph(
   self : Dsp,
   context : DspContext,
   output : AudioBuffer,
-  sample_count : Int,
+  sample_count : Int32,
 ) -> Unit {
   // Mono wrapper: left_output/right_output are unused — pass output as a
   // harmless placeholder (is_stereo=false means only the mono copy fires).
@@ -355,7 +355,7 @@ fn StereoDsp::process_feedback_graph(
   context : DspContext,
   left_output : AudioBuffer,
   right_output : AudioBuffer,
-  sample_count : Int,
+  sample_count : Int32,
 ) -> Unit {
   // Stereo wrapper: output is unused — pass left_output as a harmless
   // placeholder (is_stereo=true means only the stereo copy fires).
@@ -418,8 +418,8 @@ fn CompiledGraph::prepare_feedback_biquads(
 fn self_register_input_sample(
   sample_values : FixedArray[Double],
   self_values : FixedArray[Double],
-  input_index : Int,
-  back_edge_source : Int,
+  input_index : Int32,
+  back_edge_source : Int32,
 ) -> Double {
   if back_edge_source >= 0 {
     self_values[back_edge_source]
@@ -434,8 +434,8 @@ fn self_register_input_sample(
 fn self_register_stereo_input_left(
   left_sv : FixedArray[Double],
   self_left_values : FixedArray[Double],
-  input_index : Int,
-  back_edge_source : Int,
+  input_index : Int32,
+  back_edge_source : Int32,
 ) -> Double {
   if back_edge_source >= 0 {
     self_left_values[back_edge_source]
@@ -450,8 +450,8 @@ fn self_register_stereo_input_left(
 fn self_register_stereo_input_right(
   right_sv : FixedArray[Double],
   self_right_values : FixedArray[Double],
-  input_index : Int,
-  back_edge_source : Int,
+  input_index : Int32,
+  back_edge_source : Int32,
 ) -> Double {
   if back_edge_source >= 0 {
     self_right_values[back_edge_source]
@@ -491,7 +491,7 @@ fn clear_compiled_buffers(buffers : FixedArray[AudioBuffer]) -> Unit {
 }
 
 ///|
-fn is_mono_shape(shape : Int?) -> Bool {
+fn is_mono_shape(shape : Int32?) -> Bool {
   match shape {
     Some(MONO_SIGNAL_SHAPE) => true
     _ => false

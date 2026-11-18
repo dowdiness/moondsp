@@ -95,7 +95,7 @@ priv struct RelativeSequenceSlot {
 /// Weights must be 1–16 and their sum at most 256; invalid inputs yield silence.
 pub fn[A] sequence_weighted(
   pats : Array[Pat[A]],
-  weights : Array[Int],
+  weights : Array[Int32],
 ) -> Pat[A] {
   let n = pats.length()
   guard n > 0 && n == weights.length() else { return Pat::silence() }
@@ -283,7 +283,7 @@ fn[A, B] Pat::filter_map_payload(
 /// back to produce the final pattern.
 ///
 /// Edge cases: `k <= 0` → all-false; `k >= n` → all-true (saturates).
-fn bjorklund(k : Int, n : Int) -> Array[Bool] {
+fn bjorklund(k : Int32, n : Int32) -> Array[Bool] {
   if n <= 0 {
     return []
   }
@@ -325,9 +325,9 @@ fn bjorklund(k : Int, n : Int) -> Array[Bool] {
 /// `k <= 0` or `n <= 0` yields silence; `k >= n` yields one pulse per step.
 pub fn[A] Pat::euclid(
   self : Pat[A],
-  k : Int,
-  n : Int,
-  rotation? : Int = 0,
+  k : Int32,
+  n : Int32,
+  rotation~ : Int32 = 0,
 ) -> Pat[A] {
   if n <= 0 || k <= 0 {
     return Pat::silence()
@@ -346,7 +346,7 @@ pub fn[A] Pat::euclid(
 /// always produces the same value, so `degrade_by` is reproducible across
 /// queries of the same arc — required for live coding (no audible glitch
 /// when the worklet re-queries a cycle that was already partly scheduled).
-fn hash_unit(num : Int64, den : Int64, seed : Int) -> Double {
+fn hash_unit(num : Int64, den : Int64, seed : Int32) -> Double {
   let n = num.to_double()
   let d = den.to_double()
   let s = seed.to_double()
@@ -371,7 +371,7 @@ fn hash_unit(num : Int64, den : Int64, seed : Int) -> Double {
 pub fn[A] Pat::degrade_by(
   self : Pat[A],
   p : Double,
-  seed? : Int = 42,
+  seed~ : Int32 = 42,
 ) -> Pat[A] {
   let prob = if p < 0.0 { 0.0 } else if p > 1.0 { 1.0 } else { p }
   guard !(prob <= 0.0) else { return self }
@@ -404,13 +404,13 @@ pub fn[A] Pat::degrade_by(
 
 ///|
 /// Apply an arbitrary callback every n source cycles. Its content is unknown.
-pub fn[A] every(n : Int, f : (Pat[A]) -> Pat[A], pat : Pat[A]) -> Pat[A] {
+pub fn[A] every(n : Int32, f : (Pat[A]) -> Pat[A], pat : Pat[A]) -> Pat[A] {
   every_known(n, f, pat, "")
 }
 
 ///|
 fn[A] every_known(
-  n : Int,
+  n : Int32,
   f : (Pat[A]) -> Pat[A],
   pat : Pat[A],
   signature : String,

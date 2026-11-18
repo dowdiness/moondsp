@@ -8,10 +8,11 @@ struct MiniGraphPreparedTemplate {
 }
 
 ///|
+#derive(Debug, Eq)
 enum MiniGraphBridgeError {
   MissingSoundKey
   MissingTemplate(String)
-} derive(Debug, Eq)
+}
 
 ///|
 fn prepared_bd_graph_template(

@@ -36,7 +36,7 @@ let compiled_output : @ref.Ref[@moondsp.AudioBuffer?] = Ref(None)
 let compiled_sample_rate : @ref.Ref[Double] = Ref(0.0)
 
 ///|
-let compiled_block_size : @ref.Ref[Int] = Ref(0)
+let compiled_block_size : @ref.Ref[Int32] = Ref(0)
 
 ///|
 pub fn reset_phase() -> Unit {
@@ -51,7 +51,7 @@ pub fn tick(freq_hz~ : Double, sample_rate~ : Double) -> Double {
 
 ///|
 pub fn tick_source(
-  source_id~ : Int,
+  source_id~ : Int32,
   freq_hz~ : Double,
   sample_rate~ : Double,
 ) -> Double {
@@ -59,7 +59,7 @@ pub fn tick_source(
 }
 
 ///|
-pub fn init_compiled_graph(sample_rate : Double, block_size : Int) -> Bool {
+pub fn init_compiled_graph(sample_rate : Double, block_size : Int32) -> Bool {
   ensure_compiled_graph(sample_rate, block_size)
 }
 
@@ -68,7 +68,7 @@ pub fn process_compiled_block(
   freq : Double,
   gain : Double,
   sample_rate : Double,
-  block_size : Int,
+  block_size : Int32,
 ) -> Bool {
   if !ensure_compiled_graph(sample_rate, block_size) {
     return false
@@ -94,7 +94,7 @@ pub fn process_compiled_block(
 }
 
 ///|
-pub fn compiled_output_sample(index : Int) -> Double {
+pub fn compiled_output_sample(index : Int32) -> Double {
   match compiled_output.val {
     Some(output) =>
       if index >= 0 && index < output.length() {
@@ -109,7 +109,7 @@ pub fn compiled_output_sample(index : Int) -> Double {
 ///|
 pub fn init_compiled_stereo_graph(
   _sample_rate : Double,
-  _block_size : Int,
+  _block_size : Int32,
 ) -> Bool {
   false
 }
@@ -122,23 +122,23 @@ pub fn process_compiled_stereo_block(
   _delay_samples : Double,
   _cutoff : Double,
   _sample_rate : Double,
-  _block_size : Int,
+  _block_size : Int32,
 ) -> Bool {
   false
 }
 
 ///|
-pub fn compiled_stereo_left_sample(_index : Int) -> Double {
+pub fn compiled_stereo_left_sample(_index : Int32) -> Double {
   0.0
 }
 
 ///|
-pub fn compiled_stereo_right_sample(_index : Int) -> Double {
+pub fn compiled_stereo_right_sample(_index : Int32) -> Double {
   0.0
 }
 
 ///|
-fn ensure_compiled_graph(sample_rate : Double, block_size : Int) -> Bool {
+fn ensure_compiled_graph(sample_rate : Double, block_size : Int32) -> Bool {
   if sample_rate <= 0.0 || block_size <= 0 {
     reset_compiled_graph()
     return false
@@ -217,7 +217,7 @@ fn reset_compiled_graph() -> Unit {
 /// mul(0,1), output(2)]` with gate_on fired. Proves that `DspNode::mul` in a
 /// wasm-gc release build produces non-trivial audio — counter-evidence to the
 /// former "Mul wasm-gc bug" memory. Returns -1.0 if compile fails.
-pub fn mul_adsr_peak(sample_rate : Double, block_size : Int) -> Double {
+pub fn mul_adsr_peak(sample_rate : Double, block_size : Int32) -> Double {
   let ctx = @moondsp.DspContext(sample_rate~, block_size~)
   let nodes = [
     @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 440.0),

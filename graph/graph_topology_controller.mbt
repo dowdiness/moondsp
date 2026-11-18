@@ -1,21 +1,22 @@
 ///|
 /// Failure reason for result-typed topology queue APIs.
+#derive(Debug)
 pub(all) enum GraphTopologyEditError {
-  InvalidNodeIndex(Int)
-  InvalidSourceIndex(Int)
-  UnsupportedInputSlot(Int, GraphTopologyInputSlot, DspNodeKind)
+  InvalidNodeIndex(Int32)
+  InvalidSourceIndex(Int32)
+  UnsupportedInputSlot(Int32, GraphTopologyInputSlot, DspNodeKind)
   UnsupportedInsertTemplate(DspNodeKind)
   EmptyInsertChain
-  UnsupportedChainNode(Int, DspNodeKind)
-  InvalidDeleteRange(Int, Int)
-  ReplacementSourceInDeletedRange(Int)
-  DeleteNodeRequiresUnary(Int, DspNodeKind)
-  DeleteNodeRequiresSingleConsumer(Int)
-  DeleteNodeConsumerMismatch(Int, Int)
-  DeleteChainRequiresUnary(Int, DspNodeKind)
-  DeleteChainRequiresSingleConsumer(Int)
-  DeleteChainConsumerMismatch(Int, Int, Int)
-} derive(Debug)
+  UnsupportedChainNode(Int32, DspNodeKind)
+  InvalidDeleteRange(Int32, Int32)
+  ReplacementSourceInDeletedRange(Int32)
+  DeleteNodeRequiresUnary(Int32, DspNodeKind)
+  DeleteNodeRequiresSingleConsumer(Int32)
+  DeleteNodeConsumerMismatch(Int32, Int32)
+  DeleteChainRequiresUnary(Int32, DspNodeKind)
+  DeleteChainRequiresSingleConsumer(Int32)
+  DeleteChainConsumerMismatch(Int32, Int32, Int32)
+}
 
 ///|
 pub extend GraphTopologyEditError with @moonbitlang/core/debug.Debug::{to_repr}
@@ -30,12 +31,13 @@ pub extend GraphTopologyEditError with Show::{to_string, output}
 
 ///|
 /// Failure reason for result-typed topology queue APIs.
+#derive(Debug)
 pub(all) enum GraphTopologyQueueError {
   PendingSwap
-  InvalidEdit(Int, GraphTopologyEditError)
+  InvalidEdit(Int32, GraphTopologyEditError)
   RecompileRejected
   HotSwap(HotSwapQueueError)
-} derive(Debug)
+}
 
 ///|
 pub extend GraphTopologyQueueError with @moonbitlang/core/debug.Debug::{to_repr}
@@ -87,7 +89,7 @@ fn graph_topology_edit_error_from_staging(
       GraphTopologyEditError::DeleteNodeRequiresSingleConsumer(index)
     @staging.GraphTopologyEditError::DeleteNodeConsumerMismatch(
       consumer,
-      retarget
+      retarget,
     ) => GraphTopologyEditError::DeleteNodeConsumerMismatch(consumer, retarget)
     @staging.GraphTopologyEditError::DeleteChainRequiresUnary(index, kind) =>
       GraphTopologyEditError::DeleteChainRequiresUnary(
@@ -99,7 +101,7 @@ fn graph_topology_edit_error_from_staging(
     @staging.GraphTopologyEditError::DeleteChainConsumerMismatch(
       index,
       consumer,
-      expected
+      expected,
     ) =>
       GraphTopologyEditError::DeleteChainConsumerMismatch(
         index, consumer, expected,
@@ -159,7 +161,7 @@ struct DspTopologyController(@staging.DspTopologyController)
 pub fn DspTopologyController::from_nodes(
   nodes : Array[DspNode],
   context : DspContext,
-  crossfade_samples? : Int = 0,
+  crossfade_samples~ : Int32 = 0,
 ) -> DspTopologyController? {
   @staging.DspTopologyController::from_nodes(
     dsp_nodes_to_model(nodes),
@@ -215,7 +217,7 @@ struct StereoDspTopologyController(@staging.StereoDspTopologyController)
 pub fn StereoDspTopologyController::from_nodes(
   nodes : Array[DspNode],
   context : DspContext,
-  crossfade_samples? : Int = 0,
+  crossfade_samples~ : Int32 = 0,
 ) -> StereoDspTopologyController? {
   @staging.StereoDspTopologyController::from_nodes(
     dsp_nodes_to_model(nodes),

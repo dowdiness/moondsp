@@ -63,7 +63,7 @@ pub fn PatternScheduler::queued_snapshot(
 /// Accepted material changes still waiting for a reserved entry boundary.
 pub fn PatternScheduler::pending_material_change_count(
   self : PatternScheduler,
-) -> Int {
+) -> Int32 {
   self.playback_state.inspect().pending_materials
 }
 
@@ -71,7 +71,7 @@ pub fn PatternScheduler::pending_material_change_count(
 /// Accepted finite material changes that cannot enter during this Play.
 pub fn PatternScheduler::skipped_material_change_count(
   self : PatternScheduler,
-) -> Int {
+) -> Int32 {
   self.playback_state.inspect().skipped_materials
 }
 

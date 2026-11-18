@@ -2,13 +2,13 @@
 const HOT_SWAP_SAMPLE_RATE : Double = 48000.0
 
 ///|
-const HOT_SWAP_BLOCK_SIZE : Int = 4
+const HOT_SWAP_BLOCK_SIZE : Int32 = 4
 
 ///|
 const HOT_SWAP_EPSILON : Double = 0.000000001
 
 ///|
-const HOT_SWAP_CROSSFADE_SAMPLES : Int = 8
+const HOT_SWAP_CROSSFADE_SAMPLES : Int32 = 8
 
 ///|
 const HOT_SWAP_CENTER_GAIN : Double = 0.7071067811865476
@@ -198,8 +198,8 @@ test "compiled dsp hot swap result reports block capacity mismatch" {
     Err(
       @graph.HotSwapQueueError::BlockCapacityMismatch(
         active_capacity,
-        next_capacity
-      )
+        next_capacity,
+      ),
     ) => {
       @debug.assert_eq(active_capacity, HOT_SWAP_BLOCK_SIZE)
       @debug.assert_eq(next_capacity, HOT_SWAP_BLOCK_SIZE * 2)
@@ -296,8 +296,8 @@ test "compiled dsp hot swap result reports pending graph control rejection" {
       @graph.GraphControlError::InvalidSlotForNode(
         1,
         @graph.DspNodeKind::Output,
-        @graph.GraphParamSlot::Value0
-      )
+        @graph.GraphParamSlot::Value0,
+      ),
     ) => ()
     other =>
       fail(
@@ -534,7 +534,7 @@ test "compiled stereo dsp hot swap result reports pending graph control rejectio
   assert_true(hot_swap.queue_swap(replacement) is Ok(_))
   match hot_swap.gate_on(0) {
     Err(
-      @graph.GraphControlError::InvalidGateNode(0, @graph.DspNodeKind::Constant)
+      @graph.GraphControlError::InvalidGateNode(0, @graph.DspNodeKind::Constant),
     ) => ()
     other =>
       fail("expected pending InvalidGateNode, got \{@debug.to_string(other)}")

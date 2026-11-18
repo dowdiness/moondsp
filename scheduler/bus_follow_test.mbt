@@ -3,7 +3,7 @@
 const BUS_RATE : Double = 48000.0
 
 ///|
-const BUS_BLOCK : Int = 128
+const BUS_BLOCK : Int32 = 128
 
 ///|
 fn bus_id(name : String) -> @identity.PatternNodeId {

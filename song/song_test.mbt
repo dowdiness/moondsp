@@ -53,7 +53,7 @@ fn make_scoped_section(
 }
 
 ///|
-fn fast_scope(n : Int) -> @song.TimeScope {
+fn fast_scope(n : Int32) -> @song.TimeScope {
   @song.TimeScope::fast(factor=@pattern.Rational::from_int(n)) catch {
     _ => abort("time scope creation failed")
   }

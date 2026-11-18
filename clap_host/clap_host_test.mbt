@@ -1,12 +1,12 @@
 ///|
-fn create_test_handle() -> Int {
+fn create_test_handle() -> Int32 {
   let handle = @clap_host.engine_create(48000.0, 128, 8)
   guard handle > 0 else { abort("expected positive engine handle") }
   handle
 }
 
 ///|
-fn destroy_test_handle(handle : Int) -> Unit {
+fn destroy_test_handle(handle : Int32) -> Unit {
   guard @clap_host.engine_destroy(handle) else {
     abort("expected engine destroy to succeed")
   }
@@ -22,7 +22,7 @@ fn abs_double(value : Double) -> Double {
 }
 
 ///|
-fn rendered_peak(handle : Int, frames : Int) -> Double {
+fn rendered_peak(handle : Int32, frames : Int32) -> Double {
   let processed = @clap_host.engine_process(handle, frames)
   for i in 0..<processed; peak = 0.0 {
     let l = abs_double(@clap_host.engine_left_sample(handle, i))

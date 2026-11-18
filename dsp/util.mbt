@@ -16,7 +16,7 @@ pub fn is_finite_positive(value : Double) -> Bool {
 pub fn effective_sample_count(
   context : DspContext,
   buffer : AudioBuffer,
-) -> Int {
+) -> Int32 {
   if buffer.length() < context.block_size() {
     buffer.length()
   } else {
@@ -28,7 +28,7 @@ pub fn effective_sample_count(
 /// Replace non-finite samples (NaN, Inf) with 0.0 in-place.
 /// Returns the number of samples replaced. This is the output firewall —
 /// the last line of defense before samples leave the DSP engine.
-pub fn sanitize_buffer(buffer : AudioBuffer, sample_count : Int) -> Int {
+pub fn sanitize_buffer(buffer : AudioBuffer, sample_count : Int32) -> Int32 {
   let count = if sample_count > buffer.length() {
     buffer.length()
   } else if sample_count < 0 {

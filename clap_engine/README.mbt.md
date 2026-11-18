@@ -49,10 +49,10 @@ voice count. The engine preallocates all buffers and voice slots up front.
 ///|
 test "initialize clap synth engine and process audio" {
   let engine = @clap_engine.ClapSynthEngine(
-      sample_rate=48000.0,
-      max_block_size=128,
-      max_voices=8,
-    ) catch {
+    sample_rate=48000.0,
+    max_block_size=128,
+    max_voices=8,
+  ) catch {
     _ => fail("failed to initialize clap engine")
   }
 

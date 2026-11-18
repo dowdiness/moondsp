@@ -134,7 +134,7 @@ pub fn PlaybackSnapshot::song_layout_revision(
 
 ///|
 /// Count source entries independently of the current play position.
-pub fn PlaybackSnapshot::material_count(self : PlaybackSnapshot) -> Int {
+pub fn PlaybackSnapshot::material_count(self : PlaybackSnapshot) -> Int32 {
   match self {
     Pattern(snapshot) => snapshot.pat().entries().length()
     PatternWithOrigins(snapshot) => snapshot.pat().entries().length()
@@ -210,8 +210,8 @@ pub fn PlaybackState::PlaybackState() -> PlaybackState {
 pub(all) struct PlaybackInspection {
   current : PlaybackSnapshot?
   staged : PlaybackSnapshot?
-  pending_materials : Int
-  skipped_materials : Int
+  pending_materials : Int32
+  skipped_materials : Int32
 }
 
 ///|
@@ -262,7 +262,7 @@ pub fn PlaybackState::prepare_acceptance(
   self : PlaybackState,
   snapshot : PlaybackSnapshot,
   now : @pattern.Rational,
-  material_limit~ : Int,
+  material_limit~ : Int32,
   restart~ : Bool,
 ) -> PlaybackState? {
   guard snapshot.material_count() <= material_limit else { return None }
@@ -302,7 +302,7 @@ pub fn PlaybackState::has_pending(self : PlaybackState) -> Bool {
 }
 
 ///|
-pub fn PlaybackState::skipped_entry_count(self : PlaybackState) -> Int {
+pub fn PlaybackState::skipped_entry_count(self : PlaybackState) -> Int32 {
   match self.running {
     None => 0
     Some(run) => run.entries.iter().filter(entry => entry.is_skipped()).count()

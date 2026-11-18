@@ -14,13 +14,13 @@
 ///|
 /// `(key, bus)` pairs, shared and never mutated. The outermost `MergeControl`
 /// for a key wins, the same order as `ControlMap::merge`.
-let no_bus_bindings : FixedArray[(String, Int)] = []
+let no_bus_bindings : FixedArray[(String, Int32)] = []
 
 ///|
 fn bus_binding_for(
-  bindings : FixedArray[(String, Int)],
+  bindings : FixedArray[(String, Int32)],
   key : String,
-) -> Int? {
+) -> Int32? {
   for binding in bindings {
     if binding.0 == key {
       return Some(binding.1)
@@ -52,10 +52,10 @@ fn[A] ControlBus::map_signal(
 /// outermost merge wins where it has a value. The binding does not depend on
 /// time, so a sounding voice keeps the right bus across rests.
 fn bind_buses(
-  bindings : FixedArray[(String, Int)],
-  provided : Array[(String, Int)],
-  chained : Map[Int, Int],
-) -> FixedArray[(String, Int)] {
+  bindings : FixedArray[(String, Int32)],
+  provided : Array[(String, Int32)],
+  chained : Map[Int32, Int32],
+) -> FixedArray[(String, Int32)] {
   let mut added = 0
   for pair in provided {
     if bus_binding_for(bindings, pair.0) is None {
@@ -82,9 +82,9 @@ fn bind_buses(
 ///|
 /// Drop the bindings of the keys `keys` sets to fixed values (`jux` pan).
 fn unbind_keys(
-  bindings : FixedArray[(String, Int)],
+  bindings : FixedArray[(String, Int32)],
   keys : ControlMap,
-) -> FixedArray[(String, Int)] {
+) -> FixedArray[(String, Int32)] {
   let mut kept = 0
   for binding in bindings {
     if keys.get(binding.0) is None {
@@ -110,7 +110,7 @@ fn unbind_keys(
 /// value there keeps the payload's own value.
 fn[A] fill_bound_controls(
   value : A,
-  bindings : FixedArray[(String, Int)],
+  bindings : FixedArray[(String, Int32)],
   buses : Array[ControlBus[A]],
   time : Rational,
 ) -> A {
@@ -127,9 +127,9 @@ fn[A] fill_bound_controls(
 
 ///|
 fn shift_bus_bindings(
-  bindings : FixedArray[(String, Int)],
-  offset : Int,
-) -> FixedArray[(String, Int)] {
+  bindings : FixedArray[(String, Int32)],
+  offset : Int32,
+) -> FixedArray[(String, Int32)] {
   if bindings.is_empty() {
     return bindings
   }
@@ -142,7 +142,7 @@ fn shift_bus_bindings(
 /// The buses one event's controls follow, placed on the clock the event is on.
 pub struct EventBuses {
   priv table : Array[BusSignal]
-  priv bindings : FixedArray[(String, Int)]
+  priv bindings : FixedArray[(String, Int32)]
   priv placement : Placement
 }
 
@@ -162,7 +162,7 @@ pub fn EventBuses::none() -> EventBuses {
 ///|
 fn EventBuses::in_snapshot(
   table : Array[BusSignal],
-  bindings : FixedArray[(String, Int)],
+  bindings : FixedArray[(String, Int32)],
 ) -> EventBuses {
   if bindings.is_empty() {
     return no_event_buses
@@ -310,7 +310,7 @@ fn BusSignal::eval(
       child.eval((cycle + 1L) * den - num, den, !left)
     }
     Sequence(children) => {
-      let n = (children.length()).to_int64()
+      let n = children.length().to_int64()
       let cycle = bus_floor(num, den, left)
       let pos = (num - cycle * den) * n
       let slot = bus_floor(pos, den, left)
@@ -387,9 +387,9 @@ fn BusSignal::transformed(
 
 ///|
 fn euclid_slots(
-  k : Int,
-  n : Int,
-  rotation : Int,
+  k : Int32,
+  n : Int32,
+  rotation : Int32,
   hit : BusSignal,
 ) -> BusSignal {
   if n <= 0 || k <= 0 {
@@ -410,8 +410,8 @@ fn euclid_slots(
 
 ///|
 fn slot_signals(
-  count : Int,
-  index : Int,
+  count : Int32,
+  index : Int32,
   hit : BusSignal,
 ) -> Array[BusSignal] {
   Array::makei(count, i => {
@@ -424,7 +424,7 @@ fn slot_signals(
 }
 
 ///|
-fn weight_bounds(weights : Array[Int]) -> Array[Int64] {
+fn weight_bounds(weights : Array[Int32]) -> Array[Int64] {
   let bounds = [0L]
   for weight in weights {
     bounds.push(bounds[bounds.length() - 1] + weight.to_int64())

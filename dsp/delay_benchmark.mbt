@@ -4,19 +4,19 @@
 /// Prime once before timing. Repeated reset-only batches mostly measure an
 /// already-reset line; use reset-plus-ticks and prepared stealing as the
 /// primary evidence for active-use cost.
-fn delay_reset_fixture(capacity : Int) -> DelayLine {
+fn delay_reset_fixture(capacity : Int32) -> DelayLine {
   let delay = DelayLine(capacity, delay_samples=1, feedback=0.3)
   ignore(delay.tick(1.0))
   delay
 }
 
 ///|
-fn delay_tick_fixture(capacity : Int) -> DelayLine {
+fn delay_tick_fixture(capacity : Int32) -> DelayLine {
   DelayLine(capacity, delay_samples=2400, feedback=0.3)
 }
 
 ///|
-fn warm_delay_ticks(delay : DelayLine, ticks : Int) -> Unit {
+fn warm_delay_ticks(delay : DelayLine, ticks : Int32) -> Unit {
   for _ in 0..<ticks {
     ignore(delay.tick(1.0))
   }

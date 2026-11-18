@@ -91,11 +91,11 @@ extern "js" fn has_node_index(error : NativeError) -> Bool =
   #| error => Number.isInteger(error.nodeIndex)
 
 ///|
-extern "js" fn node_index(error : NativeError) -> Int =
+extern "js" fn node_index(error : NativeError) -> Int32 =
   #| error => error.nodeIndex
 
 ///|
-pub fn RuntimeFailure::node_index(self : RuntimeFailure) -> Int? {
+pub fn RuntimeFailure::node_index(self : RuntimeFailure) -> Int32? {
   if has_node_index(self.error) {
     Some(node_index(self.error))
   } else {

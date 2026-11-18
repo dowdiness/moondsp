@@ -1,9 +1,9 @@
 ///|
 fn span(
-  b_num : Int,
-  b_den : Int,
-  e_num : Int,
-  e_den : Int,
+  b_num : Int32,
+  b_den : Int32,
+  e_num : Int32,
+  e_den : Int32,
 ) -> @pattern.TimeSpan {
   @pattern.TimeSpan(r(b_num, b_den), r(e_num, e_den))
 }

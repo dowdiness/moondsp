@@ -2,8 +2,8 @@
 /// Shared expression syntax. This representation contains data and source spans,
 /// never runtime closures or compiled documents.
 priv struct MiniSpan {
-  start : Int
-  end : Int
+  start : Int32
+  end : Int32
 }
 
 ///|
@@ -16,8 +16,8 @@ priv enum MiniLiteral {
 
 ///|
 priv enum MiniCallback {
-  Fast(Int)
-  Slow(Int)
+  Fast(Int32)
+  Slow(Int32)
   Rev
 }
 
@@ -117,7 +117,7 @@ fn MiniSignal::function(self : MiniSignal) -> (Double) -> Double {
 priv enum MiniValue {
   Number(Double)
   /// Quoted notation, the source offset of its content, and its numbers.
-  Steps(String, Int, Array[Double])
+  Steps(String, Int32, Array[Double])
   Signal(MiniSignal)
 }
 
@@ -141,7 +141,7 @@ priv enum MiniTransform {
   Degrade(Double)
   Control(String, MiniValue)
   Filter(MiniFilterKind, MiniValue, MiniValue?)
-  Every(Int, MiniCallback)
+  Every(Int32, MiniCallback)
   Jux(MiniCallback)
 }
 
@@ -153,7 +153,7 @@ priv struct MiniExpr {
 
 ///|
 priv enum MiniExprNode {
-  Literal(MiniLiteral, String, Int)
+  Literal(MiniLiteral, String, Int32)
   Stack(Array[MiniExpr])
   Reference(String)
   Apply(MiniExpr, MiniTransform)
@@ -162,7 +162,7 @@ priv enum MiniExprNode {
 ///|
 fn Parser::parse_syntax_expr(
   self : Parser,
-  depth? : Int = 0,
+  depth~ : Int32 = 0,
 ) -> MiniExpr raise ParseError {
   guard self.admission is None || depth < 32 else {
     raise ParseError("playback source exceeds nesting depth 32")
@@ -208,7 +208,7 @@ fn Parser::parse_syntax_expr(
 /// Parse one primary and its left-to-right transform chain.
 fn Parser::parse_syntax_chain(
   self : Parser,
-  depth : Int,
+  depth : Int32,
 ) -> MiniExpr raise ParseError {
   self.skip_whitespace()
   let start = self.pos
@@ -241,7 +241,7 @@ fn Parser::parse_syntax_chain(
 /// at the name inside the parentheses.
 fn Parser::parse_syntax_primary(
   self : Parser,
-  depth : Int,
+  depth : Int32,
 ) -> MiniExpr raise ParseError {
   guard !self.at_end() else {
     raise ParseError("position \{self.pos}: unexpected end of input")
@@ -482,7 +482,7 @@ fn Parser::parse_transform(self : Parser) -> MiniTransform raise ParseError {
 ///|
 fn Parser::parse_transform_callback(
   self : Parser,
-  method_start : Int,
+  method_start : Int32,
   name : String,
   calling_method~ : String,
 ) -> MiniCallback raise ParseError {

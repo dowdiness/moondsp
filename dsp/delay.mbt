@@ -6,20 +6,20 @@
 /// still holds older values.
 pub struct DelayLine {
   priv buffer : FixedArray[Double]
-  priv mut write_pos : Int
+  priv mut write_pos : Int32
   // Before the first wrap after construction/reset, only indices below
   // write_pos are valid. Once has_wrapped is true, the whole buffer is valid.
   priv mut has_wrapped : Bool
-  priv mut delay_samples : Int
+  priv mut delay_samples : Int32
   priv mut feedback : Double
 }
 
 ///|
 /// Create a delay line with preallocated storage and a normalized delay length.
 pub fn DelayLine::DelayLine(
-  max_delay_samples : Int,
-  delay_samples? : Int = default_delay_samples(max_delay_samples),
-  feedback? : Double = 0.0,
+  max_delay_samples : Int32,
+  delay_samples~ : Int32 = default_delay_samples(max_delay_samples),
+  feedback~ : Double = 0.0,
 ) -> DelayLine {
   let capacity = max_delay_capacity(max_delay_samples)
   {
@@ -33,13 +33,13 @@ pub fn DelayLine::DelayLine(
 
 ///|
 /// Return the maximum representable delay length in samples.
-pub fn DelayLine::max_delay_samples(self : DelayLine) -> Int {
+pub fn DelayLine::max_delay_samples(self : DelayLine) -> Int32 {
   self.buffer.length()
 }
 
 ///|
 /// Return the active delay length in samples.
-pub fn DelayLine::delay_samples(self : DelayLine) -> Int {
+pub fn DelayLine::delay_samples(self : DelayLine) -> Int32 {
   self.delay_samples
 }
 
@@ -53,7 +53,7 @@ pub fn DelayLine::feedback(self : DelayLine) -> Double {
 /// Update the active delay length, clamping to the allocated storage range.
 pub fn DelayLine::set_delay_samples(
   self : DelayLine,
-  delay_samples : Int,
+  delay_samples : Int32,
 ) -> Unit {
   self.delay_samples = normalize_delay_samples(
     delay_samples,
@@ -158,10 +158,10 @@ fn DelayLine::advance_write_pos(self : DelayLine) -> Unit {
 
 ///|
 fn delayed_read_pos(
-  write_pos : Int,
-  delay_samples : Int,
-  capacity : Int,
-) -> Int {
+  write_pos : Int32,
+  delay_samples : Int32,
+  capacity : Int32,
+) -> Int32 {
   let read_pos = write_pos - delay_samples
   if read_pos < 0 {
     read_pos + capacity
@@ -171,7 +171,7 @@ fn delayed_read_pos(
 }
 
 ///|
-fn max_delay_capacity(value : Int) -> Int {
+fn max_delay_capacity(value : Int32) -> Int32 {
   if value > 0 {
     value
   } else {
@@ -180,7 +180,7 @@ fn max_delay_capacity(value : Int) -> Int {
 }
 
 ///|
-fn default_delay_samples(value : Int) -> Int {
+fn default_delay_samples(value : Int32) -> Int32 {
   if value > 0 {
     value
   } else {
@@ -189,7 +189,7 @@ fn default_delay_samples(value : Int) -> Int {
 }
 
 ///|
-fn normalize_delay_samples(value : Int, capacity : Int) -> Int {
+fn normalize_delay_samples(value : Int32, capacity : Int32) -> Int32 {
   if value < 0 {
     0
   } else if value > capacity {

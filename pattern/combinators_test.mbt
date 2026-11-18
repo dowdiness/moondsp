@@ -1,6 +1,6 @@
 ///|
 test "sequence: empty array produces silence (0 events)" {
-  let p : @pattern.Pat[Int] = @pattern.sequence([])
+  let p : @pattern.Pat[Int32] = @pattern.sequence([])
   let events = p.query(span(0, 1, 1, 1))
   inspect(events.length(), content="0")
 }
@@ -94,7 +94,7 @@ test "sequence: nested slots preserve negative fractional clips across queries" 
 
 ///|
 test "stack: empty array produces silence (0 events)" {
-  let p : @pattern.Pat[Int] = @pattern.stack([])
+  let p : @pattern.Pat[Int32] = @pattern.stack([])
   let events = p.query(span(0, 1, 1, 1))
   inspect(events.length(), content="0")
 }
@@ -193,7 +193,7 @@ test "filter_map: removes all non-matching events" {
 
 ///|
 test "filter_map: on silence returns empty" {
-  let p : @pattern.Pat[Int] = @pattern.Pat::silence()
+  let p : @pattern.Pat[Int32] = @pattern.Pat::silence()
   let filtered = p.filter_map(fn(x) { Some(x + 1) })
   let events = filtered.query(span(0, 1, 1, 1))
   inspect(events.length(), content="0")
@@ -372,7 +372,7 @@ test "degrade_by is deterministic — same query yields same result" {
 
 ///|
 test "degrade_by(0.5) drops some but not all events from 32-event pattern" {
-  let pats : Array[@pattern.Pat[Int]] = []
+  let pats : Array[@pattern.Pat[Int32]] = []
   for i in 0..<32 {
     pats.push(@pattern.Pat::pure(i))
   }
@@ -388,7 +388,7 @@ test "degrade_by: split-arc query equivalent to single full-arc query" {
   // Drop decisions must be identical whether we query [0,1) once or
   // [0,1/2) + [1/2,1). A different keying scheme (e.g. arc-begin based)
   // would diverge here.
-  let pats : Array[@pattern.Pat[Int]] = []
+  let pats : Array[@pattern.Pat[Int32]] = []
   for i in 0..<8 {
     pats.push(@pattern.Pat::pure(i))
   }

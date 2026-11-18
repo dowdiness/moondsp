@@ -104,8 +104,8 @@ test "compiled dsp topology controller result reports invalid edit index" {
     Err(
       @graph.GraphTopologyQueueError::InvalidEdit(
         index,
-        @graph.GraphTopologyEditError::InvalidNodeIndex(node_index)
-      )
+        @graph.GraphTopologyEditError::InvalidNodeIndex(node_index),
+      ),
     ) => {
       @debug.assert_eq(index, 1)
       @debug.assert_eq(node_index, 99)
@@ -146,9 +146,9 @@ test "compiled dsp topology controller result reports invalid edit reason" {
         @graph.GraphTopologyEditError::UnsupportedInputSlot(
           node_index,
           @graph.GraphTopologyInputSlot::Input0,
-          @graph.DspNodeKind::Constant
-        )
-      )
+          @graph.DspNodeKind::Constant,
+        ),
+      ),
     ) => {
       @debug.assert_eq(index, 0)
       @debug.assert_eq(node_index, 0)
@@ -168,9 +168,9 @@ test "compiled dsp topology controller result reports invalid edit reason" {
       @graph.GraphTopologyQueueError::InvalidEdit(
         index,
         @graph.GraphTopologyEditError::UnsupportedInsertTemplate(
-          @graph.DspNodeKind::Constant
-        )
-      )
+          @graph.DspNodeKind::Constant,
+        ),
+      ),
     ) => @debug.assert_eq(index, 0)
     other =>
       fail("expected UnsupportedInsertTemplate, got \{@debug.to_string(other)}")
@@ -309,8 +309,8 @@ test "compiled dsp topology controller result reports pending graph control reje
       @graph.GraphControlError::InvalidSlotForNode(
         1,
         @graph.DspNodeKind::Mix,
-        @graph.GraphParamSlot::Value0
-      )
+        @graph.GraphParamSlot::Value0,
+      ),
     ) => ()
     other =>
       fail(
@@ -1114,8 +1114,8 @@ test "compiled stereo dsp topology controller set_param reports invalid value" {
         1,
         @graph.DspNodeKind::Pan,
         @graph.GraphParamSlot::Value0,
-        _
-      )
+        _,
+      ),
     ) => ()
     other => fail("expected InvalidParamValue, got \{@debug.to_string(other)}")
   }
@@ -1541,8 +1541,8 @@ test "topology edit preserves stereo oscillator phase across recompilation" {
 
 ///|
 fn topology_test_hot_swap_progress(
-  position : Int,
-  crossfade_samples : Int,
+  position : Int32,
+  crossfade_samples : Int32,
 ) -> Double {
   if crossfade_samples <= 0 {
     1.0

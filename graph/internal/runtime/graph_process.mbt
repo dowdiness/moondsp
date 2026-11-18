@@ -4,9 +4,9 @@
 /// compile-time validation guarantees only the appropriate one fires.
 fn process_node_block(
   graph : CompiledGraph,
-  index : Int,
+  index : Int32,
   context : DspContext,
-  sample_count : Int,
+  sample_count : Int32,
   pan : Pan,
 ) -> Unit {
   let node = graph.nodes[index]
@@ -184,7 +184,7 @@ fn process_node_block(
 fn CompiledGraph::run_node_loop(
   self : CompiledGraph,
   context : DspContext,
-  sample_count : Int,
+  sample_count : Int32,
 ) -> Unit {
   let pan = Pan()
   for index in 0..<self.nodes.length() {
@@ -296,7 +296,7 @@ fn compiled_stereo_sample_count(
   context : DspContext,
   left_output : AudioBuffer,
   right_output : AudioBuffer,
-) -> Int {
+) -> Int32 {
   let output_length = if left_output.length() < right_output.length() {
     left_output.length()
   } else {

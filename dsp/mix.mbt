@@ -38,7 +38,7 @@ fn mix_sample_count(
   context : DspContext,
   output : AudioBuffer,
   input : AudioBuffer,
-) -> Int {
+) -> Int32 {
   let block_size = context.block_size()
   let output_len = output.length()
   let input_len = input.length()

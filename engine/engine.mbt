@@ -1,5 +1,6 @@
 ///|
 /// Recoverable failures of the host-independent graph engine.
+#derive(Debug)
 pub suberror GraphEngineError {
   InvalidConfiguration
   EngineClosed
@@ -7,9 +8,9 @@ pub suberror GraphEngineError {
   CapacityExceeded
   InvalidHandle
   InvalidGraph(@graph.GraphCompileError)
-  BufferSizeMismatch(expected~ : Int, actual~ : Int)
+  BufferSizeMismatch(expected~ : Int32, actual~ : Int32)
   ControlRejected(@graph.GraphControlError)
-} derive(Debug)
+}
 
 ///|
 pub extend GraphEngineError with @moonbitlang/core/debug.Debug::{to_repr}
@@ -43,7 +44,7 @@ pub struct MountedGraph {
 ///|
 pub fn GraphEngine::GraphEngine(
   context : @dsp.DspContext,
-  capacity? : Int = 16,
+  capacity~ : Int32 = 16,
 ) -> GraphEngine raise GraphEngineError {
   let raw = @lifecycle.Engine::Engine(context, @graph.Dsp::process, capacity~) catch {
     error => raise lifecycle_error(error)

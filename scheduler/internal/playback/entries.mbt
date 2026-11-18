@@ -1,11 +1,11 @@
 ///|
 priv enum EntrySource {
-  Pattern(@pattern.PatternSnapshot[@pattern.ControlMap], Int)
+  Pattern(@pattern.PatternSnapshot[@pattern.ControlMap], Int32)
   PatternWithOrigins(
     @pattern.PatternSnapshotWithOrigins[@pattern.ControlMap],
-    Int
+    Int32,
   )
-  Song(@song.SongSnapshot[@pattern.ControlMap], Int)
+  Song(@song.SongSnapshot[@pattern.ControlMap], Int32)
 }
 
 ///|

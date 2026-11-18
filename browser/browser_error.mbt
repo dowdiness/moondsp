@@ -1,29 +1,29 @@
 ///|
-const BROWSER_ERROR_NONE : Int = 0
+const BROWSER_ERROR_NONE : Int32 = 0
 
 ///|
-const BROWSER_ERROR_NOT_INITIALIZED : Int = 1
+const BROWSER_ERROR_NOT_INITIALIZED : Int32 = 1
 
 ///|
-const BROWSER_ERROR_COMPILE_REJECTED : Int = 2
+const BROWSER_ERROR_COMPILE_REJECTED : Int32 = 2
 
 ///|
-const BROWSER_ERROR_HOT_SWAP_QUEUE : Int = 3
+const BROWSER_ERROR_HOT_SWAP_QUEUE : Int32 = 3
 
 ///|
-const BROWSER_ERROR_TOPOLOGY_QUEUE : Int = 4
+const BROWSER_ERROR_TOPOLOGY_QUEUE : Int32 = 4
 
 ///|
-const BROWSER_ERROR_RUNTIME_CONTROL : Int = 5
+const BROWSER_ERROR_RUNTIME_CONTROL : Int32 = 5
 
 ///|
-const BROWSER_ERROR_INIT : Int = 6
+const BROWSER_ERROR_INIT : Int32 = 6
 
 ///|
 let browser_last_error : @ref.Ref[String] = Ref("")
 
 ///|
-let browser_last_error_code : @ref.Ref[Int] = Ref(BROWSER_ERROR_NONE)
+let browser_last_error_code : @ref.Ref[Int32] = Ref(BROWSER_ERROR_NONE)
 
 ///|
 fn clear_browser_error() -> Unit {
@@ -32,7 +32,7 @@ fn clear_browser_error() -> Unit {
 }
 
 ///|
-fn set_browser_error(code : Int, message : String) -> Bool {
+fn set_browser_error(code : Int32, message : String) -> Bool {
   browser_last_error.val = message
   browser_last_error_code.val = code
   false
@@ -40,7 +40,7 @@ fn set_browser_error(code : Int, message : String) -> Bool {
 
 ///|
 fn set_browser_error_detail(
-  code : Int,
+  code : Int32,
   context : String,
   detail : String,
 ) -> Bool {
@@ -113,17 +113,17 @@ pub fn get_browser_last_error() -> String {
 }
 
 ///|
-pub fn get_browser_error_code() -> Int {
+pub fn get_browser_error_code() -> Int32 {
   browser_last_error_code.val
 }
 
 ///|
-pub fn get_browser_error_length() -> Int {
+pub fn get_browser_error_length() -> Int32 {
   browser_last_error.val.length()
 }
 
 ///|
-pub fn get_browser_error_char(i : Int) -> Int {
+pub fn get_browser_error_char(i : Int32) -> Int32 {
   let s = browser_last_error.val
   if i < 0 || i >= s.length() {
     0

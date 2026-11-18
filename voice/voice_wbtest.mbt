@@ -6,8 +6,8 @@ using @graph {type DspNode}
 /// Whitebox test helper — needs access to private `slots` field.
 fn set_slot_generation(
   pool : VoicePool,
-  slot_index : Int,
-  generation : Int,
+  slot_index : Int32,
+  generation : Int32,
 ) -> Unit {
   if slot_index >= 0 && slot_index < pool.max_voices {
     pool.slots[slot_index].generation = generation
@@ -17,7 +17,7 @@ fn set_slot_generation(
 ///|
 /// Force the pool's next_allocation_order to a specific value.
 /// Whitebox test helper — needs access to private field.
-fn set_next_allocation_order(pool : VoicePool, value : Int) -> Unit {
+fn set_next_allocation_order(pool : VoicePool, value : Int32) -> Unit {
   pool.next_allocation_order = value
 }
 

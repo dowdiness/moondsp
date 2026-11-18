@@ -1,9 +1,10 @@
 ///|
 /// Numeric control map — the contract between Pattern and DSP engines.
 /// Values are immutable to callers; entries() returns an owned copy.
+#derive(Debug)
 pub struct ControlMap {
   priv values : Map[String, Double]
-} derive(Debug)
+}
 
 ///|
 pub impl Show for ControlMap with fn output(self, logger) {

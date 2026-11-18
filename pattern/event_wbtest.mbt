@@ -1,6 +1,6 @@
 ///|
 test "Event::shift by zero preserves a missing whole span" {
-  let event : Event[Int] = {
+  let event : Event[Int32] = {
     whole: None,
     part: TimeSpan(Rational(1L, 3L), Rational(2L, 3L)),
     value: 7,

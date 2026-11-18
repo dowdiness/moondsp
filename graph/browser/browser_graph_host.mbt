@@ -2,7 +2,7 @@
 // Primitive-only adapter boundary; no binding types escape this package.
 // This file owns only one WASM instance's transport state. Graph lifecycle,
 // capacity and mixing share the same internal lifecycle as GraphEngine.
-const GRAPH_HOST_BLOCK_SIZE : Int = 128
+const GRAPH_HOST_BLOCK_SIZE : Int32 = 128
 
 ///|
 let graph_host_engine : @ref.Ref[@lifecycle.Engine[@runtime.BoundDsp]?] = Ref(
@@ -13,7 +13,7 @@ let graph_host_engine : @ref.Ref[@lifecycle.Engine[@runtime.BoundDsp]?] = Ref(
 let graph_host_context : @ref.Ref[@moondsp.DspContext?] = Ref(None)
 
 ///|
-let graph_host_handles : Map[Int, @lifecycle.Mount[@runtime.BoundDsp]] = Map([])
+let graph_host_handles : Map[Int32, @lifecycle.Mount[@runtime.BoundDsp]] = Map([])
 
 ///|
 // 64 nodes × at most four parameter fields, followed by 64 gate actions.
@@ -25,7 +25,7 @@ let graph_host_batch : @runtime.GraphControlBatch = @runtime.GraphControlBatch::
 let graph_host_bindings : @ref.Ref[String] = Ref("")
 
 ///|
-let graph_host_next_handle : @ref.Ref[Int] = Ref(1)
+let graph_host_next_handle : @ref.Ref[Int32] = Ref(1)
 
 ///|
 let graph_host_input : StringBuilder = StringBuilder()
@@ -55,13 +55,13 @@ priv enum HostErrorCode {
 let graph_host_error_kind : @ref.Ref[HostErrorCode] = Ref(None)
 
 ///|
-let graph_host_error_node : @ref.Ref[Int] = Ref(-1)
+let graph_host_error_node : @ref.Ref[Int32] = Ref(-1)
 
 ///|
 fn graph_host_reject(
   code : HostErrorCode,
   message : String,
-  node_index? : Int = -1,
+  node_index~ : Int32 = -1,
 ) -> Bool {
   graph_host_error_kind.val = code
   graph_host_error_node.val = node_index
@@ -70,7 +70,7 @@ fn graph_host_reject(
 }
 
 ///|
-fn graph_control_error_node_index(error : @runtime.GraphControlError) -> Int {
+fn graph_control_error_node_index(error : @runtime.GraphControlError) -> Int32 {
   match error {
     InvalidNodeIndex(index) => index
     OrphanNode(index) => index
@@ -140,14 +140,14 @@ pub fn graph_host_clear_input() -> Unit {
 
 ///|
 /// The JS adapter sends Unicode scalar values, not UTF-16 code units.
-pub fn graph_host_push_char(code : Int) -> Unit {
+pub fn graph_host_push_char(code : Int32) -> Unit {
   if code >= 0 && code <= 0x10FFFF && !(code >= 0xD800 && code <= 0xDFFF) {
     graph_host_input.write_char(code.unsafe_to_char())
   }
 }
 
 ///|
-pub fn graph_host_mount() -> Int {
+pub fn graph_host_mount() -> Int32 {
   guard graph_host_engine.val is Some(engine) else {
     let _ = graph_host_reject(InvalidState, "Engine not initialized")
     return 0
@@ -158,8 +158,8 @@ pub fn graph_host_mount() -> Int {
   }
   let text = graph_host_input.to_string()
   graph_host_input.reset()
-  let bindings : Map[String, Array[Int]] = Map([])
-  let gates : Map[String, Int] = Map([])
+  let bindings : Map[String, Array[Int32]] = Map([])
+  let gates : Map[String, Int32] = Map([])
   let targets : Array[@runtime.GraphControlTarget] = []
   let nodes = decode_browser_graph(text, bindings~, gates~, targets~) catch {
     InvalidDescription(message, node_index) => {
@@ -232,7 +232,7 @@ pub fn graph_host_begin_update() -> Unit {
 }
 
 ///|
-pub fn graph_host_push_update(target : Int, value : Double) -> Bool {
+pub fn graph_host_push_update(target : Int32, value : Double) -> Bool {
   if !graph_host_batch.push(target, value) {
     return graph_host_reject(InvalidControl, "Update capacity exceeded")
   }
@@ -241,7 +241,7 @@ pub fn graph_host_push_update(target : Int, value : Double) -> Bool {
 
 ///|
 /// Validate and apply the numeric batch against this mount's bound targets.
-pub fn graph_host_update(handle : Int) -> Bool {
+pub fn graph_host_update(handle : Int32) -> Bool {
   // Unmount and close remove registry entries; nullable live projection keeps
   // the successful path free of raising-return Result boxes.
   guard graph_host_handles.get(handle) is Some(sound) &&
@@ -257,7 +257,7 @@ pub fn graph_host_update(handle : Int) -> Bool {
 
 ///|
 /// Primitive transport commands; native MoonBit callers use handle methods.
-pub fn graph_host_command(handle : Int, command : Int) -> Bool {
+pub fn graph_host_command(handle : Int32, command : Int32) -> Bool {
   guard graph_host_handles.get(handle) is Some(sound) else {
     return graph_host_reject(InvalidHandle, "Invalid transport handle")
   }
@@ -289,7 +289,7 @@ pub fn graph_host_close() -> Unit {
 }
 
 ///|
-pub fn graph_host_process(block_size : Int) -> Bool {
+pub fn graph_host_process(block_size : Int32) -> Bool {
   guard graph_host_engine.val is Some(engine) else { return false }
   guard block_size == GRAPH_HOST_BLOCK_SIZE else {
     return graph_host_reject(
@@ -304,24 +304,24 @@ pub fn graph_host_process(block_size : Int) -> Bool {
 }
 
 ///|
-pub fn graph_host_sample(index : Int) -> Double {
+pub fn graph_host_sample(index : Int32) -> Double {
   guard index >= 0 && index < GRAPH_HOST_BLOCK_SIZE else { return 0.0 }
   graph_host_output.get(index)
 }
 
 ///|
-pub fn graph_host_error_length() -> Int {
+pub fn graph_host_error_length() -> Int32 {
   graph_host_error.val.length()
 }
 
 ///|
-pub fn graph_host_error_char(index : Int) -> Int {
+pub fn graph_host_error_char(index : Int32) -> Int32 {
   guard index >= 0 && index < graph_host_error.val.length() else { return 0 }
   graph_host_error.val[index].to_int()
 }
 
 ///|
-pub fn graph_host_error_code() -> Int {
+pub fn graph_host_error_code() -> Int32 {
   match graph_host_error_kind.val {
     None => 0
     InvalidState => 1
@@ -336,18 +336,18 @@ pub fn graph_host_error_code() -> Int {
 }
 
 ///|
-pub fn graph_host_error_node_index() -> Int {
+pub fn graph_host_error_node_index() -> Int32 {
   graph_host_error_node.val
 }
 
 ///|
 /// Mount-only result, read synchronously before another mount.
-pub fn graph_host_bindings_length() -> Int {
+pub fn graph_host_bindings_length() -> Int32 {
   graph_host_bindings.val.length()
 }
 
 ///|
-pub fn graph_host_bindings_char(index : Int) -> Int {
+pub fn graph_host_bindings_char(index : Int32) -> Int32 {
   guard index >= 0 && index < graph_host_bindings.val.length() else { return 0 }
   graph_host_bindings.val[index].to_int()
 }

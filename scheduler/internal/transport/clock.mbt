@@ -1,9 +1,10 @@
 ///|
+#derive(Eq, Debug)
 pub(all) suberror TransportError {
   InvalidTempo
   InvalidSampleRate
   TimeOutOfRange
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend TransportError with Eq::{not_equal, equal}
@@ -14,9 +15,10 @@ pub extend TransportError with @moonbitlang/core/debug.Debug::{to_repr}
 ///|
 /// Exact millibeats per minute, rounded to nearest (ties upward) on input.
 /// Supported range: 0.001 through 1000 BPM.
+#derive(Eq, Debug)
 pub struct Tempo {
   priv milli : Int64
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Tempo with Eq::{not_equal, equal}
@@ -41,12 +43,13 @@ pub fn Tempo::bpm(self : Tempo) -> Double {
 ///|
 /// One affine segment anchored at the next unrendered sample. Position ticks
 /// use sample_rate * 60000 per cycle, so edits do not accumulate denominators.
+#derive(Eq, Debug)
 pub struct Clock {
   priv sample : Int64
   priv ticks : Int64
   priv scale : Int64
   priv tempo : Tempo
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Clock with Eq::{not_equal, equal}
@@ -139,7 +142,7 @@ pub fn Clock::position(
 ///|
 pub fn Clock::advance(
   self : Clock,
-  count : Int,
+  count : Int32,
 ) -> Result[Clock, TransportError] {
   try {
     if count < 0 {

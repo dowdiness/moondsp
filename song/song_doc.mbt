@@ -1,18 +1,20 @@
 ///|
+#derive(Eq, Debug)
 pub(all) suberror SongDocBuildError {
   EmptySongDoc
   DuplicateSongDocOccurrenceId(String)
   DuplicateSongDocOccurrenceName(String)
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) suberror SongDocEditError {
   MissingSongDocOccurrenceId(String)
   DuplicateEditedSongDocOccurrenceId(String)
   DuplicateEditedSongDocOccurrenceName(String)
-  InvalidSongDocOccurrenceIndex(Int)
+  InvalidSongDocOccurrenceIndex(Int32)
   CannotRemoveLastSongDocOccurrence
-} derive(Eq, Debug)
+}
 
 ///|
 /// Identity-bearing authoring placement for one section occurrence.
@@ -197,7 +199,7 @@ fn[A] copy_song_occurrence_docs(
 fn[A] song_doc_find_occurrence_index(
   parts : Array[SongOccurrenceDoc[A]],
   id : @identity.OccurrenceId,
-) -> Int? {
+) -> Int32? {
   for index in 0..<parts.length() {
     if parts[index].id() == id {
       return Some(index)
@@ -270,7 +272,7 @@ fn[A] aggregate_song_doc_layout_revision(
 ///|
 fn[A] insert_song_doc_occurrence_at(
   parts : Array[SongOccurrenceDoc[A]],
-  index : Int,
+  index : Int32,
   occurrence : SongOccurrenceDoc[A],
 ) -> Array[SongOccurrenceDoc[A]] {
   [..parts[0:index], occurrence, ..parts[index:]]
@@ -279,8 +281,8 @@ fn[A] insert_song_doc_occurrence_at(
 ///|
 fn[A] move_song_doc_occurrence_to(
   parts : Array[SongOccurrenceDoc[A]],
-  current_index : Int,
-  target_index : Int,
+  current_index : Int32,
+  target_index : Int32,
 ) -> Array[SongOccurrenceDoc[A]] {
   let moving = parts[current_index]
   let without = [ for index, part in parts if index != current_index => part ]
@@ -359,7 +361,7 @@ priv struct SourcedSongSnapshotEntry[A] {
   layer : @identity.SectionLayerId
   body : @pattern.Pat[A]
   source_snapshot : @pattern.PatternSnapshotWithOrigins[A]?
-  source_index : Int
+  source_index : Int32
 }
 
 ///|
@@ -385,11 +387,12 @@ fn[A] source_song_snapshot_entries(
 }
 
 ///|
+#derive(Eq, Debug)
 pub struct SongEventOrigin {
   priv occurrence : @identity.OccurrenceId
   priv section : @identity.SectionId
   priv layer : @identity.SectionLayerId
-} derive(Eq, Debug)
+}
 
 ///|
 fn SongEventOrigin::SongEventOrigin(
@@ -565,7 +568,7 @@ fn[A] push_song_snapshot_events(
   result : Array[SongSnapshotEvent[A]],
   body : @pattern.Pat[A],
   snapshot : @pattern.PatternSnapshotWithOrigins[A]?,
-  source_index : Int,
+  source_index : Int32,
   occurrence : SectionOccurrence[A],
   section : @identity.SectionId,
   layer : @identity.SectionLayerId,
@@ -651,7 +654,7 @@ pub fn[A] SongSnapshot::query_sourced_events(
 /// Invalid indexes return an empty result.
 pub fn[A] SongSnapshot::query_sourced_events_for_entry(
   self : SongSnapshot[A],
-  source_index : Int,
+  source_index : Int32,
   arc : @pattern.TimeSpan,
 ) -> Array[SongSnapshotEvent[A]] {
   let source = match self.sourced_entries.get(source_index) {
@@ -720,7 +723,7 @@ pub fn[A] SongDoc::layout_revision(self : SongDoc[A]) -> @identity.Revision {
 }
 
 ///|
-pub fn[A] SongDoc::occurrence_count(self : SongDoc[A]) -> Int {
+pub fn[A] SongDoc::occurrence_count(self : SongDoc[A]) -> Int32 {
   self.parts.length()
 }
 
@@ -734,7 +737,7 @@ pub fn[A] SongDoc::occurrences(
 ///|
 pub fn[A] SongDoc::occurrence(
   self : SongDoc[A],
-  index : Int,
+  index : Int32,
 ) -> SongOccurrenceDoc[A]? {
   match self.parts.get(index) {
     Some(part) => Some(part)
@@ -840,7 +843,7 @@ pub fn[A] SongDoc::clear_occurrence_start(
 ///|
 pub fn[A] SongDoc::insert_occurrence(
   self : SongDoc[A],
-  index~ : Int,
+  index~ : Int32,
   occurrence~ : SongOccurrenceDoc[A],
 ) -> SongDoc[A] raise SongDocEditError {
   if index < 0 || index > self.parts.length() {
@@ -888,7 +891,7 @@ pub fn[A] SongDoc::remove_occurrence(
 pub fn[A] SongDoc::move_occurrence(
   self : SongDoc[A],
   id : @identity.OccurrenceId,
-  index~ : Int,
+  index~ : Int32,
 ) -> SongDoc[A] raise SongDocEditError {
   if index < 0 || index >= self.parts.length() {
     raise InvalidSongDocOccurrenceIndex(index)

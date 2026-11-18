@@ -8,7 +8,7 @@ fn path_bench_id(value : String) -> @identity.PatternNodeId {
 ///|
 fn path_bench_ids(
   prefix : String,
-  count : Int,
+  count : Int32,
 ) -> Array[@identity.PatternNodeId] {
   Array::makei(count, index => path_bench_id("\{prefix}-\{index}"))
 }

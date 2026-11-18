@@ -2,6 +2,7 @@
 const PLAYBACK_MATERIAL_LIMIT = 256
 
 ///|
+#derive(Eq)
 priv struct PlaybackLayoutRow {
   id : String
   name : String
@@ -9,13 +10,14 @@ priv struct PlaybackLayoutRow {
   start : @pattern.Rational
   length : @pattern.Rational
   rate : @pattern.Rational
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 priv enum PlaybackLayout {
   PatternLayout
   SongLayout(Array[PlaybackLayoutRow], Bool)
-} derive(Eq)
+}
 
 ///|
 priv enum PlaybackSpan {
@@ -47,11 +49,12 @@ priv enum Session {
 ///|
 /// Kind of the latest accepted score, independent of the visible draft.
 /// Internal observation value, projected into the browser's public enum.
+#derive(Eq, Debug)
 pub enum PlaybackMode {
   None
   Pattern
   Song
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend PlaybackMode with Eq::{not_equal, equal}
@@ -60,6 +63,7 @@ pub extend PlaybackMode with Eq::{not_equal, equal}
 pub extend PlaybackMode with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum PlayState {
   Empty
   Ready
@@ -67,7 +71,7 @@ pub(all) enum PlayState {
   Paused
   Ended
   Fault
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend PlayState with Eq::{not_equal, equal}
@@ -76,13 +80,14 @@ pub extend PlayState with Eq::{not_equal, equal}
 pub extend PlayState with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum PlayerError {
   InvalidSource(String)
   RestartRequired
   NoSong
   TransportRange
   Failed(String)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend PlayerError with Eq::{not_equal, equal}
@@ -96,8 +101,8 @@ pub struct PlayerView {
   source : String?
   bpm : Double
   sample_position : Double
-  pending_materials : Int
-  skipped_materials : Int
+  pending_materials : Int32
+  skipped_materials : Int32
 }
 
 ///|
@@ -512,7 +517,7 @@ fn PlayerError::message(self : PlayerError) -> String {
 }
 
 ///|
-fn player_command(command : (Player) -> Result[Unit, PlayerError]) -> Int {
+fn player_command(command : (Player) -> Result[Unit, PlayerError]) -> Int32 {
   guard player.val is Some(owner) else {
     return set_scheduler_parse_error("Player is not initialized")
   }
@@ -545,7 +550,7 @@ fn take_playback_input() -> Result[@mini.PlaybackInput, String] {
 }
 
 ///|
-pub fn player_update_input() -> Int {
+pub fn player_update_input() -> Int32 {
   match take_playback_input() {
     Err(message) => set_scheduler_parse_error(message)
     Ok(input) => player_command(owner => owner.update(input))
@@ -553,7 +558,7 @@ pub fn player_update_input() -> Int {
 }
 
 ///|
-pub fn player_restart_input() -> Int {
+pub fn player_restart_input() -> Int32 {
   match take_playback_input() {
     Err(message) => set_scheduler_parse_error(message)
     Ok(input) => player_command(owner => owner.restart(input))
@@ -561,17 +566,17 @@ pub fn player_restart_input() -> Int {
 }
 
 ///|
-pub fn player_play() -> Int {
+pub fn player_play() -> Int32 {
   player_command(owner => owner.play())
 }
 
 ///|
-pub fn player_pause() -> Int {
+pub fn player_pause() -> Int32 {
   player_command(owner => owner.pause())
 }
 
 ///|
-pub fn player_state() -> Int {
+pub fn player_state() -> Int32 {
   match player.val {
     None => 0
     Some(owner) =>
@@ -603,7 +608,7 @@ pub fn scheduler_cycle_position() -> Double {
 }
 
 ///|
-pub fn player_pending_count() -> Int {
+pub fn player_pending_count() -> Int32 {
   match player.val {
     Some(owner) => owner.view().pending_materials
     None => 0
@@ -611,7 +616,7 @@ pub fn player_pending_count() -> Int {
 }
 
 ///|
-pub fn player_skipped_count() -> Int {
+pub fn player_skipped_count() -> Int32 {
   match player.val {
     Some(owner) => owner.view().skipped_materials
     None => 0
@@ -635,14 +640,14 @@ pub fn scheduler_sample_position() -> Double {
 }
 
 ///|
-pub fn player_onset_enable(enabled : Int) -> Unit {
+pub fn player_onset_enable(enabled : Int32) -> Unit {
   if player.val is Some(owner) {
     owner.onsets.enable(enabled == 1)
   }
 }
 
 ///|
-pub fn player_onset_count() -> Int {
+pub fn player_onset_count() -> Int32 {
   match player.val {
     Some(owner) => owner.onsets.count()
     None => 0
@@ -651,7 +656,7 @@ pub fn player_onset_count() -> Int {
 
 ///|
 /// Read the shared bounded ring; no array or binding path is copied.
-pub fn player_onset_field(index : Int, field : Int) -> Double {
+pub fn player_onset_field(index : Int32, field : Int32) -> Double {
   guard index >= 0 else { return 0.0 }
   match player.val {
     None => 0.0

@@ -6,28 +6,29 @@
 priv struct TopologyGraph {
   mut authoring_nodes : Array[DspNode]
   compile_sample_rate : Double
-  compile_block_size : Int
+  compile_block_size : Int32
   hot_swap : HotSwapGraph
 }
 
 ///|
 /// Failure reason for result-typed topology queue APIs.
+#derive(Debug)
 pub(all) enum GraphTopologyEditError {
-  InvalidNodeIndex(Int)
-  InvalidSourceIndex(Int)
-  UnsupportedInputSlot(Int, GraphTopologyInputSlot, DspNodeKind)
+  InvalidNodeIndex(Int32)
+  InvalidSourceIndex(Int32)
+  UnsupportedInputSlot(Int32, GraphTopologyInputSlot, DspNodeKind)
   UnsupportedInsertTemplate(DspNodeKind)
   EmptyInsertChain
-  UnsupportedChainNode(Int, DspNodeKind)
-  InvalidDeleteRange(Int, Int)
-  ReplacementSourceInDeletedRange(Int)
-  DeleteNodeRequiresUnary(Int, DspNodeKind)
-  DeleteNodeRequiresSingleConsumer(Int)
-  DeleteNodeConsumerMismatch(Int, Int)
-  DeleteChainRequiresUnary(Int, DspNodeKind)
-  DeleteChainRequiresSingleConsumer(Int)
-  DeleteChainConsumerMismatch(Int, Int, Int)
-} derive(Debug)
+  UnsupportedChainNode(Int32, DspNodeKind)
+  InvalidDeleteRange(Int32, Int32)
+  ReplacementSourceInDeletedRange(Int32)
+  DeleteNodeRequiresUnary(Int32, DspNodeKind)
+  DeleteNodeRequiresSingleConsumer(Int32)
+  DeleteNodeConsumerMismatch(Int32, Int32)
+  DeleteChainRequiresUnary(Int32, DspNodeKind)
+  DeleteChainRequiresSingleConsumer(Int32)
+  DeleteChainConsumerMismatch(Int32, Int32, Int32)
+}
 
 ///|
 pub extend GraphTopologyEditError with @moonbitlang/core/debug.Debug::{to_repr}
@@ -42,12 +43,13 @@ pub extend GraphTopologyEditError with Show::{to_string, output}
 
 ///|
 /// Failure reason for result-typed topology queue APIs.
+#derive(Debug)
 pub(all) enum GraphTopologyQueueError {
   PendingSwap
-  InvalidEdit(Int, GraphTopologyEditError)
+  InvalidEdit(Int32, GraphTopologyEditError)
   RecompileRejected
   HotSwap(HotSwapQueueError)
-} derive(Debug)
+}
 
 ///|
 pub extend GraphTopologyQueueError with @moonbitlang/core/debug.Debug::{to_repr}
@@ -82,8 +84,8 @@ struct DspTopologyController(TopologyGraph)
 fn build_topology_graph(
   nodes : Array[DspNode],
   context : DspContext,
-  crossfade_samples : Int,
-  compile_and_wrap : (Array[DspNode], DspContext, Int) -> HotSwapGraph?,
+  crossfade_samples : Int32,
+  compile_and_wrap : (Array[DspNode], DspContext, Int32) -> HotSwapGraph?,
 ) -> TopologyGraph? {
   let hot_swap = match compile_and_wrap(nodes, context, crossfade_samples) {
     Some(hs) => hs
@@ -102,7 +104,7 @@ fn build_topology_graph(
 pub fn DspTopologyController::from_nodes(
   nodes : Array[DspNode],
   context : DspContext,
-  crossfade_samples? : Int = 0,
+  crossfade_samples~ : Int32 = 0,
 ) -> DspTopologyController? {
   build_topology_graph(nodes, context, crossfade_samples, fn(ns, ctx, xf) {
     match @runtime.Dsp::compile_raw(ns, ctx) {
@@ -278,7 +280,7 @@ struct StereoDspTopologyController(TopologyGraph)
 pub fn StereoDspTopologyController::from_nodes(
   nodes : Array[DspNode],
   context : DspContext,
-  crossfade_samples? : Int = 0,
+  crossfade_samples~ : Int32 = 0,
 ) -> StereoDspTopologyController? {
   build_topology_graph(nodes, context, crossfade_samples, fn(ns, ctx, xf) {
     match @runtime.StereoDsp::compile_raw(ns, ctx) {

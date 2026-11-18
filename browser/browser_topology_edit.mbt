@@ -24,7 +24,7 @@ let compiled_topology_edit : GraphSlot[@moondsp.DspTopologyController, MonoOut] 
 /// `DspTopologyController`.
 pub fn init_compiled_topology_edit_graph(
   sample_rate : Double,
-  block_size : Int,
+  block_size : Int32,
 ) -> Bool {
   if compiled_topology_edit.ensure(sample_rate, block_size, on_rebuild=() => {
       topo_edit_inserted.val = false
@@ -117,7 +117,7 @@ pub fn set_compiled_topology_edit_gain(gain : Double) -> Bool {
 /// `DspTopologyController` graph.
 pub fn process_compiled_topology_edit_block(
   sample_rate : Double,
-  block_size : Int,
+  block_size : Int32,
 ) -> Bool {
   if !compiled_topology_edit.ensure(sample_rate, block_size, on_rebuild=() => {
       topo_edit_inserted.val = false
@@ -147,7 +147,7 @@ pub fn process_compiled_topology_edit_block(
 
 ///|
 /// Read one sample from the most recent topology-edit browser output block.
-pub fn compiled_topology_edit_output_sample(index : Int) -> Double {
+pub fn compiled_topology_edit_output_sample(index : Int32) -> Double {
   compiled_topology_edit.output.sample(index)
 }
 

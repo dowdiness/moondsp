@@ -14,15 +14,15 @@
 const PROP_SAMPLE_RATE : Double = 48000.0
 
 ///|
-const PROP_BLOCK_SIZE : Int = 128
+const PROP_BLOCK_SIZE : Int32 = 128
 
 ///|
-const PROP_NUM_BLOCKS : Int = 3
+const PROP_NUM_BLOCKS : Int32 = 3
 
 ///|
 /// Map both signed halves onto 0..Int::max_value without overflowing at
 /// Int::min_value. abs() cannot represent that value's positive magnitude.
-fn prop_seed(seed : Int) -> Int {
+fn prop_seed(seed : Int32) -> Int32 {
   if seed < 0 {
     -(seed + 1)
   } else {
@@ -32,10 +32,10 @@ fn prop_seed(seed : Int) -> Int {
 
 ///|
 /// Waveform options for random selection.
-const PROP_WAVEFORM_COUNT : Int = 4
+const PROP_WAVEFORM_COUNT : Int32 = 4
 
 ///|
-fn prop_waveform(seed : Int) -> Waveform {
+fn prop_waveform(seed : Int32) -> Waveform {
   match prop_seed(seed) % PROP_WAVEFORM_COUNT {
     0 => Waveform::Sine
     1 => Waveform::Saw
@@ -46,10 +46,10 @@ fn prop_waveform(seed : Int) -> Waveform {
 
 ///|
 /// BiquadMode options for random selection.
-const PROP_BIQUAD_MODE_COUNT : Int = 3
+const PROP_BIQUAD_MODE_COUNT : Int32 = 3
 
 ///|
-fn prop_biquad_mode(seed : Int) -> BiquadMode {
+fn prop_biquad_mode(seed : Int32) -> BiquadMode {
   match prop_seed(seed) % PROP_BIQUAD_MODE_COUNT {
     0 => BiquadMode::LowPass
     1 => BiquadMode::HighPass
@@ -64,7 +64,7 @@ fn prop_biquad_mode(seed : Int) -> BiquadMode {
 /// (oscillator, noise, or constant) through optional processors (gain, clip,
 /// biquad, delay) to an Output node. Every generated graph compiles
 /// successfully — the test aborts on compilation failure.
-fn gen_mono_graph(seed : Int) -> Array[@graph.DspNode] {
+fn gen_mono_graph(seed : Int32) -> Array[@graph.DspNode] {
   let s = prop_seed(seed)
   let nodes : Array[@graph.DspNode] = []
   // Source node selection
@@ -145,7 +145,7 @@ fn gen_mono_graph(seed : Int) -> Array[@graph.DspNode] {
 ///
 /// Builds a mono chain, then adds Pan → optional stereo processors →
 /// StereoOutput.
-fn gen_stereo_graph(seed : Int) -> Array[@graph.DspNode] {
+fn gen_stereo_graph(seed : Int32) -> Array[@graph.DspNode] {
   let s = prop_seed(seed)
   let nodes : Array[@graph.DspNode] = []
   // Source node: oscillator or noise
@@ -218,7 +218,7 @@ fn gen_stereo_graph(seed : Int) -> Array[@graph.DspNode] {
 
 ///|
 /// Generate a valid graph with two mixed sources from a seed.
-fn gen_binary_graph(seed : Int) -> Array[@graph.DspNode] {
+fn gen_binary_graph(seed : Int32) -> Array[@graph.DspNode] {
   let s = prop_seed(seed)
   let nodes : Array[@graph.DspNode] = []
   // Source A
@@ -256,7 +256,7 @@ fn gen_binary_graph(seed : Int) -> Array[@graph.DspNode] {
 
 ///|
 /// Generate a graph with ADSR envelope (stateful, time-varying).
-fn gen_adsr_graph(seed : Int) -> Array[@graph.DspNode] {
+fn gen_adsr_graph(seed : Int32) -> Array[@graph.DspNode] {
   let s = prop_seed(seed)
   let attack_ms = 0.5 + (s % 10).to_double() * 0.5
   let decay_ms = 0.5 + (s / 3 % 10).to_double() * 0.5
@@ -277,7 +277,7 @@ fn gen_adsr_graph(seed : Int) -> Array[@graph.DspNode] {
 /// Pattern: Constant → Mix(const, back_edge) → Gain → Output
 /// where Gain feeds back to Mix's input1 via a z^-1 back-edge.
 /// The gain is clamped to (0, 1) to keep the feedback stable.
-fn gen_mono_feedback_graph(seed : Int) -> Array[@graph.DspNode] {
+fn gen_mono_feedback_graph(seed : Int32) -> Array[@graph.DspNode] {
   let s = prop_seed(seed)
   let constant_val = 0.1 + (s % 9).to_double() * 0.1
   // Feedback gain in (0, 0.95) — stable range
@@ -338,7 +338,7 @@ fn gen_mono_feedback_graph(seed : Int) -> Array[@graph.DspNode] {
 /// Pattern: Constant → Mix(const, stereo_mixdown) → Gain → Pan → StereoGain
 ///          → StereoMixDown → Output(Gain)
 /// The StereoMixDown feeds back to Mix's input1 crossing the mono/stereo boundary.
-fn gen_stereo_feedback_graph(seed : Int) -> Array[@graph.DspNode] {
+fn gen_stereo_feedback_graph(seed : Int32) -> Array[@graph.DspNode] {
   let s = prop_seed(seed)
   let constant_val = 0.1 + (s % 9).to_double() * 0.1
   let feedback_gain = 0.05 + (s % 18).to_double() * 0.05
@@ -360,7 +360,7 @@ fn gen_stereo_feedback_graph(seed : Int) -> Array[@graph.DspNode] {
 ///|
 /// Compare two AudioBuffers sample-by-sample up to `count` samples.
 /// Returns true if all samples are identical (bitwise equal).
-fn buffers_identical(a : AudioBuffer, b : AudioBuffer, count : Int) -> Bool {
+fn buffers_identical(a : AudioBuffer, b : AudioBuffer, count : Int32) -> Bool {
   for i = 0; i < count; i = i + 1 {
     if a.get(i) != b.get(i) {
       return false
@@ -405,7 +405,7 @@ fn compile_stereo(nodes : Array[@graph.DspNode]) -> @graph.StereoDsp {
 
 ///|
 /// Process a mono compiled graph for N blocks, return all samples.
-fn run_mono(compiled : @graph.Dsp, num_blocks : Int) -> Array[Double] {
+fn run_mono(compiled : @graph.Dsp, num_blocks : Int32) -> Array[Double] {
   let context = DspContext(
     sample_rate=PROP_SAMPLE_RATE,
     block_size=PROP_BLOCK_SIZE,
@@ -425,7 +425,7 @@ fn run_mono(compiled : @graph.Dsp, num_blocks : Int) -> Array[Double] {
 /// Process a stereo compiled graph for N blocks, return (left, right) samples.
 fn run_stereo(
   compiled : @graph.StereoDsp,
-  num_blocks : Int,
+  num_blocks : Int32,
 ) -> (Array[Double], Array[Double]) {
   let context = DspContext(
     sample_rate=PROP_SAMPLE_RATE,
@@ -456,7 +456,7 @@ fn run_stereo(
 ///|
 test "prop: mono linear chain — compile twice, process identically" {
   @qc.quick_check_fn(
-    fn(seed : Int) {
+    fn(seed : Int32) {
       let nodes = gen_mono_graph(seed)
       let a = run_mono(compile_mono(nodes), PROP_NUM_BLOCKS)
       let b = run_mono(compile_mono(nodes), PROP_NUM_BLOCKS)
@@ -469,7 +469,7 @@ test "prop: mono linear chain — compile twice, process identically" {
 ///|
 test "prop: mono binary combinator — compile twice, process identically" {
   @qc.quick_check_fn(
-    fn(seed : Int) {
+    fn(seed : Int32) {
       let nodes = gen_binary_graph(seed)
       let a = run_mono(compile_mono(nodes), PROP_NUM_BLOCKS)
       let b = run_mono(compile_mono(nodes), PROP_NUM_BLOCKS)
@@ -482,7 +482,7 @@ test "prop: mono binary combinator — compile twice, process identically" {
 ///|
 test "prop: mono ADSR graph — compile twice, process identically" {
   @qc.quick_check_fn(
-    fn(seed : Int) {
+    fn(seed : Int32) {
       let nodes = gen_adsr_graph(seed)
       let context = DspContext(
         sample_rate=PROP_SAMPLE_RATE,
@@ -539,7 +539,7 @@ test "prop: mono ADSR graph — compile twice, process identically" {
 ///|
 test "prop: stereo graph — compile twice, process identically" {
   @qc.quick_check_fn(
-    fn(seed : Int) {
+    fn(seed : Int32) {
       let nodes = gen_stereo_graph(seed)
       let (la, ra) = run_stereo(compile_stereo(nodes), PROP_NUM_BLOCKS)
       let (lb, rb) = run_stereo(compile_stereo(nodes), PROP_NUM_BLOCKS)
@@ -556,7 +556,7 @@ test "prop: stereo graph — compile twice, process identically" {
 ///|
 test "prop: mono feedback cycle — compile twice, process identically" {
   @qc.quick_check_fn(
-    fn(seed : Int) {
+    fn(seed : Int32) {
       let nodes = gen_mono_feedback_graph(seed)
       let a = run_mono(compile_mono(nodes), PROP_NUM_BLOCKS)
       let b = run_mono(compile_mono(nodes), PROP_NUM_BLOCKS)
@@ -569,7 +569,7 @@ test "prop: mono feedback cycle — compile twice, process identically" {
 ///|
 test "prop: mono feedback cycle — runtime retune is deterministic" {
   @qc.quick_check_fn(
-    fn(seed : Int) {
+    fn(seed : Int32) {
       let s = prop_seed(seed)
       let nodes = gen_mono_feedback_graph(s)
       let context = DspContext(
@@ -628,7 +628,7 @@ test "prop: mono feedback cycle — runtime retune is deterministic" {
 ///|
 test "prop: stereo feedback cycle — compile twice, process identically" {
   @qc.quick_check_fn(
-    fn(seed : Int) {
+    fn(seed : Int32) {
       let nodes = gen_stereo_feedback_graph(seed)
       let (la, ra) = run_stereo(compile_stereo(nodes), PROP_NUM_BLOCKS)
       let (lb, rb) = run_stereo(compile_stereo(nodes), PROP_NUM_BLOCKS)
@@ -645,7 +645,7 @@ test "prop: stereo feedback cycle — compile twice, process identically" {
 ///|
 test "prop: mono hot-swap — same swap sequence produces identical output" {
   @qc.quick_check_fn(
-    fn(seed : Int) {
+    fn(seed : Int32) {
       let s = prop_seed(seed)
       let nodes_initial = gen_mono_graph(s)
       let nodes_replacement = gen_mono_graph(s + 1000)
@@ -692,7 +692,7 @@ test "prop: mono hot-swap — same swap sequence produces identical output" {
 ///|
 test "prop: stereo hot-swap — same swap sequence produces identical output" {
   @qc.quick_check_fn(
-    fn(seed : Int) {
+    fn(seed : Int32) {
       let s = prop_seed(seed)
       let nodes_initial = gen_stereo_graph(s)
       let nodes_replacement = gen_stereo_graph(s + 1000)
@@ -747,7 +747,7 @@ test "prop: stereo hot-swap — same swap sequence produces identical output" {
 ///|
 test "prop: runtime param update is deterministic across compilations" {
   @qc.quick_check_fn(
-    fn(seed : Int) {
+    fn(seed : Int32) {
       let s = prop_seed(seed)
       let freq = 200.0 + (s % 600).to_double()
       let gain_val = 0.1 + (s % 9).to_double() * 0.1
@@ -802,7 +802,7 @@ test "prop: runtime param update is deterministic across compilations" {
 /// transitions all produce deterministic output across two compilations.
 test "prop: runtime control variants are deterministic" {
   @qc.quick_check_fn(
-    fn(seed : Int) {
+    fn(seed : Int32) {
       let s = prop_seed(seed)
       let variant = s % 3
       let context = DspContext(
@@ -971,7 +971,7 @@ test "prop: runtime control variants are deterministic" {
 ///|
 test "prop: mono graphs produce finite output" {
   @qc.quick_check_fn(
-    fn(seed : Int) {
+    fn(seed : Int32) {
       let nodes = gen_mono_graph(seed)
       let compiled = compile_mono(nodes)
       let output = AudioBuffer::filled(PROP_BLOCK_SIZE)
@@ -995,7 +995,7 @@ test "prop: mono graphs produce finite output" {
 ///|
 test "prop: stereo graphs produce finite output" {
   @qc.quick_check_fn(
-    fn(seed : Int) {
+    fn(seed : Int32) {
       let nodes = gen_stereo_graph(seed)
       let compiled = compile_stereo(nodes)
       let left = AudioBuffer::filled(PROP_BLOCK_SIZE)
@@ -1021,7 +1021,7 @@ test "prop: stereo graphs produce finite output" {
 ///|
 test "prop: mono feedback graphs produce finite output" {
   @qc.quick_check_fn(
-    fn(seed : Int) {
+    fn(seed : Int32) {
       let nodes = gen_mono_feedback_graph(seed)
       let compiled = compile_mono(nodes)
       let context = DspContext(
@@ -1055,7 +1055,7 @@ test "prop: mono feedback graphs produce finite output" {
 ///|
 test "prop: stereo feedback graphs produce finite output" {
   @qc.quick_check_fn(
-    fn(seed : Int) {
+    fn(seed : Int32) {
       let nodes = gen_stereo_feedback_graph(seed)
       let compiled = compile_stereo(nodes)
       let context = DspContext(
@@ -1093,7 +1093,7 @@ test "prop: stereo feedback graphs produce finite output" {
 ///|
 test "prop: debug mode produces same output as normal mode (acyclic)" {
   @qc.quick_check_fn(
-    fn(seed : Int) {
+    fn(seed : Int32) {
       let nodes = gen_mono_graph(seed)
       let compiled_normal = compile_mono(nodes)
       let compiled_debug = compile_mono(nodes)
@@ -1123,7 +1123,7 @@ test "prop: debug mode produces same output as normal mode (acyclic)" {
 ///|
 test "prop: stereo debug mode produces same output as normal mode (acyclic)" {
   @qc.quick_check_fn(
-    fn(seed : Int) {
+    fn(seed : Int32) {
       let nodes = gen_stereo_graph(seed)
       let compiled_normal = compile_stereo(nodes)
       let compiled_debug = compile_stereo(nodes)
@@ -1159,7 +1159,7 @@ test "prop: stereo debug mode produces same output as normal mode (acyclic)" {
 /// per-sample feedback path as production.
 test "prop: debug mode equals production for mono feedback graphs" {
   @qc.quick_check_fn(
-    fn(seed : Int) {
+    fn(seed : Int32) {
       let nodes = gen_mono_feedback_graph(seed)
       let compiled_debug = compile_mono(nodes)
       let compiled_prod = compile_mono(nodes)
@@ -1193,7 +1193,7 @@ test "prop: debug mode equals production for mono feedback graphs" {
 /// per-sample feedback path as production.
 test "prop: debug mode equals production for stereo feedback graphs" {
   @qc.quick_check_fn(
-    fn(seed : Int) {
+    fn(seed : Int32) {
       let nodes = gen_stereo_feedback_graph(seed)
       let compiled_debug = compile_stereo(nodes)
       let compiled_prod = compile_stereo(nodes)

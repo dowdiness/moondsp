@@ -22,7 +22,7 @@ let compiled_stereo_topology_edit : GraphSlot[
 /// `StereoDspTopologyController`.
 pub fn init_compiled_stereo_topology_edit_graph(
   sample_rate : Double,
-  block_size : Int,
+  block_size : Int32,
 ) -> Bool {
   if compiled_stereo_topology_edit.ensure(sample_rate, block_size) {
     clear_browser_error()
@@ -78,7 +78,7 @@ pub fn set_compiled_stereo_topology_edit_level(level : Double) -> Bool {
 /// `StereoDspTopologyController` graph.
 pub fn process_compiled_stereo_topology_edit_block(
   sample_rate : Double,
-  block_size : Int,
+  block_size : Int32,
 ) -> Bool {
   if !compiled_stereo_topology_edit.ensure(sample_rate, block_size) {
     return set_browser_init_error("compiled_stereo_topology_edit.process")
@@ -109,13 +109,13 @@ pub fn process_compiled_stereo_topology_edit_block(
 
 ///|
 /// Read one sample from the most recent stereo topology-edit browser left block.
-pub fn compiled_stereo_topology_edit_left_sample(index : Int) -> Double {
+pub fn compiled_stereo_topology_edit_left_sample(index : Int32) -> Double {
   compiled_stereo_topology_edit.output.left_sample(index)
 }
 
 ///|
 /// Read one sample from the most recent stereo topology-edit browser right block.
-pub fn compiled_stereo_topology_edit_right_sample(index : Int) -> Double {
+pub fn compiled_stereo_topology_edit_right_sample(index : Int32) -> Double {
   compiled_stereo_topology_edit.output.right_sample(index)
 }
 

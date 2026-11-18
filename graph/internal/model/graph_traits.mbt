@@ -1,7 +1,7 @@
 ///|
 /// Capability trait for signal shape queries.
 pub trait NodeSpanning {
-  fn signal_shape(Self) -> Int
+  fn signal_shape(Self) -> Int32
 }
 
 ///|
@@ -25,7 +25,7 @@ pub trait NodeEditable: NodeSpanning + NodeFoldable {
 }
 
 ///|
-pub impl NodeSpanning for DspNode with fn signal_shape(self) -> Int {
+pub impl NodeSpanning for DspNode with fn signal_shape(self) -> Int32 {
   match self.kind {
     Pan | StereoGain | StereoClip | StereoBiquad | StereoDelay | StereoOutput =>
       STEREO_SIGNAL_SHAPE
@@ -95,7 +95,7 @@ pub impl NodeEditable for DspNode with fn can_delete(self) -> Bool {
 }
 
 ///|
-pub fn node_signal_shape(node : DspNode) -> Int {
+pub fn node_signal_shape(node : DspNode) -> Int32 {
   NodeSpanning::signal_shape(node)
 }
 

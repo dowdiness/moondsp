@@ -1,6 +1,6 @@
 ///|
 pub trait ChannelSpec {
-  fn channel_count(Self) -> Int
+  fn channel_count(Self) -> Int32
 }
 
 ///|
@@ -37,12 +37,12 @@ pub extend Stereo with ChannelSpec::{channel_count}
 
 ///|
 /// Bridge to existing MONO_SIGNAL_SHAPE constant (value 0).
-pub fn mono_shape() -> Int {
+pub fn mono_shape() -> Int32 {
   0
 }
 
 ///|
 /// Bridge to existing STEREO_SIGNAL_SHAPE constant (value 1).
-pub fn stereo_shape() -> Int {
+pub fn stereo_shape() -> Int32 {
   1
 }

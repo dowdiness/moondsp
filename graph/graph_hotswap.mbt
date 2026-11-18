@@ -12,10 +12,11 @@ struct StereoDspHotSwap(@staging.StereoDspHotSwap)
 
 ///|
 /// Failure reason for result-typed hot-swap queue APIs.
+#derive(Debug)
 pub(all) enum HotSwapQueueError {
   SampleRateMismatch(Double, Double)
-  BlockCapacityMismatch(Int, Int)
-} derive(Debug)
+  BlockCapacityMismatch(Int32, Int32)
+}
 
 ///|
 pub extend HotSwapQueueError with @moonbitlang/core/debug.Debug::{to_repr}
@@ -37,7 +38,7 @@ fn hot_swap_queue_error_from_staging(
       HotSwapQueueError::SampleRateMismatch(active_rate, next_rate)
     @staging.HotSwapQueueError::BlockCapacityMismatch(
       active_capacity,
-      next_capacity
+      next_capacity,
     ) =>
       HotSwapQueueError::BlockCapacityMismatch(active_capacity, next_capacity)
   }
@@ -57,7 +58,7 @@ fn hot_swap_queue_result_from_staging(
 /// Create a hot-swap wrapper around an active mono compiled graph.
 pub fn DspHotSwap::from_graph(
   active : Dsp,
-  crossfade_samples? : Int = 0,
+  crossfade_samples~ : Int32 = 0,
 ) -> DspHotSwap {
   DspHotSwap(@staging.DspHotSwap::from_graph(active.raw(), crossfade_samples~))
 }
@@ -89,7 +90,7 @@ pub fn DspHotSwap::process(
 /// Create a hot-swap wrapper around an active stereo compiled graph.
 pub fn StereoDspHotSwap::from_graph(
   active : StereoDsp,
-  crossfade_samples? : Int = 0,
+  crossfade_samples~ : Int32 = 0,
 ) -> StereoDspHotSwap {
   StereoDspHotSwap(
     @staging.StereoDspHotSwap::from_graph(active.raw(), crossfade_samples~),

@@ -2,7 +2,7 @@
 const BENCH_SAMPLE_RATE : Double = 48000.0
 
 ///|
-const BENCH_BLOCK_SIZE : Int = 128
+const BENCH_BLOCK_SIZE : Int32 = 128
 
 ///|
 fn bench_ctx() -> @moondsp.DspContext {

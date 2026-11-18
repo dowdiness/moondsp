@@ -250,8 +250,8 @@ test "bound voice pool constructor reports invalid bindings" {
   match result {
     Err(
       @voice.BoundVoicePoolError::Binding(
-        ControlBindingError::InvalidNodeIndex(5)
-      )
+        ControlBindingError::InvalidNodeIndex(5),
+      ),
     ) => ()
     _ => assert_true(false)
   }
@@ -362,7 +362,7 @@ test "bound voice live control invalid batch leaves voice unchanged" {
       GraphControl::set_param(99, GraphParamSlot::Value0, 3.0),
     ]) {
     Err(
-      @voice.VoiceControlError::Graph(GraphControlError::InvalidNodeIndex(99))
+      @voice.VoiceControlError::Graph(GraphControlError::InvalidNodeIndex(99)),
     ) => ()
     _ => assert_true(false)
   }
@@ -407,7 +407,7 @@ test "multi voice rejection preserves earlier targets and diagnostic order" {
       GraphControl::set_param(99, GraphParamSlot::Value0, 2.0),
     ]) {
     Err(
-      @voice.VoiceControlError::Graph(GraphControlError::InvalidNodeIndex(99))
+      @voice.VoiceControlError::Graph(GraphControlError::InvalidNodeIndex(99)),
     ) => ()
     _ => fail("earlier graph rejection must precede later stale handle")
   }
@@ -424,8 +424,8 @@ test "multi voice rejection preserves earlier targets and diagnostic order" {
     ]) {
     Err(
       @voice.VoiceControlError::Graph(
-        GraphControlError::InvalidSlotForNode(_, _, _)
-      )
+        GraphControlError::InvalidSlotForNode(_, _, _),
+      ),
     ) => ()
     _ => fail("later voice must reject unsupported parameter")
   }

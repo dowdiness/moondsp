@@ -1,7 +1,8 @@
 ///|
+#derive(Eq)
 struct Eval {
   value : Double
-} derive(Eq)
+}
 
 ///|
 pub impl ArithSym for Eval with fn constant(v) -> Eval {

@@ -9,11 +9,12 @@ fn copy_control_events(
 /// Which events an instrument plays. The scheduler routes each event to the
 /// first instrument whose selector matches its controls; an event no
 /// instrument selects stays silent.
+#derive(Eq, Debug)
 pub(all) enum InstrumentSelector {
   AllEvents
   HasControl(String)
   ControlEquals(String, Double)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend InstrumentSelector with Eq::{not_equal, equal}

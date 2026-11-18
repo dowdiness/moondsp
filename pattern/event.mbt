@@ -9,11 +9,12 @@
 /// - `whole` is None for continuous (non-onset) signals that don't trigger notes.
 ///
 /// All combinators must transform both `whole` and `part` independently.
+#derive(Debug)
 pub struct Event[A] {
   whole : TimeSpan?
   part : TimeSpan
   value : A
-} derive(Debug)
+}
 
 ///|
 pub fn[A] Event::shift(self : Event[A], offset : Rational) -> Event[A] {

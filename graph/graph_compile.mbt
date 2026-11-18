@@ -33,12 +33,12 @@ fn StereoDsp::raw(self : StereoDsp) -> @runtime.StereoDsp {
 ///|
 /// Number of non-finite samples replaced with 0.0 during the most recent
 /// process() call. Returns 0 if output was clean.
-pub fn Dsp::last_sanitized_count(self : Dsp) -> Int {
+pub fn Dsp::last_sanitized_count(self : Dsp) -> Int32 {
   self.0.last_sanitized_count()
 }
 
 ///|
-pub fn StereoDsp::last_sanitized_count(self : StereoDsp) -> Int {
+pub fn StereoDsp::last_sanitized_count(self : StereoDsp) -> Int32 {
   self.0.last_sanitized_count()
 }
 

@@ -1,7 +1,7 @@
 ///|
 /// Scheduler-owned active voice with its performance-sample gate-off time.
 priv struct ActiveNote {
-  instrument : Int
+  instrument : Int32
   handle : @voice.VoiceHandle
   origin : @model.VoiceOrigin
   mut end_sample : Int64
@@ -10,9 +10,9 @@ priv struct ActiveNote {
 
 ///|
 fn ActiveNote::ActiveNote(
-  instrument~ : Int,
+  instrument~ : Int32,
   handle~ : @voice.VoiceHandle,
-  origin? : @model.VoiceOrigin = @model.VoiceOrigin::Anonymous,
+  origin~ : @model.VoiceOrigin = @model.VoiceOrigin::Anonymous,
   end_sample~ : Int64,
   musical_end~ : @pattern.Rational?,
 ) -> ActiveNote {
@@ -62,16 +62,16 @@ pub fn ActiveNotes::ActiveNotes() -> ActiveNotes {
 }
 
 ///|
-pub fn ActiveNotes::length(self : ActiveNotes) -> Int {
+pub fn ActiveNotes::length(self : ActiveNotes) -> Int32 {
   self.notes.length()
 }
 
 ///|
 pub fn ActiveNotes::push_note(
   self : ActiveNotes,
-  instrument~ : Int,
+  instrument~ : Int32,
   handle~ : @voice.VoiceHandle,
-  origin? : @model.VoiceOrigin = @model.VoiceOrigin::Anonymous,
+  origin~ : @model.VoiceOrigin = @model.VoiceOrigin::Anonymous,
   end_sample~ : Int64,
   musical_end? : @pattern.Rational,
 ) -> Unit {
@@ -137,7 +137,7 @@ pub fn ActiveNotes::expire_at_sample(
 pub fn ActiveNotes::matching_count(
   self : ActiveNotes,
   matches : (@model.VoiceOrigin) -> Bool,
-) -> Int {
+) -> Int32 {
   for note in self.notes; total = 0 {
     continue total + (if matches(note.origin()) { 1 } else { 0 })
   } nobreak {
@@ -151,7 +151,7 @@ pub fn ActiveNotes::remove_matching(
   matches : (@model.VoiceOrigin) -> Bool,
   pools : Array[@voice.BoundVoicePool],
   kill~ : Bool,
-) -> Int {
+) -> Int32 {
   let mut count = 0
   let mut i = 0
   while i < self.notes.length() {
@@ -179,7 +179,7 @@ pub fn ActiveNotes::remove_matching(
 pub fn ActiveNotes::matching_voices(
   self : ActiveNotes,
   matches : (@model.VoiceOrigin) -> Bool,
-  instrument : Int,
+  instrument : Int32,
   pools : Array[@voice.BoundVoicePool],
 ) -> Array[(@voice.BoundVoicePool, @voice.VoiceHandle)] {
   [

@@ -1,12 +1,13 @@
 ///|
-const MAX_DEBUG_ERRORS : Int = 32
+const MAX_DEBUG_ERRORS : Int32 = 32
 
 ///|
+#derive(Debug, Eq)
 pub enum GraphValidationError {
-  InvalidInput0(Int, Int, Int)
-  InvalidInput1(Int, Int, Int)
-  InvalidStateIndex(Int, String)
-} derive(Debug, Eq)
+  InvalidInput0(Int32, Int32, Int32)
+  InvalidInput1(Int32, Int32, Int32)
+  InvalidStateIndex(Int32, String)
+}
 
 ///|
 pub extend GraphValidationError with @moonbitlang/core/debug.Debug::{to_repr}
@@ -61,8 +62,8 @@ pub fn StereoDsp::last_validation_errors(
 /// Called per node in debug mode only. Returns true if valid.
 fn validate_node_inputs(
   node : @model.DspNode,
-  node_index : Int,
-  buffer_count : Int,
+  node_index : Int32,
+  buffer_count : Int32,
   errors : Array[GraphValidationError],
 ) -> Bool {
   let max_valid = buffer_count - 1
@@ -100,7 +101,7 @@ fn validate_node_inputs(
 fn validate_node_state(
   graph : CompiledGraph,
   node : @model.DspNode,
-  node_index : Int,
+  node_index : Int32,
   errors : Array[GraphValidationError],
 ) -> Bool {
   let missing = match node.kind() {
@@ -172,7 +173,7 @@ fn validate_node_state(
 fn process_debug_loop(
   graph : CompiledGraph,
   context : DspContext,
-  sample_count : Int,
+  sample_count : Int32,
 ) -> Unit {
   graph.last_validation_errors = []
   let buffer_count = graph.buffers.length()
@@ -230,7 +231,7 @@ fn Dsp::process_mono_debug(
   self : Dsp,
   context : DspContext,
   output : AudioBuffer,
-  sample_count : Int,
+  sample_count : Int32,
 ) -> Unit {
   if !self.0.feedback_edges.is_empty() {
     if validate_all_nodes(self.0) {
@@ -255,7 +256,7 @@ fn StereoDsp::process_stereo_debug(
   context : DspContext,
   left_output : AudioBuffer,
   right_output : AudioBuffer,
-  sample_count : Int,
+  sample_count : Int32,
 ) -> Unit {
   if !self.0.feedback_edges.is_empty() {
     if validate_all_nodes(self.0) {

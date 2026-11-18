@@ -13,13 +13,13 @@
 // [9] Biquad(LowPass)     — filter
 // [10] Gain(0.3)          — master gain
 // [11] Output
-const EXIT_LFO_RATE_NODE : Int = 0
+const EXIT_LFO_RATE_NODE : Int32 = 0
 
 ///|
-const EXIT_BIQUAD_NODE : Int = 9
+const EXIT_BIQUAD_NODE : Int32 = 9
 
 ///|
-const EXIT_GAIN_NODE : Int = 10
+const EXIT_GAIN_NODE : Int32 = 10
 
 ///|
 let exit_lfo_rate : @ref.Ref[Double] = Ref(2.0)
@@ -43,7 +43,7 @@ let exit_deliverable : GraphSlot[@moondsp.Dsp, MonoOut] = GraphSlot(
 /// Initialize the exit deliverable graph: FM synthesis via tagless composition.
 pub fn init_exit_deliverable_graph(
   sample_rate : Double,
-  block_size : Int,
+  block_size : Int32,
 ) -> Bool {
   if exit_deliverable.ensure(sample_rate, block_size) {
     clear_browser_error()
@@ -87,7 +87,7 @@ pub fn set_exit_deliverable_gain(gain : Double) -> Bool {
 /// Run one render quantum through the exit deliverable graph.
 pub fn process_exit_deliverable_block(
   sample_rate : Double,
-  block_size : Int,
+  block_size : Int32,
 ) -> Bool {
   if !exit_deliverable.ensure(sample_rate, block_size) {
     return set_browser_init_error("exit_deliverable.process")
@@ -138,7 +138,7 @@ pub fn process_exit_deliverable_block(
 
 ///|
 /// Read one sample from the most recent exit deliverable output block.
-pub fn exit_deliverable_output_sample(index : Int) -> Double {
+pub fn exit_deliverable_output_sample(index : Int32) -> Double {
   exit_deliverable.output.sample(index)
 }
 

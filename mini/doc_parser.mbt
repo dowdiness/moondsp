@@ -1,7 +1,7 @@
 ///|
 pub struct MiniDocBuilder {
   priv previous : @pattern.PatternDoc[@pattern.ControlMap]?
-  priv counters : Map[String, Int]
+  priv counters : Map[String, Int32]
   priv origins : SourceMap?
   priv source_atom_by_graph_id : Map[String, @identity.SourceAtomId]
   /// Musical content by node ID. Unlike IDs it omits occurrences and binding
@@ -37,7 +37,7 @@ fn mini_doc_id_fragment(value : String) -> String {
 ///|
 fn MiniDocBuilder::MiniDocBuilder(
   previous~ : @pattern.PatternDoc[@pattern.ControlMap]?,
-  origins? : SourceMap? = None,
+  origins~ : SourceMap? = None,
 ) -> MiniDocBuilder {
   {
     previous,
@@ -51,8 +51,8 @@ fn MiniDocBuilder::MiniDocBuilder(
 ///|
 fn MiniDocBuilder::source_frame_at(
   self : MiniDocBuilder,
-  content_from : Int,
-  content_to : Int,
+  content_from : Int32,
+  content_to : Int32,
 ) -> @identity.SourceFrameId? {
   match self.origins {
     Some(origins) => origins.frame_at(content_from, content_to)
@@ -107,8 +107,8 @@ pub fn MiniDocBuilder::note_atom(
 fn MiniDocBuilder::chord_tone_id(
   self : MiniDocBuilder,
   chord_id : @identity.PatternNodeId,
-  tone_index : Int,
-  midi : Int,
+  tone_index : Int32,
+  midi : Int32,
 ) -> @identity.PatternNodeId raise ParseError {
   self.id("mini:chord-tone:\{chord_id.value()}:\{tone_index}:\{midi}")
 }
@@ -117,7 +117,7 @@ fn MiniDocBuilder::chord_tone_id(
 fn MiniDocBuilder::chord_doc_from_notes(
   self : MiniDocBuilder,
   id : @identity.PatternNodeId,
-  notes : Array[Int],
+  notes : Array[Int32],
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
   self.contents[id.value()] = "chord:\{notes.map(note => "\{note}").join(":")}"
   match self.reuse_doc(id) {
@@ -231,9 +231,9 @@ pub fn MiniDocBuilder::rev(
 pub fn MiniDocBuilder::euclid(
   self : MiniDocBuilder,
   doc : @pattern.PatternDoc[@pattern.ControlMap],
-  k : Int,
-  n : Int,
-  rotation : Int,
+  k : Int32,
+  n : Int32,
+  rotation : Int32,
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
   let doc = self.euclid_doc(doc, k, n, rotation) catch {
     ParseError(msg) => return Err(msg)
@@ -248,7 +248,7 @@ pub fn MiniDocBuilder::degrade(
   self : MiniDocBuilder,
   doc : @pattern.PatternDoc[@pattern.ControlMap],
   p : Double,
-  step? : Int,
+  step? : Int32,
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
   let doc = self.degrade_doc(doc, p, step?) catch {
     ParseError(msg) => return Err(msg)
@@ -275,7 +275,7 @@ pub fn MiniDocBuilder::control(
 pub fn MiniDocBuilder::every(
   self : MiniDocBuilder,
   doc : @pattern.PatternDoc[@pattern.ControlMap],
-  n : Int,
+  n : Int32,
   transform : @pattern.TimeTransform,
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
   let doc = self.every_doc(doc, n, transform) catch {
@@ -329,7 +329,10 @@ fn MiniDocBuilder::id(
 }
 
 ///|
-fn MiniDocBuilder::next_occurrence(self : MiniDocBuilder, key : String) -> Int {
+fn MiniDocBuilder::next_occurrence(
+  self : MiniDocBuilder,
+  key : String,
+) -> Int32 {
   let index = match self.counters.get(key) {
     Some(value) => value
     None => 0
@@ -354,8 +357,8 @@ fn MiniDocBuilder::atom_id_at(
   self : MiniDocBuilder,
   kind : String,
   value : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
 ) -> @identity.PatternNodeId raise ParseError {
   let id = self.atom_id(kind, value)
   if self.origins is Some(origins) &&
@@ -408,7 +411,7 @@ fn MiniDocBuilder::content(
 fn MiniDocBuilder::reuse_doc(
   self : MiniDocBuilder,
   id : @identity.PatternNodeId,
-  inputs? : Array[@pattern.PatternDoc[@pattern.ControlMap]] = [],
+  inputs~ : Array[@pattern.PatternDoc[@pattern.ControlMap]] = [],
 ) -> @pattern.PatternDoc[@pattern.ControlMap]? raise ParseError {
   guard self.origins is None else { return None }
   match self.previous {
@@ -471,8 +474,8 @@ fn MiniDocBuilder::control_doc(
 fn MiniDocBuilder::reference_doc(
   self : MiniDocBuilder,
   id : @identity.PatternNodeId,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   definition_span : MiniSpan,
   definition : @pattern.PatternDoc[@pattern.ControlMap],
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
@@ -510,7 +513,7 @@ fn MiniDocBuilder::sequence_doc(
 fn MiniDocBuilder::weighted_sequence_doc(
   self : MiniDocBuilder,
   docs : Array[@pattern.PatternDoc[@pattern.ControlMap]],
-  weights : Array[Int],
+  weights : Array[Int32],
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
   let id = self.node_id(
     "weighted_seq",
@@ -611,9 +614,9 @@ fn MiniDocBuilder::rev_doc(
 fn MiniDocBuilder::euclid_doc(
   self : MiniDocBuilder,
   doc : @pattern.PatternDoc[@pattern.ControlMap],
-  k : Int,
-  n : Int,
-  rotation : Int,
+  k : Int32,
+  n : Int32,
+  rotation : Int32,
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
   let id = self.node_id("euclid", [doc], "\{k}:\{n}:\{rotation}")
   match self.reuse_doc(id, inputs=[doc]) {
@@ -630,7 +633,7 @@ fn MiniDocBuilder::degrade_doc(
   self : MiniDocBuilder,
   doc : @pattern.PatternDoc[@pattern.ControlMap],
   p : Double,
-  step? : Int,
+  step? : Int32,
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
   // Seed by content so a named pattern drops the events its inline form does.
   // Like Strudel, each `?` of a notation string draws its own seed; the seed
@@ -654,7 +657,7 @@ fn MiniDocBuilder::degrade_doc(
 fn MiniDocBuilder::every_doc(
   self : MiniDocBuilder,
   doc : @pattern.PatternDoc[@pattern.ControlMap],
-  n : Int,
+  n : Int32,
   transform : @pattern.TimeTransform,
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
   let signature = time_transform_signature(transform)
@@ -768,7 +771,7 @@ fn MiniDocBuilder::control_value_doc(
 }
 
 ///|
-fn stable_seed(value : String) -> Int {
+fn stable_seed(value : String) -> Int32 {
   let mut hash = 17
   for index in 0..<value.length() {
     hash = (hash * 131 + value[index].to_int()) & 0x3fffffff
@@ -839,7 +842,7 @@ fn parse_doc_dollar_stack_program(
 /// this preserves subtree generations for lowering-cache reuse.
 pub fn parse_doc(
   input : String,
-  previous? : @pattern.PatternDoc[@pattern.ControlMap]? = None,
+  previous~ : @pattern.PatternDoc[@pattern.ControlMap]? = None,
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
   parse_doc_internal(input, previous)
 }
@@ -851,7 +854,7 @@ pub fn parse_doc(
 /// document, mirroring `parse_doc`'s reuse semantics.
 pub fn parse_snapshot(
   input : String,
-  previous? : @pattern.PatternDoc[@pattern.ControlMap]? = None,
+  previous~ : @pattern.PatternDoc[@pattern.ControlMap]? = None,
 ) -> Result[@pattern.PatternSnapshot[@pattern.ControlMap], String] {
   match parse_doc(input, previous~) {
     Err(msg) => Err(msg)
@@ -881,7 +884,7 @@ fn Parser::parse_doc_expr(
 ///|
 fn Parser::read_quoted_string_with_start(
   self : Parser,
-) -> (String, Int) raise ParseError {
+) -> (String, Int32) raise ParseError {
   self.expect_char('"')
   let start = self.pos
   while !self.at_end() && self.input[self.pos] != '"' {
@@ -896,7 +899,7 @@ fn Parser::read_quoted_string_with_start(
 fn parse_sound_doc_notation(
   content : String,
   builder : MiniDocBuilder,
-  source_offset~ : Int,
+  source_offset~ : Int32,
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
   guard !content.is_empty() else {
     raise ParseError("position 0: empty notation")
@@ -909,7 +912,7 @@ fn parse_sound_doc_notation(
 fn parse_note_doc_notation(
   content : String,
   builder : MiniDocBuilder,
-  source_offset~ : Int,
+  source_offset~ : Int32,
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
   guard !content.is_empty() else {
     raise ParseError("position 0: empty notation")
@@ -922,7 +925,7 @@ fn parse_note_doc_notation(
 fn parse_chord_doc_notation(
   content : String,
   builder : MiniDocBuilder,
-  source_offset~ : Int,
+  source_offset~ : Int32,
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
   guard !content.is_empty() else {
     raise ParseError("position 0: empty notation")
@@ -953,7 +956,7 @@ fn NotationParser::parse_doc_layer(
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
   self.skip_spaces()
   let elements : Array[@pattern.PatternDoc[@pattern.ControlMap]] = []
-  let weights : Array[Int] = []
+  let weights : Array[Int32] = []
   let mut total_weight = 0
   let mut weighted = false
   while !self.at_end() &&
@@ -985,7 +988,7 @@ fn NotationParser::parse_doc_layer(
 fn NotationParser::parse_doc_element(
   self : NotationParser,
   builder : MiniDocBuilder,
-) -> (@pattern.PatternDoc[@pattern.ControlMap], Int) raise ParseError {
+) -> (@pattern.PatternDoc[@pattern.ControlMap], Int32) raise ParseError {
   self.skip_spaces()
   guard !self.at_end() else {
     raise ParseError("position \{self.pos}: unexpected end of notation")
@@ -1188,7 +1191,7 @@ fn NotationParser::parse_doc_atom(
 fn NotationParser::parse_doc_note_name_atom(
   self : NotationParser,
   builder : MiniDocBuilder,
-  start : Int,
+  start : Int32,
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
   let name_start = self.pos
   let name = self.read_note_name_text()
@@ -1212,8 +1215,8 @@ fn NotationParser::parse_doc_note_name_atom(
 ///|
 fn NotationParser::read_note_number_value(
   self : NotationParser,
-  start : Int,
-) -> (Double, String, Int, Int) raise ParseError {
+  start : Int32,
+) -> (Double, String, Int32, Int32) raise ParseError {
   let num_start = self.pos
   if !self.at_end() && self.input[self.pos] == '-' {
     self.pos += 1

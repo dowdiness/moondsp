@@ -1,7 +1,8 @@
 ///|
+#derive(Eq, Debug)
 pub(all) suberror TimeScopeBuildError {
   NonPositiveRate
-} derive(Eq, Debug)
+}
 
 ///|
 /// Section-local timing context.

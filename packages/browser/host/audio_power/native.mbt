@@ -70,7 +70,7 @@ extern "js" fn native_engine_from_value(
   #| value => value
 
 ///|
-extern "js" fn native_context_state(context : NativeContext) -> Int =
+extern "js" fn native_context_state(context : NativeContext) -> Int32 =
   #| context => context.state === "running" ? 0 : context.state === "closed" ? 2 : 1
 
 ///|

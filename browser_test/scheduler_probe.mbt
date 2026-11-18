@@ -36,12 +36,10 @@ let scheduler_probe_active_notes : @ref.Ref[Array[Double]?] = Ref(None)
 let scheduler_probe_voices_started : @ref.Ref[Bool] = Ref(false)
 
 ///|
-let scheduler_probe_gain : @ref.Ref[Double] = Ref(
-  SCHEDULER_PROBE_DEFAULT_GAIN,
-)
+let scheduler_probe_gain : @ref.Ref[Double] = Ref(SCHEDULER_PROBE_DEFAULT_GAIN)
 
 ///|
-let scheduler_probe_pattern_input_chars : Array[Int] = []
+let scheduler_probe_pattern_input_chars : Array[Int32] = []
 
 ///|
 let scheduler_probe_last_error : @ref.Ref[String] = Ref("")
@@ -83,7 +81,7 @@ fn reset_scheduler_probe_graph() -> Unit {
 ///|
 fn init_scheduler_probe_graph_with_waveform(
   sample_rate : Double,
-  block_size : Int,
+  block_size : Int32,
   waveform : @moondsp.Waveform,
 ) -> Bool {
   if sample_rate <= 0.0 || block_size <= 0 {
@@ -127,7 +125,7 @@ fn init_scheduler_probe_graph_with_waveform(
 ///|
 /// Initialize the test scheduler-compatible wrapper with the same Triangle
 /// synth waveform used by production browser playback.
-pub fn init_scheduler_graph(sample_rate : Double, block_size : Int) -> Bool {
+pub fn init_scheduler_graph(sample_rate : Double, block_size : Int32) -> Bool {
   init_scheduler_probe_graph_with_waveform(
     sample_rate,
     block_size,
@@ -141,7 +139,7 @@ pub fn init_scheduler_graph(sample_rate : Double, block_size : Int) -> Bool {
 /// production.
 pub fn init_scheduler_sine_graph(
   sample_rate : Double,
-  block_size : Int,
+  block_size : Int32,
 ) -> Bool {
   init_scheduler_probe_graph_with_waveform(
     sample_rate,
@@ -151,7 +149,7 @@ pub fn init_scheduler_sine_graph(
 }
 
 ///|
-fn scheduler_probe_input_chars_to_string(chars : Array[Int]) -> String {
+fn scheduler_probe_input_chars_to_string(chars : Array[Int32]) -> String {
   let buf = StringBuilder()
   for c in chars {
     buf.write_char(c.unsafe_to_char())
@@ -179,12 +177,12 @@ pub fn clear_playback_input() -> Unit {
 }
 
 ///|
-pub fn push_playback_char(code : Int) -> Unit {
+pub fn push_playback_char(code : Int32) -> Unit {
   scheduler_probe_pattern_input_chars.push(code)
 }
 
 ///|
-pub fn player_restart_input() -> Int {
+pub fn player_restart_input() -> Int32 {
   let wire = scheduler_probe_input_chars_to_string(
     scheduler_probe_pattern_input_chars,
   )
@@ -273,7 +271,7 @@ pub fn process_scheduler_block() -> Bool {
 
 ///|
 fn scheduler_probe_checked_sample(
-  index : Int,
+  index : Int32,
   buffer : @moondsp.AudioBuffer?,
 ) -> Double {
   match buffer {
@@ -283,7 +281,7 @@ fn scheduler_probe_checked_sample(
 }
 
 ///|
-pub fn scheduler_left_sample(index : Int) -> Double {
+pub fn scheduler_left_sample(index : Int32) -> Double {
   scheduler_probe_checked_sample(
     index,
     match scheduler_probe_runtime.val {
@@ -294,7 +292,7 @@ pub fn scheduler_left_sample(index : Int) -> Double {
 }
 
 ///|
-pub fn scheduler_right_sample(index : Int) -> Double {
+pub fn scheduler_right_sample(index : Int32) -> Double {
   scheduler_probe_checked_sample(
     index,
     match scheduler_probe_runtime.val {
@@ -305,12 +303,12 @@ pub fn scheduler_right_sample(index : Int) -> Double {
 }
 
 ///|
-pub fn get_playback_error_length() -> Int {
+pub fn get_playback_error_length() -> Int32 {
   scheduler_probe_last_error.val.length()
 }
 
 ///|
-pub fn get_playback_error_char(index : Int) -> Int {
+pub fn get_playback_error_char(index : Int32) -> Int32 {
   let message = scheduler_probe_last_error.val
   if index < 0 || index >= message.length() {
     0
@@ -320,12 +318,12 @@ pub fn get_playback_error_char(index : Int) -> Int {
 }
 
 ///|
-pub fn get_browser_error_length() -> Int {
+pub fn get_browser_error_length() -> Int32 {
   0
 }
 
 ///|
-pub fn get_browser_error_char(_index : Int) -> Int {
+pub fn get_browser_error_char(_index : Int32) -> Int32 {
   0
 }
 

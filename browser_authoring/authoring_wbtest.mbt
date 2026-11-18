@@ -10,7 +10,7 @@ test "notation projection ties repeated events to exact source atoms" {
   }
   assert_true(rests.is_empty())
   assert_eq(events.length(), 4)
-  let source_node = fn(index : Int) -> Json raise {
+  let source_node = fn(index : Int32) -> Json raise {
     guard events[index] is Object(event) && event.get("node") is Some(node) else {
       fail("projected event is missing its source atom")
     }

@@ -15,10 +15,7 @@ test "bench/pattern-time/rational-identities" (b : @bench.T) {
   let values = time_bench_rationals()
   let other_values = [
     for i in 0..<values.length() => {
-      Rational(
-        (i * 4567 % 997 + 1).to_int64(),
-        (i * 1237 % 991 + 1).to_int64(),
-      )
+      Rational((i * 4567 % 997 + 1).to_int64(), (i * 1237 % 991 + 1).to_int64())
     }
   ]
   let zeros = [ for _ in 0..<values.length() => Rational::from_int(0) ]

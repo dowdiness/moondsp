@@ -56,10 +56,10 @@ const BROWSER_COMPILED_DEFAULT_CUTOFF : Double = 1800.0
 const BROWSER_COMPILED_FILTER_Q : Double = 0.707
 
 ///|
-const BROWSER_COMPILED_DELAY_CAPACITY : Int = 128
+const BROWSER_COMPILED_DELAY_CAPACITY : Int32 = 128
 
 ///|
-const BROWSER_COMPILED_DELAY_SAMPLES : Int = 0
+const BROWSER_COMPILED_DELAY_SAMPLES : Int32 = 0
 
 ///|
 const BROWSER_COMPILED_OSC_GAIN : Double = 0.2
@@ -74,13 +74,13 @@ const BROWSER_HOT_SWAP_OLD_CONSTANT : Double = 0.25
 const BROWSER_HOT_SWAP_NEW_CONSTANT : Double = 0.75
 
 ///|
-const BROWSER_HOT_SWAP_CROSSFADE_SAMPLES : Int = 128
+const BROWSER_HOT_SWAP_CROSSFADE_SAMPLES : Int32 = 128
 
 ///|
 const BROWSER_TOPOLOGY_EDIT_INSERTED_GAIN : Double = 0.5
 
 ///|
-const BROWSER_TOPOLOGY_EDIT_CROSSFADE_SAMPLES : Int = 1024
+const BROWSER_TOPOLOGY_EDIT_CROSSFADE_SAMPLES : Int32 = 1024
 
 ///|
 const BROWSER_STEREO_HOT_SWAP_OLD_CONSTANT : Double = 0.25
@@ -89,7 +89,7 @@ const BROWSER_STEREO_HOT_SWAP_OLD_CONSTANT : Double = 0.25
 const BROWSER_STEREO_HOT_SWAP_NEW_CONSTANT : Double = 0.75
 
 ///|
-const BROWSER_STEREO_HOT_SWAP_CROSSFADE_SAMPLES : Int = 128
+const BROWSER_STEREO_HOT_SWAP_CROSSFADE_SAMPLES : Int32 = 128
 
 ///|
 const BROWSER_STEREO_TOPOLOGY_EDIT_OLD_PAN : Double = 0.0
@@ -98,7 +98,7 @@ const BROWSER_STEREO_TOPOLOGY_EDIT_OLD_PAN : Double = 0.0
 const BROWSER_STEREO_TOPOLOGY_EDIT_NEW_PAN : Double = 1.0
 
 ///|
-const BROWSER_STEREO_TOPOLOGY_EDIT_CROSSFADE_SAMPLES : Int = 128
+const BROWSER_STEREO_TOPOLOGY_EDIT_CROSSFADE_SAMPLES : Int32 = 128
 
 // ---------------------------------------------------------------------------
 // Demo tick passthrough
@@ -127,7 +127,7 @@ pub fn tick(freq_hz~ : Double, sample_rate~ : Double) -> Double {
 ///|
 /// Generate one sample from the selected browser demo source.
 pub fn tick_source(
-  source_id~ : Int,
+  source_id~ : Int32,
   freq_hz~ : Double,
   sample_rate~ : Double,
 ) -> Double {

@@ -23,7 +23,7 @@ fn is_optimizer_fold_candidate(node : @model.DspNode) -> Bool {
 /// Returns (folded_nodes, index_map, changed).
 fn fold_constants(
   nodes : Array[@model.DspNode],
-) -> (Array[@model.DspNode], FixedArray[Int], Bool) {
+) -> (Array[@model.DspNode], FixedArray[Int32], Bool) {
   let n = nodes.length()
   // Bail out if nodes are not in topological order (forward references present)
   for i = 0; i < n; i = i + 1 {
@@ -104,7 +104,7 @@ fn fold_constants(
 /// Returns (live_nodes, index_map, changed).
 fn eliminate_dead(
   nodes : Array[@model.DspNode],
-) -> (Array[@model.DspNode], FixedArray[Int], Bool) {
+) -> (Array[@model.DspNode], FixedArray[Int32], Bool) {
   let n = nodes.length()
   if n == 0 {
     return ([], FixedArray::make(0, -1), false)
@@ -162,9 +162,9 @@ fn eliminate_dead(
 fn mark_reachable(
   nodes : Array[@model.DspNode],
   reachable : FixedArray[Bool],
-  start : Int,
+  start : Int32,
 ) -> Unit {
-  let stack : Array[Int] = [start]
+  let stack : Array[Int32] = [start]
   while !stack.is_empty() {
     let index = stack.pop().unwrap()
     if index < 0 || index >= nodes.length() || reachable[index] {
@@ -186,9 +186,9 @@ fn mark_reachable(
 /// map1 then map2 to get the final index. If either step yields -1,
 /// the result is -1.
 fn compose_index_maps(
-  map1 : FixedArray[Int],
-  map2 : FixedArray[Int],
-) -> FixedArray[Int] {
+  map1 : FixedArray[Int32],
+  map2 : FixedArray[Int32],
+) -> FixedArray[Int32] {
   FixedArray::makei(map1.length(), fn(i) {
     let mid = map1[i]
     if mid < 0 {
@@ -207,7 +207,7 @@ fn compose_index_maps(
 /// original node index to its final optimized index (-1 if eliminated).
 fn optimize_graph(
   nodes : Array[@model.DspNode],
-) -> (Array[@model.DspNode], FixedArray[Int]) {
+) -> (Array[@model.DspNode], FixedArray[Int32]) {
   let n = nodes.length()
   let mut current = nodes
   let mut total_map = FixedArray::makei(n, fn(i) { i })

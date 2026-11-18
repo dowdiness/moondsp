@@ -1,5 +1,5 @@
 ///|
-fn scheduler_probe_eval_pattern_for_test(text : String) -> Int {
+fn scheduler_probe_eval_pattern_for_test(text : String) -> Int32 {
   let input : Json = { "schema": 1, "kind": "text", "text": Json(text) }
   let wire = input.stringify()
   clear_playback_input()
@@ -10,7 +10,7 @@ fn scheduler_probe_eval_pattern_for_test(text : String) -> Int {
 }
 
 ///|
-fn scheduler_probe_peak_for_test(block_size : Int) -> Double {
+fn scheduler_probe_peak_for_test(block_size : Int32) -> Double {
   for i in 0..<block_size; peak = 0.0 {
     let left = scheduler_left_sample(i).abs()
     let right = scheduler_right_sample(i).abs()

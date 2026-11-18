@@ -2,29 +2,33 @@
 const DEFAULT_LAYER_NAME = "main"
 
 ///|
+#derive(Eq, Debug)
 pub(all) suberror SectionBuildError {
   NonPositiveLength
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) suberror SectionPatchError {
   MissingLayer(String)
   DuplicateLayer(String)
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) suberror SectionDocBuildError {
   NonPositiveSectionLength
   EmptyLayers
   DuplicateLayerId(String)
   DuplicateLayerName(String)
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub(all) suberror SectionDocEditError {
   MissingLayerId(String)
   DuplicateLayerName(String)
-} derive(Eq, Debug)
+}
 
 ///|
 /// Named pattern layer inside a section body.
@@ -208,7 +212,7 @@ pub fn[A] SectionBody::to_pattern(self : SectionBody[A]) -> @pattern.Pat[A] {
 }
 
 ///|
-pub fn[A] SectionBody::layer_count(self : SectionBody[A]) -> Int {
+pub fn[A] SectionBody::layer_count(self : SectionBody[A]) -> Int32 {
   match self {
     Single(_) => 1
     Layers(layers) => layers.length()
@@ -277,7 +281,7 @@ fn[A] SectionDocBody::to_section_body(
 }
 
 ///|
-pub fn[A] SectionDocBody::layer_count(self : SectionDocBody[A]) -> Int {
+pub fn[A] SectionDocBody::layer_count(self : SectionDocBody[A]) -> Int32 {
   match self {
     Single(_) => 1
     Layers(layers) => layers.length()
@@ -596,7 +600,7 @@ pub fn[A] SectionDoc::body(self : SectionDoc[A]) -> SectionDocBody[A] {
 }
 
 ///|
-pub fn[A] SectionDoc::layer_count(self : SectionDoc[A]) -> Int {
+pub fn[A] SectionDoc::layer_count(self : SectionDoc[A]) -> Int32 {
   self.body.layer_count()
 }
 
@@ -822,7 +826,7 @@ pub fn[A] Section::get_layer(
 }
 
 ///|
-pub fn[A] Section::layer_count(self : Section[A]) -> Int {
+pub fn[A] Section::layer_count(self : Section[A]) -> Int32 {
   self.body.layer_count()
 }
 

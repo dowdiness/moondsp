@@ -1,7 +1,7 @@
 ///|
 pub(all) enum GraphControlTarget {
-  Param(Int, GraphParamSlot)
-  Gate(Int)
+  Param(Int32, GraphParamSlot)
+  Gate(Int32)
 }
 
 ///|
@@ -9,28 +9,28 @@ pub(all) enum GraphControlTarget {
 // Keep a flat payload so rejected updates need no nested error allocation.
 pub enum GraphControlBatchError {
   BatchCapacityExceeded
-  InvalidBindingIndex(Int)
-  InvalidGateValue(Int, Double)
-  InvalidParamValue(Int, DspNodeKind, GraphParamSlot, Double)
+  InvalidBindingIndex(Int32)
+  InvalidGateValue(Int32, Double)
+  InvalidParamValue(Int32, DspNodeKind, GraphParamSlot, Double)
 }
 
 ///|
 priv enum ResolvedControlTarget {
-  Param(Int, Int, GraphParamSlot)
-  Gate(Int, EnvelopeControl)
+  Param(Int32, Int32, GraphParamSlot)
+  Gate(Int32, EnvelopeControl)
 }
 
 ///|
 pub struct GraphControlBatch {
-  priv ids : FixedArray[Int]
+  priv ids : FixedArray[Int32]
   priv values : FixedArray[Double]
-  priv mut count : Int
+  priv mut count : Int32
   priv mut overflowed : Bool
 }
 
 ///|
 pub fn GraphControlBatch::GraphControlBatch(
-  capacity : Int,
+  capacity : Int32,
 ) -> GraphControlBatch {
   // Zero is an empty batch: an empty update succeeds, any push poisons it.
   guard capacity >= 0 else { abort("negative control batch capacity") }
@@ -49,14 +49,14 @@ pub fn GraphControlBatch::clear(self : GraphControlBatch) -> Unit {
 }
 
 ///|
-pub fn GraphControlBatch::length(self : GraphControlBatch) -> Int {
+pub fn GraphControlBatch::length(self : GraphControlBatch) -> Int32 {
   self.count
 }
 
 ///|
 pub fn GraphControlBatch::push(
   self : GraphControlBatch,
-  target : Int,
+  target : Int32,
   value : Double,
 ) -> Bool {
   guard self.count < self.ids.length() else {

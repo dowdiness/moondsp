@@ -2,14 +2,14 @@
 /// Shared execution context for block-based DSP processing.
 pub struct DspContext {
   priv sample_rate : Double
-  priv block_size : Int
+  priv block_size : Int32
 }
 
 ///|
 /// Create a DSP context with normalized runtime parameters.
 pub fn DspContext::DspContext(
   sample_rate~ : Double,
-  block_size~ : Int,
+  block_size~ : Int32,
 ) -> DspContext {
   {
     sample_rate: normalize_sample_rate(sample_rate),
@@ -25,7 +25,7 @@ pub fn DspContext::sample_rate(self : DspContext) -> Double {
 
 ///|
 /// Return the configured block size for this processing context.
-pub fn DspContext::block_size(self : DspContext) -> Int {
+pub fn DspContext::block_size(self : DspContext) -> Int32 {
   self.block_size
 }
 
@@ -33,7 +33,7 @@ pub fn DspContext::block_size(self : DspContext) -> Int {
 /// Create an owned audio buffer sized to this context's block size.
 pub fn DspContext::make_buffer(
   self : DspContext,
-  init? : Double = 0.0,
+  init~ : Double = 0.0,
 ) -> AudioBuffer {
   AudioBuffer::filled(self.block_size, init~)
 }
@@ -48,7 +48,7 @@ fn normalize_sample_rate(sample_rate : Double) -> Double {
 }
 
 ///|
-fn normalize_block_size(block_size : Int) -> Int {
+fn normalize_block_size(block_size : Int32) -> Int32 {
   if block_size > 0 {
     block_size
   } else {

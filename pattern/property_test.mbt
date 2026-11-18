@@ -1,22 +1,22 @@
 ///|
-fn r_prop(num : Int, den : Int) -> @pattern.Rational {
+fn r_prop(num : Int32, den : Int32) -> @pattern.Rational {
   @pattern.Rational(num.to_int64(), den.to_int64())
 }
 
 ///|
 fn span_prop(
-  b_num : Int,
-  b_den : Int,
-  e_num : Int,
-  e_den : Int,
+  b_num : Int32,
+  b_den : Int32,
+  e_num : Int32,
+  e_den : Int32,
 ) -> @pattern.TimeSpan {
   @pattern.TimeSpan(r_prop(b_num, b_den), r_prop(e_num, e_den))
 }
 
 ///|
 fn events_equal(
-  a : Array[@pattern.Event[Int]],
-  b : Array[@pattern.Event[Int]],
+  a : Array[@pattern.Event[Int32]],
+  b : Array[@pattern.Event[Int32]],
 ) -> Bool {
   if a.length() != b.length() {
     return false
@@ -48,7 +48,7 @@ fn events_equal(
 // Associativity of time scaling.
 test "prop: fast(a, fast(b, pat)) == fast(a*b, pat)" {
   @qc.quick_check_fn(
-    fn(pair : (Int, Int)) {
+    fn(pair : (Int32, Int32)) {
       let a_raw = pair.0.abs() % 7 + 1
       let b_raw = pair.1.abs() % 7 + 1
       let a = @pattern.Rational::from_int(a_raw)
@@ -70,7 +70,7 @@ test "prop: fast(a, fast(b, pat)) == fast(a*b, pat)" {
 // Slow is the inverse of fast.
 test "prop: slow(n, pat) == fast(1/n, pat)" {
   @qc.quick_check_fn(
-    fn(n_raw : Int) {
+    fn(n_raw : Int32) {
       let n_val = n_raw.abs() % 7 + 1
       let n = @pattern.Rational::from_int(n_val)
       let inv_n = @pattern.Rational(1L, n_val.to_int64())
@@ -89,7 +89,7 @@ test "prop: slow(n, pat) == fast(1/n, pat)" {
 // Identity: speed factor 1 changes nothing.
 test "prop: fast(1, pat) == pat" {
   @qc.quick_check_fn(
-    fn(value : Int) {
+    fn(value : Int32) {
       let v = value.abs() % 1000
       let pat = @pattern.Pat::pure(v)
       let lhs = pat.fast(@pattern.Rational::from_int(1))
@@ -105,7 +105,7 @@ test "prop: fast(1, pat) == pat" {
 // Double reversal is identity.
 test "prop: rev(rev(pat)) == pat" {
   @qc.quick_check_fn(
-    fn(value : Int) {
+    fn(value : Int32) {
       let v = value.abs() % 1000
       let pat = @pattern.Pat::pure(v)
       let double_rev = pat.rev().rev()
@@ -121,7 +121,7 @@ test "prop: rev(rev(pat)) == pat" {
 // A single-element sequence should be equivalent to the original pattern.
 test "prop: sequence([pat]) == fast(1, pat)" {
   @qc.quick_check_fn(
-    fn(value : Int) {
+    fn(value : Int32) {
       let v = value.abs() % 1000
       let pat = @pattern.Pat::pure(v)
       let seq1 = @pattern.sequence([pat])
@@ -138,7 +138,7 @@ test "prop: sequence([pat]) == fast(1, pat)" {
 // Stacking one pattern returns the same events.
 test "prop: stack([pat]) == pat" {
   @qc.quick_check_fn(
-    fn(value : Int) {
+    fn(value : Int32) {
       let v = value.abs() % 1000
       let pat = @pattern.Pat::pure(v)
       let stacked = @pattern.stack([pat])
@@ -154,12 +154,12 @@ test "prop: stack([pat]) == pat" {
 // For any begin < end, silence returns empty.
 test "prop: silence produces no events for any arc" {
   @qc.quick_check_fn(
-    fn(pair : (Int, Int)) {
+    fn(pair : (Int32, Int32)) {
       let b = pair.0.abs() % 10
       let len = pair.1.abs() % 5 + 1
       let e = b + len
       let arc = span_prop(b, 1, e, 1)
-      let s : @pattern.Pat[Int] = @pattern.Pat::silence()
+      let s : @pattern.Pat[Int32] = @pattern.Pat::silence()
       s.query(arc).length() == 0
     },
     max_success=100,
@@ -171,7 +171,7 @@ test "prop: silence produces no events for any arc" {
 // For a query spanning N cycles, pure produces exactly N events.
 test "prop: pure produces exactly N events for N-cycle query" {
   @qc.quick_check_fn(
-    fn(n_raw : Int) {
+    fn(n_raw : Int32) {
       let n = n_raw.abs() % 8 + 1
       let pat = @pattern.Pat::pure(42)
       let arc = span_prop(0, 1, n, 1)
@@ -188,7 +188,7 @@ test "prop: pure produces exactly N events for N-cycle query" {
 // Tests fast associativity with a real sequence, not just pure, over 2 cycles.
 test "prop: fast associativity with sequence over multi-cycle" {
   @qc.quick_check_fn(
-    fn(pair : (Int, Int)) {
+    fn(pair : (Int32, Int32)) {
       let a_raw = pair.0.abs() % 4 + 1
       let b_raw = pair.1.abs() % 4 + 1
       let a = @pattern.Rational::from_int(a_raw)
@@ -212,9 +212,9 @@ test "prop: fast associativity with sequence over multi-cycle" {
 // Double reversal of a sequence preserves event order across cycles.
 test "prop: rev(rev(sequence)) is identity over multi-cycle" {
   @qc.quick_check_fn(
-    fn(n_raw : Int) {
+    fn(n_raw : Int32) {
       let n = n_raw.abs() % 5 + 2 // 2..6 elements
-      let pats : Array[@pattern.Pat[Int]] = []
+      let pats : Array[@pattern.Pat[Int32]] = []
       for i = 0; i < n; i = i + 1 {
         pats.push(@pattern.Pat::pure(i))
       }

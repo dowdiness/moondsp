@@ -8,16 +8,16 @@ const STANDARD_SAMPLE_RATE : Double = 48000.0
 const ADSR_TEST_SAMPLE_RATE : Double = 1000.0
 
 ///|
-const SMALL_BLOCK_SIZE : Int = 4
+const SMALL_BLOCK_SIZE : Int32 = 4
 
 ///|
-const LARGE_BLOCK_SIZE : Int = 8
+const LARGE_BLOCK_SIZE : Int32 = 8
 
 ///|
 const OSCILLATOR_FREQ : Double = 440.0
 
 ///|
-const NOISE_SEED : UInt = 123U
+const NOISE_SEED : UInt32 = 123U
 
 ///|
 const UNIT_SAMPLE : Double = 1.0
@@ -62,10 +62,10 @@ const ADSR_SUSTAIN_LEVEL : Double = 0.25
 const ADSR_RELEASE_MS : Double = 2.0
 
 ///|
-const DELAY_CAPACITY : Int = 4
+const DELAY_CAPACITY : Int32 = 4
 
 ///|
-const DELAY_SAMPLES : Int = 2
+const DELAY_SAMPLES : Int32 = 2
 
 ///|
 const DELAY_SAMPLES_DOUBLE : Double = 2.0

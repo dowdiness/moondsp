@@ -337,8 +337,8 @@ test "compiled dsp apply_control reports invalid slot and value" {
       @graph.GraphControlError::InvalidSlotForNode(
         0,
         @graph.DspNodeKind::Constant,
-        @graph.GraphParamSlot::DelaySamples
-      )
+        @graph.GraphParamSlot::DelaySamples,
+      ),
     ) => ()
     other => fail("expected InvalidSlotForNode, got \{@debug.to_string(other)}")
   }
@@ -356,8 +356,8 @@ test "compiled dsp apply_control reports invalid slot and value" {
         1,
         @graph.DspNodeKind::Delay,
         @graph.GraphParamSlot::DelaySamples,
-        1.5
-      )
+        1.5,
+      ),
     ) => ()
     other => fail("expected InvalidParamValue, got \{@debug.to_string(other)}")
   }
@@ -397,8 +397,8 @@ test "compiled dsp apply_controls is transactional" {
       @graph.GraphControlError::InvalidSlotForNode(
         1,
         @graph.DspNodeKind::Gain,
-        @graph.GraphParamSlot::DelaySamples
-      )
+        @graph.GraphParamSlot::DelaySamples,
+      ),
     ) => ()
     other => fail("expected InvalidSlotForNode, got \{@debug.to_string(other)}")
   }

@@ -88,7 +88,7 @@ test "overlays keep independent clocks while material explicitly groups them" {
     .map(p => p.entry_period()),
     [two, three],
   )
-  let rest : @pattern.Pat[Int] = @pattern.Pat::silence()
+  let rest : @pattern.Pat[Int32] = @pattern.Pat::silence()
     .slow(three)
     .material()
   assert_eq(rest.entries().map(p => p.entry_period()), [three])

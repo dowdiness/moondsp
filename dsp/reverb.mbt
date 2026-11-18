@@ -19,7 +19,7 @@ const REVERB_DEFAULT_DAMPING : Double = 0.35
 ///|
 priv struct ReverbComb {
   buffer : FixedArray[Double]
-  mut position : Int
+  mut position : Int32
   feedback : Double
   damping : Double
   mut filter_state : Double
@@ -27,7 +27,7 @@ priv struct ReverbComb {
 
 ///|
 fn ReverbComb::ReverbComb(
-  size : Int,
+  size : Int32,
   sample_rate : Double,
   decay_seconds : Double,
   damping : Double,
@@ -82,11 +82,11 @@ fn ReverbComb::tick(self : ReverbComb, input : Double) -> Double {
 ///|
 priv struct ReverbAllpass {
   buffer : FixedArray[Double]
-  mut position : Int
+  mut position : Int32
 }
 
 ///|
-fn ReverbAllpass::ReverbAllpass(size : Int) -> ReverbAllpass {
+fn ReverbAllpass::ReverbAllpass(size : Int32) -> ReverbAllpass {
   { buffer: FixedArray::make(size, 0.0), position: 0, }
 }
 
@@ -123,7 +123,7 @@ pub struct StereoReverb {
 }
 
 ///|
-fn reverb_scaled_delay(base : Int, sample_rate : Double) -> Int {
+fn reverb_scaled_delay(base : Int32, sample_rate : Double) -> Int32 {
   let scaled = (base.to_double() * sample_rate / REVERB_REFERENCE_SAMPLE_RATE)
     .round()
     .to_int()
@@ -137,8 +137,8 @@ fn reverb_scaled_delay(base : Int, sample_rate : Double) -> Int {
 ///|
 pub fn StereoReverb::StereoReverb(
   sample_rate : Double,
-  decay_seconds? : Double = REVERB_DEFAULT_DECAY_SECONDS,
-  damping? : Double = REVERB_DEFAULT_DAMPING,
+  decay_seconds~ : Double = REVERB_DEFAULT_DECAY_SECONDS,
+  damping~ : Double = REVERB_DEFAULT_DAMPING,
 ) -> StereoReverb {
   let safe_rate = if is_finite_positive(sample_rate) {
     sample_rate

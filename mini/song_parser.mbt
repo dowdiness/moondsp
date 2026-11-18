@@ -168,7 +168,7 @@ fn Parser::parse_song_item(
 ///|
 fn Parser::parse_song_bpm(
   self : Parser,
-  item_start : Int,
+  item_start : Int32,
 ) -> Double raise ParseError {
   self.skip_whitespace()
   let value = self.read_number()
@@ -185,7 +185,7 @@ fn Parser::parse_song_bpm(
 ///|
 fn Parser::parse_song_section(
   self : Parser,
-  item_start : Int,
+  item_start : Int32,
   builder~ : MiniDocBuilder,
 ) -> @song.Section[@pattern.ControlMap] raise ParseError {
   self.skip_whitespace()
@@ -226,7 +226,7 @@ fn Parser::parse_song_section(
 ///|
 fn Parser::parse_song_part(
   self : Parser,
-  item_start : Int,
+  item_start : Int32,
 ) -> SongPartSpec raise ParseError {
   ignore(item_start)
   self.skip_whitespace()
@@ -240,7 +240,7 @@ fn Parser::parse_song_part(
 ///|
 fn Parser::parse_song_part_with_id(
   self : Parser,
-  item_start : Int,
+  item_start : Int32,
 ) -> SongPartSpec raise ParseError {
   self.skip_whitespace()
   let id_value = self.read_quoted_string()
@@ -312,9 +312,9 @@ fn Parser::read_song_rational(
 ///|
 fn Parser::read_song_int(
   self : Parser,
-  err_pos : Int,
+  err_pos : Int32,
   label : String,
-) -> Int raise ParseError {
+) -> Int32 raise ParseError {
   let start = self.pos
   if !self.at_end() && self.input[self.pos] == '-' {
     self.pos += 1
@@ -350,7 +350,7 @@ fn Parser::read_song_int(
 ///|
 fn parse_occurrence_id(
   value : String,
-  pos : Int,
+  pos : Int32,
 ) -> @identity.OccurrenceId raise ParseError {
   @identity.OccurrenceId::from_string(value) catch {
     _ => raise ParseError("position \{pos}: invalid occurrence id '\{value}'")

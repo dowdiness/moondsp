@@ -29,7 +29,7 @@ priv struct ResolvedMiniExpr {
 
 ///|
 priv enum ResolvedMiniExprNode {
-  Literal(MiniLiteral, String, Int)
+  Literal(MiniLiteral, String, Int32)
   Stack(Array[ResolvedMiniExpr])
   Reference(String, MiniDefinition)
   Apply(ResolvedMiniExpr, MiniTransform)

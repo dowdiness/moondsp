@@ -4,7 +4,7 @@
 /// `note_on_prevalidated_params4_id` reuses the compiled voice and calls
 /// `reset_runtime_state`, which resets every DelayLine. These rows exist to
 /// show that active-slot steal no longer scales with delay capacity.
-fn delay_reset_voice_nodes(capacity : Int) -> Array[@graph.DspNode] {
+fn delay_reset_voice_nodes(capacity : Int32) -> Array[@graph.DspNode] {
   let delay_samples = if capacity < 2400 { capacity } else { 2400 }
   [
     @graph.DspNode::oscillator(@dsp.Waveform::Saw, 220.0),

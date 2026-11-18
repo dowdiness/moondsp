@@ -1,12 +1,13 @@
 ///|
 /// Public ADSR stage names for diagnostics and tests.
+#derive(Eq)
 pub enum EnvStage {
   Idle
   Attack
   Decay
   Sustain
   Release
-} derive(Eq)
+}
 
 ///|
 pub extend EnvStage with Eq::{not_equal, equal}

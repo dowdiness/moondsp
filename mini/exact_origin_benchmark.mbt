@@ -14,7 +14,7 @@ fn bench_origin_draft_doc(
 }
 
 ///|
-fn bench_origin_arc(index : Int) -> @pattern.TimeSpan {
+fn bench_origin_arc(index : Int32) -> @pattern.TimeSpan {
   let starts = [0, 1, 2, 3]
   let start = @pattern.Rational::from_int(starts[index % starts.length()])
   @pattern.TimeSpan(start, start + @pattern.Rational(3L, 2L))

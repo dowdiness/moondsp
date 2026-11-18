@@ -1,6 +1,6 @@
 ///|
 pub(all) struct GraphTopologyEditFailure {
-  edit_index : Int
+  edit_index : Int32
   reason : GraphTopologyEditError
 }
 
@@ -10,7 +10,9 @@ pub fn apply_topology_edits(
   edits : Array[GraphTopologyEdit],
 ) -> Result[GraphEditResult, GraphTopologyEditFailure] {
   let working = nodes.map(@model.clone_node)
-  let correspondence : Array[Int] = [ for index in 0..<nodes.length() => index ]
+  let correspondence : Array[Int32] = [
+    for index in 0..<nodes.length() => index
+  ]
   for index = 0; index < edits.length(); index = index + 1 {
     let edit = edits[index]
     match apply_topology_edit_mutating(working, edit) {
@@ -85,7 +87,7 @@ fn apply_topology_edit_mutating(
       delete_node_index,
       retarget_node_index,
       retarget_input_slot,
-      replacement_source_index
+      replacement_source_index,
     ) =>
       if delete_node_index < 0 ||
         delete_node_index >= nodes.length() ||
@@ -110,7 +112,7 @@ fn apply_topology_edit_mutating(
       end_node,
       retarget_node,
       input_slot,
-      replacement_source
+      replacement_source,
     ) =>
       apply_topology_delete_chain(
         nodes, start_node, end_node, retarget_node, input_slot, replacement_source,
@@ -121,7 +123,7 @@ fn apply_topology_edit_mutating(
 ///|
 fn apply_topology_insert_node(
   nodes : Array[DspNode],
-  retarget_node_index : Int,
+  retarget_node_index : Int32,
   inserted_template : DspNode,
   retarget_input_slot : GraphTopologyInputSlot,
 ) -> Result[Unit, GraphTopologyEditError] {
@@ -166,10 +168,10 @@ fn apply_topology_insert_node(
 ///|
 fn apply_topology_delete_node(
   nodes : Array[DspNode],
-  delete_node_index : Int,
-  retarget_node_index : Int,
+  delete_node_index : Int32,
+  retarget_node_index : Int32,
   retarget_input_slot : GraphTopologyInputSlot,
-  replacement_source_index : Int,
+  replacement_source_index : Int32,
 ) -> Result[Unit, GraphTopologyEditError] {
   let unary_input = match
     topology_node_input(
@@ -238,7 +240,7 @@ fn apply_topology_delete_node(
 ///|
 fn apply_topology_insert_chain(
   nodes : Array[DspNode],
-  retarget_node_index : Int,
+  retarget_node_index : Int32,
   retarget_input_slot : GraphTopologyInputSlot,
   chain_nodes : Array[DspNode],
 ) -> Result[Unit, GraphTopologyEditError] {
@@ -310,11 +312,11 @@ fn apply_topology_insert_chain(
 ///|
 fn apply_topology_delete_chain(
   nodes : Array[DspNode],
-  start_node_index : Int,
-  end_node_index : Int,
-  retarget_node_index : Int,
+  start_node_index : Int32,
+  end_node_index : Int32,
+  retarget_node_index : Int32,
   retarget_input_slot : GraphTopologyInputSlot,
-  replacement_source_index : Int,
+  replacement_source_index : Int32,
 ) -> Result[Unit, GraphTopologyEditError] {
   // Basic bounds check
   if start_node_index < 0 || start_node_index >= nodes.length() {
@@ -421,8 +423,8 @@ fn apply_topology_delete_chain(
 ///|
 fn topology_chain_compacted_node_inputs(
   node : DspNode,
-  start_deleted : Int,
-  end_deleted : Int,
+  start_deleted : Int32,
+  end_deleted : Int32,
 ) -> DspNode {
   @model.node_with_inputs(
     node,
@@ -441,10 +443,10 @@ fn topology_chain_compacted_node_inputs(
 
 ///|
 fn topology_chain_compacted_input(
-  input : Int,
-  start_deleted : Int,
-  end_deleted : Int,
-) -> Int {
+  input : Int32,
+  start_deleted : Int32,
+  end_deleted : Int32,
+) -> Int32 {
   if input < 0 {
     input
   } else if input > end_deleted {
@@ -461,8 +463,8 @@ fn topology_chain_compacted_input(
 ///|
 fn topology_single_consumer_for_input(
   nodes : Array[DspNode],
-  source_index : Int,
-) -> Int? {
+  source_index : Int32,
+) -> Int32? {
   let mut consumer = -1
   for index in 0..<nodes.length() {
     let node = nodes[index]
@@ -483,7 +485,7 @@ fn topology_single_consumer_for_input(
 ///|
 fn topology_compacted_node_inputs(
   node : DspNode,
-  deleted_index : Int,
+  deleted_index : Int32,
 ) -> DspNode {
   @model.node_with_inputs(
     node,
@@ -493,7 +495,7 @@ fn topology_compacted_node_inputs(
 }
 
 ///|
-fn topology_compacted_input(input : Int, deleted_index : Int) -> Int {
+fn topology_compacted_input(input : Int32, deleted_index : Int32) -> Int32 {
   if input >= 0 && input > deleted_index {
     input - 1
   } else {
@@ -505,7 +507,7 @@ fn topology_compacted_input(input : Int, deleted_index : Int) -> Int {
 fn topology_node_input(
   node : DspNode,
   input_slot : GraphTopologyInputSlot,
-) -> Int? {
+) -> Int32? {
   match (node.kind(), input_slot) {
     (DspNodeKind::Mul, GraphTopologyInputSlot::Input0) => Some(node.input0())
     (DspNodeKind::Mul, GraphTopologyInputSlot::Input1) => Some(node.input1())
@@ -534,7 +536,7 @@ fn topology_node_input(
 }
 
 ///|
-fn topology_inserted_node(template : DspNode, input_source : Int) -> DspNode? {
+fn topology_inserted_node(template : DspNode, input_source : Int32) -> DspNode? {
   match template.kind() {
     DspNodeKind::Gain
     | DspNodeKind::Clip
@@ -562,9 +564,9 @@ fn topology_inserted_node(template : DspNode, input_source : Int) -> DspNode? {
 ///|
 fn apply_topology_rewire_input_result(
   nodes : Array[DspNode],
-  node_index : Int,
+  node_index : Int32,
   input_slot : GraphTopologyInputSlot,
-  source_index : Int,
+  source_index : Int32,
 ) -> Result[Unit, GraphTopologyEditError] {
   let node = nodes[node_index]
   match topology_node_input(node, input_slot) {

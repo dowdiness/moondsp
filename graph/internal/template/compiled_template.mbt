@@ -12,7 +12,7 @@
 pub struct AnalyzedGraph {
   priv template : Array[@model.DspNode]
   priv optimized : Array[@model.DspNode]
-  priv index_map : FixedArray[Int]
+  priv index_map : FixedArray[Int32]
 }
 
 ///|
@@ -33,8 +33,8 @@ fn dsp_node_array_equal(
 
 ///|
 fn int_fixed_array_equal(
-  left : FixedArray[Int],
-  right : FixedArray[Int],
+  left : FixedArray[Int32],
+  right : FixedArray[Int32],
 ) -> Bool {
   if left.length() != right.length() {
     return false
@@ -81,7 +81,7 @@ pub fn AnalyzedGraph::analyze(
 
 ///|
 /// Length of the authoring template snapshot.
-pub fn AnalyzedGraph::length(self : AnalyzedGraph) -> Int {
+pub fn AnalyzedGraph::length(self : AnalyzedGraph) -> Int32 {
   self.template.length()
 }
 
@@ -90,7 +90,7 @@ pub fn AnalyzedGraph::length(self : AnalyzedGraph) -> Int {
 /// are expected to bounds-check first).
 pub fn AnalyzedGraph::node_at(
   self : AnalyzedGraph,
-  index : Int,
+  index : Int32,
 ) -> @model.DspNode {
   self.template[index]
 }
@@ -113,14 +113,14 @@ pub fn AnalyzedGraph::optimized_nodes(
 
 ///|
 /// Return the authoring-to-optimized index map.
-pub fn AnalyzedGraph::index_map(self : AnalyzedGraph) -> FixedArray[Int] {
+pub fn AnalyzedGraph::index_map(self : AnalyzedGraph) -> FixedArray[Int32] {
   self.index_map
 }
 
 ///|
 /// Does authoring index `i` survive the optimizer? Returns false for
 /// out-of-range indices (no abort).
-pub fn AnalyzedGraph::is_node_live(self : AnalyzedGraph, index : Int) -> Bool {
+pub fn AnalyzedGraph::is_node_live(self : AnalyzedGraph, index : Int32) -> Bool {
   index >= 0 && index < self.index_map.length() && self.index_map[index] >= 0
 }
 
@@ -140,7 +140,7 @@ pub fn AnalyzedGraph::is_node_live(self : AnalyzedGraph, index : Int) -> Bool {
 /// introspection waits for a concrete consumer.
 pub fn AnalyzedGraph::adsr_authoring_indices(
   self : AnalyzedGraph,
-) -> FixedArray[Int] {
+) -> FixedArray[Int32] {
   let result = FixedArray::make(self.template.length(), -1)
   let n = for i in 0..<self.template.length(); count = 0 {
     if self.template[i].kind() is @model.DspNodeKind::Adsr &&

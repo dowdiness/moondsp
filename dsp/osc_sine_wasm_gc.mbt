@@ -131,7 +131,7 @@ fn trig_kernel(x : Double, cosine~ : Bool) -> Double {
 }
 
 ///|
-fn sine_high_word(x : Double) -> Int {
+fn sine_high_word(x : Double) -> Int32 {
   (x.reinterpret_as_uint64() >> 32).to_uint().reinterpret_as_int() & 0x7fffffff
 }
 

@@ -2,7 +2,7 @@
 /// Anchor the primitive CLAP host bridge in a native main package so `moon build
 /// --target native clap_plugin` emits C for the MoonBit payload that a custom
 /// CLAP shared-library build can link with a C ABI shim.
-fn payload_anchor() -> Int {
+fn payload_anchor() -> Int32 {
   let handle = @host.engine_create(48000.0, 128, 1)
   if handle <= 0 {
     return 0

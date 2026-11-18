@@ -26,7 +26,7 @@ let compiled_hot_swap : GraphSlot[@moondsp.DspHotSwap, MonoOut] = GraphSlot(
 /// Initialize the browser proof graph that runs through `DspHotSwap`.
 pub fn init_compiled_hot_swap_graph(
   sample_rate : Double,
-  block_size : Int,
+  block_size : Int32,
 ) -> Bool {
   if compiled_hot_swap.ensure(sample_rate, block_size) {
     clear_browser_error()
@@ -72,7 +72,7 @@ pub fn queue_compiled_hot_swap() -> Bool {
 /// Run one render quantum through the browser proof `DspHotSwap` graph.
 pub fn process_compiled_hot_swap_block(
   sample_rate : Double,
-  block_size : Int,
+  block_size : Int32,
 ) -> Bool {
   if !compiled_hot_swap.ensure(sample_rate, block_size) {
     return set_browser_init_error("compiled_hot_swap.process")
@@ -85,7 +85,7 @@ pub fn process_compiled_hot_swap_block(
 
 ///|
 /// Read one sample from the most recent hot-swap browser output block.
-pub fn compiled_hot_swap_output_sample(index : Int) -> Double {
+pub fn compiled_hot_swap_output_sample(index : Int32) -> Double {
   compiled_hot_swap.output.sample(index)
 }
 

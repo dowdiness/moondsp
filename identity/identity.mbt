@@ -1,14 +1,16 @@
 ///|
+#derive(Eq, Debug)
 pub(all) suberror StableIdError {
   EmptyId
   InvalidId(String)
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq, Debug)
 pub struct Revision {
   priv value : Int64
   priv fingerprint : Int64
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn Revision::zero() -> Revision {
@@ -61,7 +63,7 @@ pub fn Revision::value(self : Revision) -> Int64 {
 }
 
 ///|
-fn valid_id_code(code : Int) -> Bool {
+fn valid_id_code(code : Int32) -> Bool {
   (code >= 'a'.to_int() && code <= 'z'.to_int()) ||
   (code >= 'A'.to_int() && code <= 'Z'.to_int()) ||
   (code >= '0'.to_int() && code <= '9'.to_int()) ||
@@ -81,7 +83,8 @@ fn validate_id_value(value : String) -> String raise StableIdError {
 }
 
 ///|
-pub struct PatternNodeId(String) derive(Eq, Debug)
+#derive(Eq, Debug)
+pub struct PatternNodeId(String)
 
 ///|
 pub fn PatternNodeId::from_string(
@@ -96,7 +99,8 @@ pub fn PatternNodeId::value(self : PatternNodeId) -> String {
 }
 
 ///|
-pub struct SectionId(String) derive(Eq, Debug)
+#derive(Eq, Debug)
+pub struct SectionId(String)
 
 ///|
 pub fn SectionId::from_string(value : String) -> SectionId raise StableIdError {
@@ -109,7 +113,8 @@ pub fn SectionId::value(self : SectionId) -> String {
 }
 
 ///|
-pub struct SectionLayerId(String) derive(Eq, Debug)
+#derive(Eq, Debug)
+pub struct SectionLayerId(String)
 
 ///|
 pub fn SectionLayerId::from_string(
@@ -124,7 +129,8 @@ pub fn SectionLayerId::value(self : SectionLayerId) -> String {
 }
 
 ///|
-pub struct OccurrenceId(String) derive(Eq, Debug)
+#derive(Eq, Debug)
+pub struct OccurrenceId(String)
 
 ///|
 pub fn OccurrenceId::from_string(
@@ -139,7 +145,8 @@ pub fn OccurrenceId::value(self : OccurrenceId) -> String {
 }
 
 ///|
-pub struct GraphNodeId(String) derive(Eq, Debug)
+#derive(Eq, Debug)
+pub struct GraphNodeId(String)
 
 ///|
 pub fn GraphNodeId::from_string(

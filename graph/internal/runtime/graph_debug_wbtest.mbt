@@ -1,7 +1,7 @@
 ///|
 /// Corrupt a compiled node's input0 to an out-of-bounds value.
 /// Whitebox test helper — needs access to private CompiledGraph fields.
-fn corrupt_input0(compiled : Dsp, node_index : Int, value : Int) -> Unit {
+fn corrupt_input0(compiled : Dsp, node_index : Int32, value : Int32) -> Unit {
   let nodes = compiled.0.nodes
   let node = nodes[node_index]
   nodes[node_index] = @model.node_with_inputs(

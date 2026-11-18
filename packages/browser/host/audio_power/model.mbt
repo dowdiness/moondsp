@@ -60,7 +60,7 @@ priv struct Owner {
 fn Owner::Owner(
   options : NativeValue,
   graph_engine_factory : NativeValue,
-  create_context? : (NativeValue) -> NativeResult = NativeContext::create,
+  create_context~ : (NativeValue) -> NativeResult = NativeContext::create,
 ) -> Owner {
   {
     current: Vacant,

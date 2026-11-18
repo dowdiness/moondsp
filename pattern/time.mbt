@@ -6,10 +6,11 @@
 /// prevents double-counting events at cycle boundaries.
 ///
 /// WHY `end_` not `end`: avoids potential keyword collision in MoonBit.
+#derive(Eq, Debug)
 pub struct TimeSpan {
   begin : Rational
   end_ : Rational
-} derive(Eq, Debug)
+}
 
 ///|
 pub impl Show for TimeSpan with fn output(self, logger) {
@@ -45,8 +46,8 @@ pub struct Placement {
 
 ///|
 pub fn Placement::Placement(
-  origin? : Rational = Rational::from_int(0),
-  rate? : Rational = Rational::from_int(1),
+  origin~ : Rational = Rational::from_int(0),
+  rate~ : Rational = Rational::from_int(1),
 ) -> Placement {
   { origin, rate, }
 }

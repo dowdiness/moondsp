@@ -5,9 +5,10 @@ struct ExternalLoweredGraphFixture {
 }
 
 ///|
+#derive(Debug, Eq)
 enum ExternalLoweringError {
   UnresolvedReference(String)
-} derive(Debug, Eq)
+}
 
 ///|
 fn valid_external_lowering_fixture() -> ExternalLoweredGraphFixture {

@@ -3,7 +3,7 @@
 /// `old_to_new[i]` is the final index of original node `i`, or -1 when deleted.
 pub struct GraphEditResult {
   priv final_nodes : Array[DspNode]
-  priv correspondence : FixedArray[Int]
+  priv correspondence : FixedArray[Int32]
 }
 
 ///|
@@ -12,6 +12,6 @@ pub fn GraphEditResult::nodes(self : GraphEditResult) -> Array[DspNode] {
 }
 
 ///|
-pub fn GraphEditResult::old_to_new(self : GraphEditResult) -> FixedArray[Int] {
+pub fn GraphEditResult::old_to_new(self : GraphEditResult) -> FixedArray[Int32] {
   self.correspondence
 }

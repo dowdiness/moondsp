@@ -42,7 +42,7 @@ pub fn Tempo::sample_at_start(
 /// accepted sample-rate checks and millibeats-per-minute precision.
 pub fn Tempo::span_for_samples(
   self : Tempo,
-  samples : Int,
+  samples : Int32,
   sample_rate~ : Double,
 ) -> Result[@pattern.Rational, TransportError] {
   let clock = match @transport.Clock::at_start(self.value, sample_rate) {
@@ -238,8 +238,8 @@ pub fn PatternScheduler::accept_playback(
   self : PatternScheduler,
   snapshot : PlaybackSnapshot,
   tempo : Tempo,
-  material_limit~ : Int,
-  restart? : Bool = false,
+  material_limit~ : Int32,
+  restart~ : Bool = false,
   end_? : @pattern.Rational,
 ) -> Result[Unit, PlaybackAdmissionError] {
   let plan = match self.tempo_plan(tempo, restart, end_?) {

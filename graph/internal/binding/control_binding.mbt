@@ -1,12 +1,13 @@
 ///|
 /// How a score value converts to the value its target takes.
+#derive(Debug, Eq)
 pub(all) enum ControlUnit {
   Linear
   /// MIDI note number to Hz.
   MidiToHz
   /// Seconds to milliseconds.
   SecondsToMs
-} derive(Debug, Eq)
+}
 
 ///|
 pub extend ControlUnit with @moonbitlang/core/debug.Debug::{to_repr}
@@ -37,11 +38,12 @@ pub fn ControlUnit::invert(self : ControlUnit, value : Double) -> Double {
 ///|
 /// A parameter every voice has outside its graph (ADR-0019 Decision 8).
 /// The mix order is gain -> pan -> (dry, send).
+#derive(Debug, Eq)
 pub(all) enum VoiceParam {
   Gain
   Pan
   Send
-} derive(Debug, Eq)
+}
 
 ///|
 pub extend VoiceParam with @moonbitlang/core/debug.Debug::{to_repr}
@@ -50,10 +52,11 @@ pub extend VoiceParam with @moonbitlang/core/debug.Debug::{to_repr}
 pub extend VoiceParam with Eq::{not_equal, equal}
 
 ///|
+#derive(Debug, Eq)
 pub(all) enum BindingTarget {
-  Graph(Int, @model.GraphParamSlot)
+  Graph(Int32, @model.GraphParamSlot)
   Voice(VoiceParam)
-} derive(Debug, Eq)
+}
 
 ///|
 pub extend BindingTarget with @moonbitlang/core/debug.Debug::{to_repr}
@@ -62,21 +65,23 @@ pub extend BindingTarget with @moonbitlang/core/debug.Debug::{to_repr}
 pub extend BindingTarget with Eq::{not_equal, equal}
 
 ///|
+#derive(Debug, Eq)
 priv struct ControlBinding {
   key : String
   target : BindingTarget
   unit : ControlUnit
-} derive(Debug, Eq)
+}
 
 ///|
+#derive(Debug, Eq)
 pub enum ControlBindingError {
-  InvalidNodeIndex(Int)
-  InvalidSlotForNode(Int, @model.GraphParamSlot)
+  InvalidNodeIndex(Int32)
+  InvalidSlotForNode(Int32, @model.GraphParamSlot)
   DuplicateKey(String)
   /// Binding (key, node_index) targets a template node that
   /// optimize_graph eliminated. Prevents silent set_param no-ops.
-  OrphanBinding(String, Int)
-} derive(Debug, Eq)
+  OrphanBinding(String, Int32)
+}
 
 ///|
 pub extend ControlBindingError with @moonbitlang/core/debug.Debug::{to_repr}
@@ -85,9 +90,10 @@ pub extend ControlBindingError with @moonbitlang/core/debug.Debug::{to_repr}
 pub extend ControlBindingError with Eq::{not_equal, equal}
 
 ///|
+#derive(Debug)
 pub struct ControlBindingBuilder {
   priv bindings : Array[ControlBinding]
-} derive(Debug)
+}
 
 ///|
 pub extend ControlBindingBuilder with @moonbitlang/core/debug.Debug::{to_repr}
@@ -123,10 +129,11 @@ pub fn ControlBindingBuilder::bind(
 /// nodes the new template's optimize_graph eliminated. Rebuild the
 /// ControlBindingMap whenever the template changes. Structural staleness
 /// detection is tracked as a follow-up.
+#derive(Debug, Eq)
 pub struct ControlBindingMap {
   priv bindings : Array[ControlBinding]
   priv defaults : Array[Double]
-} derive(Debug, Eq)
+}
 
 ///|
 pub extend ControlBindingMap with @moonbitlang/core/debug.Debug::{to_repr}
@@ -136,7 +143,7 @@ pub extend ControlBindingMap with Eq::{not_equal, equal}
 
 ///|
 /// Number of validated bindings in this map.
-pub fn ControlBindingMap::length(self : ControlBindingMap) -> Int {
+pub fn ControlBindingMap::length(self : ControlBindingMap) -> Int32 {
   self.bindings.length()
 }
 

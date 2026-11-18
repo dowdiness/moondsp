@@ -1,7 +1,8 @@
 ///|
+#derive(Eq, Debug)
 pub struct PatternVoiceScope {
   priv raw : @model.PatternVoiceScope
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend PatternVoiceScope with Eq::{not_equal, equal}
@@ -17,9 +18,10 @@ pub fn PatternVoiceScope::node(
 }
 
 ///|
+#derive(Eq, Debug)
 pub struct SongVoiceScope {
   priv raw : @model.SongVoiceScope
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend SongVoiceScope with Eq::{not_equal, equal}
@@ -51,16 +53,16 @@ pub fn SongVoiceScope::layer(
 /// Graph controls for the voices of one instrument: node indices only mean
 /// something for that instrument's graph.
 pub struct VoiceControlBatch {
-  priv instrument : Int
+  priv instrument : Int32
   priv controls : Array[@moondsp.GraphControl]
 }
 
 ///|
 /// `instrument` is an index into the scheduler's instrument list.
 pub fn VoiceControlBatch::VoiceControlBatch(
-  instrument~ : Int,
+  instrument~ : Int32,
   first : @moondsp.GraphControl,
-  rest? : Array[@moondsp.GraphControl] = [],
+  rest~ : Array[@moondsp.GraphControl] = [],
 ) -> VoiceControlBatch {
   let controls = Array(capacity=rest.length() + 1)
   controls.push(first)

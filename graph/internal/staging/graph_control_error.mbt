@@ -1,14 +1,15 @@
 ///|
 /// Failure reason for staging-layer runtime control APIs.
+#derive(Debug)
 pub enum GraphControlError {
-  InvalidNodeIndex(Int)
+  InvalidNodeIndex(Int32)
   /// The authoring node existed but was eliminated by graph optimization.
-  OrphanNode(Int)
-  InvalidGateNode(Int, DspNodeKind)
-  InvalidSlotForNode(Int, DspNodeKind, GraphParamSlot)
-  InvalidParamValue(Int, DspNodeKind, GraphParamSlot, Double)
-  MissingRuntimeState(Int, DspNodeKind)
-} derive(Debug)
+  OrphanNode(Int32)
+  InvalidGateNode(Int32, DspNodeKind)
+  InvalidSlotForNode(Int32, DspNodeKind, GraphParamSlot)
+  InvalidParamValue(Int32, DspNodeKind, GraphParamSlot, Double)
+  MissingRuntimeState(Int32, DspNodeKind)
+}
 
 ///|
 pub extend GraphControlError with @moonbitlang/core/debug.Debug::{to_repr}

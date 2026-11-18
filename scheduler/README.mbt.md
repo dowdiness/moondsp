@@ -290,11 +290,9 @@ test "edit orchestration stages a replacement and reconciles active voices" {
     ),
     max_voices=4,
   )
-  let sched = try! @scheduler.PatternScheduler(
-    bpm=120.0,
-    ctx~,
-    instruments=[(@scheduler.AllEvents, pool)],
-  )
+  let sched = try! @scheduler.PatternScheduler(bpm=120.0, ctx~, instruments=[
+    (@scheduler.AllEvents, pool),
+  ])
   let edited = try! @identity.PatternNodeId::from_string("docs:lead")
   let replacement_root = try! @identity.PatternNodeId::from_string(
     "docs:replacement",

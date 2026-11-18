@@ -8,7 +8,7 @@
 /// from different sources.
 pub struct GraphBuilder {
   priv nodes_ : Array[DspNode]
-  priv index : Int
+  priv index : Int32
 }
 
 ///|
@@ -20,7 +20,7 @@ pub fn GraphBuilder::nodes(self : GraphBuilder) -> Array[DspNode] {
 ///|
 /// Merge `source` nodes into `target`, remapping indices by the target
 /// length.  Returns the offset applied (0 when arrays are identical).
-fn merge_into(target : Array[DspNode], source : Array[DspNode]) -> Int {
+fn merge_into(target : Array[DspNode], source : Array[DspNode]) -> Int32 {
   if physical_equal(target, source) {
     return 0
   }
@@ -34,7 +34,7 @@ fn merge_into(target : Array[DspNode], source : Array[DspNode]) -> Int {
 ///|
 /// Create a copy of `node` with `input0` and `input1` shifted by `offset`.
 /// Inputs that are `-1` (meaning "no input") are left unchanged.
-fn remap_node_by_offset(node : DspNode, offset : Int) -> DspNode {
+fn remap_node_by_offset(node : DspNode, offset : Int32) -> DspNode {
   node_with_offset_inputs(node, offset)
 }
 
@@ -445,7 +445,7 @@ pub fn GraphBuilder::analyze(self : GraphBuilder) -> AnalyzedGraph {
 ///|
 /// Safely access a replay result by index, returning None for out-of-bounds
 /// or missing results.
-fn[T] replay_get_result(results : FixedArray[T?], index : Int) -> T? {
+fn[T] replay_get_result(results : FixedArray[T?], index : Int32) -> T? {
   if index >= 0 && index < results.length() {
     results[index]
   } else {

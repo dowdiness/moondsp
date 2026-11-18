@@ -1,7 +1,7 @@
 ///|
 /// Capability trait for signal shape queries.
 pub(open) trait NodeSpanning {
-  fn signal_shape(Self) -> Int
+  fn signal_shape(Self) -> Int32
 }
 
 ///|
@@ -25,7 +25,7 @@ pub(open) trait NodeEditable: NodeSpanning + NodeFoldable {
 }
 
 ///|
-pub impl NodeSpanning for DspNode with fn signal_shape(self) -> Int {
+pub impl NodeSpanning for DspNode with fn signal_shape(self) -> Int32 {
   @model.node_signal_shape(self.raw())
 }
 

@@ -1,20 +1,20 @@
 ///|
-const ONSET_RING_CAPACITY : Int = 256
+const ONSET_RING_CAPACITY : Int32 = 256
 
 ///|
-const ONSET_ROW_WIDTH : Int = 103
+const ONSET_ROW_WIDTH : Int32 = 103
 
 ///|
-const ONSET_MAX_BINDINGS : Int = 32
+const ONSET_MAX_BINDINGS : Int32 = 32
 
 ///|
 /// Fixed-capacity scalar storage for opt-in dispatched-onset observation.
 /// Its sole allocation happens when the player creates the buffer.
 pub struct OnsetBuffer {
   priv mut enabled : Bool
-  priv mut head : Int
-  priv mut count : Int
-  priv mut dropped_count : Int
+  priv mut head : Int32
+  priv mut count : Int32
+  priv mut dropped_count : Int32
   priv rows : Array[Double]
 }
 
@@ -35,7 +35,7 @@ pub fn OnsetBuffer::enable(self : OnsetBuffer, enabled : Bool) -> Unit {
 }
 
 ///|
-pub fn OnsetBuffer::count(self : OnsetBuffer) -> Int {
+pub fn OnsetBuffer::count(self : OnsetBuffer) -> Int32 {
   self.count
 }
 
@@ -43,8 +43,8 @@ pub fn OnsetBuffer::count(self : OnsetBuffer) -> Int {
 /// Read one scalar field without allocating or copying a path.
 pub fn OnsetBuffer::field(
   self : OnsetBuffer,
-  index : Int,
-  field : Int,
+  index : Int32,
+  field : Int32,
 ) -> Double {
   if index < 0 || index >= self.count || field < 0 || field >= ONSET_ROW_WIDTH {
     return 0.0
@@ -78,9 +78,9 @@ fn OnsetBuffer::record(
   self : OnsetBuffer,
   sample : Int64,
   origin : @pattern.EventOrigin?,
-  source_frame? : @identity.SourceFrameId? = None,
-  source_start? : Double = -1.0,
-  source_pitch? : Double = -1.0,
+  source_frame~ : @identity.SourceFrameId? = None,
+  source_start~ : Double = -1.0,
+  source_pitch~ : Double = -1.0,
 ) -> Unit {
   if !self.enabled {
     return

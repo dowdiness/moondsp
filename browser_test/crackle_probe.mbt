@@ -3,101 +3,101 @@
 // production browser playback.
 
 ///|
-const CRACKLE_PROBE_METRIC_COUNT : Int = 14
+const CRACKLE_PROBE_METRIC_COUNT : Int32 = 14
 
 ///|
-const CRACKLE_PROBE_METRIC_PEAK_ABS : Int = 0
+const CRACKLE_PROBE_METRIC_PEAK_ABS : Int32 = 0
 
 ///|
-const CRACKLE_PROBE_METRIC_RMS : Int = 1
+const CRACKLE_PROBE_METRIC_RMS : Int32 = 1
 
 ///|
-const CRACKLE_PROBE_METRIC_MEAN : Int = 2
+const CRACKLE_PROBE_METRIC_MEAN : Int32 = 2
 
 ///|
-const CRACKLE_PROBE_METRIC_NON_FINITE_COUNT : Int = 3
+const CRACKLE_PROBE_METRIC_NON_FINITE_COUNT : Int32 = 3
 
 ///|
-const CRACKLE_PROBE_METRIC_SANITIZED_COUNT : Int = 4
+const CRACKLE_PROBE_METRIC_SANITIZED_COUNT : Int32 = 4
 
 ///|
-const CRACKLE_PROBE_METRIC_MAX_STEP_ABS : Int = 5
+const CRACKLE_PROBE_METRIC_MAX_STEP_ABS : Int32 = 5
 
 ///|
-const CRACKLE_PROBE_METRIC_BOUNDARY_STEP_ABS : Int = 6
+const CRACKLE_PROBE_METRIC_BOUNDARY_STEP_ABS : Int32 = 6
 
 ///|
-const CRACKLE_PROBE_METRIC_MAX_RESIDUAL_ABS : Int = 7
+const CRACKLE_PROBE_METRIC_MAX_RESIDUAL_ABS : Int32 = 7
 
 ///|
-const CRACKLE_PROBE_METRIC_RMS_RESIDUAL : Int = 8
+const CRACKLE_PROBE_METRIC_RMS_RESIDUAL : Int32 = 8
 
 ///|
-const CRACKLE_PROBE_METRIC_FIRST_SAMPLE : Int = 9
+const CRACKLE_PROBE_METRIC_FIRST_SAMPLE : Int32 = 9
 
 ///|
-const CRACKLE_PROBE_METRIC_LAST_SAMPLE : Int = 10
+const CRACKLE_PROBE_METRIC_LAST_SAMPLE : Int32 = 10
 
 ///|
-const CRACKLE_PROBE_METRIC_BOUNDARY_STEP_DELTA : Int = 11
+const CRACKLE_PROBE_METRIC_BOUNDARY_STEP_DELTA : Int32 = 11
 
 ///|
-const CRACKLE_PROBE_METRIC_MAX_STEP_INDEX : Int = 12
+const CRACKLE_PROBE_METRIC_MAX_STEP_INDEX : Int32 = 12
 
 ///|
-const CRACKLE_PROBE_METRIC_MAX_RESIDUAL_INDEX : Int = 13
+const CRACKLE_PROBE_METRIC_MAX_RESIDUAL_INDEX : Int32 = 13
 
 ///|
-const CRACKLE_PROBE_MAX_BLOCK_SIZE : Int = 4096
+const CRACKLE_PROBE_MAX_BLOCK_SIZE : Int32 = 4096
 
 ///|
-const CRACKLE_PROBE_MAX_BLOCK_COUNT : Int = 4096
+const CRACKLE_PROBE_MAX_BLOCK_COUNT : Int32 = 4096
 
 ///|
-const CRACKLE_PROBE_MAX_TOTAL_SAMPLES : Int = 1048576
+const CRACKLE_PROBE_MAX_TOTAL_SAMPLES : Int32 = 1048576
 
 ///|
-const CRACKLE_PROBE_ERROR_OK : Int = 0
+const CRACKLE_PROBE_ERROR_OK : Int32 = 0
 
 ///|
-const CRACKLE_PROBE_ERROR_INVALID_ROUTE : Int = 1
+const CRACKLE_PROBE_ERROR_INVALID_ROUTE : Int32 = 1
 
 ///|
-const CRACKLE_PROBE_ERROR_INVALID_WAVEFORM : Int = 2
+const CRACKLE_PROBE_ERROR_INVALID_WAVEFORM : Int32 = 2
 
 ///|
-const CRACKLE_PROBE_ERROR_INVALID_FREQ : Int = 3
+const CRACKLE_PROBE_ERROR_INVALID_FREQ : Int32 = 3
 
 ///|
-const CRACKLE_PROBE_ERROR_INVALID_SAMPLE_RATE : Int = 4
+const CRACKLE_PROBE_ERROR_INVALID_SAMPLE_RATE : Int32 = 4
 
 ///|
-const CRACKLE_PROBE_ERROR_INVALID_BLOCK_SIZE : Int = 5
+const CRACKLE_PROBE_ERROR_INVALID_BLOCK_SIZE : Int32 = 5
 
 ///|
-const CRACKLE_PROBE_ERROR_INVALID_BLOCK_COUNT : Int = 6
+const CRACKLE_PROBE_ERROR_INVALID_BLOCK_COUNT : Int32 = 6
 
 ///|
-const CRACKLE_PROBE_ERROR_COMPILE_FAILED : Int = 7
+const CRACKLE_PROBE_ERROR_COMPILE_FAILED : Int32 = 7
 
 ///|
-const CRACKLE_PROBE_ERROR_CONTROL_FAILED : Int = 8
+const CRACKLE_PROBE_ERROR_CONTROL_FAILED : Int32 = 8
 
 ///|
-const CRACKLE_PROBE_ERROR_NOTE_ON_FAILED : Int = 9
+const CRACKLE_PROBE_ERROR_NOTE_ON_FAILED : Int32 = 9
 
 ///|
-const CRACKLE_PROBE_ERROR_STREAM_NOT_INITIALIZED : Int = 10
+const CRACKLE_PROBE_ERROR_STREAM_NOT_INITIALIZED : Int32 = 10
 
 ///|
 priv enum CrackleProbeStreamState {
   StreamDirect(
-    Int,
+    Int32,
     @moondsp.Waveform,
     Double,
     Double,
     @moondsp.Oscillator,
-    @moondsp.Oscillator
+    @moondsp.Oscillator,
   )
   StreamCompiled(@moondsp.Waveform, Double, @moondsp.Dsp, @moondsp.Oscillator)
   StreamVoicePool(
@@ -106,18 +106,18 @@ priv enum CrackleProbeStreamState {
     @moondsp.BoundVoicePool,
     @moondsp.AudioBuffer,
     @moondsp.Oscillator,
-    Double
+    Double,
   )
   StreamBrowserSynthShape(@moondsp.BoundVoicePool, @moondsp.AudioBuffer)
 }
 
 ///|
 priv struct CrackleProbeValidatedInput {
-  route_id : Int
+  route_id : Int32
   waveform : @moondsp.Waveform
   freq_hz : Double
   sample_rate : Double
-  block_size : Int
+  block_size : Int32
 }
 
 ///|
@@ -133,23 +133,19 @@ let crackle_probe_reference : @ref.Ref[@moondsp.AudioBuffer?] = Ref(None)
 let crackle_probe_residual : @ref.Ref[@moondsp.AudioBuffer?] = Ref(None)
 
 ///|
-let crackle_probe_blocks : @ref.Ref[Int] = Ref(0)
+let crackle_probe_blocks : @ref.Ref[Int32] = Ref(0)
 
 ///|
-let crackle_probe_last_error_code : @ref.Ref[Int] = Ref(0)
+let crackle_probe_last_error_code : @ref.Ref[Int32] = Ref(0)
 
 ///|
-let crackle_probe_stream_state : @ref.Ref[CrackleProbeStreamState?] = Ref(
-  None,
-)
+let crackle_probe_stream_state : @ref.Ref[CrackleProbeStreamState?] = Ref(None)
 
 ///|
-let crackle_probe_stream_context : @ref.Ref[@moondsp.DspContext?] = Ref(
-  None,
-)
+let crackle_probe_stream_context : @ref.Ref[@moondsp.DspContext?] = Ref(None)
 
 ///|
-let crackle_probe_stream_block_size : @ref.Ref[Int] = Ref(0)
+let crackle_probe_stream_block_size : @ref.Ref[Int32] = Ref(0)
 
 ///|
 let crackle_probe_stream_has_previous : @ref.Ref[Bool] = Ref(false)
@@ -179,12 +175,12 @@ pub fn crackle_probe_reset() -> Unit {
 /// Route 7 has no direct oscillator reference; residual metrics are disabled
 /// by copying its output into the reference buffer before metric collection.
 pub fn crackle_probe_run(
-  route_id : Int,
-  waveform_id : Int,
+  route_id : Int32,
+  waveform_id : Int32,
   freq_hz : Double,
   sample_rate : Double,
-  block_size : Int,
-  block_count : Int,
+  block_size : Int32,
+  block_count : Int32,
 ) -> Bool {
   crackle_probe_clear_results()
   crackle_probe_last_error_code.val = CRACKLE_PROBE_ERROR_OK
@@ -277,11 +273,11 @@ pub fn crackle_probe_run(
 /// `crackle_probe_stream_process` call advances exactly one render quantum and
 /// appends one block of metrics readable through `crackle_probe_metric`.
 pub fn crackle_probe_stream_init(
-  route_id : Int,
-  waveform_id : Int,
+  route_id : Int32,
+  waveform_id : Int32,
   freq_hz : Double,
   sample_rate : Double,
-  block_size : Int,
+  block_size : Int32,
 ) -> Bool {
   crackle_probe_clear_results()
   crackle_probe_last_error_code.val = CRACKLE_PROBE_ERROR_OK
@@ -395,7 +391,7 @@ pub fn crackle_probe_stream_process() -> Bool {
               freq_hz,
               sample_rate,
               output_osc,
-              reference_osc
+              reference_osc,
             ) => {
               if route_id == 0 {
                 for i in 0..<block_size {
@@ -436,7 +432,7 @@ pub fn crackle_probe_stream_process() -> Bool {
               pool,
               right,
               reference_osc,
-              left_gain
+              left_gain,
             ) => {
               output.fill(0.0)
               right.fill(0.0)
@@ -499,7 +495,7 @@ pub fn crackle_probe_stream_process() -> Bool {
 /// 8 rms_residual_vs_reference; 9 first_sample; 10 last_sample;
 /// 11 absolute boundary-step difference vs reference; 12 max_step_index;
 /// 13 max_residual_index.
-pub fn crackle_probe_metric(block_index : Int, metric_id : Int) -> Double {
+pub fn crackle_probe_metric(block_index : Int32, metric_id : Int32) -> Double {
   match crackle_probe_metrics.val {
     Some(metrics) =>
       if block_index >= 0 &&
@@ -517,7 +513,7 @@ pub fn crackle_probe_metric(block_index : Int, metric_id : Int) -> Double {
 ///|
 /// Read a sample from the last processed block: 0=output, 1=reference,
 /// 2=residual. Per-block metrics remain available through `crackle_probe_metric`.
-pub fn crackle_probe_sample(kind_id : Int, sample_index : Int) -> Double {
+pub fn crackle_probe_sample(kind_id : Int32, sample_index : Int32) -> Double {
   let maybe_buffer = match kind_id {
     0 => crackle_probe_output.val
     1 => crackle_probe_reference.val
@@ -536,12 +532,12 @@ pub fn crackle_probe_sample(kind_id : Int, sample_index : Int) -> Double {
 }
 
 ///|
-pub fn crackle_probe_last_error() -> Int {
+pub fn crackle_probe_last_error() -> Int32 {
   crackle_probe_last_error_code.val
 }
 
 ///|
-pub fn crackle_probe_block_count() -> Int {
+pub fn crackle_probe_block_count() -> Int32 {
   crackle_probe_blocks.val
 }
 
@@ -562,12 +558,12 @@ fn crackle_probe_clear_results() -> Unit {
 
 ///|
 fn crackle_probe_validate_inputs(
-  route_id : Int,
-  waveform_id : Int,
+  route_id : Int32,
+  waveform_id : Int32,
   freq_hz : Double,
   sample_rate : Double,
-  block_size : Int,
-  block_count? : Int,
+  block_size : Int32,
+  block_count? : Int32,
 ) -> CrackleProbeValidatedInput? {
   if route_id < 0 || route_id > 7 {
     crackle_probe_last_error_code.val = CRACKLE_PROBE_ERROR_INVALID_ROUTE
@@ -609,7 +605,7 @@ fn crackle_probe_validate_inputs(
 }
 
 ///|
-fn crackle_probe_waveform(id : Int) -> @moondsp.Waveform? {
+fn crackle_probe_waveform(id : Int32) -> @moondsp.Waveform? {
   match id {
     0 => Some(@moondsp.Waveform::Sine)
     1 => Some(@moondsp.Waveform::Saw)
@@ -621,13 +617,13 @@ fn crackle_probe_waveform(id : Int) -> @moondsp.Waveform? {
 
 ///|
 fn crackle_probe_run_direct(
-  route_id : Int,
+  route_id : Int32,
   waveform : @moondsp.Waveform,
   freq_hz : Double,
   sample_rate : Double,
   context : @moondsp.DspContext,
-  block_size : Int,
-  block_count : Int,
+  block_size : Int32,
+  block_count : Int32,
   output : @moondsp.AudioBuffer,
   reference : @moondsp.AudioBuffer,
   residual : @moondsp.AudioBuffer,
@@ -668,12 +664,12 @@ fn crackle_probe_run_direct(
 
 ///|
 fn crackle_probe_run_compiled(
-  route_id : Int,
+  route_id : Int32,
   waveform : @moondsp.Waveform,
   freq_hz : Double,
   context : @moondsp.DspContext,
-  block_size : Int,
-  block_count : Int,
+  block_size : Int32,
+  block_count : Int32,
   output : @moondsp.AudioBuffer,
   reference : @moondsp.AudioBuffer,
   residual : @moondsp.AudioBuffer,
@@ -720,8 +716,8 @@ fn crackle_probe_run_voice_pool(
   waveform : @moondsp.Waveform,
   freq_hz : Double,
   context : @moondsp.DspContext,
-  block_size : Int,
-  block_count : Int,
+  block_size : Int32,
+  block_count : Int32,
   output : @moondsp.AudioBuffer,
   reference : @moondsp.AudioBuffer,
   residual : @moondsp.AudioBuffer,
@@ -738,8 +734,8 @@ fn crackle_probe_run_voice_pool(
         pool,
         right,
         reference_osc,
-        left_gain
-      )
+        left_gain,
+      ),
     ) => {
       let mut has_previous = false
       let mut previous_output = 0.0
@@ -782,8 +778,8 @@ fn crackle_probe_run_browser_synth_shape(
   waveform : @moondsp.Waveform,
   freq_hz : Double,
   context : @moondsp.DspContext,
-  block_size : Int,
-  block_count : Int,
+  block_size : Int32,
+  block_count : Int32,
   output : @moondsp.AudioBuffer,
   reference : @moondsp.AudioBuffer,
   residual : @moondsp.AudioBuffer,
@@ -826,7 +822,7 @@ fn crackle_probe_run_browser_synth_shape(
 
 ///|
 fn crackle_probe_stream_compiled_state(
-  route_id : Int,
+  route_id : Int32,
   waveform : @moondsp.Waveform,
   freq_hz : Double,
   context : @moondsp.DspContext,
@@ -882,7 +878,7 @@ fn crackle_probe_stream_voice_pool_state(
   waveform : @moondsp.Waveform,
   freq_hz : Double,
   context : @moondsp.DspContext,
-  block_size : Int,
+  block_size : Int32,
 ) -> CrackleProbeStreamState? {
   let template = @moondsp.AnalyzedGraph::analyze([
     @moondsp.DspNode::oscillator(waveform, 0.0),
@@ -930,7 +926,7 @@ fn crackle_probe_stream_browser_synth_shape_state(
   waveform : @moondsp.Waveform,
   freq_hz : Double,
   context : @moondsp.DspContext,
-  block_size : Int,
+  block_size : Int32,
 ) -> CrackleProbeStreamState? {
   let template = @moondsp.AnalyzedGraph::analyze([
     @moondsp.DspNode::oscillator(waveform, 0.0),
@@ -983,7 +979,7 @@ fn crackle_probe_stream_browser_synth_shape_state(
 fn crackle_probe_copy_buffer(
   source : @moondsp.AudioBuffer,
   target : @moondsp.AudioBuffer,
-  block_size : Int,
+  block_size : Int32,
 ) -> Unit {
   for i in 0..<block_size {
     target.set(i, source.get(i))
@@ -993,7 +989,7 @@ fn crackle_probe_copy_buffer(
 ///|
 fn crackle_probe_scale_buffer(
   buffer : @moondsp.AudioBuffer,
-  block_size : Int,
+  block_size : Int32,
   gain : Double,
 ) -> Unit {
   for i in 0..<block_size {
@@ -1004,12 +1000,12 @@ fn crackle_probe_scale_buffer(
 ///|
 fn crackle_probe_write_metrics(
   metrics : FixedArray[Double],
-  block_index : Int,
+  block_index : Int32,
   output : @moondsp.AudioBuffer,
   reference : @moondsp.AudioBuffer,
   residual : @moondsp.AudioBuffer,
-  block_size : Int,
-  sanitized_count : Int,
+  block_size : Int32,
+  sanitized_count : Int32,
   has_previous : Bool,
   previous_output : Double,
   previous_reference : Double,

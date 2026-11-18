@@ -1,5 +1,5 @@
 ///|
-fn r(num : Int, den : Int) -> @pattern.Rational {
+fn r(num : Int32, den : Int32) -> @pattern.Rational {
   @pattern.Rational(num.to_int64(), den.to_int64())
 }
 

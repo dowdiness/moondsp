@@ -17,7 +17,7 @@ priv struct BenchExternalAuthoringFixture {
   ids : Array[@identity.GraphNodeId]
   control_keys : Array[String]
   control_ids : Array[@identity.GraphNodeId]
-  control_indices : Array[Int]
+  control_indices : Array[Int32]
   control_slots : Array[GraphParamSlot]
   shape_rewire_target_id : @identity.GraphNodeId
   shape_rewire_slot : GraphTopologyInputSlot
@@ -26,7 +26,7 @@ priv struct BenchExternalAuthoringFixture {
 }
 
 ///|
-fn bench_external_graph_id(index : Int) -> @identity.GraphNodeId {
+fn bench_external_graph_id(index : Int32) -> @identity.GraphNodeId {
   try @identity.GraphNodeId::from_string("bench:node:\{index}") catch {
     _ => abort("expected valid generated graph id")
   } noraise {
@@ -49,14 +49,14 @@ priv struct BenchExternalFixtureBuilder {
   ids : Array[@identity.GraphNodeId]
   control_keys : Array[String]
   control_ids : Array[@identity.GraphNodeId]
-  control_indices : Array[Int]
+  control_indices : Array[Int32]
   control_slots : Array[GraphParamSlot]
 }
 
 ///|
 fn BenchExternalFixtureBuilder::BenchExternalFixtureBuilder(
-  node_capacity~ : Int,
-  control_capacity~ : Int,
+  node_capacity~ : Int32,
+  control_capacity~ : Int32,
 ) -> BenchExternalFixtureBuilder {
   let nodes : Array[DspNode] = []
   nodes.reserve_capacity(node_capacity)
@@ -66,7 +66,7 @@ fn BenchExternalFixtureBuilder::BenchExternalFixtureBuilder(
   control_keys.reserve_capacity(control_capacity)
   let control_ids : Array[@identity.GraphNodeId] = []
   control_ids.reserve_capacity(control_capacity)
-  let control_indices : Array[Int] = []
+  let control_indices : Array[Int32] = []
   control_indices.reserve_capacity(control_capacity)
   let control_slots : Array[GraphParamSlot] = []
   control_slots.reserve_capacity(control_capacity)
@@ -77,7 +77,7 @@ fn BenchExternalFixtureBuilder::BenchExternalFixtureBuilder(
 fn BenchExternalFixtureBuilder::push_node(
   self : BenchExternalFixtureBuilder,
   node : DspNode,
-) -> Int {
+) -> Int32 {
   let index = self.nodes.length()
   self.nodes.push(node)
   self.ids.push(bench_external_graph_id(index))
@@ -88,7 +88,7 @@ fn BenchExternalFixtureBuilder::push_node(
 fn BenchExternalFixtureBuilder::push_value0_control(
   self : BenchExternalFixtureBuilder,
   key : String,
-  index : Int,
+  index : Int32,
 ) -> Unit {
   if index < 0 || index >= self.ids.length() {
     abort("expected generated control index to resolve")
@@ -104,10 +104,10 @@ fn BenchExternalFixtureBuilder::finish(
   self : BenchExternalFixtureBuilder,
   name : String,
   graph_kind : BenchExternalGraphKind,
-  shape_rewire_target_index : Int,
+  shape_rewire_target_index : Int32,
   shape_rewire_slot : GraphTopologyInputSlot,
-  shape_rewire_source_index : Int,
-  shape_rewire_restore_index : Int,
+  shape_rewire_source_index : Int32,
+  shape_rewire_restore_index : Int32,
 ) -> BenchExternalAuthoringFixture {
   if shape_rewire_target_index < 0 ||
     shape_rewire_target_index >= self.ids.length() ||
@@ -136,7 +136,7 @@ fn BenchExternalFixtureBuilder::finish(
 ///|
 fn build_bench_external_authoring_fixture(
   name : String,
-  stage_count : Int,
+  stage_count : Int32,
 ) -> BenchExternalAuthoringFixture {
   let builder = BenchExternalFixtureBuilder(
     node_capacity=stage_count + 2,

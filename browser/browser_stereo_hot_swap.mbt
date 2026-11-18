@@ -27,7 +27,7 @@ let compiled_stereo_hot_swap : GraphSlot[@moondsp.StereoDspHotSwap, StereoOut] =
 /// Initialize the browser proof graph that runs through `StereoDspHotSwap`.
 pub fn init_compiled_stereo_hot_swap_graph(
   sample_rate : Double,
-  block_size : Int,
+  block_size : Int32,
 ) -> Bool {
   if compiled_stereo_hot_swap.ensure(sample_rate, block_size) {
     clear_browser_error()
@@ -74,7 +74,7 @@ pub fn queue_compiled_stereo_hot_swap() -> Bool {
 /// Run one render quantum through the browser proof `StereoDspHotSwap` graph.
 pub fn process_compiled_stereo_hot_swap_block(
   sample_rate : Double,
-  block_size : Int,
+  block_size : Int32,
 ) -> Bool {
   if !compiled_stereo_hot_swap.ensure(sample_rate, block_size) {
     return set_browser_init_error("compiled_stereo_hot_swap.process")
@@ -91,13 +91,13 @@ pub fn process_compiled_stereo_hot_swap_block(
 
 ///|
 /// Read one sample from the most recent stereo hot-swap browser left block.
-pub fn compiled_stereo_hot_swap_left_sample(index : Int) -> Double {
+pub fn compiled_stereo_hot_swap_left_sample(index : Int32) -> Double {
   compiled_stereo_hot_swap.output.left_sample(index)
 }
 
 ///|
 /// Read one sample from the most recent stereo hot-swap browser right block.
-pub fn compiled_stereo_hot_swap_right_sample(index : Int) -> Double {
+pub fn compiled_stereo_hot_swap_right_sample(index : Int32) -> Double {
   compiled_stereo_hot_swap.output.right_sample(index)
 }
 

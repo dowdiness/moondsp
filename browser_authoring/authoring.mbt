@@ -43,7 +43,7 @@ pub fn draft_state(draft : @mini.Draft) -> String {
 }
 
 ///|
-fn edit_offset(value : Json) -> Int raise EditWireError {
+fn edit_offset(value : Json) -> Int32 raise EditWireError {
   guard value is Number(number, ..) && number >= 0.0 && number <= 2147483647.0 else {
     raise InvalidEdit("invalid UTF-16 edit offset")
   }
@@ -69,9 +69,7 @@ fn decode_transaction(
     raise InvalidEdit("invalid edit transaction")
   }
   let version = draft.state().version()
-  guard base == Json(version) else {
-    raise InvalidEdit("stale draft version")
-  }
+  guard base == Json(version) else { raise InvalidEdit("stale draft version") }
   let decoded = edits.map(edit => {
     guard edit is Object(fields) &&
       fields.length() == 3 &&
@@ -119,7 +117,11 @@ pub fn dispose_draft(draft : @mini.Draft) -> Unit {
 }
 
 ///|
-fn projection_atom_index(nodes : Array[Json], start : Int, end_ : Int) -> Int? {
+fn projection_atom_index(
+  nodes : Array[Json],
+  start : Int32,
+  end_ : Int32,
+) -> Int32? {
   for index, node in nodes {
     if node is Object(fields) &&
       fields.get("kind") == Some(Json("atom")) &&
@@ -132,7 +134,7 @@ fn projection_atom_index(nodes : Array[Json], start : Int, end_ : Int) -> Int? {
 }
 
 ///|
-fn notation_projection_is_rest(nodes : Array[Json], index : Int) -> Bool {
+fn notation_projection_is_rest(nodes : Array[Json], index : Int32) -> Bool {
   match nodes.get(index) {
     Some(Object(fields)) =>
       fields.get("kind") == Some(Json("atom")) &&
@@ -173,9 +175,9 @@ fn notation_projection_rest_source(
 fn notation_projection_events(
   draft : @mini.Draft,
   compiled : @mini.PreparedPlayback,
-  span : Int,
-  content_start : Int,
-  content_length : Int,
+  span : Int32,
+  content_start : Int32,
+  content_length : Int32,
   nodes : Array[Json],
   kind : String,
   rests_only : Bool,
@@ -248,9 +250,9 @@ fn notation_projection_events(
 ///|
 fn notation_projection_compile_events(
   draft : @mini.Draft,
-  span : Int,
-  content_start : Int,
-  content_length : Int,
+  span : Int32,
+  content_start : Int32,
+  content_length : Int32,
   nodes : Array[Json],
   kind : String,
   rests_only : Bool,

@@ -1,13 +1,14 @@
 ///|
 // Shared implementation package. Public facades keep these generic types private.
+#derive(Debug)
 pub suberror LifecycleError {
   InvalidConfiguration
   EngineClosed
   MountClosed
   CapacityExceeded
   InvalidHandle
-  BufferSizeMismatch(expected~ : Int, actual~ : Int)
-} derive(Debug)
+  BufferSizeMismatch(expected~ : Int32, actual~ : Int32)
+}
 
 ///|
 pub extend LifecycleError with @debug.Debug::{to_repr}
@@ -45,14 +46,14 @@ pub struct Engine[G] {
 pub struct Mount[G] {
   priv engine : Engine[G]
   priv instance : Instance[G]
-  priv slot : Int
+  priv slot : Int32
 }
 
 ///|
 pub fn[G] Engine::Engine(
   context : @dsp.DspContext,
   render : (G, @dsp.DspContext, @dsp.AudioBuffer) -> Unit,
-  capacity? : Int = 16,
+  capacity~ : Int32 = 16,
 ) -> Engine[G] raise LifecycleError {
   guard capacity > 0 &&
     context.block_size() > 0 &&

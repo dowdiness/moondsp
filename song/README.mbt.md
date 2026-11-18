@@ -155,24 +155,14 @@ test "query explicitly placed occurrences" {
       name="a1",
       section=a,
     ),
-    @song.SongPart::at(
-      start=@pattern.Rational(1L, 2L),
-      name="b1",
-      section=b,
-    ),
+    @song.SongPart::at(start=@pattern.Rational(1L, 2L), name="b1", section=b),
   ])
   let overlap = arrangement.query(
-    @pattern.TimeSpan(
-      @pattern.Rational(1L, 2L),
-      @pattern.Rational::from_int(1),
-    ),
+    @pattern.TimeSpan(@pattern.Rational(1L, 2L), @pattern.Rational::from_int(1)),
   )
 
   assert_eq(overlap.length(), 2)
-  assert_eq(
-    arrangement.occurrences_at(@pattern.Rational(3L, 4L)).length(),
-    2,
-  )
+  assert_eq(arrangement.occurrences_at(@pattern.Rational(3L, 4L)).length(), 2)
 }
 ```
 

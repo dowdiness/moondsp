@@ -18,7 +18,7 @@ let compiled : GraphSlot[@moondsp.Dsp, MonoOut] = GraphSlot(output=MonoOut(), co
 
 ///|
 /// Initialize the browser proof graph that runs through `Dsp`.
-pub fn init_compiled_graph(sample_rate : Double, block_size : Int) -> Bool {
+pub fn init_compiled_graph(sample_rate : Double, block_size : Int32) -> Bool {
   if compiled.ensure(sample_rate, block_size) {
     clear_browser_error()
     true
@@ -33,7 +33,7 @@ pub fn process_compiled_block(
   freq : Double,
   gain : Double,
   sample_rate : Double,
-  block_size : Int,
+  block_size : Int32,
 ) -> Bool {
   if !compiled.ensure(sample_rate, block_size) {
     return set_browser_init_error("compiled.process")
@@ -54,7 +54,7 @@ pub fn process_compiled_block(
 
 ///|
 /// Read one sample from the most recent compiled browser output block.
-pub fn compiled_output_sample(index : Int) -> Double {
+pub fn compiled_output_sample(index : Int32) -> Double {
   compiled.output.sample(index)
 }
 

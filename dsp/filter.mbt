@@ -1,10 +1,11 @@
 ///|
 /// Supported biquad response shapes for the Phase 1 filter primitive.
+#derive(Eq)
 pub(all) enum BiquadMode {
   LowPass
   HighPass
   BandPass
-} derive(Eq)
+}
 
 ///|
 pub extend BiquadMode with Eq::{not_equal, equal}

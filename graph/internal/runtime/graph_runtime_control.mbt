@@ -1,14 +1,15 @@
 ///|
 /// Failure reason for runtime graph control APIs.
+#derive(Debug)
 pub enum GraphControlError {
-  InvalidNodeIndex(Int)
+  InvalidNodeIndex(Int32)
   /// The authoring node existed but was eliminated by graph optimization.
-  OrphanNode(Int)
-  InvalidGateNode(Int, DspNodeKind)
-  InvalidSlotForNode(Int, DspNodeKind, GraphParamSlot)
-  InvalidParamValue(Int, DspNodeKind, GraphParamSlot, Double)
-  MissingRuntimeState(Int, DspNodeKind)
-} derive(Debug)
+  OrphanNode(Int32)
+  InvalidGateNode(Int32, DspNodeKind)
+  InvalidSlotForNode(Int32, DspNodeKind, GraphParamSlot)
+  InvalidParamValue(Int32, DspNodeKind, GraphParamSlot, Double)
+  MissingRuntimeState(Int32, DspNodeKind)
+}
 
 ///|
 pub extend GraphControlError with @moonbitlang/core/debug.Debug::{to_repr}
@@ -50,13 +51,13 @@ pub fn Dsp::validate_controls(
 
 ///|
 /// Allocation-conscious gate-on primitive for prevalidated host paths.
-pub fn Dsp::gate_on_bool(self : Dsp, node_index : Int) -> Bool {
+pub fn Dsp::gate_on_bool(self : Dsp, node_index : Int32) -> Bool {
   self.0.apply_gate_control_bool_impl(node_index, true)
 }
 
 ///|
 /// Allocation-conscious gate-off primitive for prevalidated host paths.
-pub fn Dsp::gate_off_bool(self : Dsp, node_index : Int) -> Bool {
+pub fn Dsp::gate_off_bool(self : Dsp, node_index : Int32) -> Bool {
   self.0.apply_gate_control_bool_impl(node_index, false)
 }
 
@@ -64,7 +65,7 @@ pub fn Dsp::gate_off_bool(self : Dsp, node_index : Int) -> Bool {
 /// Allocation-conscious parameter primitive for prevalidated host paths.
 pub fn Dsp::set_param_bool(
   self : Dsp,
-  node_index : Int,
+  node_index : Int32,
   slot : GraphParamSlot,
   value : Double,
 ) -> Bool {
@@ -75,7 +76,7 @@ pub fn Dsp::set_param_bool(
 /// Allocation-conscious parameter validation for prevalidated host paths.
 pub fn Dsp::can_set_param_bool(
   self : Dsp,
-  node_index : Int,
+  node_index : Int32,
   slot : GraphParamSlot,
   value : Double,
 ) -> Bool {
@@ -347,8 +348,8 @@ pub fn CompiledGraph::validate_controls_impl(
 ///|
 fn CompiledGraph::compiled_index_result(
   self : CompiledGraph,
-  node_index : Int,
-) -> Result[Int, GraphControlError] {
+  node_index : Int32,
+) -> Result[Int32, GraphControlError] {
   match self.compiled_index_for(node_index) {
     Some(compiled) => Ok(compiled)
     None =>
@@ -363,7 +364,7 @@ fn CompiledGraph::compiled_index_result(
 ///|
 fn CompiledGraph::apply_gate_control_bool_impl(
   self : CompiledGraph,
-  node_index : Int,
+  node_index : Int32,
   gate_on : Bool,
 ) -> Bool {
   match self.compiled_index_for(node_index) {
@@ -386,7 +387,7 @@ fn CompiledGraph::apply_gate_control_bool_impl(
 ///|
 fn CompiledGraph::apply_param_control_bool_impl(
   self : CompiledGraph,
-  node_index : Int,
+  node_index : Int32,
   slot : GraphParamSlot,
   value : Double,
 ) -> Bool {
@@ -410,7 +411,7 @@ fn CompiledGraph::apply_param_control_bool_impl(
 ///|
 fn CompiledGraph::can_param_control_bool_impl(
   self : CompiledGraph,
-  node_index : Int,
+  node_index : Int32,
   slot : GraphParamSlot,
   value : Double,
 ) -> Bool {
@@ -427,7 +428,7 @@ fn CompiledGraph::can_param_control_bool_impl(
 ///|
 pub fn updated_model_node_param_result(
   node : @model.DspNode,
-  node_index : Int,
+  node_index : Int32,
   slot : GraphParamSlot,
   value : Double,
   sample_rate : Double,
@@ -510,7 +511,7 @@ fn model_node_param_valid(
 ///|
 fn runtime_param_state_available(
   graph : CompiledGraph,
-  compiled_index : Int,
+  compiled_index : Int32,
   node : @model.DspNode,
   slot : GraphParamSlot,
 ) -> Bool {
@@ -807,7 +808,7 @@ fn updated_model_node_param(
 ///|
 fn apply_runtime_param_side_effect(
   graph : CompiledGraph,
-  compiled_index : Int,
+  compiled_index : Int32,
   node : @model.DspNode,
   slot : GraphParamSlot,
 ) -> Bool {
@@ -882,7 +883,7 @@ fn apply_runtime_param_side_effect(
 }
 
 ///|
-fn exact_int_value(value : Double) -> Int? {
+fn exact_int_value(value : Double) -> Int32? {
   if !@dsp.is_finite(value) || value.trunc() != value {
     return None
   }
@@ -898,8 +899,8 @@ fn exact_int_value(value : Double) -> Int? {
 fn apply_stereo_delay_param_side_effect(
   left_states : FixedArray[DelayLine?],
   right_states : FixedArray[DelayLine?],
-  compiled_index : Int,
-  delay_samples : Int,
+  compiled_index : Int32,
+  delay_samples : Int32,
   feedback : Double,
 ) -> Bool {
   match left_states[compiled_index] {

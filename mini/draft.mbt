@@ -1,5 +1,5 @@
 ///|
-const DRAFT_SOURCE_LIMIT : Int = 8192
+const DRAFT_SOURCE_LIMIT : Int32 = 8192
 
 ///|
 const DRAFT_IDENTITY_MAX : Int64 = 9007199254740991L
@@ -9,10 +9,11 @@ let draft_epoch_counter : Ref[Int64] = Ref(0L)
 
 ///|
 /// An opaque document epoch and revision. Only Draft issues versions.
+#derive(Eq, Debug)
 pub struct DraftVersion {
   priv epoch : @identity.SourceEpoch
   priv revision : Int64
-} derive(Eq, Debug)
+}
 
 ///|
 fn DraftVersion::DraftVersion(
@@ -30,10 +31,11 @@ pub extend DraftVersion with Debug::{to_repr}
 
 ///|
 /// Half-open UTF-16 source coordinates.
+#derive(Eq, Debug)
 pub struct SourceRange {
-  priv first : Int
-  priv last : Int
-} derive(Eq, Debug)
+  priv first : Int32
+  priv last : Int32
+}
 
 ///|
 fn SourceRange::SourceRange(span : MiniSpan) -> SourceRange {
@@ -41,12 +43,12 @@ fn SourceRange::SourceRange(span : MiniSpan) -> SourceRange {
 }
 
 ///|
-pub fn SourceRange::start(self : SourceRange) -> Int {
+pub fn SourceRange::start(self : SourceRange) -> Int32 {
   self.first
 }
 
 ///|
-pub fn SourceRange::end(self : SourceRange) -> Int {
+pub fn SourceRange::end(self : SourceRange) -> Int32 {
   self.last
 }
 
@@ -59,15 +61,15 @@ pub extend SourceRange with Debug::{to_repr}
 ///|
 /// A replacement in the transaction's old document, not an intermediate text.
 pub struct TextEdit {
-  priv from : Int
-  priv to : Int
+  priv from : Int32
+  priv to : Int32
   priv inserted : String
 }
 
 ///|
 pub fn TextEdit::TextEdit(
-  from~ : Int,
-  to~ : Int,
+  from~ : Int32,
+  to~ : Int32,
   inserted~ : String,
 ) -> TextEdit {
   { from, to, inserted, }
@@ -88,12 +90,13 @@ pub fn EditTransaction::EditTransaction(
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) suberror DraftEditError {
   WrongBase
   InvalidEdit(String)
   IdentityExhausted
   Disposed
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend DraftEditError with Eq::{equal, not_equal}
@@ -102,12 +105,13 @@ pub extend DraftEditError with Eq::{equal, not_equal}
 pub extend DraftEditError with Debug::{to_repr}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum DraftTracking {
   Pattern
   Song
   TrackingUnavailable
   Disposed
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend DraftTracking with Eq::{equal, not_equal}
@@ -116,12 +120,13 @@ pub extend DraftTracking with Eq::{equal, not_equal}
 pub extend DraftTracking with Debug::{to_repr}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum DraftDiagnosticKind {
   Syntax
   TrackingUnavailable
   CompilerContract
   Disposed
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend DraftDiagnosticKind with Eq::{equal, not_equal}
@@ -130,11 +135,12 @@ pub extend DraftDiagnosticKind with Eq::{equal, not_equal}
 pub extend DraftDiagnosticKind with Debug::{to_repr}
 
 ///|
+#derive(Eq, Debug)
 pub struct DraftDiagnostic {
   priv at : DraftVersion
   priv category : DraftDiagnosticKind
   priv detail : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend DraftDiagnostic with Eq::{equal, not_equal}
@@ -205,11 +211,12 @@ pub fn DraftState::diagnostic(self : DraftState) -> DraftDiagnostic? {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum OriginUnavailable {
   SourceReset
   AtomRetired
   BrokenReference
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend OriginUnavailable with Eq::{equal, not_equal}
@@ -218,10 +225,11 @@ pub extend OriginUnavailable with Eq::{equal, not_equal}
 pub extend OriginUnavailable with Debug::{to_repr}
 
 ///|
+#derive(Eq, Debug)
 pub(all) enum OriginLocation {
   Located(SourceRange, Array[SourceRange])
   Unavailable(OriginUnavailable)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend OriginLocation with Eq::{equal, not_equal}
@@ -266,7 +274,7 @@ priv struct LiveDefinition {
   id : @identity.DefinitionId
   name : String
   span : MiniSpan
-  visible_after : Int
+  visible_after : Int32
 }
 
 ///|
@@ -527,8 +535,8 @@ fn SourceMap::advance(
 fn SourceMap::atom_at(
   self : SourceMap,
   kind : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
 ) -> @identity.SourceAtomId? {
   for atom in self.atoms {
     if atom.kind == kind && atom.span.start == start && atom.span.end == end {
@@ -541,8 +549,8 @@ fn SourceMap::atom_at(
 ///|
 fn SourceMap::frame_at(
   self : SourceMap,
-  content_from : Int,
-  content_to : Int,
+  content_from : Int32,
+  content_to : Int32,
 ) -> @identity.SourceFrameId? {
   for literal in self.literals {
     if literal.span.start == content_from && literal.span.end == content_to {
@@ -565,8 +573,8 @@ fn SourceMap::frame_range(self : SourceMap, serial : Int64) -> SourceRange? {
 ///|
 fn SourceMap::resolve_reference(
   self : SourceMap,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   definition_span : MiniSpan,
   definition : @pattern.PatternDoc[@pattern.ControlMap],
 ) -> @pattern.ResolvedReference[@pattern.ControlMap] raise ParseError {
@@ -655,8 +663,8 @@ pub(all) enum PreparedPlayback {
 /// A failed exact compilation never falls back to runtime-only playback.
 pub fn PlaybackInput::compile(
   self : PlaybackInput,
-  previous? : @pattern.PatternDoc[@pattern.ControlMap]? = None,
-  max_query_span? : @pattern.Rational? = None,
+  previous~ : @pattern.PatternDoc[@pattern.ControlMap]? = None,
+  max_query_span~ : @pattern.Rational? = None,
 ) -> Result[PreparedPlayback, String] {
   match self.payload {
     Text =>
@@ -836,7 +844,7 @@ pub fn Draft::state(self : Draft) -> DraftState {
 }
 
 ///|
-fn draft_utf16_boundary(text : String, offset : Int) -> Bool {
+fn draft_utf16_boundary(text : String, offset : Int32) -> Bool {
   guard offset > 0 && offset < text.length() else { return true }
   let before = text[offset - 1].to_int()
   let after = text[offset].to_int()

@@ -1,31 +1,31 @@
 ///|
 /// Parameter id for the final plugin-output gain.
-pub const CLAP_PARAM_MASTER_GAIN : Int = 0
+pub const CLAP_PARAM_MASTER_GAIN : Int32 = 0
 
 ///|
 /// Parameter id for per-voice oscillator/envelope gain.
-pub const CLAP_PARAM_VOICE_GAIN : Int = 1
+pub const CLAP_PARAM_VOICE_GAIN : Int32 = 1
 
 ///|
 /// Parameter id for the low-pass cutoff in Hz.
-pub const CLAP_PARAM_CUTOFF_HZ : Int = 2
+pub const CLAP_PARAM_CUTOFF_HZ : Int32 = 2
 
 ///|
 /// Parameter id for the low-pass resonance/Q value.
-pub const CLAP_PARAM_RESONANCE : Int = 3
+pub const CLAP_PARAM_RESONANCE : Int32 = 3
 
 ///|
 /// Parameter id for per-voice stereo pan in the range [-1, 1].
-pub const CLAP_PARAM_PAN : Int = 4
+pub const CLAP_PARAM_PAN : Int32 = 4
 
 ///|
-const NOTE_NODE_INDEX : Int = 0
+const NOTE_NODE_INDEX : Int32 = 0
 
 ///|
-const FILTER_NODE_INDEX : Int = 3
+const FILTER_NODE_INDEX : Int32 = 3
 
 ///|
-const GAIN_NODE_INDEX : Int = 4
+const GAIN_NODE_INDEX : Int32 = 4
 
 ///|
 const DEFAULT_SAMPLE_RATE : Double = 48000.0
@@ -34,10 +34,10 @@ const DEFAULT_SAMPLE_RATE : Double = 48000.0
 const MIN_SAFE_SAMPLE_RATE : Double = 8000.0
 
 ///|
-const DEFAULT_MAX_BLOCK_SIZE : Int = 128
+const DEFAULT_MAX_BLOCK_SIZE : Int32 = 128
 
 ///|
-const DEFAULT_MAX_VOICES : Int = 32
+const DEFAULT_MAX_VOICES : Int32 = 32
 
 ///|
 const DEFAULT_MASTER_GAIN : Double = 0.8
@@ -55,12 +55,13 @@ const DEFAULT_RESONANCE : Double = 0.707
 const DEFAULT_PAN : Double = 0.0
 
 ///|
+#derive(Eq, Debug)
 pub(all) suberror ClapEngineError {
   InvalidSampleRate
   InvalidMaxBlockSize
   InvalidMaxVoices
   PoolInitFailed(@moondsp.BoundVoicePoolError)
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend ClapEngineError with Eq::{not_equal, equal}
@@ -84,13 +85,13 @@ pub extend ClapEngineError with Show::{to_string, output}
 /// block, then copy `left_sample`/`right_sample` into the host's output ports.
 pub struct ClapSynthEngine {
   priv sample_rate : Double
-  priv max_block_size : Int
+  priv max_block_size : Int32
   priv pool : @moondsp.BoundVoicePool
   priv left : @moondsp.AudioBuffer
   priv right : @moondsp.AudioBuffer
   priv render_contexts : FixedArray[@moondsp.DspContext]
   priv active_notes : ActiveNoteTable
-  priv mut last_frame_count : Int
+  priv mut last_frame_count : Int32
   /// Each host parameter's sanitized value, indexed by parameter id. The voice
   /// parameters are buses: every sounding voice follows them, including its
   /// release tail (ADR-0019 Decision 1). Master gain scales the output.
@@ -104,7 +105,7 @@ pub struct ClapSynthEngine {
 
 ///|
 /// The voice parameters host automation drives, by binding key.
-let voice_buses : Array[(String, Int)] = [
+let voice_buses : Array[(String, Int32)] = [
   ("gain", CLAP_PARAM_VOICE_GAIN),
   ("cutoff", CLAP_PARAM_CUTOFF_HZ),
   ("q", CLAP_PARAM_RESONANCE),
@@ -118,15 +119,15 @@ let voice_buses : Array[(String, Int)] = [
 /// inside `process`, so active-note tracking must not allocate or resize.
 priv struct ActiveNoteTable {
   used : FixedArray[Bool]
-  map_keys : FixedArray[Int]
-  keys : FixedArray[Int]
-  slots : FixedArray[Int]
-  generations : FixedArray[Int]
-  mut count : Int
+  map_keys : FixedArray[Int32]
+  keys : FixedArray[Int32]
+  slots : FixedArray[Int32]
+  generations : FixedArray[Int32]
+  mut count : Int32
 }
 
 ///|
-fn ActiveNoteTable::ActiveNoteTable(capacity : Int) -> ActiveNoteTable {
+fn ActiveNoteTable::ActiveNoteTable(capacity : Int32) -> ActiveNoteTable {
   {
     used: FixedArray::make(capacity, false),
     map_keys: FixedArray::make(capacity, 0),
@@ -138,19 +139,19 @@ fn ActiveNoteTable::ActiveNoteTable(capacity : Int) -> ActiveNoteTable {
 }
 
 ///|
-fn ActiveNoteTable::is_used(self : ActiveNoteTable, index : Int) -> Bool {
+fn ActiveNoteTable::is_used(self : ActiveNoteTable, index : Int32) -> Bool {
   self.used[index]
 }
 
 ///|
-fn ActiveNoteTable::key_at(self : ActiveNoteTable, index : Int) -> Int {
+fn ActiveNoteTable::key_at(self : ActiveNoteTable, index : Int32) -> Int32 {
   self.keys[index]
 }
 
 ///|
 fn ActiveNoteTable::handle_at(
   self : ActiveNoteTable,
-  index : Int,
+  index : Int32,
 ) -> @moondsp.VoiceHandle {
   @moondsp.VoiceHandle::from_parts(
     slot=self.slots[index],
@@ -161,8 +162,8 @@ fn ActiveNoteTable::handle_at(
 ///|
 fn ActiveNoteTable::index_for_map_key(
   self : ActiveNoteTable,
-  map_key : Int,
-) -> Int? {
+  map_key : Int32,
+) -> Int32? {
   for index in 0..<self.used.length() {
     if self.used[index] && self.map_keys[index] == map_key {
       return Some(index)
@@ -172,7 +173,7 @@ fn ActiveNoteTable::index_for_map_key(
 }
 
 ///|
-fn ActiveNoteTable::find_by_key(self : ActiveNoteTable, key : Int) -> Int? {
+fn ActiveNoteTable::find_by_key(self : ActiveNoteTable, key : Int32) -> Int32? {
   for index in 0..<self.used.length() {
     if self.used[index] && self.keys[index] == key {
       return Some(index)
@@ -182,7 +183,7 @@ fn ActiveNoteTable::find_by_key(self : ActiveNoteTable, key : Int) -> Int? {
 }
 
 ///|
-fn ActiveNoteTable::clear_index(self : ActiveNoteTable, index : Int) -> Unit {
+fn ActiveNoteTable::clear_index(self : ActiveNoteTable, index : Int32) -> Unit {
   if self.used[index] {
     self.used[index] = false
     self.count = self.count - 1
@@ -196,7 +197,10 @@ fn ActiveNoteTable::clear_all(self : ActiveNoteTable) -> Unit {
 }
 
 ///|
-fn ActiveNoteTable::remove_for_slot(self : ActiveNoteTable, slot : Int) -> Unit {
+fn ActiveNoteTable::remove_for_slot(
+  self : ActiveNoteTable,
+  slot : Int32,
+) -> Unit {
   for index in 0..<self.used.length() {
     if self.used[index] && self.slots[index] == slot {
       self.clear_index(index)
@@ -207,8 +211,8 @@ fn ActiveNoteTable::remove_for_slot(self : ActiveNoteTable, slot : Int) -> Unit 
 ///|
 fn ActiveNoteTable::store_handle_id(
   self : ActiveNoteTable,
-  map_key : Int,
-  key : Int,
+  map_key : Int32,
+  key : Int32,
   handle_id : Int64,
 ) -> Unit {
   let slot = @moondsp.VoiceHandle::packed_slot(handle_id)
@@ -289,9 +293,9 @@ fn synth_bindings() -> @moondsp.ControlBindingBuilder {
 
 ///|
 pub fn ClapSynthEngine::ClapSynthEngine(
-  sample_rate? : Double = DEFAULT_SAMPLE_RATE,
-  max_block_size? : Int = DEFAULT_MAX_BLOCK_SIZE,
-  max_voices? : Int = DEFAULT_MAX_VOICES,
+  sample_rate~ : Double = DEFAULT_SAMPLE_RATE,
+  max_block_size~ : Int32 = DEFAULT_MAX_BLOCK_SIZE,
+  max_voices~ : Int32 = DEFAULT_MAX_VOICES,
 ) -> ClapSynthEngine raise ClapEngineError {
   if !is_valid_sample_rate(sample_rate) {
     raise ClapEngineError::InvalidSampleRate
@@ -371,7 +375,7 @@ pub fn ClapSynthEngine::pan(self : ClapSynthEngine) -> Double {
 /// map key. CLAP sends `note_id = -1` when no stable note id is assigned; in
 /// that case use the MIDI key so note-off can still find the most recent voice
 /// for that pitch.
-fn note_map_key(note_id : Int, key : Int) -> Int {
+fn note_map_key(note_id : Int32, key : Int32) -> Int32 {
   if note_id >= 0 {
     note_id
   } else {
@@ -382,7 +386,7 @@ fn note_map_key(note_id : Int, key : Int) -> Int {
 ///|
 fn ClapSynthEngine::release_active_note_index(
   self : ClapSynthEngine,
-  index : Int,
+  index : Int32,
 ) -> Bool {
   if !self.active_notes.is_used(index) {
     return false
@@ -395,7 +399,7 @@ fn ClapSynthEngine::release_active_note_index(
 ///|
 fn ClapSynthEngine::release_active_note(
   self : ClapSynthEngine,
-  map_key : Int,
+  map_key : Int32,
 ) -> Bool {
   match self.active_notes.index_for_map_key(map_key) {
     None => false
@@ -406,8 +410,8 @@ fn ClapSynthEngine::release_active_note(
 ///|
 fn ClapSynthEngine::release_active_note_matching_key(
   self : ClapSynthEngine,
-  map_key : Int,
-  key : Int,
+  map_key : Int32,
+  key : Int32,
 ) -> Bool {
   match self.active_notes.index_for_map_key(map_key) {
     Some(index) if key < 0 || self.active_notes.key_at(index) == key =>
@@ -419,7 +423,7 @@ fn ClapSynthEngine::release_active_note_matching_key(
 ///|
 fn ClapSynthEngine::release_active_notes_by_key(
   self : ClapSynthEngine,
-  key : Int,
+  key : Int32,
 ) -> Bool {
   let mut released = false
   let mut searching = true
@@ -506,7 +510,7 @@ fn sanitize_cutoff(value : Double, sample_rate : Double) -> Double {
 }
 
 ///|
-fn sanitize_frame_count(frame_count : Int, max_block_size : Int) -> Int {
+fn sanitize_frame_count(frame_count : Int32, max_block_size : Int32) -> Int32 {
   if frame_count <= 0 {
     0
   } else if frame_count > max_block_size {
@@ -517,15 +521,15 @@ fn sanitize_frame_count(frame_count : Int, max_block_size : Int) -> Int {
 }
 
 ///|
-fn midi_to_hz(key : Int) -> Double {
+fn midi_to_hz(key : Int32) -> Double {
   440.0 * @math.pow(2.0, (key.to_double() - 69.0) / 12.0)
 }
 
 ///|
 pub fn ClapSynthEngine::note_on(
   self : ClapSynthEngine,
-  note_id~ : Int,
-  key~ : Int,
+  note_id~ : Int32,
+  key~ : Int32,
   velocity~ : Double,
 ) -> Bool {
   if key < 0 || key > 127 {
@@ -566,8 +570,8 @@ pub fn ClapSynthEngine::note_on(
 ///|
 pub fn ClapSynthEngine::note_off(
   self : ClapSynthEngine,
-  note_id~ : Int,
-  key~ : Int,
+  note_id~ : Int32,
+  key~ : Int32,
 ) -> Bool {
   if note_id < 0 && key < 0 {
     let had_notes = self.active_notes.count > 0
@@ -645,7 +649,7 @@ pub fn ClapSynthEngine::set_pan(
 /// Flat integer-parameter dispatcher intended for the C CLAP bridge.
 pub fn ClapSynthEngine::set_param(
   self : ClapSynthEngine,
-  param_id : Int,
+  param_id : Int32,
   value : Double,
 ) -> Bool {
   match param_id {
@@ -677,8 +681,8 @@ pub fn ClapSynthEngine::set_param(
 /// Render up to `max_block_size` frames and return the actual processed count.
 pub fn ClapSynthEngine::process(
   self : ClapSynthEngine,
-  frame_count : Int,
-) -> Int {
+  frame_count : Int32,
+) -> Int32 {
   let frames = sanitize_frame_count(frame_count, self.max_block_size)
   self.last_frame_count = frames
   self.left.fill(0.0)
@@ -701,8 +705,8 @@ pub fn ClapSynthEngine::process(
 ///|
 fn checked_sample(
   buffer : @moondsp.AudioBuffer,
-  index : Int,
-  frame_count : Int,
+  index : Int32,
+  frame_count : Int32,
 ) -> Double {
   if index >= 0 && index < frame_count {
     buffer.get(index)
@@ -714,7 +718,7 @@ fn checked_sample(
 ///|
 pub fn ClapSynthEngine::left_sample(
   self : ClapSynthEngine,
-  index : Int,
+  index : Int32,
 ) -> Double {
   checked_sample(self.left, index, self.last_frame_count)
 }
@@ -722,7 +726,7 @@ pub fn ClapSynthEngine::left_sample(
 ///|
 pub fn ClapSynthEngine::right_sample(
   self : ClapSynthEngine,
-  index : Int,
+  index : Int32,
 ) -> Double {
   checked_sample(self.right, index, self.last_frame_count)
 }

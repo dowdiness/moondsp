@@ -1,5 +1,5 @@
 ///|
-fn valid_reference(input : Int, node_count : Int) -> Bool {
+fn valid_reference(input : Int32, node_count : Int32) -> Bool {
   input >= 0 && input < node_count
 }
 
@@ -8,7 +8,7 @@ fn valid_reference(input : Int, node_count : Int) -> Bool {
 ///|
 fn valid_feedback_terminal_mono_graph(
   nodes : FixedArray[@model.DspNode],
-  feedback_edges : FixedArray[(Int, Int, Int)],
+  feedback_edges : FixedArray[(Int32, Int32, Int32)],
 ) -> Bool {
   // Build per-slot back-edge source maps for shape resolution.
   let be_input0_src = FixedArray::make(nodes.length(), -1)
@@ -331,7 +331,7 @@ fn valid_terminal_stereo_shapes(nodes : FixedArray[@model.DspNode]) -> Bool {
 ///|
 fn compiled_stereo_shapes(
   nodes : FixedArray[@model.DspNode],
-) -> FixedArray[Int]? {
+) -> FixedArray[Int32]? {
   let shapes = FixedArray::make(nodes.length(), MONO_SIGNAL_SHAPE)
   for index = 0; index < nodes.length(); index = index + 1 {
     let node = nodes[index]
@@ -434,8 +434,8 @@ fn compiled_stereo_shapes(
 /// the mono/stereo boundary (e.g. Pan -> StereoGain -> StereoMixDown -> Mix).
 fn compiled_feedback_stereo_shapes(
   nodes : FixedArray[@model.DspNode],
-  feedback_edges : FixedArray[(Int, Int, Int)],
-) -> FixedArray[Int]? {
+  feedback_edges : FixedArray[(Int32, Int32, Int32)],
+) -> FixedArray[Int32]? {
   // Build per-slot back-edge source maps so we can skip them during forward
   // shape propagation.
   let be_input0_src = FixedArray::make(nodes.length(), -1)
@@ -669,11 +669,11 @@ fn compiled_feedback_stereo_shapes(
 /// Resolve the shape of an input, accounting for back-edges. If the input is a
 /// back-edge, use the intrinsic output shape of the source node.
 fn feedback_resolved_input_shape(
-  input_index : Int,
-  back_edge_source : Int,
-  shapes : FixedArray[Int],
+  input_index : Int32,
+  back_edge_source : Int32,
+  shapes : FixedArray[Int32],
   nodes : FixedArray[@model.DspNode],
-) -> Int? {
+) -> Int32? {
   if back_edge_source >= 0 {
     Some(@model.node_signal_shape(nodes[back_edge_source]))
   } else {
@@ -684,7 +684,7 @@ fn feedback_resolved_input_shape(
 ///|
 fn valid_feedback_terminal_stereo_graph(
   nodes : FixedArray[@model.DspNode],
-  feedback_edges : FixedArray[(Int, Int, Int)],
+  feedback_edges : FixedArray[(Int32, Int32, Int32)],
 ) -> Bool {
   let shapes = match compiled_feedback_stereo_shapes(nodes, feedback_edges) {
     Some(shapes) => shapes
@@ -711,7 +711,7 @@ fn valid_feedback_terminal_stereo_graph(
 }
 
 ///|
-fn feedback_target_shape(node : @model.DspNode, target_slot : Int) -> Int? {
+fn feedback_target_shape(node : @model.DspNode, target_slot : Int32) -> Int32? {
   match node.kind() {
     Biquad => if target_slot == 0 { Some(MONO_SIGNAL_SHAPE) } else { None }
     Delay => if target_slot == 0 { Some(MONO_SIGNAL_SHAPE) } else { None }
@@ -772,7 +772,7 @@ fn feedback_target_shape(node : @model.DspNode, target_slot : Int) -> Int? {
 }
 
 ///|
-fn input_shape(input : Int, shapes : FixedArray[Int]) -> Int? {
+fn input_shape(input : Int32, shapes : FixedArray[Int32]) -> Int32? {
   if input < 0 || input >= shapes.length() {
     None
   } else {

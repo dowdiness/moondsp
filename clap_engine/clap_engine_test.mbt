@@ -19,7 +19,10 @@ fn abs_double(value : Double) -> Double {
 }
 
 ///|
-fn rendered_peak(engine : @clap_engine.ClapSynthEngine, frames : Int) -> Double {
+fn rendered_peak(
+  engine : @clap_engine.ClapSynthEngine,
+  frames : Int32,
+) -> Double {
   let processed = engine.process(frames)
   for i in 0..<processed; peak = 0.0 {
     let l = abs_double(engine.left_sample(i))
@@ -61,7 +64,7 @@ test "engine initializes and renders silence before notes" {
 ///|
 test "engine rejects unsafe tiny sample rates" {
   match
-    (try Ok(@clap_engine.ClapSynthEngine(sample_rate=1.0)) catch { e => Err(e) }) {
+    (Ok(@clap_engine.ClapSynthEngine(sample_rate=1.0)) catch { e => Err(e) }) {
     Err(@clap_engine.ClapEngineError::InvalidSampleRate) => ()
     _ => abort("expected invalid sample rate")
   }

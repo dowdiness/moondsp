@@ -2,7 +2,7 @@
 fn copy_buffer(
   source : AudioBuffer,
   target : AudioBuffer,
-  sample_count : Int,
+  sample_count : Int32,
 ) -> Unit {
   let bounded = if sample_count < source.length() {
     if sample_count < target.length() {
@@ -31,7 +31,7 @@ fn copy_stereo_buffers(
   source_right : AudioBuffer,
   target_left : AudioBuffer,
   target_right : AudioBuffer,
-  sample_count : Int,
+  sample_count : Int32,
 ) -> Unit {
   copy_buffer(source_left, target_left, sample_count)
   copy_buffer(source_right, target_right, sample_count)
@@ -42,7 +42,7 @@ fn mixdown_stereo_buffers(
   left : AudioBuffer,
   right : AudioBuffer,
   output : AudioBuffer,
-  sample_count : Int,
+  sample_count : Int32,
 ) -> Unit {
   let bounded = min_buffer_length(
     sample_count,
@@ -61,7 +61,7 @@ fn mixdown_stereo_buffers(
 ///|
 fn fill_constant_buffer(
   buffer : AudioBuffer,
-  sample_count : Int,
+  sample_count : Int32,
   value : Double,
 ) -> Unit {
   let bounded = if sample_count < buffer.length() {
@@ -81,7 +81,7 @@ fn fill_constant_buffer(
 fn apply_envelope_gain_buffer(
   buffer : AudioBuffer,
   envelope : AudioBuffer,
-  sample_count : Int,
+  sample_count : Int32,
   amount : Double,
 ) -> Unit {
   let bounded = min_buffer_length(
@@ -101,7 +101,7 @@ fn apply_envelope_gain_buffer(
 ///|
 fn apply_gain_buffer(
   buffer : AudioBuffer,
-  sample_count : Int,
+  sample_count : Int32,
   amount : Double,
 ) -> Unit {
   let bounded = if sample_count < buffer.length() {
@@ -122,7 +122,7 @@ fn mix_buffers(
   left : AudioBuffer,
   right : AudioBuffer,
   output : AudioBuffer,
-  sample_count : Int,
+  sample_count : Int32,
 ) -> Unit {
   let bounded = min_buffer_length(
     sample_count,
@@ -143,7 +143,7 @@ fn multiply_buffers(
   left : AudioBuffer,
   right : AudioBuffer,
   output : AudioBuffer,
-  sample_count : Int,
+  sample_count : Int32,
 ) -> Unit {
   let bounded = min_buffer_length(
     sample_count,
@@ -162,7 +162,7 @@ fn multiply_buffers(
 ///|
 fn clip_buffer(
   buffer : AudioBuffer,
-  sample_count : Int,
+  sample_count : Int32,
   threshold : Double,
 ) -> Unit {
   let bounded = if sample_count < buffer.length() {
@@ -187,7 +187,7 @@ fn clip_buffer(
 }
 
 ///|
-fn min_buffer_length(a : Int, b : Int, c : Int, d : Int) -> Int {
+fn min_buffer_length(a : Int32, b : Int32, c : Int32, d : Int32) -> Int32 {
   let ab = if a < b { a } else { b }
   let cd = if c < d { c } else { d }
   if ab < cd {

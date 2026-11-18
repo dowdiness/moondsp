@@ -10,7 +10,7 @@
 ///|
 /// Chord quality intervals in semitones from root.
 priv struct ChordQuality {
-  intervals : Array[Int]
+  intervals : Array[Int32]
 }
 
 ///|
@@ -117,7 +117,7 @@ let quality_map : Map[String, ChordQuality] = {
 
 ///|
 /// Parse root note letter (A-G, case insensitive) to semitone offset from C.
-fn parse_root_note(letter : UInt16) -> Int? {
+fn parse_root_note(letter : UInt16) -> Int32? {
   match letter {
     'c' | 'C' => Some(0)
     'd' | 'D' => Some(2)
@@ -131,7 +131,7 @@ fn parse_root_note(letter : UInt16) -> Int? {
 }
 
 ///|
-fn accidental_delta(c : UInt16) -> Int? {
+fn accidental_delta(c : UInt16) -> Int32? {
   match c {
     '#' | 's' => Some(1)
     'b' | 'f' => Some(-1)
@@ -141,7 +141,7 @@ fn accidental_delta(c : UInt16) -> Int? {
 
 ///|
 /// A one-digit register, optionally zero-prefixed to distinguish C07 from C7.
-fn parse_octave_digits(s : String) -> Int? {
+fn parse_octave_digits(s : String) -> Int32? {
   guard s.length() == 1 || (s.length() == 2 && s[0] == '0') else { return None }
   let c = s[s.length() - 1]
   guard c >= '0' && c <= '9' else { return None }
@@ -172,9 +172,9 @@ fn match_quality(s : String) -> (ChordQuality, String)? {
 ///|
 /// Parsed chord components.
 priv struct ChordParts {
-  accidental : Int
+  accidental : Int32
   quality : ChordQuality
-  octave : Int
+  octave : Int32
 }
 
 ///|
@@ -182,9 +182,9 @@ priv struct ChordParts {
 /// the s in C#sus4 starts sus4, while Css uses two sharp accidentals.
 fn parse_accidental_then_quality(
   name : String,
-  start_pos : Int,
-  len : Int,
-  default_octave : Int,
+  start_pos : Int32,
+  len : Int32,
+  default_octave : Int32,
 ) -> ChordParts? {
   guard start_pos < len else { return None }
   guard accidental_delta(name[start_pos]) is Some(first_delta) else {
@@ -215,10 +215,10 @@ fn parse_accidental_then_quality(
 
 ///|
 /// Parse a brace-delimited set of absolute MIDI pitches without normalizing it.
-fn parse_explicit_chord(name : String) -> Array[Int]? {
+fn parse_explicit_chord(name : String) -> Array[Int32]? {
   let len = name.length()
   guard len >= 3 && name[0] == '{' && name[len - 1] == '}' else { return None }
-  let notes : Array[Int] = []
+  let notes : Array[Int32] = []
   let mut pos = 1
   let end = len - 1
   while pos < end {
@@ -261,15 +261,15 @@ fn parse_explicit_chord(name : String) -> Array[Int]? {
 /// AFTER any accidental. Quality-only names like "Esus4" are matched
 /// directly without accidental parsing (the 's' starts "sus4", not a sharp).
 ///
-pub fn parse_chord(name : String) -> Array[Int]? {
+pub fn parse_chord(name : String) -> Array[Int32]? {
   parse_chord_with_default_octave(name, 4)
 }
 
 ///|
 fn parse_chord_with_default_octave(
   name : String,
-  default_octave : Int,
-) -> Array[Int]? {
+  default_octave : Int32,
+) -> Array[Int32]? {
   if !name.is_empty() && name[0] == '{' {
     return parse_explicit_chord(name)
   }
@@ -340,7 +340,7 @@ fn parse_chord_with_default_octave(
 ///   chord("F#m7") → F# minor 7th: [F#4, A4, C#5, E5] = [66, 69, 73, 76]
 ///
 /// Returns silence pattern for unrecognized chord names.
-pub fn chord(name : String, octave? : Int = 4) -> Pat[ControlMap] {
+pub fn chord(name : String, octave~ : Int32 = 4) -> Pat[ControlMap] {
   match parse_chord_with_default_octave(name, octave) {
     Some(notes) => chord_pat_from_notes(notes)
     None => Pat::silence()
@@ -349,7 +349,7 @@ pub fn chord(name : String, octave? : Int = 4) -> Pat[ControlMap] {
 
 ///|
 /// Internal: create a stacked pattern from MIDI note numbers.
-fn chord_pat_from_notes(notes : Array[Int]) -> Pat[ControlMap] {
+fn chord_pat_from_notes(notes : Array[Int32]) -> Pat[ControlMap] {
   stack(notes.map(fn(midi) { note(midi.to_double()) }))
 }
 
@@ -436,7 +436,7 @@ pub fn note_name_to_midi(name : String) -> Double? {
 /// the MIDI note numbers as `Double` for use in `ControlMap`.
 ///
 /// Returns `None` if the chord name is unrecognized.
-pub fn chord_notes(name : String, octave? : Int = 4) -> Array[Double]? {
+pub fn chord_notes(name : String, octave~ : Int32 = 4) -> Array[Double]? {
   match parse_chord_with_default_octave(name, octave) {
     Some(notes) => Some(notes.map(fn(n) { n.to_double() }))
     None => None

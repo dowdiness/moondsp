@@ -67,13 +67,13 @@ pub fn AudioBuffer::adopt(data : FixedArray[Double]) -> AudioBuffer {
 /// freshly-allocated `FixedArray`.
 /// The initializer is normalized once before allocation: non-finite
 /// values become `0.0`, while finite values pass through unchanged.
-pub fn AudioBuffer::filled(size : Int, init? : Double = 0.0) -> AudioBuffer {
+pub fn AudioBuffer::filled(size : Int32, init~ : Double = 0.0) -> AudioBuffer {
   AudioBuffer::adopt(FixedArray::make(size, normalize_audio_sample(init)))
 }
 
 ///|
 /// Get the number of samples stored in the buffer.
-pub fn AudioBuffer::length(self : AudioBuffer) -> Int {
+pub fn AudioBuffer::length(self : AudioBuffer) -> Int32 {
   self.data.length()
 }
 
@@ -87,7 +87,7 @@ pub fn AudioBuffer::fill(self : AudioBuffer, value : Double) -> Unit {
 
 ///|
 /// Read one sample from the buffer.
-pub fn AudioBuffer::get(self : AudioBuffer, index : Int) -> Double {
+pub fn AudioBuffer::get(self : AudioBuffer, index : Int32) -> Double {
   self.data[index]
 }
 
@@ -97,7 +97,7 @@ pub fn AudioBuffer::get(self : AudioBuffer, index : Int) -> Double {
 /// Non-finite values (`NaN`, `+Inf`, `-Inf`) are normalized to `0.0`.
 pub fn AudioBuffer::set(
   self : AudioBuffer,
-  index : Int,
+  index : Int32,
   value : Double,
 ) -> Unit {
   self.data[index] = normalize_audio_sample(value)

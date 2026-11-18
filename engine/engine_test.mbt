@@ -130,7 +130,7 @@ test "invalid compilation and capacity rejection leave the engine usable" {
   }
   guard rejected
     is Some(
-      @engine.GraphEngineError::BufferSizeMismatch(expected=128, actual=127)
+      @engine.GraphEngineError::BufferSizeMismatch(expected=128, actual=127),
     ) else {
     fail("expected buffer mismatch")
   }
@@ -167,9 +167,9 @@ test "mounted control batches are atomic and lifecycle-aware" {
         @graph.GraphControlError::InvalidSlotForNode(
           1,
           @graph.DspNodeKind::Gain,
-          @graph.GraphParamSlot::DelaySamples
-        )
-      )
+          @graph.GraphParamSlot::DelaySamples,
+        ),
+      ),
     ) else {
     fail("expected atomic control rejection")
   }
@@ -300,8 +300,8 @@ test "public controls reject orphan targets atomically without changing defaults
   guard rejected
     is Some(
       @engine.GraphEngineError::ControlRejected(
-        @graph.GraphControlError::OrphanNode(0)
-      )
+        @graph.GraphControlError::OrphanNode(0),
+      ),
     ) else {
     fail("expected optimized-away target rejection")
   }

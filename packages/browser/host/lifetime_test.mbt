@@ -1,5 +1,5 @@
 ///|
-extern "js" fn failed_engine(cause_kind : Int) -> @host.NativeEngine =
+extern "js" fn failed_engine(cause_kind : Int32) -> @host.NativeEngine =
   #| kind => {
   #|   const error = Object.assign(new Error("processor failed"), { code: "PROCESSOR_FAILED", nodeIndex: 7 });
   #|   if (kind === 1) error.cause = null;

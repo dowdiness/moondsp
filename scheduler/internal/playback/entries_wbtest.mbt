@@ -15,8 +15,8 @@ fn addressed(
 ///|
 fn material(
   name : String,
-  note : Int,
-  period : Int,
+  note : Int32,
+  period : Int32,
 ) -> @pattern.Pat[@pattern.ControlMap] raise {
   addressed(
     @pattern.sequence([
@@ -43,14 +43,18 @@ fn score(
 fn accept(
   state : PlaybackState,
   parts : Array[@pattern.Pat[@pattern.ControlMap]],
-  at : Int,
+  at : Int32,
 ) -> Unit raise {
   state.queue(score(parts))
   state.commit_pending(@pattern.Rational::from_int(at))
 }
 
 ///|
-fn notes(state : PlaybackState, begin : Int, end_ : Int) -> Array[Int] raise {
+fn notes(
+  state : PlaybackState,
+  begin : Int32,
+  end_ : Int32,
+) -> Array[Int32] raise {
   let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(begin),
     @pattern.Rational::from_int(end_),
@@ -118,7 +122,7 @@ test "reordering named entries preserves pending targets and deletion finishes t
 
 ///|
 test "finite phrase keeps its current content until a new playback" {
-  fn finite(note : Int) -> PlaybackSnapshot raise {
+  fn finite(note : Int32) -> PlaybackSnapshot raise {
     let section = @song.SectionDoc::single(
       id=@identity.SectionId::from_string("section"),
       name="once",
@@ -152,7 +156,7 @@ test "finite phrase keeps its current content until a new playback" {
 
 ///|
 test "settling after an old finite end retains its already entered replacement" {
-  fn finite(note : Int, length : Int) -> PlaybackSnapshot raise {
+  fn finite(note : Int32, length : Int32) -> PlaybackSnapshot raise {
     let section = @song.SectionDoc::single(
       id=@identity.SectionId::from_string("section"),
       name="phrase",
@@ -197,7 +201,7 @@ test "reverting cancels a reservation while a new material waits for its entry" 
 
 ///|
 test "content edits preserve the cycle count used by variation" {
-  fn varying(note : Int) -> @pattern.Pat[@pattern.ControlMap] raise {
+  fn varying(note : Int32) -> @pattern.Pat[@pattern.ControlMap] raise {
     @pattern.every(2, p => p.rev(), material("a", note, 3))
   }
   let state = PlaybackState()
@@ -214,7 +218,7 @@ test "content edits preserve the cycle count used by variation" {
 
 ///|
 test "combined custom content without signatures is conservatively replaced" {
-  fn combined(note : Int) -> @pattern.Pat[@pattern.ControlMap] raise {
+  fn combined(note : Int32) -> @pattern.Pat[@pattern.ControlMap] raise {
     addressed(
       @pattern.stack([
         @pattern.note(note.to_double()),
@@ -267,7 +271,7 @@ test "silence cancels a waiting addition without starting its old material" {
 }
 
 ///|
-fn finite_occurrence_score(lead_start : Int?) -> PlaybackSnapshot raise {
+fn finite_occurrence_score(lead_start : Int32?) -> PlaybackSnapshot raise {
   let base = @song.SectionDoc::single(
     id=@identity.SectionId::from_string("base-section"),
     name="base",
@@ -344,7 +348,7 @@ test "moving a waiting finite occurrence invalidates its reserved entry" {
 }
 
 ///|
-fn finite_single_score(start : Int, note : Int) -> PlaybackSnapshot raise {
+fn finite_single_score(start : Int32, note : Int32) -> PlaybackSnapshot raise {
   let section = @song.SectionDoc::single(
     id=@identity.SectionId::from_string("moving-section"),
     name="moving",

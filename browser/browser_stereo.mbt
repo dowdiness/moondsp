@@ -40,7 +40,7 @@ let compiled_stereo : GraphSlot[@moondsp.StereoDsp, StereoOut] = GraphSlot(
 /// Initialize the browser proof graph that runs through `StereoDsp`.
 pub fn init_compiled_stereo_graph(
   sample_rate : Double,
-  block_size : Int,
+  block_size : Int32,
 ) -> Bool {
   if compiled_stereo.ensure(sample_rate, block_size) {
     clear_browser_error()
@@ -59,7 +59,7 @@ pub fn process_compiled_stereo_block(
   delay_samples : Double,
   cutoff : Double,
   sample_rate : Double,
-  block_size : Int,
+  block_size : Int32,
 ) -> Bool {
   if !compiled_stereo.ensure(sample_rate, block_size) {
     return set_browser_init_error("compiled_stereo.process")
@@ -100,13 +100,13 @@ pub fn process_compiled_stereo_block(
 
 ///|
 /// Read one sample from the most recent compiled stereo left block.
-pub fn compiled_stereo_left_sample(index : Int) -> Double {
+pub fn compiled_stereo_left_sample(index : Int32) -> Double {
   compiled_stereo.output.left_sample(index)
 }
 
 ///|
 /// Read one sample from the most recent compiled stereo right block.
-pub fn compiled_stereo_right_sample(index : Int) -> Double {
+pub fn compiled_stereo_right_sample(index : Int32) -> Double {
   compiled_stereo.output.right_sample(index)
 }
 

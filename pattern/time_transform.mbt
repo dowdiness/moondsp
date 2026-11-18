@@ -28,7 +28,7 @@ fn TimeTransform::signature(self : TimeTransform) -> String {
 ///|
 pub fn[A] TimeTransform::every(
   self : TimeTransform,
-  n : Int,
+  n : Int32,
   pat : Pat[A],
 ) -> Pat[A] {
   every_known(n, p => self.apply(p), pat, self.signature())

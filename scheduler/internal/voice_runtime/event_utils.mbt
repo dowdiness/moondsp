@@ -10,7 +10,7 @@ pub fn copy_control_events(
 pub fn compare_event_onset(
   a : @pattern.Event[@pattern.ControlMap],
   b : @pattern.Event[@pattern.ControlMap],
-) -> Int {
+) -> Int32 {
   match (a.whole, b.whole) {
     (Some(wa), Some(wb)) => wa.begin.compare(wb.begin)
     (Some(_), None) => -1

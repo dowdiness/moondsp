@@ -12,7 +12,7 @@ pub(open) trait ArithSym {
 ///|
 pub(open) trait DspSym: ArithSym {
   fn oscillator(Self, Waveform) -> Self
-  fn noise(UInt) -> Self
+  fn noise(UInt32) -> Self
   fn adsr(Double, Double, Double, Double) -> Self
   fn gain(Self, Double) -> Self
   fn output(Self) -> Self
@@ -25,7 +25,7 @@ pub(open) trait FilterSym: DspSym {
 
 ///|
 pub(open) trait DelaySym: DspSym {
-  fn delay(Self, Int, Int, Double) -> Self
+  fn delay(Self, Int32, Int32, Double) -> Self
 }
 
 ///|
@@ -44,5 +44,5 @@ pub(open) trait StereoFilterSym: StereoSym + FilterSym {
 
 ///|
 pub(open) trait StereoDelaySym: StereoSym + DelaySym {
-  fn stereo_delay(Self, Int, Int, Double) -> Self
+  fn stereo_delay(Self, Int32, Int32, Double) -> Self
 }

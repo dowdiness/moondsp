@@ -2,7 +2,7 @@
 // A constant through a zero-release envelope makes scheduling audible as exact
 // nonzero sample ranges, independently of oscillator phase.
 fn transport_fixture(
-  sample_rate? : Double = 48000.0,
+  sample_rate~ : Double = 48000.0,
 ) -> (
   @scheduler.PatternScheduler,
   @moondsp.BoundVoicePool,
@@ -64,7 +64,7 @@ fn transport_fixture(
 fn single_span(
   begin : @pattern.Rational,
   end_ : @pattern.Rational,
-  control? : @pattern.ControlMap = @pattern.ControlMap::empty(),
+  control~ : @pattern.ControlMap = @pattern.ControlMap::empty(),
 ) -> @song.Song[@pattern.ControlMap] raise {
   let duration = end_ - begin
   let section = @song.Section::Section(

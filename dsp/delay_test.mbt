@@ -115,19 +115,19 @@ test "delay reset blocks feedback from stale samples" {
 enum DelayOperation {
   Tick(Double)
   Reset
-  SetDelay(Int)
+  SetDelay(Int32)
 }
 
 ///|
 struct PhysicalDelayReference {
   mut history : Array[Double]
-  mut delay_samples : Int
+  mut delay_samples : Int32
   feedback : Double
 }
 
 ///|
 fn new_physical_delay_reference(
-  delay_samples : Int,
+  delay_samples : Int32,
   feedback : Double,
 ) -> PhysicalDelayReference {
   { history: [], delay_samples, feedback, }

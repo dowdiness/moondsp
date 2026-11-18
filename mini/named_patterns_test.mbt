@@ -141,7 +141,7 @@ test "named document events retain distinct references and their shared definiti
 fn[T] assert_undefined_pattern_at(
   result : Result[T, String],
   name : String,
-  position : Int,
+  position : Int32,
 ) -> Unit raise {
   guard result is Err(error) else { fail("expected an undefined pattern") }
   assert_true(error.contains("undefined pattern '\{name}'"))

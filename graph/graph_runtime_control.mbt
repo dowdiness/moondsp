@@ -1,14 +1,15 @@
 ///|
 /// Failure reason for runtime graph control APIs.
+#derive(Debug)
 pub(all) enum GraphControlError {
-  InvalidNodeIndex(Int)
+  InvalidNodeIndex(Int32)
   /// The authoring node existed but was eliminated by graph optimization.
-  OrphanNode(Int)
-  InvalidGateNode(Int, DspNodeKind)
-  InvalidSlotForNode(Int, DspNodeKind, GraphParamSlot)
-  InvalidParamValue(Int, DspNodeKind, GraphParamSlot, Double)
-  MissingRuntimeState(Int, DspNodeKind)
-} derive(Debug)
+  OrphanNode(Int32)
+  InvalidGateNode(Int32, DspNodeKind)
+  InvalidSlotForNode(Int32, DspNodeKind, GraphParamSlot)
+  InvalidParamValue(Int32, DspNodeKind, GraphParamSlot, Double)
+  MissingRuntimeState(Int32, DspNodeKind)
+}
 
 ///|
 pub extend GraphControlError with @moonbitlang/core/debug.Debug::{to_repr}
@@ -109,7 +110,7 @@ fn graph_control_result_from_staging(
 /// Trigger `gate_on()` on an ADSR node using its original authoring index.
 pub fn Dsp::gate_on(
   self : Dsp,
-  node_index : Int,
+  node_index : Int32,
 ) -> Result[Unit, GraphControlError] {
   self.apply_control(GraphControl::gate_on(node_index))
 }
@@ -118,7 +119,7 @@ pub fn Dsp::gate_on(
 /// Trigger `gate_off()` on an ADSR node using its original authoring index.
 pub fn Dsp::gate_off(
   self : Dsp,
-  node_index : Int,
+  node_index : Int32,
 ) -> Result[Unit, GraphControlError] {
   self.apply_control(GraphControl::gate_off(node_index))
 }
@@ -128,7 +129,7 @@ pub fn Dsp::gate_off(
 /// index.
 pub fn Dsp::set_param(
   self : Dsp,
-  node_index : Int,
+  node_index : Int32,
   slot : GraphParamSlot,
   value : Double,
 ) -> Result[Unit, GraphControlError] {
@@ -168,13 +169,13 @@ pub fn Dsp::validate_controls(
 
 ///|
 /// Allocation-conscious gate-on primitive for prevalidated host paths.
-pub fn Dsp::gate_on_bool(self : Dsp, node_index : Int) -> Bool {
+pub fn Dsp::gate_on_bool(self : Dsp, node_index : Int32) -> Bool {
   self.raw().gate_on_bool(node_index)
 }
 
 ///|
 /// Allocation-conscious gate-off primitive for prevalidated host paths.
-pub fn Dsp::gate_off_bool(self : Dsp, node_index : Int) -> Bool {
+pub fn Dsp::gate_off_bool(self : Dsp, node_index : Int32) -> Bool {
   self.raw().gate_off_bool(node_index)
 }
 
@@ -182,7 +183,7 @@ pub fn Dsp::gate_off_bool(self : Dsp, node_index : Int) -> Bool {
 /// Allocation-conscious parameter primitive for prevalidated host paths.
 pub fn Dsp::set_param_bool(
   self : Dsp,
-  node_index : Int,
+  node_index : Int32,
   slot : GraphParamSlot,
   value : Double,
 ) -> Bool {
@@ -193,7 +194,7 @@ pub fn Dsp::set_param_bool(
 /// Allocation-conscious parameter validation for prevalidated host paths.
 pub fn Dsp::can_set_param_bool(
   self : Dsp,
-  node_index : Int,
+  node_index : Int32,
   slot : GraphParamSlot,
   value : Double,
 ) -> Bool {
@@ -225,7 +226,7 @@ pub fn Dsp::reset_runtime_state(self : Dsp) -> Unit {
 /// authoring index.
 pub fn StereoDsp::gate_on(
   self : StereoDsp,
-  node_index : Int,
+  node_index : Int32,
 ) -> Result[Unit, GraphControlError] {
   self.apply_control(GraphControl::gate_on(node_index))
 }
@@ -235,7 +236,7 @@ pub fn StereoDsp::gate_on(
 /// authoring index.
 pub fn StereoDsp::gate_off(
   self : StereoDsp,
-  node_index : Int,
+  node_index : Int32,
 ) -> Result[Unit, GraphControlError] {
   self.apply_control(GraphControl::gate_off(node_index))
 }
@@ -245,7 +246,7 @@ pub fn StereoDsp::gate_off(
 /// authoring index.
 pub fn StereoDsp::set_param(
   self : StereoDsp,
-  node_index : Int,
+  node_index : Int32,
   slot : GraphParamSlot,
   value : Double,
 ) -> Result[Unit, GraphControlError] {
@@ -287,7 +288,7 @@ pub fn StereoDsp::validate_controls(
 /// Trigger runtime gate-on through a mono hot-swap wrapper.
 pub fn DspHotSwap::gate_on(
   self : DspHotSwap,
-  node_index : Int,
+  node_index : Int32,
 ) -> Result[Unit, GraphControlError] {
   self.apply_control(GraphControl::gate_on(node_index))
 }
@@ -296,7 +297,7 @@ pub fn DspHotSwap::gate_on(
 /// Trigger runtime gate-off through a mono hot-swap wrapper.
 pub fn DspHotSwap::gate_off(
   self : DspHotSwap,
-  node_index : Int,
+  node_index : Int32,
 ) -> Result[Unit, GraphControlError] {
   self.apply_control(GraphControl::gate_off(node_index))
 }
@@ -305,7 +306,7 @@ pub fn DspHotSwap::gate_off(
 /// Update a runtime parameter through a mono hot-swap wrapper.
 pub fn DspHotSwap::set_param(
   self : DspHotSwap,
-  node_index : Int,
+  node_index : Int32,
   slot : GraphParamSlot,
   value : Double,
 ) -> Result[Unit, GraphControlError] {
@@ -336,7 +337,7 @@ pub fn DspHotSwap::apply_controls(
 /// Trigger runtime gate-on through a stereo hot-swap wrapper.
 pub fn StereoDspHotSwap::gate_on(
   self : StereoDspHotSwap,
-  node_index : Int,
+  node_index : Int32,
 ) -> Result[Unit, GraphControlError] {
   self.apply_control(GraphControl::gate_on(node_index))
 }
@@ -345,7 +346,7 @@ pub fn StereoDspHotSwap::gate_on(
 /// Trigger runtime gate-off through a stereo hot-swap wrapper.
 pub fn StereoDspHotSwap::gate_off(
   self : StereoDspHotSwap,
-  node_index : Int,
+  node_index : Int32,
 ) -> Result[Unit, GraphControlError] {
   self.apply_control(GraphControl::gate_off(node_index))
 }
@@ -354,7 +355,7 @@ pub fn StereoDspHotSwap::gate_off(
 /// Update a runtime parameter through a stereo hot-swap wrapper.
 pub fn StereoDspHotSwap::set_param(
   self : StereoDspHotSwap,
-  node_index : Int,
+  node_index : Int32,
   slot : GraphParamSlot,
   value : Double,
 ) -> Result[Unit, GraphControlError] {
@@ -385,7 +386,7 @@ pub fn StereoDspHotSwap::apply_controls(
 /// Trigger runtime gate-on through a mono topology controller.
 pub fn DspTopologyController::gate_on(
   self : DspTopologyController,
-  node_index : Int,
+  node_index : Int32,
 ) -> Result[Unit, GraphControlError] {
   self.apply_control(GraphControl::gate_on(node_index))
 }
@@ -394,7 +395,7 @@ pub fn DspTopologyController::gate_on(
 /// Trigger runtime gate-off through a mono topology controller.
 pub fn DspTopologyController::gate_off(
   self : DspTopologyController,
-  node_index : Int,
+  node_index : Int32,
 ) -> Result[Unit, GraphControlError] {
   self.apply_control(GraphControl::gate_off(node_index))
 }
@@ -403,7 +404,7 @@ pub fn DspTopologyController::gate_off(
 /// Update a runtime parameter through a mono topology controller.
 pub fn DspTopologyController::set_param(
   self : DspTopologyController,
-  node_index : Int,
+  node_index : Int32,
   slot : GraphParamSlot,
   value : Double,
 ) -> Result[Unit, GraphControlError] {
@@ -434,7 +435,7 @@ pub fn DspTopologyController::apply_controls(
 /// Trigger runtime gate-on through a stereo topology controller.
 pub fn StereoDspTopologyController::gate_on(
   self : StereoDspTopologyController,
-  node_index : Int,
+  node_index : Int32,
 ) -> Result[Unit, GraphControlError] {
   self.apply_control(GraphControl::gate_on(node_index))
 }
@@ -443,7 +444,7 @@ pub fn StereoDspTopologyController::gate_on(
 /// Trigger runtime gate-off through a stereo topology controller.
 pub fn StereoDspTopologyController::gate_off(
   self : StereoDspTopologyController,
-  node_index : Int,
+  node_index : Int32,
 ) -> Result[Unit, GraphControlError] {
   self.apply_control(GraphControl::gate_off(node_index))
 }
@@ -452,7 +453,7 @@ pub fn StereoDspTopologyController::gate_off(
 /// Update a runtime parameter through a stereo topology controller.
 pub fn StereoDspTopologyController::set_param(
   self : StereoDspTopologyController,
-  node_index : Int,
+  node_index : Int32,
   slot : GraphParamSlot,
   value : Double,
 ) -> Result[Unit, GraphControlError] {

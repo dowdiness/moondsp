@@ -12,8 +12,8 @@ priv enum GraphSwapState {
 
 ///|
 priv struct CrossfadeProgress {
-  length : Int
-  mut position : Int
+  length : Int32
+  mut position : Int32
 }
 
 ///|
@@ -33,7 +33,7 @@ priv struct PreparedGraphSwap {
 ///|
 priv struct HotSwapGraph {
   mut state : GraphSwapState
-  crossfade_samples : Int
+  crossfade_samples : Int32
   old_output : AudioBuffer
   new_output : AudioBuffer
   old_left : AudioBuffer
@@ -60,10 +60,11 @@ struct StereoDspHotSwap(HotSwapGraph)
 
 ///|
 /// Failure reason for result-typed hot-swap queue APIs.
+#derive(Debug)
 pub(all) enum HotSwapQueueError {
   SampleRateMismatch(Double, Double)
-  BlockCapacityMismatch(Int, Int)
-} derive(Debug)
+  BlockCapacityMismatch(Int32, Int32)
+}
 
 ///|
 pub extend HotSwapQueueError with @moonbitlang/core/debug.Debug::{to_repr}
@@ -152,7 +153,7 @@ fn HotSwapGraph::apply_controls_impl(
 /// Create a hot-swap wrapper around an active mono compiled graph.
 pub fn DspHotSwap::from_graph(
   active : @runtime.Dsp,
-  crossfade_samples? : Int = 0,
+  crossfade_samples~ : Int32 = 0,
 ) -> DspHotSwap {
   let clamped_crossfade = clamp_crossfade_samples(crossfade_samples)
   let capacity = active.compiled_buffer_capacity()
@@ -235,7 +236,7 @@ fn HotSwapGraph::crossfade_block(
   left_output : AudioBuffer,
   right_output : AudioBuffer,
   is_stereo : Bool,
-  sample_count : Int,
+  sample_count : Int32,
 ) -> Unit {
   if sample_count <= 0 {
     output.fill(0.0)
@@ -336,7 +337,7 @@ pub fn DspHotSwap::process(
 /// Create a hot-swap wrapper around an active stereo compiled graph.
 pub fn StereoDspHotSwap::from_graph(
   active : @runtime.StereoDsp,
-  crossfade_samples? : Int = 0,
+  crossfade_samples~ : Int32 = 0,
 ) -> StereoDspHotSwap {
   let clamped_crossfade = clamp_crossfade_samples(crossfade_samples)
   let capacity = active.compiled_buffer_capacity()
@@ -437,7 +438,7 @@ pub fn StereoDspHotSwap::process(
 }
 
 ///|
-fn clamp_crossfade_samples(crossfade_samples : Int) -> Int {
+fn clamp_crossfade_samples(crossfade_samples : Int32) -> Int32 {
   if crossfade_samples > 0 {
     crossfade_samples
   } else {
@@ -465,7 +466,7 @@ fn compiled_hot_swap_sample_count(
   output : AudioBuffer,
   old_output : AudioBuffer,
   new_output : AudioBuffer,
-) -> Int {
+) -> Int32 {
   let bounded = @dsp.effective_sample_count(context, output)
   if bounded < old_output.length() {
     if bounded < new_output.length() {
@@ -481,7 +482,7 @@ fn compiled_hot_swap_sample_count(
 }
 
 ///|
-fn hot_swap_progress(position : Int, crossfade_samples : Int) -> Double {
+fn hot_swap_progress(position : Int32, crossfade_samples : Int32) -> Double {
   if crossfade_samples <= 0 {
     1.0
   } else if position <= 0 {
@@ -508,7 +509,7 @@ fn compiled_stereo_sample_count(
   context : DspContext,
   left_output : AudioBuffer,
   right_output : AudioBuffer,
-) -> Int {
+) -> Int32 {
   let output_length = if left_output.length() < right_output.length() {
     left_output.length()
   } else {
@@ -530,7 +531,7 @@ fn compiled_stereo_hot_swap_sample_count(
   old_right : AudioBuffer,
   new_left : AudioBuffer,
   new_right : AudioBuffer,
-) -> Int {
+) -> Int32 {
   let bounded = compiled_stereo_sample_count(context, left_output, right_output)
   let old_length = if old_left.length() < old_right.length() {
     old_left.length()

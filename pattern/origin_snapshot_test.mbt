@@ -306,7 +306,7 @@ test "same music refreshes origins through reused cache without changing entry i
 
 ///|
 test "exact lowering rejects missing attribution before returning a snapshot" {
-  let cache : @pattern.PatternLoweringCache[Int] = @pattern.PatternLoweringCache::new()
+  let cache : @pattern.PatternLoweringCache[Int32] = @pattern.PatternLoweringCache::new()
   let runtime = @pattern.PatternDoc::pure(id=pid("runtime"), value=1)
   ignore(runtime.lower_with_cache(cache))
   let missing_atom = try {
@@ -351,7 +351,7 @@ test "exact lowering rejects missing attribution before returning a snapshot" {
     missing_binding,
     Some(@pattern.PatternDocError::MissingReferenceBinding(pid("reference"))),
   )
-  let silence : @pattern.PatternDoc[Int] = @pattern.PatternDoc::silence(
+  let silence : @pattern.PatternDoc[Int32] = @pattern.PatternDoc::silence(
     id=pid("silence"),
   )
   @debug.assert_eq(

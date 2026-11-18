@@ -1,7 +1,7 @@
 // Pure musical-time contracts; these tests do not initialize an audio engine.
 
 ///|
-fn cycle_span(begin : Int, end : Int) -> @pattern.TimeSpan {
+fn cycle_span(begin : Int32, end : Int32) -> @pattern.TimeSpan {
   @pattern.TimeSpan(
     @pattern.Rational::from_int(begin),
     @pattern.Rational::from_int(end),

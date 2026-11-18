@@ -1,6 +1,6 @@
 ///|
 /// Transport work is bounded separately from the 8192-code-unit source domain.
-const PLAYBACK_WIRE_LIMIT : Int = 2097152
+const PLAYBACK_WIRE_LIMIT : Int32 = 2097152
 
 ///|
 priv suberror PlaybackWireError {
@@ -27,10 +27,7 @@ fn wire_integer(
 
 ///|
 fn draft_version_json(version : DraftVersion) -> Json {
-  [
-    Json(version.epoch.serial().to_double()),
-    Json(version.revision.to_double()),
-  ]
+  [Json(version.epoch.serial().to_double()), Json(version.revision.to_double())]
 }
 
 ///|
@@ -85,10 +82,7 @@ fn SourceMap::wire_json(self : SourceMap) -> Json {
   let references : Array[Json] = self.references.map(reference => {
     let (binding, target) : (Json, Json) = match reference.binding {
       Bound(binding, target) =>
-        (
-          Json(binding.serial().to_double()),
-          Json(target.serial().to_double()),
-        )
+        (Json(binding.serial().to_double()), Json(target.serial().to_double()))
       Unresolved(_) => (Json::null(), Json::null())
     }
     [

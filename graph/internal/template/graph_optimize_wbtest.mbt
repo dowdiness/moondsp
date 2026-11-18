@@ -1,7 +1,7 @@
 ///|
 fn analyzed_optimized_graph(
   nodes : Array[@model.DspNode],
-) -> (Array[@model.DspNode], FixedArray[Int]) {
+) -> (Array[@model.DspNode], FixedArray[Int32]) {
   let analyzed = AnalyzedGraph::analyze(nodes)
   (analyzed.optimized_nodes(), analyzed.index_map())
 }

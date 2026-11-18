@@ -39,7 +39,7 @@ test "noise reset reproduces original sequence" {
 ///|
 test "prop: noise output in [-1, 1]" {
   @qc.quick_check_fn(
-    fn(raw_seed : UInt) {
+    fn(raw_seed : UInt32) {
       let seed = if raw_seed == 0U { 1U } else { raw_seed }
       let noise = @dsp.Noise(seed)
       for i = 0; i < 256; i = i + 1 {

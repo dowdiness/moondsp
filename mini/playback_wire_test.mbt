@@ -187,10 +187,10 @@ test "Song source maps preserve literal frame identities on the wire" {
       Array(
         [
           Array(
-            [Number(serial, ..), String("note"), Number(25, ..), Number(27, ..)]
+            [Number(serial, ..), String("note"), Number(25, ..), Number(27, ..)],
           ),
-        ]
-      )
+        ],
+      ),
     ) else {
     fail("expected recognized Song section literal")
   }
@@ -210,10 +210,10 @@ test "Song source maps preserve literal frame identities on the wire" {
               String("note"),
               Number(25, ..),
               Number(27, ..),
-            ]
+            ],
           ),
-        ]
-      )
+        ],
+      ),
     ) else {
     fail("expected transported Song literal witness")
   }

@@ -56,7 +56,7 @@ fn init_scheduler_graph_for_test() -> Bool {
 }
 
 ///|
-fn submit_for_test(text : String, restart? : Bool = true) -> Int {
+fn submit_for_test(text : String, restart~ : Bool = true) -> Int32 {
   clear_playback_input()
   let fields : Map[String, Json] = {
     "schema": Json::number(1.0),
@@ -75,7 +75,7 @@ fn submit_for_test(text : String, restart? : Bool = true) -> Int {
 }
 
 ///|
-fn render_for_test(count : Int) -> Unit raise {
+fn render_for_test(count : Int32) -> Unit raise {
   for _ in 0..<count {
     assert_true(process_scheduler_block())
   }
@@ -131,17 +131,17 @@ fn wet_energy() -> Double {
 }
 
 ///|
-fn active_notes() -> Int {
+fn active_notes() -> Int32 {
   player.val.unwrap().scheduler.active_note_count()
 }
 
 ///|
-fn assert_position(position : Int) -> Unit raise {
+fn assert_position(position : Int32) -> Unit raise {
   assert_eq(player.val.unwrap().scheduler.sample_counter(), position.to_int64())
 }
 
 ///|
-fn test_song(length~ : Int, bpm~ : Int) -> String {
+fn test_song(length~ : Int32, bpm~ : Int32) -> String {
   "song(bpm(\{bpm}),section(\"a\",\{length},note(\"60\")),part(\"a1\",\"a\"))"
 }
 

@@ -137,7 +137,7 @@ fn make_synth_pool(
 ///|
 pub fn init_scheduler_graph_with_templates(
   sample_rate : Double,
-  block_size : Int,
+  block_size : Int32,
   bd_template : Array[@moondsp.DspNode],
   sd_template : Array[@moondsp.DspNode],
   hh_template : Array[@moondsp.DspNode],
@@ -188,13 +188,13 @@ pub fn reset_scheduler_graph() -> Unit {
 }
 
 ///|
-fn checked_sample(index : Int, buffer : @moondsp.AudioBuffer) -> Double {
+fn checked_sample(index : Int32, buffer : @moondsp.AudioBuffer) -> Double {
   guard index >= 0 && index < buffer.length() else { return 0.0 }
   buffer.get(index)
 }
 
 ///|
-pub fn scheduler_left_sample(index : Int) -> Double {
+pub fn scheduler_left_sample(index : Int32) -> Double {
   match player.val {
     Some(owner) => checked_sample(index, owner.left)
     None => 0.0
@@ -202,7 +202,7 @@ pub fn scheduler_left_sample(index : Int) -> Double {
 }
 
 ///|
-pub fn scheduler_right_sample(index : Int) -> Double {
+pub fn scheduler_right_sample(index : Int32) -> Double {
   match player.val {
     Some(owner) => checked_sample(index, owner.right)
     None => 0.0
@@ -272,37 +272,37 @@ fn Player::process(self : Player) -> Bool {
 }
 
 ///|
-const SCHEDULER_PARSE_STATUS_OK : Int = 0
+const SCHEDULER_PARSE_STATUS_OK : Int32 = 0
 
 ///|
-const SCHEDULER_PARSE_STATUS_ERROR : Int = 1
+const SCHEDULER_PARSE_STATUS_ERROR : Int32 = 1
 
 ///|
 let sched_last_error : @ref.Ref[String] = Ref("")
 
 ///|
-fn set_scheduler_parse_success() -> Int {
+fn set_scheduler_parse_success() -> Int32 {
   sched_last_error.val = ""
   SCHEDULER_PARSE_STATUS_OK
 }
 
 ///|
-fn set_scheduler_parse_error(message : String) -> Int {
+fn set_scheduler_parse_error(message : String) -> Int32 {
   sched_last_error.val = message
   SCHEDULER_PARSE_STATUS_ERROR
 }
 
 ///|
-const MAX_PLAYBACK_INPUT_CODE_UNITS : Int = 2097152
+const MAX_PLAYBACK_INPUT_CODE_UNITS : Int32 = 2097152
 
 ///|
-let playback_input_chars : Array[Int] = []
+let playback_input_chars : Array[Int32] = []
 
 ///|
 let playback_input_overflow : @ref.Ref[Bool] = Ref(false)
 
 ///|
-fn input_chars_to_string(chars : Array[Int]) -> Result[String, String] {
+fn input_chars_to_string(chars : Array[Int32]) -> Result[String, String] {
   let buf = StringBuilder()
   let mut i = 0
   while i < chars.length() {
@@ -339,7 +339,7 @@ pub fn clear_playback_input() -> Unit {
 }
 
 ///|
-pub fn push_playback_char(code : Int) -> Unit {
+pub fn push_playback_char(code : Int32) -> Unit {
   if code < 0 ||
     code > 0xffff ||
     playback_input_chars.length() >= MAX_PLAYBACK_INPUT_CODE_UNITS {
@@ -355,12 +355,12 @@ pub fn get_playback_error() -> String {
 }
 
 ///|
-pub fn get_playback_error_length() -> Int {
+pub fn get_playback_error_length() -> Int32 {
   sched_last_error.val.length()
 }
 
 ///|
-pub fn get_playback_error_char(i : Int) -> Int {
+pub fn get_playback_error_char(i : Int32) -> Int32 {
   let s = sched_last_error.val
   if i < 0 || i >= s.length() {
     0
@@ -370,7 +370,7 @@ pub fn get_playback_error_char(i : Int) -> Int {
 }
 
 ///|
-pub fn set_scheduler_bpm(bpm : Double) -> Int {
+pub fn set_scheduler_bpm(bpm : Double) -> Int32 {
   guard player.val is Some(owner) else {
     return set_scheduler_parse_error("Player is not initialized")
   }
